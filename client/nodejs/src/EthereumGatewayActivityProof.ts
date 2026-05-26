@@ -1,6 +1,6 @@
 import { mintingGatewayAbi, type MintingGatewayActivityBlockLocator } from './EvmContracts';
 import type { ArgonClient, IArgonQueryable } from './index';
-import { getAddress, type Hex } from 'viem';
+import { getAddress, type Hex, toHex } from 'viem';
 import {
   decodeEthereumGatewayActivityLog,
   type EthereumGatewayActivity,
@@ -444,71 +444,58 @@ async function selectArgonFinalizedExecutionHeader(
     }
   }
 
-  const verifierQuery = client.query.ethereumVerifier;
-  const beaconPreset = await verifierQuery.beaconPreset();
-  const argonFinalizedExecutionHeaderCapacity = beaconPreset.isMainnet
-    ? 256 * 20
-    : beaconPreset.isMinimal
-      ? 8 * 20
-      : 0;
-  if (argonFinalizedExecutionHeaderCapacity === 0) {
-    throw new Error(`Unknown ethereum verifier beacon preset: ${beaconPreset.toString()}`);
-  }
-
-  const zeroHash = `0x${'00'.repeat(32)}`;
-  let index = (await verifierQuery.executionHeaderAnchorIndex()).toNumber();
-
-  for (let scanned = 0; scanned < argonFinalizedExecutionHeaderCapacity; scanned += 1) {
-    const argonFinalizedExecutionHeaderHash = (
-      await verifierQuery.executionHeaderAnchorMapping(index)
-    ).toHex();
-    if (argonFinalizedExecutionHeaderHash === zeroHash) {
-      break;
-    }
-
-    const argonFinalizedExecutionHeaderEntry = await verifierQuery.executionHeaderAnchors(
-      argonFinalizedExecutionHeaderHash,
-    );
-    if (argonFinalizedExecutionHeaderEntry.isNone) {
-      break;
-    }
-
-    const blockNumber = argonFinalizedExecutionHeaderEntry.unwrap().blockNumber.toBigInt();
-    if (blockNumber > maxArgonFinalizedExecutionHeaderBlockNumber) {
-      index = index === 0 ? argonFinalizedExecutionHeaderCapacity - 1 : index - 1;
-      continue;
-    }
-    if (blockNumber < earliestBlockNumber) {
-      break;
-    }
-
-    const argonFinalizedExecutionHeader = {
-      blockHash: argonFinalizedExecutionHeaderHash,
-      blockNumber,
-    };
-
-    try {
-      return {
-        argonFinalizedExecutionHeader,
+  const scannedArgonFinalizedExecutionHeader =
+    await loadRetainedExecutionHeaderAnchorAtOrAfterBlock(client, earliestBlockNumber);
+  if (
+    scannedArgonFinalizedExecutionHeader &&
+    scannedArgonFinalizedExecutionHeader.blockNumber <= maxArgonFinalizedExecutionHeaderBlockNumber
+  ) {
+    return {
+      argonFinalizedExecutionHeader: scannedArgonFinalizedExecutionHeader,
+      earliestTargetHeader,
+      targetToArgonFinalizedHeaderChain: await buildExecutionHeaderChain(
+        executionClient,
         earliestTargetHeader,
-        targetToArgonFinalizedHeaderChain: await buildExecutionHeaderChain(
-          executionClient,
-          earliestTargetHeader,
-          argonFinalizedExecutionHeader,
-        ),
-      };
-    } catch (error) {
-      if (!(error instanceof ArgonFinalizedExecutionHeaderPathError)) {
-        throw error;
-      }
-    }
-
-    index = index === 0 ? argonFinalizedExecutionHeaderCapacity - 1 : index - 1;
+        scannedArgonFinalizedExecutionHeader,
+      ),
+    };
   }
 
   throw new Error(
     'Oldest uncovered gateway activity exceeds the Argon finalized execution-header window',
   );
+}
+
+async function loadRetainedExecutionHeaderAnchorAtOrAfterBlock(
+  client: IArgonQueryable,
+  earliestBlockNumber: bigint,
+): Promise<ArgonFinalizedExecutionHeader | null> {
+  // The runtime stores this index under `block_number.to_be_bytes()`, so a fixed-width hex key
+  // preserves the same big-endian ordering here. We first try the exact block number, then seek
+  // to the first later retained key when that exact anchor is not present.
+  const scanBlockNumberKey = toHex(earliestBlockNumber, { size: 8 });
+  const executionHeaderAnchorsByBlockNumber =
+    client.query.ethereumVerifier.executionHeaderAnchorsByBlockNumber;
+  const exactAnchor = await executionHeaderAnchorsByBlockNumber(scanBlockNumberKey);
+  const matchingEntry = exactAnchor.isSome
+    ? exactAnchor
+    : (
+        await executionHeaderAnchorsByBlockNumber.entriesPaged({
+          args: [],
+          pageSize: 1,
+          startKey: executionHeaderAnchorsByBlockNumber.key(scanBlockNumberKey),
+        })
+      )[0]?.[1];
+  const scannedAnchor = matchingEntry?.isSome ? matchingEntry.unwrap() : null;
+
+  if (!scannedAnchor) {
+    return null;
+  }
+
+  return {
+    blockHash: scannedAnchor.blockHash.toHex(),
+    blockNumber: scannedAnchor.blockNumber.toBigInt(),
+  };
 }
 
 async function collectProofChunksForArgonFinalizedExecutionHeader(

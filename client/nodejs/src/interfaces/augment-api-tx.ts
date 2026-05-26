@@ -54,7 +54,6 @@ import type {
   PalletCrosschainTransferSourceChain,
   PalletEthereumVerifierBasicOperatingMode,
   PalletEthereumVerifierCheckpointUpdate,
-  PalletEthereumVerifierExecutionProof,
   PalletEthereumVerifierForkVersions,
   PalletEthereumVerifierUpdate,
   PalletMultisigTimepoint,
@@ -682,6 +681,7 @@ declare module '@polkadot/api-base/types/submittable' {
                 currentSyncCommittee?: any;
                 currentSyncCommitteeBranch?: any;
                 validatorsRoot?: any;
+                executionHeaderProof?: any;
               }
             | string
             | Uint8Array,
@@ -702,19 +702,6 @@ declare module '@polkadot/api-base/types/submittable' {
         [PalletEthereumVerifierCheckpointUpdate, PalletEthereumVerifierForkVersions]
       >;
       /**
-       * Imports a proven execution header anchor against already-retained beacon state.
-       **/
-      importExecutionHeaderAnchor: AugmentedSubmittable<
-        (
-          executionProof:
-            | PalletEthereumVerifierExecutionProof
-            | { header?: any; executionHeader?: any; executionBranch?: any }
-            | string
-            | Uint8Array,
-        ) => SubmittableExtrinsic<ApiType>,
-        [PalletEthereumVerifierExecutionProof]
-      >;
-      /**
        * Halt or resume all pallet operations. May only be called by root.
        **/
       setOperatingMode: AugmentedSubmittable<
@@ -730,7 +717,8 @@ declare module '@polkadot/api-base/types/submittable' {
       >;
       /**
        * Submits a new finalized beacon header update. The update may contain the next
-       * sync committee.
+       * sync committee and an execution header witness for the finalized beacon header it
+       * advances.
        **/
       submit: AugmentedSubmittable<
         (
@@ -743,6 +731,7 @@ declare module '@polkadot/api-base/types/submittable' {
                 nextSyncCommitteeUpdate?: any;
                 finalizedHeader?: any;
                 finalityBranch?: any;
+                executionHeaderProof?: any;
               }
             | string
             | Uint8Array,

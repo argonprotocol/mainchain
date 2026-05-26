@@ -196,14 +196,26 @@ export function createArgonGatewayClient(
     previousGatewayActivityNonce?: bigint;
     argonFinalizedExecutionHeaders?: ArgonFinalizedExecutionHeader[];
     consts?: Pick<ArgonClient, 'consts'>['consts'];
-    beaconPreset?: 'minimal' | 'mainnet';
   } = {},
 ): IArgonQueryable & Pick<ArgonClient, 'consts'> {
   const previousGatewayActivityNonce = args.previousGatewayActivityNonce ?? 0n;
   const argonFinalizedExecutionHeaders = args.argonFinalizedExecutionHeaders ?? [];
   const latestArgonFinalizedExecutionHeader = argonFinalizedExecutionHeaders.at(-1);
-  const zeroHash = ZERO_HASH;
-  const preset = args.beaconPreset ?? 'minimal';
+  const retainedExecutionHeaderAnchors = [...argonFinalizedExecutionHeaders].sort((left, right) =>
+    Number(left.blockNumber - right.blockNumber),
+  );
+  const toExecutionHeaderAnchorCodec = (header: ArgonFinalizedExecutionHeader) => ({
+    blockHash: {
+      toHex: () => header.blockHash,
+    },
+    blockNumber: {
+      toBigInt: () => header.blockNumber,
+    },
+  });
+  const toExecutionHeaderAnchorOption = (header: ArgonFinalizedExecutionHeader) => ({
+    isSome: true,
+    unwrap: () => toExecutionHeaderAnchorCodec(header),
+  });
 
   return {
     query: {
@@ -250,17 +262,41 @@ export function createArgonGatewayClient(
                 isNone: true,
               };
         },
-        beaconPreset: async () => ({
-          isMainnet: preset === 'mainnet',
-          isMinimal: preset === 'minimal',
-          toString: () => preset,
-        }),
-        executionHeaderAnchorIndex: async () => ({
-          toNumber: () => Math.max(argonFinalizedExecutionHeaders.length - 1, 0),
-        }),
-        executionHeaderAnchorMapping: async (index: number) => ({
-          toHex: () => argonFinalizedExecutionHeaders[index]?.blockHash ?? zeroHash,
-        }),
+        executionHeaderAnchorsByBlockNumber: Object.assign(
+          async (scanKey: Hex) => {
+            const header = retainedExecutionHeaderAnchors.find(
+              entry =>
+                toHex(entry.blockNumber, { size: 8 }).toLowerCase() === scanKey.toLowerCase(),
+            );
+
+            return header
+              ? {
+                  isSome: true,
+                  unwrap: () => toExecutionHeaderAnchorCodec(header),
+                }
+              : {
+                  isSome: false,
+                };
+          },
+          {
+            key: (scanKey: Hex) => `storage:${scanKey.toLowerCase()}`,
+            entriesPaged: async ({ pageSize, startKey }: { pageSize: number; startKey?: string }) =>
+              retainedExecutionHeaderAnchors
+                .filter(
+                  entry =>
+                    toHex(entry.blockNumber, { size: 8 }).toLowerCase() >
+                    (startKey?.replace('storage:', '') ?? `0x${'00'.repeat(8)}`),
+                )
+                .slice(0, pageSize)
+                .map(
+                  entry =>
+                    [
+                      `storage:${toHex(entry.blockNumber, { size: 8 }).toLowerCase()}`,
+                      toExecutionHeaderAnchorOption(entry),
+                    ] as const,
+                ),
+          },
+        ),
       },
     },
     consts: args.consts ?? createGatewayProofConsts(),

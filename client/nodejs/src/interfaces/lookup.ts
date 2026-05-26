@@ -2726,9 +2726,7 @@ export default {
       submit: {
         update: 'PalletEthereumVerifierUpdate',
       },
-      import_execution_header_anchor: {
-        executionProof: 'PalletEthereumVerifierExecutionProof',
-      },
+      __Unused2: 'Null',
       set_operating_mode: {
         mode: 'PalletEthereumVerifierBasicOperatingMode',
       },
@@ -2742,6 +2740,7 @@ export default {
     currentSyncCommittee: 'PalletEthereumVerifierSyncCommittee',
     currentSyncCommitteeBranch: 'Vec<H256>',
     validatorsRoot: 'H256',
+    executionHeaderProof: 'PalletEthereumVerifierExecutionHeaderProof',
   },
   /**
    * Lookup282: snowbridge_beacon_primitives::types::BeaconHeader
@@ -2765,63 +2764,14 @@ export default {
    **/
   SnowbridgeBeaconPrimitivesPublicKey: '[u8;48]',
   /**
-   * Lookup289: pallet_ethereum_verifier::types::ForkVersions
+   * Lookup289: pallet_ethereum_verifier::types::ExecutionHeaderProof
    **/
-  PalletEthereumVerifierForkVersions: {
-    genesis: 'PalletEthereumVerifierFork',
-    altair: 'PalletEthereumVerifierFork',
-    bellatrix: 'PalletEthereumVerifierFork',
-    capella: 'PalletEthereumVerifierFork',
-    deneb: 'PalletEthereumVerifierFork',
-    electra: 'PalletEthereumVerifierFork',
-    fulu: 'PalletEthereumVerifierFork',
-  },
-  /**
-   * Lookup290: pallet_ethereum_verifier::types::Fork
-   **/
-  PalletEthereumVerifierFork: {
-    version: '[u8;4]',
-    epoch: 'Compact<u64>',
-  },
-  /**
-   * Lookup291: pallet_ethereum_verifier::types::Update
-   **/
-  PalletEthereumVerifierUpdate: {
-    attestedHeader: 'SnowbridgeBeaconPrimitivesBeaconHeader',
-    syncAggregate: 'PalletEthereumVerifierSyncAggregate',
-    signatureSlot: 'Compact<u64>',
-    nextSyncCommitteeUpdate: 'Option<PalletEthereumVerifierNextSyncCommitteeUpdate>',
-    finalizedHeader: 'SnowbridgeBeaconPrimitivesBeaconHeader',
-    finalityBranch: 'Vec<H256>',
-  },
-  /**
-   * Lookup292: pallet_ethereum_verifier::types::SyncAggregate
-   **/
-  PalletEthereumVerifierSyncAggregate: {
-    syncCommitteeBits: 'Bytes',
-    syncCommitteeSignature: 'SnowbridgeBeaconPrimitivesSignature',
-  },
-  /**
-   * Lookup294: snowbridge_beacon_primitives::types::Signature
-   **/
-  SnowbridgeBeaconPrimitivesSignature: '[u8;96]',
-  /**
-   * Lookup297: pallet_ethereum_verifier::types::NextSyncCommitteeUpdate
-   **/
-  PalletEthereumVerifierNextSyncCommitteeUpdate: {
-    nextSyncCommittee: 'PalletEthereumVerifierSyncCommittee',
-    nextSyncCommitteeBranch: 'Vec<H256>',
-  },
-  /**
-   * Lookup298: pallet_ethereum_verifier::types::ExecutionProof
-   **/
-  PalletEthereumVerifierExecutionProof: {
-    header: 'SnowbridgeBeaconPrimitivesBeaconHeader',
+  PalletEthereumVerifierExecutionHeaderProof: {
     executionHeader: 'SnowbridgeBeaconPrimitivesVersionedExecutionPayloadHeader',
     executionBranch: 'Vec<H256>',
   },
   /**
-   * Lookup299: snowbridge_beacon_primitives::types::VersionedExecutionPayloadHeader
+   * Lookup290: snowbridge_beacon_primitives::types::VersionedExecutionPayloadHeader
    **/
   SnowbridgeBeaconPrimitivesVersionedExecutionPayloadHeader: {
     _enum: {
@@ -2830,7 +2780,7 @@ export default {
     },
   },
   /**
-   * Lookup300: snowbridge_beacon_primitives::types::ExecutionPayloadHeader
+   * Lookup291: snowbridge_beacon_primitives::types::ExecutionPayloadHeader
    **/
   SnowbridgeBeaconPrimitivesExecutionPayloadHeader: {
     parentHash: 'H256',
@@ -2850,7 +2800,7 @@ export default {
     withdrawalsRoot: 'H256',
   },
   /**
-   * Lookup301: snowbridge_beacon_primitives::types::deneb::ExecutionPayloadHeader
+   * Lookup292: snowbridge_beacon_primitives::types::deneb::ExecutionPayloadHeader
    **/
   SnowbridgeBeaconPrimitivesDenebExecutionPayloadHeader: {
     parentHash: 'H256',
@@ -2870,6 +2820,55 @@ export default {
     withdrawalsRoot: 'H256',
     blobGasUsed: 'u64',
     excessBlobGas: 'u64',
+  },
+  /**
+   * Lookup293: pallet_ethereum_verifier::types::ForkVersions
+   **/
+  PalletEthereumVerifierForkVersions: {
+    genesis: 'PalletEthereumVerifierFork',
+    altair: 'PalletEthereumVerifierFork',
+    bellatrix: 'PalletEthereumVerifierFork',
+    capella: 'PalletEthereumVerifierFork',
+    deneb: 'PalletEthereumVerifierFork',
+    electra: 'PalletEthereumVerifierFork',
+    fulu: 'PalletEthereumVerifierFork',
+  },
+  /**
+   * Lookup294: pallet_ethereum_verifier::types::Fork
+   **/
+  PalletEthereumVerifierFork: {
+    version: '[u8;4]',
+    epoch: 'Compact<u64>',
+  },
+  /**
+   * Lookup295: pallet_ethereum_verifier::types::Update
+   **/
+  PalletEthereumVerifierUpdate: {
+    attestedHeader: 'SnowbridgeBeaconPrimitivesBeaconHeader',
+    syncAggregate: 'PalletEthereumVerifierSyncAggregate',
+    signatureSlot: 'Compact<u64>',
+    nextSyncCommitteeUpdate: 'Option<PalletEthereumVerifierNextSyncCommitteeUpdate>',
+    finalizedHeader: 'SnowbridgeBeaconPrimitivesBeaconHeader',
+    finalityBranch: 'Vec<H256>',
+    executionHeaderProof: 'PalletEthereumVerifierExecutionHeaderProof',
+  },
+  /**
+   * Lookup296: pallet_ethereum_verifier::types::SyncAggregate
+   **/
+  PalletEthereumVerifierSyncAggregate: {
+    syncCommitteeBits: 'Bytes',
+    syncCommitteeSignature: 'SnowbridgeBeaconPrimitivesSignature',
+  },
+  /**
+   * Lookup298: snowbridge_beacon_primitives::types::Signature
+   **/
+  SnowbridgeBeaconPrimitivesSignature: '[u8;96]',
+  /**
+   * Lookup301: pallet_ethereum_verifier::types::NextSyncCommitteeUpdate
+   **/
+  PalletEthereumVerifierNextSyncCommitteeUpdate: {
+    nextSyncCommittee: 'PalletEthereumVerifierSyncCommittee',
+    nextSyncCommitteeBranch: 'Vec<H256>',
   },
   /**
    * Lookup302: pallet_crosschain_transfer::pallet::Call<T>

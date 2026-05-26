@@ -79,8 +79,6 @@ it('returns nothing when the verifier state is current and the anchor is already
     'https://beacon.example/eth/v1/beacon/light_client/finality_update': {
       data: createLightClientUpdate(800),
     },
-    'https://beacon.example/eth/v1/beacon/light_client/bootstrap/0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa':
-      createBootstrapResponse(800, ['0xstored800']),
     'https://beacon.example/eth/v1/config/spec': {
       data: createBeaconSpec(),
     },
@@ -94,7 +92,7 @@ it('returns nothing when the verifier state is current and the anchor is already
   expect(txs).toEqual([]);
 });
 
-it('builds submit and anchor txs once the free header interval is reached', async () => {
+it('builds a submit tx with an execution header proof once the free header interval is reached', async () => {
   globalThis.fetch = createFetch({
     'https://beacon.example/eth/v1/beacon/light_client/finality_update': {
       data: createLightClientUpdate(832, {
@@ -120,19 +118,15 @@ it('builds submit and anchor txs once the free header interval is reached', asyn
       method: 'submit',
       update: expect.objectContaining({
         finalizedHeader: expect.objectContaining({ slot: '832' }),
-      }),
-    },
-    {
-      method: 'importExecutionHeaderAnchor',
-      executionProof: expect.objectContaining({
-        header: expect.objectContaining({ slot: '832' }),
-        executionBranch: ['0xbranch832'],
+        executionHeaderProof: expect.objectContaining({
+          executionBranch: ['0xbranch832'],
+        }),
       }),
     },
   ]);
 });
 
-it('supports minimal beacon updates without fetching full beacon blocks', async () => {
+it('supports minimal beacon updates with execution header proofs embedded in submit', async () => {
   globalThis.fetch = createFetch({
     'https://minimal-beacon.example/eth/v1/beacon/light_client/finality_update': {
       data: createLightClientUpdate(32, {
@@ -170,13 +164,9 @@ it('supports minimal beacon updates without fetching full beacon blocks', async 
       method: 'submit',
       update: expect.objectContaining({
         finalizedHeader: expect.objectContaining({ slot: '32' }),
-      }),
-    },
-    {
-      method: 'importExecutionHeaderAnchor',
-      executionProof: expect.objectContaining({
-        header: expect.objectContaining({ slot: '32' }),
-        executionBranch: ['0xfulu32'],
+        executionHeaderProof: expect.objectContaining({
+          executionBranch: ['0xfulu32'],
+        }),
       }),
     },
   ]);
@@ -195,6 +185,11 @@ it('prefers the current-period update when the next sync committee is missing', 
     },
     'https://beacon.example/eth/v1/beacon/light_client/updates?count=1&start_period=0': [
       createVersionedLightClientUpdate(800, {
+        finalized_header: {
+          beacon: createBeaconHeader(800),
+          execution: createExecutionHeader(800),
+          execution_branch: ['0xperiod0-execution'],
+        },
         next_sync_committee: {
           pubkeys: ['0x4'],
           aggregate_pubkey: '0x5',
@@ -222,18 +217,14 @@ it('prefers the current-period update when the next sync committee is missing', 
         nextSyncCommittee: expect.anything(),
         nextSyncCommitteeBranch: expect.anything(),
       }),
-    }),
-  });
-  expect(txs[1]).toEqual({
-    method: 'importExecutionHeaderAnchor',
-    executionProof: expect.objectContaining({
-      header: expect.objectContaining({ slot: '800' }),
-      executionBranch: ['0xstored800'],
+      executionHeaderProof: expect.objectContaining({
+        executionBranch: ['0xperiod0-execution'],
+      }),
     }),
   });
 });
 
-it('steps to the next sync-committee period when finality is multiple periods ahead', async () => {
+it('steps to the next sync-committee period even when finality already carries committee data', async () => {
   const beaconApiUrl = 'https://minimal-beacon-multi-period.example';
 
   globalThis.fetch = createFetch({
@@ -245,6 +236,11 @@ it('steps to the next sync-committee period when finality is multiple periods ah
           execution_branch: ['0xfinality7983'],
         },
         signature_slot: '7984',
+        next_sync_committee: {
+          pubkeys: ['0xfinality-period124'],
+          aggregate_pubkey: '0xfinality-period124-agg',
+        },
+        next_sync_committee_branch: ['0xfinality-period124-branch'],
       }),
     },
     [`${beaconApiUrl}/eth/v1/beacon/light_client/updates?count=1&start_period=122`]: [
@@ -297,13 +293,9 @@ it('steps to the next sync-committee period when finality is multiple periods ah
           nextSyncCommittee: expect.anything(),
           nextSyncCommitteeBranch: ['0xperiod122-branch'],
         }),
-      }),
-    },
-    {
-      method: 'importExecutionHeaderAnchor',
-      executionProof: expect.objectContaining({
-        header: expect.objectContaining({ slot: '7808' }),
-        executionBranch: ['0xperiod122-finalized'],
+        executionHeaderProof: expect.objectContaining({
+          executionBranch: ['0xperiod122-finalized'],
+        }),
       }),
     },
   ]);
@@ -381,7 +373,7 @@ it('submits the current-period sync committee update before the next free header
   ]);
 });
 
-it('falls back to the finality update when no current-period update is available', async () => {
+it('returns nothing when the required current-period committee update is unavailable', async () => {
   globalThis.fetch = createFetch({
     'https://beacon.example/eth/v1/beacon/light_client/finality_update': {
       data: createLightClientUpdate(1600, {
@@ -403,19 +395,10 @@ it('falls back to the finality update when no current-period update is available
     'https://beacon.example',
   );
 
-  expect(txs[0]).toEqual({
-    method: 'submit',
-    update: expect.objectContaining({
-      finalizedHeader: expect.objectContaining({ slot: '1600' }),
-      nextSyncCommitteeUpdate: expect.objectContaining({
-        nextSyncCommittee: expect.anything(),
-        nextSyncCommitteeBranch: expect.anything(),
-      }),
-    }),
-  });
+  expect(txs).toEqual([]);
 });
 
-it('returns only an anchor import when the header state is current but the anchor is missing', async () => {
+it('returns nothing when the header state is current but no new update is needed', async () => {
   globalThis.fetch = createFetch({
     'https://beacon.example/eth/v1/beacon/light_client/finality_update': {
       data: createLightClientUpdate(800, {
@@ -438,15 +421,7 @@ it('returns only an anchor import when the header state is current but the ancho
     'https://beacon.example',
   );
 
-  expect(txs).toEqual([
-    {
-      method: 'importExecutionHeaderAnchor',
-      executionProof: expect.objectContaining({
-        header: expect.objectContaining({ slot: '800' }),
-        executionBranch: ['0xstored800'],
-      }),
-    },
-  ]);
+  expect(txs).toEqual([]);
 });
 
 it('builds a force-checkpoint tx from beacon bootstrap data without block-roots witnesses', async () => {
@@ -508,6 +483,9 @@ it('builds a force-checkpoint tx from beacon bootstrap data without block-roots 
       header: expect.objectContaining({ slot: '832' }),
       currentSyncCommittee: expect.objectContaining({ aggregatePubkey: '0x2' }),
       validatorsRoot: '0x11',
+      executionHeaderProof: expect.objectContaining({
+        executionBranch: [],
+      }),
     }),
     forks: expect.objectContaining({
       deneb: { version: '0x04000000', epoch: 3n },
@@ -606,10 +584,6 @@ function createMockClient(args?: {
     tx: {
       ethereumVerifier: {
         submit: (update: unknown) => ({ method: 'submit', update }),
-        importExecutionHeaderAnchor: (executionProof: unknown) => ({
-          method: 'importExecutionHeaderAnchor',
-          executionProof,
-        }),
         forceCheckpoint: (checkpoint: unknown, forks: unknown) => ({
           method: 'forceCheckpoint',
           checkpoint,

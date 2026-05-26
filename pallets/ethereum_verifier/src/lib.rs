@@ -14,8 +14,8 @@
 //!
 //! ## Consensus Updates
 //!
-//! * [`Call::submit`]: Submit a finalized beacon header with an optional sync committee update
-//! * [`Call::import_execution_header_anchor`]: Submit a proven finalized execution header anchor
+//! * [`Call::submit`]: Submit a finalized beacon header with an optional sync committee update and
+//!   any matching execution anchor witness embedded in the update payload
 #![cfg_attr(not(feature = "std"), no_std)]
 
 extern crate alloc;
@@ -33,7 +33,7 @@ pub mod weights;
 #[cfg(any(test, feature = "runtime-benchmarks", feature = "fuzzing"))]
 mod fixture_conversions;
 
-#[cfg(any(test, feature = "fuzzing"))]
+#[cfg(any(test, feature = "runtime-benchmarks", feature = "fuzzing"))]
 pub mod mock;
 
 #[cfg(test)]
@@ -42,7 +42,7 @@ mod tests;
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 
-use alloc::{boxed::Box, vec, vec::Vec};
+use alloc::{boxed::Box, vec::Vec};
 use argon_primitives::EthereumBeaconPreset;
 use frame_support::{
 	dispatch::{DispatchResult, Pays, PostDispatchInfo},
@@ -65,8 +65,8 @@ use functions::{
 use ring_buffer::RingBufferMap;
 use types::{
 	CheckpointUpdate, ExecutionBlockHash, ExecutionBlockNumber, ExecutionHeaderAnchor,
-	ExecutionHeaderAnchorBuffer, FinalizedBeaconHeaderState, FinalizedBeaconStateBuffer,
-	SyncCommitteePrepared, Update,
+	ExecutionHeaderAnchorScanKey, ExecutionHeaderProof, FinalizedBeaconHeaderState,
+	FinalizedBeaconStateBuffer, SyncCommitteePrepared, Update,
 };
 
 pub use pallet::*;
@@ -184,14 +184,20 @@ pub mod pallet {
 	pub type ExecutionHeaderAnchors<T: Config> =
 		StorageMap<_, Identity, ExecutionBlockHash, ExecutionHeaderAnchor, OptionQuery>;
 
-	/// Execution header anchors: current position in ring buffer.
+	/// Ordered retained execution-layer anchors keyed by execution block number.
+	///
+	/// The key is the big-endian execution block number so clients can start at a target execution
+	/// block number and scan forward to the first retained anchor at or after that block without
+	/// walking every retained finalized beacon root. `ExecutionHeaderAnchors` remains the canonical
+	/// hash-keyed proof lookup.
 	#[pallet::storage]
-	pub type ExecutionHeaderAnchorIndex<T: Config> = StorageValue<_, u32, ValueQuery>;
+	pub type ExecutionHeaderAnchorsByBlockNumber<T: Config> =
+		StorageMap<_, Identity, ExecutionHeaderAnchorScanKey, ExecutionHeaderAnchor, OptionQuery>;
 
-	/// Execution header anchors: mapping of ring buffer index to a pruning candidate.
+	/// Attached execution-layer anchor hash for each retained finalized beacon header root.
 	#[pallet::storage]
-	pub type ExecutionHeaderAnchorMapping<T: Config> =
-		StorageMap<_, Identity, u32, ExecutionBlockHash, ValueQuery>;
+	pub type FinalizedExecutionHeaderAnchor<T: Config> =
+		StorageMap<_, Identity, H256, ExecutionBlockHash, OptionQuery>;
 
 	/// Latest retained execution-layer anchor block hash.
 	#[pallet::storage]
@@ -259,53 +265,20 @@ pub mod pallet {
 
 		#[pallet::call_index(1)]
 		#[pallet::weight({
-			match update.next_sync_committee_update {
-				None => T::WeightInfo::submit(),
-				Some(_) => T::WeightInfo::submit_with_sync_committee(),
+			if update.next_sync_committee_update.is_some() {
+				T::WeightInfo::submit_with_sync_committee()
+			} else {
+				T::WeightInfo::submit()
 			}
 		})]
 		/// Submits a new finalized beacon header update. The update may contain the next
-		/// sync committee.
+		/// sync committee and an execution header witness for the finalized beacon header it
+		/// advances.
 		pub fn submit(origin: OriginFor<T>, update: Box<Update>) -> DispatchResultWithPostInfo {
 			ensure_signed(origin)?;
 			ensure!(!OperatingMode::<T>::get().is_halted(), Error::<T>::Halted);
-			Self::process_update(&update)
-		}
-
-		#[pallet::call_index(2)]
-		#[pallet::weight(T::WeightInfo::import_execution_header_anchor())]
-		/// Imports a proven execution header anchor against already-retained beacon state.
-		pub fn import_execution_header_anchor(
-			origin: OriginFor<T>,
-			execution_proof: ExecutionProof,
-		) -> DispatchResultWithPostInfo {
-			ensure_signed(origin)?;
-			ensure!(!OperatingMode::<T>::get().is_halted(), Error::<T>::Halted);
-
-			let anchor =
-				ExecutionHeaderAnchor::from_payload_header(&execution_proof.execution_header);
-			let mut pays_fee = Pays::Yes;
-
-			if !<ExecutionHeaderAnchorBuffer<T>>::contains_key(anchor.block_hash) {
-				Self::verify_execution_proof(&execution_proof)?;
-				<ExecutionHeaderAnchorBuffer<T>>::insert(anchor.block_hash, anchor);
-				<LatestExecutionHeaderAnchorBlockHash<T>>::set(Some(anchor.block_hash));
-
-				Self::deposit_event(Event::ExecutionHeaderAnchorImported {
-					block_hash: anchor.block_hash,
-					block_number: anchor.block_number,
-				});
-
-				if execution_proof.header.slot.is_multiple_of(T::FreeHeadersInterval::get() as u64)
-				{
-					pays_fee = Pays::No;
-				}
-			}
-
-			Ok(PostDispatchInfo {
-				actual_weight: Some(T::WeightInfo::import_execution_header_anchor()),
-				pays_fee,
-			})
+			Self::verify_update(&update)?;
+			Self::apply_update(&update)
 		}
 
 		/// Halt or resume all pallet operations. May only be called by root.
@@ -363,21 +336,31 @@ pub mod pallet {
 			let sync_committee_prepared = update
 				.current_sync_committee
 				.prepare(preset)
-				.map_err(|_| <Error<T>>::BLSPreparePublicKeysFailed)?;
-			<CurrentSyncCommittee<T>>::set(sync_committee_prepared);
-			<NextSyncCommittee<T>>::kill();
+				.map_err(|_| Error::<T>::BLSPreparePublicKeysFailed)?;
+			CurrentSyncCommittee::<T>::set(sync_committee_prepared);
+			NextSyncCommittee::<T>::kill();
 			InitialCheckpointRoot::<T>::set(header_root);
 
-			<ForkVersionSchedule<T>>::put(*fork_versions);
+			ForkVersionSchedule::<T>::put(*fork_versions);
 			Self::store_validators_root(update.validators_root);
-			Self::store_finalized_header(update.header)?;
+
+			let anchor = Self::verify_execution_proof_for_header(
+				&update.header,
+				&update.execution_header_proof,
+			)?;
+			ExecutionHeaderAnchors::<T>::insert(anchor.block_hash, anchor);
+			ExecutionHeaderAnchorsByBlockNumber::<T>::insert(
+				Self::execution_header_anchor_scan_key(anchor.block_number),
+				anchor,
+			);
+			LatestExecutionHeaderAnchorBlockHash::<T>::put(anchor.block_hash);
+			Self::deposit_event(Event::ExecutionHeaderAnchorImported {
+				block_hash: anchor.block_hash,
+				block_number: anchor.block_number,
+			});
+			Self::store_finalized_header(update.header, anchor.block_hash)?;
 
 			Ok(())
-		}
-
-		pub(crate) fn process_update(update: &Update) -> DispatchResultWithPostInfo {
-			Self::verify_update(update)?;
-			Self::apply_update(update)
 		}
 
 		/// References and strictly follows <https://github.com/ethereum/consensus-specs/blob/ec42646/specs/altair/light-client/sync-protocol.md#validate_light_client_update>
@@ -467,15 +450,13 @@ pub mod pallet {
 				Error::<T>::InvalidHeaderMerkleProof
 			);
 
-			// Verify that the `next_sync_committee`, if present, actually is the next sync
-			// committee saved in the state of the `attested_header`.
 			if let Some(next_sync_committee_update) = &update.next_sync_committee_update {
 				let sync_committee_root = next_sync_committee_update
 					.next_sync_committee
 					.hash_tree_root(preset)
 					.map_err(|_| Error::<T>::SyncCommitteeHashTreeRootFailed)?;
-				if update_attested_period == store_period && <NextSyncCommittee<T>>::exists() {
-					let next_committee_root = <NextSyncCommittee<T>>::get().root;
+				if update_attested_period == store_period && NextSyncCommittee::<T>::exists() {
+					let next_committee_root = NextSyncCommittee::<T>::get().root;
 					ensure!(
 						sync_committee_root == next_committee_root,
 						Error::<T>::InvalidSyncCommitteeUpdate
@@ -504,9 +485,9 @@ pub mod pallet {
 
 			// Verify sync committee aggregate signature.
 			let sync_committee = if signature_period == store_period {
-				<CurrentSyncCommittee<T>>::get()
+				CurrentSyncCommittee::<T>::get()
 			} else {
-				<NextSyncCommittee<T>>::get()
+				NextSyncCommittee::<T>::get()
 			};
 			let absent_pubkeys =
 				Self::find_pubkeys(&participation, sync_committee.pubkeys.as_ref(), false);
@@ -541,42 +522,58 @@ pub mod pallet {
 					.ok_or(Error::<T>::NotBootstrapped)?;
 
 			let pays_fee = Self::check_refundable(update, latest_finalized_state.slot);
-			let actual_weight = match update.next_sync_committee_update {
-				None => T::WeightInfo::submit(),
-				Some(_) => T::WeightInfo::submit_with_sync_committee(),
+			let actual_weight = if update.next_sync_committee_update.is_some() {
+				T::WeightInfo::submit_with_sync_committee()
+			} else {
+				T::WeightInfo::submit()
 			};
 
+			let store_period = Self::compute_period(latest_finalized_state.slot);
+			let update_finalized_period = Self::compute_period(update.finalized_header.slot);
+
 			if let Some(next_sync_committee_update) = &update.next_sync_committee_update {
-				let store_period = Self::compute_period(latest_finalized_state.slot);
-				let update_finalized_period = Self::compute_period(update.finalized_header.slot);
 				let sync_committee_prepared = next_sync_committee_update
 					.next_sync_committee
 					.prepare(preset)
-					.map_err(|_| <Error<T>>::BLSPreparePublicKeysFailed)?;
+					.map_err(|_| Error::<T>::BLSPreparePublicKeysFailed)?;
 
-				if !<NextSyncCommittee<T>>::exists() {
+				if !NextSyncCommittee::<T>::exists() {
 					ensure!(
 						update_finalized_period == store_period,
-						<Error<T>>::InvalidSyncCommitteeUpdate
+						Error::<T>::InvalidSyncCommitteeUpdate
 					);
-					<NextSyncCommittee<T>>::set(sync_committee_prepared);
+					NextSyncCommittee::<T>::set(sync_committee_prepared);
 				} else if update_finalized_period == store_period + 1 {
-					<CurrentSyncCommittee<T>>::set(<NextSyncCommittee<T>>::get());
-					<NextSyncCommittee<T>>::set(sync_committee_prepared);
+					CurrentSyncCommittee::<T>::set(NextSyncCommittee::<T>::get());
+					NextSyncCommittee::<T>::set(sync_committee_prepared);
 				}
 				tracing::info!(
 					target: LOG_TARGET,
 					period=%update_finalized_period,
 					"💫 SyncCommitteeUpdated."
 				);
-				<LatestSyncCommitteeUpdatePeriod<T>>::set(update_finalized_period);
+				LatestSyncCommitteeUpdatePeriod::<T>::set(update_finalized_period);
 				Self::deposit_event(Event::SyncCommitteeUpdated {
 					period: update_finalized_period,
 				});
-			};
+			}
 
 			if update.finalized_header.slot > latest_finalized_state.slot {
-				Self::store_finalized_header(update.finalized_header)?;
+				let anchor = Self::verify_execution_proof_for_header(
+					&update.finalized_header,
+					&update.execution_header_proof,
+				)?;
+				ExecutionHeaderAnchors::<T>::insert(anchor.block_hash, anchor);
+				ExecutionHeaderAnchorsByBlockNumber::<T>::insert(
+					Self::execution_header_anchor_scan_key(anchor.block_number),
+					anchor,
+				);
+				LatestExecutionHeaderAnchorBlockHash::<T>::set(Some(anchor.block_hash));
+				Self::deposit_event(Event::ExecutionHeaderAnchorImported {
+					block_hash: anchor.block_hash,
+					block_number: anchor.block_number,
+				});
+				Self::store_finalized_header(update.finalized_header, anchor.block_hash)?;
 			}
 
 			Ok(PostDispatchInfo { actual_weight: Some(actual_weight), pays_fee })
@@ -601,17 +598,46 @@ pub mod pallet {
 		}
 
 		/// Stores the finalized beacon header slot keyed by the finalized header root.
-		pub fn store_finalized_header(header: BeaconHeader) -> DispatchResult {
+		pub fn store_finalized_header(
+			header: BeaconHeader,
+			execution_header_block_hash: ExecutionBlockHash,
+		) -> DispatchResult {
 			let slot = header.slot;
-
 			let header_root: H256 =
 				header.hash_tree_root().map_err(|_| Error::<T>::HeaderHashTreeRootFailed)?;
+			let bound = MaxFinalizedHeadersToKeep::<T>::get();
+			debug_assert!(bound > 0, "finalized header ring buffer bound must be non-zero");
+			let current_index = FinalizedBeaconStateIndex::<T>::get();
+			let next_index = if current_index.saturating_add(1) >= bound {
+				0
+			} else {
+				current_index.saturating_add(1)
+			};
 
-			<FinalizedBeaconStateBuffer<T>>::insert(
+			if FinalizedBeaconStateMapping::<T>::contains_key(next_index) {
+				let evicted_root = FinalizedBeaconStateMapping::<T>::get(next_index);
+				if let Some(evicted_execution_header_block_hash) =
+					FinalizedExecutionHeaderAnchor::<T>::take(evicted_root) &&
+					let Some(evicted_anchor) =
+						ExecutionHeaderAnchors::<T>::take(evicted_execution_header_block_hash)
+				{
+					ExecutionHeaderAnchorsByBlockNumber::<T>::remove(
+						Self::execution_header_anchor_scan_key(evicted_anchor.block_number),
+					);
+					if LatestExecutionHeaderAnchorBlockHash::<T>::get() ==
+						Some(evicted_execution_header_block_hash)
+					{
+						LatestExecutionHeaderAnchorBlockHash::<T>::kill();
+					}
+				}
+			}
+
+			FinalizedBeaconStateBuffer::<T>::insert(
 				header_root,
-				FinalizedBeaconHeaderState { slot: header.slot },
+				FinalizedBeaconHeaderState { slot },
 			);
-			<LatestFinalizedBlockRoot<T>>::set(header_root);
+			LatestFinalizedBlockRoot::<T>::set(header_root);
+			FinalizedExecutionHeaderAnchor::<T>::insert(header_root, execution_header_block_hash);
 
 			tracing::info!(
 				target: LOG_TARGET,
@@ -630,22 +656,14 @@ pub mod pallet {
 		/// (used in conjunction with the fork version).
 		/// <https://eth2book.info/capella/part3/containers/state/#genesis_validators_root>
 		fn store_validators_root(validators_root: H256) {
-			<ValidatorsRoot<T>>::set(validators_root);
+			ValidatorsRoot::<T>::set(validators_root);
 		}
 
-		fn verify_execution_proof(execution_proof: &ExecutionProof) -> DispatchResult {
-			let beacon_block_root: H256 = execution_proof
-				.header
-				.hash_tree_root()
-				.map_err(|_| Error::<T>::HeaderHashTreeRootFailed)?;
-			let state = <FinalizedBeaconState<T>>::get(beacon_block_root)
-				.ok_or(Error::<T>::ExpectedFinalizedHeaderNotStored)?;
-			ensure!(
-				execution_proof.header.slot == state.slot,
-				Error::<T>::ExpectedFinalizedHeaderNotStored
-			);
-
-			let execution_header_root: H256 = execution_proof
+		pub(crate) fn verify_execution_proof_for_header(
+			finalized_header: &BeaconHeader,
+			execution_header_proof: &ExecutionHeaderProof,
+		) -> Result<ExecutionHeaderAnchor, DispatchError> {
+			let execution_header_root: H256 = execution_header_proof
 				.execution_header
 				.hash_tree_root()
 				.map_err(|_| Error::<T>::BlockBodyHashTreeRootFailed)?;
@@ -653,15 +671,21 @@ pub mod pallet {
 			ensure!(
 				verify_merkle_branch(
 					execution_header_root,
-					&execution_proof.execution_branch,
+					&execution_header_proof.execution_branch,
 					subtree_index(execution_header_gindex),
 					generalized_index_length(execution_header_gindex),
-					execution_proof.header.body_root
+					finalized_header.body_root
 				),
 				Error::<T>::InvalidExecutionHeaderProof
 			);
 
-			Ok(())
+			Ok(ExecutionHeaderAnchor::from_payload_header(&execution_header_proof.execution_header))
+		}
+
+		fn execution_header_anchor_scan_key(
+			block_number: ExecutionBlockNumber,
+		) -> ExecutionHeaderAnchorScanKey {
+			block_number.to_be_bytes()
 		}
 
 		/// Returns the domain for the domain_type and fork_version. The domain is used to
@@ -726,22 +750,22 @@ pub mod pallet {
 		/// Returns the fork version based on the current epoch.
 		pub(super) fn select_fork_version(fork_versions: &ForkVersions, epoch: u64) -> ForkVersion {
 			if epoch >= fork_versions.fulu.epoch {
-				return fork_versions.fulu.version
+				return fork_versions.fulu.version;
 			}
 			if epoch >= fork_versions.electra.epoch {
-				return fork_versions.electra.version
+				return fork_versions.electra.version;
 			}
 			if epoch >= fork_versions.deneb.epoch {
-				return fork_versions.deneb.version
+				return fork_versions.deneb.version;
 			}
 			if epoch >= fork_versions.capella.epoch {
-				return fork_versions.capella.version
+				return fork_versions.capella.version;
 			}
 			if epoch >= fork_versions.bellatrix.epoch {
-				return fork_versions.bellatrix.version
+				return fork_versions.bellatrix.version;
 			}
 			if epoch >= fork_versions.altair.epoch {
-				return fork_versions.altair.version
+				return fork_versions.altair.version;
 			}
 			fork_versions.genesis.version
 		}
@@ -799,7 +823,7 @@ pub mod pallet {
 			// If the sync committee update is in a period that we have not received an update for,
 			// the update is free.
 			let refundable =
-				!<NextSyncCommittee<T>>::exists() || update_period > latest_free_update_period;
+				!NextSyncCommittee::<T>::exists() || update_period > latest_free_update_period;
 			if update.next_sync_committee_update.is_some() && refundable {
 				return Pays::No;
 			}
@@ -897,15 +921,6 @@ pub mod pallet {
 						.using_encoded(blake2_256)
 						.to_vec(),
 				),
-				Call::import_execution_header_anchor { execution_proof } => Some(
-					(
-						b"ethereum_verifier:execution_header_anchor".as_slice(),
-						execution_proof.execution_header.block_hash(),
-						execution_proof.using_encoded(blake2_256),
-					)
-						.using_encoded(blake2_256)
-						.to_vec(),
-				),
 				_ => None,
 			}
 		}
@@ -924,32 +939,23 @@ pub mod pallet {
 				return Ok(());
 			};
 
-			match call {
-				Call::submit { update } => {
-					let Some(latest_finalized_state) =
-						FinalizedBeaconState::<T>::get(LatestFinalizedBlockRoot::<T>::get())
-					else {
-						return Ok(());
-					};
-					let store_period = Self::compute_period(latest_finalized_state.slot);
-					let update_attested_period = Self::compute_period(update.attested_header.slot);
-					let can_advance_finalized =
-						update.finalized_header.slot > latest_finalized_state.slot;
-					let can_set_missing_next_sync = !<NextSyncCommittee<T>>::exists() &&
-						update.next_sync_committee_update.is_some() &&
-						update_attested_period == store_period;
+			if let Call::submit { update } = call {
+				let Some(latest_finalized_state) =
+					FinalizedBeaconState::<T>::get(LatestFinalizedBlockRoot::<T>::get())
+				else {
+					return Ok(());
+				};
+				let store_period = Self::compute_period(latest_finalized_state.slot);
+				let update_attested_period = Self::compute_period(update.attested_header.slot);
+				let can_advance_finalized =
+					update.finalized_header.slot > latest_finalized_state.slot;
+				let can_set_missing_next_sync = update.next_sync_committee_update.is_some() &&
+					!NextSyncCommittee::<T>::exists() &&
+					update_attested_period == store_period;
 
-					if !can_advance_finalized && !can_set_missing_next_sync {
-						return Err(TransactionValidityError::Invalid(InvalidTransaction::Stale));
-					}
-				},
-				Call::import_execution_header_anchor { execution_proof } =>
-					if <ExecutionHeaderAnchors<T>>::contains_key(
-						execution_proof.execution_header.block_hash(),
-					) {
-						return Err(TransactionValidityError::Invalid(InvalidTransaction::Stale));
-					},
-				_ => {},
+				if !can_advance_finalized && !can_set_missing_next_sync {
+					return Err(TransactionValidityError::Invalid(InvalidTransaction::Stale));
+				}
 			}
 
 			Ok(())

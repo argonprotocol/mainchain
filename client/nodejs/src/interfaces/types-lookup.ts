@@ -3215,19 +3215,11 @@ declare module '@polkadot/types/lookup' {
     readonly asSubmit: {
       readonly update: PalletEthereumVerifierUpdate;
     } & Struct;
-    readonly isImportExecutionHeaderAnchor: boolean;
-    readonly asImportExecutionHeaderAnchor: {
-      readonly executionProof: PalletEthereumVerifierExecutionProof;
-    } & Struct;
     readonly isSetOperatingMode: boolean;
     readonly asSetOperatingMode: {
       readonly mode: PalletEthereumVerifierBasicOperatingMode;
     } & Struct;
-    readonly type:
-      | 'ForceCheckpoint'
-      | 'Submit'
-      | 'ImportExecutionHeaderAnchor'
-      | 'SetOperatingMode';
+    readonly type: 'ForceCheckpoint' | 'Submit' | 'SetOperatingMode';
   }
 
   /** @name PalletEthereumVerifierCheckpointUpdate (281) */
@@ -3236,6 +3228,7 @@ declare module '@polkadot/types/lookup' {
     readonly currentSyncCommittee: PalletEthereumVerifierSyncCommittee;
     readonly currentSyncCommitteeBranch: Vec<H256>;
     readonly validatorsRoot: H256;
+    readonly executionHeaderProof: PalletEthereumVerifierExecutionHeaderProof;
   }
 
   /** @name SnowbridgeBeaconPrimitivesBeaconHeader (282) */
@@ -3256,56 +3249,13 @@ declare module '@polkadot/types/lookup' {
   /** @name SnowbridgeBeaconPrimitivesPublicKey (285) */
   interface SnowbridgeBeaconPrimitivesPublicKey extends U8aFixed {}
 
-  /** @name PalletEthereumVerifierForkVersions (289) */
-  interface PalletEthereumVerifierForkVersions extends Struct {
-    readonly genesis: PalletEthereumVerifierFork;
-    readonly altair: PalletEthereumVerifierFork;
-    readonly bellatrix: PalletEthereumVerifierFork;
-    readonly capella: PalletEthereumVerifierFork;
-    readonly deneb: PalletEthereumVerifierFork;
-    readonly electra: PalletEthereumVerifierFork;
-    readonly fulu: PalletEthereumVerifierFork;
-  }
-
-  /** @name PalletEthereumVerifierFork (290) */
-  interface PalletEthereumVerifierFork extends Struct {
-    readonly version: U8aFixed;
-    readonly epoch: Compact<u64>;
-  }
-
-  /** @name PalletEthereumVerifierUpdate (291) */
-  interface PalletEthereumVerifierUpdate extends Struct {
-    readonly attestedHeader: SnowbridgeBeaconPrimitivesBeaconHeader;
-    readonly syncAggregate: PalletEthereumVerifierSyncAggregate;
-    readonly signatureSlot: Compact<u64>;
-    readonly nextSyncCommitteeUpdate: Option<PalletEthereumVerifierNextSyncCommitteeUpdate>;
-    readonly finalizedHeader: SnowbridgeBeaconPrimitivesBeaconHeader;
-    readonly finalityBranch: Vec<H256>;
-  }
-
-  /** @name PalletEthereumVerifierSyncAggregate (292) */
-  interface PalletEthereumVerifierSyncAggregate extends Struct {
-    readonly syncCommitteeBits: Bytes;
-    readonly syncCommitteeSignature: SnowbridgeBeaconPrimitivesSignature;
-  }
-
-  /** @name SnowbridgeBeaconPrimitivesSignature (294) */
-  interface SnowbridgeBeaconPrimitivesSignature extends U8aFixed {}
-
-  /** @name PalletEthereumVerifierNextSyncCommitteeUpdate (297) */
-  interface PalletEthereumVerifierNextSyncCommitteeUpdate extends Struct {
-    readonly nextSyncCommittee: PalletEthereumVerifierSyncCommittee;
-    readonly nextSyncCommitteeBranch: Vec<H256>;
-  }
-
-  /** @name PalletEthereumVerifierExecutionProof (298) */
-  interface PalletEthereumVerifierExecutionProof extends Struct {
-    readonly header: SnowbridgeBeaconPrimitivesBeaconHeader;
+  /** @name PalletEthereumVerifierExecutionHeaderProof (289) */
+  interface PalletEthereumVerifierExecutionHeaderProof extends Struct {
     readonly executionHeader: SnowbridgeBeaconPrimitivesVersionedExecutionPayloadHeader;
     readonly executionBranch: Vec<H256>;
   }
 
-  /** @name SnowbridgeBeaconPrimitivesVersionedExecutionPayloadHeader (299) */
+  /** @name SnowbridgeBeaconPrimitivesVersionedExecutionPayloadHeader (290) */
   interface SnowbridgeBeaconPrimitivesVersionedExecutionPayloadHeader extends Enum {
     readonly isCapella: boolean;
     readonly asCapella: SnowbridgeBeaconPrimitivesExecutionPayloadHeader;
@@ -3314,7 +3264,7 @@ declare module '@polkadot/types/lookup' {
     readonly type: 'Capella' | 'Deneb';
   }
 
-  /** @name SnowbridgeBeaconPrimitivesExecutionPayloadHeader (300) */
+  /** @name SnowbridgeBeaconPrimitivesExecutionPayloadHeader (291) */
   interface SnowbridgeBeaconPrimitivesExecutionPayloadHeader extends Struct {
     readonly parentHash: H256;
     readonly feeRecipient: H160;
@@ -3333,7 +3283,7 @@ declare module '@polkadot/types/lookup' {
     readonly withdrawalsRoot: H256;
   }
 
-  /** @name SnowbridgeBeaconPrimitivesDenebExecutionPayloadHeader (301) */
+  /** @name SnowbridgeBeaconPrimitivesDenebExecutionPayloadHeader (292) */
   interface SnowbridgeBeaconPrimitivesDenebExecutionPayloadHeader extends Struct {
     readonly parentHash: H256;
     readonly feeRecipient: H160;
@@ -3352,6 +3302,49 @@ declare module '@polkadot/types/lookup' {
     readonly withdrawalsRoot: H256;
     readonly blobGasUsed: u64;
     readonly excessBlobGas: u64;
+  }
+
+  /** @name PalletEthereumVerifierForkVersions (293) */
+  interface PalletEthereumVerifierForkVersions extends Struct {
+    readonly genesis: PalletEthereumVerifierFork;
+    readonly altair: PalletEthereumVerifierFork;
+    readonly bellatrix: PalletEthereumVerifierFork;
+    readonly capella: PalletEthereumVerifierFork;
+    readonly deneb: PalletEthereumVerifierFork;
+    readonly electra: PalletEthereumVerifierFork;
+    readonly fulu: PalletEthereumVerifierFork;
+  }
+
+  /** @name PalletEthereumVerifierFork (294) */
+  interface PalletEthereumVerifierFork extends Struct {
+    readonly version: U8aFixed;
+    readonly epoch: Compact<u64>;
+  }
+
+  /** @name PalletEthereumVerifierUpdate (295) */
+  interface PalletEthereumVerifierUpdate extends Struct {
+    readonly attestedHeader: SnowbridgeBeaconPrimitivesBeaconHeader;
+    readonly syncAggregate: PalletEthereumVerifierSyncAggregate;
+    readonly signatureSlot: Compact<u64>;
+    readonly nextSyncCommitteeUpdate: Option<PalletEthereumVerifierNextSyncCommitteeUpdate>;
+    readonly finalizedHeader: SnowbridgeBeaconPrimitivesBeaconHeader;
+    readonly finalityBranch: Vec<H256>;
+    readonly executionHeaderProof: PalletEthereumVerifierExecutionHeaderProof;
+  }
+
+  /** @name PalletEthereumVerifierSyncAggregate (296) */
+  interface PalletEthereumVerifierSyncAggregate extends Struct {
+    readonly syncCommitteeBits: Bytes;
+    readonly syncCommitteeSignature: SnowbridgeBeaconPrimitivesSignature;
+  }
+
+  /** @name SnowbridgeBeaconPrimitivesSignature (298) */
+  interface SnowbridgeBeaconPrimitivesSignature extends U8aFixed {}
+
+  /** @name PalletEthereumVerifierNextSyncCommitteeUpdate (301) */
+  interface PalletEthereumVerifierNextSyncCommitteeUpdate extends Struct {
+    readonly nextSyncCommittee: PalletEthereumVerifierSyncCommittee;
+    readonly nextSyncCommitteeBranch: Vec<H256>;
   }
 
   /** @name PalletCrosschainTransferCall (302) */
