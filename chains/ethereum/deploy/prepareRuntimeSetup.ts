@@ -307,7 +307,7 @@ function parseArgs(argv: string[]) {
 function stringifyJson(value: unknown) {
   return JSON.stringify(
     value,
-    (_key, entry) => (typeof entry === 'bigint' ? entry.toString() : entry),
+    (_key, entry: unknown): unknown => (typeof entry === 'bigint' ? entry.toString() : entry),
     2,
   );
 }

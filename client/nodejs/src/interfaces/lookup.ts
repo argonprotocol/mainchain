@@ -1,7 +1,4 @@
 // Auto-generated via `yarn polkadot-types-from-defs`, do not edit
-/* eslint-disable */
-
-/* eslint-disable sort-keys */
 
 export default {
   /**
@@ -1634,6 +1631,7 @@ export default {
     _enum: {
       MintingAuthorityActivation: 'H160',
       MintingAuthorityDeactivation: 'H160',
+      GlobalIssuanceCouncilRotation: 'H256',
     },
   },
   /**
@@ -1656,6 +1654,8 @@ export default {
       'UnexpectedMintingAuthorityState',
       'MintingAuthorityMismatch',
       'MissingMintingAuthorityActivationRepaymentPricing',
+      'MintingAuthorityActivationRepaymentMismatch',
+      'GlobalIssuanceCouncilNotFound',
       'GatewayStateDrift',
     ],
   },
@@ -2903,13 +2903,6 @@ export default {
         signingKey: 'H160',
         signature: '[u8;65]',
       },
-      register_minting_authority: {
-        destinationChain: 'PalletCrosschainTransferSourceChain',
-        destinationSigningKey: 'H160',
-        signature: '[u8;65]',
-        microgonCollateral: 'Compact<u128>',
-        micronotCollateral: 'Compact<u128>',
-      },
       approve_queue_entries: {
         destinationChain: 'PalletCrosschainTransferSourceChain',
         signatures: 'Vec<[u8;65]>',
@@ -2918,6 +2911,17 @@ export default {
         sourceChain: 'PalletCrosschainTransferSourceChain',
         previousGatewayActivityNonce: 'Compact<u64>',
         proofBatch: 'ArgonPrimitivesEthereumEthereumReceiptLogProofBatch',
+      },
+      register_minting_authority: {
+        destinationChain: 'PalletCrosschainTransferSourceChain',
+        destinationSigningKey: 'H160',
+        signature: '[u8;65]',
+        microgonCollateral: 'Compact<u128>',
+        micronotCollateral: 'Compact<u128>',
+      },
+      deactivate_minting_authority: {
+        destinationSigningKey: 'H160',
+        signature: '[u8;65]',
       },
       transfer_out: {
         destinationChain: 'PalletCrosschainTransferSourceChain',
@@ -2930,10 +2934,6 @@ export default {
         signature: '[u8;65]',
         microgonCollateral: 'Compact<u128>',
         micronotCollateral: 'Compact<u128>',
-      },
-      deactivate_minting_authority: {
-        destinationSigningKey: 'H160',
-        signature: '[u8;65]',
       },
     },
   },
@@ -3990,9 +3990,8 @@ export default {
     pendingReservedMicronotCollateral: 'u128',
     activePendingTransferIds: 'Vec<H256>',
     activationApprovalQueueNonce: 'u64',
-    activationBaseRepaymentDue: 'Option<u128>',
-    activationSignatureRepaymentDue: 'Option<u128>',
-    activationRepaymentDue: 'Option<u128>',
+    activationBaseRepaymentQuote: 'Compact<u128>',
+    activationSignatureRepaymentQuote: 'Compact<u128>',
     deactivationApprovalQueueNonce: 'Option<u64>',
   },
   /**
@@ -4008,7 +4007,7 @@ export default {
     argonAccountId: 'AccountId32',
     argonTransferNonce: 'Compact<u64>',
     destinationChain: 'PalletCrosschainTransferSourceChain',
-    councilHash: 'H256',
+    microgonsPerArgonot: 'Compact<u128>',
     destinationAccount: 'H160',
     validUntilEthereumBlock: 'Compact<u64>',
     asset: 'PalletCrosschainTransferAssetKind',

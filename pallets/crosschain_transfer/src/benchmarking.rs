@@ -72,12 +72,85 @@ mod benchmarks {
 	fn force_set_global_issuance_council() -> Result<(), BenchmarkError> {
 		reset_crosschain_benchmark_state::<T>();
 		let caller: T::AccountId = account("council-member", 0, 0);
+		let council_signer = benchmark_signer(1);
+		let authority_signer = benchmark_signer(2);
 
 		seed_benchmark_vault::<T>(&caller, 1, 50_000u128);
+		seed_chain_config::<T>(0x21);
 		CouncilSignerByDestinationChainAndAccountId::<T>::insert(
 			BENCHMARK_DESTINATION_CHAIN,
 			&caller,
-			benchmark_signer(1),
+			council_signer,
+		);
+		let active_council_hash =
+			seed_active_council::<T>(&caller, council_signer, 50_000u128.into())?;
+		let mut queued_rotation_council =
+			GlobalIssuanceCouncilByHash::<T>::get(active_council_hash)
+				.ok_or(BenchmarkError::Stop("active benchmark council missing"))?;
+		queued_rotation_council.epoch_microgons_per_argonot =
+			(2 * argon_primitives::MICROGONS_PER_ARGON).into();
+		let queued_rotation_hash = Pallet::<T>::hash_global_issuance_council(
+			&queued_rotation_council.members,
+			queued_rotation_council.epoch_microgons_per_argonot,
+		);
+		GlobalIssuanceCouncilByHash::<T>::insert(queued_rotation_hash, queued_rotation_council);
+
+		let rotation_entry = CouncilApprovalQueueEntry::<T> {
+			approving_council_hash: active_council_hash,
+			target: CouncilApprovalTargetId::GlobalIssuanceCouncilRotation(queued_rotation_hash),
+			target_payload_hash: H256::repeat_byte(0x21),
+			due_frame_id: 10,
+			previous_approval_hash: H256::zero(),
+			approval_hash: H256::repeat_byte(0x22),
+			approved_total_weight: T::Balance::default(),
+			signatures: BoundedBTreeMap::new(),
+		};
+		CouncilApprovalQueueByDestinationChainAndNonce::<T>::insert(
+			BENCHMARK_DESTINATION_CHAIN,
+			1,
+			rotation_entry,
+		);
+
+		let mut activation_entry = benchmark_activation_queue_entry::<T>(
+			queued_rotation_hash,
+			2,
+			H256::repeat_byte(0x22),
+			authority_signer,
+		)?;
+		activation_entry.approval_hash = Pallet::<T>::hash_council_approval_queue_entry(
+			BENCHMARK_DESTINATION_CHAIN,
+			2,
+			&activation_entry,
+		)
+		.map_err(|_| BenchmarkError::Stop("failed to hash benchmark activation queue entry"))?;
+		CouncilApprovalQueueByDestinationChainAndNonce::<T>::insert(
+			BENCHMARK_DESTINATION_CHAIN,
+			2,
+			activation_entry,
+		);
+		NextCouncilApprovalQueueNonceByDestinationChain::<T>::insert(
+			BENCHMARK_DESTINATION_CHAIN,
+			2,
+		);
+		Pallet::<T>::refresh_destination_chain_queue_tracking(BENCHMARK_DESTINATION_CHAIN)
+			.map_err(|_| BenchmarkError::Stop("failed to refresh benchmark queue tracking"))?;
+		MintingAuthoritiesBySigner::<T>::insert(
+			authority_signer,
+			MintingAuthority::<T> {
+				account_id: caller.clone(),
+				destination_chain: BENCHMARK_DESTINATION_CHAIN,
+				destination_signing_key: authority_signer,
+				state: MintingAuthorityState::PendingActivation,
+				gateway_remaining_microgon_collateral: T::Balance::default(),
+				gateway_remaining_micronot_collateral: T::Balance::default(),
+				pending_reserved_microgon_collateral: T::Balance::default(),
+				pending_reserved_micronot_collateral: T::Balance::default(),
+				active_pending_transfer_ids: BoundedVec::default(),
+				activation_approval_queue_nonce: 2,
+				activation_base_repayment_quote: T::Balance::default(),
+				activation_signature_repayment_quote: T::Balance::default(),
+				deactivation_approval_queue_nonce: None,
+			},
 		);
 		let members = vec![caller.clone()]
 			.try_into()
@@ -86,9 +159,36 @@ mod benchmarks {
 		#[extrinsic_call]
 		force_set_global_issuance_council(RawOrigin::Root, BENCHMARK_DESTINATION_CHAIN, 0, members);
 
-		assert!(ActiveGlobalIssuanceCouncilByDestinationChain::<T>::contains_key(
+		let rebased_entry = CouncilApprovalQueueByDestinationChainAndNonce::<T>::get(
 			BENCHMARK_DESTINATION_CHAIN,
-		),);
+			1,
+		)
+		.ok_or(BenchmarkError::Stop("rebased benchmark activation missing"))?;
+		assert_eq!(
+			rebased_entry.target,
+			CouncilApprovalTargetId::MintingAuthorityActivation(authority_signer),
+		);
+		assert_eq!(
+			rebased_entry.approving_council_hash,
+			ActiveGlobalIssuanceCouncilByDestinationChain::<T>::get(BENCHMARK_DESTINATION_CHAIN,)
+				.ok_or(BenchmarkError::Stop("active benchmark council missing after force set"))?,
+		);
+		assert!(CouncilApprovalQueueByDestinationChainAndNonce::<T>::get(
+			BENCHMARK_DESTINATION_CHAIN,
+			2,
+		)
+		.is_none());
+		assert_eq!(
+			NextCouncilApprovalQueueNonceByDestinationChain::<T>::get(BENCHMARK_DESTINATION_CHAIN,),
+			1,
+		);
+		assert_eq!(
+			MintingAuthoritiesBySigner::<T>::get(authority_signer)
+				.ok_or(BenchmarkError::Stop("benchmark authority missing after force set"))?
+				.activation_approval_queue_nonce,
+			1,
+		);
+		assert!(GlobalIssuanceCouncilByHash::<T>::get(queued_rotation_hash).is_none());
 		Ok(())
 	}
 
@@ -623,24 +723,21 @@ fn seed_active_council<T: Config>(
 	signer: H160,
 	weight: T::Balance,
 ) -> Result<H256, BenchmarkError> {
-	let mut members = BoundedBTreeMap::new();
-	let _ = members
-		.try_insert(
-			signer,
-			GlobalIssuanceCouncilMember::<T> { account_id: account_id.clone(), signer, weight },
-		)
-		.map_err(|_| BenchmarkError::Stop("benchmark council members exceeded runtime bound"))?;
-	let epoch_microgons_per_argonot: T::Balance = argon_primitives::MICROGONS_PER_ARGON.into();
-	let council =
-		GlobalIssuanceCouncil::<T> { epoch_microgons_per_argonot, total_weight: weight, members };
-	let council_hash = Pallet::<T>::hash_global_issuance_council(
-		&council.members,
-		council.epoch_microgons_per_argonot,
-	);
+	let (council_hash, council) = benchmark_council(
+		account_id,
+		signer,
+		weight,
+		argon_primitives::MICROGONS_PER_ARGON.into(),
+	)?;
 	GlobalIssuanceCouncilByHash::<T>::insert(council_hash, council);
 	ActiveGlobalIssuanceCouncilByDestinationChain::<T>::insert(
 		BENCHMARK_DESTINATION_CHAIN,
 		council_hash,
+	);
+	let current_transfer_out_rate: T::Balance = argon_primitives::MICROGONS_PER_ARGON.into();
+	CurrentTransferOutMicrogonsPerArgonotByDestinationChain::<T>::insert(
+		BENCHMARK_DESTINATION_CHAIN,
+		current_transfer_out_rate,
 	);
 	CouncilSignerByDestinationChainAndAccountId::<T>::insert(
 		BENCHMARK_DESTINATION_CHAIN,
@@ -648,6 +745,29 @@ fn seed_active_council<T: Config>(
 		signer,
 	);
 	Ok(council_hash)
+}
+
+fn benchmark_council<T: Config>(
+	account_id: &T::AccountId,
+	signer: H160,
+	weight: T::Balance,
+	epoch_microgons_per_argonot: T::Balance,
+) -> Result<(H256, GlobalIssuanceCouncil<T>), BenchmarkError> {
+	let mut members = BoundedBTreeMap::new();
+	let _ = members
+		.try_insert(
+			signer,
+			GlobalIssuanceCouncilMember::<T> { account_id: account_id.clone(), signer, weight },
+		)
+		.map_err(|_| BenchmarkError::Stop("benchmark council members exceeded runtime bound"))?;
+	let council =
+		GlobalIssuanceCouncil::<T> { epoch_microgons_per_argonot, total_weight: weight, members };
+	let council_hash = Pallet::<T>::hash_global_issuance_council(
+		&council.members,
+		council.epoch_microgons_per_argonot,
+	);
+
+	Ok((council_hash, council))
 }
 
 fn seed_active_minting_authority<T: Config>(
@@ -669,9 +789,8 @@ fn seed_active_minting_authority<T: Config>(
 			pending_reserved_micronot_collateral: T::Balance::default(),
 			active_pending_transfer_ids: BoundedVec::default(),
 			activation_approval_queue_nonce,
-			activation_base_repayment_due: None,
-			activation_signature_repayment_due: None,
-			activation_repayment_due: None,
+			activation_base_repayment_quote: T::Balance::default(),
+			activation_signature_repayment_quote: T::Balance::default(),
 			deactivation_approval_queue_nonce: None,
 		},
 	);

@@ -205,9 +205,8 @@ export class EthereumProofE2eHarness {
   }
 
   async configureEthereumRuntime(gateway: TestMintingGateway, mode: RuntimeSetupMode) {
-    const crosschainTransfer = this.mainchainClient.tx.crosschainTransfer as any;
     const calls = [
-      crosschainTransfer.setChainConfig('Ethereum', {
+      this.mainchainClient.tx.crosschainTransfer.setChainConfig('Ethereum', {
         Evm: {
           chainId: BigInt(this.chain.id).toString(),
           gateway: gateway.gatewayAddress,
@@ -226,17 +225,20 @@ export class EthereumProofE2eHarness {
       };
 
       calls.push(
-        crosschainTransfer.setMintingAuthorityActivationRepaymentPricing('Ethereum', {
-          activationGasCost: activationPricing.activationGasCost.toString(),
-          signatureGasCost: activationPricing.signatureGasCost.toString(),
-          estimatedWeiPerGas: activationPricing.estimatedWeiPerGas.toString(),
-          estimatedMicrogonsPerEth: activationPricing.estimatedMicrogonsPerEth.toString(),
-        }),
+        this.mainchainClient.tx.crosschainTransfer.setMintingAuthorityActivationRepaymentPricing(
+          'Ethereum',
+          {
+            activationGasCost: activationPricing.activationGasCost.toString(),
+            signatureGasCost: activationPricing.signatureGasCost.toString(),
+            estimatedWeiPerGas: activationPricing.estimatedWeiPerGas.toString(),
+            estimatedMicrogonsPerEth: activationPricing.estimatedMicrogonsPerEth.toString(),
+          },
+        ),
       );
 
       if (mode.minimumMintingAuthorityValue !== undefined) {
         calls.push(
-          crosschainTransfer.setMinimumMintingAuthorityValue(
+          this.mainchainClient.tx.crosschainTransfer.setMinimumMintingAuthorityValue(
             'Ethereum',
             mode.minimumMintingAuthorityValue.toString(),
           ),
@@ -373,7 +375,10 @@ export class TestMintingGateway {
     return waitForExecutionReceipt(this.harness.ethereum, transactionHash);
   }
 
-  async forceUpdateActiveCouncil(currentCouncil: { signers: Hex[]; weights: bigint[] }) {
+  async forceUpdateActiveCouncil(
+    replacementCouncil: { signers: Hex[]; weights: bigint[] },
+    nextMicrogonsPerArgonot: bigint,
+  ) {
     return this.harness.publicClient.waitForTransactionReceipt({
       hash: await this.harness.walletClient.writeContract({
         account: this.harness.deployer,
@@ -381,7 +386,7 @@ export class TestMintingGateway {
         address: this.gatewayAddress,
         abi: mintingGatewayAbi,
         functionName: 'forceUpdateActiveCouncil',
-        args: [currentCouncil],
+        args: [replacementCouncil, nextMicrogonsPerArgonot],
       }),
     });
   }
@@ -436,7 +441,7 @@ export class TestMintingGateway {
       argonAccountId: Hex;
       argonTransferNonce: bigint;
       chainId: bigint;
-      councilHash: Hex;
+      microgonsPerArgonot: bigint;
       recipient: Hex;
       validUntilBlock: bigint;
       token: Hex;
@@ -707,7 +712,7 @@ export class TestMintingAuthorityActor {
       argonAccountId: transfer.argonAccountId.toHex(),
       argonTransferNonce: transfer.argonTransferNonce.toBigInt(),
       chainId: BigInt(this.harness.chain.id),
-      councilHash: transfer.councilHash.toHex(),
+      microgonsPerArgonot: transfer.microgonsPerArgonot.toBigInt(),
       recipient: transfer.destinationAccount.toHex(),
       validUntilBlock: transfer.validUntilEthereumBlock.toBigInt(),
       token: gateway.argonTokenAddress,

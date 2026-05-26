@@ -317,7 +317,7 @@ async function measureUserScenarios() {
   const transferFixture = await deployFixture(createCouncil(4));
   const permitDeadline = BigInt((await ethers.provider.getBlock('latest'))!.timestamp) + 3600n;
   const permit = await signPermit(
-    transferFixture.holder as SignerLike,
+    transferFixture.holder,
     transferFixture.argon,
     transferFixture.holder.address,
     await transferFixture.gateway.getAddress(),
@@ -932,7 +932,7 @@ function parseGasCapError(error: unknown) {
 function stringifyJson(value: unknown) {
   return JSON.stringify(
     value,
-    (_key, entry) => (typeof entry === 'bigint' ? entry.toString() : entry),
+    (_key, entry: unknown): unknown => (typeof entry === 'bigint' ? entry.toString() : entry),
     2,
   );
 }

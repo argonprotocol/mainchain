@@ -1,5 +1,4 @@
 // Auto-generated via `yarn polkadot-types-from-chain`, do not edit
-/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
@@ -547,6 +546,16 @@ declare module '@polkadot/api-base/types/storage' {
         [PalletCrosschainTransferSourceChain, AccountId32]
       >;
       /**
+       * Conservative transfer-out conversion rate currently quoted for each destination chain.
+       **/
+      currentTransferOutMicrogonsPerArgonotByDestinationChain: AugmentedQuery<
+        ApiType,
+        (
+          arg: PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
+        ) => Observable<Option<u128>>,
+        [PalletCrosschainTransferSourceChain]
+      >;
+      /**
        * Latest proven gateway activity snapshot for each source chain.
        **/
       gatewayStateBySourceChain: AugmentedQuery<
@@ -589,8 +598,8 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       lastTransferExpiryCleanupTick: AugmentedQuery<ApiType, () => Observable<u64>, []>;
       /**
-       * The latest queued council hash that should govern the next queue entry on each
-       * destination chain.
+       * The latest queued council hash that should govern the next queue entry on each destination
+       * chain.
        **/
       latestQueuedCouncilHashByDestinationChain: AugmentedQuery<
         ApiType,
@@ -691,6 +700,17 @@ declare module '@polkadot/api-base/types/storage' {
         [PalletCrosschainTransferSourceChain]
       >;
       /**
+       * Immediately previous transfer-out conversion rate still accepted while the floor ratchets
+       * upward across council transitions.
+       **/
+      previousTransferOutMicrogonsPerArgonotByDestinationChain: AugmentedQuery<
+        ApiType,
+        (
+          arg: PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
+        ) => Observable<Option<u128>>,
+        [PalletCrosschainTransferSourceChain]
+      >;
+      /**
        * Count of still-retained qualifying Argon transfers for each local account.
        **/
       recentArgonTransfersByAccount: AugmentedQuery<
@@ -707,6 +727,17 @@ declare module '@polkadot/api-base/types/storage' {
           arg: H256 | string | Uint8Array,
         ) => Observable<Option<PalletCrosschainTransferTransferOutTransferOutOfArgon>>,
         [H256]
+      >;
+      /**
+       * The conservative transfer-out quote floor that the next newly opened transfer should
+       * snapshot on each destination chain.
+       **/
+      transferOutQuoteMicrogonsPerArgonotByDestinationChain: AugmentedQuery<
+        ApiType,
+        (
+          arg: PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
+        ) => Observable<Option<u128>>,
+        [PalletCrosschainTransferSourceChain]
       >;
     };
     digests: {

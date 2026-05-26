@@ -2,12 +2,12 @@
 // SPDX-FileCopyrightText: 2023 Snowfork <hello@snowfork.com>
 use super::*;
 use alloc::vec;
+mod scenarios;
 mod util;
 
 use crate::{
-	mock::{
-		load_checkpoint_update_fixture, load_finalized_header_update_fixture,
-		load_later_checkpoint_update_fixture, load_sync_committee_update_fixture,
+	fixture_conversions::{
+		anchored_update_from_fixture, checkpoint_update_from_fixture, committee_update_from_fixture,
 	},
 	types::ExecutionHeaderAnchor,
 	Fork, ForkVersions, Pallet as EthereumBeaconClient,
@@ -28,12 +28,17 @@ use polkadot_sdk::{
 	frame_support::traits::ConstU32,
 	sp_core::{H160, H256},
 };
+use scenarios::{
+	make_finalized_header_execution_proof, make_finalized_header_update, make_initial_checkpoint,
+	make_initial_checkpoint_execution_proof, make_later_checkpoint,
+	make_later_checkpoint_execution_proof, make_sync_committee_execution_proof,
+	make_sync_committee_update,
+};
 use snowbridge_beacon_primitives::{
 	fast_aggregate_verify,
 	merkle_proof::{generalized_index_length, subtree_index},
 	prepare_aggregate_pubkey, prepare_aggregate_signature, verify_merkle_branch,
 };
-use snowbridge_pallet_ethereum_client_fixtures::*;
 use util::*;
 
 frame_support::parameter_types! {
@@ -44,16 +49,37 @@ frame_support::parameter_types! {
 		capella: Fork { version: hex!("03000000"), epoch: 0 },
 		deneb: Fork { version: hex!("04000000"), epoch: 0 },
 		electra: Fork { version: hex!("05000000"), epoch: 0 },
-		fulu: Fork { version: hex!("06000000"), epoch: 100_000_000 },
+		fulu: Fork { version: hex!("06000000"), epoch: 411_392 },
 	};
 }
 
 fn benchmark_checkpoint_update() -> Result<crate::types::CheckpointUpdate, BenchmarkError> {
-	Ok(load_checkpoint_update_fixture())
+	checkpoint_update_from_fixture(
+		make_initial_checkpoint(),
+		make_initial_checkpoint_execution_proof(),
+	)
+	.map_err(|_| BenchmarkError::Stop("checkpoint fixture exceeds verifier bounds"))
 }
 
 fn benchmark_later_checkpoint_update() -> Result<crate::types::CheckpointUpdate, BenchmarkError> {
-	Ok(load_later_checkpoint_update_fixture())
+	checkpoint_update_from_fixture(make_later_checkpoint(), make_later_checkpoint_execution_proof())
+		.map_err(|_| BenchmarkError::Stop("later checkpoint fixture exceeds verifier bounds"))
+}
+
+fn benchmark_sync_committee_update() -> Result<crate::types::Update, BenchmarkError> {
+	committee_update_from_fixture(
+		make_sync_committee_update(),
+		make_sync_committee_execution_proof(),
+	)
+	.map_err(|_| BenchmarkError::Stop("sync committee fixture exceeds verifier bounds"))
+}
+
+fn benchmark_finalized_header_update() -> Result<crate::types::Update, BenchmarkError> {
+	anchored_update_from_fixture(
+		make_finalized_header_update(),
+		make_finalized_header_execution_proof(),
+	)
+	.map_err(|_| BenchmarkError::Stop("finalized header fixture exceeds verifier bounds"))
 }
 
 #[benchmarks]
@@ -78,7 +104,7 @@ mod benchmarks {
 	fn submit() -> Result<(), BenchmarkError> {
 		let caller: T::AccountId = whitelisted_caller();
 		let checkpoint_update = benchmark_later_checkpoint_update()?;
-		let finalized_header_update = load_finalized_header_update_fixture();
+		let finalized_header_update = benchmark_finalized_header_update()?;
 		EthereumBeaconClient::<T>::process_checkpoint_update(
 			&checkpoint_update,
 			&BenchmarkForkVersions::get(),
@@ -97,7 +123,7 @@ mod benchmarks {
 	fn submit_with_sync_committee() -> Result<(), BenchmarkError> {
 		let caller: T::AccountId = whitelisted_caller();
 		let checkpoint_update = benchmark_checkpoint_update()?;
-		let sync_committee_update = load_sync_committee_update_fixture();
+		let sync_committee_update = benchmark_sync_committee_update()?;
 		EthereumBeaconClient::<T>::process_checkpoint_update(
 			&checkpoint_update,
 			&BenchmarkForkVersions::get(),
@@ -185,7 +211,7 @@ mod benchmarks {
 			&benchmark_checkpoint_update()?,
 			&BenchmarkForkVersions::get(),
 		)?;
-		let update = load_sync_committee_update_fixture();
+		let update = benchmark_sync_committee_update()?;
 		let participant_pubkeys = participant_pubkeys::<T>(&update)?;
 		let signing_root = signing_root::<T>(&update)?;
 		let agg_sig =
@@ -206,7 +232,7 @@ mod benchmarks {
 			&benchmark_checkpoint_update()?,
 			&BenchmarkForkVersions::get(),
 		)?;
-		let update = load_sync_committee_update_fixture();
+		let update = benchmark_sync_committee_update()?;
 		let current_sync_committee = <CurrentSyncCommittee<T>>::get();
 		let absent_pubkeys = absent_pubkeys::<T>(&update)?;
 		let signing_root = signing_root::<T>(&update)?;
@@ -231,7 +257,7 @@ mod benchmarks {
 			&benchmark_checkpoint_update()?,
 			&BenchmarkForkVersions::get(),
 		)?;
-		let update = load_sync_committee_update_fixture();
+		let update = benchmark_sync_committee_update()?;
 		let block_root: H256 = update.finalized_header.hash_tree_root().unwrap();
 
 		let fork_versions = ForkVersions {

@@ -1,62 +1,350 @@
-pub(super) use super::{
-	migrations::InitializeCrosschainTransferMigration,
-	ActiveGlobalIssuanceCouncilByDestinationChain, ArgonApprovalsNonce, AssetKind, Call,
-	ChainConfig, ChainConfigBySourceChain, CouncilApprovalCursorByDestinationChainAndAccountId,
-	CouncilApprovalQueueByDestinationChainAndNonce, CouncilApprovalQueueEntry,
-	CouncilApprovalQueueNonce, CouncilApprovalTargetId,
-	CouncilSignerByDestinationChainAndAccountId, Error, Event, GatewayActivityNonce,
-	GatewayActivityProofBatch, GatewayActivityProofBlock, GatewayState, GatewayStateBySourceChain,
-	GatewaySyncPause, GatewaySyncPauseBySourceChain, GatewaySyncPauseReason,
-	GlobalIssuanceCouncilByHash, HoldReason, InboundTransfersExpiringAt,
-	MinimumMintingAuthorityValueByDestinationChain, MintingAuthoritiesBySigner, MintingAuthority,
-	MintingAuthorityActivationRepaymentPricing, MintingAuthorityState,
-	NonTerminalTransferOutCountByDestinationChain, PendingCollateralizationRequest,
-	PendingCollateralizationRequestsByChain, PendingCouncilSignerByDestinationChainAndAccountId,
-	PendingTransferOutCirculationByDestinationChain, RecentArgonTransfersByAccount, SourceChain,
-	TransferOutById, TransferOutRequestNonce, TransferOutState, TransferToArgonActivity,
-};
+pub(super) use super::*;
 pub(super) use alloy_primitives::Address as AlloyAddress;
 pub(super) use alloy_sol_types::SolEvent;
-pub(super) use argon_ethereum_contracts::minting_gateway::{self as ethereum_contracts};
+pub(super) use argon_ethereum_contracts::minting_gateway as ethereum_contracts;
 pub(super) use argon_primitives::{
-	CallTxPoolKeyProvider, CallTxValidityProvider, CollectBlockerProvider, EthereumLog,
+	Balance, CallTxPoolKeyProvider, CallTxValidityProvider, CollectBlockerProvider, EthereumLog,
 	EthereumReceiptLog,
 };
 pub(super) use frame_support::{
 	assert_noop, assert_ok,
 	dispatch::Pays,
 	traits::{
-		fungible::{InspectHold, Mutate},
-		OnRuntimeUpgrade,
+		fungible::{Inspect, InspectHold, Mutate, MutateHold},
+		tokens::{Fortitude, Precision, Preservation},
+		GetStorageVersion,
 	},
 };
-pub(super) use pallet_prelude::*;
+pub(super) use pallet_prelude::{BoundedVec, StorageVersion, H160, H256};
 pub(super) use sp_core::{bounded_vec, crypto::Ss58Codec, ecdsa::KeccakPair, Pair};
-pub(super) use sp_runtime::{transaction_validity::InvalidTransaction, AccountId32};
-
-pub(super) use super::mock::{
-	account, active_bond_microgons, committed_argonot_micronots, encumbered_argonot_micronots,
-	encumbered_bond_microgons, h160, legacy_token_gateway_account, new_test_ext,
-	register_vault_operator, set_active_bond_amount, set_committed_argonots, ArgonPriceInUsd,
-	ArgonotPriceInUsd, Balances, ConfirmedTransfers, CrosschainTransfer, CurrentFrameId,
-	CurrentTick, LatestExecutionBlockTimestamp, LowestMicrogonsPerArgonot,
-	MaxActivitiesPerReceiptProof, Ownership, ProofVerificationAllowed,
-	ProofVerificationRejectedTransactionIndexes, RecentTransferRetentionTicks, RuntimeCall,
-	RuntimeEvent, RuntimeHoldReason, RuntimeOrigin, System, Test, TestAccountId,
+pub(super) use sp_runtime::{
+	transaction_validity::{InvalidTransaction, TransactionValidityError},
+	AccountId32,
 };
 
-#[path = "tests/council.rs"]
-mod council_tests;
-#[path = "tests/gateway_activity.rs"]
-mod gateway_activity_tests;
-#[path = "tests/lifecycle.rs"]
-mod lifecycle_tests;
-#[path = "tests/minting_authority.rs"]
-mod minting_authority_tests;
-#[path = "tests/transfer_out.rs"]
-mod transfer_out_tests;
+pub(super) use super::mock::*;
 
-fn chain_config() -> ChainConfig {
+#[test]
+fn force_set_global_issuance_council_replaces_active_members() {
+	new_test_ext().execute_with(|| {
+		let first_account = account(30);
+		let second_account = account(31);
+		let first_signing_pair = council_signing_pair(1);
+		let second_signing_pair = council_signing_pair(2);
+		let first_signer = council_signer(&first_signing_pair);
+		let second_signer = council_signer(&second_signing_pair);
+
+		register_vault_operator(first_account.clone(), 7, 8_000);
+		register_vault_operator(second_account.clone(), 9, 5_000);
+		assert_ok!(CrosschainTransfer::register_council_signer(
+			RuntimeOrigin::signed(first_account.clone()),
+			SourceChain::Ethereum,
+			first_signer,
+			council_signer_registration_signature(&first_signing_pair, &first_account),
+		));
+		assert_ok!(CrosschainTransfer::register_council_signer(
+			RuntimeOrigin::signed(second_account.clone()),
+			SourceChain::Ethereum,
+			second_signer,
+			council_signer_registration_signature(&second_signing_pair, &second_account),
+		));
+
+		assert_ok!(CrosschainTransfer::force_set_global_issuance_council(
+			RuntimeOrigin::root(),
+			SourceChain::Ethereum,
+			0,
+			vec![first_account.clone()]
+				.try_into()
+				.expect("single council member stays within limit"),
+		));
+		assert_ok!(CrosschainTransfer::force_set_global_issuance_council(
+			RuntimeOrigin::root(),
+			SourceChain::Ethereum,
+			0,
+			vec![second_account.clone()]
+				.try_into()
+				.expect("single council member stays within limit"),
+		));
+
+		let active_council =
+			ActiveGlobalIssuanceCouncilByDestinationChain::<Test>::get(SourceChain::Ethereum)
+				.expect("council should be stored");
+		let council = GlobalIssuanceCouncilByHash::<Test>::get(active_council)
+			.expect("council snapshot should be stored");
+		assert_eq!(council.total_weight, 5_000);
+		assert_eq!(
+			CouncilSignerByDestinationChainAndAccountId::<Test>::get(
+				SourceChain::Ethereum,
+				first_account.clone(),
+			),
+			Some(first_signer),
+		);
+		assert_eq!(
+			CouncilSignerByDestinationChainAndAccountId::<Test>::get(
+				SourceChain::Ethereum,
+				second_account.clone(),
+			),
+			Some(second_signer),
+		);
+		assert_eq!(
+			CouncilApprovalCursorByDestinationChainAndAccountId::<Test>::get(
+				SourceChain::Ethereum,
+				first_account,
+			),
+			None,
+		);
+		assert_eq!(
+			CouncilApprovalCursorByDestinationChainAndAccountId::<Test>::get(
+				SourceChain::Ethereum,
+				second_account,
+			),
+			Some(0),
+		);
+		assert!(!council.members.contains_key(&first_signer));
+		assert!(council.members.contains_key(&second_signer));
+	});
+}
+
+#[test]
+fn force_set_global_issuance_council_uses_argonot_price_floor_for_combined_weight() {
+	new_test_ext().execute_with(|| {
+		let council_account = account(32);
+		let council_pair = council_signing_pair(3);
+		let council_signer = council_signer(&council_pair);
+
+		register_vault_operator(council_account.clone(), 10, 8_000);
+		assert_ok!(set_committed_argonots(council_account.clone(), 500));
+		assert_ok!(CrosschainTransfer::register_council_signer(
+			RuntimeOrigin::signed(council_account.clone()),
+			SourceChain::Ethereum,
+			council_signer,
+			council_signer_registration_signature(&council_pair, &council_account),
+		));
+
+		ArgonPriceInUsd::set(FixedU128::one());
+		ArgonotPriceInUsd::set(FixedU128::from_u32(9));
+		LowestMicrogonsPerArgonot::set(Some(2 * argon_primitives::MICROGONS_PER_ARGON));
+		assert_ok!(CrosschainTransfer::force_set_global_issuance_council(
+			RuntimeOrigin::root(),
+			SourceChain::Ethereum,
+			0,
+			vec![council_account.clone()]
+				.try_into()
+				.expect("single council member stays within limit"),
+		));
+
+		let first_active_council =
+			ActiveGlobalIssuanceCouncilByDestinationChain::<Test>::get(SourceChain::Ethereum)
+				.expect("first council should be stored");
+		let first_council = GlobalIssuanceCouncilByHash::<Test>::get(first_active_council)
+			.expect("first council snapshot should be stored");
+		assert_eq!(first_council.total_weight, 9_000);
+		assert_eq!(
+			first_council
+				.members
+				.get(&council_signer)
+				.expect("council member should be stored")
+				.weight,
+			9_000,
+		);
+
+		ArgonotPriceInUsd::set(FixedU128::from_u32(11));
+		LowestMicrogonsPerArgonot::set(Some(3 * argon_primitives::MICROGONS_PER_ARGON));
+		assert_ok!(CrosschainTransfer::force_set_global_issuance_council(
+			RuntimeOrigin::root(),
+			SourceChain::Ethereum,
+			0,
+			vec![council_account.clone()]
+				.try_into()
+				.expect("single council member stays within limit"),
+		));
+
+		let second_active_council =
+			ActiveGlobalIssuanceCouncilByDestinationChain::<Test>::get(SourceChain::Ethereum)
+				.expect("replacement council should be stored");
+		let second_council = GlobalIssuanceCouncilByHash::<Test>::get(second_active_council)
+			.expect("replacement council snapshot should be stored");
+		assert_eq!(second_council.total_weight, 9_500);
+		assert_eq!(
+			second_council
+				.members
+				.get(&council_signer)
+				.expect("replacement member should be stored")
+				.weight,
+			9_500,
+		);
+	});
+}
+
+#[test]
+fn register_council_signer_validates_proof_and_applies_queued_replacement() {
+	new_test_ext().execute_with(|| {
+		let council_account = account(37);
+		let current_pair = council_signing_pair(51);
+		let next_pair = council_signing_pair(52);
+		let wrong_pair = council_signing_pair(53);
+		let current_signer = council_signer(&current_pair);
+		let next_signer = council_signer(&next_pair);
+
+		register_vault_operator(council_account.clone(), 15, 9_000);
+		assert_noop!(
+			CrosschainTransfer::register_council_signer(
+				RuntimeOrigin::signed(council_account.clone()),
+				SourceChain::Ethereum,
+				current_signer,
+				council_signer_registration_signature(&wrong_pair, &council_account),
+			),
+			Error::<Test>::InvalidCouncilSignerProof,
+		);
+		assert_ok!(CrosschainTransfer::register_council_signer(
+			RuntimeOrigin::signed(council_account.clone()),
+			SourceChain::Ethereum,
+			current_signer,
+			council_signer_registration_signature(&current_pair, &council_account),
+		));
+		assert_ok!(CrosschainTransfer::force_set_global_issuance_council(
+			RuntimeOrigin::root(),
+			SourceChain::Ethereum,
+			0,
+			vec![council_account.clone()]
+				.try_into()
+				.expect("single council member stays within limit"),
+		));
+
+		assert_ok!(CrosschainTransfer::register_council_signer(
+			RuntimeOrigin::signed(council_account.clone()),
+			SourceChain::Ethereum,
+			next_signer,
+			council_signer_registration_signature(&next_pair, &council_account),
+		));
+		assert_eq!(
+			CouncilSignerByDestinationChainAndAccountId::<Test>::get(
+				SourceChain::Ethereum,
+				&council_account,
+			),
+			Some(current_signer),
+		);
+		assert_eq!(
+			PendingCouncilSignerByDestinationChainAndAccountId::<Test>::get(
+				SourceChain::Ethereum,
+				&council_account,
+			),
+			Some(next_signer),
+		);
+
+		assert_ok!(CrosschainTransfer::force_set_global_issuance_council(
+			RuntimeOrigin::root(),
+			SourceChain::Ethereum,
+			0,
+			vec![council_account.clone()]
+				.try_into()
+				.expect("single council member stays within limit"),
+		));
+
+		let active_council =
+			ActiveGlobalIssuanceCouncilByDestinationChain::<Test>::get(SourceChain::Ethereum)
+				.expect("replacement council should be stored");
+		let council = GlobalIssuanceCouncilByHash::<Test>::get(active_council)
+			.expect("replacement council snapshot should be stored");
+		assert!(council.members.contains_key(&next_signer));
+		assert!(!council.members.contains_key(&current_signer));
+		assert_eq!(
+			CouncilSignerByDestinationChainAndAccountId::<Test>::get(
+				SourceChain::Ethereum,
+				&council_account,
+			),
+			Some(next_signer),
+		);
+		assert_eq!(
+			PendingCouncilSignerByDestinationChainAndAccountId::<Test>::get(
+				SourceChain::Ethereum,
+				&council_account,
+			),
+			None,
+		);
+	});
+}
+
+#[test]
+fn on_initialize_expires_recent_transfers() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		CurrentTick::set(1);
+		CrosschainTransfer::on_initialize(System::block_number());
+
+		let recipient = account(7);
+		let expires_at = CurrentTick::get() + RecentTransferRetentionTicks::get();
+		RecentArgonTransfersByAccount::<Test>::insert(&recipient, 1);
+		InboundTransfersExpiringAt::<Test>::append(expires_at, recipient.clone());
+
+		assert_eq!(RecentArgonTransfersByAccount::<Test>::get(&recipient), 1);
+		assert_eq!(InboundTransfersExpiringAt::<Test>::get(expires_at).len(), 1);
+
+		CurrentTick::set(expires_at + 2);
+		System::set_block_number(2);
+		CrosschainTransfer::on_initialize(System::block_number());
+
+		assert_eq!(RecentArgonTransfersByAccount::<Test>::get(&recipient), 0);
+		assert!(InboundTransfersExpiringAt::<Test>::get(expires_at).is_empty());
+	});
+}
+
+#[test]
+fn migration_moves_legacy_balances_and_refunds_ready_cases() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+
+		let legacy_account = legacy_token_gateway_account();
+		let burn_account = CrosschainTransfer::burn_account(SourceChain::Ethereum);
+
+		let _ = super::hyperbridge_migration::initialize_crosschain_transfer::<Test>();
+
+		assert_eq!(Balances::balance(&legacy_account), 0);
+		assert_eq!(Ownership::balance(&legacy_account), 0);
+		assert_eq!(
+			<CrosschainTransfer as GetStorageVersion>::on_chain_storage_version(),
+			StorageVersion::new(1),
+		);
+
+		assert_eq!(Balances::balance(&burn_account), 1_928_409);
+		assert_eq!(Ownership::balance(&burn_account), 299_993);
+
+		assert_eq!(Balances::balance(&launch_era_argon_refund_account()), 1_000_001);
+		assert_eq!(Balances::balance(&small_launch_era_argon_refund_account()), 2_000);
+		assert_eq!(Balances::balance(&post_hack_argon_refund_account()), 197_069_590);
+		assert_eq!(Ownership::balance(&ready_argonot_refund_account()), 200_000);
+	});
+}
+
+#[test]
+fn on_initialize_runs_crosschain_transfer_initialization_on_first_load() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		StorageVersion::new(0).put::<CrosschainTransfer>();
+
+		let legacy_account = legacy_token_gateway_account();
+		let burn_account = CrosschainTransfer::burn_account(SourceChain::Ethereum);
+
+		CrosschainTransfer::on_initialize(System::block_number());
+
+		assert_eq!(Balances::balance(&legacy_account), 0);
+		assert_eq!(Ownership::balance(&legacy_account), 0);
+		assert_eq!(
+			<CrosschainTransfer as GetStorageVersion>::on_chain_storage_version(),
+			StorageVersion::new(1),
+		);
+
+		assert_eq!(Balances::balance(&burn_account), 1_928_409);
+		assert_eq!(Ownership::balance(&burn_account), 299_993);
+
+		assert_eq!(Balances::balance(&launch_era_argon_refund_account()), 1_000_001);
+		assert_eq!(Balances::balance(&small_launch_era_argon_refund_account()), 2_000);
+		assert_eq!(Balances::balance(&post_hack_argon_refund_account()), 197_069_590);
+		assert_eq!(Ownership::balance(&ready_argonot_refund_account()), 200_000);
+	});
+}
+
+pub(super) fn chain_config() -> ChainConfig {
 	ChainConfig::Evm {
 		chain_id: 1,
 		gateway: h160(0x21),
@@ -65,16 +353,16 @@ fn chain_config() -> ChainConfig {
 	}
 }
 
-fn council_signing_pair(seed_byte: u8) -> KeccakPair {
+pub(super) fn council_signing_pair(seed_byte: u8) -> KeccakPair {
 	KeccakPair::from_seed(&[seed_byte; 32])
 }
 
-fn council_signer(pair: &KeccakPair) -> H160 {
+pub(super) fn council_signer(pair: &KeccakPair) -> H160 {
 	CrosschainTransfer::evm_address_from_public_key(&pair.public())
 		.expect("test council public key should map to an ethereum address")
 }
 
-fn council_signer_registration_signature(
+pub(super) fn council_signer_registration_signature(
 	council_signing_pair: &KeccakPair,
 	account_id: &TestAccountId,
 ) -> sp_core::ecdsa::KeccakSignature {
@@ -86,7 +374,7 @@ fn council_signer_registration_signature(
 	council_signing_pair.sign(signable_message.as_slice())
 }
 
-fn minting_authority_registration_signature(
+pub(super) fn minting_authority_registration_signature(
 	signing_pair: &KeccakPair,
 	account_id: &TestAccountId,
 ) -> sp_core::ecdsa::KeccakSignature {
@@ -101,7 +389,7 @@ fn minting_authority_registration_signature(
 	signing_pair.sign(signable_message.as_slice())
 }
 
-fn minting_authority_approval_signature(
+pub(super) fn minting_authority_approval_signature(
 	council_signing_pair: &KeccakPair,
 	queue_nonce: CouncilApprovalQueueNonce,
 ) -> sp_core::ecdsa::KeccakSignature {
@@ -115,7 +403,7 @@ fn minting_authority_approval_signature(
 	council_signing_pair.sign(signable_message.as_slice())
 }
 
-fn minting_authority_deactivation_signature(
+pub(super) fn minting_authority_deactivation_signature(
 	signing_pair: &KeccakPair,
 	queue_nonce: CouncilApprovalQueueNonce,
 	signing_key: H160,
@@ -142,7 +430,7 @@ fn minting_authority_deactivation_signature(
 	signing_pair.sign(CrosschainTransfer::evm_signed_message(approval_hash).as_slice())
 }
 
-fn configure_single_member_ethereum_council(
+pub(super) fn configure_single_member_ethereum_council(
 	council_account: TestAccountId,
 	vault_id: u32,
 	securitization: Balance,
@@ -181,7 +469,7 @@ fn configure_single_member_ethereum_council(
 	));
 }
 
-fn transfer_collateral_signature(
+pub(super) fn transfer_collateral_signature(
 	signing_pair: &KeccakPair,
 	transfer_id: H256,
 	microgon_collateral: Balance,
@@ -207,12 +495,12 @@ fn transfer_collateral_signature(
 	signing_pair.sign(CrosschainTransfer::evm_signed_message(approval_hash).as_slice())
 }
 
-fn destination_bytes(recipient: &TestAccountId) -> [u8; 32] {
+pub(super) fn destination_bytes(recipient: &TestAccountId) -> [u8; 32] {
 	let bytes: &[u8] = recipient.as_ref();
 	bytes.try_into().expect("account id is 32 bytes")
 }
 
-fn activate_test_minting_authority(
+pub(super) fn activate_test_minting_authority(
 	operator_account: TestAccountId,
 	vault_id: u32,
 	activated_securitization: Balance,
@@ -294,7 +582,7 @@ fn activate_test_minting_authority(
 	signing_key
 }
 
-fn transfer_out_id(
+pub(super) fn transfer_out_id(
 	account_id: &TestAccountId,
 	argon_transfer_nonce: TransferOutRequestNonce,
 ) -> H256 {
@@ -307,19 +595,19 @@ fn transfer_out_id(
 		.expect("transfer should be stored for account nonce")
 }
 
-fn indexed_address_word(address: H160) -> H256 {
+pub(super) fn indexed_address_word(address: H160) -> H256 {
 	let mut bytes = [0u8; 32];
 	bytes[12..].copy_from_slice(address.as_bytes());
 	H256::from(bytes)
 }
 
-fn u64_word(value: u64) -> [u8; 32] {
+pub(super) fn u64_word(value: u64) -> [u8; 32] {
 	let mut bytes = [0u8; 32];
 	bytes[24..].copy_from_slice(&value.to_be_bytes());
 	bytes
 }
 
-fn u128_word(value: u128) -> [u8; 32] {
+pub(super) fn u128_word(value: u128) -> [u8; 32] {
 	let mut bytes = [0u8; 32];
 	bytes[16..].copy_from_slice(&value.to_be_bytes());
 	bytes

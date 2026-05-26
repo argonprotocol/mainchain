@@ -1021,6 +1021,14 @@ export const mintingGatewayAbi = [
   { type: 'error', inputs: [], name: 'InvalidSignatureOrder' },
   {
     type: 'error',
+    inputs: [
+      { name: 'maxRate', internalType: 'uint128', type: 'uint128' },
+      { name: 'providedRate', internalType: 'uint128', type: 'uint128' },
+    ],
+    name: 'InvalidTransferOutRate',
+  },
+  {
+    type: 'error',
     inputs: [{ name: 'kind', internalType: 'uint8', type: 'uint8' }],
     name: 'InvalidUpdateKind',
   },
@@ -1077,11 +1085,6 @@ export const mintingGatewayAbi = [
       { name: 'validUntilBlock', internalType: 'uint256', type: 'uint256' },
     ],
     name: 'TransferOutOfArgonNotExpired',
-  },
-  {
-    type: 'error',
-    inputs: [{ name: 'councilHash', internalType: 'bytes32', type: 'bytes32' }],
-    name: 'UnknownCouncilHash',
   },
   {
     type: 'error',
@@ -1419,7 +1422,7 @@ export const mintingGatewayAbi = [
           { name: 'argonAccountId', internalType: 'bytes32', type: 'bytes32' },
           { name: 'argonTransferNonce', internalType: 'uint64', type: 'uint64' },
           { name: 'chainId', internalType: 'uint64', type: 'uint64' },
-          { name: 'councilHash', internalType: 'bytes32', type: 'bytes32' },
+          { name: 'microgonsPerArgonot', internalType: 'uint128', type: 'uint128' },
           { name: 'recipient', internalType: 'address', type: 'address' },
           { name: 'validUntilBlock', internalType: 'uint64', type: 'uint64' },
           { name: 'token', internalType: 'address', type: 'address' },
@@ -1443,7 +1446,7 @@ export const mintingGatewayAbi = [
           { name: 'argonAccountId', internalType: 'bytes32', type: 'bytes32' },
           { name: 'argonTransferNonce', internalType: 'uint64', type: 'uint64' },
           { name: 'chainId', internalType: 'uint64', type: 'uint64' },
-          { name: 'councilHash', internalType: 'bytes32', type: 'bytes32' },
+          { name: 'microgonsPerArgonot', internalType: 'uint128', type: 'uint128' },
           { name: 'recipient', internalType: 'address', type: 'address' },
           { name: 'validUntilBlock', internalType: 'uint64', type: 'uint64' },
           { name: 'token', internalType: 'address', type: 'address' },
@@ -1492,6 +1495,7 @@ export const mintingGatewayAbi = [
           { name: 'weights', internalType: 'uint256[]', type: 'uint256[]' },
         ],
       },
+      { name: 'nextMicrogonsPerArgonot', internalType: 'uint128', type: 'uint128' },
     ],
     name: 'forceUpdateActiveCouncil',
     outputs: [],
@@ -1542,6 +1546,13 @@ export const mintingGatewayAbi = [
     inputs: [],
     name: 'latestActivityBlockLocatorIndex',
     outputs: [{ name: '', internalType: 'uint64', type: 'uint64' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'maxTransferOutMicrogonsPerArgonot',
+    outputs: [{ name: '', internalType: 'uint128', type: 'uint128' }],
     stateMutability: 'view',
   },
   {
@@ -1600,20 +1611,6 @@ export const mintingGatewayAbi = [
     inputs: [],
     name: 'paused',
     outputs: [{ name: '', internalType: 'bool', type: 'bool' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'previousGlobalIssuanceCouncilHash',
-    outputs: [{ name: '', internalType: 'bytes32', type: 'bytes32' }],
-    stateMutability: 'view',
-  },
-  {
-    type: 'function',
-    inputs: [],
-    name: 'previousMicrogonsPerArgonot',
-    outputs: [{ name: '', internalType: 'uint128', type: 'uint128' }],
     stateMutability: 'view',
   },
   {
