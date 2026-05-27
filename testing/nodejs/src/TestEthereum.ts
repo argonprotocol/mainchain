@@ -16,7 +16,7 @@ import {
   type Hex,
   zeroAddress,
 } from 'viem';
-import { addTeardown, type ITeardownable } from './index';
+import { addTeardown, type ITeardownable } from './support';
 
 const {
   argonTokenArtifact,

@@ -10,7 +10,7 @@ import {
   getProxy,
   ITeardownable,
   projectRoot,
-} from './index';
+} from './support';
 import { detectPort } from 'detect-port';
 import { customAlphabet } from 'nanoid';
 import * as lockfile from 'proper-lockfile';

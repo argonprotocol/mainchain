@@ -8,12 +8,19 @@
     ".": {
       "types": "./index.ts",
       "default": "./index.ts"
+    },
+    "./generated": {
+      "types": "./generated.ts",
+      "default": "./generated.ts"
+    },
+    "./hashing": {
+      "types": "./hashing.ts",
+      "default": "./hashing.ts"
     }
   },
   "scripts": {
     "build": "hardhat compile",
     "codegen": "wagmi generate",
-    "gas:measure": "node --import tsx script/gas/measure.ts",
     "lint:sol": "solhint 'contracts/**/*.sol'",
     "lint:sol:fix": "solhint --fix 'contracts/**/*.sol'",
     "tsc": "hardhat compile",
@@ -21,8 +28,7 @@
     "typecheck": "tsc --noEmit",
     "pretest": "hardhat compile",
     "pretest:ci": "hardhat compile",
-    "test": "yarn pretest && yarn --cwd ../../.. exec vitest --run --config vitest.config.ts --project ethereum-contracts",
-    "bootstrap:deploy": "node --import tsx script/bootstrap/deploy.ts"
+    "test": "yarn pretest && yarn --cwd ../../.. exec vitest --run --config vitest.config.ts --project ethereum-contracts"
   },
   "devDependencies": {
     "@nomicfoundation/hardhat-ethers": "^4.0.10",

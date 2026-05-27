@@ -1,6 +1,7 @@
 import { Wallet } from 'ethers';
-import { network } from 'hardhat';
 import type { Address, Hex } from 'viem';
+import { contractsRoot } from './src/hardhat.js';
+import { deriveMintingAuthorityActivationPricingRecommendation } from './src/pricing.js';
 import {
   encodeMintingGatewayGlobalIssuanceCouncilRotateTarget,
   encodeMintingGatewayMintingAuthorityActivationTarget,
@@ -8,7 +9,6 @@ import {
   hashMintingGatewayGlobalIssuanceCouncil,
   hashMintingGatewayMintingAuthorization,
   hashMintingGatewayRotateGlobalIssuanceCouncilApproval,
-  MINTING_GATEWAY_RUNTIME_TO_ERC20_SCALE,
   MINTING_GATEWAY_UPDATE_KINDS,
   type MintingGatewayCouncilSnapshot,
   type MintingGatewayGatewayUpdate,
@@ -19,13 +19,20 @@ import {
   type MintingGatewayMintingAuthorization,
   type MintingGatewayTransferOutOfArgonProof,
   type MintingGatewayTransferOutOfArgonRequest,
-} from '../../index.js';
+} from '@argonprotocol/ethereum-contracts/hashing';
 
-const SCALE = MINTING_GATEWAY_RUNTIME_TO_ERC20_SCALE;
+const MINTING_GATEWAY_RUNTIME_DECIMALS = 6;
+const MINTING_GATEWAY_TOKEN_DECIMALS = 18;
+const SCALE = 10n ** BigInt(MINTING_GATEWAY_TOKEN_DECIMALS - MINTING_GATEWAY_RUNTIME_DECIMALS);
 const ERC1967_ADMIN_SLOT = '0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103';
 const COUNCIL_WEIGHTS = [40n, 30n, 20n, 10n] as const;
 const MICROGONS_PER_ARGONOT = 1_000_000n;
 const LOCAL_GAS_CAP = 16_777_216n;
+const args = parseArgs(process.argv.slice(2));
+process.chdir(contractsRoot);
+const { network } = await import('hardhat');
+const connection = await network.create();
+const { ethers } = connection;
 
 type SignerLike = {
   address: Address;
@@ -37,9 +44,7 @@ type SignerLike = {
   ): Promise<Hex>;
 };
 
-type AccountSigner = Awaited<ReturnType<typeof ethers.getSigners>>[number] & {
-  address: Address;
-};
+type AccountSigner = SignerLike;
 
 type TransactionReceiptLike = {
   gasUsed: bigint;
@@ -134,15 +139,41 @@ type GasRow = {
   note: string;
 };
 
-const connection = await network.create();
-const { ethers } = connection;
+type GasMeasurementScenario = {
+  scenario: string;
+  measurement: string;
+  gasUsed: bigint;
+  note: string;
+};
+
+type GasMeasurementReport = {
+  generatedAt: string;
+  setupScenarios: GasMeasurementScenario[];
+  userScenarios: GasMeasurementScenario[];
+  activationPricingMeasurements: {
+    singleActivationGas: bigint;
+    batchActivationGas: bigint;
+    batchActivationCount: number;
+    sharedSignatureCount: number;
+  };
+  activationPricingRecommendation: ReturnType<
+    typeof deriveMintingAuthorityActivationPricingRecommendation
+  >;
+};
 
 await main();
 
 async function main() {
   try {
-    const setupRows = await measureSetupAndCouncilPaths();
-    const userRows = await measureUserPaths();
+    const report = await measureGasReport();
+
+    if (args.json === 'true') {
+      console.log(stringifyJson(report));
+      return;
+    }
+
+    const setupRows = report.setupScenarios.map(toGasRow);
+    const userRows = report.userScenarios.map(toGasRow);
 
     console.log('\nOne-Time Setup And Council Paths');
     console.table(setupRows);
@@ -160,12 +191,18 @@ async function main() {
     console.log(
       '- weiAt10Gwei / weiAt20Gwei and ethAt10Gwei / ethAt20Gwei are gas * gasPrice only.',
     );
+    console.log(
+      `- recommended activationGasCost: ${formatInteger(report.activationPricingRecommendation.activationGasCost)}`,
+    );
+    console.log(
+      `- recommended signatureGasCost: ${formatInteger(report.activationPricingRecommendation.signatureGasCost)}`,
+    );
   } finally {
     await connection.close();
   }
 }
 
-async function measureSetupAndCouncilPaths() {
+async function measureGasReport(): Promise<GasMeasurementReport> {
   const fourCouncil = createCouncil(4);
   const hundredCouncil = createCouncil(100);
 
@@ -215,36 +252,67 @@ async function measureSetupAndCouncilPaths() {
   const fourRotationGas = await measureCouncilRotationGas(fourSetup, 2n, createCouncil(4));
   const hundredRotationGas = await measureCouncilRotationGas(hundredSetup, 2n, createCouncil(100));
 
-  return [
-    toGasRow('Proxy deploy + initialize (4 council members)', fourSetup.proxyDeployGas),
-    toGasRow('Proxy deploy + initialize (100 council members)', hundredSetup.proxyDeployGas),
-    toGasRow('Upgrade to final implementation (4 council members)', fourUpgradeGas),
-    toGasRow('Upgrade to final implementation (100 council members)', hundredUpgradeGas),
-    toGasRow('Minting authority activation update (4 members, 3 signatures)', fourActivationGas),
-    toGasRow(
-      'Minting authority activation update (100 members, 90 signatures)',
-      hundredActivationGas,
-    ),
-    toGasRow(
-      'Minting authority activation batch (100 members, 3 activations, 90 signatures once)',
-      hundredActivationBatchGas,
-    ),
-    toGasRow(
-      'Council rotation update (4 -> 4 members, 3 signatures)',
-      fourRotationGas.gas,
-      fourRotationGas.measurement,
-      fourRotationGas.note,
-    ),
-    toGasRow(
-      'Council rotation update (100 -> 100 members, 90 signatures)',
-      hundredRotationGas.gas,
-      hundredRotationGas.measurement,
-      hundredRotationGas.note,
-    ),
-  ];
+  return {
+    generatedAt: new Date().toISOString(),
+    setupScenarios: [
+      createGasMeasurementScenario(
+        'Proxy deploy + initialize (4 council members)',
+        fourSetup.proxyDeployGas,
+      ),
+      createGasMeasurementScenario(
+        'Proxy deploy + initialize (100 council members)',
+        hundredSetup.proxyDeployGas,
+      ),
+      createGasMeasurementScenario(
+        'Upgrade to final implementation (4 council members)',
+        fourUpgradeGas,
+      ),
+      createGasMeasurementScenario(
+        'Upgrade to final implementation (100 council members)',
+        hundredUpgradeGas,
+      ),
+      createGasMeasurementScenario(
+        'Minting authority activation update (4 members, 3 signatures)',
+        fourActivationGas,
+      ),
+      createGasMeasurementScenario(
+        'Minting authority activation update (100 members, 90 signatures)',
+        hundredActivationGas,
+      ),
+      createGasMeasurementScenario(
+        'Minting authority activation batch (100 members, 3 activations, 90 signatures once)',
+        hundredActivationBatchGas,
+      ),
+      createGasMeasurementScenario(
+        'Council rotation update (4 -> 4 members, 3 signatures)',
+        fourRotationGas.gas,
+        fourRotationGas.measurement,
+        fourRotationGas.note,
+      ),
+      createGasMeasurementScenario(
+        'Council rotation update (100 -> 100 members, 90 signatures)',
+        hundredRotationGas.gas,
+        hundredRotationGas.measurement,
+        hundredRotationGas.note,
+      ),
+    ],
+    userScenarios: await measureUserScenarios(),
+    activationPricingMeasurements: {
+      singleActivationGas: hundredActivationGas,
+      batchActivationGas: hundredActivationBatchGas,
+      batchActivationCount: 3,
+      sharedSignatureCount: hundredCouncil.quorumSigners.length,
+    },
+    activationPricingRecommendation: deriveMintingAuthorityActivationPricingRecommendation({
+      singleActivationGas: hundredActivationGas,
+      batchActivationGas: hundredActivationBatchGas,
+      batchActivationCount: 3,
+      sharedSignatureCount: hundredCouncil.quorumSigners.length,
+    }),
+  };
 }
 
-async function measureUserPaths() {
+async function measureUserScenarios() {
   const argonAccountId = ethers.encodeBytes32String('argon-account-1') as Hex;
   const transferFixture = await deployFixture(createCouncil(4));
   const permitDeadline = BigInt((await ethers.provider.getBlock('latest'))!.timestamp) + 3600n;
@@ -333,10 +401,16 @@ async function measureUserPaths() {
   );
 
   return [
-    toGasRow('startTransferToArgon', startTransferGas),
-    toGasRow('finalizeTransferOutOfArgon (1 authorization)', finalizeOneAuthorityGas),
-    toGasRow('finalizeTransferOutOfArgon (3 authorizations)', finalizeThreeAuthorityGas),
-    toGasRow('cancelTransferOutOfArgon', cancelGas),
+    createGasMeasurementScenario('startTransferToArgon', startTransferGas),
+    createGasMeasurementScenario(
+      'finalizeTransferOutOfArgon (1 authorization)',
+      finalizeOneAuthorityGas,
+    ),
+    createGasMeasurementScenario(
+      'finalizeTransferOutOfArgon (3 authorizations)',
+      finalizeThreeAuthorityGas,
+    ),
+    createGasMeasurementScenario('cancelTransferOutOfArgon', cancelGas),
   ];
 }
 
@@ -807,16 +881,25 @@ async function getGasUsed(action: Promise<TransactionLike>) {
   return receipt.gasUsed;
 }
 
-function toGasRow(scenario: string, gasUsed: bigint, measurement = 'actual', note = ''): GasRow {
+function createGasMeasurementScenario(
+  scenario: string,
+  gasUsed: bigint,
+  measurement = 'actual',
+  note = '',
+): GasMeasurementScenario {
+  return { scenario, measurement, gasUsed, note };
+}
+
+function toGasRow(measurement: GasMeasurementScenario): GasRow {
   return {
-    scenario,
-    measurement,
-    gas: formatInteger(gasUsed),
-    weiAt10Gwei: formatWeiAtGwei(gasUsed, 10n),
-    ethAt10Gwei: formatEthAtGwei(gasUsed, 10n),
-    weiAt20Gwei: formatWeiAtGwei(gasUsed, 20n),
-    ethAt20Gwei: formatEthAtGwei(gasUsed, 20n),
-    note,
+    scenario: measurement.scenario,
+    measurement: measurement.measurement,
+    gas: formatInteger(measurement.gasUsed),
+    weiAt10Gwei: formatWeiAtGwei(measurement.gasUsed, 10n),
+    ethAt10Gwei: formatEthAtGwei(measurement.gasUsed, 10n),
+    weiAt20Gwei: formatWeiAtGwei(measurement.gasUsed, 20n),
+    ethAt20Gwei: formatEthAtGwei(measurement.gasUsed, 20n),
+    note: measurement.note,
   };
 }
 
@@ -844,6 +927,36 @@ function parseGasCapError(error: unknown) {
     estimatedGas: BigInt(match[1]),
     gasCap: BigInt(match[2]),
   };
+}
+
+function stringifyJson(value: unknown) {
+  return JSON.stringify(
+    value,
+    (_key, entry) => (typeof entry === 'bigint' ? entry.toString() : entry),
+    2,
+  );
+}
+
+function parseArgs(argv: string[]) {
+  const parsed: Record<string, string> = {};
+
+  for (let index = 0; index < argv.length; index += 1) {
+    const arg = argv[index];
+    if (!arg.startsWith('--')) continue;
+
+    const key = arg.slice(2);
+    const next = argv[index + 1];
+
+    if (!next || next.startsWith('--')) {
+      parsed[key] = 'true';
+      continue;
+    }
+
+    parsed[key] = next;
+    index += 1;
+  }
+
+  return parsed;
 }
 
 function requireDeploymentTransaction(

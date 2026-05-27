@@ -106,17 +106,14 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
       });
       authorityActor.attachGateway(gateway);
 
-      await harness.setEthereumChainConfig(gateway);
-      await harness.sudoSubmit(
-        harness.mainchainClient.tx.crosschainTransfer.setMintingAuthorityActivationRepaymentPricing(
-          'Ethereum',
-          activationRepaymentPricing,
-        ),
-      );
+      await harness.configureEthereumRuntime(gateway, {
+        kind: 'outbound',
+        activationPricing: activationRepaymentPricing,
+        minimumMintingAuthorityValue: 1n,
+      });
       const syncGatewayCouncilReceipt = await gateway.forceUpdateActiveCouncil(configuredCouncil);
       expect(syncGatewayCouncilReceipt.status).toBe('success');
 
-      await authorityActor.setMinimumValue(1n);
       await authorityActor.registerMintingAuthority(mintingAuthorityMicronots);
 
       const approval = await authorityActor.approveActivationQueueEntry();
@@ -183,7 +180,6 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
       expect(nextBatch.argonApprovalsNonce).toBe(1n);
 
       await activeHarness.waitForExecutionFinalizedAfter(relayReceipt.blockNumber);
-      await activeHarness.bootstrapVerifier();
       await activeHarness.fundProofRelayer();
       await activeHarness.syncVerifierThrough(relayReceipt.blockNumber);
 
@@ -407,7 +403,9 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
         seedArgonAmountBaseUnits: TRANSFER_AMOUNT_BASE_UNITS,
         seedArgonRecipient: harness.deployer.address,
       });
-      await harness.setEthereumChainConfig(gateway);
+      await harness.configureEthereumRuntime(gateway, {
+        kind: 'inbound-only',
+      });
       const bob = new Keyring({ type: 'sr25519' }).createFromUri('//Bob');
 
       await waitForExecutionBlockAtOrAbove(harness.publicClient, 73n);
@@ -420,7 +418,6 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
       const burnBlockNumber = BigInt(burnReceipt.blockNumber);
 
       await harness.waitForExecutionFinalizedAfter(burnBlockNumber);
-      await harness.bootstrapVerifier();
       await harness.syncVerifierThrough(burnBlockNumber);
       await harness.fundBurnAccount(TRANSFER_AMOUNT_RUNTIME_UNITS);
       await harness.fundProofRelayer();

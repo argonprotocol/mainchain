@@ -1,5 +1,5 @@
 import * as docker from 'docker-compose';
-import { runOnTeardown } from './index';
+import { runOnTeardown } from './support';
 import * as Path from 'node:path';
 
 export async function startNetwork(

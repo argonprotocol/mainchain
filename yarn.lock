@@ -56,6 +56,22 @@ __metadata:
   languageName: unknown
   linkType: soft
 
+"@argonprotocol/ethereum-deploy@workspace:chains/ethereum/deploy":
+  version: 0.0.0-use.local
+  resolution: "@argonprotocol/ethereum-deploy@workspace:chains/ethereum/deploy"
+  dependencies:
+    "@argonprotocol/ethereum-contracts": "workspace:*"
+    "@argonprotocol/mainchain": "workspace:*"
+    "@nomicfoundation/hardhat-ethers": "npm:^4.0.10"
+    "@types/node": "npm:22.17.1"
+    ethers: "npm:^6.15.0"
+    hardhat: "npm:^3.4.4"
+    tsx: "npm:^4.20.6"
+    typescript: "npm:^5.9.2"
+    viem: "npm:^2.38.5"
+  languageName: unknown
+  linkType: soft
+
 "@argonprotocol/localchain-darwin-arm64@workspace:localchain/npm/darwin-arm64":
   version: 0.0.0-use.local
   resolution: "@argonprotocol/localchain-darwin-arm64@workspace:localchain/npm/darwin-arm64"
@@ -123,7 +139,7 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@argonprotocol/mainchain@npm:1.4.3, @argonprotocol/mainchain@workspace:client/nodejs":
+"@argonprotocol/mainchain@npm:1.4.3, @argonprotocol/mainchain@workspace:*, @argonprotocol/mainchain@workspace:client/nodejs":
   version: 0.0.0-use.local
   resolution: "@argonprotocol/mainchain@workspace:client/nodejs"
   dependencies:

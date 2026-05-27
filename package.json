@@ -23,7 +23,8 @@
     "localchain/npm/*",
     "client/nodejs",
     "testing/nodejs",
-    "chains/ethereum/contracts"
+    "chains/ethereum/contracts",
+    "chains/ethereum/deploy"
   ],
   "devDependencies": {
     "@lerna-lite/version": "^4.0.0",

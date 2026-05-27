@@ -1,0 +1,184 @@
+{
+  "generatedAt": "2026-05-26T17:41:53.063Z",
+  "copiedFrom": {
+    "repo": "argonprotocol/hyperbridge-recovery",
+    "migrationFiles": [
+      {
+        "path": "migration/ethereum/manifestHashes.txt",
+        "sha256": "0e04a0bce96271a187d4e4d546b89ee619c5a104ff4e864f817eb7ccc0536119"
+      },
+      {
+        "path": "migration/ethereum/migration-plan.json",
+        "sha256": "f7265d25476c4f2c67e9bb5f45d160041252969a7026d1485820c75a9a8db83e"
+      },
+      {
+        "path": "migration/ethereum/restore-argon-batch-000.json",
+        "sha256": "314ac679c4aa05ccd3a2c63248029c92560a019071bad790021f724f20c562ad"
+      },
+      {
+        "path": "migration/ethereum/restore-argon-batch-001.json",
+        "sha256": "bbb6d080f3789d837ca07e6055f291269a61c7d5ed3e441f0b0395395f2da01b"
+      },
+      {
+        "path": "migration/ethereum/restore-argonot-batch-000.json",
+        "sha256": "a436ab49308d0fb520c73f08b7ecd0125ee184b0dd7e2719ed57b55a8d1efc54"
+      }
+    ],
+    "finalBalanceSourceHashes": [
+      {
+        "path": "final-balances/ethereum/direct-restore-holders.csv",
+        "sha256": "c9ea235c6da73e182f0c4cc89ccfc639d7bce53183e34b8b83dff79997153614"
+      },
+      {
+        "path": "final-balances/ethereum/pool-remap-required.csv",
+        "sha256": "a55cbbeae8eff6414045b14bb6887900cf3c2c2d27f04d812305e711a5bb0215"
+      },
+      {
+        "path": "final-balances/ethereum/restoration-summary.json",
+        "sha256": "00130edbdc384171a21f5ffd6ac6782f3240574f012a211fd0b2bdeac3514be1"
+      }
+    ],
+    "poolAllocationHash": {
+      "path": "research/ethereum/uniswap-pools/ownership/pool-allocation.csv",
+      "sha256": "d4d2596e182dc40211c83e5f870d2c2e7a16a597dafed6b747a9945e1c2b3f68"
+    }
+  },
+  "argonMigration": {
+    "sourceBatches": ["restore-argon-batch-000.json", "restore-argon-batch-001.json"],
+    "recipientCount": 35,
+    "totalAmountRaw": "131013793612646286913415",
+    "recipients": [
+      "0x863605712fe8b28C61F14aDB4Ded95D81DE7f922",
+      "0xBd23367587a846C840f69bD4319685EF5c6EB579",
+      "0x06852f92970a90D19de955156B131c1EB8ecc675",
+      "0xE1D1DDc3FfFFe4F4680263F17FD1cc3Bf2b5097f",
+      "0xDB29DD2974Df5dc66249D64A584B32CdafcC2D03",
+      "0xD867D1166b3198A85555b73fE1ea53d8B8944242",
+      "0x4bd1233C531F67AFa4c910986aF6De925d36a872",
+      "0x9447593Db92F4f81B0eF91dE91768DC537669eeB",
+      "0xAF6f6B8f79D00449D47AcC9EfeaeC44e49Ad5126",
+      "0x000000fee13a103A10D593b9AE06b3e05F2E7E1c",
+      "0x5AaFc1f252d544f744d17a4E734afd6efC47edE4",
+      "0xF13176eCE4ed8d9aa4C335cD4f247458D4863FE4",
+      "0xDdD337f7f30FA781C27Fd74F366a056c76Fb32BF",
+      "0x9B228B4F71B3Bc7e4b478251f218060D7B70Dc25",
+      "0x011c4bfa4e76b8B81E007D52908aA400AAB35e84",
+      "0x1092E2F075877443D9bf388c377d457A734A2a68",
+      "0x23587ECd04c178a21163502969e87d4c77041810",
+      "0x8504a563Be3C2218fB20F8090f473a8CDE22B906",
+      "0x1f2F10D1C40777AE1Da742455c65828FF36Df387",
+      "0x0708b29cfabA8E551c710991026c38e9179dCe1E",
+      "0xC5a39B9626417E3dc78C3711D85892F75DC63C8E",
+      "0x8048142550c8F11A0aEFdc6e2d394422d6B87407",
+      "0x000000000004444c5dc75cB358380D2e3dE08A90",
+      "0x1111111254EEB25477B68fb85Ed929f73A960582",
+      "0x63242A4Ea82847b20E506b63B0e2e2eFF0CC6cB0",
+      "0x000000000000000000000000000000000000dEaD",
+      "0x863605712fe8b28C61F14aDB4Ded95D81DE7f922",
+      "0x863605712fe8b28C61F14aDB4Ded95D81DE7f922",
+      "0x863605712fe8b28C61F14aDB4Ded95D81DE7f922",
+      "0xE1D1DDc3FfFFe4F4680263F17FD1cc3Bf2b5097f",
+      "0xf2371551Fe3937Db7c750f4DfABe5c2fFFdcBf5A",
+      "0x000000000000000000000000000000000000dEaD",
+      "0x863605712fe8b28C61F14aDB4Ded95D81DE7f922",
+      "0x863605712fe8b28C61F14aDB4Ded95D81DE7f922",
+      "0xf2371551Fe3937Db7c750f4DfABe5c2fFFdcBf5A"
+    ],
+    "amounts": [
+      "57410095632327499993912",
+      "4000000000000000000000",
+      "3990850000000000000000",
+      "2394799854269419921891",
+      "883605322604794616988",
+      "135653206544893573598",
+      "102634938721388362745",
+      "100000000000000000000",
+      "40000000000000000000",
+      "24285564762350368774",
+      "19854423659063171593",
+      "5695928319937935609",
+      "3324673498813066969",
+      "1500000000000000000",
+      "200000000000000000",
+      "56000000000000000",
+      "44768789104925892",
+      "44813602707633",
+      "4976233416832",
+      "639124410288",
+      "18",
+      "7",
+      "2",
+      "1",
+      "1",
+      "58",
+      "3250502826021839546368",
+      "2642243984485243994811",
+      "5000115149622433604341",
+      "1000014095866423522026",
+      "28807723300713823",
+      "1870866709760",
+      "50000099906582117969875",
+      "7733748635432499152",
+      "454727912401880448"
+    ]
+  },
+  "argonotMigration": {
+    "sourceBatches": ["restore-argonot-batch-000.json"],
+    "recipientCount": 25,
+    "totalAmountRaw": "99004770615739079708060",
+    "recipients": [
+      "0xE1D1DDc3FfFFe4F4680263F17FD1cc3Bf2b5097f",
+      "0x06852f92970a90D19de955156B131c1EB8ecc675",
+      "0x4ACb6C4321253548a7d4Bb9C84032Cc4eE04bFD7",
+      "0xF13176eCE4ed8d9aa4C335cD4f247458D4863FE4",
+      "0x000000fee13a103A10D593b9AE06b3e05F2E7E1c",
+      "0xc4cE6549C5F26de05898AB6E99005f0DBcd0D83a",
+      "0x9B228B4F71B3Bc7e4b478251f218060D7B70Dc25",
+      "0x1092E2F075877443D9bf388c377d457A734A2a68",
+      "0x1f2F10D1C40777AE1Da742455c65828FF36Df387",
+      "0xD3BfaD4daEBCF20809332A4Dd2C0b657484e281D",
+      "0x0708b29cfabA8E551c710991026c38e9179dCe1E",
+      "0x863605712fe8b28C61F14aDB4Ded95D81DE7f922",
+      "0xC5a39B9626417E3dc78C3711D85892F75DC63C8E",
+      "0x4038a44B34dC6974b2d609715c00DA7df845C4F9",
+      "0x63242A4Ea82847b20E506b63B0e2e2eFF0CC6cB0",
+      "0x000000000000000000000000000000000000dEaD",
+      "0x863605712fe8b28C61F14aDB4Ded95D81DE7f922",
+      "0x863605712fe8b28C61F14aDB4Ded95D81DE7f922",
+      "0xf2371551Fe3937Db7c750f4DfABe5c2fFFdcBf5A",
+      "0x000000000000000000000000000000000000dEaD",
+      "0x863605712fe8b28C61F14aDB4Ded95D81DE7f922",
+      "0x863605712fe8b28C61F14aDB4Ded95D81DE7f922",
+      "0x863605712fe8b28C61F14aDB4Ded95D81DE7f922",
+      "0xE1D1DDc3FfFFe4F4680263F17FD1cc3Bf2b5097f",
+      "0xf2371551Fe3937Db7c750f4DfABe5c2fFFdcBf5A"
+    ],
+    "amounts": [
+      "20317431687437248020906",
+      "6841571076159812065948",
+      "306142194570118120046",
+      "4773197897162133323",
+      "3987128330435720111",
+      "1100000000000000000",
+      "1000000000000000000",
+      "10000000000000000",
+      "37811010479178",
+      "1421277214498",
+      "620284057123",
+      "2877650",
+      "11",
+      "2",
+      "1",
+      "24910189616562",
+      "4778610339845759299322",
+      "31996790948918318993866",
+      "958729125729619276",
+      "59",
+      "5001813143824394065",
+      "34745596138751306035794",
+      "1482842434795019642",
+      "137373522512564893",
+      "177080839293475784"
+    ]
+  }
+}

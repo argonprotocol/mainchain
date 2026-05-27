@@ -2,7 +2,7 @@ import * as child_process from 'node:child_process';
 import { Keyring, KeyringPair } from '@argonprotocol/mainchain';
 import * as fs from 'node:fs';
 import * as readline from 'node:readline';
-import { addTeardown, ITeardownable, projectRoot } from './index';
+import { addTeardown, ITeardownable, projectRoot } from './support';
 import * as process from 'node:process';
 import * as Path from 'node:path';
 import { Readable } from 'node:stream';
