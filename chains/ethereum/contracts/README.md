@@ -54,15 +54,13 @@ The gateway is where the actual protocol behavior lives:
 - `migrate(...)` is the one-time owner migration path: it loads the exact Argon and Argonot
   migration balances from the prior contracts using base-unit calldata
 - `forceUpdateActiveCouncil(...)` is the owner recovery seam: it replaces the stored active council
-  summary without resetting `argonApprovalsNonce` or `argonApprovalsHash`, so later queue items can
-  keep chaining from the same last applied update under the replacement council
+  summary and active `microgonsPerArgonot` floor without resetting `argonApprovalsNonce` or
+  `argonApprovalsHash`, so later queue items can keep chaining from the same last applied update
+  under the replacement council
 - each council rotation carries the next `microgonsPerArgonot` floor value alongside the next
   council snapshot
-- transfer-out requests bind to the current or immediately previous council number, and Ethereum
-  uses the matching council-managed Argonot floor price window instead of trusting a
-  request-supplied conversion rate
-- the gateway stores both `microgonsPerArgonot` and `previousMicrogonsPerArgonot` so a transfer can
-  resolve against the council window it was opened under
+- transfer-out requests carry one exact `microgonsPerArgonot` quote, and Ethereum only accepts the
+  request if that quoted rate is at or below the currently active council floor
 - queued council-approved updates chain each signed item to the previous queue item's signed hash,
   so Ethereum only needs to verify council signatures on council-segment tips: each council rotation
   item and the last council-approved item in the submitted batch

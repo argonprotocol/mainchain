@@ -12,6 +12,9 @@ Already implemented and intentionally omitted from the open list:
   any held excess
 - deactivation now only relies on the normal `PendingActivation` / `Active` / `Deactivating` state
   machine rather than on a separate post-proof activation-completion step
+- transfer-out requests now snapshot an exact `microgons_per_argonot` and quote against the current,
+  previous, and unresolved queued rotation floor, so council-hash rollover no longer strands live
+  transfers
 
 ## 1. Add steady-state council rotation queueing
 
@@ -36,17 +39,6 @@ Already implemented and intentionally omitted from the open list:
 - if transfer-outs become priority-queued by user-paid tip, allow a higher-tip still-unfunded
   request to evict the current lowest-ranked still-unfunded request and refund that displaced
   request locally. This might need the cancel semantics to be reworked to argon-side driven.
-
-## 3. Handle more than one council rotation during a live transfer
-
-- transfer-out requests currently lock in a single `council_hash`
-- normal steady-state cadence is already close to safe because transfer lifetime and council
-  rotation cadence are both about 10 days
-- the real open question is the exception path: force / accelerated council replacement can move
-  past a still-live request's `council_hash`
-- decide whether that emergency path is allowed to strand live transfer-outs until expiry / cancel
-- if not, add only a small bounded fallback for older `councilHash -> microgonsPerArgonot` windows
-  instead of retaining full historical council snapshots indefinitely
 
 ## 4. Require multiple authority signatures for transfer finalization
 

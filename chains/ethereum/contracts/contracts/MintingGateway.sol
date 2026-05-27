@@ -52,10 +52,8 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 
 	/// @notice Current council snapshot.
 	GlobalIssuanceCouncil public globalIssuanceCouncil;
-	/// @notice Prior active council hash kept for in-flight transfer windows.
-	bytes32 public previousGlobalIssuanceCouncilHash;
-	/// @notice Previous council-approved floor kept for in-flight transfer windows.
-	uint128 public previousMicrogonsPerArgonot;
+	/// @notice Maximum transfer-out quote still accepted for finalization.
+	uint128 public maxTransferOutMicrogonsPerArgonot;
 	/// @notice Minting-authority collateral keyed by the signing key for that bucket.
 	mapping(address signingKey => MintingCollateral collateralRemaining)
 		public mintingAuthorityCollateralRemaining;
@@ -126,7 +124,7 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 		bytes32 argonAccountId;
 		uint64 argonTransferNonce;
 		uint64 chainId;
-		bytes32 councilHash;
+		uint128 microgonsPerArgonot;
 		address recipient;
 		uint64 validUntilBlock;
 		address token;
@@ -194,6 +192,7 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 	error InvalidQueueNonce(uint64 expected, uint64 provided);
 	error InvalidSignatureCount(uint256 expected, uint256 provided);
 	error InvalidSignatureOrder();
+	error InvalidTransferOutRate(uint128 maxRate, uint128 providedRate);
 	error InvalidUpdateKind(uint8 kind);
 	error LatestGatewayUpdateCannotDeactivate();
 	error InsufficientAuthorizedCollateral(uint256 authorized, uint256 required);
@@ -206,7 +205,6 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 	error TransferOutOfArgonNotExpired(uint256 currentBlock, uint256 validUntilBlock);
 	error UnsupportedToken(address token);
 	error RuntimeAmountOverflow(uint256 amount);
-	error UnknownCouncilHash(bytes32 councilHash);
 	error ZeroAdminSafe();
 	error ZeroAmount();
 	error ZeroGuardian();
@@ -329,7 +327,8 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 	/// @param councilHash Hash of the first council membership snapshot.
 	/// @param councilMemberCount Number of members in the first council snapshot.
 	/// @param councilTotalWeight Total signer weight in the first council snapshot.
-	/// @param initialMicrogonsPerArgonot Initial council-approved floor, measured in microgons per 1 whole Argonot.
+	/// @param initialMicrogonsPerArgonot Initial maximum transfer-out quote, measured in microgons
+	/// per 1 whole Argonot.
 	function initialize(
 		address adminSafe,
 		address guardianAddress,
@@ -355,7 +354,7 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 			councilMemberCount,
 			initialMicrogonsPerArgonot
 		);
-		previousMicrogonsPerArgonot = initialMicrogonsPerArgonot;
+		maxTransferOutMicrogonsPerArgonot = initialMicrogonsPerArgonot;
 
 		emit GlobalIssuanceCouncilBootstrapped(councilHash);
 	}
@@ -388,23 +387,27 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 	/// @dev Leaves argonApprovalsNonce and argonApprovalsHash unchanged so later queue items still chain
 	/// from the last applied Argon update while using the replacement council for future approvals.
 	/// @param nextCouncil Replacement active council snapshot.
+	/// @param nextMicrogonsPerArgonot Replacement council-approved rate, measured in microgons per
+	/// 1 whole Argonot, for the council hash itself. This does not advance the transfer-out max
+	/// until a proved rotation is applied.
 	function forceUpdateActiveCouncil(
-		CouncilSnapshot calldata nextCouncil
+		CouncilSnapshot calldata nextCouncil,
+		uint128 nextMicrogonsPerArgonot
 	) external onlyOwner {
+		if (nextMicrogonsPerArgonot == 0) revert ZeroMicrogonsPerArgonot();
 		(bytes32 nextCouncilHash, uint256 nextCouncilTotalWeight, uint256 nextCouncilMemberCount) =
 			_validateCouncilSnapshot(
 				nextCouncil.signers,
 				nextCouncil.weights,
-				globalIssuanceCouncil.epochMicrogonsPerArgonot
+				nextMicrogonsPerArgonot
 			);
 		GlobalIssuanceCouncil memory activeCouncil = globalIssuanceCouncil;
 
-		_rollMicrogonsPerArgonot();
 		_storeGlobalIssuanceCouncil(
 			nextCouncilHash,
 			nextCouncilTotalWeight,
 			nextCouncilMemberCount,
-			activeCouncil.epochMicrogonsPerArgonot
+			nextMicrogonsPerArgonot
 		);
 
 		emit GlobalIssuanceCouncilForceUpdated(activeCouncil.councilHash, nextCouncilHash);
@@ -605,7 +608,13 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 
 		bytes32 transferId = _hashTransferOutOfArgonRequest(request);
 		_requireTransferOutOfArgonNotFinalized(transferId);
-		uint128 resolvedMicrogonsPerArgonot = _resolveMicrogonsPerArgonot(request.councilHash);
+		if (request.microgonsPerArgonot == 0) revert ZeroMicrogonsPerArgonot();
+		uint128 maxTransferOutRate = maxTransferOutMicrogonsPerArgonot;
+		if (request.microgonsPerArgonot > maxTransferOutRate) {
+			revert InvalidTransferOutRate(
+				maxTransferOutRate, request.microgonsPerArgonot
+			);
+		}
 		uint128 authorizedMicrogonCollateral = 0;
 		uint128 authorizedMicronotCollateral = 0;
 		address previousSigningKey = address(0);
@@ -651,11 +660,12 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 		}
 
 		if (request.token == argonToken) {
-			// cast to u256 for overly cautious overflow protection, then scale down by the microgons-per-argonot floor
+			// cast to u256 for overly cautious overflow protection, then scale down by the quoted
+			// microgons-per-argonot max
 			// to get the equivalent Argonot collateral. NOTE: this might not be pragmatically possible to overflow, but
 			// we want to be sure that the math is safe.
 			uint256 authorizedArgonotAsMicrogons =
-				(uint256(authorizedMicronotCollateral) * uint256(resolvedMicrogonsPerArgonot))
+				(uint256(authorizedMicronotCollateral) * uint256(request.microgonsPerArgonot))
 					/ (10 ** RUNTIME_DECIMALS);
 			uint256 authorizedCollateralMicrogons =
 				uint256(authorizedMicrogonCollateral) + authorizedArgonotAsMicrogons;
@@ -799,13 +809,13 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 			activeCouncil.memberCount
 		);
 
-		_rollMicrogonsPerArgonot();
 		_storeGlobalIssuanceCouncil(
 			nextCouncilHash,
 			nextCouncilTotalWeight,
 			nextCouncilMemberCount,
 			target.epochMicrogonsPerArgonot
 		);
+		maxTransferOutMicrogonsPerArgonot = target.epochMicrogonsPerArgonot;
 		argonApprovalsNonce = update.queueNonce;
 		argonApprovalsHash = updateHash;
 
@@ -1112,20 +1122,12 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 		uint256 memberCount,
 		uint128 epochMicrogonsPerArgonot
 	) private {
-		bytes32 priorCouncilHash = globalIssuanceCouncil.councilHash;
-		previousGlobalIssuanceCouncilHash =
-			priorCouncilHash == bytes32(0) ? councilHash : priorCouncilHash;
 		globalIssuanceCouncil = GlobalIssuanceCouncil({
 			totalWeight: totalWeight,
 			memberCount: memberCount,
 			councilHash: councilHash,
 			epochMicrogonsPerArgonot: epochMicrogonsPerArgonot
 		});
-	}
-
-	/// Stores the active floor price for the current and previous council windows.
-	function _rollMicrogonsPerArgonot() private {
-		previousMicrogonsPerArgonot = globalIssuanceCouncil.epochMicrogonsPerArgonot;
 	}
 
 	/// Validates a council snapshot and returns its summary values.
@@ -1160,18 +1162,6 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 		uint256 runtimeAmount = tokenAmount / RUNTIME_TO_ERC20_SCALE;
 		if (runtimeAmount > type(uint128).max) revert RuntimeAmountOverflow(runtimeAmount);
 		return uint128(runtimeAmount);
-	}
-
-	/// Resolves the council-window floor price for one transfer request.
-	function _resolveMicrogonsPerArgonot(bytes32 councilHash) private view returns (uint128) {
-		if (councilHash == globalIssuanceCouncil.councilHash) {
-			return globalIssuanceCouncil.epochMicrogonsPerArgonot;
-		}
-		if (councilHash == previousGlobalIssuanceCouncilHash) {
-			return previousMicrogonsPerArgonot;
-		}
-
-		revert UnknownCouncilHash(councilHash);
 	}
 
 	/// @notice Returns the hash for a full council snapshot.
@@ -1369,7 +1359,7 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 				request.argonAccountId,
 				request.argonTransferNonce,
 				request.chainId,
-				request.councilHash,
+				request.microgonsPerArgonot,
 				request.recipient,
 				request.validUntilBlock,
 				request.token,

@@ -2042,7 +2042,12 @@ declare module '@polkadot/types/lookup' {
     readonly asMintingAuthorityActivation: H160;
     readonly isMintingAuthorityDeactivation: boolean;
     readonly asMintingAuthorityDeactivation: H160;
-    readonly type: 'MintingAuthorityActivation' | 'MintingAuthorityDeactivation';
+    readonly isGlobalIssuanceCouncilRotation: boolean;
+    readonly asGlobalIssuanceCouncilRotation: H256;
+    readonly type:
+      | 'MintingAuthorityActivation'
+      | 'MintingAuthorityDeactivation'
+      | 'GlobalIssuanceCouncilRotation';
   }
 
   /** @name PalletCrosschainTransferGatewaySyncPause (135) */
@@ -2061,6 +2066,8 @@ declare module '@polkadot/types/lookup' {
     readonly isUnexpectedMintingAuthorityState: boolean;
     readonly isMintingAuthorityMismatch: boolean;
     readonly isMissingMintingAuthorityActivationRepaymentPricing: boolean;
+    readonly isMintingAuthorityActivationRepaymentMismatch: boolean;
+    readonly isGlobalIssuanceCouncilNotFound: boolean;
     readonly isGatewayStateDrift: boolean;
     readonly type:
       | 'Manual'
@@ -2070,6 +2077,8 @@ declare module '@polkadot/types/lookup' {
       | 'UnexpectedMintingAuthorityState'
       | 'MintingAuthorityMismatch'
       | 'MissingMintingAuthorityActivationRepaymentPricing'
+      | 'MintingAuthorityActivationRepaymentMismatch'
+      | 'GlobalIssuanceCouncilNotFound'
       | 'GatewayStateDrift';
   }
 
@@ -3384,14 +3393,6 @@ declare module '@polkadot/types/lookup' {
       readonly signingKey: H160;
       readonly signature: U8aFixed;
     } & Struct;
-    readonly isRegisterMintingAuthority: boolean;
-    readonly asRegisterMintingAuthority: {
-      readonly destinationChain: PalletCrosschainTransferSourceChain;
-      readonly destinationSigningKey: H160;
-      readonly signature: U8aFixed;
-      readonly microgonCollateral: Compact<u128>;
-      readonly micronotCollateral: Compact<u128>;
-    } & Struct;
     readonly isApproveQueueEntries: boolean;
     readonly asApproveQueueEntries: {
       readonly destinationChain: PalletCrosschainTransferSourceChain;
@@ -3402,6 +3403,19 @@ declare module '@polkadot/types/lookup' {
       readonly sourceChain: PalletCrosschainTransferSourceChain;
       readonly previousGatewayActivityNonce: Compact<u64>;
       readonly proofBatch: ArgonPrimitivesEthereumEthereumReceiptLogProofBatch;
+    } & Struct;
+    readonly isRegisterMintingAuthority: boolean;
+    readonly asRegisterMintingAuthority: {
+      readonly destinationChain: PalletCrosschainTransferSourceChain;
+      readonly destinationSigningKey: H160;
+      readonly signature: U8aFixed;
+      readonly microgonCollateral: Compact<u128>;
+      readonly micronotCollateral: Compact<u128>;
+    } & Struct;
+    readonly isDeactivateMintingAuthority: boolean;
+    readonly asDeactivateMintingAuthority: {
+      readonly destinationSigningKey: H160;
+      readonly signature: U8aFixed;
     } & Struct;
     readonly isTransferOut: boolean;
     readonly asTransferOut: {
@@ -3417,11 +3431,6 @@ declare module '@polkadot/types/lookup' {
       readonly microgonCollateral: Compact<u128>;
       readonly micronotCollateral: Compact<u128>;
     } & Struct;
-    readonly isDeactivateMintingAuthority: boolean;
-    readonly asDeactivateMintingAuthority: {
-      readonly destinationSigningKey: H160;
-      readonly signature: U8aFixed;
-    } & Struct;
     readonly type:
       | 'SetChainConfig'
       | 'ForceSetGlobalIssuanceCouncil'
@@ -3430,12 +3439,12 @@ declare module '@polkadot/types/lookup' {
       | 'SetMinimumMintingAuthorityValue'
       | 'SetMintingAuthorityActivationRepaymentPricing'
       | 'RegisterCouncilSigner'
-      | 'RegisterMintingAuthority'
       | 'ApproveQueueEntries'
       | 'ProveGatewayActivity'
+      | 'RegisterMintingAuthority'
+      | 'DeactivateMintingAuthority'
       | 'TransferOut'
-      | 'CollateralizeTransfer'
-      | 'DeactivateMintingAuthority';
+      | 'CollateralizeTransfer';
   }
 
   /** @name PalletCrosschainTransferChainConfig (303) */
@@ -4642,9 +4651,8 @@ declare module '@polkadot/types/lookup' {
     readonly pendingReservedMicronotCollateral: u128;
     readonly activePendingTransferIds: Vec<H256>;
     readonly activationApprovalQueueNonce: u64;
-    readonly activationBaseRepaymentDue: Option<u128>;
-    readonly activationSignatureRepaymentDue: Option<u128>;
-    readonly activationRepaymentDue: Option<u128>;
+    readonly activationBaseRepaymentQuote: Compact<u128>;
+    readonly activationSignatureRepaymentQuote: Compact<u128>;
     readonly deactivationApprovalQueueNonce: Option<u64>;
   }
 
@@ -4661,7 +4669,7 @@ declare module '@polkadot/types/lookup' {
     readonly argonAccountId: AccountId32;
     readonly argonTransferNonce: Compact<u64>;
     readonly destinationChain: PalletCrosschainTransferSourceChain;
-    readonly councilHash: H256;
+    readonly microgonsPerArgonot: Compact<u128>;
     readonly destinationAccount: H160;
     readonly validUntilEthereumBlock: Compact<u64>;
     readonly asset: PalletCrosschainTransferAssetKind;

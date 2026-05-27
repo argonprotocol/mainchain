@@ -20,6 +20,14 @@ const {
   MINTING_GATEWAY_RUNTIME_TO_ERC20_SCALE,
 } = EvmContracts;
 
+type Harness = Awaited<ReturnType<typeof EthereumProofE2eHarness.launch>>;
+type AuthorityActor = InstanceType<typeof TestMintingAuthorityActor>;
+type Gateway = InstanceType<typeof TestMintingGateway>;
+type GatewayUpdateBatch = Awaited<ReturnType<typeof getReadyEthereumGatewayUpdates>>;
+type TransferRequest = Awaited<
+  ReturnType<AuthorityActor['collateralizeFirstPendingTransferOut']>
+>['transferRequest'];
+
 const TEST_ACCOUNT = {
   address: '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266',
   balance: '100ETH',
@@ -40,9 +48,9 @@ const QUEUE_RELAY_AUTHORITY_PRIVATE_KEY = repeatByteHex('02', 32);
 
 describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', () => {
   describe.sequential('roundtrip saga', () => {
-    let harness: EthereumProofE2eHarness | undefined;
-    let authorityActor: TestMintingAuthorityActor | undefined;
-    let gateway: TestMintingGateway | undefined;
+    let harness!: Harness;
+    let authorityActor!: AuthorityActor;
+    let gateway!: Gateway;
     const activationRelayer = new Keyring({ type: 'sr25519' }).createFromUri(
       ACTIVATION_RELAYER_URI,
     );
@@ -50,15 +58,11 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
     const argonReturnRecipient = new Keyring({ type: 'sr25519' }).createFromUri('//Bob');
     const ethereumRecipient = privateKeyToAccount(ROUNDTRIP_ETHEREUM_RECIPIENT_PRIVATE_KEY);
     let activeCouncilHash = '' as Hex;
-    let batch: Awaited<ReturnType<typeof getReadyEthereumGatewayUpdates>> | undefined;
+    let batch!: GatewayUpdateBatch;
     let councilApprovalSignature = '' as Hex;
     const mintingAuthorityMicronots = 1_000_000n;
     let transferId = '' as Hex;
-    let transferRequest:
-      | Awaited<
-          ReturnType<TestMintingAuthorityActor['collateralizeFirstPendingTransferOut']>
-        >['transferRequest']
-      | undefined;
+    let transferRequest!: TransferRequest;
     let collateralizationSignature = '' as Hex;
     const returnAmountRuntimeUnits = 4_000n;
     const activationRepaymentPricing = {
@@ -111,7 +115,10 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
         activationPricing: activationRepaymentPricing,
         minimumMintingAuthorityValue: 1n,
       });
-      const syncGatewayCouncilReceipt = await gateway.forceUpdateActiveCouncil(configuredCouncil);
+      const syncGatewayCouncilReceipt = await gateway.forceUpdateActiveCouncil(
+        configuredCouncil,
+        councilSetup.activeCouncil.epochMicrogonsPerArgonot.toBigInt(),
+      );
       expect(syncGatewayCouncilReceipt.status).toBe('success');
 
       await authorityActor.registerMintingAuthority(mintingAuthorityMicronots);
@@ -211,9 +218,7 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
         );
       expect(authorityOption.isSome).toBe(true);
       const authority = authorityOption.unwrap();
-      const authorityJson = authority.toJSON() as { activationRepaymentDue?: string | null };
       expect(authority.state.isActive).toBe(true);
-      expect(authorityJson.activationRepaymentDue).toBeNull();
       expect(
         result.events.some(event =>
           activeHarness.mainchainClient.events.crosschainTransfer.MintingAuthorityActivationCompleted.is(

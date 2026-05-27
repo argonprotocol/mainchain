@@ -441,7 +441,7 @@ describe('MintingGateway', () => {
         overrides.argonAccountId ?? (ethers.encodeBytes32String('account-1') as `0x${string}`),
       argonTransferNonce: overrides.argonTransferNonce ?? 1n,
       chainId,
-      councilHash: overrides.councilHash ?? activeCouncil.councilHash,
+      microgonsPerArgonot: overrides.microgonsPerArgonot ?? activeCouncil.epochMicrogonsPerArgonot,
       recipient: overrides.recipient ?? (fixture.recipient.address as `0x${string}`),
       validUntilBlock: overrides.validUntilBlock ?? 1_000_000n,
       token: overrides.token ?? ((await fixture.argon.getAddress()) as `0x${string}`),
@@ -544,22 +544,30 @@ describe('MintingGateway', () => {
 
   it('only lets the owner force-update the active council summary', async () => {
     const fixture = await deployFixture();
-    const nextCouncil = createCouncil([
-      Wallet.createRandom() as unknown as SignerLike,
-      Wallet.createRandom() as unknown as SignerLike,
-      Wallet.createRandom() as unknown as SignerLike,
-      Wallet.createRandom() as unknown as SignerLike,
-    ]);
+    const nextMicrogonsPerArgonot = 2n * MICROGONS_PER_ARGONOT;
+    const nextCouncil = createCouncil(
+      [
+        Wallet.createRandom() as unknown as SignerLike,
+        Wallet.createRandom() as unknown as SignerLike,
+        Wallet.createRandom() as unknown as SignerLike,
+        Wallet.createRandom() as unknown as SignerLike,
+      ],
+      nextMicrogonsPerArgonot,
+    );
 
     await expectCustomError(
-      fixture.gateway.connect(fixture.outsider).forceUpdateActiveCouncil(nextCouncil.snapshot),
+      fixture.gateway
+        .connect(fixture.outsider)
+        .forceUpdateActiveCouncil(nextCouncil.snapshot, nextCouncil.epochMicrogonsPerArgonot),
       fixture.gateway,
       'OwnableUnauthorizedAccount',
       [fixture.outsider.address],
     );
 
     const event = await parseGatewayEvent(
-      fixture.gateway.connect(fixture.adminSafe).forceUpdateActiveCouncil(nextCouncil.snapshot),
+      fixture.gateway
+        .connect(fixture.adminSafe)
+        .forceUpdateActiveCouncil(nextCouncil.snapshot, nextCouncil.epochMicrogonsPerArgonot),
       fixture.gateway,
       'GlobalIssuanceCouncilForceUpdated',
     );
@@ -568,13 +576,12 @@ describe('MintingGateway', () => {
     expect(event.args[0]).to.equal(fixture.council.hash);
     expect(event.args[1]).to.equal(nextCouncil.hash);
     expect(activeCouncil.councilHash).to.equal(nextCouncil.hash);
-    expect(await fixture.gateway.previousGlobalIssuanceCouncilHash()).to.equal(
-      fixture.council.hash,
+    expect(activeCouncil.epochMicrogonsPerArgonot).to.equal(nextMicrogonsPerArgonot);
+    expect(await fixture.gateway.maxTransferOutMicrogonsPerArgonot()).to.equal(
+      fixture.council.epochMicrogonsPerArgonot,
     );
-    expect(activeCouncil.epochMicrogonsPerArgonot).to.equal(MICROGONS_PER_ARGONOT);
     expect(activeCouncil.memberCount).to.equal(nextCouncil.memberCount);
     expect(activeCouncil.totalWeight).to.equal(nextCouncil.totalWeight);
-    expect(await fixture.gateway.previousMicrogonsPerArgonot()).to.equal(MICROGONS_PER_ARGONOT);
     expect(await fixture.gateway.argonApprovalsNonce()).to.equal(0n);
     expect(await fixture.gateway.getFunction('argonApprovalsHash')()).to.equal(ethers.ZeroHash);
   });
@@ -593,7 +600,9 @@ describe('MintingGateway', () => {
       signingKey: Wallet.createRandom().address as `0x${string}`,
     } satisfies MintingGatewayMintingAuthorityActivationTarget;
 
-    await fixture.gateway.connect(fixture.adminSafe).forceUpdateActiveCouncil(nextCouncil.snapshot);
+    await fixture.gateway
+      .connect(fixture.adminSafe)
+      .forceUpdateActiveCouncil(nextCouncil.snapshot, nextCouncil.epochMicrogonsPerArgonot);
 
     const approvalHash = hashMintingGatewayActivateMintingAuthorityApproval(
       await getGatewayHashContext(fixture.gateway),
@@ -847,11 +856,7 @@ describe('MintingGateway', () => {
     expect(await fixture.gateway.argonApprovalsNonce()).to.equal(3n);
     expect(await fixture.gateway.getFunction('argonApprovalsHash')()).to.equal(activationTwoHash);
     expect(activeCouncil.councilHash).to.equal(nextCouncil.hash);
-    expect(await fixture.gateway.previousGlobalIssuanceCouncilHash()).to.equal(
-      fixture.council.hash,
-    );
     expect(activeCouncil.epochMicrogonsPerArgonot).to.equal(nextCouncil.epochMicrogonsPerArgonot);
-    expect(await fixture.gateway.previousMicrogonsPerArgonot()).to.equal(MICROGONS_PER_ARGONOT);
     expect(activationEvents).toHaveLength(2);
     expect(activationEvents[0].args[0]).to.equal(firstTarget.signingKey);
     expect(activationEvents[0].args[3]).to.equal(1n);
@@ -996,7 +1001,7 @@ describe('MintingGateway', () => {
     );
   });
 
-  it('uses the previous council floor for in-flight Argon payouts', async () => {
+  it('accepts lower-quoted Argon payouts after the active floor increases', async () => {
     const fixture = await deployFixture();
     const signingWallet = Wallet.createRandom() as unknown as SignerLike;
     const { target } = await activateMintingAuthority(fixture, 1n, {
@@ -1006,13 +1011,13 @@ describe('MintingGateway', () => {
     });
     const nextCouncil = createCouncil(
       [fixture.adminSafe, fixture.guardian, fixture.holder, fixture.outsider],
-      500_000n,
+      2n * MICROGONS_PER_ARGONOT,
     );
 
     await rotateCouncil(fixture, 2n, nextCouncil);
 
     const request = await createTransferOutRequest(fixture, {
-      councilHash: await fixture.gateway.previousGlobalIssuanceCouncilHash(),
+      microgonsPerArgonot: MICROGONS_PER_ARGONOT,
       amount: 50n,
     });
     const signature = await signingWallet.signMessage(
@@ -1034,6 +1039,45 @@ describe('MintingGateway', () => {
     );
     expect(mintingCollateral.microgonCollateral).to.equal(0n);
     expect(mintingCollateral.micronotCollateral).to.equal(0n);
+  });
+
+  it('rejects transfer-out requests quoted above the active floor', async () => {
+    const fixture = await deployFixture();
+    const signingWallet = Wallet.createRandom() as unknown as SignerLike;
+    await activateMintingAuthority(fixture, 1n, {
+      microgonCollateral: 0n,
+      micronotCollateral: 50n,
+      signingKey: signingWallet.address as `0x${string}`,
+    });
+    const nextCouncil = createCouncil(
+      [fixture.adminSafe, fixture.guardian, fixture.holder, fixture.outsider],
+      500_000n,
+    );
+
+    await rotateCouncil(fixture, 2n, nextCouncil);
+
+    const request = await createTransferOutRequest(fixture, {
+      microgonsPerArgonot: MICROGONS_PER_ARGONOT,
+      amount: 50n,
+    });
+    const signature = await signingWallet.signMessage(
+      ethers.getBytes(
+        hashMintingGatewayMintingAuthorization(await getGatewayHashContext(fixture.gateway), {
+          request,
+          microgonCollateral: 0n,
+          micronotCollateral: 50n,
+        }),
+      ),
+    );
+
+    await expectCustomError(
+      fixture.gateway.connect(fixture.outsider).finalizeTransferOutOfArgon(request, {
+        authorizations: [{ microgonCollateral: 0n, micronotCollateral: 50n, signature }],
+      }),
+      fixture.gateway,
+      'InvalidTransferOutRate',
+      [500_000n, MICROGONS_PER_ARGONOT],
+    );
   });
 
   it('allows mixed Argon and Argonot collateral on Argon payouts', async () => {

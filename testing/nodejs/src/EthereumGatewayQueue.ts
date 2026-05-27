@@ -2,17 +2,17 @@ import {
   EvmContracts,
   type IArgonQueryable,
   type PalletCrosschainTransferCouncilApprovalQueueEntry,
-  type PalletCrosschainTransferGlobalIssuanceCouncil,
-  type PalletCrosschainTransferMintingAuthority,
 } from '@argonprotocol/mainchain';
 import type { ContractFunctionArgs } from 'viem';
-import { getAddress, type Address, type Hex } from 'viem';
+import { getAddress, keccak256, type Address, type Hex } from 'viem';
 import { toEvmRecoverableSignature } from './EthereumE2eUtils';
 
 const {
   encodeMintingGatewayMintingAuthorityActivationTarget,
+  encodeMintingGatewayMintingAuthorityDeactivateTarget,
   hashMintingGatewayActivateMintingAuthority,
   hashMintingGatewayGatewayUpdateApproval,
+  hashMintingGatewayMintingAuthorityDeactivation,
   mintingGatewayAbi,
   MINTING_GATEWAY_UPDATE_KINDS,
 } = EvmContracts;
@@ -40,6 +40,7 @@ export type EthereumGatewayUpdateBatch = {
   argonApprovalsNonce: bigint;
   argonApprovalsHash: Hex;
   paused: boolean;
+  pendingClearOutQueueNonces: bigint[];
   firstQueueNonce?: bigint;
   lastQueueNonce?: bigint;
   updates: MintingGatewayGatewayUpdate[];
@@ -121,15 +122,15 @@ export async function getReadyEthereumGatewayUpdates(
   const argonApprovalsHash = rawArgonApprovalsHash as Hex;
   const paused = rawPaused as boolean;
 
-  const updates: MintingGatewayGatewayUpdate[] = [];
+  const pendingClearOutQueueNonces: bigint[] = [];
+  const candidateUpdates: MintingGatewayGatewayUpdate[] = [];
   let expectedPreviousApprovalHash = argonApprovalsHash;
-  let firstQueueNonce: bigint | undefined;
-  let lastQueueNonce: bigint | undefined;
+  let readyQueueEntriesScanned = 0;
 
   if (!paused) {
     for (
       let queueNonce = argonApprovalsNonce + 1n;
-      updates.length < maxQueueEntries;
+      readyQueueEntriesScanned < maxQueueEntries;
       queueNonce += 1n
     ) {
       const entryOption =
@@ -143,10 +144,19 @@ export async function getReadyEthereumGatewayUpdates(
 
       const entry = entryOption.unwrap();
       const approvingCouncilHash = toHexValue(entry.approvingCouncilHash);
-      const approvingCouncil = await loadCouncilByHash(client, approvingCouncilHash, councilCache);
-      if (!queueEntryHasQuorum(entry, approvingCouncil)) {
+      if (
+        !(await queueEntryIsReady(
+          client,
+          entry,
+          approvingCouncilHash,
+          councilCache,
+          hashContext,
+          queueNonce,
+        ))
+      ) {
         break;
       }
+      readyQueueEntriesScanned += 1;
 
       if (toHexValue(entry.previousApprovalHash) !== expectedPreviousApprovalHash) {
         throw new Error(
@@ -158,12 +168,22 @@ export async function getReadyEthereumGatewayUpdates(
         entry,
         approvingCouncilHash,
       });
-      updates.push(update);
-      firstQueueNonce ??= queueNonce;
-      lastQueueNonce = queueNonce;
+      candidateUpdates.push(update);
       expectedPreviousApprovalHash = toHexValue(entry.approvalHash);
     }
   }
+
+  while (
+    candidateUpdates.length > 0 &&
+    candidateUpdates[candidateUpdates.length - 1]?.kind ===
+      MINTING_GATEWAY_UPDATE_KINDS.mintingAuthorityDeactivate
+  ) {
+    pendingClearOutQueueNonces.unshift(candidateUpdates.pop()!.queueNonce);
+  }
+
+  const updates = candidateUpdates;
+  const firstQueueNonce = updates[0]?.queueNonce;
+  const lastQueueNonce = updates[updates.length - 1]?.queueNonce;
 
   return {
     destinationChain,
@@ -174,6 +194,7 @@ export async function getReadyEthereumGatewayUpdates(
     argonApprovalsNonce,
     argonApprovalsHash,
     paused,
+    pendingClearOutQueueNonces,
     ...(firstQueueNonce !== undefined ? { firstQueueNonce, lastQueueNonce } : {}),
     updates,
   };
@@ -190,9 +211,8 @@ async function buildGatewayUpdate(
   },
 ): Promise<MintingGatewayGatewayUpdate> {
   const { entry, approvingCouncilHash } = queueItem;
-  const signatures = getSortedSignatures(entry.signatures);
-
   if (entry.target.isMintingAuthorityActivation) {
+    const signatures = getSortedSignatures(entry.signatures);
     const signingKey = getAddress(toHexValue(entry.target.asMintingAuthorityActivation));
     const authorityOption =
       await client.query.crosschainTransfer.mintingAuthoritiesBySigner(signingKey);
@@ -242,6 +262,22 @@ async function buildGatewayUpdate(
     };
   }
 
+  if (entry.target.isMintingAuthorityDeactivation) {
+    const { payload, signatures } = validateDeactivationEntry(
+      hashContext,
+      queueNonce,
+      entry,
+      approvingCouncilHash,
+    );
+
+    return {
+      queueNonce,
+      kind: MINTING_GATEWAY_UPDATE_KINDS.mintingAuthorityDeactivate,
+      payload,
+      signatures,
+    };
+  }
+
   throw new Error(`Unsupported approval queue target ${entry.target.type}`);
 }
 
@@ -277,7 +313,7 @@ async function loadCouncilByHash(
 }
 
 function queueEntryHasQuorum(entry: ApprovalQueueEntry, council: LoadedCouncil): boolean {
-  const signedWeight = [...entry.signatures.entries()].reduce((total, [signer, signature]) => {
+  const signedWeight = [...entry.signatures.entries()].reduce((total, [signer]) => {
     const signerAddress = getAddress(toHexValue(signer));
     const member = council.members.find(x => x.signer === signerAddress);
     if (!member) {
@@ -288,6 +324,23 @@ function queueEntryHasQuorum(entry: ApprovalQueueEntry, council: LoadedCouncil):
   }, 0n);
 
   return signedWeight * 2n > council.totalWeight;
+}
+
+async function queueEntryIsReady(
+  client: IArgonQueryable,
+  entry: ApprovalQueueEntry,
+  approvingCouncilHash: Hex,
+  councilCache: Map<Hex, LoadedCouncil>,
+  hashContext: MintingGatewayHashContext,
+  queueNonce: bigint,
+): Promise<boolean> {
+  if (entry.target.isMintingAuthorityDeactivation) {
+    validateDeactivationEntry(hashContext, queueNonce, entry, approvingCouncilHash);
+    return true;
+  }
+
+  const approvingCouncil = await loadCouncilByHash(client, approvingCouncilHash, councilCache);
+  return queueEntryHasQuorum(entry, approvingCouncil);
 }
 
 function councilToSnapshot(council: LoadedCouncil): MintingGatewayCouncilSnapshot {
@@ -302,6 +355,58 @@ function payloadHashFromActivationPayload(
   target: MintingGatewayMintingAuthorityActivationTarget,
 ): Hex {
   return hashMintingGatewayActivateMintingAuthority(hashContext, target);
+}
+
+function payloadHashFromDeactivationPayload(target: { signingKey: Address }): Hex {
+  return keccak256(encodeMintingGatewayMintingAuthorityDeactivateTarget(target));
+}
+
+function validateDeactivationEntry(
+  hashContext: MintingGatewayHashContext,
+  queueNonce: bigint,
+  entry: ApprovalQueueEntry,
+  approvingCouncilHash: Hex,
+): {
+  payload: ReturnType<typeof encodeMintingGatewayMintingAuthorityDeactivateTarget>;
+  signatures: MintingGatewayGatewayUpdate['signatures'];
+} {
+  const signingKey = getAddress(toHexValue(entry.target.asMintingAuthorityDeactivation));
+  const target = { signingKey };
+  const payload = encodeMintingGatewayMintingAuthorityDeactivateTarget(target);
+  const targetPayloadHash = payloadHashFromDeactivationPayload(target);
+  const approvalHash = hashMintingGatewayMintingAuthorityDeactivation(hashContext, {
+    queueNonce,
+    target,
+    previousUpdateHash: toHexValue(entry.previousApprovalHash),
+  });
+
+  if (toHexValue(entry.targetPayloadHash) !== targetPayloadHash) {
+    throw new Error(`Queue nonce ${queueNonce} target payload hash does not match deactivation`);
+  }
+  if (toHexValue(entry.approvalHash) !== approvalHash) {
+    throw new Error(
+      `Queue nonce ${queueNonce} approval hash does not match deactivation: actual=${toHexValue(entry.approvalHash)} expected=${approvalHash} previous=${toHexValue(entry.previousApprovalHash)} council=${approvingCouncilHash}`,
+    );
+  }
+
+  const deactivationSignatures = [...entry.signatures.entries()];
+  if (deactivationSignatures.length !== 1) {
+    throw new Error(
+      `Queue nonce ${queueNonce} expected exactly one deactivation signature, received ${deactivationSignatures.length}`,
+    );
+  }
+
+  const [signer] = deactivationSignatures[0];
+  if (getAddress(toHexValue(signer)) !== signingKey) {
+    throw new Error(
+      `Queue nonce ${queueNonce} deactivation signature was submitted by ${getAddress(toHexValue(signer))}, expected ${signingKey}`,
+    );
+  }
+
+  return {
+    payload,
+    signatures: getSortedSignatures(entry.signatures),
+  };
 }
 
 function getSortedSignatures(

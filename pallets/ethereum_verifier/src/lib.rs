@@ -33,7 +33,7 @@ pub mod weights;
 #[cfg(any(test, feature = "runtime-benchmarks", feature = "fuzzing"))]
 mod fixture_conversions;
 
-#[cfg(any(test, feature = "runtime-benchmarks", feature = "fuzzing"))]
+#[cfg(any(test, feature = "fuzzing"))]
 pub mod mock;
 
 #[cfg(test)]

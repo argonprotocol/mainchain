@@ -7,8 +7,10 @@ pub use weights::{prove_gateway_activity_with_providers, WeightInfo, WithProvide
 
 use pallet_prelude::*;
 
+mod approval_queue;
 mod evm;
 mod gateway_activity;
+mod minting_authority;
 mod transfer_out;
 
 #[cfg(test)]
@@ -19,7 +21,7 @@ mod tests;
 
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
-pub mod migrations;
+pub mod hyperbridge_migration;
 mod weights;
 pub use transfer_out::{
 	MintingAuthorityTransferReservation, PendingCollateralizationRequest, TransferOutOfArgon,
@@ -45,7 +47,10 @@ pub mod pallet {
 	use frame_support::{
 		dispatch::{Pays, PostDispatchInfo},
 		storage::with_storage_layer,
-		traits::fungible::{InspectHold, Mutate, MutateHold},
+		traits::{
+			fungible::{InspectHold, Mutate, MutateHold},
+			GetStorageVersion,
+		},
 	};
 	use polkadot_sdk::{
 		frame_support::traits::IsSubType,
@@ -57,7 +62,7 @@ pub mod pallet {
 
 	const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
 
-	const WEI_PER_ETH: u128 = 1_000_000_000_000_000_000;
+	pub(super) const WEI_PER_ETH: u128 = 1_000_000_000_000_000_000;
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -75,6 +80,7 @@ pub mod pallet {
 		type Balance: AtLeast32BitUnsigned
 			+ Member
 			+ codec::FullCodec
+			+ codec::HasCompact
 			+ Copy
 			+ MaybeSerializeDeserialize
 			+ DecodeWithMemTracking
@@ -342,6 +348,11 @@ pub mod pallet {
 		/// The relayer repayment pricing needed to absorb a proven activation is missing or
 		/// invalid.
 		MissingMintingAuthorityActivationRepaymentPricing,
+		/// A proven activation could not reconcile the local reimbursement hold it expected to
+		/// settle.
+		MintingAuthorityActivationRepaymentMismatch,
+		/// A proven gateway activity referenced a council snapshot Argon no longer retained.
+		GlobalIssuanceCouncilNotFound,
 		/// The gateway's reported circulation or collateral no longer matched Argon's expectation.
 		GatewayStateDrift,
 	}
@@ -478,6 +489,8 @@ pub mod pallet {
 		MintingAuthorityActivation(H160),
 		/// Deactivation of the minting authority identified by this destination-chain signing key.
 		MintingAuthorityDeactivation(H160),
+		/// Rotation to the council snapshot identified by this hash.
+		GlobalIssuanceCouncilRotation(H256),
 	}
 
 	#[derive(
@@ -547,13 +560,13 @@ pub mod pallet {
 		/// Queue item that must be incorporated by the gateway before this authority can complete
 		/// activation.
 		pub activation_approval_queue_nonce: CouncilApprovalQueueNonce,
-		/// Flat activation reimbursement component held up front for this authority.
-		pub activation_base_repayment_due: Option<T::Balance>,
-		/// Per-signature-bearing-update reimbursement component held up front for this authority.
-		pub activation_signature_repayment_due: Option<T::Balance>,
-		/// Argon-denominated reimbursement held until activation is proven, then paid to the
-		/// relayer or released back on a self-relay.
-		pub activation_repayment_due: Option<T::Balance>,
+		/// Flat activation reimbursement quote snapshotted when this authority entered the queue.
+		#[codec(compact)]
+		pub activation_base_repayment_quote: T::Balance,
+		/// Total signature-side activation reimbursement quote snapshotted when this authority
+		/// entered the queue.
+		#[codec(compact)]
+		pub activation_signature_repayment_quote: T::Balance,
 		/// Queue item carrying the authority's signer-keyed Ethereum deactivation while the local
 		/// state is already in `Deactivating`.
 		pub deactivation_approval_queue_nonce: Option<CouncilApprovalQueueNonce>,
@@ -700,15 +713,32 @@ pub mod pallet {
 		StorageMap<_, Blake2_128Concat, SourceChain, H256, OptionQuery>;
 
 	#[pallet::storage]
+	/// Conservative transfer-out conversion rate currently quoted for each destination chain.
+	pub type CurrentTransferOutMicrogonsPerArgonotByDestinationChain<T: Config> =
+		StorageMap<_, Blake2_128Concat, SourceChain, T::Balance, OptionQuery>;
+
+	#[pallet::storage]
+	/// Immediately previous transfer-out conversion rate still accepted while the floor ratchets
+	/// upward across council transitions.
+	pub type PreviousTransferOutMicrogonsPerArgonotByDestinationChain<T: Config> =
+		StorageMap<_, Blake2_128Concat, SourceChain, T::Balance, OptionQuery>;
+
+	#[pallet::storage]
 	/// Historical Global Issuance Council snapshots keyed by their signer-ordered council hash.
 	pub type GlobalIssuanceCouncilByHash<T: Config> =
 		StorageMap<_, Blake2_128Concat, H256, GlobalIssuanceCouncil<T>, OptionQuery>;
 
 	#[pallet::storage]
-	/// The latest queued council hash that should govern the next queue entry on each
-	/// destination chain.
+	/// The latest queued council hash that should govern the next queue entry on each destination
+	/// chain.
 	pub type LatestQueuedCouncilHashByDestinationChain<T: Config> =
 		StorageMap<_, Blake2_128Concat, SourceChain, H256, OptionQuery>;
+
+	#[pallet::storage]
+	/// The conservative transfer-out quote floor that the next newly opened transfer should
+	/// snapshot on each destination chain.
+	pub type TransferOutQuoteMicrogonsPerArgonotByDestinationChain<T: Config> =
+		StorageMap<_, Blake2_128Concat, SourceChain, T::Balance, OptionQuery>;
 
 	#[pallet::storage]
 	/// The next outbound approval-queue nonce to assign on each destination chain.
@@ -1023,6 +1053,14 @@ pub mod pallet {
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(_: BlockNumberFor<T>) -> Weight {
+			let mut weight = Weight::zero();
+			if <Pallet<T> as GetStorageVersion>::on_chain_storage_version() ==
+				StorageVersion::new(0)
+			{
+				weight = weight
+					.saturating_add(hyperbridge_migration::initialize_crosschain_transfer::<T>());
+			}
+
 			let current_tick = T::CurrentTick::get();
 			let last_cleanup_tick = LastTransferExpiryCleanupTick::<T>::get();
 			let first_tick_to_cleanup = if last_cleanup_tick == 0 {
@@ -1042,7 +1080,7 @@ pub mod pallet {
 			}
 
 			LastTransferExpiryCleanupTick::<T>::put(current_tick);
-			T::WeightInfo::on_initialize_cleanup(expiring_len)
+			weight.saturating_add(T::WeightInfo::on_initialize_cleanup(expiring_len))
 		}
 	}
 
@@ -1203,20 +1241,40 @@ pub mod pallet {
 			let previous_council =
 				ActiveGlobalIssuanceCouncilByDestinationChain::<T>::get(destination_chain)
 					.and_then(GlobalIssuanceCouncilByHash::<T>::get);
+			let previous_council_for_cursor_reset =
+				if after_nonce == last_synced_nonce { previous_council.as_ref() } else { None };
 			Self::reset_council_approval_cursor(
 				destination_chain,
 				after_nonce,
-				previous_council.as_ref(),
+				previous_council_for_cursor_reset,
 				&council,
 			)?;
 			GlobalIssuanceCouncilByHash::<T>::insert(council_hash, council);
+			let prunable_council_hash =
+				ActiveGlobalIssuanceCouncilByDestinationChain::<T>::get(destination_chain);
 			ActiveGlobalIssuanceCouncilByDestinationChain::<T>::insert(
 				destination_chain,
 				council_hash,
 			);
-			LatestQueuedCouncilHashByDestinationChain::<T>::remove(destination_chain);
+			if CurrentTransferOutMicrogonsPerArgonotByDestinationChain::<T>::get(destination_chain)
+				.filter(|rate| *rate != T::Balance::default())
+				.is_none()
+			{
+				// Force-sets repair council membership. Only proved gateway rotations advance the
+				// live transfer-out floor once one has already been established.
+				CurrentTransferOutMicrogonsPerArgonotByDestinationChain::<T>::insert(
+					destination_chain,
+					epoch_microgons_per_argonot,
+				);
+			}
 			Self::rebase_unresolved_queue_entries(destination_chain, after_nonce, council_hash)?;
-
+			Self::refresh_destination_chain_queue_tracking(destination_chain)?;
+			if let Some(prunable_council_hash) = prunable_council_hash {
+				Self::prune_global_issuance_council_if_unreferenced(
+					destination_chain,
+					prunable_council_hash,
+				);
+			}
 			Self::deposit_event(Event::GlobalIssuanceCouncilForced {
 				destination_chain,
 				council_hash,
@@ -1354,178 +1412,6 @@ pub mod pallet {
 		}
 
 		#[pallet::call_index(7)]
-		#[pallet::weight(T::WeightInfo::register_minting_authority())]
-		pub fn register_minting_authority(
-			origin: OriginFor<T>,
-			destination_chain: SourceChain,
-			destination_signing_key: H160,
-			signature: KeccakSignature,
-			#[pallet::compact] microgon_collateral: T::Balance,
-			#[pallet::compact] micronot_collateral: T::Balance,
-		) -> DispatchResult {
-			let vault_operator_account_id = ensure_signed(origin)?;
-			Self::ensure_source_chain_not_paused(destination_chain)?;
-			let active_council_hash =
-				ActiveGlobalIssuanceCouncilByDestinationChain::<T>::get(destination_chain)
-					.ok_or(Error::<T>::GlobalIssuanceCouncilNotFound)?;
-			let _ = Self::evm_gateway_signature_domain(destination_chain)?;
-			ensure!(
-				destination_signing_key != H160::zero(),
-				Error::<T>::InvalidMintingAuthoritySigningKey,
-			);
-			ensure!(
-				microgon_collateral != T::Balance::default() ||
-					micronot_collateral != T::Balance::default(),
-				Error::<T>::InvalidMintingAuthorityCollateral,
-			);
-
-			T::VaultProvider::get_vault_id(&vault_operator_account_id)
-				.ok_or(Error::<T>::UnknownOwnerVault)?;
-			ensure!(
-				Self::recover_evm_personal_signer(
-					&Self::minting_authority_signer_registration_message(
-						destination_chain,
-						&vault_operator_account_id,
-					),
-					&signature,
-				) == Some(destination_signing_key),
-				Error::<T>::InvalidMintingAuthoritySigningKeyProof,
-			);
-			ensure!(
-				!MintingAuthoritiesBySigner::<T>::contains_key(destination_signing_key),
-				Error::<T>::MintingAuthorityAlreadyRegistered,
-			);
-			let minimum_value =
-				MinimumMintingAuthorityValueByDestinationChain::<T>::get(destination_chain);
-			let micronot_value = if micronot_collateral == T::Balance::default() {
-				T::Balance::default()
-			} else {
-				let microgons_per_argonot = T::PriceProvider::get_lowest_microgons_per_argonot(
-					T::CouncilRotationFrames::get(),
-				)
-				.filter(|price| *price != T::Balance::default())
-				.ok_or(Error::<T>::InvalidMicrogonsPerArgonot)?;
-				let microgons_per_argonot: u128 = microgons_per_argonot.into();
-				micronot_collateral
-					.into()
-					.saturating_mul(microgons_per_argonot)
-					.saturating_div(MICROGONS_PER_ARGON)
-					.into()
-			};
-			let total_collateral_value = microgon_collateral.saturating_add(micronot_value);
-			ensure!(
-				total_collateral_value >= minimum_value,
-				Error::<T>::MintingAuthorityCollateralBelowMinimum,
-			);
-
-			let approval_queue_nonce =
-				NextCouncilApprovalQueueNonceByDestinationChain::<T>::get(destination_chain)
-					.saturating_add(1);
-			let previous_approval_hash =
-				Self::previous_gateway_update_hash(destination_chain, approval_queue_nonce)?;
-			let approving_council_hash =
-				LatestQueuedCouncilHashByDestinationChain::<T>::get(destination_chain)
-					.unwrap_or(active_council_hash);
-			let (
-				activation_base_repayment_due,
-				activation_signature_repayment_due,
-				activation_repayment_due,
-			) = Self::minting_authority_activation_repayment_quote(
-				destination_chain,
-				approving_council_hash,
-			)?;
-			let target_payload_hash = Self::hash_activate_minting_authority(
-				destination_chain,
-				microgon_collateral,
-				micronot_collateral,
-				destination_signing_key,
-			)?;
-			let due_frame_id = Self::queue_entry_due_frame_id();
-			let mut queue_entry = CouncilApprovalQueueEntry::<T> {
-				approving_council_hash,
-				target: CouncilApprovalTargetId::MintingAuthorityActivation(
-					destination_signing_key,
-				),
-				target_payload_hash,
-				due_frame_id,
-				previous_approval_hash,
-				approval_hash: H256::zero(),
-				approved_total_weight: T::Balance::default(),
-				signatures: BoundedBTreeMap::new(),
-			};
-			queue_entry.approval_hash = Self::hash_council_approval_queue_entry(
-				destination_chain,
-				approval_queue_nonce,
-				&queue_entry,
-			)?;
-
-			if microgon_collateral != T::Balance::default() {
-				T::TreasuryPoolProvider::encumber_bond_microgons(
-					&vault_operator_account_id,
-					microgon_collateral,
-				)
-				.map_err(|_| Error::<T>::InsufficientCommittedMicrogonCollateral)?;
-			}
-			if micronot_collateral != T::Balance::default() {
-				T::VaultProvider::encumber_argonots(
-					&vault_operator_account_id,
-					micronot_collateral,
-				)
-				.map_err(|_| Error::<T>::InsufficientCommittedArgonotCollateral)?;
-			}
-			if activation_repayment_due != T::Balance::default() {
-				if T::NativeCurrency::balance_on_hold(
-					&HoldReason::MintingAuthorityActivationRepayment.into(),
-					&vault_operator_account_id,
-				) == T::Balance::default()
-				{
-					frame_system::Pallet::<T>::inc_providers(&vault_operator_account_id);
-				}
-				T::NativeCurrency::hold(
-					&HoldReason::MintingAuthorityActivationRepayment.into(),
-					&vault_operator_account_id,
-					activation_repayment_due,
-				)?;
-			}
-			MintingAuthoritiesBySigner::<T>::insert(
-				destination_signing_key,
-				MintingAuthority::<T> {
-					account_id: vault_operator_account_id.clone(),
-					destination_chain,
-					destination_signing_key,
-					state: MintingAuthorityState::PendingActivation,
-					gateway_remaining_microgon_collateral: microgon_collateral,
-					gateway_remaining_micronot_collateral: micronot_collateral,
-					pending_reserved_microgon_collateral: T::Balance::default(),
-					pending_reserved_micronot_collateral: T::Balance::default(),
-					active_pending_transfer_ids: BoundedVec::default(),
-					activation_approval_queue_nonce: approval_queue_nonce,
-					activation_base_repayment_due: Some(activation_base_repayment_due),
-					activation_signature_repayment_due: Some(activation_signature_repayment_due),
-					activation_repayment_due: Some(activation_repayment_due),
-					deactivation_approval_queue_nonce: None,
-				},
-			);
-			CouncilApprovalQueueByDestinationChainAndNonce::<T>::insert(
-				destination_chain,
-				approval_queue_nonce,
-				queue_entry,
-			);
-			NextCouncilApprovalQueueNonceByDestinationChain::<T>::insert(
-				destination_chain,
-				approval_queue_nonce,
-			);
-
-			Self::deposit_event(Event::MintingAuthorityRegistered {
-				destination_chain,
-				destination_signing_key,
-				account_id: vault_operator_account_id,
-				approval_queue_nonce,
-			});
-			Ok(())
-		}
-
-		#[pallet::call_index(8)]
 		#[pallet::weight(T::WeightInfo::approve_queue_entries(signatures.len().max(1) as u32))]
 		pub fn approve_queue_entries(
 			origin: OriginFor<T>,
@@ -1535,7 +1421,7 @@ pub mod pallet {
 			let council_member_account_id = ensure_signed(origin)?;
 			ensure!(!signatures.is_empty(), Error::<T>::NoCouncilApprovalSignaturesProvided,);
 			Self::ensure_source_chain_not_paused(destination_chain)?;
-			let mut approval_queue_nonce = Self::next_council_approval_queue_nonce(
+			let mut approval_queue_nonce = Self::next_council_approval_queue_nonce_for_account(
 				destination_chain,
 				&council_member_account_id,
 			)
@@ -1613,7 +1499,7 @@ pub mod pallet {
 			Ok(Pays::No.into())
 		}
 
-		#[pallet::call_index(9)]
+		#[pallet::call_index(8)]
 		#[pallet::weight({
 			let proof_blocks = proof_batch.blocks.len() as u32;
 			let activities = proof_batch.blocks.iter().fold(0u32, |total, block| {
@@ -1711,6 +1597,7 @@ pub mod pallet {
 					}
 				}
 				GatewayStateBySourceChain::<T>::insert(source_chain, gateway_state.clone());
+				Self::refresh_destination_chain_queue_tracking(source_chain)?;
 				Self::deposit_event(Event::GatewayStateAdvanced { source_chain, gateway_state });
 			}
 
@@ -1726,7 +1613,39 @@ pub mod pallet {
 			Ok(PostDispatchInfo { pays_fee, ..Default::default() })
 		}
 
+		#[pallet::call_index(9)]
+		#[pallet::weight(T::WeightInfo::register_minting_authority())]
+		pub fn register_minting_authority(
+			origin: OriginFor<T>,
+			destination_chain: SourceChain,
+			destination_signing_key: H160,
+			signature: KeccakSignature,
+			#[pallet::compact] microgon_collateral: T::Balance,
+			#[pallet::compact] micronot_collateral: T::Balance,
+		) -> DispatchResult {
+			let vault_operator_account_id = ensure_signed(origin)?;
+			Self::do_register_minting_authority(
+				vault_operator_account_id,
+				destination_chain,
+				destination_signing_key,
+				signature,
+				microgon_collateral,
+				micronot_collateral,
+			)
+		}
+
 		#[pallet::call_index(10)]
+		#[pallet::weight(T::WeightInfo::deactivate_minting_authority())]
+		pub fn deactivate_minting_authority(
+			origin: OriginFor<T>,
+			destination_signing_key: H160,
+			signature: KeccakSignature,
+		) -> DispatchResultWithPostInfo {
+			let account_id = ensure_signed(origin)?;
+			Self::do_deactivate_minting_authority(account_id, destination_signing_key, signature)
+		}
+
+		#[pallet::call_index(11)]
 		#[pallet::weight(T::WeightInfo::transfer_out())]
 		pub fn transfer_out(
 			origin: OriginFor<T>,
@@ -1736,10 +1655,11 @@ pub mod pallet {
 			#[pallet::compact] amount: T::Balance,
 		) -> DispatchResult {
 			let account_id = ensure_signed(origin)?;
+			Self::ensure_source_chain_not_paused(destination_chain)?;
 			Self::do_transfer_out(account_id, destination_chain, asset, destination_account, amount)
 		}
 
-		#[pallet::call_index(11)]
+		#[pallet::call_index(12)]
 		#[pallet::weight(T::WeightInfo::collateralize_transfer())]
 		pub fn collateralize_transfer(
 			origin: OriginFor<T>,
@@ -1758,142 +1678,6 @@ pub mod pallet {
 			)?;
 			Ok(Pays::No.into())
 		}
-
-		#[pallet::call_index(12)]
-		#[pallet::weight(T::WeightInfo::deactivate_minting_authority())]
-		pub fn deactivate_minting_authority(
-			origin: OriginFor<T>,
-			destination_signing_key: H160,
-			signature: KeccakSignature,
-		) -> DispatchResultWithPostInfo {
-			let account_id = ensure_signed(origin)?;
-			let mut destination_chain = None;
-			let mut queued_nonce = None;
-
-			MintingAuthoritiesBySigner::<T>::try_mutate(
-				destination_signing_key,
-				|maybe_authority| -> DispatchResult {
-					let authority =
-						maybe_authority.as_mut().ok_or(Error::<T>::MintingAuthorityNotFound)?;
-					ensure!(
-						authority.account_id == account_id,
-						Error::<T>::MintingAuthorityMismatch,
-					);
-					Self::ensure_source_chain_not_paused(authority.destination_chain)?;
-					ensure!(
-						matches!(
-							authority.state,
-							MintingAuthorityState::Active | MintingAuthorityState::Deactivating
-						),
-						Error::<T>::UnexpectedMintingAuthorityState,
-					);
-
-					destination_chain = Some(authority.destination_chain);
-					authority.state = MintingAuthorityState::Deactivating;
-					let queue_nonce = if let Some(existing_nonce) =
-						authority.deactivation_approval_queue_nonce
-					{
-						existing_nonce
-					} else {
-						let active_council_hash =
-							ActiveGlobalIssuanceCouncilByDestinationChain::<T>::get(
-								authority.destination_chain,
-							)
-							.ok_or(Error::<T>::GlobalIssuanceCouncilNotFound)?;
-						let approving_council_hash =
-							LatestQueuedCouncilHashByDestinationChain::<T>::get(
-								authority.destination_chain,
-							)
-							.unwrap_or(active_council_hash);
-						let next_queue_nonce =
-							NextCouncilApprovalQueueNonceByDestinationChain::<T>::mutate(
-								authority.destination_chain,
-								|next_nonce| {
-									*next_nonce = next_nonce.saturating_add(1);
-									*next_nonce
-								},
-							);
-						let previous_approval_hash = Self::previous_gateway_update_hash(
-							authority.destination_chain,
-							next_queue_nonce,
-						)?;
-						let target_payload_hash =
-							Self::hash_deactivate_minting_authority_target(destination_signing_key);
-						let mut queue_entry = CouncilApprovalQueueEntry::<T> {
-							approving_council_hash,
-							target: CouncilApprovalTargetId::MintingAuthorityDeactivation(
-								destination_signing_key,
-							),
-							target_payload_hash,
-							due_frame_id: Self::queue_entry_due_frame_id(),
-							previous_approval_hash,
-							approval_hash: H256::zero(),
-							approved_total_weight: T::Balance::default(),
-							signatures: BoundedBTreeMap::new(),
-						};
-						queue_entry.approval_hash = Self::hash_council_approval_queue_entry(
-							authority.destination_chain,
-							next_queue_nonce,
-							&queue_entry,
-						)?;
-						CouncilApprovalQueueByDestinationChainAndNonce::<T>::insert(
-							authority.destination_chain,
-							next_queue_nonce,
-							queue_entry,
-						);
-						authority.deactivation_approval_queue_nonce = Some(next_queue_nonce);
-						queued_nonce = Some(next_queue_nonce);
-						next_queue_nonce
-					};
-					let queue_entry = CouncilApprovalQueueByDestinationChainAndNonce::<T>::get(
-						authority.destination_chain,
-						queue_nonce,
-					)
-					.ok_or(Error::<T>::CouncilApprovalQueueEntryNotFound)?;
-					ensure!(
-						Self::recover_evm_message_signer(queue_entry.approval_hash, &signature) ==
-							Some(destination_signing_key),
-						Error::<T>::InvalidMintingAuthorityDeactivationSignature,
-					);
-
-					CouncilApprovalQueueByDestinationChainAndNonce::<T>::try_mutate(
-						authority.destination_chain,
-						queue_nonce,
-						|entry| -> DispatchResult {
-							let entry = entry
-								.as_mut()
-								.ok_or(Error::<T>::CouncilApprovalQueueEntryNotFound)?;
-							ensure!(
-								entry.target ==
-									CouncilApprovalTargetId::MintingAuthorityDeactivation(
-										destination_signing_key,
-									),
-								Error::<T>::MintingAuthorityMismatch,
-							);
-							entry.signatures.remove(&destination_signing_key);
-							let _ = entry
-								.signatures
-								.try_insert(destination_signing_key, signature)
-								.map_err(|_| Error::<T>::InvalidGlobalIssuanceCouncil)?;
-							Ok(())
-						},
-					)?;
-					Ok(())
-				},
-			)?;
-
-			if let (Some(destination_chain), Some(approval_queue_nonce)) =
-				(destination_chain, queued_nonce)
-			{
-				Self::deposit_event(Event::MintingAuthorityDeactivationQueued {
-					destination_chain,
-					destination_signing_key,
-					approval_queue_nonce,
-				});
-			}
-
-			Ok(Pays::No.into())
-		}
 	}
 
 	impl<T: Config> Pallet<T> {
@@ -1907,76 +1691,6 @@ pub mod pallet {
 			source_chain: SourceChain,
 		) -> SourceChainCirculation<T> {
 			PendingTransferOutCirculationByDestinationChain::<T>::get(source_chain)
-		}
-
-		pub(crate) fn previous_gateway_update_hash(
-			destination_chain: SourceChain,
-			queue_nonce: CouncilApprovalQueueNonce,
-		) -> Result<H256, DispatchError> {
-			if queue_nonce <= 1 {
-				return Ok(H256::zero());
-			}
-
-			let previous_entry = CouncilApprovalQueueByDestinationChainAndNonce::<T>::get(
-				destination_chain,
-				queue_nonce.saturating_sub(1),
-			)
-			.ok_or(Error::<T>::CouncilApprovalQueueEntryNotFound)?;
-
-			Ok(previous_entry.approval_hash)
-		}
-
-		#[allow(clippy::type_complexity)]
-		pub(crate) fn minting_authority_activation_repayment_quote(
-			destination_chain: SourceChain,
-			approving_council_hash: H256,
-		) -> Result<(T::Balance, T::Balance, T::Balance), DispatchError> {
-			let pricing = MintingAuthorityActivationRepaymentPricingByDestinationChain::<T>::get(
-				destination_chain,
-			)
-			.ok_or(Error::<T>::MissingMintingAuthorityActivationRepaymentPricing)?;
-			let activation_base_repayment_due =
-				Self::minting_authority_activation_gas_repayment_due(
-					&pricing,
-					pricing.activation_gas_cost,
-				)?;
-			let activation_signature_repayment_due =
-				Self::minting_authority_activation_gas_repayment_due(
-					&pricing,
-					pricing.signature_gas_cost,
-				)?;
-			let signature_count = Self::council_signature_quote(approving_council_hash)?;
-			let activation_repayment_due = activation_base_repayment_due.saturating_add(
-				activation_signature_repayment_due.saturating_mul(signature_count.into()),
-			);
-			if activation_repayment_due == T::Balance::default() {
-				return Err(Error::<T>::MissingMintingAuthorityActivationRepaymentPricing.into());
-			}
-			Ok((
-				activation_base_repayment_due,
-				activation_signature_repayment_due,
-				activation_repayment_due,
-			))
-		}
-
-		pub(crate) fn minting_authority_activation_gas_repayment_due(
-			pricing: &MintingAuthorityActivationRepaymentPricing<T>,
-			gas_units: u128,
-		) -> Result<T::Balance, DispatchError> {
-			let microgons_per_eth: u128 = pricing.estimated_microgons_per_eth.into();
-			let wei_cost = gas_units.saturating_mul(pricing.estimated_wei_per_gas);
-			let total_microgons =
-				microgons_per_eth.saturating_mul(wei_cost).saturating_div(WEI_PER_ETH);
-			if total_microgons == 0 {
-				return Err(Error::<T>::MissingMintingAuthorityActivationRepaymentPricing.into());
-			}
-			Ok(total_microgons.into())
-		}
-
-		fn council_signature_quote(council_hash: H256) -> Result<u32, DispatchError> {
-			let council = GlobalIssuanceCouncilByHash::<T>::get(council_hash)
-				.ok_or(Error::<T>::GlobalIssuanceCouncilNotFound)?;
-			Ok(council.members.len() as u32)
 		}
 
 		pub(crate) fn ensure_source_chain_not_paused(source_chain: SourceChain) -> DispatchResult {
@@ -2000,278 +1714,6 @@ pub mod pallet {
 			};
 			GatewaySyncPauseBySourceChain::<T>::insert(source_chain, pause);
 			Self::deposit_event(Event::GatewaySyncPaused { source_chain, pause });
-		}
-
-		fn queue_entry_due_frame_id() -> FrameId {
-			T::CurrentFrameId::get().saturating_add(T::CouncilRotationFrames::get())
-		}
-
-		fn next_council_approval_queue_nonce(
-			destination_chain: SourceChain,
-			account_id: &T::AccountId,
-		) -> Option<CouncilApprovalQueueNonce> {
-			let last_synced_nonce = GatewayStateBySourceChain::<T>::get(destination_chain)
-				.map(|state| state.argon_approvals_nonce)
-				.unwrap_or_default();
-			let last_signed_nonce = CouncilApprovalCursorByDestinationChainAndAccountId::<T>::get(
-				destination_chain,
-				account_id,
-			)?;
-			let mut next_queue_nonce = last_synced_nonce.max(last_signed_nonce).saturating_add(1);
-
-			loop {
-				// Deactivation entries are signer-scoped cleanup follow-ons, not new work that
-				// should block this signer from reaching the next council-approved actionable
-				// queue item.
-				let Some(entry) = CouncilApprovalQueueByDestinationChainAndNonce::<T>::get(
-					destination_chain,
-					next_queue_nonce,
-				) else {
-					break;
-				};
-				if !matches!(entry.target, CouncilApprovalTargetId::MintingAuthorityDeactivation(_))
-				{
-					break;
-				}
-				next_queue_nonce = next_queue_nonce.saturating_add(1);
-			}
-
-			Some(next_queue_nonce)
-		}
-
-		fn reset_council_approval_cursor(
-			destination_chain: SourceChain,
-			after_nonce: CouncilApprovalQueueNonce,
-			previous_council: Option<&GlobalIssuanceCouncil<T>>,
-			council: &GlobalIssuanceCouncil<T>,
-		) -> DispatchResult {
-			if let Some(previous_council) = previous_council {
-				for member in previous_council.members.values() {
-					if council
-						.members
-						.values()
-						.any(|current_member| current_member.account_id == member.account_id)
-					{
-						continue;
-					}
-					CouncilApprovalCursorByDestinationChainAndAccountId::<T>::remove(
-						destination_chain,
-						&member.account_id,
-					);
-				}
-			}
-
-			for member in council.members.values() {
-				let next_cursor = CouncilApprovalCursorByDestinationChainAndAccountId::<T>::get(
-					destination_chain,
-					&member.account_id,
-				)
-				.map(|last_signed_nonce| last_signed_nonce.min(after_nonce))
-				.unwrap_or(after_nonce);
-				CouncilApprovalCursorByDestinationChainAndAccountId::<T>::insert(
-					destination_chain,
-					&member.account_id,
-					next_cursor,
-				);
-			}
-			Ok(())
-		}
-
-		fn rebase_unresolved_queue_entries(
-			destination_chain: SourceChain,
-			after_nonce: CouncilApprovalQueueNonce,
-			approving_council_hash: H256,
-		) -> DispatchResult {
-			let last_queued_nonce =
-				NextCouncilApprovalQueueNonceByDestinationChain::<T>::get(destination_chain);
-			let first_rebased_nonce = after_nonce.saturating_add(1);
-
-			if first_rebased_nonce > last_queued_nonce {
-				return Ok(());
-			}
-
-			let mut rebased_entries = Vec::new();
-			for queue_nonce in first_rebased_nonce..=last_queued_nonce {
-				let Some(entry) = CouncilApprovalQueueByDestinationChainAndNonce::<T>::get(
-					destination_chain,
-					queue_nonce,
-				) else {
-					continue;
-				};
-				let approving_council =
-					GlobalIssuanceCouncilByHash::<T>::get(entry.approving_council_hash)
-						.ok_or(Error::<T>::GlobalIssuanceCouncilNotFound)?;
-				ensure!(
-					!Self::global_issuance_council_has_quorum(&approving_council, &entry),
-					Error::<T>::CannotForceSetQuorumApprovedQueueEntry,
-				);
-				rebased_entries.push((queue_nonce, entry));
-			}
-
-			for queue_nonce in first_rebased_nonce..=last_queued_nonce {
-				CouncilApprovalQueueByDestinationChainAndNonce::<T>::remove(
-					destination_chain,
-					queue_nonce,
-				);
-			}
-
-			let mut previous_approval_hash =
-				Self::previous_gateway_update_hash(destination_chain, first_rebased_nonce)?;
-			let mut next_queue_nonce = first_rebased_nonce;
-			let due_frame_id = Self::queue_entry_due_frame_id();
-
-			for (old_queue_nonce, mut entry) in rebased_entries {
-				match entry.target {
-					CouncilApprovalTargetId::MintingAuthorityActivation(
-						destination_signing_key,
-					) => {
-						MintingAuthoritiesBySigner::<T>::try_mutate(
-							destination_signing_key,
-							|maybe_authority| -> DispatchResult {
-								let authority = maybe_authority
-									.as_mut()
-									.ok_or(Error::<T>::MintingAuthorityNotFound)?;
-								ensure!(
-									authority.activation_approval_queue_nonce == old_queue_nonce,
-									Error::<T>::MintingAuthorityMismatch,
-								);
-								authority.activation_approval_queue_nonce = next_queue_nonce;
-								Ok(())
-							},
-						)?;
-					},
-					CouncilApprovalTargetId::MintingAuthorityDeactivation(
-						destination_signing_key,
-					) => {
-						MintingAuthoritiesBySigner::<T>::try_mutate(
-							destination_signing_key,
-							|maybe_authority| -> DispatchResult {
-								let authority = maybe_authority
-									.as_mut()
-									.ok_or(Error::<T>::MintingAuthorityNotFound)?;
-								ensure!(
-									authority.deactivation_approval_queue_nonce ==
-										Some(old_queue_nonce),
-									Error::<T>::MintingAuthorityMismatch,
-								);
-								authority.deactivation_approval_queue_nonce =
-									Some(next_queue_nonce);
-								Ok(())
-							},
-						)?;
-					},
-				}
-
-				entry.approving_council_hash = approving_council_hash;
-				entry.due_frame_id = due_frame_id;
-				entry.previous_approval_hash = previous_approval_hash;
-				entry.approved_total_weight = T::Balance::default();
-				entry.signatures = BoundedBTreeMap::new();
-				entry.approval_hash = Self::hash_council_approval_queue_entry(
-					destination_chain,
-					next_queue_nonce,
-					&entry,
-				)?;
-				previous_approval_hash = entry.approval_hash;
-
-				CouncilApprovalQueueByDestinationChainAndNonce::<T>::insert(
-					destination_chain,
-					next_queue_nonce,
-					entry.clone(),
-				);
-				next_queue_nonce = next_queue_nonce.saturating_add(1);
-			}
-
-			NextCouncilApprovalQueueNonceByDestinationChain::<T>::insert(
-				destination_chain,
-				next_queue_nonce.saturating_sub(1),
-			);
-
-			Ok(())
-		}
-
-		fn global_issuance_council_has_quorum(
-			active_council: &GlobalIssuanceCouncil<T>,
-			entry: &CouncilApprovalQueueEntry<T>,
-		) -> bool {
-			let total_weight = active_council.total_weight;
-			if total_weight == T::Balance::default() {
-				return false;
-			}
-
-			let approved_weight = entry.approved_total_weight;
-			let unsigned_member_count =
-				active_council.members.len().saturating_sub(entry.signatures.len());
-
-			approved_weight.saturating_mul(100u128.into()) >=
-				total_weight.saturating_mul(90u128.into()) ||
-				(unsigned_member_count <= 2 &&
-					approved_weight.saturating_mul(100u128.into()) >=
-						total_weight.saturating_mul(80u128.into()))
-		}
-
-		pub(crate) fn release_minting_authority_collateral(
-			account_id: T::AccountId,
-			microgon_collateral: T::Balance,
-			micronot_collateral: T::Balance,
-		) -> DispatchResult {
-			if microgon_collateral != T::Balance::default() {
-				T::TreasuryPoolProvider::release_encumbered_bond_microgons(
-					&account_id,
-					microgon_collateral,
-				)
-				.map_err(|_| Error::<T>::InsufficientCommittedMicrogonCollateral)?;
-			}
-			if micronot_collateral != T::Balance::default() {
-				T::VaultProvider::release_encumbered_argonots(&account_id, micronot_collateral)
-					.map_err(|_| Error::<T>::UnknownOwnerVault)?;
-			}
-			Ok(())
-		}
-
-		pub(crate) fn burn_minting_authority_collateral(
-			account_id: T::AccountId,
-			microgon_collateral: T::Balance,
-			micronot_collateral: T::Balance,
-		) -> DispatchResult {
-			if microgon_collateral != T::Balance::default() {
-				T::TreasuryPoolProvider::burn_encumbered_bond_microgons(
-					&account_id,
-					microgon_collateral,
-				)
-				.map_err(|_| Error::<T>::InsufficientCommittedMicrogonCollateral)?;
-			}
-			if micronot_collateral != T::Balance::default() {
-				T::VaultProvider::burn_encumbered_argonots(&account_id, micronot_collateral)
-					.map_err(|_| Error::<T>::UnknownOwnerVault)?;
-			}
-			Ok(())
-		}
-
-		pub(crate) fn add_pending_transfer_out_circulation(
-			source_chain: SourceChain,
-			asset: AssetKind,
-			amount: T::Balance,
-		) {
-			PendingTransferOutCirculationByDestinationChain::<T>::mutate(source_chain, |pending| {
-				match asset {
-					AssetKind::Argon => pending.argon_circulation.saturating_accrue(amount),
-					AssetKind::Argonot => pending.argonot_circulation.saturating_accrue(amount),
-				}
-			});
-		}
-
-		pub(crate) fn remove_pending_transfer_out_circulation(
-			source_chain: SourceChain,
-			asset: AssetKind,
-			amount: T::Balance,
-		) {
-			PendingTransferOutCirculationByDestinationChain::<T>::mutate(source_chain, |pending| {
-				match asset {
-					AssetKind::Argon => pending.argon_circulation.saturating_reduce(amount),
-					AssetKind::Argonot => pending.argonot_circulation.saturating_reduce(amount),
-				}
-			});
 		}
 
 		pub(crate) fn mint_to<C: Mutate<T::AccountId, Balance = T::Balance> + 'static>(
@@ -2410,9 +1852,10 @@ pub mod pallet {
 		type Weights = super::weights::ProviderWeightAdapter<T>;
 
 		fn has_overdue_collect_blocker(account_id: &T::AccountId) -> bool {
-			let Some(next_due_nonce) =
-				Self::next_council_approval_queue_nonce(SourceChain::Ethereum, account_id)
-			else {
+			let Some(next_due_nonce) = Self::next_council_approval_queue_nonce_for_account(
+				SourceChain::Ethereum,
+				account_id,
+			) else {
 				return false;
 			};
 			let Some(entry) = CouncilApprovalQueueByDestinationChainAndNonce::<T>::get(

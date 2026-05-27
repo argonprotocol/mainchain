@@ -12,9 +12,9 @@ sol!(
 );
 
 pub use MintingGateway::{
-	GatewayActivityState, MintingAuthorityActivated, MintingAuthorityCollateral,
-	MintingAuthorityDeactivated, TransferOutOfArgonCanceled, TransferOutOfArgonFinalized,
-	TransferOutOfArgonRequest, TransferToArgonStarted,
+	GatewayActivityState, GlobalIssuanceCouncilRotated, MintingAuthorityActivated,
+	MintingAuthorityCollateral, MintingAuthorityDeactivated, TransferOutOfArgonCanceled,
+	TransferOutOfArgonFinalized, TransferOutOfArgonRequest, TransferToArgonStarted,
 };
 
 pub fn hash_global_issuance_council(
@@ -119,7 +119,7 @@ pub fn hash_transfer_out_of_argon_request(
 	argon_account_id: [u8; 32],
 	argon_transfer_nonce: u64,
 	chain_id: u64,
-	council_hash: B256,
+	microgons_per_argonot: u128,
 	recipient: Address,
 	valid_until_block: u64,
 	token: Address,
@@ -131,7 +131,7 @@ pub fn hash_transfer_out_of_argon_request(
 			B256::from(argon_account_id),
 			argon_transfer_nonce,
 			chain_id,
-			council_hash,
+			microgons_per_argonot,
 			recipient,
 			valid_until_block,
 			token,

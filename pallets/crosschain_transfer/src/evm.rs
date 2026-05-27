@@ -3,6 +3,7 @@ use alloy_primitives::{keccak256, Address as AlloyAddress, B256, U256};
 use alloy_sol_types::SolEvent;
 use argon_ethereum_contracts::minting_gateway::{
 	self as ethereum_contracts, GatewayActivityState as ContractGatewayActivityState,
+	GlobalIssuanceCouncilRotated as ContractGlobalIssuanceCouncilRotated,
 	MintingAuthorityActivated as ContractMintingAuthorityActivated,
 	MintingAuthorityDeactivated as ContractMintingAuthorityDeactivated,
 	TransferOutOfArgonCanceled as ContractTransferOutOfArgonCanceled,
@@ -100,6 +101,20 @@ impl<T: Config> Pallet<T> {
 		let (chain_id, gateway) = Self::evm_gateway_signature_domain(destination_chain)?;
 
 		match entry.target {
+			CouncilApprovalTargetId::GlobalIssuanceCouncilRotation(council_hash) =>
+				Ok(H256::from_slice(
+					ethereum_contracts::hash_gateway_update_approval(
+						chain_id,
+						AlloyAddress::from_slice(gateway.as_bytes()),
+						queue_nonce,
+						B256::from(entry.approving_council_hash.0),
+						0u8,
+						B256::from(council_hash.0),
+						B256::from(entry.target_payload_hash.0),
+						B256::from(entry.previous_approval_hash.0),
+					)
+					.as_slice(),
+				)),
 			CouncilApprovalTargetId::MintingAuthorityActivation(destination_signing_key) =>
 				Ok(H256::from_slice(
 					ethereum_contracts::hash_gateway_update_approval(
@@ -245,8 +260,19 @@ impl<T: Config> Pallet<T> {
 				microgon_collateral: activity.microgonCollateral.into(),
 				micronot_collateral: activity.micronotCollateral.into(),
 				coactivation_count: activity.coactivationCount,
-				shared_signature_count: activity.sharedSignatureCount,
 				relayer_argon_account_id: activity.relayerArgonAccountId.0,
+				gateway_state: Self::gateway_state_from_contract(activity.gatewayState),
+			});
+		}
+
+		if first_topic.0 == ContractGlobalIssuanceCouncilRotated::SIGNATURE_HASH.0 {
+			let activity = ContractGlobalIssuanceCouncilRotated::decode_raw_log_validate(
+				log.topics.iter().map(|topic| topic.0),
+				&log.data,
+			)
+			.map_err(|_| Error::<T>::InvalidGatewayActivity)?;
+			return Ok(DecodedGatewayActivity::GlobalIssuanceCouncilRotated {
+				council_hash: H256::from_slice(activity.councilHash.as_slice()),
 				gateway_state: Self::gateway_state_from_contract(activity.gatewayState),
 			});
 		}
