@@ -1,0 +1,52 @@
+{
+  "generatedAt": "2026-05-04T18:44:16.297Z",
+  "complete": true,
+  "batchSize": 25,
+  "gatewayAddress": null,
+  "submissionInputsComplete": false,
+  "readyForSubmission": false,
+  "tokenAddresses": {
+    "Argon": null,
+    "Argonot": null
+  },
+  "inputs": {
+    "directRestore": "final-balances/ethereum/direct-restore-holders.csv",
+    "poolRemaps": "final-balances/ethereum/pool-remap-required.csv",
+    "poolAllocation": "research/ethereum/uniswap-pools/ownership/pool-allocation.csv"
+  },
+  "assets": [
+    {
+      "asset": "Argon",
+      "directRecipientCount": 25,
+      "poolRecipientCount": 4,
+      "poolAllocationRowCount": 10,
+      "batchCount": 2,
+      "generatedDirectTotalRaw": "69112600363926226472753",
+      "expectedDirectTotalRaw": "69112600363926226472753",
+      "generatedPoolTotalRaw": "61901193248720060440662",
+      "generatedTotalRaw": "131013793612646286913415",
+      "expectedOriginalTotalRaw": "131013793612646286913415",
+      "expectedPoolRemapRaw": "61901193248720060440662",
+      "totalsMatch": true,
+      "batches": ["restore-argon-batch-000.json", "restore-argon-batch-001.json"]
+    },
+    {
+      "asset": "Argonot",
+      "directRecipientCount": 15,
+      "poolRecipientCount": 4,
+      "poolAllocationRowCount": 10,
+      "batchCount": 1,
+      "generatedDirectTotalRaw": "27476015324247350688797",
+      "expectedDirectTotalRaw": "27476015324247350688797",
+      "generatedPoolTotalRaw": "71528755291491729019263",
+      "generatedTotalRaw": "99004770615739079708060",
+      "expectedOriginalTotalRaw": "99004770615739079708060",
+      "expectedPoolRemapRaw": "71528755291491729019263",
+      "totalsMatch": true,
+      "batches": ["restore-argonot-batch-000.json"]
+    }
+  ],
+  "unresolvedPoolRemaps": [],
+  "unexpectedPoolAllocations": [],
+  "assetMismatches": []
+}

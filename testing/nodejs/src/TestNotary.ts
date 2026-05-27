@@ -12,7 +12,7 @@ import {
   getProxy,
   ITeardownable,
   projectRoot,
-} from './index';
+} from './support';
 import * as process from 'node:process';
 import { Readable } from 'node:stream';
 import * as Path from 'node:path';

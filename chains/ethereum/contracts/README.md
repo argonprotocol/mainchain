@@ -153,42 +153,113 @@ The generated bootstrap manifest records:
 - the Safe calldata needed to upgrade the proxy to the final implementation with fixed token
   addresses
 
-See [deployments/mainnet/bootstrap/README.md](./deployments/mainnet/bootstrap/README.md) for the
-deployment handoff and [TODO.md](./TODO.md) for the remaining hardening work.
+See [`../deploy/README.md`](../deploy/README.md) for the deploy workspace,
+[`../deploy/mainnet/migration/README.md`](../deploy/mainnet/migration/README.md) for the checked-in
+mainnet migration bundle, [`../deploy/DEPLOY_CHECKLIST.md`](../deploy/DEPLOY_CHECKLIST.md) for the
+full activation sequence, and [TODO.md](./TODO.md) for the remaining hardening work.
 
 ## Commands
 
-Recovery-specific evidence and migration tooling now live in the separate
-`argonprotocol/hyperbridge-recovery` repository.
+Recovery research and balance-derivation tooling still live in the separate
+`argonprotocol/hyperbridge-recovery` repository. The final reviewed mainnet migration bundle used by
+`bootstrap:deploy` is checked in locally under
+[`../deploy/mainnet/migration/`](../deploy/mainnet/migration/).
 
 Contract commands stay here:
 
 ```sh
 yarn workspace @argonprotocol/ethereum-contracts test
 yarn workspace @argonprotocol/ethereum-contracts typecheck
-yarn workspace @argonprotocol/ethereum-contracts gas:measure
-yarn workspace @argonprotocol/ethereum-contracts bootstrap:deploy --admin-safe 0x... --guardian-safe 0x... --council-signers 0x...,0x... --council-weights 40,30 --microgons-per-argonot 1000000
 ```
 
-Bootstrap council inputs must use unique non-zero signer addresses and non-zero weights.
-
-Mainnet bootstrap generation uses the env-driven Hardhat 3 network config:
+Bootstrap deploy commands now live in the sibling deploy workspace at
+[`../deploy/`](../deploy/README.md):
 
 ```sh
-ETHEREUM_RPC_URL=https://...
-ETHEREUM_DEPLOYER_PRIVATE_KEY=0x...
-yarn workspace @argonprotocol/ethereum-contracts bootstrap:deploy --network mainnet --admin-safe 0x... --guardian-safe 0x... --council-signers 0x...,0x... --council-weights 40,30 --microgons-per-argonot 1000000
+yarn workspace @argonprotocol/ethereum-deploy gas:measure
+yarn workspace @argonprotocol/ethereum-deploy gas:measure --json > /tmp/ethereum-gas.json
+yarn workspace @argonprotocol/ethereum-deploy bootstrap:deploy --argon-rpc-url wss://... --admin-safe 0x... --guardian-safe 0x...
+yarn workspace @argonprotocol/ethereum-deploy bootstrap:prepare-runtime-setup --argon-rpc-url wss://... --deployment-manifest chains/ethereum/deploy/mainnet/deployment-manifest.json --force-set-after-nonce 0
 ```
+
+The system selects the initial global council from Argon vault operators that already have an
+effective Ethereum council signer registered on-chain and more than `5,000` accepted treasury bonds.
+
+Mainnet bootstrap generation uses the default public Ethereum RPC unless you override
+`ETHEREUM_RPC_URL`:
+
+```sh
+ETHEREUM_DEPLOYER_PRIVATE_KEY=0x...
+yarn workspace @argonprotocol/ethereum-deploy bootstrap:deploy --argon-rpc-url wss://... --network mainnet --admin-safe 0x... --guardian-safe 0x...
+```
+
+Testnet bootstrap generation uses the default public Gnosis RPC unless you override
+`TESTNET_ETHEREUM_RPC_URL`:
+
+```sh
+ETHEREUM_DEPLOYER_PRIVATE_KEY=0x...
+yarn workspace @argonprotocol/ethereum-deploy bootstrap:deploy --argon-rpc-url wss://... --network testnet --admin-safe 0x... --guardian-safe 0x...
+```
+
+`bootstrap:deploy` already performs the full Ethereum-side deployment sequence for this bootstrap
+flow:
+
+- deploy bootstrap `MintingGateway` implementation
+- deploy proxy and initialize first council state
+- deploy `ArgonToken`
+- deploy `ArgonotToken`
+- deploy final `MintingGateway` implementation
+- derive the bootstrap Ethereum council signers from Argon vault signer registrations
+- derive the bootstrap council snapshot from the target Argon runtime council inputs
+- write `deployment-manifest.json` plus the prepared Safe upgrade transaction
+
+The remaining manual Ethereum follow-ups after that script are:
+
+- have the admin Safe execute each prepared Safe transaction from the manifest in order
+
+For mainnet, that manifest includes both the proxy upgrade and the one-time `migrate(...)` call.
+
+For mainnet, the checked-in bundle at
+[`../deploy/mainnet/migration/migrate-bundle.json`](../deploy/mainnet/migration/migrate-bundle.json)
+already carries:
+
+- the final Argon and Argonot migration recipient lists and amounts in current `migrate(...)` shape
+- the copied recovery migration file hashes
+- the upstream final-balance source hashes used to derive that bundle
+
+The Argon-side legacy gateway balance move plus the finalized refund cases are already baked into
+the runtime migration at
+[`pallets/crosschain_transfer/src/migrations.rs`](../../../pallets/crosschain_transfer/src/migrations.rs).
+
+`bootstrap:prepare-runtime-setup` defaults the execution RPC, beacon API, and
+`estimatedMicrogonsPerEth` when it can:
+
+- deployment env `mainnet` -> public Ethereum execution RPC + public Ethereum beacon API
+- deployment env `testnet` -> public Gnosis execution RPC + public Gnosis beacon API
+- when the deployment manifest includes initial council signers and no pricing override was
+  supplied, it auto-runs a fresh `gas:measure --json`
+- `estimatedMicrogonsPerEth` -> derived from Argon `priceIndex.current().argonUsdTargetPrice` and
+  the public `ETH-USD` spot price
+- pass `--measure-report` only when you intentionally want to pin a saved gas snapshot
+- the runtime already defaults minimum minting-authority value to `10000` microgons, so pass
+  `--minimum-minting-authority-value` only when you intentionally want to override it
+- local/dev networks do not use those public defaults; pass `--execution-rpc-url`,
+  `--beacon-api-url`, and `--estimated-microgons-per-eth` explicitly
+
+For the normal bootstrap council path, `bootstrap:prepare-runtime-setup` uses the manifest's initial
+council member accounts, force-sets that same council on Argon, and verifies that the target runtime
+still derives the same signer set, weights, and `microgonsPerArgonot` floor that were used during
+`bootstrap:deploy`.
 
 ## Current Costs
 
 Refresh these sample costs with:
 
 ```sh
-yarn workspace @argonprotocol/ethereum-contracts gas:measure
+yarn workspace @argonprotocol/ethereum-deploy gas:measure
 ```
 
-The numbers below are the current local measurements from `script/gas/measure.ts`. The wei and ETH
+The numbers below are the current local measurements from `../deploy/measure.ts`. The wei and ETH
 columns are sample gas-price math only at `10 gwei` and `20 gwei`.
 
 ### User Actions

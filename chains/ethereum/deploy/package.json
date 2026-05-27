@@ -1,0 +1,32 @@
+{
+  "name": "@argonprotocol/ethereum-deploy",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "bootstrap:deploy": "node --import tsx index.ts",
+    "bootstrap:prepare-runtime-setup": "node --import tsx prepareRuntimeSetup.ts",
+    "build": "tsc --noEmit",
+    "gas:measure": "node --import tsx measure.ts",
+    "pretest": "tsc --noEmit",
+    "pretest:ci": "tsc --noEmit",
+    "runtime-setup:prepare": "node --import tsx prepareRuntimeSetup.ts",
+    "tsc": "tsc --noEmit",
+    "tsup": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@argonprotocol/ethereum-contracts": "workspace:*",
+    "@argonprotocol/mainchain": "workspace:*",
+    "@nomicfoundation/hardhat-ethers": "^4.0.10",
+    "ethers": "^6.15.0",
+    "hardhat": "^3.4.4",
+    "viem": "^2.38.5"
+  },
+  "devDependencies": {
+    "@types/node": "22.17.1",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.2"
+  },
+  "packageManager": "yarn@4.10.3"
+}

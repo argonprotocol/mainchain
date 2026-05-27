@@ -1,0 +1,217 @@
+{
+  "batchName": "restore-argon-batch-000.json",
+  "asset": "Argon",
+  "validated": true,
+  "readyForSubmission": false,
+  "tokenAddress": null,
+  "gatewayAddress": null,
+  "recipientCount": 25,
+  "totalAmountRaw": "69112600363926226472753",
+  "recipients": [
+    "0x863605712fe8b28C61F14aDB4Ded95D81DE7f922",
+    "0xBd23367587a846C840f69bD4319685EF5c6EB579",
+    "0x06852f92970a90D19de955156B131c1EB8ecc675",
+    "0xE1D1DDc3FfFFe4F4680263F17FD1cc3Bf2b5097f",
+    "0xDB29DD2974Df5dc66249D64A584B32CdafcC2D03",
+    "0xD867D1166b3198A85555b73fE1ea53d8B8944242",
+    "0x4bd1233C531F67AFa4c910986aF6De925d36a872",
+    "0x9447593Db92F4f81B0eF91dE91768DC537669eeB",
+    "0xAF6f6B8f79D00449D47AcC9EfeaeC44e49Ad5126",
+    "0x000000fee13a103A10D593b9AE06b3e05F2E7E1c",
+    "0x5AaFc1f252d544f744d17a4E734afd6efC47edE4",
+    "0xF13176eCE4ed8d9aa4C335cD4f247458D4863FE4",
+    "0xDdD337f7f30FA781C27Fd74F366a056c76Fb32BF",
+    "0x9B228B4F71B3Bc7e4b478251f218060D7B70Dc25",
+    "0x011c4bfa4e76b8B81E007D52908aA400AAB35e84",
+    "0x1092E2F075877443D9bf388c377d457A734A2a68",
+    "0x23587ECd04c178a21163502969e87d4c77041810",
+    "0x8504a563Be3C2218fB20F8090f473a8CDE22B906",
+    "0x1f2F10D1C40777AE1Da742455c65828FF36Df387",
+    "0x0708b29cfabA8E551c710991026c38e9179dCe1E",
+    "0xC5a39B9626417E3dc78C3711D85892F75DC63C8E",
+    "0x8048142550c8F11A0aEFdc6e2d394422d6B87407",
+    "0x000000000004444c5dc75cB358380D2e3dE08A90",
+    "0x1111111254EEB25477B68fb85Ed929f73A960582",
+    "0x63242A4Ea82847b20E506b63B0e2e2eFF0CC6cB0"
+  ],
+  "amounts": [
+    "57410095632327499993912",
+    "4000000000000000000000",
+    "3990850000000000000000",
+    "2394799854269419921891",
+    "883605322604794616988",
+    "135653206544893573598",
+    "102634938721388362745",
+    "100000000000000000000",
+    "40000000000000000000",
+    "24285564762350368774",
+    "19854423659063171593",
+    "5695928319937935609",
+    "3324673498813066969",
+    "1500000000000000000",
+    "200000000000000000",
+    "56000000000000000",
+    "44768789104925892",
+    "44813602707633",
+    "4976233416832",
+    "639124410288",
+    "18",
+    "7",
+    "2",
+    "1",
+    "1"
+  ],
+  "rows": [
+    {
+      "amountRaw": "57410095632327499993912",
+      "recipientAddress": "0x863605712fe8b28C61F14aDB4Ded95D81DE7f922",
+      "sourceAddress": "0x863605712fe8b28C61F14aDB4Ded95D81DE7f922",
+      "sourceType": "direct_snapshot_holder"
+    },
+    {
+      "amountRaw": "4000000000000000000000",
+      "recipientAddress": "0xBd23367587a846C840f69bD4319685EF5c6EB579",
+      "sourceAddress": "0xBd23367587a846C840f69bD4319685EF5c6EB579",
+      "sourceType": "direct_snapshot_holder"
+    },
+    {
+      "amountRaw": "3990850000000000000000",
+      "recipientAddress": "0x06852f92970a90D19de955156B131c1EB8ecc675",
+      "sourceAddress": "0x06852f92970a90D19de955156B131c1EB8ecc675",
+      "sourceType": "direct_snapshot_holder"
+    },
+    {
+      "amountRaw": "2394799854269419921891",
+      "recipientAddress": "0xE1D1DDc3FfFFe4F4680263F17FD1cc3Bf2b5097f",
+      "sourceAddress": "0xE1D1DDc3FfFFe4F4680263F17FD1cc3Bf2b5097f",
+      "sourceType": "direct_snapshot_holder"
+    },
+    {
+      "amountRaw": "883605322604794616988",
+      "recipientAddress": "0xDB29DD2974Df5dc66249D64A584B32CdafcC2D03",
+      "sourceAddress": "0xDB29DD2974Df5dc66249D64A584B32CdafcC2D03",
+      "sourceType": "direct_snapshot_holder"
+    },
+    {
+      "amountRaw": "135653206544893573598",
+      "recipientAddress": "0xD867D1166b3198A85555b73fE1ea53d8B8944242",
+      "sourceAddress": "0xD867D1166b3198A85555b73fE1ea53d8B8944242",
+      "sourceType": "direct_snapshot_holder"
+    },
+    {
+      "amountRaw": "102634938721388362745",
+      "recipientAddress": "0x4bd1233C531F67AFa4c910986aF6De925d36a872",
+      "sourceAddress": "0x4bd1233C531F67AFa4c910986aF6De925d36a872",
+      "sourceType": "direct_snapshot_holder"
+    },
+    {
+      "amountRaw": "100000000000000000000",
+      "recipientAddress": "0x9447593Db92F4f81B0eF91dE91768DC537669eeB",
+      "sourceAddress": "0x9447593Db92F4f81B0eF91dE91768DC537669eeB",
+      "sourceType": "direct_snapshot_holder"
+    },
+    {
+      "amountRaw": "40000000000000000000",
+      "recipientAddress": "0xAF6f6B8f79D00449D47AcC9EfeaeC44e49Ad5126",
+      "sourceAddress": "0xAF6f6B8f79D00449D47AcC9EfeaeC44e49Ad5126",
+      "sourceType": "direct_snapshot_holder"
+    },
+    {
+      "amountRaw": "24285564762350368774",
+      "recipientAddress": "0x000000fee13a103A10D593b9AE06b3e05F2E7E1c",
+      "sourceAddress": "0x000000fee13a103A10D593b9AE06b3e05F2E7E1c",
+      "sourceType": "direct_snapshot_holder"
+    },
+    {
+      "amountRaw": "19854423659063171593",
+      "recipientAddress": "0x5AaFc1f252d544f744d17a4E734afd6efC47edE4",
+      "sourceAddress": "0x5AaFc1f252d544f744d17a4E734afd6efC47edE4",
+      "sourceType": "direct_snapshot_holder"
+    },
+    {
+      "amountRaw": "5695928319937935609",
+      "recipientAddress": "0xF13176eCE4ed8d9aa4C335cD4f247458D4863FE4",
+      "sourceAddress": "0xF13176eCE4ed8d9aa4C335cD4f247458D4863FE4",
+      "sourceType": "direct_snapshot_holder"
+    },
+    {
+      "amountRaw": "3324673498813066969",
+      "recipientAddress": "0xDdD337f7f30FA781C27Fd74F366a056c76Fb32BF",
+      "sourceAddress": "0xDdD337f7f30FA781C27Fd74F366a056c76Fb32BF",
+      "sourceType": "direct_snapshot_holder"
+    },
+    {
+      "amountRaw": "1500000000000000000",
+      "recipientAddress": "0x9B228B4F71B3Bc7e4b478251f218060D7B70Dc25",
+      "sourceAddress": "0x9B228B4F71B3Bc7e4b478251f218060D7B70Dc25",
+      "sourceType": "direct_snapshot_holder"
+    },
+    {
+      "amountRaw": "200000000000000000",
+      "recipientAddress": "0x011c4bfa4e76b8B81E007D52908aA400AAB35e84",
+      "sourceAddress": "0x011c4bfa4e76b8B81E007D52908aA400AAB35e84",
+      "sourceType": "direct_snapshot_holder"
+    },
+    {
+      "amountRaw": "56000000000000000",
+      "recipientAddress": "0x1092E2F075877443D9bf388c377d457A734A2a68",
+      "sourceAddress": "0x1092E2F075877443D9bf388c377d457A734A2a68",
+      "sourceType": "direct_snapshot_holder"
+    },
+    {
+      "amountRaw": "44768789104925892",
+      "recipientAddress": "0x23587ECd04c178a21163502969e87d4c77041810",
+      "sourceAddress": "0x23587ECd04c178a21163502969e87d4c77041810",
+      "sourceType": "direct_snapshot_holder"
+    },
+    {
+      "amountRaw": "44813602707633",
+      "recipientAddress": "0x8504a563Be3C2218fB20F8090f473a8CDE22B906",
+      "sourceAddress": "0x8504a563Be3C2218fB20F8090f473a8CDE22B906",
+      "sourceType": "direct_snapshot_holder"
+    },
+    {
+      "amountRaw": "4976233416832",
+      "recipientAddress": "0x1f2F10D1C40777AE1Da742455c65828FF36Df387",
+      "sourceAddress": "0x1f2F10D1C40777AE1Da742455c65828FF36Df387",
+      "sourceType": "direct_snapshot_holder"
+    },
+    {
+      "amountRaw": "639124410288",
+      "recipientAddress": "0x0708b29cfabA8E551c710991026c38e9179dCe1E",
+      "sourceAddress": "0x0708b29cfabA8E551c710991026c38e9179dCe1E",
+      "sourceType": "direct_snapshot_holder"
+    },
+    {
+      "amountRaw": "18",
+      "recipientAddress": "0xC5a39B9626417E3dc78C3711D85892F75DC63C8E",
+      "sourceAddress": "0xC5a39B9626417E3dc78C3711D85892F75DC63C8E",
+      "sourceType": "direct_snapshot_holder"
+    },
+    {
+      "amountRaw": "7",
+      "recipientAddress": "0x8048142550c8F11A0aEFdc6e2d394422d6B87407",
+      "sourceAddress": "0x8048142550c8F11A0aEFdc6e2d394422d6B87407",
+      "sourceType": "direct_snapshot_holder"
+    },
+    {
+      "amountRaw": "2",
+      "recipientAddress": "0x000000000004444c5dc75cB358380D2e3dE08A90",
+      "sourceAddress": "0x000000000004444c5dc75cB358380D2e3dE08A90",
+      "sourceType": "direct_snapshot_holder"
+    },
+    {
+      "amountRaw": "1",
+      "recipientAddress": "0x1111111254EEB25477B68fb85Ed929f73A960582",
+      "sourceAddress": "0x1111111254EEB25477B68fb85Ed929f73A960582",
+      "sourceType": "direct_snapshot_holder"
+    },
+    {
+      "amountRaw": "1",
+      "recipientAddress": "0x63242A4Ea82847b20E506b63B0e2e2eFF0CC6cB0",
+      "sourceAddress": "0x63242A4Ea82847b20E506b63B0e2e2eFF0CC6cB0",
+      "sourceType": "direct_snapshot_holder"
+    }
+  ],
+  "submissionTransaction": null
+}

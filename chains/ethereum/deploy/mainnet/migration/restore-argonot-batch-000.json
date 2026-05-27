@@ -1,0 +1,217 @@
+{
+  "batchName": "restore-argonot-batch-000.json",
+  "asset": "Argonot",
+  "validated": true,
+  "readyForSubmission": false,
+  "tokenAddress": null,
+  "gatewayAddress": null,
+  "recipientCount": 25,
+  "totalAmountRaw": "99004770615739079708060",
+  "recipients": [
+    "0xE1D1DDc3FfFFe4F4680263F17FD1cc3Bf2b5097f",
+    "0x06852f92970a90D19de955156B131c1EB8ecc675",
+    "0x4ACb6C4321253548a7d4Bb9C84032Cc4eE04bFD7",
+    "0xF13176eCE4ed8d9aa4C335cD4f247458D4863FE4",
+    "0x000000fee13a103A10D593b9AE06b3e05F2E7E1c",
+    "0xc4cE6549C5F26de05898AB6E99005f0DBcd0D83a",
+    "0x9B228B4F71B3Bc7e4b478251f218060D7B70Dc25",
+    "0x1092E2F075877443D9bf388c377d457A734A2a68",
+    "0x1f2F10D1C40777AE1Da742455c65828FF36Df387",
+    "0xD3BfaD4daEBCF20809332A4Dd2C0b657484e281D",
+    "0x0708b29cfabA8E551c710991026c38e9179dCe1E",
+    "0x863605712fe8b28C61F14aDB4Ded95D81DE7f922",
+    "0xC5a39B9626417E3dc78C3711D85892F75DC63C8E",
+    "0x4038a44B34dC6974b2d609715c00DA7df845C4F9",
+    "0x63242A4Ea82847b20E506b63B0e2e2eFF0CC6cB0",
+    "0x000000000000000000000000000000000000dEaD",
+    "0x863605712fe8b28C61F14aDB4Ded95D81DE7f922",
+    "0x863605712fe8b28C61F14aDB4Ded95D81DE7f922",
+    "0xf2371551Fe3937Db7c750f4DfABe5c2fFFdcBf5A",
+    "0x000000000000000000000000000000000000dEaD",
+    "0x863605712fe8b28C61F14aDB4Ded95D81DE7f922",
+    "0x863605712fe8b28C61F14aDB4Ded95D81DE7f922",
+    "0x863605712fe8b28C61F14aDB4Ded95D81DE7f922",
+    "0xE1D1DDc3FfFFe4F4680263F17FD1cc3Bf2b5097f",
+    "0xf2371551Fe3937Db7c750f4DfABe5c2fFFdcBf5A"
+  ],
+  "amounts": [
+    "20317431687437248020906",
+    "6841571076159812065948",
+    "306142194570118120046",
+    "4773197897162133323",
+    "3987128330435720111",
+    "1100000000000000000",
+    "1000000000000000000",
+    "10000000000000000",
+    "37811010479178",
+    "1421277214498",
+    "620284057123",
+    "2877650",
+    "11",
+    "2",
+    "1",
+    "24910189616562",
+    "4778610339845759299322",
+    "31996790948918318993866",
+    "958729125729619276",
+    "59",
+    "5001813143824394065",
+    "34745596138751306035794",
+    "1482842434795019642",
+    "137373522512564893",
+    "177080839293475784"
+  ],
+  "rows": [
+    {
+      "amountRaw": "20317431687437248020906",
+      "recipientAddress": "0xE1D1DDc3FfFFe4F4680263F17FD1cc3Bf2b5097f",
+      "sourceAddress": "0xE1D1DDc3FfFFe4F4680263F17FD1cc3Bf2b5097f",
+      "sourceType": "direct_snapshot_holder"
+    },
+    {
+      "amountRaw": "6841571076159812065948",
+      "recipientAddress": "0x06852f92970a90D19de955156B131c1EB8ecc675",
+      "sourceAddress": "0x06852f92970a90D19de955156B131c1EB8ecc675",
+      "sourceType": "direct_snapshot_holder"
+    },
+    {
+      "amountRaw": "306142194570118120046",
+      "recipientAddress": "0x4ACb6C4321253548a7d4Bb9C84032Cc4eE04bFD7",
+      "sourceAddress": "0x4ACb6C4321253548a7d4Bb9C84032Cc4eE04bFD7",
+      "sourceType": "direct_snapshot_holder"
+    },
+    {
+      "amountRaw": "4773197897162133323",
+      "recipientAddress": "0xF13176eCE4ed8d9aa4C335cD4f247458D4863FE4",
+      "sourceAddress": "0xF13176eCE4ed8d9aa4C335cD4f247458D4863FE4",
+      "sourceType": "direct_snapshot_holder"
+    },
+    {
+      "amountRaw": "3987128330435720111",
+      "recipientAddress": "0x000000fee13a103A10D593b9AE06b3e05F2E7E1c",
+      "sourceAddress": "0x000000fee13a103A10D593b9AE06b3e05F2E7E1c",
+      "sourceType": "direct_snapshot_holder"
+    },
+    {
+      "amountRaw": "1100000000000000000",
+      "recipientAddress": "0xc4cE6549C5F26de05898AB6E99005f0DBcd0D83a",
+      "sourceAddress": "0xc4cE6549C5F26de05898AB6E99005f0DBcd0D83a",
+      "sourceType": "direct_snapshot_holder"
+    },
+    {
+      "amountRaw": "1000000000000000000",
+      "recipientAddress": "0x9B228B4F71B3Bc7e4b478251f218060D7B70Dc25",
+      "sourceAddress": "0x9B228B4F71B3Bc7e4b478251f218060D7B70Dc25",
+      "sourceType": "direct_snapshot_holder"
+    },
+    {
+      "amountRaw": "10000000000000000",
+      "recipientAddress": "0x1092E2F075877443D9bf388c377d457A734A2a68",
+      "sourceAddress": "0x1092E2F075877443D9bf388c377d457A734A2a68",
+      "sourceType": "direct_snapshot_holder"
+    },
+    {
+      "amountRaw": "37811010479178",
+      "recipientAddress": "0x1f2F10D1C40777AE1Da742455c65828FF36Df387",
+      "sourceAddress": "0x1f2F10D1C40777AE1Da742455c65828FF36Df387",
+      "sourceType": "direct_snapshot_holder"
+    },
+    {
+      "amountRaw": "1421277214498",
+      "recipientAddress": "0xD3BfaD4daEBCF20809332A4Dd2C0b657484e281D",
+      "sourceAddress": "0xD3BfaD4daEBCF20809332A4Dd2C0b657484e281D",
+      "sourceType": "direct_snapshot_holder"
+    },
+    {
+      "amountRaw": "620284057123",
+      "recipientAddress": "0x0708b29cfabA8E551c710991026c38e9179dCe1E",
+      "sourceAddress": "0x0708b29cfabA8E551c710991026c38e9179dCe1E",
+      "sourceType": "direct_snapshot_holder"
+    },
+    {
+      "amountRaw": "2877650",
+      "recipientAddress": "0x863605712fe8b28C61F14aDB4Ded95D81DE7f922",
+      "sourceAddress": "0x863605712fe8b28C61F14aDB4Ded95D81DE7f922",
+      "sourceType": "direct_snapshot_holder"
+    },
+    {
+      "amountRaw": "11",
+      "recipientAddress": "0xC5a39B9626417E3dc78C3711D85892F75DC63C8E",
+      "sourceAddress": "0xC5a39B9626417E3dc78C3711D85892F75DC63C8E",
+      "sourceType": "direct_snapshot_holder"
+    },
+    {
+      "amountRaw": "2",
+      "recipientAddress": "0x4038a44B34dC6974b2d609715c00DA7df845C4F9",
+      "sourceAddress": "0x4038a44B34dC6974b2d609715c00DA7df845C4F9",
+      "sourceType": "direct_snapshot_holder"
+    },
+    {
+      "amountRaw": "1",
+      "recipientAddress": "0x63242A4Ea82847b20E506b63B0e2e2eFF0CC6cB0",
+      "sourceAddress": "0x63242A4Ea82847b20E506b63B0e2e2eFF0CC6cB0",
+      "sourceType": "direct_snapshot_holder"
+    },
+    {
+      "amountRaw": "24910189616562",
+      "recipientAddress": "0x000000000000000000000000000000000000dEaD",
+      "sourceAddress": "0x192f601D68922D4A230Edcf87eF8b0202eAa840B",
+      "sourceType": "unattributed_pool_dust_burn"
+    },
+    {
+      "amountRaw": "4778610339845759299322",
+      "recipientAddress": "0x863605712fe8b28C61F14aDB4Ded95D81DE7f922",
+      "sourceAddress": "0x192f601D68922D4A230Edcf87eF8b0202eAa840B",
+      "sourceType": "lp_owner_allocation"
+    },
+    {
+      "amountRaw": "31996790948918318993866",
+      "recipientAddress": "0x863605712fe8b28C61F14aDB4Ded95D81DE7f922",
+      "sourceAddress": "0x192f601D68922D4A230Edcf87eF8b0202eAa840B",
+      "sourceType": "lp_owner_allocation"
+    },
+    {
+      "amountRaw": "958729125729619276",
+      "recipientAddress": "0xf2371551Fe3937Db7c750f4DfABe5c2fFFdcBf5A",
+      "sourceAddress": "0x192f601D68922D4A230Edcf87eF8b0202eAa840B",
+      "sourceType": "protocol_fee_owner"
+    },
+    {
+      "amountRaw": "59",
+      "recipientAddress": "0x000000000000000000000000000000000000dEaD",
+      "sourceAddress": "0x20C949F4f80Af6478a1fd7808e8C9Bf8A2532B9D",
+      "sourceType": "unattributed_pool_dust_burn"
+    },
+    {
+      "amountRaw": "5001813143824394065",
+      "recipientAddress": "0x863605712fe8b28C61F14aDB4Ded95D81DE7f922",
+      "sourceAddress": "0x20C949F4f80Af6478a1fd7808e8C9Bf8A2532B9D",
+      "sourceType": "lp_owner_allocation"
+    },
+    {
+      "amountRaw": "34745596138751306035794",
+      "recipientAddress": "0x863605712fe8b28C61F14aDB4Ded95D81DE7f922",
+      "sourceAddress": "0x20C949F4f80Af6478a1fd7808e8C9Bf8A2532B9D",
+      "sourceType": "lp_owner_allocation"
+    },
+    {
+      "amountRaw": "1482842434795019642",
+      "recipientAddress": "0x863605712fe8b28C61F14aDB4Ded95D81DE7f922",
+      "sourceAddress": "0x20C949F4f80Af6478a1fd7808e8C9Bf8A2532B9D",
+      "sourceType": "lp_owner_allocation"
+    },
+    {
+      "amountRaw": "137373522512564893",
+      "recipientAddress": "0xE1D1DDc3FfFFe4F4680263F17FD1cc3Bf2b5097f",
+      "sourceAddress": "0x20C949F4f80Af6478a1fd7808e8C9Bf8A2532B9D",
+      "sourceType": "lp_owner_allocation"
+    },
+    {
+      "amountRaw": "177080839293475784",
+      "recipientAddress": "0xf2371551Fe3937Db7c750f4DfABe5c2fFFdcBf5A",
+      "sourceAddress": "0x20C949F4f80Af6478a1fd7808e8C9Bf8A2532B9D",
+      "sourceType": "protocol_fee_owner"
+    }
+  ],
+  "submissionTransaction": null
+}

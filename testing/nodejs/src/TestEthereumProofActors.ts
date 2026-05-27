@@ -54,6 +54,20 @@ type EthereumWalletClient = {
   writeContract: (...args: any[]) => Promise<Hex>;
 };
 type GatewayDeployment = Awaited<ReturnType<TestEthereum['deployMintingGatewayFixture']>>;
+type RuntimeSetupMode =
+  | {
+      kind: 'inbound-only';
+    }
+  | {
+      kind: 'outbound';
+      activationPricing: {
+        activationGasCost: bigint | number;
+        signatureGasCost: bigint | number;
+        estimatedWeiPerGas: bigint | number;
+        estimatedMicrogonsPerEth: bigint | number;
+      };
+      minimumMintingAuthorityValue?: bigint;
+    };
 
 export class EthereumProofE2eHarness {
   public readonly sudoSigner = new Keyring({ type: 'sr25519' }).createFromUri('//Alice');
@@ -159,14 +173,6 @@ export class EthereumProofE2eHarness {
     return result;
   }
 
-  async bootstrapVerifier() {
-    const checkpointTx = await getEthereumBeaconSyncBootstrapTx(
-      this.mainchainClient,
-      this.endpoints.beaconApiUrl,
-    );
-    return this.sudoSubmit(checkpointTx);
-  }
-
   async syncVerifierThrough(minimumExecutionBlockNumber: bigint) {
     await syncEthereumVerifierUntilAnchorCovers(
       this.mainchainClient,
@@ -198,17 +204,52 @@ export class EthereumProofE2eHarness {
     return { payload, result };
   }
 
-  async setEthereumChainConfig(gateway: TestMintingGateway) {
-    return this.sudoSubmit(
-      this.mainchainClient.tx.crosschainTransfer.setChainConfig('Ethereum', {
+  async configureEthereumRuntime(gateway: TestMintingGateway, mode: RuntimeSetupMode) {
+    const crosschainTransfer = this.mainchainClient.tx.crosschainTransfer as any;
+    const calls = [
+      crosschainTransfer.setChainConfig('Ethereum', {
         Evm: {
-          chainId: this.chain.id,
+          chainId: BigInt(this.chain.id).toString(),
           gateway: gateway.gatewayAddress,
           argonToken: gateway.argonTokenAddress,
           argonotToken: gateway.argonotTokenAddress,
         },
       }),
+    ];
+
+    if (mode.kind === 'outbound') {
+      const activationPricing = {
+        activationGasCost: BigInt(mode.activationPricing.activationGasCost),
+        signatureGasCost: BigInt(mode.activationPricing.signatureGasCost),
+        estimatedWeiPerGas: BigInt(mode.activationPricing.estimatedWeiPerGas),
+        estimatedMicrogonsPerEth: BigInt(mode.activationPricing.estimatedMicrogonsPerEth),
+      };
+
+      calls.push(
+        crosschainTransfer.setMintingAuthorityActivationRepaymentPricing('Ethereum', {
+          activationGasCost: activationPricing.activationGasCost.toString(),
+          signatureGasCost: activationPricing.signatureGasCost.toString(),
+          estimatedWeiPerGas: activationPricing.estimatedWeiPerGas.toString(),
+          estimatedMicrogonsPerEth: activationPricing.estimatedMicrogonsPerEth.toString(),
+        }),
+      );
+
+      if (mode.minimumMintingAuthorityValue !== undefined) {
+        calls.push(
+          crosschainTransfer.setMinimumMintingAuthorityValue(
+            'Ethereum',
+            mode.minimumMintingAuthorityValue.toString(),
+          ),
+        );
+      }
+    }
+
+    calls.push(
+      await getEthereumBeaconSyncBootstrapTx(this.mainchainClient, this.endpoints.beaconApiUrl),
     );
+
+    const result = await this.sudoSubmit(this.mainchainClient.tx.utility.batchAll(calls as never));
+    return { result };
   }
 
   async fundBurnAccount(amount: bigint) {
@@ -581,15 +622,6 @@ export class TestMintingAuthorityActor {
         weights: currentCouncil.map(member => member.weight),
       },
     };
-  }
-
-  async setMinimumValue(value: bigint) {
-    return this.harness.sudoSubmit(
-      this.harness.mainchainClient.tx.crosschainTransfer.setMinimumMintingAuthorityValue(
-        'Ethereum',
-        value,
-      ),
-    );
   }
 
   async registerMintingAuthority(micronotCollateral: bigint) {
