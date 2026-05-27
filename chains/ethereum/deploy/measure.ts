@@ -64,7 +64,7 @@ type GatewayContract = {
   getAddress(): Promise<Address>;
   connect(signer: AccountSigner): GatewayContract;
   getFunction(name: 'argonApprovalsHash'): () => Promise<Hex>;
-  globalIssuanceCouncil(): Promise<{ councilHash: Hex }>;
+  globalIssuanceCouncil(): Promise<{ councilHash: Hex; epochMicrogonsPerArgonot: bigint }>;
   migrate(
     argonMigration: MintingGatewayMigrationAssetDistribution,
     argonotMigration: MintingGatewayMigrationAssetDistribution,
@@ -389,7 +389,7 @@ async function measureUserScenarios() {
     argonAccountId: ethers.encodeBytes32String('account-cancel') as Hex,
     argonTransferNonce: 99n,
     chainId,
-    councilHash: activeCouncil.councilHash,
+    microgonsPerArgonot: activeCouncil.epochMicrogonsPerArgonot,
     recipient: cancelFixture.recipient.address,
     validUntilBlock: 0n,
     token: await cancelFixture.argon.getAddress(),
@@ -739,7 +739,7 @@ async function buildTransferOutOfArgonRequest(
     argonAccountId: ethers.encodeBytes32String(`account-${transferNonce}`) as Hex,
     argonTransferNonce: transferNonce,
     chainId,
-    councilHash: activeCouncil.councilHash,
+    microgonsPerArgonot: activeCouncil.epochMicrogonsPerArgonot,
     recipient: fixture.recipient.address,
     validUntilBlock: 1_000_000n,
     token: await fixture.argon.getAddress(),

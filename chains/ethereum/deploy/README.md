@@ -17,6 +17,10 @@ yarn workspace @argonprotocol/ethereum-deploy bootstrap:prepare-runtime-setup ..
 yarn workspace @argonprotocol/ethereum-deploy gas:measure
 ```
 
+`gas:measure` runs the local Hardhat deployment flow, exercises the current
+`finalizeTransferOutOfArgon` request/proof shape, and prints the gas figures
+that `bootstrap:prepare-runtime-setup` uses for its pricing recommendation.
+
 The contract source and tests remain in [`../contracts/`](../contracts/README.md).
 
 Layout:
