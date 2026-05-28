@@ -1,6 +1,15 @@
 # Changelog
 
-## [v1.4.3](https://github.com/argonprotocol/mainchain/compare/v1.4.2...ec2972c497b09e63db88669bbab216f1297dc1c5) (2026-03-27)
+## [v1.4.4](https://github.com/argonprotocol/mainchain/compare/v1.4.3...4544e954e6536b20f156b46443d34c2817db6d05) (2026-05-27)
+
+### Features
+
+* ethereum light client + tx verification
+([917cc19](https://github.com/argonprotocol/mainchain/commit/917cc19b8e675e5c42f6316f0161c5bd4f6565a1))
+* rename chain_transfer pallet to localchain_transfer
+([c05665c](https://github.com/argonprotocol/mainchain/commit/c05665c815e49f0c01507b458c457698288cd8ff))
+
+### [v1.4.3](https://github.com/argonprotocol/mainchain/compare/v1.4.2...v1.4.3) (2026-03-27)
 
 ### [v1.4.2](https://github.com/argonprotocol/mainchain/compare/v1.4.1...v1.4.2) (2026-03-24)
 

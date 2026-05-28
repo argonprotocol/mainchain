@@ -11,7 +11,7 @@
     "eslint": "eslint . --ext .ts --cache --fix",
     "test": "yarn pretest && vitest --run --typecheck",
     "test:ci": "yarn pretest:ci && vitest --run",
-    "version:bump": "npx lerna version $VERSION --no-push --no-git-tag-version --exact --yes"
+    "version:bump": "lerna version $VERSION --no-push --no-git-tag-version --exact --yes"
   },
   "private": true,
   "engines": {
@@ -27,6 +27,7 @@
     "chains/ethereum/deploy"
   ],
   "devDependencies": {
+    "@lerna-lite/cli": "^4.0.0",
     "@lerna-lite/version": "^4.0.0",
     "@types/node": "22.17.1",
     "@vitest/ui": "^4.0.5",

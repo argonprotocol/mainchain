@@ -153,7 +153,7 @@ script = [
     "convco changelog --paths client/nodejs --unreleased ${VERSION} > client/nodejs/CHANGELOG.md",
     "yarn",
     "yarn version:bump",
-    "yarn", # re-link workspaces
+    "YARN_ENABLE_IMMUTABLE_INSTALLS=false yarn", # re-link workspaces
     "git add .",
     # if not already on a branch matching the version, create one
     "git checkout -b v${VERSION} || true",
