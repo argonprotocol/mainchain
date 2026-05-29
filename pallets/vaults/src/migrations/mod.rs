@@ -64,7 +64,7 @@ where
 	fn pre_upgrade() -> Result<Vec<u8>, sp_runtime::TryRuntimeError> {
 		use codec::Encode;
 		Ok((
-			VaultsById::<T>::iter().count() as u64,
+			VaultsById::<T>::iter_keys().count() as u64,
 			RevenuePerFrameByVault::<T>::iter_keys().count() as u64,
 		)
 			.encode())
