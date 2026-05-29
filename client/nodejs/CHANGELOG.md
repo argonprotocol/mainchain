@@ -1,8 +1,15 @@
 # Changelog
 
-## [v1.4.4](https://github.com/argonprotocol/mainchain/compare/v1.4.3...4544e954e6536b20f156b46443d34c2817db6d05) (2026-05-27)
+## [v1.4.5](https://github.com/argonprotocol/mainchain/compare/v1.4.4...ff6a916ea75011b5eca1e5c2276c05c55c077bb8) (2026-05-29)
 
-### Features
+### Fixes
+
+* migrations not running for new pallets
+([ff6a916](https://github.com/argonprotocol/mainchain/commit/ff6a916ea75011b5eca1e5c2276c05c55c077bb8))
+
+### [v1.4.4](https://github.com/argonprotocol/mainchain/compare/v1.4.3...v1.4.4) (2026-05-29)
+
+#### Features
 
 * add ethereum deployment workflow and checklist
 ([7cd9f5e](https://github.com/argonprotocol/mainchain/commit/7cd9f5e683f6f41d93f3f03d267c272607ed1b1c))
@@ -49,8 +56,10 @@
 * **treasury:** simplify the bonds so that all funds are applied
 ([ba95f81](https://github.com/argonprotocol/mainchain/commit/ba95f8107199dbffd8966b21cf72b0f1e263d1ff))
 
-### Fixes
+#### Fixes
 
+* harden bitcoin release e2e
+([40be42a](https://github.com/argonprotocol/mainchain/commit/40be42a267f84fedb8a33a900acab0f7265d30ca))
 * **crosschain:** handle forced council clear-outs
 ([fa30416](https://github.com/argonprotocol/mainchain/commit/fa304169ce3b72cd69a2841b35159460aa8975aa))
 * embed ethereum execution proofs in verifier updates

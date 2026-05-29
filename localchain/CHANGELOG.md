@@ -1,8 +1,10 @@
 # Changelog
 
-## [v1.4.4](https://github.com/argonprotocol/mainchain/compare/v1.4.3...4544e954e6536b20f156b46443d34c2817db6d05) (2026-05-27)
+## [v1.4.5](https://github.com/argonprotocol/mainchain/compare/v1.4.4...ff6a916ea75011b5eca1e5c2276c05c55c077bb8) (2026-05-29)
 
-### Features
+### [v1.4.4](https://github.com/argonprotocol/mainchain/compare/v1.4.3...v1.4.4) (2026-05-29)
+
+#### Features
 
 * ethereum light client + tx verification
 ([917cc19](https://github.com/argonprotocol/mainchain/commit/917cc19b8e675e5c42f6316f0161c5bd4f6565a1))
