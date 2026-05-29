@@ -1,15 +1,15 @@
 use crate::{Config, Pallet};
+#[cfg(feature = "try-runtime")]
+use codec::{Decode, Encode};
 use frame_support::{
-	migrations::VersionedMigration,
 	storage::migration::move_pallet,
-	traits::{PalletInfoAccess, UncheckedOnRuntimeUpgrade},
+	traits::{
+		OnRuntimeUpgrade, PalletInfoAccess, StorageVersion, STORAGE_VERSION_STORAGE_KEY_POSTFIX,
+	},
 	weights::Weight,
 };
 #[cfg(feature = "try-runtime")]
-use frame_support::{
-	storage::KeyPrefixIterator,
-	traits::{GetStorageVersion, StorageVersion, STORAGE_VERSION_STORAGE_KEY_POSTFIX},
-};
+use frame_support::{storage::KeyPrefixIterator, traits::GetStorageVersion};
 use pallet_prelude::*;
 use sp_io::hashing::twox_128;
 
@@ -18,28 +18,27 @@ const LOG_TARGET: &str = "runtime::localchain_transfer::migration";
 
 pub struct RenameChainTransferPallet<T: Config>(core::marker::PhantomData<T>);
 
-impl<T: Config> UncheckedOnRuntimeUpgrade for RenameChainTransferPallet<T> {
+impl<T: Config> OnRuntimeUpgrade for RenameChainTransferPallet<T> {
 	#[cfg(feature = "try-runtime")]
 	fn pre_upgrade() -> Result<Vec<u8>, sp_runtime::TryRuntimeError> {
 		let new_pallet_name = <Pallet<T> as PalletInfoAccess>::name();
 
 		if new_pallet_name == OLD_PALLET_NAME {
-			return Ok(Vec::new());
+			return Ok((0u64, 0u64).encode());
 		}
 
+		let old_key_count = count_prefixed_keys(&twox_128(OLD_PALLET_NAME.as_bytes()));
 		let new_pallet_prefix = twox_128(new_pallet_name.as_bytes());
-		let storage_version_key = twox_128(STORAGE_VERSION_STORAGE_KEY_POSTFIX);
-		let mut new_pallet_prefix_iter =
-			KeyPrefixIterator::new(new_pallet_prefix.to_vec(), new_pallet_prefix.to_vec(), |key| {
-				Ok(key.to_vec())
-			});
+		let new_non_version_key_count = count_non_version_prefixed_keys(&new_pallet_prefix);
 
-		frame_support::ensure!(
-			new_pallet_prefix_iter.all(|key| key == storage_version_key),
-			"new pallet prefix already contains non-version storage"
-		);
+		if old_key_count > 0 {
+			frame_support::ensure!(
+				new_non_version_key_count == 0,
+				"new pallet prefix already contains migrated storage"
+			);
+		}
 
-		Ok(Vec::new())
+		Ok((old_key_count, new_non_version_key_count).encode())
 	}
 
 	fn on_runtime_upgrade() -> Weight {
@@ -53,22 +52,50 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for RenameChainTransferPallet<T> {
 			return Weight::zero();
 		}
 
+		let old_pallet_prefix = twox_128(OLD_PALLET_NAME.as_bytes());
+		let moved_keys = count_prefixed_keys(&old_pallet_prefix);
+		if moved_keys == 0 {
+			log::info!(
+				target: LOG_TARGET,
+				"no legacy {OLD_PALLET_NAME} storage found under the old pallet prefix",
+			);
+			return Weight::zero();
+		}
+
+		let new_pallet_prefix = twox_128(new_pallet_name.as_bytes());
+		let new_non_version_key_count = count_non_version_prefixed_keys(&new_pallet_prefix);
+		if new_non_version_key_count > 0 {
+			log::error!(
+				target: LOG_TARGET,
+				"refusing to migrate {OLD_PALLET_NAME} storage because {new_pallet_name} already contains {new_non_version_key_count} non-version keys",
+			);
+			return Weight::zero();
+		}
+
 		log::info!(
 			target: LOG_TARGET,
 			"moving pallet storage prefix from {OLD_PALLET_NAME} to {new_pallet_name}",
 		);
 
-		let moved_keys = count_prefixed_keys(&twox_128(OLD_PALLET_NAME.as_bytes()));
 		move_pallet(OLD_PALLET_NAME.as_bytes(), new_pallet_name.as_bytes());
+		StorageVersion::new(1).put::<Pallet<T>>();
+		let migrated_key_count = count_prefixed_keys(&new_pallet_prefix);
+		log::info!(
+			target: LOG_TARGET,
+			"migrated {moved_keys} legacy {OLD_PALLET_NAME} keys; {new_pallet_name} now has {migrated_key_count} total keys",
+		);
 
 		T::DbWeight::get().reads_writes(
-			moved_keys.saturating_mul(3).saturating_add(1),
-			moved_keys.saturating_mul(2),
+			moved_keys.saturating_mul(3).saturating_add(2),
+			moved_keys.saturating_mul(2).saturating_add(1),
 		)
 	}
 
 	#[cfg(feature = "try-runtime")]
-	fn post_upgrade(_state: Vec<u8>) -> Result<(), sp_runtime::TryRuntimeError> {
+	fn post_upgrade(state: Vec<u8>) -> Result<(), sp_runtime::TryRuntimeError> {
+		let (_old_key_count, _new_non_version_key_count_before) =
+			<(u64, u64)>::decode(&mut &state[..])
+				.map_err(|_| "invalid localchain migration state")?;
 		let new_pallet_name = <Pallet<T> as PalletInfoAccess>::name();
 
 		if new_pallet_name == OLD_PALLET_NAME {
@@ -86,13 +113,10 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for RenameChainTransferPallet<T> {
 		);
 
 		let new_pallet_prefix = twox_128(new_pallet_name.as_bytes());
-		let new_pallet_prefix_iter =
-			KeyPrefixIterator::new(new_pallet_prefix.to_vec(), new_pallet_prefix.to_vec(), |_| {
-				Ok(())
-			});
-		frame_support::ensure!(
-			new_pallet_prefix_iter.count() >= 1,
-			"new pallet prefix is missing migrated storage"
+		let new_key_count_after = count_prefixed_keys(&new_pallet_prefix);
+		log::info!(
+			target: LOG_TARGET,
+			"post-upgrade {new_pallet_name} key count: {new_key_count_after}",
 		);
 		frame_support::ensure!(
 			<Pallet<T> as GetStorageVersion>::on_chain_storage_version() == StorageVersion::new(1),
@@ -103,13 +127,7 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for RenameChainTransferPallet<T> {
 	}
 }
 
-pub type RenameChainTransferPalletMigration<T> = VersionedMigration<
-	0,
-	1,
-	RenameChainTransferPallet<T>,
-	crate::pallet::Pallet<T>,
-	<T as frame_system::Config>::DbWeight,
->;
+pub type RenameChainTransferPalletMigration<T> = RenameChainTransferPallet<T>;
 
 fn count_prefixed_keys(prefix: &[u8]) -> u64 {
 	let mut key_count = 0u64;
@@ -121,6 +139,26 @@ fn count_prefixed_keys(prefix: &[u8]) -> u64 {
 		}
 
 		key_count = key_count.saturating_add(1);
+		next_key = sp_io::storage::next_key(&key);
+	}
+
+	key_count
+}
+
+fn count_non_version_prefixed_keys(prefix: &[u8]) -> u64 {
+	let mut key_count = 0u64;
+	let storage_version_key = [prefix, &twox_128(STORAGE_VERSION_STORAGE_KEY_POSTFIX)].concat();
+	let mut next_key = sp_io::storage::next_key(prefix);
+
+	while let Some(key) = next_key {
+		if !key.starts_with(prefix) {
+			break;
+		}
+
+		if key != storage_version_key {
+			key_count = key_count.saturating_add(1);
+		}
+
 		next_key = sp_io::storage::next_key(&key);
 	}
 

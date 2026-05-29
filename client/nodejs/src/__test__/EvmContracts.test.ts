@@ -43,9 +43,9 @@ it('pins transfer-out hashes and finalize calldata to a known vector', () => {
   expect(mainchain.EvmContracts.hashMintingGatewayTransferOutOfArgonRequest(request)).toBe(
     '0x15547a58403a407ace23aaafbc0343f0221b1564405e9974f692e5f25b9b08ce',
   );
-  expect(mainchain.EvmContracts.hashMintingGatewayMintingAuthorization(gateway, authorization)).toBe(
-    '0x94fb1ef1202e2f7b0e2943219453e28153d2a97069bdb48ce28a695a6cf3bbb8',
-  );
+  expect(
+    mainchain.EvmContracts.hashMintingGatewayMintingAuthorization(gateway, authorization),
+  ).toBe('0x94fb1ef1202e2f7b0e2943219453e28153d2a97069bdb48ce28a695a6cf3bbb8');
   expect(
     encodeFunctionData({
       abi: mainchain.EvmContracts.mintingGatewayAbi,

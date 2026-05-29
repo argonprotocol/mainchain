@@ -47,10 +47,7 @@ pub mod pallet {
 	use frame_support::{
 		dispatch::{Pays, PostDispatchInfo},
 		storage::with_storage_layer,
-		traits::{
-			fungible::{InspectHold, Mutate, MutateHold},
-			GetStorageVersion,
-		},
+		traits::fungible::{InspectHold, Mutate, MutateHold},
 	};
 	use polkadot_sdk::{
 		frame_support::traits::IsSubType,
@@ -1054,9 +1051,7 @@ pub mod pallet {
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(_: BlockNumberFor<T>) -> Weight {
 			let mut weight = Weight::zero();
-			if <Pallet<T> as GetStorageVersion>::on_chain_storage_version() ==
-				StorageVersion::new(0)
-			{
+			if hyperbridge_migration::needs_initialization::<T>() {
 				weight = weight
 					.saturating_add(hyperbridge_migration::initialize_crosschain_transfer::<T>());
 			}
