@@ -1020,14 +1020,41 @@ async fn vault_cosigns_release(
 	xpriv_pwd: &str,
 	uploaded_xpub_hd_path: &str,
 ) -> anyhow::Result<()> {
+	let pending_cosigns = client
+		.fetch_storage(
+			&storage().vaults().pending_cosign_by_vault_id(*vault_id),
+			FetchAt::Finalized,
+		)
+		.await?
+		.ok_or_else(|| anyhow!("No pending cosign requests found for vault {vault_id}"))?;
+	assert!(
+		pending_cosigns.0.contains(utxo_id),
+		"Missing utxo {utxo_id} from pending cosign requests for vault {vault_id}: {:?}",
+		pending_cosigns.0
+	);
+
+	let pending_request = client
+		.fetch_storage(
+			&storage().bitcoin_locks().lock_release_requests_by_utxo_id(*utxo_id),
+			FetchAt::Finalized,
+		)
+		.await?;
+	assert!(pending_request.is_some(), "Missing finalized release request for utxo {utxo_id}");
+
 	let pending_release = run_bitcoin_cli(
 		test_node,
 		vec!["vault", "pending-release", "--vault-id", &vault_id.to_string()],
 	)
 	.await?;
 
-	assert!(pending_release.lines().count() > 3);
-	assert!(pending_release.contains('1'));
+	assert!(
+		pending_release.contains("Pending as of block"),
+		"Expected pending release header, got:\n{pending_release}"
+	);
+	assert!(
+		pending_release.contains(&utxo_id.to_string()),
+		"Expected pending release output to mention utxo {utxo_id}, got:\n{pending_release}"
+	);
 
 	let release_fulfill_cli = run_bitcoin_cli(
 		test_node,

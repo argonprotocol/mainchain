@@ -1,13 +1,100 @@
 # Changelog
 
-## [v1.4.3](https://github.com/argonprotocol/mainchain/compare/v1.4.2...ec2972c497b09e63db88669bbab216f1297dc1c5) (2026-03-27)
+## [v1.4.4](https://github.com/argonprotocol/mainchain/compare/v1.4.3...4544e954e6536b20f156b46443d34c2817db6d05) (2026-05-27)
 
 ### Features
+
+* add ethereum deployment workflow and checklist
+([7cd9f5e](https://github.com/argonprotocol/mainchain/commit/7cd9f5e683f6f41d93f3f03d267c272607ed1b1c))
+* **crosschain:** nodejs client integration
+([36a1bb1](https://github.com/argonprotocol/mainchain/commit/36a1bb1185d29903804d90c36653b18074ad8cc6))
+* finish ethereum proof nodejs support
+([4018d32](https://github.com/argonprotocol/mainchain/commit/4018d32137fa531d76ceafdb9cb8269260cf2647))
+* add gateway-backed crosschain transfers
+([665f2d2](https://github.com/argonprotocol/mainchain/commit/665f2d2f1a22a34d85b942e33896b5c24e83b257))
+* **crosschain:** add Ethereum gateway activity proof flow for Argon transfers
+([5328ddb](https://github.com/argonprotocol/mainchain/commit/5328ddb92ffcb4310af13e2917c95adf96835bf6))
+* **ethereum:** define MintingGatewayV2 queue and proof flow
+([50066bb](https://github.com/argonprotocol/mainchain/commit/50066bbc8d57da3613d31b33689bebd62f809c5a))
+* Add client helpers for redemption and vault bond capacity
+([6de0a80](https://github.com/argonprotocol/mainchain/commit/6de0a801ebaf1a09fe594f56b297be9c4c4f90c4))
+* finished updating to locked target price
+([8603b05](https://github.com/argonprotocol/mainchain/commit/8603b05a8371c5df676a40ebb00dcc297133e0b8))
+* refactored bitcoin_lock so that mints and burns are always the same
+([0f7d7ff](https://github.com/argonprotocol/mainchain/commit/0f7d7ff0f009302ee96b6fb3b7009dcd8ef1c044))
+* ability to run a minimal ethereum beacon
+([ca24824](https://github.com/argonprotocol/mainchain/commit/ca24824db8362402cd5736ef391d91035058dab9))
+* **crosschain:** support relayed argon prove-transfer claims
+([b902173](https://github.com/argonprotocol/mainchain/commit/b902173da309a09849f21cfdb06e4c409e087866))
+* **crosschain:** support relayed argon prove-transfer claims
+([bf6109a](https://github.com/argonprotocol/mainchain/commit/bf6109a2a24a4b3b91e6dd3ce3bd0269f38cad83))
+* expose underlying ethereum contracts
+([86e0dc6](https://github.com/argonprotocol/mainchain/commit/86e0dc63c9dda6af00aaa8f69dd89bf8e5d8bafe))
+* ethereum burn proofs
+([3178c09](https://github.com/argonprotocol/mainchain/commit/3178c0919423e6c334326038d898fb4b3b4aae42))
+* ethereum light client + tx verification
+([917cc19](https://github.com/argonprotocol/mainchain/commit/917cc19b8e675e5c42f6316f0161c5bd4f6565a1))
+* rename chain_transfer pallet to localchain_transfer
+([c05665c](https://github.com/argonprotocol/mainchain/commit/c05665c815e49f0c01507b458c457698288cd8ff))
+* **nodejs:** allow a signing fn for signers
+([2a1a40d](https://github.com/argonprotocol/mainchain/commit/2a1a40dc71a7e82f82ed04bd2bd26db5353af708))
+* let operational accounts claim pending rewards
+([78146d8](https://github.com/argonprotocol/mainchain/commit/78146d8d0693d6cbc9af3f5ef1c51064e23d7185))
+* **treasury:** move treasury pools to bond lots
+([1f94fb5](https://github.com/argonprotocol/mainchain/commit/1f94fb5fcc45004d6086f74d147630db9b53c5f1))
+* add optional vault names and benchmark weights
+([3c049cd](https://github.com/argonprotocol/mainchain/commit/3c049cdad93dece2c9536e8e3290ecac480dcc13))
+* simplify bitcoin lock initialization and refresh metadata
+([571d763](https://github.com/argonprotocol/mainchain/commit/571d76359642e85935f95a48d0fc4703ce19141f))
+* **treasury:** simplify the bonds so that all funds are applied
+([ba95f81](https://github.com/argonprotocol/mainchain/commit/ba95f8107199dbffd8966b21cf72b0f1e263d1ff))
+
+### Fixes
+
+* **crosschain:** handle forced council clear-outs
+([fa30416](https://github.com/argonprotocol/mainchain/commit/fa304169ce3b72cd69a2841b35159460aa8975aa))
+* embed ethereum execution proofs in verifier updates
+([4a64899](https://github.com/argonprotocol/mainchain/commit/4a64899fd0ee34dc67d4d357bd60193ed5e26fc3))
+* **nodejs:** keep test aliases out of package builds
+([78b528c](https://github.com/argonprotocol/mainchain/commit/78b528cc354627b8cc9cbc742fa1d4e34d632a3f))
+* clarify gateway proof planning and finalized header naming
+([16a6d91](https://github.com/argonprotocol/mainchain/commit/16a6d91e1a68793ea74b0fee8a704f7a00389fd6))
+* implemented a number of copilot suggestions
+([5dfdd60](https://github.com/argonprotocol/mainchain/commit/5dfdd60bfe39cfd7b20aa2d5cca755e43b224a93))
+* **ethereum:** sync next committees
+([afd10c3](https://github.com/argonprotocol/mainchain/commit/afd10c339cdee3f5a34625994006ae2d10e97983))
+* fixed some disrepencies between rust and ts code for calculating unlock
+amount
+([4564ef0](https://github.com/argonprotocol/mainchain/commit/4564ef0a5b68bcf1d12a9ed49b365b16ad216fa3))
+* calculateRedemptionAmount now uses same formula in rust and ts
+([5f207ff](https://github.com/argonprotocol/mainchain/commit/5f207ff6f6270798de8526d4ffe6f03888767691))
+* a number of fixes to get tests working
+([7c88f61](https://github.com/argonprotocol/mainchain/commit/7c88f611651678a8ae990c7040283d6bfb54b86a))
+* **ethereum:** allow solo next committee sync
+([4408f4f](https://github.com/argonprotocol/mainchain/commit/4408f4ffa98473cd9830a0d211149d1975ec9374))
+* **ethereum:** beacon sync not updating in all scenarios
+([76caee6](https://github.com/argonprotocol/mainchain/commit/76caee69f5c5b0847d410bed12183ddcd007d759))
+* **ethereum:** remove redundant beacon proof
+([5f01682](https://github.com/argonprotocol/mainchain/commit/5f01682df6ad2653c1c282d2a66f342f7d59e857))
+* **nodejs:** refresh client build inputs
+([89512be](https://github.com/argonprotocol/mainchain/commit/89512be44efca2f7fad9cf7d6ed5d1e847250006))
+* harden sync replay and catchup
+([8e77c08](https://github.com/argonprotocol/mainchain/commit/8e77c08f4ab22a490c9b9be50d4515f1ff205c92))
+* **ci:** remove redundant nodejs pretest hooks
+([7dfbc77](https://github.com/argonprotocol/mainchain/commit/7dfbc77f83461f4065d0a7b09e631faecf7205fb))
+* **ci:** address vault and benchmark feedback
+([8992848](https://github.com/argonprotocol/mainchain/commit/8992848cedbcc91edf8783663bbb1203c6da6b68))
+* **bitcoin_locks:** guard initialize_for collisions and stale fee loss
+([ce8b47e](https://github.com/argonprotocol/mainchain/commit/ce8b47ec050f6a2feef92787ee33a69c4827d602))
+
+### [v1.4.3](https://github.com/argonprotocol/mainchain/compare/v1.4.2...v1.4.3) (2026-03-27)
+
+#### Features
 
 * **bitcoin_locks:** add per-vault UTXO index and remove completed migrations
 ([5078a46](https://github.com/argonprotocol/mainchain/commit/5078a46aecd9dd495a141f7284fd978d61394a7b))
 
-### Fixes
+#### Fixes
 
 * missing migration for vault funders
 ([c4197f4](https://github.com/argonprotocol/mainchain/commit/c4197f4c159e6aa281824064733a62f0eb22bfc2))

@@ -110,9 +110,9 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for MigrateBondLots<T> {
 
 		Ok((
 			T::MiningFrameTransitionProvider::get_current_frame_id(),
-			old_storage::VaultPoolsByFrame::<T>::iter().count() as u64,
-			old_storage::FunderStateByVaultAndAccount::<T>::iter().count() as u64,
-			old_storage::FundersByVaultId::<T>::iter().count() as u64,
+			old_storage::VaultPoolsByFrame::<T>::iter_keys().count() as u64,
+			old_storage::FunderStateByVaultAndAccount::<T>::iter_keys().count() as u64,
+			old_storage::FundersByVaultId::<T>::iter_keys().count() as u64,
 			old_storage::CapitalActive::<T>::get().len() as u64,
 		)
 			.encode())
@@ -338,15 +338,15 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for MigrateBondLots<T> {
 			"current frame changed during treasury migration",
 		);
 		ensure!(
-			old_storage::VaultPoolsByFrame::<T>::iter().count() == 0,
+			old_storage::VaultPoolsByFrame::<T>::iter_keys().next().is_none(),
 			"legacy VaultPoolsByFrame was not cleared",
 		);
 		ensure!(
-			old_storage::FunderStateByVaultAndAccount::<T>::iter().count() == 0,
+			old_storage::FunderStateByVaultAndAccount::<T>::iter_keys().next().is_none(),
 			"legacy FunderStateByVaultAndAccount was not cleared",
 		);
 		ensure!(
-			old_storage::FundersByVaultId::<T>::iter().count() == 0,
+			old_storage::FundersByVaultId::<T>::iter_keys().next().is_none(),
 			"legacy FundersByVaultId was not cleared",
 		);
 		ensure!(
@@ -493,7 +493,7 @@ fn release_migration_refund<T: Config>(
 	T::Currency::release(&reason.into(), account_id, amount, Precision::Exact)?;
 
 	if T::Currency::balance_on_hold(&reason.into(), account_id).is_zero() {
-		frame_system::Pallet::<T>::dec_providers(account_id)?;
+		let _ = frame_system::Pallet::<T>::dec_providers(account_id);
 	}
 
 	Ok(())

@@ -37,25 +37,29 @@ pub async fn run_bitcoin_cli(
 
 	let mut out_log = String::new();
 	let mut err_log = String::new();
+	let mut stdout_done = false;
+	let mut stderr_done = false;
 
-	loop {
+	while !stdout_done || !stderr_done {
 		tokio::select! {
-			line = stdout_reader.next_line() => {
-				if let Ok(Some(line)) = line {
-					println!("CLI      {line}");
-					out_log.push_str(&line);
-					out_log.push('\n');
-				} else {
-					break;
+			line = stdout_reader.next_line(), if !stdout_done => {
+				match line? {
+					Some(line) => {
+						println!("CLI      {line}");
+						out_log.push_str(&line);
+						out_log.push('\n');
+					},
+					None => stdout_done = true,
 				}
 			},
-			line = stderr_reader.next_line() => {
-				if let Ok(Some(line)) = line {
-					eprintln!("CLI      {line}");
-					err_log.push_str(&line);
-					err_log.push('\n');
-				} else {
-					break;
+			line = stderr_reader.next_line(), if !stderr_done => {
+				match line? {
+					Some(line) => {
+						eprintln!("CLI      {line}");
+						err_log.push_str(&line);
+						err_log.push('\n');
+					},
+					None => stderr_done = true,
 				}
 			},
 		}
