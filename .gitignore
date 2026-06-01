@@ -43,3 +43,5 @@ chains/ethereum/contracts/artifacts/contracts/MintingGateway.sol/*
 chains/ethereum/contracts/cache/
 chains/ethereum/contracts/deployments/default/
 /chains/ethereum/contracts/*.js
+chains/ethereum/deploy/*/*.standard-input.json
+chains/ethereum/deploy/*/*.constructor-args.txt
