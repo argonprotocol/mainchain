@@ -27,7 +27,7 @@ export default defineConfig({
     testnet: {
       type: 'http',
       chainType: 'l1',
-      url: process.env.TESTNET_ETHEREUM_RPC_URL ?? 'https://gnosis-rpc.publicnode.com',
+      url: process.env.TESTNET_ETHEREUM_RPC_URL ?? 'https://ethereum-sepolia-rpc.publicnode.com',
       accounts: [configVariable('ETHEREUM_DEPLOYER_PRIVATE_KEY')],
     },
   },

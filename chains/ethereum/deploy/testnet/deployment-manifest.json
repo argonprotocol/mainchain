@@ -1,0 +1,109 @@
+{
+  "generatedAt": "2026-06-01T12:39:48.878Z",
+  "deployer": "0x7507661792aB888F7C2F74D4852EFa70469347b8",
+  "network": {
+    "name": "testnet",
+    "chainId": "11155111"
+  },
+  "adminSafe": "0xe473F30E41F698eB759a3bD86ec8790179E1e5ff",
+  "guardianSafe": "0xdC81BFAA621f9fCFe9D0cE10A07E10f497690b8A",
+  "contracts": {
+    "argonToken": {
+      "address": "0xa1a1e87614B1f447fD8E65c18DCc41bAd4A7A1E5",
+      "constructorArgs": ["0x8A2841380151160BBf88D44D8D9A4DdA05838B76"],
+      "deploymentTxHash": "0xaaab77caa889de754336832e51bf0bb50feb1b1bf139b55afc6e29fbdb0f9ccf"
+    },
+    "argonotToken": {
+      "address": "0xAEe2d012E2749881D1be66a86be256Bb039089C2",
+      "constructorArgs": ["0x8A2841380151160BBf88D44D8D9A4DdA05838B76"],
+      "deploymentTxHash": "0x2b2fa166a8d2e7bc10e8831f4c434dfc2ce4325be1244a3d746d4188abcba1de"
+    },
+    "mintingGatewayImplementationBootstrap": {
+      "address": "0x7bb828Cc78694f76d94372E3E4B0Ac4757BbD48d",
+      "constructorArgs": [
+        "0x0000000000000000000000000000000000000000",
+        "0x0000000000000000000000000000000000000000"
+      ],
+      "deploymentTxHash": "0x7d008002dd0661a0e3eb06d14bb76790e1d356c3cabe2d1899bd08503232cc90"
+    },
+    "mintingGatewayImplementationFinal": {
+      "address": "0x57Bd330f43e03665564734cC7518541157b8A0Af",
+      "constructorArgs": [
+        "0xa1a1e87614B1f447fD8E65c18DCc41bAd4A7A1E5",
+        "0xAEe2d012E2749881D1be66a86be256Bb039089C2"
+      ],
+      "deploymentTxHash": "0xbd0a3aec27c87b63f3365ba289dfd7930372e248b9e2895fd21ee8b5b14cbc91"
+    },
+    "mintingGatewayProxy": {
+      "address": "0x8A2841380151160BBf88D44D8D9A4DdA05838B76",
+      "constructorArgs": [
+        "0x7bb828Cc78694f76d94372E3E4B0Ac4757BbD48d",
+        "0xe473F30E41F698eB759a3bD86ec8790179E1e5ff",
+        "0xc017c902000000000000000000000000e473f30e41f698eb759a3bd86ec8790179e1e5ff000000000000000000000000dc81bfaa621f9fcfe9d0ce10a07e10f497690b8a227a2e5f214d83a04a32e106c1a1813d473543ac392d52a1d46c442e4c993dd6000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000002261f192300000000000000000000000000000000000000000000000000000000000249c0"
+      ],
+      "deploymentTxHash": "0x407a3c8a49843c2640a39f5bf97b21f1e6c7a91e495ab1b8388d185a567ed622"
+    },
+    "mintingGatewayProxyAdmin": {
+      "address": "0xC8Acbaa248F94f9020360e9021C5ed403a14c9C6",
+      "owner": "0xe473F30E41F698eB759a3bD86ec8790179E1e5ff",
+      "deploymentTxHash": "0x407a3c8a49843c2640a39f5bf97b21f1e6c7a91e495ab1b8388d185a567ed622"
+    },
+    "mintingGateway": {
+      "address": "0x8A2841380151160BBf88D44D8D9A4DdA05838B76",
+      "constructorArgs": [
+        "0x7bb828Cc78694f76d94372E3E4B0Ac4757BbD48d",
+        "0xe473F30E41F698eB759a3bD86ec8790179E1e5ff",
+        "0xc017c902000000000000000000000000e473f30e41f698eb759a3bd86ec8790179e1e5ff000000000000000000000000dc81bfaa621f9fcfe9d0ce10a07e10f497690b8a227a2e5f214d83a04a32e106c1a1813d473543ac392d52a1d46c442e4c993dd6000000000000000000000000000000000000000000000000000000000000000100000000000000000000000000000000000000000000000000000002261f192300000000000000000000000000000000000000000000000000000000000249c0"
+      ],
+      "deploymentTxHash": "0x407a3c8a49843c2640a39f5bf97b21f1e6c7a91e495ab1b8388d185a567ed622"
+    }
+  },
+  "initialCouncil": {
+    "councilHash": "0x227a2e5f214d83a04a32e106c1a1813d473543ac392d52a1d46c442e4c993dd6",
+    "memberCount": "1",
+    "totalWeight": "9229506851",
+    "epochMicrogonsPerArgonot": "149952",
+    "accounts": ["5CtJvc9WAL1Sb7ytuubW1ea19M9XKnWqRceMeaCRTXPEgDHQ"],
+    "signers": ["0x04FBD566D1db12A06F5BD0dcD4Bd7c884e79F8f5"],
+    "weights": ["9229506851"],
+    "weightSource": "runtimeCouncilSnapshot"
+  },
+  "runtimeBootstrap": {
+    "externalChain": {
+      "chainId": "11155111",
+      "gatewayAddress": "0x8A2841380151160BBf88D44D8D9A4DdA05838B76"
+    },
+    "externalChainAssets": [
+      {
+        "symbol": "ARGN",
+        "tokenAddress": "0xa1a1e87614B1f447fD8E65c18DCc41bAd4A7A1E5",
+        "gatewayAddress": "0x8A2841380151160BBf88D44D8D9A4DdA05838B76",
+        "decimals": 18,
+        "runtimeDecimals": 6,
+        "enabled": true
+      },
+      {
+        "symbol": "ARGNOT",
+        "tokenAddress": "0xAEe2d012E2749881D1be66a86be256Bb039089C2",
+        "gatewayAddress": "0x8A2841380151160BBf88D44D8D9A4DdA05838B76",
+        "decimals": 18,
+        "runtimeDecimals": 6,
+        "enabled": true
+      }
+    ],
+    "notes": [
+      "Use these seeded Ethereum addresses as the manifest inputs for bootstrap:prepare-runtime-setup.",
+      "The Argon-side legacy balance and refund migration now lives in pallet_crosschain_transfer."
+    ]
+  },
+  "migration": null,
+  "safeTransactions": [
+    {
+      "description": "Upgrade MintingGateway proxy to final implementation with fixed canonical tokens",
+      "target": "0xC8Acbaa248F94f9020360e9021C5ed403a14c9C6",
+      "value": "0",
+      "data": "0x9623609d0000000000000000000000008a2841380151160bbf88d44d8d9a4dda05838b7600000000000000000000000057bd330f43e03665564734cc7518541157b8a0af00000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000000"
+    }
+  ],
+  "notes": []
+}

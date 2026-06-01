@@ -116,8 +116,8 @@ const PUBLIC_RUNTIME_SETUP_DEFAULTS: Record<RuntimeSetupEnvironment, RuntimeSetu
     runtimeSetupEnvironment: 'mainnet',
   },
   testnet: {
-    executionRpcUrl: 'https://gnosis-rpc.publicnode.com',
-    beaconApiUrl: 'https://gnosis-beacon-api.publicnode.com',
+    executionRpcUrl: 'https://ethereum-sepolia-rpc.publicnode.com',
+    beaconApiUrl: 'https://ethereum-sepolia-beacon-api.publicnode.com',
     runtimeSetupEnvironment: 'testnet',
   },
 };
