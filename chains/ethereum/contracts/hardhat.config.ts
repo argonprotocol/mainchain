@@ -4,7 +4,7 @@ import { configVariable, defineConfig } from 'hardhat/config';
 export default defineConfig({
   plugins: [hardhatEthers],
   solidity: {
-    version: '0.8.24',
+    version: '0.8.35',
     settings: {
       optimizer: {
         enabled: true,

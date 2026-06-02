@@ -90,10 +90,6 @@
         "runtimeDecimals": 6,
         "enabled": true
       }
-    ],
-    "notes": [
-      "Use these seeded Ethereum addresses as the manifest inputs for bootstrap:prepare-runtime-setup.",
-      "The Argon-side legacy balance and refund migration now lives in pallet_crosschain_transfer."
     ]
   },
   "migration": null,

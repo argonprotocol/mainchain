@@ -4,49 +4,68 @@ import { AbiCoder } from 'ethers';
 import { contractsRoot, deployRoot } from './src/hardhat.js';
 
 const abiCoder = AbiCoder.defaultAbiCoder();
-const buildInfoFiles = {
-  gateway: 'solc-0_8_24-99a644eb68baa9f4a7d2f893d75a5ed27a4b1833.json',
-  main: 'solc-0_8_24-c97fc17823f46ca2bbf09a524bd4ff9df2054ce8.json',
-} as const;
 
 const fileSpecs = [
   {
     contractKey: 'mintingGatewayImplementationBootstrap',
     contractName: 'project/contracts/MintingGateway.sol:MintingGateway',
-    buildInfoKey: 'gateway',
     constructorTypes: ['address', 'address'],
   },
   {
     contractKey: 'mintingGatewayImplementationFinal',
     contractName: 'project/contracts/MintingGateway.sol:MintingGateway',
-    buildInfoKey: 'gateway',
     constructorTypes: ['address', 'address'],
   },
   {
     contractKey: 'argonToken',
     contractName: 'project/contracts/ArgonToken.sol:ArgonToken',
-    buildInfoKey: 'main',
     constructorTypes: ['address'],
   },
   {
     contractKey: 'argonotToken',
     contractName: 'project/contracts/ArgonotToken.sol:ArgonotToken',
-    buildInfoKey: 'main',
     constructorTypes: ['address'],
   },
   {
     contractKey: 'mintingGatewayProxy',
     contractName: 'project/contracts/ProxyArtifacts.sol:TransparentUpgradeableProxy',
-    buildInfoKey: 'main',
     constructorTypes: ['address', 'address', 'bytes'],
   },
 ] as const;
 
 async function main() {
-  const buildInfo = {
-    gateway: await readJson(join(contractsRoot, `artifacts/build-info/${buildInfoFiles.gateway}`)),
-    main: await readJson(join(contractsRoot, `artifacts/build-info/${buildInfoFiles.main}`)),
-  };
+  const buildInfoDir = join(contractsRoot, 'artifacts/build-info');
+  const buildInfos = await Promise.all(
+    (await readdir(buildInfoDir))
+      .filter(file => file.endsWith('.json') && !file.endsWith('.output.json'))
+      .map(async file => {
+        const buildInfoPath = join(buildInfoDir, file);
+        const outputPath = join(buildInfoDir, file.replace(/\.json$/, '.output.json'));
+        const buildInfo = await readJson(buildInfoPath);
+        const output = buildInfo.output ? buildInfo : await readJson(outputPath);
+
+        return {
+          input: buildInfo.input,
+          output: output.output,
+        };
+      }),
+  );
+  const buildInfoByContractName: Record<string, BuildInfo | undefined> = {};
+
+  for (const spec of fileSpecs) {
+    if (buildInfoByContractName[spec.contractName]) continue;
+
+    const [sourceName, contractName] = spec.contractName.split(':');
+    const buildInfo = buildInfos.find(
+      info => sourceName && contractName && info.output?.contracts?.[sourceName]?.[contractName],
+    );
+
+    if (!buildInfo) {
+      throw new Error(`Missing build-info for ${spec.contractName}`);
+    }
+
+    buildInfoByContractName[spec.contractName] = buildInfo;
+  }
 
   for (const dirent of await readdir(deployRoot, { withFileTypes: true })) {
     if (!dirent.isDirectory()) continue;
@@ -77,19 +96,23 @@ async function main() {
 
     for (const spec of fileSpecs) {
       const contract = contracts[spec.contractKey];
+      const buildInfo = buildInfoByContractName[spec.contractName];
       if (!contract?.address || !contract.deploymentTxHash) {
         throw new Error(`Missing deployment data for ${dirent.name}:${spec.contractKey}`);
+      }
+      if (!buildInfo) {
+        throw new Error(`Missing build-info for ${spec.contractName}`);
       }
 
       const standardInputFile = join(outputDir, `${spec.contractKey}.standard-input.json`);
       const constructorArgsFile = join(outputDir, `${spec.contractKey}.constructor-args.txt`);
       const constructorArgsHex = abiCoder
-        .encode(spec.constructorTypes as string[], contract.constructorArgs ?? [])
+        .encode([...spec.constructorTypes], contract.constructorArgs ?? [])
         .slice(2);
 
       await writeFile(
         standardInputFile,
-        `${JSON.stringify(buildInfo[spec.buildInfoKey].input, null, 2)}\n`,
+        `${JSON.stringify(buildInfo.input, null, 2)}\n`,
       );
       await writeFile(constructorArgsFile, `${constructorArgsHex}\n`);
     }
@@ -101,10 +124,15 @@ void main().catch(error => {
   process.exitCode = 1;
 });
 
+type BuildInfo = {
+  input: unknown;
+  output?: {
+    contracts?: Record<string, Record<string, unknown>>;
+  };
+};
+
 async function readJson(path: string) {
-  return JSON.parse(await readFile(path, 'utf8')) as {
-    input: unknown;
-    solcLongVersion?: string;
+  return JSON.parse(await readFile(path, 'utf8')) as BuildInfo & {
     contracts?: Record<
       string,
       {
