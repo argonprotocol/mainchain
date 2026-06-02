@@ -25,7 +25,7 @@ pub fn get_infura_url(use_sepolia: bool, project_id: String) -> String {
 }
 pub const USDC_ADDRESS: Address = address!("A0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
 pub(crate) const USDC_ADDRESS_SEPOLIA: Address =
-	address!("74ce1e12998fB861A612CD6C65244f8620e2937A");
+	address!("1c7D4B196Cb0C7B01d743Fbc6116a902379C7238");
 pub const SEPOLIA_FACTORY_ADDRESS: Address = address!("0227628f3F023bb0B980b67D528571c95c6DaC1c");
 
 #[cfg(test)]
