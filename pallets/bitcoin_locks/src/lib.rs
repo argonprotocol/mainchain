@@ -1731,10 +1731,18 @@ pub mod pallet {
 
 		/// Call made during the on_initialize to implement cosign overdue penalties.
 		pub(crate) fn cosign_bitcoin_overdue(utxo_id: UtxoId) -> DispatchResult {
-			let lock = LocksByUtxoId::<T>::take(utxo_id).ok_or(Error::<T>::LockNotFound)?;
+			let entry = Self::take_release_request(utxo_id)?;
+			let Some(lock) = LocksByUtxoId::<T>::take(utxo_id) else {
+				UtxoIdsByVaultId::<T>::remove(entry.vault_id, utxo_id);
+				T::BitcoinUtxoTracker::unwatch(utxo_id);
+				log::warn!(
+					"Cleared overdue bitcoin cosign request for missing lock {utxo_id:?} in vault {:?}",
+					entry.vault_id
+				);
+				return Ok(());
+			};
 			UtxoIdsByVaultId::<T>::remove(lock.vault_id, utxo_id);
 			let vault_id = lock.vault_id;
-			let entry = Self::take_release_request(utxo_id)?;
 
 			let redemption_amount_on_hold = entry.redemption_amount;
 
