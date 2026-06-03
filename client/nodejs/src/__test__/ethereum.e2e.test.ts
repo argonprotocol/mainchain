@@ -22,6 +22,7 @@ const {
 
 type Harness = Awaited<ReturnType<typeof EthereumProofE2eHarness.launch>>;
 type AuthorityActor = InstanceType<typeof TestMintingAuthorityActor>;
+// @ts-expect-error private constructor
 type Gateway = InstanceType<typeof TestMintingGateway>;
 type GatewayUpdateBatch = Awaited<ReturnType<typeof getReadyEthereumGatewayUpdates>>;
 type TransferRequest = Awaited<

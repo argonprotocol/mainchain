@@ -110,10 +110,7 @@ async function main() {
         .encode([...spec.constructorTypes], contract.constructorArgs ?? [])
         .slice(2);
 
-      await writeFile(
-        standardInputFile,
-        `${JSON.stringify(buildInfo.input, null, 2)}\n`,
-      );
+      await writeFile(standardInputFile, `${JSON.stringify(buildInfo.input, null, 2)}\n`);
       await writeFile(constructorArgsFile, `${constructorArgsHex}\n`);
     }
   }
