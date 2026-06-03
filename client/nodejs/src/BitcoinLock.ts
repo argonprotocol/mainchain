@@ -12,7 +12,7 @@ import { TxResult } from './TxResult';
 import { u8aToHex } from '@polkadot/util';
 import { ApiDecoration } from '@polkadot/api/types';
 import { PriceIndex } from './PriceIndex';
-import { bool, Option, u128 } from '@polkadot/types-codec';
+import { bool, Option } from '@polkadot/types-codec';
 import { formatArgons } from './utils';
 import type { Vault } from './Vault';
 import BigNumber from 'bignumber.js';
@@ -67,6 +67,7 @@ export class BitcoinLock implements IBitcoinLock {
   public isFunded: boolean;
   public createdAtArgonBlock: number;
   public fundHoldExtensionsByBitcoinExpirationHeight: Record<number, bigint>;
+  public couponFeesPaid: bigint;
 
   constructor(data: IBitcoinLock) {
     this.utxoId = data.utxoId;
@@ -89,6 +90,7 @@ export class BitcoinLock implements IBitcoinLock {
     this.fundHoldExtensionsByBitcoinExpirationHeight =
       data.fundHoldExtensionsByBitcoinExpirationHeight;
     this.createdAtArgonBlock = data.createdAtArgonBlock;
+    this.couponFeesPaid = data.couponFeesPaid ?? 0n;
   }
 
   /**
@@ -634,6 +636,8 @@ export class BitcoinLock implements IBitcoinLock {
     const fundHoldExtensionsByBitcoinExpirationHeight = Object.fromEntries(
       [...utxo.fundHoldExtensions.entries()].map(([x, y]) => [x.toNumber(), y.toBigInt()]),
     );
+    const couponFeesPaid = utxo.couponPaidFees?.toBigInt() ?? 0n;
+
     return new BitcoinLock({
       utxoId,
       p2wshScriptHashHex,
@@ -652,6 +656,7 @@ export class BitcoinLock implements IBitcoinLock {
       createdAtHeight,
       securityFees,
       isFunded,
+      couponFeesPaid,
       fundHoldExtensionsByBitcoinExpirationHeight,
       createdAtArgonBlock,
     });
@@ -879,6 +884,7 @@ export interface IBitcoinLock {
   utxoSatoshis?: bigint;
   vaultPubkey: string;
   securityFees: bigint;
+  couponFeesPaid: bigint;
   vaultClaimPubkey: string;
   ownerPubkey: string;
   vaultXpubSources: {
