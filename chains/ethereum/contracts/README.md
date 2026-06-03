@@ -191,13 +191,15 @@ ETHEREUM_DEPLOYER_PRIVATE_KEY=0x...
 yarn workspace @argonprotocol/ethereum-deploy bootstrap:deploy --argon-rpc-url wss://... --network mainnet --admin-safe 0x... --guardian-safe 0x...
 ```
 
-Testnet bootstrap generation uses the default public Gnosis RPC unless you override
+Testnet bootstrap generation now uses the default public Ethereum Sepolia RPC unless you override
 `TESTNET_ETHEREUM_RPC_URL`:
 
 ```sh
 ETHEREUM_DEPLOYER_PRIVATE_KEY=0x...
 yarn workspace @argonprotocol/ethereum-deploy bootstrap:deploy --argon-rpc-url wss://... --network testnet --admin-safe 0x... --guardian-safe 0x...
 ```
+
+The `testnet` deployment lane now points at Sepolia rather than Gnosis.
 
 `bootstrap:deploy` already performs the full Ethereum-side deployment sequence for this bootstrap
 flow:
@@ -233,7 +235,8 @@ the runtime migration at
 `estimatedMicrogonsPerEth` when it can:
 
 - deployment env `mainnet` -> public Ethereum execution RPC + public Ethereum beacon API
-- deployment env `testnet` -> public Gnosis execution RPC + public Gnosis beacon API
+- deployment env `testnet` -> public Ethereum Sepolia execution RPC + public Ethereum Sepolia beacon
+  API
 - when the deployment manifest includes initial council signers and no pricing override was
   supplied, it auto-runs a fresh `gas:measure --json`
 - `estimatedMicrogonsPerEth` -> derived from Argon `priceIndex.current().argonUsdTargetPrice` and

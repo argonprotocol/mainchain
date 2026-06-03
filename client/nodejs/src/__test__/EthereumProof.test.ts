@@ -238,6 +238,129 @@ it('builds one combined receipt proof for multiple receipts in the same executio
   }
 });
 
+it('resolves explicit Ethereum log indexes against receipt log metadata', async () => {
+  const txHash: Hex = `0x${'aa'.repeat(32)}`;
+  const zeroHash: Hex = `0x${'00'.repeat(32)}`;
+  const zeroBloom: Hex = `0x${'00'.repeat(256)}`;
+  const zeroAddress: Hex = `0x${'00'.repeat(20)}`;
+  const emptyUnclesHash =
+    '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347' as Hex;
+  const receipt = {
+    type: 'legacy',
+    status: 'success',
+    cumulativeGasUsed: 21_000n,
+    logsBloom: zeroBloom,
+    logs: [
+      {
+        address: `0x${'33'.repeat(20)}`,
+        topics: [`0x${'44'.repeat(32)}`],
+        data: '0x1234' as Hex,
+        logIndex: 318,
+      },
+    ],
+    transactionHash: txHash,
+    transactionIndex: 0,
+  } as unknown as EthereumReceipt;
+
+  const trie = await createMPT();
+  await trie.put(
+    encodeReceiptTrieKey(receipt.transactionIndex),
+    encodeEthereumReceiptForProof(receipt),
+  );
+  const receiptsRoot: Hex = bytesToHex(trie.root());
+  const targetBlockTemplate = {
+    number: toHex(10n),
+    hash: zeroHash,
+    parentHash: zeroHash,
+    nonce: '0x0000000000000000',
+    sha3Uncles: emptyUnclesHash,
+    logsBloom: zeroBloom,
+    transactionsRoot: zeroHash,
+    stateRoot: zeroHash,
+    receiptsRoot,
+    miner: zeroAddress,
+    difficulty: '0x0',
+    extraData: '0x',
+    size: '0x1',
+    gasLimit: toHex(30_000_000n),
+    gasUsed: toHex(21_000n),
+    timestamp: toHex(1n),
+    transactions: [txHash],
+    uncles: [],
+  } satisfies JSONRPCBlock;
+  const targetBlockHash: Hex = bytesToHex(createBlockHeaderFromRPC(targetBlockTemplate).hash());
+  const targetBlock = {
+    ...targetBlockTemplate,
+    hash: targetBlockHash,
+  } satisfies JSONRPCBlock;
+  const anchorBlockTemplate = {
+    ...targetBlockTemplate,
+    number: toHex(11n),
+    parentHash: targetBlockHash,
+    receiptsRoot: zeroHash,
+    gasUsed: toHex(0n),
+    timestamp: toHex(2n),
+    transactions: [],
+  } satisfies JSONRPCBlock;
+  const anchorBlockHash: Hex = bytesToHex(createBlockHeaderFromRPC(anchorBlockTemplate).hash());
+  const anchorBlock = {
+    ...anchorBlockTemplate,
+    hash: anchorBlockHash,
+  } satisfies JSONRPCBlock;
+  receipt.blockHash = targetBlockHash;
+
+  const executionClient = {
+    getTransactionReceipt: async ({ hash }: { hash: Hex }) => {
+      if (hash === txHash) return receipt;
+      throw new Error(`Unexpected receipt request for ${hash}`);
+    },
+    getBlock: async ({ blockHash }: { blockHash: Hex }) => {
+      expect(blockHash).toBe(targetBlockHash);
+      return { transactions: [txHash] };
+    },
+    request: async ({
+      method,
+      params,
+    }: {
+      method: 'eth_getBlockByHash' | 'eth_getBlockByNumber';
+      params: [Hex, true];
+    }) => {
+      if (method === 'eth_getBlockByHash') {
+        if (params[0] === targetBlockHash) return targetBlock;
+        if (params[0] === anchorBlockHash) return anchorBlock;
+      }
+      if (method === 'eth_getBlockByNumber' && params[0] === toHex(10n)) {
+        return targetBlock;
+      }
+
+      throw new Error(`Unexpected header request for ${method} ${params[0]}`);
+    },
+  } as unknown as EthereumExecutionClient;
+  const proof = await buildEthereumEventProof(
+    { executionClient },
+    { blockHash: anchorBlockHash, blockNumber: 11n },
+    [[{ txHash, receipt, logIndexes: [318] }]],
+  );
+
+  expect(proof.blocks).toHaveLength(1);
+  expect(proof.blocks[0].receiptLogs).toHaveLength(1);
+  expect(proof.blocks[0].receiptLogs[0]?.eventLog.data).toBe('0x1234');
+});
+
+it('encodes reverted receipts with an empty status byte', async () => {
+  const receipt = {
+    type: 'eip1559',
+    status: 'reverted',
+    cumulativeGasUsed: 21_000n,
+    logsBloom: `0x${'00'.repeat(256)}`,
+    logs: [],
+  } as unknown as EthereumReceipt;
+
+  expect(bytesToHex(encodeEthereumReceiptForProof(receipt))).toBe(
+    '0x02f9010880825208b9010000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000c0',
+  );
+});
+
 it('shares one execution header chain across multiple proved execution blocks', async () => {
   const txHash0: Hex = `0x${'aa'.repeat(32)}`;
   const txHash1: Hex = `0x${'bb'.repeat(32)}`;

@@ -42,7 +42,7 @@ export type EthereumEventLog = Pick<EthereumReceipt['logs'][number], 'address' |
 
 type LoadedEthereumEventLocator = {
   receipt: EthereumReceipt;
-  requestedLogIndexes: number[];
+  requestedLogs: EthereumReceipt['logs'];
 };
 
 export type EthereumEventProof = {
@@ -78,7 +78,7 @@ export function encodeReceiptTrieKey(transactionIndex: number): Uint8Array {
 export function encodeEthereumReceiptForProof(receipt: EthereumReceipt): Uint8Array {
   const payload = toRlp(
     [
-      receipt.root ?? (receipt.status === 'success' ? '0x1' : '0x0'),
+      receipt.root ?? (receipt.status === 'success' ? '0x1' : '0x'),
       toHex(receipt.cumulativeGasUsed),
       receipt.logsBloom,
       receipt.logs.map(log => [log.address, [...log.topics], log.data]),
@@ -182,18 +182,13 @@ export async function buildEthereumEventProof(
     const transactionIndexes: number[] = [];
     const seenTransactionIndexes = new Set<number>();
 
-    for (const { receipt, requestedLogIndexes } of locators) {
+    for (const { receipt, requestedLogs } of locators) {
       if (!seenTransactionIndexes.has(receipt.transactionIndex)) {
         seenTransactionIndexes.add(receipt.transactionIndex);
         transactionIndexes.push(receipt.transactionIndex);
       }
 
-      for (const index of requestedLogIndexes) {
-        const log = receipt.logs[index];
-        if (!log) {
-          throw new Error(`Missing log ${index} in receipt ${receipt.transactionHash}`);
-        }
-
+      for (const log of requestedLogs) {
         receiptLogs.push({
           transactionIndex: receipt.transactionIndex,
           eventLog: {
@@ -299,9 +294,20 @@ async function loadEthereumEventLocators(
           throw new Error(`At least one log index is required for receipt ${txHash}`);
         }
 
+        const requestedLogs = requestedLogIndexes.map(index => {
+          const matchingLog =
+            receipt.logs.find(log => log.logIndex != null && Number(log.logIndex) === index) ??
+            receipt.logs[index];
+          if (!matchingLog) {
+            throw new Error(`Missing log ${index} in receipt ${receipt.transactionHash}`);
+          }
+
+          return matchingLog;
+        });
+
         return {
           receipt,
-          requestedLogIndexes,
+          requestedLogs,
         } satisfies LoadedEthereumEventLocator;
       }),
     );

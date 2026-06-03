@@ -14,6 +14,7 @@ Use:
 ```sh
 yarn workspace @argonprotocol/ethereum-deploy bootstrap:deploy ...
 yarn workspace @argonprotocol/ethereum-deploy bootstrap:prepare-runtime-setup ...
+yarn workspace @argonprotocol/ethereum-deploy etherscan:output-files
 yarn workspace @argonprotocol/ethereum-deploy gas:measure
 ```
 
@@ -26,6 +27,8 @@ The contract source and tests remain in [`../contracts/`](../contracts/README.md
 Layout:
 
 - `./index.ts`, `./prepareRuntimeSetup.ts`, `./measure.ts`: CLI entrypoints
+- `./outputEtherscanFiles.ts`: rewrite the Etherscan standard-json files and constructor args beside
+  each deployment manifest
 - `./src/`: shared deploy logic
 - `./<env>/deployment-manifest.json`: output from `bootstrap:deploy`
 - `./mainnet/migration/`: checked-in final migration bundle and provenance files

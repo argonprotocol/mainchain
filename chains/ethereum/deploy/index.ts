@@ -256,10 +256,6 @@ async function main() {
           buildRuntimeAssetRecord('ARGN', await argonToken.getAddress(), gatewayProxyAddress),
           buildRuntimeAssetRecord('ARGNOT', await argonotToken.getAddress(), gatewayProxyAddress),
         ],
-        notes: [
-          'Use these seeded Ethereum addresses as the manifest inputs for bootstrap:prepare-runtime-setup.',
-          'The Argon-side legacy balance and refund migration now lives in pallet_crosschain_transfer.',
-        ],
       },
       migration: migrationBundle && {
         bundlePath: `chains/ethereum/deploy/${networkName}/migration/migrate-bundle.json`,
@@ -279,21 +275,7 @@ async function main() {
         },
       },
       safeTransactions,
-      notes: [
-        'Canonical tokens are deployed with the MintingGateway proxy address fixed in their constructors.',
-        'The proxy is first deployed against a bootstrap MintingGateway implementation with zero canonical token immutables.',
-        'That proxy initialization stores the first council summary derived from the target Argon runtime council inputs.',
-        'Token-bearing gateway entrypoints reject until the proxy is upgraded to the final implementation with canonical token addresses configured.',
-        'After the token contracts exist, the admin Safe upgrades the proxy through ProxyAdmin to the final MintingGateway implementation that has the Argon and Argonot token addresses baked in as immutables.',
-        'MintingGateway business ownership starts under the admin Safe.',
-        'The guardian Safe can pause immediately, while unpause remains on the admin Safe owner path.',
-        'The proxy admin is initially owned by the admin Safe.',
-        'A later hardening step can transfer ProxyAdmin ownership to a TimelockController once the governance flow is ready.',
-        migrationBundle
-          ? 'The manifest already includes the admin Safe migrate(...) call derived from the checked-in final migration bundle for this network.'
-          : 'No checked-in migration bundle was found for this network, so migrate(...) still needs to be prepared separately.',
-        'Long-term upgrades should happen through the stable gateway proxy address, not by rotating token trust.',
-      ],
+      notes: [],
     };
 
     await mkdir(outputDir, { recursive: true });

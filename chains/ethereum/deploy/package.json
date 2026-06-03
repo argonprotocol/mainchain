@@ -7,6 +7,7 @@
     "bootstrap:deploy": "node --import tsx index.ts",
     "bootstrap:prepare-runtime-setup": "node --import tsx prepareRuntimeSetup.ts",
     "build": "tsc --noEmit",
+    "etherscan:output-files": "node --import tsx outputEtherscanFiles.ts",
     "gas:measure": "node --import tsx measure.ts",
     "pretest": "tsc --noEmit",
     "pretest:ci": "tsc --noEmit",

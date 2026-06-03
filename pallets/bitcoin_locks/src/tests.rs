@@ -1302,6 +1302,49 @@ fn penalizes_vault_if_not_release_countersigned() {
 }
 
 #[test]
+fn overdue_cleanup_clears_stale_cosign_state_when_lock_is_missing() {
+	new_test_ext().execute_with(|| {
+		set_bitcoin_height(1);
+		System::set_block_number(1);
+
+		let who = 1;
+		let satoshis = SATOSHIS_PER_BITCOIN + 5_000;
+		let pubkey = CompressedBitcoinPubkey([1; 33]);
+		set_argons(who, 2_000);
+
+		assert_ok!(BitcoinLocks::initialize(RuntimeOrigin::signed(who), 1, satoshis, pubkey, None));
+		let lock = LocksByUtxoId::<Test>::get(1).unwrap();
+		assert_ok!(BitcoinLocks::funding_received(1, satoshis));
+		assert_ok!(Balances::mint_into(&who, lock.liquidity_promised));
+		assert_ok!(BitcoinLocks::request_release(
+			RuntimeOrigin::signed(who),
+			1,
+			make_script_pubkey(&[0; 32]),
+			2_000
+		));
+
+		let cosign_due_frame = CurrentFrameId::get() + LockReleaseCosignDeadlineFrames::get();
+		assert!(LockReleaseRequestsByUtxoId::<Test>::contains_key(1));
+		assert!(LockCosignDueByFrame::<Test>::get(cosign_due_frame).contains(&1));
+		assert!(VaultViewOfCosignPendingLocks::get().get(&1).unwrap().contains(&1));
+		assert!(UtxoIdsByVaultId::<Test>::contains_key(1, 1));
+		assert_eq!(WatchedUtxosById::get().len(), 1);
+
+		LocksByUtxoId::<Test>::remove(1);
+
+		CurrentFrameId::set(cosign_due_frame);
+		System::set_block_number(2);
+		BitcoinLocks::on_initialize(2);
+
+		assert!(!LockReleaseRequestsByUtxoId::<Test>::contains_key(1));
+		assert!(LockCosignDueByFrame::<Test>::get(cosign_due_frame).is_empty());
+		assert!(VaultViewOfCosignPendingLocks::get().get(&1).unwrap().is_empty());
+		assert!(!UtxoIdsByVaultId::<Test>::contains_key(1, 1));
+		assert_eq!(WatchedUtxosById::get().len(), 0);
+	});
+}
+
+#[test]
 fn clears_released_bitcoins() {
 	new_test_ext().execute_with(|| {
 		set_bitcoin_height(1);
