@@ -31,7 +31,7 @@ import {
   getXpubFromXpriv,
   HDKey,
   p2wshScriptHexToAddress,
-} from '..';
+} from '../../lib/index.js';
 import { wordlist as english } from '@scure/bip39/wordlists/english';
 
 const { generateMnemonic, mnemonicToSeedSync } = bip39;
