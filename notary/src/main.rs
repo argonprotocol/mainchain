@@ -14,6 +14,7 @@ use argon_notary::{
 	},
 	NotaryServer,
 };
+use argon_notary_apis::error::Error as NotaryApiError;
 use argon_primitives::{tick::Ticker, AccountId, CryptoType, KeystoreParams, NotaryId};
 use clap::{Parser, Subcommand};
 use futures::StreamExt;
@@ -22,6 +23,7 @@ use prometheus::Registry;
 use sp_core::{crypto::Ss58Codec, sr25519, ByteArray, Pair};
 use sqlx::{migrate, postgres::PgPoolOptions};
 use std::{env, time::Duration};
+use tokio::task::JoinHandle;
 use tracing::warn;
 
 #[derive(Parser, Debug)]
@@ -277,6 +279,9 @@ async fn main() -> anyhow::Result<()> {
 					});
 				});
 			}
+			// print to stdout - ignore log filters
+			println!("Listening on ws://{}", server.addr);
+
 			if finalize_notebooks {
 				let handles = spawn_notebook_closer(
 					pool.clone(),
@@ -289,25 +294,10 @@ async fn main() -> anyhow::Result<()> {
 					server.notary_metrics.clone(),
 				)?;
 
-				let mut subscription = server.audit_failure_stream.subscribe(10);
-				let mut server_handle = server.clone();
-				tokio::spawn(async move {
-					if let Some(failure) = subscription.next().await {
-						warn!("Audit failure detected in {}. Shutting down...", failure);
-						// stop notebook close processes immediately
-						handles.0.abort();
-						handles.1.abort();
-						// wait one second to clean up
-						tokio::time::sleep(Duration::from_secs(1)).await;
-						server_handle.stop().await;
-					}
-				});
+				wait_for_notebook_processing_shutdown(&server, handles).await?;
+			} else {
+				server.wait_for_close().await;
 			}
-
-			// print to stdout - ignore log filters
-			println!("Listening on ws://{}", server.addr);
-			let watching_server = server.clone();
-			let _ = tokio::spawn(async move { watching_server.wait_for_close().await }).await;
 
 			tracing::info!("Notary server closed");
 		},
@@ -342,6 +332,79 @@ async fn main() -> anyhow::Result<()> {
 			migrate!().run(&pool).await?;
 		},
 	};
+
+	Ok(())
+}
+
+async fn wait_for_notebook_processing_shutdown(
+	server: &NotaryServer,
+	handles: (JoinHandle<anyhow::Result<()>>, JoinHandle<anyhow::Result<()>>),
+) -> anyhow::Result<()> {
+	let (mut notebook_closer_handle, mut finalized_header_listener_handle) = handles;
+	let mut subscription = server.audit_failure_stream.subscribe(10);
+	let mut shutdown_server = server.clone();
+	let watching_server = server.clone();
+
+	tokio::select! {
+		failure = subscription.next() => {
+			match failure {
+				Some(failure) => {
+					warn!("Audit failure detected in {}. Shutting down...", failure);
+					notebook_closer_handle.abort();
+					finalized_header_listener_handle.abort();
+					tokio::time::sleep(Duration::from_secs(1)).await;
+					shutdown_server.stop().await;
+				},
+				None => {
+					return Err(anyhow::anyhow!("Audit failure stream closed unexpectedly"));
+				},
+			}
+		},
+		result = &mut notebook_closer_handle => {
+			match result {
+				Ok(Ok(())) => {
+					return Err(anyhow::anyhow!("Notebook closer exited unexpectedly"));
+				},
+				Ok(Err(e)) => {
+					if matches!(
+						e.downcast_ref::<NotaryApiError>(),
+						Some(NotaryApiError::NotaryFailedAudit(_))
+					) {
+						shutdown_server.stop().await;
+					} else {
+						return Err(anyhow::anyhow!(
+							"Notebook closer failed unexpectedly: {e:?}"
+						));
+					}
+				},
+				Err(e) => {
+					return Err(anyhow::anyhow!(
+						"Notebook closer panicked or was cancelled unexpectedly: {e}"
+					));
+				},
+			}
+		},
+		result = &mut finalized_header_listener_handle => {
+			match result {
+				Ok(Ok(())) => {
+					return Err(anyhow::anyhow!(
+						"Finalized notebook header listener exited unexpectedly"
+					));
+				},
+				Ok(Err(e)) => {
+					return Err(anyhow::anyhow!(
+						"Finalized notebook header listener failed unexpectedly: {e:?}"
+					));
+				},
+				Err(e) => {
+					return Err(anyhow::anyhow!(
+						"Finalized notebook header listener panicked or was cancelled unexpectedly: {e}"
+					));
+				},
+			}
+		},
+		_ = watching_server.wait_for_close() => {},
+	}
 
 	Ok(())
 }
