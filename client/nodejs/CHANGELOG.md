@@ -1,8 +1,15 @@
 # Changelog
 
-## [v1.4.5](https://github.com/argonprotocol/mainchain/compare/v1.4.4...ff6a916ea75011b5eca1e5c2276c05c55c077bb8) (2026-05-29)
+## [v1.4.6](https://github.com/argonprotocol/mainchain/compare/v1.4.5...7ee8a4845d61ae05703b32e667f1a6d798e4d6d0) (2026-06-05)
 
 ### Fixes
+
+* **ethereum:** proofs invalid when using full block logs
+([163a11b](https://github.com/argonprotocol/mainchain/commit/163a11bd70e4a0a4bf77469a316a9ac120dff1c4))
+
+### [v1.4.5](https://github.com/argonprotocol/mainchain/compare/v1.4.4...v1.4.5) (2026-05-29)
+
+#### Fixes
 
 * migrations not running for new pallets
 ([ff6a916](https://github.com/argonprotocol/mainchain/commit/ff6a916ea75011b5eca1e5c2276c05c55c077bb8))
