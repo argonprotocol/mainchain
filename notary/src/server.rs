@@ -308,9 +308,24 @@ impl NotaryServer {
 		let audit_failure_number_copy = audit_failure_number.clone();
 		let handle = tokio::spawn(async move {
 			loop {
-				while let Ok(notebook_number) = audit_failure_listener.next().await {
-					tracing::error!("Audit failure for notebook {}", notebook_number);
-					*audit_failure_number_copy.lock().await = Some(notebook_number);
+				match audit_failure_listener.next().await {
+					Ok(notebook_number) => {
+						tracing::error!("Audit failure for notebook {}", notebook_number);
+						*audit_failure_number_copy.lock().await = Some(notebook_number);
+					},
+					Err(e) => {
+						tracing::error!("Error listening for audit failures {:?}", e);
+						match audit_failure_listener.reconnect(Duration::from_secs(1)).await {
+							Ok(Some(notebook_number)) => {
+								*audit_failure_number_copy.lock().await = Some(notebook_number);
+							},
+							Ok(None) => {},
+							Err(e) => {
+								tracing::error!("Audit failure listener exiting {:?}", e);
+								return;
+							},
+						}
+					},
 				}
 			}
 		});

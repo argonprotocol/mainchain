@@ -186,23 +186,33 @@ pub fn spawn_notebook_closer(
 impl NotebookCloser {
 	pub async fn create_task(&'_ mut self) -> anyhow::Result<(), Error> {
 		loop {
-			if let Some(has_failed_audit) =
-				NotebookAuditFailureStore::has_unresolved_audit_failure(&self.pool).await?
-			{
+			let has_failed_audit =
+				match NotebookAuditFailureStore::has_unresolved_audit_failure(&self.pool).await {
+					Ok(has_failed_audit) => has_failed_audit,
+					Err(e) => {
+						tracing::error!("Error checking for unresolved audit failure {:?}", e);
+						if is_closed_database_error(&e) {
+							return Err(e);
+						}
+						tokio::time::sleep(Duration::from_secs(1)).await;
+						continue;
+					},
+				};
+
+			if let Some(has_failed_audit) = has_failed_audit {
 				tracing::error!(
 					"This notary has a failed audit. Need to shut down processing. Notebook={}, Reason={}",
 					has_failed_audit.notebook_number,
 					has_failed_audit.failure_reason
 				);
-				return Ok(());
+				return Err(Error::NotaryFailedAudit(has_failed_audit.notebook_number as _));
 			}
-			let _ = self.iterate_notebook_close_loop().await;
+			self.iterate_notebook_close_loop().await;
 			let tick = self.ticker.current();
 			let next_tick = self.ticker.time_for_tick(tick + 1);
 			let loop_millis = if self.ticker.tick_duration_millis <= 2000 { 200 } else { 1000 };
 			let sleep = next_tick.min(loop_millis) + 1;
-			// wait before resuming
-			tokio::time::sleep(tokio::time::Duration::from_millis(sleep)).await;
+			tokio::time::sleep(Duration::from_millis(sleep)).await;
 		}
 	}
 
@@ -285,6 +295,10 @@ impl NotebookCloser {
 		}
 		.boxed()
 	}
+}
+
+fn is_closed_database_error(error: &Error) -> bool {
+	matches!(error, Error::Database(message) if message.contains("pool closed"))
 }
 
 pub fn notary_sign(

@@ -5,7 +5,8 @@ use chrono::{DateTime, Utc};
 use polkadot_sdk::*;
 use sc_utils::notification::{NotificationSender, NotificationStream, TracingKeyStr};
 use sp_core::H256;
-use sqlx::{postgres::PgListener, FromRow, PgConnection, PgPool};
+use sqlx::{postgres::PgListener, Error as SqlxError, FromRow, PgConnection, PgPool};
+use std::time::Duration;
 pub type AuditFailureStream = NotificationStream<NotebookNumber, AuditFailureTracingKey>;
 
 #[derive(Clone)]
@@ -15,6 +16,7 @@ impl TracingKeyStr for AuditFailureTracingKey {
 }
 
 pub struct AuditFailureListener {
+	pool: PgPool,
 	failed_audits_notification: NotificationSender<NotebookNumber>,
 	listener: PgListener,
 }
@@ -23,24 +25,74 @@ impl AuditFailureListener {
 		pool: PgPool,
 		failed_audits_notification: NotificationSender<NotebookNumber>,
 	) -> anyhow::Result<Self> {
-		let mut listener = PgListener::connect_with(&pool).await?;
+		let listener = Self::connect_listener(&pool).await?;
+		Ok(Self { pool, failed_audits_notification, listener })
+	}
+
+	async fn connect_listener(pool: &PgPool) -> anyhow::Result<PgListener> {
+		let mut listener = PgListener::connect_with(pool).await?;
 		listener.listen("audit_failure").await?;
-		Ok(Self { failed_audits_notification, listener })
+		Ok(listener)
 	}
 
 	pub async fn next(&mut self) -> anyhow::Result<NotebookNumber> {
-		let notification = &self.listener.recv().await?;
-		let notebook_number = match notification.payload().parse() {
-			Ok(notebook_number) => notebook_number,
-			Err(e) => {
-				return Err(anyhow::anyhow!("Error parsing notified notebook number {e:?}"));
-			},
-		};
+		loop {
+			let notification = self.listener.recv().await?;
+			let notebook_number = match notification.payload().parse() {
+				Ok(notebook_number) => notebook_number,
+				Err(e) => {
+					tracing::error!(
+						"Ignoring malformed audit failure notification payload {:?}: {:?}",
+						notification.payload(),
+						e
+					);
+					continue;
+				},
+			};
 
+			self.notify_failed_audit(notebook_number)?;
+			return Ok(notebook_number);
+		}
+	}
+
+	pub(crate) async fn reconnect(
+		&mut self,
+		delay: Duration,
+	) -> anyhow::Result<Option<NotebookNumber>> {
+		loop {
+			match self.try_reconnect().await {
+				Ok(notebook_number) => return Ok(notebook_number),
+				Err(e) => {
+					tracing::error!("Error reconnecting audit failure listener {:?}", e);
+					if is_closed_pool_error(&e) {
+						return Err(e);
+					}
+
+					tokio::time::sleep(delay).await;
+				},
+			}
+		}
+	}
+
+	async fn try_reconnect(&mut self) -> anyhow::Result<Option<NotebookNumber>> {
+		self.listener = Self::connect_listener(&self.pool).await?;
+
+		if let Some(failure) =
+			NotebookAuditFailureStore::has_unresolved_audit_failure(&self.pool).await?
+		{
+			let notebook_number = failure.notebook_number as NotebookNumber;
+			self.notify_failed_audit(notebook_number)?;
+			return Ok(Some(notebook_number));
+		}
+
+		Ok(None)
+	}
+
+	fn notify_failed_audit(&self, notebook_number: NotebookNumber) -> anyhow::Result<()> {
 		self.failed_audits_notification.notify(|| Ok(notebook_number)).map_err(
 			|e: anyhow::Error| anyhow::anyhow!("Error sending failed audits notification {e:?}"),
 		)?;
-		Ok(notebook_number)
+		Ok(())
 	}
 }
 
@@ -100,5 +152,53 @@ impl NotebookAuditFailureStore {
 		.fetch_optional(db)
 		.await?;
 		Ok(result)
+	}
+}
+
+fn is_closed_pool_error(error: &anyhow::Error) -> bool {
+	error
+		.chain()
+		.filter_map(|source| source.downcast_ref::<SqlxError>())
+		.any(|source| matches!(source, SqlxError::PoolClosed))
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crate::stores::notebook_header::NotebookHeaderStore;
+	use futures::StreamExt;
+
+	#[sqlx::test]
+	async fn test_reconnect_publishes_existing_audit_failure(pool: PgPool) -> anyhow::Result<()> {
+		let (sender, stream) = AuditFailureStream::channel();
+		let mut listener = AuditFailureListener::connect(pool.clone(), sender).await?;
+		let mut subscription = stream.subscribe(10);
+
+		let mut tx = pool.begin().await?;
+		NotebookHeaderStore::create(&mut tx, 1, 1, 1, 1).await?;
+		tx.commit().await?;
+
+		let mut db = pool.acquire().await?;
+		NotebookAuditFailureStore::record(
+			&mut db,
+			1,
+			H256::from([1u8; 32]),
+			"failure".to_string(),
+			1,
+		)
+		.await?;
+
+		let notebook_number = listener.reconnect(Duration::ZERO).await?;
+		assert_eq!(notebook_number, Some(1));
+
+		let published_notebook = tokio::time::timeout(Duration::from_secs(1), subscription.next())
+			.await?
+			.expect("should publish the unresolved audit failure");
+		assert_eq!(published_notebook, 1);
+		assert!(tokio::time::timeout(Duration::from_millis(100), subscription.next())
+			.await
+			.is_err());
+
+		Ok(())
 	}
 }
