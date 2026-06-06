@@ -661,10 +661,13 @@ declare module '@polkadot/api-base/types/errors' {
       BlockBodyHashTreeRootFailed: AugmentedError<ApiType>;
       BLSPreparePublicKeysFailed: AugmentedError<ApiType>;
       BLSVerificationFailed: AugmentedError<ApiType>;
+      ExecutionHeaderAnchorAlreadyImported: AugmentedError<ApiType>;
+      ExecutionHeaderAnchorNotHistorical: AugmentedError<ApiType>;
       ExpectedFinalizedHeaderNotStored: AugmentedError<ApiType>;
       ForkDataHashTreeRootFailed: AugmentedError<ApiType>;
       Halted: AugmentedError<ApiType>;
       HeaderHashTreeRootFailed: AugmentedError<ApiType>;
+      InvalidBackfillHeaderRoot: AugmentedError<ApiType>;
       InvalidExecutionHeaderProof: AugmentedError<ApiType>;
       /**
        * The gap between finalized headers is larger than the retained historical window.

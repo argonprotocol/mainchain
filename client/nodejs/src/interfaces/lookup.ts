@@ -1,7 +1,4 @@
 // Auto-generated via `yarn polkadot-types-from-defs`, do not edit
-/* eslint-disable */
-
-/* eslint-disable sort-keys */
 
 export default {
   /**
@@ -1484,6 +1481,12 @@ export default {
         blockHash: 'H256',
         blockNumber: 'u64',
       },
+      ExecutionHeaderAnchorBackfilled: {
+        beaconRoot: 'H256',
+        slot: 'u64',
+        blockHash: 'H256',
+        blockNumber: 'u64',
+      },
       SyncCommitteeUpdated: {
         period: 'u64',
       },
@@ -2729,7 +2732,11 @@ export default {
       submit: {
         update: 'PalletEthereumVerifierUpdate',
       },
-      __Unused2: 'Null',
+      import_trusted_execution_header_backfill: {
+        expectedBeaconRoot: 'H256',
+        header: 'SnowbridgeBeaconPrimitivesBeaconHeader',
+        executionHeaderProof: 'PalletEthereumVerifierExecutionHeaderProof',
+      },
       set_operating_mode: {
         mode: 'PalletEthereumVerifierBasicOperatingMode',
       },
@@ -3879,6 +3886,7 @@ export default {
     timestampMillis: 'Compact<u64>',
     blockHash: 'H256',
     parentHash: 'H256',
+    stateRoot: 'H256',
     receiptsRoot: 'H256',
   },
   /**
@@ -3936,6 +3944,9 @@ export default {
       'InvalidSyncCommitteeMerkleProof',
       'InvalidExecutionHeaderProof',
       'InvalidFinalizedHeaderGap',
+      'InvalidBackfillHeaderRoot',
+      'ExecutionHeaderAnchorAlreadyImported',
+      'ExecutionHeaderAnchorNotHistorical',
       'HeaderHashTreeRootFailed',
       'BlockBodyHashTreeRootFailed',
       'SyncCommitteeHashTreeRootFailed',

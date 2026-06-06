@@ -5,10 +5,10 @@ import type {
   EthereumBeaconGenesisResponse,
   EthereumBeaconHeaderDetailsResponse,
   EthereumLightClientBootstrapResponse,
-  EthereumLightClientHeader,
   EthereumLightClientUpdate,
   EthereumLightClientUpdatesResponse,
 } from './EthereumBeaconTypes';
+import { buildExecutionHeaderProof, getBeaconJson } from './EthereumBeaconApi';
 import type { ArgonClient } from './index';
 import { type Hex, hexToBytes } from 'viem';
 
@@ -299,13 +299,6 @@ export async function getEthereumBeaconSyncState(
   };
 }
 
-function buildExecutionHeaderProof(finalizedHeader: EthereumLightClientHeader) {
-  return {
-    executionHeader: buildExecutionPayloadHeader(finalizedHeader.execution),
-    executionBranch: finalizedHeader.execution_branch.map(witness => witness.toLowerCase() as Hex),
-  };
-}
-
 function buildFork(spec: Record<string, string>, name: string) {
   const version = spec[`${name}_FORK_VERSION`];
   const epoch = spec[`${name}_FORK_EPOCH`];
@@ -368,38 +361,6 @@ function updateCarriesCommitteeForPeriod(
   return attestedPeriod === requiredCommitteePeriod && finalizedPeriod === requiredCommitteePeriod;
 }
 
-function buildExecutionPayloadHeader(header: EthereumLightClientHeader['execution']) {
-  const executionHeader = {
-    parentHash: header.parent_hash,
-    feeRecipient: header.fee_recipient,
-    stateRoot: header.state_root,
-    receiptsRoot: header.receipts_root,
-    logsBloom: header.logs_bloom,
-    prevRandao: header.prev_randao,
-    blockNumber: header.block_number,
-    gasLimit: header.gas_limit,
-    gasUsed: header.gas_used,
-    timestamp: header.timestamp,
-    extraData: header.extra_data,
-    baseFeePerGas: header.base_fee_per_gas,
-    blockHash: header.block_hash,
-    transactionsRoot: header.transactions_root,
-    withdrawalsRoot: header.withdrawals_root,
-  };
-
-  if (header.blob_gas_used && header.excess_blob_gas) {
-    return {
-      Deneb: {
-        ...executionHeader,
-        blobGasUsed: header.blob_gas_used,
-        excessBlobGas: header.excess_blob_gas,
-      },
-    };
-  }
-
-  return { Capella: executionHeader };
-}
-
 function detectBeaconPreset(spec: Record<string, string>): BeaconPreset {
   return spec.SLOTS_PER_HISTORICAL_ROOT === '64' ? 'minimal' : 'mainnet';
 }
@@ -420,7 +381,7 @@ async function getBeaconNetworkParams(
 
   const beaconNetworkParams = await paramsPromise;
 
-  if (beaconNetworkParams.preset !== expectedPreset) {
+  if (expectedPreset && beaconNetworkParams.preset !== expectedPreset) {
     throw new Error(
       `Beacon preset mismatch: chain expects ${expectedPreset}, but endpoint reports ${beaconNetworkParams.preset}`,
     );
@@ -517,20 +478,6 @@ function hasSyncCommitteeSupermajority(syncCommitteeBits: string) {
   }, 0);
 
   return participants * 3 >= totalBits * 2;
-}
-
-async function getBeaconJson<T>(beaconApiUrl: string, path: string): Promise<T> {
-  const response = await fetch(
-    new URL(path, beaconApiUrl.endsWith('/') ? beaconApiUrl : `${beaconApiUrl}/`),
-  );
-
-  if (!response.ok) {
-    throw new Error(
-      `Beacon API request failed for ${path}: ${response.status} ${response.statusText}`,
-    );
-  }
-
-  return (await response.json()) as T;
 }
 
 function isRetryableBeaconLightClientError(error: unknown) {

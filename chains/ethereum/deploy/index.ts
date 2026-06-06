@@ -4,6 +4,7 @@ import { join, resolve } from 'node:path';
 import { Interface, getAddress } from 'ethers';
 import { getClient } from '@argonprotocol/mainchain';
 import { contractsRoot, repoRoot } from './src/hardhat.js';
+import { parseArgs } from './src/cli.js';
 import {
   collectVaultOperatorsByEffectiveCouncilSigner,
   deriveRuntimeCouncilSnapshot,
@@ -372,28 +373,6 @@ function getRequiredArg(argKey: string, envKey: string) {
   }
 
   return raw.trim();
-}
-
-function parseArgs(argv: string[]) {
-  const parsed: Record<string, string> = {};
-
-  for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index];
-    if (!arg.startsWith('--')) continue;
-
-    const key = arg.slice(2);
-    const next = argv[index + 1];
-
-    if (!next || next.startsWith('--')) {
-      parsed[key] = 'true';
-      continue;
-    }
-
-    parsed[key] = next;
-    index += 1;
-  }
-
-  return parsed;
 }
 
 void main().catch(error => {

@@ -54,6 +54,7 @@ import type {
   PalletCrosschainTransferSourceChain,
   PalletEthereumVerifierBasicOperatingMode,
   PalletEthereumVerifierCheckpointUpdate,
+  PalletEthereumVerifierExecutionHeaderProof,
   PalletEthereumVerifierForkVersions,
   PalletEthereumVerifierUpdate,
   PalletMultisigTimepoint,
@@ -61,6 +62,7 @@ import type {
   PalletOperationalAccountsRegistration,
   PalletPriceIndexPriceIndex,
   PalletVaultsVaultConfig,
+  SnowbridgeBeaconPrimitivesBeaconHeader,
   SpConsensusGrandpaEquivocationProof,
   SpCoreVoid,
   SpWeightsWeightV2Weight,
@@ -700,6 +702,22 @@ declare module '@polkadot/api-base/types/submittable' {
             | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
         [PalletEthereumVerifierCheckpointUpdate, PalletEthereumVerifierForkVersions]
+      >;
+      importTrustedExecutionHeaderBackfill: AugmentedSubmittable<
+        (
+          expectedBeaconRoot: H256 | string | Uint8Array,
+          header:
+            | SnowbridgeBeaconPrimitivesBeaconHeader
+            | { slot?: any; proposerIndex?: any; parentRoot?: any; stateRoot?: any; bodyRoot?: any }
+            | string
+            | Uint8Array,
+          executionHeaderProof:
+            | PalletEthereumVerifierExecutionHeaderProof
+            | { executionHeader?: any; executionBranch?: any }
+            | string
+            | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [H256, SnowbridgeBeaconPrimitivesBeaconHeader, PalletEthereumVerifierExecutionHeaderProof]
       >;
       /**
        * Halt or resume all pallet operations. May only be called by root.

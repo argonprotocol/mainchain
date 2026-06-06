@@ -12,9 +12,10 @@ use crate::{
 	sync_committee_sum,
 	types::{CheckpointUpdate, ExecutionHeaderProof, Update},
 	verify_merkle_branch, BasicOperatingMode, BeaconHeader, Error, ExecutionHeaderAnchor,
-	ExecutionHeaderAnchors, ExecutionProof, FinalizedBeaconHeaderState, FinalizedBeaconState, Fork,
-	ForkVersionSchedule, ForkVersions, LatestFinalizedBlockRoot, LatestSyncCommitteeUpdatePeriod,
-	NextSyncCommittee, SyncCommitteePrepared,
+	ExecutionHeaderAnchors, ExecutionHeaderAnchorsByBlockNumber, ExecutionProof,
+	FinalizedBeaconHeaderState, FinalizedBeaconState, Fork, ForkVersionSchedule, ForkVersions,
+	LatestExecutionHeaderAnchorBlockHash, LatestFinalizedBlockRoot,
+	LatestSyncCommitteeUpdatePeriod, NextSyncCommittee, SyncCommitteePrepared,
 };
 use alloy_consensus::{Header as AlloyHeader, Receipt, ReceiptEnvelope};
 use alloy_primitives::{Address, Bytes, Log, B256};
@@ -184,6 +185,7 @@ fn retained_anchor_verification_payload() -> (
 		timestamp_millis: 0,
 		block_hash: anchor_block_hash,
 		parent_hash: H256::repeat_byte(8),
+		state_root: H256::zero(),
 		receipts_root: inbound_fixture.event.proof.execution_proof.execution_header.receipts_root(),
 	};
 	let event_log = EthereumReceiptLog {
@@ -573,6 +575,187 @@ fn process_initial_checkpoint_with_invalid_execution_header_proof() {
 }
 
 #[test]
+fn import_trusted_execution_header_backfill_uses_finalized_header_retention() {
+	let evicted_root = H256::repeat_byte(0x44);
+	let evicted_anchor = ExecutionHeaderAnchor {
+		block_number: 100,
+		timestamp_millis: 100_000,
+		block_hash: H256::repeat_byte(0x45),
+		parent_hash: H256::repeat_byte(0x46),
+		state_root: H256::repeat_byte(0x47),
+		receipts_root: H256::repeat_byte(0x48),
+	};
+	let historical_checkpoint = Box::new(load_checkpoint_update_fixture());
+	let latest_checkpoint = Box::new(load_later_checkpoint_update_fixture());
+	let historical_root = historical_checkpoint.header.hash_tree_root().unwrap();
+	let latest_root = latest_checkpoint.header.hash_tree_root().unwrap();
+	let historical_anchor = ExecutionHeaderAnchor::from_payload_header(
+		&historical_checkpoint.execution_header_proof.execution_header,
+	);
+
+	new_tester().execute_with(|| {
+		assert_ok!(process_checkpoint_update(&latest_checkpoint));
+		let current_committee_before = <crate::CurrentSyncCommittee<Test>>::get();
+		let latest_anchor_hash_before = <LatestExecutionHeaderAnchorBlockHash<Test>>::get();
+
+		crate::FinalizedBeaconStateIndex::<Test>::set(0);
+		crate::FinalizedBeaconStateMapping::<Test>::insert(1, evicted_root);
+		crate::FinalizedBeaconState::<Test>::insert(
+			evicted_root,
+			FinalizedBeaconHeaderState {
+				slot: historical_checkpoint.header.slot.saturating_sub(32),
+			},
+		);
+		crate::FinalizedExecutionHeaderAnchor::<Test>::insert(
+			evicted_root,
+			evicted_anchor.block_hash,
+		);
+		ExecutionHeaderAnchors::<Test>::insert(evicted_anchor.block_hash, evicted_anchor);
+		ExecutionHeaderAnchorsByBlockNumber::<Test>::insert(
+			evicted_anchor.block_number.to_be_bytes(),
+			evicted_anchor,
+		);
+
+		assert_ok!(EthereumBeaconClient::import_trusted_execution_header_backfill(
+			RuntimeOrigin::root(),
+			historical_root,
+			historical_checkpoint.header,
+			historical_checkpoint.execution_header_proof.clone(),
+		));
+
+		assert_eq!(crate::FinalizedBeaconStateIndex::<Test>::get(), 1);
+		assert_eq!(crate::FinalizedBeaconStateMapping::<Test>::get(1), historical_root);
+		assert_eq!(crate::LatestFinalizedBlockRoot::<Test>::get(), latest_root);
+		assert!(<crate::CurrentSyncCommittee<Test>>::get() == current_committee_before);
+		assert_eq!(<LatestExecutionHeaderAnchorBlockHash<Test>>::get(), latest_anchor_hash_before);
+		assert_eq!(
+			ExecutionHeaderAnchors::<Test>::get(historical_anchor.block_hash),
+			Some(historical_anchor),
+		);
+		assert_eq!(
+			ExecutionHeaderAnchorsByBlockNumber::<Test>::get(
+				historical_anchor.block_number.to_be_bytes()
+			),
+			Some(historical_anchor),
+		);
+		assert_eq!(
+			crate::FinalizedExecutionHeaderAnchor::<Test>::get(historical_root),
+			Some(historical_anchor.block_hash),
+		);
+		assert_eq!(
+			crate::FinalizedBeaconState::<Test>::get(historical_root),
+			Some(FinalizedBeaconHeaderState { slot: historical_checkpoint.header.slot }),
+		);
+		assert_eq!(crate::FinalizedBeaconState::<Test>::get(evicted_root), None);
+		assert_eq!(ExecutionHeaderAnchors::<Test>::get(evicted_anchor.block_hash), None,);
+		assert_eq!(
+			ExecutionHeaderAnchorsByBlockNumber::<Test>::get(
+				evicted_anchor.block_number.to_be_bytes()
+			),
+			None,
+		);
+	});
+}
+
+#[test]
+fn import_trusted_execution_header_backfill_rejects_mismatched_beacon_root() {
+	let checkpoint = Box::new(load_checkpoint_update_fixture());
+
+	new_tester().execute_with(|| {
+		assert_ok!(process_checkpoint_update(&Box::new(load_later_checkpoint_update_fixture())));
+
+		assert_err!(
+			EthereumBeaconClient::import_trusted_execution_header_backfill(
+				RuntimeOrigin::root(),
+				H256::repeat_byte(0xaa),
+				checkpoint.header,
+				checkpoint.execution_header_proof.clone(),
+			),
+			Error::<Test>::InvalidBackfillHeaderRoot,
+		);
+	});
+}
+
+#[test]
+fn import_trusted_execution_header_backfill_rejects_duplicate_anchor() {
+	let historical_checkpoint = Box::new(load_checkpoint_update_fixture());
+	let latest_checkpoint = Box::new(load_later_checkpoint_update_fixture());
+	let historical_root = historical_checkpoint.header.hash_tree_root().unwrap();
+
+	new_tester().execute_with(|| {
+		assert_ok!(process_checkpoint_update(&latest_checkpoint));
+		assert_ok!(EthereumBeaconClient::import_trusted_execution_header_backfill(
+			RuntimeOrigin::root(),
+			historical_root,
+			historical_checkpoint.header,
+			historical_checkpoint.execution_header_proof.clone(),
+		));
+
+		assert_err!(
+			EthereumBeaconClient::import_trusted_execution_header_backfill(
+				RuntimeOrigin::root(),
+				historical_root,
+				historical_checkpoint.header,
+				historical_checkpoint.execution_header_proof.clone(),
+			),
+			Error::<Test>::ExecutionHeaderAnchorAlreadyImported,
+		);
+	});
+}
+
+#[test]
+fn import_trusted_execution_header_backfill_rejects_non_historical_anchor() {
+	let latest_checkpoint = Box::new(load_later_checkpoint_update_fixture());
+	let newer_update = Box::new(load_next_finalized_header_update_fixture());
+	let newer_root = newer_update.finalized_header.hash_tree_root().unwrap();
+	let newer_anchor = ExecutionHeaderAnchor::from_payload_header(
+		&newer_update.execution_header_proof.execution_header,
+	);
+	let latest_anchor = ExecutionHeaderAnchor::from_payload_header(
+		&latest_checkpoint.execution_header_proof.execution_header,
+	);
+
+	assert!(newer_anchor.block_number >= latest_anchor.block_number);
+
+	new_tester().execute_with(|| {
+		assert_ok!(process_checkpoint_update(&latest_checkpoint));
+
+		assert_err!(
+			EthereumBeaconClient::import_trusted_execution_header_backfill(
+				RuntimeOrigin::root(),
+				newer_root,
+				newer_update.finalized_header,
+				newer_update.execution_header_proof.clone(),
+			),
+			Error::<Test>::ExecutionHeaderAnchorNotHistorical,
+		);
+	});
+}
+
+#[test]
+fn import_trusted_execution_header_backfill_rejects_invalid_execution_proof() {
+	let historical_checkpoint = Box::new(load_checkpoint_update_fixture());
+	let latest_checkpoint = Box::new(load_later_checkpoint_update_fixture());
+	let historical_root = historical_checkpoint.header.hash_tree_root().unwrap();
+	let mut invalid_proof = historical_checkpoint.execution_header_proof.clone();
+	invalid_proof.execution_branch[0] = TEST_HASH.into();
+
+	new_tester().execute_with(|| {
+		assert_ok!(process_checkpoint_update(&latest_checkpoint));
+
+		assert_err!(
+			EthereumBeaconClient::import_trusted_execution_header_backfill(
+				RuntimeOrigin::root(),
+				historical_root,
+				historical_checkpoint.header,
+				invalid_proof,
+			),
+			Error::<Test>::InvalidExecutionHeaderProof,
+		);
+	});
+}
+
+#[test]
 fn process_minimal_bootstrap_checkpoint() {
 	let bootstrap = load_minimal_bootstrap_fixture("minimal-bootstrap.json");
 	let raw_sync_committee = bootstrap.current_sync_committee;
@@ -840,6 +1023,9 @@ fn submit_update_with_sync_committee_in_next_period() {
 	let checkpoint = Box::new(load_checkpoint_update_fixture());
 	let update = Box::new(load_sync_committee_update_fixture());
 	let next_update = Box::new(load_next_sync_committee_update_fixture());
+	let expected_anchor = ExecutionHeaderAnchor::from_payload_header(
+		&next_update.execution_header_proof.execution_header,
+	);
 	let update_period = compute_period(finalized_header(&update).slot);
 	let next_update_period = compute_period(finalized_header(&next_update).slot);
 	assert_eq!(update_period + 1, next_update_period);
@@ -856,6 +1042,10 @@ fn submit_update_with_sync_committee_in_next_period() {
 		let second_result = EthereumBeaconClient::submit(RuntimeOrigin::signed(1), next_update);
 		assert_ok!(second_result);
 		assert_eq!(second_result.unwrap().pays_fee, Pays::No);
+		assert_eq!(
+			<ExecutionHeaderAnchors<Test>>::get(expected_anchor.block_hash),
+			Some(expected_anchor),
+		);
 		let last_finalized_state =
 			FinalizedBeaconState::<Test>::get(LatestFinalizedBlockRoot::<Test>::get()).unwrap();
 		let last_synced_period = compute_period(last_finalized_state.slot);
@@ -1166,6 +1356,7 @@ fn verify_message_accepts_multiple_receipts_from_one_combined_proof() {
 		timestamp_millis: 0,
 		block_hash: H256::repeat_byte(0x44),
 		parent_hash: H256::repeat_byte(0x33),
+		state_root: H256::zero(),
 		receipts_root,
 	};
 	let first_event_log = EthereumReceiptLog {
@@ -1798,6 +1989,7 @@ fn verify_execution_block_proof_accepts_header_chain_to_anchor() {
 		timestamp_millis: 0,
 		block_hash: anchor_block_hash,
 		parent_hash: target_block_hash,
+		state_root: H256::zero(),
 		receipts_root: H256::repeat_byte(8),
 	};
 	let proof = EthereumExecutionBlockProof {
@@ -1829,6 +2021,7 @@ fn verify_execution_block_proof_accepts_multi_hop_header_chain_to_anchor() {
 		timestamp_millis: 0,
 		block_hash: anchor_block_hash,
 		parent_hash: intermediate_block_hash,
+		state_root: H256::zero(),
 		receipts_root: H256::repeat_byte(0x54),
 	};
 	let proof = EthereumExecutionBlockProof {
@@ -1951,6 +2144,7 @@ fn verify_receipt_logs_accepts_shared_header_chain_suffixes_for_multiple_blocks(
 		timestamp_millis: 0,
 		block_hash: anchor_block_hash,
 		parent_hash: newer_block_hash,
+		state_root: H256::zero(),
 		receipts_root: H256::repeat_byte(0x63),
 	};
 	let proof_batch = EthereumReceiptLogProofBatch::<ConstU32<2>, ConstU32<1>> {
@@ -2003,6 +2197,7 @@ fn verify_execution_block_proof_rejects_invalid_client_headers() {
 		timestamp_millis: 0,
 		block_hash: anchor_block_hash,
 		parent_hash: H256::repeat_byte(2),
+		state_root: H256::zero(),
 		receipts_root: H256::repeat_byte(8),
 	};
 	let proof = EthereumExecutionBlockProof {

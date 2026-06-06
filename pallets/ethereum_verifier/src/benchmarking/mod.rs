@@ -120,6 +120,32 @@ mod benchmarks {
 	}
 
 	#[benchmark]
+	fn import_trusted_execution_header_backfill() -> Result<(), BenchmarkError> {
+		let latest_checkpoint = benchmark_later_checkpoint_update()?;
+		let historical_checkpoint = benchmark_checkpoint_update()?;
+		let historical_block_root: H256 = historical_checkpoint.header.hash_tree_root().unwrap();
+		let historical_anchor = ExecutionHeaderAnchor::from_payload_header(
+			&historical_checkpoint.execution_header_proof.execution_header,
+		);
+		EthereumBeaconClient::<T>::process_checkpoint_update(
+			&latest_checkpoint,
+			&BenchmarkForkVersions::get(),
+		)?;
+
+		#[extrinsic_call]
+		import_trusted_execution_header_backfill(
+			RawOrigin::Root,
+			historical_block_root,
+			historical_checkpoint.header,
+			historical_checkpoint.execution_header_proof,
+		);
+
+		assert!(<ExecutionHeaderAnchors<T>>::contains_key(historical_anchor.block_hash));
+
+		Ok(())
+	}
+
+	#[benchmark]
 	fn submit_with_sync_committee() -> Result<(), BenchmarkError> {
 		let caller: T::AccountId = whitelisted_caller();
 		let checkpoint_update = benchmark_checkpoint_update()?;
@@ -165,6 +191,7 @@ mod benchmarks {
 			timestamp_millis: 123_000,
 			block_hash: H256::repeat_byte(0x20),
 			parent_hash: H256::repeat_byte(0x21),
+			state_root: H256::repeat_byte(0x22),
 			receipts_root: H256::repeat_byte(0x22),
 		};
 		<ExecutionHeaderAnchors<T>>::insert(anchor.block_hash, anchor);
@@ -189,6 +216,7 @@ mod benchmarks {
 			timestamp_millis: 123_000,
 			block_hash: H256::repeat_byte(0x30),
 			parent_hash: H256::repeat_byte(0x31),
+			state_root: H256::repeat_byte(0x32),
 			receipts_root: H256::repeat_byte(0x32),
 		};
 		<ExecutionHeaderAnchors<T>>::insert(anchor.block_hash, anchor);
@@ -324,6 +352,7 @@ fn build_gateway_proof_batch(
 		timestamp_millis: 0,
 		block_hash: H256::repeat_byte(0x80),
 		parent_hash: last_block_hash,
+		state_root: H256::repeat_byte(0x81),
 		receipts_root: H256::repeat_byte(0x81),
 	};
 

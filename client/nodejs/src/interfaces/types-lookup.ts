@@ -1843,6 +1843,13 @@ declare module '@polkadot/types/lookup' {
       readonly blockHash: H256;
       readonly blockNumber: u64;
     } & Struct;
+    readonly isExecutionHeaderAnchorBackfilled: boolean;
+    readonly asExecutionHeaderAnchorBackfilled: {
+      readonly beaconRoot: H256;
+      readonly slot: u64;
+      readonly blockHash: H256;
+      readonly blockNumber: u64;
+    } & Struct;
     readonly isSyncCommitteeUpdated: boolean;
     readonly asSyncCommitteeUpdated: {
       readonly period: u64;
@@ -1854,6 +1861,7 @@ declare module '@polkadot/types/lookup' {
     readonly type:
       | 'BeaconHeaderImported'
       | 'ExecutionHeaderAnchorImported'
+      | 'ExecutionHeaderAnchorBackfilled'
       | 'SyncCommitteeUpdated'
       | 'OperatingModeChanged';
   }
@@ -3224,11 +3232,21 @@ declare module '@polkadot/types/lookup' {
     readonly asSubmit: {
       readonly update: PalletEthereumVerifierUpdate;
     } & Struct;
+    readonly isImportTrustedExecutionHeaderBackfill: boolean;
+    readonly asImportTrustedExecutionHeaderBackfill: {
+      readonly expectedBeaconRoot: H256;
+      readonly header: SnowbridgeBeaconPrimitivesBeaconHeader;
+      readonly executionHeaderProof: PalletEthereumVerifierExecutionHeaderProof;
+    } & Struct;
     readonly isSetOperatingMode: boolean;
     readonly asSetOperatingMode: {
       readonly mode: PalletEthereumVerifierBasicOperatingMode;
     } & Struct;
-    readonly type: 'ForceCheckpoint' | 'Submit' | 'SetOperatingMode';
+    readonly type:
+      | 'ForceCheckpoint'
+      | 'Submit'
+      | 'ImportTrustedExecutionHeaderBackfill'
+      | 'SetOperatingMode';
   }
 
   /** @name PalletEthereumVerifierCheckpointUpdate (281) */
@@ -4526,6 +4544,7 @@ declare module '@polkadot/types/lookup' {
     readonly timestampMillis: Compact<u64>;
     readonly blockHash: H256;
     readonly parentHash: H256;
+    readonly stateRoot: H256;
     readonly receiptsRoot: H256;
   }
 
@@ -4577,6 +4596,9 @@ declare module '@polkadot/types/lookup' {
     readonly isInvalidSyncCommitteeMerkleProof: boolean;
     readonly isInvalidExecutionHeaderProof: boolean;
     readonly isInvalidFinalizedHeaderGap: boolean;
+    readonly isInvalidBackfillHeaderRoot: boolean;
+    readonly isExecutionHeaderAnchorAlreadyImported: boolean;
+    readonly isExecutionHeaderAnchorNotHistorical: boolean;
     readonly isHeaderHashTreeRootFailed: boolean;
     readonly isBlockBodyHashTreeRootFailed: boolean;
     readonly isSyncCommitteeHashTreeRootFailed: boolean;
@@ -4599,6 +4621,9 @@ declare module '@polkadot/types/lookup' {
       | 'InvalidSyncCommitteeMerkleProof'
       | 'InvalidExecutionHeaderProof'
       | 'InvalidFinalizedHeaderGap'
+      | 'InvalidBackfillHeaderRoot'
+      | 'ExecutionHeaderAnchorAlreadyImported'
+      | 'ExecutionHeaderAnchorNotHistorical'
       | 'HeaderHashTreeRootFailed'
       | 'BlockBodyHashTreeRootFailed'
       | 'SyncCommitteeHashTreeRootFailed'

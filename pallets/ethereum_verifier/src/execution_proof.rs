@@ -179,6 +179,7 @@ impl<T: Config> Pallet<T> {
 			// header chain is anchored to the actual encoded header contents.
 			block_hash: H256::from_slice(decoded.hash_slow().as_slice()),
 			parent_hash: H256::from_slice(decoded.parent_hash.as_slice()),
+			state_root: H256::from_slice(decoded.state_root.as_slice()),
 			receipts_root: H256::from_slice(decoded.receipts_root.as_slice()),
 		})
 	}
