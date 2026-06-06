@@ -25,6 +25,7 @@ pub use polkadot_sdk::*;
 pub mod config;
 pub mod execution_proof;
 pub mod functions;
+pub mod migrations;
 mod receipt;
 pub mod ring_buffer;
 pub mod types;
@@ -47,7 +48,7 @@ use argon_primitives::EthereumBeaconPreset;
 use frame_support::{
 	dispatch::{DispatchResult, Pays, PostDispatchInfo},
 	pallet_prelude::OptionQuery,
-	traits::{Get, IsSubType},
+	traits::{Get, IsSubType, StorageVersion},
 };
 use frame_system::ensure_signed;
 use snowbridge_beacon_primitives::{
@@ -83,6 +84,8 @@ pub mod pallet {
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
 
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
+
 	#[derive(scale_info::TypeInfo, codec::Encode, codec::Decode, codec::MaxEncodedLen)]
 	#[codec(mel_bound(T: Config))]
 	#[scale_info(skip_type_params(T))]
@@ -95,6 +98,7 @@ pub mod pallet {
 	}
 
 	#[pallet::pallet]
+	#[pallet::storage_version(STORAGE_VERSION)]
 	pub struct Pallet<T>(_);
 
 	#[pallet::config]
@@ -113,6 +117,12 @@ pub mod pallet {
 			slot: u64,
 		},
 		ExecutionHeaderAnchorImported {
+			block_hash: ExecutionBlockHash,
+			block_number: ExecutionBlockNumber,
+		},
+		ExecutionHeaderAnchorBackfilled {
+			beacon_root: H256,
+			slot: u64,
 			block_hash: ExecutionBlockHash,
 			block_number: ExecutionBlockNumber,
 		},
@@ -138,6 +148,9 @@ pub mod pallet {
 		InvalidExecutionHeaderProof,
 		/// The gap between finalized headers is larger than the retained historical window.
 		InvalidFinalizedHeaderGap,
+		InvalidBackfillHeaderRoot,
+		ExecutionHeaderAnchorAlreadyImported,
+		ExecutionHeaderAnchorNotHistorical,
 		HeaderHashTreeRootFailed,
 		BlockBodyHashTreeRootFailed,
 		SyncCommitteeHashTreeRootFailed,
@@ -281,6 +294,54 @@ pub mod pallet {
 			Self::apply_update(&update)
 		}
 
+		#[pallet::call_index(2)]
+		#[pallet::weight(T::WeightInfo::import_trusted_execution_header_backfill())]
+		pub fn import_trusted_execution_header_backfill(
+			origin: OriginFor<T>,
+			expected_beacon_root: H256,
+			header: BeaconHeader,
+			execution_header_proof: ExecutionHeaderProof,
+		) -> DispatchResult {
+			ensure_root(origin)?;
+
+			let header_root =
+				header.hash_tree_root().map_err(|_| Error::<T>::HeaderHashTreeRootFailed)?;
+			ensure!(header_root == expected_beacon_root, Error::<T>::InvalidBackfillHeaderRoot);
+
+			let anchor = Self::verify_execution_proof_for_header(&header, &execution_header_proof)?;
+			ensure!(
+				!ExecutionHeaderAnchors::<T>::contains_key(anchor.block_hash) &&
+					!ExecutionHeaderAnchorsByBlockNumber::<T>::contains_key(
+						Self::execution_header_anchor_scan_key(anchor.block_number),
+					),
+				Error::<T>::ExecutionHeaderAnchorAlreadyImported
+			);
+
+			let latest_anchor_block_hash = LatestExecutionHeaderAnchorBlockHash::<T>::get()
+				.ok_or(Error::<T>::NotBootstrapped)?;
+			let latest_anchor = ExecutionHeaderAnchors::<T>::get(latest_anchor_block_hash)
+				.ok_or(Error::<T>::ExpectedFinalizedHeaderNotStored)?;
+			ensure!(
+				anchor.block_number < latest_anchor.block_number,
+				Error::<T>::ExecutionHeaderAnchorNotHistorical
+			);
+
+			ExecutionHeaderAnchors::<T>::insert(anchor.block_hash, anchor);
+			ExecutionHeaderAnchorsByBlockNumber::<T>::insert(
+				Self::execution_header_anchor_scan_key(anchor.block_number),
+				anchor,
+			);
+			Self::store_finalized_header(header, anchor.block_hash, false)?;
+			Self::deposit_event(Event::ExecutionHeaderAnchorBackfilled {
+				beacon_root: header_root,
+				slot: header.slot,
+				block_hash: anchor.block_hash,
+				block_number: anchor.block_number,
+			});
+
+			Ok(())
+		}
+
 		/// Halt or resume all pallet operations. May only be called by root.
 		#[pallet::call_index(3)]
 		#[pallet::weight((T::DbWeight::get().reads_writes(1, 1), DispatchClass::Operational))]
@@ -358,7 +419,7 @@ pub mod pallet {
 				block_hash: anchor.block_hash,
 				block_number: anchor.block_number,
 			});
-			Self::store_finalized_header(update.header, anchor.block_hash)?;
+			Self::store_finalized_header(update.header, anchor.block_hash, true)?;
 
 			Ok(())
 		}
@@ -573,7 +634,7 @@ pub mod pallet {
 					block_hash: anchor.block_hash,
 					block_number: anchor.block_number,
 				});
-				Self::store_finalized_header(update.finalized_header, anchor.block_hash)?;
+				Self::store_finalized_header(update.finalized_header, anchor.block_hash, true)?;
 			}
 
 			Ok(PostDispatchInfo { actual_weight: Some(actual_weight), pays_fee })
@@ -601,6 +662,7 @@ pub mod pallet {
 		pub fn store_finalized_header(
 			header: BeaconHeader,
 			execution_header_block_hash: ExecutionBlockHash,
+			update_latest_finalized_root: bool,
 		) -> DispatchResult {
 			let slot = header.slot;
 			let header_root: H256 =
@@ -636,15 +698,17 @@ pub mod pallet {
 				header_root,
 				FinalizedBeaconHeaderState { slot },
 			);
-			LatestFinalizedBlockRoot::<T>::set(header_root);
 			FinalizedExecutionHeaderAnchor::<T>::insert(header_root, execution_header_block_hash);
 
-			tracing::info!(
-				target: LOG_TARGET,
-				root=%header_root,
-				%slot,
-				"💫 Updated latest finalized block."
-			);
+			if update_latest_finalized_root {
+				LatestFinalizedBlockRoot::<T>::set(header_root);
+				tracing::info!(
+					target: LOG_TARGET,
+					root=%header_root,
+					%slot,
+					"💫 Updated latest finalized block."
+				);
+			}
 
 			Self::deposit_event(Event::BeaconHeaderImported { block_hash: header_root, slot });
 

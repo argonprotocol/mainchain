@@ -35,6 +35,7 @@ use polkadot_sdk::frame_support::{traits::Get, weights::{Weight, constants::Rock
 /// Weight functions needed for ethereum_beacon_client.
 pub trait WeightInfo {
 	fn force_checkpoint() -> Weight;
+	fn import_trusted_execution_header_backfill() -> Weight;
 	fn submit() -> Weight;
 	fn submit_with_sync_committee() -> Weight;
 	fn provider_verify_receipt_logs(proof_blocks: u32, extra_activities: u32) -> Weight;
@@ -49,6 +50,12 @@ impl WeightInfo for () {
 			.saturating_add(Weight::from_parts(0, 3501))
 			.saturating_add(RocksDbWeight::get().reads(2))
 			.saturating_add(RocksDbWeight::get().writes(9))
+	}
+	fn import_trusted_execution_header_backfill() -> Weight {
+		Weight::from_parts(20_000_000_000_u64, 0)
+			.saturating_add(Weight::from_parts(0, 12_000))
+			.saturating_add(RocksDbWeight::get().reads(9))
+			.saturating_add(RocksDbWeight::get().writes(8))
 	}
 	fn submit() -> Weight {
 		Weight::from_parts(26_051_019_000_u64, 0)

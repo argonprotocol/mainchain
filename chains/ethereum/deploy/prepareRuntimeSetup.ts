@@ -12,6 +12,13 @@ import {
   type RuntimeSetupManifest,
 } from './src/runtimeSetup.js';
 import { deriveRuntimeCouncilSnapshot } from './src/council.js';
+import {
+  getOptionalArg,
+  getOptionalBigInt,
+  getRequiredArg,
+  parseArgs,
+  stringifyJson,
+} from './src/cli.js';
 
 const args = parseArgs(process.argv.slice(2));
 const execFileAsync = promisify(execFile);
@@ -259,57 +266,6 @@ async function assertInitialCouncilMatchesManifest(
       'The target Argon runtime council snapshot no longer matches the council used during bootstrap:deploy; redeploy the Ethereum bootstrap contracts from the current runtime state',
     );
   }
-}
-
-function getRequiredArg(rawArgs: Record<string, string>, key: string) {
-  const value = getOptionalArg(rawArgs, key);
-  if (!value) {
-    throw new Error(`Missing required --${key}`);
-  }
-
-  return value;
-}
-
-function getOptionalArg(rawArgs: Record<string, string>, key: string) {
-  return rawArgs[key]?.trim();
-}
-
-function getOptionalBigInt(rawArgs: Record<string, string>, key: string) {
-  const value = getOptionalArg(rawArgs, key);
-  if (!value) {
-    return undefined;
-  }
-
-  return BigInt(value);
-}
-
-function parseArgs(argv: string[]) {
-  const parsed: Record<string, string> = {};
-
-  for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index];
-    if (!arg.startsWith('--')) continue;
-
-    const key = arg.slice(2);
-    const next = argv[index + 1];
-    if (!next || next.startsWith('--')) {
-      parsed[key] = 'true';
-      continue;
-    }
-
-    parsed[key] = next;
-    index += 1;
-  }
-
-  return parsed;
-}
-
-function stringifyJson(value: unknown) {
-  return JSON.stringify(
-    value,
-    (_key, entry: unknown): unknown => (typeof entry === 'bigint' ? entry.toString() : entry),
-    2,
-  );
 }
 
 void main().catch(error => {

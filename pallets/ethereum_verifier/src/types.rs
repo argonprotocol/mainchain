@@ -377,6 +377,7 @@ pub struct ExecutionHeaderAnchor {
 	pub timestamp_millis: u64,
 	pub block_hash: ExecutionBlockHash,
 	pub parent_hash: ExecutionBlockHash,
+	pub state_root: H256,
 	pub receipts_root: ReceiptsRoot,
 }
 
@@ -388,6 +389,7 @@ impl ExecutionHeaderAnchor {
 				timestamp_millis: header.timestamp.saturating_mul(1_000),
 				block_hash: header.block_hash,
 				parent_hash: header.parent_hash,
+				state_root: header.state_root,
 				receipts_root: header.receipts_root,
 			},
 			VersionedExecutionPayloadHeader::Deneb(header) => Self {
@@ -395,6 +397,7 @@ impl ExecutionHeaderAnchor {
 				timestamp_millis: header.timestamp.saturating_mul(1_000),
 				block_hash: header.block_hash,
 				parent_hash: header.parent_hash,
+				state_root: header.state_root,
 				receipts_root: header.receipts_root,
 			},
 		}

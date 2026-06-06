@@ -54,6 +54,11 @@ export {
   buildGatewayActivityProofPayload,
   type EthereumGatewayActivityProofPayload,
 } from './EthereumGatewayActivityProof';
+export {
+  buildGatewayExecutionHeaderBackfill,
+  buildGatewayExecutionHeaderBackfills,
+  type EthereumExecutionHeaderBackfillPayload,
+} from './EthereumGatewayBackfill';
 export * from './EthereumBeaconSync';
 export type {
   EthereumExecutionClient,

@@ -365,7 +365,7 @@ function describeExtrinsic(
   };
 }
 
-function resolveRuntimeSetupDefaults(deploymentEnvironment?: string) {
+export function resolveRuntimeSetupDefaults(deploymentEnvironment?: string) {
   const normalizedDeploymentEnvironment = normalizeRuntimeSetupEnvironment(deploymentEnvironment);
   if (normalizedDeploymentEnvironment) {
     return PUBLIC_RUNTIME_SETUP_DEFAULTS[normalizedDeploymentEnvironment];

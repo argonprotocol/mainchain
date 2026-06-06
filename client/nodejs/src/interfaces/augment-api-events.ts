@@ -859,6 +859,11 @@ declare module '@polkadot/api-base/types/events' {
         [blockHash: H256, slot: u64],
         { blockHash: H256; slot: u64 }
       >;
+      ExecutionHeaderAnchorBackfilled: AugmentedEvent<
+        ApiType,
+        [beaconRoot: H256, slot: u64, blockHash: H256, blockNumber: u64],
+        { beaconRoot: H256; slot: u64; blockHash: H256; blockNumber: u64 }
+      >;
       ExecutionHeaderAnchorImported: AugmentedEvent<
         ApiType,
         [blockHash: H256, blockNumber: u64],

@@ -37,7 +37,7 @@ export type EthereumGatewayActivityProofPayload = {
   activities: EthereumGatewayActivity[];
 };
 
-type DiscoveredGatewayActivities = Pick<
+export type DiscoveredGatewayActivities = Pick<
   EthereumGatewayActivityProofPayload,
   'previousGatewayActivityNonce' | 'activities'
 >;
@@ -175,7 +175,7 @@ async function findFirstUncoveredActivityBlockLocatorIndex(
   return firstUncoveredIndex;
 }
 
-async function discoverGatewayActivities(
+export async function discoverGatewayActivities(
   client: IArgonQueryable,
   options: EthereumExecutionSource & {
     gatewayAddress: Hex;
@@ -466,7 +466,7 @@ async function selectArgonFinalizedExecutionHeader(
   );
 }
 
-async function loadRetainedExecutionHeaderAnchorAtOrAfterBlock(
+export async function loadRetainedExecutionHeaderAnchorAtOrAfterBlock(
   client: IArgonQueryable,
   earliestBlockNumber: bigint,
 ): Promise<ArgonFinalizedExecutionHeader | null> {
