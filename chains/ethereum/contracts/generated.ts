@@ -1368,7 +1368,6 @@ export const mintingGatewayAbi = [
       { name: 'blockNumber', internalType: 'uint64', type: 'uint64' },
       { name: 'startGatewayActivityNonce', internalType: 'uint64', type: 'uint64' },
       { name: 'endGatewayActivityNonce', internalType: 'uint64', type: 'uint64' },
-      { name: 'previousLocatorHash', internalType: 'bytes32', type: 'bytes32' },
       { name: 'activityRoot', internalType: 'bytes32', type: 'bytes32' },
     ],
     stateMutability: 'view',

@@ -20,7 +20,6 @@ export type MintingGatewayActivityBlockLocator = {
   blockNumber: bigint;
   startGatewayActivityNonce: bigint;
   endGatewayActivityNonce: bigint;
-  previousLocatorHash: Hex;
   activityRoot: Hex;
 };
 
@@ -516,14 +515,12 @@ export function hashMintingGatewayActivityBlockLocator(
         { type: 'uint64' },
         { type: 'uint64' },
         { type: 'bytes32' },
-        { type: 'bytes32' },
       ],
       [
         MINTING_GATEWAY_ACTIVITY_HASH_VERSION,
         locator.blockNumber,
         locator.startGatewayActivityNonce,
         locator.endGatewayActivityNonce,
-        locator.previousLocatorHash,
         locator.activityRoot,
       ],
     ),

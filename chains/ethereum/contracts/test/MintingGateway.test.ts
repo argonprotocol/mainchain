@@ -534,7 +534,6 @@ describe('MintingGateway', () => {
     expect(await gateway.latestActivityBlockLocatorIndex()).to.equal(1n);
     expect(locator.startGatewayActivityNonce).to.equal(1n);
     expect(locator.endGatewayActivityNonce).to.equal(1n);
-    expect(locator.previousLocatorHash).to.equal(ethers.ZeroHash);
     expect(locator.activityRoot).to.equal(
       appendMintingGatewayActivityRoot(
         ethers.ZeroHash as `0x${string}`,
@@ -1314,18 +1313,15 @@ describe('MintingGateway', () => {
     const activationLocator = await gateway.activityBlockLocators(1n);
     const locatorIndex = await gateway.latestActivityBlockLocatorIndex();
     const finalizationLocator = await gateway.activityBlockLocators(locatorIndex);
-    expect(finalizationLocator.previousLocatorHash).to.equal(
-      hashMintingGatewayActivityBlockLocator({
-        blockNumber: activationLocator.blockNumber,
-        startGatewayActivityNonce: activationLocator.startGatewayActivityNonce,
-        endGatewayActivityNonce: activationLocator.endGatewayActivityNonce,
-        previousLocatorHash: activationLocator.previousLocatorHash as `0x${string}`,
-        activityRoot: activationLocator.activityRoot as `0x${string}`,
-      }),
-    );
+    const activationLocatorHash = hashMintingGatewayActivityBlockLocator({
+      blockNumber: activationLocator.blockNumber,
+      startGatewayActivityNonce: activationLocator.startGatewayActivityNonce,
+      endGatewayActivityNonce: activationLocator.endGatewayActivityNonce,
+      activityRoot: activationLocator.activityRoot as `0x${string}`,
+    });
     expect(finalizationLocator.activityRoot).to.equal(
       appendMintingGatewayActivityRoot(
-        ethers.ZeroHash as `0x${string}`,
+        activationLocatorHash,
         hashMintingGatewayTransferOutOfArgonFinalizedActivity(hashContext, {
           transferId,
           token: (await argon.getAddress()) as `0x${string}`,
