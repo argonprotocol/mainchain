@@ -548,11 +548,8 @@ declare module '@polkadot/api-base/types/submittable' {
         [H256, U8aFixed, Compact<u128>, Compact<u128>]
       >;
       deactivateMintingAuthority: AugmentedSubmittable<
-        (
-          destinationSigningKey: H160 | string | Uint8Array,
-          signature: U8aFixed | string | Uint8Array,
-        ) => SubmittableExtrinsic<ApiType>,
-        [H160, U8aFixed]
+        (destinationSigningKey: H160 | string | Uint8Array) => SubmittableExtrinsic<ApiType>,
+        [H160]
       >;
       forceSetGlobalIssuanceCouncil: AugmentedSubmittable<
         (

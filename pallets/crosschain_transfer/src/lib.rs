@@ -564,8 +564,8 @@ pub mod pallet {
 		/// entered the queue.
 		#[codec(compact)]
 		pub activation_signature_repayment_quote: T::Balance,
-		/// Queue item carrying the authority's signer-keyed Ethereum deactivation while the local
-		/// state is already in `Deactivating`.
+		/// Queue item carrying the council-approved Ethereum deactivation while the local state is
+		/// already in `Deactivating`.
 		pub deactivation_approval_queue_nonce: Option<CouncilApprovalQueueNonce>,
 	}
 
@@ -846,7 +846,7 @@ pub mod pallet {
 			account_id: T::AccountId,
 			approval_queue_nonce: CouncilApprovalQueueNonce,
 		},
-		/// An operator queued the signer-authorized Ethereum deactivation for a Minting Authority.
+		/// An operator queued the council-approved Ethereum deactivation for a Minting Authority.
 		MintingAuthorityDeactivationQueued {
 			destination_chain: SourceChain,
 			destination_signing_key: H160,
@@ -997,8 +997,7 @@ pub mod pallet {
 		/// The operator does not have enough remaining committed Argonot collateral for this
 		/// Minting Authority.
 		InsufficientCommittedArgonotCollateral,
-		/// The provided signer-authorized deactivation signature did not match the expected
-		/// Minting Authority signing key.
+		/// Reserved legacy error for invalid signer-keyed deactivation signatures.
 		InvalidMintingAuthorityDeactivationSignature,
 		/// The council-managed Argonot floor could not be determined from current pricing.
 		InvalidMicrogonsPerArgonot,
@@ -1634,10 +1633,9 @@ pub mod pallet {
 		pub fn deactivate_minting_authority(
 			origin: OriginFor<T>,
 			destination_signing_key: H160,
-			signature: KeccakSignature,
 		) -> DispatchResultWithPostInfo {
 			let account_id = ensure_signed(origin)?;
-			Self::do_deactivate_minting_authority(account_id, destination_signing_key, signature)
+			Self::do_deactivate_minting_authority(account_id, destination_signing_key)
 		}
 
 		#[pallet::call_index(11)]

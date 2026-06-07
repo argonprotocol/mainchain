@@ -671,6 +671,7 @@ it('decodes TransferToArgonStarted logs into gateway activity state', async () =
 
 it('decodes non-transfer gateway activity logs', async () => {
   const councilHash: Hex = `0x${'44'.repeat(32)}`;
+  const approvalHash: Hex = `0x${'66'.repeat(32)}`;
   const relayerArgonAccountId: Hex = `0x${'55'.repeat(32)}`;
   const topics = encodeEventTopics({
     abi: mintingGatewayAbi,
@@ -679,6 +680,7 @@ it('decodes non-transfer gateway activity logs', async () => {
   const data = encodeAbiParameters(
     [
       { name: 'councilHash', type: 'bytes32' },
+      { name: 'approvalHash', type: 'bytes32' },
       { name: 'relayerArgonAccountId', type: 'bytes32' },
       {
         name: 'gatewayState',
@@ -693,6 +695,7 @@ it('decodes non-transfer gateway activity logs', async () => {
     ],
     [
       councilHash,
+      approvalHash,
       relayerArgonAccountId,
       {
         gatewayActivityNonce: 9n,
@@ -711,6 +714,7 @@ it('decodes non-transfer gateway activity logs', async () => {
   ).toEqual({
     kind: MintingGatewayEvents.GlobalIssuanceCouncilRotated.name,
     councilHash,
+    approvalHash,
     relayerArgonAccountId,
     gatewayState: {
       gatewayActivityNonce: 9n,
@@ -871,10 +875,10 @@ it('builds a proveGatewayActivity payload from uncovered TransferToArgonStarted 
       }
 
       if (args?.[0] === 1n) {
-        return [10n, 1n, 2n];
+        return [10n, 1n, 2n, zeroHash, zeroHash];
       }
       if (args?.[0] === 2n) {
-        return [11n, 3n, 3n];
+        return [11n, 3n, 3n, zeroHash, zeroHash];
       }
 
       throw new Error(`Unexpected locator request ${String(args?.[0])}`);
@@ -1063,7 +1067,7 @@ it('builds a gateway activity payload from mixed gateway events', async () => {
       }
 
       if (args?.[0] === 1n) {
-        return [10n, 1n, 2n];
+        return [10n, 1n, 2n, zeroHash, zeroHash];
       }
 
       throw new Error(`Unexpected locator request ${String(args?.[0])}`);
@@ -1225,7 +1229,7 @@ it('splits one execution block into multiple proof blocks when the activity boun
       }
 
       if (args?.[0] === 1n) {
-        return [10n, 1n, 3n];
+        return [10n, 1n, 3n, zeroHash, zeroHash];
       }
 
       throw new Error(`Unexpected locator request ${String(args?.[0])}`);
@@ -1381,7 +1385,7 @@ it('resumes from the next gateway activity when a capped payload stops mid block
       }
 
       if (args?.[0] === 1n) {
-        return [10n, 1n, 3n];
+        return [10n, 1n, 3n, zeroHash, zeroHash];
       }
 
       throw new Error(`Unexpected locator request ${String(args?.[0])}`);
@@ -1578,10 +1582,10 @@ it('limits a gateway activity payload to the runtime proof-block bound', async (
       }
 
       if (args?.[0] === 1n) {
-        return [10n, 1n, 1n];
+        return [10n, 1n, 1n, zeroHash, zeroHash];
       }
       if (args?.[0] === 2n) {
-        return [11n, 2n, 2n];
+        return [11n, 2n, 2n, zeroHash, zeroHash];
       }
 
       throw new Error(`Unexpected locator request ${String(args?.[0])}`);
@@ -1762,10 +1766,10 @@ it('stops a gateway activity payload at the Argon finalized execution header', a
       }
 
       if (args?.[0] === 1n) {
-        return [10n, 1n, 1n];
+        return [10n, 1n, 1n, zeroHash, zeroHash];
       }
       if (args?.[0] === 2n) {
-        return [11n, 2n, 2n];
+        return [11n, 2n, 2n, zeroHash, zeroHash];
       }
 
       throw new Error(`Unexpected locator request ${String(args?.[0])}`);
@@ -2001,7 +2005,7 @@ it('scans forward to the first retained execution anchor at or after the target 
       }
 
       if (args?.[0] === 1n) {
-        return [10n, 1n, 1n];
+        return [10n, 1n, 1n, zeroHash, zeroHash];
       }
 
       throw new Error(`Unexpected locator request ${String(args?.[0])}`);
@@ -2177,10 +2181,10 @@ it('stops a gateway activity payload before a later proof chunk leaves the Argon
       }
 
       if (args?.[0] === 1n) {
-        return [10n, 1n, 1n];
+        return [10n, 1n, 1n, zeroHash, zeroHash];
       }
       if (args?.[0] === 2n) {
-        return [11n, 2n, 2n];
+        return [11n, 2n, 2n, zeroHash, zeroHash];
       }
 
       throw new Error(`Unexpected locator request ${String(args?.[0])}`);
@@ -2343,6 +2347,7 @@ function createGlobalIssuanceCouncilRotatedBlockLog(args: {
   blockHash: Hex;
   blockNumber: bigint;
   nonce: bigint;
+  approvalHash?: Hex;
 }): {
   address: Hex;
   topics: Hex[];
@@ -2360,6 +2365,7 @@ function createGlobalIssuanceCouncilRotatedBlockLog(args: {
   const data = encodeAbiParameters(
     [
       { name: 'councilHash', type: 'bytes32' },
+      { name: 'approvalHash', type: 'bytes32' },
       { name: 'relayerArgonAccountId', type: 'bytes32' },
       {
         name: 'gatewayState',
@@ -2374,6 +2380,7 @@ function createGlobalIssuanceCouncilRotatedBlockLog(args: {
     ],
     [
       `0x${'61'.repeat(32)}`,
+      args.approvalHash ?? `0x${'63'.repeat(32)}`,
       `0x${'62'.repeat(32)}`,
       {
         gatewayActivityNonce: args.nonce,

@@ -997,14 +997,6 @@ export const mintingGatewayAbi = [
   {
     type: 'error',
     inputs: [
-      { name: 'expectedSigner', internalType: 'address', type: 'address' },
-      { name: 'recoveredSigner', internalType: 'address', type: 'address' },
-    ],
-    name: 'InvalidMintingAuthorityDeactivationSigner',
-  },
-  {
-    type: 'error',
-    inputs: [
       { name: 'expected', internalType: 'uint64', type: 'uint64' },
       { name: 'provided', internalType: 'uint64', type: 'uint64' },
     ],
@@ -1032,7 +1024,6 @@ export const mintingGatewayAbi = [
     inputs: [{ name: 'kind', internalType: 'uint8', type: 'uint8' }],
     name: 'InvalidUpdateKind',
   },
-  { type: 'error', inputs: [], name: 'LatestGatewayUpdateCannotDeactivate' },
   { type: 'error', inputs: [], name: 'MigrationAlreadyCompleted' },
   {
     type: 'error',
@@ -1064,6 +1055,22 @@ export const mintingGatewayAbi = [
     type: 'error',
     inputs: [{ name: 'amount', internalType: 'uint256', type: 'uint256' }],
     name: 'RuntimeAmountOverflow',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'maxAllowed', internalType: 'uint256', type: 'uint256' },
+      { name: 'provided', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'TooManyGatewayUpdates',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'maxAllowed', internalType: 'uint256', type: 'uint256' },
+      { name: 'provided', internalType: 'uint256', type: 'uint256' },
+    ],
+    name: 'TooManyMintingAuthorizations',
   },
   {
     type: 'error',
@@ -1121,6 +1128,7 @@ export const mintingGatewayAbi = [
     anonymous: false,
     inputs: [
       { name: 'councilHash', internalType: 'bytes32', type: 'bytes32', indexed: false },
+      { name: 'approvalHash', internalType: 'bytes32', type: 'bytes32', indexed: false },
       { name: 'relayerArgonAccountId', internalType: 'bytes32', type: 'bytes32', indexed: false },
       {
         name: 'gatewayState',
@@ -1172,6 +1180,7 @@ export const mintingGatewayAbi = [
       { name: 'micronotCollateral', internalType: 'uint128', type: 'uint128', indexed: false },
       { name: 'coactivationCount', internalType: 'uint32', type: 'uint32', indexed: false },
       { name: 'sharedSignatureCount', internalType: 'uint32', type: 'uint32', indexed: false },
+      { name: 'approvalHash', internalType: 'bytes32', type: 'bytes32', indexed: false },
       { name: 'relayerArgonAccountId', internalType: 'bytes32', type: 'bytes32', indexed: false },
       {
         name: 'gatewayState',
@@ -1195,6 +1204,7 @@ export const mintingGatewayAbi = [
       { name: 'signingKey', internalType: 'address', type: 'address', indexed: true },
       { name: 'microgonCollateral', internalType: 'uint128', type: 'uint128', indexed: false },
       { name: 'micronotCollateral', internalType: 'uint128', type: 'uint128', indexed: false },
+      { name: 'approvalHash', internalType: 'bytes32', type: 'bytes32', indexed: false },
       { name: 'relayerArgonAccountId', internalType: 'bytes32', type: 'bytes32', indexed: false },
       {
         name: 'gatewayState',
@@ -1311,6 +1321,27 @@ export const mintingGatewayAbi = [
   {
     type: 'function',
     inputs: [],
+    name: 'ACTIVITY_HASH_VERSION',
+    outputs: [{ name: '', internalType: 'uint8', type: 'uint8' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'MAX_GATEWAY_UPDATES_PER_BATCH',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'MAX_MINTING_AUTHORIZATIONS_PER_TRANSFER',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
     name: 'RUNTIME_DECIMALS',
     outputs: [{ name: '', internalType: 'uint8', type: 'uint8' }],
     stateMutability: 'view',
@@ -1337,8 +1368,17 @@ export const mintingGatewayAbi = [
       { name: 'blockNumber', internalType: 'uint64', type: 'uint64' },
       { name: 'startGatewayActivityNonce', internalType: 'uint64', type: 'uint64' },
       { name: 'endGatewayActivityNonce', internalType: 'uint64', type: 'uint64' },
+      { name: 'previousLocatorHash', internalType: 'bytes32', type: 'bytes32' },
+      { name: 'activityRoot', internalType: 'bytes32', type: 'bytes32' },
     ],
     stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'activityBlockLocatorsMappingSlot',
+    outputs: [{ name: 'slot', internalType: 'uint256', type: 'uint256' }],
+    stateMutability: 'pure',
   },
   {
     type: 'function',
@@ -1858,6 +1898,7 @@ export type MintingGatewayActivityState = {
 
 export type MintingGatewayGlobalIssuanceCouncilRotated = {
   councilHash: Hex;
+  approvalHash: Hex;
   relayerArgonAccountId: Hex;
   gatewayState: MintingGatewayActivityState;
 };
@@ -1884,6 +1925,7 @@ export type MintingGatewayMintingAuthorityActivated = {
   micronotCollateral: bigint;
   coactivationCount: bigint;
   sharedSignatureCount: bigint;
+  approvalHash: Hex;
   relayerArgonAccountId: Hex;
   gatewayState: MintingGatewayActivityState;
 };
@@ -1892,6 +1934,7 @@ export type MintingGatewayMintingAuthorityDeactivated = {
   signingKey: Hex;
   microgonCollateral: bigint;
   micronotCollateral: bigint;
+  approvalHash: Hex;
   relayerArgonAccountId: Hex;
   gatewayState: MintingGatewayActivityState;
 };
@@ -2017,7 +2060,7 @@ export const MintingGatewayEvents = {
   },
   GlobalIssuanceCouncilRotated: {
     name: 'GlobalIssuanceCouncilRotated',
-    topic: '0xb3dbfeab9c5013403dc2f2300318b92643b1cb9323077d549b4f93bbddded963',
+    topic: '0xee5f0b6612e124988e865e18a4c4b0ec70d2f263708bb1e17f6de867fb1fe1c2',
   },
   GuardianUpdated: {
     name: 'GuardianUpdated',
@@ -2033,11 +2076,11 @@ export const MintingGatewayEvents = {
   },
   MintingAuthorityActivated: {
     name: 'MintingAuthorityActivated',
-    topic: '0xc0f81072946eba75f62302dad0fe56dd420d0b9d311e15b61bbe6e056c29908d',
+    topic: '0x9023f1e3e253ad361005d72868d790c37ca6f53a03d522ebc93dca42154e15bf',
   },
   MintingAuthorityDeactivated: {
     name: 'MintingAuthorityDeactivated',
-    topic: '0xf92f117a698345a1b681cf04280fb5da65a05a9ac88aaacad3e9ee273ce570fd',
+    topic: '0x0b4ee788c9bfc3c405fb19e3f6137bf14a218c0dbc53c13a6ed07a225d360ebc',
   },
   OwnershipTransferred: {
     name: 'OwnershipTransferred',

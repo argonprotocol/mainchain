@@ -502,21 +502,11 @@ mod benchmarks {
 
 		seed_chain_config::<T>(0x21);
 		seed_benchmark_vault::<T>(&caller, 7, 50_000u128);
-		let council_hash =
-			seed_active_council::<T>(&caller, benchmark_signer(9), 50_000u128.into())?;
+		seed_active_council::<T>(&caller, benchmark_signer(9), 50_000u128.into())?;
 		seed_active_minting_authority::<T>(caller.clone(), authority_signer, 1, 20_000u128.into())?;
-		let signature = benchmark_minting_authority_deactivation_signature::<T>(
-			authority_signer,
-			authority_signer,
-			council_hash,
-		)?;
 
 		#[extrinsic_call]
-		deactivate_minting_authority(
-			RawOrigin::Signed(caller.clone()),
-			authority_signer,
-			signature,
-		);
+		deactivate_minting_authority(RawOrigin::Signed(caller.clone()), authority_signer);
 
 		assert_eq!(
 			MintingAuthoritiesBySigner::<T>::get(authority_signer)
@@ -848,33 +838,6 @@ fn benchmark_transfer_collateral_signature<T: Config>(
 	);
 
 	Ok(benchmark_evm_message_signature(approval_hash, signer))
-}
-
-fn benchmark_minting_authority_deactivation_signature<T: Config>(
-	signer: H160,
-	destination_signing_key: H160,
-	approving_council_hash: H256,
-) -> Result<KeccakSignature, BenchmarkError> {
-	let queue_nonce = 1;
-	let mut queue_entry = CouncilApprovalQueueEntry::<T> {
-		approving_council_hash,
-		target: CouncilApprovalTargetId::MintingAuthorityDeactivation(destination_signing_key),
-		target_payload_hash: Pallet::<T>::hash_deactivate_minting_authority_target(
-			destination_signing_key,
-		),
-		due_frame_id: 10,
-		previous_approval_hash: H256::zero(),
-		approval_hash: H256::zero(),
-		approved_total_weight: T::Balance::default(),
-		signatures: BoundedBTreeMap::new(),
-	};
-	queue_entry.approval_hash = Pallet::<T>::hash_council_approval_queue_entry(
-		BENCHMARK_DESTINATION_CHAIN,
-		queue_nonce,
-		&queue_entry,
-	)
-	.map_err(|_| BenchmarkError::Stop("failed to hash benchmark deactivation queue entry"))?;
-	Ok(benchmark_evm_message_signature(queue_entry.approval_hash, signer))
 }
 
 fn benchmark_personal_signature(signer: H160) -> KeccakSignature {

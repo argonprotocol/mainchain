@@ -200,24 +200,8 @@ impl<T: Config> Pallet<T> {
 			destination_chain,
 			account_id,
 		)?;
-		let mut next_queue_nonce = last_synced_nonce.max(last_signed_nonce).saturating_add(1);
 
-		loop {
-			// Deactivation entries are signer-scoped cleanup follow-ons, not new work that should
-			// block this signer from reaching the next council-approved actionable queue item.
-			let Some(entry) = CouncilApprovalQueueByDestinationChainAndNonce::<T>::get(
-				destination_chain,
-				next_queue_nonce,
-			) else {
-				break;
-			};
-			if !matches!(entry.target, CouncilApprovalTargetId::MintingAuthorityDeactivation(_)) {
-				break;
-			}
-			next_queue_nonce = next_queue_nonce.saturating_add(1);
-		}
-
-		Some(next_queue_nonce)
+		Some(last_synced_nonce.max(last_signed_nonce).saturating_add(1))
 	}
 
 	pub(crate) fn reset_council_approval_cursor(

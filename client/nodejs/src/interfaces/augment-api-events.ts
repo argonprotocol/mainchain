@@ -661,7 +661,7 @@ declare module '@polkadot/api-base/types/events' {
         { sourceChain: PalletCrosschainTransferSourceChain; destinationSigningKey: H160 }
       >;
       /**
-       * An operator queued the signer-authorized Ethereum deactivation for a Minting Authority.
+       * An operator queued the council-approved Ethereum deactivation for a Minting Authority.
        **/
       MintingAuthorityDeactivationQueued: AugmentedEvent<
         ApiType,

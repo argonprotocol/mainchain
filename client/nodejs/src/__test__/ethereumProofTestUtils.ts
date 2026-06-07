@@ -110,6 +110,8 @@ export function createExecutionClient(args: {
     blockNumber: bigint;
     startGatewayActivityNonce: bigint;
     endGatewayActivityNonce: bigint;
+    previousLocatorHash?: Hex;
+    activityRoot?: Hex;
   }>;
 }): EthereumExecutionClient {
   const blocksByHash = Object.fromEntries(
@@ -145,6 +147,8 @@ export function createExecutionClient(args: {
         locator.blockNumber,
         locator.startGatewayActivityNonce,
         locator.endGatewayActivityNonce,
+        locator.previousLocatorHash ?? ZERO_HASH,
+        locator.activityRoot ?? ZERO_HASH,
       ] as const;
     },
     getLogs: async ({ fromBlock }: { fromBlock: bigint }) => {
@@ -163,13 +167,27 @@ export function createExecutionClient(args: {
 
       throw new Error(`Unexpected receipt request for ${hash}`);
     },
-    getBlock: async ({ blockHash }: { blockHash: Hex }) => {
-      const block = blocksByHash[blockHash.toLowerCase()];
-      if (block) {
-        return block;
+    getBlock: async ({ blockHash, blockNumber }: { blockHash?: Hex; blockNumber?: bigint }) => {
+      let block;
+      if (blockHash !== undefined) {
+        block = blocksByHash[blockHash.toLowerCase()];
+      } else if (blockNumber !== undefined) {
+        block = blocksByNumber[toHex(blockNumber).toLowerCase()];
       }
 
-      throw new Error(`Unexpected block request for ${blockHash}`);
+      if (block) {
+        return {
+          ...block,
+          number: BigInt(block.number),
+          gasLimit: BigInt(block.gasLimit),
+          gasUsed: BigInt(block.gasUsed),
+          timestamp: BigInt(block.timestamp),
+        };
+      }
+
+      throw new Error(
+        `Unexpected block request for ${blockHash ?? `blockNumber=${String(blockNumber)}`}`,
+      );
     },
     request: async ({
       method,
@@ -373,6 +391,7 @@ export function createGlobalIssuanceCouncilRotatedBlockLog(args: {
   transactionIndex: number;
   logIndex: number;
   nonce: bigint;
+  approvalHash?: Hex;
 }): {
   address: Hex;
   topics: Hex[];
@@ -390,6 +409,7 @@ export function createGlobalIssuanceCouncilRotatedBlockLog(args: {
   const data = encodeAbiParameters(
     [
       { name: 'councilHash', type: 'bytes32' },
+      { name: 'approvalHash', type: 'bytes32' },
       { name: 'relayerArgonAccountId', type: 'bytes32' },
       {
         name: 'gatewayState',
@@ -404,6 +424,7 @@ export function createGlobalIssuanceCouncilRotatedBlockLog(args: {
     ],
     [
       repeatHex('61', 32),
+      args.approvalHash ?? repeatHex('63', 32),
       repeatHex('62', 32),
       {
         gatewayActivityNonce: args.nonce,
