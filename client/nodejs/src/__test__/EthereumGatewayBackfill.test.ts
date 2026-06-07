@@ -44,9 +44,17 @@ it('builds a historical checkpoint backfill payload for the first uncovered gate
   });
 
   globalThis.fetch = createFetch({
+    'https://beacon.example/eth/v1/beacon/genesis': {
+      data: {
+        genesis_time: '0',
+        genesis_fork_version: '0x00000000',
+        genesis_validators_root: repeatHex('01', 32),
+      },
+    },
     'https://beacon.example/eth/v1/config/spec': {
       data: {
         SLOTS_PER_EPOCH: '32',
+        SECONDS_PER_SLOT: '1',
       },
     },
     'https://beacon.example/eth/v1/beacon/headers?slot=96': createHeaderAtSlotResponse(
@@ -225,9 +233,17 @@ it('lists only the missing backfills for uncovered gateway locator blocks', asyn
   });
 
   globalThis.fetch = createFetch({
+    'https://beacon.example/eth/v1/beacon/genesis': {
+      data: {
+        genesis_time: '0',
+        genesis_fork_version: '0x00000000',
+        genesis_validators_root: repeatHex('01', 32),
+      },
+    },
     'https://beacon.example/eth/v1/config/spec': {
       data: {
         SLOTS_PER_EPOCH: '32',
+        SECONDS_PER_SLOT: '1',
       },
     },
     'https://beacon.example/eth/v1/beacon/headers?slot=160': createHeaderAtSlotResponse(
@@ -407,6 +423,18 @@ function createFetch(responses: Record<string, unknown>) {
     const body = responses[url];
 
     if (!body) {
+      if (
+        url.includes('/eth/v1/beacon/headers?slot=') ||
+        url.includes('/eth/v1/beacon/light_client/bootstrap/')
+      ) {
+        return {
+          ok: false,
+          json: async () => ({}),
+          status: 404,
+          statusText: 'Not Found',
+        } as Response;
+      }
+
       throw new Error(`Unexpected fetch: ${url}`);
     }
 

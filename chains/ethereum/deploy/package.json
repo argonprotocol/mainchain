@@ -5,12 +5,12 @@
   "type": "module",
   "scripts": {
     "bootstrap:deploy": "node --import tsx index.ts",
-    "bootstrap:prepare-gateway-backfills": "node --import tsx prepareGatewayBackfills.ts",
     "bootstrap:prepare-runtime-setup": "node --import tsx prepareRuntimeSetup.ts",
     "build": "tsc --noEmit",
     "etherscan:output-files": "node --import tsx outputEtherscanFiles.ts",
     "gas:measure": "node --import tsx measure.ts",
     "gateway-backfill:prepare": "node --import tsx prepareGatewayBackfills.ts",
+    "prepare:gateway-upgrade": "node --import tsx prepareMintingGatewayUpgrade.ts",
     "pretest": "tsc --noEmit",
     "pretest:ci": "tsc --noEmit",
     "runtime-setup:prepare": "node --import tsx prepareRuntimeSetup.ts",

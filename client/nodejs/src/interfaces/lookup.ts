@@ -1,4 +1,7 @@
 // Auto-generated via `yarn polkadot-types-from-defs`, do not edit
+/* eslint-disable */
+
+/* eslint-disable sort-keys */
 
 export default {
   /**
@@ -2931,7 +2934,6 @@ export default {
       },
       deactivate_minting_authority: {
         destinationSigningKey: 'H160',
-        signature: '[u8;65]',
       },
       transfer_out: {
         destinationChain: 'PalletCrosschainTransferSourceChain',

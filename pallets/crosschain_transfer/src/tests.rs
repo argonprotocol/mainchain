@@ -403,33 +403,6 @@ pub(super) fn minting_authority_approval_signature(
 	council_signing_pair.sign(signable_message.as_slice())
 }
 
-pub(super) fn minting_authority_deactivation_signature(
-	signing_pair: &KeccakPair,
-	queue_nonce: CouncilApprovalQueueNonce,
-	signing_key: H160,
-	previous_approval_hash: H256,
-) -> sp_core::ecdsa::KeccakSignature {
-	let approval_hash = CrosschainTransfer::hash_council_approval_queue_entry(
-		SourceChain::Ethereum,
-		queue_nonce,
-		&CouncilApprovalQueueEntry::<Test> {
-			approving_council_hash: H256::zero(),
-			target: CouncilApprovalTargetId::MintingAuthorityDeactivation(signing_key),
-			target_payload_hash: CrosschainTransfer::hash_deactivate_minting_authority_target(
-				signing_key,
-			),
-			due_frame_id: 0,
-			previous_approval_hash,
-			approval_hash: H256::zero(),
-			approved_total_weight: 0,
-			signatures: BoundedBTreeMap::new(),
-		},
-	)
-	.expect("deactivation queue hash should be computable in tests");
-
-	signing_pair.sign(CrosschainTransfer::evm_signed_message(approval_hash).as_slice())
-}
-
 pub(super) fn configure_single_member_ethereum_council(
 	council_account: TestAccountId,
 	vault_id: u32,
@@ -539,6 +512,12 @@ pub(super) fn activate_test_minting_authority(
 		SourceChain::Ethereum,
 		bounded_vec![minting_authority_approval_signature(council_pair, approval_queue_nonce,)],
 	));
+	let approval_hash = CouncilApprovalQueueByDestinationChainAndNonce::<Test>::get(
+		SourceChain::Ethereum,
+		approval_queue_nonce,
+	)
+	.expect("activation queue entry should exist before proving the activation")
+	.approval_hash;
 
 	let burn_account = CrosschainTransfer::burn_account(SourceChain::Ethereum);
 	let previous_gateway_activity_nonce =
@@ -561,6 +540,7 @@ pub(super) fn activate_test_minting_authority(
 			data.extend_from_slice(&u128_word(micronot_collateral));
 			data.extend_from_slice(&u64_word(1));
 			data.extend_from_slice(&u64_word(1));
+			data.extend_from_slice(approval_hash.as_bytes());
 			data.extend_from_slice(&destination_bytes(&operator_account));
 			data.extend_from_slice(&u64_word(gateway_activity_nonce));
 			data.extend_from_slice(&u64_word(approval_queue_nonce));

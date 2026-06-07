@@ -4,6 +4,7 @@ This workspace owns the operator-side Ethereum bootstrap flow:
 
 - `bootstrap:deploy`
 - `bootstrap:prepare-runtime-setup`
+- `prepare:gateway-upgrade`
 - `gas:measure`
 - generated deployment manifests under `./<env>/`
 - checked-in final migration artifacts under `./mainnet/migration/`
@@ -14,6 +15,7 @@ Use:
 ```sh
 yarn workspace @argonprotocol/ethereum-deploy bootstrap:deploy ...
 yarn workspace @argonprotocol/ethereum-deploy bootstrap:prepare-runtime-setup ...
+yarn workspace @argonprotocol/ethereum-deploy prepare:gateway-upgrade --network testnet
 yarn workspace @argonprotocol/ethereum-deploy etherscan:output-files
 yarn workspace @argonprotocol/ethereum-deploy gas:measure
 ```
@@ -26,7 +28,8 @@ The contract source and tests remain in [`../contracts/`](../contracts/README.md
 
 Layout:
 
-- `./index.ts`, `./prepareRuntimeSetup.ts`, `./measure.ts`: CLI entrypoints
+- `./index.ts`, `./prepareRuntimeSetup.ts`, `./prepareMintingGatewayUpgrade.ts`, `./measure.ts`: CLI
+  entrypoints
 - `./outputEtherscanFiles.ts`: rewrite the Etherscan standard-json files and constructor args beside
   each deployment manifest
 - `./src/`: shared deploy logic

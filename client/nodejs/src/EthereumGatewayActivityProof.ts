@@ -1,4 +1,4 @@
-import { mintingGatewayAbi, type MintingGatewayActivityBlockLocator } from './EvmContracts';
+import { mintingGatewayAbi } from './EvmContracts';
 import type { ArgonClient, IArgonQueryable } from './index';
 import { getAddress, type Hex, toHex } from 'viem';
 import {
@@ -42,6 +42,14 @@ export type DiscoveredGatewayActivities = Pick<
   'previousGatewayActivityNonce' | 'activities'
 >;
 
+type MintingGatewayActivityBlockLocator = {
+  blockNumber: bigint;
+  startGatewayActivityNonce: bigint;
+  endGatewayActivityNonce: bigint;
+  previousLocatorHash?: Hex;
+  activityRoot?: Hex;
+};
+
 type GatewayActivityProofChunk = {
   activities: EthereumGatewayActivity[];
   locatorBlock: EthereumEventLocatorBlock;
@@ -60,6 +68,36 @@ type ArgonFinalizedExecutionHeaderPlan = {
 };
 
 type EthereumBlockLog = Awaited<ReturnType<EthereumExecutionClient['getLogs']>>[number];
+
+const activityBlockLocatorAbi = [
+  {
+    inputs: [{ name: '', type: 'uint64' }],
+    name: 'activityBlockLocators',
+    outputs: [
+      { name: 'blockNumber', type: 'uint64' },
+      { name: 'startGatewayActivityNonce', type: 'uint64' },
+      { name: 'endGatewayActivityNonce', type: 'uint64' },
+      { name: 'previousLocatorHash', type: 'bytes32' },
+      { name: 'activityRoot', type: 'bytes32' },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+] as const;
+
+const legacyActivityBlockLocatorAbi = [
+  {
+    inputs: [{ name: '', type: 'uint64' }],
+    name: 'activityBlockLocators',
+    outputs: [
+      { name: 'blockNumber', type: 'uint64' },
+      { name: 'startGatewayActivityNonce', type: 'uint64' },
+      { name: 'endGatewayActivityNonce', type: 'uint64' },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+] as const;
 
 export async function buildGatewayActivityProofPayload(
   client: IArgonQueryable & Pick<ArgonClient, 'consts'>,
@@ -132,17 +170,54 @@ async function loadActivityBlockLocator(
     return cached;
   }
 
-  const locator = await executionClient.readContract({
-    abi: mintingGatewayAbi,
-    address: gatewayAddress,
-    functionName: 'activityBlockLocators',
-    args: [locatorIndex],
-  });
-  const [blockNumber, startGatewayActivityNonce, endGatewayActivityNonce] = locator;
+  let locator: readonly [bigint, bigint, bigint, Hex, Hex];
+
+  try {
+    locator = await executionClient.readContract({
+      abi: activityBlockLocatorAbi,
+      address: gatewayAddress,
+      functionName: 'activityBlockLocators',
+      args: [locatorIndex],
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    if (
+      !message.includes('out of bounds') &&
+      !message.includes('Decode') &&
+      !message.includes('decode')
+    ) {
+      throw error;
+    }
+
+    const legacyLocator = await executionClient.readContract({
+      abi: legacyActivityBlockLocatorAbi,
+      address: gatewayAddress,
+      functionName: 'activityBlockLocators',
+      args: [locatorIndex],
+    });
+    const [blockNumber, startGatewayActivityNonce, endGatewayActivityNonce] = legacyLocator;
+    const loaded: MintingGatewayActivityBlockLocator = {
+      blockNumber,
+      startGatewayActivityNonce,
+      endGatewayActivityNonce,
+    };
+    cache.set(locatorIndex, loaded);
+    return loaded;
+  }
+
+  const [
+    blockNumber,
+    startGatewayActivityNonce,
+    endGatewayActivityNonce,
+    previousLocatorHash,
+    activityRoot,
+  ] = locator;
   const loaded: MintingGatewayActivityBlockLocator = {
     blockNumber,
     startGatewayActivityNonce,
     endGatewayActivityNonce,
+    previousLocatorHash,
+    activityRoot,
   };
   cache.set(locatorIndex, loaded);
   return loaded;

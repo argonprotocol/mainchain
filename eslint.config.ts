@@ -60,7 +60,14 @@ export default tseslint.config(
   },
   // Looser in tests and scripts
   {
-    files: ['**/*.test.ts', '**/__test__/**', 'scripts/**', '**/script/**', '**/test/**'],
+    files: [
+      '**/*.test.ts',
+      '**/__test__/**',
+      'scripts/**',
+      '**/script/**',
+      '**/test/**',
+      'testing/nodejs/src/**',
+    ],
     rules: {
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-call': 'off',

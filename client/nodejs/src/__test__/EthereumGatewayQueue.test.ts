@@ -4,7 +4,7 @@ import {
   encodeMintingGatewayMintingAuthorityActivationTarget,
   encodeMintingGatewayMintingAuthorityDeactivateTarget,
   hashMintingGatewayActivateMintingAuthorityApproval,
-  hashMintingGatewayMintingAuthorityDeactivation,
+  hashMintingGatewayGatewayUpdateApproval,
   type MintingGatewayMintingAuthorityActivationTarget,
 } from '../EvmContracts';
 import { getReadyEthereumGatewayUpdates } from '@argonprotocol/testing';
@@ -121,7 +121,6 @@ it('builds the contiguous ready activation prefix from the Argon approval queue'
     signers: [councilSignerA, councilSignerB],
     weights: [70n, 30n],
   });
-  expect(batch.pendingClearOutQueueNonces).toEqual([]);
   expect(batch.firstQueueNonce).toBe(1n);
   expect(batch.lastQueueNonce).toBe(1n);
   expect(batch.updates).toEqual([
@@ -175,29 +174,124 @@ it('returns no updates while the gateway is paused', async () => {
   const batch = await getReadyEthereumGatewayUpdates(client as any, gatewayClient as any);
 
   expect(batch.paused).toBe(true);
-  expect(batch.pendingClearOutQueueNonces).toEqual([]);
   expect(batch.updates).toEqual([]);
   expect(queueLookups).toBe(0);
 });
 
-it('relays ready deactivation clear-outs when a later activation anchors the batch', async () => {
+it('does not relay entries that only have a simple majority of council weight', async () => {
+  const gatewayAddress = repeatHex('11', 20);
+  const councilHash = repeatHex('22', 32);
+  const authoritySigningKey = repeatHex('33', 20);
+  const councilSignerA = repeatHex('44', 20);
+  const councilSignerB = repeatHex('55', 20);
+  const councilSignerC = repeatHex('66', 20);
+  const activationTarget: MintingGatewayMintingAuthorityActivationTarget = {
+    microgonCollateral: 1_500n,
+    micronotCollateral: 250n,
+    signingKey: authoritySigningKey,
+  };
+  const activationPayloadHash = hashMintingGatewayActivateMintingAuthority(
+    { chainId: 1n, gatewayAddress },
+    activationTarget,
+  );
+  const activationApprovalHash = hashMintingGatewayActivateMintingAuthorityApproval(
+    { chainId: 1n, gatewayAddress },
+    {
+      queueNonce: 1n,
+      approvingCouncilHash: councilHash,
+      previousUpdateHash: ZERO_HASH,
+      target: activationTarget,
+    },
+  );
+  const entry = {
+    approvingCouncilHash: hexCodec(councilHash),
+    target: {
+      isMintingAuthorityActivation: true,
+      asMintingAuthorityActivation: hexCodec(authoritySigningKey),
+      type: 'MintingAuthorityActivation',
+    },
+    targetPayloadHash: hexCodec(activationPayloadHash),
+    previousApprovalHash: hexCodec(ZERO_HASH),
+    approvalHash: hexCodec(activationApprovalHash),
+    approvedTotalWeight: amount(60n),
+    signatures: new Map([[hexCodec(councilSignerA), hexCodec(repeatHex('77', 65))]]),
+  };
+  const client = {
+    query: {
+      crosschainTransfer: {
+        chainConfigBySourceChain: async () =>
+          some({
+            isEvm: true,
+            asEvm: {
+              chainId: amount(1n),
+              gateway: hexCodec(gatewayAddress),
+              argonToken: hexCodec(repeatHex('aa', 20)),
+              argonotToken: hexCodec(repeatHex('bb', 20)),
+            },
+          }),
+        activeGlobalIssuanceCouncilByDestinationChain: async () => some(hexCodec(councilHash)),
+        globalIssuanceCouncilByHash: async () =>
+          some({
+            totalWeight: amount(100n),
+            members: new Map([
+              [hexCodec(councilSignerA), { weight: amount(60n) }],
+              [hexCodec(councilSignerB), { weight: amount(20n) }],
+              [hexCodec(councilSignerC), { weight: amount(20n) }],
+            ]),
+          }),
+        councilApprovalQueueByDestinationChainAndNonce: async (_chain: string, nonce: bigint) => {
+          if (nonce === 1n) return some(entry);
+          return none();
+        },
+        mintingAuthoritiesBySigner: async () =>
+          some({
+            destinationChain: { type: 'Ethereum' },
+            gatewayRemainingMicrogonCollateral: amount(activationTarget.microgonCollateral),
+            gatewayRemainingMicronotCollateral: amount(activationTarget.micronotCollateral),
+          }),
+      },
+    },
+  };
+  const gatewayClient = {
+    readContract: async ({ functionName }: { functionName: string }) => {
+      if (functionName === 'argonApprovalsNonce') return 0n;
+      if (functionName === 'argonApprovalsHash') return ZERO_HASH;
+      if (functionName === 'paused') return false;
+      throw new Error(`Unexpected function ${functionName}`);
+    },
+  };
+
+  const batch = await getReadyEthereumGatewayUpdates(client as any, gatewayClient as any);
+
+  expect(batch.updates).toEqual([]);
+  expect(batch.firstQueueNonce).toBeUndefined();
+  expect(batch.lastQueueNonce).toBeUndefined();
+});
+
+it('relays quorum-approved deactivations in the contiguous ready batch', async () => {
   const gatewayAddress = repeatHex('11', 20);
   const councilHash = repeatHex('22', 32);
   const authoritySigningKey = repeatHex('33', 20);
   const nextAuthoritySigningKey = repeatHex('34', 20);
   const councilSignerA = repeatHex('44', 20);
   const councilSignerB = repeatHex('55', 20);
-  const deactivationSignature = repeatHex('66', 65);
+  const deactivationPayload = encodeMintingGatewayMintingAuthorityDeactivateTarget({
+    signingKey: authoritySigningKey,
+  });
+  const deactivationPayloadHash = keccak256(deactivationPayload);
   const activationTarget: MintingGatewayMintingAuthorityActivationTarget = {
     microgonCollateral: 1_500n,
     micronotCollateral: 250n,
     signingKey: nextAuthoritySigningKey,
   };
-  const deactivationApprovalHash = hashMintingGatewayMintingAuthorityDeactivation(
+  const deactivationApprovalHash = hashMintingGatewayGatewayUpdateApproval(
     { chainId: 1n, gatewayAddress },
     {
       queueNonce: 1n,
-      target: { signingKey: authoritySigningKey },
+      approvingCouncilHash: councilHash,
+      kind: 2,
+      targetId: signingKeyTargetId(authoritySigningKey),
+      targetPayloadHash: deactivationPayloadHash,
       previousUpdateHash: ZERO_HASH,
     },
   );
@@ -222,15 +316,14 @@ it('relays ready deactivation clear-outs when a later activation anchors the bat
       asMintingAuthorityDeactivation: hexCodec(authoritySigningKey),
       type: 'MintingAuthorityDeactivation',
     },
-    targetPayloadHash: hexCodec(
-      keccak256(
-        encodeMintingGatewayMintingAuthorityDeactivateTarget({ signingKey: authoritySigningKey }),
-      ),
-    ),
+    targetPayloadHash: hexCodec(deactivationPayloadHash),
     previousApprovalHash: hexCodec(ZERO_HASH),
     approvalHash: hexCodec(deactivationApprovalHash),
-    approvedTotalWeight: amount(0n),
-    signatures: new Map([[hexCodec(authoritySigningKey), hexCodec(deactivationSignature)]]),
+    approvedTotalWeight: amount(90n),
+    signatures: new Map([
+      [hexCodec(councilSignerB), hexCodec(repeatHex('66', 65))],
+      [hexCodec(councilSignerA), hexCodec(repeatHex('67', 65))],
+    ]),
   };
   const activationEntry = {
     approvingCouncilHash: hexCodec(councilHash),
@@ -295,17 +388,14 @@ it('relays ready deactivation clear-outs when a later activation anchors the bat
 
   const batch = await getReadyEthereumGatewayUpdates(client as any, gatewayClient as any);
 
-  expect(batch.pendingClearOutQueueNonces).toEqual([]);
   expect(batch.firstQueueNonce).toBe(1n);
   expect(batch.lastQueueNonce).toBe(2n);
   expect(batch.updates).toEqual([
     {
       queueNonce: 1n,
       kind: 2,
-      payload: encodeMintingGatewayMintingAuthorityDeactivateTarget({
-        signingKey: authoritySigningKey,
-      }),
-      signatures: [deactivationSignature],
+      payload: deactivationPayload,
+      signatures: [],
     },
     {
       queueNonce: 2n,
@@ -316,7 +406,7 @@ it('relays ready deactivation clear-outs when a later activation anchors the bat
   ]);
 });
 
-it('surfaces trailing ready clear-outs instead of returning a reverting deactivation tail', async () => {
+it('includes a trailing quorum-approved deactivation instead of peeling it off', async () => {
   const gatewayAddress = repeatHex('11', 20);
   const councilHash = repeatHex('22', 32);
   const authoritySigningKey = repeatHex('33', 20);
@@ -341,11 +431,18 @@ it('surfaces trailing ready clear-outs instead of returning a reverting deactiva
       target: activationTarget,
     },
   );
-  const deactivationApprovalHash = hashMintingGatewayMintingAuthorityDeactivation(
+  const deactivationPayload = encodeMintingGatewayMintingAuthorityDeactivateTarget({
+    signingKey: authoritySigningKey,
+  });
+  const deactivationPayloadHash = keccak256(deactivationPayload);
+  const deactivationApprovalHash = hashMintingGatewayGatewayUpdateApproval(
     { chainId: 1n, gatewayAddress },
     {
       queueNonce: 2n,
-      target: { signingKey: authoritySigningKey },
+      approvingCouncilHash: councilHash,
+      kind: 2,
+      targetId: signingKeyTargetId(authoritySigningKey),
+      targetPayloadHash: deactivationPayloadHash,
       previousUpdateHash: activationApprovalHash,
     },
   );
@@ -373,15 +470,14 @@ it('surfaces trailing ready clear-outs instead of returning a reverting deactiva
       asMintingAuthorityDeactivation: hexCodec(authoritySigningKey),
       type: 'MintingAuthorityDeactivation',
     },
-    targetPayloadHash: hexCodec(
-      keccak256(
-        encodeMintingGatewayMintingAuthorityDeactivateTarget({ signingKey: authoritySigningKey }),
-      ),
-    ),
+    targetPayloadHash: hexCodec(deactivationPayloadHash),
     previousApprovalHash: hexCodec(activationApprovalHash),
     approvalHash: hexCodec(deactivationApprovalHash),
-    approvedTotalWeight: amount(0n),
-    signatures: new Map([[hexCodec(authoritySigningKey), hexCodec(repeatHex('66', 65))]]),
+    approvedTotalWeight: amount(90n),
+    signatures: new Map([
+      [hexCodec(councilSignerB), hexCodec(repeatHex('66', 65))],
+      [hexCodec(councilSignerA), hexCodec(repeatHex('67', 65))],
+    ]),
   };
   const client = {
     query: {
@@ -431,19 +527,24 @@ it('surfaces trailing ready clear-outs instead of returning a reverting deactiva
   const batch = await getReadyEthereumGatewayUpdates(client as any, gatewayClient as any);
 
   expect(batch.firstQueueNonce).toBe(1n);
-  expect(batch.lastQueueNonce).toBe(1n);
-  expect(batch.pendingClearOutQueueNonces).toEqual([2n]);
+  expect(batch.lastQueueNonce).toBe(2n);
   expect(batch.updates).toEqual([
     {
       queueNonce: 1n,
       kind: 1,
       payload: encodeMintingGatewayMintingAuthorityActivationTarget(activationTarget),
-      signatures: [repeatHex('88', 65), repeatHex('77', 65)],
+      signatures: [],
+    },
+    {
+      queueNonce: 2n,
+      kind: 2,
+      payload: deactivationPayload,
+      signatures: [repeatHex('67', 65), repeatHex('66', 65)],
     },
   ]);
 });
 
-it('rejects malformed trailing clear-outs before surfacing them', async () => {
+it('rejects malformed quorum-approved deactivations', async () => {
   const gatewayAddress = repeatHex('11', 20);
   const councilHash = repeatHex('22', 32);
   const authoritySigningKey = repeatHex('33', 20);
@@ -468,12 +569,19 @@ it('rejects malformed trailing clear-outs before surfacing them', async () => {
       target: activationTarget,
     },
   );
-  const malformedClearOutApprovalHash = hashMintingGatewayMintingAuthorityDeactivation(
+  const deactivationPayload = encodeMintingGatewayMintingAuthorityDeactivateTarget({
+    signingKey: authoritySigningKey,
+  });
+  const deactivationPayloadHash = keccak256(deactivationPayload);
+  const malformedDeactivationApprovalHash = hashMintingGatewayGatewayUpdateApproval(
     { chainId: 1n, gatewayAddress },
     {
       queueNonce: 2n,
-      target: { signingKey: authoritySigningKey },
-      previousUpdateHash: activationApprovalHash,
+      approvingCouncilHash: councilHash,
+      kind: 2,
+      targetId: signingKeyTargetId(authoritySigningKey),
+      targetPayloadHash: deactivationPayloadHash,
+      previousUpdateHash: ZERO_HASH,
     },
   );
   const activationEntry = {
@@ -492,7 +600,7 @@ it('rejects malformed trailing clear-outs before surfacing them', async () => {
       [hexCodec(councilSignerA), hexCodec(repeatHex('88', 65))],
     ]),
   };
-  const malformedClearOutEntry = {
+  const malformedDeactivationEntry = {
     approvingCouncilHash: hexCodec(councilHash),
     target: {
       isMintingAuthorityActivation: false,
@@ -500,16 +608,12 @@ it('rejects malformed trailing clear-outs before surfacing them', async () => {
       asMintingAuthorityDeactivation: hexCodec(authoritySigningKey),
       type: 'MintingAuthorityDeactivation',
     },
-    targetPayloadHash: hexCodec(
-      keccak256(
-        encodeMintingGatewayMintingAuthorityDeactivateTarget({ signingKey: authoritySigningKey }),
-      ),
-    ),
+    targetPayloadHash: hexCodec(deactivationPayloadHash),
     previousApprovalHash: hexCodec(activationApprovalHash),
-    approvalHash: hexCodec(malformedClearOutApprovalHash),
-    approvedTotalWeight: amount(0n),
+    approvalHash: hexCodec(malformedDeactivationApprovalHash),
+    approvedTotalWeight: amount(90n),
     signatures: new Map([
-      [hexCodec(authoritySigningKey), hexCodec(repeatHex('66', 65))],
+      [hexCodec(councilSignerB), hexCodec(repeatHex('66', 65))],
       [hexCodec(councilSignerA), hexCodec(repeatHex('67', 65))],
     ]),
   };
@@ -537,7 +641,7 @@ it('rejects malformed trailing clear-outs before surfacing them', async () => {
           }),
         councilApprovalQueueByDestinationChainAndNonce: async (_chain: string, nonce: bigint) => {
           if (nonce === 1n) return some(activationEntry);
-          if (nonce === 2n) return some(malformedClearOutEntry);
+          if (nonce === 2n) return some(malformedDeactivationEntry);
           return none();
         },
         mintingAuthoritiesBySigner: async () =>
@@ -559,7 +663,7 @@ it('rejects malformed trailing clear-outs before surfacing them', async () => {
   };
 
   await expect(getReadyEthereumGatewayUpdates(client as any, gatewayClient as any)).rejects.toThrow(
-    'expected exactly one deactivation signature',
+    'approval hash does not match deactivation',
   );
 });
 
@@ -596,4 +700,8 @@ function none() {
 
 function repeatHex(byte: string, size: number): Hex {
   return `0x${byte.repeat(size)}`;
+}
+
+function signingKeyTargetId(signingKey: Hex): Hex {
+  return `0x${signingKey.slice(2).padStart(64, '0').toLowerCase()}`;
 }

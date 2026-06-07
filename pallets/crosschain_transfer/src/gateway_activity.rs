@@ -8,10 +8,12 @@ use frame_support::{
 use pallet_prelude::*;
 
 use super::{
-	AssetKind, ChainConfig, ChainConfigBySourceChain, Config, Error, Event, GatewayActivityNonce,
+	AssetKind, ChainConfig, ChainConfigBySourceChain, Config,
+	CouncilApprovalQueueByDestinationChainAndNonce, Error, Event, GatewayActivityNonce,
 	GatewayState, GatewaySyncPauseReason, GlobalIssuanceCouncilByHash, HoldReason,
-	MintingAuthoritiesBySigner, MintingAuthorityState, Pallet, SourceChain, TransferOutById,
-	TransferToArgonActivity, H160, H256,
+	MintingAuthoritiesBySigner, MintingAuthorityActivationRepaymentPricingByDestinationChain,
+	MintingAuthorityState, Pallet, SourceChain, TransferOutById, TransferToArgonActivity, H160,
+	H256,
 };
 
 pub(crate) enum DecodedGatewayActivity<T: Config> {
@@ -27,17 +29,21 @@ pub(crate) enum DecodedGatewayActivity<T: Config> {
 		microgon_collateral: T::Balance,
 		micronot_collateral: T::Balance,
 		coactivation_count: u32,
+		shared_signature_count: u32,
 		relayer_argon_account_id: [u8; 32],
+		approval_hash: H256,
 		gateway_state: GatewayState<T>,
 	},
 	GlobalIssuanceCouncilRotated {
 		council_hash: H256,
+		approval_hash: H256,
 		gateway_state: GatewayState<T>,
 	},
 	MintingAuthorityDeactivated {
 		destination_signing_key: H160,
 		microgon_collateral: T::Balance,
 		micronot_collateral: T::Balance,
+		approval_hash: H256,
 		gateway_state: GatewayState<T>,
 	},
 	TransferOutOfArgonFinalized {
@@ -131,6 +137,24 @@ impl<T: Config> GatewayActivityContext<T> {
 		reason: GatewaySyncPauseReason,
 	) -> Result<R, GatewayActivityApplyError> {
 		Err(self.pause(reason))
+	}
+
+	fn ensure_local_approval_hash(
+		&self,
+		approval_hash: H256,
+	) -> Result<(), GatewayActivityApplyError> {
+		let Some(queue_entry) = CouncilApprovalQueueByDestinationChainAndNonce::<T>::get(
+			self.source_chain,
+			self.gateway_state.argon_approvals_nonce,
+		) else {
+			return Err(self.pause(GatewaySyncPauseReason::GatewayStateDrift));
+		};
+
+		if queue_entry.approval_hash != approval_hash {
+			return Err(self.pause(GatewaySyncPauseReason::GatewayStateDrift));
+		}
+
+		Ok(())
 	}
 
 	fn gateway_circulation_matches_local_state(
@@ -288,6 +312,7 @@ impl<T: Config> Pallet<T> {
 		microgon_collateral: T::Balance,
 		micronot_collateral: T::Balance,
 		coactivation_count: u32,
+		shared_signature_count: u32,
 		relayer_argon_account_id: [u8; 32],
 	) -> GatewayActivityApplyResult<T> {
 		let relayer_argon_account_id = Self::argon_account_id(relayer_argon_account_id);
@@ -323,8 +348,29 @@ impl<T: Config> Pallet<T> {
 						repayment_amount = held_repayment_amount;
 						refund_amount = T::Balance::default();
 					} else {
+						let actual_signature_repayment_quote = if shared_signature_count == 0 {
+							T::Balance::default()
+						} else {
+							let pricing =
+									MintingAuthorityActivationRepaymentPricingByDestinationChain::<T>::get(
+										authority.destination_chain,
+									)
+									.ok_or(
+										GatewaySyncPauseReason::MintingAuthorityActivationRepaymentMismatch,
+									)?;
+							let single_signature_repayment_quote =
+								Self::minting_authority_activation_gas_repayment_due(
+									&pricing,
+									pricing.signature_gas_cost,
+								)
+								.map_err(|_| {
+									GatewaySyncPauseReason::MintingAuthorityActivationRepaymentMismatch
+								})?;
+							single_signature_repayment_quote
+								.saturating_mul(shared_signature_count.into())
+						};
 						let coactivation_count: u128 = coactivation_count.max(1).into();
-						let shared_signature_repayment_quote = activation_signature_repayment_quote
+						let shared_signature_repayment_quote = actual_signature_repayment_quote
 							.into()
 							.saturating_add(coactivation_count.saturating_sub(1))
 							.saturating_div(coactivation_count);
@@ -508,30 +554,41 @@ impl<T: Config> Pallet<T> {
 				microgon_collateral,
 				micronot_collateral,
 				coactivation_count,
+				shared_signature_count,
 				relayer_argon_account_id,
+				approval_hash,
 				..
 			} => {
 				context.ensure_gateway_circulation_matches_local_state(None)?;
+				context.ensure_local_approval_hash(approval_hash)?;
 				Self::apply_minting_authority_activation(
 					context,
 					destination_signing_key,
 					microgon_collateral,
 					micronot_collateral,
 					coactivation_count,
+					shared_signature_count,
 					relayer_argon_account_id,
 				)
 			},
-			DecodedGatewayActivity::GlobalIssuanceCouncilRotated { council_hash, .. } => {
+			DecodedGatewayActivity::GlobalIssuanceCouncilRotated {
+				council_hash,
+				approval_hash,
+				..
+			} => {
 				context.ensure_gateway_circulation_matches_local_state(None)?;
+				context.ensure_local_approval_hash(approval_hash)?;
 				Self::apply_global_issuance_council_rotation(context, council_hash)
 			},
 			DecodedGatewayActivity::MintingAuthorityDeactivated {
 				destination_signing_key,
 				microgon_collateral,
 				micronot_collateral,
+				approval_hash,
 				..
 			} => {
 				context.ensure_gateway_circulation_matches_local_state(None)?;
+				context.ensure_local_approval_hash(approval_hash)?;
 				Self::apply_minting_authority_deactivation(
 					context,
 					destination_signing_key,
@@ -789,6 +846,7 @@ mod test {
 					owner_vault_operator.clone(),
 					1,
 					1,
+					approval_hash_for_queue_nonce(1),
 					1,
 					1,
 				)])]),
@@ -830,17 +888,9 @@ mod test {
 					argonot_circulation: 0,
 				}),
 			);
-			let deactivation_signature = minting_authority_deactivation_signature(
-				&minting_authority_pair,
-				2,
-				signing_key,
-				CrosschainTransfer::previous_gateway_update_hash(SourceChain::Ethereum, 2)
-					.expect("activation queue entry should anchor deactivation"),
-			);
 			assert_ok!(CrosschainTransfer::deactivate_minting_authority(
 				RuntimeOrigin::signed(owner_vault_operator.clone()),
 				signing_key,
-				deactivation_signature,
 			));
 
 			let burn_account = CrosschainTransfer::burn_account(SourceChain::Ethereum);
@@ -939,6 +989,27 @@ mod test {
 				next_council.epoch_microgons_per_argonot,
 			);
 			GlobalIssuanceCouncilByHash::<Test>::insert(next_council_hash, next_council);
+			let mut queued_rotation = CouncilApprovalQueueEntry::<Test> {
+				approving_council_hash: active_council_hash,
+				target: CouncilApprovalTargetId::GlobalIssuanceCouncilRotation(next_council_hash),
+				target_payload_hash: H256::repeat_byte(0x31),
+				due_frame_id: 0,
+				previous_approval_hash: H256::zero(),
+				approval_hash: H256::zero(),
+				approved_total_weight: Default::default(),
+				signatures: Default::default(),
+			};
+			queued_rotation.approval_hash = CrosschainTransfer::hash_council_approval_queue_entry(
+				SourceChain::Ethereum,
+				1,
+				&queued_rotation,
+			)
+			.expect("rotation queue entry should hash with the configured gateway domain");
+			CouncilApprovalQueueByDestinationChainAndNonce::<Test>::insert(
+				SourceChain::Ethereum,
+				1,
+				queued_rotation,
+			);
 
 			assert_ok!(CrosschainTransfer::prove_gateway_activity(
 				RuntimeOrigin::signed(account(1)),
@@ -946,6 +1017,7 @@ mod test {
 				0,
 				proof_batch(vec![activity_logs(vec![global_issuance_council_rotated_log(
 					next_council_hash,
+					approval_hash_for_queue_nonce(1),
 					1,
 					1,
 				)])]),
@@ -1005,18 +1077,10 @@ mod test {
 				bounded_vec![minting_authority_approval_signature(&council_pair, 1)],
 			));
 
-			let deactivation_signature = minting_authority_deactivation_signature(
-				&minting_authority_pair,
-				2,
-				signing_key,
-				CrosschainTransfer::previous_gateway_update_hash(SourceChain::Ethereum, 2)
-					.expect("activation queue entry should anchor deactivation"),
-			);
 			assert_noop!(
 				CrosschainTransfer::deactivate_minting_authority(
 					RuntimeOrigin::signed(owner_vault_operator.clone()),
 					signing_key,
-					deactivation_signature,
 				),
 				Error::<Test>::UnexpectedMintingAuthorityState,
 			);
@@ -1032,6 +1096,7 @@ mod test {
 					relayer.clone(),
 					1,
 					1,
+					approval_hash_for_queue_nonce(1),
 					1,
 					1,
 				)])]),
@@ -1060,7 +1125,6 @@ mod test {
 			assert_ok!(CrosschainTransfer::deactivate_minting_authority(
 				RuntimeOrigin::signed(owner_vault_operator),
 				signing_key,
-				deactivation_signature,
 			));
 			assert_eq!(
 				MintingAuthoritiesBySigner::<Test>::get(signing_key)
@@ -1130,6 +1194,7 @@ mod test {
 					relayer.clone(),
 					1,
 					1,
+					approval_hash_for_queue_nonce(1),
 					1,
 					1,
 				)])]),
@@ -1226,6 +1291,7 @@ mod test {
 					relayer,
 					1,
 					1,
+					approval_hash_for_queue_nonce(1),
 					1,
 					1,
 				)])]),
@@ -1311,6 +1377,7 @@ mod test {
 						relayer.clone(),
 						2,
 						1,
+						approval_hash_for_queue_nonce(1),
 						1,
 						1,
 					),
@@ -1321,6 +1388,7 @@ mod test {
 						relayer.clone(),
 						2,
 						1,
+						approval_hash_for_queue_nonce(2),
 						2,
 						2,
 					),
@@ -1357,6 +1425,84 @@ mod test {
 					.expect("second authority should activate")
 					.state,
 				MintingAuthorityState::Active,
+			);
+		});
+	}
+
+	#[test]
+	fn activation_settlement_uses_emitted_shared_signature_count() {
+		new_test_ext().execute_with(|| {
+			System::set_block_number(1);
+			let owner_vault_operator = account(45);
+			let relayer = account(46);
+			let council_pair = council_signing_pair(44);
+			let minting_authority_pair = council_signing_pair(45);
+			let signing_key = council_signer(&minting_authority_pair);
+
+			configure_single_member_ethereum_council(
+				owner_vault_operator.clone(),
+				44,
+				10_000,
+				&council_pair,
+			);
+			assert_ok!(Balances::mint_into(&owner_vault_operator, 10_000));
+			assert_ok!(CrosschainTransfer::register_minting_authority(
+				RuntimeOrigin::signed(owner_vault_operator.clone()),
+				SourceChain::Ethereum,
+				signing_key,
+				minting_authority_registration_signature(
+					&minting_authority_pair,
+					&owner_vault_operator,
+				),
+				10_000,
+				0,
+			));
+			assert_ok!(CrosschainTransfer::approve_queue_entries(
+				RuntimeOrigin::signed(owner_vault_operator.clone()),
+				SourceChain::Ethereum,
+				bounded_vec![minting_authority_approval_signature(&council_pair, 1)],
+			));
+			assert_ok!(Balances::hold(
+				&RuntimeHoldReason::CrosschainTransfer(
+					HoldReason::MintingAuthorityActivationRepayment,
+				),
+				&owner_vault_operator,
+				50,
+			));
+			MintingAuthoritiesBySigner::<Test>::mutate(signing_key, |authority| {
+				authority
+					.as_mut()
+					.expect("pending activation should exist")
+					.activation_signature_repayment_quote = 100;
+			});
+
+			assert_ok!(CrosschainTransfer::prove_gateway_activity(
+				RuntimeOrigin::signed(account(1)),
+				SourceChain::Ethereum,
+				0,
+				proof_batch(vec![activity_logs(vec![minting_authority_activated_log(
+					10_000,
+					0,
+					signing_key,
+					relayer.clone(),
+					1,
+					1,
+					approval_hash_for_queue_nonce(1),
+					1,
+					1,
+				)])]),
+			));
+
+			assert_eq!(Balances::balance(&relayer), 150);
+			assert_eq!(Balances::balance(&owner_vault_operator), 9_850);
+			assert_eq!(
+				Balances::balance_on_hold(
+					&RuntimeHoldReason::CrosschainTransfer(
+						HoldReason::MintingAuthorityActivationRepayment,
+					),
+					&owner_vault_operator,
+				),
+				0,
 			);
 		});
 	}
@@ -1414,6 +1560,11 @@ mod test {
 				},
 			);
 
+			assert_ok!(CrosschainTransfer::deactivate_minting_authority(
+				RuntimeOrigin::signed(owner_vault_operator.clone()),
+				signing_key,
+			));
+
 			assert_ok!(CrosschainTransfer::prove_gateway_activity(
 				RuntimeOrigin::signed(account(1)),
 				SourceChain::Ethereum,
@@ -1423,8 +1574,9 @@ mod test {
 					200,
 					signing_key,
 					account(35),
+					approval_hash_for_queue_nonce(2),
 					1,
-					5,
+					2,
 				)])]),
 			));
 
@@ -1457,7 +1609,7 @@ mod test {
 					pending_reserved_microgon_collateral: 0,
 					pending_reserved_micronot_collateral: 0,
 					active_pending_transfer_ids: bounded_vec![],
-					activation_approval_queue_nonce: 2,
+					activation_approval_queue_nonce: 3,
 					activation_base_repayment_quote: 100,
 					activation_signature_repayment_quote: 50,
 					deactivation_approval_queue_nonce: None,
@@ -1544,6 +1696,7 @@ mod test {
 					0,
 					signing_key,
 					account(41),
+					approval_hash_for_queue_nonce(1),
 					2,
 					1,
 				)])]),
@@ -2049,6 +2202,7 @@ mod test {
 					account(56),
 					1,
 					1,
+					H256::zero(),
 					1,
 					4,
 				)])]),
@@ -2061,7 +2215,7 @@ mod test {
 				Some(GatewaySyncPause {
 					last_good_gateway_activity_nonce: 0,
 					failed_gateway_activity_nonce: 1,
-					reason: GatewaySyncPauseReason::MintingAuthorityNotFound,
+					reason: GatewaySyncPauseReason::GatewayStateDrift,
 				}),
 			);
 			assert!(System::events().iter().any(|record| match &record.event {
@@ -2073,7 +2227,7 @@ mod test {
 						GatewaySyncPause {
 							last_good_gateway_activity_nonce: 0,
 							failed_gateway_activity_nonce: 1,
-							reason: GatewaySyncPauseReason::MintingAuthorityNotFound,
+							reason: GatewaySyncPauseReason::GatewayStateDrift,
 						}
 				},
 				_ => false,
@@ -2378,7 +2532,17 @@ mod test {
 				0,
 				proof_batch(vec![activity_logs(vec![
 					argon_activity_log(recipient.clone(), 1, 500),
-					minting_authority_activated_log(9_000, 0, signing_key, account(56), 1, 1, 2, 4),
+					minting_authority_activated_log(
+						9_000,
+						0,
+						signing_key,
+						account(56),
+						1,
+						1,
+						H256::zero(),
+						2,
+						4,
+					),
 				])]),
 			);
 
@@ -2769,8 +2933,18 @@ mod test {
 		)
 	}
 
+	fn approval_hash_for_queue_nonce(queue_nonce: ArgonApprovalsNonce) -> H256 {
+		CouncilApprovalQueueByDestinationChainAndNonce::<Test>::get(
+			SourceChain::Ethereum,
+			queue_nonce,
+		)
+		.expect("queued council approval should exist for the proven gateway activity")
+		.approval_hash
+	}
+
 	fn global_issuance_council_rotated_log(
 		council_hash: H256,
+		approval_hash: H256,
 		gateway_activity_nonce: GatewayActivityNonce,
 		argon_approvals_nonce: ArgonApprovalsNonce,
 	) -> EthereumLog {
@@ -2778,6 +2952,7 @@ mod test {
 			current_gateway_circulation_after(None, None);
 		let event = GlobalIssuanceCouncilRotated {
 			councilHash: alloy_primitives::B256::from(council_hash.0),
+			approvalHash: alloy_primitives::B256::from(approval_hash.0),
 			relayerArgonAccountId: destination_bytes(&account(46)).into(),
 			gatewayState: contract_gateway_activity_state(
 				gateway_activity_nonce,
@@ -2807,16 +2982,18 @@ mod test {
 		relayer_argon_account_id: TestAccountId,
 		coactivation_count: u32,
 		shared_signature_count: u32,
+		approval_hash: H256,
 		gateway_activity_nonce: GatewayActivityNonce,
 		argon_approvals_nonce: ArgonApprovalsNonce,
 	) -> EthereumLog {
 		let (argon_circulation, argonot_circulation) =
 			current_gateway_circulation_after(None, None);
-		let mut data = Vec::with_capacity(288);
+		let mut data = Vec::with_capacity(320);
 		data.extend_from_slice(&u128_word(microgon_collateral));
 		data.extend_from_slice(&u128_word(micronot_collateral));
 		data.extend_from_slice(&u64_word(coactivation_count as u64));
 		data.extend_from_slice(&u64_word(shared_signature_count as u64));
+		data.extend_from_slice(approval_hash.as_bytes());
 		data.extend_from_slice(&destination_bytes(&relayer_argon_account_id));
 		data.extend_from_slice(&u64_word(gateway_activity_nonce));
 		data.extend_from_slice(&u64_word(argon_approvals_nonce));
@@ -2842,14 +3019,16 @@ mod test {
 		micronot_collateral: Balance,
 		destination_signing_key: H160,
 		relayer_argon_account_id: TestAccountId,
+		approval_hash: H256,
 		gateway_activity_nonce: GatewayActivityNonce,
 		argon_approvals_nonce: ArgonApprovalsNonce,
 	) -> EthereumLog {
 		let (argon_circulation, argonot_circulation) =
 			current_gateway_circulation_after(None, None);
-		let mut data = Vec::with_capacity(192);
+		let mut data = Vec::with_capacity(224);
 		data.extend_from_slice(&u128_word(microgon_collateral));
 		data.extend_from_slice(&u128_word(micronot_collateral));
+		data.extend_from_slice(approval_hash.as_bytes());
 		data.extend_from_slice(&destination_bytes(&relayer_argon_account_id));
 		data.extend_from_slice(&u64_word(gateway_activity_nonce));
 		data.extend_from_slice(&u64_word(argon_approvals_nonce));

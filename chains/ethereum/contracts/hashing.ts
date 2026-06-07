@@ -1,5 +1,9 @@
 import type { Address, ContractFunctionArgs, Hex } from 'viem';
 import { encodeAbiParameters, keccak256, stringToHex } from 'viem';
+import type {
+  MintingGatewayActivityState,
+  MintingGatewayMintingAuthorityCollateral,
+} from './generated.js';
 import { mintingGatewayAbi } from './generated.js';
 
 export const MINTING_GATEWAY_UPDATE_KINDS = {
@@ -11,6 +15,13 @@ export const MINTING_GATEWAY_UPDATE_KINDS = {
 export type MintingGatewayHashContext = {
   chainId: bigint;
   gatewayAddress: Address;
+};
+export type MintingGatewayActivityBlockLocator = {
+  blockNumber: bigint;
+  startGatewayActivityNonce: bigint;
+  endGatewayActivityNonce: bigint;
+  previousLocatorHash: Hex;
+  activityRoot: Hex;
 };
 
 type ApplyGatewayUpdatesArgs = ContractFunctionArgs<
@@ -48,6 +59,48 @@ export type MintingGatewayMintingAuthorityActivationTarget = {
 export type MintingGatewayMintingAuthorityDeactivateTarget = {
   signingKey: Address;
 };
+type GlobalIssuanceCouncilRotatedActivityHashArgs = {
+  councilHash: Hex;
+  approvalHash: Hex;
+  relayerArgonAccountId: Hex;
+  gatewayState: MintingGatewayActivityState;
+};
+type MintingAuthorityActivatedActivityHashArgs = {
+  signingKey: Address;
+  microgonCollateral: bigint;
+  micronotCollateral: bigint;
+  coactivationCount: number | bigint;
+  sharedSignatureCount: number | bigint;
+  approvalHash: Hex;
+  relayerArgonAccountId: Hex;
+  gatewayState: MintingGatewayActivityState;
+};
+type MintingAuthorityDeactivatedActivityHashArgs = {
+  signingKey: Address;
+  microgonCollateral: bigint;
+  micronotCollateral: bigint;
+  approvalHash: Hex;
+  relayerArgonAccountId: Hex;
+  gatewayState: MintingGatewayActivityState;
+};
+type TransferToArgonStartedActivityHashArgs = {
+  from: Address;
+  token: Address;
+  amount: bigint;
+  argonAccountId: Hex;
+  gatewayState: MintingGatewayActivityState;
+};
+type TransferOutOfArgonCanceledActivityHashArgs = {
+  transferId: Hex;
+  gatewayState: MintingGatewayActivityState;
+};
+type TransferOutOfArgonFinalizedActivityHashArgs = {
+  transferId: Hex;
+  token: Address;
+  amount: bigint;
+  mintingCollateral: MintingGatewayMintingAuthorityCollateral[];
+  gatewayState: MintingGatewayActivityState;
+};
 
 type ActivateMintingAuthorityApprovalArgs = {
   queueNonce: bigint;
@@ -69,12 +122,6 @@ type MintingAuthorizationHashArgs = {
   micronotCollateral: MintingGatewayMintingAuthorization['micronotCollateral'];
 };
 
-type MintingAuthorityDeactivationHashArgs = {
-  queueNonce: bigint;
-  target: MintingGatewayMintingAuthorityDeactivateTarget;
-  previousUpdateHash: Hex;
-};
-
 type GatewayUpdateApprovalArgs = {
   queueNonce: bigint;
   approvingCouncilHash: Hex;
@@ -87,6 +134,17 @@ type GatewayUpdateApprovalArgs = {
 const COUNCIL_SNAPSHOT_PARAMETERS = [
   { name: 'signers', type: 'address[]' },
   { name: 'weights', type: 'uint256[]' },
+] as const;
+const GATEWAY_ACTIVITY_STATE_PARAMETERS = [
+  { name: 'gatewayActivityNonce', type: 'uint64' },
+  { name: 'argonApprovalsNonce', type: 'uint64' },
+  { name: 'argonCirculation', type: 'uint128' },
+  { name: 'argonotCirculation', type: 'uint128' },
+] as const;
+const MINTING_AUTHORITY_COLLATERAL_PARAMETERS = [
+  { name: 'signingKey', type: 'address' },
+  { name: 'microgonCollateral', type: 'uint128' },
+  { name: 'micronotCollateral', type: 'uint128' },
 ] as const;
 
 const GLOBAL_ISSUANCE_COUNCIL_ROTATE_TARGET_PARAMETERS = [
@@ -154,15 +212,6 @@ const GLOBAL_ISSUANCE_COUNCIL_ROTATION_PARAMETERS = [
   { type: 'uint128' },
 ] as const;
 
-const MINTING_AUTHORITY_DEACTIVATION_PARAMETERS = [
-  { type: 'bytes32' },
-  { type: 'uint256' },
-  { type: 'address' },
-  { type: 'uint64' },
-  { type: 'address' },
-  { type: 'bytes32' },
-] as const;
-
 function signingKeyTargetId(signingKey: Address): Hex {
   return `0x${signingKey.slice(2).padStart(64, '0').toLowerCase()}`;
 }
@@ -187,6 +236,60 @@ const MINTING_AUTHORIZATION_PARAMETERS = [
   { type: 'uint128' },
   { type: 'uint128' },
 ] as const;
+const GATEWAY_ACTIVITY_HASH_PARAMETERS = [
+  { type: 'bytes32' },
+  { type: 'uint8' },
+  { type: 'uint256' },
+  { type: 'address' },
+] as const;
+const GLOBAL_ISSUANCE_COUNCIL_ROTATED_ACTIVITY_PARAMETERS = [
+  ...GATEWAY_ACTIVITY_HASH_PARAMETERS,
+  { type: 'bytes32' },
+  { type: 'bytes32' },
+  { type: 'bytes32' },
+  { type: 'bytes32' },
+] as const;
+const MINTING_AUTHORITY_ACTIVATED_ACTIVITY_PARAMETERS = [
+  ...GATEWAY_ACTIVITY_HASH_PARAMETERS,
+  { type: 'address' },
+  { type: 'uint128' },
+  { type: 'uint128' },
+  { type: 'uint32' },
+  { type: 'uint32' },
+  { type: 'bytes32' },
+  { type: 'bytes32' },
+  { type: 'bytes32' },
+] as const;
+const MINTING_AUTHORITY_DEACTIVATED_ACTIVITY_PARAMETERS = [
+  ...GATEWAY_ACTIVITY_HASH_PARAMETERS,
+  { type: 'address' },
+  { type: 'uint128' },
+  { type: 'uint128' },
+  { type: 'bytes32' },
+  { type: 'bytes32' },
+  { type: 'bytes32' },
+] as const;
+const TRANSFER_TO_ARGON_STARTED_ACTIVITY_PARAMETERS = [
+  ...GATEWAY_ACTIVITY_HASH_PARAMETERS,
+  { type: 'address' },
+  { type: 'address' },
+  { type: 'uint128' },
+  { type: 'bytes32' },
+  { type: 'bytes32' },
+] as const;
+const TRANSFER_OUT_OF_ARGON_CANCELED_ACTIVITY_PARAMETERS = [
+  ...GATEWAY_ACTIVITY_HASH_PARAMETERS,
+  { type: 'bytes32' },
+  { type: 'bytes32' },
+] as const;
+const TRANSFER_OUT_OF_ARGON_FINALIZED_ACTIVITY_PARAMETERS = [
+  ...GATEWAY_ACTIVITY_HASH_PARAMETERS,
+  { type: 'bytes32' },
+  { type: 'address' },
+  { type: 'uint128' },
+  { type: 'bytes32' },
+  { type: 'bytes32' },
+] as const;
 
 const GLOBAL_ISSUANCE_COUNCIL_ROTATION_TAG = keccak256(
   stringToHex('ARGON_GLOBAL_ISSUANCE_COUNCIL_ROTATION'),
@@ -194,13 +297,29 @@ const GLOBAL_ISSUANCE_COUNCIL_ROTATION_TAG = keccak256(
 const MINTING_AUTHORITY_ACTIVATION_TAG = keccak256(
   stringToHex('ARGON_MINTING_AUTHORITY_ACTIVATION'),
 );
-const MINTING_AUTHORITY_DEACTIVATION_TAG = keccak256(
-  stringToHex('ARGON_MINTING_AUTHORITY_DEACTIVATION'),
-);
 const GATEWAY_UPDATE_APPROVAL_TAG = keccak256(stringToHex('ARGON_GATEWAY_UPDATE_APPROVAL'));
 const TRANSFER_OUT_OF_ARGON_AUTHORIZATION_TAG = keccak256(
   stringToHex('ARGON_TRANSFER_OUT_OF_ARGON_AUTHORIZATION'),
 );
+const GLOBAL_ISSUANCE_COUNCIL_ROTATED_ACTIVITY_TAG = keccak256(
+  stringToHex('ARGON_GLOBAL_ISSUANCE_COUNCIL_ROTATED_ACTIVITY'),
+);
+const MINTING_AUTHORITY_ACTIVATED_ACTIVITY_TAG = keccak256(
+  stringToHex('ARGON_MINTING_AUTHORITY_ACTIVATED_ACTIVITY'),
+);
+const MINTING_AUTHORITY_DEACTIVATED_ACTIVITY_TAG = keccak256(
+  stringToHex('ARGON_MINTING_AUTHORITY_DEACTIVATED_ACTIVITY'),
+);
+const TRANSFER_TO_ARGON_STARTED_ACTIVITY_TAG = keccak256(
+  stringToHex('ARGON_TRANSFER_TO_ARGON_STARTED_ACTIVITY'),
+);
+const TRANSFER_OUT_OF_ARGON_CANCELED_ACTIVITY_TAG = keccak256(
+  stringToHex('ARGON_TRANSFER_OUT_OF_ARGON_CANCELED_ACTIVITY'),
+);
+const TRANSFER_OUT_OF_ARGON_FINALIZED_ACTIVITY_TAG = keccak256(
+  stringToHex('ARGON_TRANSFER_OUT_OF_ARGON_FINALIZED_ACTIVITY'),
+);
+export const MINTING_GATEWAY_ACTIVITY_HASH_VERSION = 1;
 
 export function encodeMintingGatewayCouncilSnapshot(snapshot: MintingGatewayCouncilSnapshot): Hex {
   return encodeAbiParameters(
@@ -334,22 +453,6 @@ export function hashMintingGatewayGatewayUpdateApproval(
   );
 }
 
-export function hashMintingGatewayMintingAuthorityDeactivation(
-  context: MintingGatewayHashContext,
-  args: MintingAuthorityDeactivationHashArgs,
-): Hex {
-  return keccak256(
-    encodeAbiParameters(MINTING_AUTHORITY_DEACTIVATION_PARAMETERS, [
-      MINTING_AUTHORITY_DEACTIVATION_TAG,
-      context.chainId,
-      context.gatewayAddress,
-      args.queueNonce,
-      args.target.signingKey,
-      args.previousUpdateHash,
-    ]),
-  );
-}
-
 export function hashMintingGatewayTransferOutOfArgonRequest(
   request: MintingGatewayTransferOutOfArgonRequest,
 ): Hex {
@@ -380,6 +483,168 @@ export function hashMintingGatewayMintingAuthorization(
       hashMintingGatewayTransferOutOfArgonRequest(args.request),
       args.microgonCollateral,
       args.micronotCollateral,
+    ]),
+  );
+}
+
+export function hashMintingGatewayActivityState(gatewayState: MintingGatewayActivityState): Hex {
+  return keccak256(
+    encodeAbiParameters(
+      [{ type: 'tuple', components: GATEWAY_ACTIVITY_STATE_PARAMETERS }],
+      [gatewayState],
+    ),
+  );
+}
+
+export function appendMintingGatewayActivityRoot(currentRoot: Hex, activityHash: Hex): Hex {
+  return keccak256(
+    encodeAbiParameters(
+      [{ type: 'uint8' }, { type: 'bytes32' }, { type: 'bytes32' }],
+      [MINTING_GATEWAY_ACTIVITY_HASH_VERSION, currentRoot, activityHash],
+    ),
+  );
+}
+
+export function hashMintingGatewayActivityBlockLocator(
+  locator: MintingGatewayActivityBlockLocator,
+): Hex {
+  return keccak256(
+    encodeAbiParameters(
+      [
+        { type: 'uint8' },
+        { type: 'uint64' },
+        { type: 'uint64' },
+        { type: 'uint64' },
+        { type: 'bytes32' },
+        { type: 'bytes32' },
+      ],
+      [
+        MINTING_GATEWAY_ACTIVITY_HASH_VERSION,
+        locator.blockNumber,
+        locator.startGatewayActivityNonce,
+        locator.endGatewayActivityNonce,
+        locator.previousLocatorHash,
+        locator.activityRoot,
+      ],
+    ),
+  );
+}
+
+export function hashMintingGatewayGlobalIssuanceCouncilRotatedActivity(
+  context: MintingGatewayHashContext,
+  args: GlobalIssuanceCouncilRotatedActivityHashArgs,
+): Hex {
+  return keccak256(
+    encodeAbiParameters(GLOBAL_ISSUANCE_COUNCIL_ROTATED_ACTIVITY_PARAMETERS, [
+      GLOBAL_ISSUANCE_COUNCIL_ROTATED_ACTIVITY_TAG,
+      MINTING_GATEWAY_ACTIVITY_HASH_VERSION,
+      context.chainId,
+      context.gatewayAddress,
+      args.councilHash,
+      args.approvalHash,
+      args.relayerArgonAccountId,
+      hashMintingGatewayActivityState(args.gatewayState),
+    ]),
+  );
+}
+
+export function hashMintingGatewayMintingAuthorityActivatedActivity(
+  context: MintingGatewayHashContext,
+  args: MintingAuthorityActivatedActivityHashArgs,
+): Hex {
+  return keccak256(
+    encodeAbiParameters(MINTING_AUTHORITY_ACTIVATED_ACTIVITY_PARAMETERS, [
+      MINTING_AUTHORITY_ACTIVATED_ACTIVITY_TAG,
+      MINTING_GATEWAY_ACTIVITY_HASH_VERSION,
+      context.chainId,
+      context.gatewayAddress,
+      args.signingKey,
+      args.microgonCollateral,
+      args.micronotCollateral,
+      Number(args.coactivationCount),
+      Number(args.sharedSignatureCount),
+      args.approvalHash,
+      args.relayerArgonAccountId,
+      hashMintingGatewayActivityState(args.gatewayState),
+    ]),
+  );
+}
+
+export function hashMintingGatewayMintingAuthorityDeactivatedActivity(
+  context: MintingGatewayHashContext,
+  args: MintingAuthorityDeactivatedActivityHashArgs,
+): Hex {
+  return keccak256(
+    encodeAbiParameters(MINTING_AUTHORITY_DEACTIVATED_ACTIVITY_PARAMETERS, [
+      MINTING_AUTHORITY_DEACTIVATED_ACTIVITY_TAG,
+      MINTING_GATEWAY_ACTIVITY_HASH_VERSION,
+      context.chainId,
+      context.gatewayAddress,
+      args.signingKey,
+      args.microgonCollateral,
+      args.micronotCollateral,
+      args.approvalHash,
+      args.relayerArgonAccountId,
+      hashMintingGatewayActivityState(args.gatewayState),
+    ]),
+  );
+}
+
+export function hashMintingGatewayTransferToArgonStartedActivity(
+  context: MintingGatewayHashContext,
+  args: TransferToArgonStartedActivityHashArgs,
+): Hex {
+  return keccak256(
+    encodeAbiParameters(TRANSFER_TO_ARGON_STARTED_ACTIVITY_PARAMETERS, [
+      TRANSFER_TO_ARGON_STARTED_ACTIVITY_TAG,
+      MINTING_GATEWAY_ACTIVITY_HASH_VERSION,
+      context.chainId,
+      context.gatewayAddress,
+      args.from,
+      args.token,
+      args.amount,
+      args.argonAccountId,
+      hashMintingGatewayActivityState(args.gatewayState),
+    ]),
+  );
+}
+
+export function hashMintingGatewayTransferOutOfArgonCanceledActivity(
+  context: MintingGatewayHashContext,
+  args: TransferOutOfArgonCanceledActivityHashArgs,
+): Hex {
+  return keccak256(
+    encodeAbiParameters(TRANSFER_OUT_OF_ARGON_CANCELED_ACTIVITY_PARAMETERS, [
+      TRANSFER_OUT_OF_ARGON_CANCELED_ACTIVITY_TAG,
+      MINTING_GATEWAY_ACTIVITY_HASH_VERSION,
+      context.chainId,
+      context.gatewayAddress,
+      args.transferId,
+      hashMintingGatewayActivityState(args.gatewayState),
+    ]),
+  );
+}
+
+export function hashMintingGatewayTransferOutOfArgonFinalizedActivity(
+  context: MintingGatewayHashContext,
+  args: TransferOutOfArgonFinalizedActivityHashArgs,
+): Hex {
+  return keccak256(
+    encodeAbiParameters(TRANSFER_OUT_OF_ARGON_FINALIZED_ACTIVITY_PARAMETERS, [
+      TRANSFER_OUT_OF_ARGON_FINALIZED_ACTIVITY_TAG,
+      MINTING_GATEWAY_ACTIVITY_HASH_VERSION,
+      context.chainId,
+      context.gatewayAddress,
+      args.transferId,
+      args.token,
+      args.amount,
+      keccak256(
+        encodeAbiParameters(
+          [{ type: 'tuple[]', components: MINTING_AUTHORITY_COLLATERAL_PARAMETERS }],
+          [args.mintingCollateral],
+        ),
+      ),
+      hashMintingGatewayActivityState(args.gatewayState),
     ]),
   );
 }

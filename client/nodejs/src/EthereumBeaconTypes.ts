@@ -85,6 +85,7 @@ export type EthereumVersionedLightClientUpdate = {
 
 export type EthereumBeaconGenesisResponse = {
   data: {
+    genesis_time: string;
     genesis_fork_version: string;
     genesis_validators_root: string;
   };

@@ -9,12 +9,6 @@ export const MINTING_GATEWAY_TOKEN_DECIMALS = 18;
 export const MINTING_GATEWAY_RUNTIME_TO_ERC20_SCALE =
   10n ** BigInt(MINTING_GATEWAY_TOKEN_DECIMALS - MINTING_GATEWAY_RUNTIME_DECIMALS);
 
-export type MintingGatewayActivityBlockLocator = {
-  blockNumber: bigint;
-  startGatewayActivityNonce: bigint;
-  endGatewayActivityNonce: bigint;
-};
-
 export * from './generated.js';
 export * from './hashing.js';
 

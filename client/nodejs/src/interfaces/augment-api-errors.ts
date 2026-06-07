@@ -445,8 +445,7 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       InvalidMintingAuthorityCollateral: AugmentedError<ApiType>;
       /**
-       * The provided signer-authorized deactivation signature did not match the expected
-       * Minting Authority signing key.
+       * Reserved legacy error for invalid signer-keyed deactivation signatures.
        **/
       InvalidMintingAuthorityDeactivationSignature: AugmentedError<ApiType>;
       /**

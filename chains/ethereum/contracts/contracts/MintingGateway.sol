@@ -20,17 +20,33 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 	uint8 public constant TOKEN_DECIMALS = 18;
 	/// @notice Conversion factor from runtime units into ERC-20 base units.
 	uint256 public constant RUNTIME_TO_ERC20_SCALE = 10 ** (TOKEN_DECIMALS - RUNTIME_DECIMALS);
+	/// @notice Maximum queued Argon gateway updates accepted in one relay call.
+	uint256 public constant MAX_GATEWAY_UPDATES_PER_BATCH = 100;
+	/// @notice Maximum minting-authority signatures accepted in one transfer finalization.
+	uint256 public constant MAX_MINTING_AUTHORIZATIONS_PER_TRANSFER = 25;
+	/// @notice Version byte included in every on-chain activity hash domain.
+	uint8 public constant ACTIVITY_HASH_VERSION = 1;
 
 	bytes32 private constant _GLOBAL_ISSUANCE_COUNCIL_ROTATION_TAG =
 		keccak256("ARGON_GLOBAL_ISSUANCE_COUNCIL_ROTATION");
 	bytes32 private constant _MINTING_AUTHORITY_ACTIVATION_TAG =
 		keccak256("ARGON_MINTING_AUTHORITY_ACTIVATION");
-	bytes32 private constant _MINTING_AUTHORITY_DEACTIVATION_TAG =
-		keccak256("ARGON_MINTING_AUTHORITY_DEACTIVATION");
 	bytes32 private constant _GATEWAY_UPDATE_APPROVAL_TAG =
 		keccak256("ARGON_GATEWAY_UPDATE_APPROVAL");
 	bytes32 private constant _TRANSFER_OUT_OF_ARGON_AUTHORIZATION_TAG =
 		keccak256("ARGON_TRANSFER_OUT_OF_ARGON_AUTHORIZATION");
+	bytes32 private constant _GLOBAL_ISSUANCE_COUNCIL_ROTATED_ACTIVITY_TAG =
+		keccak256("ARGON_GLOBAL_ISSUANCE_COUNCIL_ROTATED_ACTIVITY");
+	bytes32 private constant _MINTING_AUTHORITY_ACTIVATED_ACTIVITY_TAG =
+		keccak256("ARGON_MINTING_AUTHORITY_ACTIVATED_ACTIVITY");
+	bytes32 private constant _MINTING_AUTHORITY_DEACTIVATED_ACTIVITY_TAG =
+		keccak256("ARGON_MINTING_AUTHORITY_DEACTIVATED_ACTIVITY");
+	bytes32 private constant _TRANSFER_TO_ARGON_STARTED_ACTIVITY_TAG =
+		keccak256("ARGON_TRANSFER_TO_ARGON_STARTED_ACTIVITY");
+	bytes32 private constant _TRANSFER_OUT_OF_ARGON_CANCELED_ACTIVITY_TAG =
+		keccak256("ARGON_TRANSFER_OUT_OF_ARGON_CANCELED_ACTIVITY");
+	bytes32 private constant _TRANSFER_OUT_OF_ARGON_FINALIZED_ACTIVITY_TAG =
+		keccak256("ARGON_TRANSFER_OUT_OF_ARGON_FINALIZED_ACTIVITY");
 
 	/// @notice Canonical Argon token managed by this gateway.
 	address public immutable argonToken;
@@ -67,6 +83,8 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 		uint64 blockNumber;
 		uint64 startGatewayActivityNonce;
 		uint64 endGatewayActivityNonce;
+		bytes32 previousLocatorHash;
+		bytes32 activityRoot;
 	}
 
 	/// @notice Shared gateway snapshot appended to every activity event.
@@ -159,7 +177,7 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 
 	/// @notice Decoded payload for a minting-authority deactivation queue item.
 	struct MintingAuthorityDeactivateTarget {
-		/// @notice Signing key that must authorize the deactivation on this chain.
+		/// @notice Signing key for the authority being removed on this chain.
 		address signingKey;
 	}
 
@@ -176,7 +194,7 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 		GatewayUpdateKind kind;
 		/// @notice Encoded target payload for the queue item kind.
 		bytes payload;
-		/// @notice Sorted council signatures for council-segment tips, or one authority signature for deactivation.
+		/// @notice Sorted council signatures for council-segment borders.
 		bytes[] signatures;
 	}
 
@@ -187,14 +205,12 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 	error InvalidCurrentCouncilSnapshot(bytes32 expected, bytes32 provided);
 	error InvalidGlobalIssuanceCouncilMember(uint256 index);
 	error InvalidMintingAuthority(address signingKey);
-	error InvalidMintingAuthorityDeactivationSigner(address expectedSigner, address recoveredSigner);
 	error InvalidMicrogonCollateralForArgonotPayout();
 	error InvalidQueueNonce(uint64 expected, uint64 provided);
 	error InvalidSignatureCount(uint256 expected, uint256 provided);
 	error InvalidSignatureOrder();
 	error InvalidTransferOutRate(uint128 maxRate, uint128 providedRate);
 	error InvalidUpdateKind(uint8 kind);
-	error LatestGatewayUpdateCannotDeactivate();
 	error InsufficientAuthorizedCollateral(uint256 authorized, uint256 required);
 	error MigrationAlreadyCompleted();
 	error MintingAuthorityAlreadyActive(address signingKey);
@@ -203,6 +219,8 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 	error TransferOutOfArgonAlreadyFinalized(bytes32 transferId);
 	error TransferOutOfArgonExpired(uint256 currentBlock, uint256 validUntilBlock);
 	error TransferOutOfArgonNotExpired(uint256 currentBlock, uint256 validUntilBlock);
+	error TooManyGatewayUpdates(uint256 maxAllowed, uint256 provided);
+	error TooManyMintingAuthorizations(uint256 maxAllowed, uint256 provided);
 	error UnsupportedToken(address token);
 	error RuntimeAmountOverflow(uint256 amount);
 	error ZeroAdminSafe();
@@ -235,10 +253,12 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 	);
 	/// @notice Emitted when a queued council rotation is applied.
 	/// @param councilHash Hash of the new council membership and weights.
+	/// @param approvalHash Canonical Argon queue approval hash consumed by this update.
 	/// @param relayerArgonAccountId Argon account that submitted the update relay.
 	/// @param gatewayState Shared gateway state snapshot after the update lands.
 	event GlobalIssuanceCouncilRotated(
 		bytes32 councilHash,
+		bytes32 approvalHash,
 		bytes32 relayerArgonAccountId,
 		GatewayActivityState gatewayState
 	);
@@ -255,6 +275,7 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 	/// @param sharedSignatureCount Number of council signatures actually supplied across that
 	/// tranche, including queued council rotations ahead of the tranche and the final signed head
 	/// update.
+	/// @param approvalHash Canonical Argon queue approval hash consumed by this update.
 	/// @param relayerArgonAccountId Argon account that submitted the update relay.
 	/// @param gatewayState Shared gateway state snapshot after the update lands.
 	event MintingAuthorityActivated(
@@ -263,6 +284,7 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 		uint128 micronotCollateral,
 		uint32 coactivationCount,
 		uint32 sharedSignatureCount,
+		bytes32 approvalHash,
 		bytes32 relayerArgonAccountId,
 		GatewayActivityState gatewayState
 	);
@@ -270,12 +292,14 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 	/// @param signingKey Signing key for the minting authority being deactivated.
 	/// @param microgonCollateral Remaining Argon collateral returned by the deactivation.
 	/// @param micronotCollateral Remaining Argonot collateral returned by the deactivation.
+	/// @param approvalHash Canonical Argon queue approval hash consumed by this update.
 	/// @param relayerArgonAccountId Argon account that submitted the update relay.
 	/// @param gatewayState Shared gateway state snapshot after the update lands.
 	event MintingAuthorityDeactivated(
 		address indexed signingKey,
 		uint128 microgonCollateral,
 		uint128 micronotCollateral,
+		bytes32 approvalHash,
 		bytes32 relayerArgonAccountId,
 		GatewayActivityState gatewayState
 	);
@@ -413,7 +437,8 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 		emit GlobalIssuanceCouncilForceUpdated(activeCouncil.councilHash, nextCouncilHash);
 	}
 
-	/// @notice Applies queued updates from Argon after verifying the required signatures for each item kind.
+	/// @notice Applies queued updates from Argon after verifying council signatures on each
+	/// council rotation and the final submitted item.
 	/// @dev Updates must start at argonApprovalsNonce + 1 and continue without gaps.
 	/// @param currentCouncil Current active council snapshot in force for the first council-approved item in the batch.
 	/// @param updates Ordered queue updates to apply.
@@ -423,11 +448,8 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 		GatewayUpdate[] calldata updates,
 		bytes32 relayerArgonAccountId
 	) external whenNotPaused {
-		if (
-			updates.length != 0
-				&& updates[updates.length - 1].kind == GatewayUpdateKind.MintingAuthorityDeactivate
-		) {
-			revert LatestGatewayUpdateCannotDeactivate();
+		if (updates.length > MAX_GATEWAY_UPDATES_PER_BATCH) {
+			revert TooManyGatewayUpdates(MAX_GATEWAY_UPDATES_PER_BATCH, updates.length);
 		}
 
 		if (globalIssuanceCouncil.councilHash == bytes32(0)) {
@@ -436,38 +458,43 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 
 		ActiveCouncilSnapshot memory activeCouncil = _currentActiveCouncilSnapshot(currentCouncil);
 		bytes32 previousUpdateHash = argonApprovalsHash;
-		uint32[] memory activationCohortCounts = new uint32[](updates.length);
-		uint32[] memory activationSharedSignatureCounts = new uint32[](updates.length);
-		uint256 lastSignedHeadIndex = _collectActivationCohorts(
-			updates,
-			activationCohortCounts,
-			activationSharedSignatureCounts
-		);
+		(
+			uint32[] memory activationCohortCounts,
+			uint32[] memory activationSharedSignatureCounts
+		) = _collectActivationCohorts(updates);
+		uint256 lastUpdateIndex = updates.length == 0 ? 0 : updates.length - 1;
 
 		for (uint256 index = 0; index < updates.length; ++index) {
 			GatewayUpdate calldata update = updates[index];
+			bool isLastItem = index == lastUpdateIndex;
 
 			uint64 expectedQueueNonce = argonApprovalsNonce + 1;
 			if (update.queueNonce != expectedQueueNonce) {
 				revert InvalidQueueNonce(expectedQueueNonce, update.queueNonce);
 			}
+			bytes32 updateHash = _hashGatewayUpdateWithCouncilHash(
+				update,
+				activeCouncil.councilHash,
+				previousUpdateHash
+			);
+			_requireCouncilBorderSignatures(update, updateHash, activeCouncil, isLastItem);
 
 			if (update.kind == GatewayUpdateKind.MintingAuthorityDeactivate) {
-				previousUpdateHash =
-					_applyMintingAuthorityDeactivate(update, previousUpdateHash, relayerArgonAccountId);
+				previousUpdateHash = _applyMintingAuthorityDeactivate(
+					update,
+					updateHash,
+					relayerArgonAccountId
+				);
 			} else if (update.kind == GatewayUpdateKind.GlobalIssuanceCouncilRotate) {
 				(activeCouncil, previousUpdateHash) = _applyGlobalIssuanceCouncilUpdate(
 					update,
-					activeCouncil,
-					previousUpdateHash,
+					updateHash,
 					relayerArgonAccountId
 				);
-			} else if (update.kind == GatewayUpdateKind.MintingAuthorityActivate){
+			} else if (update.kind == GatewayUpdateKind.MintingAuthorityActivate) {
 				previousUpdateHash = _applyMintingAuthorityActivation(
 					update,
-					activeCouncil,
-					previousUpdateHash,
-					index == lastSignedHeadIndex,
+					updateHash,
 					activationCohortCounts[index],
 					activationSharedSignatureCounts[index],
 					relayerArgonAccountId
@@ -476,6 +503,73 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 				revert InvalidUpdateKind(uint8(update.kind));
 			}
 		}
+	}
+
+	function _hashGatewayUpdateWithCouncilHash(
+		GatewayUpdate calldata update,
+		bytes32 approvingCouncilHash,
+		bytes32 previousUpdateHash
+	) private view returns (bytes32 updateHash) {
+		if (update.kind == GatewayUpdateKind.MintingAuthorityActivate) {
+			MintingAuthorityActivationTarget memory target =
+				abi.decode(update.payload, (MintingAuthorityActivationTarget));
+			return _hashActivateMintingAuthorityApproval(
+				update.queueNonce,
+				approvingCouncilHash,
+				target.microgonCollateral,
+				target.micronotCollateral,
+				target.signingKey,
+				previousUpdateHash
+			);
+		}
+
+		if (update.kind == GatewayUpdateKind.MintingAuthorityDeactivate) {
+			MintingAuthorityDeactivateTarget memory target =
+				abi.decode(update.payload, (MintingAuthorityDeactivateTarget));
+			return _hashGatewayUpdateApproval(
+				update.queueNonce,
+				approvingCouncilHash,
+				GatewayUpdateKind.MintingAuthorityDeactivate,
+				_signingKeyTargetId(target.signingKey),
+				keccak256(abi.encode(target.signingKey)),
+				previousUpdateHash
+			);
+		}
+
+		if (update.kind == GatewayUpdateKind.GlobalIssuanceCouncilRotate) {
+			GlobalIssuanceCouncilRotateTarget memory target =
+				abi.decode(update.payload, (GlobalIssuanceCouncilRotateTarget));
+			return _hashRotateGlobalIssuanceCouncilApproval(
+				update.queueNonce,
+				approvingCouncilHash,
+				target.council.signers,
+				target.council.weights,
+				target.epochMicrogonsPerArgonot,
+				previousUpdateHash
+			);
+		}
+
+		revert InvalidUpdateKind(uint8(update.kind));
+	}
+
+	function _requireCouncilBorderSignatures(
+		GatewayUpdate calldata update,
+		bytes32 updateHash,
+		ActiveCouncilSnapshot memory activeCouncil,
+		bool isLastItem
+	) private pure {
+		if (update.kind != GatewayUpdateKind.GlobalIssuanceCouncilRotate && !isLastItem) {
+			return;
+		}
+
+		_requireCouncilQuorum(
+			updateHash,
+			update.signatures,
+			activeCouncil.signers,
+			activeCouncil.weights,
+			activeCouncil.totalWeight,
+			activeCouncil.memberCount
+		);
 	}
 
 	function _currentActiveCouncilSnapshot(
@@ -505,31 +599,23 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 	}
 
 	function _collectActivationCohorts(
-		GatewayUpdate[] calldata updates,
-		uint32[] memory activationCohortCounts,
-		uint32[] memory activationSharedSignatureCounts
+		GatewayUpdate[] calldata updates
 	)
 		private
 		pure
-		returns (uint256 lastSignedHeadIndex)
+		returns (
+			uint32[] memory activationCohortCounts,
+			uint32[] memory activationSharedSignatureCounts
+		)
 	{
-		// `applyGatewayUpdates(...)` rejects batches whose final item is a deactivation, so this
-		// scan finds the last non-deactivation head that can actually land any pending activations.
-		// Trailing deactivations carry their own one-off signatures and do not close an activation
-		// tranche.
-		lastSignedHeadIndex = updates.length;
+		activationCohortCounts = new uint32[](updates.length);
+		activationSharedSignatureCounts = new uint32[](updates.length);
+		if (updates.length == 0) return (activationCohortCounts, activationSharedSignatureCounts);
+
 		uint32[] memory pendingActivationIndexes = new uint32[](updates.length);
 		uint32 pendingActivationCount = 0;
-		uint32 pendingSharedSignatureCount = 0;
-
-		for (uint256 index = updates.length; index > 0;) {
-			--index;
-
-			if (updates[index].kind != GatewayUpdateKind.MintingAuthorityDeactivate) {
-				lastSignedHeadIndex = index;
-				break;
-			}
-		}
+		uint32 carriedSignatureCount = 0;
+		uint256 lastUpdateIndex = updates.length - 1;
 
 		for (uint256 index = 0; index < updates.length; ++index) {
 			GatewayUpdateKind kind = updates[index].kind;
@@ -538,22 +624,23 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 				++pendingActivationCount;
 			}
 
-			if (
-				kind == GatewayUpdateKind.GlobalIssuanceCouncilRotate
-					|| index == lastSignedHeadIndex
-			) {
-				pendingSharedSignatureCount += uint32(updates[index].signatures.length);
-				if (pendingActivationCount != 0) {
-					for (uint256 activationIndex = 0; activationIndex < pendingActivationCount; ++activationIndex) {
-						uint256 updateIndex = uint256(pendingActivationIndexes[activationIndex]);
-						activationCohortCounts[updateIndex] = pendingActivationCount;
-						activationSharedSignatureCounts[updateIndex] = pendingSharedSignatureCount;
-					}
-					pendingActivationCount = 0;
-					pendingSharedSignatureCount = 0;
-				}
+			bool isBorder =
+				kind == GatewayUpdateKind.GlobalIssuanceCouncilRotate || index == lastUpdateIndex;
+			if (!isBorder) continue;
+
+			carriedSignatureCount += uint32(updates[index].signatures.length);
+			if (pendingActivationCount == 0) continue;
+
+			for (uint256 activationIndex = 0; activationIndex < pendingActivationCount; ++activationIndex) {
+				uint256 updateIndex = uint256(pendingActivationIndexes[activationIndex]);
+				activationCohortCounts[updateIndex] = pendingActivationCount;
+				activationSharedSignatureCounts[updateIndex] = carriedSignatureCount;
 			}
+			pendingActivationCount = 0;
+			carriedSignatureCount = 0;
 		}
+
+		return (activationCohortCounts, activationSharedSignatureCounts);
 	}
 
 	/// @notice Burns tokens on this chain to start a transfer to Argon.
@@ -580,13 +667,19 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 		ICanonicalToken(token).permit(msg.sender, address(this), tokenAmount, deadline, v, r, s);
 		ICanonicalToken(token).burnFrom(msg.sender, tokenAmount);
 
-		uint64 activityNonce = _nextGatewayActivityNonce();
+		GatewayActivityState memory gatewayState = _gatewayActivityState(gatewayActivityNonce + 1);
+		_recordActivity(
+			gatewayState,
+			_hashTransferToArgonStartedActivity(
+				msg.sender, token, amount, argonAccountId, gatewayState
+			)
+		);
 		emit TransferToArgonStarted(
 			msg.sender,
 			token,
 			amount,
 			argonAccountId,
-			_gatewayActivityState(activityNonce)
+			gatewayState
 		);
 	}
 
@@ -601,6 +694,11 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 		_requireTransferOutOfArgonChain(request);
 		_requireCanonicalToken(request.token);
 		if (request.amount == 0) revert ZeroAmount();
+		if (proof.authorizations.length > MAX_MINTING_AUTHORIZATIONS_PER_TRANSFER) {
+			revert TooManyMintingAuthorizations(
+				MAX_MINTING_AUTHORIZATIONS_PER_TRANSFER, proof.authorizations.length
+			);
+		}
 
 		if (block.number > request.validUntilBlock) {
 			revert TransferOutOfArgonExpired(block.number, request.validUntilBlock);
@@ -690,13 +788,19 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 			request.recipient, toTokenAmount(request.amount)
 		);
 
-		uint64 activityNonce = _nextGatewayActivityNonce();
+		GatewayActivityState memory gatewayState = _gatewayActivityState(gatewayActivityNonce + 1);
+		_recordActivity(
+			gatewayState,
+			_hashTransferOutOfArgonFinalizedActivity(
+				transferId, request.token, request.amount, mintingCollateral, gatewayState
+			)
+		);
 		emit TransferOutOfArgonFinalized(
 			transferId,
 			request.token,
 			request.amount,
 			mintingCollateral,
-			_gatewayActivityState(activityNonce)
+			gatewayState
 		);
 	}
 
@@ -718,10 +822,14 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 		_requireTransferOutOfArgonNotFinalized(transferId);
 		_setTransferOutOfArgonFinalized(transferId);
 
-		uint64 activityNonce = _nextGatewayActivityNonce();
+		GatewayActivityState memory gatewayState = _gatewayActivityState(gatewayActivityNonce + 1);
+		_recordActivity(
+			gatewayState,
+			_hashTransferOutOfArgonCanceledActivity(transferId, gatewayState)
+		);
 		emit TransferOutOfArgonCanceled(
 			transferId,
-			_gatewayActivityState(activityNonce)
+			gatewayState
 		);
 	}
 
@@ -752,6 +860,13 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 		return uint256(amount) * RUNTIME_TO_ERC20_SCALE;
 	}
 
+	/// @notice Returns the storage slot used as the activityBlockLocators mapping seed.
+	function activityBlockLocatorsMappingSlot() external pure returns (uint256 slot) {
+		assembly {
+			slot := activityBlockLocators.slot
+		}
+	}
+
 	/// @notice Unpauses the gateway.
 	function unpause() external onlyOwner {
 		_unpause();
@@ -769,15 +884,14 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 		return _toRuntimeAmount(ICanonicalToken(argonotToken).totalSupply());
 	}
 
-	/// Applies one council rotation after quorum verification.
+	/// Applies one council rotation after the batch-level border verification succeeds.
 	function _applyGlobalIssuanceCouncilUpdate(
 		GatewayUpdate calldata update,
-		ActiveCouncilSnapshot memory activeCouncil,
-		bytes32 previousUpdateHash,
+		bytes32 approvalHash,
 		bytes32 relayerArgonAccountId
 	)
 		private
-		returns (ActiveCouncilSnapshot memory nextCouncilState, bytes32 updateHash)
+		returns (ActiveCouncilSnapshot memory nextCouncilState, bytes32 nextApprovalHash)
 	{
 		GlobalIssuanceCouncilRotateTarget memory target =
 			abi.decode(update.payload, (GlobalIssuanceCouncilRotateTarget));
@@ -792,23 +906,6 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 				target.council.weights,
 				target.epochMicrogonsPerArgonot
 			);
-		updateHash = _hashRotateGlobalIssuanceCouncilApproval(
-			update.queueNonce,
-			activeCouncil.councilHash,
-			target.council.signers,
-			target.council.weights,
-			target.epochMicrogonsPerArgonot,
-			previousUpdateHash
-		);
-		_requireCouncilQuorum(
-			updateHash,
-			update.signatures,
-			activeCouncil.signers,
-			activeCouncil.weights,
-			activeCouncil.totalWeight,
-			activeCouncil.memberCount
-		);
-
 		_storeGlobalIssuanceCouncil(
 			nextCouncilHash,
 			nextCouncilTotalWeight,
@@ -817,13 +914,20 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 		);
 		maxTransferOutMicrogonsPerArgonot = target.epochMicrogonsPerArgonot;
 		argonApprovalsNonce = update.queueNonce;
-		argonApprovalsHash = updateHash;
+		argonApprovalsHash = approvalHash;
 
-		uint64 activityNonce = _nextGatewayActivityNonce();
+		GatewayActivityState memory gatewayState = _gatewayActivityState(gatewayActivityNonce + 1);
+		_recordActivity(
+			gatewayState,
+			_hashGlobalIssuanceCouncilRotatedActivity(
+				nextCouncilHash, approvalHash, relayerArgonAccountId, gatewayState
+			)
+		);
 		emit GlobalIssuanceCouncilRotated(
 			nextCouncilHash,
+			approvalHash,
 			relayerArgonAccountId,
-			_gatewayActivityState(activityNonce)
+			gatewayState
 		);
 
 		return (
@@ -834,20 +938,18 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 				totalWeight: nextCouncilTotalWeight,
 				memberCount: nextCouncilMemberCount
 			}),
-			updateHash
+			approvalHash
 		);
 	}
 
-	/// Applies one minting-authority activation after quorum verification.
+	/// Applies one minting-authority activation after the batch-level border verification succeeds.
 	function _applyMintingAuthorityActivation(
 		GatewayUpdate calldata update,
-		ActiveCouncilSnapshot memory activeCouncil,
-		bytes32 previousUpdateHash,
-		bool requireCouncilVerification,
+		bytes32 approvalHash,
 		uint32 coactivationCount,
 		uint32 sharedSignatureCount,
 		bytes32 relayerArgonAccountId
-	) private returns (bytes32 updateHash) {
+	) private returns (bytes32 nextApprovalHash) {
 		MintingAuthorityActivationTarget memory target =
 			abi.decode(update.payload, (MintingAuthorityActivationTarget));
 		if (target.signingKey == address(0)) revert ZeroSigningKey();
@@ -866,68 +968,52 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 			revert MintingAuthorityAlreadyActive(target.signingKey);
 		}
 
-		updateHash = _hashActivateMintingAuthorityApproval(
-			update.queueNonce,
-			activeCouncil.councilHash,
-			target.microgonCollateral,
-			target.micronotCollateral,
-			target.signingKey,
-			previousUpdateHash
-		);
-		if (requireCouncilVerification) {
-			_requireCouncilQuorum(
-				updateHash,
-				update.signatures,
-				activeCouncil.signers,
-				activeCouncil.weights,
-				activeCouncil.totalWeight,
-				activeCouncil.memberCount
-			);
-		}
-
 		mintingAuthorityCollateralRemaining[target.signingKey] = MintingCollateral({
 			microgonCollateral: target.microgonCollateral,
 			micronotCollateral: target.micronotCollateral
 		});
 
 		argonApprovalsNonce = update.queueNonce;
-		argonApprovalsHash = updateHash;
-		uint64 activityNonce = _nextGatewayActivityNonce();
+		argonApprovalsHash = approvalHash;
+
+		GatewayActivityState memory gatewayState = _gatewayActivityState(gatewayActivityNonce + 1);
+		_recordActivity(
+			gatewayState,
+			_hashMintingAuthorityActivatedActivity(
+				target.signingKey,
+				target.microgonCollateral,
+				target.micronotCollateral,
+				coactivationCount,
+				sharedSignatureCount,
+				approvalHash,
+				relayerArgonAccountId,
+				gatewayState
+			)
+		);
 		emit MintingAuthorityActivated(
 			target.signingKey,
 			target.microgonCollateral,
 			target.micronotCollateral,
 			coactivationCount,
 			sharedSignatureCount,
+			approvalHash,
 			relayerArgonAccountId,
-			_gatewayActivityState(activityNonce)
+			gatewayState
 		);
+		return approvalHash;
 	}
 
-	/// Applies one minting-authority deactivation after verifying the authority signing key.
+	/// Applies one minting-authority deactivation after the batch-level border verification
+	/// succeeds.
 	function _applyMintingAuthorityDeactivate(
 		GatewayUpdate calldata update,
-		bytes32 previousUpdateHash,
+		bytes32 approvalHash,
 		bytes32 relayerArgonAccountId
-	) private returns (bytes32 updateHash) {
+	) private returns (bytes32 nextApprovalHash) {
 		MintingAuthorityDeactivateTarget memory target =
 			abi.decode(update.payload, (MintingAuthorityDeactivateTarget));
-		if (update.signatures.length != 1) {
-			revert InvalidSignatureCount(1, update.signatures.length);
-		}
+		if (target.signingKey == address(0)) revert ZeroSigningKey();
 
-		updateHash = _hashMintingAuthorityDeactivation(
-			update.queueNonce, target.signingKey, previousUpdateHash
-		);
-		address recoveredSigner = ECDSA.recoverCalldata(
-			updateHash.toEthSignedMessageHash(),
-			update.signatures[0]
-		);
-		if (recoveredSigner != target.signingKey) {
-			revert InvalidMintingAuthorityDeactivationSigner(
-				target.signingKey, recoveredSigner
-			);
-		}
 		MintingCollateral storage collateralRemaining =
 			mintingAuthorityCollateralRemaining[target.signingKey];
 
@@ -936,16 +1022,29 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 
 		delete mintingAuthorityCollateralRemaining[target.signingKey];
 		argonApprovalsNonce = update.queueNonce;
-		argonApprovalsHash = updateHash;
+		argonApprovalsHash = approvalHash;
 
-		uint64 activityNonce = _nextGatewayActivityNonce();
+		GatewayActivityState memory gatewayState = _gatewayActivityState(gatewayActivityNonce + 1);
+		_recordActivity(
+			gatewayState,
+			_hashMintingAuthorityDeactivatedActivity(
+				target.signingKey,
+				microgonCollateral,
+				micronotCollateral,
+				approvalHash,
+				relayerArgonAccountId,
+				gatewayState
+			)
+		);
 		emit MintingAuthorityDeactivated(
 			target.signingKey,
 			microgonCollateral,
 			micronotCollateral,
+			approvalHash,
 			relayerArgonAccountId,
-			_gatewayActivityState(activityNonce)
+			gatewayState
 		);
+		return approvalHash;
 	}
 
 	/// Counts valid council signatures and the weight they represent.
@@ -1027,15 +1126,13 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 		});
 	}
 
-	/// Increments the activity counter and records it for the current block.
-	function _nextGatewayActivityNonce() private returns (uint64 nextNonce) {
-		nextNonce = gatewayActivityNonce + 1;
-		gatewayActivityNonce = nextNonce;
-		_recordActivity(nextNonce);
-	}
-
-	/// Updates the locator entry for the current block.
-	function _recordActivity(uint64 activityNonce) private {
+	/// Updates the locator entry for the current block using the fully encoded event leaf hash.
+	function _recordActivity(
+		GatewayActivityState memory gatewayState,
+		bytes32 activityLeaf
+	) private {
+		uint64 activityNonce = gatewayState.gatewayActivityNonce;
+		gatewayActivityNonce = activityNonce;
 		uint64 currentBlock = uint64(block.number);
 
 		if (latestActivityBlockLocatorIndex == 0) {
@@ -1043,7 +1140,9 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 			activityBlockLocators[1] = ActivityBlockLocator({
 				blockNumber: currentBlock,
 				startGatewayActivityNonce: activityNonce,
-				endGatewayActivityNonce: activityNonce
+				endGatewayActivityNonce: activityNonce,
+				previousLocatorHash: bytes32(0),
+				activityRoot: _appendActivityRoot(bytes32(0), activityLeaf)
 			});
 			return;
 		}
@@ -1053,6 +1152,7 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 		if (latestLocator.blockNumber == currentBlock) {
 			// If this block already has a locator entry, just extend its end nonce.
 			latestLocator.endGatewayActivityNonce = activityNonce;
+			latestLocator.activityRoot = _appendActivityRoot(latestLocator.activityRoot, activityLeaf);
 			return;
 		}
 
@@ -1061,8 +1161,167 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 		activityBlockLocators[nextLocatorIndex] = ActivityBlockLocator({
 			blockNumber: currentBlock,
 			startGatewayActivityNonce: activityNonce,
-			endGatewayActivityNonce: activityNonce
+			endGatewayActivityNonce: activityNonce,
+			previousLocatorHash: _hashActivityBlockLocator(latestLocator),
+			activityRoot: _appendActivityRoot(bytes32(0), activityLeaf)
 		});
+	}
+
+	function _appendActivityRoot(bytes32 currentRoot, bytes32 activityLeaf) private pure returns (bytes32) {
+		return keccak256(abi.encode(ACTIVITY_HASH_VERSION, currentRoot, activityLeaf));
+	}
+
+	function _hashActivityBlockLocator(
+		ActivityBlockLocator memory locator
+	) private pure returns (bytes32) {
+		return keccak256(
+			abi.encode(
+				ACTIVITY_HASH_VERSION,
+				locator.blockNumber,
+				locator.startGatewayActivityNonce,
+				locator.endGatewayActivityNonce,
+				locator.previousLocatorHash,
+				locator.activityRoot
+			)
+		);
+	}
+
+	function _hashGlobalIssuanceCouncilRotatedActivity(
+		bytes32 councilHash,
+		bytes32 approvalHash,
+		bytes32 relayerArgonAccountId,
+		GatewayActivityState memory gatewayState
+	) private view returns (bytes32) {
+		return keccak256(
+			abi.encode(
+				_GLOBAL_ISSUANCE_COUNCIL_ROTATED_ACTIVITY_TAG,
+				ACTIVITY_HASH_VERSION,
+				block.chainid,
+				address(this),
+				councilHash,
+				approvalHash,
+				relayerArgonAccountId,
+				_hashGatewayActivityState(gatewayState)
+			)
+		);
+	}
+
+	function _hashMintingAuthorityActivatedActivity(
+		address signingKey,
+		uint128 microgonCollateral,
+		uint128 micronotCollateral,
+		uint32 coactivationCount,
+		uint32 sharedSignatureCount,
+		bytes32 approvalHash,
+		bytes32 relayerArgonAccountId,
+		GatewayActivityState memory gatewayState
+	) private view returns (bytes32) {
+		return keccak256(
+			abi.encode(
+				_MINTING_AUTHORITY_ACTIVATED_ACTIVITY_TAG,
+				ACTIVITY_HASH_VERSION,
+				block.chainid,
+				address(this),
+				signingKey,
+				microgonCollateral,
+				micronotCollateral,
+				coactivationCount,
+				sharedSignatureCount,
+				approvalHash,
+				relayerArgonAccountId,
+				_hashGatewayActivityState(gatewayState)
+			)
+		);
+	}
+
+	function _hashMintingAuthorityDeactivatedActivity(
+		address signingKey,
+		uint128 microgonCollateral,
+		uint128 micronotCollateral,
+		bytes32 approvalHash,
+		bytes32 relayerArgonAccountId,
+		GatewayActivityState memory gatewayState
+	) private view returns (bytes32) {
+		return keccak256(
+			abi.encode(
+				_MINTING_AUTHORITY_DEACTIVATED_ACTIVITY_TAG,
+				ACTIVITY_HASH_VERSION,
+				block.chainid,
+				address(this),
+				signingKey,
+				microgonCollateral,
+				micronotCollateral,
+				approvalHash,
+				relayerArgonAccountId,
+				_hashGatewayActivityState(gatewayState)
+			)
+		);
+	}
+
+	function _hashTransferToArgonStartedActivity(
+		address from,
+		address token,
+		uint128 amount,
+		bytes32 argonAccountId,
+		GatewayActivityState memory gatewayState
+	) private view returns (bytes32) {
+		return keccak256(
+			abi.encode(
+				_TRANSFER_TO_ARGON_STARTED_ACTIVITY_TAG,
+				ACTIVITY_HASH_VERSION,
+				block.chainid,
+				address(this),
+				from,
+				token,
+				amount,
+				argonAccountId,
+				_hashGatewayActivityState(gatewayState)
+			)
+		);
+	}
+
+	function _hashTransferOutOfArgonCanceledActivity(
+		bytes32 transferId,
+		GatewayActivityState memory gatewayState
+	) private view returns (bytes32) {
+		return keccak256(
+			abi.encode(
+				_TRANSFER_OUT_OF_ARGON_CANCELED_ACTIVITY_TAG,
+				ACTIVITY_HASH_VERSION,
+				block.chainid,
+				address(this),
+				transferId,
+				_hashGatewayActivityState(gatewayState)
+			)
+		);
+	}
+
+	function _hashTransferOutOfArgonFinalizedActivity(
+		bytes32 transferId,
+		address token,
+		uint128 amount,
+		MintingAuthorityCollateral[] memory mintingCollateral,
+		GatewayActivityState memory gatewayState
+	) private view returns (bytes32) {
+		return keccak256(
+			abi.encode(
+				_TRANSFER_OUT_OF_ARGON_FINALIZED_ACTIVITY_TAG,
+				ACTIVITY_HASH_VERSION,
+				block.chainid,
+				address(this),
+				transferId,
+				token,
+				amount,
+				keccak256(abi.encode(mintingCollateral)),
+				_hashGatewayActivityState(gatewayState)
+			)
+		);
+	}
+
+	function _hashGatewayActivityState(
+		GatewayActivityState memory gatewayState
+	) private pure returns (bytes32) {
+		return keccak256(abi.encode(gatewayState));
 	}
 
 	/// Reverts unless the token is managed by this gateway.
@@ -1323,28 +1582,6 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 			_signingKeyTargetId(signingKey),
 			_hashActivateMintingAuthority(microgonCollateral, micronotCollateral, signingKey),
 			previousUpdateHash
-		);
-	}
-
-	/// @notice Returns the hash that a minting authority signs to authorize its own deactivation.
-	/// @param queueNonce Contiguous queue nonce being applied.
-	/// @param signingKey Signing key that must authorize the deactivation on this chain.
-	/// @param previousUpdateHash Chained signed hash of the immediately previous queue item.
-	/// @return deactivateHash Deactivation authorization hash.
-	function _hashMintingAuthorityDeactivation(
-		uint64 queueNonce,
-		address signingKey,
-		bytes32 previousUpdateHash
-	) private view returns (bytes32) {
-		return keccak256(
-			abi.encode(
-				_MINTING_AUTHORITY_DEACTIVATION_TAG,
-				block.chainid,
-				address(this),
-				queueNonce,
-				signingKey,
-				previousUpdateHash
-			)
 		);
 	}
 

@@ -186,7 +186,6 @@ impl<T: Config> Pallet<T> {
 	pub(crate) fn do_deactivate_minting_authority(
 		account_id: T::AccountId,
 		destination_signing_key: H160,
-		signature: KeccakSignature,
 	) -> DispatchResultWithPostInfo {
 		let mut destination_chain = None;
 		let mut queued_nonce = None;
@@ -275,32 +274,12 @@ impl<T: Config> Pallet<T> {
 				)
 				.ok_or(Error::<T>::CouncilApprovalQueueEntryNotFound)?;
 				ensure!(
-					Self::recover_evm_message_signer(queue_entry.approval_hash, &signature) ==
-						Some(destination_signing_key),
-					Error::<T>::InvalidMintingAuthorityDeactivationSignature,
+					queue_entry.target ==
+						CouncilApprovalTargetId::MintingAuthorityDeactivation(
+							destination_signing_key,
+						),
+					Error::<T>::MintingAuthorityMismatch,
 				);
-
-				CouncilApprovalQueueByDestinationChainAndNonce::<T>::try_mutate(
-					authority.destination_chain,
-					queue_nonce,
-					|entry| -> DispatchResult {
-						let entry =
-							entry.as_mut().ok_or(Error::<T>::CouncilApprovalQueueEntryNotFound)?;
-						ensure!(
-							entry.target ==
-								CouncilApprovalTargetId::MintingAuthorityDeactivation(
-									destination_signing_key,
-								),
-							Error::<T>::MintingAuthorityMismatch,
-						);
-						entry.signatures.remove(&destination_signing_key);
-						let _ = entry
-							.signatures
-							.try_insert(destination_signing_key, signature)
-							.map_err(|_| Error::<T>::InvalidGlobalIssuanceCouncil)?;
-						Ok(())
-					},
-				)?;
 				Ok(())
 			},
 		)?;
@@ -429,18 +408,20 @@ mod tests {
 		tests::{
 			account, activate_test_minting_authority, assert_noop, assert_ok, bounded_vec,
 			encumbered_argonot_micronots, encumbered_bond_microgons, h160,
-			minting_authority_deactivation_signature, minting_authority_registration_signature,
-			new_test_ext, set_active_bond_amount, set_committed_argonots,
-			transfer_collateral_signature, Balances, CrosschainTransfer, Mutate, Ownership,
-			RuntimeOrigin, TokenError,
+			minting_authority_registration_signature, new_test_ext, set_active_bond_amount,
+			set_committed_argonots, transfer_collateral_signature, Balances, CrosschainTransfer,
+			Mutate, Ownership, RuntimeOrigin, TokenError,
 		},
 		ActiveGlobalIssuanceCouncilByDestinationChain,
 		CouncilApprovalCursorByDestinationChainAndAccountId,
-		CouncilApprovalQueueByDestinationChainAndNonce, CouncilApprovalTargetId, Error,
+		CouncilApprovalQueueByDestinationChainAndNonce, CouncilApprovalQueueEntry,
+		CouncilApprovalTargetId, Error, GlobalIssuanceCouncilByHash,
 		MinimumMintingAuthorityValueByDestinationChain, MintingAuthoritiesBySigner,
-		MintingAuthority, MintingAuthorityState, SourceChain,
+		MintingAuthority, MintingAuthorityState, NextCouncilApprovalQueueNonceByDestinationChain,
+		SourceChain,
 	};
 	use argon_ethereum_contracts::minting_gateway as ethereum_contracts;
+	use polkadot_sdk::sp_runtime::BoundedBTreeMap;
 
 	use crate::tests::{
 		configure_single_member_ethereum_council, council_signer, council_signing_pair,
@@ -638,6 +619,146 @@ mod tests {
 	}
 
 	#[test]
+	fn register_minting_authority_counts_unresolved_rotations_and_ignores_deactivations_in_signature_quote(
+	) {
+		new_test_ext().execute_with(|| {
+			let authority_account = account(32);
+			let council_pair = council_signing_pair(16);
+			let authority_pair = council_signing_pair(17);
+			let signing_key = council_signer(&authority_pair);
+
+			configure_single_member_ethereum_council(
+				authority_account.clone(),
+				18,
+				10_000,
+				&council_pair,
+			);
+			assert_ok!(Balances::mint_into(&authority_account, 10_000));
+			set_active_bond_amount(18, authority_account.clone(), 10_000);
+
+			let active_council_hash =
+				ActiveGlobalIssuanceCouncilByDestinationChain::<Test>::get(SourceChain::Ethereum)
+					.expect("active council should exist");
+			let first_rotation_hash = H256::repeat_byte(0x41);
+			let second_rotation_hash = H256::repeat_byte(0x42);
+			let third_rotation_hash = H256::repeat_byte(0x43);
+
+			GlobalIssuanceCouncilByHash::<Test>::insert(
+				first_rotation_hash,
+				GlobalIssuanceCouncilByHash::<Test>::get(active_council_hash)
+					.expect("active council should be stored"),
+			);
+			GlobalIssuanceCouncilByHash::<Test>::insert(
+				second_rotation_hash,
+				GlobalIssuanceCouncilByHash::<Test>::get(active_council_hash)
+					.expect("active council should be stored"),
+			);
+			GlobalIssuanceCouncilByHash::<Test>::insert(
+				third_rotation_hash,
+				GlobalIssuanceCouncilByHash::<Test>::get(active_council_hash)
+					.expect("active council should be stored"),
+			);
+
+			CouncilApprovalQueueByDestinationChainAndNonce::<Test>::insert(
+				SourceChain::Ethereum,
+				1,
+				CouncilApprovalQueueEntry::<Test> {
+					approving_council_hash: active_council_hash,
+					target: CouncilApprovalTargetId::GlobalIssuanceCouncilRotation(
+						first_rotation_hash,
+					),
+					target_payload_hash: H256::repeat_byte(0x51),
+					due_frame_id: 1,
+					previous_approval_hash: H256::zero(),
+					approval_hash: H256::repeat_byte(0x52),
+					approved_total_weight: 0,
+					signatures: BoundedBTreeMap::new(),
+				},
+			);
+			CouncilApprovalQueueByDestinationChainAndNonce::<Test>::insert(
+				SourceChain::Ethereum,
+				2,
+				CouncilApprovalQueueEntry::<Test> {
+					approving_council_hash: first_rotation_hash,
+					target: CouncilApprovalTargetId::MintingAuthorityDeactivation(h160(0x77)),
+					target_payload_hash: H256::repeat_byte(0x61),
+					due_frame_id: 1,
+					previous_approval_hash: H256::repeat_byte(0x52),
+					approval_hash: H256::repeat_byte(0x62),
+					approved_total_weight: 0,
+					signatures: BoundedBTreeMap::new(),
+				},
+			);
+			CouncilApprovalQueueByDestinationChainAndNonce::<Test>::insert(
+				SourceChain::Ethereum,
+				3,
+				CouncilApprovalQueueEntry::<Test> {
+					approving_council_hash: first_rotation_hash,
+					target: CouncilApprovalTargetId::GlobalIssuanceCouncilRotation(
+						second_rotation_hash,
+					),
+					target_payload_hash: H256::repeat_byte(0x71),
+					due_frame_id: 1,
+					previous_approval_hash: H256::repeat_byte(0x62),
+					approval_hash: H256::repeat_byte(0x72),
+					approved_total_weight: 0,
+					signatures: BoundedBTreeMap::new(),
+				},
+			);
+			CouncilApprovalQueueByDestinationChainAndNonce::<Test>::insert(
+				SourceChain::Ethereum,
+				4,
+				CouncilApprovalQueueEntry::<Test> {
+					approving_council_hash: second_rotation_hash,
+					target: CouncilApprovalTargetId::GlobalIssuanceCouncilRotation(
+						third_rotation_hash,
+					),
+					target_payload_hash: H256::repeat_byte(0x81),
+					due_frame_id: 1,
+					previous_approval_hash: H256::repeat_byte(0x72),
+					approval_hash: H256::repeat_byte(0x82),
+					approved_total_weight: 0,
+					signatures: BoundedBTreeMap::new(),
+				},
+			);
+			NextCouncilApprovalQueueNonceByDestinationChain::<Test>::insert(
+				SourceChain::Ethereum,
+				4,
+			);
+			assert_ok!(CrosschainTransfer::refresh_destination_chain_queue_tracking(
+				SourceChain::Ethereum,
+			));
+			MinimumMintingAuthorityValueByDestinationChain::<Test>::insert(
+				SourceChain::Ethereum,
+				1,
+			);
+
+			assert_ok!(CrosschainTransfer::register_minting_authority(
+				RuntimeOrigin::signed(authority_account.clone()),
+				SourceChain::Ethereum,
+				signing_key,
+				minting_authority_registration_signature(&authority_pair, &authority_account),
+				4_000,
+				0,
+			));
+
+			let authority = MintingAuthoritiesBySigner::<Test>::get(signing_key)
+				.expect("authority should be queued");
+			assert_eq!(authority.activation_approval_queue_nonce, 5);
+			assert_eq!(authority.activation_signature_repayment_quote, 200);
+			assert_eq!(
+				CouncilApprovalQueueByDestinationChainAndNonce::<Test>::get(
+					SourceChain::Ethereum,
+					5,
+				)
+				.expect("activation queue entry should exist")
+				.approving_council_hash,
+				third_rotation_hash,
+			);
+		});
+	}
+
+	#[test]
 	fn deactivate_minting_authority_moves_authority_into_deactivating_and_queues_entry() {
 		new_test_ext().execute_with(|| {
 			let authority_account = account(34);
@@ -651,18 +772,10 @@ mod tests {
 				10_000,
 				0,
 			);
-			let deactivation_signature = minting_authority_deactivation_signature(
-				&authority_pair,
-				2,
-				signing_key,
-				CrosschainTransfer::previous_gateway_update_hash(SourceChain::Ethereum, 2)
-					.expect("activation queue entry should anchor deactivation"),
-			);
 
 			assert_ok!(CrosschainTransfer::deactivate_minting_authority(
 				RuntimeOrigin::signed(authority_account.clone()),
 				signing_key,
-				deactivation_signature,
 			));
 
 			let authority = MintingAuthoritiesBySigner::<Test>::get(signing_key)
@@ -684,15 +797,12 @@ mod tests {
 				deactivation_entry.target_payload_hash,
 				CrosschainTransfer::hash_deactivate_minting_authority_target(signing_key),
 			);
-			assert_eq!(
-				deactivation_entry.signatures.get(&signing_key),
-				Some(&deactivation_signature),
-			);
+			assert!(deactivation_entry.signatures.is_empty());
 		});
 	}
 
 	#[test]
-	fn deactivate_minting_authority_skips_council_cursor_blocking() {
+	fn deactivate_minting_authority_blocks_council_cursor_until_approved() {
 		new_test_ext().execute_with(|| {
 			let authority_account = account(35);
 			let council_pair = council_signing_pair(22);
@@ -725,19 +835,9 @@ mod tests {
 				5_000,
 				0,
 			));
-			let previous_approval_hash =
-				CrosschainTransfer::previous_gateway_update_hash(SourceChain::Ethereum, 2)
-					.expect("activation queue entry should anchor deactivation");
-			let deactivation_signature = minting_authority_deactivation_signature(
-				&authority_pair,
-				2,
-				signing_key,
-				previous_approval_hash,
-			);
 			assert_ok!(CrosschainTransfer::deactivate_minting_authority(
 				RuntimeOrigin::signed(authority_account.clone()),
 				signing_key,
-				deactivation_signature,
 			));
 
 			let authority = MintingAuthoritiesBySigner::<Test>::get(signing_key)
@@ -758,6 +858,23 @@ mod tests {
 				),
 				10_000,
 				0,
+			));
+
+			assert_noop!(
+				CrosschainTransfer::approve_queue_entries(
+					RuntimeOrigin::signed(authority_account.clone()),
+					SourceChain::Ethereum,
+					bounded_vec![crate::tests::minting_authority_approval_signature(
+						&council_pair,
+						3,
+					)],
+				),
+				Error::<Test>::InvalidCouncilApprovalSignature,
+			);
+			assert_ok!(CrosschainTransfer::approve_queue_entries(
+				RuntimeOrigin::signed(authority_account.clone()),
+				SourceChain::Ethereum,
+				bounded_vec![crate::tests::minting_authority_approval_signature(&council_pair, 2,)],
 			));
 			assert_ok!(CrosschainTransfer::approve_queue_entries(
 				RuntimeOrigin::signed(authority_account.clone()),

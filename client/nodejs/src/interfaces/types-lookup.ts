@@ -3433,7 +3433,6 @@ declare module '@polkadot/types/lookup' {
     readonly isDeactivateMintingAuthority: boolean;
     readonly asDeactivateMintingAuthority: {
       readonly destinationSigningKey: H160;
-      readonly signature: U8aFixed;
     } & Struct;
     readonly isTransferOut: boolean;
     readonly asTransferOut: {

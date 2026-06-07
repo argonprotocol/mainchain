@@ -57,6 +57,7 @@ curl -H "Content-Type: application/json" -d '{"id":"1", "jsonrpc":"2.0", "method
 (cd "$BASEDIR" && yarn)
 (cd "$BASEDIR/nodejs" && yarn build)
 (cd "$BASEDIR" && yarn lint)
+(cd "$BASEDIR" && cargo make fmt)
 
 # Cleanup and exit (this will be called automatically via trap)
 cleanup

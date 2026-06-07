@@ -133,11 +133,16 @@ impl<T: Config> Pallet<T> {
 				)),
 			CouncilApprovalTargetId::MintingAuthorityDeactivation(destination_signing_key) =>
 				Ok(H256::from_slice(
-					ethereum_contracts::hash_minting_authority_deactivation(
+					ethereum_contracts::hash_gateway_update_approval(
 						chain_id,
 						AlloyAddress::from_slice(gateway.as_bytes()),
 						queue_nonce,
-						AlloyAddress::from_slice(destination_signing_key.as_bytes()),
+						B256::from(entry.approving_council_hash.0),
+						2u8,
+						ethereum_contracts::destination_signing_key_target_id(
+							AlloyAddress::from_slice(destination_signing_key.as_bytes()),
+						),
+						B256::from(entry.target_payload_hash.0),
 						B256::from(entry.previous_approval_hash.0),
 					)
 					.as_slice(),
@@ -260,6 +265,8 @@ impl<T: Config> Pallet<T> {
 				microgon_collateral: activity.microgonCollateral.into(),
 				micronot_collateral: activity.micronotCollateral.into(),
 				coactivation_count: activity.coactivationCount,
+				shared_signature_count: activity.sharedSignatureCount,
+				approval_hash: H256::from_slice(activity.approvalHash.as_slice()),
 				relayer_argon_account_id: activity.relayerArgonAccountId.0,
 				gateway_state: Self::gateway_state_from_contract(activity.gatewayState),
 			});
@@ -273,6 +280,7 @@ impl<T: Config> Pallet<T> {
 			.map_err(|_| Error::<T>::InvalidGatewayActivity)?;
 			return Ok(DecodedGatewayActivity::GlobalIssuanceCouncilRotated {
 				council_hash: H256::from_slice(activity.councilHash.as_slice()),
+				approval_hash: H256::from_slice(activity.approvalHash.as_slice()),
 				gateway_state: Self::gateway_state_from_contract(activity.gatewayState),
 			});
 		}
@@ -287,6 +295,7 @@ impl<T: Config> Pallet<T> {
 				destination_signing_key: H160::from_slice(activity.signingKey.as_slice()),
 				microgon_collateral: activity.microgonCollateral.into(),
 				micronot_collateral: activity.micronotCollateral.into(),
+				approval_hash: H256::from_slice(activity.approvalHash.as_slice()),
 				gateway_state: Self::gateway_state_from_contract(activity.gatewayState),
 			});
 		}

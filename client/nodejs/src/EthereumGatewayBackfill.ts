@@ -2,7 +2,7 @@ import camelcaseKeys from 'camelcase-keys';
 import { type Hex } from 'viem';
 import type {
   EthereumBeaconConfigSpecResponse,
-  EthereumBeaconHeadersResponse,
+  EthereumBeaconGenesisResponse,
   EthereumLightClientBootstrapResponse,
 } from './EthereumBeaconTypes';
 import { buildExecutionHeaderProof, getBeaconJson } from './EthereumBeaconApi';
@@ -10,7 +10,7 @@ import {
   discoverGatewayActivities,
   loadRetainedExecutionHeaderAnchorAtOrAfterBlock,
 } from './EthereumGatewayActivityProof';
-import type { EthereumExecutionSource } from './EthereumExecution';
+import { getExecutionClient, type EthereumExecutionSource } from './EthereumExecution';
 import type { ArgonClient, IArgonQueryable } from './index';
 
 export type EthereumExecutionHeaderBackfillPayload = {
@@ -26,6 +26,12 @@ export type EthereumExecutionHeaderBackfillPayload = {
   executionHeaderProof: ReturnType<typeof buildExecutionHeaderProof>;
   executionBlockNumber: bigint;
   executionBlockHash: Hex;
+};
+
+type EthereumBeaconHeadersResponse = {
+  data: Array<{
+    root: Hex;
+  }>;
 };
 
 export async function buildGatewayExecutionHeaderBackfill(
@@ -73,20 +79,42 @@ export async function buildGatewayExecutionHeaderBackfill(
   }
   const finalizedStateValue = finalizedState.unwrap();
 
-  const spec = await getBeaconJson<EthereumBeaconConfigSpecResponse>(
-    options.beaconApiUrl,
-    '/eth/v1/config/spec',
-  );
+  const executionClient = getExecutionClient(options);
+  const [spec, genesis, targetExecutionHeader] = await Promise.all([
+    getBeaconJson<EthereumBeaconConfigSpecResponse>(options.beaconApiUrl, '/eth/v1/config/spec'),
+    getBeaconJson<EthereumBeaconGenesisResponse>(options.beaconApiUrl, '/eth/v1/beacon/genesis'),
+    executionClient.getBlock({ blockNumber: targetExecutionBlockNumber }),
+  ]);
   const slotsPerEpoch = BigInt(spec.data.SLOTS_PER_EPOCH);
+  const secondsPerSlot = BigInt(spec.data.SECONDS_PER_SLOT);
   if (slotsPerEpoch <= 0n) {
     throw new Error('Beacon API returned an invalid SLOTS_PER_EPOCH value');
   }
+  if (secondsPerSlot <= 0n) {
+    throw new Error('Beacon API returned an invalid SECONDS_PER_SLOT value');
+  }
 
-  let scanSlot = finalizedStateValue.slot.toBigInt();
-  scanSlot -= scanSlot % slotsPerEpoch;
-  let closestCoveringPayload: EthereumExecutionHeaderBackfillPayload | null = null;
+  const latestFinalizedSlot = finalizedStateValue.slot.toBigInt();
+  const beaconGenesisTime = BigInt(genesis.data.genesis_time);
+  let scanSlot =
+    targetExecutionHeader.timestamp <= beaconGenesisTime
+      ? 0n
+      : (targetExecutionHeader.timestamp - beaconGenesisTime) / secondsPerSlot;
 
-  while (true) {
+  if (scanSlot >= slotsPerEpoch) {
+    scanSlot -= slotsPerEpoch;
+  } else {
+    scanSlot = 0n;
+  }
+  if (scanSlot > latestFinalizedSlot) {
+    scanSlot = latestFinalizedSlot;
+  }
+  const maxScanSlot =
+    scanSlot + slotsPerEpoch * 8n < latestFinalizedSlot
+      ? scanSlot + slotsPerEpoch * 8n
+      : latestFinalizedSlot;
+
+  while (scanSlot <= maxScanSlot) {
     let headers: EthereumBeaconHeadersResponse = { data: [] };
     try {
       headers = await getBeaconJson<EthereumBeaconHeadersResponse>(
@@ -114,7 +142,7 @@ export async function buildGatewayExecutionHeaderBackfill(
         const executionBlockNumber = BigInt(bootstrap.data.header.execution.block_number);
 
         if (executionBlockNumber >= targetExecutionBlockNumber) {
-          closestCoveringPayload = {
+          return {
             targetExecutionBlockNumber,
             expectedBeaconRoot: checkpointHeader.root.toLowerCase() as Hex,
             header: camelcaseKeys(
@@ -124,10 +152,6 @@ export async function buildGatewayExecutionHeaderBackfill(
             executionBlockNumber,
             executionBlockHash: bootstrap.data.header.execution.block_hash.toLowerCase() as Hex,
           };
-        } else if (closestCoveringPayload) {
-          return closestCoveringPayload;
-        } else {
-          return null;
         }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -140,12 +164,12 @@ export async function buildGatewayExecutionHeaderBackfill(
       }
     }
 
-    if (scanSlot < slotsPerEpoch) {
-      return closestCoveringPayload;
-    }
-
-    scanSlot -= slotsPerEpoch;
+    scanSlot += 1n;
   }
+
+  throw new Error(
+    `Unable to find a historical light-client bootstrap near execution block ${targetExecutionBlockNumber} using ${options.beaconApiUrl}; try a beacon API that exposes historical /eth/v1/beacon/light_client/bootstrap roots`,
+  );
 }
 
 export async function buildGatewayExecutionHeaderBackfills(

@@ -57,13 +57,19 @@ The gateway is where the actual protocol behavior lives:
   summary and active `microgonsPerArgonot` floor without resetting `argonApprovalsNonce` or
   `argonApprovalsHash`, so later queue items can keep chaining from the same last applied update
   under the replacement council
+- every gateway activity extends one per-block `activityRoot` commitment in storage, and each new
+  block locator links to the previous locator hash, so later proof systems can anchor on `stateRoot`
+  while still reconstructing the rich activity payload from emitted logs
 - each council rotation carries the next `microgonsPerArgonot` floor value alongside the next
   council snapshot
 - transfer-out requests carry one exact `microgonsPerArgonot` quote, and Ethereum only accepts the
   request if that quoted rate is at or below the currently active council floor
 - queued council-approved updates chain each signed item to the previous queue item's signed hash,
   so Ethereum only needs to verify council signatures on council-segment tips: each council rotation
-  item and the last council-approved item in the submitted batch
+  item and the last relayed item in the submitted batch
+- `applyGatewayUpdates(...)` rejects batches above `100` items, and
+  `finalizeTransferOutOfArgon(...)` rejects proofs above `25` minting-authority authorizations, so
+  the activity payloads stay within explicit relay bounds
 - `pause()` can be called by the guardian
 - `unpause()` stays on the admin Safe owner path
 
@@ -84,7 +90,7 @@ There are only three things to keep in your head:
 3. The gateway code is upgradeable. The proxy points at a `MintingGateway` implementation, and that
    implementation can be replaced later.
 
-Today the split is:
+The split is:
 
 - guardian Safe: `pause()`
 - admin Safe: `migrate(...)`, `unpause()`, and the one-time bootstrap upgrade into the final
@@ -170,7 +176,7 @@ yarn workspace @argonprotocol/ethereum-contracts test
 yarn workspace @argonprotocol/ethereum-contracts typecheck
 ```
 
-Bootstrap deploy commands now live in the sibling deploy workspace at
+Bootstrap deploy commands live in the sibling deploy workspace at
 [`../deploy/`](../deploy/README.md):
 
 ```sh
@@ -191,7 +197,7 @@ ETHEREUM_DEPLOYER_PRIVATE_KEY=0x...
 yarn workspace @argonprotocol/ethereum-deploy bootstrap:deploy --argon-rpc-url wss://... --network mainnet --admin-safe 0x... --guardian-safe 0x...
 ```
 
-Testnet bootstrap generation now uses the default public Ethereum Sepolia RPC unless you override
+Testnet bootstrap generation uses the default public Ethereum Sepolia RPC unless you override
 `TESTNET_ETHEREUM_RPC_URL`:
 
 ```sh
@@ -199,7 +205,7 @@ ETHEREUM_DEPLOYER_PRIVATE_KEY=0x...
 yarn workspace @argonprotocol/ethereum-deploy bootstrap:deploy --argon-rpc-url wss://... --network testnet --admin-safe 0x... --guardian-safe 0x...
 ```
 
-The `testnet` deployment lane now points at Sepolia rather than Gnosis.
+The `testnet` deployment lane points at Sepolia.
 
 `bootstrap:deploy` already performs the full Ethereum-side deployment sequence for this bootstrap
 flow:
@@ -260,45 +266,45 @@ Refresh these sample costs with:
 yarn workspace @argonprotocol/ethereum-deploy gas:measure
 ```
 
-The numbers below are the current local measurements from `../deploy/measure.ts`. The wei and ETH
-columns are sample gas-price math only at `10 gwei` and `20 gwei`.
+The numbers below are local measurements from `../deploy/measure.ts`. The wei and ETH columns are
+sample gas-price math only at `10 gwei` and `20 gwei`.
 
 ### User Actions
 
 | Action                                          |     Gas |         Wei @ 10 gwei | ETH @ 10 gwei |         Wei @ 20 gwei | ETH @ 20 gwei |
 | ----------------------------------------------- | ------: | --------------------: | ------------: | --------------------: | ------------: |
-| `startTransferToArgon`                          | 126,068 | 1,260,680,000,000,000 |  0.001260 ETH | 2,521,360,000,000,000 |  0.002521 ETH |
-| `finalizeTransferOutOfArgon` (1 authorization)  | 162,227 | 1,622,270,000,000,000 |  0.001622 ETH | 3,244,540,000,000,000 |  0.003244 ETH |
-| `finalizeTransferOutOfArgon` (3 authorizations) | 198,475 | 1,984,750,000,000,000 |  0.001984 ETH | 3,969,500,000,000,000 |  0.003969 ETH |
-| `cancelTransferOutOfArgon`                      | 105,098 | 1,050,980,000,000,000 |  0.001050 ETH | 2,101,960,000,000,000 |  0.002101 ETH |
+| `startTransferToArgon`                          | 151,608 | 1,516,080,000,000,000 |  0.001516 ETH | 3,032,160,000,000,000 |  0.003032 ETH |
+| `finalizeTransferOutOfArgon` (1 authorization)  | 213,061 | 2,130,610,000,000,000 |  0.002131 ETH | 4,261,220,000,000,000 |  0.004261 ETH |
+| `finalizeTransferOutOfArgon` (3 authorizations) | 250,035 | 2,500,350,000,000,000 |  0.002500 ETH | 5,000,700,000,000,000 |  0.005001 ETH |
+| `cancelTransferOutOfArgon`                      | 130,337 | 1,303,370,000,000,000 |  0.001303 ETH | 2,606,740,000,000,000 |  0.002607 ETH |
 
 ### Admin And Council Actions
 
-| Action                                                                              |     Gas |         Wei @ 10 gwei | ETH @ 10 gwei |          Wei @ 20 gwei | ETH @ 20 gwei |
-| ----------------------------------------------------------------------------------- | ------: | --------------------: | ------------: | ---------------------: | ------------: |
-| Proxy deploy + `initialize` (4 council members)                                     | 841,523 | 8,415,230,000,000,000 |  0.008415 ETH | 16,830,460,000,000,000 |  0.016830 ETH |
-| Proxy deploy + `initialize` (100 council members)                                   | 841,523 | 8,415,230,000,000,000 |  0.008415 ETH | 16,830,460,000,000,000 |  0.016830 ETH |
-| Upgrade to final implementation (4 council members)                                 |  37,834 |   378,340,000,000,000 |  0.000378 ETH |    756,680,000,000,000 |  0.000756 ETH |
-| Upgrade to final implementation (100 council members)                               |  37,846 |   378,460,000,000,000 |  0.000378 ETH |    756,920,000,000,000 |  0.000756 ETH |
-| Minting authority activation (4 members, 3 signatures)                              | 190,347 | 1,903,470,000,000,000 |  0.001903 ETH |  3,806,940,000,000,000 |  0.003806 ETH |
-| Minting authority activation (100 members, 90 signatures)                           | 863,425 | 8,634,250,000,000,000 |  0.008634 ETH | 17,268,500,000,000,000 |  0.017268 ETH |
-| Minting authority activation batch (100 members, 3 activations, 90 signatures once) | 938,887 | 9,388,870,000,000,000 |  0.009388 ETH | 18,777,740,000,000,000 |  0.018777 ETH |
-| Council rotation (4 -> 4 members, 3 signatures)                                     | 152,206 | 1,522,060,000,000,000 |  0.001522 ETH |  3,044,120,000,000,000 |  0.003044 ETH |
-| Council rotation (100 -> 100 members, 90 signatures)                                | 997,305 | 9,973,050,000,000,000 |  0.009973 ETH | 19,946,100,000,000,000 |  0.019946 ETH |
+| Action                                                                              |       Gas |          Wei @ 10 gwei | ETH @ 10 gwei |          Wei @ 20 gwei | ETH @ 20 gwei |
+| ----------------------------------------------------------------------------------- | --------: | ---------------------: | ------------: | ---------------------: | ------------: |
+| Proxy deploy + `initialize` (4 council members)                                     |   817,423 |  8,174,230,000,000,000 |  0.008174 ETH | 16,348,460,000,000,000 |  0.016348 ETH |
+| Proxy deploy + `initialize` (100 council members)                                   |   817,423 |  8,174,230,000,000,000 |  0.008174 ETH | 16,348,460,000,000,000 |  0.016348 ETH |
+| Upgrade to final implementation (4 council members)                                 |    37,782 |    377,820,000,000,000 |  0.000378 ETH |    755,640,000,000,000 |  0.000756 ETH |
+| Upgrade to final implementation (100 council members)                               |    37,794 |    377,940,000,000,000 |  0.000378 ETH |    755,880,000,000,000 |  0.000756 ETH |
+| Minting authority activation (4 members, 3 signatures)                              |   215,941 |  2,159,410,000,000,000 |  0.002159 ETH |  4,318,820,000,000,000 |  0.004319 ETH |
+| Minting authority activation (100 members, 90 signatures)                           |   890,351 |  8,903,510,000,000,000 |  0.008904 ETH | 17,807,020,000,000,000 |  0.017807 ETH |
+| Minting authority activation batch (100 members, 3 activations, 90 signatures once) |   968,836 |  9,688,360,000,000,000 |  0.009688 ETH | 19,376,720,000,000,000 |  0.019377 ETH |
+| Council rotation (4 -> 4 members, 3 signatures)                                     |   200,141 |  2,001,410,000,000,000 |  0.002001 ETH |  4,002,820,000,000,000 |  0.004003 ETH |
+| Council rotation (100 -> 100 members, 90 signatures)                                | 1,048,534 | 10,485,340,000,000,000 |  0.010485 ETH | 20,970,680,000,000,000 |  0.020971 ETH |
 
 The batched `100`-member activation row is where the chained queue hash pays off: three activations
-land for about `938,887` gas total, or about `312,963` gas per activation, because the council
+land for about `968,836` gas total, or about `322,945` gas per activation, because the council
 quorum is only verified once at the segment tip.
 
-`startTransferToArgon(...)` now includes the ERC-2612 permit directly. The caller signs for the
+`startTransferToArgon(...)` includes the ERC-2612 permit directly. The caller signs for the
 runtime-unit amount they want Argon to credit, and the gateway scales that amount into exact token
 base units before it permits and burns in one transaction.
 
 ## Current Scope
 
-This is still the bootstrap slice, not the full long-term mint-authority system.
+This package covers the bootstrap slice, not the full long-term mint-authority system.
 
-Today that means:
+That means:
 
 - the gateway contract shape is in place
 - the stable proxy address is in place
@@ -309,14 +315,14 @@ Today that means:
 
 ## Deferred Controls
 
-This package still does not include the follow-on control layer.
+This package does not include the follow-on control layer.
 
-Not included yet:
+Not included in this package:
 
 - per-authority, per-chain, per-epoch, or rolling daily issuance caps
 - delayed Ethereum-side activation for large mint paths that should allow emergency review
 - automatic pause triggers on abnormal circulation growth, authority loss, or state drift
 - fast authority disable / suspend and replacement-authorization handling for suspicious operators
-- the restoration batch generator now lives in the standalone recovery repo
-- the migration path is still temporary
-- the restoration forensics work is still the real blocker before a mainnet mint run
+- the restoration batch generator in the standalone recovery repo
+- the temporary migration path
+- the restoration forensics work that blocks a mainnet mint run
