@@ -83,7 +83,6 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 		uint64 blockNumber;
 		uint64 startGatewayActivityNonce;
 		uint64 endGatewayActivityNonce;
-		bytes32 previousLocatorHash;
 		bytes32 activityRoot;
 	}
 
@@ -1141,7 +1140,6 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 				blockNumber: currentBlock,
 				startGatewayActivityNonce: activityNonce,
 				endGatewayActivityNonce: activityNonce,
-				previousLocatorHash: bytes32(0),
 				activityRoot: _appendActivityRoot(bytes32(0), activityLeaf)
 			});
 			return;
@@ -1162,8 +1160,7 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 			blockNumber: currentBlock,
 			startGatewayActivityNonce: activityNonce,
 			endGatewayActivityNonce: activityNonce,
-			previousLocatorHash: _hashActivityBlockLocator(latestLocator),
-			activityRoot: _appendActivityRoot(bytes32(0), activityLeaf)
+			activityRoot: _appendActivityRoot(_hashActivityBlockLocator(latestLocator), activityLeaf)
 		});
 	}
 
@@ -1180,7 +1177,6 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 				locator.blockNumber,
 				locator.startGatewayActivityNonce,
 				locator.endGatewayActivityNonce,
-				locator.previousLocatorHash,
 				locator.activityRoot
 			)
 		);

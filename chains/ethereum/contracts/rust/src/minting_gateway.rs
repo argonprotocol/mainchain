@@ -96,7 +96,6 @@ sol! {
 		uint64 blockNumber;
 		uint64 startGatewayActivityNonce;
 		uint64 endGatewayActivityNonce;
-		bytes32 previousLocatorHash;
 		bytes32 activityRoot;
 	}
 
@@ -260,7 +259,6 @@ pub fn hash_activity_block_locator(
 	block_number: u64,
 	start_gateway_activity_nonce: u64,
 	end_gateway_activity_nonce: u64,
-	previous_locator_hash: B256,
 	activity_root: B256,
 ) -> B256 {
 	keccak256(
@@ -269,7 +267,6 @@ pub fn hash_activity_block_locator(
 			blockNumber: block_number,
 			startGatewayActivityNonce: start_gateway_activity_nonce,
 			endGatewayActivityNonce: end_gateway_activity_nonce,
-			previousLocatorHash: previous_locator_hash,
 			activityRoot: activity_root,
 		}
 		.abi_encode(),
@@ -565,14 +562,8 @@ mod tests {
 				.unwrap()
 		);
 		assert_eq!(
-			hash_activity_block_locator(
-				10,
-				1,
-				1,
-				B256::ZERO,
-				append_activity_root(B256::ZERO, leaf1),
-			),
-			B256::from_str("0x7572bb6cc2ec2ccec41eaa58a3d0f81e3dcdb06fcb4e3e522d58a08c2054fefd")
+			hash_activity_block_locator(10, 1, 1, append_activity_root(B256::ZERO, leaf1),),
+			B256::from_str("0x211d2e88a54ddba440081b6ebc422953f21409da75f231195cc90114f5055b7f")
 				.unwrap()
 		);
 	}

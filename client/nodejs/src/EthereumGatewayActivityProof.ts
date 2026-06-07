@@ -46,7 +46,6 @@ type MintingGatewayActivityBlockLocator = {
   blockNumber: bigint;
   startGatewayActivityNonce: bigint;
   endGatewayActivityNonce: bigint;
-  previousLocatorHash?: Hex;
   activityRoot?: Hex;
 };
 
@@ -77,7 +76,6 @@ const activityBlockLocatorAbi = [
       { name: 'blockNumber', type: 'uint64' },
       { name: 'startGatewayActivityNonce', type: 'uint64' },
       { name: 'endGatewayActivityNonce', type: 'uint64' },
-      { name: 'previousLocatorHash', type: 'bytes32' },
       { name: 'activityRoot', type: 'bytes32' },
     ],
     stateMutability: 'view',
@@ -170,7 +168,7 @@ async function loadActivityBlockLocator(
     return cached;
   }
 
-  let locator: readonly [bigint, bigint, bigint, Hex, Hex];
+  let locator: readonly [bigint, bigint, bigint, Hex];
 
   try {
     locator = await executionClient.readContract({
@@ -205,18 +203,11 @@ async function loadActivityBlockLocator(
     return loaded;
   }
 
-  const [
-    blockNumber,
-    startGatewayActivityNonce,
-    endGatewayActivityNonce,
-    previousLocatorHash,
-    activityRoot,
-  ] = locator;
+  const [blockNumber, startGatewayActivityNonce, endGatewayActivityNonce, activityRoot] = locator;
   const loaded: MintingGatewayActivityBlockLocator = {
     blockNumber,
     startGatewayActivityNonce,
     endGatewayActivityNonce,
-    previousLocatorHash,
     activityRoot,
   };
   cache.set(locatorIndex, loaded);

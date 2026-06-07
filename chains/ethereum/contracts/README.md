@@ -58,8 +58,8 @@ The gateway is where the actual protocol behavior lives:
   `argonApprovalsHash`, so later queue items can keep chaining from the same last applied update
   under the replacement council
 - every gateway activity extends one per-block `activityRoot` commitment in storage, and each new
-  block locator links to the previous locator hash, so later proof systems can anchor on `stateRoot`
-  while still reconstructing the rich activity payload from emitted logs
+  block seeds that root from the previous locator hash, so later proof systems can anchor on
+  `stateRoot` while still reconstructing the rich activity payload from emitted logs
 - each council rotation carries the next `microgonsPerArgonot` floor value alongside the next
   council snapshot
 - transfer-out requests carry one exact `microgonsPerArgonot` quote, and Ethereum only accepts the
@@ -273,10 +273,10 @@ sample gas-price math only at `10 gwei` and `20 gwei`.
 
 | Action                                          |     Gas |         Wei @ 10 gwei | ETH @ 10 gwei |         Wei @ 20 gwei | ETH @ 20 gwei |
 | ----------------------------------------------- | ------: | --------------------: | ------------: | --------------------: | ------------: |
-| `startTransferToArgon`                          | 151,608 | 1,516,080,000,000,000 |  0.001516 ETH | 3,032,160,000,000,000 |  0.003032 ETH |
-| `finalizeTransferOutOfArgon` (1 authorization)  | 213,061 | 2,130,610,000,000,000 |  0.002131 ETH | 4,261,220,000,000,000 |  0.004261 ETH |
-| `finalizeTransferOutOfArgon` (3 authorizations) | 250,035 | 2,500,350,000,000,000 |  0.002500 ETH | 5,000,700,000,000,000 |  0.005001 ETH |
-| `cancelTransferOutOfArgon`                      | 130,337 | 1,303,370,000,000,000 |  0.001303 ETH | 2,606,740,000,000,000 |  0.002607 ETH |
+| `startTransferToArgon`                          | 149,366 | 1,493,660,000,000,000 |  0.001494 ETH | 2,987,320,000,000,000 |  0.002987 ETH |
+| `finalizeTransferOutOfArgon` (1 authorization)  | 188,758 | 1,887,580,000,000,000 |  0.001888 ETH | 3,775,160,000,000,000 |  0.003775 ETH |
+| `finalizeTransferOutOfArgon` (3 authorizations) | 225,732 | 2,257,320,000,000,000 |  0.002257 ETH | 4,514,640,000,000,000 |  0.004515 ETH |
+| `cancelTransferOutOfArgon`                      | 128,095 | 1,280,950,000,000,000 |  0.001281 ETH | 2,561,900,000,000,000 |  0.002562 ETH |
 
 ### Admin And Council Actions
 
@@ -286,14 +286,14 @@ sample gas-price math only at `10 gwei` and `20 gwei`.
 | Proxy deploy + `initialize` (100 council members)                                   |   817,423 |  8,174,230,000,000,000 |  0.008174 ETH | 16,348,460,000,000,000 |  0.016348 ETH |
 | Upgrade to final implementation (4 council members)                                 |    37,782 |    377,820,000,000,000 |  0.000378 ETH |    755,640,000,000,000 |  0.000756 ETH |
 | Upgrade to final implementation (100 council members)                               |    37,794 |    377,940,000,000,000 |  0.000378 ETH |    755,880,000,000,000 |  0.000756 ETH |
-| Minting authority activation (4 members, 3 signatures)                              |   215,941 |  2,159,410,000,000,000 |  0.002159 ETH |  4,318,820,000,000,000 |  0.004319 ETH |
-| Minting authority activation (100 members, 90 signatures)                           |   890,351 |  8,903,510,000,000,000 |  0.008904 ETH | 17,807,020,000,000,000 |  0.017807 ETH |
-| Minting authority activation batch (100 members, 3 activations, 90 signatures once) |   968,836 |  9,688,360,000,000,000 |  0.009688 ETH | 19,376,720,000,000,000 |  0.019377 ETH |
-| Council rotation (4 -> 4 members, 3 signatures)                                     |   200,141 |  2,001,410,000,000,000 |  0.002001 ETH |  4,002,820,000,000,000 |  0.004003 ETH |
-| Council rotation (100 -> 100 members, 90 signatures)                                | 1,048,534 | 10,485,340,000,000,000 |  0.010485 ETH | 20,970,680,000,000,000 |  0.020971 ETH |
+| Minting authority activation (4 members, 3 signatures)                              |   214,511 |  2,145,110,000,000,000 |  0.002145 ETH |  4,290,220,000,000,000 |  0.004290 ETH |
+| Minting authority activation (100 members, 90 signatures)                           |   888,974 |  8,889,740,000,000,000 |  0.008890 ETH | 17,779,480,000,000,000 |  0.017779 ETH |
+| Minting authority activation batch (100 members, 3 activations, 90 signatures once) |   970,446 |  9,704,460,000,000,000 |  0.009704 ETH | 19,408,920,000,000,000 |  0.019409 ETH |
+| Council rotation (4 -> 4 members, 3 signatures)                                     |   178,960 |  1,789,600,000,000,000 |  0.001790 ETH |  3,579,200,000,000,000 |  0.003579 ETH |
+| Council rotation (100 -> 100 members, 90 signatures)                                | 1,050,743 | 10,507,430,000,000,000 |  0.010507 ETH | 21,014,860,000,000,000 |  0.021015 ETH |
 
 The batched `100`-member activation row is where the chained queue hash pays off: three activations
-land for about `968,836` gas total, or about `322,945` gas per activation, because the council
+land for about `970,446` gas total, or about `323,482` gas per activation, because the council
 quorum is only verified once at the segment tip.
 
 `startTransferToArgon(...)` includes the ERC-2612 permit directly. The caller signs for the

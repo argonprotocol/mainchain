@@ -110,7 +110,6 @@ export function createExecutionClient(args: {
     blockNumber: bigint;
     startGatewayActivityNonce: bigint;
     endGatewayActivityNonce: bigint;
-    previousLocatorHash?: Hex;
     activityRoot?: Hex;
   }>;
 }): EthereumExecutionClient {
@@ -147,7 +146,6 @@ export function createExecutionClient(args: {
         locator.blockNumber,
         locator.startGatewayActivityNonce,
         locator.endGatewayActivityNonce,
-        locator.previousLocatorHash ?? ZERO_HASH,
         locator.activityRoot ?? ZERO_HASH,
       ] as const;
     },
