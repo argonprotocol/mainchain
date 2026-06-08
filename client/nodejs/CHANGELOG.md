@@ -1,8 +1,20 @@
 # Changelog
 
-## [v1.4.6](https://github.com/argonprotocol/mainchain/compare/v1.4.5...7ee8a4845d61ae05703b32e667f1a6d798e4d6d0) (2026-06-05)
+## [v1.4.7](https://github.com/argonprotocol/mainchain/compare/v1.4.6...41832e0b4c16cbd9cb9da0a4099b6c32c856c1ef) (2026-06-07)
+
+### Features
+
+* **ethereum:** prepare gateway activity commitments for storage proofs
+([b5961e9](https://github.com/argonprotocol/mainchain/commit/b5961e979a2395d75169bee8c783a0c6dcd6e218))
 
 ### Fixes
+
+* **ethereum:** add gateway execution anchor backfills
+([1c2da44](https://github.com/argonprotocol/mainchain/commit/1c2da448cdccdf66ae8f10450428ce7cd78a5980))
+
+### [v1.4.6](https://github.com/argonprotocol/mainchain/compare/v1.4.5...v1.4.6) (2026-06-05)
+
+#### Fixes
 
 * **ethereum:** proofs invalid when using full block logs
 ([163a11b](https://github.com/argonprotocol/mainchain/commit/163a11bd70e4a0a4bf77469a316a9ac120dff1c4))
