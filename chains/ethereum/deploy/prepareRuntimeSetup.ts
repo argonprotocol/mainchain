@@ -112,7 +112,7 @@ async function loadCliInputs(rawArgs: Record<string, string>) {
       manifestCouncilSigners,
       estimatedMicrogonsPerEth,
       estimatedWeiPerGas,
-    }),
+    }, manifestCouncilSigners.length),
   };
 
   return {
@@ -131,13 +131,16 @@ async function loadManifestInputs(manifestPath: string) {
   return extractRuntimeSetupInputsFromManifest(manifest);
 }
 
-async function loadMeasureRecommendation(measureReportPath?: string) {
+async function loadMeasureRecommendation(
+  measureReportPath: string | undefined,
+  targetSharedSignatureCount: number,
+) {
   if (!measureReportPath) return undefined;
 
   const report = JSON.parse(
     await readFile(measureReportPath, 'utf8'),
   ) as ActivationPricingMeasureReport;
-  return parseActivationPricingRecommendation(report);
+  return parseActivationPricingRecommendation(report, targetSharedSignatureCount);
 }
 
 function getRequiredManifestCouncilSigners(
@@ -187,15 +190,21 @@ function getRequiredManifestCouncilVerification(
   };
 }
 
-async function loadPricingRecommendation(inputs: PricingRecommendationInputs) {
+async function loadPricingRecommendation(
+  inputs: PricingRecommendationInputs,
+  targetSharedSignatureCount: number,
+) {
   return (
-    (await loadMeasureRecommendation(inputs.measureReportPath)) ??
+    (await loadMeasureRecommendation(inputs.measureReportPath, targetSharedSignatureCount)) ??
     loadExplicitPricingRecommendation(inputs) ??
-    (await loadGeneratedMeasureRecommendation(inputs))
+    (await loadGeneratedMeasureRecommendation(inputs, targetSharedSignatureCount))
   );
 }
 
-async function loadGeneratedMeasureRecommendation(inputs: PricingRecommendationInputs) {
+async function loadGeneratedMeasureRecommendation(
+  inputs: PricingRecommendationInputs,
+  targetSharedSignatureCount: number,
+) {
   if (!shouldGenerateMeasureRecommendation(inputs)) {
     return undefined;
   }
@@ -210,7 +219,7 @@ async function loadGeneratedMeasureRecommendation(inputs: PricingRecommendationI
   );
 
   const report = JSON.parse(stdout) as ActivationPricingMeasureReport;
-  return parseActivationPricingRecommendation(report);
+  return parseActivationPricingRecommendation(report, targetSharedSignatureCount);
 }
 
 function loadExplicitPricingRecommendation(inputs: PricingRecommendationInputs) {

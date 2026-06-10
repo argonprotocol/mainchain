@@ -1,0 +1,35 @@
+{
+  "generatedAt": "2026-06-08T12:24:36.956Z",
+  "network": {
+    "name": "testnet",
+    "chainId": "11155111"
+  },
+  "deployer": "0x7507661792aB888F7C2F74D4852EFa70469347b8",
+  "sourceManifestPath": "chains/ethereum/deploy/testnet/deployment-manifest.json",
+  "target": {
+    "gatewayProxyAddress": "0x8A2841380151160BBf88D44D8D9A4DdA05838B76",
+    "proxyAdminAddress": "0xC8Acbaa248F94f9020360e9021C5ed403a14c9C6",
+    "argonTokenAddress": "0xa1a1e87614B1f447fD8E65c18DCc41bAd4A7A1E5",
+    "argonotTokenAddress": "0xAEe2d012E2749881D1be66a86be256Bb039089C2",
+    "previousImplementationAddress": "0x57Bd330f43e03665564734cC7518541157b8A0Af"
+  },
+  "contracts": {
+    "mintingGatewayImplementationFinal": {
+      "address": "0x6B93a120829558C18f8CD54a96E8024EF973cE52",
+      "constructorArgs": [
+        "0xa1a1e87614B1f447fD8E65c18DCc41bAd4A7A1E5",
+        "0xAEe2d012E2749881D1be66a86be256Bb039089C2"
+      ],
+      "deploymentTxHash": "0xa7f1d6fc23b4309b36a594de62206f72c80eccb96c2b0f566d7b53d21e9219b4"
+    }
+  },
+  "safeTransactions": [
+    {
+      "description": "Upgrade MintingGateway proxy to the activity-root implementation",
+      "target": "0xC8Acbaa248F94f9020360e9021C5ed403a14c9C6",
+      "value": "0",
+      "data": "0x9623609d0000000000000000000000008a2841380151160bbf88d44d8d9a4dda05838b760000000000000000000000006b93a120829558c18f8cd54a96e8024ef973ce5200000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000000"
+    }
+  ],
+  "notes": []
+}

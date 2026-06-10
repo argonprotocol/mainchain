@@ -45,6 +45,10 @@ export type ActivationPricingMeasureReport = {
     batchActivationGas: string;
     batchActivationCount: number;
     sharedSignatureCount: number;
+    oneMemberSingleActivationGas?: string;
+    oneMemberSharedSignatureCount?: number;
+    smallCouncilSingleActivationGas?: string;
+    smallCouncilSharedSignatureCount?: number;
   };
   activationPricingRecommendation?: {
     activationGasCost: string;
@@ -308,6 +312,7 @@ export function extractRuntimeSetupInputsFromManifest(manifest: RuntimeSetupMani
 
 export function parseActivationPricingRecommendation(
   report: ActivationPricingMeasureReport,
+  targetSharedSignatureCount?: number,
 ): MintingAuthorityActivationPricingRecommendation {
   if (report.activationPricingRecommendation) {
     if (report.activationPricingMeasurements) {
@@ -316,7 +321,19 @@ export function parseActivationPricingRecommendation(
         batchActivationGas: BigInt(report.activationPricingMeasurements.batchActivationGas),
         batchActivationCount: report.activationPricingMeasurements.batchActivationCount,
         sharedSignatureCount: report.activationPricingMeasurements.sharedSignatureCount,
-      });
+        oneMemberSingleActivationGas: report.activationPricingMeasurements
+          .oneMemberSingleActivationGas
+          ? BigInt(report.activationPricingMeasurements.oneMemberSingleActivationGas)
+          : undefined,
+        oneMemberSharedSignatureCount:
+          report.activationPricingMeasurements.oneMemberSharedSignatureCount,
+        smallCouncilSingleActivationGas: report.activationPricingMeasurements
+          .smallCouncilSingleActivationGas
+          ? BigInt(report.activationPricingMeasurements.smallCouncilSingleActivationGas)
+          : undefined,
+        smallCouncilSharedSignatureCount:
+          report.activationPricingMeasurements.smallCouncilSharedSignatureCount,
+      }, targetSharedSignatureCount);
     }
 
     return {
@@ -342,7 +359,18 @@ export function parseActivationPricingRecommendation(
     batchActivationGas: BigInt(report.activationPricingMeasurements.batchActivationGas),
     batchActivationCount: report.activationPricingMeasurements.batchActivationCount,
     sharedSignatureCount: report.activationPricingMeasurements.sharedSignatureCount,
-  });
+    oneMemberSingleActivationGas: report.activationPricingMeasurements.oneMemberSingleActivationGas
+      ? BigInt(report.activationPricingMeasurements.oneMemberSingleActivationGas)
+      : undefined,
+    oneMemberSharedSignatureCount:
+      report.activationPricingMeasurements.oneMemberSharedSignatureCount,
+    smallCouncilSingleActivationGas: report.activationPricingMeasurements
+      .smallCouncilSingleActivationGas
+      ? BigInt(report.activationPricingMeasurements.smallCouncilSingleActivationGas)
+      : undefined,
+    smallCouncilSharedSignatureCount:
+      report.activationPricingMeasurements.smallCouncilSharedSignatureCount,
+  }, targetSharedSignatureCount);
 }
 
 function describeExtrinsic(
@@ -387,7 +415,7 @@ function normalizeRuntimeSetupEnvironment(value?: string): RuntimeSetupEnvironme
   return undefined;
 }
 
-async function deriveEstimatedMicrogonsPerEth(
+export async function deriveEstimatedMicrogonsPerEth(
   client: ArgonClient,
   defaults?: RuntimeSetupDefaults,
 ) {

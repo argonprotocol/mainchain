@@ -156,6 +156,10 @@ type GasMeasurementReport = {
     batchActivationGas: bigint;
     batchActivationCount: number;
     sharedSignatureCount: number;
+    oneMemberSingleActivationGas: bigint;
+    oneMemberSharedSignatureCount: number;
+    smallCouncilSingleActivationGas: bigint;
+    smallCouncilSharedSignatureCount: number;
   };
   activationPricingRecommendation: ReturnType<
     typeof deriveMintingAuthorityActivationPricingRecommendation
@@ -204,9 +208,11 @@ async function main() {
 }
 
 async function measureGasReport(): Promise<GasMeasurementReport> {
+  const oneCouncil = createCouncil(1);
   const fourCouncil = createCouncil(4);
   const hundredCouncil = createCouncil(100);
 
+  const oneSetup = await deployFixture(oneCouncil);
   const fourSetup = await deployGatewayStack(fourCouncil);
   const hundredSetup = await deployGatewayStack(hundredCouncil);
 
@@ -243,6 +249,7 @@ async function measureGasReport(): Promise<GasMeasurementReport> {
     );
   const hundredBatchSetup = await deployFixture(hundredCouncil);
 
+  const oneActivationGas = await measureMintingAuthorityActivationGas(oneSetup, 1n);
   const fourActivationGas = await measureMintingAuthorityActivationGas(fourSetup, 1n);
   const hundredActivationGas = await measureMintingAuthorityActivationGas(hundredSetup, 1n);
   const hundredActivationBatchGas = await measureMintingAuthorityActivationBatchGas(
@@ -271,6 +278,10 @@ async function measureGasReport(): Promise<GasMeasurementReport> {
       createGasMeasurementScenario(
         'Upgrade to final implementation (100 council members)',
         hundredUpgradeGas,
+      ),
+      createGasMeasurementScenario(
+        'Minting authority activation update (1 member, 1 signature)',
+        oneActivationGas,
       ),
       createGasMeasurementScenario(
         'Minting authority activation update (4 members, 3 signatures)',
@@ -303,12 +314,20 @@ async function measureGasReport(): Promise<GasMeasurementReport> {
       batchActivationGas: hundredActivationBatchGas,
       batchActivationCount: 3,
       sharedSignatureCount: hundredCouncil.quorumSigners.length,
+      oneMemberSingleActivationGas: oneActivationGas,
+      oneMemberSharedSignatureCount: oneCouncil.quorumSigners.length,
+      smallCouncilSingleActivationGas: fourActivationGas,
+      smallCouncilSharedSignatureCount: fourCouncil.quorumSigners.length,
     },
     activationPricingRecommendation: deriveMintingAuthorityActivationPricingRecommendation({
       singleActivationGas: hundredActivationGas,
       batchActivationGas: hundredActivationBatchGas,
       batchActivationCount: 3,
       sharedSignatureCount: hundredCouncil.quorumSigners.length,
+      oneMemberSingleActivationGas: oneActivationGas,
+      oneMemberSharedSignatureCount: oneCouncil.quorumSigners.length,
+      smallCouncilSingleActivationGas: fourActivationGas,
+      smallCouncilSharedSignatureCount: fourCouncil.quorumSigners.length,
     }),
   };
 }
