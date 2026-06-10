@@ -4,7 +4,11 @@ use argon_ethereum_contracts::minting_gateway as ethereum_contracts;
 use argon_primitives::{
 	EthereumBlockNumber, EthereumVerifyProvider, TickProvider, MICROGONS_PER_ARGON,
 };
-use frame_support::{ensure, traits::fungible::MutateHold};
+use frame_support::{
+	ensure,
+	storage::{transactional::with_transaction_opaque_err, TransactionOutcome},
+	traits::fungible::MutateHold,
+};
 use pallet_prelude::*;
 use polkadot_sdk::sp_core::ecdsa::KeccakSignature;
 
@@ -499,6 +503,9 @@ impl<T: Config> Pallet<T> {
 
 		for collateral_row in &finalized_collateral_rows {
 			Self::invalidate_excess_transfer_reservations(collateral_row.signing_key)?;
+			// Proven finalization should still land even if opportunistic local deactivation
+			// queueing cannot be scheduled right now.
+			let _ = Self::maybe_auto_deactivate_minting_authority(collateral_row.signing_key);
 		}
 
 		if let Some(transfer) = local_transfer.as_ref() {
@@ -548,6 +555,31 @@ impl<T: Config> Pallet<T> {
 		)
 		.map_err(|_| GatewaySyncPauseReason::GatewayStateDrift)?;
 		Self::deposit_event(Event::TransferOutCanceled { source_chain, transfer_id });
+		Ok(())
+	}
+
+	pub(crate) fn expire_transfer_outs_through_block(
+		source_chain: SourceChain,
+		synced_ethereum_block: EthereumBlockNumber,
+	) -> Result<(), GatewaySyncPauseReason> {
+		let expired_transfer_ids = TransferOutById::<T>::iter()
+			.filter_map(|(transfer_id, transfer)| {
+				(transfer.destination_chain == source_chain &&
+					transfer.valid_until_ethereum_block < synced_ethereum_block)
+					.then_some(transfer_id)
+			})
+			.collect::<Vec<_>>();
+
+		for transfer_id in expired_transfer_ids {
+			with_transaction_opaque_err(|| {
+				match Self::cancel_transfer_out_from_gateway(source_chain, transfer_id) {
+					Ok(()) => TransactionOutcome::Commit(Ok(())),
+					Err(reason) => TransactionOutcome::Rollback(Err(reason)),
+				}
+			})
+			.map_err(|_| GatewaySyncPauseReason::GatewayStateDrift)??;
+		}
+
 		Ok(())
 	}
 
@@ -697,8 +729,8 @@ impl<T: Config> Pallet<T> {
 					transfer.state = if transfer.total_attached_collateral >= transfer.amount {
 						TransferOutState::Ready
 					} else {
-					TransferOutState::Started
-				};
+						TransferOutState::Started
+					};
 				Ok(removed_row)
 			},
 		)?;

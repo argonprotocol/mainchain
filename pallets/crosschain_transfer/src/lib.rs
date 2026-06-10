@@ -30,7 +30,7 @@ pub use transfer_out::{
 
 #[frame_support::pallet]
 pub mod pallet {
-	use super::{gateway_activity::GatewayActivityApplyError, *};
+	use super::*;
 	use alloc::vec::Vec;
 	use argon_primitives::{
 		block_seal::FrameId,
@@ -46,7 +46,6 @@ pub mod pallet {
 	};
 	use frame_support::{
 		dispatch::{Pays, PostDispatchInfo},
-		storage::with_storage_layer,
 		traits::fungible::{InspectHold, Mutate, MutateHold},
 	};
 	use polkadot_sdk::{
@@ -1539,36 +1538,26 @@ pub mod pallet {
 			T::EthereumVerifier::verify_receipt_logs(&proof_batch)
 				.map_err(|_| Error::<T>::InvalidProof)?;
 
-			for receipt_log in proof_batch
-				.blocks
-				.into_iter()
-				.flat_map(|proof_block| proof_block.receipt_logs.into_iter())
-			{
-				match with_storage_layer(|| {
-					Self::apply_proved_gateway_activity_log(
+			for proof_block in proof_batch.blocks.into_iter() {
+				let block_outcome = Self::apply_proved_gateway_activity_proof_block(
+					source_chain,
+					expected_gateway_activity_nonce,
+					proof_block,
+				)?;
+
+				if let Some(gateway_state) = block_outcome.latest_gateway_state {
+					expected_gateway_activity_nonce = gateway_state.gateway_activity_nonce;
+					latest_gateway_state = Some(gateway_state);
+				}
+				if let Some(pause) = block_outcome.pause {
+					Self::pause_source_chain(
 						source_chain,
-						expected_gateway_activity_nonce,
-						receipt_log,
-					)
-				}) {
-					Ok(gateway_state) => {
-						expected_gateway_activity_nonce = gateway_state.gateway_activity_nonce;
-						latest_gateway_state = Some(gateway_state);
-					},
-					Err(GatewayActivityApplyError::Pause {
-						failed_gateway_activity_nonce,
-						reason,
-					}) => {
-						Self::pause_source_chain(
-							source_chain,
-							expected_gateway_activity_nonce,
-							failed_gateway_activity_nonce,
-							reason,
-						);
-						did_pause_gateway_sync = true;
-						break;
-					},
-					Err(GatewayActivityApplyError::Reject(error)) => return Err(error.into()),
+						pause.last_good_gateway_activity_nonce,
+						pause.failed_gateway_activity_nonce,
+						pause.reason,
+					);
+					did_pause_gateway_sync = true;
+					break;
 				}
 			}
 

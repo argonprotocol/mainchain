@@ -247,6 +247,7 @@ impl<T: Config> Pallet<T> {
 			let gateway_state = Self::gateway_state_from_contract(activity.gatewayState);
 			return Ok(DecodedGatewayActivity::TransferToArgon {
 				from: H160::from_slice(activity.from.as_slice()),
+				gateway: log.address,
 				token: H160::from_slice(activity.token.as_slice()),
 				to: activity.argonAccountId.0,
 				amount: activity.amount.into(),
