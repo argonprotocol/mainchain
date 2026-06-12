@@ -13,6 +13,7 @@
     "prepare:gateway-upgrade": "node --import tsx prepareMintingGatewayUpgrade.ts",
     "pretest": "tsc --noEmit",
     "pretest:ci": "tsc --noEmit",
+    "runtime-pricing:prepare": "node --import tsx prepareRuntimePricing.ts",
     "runtime-setup:prepare": "node --import tsx prepareRuntimeSetup.ts",
     "tsc": "tsc --noEmit",
     "tsup": "tsc --noEmit",

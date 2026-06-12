@@ -4,6 +4,7 @@ This workspace owns the operator-side Ethereum bootstrap flow:
 
 - `bootstrap:deploy`
 - `bootstrap:prepare-runtime-setup`
+- `runtime-pricing:prepare`
 - `prepare:gateway-upgrade`
 - `gas:measure`
 - generated deployment manifests under `./<env>/`
@@ -15,6 +16,7 @@ Use:
 ```sh
 yarn workspace @argonprotocol/ethereum-deploy bootstrap:deploy ...
 yarn workspace @argonprotocol/ethereum-deploy bootstrap:prepare-runtime-setup ...
+yarn workspace @argonprotocol/ethereum-deploy runtime-pricing:prepare ...
 yarn workspace @argonprotocol/ethereum-deploy prepare:gateway-upgrade --network testnet
 yarn workspace @argonprotocol/ethereum-deploy etherscan:output-files
 yarn workspace @argonprotocol/ethereum-deploy gas:measure
@@ -30,6 +32,7 @@ Layout:
 
 - `./index.ts`, `./prepareRuntimeSetup.ts`, `./prepareMintingGatewayUpgrade.ts`, `./measure.ts`: CLI
   entrypoints
+- `./prepareRuntimePricing.ts`: pricing-only runtime update CLI
 - `./outputEtherscanFiles.ts`: rewrite the Etherscan standard-json files and constructor args beside
   each deployment manifest
 - `./src/`: shared deploy logic
