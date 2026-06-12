@@ -550,10 +550,18 @@ pub(super) fn activate_test_minting_authority(
 				.expect("minting-authority activation data stays within bounded log payload")
 		},
 	};
-	let gateway_state = match CrosschainTransfer::apply_proved_gateway_activity_log(
+	let receipt_log = EthereumReceiptLog { transaction_index: 0, event_log };
+	let decoded_activity = match CrosschainTransfer::decode_evm_gateway_activity(
+		SourceChain::Ethereum,
+		&receipt_log.event_log,
+	) {
+		Ok(decoded_activity) => decoded_activity,
+		Err(_) => panic!("activation proof should succeed"),
+	};
+	let gateway_state = match CrosschainTransfer::apply_decoded_gateway_activity(
 		SourceChain::Ethereum,
 		previous_gateway_activity_nonce,
-		EthereumReceiptLog { transaction_index: 0, event_log },
+		decoded_activity,
 	) {
 		Ok(gateway_state) => gateway_state,
 		Err(_) => panic!("activation proof should succeed"),

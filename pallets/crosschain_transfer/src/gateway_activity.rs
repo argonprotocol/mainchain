@@ -3,6 +3,7 @@ use argon_primitives::{AccountId as ArgonAccountId, EthereumReceiptLog, Operatio
 use frame_support::{
 	dispatch::DispatchResult,
 	ensure,
+	storage::with_storage_layer,
 	traits::fungible::{Inspect, Mutate, MutateHold},
 };
 use pallet_prelude::*;
@@ -10,15 +11,16 @@ use pallet_prelude::*;
 use super::{
 	AssetKind, ChainConfig, ChainConfigBySourceChain, Config,
 	CouncilApprovalQueueByDestinationChainAndNonce, Error, Event, GatewayActivityNonce,
-	GatewayState, GatewaySyncPauseReason, GlobalIssuanceCouncilByHash, HoldReason,
-	MintingAuthoritiesBySigner, MintingAuthorityActivationRepaymentPricingByDestinationChain,
-	MintingAuthorityState, Pallet, SourceChain, TransferOutById, TransferToArgonActivity, H160,
-	H256,
+	GatewayActivityProofBlock, GatewayState, GatewaySyncPause, GatewaySyncPauseReason,
+	GlobalIssuanceCouncilByHash, HoldReason, MintingAuthoritiesBySigner,
+	MintingAuthorityActivationRepaymentPricingByDestinationChain, MintingAuthorityState, Pallet,
+	SourceChain, TransferOutById, TransferToArgonActivity, H160, H256,
 };
 
 pub(crate) enum DecodedGatewayActivity<T: Config> {
 	TransferToArgon {
 		from: H160,
+		gateway: H160,
 		token: H160,
 		to: [u8; 32],
 		amount: T::Balance,
@@ -88,6 +90,11 @@ pub(crate) enum GatewayActivityApplyError {
 }
 
 pub(crate) type GatewayActivityApplyResult<T> = Result<GatewayState<T>, GatewayActivityApplyError>;
+
+pub(crate) struct GatewayActivityProofBlockOutcome<T: Config> {
+	pub latest_gateway_state: Option<GatewayState<T>>,
+	pub pause: Option<GatewaySyncPause>,
+}
 
 impl From<DispatchError> for GatewayActivityApplyError {
 	fn from(error: DispatchError) -> Self {
@@ -511,22 +518,90 @@ impl<T: Config> Pallet<T> {
 		Ok(context.applied())
 	}
 
-	pub(crate) fn apply_proved_gateway_activity_log(
+	pub(crate) fn apply_proved_gateway_activity_proof_block(
+		source_chain: SourceChain,
+		starting_gateway_activity_nonce: GatewayActivityNonce,
+		proof_block: GatewayActivityProofBlock<T>,
+	) -> Result<GatewayActivityProofBlockOutcome<T>, DispatchError> {
+		let target_block_number = proof_block.target_block_number;
+		let mut expected_gateway_activity_nonce = starting_gateway_activity_nonce;
+		let mut latest_gateway_state = None;
+		let apply_result: Result<(), GatewayActivityApplyError> = (|| {
+			for receipt_log in proof_block.receipt_logs {
+				let gateway_state = Self::apply_proved_gateway_activity_log(
+					source_chain,
+					expected_gateway_activity_nonce,
+					receipt_log,
+				)?;
+				expected_gateway_activity_nonce = gateway_state.gateway_activity_nonce;
+				latest_gateway_state = Some(gateway_state);
+			}
+
+			Self::expire_transfer_outs_through_block(source_chain, target_block_number).map_err(
+				|reason| GatewayActivityApplyError::Pause {
+					failed_gateway_activity_nonce: expected_gateway_activity_nonce,
+					reason,
+				},
+			)?;
+
+			Ok(())
+		})();
+
+		match apply_result {
+			Ok(()) => Ok(GatewayActivityProofBlockOutcome {
+				latest_gateway_state: Some(
+					latest_gateway_state.ok_or(Error::<T>::NoGatewayActivitiesProvided)?,
+				),
+				pause: None,
+			}),
+			Err(GatewayActivityApplyError::Pause { failed_gateway_activity_nonce, reason }) =>
+				Ok(GatewayActivityProofBlockOutcome {
+					latest_gateway_state,
+					pause: Some(GatewaySyncPause {
+						last_good_gateway_activity_nonce: expected_gateway_activity_nonce,
+						failed_gateway_activity_nonce,
+						reason,
+					}),
+				}),
+			Err(GatewayActivityApplyError::Reject(error)) => Err(error),
+		}
+	}
+
+	fn apply_proved_gateway_activity_log(
 		source_chain: SourceChain,
 		expected_gateway_activity_nonce: GatewayActivityNonce,
 		receipt_log: EthereumReceiptLog,
 	) -> GatewayActivityApplyResult<T> {
-		let gateway = receipt_log.event_log.address;
-		Self::ensure_supported_gateway(source_chain, &gateway)
-			.map_err(GatewayActivityApplyError::from)?;
-		let decoded_activity = Self::decode_evm_gateway_activity(
-			source_chain,
-			&receipt_log.event_log,
-		)
-		.map_err(|_| GatewayActivityApplyError::Pause {
-			failed_gateway_activity_nonce: expected_gateway_activity_nonce.saturating_add(1),
-			reason: GatewaySyncPauseReason::MalformedGatewayActivity,
-		})?;
+		// Keep the original per-log commit semantics: each activity either lands fully or rolls
+		// back on its own, and a later pause does not undo earlier logs from this proof block.
+		with_storage_layer(|| {
+			let event_log = receipt_log.event_log;
+			let gateway = event_log.address;
+			Self::ensure_supported_gateway(source_chain, &gateway)
+				.map_err(GatewayActivityApplyError::from)?;
+			// A verified log from the active gateway that we still cannot decode means the
+			// canonical gateway activity stream has advanced beyond what this runtime understands,
+			// so sync must stop at that nonce instead of rejecting the relayer's otherwise valid
+			// proof.
+			let decoded_activity = Self::decode_evm_gateway_activity(source_chain, &event_log)
+				.map_err(|_| GatewayActivityApplyError::Pause {
+					failed_gateway_activity_nonce: expected_gateway_activity_nonce
+						.saturating_add(1),
+					reason: GatewaySyncPauseReason::MalformedGatewayActivity,
+				})?;
+			Self::apply_decoded_gateway_activity(
+				source_chain,
+				expected_gateway_activity_nonce,
+				decoded_activity,
+			)
+		})
+	}
+
+	pub(crate) fn apply_decoded_gateway_activity(
+		source_chain: SourceChain,
+		expected_gateway_activity_nonce: GatewayActivityNonce,
+		decoded_activity: DecodedGatewayActivity<T>,
+	) -> GatewayActivityApplyResult<T> {
 		let context = GatewayActivityContext::new(
 			source_chain,
 			decoded_activity.gateway_state().clone(),
@@ -535,7 +610,9 @@ impl<T: Config> Pallet<T> {
 		.map_err(GatewayActivityApplyError::from)?;
 
 		match decoded_activity {
-			DecodedGatewayActivity::TransferToArgon { from, token, to, amount, .. } => {
+			DecodedGatewayActivity::TransferToArgon {
+				from, gateway, token, to, amount, ..
+			} => {
 				let asset = match Self::resolve_source_asset_kind(source_chain, &gateway, &token) {
 					Ok(asset) => asset,
 					Err(_) => return context.pause_result(GatewaySyncPauseReason::UnsupportedToken),
@@ -2512,6 +2589,341 @@ mod test {
 	}
 
 	#[test]
+	fn prove_gateway_activity_expires_transfer_outs_once_synced_past_validity_block() {
+		new_test_ext().execute_with(|| {
+			System::set_block_number(1);
+
+			let authority_account = account(201);
+			let authority_pair = council_signing_pair(111);
+			let signing_key = activate_test_minting_authority(
+				authority_account.clone(),
+				51,
+				20_000,
+				&council_signing_pair(112),
+				&authority_pair,
+				20_000,
+				0,
+			);
+			let user = account(202);
+			let hold_reason =
+				RuntimeHoldReason::CrosschainTransfer(HoldReason::TransferOutMintingAuthorityTip);
+
+			LatestExecutionBlockNumber::set(Some(1_000));
+			assert_ok!(Balances::mint_into(&user, 6_000));
+			assert_ok!(CrosschainTransfer::transfer_out(
+				RuntimeOrigin::signed(user.clone()),
+				SourceChain::Ethereum,
+				AssetKind::Argon,
+				h160(0x71),
+				5_000,
+			));
+			let transfer_id = transfer_out_id(&user, 1);
+			assert_ok!(CrosschainTransfer::collateralize_transfer(
+				RuntimeOrigin::signed(authority_account),
+				transfer_id,
+				transfer_collateral_signature(&authority_pair, transfer_id, 5_000, 0),
+				5_000,
+				0,
+			));
+			let valid_until_ethereum_block = TransferOutById::<Test>::get(transfer_id)
+				.expect("transfer should remain stored")
+				.valid_until_ethereum_block;
+			let previous_gateway_activity_nonce =
+				GatewayStateBySourceChain::<Test>::get(SourceChain::Ethereum)
+					.expect("activation should seed gateway state")
+					.gateway_activity_nonce;
+
+			assert_ok!(CrosschainTransfer::prove_gateway_activity(
+				RuntimeOrigin::signed(account(1)),
+				SourceChain::Ethereum,
+				previous_gateway_activity_nonce,
+				proof_batch_at_block(
+					valid_until_ethereum_block.saturating_add(1),
+					vec![activity_logs(vec![argon_activity_log(
+						account(203),
+						previous_gateway_activity_nonce.saturating_add(1),
+						0,
+					)])],
+				),
+			));
+
+			let authority = MintingAuthoritiesBySigner::<Test>::get(signing_key)
+				.expect("authority should stay registered");
+			assert!(TransferOutById::<Test>::get(transfer_id).is_none());
+			assert_eq!(Balances::balance(&user), 6_000);
+			assert_eq!(Balances::balance_on_hold(&hold_reason, &user), 0);
+			assert_eq!(
+				PendingCollateralizationRequestsByChain::<Test>::get(SourceChain::Ethereum),
+				vec![],
+			);
+			assert_eq!(
+				NonTerminalTransferOutCountByDestinationChain::<Test>::get(SourceChain::Ethereum),
+				0,
+			);
+			assert_eq!(
+				PendingTransferOutCirculationByDestinationChain::<Test>::get(SourceChain::Ethereum)
+					.argon_circulation,
+				0,
+			);
+			assert_eq!(authority.pending_reserved_microgon_collateral, 0);
+			assert!(authority.active_pending_transfer_ids.is_empty());
+		});
+	}
+
+	#[test]
+	fn prove_gateway_activity_auto_queues_deactivation_for_fully_depleted_authority() {
+		new_test_ext().execute_with(|| {
+			System::set_block_number(1);
+
+			let authority_account = account(204);
+			let authority_pair = council_signing_pair(113);
+			let signing_key = activate_test_minting_authority(
+				authority_account.clone(),
+				52,
+				20_000,
+				&council_signing_pair(114),
+				&authority_pair,
+				12_000,
+				0,
+			);
+			let user = account(205);
+
+			assert_ok!(Balances::mint_into(&user, 13_000));
+			assert_ok!(CrosschainTransfer::transfer_out(
+				RuntimeOrigin::signed(user.clone()),
+				SourceChain::Ethereum,
+				AssetKind::Argon,
+				h160(0x72),
+				12_000,
+			));
+			let transfer_id = transfer_out_id(&user, 1);
+			assert_ok!(CrosschainTransfer::collateralize_transfer(
+				RuntimeOrigin::signed(authority_account),
+				transfer_id,
+				transfer_collateral_signature(&authority_pair, transfer_id, 12_000, 0),
+				12_000,
+				0,
+			));
+			let previous_gateway_activity_nonce =
+				GatewayStateBySourceChain::<Test>::get(SourceChain::Ethereum)
+					.expect("activation should seed gateway state")
+					.gateway_activity_nonce;
+
+			assert_ok!(CrosschainTransfer::prove_gateway_activity(
+				RuntimeOrigin::signed(account(1)),
+				SourceChain::Ethereum,
+				previous_gateway_activity_nonce,
+				proof_batch_at_block(
+					10,
+					vec![activity_logs(vec![transfer_out_of_argon_finalized_log(
+						transfer_id,
+						vec![(signing_key, 12_000, 0)],
+						previous_gateway_activity_nonce.saturating_add(1),
+						1,
+					)])],
+				),
+			));
+
+			let authority = MintingAuthoritiesBySigner::<Test>::get(signing_key)
+				.expect("authority should remain registered while deactivation is queued");
+			assert_eq!(authority.gateway_remaining_microgon_collateral, 0);
+			assert_eq!(authority.state, MintingAuthorityState::Deactivating);
+			assert_eq!(authority.deactivation_approval_queue_nonce, Some(2));
+		});
+	}
+
+	#[test]
+	fn prove_gateway_activity_ignores_auto_deactivation_failures_during_finalization() {
+		new_test_ext().execute_with(|| {
+			System::set_block_number(1);
+
+			let authority_account = account(206);
+			let authority_pair = council_signing_pair(115);
+			let signing_key = activate_test_minting_authority(
+				authority_account.clone(),
+				53,
+				20_000,
+				&council_signing_pair(116),
+				&authority_pair,
+				12_000,
+				0,
+			);
+			let user = account(207);
+
+			assert_ok!(Balances::mint_into(&user, 13_000));
+			assert_ok!(CrosschainTransfer::transfer_out(
+				RuntimeOrigin::signed(user.clone()),
+				SourceChain::Ethereum,
+				AssetKind::Argon,
+				h160(0x73),
+				12_000,
+			));
+			let transfer_id = transfer_out_id(&user, 1);
+			assert_ok!(CrosschainTransfer::collateralize_transfer(
+				RuntimeOrigin::signed(authority_account.clone()),
+				transfer_id,
+				transfer_collateral_signature(&authority_pair, transfer_id, 12_000, 0),
+				12_000,
+				0,
+			));
+			let previous_gateway_activity_nonce =
+				GatewayStateBySourceChain::<Test>::get(SourceChain::Ethereum)
+					.expect("activation should seed gateway state")
+					.gateway_activity_nonce;
+
+			ActiveGlobalIssuanceCouncilByDestinationChain::<Test>::remove(SourceChain::Ethereum);
+			LatestQueuedCouncilHashByDestinationChain::<Test>::remove(SourceChain::Ethereum);
+
+			assert_ok!(CrosschainTransfer::prove_gateway_activity(
+				RuntimeOrigin::signed(account(1)),
+				SourceChain::Ethereum,
+				previous_gateway_activity_nonce,
+				proof_batch_at_block(
+					10,
+					vec![activity_logs(vec![transfer_out_of_argon_finalized_log(
+						transfer_id,
+						vec![(signing_key, 12_000, 0)],
+						previous_gateway_activity_nonce.saturating_add(1),
+						1,
+					)])],
+				),
+			));
+
+			assert_eq!(GatewaySyncPauseBySourceChain::<Test>::get(SourceChain::Ethereum), None);
+			let authority = MintingAuthoritiesBySigner::<Test>::get(signing_key)
+				.expect("authority should remain registered if best-effort deactivation fails");
+			assert_eq!(authority.gateway_remaining_microgon_collateral, 0);
+			assert_eq!(authority.state, MintingAuthorityState::Active);
+			assert_eq!(authority.deactivation_approval_queue_nonce, None);
+		});
+	}
+
+	#[test]
+	fn prove_gateway_activity_keeps_log_results_when_expiration_cleanup_pauses_midway() {
+		new_test_ext().execute_with(|| {
+			System::set_block_number(1);
+
+			let authority_account = account(208);
+			let authority_pair = council_signing_pair(117);
+			let signing_key = activate_test_minting_authority(
+				authority_account.clone(),
+				54,
+				20_000,
+				&council_signing_pair(118),
+				&authority_pair,
+				20_000,
+				0,
+			);
+			let expired_user = account(209);
+			let finalized_user = account(210);
+
+			LatestExecutionBlockNumber::set(Some(1_000));
+			assert_ok!(Balances::mint_into(&expired_user, 6_000));
+			assert_ok!(CrosschainTransfer::transfer_out(
+				RuntimeOrigin::signed(expired_user.clone()),
+				SourceChain::Ethereum,
+				AssetKind::Argon,
+				h160(0x73),
+				5_000,
+			));
+			let expired_transfer_id = transfer_out_id(&expired_user, 1);
+			assert_ok!(CrosschainTransfer::collateralize_transfer(
+				RuntimeOrigin::signed(authority_account.clone()),
+				expired_transfer_id,
+				transfer_collateral_signature(&authority_pair, expired_transfer_id, 5_000, 0),
+				5_000,
+				0,
+			));
+
+			assert_ok!(Balances::mint_into(&finalized_user, 6_000));
+			assert_ok!(CrosschainTransfer::transfer_out(
+				RuntimeOrigin::signed(finalized_user.clone()),
+				SourceChain::Ethereum,
+				AssetKind::Argon,
+				h160(0x74),
+				5_000,
+			));
+			let finalized_transfer_id = transfer_out_id(&finalized_user, 1);
+			assert_ok!(CrosschainTransfer::collateralize_transfer(
+				RuntimeOrigin::signed(authority_account.clone()),
+				finalized_transfer_id,
+				transfer_collateral_signature(&authority_pair, finalized_transfer_id, 5_000, 0),
+				5_000,
+				0,
+			));
+
+			let valid_until_ethereum_block = TransferOutById::<Test>::get(expired_transfer_id)
+				.expect("expired transfer should remain stored")
+				.valid_until_ethereum_block;
+			let previous_gateway_activity_nonce =
+				GatewayStateBySourceChain::<Test>::get(SourceChain::Ethereum)
+					.expect("activation should seed gateway state")
+					.gateway_activity_nonce;
+			let burn_account = CrosschainTransfer::burn_account(SourceChain::Ethereum);
+			let _ = Balances::burn_from(
+				&burn_account,
+				6_000,
+				Preservation::Expendable,
+				Precision::Exact,
+				Fortitude::Force,
+			)
+			.expect("draining the burn account should succeed in the mock");
+
+			assert_ok!(CrosschainTransfer::prove_gateway_activity(
+				RuntimeOrigin::signed(account(1)),
+				SourceChain::Ethereum,
+				previous_gateway_activity_nonce,
+				proof_batch_at_block(
+					valid_until_ethereum_block.saturating_add(1),
+					vec![activity_logs(vec![transfer_out_of_argon_finalized_log(
+						finalized_transfer_id,
+						vec![(signing_key, 5_000, 0)],
+						previous_gateway_activity_nonce.saturating_add(1),
+						1,
+					)])],
+				),
+			));
+
+			let gateway_state = GatewayStateBySourceChain::<Test>::get(SourceChain::Ethereum)
+				.expect("finalized activity should still advance gateway state");
+			assert_eq!(
+				gateway_state.gateway_activity_nonce,
+				previous_gateway_activity_nonce.saturating_add(1),
+			);
+			assert_eq!(gateway_state.argon_circulation, 5_000);
+
+			let pause = GatewaySyncPauseBySourceChain::<Test>::get(SourceChain::Ethereum)
+				.expect("expiration cleanup failure should pause sync");
+			assert_eq!(
+				pause.last_good_gateway_activity_nonce,
+				previous_gateway_activity_nonce.saturating_add(1),
+			);
+			assert_eq!(
+				pause.failed_gateway_activity_nonce,
+				previous_gateway_activity_nonce.saturating_add(1),
+			);
+			assert_eq!(pause.reason, GatewaySyncPauseReason::GatewayStateDrift);
+			assert!(TransferOutById::<Test>::get(finalized_transfer_id).is_none());
+			assert_eq!(
+				TransferOutById::<Test>::get(expired_transfer_id).map(|transfer| transfer.amount),
+				Some(5_000),
+			);
+			assert_eq!(
+				PendingCollateralizationRequestsByChain::<Test>::get(SourceChain::Ethereum),
+				vec![],
+			);
+			assert_eq!(
+				NonTerminalTransferOutCountByDestinationChain::<Test>::get(SourceChain::Ethereum),
+				1,
+			);
+			let authority = MintingAuthoritiesBySigner::<Test>::get(signing_key)
+				.expect("cleanup pause should keep the expired transfer reserved");
+			assert_eq!(authority.pending_reserved_microgon_collateral, 5_000);
+			assert_eq!(authority.active_pending_transfer_ids, vec![expired_transfer_id]);
+		});
+	}
+
+	#[test]
 	fn prove_gateway_activity_refunds_batch_that_advances_before_pausing() {
 		new_test_ext().execute_with(|| {
 			System::set_block_number(1);
@@ -2806,6 +3218,43 @@ mod test {
 					)])]),
 				),
 				Error::<Test>::UnsupportedGateway,
+			);
+		});
+	}
+
+	#[test]
+	fn prove_gateway_activity_pauses_on_malformed_gateway_activity() {
+		new_test_ext().execute_with(|| {
+			System::set_block_number(1);
+			assert_ok!(CrosschainTransfer::set_chain_config(
+				RuntimeOrigin::root(),
+				SourceChain::Ethereum,
+				chain_config(),
+			));
+
+			assert!(matches!(
+				CrosschainTransfer::prove_gateway_activity(
+					RuntimeOrigin::signed(account(1)),
+					SourceChain::Ethereum,
+					0,
+					proof_batch(vec![activity_logs(vec![EthereumLog {
+						address: h160(0x21),
+						topics: vec![H256::zero()]
+							.try_into()
+							.expect("topics stay within Ethereum log topic bounds"),
+						data: vec![].try_into().expect("empty data stays within log payload bounds"),
+					}])]),
+				),
+				Ok(post_info) if post_info.pays_fee == Pays::No
+			));
+			assert_eq!(GatewayStateBySourceChain::<Test>::get(SourceChain::Ethereum), None);
+			assert_eq!(
+				GatewaySyncPauseBySourceChain::<Test>::get(SourceChain::Ethereum),
+				Some(GatewaySyncPause {
+					last_good_gateway_activity_nonce: 0,
+					failed_gateway_activity_nonce: 1,
+					reason: GatewaySyncPauseReason::MalformedGatewayActivity,
+				}),
 			);
 		});
 	}
@@ -3257,12 +3706,19 @@ mod test {
 	fn proof_batch(
 		log_blocks: Vec<BoundedVec<EthereumReceiptLog, MaxActivitiesPerReceiptProof>>,
 	) -> GatewayActivityProofBatch<Test> {
+		proof_batch_at_block(0, log_blocks)
+	}
+
+	fn proof_batch_at_block(
+		target_block_number: u64,
+		log_blocks: Vec<BoundedVec<EthereumReceiptLog, MaxActivitiesPerReceiptProof>>,
+	) -> GatewayActivityProofBatch<Test> {
 		GatewayActivityProofBatch::<Test> {
 			execution_block_proof: dummy_execution_block_proof(),
 			blocks: log_blocks
 				.into_iter()
 				.map(|receipt_logs| GatewayActivityProofBlock::<Test> {
-					target_block_number: 0,
+					target_block_number,
 					receipt_proof: dummy_receipt_proof(),
 					receipt_logs,
 				})

@@ -183,6 +183,33 @@ impl<T: Config> Pallet<T> {
 		Ok(())
 	}
 
+	pub(crate) fn maybe_auto_deactivate_minting_authority(
+		destination_signing_key: H160,
+	) -> DispatchResult {
+		let Some(authority) = MintingAuthoritiesBySigner::<T>::get(destination_signing_key) else {
+			return Ok(());
+		};
+		if authority.state != MintingAuthorityState::Active ||
+			!authority.active_pending_transfer_ids.is_empty() ||
+			authority.pending_reserved_microgon_collateral != T::Balance::default() ||
+			authority.pending_reserved_micronot_collateral != T::Balance::default()
+		{
+			return Ok(());
+		}
+		if authority.gateway_remaining_microgon_collateral != T::Balance::default() ||
+			authority.gateway_remaining_micronot_collateral != T::Balance::default()
+		{
+			return Ok(());
+		}
+
+		Self::do_deactivate_minting_authority(
+			authority.account_id.clone(),
+			destination_signing_key,
+		)
+		.map_err(|error| error.error)?;
+		Ok(())
+	}
+
 	pub(crate) fn do_deactivate_minting_authority(
 		account_id: T::AccountId,
 		destination_signing_key: H160,
@@ -296,7 +323,6 @@ impl<T: Config> Pallet<T> {
 
 		Ok(Pays::No.into())
 	}
-
 	#[allow(clippy::type_complexity)]
 	pub(crate) fn minting_authority_activation_repayment_quote(
 		destination_chain: SourceChain,
