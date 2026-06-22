@@ -1,5 +1,4 @@
 // Auto-generated via `yarn polkadot-types-from-chain`, do not edit
-/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
@@ -605,6 +604,14 @@ declare module '@polkadot/api-base/types/events' {
         ApiType,
         [destinationChain: PalletCrosschainTransferSourceChain, councilHash: H256],
         { destinationChain: PalletCrosschainTransferSourceChain; councilHash: H256 }
+      >;
+      /**
+       * Root explicitly set the continuity hash needed to validate the next gateway locator.
+       **/
+      LastAcceptedLocatorHashSet: AugmentedEvent<
+        ApiType,
+        [sourceChain: PalletCrosschainTransferSourceChain, locatorHash: H256],
+        { sourceChain: PalletCrosschainTransferSourceChain; locatorHash: H256 }
       >;
       /**
        * Root updated the minimum normalized microgon value required to register a Minting

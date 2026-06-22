@@ -316,24 +316,27 @@ export function parseActivationPricingRecommendation(
 ): MintingAuthorityActivationPricingRecommendation {
   if (report.activationPricingRecommendation) {
     if (report.activationPricingMeasurements) {
-      return deriveMintingAuthorityActivationPricingRecommendation({
-        singleActivationGas: BigInt(report.activationPricingMeasurements.singleActivationGas),
-        batchActivationGas: BigInt(report.activationPricingMeasurements.batchActivationGas),
-        batchActivationCount: report.activationPricingMeasurements.batchActivationCount,
-        sharedSignatureCount: report.activationPricingMeasurements.sharedSignatureCount,
-        oneMemberSingleActivationGas: report.activationPricingMeasurements
-          .oneMemberSingleActivationGas
-          ? BigInt(report.activationPricingMeasurements.oneMemberSingleActivationGas)
-          : undefined,
-        oneMemberSharedSignatureCount:
-          report.activationPricingMeasurements.oneMemberSharedSignatureCount,
-        smallCouncilSingleActivationGas: report.activationPricingMeasurements
-          .smallCouncilSingleActivationGas
-          ? BigInt(report.activationPricingMeasurements.smallCouncilSingleActivationGas)
-          : undefined,
-        smallCouncilSharedSignatureCount:
-          report.activationPricingMeasurements.smallCouncilSharedSignatureCount,
-      }, targetSharedSignatureCount);
+      return deriveMintingAuthorityActivationPricingRecommendation(
+        {
+          singleActivationGas: BigInt(report.activationPricingMeasurements.singleActivationGas),
+          batchActivationGas: BigInt(report.activationPricingMeasurements.batchActivationGas),
+          batchActivationCount: report.activationPricingMeasurements.batchActivationCount,
+          sharedSignatureCount: report.activationPricingMeasurements.sharedSignatureCount,
+          oneMemberSingleActivationGas: report.activationPricingMeasurements
+            .oneMemberSingleActivationGas
+            ? BigInt(report.activationPricingMeasurements.oneMemberSingleActivationGas)
+            : undefined,
+          oneMemberSharedSignatureCount:
+            report.activationPricingMeasurements.oneMemberSharedSignatureCount,
+          smallCouncilSingleActivationGas: report.activationPricingMeasurements
+            .smallCouncilSingleActivationGas
+            ? BigInt(report.activationPricingMeasurements.smallCouncilSingleActivationGas)
+            : undefined,
+          smallCouncilSharedSignatureCount:
+            report.activationPricingMeasurements.smallCouncilSharedSignatureCount,
+        },
+        targetSharedSignatureCount,
+      );
     }
 
     return {
@@ -354,23 +357,27 @@ export function parseActivationPricingRecommendation(
     );
   }
 
-  return deriveMintingAuthorityActivationPricingRecommendation({
-    singleActivationGas: BigInt(report.activationPricingMeasurements.singleActivationGas),
-    batchActivationGas: BigInt(report.activationPricingMeasurements.batchActivationGas),
-    batchActivationCount: report.activationPricingMeasurements.batchActivationCount,
-    sharedSignatureCount: report.activationPricingMeasurements.sharedSignatureCount,
-    oneMemberSingleActivationGas: report.activationPricingMeasurements.oneMemberSingleActivationGas
-      ? BigInt(report.activationPricingMeasurements.oneMemberSingleActivationGas)
-      : undefined,
-    oneMemberSharedSignatureCount:
-      report.activationPricingMeasurements.oneMemberSharedSignatureCount,
-    smallCouncilSingleActivationGas: report.activationPricingMeasurements
-      .smallCouncilSingleActivationGas
-      ? BigInt(report.activationPricingMeasurements.smallCouncilSingleActivationGas)
-      : undefined,
-    smallCouncilSharedSignatureCount:
-      report.activationPricingMeasurements.smallCouncilSharedSignatureCount,
-  }, targetSharedSignatureCount);
+  return deriveMintingAuthorityActivationPricingRecommendation(
+    {
+      singleActivationGas: BigInt(report.activationPricingMeasurements.singleActivationGas),
+      batchActivationGas: BigInt(report.activationPricingMeasurements.batchActivationGas),
+      batchActivationCount: report.activationPricingMeasurements.batchActivationCount,
+      sharedSignatureCount: report.activationPricingMeasurements.sharedSignatureCount,
+      oneMemberSingleActivationGas: report.activationPricingMeasurements
+        .oneMemberSingleActivationGas
+        ? BigInt(report.activationPricingMeasurements.oneMemberSingleActivationGas)
+        : undefined,
+      oneMemberSharedSignatureCount:
+        report.activationPricingMeasurements.oneMemberSharedSignatureCount,
+      smallCouncilSingleActivationGas: report.activationPricingMeasurements
+        .smallCouncilSingleActivationGas
+        ? BigInt(report.activationPricingMeasurements.smallCouncilSingleActivationGas)
+        : undefined,
+      smallCouncilSharedSignatureCount:
+        report.activationPricingMeasurements.smallCouncilSharedSignatureCount,
+    },
+    targetSharedSignatureCount,
+  );
 }
 
 function describeExtrinsic(

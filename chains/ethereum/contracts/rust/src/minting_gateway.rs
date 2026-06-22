@@ -114,6 +114,8 @@ pub use MintingGateway::{
 };
 
 pub const ACTIVITY_HASH_VERSION: u8 = 1;
+/// Storage slot seed for `MintingGateway.activityBlockLocators`.
+pub const ACTIVITY_BLOCK_LOCATORS_MAPPING_SLOT: u64 = 11;
 
 pub fn hash_global_issuance_council(
 	signers: Vec<Address>,
@@ -433,6 +435,52 @@ mod tests {
 	use alloy_primitives::Bytes;
 	use alloy_sol_types::SolCall;
 	use core::str::FromStr;
+	use serde_json::Value;
+
+	fn fixture() -> Value {
+		serde_json::from_str(include_str!(concat!(
+			env!("CARGO_MANIFEST_DIR"),
+			"/../test/fixtures/gateway-activity-hashing.json"
+		)))
+		.unwrap()
+	}
+
+	fn json<'a>(value: &'a Value, key: &str) -> &'a Value {
+		value.get(key).unwrap()
+	}
+
+	fn string(value: &Value) -> &str {
+		value.as_str().unwrap()
+	}
+
+	fn address(value: &Value) -> Address {
+		Address::from_str(string(value)).unwrap()
+	}
+
+	fn b256(value: &Value) -> B256 {
+		B256::from_str(string(value)).unwrap()
+	}
+
+	fn u64_value(value: &Value) -> u64 {
+		string(value).parse().unwrap()
+	}
+
+	fn u128_value(value: &Value) -> u128 {
+		string(value).parse().unwrap()
+	}
+
+	fn u32_value(value: &Value) -> u32 {
+		value.as_u64().unwrap().try_into().unwrap()
+	}
+
+	fn gateway_state(value: &Value) -> GatewayActivityState {
+		GatewayActivityState {
+			gatewayActivityNonce: u64_value(json(value, "gatewayActivityNonce")),
+			argonApprovalsNonce: u64_value(json(value, "argonApprovalsNonce")),
+			argonCirculation: u128_value(json(value, "argonCirculation")),
+			argonotCirculation: u128_value(json(value, "argonotCirculation")),
+		}
+	}
 
 	#[test]
 	fn transfer_out_hashes_match_the_known_vector() {
@@ -494,77 +542,163 @@ mod tests {
 	}
 
 	#[test]
-	fn activity_hashes_match_known_vectors() {
-		let gateway = Address::from_str("0x8A2841380151160BBf88D44D8D9A4DdA05838B76").unwrap();
-		let token = Address::from_str("0xa1a1e87614B1f447fD8E65c18DCc41bAd4A7A1E5").unwrap();
-		let from = Address::from([0x11; 20]);
-		let signing_key = Address::from([0x22; 20]);
-		let argon_account_id =
-			B256::from_str("0x6172676f6e2d6163636f756e742d310000000000000000000000000000000000")
-				.unwrap();
-		let relayer_argon_account_id =
-			B256::from_str("0x72656c617965722d310000000000000000000000000000000000000000000000")
-				.unwrap();
-		let approval_hash = B256::from([0x33; 32]);
-		let state1 = GatewayActivityState {
-			gatewayActivityNonce: 1,
-			argonApprovalsNonce: 0,
-			argonCirculation: 750,
-			argonotCirculation: 2_000,
-		};
-		let state2 = GatewayActivityState {
-			gatewayActivityNonce: 2,
-			argonApprovalsNonce: 1,
-			argonCirculation: 750,
-			argonotCirculation: 2_000,
-		};
+	fn activity_hashes_match_shared_fixture() {
+		let fixture = fixture();
+		let context = json(&fixture, "context");
+		let activities = json(&fixture, "activities");
+		let leaf_hashes = json(&fixture, "leafHashes");
+		let transfer_to_argon_started_activity = json(activities, "transferToArgonStarted");
+		let minting_authority_activated_activity = json(activities, "mintingAuthorityActivated");
+		let global_issuance_council_rotated_activity =
+			json(activities, "globalIssuanceCouncilRotated");
+		let minting_authority_deactivated_activity =
+			json(activities, "mintingAuthorityDeactivated");
+		let transfer_out_of_argon_canceled_activity =
+			json(activities, "transferOutOfArgonCanceled");
+		let transfer_out_of_argon_finalized_activity =
+			json(activities, "transferOutOfArgonFinalized");
+		let block_number = u64_value(json(&fixture, "blockNumber"));
+		let start_gateway_activity_nonce = u64_value(json(&fixture, "startGatewayActivityNonce"));
+		let end_gateway_activity_nonce = u64_value(json(&fixture, "endGatewayActivityNonce"));
+		let mapping_slot = u64_value(json(&fixture, "mappingSlot"));
+		let locator_index = u64_value(json(&fixture, "locatorIndex"));
+		let gateway = address(json(context, "gatewayAddress"));
+		let chain_id = u64_value(json(context, "chainId"));
 
-		let leaf1 = hash_transfer_to_argon_started_activity(
-			11_155_111,
+		let transfer_to_argon_started = hash_transfer_to_argon_started_activity(
+			chain_id,
 			gateway,
-			from,
-			token,
-			250,
-			argon_account_id,
-			state1,
+			address(json(transfer_to_argon_started_activity, "from")),
+			address(json(transfer_to_argon_started_activity, "token")),
+			u128_value(json(transfer_to_argon_started_activity, "amount")),
+			b256(json(transfer_to_argon_started_activity, "argonAccountId")),
+			gateway_state(json(transfer_to_argon_started_activity, "gatewayState")),
 		);
-		let leaf2 = hash_minting_authority_activated_activity(
-			11_155_111,
+		assert_eq!(transfer_to_argon_started, b256(json(leaf_hashes, "transferToArgonStarted")));
+
+		let minting_authority_activated = hash_minting_authority_activated_activity(
+			chain_id,
 			gateway,
-			signing_key,
-			1_000,
-			100,
-			2,
-			3,
-			approval_hash,
-			relayer_argon_account_id,
-			state2,
+			address(json(minting_authority_activated_activity, "signingKey")),
+			u128_value(json(minting_authority_activated_activity, "microgonCollateral")),
+			u128_value(json(minting_authority_activated_activity, "micronotCollateral")),
+			u32_value(json(minting_authority_activated_activity, "coactivationCount")),
+			u32_value(json(minting_authority_activated_activity, "sharedSignatureCount")),
+			b256(json(minting_authority_activated_activity, "approvalHash")),
+			b256(json(minting_authority_activated_activity, "relayerArgonAccountId")),
+			gateway_state(json(minting_authority_activated_activity, "gatewayState")),
+		);
+		assert_eq!(
+			minting_authority_activated,
+			b256(json(leaf_hashes, "mintingAuthorityActivated"))
 		);
 
-		assert_eq!(
-			leaf1,
-			B256::from_str("0x5cf4762ca44e4650c2f11040a0d9864cdb84fc0df19f478605ac2e3872032857")
-				.unwrap()
+		let global_issuance_council_rotated = hash_global_issuance_council_rotated_activity(
+			chain_id,
+			gateway,
+			b256(json(global_issuance_council_rotated_activity, "councilHash")),
+			b256(json(global_issuance_council_rotated_activity, "approvalHash")),
+			b256(json(global_issuance_council_rotated_activity, "relayerArgonAccountId")),
+			gateway_state(json(global_issuance_council_rotated_activity, "gatewayState")),
 		);
 		assert_eq!(
-			leaf2,
-			B256::from_str("0xc7a6582937d2403a52b116f280ba9367acc5f77142527bf06da1177256491868")
-				.unwrap()
+			global_issuance_council_rotated,
+			b256(json(leaf_hashes, "globalIssuanceCouncilRotated"))
+		);
+
+		let minting_authority_deactivated = hash_minting_authority_deactivated_activity(
+			chain_id,
+			gateway,
+			address(json(minting_authority_deactivated_activity, "signingKey")),
+			u128_value(json(minting_authority_deactivated_activity, "microgonCollateral")),
+			u128_value(json(minting_authority_deactivated_activity, "micronotCollateral")),
+			b256(json(minting_authority_deactivated_activity, "approvalHash")),
+			b256(json(minting_authority_deactivated_activity, "relayerArgonAccountId")),
+			gateway_state(json(minting_authority_deactivated_activity, "gatewayState")),
 		);
 		assert_eq!(
-			append_activity_root(B256::ZERO, leaf1),
-			B256::from_str("0x77344b2f6e1a3d658361e8760b7ab1cb824371891488876d4b1126eb645dbc1a")
-				.unwrap()
+			minting_authority_deactivated,
+			b256(json(leaf_hashes, "mintingAuthorityDeactivated"))
+		);
+
+		let transfer_out_of_argon_canceled = hash_transfer_out_of_argon_canceled_activity(
+			chain_id,
+			gateway,
+			b256(json(transfer_out_of_argon_canceled_activity, "transferId")),
+			gateway_state(json(transfer_out_of_argon_canceled_activity, "gatewayState")),
 		);
 		assert_eq!(
-			append_activity_root(append_activity_root(B256::ZERO, leaf1), leaf2),
-			B256::from_str("0x9bf620d17225f03ab3cbd4fce6218ff360a324391bb68ad77669c4401a9f23cf")
+			transfer_out_of_argon_canceled,
+			b256(json(leaf_hashes, "transferOutOfArgonCanceled"))
+		);
+
+		let transfer_out_of_argon_finalized = hash_transfer_out_of_argon_finalized_activity(
+			chain_id,
+			gateway,
+			b256(json(transfer_out_of_argon_finalized_activity, "transferId")),
+			address(json(transfer_out_of_argon_finalized_activity, "token")),
+			u128_value(json(transfer_out_of_argon_finalized_activity, "amount")),
+			json(transfer_out_of_argon_finalized_activity, "mintingCollateral")
+				.as_array()
 				.unwrap()
+				.iter()
+				.map(|row| MintingAuthorityCollateral {
+					signingKey: address(json(row, "signingKey")),
+					microgonCollateral: u128_value(json(row, "microgonCollateral")),
+					micronotCollateral: u128_value(json(row, "micronotCollateral")),
+				})
+				.collect(),
+			gateway_state(json(transfer_out_of_argon_finalized_activity, "gatewayState")),
 		);
 		assert_eq!(
-			hash_activity_block_locator(10, 1, 1, append_activity_root(B256::ZERO, leaf1),),
-			B256::from_str("0x211d2e88a54ddba440081b6ebc422953f21409da75f231195cc90114f5055b7f")
-				.unwrap()
+			transfer_out_of_argon_finalized,
+			b256(json(leaf_hashes, "transferOutOfArgonFinalized"))
 		);
+
+		let mut activity_root = b256(json(&fixture, "activityRootSeed"));
+		for root in json(&fixture, "roots").as_array().unwrap() {
+			let leaf_hash = match string(json(root, "name")) {
+				"transferToArgonStarted" => transfer_to_argon_started,
+				"mintingAuthorityActivated" => minting_authority_activated,
+				"globalIssuanceCouncilRotated" => global_issuance_council_rotated,
+				"mintingAuthorityDeactivated" => minting_authority_deactivated,
+				"transferOutOfArgonCanceled" => transfer_out_of_argon_canceled,
+				"transferOutOfArgonFinalized" => transfer_out_of_argon_finalized,
+				_ => panic!("unexpected root fixture name"),
+			};
+			activity_root = append_activity_root(activity_root, leaf_hash);
+			assert_eq!(activity_root, b256(json(root, "root")));
+		}
+		assert_eq!(activity_root, b256(json(&fixture, "finalRoot")));
+		assert_eq!(
+			hash_activity_block_locator(
+				block_number,
+				start_gateway_activity_nonce,
+				end_gateway_activity_nonce,
+				activity_root,
+			),
+			b256(json(&fixture, "locatorHash"))
+		);
+		assert_eq!(ACTIVITY_BLOCK_LOCATORS_MAPPING_SLOT, mapping_slot);
+
+		let mut locator_slot_key = [0u8; 64];
+		locator_slot_key[..32].copy_from_slice(&U256::from(locator_index).to_be_bytes::<32>());
+		locator_slot_key[32..]
+			.copy_from_slice(&U256::from(ACTIVITY_BLOCK_LOCATORS_MAPPING_SLOT).to_be_bytes::<32>());
+		let range_slot_key = keccak256(locator_slot_key);
+		assert_eq!(range_slot_key, b256(json(&fixture, "rangeSlotKey")));
+
+		let root_slot_key = B256::from(
+			U256::from_be_slice(range_slot_key.as_slice())
+				.saturating_add(U256::from(1u8))
+				.to_be_bytes::<32>(),
+		);
+		assert_eq!(root_slot_key, b256(json(&fixture, "rootSlotKey")));
+
+		let mut range_slot_value = [0u8; 32];
+		range_slot_value[24..].copy_from_slice(&block_number.to_be_bytes());
+		range_slot_value[16..24].copy_from_slice(&start_gateway_activity_nonce.to_be_bytes());
+		range_slot_value[8..16].copy_from_slice(&end_gateway_activity_nonce.to_be_bytes());
+		assert_eq!(B256::from(range_slot_value), b256(json(&fixture, "rangeSlotValue")));
 	}
 }

@@ -38,6 +38,7 @@ pub type EthereumReceiptProofNodeIndexes =
 	BoundedVec<u16, ConstU32<MAX_ETHEREUM_RECEIPT_PROOF_NODE_REFS>>;
 pub type EthereumCombinedReceiptProofReceipts =
 	BoundedVec<EthereumReceiptProofReceipt, ConstU32<MAX_ETHEREUM_RECEIPTS_PER_PROOF>>;
+pub type EthereumTrieProofNodes = EthereumCombinedReceiptProofNodes;
 pub type EthereumExecutionHeaderRlp =
 	BoundedVec<u8, ConstU32<MAX_ETHEREUM_EXECUTION_HEADER_RLP_BYTES>>;
 pub type EthereumExecutionHeaderChain =
@@ -146,6 +147,49 @@ pub struct EthereumExecutionBlockProof {
 	/// Empty means the burn block is the retained anchor. Otherwise, the first header is the burn
 	/// block and the final supplied header must be the retained anchor's parent.
 	pub target_to_anchor_header_chain: EthereumExecutionHeaderChain,
+}
+
+#[derive(
+	Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen,
+)]
+/// Proof of one storage slot in an Ethereum account's storage trie.
+pub struct EthereumStorageSlotProof {
+	/// Solidity storage-slot key before the storage-trie path hash is applied.
+	pub slot: H256,
+	/// Expected 32-byte value stored at that slot. Zero denotes an absent/zero slot.
+	pub value: H256,
+	/// Ordered indexes into the shared storage proof-node set for this slot.
+	pub node_indexes: EthereumReceiptProofNodeIndexes,
+}
+
+#[derive(
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	CloneNoBound,
+	PartialEqNoBound,
+	EqNoBound,
+	DebugNoBound,
+	TypeInfo,
+	MaxEncodedLen,
+)]
+#[scale_info(skip_type_params(MaxStorageSlots))]
+/// Proof of one Ethereum account plus a bounded set of storage slots against a retained execution
+/// header anchor.
+///
+/// `account_proof` proves the gateway contract account in the Ethereum state trie rooted at the
+/// retained header's `state_root`. That account yields the contract `storage_root`.
+///
+/// `storage_proof` is then one shared node set from that account's storage trie. Each entry in
+/// `slots` selects the nodes within that shared proof needed to verify one storage slot.
+pub struct EthereumAccountStorageProof<MaxStorageSlots: Get<u32>> {
+	/// Retained execution anchor whose `state_root` this proof is checked against.
+	pub anchor_block_hash: H256,
+	/// State-trie proof for the target account.
+	pub account_proof: EthereumTrieProofNodes,
+	/// Shared storage-trie proof nodes for the proven storage slots.
+	pub storage_proof: EthereumTrieProofNodes,
+	pub slots: BoundedVec<EthereumStorageSlotProof, MaxStorageSlots>,
 }
 
 #[derive(

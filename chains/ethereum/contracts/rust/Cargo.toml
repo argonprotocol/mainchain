@@ -17,6 +17,9 @@ targets = ["x86_64-unknown-linux-gnu"]
 alloy-primitives = { workspace = true }
 alloy-sol-types = { workspace = true, features = ["json"] }
 
+[dev-dependencies]
+serde_json = { workspace = true }
+
 [features]
 default = [ "std" ]
 std = [ "alloy-primitives/std", "alloy-sol-types/std" ]

@@ -1,9 +1,11 @@
 import {
   type ArgonClient,
-  buildGatewayActivityProofPayload,
+  buildGatewayActivityStorageProofs,
+  discoverMissingGatewayActivityLocators,
   decodeAddress,
   dispatchErrorToString,
   EvmContracts,
+  getLatestArgonFinalizedExecutionHeader,
   getEthereumBeaconSyncBootstrapTx,
   Keyring,
   type KeyringPair,
@@ -182,26 +184,52 @@ export class EthereumProofE2eHarness {
     );
   }
 
-  async proveGatewayActivity(gatewayAddress: Hex, throughExecutionBlockNumber: bigint) {
-    const payload = await buildGatewayActivityProofPayload(this.mainchainClient, {
+  async proveGatewayActivities(gatewayAddress: Hex, throughExecutionBlockNumber: bigint) {
+    const argonFinalizedExecutionHeader = await getLatestArgonFinalizedExecutionHeader(
+      this.mainchainClient,
+    );
+    const currentGatewayState =
+      await this.mainchainClient.query.crosschainTransfer.gatewayStateBySourceChain('Ethereum');
+    const minimumGatewayActivityNonce = currentGatewayState.isSome
+      ? currentGatewayState.unwrap().gatewayActivityNonce.toBigInt() + 1n
+      : 1n;
+    const collectedLocators = await discoverMissingGatewayActivityLocators({
+      finalizedExecutionBlockNumber: argonFinalizedExecutionHeader.blockNumber,
       executionRpcUrl: this.endpoints.executionRpcUrl,
       gatewayAddress,
-      throughExecutionBlockNumber,
+      minimumGatewayActivityNonce,
     });
-    if (!payload) {
+    const locators = collectedLocators.filter(
+      locator => locator.blockNumber <= throughExecutionBlockNumber,
+    );
+    if (locators.length === 0) {
       throw new Error('Expected uncovered gateway activity to prove');
     }
 
-    const result = await this.submit(
-      this.mainchainClient.tx.crosschainTransfer.proveGatewayActivity(
-        'Ethereum',
-        payload.previousGatewayActivityNonce,
-        payload.proof,
-      ),
-      this.proofRelayer,
-    );
+    const { payloads } = await buildGatewayActivityStorageProofs(this.mainchainClient, {
+      executionRpcUrl: this.endpoints.executionRpcUrl,
+      finalizedExecutionHeader: argonFinalizedExecutionHeader,
+      gatewayAddress,
+      locators,
+    });
+    if (payloads.length === 0) {
+      throw new Error('Expected uncovered gateway activity to prove');
+    }
 
-    return { payload, result };
+    const results = [];
+    for (const payload of payloads) {
+      const result = await this.submit(
+        this.mainchainClient.tx.crosschainTransfer.proveGatewayActivity(
+          'Ethereum',
+          payload.previousGatewayActivityNonce,
+          payload.proof,
+        ),
+        this.proofRelayer,
+      );
+      results.push(result);
+    }
+
+    return { payloads, results };
   }
 
   async configureEthereumRuntime(gateway: TestMintingGateway, mode: RuntimeSetupMode) {

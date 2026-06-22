@@ -1,5 +1,4 @@
 // Auto-generated via `yarn polkadot-types-from-chain`, do not edit
-/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
@@ -486,6 +485,10 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       InvalidTransferToArgonActivity: AugmentedError<ApiType>;
       /**
+       * The continuity hash may only be bootstrapped once for a source chain.
+       **/
+      LastAcceptedLocatorHashAlreadySet: AugmentedError<ApiType>;
+      /**
        * The supplied Minting Authority signing key already has a live local authority record.
        **/
       MintingAuthorityAlreadyRegistered: AugmentedError<ApiType>;
@@ -503,6 +506,11 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       MintingAuthorityNotFound: AugmentedError<ApiType>;
       /**
+       * The next gateway proof needs a previously accepted locator hash that has not been
+       * bootstrapped yet.
+       **/
+      MissingLastAcceptedLocatorHash: AugmentedError<ApiType>;
+      /**
        * The configured activation repayment pricing is missing for this source chain.
        **/
       MissingMintingAuthorityActivationRepaymentPricing: AugmentedError<ApiType>;
@@ -516,13 +524,9 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       NoCouncilApprovalSignaturesProvided: AugmentedError<ApiType>;
       /**
-       * At least one gateway activity log must be supplied with the receipt proof.
+       * At least one gateway activity log must be supplied with the proof.
        **/
       NoGatewayActivitiesProvided: AugmentedError<ApiType>;
-      /**
-       * At least one proven gateway-activity block must be supplied.
-       **/
-      NoGatewayProofBlocksProvided: AugmentedError<ApiType>;
       /**
        * The latest verifier-backed Ethereum execution block is too old to safely open a new
        * transfer out.

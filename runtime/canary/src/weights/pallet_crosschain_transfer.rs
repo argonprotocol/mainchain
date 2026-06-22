@@ -40,8 +40,8 @@ impl<T: frame_system::Config> pallet_crosschain_transfer::WeightInfo for WeightI
 		// Proof Size summary in bytes:
 		//  Measured:  `85`
 		//  Estimated: `3593`
-		// Minimum execution time: 14_000_000 picoseconds.
-		Weight::from_parts(15_000_000, 3593)
+		// Minimum execution time: 13_000_000 picoseconds.
+		Weight::from_parts(14_000_000, 3593)
 			.saturating_add(T::DbWeight::get().reads(2))
 			.saturating_add(T::DbWeight::get().writes(2))
 		}
@@ -77,8 +77,8 @@ impl<T: frame_system::Config> pallet_crosschain_transfer::WeightInfo for WeightI
 		// Proof Size summary in bytes:
 		//  Measured:  `1434`
 		//  Estimated: `23704`
-		// Minimum execution time: 93_000_000 picoseconds.
-		Weight::from_parts(100_000_000, 23704)
+		// Minimum execution time: 90_000_000 picoseconds.
+		Weight::from_parts(98_000_000, 23704)
 			.saturating_add(T::DbWeight::get().reads(14))
 			.saturating_add(T::DbWeight::get().writes(10))
 		}
@@ -91,7 +91,7 @@ impl<T: frame_system::Config> pallet_crosschain_transfer::WeightInfo for WeightI
 		//  Measured:  `57`
 		//  Estimated: `3530`
 		// Minimum execution time: 8_000_000 picoseconds.
-		Weight::from_parts(9_000_000, 3530)
+		Weight::from_parts(8_000_000, 3530)
 			.saturating_add(T::DbWeight::get().reads(1))
 			.saturating_add(T::DbWeight::get().writes(1))
 		}
@@ -151,8 +151,8 @@ impl<T: frame_system::Config> pallet_crosschain_transfer::WeightInfo for WeightI
 		// Proof Size summary in bytes:
 		//  Measured:  `511`
 		//  Estimated: `12347`
-		// Minimum execution time: 89_000_000 picoseconds.
-		Weight::from_parts(96_000_000, 12347)
+		// Minimum execution time: 88_000_000 picoseconds.
+		Weight::from_parts(89_000_000, 12347)
 			.saturating_add(T::DbWeight::get().reads(14))
 			.saturating_add(T::DbWeight::get().writes(6))
 		}
@@ -171,10 +171,10 @@ impl<T: frame_system::Config> pallet_crosschain_transfer::WeightInfo for WeightI
 		// Proof Size summary in bytes:
 		//  Measured:  `442 + a * (191 +/- 0)`
 		//  Estimated: `12347 + a * (11195 +/- 0)`
-		// Minimum execution time: 25_000_000 picoseconds.
-		Weight::from_parts(19_644_712, 12347)
-			// Standard Error: 36_342
-			.saturating_add(Weight::from_parts(13_298_582, 0).saturating_mul(a.into()))
+		// Minimum execution time: 24_000_000 picoseconds.
+		Weight::from_parts(13_289_641, 12347)
+			// Standard Error: 45_074
+			.saturating_add(Weight::from_parts(13_715_003, 0).saturating_mul(a.into()))
 			.saturating_add(T::DbWeight::get().reads(4))
 			.saturating_add(T::DbWeight::get().reads((1_u64).saturating_mul(a.into())))
 			.saturating_add(T::DbWeight::get().writes(1))
@@ -187,52 +187,38 @@ impl<T: frame_system::Config> pallet_crosschain_transfer::WeightInfo for WeightI
 	/// Proof: `CrosschainTransfer::GatewayStateBySourceChain` (`max_values`: None, `max_size`: Some(65), added: 2540, mode: `MaxEncodedLen`)
 	/// Storage: `CrosschainTransfer::ChainConfigBySourceChain` (r:1 w:0)
 	/// Proof: `CrosschainTransfer::ChainConfigBySourceChain` (`max_values`: None, `max_size`: Some(86), added: 2561, mode: `MaxEncodedLen`)
-	/// Storage: `CrosschainTransfer::PendingTransferOutCirculationByDestinationChain` (r:1 w:1)
+	/// Storage: `CrosschainTransfer::LastAcceptedLocatorHashBySourceChain` (r:1 w:1)
+	/// Proof: `CrosschainTransfer::LastAcceptedLocatorHashBySourceChain` (`max_values`: None, `max_size`: Some(49), added: 2524, mode: `MaxEncodedLen`)
+	/// Storage: `CrosschainTransfer::PendingTransferOutCirculationByDestinationChain` (r:1 w:0)
 	/// Proof: `CrosschainTransfer::PendingTransferOutCirculationByDestinationChain` (`max_values`: None, `max_size`: Some(49), added: 2524, mode: `MaxEncodedLen`)
-	/// Storage: `System::Account` (r:111 w:111)
+	/// Storage: `System::Account` (r:2005 w:2005)
 	/// Proof: `System::Account` (`max_values`: None, `max_size`: Some(128), added: 2603, mode: `MaxEncodedLen`)
 	/// Storage: `Ownership::Account` (r:1 w:0)
 	/// Proof: `Ownership::Account` (`max_values`: None, `max_size`: Some(112), added: 2587, mode: `MaxEncodedLen`)
-	/// Storage: `CrosschainTransfer::RecentArgonTransfersByAccount` (r:10 w:10)
+	/// Storage: `CrosschainTransfer::RecentArgonTransfersByAccount` (r:2004 w:2004)
 	/// Proof: `CrosschainTransfer::RecentArgonTransfersByAccount` (`max_values`: None, `max_size`: Some(52), added: 2527, mode: `MaxEncodedLen`)
 	/// Storage: `Ticks::CurrentTick` (r:1 w:0)
 	/// Proof: `Ticks::CurrentTick` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
 	/// Storage: `CrosschainTransfer::InboundTransfersExpiringAt` (r:1 w:1)
 	/// Proof: `CrosschainTransfer::InboundTransfersExpiringAt` (`max_values`: None, `max_size`: None, mode: `Measured`)
-	/// Storage: `CrosschainTransfer::TransferOutById` (r:101 w:100)
-	/// Proof: `CrosschainTransfer::TransferOutById` (`max_values`: None, `max_size`: Some(13485), added: 15960, mode: `MaxEncodedLen`)
-	/// Storage: `CrosschainTransfer::PendingCollateralizationRequestsByChain` (r:1 w:1)
-	/// Proof: `CrosschainTransfer::PendingCollateralizationRequestsByChain` (`max_values`: None, `max_size`: Some(6419), added: 8894, mode: `MaxEncodedLen`)
-	/// Storage: `CrosschainTransfer::NonTerminalTransferOutCountByDestinationChain` (r:1 w:1)
-	/// Proof: `CrosschainTransfer::NonTerminalTransferOutCountByDestinationChain` (`max_values`: None, `max_size`: Some(21), added: 2496, mode: `MaxEncodedLen`)
-	/// Storage: `CrosschainTransfer::MintingAuthoritiesBySigner` (r:1 w:1)
-	/// Proof: `CrosschainTransfer::MintingAuthoritiesBySigner` (`max_values`: None, `max_size`: Some(3405), added: 5880, mode: `MaxEncodedLen`)
-	/// Storage: `Balances::Holds` (r:100 w:100)
-	/// Proof: `Balances::Holds` (`max_values`: None, `max_size`: Some(211), added: 2686, mode: `MaxEncodedLen`)
 	/// Storage: `CrosschainTransfer::ActiveGlobalIssuanceCouncilByDestinationChain` (r:1 w:0)
 	/// Proof: `CrosschainTransfer::ActiveGlobalIssuanceCouncilByDestinationChain` (`max_values`: None, `max_size`: Some(49), added: 2524, mode: `MaxEncodedLen`)
-	/// Storage: `CrosschainTransfer::CurrentTransferOutMicrogonsPerArgonotByDestinationChain` (r:1 w:0)
-	/// Proof: `CrosschainTransfer::CurrentTransferOutMicrogonsPerArgonotByDestinationChain` (`max_values`: None, `max_size`: Some(33), added: 2508, mode: `MaxEncodedLen`)
-	/// Storage: `CrosschainTransfer::PreviousTransferOutMicrogonsPerArgonotByDestinationChain` (r:1 w:0)
-	/// Proof: `CrosschainTransfer::PreviousTransferOutMicrogonsPerArgonotByDestinationChain` (`max_values`: None, `max_size`: Some(33), added: 2508, mode: `MaxEncodedLen`)
-	/// Storage: `CrosschainTransfer::NextCouncilApprovalQueueNonceByDestinationChain` (r:1 w:0)
-	/// Proof: `CrosschainTransfer::NextCouncilApprovalQueueNonceByDestinationChain` (`max_values`: None, `max_size`: Some(25), added: 2500, mode: `MaxEncodedLen`)
 	/// Storage: `CrosschainTransfer::TransferOutQuoteMicrogonsPerArgonotByDestinationChain` (r:0 w:1)
 	/// Proof: `CrosschainTransfer::TransferOutQuoteMicrogonsPerArgonotByDestinationChain` (`max_values`: None, `max_size`: Some(33), added: 2508, mode: `MaxEncodedLen`)
 	/// Storage: `CrosschainTransfer::LatestQueuedCouncilHashByDestinationChain` (r:0 w:1)
 	/// Proof: `CrosschainTransfer::LatestQueuedCouncilHashByDestinationChain` (`max_values`: None, `max_size`: Some(49), added: 2524, mode: `MaxEncodedLen`)
-	/// The range of component `a` is `[1, 10]`.
+	/// The range of component `a` is `[1, 2004]`.
 	fn prove_gateway_activity(a: u32, ) -> Weight {
 		// Proof Size summary in bytes:
-		//  Measured:  `54491`
-		//  Estimated: `1612950 + a * (2603 +/- 0)`
-		// Minimum execution time: 8_898_000_000 picoseconds.
-		Weight::from_parts(9_086_552_249, 1612950)
-			// Standard Error: 1_475_179
-			.saturating_add(Weight::from_parts(216_448_157, 0).saturating_mul(a.into()))
-			.saturating_add(T::DbWeight::get().reads(316))
+		//  Measured:  `137`
+		//  Estimated: `3602 + a * (2603 +/- 0)`
+		// Minimum execution time: 87_000_000 picoseconds.
+		Weight::from_parts(90_000_000, 3602)
+			// Standard Error: 189_363
+			.saturating_add(Weight::from_parts(74_045_752, 0).saturating_mul(a.into()))
+			.saturating_add(T::DbWeight::get().reads(10))
 			.saturating_add(T::DbWeight::get().reads((2_u64).saturating_mul(a.into())))
-			.saturating_add(T::DbWeight::get().writes(309))
+			.saturating_add(T::DbWeight::get().writes(6))
 			.saturating_add(T::DbWeight::get().writes((2_u64).saturating_mul(a.into())))
 				.saturating_add(Weight::from_parts(0, 2603).saturating_mul(a.into()))
 		}
@@ -266,8 +252,8 @@ impl<T: frame_system::Config> pallet_crosschain_transfer::WeightInfo for WeightI
 		// Proof Size summary in bytes:
 		//  Measured:  `312`
 		//  Estimated: `9884`
-		// Minimum execution time: 100_000_000 picoseconds.
-		Weight::from_parts(104_000_000, 9884)
+		// Minimum execution time: 104_000_000 picoseconds.
+		Weight::from_parts(114_000_000, 9884)
 			.saturating_add(T::DbWeight::get().reads(12))
 			.saturating_add(T::DbWeight::get().writes(7))
 		}
@@ -283,8 +269,8 @@ impl<T: frame_system::Config> pallet_crosschain_transfer::WeightInfo for WeightI
 		// Proof Size summary in bytes:
 		//  Measured:  `778`
 		//  Estimated: `16950`
-		// Minimum execution time: 32_000_000 picoseconds.
-		Weight::from_parts(33_000_000, 16950)
+		// Minimum execution time: 35_000_000 picoseconds.
+		Weight::from_parts(39_000_000, 16950)
 			.saturating_add(T::DbWeight::get().reads(4))
 			.saturating_add(T::DbWeight::get().writes(3))
 		}
@@ -314,7 +300,7 @@ impl<T: frame_system::Config> pallet_crosschain_transfer::WeightInfo for WeightI
 		// Proof Size summary in bytes:
 		//  Measured:  `632`
 		//  Estimated: `12347`
-		// Minimum execution time: 42_000_000 picoseconds.
+		// Minimum execution time: 41_000_000 picoseconds.
 		Weight::from_parts(44_000_000, 12347)
 			.saturating_add(T::DbWeight::get().reads(10))
 			.saturating_add(T::DbWeight::get().writes(5))
@@ -337,9 +323,9 @@ impl<T: frame_system::Config> pallet_crosschain_transfer::WeightInfo for WeightI
 		//  Measured:  `63 + e * (89 +/- 0)`
 		//  Estimated: `3593 + e * (2527 +/- 0)`
 		// Minimum execution time: 11_000_000 picoseconds.
-		Weight::from_parts(11_000_000, 3593)
-			// Standard Error: 4_931
-			.saturating_add(Weight::from_parts(3_783_408, 0).saturating_mul(e.into()))
+		Weight::from_parts(12_000_000, 3593)
+			// Standard Error: 13_212
+			.saturating_add(Weight::from_parts(3_983_573, 0).saturating_mul(e.into()))
 			.saturating_add(T::DbWeight::get().reads(5))
 			.saturating_add(T::DbWeight::get().reads((1_u64).saturating_mul(e.into())))
 			.saturating_add(T::DbWeight::get().writes(2))
@@ -378,7 +364,7 @@ impl<T: frame_system::Config> pallet_crosschain_transfer::WeightInfo for WeightI
 		// Proof Size summary in bytes:
 		//  Measured:  `473`
 		//  Estimated: `12185`
-		// Minimum execution time: 10_000_000 picoseconds.
+		// Minimum execution time: 9_000_000 picoseconds.
 		Weight::from_parts(10_000_000, 12185)
 			.saturating_add(T::DbWeight::get().reads(3))
 		}

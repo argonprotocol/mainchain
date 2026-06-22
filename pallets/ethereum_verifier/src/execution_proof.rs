@@ -14,11 +14,11 @@ use alloc::{collections::BTreeMap, vec::Vec};
 use alloy_consensus::Header as AlloyHeader;
 use alloy_rlp::Decodable;
 use argon_primitives::{
-	EthereumBlockNumber, EthereumCombinedReceiptProof, EthereumExecutionBlockProof,
-	EthereumExecutionHeader, EthereumLog, EthereumReceiptLog, EthereumReceiptLogProofBatch,
-	EthereumVerifyError, EthereumVerifyProvider, Moment,
+	EthereumAccountStorageProof, EthereumBlockNumber, EthereumCombinedReceiptProof,
+	EthereumExecutionBlockProof, EthereumExecutionHeader, EthereumLog, EthereumReceiptLog,
+	EthereumReceiptLogProofBatch, EthereumVerifyError, EthereumVerifyProvider, Moment,
 };
-use polkadot_sdk::{frame_support::ensure, sp_runtime::traits::Get};
+use polkadot_sdk::{frame_support::ensure, sp_core::H160, sp_runtime::traits::Get};
 
 impl<T: Config> EthereumVerifyProvider for Pallet<T> {
 	type Weights = weights::ProviderWeightAdapter<T>;
@@ -49,6 +49,24 @@ impl<T: Config> EthereumVerifyProvider for Pallet<T> {
 		}
 
 		Ok(())
+	}
+
+	fn verify_account_storage_proof<MaxStorageSlots>(
+		account_address: H160,
+		proof: &EthereumAccountStorageProof<MaxStorageSlots>,
+	) -> Result<(), EthereumVerifyError>
+	where
+		MaxStorageSlots: Get<u32>,
+	{
+		ensure!(!OperatingMode::<T>::get().is_halted(), EthereumVerifyError::VerifierUnavailable);
+
+		let anchor = ExecutionHeaderAnchors::<T>::get(proof.anchor_block_hash)
+			.ok_or(EthereumVerifyError::AnchorNotFound)?;
+		Self::verify_account_storage_proof_against_state_root(
+			anchor.state_root,
+			account_address,
+			proof,
+		)
 	}
 
 	fn latest_execution_block_number() -> Option<EthereumBlockNumber> {

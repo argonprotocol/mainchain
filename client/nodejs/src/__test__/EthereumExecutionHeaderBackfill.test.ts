@@ -3,7 +3,7 @@ import type { ArgonClient, IArgonQueryable } from '../index';
 import {
   buildGatewayExecutionHeaderBackfill,
   buildGatewayExecutionHeaderBackfills,
-} from '../EthereumGatewayBackfill';
+} from '../EthereumExecutionHeaderBackfill';
 import { MintingGatewayEvents, mintingGatewayAbi } from '../EvmContracts';
 import {
   createExecutionBlock,
@@ -85,6 +85,7 @@ it('builds a historical checkpoint backfill payload for the first uncovered gate
     }),
     {
       beaconApiUrl: 'https://beacon.example',
+      targetExecutionBlockNumber: 10n,
       executionClient: createExecutionClient({
         blocks: [block10],
         receipts: [receipt],
@@ -93,7 +94,6 @@ it('builds a historical checkpoint backfill payload for the first uncovered gate
           { blockNumber: 10n, startGatewayActivityNonce: 1n, endGatewayActivityNonce: 1n },
         ],
       }),
-      gatewayAddress,
     },
   );
 
@@ -150,6 +150,7 @@ it('returns null when a retained execution anchor already covers the missing gat
       }),
       {
         beaconApiUrl: 'https://beacon.example',
+        targetExecutionBlockNumber: 10n,
         executionClient: createExecutionClient({
           blocks: [block10],
           receipts: [receipt],
@@ -158,7 +159,6 @@ it('returns null when a retained execution anchor already covers the missing gat
             { blockNumber: 10n, startGatewayActivityNonce: 1n, endGatewayActivityNonce: 1n },
           ],
         }),
-        gatewayAddress,
       },
     ),
   ).resolves.toBeNull();
@@ -283,6 +283,32 @@ it('lists only the missing backfills for uncovered gateway locator blocks', asyn
     'https://beacon.example/eth/v1/beacon/light_client/bootstrap/0x0000000000000000000000000000000000000000000000000000000000000000':
       createBootstrapResponse(0, 4n, repeatHex('00', 32), ['0xbranch0']),
   });
+  const locators = [
+    {
+      locatorIndex: 1n,
+      blockNumber: 10n,
+      startGatewayActivityNonce: 1n,
+      endGatewayActivityNonce: 1n,
+      previousLocatorHash: repeatHex('00', 32),
+      activityRoot: repeatHex('10', 32),
+    },
+    {
+      locatorIndex: 2n,
+      blockNumber: 40n,
+      startGatewayActivityNonce: 2n,
+      endGatewayActivityNonce: 2n,
+      previousLocatorHash: repeatHex('10', 32),
+      activityRoot: repeatHex('40', 32),
+    },
+    {
+      locatorIndex: 3n,
+      blockNumber: 120n,
+      startGatewayActivityNonce: 3n,
+      endGatewayActivityNonce: 3n,
+      previousLocatorHash: repeatHex('40', 32),
+      activityRoot: repeatHex('12', 32),
+    },
+  ] as const;
 
   const payloads = await buildGatewayExecutionHeaderBackfills(
     createBackfillClient({
@@ -302,13 +328,8 @@ it('lists only the missing backfills for uncovered gateway locator blocks', asyn
           '40': [log40],
           '120': [log120],
         },
-        locators: [
-          { blockNumber: 10n, startGatewayActivityNonce: 1n, endGatewayActivityNonce: 1n },
-          { blockNumber: 40n, startGatewayActivityNonce: 2n, endGatewayActivityNonce: 2n },
-          { blockNumber: 120n, startGatewayActivityNonce: 3n, endGatewayActivityNonce: 3n },
-        ],
       }),
-      gatewayAddress,
+      locators: [...locators],
     },
   );
 
@@ -334,6 +355,7 @@ function createBackfillClient(args: {
   } | null;
 }) {
   const latestFinalizedBlockRoot = repeatHex('aa', 32);
+  const latestExecutionHeaderBlockHash = repeatHex('bb', 32);
 
   return {
     query: {
@@ -343,6 +365,26 @@ function createBackfillClient(args: {
         }),
       },
       ethereumVerifier: {
+        latestExecutionHeaderAnchorBlockHash: async () => ({
+          isNone: false,
+          unwrap: () => ({
+            toHex: () => latestExecutionHeaderBlockHash,
+          }),
+        }),
+        executionHeaderAnchors: async (blockHash: Hex) => {
+          if (blockHash.toLowerCase() !== latestExecutionHeaderBlockHash) {
+            return { isSome: false };
+          }
+
+          return {
+            isSome: true,
+            unwrap: () => ({
+              blockNumber: {
+                toBigInt: () => args.latestFinalizedSlot,
+              },
+            }),
+          };
+        },
         latestFinalizedBlockRoot: async () => ({
           toHex: () => latestFinalizedBlockRoot,
         }),

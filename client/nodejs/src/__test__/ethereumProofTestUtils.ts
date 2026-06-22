@@ -22,6 +22,7 @@ export function repeatHex(byte: string, length: number): Hex {
 
 export function createGatewayProofConsts(
   args: {
+    maxActivitiesPerGatewayProof?: number;
     maxActivitiesPerReceiptProof?: number;
     maxReceiptProofsPerExtrinsic?: number;
     maxProofExecutionHeaderDepth?: number;
@@ -29,8 +30,11 @@ export function createGatewayProofConsts(
 ) {
   return {
     crosschainTransfer: {
+      maxActivitiesPerGatewayProof: { toNumber: () => args.maxActivitiesPerGatewayProof ?? 2004 },
       maxActivitiesPerReceiptProof: { toNumber: () => args.maxActivitiesPerReceiptProof ?? 16 },
-      maxReceiptProofsPerExtrinsic: { toNumber: () => args.maxReceiptProofsPerExtrinsic ?? 10 },
+      maxReceiptProofsPerExtrinsic: {
+        toNumber: () => args.maxReceiptProofsPerExtrinsic ?? 10,
+      },
       maxProofExecutionHeaderDepth: { toNumber: () => args.maxProofExecutionHeaderDepth ?? 64 },
     },
   } as unknown as Pick<ArgonClient, 'consts'>['consts'];
@@ -106,12 +110,30 @@ export function createExecutionClient(args: {
   blocks: JSONRPCBlock[];
   receipts?: EthereumReceipt[];
   logsByBlockNumber?: Record<string, unknown[]>;
+  activityBlockLocatorsMappingSlot?: bigint;
+  chainId?: bigint;
+  readContractRequests?: Array<{
+    functionName: string;
+    blockNumber?: bigint;
+    locatorIndex?: bigint;
+  }>;
   locators?: Array<{
     blockNumber: bigint;
     startGatewayActivityNonce: bigint;
     endGatewayActivityNonce: bigint;
     activityRoot?: Hex;
   }>;
+  proofsByBlockNumber?: Record<
+    string,
+    {
+      accountProof?: Hex[];
+      storageProof?: Array<{
+        key: Hex;
+        value: bigint;
+        proof: Hex[];
+      }>;
+    }
+  >;
 }): EthereumExecutionClient {
   const blocksByHash = Object.fromEntries(
     args.blocks.map(block => [block.hash.toLowerCase(), block]),
@@ -124,17 +146,31 @@ export function createExecutionClient(args: {
   );
   const logsByBlockNumber = args.logsByBlockNumber ?? {};
   const locators = args.locators ?? [];
+  const proofsByBlockNumber = args.proofsByBlockNumber ?? {};
 
   return {
     readContract: async ({
       functionName,
+      blockNumber,
       args: locatorArgs,
     }: {
-      functionName: 'latestActivityBlockLocatorIndex' | 'activityBlockLocators';
+      functionName:
+        | 'latestActivityBlockLocatorIndex'
+        | 'activityBlockLocators'
+        | 'activityBlockLocatorsMappingSlot';
+      blockNumber?: bigint;
       args?: [bigint];
     }) => {
+      args.readContractRequests?.push({
+        functionName,
+        blockNumber,
+        locatorIndex: locatorArgs?.[0],
+      });
       if (functionName === 'latestActivityBlockLocatorIndex') {
         return BigInt(locators.length);
+      }
+      if (functionName === 'activityBlockLocatorsMappingSlot') {
+        return args.activityBlockLocatorsMappingSlot ?? 11n;
       }
 
       const locator = locators[Number((locatorArgs?.[0] ?? 1n) - 1n)];
@@ -164,6 +200,40 @@ export function createExecutionClient(args: {
       }
 
       throw new Error(`Unexpected receipt request for ${hash}`);
+    },
+    getProof: async ({
+      blockNumber,
+      storageKeys,
+    }: {
+      blockNumber?: bigint;
+      storageKeys: Hex[];
+    }) => {
+      const proofForBlock = proofsByBlockNumber[(blockNumber ?? 0n).toString()] ?? {};
+      const storageProof = storageKeys.map(key => {
+        const proof = proofForBlock.storageProof?.find(
+          candidate => candidate.key.toLowerCase() === key.toLowerCase(),
+        ) ?? {
+          key,
+          value: 0n,
+          proof: [ZERO_HASH],
+        };
+
+        return {
+          key: proof.key,
+          value: proof.value,
+          proof: proof.proof,
+        };
+      });
+
+      return {
+        address: ZERO_ADDRESS,
+        balance: 0n,
+        codeHash: ZERO_HASH,
+        nonce: 0,
+        storageHash: ZERO_HASH,
+        accountProof: proofForBlock.accountProof ?? [ZERO_HASH],
+        storageProof,
+      };
     },
     getBlock: async ({ blockHash, blockNumber }: { blockHash?: Hex; blockNumber?: bigint }) => {
       let block;
@@ -204,6 +274,7 @@ export function createExecutionClient(args: {
 
       throw new Error(`Unexpected header request for ${method} ${params[0]}`);
     },
+    getChainId: async () => args.chainId ?? 1n,
   } as unknown as EthereumExecutionClient;
 }
 
@@ -212,8 +283,9 @@ export function createArgonGatewayClient(
     previousGatewayActivityNonce?: bigint;
     argonFinalizedExecutionHeaders?: ArgonFinalizedExecutionHeader[];
     consts?: Pick<ArgonClient, 'consts'>['consts'];
+    runtimeSpecVersion?: number;
   } = {},
-): IArgonQueryable & Pick<ArgonClient, 'consts'> {
+): IArgonQueryable & Pick<ArgonClient, 'consts' | 'runtimeVersion'> {
   const previousGatewayActivityNonce = args.previousGatewayActivityNonce ?? 0n;
   const argonFinalizedExecutionHeaders = args.argonFinalizedExecutionHeaders ?? [];
   const latestArgonFinalizedExecutionHeader = argonFinalizedExecutionHeaders.at(-1);
@@ -316,7 +388,12 @@ export function createArgonGatewayClient(
       },
     },
     consts: args.consts ?? createGatewayProofConsts(),
-  } as unknown as IArgonQueryable & Pick<ArgonClient, 'consts'>;
+    runtimeVersion: {
+      specVersion: {
+        toNumber: () => args.runtimeSpecVersion ?? 154,
+      },
+    },
+  } as unknown as IArgonQueryable & Pick<ArgonClient, 'consts' | 'runtimeVersion'>;
 }
 
 export function createTransferToArgonStartedBlockLog(args: {

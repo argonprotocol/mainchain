@@ -191,15 +191,22 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
       await activeHarness.fundProofRelayer();
       await activeHarness.syncVerifierThrough(relayReceipt.blockNumber);
 
-      const { payload, result } = await activeHarness.proveGatewayActivity(
+      const { payloads, results } = await activeHarness.proveGatewayActivities(
         gateway.gatewayAddress,
         relayReceipt.blockNumber,
       );
+      const payload = payloads.at(-1)!;
+      const result = results.at(-1)!;
 
+      expect(payloads).toHaveLength(1);
+      expect(results).toHaveLength(1);
       expect(payload.previousGatewayActivityNonce).toBe(0n);
       expect(payload.gatewayActivityNonceRange).toEqual({ start: 1n, end: 1n });
       expect(payload.activities).toHaveLength(1);
       expect(payload.activities[0]?.kind).toBe('MintingAuthorityActivated');
+      expect(payload.proof.locatorIndex).toBeGreaterThan(0n);
+      expect(payload.proof.activityLogs).toHaveLength(1);
+      expect(payload.proof.storageProof.slots).toHaveLength(2);
       expect(
         result.events.some(event =>
           activeHarness.mainchainClient.events.crosschainTransfer.MintingAuthorityActivationFinalized.is(
@@ -296,14 +303,21 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
       await activeHarness.waitForExecutionFinalizedAfter(finalizeTransferReceipt.blockNumber);
       await activeHarness.syncVerifierThrough(finalizeTransferReceipt.blockNumber);
 
-      const { payload, result } = await activeHarness.proveGatewayActivity(
+      const { payloads, results } = await activeHarness.proveGatewayActivities(
         gateway.gatewayAddress,
         finalizeTransferReceipt.blockNumber,
       );
+      const payload = payloads.at(-1)!;
+      const result = results.at(-1)!;
+      expect(payloads).toHaveLength(1);
+      expect(results).toHaveLength(1);
       expect(payload.previousGatewayActivityNonce).toBe(1n);
       expect(payload.gatewayActivityNonceRange).toEqual({ start: 2n, end: 2n });
       expect(payload.activities).toHaveLength(1);
       expect(payload.activities[0]?.kind).toBe('TransferOutOfArgonFinalized');
+      expect(payload.proof.locatorIndex).toBeGreaterThan(0n);
+      expect(payload.proof.activityLogs).toHaveLength(1);
+      expect(payload.proof.storageProof.slots).toHaveLength(2);
       expect(
         result.events.some(event =>
           activeHarness.mainchainClient.events.crosschainTransfer.TransferOutFinalized.is(event),
@@ -339,7 +353,7 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
       expect(gatewayStateOption.unwrap().gatewayActivityNonce.toBigInt()).toBe(2n);
     }, 420_000);
 
-    it('transfers from Ethereum back to Argon and settles it', async () => {
+    it('transfers from Ethereum back to Argon and settles multiple locator proofs in sequence', async () => {
       if (!harness || !gateway || !transferRequest) {
         throw new Error('outbound finalization checkpoint did not complete');
       }
@@ -353,25 +367,56 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
 
       const returnTransferRecipientBefore =
         await activeHarness.mainchainClient.query.system.account(argonReturnRecipient.address);
-      const returnTransferReceipt = await gateway.startTransferToArgon({
+      const firstReturnTransferReceipt = await gateway.startTransferToArgon({
+        account: ethereumRecipient,
+        amountRuntimeUnits: returnAmountRuntimeUnits,
+        recipientArgonAddress: toHex(argonReturnRecipient.publicKey, { size: 32 }),
+      });
+      const secondReturnTransferReceipt = await gateway.startTransferToArgon({
         account: ethereumRecipient,
         amountRuntimeUnits: returnAmountRuntimeUnits,
         recipientArgonAddress: toHex(argonReturnRecipient.publicKey, { size: 32 }),
       });
 
-      await activeHarness.waitForExecutionFinalizedAfter(BigInt(returnTransferReceipt.blockNumber));
-      await activeHarness.syncVerifierThrough(BigInt(returnTransferReceipt.blockNumber));
-
-      const { payload, result } = await activeHarness.proveGatewayActivity(
-        gateway.gatewayAddress,
-        BigInt(returnTransferReceipt.blockNumber),
+      await activeHarness.waitForExecutionFinalizedAfter(
+        BigInt(secondReturnTransferReceipt.blockNumber),
       );
-      expect(payload.previousGatewayActivityNonce).toBe(2n);
-      expect(payload.gatewayActivityNonceRange).toEqual({ start: 3n, end: 3n });
-      expect(payload.activities).toHaveLength(1);
-      expect(payload.activities[0]?.kind).toBe('TransferToArgonStarted');
+      await activeHarness.syncVerifierThrough(BigInt(secondReturnTransferReceipt.blockNumber));
+
+      const { payloads, results } = await activeHarness.proveGatewayActivities(
+        gateway.gatewayAddress,
+        BigInt(secondReturnTransferReceipt.blockNumber),
+      );
+      const firstPayload = payloads[0]!;
+      const secondPayload = payloads[1]!;
+      const secondResult = results[1]!;
+
+      expect(payloads).toHaveLength(2);
+      expect(results).toHaveLength(2);
+      expect(firstPayload.previousGatewayActivityNonce).toBe(2n);
+      expect(firstPayload.gatewayActivityNonceRange).toEqual({ start: 3n, end: 3n });
+      expect(firstPayload.executionBlockNumberRange).toEqual({
+        start: BigInt(firstReturnTransferReceipt.blockNumber),
+        end: BigInt(firstReturnTransferReceipt.blockNumber),
+      });
+      expect(firstPayload.activities).toHaveLength(1);
+      expect(firstPayload.activities[0]?.kind).toBe('TransferToArgonStarted');
+      expect(firstPayload.proof.locatorIndex).toBeGreaterThan(0n);
+      expect(firstPayload.proof.activityLogs).toHaveLength(1);
+      expect(firstPayload.proof.storageProof.slots).toHaveLength(2);
+      expect(secondPayload.previousGatewayActivityNonce).toBe(3n);
+      expect(secondPayload.gatewayActivityNonceRange).toEqual({ start: 4n, end: 4n });
+      expect(secondPayload.executionBlockNumberRange).toEqual({
+        start: BigInt(secondReturnTransferReceipt.blockNumber),
+        end: BigInt(secondReturnTransferReceipt.blockNumber),
+      });
+      expect(secondPayload.activities).toHaveLength(1);
+      expect(secondPayload.activities[0]?.kind).toBe('TransferToArgonStarted');
+      expect(secondPayload.proof.locatorIndex).toBeGreaterThan(firstPayload.proof.locatorIndex);
+      expect(secondPayload.proof.activityLogs).toHaveLength(1);
+      expect(secondPayload.proof.storageProof.slots).toHaveLength(2);
       expect(
-        result.events.some(event =>
+        secondResult.events.some(event =>
           activeHarness.mainchainClient.events.crosschainTransfer.TransferToArgonSettled.is(event),
         ),
       ).toBe(true);
@@ -382,14 +427,14 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
       expect(
         returnTransferRecipientAfter.data.free.toBigInt() -
           returnTransferRecipientBefore.data.free.toBigInt(),
-      ).toBe(returnAmountRuntimeUnits);
+      ).toBe(returnAmountRuntimeUnits * 2n);
 
       const finalGatewayStateOption =
         await activeHarness.mainchainClient.query.crosschainTransfer.gatewayStateBySourceChain(
           'Ethereum',
         );
       expect(finalGatewayStateOption.isSome).toBe(true);
-      expect(finalGatewayStateOption.unwrap().gatewayActivityNonce.toBigInt()).toBe(3n);
+      expect(finalGatewayStateOption.unwrap().gatewayActivityNonce.toBigInt()).toBe(4n);
     }, 420_000);
   });
 
@@ -431,17 +476,24 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
       const relayerBefore = await harness.mainchainClient.query.system.account(
         harness.proofRelayer.address,
       );
-      const { payload, result } = await harness.proveGatewayActivity(
+      const { payloads, results } = await harness.proveGatewayActivities(
         gateway.gatewayAddress,
         burnBlockNumber,
       );
+      const payload = payloads.at(-1)!;
+      const result = results.at(-1)!;
 
+      expect(payloads).toHaveLength(1);
+      expect(results).toHaveLength(1);
       expect(payload.previousGatewayActivityNonce).toBe(0n);
       expect(payload.gatewayActivityNonceRange).toEqual({ start: 1n, end: 1n });
       expect(payload.executionBlockNumberRange).toEqual({
         start: burnBlockNumber,
         end: burnBlockNumber,
       });
+      expect(payload.proof.locatorIndex).toBeGreaterThan(0n);
+      expect(payload.proof.activityLogs).toHaveLength(1);
+      expect(payload.proof.storageProof.slots).toHaveLength(2);
       expect(
         result.events.some(event =>
           harness.mainchainClient.events.crosschainTransfer.TransferToArgonSettled.is(event),

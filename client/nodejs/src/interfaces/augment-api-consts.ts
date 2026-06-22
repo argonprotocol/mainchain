@@ -1,5 +1,4 @@
 // Auto-generated via `yarn polkadot-types-from-chain`, do not edit
-/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
@@ -176,9 +175,9 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       ethereumBurnAccount: AccountId32 & AugmentedConst<ApiType>;
       /**
-       * Maximum number of ordered gateway activities that may share one receipt proof.
+       * Maximum number of ordered gateway activities that may share one proven gateway block.
        **/
-      maxActivitiesPerReceiptProof: u32 & AugmentedConst<ApiType>;
+      maxActivitiesPerGatewayProof: u32 & AugmentedConst<ApiType>;
       /**
        * Maximum number of members the active Global Issuance Council may carry.
        **/
@@ -195,10 +194,6 @@ declare module '@polkadot/api-base/types/consts' {
        * Maximum number of contiguous queue approvals one council member may submit in one call.
        **/
       maxQueueApprovalsPerCall: u32 & AugmentedConst<ApiType>;
-      /**
-       * Maximum number of proven receipt proofs that may be supplied in one extrinsic.
-       **/
-      maxReceiptProofsPerExtrinsic: u32 & AugmentedConst<ApiType>;
       /**
        * Maximum age, in ticks, of the verified Ethereum execution anchor used to open a
        * transfer out.

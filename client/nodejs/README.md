@@ -63,3 +63,24 @@ locks
 
 The client also has a `Vault` class that can be used to create and manage vaults, as well as
 calculate bitcoin fees.
+
+## Gateway Activity Proof Flow
+
+Gateway activity proving uses one shared discovery step and then one of two runtime-dependent
+builders:
+
+1. Call `discoverMissingGatewayActivityLocators(...)` with a finalized execution block number plus
+   the minimum gateway activity nonce you care about. If you already cache finalized locators, pass
+   `afterLocatorIndex` to fetch only the new suffix.
+2. Cache those finalized locator blocks in the app as you collect them.
+3. Call `buildGatewayActivityProof(...)` with those locators. Receipt-proof runtimes choose the
+   receipt path automatically. Storage-proof runtimes also require the finalized execution header
+   you want to relay against.
+4. If you need runtime-specific control, use `buildGatewayActivityReceiptProofPayloads(...)` for
+   receipt-proof runtimes or `buildGatewayActivityStorageProofs(...)` for storage-proof runtimes.
+5. Submit each returned payload, and keep any `deferredLocators` for a later attempt.
+
+The client library does not keep a long-lived locator cache. App-side code should own that cache,
+scoped to the range between the last proven gateway locator and the latest Argon-finalized execution
+anchor, and pass those cached locators into both gateway proof building and execution-header
+backfill planning.

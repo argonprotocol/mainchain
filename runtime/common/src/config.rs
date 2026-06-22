@@ -226,14 +226,13 @@ parameter_types! {
 	pub const DefaultMinimumMintingAuthorityMicrogonValue: Balance = 10_000;
 	/// Maximum number of non-terminal transfer-out requests tracked for one destination chain.
 	pub const MaxPendingTransferOutsPerDestinationChain: u32 = 100;
-	/// Maximum number of gateway activities carried by one Ethereum receipt proof.
-	pub const MaxActivitiesPerReceiptProof: u32 = 16;
-	/// Maximum number of proven Ethereum receipt proofs accepted in one extrinsic.
+	/// Maximum number of gateway activities carried by one proven gateway block.
 	///
-	/// `10` leaves comfortable headroom below the worst-case bound proven in the config test, so
-	/// any proof accepted by the runtime envelope is submittable without extra client-side byte
-	/// budgeting.
-	pub const MaxReceiptProofsPerExtrinsic: u32 = 10;
+	/// This is derived from the contract-side gas measurement helper in
+	/// `chains/ethereum/deploy/measure.ts` using a `36_000_000` Ethereum block gas limit and the
+	/// current cheapest activity mix, which presently yields a theoretical maximum of `2004`
+	/// activities in one Ethereum block.
+	pub const MaxActivitiesPerGatewayProof: u32 = 2004;
 	// ## pallet_operational_accounts
 	/// Maximum number of available operational referrals allowed at once.
 	pub const MaxAvailableOperationalReferrals: u32 = 3;
@@ -303,22 +302,19 @@ impl WeightToFeePolynomial for ArgonWeightToFee {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use argon_primitives::ethereum::EthereumReceiptLogProofBatch;
 	use codec::MaxEncodedLen;
 	use frame_support::dispatch::DispatchClass;
 
 	#[test]
-	fn gateway_activity_proof_batch_bound_fits_normal_extrinsic_limit() {
-		type MaxGatewayActivityProofBatch = EthereumReceiptLogProofBatch<
-			MaxReceiptProofsPerExtrinsic,
-			MaxActivitiesPerReceiptProof,
-		>;
+	fn gateway_activity_proof_bound_fits_normal_extrinsic_limit() {
+		type MaxGatewayActivityProof =
+			pallet_crosschain_transfer::GatewayActivityProof<MaxActivitiesPerGatewayProof>;
 
 		const RESERVED_SIGNED_EXTRINSIC_BYTES: usize = 512;
 		const RESERVED_CALL_PREFIX_BYTES: usize = 16;
 
 		assert!(
-			MaxGatewayActivityProofBatch::max_encoded_len() +
+			MaxGatewayActivityProof::max_encoded_len() +
 				RESERVED_SIGNED_EXTRINSIC_BYTES +
 				RESERVED_CALL_PREFIX_BYTES <=
 				*BlockLength::get().max.get(DispatchClass::Normal) as usize

@@ -4,6 +4,7 @@
 use core::marker::PhantomData;
 use polkadot_sdk::{
 	sp_arithmetic::FixedU128,
+	sp_core::H160,
 	sp_runtime::{
 		traits::{AtLeast32BitUnsigned, Get, SaturatedConversion},
 		DispatchError,
@@ -17,7 +18,10 @@ use argon_primitives::{
 		CompressedBitcoinPubkey, UtxoId,
 	},
 	block_seal::FrameId,
-	ethereum::{EthereumBlockNumber, EthereumReceiptLogProofBatch, EthereumVerifyError},
+	ethereum::{
+		EthereumAccountStorageProof, EthereumBlockNumber, EthereumReceiptLogProofBatch,
+		EthereumVerifyError,
+	},
 	vault::{
 		BitcoinVaultProvider, LockExtension, RegistrationVaultData, Securitization, VaultError,
 	},
@@ -69,6 +73,16 @@ impl EthereumVerifyProvider for BenchmarkCrosschainTransferEthereumVerifier {
 	where
 		MaxProofBlocks: Get<u32>,
 		MaxReceiptLogs: Get<u32>,
+	{
+		Ok(())
+	}
+
+	fn verify_account_storage_proof<MaxStorageSlots>(
+		_gateway_address: H160,
+		_proof: &EthereumAccountStorageProof<MaxStorageSlots>,
+	) -> Result<(), EthereumVerifyError>
+	where
+		MaxStorageSlots: Get<u32>,
 	{
 		Ok(())
 	}

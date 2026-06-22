@@ -1,0 +1,136 @@
+{
+  "context": {
+    "chainId": "11155111",
+    "gatewayAddress": "0x8A2841380151160BBf88D44D8D9A4DdA05838B76"
+  },
+  "mappingSlot": "11",
+  "locatorIndex": "7",
+  "activityRootSeed": "0x211d2e88a54ddba440081b6ebc422953f21409da75f231195cc90114f5055b7f",
+  "blockNumber": "88",
+  "startGatewayActivityNonce": "41",
+  "endGatewayActivityNonce": "46",
+  "rangeSlotKey": "0xf5559028dc9ba50d75343c779b2f75e13a84a14662932fc67a486f263ca31a96",
+  "rootSlotKey": "0xf5559028dc9ba50d75343c779b2f75e13a84a14662932fc67a486f263ca31a97",
+  "rangeSlotValue": "0x0000000000000000000000000000002e00000000000000290000000000000058",
+  "activities": {
+    "transferToArgonStarted": {
+      "from": "0x1111111111111111111111111111111111111111",
+      "token": "0xa1a1e87614B1f447fD8E65c18DCc41bAd4A7A1E5",
+      "amount": "250",
+      "argonAccountId": "0x6172676f6e2d6163636f756e742d310000000000000000000000000000000000",
+      "gatewayState": {
+        "gatewayActivityNonce": "41",
+        "argonApprovalsNonce": "5",
+        "argonCirculation": "750",
+        "argonotCirculation": "2000"
+      }
+    },
+    "mintingAuthorityActivated": {
+      "signingKey": "0x2222222222222222222222222222222222222222",
+      "microgonCollateral": "1000",
+      "micronotCollateral": "100",
+      "coactivationCount": 2,
+      "sharedSignatureCount": 3,
+      "approvalHash": "0x3333333333333333333333333333333333333333333333333333333333333333",
+      "relayerArgonAccountId": "0x72656c617965722d310000000000000000000000000000000000000000000000",
+      "gatewayState": {
+        "gatewayActivityNonce": "42",
+        "argonApprovalsNonce": "6",
+        "argonCirculation": "750",
+        "argonotCirculation": "2000"
+      }
+    },
+    "globalIssuanceCouncilRotated": {
+      "councilHash": "0x4444444444444444444444444444444444444444444444444444444444444444",
+      "approvalHash": "0x5555555555555555555555555555555555555555555555555555555555555555",
+      "relayerArgonAccountId": "0x72656c617965722d320000000000000000000000000000000000000000000000",
+      "gatewayState": {
+        "gatewayActivityNonce": "43",
+        "argonApprovalsNonce": "7",
+        "argonCirculation": "760",
+        "argonotCirculation": "2000"
+      }
+    },
+    "mintingAuthorityDeactivated": {
+      "signingKey": "0x2222222222222222222222222222222222222222",
+      "microgonCollateral": "800",
+      "micronotCollateral": "90",
+      "approvalHash": "0x6666666666666666666666666666666666666666666666666666666666666666",
+      "relayerArgonAccountId": "0x72656c617965722d330000000000000000000000000000000000000000000000",
+      "gatewayState": {
+        "gatewayActivityNonce": "44",
+        "argonApprovalsNonce": "8",
+        "argonCirculation": "760",
+        "argonotCirculation": "1990"
+      }
+    },
+    "transferOutOfArgonCanceled": {
+      "transferId": "0x7777777777777777777777777777777777777777777777777777777777777777",
+      "gatewayState": {
+        "gatewayActivityNonce": "45",
+        "argonApprovalsNonce": "8",
+        "argonCirculation": "760",
+        "argonotCirculation": "1990"
+      }
+    },
+    "transferOutOfArgonFinalized": {
+      "transferId": "0x8888888888888888888888888888888888888888888888888888888888888888",
+      "token": "0xa1a1e87614B1f447fD8E65c18DCc41bAd4A7A1E5",
+      "amount": "50",
+      "mintingCollateral": [
+        {
+          "signingKey": "0x2222222222222222222222222222222222222222",
+          "microgonCollateral": "80",
+          "micronotCollateral": "0"
+        },
+        {
+          "signingKey": "0x9999999999999999999999999999999999999999",
+          "microgonCollateral": "20",
+          "micronotCollateral": "5"
+        }
+      ],
+      "gatewayState": {
+        "gatewayActivityNonce": "46",
+        "argonApprovalsNonce": "8",
+        "argonCirculation": "710",
+        "argonotCirculation": "1990"
+      }
+    }
+  },
+  "leafHashes": {
+    "transferToArgonStarted": "0x28446ebd4cc1f5cfd67c5258da73193300e305a14d30462aa9f563c9c999bb68",
+    "mintingAuthorityActivated": "0x19d422070fcce41a0516a042c88a68d735ca8b923550bb0a796c2a9c273478f3",
+    "globalIssuanceCouncilRotated": "0xc0e7585df9af63127358aea1f9d3d5a91512886ac59b089981391b952dcc703f",
+    "mintingAuthorityDeactivated": "0x1e59a5e751e859d2ae775a6c805fde48f95025368717290d9d269673bf9c6d53",
+    "transferOutOfArgonCanceled": "0x38905804d40b951b57f31a4ea9db00ed81da04d41a8a2a03d8c8ebcbe1bc0282",
+    "transferOutOfArgonFinalized": "0x24594474ca1b97941001655e091df7adc83b2b6be1cba56f3ba130e3c2d62102"
+  },
+  "roots": [
+    {
+      "name": "transferToArgonStarted",
+      "root": "0x4ef9c23cc20e7d7e54813775f62105a026411819e17b2623b3008e3aea131360"
+    },
+    {
+      "name": "mintingAuthorityActivated",
+      "root": "0x72431877c67b70276f038b5bc942f53a0f0a8fb6c4d74d5b904e613318650237"
+    },
+    {
+      "name": "globalIssuanceCouncilRotated",
+      "root": "0xa640025f55f01a94e1a72ae907b65344caa80d0a1eec4efab01ef7e6bf79f2c0"
+    },
+    {
+      "name": "mintingAuthorityDeactivated",
+      "root": "0x0ce8c6dafa808bded9cbbf4076c75e9ab834e44d783ab60d33e7291a79f7c5f1"
+    },
+    {
+      "name": "transferOutOfArgonCanceled",
+      "root": "0xf8830e8f43be67ba819420e62b5f69e33dee62d8f4008c1ac87f7566e23271fb"
+    },
+    {
+      "name": "transferOutOfArgonFinalized",
+      "root": "0xffc9df1d002719f8db86093c24507ce8ba44564e1a1aee79c632cc30ed82fcd1"
+    }
+  ],
+  "finalRoot": "0xffc9df1d002719f8db86093c24507ce8ba44564e1a1aee79c632cc30ed82fcd1",
+  "locatorHash": "0x48113b61f7355ef11f7bc0a0c07783591c62d4a97f0e1fbe282542c5552b61ca"
+}

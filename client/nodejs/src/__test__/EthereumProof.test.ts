@@ -1,16 +1,23 @@
 import { createBlockHeaderFromRPC, type JSONRPCBlock } from '@ethereumjs/block';
+import { mintingGatewayActivityHashingFixture } from '@argonprotocol/ethereum-contracts/fixtures';
 import { expect, it } from 'vitest';
 import { createMPT, verifyMPTWithMerkleProof } from '@ethereumjs/mpt';
 import {
   bytesToHex,
+  concatHex,
   encodeAbiParameters,
   encodeEventTopics,
   hexToBytes,
+  keccak256,
   toHex,
   type Hex,
 } from 'viem';
-import { MintingGatewayEvents, mintingGatewayAbi } from '../EvmContracts';
-import type { ArgonClient, IArgonQueryable } from '../index';
+import {
+  hashMintingGatewayActivityBlockLocator,
+  MintingGatewayEvents,
+  mintingGatewayAbi,
+} from '../EvmContracts';
+import type { ArgonClient } from '../index';
 import {
   buildEthereumEventProof,
   encodeEthereumReceiptForProof,
@@ -18,32 +25,248 @@ import {
 } from '../EthereumProof';
 import type { EthereumExecutionClient, EthereumReceipt } from '../EthereumExecution';
 import {
+  appendEthereumGatewayActivityRoot,
   decodeEthereumGatewayActivityLog,
   decodeEthereumTransferToArgonStartedLog,
+  hashEthereumGatewayActivity,
 } from '../EthereumGatewayActivity';
-import { buildGatewayActivityProofPayload } from '../EthereumGatewayActivityProof';
+import {
+  buildGatewayActivityProof,
+  buildGatewayActivityReceiptProofPayloads,
+  buildGatewayActivityStorageProofs,
+  discoverMissingGatewayActivityLocators,
+  supportsGatewayActivityReceiptProofs,
+} from '../EthereumGatewayActivityProof';
 import productionInboundReceipt from './fixtures/productionInboundReceipt.json';
+import {
+  createArgonGatewayClient,
+  createExecutionBlock,
+  createExecutionClient,
+  createGatewayProofConsts,
+  createGlobalIssuanceCouncilRotatedBlockLog,
+  createLegacyReceipt,
+  createTransferToArgonStartedBlockLog,
+  repeatHex,
+} from './ethereumProofTestUtils';
 
 type EncodedReceiptInput = Parameters<typeof encodeEthereumReceiptForProof>[0];
 
-function createGatewayProofConsts(
-  args: {
-    maxActivitiesPerReceiptProof?: number;
-    maxReceiptProofsPerExtrinsic?: number;
-    maxProofExecutionHeaderDepth?: number;
-  } = {},
-) {
-  return {
-    crosschainTransfer: {
-      maxActivitiesPerReceiptProof: { toNumber: () => args.maxActivitiesPerReceiptProof ?? 16 },
-      maxReceiptProofsPerExtrinsic: { toNumber: () => args.maxReceiptProofsPerExtrinsic ?? 10 },
-      maxProofExecutionHeaderDepth: { toNumber: () => args.maxProofExecutionHeaderDepth ?? 64 },
-    },
-  } as unknown as Pick<ArgonClient, 'consts'>['consts'];
-}
-
 // Mirror the runtime proof-bound consts for query-only unit tests.
 const gatewayProofConsts = createGatewayProofConsts();
+
+it('imports the shared gateway hashing fixture through the contracts fixture export', () => {
+  expect(
+    hashMintingGatewayActivityBlockLocator({
+      blockNumber: mintingGatewayActivityHashingFixture.blockNumber,
+      startGatewayActivityNonce: mintingGatewayActivityHashingFixture.startGatewayActivityNonce,
+      endGatewayActivityNonce: mintingGatewayActivityHashingFixture.endGatewayActivityNonce,
+      activityRoot: mintingGatewayActivityHashingFixture.finalRoot,
+    }),
+  ).toBe(mintingGatewayActivityHashingFixture.locatorHash);
+});
+
+it('reports receipt gateway proofs as supported before the storage-proof runtime version', () => {
+  const client = {
+    runtimeVersion: {
+      specVersion: {
+        toNumber: () => 153,
+      },
+    },
+  } as Pick<ArgonClient, 'runtimeVersion'>;
+
+  expect(supportsGatewayActivityReceiptProofs(client)).toBe(true);
+});
+
+it('reports receipt gateway proofs as unsupported once storage proofs are required', () => {
+  const client = {
+    runtimeVersion: {
+      specVersion: {
+        toNumber: () => 154,
+      },
+    },
+  } as Pick<ArgonClient, 'runtimeVersion'>;
+
+  expect(supportsGatewayActivityReceiptProofs(client)).toBe(false);
+});
+
+it('builds the legacy receipt proof payload for pre-storage-proof runtimes', async () => {
+  const gatewayAddress = repeatHex('70', 20);
+  const transferLog = createTransferToArgonStartedBlockLog({
+    gatewayAddress,
+    txHash: repeatHex('30', 32),
+    transactionIndex: 0,
+    logIndex: 0,
+    nonce: 1n,
+    argonAccountId: repeatHex('45', 32),
+  });
+  const receipt = createLegacyReceipt({
+    txHash: transferLog.transactionHash,
+    transactionIndex: transferLog.transactionIndex,
+    logs: [
+      {
+        address: transferLog.address,
+        topics: transferLog.topics as [Hex, ...Hex[]],
+        data: transferLog.data,
+      },
+    ],
+  });
+  const block = await createExecutionBlock({
+    number: 10n,
+    receipts: [receipt],
+    blockLogs: [transferLog],
+  });
+  const decodedActivity = {
+    txHash: transferLog.transactionHash,
+    transactionIndex: transferLog.transactionIndex,
+    logIndex: transferLog.logIndex,
+    blockHash: transferLog.blockHash,
+    blockNumber: transferLog.blockNumber,
+    ...decodeEthereumGatewayActivityLog(transferLog),
+  };
+  const argonClient = createArgonGatewayClient({
+    previousGatewayActivityNonce: 0n,
+    runtimeSpecVersion: 153,
+    consts: createGatewayProofConsts(),
+    argonFinalizedExecutionHeaders: [{ blockHash: block.hash, blockNumber: 10n }],
+  });
+  const executionClient = createExecutionClient({
+    blocks: [block],
+    receipts: [receipt],
+    chainId: 1n,
+    locators: [
+      {
+        blockNumber: 10n,
+        startGatewayActivityNonce: 1n,
+        endGatewayActivityNonce: 1n,
+        activityRoot: appendEthereumGatewayActivityRoot(
+          repeatHex('00', 32),
+          hashEthereumGatewayActivity({ chainId: 1n, gatewayAddress }, decodedActivity),
+        ),
+      },
+    ],
+    logsByBlockNumber: {
+      '10': [transferLog],
+    },
+  });
+
+  const locators = await discoverMissingGatewayActivityLocators({
+    executionClient,
+    finalizedExecutionBlockNumber: 10n,
+    gatewayAddress,
+    minimumGatewayActivityNonce: 1n,
+  });
+  const { payloads } = await buildGatewayActivityProof(argonClient, {
+    gatewayAddress,
+    executionClient,
+    locators,
+  });
+  const payload = payloads[0];
+  if (!payload || !('blocks' in payload.proof)) {
+    throw new Error('Expected the default gateway activity proof builder to choose receipt proofs');
+  }
+
+  expect(payload?.previousGatewayActivityNonce).toBe(0n);
+  expect(payload?.gatewayActivityNonceRange).toEqual({ start: 1n, end: 1n });
+  expect(payload?.executionBlockNumberRange).toEqual({ start: 10n, end: 10n });
+  expect(payload.proof.blocks).toHaveLength(1);
+  expect(payload.proof.blocks[0]?.receiptLogs).toHaveLength(1);
+  expect(payload.proof.blocks[0]?.receiptProof.receipts[0]?.transactionIndex).toBe(0);
+});
+
+it('requires a finalized execution header when the default builder routes to storage proofs', async () => {
+  const gatewayAddress = repeatHex('70', 20);
+  const transferLog = createTransferToArgonStartedBlockLog({
+    gatewayAddress,
+    txHash: repeatHex('33', 32),
+    transactionIndex: 0,
+    logIndex: 0,
+    nonce: 1n,
+    argonAccountId: repeatHex('48', 32),
+  });
+  const { argonClient, executionClient, argonFinalizedExecutionHeader } = createGatewayProofHarness(
+    {
+      gatewayAddress,
+      runtimeSpecVersion: 154,
+      latestArgonFinalizedHeader: {
+        blockHash: repeatHex('ab', 32),
+        blockNumber: 12n,
+      },
+      locators: [{ blockNumber: 10n, logs: [transferLog] }],
+    },
+  );
+  const locators = await discoverMissingGatewayActivityLocators({
+    executionClient,
+    finalizedExecutionBlockNumber: argonFinalizedExecutionHeader.blockNumber,
+    gatewayAddress,
+    minimumGatewayActivityNonce: 1n,
+  });
+
+  await expect(
+    buildGatewayActivityProof(argonClient, {
+      gatewayAddress,
+      executionClient,
+      locators,
+    }),
+  ).rejects.toThrow(
+    'Gateway activity storage proofs require a finalizedExecutionHeader; use discoverMissingGatewayActivityLocators and provide the execution header you want to relay against',
+  );
+});
+
+it('rejects building storage gateway proofs against a receipt-proof runtime', async () => {
+  const gatewayAddress = repeatHex('71', 20);
+  const transferLog = createTransferToArgonStartedBlockLog({
+    gatewayAddress,
+    txHash: repeatHex('31', 32),
+    transactionIndex: 0,
+    logIndex: 0,
+    nonce: 1n,
+    argonAccountId: repeatHex('46', 32),
+  });
+  const { argonClient, executionClient, locators, argonFinalizedExecutionHeader } =
+    createGatewayProofHarness({
+      gatewayAddress,
+      locators: [{ blockNumber: 10n, logs: [transferLog] }],
+      runtimeSpecVersion: 153,
+    });
+
+  await expect(
+    buildGatewayActivityStorageProofs(argonClient, {
+      finalizedExecutionHeader: argonFinalizedExecutionHeader,
+      gatewayAddress,
+      executionClient,
+      locators: [locators[0]],
+    }),
+  ).rejects.toThrow(
+    'Gateway activity storage proofs are not supported by this runtime; use buildGatewayActivityReceiptProofPayloads instead',
+  );
+});
+
+it('rejects building receipt gateway proofs against a storage-proof runtime', async () => {
+  const gatewayAddress = repeatHex('72', 20);
+  const transferLog = createTransferToArgonStartedBlockLog({
+    gatewayAddress,
+    txHash: repeatHex('32', 32),
+    transactionIndex: 0,
+    logIndex: 0,
+    nonce: 1n,
+    argonAccountId: repeatHex('47', 32),
+  });
+  const { argonClient, executionClient } = createGatewayProofHarness({
+    gatewayAddress,
+    locators: [{ blockNumber: 10n, logs: [transferLog] }],
+    runtimeSpecVersion: 154,
+  });
+
+  await expect(
+    buildGatewayActivityReceiptProofPayloads(argonClient, {
+      gatewayAddress,
+      executionClient,
+      locators: [],
+    }),
+  ).rejects.toThrow(
+    'Gateway activity receipt proofs are not supported by this runtime; use discoverMissingGatewayActivityLocators and buildGatewayActivityStorageProofs instead',
+  );
+});
 
 it('encodes a production inbound receipt exactly as retained proof expects', async () => {
   const receipt = {
@@ -725,414 +948,40 @@ it('decodes non-transfer gateway activity logs', async () => {
   });
 });
 
-it('builds a proveGatewayActivity payload from uncovered TransferToArgonStarted locators', async () => {
-  const gatewayAddress: Hex = `0x${'77'.repeat(20)}`;
-  const zeroHash: Hex = `0x${'00'.repeat(32)}`;
-  const zeroBloom: Hex = `0x${'00'.repeat(256)}`;
-  const zeroAddress: Hex = `0x${'00'.repeat(20)}`;
-  const emptyUnclesHash =
-    '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347' as Hex;
-  const txHash0: Hex = `0x${'10'.repeat(32)}`;
-  const txHash1: Hex = `0x${'11'.repeat(32)}`;
-  const txHash2: Hex = `0x${'12'.repeat(32)}`;
-  const block10Logs = [
-    createTransferToArgonStartedBlockLog({
-      gatewayAddress,
-      txHash: txHash0,
-      transactionIndex: 0,
-      logIndex: 0,
-      blockHash: zeroHash,
-      blockNumber: 10n,
-      nonce: 1n,
-      argonAccountId: `0x${'41'.repeat(32)}`,
-    }),
-    createTransferToArgonStartedBlockLog({
-      gatewayAddress,
-      txHash: txHash1,
-      transactionIndex: 1,
-      logIndex: 0,
-      blockHash: zeroHash,
-      blockNumber: 10n,
-      nonce: 2n,
-      argonAccountId: `0x${'42'.repeat(32)}`,
-    }),
-  ];
-  const block11Logs = [
-    createTransferToArgonStartedBlockLog({
-      gatewayAddress,
-      txHash: txHash2,
-      transactionIndex: 0,
-      logIndex: 0,
-      blockHash: zeroHash,
-      blockNumber: 11n,
-      nonce: 3n,
-      argonAccountId: `0x${'43'.repeat(32)}`,
-    }),
-  ];
-  const receipt0 = {
-    type: 'legacy',
-    status: 'success',
-    cumulativeGasUsed: 21_000n,
-    logsBloom: zeroBloom,
-    logs: [{ address: gatewayAddress, topics: block10Logs[0].topics, data: block10Logs[0].data }],
-    transactionHash: txHash0,
-    transactionIndex: 0,
-  } as unknown as EthereumReceipt;
-  const receipt1 = {
-    type: 'legacy',
-    status: 'success',
-    cumulativeGasUsed: 42_000n,
-    logsBloom: zeroBloom,
-    logs: [{ address: gatewayAddress, topics: block10Logs[1].topics, data: block10Logs[1].data }],
-    transactionHash: txHash1,
-    transactionIndex: 1,
-  } as unknown as EthereumReceipt;
-  const receipt2 = {
-    type: 'legacy',
-    status: 'success',
-    cumulativeGasUsed: 21_000n,
-    logsBloom: zeroBloom,
-    logs: [{ address: gatewayAddress, topics: block11Logs[0].topics, data: block11Logs[0].data }],
-    transactionHash: txHash2,
-    transactionIndex: 0,
-  } as unknown as EthereumReceipt;
-
-  const trie10 = await createMPT();
-  await trie10.put(encodeReceiptTrieKey(0), encodeEthereumReceiptForProof(receipt0));
-  await trie10.put(encodeReceiptTrieKey(1), encodeEthereumReceiptForProof(receipt1));
-  const receiptsRoot10: Hex = bytesToHex(trie10.root());
-
-  const trie11 = await createMPT();
-  await trie11.put(encodeReceiptTrieKey(0), encodeEthereumReceiptForProof(receipt2));
-  const receiptsRoot11: Hex = bytesToHex(trie11.root());
-
-  const block10Template = {
-    number: toHex(10n),
-    hash: zeroHash,
-    parentHash: zeroHash,
-    nonce: '0x0000000000000000',
-    sha3Uncles: emptyUnclesHash,
-    logsBloom: zeroBloom,
-    transactionsRoot: zeroHash,
-    stateRoot: zeroHash,
-    receiptsRoot: receiptsRoot10,
-    miner: zeroAddress,
-    difficulty: '0x0',
-    extraData: '0x',
-    size: '0x1',
-    gasLimit: toHex(30_000_000n),
-    gasUsed: toHex(63_000n),
-    timestamp: toHex(1n),
-    transactions: [txHash0, txHash1],
-    uncles: [],
-  } satisfies JSONRPCBlock;
-  const block10Hash: Hex = bytesToHex(createBlockHeaderFromRPC(block10Template).hash());
-  const block10 = { ...block10Template, hash: block10Hash } satisfies JSONRPCBlock;
-
-  const block11Template = {
-    ...block10Template,
-    number: toHex(11n),
-    parentHash: block10Hash,
-    receiptsRoot: receiptsRoot11,
-    gasUsed: toHex(21_000n),
-    timestamp: toHex(2n),
-    transactions: [txHash2],
-  } satisfies JSONRPCBlock;
-  const block11Hash: Hex = bytesToHex(createBlockHeaderFromRPC(block11Template).hash());
-  const block11 = { ...block11Template, hash: block11Hash } satisfies JSONRPCBlock;
-  const block12Template = {
-    ...block10Template,
-    number: toHex(12n),
-    parentHash: block11Hash,
-    receiptsRoot: zeroHash,
-    gasUsed: toHex(0n),
-    timestamp: toHex(3n),
-    transactions: [],
-  } satisfies JSONRPCBlock;
-  const block12Hash: Hex = bytesToHex(createBlockHeaderFromRPC(block12Template).hash());
-  const block12 = { ...block12Template, hash: block12Hash } satisfies JSONRPCBlock;
-
-  block10Logs.forEach(log => {
-    log.blockHash = block10Hash;
-  });
-  block11Logs.forEach(log => {
-    log.blockHash = block11Hash;
-  });
-  receipt0.blockHash = block10Hash;
-  receipt1.blockHash = block10Hash;
-  receipt2.blockHash = block11Hash;
-
-  const executionClient = {
-    readContract: async ({
-      functionName,
-      args,
-    }: {
-      functionName: 'latestActivityBlockLocatorIndex' | 'activityBlockLocators';
-      args?: [bigint];
-    }) => {
-      if (functionName === 'latestActivityBlockLocatorIndex') {
-        return 2n;
-      }
-
-      if (args?.[0] === 1n) {
-        return [10n, 1n, 2n, zeroHash, zeroHash];
-      }
-      if (args?.[0] === 2n) {
-        return [11n, 3n, 3n, zeroHash, zeroHash];
-      }
-
-      throw new Error(`Unexpected locator request ${String(args?.[0])}`);
-    },
-    getLogs: async ({ fromBlock }: { fromBlock: bigint }) => {
-      if (fromBlock === 10n) return block10Logs;
-      if (fromBlock === 11n) return block11Logs;
-      throw new Error(`Unexpected logs request for block ${fromBlock}`);
-    },
-    getTransactionReceipt: async ({ hash }: { hash: Hex }) => {
-      if (hash === txHash0) return receipt0;
-      if (hash === txHash1) return receipt1;
-      if (hash === txHash2) return receipt2;
-      throw new Error(`Unexpected receipt request for ${hash}`);
-    },
-    getBlock: async ({ blockHash }: { blockHash: Hex }) => {
-      if (blockHash === block10Hash) return { transactions: [txHash0, txHash1] };
-      if (blockHash === block11Hash) return { transactions: [txHash2] };
-      throw new Error(`Unexpected block request for ${blockHash}`);
-    },
-    request: async ({
-      method,
-      params,
-    }: {
-      method: 'eth_getBlockByHash' | 'eth_getBlockByNumber';
-      params: [Hex, true];
-    }) => {
-      if (method === 'eth_getBlockByHash') {
-        if (params[0] === block10Hash) return block10;
-        if (params[0] === block11Hash) return block11;
-        if (params[0] === block12Hash) return block12;
-      }
-      if (method === 'eth_getBlockByNumber') {
-        if (params[0] === toHex(10n)) return block10;
-        if (params[0] === toHex(11n)) return block11;
-        if (params[0] === toHex(12n)) return block12;
-      }
-
-      throw new Error(`Unexpected header request for ${method} ${params[0]}`);
-    },
-  } as unknown as EthereumExecutionClient;
-  const argonClient = {
-    query: {
-      crosschainTransfer: {
-        gatewayStateBySourceChain: async () => ({
-          isSome: true,
-          unwrap: () => ({
-            gatewayActivityNonce: {
-              toBigInt: () => 1n,
-            },
-          }),
-        }),
-      },
-      ethereumVerifier: {
-        latestExecutionHeaderAnchorBlockHash: async () => ({
-          isNone: false,
-          unwrap: () => ({ toHex: () => block12Hash }),
-        }),
-        executionHeaderAnchors: async (blockHash: Hex) => {
-          expect(blockHash).toBe(block12Hash);
-
-          return {
-            isNone: false,
-            unwrap: () => ({
-              blockNumber: {
-                toBigInt: () => 12n,
-              },
-            }),
-          };
-        },
-      },
-    },
-    consts: gatewayProofConsts,
-  } as unknown as IArgonQueryable & Pick<ArgonClient, 'consts'>;
-
-  const payload = await buildGatewayActivityProofPayload(argonClient, {
-    gatewayAddress,
-    executionClient,
-    throughExecutionBlockNumber: 11n,
-  });
-
-  expect(payload?.previousGatewayActivityNonce).toBe(1n);
-  expect(payload?.gatewayActivityNonceRange).toEqual({ start: 2n, end: 3n });
-  expect(payload?.executionBlockNumberRange).toEqual({ start: 10n, end: 11n });
-  expect(payload?.activities.map(activity => activity.kind)).toEqual([
-    MintingGatewayEvents.TransferToArgonStarted.name,
-    MintingGatewayEvents.TransferToArgonStarted.name,
-  ]);
-  expect(payload?.proof.blocks).toHaveLength(2);
-  expect(payload?.proof.blocks.map(block => block.targetBlockNumber)).toEqual([10, 11]);
-  expect(payload?.proof.blocks[0].receiptLogs.map(log => log.transactionIndex)).toEqual([1]);
-  expect(payload?.proof.blocks[1].receiptLogs.map(log => log.transactionIndex)).toEqual([0]);
-});
-
-it('builds a gateway activity payload from mixed gateway events', async () => {
-  const gatewayAddress: Hex = `0x${'77'.repeat(20)}`;
-  const zeroHash: Hex = `0x${'00'.repeat(32)}`;
-  const zeroBloom: Hex = `0x${'00'.repeat(256)}`;
-  const zeroAddress: Hex = `0x${'00'.repeat(20)}`;
-  const emptyUnclesHash =
-    '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347' as Hex;
-  const txHash: Hex = `0x${'10'.repeat(32)}`;
+it('builds a gateway payload for the next uncovered locator', async () => {
+  const gatewayAddress = repeatHex('77', 20);
+  const latestArgonFinalizedHeader = {
+    blockHash: repeatHex('fe', 32),
+    blockNumber: 12n,
+  };
   const transferLog = createTransferToArgonStartedBlockLog({
     gatewayAddress,
-    txHash,
+    txHash: repeatHex('10', 32),
     transactionIndex: 0,
     logIndex: 0,
-    blockHash: zeroHash,
-    blockNumber: 10n,
     nonce: 1n,
-    argonAccountId: `0x${'41'.repeat(32)}`,
+    argonAccountId: repeatHex('41', 32),
   });
   const councilRotationLog = createGlobalIssuanceCouncilRotatedBlockLog({
     gatewayAddress,
-    txHash,
+    txHash: repeatHex('10', 32),
     transactionIndex: 0,
     logIndex: 1,
-    blockHash: zeroHash,
-    blockNumber: 10n,
     nonce: 2n,
   });
-  const receipt = {
-    type: 'legacy',
-    status: 'success',
-    cumulativeGasUsed: 42_000n,
-    logsBloom: zeroBloom,
-    logs: [
-      { address: gatewayAddress, topics: transferLog.topics, data: transferLog.data },
-      { address: gatewayAddress, topics: councilRotationLog.topics, data: councilRotationLog.data },
-    ],
-    transactionHash: txHash,
-    transactionIndex: 0,
-  } as unknown as EthereumReceipt;
-
-  const trie = await createMPT();
-  await trie.put(encodeReceiptTrieKey(0), encodeEthereumReceiptForProof(receipt));
-  const receiptsRoot: Hex = bytesToHex(trie.root());
-
-  const blockTemplate = {
-    number: toHex(10n),
-    hash: zeroHash,
-    parentHash: zeroHash,
-    nonce: '0x0000000000000000',
-    sha3Uncles: emptyUnclesHash,
-    logsBloom: zeroBloom,
-    transactionsRoot: zeroHash,
-    stateRoot: zeroHash,
-    receiptsRoot,
-    miner: zeroAddress,
-    difficulty: '0x0',
-    extraData: '0x',
-    size: '0x1',
-    gasLimit: toHex(30_000_000n),
-    gasUsed: toHex(42_000n),
-    timestamp: toHex(1n),
-    transactions: [txHash],
-    uncles: [],
-  } satisfies JSONRPCBlock;
-  const blockHash: Hex = bytesToHex(createBlockHeaderFromRPC(blockTemplate).hash());
-  const block = { ...blockTemplate, hash: blockHash } satisfies JSONRPCBlock;
-  const block11Template = {
-    ...blockTemplate,
-    number: toHex(11n),
-    parentHash: blockHash,
-    receiptsRoot: zeroHash,
-    gasUsed: toHex(0n),
-    timestamp: toHex(2n),
-    transactions: [],
-  } satisfies JSONRPCBlock;
-  const block11Hash: Hex = bytesToHex(createBlockHeaderFromRPC(block11Template).hash());
-  const block11 = { ...block11Template, hash: block11Hash } satisfies JSONRPCBlock;
-  transferLog.blockHash = blockHash;
-  councilRotationLog.blockHash = blockHash;
-  receipt.blockHash = blockHash;
-
-  const executionClient = {
-    readContract: async ({
-      functionName,
-      args,
-    }: {
-      functionName: 'latestActivityBlockLocatorIndex' | 'activityBlockLocators';
-      args?: [bigint];
-    }) => {
-      if (functionName === 'latestActivityBlockLocatorIndex') {
-        return 1n;
-      }
-
-      if (args?.[0] === 1n) {
-        return [10n, 1n, 2n, zeroHash, zeroHash];
-      }
-
-      throw new Error(`Unexpected locator request ${String(args?.[0])}`);
-    },
-    getLogs: async () => [transferLog, councilRotationLog],
-    getTransactionReceipt: async ({ hash }: { hash: Hex }) => {
-      if (hash === txHash) return receipt;
-      throw new Error(`Unexpected receipt request for ${hash}`);
-    },
-    getBlock: async ({ blockHash: queriedBlockHash }: { blockHash: Hex }) => {
-      expect(queriedBlockHash).toBe(blockHash);
-      return { transactions: [txHash] };
-    },
-    request: async ({
-      method,
-      params,
-    }: {
-      method: 'eth_getBlockByHash' | 'eth_getBlockByNumber';
-      params: [Hex, true];
-    }) => {
-      if (method === 'eth_getBlockByHash') {
-        if (params[0] === blockHash) return block;
-        if (params[0] === block11Hash) return block11;
-      }
-      if (method === 'eth_getBlockByNumber') {
-        if (params[0] === toHex(10n)) return block;
-        if (params[0] === toHex(11n)) return block11;
-      }
-
-      throw new Error(`Unexpected header request for ${method} ${params[0]}`);
-    },
-  } as unknown as EthereumExecutionClient;
-  const argonClient = {
-    query: {
-      crosschainTransfer: {
-        gatewayStateBySourceChain: async () => ({
-          isSome: false,
-        }),
-      },
-      ethereumVerifier: {
-        latestExecutionHeaderAnchorBlockHash: async () => ({
-          isNone: false,
-          unwrap: () => ({ toHex: () => block11Hash }),
-        }),
-        executionHeaderAnchors: async (queriedBlockHash: Hex) => {
-          expect(queriedBlockHash).toBe(block11Hash);
-
-          return {
-            isNone: false,
-            unwrap: () => ({
-              blockNumber: {
-                toBigInt: () => 11n,
-              },
-            }),
-          };
-        },
-      },
-    },
-    consts: gatewayProofConsts,
-  } as unknown as IArgonQueryable & Pick<ArgonClient, 'consts'>;
-
-  const payload = await buildGatewayActivityProofPayload(argonClient, {
+  const { argonClient, executionClient, locators } = createGatewayProofHarness({
     gatewayAddress,
-    executionClient,
+    latestArgonFinalizedHeader,
+    locators: [{ blockNumber: 10n, logs: [transferLog, councilRotationLog] }],
   });
+
+  const { payloads } = await buildGatewayActivityStorageProofs(argonClient, {
+    executionClient,
+    finalizedExecutionHeader: latestArgonFinalizedHeader,
+    gatewayAddress,
+    locators: [locators[0]],
+  });
+  const payload = payloads[0];
 
   expect(payload?.previousGatewayActivityNonce).toBe(0n);
   expect(payload?.gatewayActivityNonceRange).toEqual({ start: 1n, end: 2n });
@@ -1141,1264 +990,820 @@ it('builds a gateway activity payload from mixed gateway events', async () => {
     MintingGatewayEvents.TransferToArgonStarted.name,
     MintingGatewayEvents.GlobalIssuanceCouncilRotated.name,
   ]);
-  expect(payload?.proof.blocks).toHaveLength(1);
-  expect(payload?.proof.blocks[0].receiptLogs.map(log => log.transactionIndex)).toEqual([0, 0]);
-});
-
-it('splits one execution block into multiple proof blocks when the activity bound is lower', async () => {
-  const gatewayAddress: Hex = `0x${'91'.repeat(20)}`;
-  const zeroHash: Hex = `0x${'00'.repeat(32)}`;
-  const zeroBloom: Hex = `0x${'00'.repeat(256)}`;
-  const zeroAddress: Hex = `0x${'00'.repeat(20)}`;
-  const emptyUnclesHash =
-    '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347' as Hex;
-  const txHash: Hex = `0x${'93'.repeat(32)}`;
-  const logs = [1n, 2n, 3n].map((nonce, index) =>
-    createTransferToArgonStartedBlockLog({
-      gatewayAddress,
-      txHash,
-      transactionIndex: 0,
-      logIndex: index,
-      blockHash: zeroHash,
-      blockNumber: 10n,
-      nonce,
-      argonAccountId: toHex(index + 1, { size: 32 }),
-    }),
-  );
-  const receipt = {
-    type: 'legacy',
-    status: 'success',
-    cumulativeGasUsed: 63_000n,
-    logsBloom: zeroBloom,
-    logs: logs.map(log => ({ address: gatewayAddress, topics: log.topics, data: log.data })),
-    transactionHash: txHash,
-    transactionIndex: 0,
-  } as unknown as EthereumReceipt;
-
-  const trie = await createMPT();
-  await trie.put(encodeReceiptTrieKey(0), encodeEthereumReceiptForProof(receipt));
-  const receiptsRoot: Hex = bytesToHex(trie.root());
-  const blockTemplate = {
-    number: toHex(10n),
-    hash: zeroHash,
-    parentHash: zeroHash,
-    nonce: '0x0000000000000000',
-    sha3Uncles: emptyUnclesHash,
-    logsBloom: zeroBloom,
-    transactionsRoot: zeroHash,
-    stateRoot: zeroHash,
-    receiptsRoot,
-    miner: zeroAddress,
-    difficulty: '0x0',
-    extraData: '0x',
-    size: '0x1',
-    gasLimit: toHex(30_000_000n),
-    gasUsed: toHex(63_000n),
-    timestamp: toHex(1n),
-    transactions: [txHash],
-    uncles: [],
-  } satisfies JSONRPCBlock;
-  const blockHash: Hex = bytesToHex(createBlockHeaderFromRPC(blockTemplate).hash());
-  const block = { ...blockTemplate, hash: blockHash } satisfies JSONRPCBlock;
-  const block11Template = {
-    ...blockTemplate,
-    number: toHex(11n),
-    parentHash: blockHash,
-    receiptsRoot: zeroHash,
-    gasUsed: toHex(0n),
-    timestamp: toHex(2n),
-    transactions: [],
-  } satisfies JSONRPCBlock;
-  const block11Hash: Hex = bytesToHex(createBlockHeaderFromRPC(block11Template).hash());
-  const block11 = { ...block11Template, hash: block11Hash } satisfies JSONRPCBlock;
-  for (const log of logs) {
-    log.blockHash = blockHash;
-  }
-  receipt.blockHash = blockHash;
-
-  const executionClient = {
-    readContract: async ({
-      functionName,
-      args,
-    }: {
-      functionName: 'latestActivityBlockLocatorIndex' | 'activityBlockLocators';
-      args?: [bigint];
-    }) => {
-      if (functionName === 'latestActivityBlockLocatorIndex') {
-        return 1n;
-      }
-
-      if (args?.[0] === 1n) {
-        return [10n, 1n, 3n, zeroHash, zeroHash];
-      }
-
-      throw new Error(`Unexpected locator request ${String(args?.[0])}`);
-    },
-    getLogs: async () => logs,
-    getTransactionReceipt: async ({ hash }: { hash: Hex }) => {
-      if (hash === txHash) return receipt;
-      throw new Error(`Unexpected receipt request for ${hash}`);
-    },
-    getBlock: async ({ blockHash: queriedBlockHash }: { blockHash: Hex }) => {
-      expect(queriedBlockHash).toBe(blockHash);
-      return { transactions: [txHash] };
-    },
-    request: async ({
-      method,
-      params,
-    }: {
-      method: 'eth_getBlockByHash' | 'eth_getBlockByNumber';
-      params: [Hex, true];
-    }) => {
-      if (method === 'eth_getBlockByHash') {
-        if (params[0] === blockHash) return block;
-        if (params[0] === block11Hash) return block11;
-      }
-      if (method === 'eth_getBlockByNumber') {
-        if (params[0] === toHex(10n)) return block;
-        if (params[0] === toHex(11n)) return block11;
-      }
-
-      throw new Error(`Unexpected header request for ${method} ${params[0]}`);
-    },
-  } as unknown as EthereumExecutionClient;
-  const argonClient = {
-    query: {
-      crosschainTransfer: {
-        gatewayStateBySourceChain: async () => ({
-          isSome: false,
-        }),
-      },
-      ethereumVerifier: {
-        latestExecutionHeaderAnchorBlockHash: async () => ({
-          isNone: false,
-          unwrap: () => ({ toHex: () => block11Hash }),
-        }),
-        executionHeaderAnchors: async () => ({
-          isNone: false,
-          unwrap: () => ({
-            blockNumber: {
-              toBigInt: () => 11n,
-            },
-          }),
-        }),
-      },
-    },
-    consts: createGatewayProofConsts({ maxActivitiesPerReceiptProof: 1 }),
-  } as unknown as IArgonQueryable & Pick<ArgonClient, 'consts'>;
-
-  const payload = await buildGatewayActivityProofPayload(argonClient, {
-    gatewayAddress,
-    executionClient,
-  });
-
-  expect(payload?.gatewayActivityNonceRange).toEqual({ start: 1n, end: 3n });
-  expect(payload?.proof.blocks).toHaveLength(3);
-  expect(payload?.proof.blocks.map(block => block.receiptLogs)).toEqual([
-    [expect.objectContaining({ transactionIndex: 0 })],
-    [expect.objectContaining({ transactionIndex: 0 })],
-    [expect.objectContaining({ transactionIndex: 0 })],
+  expect(payload?.proof.locatorIndex).toBe(1n);
+  expect(payload?.proof.activityLogs).toHaveLength(2);
+  expect(payload?.proof.storageProof.anchorBlockHash).toBe(latestArgonFinalizedHeader.blockHash);
+  expect(payload?.proof.storageProof.slots).toHaveLength(2);
+  expect(payload?.proof.storageProof.slots[0]?.nodeIndexes).toEqual([0, 1]);
+  expect(payload?.proof.storageProof.slots[1]?.nodeIndexes).toEqual([1, 2]);
+  expect(payload?.proof.storageProof.storageProof).toEqual([
+    repeatHex('01', 32),
+    repeatHex('02', 32),
+    repeatHex('03', 32),
   ]);
 });
 
-it('resumes from the next gateway activity when a capped payload stops mid block', async () => {
-  const gatewayAddress: Hex = `0x${'94'.repeat(20)}`;
-  const zeroHash: Hex = `0x${'00'.repeat(32)}`;
-  const zeroBloom: Hex = `0x${'00'.repeat(256)}`;
-  const zeroAddress: Hex = `0x${'00'.repeat(20)}`;
-  const emptyUnclesHash =
-    '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347' as Hex;
-  const txHash: Hex = `0x${'96'.repeat(32)}`;
-  const logs = [1n, 2n, 3n].map((nonce, index) =>
-    createTransferToArgonStartedBlockLog({
-      gatewayAddress,
-      txHash,
-      transactionIndex: 0,
-      logIndex: index,
-      blockHash: zeroHash,
-      blockNumber: 10n,
-      nonce,
-      argonAccountId: toHex(index + 1, { size: 32 }),
-    }),
-  );
-  const receipt = {
-    type: 'legacy',
-    status: 'success',
-    cumulativeGasUsed: 63_000n,
-    logsBloom: zeroBloom,
-    logs: logs.map(log => ({ address: gatewayAddress, topics: log.topics, data: log.data })),
-    transactionHash: txHash,
-    transactionIndex: 0,
-  } as unknown as EthereumReceipt;
-
-  const trie = await createMPT();
-  await trie.put(encodeReceiptTrieKey(0), encodeEthereumReceiptForProof(receipt));
-  const receiptsRoot: Hex = bytesToHex(trie.root());
-  const blockTemplate = {
-    number: toHex(10n),
-    hash: zeroHash,
-    parentHash: zeroHash,
-    nonce: '0x0000000000000000',
-    sha3Uncles: emptyUnclesHash,
-    logsBloom: zeroBloom,
-    transactionsRoot: zeroHash,
-    stateRoot: zeroHash,
-    receiptsRoot,
-    miner: zeroAddress,
-    difficulty: '0x0',
-    extraData: '0x',
-    size: '0x1',
-    gasLimit: toHex(30_000_000n),
-    gasUsed: toHex(63_000n),
-    timestamp: toHex(1n),
-    transactions: [txHash],
-    uncles: [],
-  } satisfies JSONRPCBlock;
-  const blockHash: Hex = bytesToHex(createBlockHeaderFromRPC(blockTemplate).hash());
-  const block = { ...blockTemplate, hash: blockHash } satisfies JSONRPCBlock;
-  const block11Template = {
-    ...blockTemplate,
-    number: toHex(11n),
-    parentHash: blockHash,
-    receiptsRoot: zeroHash,
-    gasUsed: toHex(0n),
-    timestamp: toHex(2n),
-    transactions: [],
-  } satisfies JSONRPCBlock;
-  const block11Hash: Hex = bytesToHex(createBlockHeaderFromRPC(block11Template).hash());
-  const block11 = { ...block11Template, hash: block11Hash } satisfies JSONRPCBlock;
-  for (const log of logs) {
-    log.blockHash = blockHash;
-  }
-  receipt.blockHash = blockHash;
-
-  const executionClient = {
-    readContract: async ({
-      functionName,
-      args,
-    }: {
-      functionName: 'latestActivityBlockLocatorIndex' | 'activityBlockLocators';
-      args?: [bigint];
-    }) => {
-      if (functionName === 'latestActivityBlockLocatorIndex') {
-        return 1n;
-      }
-
-      if (args?.[0] === 1n) {
-        return [10n, 1n, 3n, zeroHash, zeroHash];
-      }
-
-      throw new Error(`Unexpected locator request ${String(args?.[0])}`);
-    },
-    getLogs: async () => logs,
-    getTransactionReceipt: async ({ hash }: { hash: Hex }) => {
-      if (hash === txHash) return receipt;
-      throw new Error(`Unexpected receipt request for ${hash}`);
-    },
-    getBlock: async ({ blockHash: queriedBlockHash }: { blockHash: Hex }) => {
-      expect(queriedBlockHash).toBe(blockHash);
-      return { transactions: [txHash] };
-    },
-    request: async ({
-      method,
-      params,
-    }: {
-      method: 'eth_getBlockByHash' | 'eth_getBlockByNumber';
-      params: [Hex, true];
-    }) => {
-      if (method === 'eth_getBlockByHash') {
-        if (params[0] === blockHash) return block;
-        if (params[0] === block11Hash) return block11;
-      }
-      if (method === 'eth_getBlockByNumber') {
-        if (params[0] === toHex(10n)) return block;
-        if (params[0] === toHex(11n)) return block11;
-      }
-
-      throw new Error(`Unexpected header request for ${method} ${params[0]}`);
-    },
-  } as unknown as EthereumExecutionClient;
-  const argonClient = {
-    query: {
-      crosschainTransfer: {
-        gatewayStateBySourceChain: async () => ({
-          isSome: true,
-          unwrap: () => ({
-            gatewayActivityNonce: {
-              toBigInt: () => 1n,
-            },
-          }),
-        }),
-      },
-      ethereumVerifier: {
-        latestExecutionHeaderAnchorBlockHash: async () => ({
-          isNone: false,
-          unwrap: () => ({ toHex: () => block11Hash }),
-        }),
-        executionHeaderAnchors: async () => ({
-          isNone: false,
-          unwrap: () => ({
-            blockNumber: {
-              toBigInt: () => 11n,
-            },
-          }),
-        }),
-      },
-    },
-    consts: createGatewayProofConsts({
-      maxActivitiesPerReceiptProof: 1,
-      maxReceiptProofsPerExtrinsic: 1,
-    }),
-  } as unknown as IArgonQueryable & Pick<ArgonClient, 'consts'>;
-
-  const payload = await buildGatewayActivityProofPayload(argonClient, {
+it('discovers all missing locators in order', async () => {
+  const gatewayAddress = repeatHex('78', 20);
+  const log10 = createTransferToArgonStartedBlockLog({
     gatewayAddress,
-    executionClient,
+    txHash: repeatHex('11', 32),
+    transactionIndex: 0,
+    logIndex: 0,
+    nonce: 1n,
+    argonAccountId: repeatHex('42', 32),
+  });
+  const log11 = createTransferToArgonStartedBlockLog({
+    gatewayAddress,
+    txHash: repeatHex('12', 32),
+    transactionIndex: 0,
+    logIndex: 0,
+    nonce: 2n,
+    argonAccountId: repeatHex('43', 32),
+  });
+  const { executionClient, argonFinalizedExecutionHeader } = createGatewayProofHarness({
+    gatewayAddress,
+    latestArgonFinalizedHeader: {
+      blockHash: repeatHex('fd', 32),
+      blockNumber: 12n,
+    },
+    locators: [
+      { blockNumber: 10n, logs: [log10] },
+      { blockNumber: 11n, logs: [log11] },
+    ],
   });
 
+  const discovered = await discoverMissingGatewayActivityLocators({
+    executionClient,
+    finalizedExecutionBlockNumber: argonFinalizedExecutionHeader.blockNumber,
+    gatewayAddress,
+    minimumGatewayActivityNonce: 1n,
+  });
+
+  expect(
+    discovered.map(locator => ({
+      locatorIndex: locator.locatorIndex,
+      blockNumber: locator.blockNumber,
+      startGatewayActivityNonce: locator.startGatewayActivityNonce,
+      endGatewayActivityNonce: locator.endGatewayActivityNonce,
+    })),
+  ).toEqual([
+    {
+      locatorIndex: 1n,
+      blockNumber: 10n,
+      startGatewayActivityNonce: 1n,
+      endGatewayActivityNonce: 1n,
+    },
+    {
+      locatorIndex: 2n,
+      blockNumber: 11n,
+      startGatewayActivityNonce: 2n,
+      endGatewayActivityNonce: 2n,
+    },
+  ]);
+});
+
+it('builds a later locator payload using the previous locator hash seed', async () => {
+  const gatewayAddress = repeatHex('7a', 20);
+  const log10 = createTransferToArgonStartedBlockLog({
+    gatewayAddress,
+    txHash: repeatHex('17', 32),
+    transactionIndex: 0,
+    logIndex: 0,
+    nonce: 1n,
+    argonAccountId: repeatHex('51', 32),
+  });
+  const log11 = createTransferToArgonStartedBlockLog({
+    gatewayAddress,
+    txHash: repeatHex('18', 32),
+    transactionIndex: 0,
+    logIndex: 0,
+    nonce: 2n,
+    argonAccountId: repeatHex('52', 32),
+  });
+  const { argonClient, executionClient, locators, argonFinalizedExecutionHeader } =
+    createGatewayProofHarness({
+      gatewayAddress,
+      previousGatewayActivityNonce: 1n,
+      latestArgonFinalizedHeader: {
+        blockHash: repeatHex('fb', 32),
+        blockNumber: 12n,
+      },
+      locators: [
+        { blockNumber: 10n, logs: [log10] },
+        { blockNumber: 11n, logs: [log11] },
+      ],
+    });
+
+  const { payloads } = await buildGatewayActivityStorageProofs(argonClient, {
+    executionClient,
+    finalizedExecutionHeader: argonFinalizedExecutionHeader,
+    gatewayAddress,
+    locators: [locators[1]],
+  });
+  const payload = payloads[0];
+
+  expect(payload?.previousGatewayActivityNonce).toBe(1n);
+  expect(payload?.proof.locatorIndex).toBe(2n);
   expect(payload?.gatewayActivityNonceRange).toEqual({ start: 2n, end: 2n });
-  expect(payload?.executionBlockNumberRange).toEqual({ start: 10n, end: 10n });
+  expect(payload?.proof.storageProof.slots[1]?.value).toBe(locators[1]?.activityRoot);
+  expect(locators[1]?.activityRoot).toBe(
+    appendEthereumGatewayActivityRoot(
+      hashMintingGatewayActivityBlockLocator(locators[0]),
+      hashEthereumGatewayActivity({ chainId: 1n, gatewayAddress }, payload.activities[0]),
+    ),
+  );
+});
+
+it('rejects a locator payload when eth_getProof returns an unexpected range slot value', async () => {
+  const gatewayAddress = repeatHex('7e', 20);
+  const log = createTransferToArgonStartedBlockLog({
+    gatewayAddress,
+    txHash: repeatHex('19', 32),
+    transactionIndex: 0,
+    logIndex: 0,
+    nonce: 1n,
+    argonAccountId: repeatHex('53', 32),
+  });
+  const {
+    argonClient,
+    executionClient,
+    proofsByBlockNumber,
+    locators,
+    argonFinalizedExecutionHeader,
+  } = createGatewayProofHarness({
+    gatewayAddress,
+    latestArgonFinalizedHeader: {
+      blockHash: repeatHex('fa', 32),
+      blockNumber: 12n,
+    },
+    locators: [{ blockNumber: 10n, logs: [log] }],
+  });
+
+  const rangeProof = proofsByBlockNumber['12']?.storageProof?.[0];
+  if (!rangeProof) {
+    throw new Error('Expected a mocked range slot proof');
+  }
+  rangeProof.value += 1n;
+
+  await expect(() =>
+    buildGatewayActivityStorageProofs(argonClient, {
+      executionClient,
+      finalizedExecutionHeader: argonFinalizedExecutionHeader,
+      gatewayAddress,
+      locators: [locators[0]],
+    }),
+  ).rejects.toThrow('eth_getProof returned an unexpected value for storage slot');
+});
+
+it('discovers only locators after the accepted nonce and builds the next payload', async () => {
+  const gatewayAddress = repeatHex('79', 20);
+  const log10 = createTransferToArgonStartedBlockLog({
+    gatewayAddress,
+    txHash: repeatHex('13', 32),
+    transactionIndex: 0,
+    logIndex: 0,
+    nonce: 1n,
+    argonAccountId: repeatHex('44', 32),
+  });
+  const log11 = createTransferToArgonStartedBlockLog({
+    gatewayAddress,
+    txHash: repeatHex('14', 32),
+    transactionIndex: 0,
+    logIndex: 0,
+    nonce: 2n,
+    argonAccountId: repeatHex('45', 32),
+  });
+  const { argonClient, executionClient, locators, argonFinalizedExecutionHeader } =
+    createGatewayProofHarness({
+      gatewayAddress,
+      previousGatewayActivityNonce: 1n,
+      latestArgonFinalizedHeader: {
+        blockHash: repeatHex('fc', 32),
+        blockNumber: 12n,
+      },
+      locators: [
+        { blockNumber: 10n, logs: [log10] },
+        { blockNumber: 11n, logs: [log11] },
+      ],
+    });
+
+  const discovered = await discoverMissingGatewayActivityLocators({
+    executionClient,
+    finalizedExecutionBlockNumber: argonFinalizedExecutionHeader.blockNumber,
+    gatewayAddress,
+    minimumGatewayActivityNonce: 2n,
+  });
+  const { payloads } = await buildGatewayActivityStorageProofs(argonClient, {
+    executionClient,
+    finalizedExecutionHeader: argonFinalizedExecutionHeader,
+    gatewayAddress,
+    locators: [locators[1]],
+  });
+  const payload = payloads[0];
+
+  expect(discovered).toEqual([locators[1]]);
+  expect(payload?.previousGatewayActivityNonce).toBe(1n);
+  expect(payload?.gatewayActivityNonceRange).toEqual({ start: 2n, end: 2n });
+  expect(payload?.executionBlockNumberRange).toEqual({ start: 11n, end: 11n });
+  expect(payload?.proof.locatorIndex).toBe(2n);
   expect(payload?.activities.map(activity => activity.gatewayState.gatewayActivityNonce)).toEqual([
     2n,
   ]);
-  expect(payload?.proof.blocks).toHaveLength(1);
-  expect(payload?.proof.blocks[0].receiptLogs.map(log => log.transactionIndex)).toEqual([0]);
 });
 
-it('limits a gateway activity payload to the runtime proof-block bound', async () => {
-  const gatewayAddress: Hex = `0x${'77'.repeat(20)}`;
-  const zeroHash: Hex = `0x${'00'.repeat(32)}`;
-  const zeroBloom: Hex = `0x${'00'.repeat(256)}`;
-  const zeroAddress: Hex = `0x${'00'.repeat(20)}`;
-  const emptyUnclesHash =
-    '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347' as Hex;
-  const txHash10: Hex = `0x${'10'.repeat(32)}`;
-  const txHash11: Hex = `0x${'11'.repeat(32)}`;
+it('discovers missing locator blocks in chronological order', async () => {
+  const gatewayAddress = repeatHex('7e', 20);
   const log10 = createTransferToArgonStartedBlockLog({
     gatewayAddress,
-    txHash: txHash10,
+    txHash: repeatHex('21', 32),
     transactionIndex: 0,
     logIndex: 0,
-    blockHash: zeroHash,
-    blockNumber: 10n,
     nonce: 1n,
-    argonAccountId: `0x${'41'.repeat(32)}`,
+    argonAccountId: repeatHex('46', 32),
   });
   const log11 = createTransferToArgonStartedBlockLog({
     gatewayAddress,
-    txHash: txHash11,
+    txHash: repeatHex('22', 32),
     transactionIndex: 0,
     logIndex: 0,
-    blockHash: zeroHash,
-    blockNumber: 11n,
     nonce: 2n,
-    argonAccountId: `0x${'42'.repeat(32)}`,
+    argonAccountId: repeatHex('47', 32),
   });
-  const receipt10 = {
-    type: 'legacy',
-    status: 'success',
-    cumulativeGasUsed: 21_000n,
-    logsBloom: zeroBloom,
-    logs: [{ address: gatewayAddress, topics: log10.topics, data: log10.data }],
-    transactionHash: txHash10,
-    transactionIndex: 0,
-  } as unknown as EthereumReceipt;
-  const receipt11 = {
-    type: 'legacy',
-    status: 'success',
-    cumulativeGasUsed: 21_000n,
-    logsBloom: zeroBloom,
-    logs: [{ address: gatewayAddress, topics: log11.topics, data: log11.data }],
-    transactionHash: txHash11,
-    transactionIndex: 0,
-  } as unknown as EthereumReceipt;
-
-  const trie10 = await createMPT();
-  await trie10.put(encodeReceiptTrieKey(0), encodeEthereumReceiptForProof(receipt10));
-  const receiptsRoot10: Hex = bytesToHex(trie10.root());
-  const trie11 = await createMPT();
-  await trie11.put(encodeReceiptTrieKey(0), encodeEthereumReceiptForProof(receipt11));
-  const receiptsRoot11: Hex = bytesToHex(trie11.root());
-
-  const block10Template = {
-    number: toHex(10n),
-    hash: zeroHash,
-    parentHash: zeroHash,
-    nonce: '0x0000000000000000',
-    sha3Uncles: emptyUnclesHash,
-    logsBloom: zeroBloom,
-    transactionsRoot: zeroHash,
-    stateRoot: zeroHash,
-    receiptsRoot: receiptsRoot10,
-    miner: zeroAddress,
-    difficulty: '0x0',
-    extraData: '0x',
-    size: '0x1',
-    gasLimit: toHex(30_000_000n),
-    gasUsed: toHex(21_000n),
-    timestamp: toHex(1n),
-    transactions: [txHash10],
-    uncles: [],
-  } satisfies JSONRPCBlock;
-  const block10Hash: Hex = bytesToHex(createBlockHeaderFromRPC(block10Template).hash());
-  const block10 = { ...block10Template, hash: block10Hash } satisfies JSONRPCBlock;
-  const block11Template = {
-    ...block10Template,
-    number: toHex(11n),
-    parentHash: block10Hash,
-    hash: zeroHash,
-    receiptsRoot: receiptsRoot11,
-    timestamp: toHex(2n),
-    transactions: [txHash11],
-  } satisfies JSONRPCBlock;
-  const block11Hash: Hex = bytesToHex(createBlockHeaderFromRPC(block11Template).hash());
-  const block11 = { ...block11Template, hash: block11Hash } satisfies JSONRPCBlock;
-  const block12Template = {
-    ...block10Template,
-    number: toHex(12n),
-    parentHash: block11Hash,
-    receiptsRoot: zeroHash,
-    gasUsed: toHex(0n),
-    timestamp: toHex(3n),
-    transactions: [],
-  } satisfies JSONRPCBlock;
-  const block12Hash: Hex = bytesToHex(createBlockHeaderFromRPC(block12Template).hash());
-  const block12 = { ...block12Template, hash: block12Hash } satisfies JSONRPCBlock;
-  log10.blockHash = block10Hash;
-  log11.blockHash = block11Hash;
-  receipt10.blockHash = block10Hash;
-  receipt11.blockHash = block11Hash;
-
-  const executionClient = {
-    readContract: async ({
-      functionName,
-      args,
-    }: {
-      functionName: 'latestActivityBlockLocatorIndex' | 'activityBlockLocators';
-      args?: [bigint];
-    }) => {
-      if (functionName === 'latestActivityBlockLocatorIndex') {
-        return 2n;
-      }
-
-      if (args?.[0] === 1n) {
-        return [10n, 1n, 1n, zeroHash, zeroHash];
-      }
-      if (args?.[0] === 2n) {
-        return [11n, 2n, 2n, zeroHash, zeroHash];
-      }
-
-      throw new Error(`Unexpected locator request ${String(args?.[0])}`);
-    },
-    getLogs: async ({ fromBlock }: { fromBlock: bigint }) => {
-      if (fromBlock === 10n) return [log10];
-      if (fromBlock === 11n) return [log11];
-      throw new Error(`Unexpected getLogs block ${fromBlock}`);
-    },
-    getTransactionReceipt: async ({ hash }: { hash: Hex }) => {
-      if (hash === txHash10) return receipt10;
-      if (hash === txHash11) return receipt11;
-      throw new Error(`Unexpected receipt request for ${hash}`);
-    },
-    getBlock: async ({ blockHash }: { blockHash: Hex }) => {
-      if (blockHash === block10Hash) return { transactions: [txHash10] };
-      if (blockHash === block11Hash) return { transactions: [txHash11] };
-      throw new Error(`Unexpected block request for ${blockHash}`);
-    },
-    request: async ({
-      method,
-      params,
-    }: {
-      method: 'eth_getBlockByHash' | 'eth_getBlockByNumber';
-      params: [Hex, true];
-    }) => {
-      if (method === 'eth_getBlockByHash') {
-        if (params[0] === block10Hash) return block10;
-        if (params[0] === block11Hash) return block11;
-        if (params[0] === block12Hash) return block12;
-      }
-      if (method === 'eth_getBlockByNumber') {
-        if (params[0] === toHex(10n)) return block10;
-        if (params[0] === toHex(11n)) return block11;
-        if (params[0] === toHex(12n)) return block12;
-      }
-
-      throw new Error(`Unexpected header request for ${method} ${params[0]}`);
-    },
-  } as unknown as EthereumExecutionClient;
-  const argonClient = {
-    query: {
-      crosschainTransfer: {
-        gatewayStateBySourceChain: async () => ({
-          isSome: false,
-        }),
-      },
-      ethereumVerifier: {
-        latestExecutionHeaderAnchorBlockHash: async () => ({
-          isNone: false,
-          unwrap: () => ({ toHex: () => block12Hash }),
-        }),
-        executionHeaderAnchors: async () => ({
-          isNone: false,
-          unwrap: () => ({
-            blockNumber: {
-              toBigInt: () => 12n,
-            },
-          }),
-        }),
-      },
-    },
-    consts: createGatewayProofConsts({ maxReceiptProofsPerExtrinsic: 1 }),
-  } as unknown as IArgonQueryable & Pick<ArgonClient, 'consts'>;
-
-  const payload = await buildGatewayActivityProofPayload(argonClient, {
+  const log12 = createTransferToArgonStartedBlockLog({
     gatewayAddress,
+    txHash: repeatHex('23', 32),
+    transactionIndex: 0,
+    logIndex: 0,
+    nonce: 3n,
+    argonAccountId: repeatHex('48', 32),
+  });
+  const { argonClient, executionClient, locators, argonFinalizedExecutionHeader } =
+    createGatewayProofHarness({
+      gatewayAddress,
+      previousGatewayActivityNonce: 1n,
+      latestArgonFinalizedHeader: {
+        blockHash: repeatHex('fa', 32),
+        blockNumber: 13n,
+      },
+      locators: [
+        { blockNumber: 10n, logs: [log10] },
+        { blockNumber: 11n, logs: [log11] },
+        { blockNumber: 12n, logs: [log12] },
+      ],
+    });
+
+  const discovered = await discoverMissingGatewayActivityLocators({
     executionClient,
+    finalizedExecutionBlockNumber: argonFinalizedExecutionHeader.blockNumber,
+    gatewayAddress,
+    minimumGatewayActivityNonce: 2n,
   });
 
-  expect(payload?.gatewayActivityNonceRange).toEqual({ start: 1n, end: 1n });
-  expect(payload?.executionBlockNumberRange).toEqual({ start: 10n, end: 10n });
-  expect(payload?.proof.blocks).toHaveLength(1);
+  expect(discovered).toEqual([locators[1], locators[2]]);
 });
 
-it('stops a gateway activity payload at the Argon finalized execution header', async () => {
-  const gatewayAddress: Hex = `0x${'67'.repeat(20)}`;
-  const zeroHash: Hex = `0x${'00'.repeat(32)}`;
-  const zeroBloom: Hex = `0x${'00'.repeat(256)}`;
-  const zeroAddress: Hex = `0x${'00'.repeat(20)}`;
-  const emptyUnclesHash =
-    '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347' as Hex;
-  const txHash10: Hex = `0x${'12'.repeat(32)}`;
-  const txHash11: Hex = `0x${'13'.repeat(32)}`;
+it('reads locator discovery from the latest Argon finalized execution block', async () => {
+  const gatewayAddress = repeatHex('7d', 20);
+  const readContractRequests: Array<{
+    functionName: string;
+    blockNumber?: bigint;
+    locatorIndex?: bigint;
+  }> = [];
   const log10 = createTransferToArgonStartedBlockLog({
     gatewayAddress,
-    txHash: txHash10,
+    txHash: repeatHex('26', 32),
     transactionIndex: 0,
     logIndex: 0,
-    blockHash: zeroHash,
-    blockNumber: 10n,
     nonce: 1n,
-    argonAccountId: `0x${'51'.repeat(32)}`,
+    argonAccountId: repeatHex('4b', 32),
   });
   const log11 = createTransferToArgonStartedBlockLog({
     gatewayAddress,
-    txHash: txHash11,
+    txHash: repeatHex('27', 32),
     transactionIndex: 0,
     logIndex: 0,
-    blockHash: zeroHash,
-    blockNumber: 11n,
     nonce: 2n,
-    argonAccountId: `0x${'52'.repeat(32)}`,
+    argonAccountId: repeatHex('4c', 32),
   });
-  const receipt10 = {
-    type: 'legacy',
-    status: 'success',
-    cumulativeGasUsed: 21_000n,
-    logsBloom: zeroBloom,
-    logs: [{ address: gatewayAddress, topics: log10.topics, data: log10.data }],
-    transactionHash: txHash10,
-    transactionIndex: 0,
-  } as unknown as EthereumReceipt;
-  const receipt11 = {
-    type: 'legacy',
-    status: 'success',
-    cumulativeGasUsed: 21_000n,
-    logsBloom: zeroBloom,
-    logs: [{ address: gatewayAddress, topics: log11.topics, data: log11.data }],
-    transactionHash: txHash11,
-    transactionIndex: 0,
-  } as unknown as EthereumReceipt;
-
-  const trie10 = await createMPT();
-  await trie10.put(encodeReceiptTrieKey(0), encodeEthereumReceiptForProof(receipt10));
-  const receiptsRoot10: Hex = bytesToHex(trie10.root());
-  const trie11 = await createMPT();
-  await trie11.put(encodeReceiptTrieKey(0), encodeEthereumReceiptForProof(receipt11));
-  const receiptsRoot11: Hex = bytesToHex(trie11.root());
-
-  const block10Template = {
-    number: toHex(10n),
-    hash: zeroHash,
-    parentHash: zeroHash,
-    nonce: '0x0000000000000000',
-    sha3Uncles: emptyUnclesHash,
-    logsBloom: zeroBloom,
-    transactionsRoot: zeroHash,
-    stateRoot: zeroHash,
-    receiptsRoot: receiptsRoot10,
-    miner: zeroAddress,
-    difficulty: '0x0',
-    extraData: '0x',
-    size: '0x1',
-    gasLimit: toHex(30_000_000n),
-    gasUsed: toHex(21_000n),
-    timestamp: toHex(1n),
-    transactions: [txHash10],
-    uncles: [],
-  } satisfies JSONRPCBlock;
-  const block10Hash: Hex = bytesToHex(createBlockHeaderFromRPC(block10Template).hash());
-  const block10 = { ...block10Template, hash: block10Hash } satisfies JSONRPCBlock;
-  const block11Template = {
-    ...block10Template,
-    number: toHex(11n),
-    hash: zeroHash,
-    receiptsRoot: receiptsRoot11,
-    timestamp: toHex(2n),
-    transactions: [txHash11],
-  } satisfies JSONRPCBlock;
-  const block11Hash: Hex = bytesToHex(createBlockHeaderFromRPC(block11Template).hash());
-  const block11 = { ...block11Template, hash: block11Hash } satisfies JSONRPCBlock;
-  log10.blockHash = block10Hash;
-  log11.blockHash = block11Hash;
-  receipt10.blockHash = block10Hash;
-  receipt11.blockHash = block11Hash;
-
-  const executionClient = {
-    readContract: async ({
-      functionName,
-      args,
-    }: {
-      functionName: 'latestActivityBlockLocatorIndex' | 'activityBlockLocators';
-      args?: [bigint];
-    }) => {
-      if (functionName === 'latestActivityBlockLocatorIndex') {
-        return 2n;
-      }
-
-      if (args?.[0] === 1n) {
-        return [10n, 1n, 1n, zeroHash, zeroHash];
-      }
-      if (args?.[0] === 2n) {
-        return [11n, 2n, 2n, zeroHash, zeroHash];
-      }
-
-      throw new Error(`Unexpected locator request ${String(args?.[0])}`);
-    },
-    getLogs: async ({ fromBlock }: { fromBlock: bigint }) => {
-      if (fromBlock === 10n) return [log10];
-      if (fromBlock === 11n) return [log11];
-      throw new Error(`Unexpected getLogs block ${fromBlock}`);
-    },
-    getTransactionReceipt: async ({ hash }: { hash: Hex }) => {
-      if (hash === txHash10) return receipt10;
-      if (hash === txHash11) return receipt11;
-      throw new Error(`Unexpected receipt request for ${hash}`);
-    },
-    getBlock: async ({ blockHash }: { blockHash: Hex }) => {
-      if (blockHash === block10Hash) return { transactions: [txHash10] };
-      if (blockHash === block11Hash) return { transactions: [txHash11] };
-      throw new Error(`Unexpected block request for ${blockHash}`);
-    },
-    request: async ({
-      method,
-      params,
-    }: {
-      method: 'eth_getBlockByHash' | 'eth_getBlockByNumber';
-      params: [Hex, true];
-    }) => {
-      if (method === 'eth_getBlockByHash') {
-        if (params[0] === block10Hash) return block10;
-        if (params[0] === block11Hash) return block11;
-      }
-      if (method === 'eth_getBlockByNumber') {
-        if (params[0] === toHex(10n)) return block10;
-        if (params[0] === toHex(11n)) return block11;
-      }
-
-      throw new Error(`Unexpected header request for ${method} ${params[0]}`);
-    },
-  } as unknown as EthereumExecutionClient;
-  const argonClient = {
-    query: {
-      crosschainTransfer: {
-        gatewayStateBySourceChain: async () => ({
-          isSome: false,
-        }),
-      },
-      ethereumVerifier: {
-        latestExecutionHeaderAnchorBlockHash: async () => ({
-          isNone: false,
-          unwrap: () => ({ toHex: () => block10Hash }),
-        }),
-        executionHeaderAnchors: async () => ({
-          isNone: false,
-          unwrap: () => ({
-            blockNumber: {
-              toBigInt: () => 10n,
-            },
-          }),
-        }),
-      },
-    },
-    consts: gatewayProofConsts,
-  } as unknown as IArgonQueryable & Pick<ArgonClient, 'consts'>;
-
-  const payload = await buildGatewayActivityProofPayload(argonClient, {
+  const latestArgonFinalizedHeader = {
+    blockHash: repeatHex('f8', 32),
+    blockNumber: 12n,
+  };
+  const { executionClient } = createGatewayProofHarness({
     gatewayAddress,
+    latestArgonFinalizedHeader,
+    readContractRequests,
+    locators: [
+      { blockNumber: 10n, logs: [log10] },
+      { blockNumber: 11n, logs: [log11] },
+    ],
+  });
+
+  await discoverMissingGatewayActivityLocators({
     executionClient,
-  });
-
-  expect(payload?.gatewayActivityNonceRange).toEqual({ start: 1n, end: 1n });
-  expect(payload?.executionBlockNumberRange).toEqual({ start: 10n, end: 10n });
-  expect(payload?.proof.blocks).toHaveLength(1);
-});
-
-it('scans forward to the first retained execution anchor at or after the target block', async () => {
-  const gatewayAddress: Hex = `0x${'68'.repeat(20)}`;
-  const zeroHash: Hex = `0x${'00'.repeat(32)}`;
-  const zeroBloom: Hex = `0x${'00'.repeat(256)}`;
-  const zeroAddress: Hex = `0x${'00'.repeat(20)}`;
-  const emptyUnclesHash =
-    '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347' as Hex;
-  const txHash10: Hex = `0x${'16'.repeat(32)}`;
-  const log10 = createTransferToArgonStartedBlockLog({
+    finalizedExecutionBlockNumber: latestArgonFinalizedHeader.blockNumber,
     gatewayAddress,
-    txHash: txHash10,
-    transactionIndex: 0,
-    logIndex: 0,
-    blockHash: zeroHash,
-    blockNumber: 10n,
-    nonce: 1n,
-    argonAccountId: `0x${'53'.repeat(32)}`,
-  });
-  const receipt10 = {
-    type: 'legacy',
-    status: 'success',
-    cumulativeGasUsed: 21_000n,
-    logsBloom: zeroBloom,
-    logs: [{ address: gatewayAddress, topics: log10.topics, data: log10.data }],
-    transactionHash: txHash10,
-    transactionIndex: 0,
-  } as unknown as EthereumReceipt;
-
-  const trie10 = await createMPT();
-  await trie10.put(encodeReceiptTrieKey(0), encodeEthereumReceiptForProof(receipt10));
-  const receiptsRoot10: Hex = bytesToHex(trie10.root());
-
-  const block10Template = {
-    number: toHex(10n),
-    hash: zeroHash,
-    parentHash: zeroHash,
-    nonce: '0x0000000000000000',
-    sha3Uncles: emptyUnclesHash,
-    logsBloom: zeroBloom,
-    transactionsRoot: zeroHash,
-    stateRoot: zeroHash,
-    receiptsRoot: receiptsRoot10,
-    miner: zeroAddress,
-    difficulty: '0x0',
-    extraData: '0x',
-    size: '0x1',
-    gasLimit: toHex(30_000_000n),
-    gasUsed: toHex(21_000n),
-    timestamp: toHex(1n),
-    transactions: [txHash10],
-    uncles: [],
-  } satisfies JSONRPCBlock;
-  const block10Hash: Hex = bytesToHex(createBlockHeaderFromRPC(block10Template).hash());
-  const block10 = { ...block10Template, hash: block10Hash } satisfies JSONRPCBlock;
-  const block11Template = {
-    ...block10Template,
-    number: toHex(11n),
-    hash: zeroHash,
-    parentHash: block10Hash,
-    receiptsRoot: zeroHash,
-    gasUsed: toHex(0n),
-    timestamp: toHex(2n),
-    transactions: [],
-  } satisfies JSONRPCBlock;
-  const block11Hash: Hex = bytesToHex(createBlockHeaderFromRPC(block11Template).hash());
-  const block11 = { ...block11Template, hash: block11Hash } satisfies JSONRPCBlock;
-  const block12Template = {
-    ...block11Template,
-    number: toHex(12n),
-    hash: zeroHash,
-    parentHash: block11Hash,
-    timestamp: toHex(3n),
-  } satisfies JSONRPCBlock;
-  const block12Hash: Hex = bytesToHex(createBlockHeaderFromRPC(block12Template).hash());
-  const block12 = { ...block12Template, hash: block12Hash } satisfies JSONRPCBlock;
-  log10.blockHash = block10Hash;
-  receipt10.blockHash = block10Hash;
-
-  const latestAnchorBlockHash: Hex = `0x${'ff'.repeat(32)}`;
-  const argonClient = {
-    query: {
-      crosschainTransfer: {
-        gatewayStateBySourceChain: async () => ({
-          isSome: false,
-        }),
-      },
-      ethereumVerifier: {
-        latestExecutionHeaderAnchorBlockHash: async () => ({
-          isNone: false,
-          unwrap: () => ({ toHex: () => latestAnchorBlockHash }),
-        }),
-        executionHeaderAnchors: async (blockHash?: Hex) => {
-          if (blockHash?.toLowerCase() === latestAnchorBlockHash.toLowerCase()) {
-            return {
-              isNone: false,
-              unwrap: () => ({
-                blockNumber: {
-                  toBigInt: () => 30n,
-                },
-              }),
-            };
-          }
-
-          return {
-            isNone: true,
-          };
-        },
-        executionHeaderAnchorsByBlockNumber: Object.assign(
-          async (scanKey: Hex) =>
-            scanKey.toLowerCase() === toHex(10n, { size: 8 }).toLowerCase()
-              ? { isSome: false }
-              : {
-                  isSome: true,
-                  unwrap: () => ({
-                    blockHash: {
-                      toHex: () => block12Hash,
-                    },
-                    blockNumber: {
-                      toBigInt: () => 12n,
-                    },
-                  }),
-                },
-          {
-            key: (scanKey: Hex) => `storage:${scanKey.toLowerCase()}`,
-            entriesPaged: async ({ startKey }: { startKey?: string }) =>
-              startKey === `storage:${toHex(10n, { size: 8 }).toLowerCase()}`
-                ? [
-                    [
-                      `storage:${toHex(12n, { size: 8 }).toLowerCase()}`,
-                      {
-                        isSome: true,
-                        unwrap: () => ({
-                          blockHash: {
-                            toHex: () => block12Hash,
-                          },
-                          blockNumber: {
-                            toBigInt: () => 12n,
-                          },
-                        }),
-                      },
-                    ] as const,
-                  ]
-                : [],
-          },
-        ),
-      },
-    },
-    consts: createGatewayProofConsts({ maxProofExecutionHeaderDepth: 4 }),
-  } as unknown as IArgonQueryable & Pick<ArgonClient, 'consts'>;
-  const executionClient = {
-    readContract: async ({
-      functionName,
-      args,
-    }: {
-      functionName: 'latestActivityBlockLocatorIndex' | 'activityBlockLocators';
-      args?: [bigint];
-    }) => {
-      if (functionName === 'latestActivityBlockLocatorIndex') {
-        return 1n;
-      }
-
-      if (args?.[0] === 1n) {
-        return [10n, 1n, 1n, zeroHash, zeroHash];
-      }
-
-      throw new Error(`Unexpected locator request ${String(args?.[0])}`);
-    },
-    getLogs: async ({ fromBlock }: { fromBlock: bigint }) => {
-      if (fromBlock === 10n) return [log10];
-      throw new Error(`Unexpected getLogs block ${fromBlock}`);
-    },
-    getTransactionReceipt: async ({ hash }: { hash: Hex }) => {
-      if (hash === txHash10) return receipt10;
-      throw new Error(`Unexpected receipt request for ${hash}`);
-    },
-    getBlock: async ({ blockHash }: { blockHash: Hex }) => {
-      if (blockHash === block10Hash) return { transactions: [txHash10] };
-      throw new Error(`Unexpected block request for ${blockHash}`);
-    },
-    request: async ({
-      method,
-      params,
-    }: {
-      method: 'eth_getBlockByHash' | 'eth_getBlockByNumber';
-      params: [Hex, true];
-    }) => {
-      if (method === 'eth_getBlockByHash') {
-        if (params[0] === block10Hash) return block10;
-        if (params[0] === block11Hash) return block11;
-        if (params[0] === block12Hash) return block12;
-      }
-      if (method === 'eth_getBlockByNumber' && params[0] === toHex(10n)) {
-        return block10;
-      }
-
-      throw new Error(`Unexpected header request for ${method} ${params[0]}`);
-    },
-  } as unknown as EthereumExecutionClient;
-
-  const payload = await buildGatewayActivityProofPayload(argonClient, {
-    gatewayAddress,
-    executionClient,
+    minimumGatewayActivityNonce: 1n,
   });
 
-  expect(payload?.proof.executionBlockProof.anchorBlockHash).toBe(block12Hash);
-  expect(payload?.proof.executionBlockProof.targetToAnchorHeaderChain).toHaveLength(2);
-});
-
-it('stops a gateway activity payload before a later proof chunk leaves the Argon finalized header chain', async () => {
-  const gatewayAddress: Hex = `0x${'57'.repeat(20)}`;
-  const zeroHash: Hex = `0x${'00'.repeat(32)}`;
-  const zeroBloom: Hex = `0x${'00'.repeat(256)}`;
-  const zeroAddress: Hex = `0x${'00'.repeat(20)}`;
-  const emptyUnclesHash = '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347';
-  const txHash10: Hex = `0x${'14'.repeat(32)}`;
-  const txHash11: Hex = `0x${'15'.repeat(32)}`;
-  const log10 = createTransferToArgonStartedBlockLog({
-    gatewayAddress,
-    txHash: txHash10,
-    transactionIndex: 0,
-    logIndex: 0,
-    blockHash: zeroHash,
-    blockNumber: 10n,
-    nonce: 1n,
-    argonAccountId: `0x${'61'.repeat(32)}`,
-  });
-  const log11 = createTransferToArgonStartedBlockLog({
-    gatewayAddress,
-    txHash: txHash11,
-    transactionIndex: 0,
-    logIndex: 0,
-    blockHash: zeroHash,
-    blockNumber: 11n,
-    nonce: 2n,
-    argonAccountId: `0x${'62'.repeat(32)}`,
-  });
-  const receipt10 = {
-    type: 'legacy',
-    status: 'success',
-    cumulativeGasUsed: 21_000n,
-    logsBloom: zeroBloom,
-    logs: [{ address: gatewayAddress, topics: log10.topics, data: log10.data }],
-    transactionHash: txHash10,
-    transactionIndex: 0,
-  } as unknown as EthereumReceipt;
-  const receipt11 = {
-    type: 'legacy',
-    status: 'success',
-    cumulativeGasUsed: 21_000n,
-    logsBloom: zeroBloom,
-    logs: [{ address: gatewayAddress, topics: log11.topics, data: log11.data }],
-    transactionHash: txHash11,
-    transactionIndex: 0,
-  } as unknown as EthereumReceipt;
-
-  const trie10 = await createMPT();
-  await trie10.put(encodeReceiptTrieKey(0), encodeEthereumReceiptForProof(receipt10));
-  const receiptsRoot10: Hex = bytesToHex(trie10.root());
-  const trie11 = await createMPT();
-  await trie11.put(encodeReceiptTrieKey(0), encodeEthereumReceiptForProof(receipt11));
-  const receiptsRoot11: Hex = bytesToHex(trie11.root());
-
-  const block10Template = {
-    number: toHex(10n),
-    hash: zeroHash,
-    parentHash: zeroHash,
-    nonce: '0x0000000000000000',
-    sha3Uncles: emptyUnclesHash,
-    logsBloom: zeroBloom,
-    transactionsRoot: zeroHash,
-    stateRoot: zeroHash,
-    receiptsRoot: receiptsRoot10,
-    miner: zeroAddress,
-    difficulty: '0x0',
-    extraData: '0x',
-    size: '0x1',
-    gasLimit: toHex(30_000_000n),
-    gasUsed: toHex(21_000n),
-    timestamp: toHex(1n),
-    transactions: [txHash10],
-    uncles: [],
-  } satisfies JSONRPCBlock;
-  const block10Hash: Hex = bytesToHex(createBlockHeaderFromRPC(block10Template).hash());
-  const block10 = { ...block10Template, hash: block10Hash } satisfies JSONRPCBlock;
-
-  const block11CanonicalTemplate = {
-    ...block10Template,
-    number: toHex(11n),
-    parentHash: block10Hash,
-    hash: zeroHash,
-    receiptsRoot: receiptsRoot11,
-    timestamp: toHex(2n),
-    transactions: [txHash11],
-  } satisfies JSONRPCBlock;
-  const block11CanonicalHash: Hex = bytesToHex(
-    createBlockHeaderFromRPC(block11CanonicalTemplate).hash(),
+  const locatorRequests = readContractRequests.filter(
+    ({ functionName }) =>
+      functionName === 'latestActivityBlockLocatorIndex' ||
+      functionName === 'activityBlockLocators',
   );
-  const block11Canonical = {
-    ...block11CanonicalTemplate,
-    hash: block11CanonicalHash,
-  } satisfies JSONRPCBlock;
-  const block12Template = {
-    ...block10Template,
-    number: toHex(12n),
-    parentHash: block11CanonicalHash,
-    receiptsRoot: zeroHash,
-    gasUsed: toHex(0n),
-    timestamp: toHex(3n),
-    transactions: [],
-  } satisfies JSONRPCBlock;
-  const block12Hash: Hex = bytesToHex(createBlockHeaderFromRPC(block12Template).hash());
-  const block12 = { ...block12Template, hash: block12Hash } satisfies JSONRPCBlock;
-  const block11Wrong = {
-    ...block11CanonicalTemplate,
-    parentHash: `0x${'ff'.repeat(32)}`,
-    hash: zeroHash,
-  } satisfies JSONRPCBlock;
-  const block11WrongHash: Hex = bytesToHex(createBlockHeaderFromRPC(block11Wrong).hash());
-  const block11 = { ...block11Wrong, hash: block11WrongHash } satisfies JSONRPCBlock;
 
-  log10.blockHash = block10Hash;
-  log11.blockHash = block11WrongHash;
-  receipt10.blockHash = block10Hash;
-  receipt11.blockHash = block11WrongHash;
-
-  const executionClient = {
-    readContract: async ({
-      functionName,
-      args,
-    }: {
-      functionName: 'latestActivityBlockLocatorIndex' | 'activityBlockLocators';
-      args?: [bigint];
-    }) => {
-      if (functionName === 'latestActivityBlockLocatorIndex') {
-        return 2n;
-      }
-
-      if (args?.[0] === 1n) {
-        return [10n, 1n, 1n, zeroHash, zeroHash];
-      }
-      if (args?.[0] === 2n) {
-        return [11n, 2n, 2n, zeroHash, zeroHash];
-      }
-
-      throw new Error(`Unexpected locator request ${String(args?.[0])}`);
-    },
-    getLogs: async ({ fromBlock }: { fromBlock: bigint }) => {
-      if (fromBlock === 10n) return [log10];
-      if (fromBlock === 11n) return [log11];
-      throw new Error(`Unexpected getLogs block ${fromBlock}`);
-    },
-    getTransactionReceipt: async ({ hash }: { hash: Hex }) => {
-      if (hash === txHash10) return receipt10;
-      if (hash === txHash11) return receipt11;
-      throw new Error(`Unexpected receipt request for ${hash}`);
-    },
-    getBlock: async ({ blockHash }: { blockHash: Hex }) => {
-      if (blockHash === block10Hash) return { transactions: [txHash10] };
-      if (blockHash === block11WrongHash) return { transactions: [txHash11] };
-      throw new Error(`Unexpected block request for ${blockHash}`);
-    },
-    request: async ({
-      method,
-      params,
-    }: {
-      method: 'eth_getBlockByHash' | 'eth_getBlockByNumber';
-      params: [Hex, true];
-    }) => {
-      if (method === 'eth_getBlockByHash') {
-        if (params[0] === block10Hash) return block10;
-        if (params[0] === block11CanonicalHash) return block11Canonical;
-        if (params[0] === block11WrongHash) return block11;
-        if (params[0] === block12Hash) return block12;
-      }
-      if (method === 'eth_getBlockByNumber') {
-        if (params[0] === toHex(10n)) return block10;
-        if (params[0] === toHex(11n)) return block11Canonical;
-        if (params[0] === toHex(12n)) return block12;
-      }
-
-      throw new Error(`Unexpected header request for ${method} ${params[0]}`);
-    },
-  } as unknown as EthereumExecutionClient;
-  const argonClient = {
-    query: {
-      crosschainTransfer: {
-        gatewayStateBySourceChain: async () => ({
-          isSome: false,
-        }),
-      },
-      ethereumVerifier: {
-        latestExecutionHeaderAnchorBlockHash: async () => ({
-          isNone: false,
-          unwrap: () => ({ toHex: () => block12Hash }),
-        }),
-        executionHeaderAnchors: async () => ({
-          isNone: false,
-          unwrap: () => ({
-            blockNumber: {
-              toBigInt: () => 12n,
-            },
-          }),
-        }),
-      },
-    },
-    consts: gatewayProofConsts,
-  } as unknown as IArgonQueryable & Pick<ArgonClient, 'consts'>;
-
-  const payload = await buildGatewayActivityProofPayload(argonClient, {
-    gatewayAddress,
-    executionClient,
-  });
-
-  expect(payload?.gatewayActivityNonceRange).toEqual({ start: 1n, end: 1n });
-  expect(payload?.executionBlockNumberRange).toEqual({ start: 10n, end: 10n });
-  expect(payload?.proof.blocks).toHaveLength(1);
+  expect(locatorRequests).not.toHaveLength(0);
+  expect(
+    locatorRequests.every(
+      ({ blockNumber }) => blockNumber === latestArgonFinalizedHeader.blockNumber,
+    ),
+  ).toBe(true);
 });
 
-it('rejects zero receipt-proof bounds before building a gateway payload', async () => {
-  const argonClient = {
-    consts: createGatewayProofConsts({ maxReceiptProofsPerExtrinsic: 0 }),
-  } as unknown as Pick<ArgonClient, 'consts'>;
+it('discovers only newly finalized locator blocks when given the last cached locator index', async () => {
+  const gatewayAddress = repeatHex('7e', 20);
+  const readContractRequests: Array<{
+    functionName: string;
+    blockNumber?: bigint;
+    locatorIndex?: bigint;
+  }> = [];
+  const log10 = createTransferToArgonStartedBlockLog({
+    gatewayAddress,
+    txHash: repeatHex('24', 32),
+    transactionIndex: 0,
+    logIndex: 0,
+    nonce: 1n,
+    argonAccountId: repeatHex('49', 32),
+  });
+  const log11 = createTransferToArgonStartedBlockLog({
+    gatewayAddress,
+    txHash: repeatHex('25', 32),
+    transactionIndex: 0,
+    logIndex: 0,
+    nonce: 2n,
+    argonAccountId: repeatHex('4a', 32),
+  });
+  const log12 = createTransferToArgonStartedBlockLog({
+    gatewayAddress,
+    txHash: repeatHex('28', 32),
+    transactionIndex: 0,
+    logIndex: 0,
+    nonce: 3n,
+    argonAccountId: repeatHex('4d', 32),
+  });
+  const { executionClient, locators, argonFinalizedExecutionHeader } = createGatewayProofHarness({
+    gatewayAddress,
+    latestArgonFinalizedHeader: {
+      blockHash: repeatHex('f9', 32),
+      blockNumber: 13n,
+    },
+    readContractRequests,
+    locators: [
+      { blockNumber: 10n, logs: [log10] },
+      { blockNumber: 11n, logs: [log11] },
+      { blockNumber: 12n, logs: [log12] },
+    ],
+  });
+
+  const discovered = await discoverMissingGatewayActivityLocators({
+    afterLocatorIndex: 1n,
+    executionClient,
+    finalizedExecutionBlockNumber: argonFinalizedExecutionHeader.blockNumber,
+    gatewayAddress,
+    minimumGatewayActivityNonce: 1n,
+  });
+
+  expect(discovered).toEqual([locators[1], locators[2]]);
+  expect(
+    readContractRequests.filter(({ functionName }) => functionName === 'activityBlockLocators'),
+  ).toEqual([
+    {
+      functionName: 'activityBlockLocators',
+      blockNumber: argonFinalizedExecutionHeader.blockNumber,
+      locatorIndex: 1n,
+    },
+    {
+      functionName: 'activityBlockLocators',
+      blockNumber: argonFinalizedExecutionHeader.blockNumber,
+      locatorIndex: 2n,
+    },
+    {
+      functionName: 'activityBlockLocators',
+      blockNumber: argonFinalizedExecutionHeader.blockNumber,
+      locatorIndex: 3n,
+    },
+  ]);
+});
+
+it('builds gateway activity payloads from cached locator blocks across chained roots', async () => {
+  const gatewayAddress = repeatHex('7f', 20);
+  const log10 = createTransferToArgonStartedBlockLog({
+    gatewayAddress,
+    txHash: repeatHex('24', 32),
+    transactionIndex: 0,
+    logIndex: 0,
+    nonce: 1n,
+    argonAccountId: repeatHex('49', 32),
+  });
+  const log11 = createTransferToArgonStartedBlockLog({
+    gatewayAddress,
+    txHash: repeatHex('25', 32),
+    transactionIndex: 0,
+    logIndex: 0,
+    nonce: 2n,
+    argonAccountId: repeatHex('4a', 32),
+  });
+  const { argonClient, executionClient, argonFinalizedExecutionHeader } = createGatewayProofHarness(
+    {
+      gatewayAddress,
+      latestArgonFinalizedHeader: {
+        blockHash: repeatHex('f9', 32),
+        blockNumber: 12n,
+      },
+      locators: [
+        { blockNumber: 10n, logs: [log10] },
+        { blockNumber: 11n, logs: [log11] },
+      ],
+    },
+  );
+
+  const locators = await discoverMissingGatewayActivityLocators({
+    executionClient,
+    finalizedExecutionBlockNumber: argonFinalizedExecutionHeader.blockNumber,
+    gatewayAddress,
+    minimumGatewayActivityNonce: 1n,
+  });
+  const { payloads } = await buildGatewayActivityStorageProofs(argonClient, {
+    executionClient,
+    finalizedExecutionHeader: argonFinalizedExecutionHeader,
+    gatewayAddress,
+    locators,
+  });
+
+  expect(payloads).toHaveLength(2);
+  expect(
+    payloads.flatMap(payload =>
+      payload.activities.map(activity => activity.gatewayState.gatewayActivityNonce),
+    ),
+  ).toEqual([1n, 2n]);
+});
+
+it('builds a gateway payload for a chosen missing locator block', async () => {
+  const gatewayAddress = repeatHex('7f', 20);
+  const log10 = createTransferToArgonStartedBlockLog({
+    gatewayAddress,
+    txHash: repeatHex('24', 32),
+    transactionIndex: 0,
+    logIndex: 0,
+    nonce: 1n,
+    argonAccountId: repeatHex('49', 32),
+  });
+  const log11 = createTransferToArgonStartedBlockLog({
+    gatewayAddress,
+    txHash: repeatHex('25', 32),
+    transactionIndex: 0,
+    logIndex: 0,
+    nonce: 2n,
+    argonAccountId: repeatHex('4a', 32),
+  });
+  const { argonClient, executionClient, argonFinalizedExecutionHeader } = createGatewayProofHarness(
+    {
+      gatewayAddress,
+      previousGatewayActivityNonce: 1n,
+      latestArgonFinalizedHeader: {
+        blockHash: repeatHex('f9', 32),
+        blockNumber: 12n,
+      },
+      locators: [
+        { blockNumber: 10n, logs: [log10] },
+        { blockNumber: 11n, logs: [log11] },
+      ],
+    },
+  );
+
+  const discovered = await discoverMissingGatewayActivityLocators({
+    executionClient,
+    finalizedExecutionBlockNumber: argonFinalizedExecutionHeader.blockNumber,
+    gatewayAddress,
+    minimumGatewayActivityNonce: 2n,
+  });
+  const nextLocator = discovered[0];
+  const { payloads } = await buildGatewayActivityStorageProofs(argonClient, {
+    executionClient,
+    finalizedExecutionHeader: argonFinalizedExecutionHeader,
+    gatewayAddress,
+    locators: [nextLocator],
+  });
+  const payload = payloads[0];
+
+  expect(payload?.previousGatewayActivityNonce).toBe(1n);
+  expect(payload?.gatewayActivityNonceRange).toEqual({ start: 2n, end: 2n });
+  expect(payload?.executionBlockNumberRange).toEqual({ start: 11n, end: 11n });
+  expect(payload?.proof.locatorIndex).toBe(nextLocator?.locatorIndex);
+  expect(payload?.activities.map(activity => activity.gatewayState.gatewayActivityNonce)).toEqual([
+    2n,
+  ]);
+});
+
+it('defers a partial locator resume because whole locators must be proven atomically', async () => {
+  const gatewayAddress = repeatHex('79', 20);
+  const logs = [1n, 2n].map((nonce, index) =>
+    createTransferToArgonStartedBlockLog({
+      gatewayAddress,
+      txHash: repeatHex('13', 32),
+      transactionIndex: 0,
+      logIndex: index,
+      nonce,
+      argonAccountId: toHex(index + 1, { size: 32 }),
+    }),
+  );
+  const { argonClient, executionClient, locators, argonFinalizedExecutionHeader } =
+    createGatewayProofHarness({
+      gatewayAddress,
+      previousGatewayActivityNonce: 1n,
+      locators: [{ blockNumber: 10n, logs }],
+    });
+
+  await expect(
+    buildGatewayActivityStorageProofs(argonClient, {
+      executionClient,
+      finalizedExecutionHeader: argonFinalizedExecutionHeader,
+      gatewayAddress,
+      locators: [locators[0]],
+    }),
+  ).resolves.toEqual({
+    payloads: [],
+    deferredLocators: [locators[0]],
+  });
+});
+
+it('rejects a locator that exceeds maxActivitiesPerGatewayProof instead of splitting it', async () => {
+  const gatewayAddress = repeatHex('7a', 20);
+  const logs = [1n, 2n, 3n].map((nonce, index) =>
+    createTransferToArgonStartedBlockLog({
+      gatewayAddress,
+      txHash: repeatHex('14', 32),
+      transactionIndex: 0,
+      logIndex: index,
+      nonce,
+      argonAccountId: toHex(index + 1, { size: 32 }),
+    }),
+  );
+  const { argonClient, executionClient, locators, argonFinalizedExecutionHeader } =
+    createGatewayProofHarness({
+      gatewayAddress,
+      consts: createGatewayProofConsts({ maxActivitiesPerGatewayProof: 2 }),
+      locators: [{ blockNumber: 10n, logs }],
+    });
 
   await expect(() =>
-    buildGatewayActivityProofPayload(argonClient as never, {
-      gatewayAddress: `0x${'77'.repeat(20)}`,
+    buildGatewayActivityStorageProofs(argonClient, {
+      executionClient,
+      finalizedExecutionHeader: argonFinalizedExecutionHeader,
+      gatewayAddress,
+      locators: [locators[0]],
     }),
-  ).rejects.toThrow('Gateway proof requires maxReceiptProofsPerExtrinsic to be a positive integer');
+  ).rejects.toThrow('exceeds maxActivitiesPerGatewayProof');
 });
 
-function createTransferToArgonStartedBlockLog(args: {
-  gatewayAddress: Hex;
-  txHash: Hex;
-  transactionIndex: number;
-  logIndex: number;
-  blockHash: Hex;
-  blockNumber: bigint;
-  nonce: bigint;
-  argonAccountId: Hex;
-}): {
-  address: Hex;
-  topics: Hex[];
-  data: Hex;
-  transactionHash: Hex;
-  transactionIndex: number;
-  logIndex: number;
-  blockHash: Hex;
-  blockNumber: bigint;
-} {
-  const topics = encodeEventTopics({
-    abi: mintingGatewayAbi,
-    eventName: MintingGatewayEvents.TransferToArgonStarted.name,
-    args: {
-      from: `0x${'11'.repeat(20)}`,
-      token: `0x${'22'.repeat(20)}`,
-    },
+it('defers locators when the latest finalized execution header is still behind the locator block', async () => {
+  const gatewayAddress = repeatHex('7b', 20);
+  const log = createTransferToArgonStartedBlockLog({
+    gatewayAddress,
+    txHash: repeatHex('15', 32),
+    transactionIndex: 0,
+    logIndex: 0,
+    nonce: 1n,
+    argonAccountId: repeatHex('44', 32),
   });
-  const data = encodeAbiParameters(
-    [
-      { name: 'amount', type: 'uint128' },
-      { name: 'argonAccountId', type: 'bytes32' },
-      {
-        name: 'gatewayState',
-        type: 'tuple',
-        components: [
-          { name: 'gatewayActivityNonce', type: 'uint64' },
-          { name: 'argonApprovalsNonce', type: 'uint64' },
-          { name: 'argonCirculation', type: 'uint128' },
-          { name: 'argonotCirculation', type: 'uint128' },
-        ],
+  const { argonClient, executionClient, locators, argonFinalizedExecutionHeader } =
+    createGatewayProofHarness({
+      gatewayAddress,
+      latestArgonFinalizedHeader: {
+        blockHash: repeatHex('fc', 32),
+        blockNumber: 9n,
       },
-    ],
-    [
-      250n,
-      args.argonAccountId,
-      {
-        gatewayActivityNonce: args.nonce,
-        argonApprovalsNonce: 0n,
-        argonCirculation: 750n,
-        argonotCirculation: 2_000n,
+      locators: [{ blockNumber: 10n, logs: [log] }],
+    });
+
+  await expect(
+    buildGatewayActivityStorageProofs(argonClient, {
+      executionClient,
+      finalizedExecutionHeader: argonFinalizedExecutionHeader,
+      gatewayAddress,
+      locators: [locators[0]],
+    }),
+  ).resolves.toEqual({
+    payloads: [],
+    deferredLocators: [locators[0]],
+  });
+});
+
+it('rejects zero gateway-proof bounds before building a gateway payload', async () => {
+  const gatewayAddress = repeatHex('7d', 20);
+  const log = createTransferToArgonStartedBlockLog({
+    gatewayAddress,
+    txHash: repeatHex('17', 32),
+    transactionIndex: 0,
+    logIndex: 0,
+    nonce: 1n,
+    argonAccountId: repeatHex('46', 32),
+  });
+  const { argonClient, executionClient, locators, argonFinalizedExecutionHeader } =
+    createGatewayProofHarness({
+      gatewayAddress,
+      consts: createGatewayProofConsts({ maxActivitiesPerGatewayProof: 0 }),
+      locators: [{ blockNumber: 10n, logs: [log] }],
+    });
+
+  await expect(() =>
+    buildGatewayActivityStorageProofs(argonClient, {
+      executionClient,
+      finalizedExecutionHeader: argonFinalizedExecutionHeader,
+      gatewayAddress,
+      locators: [locators[0]],
+    }),
+  ).rejects.toThrow('Gateway proof requires maxActivitiesPerGatewayProof to be a positive integer');
+});
+
+type TestGatewayBlockLog =
+  | ReturnType<typeof createTransferToArgonStartedBlockLog>
+  | ReturnType<typeof createGlobalIssuanceCouncilRotatedBlockLog>;
+
+function createGatewayProofHarness(args: {
+  gatewayAddress: Hex;
+  locators: Array<{
+    blockNumber: bigint;
+    logs: TestGatewayBlockLog[];
+  }>;
+  previousGatewayActivityNonce?: bigint;
+  latestArgonFinalizedHeader?: {
+    blockHash: Hex;
+    blockNumber: bigint;
+  };
+  consts?: Pick<ArgonClient, 'consts'>['consts'];
+  chainId?: bigint;
+  mappingSlot?: bigint;
+  readContractRequests?: Array<{
+    functionName: string;
+    blockNumber?: bigint;
+    locatorIndex?: bigint;
+  }>;
+  runtimeSpecVersion?: number;
+}) {
+  const chainId = args.chainId ?? 1n;
+  const mappingSlot = args.mappingSlot ?? 11n;
+  const previousGatewayActivityNonce = args.previousGatewayActivityNonce ?? 0n;
+  const latestArgonFinalizedHeader = args.latestArgonFinalizedHeader ?? {
+    blockHash: repeatHex('ff', 32),
+    blockNumber: args.locators.at(-1)?.blockNumber ?? 0n,
+  };
+  let previousLocatorHash = repeatHex('00', 32);
+  const locatorFixtures = args.locators.map(({ blockNumber, logs }, index) => {
+    const blockHash = repeatHex((index + 1).toString(16).padStart(2, '0'), 32);
+    for (const log of logs) {
+      log.blockHash = blockHash;
+      log.blockNumber = blockNumber;
+    }
+
+    const locator = createGatewayLocator(
+      args.gatewayAddress,
+      chainId,
+      blockNumber,
+      logs,
+      previousLocatorHash,
+    );
+    previousLocatorHash = hashMintingGatewayActivityBlockLocator(locator);
+
+    return {
+      logs,
+      locator: {
+        ...locator,
+        locatorIndex: BigInt(index + 1),
       },
-    ],
-  );
+    };
+  });
+  const proofsByBlockNumber =
+    locatorFixtures.length === 0
+      ? {}
+      : {
+          [latestArgonFinalizedHeader.blockNumber.toString()]: {
+            accountProof: [repeatHex('aa', 32)],
+            storageProof: locatorFixtures.flatMap(
+              ({ locator }, index) =>
+                createGatewayStorageProof(BigInt(index + 1), locator, mappingSlot).storageProof,
+            ),
+          },
+        };
 
   return {
-    address: args.gatewayAddress,
-    topics: topics as Hex[],
-    data,
-    transactionHash: args.txHash,
-    transactionIndex: args.transactionIndex,
-    logIndex: args.logIndex,
-    blockHash: args.blockHash,
-    blockNumber: args.blockNumber,
+    argonClient: createArgonGatewayClient({
+      previousGatewayActivityNonce,
+      argonFinalizedExecutionHeaders: [latestArgonFinalizedHeader],
+      consts: args.consts,
+      runtimeSpecVersion: args.runtimeSpecVersion,
+    }),
+    argonFinalizedExecutionHeader: latestArgonFinalizedHeader,
+    previousGatewayActivityNonce,
+    executionClient: createExecutionClient({
+      blocks: [],
+      chainId,
+      activityBlockLocatorsMappingSlot: mappingSlot,
+      readContractRequests: args.readContractRequests,
+      locators: locatorFixtures.map(({ locator }) => locator),
+      logsByBlockNumber: Object.fromEntries(
+        locatorFixtures.map(({ locator, logs }) => [locator.blockNumber.toString(), logs]),
+      ),
+      proofsByBlockNumber,
+    }),
+    locators: locatorFixtures.map(({ locator }) => locator),
+    proofsByBlockNumber,
   };
 }
 
-function createGlobalIssuanceCouncilRotatedBlockLog(args: {
-  gatewayAddress: Hex;
-  txHash: Hex;
-  transactionIndex: number;
-  logIndex: number;
-  blockHash: Hex;
-  blockNumber: bigint;
-  nonce: bigint;
-  approvalHash?: Hex;
-}): {
-  address: Hex;
-  topics: Hex[];
-  data: Hex;
-  transactionHash: Hex;
-  transactionIndex: number;
-  logIndex: number;
-  blockHash: Hex;
-  blockNumber: bigint;
-} {
-  const topics = encodeEventTopics({
-    abi: mintingGatewayAbi,
-    eventName: MintingGatewayEvents.GlobalIssuanceCouncilRotated.name,
-  });
-  const data = encodeAbiParameters(
-    [
-      { name: 'councilHash', type: 'bytes32' },
-      { name: 'approvalHash', type: 'bytes32' },
-      { name: 'relayerArgonAccountId', type: 'bytes32' },
-      {
-        name: 'gatewayState',
-        type: 'tuple',
-        components: [
-          { name: 'gatewayActivityNonce', type: 'uint64' },
-          { name: 'argonApprovalsNonce', type: 'uint64' },
-          { name: 'argonCirculation', type: 'uint128' },
-          { name: 'argonotCirculation', type: 'uint128' },
-        ],
-      },
-    ],
-    [
-      `0x${'61'.repeat(32)}`,
-      args.approvalHash ?? `0x${'63'.repeat(32)}`,
-      `0x${'62'.repeat(32)}`,
-      {
-        gatewayActivityNonce: args.nonce,
-        argonApprovalsNonce: 4n,
-        argonCirculation: 750n,
-        argonotCirculation: 2_000n,
-      },
-    ],
-  );
+function createGatewayLocator(
+  gatewayAddress: Hex,
+  chainId: bigint,
+  blockNumber: bigint,
+  logs: TestGatewayBlockLog[],
+  previousLocatorHash: Hex,
+) {
+  const activities = [...logs]
+    .map(log => ({
+      txHash: log.transactionHash,
+      transactionIndex: log.transactionIndex,
+      logIndex: log.logIndex,
+      blockHash: log.blockHash,
+      blockNumber: log.blockNumber,
+      ...decodeEthereumGatewayActivityLog(log),
+    }))
+    .sort((left, right) =>
+      left.gatewayState.gatewayActivityNonce < right.gatewayState.gatewayActivityNonce ? -1 : 1,
+    );
+  let activityRoot = previousLocatorHash;
+
+  for (const activity of activities) {
+    activityRoot = appendEthereumGatewayActivityRoot(
+      activityRoot,
+      hashEthereumGatewayActivity({ chainId, gatewayAddress }, activity),
+    );
+  }
 
   return {
-    address: args.gatewayAddress,
-    topics: topics as Hex[],
-    data,
-    transactionHash: args.txHash,
-    transactionIndex: args.transactionIndex,
-    logIndex: args.logIndex,
-    blockHash: args.blockHash,
-    blockNumber: args.blockNumber,
+    blockNumber,
+    startGatewayActivityNonce: activities[0].gatewayState.gatewayActivityNonce,
+    endGatewayActivityNonce: activities.at(-1)!.gatewayState.gatewayActivityNonce,
+    previousLocatorHash,
+    activityRoot,
   };
+}
+
+function createGatewayStorageProof(
+  locatorIndex: bigint,
+  locator: {
+    blockNumber: bigint;
+    startGatewayActivityNonce: bigint;
+    endGatewayActivityNonce: bigint;
+    activityRoot: Hex;
+  },
+  mappingSlot: bigint,
+) {
+  const [rangeSlot, rootSlot] = gatewayActivityLocatorSlots(locatorIndex, mappingSlot);
+
+  return {
+    storageProof: [
+      {
+        key: rangeSlot,
+        value: BigInt(gatewayActivityLocatorRangeSlotValue(locator)),
+        proof: [repeatHex('01', 32), repeatHex('02', 32)],
+      },
+      {
+        key: rootSlot,
+        value: BigInt(locator.activityRoot),
+        proof: [repeatHex('02', 32), repeatHex('03', 32)],
+      },
+    ],
+  };
+}
+
+function gatewayActivityLocatorSlots(locatorIndex: bigint, mappingSlot: bigint): [Hex, Hex] {
+  const baseSlot = BigInt(
+    keccak256(concatHex([toHex(locatorIndex, { size: 32 }), toHex(mappingSlot, { size: 32 })])),
+  );
+
+  return [toHex(baseSlot, { size: 32 }), toHex(baseSlot + 1n, { size: 32 })];
+}
+
+function gatewayActivityLocatorRangeSlotValue(locator: {
+  blockNumber: bigint;
+  startGatewayActivityNonce: bigint;
+  endGatewayActivityNonce: bigint;
+}): Hex {
+  return toHex(
+    (locator.endGatewayActivityNonce << 128n) |
+      (locator.startGatewayActivityNonce << 64n) |
+      locator.blockNumber,
+    { size: 32 },
+  );
 }
