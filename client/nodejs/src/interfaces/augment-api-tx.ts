@@ -1,5 +1,4 @@
 // Auto-generated via `yarn polkadot-types-from-chain`, do not edit
-/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
@@ -37,7 +36,6 @@ import type {
   ArgonPrimitivesBitcoinOpaqueBitcoinXpub,
   ArgonPrimitivesBitcoinUtxoRef,
   ArgonPrimitivesDomainZoneRecord,
-  ArgonPrimitivesEthereumEthereumReceiptLogProofBatch,
   ArgonPrimitivesInherentsBitcoinUtxoSync,
   ArgonPrimitivesInherentsBlockSealInherent,
   ArgonPrimitivesNotaryNotaryMeta,
@@ -50,6 +48,7 @@ import type {
   PalletBitcoinLocksLockOptions,
   PalletCrosschainTransferAssetKind,
   PalletCrosschainTransferChainConfig,
+  PalletCrosschainTransferGatewayActivityProof,
   PalletCrosschainTransferMintingAuthorityActivationRepaymentPricing,
   PalletCrosschainTransferSourceChain,
   PalletEthereumVerifierBasicOperatingMode,
@@ -569,16 +568,16 @@ declare module '@polkadot/api-base/types/submittable' {
         (
           sourceChain: PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
           previousGatewayActivityNonce: Compact<u64> | AnyNumber | Uint8Array,
-          proofBatch:
-            | ArgonPrimitivesEthereumEthereumReceiptLogProofBatch
-            | { executionBlockProof?: any; blocks?: any }
+          proof:
+            | PalletCrosschainTransferGatewayActivityProof
+            | { locatorIndex?: any; storageProof?: any; activityLogs?: any }
             | string
             | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
         [
           PalletCrosschainTransferSourceChain,
           Compact<u64>,
-          ArgonPrimitivesEthereumEthereumReceiptLogProofBatch,
+          PalletCrosschainTransferGatewayActivityProof,
         ]
       >;
       registerCouncilSigner: AugmentedSubmittable<
@@ -605,6 +604,13 @@ declare module '@polkadot/api-base/types/submittable' {
           config: PalletCrosschainTransferChainConfig | { Evm: any } | string | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
         [PalletCrosschainTransferSourceChain, PalletCrosschainTransferChainConfig]
+      >;
+      setLastAcceptedLocatorHash: AugmentedSubmittable<
+        (
+          sourceChain: PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
+          locatorHash: H256 | string | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [PalletCrosschainTransferSourceChain, H256]
       >;
       setMinimumMintingAuthorityValue: AugmentedSubmittable<
         (

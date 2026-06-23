@@ -7,8 +7,8 @@ import type {
 } from './EthereumBeaconTypes';
 import { buildExecutionHeaderProof, getBeaconJson } from './EthereumBeaconApi';
 import {
-  discoverGatewayActivities,
   loadRetainedExecutionHeaderAnchorAtOrAfterBlock,
+  type MissingGatewayActivityLocator,
 } from './EthereumGatewayActivityProof';
 import { getExecutionClient, type EthereumExecutionSource } from './EthereumExecution';
 import type { ArgonClient, IArgonQueryable } from './index';
@@ -34,21 +34,35 @@ type EthereumBeaconHeadersResponse = {
   }>;
 };
 
+/**
+ * Builds one execution-header backfill for a chosen target execution block.
+ */
 export async function buildGatewayExecutionHeaderBackfill(
   client: IArgonQueryable & Pick<ArgonClient, 'consts'>,
   options: EthereumExecutionSource & {
     beaconApiUrl: string;
-    gatewayAddress: Hex;
-    throughExecutionBlockNumber?: bigint;
-    targetExecutionBlockNumber?: bigint;
+    targetExecutionBlockNumber: bigint;
   },
 ): Promise<EthereumExecutionHeaderBackfillPayload | null> {
-  const targetExecutionBlockNumber =
-    options.targetExecutionBlockNumber ??
-    (await discoverGatewayActivities(client, options))?.activities[0]?.blockNumber;
-  if (targetExecutionBlockNumber == null) {
-    return null;
+  const latestExecutionHeaderAnchorBlockHash =
+    await client.query.ethereumVerifier.latestExecutionHeaderAnchorBlockHash();
+  if (latestExecutionHeaderAnchorBlockHash.isNone) {
+    throw new Error('No Argon finalized execution header is available yet; wait for relayer sync');
   }
+
+  const latestExecutionHeaderAnchorBlockHashHex = latestExecutionHeaderAnchorBlockHash
+    .unwrap()
+    .toHex();
+  const latestExecutionHeaderAnchor = await client.query.ethereumVerifier.executionHeaderAnchors(
+    latestExecutionHeaderAnchorBlockHashHex,
+  );
+  if (latestExecutionHeaderAnchor.isNone) {
+    throw new Error(
+      `Argon finalized execution header ${latestExecutionHeaderAnchorBlockHashHex} is missing`,
+    );
+  }
+
+  const targetExecutionBlockNumber = options.targetExecutionBlockNumber;
 
   const maxProofExecutionHeaderDepth =
     client.consts.crosschainTransfer.maxProofExecutionHeaderDepth.toNumber();
@@ -172,16 +186,27 @@ export async function buildGatewayExecutionHeaderBackfill(
   );
 }
 
+/**
+ * Builds the execution-header backfills still needed for the supplied cached locator blocks.
+ */
 export async function buildGatewayExecutionHeaderBackfills(
   client: IArgonQueryable & Pick<ArgonClient, 'consts'>,
   options: EthereumExecutionSource & {
     beaconApiUrl: string;
-    gatewayAddress: Hex;
-    throughExecutionBlockNumber?: bigint;
+    locators: MissingGatewayActivityLocator[];
   },
 ): Promise<EthereumExecutionHeaderBackfillPayload[]> {
-  const discovered = await discoverGatewayActivities(client, options);
-  if (!discovered) {
+  const currentGatewayState =
+    await client.query.crosschainTransfer.gatewayStateBySourceChain('Ethereum');
+  const minimumGatewayActivityNonce = currentGatewayState.isSome
+    ? currentGatewayState.unwrap().gatewayActivityNonce.toBigInt() + 1n
+    : 1n;
+  const locators = [...options.locators]
+    .filter(locator => locator.endGatewayActivityNonce >= minimumGatewayActivityNonce)
+    .sort((left, right) =>
+      left.startGatewayActivityNonce < right.startGatewayActivityNonce ? -1 : 1,
+    );
+  if (locators.length === 0) {
     return [];
   }
 
@@ -195,12 +220,12 @@ export async function buildGatewayExecutionHeaderBackfills(
 
   const seenTargetBlocks = new Set<bigint>();
   const targetExecutionBlockNumbers: bigint[] = [];
-  for (const activity of discovered.activities) {
-    if (seenTargetBlocks.has(activity.blockNumber)) {
+  for (const locator of locators) {
+    if (seenTargetBlocks.has(locator.blockNumber)) {
       continue;
     }
-    seenTargetBlocks.add(activity.blockNumber);
-    targetExecutionBlockNumbers.push(activity.blockNumber);
+    seenTargetBlocks.add(locator.blockNumber);
+    targetExecutionBlockNumbers.push(locator.blockNumber);
   }
 
   const payloads: EthereumExecutionHeaderBackfillPayload[] = [];
@@ -230,7 +255,9 @@ export async function buildGatewayExecutionHeaderBackfills(
     }
 
     const payload = await buildGatewayExecutionHeaderBackfill(client, {
-      ...options,
+      beaconApiUrl: options.beaconApiUrl,
+      executionClient: options.executionClient,
+      executionRpcUrl: options.executionRpcUrl,
       targetExecutionBlockNumber,
     });
     if (!payload) {

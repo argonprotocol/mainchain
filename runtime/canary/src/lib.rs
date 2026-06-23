@@ -690,8 +690,7 @@ impl pallet_crosschain_transfer::Config for Runtime {
 	type CurrentTick = Ticks;
 	type TickProvider = use_unless_benchmark!(Ticks, benchmarking::BenchmarkTickProvider);
 	type RecentTransferRetentionTicks = RecentTransferRetentionTicks;
-	type MaxActivitiesPerReceiptProof = MaxActivitiesPerReceiptProof;
-	type MaxReceiptProofsPerExtrinsic = MaxReceiptProofsPerExtrinsic;
+	type MaxActivitiesPerGatewayProof = MaxActivitiesPerGatewayProof;
 	type MaxCouncilMembers = MaxCouncilMembers;
 	type MaxQueueApprovalsPerCall = MaxQueueApprovalsPerCall;
 	type TransferOutValidityEthereumBlocks = TransferOutValidityEthereumBlocks;

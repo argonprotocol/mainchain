@@ -9,6 +9,7 @@ use crate::{
 		load_finalized_header_update_fixture, load_next_finalized_header_update_fixture,
 		load_next_sync_committee_update_fixture, load_sync_committee_update_fixture,
 	},
+	storage_proof_fixture::load_account_storage_proof_fixture as load_storage_proof_fixture,
 	sync_committee_sum,
 	types::{CheckpointUpdate, ExecutionHeaderProof, Update},
 	verify_merkle_branch, BasicOperatingMode, BeaconHeader, Error, ExecutionHeaderAnchor,
@@ -29,9 +30,10 @@ use argon_primitives::{
 		MAX_ETHEREUM_RECEIPTS_PER_PROOF, MAX_ETHEREUM_RECEIPT_PROOF_NODE_BYTES,
 		MAX_ETHEREUM_RECEIPT_PROOF_NODE_REFS,
 	},
-	CallTxPoolKeyProvider, EthereumBeaconPreset, EthereumCombinedReceiptProof,
-	EthereumExecutionBlockProof, EthereumExecutionHeader, EthereumLog, EthereumReceiptLog,
-	EthereumReceiptProofReceipt, EthereumVerifyError, EthereumVerifyProvider,
+	CallTxPoolKeyProvider, EthereumAccountStorageProof, EthereumBeaconPreset,
+	EthereumCombinedReceiptProof, EthereumExecutionBlockProof, EthereumExecutionHeader,
+	EthereumLog, EthereumReceiptLog, EthereumReceiptProofReceipt, EthereumVerifyError,
+	EthereumVerifyProvider,
 };
 use codec::{Decode, Encode};
 use hex_literal::hex;
@@ -148,6 +150,21 @@ fn load_minimal_bootstrap_fixture(basename: &str) -> MinimalBootstrapFixture {
 	let filepath: PathBuf =
 		[env!("CARGO_MANIFEST_DIR"), "tests", "fixtures", basename].iter().collect();
 	serde_json::from_reader(File::open(filepath).unwrap()).unwrap()
+}
+
+fn load_account_storage_proof_fixture(
+) -> (H160, ExecutionHeaderAnchor, EthereumAccountStorageProof<ConstU32<2>>) {
+	let fixture = load_storage_proof_fixture();
+	let proof = EthereumAccountStorageProof::<ConstU32<2>> {
+		anchor_block_hash: fixture.anchor.block_hash,
+		account_proof: fixture.account_proof,
+		storage_proof: fixture.storage_proof,
+		slots: vec![fixture.range_slot, fixture.root_slot]
+			.try_into()
+			.expect("fixture storage slots stay within bounded slot count"),
+	};
+
+	(fixture.gateway_address, fixture.anchor, proof)
 }
 
 fn compute_period(slot: u64) -> u64 {
@@ -2221,6 +2238,117 @@ fn verify_execution_block_proof_rejects_invalid_client_headers() {
 		assert_eq!(
 			EthereumBeaconClient::verify_execution_block_proof(&proof),
 			Err(EthereumVerifyError::InvalidHeaderChain)
+		);
+	});
+}
+
+#[test]
+fn verify_account_storage_proof_matches_hardhat_eth_getproof_fixture() {
+	let (gateway_address, anchor, proof) = load_account_storage_proof_fixture();
+
+	new_tester().execute_with(|| {
+		ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor.clone());
+		assert_ok!(EthereumBeaconClient::verify_account_storage_proof_against_state_root(
+			anchor.state_root,
+			gateway_address,
+			&proof,
+		));
+		assert_eq!(
+			EthereumBeaconClient::verify_account_storage_proof(gateway_address, &proof),
+			Ok(()),
+		);
+	});
+}
+
+#[test]
+fn verify_account_storage_proof_fixture_rejects_wrong_account() {
+	let (_gateway_address, anchor, proof) = load_account_storage_proof_fixture();
+	let wrong_gateway_address = H160::repeat_byte(0x24);
+
+	new_tester().execute_with(|| {
+		ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor.clone());
+		assert_eq!(
+			EthereumBeaconClient::verify_account_storage_proof_against_state_root(
+				anchor.state_root,
+				wrong_gateway_address,
+				&proof,
+			),
+			Err(EthereumVerifyError::InvalidProof)
+		);
+		assert_eq!(
+			EthereumBeaconClient::verify_account_storage_proof(wrong_gateway_address, &proof),
+			Err(EthereumVerifyError::InvalidProof),
+		);
+	});
+}
+
+#[test]
+fn verify_account_storage_proof_fixture_rejects_wrong_slot_value() {
+	let (gateway_address, anchor, mut proof) = load_account_storage_proof_fixture();
+	proof.slots[1].value = H256::repeat_byte(0x36);
+
+	new_tester().execute_with(|| {
+		ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor.clone());
+		assert_eq!(
+			EthereumBeaconClient::verify_account_storage_proof_against_state_root(
+				anchor.state_root,
+				gateway_address,
+				&proof,
+			),
+			Err(EthereumVerifyError::InvalidProof)
+		);
+		assert_eq!(
+			EthereumBeaconClient::verify_account_storage_proof(gateway_address, &proof),
+			Err(EthereumVerifyError::InvalidProof),
+		);
+	});
+}
+
+#[test]
+fn verify_account_storage_proof_fixture_rejects_out_of_range_shared_node_index() {
+	let (gateway_address, anchor, mut proof) = load_account_storage_proof_fixture();
+	proof.slots[1].node_indexes = vec![999u16]
+		.try_into()
+		.expect("single out-of-range index stays within bounded node refs");
+
+	new_tester().execute_with(|| {
+		ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor.clone());
+		assert_eq!(
+			EthereumBeaconClient::verify_account_storage_proof_against_state_root(
+				anchor.state_root,
+				gateway_address,
+				&proof,
+			),
+			Err(EthereumVerifyError::InvalidProof)
+		);
+		assert_eq!(
+			EthereumBeaconClient::verify_account_storage_proof(gateway_address, &proof),
+			Err(EthereumVerifyError::InvalidProof),
+		);
+	});
+}
+
+#[test]
+fn verify_account_storage_proof_fixture_rejects_duplicate_shared_node_index() {
+	let (gateway_address, anchor, mut proof) = load_account_storage_proof_fixture();
+	let duplicated_index = proof.slots[0].node_indexes[0];
+	proof.slots[0].node_indexes = vec![duplicated_index, duplicated_index]
+		.try_into()
+		.expect("duplicate indexes stay within bounded node refs");
+
+	new_tester().execute_with(|| {
+		ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor.clone());
+		assert_eq!(
+			EthereumBeaconClient::verify_account_storage_proof_against_state_root(
+				anchor.state_root,
+				gateway_address,
+				&proof,
+			),
+			Err(EthereumVerifyError::InvalidProof)
+		);
+		assert_eq!(
+			EthereumBeaconClient::verify_account_storage_proof(gateway_address, &proof),
+			Err(EthereumVerifyError::InvalidProof),
 		);
 	});
 }

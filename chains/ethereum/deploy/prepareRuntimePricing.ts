@@ -67,9 +67,7 @@ type PreparedRuntimePricingUpdate = {
 
 async function main() {
   const inputs = await loadCliInputs(args);
-  console.error(
-    `[runtime-pricing:prepare] Connecting to Argon RPC ${inputs.argonRpcUrl}`,
-  );
+  console.error(`[runtime-pricing:prepare] Connecting to Argon RPC ${inputs.argonRpcUrl}`);
   const client = await getClient(inputs.argonRpcUrl);
 
   try {

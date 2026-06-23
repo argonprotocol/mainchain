@@ -24,12 +24,13 @@ use hex_literal::hex;
 
 pub const INBOUND_FIXTURE_RECEIPT_INDEX: u64 = 0;
 
-fn load_fixture<T>(basename: String) -> Result<T, serde_json::Error>
+pub(crate) fn load_fixture<T>(basename: impl AsRef<str>) -> Result<T, serde_json::Error>
 where
 	T: for<'de> serde::Deserialize<'de>,
 {
-	let filepath: PathBuf =
-		[env!("CARGO_MANIFEST_DIR"), "tests", "fixtures", &basename].iter().collect();
+	let filepath: PathBuf = [env!("CARGO_MANIFEST_DIR"), "tests", "fixtures", basename.as_ref()]
+		.iter()
+		.collect();
 	serde_json::from_reader(File::open(filepath).unwrap())
 }
 

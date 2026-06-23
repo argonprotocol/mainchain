@@ -2,10 +2,34 @@
 
 extern crate alloc;
 
+use argon_primitives::{EthereumAccountStorageProof, EthereumLog};
 pub use pallet::*;
 pub use weights::{prove_gateway_activity_with_providers, WeightInfo, WithProviderWeights};
 
 use pallet_prelude::*;
+use polkadot_sdk::sp_runtime::{traits::ConstU32, BoundedVec};
+
+pub(crate) const GATEWAY_ACTIVITY_STORAGE_SLOT_COUNT: u32 = 2;
+type GatewayActivityStorageSlots = ConstU32<GATEWAY_ACTIVITY_STORAGE_SLOT_COUNT>;
+
+#[derive(
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	CloneNoBound,
+	PartialEqNoBound,
+	EqNoBound,
+	DebugNoBound,
+	TypeInfo,
+	MaxEncodedLen,
+)]
+#[scale_info(skip_type_params(MaxActivityLogs))]
+pub struct GatewayActivityProof<MaxActivityLogs: Get<u32>> {
+	#[codec(compact)]
+	pub locator_index: u64,
+	pub storage_proof: EthereumAccountStorageProof<GatewayActivityStorageSlots>,
+	pub activity_logs: BoundedVec<EthereumLog, MaxActivityLogs>,
+}
 
 mod approval_queue;
 mod evm;
@@ -30,22 +54,19 @@ pub use transfer_out::{
 
 #[frame_support::pallet]
 pub mod pallet {
-	use super::*;
+	use super::{gateway_activity::GatewayActivityApplyError, *};
 	use alloc::vec::Vec;
 	use argon_primitives::{
 		block_seal::FrameId,
-		ethereum::{
-			EthereumBlockNumber, EthereumReceiptLogProofBatch as BaseEthereumReceiptLogProofBatch,
-			EthereumReceiptLogProofBlock as BaseEthereumReceiptLogProofBlock,
-			MAX_ETHEREUM_HEADER_CHAIN_LEN,
-		},
+		ethereum::{EthereumBlockNumber, MAX_ETHEREUM_HEADER_CHAIN_LEN},
 		vault::BitcoinVaultProvider,
 		CallTxPoolKeyProvider, CallTxValidityProvider, CollectBlockerProvider,
 		EthereumVerifyProvider, OperationalAccountsHook, PriceProvider, TickProvider,
 		TreasuryPoolProvider, UniswapTransferProvider, MICROGONS_PER_ARGON,
 	};
 	use frame_support::{
-		dispatch::{Pays, PostDispatchInfo},
+		dispatch::Pays,
+		storage::with_storage_layer,
 		traits::fungible::{InspectHold, Mutate, MutateHold},
 	};
 	use polkadot_sdk::{
@@ -139,13 +160,9 @@ pub mod pallet {
 		#[pallet::constant]
 		type RecentTransferRetentionTicks: Get<Tick>;
 
-		/// Maximum number of ordered gateway activities that may share one receipt proof.
+		/// Maximum number of ordered gateway activities that may share one proven gateway block.
 		#[pallet::constant]
-		type MaxActivitiesPerReceiptProof: Get<u32>;
-
-		/// Maximum number of proven receipt proofs that may be supplied in one extrinsic.
-		#[pallet::constant]
-		type MaxReceiptProofsPerExtrinsic: Get<u32>;
+		type MaxActivitiesPerGatewayProof: Get<u32>;
 
 		/// Maximum number of members the active Global Issuance Council may carry.
 		#[pallet::constant]
@@ -626,17 +643,6 @@ pub mod pallet {
 		}
 	}
 
-	/// One proven contiguous activity slice backed by a combined receipt proof for one execution
-	/// block.
-	pub type GatewayActivityProofBlock<T> =
-		BaseEthereumReceiptLogProofBlock<<T as Config>::MaxActivitiesPerReceiptProof>;
-
-	/// Ordered proof batch supplied to `prove_gateway_activity(...)`.
-	pub type GatewayActivityProofBatch<T> = BaseEthereumReceiptLogProofBatch<
-		<T as Config>::MaxReceiptProofsPerExtrinsic,
-		<T as Config>::MaxActivitiesPerReceiptProof,
-	>;
-
 	#[pallet::storage]
 	/// Config accepted for each supported source chain.
 	pub type ChainConfigBySourceChain<T: Config> =
@@ -646,6 +652,11 @@ pub mod pallet {
 	/// Latest proven gateway activity snapshot for each source chain.
 	pub type GatewayStateBySourceChain<T: Config> =
 		StorageMap<_, Blake2_128Concat, SourceChain, GatewayState<T>, OptionQuery>;
+
+	#[pallet::storage]
+	/// Latest accepted gateway locator hash for each source chain.
+	pub type LastAcceptedLocatorHashBySourceChain<T: Config> =
+		StorageMap<_, Blake2_128Concat, SourceChain, H256, ValueQuery>;
 
 	#[pallet::storage]
 	/// Pause state recorded when a canonical gateway activity cannot be applied safely.
@@ -895,6 +906,8 @@ pub mod pallet {
 		GatewaySyncPaused { source_chain: SourceChain, pause: GatewaySyncPause },
 		/// Root manually unpaused one source chain.
 		GatewayUnpaused { source_chain: SourceChain },
+		/// Root explicitly set the continuity hash needed to validate the next gateway locator.
+		LastAcceptedLocatorHashSet { source_chain: SourceChain, locator_hash: H256 },
 		/// The stored gateway-state snapshot advanced after a proven contiguous batch.
 		GatewayStateAdvanced { source_chain: SourceChain, gateway_state: GatewayState<T> },
 		/// A transfer out was opened.
@@ -927,12 +940,15 @@ pub mod pallet {
 	pub enum Error<T> {
 		/// The Ethereum event topics or payload do not match `TransferToArgonStarted`.
 		InvalidTransferToArgonActivity,
-		/// At least one proven gateway-activity block must be supplied.
-		NoGatewayProofBlocksProvided,
-		/// At least one gateway activity log must be supplied with the receipt proof.
+		/// At least one gateway activity log must be supplied with the proof.
 		NoGatewayActivitiesProvided,
 		/// The Ethereum verifier rejected the supplied proof.
 		InvalidProof,
+		/// The next gateway proof needs a previously accepted locator hash that has not been
+		/// bootstrapped yet.
+		MissingLastAcceptedLocatorHash,
+		/// The continuity hash may only be bootstrapped once for a source chain.
+		LastAcceptedLocatorHashAlreadySet,
 		/// The source chain is not configured for inbound claims.
 		UnsupportedSource,
 		/// The gateway does not match the configured gateway address.
@@ -1494,11 +1510,8 @@ pub mod pallet {
 
 		#[pallet::call_index(8)]
 		#[pallet::weight({
-			let proof_blocks = proof_batch.blocks.len() as u32;
-			let activities = proof_batch.blocks.iter().fold(0u32, |total, block| {
-				total.saturating_add(block.receipt_logs.len() as u32)
-			});
-			prove_gateway_activity_with_providers::<T>(proof_blocks, activities)
+			let activities = proof.activity_logs.len() as u32;
+			prove_gateway_activity_with_providers::<T>(activities)
 				.saturating_add(
 					T::OperationalAccountsHook::uniswap_transfer_confirmed_weight()
 						.saturating_mul(activities as u64)
@@ -1508,11 +1521,11 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			source_chain: SourceChain,
 			#[pallet::compact] previous_gateway_activity_nonce: GatewayActivityNonce,
-			proof_batch: GatewayActivityProofBatch<T>,
+			proof: GatewayActivityProof<<T as Config>::MaxActivitiesPerGatewayProof>,
 		) -> DispatchResultWithPostInfo {
 			let _ = ensure_signed(origin)?;
 			Self::ensure_source_chain_not_paused(source_chain)?;
-			ensure!(!proof_batch.blocks.is_empty(), Error::<T>::NoGatewayProofBlocksProvided);
+			ensure!(!proof.activity_logs.is_empty(), Error::<T>::NoGatewayActivitiesProvided);
 			let current_gateway_state = GatewayStateBySourceChain::<T>::get(source_chain)
 				.unwrap_or(GatewayState::<T> {
 					gateway_activity_nonce: 0,
@@ -1525,75 +1538,81 @@ pub mod pallet {
 				previous_gateway_activity_nonce == current_gateway_state.gateway_activity_nonce,
 				Error::<T>::UnexpectedPreviousGatewayActivityNonce,
 			);
-			let mut expected_gateway_activity_nonce = previous_gateway_activity_nonce;
-			let mut latest_gateway_state = None;
-			let mut did_pause_gateway_sync = false;
-			for proof_block in &proof_batch.blocks {
-				ensure!(
-					!proof_block.receipt_logs.is_empty(),
-					Error::<T>::NoGatewayActivitiesProvided
-				);
-			}
-
-			T::EthereumVerifier::verify_receipt_logs(&proof_batch)
+			let activity_root_seed = if previous_gateway_activity_nonce == 0 {
+				H256::zero()
+			} else {
+				let locator_hash = LastAcceptedLocatorHashBySourceChain::<T>::get(source_chain);
+				ensure!(locator_hash != H256::zero(), Error::<T>::MissingLastAcceptedLocatorHash,);
+				locator_hash
+			};
+			let (_, gateway) = Self::evm_gateway_signature_domain(source_chain)?;
+			T::EthereumVerifier::verify_account_storage_proof(gateway, &proof.storage_proof)
 				.map_err(|_| Error::<T>::InvalidProof)?;
+			let (locator_hash, decoded_activities) = Self::validate_gateway_activity_proof(
+				source_chain,
+				previous_gateway_activity_nonce,
+				activity_root_seed,
+				&proof,
+			)
+			.map_err(|_| Error::<T>::InvalidProof)?;
 
-			for proof_block in proof_batch.blocks.into_iter() {
-				let block_outcome = Self::apply_proved_gateway_activity_proof_block(
-					source_chain,
-					expected_gateway_activity_nonce,
-					proof_block,
-				)?;
+			let latest_gateway_state = match with_storage_layer(|| {
+				let mut expected_gateway_activity_nonce = previous_gateway_activity_nonce;
+				let mut latest_gateway_state = None;
 
-				if let Some(gateway_state) = block_outcome.latest_gateway_state {
+				for decoded_activity in decoded_activities {
+					let gateway_state = Self::apply_decoded_gateway_activity(
+						source_chain,
+						expected_gateway_activity_nonce,
+						decoded_activity,
+					)?;
 					expected_gateway_activity_nonce = gateway_state.gateway_activity_nonce;
 					latest_gateway_state = Some(gateway_state);
 				}
-				if let Some(pause) = block_outcome.pause {
+
+				latest_gateway_state.ok_or(GatewayActivityApplyError::Reject(
+					Error::<T>::NoGatewayActivitiesProvided.into(),
+				))
+			}) {
+				Ok(gateway_state) => gateway_state,
+				Err(GatewayActivityApplyError::Pause { failed_gateway_activity_nonce, reason }) => {
 					Self::pause_source_chain(
 						source_chain,
-						pause.last_good_gateway_activity_nonce,
-						pause.failed_gateway_activity_nonce,
-						pause.reason,
+						previous_gateway_activity_nonce,
+						failed_gateway_activity_nonce,
+						reason,
 					);
-					did_pause_gateway_sync = true;
-					break;
+					return Ok(Pays::No.into());
+				},
+				Err(GatewayActivityApplyError::Reject(error)) => return Err(error.into()),
+			};
+
+			if latest_gateway_state.argon_approvals_nonce >
+				current_gateway_state.argon_approvals_nonce
+			{
+				let last_local_queue_nonce =
+					NextCouncilApprovalQueueNonceByDestinationChain::<T>::get(source_chain);
+				let previous_retained_queue_nonce =
+					current_gateway_state.argon_approvals_nonce.min(last_local_queue_nonce);
+				let retained_queue_nonce =
+					latest_gateway_state.argon_approvals_nonce.min(last_local_queue_nonce);
+
+				for queue_nonce in previous_retained_queue_nonce.max(1)..retained_queue_nonce {
+					CouncilApprovalQueueByDestinationChainAndNonce::<T>::remove(
+						source_chain,
+						queue_nonce,
+					);
 				}
 			}
+			GatewayStateBySourceChain::<T>::insert(source_chain, latest_gateway_state.clone());
+			LastAcceptedLocatorHashBySourceChain::<T>::insert(source_chain, locator_hash);
+			Self::refresh_destination_chain_queue_tracking(source_chain)?;
+			Self::deposit_event(Event::GatewayStateAdvanced {
+				source_chain,
+				gateway_state: latest_gateway_state,
+			});
 
-			let did_advance_gateway_state = latest_gateway_state.is_some();
-			if let Some(gateway_state) = latest_gateway_state {
-				if gateway_state.argon_approvals_nonce > current_gateway_state.argon_approvals_nonce
-				{
-					let last_local_queue_nonce =
-						NextCouncilApprovalQueueNonceByDestinationChain::<T>::get(source_chain);
-					let previous_retained_queue_nonce =
-						current_gateway_state.argon_approvals_nonce.min(last_local_queue_nonce);
-					let retained_queue_nonce =
-						gateway_state.argon_approvals_nonce.min(last_local_queue_nonce);
-
-					for queue_nonce in previous_retained_queue_nonce.max(1)..retained_queue_nonce {
-						CouncilApprovalQueueByDestinationChainAndNonce::<T>::remove(
-							source_chain,
-							queue_nonce,
-						);
-					}
-				}
-				GatewayStateBySourceChain::<T>::insert(source_chain, gateway_state.clone());
-				Self::refresh_destination_chain_queue_tracking(source_chain)?;
-				Self::deposit_event(Event::GatewayStateAdvanced { source_chain, gateway_state });
-			}
-
-			if did_pause_gateway_sync {
-				return Ok(Pays::No.into());
-			}
-
-			ensure!(
-				expected_gateway_activity_nonce > previous_gateway_activity_nonce,
-				Error::<T>::NoGatewayActivitiesProvided,
-			);
-			let pays_fee = if did_advance_gateway_state { Pays::No } else { Pays::Yes };
-			Ok(PostDispatchInfo { pays_fee, ..Default::default() })
+			Ok(Pays::No.into())
 		}
 
 		#[pallet::call_index(9)]
@@ -1659,6 +1678,23 @@ pub mod pallet {
 				micronot_collateral,
 			)?;
 			Ok(Pays::No.into())
+		}
+
+		#[pallet::call_index(13)]
+		#[pallet::weight(T::DbWeight::get().reads_writes(1, 1))]
+		pub fn set_last_accepted_locator_hash(
+			origin: OriginFor<T>,
+			source_chain: SourceChain,
+			locator_hash: H256,
+		) -> DispatchResult {
+			ensure_root(origin)?;
+			ensure!(
+				LastAcceptedLocatorHashBySourceChain::<T>::get(source_chain) == H256::zero(),
+				Error::<T>::LastAcceptedLocatorHashAlreadySet,
+			);
+			LastAcceptedLocatorHashBySourceChain::<T>::insert(source_chain, locator_hash);
+			Self::deposit_event(Event::LastAcceptedLocatorHashSet { source_chain, locator_hash });
+			Ok(())
 		}
 	}
 
@@ -1781,11 +1817,11 @@ pub mod pallet {
 			let call = <RuntimeCallOf<T> as IsSubType<Call<T>>>::is_sub_type(call)?;
 
 			match call {
-				Call::prove_gateway_activity { source_chain, proof_batch, .. } => Some(
+				Call::prove_gateway_activity { source_chain, proof, .. } => Some(
 					(
 						b"crosschain_transfer:prove".as_slice(),
 						source_chain,
-						proof_batch.using_encoded(blake2_256),
+						proof.using_encoded(blake2_256),
 					)
 						.using_encoded(blake2_256)
 						.to_vec(),

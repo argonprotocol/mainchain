@@ -1,6 +1,7 @@
 import { network } from 'hardhat';
 import { afterAll, describe, expect, it } from 'vitest';
 import { Wallet } from 'ethers';
+import { mintingGatewayActivityHashingFixture as gatewayHashFixture } from '../fixtures.js';
 import {
   appendMintingGatewayActivityRoot,
   encodeMintingGatewayGlobalIssuanceCouncilRotateTarget,
@@ -31,7 +32,6 @@ const SCALE = 1_000_000_000_000n;
 const MICROGONS_PER_ARGONOT = 1_000_000n;
 const ERC1967_ADMIN_SLOT = '0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103';
 const COUNCIL_WEIGHTS = [40n, 30n, 20n, 10n] as const;
-
 const connection = await network.create();
 const { ethers } = connection;
 
@@ -550,6 +550,14 @@ describe('MintingGateway', () => {
     expect(await argon.balanceOf(holder.address)).to.equal(750n * SCALE);
     expect(await argon.allowance(holder.address, await gateway.getAddress())).to.equal(0n);
     expect(await argonot.balanceOf(holder.address)).to.equal(2_000n * SCALE);
+  });
+
+  it('exposes the shared activity locator mapping slot', async () => {
+    const { gateway } = await deployFixture();
+
+    expect(await gateway.activityBlockLocatorsMappingSlot()).to.equal(
+      gatewayHashFixture.mappingSlot,
+    );
   });
 
   it('rejects zero runtime-unit transfer amounts', async () => {

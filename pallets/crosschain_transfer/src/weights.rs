@@ -223,13 +223,11 @@ impl WeightInfo for () {
 	}
 }
 
-pub fn prove_gateway_activity_with_providers<T: Config>(
-	proof_blocks: u32,
-	activities: u32,
-) -> Weight {
-	let extra_activities = activities.saturating_sub(proof_blocks);
+pub fn prove_gateway_activity_with_providers<T: Config>(activities: u32) -> Weight {
 	T::WeightInfo::prove_gateway_activity(activities).saturating_add(
 		<<T::EthereumVerifier as EthereumVerifyProvider>::Weights as
-			EthereumVerifyProviderWeightInfo>::verify_receipt_logs(proof_blocks, extra_activities),
+			EthereumVerifyProviderWeightInfo>::verify_account_storage_proof(
+			crate::GATEWAY_ACTIVITY_STORAGE_SLOT_COUNT,
+		),
 	)
 }

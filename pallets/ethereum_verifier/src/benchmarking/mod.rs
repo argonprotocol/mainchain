@@ -9,6 +9,7 @@ use crate::{
 	fixture_conversions::{
 		anchored_update_from_fixture, checkpoint_update_from_fixture, committee_update_from_fixture,
 	},
+	storage_proof_fixture::load_account_storage_proof_fixture,
 	types::ExecutionHeaderAnchor,
 	Fork, ForkVersions, Pallet as EthereumBeaconClient,
 };
@@ -19,7 +20,7 @@ use alloy_trie::{proof::ProofRetainer, HashBuilder, Nibbles};
 use argon_primitives::{
 	ethereum::EthereumExecutionHeader, EthereumCombinedReceiptProof, EthereumExecutionBlockProof,
 	EthereumLog, EthereumReceiptLog, EthereumReceiptLogProofBatch, EthereumReceiptLogProofBlock,
-	EthereumReceiptProofReceipt, EthereumVerifyProvider,
+	EthereumReceiptProofReceipt, EthereumStorageSlotProof, EthereumVerifyProvider,
 };
 use frame_benchmarking::v2::*;
 use frame_system::RawOrigin;
@@ -27,6 +28,7 @@ use hex_literal::hex;
 use polkadot_sdk::{
 	frame_support::traits::ConstU32,
 	sp_core::{H160, H256},
+	sp_runtime::BoundedVec,
 };
 use scenarios::{
 	make_finalized_header_execution_proof, make_finalized_header_update, make_initial_checkpoint,
@@ -179,6 +181,30 @@ mod benchmarks {
 		{
 			<EthereumBeaconClient<T> as EthereumVerifyProvider>::verify_receipt_logs(&proof_batch)
 				.map_err(|_| BenchmarkError::Stop("provider_verify_receipt_logs failed"))?;
+		}
+
+		Ok(())
+	}
+
+	#[benchmark]
+	fn provider_verify_account_storage_proof(s: Linear<1, 10>) -> Result<(), BenchmarkError> {
+		let fixture = load_account_storage_proof_fixture();
+		let proof = argon_primitives::EthereumAccountStorageProof::<ConstU32<10>> {
+			anchor_block_hash: fixture.anchor.block_hash,
+			account_proof: fixture.account_proof,
+			storage_proof: fixture.storage_proof,
+			slots: storage_slots_for_benchmark(fixture.range_slot, fixture.root_slot, s)?,
+		};
+
+		ExecutionHeaderAnchors::<T>::insert(fixture.anchor.block_hash, fixture.anchor);
+
+		#[block]
+		{
+			<EthereumBeaconClient<T> as EthereumVerifyProvider>::verify_account_storage_proof(
+				fixture.gateway_address,
+				&proof,
+			)
+			.map_err(|_| BenchmarkError::Stop("provider_verify_account_storage_proof failed"))?;
 		}
 
 		Ok(())
@@ -499,4 +525,20 @@ fn make_execution_header(
 
 fn b256_from_h256(value: H256) -> B256 {
 	B256::from_slice(value.as_bytes())
+}
+
+fn storage_slots_for_benchmark(
+	range_slot: EthereumStorageSlotProof,
+	root_slot: EthereumStorageSlotProof,
+	slot_count: u32,
+) -> Result<BoundedVec<EthereumStorageSlotProof, ConstU32<10>>, BenchmarkError> {
+	let mut slots = Vec::with_capacity(slot_count as usize);
+	slots.push(range_slot);
+	for _ in 1..slot_count {
+		slots.push(root_slot.clone());
+	}
+
+	slots
+		.try_into()
+		.map_err(|_| BenchmarkError::Stop("benchmark storage slots exceeded bounded slot count"))
 }

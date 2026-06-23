@@ -1,9 +1,7 @@
 use alloc::vec::Vec;
-use argon_primitives::{AccountId as ArgonAccountId, EthereumReceiptLog, OperationalAccountsHook};
+use argon_primitives::{AccountId as ArgonAccountId, OperationalAccountsHook};
 use frame_support::{
-	dispatch::DispatchResult,
 	ensure,
-	storage::with_storage_layer,
 	traits::fungible::{Inspect, Mutate, MutateHold},
 };
 use pallet_prelude::*;
@@ -11,16 +9,15 @@ use pallet_prelude::*;
 use super::{
 	AssetKind, ChainConfig, ChainConfigBySourceChain, Config,
 	CouncilApprovalQueueByDestinationChainAndNonce, Error, Event, GatewayActivityNonce,
-	GatewayActivityProofBlock, GatewayState, GatewaySyncPause, GatewaySyncPauseReason,
-	GlobalIssuanceCouncilByHash, HoldReason, MintingAuthoritiesBySigner,
-	MintingAuthorityActivationRepaymentPricingByDestinationChain, MintingAuthorityState, Pallet,
-	SourceChain, TransferOutById, TransferToArgonActivity, H160, H256,
+	GatewayState, GatewaySyncPauseReason, GlobalIssuanceCouncilByHash, HoldReason,
+	MintingAuthoritiesBySigner, MintingAuthorityActivationRepaymentPricingByDestinationChain,
+	MintingAuthorityState, Pallet, SourceChain, TransferOutById, TransferToArgonActivity, H160,
+	H256,
 };
 
 pub(crate) enum DecodedGatewayActivity<T: Config> {
 	TransferToArgon {
 		from: H160,
-		gateway: H160,
 		token: H160,
 		to: [u8; 32],
 		amount: T::Balance,
@@ -39,6 +36,7 @@ pub(crate) enum DecodedGatewayActivity<T: Config> {
 	GlobalIssuanceCouncilRotated {
 		council_hash: H256,
 		approval_hash: H256,
+		relayer_argon_account_id: [u8; 32],
 		gateway_state: GatewayState<T>,
 	},
 	MintingAuthorityDeactivated {
@@ -46,6 +44,7 @@ pub(crate) enum DecodedGatewayActivity<T: Config> {
 		microgon_collateral: T::Balance,
 		micronot_collateral: T::Balance,
 		approval_hash: H256,
+		relayer_argon_account_id: [u8; 32],
 		gateway_state: GatewayState<T>,
 	},
 	TransferOutOfArgonFinalized {
@@ -62,6 +61,10 @@ pub(crate) enum DecodedGatewayActivity<T: Config> {
 }
 
 impl<T: Config> DecodedGatewayActivity<T> {
+	pub(crate) fn gateway_activity_nonce(&self) -> GatewayActivityNonce {
+		self.gateway_state().gateway_activity_nonce
+	}
+
 	pub(crate) fn gateway_state(&self) -> &GatewayState<T> {
 		match self {
 			Self::TransferToArgon { gateway_state, .. } |
@@ -90,11 +93,6 @@ pub(crate) enum GatewayActivityApplyError {
 }
 
 pub(crate) type GatewayActivityApplyResult<T> = Result<GatewayState<T>, GatewayActivityApplyError>;
-
-pub(crate) struct GatewayActivityProofBlockOutcome<T: Config> {
-	pub latest_gateway_state: Option<GatewayState<T>>,
-	pub pause: Option<GatewaySyncPause>,
-}
 
 impl From<DispatchError> for GatewayActivityApplyError {
 	fn from(error: DispatchError) -> Self {
@@ -239,18 +237,6 @@ impl<T: Config> Pallet<T> {
 				}
 
 				Err(Error::<T>::UnsupportedToken.into())
-			},
-		}
-	}
-
-	fn ensure_supported_gateway(source_chain: SourceChain, gateway: &H160) -> DispatchResult {
-		let config = ChainConfigBySourceChain::<T>::get(source_chain)
-			.ok_or(Error::<T>::UnsupportedSource)?;
-
-		match config {
-			ChainConfig::Evm { gateway: active_gateway, .. } => {
-				ensure!(*gateway == active_gateway, Error::<T>::UnsupportedGateway);
-				Ok(())
 			},
 		}
 	}
@@ -518,85 +504,6 @@ impl<T: Config> Pallet<T> {
 		Ok(context.applied())
 	}
 
-	pub(crate) fn apply_proved_gateway_activity_proof_block(
-		source_chain: SourceChain,
-		starting_gateway_activity_nonce: GatewayActivityNonce,
-		proof_block: GatewayActivityProofBlock<T>,
-	) -> Result<GatewayActivityProofBlockOutcome<T>, DispatchError> {
-		let target_block_number = proof_block.target_block_number;
-		let mut expected_gateway_activity_nonce = starting_gateway_activity_nonce;
-		let mut latest_gateway_state = None;
-		let apply_result: Result<(), GatewayActivityApplyError> = (|| {
-			for receipt_log in proof_block.receipt_logs {
-				let gateway_state = Self::apply_proved_gateway_activity_log(
-					source_chain,
-					expected_gateway_activity_nonce,
-					receipt_log,
-				)?;
-				expected_gateway_activity_nonce = gateway_state.gateway_activity_nonce;
-				latest_gateway_state = Some(gateway_state);
-			}
-
-			Self::expire_transfer_outs_through_block(source_chain, target_block_number).map_err(
-				|reason| GatewayActivityApplyError::Pause {
-					failed_gateway_activity_nonce: expected_gateway_activity_nonce,
-					reason,
-				},
-			)?;
-
-			Ok(())
-		})();
-
-		match apply_result {
-			Ok(()) => Ok(GatewayActivityProofBlockOutcome {
-				latest_gateway_state: Some(
-					latest_gateway_state.ok_or(Error::<T>::NoGatewayActivitiesProvided)?,
-				),
-				pause: None,
-			}),
-			Err(GatewayActivityApplyError::Pause { failed_gateway_activity_nonce, reason }) =>
-				Ok(GatewayActivityProofBlockOutcome {
-					latest_gateway_state,
-					pause: Some(GatewaySyncPause {
-						last_good_gateway_activity_nonce: expected_gateway_activity_nonce,
-						failed_gateway_activity_nonce,
-						reason,
-					}),
-				}),
-			Err(GatewayActivityApplyError::Reject(error)) => Err(error),
-		}
-	}
-
-	fn apply_proved_gateway_activity_log(
-		source_chain: SourceChain,
-		expected_gateway_activity_nonce: GatewayActivityNonce,
-		receipt_log: EthereumReceiptLog,
-	) -> GatewayActivityApplyResult<T> {
-		// Keep the original per-log commit semantics: each activity either lands fully or rolls
-		// back on its own, and a later pause does not undo earlier logs from this proof block.
-		with_storage_layer(|| {
-			let event_log = receipt_log.event_log;
-			let gateway = event_log.address;
-			Self::ensure_supported_gateway(source_chain, &gateway)
-				.map_err(GatewayActivityApplyError::from)?;
-			// A verified log from the active gateway that we still cannot decode means the
-			// canonical gateway activity stream has advanced beyond what this runtime understands,
-			// so sync must stop at that nonce instead of rejecting the relayer's otherwise valid
-			// proof.
-			let decoded_activity = Self::decode_evm_gateway_activity(source_chain, &event_log)
-				.map_err(|_| GatewayActivityApplyError::Pause {
-					failed_gateway_activity_nonce: expected_gateway_activity_nonce
-						.saturating_add(1),
-					reason: GatewaySyncPauseReason::MalformedGatewayActivity,
-				})?;
-			Self::apply_decoded_gateway_activity(
-				source_chain,
-				expected_gateway_activity_nonce,
-				decoded_activity,
-			)
-		})
-	}
-
 	pub(crate) fn apply_decoded_gateway_activity(
 		source_chain: SourceChain,
 		expected_gateway_activity_nonce: GatewayActivityNonce,
@@ -610,9 +517,14 @@ impl<T: Config> Pallet<T> {
 		.map_err(GatewayActivityApplyError::from)?;
 
 		match decoded_activity {
-			DecodedGatewayActivity::TransferToArgon {
-				from, gateway, token, to, amount, ..
-			} => {
+			DecodedGatewayActivity::TransferToArgon { from, token, to, amount, .. } => {
+				let gateway = match ChainConfigBySourceChain::<T>::get(source_chain) {
+					Some(ChainConfig::Evm { gateway, .. }) => gateway,
+					None =>
+						return Err(GatewayActivityApplyError::Reject(
+							Error::<T>::InvalidChainConfig.into(),
+						)),
+				};
 				let asset = match Self::resolve_source_asset_kind(source_chain, &gateway, &token) {
 					Ok(asset) => asset,
 					Err(_) => return context.pause_result(GatewaySyncPauseReason::UnsupportedToken),
@@ -731,12 +643,7 @@ mod test {
 		TransferOutOfArgonCanceled as ContractTransferOutOfArgonCanceled,
 		TransferOutOfArgonFinalized as ContractTransferOutOfArgonFinalized, TransferToArgonStarted,
 	};
-	use argon_primitives::{
-		ethereum::{
-			EthereumCombinedReceiptProof, EthereumExecutionBlockProof, EthereumReceiptProofReceipt,
-		},
-		EthereumLog, EthereumReceiptLog,
-	};
+	use argon_primitives::EthereumLog;
 
 	#[test]
 	fn prove_gateway_activity_pays_argon_marks_recent_transfer_and_ignores_zero_amounts() {
@@ -762,7 +669,7 @@ mod test {
 				RuntimeOrigin::signed(account(1)),
 				SourceChain::Ethereum,
 				0,
-				proof_batch(vec![activity_logs(vec![argon_activity_log(
+				block_proof(vec![activity_logs(vec![argon_activity_log(
 					recipient.clone(),
 					1,
 					1_250,
@@ -818,7 +725,7 @@ mod test {
 				RuntimeOrigin::signed(account(1)),
 				SourceChain::Ethereum,
 				1,
-				proof_batch(vec![activity_logs(vec![argon_activity_log(
+				block_proof(vec![activity_logs(vec![argon_activity_log(
 					zero_amount_recipient.clone(),
 					2,
 					0,
@@ -860,7 +767,7 @@ mod test {
 				RuntimeOrigin::signed(account(1)),
 				SourceChain::Ethereum,
 				0,
-				proof_batch(vec![activity_logs(vec![argonot_activity_log(
+				block_proof(vec![activity_logs(vec![argonot_activity_log(
 					recipient.clone(),
 					1,
 					777,
@@ -916,7 +823,7 @@ mod test {
 				RuntimeOrigin::signed(account(1)),
 				SourceChain::Ethereum,
 				0,
-				proof_batch(vec![activity_logs(vec![minting_authority_activated_log(
+				block_proof(vec![activity_logs(vec![minting_authority_activated_log(
 					10_000,
 					0,
 					signing_key,
@@ -979,7 +886,7 @@ mod test {
 				RuntimeOrigin::signed(account(1)),
 				SourceChain::Ethereum,
 				1,
-				proof_batch(vec![activity_logs(vec![transfer_to_argon_started_log(
+				block_proof(vec![activity_logs(vec![transfer_to_argon_started_log(
 					h160(0x21),
 					h160(0x11),
 					h160(0x31),
@@ -1092,7 +999,7 @@ mod test {
 				RuntimeOrigin::signed(account(1)),
 				SourceChain::Ethereum,
 				0,
-				proof_batch(vec![activity_logs(vec![global_issuance_council_rotated_log(
+				block_proof(vec![activity_logs(vec![global_issuance_council_rotated_log(
 					next_council_hash,
 					approval_hash_for_queue_nonce(1),
 					1,
@@ -1166,7 +1073,7 @@ mod test {
 				RuntimeOrigin::signed(account(1)),
 				SourceChain::Ethereum,
 				0,
-				proof_batch(vec![activity_logs(vec![minting_authority_activated_log(
+				block_proof(vec![activity_logs(vec![minting_authority_activated_log(
 					10_000,
 					0,
 					signing_key,
@@ -1264,7 +1171,7 @@ mod test {
 				RuntimeOrigin::signed(account(1)),
 				SourceChain::Ethereum,
 				0,
-				proof_batch(vec![activity_logs(vec![minting_authority_activated_log(
+				block_proof(vec![activity_logs(vec![minting_authority_activated_log(
 					10_000,
 					0,
 					signing_key,
@@ -1361,7 +1268,7 @@ mod test {
 				RuntimeOrigin::signed(account(1)),
 				SourceChain::Ethereum,
 				0,
-				proof_batch(vec![activity_logs(vec![minting_authority_activated_log(
+				block_proof(vec![activity_logs(vec![minting_authority_activated_log(
 					10_000,
 					0,
 					signing_key,
@@ -1446,7 +1353,7 @@ mod test {
 				RuntimeOrigin::signed(account(1)),
 				SourceChain::Ethereum,
 				0,
-				proof_batch(vec![activity_logs(vec![
+				block_proof(vec![activity_logs(vec![
 					minting_authority_activated_log(
 						10_000,
 						0,
@@ -1557,7 +1464,7 @@ mod test {
 				RuntimeOrigin::signed(account(1)),
 				SourceChain::Ethereum,
 				0,
-				proof_batch(vec![activity_logs(vec![minting_authority_activated_log(
+				block_proof(vec![activity_logs(vec![minting_authority_activated_log(
 					10_000,
 					0,
 					signing_key,
@@ -1646,7 +1553,7 @@ mod test {
 				RuntimeOrigin::signed(account(1)),
 				SourceChain::Ethereum,
 				0,
-				proof_batch(vec![activity_logs(vec![minting_authority_deactivated_log(
+				block_proof(vec![activity_logs(vec![minting_authority_deactivated_log(
 					3_000,
 					200,
 					signing_key,
@@ -1768,7 +1675,7 @@ mod test {
 				RuntimeOrigin::signed(account(1)),
 				SourceChain::Ethereum,
 				1,
-				proof_batch(vec![activity_logs(vec![minting_authority_deactivated_log(
+				block_proof(vec![activity_logs(vec![minting_authority_deactivated_log(
 					12_000,
 					0,
 					signing_key,
@@ -1856,7 +1763,7 @@ mod test {
 				RuntimeOrigin::signed(account(1)),
 				SourceChain::Ethereum,
 				0,
-				proof_batch(vec![activity_logs(vec![transfer_out_of_argon_finalized_log(
+				block_proof(vec![activity_logs(vec![transfer_out_of_argon_finalized_log(
 					transfer_id,
 					vec![(h160(0xad), 20_000, 0)],
 					1,
@@ -1937,7 +1844,7 @@ mod test {
 				RuntimeOrigin::signed(account(1)),
 				SourceChain::Ethereum,
 				1,
-				proof_batch(vec![activity_logs(vec![transfer_out_of_argon_finalized_log(
+				block_proof(vec![activity_logs(vec![transfer_out_of_argon_finalized_log(
 					transfer_id,
 					vec![(signing_key, 11_000, 0)],
 					2,
@@ -2036,7 +1943,7 @@ mod test {
 				RuntimeOrigin::signed(account(1)),
 				SourceChain::Ethereum,
 				1,
-				proof_batch(vec![activity_logs(vec![
+				block_proof(vec![activity_logs(vec![
 					transfer_out_of_argon_finalized_log_with_circulation(
 						external_transfer_id,
 						AssetKind::Argon,
@@ -2120,7 +2027,7 @@ mod test {
 				RuntimeOrigin::signed(account(1)),
 				SourceChain::Ethereum,
 				1,
-				proof_batch(vec![activity_logs(vec![
+				block_proof(vec![activity_logs(vec![
 					transfer_out_of_argon_finalized_log_with_circulation(
 						external_transfer_id,
 						AssetKind::Argon,
@@ -2205,7 +2112,7 @@ mod test {
 				RuntimeOrigin::signed(account(1)),
 				SourceChain::Ethereum,
 				0,
-				proof_batch(vec![activity_logs(vec![transfer_out_of_argon_canceled_log(
+				block_proof(vec![activity_logs(vec![transfer_out_of_argon_canceled_log(
 					transfer_id,
 					1,
 					0,
@@ -2272,7 +2179,7 @@ mod test {
 				RuntimeOrigin::signed(account(1)),
 				SourceChain::Ethereum,
 				0,
-				proof_batch(vec![activity_logs(vec![minting_authority_activated_log(
+				block_proof(vec![activity_logs(vec![minting_authority_activated_log(
 					9_000,
 					0,
 					signing_key,
@@ -2337,7 +2244,7 @@ mod test {
 				RuntimeOrigin::signed(account(1)),
 				SourceChain::Ethereum,
 				0,
-				proof_batch(vec![activity_logs(vec![transfer_to_argon_started_log(
+				block_proof(vec![activity_logs(vec![transfer_to_argon_started_log(
 					h160(0x21),
 					h160(0x11),
 					h160(0x31),
@@ -2380,21 +2287,7 @@ mod test {
 					RuntimeOrigin::signed(account(1)),
 					SourceChain::Ethereum,
 					0,
-					GatewayActivityProofBatch::<Test> {
-						execution_block_proof: dummy_execution_block_proof(),
-						blocks: Vec::new()
-							.try_into()
-							.expect("empty proof batch stays within pallet block bound"),
-					},
-				),
-				Error::<Test>::NoGatewayProofBlocksProvided,
-			);
-			assert_noop!(
-				CrosschainTransfer::prove_gateway_activity(
-					RuntimeOrigin::signed(account(1)),
-					SourceChain::Ethereum,
-					0,
-					proof_batch(vec![activity_logs(vec![])]),
+					block_proof(vec![activity_logs(vec![])]),
 				),
 				Error::<Test>::NoGatewayActivitiesProvided,
 			);
@@ -2418,20 +2311,11 @@ mod test {
 				RuntimeOrigin::signed(account(1)),
 				SourceChain::Ethereum,
 				0,
-				GatewayActivityProofBatch::<Test> {
-					execution_block_proof: dummy_execution_block_proof(),
-					blocks: vec![GatewayActivityProofBlock::<Test> {
-						target_block_number: 0,
-						receipt_proof: dummy_receipt_proof(),
-						receipt_logs: activity_logs(vec![argon_activity_log(
-							recipient.clone(),
-							1,
-							10
-						)]),
-					}]
-					.try_into()
-					.expect("single proof block stays within pallet block bound"),
-				},
+				block_proof(vec![activity_logs(vec![argon_activity_log(
+					recipient.clone(),
+					1,
+					10
+				)])]),
 			),);
 			assert_eq!(Balances::balance(&recipient), 10);
 		});
@@ -2444,7 +2328,7 @@ mod test {
 				RuntimeCall::CrosschainTransfer(Call::<Test>::prove_gateway_activity {
 					source_chain: SourceChain::Ethereum,
 					previous_gateway_activity_nonce: 0,
-					proof_batch: proof_batch(vec![activity_logs(vec![argon_activity_log(
+					proof: block_proof(vec![activity_logs(vec![argon_activity_log(
 						account(2),
 						1,
 						1_250,
@@ -2454,7 +2338,7 @@ mod test {
 				RuntimeCall::CrosschainTransfer(Call::<Test>::prove_gateway_activity {
 					source_chain: SourceChain::Ethereum,
 					previous_gateway_activity_nonce: 0,
-					proof_batch: proof_batch(vec![activity_logs(vec![argon_activity_log(
+					proof: block_proof(vec![activity_logs(vec![argon_activity_log(
 						account(2),
 						1,
 						1_250,
@@ -2464,25 +2348,23 @@ mod test {
 				RuntimeCall::CrosschainTransfer(Call::<Test>::prove_gateway_activity {
 					source_chain: SourceChain::Ethereum,
 					previous_gateway_activity_nonce: 0,
-					proof_batch: proof_batch(vec![activity_logs(vec![
-						transfer_to_argon_started_log(
-							h160(0x21),
-							h160(0x99),
-							h160(0x31),
-							1_250,
-							destination_bytes(&account(2)),
-							1,
-							0,
-							8_750,
-							0,
-						),
-					])]),
+					proof: block_proof(vec![activity_logs(vec![transfer_to_argon_started_log(
+						h160(0x21),
+						h160(0x99),
+						h160(0x31),
+						1_250,
+						destination_bytes(&account(2)),
+						1,
+						0,
+						8_750,
+						0,
+					)])]),
 				});
 			let different_nonce_call =
 				RuntimeCall::CrosschainTransfer(Call::<Test>::prove_gateway_activity {
 					source_chain: SourceChain::Ethereum,
 					previous_gateway_activity_nonce: 1,
-					proof_batch: proof_batch(vec![activity_logs(vec![argon_activity_log(
+					proof: block_proof(vec![activity_logs(vec![argon_activity_log(
 						account(2),
 						2,
 						1_250,
@@ -2534,14 +2416,14 @@ mod test {
 				RuntimeOrigin::signed(account(1)),
 				SourceChain::Ethereum,
 				0,
-				proof_batch(vec![activity_logs(vec![argon_activity_log(account(2), 1, 500)])]),
+				block_proof(vec![activity_logs(vec![argon_activity_log(account(2), 1, 500)])]),
 			));
 
 			let stale_call =
 				RuntimeCall::CrosschainTransfer(Call::<Test>::prove_gateway_activity {
 					source_chain: SourceChain::Ethereum,
 					previous_gateway_activity_nonce: 0,
-					proof_batch: proof_batch(vec![activity_logs(vec![argon_activity_log(
+					proof: block_proof(vec![activity_logs(vec![argon_activity_log(
 						account(3),
 						2,
 						750,
@@ -2571,7 +2453,7 @@ mod test {
 				RuntimeCall::CrosschainTransfer(Call::<Test>::prove_gateway_activity {
 					source_chain: SourceChain::Ethereum,
 					previous_gateway_activity_nonce: 4,
-					proof_batch: proof_batch(vec![activity_logs(vec![argon_activity_log(
+					proof: block_proof(vec![activity_logs(vec![argon_activity_log(
 						account(3),
 						5,
 						750,
@@ -2589,342 +2471,7 @@ mod test {
 	}
 
 	#[test]
-	fn prove_gateway_activity_expires_transfer_outs_once_synced_past_validity_block() {
-		new_test_ext().execute_with(|| {
-			System::set_block_number(1);
-
-			let authority_account = account(201);
-			let authority_pair = council_signing_pair(111);
-			let signing_key = activate_test_minting_authority(
-				authority_account.clone(),
-				51,
-				20_000,
-				&council_signing_pair(112),
-				&authority_pair,
-				20_000,
-				0,
-			);
-			let user = account(202);
-			let hold_reason =
-				RuntimeHoldReason::CrosschainTransfer(HoldReason::TransferOutMintingAuthorityTip);
-
-			LatestExecutionBlockNumber::set(Some(1_000));
-			assert_ok!(Balances::mint_into(&user, 6_000));
-			assert_ok!(CrosschainTransfer::transfer_out(
-				RuntimeOrigin::signed(user.clone()),
-				SourceChain::Ethereum,
-				AssetKind::Argon,
-				h160(0x71),
-				5_000,
-			));
-			let transfer_id = transfer_out_id(&user, 1);
-			assert_ok!(CrosschainTransfer::collateralize_transfer(
-				RuntimeOrigin::signed(authority_account),
-				transfer_id,
-				transfer_collateral_signature(&authority_pair, transfer_id, 5_000, 0),
-				5_000,
-				0,
-			));
-			let valid_until_ethereum_block = TransferOutById::<Test>::get(transfer_id)
-				.expect("transfer should remain stored")
-				.valid_until_ethereum_block;
-			let previous_gateway_activity_nonce =
-				GatewayStateBySourceChain::<Test>::get(SourceChain::Ethereum)
-					.expect("activation should seed gateway state")
-					.gateway_activity_nonce;
-
-			assert_ok!(CrosschainTransfer::prove_gateway_activity(
-				RuntimeOrigin::signed(account(1)),
-				SourceChain::Ethereum,
-				previous_gateway_activity_nonce,
-				proof_batch_at_block(
-					valid_until_ethereum_block.saturating_add(1),
-					vec![activity_logs(vec![argon_activity_log(
-						account(203),
-						previous_gateway_activity_nonce.saturating_add(1),
-						0,
-					)])],
-				),
-			));
-
-			let authority = MintingAuthoritiesBySigner::<Test>::get(signing_key)
-				.expect("authority should stay registered");
-			assert!(TransferOutById::<Test>::get(transfer_id).is_none());
-			assert_eq!(Balances::balance(&user), 6_000);
-			assert_eq!(Balances::balance_on_hold(&hold_reason, &user), 0);
-			assert_eq!(
-				PendingCollateralizationRequestsByChain::<Test>::get(SourceChain::Ethereum),
-				vec![],
-			);
-			assert_eq!(
-				NonTerminalTransferOutCountByDestinationChain::<Test>::get(SourceChain::Ethereum),
-				0,
-			);
-			assert_eq!(
-				PendingTransferOutCirculationByDestinationChain::<Test>::get(SourceChain::Ethereum)
-					.argon_circulation,
-				0,
-			);
-			assert_eq!(authority.pending_reserved_microgon_collateral, 0);
-			assert!(authority.active_pending_transfer_ids.is_empty());
-		});
-	}
-
-	#[test]
-	fn prove_gateway_activity_auto_queues_deactivation_for_fully_depleted_authority() {
-		new_test_ext().execute_with(|| {
-			System::set_block_number(1);
-
-			let authority_account = account(204);
-			let authority_pair = council_signing_pair(113);
-			let signing_key = activate_test_minting_authority(
-				authority_account.clone(),
-				52,
-				20_000,
-				&council_signing_pair(114),
-				&authority_pair,
-				12_000,
-				0,
-			);
-			let user = account(205);
-
-			assert_ok!(Balances::mint_into(&user, 13_000));
-			assert_ok!(CrosschainTransfer::transfer_out(
-				RuntimeOrigin::signed(user.clone()),
-				SourceChain::Ethereum,
-				AssetKind::Argon,
-				h160(0x72),
-				12_000,
-			));
-			let transfer_id = transfer_out_id(&user, 1);
-			assert_ok!(CrosschainTransfer::collateralize_transfer(
-				RuntimeOrigin::signed(authority_account),
-				transfer_id,
-				transfer_collateral_signature(&authority_pair, transfer_id, 12_000, 0),
-				12_000,
-				0,
-			));
-			let previous_gateway_activity_nonce =
-				GatewayStateBySourceChain::<Test>::get(SourceChain::Ethereum)
-					.expect("activation should seed gateway state")
-					.gateway_activity_nonce;
-
-			assert_ok!(CrosschainTransfer::prove_gateway_activity(
-				RuntimeOrigin::signed(account(1)),
-				SourceChain::Ethereum,
-				previous_gateway_activity_nonce,
-				proof_batch_at_block(
-					10,
-					vec![activity_logs(vec![transfer_out_of_argon_finalized_log(
-						transfer_id,
-						vec![(signing_key, 12_000, 0)],
-						previous_gateway_activity_nonce.saturating_add(1),
-						1,
-					)])],
-				),
-			));
-
-			let authority = MintingAuthoritiesBySigner::<Test>::get(signing_key)
-				.expect("authority should remain registered while deactivation is queued");
-			assert_eq!(authority.gateway_remaining_microgon_collateral, 0);
-			assert_eq!(authority.state, MintingAuthorityState::Deactivating);
-			assert_eq!(authority.deactivation_approval_queue_nonce, Some(2));
-		});
-	}
-
-	#[test]
-	fn prove_gateway_activity_ignores_auto_deactivation_failures_during_finalization() {
-		new_test_ext().execute_with(|| {
-			System::set_block_number(1);
-
-			let authority_account = account(206);
-			let authority_pair = council_signing_pair(115);
-			let signing_key = activate_test_minting_authority(
-				authority_account.clone(),
-				53,
-				20_000,
-				&council_signing_pair(116),
-				&authority_pair,
-				12_000,
-				0,
-			);
-			let user = account(207);
-
-			assert_ok!(Balances::mint_into(&user, 13_000));
-			assert_ok!(CrosschainTransfer::transfer_out(
-				RuntimeOrigin::signed(user.clone()),
-				SourceChain::Ethereum,
-				AssetKind::Argon,
-				h160(0x73),
-				12_000,
-			));
-			let transfer_id = transfer_out_id(&user, 1);
-			assert_ok!(CrosschainTransfer::collateralize_transfer(
-				RuntimeOrigin::signed(authority_account.clone()),
-				transfer_id,
-				transfer_collateral_signature(&authority_pair, transfer_id, 12_000, 0),
-				12_000,
-				0,
-			));
-			let previous_gateway_activity_nonce =
-				GatewayStateBySourceChain::<Test>::get(SourceChain::Ethereum)
-					.expect("activation should seed gateway state")
-					.gateway_activity_nonce;
-
-			ActiveGlobalIssuanceCouncilByDestinationChain::<Test>::remove(SourceChain::Ethereum);
-			LatestQueuedCouncilHashByDestinationChain::<Test>::remove(SourceChain::Ethereum);
-
-			assert_ok!(CrosschainTransfer::prove_gateway_activity(
-				RuntimeOrigin::signed(account(1)),
-				SourceChain::Ethereum,
-				previous_gateway_activity_nonce,
-				proof_batch_at_block(
-					10,
-					vec![activity_logs(vec![transfer_out_of_argon_finalized_log(
-						transfer_id,
-						vec![(signing_key, 12_000, 0)],
-						previous_gateway_activity_nonce.saturating_add(1),
-						1,
-					)])],
-				),
-			));
-
-			assert_eq!(GatewaySyncPauseBySourceChain::<Test>::get(SourceChain::Ethereum), None);
-			let authority = MintingAuthoritiesBySigner::<Test>::get(signing_key)
-				.expect("authority should remain registered if best-effort deactivation fails");
-			assert_eq!(authority.gateway_remaining_microgon_collateral, 0);
-			assert_eq!(authority.state, MintingAuthorityState::Active);
-			assert_eq!(authority.deactivation_approval_queue_nonce, None);
-		});
-	}
-
-	#[test]
-	fn prove_gateway_activity_keeps_log_results_when_expiration_cleanup_pauses_midway() {
-		new_test_ext().execute_with(|| {
-			System::set_block_number(1);
-
-			let authority_account = account(208);
-			let authority_pair = council_signing_pair(117);
-			let signing_key = activate_test_minting_authority(
-				authority_account.clone(),
-				54,
-				20_000,
-				&council_signing_pair(118),
-				&authority_pair,
-				20_000,
-				0,
-			);
-			let expired_user = account(209);
-			let finalized_user = account(210);
-
-			LatestExecutionBlockNumber::set(Some(1_000));
-			assert_ok!(Balances::mint_into(&expired_user, 6_000));
-			assert_ok!(CrosschainTransfer::transfer_out(
-				RuntimeOrigin::signed(expired_user.clone()),
-				SourceChain::Ethereum,
-				AssetKind::Argon,
-				h160(0x73),
-				5_000,
-			));
-			let expired_transfer_id = transfer_out_id(&expired_user, 1);
-			assert_ok!(CrosschainTransfer::collateralize_transfer(
-				RuntimeOrigin::signed(authority_account.clone()),
-				expired_transfer_id,
-				transfer_collateral_signature(&authority_pair, expired_transfer_id, 5_000, 0),
-				5_000,
-				0,
-			));
-
-			assert_ok!(Balances::mint_into(&finalized_user, 6_000));
-			assert_ok!(CrosschainTransfer::transfer_out(
-				RuntimeOrigin::signed(finalized_user.clone()),
-				SourceChain::Ethereum,
-				AssetKind::Argon,
-				h160(0x74),
-				5_000,
-			));
-			let finalized_transfer_id = transfer_out_id(&finalized_user, 1);
-			assert_ok!(CrosschainTransfer::collateralize_transfer(
-				RuntimeOrigin::signed(authority_account.clone()),
-				finalized_transfer_id,
-				transfer_collateral_signature(&authority_pair, finalized_transfer_id, 5_000, 0),
-				5_000,
-				0,
-			));
-
-			let valid_until_ethereum_block = TransferOutById::<Test>::get(expired_transfer_id)
-				.expect("expired transfer should remain stored")
-				.valid_until_ethereum_block;
-			let previous_gateway_activity_nonce =
-				GatewayStateBySourceChain::<Test>::get(SourceChain::Ethereum)
-					.expect("activation should seed gateway state")
-					.gateway_activity_nonce;
-			let burn_account = CrosschainTransfer::burn_account(SourceChain::Ethereum);
-			let _ = Balances::burn_from(
-				&burn_account,
-				6_000,
-				Preservation::Expendable,
-				Precision::Exact,
-				Fortitude::Force,
-			)
-			.expect("draining the burn account should succeed in the mock");
-
-			assert_ok!(CrosschainTransfer::prove_gateway_activity(
-				RuntimeOrigin::signed(account(1)),
-				SourceChain::Ethereum,
-				previous_gateway_activity_nonce,
-				proof_batch_at_block(
-					valid_until_ethereum_block.saturating_add(1),
-					vec![activity_logs(vec![transfer_out_of_argon_finalized_log(
-						finalized_transfer_id,
-						vec![(signing_key, 5_000, 0)],
-						previous_gateway_activity_nonce.saturating_add(1),
-						1,
-					)])],
-				),
-			));
-
-			let gateway_state = GatewayStateBySourceChain::<Test>::get(SourceChain::Ethereum)
-				.expect("finalized activity should still advance gateway state");
-			assert_eq!(
-				gateway_state.gateway_activity_nonce,
-				previous_gateway_activity_nonce.saturating_add(1),
-			);
-			assert_eq!(gateway_state.argon_circulation, 5_000);
-
-			let pause = GatewaySyncPauseBySourceChain::<Test>::get(SourceChain::Ethereum)
-				.expect("expiration cleanup failure should pause sync");
-			assert_eq!(
-				pause.last_good_gateway_activity_nonce,
-				previous_gateway_activity_nonce.saturating_add(1),
-			);
-			assert_eq!(
-				pause.failed_gateway_activity_nonce,
-				previous_gateway_activity_nonce.saturating_add(1),
-			);
-			assert_eq!(pause.reason, GatewaySyncPauseReason::GatewayStateDrift);
-			assert!(TransferOutById::<Test>::get(finalized_transfer_id).is_none());
-			assert_eq!(
-				TransferOutById::<Test>::get(expired_transfer_id).map(|transfer| transfer.amount),
-				Some(5_000),
-			);
-			assert_eq!(
-				PendingCollateralizationRequestsByChain::<Test>::get(SourceChain::Ethereum),
-				vec![],
-			);
-			assert_eq!(
-				NonTerminalTransferOutCountByDestinationChain::<Test>::get(SourceChain::Ethereum),
-				1,
-			);
-			let authority = MintingAuthoritiesBySigner::<Test>::get(signing_key)
-				.expect("cleanup pause should keep the expired transfer reserved");
-			assert_eq!(authority.pending_reserved_microgon_collateral, 5_000);
-			assert_eq!(authority.active_pending_transfer_ids, vec![expired_transfer_id]);
-		});
-	}
-
-	#[test]
-	fn prove_gateway_activity_refunds_batch_that_advances_before_pausing() {
+	fn prove_gateway_activity_rolls_back_block_before_pausing() {
 		new_test_ext().execute_with(|| {
 			System::set_block_number(1);
 			assert_ok!(CrosschainTransfer::set_chain_config(
@@ -2942,7 +2489,7 @@ mod test {
 				RuntimeOrigin::signed(account(1)),
 				SourceChain::Ethereum,
 				0,
-				proof_batch(vec![activity_logs(vec![
+				block_proof(vec![activity_logs(vec![
 					argon_activity_log(recipient.clone(), 1, 500),
 					minting_authority_activated_log(
 						9_000,
@@ -2959,20 +2506,12 @@ mod test {
 			);
 
 			assert!(matches!(result, Ok(post_info) if post_info.pays_fee == Pays::No));
-			assert_eq!(Balances::balance(&recipient), 500);
-			assert_eq!(
-				GatewayStateBySourceChain::<Test>::get(SourceChain::Ethereum),
-				Some(GatewayState::<Test> {
-					gateway_activity_nonce: 1,
-					argon_approvals_nonce: 0,
-					argon_circulation: 9_500,
-					argonot_circulation: 0,
-				}),
-			);
+			assert_eq!(Balances::balance(&recipient), 0);
+			assert_eq!(GatewayStateBySourceChain::<Test>::get(SourceChain::Ethereum), None);
 			assert_eq!(
 				GatewaySyncPauseBySourceChain::<Test>::get(SourceChain::Ethereum),
 				Some(GatewaySyncPause {
-					last_good_gateway_activity_nonce: 1,
+					last_good_gateway_activity_nonce: 0,
 					failed_gateway_activity_nonce: 2,
 					reason: GatewaySyncPauseReason::GatewayStateDrift,
 				}),
@@ -2981,7 +2520,7 @@ mod test {
 	}
 
 	#[test]
-	fn prove_gateway_activity_accepts_contiguous_batch_across_proof_blocks() {
+	fn prove_gateway_activity_accepts_contiguous_logs_within_one_block_proof() {
 		new_test_ext().execute_with(|| {
 			System::set_block_number(1);
 			assert_ok!(CrosschainTransfer::set_chain_config(
@@ -3000,7 +2539,7 @@ mod test {
 				RuntimeOrigin::signed(account(1)),
 				SourceChain::Ethereum,
 				0,
-				proof_batch(vec![
+				block_proof(vec![
 					activity_logs(vec![argon_activity_log(first_recipient.clone(), 1, 500)]),
 					activity_logs(vec![argon_activity_log_with_circulation(
 						second_recipient.clone(),
@@ -3048,7 +2587,7 @@ mod test {
 				RuntimeOrigin::signed(account(1)),
 				SourceChain::Ethereum,
 				0,
-				proof_batch(vec![activity_logs(vec![
+				block_proof(vec![activity_logs(vec![
 					argon_activity_log(first_recipient.clone(), 1, 400),
 					argon_activity_log_with_circulation(second_recipient.clone(), 2, 600, 9_000, 0),
 				])]),
@@ -3071,7 +2610,7 @@ mod test {
 	}
 
 	#[test]
-	fn prove_gateway_activity_rejects_invalid_batches_without_partial_settlement() {
+	fn prove_gateway_activity_rejects_invalid_block_proofs_without_partial_settlement() {
 		new_test_ext().execute_with(|| {
 			System::set_block_number(1);
 			assert_ok!(CrosschainTransfer::set_chain_config(
@@ -3091,51 +2630,10 @@ mod test {
 					RuntimeOrigin::signed(account(1)),
 					SourceChain::Ethereum,
 					0,
-					proof_batch(vec![activity_logs(vec![
+					block_proof(vec![activity_logs(vec![
 						argon_activity_log(first_recipient.clone(), 2, 400),
 						argon_activity_log(second_recipient.clone(), 1, 600),
 					])]),
-				),
-				Error::<Test>::UnexpectedGatewayActivityNonce,
-			);
-
-			assert_eq!(Balances::balance(&first_recipient), 0);
-			assert_eq!(Balances::balance(&second_recipient), 0);
-			assert_eq!(GatewayStateBySourceChain::<Test>::get(SourceChain::Ethereum), None);
-			assert_eq!(RecentArgonTransfersByAccount::<Test>::get(&first_recipient), 0);
-			assert_eq!(RecentArgonTransfersByAccount::<Test>::get(&second_recipient), 0);
-			assert!(
-				!System::events()
-					.iter()
-					.any(|record| { matches!(record.event, RuntimeEvent::CrosschainTransfer(_)) }),
-				"transactional batch failure should roll back crosschain events",
-			);
-			ProofVerificationRejectedTransactionIndexes::set(vec![1]);
-
-			let first_recipient = account(14);
-			let second_recipient = account(15);
-
-			assert_noop!(
-				CrosschainTransfer::prove_gateway_activity(
-					RuntimeOrigin::signed(account(1)),
-					SourceChain::Ethereum,
-					0,
-					proof_batch(vec![
-						activity_logs_for_transaction_index(
-							vec![argon_activity_log(first_recipient.clone(), 1, 500)],
-							0,
-						),
-						activity_logs_for_transaction_index(
-							vec![argon_activity_log_with_circulation(
-								second_recipient.clone(),
-								2,
-								750,
-								8_750,
-								0,
-							)],
-							1,
-						),
-					]),
 				),
 				Error::<Test>::InvalidProof,
 			);
@@ -3149,9 +2647,8 @@ mod test {
 				!System::events()
 					.iter()
 					.any(|record| { matches!(record.event, RuntimeEvent::CrosschainTransfer(_)) }),
-				"invalid later proof block should not leave partial crosschain events behind",
+				"transactional batch failure should roll back crosschain events",
 			);
-			ProofVerificationRejectedTransactionIndexes::set(vec![]);
 
 			let first_recipient = account(16);
 			let second_recipient = account(17);
@@ -3161,7 +2658,7 @@ mod test {
 					RuntimeOrigin::signed(account(1)),
 					SourceChain::Ethereum,
 					0,
-					proof_batch(vec![activity_logs(vec![
+					block_proof(vec![activity_logs(vec![
 						argon_activity_log(first_recipient.clone(), 1, 500),
 						argon_activity_log_with_circulation(
 							second_recipient.clone(),
@@ -3172,7 +2669,7 @@ mod test {
 						),
 					])]),
 				),
-				Error::<Test>::UnexpectedGatewayActivityNonce,
+				Error::<Test>::InvalidProof,
 			);
 
 			assert_eq!(Balances::balance(&first_recipient), 0);
@@ -3200,61 +2697,17 @@ mod test {
 			));
 
 			let recipient = account(4);
+			let mut proof =
+				block_proof(vec![activity_logs(vec![argon_activity_log(recipient.clone(), 1, 5)])]);
+			proof.activity_logs[0].address = h160(0x44);
 			assert_noop!(
 				CrosschainTransfer::prove_gateway_activity(
 					RuntimeOrigin::signed(account(1)),
 					SourceChain::Ethereum,
 					0,
-					proof_batch(vec![activity_logs(vec![transfer_to_argon_started_log(
-						h160(0x44),
-						h160(0x11),
-						h160(0x31),
-						5,
-						destination_bytes(&recipient),
-						1,
-						0,
-						0,
-						0,
-					)])]),
+					proof,
 				),
-				Error::<Test>::UnsupportedGateway,
-			);
-		});
-	}
-
-	#[test]
-	fn prove_gateway_activity_pauses_on_malformed_gateway_activity() {
-		new_test_ext().execute_with(|| {
-			System::set_block_number(1);
-			assert_ok!(CrosschainTransfer::set_chain_config(
-				RuntimeOrigin::root(),
-				SourceChain::Ethereum,
-				chain_config(),
-			));
-
-			assert!(matches!(
-				CrosschainTransfer::prove_gateway_activity(
-					RuntimeOrigin::signed(account(1)),
-					SourceChain::Ethereum,
-					0,
-					proof_batch(vec![activity_logs(vec![EthereumLog {
-						address: h160(0x21),
-						topics: vec![H256::zero()]
-							.try_into()
-							.expect("topics stay within Ethereum log topic bounds"),
-						data: vec![].try_into().expect("empty data stays within log payload bounds"),
-					}])]),
-				),
-				Ok(post_info) if post_info.pays_fee == Pays::No
-			));
-			assert_eq!(GatewayStateBySourceChain::<Test>::get(SourceChain::Ethereum), None);
-			assert_eq!(
-				GatewaySyncPauseBySourceChain::<Test>::get(SourceChain::Ethereum),
-				Some(GatewaySyncPause {
-					last_good_gateway_activity_nonce: 0,
-					failed_gateway_activity_nonce: 1,
-					reason: GatewaySyncPauseReason::MalformedGatewayActivity,
-				}),
+				Error::<Test>::InvalidProof,
 			);
 		});
 	}
@@ -3278,7 +2731,7 @@ mod test {
 					RuntimeOrigin::signed(account(1)),
 					SourceChain::Ethereum,
 					1,
-					proof_batch(vec![activity_logs(vec![argon_activity_log(
+					block_proof(vec![activity_logs(vec![argon_activity_log(
 						recipient.clone(),
 						1,
 						10,
@@ -3291,14 +2744,145 @@ mod test {
 					RuntimeOrigin::signed(account(1)),
 					SourceChain::Ethereum,
 					0,
-					proof_batch(vec![activity_logs(vec![argon_activity_log(
+					block_proof(vec![activity_logs(vec![argon_activity_log(
 						recipient.clone(),
 						2,
 						10,
 					)])]),
 				),
-				Error::<Test>::UnexpectedGatewayActivityNonce,
+				Error::<Test>::InvalidProof,
 			);
+		});
+	}
+
+	#[test]
+	fn prove_gateway_activity_rejects_later_locator_root_recomputed_from_zero() {
+		new_test_ext().execute_with(|| {
+			System::set_block_number(1);
+			assert_ok!(CrosschainTransfer::set_chain_config(
+				RuntimeOrigin::root(),
+				SourceChain::Ethereum,
+				chain_config(),
+			));
+
+			let burn_account = CrosschainTransfer::burn_account(SourceChain::Ethereum);
+			assert_ok!(Balances::mint_into(&burn_account, 10_000));
+
+			assert_ok!(CrosschainTransfer::prove_gateway_activity(
+				RuntimeOrigin::signed(account(1)),
+				SourceChain::Ethereum,
+				0,
+				block_proof(vec![activity_logs(vec![argon_activity_log(account(18), 1, 400)])]),
+			));
+			assert_ne!(
+				LastAcceptedLocatorHashBySourceChain::<Test>::get(SourceChain::Ethereum),
+				H256::zero(),
+			);
+
+			let second_recipient = account(19);
+			let second_log = argon_activity_log(second_recipient.clone(), 2, 500);
+			let mut proof = block_proof(vec![activity_logs(vec![second_log.clone()])]);
+			let locator_index = 2;
+			let (range_slot, root_slot) =
+				CrosschainTransfer::gateway_activity_locator_slots(locator_index);
+			proof.locator_index = locator_index;
+			proof.storage_proof.slots[0].slot = range_slot;
+			proof.storage_proof.slots[1].slot = root_slot;
+
+			let decoded_activity =
+				CrosschainTransfer::decode_evm_gateway_activity(SourceChain::Ethereum, &second_log)
+					.expect("test gateway activity should decode");
+			let chain_config = chain_config();
+			let unseeded_root = ethereum_contracts::append_activity_root(
+				alloy_primitives::B256::ZERO,
+				alloy_primitives::B256::from(decoded_activity.leaf_hash(&chain_config).0),
+			);
+			proof.storage_proof.slots[1].value = H256::from_slice(unseeded_root.as_slice());
+
+			assert_noop!(
+				CrosschainTransfer::prove_gateway_activity(
+					RuntimeOrigin::signed(account(1)),
+					SourceChain::Ethereum,
+					1,
+					proof,
+				),
+				Error::<Test>::InvalidProof,
+			);
+			assert_eq!(Balances::balance(&second_recipient), 0);
+			assert_eq!(
+				GatewayStateBySourceChain::<Test>::get(SourceChain::Ethereum)
+					.expect("gateway state should remain at the first accepted locator")
+					.gateway_activity_nonce,
+				1,
+			);
+		});
+	}
+
+	#[test]
+	fn prove_gateway_activity_requires_bootstrapped_locator_hash_for_existing_gateway_state() {
+		new_test_ext().execute_with(|| {
+			System::set_block_number(1);
+			assert_ok!(CrosschainTransfer::set_chain_config(
+				RuntimeOrigin::root(),
+				SourceChain::Ethereum,
+				chain_config(),
+			));
+
+			let burn_account = CrosschainTransfer::burn_account(SourceChain::Ethereum);
+			assert_ok!(Balances::mint_into(&burn_account, 10_000));
+
+			let first_recipient = account(18);
+			let first_proof = block_proof(vec![activity_logs(vec![argon_activity_log(
+				first_recipient.clone(),
+				1,
+				400,
+			)])]);
+			assert_ok!(CrosschainTransfer::prove_gateway_activity(
+				RuntimeOrigin::signed(account(1)),
+				SourceChain::Ethereum,
+				0,
+				first_proof,
+			));
+			let first_locator_hash =
+				LastAcceptedLocatorHashBySourceChain::<Test>::get(SourceChain::Ethereum);
+			let second_recipient = account(19);
+			let second_proof = block_proof(vec![activity_logs(vec![argon_activity_log(
+				second_recipient.clone(),
+				2,
+				500,
+			)])]);
+			LastAcceptedLocatorHashBySourceChain::<Test>::remove(SourceChain::Ethereum);
+
+			assert_noop!(
+				CrosschainTransfer::prove_gateway_activity(
+					RuntimeOrigin::signed(account(1)),
+					SourceChain::Ethereum,
+					1,
+					second_proof.clone(),
+				),
+				Error::<Test>::MissingLastAcceptedLocatorHash,
+			);
+
+			assert_ok!(CrosschainTransfer::set_last_accepted_locator_hash(
+				RuntimeOrigin::root(),
+				SourceChain::Ethereum,
+				first_locator_hash,
+			));
+			assert_noop!(
+				CrosschainTransfer::set_last_accepted_locator_hash(
+					RuntimeOrigin::root(),
+					SourceChain::Ethereum,
+					H256::repeat_byte(0x44),
+				),
+				Error::<Test>::LastAcceptedLocatorHashAlreadySet,
+			);
+			assert_ok!(CrosschainTransfer::prove_gateway_activity(
+				RuntimeOrigin::signed(account(1)),
+				SourceChain::Ethereum,
+				1,
+				second_proof,
+			));
+			assert_eq!(Balances::balance(&second_recipient), 500);
 		});
 	}
 
@@ -3319,7 +2903,7 @@ mod test {
 					RuntimeOrigin::signed(account(1)),
 					SourceChain::Ethereum,
 					0,
-					proof_batch(vec![activity_logs(vec![argon_activity_log(account(8), 1, 100)])]),
+					block_proof(vec![activity_logs(vec![argon_activity_log(account(8), 1, 100)])]),
 				),
 				Error::<Test>::InvalidProof,
 			);
@@ -3688,68 +3272,80 @@ mod test {
 
 	fn activity_logs(
 		logs: Vec<EthereumLog>,
-	) -> BoundedVec<EthereumReceiptLog, MaxActivitiesPerReceiptProof> {
-		activity_logs_for_transaction_index(logs, 0)
-	}
-
-	fn activity_logs_for_transaction_index(
-		logs: Vec<EthereumLog>,
-		transaction_index: u64,
-	) -> BoundedVec<EthereumReceiptLog, MaxActivitiesPerReceiptProof> {
+	) -> BoundedVec<EthereumLog, MaxActivitiesPerGatewayProof> {
 		logs.into_iter()
-			.map(|event_log| EthereumReceiptLog { transaction_index, event_log })
 			.collect::<Vec<_>>()
 			.try_into()
 			.expect("test gateway activity logs stay within pallet bound")
 	}
 
-	fn proof_batch(
-		log_blocks: Vec<BoundedVec<EthereumReceiptLog, MaxActivitiesPerReceiptProof>>,
-	) -> GatewayActivityProofBatch<Test> {
-		proof_batch_at_block(0, log_blocks)
-	}
-
-	fn proof_batch_at_block(
-		target_block_number: u64,
-		log_blocks: Vec<BoundedVec<EthereumReceiptLog, MaxActivitiesPerReceiptProof>>,
-	) -> GatewayActivityProofBatch<Test> {
-		GatewayActivityProofBatch::<Test> {
-			execution_block_proof: dummy_execution_block_proof(),
-			blocks: log_blocks
-				.into_iter()
-				.map(|receipt_logs| GatewayActivityProofBlock::<Test> {
-					target_block_number,
-					receipt_proof: dummy_receipt_proof(),
-					receipt_logs,
-				})
-				.collect::<Vec<_>>()
-				.try_into()
-				.expect("test gateway proof blocks stay within pallet bound"),
-		}
-	}
-
-	fn dummy_execution_block_proof() -> EthereumExecutionBlockProof {
-		EthereumExecutionBlockProof {
-			anchor_block_hash: H256::repeat_byte(1),
-			target_to_anchor_header_chain: Vec::new()
-				.try_into()
-				.expect("empty header chain stays within bounds"),
-		}
-	}
-
-	fn dummy_receipt_proof() -> EthereumCombinedReceiptProof {
-		EthereumCombinedReceiptProof {
-			nodes: vec![vec![1u8].try_into().expect("tiny receipt proof node stays within bounds")]
-				.try_into()
-				.expect("single-node receipt proof stays within bounds"),
-			receipts: vec![EthereumReceiptProofReceipt {
-				transaction_index: 0,
-				node_indexes: vec![0]
-					.try_into()
-					.expect("single node index stays within bounded receipt proof refs"),
-			}]
+	fn block_proof(
+		log_blocks: Vec<BoundedVec<EthereumLog, MaxActivitiesPerGatewayProof>>,
+	) -> GatewayActivityProof<MaxActivitiesPerGatewayProof> {
+		let activity_logs: BoundedVec<EthereumLog, MaxActivitiesPerGatewayProof> = log_blocks
+			.into_iter()
+			.flat_map(|logs| logs.into_iter())
+			.collect::<Vec<_>>()
 			.try_into()
-			.expect("single receipt reference stays within bounded receipt proof count"),
+			.expect("test gateway activity logs stay within pallet bound");
+		if !activity_logs.is_empty() &&
+			!ChainConfigBySourceChain::<Test>::contains_key(SourceChain::Ethereum)
+		{
+			ChainConfigBySourceChain::<Test>::insert(SourceChain::Ethereum, chain_config());
+		}
+		let mut activity_root = alloy_primitives::B256::from(
+			LastAcceptedLocatorHashBySourceChain::<Test>::get(SourceChain::Ethereum).0,
+		);
+		let chain_config = chain_config();
+		let mut start_gateway_activity_nonce: Option<GatewayActivityNonce> = None;
+		let mut end_gateway_activity_nonce: Option<GatewayActivityNonce> = None;
+
+		for activity_log in &activity_logs {
+			let decoded_activity = CrosschainTransfer::decode_evm_gateway_activity(
+				SourceChain::Ethereum,
+				activity_log,
+			)
+			.expect("test gateway activity should decode");
+			let gateway_activity_nonce = decoded_activity.gateway_activity_nonce();
+			if start_gateway_activity_nonce.is_none() {
+				start_gateway_activity_nonce = Some(gateway_activity_nonce);
+			}
+			end_gateway_activity_nonce = Some(gateway_activity_nonce);
+			activity_root = ethereum_contracts::append_activity_root(
+				activity_root,
+				alloy_primitives::B256::from(decoded_activity.leaf_hash(&chain_config).0),
+			);
+		}
+		let locator_index = 1;
+		let (range_slot, root_slot) =
+			CrosschainTransfer::gateway_activity_locator_slots(locator_index);
+
+		GatewayActivityProof::<MaxActivitiesPerGatewayProof> {
+			locator_index,
+			storage_proof: argon_primitives::EthereumAccountStorageProof {
+				anchor_block_hash: H256::repeat_byte(1),
+				account_proof: Default::default(),
+				storage_proof: Default::default(),
+				slots: vec![
+					argon_primitives::EthereumStorageSlotProof {
+						slot: range_slot,
+						value: CrosschainTransfer::gateway_activity_locator_range_slot_value(
+							0,
+							start_gateway_activity_nonce.unwrap_or_default(),
+							end_gateway_activity_nonce.unwrap_or_default(),
+						),
+						node_indexes: Default::default(),
+					},
+					argon_primitives::EthereumStorageSlotProof {
+						slot: root_slot,
+						value: H256::from_slice(activity_root.as_slice()),
+						node_indexes: Default::default(),
+					},
+				]
+				.try_into()
+				.expect("test locator slots stay within proof bound"),
+			},
+			activity_logs,
 		}
 	}
 }

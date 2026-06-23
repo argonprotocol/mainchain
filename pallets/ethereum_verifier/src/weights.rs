@@ -39,6 +39,7 @@ pub trait WeightInfo {
 	fn submit() -> Weight;
 	fn submit_with_sync_committee() -> Weight;
 	fn provider_verify_receipt_logs(proof_blocks: u32, extra_activities: u32) -> Weight;
+	fn provider_verify_account_storage_proof(storage_slots: u32) -> Weight;
 	fn provider_latest_execution_block_number() -> Weight;
 	fn provider_latest_execution_block_timestamp() -> Weight;
 }
@@ -75,6 +76,12 @@ impl WeightInfo for () {
 			.saturating_add(RocksDbWeight::get().reads(1))
 	}
 
+	fn provider_verify_account_storage_proof(_storage_slots: u32) -> Weight {
+		Weight::from_parts(25_000_000_000_u64, 0)
+			.saturating_add(Weight::from_parts(0, 8192))
+			.saturating_add(RocksDbWeight::get().reads(1))
+	}
+
 	fn provider_latest_execution_block_number() -> Weight {
 		Weight::from_parts(8_000_000, 0).saturating_add(RocksDbWeight::get().reads(2))
 	}
@@ -89,6 +96,10 @@ pub struct ProviderWeightAdapter<T>(PhantomData<T>);
 impl<T: super::Config> EthereumVerifyProviderWeightInfo for ProviderWeightAdapter<T> {
 	fn verify_receipt_logs(proof_blocks: u32, extra_activities: u32) -> Weight {
 		T::WeightInfo::provider_verify_receipt_logs(proof_blocks, extra_activities)
+	}
+
+	fn verify_account_storage_proof(storage_slots: u32) -> Weight {
+		T::WeightInfo::provider_verify_account_storage_proof(storage_slots)
 	}
 
 	fn latest_execution_block_number() -> Weight {

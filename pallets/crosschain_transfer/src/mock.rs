@@ -2,9 +2,9 @@ use crate as pallet_crosschain_transfer;
 use argon_primitives::{
 	tick::Ticker,
 	vault::{BitcoinVaultProvider, RegistrationVaultData, VaultArgonotCommitment, VaultError},
-	EthereumBlockNumber, EthereumReceiptLog, EthereumReceiptLogProofBatch, EthereumVerifyError,
-	EthereumVerifyProvider, OperationalAccountsHook, PriceProvider, TickProvider,
-	TreasuryPoolProvider, VaultId, VotingSchedule,
+	EthereumAccountStorageProof, EthereumBlockNumber, EthereumVerifyError, EthereumVerifyProvider,
+	OperationalAccountsHook, PriceProvider, TickProvider, TreasuryPoolProvider, VaultId,
+	VotingSchedule,
 };
 use frame_support::traits::StorageMapShim;
 use pallet_prelude::*;
@@ -44,8 +44,7 @@ parameter_types! {
 	pub CrosschainTransferEthereumBurnAccount: TestAccountId = CrosschainTransferPalletId::get()
 		.into_sub_account_truncating((pallet_crosschain_transfer::SourceChain::Ethereum, *b"burn"));
 	pub const RecentTransferRetentionTicks: Tick = 5;
-	pub const MaxActivitiesPerReceiptProof: u32 = 16;
-	pub const MaxReceiptProofsPerExtrinsic: u32 = 10;
+	pub const MaxActivitiesPerGatewayProof: u32 = 2004;
 	pub const MaxCouncilMembers: u32 = 100;
 	pub const MaxQueueApprovalsPerCall: u32 = 32;
 	pub const TransferOutValidityEthereumBlocks: EthereumBlockNumber = 72_000;
@@ -62,7 +61,6 @@ parameter_types! {
 	pub static ArgonotPriceInUsd: FixedU128 = FixedU128::one();
 	pub static LowestMicrogonsPerArgonot: Option<Balance> = None;
 	pub static ProofVerificationAllowed: bool = true;
-	pub static ProofVerificationRejectedTransactionIndexes: Vec<u64> = Vec::new();
 	pub static LatestExecutionBlockNumber: Option<EthereumBlockNumber> = Some(1_000);
 	pub static LatestExecutionBlockTimestamp: Option<u64> = Some(0);
 	pub static ConfirmedTransfers: Vec<(TestAccountId, Balance)> = Vec::new();
@@ -158,14 +156,27 @@ impl EthereumVerifyProvider for MockEthereumVerifier {
 	type Weights = ();
 
 	fn verify_receipt_logs<MaxProofBlocks, MaxReceiptLogs>(
-		proof_batch: &EthereumReceiptLogProofBatch<MaxProofBlocks, MaxReceiptLogs>,
+		_proof_batch: &argon_primitives::EthereumReceiptLogProofBatch<
+			MaxProofBlocks,
+			MaxReceiptLogs,
+		>,
 	) -> Result<(), EthereumVerifyError>
 	where
 		MaxProofBlocks: Get<u32>,
 		MaxReceiptLogs: Get<u32>,
 	{
-		for proof_block in &proof_batch.blocks {
-			Self::verify_receipt_logs_internal(&proof_block.receipt_logs)?;
+		Err(EthereumVerifyError::InvalidProof)
+	}
+
+	fn verify_account_storage_proof<MaxStorageSlots>(
+		_account_address: H160,
+		_proof: &EthereumAccountStorageProof<MaxStorageSlots>,
+	) -> Result<(), EthereumVerifyError>
+	where
+		MaxStorageSlots: Get<u32>,
+	{
+		if !ProofVerificationAllowed::get() {
+			return Err(EthereumVerifyError::InvalidProof);
 		}
 
 		Ok(())
@@ -206,26 +217,6 @@ impl TickProvider<Block> for MockTickProvider {
 
 	fn blocks_at_tick(_tick: Tick) -> Vec<<Block as sp_runtime::traits::Block>::Hash> {
 		Vec::new()
-	}
-}
-
-impl MockEthereumVerifier {
-	fn verify_receipt_logs_internal(
-		receipt_logs: &[EthereumReceiptLog],
-	) -> Result<(), EthereumVerifyError> {
-		if !ProofVerificationAllowed::get() {
-			return Err(EthereumVerifyError::InvalidProof);
-		}
-
-		let rejected_indexes = ProofVerificationRejectedTransactionIndexes::get();
-		if receipt_logs
-			.iter()
-			.any(|receipt_log| rejected_indexes.contains(&receipt_log.transaction_index))
-		{
-			return Err(EthereumVerifyError::InvalidProof);
-		}
-
-		Ok(())
 	}
 }
 
@@ -575,8 +566,7 @@ impl pallet_crosschain_transfer::Config for Test {
 	type CurrentTick = CurrentTick;
 	type TickProvider = MockTickProvider;
 	type RecentTransferRetentionTicks = RecentTransferRetentionTicks;
-	type MaxActivitiesPerReceiptProof = MaxActivitiesPerReceiptProof;
-	type MaxReceiptProofsPerExtrinsic = MaxReceiptProofsPerExtrinsic;
+	type MaxActivitiesPerGatewayProof = MaxActivitiesPerGatewayProof;
 	type MaxCouncilMembers = MaxCouncilMembers;
 	type MaxQueueApprovalsPerCall = MaxQueueApprovalsPerCall;
 	type TransferOutValidityEthereumBlocks = TransferOutValidityEthereumBlocks;
@@ -597,7 +587,6 @@ pub fn new_test_ext() -> TestState {
 	ArgonotPriceInUsd::set(FixedU128::one());
 	LowestMicrogonsPerArgonot::set(None);
 	ProofVerificationAllowed::set(true);
-	ProofVerificationRejectedTransactionIndexes::set(Vec::new());
 	LatestExecutionBlockNumber::set(Some(1_000));
 	LatestExecutionBlockTimestamp::set(Some(0));
 	ConfirmedTransfers::set(Vec::new());

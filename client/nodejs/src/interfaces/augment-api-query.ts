@@ -1,5 +1,4 @@
 // Auto-generated via `yarn polkadot-types-from-chain`, do not edit
-/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
@@ -593,6 +592,16 @@ declare module '@polkadot/api-base/types/storage' {
         ApiType,
         (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<AccountId32>>,
         [u64]
+      >;
+      /**
+       * Latest accepted gateway locator hash for each source chain.
+       **/
+      lastAcceptedLocatorHashBySourceChain: AugmentedQuery<
+        ApiType,
+        (
+          arg: PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
+        ) => Observable<H256>,
+        [PalletCrosschainTransferSourceChain]
       >;
       /**
        * Latest tick whose recent-transfer expiration bucket was cleaned up.

@@ -4,7 +4,6 @@ pub(super) use alloy_sol_types::SolEvent;
 pub(super) use argon_ethereum_contracts::minting_gateway as ethereum_contracts;
 pub(super) use argon_primitives::{
 	Balance, CallTxPoolKeyProvider, CallTxValidityProvider, CollectBlockerProvider, EthereumLog,
-	EthereumReceiptLog,
 };
 pub(super) use frame_support::{
 	assert_noop, assert_ok,
@@ -550,14 +549,15 @@ pub(super) fn activate_test_minting_authority(
 				.expect("minting-authority activation data stays within bounded log payload")
 		},
 	};
-	let receipt_log = EthereumReceiptLog { transaction_index: 0, event_log };
-	let decoded_activity = match CrosschainTransfer::decode_evm_gateway_activity(
-		SourceChain::Ethereum,
-		&receipt_log.event_log,
-	) {
-		Ok(decoded_activity) => decoded_activity,
-		Err(_) => panic!("activation proof should succeed"),
-	};
+	let decoded_activity =
+		CrosschainTransfer::decode_evm_gateway_activity(SourceChain::Ethereum, &event_log)
+			.expect("activation log should decode");
+	let activity_root = ethereum_contracts::append_activity_root(
+		alloy_primitives::B256::from(
+			LastAcceptedLocatorHashBySourceChain::<Test>::get(SourceChain::Ethereum).0,
+		),
+		alloy_primitives::B256::from(decoded_activity.leaf_hash(&chain_config()).0),
+	);
 	let gateway_state = match CrosschainTransfer::apply_decoded_gateway_activity(
 		SourceChain::Ethereum,
 		previous_gateway_activity_nonce,
@@ -567,6 +567,15 @@ pub(super) fn activate_test_minting_authority(
 		Err(_) => panic!("activation proof should succeed"),
 	};
 	GatewayStateBySourceChain::<Test>::insert(SourceChain::Ethereum, gateway_state);
+	LastAcceptedLocatorHashBySourceChain::<Test>::insert(
+		SourceChain::Ethereum,
+		CrosschainTransfer::hash_gateway_activity_block_locator(
+			0,
+			gateway_activity_nonce,
+			gateway_activity_nonce,
+			H256::from_slice(activity_root.as_slice()),
+		),
+	);
 	signing_key
 }
 

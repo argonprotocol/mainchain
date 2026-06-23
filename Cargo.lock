@@ -1026,6 +1026,7 @@ version = "1.4.7"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
+ "serde_json",
 ]
 
 [[package]]
