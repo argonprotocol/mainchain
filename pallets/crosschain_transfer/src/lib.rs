@@ -21,7 +21,6 @@ mod tests;
 
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
-pub mod hyperbridge_migration;
 mod weights;
 pub use transfer_out::{
 	MintingAuthorityTransferReservation, PendingCollateralizationRequest, TransferOutOfArgon,
@@ -1048,12 +1047,6 @@ pub mod pallet {
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(_: BlockNumberFor<T>) -> Weight {
-			let mut weight = Weight::zero();
-			if hyperbridge_migration::needs_initialization::<T>() {
-				weight = weight
-					.saturating_add(hyperbridge_migration::initialize_crosschain_transfer::<T>());
-			}
-
 			let current_tick = T::CurrentTick::get();
 			let last_cleanup_tick = LastTransferExpiryCleanupTick::<T>::get();
 			let first_tick_to_cleanup = if last_cleanup_tick == 0 {
@@ -1073,7 +1066,7 @@ pub mod pallet {
 			}
 
 			LastTransferExpiryCleanupTick::<T>::put(current_tick);
-			weight.saturating_add(T::WeightInfo::on_initialize_cleanup(expiring_len))
+			T::WeightInfo::on_initialize_cleanup(expiring_len)
 		}
 	}
 
