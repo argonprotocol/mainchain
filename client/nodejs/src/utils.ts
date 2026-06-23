@@ -73,6 +73,34 @@ export function isOutdatedTransactionError(error: unknown): boolean {
   );
 }
 
+export const TxSubmissionErrorCode = {
+  Dropped: 'TxSubmission.Dropped',
+  Invalid: 'TxSubmission.Invalid',
+  Usurped: 'TxSubmission.Usurped',
+} as const;
+
+export type TxSubmissionErrorCode = (typeof TxSubmissionErrorCode)[keyof typeof TxSubmissionErrorCode];
+
+export class TxSubmissionError extends Error {
+  constructor(
+    public readonly errorCode: TxSubmissionErrorCode,
+    message: string,
+  ) {
+    super(message);
+  }
+}
+
+export function isTxSubmissionError(
+  error: unknown,
+  ...codes: TxSubmissionErrorCode[]
+): error is TxSubmissionError {
+  if (!(error instanceof TxSubmissionError)) {
+    return false;
+  }
+
+  return codes.length === 0 || codes.includes(error.errorCode);
+}
+
 // ExtrinsicError
 export class ExtrinsicError extends Error {
   constructor(

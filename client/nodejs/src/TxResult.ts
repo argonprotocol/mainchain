@@ -1,5 +1,10 @@
 import { ArgonClient, GenericEvent, SpRuntimeDispatchError } from './index';
-import { dispatchErrorToExtrinsicError, ExtrinsicError } from './utils';
+import {
+  dispatchErrorToExtrinsicError,
+  ExtrinsicError,
+  TxSubmissionError,
+  TxSubmissionErrorCode,
+} from './utils';
 import type { ISubmittableResult } from '@polkadot/types/types/extrinsic';
 import { DispatchError } from '@polkadot/types/interfaces';
 
@@ -141,6 +146,24 @@ export class TxResult {
         events: extrinsicEvents,
         extrinsicIndex: txIndex!,
       });
+    }
+    if (status.isUsurped) {
+      this.submissionError = new TxSubmissionError(
+        TxSubmissionErrorCode.Usurped,
+        `Transaction was usurped by ${status.asUsurped.toHex()}.`,
+      );
+    }
+    if (status.isDropped) {
+      this.submissionError = new TxSubmissionError(
+        TxSubmissionErrorCode.Dropped,
+        'Transaction was dropped before it was included in a block.',
+      );
+    }
+    if (status.isInvalid) {
+      this.submissionError = new TxSubmissionError(
+        TxSubmissionErrorCode.Invalid,
+        'Transaction was rejected as invalid by the node.',
+      );
     }
     if (isFinalized) {
       this.setFinalized();
