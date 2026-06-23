@@ -23,7 +23,6 @@ bitcoincore-rpc = { workspace = true, optional = true }
 
 anyhow = { workspace = true, default-features = false }
 parking_lot = { workspace = true, optional = true }
-hwi = { workspace = true, optional = true }
 
 argon-primitives = { workspace = true, default-features = false, features = ["bitcoin"] }
 log = { workspace = true }
@@ -62,4 +61,3 @@ std = [
 	"tokio",
 	"url/std",
 ]
-hwi = [ "dep:hwi" ]

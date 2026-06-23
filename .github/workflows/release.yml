@@ -184,11 +184,3 @@ jobs:
           archive: $bin-$tag-$target
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: refs/tags/${{ env.RELEASE_TAG }}
-
-      - uses: taiki-e/upload-rust-binary-action@f0d45ae91ee7b8ee928de7a9d04d893a08bcbec6 # v1
-        with:
-          bin: argon-bitcoin-cli
-          target: ${{ matrix.target }}
-          archive: $bin-$tag-$target
-          token: ${{ secrets.GITHUB_TOKEN }}
-          ref: refs/tags/${{ env.RELEASE_TAG }}

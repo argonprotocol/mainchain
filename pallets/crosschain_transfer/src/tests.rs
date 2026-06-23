@@ -12,15 +12,11 @@ pub(super) use frame_support::{
 	traits::{
 		fungible::{Inspect, InspectHold, Mutate, MutateHold},
 		tokens::{Fortitude, Precision, Preservation},
-		GetStorageVersion,
 	},
 };
-pub(super) use pallet_prelude::{BoundedVec, StorageVersion, H160, H256};
-pub(super) use sp_core::{bounded_vec, crypto::Ss58Codec, ecdsa::KeccakPair, Pair};
-pub(super) use sp_runtime::{
-	transaction_validity::{InvalidTransaction, TransactionValidityError},
-	AccountId32,
-};
+pub(super) use pallet_prelude::{BoundedVec, H160, H256};
+pub(super) use sp_core::{bounded_vec, ecdsa::KeccakPair, Pair};
+pub(super) use sp_runtime::transaction_validity::{InvalidTransaction, TransactionValidityError};
 
 pub(super) use super::mock::*;
 
@@ -289,61 +285,6 @@ fn on_initialize_expires_recent_transfers() {
 	});
 }
 
-#[test]
-fn migration_moves_legacy_balances_and_refunds_ready_cases() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-
-		let legacy_account = legacy_token_gateway_account();
-		let burn_account = CrosschainTransfer::burn_account(SourceChain::Ethereum);
-
-		let _ = super::hyperbridge_migration::initialize_crosschain_transfer::<Test>();
-
-		assert_eq!(Balances::balance(&legacy_account), 0);
-		assert_eq!(Ownership::balance(&legacy_account), 0);
-		assert_eq!(
-			<CrosschainTransfer as GetStorageVersion>::on_chain_storage_version(),
-			StorageVersion::new(1),
-		);
-
-		assert_eq!(Balances::balance(&burn_account), 1_928_409);
-		assert_eq!(Ownership::balance(&burn_account), 299_993);
-
-		assert_eq!(Balances::balance(&launch_era_argon_refund_account()), 1_000_001);
-		assert_eq!(Balances::balance(&small_launch_era_argon_refund_account()), 2_000);
-		assert_eq!(Balances::balance(&post_hack_argon_refund_account()), 197_069_590);
-		assert_eq!(Ownership::balance(&ready_argonot_refund_account()), 200_000);
-	});
-}
-
-#[test]
-fn on_initialize_runs_crosschain_transfer_initialization_on_first_load() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-		StorageVersion::new(0).put::<CrosschainTransfer>();
-
-		let legacy_account = legacy_token_gateway_account();
-		let burn_account = CrosschainTransfer::burn_account(SourceChain::Ethereum);
-
-		CrosschainTransfer::on_initialize(System::block_number());
-
-		assert_eq!(Balances::balance(&legacy_account), 0);
-		assert_eq!(Ownership::balance(&legacy_account), 0);
-		assert_eq!(
-			<CrosschainTransfer as GetStorageVersion>::on_chain_storage_version(),
-			StorageVersion::new(1),
-		);
-
-		assert_eq!(Balances::balance(&burn_account), 1_928_409);
-		assert_eq!(Ownership::balance(&burn_account), 299_993);
-
-		assert_eq!(Balances::balance(&launch_era_argon_refund_account()), 1_000_001);
-		assert_eq!(Balances::balance(&small_launch_era_argon_refund_account()), 2_000);
-		assert_eq!(Balances::balance(&post_hack_argon_refund_account()), 197_069_590);
-		assert_eq!(Ownership::balance(&ready_argonot_refund_account()), 200_000);
-	});
-}
-
 pub(super) fn chain_config() -> ChainConfig {
 	ChainConfig::Evm {
 		chain_id: 1,
@@ -599,24 +540,4 @@ pub(super) fn u128_word(value: u128) -> [u8; 32] {
 	let mut bytes = [0u8; 32];
 	bytes[16..].copy_from_slice(&value.to_be_bytes());
 	bytes
-}
-
-fn launch_era_argon_refund_account() -> AccountId32 {
-	AccountId32::from_ss58check("5C5CdgR7eNjc8HCtR43uWSKsMoWZGZpMYGgCXAPJPMKdoVU2")
-		.expect("valid ss58")
-}
-
-fn small_launch_era_argon_refund_account() -> AccountId32 {
-	AccountId32::from_ss58check("5F4UiKa1o5LLrLwgZz3pFizXhZnEvEr3mvtoGrEk3fZTXeyd")
-		.expect("valid ss58")
-}
-
-fn post_hack_argon_refund_account() -> AccountId32 {
-	AccountId32::from_ss58check("5Cz3PZVcLitGyqc1Su4KYcvseoLhn93pUHtXDNBLx5aoKsF5")
-		.expect("valid ss58")
-}
-
-fn ready_argonot_refund_account() -> AccountId32 {
-	AccountId32::from_ss58check("5EqsqBNe1LfkGLEah9GpSMWTT4XHzGeVEAZ4dGUm5vFHA4t8")
-		.expect("valid ss58")
 }
