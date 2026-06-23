@@ -172,15 +172,15 @@ Useful Urls:
 - Notary: `wss://notary1.argon.network`
 - Bootnodes: `wss://bootnode0.argon.network`, `wss://bootnode1.argon.network`
 - [Polkadot/Substrate Portal](https://polkadot.js.org/apps/#/explorer?rpc=wss://rpc.argon.network)
-- [Argon Discord](https://discord.gg/6JxjCNvu6x)
+- [Argon Discord](https://discord.gg/xDwwDgCYr9)
 
 ## Using the Testnet
 
 The Argon testnet is intended to be used for testing and development. All changes will be deployed
 to this network before the mainnet. You can connect to the
 [Polkadot Developer Portal](https://polkadot.js.org/apps/#/explorer?rpc=wss://rpc.argon.network) to
-interact with the testnet. We are also publishing binary versions of the localchain and bitcoin cli
-that are useful to test out connecting to the testnet. Those versions can be found on the
+interact with the testnet. We are also publishing binary versions of the localchain that are
+useful to test out connecting to the testnet. Those versions can be found on the
 [releases page](https://github.com/argonprotocol/argon/releases/latest).
 
 Useful Urls:
@@ -195,8 +195,6 @@ Here are some tutorials to get you started:
 
 - [How to set up an Account](./docs/account-setup.md)
 - [How to use the Argon Localchain CLI](./docs/localchain.md#command-line-interface)
-- [How to lock Bitcoins using the Argon Bitcoin CLI](./docs/bitcoin-lock)
-- [How to create and manage a Vault using the Argon Bitcoin CLI](./docs/running-a-vault.md)
 - [How to run a miner](./docs/run-a-miner.md)
 - [How to transfer Argon between chains](./docs/chain-transfers.md)
 

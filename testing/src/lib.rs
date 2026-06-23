@@ -5,7 +5,6 @@ use std::{
 	path::{Path, PathBuf},
 };
 
-mod argon_bitcoin;
 mod argon_localchain;
 mod argon_node;
 mod argon_notary;
@@ -14,7 +13,6 @@ mod bitcoind;
 mod log_watcher;
 
 pub use crate::argon_node::ArgonNodeStartArgs;
-pub use argon_bitcoin::run_bitcoin_cli;
 pub use argon_localchain::*;
 pub use argon_node::ArgonTestNode;
 pub use argon_notary::ArgonTestNotary;

@@ -1,7 +1,6 @@
 import { ArgonClient, Keyring, KeyringPair, TxSubmitter } from '@argonprotocol/mainchain';
 import TestNotary from './TestNotary';
 import TestMainchain from './TestMainchain';
-import TestBitcoinCli from './TestBitcoinCli';
 import TestOracle from './TestOracle';
 import TestEthereum from './TestEthereum';
 import { startNetwork } from './TestNetwork';
@@ -38,7 +37,7 @@ export {
   TestMintingAuthorityActor,
   TestMintingGateway,
 } from './TestEthereumProofActors';
-export { TestNotary, TestMainchain, TestBitcoinCli, TestOracle, TestEthereum, startNetwork };
+export { TestNotary, TestMainchain, TestOracle, TestEthereum, startNetwork };
 
 export function stringifyExt(obj: any): any {
   return JSON.stringify(
