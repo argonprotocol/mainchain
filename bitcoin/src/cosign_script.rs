@@ -821,6 +821,56 @@ mod test {
 		drop(bitcoind);
 	}
 
+	#[test]
+	fn vault_uploaded_xpub_root_can_sign_release_child() {
+		let network = Network::Regtest;
+		let secp = Secp256k1::new();
+		let amount: Satoshis = Amount::ONE_BTC.to_sat();
+		let (master_xpriv, _) = create_xpriv(network);
+		let uploaded_vault_xpub_path: bitcoin::bip32::DerivationPath = "m/0'".parse().unwrap();
+		let uploaded_vault_xpriv = master_xpriv
+			.derive_priv(&secp, &uploaded_vault_xpub_path)
+			.expect("uploaded vault xpub root");
+		let (vault_compressed_pubkey, _) = derive(&master_xpriv, "m/0'/1");
+		let vault_claim_pubkey = derive(&master_xpriv, "m/0'/2").0;
+		let owner_pubkey: CompressedBitcoinPubkey =
+			PrivateKey::generate(network).public_key(&secp).into();
+		let vault_pubkey: CompressedBitcoinPubkey = vault_compressed_pubkey.into();
+		let out_script_pubkey = vault_compressed_pubkey.p2wpkh_script_code();
+		let fee = Amount::from_sat(500);
+		let mut releaser = CosignReleaser::new(
+			CosignScriptArgs {
+				vault_pubkey,
+				vault_claim_pubkey: vault_claim_pubkey.into(),
+				owner_pubkey,
+				vault_claim_height: 120,
+				open_claim_height: 240,
+				created_at_height: 100,
+			},
+			amount,
+			"0000000000000000000000000000000000000000000000000000000000000001"
+				.parse()
+				.unwrap(),
+			0,
+			ReleaseStep::VaultCosign,
+			fee,
+			out_script_pubkey,
+			network,
+		)
+		.expect("unlocker");
+
+		let (vault_signature, signed_pubkey) = releaser
+			.sign_derived(
+				uploaded_vault_xpriv,
+				alloc::vec![bitcoin::bip32::ChildNumber::from_normal_idx(1).unwrap()].into(),
+			)
+			.expect("sign");
+
+		assert_eq!(signed_pubkey, vault_compressed_pubkey.into());
+		let vault_signature_api: BitcoinSignature = vault_signature.try_into().unwrap();
+		assert!(releaser.verify_signature_raw(vault_pubkey, &vault_signature_api).unwrap());
+	}
+
 	fn check_spent(
 		tx_hex: &str,
 		tracker: &UtxoSpendFilter,

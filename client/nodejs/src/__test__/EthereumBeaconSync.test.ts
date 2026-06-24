@@ -172,7 +172,7 @@ it('supports minimal beacon updates with execution header proofs embedded in sub
   ]);
 });
 
-it('prefers the current-period update when the next sync committee is missing', async () => {
+it('uses a bridgeable finality update when the next sync committee is missing and finality already carries it', async () => {
   globalThis.fetch = createFetch({
     'https://beacon.example/eth/v1/beacon/light_client/finality_update': {
       data: createLightClientUpdate(1600, {
@@ -182,6 +182,38 @@ it('prefers the current-period update when the next sync committee is missing', 
         },
         next_sync_committee_branch: ['0x9'],
       }),
+    },
+    'https://beacon.example/eth/v1/beacon/light_client/bootstrap/0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa':
+      createBootstrapResponse(800, ['0xstored800']),
+    'https://beacon.example/eth/v1/config/spec': {
+      data: createBeaconSpec(),
+    },
+  });
+
+  const txs = await getNextEthereumBeaconSyncTxs(
+    createMockClient({ hasNextSyncCommittee: false }),
+    'https://beacon.example',
+  );
+
+  expect(txs[0]).toEqual({
+    method: 'submit',
+    update: expect.objectContaining({
+      finalizedHeader: expect.objectContaining({ slot: '1600' }),
+      nextSyncCommitteeUpdate: expect.objectContaining({
+        nextSyncCommittee: expect.anything(),
+        nextSyncCommitteeBranch: ['0x9'],
+      }),
+      executionHeaderProof: expect.objectContaining({
+        executionBranch: [],
+      }),
+    }),
+  });
+});
+
+it('fetches the current-period update when the next sync committee is missing and finality does not carry it', async () => {
+  globalThis.fetch = createFetch({
+    'https://beacon.example/eth/v1/beacon/light_client/finality_update': {
+      data: createLightClientUpdate(1600),
     },
     'https://beacon.example/eth/v1/beacon/light_client/updates?count=1&start_period=0': [
       createVersionedLightClientUpdate(800, {
@@ -215,7 +247,7 @@ it('prefers the current-period update when the next sync committee is missing', 
       finalizedHeader: expect.objectContaining({ slot: '800' }),
       nextSyncCommitteeUpdate: expect.objectContaining({
         nextSyncCommittee: expect.anything(),
-        nextSyncCommitteeBranch: expect.anything(),
+        nextSyncCommitteeBranch: ['0x6'],
       }),
       executionHeaderProof: expect.objectContaining({
         executionBranch: ['0xperiod0-execution'],
@@ -373,16 +405,210 @@ it('submits the current-period sync committee update before the next free header
   ]);
 });
 
+it('falls back to a bridgeable period update when the latest finality jump is too large', async () => {
+  const beaconApiUrl = 'https://minimal-beacon-bridgeable-gap.example';
+
+  globalThis.fetch = createFetch({
+    [`${beaconApiUrl}/eth/v1/beacon/light_client/finality_update`]: {
+      data: createLightClientUpdate(120, {
+        attested_header: {
+          beacon: createBeaconHeader(121),
+          execution: createExecutionHeader(121),
+          execution_branch: ['0xfinality121'],
+        },
+        signature_slot: '122',
+        next_sync_committee: {
+          pubkeys: ['0xfinality-period1'],
+          aggregate_pubkey: '0xfinality-period1-agg',
+        },
+        next_sync_committee_branch: ['0xfinality-period1-branch'],
+        finalized_header: {
+          beacon: createBeaconHeader(120),
+          execution: createExecutionHeader(120),
+          execution_branch: ['0xfinality120'],
+        },
+      }),
+    },
+    [`${beaconApiUrl}/eth/v1/beacon/light_client/updates?count=1&start_period=1`]: [
+      createVersionedLightClientUpdate(96, {
+        attested_header: {
+          beacon: createBeaconHeader(97),
+          execution: createExecutionHeader(97),
+          execution_branch: ['0xbridgeable97'],
+        },
+        signature_slot: '98',
+        next_sync_committee: {
+          pubkeys: ['0xbridgeable-period1'],
+          aggregate_pubkey: '0xbridgeable-period1-agg',
+        },
+        next_sync_committee_branch: ['0xbridgeable-period1-branch'],
+        finalized_header: {
+          beacon: createBeaconHeader(96),
+          execution: createExecutionHeader(96),
+          execution_branch: ['0xbridgeable96'],
+        },
+      }),
+    ],
+    [`${beaconApiUrl}/eth/v1/config/spec`]: {
+      data: createBeaconSpec({
+        slotsPerEpoch: '8',
+        epochsPerSyncCommitteePeriod: '8',
+        slotsPerHistoricalRoot: '64',
+      }),
+    },
+  });
+
+  const txs = await getNextEthereumBeaconSyncTxs(
+    createMockClient({
+      beaconPreset: 'minimal',
+      hasNextSyncCommittee: true,
+      latestFinalizedSlot: 40,
+      latestSyncCommitteeUpdatePeriod: 0,
+      headerInterval: 32,
+    }),
+    beaconApiUrl,
+  );
+
+  expect(txs).toEqual([
+    {
+      method: 'submit',
+      update: expect.objectContaining({
+        finalizedHeader: expect.objectContaining({ slot: '96' }),
+        signatureSlot: '98',
+        nextSyncCommitteeUpdate: expect.objectContaining({
+          nextSyncCommittee: expect.anything(),
+          nextSyncCommitteeBranch: ['0xbridgeable-period1-branch'],
+        }),
+        executionHeaderProof: expect.objectContaining({
+          executionBranch: ['0xbridgeable96'],
+        }),
+      }),
+    },
+  ]);
+});
+
+it('retries until a bridgeable period update is available when finality is not bridgeable', async () => {
+  const beaconApiUrl = 'https://minimal-beacon-bridgeable-gap-retry.example';
+  const periodUpdateUrl = `${beaconApiUrl}/eth/v1/beacon/light_client/updates?count=1&start_period=1`;
+  let periodUpdateRequests = 0;
+
+  globalThis.fetch = async (input: string | URL | Request) => {
+    const url =
+      typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
+
+    if (url === `${beaconApiUrl}/eth/v1/beacon/light_client/finality_update`) {
+      return {
+        ok: true,
+        json: async () => ({
+          data: createLightClientUpdate(120, {
+            attested_header: {
+              beacon: createBeaconHeader(121),
+              execution: createExecutionHeader(121),
+              execution_branch: ['0xfinality121'],
+            },
+            signature_slot: '122',
+            next_sync_committee: {
+              pubkeys: ['0xfinality-period1'],
+              aggregate_pubkey: '0xfinality-period1-agg',
+            },
+            next_sync_committee_branch: ['0xfinality-period1-branch'],
+            finalized_header: {
+              beacon: createBeaconHeader(120),
+              execution: createExecutionHeader(120),
+              execution_branch: ['0xfinality120'],
+            },
+          }),
+        }),
+        status: 200,
+        statusText: 'OK',
+      } as Response;
+    }
+
+    if (url === periodUpdateUrl) {
+      periodUpdateRequests += 1;
+
+      return {
+        ok: true,
+        json: async () =>
+          periodUpdateRequests === 1
+            ? []
+            : [
+                createVersionedLightClientUpdate(96, {
+                  attested_header: {
+                    beacon: createBeaconHeader(97),
+                    execution: createExecutionHeader(97),
+                    execution_branch: ['0xbridgeable97'],
+                  },
+                  signature_slot: '98',
+                  next_sync_committee: {
+                    pubkeys: ['0xbridgeable-period1'],
+                    aggregate_pubkey: '0xbridgeable-period1-agg',
+                  },
+                  next_sync_committee_branch: ['0xbridgeable-period1-branch'],
+                  finalized_header: {
+                    beacon: createBeaconHeader(96),
+                    execution: createExecutionHeader(96),
+                    execution_branch: ['0xbridgeable96'],
+                  },
+                }),
+              ],
+        status: 200,
+        statusText: 'OK',
+      } as Response;
+    }
+
+    if (url === `${beaconApiUrl}/eth/v1/config/spec`) {
+      return {
+        ok: true,
+        json: async () => ({
+          data: createBeaconSpec({
+            slotsPerEpoch: '8',
+            epochsPerSyncCommitteePeriod: '8',
+            slotsPerHistoricalRoot: '64',
+          }),
+        }),
+        status: 200,
+        statusText: 'OK',
+      } as Response;
+    }
+
+    throw new Error(`Unexpected fetch: ${url}`);
+  };
+
+  const txs = await getNextEthereumBeaconSyncTxs(
+    createMockClient({
+      beaconPreset: 'minimal',
+      hasNextSyncCommittee: true,
+      latestFinalizedSlot: 40,
+      latestSyncCommitteeUpdatePeriod: 0,
+      headerInterval: 32,
+    }),
+    beaconApiUrl,
+  );
+
+  expect(periodUpdateRequests).toBe(2);
+  expect(txs).toEqual([
+    {
+      method: 'submit',
+      update: expect.objectContaining({
+        finalizedHeader: expect.objectContaining({ slot: '96' }),
+        signatureSlot: '98',
+        nextSyncCommitteeUpdate: expect.objectContaining({
+          nextSyncCommittee: expect.anything(),
+          nextSyncCommitteeBranch: ['0xbridgeable-period1-branch'],
+        }),
+        executionHeaderProof: expect.objectContaining({
+          executionBranch: ['0xbridgeable96'],
+        }),
+      }),
+    },
+  ]);
+});
+
 it('returns nothing when the required current-period committee update is unavailable', async () => {
   globalThis.fetch = createFetch({
     'https://beacon.example/eth/v1/beacon/light_client/finality_update': {
-      data: createLightClientUpdate(1600, {
-        next_sync_committee: {
-          pubkeys: ['0x4'],
-          aggregate_pubkey: '0x5',
-        },
-        next_sync_committee_branch: ['0x6'],
-      }),
+      data: createLightClientUpdate(1600),
     },
     'https://beacon.example/eth/v1/beacon/light_client/updates?count=1&start_period=0': [{} as any],
     'https://beacon.example/eth/v1/config/spec': {

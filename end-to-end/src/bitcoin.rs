@@ -881,8 +881,12 @@ async fn vault_cosigns_release(
 		.await?
 		.ok_or_else(|| anyhow!("No finalized lock found for utxo {utxo_id}"))?;
 	let mut releaser = load_cosign_releaser(client, *utxo_id, &lock, FetchAt::Finalized).await?;
-	let (signature, _) = releaser
-		.sign_derived(vault_xpriv.clone(), DerivationPath::from_str(uploaded_xpub_hd_path)?)?;
+	// The runtime derives each lock pubkey from the uploaded vault xpub, so we need to sign from
+	// that xpub root and then derive the per-lock child number stored on the lock.
+	let uploaded_vault_xpriv = vault_xpriv
+		.derive_priv(&Secp256k1::new(), &DerivationPath::from_str(uploaded_xpub_hd_path)?)?;
+	let vault_hd_path = DerivationPath::from(vec![ChildNumber::from(lock.vault_xpub_sources.1)]);
+	let (signature, _) = releaser.sign_derived(uploaded_vault_xpriv, vault_hd_path)?;
 	let signature: BitcoinSignature = signature
 		.try_into()
 		.map_err(|_| anyhow!("Unable to translate signature to bytes"))?;
