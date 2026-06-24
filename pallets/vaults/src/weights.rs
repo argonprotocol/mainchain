@@ -12,7 +12,7 @@ pub trait WeightInfo {
 	fn modify_terms() -> Weight;
 	fn close() -> Weight;
 	fn replace_bitcoin_xpub() -> Weight;
-	fn set_bitcoin_lock_delegate() -> Weight;
+	fn set_delegate_account() -> Weight;
 	fn set_name() -> Weight;
 	fn set_committed_argonots() -> Weight;
 	fn on_initialize_with_vault_releases(
@@ -73,8 +73,8 @@ where
 		Base::replace_bitcoin_xpub()
 	}
 
-	fn set_bitcoin_lock_delegate() -> Weight {
-		Base::set_bitcoin_lock_delegate()
+	fn set_delegate_account() -> Weight {
+		Base::set_delegate_account()
 	}
 
 	fn set_name() -> Weight {
@@ -185,7 +185,7 @@ impl WeightInfo for () {
 	fn replace_bitcoin_xpub() -> Weight {
 		Weight::zero()
 	}
-	fn set_bitcoin_lock_delegate() -> Weight {
+	fn set_delegate_account() -> Weight {
 		Weight::zero()
 	}
 	fn set_name() -> Weight {

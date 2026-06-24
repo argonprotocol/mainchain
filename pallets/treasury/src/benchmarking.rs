@@ -3,8 +3,8 @@
 use super::*;
 use argon_primitives::{
 	bitcoin::Satoshis,
-	vault::{Vault, VaultTerms},
-	TreasuryPoolProvider, VaultId, MICROGONS_PER_ARGON,
+	vault::{TreasuryBonusApprovalProof, Vault, VaultTerms},
+	Signature, TreasuryPoolProvider, VaultId, MICROGONS_PER_ARGON,
 };
 use frame_benchmarking::v2::*;
 use frame_system::RawOrigin;
@@ -23,7 +23,7 @@ use polkadot_sdk::{
 		BoundedVec,
 	},
 	sp_arithmetic::FixedU128,
-	sp_runtime::Permill,
+	sp_runtime::{AccountId32, Permill},
 };
 
 const BENCHMARK_FRAME_ID: FrameId = 20;
@@ -61,11 +61,21 @@ mod benchmarks {
 		T::Currency::mint_into(&caller, purchase_amount)
 			.map_err(|_| BenchmarkError::Stop("failed to fund benchmark buyer"))?;
 		whitelist_account!(caller);
+		let beneficiary: AccountId32 = caller.clone();
+		let bonus_approval = TreasuryBonusApprovalProof {
+			vault_id,
+			beneficiary,
+			expires_at_frame: BENCHMARK_FRAME_ID,
+			signature: Signature::Sr25519([0; 64].into()),
+		};
 
 		#[extrinsic_call]
-		_(RawOrigin::Signed(caller.clone()), vault_id, purchase_bonds);
+		_(RawOrigin::Signed(caller.clone()), vault_id, purchase_bonds, Some(bonus_approval));
 
-		assert!(BondLotById::<T>::contains_key(next_bond_lot_id));
+		let purchased_bond_lot = BondLotById::<T>::get(next_bond_lot_id)
+			.ok_or(BenchmarkError::Stop("missing new bond lot"))?;
+		assert_eq!(purchased_bond_lot.sharing_percent, Permill::from_percent(20));
+		assert_eq!(purchased_bond_lot.bonus_percent, Permill::zero());
 		assert_eq!(
 			BondLotsByVault::<T>::get(vault_id).len(),
 			T::MaxTreasuryContributors::get() as usize,
@@ -532,6 +542,8 @@ where
 			owner: owner.clone(),
 			vault_id,
 			bonds,
+			sharing_percent: Permill::from_percent(20),
+			bonus_percent: Permill::zero(),
 			created_frame_id,
 			participated_frames: 0,
 			last_frame_earnings_frame_id: None,
@@ -569,7 +581,7 @@ fn benchmark_vault<T: Config>(
 
 	Vault {
 		operator_account_id,
-		bitcoin_lock_delegate_account: None,
+		delegate_account_id: Some(benchmark_bonus_approval_delegate_account()),
 		name: None,
 		last_name_change_tick: None,
 		securitization: TreasuryBalanceOf::<T>::zero(),
@@ -585,6 +597,7 @@ fn benchmark_vault<T: Config>(
 			bitcoin_annual_percent_rate: FixedU128::one(),
 			bitcoin_base_fee: TreasuryBalanceOf::<T>::zero(),
 			treasury_profit_sharing: Permill::from_percent(20),
+			treasury_bonus_profit_sharing: Permill::zero(),
 		},
 		pending_terms: None,
 		opened_tick: 0,
@@ -608,4 +621,8 @@ fn bonds_to_balance<T: Config>(bonds: Bonds) -> TreasuryBalanceOf<T> {
 
 fn balance<T: Config>(amount: u128) -> TreasuryBalanceOf<T> {
 	amount.into()
+}
+
+fn benchmark_bonus_approval_delegate_account() -> AccountId32 {
+	AccountId32::new([31; 32])
 }

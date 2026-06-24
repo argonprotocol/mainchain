@@ -42,6 +42,7 @@ import type {
   ArgonPrimitivesInherentsBlockSealInherent,
   ArgonPrimitivesNotaryNotaryMeta,
   ArgonPrimitivesNotebookSignedNotebookHeader,
+  ArgonPrimitivesVaultTreasuryBonusApprovalProof,
   ArgonPrimitivesVaultVaultTerms,
   ArgonRuntimeOriginCaller,
   ArgonRuntimeProxyType,
@@ -1456,7 +1457,7 @@ declare module '@polkadot/api-base/types/submittable' {
             | 'MiningBidRealPaysFee'
             | 'Bitcoin'
             | 'VaultAdmin'
-            | 'BitcoinInitializeFor'
+            | 'VaultDelegate'
             | number
             | Uint8Array,
           delay: u32 | AnyNumber | Uint8Array,
@@ -1526,7 +1527,7 @@ declare module '@polkadot/api-base/types/submittable' {
             | 'MiningBidRealPaysFee'
             | 'Bitcoin'
             | 'VaultAdmin'
-            | 'BitcoinInitializeFor'
+            | 'VaultDelegate'
             | number
             | Uint8Array,
           delay: u32 | AnyNumber | Uint8Array,
@@ -1572,7 +1573,7 @@ declare module '@polkadot/api-base/types/submittable' {
             | 'MiningBidRealPaysFee'
             | 'Bitcoin'
             | 'VaultAdmin'
-            | 'BitcoinInitializeFor'
+            | 'VaultDelegate'
             | number
             | Uint8Array,
           index: u16 | AnyNumber | Uint8Array,
@@ -1626,7 +1627,7 @@ declare module '@polkadot/api-base/types/submittable' {
             | 'MiningBidRealPaysFee'
             | 'Bitcoin'
             | 'VaultAdmin'
-            | 'BitcoinInitializeFor'
+            | 'VaultDelegate'
             | number,
           call: Call | IMethod | string | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
@@ -1677,7 +1678,7 @@ declare module '@polkadot/api-base/types/submittable' {
             | 'MiningBidRealPaysFee'
             | 'Bitcoin'
             | 'VaultAdmin'
-            | 'BitcoinInitializeFor'
+            | 'VaultDelegate'
             | number,
           call: Call | IMethod | string | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
@@ -1775,7 +1776,7 @@ declare module '@polkadot/api-base/types/submittable' {
             | 'MiningBidRealPaysFee'
             | 'Bitcoin'
             | 'VaultAdmin'
-            | 'BitcoinInitializeFor'
+            | 'VaultDelegate'
             | number
             | Uint8Array,
           delay: u32 | AnyNumber | Uint8Array,
@@ -2005,8 +2006,15 @@ declare module '@polkadot/api-base/types/submittable' {
         (
           vaultId: u32 | AnyNumber | Uint8Array,
           bonds: u32 | AnyNumber | Uint8Array,
+          bonusApproval:
+            | Option<ArgonPrimitivesVaultTreasuryBonusApprovalProof>
+            | null
+            | Uint8Array
+            | ArgonPrimitivesVaultTreasuryBonusApprovalProof
+            | { vaultId?: any; beneficiary?: any; expiresAtFrame?: any; signature?: any }
+            | string,
         ) => SubmittableExtrinsic<ApiType>,
-        [u32, u32]
+        [u32, u32, Option<ArgonPrimitivesVaultTreasuryBonusApprovalProof>]
       >;
       /**
        * Liquidate one full bond lot.
@@ -2240,6 +2248,7 @@ declare module '@polkadot/api-base/types/submittable' {
             | {
                 terms?: any;
                 name?: any;
+                delegateAccountId?: any;
                 securitization?: any;
                 bitcoinXpubkey?: any;
                 securitizationRatio?: any;
@@ -2276,7 +2285,12 @@ declare module '@polkadot/api-base/types/submittable' {
           vaultId: u32 | AnyNumber | Uint8Array,
           terms:
             | ArgonPrimitivesVaultVaultTerms
-            | { bitcoinAnnualPercentRate?: any; bitcoinBaseFee?: any; treasuryProfitSharing?: any }
+            | {
+                bitcoinAnnualPercentRate?: any;
+                bitcoinBaseFee?: any;
+                treasuryProfitSharing?: any;
+                treasuryBonusProfitSharing?: any;
+              }
             | string
             | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
@@ -2294,15 +2308,15 @@ declare module '@polkadot/api-base/types/submittable' {
         ) => SubmittableExtrinsic<ApiType>,
         [u32, ArgonPrimitivesBitcoinOpaqueBitcoinXpub]
       >;
-      setBitcoinLockDelegate: AugmentedSubmittable<
+      setCommittedArgonots: AugmentedSubmittable<
+        (amount: Compact<u128> | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>,
+        [Compact<u128>]
+      >;
+      setDelegateAccount: AugmentedSubmittable<
         (
           delegateAccountId: Option<AccountId32> | null | Uint8Array | AccountId32 | string,
         ) => SubmittableExtrinsic<ApiType>,
         [Option<AccountId32>]
-      >;
-      setCommittedArgonots: AugmentedSubmittable<
-        (amount: Compact<u128> | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>,
-        [Compact<u128>]
       >;
       setName: AugmentedSubmittable<
         (name: Option<Bytes> | null | Uint8Array | Bytes | string) => SubmittableExtrinsic<ApiType>,

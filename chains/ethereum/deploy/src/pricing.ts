@@ -61,10 +61,7 @@ export function deriveMintingAuthorityActivationPricingRecommendation(
   ];
 
   if (oneMemberSingleActivationGas !== undefined || oneMemberSharedSignatureCount !== undefined) {
-    if (
-      oneMemberSingleActivationGas === undefined ||
-      oneMemberSharedSignatureCount === undefined
-    ) {
+    if (oneMemberSingleActivationGas === undefined || oneMemberSharedSignatureCount === undefined) {
       throw new Error(
         'oneMemberSingleActivationGas and oneMemberSharedSignatureCount must be provided together',
       );
@@ -72,7 +69,10 @@ export function deriveMintingAuthorityActivationPricingRecommendation(
     if (oneMemberSingleActivationGas <= activationBatchMarginalGas) {
       throw new Error('oneMemberSingleActivationGas must exceed activationBatchMarginalGas');
     }
-    if (oneMemberSharedSignatureCount < 1 || oneMemberSharedSignatureCount >= sharedSignatureCount) {
+    if (
+      oneMemberSharedSignatureCount < 1 ||
+      oneMemberSharedSignatureCount >= sharedSignatureCount
+    ) {
       throw new Error(
         'oneMemberSharedSignatureCount must be at least 1 and less than sharedSignatureCount',
       );
@@ -138,11 +138,7 @@ export function deriveMintingAuthorityActivationPricingRecommendation(
 
     for (let leftIndex = 0; leftIndex < consolidatedAnchors.length - 1; ++leftIndex) {
       const leftAnchor = consolidatedAnchors[leftIndex]!;
-      for (
-        let rightIndex = leftIndex + 1;
-        rightIndex < consolidatedAnchors.length;
-        ++rightIndex
-      ) {
+      for (let rightIndex = leftIndex + 1; rightIndex < consolidatedAnchors.length; ++rightIndex) {
         const rightAnchor = consolidatedAnchors[rightIndex]!;
         const deltaGas =
           rightAnchor.singleActivationGas > leftAnchor.singleActivationGas
@@ -170,8 +166,7 @@ export function deriveMintingAuthorityActivationPricingRecommendation(
     }
 
     const signatureGasCost =
-      variableSignatureGasCost +
-      divideCeil(sharedFixedGas, BigInt(targetSharedSignatureCount));
+      variableSignatureGasCost + divideCeil(sharedFixedGas, BigInt(targetSharedSignatureCount));
     const sharedSignatureGasTotal = signatureGasCost * BigInt(targetSharedSignatureCount);
     const quotedSingleActivationGas = activationBatchMarginalGas + sharedSignatureGasTotal;
 

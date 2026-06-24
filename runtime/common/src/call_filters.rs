@@ -80,7 +80,7 @@ macro_rules! call_filters {
 			MiningBidRealPaysFee,
 			Bitcoin,
 			VaultAdmin,
-			BitcoinInitializeFor,
+			VaultDelegate,
 		}
 		impl Default for ProxyType {
 			fn default() -> Self {
@@ -126,10 +126,13 @@ macro_rules! call_filters {
 							calls.iter().all(VaultAdminCallFilter::is_single_vault_admin_call),
 						_ => VaultAdminCallFilter::is_single_vault_admin_call(c),
 					},
-					ProxyType::BitcoinInitializeFor => match c {
+					ProxyType::VaultDelegate => match c {
 						RuntimeCall::BitcoinLocks(pallet_bitcoin_locks::Call::initialize_for {
 							..
-						}) => true,
+						}) |
+						RuntimeCall::CrosschainTransfer(
+							pallet_crosschain_transfer::Call::prove_gateway_activity { .. }
+						) => true,
 						RuntimeCall::Utility(pallet_utility::Call::batch { calls }) |
 						RuntimeCall::Utility(pallet_utility::Call::batch_all { calls }) |
 						RuntimeCall::Utility(pallet_utility::Call::force_batch { calls }) =>
@@ -138,6 +141,8 @@ macro_rules! call_filters {
 									sc,
 									RuntimeCall::BitcoinLocks(
 										pallet_bitcoin_locks::Call::initialize_for { .. }
+									) | RuntimeCall::CrosschainTransfer(
+										pallet_crosschain_transfer::Call::prove_gateway_activity { .. }
 									)
 								)
 							}),

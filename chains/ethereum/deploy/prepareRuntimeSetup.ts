@@ -105,14 +105,17 @@ async function loadCliInputs(rawArgs: Record<string, string>) {
     estimatedWeiPerGas,
     minimumMintingAuthorityValue: getOptionalBigInt(rawArgs, 'minimum-minting-authority-value'),
     forceSetGlobalIssuanceCouncilAfterNonce: getOptionalBigInt(rawArgs, 'force-set-after-nonce'),
-    pricingRecommendation: await loadPricingRecommendation({
-      measureReportPath: getOptionalArg(rawArgs, 'measure-report'),
-      activationGasCost: getOptionalBigInt(rawArgs, 'activation-gas-cost'),
-      signatureGasCost: getOptionalBigInt(rawArgs, 'signature-gas-cost'),
-      manifestCouncilSigners,
-      estimatedMicrogonsPerEth,
-      estimatedWeiPerGas,
-    }, manifestCouncilSigners.length),
+    pricingRecommendation: await loadPricingRecommendation(
+      {
+        measureReportPath: getOptionalArg(rawArgs, 'measure-report'),
+        activationGasCost: getOptionalBigInt(rawArgs, 'activation-gas-cost'),
+        signatureGasCost: getOptionalBigInt(rawArgs, 'signature-gas-cost'),
+        manifestCouncilSigners,
+        estimatedMicrogonsPerEth,
+        estimatedWeiPerGas,
+      },
+      manifestCouncilSigners.length,
+    ),
   };
 
   return {

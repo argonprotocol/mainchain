@@ -1080,7 +1080,7 @@ where
 			.get(&vault_id)
 			.map(|vault| {
 				vault.operator_account_id == *account_id ||
-					vault.bitcoin_lock_delegate_account.as_ref() == Some(account_id)
+					vault.delegate_account_id.as_ref() == Some(account_id)
 			})
 			.unwrap_or(false)
 	}
@@ -1415,11 +1415,25 @@ where
 			.map(|vault| vault.operator_account_id.clone())
 	}
 
+	fn get_vault_delegate(vault_id: VaultId) -> Option<Self::AccountId> {
+		benchmark_bitcoin_vault_provider_state::<AccountId, Balance>()
+			.vaults
+			.get(&vault_id)
+			.and_then(|vault| vault.delegate_account_id.clone())
+	}
+
 	fn get_vault_profit_sharing_percent(vault_id: VaultId) -> Option<Permill> {
 		benchmark_bitcoin_vault_provider_state::<AccountId, Balance>()
 			.vaults
 			.get(&vault_id)
 			.map(|vault| vault.terms.treasury_profit_sharing)
+	}
+
+	fn get_vault_treasury_bonus_profit_sharing(vault_id: VaultId) -> Option<Permill> {
+		benchmark_bitcoin_vault_provider_state::<AccountId, Balance>()
+			.vaults
+			.get(&vault_id)
+			.map(|vault| vault.terms.treasury_bonus_profit_sharing)
 	}
 
 	fn is_vault_open(vault_id: VaultId) -> bool {

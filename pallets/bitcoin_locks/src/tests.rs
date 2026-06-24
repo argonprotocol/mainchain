@@ -218,7 +218,7 @@ fn initialize_for_requires_vault_permissions_and_covers_lock_fee() {
 		assert_eq!(lock.owner_account, 2);
 		assert_eq!(lock.coupon_paid_fees, fee);
 
-		DefaultVault::mutate(|vault| vault.bitcoin_lock_delegate_account = Some(9));
+		DefaultVault::mutate(|vault| vault.delegate_account_id = Some(9));
 		let result = BitcoinLocks::initialize_for(
 			RuntimeOrigin::signed(9),
 			3,

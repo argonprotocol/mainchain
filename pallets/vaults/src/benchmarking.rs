@@ -19,6 +19,7 @@ fn benchmark_terms<T: Config>() -> VaultTerms<T::Balance> {
 		bitcoin_annual_percent_rate: FixedU128::from_rational(110u128, 100u128),
 		bitcoin_base_fee: 1_000u128.into(),
 		treasury_profit_sharing: Permill::from_percent(20),
+		treasury_bonus_profit_sharing: Permill::from_percent(10),
 	}
 }
 
@@ -35,10 +36,11 @@ fn benchmark_xpub<T: Config>(seed_hint: u8) -> OpaqueBitcoinXpub {
 fn benchmark_vault_config<T: Config>(
 	seed_hint: u8,
 	securitization: u128,
-) -> VaultConfig<T::Balance> {
+) -> VaultConfig<T::AccountId, T::Balance> {
 	VaultConfig {
 		terms: benchmark_terms::<T>(),
 		name: None,
+		delegate_account_id: None,
 		securitization: securitization.into(),
 		bitcoin_xpubkey: benchmark_xpub::<T>(seed_hint),
 		securitization_ratio: FixedU128::one(),
@@ -165,6 +167,7 @@ mod benchmarks {
 			bitcoin_annual_percent_rate: FixedU128::from_rational(120u128, 100u128),
 			bitcoin_base_fee: 2_000u128.into(),
 			treasury_profit_sharing: Permill::from_percent(25),
+			treasury_bonus_profit_sharing: Permill::from_percent(5),
 		};
 
 		#[extrinsic_call]
@@ -219,7 +222,7 @@ mod benchmarks {
 	}
 
 	#[benchmark]
-	fn set_bitcoin_lock_delegate() -> Result<(), BenchmarkError> {
+	fn set_delegate_account() -> Result<(), BenchmarkError> {
 		let caller: T::AccountId = account("set_delegate_caller", 0, 0);
 		let delegate: T::AccountId = account("set_delegate_target", 0, 0);
 		let vault_id = create_vault::<T>(&caller, 6, 100_000)?;
@@ -228,7 +231,7 @@ mod benchmarks {
 		_(RawOrigin::Signed(caller.clone()), Some(delegate.clone()));
 
 		let vault = VaultsById::<T>::get(vault_id).ok_or(BenchmarkError::Stop("vault missing"))?;
-		assert_eq!(vault.bitcoin_lock_delegate_account, Some(delegate));
+		assert_eq!(vault.delegate_account_id, Some(delegate));
 		Ok(())
 	}
 

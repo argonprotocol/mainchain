@@ -30,7 +30,6 @@ frame_support::construct_runtime!(
 		System: frame_system,
 		Balances: pallet_balances,
 		Vaults: pallet_vaults,
-		Treasury: pallet_treasury,
 		BitcoinLocks: pallet_bitcoin_locks
 	}
 );
@@ -192,26 +191,6 @@ impl pallet_vaults::Config for Test {
 	type CapacityDropAttemptUnit = CapacityDropAttemptUnit;
 	type OperationalAccountsHook = ();
 	type CollectBlockerProvider = MockCollectBlockerProvider;
-}
-
-impl pallet_treasury::Config for Test {
-	type WeightInfo = ();
-	type Balance = Balance;
-	type Currency = Balances;
-	type RuntimeHoldReason = RuntimeHoldReason;
-	type TreasuryVaultProvider = Vaults;
-	type MaxTreasuryContributors = MaxTreasuryContributors;
-	type MinimumArgonsPerContributor = MinimumArgonsPerContributor;
-	type PalletId = VaultPalletId;
-	type MiningBidPoolAccount = BidPoolAccountId;
-	type TreasuryReservesAccount = TreasuryReservesAccountId;
-	type PercentForTreasuryReserves = PercentForTreasuryReserves;
-	type MaxVaultsPerPool = MaxVaultsPerPool;
-	type MaxPendingUnlocksPerFrame = MaxPendingUnlocksPerFrame;
-	type TreasuryExitDelayFrames = TreasuryExitDelayFrames;
-	type MiningFrameTransitionProvider = StaticMiningFrameProvider;
-	type OperationalAccountsHook = ();
-	type PriceProvider = StaticPriceProvider;
 }
 
 pub struct StaticBitcoinUtxoTracker;

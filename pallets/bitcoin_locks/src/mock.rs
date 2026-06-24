@@ -77,7 +77,7 @@ parameter_types! {
 	pub static MinimumLockSatoshis: Satoshis = 10_000_000;
 	pub static DefaultVault: Vault<u64, Balance> = Vault {
 		operator_account_id: 1,
-		bitcoin_lock_delegate_account: None,
+		delegate_account_id: None,
 		name: None,
 		last_name_change_tick: None,
 		securitization:  200_000_000_000,
@@ -89,6 +89,7 @@ parameter_types! {
 			bitcoin_annual_percent_rate: FixedU128::from_float(0.1),
 			bitcoin_base_fee: 0,
 			treasury_profit_sharing: Permill::from_float(0.0),
+			treasury_bonus_profit_sharing: Permill::from_float(0.0),
 		},
 		opened_tick: 1,
 		securitization_ratio: FixedU128::from_float(1.0),
@@ -201,7 +202,7 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 		if vault_id == 1 {
 			let vault = DefaultVault::get();
 			return vault.operator_account_id == *account_id ||
-				vault.bitcoin_lock_delegate_account == Some(*account_id);
+				vault.delegate_account_id == Some(*account_id);
 		}
 		false
 	}
@@ -579,7 +580,7 @@ impl pallet_bitcoin_locks::Config for Test {
 pub fn new_test_ext() -> TestState {
 	DefaultVault::set(Vault {
 		operator_account_id: 1,
-		bitcoin_lock_delegate_account: None,
+		delegate_account_id: None,
 		name: None,
 		last_name_change_tick: None,
 		securitization: 200_000_000_000,
@@ -591,6 +592,7 @@ pub fn new_test_ext() -> TestState {
 			bitcoin_annual_percent_rate: FixedU128::from_float(0.1),
 			bitcoin_base_fee: 0,
 			treasury_profit_sharing: Permill::from_float(0.0),
+			treasury_bonus_profit_sharing: Permill::from_float(0.0),
 		},
 		opened_tick: 1,
 		securitization_ratio: FixedU128::from_float(1.0),

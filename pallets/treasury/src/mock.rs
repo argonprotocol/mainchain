@@ -8,13 +8,16 @@ use pallet_prelude::{
 	argon_primitives::{vault::VaultTreasuryFrameEarnings, MiningFrameTransitionProvider},
 	*,
 };
+use sp_core::{crypto::AccountId32, sr25519, Pair};
+use sp_runtime::{traits::IdentifyAccount, MultiSigner};
 use std::collections::HashMap;
 
 type Block = frame_system::mocking::MockBlock<Test>;
+pub type TestAccountId = AccountId32;
 
 pub struct TestOperationalAccountsHook;
 
-impl OperationalAccountsHook<u64, Balance> for TestOperationalAccountsHook {
+impl OperationalAccountsHook<TestAccountId, Balance> for TestOperationalAccountsHook {
 	fn vault_created_weight() -> Weight {
 		Weight::zero()
 	}
@@ -35,8 +38,10 @@ impl OperationalAccountsHook<u64, Balance> for TestOperationalAccountsHook {
 		Weight::zero()
 	}
 
-	fn treasury_pool_participated(vault_operator_account: &u64, amount: Balance) {
-		TreasuryPoolParticipated::mutate(|calls| calls.push((*vault_operator_account, amount)));
+	fn treasury_pool_participated(vault_operator_account: &TestAccountId, amount: Balance) {
+		TreasuryPoolParticipated::mutate(|calls| {
+			calls.push((vault_operator_account.clone(), amount));
+		});
 	}
 }
 
@@ -53,14 +58,18 @@ frame_support::construct_runtime!(
 #[derive_impl(frame_system::config_preludes::TestDefaultConfig as frame_system::DefaultConfig)]
 impl frame_system::Config for Test {
 	type Block = Block;
+	type AccountId = TestAccountId;
 	type AccountData = pallet_balances::AccountData<Balance>;
 	type DbWeight = RocksDbWeight;
+	type Lookup = IdentityLookup<TestAccountId>;
 }
 
 parameter_types! {
 	pub const BidIncrements: u128 = 10_000; // 1 cent
 
 	pub static ExistentialDeposit: Balance = 1;
+	pub static BidPoolAccountId: TestAccountId = AccountId32::new([250; 32]);
+	pub static TreasuryReservesAccountId: TestAccountId = AccountId32::new([251; 32]);
 }
 
 impl pallet_balances::Config for Test {
@@ -80,7 +89,38 @@ impl pallet_balances::Config for Test {
 	type DoneSlashHandler = ();
 }
 
-pub fn set_argons(account_id: u64, amount: Balance) {
+pub(crate) fn account_pair_from_seed(seed: u64) -> sr25519::Pair {
+	sr25519::Pair::from_seed(&[(seed & 0xff) as u8; 32])
+}
+
+pub(crate) fn account_id_from_seed(seed: u64) -> TestAccountId {
+	MultiSigner::from(account_pair_from_seed(seed).public()).into_account()
+}
+
+pub(crate) trait IntoTestAccountId {
+	fn into_test_account_id(self) -> TestAccountId;
+}
+
+impl IntoTestAccountId for u64 {
+	fn into_test_account_id(self) -> TestAccountId {
+		account_id_from_seed(self)
+	}
+}
+
+impl IntoTestAccountId for TestAccountId {
+	fn into_test_account_id(self) -> TestAccountId {
+		self
+	}
+}
+
+impl IntoTestAccountId for &TestAccountId {
+	fn into_test_account_id(self) -> TestAccountId {
+		self.clone()
+	}
+}
+
+pub(crate) fn set_argons(account_id: impl IntoTestAccountId, amount: Balance) {
+	let account_id = account_id.into_test_account_id();
 	let _ = Balances::make_free_balance_be(&account_id, amount);
 	drop(Balances::issue(amount));
 }
@@ -88,9 +128,6 @@ pub fn set_argons(account_id: u64, amount: Balance) {
 parameter_types! {
 	pub const NextSlot: BlockNumberFor<Test> = 100;
 	pub const MiningWindowBlocks: BlockNumberFor<Test> = 100;
-
-	pub const BidPoolAccountId: u64 = 10000;
-	pub const TreasuryReservesAccountId: u64 = 10001;
 
 	pub const LastBidPoolDistribution: (FrameId, Tick) = (0, 0);
 
@@ -110,19 +147,21 @@ parameter_types! {
 	pub static BitcoinPricePerUsd: Option<FixedU128> = Some(FixedU128::from_float(100.00));
 	pub static ArgonPricePerUsd: Option<FixedU128> = Some(FixedU128::from_float(1.00));
 
-	pub static LastVaultProfits: Vec<VaultTreasuryFrameEarnings<Balance, u64>> = vec![];
-	pub static TreasuryPoolParticipated: Vec<(u64, Balance)> = vec![];
+	pub static LastVaultProfits: Vec<VaultTreasuryFrameEarnings<Balance, TestAccountId>> = vec![];
+	pub static TreasuryPoolParticipated: Vec<(TestAccountId, Balance)> = vec![];
 }
 
 #[derive(Clone)]
 pub struct TestVault {
 	pub securitized_satoshis: Satoshis,
 	pub sharing_percent: Permill,
-	pub account_id: u64,
+	pub bonus_percent: Permill,
+	pub account_id: TestAccountId,
+	pub delegate_account_id: Option<TestAccountId>,
 	pub is_closed: bool,
 }
 
-pub fn insert_vault(vault_id: VaultId, vault: TestVault) {
+pub(crate) fn insert_vault(vault_id: VaultId, vault: TestVault) {
 	VaultsById::mutate(|x| {
 		x.insert(vault_id, vault);
 	});
@@ -159,7 +198,7 @@ impl PriceProvider<Balance> for StaticPriceProvider {
 pub struct StaticTreasuryVaultProvider;
 impl TreasuryVaultProvider for StaticTreasuryVaultProvider {
 	type Balance = Balance;
-	type AccountId = u64;
+	type AccountId = TestAccountId;
 
 	fn get_securitized_satoshis(vault_id: VaultId) -> Satoshis {
 		VaultsById::get()
@@ -172,8 +211,16 @@ impl TreasuryVaultProvider for StaticTreasuryVaultProvider {
 		VaultsById::get().get(&vault_id).map(|a| a.sharing_percent)
 	}
 
+	fn get_vault_treasury_bonus_profit_sharing(vault_id: VaultId) -> Option<Permill> {
+		VaultsById::get().get(&vault_id).map(|a| a.bonus_percent)
+	}
+
 	fn get_vault_operator(vault_id: VaultId) -> Option<Self::AccountId> {
-		VaultsById::get().get(&vault_id).map(|a| a.account_id)
+		VaultsById::get().get(&vault_id).map(|a| a.account_id.clone())
+	}
+
+	fn get_vault_delegate(vault_id: VaultId) -> Option<Self::AccountId> {
+		VaultsById::get().get(&vault_id).and_then(|a| a.delegate_account_id.clone())
 	}
 
 	fn is_vault_open(vault_id: VaultId) -> bool {
@@ -226,11 +273,11 @@ impl pallet_treasury::Config for Test {
 	type OperationalAccountsHook = TestOperationalAccountsHook;
 }
 
-pub fn new_test_ext() -> TestState {
+pub(crate) fn new_test_ext() -> TestState {
 	new_test_with_genesis::<Test>(|_t| {})
 }
 
-pub fn take_treasury_pool_participated() -> Vec<(u64, Balance)> {
+pub(crate) fn take_treasury_pool_participated() -> Vec<(TestAccountId, Balance)> {
 	let values = TreasuryPoolParticipated::get();
 	TreasuryPoolParticipated::set(vec![]);
 	values

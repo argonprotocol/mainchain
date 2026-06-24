@@ -179,8 +179,8 @@ Useful Urls:
 The Argon testnet is intended to be used for testing and development. All changes will be deployed
 to this network before the mainnet. You can connect to the
 [Polkadot Developer Portal](https://polkadot.js.org/apps/#/explorer?rpc=wss://rpc.argon.network) to
-interact with the testnet. We are also publishing binary versions of the localchain that are
-useful to test out connecting to the testnet. Those versions can be found on the
+interact with the testnet. We are also publishing binary versions of the localchain that are useful
+to test out connecting to the testnet. Those versions can be found on the
 [releases page](https://github.com/argonprotocol/argon/releases/latest).
 
 Useful Urls:

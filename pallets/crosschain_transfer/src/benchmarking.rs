@@ -709,6 +709,7 @@ fn benchmark_vault_terms<T: Config>() -> VaultTerms<T::Balance> {
 		bitcoin_annual_percent_rate: FixedU128::one(),
 		bitcoin_base_fee: 1u128.into(),
 		treasury_profit_sharing: Permill::zero(),
+		treasury_bonus_profit_sharing: Permill::zero(),
 	}
 }
 
@@ -721,7 +722,7 @@ where
 		vault_id,
 		Vault::<T::AccountId, T::Balance> {
 			operator_account_id: operator.clone(),
-			bitcoin_lock_delegate_account: None,
+			delegate_account_id: None,
 			name: None,
 			last_name_change_tick: None,
 			securitization: securitization.into(),

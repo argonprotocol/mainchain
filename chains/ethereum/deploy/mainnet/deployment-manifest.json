@@ -10,16 +10,12 @@
   "contracts": {
     "argonToken": {
       "address": "0xf3D6b714dc93bc6C44bc766cc92F4A0D99344932",
-      "constructorArgs": [
-        "0x57Bd330f43e03665564734cC7518541157b8A0Af"
-      ],
+      "constructorArgs": ["0x57Bd330f43e03665564734cC7518541157b8A0Af"],
       "deploymentTxHash": "0x62f027c68d8969aaccc708c61c06413cc568b96dccbdb6db445b0d13dee22720"
     },
     "argonotToken": {
       "address": "0x6B93a120829558C18f8CD54a96E8024EF973cE52",
-      "constructorArgs": [
-        "0x57Bd330f43e03665564734cC7518541157b8A0Af"
-      ],
+      "constructorArgs": ["0x57Bd330f43e03665564734cC7518541157b8A0Af"],
       "deploymentTxHash": "0x787eeb8ac50dad8f2e8135cc824aa0fdf6008b8a323ae030a30bcf87c59a25da"
     },
     "mintingGatewayImplementationBootstrap": {
@@ -75,10 +71,7 @@
       "0x6AAFfBDf896283F272dB681B586eCE0eFB48AD15",
       "0xaB23454278a2Eb96462a2f2A9e716AB381023306"
     ],
-    "weights": [
-      "3349997241",
-      "3399433178"
-    ],
+    "weights": ["3349997241", "3399433178"],
     "weightSource": "runtimeCouncilSnapshot"
   },
   "runtimeBootstrap": {
@@ -149,17 +142,12 @@
       "sha256": "d4d2596e182dc40211c83e5f870d2c2e7a16a597dafed6b747a9945e1c2b3f68"
     },
     "argon": {
-      "sourceBatches": [
-        "restore-argon-batch-000.json",
-        "restore-argon-batch-001.json"
-      ],
+      "sourceBatches": ["restore-argon-batch-000.json", "restore-argon-batch-001.json"],
       "recipientCount": 35,
       "totalAmountRaw": "131013793612646286913415"
     },
     "argonot": {
-      "sourceBatches": [
-        "restore-argonot-batch-000.json"
-      ],
+      "sourceBatches": ["restore-argonot-batch-000.json"],
       "recipientCount": 25,
       "totalAmountRaw": "99004770615739079708060"
     }
