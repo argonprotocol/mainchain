@@ -438,15 +438,15 @@ impl pallet_mining_slot::Config for Runtime {
 	type FramesPerMiningTerm = FramesPerMiningTerm;
 	type MinCohortSize = MinCohortSize;
 	type MaxCohortSize = MaxCohortSize;
-	type ArgonotsPercentAdjustmentDamper = ArgonotsPercentAdjustmentDamper;
-	type MinimumArgonotsPerSeat = ConstU128<ARGONOT_EXISTENTIAL_DEPOSIT>;
-	type MaximumArgonotProrataPercent = MaximumArgonotProrataPercent;
-	type TargetBidsPerSeatPercent = TargetBidsPerSeatPercent;
+	type InitialArgonotsPerSeat = InitialArgonotsPerSeat;
+	type ArgonotBidCollateralMultiple = ArgonotBidCollateralMultiple;
 	type TargetPricePerSeat = TargetPricePerSeat;
 	type PricePerSeatAdjustmentDamper = PricePerSeatAdjustmentDamper;
 	type Balance = Balance;
 	type OwnershipCurrency = Ownership;
 	type ArgonCurrency = Balances;
+	type PriceProvider =
+		use_unless_benchmark!(PriceIndex, benchmarking::BenchmarkPriceProvider<Balance>);
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type MiningBidPoolAccount = TreasuryMiningBidPoolAccount;
 	type OperationalAccountsHook = use_unless_benchmark!(OperationalAccounts, ());
@@ -575,15 +575,18 @@ impl pallet_proxy::Config for Runtime {
 }
 
 impl pallet_price_index::Config for Runtime {
-	type WeightInfo = ();
+	type WeightInfo = weights::pallet_price_index::WeightInfo<Runtime>;
 	type Currency = Balances;
 	type Balance = Balance;
 	type MaxDowntimeTicksBeforeReset = MaxDowntimeTicksBeforeReset;
 	type MaxPriceAgeInTicks = MaxPriceAgeInTicks;
 	type CurrentFrameId =
 		use_unless_benchmark!(GetCurrentFrameId, benchmarking::BenchmarkCurrentFrameId);
+	type MiningFrameTransitionProvider =
+		use_unless_benchmark!(MiningSlot, benchmarking::BenchmarkCurrentFrameId);
 	type CurrentTick = use_unless_benchmark!(Ticks, benchmarking::BenchmarkCurrentTick);
 	type MaxArgonotFloorHistoryFrames = MaxArgonotFloorHistoryFrames;
+	type MaxArgonotAverageHistoryFrames = MaxArgonotAverageHistoryFrames;
 	type MaxArgonChangePerTickAwayFromTarget = MaxArgonChangePerTickAwayFromTarget;
 	type MaxArgonTargetChangePerTick = MaxArgonTargetChangePerTick;
 }

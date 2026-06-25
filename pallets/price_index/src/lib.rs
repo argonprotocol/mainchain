@@ -7,6 +7,8 @@ use argon_primitives::{block_seal::FrameId, ArgonCPI};
 pub use pallet::*;
 pub use weights::WeightInfo;
 
+#[cfg(feature = "runtime-benchmarks")]
+mod benchmarking;
 pub mod migrations;
 #[cfg(test)]
 mod tests;
@@ -71,11 +73,36 @@ impl PriceIndex {
 	}
 }
 
+#[derive(
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	Eq,
+	PartialEq,
+	Clone,
+	Copy,
+	Default,
+	Debug,
+	TypeInfo,
+	MaxEncodedLen,
+)]
+pub struct ArgonotAverageFrameAccumulator<Balance>
+where
+	Balance: codec::FullCodec + Copy + MaxEncodedLen + TypeInfo,
+{
+	#[codec(compact)]
+	pub frame_id: FrameId,
+	#[codec(compact)]
+	pub total_microgons_per_argonot: Balance,
+	#[codec(compact)]
+	pub sample_count: u32,
+}
+
 #[frame_support::pallet]
 pub mod pallet {
 	use sp_arithmetic::FixedPointNumber;
 
-	use argon_primitives::PriceProvider;
+	use argon_primitives::{MiningFrameTransitionProvider, PriceProvider};
 
 	use super::*;
 
@@ -121,9 +148,16 @@ pub mod pallet {
 		/// Current mining frame id for trailing floor history.
 		type CurrentFrameId: Get<FrameId>;
 
+		/// Provider for frame-transition notifications.
+		type MiningFrameTransitionProvider: MiningFrameTransitionProvider;
+
 		/// Maximum number of per-frame Argonot floor buckets to retain.
 		#[pallet::constant]
 		type MaxArgonotFloorHistoryFrames: Get<u32>;
+
+		/// Maximum number of per-frame Argonot average buckets to retain.
+		#[pallet::constant]
+		type MaxArgonotAverageHistoryFrames: Get<u32>;
 
 		/// The max price difference dropping below target or raising above target per tick. There's
 		/// no corresponding constant for time to recovery to target
@@ -176,6 +210,19 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
+	/// Tracks the average Argonot price observed in each recent frame.
+	#[pallet::storage]
+	pub type HistoricArgonotAverageByFrame<T: Config> = StorageValue<
+		_,
+		BoundedBTreeMap<FrameId, T::Balance, T::MaxArgonotAverageHistoryFrames>,
+		ValueQuery,
+	>;
+
+	/// Accumulates the current frame's Argonot price samples until the frame closes.
+	#[pallet::storage]
+	pub type CurrentFrameArgonotAverage<T: Config> =
+		StorageValue<_, ArgonotAverageFrameAccumulator<T::Balance>, OptionQuery>;
+
 	/// The price index operator account
 	#[pallet::storage]
 	pub type Operator<T: Config> = StorageValue<_, T::AccountId, OptionQuery>;
@@ -199,19 +246,22 @@ pub mod pallet {
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(_: BlockNumberFor<T>) -> Weight {
 			let prev_tick = T::CurrentTick::get();
+			let new_frame_id = T::MiningFrameTransitionProvider::is_new_frame_started();
+			if let Some(frame_id) = new_frame_id {
+				Self::finalize_argonot_average_for_frame(frame_id.saturating_sub(1));
+			}
 			if let Some(current) = Current::<T>::get() {
 				LastValid::<T>::put(current);
 				if current.tick >= prev_tick.saturating_sub(T::MaxDowntimeTicksBeforeReset::get()) &&
 					let Some(microgons_per_argonot) =
 						Self::microgons_per_argonot_from_index(&current)
 				{
-					Self::record_argonot_floor_for_frame(
-						T::CurrentFrameId::get(),
-						microgons_per_argonot,
-					);
+					let frame_id = new_frame_id.unwrap_or_else(T::CurrentFrameId::get);
+					Self::record_argonot_average_sample(frame_id, microgons_per_argonot);
+					Self::record_argonot_floor_for_frame(frame_id, microgons_per_argonot);
 				}
 			}
-			T::DbWeight::get().reads_writes(4, 3)
+			T::WeightInfo::on_initialize()
 		}
 	}
 
@@ -249,10 +299,9 @@ pub mod pallet {
 
 			Current::<T>::put(index);
 			if let Some(microgons_per_argonot) = Self::microgons_per_argonot_from_index(&index) {
-				Self::record_argonot_floor_for_frame(
-					T::CurrentFrameId::get(),
-					microgons_per_argonot,
-				);
+				let frame_id = T::MiningFrameTransitionProvider::is_new_frame_started()
+					.unwrap_or_else(T::CurrentFrameId::get);
+				Self::record_argonot_floor_for_frame(frame_id, microgons_per_argonot);
 			}
 
 			// Get the current frame bucket (one per hour)
@@ -396,9 +445,68 @@ pub mod pallet {
 				let _ = history.try_insert(frame_id, microgons_per_argonot);
 			});
 		}
+
+		fn record_argonot_average_for_frame(frame_id: FrameId, microgons_per_argonot: T::Balance) {
+			HistoricArgonotAverageByFrame::<T>::mutate(|history| {
+				if let Some(existing) = history.get_mut(&frame_id) {
+					*existing = microgons_per_argonot;
+					return;
+				}
+
+				if history.is_full() {
+					let Some((&oldest_frame_id, _)) = history.iter().next() else {
+						return;
+					};
+					if frame_id <= oldest_frame_id {
+						return;
+					}
+					history.remove(&oldest_frame_id);
+				}
+				let _ = history.try_insert(frame_id, microgons_per_argonot);
+			});
+		}
+
+		fn record_argonot_average_sample(frame_id: FrameId, microgons_per_argonot: T::Balance) {
+			CurrentFrameArgonotAverage::<T>::mutate(|average| match average {
+				Some(current) if current.frame_id == frame_id => {
+					current.total_microgons_per_argonot =
+						current.total_microgons_per_argonot.saturating_add(microgons_per_argonot);
+					current.sample_count = current.sample_count.saturating_add(1);
+				},
+				_ => {
+					*average = Some(ArgonotAverageFrameAccumulator {
+						frame_id,
+						total_microgons_per_argonot: microgons_per_argonot,
+						sample_count: 1,
+					});
+				},
+			});
+		}
+
+		fn finalize_argonot_average_for_frame(frame_id: FrameId) {
+			let average = CurrentFrameArgonotAverage::<T>::take()
+				.filter(|current| current.frame_id == frame_id && current.sample_count > 0)
+				.map(|current| {
+					let total: u128 = current.total_microgons_per_argonot.into();
+					let average = total / current.sample_count as u128;
+					T::Balance::from(average)
+				})
+				.or_else(|| {
+					HistoricArgonotAverageByFrame::<T>::get()
+						.iter()
+						.next_back()
+						.map(|(_, average)| *average)
+				});
+
+			if let Some(average) = average {
+				Self::record_argonot_average_for_frame(frame_id, average);
+			}
+		}
 	}
 
 	impl<T: Config> PriceProvider<T::Balance> for Pallet<T> {
+		type Weights = crate::weights::ProviderWeightAdapter<T>;
+
 		fn get_argon_cpi() -> Option<ArgonCPI> {
 			Self::get_current().map(|a| a.argon_cpi())
 		}
@@ -428,6 +536,10 @@ pub mod pallet {
 			}
 
 			lowest_microgons_per_argonot
+		}
+
+		fn get_average_microgons_per_argonot(frame_id: FrameId) -> Option<T::Balance> {
+			HistoricArgonotAverageByFrame::<T>::get().get(&frame_id).copied()
 		}
 
 		fn get_average_cpi_for_ticks(tick_range: (Tick, Tick)) -> ArgonCPI {

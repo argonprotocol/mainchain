@@ -109,9 +109,8 @@ parameter_types! {
 	pub const MaxGrandpas: u32 = 1000;
 	pub const PricePerSeatAdjustmentDamper: FixedU128 = FixedU128::from_rational(20, 100);
 	pub const TargetPricePerSeat: Balance = 1000 * ARGON;
-	pub const ArgonotsPercentAdjustmentDamper: FixedU128 = FixedU128::from_rational(20, 100);
-	pub const MaximumArgonotProrataPercent: Percent = Percent::from_percent(40);
-	pub const TargetBidsPerSeatPercent: FixedU128 = FixedU128::from_rational(2, 1); // Ideally we want 2x bids per seat
+	pub const InitialArgonotsPerSeat: Balance = ARGONOT_EXISTENTIAL_DEPOSIT;
+	pub const ArgonotBidCollateralMultiple: u128 = 2;
 	pub const GrandpaRotationBlocks: BlockNumber = 260;
 	pub const MiningSlotBidIncrement: Balance = 10 * MILLIGONS;
 
@@ -207,6 +206,8 @@ parameter_types! {
 	pub const CouncilRotationFrames: FrameId = 10;
 	/// Number of frame-level Argonot floor buckets retained by the price index.
 	pub const MaxArgonotFloorHistoryFrames: u32 = 10;
+	/// Number of frame-level Argonot average buckets retained by the price index.
+	pub const MaxArgonotAverageHistoryFrames: u32 = 10;
 	/// Maximum size of the active Global Issuance Council member set.
 	pub const MaxCouncilMembers: u32 = 100;
 	/// Maximum number of contiguous council approval signatures accepted in one extrinsic.

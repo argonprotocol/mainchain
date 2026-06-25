@@ -1,11 +1,13 @@
 use crate as pallet_mining_slot;
 use argon_primitives::{
-	block_seal::MiningSlotConfig, providers::OnNewSlot, tick::Ticker, BlockNumber, BlockSealerInfo,
-	BlockSealerProvider, OperationalAccountsHook, TickProvider, VotingSchedule,
+	block_seal::MiningSlotConfig, providers::OnNewSlot, tick::Ticker, ArgonCPI, BlockNumber,
+	BlockSealerInfo, BlockSealerProvider, OperationalAccountsHook, PriceProvider, TickProvider,
+	VotingSchedule,
 };
 use frame_support::traits::{Currency, StorageMapShim};
 use pallet_prelude::*;
 use sp_runtime::{impl_opaque_keys, testing::UintAuthorityId};
+use std::collections::BTreeMap;
 
 type Block = frame_system::mocking::MockBlock<Test>;
 
@@ -34,12 +36,10 @@ parameter_types! {
 	pub static FramesPerMiningTerm: u32 = 2;
 	pub static BlocksBeforeBidEndForVrfClose: u64 = 0;
 	pub static SlotBiddingStartAfterTicks: u64 = 3;
-	pub static TargetBidsPerSeatPercent: FixedU128 = FixedU128::from_u32(5);
-	pub static MinOwnershipBondAmount: Balance = 1;
-	pub static MaxOwnershipPercent: Percent = Percent::from_float(0.4);
-	pub const ArgonotsPercentAdjustmentDamper: FixedU128 = FixedU128::from_rational(20, 100);
+	pub static InitialArgonotsPerSeat: Balance = 1;
 	pub const PricePerSeatAdjustmentDamper: FixedU128 = FixedU128::from_rational(20, 100);
 	pub static TargetPricePerSeat: Balance = 10 * 1_000_000; // 10 Argons
+	pub const ArgonotBidCollateralMultiple: u128 = 2;
 
 	pub const BidIncrements: u128 = 10_000; // 1 cent
 
@@ -72,6 +72,12 @@ pub fn set_ownership(account_id: u64, amount: Balance) {
 pub fn set_argons(account_id: u64, amount: Balance) {
 	let _ = Balances::make_free_balance_be(&account_id, amount);
 	drop(Balances::issue(amount));
+}
+
+pub fn set_average_microgons_per_argonot(frame_id: FrameId, amount: Balance) {
+	AverageMicrogonsPerArgonotByFrame::mutate(|history| {
+		history.insert(frame_id, amount);
+	});
 }
 
 pub(crate) type OwnershipToken = pallet_balances::Instance2;
@@ -123,6 +129,7 @@ parameter_types! {
 		block_author_account_id: 1,
 	};
 	pub static IsBlockVoteSeal: bool = false;
+	pub static AverageMicrogonsPerArgonotByFrame: BTreeMap<FrameId, Balance> = BTreeMap::new();
 }
 
 pub struct StaticNewSlotEvent;
@@ -232,6 +239,47 @@ impl BlockSealerProvider<u64, UintAuthorityId> for StaticBlockSealerProvider {
 	}
 }
 
+pub struct StaticPriceProvider;
+impl PriceProvider<Balance> for StaticPriceProvider {
+	type Weights = ();
+
+	fn get_latest_btc_price_in_usd() -> Option<FixedU128> {
+		None
+	}
+
+	fn get_latest_argon_price_in_usd() -> Option<FixedU128> {
+		None
+	}
+
+	fn get_argonot_price_in_usd() -> Option<FixedU128> {
+		None
+	}
+
+	fn get_target_argon_price_in_usd() -> Option<FixedU128> {
+		None
+	}
+
+	fn get_average_microgons_per_argonot(frame_id: FrameId) -> Option<Balance> {
+		AverageMicrogonsPerArgonotByFrame::get().get(&frame_id).copied()
+	}
+
+	fn get_argon_cpi() -> Option<ArgonCPI> {
+		None
+	}
+
+	fn get_average_cpi_for_ticks(_tick_range: (Tick, Tick)) -> ArgonCPI {
+		ArgonCPI::zero()
+	}
+
+	fn get_circulation() -> Balance {
+		0
+	}
+
+	fn get_redemption_r_value() -> Option<FixedU128> {
+		Some(FixedU128::from_u32(1))
+	}
+}
+
 impl pallet_mining_slot::Config for Test {
 	type WeightInfo = ();
 	type MinCohortSize = MinCohortSize;
@@ -239,13 +287,12 @@ impl pallet_mining_slot::Config for Test {
 	type PricePerSeatAdjustmentDamper = PricePerSeatAdjustmentDamper;
 	type FramesPerMiningTerm = FramesPerMiningTerm;
 	type TargetPricePerSeat = TargetPricePerSeat;
-	type ArgonotsPercentAdjustmentDamper = ArgonotsPercentAdjustmentDamper;
-	type MinimumArgonotsPerSeat = MinOwnershipBondAmount;
-	type MaximumArgonotProrataPercent = MaxOwnershipPercent;
-	type TargetBidsPerSeatPercent = TargetBidsPerSeatPercent;
+	type InitialArgonotsPerSeat = InitialArgonotsPerSeat;
+	type ArgonotBidCollateralMultiple = ArgonotBidCollateralMultiple;
 	type Balance = Balance;
 	type OwnershipCurrency = Ownership;
 	type ArgonCurrency = Balances;
+	type PriceProvider = StaticPriceProvider;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type MiningBidPoolAccount = BidPoolAccountId;
 	type OperationalAccountsHook = StaticOperationalAccountsHook;
@@ -259,6 +306,7 @@ impl pallet_mining_slot::Config for Test {
 }
 
 pub fn new_test_ext() -> TestState {
+	AverageMicrogonsPerArgonotByFrame::set(BTreeMap::new());
 	new_test_with_genesis::<Test>(|t: &mut Storage| {
 		let mining_config = MiningSlotConfig {
 			slot_bidding_start_after_ticks: SlotBiddingStartAfterTicks::get(),

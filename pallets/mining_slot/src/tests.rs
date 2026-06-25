@@ -9,11 +9,7 @@ use crate::{
 	Error, Event, FrameRewardTicksRemaining, FrameStartTicks, HoldReason, MinerNonce,
 	MinerNonceScoring, Registration, ScheduledCohortSizeChangeByFrame,
 };
-use argon_primitives::{
-	block_seal::{MiningBidStats, MiningRegistration},
-	AuthorityProvider,
-};
-use frame_support::traits::fungible::Unbalanced;
+use argon_primitives::{block_seal::MiningRegistration, AuthorityProvider, MICROGONS_PER_ARGON};
 use frame_system::AccountInfo;
 use pallet_balances::{AccountData, Event as OwnershipEvent, ExtraFlags};
 use pallet_prelude::{
@@ -1687,76 +1683,83 @@ fn it_should_allow_a_tie() {
 	});
 }
 
-fn bid_stats(count: u32, amount: Balance) -> MiningBidStats {
-	MiningBidStats {
-		bids_count: count,
-		bid_amount_sum: amount * count as u128,
-		bid_amount_min: amount,
-		bid_amount_max: amount,
-	}
-}
-
 #[test]
-fn it_adjusts_locked_argonots() {
+fn it_uses_the_lower_median_winning_bid_to_update_argonots_per_seat() {
 	TicksBetweenSlots::set(10);
 	FramesPerMiningTerm::set(10);
 	MinCohortSize::set(10);
 	MaxCohortSize::set(10);
 	SlotBiddingStartAfterTicks::set(10);
-	TargetBidsPerSeatPercent::set(FixedU128::from_rational(12, 10));
-	MinOwnershipBondAmount::set(100_000);
 
 	new_test_ext().execute_with(|| {
-		System::set_block_number(10);
+		ArgonotsPerMiningSeat::<Test>::set(999);
+		NextFrameId::<Test>::set(5);
+		set_average_microgons_per_argonot(4, 4 * MICROGONS_PER_ARGON);
 
-		Ownership::set_total_issuance(500_000 * 100);
-		ArgonotsPerMiningSeat::<Test>::set(120_000);
-		// should have 10 per slot, make it 12
-		HistoricalBidsPerSlot::<Test>::set(bounded_vec![bid_stats(12, 10), bid_stats(12, 10)]);
-		MiningSlots::adjust_argonots_per_seat();
-
-		// we're targeting 12 bids per slot, so should stay the same
-		assert_eq!(ArgonotsPerMiningSeat::<Test>::get(), 120_000);
-
-		// simulate bids being past 20%
-		HistoricalBidsPerSlot::<Test>::set(bounded_vec![
-			bid_stats(20, 100),
-			bid_stats(20, 101),
-			bid_stats(20, 102)
+		BidsForNextSlotCohort::<Test>::set(bounded_vec![
+			MiningRegistration {
+				account_id: 1,
+				argonots: 0,
+				bid: 100 * MICROGONS_PER_ARGON,
+				authority_keys: 1.into(),
+				starting_frame_id: 5,
+				external_funding_account: None,
+				bid_at_tick: 1,
+			},
+			MiningRegistration {
+				account_id: 2,
+				argonots: 0,
+				bid: 80 * MICROGONS_PER_ARGON,
+				authority_keys: 2.into(),
+				starting_frame_id: 5,
+				external_funding_account: None,
+				bid_at_tick: 1,
+			},
+			MiningRegistration {
+				account_id: 3,
+				argonots: 0,
+				bid: 60 * MICROGONS_PER_ARGON,
+				authority_keys: 3.into(),
+				starting_frame_id: 5,
+				external_funding_account: None,
+				bid_at_tick: 1,
+			},
+			MiningRegistration {
+				account_id: 4,
+				argonots: 0,
+				bid: 20 * MICROGONS_PER_ARGON,
+				authority_keys: 4.into(),
+				starting_frame_id: 5,
+				external_funding_account: None,
+				bid_at_tick: 1,
+			},
 		]);
-		MiningSlots::adjust_argonots_per_seat();
-		// 120k * 1.2
-		assert_eq!(ArgonotsPerMiningSeat::<Test>::get(), 144000);
 
-		// simulate bids being way past 20%
-		// should have 10 per slot, make it 12
-		HistoricalBidsPerSlot::<Test>::set(bounded_vec![
-			bid_stats(0, 0),
-			bid_stats(1, 100),
-			bid_stats(0, 0)
-		]);
-		MiningSlots::adjust_argonots_per_seat();
-		assert_eq!(ArgonotsPerMiningSeat::<Test>::get(), (144000.0 * 0.8f64) as u128);
+		MiningSlots::update_argonots_per_seat(5);
 
-		// simulate bids being way past 20%
-		let mut last = ArgonotsPerMiningSeat::<Test>::get();
-		for _ in 0..100 {
-			HistoricalBidsPerSlot::<Test>::set(bounded_vec![
-				bid_stats(100, 0),
-				bid_stats(100, 100),
-				bid_stats(100, 0)
-			]);
-			MiningSlots::adjust_argonots_per_seat();
-			let next = ArgonotsPerMiningSeat::<Test>::get();
-			if next == 200_000 {
-				break;
-			}
-			assert_eq!(next, (last as f64 * 1.2) as u128);
-			last = next;
-		}
+		assert_eq!(ArgonotsPerMiningSeat::<Test>::get(), 30 * MICROGONS_PER_ARGON);
+	});
+}
 
-		// max increase is to a set amount of the total issuance
-		assert_eq!(ArgonotsPerMiningSeat::<Test>::get(), (500_000.0 * 0.4) as u128);
+#[test]
+fn it_keeps_argonots_per_seat_unchanged_when_there_are_no_winning_bids() {
+	new_test_ext().execute_with(|| {
+		ArgonotsPerMiningSeat::<Test>::set(77);
+		NextFrameId::<Test>::set(5);
+		set_average_microgons_per_argonot(4, 4 * MICROGONS_PER_ARGON);
+
+		MiningSlots::update_argonots_per_seat(5);
+
+		assert_eq!(ArgonotsPerMiningSeat::<Test>::get(), 77);
+	});
+}
+
+#[test]
+fn it_defaults_argonots_per_seat_to_the_initial_value() {
+	new_test_ext().execute_with(|| {
+		ArgonotsPerMiningSeat::<Test>::kill();
+
+		assert_eq!(ArgonotsPerMiningSeat::<Test>::get(), InitialArgonotsPerSeat::get());
 	});
 }
 
@@ -1869,8 +1872,6 @@ fn it_doesnt_accept_bids_until_first_slot() {
 	MinCohortSize::set(10);
 	MaxCohortSize::set(10);
 	SlotBiddingStartAfterTicks::set(12_960);
-	TargetBidsPerSeatPercent::set(FixedU128::from_rational(12, 10));
-	MinOwnershipBondAmount::set(100_000);
 
 	new_test_ext().execute_with(|| {
 		let argonots_per_seat = 1_000;

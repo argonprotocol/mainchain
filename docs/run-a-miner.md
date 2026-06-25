@@ -282,15 +282,20 @@ that is less than the current difficulty target. This phase lasted from January 
 ### Slot Bidding
 
 After this point, there are 10 mining slots per day (each lasting 10 days). To bid for a mining
-slot, the account you register as a miner must possess 1/100th of the total Ownership Tokens in
-circulation (this amount moves up and down based on a target number of miners applying for the
-slots). These variables can be found in the mining_slot pallet:
+slot, your registering account must possess at least the current `ArgonotsPerMiningSeat` amount of
+Ownership Tokens (argonots). The number of tokens is updated at the end of each frame based on the
+previous frame's winning bids. The new value is calculated by:
 
-- `TargetBidsPerSeatPercent`: the target number of bids per auction (2x more than seats available)
-- `HistoricalBidsPerSlot`: the number of bids per slot over the recent history
-- `ArgonotsPerMiningSeat`: the total number of Ownership Tokens (argonots) needed to bid for a slot
+- taking the median bid from the winning bids in `BidsForNextSlotCohort`
+- doubling that bid's Argon value and converting into argonots using the previous frame's average
+  Argonot price
+
+These values can be found in the mining and price pallets:
+
+- `ArgonotsPerMiningSeat`: the current number of Ownership Tokens needed to bid for a slot
 - `BidsForNextSlotCohort`: the current winning bids for miners for the slot starting in the next
   frame
+- `HistoricArgonotAverageByFrame`: the recorded average Argonot price for completed frames
 
 #### Frame
 

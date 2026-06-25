@@ -3396,9 +3396,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				130u8, 28u8, 78u8, 116u8, 207u8, 52u8, 204u8, 220u8, 72u8, 156u8, 29u8, 172u8,
-				144u8, 211u8, 56u8, 159u8, 76u8, 33u8, 148u8, 230u8, 206u8, 193u8, 167u8, 58u8,
-				172u8, 50u8, 49u8, 53u8, 141u8, 22u8, 179u8, 167u8,
+				67u8, 70u8, 184u8, 191u8, 91u8, 99u8, 148u8, 217u8, 221u8, 32u8, 70u8, 163u8, 61u8,
+				247u8, 144u8, 82u8, 142u8, 243u8, 236u8, 60u8, 11u8, 248u8, 100u8, 24u8, 28u8,
+				154u8, 123u8, 192u8, 164u8, 56u8, 176u8, 241u8,
 			]
 	}
 	pub mod system {
@@ -8004,10 +8004,9 @@ pub mod api {
 						"ArgonotsPerMiningSeat",
 						(),
 						[
-							15u8, 146u8, 80u8, 61u8, 135u8, 204u8, 92u8, 124u8, 106u8, 109u8, 51u8,
-							135u8, 194u8, 104u8, 192u8, 69u8, 81u8, 146u8, 100u8, 4u8, 219u8,
-							166u8, 135u8, 216u8, 84u8, 203u8, 32u8, 177u8, 182u8, 233u8, 98u8,
-							189u8,
+							42u8, 227u8, 164u8, 201u8, 9u8, 117u8, 214u8, 232u8, 252u8, 249u8,
+							110u8, 159u8, 49u8, 12u8, 27u8, 211u8, 79u8, 168u8, 3u8, 181u8, 228u8,
+							11u8, 101u8, 113u8, 178u8, 53u8, 213u8, 239u8, 9u8, 193u8, 4u8, 36u8,
 						],
 					)
 				}
@@ -8420,32 +8419,15 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " The max percent swing for the argonots per slot (from the last percent)"]
-				pub fn argonots_percent_adjustment_damper(
-					&self,
-				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
-					runtime_types::sp_arithmetic::fixed_point::FixedU128,
-				> {
-					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
-						"MiningSlot",
-						"ArgonotsPercentAdjustmentDamper",
-						[
-							62u8, 145u8, 102u8, 227u8, 159u8, 92u8, 27u8, 54u8, 159u8, 228u8,
-							193u8, 99u8, 75u8, 196u8, 26u8, 250u8, 229u8, 230u8, 88u8, 109u8,
-							246u8, 100u8, 152u8, 158u8, 14u8, 25u8, 224u8, 173u8, 224u8, 41u8,
-							105u8, 231u8,
-						],
-					)
-				}
-				#[doc = " The minimum argonots needed per seat"]
-				pub fn minimum_argonots_per_seat(
+				#[doc = " The initial argonots needed per seat before a prior-day median is available."]
+				pub fn initial_argonots_per_seat(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
 					::core::primitive::u128,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"MiningSlot",
-						"MinimumArgonotsPerSeat",
+						"InitialArgonotsPerSeat",
 						[
 							84u8, 157u8, 140u8, 4u8, 93u8, 57u8, 29u8, 133u8, 105u8, 200u8, 214u8,
 							27u8, 144u8, 208u8, 218u8, 160u8, 130u8, 109u8, 101u8, 54u8, 210u8,
@@ -8453,39 +8435,19 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " The maximum percent of argonots in the network that should be required for"]
-				#[doc = " mining seats"]
-				pub fn maximum_argonot_prorata_percent(
+				#[doc = " The multiple of the prior-day lower median winning bid that must be collateralized."]
+				pub fn argonot_bid_collateral_multiple(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
-					runtime_types::sp_arithmetic::per_things::Percent,
+					::core::primitive::u128,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"MiningSlot",
-						"MaximumArgonotProrataPercent",
+						"ArgonotBidCollateralMultiple",
 						[
-							40u8, 171u8, 69u8, 196u8, 34u8, 184u8, 50u8, 128u8, 139u8, 192u8, 63u8,
-							231u8, 249u8, 200u8, 252u8, 73u8, 244u8, 170u8, 51u8, 177u8, 106u8,
-							47u8, 114u8, 234u8, 84u8, 104u8, 62u8, 118u8, 227u8, 50u8, 225u8,
-							122u8,
-						],
-					)
-				}
-				#[doc = " The target percent of bids per auction relative to the max number of seats. This will"]
-				#[doc = " adjust the argonots per seat up or down to ensure mining slots are filled."]
-				pub fn target_bids_per_seat_percent(
-					&self,
-				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
-					runtime_types::sp_arithmetic::fixed_point::FixedU128,
-				> {
-					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
-						"MiningSlot",
-						"TargetBidsPerSeatPercent",
-						[
-							62u8, 145u8, 102u8, 227u8, 159u8, 92u8, 27u8, 54u8, 159u8, 228u8,
-							193u8, 99u8, 75u8, 196u8, 26u8, 250u8, 229u8, 230u8, 88u8, 109u8,
-							246u8, 100u8, 152u8, 158u8, 14u8, 25u8, 224u8, 173u8, 224u8, 41u8,
-							105u8, 231u8,
+							84u8, 157u8, 140u8, 4u8, 93u8, 57u8, 29u8, 133u8, 105u8, 200u8, 214u8,
+							27u8, 144u8, 208u8, 218u8, 160u8, 130u8, 109u8, 101u8, 54u8, 210u8,
+							136u8, 71u8, 63u8, 49u8, 237u8, 234u8, 15u8, 178u8, 98u8, 148u8, 156u8,
 						],
 					)
 				}
@@ -15411,6 +15373,21 @@ pub mod api {
 							::core::primitive::u128,
 						>;
 				}
+				pub mod historic_argonot_average_by_frame {
+					use super::runtime_types;
+					pub type HistoricArgonotAverageByFrame =
+						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap1<
+							::core::primitive::u64,
+							::core::primitive::u128,
+						>;
+				}
+				pub mod current_frame_argonot_average {
+					use super::runtime_types;
+					pub type CurrentFrameArgonotAverage =
+						runtime_types::pallet_price_index::ArgonotAverageFrameAccumulator<
+							::core::primitive::u128,
+						>;
+				}
 				pub mod operator {
 					use super::runtime_types;
 					pub type Operator = crate::types::AccountId32;
@@ -15504,6 +15481,50 @@ pub mod api {
 						],
 					)
 				}
+				#[doc = " Tracks the average Argonot price observed in each recent frame."]
+				pub fn historic_argonot_average_by_frame(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::historic_argonot_average_by_frame::HistoricArgonotAverageByFrame,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"PriceIndex",
+						"HistoricArgonotAverageByFrame",
+						(),
+						[
+							64u8, 37u8, 237u8, 78u8, 163u8, 100u8, 248u8, 11u8, 146u8, 228u8,
+							191u8, 185u8, 112u8, 237u8, 129u8, 121u8, 70u8, 134u8, 246u8, 59u8,
+							38u8, 231u8, 231u8, 238u8, 229u8, 41u8, 151u8, 47u8, 38u8, 201u8,
+							116u8, 89u8,
+						],
+					)
+				}
+				#[doc = " Accumulates the current frame's Argonot price samples until the frame closes."]
+				pub fn current_frame_argonot_average(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::current_frame_argonot_average::CurrentFrameArgonotAverage,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"PriceIndex",
+						"CurrentFrameArgonotAverage",
+						(),
+						[
+							200u8, 66u8, 68u8, 14u8, 148u8, 202u8, 221u8, 96u8, 228u8, 155u8,
+							238u8, 146u8, 172u8, 46u8, 77u8, 79u8, 149u8, 89u8, 170u8, 55u8, 215u8,
+							130u8, 36u8, 229u8, 203u8, 186u8, 160u8, 47u8, 211u8, 86u8, 131u8,
+							132u8,
+						],
+					)
+				}
 				#[doc = " The price index operator account"]
 				pub fn operator(
 					&self,
@@ -15575,6 +15596,23 @@ pub mod api {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"PriceIndex",
 						"MaxArgonotFloorHistoryFrames",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
+						],
+					)
+				}
+				#[doc = " Maximum number of per-frame Argonot average buckets to retain."]
+				pub fn max_argonot_average_history_frames(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u32,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"PriceIndex",
+						"MaxArgonotAverageHistoryFrames",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
@@ -34693,6 +34731,22 @@ pub mod api {
 					#[codec(index = 1)]
 					OperatorChanged { operator_id: crate::types::AccountId32 },
 				}
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub struct ArgonotAverageFrameAccumulator<_0> {
+				#[codec(compact)]
+				pub frame_id: ::core::primitive::u64,
+				#[codec(compact)]
+				pub total_microgons_per_argonot: _0,
+				#[codec(compact)]
+				pub sample_count: ::core::primitive::u32,
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,

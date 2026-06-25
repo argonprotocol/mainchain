@@ -169,6 +169,8 @@ pub(crate) fn insert_vault(vault_id: VaultId, vault: TestVault) {
 
 pub struct StaticPriceProvider;
 impl PriceProvider<Balance> for StaticPriceProvider {
+	type Weights = ();
+
 	fn get_latest_btc_price_in_usd() -> Option<FixedU128> {
 		BitcoinPricePerUsd::get()
 	}

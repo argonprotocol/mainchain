@@ -147,10 +147,7 @@ export async function getNextEthereumBeaconSyncTxs(
 
     const missingNextSyncCommittee = !state.hasNextSyncCommittee;
     const finalityFinalizedSlot = BigInt(finalityUpdate.finalized_header.beacon.slot);
-    const finalityFinalizedPeriod = computePeriod(
-      finalityFinalizedSlot,
-      beaconNetworkParams,
-    );
+    const finalityFinalizedPeriod = computePeriod(finalityFinalizedSlot, beaconNetworkParams);
     const requiredCommitteePeriod = getRequiredCommitteePeriod({
       storedPeriod,
       missingNextSyncCommittee,

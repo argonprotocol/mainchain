@@ -91,6 +91,7 @@ import type {
   PalletMultisigMultisig,
   PalletOperationalAccountsOperationalAccount,
   PalletOperationalAccountsRewardsConfig,
+  PalletPriceIndexArgonotAverageFrameAccumulator,
   PalletPriceIndexCpiMeasurementBucket,
   PalletPriceIndexPriceIndex,
   PalletProxyAnnouncement,
@@ -1376,11 +1377,27 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       current: AugmentedQuery<ApiType, () => Observable<Option<PalletPriceIndexPriceIndex>>, []>;
       /**
+       * Accumulates the current frame's Argonot price samples until the frame closes.
+       **/
+      currentFrameArgonotAverage: AugmentedQuery<
+        ApiType,
+        () => Observable<Option<PalletPriceIndexArgonotAverageFrameAccumulator>>,
+        []
+      >;
+      /**
        * Tracks the average cpi data every 60 ticks
        **/
       historicArgonCPI: AugmentedQuery<
         ApiType,
         () => Observable<Vec<PalletPriceIndexCpiMeasurementBucket>>,
+        []
+      >;
+      /**
+       * Tracks the average Argonot price observed in each recent frame.
+       **/
+      historicArgonotAverageByFrame: AugmentedQuery<
+        ApiType,
+        () => Observable<BTreeMap<u64, u128>>,
         []
       >;
       /**

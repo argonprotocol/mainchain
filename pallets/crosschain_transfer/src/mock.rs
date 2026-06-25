@@ -78,6 +78,8 @@ pub static EncumberedBondMicrogonsByAccount:
 
 pub struct MockPriceProvider;
 impl PriceProvider<Balance> for MockPriceProvider {
+	type Weights = ();
+
 	fn get_latest_btc_price_in_usd() -> Option<FixedU128> {
 		Some(FixedU128::one())
 	}

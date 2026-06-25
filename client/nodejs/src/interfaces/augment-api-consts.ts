@@ -263,9 +263,9 @@ declare module '@polkadot/api-base/types/consts' {
     };
     miningSlot: {
       /**
-       * The max percent swing for the argonots per slot (from the last percent)
+       * The multiple of the prior-day lower median winning bid that must be collateralized.
        **/
-      argonotsPercentAdjustmentDamper: u128 & AugmentedConst<ApiType>;
+      argonotBidCollateralMultiple: u128 & AugmentedConst<ApiType>;
       /**
        * The increment that bids can be on (for instance, one cent increments)
        **/
@@ -275,23 +275,18 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       framesPerMiningTerm: u32 & AugmentedConst<ApiType>;
       /**
+       * The initial argonots needed per seat before a prior-day median is available.
+       **/
+      initialArgonotsPerSeat: u128 & AugmentedConst<ApiType>;
+      /**
        * How many new miners can be in the cohort for each slot. The actual maximum will adjust
        * dynamically
        **/
       maxCohortSize: u32 & AugmentedConst<ApiType>;
       /**
-       * The maximum percent of argonots in the network that should be required for
-       * mining seats
-       **/
-      maximumArgonotProrataPercent: Percent & AugmentedConst<ApiType>;
-      /**
        * The minimum number of miners per cohort
        **/
       minCohortSize: u32 & AugmentedConst<ApiType>;
-      /**
-       * The minimum argonots needed per seat
-       **/
-      minimumArgonotsPerSeat: u128 & AugmentedConst<ApiType>;
       /**
        * Account that receives mining bid funds before treasury distribution.
        **/
@@ -300,11 +295,6 @@ declare module '@polkadot/api-base/types/consts' {
        * The damper on the price per seat adjustment (from the last price)
        **/
       pricePerSeatAdjustmentDamper: u128 & AugmentedConst<ApiType>;
-      /**
-       * The target percent of bids per auction relative to the max number of seats. This will
-       * adjust the argonots per seat up or down to ensure mining slots are filled.
-       **/
-      targetBidsPerSeatPercent: u128 & AugmentedConst<ApiType>;
       /**
        * The target price per seat.
        **/
@@ -445,6 +435,10 @@ declare module '@polkadot/api-base/types/consts' {
        * no corresponding constant for time to recovery to target
        **/
       maxArgonChangePerTickAwayFromTarget: u128 & AugmentedConst<ApiType>;
+      /**
+       * Maximum number of per-frame Argonot average buckets to retain.
+       **/
+      maxArgonotAverageHistoryFrames: u32 & AugmentedConst<ApiType>;
       /**
        * Maximum number of per-frame Argonot floor buckets to retain.
        **/

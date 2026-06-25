@@ -9,6 +9,7 @@ frame_benchmarking::define_benchmarks!(
 	[pallet_multisig, Multisig]
 	[pallet_proxy, Proxy]
 	[pallet_ticks, Ticks]
+	[pallet_price_index, PriceIndex]
 	[pallet_bitcoin_locks, BitcoinLocks]
 	[pallet_bitcoin_utxos, BitcoinUtxos]
 	[pallet_mining_slot, MiningSlot]
