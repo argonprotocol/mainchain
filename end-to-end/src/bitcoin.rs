@@ -549,7 +549,9 @@ async fn create_vault(
 			bitcoin_base_fee: 0,
 			bitcoin_annual_percent_rate: to_api_fixed_u128(FixedU128::from_float(0.01)),
 			treasury_profit_sharing: to_api_per_mill(Permill::from_percent(50)),
+			treasury_bonus_profit_sharing: to_api_per_mill(Permill::zero()),
 		},
+		delegate_account_id: None,
 		securitization_ratio: to_api_fixed_u128(FixedU128::from_u32(1)),
 		securitization: 100_000_000_000,
 	};

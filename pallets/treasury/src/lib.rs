@@ -81,16 +81,16 @@ pub mod pallet {
 	use alloc::vec::Vec;
 	use argon_primitives::{
 		providers::PriceProvider,
-		vault::{TreasuryVaultProvider, VaultTreasuryFrameEarnings},
+		vault::{TreasuryBonusApprovalProof, TreasuryVaultProvider, VaultTreasuryFrameEarnings},
 		BlockSealAuthorityId, OnNewSlot, TreasuryPoolProvider, MICROGONS_PER_ARGON,
 	};
 	use pallet_prelude::argon_primitives::{
 		MiningFrameTransitionProvider, OperationalAccountsHook, OperationalRewardsPayer,
 	};
-	use sp_runtime::{BoundedBTreeMap, FixedU128, TokenError};
+	use sp_runtime::{AccountId32, BoundedBTreeMap, FixedU128, Permill, TokenError};
 	use tracing::info;
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(4);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(5);
 
 	pub type BondLotId = u64;
 	pub type Bonds = u32;
@@ -101,7 +101,7 @@ pub mod pallet {
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
-	pub trait Config: polkadot_sdk::frame_system::Config
+	pub trait Config: polkadot_sdk::frame_system::Config<AccountId = AccountId32>
 	where
 		<Self as Config>::Balance: Into<u128>,
 	{
@@ -341,6 +341,16 @@ pub mod pallet {
 		/// Liquidating this bond lot would take the account below its crosschain-encumbered
 		/// treasury backing.
 		ActiveBondAmountBelowEncumberedBacking,
+		/// The bonus approval was signed for a different vault.
+		BonusApprovalWrongVault,
+		/// The bonus approval was signed for a different beneficiary.
+		BonusApprovalWrongAccount,
+		/// The bonus approval already expired.
+		BonusApprovalExpired,
+		/// The beneficiary already has a bond lot for this vault.
+		BonusApprovalExistingBondLot,
+		/// The bonus approval signature is invalid or unauthorized.
+		InvalidBonusApprovalSignature,
 	}
 
 	#[pallet::call]
@@ -350,7 +360,12 @@ pub mod pallet {
 		/// The purchase either enters the accepted list or fails.
 		#[pallet::call_index(4)]
 		#[pallet::weight(T::WeightInfo::buy_bonds())]
-		pub fn buy_bonds(origin: OriginFor<T>, vault_id: VaultId, bonds: Bonds) -> DispatchResult {
+		pub fn buy_bonds(
+			origin: OriginFor<T>,
+			vault_id: VaultId,
+			bonds: Bonds,
+			bonus_approval: Option<TreasuryBonusApprovalProof>,
+		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 			ensure!(
 				T::TreasuryVaultProvider::is_vault_open(vault_id),
@@ -363,13 +378,19 @@ pub mod pallet {
 			ensure!(!activated_vault_bonds.is_zero(), Error::<T>::VaultNotAcceptingBondPurchases);
 
 			let current_frame_id = T::MiningFrameTransitionProvider::get_current_frame_id();
+			let sharing_percent =
+				T::TreasuryVaultProvider::get_vault_profit_sharing_percent(vault_id)
+					.unwrap_or_default();
 			let mut accepted_lots = BondLotsByVault::<T>::get(vault_id);
 
 			let sold_bonds = Self::sum_bonds(&accepted_lots);
 			let available_bond_space_now = activated_vault_bonds.saturating_sub(sold_bonds);
 
-			if accepted_lots.len() < T::MaxTreasuryContributors::get() as usize {
+			let evicted_summary = if accepted_lots.len() <
+				T::MaxTreasuryContributors::get() as usize
+			{
 				ensure!(bonds <= available_bond_space_now, Error::<T>::BondPurchaseAboveSecurity);
+				None
 			} else {
 				let evicted_summary =
 					accepted_lots.pop().ok_or(Error::<T>::BondPurchaseRejected)?;
@@ -379,7 +400,17 @@ pub mod pallet {
 					bonds.saturating_sub(evicted_summary.bonds) <= available_bond_space_now,
 					Error::<T>::BondPurchaseAboveSecurity
 				);
+				Some(evicted_summary)
+			};
 
+			let bonus_percent = Self::validate_bonus_approval(
+				vault_id,
+				&who,
+				current_frame_id,
+				bonus_approval.as_ref(),
+			)?;
+
+			if let Some(evicted_summary) = evicted_summary {
 				let evicted_lot = BondLotById::<T>::get(evicted_summary.bond_lot_id)
 					.ok_or(Error::<T>::BondLotNotFound)?;
 				let release_frame_id = Self::schedule_bond_lot_release(
@@ -401,12 +432,23 @@ pub mod pallet {
 			let purchase_amount = Self::bonds_to_balance(bonds);
 			Self::create_hold(&who, purchase_amount)?;
 
+			let insert_index = accepted_lots
+				.iter()
+				.position(|summary| summary.bonds < bonds)
+				.unwrap_or(accepted_lots.len());
+
+			accepted_lots
+				.try_insert(insert_index, BondLotSummary { bond_lot_id, bonds })
+				.map_err(|_| Error::<T>::MaxAcceptedBondLotsExceeded)?;
+
 			BondLotById::<T>::insert(
 				bond_lot_id,
 				BondLot {
 					owner: who.clone(),
 					vault_id,
 					bonds,
+					sharing_percent,
+					bonus_percent,
 					created_frame_id: current_frame_id,
 					participated_frames: 0,
 					last_frame_earnings_frame_id: None,
@@ -417,21 +459,12 @@ pub mod pallet {
 				},
 			);
 			BondLotIdsByAccount::<T>::insert(&who, bond_lot_id, ());
-
-			let insert_index = accepted_lots
-				.iter()
-				.position(|summary| summary.bonds < bonds)
-				.unwrap_or(accepted_lots.len());
-
-			accepted_lots
-				.try_insert(insert_index, BondLotSummary { bond_lot_id, bonds })
-				.map_err(|_| Error::<T>::MaxAcceptedBondLotsExceeded)?;
 			BondLotsByVault::<T>::insert(vault_id, accepted_lots);
 
 			Self::deposit_event(Event::<T>::BondLotPurchased {
 				vault_id,
 				bond_lot_id,
-				account_id: who,
+				account_id: who.clone(),
 				bonds,
 			});
 			Ok(())
@@ -504,6 +537,49 @@ pub mod pallet {
 			Ok(())
 		}
 
+		fn validate_bonus_approval(
+			vault_id: VaultId,
+			beneficiary: &T::AccountId,
+			current_frame_id: FrameId,
+			bonus_approval: Option<&TreasuryBonusApprovalProof>,
+		) -> Result<Permill, Error<T>> {
+			let Some(bonus_approval) = bonus_approval else {
+				return Ok(Permill::zero());
+			};
+
+			ensure!(bonus_approval.vault_id == vault_id, Error::<T>::BonusApprovalWrongVault);
+			ensure!(
+				bonus_approval.beneficiary == *beneficiary,
+				Error::<T>::BonusApprovalWrongAccount
+			);
+			ensure!(
+				current_frame_id <= bonus_approval.expires_at_frame,
+				Error::<T>::BonusApprovalExpired
+			);
+
+			let signed_by_operator = T::TreasuryVaultProvider::get_vault_operator(vault_id)
+				.as_ref()
+				.is_some_and(|account_id| bonus_approval.verify(account_id));
+			let signed_by_delegate = T::TreasuryVaultProvider::get_vault_delegate(vault_id)
+				.as_ref()
+				.is_some_and(|account_id| bonus_approval.verify(account_id));
+			ensure!(
+				signed_by_operator || signed_by_delegate,
+				Error::<T>::InvalidBonusApprovalSignature
+			);
+
+			for (bond_lot_id, ()) in BondLotIdsByAccount::<T>::iter_prefix(beneficiary) {
+				let bond_lot =
+					BondLotById::<T>::get(bond_lot_id).ok_or(Error::<T>::BondLotNotFound)?;
+				if bond_lot.vault_id == vault_id {
+					return Err(Error::<T>::BonusApprovalExistingBondLot);
+				}
+			}
+
+			Ok(T::TreasuryVaultProvider::get_vault_treasury_bonus_profit_sharing(vault_id)
+				.unwrap_or_default())
+		}
+
 		/// Once the frame is complete, this fn distributes the bid pool to each vault based on
 		/// their prorata eligible bonds. Then within each vault, profits are distributed to bond
 		/// lots based on the stored frame shares.
@@ -570,12 +646,8 @@ pub mod pallet {
 				.mul_floor(total_bid_pool_amount);
 				remaining_bid_pool.saturating_reduce(gross_vault_earnings);
 
-				let vault_earnings =
-					vault_capital.vault_sharing_percent.mul_floor(gross_vault_earnings);
-
-				let contributor_pool = gross_vault_earnings.saturating_sub(vault_earnings);
-				let mut contributors_paid = T::Balance::zero();
-				let mut earnings_for_vault = vault_earnings;
+				let mut gross_lot_yield_total = T::Balance::zero();
+				let mut earnings_for_vault = T::Balance::zero();
 				let mut capital_contributed_by_vault = T::Balance::zero();
 
 				for allocation in vault_capital.bond_lot_allocations.iter() {
@@ -583,28 +655,43 @@ pub mod pallet {
 						continue;
 					};
 
-					let payout = allocation.prorata.saturating_mul_int(contributor_pool);
-					let mut paid_payout = payout;
+					let gross_lot_yield =
+						allocation.prorata.saturating_mul_int(gross_vault_earnings);
+					gross_lot_yield_total.saturating_accrue(gross_lot_yield);
+
+					let bonder_percent = Permill::from_parts(
+						bond_lot
+							.sharing_percent
+							.deconstruct()
+							.saturating_add(bond_lot.bonus_percent.deconstruct()),
+					);
+					let mut paid_payout = bonder_percent.mul_floor(gross_lot_yield);
+
 					if bond_lot.owner == vault_account_id {
-						earnings_for_vault.saturating_accrue(paid_payout);
+						earnings_for_vault.saturating_accrue(gross_lot_yield);
 						capital_contributed_by_vault
 							.saturating_accrue(Self::bonds_to_balance(bond_lot.bonds));
-					} else if !paid_payout.is_zero() &&
-						let Err(e) = T::Currency::transfer(
-							&bid_pool_account,
-							&bond_lot.owner,
-							paid_payout,
-							Preservation::Expendable,
-						) {
-						Self::deposit_event(Event::<T>::CouldNotDistributeEarningsToBondLot {
-							frame_id,
-							vault_id: *vault_id,
-							bond_lot_id: allocation.bond_lot_id,
-							account_id: bond_lot.owner,
-							amount: paid_payout,
-							dispatch_error: e,
-						});
-						paid_payout = T::Balance::zero();
+					} else {
+						earnings_for_vault
+							.saturating_accrue(gross_lot_yield.saturating_sub(paid_payout));
+						if !paid_payout.is_zero() &&
+							let Err(e) = T::Currency::transfer(
+								&bid_pool_account,
+								&bond_lot.owner,
+								paid_payout,
+								Preservation::Expendable,
+							) {
+							Self::deposit_event(Event::<T>::CouldNotDistributeEarningsToBondLot {
+								frame_id,
+								vault_id: *vault_id,
+								bond_lot_id: allocation.bond_lot_id,
+								account_id: bond_lot.owner,
+								amount: paid_payout,
+								dispatch_error: e,
+							});
+							treasury_refund_total.saturating_accrue(paid_payout);
+							paid_payout = T::Balance::zero();
+						}
 					}
 
 					BondLotById::<T>::mutate_exists(allocation.bond_lot_id, |maybe_bond_lot| {
@@ -617,11 +704,10 @@ pub mod pallet {
 						bond_lot.last_frame_earnings = Some(paid_payout);
 						bond_lot.cumulative_earnings.saturating_accrue(paid_payout);
 					});
-					contributors_paid.saturating_accrue(paid_payout);
 				}
 
-				let treasury_refund = contributor_pool.saturating_sub(contributors_paid);
-				treasury_refund_total.saturating_accrue(treasury_refund);
+				treasury_refund_total
+					.saturating_accrue(gross_vault_earnings.saturating_sub(gross_lot_yield_total));
 
 				T::TreasuryVaultProvider::record_vault_frame_earnings(
 					&bid_pool_account,
@@ -699,13 +785,7 @@ pub mod pallet {
 				vault_candidates.push((
 					vault_id,
 					eligible_bonds,
-					VaultCapital {
-						bond_lot_allocations,
-						eligible_bonds,
-						vault_sharing_percent:
-							T::TreasuryVaultProvider::get_vault_profit_sharing_percent(vault_id)
-								.unwrap_or_default(),
-					},
+					VaultCapital { bond_lot_allocations, eligible_bonds },
 				));
 			}
 
@@ -1196,6 +1276,12 @@ pub mod pallet {
 		/// The number of bonds in this lot. `1 ARGON = 1 bond`.
 		#[codec(compact)]
 		pub bonds: Bonds,
+		/// The immutable bonder-side percent of lot yield shared to the bond holder.
+		#[codec(compact)]
+		pub sharing_percent: Permill,
+		/// The immutable bonus bonder-side percent of lot yield shared to the bond holder.
+		#[codec(compact)]
+		pub bonus_percent: Permill,
 		/// The frame when this lot was purchased.
 		#[codec(compact)]
 		pub created_frame_id: FrameId,
@@ -1241,15 +1327,12 @@ pub mod pallet {
 	#[derive(Encode, Decode, PartialEqNoBound, DebugNoBound, TypeInfo, MaxEncodedLen)]
 	#[scale_info(skip_type_params(T))]
 	pub struct VaultCapital<T: Config> {
-		/// The lots that share this vault's frame earnings after the vault-side cut.
+		/// The lots that share this vault's frame earnings.
 		pub bond_lot_allocations: BoundedVec<BondLotAllocation, T::MaxTreasuryContributors>,
 		/// The cross-vault frame weight:
 		/// `min(activated_bitcoin_security_bonds, sold_bonds)`.
 		#[codec(compact)]
 		pub eligible_bonds: Bonds,
-		/// The vault's percent of frame earnings shared to the vault side.
-		#[codec(compact)]
-		pub vault_sharing_percent: Permill,
 	}
 
 	/// The frame-wide locked capital object.

@@ -71,7 +71,7 @@ mod benchmarks {
 			.vaults
 			.get_mut(&vault_id)
 			.ok_or(BenchmarkError::Stop("missing benchmark vault"))?
-			.bitcoin_lock_delegate_account = Some(delegate.clone());
+			.delegate_account_id = Some(delegate.clone());
 		set_benchmark_bitcoin_vault_provider_state(state);
 		let options = benchmark_lock_options::<T>(vault_id, &beneficiary, satoshis, 12)?;
 		whitelist_account!(delegate);
@@ -572,10 +572,11 @@ where
 		bitcoin_annual_percent_rate: FixedU128::from_rational(110u128, 100u128),
 		bitcoin_base_fee: 1_000u128.into(),
 		treasury_profit_sharing: Permill::from_percent(20),
+		treasury_bonus_profit_sharing: Permill::zero(),
 	};
 	let vault = Vault {
 		operator_account_id: operator.clone(),
-		bitcoin_lock_delegate_account: None,
+		delegate_account_id: None,
 		name: None,
 		last_name_change_tick: None,
 		securitization: securitization.into(),

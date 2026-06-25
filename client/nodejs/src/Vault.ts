@@ -65,7 +65,7 @@ export class Vault {
   public securitizedSatoshis!: number;
   public name?: string;
   public lastNameChangeTick?: number;
-  public bitcoinLockDelegateAccount?: string;
+  public delegateAccountId?: string;
 
   constructor(
     id: number,
@@ -102,6 +102,10 @@ export class Vault {
         this.securitizationReleaseSchedule.set(bitcoinHeight.toNumber(), amount.toBigInt());
       }
     }
+    const currentBonusSharingPercent =
+      'treasuryBonusProfitSharing' in vault.terms
+        ? vault.terms.treasuryBonusProfitSharing
+        : (vault.terms as { bonusSharingPercent?: { toBigInt(): bigint } }).bonusSharingPercent;
     this.terms = {
       bitcoinAnnualPercentRate: fromFixedNumber(
         vault.terms.bitcoinAnnualPercentRate.toBigInt(),
@@ -110,6 +114,10 @@ export class Vault {
       bitcoinBaseFee: vault.terms.bitcoinBaseFee.toBigInt(),
       treasuryProfitSharing: fromFixedNumber(
         vault.terms.treasuryProfitSharing.toBigInt(),
+        PERMILL_DECIMALS,
+      ),
+      bonusSharingPercent: fromFixedNumber(
+        currentBonusSharingPercent?.toBigInt() ?? 0n,
         PERMILL_DECIMALS,
       ),
     };
@@ -127,9 +135,13 @@ export class Vault {
     this.pendingTermsChangeTick = undefined;
     this.name = undefined;
     this.lastNameChangeTick = undefined;
-    this.bitcoinLockDelegateAccount = undefined;
+    this.delegateAccountId = undefined;
     if (vault.pendingTerms.isSome) {
       const [tickApply, terms] = vault.pendingTerms.value;
+      const pendingBonusSharingPercent =
+        'treasuryBonusProfitSharing' in terms
+          ? terms.treasuryBonusProfitSharing
+          : (terms as { bonusSharingPercent?: { toBigInt(): bigint } }).bonusSharingPercent;
       this.pendingTermsChangeTick = tickApply.toNumber();
       this.pendingTerms = {
         bitcoinAnnualPercentRate: fromFixedNumber(
@@ -138,7 +150,11 @@ export class Vault {
         ),
         bitcoinBaseFee: terms.bitcoinBaseFee.toBigInt(),
         treasuryProfitSharing: fromFixedNumber(
-          vault.terms.treasuryProfitSharing.toBigInt(),
+          terms.treasuryProfitSharing.toBigInt(),
+          PERMILL_DECIMALS,
+        ),
+        bonusSharingPercent: fromFixedNumber(
+          pendingBonusSharingPercent?.toBigInt() ?? 0n,
           PERMILL_DECIMALS,
         ),
       };
@@ -149,8 +165,16 @@ export class Vault {
     if ('lastNameChangeTick' in vault && vault.lastNameChangeTick.isSome) {
       this.lastNameChangeTick = vault.lastNameChangeTick.unwrap().toNumber();
     }
-    if ('bitcoinLockDelegateAccount' in vault && vault.bitcoinLockDelegateAccount.isSome) {
-      this.bitcoinLockDelegateAccount = vault.bitcoinLockDelegateAccount.unwrap().toHuman();
+    const legacyDelegateAccount = (
+      vault as {
+        bitcoinLockDelegateAccount?: Option<AccountId32>;
+      }
+    ).bitcoinLockDelegateAccount;
+    if (legacyDelegateAccount?.isSome) {
+      this.delegateAccountId = legacyDelegateAccount.unwrap().toHuman();
+    }
+    if ('delegateAccountId' in vault && vault.delegateAccountId.isSome) {
+      this.delegateAccountId = vault.delegateAccountId.unwrap().toHuman();
     }
   }
 
@@ -239,8 +263,10 @@ export class Vault {
       annualPercentRate: number;
       baseFee: bigint | number;
       bitcoinXpub: string;
+      delegateAccountId?: string;
       name?: string;
       treasuryProfitSharing: number;
+      bonusSharingPercent: number;
       doNotExceedBalance?: bigint;
     } & ISubmittableOptions,
     config: { tickDurationMillis?: number } = {},
@@ -251,6 +277,7 @@ export class Vault {
       annualPercentRate,
       baseFee,
       bitcoinXpub,
+      delegateAccountId,
       name,
       tip,
       doNotExceedBalance,
@@ -279,10 +306,12 @@ export class Vault {
         bitcoinAnnualPercentRate: toFixedNumber(annualPercentRate, FIXED_U128_DECIMALS),
         bitcoinBaseFee: BigInt(baseFee),
         treasuryProfitSharing: toFixedNumber(args.treasuryProfitSharing, PERMILL_DECIMALS),
+        treasuryBonusProfitSharing: toFixedNumber(args.bonusSharingPercent, PERMILL_DECIMALS),
       },
       securitizationRatio: toFixedNumber(securitizationRatio, FIXED_U128_DECIMALS),
       securitization: BigInt(securitization),
       bitcoinXpubkey: xpubBytes,
+      delegateAccountId: delegateAccountId ?? null,
       name: encodedName,
     };
     const tx = new TxSubmitter(client, client.tx.vaults.create(vaultParams), txSigner);
@@ -348,6 +377,7 @@ export interface ITerms {
   readonly bitcoinAnnualPercentRate: BigNumber;
   readonly bitcoinBaseFee: bigint;
   readonly treasuryProfitSharing: BigNumber;
+  readonly bonusSharingPercent: BigNumber;
 }
 function bigNumberToBigInt(bn: BigNumber): bigint {
   return BigInt(bn.integerValue(BigNumber.ROUND_DOWN).toString());

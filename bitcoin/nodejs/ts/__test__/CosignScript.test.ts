@@ -128,6 +128,7 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
       baseFee: 500_000n,
       bitcoinXpub: vaultMasterXpub,
       treasuryProfitSharing: 0.5,
+      bonusSharingPercent: 0,
     });
     vault = await vaultResult.getVault();
 

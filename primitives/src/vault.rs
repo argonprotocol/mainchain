@@ -5,7 +5,11 @@ use frame_support::{weights::Weight, PalletError};
 use polkadot_sdk::{sp_core::ConstU32, sp_runtime::BoundedBTreeMap, *};
 use scale_info::TypeInfo;
 use sp_arithmetic::{FixedPointNumber, FixedU128, Permill};
-use sp_runtime::{traits::AtLeast32BitUnsigned, BoundedVec};
+use sp_core::blake2_256;
+use sp_runtime::{
+	traits::{AtLeast32BitUnsigned, Verify},
+	AccountId32, BoundedVec,
+};
 
 use crate::{
 	bitcoin::{
@@ -15,7 +19,7 @@ use crate::{
 	ensure,
 	prelude::FrameId,
 	tick::Tick,
-	VaultId,
+	Signature, VaultId,
 };
 
 pub trait BitcoinVaultProviderWeightInfo {
@@ -59,6 +63,42 @@ impl BitcoinVaultProviderWeightInfo for () {
 }
 
 pub type VaultName = BoundedVec<u8, ConstU32<18>>;
+
+pub const TREASURY_BONUS_APPROVAL_PROOF_MESSAGE_KEY: &[u8] = b"treasury_bonus_approval";
+
+#[derive(
+	Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen,
+)]
+pub struct TreasuryBonusApprovalProof {
+	#[codec(compact)]
+	pub vault_id: VaultId,
+	pub beneficiary: AccountId32,
+	#[codec(compact)]
+	pub expires_at_frame: FrameId,
+	pub signature: Signature,
+}
+
+impl TreasuryBonusApprovalProof {
+	pub fn verify(&self, signer: &AccountId32) -> bool {
+		let message = (
+			TREASURY_BONUS_APPROVAL_PROOF_MESSAGE_KEY,
+			self.vault_id,
+			&self.beneficiary,
+			self.expires_at_frame,
+		)
+			.using_encoded(blake2_256);
+		let verified = self.signature.verify(message.as_slice(), signer);
+		#[cfg(feature = "runtime-benchmarks")]
+		{
+			let _ = verified;
+			return true;
+		}
+		#[cfg(not(feature = "runtime-benchmarks"))]
+		{
+			verified
+		}
+	}
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RegistrationVaultData<Balance> {
@@ -115,8 +155,11 @@ pub trait TreasuryVaultProvider {
 	fn get_securitized_satoshis(vault_id: VaultId) -> Satoshis;
 
 	fn get_vault_operator(vault_id: VaultId) -> Option<Self::AccountId>;
-	/// Gets the percent of profit sharing
+	fn get_vault_delegate(vault_id: VaultId) -> Option<Self::AccountId>;
+	/// Gets the bonder-side percent of lot yield shared to the bond holder.
 	fn get_vault_profit_sharing_percent(vault_id: VaultId) -> Option<Permill>;
+	/// Gets the bonus bonder-side percent of lot yield shared to the bond holder.
+	fn get_vault_treasury_bonus_profit_sharing(vault_id: VaultId) -> Option<Permill>;
 
 	/// Ensure a vault is open
 	fn is_vault_open(vault_id: VaultId) -> bool;
@@ -348,8 +391,8 @@ where
 {
 	/// The account assigned to operate this vault
 	pub operator_account_id: AccountId,
-	/// Optional delegated hot account allowed to initialize bitcoin locks for this vault
-	pub bitcoin_lock_delegate_account: Option<AccountId>,
+	/// Optional delegated hot account allowed to act on behalf of this vault.
+	pub delegate_account_id: Option<AccountId>,
 	/// Optional display name for the vault.
 	pub name: Option<VaultName>,
 	/// Tick of the most recent vault name change.
@@ -405,9 +448,12 @@ where
 	/// The base fee for a bitcoin lock
 	#[codec(compact)]
 	pub bitcoin_base_fee: Balance,
-	/// The percent of mining bonds taken by the vault
+	/// The bonder-side percent of lot yield shared to the bond holder.
 	#[codec(compact)]
 	pub treasury_profit_sharing: Permill,
+	/// An extra bonder-side percent of lot yield shared to the bond holder when approved.
+	#[codec(compact)]
+	pub treasury_bonus_profit_sharing: Permill,
 }
 
 pub struct BurnResult<Balance> {
@@ -922,7 +968,7 @@ mod test {
 	fn default_vault(securitization: Balance, ratio: f64) -> Vault<u64, Balance> {
 		Vault::<u64, Balance> {
 			operator_account_id: 0,
-			bitcoin_lock_delegate_account: None,
+			delegate_account_id: None,
 			name: None,
 			last_name_change_tick: None,
 			securitization,
@@ -938,6 +984,7 @@ mod test {
 				bitcoin_annual_percent_rate: 0.into(),
 				bitcoin_base_fee: 0,
 				treasury_profit_sharing: Default::default(),
+				treasury_bonus_profit_sharing: Default::default(),
 			},
 			pending_terms: None,
 			opened_tick: 0,

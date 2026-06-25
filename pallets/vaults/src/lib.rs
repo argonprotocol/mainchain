@@ -49,7 +49,7 @@ pub mod pallet {
 	};
 	use sp_runtime::traits::SaturatedConversion;
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(14);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(15);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -384,6 +384,8 @@ pub mod pallet {
 		UnableToGenerateVaultBitcoinPubkey,
 		/// A funding change is already scheduled
 		FundingChangeAlreadyScheduled,
+		/// Treasury bond sharing plus bonus cannot exceed 100%.
+		InvalidBondSharingTerms,
 		/// Vault names must start with an uppercase ASCII letter and otherwise be ASCII
 		/// alphanumeric.
 		InvalidVaultName,
@@ -455,14 +457,17 @@ pub mod pallet {
 		TypeInfo,
 		MaxEncodedLen,
 	)]
-	pub struct VaultConfig<Balance>
+	pub struct VaultConfig<AccountId, Balance>
 	where
+		AccountId: Codec + MaxEncodedLen + Clone + TypeInfo + PartialEq + Eq + Debug,
 		Balance: Codec + MaxEncodedLen + Clone + TypeInfo + PartialEq + Eq + Debug,
 	{
 		/// Terms of this vault configuration
 		pub terms: VaultTerms<Balance>,
 		/// Optional display name for the vault.
 		pub name: Option<VaultName>,
+		/// Optional account allowed to perform delegated vault actions.
+		pub delegate_account_id: Option<AccountId>,
 		/// The amount of argons to be vaulted for bitcoin locks
 		#[codec(compact)]
 		pub securitization: Balance,
@@ -537,15 +542,22 @@ pub mod pallet {
 		)]
 		pub fn create(
 			origin: OriginFor<T>,
-			vault_config: VaultConfig<T::Balance>,
+			vault_config: VaultConfig<T::AccountId, T::Balance>,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
-			let VaultConfig { name, securitization_ratio, securitization, terms, bitcoin_xpubkey } =
-				vault_config;
+			let VaultConfig {
+				name,
+				delegate_account_id,
+				securitization_ratio,
+				securitization,
+				terms,
+				bitcoin_xpubkey,
+			} = vault_config;
 
 			if let Some(name) = name.as_ref() {
 				Self::ensure_valid_name(name)?;
 			}
+			ensure!(Self::is_valid_bond_sharing_terms(&terms), Error::<T>::InvalidBondSharingTerms);
 
 			ensure!(
 				securitization_ratio >= FixedU128::one() &&
@@ -581,7 +593,7 @@ pub mod pallet {
 
 			let vault = Vault {
 				operator_account_id: who.clone(),
-				bitcoin_lock_delegate_account: None,
+				delegate_account_id,
 				last_name_change_tick: name.as_ref().map(|_| opened_tick),
 				name,
 				securitization,
@@ -689,6 +701,7 @@ pub mod pallet {
 
 			ensure!(vault.operator_account_id == who, Error::<T>::NoPermissions);
 			ensure!(vault.pending_terms.is_none(), Error::<T>::TermsChangeAlreadyScheduled);
+			ensure!(Self::is_valid_bond_sharing_terms(&terms), Error::<T>::InvalidBondSharingTerms);
 
 			let terms_change_tick = Self::get_terms_active_tick();
 
@@ -813,8 +826,8 @@ pub mod pallet {
 		}
 
 		#[pallet::call_index(6)]
-		#[pallet::weight(T::WeightInfo::set_bitcoin_lock_delegate())]
-		pub fn set_bitcoin_lock_delegate(
+		#[pallet::weight(T::WeightInfo::set_delegate_account())]
+		pub fn set_delegate_account(
 			origin: OriginFor<T>,
 			delegate_account_id: Option<T::AccountId>,
 		) -> DispatchResult {
@@ -822,7 +835,7 @@ pub mod pallet {
 			let vault_id = VaultIdByOperator::<T>::get(&who).ok_or(Error::<T>::VaultNotFound)?;
 			VaultsById::<T>::try_mutate(vault_id, |vault| {
 				let vault = vault.as_mut().ok_or::<Error<T>>(Error::<T>::VaultNotFound)?;
-				vault.bitcoin_lock_delegate_account = delegate_account_id.clone();
+				vault.delegate_account_id = delegate_account_id.clone();
 				Ok::<(), Error<T>>(())
 			})?;
 			Ok(())
@@ -944,6 +957,12 @@ pub mod pallet {
 				Error::<T>::InvalidVaultName
 			);
 			Ok(())
+		}
+
+		pub(crate) fn is_valid_bond_sharing_terms(terms: &VaultTerms<T::Balance>) -> bool {
+			let sharing_parts = terms.treasury_profit_sharing.deconstruct();
+			let bonus_parts = terms.treasury_bonus_profit_sharing.deconstruct();
+			sharing_parts.saturating_add(bonus_parts) <= Permill::one().deconstruct()
 		}
 
 		pub(crate) fn get_terms_active_tick() -> Tick {
@@ -1367,8 +1386,16 @@ pub mod pallet {
 			VaultsById::<T>::get(vault_id).map(|a| a.operator_account_id)
 		}
 
+		fn get_vault_delegate(vault_id: VaultId) -> Option<Self::AccountId> {
+			VaultsById::<T>::get(vault_id).and_then(|a| a.delegate_account_id)
+		}
+
 		fn get_vault_profit_sharing_percent(vault_id: VaultId) -> Option<Permill> {
 			VaultsById::<T>::get(vault_id).map(|a| a.terms.treasury_profit_sharing)
+		}
+
+		fn get_vault_treasury_bonus_profit_sharing(vault_id: VaultId) -> Option<Permill> {
+			VaultsById::<T>::get(vault_id).map(|a| a.terms.treasury_bonus_profit_sharing)
 		}
 
 		fn is_vault_open(vault_id: VaultId) -> bool {
@@ -1435,7 +1462,7 @@ pub mod pallet {
 		fn can_initialize_bitcoin_locks(vault_id: VaultId, account_id: &T::AccountId) -> bool {
 			if let Some(vault) = VaultsById::<T>::get(vault_id) {
 				return &vault.operator_account_id == account_id ||
-					vault.bitcoin_lock_delegate_account.as_ref() == Some(account_id);
+					vault.delegate_account_id.as_ref() == Some(account_id);
 			}
 			false
 		}

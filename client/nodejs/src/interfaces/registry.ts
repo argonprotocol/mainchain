@@ -63,6 +63,7 @@ import type {
   ArgonPrimitivesProvidersOperationalRewardKind,
   ArgonPrimitivesTickTicker,
   ArgonPrimitivesVault,
+  ArgonPrimitivesVaultTreasuryBonusApprovalProof,
   ArgonPrimitivesVaultVaultArgonotCommitment,
   ArgonPrimitivesVaultVaultError,
   ArgonPrimitivesVaultVaultTerms,
@@ -359,6 +360,7 @@ declare module '@polkadot/types/types/registry' {
     ArgonPrimitivesProvidersOperationalRewardKind: ArgonPrimitivesProvidersOperationalRewardKind;
     ArgonPrimitivesTickTicker: ArgonPrimitivesTickTicker;
     ArgonPrimitivesVault: ArgonPrimitivesVault;
+    ArgonPrimitivesVaultTreasuryBonusApprovalProof: ArgonPrimitivesVaultTreasuryBonusApprovalProof;
     ArgonPrimitivesVaultVaultArgonotCommitment: ArgonPrimitivesVaultVaultArgonotCommitment;
     ArgonPrimitivesVaultVaultError: ArgonPrimitivesVaultVaultError;
     ArgonPrimitivesVaultVaultTerms: ArgonPrimitivesVaultVaultTerms;
