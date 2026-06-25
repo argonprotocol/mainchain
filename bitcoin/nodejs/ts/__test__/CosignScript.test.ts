@@ -144,7 +144,7 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
       mnemonicToSeedSync(bitcoinMnemonic),
       "m/84'/0'/0'/0/0'",
     );
-    const ownerBitcoinPubkey = getCompressedPubkey(ownerBitcoinXpriv.publicKey);
+    const ownerBitcoinPubkey = getCompressedPubkey(ownerBitcoinXpriv.publicKey!);
     console.log('Owner Bitcoin Pubkey:', u8aToHex(ownerBitcoinPubkey), ownerBitcoinPubkey.length);
     const priceIndex = new PriceIndex();
     await priceIndex.load(vaulterClient);
