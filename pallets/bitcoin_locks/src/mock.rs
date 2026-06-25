@@ -156,6 +156,8 @@ impl UtxoLockEvents<u64, Balance> for EventHandler {
 
 pub struct StaticPriceProvider;
 impl PriceProvider<Balance> for StaticPriceProvider {
+	type Weights = ();
+
 	fn get_latest_btc_price_in_usd() -> Option<FixedU128> {
 		BitcoinPriceInUsd::get()
 	}

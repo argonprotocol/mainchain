@@ -1,8 +1,8 @@
 use argon_primitives::{
 	vault::{BitcoinVaultProvider, BitcoinVaultProviderWeightInfo},
 	CollectBlockerProviderWeightInfo, EthereumVerifyProvider, EthereumVerifyProviderWeightInfo,
-	TickProvider, TickProviderWeightInfo, TreasuryPoolProvider, TreasuryPoolProviderWeightInfo,
-	UniswapTransferProviderWeightInfo,
+	PriceProvider, PriceProviderWeightInfo, TickProvider, TickProviderWeightInfo,
+	TreasuryPoolProvider, TreasuryPoolProviderWeightInfo, UniswapTransferProviderWeightInfo,
 };
 use core::marker::PhantomData;
 use pallet_prelude::*;
@@ -36,6 +36,8 @@ type TreasuryPoolProviderWeights<T> =
 type TickProviderWeights<T> =
 	<<T as Config>::TickProvider as TickProvider<<T as frame_system::Config>::Block>>::Weights;
 type VaultProviderWeights<T> = <<T as Config>::VaultProvider as BitcoinVaultProvider>::Weights;
+type PriceProviderWeights<T> =
+	<<T as Config>::PriceProvider as PriceProvider<<T as Config>::Balance>>::Weights;
 
 pub struct WithProviderWeights<
 	T,
@@ -44,6 +46,7 @@ pub struct WithProviderWeights<
 	TreasuryPoolWeight = TreasuryPoolProviderWeights<T>,
 	TickProviderWeight = TickProviderWeights<T>,
 	VaultProviderWeight = VaultProviderWeights<T>,
+	PriceProviderWeight = PriceProviderWeights<T>,
 >(
 	PhantomData<(
 		T,
@@ -52,6 +55,7 @@ pub struct WithProviderWeights<
 		TreasuryPoolWeight,
 		TickProviderWeight,
 		VaultProviderWeight,
+		PriceProviderWeight,
 	)>,
 );
 impl<
@@ -61,6 +65,7 @@ impl<
 		TreasuryPoolWeight,
 		TickProviderWeight,
 		VaultProviderWeight,
+		PriceProviderWeight,
 	> WeightInfo
 	for WithProviderWeights<
 		T,
@@ -69,6 +74,7 @@ impl<
 		TreasuryPoolWeight,
 		TickProviderWeight,
 		VaultProviderWeight,
+		PriceProviderWeight,
 	>
 where
 	T: Config,
@@ -77,6 +83,7 @@ where
 	TreasuryPoolWeight: TreasuryPoolProviderWeightInfo,
 	TickProviderWeight: TickProviderWeightInfo,
 	VaultProviderWeight: BitcoinVaultProviderWeightInfo,
+	PriceProviderWeight: PriceProviderWeightInfo,
 {
 	fn set_chain_config() -> Weight {
 		Base::set_chain_config()
@@ -84,6 +91,7 @@ where
 
 	fn force_set_global_issuance_council() -> Weight {
 		Base::force_set_global_issuance_council()
+			.saturating_add(PriceProviderWeight::get_lowest_microgons_per_argonot())
 	}
 
 	fn register_council_signer() -> Weight {
@@ -100,6 +108,7 @@ where
 
 	fn register_minting_authority() -> Weight {
 		Base::register_minting_authority()
+			.saturating_add(PriceProviderWeight::get_lowest_microgons_per_argonot())
 			.saturating_add(TreasuryPoolWeight::encumber_bond_microgons())
 			.saturating_add(VaultProviderWeight::encumber_argonots())
 	}

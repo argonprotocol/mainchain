@@ -81,6 +81,8 @@ impl MiningFrameProvider for StaticMiningFrameProvider {
 }
 pub struct StaticPriceProvider;
 impl PriceProvider<Balance> for StaticPriceProvider {
+	type Weights = ();
+
 	fn get_argon_cpi() -> Option<argon_primitives::ArgonCPI> {
 		ArgonCPI::get()
 	}

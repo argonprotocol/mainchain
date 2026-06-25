@@ -324,26 +324,33 @@ mod benchmarks {
 		};
 		MiningConfig::<T>::put(mining_config);
 
-		let mut bid_stats_vec = BoundedVec::new();
-		for i in 0..10 {
-			let bid_stat = MiningBidStats {
-				bids_count: 10 + i,
-				bid_amount_min: 1_000_000u128,
-				bid_amount_max: 5_000_000u128,
-				bid_amount_sum: 30_000_000u128,
-			};
-			let _ = bid_stats_vec.try_push(bid_stat);
-		}
-		HistoricalBidsPerSlot::<T>::put(bid_stats_vec);
-
 		let argonots_amount: T::Balance = 100_000u128.into();
 		ArgonotsPerMiningSeat::<T>::put(argonots_amount);
+		NextFrameId::<T>::put(2);
 		NextCohortSize::<T>::put(T::MinCohortSize::get());
 		ActiveMinersCount::<T>::put(10u16);
+		let mut bids = BoundedVec::new();
+		for i in 0..T::MinCohortSize::get() {
+			use sp_runtime::codec::Decode;
+			let key_size = T::Keys::max_encoded_len();
+			let key_data = vec![0u8; key_size];
+			let keys = T::Keys::decode(&mut &key_data[..])
+				.expect("Failed to create test keys for benchmarking");
+			let _ = bids.try_push(Registration::<T> {
+				account_id: account("median", i, 0),
+				external_funding_account: None,
+				bid: (5_000_000u128.saturating_sub((i as u128) * 10_000)).into(),
+				argonots: argonots_amount,
+				authority_keys: keys,
+				starting_frame_id: 2,
+				bid_at_tick: 1,
+			});
+		}
+		BidsForNextSlotCohort::<T>::put(bids);
 
 		#[block]
 		{
-			Pallet::<T>::adjust_argonots_per_seat();
+			Pallet::<T>::update_argonots_per_seat(2);
 			Pallet::<T>::adjust_number_of_seats();
 		}
 

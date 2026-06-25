@@ -5,8 +5,8 @@ use argon_primitives::{
 };
 
 use crate::{
-	mock::*, CpiMeasurementBucket, Current, HistoricArgonCPI, HistoricArgonotFloorByFrame,
-	Operator, PriceIndex as PriceIndexEntry,
+	mock::*, CpiMeasurementBucket, Current, HistoricArgonCPI, HistoricArgonotAverageByFrame,
+	HistoricArgonotFloorByFrame, Operator, PriceIndex as PriceIndexEntry,
 };
 
 type Event = crate::Event<Test>;
@@ -198,6 +198,117 @@ fn carries_argonot_floor_forward_to_new_frames_without_new_submissions() {
 			<PriceIndex as PriceProvider<u128>>::get_lowest_microgons_per_argonot(2),
 			Some(2 * MICROGONS_PER_ARGON),
 		);
+	});
+}
+
+#[test]
+fn buckets_transition_block_floor_samples_under_the_new_frame() {
+	new_test_ext(Some(1)).execute_with(|| {
+		System::set_block_number(1);
+
+		CurrentTick::set(12);
+		CurrentFrameId::set(1);
+		let mut index = create_index();
+		index.tick = 12;
+		index.argonot_usd_price = FixedU128::from_u32(2);
+		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), index));
+
+		NewlyStartedFrameId::set(Some(2));
+		CurrentTick::set(13);
+		let mut transition_block_index = index;
+		transition_block_index.tick = 13;
+		transition_block_index.argonot_usd_price = FixedU128::from_u32(3);
+		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), transition_block_index));
+
+		let history = HistoricArgonotFloorByFrame::<Test>::get();
+		assert_eq!(history.get(&1), Some(&(2 * MICROGONS_PER_ARGON)));
+		assert_eq!(history.get(&2), Some(&(3 * MICROGONS_PER_ARGON)));
+	});
+}
+
+#[test]
+fn buckets_transition_block_initialize_floor_samples_under_the_new_frame() {
+	new_test_ext(Some(1)).execute_with(|| {
+		System::set_block_number(1);
+
+		CurrentTick::set(12);
+		CurrentFrameId::set(1);
+		let mut index = create_index();
+		index.tick = 12;
+		index.argonot_usd_price = FixedU128::from_u32(2);
+		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), index));
+
+		NewlyStartedFrameId::set(Some(2));
+		CurrentTick::set(13);
+		PriceIndex::on_initialize(2);
+
+		let history = HistoricArgonotFloorByFrame::<Test>::get();
+		assert_eq!(history.get(&1), Some(&(2 * MICROGONS_PER_ARGON)));
+		assert_eq!(history.get(&2), Some(&(2 * MICROGONS_PER_ARGON)));
+	});
+}
+
+#[test]
+fn finalizes_argonot_average_for_completed_frames() {
+	new_test_ext(Some(1)).execute_with(|| {
+		System::set_block_number(1);
+
+		let mut first = create_index();
+		first.tick = 5;
+		first.argonot_usd_price = FixedU128::from_u32(2);
+		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), first));
+
+		CurrentTick::set(5);
+		CurrentFrameId::set(0);
+		PriceIndex::on_initialize(1);
+
+		let mut second = first;
+		second.tick = 7;
+		second.argonot_usd_price = FixedU128::from_u32(4);
+		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), second));
+
+		CurrentTick::set(7);
+		CurrentFrameId::set(0);
+		PriceIndex::on_initialize(2);
+
+		NewlyStartedFrameId::set(Some(1));
+		CurrentTick::set(8);
+		PriceIndex::on_initialize(3);
+
+		let history = HistoricArgonotAverageByFrame::<Test>::get();
+		assert_eq!(history.get(&0), Some(&(3 * MICROGONS_PER_ARGON)));
+		assert_eq!(
+			<PriceIndex as PriceProvider<u128>>::get_average_microgons_per_argonot(0),
+			Some(3 * MICROGONS_PER_ARGON),
+		);
+	});
+}
+
+#[test]
+fn carries_forward_previous_argonot_average_when_a_frame_has_no_samples() {
+	new_test_ext(Some(1)).execute_with(|| {
+		System::set_block_number(1);
+
+		let mut index = create_index();
+		index.tick = 1;
+		index.argonot_usd_price = FixedU128::from_u32(2);
+		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), index));
+
+		CurrentTick::set(1);
+		CurrentFrameId::set(1);
+		PriceIndex::on_initialize(1);
+
+		NewlyStartedFrameId::set(Some(2));
+		CurrentTick::set(100);
+		PriceIndex::on_initialize(2);
+
+		NewlyStartedFrameId::set(Some(3));
+		CurrentTick::set(101);
+		PriceIndex::on_initialize(3);
+
+		let history = HistoricArgonotAverageByFrame::<Test>::get();
+		assert_eq!(history.get(&1), Some(&(2 * MICROGONS_PER_ARGON)));
+		assert_eq!(history.get(&2), Some(&(2 * MICROGONS_PER_ARGON)));
 	});
 }
 

@@ -451,10 +451,27 @@ fn btc_price_in_microgons<
 	Some(microgons.saturating_mul_int(Balance::one()))
 }
 
+pub trait PriceProviderWeightInfo {
+	fn get_lowest_microgons_per_argonot() -> Weight;
+	fn get_average_microgons_per_argonot() -> Weight;
+}
+
+impl PriceProviderWeightInfo for () {
+	fn get_lowest_microgons_per_argonot() -> Weight {
+		Weight::zero()
+	}
+
+	fn get_average_microgons_per_argonot() -> Weight {
+		Weight::zero()
+	}
+}
+
 pub trait PriceProvider<
 	Balance: Codec + Copy + AtLeast32BitUnsigned + Into<u128> + From<u128> + HasCompact + MaxEncodedLen,
 >
 {
+	type Weights: PriceProviderWeightInfo;
+
 	/// Price of the given satoshis in argon microgons at current market
 	fn get_btc_price_in_market_microgons(satoshis: Satoshis) -> Option<Balance> {
 		btc_price_in_microgons(
@@ -506,6 +523,11 @@ pub trait PriceProvider<
 	/// Lowest council floor price of one whole Argonot, measured in microgons, across the
 	/// requested trailing frame horizon.
 	fn get_lowest_microgons_per_argonot(_frames: FrameId) -> Option<Balance> {
+		Self::get_microgons_per_argonot()
+	}
+
+	/// Average council price of one whole Argonot, measured in microgons, for a specific frame.
+	fn get_average_microgons_per_argonot(_frame_id: FrameId) -> Option<Balance> {
 		Self::get_microgons_per_argonot()
 	}
 

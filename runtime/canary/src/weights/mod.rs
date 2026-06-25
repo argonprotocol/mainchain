@@ -13,6 +13,7 @@ pub mod pallet_mining_slot;
 pub mod pallet_multisig;
 pub mod pallet_notebook;
 pub mod pallet_operational_accounts;
+pub mod pallet_price_index;
 pub mod pallet_proxy;
 pub mod pallet_sudo;
 pub mod pallet_ticks;

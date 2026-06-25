@@ -208,6 +208,8 @@ parameter_types! {
 
 pub struct StaticPriceProvider;
 impl PriceProvider<Balance> for StaticPriceProvider {
+	type Weights = ();
+
 	fn get_argon_cpi() -> Option<argon_primitives::ArgonCPI> {
 		Some(ArgonCPI::get())
 	}

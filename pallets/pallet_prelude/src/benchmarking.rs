@@ -11,7 +11,7 @@ use argon_primitives::{
 		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinNetwork, BitcoinXPub,
 		CompressedBitcoinPubkey, Satoshis, UtxoId, UtxoRef,
 	},
-	block_seal::MiningAuthority,
+	block_seal::{FrameId, MiningAuthority},
 	digests::{
 		BlockVoteDigest, NotebookDigest, AUTHOR_DIGEST_ID, BLOCK_VOTES_DIGEST_ID,
 		NOTEBOOKS_DIGEST_ID, TICK_DIGEST_ID,
@@ -19,7 +19,8 @@ use argon_primitives::{
 	notary::{NotaryProvider, NotarySignature},
 	providers::{
 		AuthorityProvider, BitcoinUtxoTracker, BlockRewardAccountsProvider, BlockSealerInfo,
-		BlockSealerProvider, NotebookProvider, OperationalRewardsPayer, OperationalRewardsProvider,
+		BlockSealerProvider, MiningFrameTransitionProvider, NotebookProvider,
+		OperationalRewardsPayer, OperationalRewardsProvider,
 	},
 	tick::{Tick, TickDigest, Ticker},
 	vault::{
@@ -796,6 +797,8 @@ where
 	Balance:
 		Codec + Copy + AtLeast32BitUnsigned + Into<u128> + From<u128> + HasCompact + MaxEncodedLen,
 {
+	type Weights = ();
+
 	fn get_latest_btc_price_in_usd() -> Option<FixedU128> {
 		benchmark_price_provider_state().btc_price_in_usd
 	}
@@ -817,6 +820,14 @@ where
 		let ratio = state.argon_target_price_in_usd? / state.argon_price_in_usd?;
 		let ratio_as_cpi = ArgonCPI::from_inner(ratio.into_inner() as i128);
 		Some(ratio_as_cpi - One::one())
+	}
+
+	fn get_lowest_microgons_per_argonot(_frames: FrameId) -> Option<Balance> {
+		Self::get_microgons_per_argonot()
+	}
+
+	fn get_average_microgons_per_argonot(_frame_id: FrameId) -> Option<Balance> {
+		Self::get_microgons_per_argonot()
 	}
 
 	fn get_average_cpi_for_ticks(_tick_range: (Tick, Tick)) -> ArgonCPI {
@@ -956,6 +967,17 @@ pub fn benchmark_bitcoin_locks_runtime_state() -> BenchmarkBitcoinLocksRuntimeSt
 pub struct BenchmarkCurrentFrameId;
 impl Get<FrameId> for BenchmarkCurrentFrameId {
 	fn get() -> FrameId {
+		benchmark_bitcoin_locks_runtime_state().current_frame_id
+	}
+}
+
+impl MiningFrameTransitionProvider for BenchmarkCurrentFrameId {
+	fn is_new_frame_started() -> Option<FrameId> {
+		let state = benchmark_bitcoin_locks_runtime_state();
+		state.did_start_new_frame.then_some(state.current_frame_id)
+	}
+
+	fn get_current_frame_id() -> FrameId {
 		benchmark_bitcoin_locks_runtime_state().current_frame_id
 	}
 }

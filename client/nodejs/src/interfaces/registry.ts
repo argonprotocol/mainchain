@@ -229,6 +229,7 @@ import type {
   PalletOperationalAccountsRegistration,
   PalletOperationalAccountsRegistrationV1,
   PalletOperationalAccountsRewardsConfig,
+  PalletPriceIndexArgonotAverageFrameAccumulator,
   PalletPriceIndexCall,
   PalletPriceIndexCpiMeasurementBucket,
   PalletPriceIndexError,
@@ -526,6 +527,7 @@ declare module '@polkadot/types/types/registry' {
     PalletOperationalAccountsRegistration: PalletOperationalAccountsRegistration;
     PalletOperationalAccountsRegistrationV1: PalletOperationalAccountsRegistrationV1;
     PalletOperationalAccountsRewardsConfig: PalletOperationalAccountsRewardsConfig;
+    PalletPriceIndexArgonotAverageFrameAccumulator: PalletPriceIndexArgonotAverageFrameAccumulator;
     PalletPriceIndexCall: PalletPriceIndexCall;
     PalletPriceIndexCpiMeasurementBucket: PalletPriceIndexCpiMeasurementBucket;
     PalletPriceIndexError: PalletPriceIndexError;

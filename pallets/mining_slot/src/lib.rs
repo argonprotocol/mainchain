@@ -35,10 +35,8 @@ pub mod weights;
 ///
 /// When a new Slot begins, the Miners from `config.FramesPerMiningTerm` will be retired.
 ///
-/// To be eligible for mining, you must reserve a percentage of the argonot issuance (ownership
-/// tokens). The percentage is configured to aim for `TargetBidsPerSeatPercent`, with a
-/// maximum change in ownership tokens needed per slot capped at `ArgonotsPercentAdjustmentDamper`
-/// (NOTE: this percent is the max increase or reduction in the amount of ownership issued).
+/// To be eligible for mining, you must reserve enough argonots to cover 2x (configurable) of the
+/// previous day's lower-median winning bid using the previous frame's average Argonot price.
 ///
 /// You can out-bid others for cohort membership by submitting a bid amount in `BidIncrements` argon
 /// to supplant other entrants (eg, 1.01 argon, 1.02 argons, etc.).
@@ -52,7 +50,7 @@ pub mod weights;
 pub mod pallet {
 	use codec::FullCodec;
 	use core::cmp::Ordering;
-	use sp_runtime::{BoundedBTreeMap, Percent};
+	use sp_runtime::BoundedBTreeMap;
 
 	use super::*;
 	use argon_primitives::{
@@ -91,23 +89,13 @@ pub mod pallet {
 		#[pallet::constant]
 		type MaxCohortSize: Get<u32>;
 
-		/// The max percent swing for the argonots per slot (from the last percent)
+		/// The initial argonots needed per seat before a prior-day median is available.
 		#[pallet::constant]
-		type ArgonotsPercentAdjustmentDamper: Get<FixedU128>;
+		type InitialArgonotsPerSeat: Get<Self::Balance>;
 
-		/// The minimum argonots needed per seat
+		/// The multiple of the prior-day lower median winning bid that must be collateralized.
 		#[pallet::constant]
-		type MinimumArgonotsPerSeat: Get<Self::Balance>;
-
-		/// The maximum percent of argonots in the network that should be required for
-		/// mining seats
-		#[pallet::constant]
-		type MaximumArgonotProrataPercent: Get<Percent>;
-
-		/// The target percent of bids per auction relative to the max number of seats. This will
-		/// adjust the argonots per seat up or down to ensure mining slots are filled.
-		#[pallet::constant]
-		type TargetBidsPerSeatPercent: Get<FixedU128>;
+		type ArgonotBidCollateralMultiple: Get<u128>;
 
 		/// The target price per seat.
 		#[pallet::constant]
@@ -136,6 +124,9 @@ pub mod pallet {
 
 		/// The currency representing argons
 		type ArgonCurrency: Mutate<Self::AccountId, Balance = Self::Balance>;
+
+		/// Price source for frame-average Argonot valuations.
+		type PriceProvider: PriceProvider<Self::Balance>;
 
 		/// The hold reason when reserving funds for entering or extending the safe-mode.
 		type RuntimeHoldReason: From<HoldReason>;
@@ -204,9 +195,15 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
+	#[pallet::type_value]
+	pub fn DefaultArgonotsPerMiningSeat<T: Config>() -> T::Balance {
+		T::InitialArgonotsPerSeat::get()
+	}
+
 	/// Argonots that must be locked to take a Miner role
 	#[pallet::storage]
-	pub type ArgonotsPerMiningSeat<T: Config> = StorageValue<_, T::Balance, ValueQuery>;
+	pub type ArgonotsPerMiningSeat<T: Config> =
+		StorageValue<_, T::Balance, ValueQuery, DefaultArgonotsPerMiningSeat<T>>;
 
 	/// Lookup by account id to the corresponding index in MinersByCohort and MinerNoncesByCohort
 	#[pallet::storage]
@@ -298,7 +295,6 @@ pub mod pallet {
 			}
 			MiningConfig::<T>::put(self.mining_config.clone());
 			FrameRewardTicksRemaining::<T>::put(self.mining_config.ticks_between_slots);
-			ArgonotsPerMiningSeat::<T>::put(T::MinimumArgonotsPerSeat::get());
 			NextFrameId::<T>::put(1);
 			NextCohortSize::<T>::put(T::MinCohortSize::get());
 		}
@@ -433,7 +429,7 @@ pub mod pallet {
 			// if it's time for the cohort to start, do it
 			if let Some(activating_frame_id) = Self::get_newly_started_frame() {
 				log::info!("Starting Frame {activating_frame_id}");
-				Self::adjust_argonots_per_seat();
+				Self::update_argonots_per_seat(activating_frame_id);
 				Self::start_new_frame(activating_frame_id);
 				// we use the current price as part of calculations
 				Self::adjust_number_of_seats();
@@ -1056,58 +1052,39 @@ impl<T: Config> Pallet<T> {
 		});
 	}
 
-	/// Adjust the argonots per seat amount based on a rolling 10-frame average of bids.
-	///
-	/// This should be called before starting a new slot. It will adjust the argonots per seat
-	/// amount based on the number of bids in the last 10 frames to reach the target number of bids
-	/// per cohort. The amount must also be adjusted based on the total ownership tokens in the
-	/// network, which will increase in every block.
-	///
-	/// The max percent swing is 20% over the previous adjustment to the argonots per seat amount.
-	pub(crate) fn adjust_argonots_per_seat() {
-		let ownership_circulation: u128 = T::OwnershipCurrency::total_issuance().saturated_into();
-		if ownership_circulation == 0 {
+	/// Update the argonots per seat requirement using the prior-day lower median winning bid and
+	/// the previous frame's average Argonot price.
+	pub(crate) fn update_argonots_per_seat(activating_frame_id: FrameId) {
+		let winning_bids = BidsForNextSlotCohort::<T>::get();
+		if winning_bids.is_empty() {
 			return;
 		}
 
-		let historical_bids = HistoricalBidsPerSlot::<T>::get();
-		let total_bids: u32 = historical_bids.iter().map(|a| a.bids_count).sum();
-
-		let auctions = historical_bids.len() as u32;
-		let max_seats = NextCohortSize::<T>::get() * auctions;
-		let expected_bids_for_period =
-			T::TargetBidsPerSeatPercent::get().saturating_mul_int(max_seats);
-		if expected_bids_for_period == 0 {
+		let previous_frame_id = activating_frame_id.saturating_sub(1);
+		let Some(microgons_per_argonot) =
+			T::PriceProvider::get_average_microgons_per_argonot(previous_frame_id)
+		else {
+			return;
+		};
+		if microgons_per_argonot.is_zero() {
 			return;
 		}
 
-		let current_max_miners = NextCohortSize::<T>::get() * T::FramesPerMiningTerm::get();
-		let base_ownership_tokens: u128 =
-			ownership_circulation.checked_div(current_max_miners.into()).unwrap_or_default();
+		// Winning bids are stored from highest to lowest, so `len / 2` yields the middle bid for
+		// odd cohort sizes and the lower median for even cohort sizes.
+		let median_bid: u128 = winning_bids[winning_bids.len() / 2].bid.into();
+		let required_value_in_microgons =
+			median_bid.saturating_mul(T::ArgonotBidCollateralMultiple::get());
+		let price_of_one_whole_argonot_in_microgons: u128 = microgons_per_argonot.into();
+		// `ArgonotsPerMiningSeat` is stored in base units, so scale the numerator by 1e6 to keep
+		// micronot precision while dividing by the price of one whole Argonot.
+		let micronots_needed = required_value_in_microgons
+			.saturating_mul(argon_primitives::MICROGONS_PER_ARGON)
+			.saturating_add(price_of_one_whole_argonot_in_microgons.saturating_sub(1))
+			.checked_div(price_of_one_whole_argonot_in_microgons)
+			.unwrap_or_default();
 
-		let damper = T::ArgonotsPercentAdjustmentDamper::get();
-		let one = FixedU128::one();
-		let adjustment_percent =
-			FixedU128::from_rational(total_bids as u128, expected_bids_for_period as u128)
-				.clamp(one.saturating_sub(damper), one.saturating_add(damper));
-
-		if adjustment_percent == FixedU128::one() {
-			return;
-		}
-		let current = ArgonotsPerMiningSeat::<T>::get();
-
-		let min_value = T::MinimumArgonotsPerSeat::get();
-		// don't let this go below the minimum (it is in the beginning)
-		let max_value: T::Balance = T::MaximumArgonotProrataPercent::get()
-			.mul_ceil(base_ownership_tokens)
-			.unique_saturated_into();
-		let mut argonots_needed = adjustment_percent.saturating_mul_int(current);
-		if argonots_needed < min_value {
-			argonots_needed = min_value;
-		} else if argonots_needed > max_value {
-			argonots_needed = max_value;
-		}
-		ArgonotsPerMiningSeat::<T>::put(argonots_needed.saturated_into::<T::Balance>());
+		ArgonotsPerMiningSeat::<T>::put(T::Balance::from(micronots_needed));
 	}
 
 	/// Adjust the number of seats in the next cohort based on the average price per seat vs the

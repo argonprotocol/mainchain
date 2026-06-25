@@ -1,6 +1,9 @@
-use argon_primitives::providers::{
-	BlockSealerProvider, BlockSealerProviderWeightInfo, MiningSlotProviderWeightInfo, TickProvider,
-	TickProviderWeightInfo,
+use argon_primitives::{
+	providers::{
+		BlockSealerProvider, BlockSealerProviderWeightInfo, MiningSlotProviderWeightInfo,
+		PriceProviderWeightInfo, TickProvider, TickProviderWeightInfo,
+	},
+	PriceProvider,
 };
 use core::marker::PhantomData;
 use pallet_prelude::*;
@@ -31,20 +34,24 @@ type SealerInfoProviderWeights<T> = <<T as crate::Config>::SealerInfo as BlockSe
 type TickProviderWeights<T> = <<T as crate::Config>::TickProvider as TickProvider<
 	<T as frame_system::Config>::Block,
 >>::Weights;
+type PriceProviderWeights<T> =
+	<<T as crate::Config>::PriceProvider as PriceProvider<<T as crate::Config>::Balance>>::Weights;
 
 pub struct WithProviderWeights<
 	T,
 	Base,
 	SealerInfoWeight = SealerInfoProviderWeights<T>,
 	TickProviderWeight = TickProviderWeights<T>,
->(PhantomData<(T, Base, SealerInfoWeight, TickProviderWeight)>);
-impl<T, Base, SealerInfoWeight, TickProviderWeight> WeightInfo
-	for WithProviderWeights<T, Base, SealerInfoWeight, TickProviderWeight>
+	PriceProviderWeight = PriceProviderWeights<T>,
+>(PhantomData<(T, Base, SealerInfoWeight, TickProviderWeight, PriceProviderWeight)>);
+impl<T, Base, SealerInfoWeight, TickProviderWeight, PriceProviderWeight> WeightInfo
+	for WithProviderWeights<T, Base, SealerInfoWeight, TickProviderWeight, PriceProviderWeight>
 where
 	T: crate::Config,
 	Base: WeightInfo,
 	SealerInfoWeight: BlockSealerProviderWeightInfo,
 	TickProviderWeight: TickProviderWeightInfo,
+	PriceProviderWeight: PriceProviderWeightInfo,
 {
 	fn bid() -> Weight {
 		Base::bid().saturating_add(TickProviderWeight::current_tick())
@@ -68,6 +75,7 @@ where
 
 	fn on_finalize_frame_adjustments() -> Weight {
 		Base::on_finalize_frame_adjustments()
+			.saturating_add(PriceProviderWeight::get_average_microgons_per_argonot())
 	}
 
 	fn block_seal_read_vote() -> Weight {

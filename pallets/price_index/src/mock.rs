@@ -1,4 +1,5 @@
 use crate as pallet_price_index;
+use argon_primitives::MiningFrameTransitionProvider;
 
 use pallet_prelude::*;
 pub(crate) type Block = frame_system::mocking::MockBlock<Test>;
@@ -49,19 +50,34 @@ parameter_types! {
 	pub static MaxPriceAgeInTicks: Tick = 1440; // 1 day
 	pub static CurrentTick:Tick = 0;
 	pub static CurrentFrameId: FrameId = 0;
+	pub static NewlyStartedFrameId: Option<FrameId> = None;
 	pub const MaxArgonotFloorHistoryFrames: u32 = 10;
+	pub const MaxArgonotAverageHistoryFrames: u32 = 10;
 	pub const MaxArgonChangePerTickAwayFromTarget: FixedU128 = FixedU128::from_rational(1, 100);
 	pub const MaxArgonTargetChangePerTick: FixedU128 = FixedU128::from_rational(1, 100);
+}
+
+pub struct StaticMiningFrameTransitionProvider;
+impl MiningFrameTransitionProvider for StaticMiningFrameTransitionProvider {
+	fn is_new_frame_started() -> Option<FrameId> {
+		NewlyStartedFrameId::get()
+	}
+
+	fn get_current_frame_id() -> FrameId {
+		CurrentFrameId::get()
+	}
 }
 
 impl pallet_price_index::Config for Test {
 	type CurrentTick = CurrentTick;
 	type CurrentFrameId = CurrentFrameId;
+	type MiningFrameTransitionProvider = StaticMiningFrameTransitionProvider;
 	type WeightInfo = ();
 	type Balance = u128;
 	type MaxDowntimeTicksBeforeReset = MaxDowntimeBeforeReset;
 	type MaxPriceAgeInTicks = MaxPriceAgeInTicks;
 	type MaxArgonotFloorHistoryFrames = MaxArgonotFloorHistoryFrames;
+	type MaxArgonotAverageHistoryFrames = MaxArgonotAverageHistoryFrames;
 	type MaxArgonChangePerTickAwayFromTarget = MaxArgonChangePerTickAwayFromTarget;
 	type MaxArgonTargetChangePerTick = MaxArgonTargetChangePerTick;
 	type Currency = Balances;
@@ -70,6 +86,7 @@ impl pallet_price_index::Config for Test {
 pub fn new_test_ext(operator: Option<u64>) -> TestState {
 	CurrentTick::set(0);
 	CurrentFrameId::set(0);
+	NewlyStartedFrameId::set(None);
 	new_test_with_genesis::<Test>(|t: &mut Storage| {
 		pallet_price_index::GenesisConfig::<Test> { operator }
 			.assimilate_storage(t)
