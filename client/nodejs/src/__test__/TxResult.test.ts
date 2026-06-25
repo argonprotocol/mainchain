@@ -48,9 +48,11 @@ describe('TxResult', () => {
 
     await expect(result.waitForInFirstBlock).rejects.toMatchObject({
       errorCode: TxSubmissionErrorCode.Usurped,
+      message: expect.stringContaining('0xreplacement'),
     });
     await expect(result.waitForFinalizedBlock).rejects.toMatchObject({
       errorCode: TxSubmissionErrorCode.Usurped,
+      message: expect.stringContaining('0xreplacement'),
     });
   });
 });

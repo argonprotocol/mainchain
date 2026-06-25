@@ -87,6 +87,7 @@ export class TxSubmissionError extends Error {
     message: string,
   ) {
     super(message);
+    this.name = 'TxSubmissionError';
   }
 }
 
