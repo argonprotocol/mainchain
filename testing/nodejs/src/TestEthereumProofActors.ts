@@ -545,7 +545,7 @@ export class TestMintingAuthorityActor {
       baseFee: 0n,
       bitcoinXpub: args.bitcoinXpub,
       treasuryProfitSharing: 0,
-      bonusSharingPercent: 0,
+      treasuryBonusProfitSharing: 0,
     });
     await vault.getVault();
 
