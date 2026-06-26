@@ -1083,8 +1083,9 @@ impl<T: Config> Pallet<T> {
 			.saturating_add(price_of_one_whole_argonot_in_microgons.saturating_sub(1))
 			.checked_div(price_of_one_whole_argonot_in_microgons)
 			.unwrap_or_default();
+		let argonots_needed = T::Balance::from(micronots_needed);
 
-		ArgonotsPerMiningSeat::<T>::put(T::Balance::from(micronots_needed));
+		ArgonotsPerMiningSeat::<T>::put(argonots_needed.max(T::InitialArgonotsPerSeat::get()));
 	}
 
 	/// Adjust the number of seats in the next cohort based on the average price per seat vs the
