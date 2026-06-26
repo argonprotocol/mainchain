@@ -1,13 +1,37 @@
 # Changelog
 
-## [v1.4.7](https://github.com/argonprotocol/mainchain/compare/v1.4.6...41832e0b4c16cbd9cb9da0a4099b6c32c856c1ef) (2026-06-07)
+## [v1.4.8](https://github.com/argonprotocol/mainchain/compare/v1.4.7...ceb2baacd255b4c7e353af6d3a23d6055b18124b) (2026-06-25)
 
 ### Features
+
+* **treasury:** add bonus to bonds
+([b4140f4](https://github.com/argonprotocol/mainchain/commit/b4140f430a9d86dac9e0a6708896df31219919b6))
+* clean up crosschain gateway proof-block cleanup
+([fbceae2](https://github.com/argonprotocol/mainchain/commit/fbceae2f79dfbc75b732a58acc36cd8470cef6dc))
+* add pricing tweaks
+([3416464](https://github.com/argonprotocol/mainchain/commit/3416464db5edfe5c2649ddd43017996094473038))
+
+### Fixes
+
+* nodejs compile issue
+([7449378](https://github.com/argonprotocol/mainchain/commit/74493782725a18285f3d9fca39d7e4d7de141e7f))
+* **mining-slot:** base seat collateral on recent winning bids
+([191d6e1](https://github.com/argonprotocol/mainchain/commit/191d6e132d18014264671698c17ce8a821e27125))
+* **bitcoin-locks:** restore vault release cosign derivation
+([00913a8](https://github.com/argonprotocol/mainchain/commit/00913a863eac05517966b5e189443a9f670ab1c6))
+* **nodejs:** recover missing beacon sync committee from finality update
+([4505add](https://github.com/argonprotocol/mainchain/commit/4505add957227ea00887b342d660e502efa73091))
+* add tx errors
+([c21a790](https://github.com/argonprotocol/mainchain/commit/c21a7903e69d0fd19e3a294e72832fdeb6750b02))
+
+### [v1.4.7](https://github.com/argonprotocol/mainchain/compare/v1.4.6...v1.4.7) (2026-06-07)
+
+#### Features
 
 * **ethereum:** prepare gateway activity commitments for storage proofs
 ([b5961e9](https://github.com/argonprotocol/mainchain/commit/b5961e979a2395d75169bee8c783a0c6dcd6e218))
 
-### Fixes
+#### Fixes
 
 * **ethereum:** add gateway execution anchor backfills
 ([1c2da44](https://github.com/argonprotocol/mainchain/commit/1c2da448cdccdf66ae8f10450428ce7cd78a5980))
