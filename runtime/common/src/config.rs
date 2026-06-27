@@ -94,7 +94,7 @@ parameter_types! {
 
 	// ### pallet_treasury
 	pub const MaxTreasuryContributors: u32 = 100;
-	pub const MaxArgonotBondHolders: u32 = 1_000;
+	pub const MaxActiveArgonotBondLots: u32 = 1_000;
 	pub const MaxVaultsPerPool: u32 = 100;
 	pub const TreasuryInternalPalletId: PalletId = PalletId(*b"lqdPools");
 	pub TreasuryMiningBidPoolAccount: AccountId =

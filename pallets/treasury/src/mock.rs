@@ -163,7 +163,7 @@ parameter_types! {
 
 	pub static MaxTreasuryContributors: u32 = 10;
 	pub static MinimumArgonsPerContributor: u128 = 100_000_000;
-	pub static MaxArgonotBondHolders: u32 = 1_000;
+	pub static MaxActiveArgonotBondLots: u32 = 1_000;
 	pub static MaxVaultsPerPool: u32 = 100;
 	pub static MaxPendingUnlocksPerFrame: u32 = 100;
 	pub static TreasuryExitDelayFrames: FrameId = 10;
@@ -298,7 +298,7 @@ impl pallet_treasury::Config for Test {
 	type PriceProvider = StaticPriceProvider;
 	type MaxTreasuryContributors = MaxTreasuryContributors;
 	type MinimumArgonsPerContributor = MinimumArgonsPerContributor;
-	type MaxArgonotBondHolders = MaxArgonotBondHolders;
+	type MaxActiveArgonotBondLots = MaxActiveArgonotBondLots;
 	type MaxArgonotBondedPercentOfCirculation = MaxArgonotBondedPercentOfCirculation;
 	type PalletId = VaultPalletId;
 	type MiningBidPoolAccount = BidPoolAccountId;

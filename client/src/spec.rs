@@ -1168,9 +1168,10 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							78u8, 198u8, 94u8, 44u8, 25u8, 35u8, 133u8, 234u8, 95u8, 194u8, 146u8,
-							64u8, 109u8, 65u8, 110u8, 197u8, 100u8, 225u8, 226u8, 25u8, 220u8,
-							58u8, 51u8, 19u8, 131u8, 145u8, 238u8, 95u8, 24u8, 161u8, 182u8, 242u8,
+							158u8, 115u8, 218u8, 125u8, 143u8, 165u8, 254u8, 236u8, 231u8, 243u8,
+							218u8, 78u8, 232u8, 22u8, 199u8, 128u8, 249u8, 75u8, 203u8, 75u8, 67u8,
+							16u8, 102u8, 100u8, 192u8, 87u8, 48u8, 154u8, 102u8, 172u8, 190u8,
+							90u8,
 						],
 					)
 				}
@@ -1188,10 +1189,10 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							64u8, 215u8, 79u8, 213u8, 28u8, 15u8, 153u8, 216u8, 225u8, 10u8, 240u8,
-							242u8, 45u8, 185u8, 64u8, 223u8, 177u8, 87u8, 53u8, 189u8, 125u8,
-							172u8, 228u8, 62u8, 254u8, 226u8, 127u8, 106u8, 135u8, 155u8, 137u8,
-							245u8,
+							107u8, 209u8, 62u8, 231u8, 201u8, 171u8, 136u8, 24u8, 147u8, 35u8,
+							53u8, 81u8, 121u8, 59u8, 51u8, 78u8, 4u8, 63u8, 91u8, 111u8, 230u8,
+							57u8, 235u8, 94u8, 32u8, 144u8, 205u8, 231u8, 152u8, 248u8, 75u8,
+							117u8,
 						],
 					)
 				}
@@ -3395,9 +3396,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				168u8, 182u8, 204u8, 95u8, 72u8, 43u8, 225u8, 228u8, 193u8, 104u8, 203u8, 0u8,
-				247u8, 201u8, 101u8, 178u8, 43u8, 101u8, 57u8, 221u8, 188u8, 175u8, 4u8, 12u8,
-				246u8, 42u8, 57u8, 170u8, 83u8, 180u8, 45u8, 91u8,
+				39u8, 36u8, 152u8, 129u8, 59u8, 253u8, 111u8, 43u8, 134u8, 167u8, 116u8, 186u8,
+				158u8, 44u8, 14u8, 110u8, 197u8, 20u8, 39u8, 85u8, 108u8, 96u8, 208u8, 60u8, 216u8,
+				200u8, 11u8, 20u8, 104u8, 17u8, 186u8, 26u8,
 			]
 	}
 	pub mod system {
@@ -5431,10 +5432,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							173u8, 139u8, 146u8, 144u8, 197u8, 165u8, 26u8, 117u8, 172u8, 52u8,
-							158u8, 1u8, 11u8, 208u8, 5u8, 8u8, 157u8, 15u8, 189u8, 158u8, 48u8,
-							128u8, 255u8, 225u8, 46u8, 189u8, 171u8, 95u8, 10u8, 103u8, 150u8,
-							133u8,
+							72u8, 127u8, 123u8, 1u8, 110u8, 92u8, 233u8, 172u8, 12u8, 122u8, 76u8,
+							103u8, 240u8, 204u8, 215u8, 50u8, 129u8, 206u8, 251u8, 168u8, 31u8,
+							121u8, 30u8, 166u8, 150u8, 231u8, 13u8, 46u8, 245u8, 209u8, 4u8, 52u8,
 						],
 					)
 				}
@@ -5499,10 +5499,9 @@ pub mod api {
 							max_weight,
 						},
 						[
-							206u8, 167u8, 90u8, 68u8, 55u8, 180u8, 112u8, 161u8, 252u8, 190u8,
-							81u8, 8u8, 123u8, 76u8, 4u8, 136u8, 42u8, 57u8, 73u8, 164u8, 154u8,
-							187u8, 128u8, 164u8, 24u8, 12u8, 192u8, 76u8, 240u8, 229u8, 200u8,
-							126u8,
+							1u8, 30u8, 138u8, 110u8, 124u8, 56u8, 41u8, 49u8, 136u8, 80u8, 92u8,
+							183u8, 7u8, 35u8, 128u8, 141u8, 105u8, 52u8, 205u8, 164u8, 140u8, 13u8,
+							251u8, 184u8, 58u8, 111u8, 218u8, 240u8, 186u8, 57u8, 126u8, 191u8,
 						],
 					)
 				}
@@ -6407,10 +6406,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							110u8, 225u8, 240u8, 187u8, 2u8, 216u8, 200u8, 130u8, 94u8, 212u8,
-							35u8, 150u8, 236u8, 93u8, 139u8, 170u8, 129u8, 236u8, 204u8, 12u8,
-							43u8, 10u8, 8u8, 159u8, 113u8, 130u8, 209u8, 225u8, 134u8, 153u8, 46u8,
-							195u8,
+							57u8, 242u8, 173u8, 71u8, 205u8, 39u8, 112u8, 198u8, 190u8, 10u8,
+							249u8, 23u8, 217u8, 17u8, 57u8, 182u8, 17u8, 204u8, 194u8, 187u8,
+							166u8, 62u8, 67u8, 191u8, 67u8, 53u8, 172u8, 96u8, 252u8, 61u8, 40u8,
+							95u8,
 						],
 					)
 				}
@@ -6674,9 +6673,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							219u8, 151u8, 160u8, 208u8, 4u8, 73u8, 233u8, 116u8, 253u8, 97u8, 7u8,
-							44u8, 115u8, 170u8, 30u8, 190u8, 135u8, 71u8, 239u8, 16u8, 199u8,
-							108u8, 5u8, 28u8, 48u8, 106u8, 181u8, 140u8, 18u8, 245u8, 243u8, 46u8,
+							161u8, 100u8, 55u8, 113u8, 135u8, 245u8, 198u8, 222u8, 215u8, 148u8,
+							49u8, 217u8, 228u8, 192u8, 192u8, 207u8, 14u8, 129u8, 36u8, 47u8,
+							121u8, 219u8, 243u8, 118u8, 123u8, 100u8, 80u8, 32u8, 74u8, 107u8,
+							183u8, 185u8,
 						],
 					)
 				}
@@ -6725,10 +6725,9 @@ pub mod api {
 						],
 						check_permissions::Input { call, proxy_type },
 						[
-							71u8, 106u8, 253u8, 158u8, 206u8, 228u8, 119u8, 99u8, 102u8, 36u8,
-							179u8, 176u8, 119u8, 222u8, 69u8, 45u8, 197u8, 61u8, 143u8, 236u8,
-							124u8, 64u8, 12u8, 48u8, 253u8, 26u8, 67u8, 124u8, 105u8, 169u8, 92u8,
-							201u8,
+							78u8, 193u8, 57u8, 8u8, 16u8, 85u8, 195u8, 83u8, 146u8, 179u8, 6u8,
+							209u8, 237u8, 31u8, 254u8, 144u8, 230u8, 4u8, 172u8, 15u8, 59u8, 148u8,
+							213u8, 83u8, 197u8, 202u8, 212u8, 60u8, 84u8, 215u8, 205u8, 145u8,
 						],
 					)
 				}
@@ -16553,6 +16552,29 @@ pub mod api {
 					const PALLET: &'static str = "BlockRewards";
 					const CALL: &'static str = "set_block_rewards_paused";
 				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct SetBlockVoterRewardsEnabled {
+					pub enabled: set_block_voter_rewards_enabled::Enabled,
+				}
+				pub mod set_block_voter_rewards_enabled {
+					use super::runtime_types;
+					pub type Enabled = ::core::primitive::bool;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for SetBlockVoterRewardsEnabled {
+					const PALLET: &'static str = "BlockRewards";
+					const CALL: &'static str = "set_block_voter_rewards_enabled";
+				}
 			}
 			pub struct TransactionApi;
 			impl TransactionApi {
@@ -16570,6 +16592,23 @@ pub mod api {
 							56u8, 226u8, 8u8, 114u8, 228u8, 219u8, 24u8, 190u8, 245u8, 128u8, 94u8,
 							112u8, 194u8, 27u8, 128u8, 48u8, 104u8, 34u8, 232u8, 1u8, 190u8, 26u8,
 							34u8, 23u8, 110u8, 177u8, 162u8, 72u8, 62u8, 139u8, 211u8, 173u8,
+						],
+					)
+				}
+				pub fn set_block_voter_rewards_enabled(
+					&self,
+					enabled: types::set_block_voter_rewards_enabled::Enabled,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<
+					types::SetBlockVoterRewardsEnabled,
+				> {
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"BlockRewards",
+						"set_block_voter_rewards_enabled",
+						types::SetBlockVoterRewardsEnabled { enabled },
+						[
+							247u8, 129u8, 245u8, 5u8, 120u8, 68u8, 15u8, 36u8, 130u8, 239u8, 118u8,
+							208u8, 48u8, 228u8, 213u8, 65u8, 51u8, 54u8, 171u8, 73u8, 106u8, 211u8,
+							27u8, 137u8, 217u8, 212u8, 37u8, 17u8, 4u8, 195u8, 238u8, 172u8,
 						],
 					)
 				}
@@ -16647,6 +16686,10 @@ pub mod api {
 				pub mod block_rewards_paused {
 					use super::runtime_types;
 					pub type BlockRewardsPaused = ::core::primitive::bool;
+				}
+				pub mod block_voter_rewards_enabled {
+					use super::runtime_types;
+					pub type BlockVoterRewardsEnabled = ::core::primitive::bool;
 				}
 				pub mod block_rewards_by_cohort {
 					use super::runtime_types;
@@ -16731,6 +16774,27 @@ pub mod api {
 							74u8, 109u8, 204u8, 149u8, 38u8, 187u8, 216u8, 106u8, 23u8, 83u8,
 							246u8, 242u8, 222u8, 46u8, 194u8, 180u8, 161u8, 218u8, 41u8, 106u8,
 							150u8, 234u8,
+						],
+					)
+				}
+				#[doc = " Bool if block voter rewards are enabled"]
+				pub fn block_voter_rewards_enabled(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::block_voter_rewards_enabled::BlockVoterRewardsEnabled,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"BlockRewards",
+						"BlockVoterRewardsEnabled",
+						(),
+						[
+							106u8, 148u8, 216u8, 159u8, 2u8, 3u8, 158u8, 129u8, 244u8, 31u8, 88u8,
+							236u8, 204u8, 196u8, 190u8, 0u8, 10u8, 5u8, 205u8, 213u8, 109u8, 161u8,
+							99u8, 37u8, 131u8, 251u8, 96u8, 217u8, 140u8, 73u8, 84u8, 252u8,
 						],
 					)
 				}
@@ -21367,9 +21431,10 @@ pub mod api {
 						"batch",
 						types::Batch { calls },
 						[
-							202u8, 93u8, 91u8, 65u8, 191u8, 95u8, 61u8, 229u8, 159u8, 172u8, 212u8,
-							237u8, 1u8, 95u8, 90u8, 118u8, 115u8, 140u8, 242u8, 154u8, 216u8,
-							238u8, 33u8, 39u8, 63u8, 229u8, 47u8, 174u8, 98u8, 180u8, 14u8, 29u8,
+							109u8, 38u8, 223u8, 175u8, 157u8, 218u8, 126u8, 159u8, 142u8, 37u8,
+							237u8, 97u8, 88u8, 238u8, 228u8, 66u8, 39u8, 175u8, 103u8, 65u8, 207u8,
+							20u8, 148u8, 98u8, 196u8, 93u8, 199u8, 195u8, 120u8, 101u8, 222u8,
+							120u8,
 						],
 					)
 				}
@@ -21399,10 +21464,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							231u8, 162u8, 225u8, 119u8, 164u8, 209u8, 182u8, 184u8, 26u8, 228u8,
-							20u8, 192u8, 154u8, 8u8, 243u8, 82u8, 34u8, 50u8, 59u8, 8u8, 75u8,
-							205u8, 240u8, 31u8, 255u8, 159u8, 175u8, 204u8, 35u8, 86u8, 196u8,
-							57u8,
+							71u8, 65u8, 222u8, 39u8, 70u8, 81u8, 144u8, 147u8, 0u8, 165u8, 130u8,
+							44u8, 135u8, 48u8, 219u8, 46u8, 102u8, 98u8, 249u8, 57u8, 163u8, 189u8,
+							182u8, 213u8, 50u8, 113u8, 243u8, 152u8, 239u8, 211u8, 31u8, 66u8,
 						],
 					)
 				}
@@ -21428,9 +21492,9 @@ pub mod api {
 						"batch_all",
 						types::BatchAll { calls },
 						[
-							34u8, 240u8, 225u8, 87u8, 219u8, 13u8, 239u8, 241u8, 193u8, 48u8,
-							243u8, 81u8, 235u8, 214u8, 215u8, 57u8, 2u8, 163u8, 26u8, 195u8, 138u8,
-							97u8, 158u8, 77u8, 242u8, 231u8, 141u8, 50u8, 28u8, 51u8, 234u8, 243u8,
+							188u8, 109u8, 89u8, 252u8, 8u8, 158u8, 48u8, 208u8, 120u8, 205u8,
+							229u8, 246u8, 222u8, 118u8, 31u8, 30u8, 9u8, 246u8, 31u8, 196u8, 147u8,
+							128u8, 187u8, 133u8, 65u8, 0u8, 211u8, 67u8, 157u8, 46u8, 133u8, 160u8,
 						],
 					)
 				}
@@ -21453,9 +21517,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							237u8, 79u8, 52u8, 179u8, 58u8, 219u8, 84u8, 228u8, 212u8, 6u8, 152u8,
-							96u8, 181u8, 94u8, 226u8, 255u8, 76u8, 188u8, 149u8, 41u8, 89u8, 109u8,
-							247u8, 186u8, 197u8, 134u8, 61u8, 31u8, 58u8, 207u8, 236u8, 101u8,
+							200u8, 22u8, 190u8, 237u8, 59u8, 30u8, 176u8, 59u8, 237u8, 171u8,
+							161u8, 36u8, 198u8, 142u8, 20u8, 171u8, 72u8, 158u8, 218u8, 86u8,
+							209u8, 243u8, 194u8, 206u8, 246u8, 36u8, 236u8, 190u8, 123u8, 172u8,
+							136u8, 138u8,
 						],
 					)
 				}
@@ -21481,10 +21546,10 @@ pub mod api {
 						"force_batch",
 						types::ForceBatch { calls },
 						[
-							119u8, 119u8, 2u8, 234u8, 158u8, 125u8, 184u8, 163u8, 195u8, 129u8,
-							14u8, 177u8, 139u8, 153u8, 188u8, 216u8, 43u8, 231u8, 238u8, 187u8,
-							133u8, 212u8, 210u8, 143u8, 163u8, 41u8, 145u8, 166u8, 130u8, 128u8,
-							218u8, 36u8,
+							202u8, 71u8, 8u8, 248u8, 112u8, 187u8, 119u8, 250u8, 107u8, 224u8,
+							137u8, 5u8, 83u8, 231u8, 152u8, 199u8, 34u8, 222u8, 223u8, 144u8,
+							130u8, 205u8, 197u8, 4u8, 255u8, 210u8, 4u8, 213u8, 132u8, 216u8,
+							154u8, 231u8,
 						],
 					)
 				}
@@ -21507,10 +21572,9 @@ pub mod api {
 							weight,
 						},
 						[
-							217u8, 169u8, 162u8, 34u8, 187u8, 87u8, 5u8, 140u8, 126u8, 162u8,
-							198u8, 19u8, 182u8, 218u8, 93u8, 187u8, 167u8, 207u8, 46u8, 197u8,
-							190u8, 14u8, 118u8, 171u8, 54u8, 30u8, 84u8, 33u8, 190u8, 53u8, 51u8,
-							218u8,
+							49u8, 106u8, 59u8, 93u8, 79u8, 164u8, 19u8, 90u8, 175u8, 138u8, 147u8,
+							8u8, 234u8, 127u8, 214u8, 130u8, 33u8, 48u8, 106u8, 165u8, 251u8, 37u8,
+							17u8, 99u8, 125u8, 106u8, 66u8, 162u8, 134u8, 103u8, 142u8, 119u8,
 						],
 					)
 				}
@@ -21550,10 +21614,10 @@ pub mod api {
 							fallback: ::subxt::ext::subxt_core::alloc::boxed::Box::new(fallback),
 						},
 						[
-							234u8, 127u8, 172u8, 210u8, 223u8, 145u8, 109u8, 44u8, 97u8, 159u8,
-							51u8, 148u8, 30u8, 133u8, 33u8, 101u8, 97u8, 109u8, 81u8, 140u8, 162u8,
-							225u8, 19u8, 58u8, 251u8, 184u8, 154u8, 69u8, 118u8, 161u8, 60u8,
-							218u8,
+							156u8, 62u8, 74u8, 44u8, 222u8, 224u8, 188u8, 246u8, 0u8, 114u8, 246u8,
+							61u8, 164u8, 199u8, 103u8, 154u8, 164u8, 67u8, 152u8, 115u8, 66u8,
+							230u8, 78u8, 219u8, 40u8, 206u8, 43u8, 76u8, 178u8, 248u8, 165u8,
+							253u8,
 						],
 					)
 				}
@@ -21576,9 +21640,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							161u8, 82u8, 207u8, 139u8, 123u8, 56u8, 235u8, 54u8, 12u8, 43u8, 137u8,
-							78u8, 110u8, 27u8, 23u8, 59u8, 232u8, 154u8, 56u8, 246u8, 104u8, 189u8,
-							146u8, 208u8, 179u8, 154u8, 103u8, 4u8, 176u8, 116u8, 75u8, 112u8,
+							164u8, 200u8, 129u8, 125u8, 50u8, 245u8, 170u8, 210u8, 102u8, 104u8,
+							95u8, 35u8, 88u8, 249u8, 31u8, 85u8, 15u8, 251u8, 148u8, 210u8, 225u8,
+							37u8, 36u8, 224u8, 128u8, 180u8, 113u8, 236u8, 127u8, 179u8, 116u8,
+							17u8,
 						],
 					)
 				}
@@ -21914,10 +21979,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							146u8, 88u8, 136u8, 93u8, 85u8, 2u8, 29u8, 108u8, 124u8, 154u8, 46u8,
-							215u8, 89u8, 122u8, 188u8, 199u8, 10u8, 55u8, 49u8, 171u8, 114u8,
-							186u8, 158u8, 168u8, 225u8, 227u8, 170u8, 208u8, 228u8, 177u8, 1u8,
-							117u8,
+							14u8, 206u8, 157u8, 235u8, 89u8, 130u8, 170u8, 16u8, 233u8, 79u8,
+							203u8, 200u8, 86u8, 202u8, 234u8, 247u8, 223u8, 254u8, 147u8, 92u8,
+							173u8, 90u8, 240u8, 12u8, 154u8, 245u8, 192u8, 206u8, 3u8, 18u8, 201u8,
+							76u8,
 						],
 					)
 				}
@@ -21940,10 +22005,10 @@ pub mod api {
 							weight,
 						},
 						[
-							136u8, 116u8, 26u8, 72u8, 53u8, 240u8, 188u8, 82u8, 252u8, 145u8,
-							134u8, 181u8, 55u8, 115u8, 117u8, 85u8, 112u8, 150u8, 252u8, 250u8,
-							209u8, 187u8, 237u8, 36u8, 118u8, 111u8, 247u8, 55u8, 62u8, 121u8,
-							231u8, 209u8,
+							30u8, 86u8, 195u8, 24u8, 198u8, 237u8, 69u8, 64u8, 52u8, 144u8, 29u8,
+							107u8, 207u8, 71u8, 230u8, 122u8, 108u8, 117u8, 149u8, 122u8, 64u8,
+							190u8, 162u8, 146u8, 2u8, 227u8, 107u8, 218u8, 253u8, 187u8, 18u8,
+							37u8,
 						],
 					)
 				}
@@ -21981,10 +22046,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							18u8, 186u8, 250u8, 34u8, 223u8, 214u8, 100u8, 225u8, 117u8, 208u8,
-							216u8, 181u8, 194u8, 111u8, 236u8, 61u8, 201u8, 145u8, 137u8, 241u8,
-							63u8, 11u8, 161u8, 39u8, 243u8, 12u8, 171u8, 57u8, 90u8, 19u8, 242u8,
-							233u8,
+							30u8, 28u8, 66u8, 123u8, 237u8, 100u8, 177u8, 123u8, 198u8, 161u8,
+							222u8, 231u8, 177u8, 155u8, 126u8, 164u8, 119u8, 48u8, 232u8, 234u8,
+							168u8, 213u8, 87u8, 150u8, 4u8, 89u8, 152u8, 193u8, 226u8, 33u8, 62u8,
+							214u8,
 						],
 					)
 				}
@@ -23076,14 +23141,14 @@ pub mod api {
 					)
 				}
 				#[doc = " The maximum number of active Argonot bond lots."]
-				pub fn max_argonot_bond_holders(
+				pub fn max_active_argonot_bond_lots(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
 					::core::primitive::u32,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"Treasury",
-						"MaxArgonotBondHolders",
+						"MaxActiveArgonotBondLots",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
@@ -23310,6 +23375,7 @@ pub mod api {
 				#[doc = "Register vault, mining funding, and bot accounts for an operational account."]
 				#[doc = "Any account in the registration may submit the transaction."]
 				#[doc = "If a referral proof is provided, the registration records the sponsor relationship."]
+				#[doc = "When invite-only is enabled, a valid referral proof is required."]
 				pub struct Register {
 					pub registration: register::Registration,
 				}
@@ -23451,6 +23517,7 @@ pub mod api {
 				#[doc = "Register vault, mining funding, and bot accounts for an operational account."]
 				#[doc = "Any account in the registration may submit the transaction."]
 				#[doc = "If a referral proof is provided, the registration records the sponsor relationship."]
+				#[doc = "When invite-only is enabled, a valid referral proof is required."]
 				pub fn register(
 					&self,
 					registration: types::register::Registration,
@@ -23773,6 +23840,10 @@ pub mod api {
 					use super::runtime_types;
 					pub type ExpiredReferralCodeCleanupFrame = ::core::primitive::u64;
 				}
+				pub mod is_operational_account_invite_only {
+					use super::runtime_types;
+					pub type IsOperationalAccountInviteOnly = ::core::primitive::bool;
+				}
 				pub mod rewards {
 					use super::runtime_types;
 					pub type Rewards =
@@ -24030,6 +24101,34 @@ pub mod api {
 							29u8, 48u8, 189u8, 150u8, 52u8, 134u8, 170u8, 212u8, 175u8, 170u8,
 							207u8, 204u8, 227u8, 65u8, 174u8, 213u8, 68u8, 242u8, 192u8, 7u8,
 							202u8,
+						],
+					)
+				}
+				#[doc = " Whether operational-account access is invite-only."]
+				#[doc = ""]
+				#[doc = " When enabled, registration requires a valid referral invite and vault creation plus"]
+				#[doc = " mining-slot bidding remain restricted to registered operational accounts."]
+				#[doc = ""]
+				#[doc = " Existing live raw chain specs do not contain this key, so the default remains invite-only"]
+				#[doc = " unless a development chain overrides it in genesis."]
+				pub fn is_operational_account_invite_only(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::is_operational_account_invite_only::IsOperationalAccountInviteOnly,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"OperationalAccounts",
+						"IsOperationalAccountInviteOnly",
+						(),
+						[
+							153u8, 178u8, 221u8, 225u8, 183u8, 177u8, 153u8, 151u8, 115u8, 201u8,
+							245u8, 116u8, 86u8, 159u8, 23u8, 192u8, 101u8, 128u8, 152u8, 15u8,
+							253u8, 73u8, 73u8, 173u8, 74u8, 60u8, 216u8, 22u8, 243u8, 130u8, 76u8,
+							8u8,
 						],
 					)
 				}
@@ -31789,6 +31888,8 @@ pub mod api {
 				pub enum Call {
 					#[codec(index = 0)]
 					set_block_rewards_paused { paused: ::core::primitive::bool },
+					#[codec(index = 1)]
+					set_block_voter_rewards_enabled { enabled: ::core::primitive::bool },
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -33741,6 +33842,9 @@ pub mod api {
 					#[doc = "Bids must be in allowed increments"]
 					InvalidBidAmount,
 					#[codec(index = 9)]
+					#[doc = "Mining slot bidding currently requires prior operational-account registration."]
+					OperationalAccountRegistrationRequired,
+					#[codec(index = 10)]
 					#[doc = "The argonots on hold cannot be released"]
 					UnrecoverableHold,
 				}
@@ -34565,7 +34669,7 @@ pub mod api {
 				)]
 				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 				pub enum Call {
-					# [codec (index = 0)] # [doc = "Register vault, mining funding, and bot accounts for an operational account."] # [doc = "Any account in the registration may submit the transaction."] # [doc = "If a referral proof is provided, the registration records the sponsor relationship."] register { registration : runtime_types :: pallet_operational_accounts :: pallet :: Registration , } , # [codec (index = 2)] # [doc = "Update reward amounts for operational accounts."] set_reward_config { operational_referral_reward : :: core :: primitive :: u128 , referral_bonus_reward : :: core :: primitive :: u128 , } , # [codec (index = 3)] # [doc = "Force-update operational progress markers for an account."] force_set_progress { owner : crate :: types :: AccountId32 , patch : runtime_types :: pallet_operational_accounts :: pallet :: OperationalProgressPatch < :: core :: primitive :: u128 > , update_operational_progress : :: core :: primitive :: bool , } , # [codec (index = 4)] # [doc = "Store an opaque encrypted sponsor server payload for a sponsored operational account."] set_encrypted_server_for_sponsee { sponsee : crate :: types :: AccountId32 , encrypted_server : :: subxt :: ext :: subxt_core :: alloc :: vec :: Vec < :: core :: primitive :: u8 > , } , # [codec (index = 5)] # [doc = "Activate an eligible operational account from any managed account."] activate , # [codec (index = 6)] # [doc = "Claim pending operational rewards to any managed account."] claim_rewards { amount : :: core :: primitive :: u128 , } , }
+					# [codec (index = 0)] # [doc = "Register vault, mining funding, and bot accounts for an operational account."] # [doc = "Any account in the registration may submit the transaction."] # [doc = "If a referral proof is provided, the registration records the sponsor relationship."] # [doc = "When invite-only is enabled, a valid referral proof is required."] register { registration : runtime_types :: pallet_operational_accounts :: pallet :: Registration , } , # [codec (index = 2)] # [doc = "Update reward amounts for operational accounts."] set_reward_config { operational_referral_reward : :: core :: primitive :: u128 , referral_bonus_reward : :: core :: primitive :: u128 , } , # [codec (index = 3)] # [doc = "Force-update operational progress markers for an account."] force_set_progress { owner : crate :: types :: AccountId32 , patch : runtime_types :: pallet_operational_accounts :: pallet :: OperationalProgressPatch < :: core :: primitive :: u128 > , update_operational_progress : :: core :: primitive :: bool , } , # [codec (index = 4)] # [doc = "Store an opaque encrypted sponsor server payload for a sponsored operational account."] set_encrypted_server_for_sponsee { sponsee : crate :: types :: AccountId32 , encrypted_server : :: subxt :: ext :: subxt_core :: alloc :: vec :: Vec < :: core :: primitive :: u8 > , } , # [codec (index = 5)] # [doc = "Activate an eligible operational account from any managed account."] activate , # [codec (index = 6)] # [doc = "Claim pending operational rewards to any managed account."] claim_rewards { amount : :: core :: primitive :: u128 , } , }
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
 					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
@@ -34602,33 +34706,36 @@ pub mod api {
 					#[doc = "The referral proof has expired."]
 					ReferralProofExpired,
 					#[codec(index = 7)]
+					#[doc = "A valid invite is required to register an operational account."]
+					RegistrationInviteRequired,
+					#[codec(index = 8)]
 					#[doc = "The requested progress patch does not contain any updates."]
 					NoProgressUpdateProvided,
-					#[codec(index = 8)]
+					#[codec(index = 9)]
 					#[doc = "The encrypted server payload exceeds the configured max length."]
 					EncryptedServerTooLong,
-					#[codec(index = 9)]
+					#[codec(index = 10)]
 					#[doc = "The caller is not the sponsor of the requested sponsee."]
 					NotSponsorOfSponsee,
-					#[codec(index = 10)]
+					#[codec(index = 11)]
 					#[doc = "The operational account has no pending rewards to claim."]
 					NoPendingRewards,
-					#[codec(index = 11)]
+					#[codec(index = 12)]
 					#[doc = "Reward claims must be at least one Argon."]
 					RewardClaimBelowMinimum,
-					#[codec(index = 12)]
+					#[codec(index = 13)]
 					#[doc = "Reward claims must be whole Argon increments."]
 					RewardClaimNotWholeArgon,
-					#[codec(index = 13)]
+					#[codec(index = 14)]
 					#[doc = "The requested reward claim exceeds pending rewards."]
 					RewardClaimExceedsPending,
-					#[codec(index = 14)]
+					#[codec(index = 15)]
 					#[doc = "The treasury does not currently have enough available reserves for the claim."]
 					TreasuryInsufficientFunds,
-					#[codec(index = 15)]
+					#[codec(index = 16)]
 					#[doc = "The account is already operational."]
 					AlreadyOperational,
-					#[codec(index = 16)]
+					#[codec(index = 17)]
 					#[doc = "The account has not satisfied operational requirements yet."]
 					NotEligibleForActivation,
 				}
@@ -36645,6 +36752,9 @@ pub mod api {
 					#[doc = "An account may only be associated with a single vault"]
 					AccountAlreadyHasVault,
 					#[codec(index = 32)]
+					#[doc = "Vault creation currently requires prior operational-account registration."]
+					OperationalAccountRegistrationRequired,
+					#[codec(index = 33)]
 					#[doc = "Committed Argonots cannot be reduced below the amount already crosschain-encumbered."]
 					CommittedArgonotsBelowEncumberedBacking,
 				}

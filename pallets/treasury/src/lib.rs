@@ -67,7 +67,7 @@ pub use pallet::*;
 ///
 /// The limitations on bond purchases are:
 /// - the maximum number of accepted bond lots in an active vault pool (`MaxTreasuryContributors`)
-/// - the maximum number of active Argonot bond lots (`MaxArgonotBondHolders`)
+/// - the maximum number of active Argonot bond lots (`MaxActiveArgonotBondLots`)
 /// - the maximum active Argonot bonds as a percent of ownership circulation
 ///   (`MaxArgonotBondedPercentOfCirculation`)
 /// - the minimum whole-bond purchase amount (`MinimumArgonsPerContributor`)
@@ -156,7 +156,7 @@ pub mod pallet {
 
 		/// The maximum number of active Argonot bond lots.
 		#[pallet::constant]
-		type MaxArgonotBondHolders: Get<u32>;
+		type MaxActiveArgonotBondLots: Get<u32>;
 
 		/// The maximum percent of ownership-token circulation that can be bonded.
 		#[pallet::constant]
@@ -274,7 +274,7 @@ pub mod pallet {
 	/// The active top Argonot bond lots kept in ascending bond order, then lower ids first.
 	#[pallet::storage]
 	pub type ArgonotBondLots<T: Config> =
-		StorageValue<_, BoundedVec<BondLotSummary, T::MaxArgonotBondHolders>, ValueQuery>;
+		StorageValue<_, BoundedVec<BondLotSummary, T::MaxActiveArgonotBondLots>, ValueQuery>;
 
 	/// The total number of active Argonot bonds in the active set.
 	#[pallet::storage]
@@ -572,7 +572,7 @@ pub mod pallet {
 			let active_lot_count = active_lots.len() as u32;
 			let mut evicted_bond_lot_id = None;
 
-			let next_total_bonds = if active_lot_count < T::MaxArgonotBondHolders::get() {
+			let next_total_bonds = if active_lot_count < T::MaxActiveArgonotBondLots::get() {
 				current_total_bonds.checked_add(bonds).ok_or(ArithmeticError::Overflow)?
 			} else {
 				let floor_lot = active_lots.first().ok_or(Error::<T>::InternalError)?;
@@ -786,7 +786,7 @@ pub mod pallet {
 
 			let total_argonot_bond_pool =
 				T::PercentForArgonotBondPool::get().mul_floor(full_bid_pool_amount);
-			let (remaining_bid_pool, mut treasury_refund_total, argonot_bond_pool_distributed) =
+			let (vault_bid_pool_amount, mut treasury_refund_total, argonot_bond_pool_distributed) =
 				Self::distribute_argonot_bond_pool(
 					frame_id,
 					&bid_pool_account,
@@ -825,8 +825,8 @@ pub mod pallet {
 				return;
 			};
 
-			let total_bid_pool_amount = remaining_bid_pool;
-			let mut remaining_bid_pool = total_bid_pool_amount;
+			let total_bid_pool_amount = vault_bid_pool_amount;
+			let mut remaining_bid_pool = vault_bid_pool_amount;
 			let frame_total_eligible_bonds = frame_capital
 				.vaults
 				.values()
@@ -859,14 +859,14 @@ pub mod pallet {
 						continue;
 					};
 
-					let gross_lot_yield =
-						allocation.prorata.saturating_mul_int(gross_vault_earnings);
-					gross_lot_yield_total.saturating_accrue(gross_lot_yield);
-
 					let Some((_, sharing_percent, bonus_percent)) = bond_lot.program.as_vault()
 					else {
 						continue;
 					};
+
+					let gross_lot_yield =
+						allocation.prorata.saturating_mul_int(gross_vault_earnings);
+					gross_lot_yield_total.saturating_accrue(gross_lot_yield);
 
 					let bonder_percent = Permill::from_parts(
 						sharing_percent.deconstruct().saturating_add(bonus_percent.deconstruct()),
@@ -1080,8 +1080,9 @@ pub mod pallet {
 			if argonot_participants.total_bonds == 0 {
 				return (remaining_bid_pool, treasury_refund_total, argonot_bond_pool_distributed);
 			}
-			remaining_bid_pool.saturating_reduce(total_argonot_bond_pool);
-			argonot_bond_pool_distributed = total_argonot_bond_pool;
+			let capped_argonot_bond_pool = total_argonot_bond_pool.min(total_bid_pool_amount);
+			remaining_bid_pool.saturating_reduce(capped_argonot_bond_pool);
+			argonot_bond_pool_distributed = capped_argonot_bond_pool;
 
 			let mut gross_argonot_yield_total = T::Balance::zero();
 			for participant in argonot_participants.bond_lots.iter() {
@@ -1096,7 +1097,7 @@ pub mod pallet {
 					participant.bonds as u128,
 					argonot_participants.total_bonds as u128,
 				)
-				.mul_floor(total_argonot_bond_pool);
+				.mul_floor(capped_argonot_bond_pool);
 				gross_argonot_yield_total.saturating_accrue(gross_lot_yield);
 
 				let mut paid_payout = gross_lot_yield;
@@ -1122,7 +1123,7 @@ pub mod pallet {
 			}
 
 			treasury_refund_total.saturating_accrue(
-				total_argonot_bond_pool.saturating_sub(gross_argonot_yield_total),
+				capped_argonot_bond_pool.saturating_sub(gross_argonot_yield_total),
 			);
 
 			(remaining_bid_pool, treasury_refund_total, argonot_bond_pool_distributed)
@@ -1733,6 +1734,6 @@ pub mod pallet {
 		#[codec(compact)]
 		pub total_bonds: Bonds,
 		/// The Argonot bond lots participating in this frame.
-		pub bond_lots: BoundedVec<BondLotSummary, T::MaxArgonotBondHolders>,
+		pub bond_lots: BoundedVec<BondLotSummary, T::MaxActiveArgonotBondLots>,
 	}
 }

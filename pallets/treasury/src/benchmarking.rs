@@ -99,12 +99,12 @@ mod benchmarks {
 	fn buy_argonot_bonds() -> Result<(), BenchmarkError> {
 		reset_benchmark_state::<T>();
 
-		let active_holder_count = T::MaxArgonotBondHolders::get();
+		let active_lot_count = T::MaxActiveArgonotBondLots::get();
 		let floor_bonds = minimum_purchase_bonds::<T>();
 		let purchase_bonds = floor_bonds.saturating_add(1);
 		let retained_bonds = purchase_bonds.saturating_add(1);
 		let first_bond_lot_id = seed_active_argonot_state::<T>(
-			active_holder_count,
+			active_lot_count,
 			floor_bonds,
 			retained_bonds,
 			BENCHMARK_FRAME_ID.saturating_sub(1),
@@ -123,7 +123,7 @@ mod benchmarks {
 		let purchased_bond_lot = BondLotById::<T>::get(purchased_bond_lot_id)
 			.ok_or(BenchmarkError::Stop("missing new Argonot bond lot"))?;
 		assert_eq!(purchased_bond_lot.program, BondProgram::Argonot);
-		assert_eq!(ArgonotBondLots::<T>::get().len(), active_holder_count as usize);
+		assert_eq!(ArgonotBondLots::<T>::get().len(), active_lot_count as usize);
 		assert_eq!(
 			BondLotById::<T>::get(first_bond_lot_id).and_then(|bond_lot| bond_lot.release_reason),
 			Some(BondReleaseReason::Bumped),
@@ -131,9 +131,7 @@ mod benchmarks {
 		assert_eq!(
 			TotalActiveArgonotBonds::<T>::get(),
 			floor_bonds
-				.saturating_add(
-					retained_bonds.saturating_mul(active_holder_count.saturating_sub(1))
-				)
+				.saturating_add(retained_bonds.saturating_mul(active_lot_count.saturating_sub(1)))
 				.saturating_sub(floor_bonds)
 				.saturating_add(purchase_bonds),
 		);
@@ -144,28 +142,25 @@ mod benchmarks {
 	fn liquidate_bond_lot() -> Result<(), BenchmarkError> {
 		reset_benchmark_state::<T>();
 
-		let active_holder_count = T::MaxArgonotBondHolders::get();
+		let active_lot_count = T::MaxActiveArgonotBondLots::get();
 		let floor_bonds = minimum_purchase_bonds::<T>();
 		let retained_bonds = floor_bonds.saturating_add(1);
 		let first_bond_lot_id = seed_active_argonot_state::<T>(
-			active_holder_count,
+			active_lot_count,
 			floor_bonds,
 			retained_bonds,
 			BENCHMARK_FRAME_ID.saturating_sub(1),
 		)?;
-		let caller = benchmark_argonot_holder::<T>(active_holder_count.saturating_sub(1));
+		let caller = benchmark_argonot_holder::<T>(active_lot_count.saturating_sub(1));
 		let bond_lot_id =
-			first_bond_lot_id.saturating_add(active_holder_count.saturating_sub(1) as BondLotId);
+			first_bond_lot_id.saturating_add(active_lot_count.saturating_sub(1) as BondLotId);
 
 		whitelist_account!(caller);
 
 		#[extrinsic_call]
 		_(RawOrigin::Signed(caller.clone()), bond_lot_id);
 
-		assert_eq!(
-			ArgonotBondLots::<T>::get().len(),
-			active_holder_count.saturating_sub(1) as usize
-		);
+		assert_eq!(ArgonotBondLots::<T>::get().len(), active_lot_count.saturating_sub(1) as usize);
 		assert_eq!(
 			BondLotById::<T>::get(bond_lot_id).and_then(|bond_lot| bond_lot.release_reason),
 			Some(BondReleaseReason::UserLiquidation),
@@ -452,7 +447,7 @@ where
 	seed_lock_in_vault_capital_state::<T>(frame_id)?;
 	Pallet::<T>::lock_in_vault_capital(frame_id);
 	seed_active_argonot_state::<T>(
-		T::MaxArgonotBondHolders::get(),
+		T::MaxActiveArgonotBondLots::get(),
 		minimum_purchase_bonds::<T>(),
 		minimum_purchase_bonds::<T>().saturating_add(1),
 		frame_id.saturating_sub(1),
@@ -605,7 +600,7 @@ where
 }
 
 fn seed_active_argonot_state<T: Config>(
-	holder_count: u32,
+	lot_count: u32,
 	floor_bonds: Bonds,
 	retained_bonds: Bonds,
 	created_frame_id: FrameId,
@@ -618,7 +613,7 @@ where
 	let mut active_lots = BoundedVec::default();
 	let mut total_bonds = 0u128;
 
-	for holder_index in 0..holder_count {
+	for holder_index in 0..lot_count {
 		let owner = benchmark_argonot_holder::<T>(holder_index);
 		let bonds = if holder_index == 0 { floor_bonds } else { retained_bonds };
 		insert_bond_lot::<T, T::OwnershipCurrency>(

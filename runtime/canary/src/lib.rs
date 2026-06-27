@@ -429,7 +429,7 @@ impl pallet_treasury::Config for Runtime {
 		use_unless_benchmark!(PriceIndex, benchmarking::BenchmarkPriceProvider<Balance>);
 	type MaxTreasuryContributors = MaxTreasuryContributors;
 	type MinimumArgonsPerContributor = MinimumArgonsPerContributor;
-	type MaxArgonotBondHolders = MaxArgonotBondHolders;
+	type MaxActiveArgonotBondLots = MaxActiveArgonotBondLots;
 	type MaxArgonotBondedPercentOfCirculation = MaxArgonotBondedPercentOfCirculation;
 	type PalletId = TreasuryInternalPalletId;
 	type MiningBidPoolAccount = TreasuryMiningBidPoolAccount;

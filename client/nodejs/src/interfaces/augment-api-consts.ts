@@ -561,13 +561,13 @@ declare module '@polkadot/api-base/types/consts' {
     };
     treasury: {
       /**
+       * The maximum number of active Argonot bond lots.
+       **/
+      maxActiveArgonotBondLots: u32 & AugmentedConst<ApiType>;
+      /**
        * The maximum percent of ownership-token circulation that can be bonded.
        **/
       maxArgonotBondedPercentOfCirculation: Percent & AugmentedConst<ApiType>;
-      /**
-       * The maximum number of active Argonot bond lots.
-       **/
-      maxArgonotBondHolders: u32 & AugmentedConst<ApiType>;
       /**
        * The maximum number of bond lots whose release delay may mature in a single frame.
        **/

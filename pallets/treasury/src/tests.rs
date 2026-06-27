@@ -7,7 +7,7 @@ use crate::{
 	mock::{
 		account_id_from_seed, account_pair_from_seed, insert_vault, new_test_ext, set_argons,
 		set_ownership, take_treasury_pool_participated, Balances, BidPoolAccountId, CurrentFrameId,
-		ExistentialDeposit, LastVaultProfits, MaxArgonotBondHolders,
+		ExistentialDeposit, LastVaultProfits, MaxActiveArgonotBondLots,
 		MaxArgonotBondedPercentOfCirculation, MaxTreasuryContributors, MaxVaultsPerPool,
 		MinimumArgonsPerContributor, Ownership, RuntimeEvent, RuntimeHoldReason, RuntimeOrigin,
 		System, Test, TestAccountId, TestVault, Treasury, TreasuryExitDelayFrames,
@@ -300,7 +300,7 @@ fn buy_argonot_bonds_allows_multiple_lots_per_account() {
 fn buy_argonot_bonds_rejects_when_full_queue_lot_does_not_beat_floor() {
 	new_test_ext().execute_with(|| {
 		MinimumArgonsPerContributor::set(1);
-		MaxArgonotBondHolders::set(2);
+		MaxActiveArgonotBondLots::set(2);
 		MaxArgonotBondedPercentOfCirculation::set(Percent::from_percent(100));
 
 		set_ownership(2, 20 * MICROGONS_PER_ARGON);
@@ -325,7 +325,7 @@ fn buy_argonot_bonds_rejects_when_full_queue_lot_does_not_beat_floor() {
 fn buy_argonot_bonds_evicts_floor_and_schedules_release() {
 	new_test_ext().execute_with(|| {
 		MinimumArgonsPerContributor::set(1);
-		MaxArgonotBondHolders::set(2);
+		MaxActiveArgonotBondLots::set(2);
 		MaxArgonotBondedPercentOfCirculation::set(Percent::from_percent(100));
 
 		set_ownership(2, 20 * MICROGONS_PER_ARGON);
