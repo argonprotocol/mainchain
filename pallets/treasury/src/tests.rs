@@ -1,15 +1,17 @@
 use super::{
-	BondLot, BondLotById, BondLotIdsByAccount, BondLotsByVault, BondReleaseReason,
-	CurrentFrameVaultCapital, HoldReason, PendingBondReleaseRetryCursor,
-	PendingBondReleasesByFrame,
+	ArgonotBondLots, BondLot, BondLotById, BondLotIdsByAccount, BondLotSummary, BondLotsByVault,
+	BondProgram, BondReleaseReason, CurrentFrameArgonotBondParticipants, CurrentFrameVaultCapital,
+	HoldReason, PendingBondReleaseRetryCursor, PendingBondReleasesByFrame, TotalActiveArgonotBonds,
 };
 use crate::{
 	mock::{
 		account_id_from_seed, account_pair_from_seed, insert_vault, new_test_ext, set_argons,
-		take_treasury_pool_participated, Balances, BidPoolAccountId, CurrentFrameId,
-		ExistentialDeposit, LastVaultProfits, MaxTreasuryContributors, MaxVaultsPerPool,
-		MinimumArgonsPerContributor, RuntimeEvent, RuntimeHoldReason, RuntimeOrigin, System, Test,
-		TestAccountId, TestVault, Treasury, TreasuryExitDelayFrames, TreasuryReservesAccountId,
+		set_ownership, take_treasury_pool_participated, Balances, BidPoolAccountId, CurrentFrameId,
+		ExistentialDeposit, LastVaultProfits, MaxArgonotBondHolders,
+		MaxArgonotBondedPercentOfCirculation, MaxTreasuryContributors, MaxVaultsPerPool,
+		MinimumArgonsPerContributor, Ownership, RuntimeEvent, RuntimeHoldReason, RuntimeOrigin,
+		System, Test, TestAccountId, TestVault, Treasury, TreasuryExitDelayFrames,
+		TreasuryReservesAccountId,
 	},
 	pallet::{BondLotAllocation, Error, FrameVaultCapital, VaultCapital},
 };
@@ -35,6 +37,10 @@ fn account(seed: u64) -> TestAccountId {
 
 fn origin(seed: u64) -> RuntimeOrigin {
 	RuntimeOrigin::signed(account(seed))
+}
+
+fn argonot_bond_lots() -> Vec<BondLotSummary> {
+	ArgonotBondLots::<Test>::get().into_inner()
 }
 
 fn test_vault(account_id: u64, securitized_satoshis: u64, sharing_percent: Permill) -> TestVault {
@@ -90,18 +96,28 @@ fn buy_bonds_store_plain_and_bonus_terms_and_track_pool_participation() {
 
 		let plain_bond_lot = BondLotById::<Test>::get(plain_bond_lot_ids[0]).expect("bond lot");
 		assert_eq!(plain_bond_lot.owner, account(2));
-		assert_eq!(plain_bond_lot.vault_id, 1);
+		assert_eq!(
+			plain_bond_lot.program,
+			BondProgram::Vault {
+				vault_id: 1,
+				sharing_percent: Permill::from_percent(20),
+				bonus_percent: Permill::zero(),
+			},
+		);
 		assert_eq!(plain_bond_lot.bonds, 5);
-		assert_eq!(plain_bond_lot.sharing_percent, Permill::from_percent(20));
-		assert_eq!(plain_bond_lot.bonus_percent, Permill::zero());
 		assert_eq!(plain_bond_lot.created_frame_id, 1);
 
 		let bonus_bond_lot = BondLotById::<Test>::get(bonus_bond_lot_ids[0]).expect("bond lot");
 		assert_eq!(bonus_bond_lot.owner, account(3));
-		assert_eq!(bonus_bond_lot.vault_id, 1);
+		assert_eq!(
+			bonus_bond_lot.program,
+			BondProgram::Vault {
+				vault_id: 1,
+				sharing_percent: Permill::from_percent(20),
+				bonus_percent: Permill::from_percent(15),
+			},
+		);
 		assert_eq!(bonus_bond_lot.bonds, 5);
-		assert_eq!(bonus_bond_lot.sharing_percent, Permill::from_percent(20));
-		assert_eq!(bonus_bond_lot.bonus_percent, Permill::from_percent(15));
 		assert_eq!(bonus_bond_lot.created_frame_id, 1);
 
 		assert_eq!(
@@ -257,6 +273,153 @@ fn liquidate_bond_lot_rejects_when_it_would_drop_below_encumbered_backing() {
 }
 
 #[test]
+fn buy_argonot_bonds_allows_multiple_lots_per_account() {
+	new_test_ext().execute_with(|| {
+		MinimumArgonsPerContributor::set(1);
+		MaxArgonotBondedPercentOfCirculation::set(Percent::from_percent(100));
+		set_ownership(2, 20 * MICROGONS_PER_ARGON);
+
+		assert_ok!(Treasury::buy_argonot_bonds(origin(2), 5));
+		assert_ok!(Treasury::buy_argonot_bonds(origin(2), 4));
+
+		let bond_lot_ids = account_bond_lot_ids(2);
+		assert_eq!(bond_lot_ids.len(), 2);
+		assert_eq!(argonot_bond_lots().len(), 2);
+		assert_eq!(TotalActiveArgonotBonds::<Test>::get(), 9);
+		assert_eq!(
+			Ownership::balance_on_hold(
+				&RuntimeHoldReason::from(HoldReason::ContributedToTreasury),
+				&account(2),
+			),
+			9 * MICROGONS_PER_ARGON,
+		);
+	});
+}
+
+#[test]
+fn buy_argonot_bonds_rejects_when_full_queue_lot_does_not_beat_floor() {
+	new_test_ext().execute_with(|| {
+		MinimumArgonsPerContributor::set(1);
+		MaxArgonotBondHolders::set(2);
+		MaxArgonotBondedPercentOfCirculation::set(Percent::from_percent(100));
+
+		set_ownership(2, 20 * MICROGONS_PER_ARGON);
+		set_ownership(3, 20 * MICROGONS_PER_ARGON);
+		set_ownership(4, 20 * MICROGONS_PER_ARGON);
+
+		assert_ok!(Treasury::buy_argonot_bonds(origin(2), 3));
+		assert_ok!(Treasury::buy_argonot_bonds(origin(3), 5));
+
+		assert_err!(
+			Treasury::buy_argonot_bonds(origin(4), 3),
+			Error::<Test>::ArgonotBondPurchaseBelowCutoff,
+		);
+
+		assert!(account_bond_lot_ids(4).is_empty());
+		assert_eq!(argonot_bond_lots().len(), 2);
+		assert_eq!(TotalActiveArgonotBonds::<Test>::get(), 8);
+	});
+}
+
+#[test]
+fn buy_argonot_bonds_evicts_floor_and_schedules_release() {
+	new_test_ext().execute_with(|| {
+		MinimumArgonsPerContributor::set(1);
+		MaxArgonotBondHolders::set(2);
+		MaxArgonotBondedPercentOfCirculation::set(Percent::from_percent(100));
+
+		set_ownership(2, 20 * MICROGONS_PER_ARGON);
+		set_ownership(3, 20 * MICROGONS_PER_ARGON);
+		set_ownership(4, 20 * MICROGONS_PER_ARGON);
+
+		assert_ok!(Treasury::buy_argonot_bonds(origin(2), 3));
+		assert_ok!(Treasury::buy_argonot_bonds(origin(3), 5));
+		let evicted_bond_lot_id = account_bond_lot_ids(2)[0];
+		let retained_bond_lot_id = account_bond_lot_ids(3)[0];
+
+		assert_ok!(Treasury::buy_argonot_bonds(origin(4), 6));
+		let new_bond_lot_id = account_bond_lot_ids(4)[0];
+
+		let evicted_bond_lot = BondLotById::<Test>::get(evicted_bond_lot_id).expect("bond lot");
+		assert_eq!(evicted_bond_lot.release_reason, Some(BondReleaseReason::Bumped));
+		assert_eq!(evicted_bond_lot.release_frame_id, Some(11));
+		assert_eq!(argonot_bond_lots().len(), 2);
+		assert_eq!(TotalActiveArgonotBonds::<Test>::get(), 11);
+		assert_eq!(
+			Ownership::balance_on_hold(
+				&RuntimeHoldReason::from(HoldReason::ContributedToTreasury),
+				&account(2),
+			),
+			3 * MICROGONS_PER_ARGON,
+		);
+		assert_eq!(
+			argonot_bond_lots(),
+			vec![
+				BondLotSummary { bond_lot_id: retained_bond_lot_id, bonds: 5 },
+				BondLotSummary { bond_lot_id: new_bond_lot_id, bonds: 6 },
+			],
+		);
+	});
+}
+
+#[test]
+fn buy_argonot_bonds_enforces_circulation_cap() {
+	new_test_ext().execute_with(|| {
+		MinimumArgonsPerContributor::set(1);
+		MaxArgonotBondedPercentOfCirculation::set(Percent::from_percent(40));
+		set_ownership(2, 10 * MICROGONS_PER_ARGON);
+
+		assert_err!(
+			Treasury::buy_argonot_bonds(origin(2), 5),
+			Error::<Test>::ArgonotBondPurchaseAboveCap,
+		);
+
+		assert!(account_bond_lot_ids(2).is_empty());
+		assert!(argonot_bond_lots().is_empty());
+		assert_eq!(TotalActiveArgonotBonds::<Test>::get(), 0);
+	});
+}
+
+#[test]
+fn liquidate_argonot_bond_lot_removes_queue_entry_and_releases_ownership_on_maturity() {
+	new_test_ext().execute_with(|| {
+		MinimumArgonsPerContributor::set(1);
+		MaxArgonotBondedPercentOfCirculation::set(Percent::from_percent(100));
+		set_ownership(2, 20 * MICROGONS_PER_ARGON);
+
+		assert_ok!(Treasury::buy_argonot_bonds(origin(2), 3));
+		let bond_lot_id = account_bond_lot_ids(2)[0];
+
+		assert_ok!(Treasury::liquidate_bond_lot(origin(2), bond_lot_id));
+
+		let bond_lot = BondLotById::<Test>::get(bond_lot_id).expect("releasing bond lot");
+		assert_eq!(bond_lot.release_reason, Some(BondReleaseReason::UserLiquidation));
+		assert_eq!(bond_lot.release_frame_id, Some(11));
+		assert!(argonot_bond_lots().is_empty());
+		assert_eq!(TotalActiveArgonotBonds::<Test>::get(), 0);
+		assert_eq!(
+			Ownership::balance_on_hold(
+				&RuntimeHoldReason::from(HoldReason::ContributedToTreasury),
+				&account(2),
+			),
+			3 * MICROGONS_PER_ARGON,
+		);
+
+		Treasury::release_pending_bond_lots(11);
+
+		assert!(BondLotById::<Test>::get(bond_lot_id).is_none());
+		assert!(account_bond_lot_ids(2).is_empty());
+		assert_eq!(
+			Ownership::balance_on_hold(
+				&RuntimeHoldReason::from(HoldReason::ContributedToTreasury),
+				&account(2),
+			),
+			0,
+		);
+	});
+}
+
+#[test]
 fn accepted_lots_are_ranked_only_by_size() {
 	new_test_ext().execute_with(|| {
 		MinimumArgonsPerContributor::set(1);
@@ -296,6 +459,7 @@ fn accepted_lots_are_ranked_only_by_size() {
 #[test]
 fn distribution_uses_frame_snapshot_payouts_and_refunds_underfill_to_treasury() {
 	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
 		MinimumArgonsPerContributor::set(1);
 		CurrentFrameId::set(1);
 		insert_vault(
@@ -327,6 +491,26 @@ fn distribution_uses_frame_snapshot_payouts_and_refunds_underfill_to_treasury() 
 		Treasury::distribute_bid_pool(1);
 
 		assert!(CurrentFrameVaultCapital::<Test>::get().is_none());
+		assert!(System::events().iter().any(|record| {
+			matches!(
+				&record.event,
+				RuntimeEvent::Treasury(crate::Event::FrameEarningsDistributed {
+					frame_id,
+					bid_pool_distributed,
+					argonot_bond_pool_distributed,
+					vault_bid_pool_distributed,
+					treasury_refunds,
+					treasury_reserves,
+					participating_vaults,
+				}) if *frame_id == 1
+					&& *bid_pool_distributed == 80 * MICROGONS_PER_ARGON
+					&& *argonot_bond_pool_distributed == 0
+					&& *vault_bid_pool_distributed == 80 * MICROGONS_PER_ARGON
+					&& *treasury_refunds == 48 * MICROGONS_PER_ARGON
+					&& *treasury_reserves == 68 * MICROGONS_PER_ARGON
+					&& *participating_vaults == 1
+			)
+		}));
 
 		let bond_lot = BondLotById::<Test>::get(bond_lot_id).expect("paid bond lot");
 		assert_eq!(bond_lot.participated_frames, 1);
@@ -342,6 +526,79 @@ fn distribution_uses_frame_snapshot_payouts_and_refunds_underfill_to_treasury() 
 		assert_eq!(LastVaultProfits::get()[0].earnings_for_vault, 25_600_000);
 		assert_eq!(LastVaultProfits::get()[0].capital_contributed, 4 * MICROGONS_PER_ARGON);
 		assert_eq!(LastVaultProfits::get()[0].capital_contributed_by_vault, 0);
+	});
+}
+
+#[test]
+fn argonot_bonds_are_paid_before_vault_bonds() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		MinimumArgonsPerContributor::set(1);
+		CurrentFrameId::set(1);
+
+		insert_vault(
+			1,
+			test_vault(10, (4 * MICROGONS_PER_ARGON) as u64, Permill::from_percent(20)),
+		);
+		set_argons(2, 50 * MICROGONS_PER_ARGON);
+		set_ownership(3, 50 * MICROGONS_PER_ARGON);
+
+		assert_ok!(Treasury::buy_bonds(origin(2), 1, 4, None));
+		assert_ok!(Treasury::buy_argonot_bonds(origin(3), 5));
+
+		let vault_bond_lot_id = account_bond_lot_ids(2)[0];
+		let argonot_bond_lot_id = account_bond_lot_ids(3)[0];
+
+		Treasury::lock_in_argonot_bond_participants(1);
+		Treasury::lock_in_vault_capital(1);
+
+		let argonot_participants =
+			CurrentFrameArgonotBondParticipants::<Test>::get().expect("argonot participants");
+		assert_eq!(argonot_participants.frame_id, 1);
+		assert_eq!(argonot_participants.total_bonds, 5);
+		assert_eq!(argonot_participants.bond_lots.len(), 1);
+
+		let bid_pool_account = BidPoolAccountId::get();
+		assert_ok!(Balances::mint_into(&bid_pool_account, 100 * MICROGONS_PER_ARGON));
+
+		Treasury::distribute_bid_pool(1);
+
+		assert!(CurrentFrameArgonotBondParticipants::<Test>::get().is_none());
+		assert!(CurrentFrameVaultCapital::<Test>::get().is_none());
+		assert!(System::events().iter().any(|record| {
+			matches!(
+				&record.event,
+				RuntimeEvent::Treasury(crate::Event::FrameEarningsDistributed {
+					frame_id,
+					bid_pool_distributed,
+					argonot_bond_pool_distributed,
+					vault_bid_pool_distributed,
+					treasury_refunds,
+					treasury_reserves,
+					participating_vaults,
+				}) if *frame_id == 1
+					&& *bid_pool_distributed == 80 * MICROGONS_PER_ARGON
+					&& *argonot_bond_pool_distributed == 10 * MICROGONS_PER_ARGON
+					&& *vault_bid_pool_distributed == 70 * MICROGONS_PER_ARGON
+					&& *treasury_refunds == 0
+					&& *treasury_reserves == 20 * MICROGONS_PER_ARGON
+					&& *participating_vaults == 1
+			)
+		}));
+
+		let argonot_bond_lot = BondLotById::<Test>::get(argonot_bond_lot_id).expect("argonot lot");
+		assert_eq!(argonot_bond_lot.last_frame_earnings, Some(10_000_000));
+		assert_eq!(argonot_bond_lot.cumulative_earnings, 10_000_000);
+		assert_eq!(Balances::balance(&account(3)), 10_000_000);
+
+		let vault_bond_lot = BondLotById::<Test>::get(vault_bond_lot_id).expect("vault lot");
+		assert_eq!(vault_bond_lot.last_frame_earnings, Some(14_000_000));
+		assert_eq!(vault_bond_lot.cumulative_earnings, 14_000_000);
+
+		assert_eq!(Balances::balance(&TreasuryReservesAccountId::get()), 20_000_000);
+		assert_eq!(LastVaultProfits::get().len(), 1);
+		assert_eq!(LastVaultProfits::get()[0].earnings, 70 * MICROGONS_PER_ARGON);
+		assert_eq!(LastVaultProfits::get()[0].earnings_for_vault, 56_000_000);
 	});
 }
 
@@ -377,6 +634,36 @@ fn bonus_backed_lots_increase_bonder_payout_and_reduce_vault_remainder() {
 		assert_eq!(bonus_lot.last_frame_earnings, Some(4_800_000));
 		assert!(bonus_lot.cumulative_earnings > plain_lot.cumulative_earnings);
 		assert_eq!(LastVaultProfits::get()[0].earnings_for_vault, 24_000_000);
+	});
+}
+
+#[test]
+fn locked_argonot_participants_still_pay_after_lot_is_liquidated() {
+	new_test_ext().execute_with(|| {
+		MinimumArgonsPerContributor::set(1);
+		CurrentFrameId::set(1);
+		set_ownership(2, 50 * MICROGONS_PER_ARGON);
+
+		assert_ok!(Treasury::buy_argonot_bonds(origin(2), 5));
+
+		let bond_lot_id = account_bond_lot_ids(2)[0];
+		Treasury::lock_in_argonot_bond_participants(1);
+
+		assert_ok!(Treasury::liquidate_bond_lot(origin(2), bond_lot_id));
+		assert!(ArgonotBondLots::<Test>::get().is_empty());
+
+		let bid_pool_account = BidPoolAccountId::get();
+		assert_ok!(Balances::mint_into(&bid_pool_account, 100 * MICROGONS_PER_ARGON));
+
+		Treasury::distribute_bid_pool(1);
+
+		let bond_lot = BondLotById::<Test>::get(bond_lot_id).expect("liquidating argonot lot");
+		assert_eq!(bond_lot.release_reason, Some(BondReleaseReason::UserLiquidation));
+		assert_eq!(bond_lot.participated_frames, 1);
+		assert_eq!(bond_lot.last_frame_earnings_frame_id, Some(1));
+		assert_eq!(bond_lot.last_frame_earnings, Some(10_000_000));
+		assert_eq!(bond_lot.cumulative_earnings, 10_000_000);
+		assert_eq!(Balances::balance(&account(2)), 10_000_000);
 	});
 }
 
@@ -508,10 +795,12 @@ fn failed_bond_lot_payout_is_not_recorded_as_earned() {
 			0,
 			BondLot {
 				owner: account(99),
-				vault_id: 1,
+				program: BondProgram::Vault {
+					vault_id: 1,
+					sharing_percent: Permill::one(),
+					bonus_percent: Permill::zero(),
+				},
 				bonds: 1,
-				sharing_percent: Permill::one(),
-				bonus_percent: Permill::zero(),
 				created_frame_id: 1,
 				participated_frames: 0,
 				last_frame_earnings_frame_id: None,
@@ -759,10 +1048,12 @@ fn failed_release_retries_and_does_not_block_current_frame_releases() {
 			0,
 			BondLot {
 				owner: account(2),
-				vault_id: 1,
+				program: BondProgram::Vault {
+					vault_id: 1,
+					sharing_percent: Permill::zero(),
+					bonus_percent: Permill::zero(),
+				},
 				bonds: 1,
-				sharing_percent: Permill::zero(),
-				bonus_percent: Permill::zero(),
 				created_frame_id: 1,
 				participated_frames: 0,
 				last_frame_earnings_frame_id: None,
@@ -776,15 +1067,17 @@ fn failed_release_retries_and_does_not_block_current_frame_releases() {
 		PendingBondReleasesByFrame::<Test>::insert(11, BoundedVec::truncate_from(vec![0]));
 
 		set_argons(3, MICROGONS_PER_ARGON);
-		assert_ok!(Treasury::create_hold(&account(3), MICROGONS_PER_ARGON));
+		assert_ok!(Treasury::create_hold::<Balances>(&account(3), MICROGONS_PER_ARGON));
 		BondLotById::<Test>::insert(
 			1,
 			BondLot {
 				owner: account(3),
-				vault_id: 1,
+				program: BondProgram::Vault {
+					vault_id: 1,
+					sharing_percent: Permill::zero(),
+					bonus_percent: Permill::zero(),
+				},
 				bonds: 1,
-				sharing_percent: Permill::zero(),
-				bonus_percent: Permill::zero(),
 				created_frame_id: 1,
 				participated_frames: 0,
 				last_frame_earnings_frame_id: None,
@@ -817,7 +1110,7 @@ fn failed_release_retries_and_does_not_block_current_frame_releases() {
 		);
 
 		set_argons(2, MICROGONS_PER_ARGON);
-		assert_ok!(Treasury::create_hold(&account(2), MICROGONS_PER_ARGON));
+		assert_ok!(Treasury::create_hold::<Balances>(&account(2), MICROGONS_PER_ARGON));
 		Treasury::release_pending_bond_lots(13);
 
 		assert_eq!(PendingBondReleaseRetryCursor::<Test>::get(), None);

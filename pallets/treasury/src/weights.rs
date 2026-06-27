@@ -10,6 +10,7 @@ pub trait WeightInfo {
 	fn lock_in_vault_capital() -> Weight;
 	fn claim_reward() -> Weight;
 	fn buy_bonds() -> Weight;
+	fn buy_argonot_bonds() -> Weight;
 	fn liquidate_bond_lot() -> Weight;
 	fn provider_has_bond_participation() -> Weight;
 	fn provider_encumber_bond_microgons() -> Weight;
@@ -46,6 +47,10 @@ where
 
 	fn buy_bonds() -> Weight {
 		Base::buy_bonds()
+	}
+
+	fn buy_argonot_bonds() -> Weight {
+		Base::buy_argonot_bonds()
 	}
 
 	fn liquidate_bond_lot() -> Weight {
@@ -107,6 +112,9 @@ impl WeightInfo for () {
 		Weight::from_parts(100_000_000, 0)
 	}
 	fn buy_bonds() -> Weight {
+		Weight::zero()
+	}
+	fn buy_argonot_bonds() -> Weight {
 		Weight::zero()
 	}
 	fn liquidate_bond_lot() -> Weight {

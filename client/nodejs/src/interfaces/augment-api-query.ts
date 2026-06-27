@@ -99,6 +99,7 @@ import type {
   PalletTransactionPaymentReleases,
   PalletTreasuryBondLot,
   PalletTreasuryBondLotSummary,
+  PalletTreasuryFrameArgonotBondParticipants,
   PalletTreasuryFrameVaultCapital,
   PalletVaultsRecentCapacityDrop,
   PalletVaultsVaultFrameRevenue,
@@ -1646,6 +1647,14 @@ declare module '@polkadot/api-base/types/storage' {
     };
     treasury: {
       /**
+       * The active top Argonot bond lots kept in ascending bond order, then lower ids first.
+       **/
+      argonotBondLots: AugmentedQuery<
+        ApiType,
+        () => Observable<Vec<PalletTreasuryBondLotSummary>>,
+        []
+      >;
+      /**
        * The stored state for each bond lot.
        **/
       bondLotById: AugmentedQuery<
@@ -1673,6 +1682,16 @@ declare module '@polkadot/api-base/types/storage' {
         ApiType,
         (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<PalletTreasuryBondLotSummary>>,
         [u32]
+      >;
+      /**
+       * The Argonot bond participants locked for the current frame.
+       *
+       * Payout uses this to see which Argonot bond lots are participating in the frame.
+       **/
+      currentFrameArgonotBondParticipants: AugmentedQuery<
+        ApiType,
+        () => Observable<Option<PalletTreasuryFrameArgonotBondParticipants>>,
+        []
       >;
       /**
        * The vault capital locked for the current frame.
@@ -1713,6 +1732,10 @@ declare module '@polkadot/api-base/types/storage' {
         (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<u64>>,
         [u64]
       >;
+      /**
+       * The total number of active Argonot bonds in the active set.
+       **/
+      totalActiveArgonotBonds: AugmentedQuery<ApiType, () => Observable<u32>, []>;
     };
     txPause: {
       /**

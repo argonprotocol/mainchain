@@ -94,6 +94,7 @@ parameter_types! {
 
 	// ### pallet_treasury
 	pub const MaxTreasuryContributors: u32 = 100;
+	pub const MaxArgonotBondHolders: u32 = 1_000;
 	pub const MaxVaultsPerPool: u32 = 100;
 	pub const TreasuryInternalPalletId: PalletId = PalletId(*b"lqdPools");
 	pub TreasuryMiningBidPoolAccount: AccountId =
@@ -101,6 +102,8 @@ parameter_types! {
 	pub TreasuryReservesAccount: AccountId =
 		TreasuryInternalPalletId::get().into_sub_account_truncating(*b"treasury-reserve");
 	pub const PercentForTreasuryReserves: Percent = Percent::from_percent(20);
+	pub const PercentForArgonotBondPool: Percent = Percent::from_percent(10);
+	pub const MaxArgonotBondedPercentOfCirculation: Percent = Percent::from_percent(40);
 
 	// ### pallet_mining_slot
 	pub const FramesPerMiningTerm: u32 = 10;

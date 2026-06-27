@@ -1168,10 +1168,9 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							124u8, 138u8, 85u8, 57u8, 92u8, 186u8, 151u8, 120u8, 207u8, 40u8,
-							192u8, 178u8, 21u8, 226u8, 151u8, 150u8, 178u8, 16u8, 167u8, 245u8,
-							174u8, 37u8, 227u8, 164u8, 175u8, 36u8, 180u8, 163u8, 15u8, 85u8,
-							123u8, 58u8,
+							78u8, 198u8, 94u8, 44u8, 25u8, 35u8, 133u8, 234u8, 95u8, 194u8, 146u8,
+							64u8, 109u8, 65u8, 110u8, 197u8, 100u8, 225u8, 226u8, 25u8, 220u8,
+							58u8, 51u8, 19u8, 131u8, 145u8, 238u8, 95u8, 24u8, 161u8, 182u8, 242u8,
 						],
 					)
 				}
@@ -1189,10 +1188,10 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							150u8, 191u8, 121u8, 251u8, 206u8, 31u8, 119u8, 248u8, 248u8, 228u8,
-							44u8, 222u8, 203u8, 79u8, 36u8, 170u8, 199u8, 207u8, 25u8, 193u8,
-							218u8, 150u8, 169u8, 19u8, 223u8, 204u8, 227u8, 232u8, 246u8, 7u8,
-							76u8, 157u8,
+							64u8, 215u8, 79u8, 213u8, 28u8, 15u8, 153u8, 216u8, 225u8, 10u8, 240u8,
+							242u8, 45u8, 185u8, 64u8, 223u8, 177u8, 87u8, 53u8, 189u8, 125u8,
+							172u8, 228u8, 62u8, 254u8, 226u8, 127u8, 106u8, 135u8, 155u8, 137u8,
+							245u8,
 						],
 					)
 				}
@@ -3396,9 +3395,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				84u8, 192u8, 154u8, 50u8, 211u8, 5u8, 188u8, 159u8, 35u8, 43u8, 152u8, 112u8,
-				116u8, 125u8, 185u8, 59u8, 87u8, 105u8, 146u8, 116u8, 188u8, 41u8, 205u8, 140u8,
-				181u8, 224u8, 148u8, 234u8, 104u8, 11u8, 203u8, 122u8,
+				168u8, 182u8, 204u8, 95u8, 72u8, 43u8, 225u8, 228u8, 193u8, 104u8, 203u8, 0u8,
+				247u8, 201u8, 101u8, 178u8, 43u8, 101u8, 57u8, 221u8, 188u8, 175u8, 4u8, 12u8,
+				246u8, 42u8, 57u8, 170u8, 83u8, 180u8, 45u8, 91u8,
 			]
 	}
 	pub mod system {
@@ -4522,10 +4521,9 @@ pub mod api {
 						"Events",
 						(),
 						[
-							42u8, 4u8, 114u8, 78u8, 183u8, 137u8, 74u8, 185u8, 168u8, 231u8, 233u8,
-							162u8, 218u8, 168u8, 136u8, 95u8, 220u8, 188u8, 231u8, 77u8, 10u8,
-							46u8, 118u8, 82u8, 215u8, 139u8, 116u8, 152u8, 27u8, 109u8, 38u8,
-							124u8,
+							83u8, 138u8, 153u8, 101u8, 223u8, 151u8, 150u8, 61u8, 206u8, 15u8,
+							54u8, 167u8, 90u8, 142u8, 14u8, 145u8, 86u8, 69u8, 215u8, 248u8, 35u8,
+							47u8, 226u8, 158u8, 159u8, 26u8, 37u8, 124u8, 227u8, 71u8, 44u8, 246u8,
 						],
 					)
 				}
@@ -5433,9 +5431,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							90u8, 223u8, 61u8, 127u8, 188u8, 146u8, 40u8, 228u8, 27u8, 5u8, 203u8,
-							21u8, 219u8, 23u8, 73u8, 24u8, 193u8, 123u8, 185u8, 23u8, 176u8, 224u8,
-							213u8, 32u8, 80u8, 51u8, 112u8, 159u8, 119u8, 72u8, 201u8, 125u8,
+							173u8, 139u8, 146u8, 144u8, 197u8, 165u8, 26u8, 117u8, 172u8, 52u8,
+							158u8, 1u8, 11u8, 208u8, 5u8, 8u8, 157u8, 15u8, 189u8, 158u8, 48u8,
+							128u8, 255u8, 225u8, 46u8, 189u8, 171u8, 95u8, 10u8, 103u8, 150u8,
+							133u8,
 						],
 					)
 				}
@@ -5500,10 +5499,10 @@ pub mod api {
 							max_weight,
 						},
 						[
-							89u8, 180u8, 202u8, 84u8, 192u8, 249u8, 25u8, 48u8, 130u8, 155u8,
-							119u8, 179u8, 176u8, 86u8, 241u8, 216u8, 11u8, 190u8, 111u8, 122u8,
-							67u8, 114u8, 30u8, 124u8, 226u8, 61u8, 168u8, 236u8, 134u8, 179u8,
-							110u8, 47u8,
+							206u8, 167u8, 90u8, 68u8, 55u8, 180u8, 112u8, 161u8, 252u8, 190u8,
+							81u8, 8u8, 123u8, 76u8, 4u8, 136u8, 42u8, 57u8, 73u8, 164u8, 154u8,
+							187u8, 128u8, 164u8, 24u8, 12u8, 192u8, 76u8, 240u8, 229u8, 200u8,
+							126u8,
 						],
 					)
 				}
@@ -6408,9 +6407,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							88u8, 109u8, 153u8, 12u8, 114u8, 23u8, 183u8, 185u8, 18u8, 127u8,
-							120u8, 209u8, 0u8, 65u8, 80u8, 128u8, 105u8, 124u8, 180u8, 44u8, 231u8,
-							66u8, 57u8, 33u8, 123u8, 72u8, 56u8, 124u8, 161u8, 185u8, 68u8, 31u8,
+							110u8, 225u8, 240u8, 187u8, 2u8, 216u8, 200u8, 130u8, 94u8, 212u8,
+							35u8, 150u8, 236u8, 93u8, 139u8, 170u8, 129u8, 236u8, 204u8, 12u8,
+							43u8, 10u8, 8u8, 159u8, 113u8, 130u8, 209u8, 225u8, 134u8, 153u8, 46u8,
+							195u8,
 						],
 					)
 				}
@@ -6674,9 +6674,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							18u8, 164u8, 214u8, 108u8, 211u8, 147u8, 171u8, 45u8, 104u8, 89u8,
-							64u8, 35u8, 177u8, 185u8, 205u8, 168u8, 49u8, 11u8, 135u8, 232u8, 81u8,
-							16u8, 181u8, 199u8, 148u8, 85u8, 55u8, 87u8, 36u8, 76u8, 140u8, 214u8,
+							219u8, 151u8, 160u8, 208u8, 4u8, 73u8, 233u8, 116u8, 253u8, 97u8, 7u8,
+							44u8, 115u8, 170u8, 30u8, 190u8, 135u8, 71u8, 239u8, 16u8, 199u8,
+							108u8, 5u8, 28u8, 48u8, 106u8, 181u8, 140u8, 18u8, 245u8, 243u8, 46u8,
 						],
 					)
 				}
@@ -6725,10 +6725,10 @@ pub mod api {
 						],
 						check_permissions::Input { call, proxy_type },
 						[
-							161u8, 243u8, 19u8, 103u8, 48u8, 161u8, 238u8, 165u8, 103u8, 106u8,
-							89u8, 55u8, 177u8, 147u8, 236u8, 76u8, 152u8, 43u8, 227u8, 211u8,
-							242u8, 175u8, 48u8, 119u8, 152u8, 14u8, 80u8, 48u8, 187u8, 93u8, 87u8,
-							189u8,
+							71u8, 106u8, 253u8, 158u8, 206u8, 228u8, 119u8, 99u8, 102u8, 36u8,
+							179u8, 176u8, 119u8, 222u8, 69u8, 45u8, 197u8, 61u8, 143u8, 236u8,
+							124u8, 64u8, 12u8, 48u8, 253u8, 26u8, 67u8, 124u8, 105u8, 169u8, 92u8,
+							201u8,
 						],
 					)
 				}
@@ -16553,29 +16553,6 @@ pub mod api {
 					const PALLET: &'static str = "BlockRewards";
 					const CALL: &'static str = "set_block_rewards_paused";
 				}
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
-				pub struct SetBlockVoterRewardsEnabled {
-					pub enabled: set_block_voter_rewards_enabled::Enabled,
-				}
-				pub mod set_block_voter_rewards_enabled {
-					use super::runtime_types;
-					pub type Enabled = ::core::primitive::bool;
-				}
-				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for SetBlockVoterRewardsEnabled {
-					const PALLET: &'static str = "BlockRewards";
-					const CALL: &'static str = "set_block_voter_rewards_enabled";
-				}
 			}
 			pub struct TransactionApi;
 			impl TransactionApi {
@@ -16593,23 +16570,6 @@ pub mod api {
 							56u8, 226u8, 8u8, 114u8, 228u8, 219u8, 24u8, 190u8, 245u8, 128u8, 94u8,
 							112u8, 194u8, 27u8, 128u8, 48u8, 104u8, 34u8, 232u8, 1u8, 190u8, 26u8,
 							34u8, 23u8, 110u8, 177u8, 162u8, 72u8, 62u8, 139u8, 211u8, 173u8,
-						],
-					)
-				}
-				pub fn set_block_voter_rewards_enabled(
-					&self,
-					enabled: types::set_block_voter_rewards_enabled::Enabled,
-				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<
-					types::SetBlockVoterRewardsEnabled,
-				> {
-					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
-						"BlockRewards",
-						"set_block_voter_rewards_enabled",
-						types::SetBlockVoterRewardsEnabled { enabled },
-						[
-							247u8, 129u8, 245u8, 5u8, 120u8, 68u8, 15u8, 36u8, 130u8, 239u8, 118u8,
-							208u8, 48u8, 228u8, 213u8, 65u8, 51u8, 54u8, 171u8, 73u8, 106u8, 211u8,
-							27u8, 137u8, 217u8, 212u8, 37u8, 17u8, 4u8, 195u8, 238u8, 172u8,
 						],
 					)
 				}
@@ -16687,10 +16647,6 @@ pub mod api {
 				pub mod block_rewards_paused {
 					use super::runtime_types;
 					pub type BlockRewardsPaused = ::core::primitive::bool;
-				}
-				pub mod block_voter_rewards_enabled {
-					use super::runtime_types;
-					pub type BlockVoterRewardsEnabled = ::core::primitive::bool;
 				}
 				pub mod block_rewards_by_cohort {
 					use super::runtime_types;
@@ -16775,27 +16731,6 @@ pub mod api {
 							74u8, 109u8, 204u8, 149u8, 38u8, 187u8, 216u8, 106u8, 23u8, 83u8,
 							246u8, 242u8, 222u8, 46u8, 194u8, 180u8, 161u8, 218u8, 41u8, 106u8,
 							150u8, 234u8,
-						],
-					)
-				}
-				#[doc = " Bool if block voter rewards are enabled"]
-				pub fn block_voter_rewards_enabled(
-					&self,
-				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
-					(),
-					types::block_voter_rewards_enabled::BlockVoterRewardsEnabled,
-					::subxt::ext::subxt_core::utils::Yes,
-					::subxt::ext::subxt_core::utils::Yes,
-					(),
-				> {
-					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"BlockRewards",
-						"BlockVoterRewardsEnabled",
-						(),
-						[
-							106u8, 148u8, 216u8, 159u8, 2u8, 3u8, 158u8, 129u8, 244u8, 31u8, 88u8,
-							236u8, 204u8, 196u8, 190u8, 0u8, 10u8, 5u8, 205u8, 213u8, 109u8, 161u8,
-							99u8, 37u8, 131u8, 251u8, 96u8, 217u8, 140u8, 73u8, 84u8, 252u8,
 						],
 					)
 				}
@@ -21432,9 +21367,9 @@ pub mod api {
 						"batch",
 						types::Batch { calls },
 						[
-							161u8, 198u8, 200u8, 116u8, 247u8, 157u8, 33u8, 162u8, 188u8, 175u8,
-							121u8, 18u8, 235u8, 78u8, 111u8, 249u8, 70u8, 167u8, 142u8, 64u8, 75u8,
-							228u8, 84u8, 125u8, 68u8, 102u8, 48u8, 115u8, 197u8, 33u8, 81u8, 104u8,
+							202u8, 93u8, 91u8, 65u8, 191u8, 95u8, 61u8, 229u8, 159u8, 172u8, 212u8,
+							237u8, 1u8, 95u8, 90u8, 118u8, 115u8, 140u8, 242u8, 154u8, 216u8,
+							238u8, 33u8, 39u8, 63u8, 229u8, 47u8, 174u8, 98u8, 180u8, 14u8, 29u8,
 						],
 					)
 				}
@@ -21464,9 +21399,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							36u8, 23u8, 137u8, 142u8, 79u8, 244u8, 202u8, 123u8, 127u8, 205u8,
-							199u8, 64u8, 149u8, 132u8, 61u8, 195u8, 75u8, 81u8, 108u8, 32u8, 14u8,
-							125u8, 198u8, 51u8, 12u8, 80u8, 221u8, 236u8, 246u8, 12u8, 73u8, 192u8,
+							231u8, 162u8, 225u8, 119u8, 164u8, 209u8, 182u8, 184u8, 26u8, 228u8,
+							20u8, 192u8, 154u8, 8u8, 243u8, 82u8, 34u8, 50u8, 59u8, 8u8, 75u8,
+							205u8, 240u8, 31u8, 255u8, 159u8, 175u8, 204u8, 35u8, 86u8, 196u8,
+							57u8,
 						],
 					)
 				}
@@ -21492,9 +21428,9 @@ pub mod api {
 						"batch_all",
 						types::BatchAll { calls },
 						[
-							121u8, 116u8, 139u8, 33u8, 156u8, 223u8, 102u8, 200u8, 96u8, 16u8,
-							89u8, 31u8, 247u8, 162u8, 190u8, 244u8, 73u8, 50u8, 144u8, 90u8, 159u8,
-							183u8, 12u8, 170u8, 33u8, 0u8, 18u8, 125u8, 39u8, 23u8, 100u8, 49u8,
+							34u8, 240u8, 225u8, 87u8, 219u8, 13u8, 239u8, 241u8, 193u8, 48u8,
+							243u8, 81u8, 235u8, 214u8, 215u8, 57u8, 2u8, 163u8, 26u8, 195u8, 138u8,
+							97u8, 158u8, 77u8, 242u8, 231u8, 141u8, 50u8, 28u8, 51u8, 234u8, 243u8,
 						],
 					)
 				}
@@ -21517,9 +21453,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							95u8, 194u8, 238u8, 239u8, 165u8, 5u8, 9u8, 157u8, 37u8, 34u8, 255u8,
-							33u8, 108u8, 94u8, 65u8, 246u8, 203u8, 155u8, 43u8, 85u8, 148u8, 173u8,
-							126u8, 13u8, 158u8, 66u8, 103u8, 252u8, 207u8, 168u8, 20u8, 195u8,
+							237u8, 79u8, 52u8, 179u8, 58u8, 219u8, 84u8, 228u8, 212u8, 6u8, 152u8,
+							96u8, 181u8, 94u8, 226u8, 255u8, 76u8, 188u8, 149u8, 41u8, 89u8, 109u8,
+							247u8, 186u8, 197u8, 134u8, 61u8, 31u8, 58u8, 207u8, 236u8, 101u8,
 						],
 					)
 				}
@@ -21545,9 +21481,10 @@ pub mod api {
 						"force_batch",
 						types::ForceBatch { calls },
 						[
-							211u8, 31u8, 189u8, 35u8, 73u8, 76u8, 89u8, 29u8, 151u8, 156u8, 121u8,
-							55u8, 31u8, 142u8, 237u8, 191u8, 134u8, 75u8, 153u8, 248u8, 19u8, 13u8,
-							193u8, 156u8, 129u8, 57u8, 50u8, 69u8, 96u8, 22u8, 221u8, 140u8,
+							119u8, 119u8, 2u8, 234u8, 158u8, 125u8, 184u8, 163u8, 195u8, 129u8,
+							14u8, 177u8, 139u8, 153u8, 188u8, 216u8, 43u8, 231u8, 238u8, 187u8,
+							133u8, 212u8, 210u8, 143u8, 163u8, 41u8, 145u8, 166u8, 130u8, 128u8,
+							218u8, 36u8,
 						],
 					)
 				}
@@ -21570,10 +21507,10 @@ pub mod api {
 							weight,
 						},
 						[
-							123u8, 212u8, 156u8, 20u8, 126u8, 124u8, 239u8, 210u8, 34u8, 53u8,
-							198u8, 184u8, 52u8, 88u8, 139u8, 165u8, 216u8, 173u8, 201u8, 213u8,
-							62u8, 249u8, 204u8, 163u8, 117u8, 224u8, 107u8, 168u8, 225u8, 223u8,
-							194u8, 89u8,
+							217u8, 169u8, 162u8, 34u8, 187u8, 87u8, 5u8, 140u8, 126u8, 162u8,
+							198u8, 19u8, 182u8, 218u8, 93u8, 187u8, 167u8, 207u8, 46u8, 197u8,
+							190u8, 14u8, 118u8, 171u8, 54u8, 30u8, 84u8, 33u8, 190u8, 53u8, 51u8,
+							218u8,
 						],
 					)
 				}
@@ -21613,10 +21550,10 @@ pub mod api {
 							fallback: ::subxt::ext::subxt_core::alloc::boxed::Box::new(fallback),
 						},
 						[
-							160u8, 253u8, 116u8, 139u8, 176u8, 33u8, 66u8, 217u8, 109u8, 15u8,
-							218u8, 7u8, 68u8, 48u8, 4u8, 159u8, 143u8, 29u8, 105u8, 238u8, 154u8,
-							241u8, 106u8, 191u8, 143u8, 245u8, 120u8, 241u8, 172u8, 180u8, 2u8,
-							125u8,
+							234u8, 127u8, 172u8, 210u8, 223u8, 145u8, 109u8, 44u8, 97u8, 159u8,
+							51u8, 148u8, 30u8, 133u8, 33u8, 101u8, 97u8, 109u8, 81u8, 140u8, 162u8,
+							225u8, 19u8, 58u8, 251u8, 184u8, 154u8, 69u8, 118u8, 161u8, 60u8,
+							218u8,
 						],
 					)
 				}
@@ -21639,9 +21576,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							81u8, 157u8, 93u8, 86u8, 54u8, 226u8, 178u8, 189u8, 222u8, 2u8, 89u8,
-							33u8, 183u8, 207u8, 94u8, 84u8, 33u8, 188u8, 169u8, 241u8, 141u8, 97u8,
-							83u8, 94u8, 247u8, 112u8, 232u8, 28u8, 95u8, 140u8, 60u8, 29u8,
+							161u8, 82u8, 207u8, 139u8, 123u8, 56u8, 235u8, 54u8, 12u8, 43u8, 137u8,
+							78u8, 110u8, 27u8, 23u8, 59u8, 232u8, 154u8, 56u8, 246u8, 104u8, 189u8,
+							146u8, 208u8, 179u8, 154u8, 103u8, 4u8, 176u8, 116u8, 75u8, 112u8,
 						],
 					)
 				}
@@ -21977,10 +21914,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							208u8, 92u8, 101u8, 76u8, 169u8, 236u8, 142u8, 71u8, 246u8, 115u8,
-							90u8, 202u8, 99u8, 196u8, 93u8, 233u8, 34u8, 19u8, 37u8, 178u8, 94u8,
-							51u8, 157u8, 214u8, 10u8, 140u8, 250u8, 37u8, 215u8, 86u8, 243u8,
-							214u8,
+							146u8, 88u8, 136u8, 93u8, 85u8, 2u8, 29u8, 108u8, 124u8, 154u8, 46u8,
+							215u8, 89u8, 122u8, 188u8, 199u8, 10u8, 55u8, 49u8, 171u8, 114u8,
+							186u8, 158u8, 168u8, 225u8, 227u8, 170u8, 208u8, 228u8, 177u8, 1u8,
+							117u8,
 						],
 					)
 				}
@@ -22003,9 +21940,10 @@ pub mod api {
 							weight,
 						},
 						[
-							155u8, 85u8, 232u8, 82u8, 244u8, 8u8, 133u8, 246u8, 43u8, 248u8, 157u8,
-							91u8, 49u8, 161u8, 53u8, 105u8, 170u8, 116u8, 217u8, 219u8, 231u8,
-							168u8, 23u8, 242u8, 173u8, 80u8, 89u8, 2u8, 141u8, 231u8, 178u8, 11u8,
+							136u8, 116u8, 26u8, 72u8, 53u8, 240u8, 188u8, 82u8, 252u8, 145u8,
+							134u8, 181u8, 55u8, 115u8, 117u8, 85u8, 112u8, 150u8, 252u8, 250u8,
+							209u8, 187u8, 237u8, 36u8, 118u8, 111u8, 247u8, 55u8, 62u8, 121u8,
+							231u8, 209u8,
 						],
 					)
 				}
@@ -22043,9 +21981,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							224u8, 148u8, 72u8, 214u8, 12u8, 250u8, 191u8, 206u8, 8u8, 34u8, 127u8,
-							181u8, 40u8, 176u8, 132u8, 243u8, 232u8, 172u8, 69u8, 201u8, 189u8,
-							151u8, 187u8, 0u8, 245u8, 150u8, 105u8, 23u8, 127u8, 116u8, 5u8, 70u8,
+							18u8, 186u8, 250u8, 34u8, 223u8, 214u8, 100u8, 225u8, 117u8, 208u8,
+							216u8, 181u8, 194u8, 111u8, 236u8, 61u8, 201u8, 145u8, 137u8, 241u8,
+							63u8, 11u8, 161u8, 39u8, 243u8, 12u8, 171u8, 57u8, 90u8, 19u8, 242u8,
+							233u8,
 						],
 					)
 				}
@@ -22256,6 +22195,30 @@ pub mod api {
 					const PALLET: &'static str = "Treasury";
 					const CALL: &'static str = "liquidate_bond_lot";
 				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Buy whole bond units for the Argonot active set."]
+				pub struct BuyArgonotBonds {
+					pub bonds: buy_argonot_bonds::Bonds,
+				}
+				pub mod buy_argonot_bonds {
+					use super::runtime_types;
+					pub type Bonds = ::core::primitive::u32;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for BuyArgonotBonds {
+					const PALLET: &'static str = "Treasury";
+					const CALL: &'static str = "buy_argonot_bonds";
+				}
 			}
 			pub struct TransactionApi;
 			impl TransactionApi {
@@ -22297,6 +22260,23 @@ pub mod api {
 							80u8, 214u8, 20u8, 125u8, 137u8, 250u8, 26u8, 210u8, 108u8, 53u8, 52u8,
 							208u8, 226u8, 110u8, 132u8, 59u8, 184u8, 22u8, 150u8, 90u8, 18u8,
 							160u8,
+						],
+					)
+				}
+				#[doc = "Buy whole bond units for the Argonot active set."]
+				pub fn buy_argonot_bonds(
+					&self,
+					bonds: types::buy_argonot_bonds::Bonds,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::BuyArgonotBonds>
+				{
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"Treasury",
+						"buy_argonot_bonds",
+						types::BuyArgonotBonds { bonds },
+						[
+							187u8, 182u8, 36u8, 86u8, 242u8, 210u8, 6u8, 155u8, 84u8, 139u8, 152u8,
+							27u8, 4u8, 215u8, 181u8, 45u8, 218u8, 253u8, 248u8, 67u8, 137u8, 211u8,
+							167u8, 9u8, 109u8, 118u8, 247u8, 145u8, 29u8, 34u8, 78u8, 243u8,
 						],
 					)
 				}
@@ -22344,6 +22324,35 @@ pub mod api {
 			)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "An error occurred while paying frame earnings for an Argonot bond lot."]
+			pub struct CouldNotDistributeEarningsToArgonotBondLot {
+				pub frame_id: could_not_distribute_earnings_to_argonot_bond_lot::FrameId,
+				pub bond_lot_id: could_not_distribute_earnings_to_argonot_bond_lot::BondLotId,
+				pub account_id: could_not_distribute_earnings_to_argonot_bond_lot::AccountId,
+				pub amount: could_not_distribute_earnings_to_argonot_bond_lot::Amount,
+				pub dispatch_error:
+					could_not_distribute_earnings_to_argonot_bond_lot::DispatchError,
+			}
+			pub mod could_not_distribute_earnings_to_argonot_bond_lot {
+				use super::runtime_types;
+				pub type FrameId = ::core::primitive::u64;
+				pub type BondLotId = ::core::primitive::u64;
+				pub type AccountId = crate::types::AccountId32;
+				pub type Amount = ::core::primitive::u128;
+				pub type DispatchError = runtime_types::sp_runtime::DispatchError;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for CouldNotDistributeEarningsToArgonotBondLot {
+				const PALLET: &'static str = "Treasury";
+				const EVENT: &'static str = "CouldNotDistributeEarningsToArgonotBondLot";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
 			#[doc = "An error occurred while moving bid-pool funds into treasury reserves."]
 			pub struct CouldNotTransferToTreasuryReserves {
 				pub frame_id: could_not_transfer_to_treasury_reserves::FrameId,
@@ -22372,6 +22381,10 @@ pub mod api {
 			pub struct FrameEarningsDistributed {
 				pub frame_id: frame_earnings_distributed::FrameId,
 				pub bid_pool_distributed: frame_earnings_distributed::BidPoolDistributed,
+				pub argonot_bond_pool_distributed:
+					frame_earnings_distributed::ArgonotBondPoolDistributed,
+				pub vault_bid_pool_distributed: frame_earnings_distributed::VaultBidPoolDistributed,
+				pub treasury_refunds: frame_earnings_distributed::TreasuryRefunds,
 				pub treasury_reserves: frame_earnings_distributed::TreasuryReserves,
 				pub participating_vaults: frame_earnings_distributed::ParticipatingVaults,
 			}
@@ -22379,6 +22392,9 @@ pub mod api {
 				use super::runtime_types;
 				pub type FrameId = ::core::primitive::u64;
 				pub type BidPoolDistributed = ::core::primitive::u128;
+				pub type ArgonotBondPoolDistributed = ::core::primitive::u128;
+				pub type VaultBidPoolDistributed = ::core::primitive::u128;
+				pub type TreasuryRefunds = ::core::primitive::u128;
 				pub type TreasuryReserves = ::core::primitive::u128;
 				pub type ParticipatingVaults = ::core::primitive::u32;
 			}
@@ -22421,7 +22437,7 @@ pub mod api {
 			#[doc = "An error occurred while releasing a bond lot."]
 			pub struct CouldNotReleaseBondLot {
 				pub frame_id: could_not_release_bond_lot::FrameId,
-				pub vault_id: could_not_release_bond_lot::VaultId,
+				pub program_id: could_not_release_bond_lot::ProgramId,
 				pub bond_lot_id: could_not_release_bond_lot::BondLotId,
 				pub amount: could_not_release_bond_lot::Amount,
 				pub account_id: could_not_release_bond_lot::AccountId,
@@ -22430,7 +22446,7 @@ pub mod api {
 			pub mod could_not_release_bond_lot {
 				use super::runtime_types;
 				pub type FrameId = ::core::primitive::u64;
-				pub type VaultId = ::core::primitive::u32;
+				pub type ProgramId = runtime_types::pallet_treasury::pallet::BondProgramId;
 				pub type BondLotId = ::core::primitive::u64;
 				pub type Amount = ::core::primitive::u128;
 				pub type AccountId = crate::types::AccountId32;
@@ -22448,16 +22464,16 @@ pub mod api {
 			)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			#[doc = "A bond purchase entered a vault's accepted list."]
+			#[doc = "A bond purchase entered its active program set."]
 			pub struct BondLotPurchased {
-				pub vault_id: bond_lot_purchased::VaultId,
+				pub program_id: bond_lot_purchased::ProgramId,
 				pub bond_lot_id: bond_lot_purchased::BondLotId,
 				pub account_id: bond_lot_purchased::AccountId,
 				pub bonds: bond_lot_purchased::Bonds,
 			}
 			pub mod bond_lot_purchased {
 				use super::runtime_types;
-				pub type VaultId = ::core::primitive::u32;
+				pub type ProgramId = runtime_types::pallet_treasury::pallet::BondProgramId;
 				pub type BondLotId = ::core::primitive::u64;
 				pub type AccountId = crate::types::AccountId32;
 				pub type Bonds = ::core::primitive::u32;
@@ -22476,7 +22492,7 @@ pub mod api {
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
 			#[doc = "A bond lot was removed from future frames and scheduled for release."]
 			pub struct BondLotReleaseScheduled {
-				pub vault_id: bond_lot_release_scheduled::VaultId,
+				pub program_id: bond_lot_release_scheduled::ProgramId,
 				pub bond_lot_id: bond_lot_release_scheduled::BondLotId,
 				pub account_id: bond_lot_release_scheduled::AccountId,
 				pub bonds: bond_lot_release_scheduled::Bonds,
@@ -22485,7 +22501,7 @@ pub mod api {
 			}
 			pub mod bond_lot_release_scheduled {
 				use super::runtime_types;
-				pub type VaultId = ::core::primitive::u32;
+				pub type ProgramId = runtime_types::pallet_treasury::pallet::BondProgramId;
 				pub type BondLotId = ::core::primitive::u64;
 				pub type AccountId = crate::types::AccountId32;
 				pub type Bonds = ::core::primitive::u32;
@@ -22507,7 +22523,7 @@ pub mod api {
 			#[doc = "A bond lot was released."]
 			pub struct BondLotReleased {
 				pub frame_id: bond_lot_released::FrameId,
-				pub vault_id: bond_lot_released::VaultId,
+				pub program_id: bond_lot_released::ProgramId,
 				pub bond_lot_id: bond_lot_released::BondLotId,
 				pub account_id: bond_lot_released::AccountId,
 				pub bonds: bond_lot_released::Bonds,
@@ -22515,7 +22531,7 @@ pub mod api {
 			pub mod bond_lot_released {
 				use super::runtime_types;
 				pub type FrameId = ::core::primitive::u64;
-				pub type VaultId = ::core::primitive::u32;
+				pub type ProgramId = runtime_types::pallet_treasury::pallet::BondProgramId;
 				pub type BondLotId = ::core::primitive::u64;
 				pub type AccountId = crate::types::AccountId32;
 				pub type Bonds = ::core::primitive::u32;
@@ -22559,6 +22575,11 @@ pub mod api {
 					pub type CurrentFrameVaultCapital =
 						runtime_types::pallet_treasury::pallet::FrameVaultCapital;
 				}
+				pub mod current_frame_argonot_bond_participants {
+					use super::runtime_types;
+					pub type CurrentFrameArgonotBondParticipants =
+						runtime_types::pallet_treasury::pallet::FrameArgonotBondParticipants;
+				}
 				pub mod next_bond_lot_id {
 					use super::runtime_types;
 					pub type NextBondLotId = ::core::primitive::u64;
@@ -22599,6 +22620,17 @@ pub mod api {
 						>;
 					pub type Param0 = ::core::primitive::u32;
 				}
+				pub mod argonot_bond_lots {
+					use super::runtime_types;
+					pub type ArgonotBondLots =
+						runtime_types::bounded_collections::bounded_vec::BoundedVec<
+							runtime_types::pallet_treasury::pallet::BondLotSummary,
+						>;
+				}
+				pub mod total_active_argonot_bonds {
+					use super::runtime_types;
+					pub type TotalActiveArgonotBonds = ::core::primitive::u32;
+				}
 			}
 			pub struct StorageApi;
 			impl StorageApi {
@@ -22623,6 +22655,20 @@ pub mod api {
 							40u8, 244u8, 40u8, 160u8, 91u8, 81u8, 21u8, 11u8, 152u8, 35u8, 96u8,
 							246u8, 65u8, 196u8, 232u8, 151u8, 219u8, 175u8, 190u8, 159u8, 172u8,
 							24u8,
+						],
+					)
+				}
+				#[doc = " The Argonot bond participants locked for the current frame."]
+				#[doc = ""]
+				#[doc = " Payout uses this to see which Argonot bond lots are participating in the frame."]				pub fn current_frame_argonot_bond_participants (& self ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < () , types :: current_frame_argonot_bond_participants :: CurrentFrameArgonotBondParticipants , :: subxt :: ext :: subxt_core :: utils :: Yes , () , () >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Treasury",
+						"CurrentFrameArgonotBondParticipants",
+						(),
+						[
+							186u8, 7u8, 171u8, 179u8, 5u8, 94u8, 194u8, 34u8, 64u8, 66u8, 218u8,
+							138u8, 187u8, 13u8, 102u8, 38u8, 144u8, 71u8, 84u8, 81u8, 139u8, 226u8,
+							119u8, 166u8, 250u8, 208u8, 197u8, 47u8, 226u8, 243u8, 254u8, 141u8,
 						],
 					)
 				}
@@ -22662,10 +22708,9 @@ pub mod api {
 						"BondLotById",
 						(),
 						[
-							253u8, 66u8, 152u8, 67u8, 160u8, 28u8, 94u8, 169u8, 153u8, 150u8, 31u8,
-							98u8, 52u8, 251u8, 149u8, 209u8, 126u8, 203u8, 80u8, 145u8, 15u8,
-							209u8, 214u8, 138u8, 194u8, 19u8, 228u8, 35u8, 117u8, 177u8, 206u8,
-							157u8,
+							160u8, 151u8, 147u8, 59u8, 194u8, 98u8, 21u8, 224u8, 167u8, 190u8,
+							36u8, 12u8, 153u8, 45u8, 236u8, 218u8, 54u8, 14u8, 108u8, 175u8, 186u8,
+							7u8, 162u8, 253u8, 124u8, 239u8, 192u8, 1u8, 18u8, 251u8, 72u8, 96u8,
 						],
 					)
 				}
@@ -22687,10 +22732,9 @@ pub mod api {
 						"BondLotById",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							253u8, 66u8, 152u8, 67u8, 160u8, 28u8, 94u8, 169u8, 153u8, 150u8, 31u8,
-							98u8, 52u8, 251u8, 149u8, 209u8, 126u8, 203u8, 80u8, 145u8, 15u8,
-							209u8, 214u8, 138u8, 194u8, 19u8, 228u8, 35u8, 117u8, 177u8, 206u8,
-							157u8,
+							160u8, 151u8, 147u8, 59u8, 194u8, 98u8, 21u8, 224u8, 167u8, 190u8,
+							36u8, 12u8, 153u8, 45u8, 236u8, 218u8, 54u8, 14u8, 108u8, 175u8, 186u8,
+							7u8, 162u8, 253u8, 124u8, 239u8, 192u8, 1u8, 18u8, 251u8, 72u8, 96u8,
 						],
 					)
 				}
@@ -22949,6 +22993,49 @@ pub mod api {
 						],
 					)
 				}
+				#[doc = " The active top Argonot bond lots kept in ascending bond order, then lower ids first."]
+				pub fn argonot_bond_lots(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::argonot_bond_lots::ArgonotBondLots,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Treasury",
+						"ArgonotBondLots",
+						(),
+						[
+							137u8, 244u8, 97u8, 67u8, 240u8, 227u8, 54u8, 236u8, 44u8, 48u8, 124u8,
+							36u8, 228u8, 106u8, 199u8, 84u8, 83u8, 64u8, 23u8, 171u8, 191u8, 224u8,
+							219u8, 106u8, 183u8, 52u8, 218u8, 26u8, 58u8, 149u8, 205u8, 82u8,
+						],
+					)
+				}
+				#[doc = " The total number of active Argonot bonds in the active set."]
+				pub fn total_active_argonot_bonds(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::total_active_argonot_bonds::TotalActiveArgonotBonds,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Treasury",
+						"TotalActiveArgonotBonds",
+						(),
+						[
+							225u8, 48u8, 250u8, 219u8, 126u8, 30u8, 210u8, 39u8, 169u8, 154u8,
+							121u8, 178u8, 44u8, 248u8, 205u8, 232u8, 196u8, 230u8, 165u8, 116u8,
+							115u8, 169u8, 105u8, 245u8, 140u8, 61u8, 132u8, 208u8, 116u8, 191u8,
+							198u8, 226u8,
+						],
+					)
+				}
 			}
 		}
 		pub mod constants {
@@ -22985,6 +23072,40 @@ pub mod api {
 							84u8, 157u8, 140u8, 4u8, 93u8, 57u8, 29u8, 133u8, 105u8, 200u8, 214u8,
 							27u8, 144u8, 208u8, 218u8, 160u8, 130u8, 109u8, 101u8, 54u8, 210u8,
 							136u8, 71u8, 63u8, 49u8, 237u8, 234u8, 15u8, 178u8, 98u8, 148u8, 156u8,
+						],
+					)
+				}
+				#[doc = " The maximum number of active Argonot bond lots."]
+				pub fn max_argonot_bond_holders(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u32,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"Treasury",
+						"MaxArgonotBondHolders",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
+						],
+					)
+				}
+				#[doc = " The maximum percent of ownership-token circulation that can be bonded."]
+				pub fn max_argonot_bonded_percent_of_circulation(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					runtime_types::sp_arithmetic::per_things::Percent,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"Treasury",
+						"MaxArgonotBondedPercentOfCirculation",
+						[
+							40u8, 171u8, 69u8, 196u8, 34u8, 184u8, 50u8, 128u8, 139u8, 192u8, 63u8,
+							231u8, 249u8, 200u8, 252u8, 73u8, 244u8, 170u8, 51u8, 177u8, 106u8,
+							47u8, 114u8, 234u8, 84u8, 104u8, 62u8, 118u8, 227u8, 50u8, 225u8,
+							122u8,
 						],
 					)
 				}
@@ -23030,6 +23151,23 @@ pub mod api {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"Treasury",
 						"PercentForTreasuryReserves",
+						[
+							40u8, 171u8, 69u8, 196u8, 34u8, 184u8, 50u8, 128u8, 139u8, 192u8, 63u8,
+							231u8, 249u8, 200u8, 252u8, 73u8, 244u8, 170u8, 51u8, 177u8, 106u8,
+							47u8, 114u8, 234u8, 84u8, 104u8, 62u8, 118u8, 227u8, 50u8, 225u8,
+							122u8,
+						],
+					)
+				}
+				#[doc = " Percent of the full bid pool paid to Argonot bonds before vault distribution."]
+				pub fn percent_for_argonot_bond_pool(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					runtime_types::sp_arithmetic::per_things::Percent,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"Treasury",
+						"PercentForArgonotBondPool",
 						[
 							40u8, 171u8, 69u8, 196u8, 34u8, 184u8, 50u8, 128u8, 139u8, 192u8, 63u8,
 							231u8, 249u8, 200u8, 252u8, 73u8, 244u8, 170u8, 51u8, 177u8, 106u8,
@@ -23172,7 +23310,6 @@ pub mod api {
 				#[doc = "Register vault, mining funding, and bot accounts for an operational account."]
 				#[doc = "Any account in the registration may submit the transaction."]
 				#[doc = "If a referral proof is provided, the registration records the sponsor relationship."]
-				#[doc = "When invite-only is enabled, a valid referral proof is required."]
 				pub struct Register {
 					pub registration: register::Registration,
 				}
@@ -23314,7 +23451,6 @@ pub mod api {
 				#[doc = "Register vault, mining funding, and bot accounts for an operational account."]
 				#[doc = "Any account in the registration may submit the transaction."]
 				#[doc = "If a referral proof is provided, the registration records the sponsor relationship."]
-				#[doc = "When invite-only is enabled, a valid referral proof is required."]
 				pub fn register(
 					&self,
 					registration: types::register::Registration,
@@ -23637,10 +23773,6 @@ pub mod api {
 					use super::runtime_types;
 					pub type ExpiredReferralCodeCleanupFrame = ::core::primitive::u64;
 				}
-				pub mod is_operational_account_invite_only {
-					use super::runtime_types;
-					pub type IsOperationalAccountInviteOnly = ::core::primitive::bool;
-				}
 				pub mod rewards {
 					use super::runtime_types;
 					pub type Rewards =
@@ -23898,34 +24030,6 @@ pub mod api {
 							29u8, 48u8, 189u8, 150u8, 52u8, 134u8, 170u8, 212u8, 175u8, 170u8,
 							207u8, 204u8, 227u8, 65u8, 174u8, 213u8, 68u8, 242u8, 192u8, 7u8,
 							202u8,
-						],
-					)
-				}
-				#[doc = " Whether operational-account access is invite-only."]
-				#[doc = ""]
-				#[doc = " When enabled, registration requires a valid referral invite and vault creation plus"]
-				#[doc = " mining-slot bidding remain restricted to registered operational accounts."]
-				#[doc = ""]
-				#[doc = " Existing live raw chain specs do not contain this key, so the default remains invite-only"]
-				#[doc = " unless a development chain overrides it in genesis."]
-				pub fn is_operational_account_invite_only(
-					&self,
-				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
-					(),
-					types::is_operational_account_invite_only::IsOperationalAccountInviteOnly,
-					::subxt::ext::subxt_core::utils::Yes,
-					::subxt::ext::subxt_core::utils::Yes,
-					(),
-				> {
-					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"OperationalAccounts",
-						"IsOperationalAccountInviteOnly",
-						(),
-						[
-							153u8, 178u8, 221u8, 225u8, 183u8, 177u8, 153u8, 151u8, 115u8, 201u8,
-							245u8, 116u8, 86u8, 159u8, 23u8, 192u8, 101u8, 128u8, 152u8, 15u8,
-							253u8, 73u8, 73u8, 173u8, 74u8, 60u8, 216u8, 22u8, 243u8, 130u8, 76u8,
-							8u8,
 						],
 					)
 				}
@@ -31685,8 +31789,6 @@ pub mod api {
 				pub enum Call {
 					#[codec(index = 0)]
 					set_block_rewards_paused { paused: ::core::primitive::bool },
-					#[codec(index = 1)]
-					set_block_voter_rewards_enabled { enabled: ::core::primitive::bool },
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -33639,9 +33741,6 @@ pub mod api {
 					#[doc = "Bids must be in allowed increments"]
 					InvalidBidAmount,
 					#[codec(index = 9)]
-					#[doc = "Mining slot bidding currently requires prior operational-account registration."]
-					OperationalAccountRegistrationRequired,
-					#[codec(index = 10)]
 					#[doc = "The argonots on hold cannot be released"]
 					UnrecoverableHold,
 				}
@@ -34466,7 +34565,7 @@ pub mod api {
 				)]
 				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 				pub enum Call {
-					# [codec (index = 0)] # [doc = "Register vault, mining funding, and bot accounts for an operational account."] # [doc = "Any account in the registration may submit the transaction."] # [doc = "If a referral proof is provided, the registration records the sponsor relationship."] # [doc = "When invite-only is enabled, a valid referral proof is required."] register { registration : runtime_types :: pallet_operational_accounts :: pallet :: Registration , } , # [codec (index = 2)] # [doc = "Update reward amounts for operational accounts."] set_reward_config { operational_referral_reward : :: core :: primitive :: u128 , referral_bonus_reward : :: core :: primitive :: u128 , } , # [codec (index = 3)] # [doc = "Force-update operational progress markers for an account."] force_set_progress { owner : crate :: types :: AccountId32 , patch : runtime_types :: pallet_operational_accounts :: pallet :: OperationalProgressPatch < :: core :: primitive :: u128 > , update_operational_progress : :: core :: primitive :: bool , } , # [codec (index = 4)] # [doc = "Store an opaque encrypted sponsor server payload for a sponsored operational account."] set_encrypted_server_for_sponsee { sponsee : crate :: types :: AccountId32 , encrypted_server : :: subxt :: ext :: subxt_core :: alloc :: vec :: Vec < :: core :: primitive :: u8 > , } , # [codec (index = 5)] # [doc = "Activate an eligible operational account from any managed account."] activate , # [codec (index = 6)] # [doc = "Claim pending operational rewards to any managed account."] claim_rewards { amount : :: core :: primitive :: u128 , } , }
+					# [codec (index = 0)] # [doc = "Register vault, mining funding, and bot accounts for an operational account."] # [doc = "Any account in the registration may submit the transaction."] # [doc = "If a referral proof is provided, the registration records the sponsor relationship."] register { registration : runtime_types :: pallet_operational_accounts :: pallet :: Registration , } , # [codec (index = 2)] # [doc = "Update reward amounts for operational accounts."] set_reward_config { operational_referral_reward : :: core :: primitive :: u128 , referral_bonus_reward : :: core :: primitive :: u128 , } , # [codec (index = 3)] # [doc = "Force-update operational progress markers for an account."] force_set_progress { owner : crate :: types :: AccountId32 , patch : runtime_types :: pallet_operational_accounts :: pallet :: OperationalProgressPatch < :: core :: primitive :: u128 > , update_operational_progress : :: core :: primitive :: bool , } , # [codec (index = 4)] # [doc = "Store an opaque encrypted sponsor server payload for a sponsored operational account."] set_encrypted_server_for_sponsee { sponsee : crate :: types :: AccountId32 , encrypted_server : :: subxt :: ext :: subxt_core :: alloc :: vec :: Vec < :: core :: primitive :: u8 > , } , # [codec (index = 5)] # [doc = "Activate an eligible operational account from any managed account."] activate , # [codec (index = 6)] # [doc = "Claim pending operational rewards to any managed account."] claim_rewards { amount : :: core :: primitive :: u128 , } , }
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
 					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
@@ -34503,36 +34602,33 @@ pub mod api {
 					#[doc = "The referral proof has expired."]
 					ReferralProofExpired,
 					#[codec(index = 7)]
-					#[doc = "A valid invite is required to register an operational account."]
-					RegistrationInviteRequired,
-					#[codec(index = 8)]
 					#[doc = "The requested progress patch does not contain any updates."]
 					NoProgressUpdateProvided,
-					#[codec(index = 9)]
+					#[codec(index = 8)]
 					#[doc = "The encrypted server payload exceeds the configured max length."]
 					EncryptedServerTooLong,
-					#[codec(index = 10)]
+					#[codec(index = 9)]
 					#[doc = "The caller is not the sponsor of the requested sponsee."]
 					NotSponsorOfSponsee,
-					#[codec(index = 11)]
+					#[codec(index = 10)]
 					#[doc = "The operational account has no pending rewards to claim."]
 					NoPendingRewards,
-					#[codec(index = 12)]
+					#[codec(index = 11)]
 					#[doc = "Reward claims must be at least one Argon."]
 					RewardClaimBelowMinimum,
-					#[codec(index = 13)]
+					#[codec(index = 12)]
 					#[doc = "Reward claims must be whole Argon increments."]
 					RewardClaimNotWholeArgon,
-					#[codec(index = 14)]
+					#[codec(index = 13)]
 					#[doc = "The requested reward claim exceeds pending rewards."]
 					RewardClaimExceedsPending,
-					#[codec(index = 15)]
+					#[codec(index = 14)]
 					#[doc = "The treasury does not currently have enough available reserves for the claim."]
 					TreasuryInsufficientFunds,
-					#[codec(index = 16)]
+					#[codec(index = 15)]
 					#[doc = "The account is already operational."]
 					AlreadyOperational,
-					#[codec(index = 17)]
+					#[codec(index = 16)]
 					#[doc = "The account has not satisfied operational requirements yet."]
 					NotEligibleForActivation,
 				}
@@ -35597,14 +35693,9 @@ pub mod api {
 				)]
 				pub struct BondLot {
 					pub owner: crate::types::AccountId32,
-					#[codec(compact)]
-					pub vault_id: ::core::primitive::u32,
+					pub program: runtime_types::pallet_treasury::pallet::BondProgram,
 					#[codec(compact)]
 					pub bonds: ::core::primitive::u32,
-					#[codec(compact)]
-					pub sharing_percent: runtime_types::sp_arithmetic::per_things::Permill,
-					#[codec(compact)]
-					pub bonus_percent: runtime_types::sp_arithmetic::per_things::Permill,
 					#[codec(compact)]
 					pub created_frame_id: ::core::primitive::u64,
 					#[codec(compact)]
@@ -35666,6 +35757,52 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
+				pub enum BondProgram {
+					#[codec(index = 0)]
+					Vault {
+						#[codec(compact)]
+						vault_id: ::core::primitive::u32,
+						#[codec(compact)]
+						sharing_percent: runtime_types::sp_arithmetic::per_things::Permill,
+						#[codec(compact)]
+						bonus_percent: runtime_types::sp_arithmetic::per_things::Permill,
+					},
+					#[codec(index = 1)]
+					Argonot,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub enum BondProgramId {
+					#[codec(index = 0)]
+					Vault {
+						#[codec(compact)]
+						vault_id: ::core::primitive::u32,
+					},
+					#[codec(index = 1)]
+					Argonot,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
 				pub enum BondReleaseReason {
 					#[codec(index = 0)]
 					UserLiquidation,
@@ -35704,6 +35841,9 @@ pub mod api {
 					#[doc = ""]
 					#[doc = "The lot stops participating right away and is released after the delay."]
 					liquidate_bond_lot { bond_lot_id: ::core::primitive::u64 },
+					#[codec(index = 6)]
+					#[doc = "Buy whole bond units for the Argonot active set."]
+					buy_argonot_bonds { bonds: ::core::primitive::u32 },
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -35768,6 +35908,12 @@ pub mod api {
 					#[codec(index = 15)]
 					#[doc = "The bonus approval signature is invalid or unauthorized."]
 					InvalidBonusApprovalSignature,
+					#[codec(index = 16)]
+					#[doc = "The Argonot bond purchase did not beat the current active-set cutoff."]
+					ArgonotBondPurchaseBelowCutoff,
+					#[codec(index = 17)]
+					#[doc = "The Argonot bond purchase would exceed the active circulation cap."]
+					ArgonotBondPurchaseAboveCap,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -35794,65 +35940,77 @@ pub mod api {
 						dispatch_error: runtime_types::sp_runtime::DispatchError,
 					},
 					#[codec(index = 1)]
+					#[doc = "An error occurred while paying frame earnings for an Argonot bond lot."]
+					CouldNotDistributeEarningsToArgonotBondLot {
+						frame_id: ::core::primitive::u64,
+						bond_lot_id: ::core::primitive::u64,
+						account_id: crate::types::AccountId32,
+						amount: ::core::primitive::u128,
+						dispatch_error: runtime_types::sp_runtime::DispatchError,
+					},
+					#[codec(index = 2)]
 					#[doc = "An error occurred while moving bid-pool funds into treasury reserves."]
 					CouldNotTransferToTreasuryReserves {
 						frame_id: ::core::primitive::u64,
 						amount: ::core::primitive::u128,
 						dispatch_error: runtime_types::sp_runtime::DispatchError,
 					},
-					#[codec(index = 2)]
+					#[codec(index = 3)]
 					#[doc = "Frame earnings were distributed."]
 					FrameEarningsDistributed {
 						frame_id: ::core::primitive::u64,
 						bid_pool_distributed: ::core::primitive::u128,
+						argonot_bond_pool_distributed: ::core::primitive::u128,
+						vault_bid_pool_distributed: ::core::primitive::u128,
+						treasury_refunds: ::core::primitive::u128,
 						treasury_reserves: ::core::primitive::u128,
 						participating_vaults: ::core::primitive::u32,
 					},
-					#[codec(index = 3)]
+					#[codec(index = 4)]
 					#[doc = "The current frame's vault capital was locked in."]
 					FrameVaultCapitalLocked {
 						frame_id: ::core::primitive::u64,
 						total_eligible_bonds: ::core::primitive::u128,
 						participating_vaults: ::core::primitive::u32,
 					},
-					#[codec(index = 4)]
+					#[codec(index = 5)]
 					#[doc = "An error occurred while releasing a bond lot."]
 					CouldNotReleaseBondLot {
 						frame_id: ::core::primitive::u64,
-						vault_id: ::core::primitive::u32,
+						program_id: runtime_types::pallet_treasury::pallet::BondProgramId,
 						bond_lot_id: ::core::primitive::u64,
 						amount: ::core::primitive::u128,
 						account_id: crate::types::AccountId32,
 						dispatch_error: runtime_types::sp_runtime::DispatchError,
 					},
-					#[codec(index = 5)]
-					#[doc = "A bond purchase entered a vault's accepted list."]
+					#[codec(index = 6)]
+					#[doc = "A bond purchase entered its active program set."]
 					BondLotPurchased {
-						vault_id: ::core::primitive::u32,
+						program_id: runtime_types::pallet_treasury::pallet::BondProgramId,
 						bond_lot_id: ::core::primitive::u64,
 						account_id: crate::types::AccountId32,
 						bonds: ::core::primitive::u32,
 					},
-					#[codec(index = 6)]
+					#[codec(index = 7)]
 					#[doc = "A bond lot was removed from future frames and scheduled for release."]
 					BondLotReleaseScheduled {
-						vault_id: ::core::primitive::u32,
+						program_id: runtime_types::pallet_treasury::pallet::BondProgramId,
 						bond_lot_id: ::core::primitive::u64,
 						account_id: crate::types::AccountId32,
 						bonds: ::core::primitive::u32,
 						release_frame_id: ::core::primitive::u64,
 						reason: runtime_types::pallet_treasury::pallet::BondReleaseReason,
 					},
-					#[codec(index = 7)]
+					#[codec(index = 8)]
 					#[doc = "A bond lot was released."]
 					BondLotReleased {
 						frame_id: ::core::primitive::u64,
-						vault_id: ::core::primitive::u32,
+						program_id: runtime_types::pallet_treasury::pallet::BondProgramId,
 						bond_lot_id: ::core::primitive::u64,
 						account_id: crate::types::AccountId32,
 						bonds: ::core::primitive::u32,
 					},
-					#[codec(index = 8)]
+					#[codec(index = 9)]
 					#[doc = "Encumbered treasury backing was burned and any no-longer-needed fractional hold was"]
 					#[doc = "returned."]
 					EncumberedBondMicrogonsBurned {
@@ -35860,6 +36018,27 @@ pub mod api {
 						burned_amount: ::core::primitive::u128,
 						released_amount: ::core::primitive::u128,
 					},
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct FrameArgonotBondParticipants {
+					#[codec(compact)]
+					pub frame_id: ::core::primitive::u64,
+					#[codec(compact)]
+					pub total_bonds: ::core::primitive::u32,
+					pub bond_lots: runtime_types::bounded_collections::bounded_vec::BoundedVec<
+						runtime_types::pallet_treasury::pallet::BondLotSummary,
+					>,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -36466,9 +36645,6 @@ pub mod api {
 					#[doc = "An account may only be associated with a single vault"]
 					AccountAlreadyHasVault,
 					#[codec(index = 32)]
-					#[doc = "Vault creation currently requires prior operational-account registration."]
-					OperationalAccountRegistrationRequired,
-					#[codec(index = 33)]
 					#[doc = "Committed Argonots cannot be reduced below the amount already crosschain-encumbered."]
 					CommittedArgonotsBelowEncumberedBacking,
 				}

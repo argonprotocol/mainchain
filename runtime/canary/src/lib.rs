@@ -419,6 +419,7 @@ impl pallet_treasury::Config for Runtime {
 	>;
 	type Balance = Balance;
 	type Currency = Balances;
+	type OwnershipCurrency = Ownership;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type TreasuryVaultProvider = use_unless_benchmark!(
 		Vaults,
@@ -428,10 +429,13 @@ impl pallet_treasury::Config for Runtime {
 		use_unless_benchmark!(PriceIndex, benchmarking::BenchmarkPriceProvider<Balance>);
 	type MaxTreasuryContributors = MaxTreasuryContributors;
 	type MinimumArgonsPerContributor = MinimumArgonsPerContributor;
+	type MaxArgonotBondHolders = MaxArgonotBondHolders;
+	type MaxArgonotBondedPercentOfCirculation = MaxArgonotBondedPercentOfCirculation;
 	type PalletId = TreasuryInternalPalletId;
 	type MiningBidPoolAccount = TreasuryMiningBidPoolAccount;
 	type TreasuryReservesAccount = TreasuryReservesAccount;
 	type PercentForTreasuryReserves = PercentForTreasuryReserves;
+	type PercentForArgonotBondPool = PercentForArgonotBondPool;
 	type MaxVaultsPerPool = MaxVaultsPerPool;
 	type MaxPendingUnlocksPerFrame = MaxPendingUnlocksPerFrame;
 	type TreasuryExitDelayFrames = TreasuryExitDelayFrames;

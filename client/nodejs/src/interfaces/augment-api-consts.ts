@@ -561,6 +561,14 @@ declare module '@polkadot/api-base/types/consts' {
     };
     treasury: {
       /**
+       * The maximum percent of ownership-token circulation that can be bonded.
+       **/
+      maxArgonotBondedPercentOfCirculation: Percent & AugmentedConst<ApiType>;
+      /**
+       * The maximum number of active Argonot bond lots.
+       **/
+      maxArgonotBondHolders: u32 & AugmentedConst<ApiType>;
+      /**
        * The maximum number of bond lots whose release delay may mature in a single frame.
        **/
       maxPendingUnlocksPerFrame: u32 & AugmentedConst<ApiType>;
@@ -580,6 +588,10 @@ declare module '@polkadot/api-base/types/consts' {
        * Treasury pallet id retained in metadata for account derivation.
        **/
       palletId: FrameSupportPalletId & AugmentedConst<ApiType>;
+      /**
+       * Percent of the full bid pool paid to Argonot bonds before vault distribution.
+       **/
+      percentForArgonotBondPool: Percent & AugmentedConst<ApiType>;
       /**
        * Percent of the bid pool reserved for treasury reserves.
        **/

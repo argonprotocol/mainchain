@@ -3,7 +3,7 @@ use argon_primitives::{
 	bitcoin::Satoshis, providers::PriceProvider, vault::TreasuryVaultProvider,
 	OperationalAccountsHook,
 };
-use frame_support::traits::Currency;
+use frame_support::traits::{Currency, StorageMapShim};
 use pallet_prelude::{
 	argon_primitives::{vault::VaultTreasuryFrameEarnings, MiningFrameTransitionProvider},
 	*,
@@ -51,7 +51,8 @@ frame_support::construct_runtime!(
 	{
 		System: frame_system,
 		Treasury: pallet_treasury,
-		Balances: pallet_balances,
+		Balances: pallet_balances::<Instance1>,
+		Ownership: pallet_balances::<Instance2>,
 	}
 );
 
@@ -72,7 +73,8 @@ parameter_types! {
 	pub static TreasuryReservesAccountId: TestAccountId = AccountId32::new([251; 32]);
 }
 
-impl pallet_balances::Config for Test {
+pub(crate) type ArgonToken = pallet_balances::Instance1;
+impl pallet_balances::Config<ArgonToken> for Test {
 	type RuntimeEvent = RuntimeEvent;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type RuntimeFreezeReason = RuntimeFreezeReason;
@@ -81,6 +83,28 @@ impl pallet_balances::Config for Test {
 	type DustRemoval = ();
 	type ExistentialDeposit = ExistentialDeposit;
 	type AccountStore = System;
+	type ReserveIdentifier = [u8; 8];
+	type FreezeIdentifier = ();
+	type MaxLocks = ();
+	type MaxReserves = ();
+	type MaxFreezes = ();
+	type DoneSlashHandler = ();
+}
+
+pub(crate) type OwnershipToken = pallet_balances::Instance2;
+impl pallet_balances::Config<OwnershipToken> for Test {
+	type RuntimeEvent = RuntimeEvent;
+	type RuntimeHoldReason = RuntimeHoldReason;
+	type RuntimeFreezeReason = RuntimeFreezeReason;
+	type WeightInfo = ();
+	type Balance = Balance;
+	type DustRemoval = ();
+	type ExistentialDeposit = ExistentialDeposit;
+	type AccountStore = StorageMapShim<
+		pallet_balances::Account<Test, OwnershipToken>,
+		Self::AccountId,
+		pallet_balances::AccountData<Balance>,
+	>;
 	type ReserveIdentifier = [u8; 8];
 	type FreezeIdentifier = ();
 	type MaxLocks = ();
@@ -125,6 +149,12 @@ pub(crate) fn set_argons(account_id: impl IntoTestAccountId, amount: Balance) {
 	drop(Balances::issue(amount));
 }
 
+pub(crate) fn set_ownership(account_id: impl IntoTestAccountId, amount: Balance) {
+	let account_id = account_id.into_test_account_id();
+	let _ = Ownership::make_free_balance_be(&account_id, amount);
+	drop(Ownership::issue(amount));
+}
+
 parameter_types! {
 	pub const NextSlot: BlockNumberFor<Test> = 100;
 	pub const MiningWindowBlocks: BlockNumberFor<Test> = 100;
@@ -133,12 +163,15 @@ parameter_types! {
 
 	pub static MaxTreasuryContributors: u32 = 10;
 	pub static MinimumArgonsPerContributor: u128 = 100_000_000;
+	pub static MaxArgonotBondHolders: u32 = 1_000;
 	pub static MaxVaultsPerPool: u32 = 100;
 	pub static MaxPendingUnlocksPerFrame: u32 = 100;
 	pub static TreasuryExitDelayFrames: FrameId = 10;
 	pub const VaultPalletId: PalletId = PalletId(*b"bidPools");
 
 	pub const PercentForTreasuryReserves: Percent = Percent::from_percent(20);
+	pub const PercentForArgonotBondPool: Percent = Percent::from_percent(10);
+	pub static MaxArgonotBondedPercentOfCirculation: Percent = Percent::from_percent(40);
 	pub static CurrentFrameId: FrameId = 1;
 
 	pub static VaultsById: HashMap<VaultId, TestVault> = HashMap::new();
@@ -259,15 +292,19 @@ impl pallet_treasury::Config for Test {
 	type WeightInfo = ();
 	type Balance = Balance;
 	type Currency = Balances;
+	type OwnershipCurrency = Ownership;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type TreasuryVaultProvider = StaticTreasuryVaultProvider;
 	type PriceProvider = StaticPriceProvider;
 	type MaxTreasuryContributors = MaxTreasuryContributors;
 	type MinimumArgonsPerContributor = MinimumArgonsPerContributor;
+	type MaxArgonotBondHolders = MaxArgonotBondHolders;
+	type MaxArgonotBondedPercentOfCirculation = MaxArgonotBondedPercentOfCirculation;
 	type PalletId = VaultPalletId;
 	type MiningBidPoolAccount = BidPoolAccountId;
 	type TreasuryReservesAccount = TreasuryReservesAccountId;
 	type PercentForTreasuryReserves = PercentForTreasuryReserves;
+	type PercentForArgonotBondPool = PercentForArgonotBondPool;
 	type MaxVaultsPerPool = MaxVaultsPerPool;
 	type MaxPendingUnlocksPerFrame = MaxPendingUnlocksPerFrame;
 	type TreasuryExitDelayFrames = TreasuryExitDelayFrames;

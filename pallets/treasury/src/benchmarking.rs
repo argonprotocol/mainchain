@@ -4,7 +4,7 @@ use super::*;
 use argon_primitives::{
 	bitcoin::Satoshis,
 	vault::{TreasuryBonusApprovalProof, Vault, VaultTerms},
-	Signature, TreasuryPoolProvider, VaultId, MICROGONS_PER_ARGON,
+	Signature, TreasuryPoolProvider, MICROGONS_PER_ARGON,
 };
 use frame_benchmarking::v2::*;
 use frame_system::RawOrigin;
@@ -33,7 +33,8 @@ type TreasuryBalanceOf<T> = <T as Config>::Balance;
 #[benchmarks(
 	where
 		T::AccountId: Ord,
-		T::Currency: Mutate<T::AccountId, Balance = T::Balance>
+		T::Currency: Mutate<T::AccountId, Balance = T::Balance>,
+		T::OwnershipCurrency: Mutate<T::AccountId, Balance = T::Balance>
 )]
 mod benchmarks {
 	use super::*;
@@ -74,8 +75,14 @@ mod benchmarks {
 
 		let purchased_bond_lot = BondLotById::<T>::get(next_bond_lot_id)
 			.ok_or(BenchmarkError::Stop("missing new bond lot"))?;
-		assert_eq!(purchased_bond_lot.sharing_percent, Permill::from_percent(20));
-		assert_eq!(purchased_bond_lot.bonus_percent, Permill::zero());
+		assert_eq!(
+			purchased_bond_lot.program,
+			BondProgram::Vault {
+				vault_id,
+				sharing_percent: Permill::from_percent(20),
+				bonus_percent: Permill::zero(),
+			},
+		);
 		assert_eq!(
 			BondLotsByVault::<T>::get(vault_id).len(),
 			T::MaxTreasuryContributors::get() as usize,
@@ -89,26 +96,76 @@ mod benchmarks {
 	}
 
 	#[benchmark]
+	fn buy_argonot_bonds() -> Result<(), BenchmarkError> {
+		reset_benchmark_state::<T>();
+
+		let active_holder_count = T::MaxArgonotBondHolders::get();
+		let floor_bonds = minimum_purchase_bonds::<T>();
+		let purchase_bonds = floor_bonds.saturating_add(1);
+		let retained_bonds = purchase_bonds.saturating_add(1);
+		let first_bond_lot_id = seed_active_argonot_state::<T>(
+			active_holder_count,
+			floor_bonds,
+			retained_bonds,
+			BENCHMARK_FRAME_ID.saturating_sub(1),
+		)?;
+		let purchased_bond_lot_id = NextBondLotId::<T>::get();
+		let caller = account("buy-argonot-bonds-caller", 0, 0);
+		let purchase_amount = bonds_to_balance::<T>(purchase_bonds);
+
+		T::OwnershipCurrency::mint_into(&caller, purchase_amount)
+			.map_err(|_| BenchmarkError::Stop("failed to fund benchmark Argonot buyer"))?;
+		whitelist_account!(caller);
+
+		#[extrinsic_call]
+		_(RawOrigin::Signed(caller.clone()), purchase_bonds);
+
+		let purchased_bond_lot = BondLotById::<T>::get(purchased_bond_lot_id)
+			.ok_or(BenchmarkError::Stop("missing new Argonot bond lot"))?;
+		assert_eq!(purchased_bond_lot.program, BondProgram::Argonot);
+		assert_eq!(ArgonotBondLots::<T>::get().len(), active_holder_count as usize);
+		assert_eq!(
+			BondLotById::<T>::get(first_bond_lot_id).and_then(|bond_lot| bond_lot.release_reason),
+			Some(BondReleaseReason::Bumped),
+		);
+		assert_eq!(
+			TotalActiveArgonotBonds::<T>::get(),
+			floor_bonds
+				.saturating_add(
+					retained_bonds.saturating_mul(active_holder_count.saturating_sub(1))
+				)
+				.saturating_sub(floor_bonds)
+				.saturating_add(purchase_bonds),
+		);
+		Ok(())
+	}
+
+	#[benchmark]
 	fn liquidate_bond_lot() -> Result<(), BenchmarkError> {
 		reset_benchmark_state::<T>();
 
-		let lot_bonds = minimum_purchase_bonds::<T>();
-		let _ = seed_accepted_vault_state::<T>(
-			1,
-			1,
-			lot_bonds,
-			lot_bonds,
+		let active_holder_count = T::MaxArgonotBondHolders::get();
+		let floor_bonds = minimum_purchase_bonds::<T>();
+		let retained_bonds = floor_bonds.saturating_add(1);
+		let first_bond_lot_id = seed_active_argonot_state::<T>(
+			active_holder_count,
+			floor_bonds,
+			retained_bonds,
 			BENCHMARK_FRAME_ID.saturating_sub(1),
 		)?;
-		let caller = benchmark_operator::<T>(0);
-		let bond_lot_id = 0;
+		let caller = benchmark_argonot_holder::<T>(active_holder_count.saturating_sub(1));
+		let bond_lot_id =
+			first_bond_lot_id.saturating_add(active_holder_count.saturating_sub(1) as BondLotId);
 
 		whitelist_account!(caller);
 
 		#[extrinsic_call]
 		_(RawOrigin::Signed(caller.clone()), bond_lot_id);
 
-		assert!(BondLotsByVault::<T>::get(1).is_empty());
+		assert_eq!(
+			ArgonotBondLots::<T>::get().len(),
+			active_holder_count.saturating_sub(1) as usize
+		);
 		assert_eq!(
 			BondLotById::<T>::get(bond_lot_id).and_then(|bond_lot| bond_lot.release_reason),
 			Some(BondReleaseReason::UserLiquidation),
@@ -287,6 +344,10 @@ mod benchmarks {
 			CurrentFrameVaultCapital::<T>::get().is_none(),
 			"expected current frame capital to be consumed during distribution",
 		);
+		assert!(
+			CurrentFrameArgonotBondParticipants::<T>::get().is_none(),
+			"expected current Argonot participants to be consumed during distribution",
+		);
 		assert_eq!(
 			benchmark_bitcoin_vault_provider_state::<T::AccountId, TreasuryBalanceOf<T>>()
 				.treasury_frame_earnings
@@ -339,6 +400,13 @@ mod benchmarks {
 			BENCHMARK_FRAME_ID,
 			"expected next frame capital to be locked in",
 		);
+		assert_eq!(
+			CurrentFrameArgonotBondParticipants::<T>::get()
+				.ok_or(BenchmarkError::Stop("missing current Argonot participants"))?
+				.frame_id,
+			BENCHMARK_FRAME_ID,
+			"expected next Argonot participants to be locked in",
+		);
 		Ok(())
 	}
 }
@@ -379,9 +447,17 @@ fn seed_distribution_state<T: Config>(frame_id: FrameId) -> Result<(), Benchmark
 where
 	T::AccountId: Ord,
 	T::Currency: Mutate<T::AccountId, Balance = T::Balance>,
+	T::OwnershipCurrency: Mutate<T::AccountId, Balance = T::Balance>,
 {
 	seed_lock_in_vault_capital_state::<T>(frame_id)?;
 	Pallet::<T>::lock_in_vault_capital(frame_id);
+	seed_active_argonot_state::<T>(
+		T::MaxArgonotBondHolders::get(),
+		minimum_purchase_bonds::<T>(),
+		minimum_purchase_bonds::<T>().saturating_add(1),
+		frame_id.saturating_sub(1),
+	)?;
+	Pallet::<T>::lock_in_argonot_bond_participants(frame_id);
 
 	let bid_pool_account = T::MiningBidPoolAccount::get();
 	T::Currency::mint_into(&bid_pool_account, balance::<T>(10_000_000_000_000))
@@ -394,6 +470,7 @@ fn seed_on_frame_transition_state<T: Config>(frame_id: FrameId) -> Result<(), Be
 where
 	T::AccountId: Ord,
 	T::Currency: Mutate<T::AccountId, Balance = T::Balance>,
+	T::OwnershipCurrency: Mutate<T::AccountId, Balance = T::Balance>,
 {
 	seed_distribution_state::<T>(frame_id.saturating_sub(1))?;
 	seed_pending_bond_releases::<T>(frame_id)?;
@@ -412,10 +489,14 @@ where
 		let owner: T::AccountId = account("pending-liquidation", liquidation_index, 0);
 		let bond_lot_id = liquidation_index as BondLotId;
 		let vault_id = 10_000u32.saturating_add(liquidation_index);
-		insert_bond_lot::<T>(
+		insert_bond_lot::<T, T::Currency>(
 			bond_lot_id,
 			&owner,
-			vault_id,
+			BondProgram::Vault {
+				vault_id,
+				sharing_percent: Permill::from_percent(20),
+				bonus_percent: Permill::zero(),
+			},
 			lot_bonds,
 			frame_id.saturating_sub(1),
 			Some(frame_id),
@@ -463,10 +544,14 @@ where
 				benchmark_bond_holder::<T>(vault_index, contributor_index)
 			};
 
-			insert_bond_lot::<T>(
+			insert_bond_lot::<T, T::Currency>(
 				next_bond_lot_id,
 				&owner,
-				vault_id,
+				BondProgram::Vault {
+					vault_id,
+					sharing_percent: Permill::from_percent(20),
+					bonus_percent: Permill::zero(),
+				},
 				lot_bonds,
 				created_frame_id,
 				None,
@@ -500,10 +585,14 @@ where
 		.try_push(BondLotSummary { bond_lot_id: 0, bonds })
 		.map_err(|_| BenchmarkError::Stop("failed to seed benchmark bond-lot summary"))?;
 
-	insert_bond_lot::<T>(
+	insert_bond_lot::<T, T::Currency>(
 		0,
 		&account_id,
-		1,
+		BondProgram::Vault {
+			vault_id: 1,
+			sharing_percent: Permill::from_percent(20),
+			bonus_percent: Permill::zero(),
+		},
 		bonds,
 		BENCHMARK_FRAME_ID.saturating_sub(1),
 		None,
@@ -515,10 +604,59 @@ where
 	Ok(account_id)
 }
 
-fn insert_bond_lot<T: Config>(
+fn seed_active_argonot_state<T: Config>(
+	holder_count: u32,
+	floor_bonds: Bonds,
+	retained_bonds: Bonds,
+	created_frame_id: FrameId,
+) -> Result<BondLotId, BenchmarkError>
+where
+	T::OwnershipCurrency: Mutate<T::AccountId, Balance = T::Balance>,
+{
+	let first_bond_lot_id = NextBondLotId::<T>::get();
+	let mut next_bond_lot_id = first_bond_lot_id;
+	let mut active_lots = BoundedVec::default();
+	let mut total_bonds = 0u128;
+
+	for holder_index in 0..holder_count {
+		let owner = benchmark_argonot_holder::<T>(holder_index);
+		let bonds = if holder_index == 0 { floor_bonds } else { retained_bonds };
+		insert_bond_lot::<T, T::OwnershipCurrency>(
+			next_bond_lot_id,
+			&owner,
+			BondProgram::Argonot,
+			bonds,
+			created_frame_id,
+			None,
+			None,
+			true,
+		)?;
+		active_lots
+			.try_push(BondLotSummary { bond_lot_id: next_bond_lot_id, bonds })
+			.map_err(|_| BenchmarkError::Stop("failed to seed Argonot active set"))?;
+		total_bonds = total_bonds.saturating_add(bonds as u128);
+		next_bond_lot_id = next_bond_lot_id.saturating_add(1);
+	}
+
+	let issuance_buffer_bonds = total_bonds.saturating_mul(2).min(Bonds::MAX as u128) as Bonds;
+	let issuance_buffer_account: T::AccountId = account("argonot-issuance-buffer", 0, 0);
+	T::OwnershipCurrency::mint_into(
+		&issuance_buffer_account,
+		bonds_to_balance::<T>(issuance_buffer_bonds),
+	)
+	.map_err(|_| BenchmarkError::Stop("failed to seed Argonot issuance buffer"))?;
+
+	ArgonotBondLots::<T>::put(active_lots);
+	TotalActiveArgonotBonds::<T>::put(total_bonds.min(Bonds::MAX as u128) as Bonds);
+	NextBondLotId::<T>::put(next_bond_lot_id);
+
+	Ok(first_bond_lot_id)
+}
+
+fn insert_bond_lot<T: Config, C>(
 	bond_lot_id: BondLotId,
 	owner: &T::AccountId,
-	vault_id: VaultId,
+	program: BondProgram,
 	bonds: Bonds,
 	created_frame_id: FrameId,
 	release_frame_id: Option<FrameId>,
@@ -526,13 +664,14 @@ fn insert_bond_lot<T: Config>(
 	hold_funds: bool,
 ) -> Result<(), BenchmarkError>
 where
-	T::Currency: Mutate<T::AccountId, Balance = T::Balance>,
+	C: Mutate<T::AccountId, Balance = T::Balance>
+		+ MutateHold<T::AccountId, Reason = T::RuntimeHoldReason, Balance = T::Balance>,
 {
 	if hold_funds {
 		let held_amount = bonds_to_balance::<T>(bonds);
-		T::Currency::mint_into(owner, held_amount)
+		C::mint_into(owner, held_amount)
 			.map_err(|_| BenchmarkError::Stop("failed to fund held bond lot"))?;
-		Pallet::<T>::create_hold(owner, held_amount)
+		Pallet::<T>::create_hold::<C>(owner, held_amount)
 			.map_err(|_| BenchmarkError::Stop("failed to create bond lot hold"))?;
 	}
 
@@ -540,10 +679,8 @@ where
 		bond_lot_id,
 		BondLot {
 			owner: owner.clone(),
-			vault_id,
+			program,
 			bonds,
-			sharing_percent: Permill::from_percent(20),
-			bonus_percent: Permill::zero(),
 			created_frame_id,
 			participated_frames: 0,
 			last_frame_earnings_frame_id: None,
@@ -570,6 +707,10 @@ fn benchmark_bond_holder<T: Config>(vault_index: u32, contributor_index: u32) ->
 			.saturating_add(contributor_index),
 		0,
 	)
+}
+
+fn benchmark_argonot_holder<T: Config>(holder_index: u32) -> T::AccountId {
+	account("argonot-bond-holder", holder_index, 0)
 }
 
 fn benchmark_vault<T: Config>(

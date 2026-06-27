@@ -1201,6 +1201,14 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       ActiveBondAmountBelowEncumberedBacking: AugmentedError<ApiType>;
       /**
+       * The Argonot bond purchase would exceed the active circulation cap.
+       **/
+      ArgonotBondPurchaseAboveCap: AugmentedError<ApiType>;
+      /**
+       * The Argonot bond purchase did not beat the current active-set cutoff.
+       **/
+      ArgonotBondPurchaseBelowCutoff: AugmentedError<ApiType>;
+      /**
        * The bond lot is already scheduled for release.
        **/
       BondLotAlreadyReleasing: AugmentedError<ApiType>;

@@ -253,10 +253,13 @@ import type {
   PalletTreasuryBondLot,
   PalletTreasuryBondLotAllocation,
   PalletTreasuryBondLotSummary,
+  PalletTreasuryBondProgram,
+  PalletTreasuryBondProgramId,
   PalletTreasuryBondReleaseReason,
   PalletTreasuryCall,
   PalletTreasuryError,
   PalletTreasuryEvent,
+  PalletTreasuryFrameArgonotBondParticipants,
   PalletTreasuryFrameVaultCapital,
   PalletTreasuryHoldReason,
   PalletTreasuryVaultCapital,
@@ -551,10 +554,13 @@ declare module '@polkadot/types/types/registry' {
     PalletTreasuryBondLot: PalletTreasuryBondLot;
     PalletTreasuryBondLotAllocation: PalletTreasuryBondLotAllocation;
     PalletTreasuryBondLotSummary: PalletTreasuryBondLotSummary;
+    PalletTreasuryBondProgram: PalletTreasuryBondProgram;
+    PalletTreasuryBondProgramId: PalletTreasuryBondProgramId;
     PalletTreasuryBondReleaseReason: PalletTreasuryBondReleaseReason;
     PalletTreasuryCall: PalletTreasuryCall;
     PalletTreasuryError: PalletTreasuryError;
     PalletTreasuryEvent: PalletTreasuryEvent;
+    PalletTreasuryFrameArgonotBondParticipants: PalletTreasuryFrameArgonotBondParticipants;
     PalletTreasuryFrameVaultCapital: PalletTreasuryFrameVaultCapital;
     PalletTreasuryHoldReason: PalletTreasuryHoldReason;
     PalletTreasuryVaultCapital: PalletTreasuryVaultCapital;
