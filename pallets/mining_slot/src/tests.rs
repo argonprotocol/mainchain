@@ -1755,6 +1755,32 @@ fn it_keeps_argonots_per_seat_unchanged_when_there_are_no_winning_bids() {
 }
 
 #[test]
+fn it_floors_argonots_per_seat_to_the_initial_value() {
+	new_test_ext().execute_with(|| {
+		let original_initial_argonots_per_seat = InitialArgonotsPerSeat::get();
+		InitialArgonotsPerSeat::set(10 * MICROGONS_PER_ARGON);
+		ArgonotsPerMiningSeat::<Test>::set(77);
+		NextFrameId::<Test>::set(5);
+		set_average_microgons_per_argonot(4, 4 * MICROGONS_PER_ARGON);
+
+		BidsForNextSlotCohort::<Test>::set(bounded_vec![MiningRegistration {
+			account_id: 1,
+			argonots: 0,
+			bid: MICROGONS_PER_ARGON,
+			authority_keys: 1.into(),
+			starting_frame_id: 5,
+			external_funding_account: None,
+			bid_at_tick: 1,
+		}]);
+
+		MiningSlots::update_argonots_per_seat(5);
+
+		assert_eq!(ArgonotsPerMiningSeat::<Test>::get(), 10 * MICROGONS_PER_ARGON);
+		InitialArgonotsPerSeat::set(original_initial_argonots_per_seat);
+	});
+}
+
+#[test]
 fn it_defaults_argonots_per_seat_to_the_initial_value() {
 	new_test_ext().execute_with(|| {
 		ArgonotsPerMiningSeat::<Test>::kill();

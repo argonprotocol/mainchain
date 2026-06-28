@@ -105,7 +105,7 @@ export class Vault {
     const currentBonusSharingPercent =
       'treasuryBonusProfitSharing' in vault.terms
         ? vault.terms.treasuryBonusProfitSharing
-        : (vault.terms as { bonusSharingPercent?: { toBigInt(): bigint } }).bonusSharingPercent;
+        : undefined;
     this.terms = {
       bitcoinAnnualPercentRate: fromFixedNumber(
         vault.terms.bitcoinAnnualPercentRate.toBigInt(),
@@ -116,7 +116,7 @@ export class Vault {
         vault.terms.treasuryProfitSharing.toBigInt(),
         PERMILL_DECIMALS,
       ),
-      bonusSharingPercent: fromFixedNumber(
+      treasuryBonusProfitSharing: fromFixedNumber(
         currentBonusSharingPercent?.toBigInt() ?? 0n,
         PERMILL_DECIMALS,
       ),
@@ -139,9 +139,7 @@ export class Vault {
     if (vault.pendingTerms.isSome) {
       const [tickApply, terms] = vault.pendingTerms.value;
       const pendingBonusSharingPercent =
-        'treasuryBonusProfitSharing' in terms
-          ? terms.treasuryBonusProfitSharing
-          : (terms as { bonusSharingPercent?: { toBigInt(): bigint } }).bonusSharingPercent;
+        'treasuryBonusProfitSharing' in terms ? terms.treasuryBonusProfitSharing : undefined;
       this.pendingTermsChangeTick = tickApply.toNumber();
       this.pendingTerms = {
         bitcoinAnnualPercentRate: fromFixedNumber(
@@ -153,7 +151,7 @@ export class Vault {
           terms.treasuryProfitSharing.toBigInt(),
           PERMILL_DECIMALS,
         ),
-        bonusSharingPercent: fromFixedNumber(
+        treasuryBonusProfitSharing: fromFixedNumber(
           pendingBonusSharingPercent?.toBigInt() ?? 0n,
           PERMILL_DECIMALS,
         ),
@@ -266,7 +264,7 @@ export class Vault {
       delegateAccountId?: string;
       name?: string;
       treasuryProfitSharing: number;
-      bonusSharingPercent: number;
+      treasuryBonusProfitSharing: number;
       doNotExceedBalance?: bigint;
     } & ISubmittableOptions,
     config: { tickDurationMillis?: number } = {},
@@ -306,7 +304,10 @@ export class Vault {
         bitcoinAnnualPercentRate: toFixedNumber(annualPercentRate, FIXED_U128_DECIMALS),
         bitcoinBaseFee: BigInt(baseFee),
         treasuryProfitSharing: toFixedNumber(args.treasuryProfitSharing, PERMILL_DECIMALS),
-        treasuryBonusProfitSharing: toFixedNumber(args.bonusSharingPercent, PERMILL_DECIMALS),
+        treasuryBonusProfitSharing: toFixedNumber(
+          args.treasuryBonusProfitSharing,
+          PERMILL_DECIMALS,
+        ),
       },
       securitizationRatio: toFixedNumber(securitizationRatio, FIXED_U128_DECIMALS),
       securitization: BigInt(securitization),
@@ -377,7 +378,7 @@ export interface ITerms {
   readonly bitcoinAnnualPercentRate: BigNumber;
   readonly bitcoinBaseFee: bigint;
   readonly treasuryProfitSharing: BigNumber;
-  readonly bonusSharingPercent: BigNumber;
+  readonly treasuryBonusProfitSharing: BigNumber;
 }
 function bigNumberToBigInt(bn: BigNumber): bigint {
   return BigInt(bn.integerValue(BigNumber.ROUND_DOWN).toString());
