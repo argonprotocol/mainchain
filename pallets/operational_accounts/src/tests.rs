@@ -7,7 +7,9 @@ use crate::{
 	REFERRAL_CLAIM_PROOF_MESSAGE_KEY, REFERRAL_SPONSOR_GRANT_MESSAGE_KEY,
 	VAULT_ACCOUNT_PROOF_MESSAGE_KEY,
 };
-use argon_primitives::{OperationalAccountsHook, Signature, MICROGONS_PER_ARGON};
+use argon_primitives::{
+	OperationalAccountProvider, OperationalAccountsHook, Signature, MICROGONS_PER_ARGON,
+};
 use frame_support::{assert_err, assert_noop, assert_ok, traits::Hooks};
 use pallet_prelude::*;
 use sp_core::{sr25519, Pair};
@@ -22,6 +24,65 @@ use crate::mock::{
 	OperationalAccounts as OperationalAccountsPallet, OperationalMinimumVaultSecuritization,
 	OperationalReferralBonusReward, OperationalReferralReward, RuntimeOrigin, Test, TestAccountId,
 };
+
+#[test]
+fn eligibility_respects_invite_only_and_registered_accounts() {
+	new_test_with_genesis::<Test>(|_t| {}).execute_with(|| {
+		assert!(
+			!<OperationalAccountsPallet as OperationalAccountProvider<TestAccountId>>::is_eligible(
+				&account_id_from_seed(99)
+			)
+		);
+	});
+
+	new_test_with_genesis::<Test>(|t: &mut Storage| {
+		crate::GenesisConfig::<Test> {
+			is_operational_account_invite_only: false,
+			..Default::default()
+		}
+		.assimilate_storage(t)
+		.unwrap();
+	})
+	.execute_with(|| {
+		assert!(
+			<OperationalAccountsPallet as OperationalAccountProvider<TestAccountId>>::is_eligible(
+				&account_id_from_seed(99)
+			)
+		);
+	});
+
+	new_test_ext().execute_with(|| {
+		let account_set = make_account_set(1, 2, 3, 4);
+		register_account(&account_set, None);
+		crate::IsOperationalAccountInviteOnly::<Test>::put(true);
+
+		assert!(
+			<OperationalAccountsPallet as OperationalAccountProvider<TestAccountId>>::is_eligible(
+				&account_set.owner
+			)
+		);
+		assert!(
+			<OperationalAccountsPallet as OperationalAccountProvider<TestAccountId>>::is_eligible(
+				&account_set.vault
+			)
+		);
+		assert!(
+			<OperationalAccountsPallet as OperationalAccountProvider<TestAccountId>>::is_eligible(
+				&account_set.mining_funding
+			)
+		);
+		assert!(
+			<OperationalAccountsPallet as OperationalAccountProvider<TestAccountId>>::is_eligible(
+				&account_set.mining_bot
+			)
+		);
+		assert!(
+			!<OperationalAccountsPallet as OperationalAccountProvider<TestAccountId>>::is_eligible(
+				&account_id_from_seed(99)
+			)
+		);
+	});
+}
 
 #[test]
 fn test_register_creates_operational_account() {
@@ -48,6 +109,21 @@ fn test_register_creates_operational_account() {
 		assert_eq!(
 			OperationalAccountBySubAccount::<Test>::get(&account_set.mining_bot),
 			Some(account_set.owner.clone())
+		);
+	});
+}
+
+#[test]
+fn test_register_requires_invite_when_invite_only() {
+	new_test_with_genesis::<Test>(|_t| {}).execute_with(|| {
+		let account_set = make_account_set(1, 2, 3, 4);
+
+		assert_noop!(
+			OperationalAccountsPallet::register(
+				RuntimeOrigin::signed(account_set.owner.clone()),
+				account_set.registration(None),
+			),
+			crate::Error::<Test>::RegistrationInviteRequired
 		);
 	});
 }
@@ -150,11 +226,12 @@ fn test_register_rejects_outsider_submitter() {
 }
 
 #[test]
-fn test_register_rejects_invalid_referral_proof_and_ignores_sponsor_without_capacity() {
+fn test_register_rejects_invalid_or_unusable_invites_when_invite_only() {
 	new_test_ext().execute_with(|| {
 		let sponsor_set = make_account_set(10, 11, 12, 13);
 		register_account(&sponsor_set, None);
 		set_available_referrals(&sponsor_set.owner, 1);
+		crate::IsOperationalAccountInviteOnly::<Test>::put(true);
 
 		#[cfg(not(feature = "runtime-benchmarks"))]
 		{
@@ -189,10 +266,14 @@ fn test_register_rejects_invalid_referral_proof_and_ignores_sponsor_without_capa
 		let no_referrals_set = make_account_set(40, 41, 42, 43);
 		let no_referrals = make_referral_proof(&no_referrals_set.owner, &sponsor_set.owner, 2, 10);
 		set_available_referrals(&sponsor_set.owner, 0);
-		register_account(&no_referrals_set, Some(no_referrals));
-
-		let account = OperationalAccounts::<Test>::get(&no_referrals_set.owner).expect("account");
-		assert!(account.sponsor.is_none());
+		assert_noop!(
+			OperationalAccountsPallet::register(
+				RuntimeOrigin::signed(no_referrals_set.owner.clone()),
+				no_referrals_set.registration(Some(no_referrals)),
+			),
+			crate::Error::<Test>::RegistrationInviteRequired
+		);
+		assert!(!OperationalAccounts::<Test>::contains_key(&no_referrals_set.owner));
 		let sponsor_account =
 			OperationalAccounts::<Test>::get(&sponsor_set.owner).expect("sponsor account");
 		assert_eq!(sponsor_account.available_referrals, 0);
@@ -447,11 +528,12 @@ fn test_referral_registration_consumes_available_and_materializes_ready_referral
 }
 
 #[test]
-fn test_reused_referral_code_registers_without_sponsor_until_expiration() {
+fn test_reused_referral_code_requires_expiration_when_invite_only() {
 	new_test_ext().execute_with(|| {
 		let sponsor_set = make_account_set(10, 11, 12, 13);
 		register_account(&sponsor_set, None);
 		set_available_referrals(&sponsor_set.owner, 2);
+		crate::IsOperationalAccountInviteOnly::<Test>::put(true);
 
 		let first_recruit = make_account_set(20, 21, 22, 23);
 		let expires_at_frame = CurrentFrameId::get().saturating_add(1);
@@ -473,11 +555,14 @@ fn test_reused_referral_code_registers_without_sponsor_until_expiration() {
 
 		let reused_recruit = make_account_set(30, 31, 32, 33);
 		let reused_referral = make_referral_proof(&reused_recruit.owner, &sponsor_set.owner, 1, 10);
-		register_account(&reused_recruit, Some(reused_referral));
-
-		let reused_account =
-			OperationalAccounts::<Test>::get(&reused_recruit.owner).expect("reused account");
-		assert!(reused_account.sponsor.is_none());
+		assert_noop!(
+			OperationalAccountsPallet::register(
+				RuntimeOrigin::signed(reused_recruit.owner.clone()),
+				reused_recruit.registration(Some(reused_referral)),
+			),
+			crate::Error::<Test>::RegistrationInviteRequired
+		);
+		assert!(!OperationalAccounts::<Test>::contains_key(&reused_recruit.owner));
 		let sponsor_account =
 			OperationalAccounts::<Test>::get(&sponsor_set.owner).expect("sponsor account");
 		assert_eq!(sponsor_account.available_referrals, 1);

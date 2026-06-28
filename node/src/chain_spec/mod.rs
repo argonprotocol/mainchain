@@ -9,7 +9,8 @@ use argon_primitives::{
 use argon_runtime::{
 	BalancesConfig, BitcoinLocksConfig, BitcoinUtxosConfig, BlockSealSpecConfig, GrandpaConfig,
 	LocalchainTransferConfig, MiningSlotConfig as MiningSlotPalletConfig, NotariesConfig,
-	PriceIndexConfig, RuntimeGenesisConfig, SessionKeys, SudoConfig, TicksConfig,
+	OperationalAccountsConfig, PriceIndexConfig, RuntimeGenesisConfig, SessionKeys, SudoConfig,
+	TicksConfig,
 };
 use polkadot_sdk::*;
 use sp_consensus_grandpa::{AuthorityId as GrandpaId, AuthorityWeight};
@@ -73,6 +74,7 @@ pub struct GenesisSettings {
 	pub mining_config: MiningSlotConfig,
 	pub minimum_bitcoin_lock_satoshis: Satoshis,
 	pub ethereum_beacon_preset: EthereumBeaconPreset,
+	pub is_operational_account_invite_only: bool,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -92,6 +94,7 @@ pub(crate) fn build_genesis_config(
 		mining_config,
 		minimum_bitcoin_lock_satoshis,
 		ethereum_beacon_preset,
+		is_operational_account_invite_only,
 	}: GenesisSettings,
 ) -> serde_json::Value {
 	let config = RuntimeGenesisConfig {
@@ -117,6 +120,10 @@ pub(crate) fn build_genesis_config(
 		notaries: NotariesConfig { list: initial_notaries },
 		grandpa: GrandpaConfig { authorities: founding_grandpas, ..Default::default() },
 		localchain_transfer: LocalchainTransferConfig::default(),
+		operational_accounts: OperationalAccountsConfig {
+			is_operational_account_invite_only,
+			..Default::default()
+		},
 		..Default::default()
 	};
 

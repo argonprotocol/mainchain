@@ -24,8 +24,9 @@ pub mod pallet {
 	use alloc::vec::Vec;
 	use argon_primitives::{
 		vault::BitcoinVaultProvider, MiningFrameTransitionProvider, MiningSlotProvider,
-		OperationalAccountsHook, OperationalRewardKind, OperationalRewardsPayer, Signature,
-		TreasuryPoolProvider, UniswapTransferProvider, MICROGONS_PER_ARGON,
+		OperationalAccountProvider, OperationalAccountsHook, OperationalRewardKind,
+		OperationalRewardsPayer, Signature, TreasuryPoolProvider, UniswapTransferProvider,
+		MICROGONS_PER_ARGON,
 	};
 	use codec::{Decode, Encode, EncodeLike};
 	use core::marker::PhantomData;
@@ -411,6 +412,22 @@ pub mod pallet {
 	/// Oldest referral expiration frame that still has cleanup work to resume.
 	pub type ExpiredReferralCodeCleanupFrame<T: Config> = StorageValue<_, FrameId, OptionQuery>;
 
+	#[pallet::type_value]
+	pub fn DefaultIsOperationalAccountInviteOnly<T: Config>() -> bool {
+		true
+	}
+
+	#[pallet::storage]
+	/// Whether operational-account access is invite-only.
+	///
+	/// When enabled, registration requires a valid referral invite and vault creation plus
+	/// mining-slot bidding remain restricted to registered operational accounts.
+	///
+	/// Existing live raw chain specs do not contain this key, so the default remains invite-only
+	/// unless a development chain overrides it in genesis.
+	pub type IsOperationalAccountInviteOnly<T: Config> =
+		StorageValue<_, bool, ValueQuery, DefaultIsOperationalAccountInviteOnly<T>>;
+
 	#[derive(
 		Encode,
 		Decode,
@@ -434,10 +451,16 @@ pub mod pallet {
 	}
 
 	#[pallet::genesis_config]
-	#[derive(frame_support::DefaultNoBound)]
 	pub struct GenesisConfig<T: Config> {
+		pub is_operational_account_invite_only: bool,
 		#[serde(skip)]
 		pub _phantom: PhantomData<T>,
+	}
+
+	impl<T: Config> Default for GenesisConfig<T> {
+		fn default() -> Self {
+			Self { is_operational_account_invite_only: true, _phantom: Default::default() }
+		}
 	}
 
 	#[pallet::genesis_build]
@@ -447,6 +470,7 @@ pub mod pallet {
 				operational_referral_reward: T::OperationalReferralReward::get(),
 				referral_bonus_reward: T::OperationalReferralBonusReward::get(),
 			});
+			IsOperationalAccountInviteOnly::<T>::put(self.is_operational_account_invite_only);
 		}
 	}
 
@@ -525,6 +549,8 @@ pub mod pallet {
 		InvalidReferralProof,
 		/// The referral proof has expired.
 		ReferralProofExpired,
+		/// A valid invite is required to register an operational account.
+		RegistrationInviteRequired,
 		/// The requested progress patch does not contain any updates.
 		NoProgressUpdateProvided,
 		/// The encrypted server payload exceeds the configured max length.
@@ -590,6 +616,7 @@ pub mod pallet {
 		/// Register vault, mining funding, and bot accounts for an operational account.
 		/// Any account in the registration may submit the transaction.
 		/// If a referral proof is provided, the registration records the sponsor relationship.
+		/// When invite-only is enabled, a valid referral proof is required.
 		#[pallet::call_index(0)]
 		#[pallet::weight(T::WeightInfo::register())]
 		pub fn register(origin: OriginFor<T>, registration: Registration<T>) -> DispatchResult {
@@ -654,6 +681,7 @@ pub mod pallet {
 				Error::<T>::InvalidAccountProof
 			);
 
+			let invite_only = IsOperationalAccountInviteOnly::<T>::get();
 			let current_frame = T::FrameProvider::get_current_frame_id();
 			let sponsor = if let Some(referral_proof) = referral_proof.as_ref() {
 				ensure!(
@@ -695,6 +723,9 @@ pub mod pallet {
 			} else {
 				None
 			};
+			if invite_only {
+				ensure!(sponsor.is_some(), Error::<T>::RegistrationInviteRequired);
+			}
 			let vault_registration = T::VaultProvider::get_registration_vault_data(&vault_account);
 			let has_treasury_pool_participation = vault_registration
 				.as_ref()
@@ -1176,6 +1207,16 @@ pub mod pallet {
 
 		fn uniswap_transfer_confirmed(account_id: &T::AccountId, amount: T::Balance) {
 			Self::on_uniswap_transfer(account_id, amount)
+		}
+	}
+
+	impl<T: Config> OperationalAccountProvider<T::AccountId> for Pallet<T> {
+		type Weights = crate::weights::ProviderWeightAdapter<T>;
+
+		fn is_eligible(account_id: &T::AccountId) -> bool {
+			!IsOperationalAccountInviteOnly::<T>::get() ||
+				OperationalAccounts::<T>::contains_key(account_id) ||
+				OperationalAccountBySubAccount::<T>::contains_key(account_id)
 		}
 	}
 }

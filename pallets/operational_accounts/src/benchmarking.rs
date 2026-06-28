@@ -115,6 +115,7 @@ mod benchmarks {
 					securitization: T::OperationalMinimumVaultSecuritization::get()
 						.saturated_into(),
 				}),
+				is_eligible: false,
 				has_active_rewards_account_seat: true,
 				has_bond_participation: true,
 				is_crosschain_activated: true,
@@ -180,6 +181,7 @@ mod benchmarks {
 		assert!(OperationalAccountBySubAccount::<T>::contains_key(mining_bot));
 		assert_provider_calls(BenchmarkOperationalAccountsProviderCallCounters {
 			get_registration_vault_data: 1,
+			is_eligible: 0,
 			has_active_rewards_account_seat: 1,
 			has_bond_participation: 1,
 			is_crosschain_activated: 1,
@@ -198,6 +200,7 @@ mod benchmarks {
 					securitization: T::OperationalMinimumVaultSecuritization::get()
 						.saturated_into(),
 				}),
+				is_eligible: false,
 				has_active_rewards_account_seat: true,
 				has_bond_participation: true,
 				is_crosschain_activated: true,
@@ -238,6 +241,7 @@ mod benchmarks {
 					securitization: T::OperationalMinimumVaultSecuritization::get()
 						.saturated_into(),
 				}),
+				is_eligible: false,
 				has_active_rewards_account_seat: true,
 				has_bond_participation: true,
 				is_crosschain_activated: true,
@@ -280,6 +284,7 @@ mod benchmarks {
 					securitization: T::OperationalMinimumVaultSecuritization::get()
 						.saturated_into(),
 				}),
+				is_eligible: false,
 				has_active_rewards_account_seat: true,
 				has_bond_participation: true,
 				is_crosschain_activated: true,
@@ -322,6 +327,7 @@ mod benchmarks {
 					securitization: T::OperationalMinimumVaultSecuritization::get()
 						.saturated_into(),
 				}),
+				is_eligible: false,
 				has_active_rewards_account_seat: true,
 				has_bond_participation: true,
 				is_crosschain_activated: true,
@@ -365,6 +371,7 @@ mod benchmarks {
 					securitization: T::OperationalMinimumVaultSecuritization::get()
 						.saturated_into(),
 				}),
+				is_eligible: false,
 				has_active_rewards_account_seat: true,
 				has_bond_participation: true,
 				is_crosschain_activated: true,
@@ -408,6 +415,7 @@ mod benchmarks {
 					securitization: T::OperationalMinimumVaultSecuritization::get()
 						.saturated_into(),
 				}),
+				is_eligible: false,
 				has_active_rewards_account_seat: true,
 				has_bond_participation: true,
 				is_crosschain_activated: true,
@@ -495,6 +503,7 @@ mod benchmarks {
 					securitization: T::OperationalMinimumVaultSecuritization::get()
 						.saturated_into(),
 				}),
+				is_eligible: false,
 				has_active_rewards_account_seat: true,
 				has_bond_participation: true,
 				is_crosschain_activated: true,

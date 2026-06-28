@@ -57,6 +57,7 @@ pub fn development_config() -> Result<ChainSpec, String> {
 		},
 		minimum_bitcoin_lock_satoshis: 100,
 		ethereum_beacon_preset: EthereumBeaconPreset::Minimal,
+		is_operational_account_invite_only: false,
 	}))
 	.build())
 }

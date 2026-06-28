@@ -134,6 +134,7 @@ pub mod pallet {
 		/// Account that receives mining bid funds before treasury distribution.
 		#[pallet::constant]
 		type MiningBidPoolAccount: Get<Self::AccountId>;
+		type OperationalAccountProvider: OperationalAccountProvider<Self::AccountId>;
 		type OperationalAccountsHook: OperationalAccountsHook<Self::AccountId, Self::Balance>;
 		/// Handler when a new slot is started
 		type SlotEvents: SlotEvents<Self::AccountId>;
@@ -356,6 +357,8 @@ pub mod pallet {
 		BidCannotBeReduced,
 		/// Bids must be in allowed increments
 		InvalidBidAmount,
+		/// Mining slot bidding currently requires prior operational-account registration.
+		OperationalAccountRegistrationRequired,
 		/// The argonots on hold cannot be released
 		UnrecoverableHold,
 	}
@@ -506,6 +509,10 @@ pub mod pallet {
 			let funding_account = ensure_signed(origin)?;
 			let miner_account_id = mining_account_id.unwrap_or(funding_account.clone());
 
+			ensure!(
+				T::OperationalAccountProvider::is_eligible(&funding_account),
+				Error::<T>::OperationalAccountRegistrationRequired
+			);
 			ensure!(IsNextSlotBiddingOpen::<T>::get(), Error::<T>::SlotNotTakingBids);
 			ensure!(
 				bid % T::BidIncrements::get() == T::Balance::zero(),

@@ -342,9 +342,12 @@ impl pallet_operational_accounts::Config for Test {
 
 pub fn new_test_ext() -> TestState {
 	let mut ext = new_test_with_genesis::<Test>(|t: &mut Storage| {
-		pallet_operational_accounts::GenesisConfig::<Test>::default()
-			.assimilate_storage(t)
-			.unwrap();
+		pallet_operational_accounts::GenesisConfig::<Test> {
+			is_operational_account_invite_only: false,
+			..Default::default()
+		}
+		.assimilate_storage(t)
+		.unwrap();
 	});
 	ext.execute_with(|| {
 		CurrentFrameId::set(1);

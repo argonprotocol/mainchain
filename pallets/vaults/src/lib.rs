@@ -39,7 +39,7 @@ pub mod pallet {
 			BitcoinVaultProvider, RegistrationVaultData, TreasuryVaultProvider, Vault,
 			VaultArgonotCommitment, VaultError, VaultName, VaultTerms,
 		},
-		CollectBlockerProvider, MiningFrameProvider, TickProvider,
+		CollectBlockerProvider, MiningFrameProvider, OperationalAccountProvider, TickProvider,
 	};
 	use core::iter::Sum;
 	use frame_support::traits::Incrementable;
@@ -134,6 +134,9 @@ pub mod pallet {
 
 		/// Hook to notify operational accounts about vault lifecycle events.
 		type OperationalAccountsHook: OperationalAccountsHook<Self::AccountId, Self::Balance>;
+		/// Provider for whether restricted vault creation requires operational-account
+		/// registration.
+		type OperationalAccountProvider: OperationalAccountProvider<Self::AccountId>;
 		/// External collect blockers that must be cleared before revenue can be collected.
 		type CollectBlockerProvider: CollectBlockerProvider<Self::AccountId>;
 	}
@@ -397,6 +400,8 @@ pub mod pallet {
 		OverdueCollectBlockersBeforeCollect,
 		/// An account may only be associated with a single vault
 		AccountAlreadyHasVault,
+		/// Vault creation currently requires prior operational-account registration.
+		OperationalAccountRegistrationRequired,
 		/// Committed Argonots cannot be reduced below the amount already crosschain-encumbered.
 		CommittedArgonotsBelowEncumberedBacking,
 	}
@@ -545,6 +550,10 @@ pub mod pallet {
 			vault_config: VaultConfig<T::AccountId, T::Balance>,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
+			ensure!(
+				T::OperationalAccountProvider::is_eligible(&who),
+				Error::<T>::OperationalAccountRegistrationRequired
+			);
 			let VaultConfig {
 				name,
 				delegate_account_id,

@@ -1,8 +1,9 @@
 use argon_primitives::{
 	providers::{
 		BlockRewardAccountsProviderWeightInfo, BlockSealerProvider, BlockSealerProviderWeightInfo,
-		MiningSlotProviderWeightInfo, PriceProviderWeightInfo, TickProvider,
-		TickProviderWeightInfo,
+		MiningSlotProviderWeightInfo,
+		OperationalAccountProvider, OperationalAccountProviderWeightInfo, PriceProviderWeightInfo,
+		TickProvider, TickProviderWeightInfo,
 	},
 	PriceProvider,
 };
@@ -39,6 +40,10 @@ type TickProviderWeights<T> = <<T as crate::Config>::TickProvider as TickProvide
 >>::Weights;
 type PriceProviderWeights<T> =
 	<<T as crate::Config>::PriceProvider as PriceProvider<<T as crate::Config>::Balance>>::Weights;
+type OperationalAccountProviderWeights<T> =
+	<<T as crate::Config>::OperationalAccountProvider as OperationalAccountProvider<
+		<T as frame_system::Config>::AccountId,
+	>>::Weights;
 
 pub struct WithProviderWeights<
 	T,
@@ -46,18 +51,45 @@ pub struct WithProviderWeights<
 	SealerInfoWeight = SealerInfoProviderWeights<T>,
 	TickProviderWeight = TickProviderWeights<T>,
 	PriceProviderWeight = PriceProviderWeights<T>,
->(PhantomData<(T, Base, SealerInfoWeight, TickProviderWeight, PriceProviderWeight)>);
-impl<T, Base, SealerInfoWeight, TickProviderWeight, PriceProviderWeight> WeightInfo
-	for WithProviderWeights<T, Base, SealerInfoWeight, TickProviderWeight, PriceProviderWeight>
+	OperationalAccountProviderWeight = OperationalAccountProviderWeights<T>,
+>(
+	PhantomData<(
+		T,
+		Base,
+		SealerInfoWeight,
+		TickProviderWeight,
+		PriceProviderWeight,
+		OperationalAccountProviderWeight,
+	)>,
+);
+impl<
+		T,
+		Base,
+		SealerInfoWeight,
+		TickProviderWeight,
+		PriceProviderWeight,
+		OperationalAccountProviderWeight,
+	> WeightInfo
+	for WithProviderWeights<
+		T,
+		Base,
+		SealerInfoWeight,
+		TickProviderWeight,
+		PriceProviderWeight,
+		OperationalAccountProviderWeight,
+	>
 where
 	T: crate::Config,
 	Base: WeightInfo,
 	SealerInfoWeight: BlockSealerProviderWeightInfo,
 	TickProviderWeight: TickProviderWeightInfo,
 	PriceProviderWeight: PriceProviderWeightInfo,
+	OperationalAccountProviderWeight: OperationalAccountProviderWeightInfo,
 {
 	fn bid() -> Weight {
-		Base::bid().saturating_add(TickProviderWeight::current_tick())
+		Base::bid()
+			.saturating_add(TickProviderWeight::current_tick())
+			.saturating_add(OperationalAccountProviderWeight::is_eligible())
 	}
 
 	fn configure_mining_slot_delay() -> Weight {

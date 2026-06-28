@@ -52,6 +52,7 @@ pub struct BenchmarkNotebookProviderState {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct BenchmarkOperationalAccountsProviderCallCounters {
 	pub get_registration_vault_data: u32,
+	pub is_eligible: u32,
 	pub has_active_rewards_account_seat: u32,
 	pub has_bond_participation: u32,
 	pub is_crosschain_activated: u32,
@@ -59,14 +60,29 @@ pub struct BenchmarkOperationalAccountsProviderCallCounters {
 	pub account_became_operational: u32,
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BenchmarkOperationalAccountsProviderState {
 	pub vault_registration_data: Option<RegistrationVaultData<u128>>,
+	pub is_eligible: bool,
 	pub has_active_rewards_account_seat: bool,
 	pub has_bond_participation: bool,
 	pub is_crosschain_activated: bool,
 	pub has_recent_argon_transfer: bool,
 	pub call_counters: BenchmarkOperationalAccountsProviderCallCounters,
+}
+
+impl Default for BenchmarkOperationalAccountsProviderState {
+	fn default() -> Self {
+		Self {
+			vault_registration_data: None,
+			is_eligible: true,
+			has_active_rewards_account_seat: false,
+			has_bond_participation: false,
+			is_crosschain_activated: false,
+			has_recent_argon_transfer: false,
+			call_counters: Default::default(),
+		}
+	}
 }
 
 #[derive(Clone, Encode, Decode, PartialEq)]
