@@ -91,7 +91,7 @@ impl TreasuryBonusApprovalProof {
 		#[cfg(feature = "runtime-benchmarks")]
 		{
 			let _ = verified;
-			return true;
+			true
 		}
 		#[cfg(not(feature = "runtime-benchmarks"))]
 		{

@@ -79,7 +79,8 @@ export const TxSubmissionErrorCode = {
   Usurped: 'TxSubmission.Usurped',
 } as const;
 
-export type TxSubmissionErrorCode = (typeof TxSubmissionErrorCode)[keyof typeof TxSubmissionErrorCode];
+export type TxSubmissionErrorCode =
+  (typeof TxSubmissionErrorCode)[keyof typeof TxSubmissionErrorCode];
 
 export class TxSubmissionError extends Error {
   constructor(

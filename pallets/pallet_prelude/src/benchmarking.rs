@@ -1,5 +1,3 @@
-#![cfg(feature = "runtime-benchmarks")]
-
 use crate::*;
 use alloc::{
 	collections::{BTreeMap, BTreeSet},
@@ -187,6 +185,11 @@ fn benchmark_authority_account_id<AccountId: Decode>() -> AccountId {
 	AccountId::decode(&mut &bytes[..]).expect("benchmark authority account id must decode")
 }
 
+fn benchmark_voter_account_id<AccountId: Decode>() -> AccountId {
+	let bytes = [3u8; 32];
+	AccountId::decode(&mut &bytes[..]).expect("benchmark voter account id must decode")
+}
+
 fn benchmark_authority_id<AuthorityId: Decode>() -> AuthorityId {
 	let bytes = [2u8; 32];
 	AuthorityId::decode(&mut &bytes[..]).expect("benchmark authority id must decode")
@@ -218,16 +221,16 @@ where
 		best_miner_nonce_score: Option<U256>,
 	) -> Option<(MiningAuthority<AuthorityId, T::AccountId>, U256, Permill)> {
 		let authority_id = benchmark_authority_id::<AuthorityId>();
-		if let Some(expected_authority) = signing_key {
-			if expected_authority != authority_id {
-				return None;
-			}
+		if let Some(expected_authority) = signing_key &&
+			expected_authority != authority_id
+		{
+			return None;
 		}
 		let score = seal_proof;
-		if let Some(best_score) = best_miner_nonce_score {
-			if best_score <= score {
-				return None;
-			}
+		if let Some(best_score) = best_miner_nonce_score &&
+			best_score <= score
+		{
+			return None;
 		}
 		Some((
 			MiningAuthority {
@@ -260,19 +263,16 @@ fn notebook_entries_from_digests<T: frame_system::Config>() -> Vec<(NotaryId, No
 {
 	let digest = frame_system::Pallet::<T>::digest();
 	for entry in digest.logs.iter() {
-		if let DigestItem::PreRuntime(id, data) = entry {
-			if *id == NOTEBOOKS_DIGEST_ID {
-				if let Ok(notebook_digest) = NotebookDigest::<()>::decode(&mut &data[..]) {
-					return notebook_digest
-						.notebooks
-						.into_inner()
-						.into_iter()
-						.map(|notebook| {
-							(notebook.notary_id, notebook.notebook_number, notebook.tick)
-						})
-						.collect();
-				}
-			}
+		if let DigestItem::PreRuntime(id, data) = entry &&
+			*id == NOTEBOOKS_DIGEST_ID &&
+			let Ok(notebook_digest) = NotebookDigest::<()>::decode(&mut &data[..])
+		{
+			return notebook_digest
+				.notebooks
+				.into_inner()
+				.into_iter()
+				.map(|notebook| (notebook.notary_id, notebook.notebook_number, notebook.tick))
+				.collect();
 		}
 	}
 	Vec::new()
@@ -414,7 +414,7 @@ impl<AccountId: FullCodec> BlockSealerProvider<AccountId>
 	fn get_sealer_info() -> BlockSealerInfo<AccountId> {
 		BlockSealerInfo {
 			block_author_account_id: benchmark_authority_account_id::<AccountId>(),
-			block_vote_rewards_account: None,
+			block_vote_rewards_account: Some(benchmark_voter_account_id::<AccountId>()),
 			block_seal_authority: None,
 		}
 	}
@@ -428,6 +428,8 @@ pub struct BenchmarkBlockRewardAccountsProvider<AccountId>(PhantomData<AccountId
 impl<AccountId: FullCodec> BlockRewardAccountsProvider<AccountId>
 	for BenchmarkBlockRewardAccountsProvider<AccountId>
 {
+	type Weights = ();
+
 	fn get_block_rewards_account(_author: &AccountId) -> Option<(AccountId, FrameId)> {
 		None
 	}
@@ -770,7 +772,7 @@ pub struct BenchmarkPriceProviderState {
 impl Default for BenchmarkPriceProviderState {
 	fn default() -> Self {
 		Self {
-			btc_price_in_usd: Some(FixedU128::from_rational(62_000_00u128, 100u128)),
+			btc_price_in_usd: Some(FixedU128::from_rational(6_200_000u128, 100u128)),
 			argon_price_in_usd: Some(FixedU128::one()),
 			argonot_price_in_usd: Some(FixedU128::one()),
 			argon_target_price_in_usd: Some(FixedU128::one()),

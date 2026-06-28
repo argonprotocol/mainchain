@@ -1,5 +1,3 @@
-#![cfg(feature = "runtime-benchmarks")]
-
 use super::*;
 use argon_primitives::{PriceProvider, MICROGONS_PER_ARGON};
 use frame_support::traits::Hooks;
@@ -106,13 +104,29 @@ mod benchmarks {
 		Ok(())
 	}
 
+	#[benchmark]
+	fn provider_get_liquidity_change_needed() -> Result<(), BenchmarkError> {
+		let mut index = benchmark_price_index(10);
+		index.argon_usd_target_price = FixedU128::from_rational(101u128, 100u128);
+		Current::<T>::put(index);
+
+		#[block]
+		{
+			assert!(
+				<Pallet<T> as PriceProvider<T::Balance>>::get_liquidity_change_needed().is_some()
+			);
+		}
+
+		Ok(())
+	}
+
 	impl_benchmark_test_suite!(Pallet, crate::mock::new_test_ext(Some(1)), crate::mock::Test);
 }
 
 fn benchmark_price_index(tick: Tick) -> PriceIndex {
 	PriceIndex {
 		tick,
-		btc_usd_price: FixedU128::from_rational(62_000_00u128, 100u128),
+		btc_usd_price: FixedU128::from_rational(6_200_000u128, 100u128),
 		argon_usd_price: FixedU128::from_u32(1),
 		argon_usd_target_price: FixedU128::from_u32(1),
 		argonot_usd_price: FixedU128::from_u32(2),

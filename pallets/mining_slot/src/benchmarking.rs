@@ -3,10 +3,11 @@
 
 use super::*;
 use argon_primitives::{
-	balance_change::MerkleProof, localchain::BlockVote, AccountId, MiningSlotProvider, NotaryId,
+	balance_change::MerkleProof, localchain::BlockVote, AccountId, BlockRewardAccountsProvider,
+	MiningSlotProvider, NotaryId,
 };
 use frame_system::RawOrigin;
-use polkadot_sdk::frame_benchmarking::v2::*;
+use polkadot_sdk::{frame_benchmarking::v2::*, sp_runtime::BoundedBTreeMap};
 use sp_core::U256;
 
 #[benchmarks(
@@ -445,5 +446,80 @@ mod benchmarks {
 		}
 
 		Ok(())
+	}
+
+	#[benchmark]
+	fn provider_get_block_rewards_account() -> Result<(), BenchmarkError> {
+		use sp_runtime::codec::Decode;
+
+		let author: T::AccountId = account("provider_author", 0, 0);
+		let argonots_per_seat: T::Balance = 100_000u128.into();
+		let max_cohort_size = T::MaxCohortSize::get().max(1);
+		let key_size = T::Keys::max_encoded_len();
+		let key_data = vec![0u8; key_size];
+		let keys =
+			T::Keys::decode(&mut &key_data[..]).expect("failed to create benchmark mining keys");
+
+		let mut released_miners =
+			BoundedBTreeMap::<T::AccountId, Registration<T>, T::MaxCohortSize>::new();
+		for i in 0..max_cohort_size {
+			let released_account: T::AccountId = account("released_provider_miner", i, 0);
+			released_miners
+				.try_insert(
+					released_account.clone(),
+					Registration::<T> {
+						account_id: released_account,
+						external_funding_account: None,
+						bid: 10_000u128.into(),
+						argonots: argonots_per_seat,
+						authority_keys: keys.clone(),
+						starting_frame_id: u64::from(i).saturating_add(1),
+						bid_at_tick: 0,
+					},
+				)
+				.map_err(|_| BenchmarkError::Stop("released miners overflow"))?;
+		}
+		ReleasedMinersByAccountId::<T>::put(released_miners);
+
+		MinersByCohort::<T>::insert(
+			1,
+			BoundedVec::<Registration<T>, T::MaxCohortSize>::truncate_from(vec![
+				Registration::<T> {
+					account_id: author.clone(),
+					external_funding_account: None,
+					bid: 10_000u128.into(),
+					argonots: argonots_per_seat,
+					authority_keys: keys,
+					starting_frame_id: 1u64,
+					bid_at_tick: 0,
+				},
+			]),
+		);
+		AccountIndexLookup::<T>::insert(&author, (1u64, 0u32));
+
+		#[block]
+		{
+			assert_eq!(
+				<Pallet<T> as BlockRewardAccountsProvider<T::AccountId>>::get_block_rewards_account(
+					&author
+				),
+				Some((author.clone(), 1u64)),
+			);
+		}
+
+		Ok(())
+	}
+
+	#[benchmark]
+	fn provider_is_compute_block_eligible_for_rewards() {
+		NextFrameId::<T>::put(2);
+		ActiveMinersCount::<T>::put(1u16);
+
+		#[block]
+		{
+			assert!(
+				!<Pallet<T> as BlockRewardAccountsProvider<T::AccountId>>::is_compute_block_eligible_for_rewards()
+			);
+		}
 	}
 }

@@ -111,6 +111,8 @@ impl PriceProvider<Balance> for StaticPriceProvider {
 
 pub struct StaticBlockRewardAccountsProvider;
 impl BlockRewardAccountsProvider<u64> for StaticBlockRewardAccountsProvider {
+	type Weights = ();
+
 	fn get_block_rewards_account(_author: &u64) -> Option<(u64, FrameId)> {
 		todo!("not used by mint")
 	}

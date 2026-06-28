@@ -404,6 +404,10 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       blockRewardsPaused: AugmentedQuery<ApiType, () => Observable<bool>, []>;
       /**
+       * Bool if block voter rewards are enabled
+       **/
+      blockVoterRewardsEnabled: AugmentedQuery<ApiType, () => Observable<bool>, []>;
+      /**
        * Historical payouts by block number
        **/
       payoutsByBlock: AugmentedQuery<

@@ -665,6 +665,8 @@ pub mod pallet {
 	}
 }
 impl<T: Config> BlockRewardAccountsProvider<T::AccountId> for Pallet<T> {
+	type Weights = crate::weights::ProviderWeightAdapter<T>;
+
 	fn get_block_rewards_account(author: &T::AccountId) -> Option<(T::AccountId, FrameId)> {
 		let released_miners = ReleasedMinersByAccountId::<T>::get();
 		if let Some(x) = released_miners.get(author) {

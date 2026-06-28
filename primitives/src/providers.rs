@@ -454,6 +454,7 @@ fn btc_price_in_microgons<
 pub trait PriceProviderWeightInfo {
 	fn get_lowest_microgons_per_argonot() -> Weight;
 	fn get_average_microgons_per_argonot() -> Weight;
+	fn get_liquidity_change_needed() -> Weight;
 }
 
 impl PriceProviderWeightInfo for () {
@@ -462,6 +463,10 @@ impl PriceProviderWeightInfo for () {
 	}
 
 	fn get_average_microgons_per_argonot() -> Weight {
+		Weight::zero()
+	}
+
+	fn get_liquidity_change_needed() -> Weight {
 		Weight::zero()
 	}
 }
@@ -837,7 +842,24 @@ pub trait BlockSealerProvider<AccountId: FullCodec, AuthorityId: FullCodec = Blo
 	fn is_block_vote_seal() -> bool;
 }
 
+pub trait BlockRewardAccountsProviderWeightInfo {
+	fn get_block_rewards_account() -> Weight;
+	fn is_compute_block_eligible_for_rewards() -> Weight;
+}
+
+impl BlockRewardAccountsProviderWeightInfo for () {
+	fn get_block_rewards_account() -> Weight {
+		Weight::zero()
+	}
+
+	fn is_compute_block_eligible_for_rewards() -> Weight {
+		Weight::zero()
+	}
+}
+
 pub trait BlockRewardAccountsProvider<AccountId: FullCodec> {
+	type Weights: BlockRewardAccountsProviderWeightInfo;
+
 	fn get_block_rewards_account(author: &AccountId) -> Option<(AccountId, FrameId)>;
 	/// Returns mint reward accounts
 	fn get_mint_rewards_accounts() -> Vec<(AccountId, FrameId)>;

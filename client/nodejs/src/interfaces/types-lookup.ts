@@ -2967,7 +2967,11 @@ declare module '@polkadot/types/lookup' {
     readonly asSetBlockRewardsPaused: {
       readonly paused: bool;
     } & Struct;
-    readonly type: 'SetBlockRewardsPaused';
+    readonly isSetBlockVoterRewardsEnabled: boolean;
+    readonly asSetBlockVoterRewardsEnabled: {
+      readonly enabled: bool;
+    } & Struct;
+    readonly type: 'SetBlockRewardsPaused' | 'SetBlockVoterRewardsEnabled';
   }
 
   /** @name PalletMintCall (262) */

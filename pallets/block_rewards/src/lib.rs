@@ -28,6 +28,7 @@ pub mod pallet {
 	use argon_primitives::{
 		block_seal::{BlockPayout, BlockRewardType, FrameId},
 		notary::NotaryProvider,
+		providers::{PriceProviderWeightInfo, TickProviderWeightInfo},
 		BlockRewardAccountsProvider, BlockRewardsEventHandler, BlockSealAuthorityId,
 		BlockSealerProvider, NotebookProvider, OnNewSlot, PriceProvider, TickProvider,
 	};
@@ -133,6 +134,10 @@ pub mod pallet {
 	#[pallet::storage]
 	pub type BlockRewardsPaused<T: Config> = StorageValue<_, bool, ValueQuery>;
 
+	/// Bool if block voter rewards are enabled
+	#[pallet::storage]
+	pub type BlockVoterRewardsEnabled<T: Config> = StorageValue<_, bool, ValueQuery>;
+
 	/// The cohort block rewards by mining cohort (ie, with the same starting frame id)
 	#[pallet::storage]
 	pub type BlockRewardsByCohort<T: Config> =
@@ -227,7 +232,9 @@ pub mod pallet {
 				argons: miner_argons,
 			}];
 
-			if let Some(ref block_vote_rewards_account) = authors.block_vote_rewards_account {
+			if BlockVoterRewardsEnabled::<T>::get() &&
+				let Some(ref block_vote_rewards_account) = authors.block_vote_rewards_account
+			{
 				rewards.push(BlockPayout {
 					account_id: block_vote_rewards_account.clone(),
 					ownership: block_ownership.saturating_sub(miner_ownership),
@@ -281,6 +288,17 @@ pub mod pallet {
 		pub fn set_block_rewards_paused(origin: OriginFor<T>, paused: bool) -> DispatchResult {
 			ensure_root(origin)?;
 			<BlockRewardsPaused<T>>::set(paused);
+			Ok(())
+		}
+
+		#[pallet::call_index(1)]
+		#[pallet::weight(T::WeightInfo::set_block_voter_rewards_enabled())]
+		pub fn set_block_voter_rewards_enabled(
+			origin: OriginFor<T>,
+			enabled: bool,
+		) -> DispatchResult {
+			ensure_root(origin)?;
+			<BlockVoterRewardsEnabled<T>>::set(enabled);
 			Ok(())
 		}
 	}
@@ -445,8 +463,16 @@ pub mod pallet {
 		}
 
 		fn on_frame_start_weight(_frame_id: FrameId) -> Weight {
-			// Includes local cohort/argon updates plus provider-backed price/tick lookups.
-			T::DbWeight::get().reads_writes(6, 3)
+			T::DbWeight::get()
+				.reads_writes(3, 2)
+				.saturating_add(
+					<<T as Config>::TickProvider as TickProvider<T::Block>>::Weights::elapsed_ticks(),
+				)
+				.saturating_add(
+					<<T as Config>::PriceProvider as PriceProvider<
+						T::Balance,
+					>>::Weights::get_liquidity_change_needed(),
+				)
 		}
 	}
 }

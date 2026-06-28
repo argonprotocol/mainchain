@@ -1,7 +1,8 @@
 use argon_primitives::{
 	providers::{
-		BlockSealerProvider, BlockSealerProviderWeightInfo, MiningSlotProviderWeightInfo,
-		PriceProviderWeightInfo, TickProvider, TickProviderWeightInfo,
+		BlockRewardAccountsProviderWeightInfo, BlockSealerProvider, BlockSealerProviderWeightInfo,
+		MiningSlotProviderWeightInfo, PriceProviderWeightInfo, TickProvider,
+		TickProviderWeightInfo,
 	},
 	PriceProvider,
 };
@@ -25,6 +26,8 @@ pub trait WeightInfo {
 	// Event handlers
 	fn block_seal_read_vote() -> Weight;
 	fn provider_has_active_rewards_account_seat() -> Weight;
+	fn provider_get_block_rewards_account() -> Weight;
+	fn provider_is_compute_block_eligible_for_rewards() -> Weight;
 }
 
 type SealerInfoProviderWeights<T> = <<T as crate::Config>::SealerInfo as BlockSealerProvider<
@@ -85,12 +88,30 @@ where
 	fn provider_has_active_rewards_account_seat() -> Weight {
 		Base::provider_has_active_rewards_account_seat()
 	}
+
+	fn provider_get_block_rewards_account() -> Weight {
+		Base::provider_get_block_rewards_account()
+	}
+
+	fn provider_is_compute_block_eligible_for_rewards() -> Weight {
+		Base::provider_is_compute_block_eligible_for_rewards()
+	}
 }
 
 pub struct ProviderWeightAdapter<T>(PhantomData<T>);
 impl<T: crate::Config> MiningSlotProviderWeightInfo for ProviderWeightAdapter<T> {
 	fn has_active_rewards_account_seat() -> Weight {
-		<T as crate::Config>::WeightInfo::provider_has_active_rewards_account_seat()
+		T::WeightInfo::provider_has_active_rewards_account_seat()
+	}
+}
+
+impl<T: crate::Config> BlockRewardAccountsProviderWeightInfo for ProviderWeightAdapter<T> {
+	fn get_block_rewards_account() -> Weight {
+		T::WeightInfo::provider_get_block_rewards_account()
+	}
+
+	fn is_compute_block_eligible_for_rewards() -> Weight {
+		T::WeightInfo::provider_is_compute_block_eligible_for_rewards()
 	}
 }
 
@@ -125,6 +146,14 @@ impl WeightInfo for () {
 	}
 
 	fn provider_has_active_rewards_account_seat() -> Weight {
+		Weight::zero()
+	}
+
+	fn provider_get_block_rewards_account() -> Weight {
+		Weight::zero()
+	}
+
+	fn provider_is_compute_block_eligible_for_rewards() -> Weight {
 		Weight::zero()
 	}
 }

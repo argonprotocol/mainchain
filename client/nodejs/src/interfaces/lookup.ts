@@ -2495,6 +2495,9 @@ export default {
       set_block_rewards_paused: {
         paused: 'bool',
       },
+      set_block_voter_rewards_enabled: {
+        enabled: 'bool',
+      },
     },
   },
   /**
