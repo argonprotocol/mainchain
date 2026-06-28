@@ -513,6 +513,27 @@ fn it_holds_ownership_tokens_for_a_slot() {
 }
 
 #[test]
+fn it_requires_operational_account_registration_when_invite_only() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		OperationalAccountsInviteOnly::set(true);
+		IsNextSlotBiddingOpen::<Test>::set(true);
+		ArgonotsPerMiningSeat::<Test>::set(1);
+		set_ownership(1, 1);
+
+		assert_noop!(
+			MiningSlots::bid(RuntimeOrigin::signed(1), 0, 1.into(), None),
+			Error::<Test>::OperationalAccountRegistrationRequired
+		);
+
+		RegisteredOperationalAccounts::mutate(|accounts| {
+			accounts.insert(1);
+		});
+		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(1), 0, 1.into(), None));
+	});
+}
+
+#[test]
 fn it_wont_accept_bids_until_bidding_starts() {
 	TicksBetweenSlots::set(4);
 	FramesPerMiningTerm::set(3);

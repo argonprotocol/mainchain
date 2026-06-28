@@ -1,13 +1,13 @@
 use crate as pallet_mining_slot;
 use argon_primitives::{
 	block_seal::MiningSlotConfig, providers::OnNewSlot, tick::Ticker, ArgonCPI, BlockNumber,
-	BlockSealerInfo, BlockSealerProvider, OperationalAccountsHook, PriceProvider, TickProvider,
-	VotingSchedule,
+	BlockSealerInfo, BlockSealerProvider, OperationalAccountProvider, OperationalAccountsHook,
+	PriceProvider, TickProvider, VotingSchedule,
 };
 use frame_support::traits::{Currency, StorageMapShim};
 use pallet_prelude::*;
 use sp_runtime::{impl_opaque_keys, testing::UintAuthorityId};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 type Block = frame_system::mocking::MockBlock<Test>;
 
@@ -107,6 +107,8 @@ parameter_types! {
 	pub static LastSlotAdded: Vec<(u64, UintAuthorityId)> = vec![];
 	pub static GrandaRotations: Vec<FrameId> = vec![];
 	pub static MiningSeatsWon: Vec<u64> = vec![];
+	pub static OperationalAccountsInviteOnly: bool = false;
+	pub static RegisteredOperationalAccounts: BTreeSet<u64> = BTreeSet::new();
 
 	// set slot bidding active by default
 	pub static ElapsedTicks: u64 = 3;
@@ -171,6 +173,16 @@ impl OperationalAccountsHook<u64, Balance> for StaticOperationalAccountsHook {
 
 	fn mining_seat_won(miner_account: &u64) {
 		MiningSeatsWon::mutate(|accounts| accounts.push(*miner_account));
+	}
+}
+
+pub struct MockOperationalAccountProvider;
+impl OperationalAccountProvider<u64> for MockOperationalAccountProvider {
+	type Weights = ();
+
+	fn is_eligible(account_id: &u64) -> bool {
+		!OperationalAccountsInviteOnly::get() ||
+			RegisteredOperationalAccounts::get().contains(account_id)
 	}
 }
 
@@ -295,6 +307,7 @@ impl pallet_mining_slot::Config for Test {
 	type PriceProvider = StaticPriceProvider;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type MiningBidPoolAccount = BidPoolAccountId;
+	type OperationalAccountProvider = MockOperationalAccountProvider;
 	type OperationalAccountsHook = StaticOperationalAccountsHook;
 	type SlotEvents = (StaticNewSlotEvent,);
 	type GrandpaRotationBlocks = GrandpaRotationFrequency;
@@ -307,6 +320,8 @@ impl pallet_mining_slot::Config for Test {
 
 pub fn new_test_ext() -> TestState {
 	AverageMicrogonsPerArgonotByFrame::set(BTreeMap::new());
+	OperationalAccountsInviteOnly::set(false);
+	RegisteredOperationalAccounts::set(BTreeSet::new());
 	new_test_with_genesis::<Test>(|t: &mut Storage| {
 		let mining_config = MiningSlotConfig {
 			slot_bidding_start_after_ticks: SlotBiddingStartAfterTicks::get(),

@@ -116,6 +116,25 @@ fn it_can_create_a_vault() {
 }
 
 #[test]
+fn it_requires_operational_account_registration_when_invite_only() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		OperationalAccountsInviteOnly::set(true);
+		set_argons(1, 100_010);
+
+		assert_noop!(
+			Vaults::create(RuntimeOrigin::signed(1), default_vault()),
+			Error::<Test>::OperationalAccountRegistrationRequired
+		);
+
+		RegisteredOperationalAccounts::mutate(|accounts| {
+			accounts.insert(1);
+		});
+		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), default_vault()));
+	});
+}
+
+#[test]
 fn it_can_create_a_vault_with_a_delegate_account() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);

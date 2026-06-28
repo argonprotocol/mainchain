@@ -1,7 +1,8 @@
 use argon_primitives::{
 	vault::{BitcoinVaultProvider, BitcoinVaultProviderWeightInfo},
-	MiningSlotProvider, MiningSlotProviderWeightInfo, TreasuryPoolProvider,
-	TreasuryPoolProviderWeightInfo, UniswapTransferProvider, UniswapTransferProviderWeightInfo,
+	MiningSlotProvider, MiningSlotProviderWeightInfo, OperationalAccountProviderWeightInfo,
+	TreasuryPoolProvider, TreasuryPoolProviderWeightInfo, UniswapTransferProvider,
+	UniswapTransferProviderWeightInfo,
 };
 use core::marker::PhantomData;
 use pallet_prelude::*;
@@ -132,6 +133,13 @@ where
 
 	fn on_uniswap_transfer() -> Weight {
 		Base::on_uniswap_transfer()
+	}
+}
+
+pub struct ProviderWeightAdapter<T>(PhantomData<T>);
+impl<T: crate::Config> OperationalAccountProviderWeightInfo for ProviderWeightAdapter<T> {
+	fn is_eligible() -> Weight {
+		T::DbWeight::get().reads(3)
 	}
 }
 

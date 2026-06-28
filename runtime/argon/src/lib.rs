@@ -305,6 +305,10 @@ impl pallet_vaults::Config for Runtime {
 	type MaxRecentCapacityDropsPerVault = MaxRecentCapacityDropsPerVault;
 	type CapacityDropAttemptUnit = CapacityDropAttemptUnit;
 	type OperationalAccountsHook = use_unless_benchmark!(OperationalAccounts, ());
+	type OperationalAccountProvider = use_unless_benchmark!(
+		OperationalAccounts,
+		benchmarking::BenchmarkOperationalAccountProvider<AccountId>
+	);
 	type CollectBlockerProvider = use_unless_benchmark!(CrosschainTransfer, ());
 }
 
@@ -452,6 +456,10 @@ impl pallet_mining_slot::Config for Runtime {
 		use_unless_benchmark!(PriceIndex, benchmarking::BenchmarkPriceProvider<Balance>);
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type MiningBidPoolAccount = TreasuryMiningBidPoolAccount;
+	type OperationalAccountProvider = use_unless_benchmark!(
+		OperationalAccounts,
+		benchmarking::BenchmarkOperationalAccountProvider<AccountId>
+	);
 	type OperationalAccountsHook = use_unless_benchmark!(OperationalAccounts, ());
 	type SlotEvents = use_unless_benchmark!(
 		(GrandpaSlotRotation, BlockRewards, Treasury, Vaults),

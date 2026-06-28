@@ -1,5 +1,8 @@
 use argon_primitives::{
-	providers::{CollectBlockerProvider, TickProvider, TickProviderWeightInfo},
+	providers::{
+		CollectBlockerProvider, OperationalAccountProvider, OperationalAccountProviderWeightInfo,
+		TickProvider, TickProviderWeightInfo,
+	},
 	vault::BitcoinVaultProviderWeightInfo,
 };
 use core::marker::PhantomData;
@@ -38,23 +41,45 @@ type CollectBlockerProviderWeights<T> =
 	<<T as crate::Config>::CollectBlockerProvider as CollectBlockerProvider<
 		<T as frame_system::Config>::AccountId,
 	>>::Weights;
+type OperationalAccountProviderWeights<T> =
+	<<T as crate::Config>::OperationalAccountProvider as OperationalAccountProvider<
+		<T as frame_system::Config>::AccountId,
+	>>::Weights;
 
 pub struct WithProviderWeights<
 	T,
 	Base,
 	TickProviderWeight = TickProviderWeights<T>,
 	CollectBlockerWeight = CollectBlockerProviderWeights<T>,
->(PhantomData<(T, Base, TickProviderWeight, CollectBlockerWeight)>);
-impl<T, Base, TickProviderWeight, CollectBlockerWeight> WeightInfo
-	for WithProviderWeights<T, Base, TickProviderWeight, CollectBlockerWeight>
+	OperationalAccountProviderWeight = OperationalAccountProviderWeights<T>,
+>(
+	PhantomData<(
+		T,
+		Base,
+		TickProviderWeight,
+		CollectBlockerWeight,
+		OperationalAccountProviderWeight,
+	)>,
+);
+impl<T, Base, TickProviderWeight, CollectBlockerWeight, OperationalAccountProviderWeight> WeightInfo
+	for WithProviderWeights<
+		T,
+		Base,
+		TickProviderWeight,
+		CollectBlockerWeight,
+		OperationalAccountProviderWeight,
+	>
 where
 	T: crate::Config,
 	Base: WeightInfo,
 	TickProviderWeight: TickProviderWeightInfo,
 	CollectBlockerWeight: argon_primitives::CollectBlockerProviderWeightInfo,
+	OperationalAccountProviderWeight: OperationalAccountProviderWeightInfo,
 {
 	fn create() -> Weight {
-		Base::create().saturating_add(TickProviderWeight::current_tick())
+		Base::create()
+			.saturating_add(TickProviderWeight::current_tick())
+			.saturating_add(OperationalAccountProviderWeight::is_eligible())
 	}
 
 	fn modify_funding() -> Weight {

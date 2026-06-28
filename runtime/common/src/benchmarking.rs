@@ -21,8 +21,8 @@ use argon_primitives::{
 	vault::{
 		BitcoinVaultProvider, LockExtension, RegistrationVaultData, Securitization, VaultError,
 	},
-	EthereumVerifyProvider, MiningSlotProvider, Moment, TreasuryPoolProvider,
-	UniswapTransferProvider, VaultId,
+	EthereumVerifyProvider, MiningSlotProvider, Moment, OperationalAccountProvider,
+	TreasuryPoolProvider, UniswapTransferProvider, VaultId,
 };
 use pallet_bitcoin_locks::BitcoinVerifier;
 pub use pallet_prelude::benchmarking::{
@@ -293,6 +293,22 @@ impl<AccountId> MiningSlotProvider<AccountId>
 		state.call_counters.has_active_rewards_account_seat =
 			state.call_counters.has_active_rewards_account_seat.saturating_add(1);
 		let result = state.has_active_rewards_account_seat;
+		set_benchmark_operational_accounts_provider_state(state);
+		result
+	}
+}
+
+pub struct BenchmarkOperationalAccountProvider<AccountId>(PhantomData<AccountId>);
+
+impl<AccountId> OperationalAccountProvider<AccountId>
+	for BenchmarkOperationalAccountProvider<AccountId>
+{
+	type Weights = ();
+
+	fn is_eligible(_account_id: &AccountId) -> bool {
+		let mut state = benchmark_operational_accounts_provider_state();
+		state.call_counters.is_eligible = state.call_counters.is_eligible.saturating_add(1);
+		let result = state.is_eligible;
 		set_benchmark_operational_accounts_provider_state(state);
 		result
 	}

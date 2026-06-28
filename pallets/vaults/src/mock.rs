@@ -9,7 +9,8 @@ use argon_bitcoin::{
 use argon_primitives::{
 	bitcoin::{BitcoinHeight, BitcoinNetwork},
 	tick::Ticker,
-	CollectBlockerProvider, MiningFrameProvider, TickProvider, VotingSchedule,
+	CollectBlockerProvider, MiningFrameProvider, OperationalAccountProvider, TickProvider,
+	VotingSchedule,
 };
 use frame_support::traits::Currency;
 use pallet_bitcoin_locks::BitcoinVerifier;
@@ -104,6 +105,8 @@ parameter_types! {
 
 	pub static PercentForTreasuryReserves: Percent = Percent::from_percent(20);
 	pub static OverdueCollectBlockers: BTreeSet<u64> = BTreeSet::new();
+	pub static OperationalAccountsInviteOnly: bool = false;
+	pub static RegisteredOperationalAccounts: BTreeSet<u64> = BTreeSet::new();
 
 }
 pub struct StaticMiningFrameProvider;
@@ -167,6 +170,16 @@ impl CollectBlockerProvider<u64> for MockCollectBlockerProvider {
 	}
 }
 
+pub struct MockOperationalAccountProvider;
+impl OperationalAccountProvider<u64> for MockOperationalAccountProvider {
+	type Weights = ();
+
+	fn is_eligible(account_id: &u64) -> bool {
+		!OperationalAccountsInviteOnly::get() ||
+			RegisteredOperationalAccounts::get().contains(account_id)
+	}
+}
+
 impl pallet_vaults::Config for Test {
 	type WeightInfo = ();
 	type Currency = Balances;
@@ -190,6 +203,7 @@ impl pallet_vaults::Config for Test {
 	type MaxRecentCapacityDropsPerVault = MaxRecentCapacityDropsPerVault;
 	type CapacityDropAttemptUnit = CapacityDropAttemptUnit;
 	type OperationalAccountsHook = ();
+	type OperationalAccountProvider = MockOperationalAccountProvider;
 	type CollectBlockerProvider = MockCollectBlockerProvider;
 }
 
@@ -344,5 +358,7 @@ impl pallet_bitcoin_locks::Config for Test {
 
 pub fn new_test_ext() -> TestState {
 	OverdueCollectBlockers::set(BTreeSet::new());
+	OperationalAccountsInviteOnly::set(false);
+	RegisteredOperationalAccounts::set(BTreeSet::new());
 	new_test_with_genesis::<Test>(|_t| {})
 }

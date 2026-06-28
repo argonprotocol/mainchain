@@ -76,6 +76,16 @@ impl MiningSlotProviderWeightInfo for () {
 	}
 }
 
+pub trait OperationalAccountProviderWeightInfo {
+	fn is_eligible() -> Weight;
+}
+
+impl OperationalAccountProviderWeightInfo for () {
+	fn is_eligible() -> Weight {
+		Weight::zero()
+	}
+}
+
 pub trait TreasuryPoolProviderWeightInfo {
 	fn has_bond_participation() -> Weight;
 	fn encumber_bond_microgons() -> Weight;
@@ -328,6 +338,20 @@ pub trait MiningSlotProvider<AccountId> {
 	type Weights: MiningSlotProviderWeightInfo;
 
 	fn has_active_rewards_account_seat(account_id: &AccountId) -> bool;
+}
+
+pub trait OperationalAccountProvider<AccountId> {
+	type Weights: OperationalAccountProviderWeightInfo;
+
+	fn is_eligible(account_id: &AccountId) -> bool;
+}
+
+impl<AccountId> OperationalAccountProvider<AccountId> for () {
+	type Weights = ();
+
+	fn is_eligible(_account_id: &AccountId) -> bool {
+		true
+	}
 }
 
 pub trait TreasuryPoolProvider<AccountId> {

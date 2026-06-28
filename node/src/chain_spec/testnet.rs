@@ -86,6 +86,7 @@ pub fn testnet_config() -> Result<ChainSpec, String> {
 			},
 			minimum_bitcoin_lock_satoshis: 5_000,
 			ethereum_beacon_preset: EthereumBeaconPreset::Mainnet,
+			is_operational_account_invite_only: true,
 		}
 	))
 	.build())
