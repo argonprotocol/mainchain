@@ -9,6 +9,7 @@ pub trait WeightInfo {
 	fn set_operator() -> Weight;
 	fn provider_get_lowest_microgons_per_argonot() -> Weight;
 	fn provider_get_average_microgons_per_argonot() -> Weight;
+	fn provider_get_liquidity_change_needed() -> Weight;
 }
 
 pub struct ProviderWeightAdapter<T>(PhantomData<T>);
@@ -19,6 +20,10 @@ impl<T: crate::Config> PriceProviderWeightInfo for ProviderWeightAdapter<T> {
 
 	fn get_average_microgons_per_argonot() -> Weight {
 		<T as crate::Config>::WeightInfo::provider_get_average_microgons_per_argonot()
+	}
+
+	fn get_liquidity_change_needed() -> Weight {
+		<T as crate::Config>::WeightInfo::provider_get_liquidity_change_needed()
 	}
 }
 
@@ -37,6 +42,9 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 	fn provider_get_average_microgons_per_argonot() -> Weight {
+		Weight::zero()
+	}
+	fn provider_get_liquidity_change_needed() -> Weight {
 		Weight::zero()
 	}
 }

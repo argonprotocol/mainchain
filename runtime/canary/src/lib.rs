@@ -204,7 +204,10 @@ impl Get<Tick> for NotebookTickProvider {
 }
 
 impl pallet_block_rewards::Config for Runtime {
-	type WeightInfo = pallet_block_rewards::weights::WithProviderWeights<Runtime, ()>;
+	type WeightInfo = pallet_block_rewards::weights::WithProviderWeights<
+		Runtime,
+		weights::pallet_block_rewards::WeightInfo<Runtime>,
+	>;
 	type ArgonCurrency = Balances;
 	type OwnershipCurrency = Ownership;
 	type Balance = Balance;
@@ -452,7 +455,10 @@ impl pallet_mining_slot::Config for Runtime {
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type MiningBidPoolAccount = TreasuryMiningBidPoolAccount;
 	type OperationalAccountsHook = use_unless_benchmark!(OperationalAccounts, ());
-	type SlotEvents = (GrandpaSlotRotation, BlockRewards, Treasury, Vaults);
+	type SlotEvents = use_unless_benchmark!(
+		(GrandpaSlotRotation, BlockRewards, Treasury, Vaults),
+		(GrandpaSlotRotation,)
+	);
 	type GrandpaRotationBlocks = GrandpaRotationBlocks;
 	type MiningAuthorityId = BlockSealAuthorityId;
 	type Keys = SessionKeys;

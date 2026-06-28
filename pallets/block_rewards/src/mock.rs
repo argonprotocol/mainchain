@@ -155,6 +155,8 @@ impl NotebookProvider for TestProvider {
 
 pub struct StaticBlockRewardAccountsProvider;
 impl BlockRewardAccountsProvider<u64> for StaticBlockRewardAccountsProvider {
+	type Weights = ();
+
 	fn get_block_rewards_account(author: &u64) -> Option<(u64, FrameId)> {
 		AccountCohorts::get().iter().find(|(a, _)| a == author).cloned()
 	}

@@ -508,6 +508,10 @@ declare module '@polkadot/api-base/types/submittable' {
         (paused: bool | boolean | Uint8Array) => SubmittableExtrinsic<ApiType>,
         [bool]
       >;
+      setBlockVoterRewardsEnabled: AugmentedSubmittable<
+        (enabled: bool | boolean | Uint8Array) => SubmittableExtrinsic<ApiType>,
+        [bool]
+      >;
     };
     blockSeal: {
       apply: AugmentedSubmittable<

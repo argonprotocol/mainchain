@@ -1,6 +1,6 @@
 use crate::{
 	mock::{Balances, BlockRewards, Ownership, *},
-	pallet::{ArgonsPerBlock, BlockRewardsByCohort},
+	pallet::{ArgonsPerBlock, BlockRewardsByCohort, BlockVoterRewardsEnabled},
 	Event, RewardAmounts,
 };
 use argon_primitives::{
@@ -25,6 +25,7 @@ fn it_mints_immediately_available_funds() {
 	NotebooksInBlock::set(vec![(1, 1, 1)]);
 	NotebookTick::set(1);
 	new_test_ext().execute_with(|| {
+		BlockVoterRewardsEnabled::<Test>::set(true);
 		// Go past genesis block so events get deposited
 		System::set_block_number(1);
 		BlockRewards::on_initialize(1);
@@ -88,6 +89,7 @@ fn it_should_unlock_rewards() {
 		block_seal_authority: None,
 	});
 	new_test_ext().execute_with(|| {
+		BlockVoterRewardsEnabled::<Test>::set(true);
 		// Go past genesis block so events get deposited
 		System::set_block_number(1);
 		NotebooksInBlock::set(vec![(1, 1, 1)]);
@@ -151,6 +153,40 @@ fn it_should_payout_only_to_set_miners() {
 	});
 }
 
+#[test]
+fn it_can_disable_block_voter_rewards() {
+	BlockSealer::set(BlockSealerInfo {
+		block_author_account_id: 1,
+		block_vote_rewards_account: Some(2),
+		block_seal_authority: None,
+	});
+	new_test_ext().execute_with(|| {
+		assert!(!BlockVoterRewardsEnabled::<Test>::get());
+		assert_ok!(BlockRewards::set_block_voter_rewards_enabled(RuntimeOrigin::root(), true));
+		assert!(BlockVoterRewardsEnabled::<Test>::get());
+		assert_ok!(BlockRewards::set_block_voter_rewards_enabled(RuntimeOrigin::root(), false));
+		assert!(!BlockVoterRewardsEnabled::<Test>::get());
+
+		System::set_block_number(1);
+		NotebooksInBlock::set(vec![(1, 1, 1)]);
+		NotebookTick::set(1);
+		BlockRewards::on_initialize(1);
+		BlockRewards::on_finalize(1);
+		System::assert_last_event(
+			Event::RewardCreated {
+				rewards: vec![BlockPayout {
+					account_id: 1,
+					ownership: 3750,
+					argons: 3750,
+					block_seal_authority: None,
+					reward_type: BlockRewardType::Miner,
+				}],
+			}
+			.into(),
+		);
+	});
+}
+
 /// make sure deflationary schedule works
 #[test]
 fn it_should_halve_rewards() {
@@ -160,6 +196,7 @@ fn it_should_halve_rewards() {
 		block_seal_authority: None,
 	});
 	new_test_ext().execute_with(|| {
+		BlockVoterRewardsEnabled::<Test>::set(true);
 		let halving = HalvingBlocks::get() + HalvingBeginBlock::get() + 1;
 		System::set_block_number(halving.into());
 		ElapsedTicks::set(halving as u64);
@@ -243,6 +280,7 @@ fn it_should_scale_rewards_based_on_notaries() {
 	NotebooksInBlock::set(vec![(1, 1, 1)]);
 	NotebookTick::set(1);
 	new_test_ext().execute_with(|| {
+		BlockVoterRewardsEnabled::<Test>::set(true);
 		System::set_block_number(1);
 		BlockRewards::on_initialize(1);
 		BlockRewards::on_finalize(1);
@@ -281,6 +319,7 @@ fn it_should_disable_compute_rewards_after_bidding_begins() {
 	NotebooksInBlock::set(vec![(1, 1, 1)]);
 	NotebookTick::set(1);
 	new_test_ext().execute_with(|| {
+		BlockVoterRewardsEnabled::<Test>::set(true);
 		IsBlockVoteSeal::set(false);
 		IsMiningSlotsActive::set(false);
 		System::set_block_number(1);
@@ -315,6 +354,7 @@ fn it_should_not_fail_with_no_notebooks() {
 	NotebooksInBlock::set(vec![]);
 	NotebookTick::set(1);
 	new_test_ext().execute_with(|| {
+		BlockVoterRewardsEnabled::<Test>::set(true);
 		System::set_block_number(1);
 		BlockRewards::on_initialize(1);
 		BlockRewards::on_finalize(1);
@@ -342,6 +382,7 @@ fn it_should_not_fail_with_no_notaries() {
 	NotebooksInBlock::set(vec![]);
 	NotebookTick::set(1);
 	new_test_ext().execute_with(|| {
+		BlockVoterRewardsEnabled::<Test>::set(true);
 		System::set_block_number(1);
 		BlockRewards::on_initialize(1);
 		BlockRewards::on_finalize(1);
