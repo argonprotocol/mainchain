@@ -1,9 +1,9 @@
 use argon_primitives::{
 	providers::{
 		BlockRewardAccountsProviderWeightInfo, BlockSealerProvider, BlockSealerProviderWeightInfo,
-		MiningSlotProviderWeightInfo,
-		OperationalAccountProvider, OperationalAccountProviderWeightInfo, PriceProviderWeightInfo,
-		TickProvider, TickProviderWeightInfo,
+		MiningSlotProviderWeightInfo, OperationalAccountProvider,
+		OperationalAccountProviderWeightInfo, PriceProviderWeightInfo, TickProvider,
+		TickProviderWeightInfo,
 	},
 	PriceProvider,
 };

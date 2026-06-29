@@ -3659,6 +3659,7 @@ declare module '@polkadot/types/lookup' {
     readonly isInsufficientFunds: boolean;
     readonly isBidCannotBeReduced: boolean;
     readonly isInvalidBidAmount: boolean;
+    readonly isOperationalAccountRegistrationRequired: boolean;
     readonly isUnrecoverableHold: boolean;
     readonly type:
       | 'SlotNotTakingBids'
@@ -3670,6 +3671,7 @@ declare module '@polkadot/types/lookup' {
       | 'InsufficientFunds'
       | 'BidCannotBeReduced'
       | 'InvalidBidAmount'
+      | 'OperationalAccountRegistrationRequired'
       | 'UnrecoverableHold';
   }
 
@@ -3841,6 +3843,7 @@ declare module '@polkadot/types/lookup' {
     readonly isPendingOrphanedUtxoCosignsBeforeCollect: boolean;
     readonly isOverdueCollectBlockersBeforeCollect: boolean;
     readonly isAccountAlreadyHasVault: boolean;
+    readonly isOperationalAccountRegistrationRequired: boolean;
     readonly isCommittedArgonotsBelowEncumberedBacking: boolean;
     readonly type:
       | 'NoMoreVaultIds'
@@ -3875,6 +3878,7 @@ declare module '@polkadot/types/lookup' {
       | 'PendingOrphanedUtxoCosignsBeforeCollect'
       | 'OverdueCollectBlockersBeforeCollect'
       | 'AccountAlreadyHasVault'
+      | 'OperationalAccountRegistrationRequired'
       | 'CommittedArgonotsBelowEncumberedBacking';
   }
 
@@ -4537,6 +4541,7 @@ declare module '@polkadot/types/lookup' {
     readonly isNotOperationalAccount: boolean;
     readonly isInvalidReferralProof: boolean;
     readonly isReferralProofExpired: boolean;
+    readonly isRegistrationInviteRequired: boolean;
     readonly isNoProgressUpdateProvided: boolean;
     readonly isEncryptedServerTooLong: boolean;
     readonly isNotSponsorOfSponsee: boolean;
@@ -4555,6 +4560,7 @@ declare module '@polkadot/types/lookup' {
       | 'NotOperationalAccount'
       | 'InvalidReferralProof'
       | 'ReferralProofExpired'
+      | 'RegistrationInviteRequired'
       | 'NoProgressUpdateProvided'
       | 'EncryptedServerTooLong'
       | 'NotSponsorOfSponsee'
