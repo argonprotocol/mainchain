@@ -542,6 +542,26 @@ fn sync_committee_prepare_rejects_infinity_public_keys() {
 	));
 }
 
+#[test]
+fn sync_committee_prepare_rejects_non_subgroup_public_keys() {
+	// Mirrors the compressed `(0, 2)` G1 test vector from `snowbridge-milagro-bls`, which
+	// deserializes on the unchecked path but fails subgroup validation.
+	let mut non_subgroup_bytes = [0u8; 48];
+	non_subgroup_bytes[0] = 128;
+	let non_subgroup_pubkey = PublicKey::from(non_subgroup_bytes);
+	let committee = SyncCommittee {
+		pubkeys: vec![non_subgroup_pubkey; MINIMAL_SYNC_COMMITTEE_SIZE]
+			.try_into()
+			.expect("minimal committee length is bounded"),
+		aggregate_pubkey: non_subgroup_pubkey,
+	};
+
+	assert!(matches!(
+		committee.prepare(EthereumBeaconPreset::Minimal),
+		Err(TypeError::PreparePublicKeysFailed)
+	));
+}
+
 /* SYNC PROCESS TESTS */
 
 #[test]
