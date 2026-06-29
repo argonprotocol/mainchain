@@ -3396,9 +3396,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				250u8, 56u8, 110u8, 224u8, 54u8, 170u8, 253u8, 159u8, 160u8, 191u8, 165u8, 100u8,
-				31u8, 30u8, 25u8, 171u8, 86u8, 134u8, 145u8, 207u8, 59u8, 196u8, 246u8, 9u8, 21u8,
-				10u8, 224u8, 140u8, 54u8, 107u8, 42u8, 130u8,
+				84u8, 192u8, 154u8, 50u8, 211u8, 5u8, 188u8, 159u8, 35u8, 43u8, 152u8, 112u8,
+				116u8, 125u8, 185u8, 59u8, 87u8, 105u8, 146u8, 116u8, 188u8, 41u8, 205u8, 140u8,
+				181u8, 224u8, 148u8, 234u8, 104u8, 11u8, 203u8, 122u8,
 			]
 	}
 	pub mod system {
@@ -16793,9 +16793,9 @@ pub mod api {
 						"BlockVoterRewardsEnabled",
 						(),
 						[
-							61u8, 53u8, 117u8, 26u8, 18u8, 95u8, 199u8, 248u8, 21u8, 89u8, 195u8,
-							46u8, 39u8, 205u8, 123u8, 20u8, 9u8, 154u8, 67u8, 119u8, 94u8, 81u8,
-							96u8, 131u8, 197u8, 173u8, 51u8, 24u8, 7u8, 159u8, 230u8, 150u8,
+							106u8, 148u8, 216u8, 159u8, 2u8, 3u8, 158u8, 129u8, 244u8, 31u8, 88u8,
+							236u8, 204u8, 196u8, 190u8, 0u8, 10u8, 5u8, 205u8, 213u8, 109u8, 161u8,
+							99u8, 37u8, 131u8, 251u8, 96u8, 217u8, 140u8, 73u8, 84u8, 252u8,
 						],
 					)
 				}
@@ -23172,6 +23172,7 @@ pub mod api {
 				#[doc = "Register vault, mining funding, and bot accounts for an operational account."]
 				#[doc = "Any account in the registration may submit the transaction."]
 				#[doc = "If a referral proof is provided, the registration records the sponsor relationship."]
+				#[doc = "When invite-only is enabled, a valid referral proof is required."]
 				pub struct Register {
 					pub registration: register::Registration,
 				}
@@ -23313,6 +23314,7 @@ pub mod api {
 				#[doc = "Register vault, mining funding, and bot accounts for an operational account."]
 				#[doc = "Any account in the registration may submit the transaction."]
 				#[doc = "If a referral proof is provided, the registration records the sponsor relationship."]
+				#[doc = "When invite-only is enabled, a valid referral proof is required."]
 				pub fn register(
 					&self,
 					registration: types::register::Registration,
@@ -23635,6 +23637,10 @@ pub mod api {
 					use super::runtime_types;
 					pub type ExpiredReferralCodeCleanupFrame = ::core::primitive::u64;
 				}
+				pub mod is_operational_account_invite_only {
+					use super::runtime_types;
+					pub type IsOperationalAccountInviteOnly = ::core::primitive::bool;
+				}
 				pub mod rewards {
 					use super::runtime_types;
 					pub type Rewards =
@@ -23892,6 +23898,34 @@ pub mod api {
 							29u8, 48u8, 189u8, 150u8, 52u8, 134u8, 170u8, 212u8, 175u8, 170u8,
 							207u8, 204u8, 227u8, 65u8, 174u8, 213u8, 68u8, 242u8, 192u8, 7u8,
 							202u8,
+						],
+					)
+				}
+				#[doc = " Whether operational-account access is invite-only."]
+				#[doc = ""]
+				#[doc = " When enabled, registration requires a valid referral invite and vault creation plus"]
+				#[doc = " mining-slot bidding remain restricted to registered operational accounts."]
+				#[doc = ""]
+				#[doc = " Existing live raw chain specs do not contain this key, so the default remains invite-only"]
+				#[doc = " unless a development chain overrides it in genesis."]
+				pub fn is_operational_account_invite_only(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::is_operational_account_invite_only::IsOperationalAccountInviteOnly,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"OperationalAccounts",
+						"IsOperationalAccountInviteOnly",
+						(),
+						[
+							153u8, 178u8, 221u8, 225u8, 183u8, 177u8, 153u8, 151u8, 115u8, 201u8,
+							245u8, 116u8, 86u8, 159u8, 23u8, 192u8, 101u8, 128u8, 152u8, 15u8,
+							253u8, 73u8, 73u8, 173u8, 74u8, 60u8, 216u8, 22u8, 243u8, 130u8, 76u8,
+							8u8,
 						],
 					)
 				}
@@ -33605,6 +33639,9 @@ pub mod api {
 					#[doc = "Bids must be in allowed increments"]
 					InvalidBidAmount,
 					#[codec(index = 9)]
+					#[doc = "Mining slot bidding currently requires prior operational-account registration."]
+					OperationalAccountRegistrationRequired,
+					#[codec(index = 10)]
 					#[doc = "The argonots on hold cannot be released"]
 					UnrecoverableHold,
 				}
@@ -34429,7 +34466,7 @@ pub mod api {
 				)]
 				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 				pub enum Call {
-					# [codec (index = 0)] # [doc = "Register vault, mining funding, and bot accounts for an operational account."] # [doc = "Any account in the registration may submit the transaction."] # [doc = "If a referral proof is provided, the registration records the sponsor relationship."] register { registration : runtime_types :: pallet_operational_accounts :: pallet :: Registration , } , # [codec (index = 2)] # [doc = "Update reward amounts for operational accounts."] set_reward_config { operational_referral_reward : :: core :: primitive :: u128 , referral_bonus_reward : :: core :: primitive :: u128 , } , # [codec (index = 3)] # [doc = "Force-update operational progress markers for an account."] force_set_progress { owner : crate :: types :: AccountId32 , patch : runtime_types :: pallet_operational_accounts :: pallet :: OperationalProgressPatch < :: core :: primitive :: u128 > , update_operational_progress : :: core :: primitive :: bool , } , # [codec (index = 4)] # [doc = "Store an opaque encrypted sponsor server payload for a sponsored operational account."] set_encrypted_server_for_sponsee { sponsee : crate :: types :: AccountId32 , encrypted_server : :: subxt :: ext :: subxt_core :: alloc :: vec :: Vec < :: core :: primitive :: u8 > , } , # [codec (index = 5)] # [doc = "Activate an eligible operational account from any managed account."] activate , # [codec (index = 6)] # [doc = "Claim pending operational rewards to any managed account."] claim_rewards { amount : :: core :: primitive :: u128 , } , }
+					# [codec (index = 0)] # [doc = "Register vault, mining funding, and bot accounts for an operational account."] # [doc = "Any account in the registration may submit the transaction."] # [doc = "If a referral proof is provided, the registration records the sponsor relationship."] # [doc = "When invite-only is enabled, a valid referral proof is required."] register { registration : runtime_types :: pallet_operational_accounts :: pallet :: Registration , } , # [codec (index = 2)] # [doc = "Update reward amounts for operational accounts."] set_reward_config { operational_referral_reward : :: core :: primitive :: u128 , referral_bonus_reward : :: core :: primitive :: u128 , } , # [codec (index = 3)] # [doc = "Force-update operational progress markers for an account."] force_set_progress { owner : crate :: types :: AccountId32 , patch : runtime_types :: pallet_operational_accounts :: pallet :: OperationalProgressPatch < :: core :: primitive :: u128 > , update_operational_progress : :: core :: primitive :: bool , } , # [codec (index = 4)] # [doc = "Store an opaque encrypted sponsor server payload for a sponsored operational account."] set_encrypted_server_for_sponsee { sponsee : crate :: types :: AccountId32 , encrypted_server : :: subxt :: ext :: subxt_core :: alloc :: vec :: Vec < :: core :: primitive :: u8 > , } , # [codec (index = 5)] # [doc = "Activate an eligible operational account from any managed account."] activate , # [codec (index = 6)] # [doc = "Claim pending operational rewards to any managed account."] claim_rewards { amount : :: core :: primitive :: u128 , } , }
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
 					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
@@ -34466,33 +34503,36 @@ pub mod api {
 					#[doc = "The referral proof has expired."]
 					ReferralProofExpired,
 					#[codec(index = 7)]
+					#[doc = "A valid invite is required to register an operational account."]
+					RegistrationInviteRequired,
+					#[codec(index = 8)]
 					#[doc = "The requested progress patch does not contain any updates."]
 					NoProgressUpdateProvided,
-					#[codec(index = 8)]
+					#[codec(index = 9)]
 					#[doc = "The encrypted server payload exceeds the configured max length."]
 					EncryptedServerTooLong,
-					#[codec(index = 9)]
+					#[codec(index = 10)]
 					#[doc = "The caller is not the sponsor of the requested sponsee."]
 					NotSponsorOfSponsee,
-					#[codec(index = 10)]
+					#[codec(index = 11)]
 					#[doc = "The operational account has no pending rewards to claim."]
 					NoPendingRewards,
-					#[codec(index = 11)]
+					#[codec(index = 12)]
 					#[doc = "Reward claims must be at least one Argon."]
 					RewardClaimBelowMinimum,
-					#[codec(index = 12)]
+					#[codec(index = 13)]
 					#[doc = "Reward claims must be whole Argon increments."]
 					RewardClaimNotWholeArgon,
-					#[codec(index = 13)]
+					#[codec(index = 14)]
 					#[doc = "The requested reward claim exceeds pending rewards."]
 					RewardClaimExceedsPending,
-					#[codec(index = 14)]
+					#[codec(index = 15)]
 					#[doc = "The treasury does not currently have enough available reserves for the claim."]
 					TreasuryInsufficientFunds,
-					#[codec(index = 15)]
+					#[codec(index = 16)]
 					#[doc = "The account is already operational."]
 					AlreadyOperational,
-					#[codec(index = 16)]
+					#[codec(index = 17)]
 					#[doc = "The account has not satisfied operational requirements yet."]
 					NotEligibleForActivation,
 				}
@@ -36426,6 +36466,9 @@ pub mod api {
 					#[doc = "An account may only be associated with a single vault"]
 					AccountAlreadyHasVault,
 					#[codec(index = 32)]
+					#[doc = "Vault creation currently requires prior operational-account registration."]
+					OperationalAccountRegistrationRequired,
+					#[codec(index = 33)]
 					#[doc = "Committed Argonots cannot be reduced below the amount already crosschain-encumbered."]
 					CommittedArgonotsBelowEncumberedBacking,
 				}

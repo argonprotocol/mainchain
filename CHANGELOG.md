@@ -1,8 +1,23 @@
 # Changelog
 
-## [v1.4.8](https://github.com/argonprotocol/mainchain/compare/v1.4.7...ceb2baacd255b4c7e353af6d3a23d6055b18124b) (2026-06-25)
+## [v1.4.9](https://github.com/argonprotocol/mainchain/compare/v1.4.8...9f278b47e377936d52802f8ed38d63256de06de4) (2026-06-28)
 
 ### Features
+
+* **block-rewards:** add voter rewards toggle and disable voter rewards by
+default
+([fffe0a0](https://github.com/argonprotocol/mainchain/commit/fffe0a0be20833a4b868459aea5f20deab04706c))
+
+### Fixes
+
+* **runtime:** enforce invite-only operational account access
+([cbe619d](https://github.com/argonprotocol/mainchain/commit/cbe619da16d4032a46f646f65b016b6c3df2f41c))
+* **mining-slot:** floor seat argonots at initial minimum
+([6efae74](https://github.com/argonprotocol/mainchain/commit/6efae7412a32b6cea43065ac6cc4ed524f76ed68))
+
+### [v1.4.8](https://github.com/argonprotocol/mainchain/compare/v1.4.7...v1.4.8) (2026-06-25)
+
+#### Features
 
 * **treasury:** add bonus to bonds
 ([b4140f4](https://github.com/argonprotocol/mainchain/commit/b4140f430a9d86dac9e0a6708896df31219919b6))
@@ -11,7 +26,7 @@
 * add pricing tweaks
 ([3416464](https://github.com/argonprotocol/mainchain/commit/3416464db5edfe5c2649ddd43017996094473038))
 
-### Fixes
+#### Fixes
 
 * nodejs compile issue
 ([7449378](https://github.com/argonprotocol/mainchain/commit/74493782725a18285f3d9fca39d7e4d7de141e7f))

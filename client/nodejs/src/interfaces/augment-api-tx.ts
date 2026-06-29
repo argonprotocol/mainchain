@@ -1169,6 +1169,7 @@ declare module '@polkadot/api-base/types/submittable' {
        * Register vault, mining funding, and bot accounts for an operational account.
        * Any account in the registration may submit the transaction.
        * If a referral proof is provided, the registration records the sponsor relationship.
+       * When invite-only is enabled, a valid referral proof is required.
        **/
       register: AugmentedSubmittable<
         (

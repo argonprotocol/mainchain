@@ -791,6 +791,10 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       InvalidBidAmount: AugmentedError<ApiType>;
       /**
+       * Mining slot bidding currently requires prior operational-account registration.
+       **/
+      OperationalAccountRegistrationRequired: AugmentedError<ApiType>;
+      /**
        * Bidding for the next cohort has closed
        **/
       SlotNotTakingBids: AugmentedError<ApiType>;
@@ -1018,6 +1022,10 @@ declare module '@polkadot/api-base/types/errors' {
        * The referral proof has expired.
        **/
       ReferralProofExpired: AugmentedError<ApiType>;
+      /**
+       * A valid invite is required to register an operational account.
+       **/
+      RegistrationInviteRequired: AugmentedError<ApiType>;
       /**
        * Reward claims must be at least one Argon.
        **/
@@ -1343,6 +1351,10 @@ declare module '@polkadot/api-base/types/errors' {
        * No Vault public keys are available
        **/
       NoVaultBitcoinPubkeysAvailable: AugmentedError<ApiType>;
+      /**
+       * Vault creation currently requires prior operational-account registration.
+       **/
+      OperationalAccountRegistrationRequired: AugmentedError<ApiType>;
       /**
        * A vault must clear out all overdue external collect blockers before it can collect.
        **/

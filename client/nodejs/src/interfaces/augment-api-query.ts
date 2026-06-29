@@ -1267,6 +1267,16 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       expiredReferralCodeCleanupFrame: AugmentedQuery<ApiType, () => Observable<Option<u64>>, []>;
       /**
+       * Whether operational-account access is invite-only.
+       *
+       * When enabled, registration requires a valid referral invite and vault creation plus
+       * mining-slot bidding remain restricted to registered operational accounts.
+       *
+       * Existing live raw chain specs do not contain this key, so the default remains invite-only
+       * unless a development chain overrides it in genesis.
+       **/
+      isOperationalAccountInviteOnly: AugmentedQuery<ApiType, () => Observable<bool>, []>;
+      /**
        * Reverse lookup of any linked account to its operational account id.
        **/
       operationalAccountBySubAccount: AugmentedQuery<
