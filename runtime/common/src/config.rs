@@ -182,7 +182,10 @@ parameter_types! {
 	pub const MaxBtcPriceTickAge: u32 = 30; // 30 minutes of btc prices allowed for locks
 
 	pub const BitcoinLockDuration: u32 = 60 * 24 * 365; // 1 year
-	pub const MaxPendingMintUtxos: u32 = 10_000;
+	pub const MaxPendingMintsPerUtxo: u32 = 50;
+	pub const MaxPendingMintPayoutWindowSize: u32 = 1_000;
+	/// The maximum share of a queued bitcoin mint that may be paid in a single frame.
+	pub const BitcoinMintPayoutPercentPerFrame: Percent = Percent::from_percent(10);
 	pub const MaxMintHistoryToMaintain: u32 = 10; // keep all active sessions + the rollover
 	pub const MaxPossibleMiners: u32 = MaxCohortSize::get() * 10u32;
 

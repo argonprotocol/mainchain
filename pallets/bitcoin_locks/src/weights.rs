@@ -13,7 +13,9 @@
 #![allow(unused_parens)]
 #![allow(unused_imports)]
 
-use argon_primitives::providers::BitcoinUtxoEventsWeightInfo;
+use super::Config;
+use argon_primitives::providers::{BitcoinUtxoEventsWeightInfo, UtxoLockEvents};
+use argon_primitives::UtxoLockEventsWeightInfo;
 use pallet_prelude::*;
 
 /// Weight functions needed for pallet_bitcoin_locks.
@@ -57,8 +59,6 @@ pub trait WeightInfo {
 	fn cosign_orphaned_utxo_release() -> Weight;
 	fn increase_securitization() -> Weight;
 
-	fn register_fee_coupon() -> Weight;
-
 	// Bitcoin UTXO event handler provider weights
 	fn provider_funding_received() -> Weight;
 	fn provider_timeout_waiting_for_funding() -> Weight;
@@ -68,34 +68,130 @@ pub trait WeightInfo {
 	fn provider_spent() -> Weight;
 }
 
+type LockEventWeights<T> = <<T as Config>::LockEvents as UtxoLockEvents<
+	<T as frame_system::Config>::AccountId,
+	<T as Config>::Balance,
+>>::Weights;
 
 /// Placeholder implementation for tests and no-std environments
 pub struct SubstrateWeight<T>(PhantomData<T>);
 
+pub struct WithProviderWeights<T, Base, LockEventWeight = LockEventWeights<T>>(
+	PhantomData<(T, Base, LockEventWeight)>,
+);
+impl<T, Base, LockEventWeight> WeightInfo for WithProviderWeights<T, Base, LockEventWeight>
+where
+	T: Config,
+	Base: WeightInfo,
+	LockEventWeight: UtxoLockEventsWeightInfo,
+{
+	fn initialize() -> Weight {
+		Base::initialize()
+	}
+
+	fn initialize_for() -> Weight {
+		Base::initialize_for()
+	}
+
+	fn request_release() -> Weight {
+		Base::request_release()
+	}
+
+	fn cosign_release() -> Weight {
+		Base::cosign_release().saturating_add(LockEventWeight::utxo_released())
+	}
+
+	fn ratchet() -> Weight {
+		Base::ratchet()
+			.saturating_add(LockEventWeight::utxo_locked())
+			.saturating_add(LockEventWeight::utxo_released())
+	}
+
+	fn on_initialize_base() -> Weight {
+		Base::on_initialize_base()
+	}
+
+	fn on_initialize_expiring_locks(n: u32) -> Weight {
+		Base::on_initialize_expiring_locks(n)
+			.saturating_add(LockEventWeight::utxo_released().saturating_mul(n.into()))
+	}
+
+	fn on_initialize_overdue_releases(n: u32) -> Weight {
+		Base::on_initialize_overdue_releases(n)
+			.saturating_add(LockEventWeight::utxo_released().saturating_mul(n.into()))
+	}
+
+	fn on_initialize_orphan_expirations(n: u32) -> Weight {
+		Base::on_initialize_orphan_expirations(n)
+	}
+
+	fn admin_modify_minimum_locked_sats() -> Weight {
+		Base::admin_modify_minimum_locked_sats()
+	}
+
+	fn request_orphaned_utxo_release() -> Weight {
+		Base::request_orphaned_utxo_release()
+	}
+
+	fn cosign_orphaned_utxo_release() -> Weight {
+		Base::cosign_orphaned_utxo_release()
+	}
+
+	fn increase_securitization() -> Weight {
+		Base::increase_securitization()
+	}
+
+	fn provider_funding_received() -> Weight {
+		Base::provider_funding_received().saturating_add(LockEventWeight::utxo_locked())
+	}
+
+	fn provider_timeout_waiting_for_funding() -> Weight {
+		Base::provider_timeout_waiting_for_funding()
+	}
+
+	fn provider_funding_promoted_by_account() -> Weight {
+		Base::provider_funding_promoted_by_account()
+			.saturating_add(LockEventWeight::utxo_locked())
+	}
+
+	fn provider_candidate_rejected_by_account() -> Weight {
+		Base::provider_candidate_rejected_by_account()
+	}
+
+	fn provider_orphaned_utxo_detected() -> Weight {
+		Base::provider_orphaned_utxo_detected()
+	}
+
+	fn provider_spent() -> Weight {
+		Base::provider_spent()
+			.saturating_add(LockEventWeight::utxo_released_with_pending_mints())
+	}
+}
+
 pub struct ProviderWeightAdapter<T>(PhantomData<T>);
-impl<T: crate::Config> BitcoinUtxoEventsWeightInfo for ProviderWeightAdapter<T> {
+impl<T: Config> BitcoinUtxoEventsWeightInfo for ProviderWeightAdapter<T> {
 	fn funding_received() -> Weight {
-		<T as crate::Config>::WeightInfo::provider_funding_received()
+		<T as Config>::WeightInfo::provider_funding_received()
 	}
 
 	fn timeout_waiting_for_funding() -> Weight {
-		<T as crate::Config>::WeightInfo::provider_timeout_waiting_for_funding()
+		<T as Config>::WeightInfo::provider_timeout_waiting_for_funding()
 	}
 
 	fn funding_promoted_by_account() -> Weight {
-		<T as crate::Config>::WeightInfo::provider_funding_promoted_by_account()
+		<T as Config>::WeightInfo::provider_funding_promoted_by_account()
 	}
 
 	fn candidate_rejected_by_account() -> Weight {
-		<T as crate::Config>::WeightInfo::provider_candidate_rejected_by_account()
+		<T as Config>::WeightInfo::provider_candidate_rejected_by_account()
 	}
 
 	fn orphaned_utxo_detected() -> Weight {
-		<T as crate::Config>::WeightInfo::provider_orphaned_utxo_detected()
+		<T as Config>::WeightInfo::provider_orphaned_utxo_detected()
 	}
 
 	fn spent() -> Weight {
-		<T as crate::Config>::WeightInfo::provider_spent()
+		<T as Config>::WeightInfo::provider_spent()
 	}
 }
 
@@ -114,7 +210,6 @@ impl WeightInfo for () {
 	fn request_orphaned_utxo_release() -> Weight { Weight::zero() }
 	fn cosign_orphaned_utxo_release() -> Weight { Weight::zero() }
 	fn increase_securitization() -> Weight { Weight::zero() }
-	fn register_fee_coupon() -> Weight { Weight::zero() }
 	fn provider_funding_received() -> Weight { Weight::zero() }
 	fn provider_timeout_waiting_for_funding() -> Weight { Weight::zero() }
 	fn provider_funding_promoted_by_account() -> Weight { Weight::zero() }

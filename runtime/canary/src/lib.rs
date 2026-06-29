@@ -330,7 +330,10 @@ impl Get<bool> for DidStartNewFrame {
 pub struct BitcoinSignatureVerifier;
 impl BitcoinVerifier<Runtime> for BitcoinSignatureVerifier {}
 impl pallet_bitcoin_locks::Config for Runtime {
-	type WeightInfo = weights::pallet_bitcoin_locks::WeightInfo<Runtime>;
+	type WeightInfo = pallet_bitcoin_locks::weights::WithProviderWeights<
+		Runtime,
+		weights::pallet_bitcoin_locks::WeightInfo<Runtime>,
+	>;
 	type Currency = Balances;
 	type Balance = Balance;
 	type RuntimeHoldReason = RuntimeHoldReason;
@@ -633,15 +636,22 @@ impl pallet_bitcoin_utxos::Config for Runtime {
 }
 
 impl pallet_mint::Config for Runtime {
-	type WeightInfo = ();
+	type WeightInfo = weights::pallet_mint::WeightInfo<Runtime>;
 	type Currency = Balances;
-	type PriceProvider = PriceIndex;
+	type PriceProvider =
+		use_unless_benchmark!(PriceIndex, benchmarking::BenchmarkPriceProvider<Balance>);
 	type Balance = Balance;
-	type MaxPendingMintUtxos = MaxPendingMintUtxos;
-	type BlockRewardAccountsProvider = MiningSlot;
+	type MaxPendingMintsPerUtxo = MaxPendingMintsPerUtxo;
+	type MaxPendingMintPayoutWindowSize = MaxPendingMintPayoutWindowSize;
+	type BlockRewardAccountsProvider = use_unless_benchmark!(
+		MiningSlot,
+		benchmarking::BenchmarkBlockRewardAccountsProvider<AccountId>
+	);
 	type MaxMintHistoryToMaintain = MaxMintHistoryToMaintain;
 	type MaxPossibleMiners = MaxPossibleMiners;
-	type MiningFrameProvider = MiningSlot;
+	type MiningFrameProvider =
+		use_unless_benchmark!(MiningSlot, benchmarking::BenchmarkCurrentFrameId);
+	type BitcoinMintPayoutPercentPerFrame = BitcoinMintPayoutPercentPerFrame;
 }
 
 pub(crate) type OwnershipToken = pallet_balances::Instance2;

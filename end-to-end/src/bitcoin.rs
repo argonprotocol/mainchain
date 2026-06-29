@@ -21,6 +21,7 @@ use argon_primitives::{
 		BitcoinCosignScriptPubkey, BitcoinNetwork, BitcoinScriptPubkey, BitcoinSignature,
 		CompressedBitcoinPubkey, H256Le, Satoshis, UtxoId,
 	},
+	block_seal::MiningSlotConfig,
 	prelude::sp_core::Encode,
 	tick::{Tick, Ticker},
 	Balance, VaultId,
@@ -203,6 +204,50 @@ async fn test_bitcoin_minting_e2e() {
 	.await
 	.unwrap();
 
+	// Speed up frame transitions so the 10%-per-frame mint payout completes within the e2e window.
+	let fetched_mining_config = client
+		.fetch_storage(&storage().mining_slot().mining_config(), FetchAt::Finalized)
+		.await
+		.unwrap()
+		.expect("mining config");
+	let original_mining_config = MiningSlotConfig {
+		ticks_between_slots: fetched_mining_config.ticks_between_slots,
+		ticks_before_bid_end_for_vrf_close: fetched_mining_config
+			.ticks_before_bid_end_for_vrf_close,
+		slot_bidding_start_after_ticks: fetched_mining_config.slot_bidding_start_after_ticks,
+	};
+	let original_frame_reward_ticks_remaining = client
+		.fetch_storage(&storage().mining_slot().frame_reward_ticks_remaining(), FetchAt::Finalized)
+		.await
+		.unwrap()
+		.expect("frame reward ticks remaining");
+	let mining_config = MiningSlotConfig {
+		ticks_between_slots: 1,
+		ticks_before_bid_end_for_vrf_close: original_mining_config
+			.ticks_before_bid_end_for_vrf_close,
+		slot_bidding_start_after_ticks: original_mining_config.slot_bidding_start_after_ticks,
+	};
+	sudo(
+		&test_node,
+		RuntimeCall::System(
+			argon_client::api::runtime_types::frame_system::pallet::Call::set_storage {
+				items: vec![
+					(
+						storage().mining_slot().mining_config().to_root_bytes(),
+						mining_config.encode(),
+					),
+					(
+						storage().mining_slot().frame_reward_ticks_remaining().to_root_bytes(),
+						1u64.encode(),
+					),
+				],
+			},
+		),
+		false,
+	)
+	.await
+	.unwrap();
+
 	wait_for_mint(
 		&bitcoin_owner_pair,
 		&client,
@@ -213,6 +258,29 @@ async fn test_bitcoin_minting_e2e() {
 		&ticker,
 		&price_index_operator,
 		&mut last_bitcoin_price_tick,
+	)
+	.await
+	.unwrap();
+
+	// Restore the original frame cadence before the release flow so the cosign deadline timing
+	// matches the rest of the bitcoin lock lifecycle.
+	sudo(
+		&test_node,
+		RuntimeCall::System(
+			argon_client::api::runtime_types::frame_system::pallet::Call::set_storage {
+				items: vec![
+					(
+						storage().mining_slot().mining_config().to_root_bytes(),
+						original_mining_config.encode(),
+					),
+					(
+						storage().mining_slot().frame_reward_ticks_remaining().to_root_bytes(),
+						original_frame_reward_ticks_remaining.encode(),
+					),
+				],
+			},
+		),
+		false,
 	)
 	.await
 	.unwrap();
@@ -730,35 +798,99 @@ async fn wait_for_mint(
 	assert_eq!(utxo_ref.txid.0, txid.to_byte_array());
 	assert_eq!(utxo_ref.output_index, vout);
 
-	let pending_mint = client
-		.fetch_storage(&storage().mint().pending_mint_utxos(), FetchAt::Finalized)
+	let pending_mint_index = client
+		.fetch_storage(&storage().mint().pending_mint_utxo_id_lookup(*utxo_id), FetchAt::Finalized)
 		.await?
-		.expect("pending mint");
+		.and_then(|lookup| lookup.0.first().copied());
+	let pending_mint = if let Some(pending_mint_index) = pending_mint_index {
+		client
+			.fetch_storage(
+				&storage().mint().pending_mint_utxos_by_index(pending_mint_index),
+				FetchAt::Finalized,
+			)
+			.await?
+	} else {
+		None
+	};
 
 	let owner_account_id32: AccountId32 = bitcoin_owner.clone().public().into();
-	let balance = client.get_argons(&owner_account_id32).await.expect("pending mint balance");
-	if pending_mint.0.is_empty() {
+	let owner_account_id = owner_account_id32.clone().into();
+	if pending_mint.is_none() {
+		let balance = client.get_argons(&owner_account_id32).await.expect("pending mint balance");
 		assert!(balance.free >= liquidity_promised);
 	} else {
-		assert_eq!(pending_mint.0.len(), 1);
-		assert_eq!(pending_mint.0[0].1, owner_account_id32.into());
-		// should have minted some amount
-		assert!(pending_mint.0[0].2 < liquidity_promised);
+		let mut pending_mint = pending_mint.expect("checked is_some");
+		let mut counter = 0;
+		while pending_mint.remaining_amount == liquidity_promised {
+			let Some(_block) = finalized_sub.next().await else {
+				panic!("Stopped waiting for pending mint to start paying out");
+			};
+			submit_price_if_needed(ticker, client, price_index_operator, last_submitted_tick).await;
+
+			let pending_mint_index = client
+				.fetch_storage(
+					&storage().mint().pending_mint_utxo_id_lookup(*utxo_id),
+					FetchAt::Finalized,
+				)
+				.await?
+				.and_then(|lookup| lookup.0.first().copied());
+			let pending_mint_after_block = if let Some(pending_mint_index) = pending_mint_index {
+				client
+					.fetch_storage(
+						&storage().mint().pending_mint_utxos_by_index(pending_mint_index),
+						FetchAt::Finalized,
+					)
+					.await?
+			} else {
+				None
+			};
+			let Some(updated_pending_mint) = pending_mint_after_block else {
+				let balance =
+					client.get_argons(&owner_account_id32).await.expect("pending mint balance");
+				assert!(balance.free >= liquidity_promised);
+				return Ok(());
+			};
+			assert_eq!(updated_pending_mint.account_id, owner_account_id);
+			pending_mint = updated_pending_mint;
+			counter += 1;
+
+			if counter >= 30 {
+				panic!(
+					"Timed out waiting for pending mint payout to start. Last mint was {:?}",
+					pending_mint
+				);
+			}
+		}
+
+		let balance = client.get_argons(&owner_account_id32).await.expect("pending mint balance");
+		assert_eq!(pending_mint.account_id, owner_account_id);
 		println!(
 			"Owner mint pending remaining = {} (balance={})",
-			pending_mint.0[0].2, balance.free
+			pending_mint.remaining_amount, balance.free
 		);
-		assert!(balance.free > (liquidity_promised - pending_mint.0[0].2));
+		assert!(balance.free > (liquidity_promised - pending_mint.remaining_amount));
 
-		// 4. Wait for the full payout
 		let mut counter = 0;
 		while let Some(_block) = finalized_sub.next().await {
-			let pending_mint = client
-				.fetch_storage(&storage().mint().pending_mint_utxos(), FetchAt::Finalized)
+			let pending_mint_index = client
+				.fetch_storage(
+					&storage().mint().pending_mint_utxo_id_lookup(*utxo_id),
+					FetchAt::Finalized,
+				)
 				.await?
-				.expect("pending mint");
-			println!("Pending mint {:?}", pending_mint.0.first().map(|a| a.2));
-			if pending_mint.0.is_empty() {
+				.and_then(|lookup| lookup.0.first().copied());
+			let pending_mint = if let Some(pending_mint_index) = pending_mint_index {
+				client
+					.fetch_storage(
+						&storage().mint().pending_mint_utxos_by_index(pending_mint_index),
+						FetchAt::Finalized,
+					)
+					.await?
+			} else {
+				None
+			};
+			println!("Pending mint {:?}", pending_mint.as_ref().map(|mint| mint.remaining_amount));
+			if pending_mint.is_none() {
 				break;
 			}
 			counter += 1;
@@ -782,7 +914,7 @@ async fn wait_for_mint(
 					.expect("mining mint");
 				panic!(
 					"Timed out waiting for remaining mint. Last mint was {:?}. Miners registered {:?}. Mining Minted {} microgons, Bitcoin Minted {} microgons",
-					pending_mint.0, registered_miners, mining_minted, bitcoin_minted
+					pending_mint, registered_miners, mining_minted, bitcoin_minted
 				);
 			}
 		}

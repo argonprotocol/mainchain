@@ -3667,6 +3667,23 @@ export default {
    **/
   PalletBlockRewardsError: 'Null',
   /**
+   * Lookup483: pallet_mint::pallet::PendingMintUtxo<T>
+   **/
+  PalletMintPendingMintUtxo: {
+    utxoId: 'Compact<u64>',
+    accountId: 'AccountId32',
+    remainingAmount: 'Compact<u128>',
+    maxAmountPerFrame: 'Compact<u128>',
+  },
+  /**
+   * Lookup485: pallet_mint::pallet::MintQueueCursor
+   **/
+  PalletMintMintQueueCursor: {
+    payoutStartIndex: 'Compact<u64>',
+    payoutCursorIndex: 'Compact<u64>',
+    payoutCursorFrameId: 'Option<u64>',
+  },
+  /**
    * Lookup488: pallet_mint::pallet::MintAction<B>
    **/
   PalletMintMintAction: {
@@ -3675,13 +3692,13 @@ export default {
     bitcoinMinted: 'u128',
   },
   /**
-   * Lookup489: pallet_mint::pallet::Error<T>
+   * Lookup490: pallet_mint::pallet::Error<T>
    **/
   PalletMintError: {
     _enum: ['TooManyPendingMints'],
   },
   /**
-   * Lookup491: pallet_balances::types::BalanceLock<Balance>
+   * Lookup492: pallet_balances::types::BalanceLock<Balance>
    **/
   PalletBalancesBalanceLock: {
     id: '[u8;8]',
@@ -3689,34 +3706,34 @@ export default {
     reasons: 'PalletBalancesReasons',
   },
   /**
-   * Lookup492: pallet_balances::types::Reasons
+   * Lookup493: pallet_balances::types::Reasons
    **/
   PalletBalancesReasons: {
     _enum: ['Fee', 'Misc', 'All'],
   },
   /**
-   * Lookup495: pallet_balances::types::ReserveData<ReserveIdentifier, Balance>
+   * Lookup496: pallet_balances::types::ReserveData<ReserveIdentifier, Balance>
    **/
   PalletBalancesReserveData: {
     id: '[u8;8]',
     amount: 'u128',
   },
   /**
-   * Lookup498: frame_support::traits::tokens::misc::IdAmount<argon_runtime::RuntimeHoldReason, Balance>
+   * Lookup499: frame_support::traits::tokens::misc::IdAmount<argon_runtime::RuntimeHoldReason, Balance>
    **/
   FrameSupportTokensMiscIdAmountRuntimeHoldReason: {
     id: 'ArgonRuntimeRuntimeHoldReason',
     amount: 'u128',
   },
   /**
-   * Lookup501: frame_support::traits::tokens::misc::IdAmount<argon_runtime::RuntimeFreezeReason, Balance>
+   * Lookup502: frame_support::traits::tokens::misc::IdAmount<argon_runtime::RuntimeFreezeReason, Balance>
    **/
   FrameSupportTokensMiscIdAmountRuntimeFreezeReason: {
     id: 'ArgonRuntimeRuntimeFreezeReason',
     amount: 'u128',
   },
   /**
-   * Lookup502: argon_runtime::RuntimeFreezeReason
+   * Lookup503: argon_runtime::RuntimeFreezeReason
    **/
   ArgonRuntimeRuntimeFreezeReason: {
     _enum: {
@@ -3743,13 +3760,13 @@ export default {
     },
   },
   /**
-   * Lookup503: pallet_block_rewards::pallet::FreezeReason
+   * Lookup504: pallet_block_rewards::pallet::FreezeReason
    **/
   PalletBlockRewardsFreezeReason: {
     _enum: ['MaturationPeriod'],
   },
   /**
-   * Lookup505: pallet_balances::pallet::Error<T, I>
+   * Lookup506: pallet_balances::pallet::Error<T, I>
    **/
   PalletBalancesError: {
     _enum: [
@@ -3768,62 +3785,62 @@ export default {
     ],
   },
   /**
-   * Lookup507: pallet_tx_pause::pallet::Error<T>
+   * Lookup508: pallet_tx_pause::pallet::Error<T>
    **/
   PalletTxPauseError: {
     _enum: ['IsPaused', 'IsUnpaused', 'Unpausable', 'NotFound'],
   },
   /**
-   * Lookup508: pallet_transaction_payment::Releases
+   * Lookup509: pallet_transaction_payment::Releases
    **/
   PalletTransactionPaymentReleases: {
     _enum: ['V1Ancient', 'V2'],
   },
   /**
-   * Lookup509: frame_support::traits::storage::NoDrop<frame_support::traits::tokens::fungible::imbalance::Imbalance<B, OnDrop, OppositeOnDrop>>
+   * Lookup510: frame_support::traits::storage::NoDrop<frame_support::traits::tokens::fungible::imbalance::Imbalance<B, OnDrop, OppositeOnDrop>>
    **/
   FrameSupportStorageNoDrop: 'FrameSupportTokensFungibleImbalance',
   /**
-   * Lookup510: frame_support::traits::tokens::fungible::imbalance::Imbalance<B, OnDrop, OppositeOnDrop>
+   * Lookup511: frame_support::traits::tokens::fungible::imbalance::Imbalance<B, OnDrop, OppositeOnDrop>
    **/
   FrameSupportTokensFungibleImbalance: {
     amount: 'u128',
   },
   /**
-   * Lookup511: pallet_utility::pallet::Error<T>
+   * Lookup512: pallet_utility::pallet::Error<T>
    **/
   PalletUtilityError: {
     _enum: ['TooManyCalls'],
   },
   /**
-   * Lookup512: pallet_sudo::pallet::Error<T>
+   * Lookup513: pallet_sudo::pallet::Error<T>
    **/
   PalletSudoError: {
     _enum: ['RequireSudo'],
   },
   /**
-   * Lookup513: pallet_treasury::pallet::FrameVaultCapital<T>
+   * Lookup514: pallet_treasury::pallet::FrameVaultCapital<T>
    **/
   PalletTreasuryFrameVaultCapital: {
     frameId: 'Compact<u64>',
     vaults: 'BTreeMap<u32, PalletTreasuryVaultCapital>',
   },
   /**
-   * Lookup515: pallet_treasury::pallet::VaultCapital<T>
+   * Lookup516: pallet_treasury::pallet::VaultCapital<T>
    **/
   PalletTreasuryVaultCapital: {
     bondLotAllocations: 'Vec<PalletTreasuryBondLotAllocation>',
     eligibleBonds: 'Compact<u32>',
   },
   /**
-   * Lookup517: pallet_treasury::pallet::BondLotAllocation
+   * Lookup518: pallet_treasury::pallet::BondLotAllocation
    **/
   PalletTreasuryBondLotAllocation: {
     bondLotId: 'Compact<u64>',
     prorata: 'u128',
   },
   /**
-   * Lookup522: pallet_treasury::pallet::FrameArgonotBondParticipants<T>
+   * Lookup523: pallet_treasury::pallet::FrameArgonotBondParticipants<T>
    **/
   PalletTreasuryFrameArgonotBondParticipants: {
     frameId: 'Compact<u64>',
@@ -3831,14 +3848,14 @@ export default {
     bondLots: 'Vec<PalletTreasuryBondLotSummary>',
   },
   /**
-   * Lookup524: pallet_treasury::pallet::BondLotSummary
+   * Lookup525: pallet_treasury::pallet::BondLotSummary
    **/
   PalletTreasuryBondLotSummary: {
     bondLotId: 'Compact<u64>',
     bonds: 'Compact<u32>',
   },
   /**
-   * Lookup526: pallet_treasury::pallet::BondLot<T>
+   * Lookup527: pallet_treasury::pallet::BondLot<T>
    **/
   PalletTreasuryBondLot: {
     owner: 'AccountId32',
@@ -3853,7 +3870,7 @@ export default {
     releaseReason: 'Option<PalletTreasuryBondReleaseReason>',
   },
   /**
-   * Lookup527: pallet_treasury::pallet::BondProgram
+   * Lookup528: pallet_treasury::pallet::BondProgram
    **/
   PalletTreasuryBondProgram: {
     _enum: {

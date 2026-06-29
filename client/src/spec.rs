@@ -3396,9 +3396,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				39u8, 36u8, 152u8, 129u8, 59u8, 253u8, 111u8, 43u8, 134u8, 167u8, 116u8, 186u8,
-				158u8, 44u8, 14u8, 110u8, 197u8, 20u8, 39u8, 85u8, 108u8, 96u8, 208u8, 60u8, 216u8,
-				200u8, 11u8, 20u8, 104u8, 17u8, 186u8, 26u8,
+				130u8, 136u8, 102u8, 254u8, 224u8, 175u8, 209u8, 204u8, 149u8, 165u8, 66u8, 155u8,
+				29u8, 62u8, 77u8, 229u8, 14u8, 94u8, 195u8, 71u8, 209u8, 9u8, 75u8, 32u8, 159u8,
+				86u8, 45u8, 95u8, 212u8, 115u8, 172u8, 206u8,
 			]
 	}
 	pub mod system {
@@ -17075,14 +17075,28 @@ pub mod api {
 			use super::runtime_types;
 			pub mod types {
 				use super::runtime_types;
-				pub mod pending_mint_utxos {
+				pub mod pending_mint_utxos_by_index {
 					use super::runtime_types;
-					pub type PendingMintUtxos =
-						runtime_types::bounded_collections::bounded_vec::BoundedVec<(
+					pub type PendingMintUtxosByIndex =
+						runtime_types::pallet_mint::pallet::PendingMintUtxo;
+					pub type Param0 = ::core::primitive::u64;
+				}
+				pub mod pending_mint_utxo_id_lookup {
+					use super::runtime_types;
+					pub type PendingMintUtxoIdLookup =
+						runtime_types::bounded_collections::bounded_vec::BoundedVec<
 							::core::primitive::u64,
-							crate::types::AccountId32,
-							::core::primitive::u128,
-						)>;
+						>;
+					pub type Param0 = ::core::primitive::u64;
+				}
+				pub mod next_pending_mint_utxo_index {
+					use super::runtime_types;
+					pub type NextPendingMintUtxoIndex = ::core::primitive::u64;
+				}
+				pub mod pending_mint_queue_state {
+					use super::runtime_types;
+					pub type PendingMintQueueState =
+						runtime_types::pallet_mint::pallet::MintQueueCursor;
 				}
 				pub mod minted_mining_microgons {
 					use super::runtime_types;
@@ -17110,27 +17124,144 @@ pub mod api {
 			}
 			pub struct StorageApi;
 			impl StorageApi {
-				#[doc = " Bitcoin UTXOs that have been submitted for minting. This list is FIFO for minting whenever"]
-				#[doc = " a) CPI >= 0 and"]
-				#[doc = " b) the aggregate minted Bitcoins <= the aggregate minted microgons from mining"]
-				pub fn pending_mint_utxos(
+				#[doc = " Bitcoin UTXOs that have been submitted for minting, keyed by a monotonic queue index so"]
+				#[doc = " payouts can preserve FIFO order while each frame works through a fixed payout cohort."]
+				pub fn pending_mint_utxos_by_index_iter(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
 					(),
-					types::pending_mint_utxos::PendingMintUtxos,
+					types::pending_mint_utxos_by_index::PendingMintUtxosByIndex,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Mint",
+						"PendingMintUtxosByIndex",
+						(),
+						[
+							202u8, 43u8, 219u8, 218u8, 20u8, 74u8, 174u8, 43u8, 114u8, 151u8,
+							194u8, 61u8, 150u8, 3u8, 138u8, 129u8, 90u8, 163u8, 16u8, 118u8, 1u8,
+							196u8, 194u8, 197u8, 211u8, 23u8, 252u8, 213u8, 167u8, 20u8, 153u8,
+							109u8,
+						],
+					)
+				}
+				#[doc = " Bitcoin UTXOs that have been submitted for minting, keyed by a monotonic queue index so"]
+				#[doc = " payouts can preserve FIFO order while each frame works through a fixed payout cohort."]
+				pub fn pending_mint_utxos_by_index(
+					&self,
+					_0: types::pending_mint_utxos_by_index::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::pending_mint_utxos_by_index::Param0,
+					>,
+					types::pending_mint_utxos_by_index::PendingMintUtxosByIndex,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Mint",
+						"PendingMintUtxosByIndex",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							202u8, 43u8, 219u8, 218u8, 20u8, 74u8, 174u8, 43u8, 114u8, 151u8,
+							194u8, 61u8, 150u8, 3u8, 138u8, 129u8, 90u8, 163u8, 16u8, 118u8, 1u8,
+							196u8, 194u8, 197u8, 211u8, 23u8, 252u8, 213u8, 167u8, 20u8, 153u8,
+							109u8,
+						],
+					)
+				}
+				#[doc = " Reverse lookup from bitcoin UTXO id to all queued mint indices for direct removal and"]
+				#[doc = " client lookup."]
+				pub fn pending_mint_utxo_id_lookup_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::pending_mint_utxo_id_lookup::PendingMintUtxoIdLookup,
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Mint",
+						"PendingMintUtxoIdLookup",
+						(),
+						[
+							200u8, 180u8, 86u8, 232u8, 18u8, 106u8, 219u8, 55u8, 147u8, 88u8, 44u8,
+							181u8, 47u8, 103u8, 66u8, 150u8, 194u8, 112u8, 93u8, 81u8, 236u8,
+							251u8, 203u8, 145u8, 26u8, 161u8, 229u8, 187u8, 201u8, 221u8, 207u8,
+							156u8,
+						],
+					)
+				}
+				#[doc = " Reverse lookup from bitcoin UTXO id to all queued mint indices for direct removal and"]
+				#[doc = " client lookup."]
+				pub fn pending_mint_utxo_id_lookup(
+					&self,
+					_0: types::pending_mint_utxo_id_lookup::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::pending_mint_utxo_id_lookup::Param0,
+					>,
+					types::pending_mint_utxo_id_lookup::PendingMintUtxoIdLookup,
 					::subxt::ext::subxt_core::utils::Yes,
 					::subxt::ext::subxt_core::utils::Yes,
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"Mint",
-						"PendingMintUtxos",
+						"PendingMintUtxoIdLookup",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							200u8, 180u8, 86u8, 232u8, 18u8, 106u8, 219u8, 55u8, 147u8, 88u8, 44u8,
+							181u8, 47u8, 103u8, 66u8, 150u8, 194u8, 112u8, 93u8, 81u8, 236u8,
+							251u8, 203u8, 145u8, 26u8, 161u8, 229u8, 187u8, 201u8, 221u8, 207u8,
+							156u8,
+						],
+					)
+				}
+				#[doc = " The next monotonic queue index to assign to a pending bitcoin mint."]
+				pub fn next_pending_mint_utxo_index(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::next_pending_mint_utxo_index::NextPendingMintUtxoIndex,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Mint",
+						"NextPendingMintUtxoIndex",
 						(),
 						[
-							196u8, 160u8, 225u8, 237u8, 86u8, 164u8, 92u8, 231u8, 111u8, 145u8,
-							28u8, 0u8, 109u8, 229u8, 72u8, 54u8, 178u8, 120u8, 204u8, 23u8, 98u8,
-							40u8, 69u8, 158u8, 175u8, 210u8, 29u8, 172u8, 163u8, 182u8, 128u8,
-							108u8,
+							78u8, 119u8, 134u8, 71u8, 223u8, 240u8, 59u8, 55u8, 166u8, 48u8, 162u8,
+							254u8, 178u8, 240u8, 42u8, 0u8, 215u8, 0u8, 12u8, 223u8, 245u8, 125u8,
+							211u8, 162u8, 58u8, 176u8, 216u8, 7u8, 89u8, 192u8, 16u8, 95u8,
+						],
+					)
+				}
+				#[doc = " Queue bookkeeping for pending bitcoin mints, including the bounded payout start and the"]
+				#[doc = " current frame scan cursor."]
+				pub fn pending_mint_queue_state(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::pending_mint_queue_state::PendingMintQueueState,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Mint",
+						"PendingMintQueueState",
+						(),
+						[
+							36u8, 35u8, 48u8, 228u8, 90u8, 29u8, 46u8, 212u8, 202u8, 72u8, 127u8,
+							156u8, 57u8, 187u8, 249u8, 130u8, 217u8, 160u8, 242u8, 99u8, 151u8,
+							26u8, 99u8, 17u8, 231u8, 95u8, 36u8, 182u8, 249u8, 167u8, 222u8, 254u8,
 						],
 					)
 				}
@@ -17226,15 +17357,32 @@ pub mod api {
 			use super::runtime_types;
 			pub struct ConstantsApi;
 			impl ConstantsApi {
-				#[doc = " The maximum number of UTXOs that can be waiting for minting"]
-				pub fn max_pending_mint_utxos(
+				#[doc = " The maximum number of queued mint entries a single bitcoin UTXO may accumulate."]
+				pub fn max_pending_mints_per_utxo(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
 					::core::primitive::u32,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"Mint",
-						"MaxPendingMintUtxos",
+						"MaxPendingMintsPerUtxo",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
+						],
+					)
+				}
+				#[doc = " The maximum number of queued bitcoin mints that may receive payouts in a frame."]
+				pub fn max_pending_mint_payout_window_size(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u32,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"Mint",
+						"MaxPendingMintPayoutWindowSize",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
@@ -17260,6 +17408,7 @@ pub mod api {
 						],
 					)
 				}
+				#[doc = " The maximum number of miners that can be paid in a frame."]
 				pub fn max_possible_miners(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
@@ -17273,6 +17422,23 @@ pub mod api {
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
 							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
 							145u8,
+						],
+					)
+				}
+				#[doc = " The maximum share of a queued bitcoin mint that may be paid in a single frame."]
+				pub fn bitcoin_mint_payout_percent_per_frame(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					runtime_types::sp_arithmetic::per_things::Percent,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"Mint",
+						"BitcoinMintPayoutPercentPerFrame",
+						[
+							40u8, 171u8, 69u8, 196u8, 34u8, 184u8, 50u8, 128u8, 139u8, 192u8, 63u8,
+							231u8, 249u8, 200u8, 252u8, 73u8, 244u8, 170u8, 51u8, 177u8, 106u8,
+							47u8, 114u8, 234u8, 84u8, 104u8, 62u8, 118u8, 227u8, 50u8, 225u8,
+							122u8,
 						],
 					)
 				}
@@ -34042,11 +34208,51 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
+				pub struct MintQueueCursor {
+					#[codec(compact)]
+					pub payout_start_index: ::core::primitive::u64,
+					#[codec(compact)]
+					pub payout_cursor_index: ::core::primitive::u64,
+					pub payout_cursor_frame_id: ::core::option::Option<::core::primitive::u64>,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
 				pub enum MintType {
 					#[codec(index = 0)]
 					Bitcoin,
 					#[codec(index = 1)]
 					Mining,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct PendingMintUtxo {
+					#[codec(compact)]
+					pub utxo_id: ::core::primitive::u64,
+					pub account_id: crate::types::AccountId32,
+					#[codec(compact)]
+					pub remaining_amount: ::core::primitive::u128,
+					#[codec(compact)]
+					pub max_amount_per_frame: ::core::primitive::u128,
 				}
 			}
 		}

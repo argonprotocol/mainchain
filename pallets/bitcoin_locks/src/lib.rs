@@ -1192,7 +1192,7 @@ pub mod pallet {
 	}
 
 	impl<T: Config> BitcoinUtxoEvents<T::AccountId> for Pallet<T> {
-		type Weights = crate::weights::ProviderWeightAdapter<T>;
+		type Weights = ProviderWeightAdapter<T>;
 
 		fn funding_received(utxo_id: UtxoId, received_satoshis: Satoshis) -> DispatchResult {
 			LocksByUtxoId::<T>::mutate(utxo_id, |a| {

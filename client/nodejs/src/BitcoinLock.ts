@@ -13,6 +13,9 @@ import { u8aToHex } from '@polkadot/util';
 import { ApiDecoration } from '@polkadot/api/types';
 import { PriceIndex } from './PriceIndex';
 import { bool, Option } from '@polkadot/types-codec';
+import type { AccountId32 } from '@polkadot/types/interfaces/runtime';
+import type { ITuple } from '@polkadot/types-codec/types';
+import type { u128, u64, Vec } from '@polkadot/types-codec';
 import { formatArgons } from './utils';
 import type { Vault } from './Vault';
 import BigNumber from 'bignumber.js';
@@ -20,6 +23,16 @@ import BigNumber from 'bignumber.js';
 export const SATS_PER_BTC = 100_000_000n;
 
 type IQueryableClient = ArgonClient | ApiDecoration<'promise'>;
+type PendingMintQueries =
+  | Pick<IQueryableClient['query']['mint'], 'pendingMintUtxoIdLookup' | 'pendingMintUtxosByIndex'>
+  | {
+      pendingMintUtxos: () => Promise<Vec<ITuple<[u64, AccountId32, u128]>>>;
+    };
+type PendingMintQueryableClient = {
+  query: {
+    mint: PendingMintQueries;
+  };
+};
 type UtxoRefLike =
   | ArgonPrimitivesBitcoinUtxoRef
   | { txid: string | Uint8Array; outputIndex: number };
@@ -125,12 +138,27 @@ export class BitcoinLock implements IBitcoinLock {
     return { txid, vout, bitcoinTxid };
   }
 
-  public async findPendingMints(client: IQueryableClient): Promise<bigint[]> {
-    const pendingMint = await client.query.mint.pendingMintUtxos();
+  public async findPendingMints(client: PendingMintQueryableClient): Promise<bigint[]> {
+    const { mint } = client.query;
+
+    if ('pendingMintUtxoIdLookup' in mint) {
+      const mintsPending: bigint[] = [];
+      const pendingMintIndices = await mint.pendingMintUtxoIdLookup(this.utxoId);
+
+      for (const pendingMintIndex of pendingMintIndices) {
+        const pendingMint = await mint.pendingMintUtxosByIndex(pendingMintIndex);
+        if (pendingMint.isSome) {
+          mintsPending.push(pendingMint.unwrap().remainingAmount.toBigInt());
+        }
+      }
+      return mintsPending;
+    }
+
     const mintsPending: bigint[] = [];
-    for (const [utxoIdRaw, _accountId, mintAmountRaw] of pendingMint) {
-      if (utxoIdRaw.toNumber() === this.utxoId) {
-        mintsPending.push(mintAmountRaw.toBigInt());
+    const pendingMint = await mint.pendingMintUtxos();
+    for (const [utxoId, , amount] of pendingMint) {
+      if (utxoId.toNumber() === this.utxoId) {
+        mintsPending.push(amount.toBigInt());
       }
     }
     return mintsPending;

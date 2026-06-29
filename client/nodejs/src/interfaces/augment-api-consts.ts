@@ -302,13 +302,24 @@ declare module '@polkadot/api-base/types/consts' {
     };
     mint: {
       /**
+       * The maximum share of a queued bitcoin mint that may be paid in a single frame.
+       **/
+      bitcoinMintPayoutPercentPerFrame: Percent & AugmentedConst<ApiType>;
+      /**
        * The maximum number of mint histories to keep
        **/
       maxMintHistoryToMaintain: u32 & AugmentedConst<ApiType>;
       /**
-       * The maximum number of UTXOs that can be waiting for minting
+       * The maximum number of queued bitcoin mints that may receive payouts in a frame.
        **/
-      maxPendingMintUtxos: u32 & AugmentedConst<ApiType>;
+      maxPendingMintPayoutWindowSize: u32 & AugmentedConst<ApiType>;
+      /**
+       * The maximum number of queued mint entries a single bitcoin UTXO may accumulate.
+       **/
+      maxPendingMintsPerUtxo: u32 & AugmentedConst<ApiType>;
+      /**
+       * The maximum number of miners that can be paid in a frame.
+       **/
       maxPossibleMiners: u32 & AugmentedConst<ApiType>;
     };
     multisig: {

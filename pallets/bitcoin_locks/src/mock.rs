@@ -135,6 +135,8 @@ parameter_types! {
 
 pub struct EventHandler;
 impl UtxoLockEvents<u64, Balance> for EventHandler {
+	type Weights = ();
+
 	fn utxo_locked(
 		utxo_id: UtxoId,
 		account_id: &u64,
