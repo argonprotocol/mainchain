@@ -10,7 +10,7 @@ use crate::{
 		load_next_sync_committee_update_fixture, load_sync_committee_update_fixture,
 	},
 	sync_committee_sum,
-	types::{CheckpointUpdate, ExecutionHeaderProof, Update},
+	types::{CheckpointUpdate, ExecutionHeaderProof, SyncCommittee, TypeError, Update},
 	verify_merkle_branch, BasicOperatingMode, BeaconHeader, Error, ExecutionHeaderAnchor,
 	ExecutionHeaderAnchors, ExecutionHeaderAnchorsByBlockNumber, ExecutionProof,
 	FinalizedBeaconHeaderState, FinalizedBeaconState, Fork, ForkVersionSchedule, ForkVersions,
@@ -42,7 +42,10 @@ use polkadot_sdk::{
 	sp_core::{hashing::blake2_256, H160, H256},
 	sp_runtime::{traits::ConstU32, DispatchError},
 };
-use snowbridge_beacon_primitives::merkle_proof::{generalized_index_length, subtree_index};
+use snowbridge_beacon_primitives::{
+	merkle_proof::{generalized_index_length, subtree_index},
+	PublicKey, PublicKeyPrepared,
+};
 use std::{fs::File, path::PathBuf};
 
 const MAINNET_SLOTS_PER_EPOCH: u64 = EthereumBeaconPreset::Mainnet.slots_per_epoch() as u64;
@@ -521,6 +524,22 @@ fn find_present_keys() {
 		assert_eq!(pubkeys[2], sync_committee_prepared.pubkeys[26]);
 		assert_eq!(pubkeys[3], sync_committee_prepared.pubkeys[30]);
 	});
+}
+
+#[test]
+fn sync_committee_prepare_rejects_infinity_public_keys() {
+	let infinity_pubkey = PublicKey::from(PublicKeyPrepared::default().as_bytes());
+	let committee = SyncCommittee {
+		pubkeys: vec![infinity_pubkey; MINIMAL_SYNC_COMMITTEE_SIZE]
+			.try_into()
+			.expect("minimal committee length is bounded"),
+		aggregate_pubkey: infinity_pubkey,
+	};
+
+	assert!(matches!(
+		committee.prepare(EthereumBeaconPreset::Minimal),
+		Err(TypeError::PreparePublicKeysFailed)
+	));
 }
 
 /* SYNC PROCESS TESTS */
