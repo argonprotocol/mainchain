@@ -255,7 +255,7 @@ parameter_types! {
 	pub static GetUtxoRef: Option<UtxoRef> = None;
 
 	pub static LastLockEvent: Option<(UtxoId, u64, Balance)> = None;
-	pub static LastReleaseEvent: Option<(UtxoId, bool, Balance)> = None;
+	pub static LastReleaseEvent: Option<(UtxoId, bool, Balance, Balance)> = None;
 
 	pub static CanceledLocks: Vec<(VaultId, Balance)> = Vec::new();
 
@@ -281,10 +281,17 @@ impl UtxoLockEvents<u64, Balance> for EventHandler {
 	}
 	fn utxo_released(
 		utxo_id: UtxoId,
+		_account_id: &u64,
 		remove_pending_mints: bool,
 		amount_burned: Balance,
+		original_liquidity_promised: Balance,
 	) -> DispatchResult {
-		LastReleaseEvent::set(Some((utxo_id, remove_pending_mints, amount_burned)));
+		LastReleaseEvent::set(Some((
+			utxo_id,
+			remove_pending_mints,
+			amount_burned,
+			original_liquidity_promised,
+		)));
 
 		Ok(())
 	}

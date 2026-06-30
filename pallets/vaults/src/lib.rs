@@ -1973,7 +1973,7 @@ pub mod pallet {
 			VaultsById::<T>::try_mutate(vault_id, |vault| {
 				let vault = vault.as_mut().ok_or(VaultError::VaultNotFound)?;
 				vault.did_confirm_pending_activation(securitization);
-				T::OperationalAccountsHook::bitcoin_lock_funded(
+				T::OperationalAccountsHook::vault_bitcoin_lock_funded(
 					&vault.operator_account_id,
 					vault.get_activated_securitization(),
 				);

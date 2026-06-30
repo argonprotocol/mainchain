@@ -43,7 +43,6 @@ parameter_types! {
 	pub const CrosschainTransferPalletId: PalletId = PalletId(*b"xchaintr");
 	pub CrosschainTransferEthereumBurnAccount: TestAccountId = CrosschainTransferPalletId::get()
 		.into_sub_account_truncating((pallet_crosschain_transfer::SourceChain::Ethereum, *b"burn"));
-	pub const RecentTransferRetentionTicks: Tick = 5;
 	pub const MaxActivitiesPerReceiptProof: u32 = 16;
 	pub const MaxReceiptProofsPerExtrinsic: u32 = 10;
 	pub const MaxCouncilMembers: u32 = 100;
@@ -65,7 +64,7 @@ parameter_types! {
 	pub static ProofVerificationRejectedTransactionIndexes: Vec<u64> = Vec::new();
 	pub static LatestExecutionBlockNumber: Option<EthereumBlockNumber> = Some(1_000);
 	pub static LatestExecutionBlockTimestamp: Option<u64> = Some(0);
-	pub static ConfirmedTransfers: Vec<(TestAccountId, Balance)> = Vec::new();
+	pub static ArgonFlowUpdates: Vec<(TestAccountId, Balance)> = Vec::new();
 pub static RegistrationVaultDataByOperator:
 	BTreeMap<TestAccountId, RegistrationVaultData<Balance>> = BTreeMap::new();
 pub static ArgonotCommitmentByOperator:
@@ -237,7 +236,7 @@ impl OperationalAccountsHook<TestAccountId, Balance> for MockOperationalAccounts
 		Weight::zero()
 	}
 
-	fn bitcoin_lock_funded_weight() -> Weight {
+	fn vault_bitcoin_lock_funded_weight() -> Weight {
 		Weight::zero()
 	}
 
@@ -245,16 +244,17 @@ impl OperationalAccountsHook<TestAccountId, Balance> for MockOperationalAccounts
 		Weight::zero()
 	}
 
-	fn treasury_pool_participated_weight() -> Weight {
+	fn account_vault_bond_total_updated_weight() -> Weight {
 		Weight::zero()
 	}
 
-	fn uniswap_transfer_confirmed_weight() -> Weight {
+	fn account_uniswap_argon_transfers_in_updated_weight() -> Weight {
 		Weight::zero()
 	}
 
-	fn uniswap_transfer_confirmed(account_id: &TestAccountId, amount: Balance) {
-		ConfirmedTransfers::mutate(|confirmed| confirmed.push((account_id.clone(), amount)));
+	fn account_uniswap_argon_transfers_in_updated(account_id: &TestAccountId) {
+		let amount = crate::TransferTotalsByAccount::<Test>::get(account_id).microgons_in;
+		ArgonFlowUpdates::mutate(|updates| updates.push((account_id.clone(), amount)));
 	}
 }
 
@@ -489,8 +489,22 @@ impl TreasuryPoolProvider<TestAccountId> for MockTreasuryPoolProvider {
 	type Weights = ();
 	type Balance = Balance;
 
-	fn has_bond_participation(vault_id: VaultId, account_id: &TestAccountId) -> bool {
-		ActiveBondAmountsByVaultAndAccount::get().contains_key(&(vault_id, account_id.clone()))
+	fn has_vault_bond_participation(vault_id: VaultId, account_id: &TestAccountId) -> bool {
+		Self::active_vault_bond_amount(vault_id, account_id) > 0
+	}
+
+	fn active_vault_bond_amount(vault_id: VaultId, account_id: &TestAccountId) -> Self::Balance {
+		ActiveBondAmountsByVaultAndAccount::get()
+			.get(&(vault_id, account_id.clone()))
+			.copied()
+			.unwrap_or_default()
+	}
+
+	fn active_account_vault_bond_amount(account_id: &TestAccountId) -> Self::Balance {
+		ActiveBondAmountsByVaultAndAccount::get()
+			.iter()
+			.filter(|((_, entry_account_id), _)| entry_account_id == account_id)
+			.fold(0, |total, (_, amount)| total.saturating_add(*amount))
 	}
 
 	fn encumber_bond_microgons(
@@ -576,7 +590,6 @@ impl pallet_crosschain_transfer::Config for Test {
 	type CurrentFrameId = CurrentFrameId;
 	type CurrentTick = CurrentTick;
 	type TickProvider = MockTickProvider;
-	type RecentTransferRetentionTicks = RecentTransferRetentionTicks;
 	type MaxActivitiesPerReceiptProof = MaxActivitiesPerReceiptProof;
 	type MaxReceiptProofsPerExtrinsic = MaxReceiptProofsPerExtrinsic;
 	type MaxCouncilMembers = MaxCouncilMembers;
@@ -602,7 +615,7 @@ pub fn new_test_ext() -> TestState {
 	ProofVerificationRejectedTransactionIndexes::set(Vec::new());
 	LatestExecutionBlockNumber::set(Some(1_000));
 	LatestExecutionBlockTimestamp::set(Some(0));
-	ConfirmedTransfers::set(Vec::new());
+	ArgonFlowUpdates::set(Vec::new());
 	RegistrationVaultDataByOperator::set(BTreeMap::new());
 	ArgonotCommitmentByOperator::set(BTreeMap::new());
 	ActiveBondAmountsByVaultAndAccount::set(BTreeMap::new());
@@ -675,7 +688,11 @@ pub fn set_committed_argonots(operator_account: TestAccountId, amount: Balance) 
 	Ok(())
 }
 
-pub fn set_active_bond_amount(vault_id: VaultId, operator_account: TestAccountId, amount: Balance) {
+pub fn set_active_vault_bond_amount(
+	vault_id: VaultId,
+	operator_account: TestAccountId,
+	amount: Balance,
+) {
 	ActiveBondAmountsByVaultAndAccount::mutate(|entries| {
 		entries.insert((vault_id, operator_account), amount);
 	});

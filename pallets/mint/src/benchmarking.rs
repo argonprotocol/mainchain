@@ -136,6 +136,7 @@ mod benchmarks {
 
 	#[benchmark]
 	fn provider_utxo_released() -> Result<(), BenchmarkError> {
+		let account_id: T::AccountId = account("mint-provider-release", 0, 0);
 		let amount_burned = T::Balance::from(100u128);
 		MintedBitcoinMicrogons::<T>::put(amount_burned);
 
@@ -143,7 +144,9 @@ mod benchmarks {
 		{
 			<Pallet<T> as UtxoLockEvents<T::AccountId, T::Balance>>::utxo_released(
 				1u64,
+				&account_id,
 				false,
+				amount_burned,
 				amount_burned,
 			)?;
 		}
@@ -181,7 +184,11 @@ mod benchmarks {
 		#[block]
 		{
 			<Pallet<T> as UtxoLockEvents<T::AccountId, T::Balance>>::utxo_released(
-				utxo_id, true, amount,
+				utxo_id,
+				&account_id,
+				true,
+				amount,
+				amount,
 			)?;
 		}
 

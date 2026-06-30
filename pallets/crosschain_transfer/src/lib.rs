@@ -10,6 +10,7 @@ use pallet_prelude::*;
 mod approval_queue;
 mod evm;
 mod gateway_activity;
+pub mod migrations;
 mod minting_authority;
 mod transfer_out;
 
@@ -55,7 +56,7 @@ pub mod pallet {
 		sp_runtime::{transaction_validity::InvalidTransaction, BoundedBTreeMap},
 	};
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(2);
 
 	pub(super) const WEI_PER_ETH: u128 = 1_000_000_000_000_000_000;
 
@@ -71,7 +72,7 @@ pub mod pallet {
 		RuntimeEvent: From<Event<Self>>,
 	>
 	{
-		/// Balance type used for inbound payouts and recent-transfer tracking.
+		/// Balance type used for inbound payouts and crosschain transfer accounting.
 		type Balance: AtLeast32BitUnsigned
 			+ Member
 			+ codec::FullCodec
@@ -126,17 +127,12 @@ pub mod pallet {
 		/// Runtime frame provider used for collect-due alignment on queued council work.
 		type CurrentFrameId: Get<FrameId>;
 
-		/// Runtime tick provider used for recent-transfer retention checks.
+		/// Runtime tick provider used for transfer age checks.
 		type CurrentTick: Get<Tick>;
 
 		/// Runtime tick provider used to convert verified Ethereum header timestamps into local
 		/// tick age.
 		type TickProvider: TickProvider<Self::Block>;
-
-		/// Retention window, in ticks, for recent Argon transfer evidence used by operational
-		/// accounts.
-		#[pallet::constant]
-		type RecentTransferRetentionTicks: Get<Tick>;
 
 		/// Maximum number of ordered gateway activities that may share one receipt proof.
 		#[pallet::constant]
@@ -625,6 +621,49 @@ pub mod pallet {
 		}
 	}
 
+	#[derive(
+		Encode,
+		Decode,
+		DecodeWithMemTracking,
+		Clone,
+		PartialEq,
+		Eq,
+		DebugNoBound,
+		TypeInfo,
+		MaxEncodedLen,
+	)]
+	#[scale_info(skip_type_params(T))]
+	/// Cumulative inbound and outbound transfer totals for one Argon account.
+	pub struct AccountTransferTotals<T: Config> {
+		pub microgons_in: T::Balance,
+		pub microgons_out: T::Balance,
+		#[codec(compact)]
+		pub argon_transfers_in_count: u32,
+		#[codec(compact)]
+		pub argon_transfers_out_count: u32,
+		pub micronots_in: T::Balance,
+		pub micronots_out: T::Balance,
+		#[codec(compact)]
+		pub argonot_transfers_in_count: u32,
+		#[codec(compact)]
+		pub argonot_transfers_out_count: u32,
+	}
+
+	impl<T: Config> Default for AccountTransferTotals<T> {
+		fn default() -> Self {
+			Self {
+				microgons_in: T::Balance::default(),
+				microgons_out: T::Balance::default(),
+				argon_transfers_in_count: 0,
+				argon_transfers_out_count: 0,
+				micronots_in: T::Balance::default(),
+				micronots_out: T::Balance::default(),
+				argonot_transfers_in_count: 0,
+				argonot_transfers_out_count: 0,
+			}
+		}
+	}
+
 	/// One proven contiguous activity slice backed by a combined receipt proof for one execution
 	/// block.
 	pub type GatewayActivityProofBlock<T> =
@@ -652,9 +691,9 @@ pub mod pallet {
 		StorageMap<_, Blake2_128Concat, SourceChain, GatewaySyncPause, OptionQuery>;
 
 	#[pallet::storage]
-	/// Count of still-retained qualifying Argon transfers for each local account.
-	pub type RecentArgonTransfersByAccount<T: Config> =
-		StorageMap<_, Blake2_128Concat, T::AccountId, u32, ValueQuery>;
+	/// Cumulative inbound and outbound transfer totals for each local account.
+	pub type TransferTotalsByAccount<T: Config> =
+		StorageMap<_, Blake2_128Concat, T::AccountId, AccountTransferTotals<T>, ValueQuery>;
 
 	#[pallet::storage]
 	/// Latest council approval queue nonce signed by this account for one destination chain.
@@ -667,16 +706,6 @@ pub mod pallet {
 		CouncilApprovalQueueNonce,
 		OptionQuery,
 	>;
-
-	#[pallet::storage]
-	/// Accounts whose recent-transfer evidence expires at a given tick.
-	#[pallet::unbounded]
-	pub type InboundTransfersExpiringAt<T: Config> =
-		StorageMap<_, Twox64Concat, Tick, Vec<T::AccountId>, ValueQuery>;
-
-	#[pallet::storage]
-	/// Latest tick whose recent-transfer expiration bucket was cleaned up.
-	pub type LastTransferExpiryCleanupTick<T: Config> = StorageValue<_, Tick, ValueQuery>;
 
 	#[pallet::storage]
 	/// The registered council signer for each account on each destination chain.
@@ -1046,27 +1075,10 @@ pub mod pallet {
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
-		fn on_initialize(_: BlockNumberFor<T>) -> Weight {
-			let current_tick = T::CurrentTick::get();
-			let last_cleanup_tick = LastTransferExpiryCleanupTick::<T>::get();
-			let first_tick_to_cleanup = if last_cleanup_tick == 0 {
-				current_tick
-			} else {
-				last_cleanup_tick.saturating_add(1)
-			};
-			let mut expiring_len = 0u32;
+		fn on_runtime_upgrade() -> Weight {
+			use frame_support::traits::OnRuntimeUpgrade;
 
-			for tick in first_tick_to_cleanup..=current_tick {
-				let expiring = InboundTransfersExpiringAt::<T>::take(tick);
-				expiring_len = expiring_len.saturating_add(expiring.len() as u32);
-
-				for account_id in expiring {
-					Self::decrement_recent_argon_transfer(&account_id);
-				}
-			}
-
-			LastTransferExpiryCleanupTick::<T>::put(current_tick);
-			T::WeightInfo::on_initialize_cleanup(expiring_len)
+			migrations::CleanupRecentTransferStateMigration::<T>::on_runtime_upgrade()
 		}
 	}
 
@@ -1493,7 +1505,7 @@ pub mod pallet {
 			});
 			prove_gateway_activity_with_providers::<T>(proof_blocks, activities)
 				.saturating_add(
-					T::OperationalAccountsHook::uniswap_transfer_confirmed_weight()
+					T::OperationalAccountsHook::account_uniswap_argon_transfers_in_updated_weight()
 						.saturating_mul(activities as u64)
 				)
 		})]
@@ -1725,42 +1737,65 @@ pub mod pallet {
 			}
 		}
 
-		pub(crate) fn retain_recent_argon_transfer(account_id: &T::AccountId) {
-			RecentArgonTransfersByAccount::<T>::mutate(account_id, |count| {
-				*count = count.saturating_add(1);
-			});
+		pub(crate) fn record_transfer_in(
+			account_id: &T::AccountId,
+			asset: AssetKind,
+			amount: T::Balance,
+		) {
+			if amount == T::Balance::default() {
+				return;
+			}
 
-			let expires_at =
-				T::CurrentTick::get().saturating_add(T::RecentTransferRetentionTicks::get());
-			InboundTransfersExpiringAt::<T>::mutate(expires_at, |accounts| {
-				accounts.push(account_id.clone());
+			TransferTotalsByAccount::<T>::mutate(account_id, |totals| match asset {
+				AssetKind::Argon => {
+					totals.microgons_in.saturating_accrue(amount);
+					totals.argon_transfers_in_count.saturating_accrue(1);
+				},
+				AssetKind::Argonot => {
+					totals.micronots_in.saturating_accrue(amount);
+					totals.argonot_transfers_in_count.saturating_accrue(1);
+				},
 			});
 		}
 
-		fn decrement_recent_argon_transfer(account_id: &T::AccountId) {
-			RecentArgonTransfersByAccount::<T>::mutate_exists(account_id, |count| {
-				let Some(existing) = count.as_mut() else {
-					return;
-				};
+		pub(crate) fn record_transfer_out(
+			account_id: &T::AccountId,
+			asset: AssetKind,
+			amount: T::Balance,
+		) {
+			if amount == T::Balance::default() {
+				return;
+			}
 
-				if *existing <= 1 {
-					*count = None;
-				} else {
-					*existing = existing.saturating_sub(1);
-				}
+			TransferTotalsByAccount::<T>::mutate(account_id, |totals| match asset {
+				AssetKind::Argon => {
+					totals.microgons_out.saturating_accrue(amount);
+					totals.argon_transfers_out_count.saturating_accrue(1);
+				},
+				AssetKind::Argonot => {
+					totals.micronots_out.saturating_accrue(amount);
+					totals.argonot_transfers_out_count.saturating_accrue(1);
+				},
 			});
+		}
+
+		pub(crate) fn current_account_uniswap_argon_transfers_in_amount(
+			account_id: &T::AccountId,
+		) -> T::Balance {
+			TransferTotalsByAccount::<T>::get(account_id).microgons_in
 		}
 	}
 	impl<T: Config> UniswapTransferProvider<T::AccountId> for Pallet<T> {
 		type Weights = weights::ProviderWeightAdapter<T>;
+		type Balance = T::Balance;
 
 		fn is_crosschain_activated() -> bool {
 			ChainConfigBySourceChain::<T>::contains_key(SourceChain::Ethereum) &&
 				!GatewaySyncPauseBySourceChain::<T>::contains_key(SourceChain::Ethereum)
 		}
 
-		fn has_recent_argon_transfer(account_id: &T::AccountId) -> bool {
-			RecentArgonTransfersByAccount::<T>::get(account_id) > 0
+		fn account_uniswap_argon_transfers_in_amount(account_id: &T::AccountId) -> Self::Balance {
+			Self::current_account_uniswap_argon_transfers_in_amount(account_id)
 		}
 	}
 

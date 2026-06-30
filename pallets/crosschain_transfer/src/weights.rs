@@ -21,9 +21,8 @@ pub trait WeightInfo {
 	fn prove_gateway_activity(activities: u32) -> Weight;
 	fn transfer_out() -> Weight;
 	fn collateralize_transfer() -> Weight;
-	fn on_initialize_cleanup(expiring: u32) -> Weight;
 	fn provider_is_crosschain_activated() -> Weight;
-	fn provider_has_recent_argon_transfer() -> Weight;
+	fn provider_account_uniswap_argon_transfers_in_amount() -> Weight;
 	fn provider_has_overdue_collect_blocker() -> Weight;
 }
 
@@ -136,16 +135,12 @@ where
 		Base::collateralize_transfer()
 	}
 
-	fn on_initialize_cleanup(expiring: u32) -> Weight {
-		Base::on_initialize_cleanup(expiring)
-	}
-
 	fn provider_is_crosschain_activated() -> Weight {
 		Base::provider_is_crosschain_activated()
 	}
 
-	fn provider_has_recent_argon_transfer() -> Weight {
-		Base::provider_has_recent_argon_transfer()
+	fn provider_account_uniswap_argon_transfers_in_amount() -> Weight {
+		Base::provider_account_uniswap_argon_transfers_in_amount()
 	}
 
 	fn provider_has_overdue_collect_blocker() -> Weight {
@@ -159,8 +154,8 @@ impl<T: Config> UniswapTransferProviderWeightInfo for ProviderWeightAdapter<T> {
 		T::WeightInfo::provider_is_crosschain_activated()
 	}
 
-	fn has_recent_argon_transfer() -> Weight {
-		T::WeightInfo::provider_has_recent_argon_transfer()
+	fn account_uniswap_argon_transfers_in_amount() -> Weight {
+		T::WeightInfo::provider_account_uniswap_argon_transfers_in_amount()
 	}
 }
 
@@ -215,15 +210,11 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 
-	fn on_initialize_cleanup(_expiring: u32) -> Weight {
-		Weight::zero()
-	}
-
 	fn provider_is_crosschain_activated() -> Weight {
 		Weight::zero()
 	}
 
-	fn provider_has_recent_argon_transfer() -> Weight {
+	fn provider_account_uniswap_argon_transfers_in_amount() -> Weight {
 		Weight::zero()
 	}
 

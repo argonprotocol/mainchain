@@ -632,7 +632,7 @@ fn it_tracks_multiple_pending_mints_for_the_same_utxo() {
 			]
 		);
 
-		assert_ok!(Mint::utxo_released(1, true, 0));
+		assert_ok!(Mint::utxo_released(1, &1, true, 0, 100));
 		assert!(PendingMintUtxoIdLookup::<Test>::get(1).is_empty());
 		assert!(pending_mints().is_empty());
 		let queue_cursor = PendingMintQueueState::<Test>::get();
@@ -649,7 +649,7 @@ fn it_advances_payout_start_when_loop_reaches_released_front_entry() {
 		assert_ok!(Mint::utxo_locked(3, &3, 100));
 		MaxPendingMintPayoutWindowSize::set(2);
 
-		assert_ok!(Mint::utxo_released(1, true, 0));
+		assert_ok!(Mint::utxo_released(1, &1, true, 0, 100));
 		let queue_cursor = PendingMintQueueState::<Test>::get();
 		assert_eq!(queue_cursor.payout_start_index, 0);
 		assert_eq!(queue_cursor.payout_cursor_index, 0);
@@ -700,12 +700,12 @@ fn it_decrements_unlocked_bitcoins() {
 		System::set_block_number(1);
 		MintedBitcoinMicrogons::<Test>::set(100);
 
-		assert_ok!(Mint::utxo_released(1, true, 50));
+		assert_ok!(Mint::utxo_released(1, &1, true, 50, 50));
 		assert_eq!(MintedBitcoinMicrogons::<Test>::get(), 50);
 
 		assert_ok!(Mint::utxo_locked(1, &1, 10));
 
-		assert_ok!(Mint::utxo_released(1, false, 10));
+		assert_ok!(Mint::utxo_released(1, &1, false, 10, 10));
 
 		assert_eq!(MintedBitcoinMicrogons::<Test>::get(), 40);
 		// Releasing without removing pending mints should keep the queue entry in place.
@@ -722,7 +722,7 @@ fn it_decrements_unlocked_bitcoins() {
 			)]
 		);
 
-		assert_ok!(Mint::utxo_released(1, true, 40));
+		assert_ok!(Mint::utxo_released(1, &1, true, 40, 40));
 		assert_eq!(MintedBitcoinMicrogons::<Test>::get(), 0);
 		assert!(pending_mints().is_empty());
 		let queue_cursor = PendingMintQueueState::<Test>::get();

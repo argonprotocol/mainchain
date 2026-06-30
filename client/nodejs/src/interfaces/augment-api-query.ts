@@ -66,6 +66,7 @@ import type {
   PalletBitcoinLocksLockReleaseRequest,
   PalletBitcoinLocksLockedBitcoin,
   PalletBitcoinLocksOrphanedUtxo,
+  PalletCrosschainTransferAccountTransferTotals,
   PalletCrosschainTransferChainConfig,
   PalletCrosschainTransferCouncilApprovalQueueEntry,
   PalletCrosschainTransferGatewayState,
@@ -285,6 +286,17 @@ declare module '@polkadot/api-base/types/storage' {
             | Uint8Array,
         ) => Observable<Option<PalletBitcoinLocksOrphanedUtxo>>,
         [AccountId32, ArgonPrimitivesBitcoinUtxoRef]
+      >;
+      /**
+       * Index of active UTXO IDs per owner account.
+       **/
+      utxoIdsByOwnerAccount: AugmentedQuery<
+        ApiType,
+        (
+          arg1: AccountId32 | string | Uint8Array,
+          arg2: u64 | AnyNumber | Uint8Array,
+        ) => Observable<Option<Null>>,
+        [AccountId32, u64]
       >;
       /**
        * Index of active UTXO IDs per vault
@@ -595,18 +607,6 @@ declare module '@polkadot/api-base/types/storage' {
         [H256]
       >;
       /**
-       * Accounts whose recent-transfer evidence expires at a given tick.
-       **/
-      inboundTransfersExpiringAt: AugmentedQuery<
-        ApiType,
-        (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<AccountId32>>,
-        [u64]
-      >;
-      /**
-       * Latest tick whose recent-transfer expiration bucket was cleaned up.
-       **/
-      lastTransferExpiryCleanupTick: AugmentedQuery<ApiType, () => Observable<u64>, []>;
-      /**
        * The latest queued council hash that should govern the next queue entry on each destination
        * chain.
        **/
@@ -720,14 +720,6 @@ declare module '@polkadot/api-base/types/storage' {
         [PalletCrosschainTransferSourceChain]
       >;
       /**
-       * Count of still-retained qualifying Argon transfers for each local account.
-       **/
-      recentArgonTransfersByAccount: AugmentedQuery<
-        ApiType,
-        (arg: AccountId32 | string | Uint8Array) => Observable<u32>,
-        [AccountId32]
-      >;
-      /**
        * Outbound transfers by transfer id.
        **/
       transferOutById: AugmentedQuery<
@@ -747,6 +739,16 @@ declare module '@polkadot/api-base/types/storage' {
           arg: PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
         ) => Observable<Option<u128>>,
         [PalletCrosschainTransferSourceChain]
+      >;
+      /**
+       * Cumulative inbound and outbound transfer totals for each local account.
+       **/
+      transferTotalsByAccount: AugmentedQuery<
+        ApiType,
+        (
+          arg: AccountId32 | string | Uint8Array,
+        ) => Observable<PalletCrosschainTransferAccountTransferTotals>,
+        [AccountId32]
       >;
     };
     digests: {
@@ -1260,40 +1262,17 @@ declare module '@polkadot/api-base/types/storage' {
     };
     operationalAccounts: {
       /**
-       * Referral codes that have already been linked, keyed to their proof expiration frame.
+       * Opaque encrypted referrer server payload keyed by the downstream account.
        **/
-      consumedReferralCodes: AugmentedQuery<
-        ApiType,
-        (arg: U8aFixed | string | Uint8Array) => Observable<Option<u64>>,
-        [U8aFixed]
-      >;
-      /**
-       * Referral codes to clear after their referral proof expiration frame.
-       **/
-      consumedReferralCodesByExpiration: AugmentedQuery<
-        ApiType,
-        (
-          arg1: u64 | AnyNumber | Uint8Array,
-          arg2: U8aFixed | string | Uint8Array,
-        ) => Observable<Option<Null>>,
-        [u64, U8aFixed]
-      >;
-      /**
-       * Opaque encrypted sponsor server payload keyed by the sponsee operational account.
-       **/
-      encryptedServerBySponsee: AugmentedQuery<
+      encryptedServerByDownstreamAccount: AugmentedQuery<
         ApiType,
         (arg: AccountId32 | string | Uint8Array) => Observable<Option<Bytes>>,
         [AccountId32]
       >;
       /**
-       * Oldest referral expiration frame that still has cleanup work to resume.
-       **/
-      expiredReferralCodeCleanupFrame: AugmentedQuery<ApiType, () => Observable<Option<u64>>, []>;
-      /**
        * Whether operational-account access is invite-only.
        *
-       * When enabled, registration requires a valid referral invite and vault creation plus
+       * When enabled, registration requires a referrer invite and vault creation plus
        * mining-slot bidding remain restricted to registered operational accounts.
        *
        * Existing live raw chain specs do not contain this key, so the default remains invite-only

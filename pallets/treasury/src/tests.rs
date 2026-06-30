@@ -6,12 +6,11 @@ use super::{
 use crate::{
 	mock::{
 		account_id_from_seed, account_pair_from_seed, insert_vault, new_test_ext, set_argons,
-		set_ownership, take_treasury_pool_participated, Balances, BidPoolAccountId, CurrentFrameId,
-		ExistentialDeposit, LastVaultProfits, MaxActiveArgonotBondLots,
-		MaxArgonotBondedPercentOfCirculation, MaxTreasuryContributors, MaxVaultsPerPool,
-		MinimumArgonsPerContributor, Ownership, RuntimeEvent, RuntimeHoldReason, RuntimeOrigin,
-		System, Test, TestAccountId, TestVault, Treasury, TreasuryExitDelayFrames,
-		TreasuryReservesAccountId,
+		set_ownership, Balances, BidPoolAccountId, CurrentFrameId, ExistentialDeposit,
+		LastVaultProfits, MaxActiveArgonotBondLots, MaxArgonotBondedPercentOfCirculation,
+		MaxTreasuryContributors, MaxVaultsPerPool, MinimumArgonsPerContributor, Ownership,
+		RuntimeEvent, RuntimeHoldReason, RuntimeOrigin, System, Test, TestAccountId, TestVault,
+		Treasury, TreasuryExitDelayFrames, TreasuryReservesAccountId,
 	},
 	pallet::{BondLotAllocation, Error, FrameVaultCapital, VaultCapital},
 };
@@ -128,11 +127,11 @@ fn buy_bonds_store_plain_and_bonus_terms_and_track_pool_participation() {
 			5 * MICROGONS_PER_ARGON,
 		);
 		assert_eq!(BondLotsByVault::<Test>::get(1).len(), 2);
-		assert!(<Treasury as TreasuryPoolProvider<TestAccountId>>::has_bond_participation(
+		assert!(<Treasury as TreasuryPoolProvider<TestAccountId>>::has_vault_bond_participation(
 			1,
 			&account(2),
 		));
-		assert!(<Treasury as TreasuryPoolProvider<TestAccountId>>::has_bond_participation(
+		assert!(<Treasury as TreasuryPoolProvider<TestAccountId>>::has_vault_bond_participation(
 			1,
 			&account(3),
 		));
@@ -292,6 +291,46 @@ fn buy_argonot_bonds_allows_multiple_lots_per_account() {
 				&account(2),
 			),
 			9 * MICROGONS_PER_ARGON,
+		);
+	});
+}
+
+#[test]
+fn active_account_vault_bond_amount_only_counts_vault_bonds() {
+	new_test_ext().execute_with(|| {
+		MinimumArgonsPerContributor::set(1);
+		CurrentFrameId::set(1);
+		MaxArgonotBondedPercentOfCirculation::set(Percent::from_percent(100));
+
+		insert_vault(1, test_vault(10, (100 * MICROGONS_PER_ARGON) as u64, Permill::zero()));
+		insert_vault(2, test_vault(11, (100 * MICROGONS_PER_ARGON) as u64, Permill::zero()));
+
+		set_argons(2, 30 * MICROGONS_PER_ARGON);
+		set_ownership(2, 20 * MICROGONS_PER_ARGON);
+
+		assert_ok!(Treasury::buy_bonds(origin(2), 1, 5, None));
+		assert_ok!(Treasury::buy_bonds(origin(2), 2, 7, None));
+		assert_ok!(Treasury::buy_argonot_bonds(origin(2), 11));
+
+		assert_eq!(
+			<Treasury as TreasuryPoolProvider<TestAccountId>>::active_vault_bond_amount(
+				1,
+				&account(2),
+			),
+			5 * MICROGONS_PER_ARGON,
+		);
+		assert_eq!(
+			<Treasury as TreasuryPoolProvider<TestAccountId>>::active_vault_bond_amount(
+				2,
+				&account(2),
+			),
+			7 * MICROGONS_PER_ARGON,
+		);
+		assert_eq!(
+			<Treasury as TreasuryPoolProvider<TestAccountId>>::active_account_vault_bond_amount(
+				&account(2),
+			),
+			12 * MICROGONS_PER_ARGON,
 		);
 	});
 }
@@ -700,12 +739,6 @@ fn lock_in_vault_capital_selects_top_vaults_by_eligible_bonds() {
 		assert!(current.vaults.get(&1).is_none());
 		assert_eq!(current.vaults.get(&2).map(|vault| vault.eligible_bonds), Some(2));
 		assert_eq!(current.vaults.get(&3).map(|vault| vault.eligible_bonds), Some(3));
-
-		let participation = take_treasury_pool_participated();
-		assert_eq!(
-			participation,
-			vec![(account(13), 3 * MICROGONS_PER_ARGON), (account(12), 2 * MICROGONS_PER_ARGON),]
-		);
 	});
 }
 

@@ -13,7 +13,7 @@ use argon_bitcoin::CosignReleaser;
 use argon_primitives::{
 	bitcoin::{BitcoinNetwork, BitcoinSignature, CompressedBitcoinPubkey},
 	vault::BitcoinVaultProvider,
-	CallTxPoolKeyProvider,
+	BitcoinLocksProvider, CallTxPoolKeyProvider,
 };
 pub use pallet::*;
 pub use weights::*;
@@ -82,7 +82,7 @@ pub mod pallet {
 	};
 	use codec::HasCompact;
 	use core::iter::Sum;
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(7);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(8);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -199,6 +199,11 @@ pub mod pallet {
 	#[pallet::storage]
 	pub type UtxoIdsByVaultId<T: Config> =
 		StorageDoubleMap<_, Twox64Concat, VaultId, Twox64Concat, UtxoId, (), OptionQuery>;
+
+	/// Index of active UTXO IDs per owner account.
+	#[pallet::storage]
+	pub type UtxoIdsByOwnerAccount<T: Config> =
+		StorageDoubleMap<_, Twox64Concat, T::AccountId, Twox64Concat, UtxoId, (), OptionQuery>;
 
 	/// Stores the block number where a release was cosigned by the vault.
 	#[pallet::storage]
@@ -826,6 +831,7 @@ pub mod pallet {
 
 			let lock = LocksByUtxoId::<T>::take(utxo_id).ok_or(Error::<T>::LockNotFound)?;
 			UtxoIdsByVaultId::<T>::remove(lock.vault_id, utxo_id);
+			UtxoIdsByOwnerAccount::<T>::remove(&lock.owner_account, utxo_id);
 			let lock_extension = lock.get_lock_extension();
 			let utxo_satoshis = lock.effective_satoshis();
 			let securitization = lock.get_securitization();
@@ -952,7 +958,13 @@ pub mod pallet {
 				let amount_to_mint = new_liquidity_promised;
 
 				// NOTE: we send amount_to_burn to be released
-				T::LockEvents::utxo_released(utxo_id, false, amount_to_burn)?;
+				T::LockEvents::utxo_released(
+					utxo_id,
+					&who,
+					false,
+					amount_to_burn,
+					lock.liquidity_promised,
+				)?;
 				let _ = T::Currency::burn_from(
 					&who,
 					amount_to_burn,
@@ -1262,6 +1274,7 @@ pub mod pallet {
 
 			if let Some(lock) = LocksByUtxoId::<T>::take(utxo_id) {
 				UtxoIdsByVaultId::<T>::remove(lock.vault_id, utxo_id);
+				UtxoIdsByOwnerAccount::<T>::remove(&lock.owner_account, utxo_id);
 				Self::schedule_orphans_for_cleanup(utxo_id, &lock);
 				let securitization = lock.get_securitization();
 				T::VaultProvider::remove_pending(lock.vault_id, &securitization)
@@ -1453,6 +1466,7 @@ pub mod pallet {
 				},
 			);
 			UtxoIdsByVaultId::<T>::insert(vault_id, utxo_id, ());
+			UtxoIdsByOwnerAccount::<T>::insert(account_id, utxo_id, ());
 			Self::deposit_event(Event::<T>::BitcoinLockCreated {
 				utxo_id,
 				vault_id,
@@ -1587,6 +1601,7 @@ pub mod pallet {
 		fn burn_bitcoin_lock(utxo_id: UtxoId, is_externally_spent: bool) -> DispatchResult {
 			let lock = LocksByUtxoId::<T>::take(utxo_id).ok_or(Error::<T>::LockNotFound)?;
 			UtxoIdsByVaultId::<T>::remove(lock.vault_id, utxo_id);
+			UtxoIdsByOwnerAccount::<T>::remove(&lock.owner_account, utxo_id);
 			if LockReleaseRequestsByUtxoId::<T>::contains_key(utxo_id) {
 				let request = Self::take_release_request(utxo_id)?;
 				// We don't branch on spend status here. A valid release request must be made far
@@ -1641,7 +1656,13 @@ pub mod pallet {
 			.map_err(Error::<T>::from)?;
 
 			let amount_eligible_for_pool = lock.liquidity_promised.min(redemption_amount);
-			T::LockEvents::utxo_released(utxo_id, is_externally_spent, amount_eligible_for_pool)?;
+			T::LockEvents::utxo_released(
+				utxo_id,
+				&lock.owner_account,
+				is_externally_spent,
+				amount_eligible_for_pool,
+				lock.liquidity_promised,
+			)?;
 
 			Self::deposit_event(Event::BitcoinLockBurned {
 				utxo_id,
@@ -1655,6 +1676,7 @@ pub mod pallet {
 		fn complete_release_after_spent(utxo_id: UtxoId) -> DispatchResult {
 			let lock = LocksByUtxoId::<T>::take(utxo_id).ok_or(Error::<T>::LockNotFound)?;
 			UtxoIdsByVaultId::<T>::remove(lock.vault_id, utxo_id);
+			UtxoIdsByOwnerAccount::<T>::remove(&lock.owner_account, utxo_id);
 			let owner_account = lock.owner_account.clone();
 			let vault_id = lock.vault_id;
 			let securitization = lock.get_securitization();
@@ -1709,7 +1731,13 @@ pub mod pallet {
 				)?;
 				frame_system::Pallet::<T>::dec_providers(owner_account)?;
 			}
-			T::LockEvents::utxo_released(utxo_id, false, burn_amount)?;
+			T::LockEvents::utxo_released(
+				utxo_id,
+				owner_account,
+				false,
+				burn_amount,
+				lock.liquidity_promised,
+			)?;
 			T::VaultProvider::schedule_for_release(
 				vault_id,
 				securitization,
@@ -1742,6 +1770,7 @@ pub mod pallet {
 				return Ok(());
 			};
 			UtxoIdsByVaultId::<T>::remove(lock.vault_id, utxo_id);
+			UtxoIdsByOwnerAccount::<T>::remove(&lock.owner_account, utxo_id);
 			let vault_id = lock.vault_id;
 
 			let redemption_amount_on_hold = entry.redemption_amount;
@@ -1783,7 +1812,13 @@ pub mod pallet {
 			)
 			.map_err(Error::<T>::from)?;
 			// count the amount we took from the vault as the burn amount
-			T::LockEvents::utxo_released(utxo_id, false, adjusted_market_rate)?;
+			T::LockEvents::utxo_released(
+				utxo_id,
+				&lock.owner_account,
+				false,
+				adjusted_market_rate,
+				lock.liquidity_promised,
+			)?;
 
 			Self::deposit_event(Event::BitcoinCosignPastDue {
 				utxo_id,
@@ -1867,6 +1902,7 @@ pub mod pallet {
 			Self::schedule_orphans_for_cleanup(utxo_id, lock);
 			LocksByUtxoId::<T>::remove(utxo_id);
 			UtxoIdsByVaultId::<T>::remove(lock.vault_id, utxo_id);
+			UtxoIdsByOwnerAccount::<T>::remove(&lock.owner_account, utxo_id);
 
 			Ok(())
 		}
@@ -1927,6 +1963,27 @@ pub mod pallet {
 
 			Ok(())
 		}
+	}
+}
+
+impl<T: Config> BitcoinLocksProvider<T::AccountId, T::Balance> for Pallet<T> {
+	type Weights = weights::ProviderWeightAdapter<T>;
+
+	fn get_account_funded_bitcoin_amount(account_id: &T::AccountId) -> T::Balance {
+		let mut amount = T::Balance::default();
+
+		for (utxo_id, _) in UtxoIdsByOwnerAccount::<T>::iter_prefix(account_id) {
+			let Some(lock) = LocksByUtxoId::<T>::get(utxo_id) else {
+				continue;
+			};
+			if !lock.is_funded {
+				continue;
+			}
+
+			amount.saturating_accrue(lock.liquidity_promised);
+		}
+
+		amount
 	}
 }
 

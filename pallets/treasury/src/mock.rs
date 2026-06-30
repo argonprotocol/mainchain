@@ -22,7 +22,7 @@ impl OperationalAccountsHook<TestAccountId, Balance> for TestOperationalAccounts
 		Weight::zero()
 	}
 
-	fn bitcoin_lock_funded_weight() -> Weight {
+	fn vault_bitcoin_lock_funded_weight() -> Weight {
 		Weight::zero()
 	}
 
@@ -30,18 +30,12 @@ impl OperationalAccountsHook<TestAccountId, Balance> for TestOperationalAccounts
 		Weight::zero()
 	}
 
-	fn treasury_pool_participated_weight() -> Weight {
+	fn account_vault_bond_total_updated_weight() -> Weight {
 		Weight::zero()
 	}
 
-	fn uniswap_transfer_confirmed_weight() -> Weight {
+	fn account_uniswap_argon_transfers_in_updated_weight() -> Weight {
 		Weight::zero()
-	}
-
-	fn treasury_pool_participated(vault_operator_account: &TestAccountId, amount: Balance) {
-		TreasuryPoolParticipated::mutate(|calls| {
-			calls.push((vault_operator_account.clone(), amount));
-		});
 	}
 }
 
@@ -181,7 +175,6 @@ parameter_types! {
 	pub static ArgonPricePerUsd: Option<FixedU128> = Some(FixedU128::from_float(1.00));
 
 	pub static LastVaultProfits: Vec<VaultTreasuryFrameEarnings<Balance, TestAccountId>> = vec![];
-	pub static TreasuryPoolParticipated: Vec<(TestAccountId, Balance)> = vec![];
 }
 
 #[derive(Clone)]
@@ -314,10 +307,4 @@ impl pallet_treasury::Config for Test {
 
 pub(crate) fn new_test_ext() -> TestState {
 	new_test_with_genesis::<Test>(|_t| {})
-}
-
-pub(crate) fn take_treasury_pool_participated() -> Vec<(TestAccountId, Balance)> {
-	let values = TreasuryPoolParticipated::get();
-	TreasuryPoolParticipated::set(vec![]);
-	values
 }

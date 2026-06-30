@@ -478,8 +478,10 @@ pub mod pallet {
 
 		fn utxo_released(
 			utxo_id: UtxoId,
+			_account_id: &T::AccountId,
 			remove_pending_mints: bool,
 			amount_burned: T::Balance,
+			_original_liquidity_promised: T::Balance,
 		) -> sp_runtime::DispatchResult {
 			if remove_pending_mints {
 				let pending_indices = PendingMintUtxoIdLookup::<T>::take(utxo_id);

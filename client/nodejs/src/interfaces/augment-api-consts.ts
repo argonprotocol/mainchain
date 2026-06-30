@@ -210,11 +210,6 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       minTransferCollateralIncrement: u128 & AugmentedConst<ApiType>;
       /**
-       * Retention window, in ticks, for recent Argon transfer evidence used by operational
-       * accounts.
-       **/
-      recentTransferRetentionTicks: u64 & AugmentedConst<ApiType>;
-      /**
        * Minting authority tip rate applied to transfer-out requests in basis points.
        **/
       transferOutMintingAuthorityTipBasisPoints: u32 & AugmentedConst<ApiType>;
@@ -370,45 +365,58 @@ declare module '@polkadot/api-base/types/consts' {
     };
     operationalAccounts: {
       /**
-       * Additional argon amount (base units) required per referral after operational.
+       * Additional argon amount (base units) required per follow-on upgrade code after
+       * operational certification.
        **/
-      bitcoinLockSizeForReferral: u128 & AugmentedConst<ApiType>;
+      bitcoinLockSizeForUpgradeCode: u128 & AugmentedConst<ApiType>;
       /**
-       * Maximum number of available referrals allowed at once.
+       * Maximum number of available upgrade codes allowed at once.
        **/
-      maxAvailableReferrals: u32 & AugmentedConst<ApiType>;
+      maxAvailableUpgradeCodes: u32 & AugmentedConst<ApiType>;
       /**
-       * Maximum number of encrypted server bytes stored per sponsee.
+       * Maximum number of encrypted server bytes stored per network account.
        **/
       maxEncryptedServerLen: u32 & AugmentedConst<ApiType>;
-      /**
-       * Maximum number of expired referral codes cleared per block.
-       **/
-      maxExpiredReferralCodeCleanupsPerBlock: u32 & AugmentedConst<ApiType>;
       /**
        * Mining seats required to become operational.
        **/
       miningSeatsForOperational: u32 & AugmentedConst<ApiType>;
       /**
-       * Mining seats required per referral after operational.
+       * Mining seats required per follow-on upgrade code after operational certification.
        **/
-      miningSeatsPerReferral: u32 & AugmentedConst<ApiType>;
+      miningSeatsPerUpgradeCode: u32 & AugmentedConst<ApiType>;
+      /**
+       * Default reward paid when an account becomes operational.
+       **/
+      operationalActivationReward: u128 & AugmentedConst<ApiType>;
+      /**
+       * Minimum total Uniswap transfer amount required for operational certification.
+       **/
+      operationalMinimumUniswapTransfer: u128 & AugmentedConst<ApiType>;
       /**
        * Minimum vault securitization required to become operational.
        **/
       operationalMinimumVaultSecuritization: u128 & AugmentedConst<ApiType>;
       /**
-       * Default bonus reward paid every referral threshold.
+       * Default bonus reward paid every operational referral threshold.
        **/
       operationalReferralBonusReward: u128 & AugmentedConst<ApiType>;
       /**
-       * Default reward paid when an account becomes operational.
+       * Number of operational referrals required per bonus reward.
        **/
-      operationalReferralReward: u128 & AugmentedConst<ApiType>;
+      operationalReferralsPerBonusReward: u32 & AugmentedConst<ApiType>;
       /**
-       * Number of operational sponsees required per referral bonus reward.
+       * Minimum bitcoin amount required for treasury certification.
        **/
-      referralBonusEveryXOperationalSponsees: u32 & AugmentedConst<ApiType>;
+      treasuryMinimumBitcoin: u128 & AugmentedConst<ApiType>;
+      /**
+       * Minimum bond amount required for treasury certification.
+       **/
+      treasuryMinimumBonds: u128 & AugmentedConst<ApiType>;
+      /**
+       * Minimum Uniswap transfer amount required for treasury certification.
+       **/
+      treasuryMinimumUniswapTransfer: u128 & AugmentedConst<ApiType>;
     };
     ownership: {
       /**

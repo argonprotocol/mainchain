@@ -1018,7 +1018,7 @@ fn burns_an_externally_spent_bitcoin() {
 		set_bitcoin_height(expiration_block);
 		BitcoinLocks::on_initialize(2);
 
-		assert_eq!(LastReleaseEvent::get(), Some((1, true, new_price)));
+		assert_eq!(LastReleaseEvent::get(), Some((1, who, true, new_price, price)));
 		assert_eq!(LocksByUtxoId::<Test>::get(1), None);
 	});
 }
@@ -1081,7 +1081,10 @@ fn spent_after_release_request_finalizes_as_release() {
 		assert_eq!(Balances::balance_on_hold(&HoldReason::ReleaseBitcoinLock.into(), &who), 0);
 		assert_eq!(System::providers(&who), providers_before_request);
 		assert_eq!(Balances::balance(&who), 2_000 + lock.liquidity_promised - redemption_amount);
-		assert_eq!(LastReleaseEvent::get(), Some((1, false, redemption_amount)));
+		assert_eq!(
+			LastReleaseEvent::get(),
+			Some((1, who, false, redemption_amount, lock.liquidity_promised)),
+		);
 
 		System::assert_last_event(
 			Event::<Test>::BitcoinSpentAfterRelease { vault_id: 1, utxo_id: 1 }.into(),
@@ -1294,7 +1297,10 @@ fn penalizes_vault_if_not_release_countersigned() {
 			}
 			.into(),
 		);
-		assert_eq!(LastReleaseEvent::get(), Some((1, false, redemption_amount)));
+		assert_eq!(
+			LastReleaseEvent::get(),
+			Some((1, who, false, redemption_amount, lock.liquidity_promised)),
+		);
 		assert_eq!(Balances::balance_on_hold(&HoldReason::ReleaseBitcoinLock.into(), &who), 0);
 		assert_eq!(Balances::balance(&who), 2000 + market_price);
 		assert_eq!(DefaultVault::get().securitized_satoshis, 0);
@@ -1415,7 +1421,10 @@ fn clears_released_bitcoins() {
 			1,
 			BitcoinSignature(BoundedVec::truncate_from([0u8; 73].to_vec()))
 		));
-		assert_eq!(LastReleaseEvent::get(), Some((1, false, redemption_amount)));
+		assert_eq!(
+			LastReleaseEvent::get(),
+			Some((1, who, false, redemption_amount, lock.liquidity_promised)),
+		);
 		assert!(LockCosignDueByFrame::<Test>::get(cosign_due_frame).is_empty());
 		assert!(LockReleaseRequestsByUtxoId::<Test>::get(1).is_none());
 		assert!(VaultViewOfCosignPendingLocks::get().get(&1).unwrap().is_empty());
@@ -1858,7 +1867,7 @@ fn it_should_allow_a_ratchet_down() {
 		assert_ok!(BitcoinLocks::ratchet(RuntimeOrigin::signed(who), 1, None));
 		assert_eq!(
 			LastReleaseEvent::get(),
-			Some((1, false, redemption_amount)),
+			Some((1, who, false, redemption_amount, lock.liquidity_promised)),
 			"shouldn't remove from mint queue, but should release the redemption amount"
 		);
 		assert_eq!(
@@ -1965,7 +1974,10 @@ fn down_ratchet_redemption_uses_requested_microgons_at_target_per_btc() {
 			Some(LockOptions::V1 { microgons_at_target_per_btc: Some(requested_target_rate) })
 		));
 
-		assert_eq!(LastReleaseEvent::get(), Some((1, false, requested_target_rate)));
+		assert_eq!(
+			LastReleaseEvent::get(),
+			Some((1, who, false, requested_target_rate, lock.liquidity_promised)),
+		);
 		assert_eq!(LastLockEvent::get(), Some((1, who, requested_target_rate)));
 	});
 }

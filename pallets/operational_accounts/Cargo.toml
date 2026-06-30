@@ -22,7 +22,7 @@ argon-primitives = { workspace = true }
 serde = { workspace = true, features = ["derive"] }
 
 [dev-dependencies]
-polkadot-sdk = { workspace = true, features = ["sp-io", "sp-core"], default-features = true }
+polkadot-sdk = { workspace = true, features = ["sp-io", "sp-core", "pallet-balances"], default-features = true }
 pallet-prelude = { workspace = true, features = ["test"], default-features = true }
 
 [features]

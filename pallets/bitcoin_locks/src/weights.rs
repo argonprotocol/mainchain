@@ -14,7 +14,9 @@
 #![allow(unused_imports)]
 
 use super::Config;
-use argon_primitives::providers::{BitcoinUtxoEventsWeightInfo, UtxoLockEvents};
+use argon_primitives::providers::{
+	BitcoinLocksProviderWeightInfo, BitcoinUtxoEventsWeightInfo, UtxoLockEvents,
+};
 use argon_primitives::UtxoLockEventsWeightInfo;
 use pallet_prelude::*;
 
@@ -58,7 +60,9 @@ pub trait WeightInfo {
 	fn request_orphaned_utxo_release() -> Weight;
 	fn cosign_orphaned_utxo_release() -> Weight;
 	fn increase_securitization() -> Weight;
+	fn register_fee_coupon() -> Weight;
 
+	fn provider_get_account_funded_bitcoin_amount() -> Weight;
 	// Bitcoin UTXO event handler provider weights
 	fn provider_funding_received() -> Weight;
 	fn provider_timeout_waiting_for_funding() -> Weight;
@@ -141,6 +145,14 @@ where
 		Base::increase_securitization()
 	}
 
+	fn register_fee_coupon() -> Weight {
+		Base::register_fee_coupon()
+	}
+
+	fn provider_get_account_funded_bitcoin_amount() -> Weight {
+		Base::provider_get_account_funded_bitcoin_amount()
+	}
+
 	fn provider_funding_received() -> Weight {
 		Base::provider_funding_received().saturating_add(LockEventWeight::utxo_locked())
 	}
@@ -169,6 +181,11 @@ where
 }
 
 pub struct ProviderWeightAdapter<T>(PhantomData<T>);
+impl<T: Config> BitcoinLocksProviderWeightInfo for ProviderWeightAdapter<T> {
+	fn get_account_funded_bitcoin_amount() -> Weight {
+		<T as Config>::WeightInfo::provider_get_account_funded_bitcoin_amount()
+	}
+}
 impl<T: Config> BitcoinUtxoEventsWeightInfo for ProviderWeightAdapter<T> {
 	fn funding_received() -> Weight {
 		<T as Config>::WeightInfo::provider_funding_received()
@@ -210,6 +227,8 @@ impl WeightInfo for () {
 	fn request_orphaned_utxo_release() -> Weight { Weight::zero() }
 	fn cosign_orphaned_utxo_release() -> Weight { Weight::zero() }
 	fn increase_securitization() -> Weight { Weight::zero() }
+	fn register_fee_coupon() -> Weight { Weight::zero() }
+	fn provider_get_account_funded_bitcoin_amount() -> Weight { Weight::zero() }
 	fn provider_funding_received() -> Weight { Weight::zero() }
 	fn provider_timeout_waiting_for_funding() -> Weight { Weight::zero() }
 	fn provider_funding_promoted_by_account() -> Weight { Weight::zero() }

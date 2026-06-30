@@ -1,9 +1,14 @@
 use crate as pallet_operational_accounts;
 use argon_primitives::{
 	vault::{BitcoinVaultProvider, RegistrationVaultData},
-	MiningFrameTransitionProvider, MiningSlotProvider, OperationalRewardsPayer,
-	TreasuryPoolProvider, UniswapTransferProvider,
+	BitcoinLocksProvider, MiningSlotProvider, OperationalRewardsPayer, TreasuryPoolProvider,
+	UniswapTransferProvider,
 };
+use frame_support::traits::{
+	fungible::{Inspect, Mutate},
+	Currency,
+};
+use pallet_balances::AccountData;
 use pallet_prelude::*;
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -17,6 +22,7 @@ type Block = frame_system::mocking::MockBlock<Test>;
 frame_support::construct_runtime!(
 	pub enum Test {
 		System: frame_system,
+		Balances: pallet_balances,
 		OperationalAccounts: pallet_operational_accounts,
 	}
 );
@@ -26,43 +32,61 @@ impl frame_system::Config for Test {
 	type AccountId = TestAccountId;
 	type Lookup = IdentityLookup<Self::AccountId>;
 	type Block = Block;
-	type AccountData = ();
+	type AccountData = AccountData<Balance>;
 	type DbWeight = RocksDbWeight;
 }
 
 parameter_types! {
+	pub static ExistentialDeposit: Balance = 10;
+}
+
+impl pallet_balances::Config for Test {
+	type MaxLocks = ConstU32<0>;
+	type MaxReserves = ConstU32<0>;
+	type ReserveIdentifier = ();
+	type Balance = Balance;
+	type RuntimeEvent = RuntimeEvent;
+	type DustRemoval = ();
+	type ExistentialDeposit = ExistentialDeposit;
+	type AccountStore = System;
+	type WeightInfo = ();
+	type FreezeIdentifier = ();
+	type MaxFreezes = ();
+	type RuntimeHoldReason = RuntimeHoldReason;
+	type RuntimeFreezeReason = RuntimeFreezeReason;
+	type DoneSlashHandler = ();
+}
+
+parameter_types! {
 	pub static CurrentFrameId: FrameId = 1;
-	pub const MaxAvailableReferrals: u32 = 2;
-	pub const MaxExpiredReferralCodeCleanupsPerBlock: u32 = 2;
+	pub const MaxAvailableUpgradeCodes: u32 = 2;
 	pub const MaxEncryptedServerLen: u32 = 256;
+	pub const TreasuryMinimumUniswapTransfer: Balance = 250;
+	pub const TreasuryMinimumBitcoin: Balance = 500;
+	pub const TreasuryMinimumBonds: Balance = 250;
+	pub const OperationalMinimumUniswapTransfer: Balance = 3_000;
 	pub const OperationalMinimumVaultSecuritization: Balance = 2_000;
-	pub const BitcoinLockSizeForReferral: Balance = 5_000;
+	pub const BitcoinLockSizeForUpgradeCode: Balance = 5_000;
 	pub const MiningSeatsForOperational: u32 = 2;
-	pub const MiningSeatsPerReferral: u32 = 5;
-	pub const ReferralBonusEveryXOperationalSponsees: u32 = 5;
-	pub const OperationalReferralReward: Balance = 1_000;
+	pub const MiningSeatsPerUpgradeCode: u32 = 5;
+	pub const OperationalReferralsPerBonusReward: u32 = 5;
+	pub const OperationalActivationReward: Balance = 1_000;
 	pub const OperationalReferralBonusReward: Balance = 500;
 	pub static IsCrosschainActivated: bool = true;
-	pub static AccountsWithRecentArgonTransfers: BTreeSet<TestAccountId> = BTreeSet::new();
+	pub static MicrogonsInByAccount:
+		BTreeMap<TestAccountId, Balance> = BTreeMap::new();
+	pub static MicrogonsOutByAccount:
+		BTreeMap<TestAccountId, Balance> = BTreeMap::new();
+	pub static FundedBitcoinAmountsByAccount:
+		BTreeMap<TestAccountId, Balance> = BTreeMap::new();
 	pub static RegistrationVaultDataByAccount:
 		BTreeMap<TestAccountId, RegistrationVaultData<Balance>> = BTreeMap::new();
-	pub static TreasuryPoolParticipantsByVaultId:
-		BTreeMap<VaultId, BTreeSet<TestAccountId>> = BTreeMap::new();
+	pub static ActiveBondAmountsByVaultAndAccount:
+		BTreeMap<(VaultId, TestAccountId), Balance> = BTreeMap::new();
 	pub static ActiveMiningRewardsAccounts: BTreeSet<TestAccountId> = BTreeSet::new();
 	pub static OperationalVaultsMarkedOperational: BTreeSet<TestAccountId> = BTreeSet::new();
 	pub static ClaimableTreasuryBalance: Balance = 0;
 	pub static ClaimedOperationalRewards: Vec<(TestAccountId, Balance)> = Vec::new();
-}
-
-pub struct StaticFrameProvider;
-impl MiningFrameTransitionProvider for StaticFrameProvider {
-	fn get_current_frame_id() -> FrameId {
-		CurrentFrameId::get()
-	}
-
-	fn is_new_frame_started() -> Option<FrameId> {
-		None
-	}
 }
 
 pub struct MockVaultProvider;
@@ -259,15 +283,42 @@ impl MiningSlotProvider<TestAccountId> for MockMiningSlotProvider {
 	}
 }
 
+pub struct MockBitcoinLocksProvider;
+impl BitcoinLocksProvider<TestAccountId, Balance> for MockBitcoinLocksProvider {
+	type Weights = ();
+
+	fn get_account_funded_bitcoin_amount(account_id: &TestAccountId) -> Balance {
+		FundedBitcoinAmountsByAccount::get()
+			.get(account_id)
+			.copied()
+			.unwrap_or_default()
+	}
+}
+
 pub struct MockTreasuryPoolProvider;
 impl TreasuryPoolProvider<TestAccountId> for MockTreasuryPoolProvider {
 	type Weights = ();
 	type Balance = Balance;
 
-	fn has_bond_participation(vault_id: VaultId, account_id: &TestAccountId) -> bool {
-		TreasuryPoolParticipantsByVaultId::get()
-			.get(&vault_id)
-			.is_some_and(|accounts| accounts.contains(account_id))
+	fn has_vault_bond_participation(vault_id: VaultId, account_id: &TestAccountId) -> bool {
+		Self::active_vault_bond_amount(vault_id, account_id) > 0
+	}
+
+	fn active_vault_bond_amount(vault_id: VaultId, account_id: &TestAccountId) -> Self::Balance {
+		ActiveBondAmountsByVaultAndAccount::get()
+			.get(&(vault_id, account_id.clone()))
+			.copied()
+			.unwrap_or_default()
+	}
+
+	fn active_account_vault_bond_amount(account_id: &TestAccountId) -> Self::Balance {
+		let mut amount = 0;
+		for ((_, owner), balance) in ActiveBondAmountsByVaultAndAccount::get() {
+			if owner == *account_id {
+				amount = amount.saturating_add(balance);
+			}
+		}
+		amount
 	}
 
 	fn encumber_bond_microgons(
@@ -295,13 +346,14 @@ impl TreasuryPoolProvider<TestAccountId> for MockTreasuryPoolProvider {
 pub struct MockUniswapTransferProvider;
 impl UniswapTransferProvider<TestAccountId> for MockUniswapTransferProvider {
 	type Weights = ();
+	type Balance = Balance;
 
 	fn is_crosschain_activated() -> bool {
 		IsCrosschainActivated::get()
 	}
 
-	fn has_recent_argon_transfer(account_id: &TestAccountId) -> bool {
-		AccountsWithRecentArgonTransfers::get().contains(account_id)
+	fn account_uniswap_argon_transfers_in_amount(account_id: &TestAccountId) -> Self::Balance {
+		MicrogonsInByAccount::get().get(account_id).copied().unwrap_or_default()
 	}
 }
 
@@ -321,21 +373,25 @@ impl OperationalRewardsPayer<TestAccountId, Balance> for MockOperationalRewardsP
 
 impl pallet_operational_accounts::Config for Test {
 	type Balance = Balance;
-	type FrameProvider = StaticFrameProvider;
-	type MaxAvailableReferrals = MaxAvailableReferrals;
-	type MaxExpiredReferralCodeCleanupsPerBlock = MaxExpiredReferralCodeCleanupsPerBlock;
+	type MaxAvailableUpgradeCodes = MaxAvailableUpgradeCodes;
 	type MaxEncryptedServerLen = MaxEncryptedServerLen;
+	type TreasuryMinimumUniswapTransfer = TreasuryMinimumUniswapTransfer;
+	type TreasuryMinimumBitcoin = TreasuryMinimumBitcoin;
+	type TreasuryMinimumBonds = TreasuryMinimumBonds;
+	type OperationalMinimumUniswapTransfer = OperationalMinimumUniswapTransfer;
 	type OperationalMinimumVaultSecuritization = OperationalMinimumVaultSecuritization;
-	type BitcoinLockSizeForReferral = BitcoinLockSizeForReferral;
+	type BitcoinLockSizeForUpgradeCode = BitcoinLockSizeForUpgradeCode;
 	type MiningSeatsForOperational = MiningSeatsForOperational;
-	type MiningSeatsPerReferral = MiningSeatsPerReferral;
-	type ReferralBonusEveryXOperationalSponsees = ReferralBonusEveryXOperationalSponsees;
-	type OperationalReferralReward = OperationalReferralReward;
+	type MiningSeatsPerUpgradeCode = MiningSeatsPerUpgradeCode;
+	type OperationalReferralsPerBonusReward = OperationalReferralsPerBonusReward;
+	type OperationalActivationReward = OperationalActivationReward;
 	type OperationalReferralBonusReward = OperationalReferralBonusReward;
 	type VaultProvider = MockVaultProvider;
 	type MiningSlotProvider = MockMiningSlotProvider;
+	type BitcoinLocksProvider = MockBitcoinLocksProvider;
 	type TreasuryPoolProvider = MockTreasuryPoolProvider;
 	type UniswapTransferProvider = MockUniswapTransferProvider;
+	type Currency = Balances;
 	type OperationalRewardsPayer = MockOperationalRewardsPayer;
 	type WeightInfo = ();
 }
@@ -352,9 +408,11 @@ pub fn new_test_ext() -> TestState {
 	ext.execute_with(|| {
 		CurrentFrameId::set(1);
 		IsCrosschainActivated::set(true);
-		AccountsWithRecentArgonTransfers::set(BTreeSet::new());
+		MicrogonsInByAccount::set(BTreeMap::new());
+		MicrogonsOutByAccount::set(BTreeMap::new());
+		FundedBitcoinAmountsByAccount::set(BTreeMap::new());
 		RegistrationVaultDataByAccount::set(BTreeMap::new());
-		TreasuryPoolParticipantsByVaultId::set(BTreeMap::new());
+		ActiveBondAmountsByVaultAndAccount::set(BTreeMap::new());
 		ActiveMiningRewardsAccounts::set(BTreeSet::new());
 		OperationalVaultsMarkedOperational::set(BTreeSet::new());
 		ClaimableTreasuryBalance::set(0);
@@ -367,19 +425,58 @@ pub fn set_crosschain_activated(activated: bool) {
 	IsCrosschainActivated::set(activated);
 }
 
-pub fn record_recent_argon_transfer(account_id: &TestAccountId) {
-	AccountsWithRecentArgonTransfers::mutate(|accounts| {
-		accounts.insert(account_id.clone());
+pub fn record_microgons_in(account_id: &TestAccountId, amount: Balance) {
+	MicrogonsInByAccount::mutate(|accounts| {
+		accounts.insert(account_id.clone(), amount);
 	});
+}
+
+pub fn record_microgons_out(account_id: &TestAccountId, amount: Balance) {
+	MicrogonsOutByAccount::mutate(|accounts| {
+		accounts.insert(account_id.clone(), amount);
+	});
+}
+
+pub fn record_funded_bitcoin_amount(account_id: &TestAccountId, amount: Balance) {
+	FundedBitcoinAmountsByAccount::mutate(|accounts| {
+		accounts.insert(account_id.clone(), amount);
+	});
+}
+
+pub fn funded_bitcoin_amount(account_id: &TestAccountId) -> Balance {
+	FundedBitcoinAmountsByAccount::get()
+		.get(account_id)
+		.copied()
+		.unwrap_or_default()
+}
+
+pub fn record_active_vault_bond_amount(
+	vault_id: VaultId,
+	account_id: &TestAccountId,
+	amount: Balance,
+) {
+	ActiveBondAmountsByVaultAndAccount::mutate(|entries| {
+		entries.insert((vault_id, account_id.clone()), amount);
+	});
+}
+
+pub fn set_argon_balance(account_id: &TestAccountId, amount: Balance) {
+	let current = Balances::balance(account_id);
+	if amount > current {
+		let _ = Balances::mint_into(account_id, amount.saturating_sub(current));
+		return;
+	}
+
+	let _ = Balances::make_free_balance_be(account_id, amount);
 }
 
 pub fn set_registration_lookup(
 	vault_account: TestAccountId,
-	mining_funding_account: TestAccountId,
+	mining_account: TestAccountId,
 	activated_securitization: Balance,
 	securitization: Balance,
-	has_treasury_pool_participation: bool,
-	observed_mining_seat_total: u32,
+	active_vault_bond_amount: Balance,
+	mining_seat_count: u32,
 ) {
 	let account_bytes: &[u8] = vault_account.as_ref();
 	let vault_id = u32::from_le_bytes(account_bytes[0..4].try_into().unwrap_or([0u8; 4]));
@@ -389,34 +486,14 @@ pub fn set_registration_lookup(
 			RegistrationVaultData { vault_id, activated_securitization, securitization },
 		);
 	});
-	if has_treasury_pool_participation {
-		TreasuryPoolParticipantsByVaultId::mutate(|entries| {
-			entries.entry(vault_id).or_default().insert(vault_account.clone());
-		});
+	if active_vault_bond_amount > 0 {
+		record_active_vault_bond_amount(vault_id, &vault_account, active_vault_bond_amount);
 	}
-	if observed_mining_seat_total > 0 {
+	if mining_seat_count > 0 {
 		ActiveMiningRewardsAccounts::mutate(|entries| {
-			entries.insert(mining_funding_account);
+			entries.insert(mining_account);
 		});
 	}
-}
-
-pub fn ensure_registration_lookup(
-	vault_account: TestAccountId,
-	mining_funding_account: TestAccountId,
-) {
-	if RegistrationVaultDataByAccount::get().contains_key(&vault_account) {
-		return;
-	}
-
-	set_registration_lookup(
-		vault_account,
-		mining_funding_account,
-		0,
-		OperationalMinimumVaultSecuritization::get(),
-		false,
-		0,
-	);
 }
 
 pub fn has_vault_operational_mark(vault_account: &TestAccountId) -> bool {

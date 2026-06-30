@@ -975,6 +975,10 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       AccountAlreadyLinked: AugmentedError<ApiType>;
       /**
+       * The requested account is already upgraded to operational.
+       **/
+      AccountAlreadyUpgraded: AugmentedError<ApiType>;
+      /**
        * The account is already operational.
        **/
       AlreadyOperational: AugmentedError<ApiType>;
@@ -982,6 +986,10 @@ declare module '@polkadot/api-base/types/errors' {
        * The caller already registered an operational account.
        **/
       AlreadyRegistered: AugmentedError<ApiType>;
+      /**
+       * An account cannot upgrade itself.
+       **/
+      CannotUpgradeSelf: AugmentedError<ApiType>;
       /**
        * The encrypted server payload exceeds the configured max length.
        **/
@@ -991,13 +999,13 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       InvalidAccountProof: AugmentedError<ApiType>;
       /**
-       * The referral proof or sponsor proof is invalid.
-       **/
-      InvalidReferralProof: AugmentedError<ApiType>;
-      /**
        * The caller is not one of the accounts included in the registration.
        **/
       InvalidRegistrationSubmitter: AugmentedError<ApiType>;
+      /**
+       * The requested referrer does not have an available upgrade to spend.
+       **/
+      NoAvailableUpgrades: AugmentedError<ApiType>;
       /**
        * The operational account has no pending rewards to claim.
        **/
@@ -1011,17 +1019,25 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       NotEligibleForActivation: AugmentedError<ApiType>;
       /**
-       * The caller has not registered an operational account.
+       * The requested account has not registered operational accounts.
        **/
       NotOperationalAccount: AugmentedError<ApiType>;
       /**
-       * The caller is not the sponsor of the requested sponsee.
+       * The caller is not the referrer of the requested downstream account.
        **/
-      NotSponsorOfSponsee: AugmentedError<ApiType>;
+      NotReferrerOfAccount: AugmentedError<ApiType>;
       /**
-       * The referral proof has expired.
+       * The requested account has not reached treasury certification.
        **/
-      ReferralProofExpired: AugmentedError<ApiType>;
+      NotTreasuryCertified: AugmentedError<ApiType>;
+      /**
+       * The requested referrer does not have a registered operational account.
+       **/
+      ReferrerNotOperationalAccount: AugmentedError<ApiType>;
+      /**
+       * The requested referrer does not match the referrer recorded during registration.
+       **/
+      RegisteredReferrerMismatch: AugmentedError<ApiType>;
       /**
        * A valid invite is required to register an operational account.
        **/
@@ -1038,6 +1054,10 @@ declare module '@polkadot/api-base/types/errors' {
        * Reward claims must be whole Argon increments.
        **/
       RewardClaimNotWholeArgon: AugmentedError<ApiType>;
+      /**
+       * The requested account no longer satisfies treasury certification requirements.
+       **/
+      TreasuryCertificationNoLongerMet: AugmentedError<ApiType>;
       /**
        * The treasury does not currently have enough available reserves for the claim.
        **/
