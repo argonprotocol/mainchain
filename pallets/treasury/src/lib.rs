@@ -60,13 +60,16 @@ pub use pallet::*;
 ///
 /// ## Profits from Bid Pool
 /// Once each bid pool is closed, 20% of the pool is reserved for treasury reserves. (Operational
-/// rewards are one use of these reserves.) The remaining funds are distributed pro-rata to each
-/// vault's frame treasury pool. Vaults disperse funds to bond lots based on the vault's sharing
-/// percent, each lot's stored frame share, and any underfilled-vault remainder is returned to
-/// treasury reserves.
+/// rewards are one use of these reserves.) Then 10% of the full bid pool is paid to Argonot bond
+/// lots, and the remaining funds are distributed pro-rata to each vault's frame treasury pool.
+/// Vaults disperse funds to bond lots based on the vault's sharing percent, each lot's stored
+/// frame share, and any underfilled-vault remainder is returned to treasury reserves.
 ///
 /// The limitations on bond purchases are:
 /// - the maximum number of accepted bond lots in an active vault pool (`MaxTreasuryContributors`)
+/// - the maximum number of active Argonot bond lots (`MaxActiveArgonotBondLots`)
+/// - the maximum active Argonot bonds as a percent of ownership circulation
+///   (`MaxArgonotBondedPercentOfCirculation`)
 /// - the minimum whole-bond purchase amount (`MinimumArgonsPerContributor`)
 ///
 /// Terminology note:
@@ -87,10 +90,12 @@ pub mod pallet {
 	use pallet_prelude::argon_primitives::{
 		MiningFrameTransitionProvider, OperationalAccountsHook, OperationalRewardsPayer,
 	};
-	use sp_runtime::{AccountId32, BoundedBTreeMap, FixedU128, Permill, TokenError};
+	use sp_runtime::{
+		AccountId32, ArithmeticError, BoundedBTreeMap, FixedU128, Permill, TokenError,
+	};
 	use tracing::info;
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(5);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(6);
 
 	pub type BondLotId = u64;
 	pub type Bonds = u32;
@@ -125,6 +130,10 @@ pub mod pallet {
 		type Currency: MutateHold<Self::AccountId, Reason = Self::RuntimeHoldReason, Balance = Self::Balance>
 			+ Mutate<Self::AccountId, Balance = Self::Balance>;
 
+		/// The currency representing ownership tokens (argonots).
+		type OwnershipCurrency: MutateHold<Self::AccountId, Reason = Self::RuntimeHoldReason, Balance = Self::Balance>
+			+ Mutate<Self::AccountId, Balance = Self::Balance>;
+
 		/// The hold reason when reserving funds for treasury bond lots.
 		type RuntimeHoldReason: From<HoldReason>;
 
@@ -145,6 +154,14 @@ pub mod pallet {
 		#[pallet::constant]
 		type MinimumArgonsPerContributor: Get<Self::Balance>;
 
+		/// The maximum number of active Argonot bond lots.
+		#[pallet::constant]
+		type MaxActiveArgonotBondLots: Get<u32>;
+
+		/// The maximum percent of ownership-token circulation that can be bonded.
+		#[pallet::constant]
+		type MaxArgonotBondedPercentOfCirculation: Get<Percent>;
+
 		/// Treasury pallet id retained in metadata for account derivation.
 		#[pallet::constant]
 		type PalletId: Get<PalletId>;
@@ -159,6 +176,10 @@ pub mod pallet {
 		/// Percent of the bid pool reserved for treasury reserves.
 		#[pallet::constant]
 		type PercentForTreasuryReserves: Get<Percent>;
+
+		/// Percent of the full bid pool paid to Argonot bonds before vault distribution.
+		#[pallet::constant]
+		type PercentForArgonotBondPool: Get<Percent>;
 
 		/// The maximum number of vaults that can participate in one frame's locked vault capital.
 		#[pallet::constant]
@@ -192,6 +213,13 @@ pub mod pallet {
 	#[pallet::storage]
 	pub type CurrentFrameVaultCapital<T: Config> =
 		StorageValue<_, FrameVaultCapital<T>, OptionQuery>;
+
+	/// The Argonot bond participants locked for the current frame.
+	///
+	/// Payout uses this to see which Argonot bond lots are participating in the frame.
+	#[pallet::storage]
+	pub type CurrentFrameArgonotBondParticipants<T: Config> =
+		StorageValue<_, FrameArgonotBondParticipants<T>, OptionQuery>;
 
 	/// The next bond lot id.
 	#[pallet::storage]
@@ -243,6 +271,15 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
+	/// The active top Argonot bond lots kept in ascending bond order, then lower ids first.
+	#[pallet::storage]
+	pub type ArgonotBondLots<T: Config> =
+		StorageValue<_, BoundedVec<BondLotSummary, T::MaxActiveArgonotBondLots>, ValueQuery>;
+
+	/// The total number of active Argonot bonds in the active set.
+	#[pallet::storage]
+	pub type TotalActiveArgonotBonds<T: Config> = StorageValue<_, Bonds, ValueQuery>;
+
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
@@ -250,6 +287,14 @@ pub mod pallet {
 		CouldNotDistributeEarningsToBondLot {
 			frame_id: FrameId,
 			vault_id: VaultId,
+			bond_lot_id: BondLotId,
+			account_id: T::AccountId,
+			amount: T::Balance,
+			dispatch_error: DispatchError,
+		},
+		/// An error occurred while paying frame earnings for an Argonot bond lot.
+		CouldNotDistributeEarningsToArgonotBondLot {
+			frame_id: FrameId,
 			bond_lot_id: BondLotId,
 			account_id: T::AccountId,
 			amount: T::Balance,
@@ -264,7 +309,15 @@ pub mod pallet {
 		/// Frame earnings were distributed.
 		FrameEarningsDistributed {
 			frame_id: FrameId,
+			/// The total gross bid-pool allocation made to non-reserve recipients this frame.
 			bid_pool_distributed: T::Balance,
+			/// The gross slice allocated to Argonot bond lots before any refunds.
+			argonot_bond_pool_distributed: T::Balance,
+			/// The gross slice allocated to vault treasury pools before any refunds.
+			vault_bid_pool_distributed: T::Balance,
+			/// The portion of non-reserve allocations that was returned to treasury reserves.
+			treasury_refunds: T::Balance,
+			/// The total amount moved into treasury reserves, including refunds.
 			treasury_reserves: T::Balance,
 			participating_vaults: u32,
 		},
@@ -277,22 +330,22 @@ pub mod pallet {
 		/// An error occurred while releasing a bond lot.
 		CouldNotReleaseBondLot {
 			frame_id: FrameId,
-			vault_id: VaultId,
+			program_id: BondProgramId,
 			bond_lot_id: BondLotId,
 			amount: T::Balance,
 			account_id: T::AccountId,
 			dispatch_error: DispatchError,
 		},
-		/// A bond purchase entered a vault's accepted list.
+		/// A bond purchase entered its active program set.
 		BondLotPurchased {
-			vault_id: VaultId,
+			program_id: BondProgramId,
 			bond_lot_id: BondLotId,
 			account_id: T::AccountId,
 			bonds: Bonds,
 		},
 		/// A bond lot was removed from future frames and scheduled for release.
 		BondLotReleaseScheduled {
-			vault_id: VaultId,
+			program_id: BondProgramId,
 			bond_lot_id: BondLotId,
 			account_id: T::AccountId,
 			bonds: Bonds,
@@ -302,7 +355,7 @@ pub mod pallet {
 		/// A bond lot was released.
 		BondLotReleased {
 			frame_id: FrameId,
-			vault_id: VaultId,
+			program_id: BondProgramId,
 			bond_lot_id: BondLotId,
 			account_id: T::AccountId,
 			bonds: Bonds,
@@ -351,6 +404,10 @@ pub mod pallet {
 		BonusApprovalExistingBondLot,
 		/// The bonus approval signature is invalid or unauthorized.
 		InvalidBonusApprovalSignature,
+		/// The Argonot bond purchase did not beat the current active-set cutoff.
+		ArgonotBondPurchaseBelowCutoff,
+		/// The Argonot bond purchase would exceed the active circulation cap.
+		ArgonotBondPurchaseAboveCap,
 	}
 
 	#[pallet::call]
@@ -411,26 +468,15 @@ pub mod pallet {
 			)?;
 
 			if let Some(evicted_summary) = evicted_summary {
-				let evicted_lot = BondLotById::<T>::get(evicted_summary.bond_lot_id)
-					.ok_or(Error::<T>::BondLotNotFound)?;
-				let release_frame_id = Self::schedule_bond_lot_release(
+				Self::schedule_bond_lot_release(
 					evicted_summary.bond_lot_id,
 					BondReleaseReason::Bumped,
 				)?;
-
-				Self::deposit_event(Event::<T>::BondLotReleaseScheduled {
-					vault_id,
-					bond_lot_id: evicted_summary.bond_lot_id,
-					account_id: evicted_lot.owner,
-					bonds: evicted_lot.bonds,
-					release_frame_id,
-					reason: BondReleaseReason::Bumped,
-				});
 			}
 
 			let bond_lot_id = Self::next_bond_lot_id()?;
 			let purchase_amount = Self::bonds_to_balance(bonds);
-			Self::create_hold(&who, purchase_amount)?;
+			Self::create_hold::<T::Currency>(&who, purchase_amount)?;
 
 			let insert_index = accepted_lots
 				.iter()
@@ -441,14 +487,13 @@ pub mod pallet {
 				.try_insert(insert_index, BondLotSummary { bond_lot_id, bonds })
 				.map_err(|_| Error::<T>::MaxAcceptedBondLotsExceeded)?;
 
+			let program = BondProgram::Vault { vault_id, sharing_percent, bonus_percent };
 			BondLotById::<T>::insert(
 				bond_lot_id,
 				BondLot {
 					owner: who.clone(),
-					vault_id,
+					program,
 					bonds,
-					sharing_percent,
-					bonus_percent,
 					created_frame_id: current_frame_id,
 					participated_frames: 0,
 					last_frame_earnings_frame_id: None,
@@ -462,7 +507,7 @@ pub mod pallet {
 			BondLotsByVault::<T>::insert(vault_id, accepted_lots);
 
 			Self::deposit_event(Event::<T>::BondLotPurchased {
-				vault_id,
+				program_id: program.id(),
 				bond_lot_id,
 				account_id: who.clone(),
 				bonds,
@@ -480,24 +525,119 @@ pub mod pallet {
 			let bond_lot = BondLotById::<T>::get(bond_lot_id).ok_or(Error::<T>::BondLotNotFound)?;
 			ensure!(bond_lot.owner == who, Error::<T>::NotBondLotOwner);
 			ensure!(bond_lot.release_reason.is_none(), Error::<T>::BondLotAlreadyReleasing);
-			let remaining_non_releasing_hold = Self::non_releasing_held_bond_amount(&who)?
-				.saturating_sub(Self::bonds_to_balance(bond_lot.bonds));
-			ensure!(
-				remaining_non_releasing_hold >= Self::encumbered_bond_microgons(&who),
-				Error::<T>::ActiveBondAmountBelowEncumberedBacking,
+
+			match bond_lot.program {
+				BondProgram::Vault { vault_id, .. } => {
+					let (_, current_hold) = Self::account_vault_bond_status(&who)?;
+					let remaining_non_releasing_hold =
+						current_hold.saturating_sub(Self::bonds_to_balance(bond_lot.bonds));
+					ensure!(
+						remaining_non_releasing_hold >= Self::encumbered_bond_microgons(&who),
+						Error::<T>::ActiveBondAmountBelowEncumberedBacking,
+					);
+
+					Self::remove_bond_lot_from_vault(vault_id, bond_lot_id);
+				},
+				BondProgram::Argonot => {
+					ArgonotBondLots::<T>::try_mutate(|active_lots| -> DispatchResult {
+						let index = active_lots
+							.iter()
+							.position(|summary| summary.bond_lot_id == bond_lot_id)
+							.ok_or(Error::<T>::BondLotNotFound)?;
+						active_lots.remove(index);
+						Ok(())
+					})?;
+					Self::set_total_active_argonot_bonds(
+						TotalActiveArgonotBonds::<T>::get()
+							.checked_sub(bond_lot.bonds)
+							.ok_or(ArithmeticError::Underflow)?,
+					);
+				},
+			};
+
+			Self::schedule_bond_lot_release(bond_lot_id, BondReleaseReason::UserLiquidation)?;
+			Ok(())
+		}
+
+		/// Buy whole bond units for the Argonot active set.
+		#[pallet::call_index(6)]
+		#[pallet::weight(T::WeightInfo::buy_argonot_bonds())]
+		pub fn buy_argonot_bonds(origin: OriginFor<T>, bonds: Bonds) -> DispatchResult {
+			let who = ensure_signed(origin)?;
+			ensure!(bonds >= Self::minimum_purchase_bonds(), Error::<T>::BondPurchaseBelowMinimum);
+
+			let current_total_bonds = TotalActiveArgonotBonds::<T>::get();
+			let max_active_bonds = Self::maximum_active_argonot_bonds();
+			let active_lots = ArgonotBondLots::<T>::get();
+			let active_lot_count = active_lots.len() as u32;
+			let mut evicted_bond_lot_id = None;
+
+			let next_total_bonds = if active_lot_count < T::MaxActiveArgonotBondLots::get() {
+				current_total_bonds.checked_add(bonds).ok_or(ArithmeticError::Overflow)?
+			} else {
+				let floor_lot = active_lots.first().ok_or(Error::<T>::InternalError)?;
+				ensure!(bonds > floor_lot.bonds, Error::<T>::ArgonotBondPurchaseBelowCutoff);
+				evicted_bond_lot_id = Some(floor_lot.bond_lot_id);
+
+				current_total_bonds
+					.checked_sub(floor_lot.bonds)
+					.ok_or(ArithmeticError::Underflow)?
+					.checked_add(bonds)
+					.ok_or(ArithmeticError::Overflow)?
+			};
+			ensure!(next_total_bonds <= max_active_bonds, Error::<T>::ArgonotBondPurchaseAboveCap);
+
+			let program = BondProgram::Argonot;
+			let program_id = program.id();
+			let bond_lot_id = Self::next_bond_lot_id()?;
+			let current_frame_id = T::MiningFrameTransitionProvider::get_current_frame_id();
+			Self::create_hold::<T::OwnershipCurrency>(&who, Self::bonds_to_balance(bonds))?;
+			BondLotById::<T>::insert(
+				bond_lot_id,
+				BondLot {
+					owner: who.clone(),
+					program,
+					bonds,
+					created_frame_id: current_frame_id,
+					participated_frames: 0,
+					last_frame_earnings_frame_id: None,
+					last_frame_earnings: None,
+					cumulative_earnings: T::Balance::zero(),
+					release_frame_id: None,
+					release_reason: None,
+				},
 			);
+			BondLotIdsByAccount::<T>::insert(&who, bond_lot_id, ());
 
-			Self::remove_bond_lot_from_vault(bond_lot.vault_id, bond_lot_id);
-			let release_frame_id =
-				Self::schedule_bond_lot_release(bond_lot_id, BondReleaseReason::UserLiquidation)?;
+			ArgonotBondLots::<T>::try_mutate(|active_lots| -> DispatchResult {
+				if let Some(evicted_bond_lot_id) = evicted_bond_lot_id {
+					let removed = active_lots.remove(0);
+					ensure!(removed.bond_lot_id == evicted_bond_lot_id, Error::<T>::InternalError);
+				}
 
-			Self::deposit_event(Event::<T>::BondLotReleaseScheduled {
-				vault_id: bond_lot.vault_id,
+				let insert_index = active_lots
+					.iter()
+					.position(|summary| {
+						summary.bonds > bonds ||
+							(summary.bonds == bonds && summary.bond_lot_id > bond_lot_id)
+					})
+					.unwrap_or(active_lots.len());
+				active_lots
+					.try_insert(insert_index, BondLotSummary { bond_lot_id, bonds })
+					.map_err(|_| Error::<T>::InternalError)?;
+				Ok(())
+			})?;
+
+			if let Some(evicted_bond_lot_id) = evicted_bond_lot_id {
+				Self::schedule_bond_lot_release(evicted_bond_lot_id, BondReleaseReason::Bumped)?;
+			}
+			Self::set_total_active_argonot_bonds(next_total_bonds);
+
+			Self::deposit_event(Event::<T>::BondLotPurchased {
+				program_id,
 				bond_lot_id,
 				account_id: who,
-				bonds: bond_lot.bonds,
-				release_frame_id,
-				reason: BondReleaseReason::UserLiquidation,
+				bonds,
 			});
 			Ok(())
 		}
@@ -511,27 +651,36 @@ pub mod pallet {
 			}
 		}
 
-		pub(crate) fn create_hold(account_id: &T::AccountId, amount: T::Balance) -> DispatchResult {
+		pub(crate) fn create_hold<C>(
+			account_id: &T::AccountId,
+			amount: T::Balance,
+		) -> DispatchResult
+		where
+			C: MutateHold<T::AccountId, Reason = T::RuntimeHoldReason, Balance = T::Balance>,
+		{
 			if amount.is_zero() {
 				return Ok(());
 			}
 			let hold_reason = HoldReason::ContributedToTreasury;
-			if T::Currency::balance_on_hold(&hold_reason.into(), account_id).is_zero() {
+			if C::balance_on_hold(&hold_reason.into(), account_id).is_zero() {
 				frame_system::Pallet::<T>::inc_providers(account_id);
 			}
 
-			T::Currency::hold(&hold_reason.into(), account_id, amount)?;
+			C::hold(&hold_reason.into(), account_id, amount)?;
 			Ok(())
 		}
 
-		fn release_hold(who: &T::AccountId, amount: T::Balance) -> DispatchResult {
+		fn release_hold<C>(who: &T::AccountId, amount: T::Balance) -> DispatchResult
+		where
+			C: MutateHold<T::AccountId, Reason = T::RuntimeHoldReason, Balance = T::Balance>,
+		{
 			if amount.is_zero() {
 				return Ok(());
 			}
 			let reason = HoldReason::ContributedToTreasury;
-			T::Currency::release(&reason.into(), who, amount, Precision::Exact)?;
+			C::release(&reason.into(), who, amount, Precision::Exact)?;
 
-			if T::Currency::balance_on_hold(&reason.into(), who).is_zero() {
+			if C::balance_on_hold(&reason.into(), who).is_zero() {
 				frame_system::Pallet::<T>::dec_providers(who)?;
 			}
 			Ok(())
@@ -571,7 +720,10 @@ pub mod pallet {
 			for (bond_lot_id, ()) in BondLotIdsByAccount::<T>::iter_prefix(beneficiary) {
 				let bond_lot =
 					BondLotById::<T>::get(bond_lot_id).ok_or(Error::<T>::BondLotNotFound)?;
-				if bond_lot.vault_id == vault_id {
+				if matches!(
+					bond_lot.program,
+					BondProgram::Vault { vault_id: lot_vault_id, .. } if lot_vault_id == vault_id
+				) {
 					return Err(Error::<T>::BonusApprovalExistingBondLot);
 				}
 			}
@@ -580,21 +732,33 @@ pub mod pallet {
 				.unwrap_or_default())
 		}
 
-		/// Once the frame is complete, this fn distributes the bid pool to each vault based on
-		/// their prorata eligible bonds. Then within each vault, profits are distributed to bond
-		/// lots based on the stored frame shares.
+		/// Once the frame is complete, this fn distributes frame earnings to Argonot bond lots
+		/// first and then to vault treasury bond lots.
 		pub(crate) fn distribute_bid_pool(frame_id: FrameId) {
-			let Some(frame_capital) = CurrentFrameVaultCapital::<T>::take() else {
-				return;
+			let argonot_participants = match CurrentFrameArgonotBondParticipants::<T>::take() {
+				Some(participants) if participants.frame_id == frame_id => Some(participants),
+				Some(participants) => {
+					CurrentFrameArgonotBondParticipants::<T>::put(participants);
+					None
+				},
+				None => None,
 			};
-			if frame_capital.frame_id != frame_id {
-				CurrentFrameVaultCapital::<T>::put(frame_capital);
+			let frame_capital = match CurrentFrameVaultCapital::<T>::take() {
+				Some(frame_capital) if frame_capital.frame_id == frame_id => Some(frame_capital),
+				Some(frame_capital) => {
+					CurrentFrameVaultCapital::<T>::put(frame_capital);
+					None
+				},
+				None => None,
+			};
+			if argonot_participants.is_none() && frame_capital.is_none() {
 				return;
 			}
 
 			let bid_pool_account = T::MiningBidPoolAccount::get();
 			Self::ensure_account_provider(&bid_pool_account);
-			let mut total_bid_pool_amount = T::Currency::balance(&bid_pool_account);
+			let full_bid_pool_amount = T::Currency::balance(&bid_pool_account);
+			let mut total_bid_pool_amount = full_bid_pool_amount;
 
 			let initial_reserves_amount =
 				T::PercentForTreasuryReserves::get().mul_ceil(total_bid_pool_amount);
@@ -620,13 +784,53 @@ pub mod pallet {
 				}
 			}
 
+			let total_argonot_bond_pool =
+				T::PercentForArgonotBondPool::get().mul_floor(full_bid_pool_amount);
+			let (vault_bid_pool_amount, mut treasury_refund_total, argonot_bond_pool_distributed) =
+				Self::distribute_argonot_bond_pool(
+					frame_id,
+					&bid_pool_account,
+					total_bid_pool_amount,
+					total_argonot_bond_pool,
+					argonot_participants,
+				);
+
+			let Some(frame_capital) = frame_capital else {
+				if !treasury_refund_total.is_zero() {
+					if let Err(e) = T::Currency::transfer(
+						&bid_pool_account,
+						&reserves_account,
+						treasury_refund_total,
+						Preservation::Expendable,
+					) {
+						Self::deposit_event(Event::<T>::CouldNotTransferToTreasuryReserves {
+							frame_id,
+							amount: treasury_refund_total,
+							dispatch_error: e,
+						});
+					} else {
+						total_treasury_reserves.saturating_accrue(treasury_refund_total);
+					}
+				}
+
+				Self::deposit_event(Event::<T>::FrameEarningsDistributed {
+					frame_id,
+					bid_pool_distributed: argonot_bond_pool_distributed,
+					argonot_bond_pool_distributed,
+					vault_bid_pool_distributed: T::Balance::zero(),
+					treasury_refunds: treasury_refund_total,
+					treasury_reserves: total_treasury_reserves,
+					participating_vaults: 0,
+				});
+				return;
+			};
+
+			let total_bid_pool_amount = vault_bid_pool_amount;
+			let mut remaining_bid_pool = vault_bid_pool_amount;
 			let frame_total_eligible_bonds = frame_capital
 				.vaults
 				.values()
 				.fold(0u128, |acc, vault| acc.saturating_add(vault.eligible_bonds as u128));
-
-			let mut remaining_bid_pool = total_bid_pool_amount;
-			let mut treasury_refund_total = T::Balance::zero();
 
 			for (vault_id, vault_capital) in frame_capital.vaults.iter() {
 				if frame_total_eligible_bonds.is_zero() {
@@ -655,15 +859,17 @@ pub mod pallet {
 						continue;
 					};
 
+					let Some((_, sharing_percent, bonus_percent)) = bond_lot.program.as_vault()
+					else {
+						continue;
+					};
+
 					let gross_lot_yield =
 						allocation.prorata.saturating_mul_int(gross_vault_earnings);
 					gross_lot_yield_total.saturating_accrue(gross_lot_yield);
 
 					let bonder_percent = Permill::from_parts(
-						bond_lot
-							.sharing_percent
-							.deconstruct()
-							.saturating_add(bond_lot.bonus_percent.deconstruct()),
+						sharing_percent.deconstruct().saturating_add(bonus_percent.deconstruct()),
 					);
 					let mut paid_payout = bonder_percent.mul_floor(gross_lot_yield);
 
@@ -694,16 +900,7 @@ pub mod pallet {
 						}
 					}
 
-					BondLotById::<T>::mutate_exists(allocation.bond_lot_id, |maybe_bond_lot| {
-						let Some(bond_lot) = maybe_bond_lot.as_mut() else {
-							return;
-						};
-						bond_lot.participated_frames =
-							bond_lot.participated_frames.saturating_add(1);
-						bond_lot.last_frame_earnings_frame_id = Some(frame_id);
-						bond_lot.last_frame_earnings = Some(paid_payout);
-						bond_lot.cumulative_earnings.saturating_accrue(paid_payout);
-					});
+					Self::record_bond_lot_earnings(allocation.bond_lot_id, frame_id, paid_payout);
 				}
 
 				treasury_refund_total
@@ -723,6 +920,10 @@ pub mod pallet {
 				);
 			}
 
+			let participating_vaults = frame_capital.vaults.len() as u32;
+			let vault_bid_pool_distributed =
+				total_bid_pool_amount.saturating_sub(remaining_bid_pool);
+
 			if !treasury_refund_total.is_zero() {
 				if let Err(e) = T::Currency::transfer(
 					&bid_pool_account,
@@ -740,13 +941,30 @@ pub mod pallet {
 				}
 			}
 
-			let participating_vaults = frame_capital.vaults.len() as u32;
-
 			Self::deposit_event(Event::<T>::FrameEarningsDistributed {
 				frame_id,
-				bid_pool_distributed: total_bid_pool_amount.saturating_sub(remaining_bid_pool),
+				bid_pool_distributed: argonot_bond_pool_distributed
+					.saturating_add(vault_bid_pool_distributed),
+				argonot_bond_pool_distributed,
+				vault_bid_pool_distributed,
+				treasury_refunds: treasury_refund_total,
 				treasury_reserves: total_treasury_reserves,
 				participating_vaults,
+			});
+		}
+
+		pub(crate) fn lock_in_argonot_bond_participants(frame_id: FrameId) {
+			let bond_lots = ArgonotBondLots::<T>::get();
+			let total_bonds = TotalActiveArgonotBonds::<T>::get();
+			if bond_lots.is_empty() || total_bonds == 0 {
+				CurrentFrameArgonotBondParticipants::<T>::kill();
+				return;
+			}
+
+			CurrentFrameArgonotBondParticipants::<T>::put(FrameArgonotBondParticipants {
+				frame_id,
+				total_bonds,
+				bond_lots,
 			});
 		}
 
@@ -799,15 +1017,24 @@ pub mod pallet {
 				total_eligible_bonds = total_eligible_bonds.saturating_add(eligible_bonds as u128);
 				let _ = vaults.try_insert(vault_id, vault_capital);
 
-				if let Some(operator) = T::TreasuryVaultProvider::get_vault_operator(vault_id) &&
-					let Some(operator_amount) =
-						Self::active_account_bond_amount(vault_id, &operator).unwrap_or_default() &&
-					!operator_amount.is_zero()
-				{
-					T::OperationalAccountsHook::treasury_pool_participated(
-						&operator,
-						operator_amount,
-					);
+				if let Some(operator) = T::TreasuryVaultProvider::get_vault_operator(vault_id) {
+					let mut operator_amount = T::Balance::zero();
+					for summary in BondLotsByVault::<T>::get(vault_id) {
+						let Some(bond_lot) = BondLotById::<T>::get(summary.bond_lot_id) else {
+							continue;
+						};
+						if bond_lot.owner == operator {
+							operator_amount
+								.saturating_accrue(Self::bonds_to_balance(bond_lot.bonds));
+						}
+					}
+
+					if !operator_amount.is_zero() {
+						T::OperationalAccountsHook::treasury_pool_participated(
+							&operator,
+							operator_amount,
+						);
+					}
 				}
 			}
 
@@ -822,7 +1049,7 @@ pub mod pallet {
 		}
 
 		/// Runs the treasury frame transition in the current pallet order: release, distribute,
-		/// then lock in next-frame capital.
+		/// then lock in next-frame participants and capital.
 		pub(crate) fn run_frame_transition(frame_id: FrameId) {
 			if frame_id == 0 {
 				return;
@@ -832,7 +1059,74 @@ pub mod pallet {
 			info!("Starting treasury bond frame {frame_id}. Distributing frame {payout_frame}.");
 			Self::release_pending_bond_lots(frame_id);
 			Self::distribute_bid_pool(payout_frame);
+			Self::lock_in_argonot_bond_participants(frame_id);
 			Self::lock_in_vault_capital(frame_id);
+		}
+
+		fn distribute_argonot_bond_pool(
+			frame_id: FrameId,
+			bid_pool_account: &T::AccountId,
+			total_bid_pool_amount: T::Balance,
+			total_argonot_bond_pool: T::Balance,
+			argonot_participants: Option<FrameArgonotBondParticipants<T>>,
+		) -> (T::Balance, T::Balance, T::Balance) {
+			let mut remaining_bid_pool = total_bid_pool_amount;
+			let mut treasury_refund_total = T::Balance::zero();
+			let mut argonot_bond_pool_distributed = T::Balance::zero();
+
+			let Some(argonot_participants) = argonot_participants else {
+				return (remaining_bid_pool, treasury_refund_total, argonot_bond_pool_distributed);
+			};
+			if argonot_participants.total_bonds == 0 {
+				return (remaining_bid_pool, treasury_refund_total, argonot_bond_pool_distributed);
+			}
+			let capped_argonot_bond_pool = total_argonot_bond_pool.min(total_bid_pool_amount);
+			remaining_bid_pool.saturating_reduce(capped_argonot_bond_pool);
+			argonot_bond_pool_distributed = capped_argonot_bond_pool;
+
+			let mut gross_argonot_yield_total = T::Balance::zero();
+			for participant in argonot_participants.bond_lots.iter() {
+				let Some(bond_lot) = BondLotById::<T>::get(participant.bond_lot_id) else {
+					continue;
+				};
+				if !matches!(bond_lot.program, BondProgram::Argonot) {
+					continue;
+				}
+
+				let gross_lot_yield = Perbill::from_rational(
+					participant.bonds as u128,
+					argonot_participants.total_bonds as u128,
+				)
+				.mul_floor(capped_argonot_bond_pool);
+				gross_argonot_yield_total.saturating_accrue(gross_lot_yield);
+
+				let mut paid_payout = gross_lot_yield;
+				if !paid_payout.is_zero() &&
+					let Err(e) = T::Currency::transfer(
+						bid_pool_account,
+						&bond_lot.owner,
+						paid_payout,
+						Preservation::Expendable,
+					) {
+					Self::deposit_event(Event::<T>::CouldNotDistributeEarningsToArgonotBondLot {
+						frame_id,
+						bond_lot_id: participant.bond_lot_id,
+						account_id: bond_lot.owner,
+						amount: paid_payout,
+						dispatch_error: e,
+					});
+					treasury_refund_total.saturating_accrue(paid_payout);
+					paid_payout = T::Balance::zero();
+				}
+
+				Self::record_bond_lot_earnings(participant.bond_lot_id, frame_id, paid_payout);
+			}
+
+			treasury_refund_total.saturating_accrue(
+				capped_argonot_bond_pool.saturating_sub(gross_argonot_yield_total),
+			);
+
+			(remaining_bid_pool, treasury_refund_total, argonot_bond_pool_distributed)
 		}
 
 		/// Releases bond lots whose release delay has matured.
@@ -854,15 +1148,25 @@ pub mod pallet {
 						continue;
 					};
 					let release_amount = Self::bonds_to_balance(bond_lot.bonds);
+					let program_id = bond_lot.program.id();
 
-					if let Err(e) = Self::release_hold(&bond_lot.owner, release_amount) {
+					let release_result = match bond_lot.program {
+						BondProgram::Vault { .. } =>
+							Self::release_hold::<T::Currency>(&bond_lot.owner, release_amount),
+						BondProgram::Argonot => Self::release_hold::<T::OwnershipCurrency>(
+							&bond_lot.owner,
+							release_amount,
+						),
+					};
+
+					if let Err(e) = release_result {
 						let _ = failed_releases.try_push(bond_lot_id);
 						if next_retry_frame.is_none() {
 							next_retry_frame = Some(due_frame);
 						}
 						Self::deposit_event(Event::<T>::CouldNotReleaseBondLot {
 							frame_id: due_frame,
-							vault_id: bond_lot.vault_id,
+							program_id,
 							bond_lot_id,
 							amount: release_amount,
 							account_id: bond_lot.owner,
@@ -873,10 +1177,9 @@ pub mod pallet {
 
 					BondLotIdsByAccount::<T>::remove(&bond_lot.owner, bond_lot_id);
 					BondLotById::<T>::remove(bond_lot_id);
-
 					Self::deposit_event(Event::<T>::BondLotReleased {
 						frame_id: due_frame,
-						vault_id: bond_lot.vault_id,
+						program_id,
 						bond_lot_id,
 						account_id: bond_lot.owner,
 						bonds: bond_lot.bonds,
@@ -921,67 +1224,69 @@ pub mod pallet {
 				.unwrap_or_default()
 		}
 
-		fn sum_bonds(summaries: &BoundedVec<BondLotSummary, T::MaxTreasuryContributors>) -> Bonds {
+		fn sum_bonds(summaries: &[BondLotSummary]) -> Bonds {
 			summaries
 				.iter()
 				.fold(0u128, |acc, summary| acc.saturating_add(summary.bonds as u128))
 				.min(Bonds::MAX as u128) as Bonds
 		}
 
-		fn active_account_bond_amount(
-			vault_id: VaultId,
-			account_id: &T::AccountId,
-		) -> Result<Option<T::Balance>, Error<T>> {
-			let mut total = T::Balance::zero();
-			for summary in BondLotsByVault::<T>::get(vault_id) {
-				let bond_lot = BondLotById::<T>::get(summary.bond_lot_id)
-					.ok_or(Error::<T>::BondLotNotFound)?;
-				if bond_lot.owner == *account_id {
-					total.saturating_accrue(Self::bonds_to_balance(bond_lot.bonds));
-				}
-			}
-
-			Ok((!total.is_zero()).then_some(total))
+		fn record_bond_lot_earnings(
+			bond_lot_id: BondLotId,
+			frame_id: FrameId,
+			paid_payout: T::Balance,
+		) {
+			BondLotById::<T>::mutate_exists(bond_lot_id, |maybe_bond_lot| {
+				let Some(bond_lot) = maybe_bond_lot.as_mut() else {
+					return;
+				};
+				bond_lot.participated_frames = bond_lot.participated_frames.saturating_add(1);
+				bond_lot.last_frame_earnings_frame_id = Some(frame_id);
+				bond_lot.last_frame_earnings = Some(paid_payout);
+				bond_lot.cumulative_earnings.saturating_accrue(paid_payout);
+			});
 		}
 
-		fn active_non_releasing_account_bond_amount(
+		fn account_vault_bond_status(
 			account_id: &T::AccountId,
-		) -> Result<Option<T::Balance>, Error<T>> {
-			let mut total = T::Balance::zero();
+		) -> Result<(T::Balance, T::Balance), Error<T>> {
+			let mut active_balance = T::Balance::zero();
+			let mut releasing_balance = T::Balance::zero();
+
 			for (bond_lot_id, ()) in BondLotIdsByAccount::<T>::iter_prefix(account_id) {
 				let bond_lot =
 					BondLotById::<T>::get(bond_lot_id).ok_or(Error::<T>::BondLotNotFound)?;
+				if !matches!(bond_lot.program, BondProgram::Vault { .. }) {
+					continue;
+				}
+
+				let bond_balance = Self::bonds_to_balance(bond_lot.bonds);
 				if bond_lot.release_reason.is_some() {
-					continue;
+					releasing_balance.saturating_accrue(bond_balance);
+				} else {
+					active_balance.saturating_accrue(bond_balance);
 				}
-
-				total.saturating_accrue(Self::bonds_to_balance(bond_lot.bonds));
 			}
 
-			Ok((!total.is_zero()).then_some(total))
-		}
+			let held_balance =
+				T::Currency::balance_on_hold(&HoldReason::ContributedToTreasury.into(), account_id)
+					.saturating_sub(releasing_balance);
 
-		fn non_releasing_held_bond_amount(
-			account_id: &T::AccountId,
-		) -> Result<T::Balance, Error<T>> {
-			let mut held_balance =
-				T::Currency::balance_on_hold(&HoldReason::ContributedToTreasury.into(), account_id);
-
-			for (bond_lot_id, ()) in BondLotIdsByAccount::<T>::iter_prefix(account_id) {
-				let bond_lot =
-					BondLotById::<T>::get(bond_lot_id).ok_or(Error::<T>::BondLotNotFound)?;
-				if bond_lot.release_reason.is_none() {
-					continue;
-				}
-
-				held_balance = held_balance.saturating_sub(Self::bonds_to_balance(bond_lot.bonds));
-			}
-
-			Ok(held_balance)
+			Ok((active_balance, held_balance))
 		}
 
 		pub(crate) fn encumbered_bond_microgons(account_id: &T::AccountId) -> T::Balance {
 			EncumberedBondMicrogonsByAccount::<T>::get(account_id)
+		}
+
+		fn maximum_active_argonot_bonds() -> Bonds {
+			let circulation = T::OwnershipCurrency::total_issuance();
+			let cap_balance = T::MaxArgonotBondedPercentOfCirculation::get().mul_floor(circulation);
+			Self::balance_to_bonds(cap_balance)
+		}
+
+		fn set_total_active_argonot_bonds(total_bonds: Bonds) {
+			TotalActiveArgonotBonds::<T>::put(total_bonds);
 		}
 
 		fn remove_bond_lot_from_vault(vault_id: VaultId, bond_lot_id: BondLotId) {
@@ -1025,8 +1330,20 @@ pub mod pallet {
 				if bond_lot.release_reason.is_some() {
 					return Err(Error::<T>::BondLotAlreadyReleasing.into());
 				}
+				let program_id = bond_lot.program.id();
+				let account_id = bond_lot.owner.clone();
+				let bonds = bond_lot.bonds;
+				let event_reason = reason.clone();
 				bond_lot.release_frame_id = Some(release_frame_id);
 				bond_lot.release_reason = Some(reason);
+				Self::deposit_event(Event::<T>::BondLotReleaseScheduled {
+					program_id,
+					bond_lot_id,
+					account_id,
+					bonds,
+					release_frame_id,
+					reason: event_reason,
+				});
 				Ok(())
 			})?;
 
@@ -1102,8 +1419,9 @@ pub mod pallet {
 			let next_encumbered = Self::encumbered_bond_microgons(account_id)
 				.checked_add(&microgon_amount)
 				.ok_or(Error::<T>::InternalError)?;
+			let (_, current_hold) = Self::account_vault_bond_status(account_id)?;
 			ensure!(
-				Self::non_releasing_held_bond_amount(account_id)? >= next_encumbered,
+				current_hold >= next_encumbered,
 				Error::<T>::ActiveBondAmountBelowEncumberedBacking,
 			);
 
@@ -1128,13 +1446,11 @@ pub mod pallet {
 			);
 			let remaining_encumbered = current_encumbered.saturating_sub(microgon_amount);
 			EncumberedBondMicrogonsByAccount::<T>::insert(account_id, remaining_encumbered);
-			let current_active =
-				Self::active_non_releasing_account_bond_amount(account_id)?.unwrap_or_default();
-			let current_hold = Self::non_releasing_held_bond_amount(account_id)?;
+			let (current_active, current_hold) = Self::account_vault_bond_status(account_id)?;
 			let required_hold = current_active.max(remaining_encumbered);
 			let released_amount = current_hold.saturating_sub(required_hold);
 			if !released_amount.is_zero() {
-				Self::release_hold(account_id, released_amount)?;
+				Self::release_hold::<T::Currency>(account_id, released_amount)?;
 			}
 			Ok(())
 		}
@@ -1168,12 +1484,11 @@ pub mod pallet {
 			}
 			EncumberedBondMicrogonsByAccount::<T>::insert(account_id, encumbered_after_burn);
 
-			let held_microgons_after_burn = Self::non_releasing_held_bond_amount(account_id)?;
+			let (active_balance_before_trim, held_microgons_after_burn) =
+				Self::account_vault_bond_status(account_id)?;
 			ensure!(held_microgons_after_burn >= encumbered_after_burn, Error::<T>::InternalError,);
 
-			let active_bonds_before_trim = Self::balance_to_bonds(
-				Self::active_non_releasing_account_bond_amount(account_id)?.unwrap_or_default(),
-			);
+			let active_bonds_before_trim = Self::balance_to_bonds(active_balance_before_trim);
 			let target_active_bonds = Self::balance_to_bonds(held_microgons_after_burn);
 			let mut remaining_bonds_to_trim =
 				active_bonds_before_trim.saturating_sub(target_active_bonds);
@@ -1195,6 +1510,9 @@ pub mod pallet {
 					if bond_lot.release_reason.is_some() || bond_lot.bonds == 0 {
 						continue;
 					}
+					if !matches!(bond_lot.program, BondProgram::Vault { .. }) {
+						continue;
+					}
 
 					let removed_bonds = bond_lot.bonds.min(remaining_bonds_to_trim);
 					let remaining_bonds = bond_lot.bonds.saturating_sub(removed_bonds);
@@ -1203,7 +1521,9 @@ pub mod pallet {
 					if remaining_bonds == 0 {
 						BondLotById::<T>::remove(bond_lot_id);
 						BondLotIdsByAccount::<T>::remove(account_id, bond_lot_id);
-						Self::remove_bond_lot_from_vault(bond_lot.vault_id, bond_lot_id);
+						if let BondProgram::Vault { vault_id, .. } = bond_lot.program {
+							Self::remove_bond_lot_from_vault(vault_id, bond_lot_id);
+						}
 					} else {
 						BondLotById::<T>::mutate_exists(bond_lot_id, |maybe_bond_lot| {
 							let Some(bond_lot) = maybe_bond_lot.as_mut() else {
@@ -1211,7 +1531,10 @@ pub mod pallet {
 							};
 							bond_lot.bonds = remaining_bonds;
 						});
-						BondLotsByVault::<T>::mutate_exists(bond_lot.vault_id, |maybe_summaries| {
+						let BondProgram::Vault { vault_id, .. } = bond_lot.program else {
+							continue;
+						};
+						BondLotsByVault::<T>::mutate_exists(vault_id, |maybe_summaries| {
 							let Some(summaries) = maybe_summaries.as_mut() else {
 								return;
 							};
@@ -1239,7 +1562,7 @@ pub mod pallet {
 			let required_hold = target_active_hold.max(encumbered_after_burn);
 			let released_amount = held_microgons_after_burn.saturating_sub(required_hold);
 			if !released_amount.is_zero() {
-				Self::release_hold(account_id, released_amount)?;
+				Self::release_hold::<T::Currency>(account_id, released_amount)?;
 			}
 			Self::deposit_event(Event::<T>::EncumberedBondMicrogonsBurned {
 				account_id: account_id.clone(),
@@ -1262,7 +1585,68 @@ pub mod pallet {
 		VaultClosed,
 	}
 
-	/// One purchase of `N` whole-argon bonds for one vault.
+	#[derive(
+		Encode,
+		Decode,
+		DecodeWithMemTracking,
+		Clone,
+		Copy,
+		PartialEq,
+		Eq,
+		Debug,
+		TypeInfo,
+		MaxEncodedLen,
+	)]
+	pub enum BondProgram {
+		Vault {
+			#[codec(compact)]
+			vault_id: VaultId,
+			#[codec(compact)]
+			sharing_percent: Permill,
+			#[codec(compact)]
+			bonus_percent: Permill,
+		},
+		Argonot,
+	}
+
+	#[derive(
+		Encode,
+		Decode,
+		DecodeWithMemTracking,
+		Clone,
+		Copy,
+		PartialEq,
+		Eq,
+		Debug,
+		TypeInfo,
+		MaxEncodedLen,
+	)]
+	pub enum BondProgramId {
+		Vault {
+			#[codec(compact)]
+			vault_id: VaultId,
+		},
+		Argonot,
+	}
+
+	impl BondProgram {
+		fn id(self) -> BondProgramId {
+			match self {
+				Self::Vault { vault_id, .. } => BondProgramId::Vault { vault_id },
+				Self::Argonot => BondProgramId::Argonot,
+			}
+		}
+
+		fn as_vault(self) -> Option<(VaultId, Permill, Permill)> {
+			match self {
+				Self::Vault { vault_id, sharing_percent, bonus_percent } =>
+					Some((vault_id, sharing_percent, bonus_percent)),
+				Self::Argonot => None,
+			}
+		}
+	}
+
+	/// One purchase of `N` bonds for one treasury bond program.
 	#[derive(
 		Encode, Decode, Clone, PartialEqNoBound, Eq, DebugNoBound, TypeInfo, MaxEncodedLen,
 	)]
@@ -1270,18 +1654,11 @@ pub mod pallet {
 	pub struct BondLot<T: Config> {
 		/// The account that owns this purchase lot.
 		pub owner: T::AccountId,
-		/// The vault this purchase belongs to.
-		#[codec(compact)]
-		pub vault_id: VaultId,
+		/// The treasury bond program this purchase belongs to.
+		pub program: BondProgram,
 		/// The number of bonds in this lot. `1 ARGON = 1 bond`.
 		#[codec(compact)]
 		pub bonds: Bonds,
-		/// The immutable bonder-side percent of lot yield shared to the bond holder.
-		#[codec(compact)]
-		pub sharing_percent: Permill,
-		/// The immutable bonus bonder-side percent of lot yield shared to the bond holder.
-		#[codec(compact)]
-		pub bonus_percent: Permill,
 		/// The frame when this lot was purchased.
 		#[codec(compact)]
 		pub created_frame_id: FrameId,
@@ -1344,5 +1721,19 @@ pub mod pallet {
 		pub frame_id: FrameId,
 		/// The per-vault frame capital snapshot keyed by vault id.
 		pub vaults: BoundedBTreeMap<VaultId, VaultCapital<T>, T::MaxVaultsPerPool>,
+	}
+
+	/// The Argonot bond participants locked for one frame.
+	#[derive(Encode, Decode, PartialEqNoBound, DebugNoBound, TypeInfo, MaxEncodedLen)]
+	#[scale_info(skip_type_params(T))]
+	pub struct FrameArgonotBondParticipants<T: Config> {
+		/// The frame this participant set belongs to.
+		#[codec(compact)]
+		pub frame_id: FrameId,
+		/// The total active bonds sharing the Argonot bond pool for the frame.
+		#[codec(compact)]
+		pub total_bonds: Bonds,
+		/// The Argonot bond lots participating in this frame.
+		pub bond_lots: BoundedVec<BondLotSummary, T::MaxActiveArgonotBondLots>,
 	}
 }

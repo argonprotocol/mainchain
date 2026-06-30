@@ -49,6 +49,7 @@ import type {
   PalletMintMintType,
   PalletMultisigTimepoint,
   PalletProxyDepositKind,
+  PalletTreasuryBondProgramId,
   PalletTreasuryBondReleaseReason,
   SpConsensusGrandpaAppPublic,
   SpRuntimeDispatchError,
@@ -1804,20 +1805,42 @@ declare module '@polkadot/api-base/types/events' {
     };
     treasury: {
       /**
-       * A bond purchase entered a vault's accepted list.
+       * A bond purchase entered its active program set.
        **/
       BondLotPurchased: AugmentedEvent<
         ApiType,
-        [vaultId: u32, bondLotId: u64, accountId: AccountId32, bonds: u32],
-        { vaultId: u32; bondLotId: u64; accountId: AccountId32; bonds: u32 }
+        [
+          programId: PalletTreasuryBondProgramId,
+          bondLotId: u64,
+          accountId: AccountId32,
+          bonds: u32,
+        ],
+        {
+          programId: PalletTreasuryBondProgramId;
+          bondLotId: u64;
+          accountId: AccountId32;
+          bonds: u32;
+        }
       >;
       /**
        * A bond lot was released.
        **/
       BondLotReleased: AugmentedEvent<
         ApiType,
-        [frameId: u64, vaultId: u32, bondLotId: u64, accountId: AccountId32, bonds: u32],
-        { frameId: u64; vaultId: u32; bondLotId: u64; accountId: AccountId32; bonds: u32 }
+        [
+          frameId: u64,
+          programId: PalletTreasuryBondProgramId,
+          bondLotId: u64,
+          accountId: AccountId32,
+          bonds: u32,
+        ],
+        {
+          frameId: u64;
+          programId: PalletTreasuryBondProgramId;
+          bondLotId: u64;
+          accountId: AccountId32;
+          bonds: u32;
+        }
       >;
       /**
        * A bond lot was removed from future frames and scheduled for release.
@@ -1825,7 +1848,7 @@ declare module '@polkadot/api-base/types/events' {
       BondLotReleaseScheduled: AugmentedEvent<
         ApiType,
         [
-          vaultId: u32,
+          programId: PalletTreasuryBondProgramId,
           bondLotId: u64,
           accountId: AccountId32,
           bonds: u32,
@@ -1833,12 +1856,32 @@ declare module '@polkadot/api-base/types/events' {
           reason: PalletTreasuryBondReleaseReason,
         ],
         {
-          vaultId: u32;
+          programId: PalletTreasuryBondProgramId;
           bondLotId: u64;
           accountId: AccountId32;
           bonds: u32;
           releaseFrameId: u64;
           reason: PalletTreasuryBondReleaseReason;
+        }
+      >;
+      /**
+       * An error occurred while paying frame earnings for an Argonot bond lot.
+       **/
+      CouldNotDistributeEarningsToArgonotBondLot: AugmentedEvent<
+        ApiType,
+        [
+          frameId: u64,
+          bondLotId: u64,
+          accountId: AccountId32,
+          amount: u128,
+          dispatchError: SpRuntimeDispatchError,
+        ],
+        {
+          frameId: u64;
+          bondLotId: u64;
+          accountId: AccountId32;
+          amount: u128;
+          dispatchError: SpRuntimeDispatchError;
         }
       >;
       /**
@@ -1870,7 +1913,7 @@ declare module '@polkadot/api-base/types/events' {
         ApiType,
         [
           frameId: u64,
-          vaultId: u32,
+          programId: PalletTreasuryBondProgramId,
           bondLotId: u64,
           amount: u128,
           accountId: AccountId32,
@@ -1878,7 +1921,7 @@ declare module '@polkadot/api-base/types/events' {
         ],
         {
           frameId: u64;
-          vaultId: u32;
+          programId: PalletTreasuryBondProgramId;
           bondLotId: u64;
           amount: u128;
           accountId: AccountId32;
@@ -1907,8 +1950,24 @@ declare module '@polkadot/api-base/types/events' {
        **/
       FrameEarningsDistributed: AugmentedEvent<
         ApiType,
-        [frameId: u64, bidPoolDistributed: u128, treasuryReserves: u128, participatingVaults: u32],
-        { frameId: u64; bidPoolDistributed: u128; treasuryReserves: u128; participatingVaults: u32 }
+        [
+          frameId: u64,
+          bidPoolDistributed: u128,
+          argonotBondPoolDistributed: u128,
+          vaultBidPoolDistributed: u128,
+          treasuryRefunds: u128,
+          treasuryReserves: u128,
+          participatingVaults: u32,
+        ],
+        {
+          frameId: u64;
+          bidPoolDistributed: u128;
+          argonotBondPoolDistributed: u128;
+          vaultBidPoolDistributed: u128;
+          treasuryRefunds: u128;
+          treasuryReserves: u128;
+          participatingVaults: u32;
+        }
       >;
       /**
        * The current frame's vault capital was locked in.

@@ -2003,6 +2003,13 @@ declare module '@polkadot/api-base/types/submittable' {
     };
     treasury: {
       /**
+       * Buy whole bond units for the Argonot active set.
+       **/
+      buyArgonotBonds: AugmentedSubmittable<
+        (bonds: u32 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>,
+        [u32]
+      >;
+      /**
        * Buy whole `1 ARGON` bonds for a vault.
        *
        * The purchase either enters the accepted list or fails.
