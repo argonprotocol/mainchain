@@ -10,9 +10,10 @@ mod call_filters;
 pub mod config;
 mod deal_with_fees;
 mod fee_control;
+pub mod grandpa;
 
 pub mod prelude {
-	pub use crate::config::*;
+	pub use super::config::*;
 	pub use alloc::{borrow::Cow, boxed::Box, collections::BTreeMap, vec, vec::Vec};
 	pub use argon_primitives::{
 		apis::*,

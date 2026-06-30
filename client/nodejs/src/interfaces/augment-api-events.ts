@@ -1006,6 +1006,11 @@ declare module '@polkadot/api-base/types/events' {
       >;
     };
     miningSlot: {
+      GrandpaEquivocationObserved: AugmentedEvent<
+        ApiType,
+        [authorityId: SpConsensusGrandpaAppPublic, setId: u64, round: u64],
+        { authorityId: SpConsensusGrandpaAppPublic; setId: u64; round: u64 }
+      >;
       /**
        * Bids are closed due to the VRF randomized function triggering
        **/

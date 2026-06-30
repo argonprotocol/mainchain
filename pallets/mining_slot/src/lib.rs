@@ -21,6 +21,7 @@ mod tests;
 
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
+pub mod grandpa;
 pub mod migrations;
 pub mod weights;
 
@@ -46,10 +47,33 @@ pub mod weights;
 /// bid on. Bids are eligible at 1 argon increments. If you are outbid, your funds are returned
 /// immediately. Once bidding ends, the winning bids are distributed to participating Vaults with
 /// Treasury.
+///
+/// ### GRANDPA Authority Derivation
+/// The pallet also derives GRANDPA authorities from recent mining activity.
+///
+/// - Eligibility is recency-based: operators must have produced blocks within the configured window
+///   (`GrandpaRotationBlocks * GrandpaRecentActivityWindowInRotations`).
+/// - Authorities are ranked by recent activity and bounded to `MaxGrandpaAuthorities`.
+/// - Operator influence is weighted from recent activity and usually normalized into a fixed vote
+///   budget to keep authority weights stable and deterministic.
+/// - A per-operator maximum share (`MaxGrandpaAuthorityWeightPercent`) is enforced so finality
+///   weight cannot concentrate in a single authority.
+/// - If active authorities are below the minimum needed for the configured max share (`ceil(100 /
+///   MaxGrandpaAuthorityWeightPercent)`), selected authorities receive equal weights so finality
+///   can continue without dropping below a viable set.
+/// - A configured max share of `0%` disables bounded weighting and keeps canonical raw activity
+///   weights instead.
+///
+/// This design intentionally balances three goals: exclude stale operators, preserve economic
+/// influence for active operators, and constrain concentration to improve finality stall
+/// resistance.
 #[frame_support::pallet]
 pub mod pallet {
 	use codec::FullCodec;
 	use core::cmp::Ordering;
+	use sp_consensus_grandpa::{
+		AuthorityId as GrandpaAuthorityId, AuthorityWeight, RoundNumber, SetId,
+	};
 	use sp_runtime::BoundedBTreeMap;
 
 	use super::*;
@@ -141,6 +165,21 @@ pub mod pallet {
 
 		/// How often to rotate grandpas
 		type GrandpaRotationBlocks: Get<BlockNumberFor<Self>>;
+		/// Number of GRANDPA rotation periods to include when scoring recent activity.
+		#[pallet::constant]
+		type GrandpaRecentActivityWindowInRotations: Get<u32>;
+		/// Fixed total GRANDPA vote weight budget distributed each rotation.
+		#[pallet::constant]
+		type GrandpaTotalVoteWeight: Get<u64>;
+		/// Multiplier used for a single recency-window retry when too few authorities are eligible.
+		#[pallet::constant]
+		type GrandpaRecencyWindowFallbackMultiplier: Get<u32>;
+		/// Maximum number of GRANDPA authorities derived from mining activity.
+		#[pallet::constant]
+		type MaxGrandpaAuthorities: Get<u32>;
+		/// Max share a single GRANDPA authority can carry when the guard is enforceable.
+		#[pallet::constant]
+		type MaxGrandpaAuthorityWeightPercent: Get<Percent>;
 
 		/// The mining authority runtime public key
 		type MiningAuthorityId: RuntimeAppPublic + FullCodec + Clone + TypeInfo + PartialEq;
@@ -228,6 +267,15 @@ pub mod pallet {
 	/// Is the next slot still open for bids
 	#[pallet::storage]
 	pub type IsNextSlotBiddingOpen<T: Config> = StorageValue<_, bool, ValueQuery>;
+
+	/// The immediately previous GRANDPA authority set retained for equivocation reports that cross
+	/// a set boundary.
+	#[pallet::storage]
+	pub type PreviousGrandpaAuthorities<T: Config> = StorageValue<
+		_,
+		BoundedVec<(GrandpaAuthorityId, AuthorityWeight), T::MaxGrandpaAuthorities>,
+		ValueQuery,
+	>;
 
 	/// The number of bids per slot for the last 10 slots (newest first)
 	#[pallet::storage]
@@ -334,6 +382,11 @@ pub mod pallet {
 		ReleaseBidError {
 			account_id: T::AccountId,
 			error: DispatchError,
+		},
+		GrandpaEquivocationObserved {
+			authority_id: GrandpaAuthorityId,
+			set_id: SetId,
+			round: RoundNumber,
 		},
 	}
 
@@ -798,6 +851,31 @@ impl<T: Config> AuthorityProvider<T::MiningAuthorityId, T::Block, T::AccountId> 
 }
 
 impl<T: Config> Pallet<T> {
+	pub fn previous_grandpa_authorities() -> Option<sp_consensus_grandpa::AuthorityList> {
+		let authorities = PreviousGrandpaAuthorities::<T>::get().to_vec();
+		if authorities.is_empty() {
+			return None;
+		}
+		Some(authorities)
+	}
+
+	pub fn record_previous_grandpa_authorities(authorities: sp_consensus_grandpa::AuthorityList) {
+		let authorities = BoundedVec::<_, T::MaxGrandpaAuthorities>::truncate_from(authorities);
+		PreviousGrandpaAuthorities::<T>::put(authorities);
+	}
+
+	pub fn record_grandpa_equivocation_observed(
+		authority_id: sp_consensus_grandpa::AuthorityId,
+		set_id: sp_consensus_grandpa::SetId,
+		round: sp_consensus_grandpa::RoundNumber,
+	) {
+		Self::deposit_event(Event::<T>::GrandpaEquivocationObserved {
+			authority_id,
+			set_id,
+			round,
+		});
+	}
+
 	pub fn current_frame_id() -> FrameId {
 		NextFrameId::<T>::get().saturating_sub(1)
 	}

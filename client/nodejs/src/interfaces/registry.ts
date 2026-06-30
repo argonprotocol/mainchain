@@ -67,6 +67,7 @@ import type {
   ArgonPrimitivesVaultVaultArgonotCommitment,
   ArgonPrimitivesVaultVaultError,
   ArgonPrimitivesVaultVaultTerms,
+  ArgonRuntimeGrandpaKeyOwnerProof,
   ArgonRuntimeOriginCaller,
   ArgonRuntimeProxyType,
   ArgonRuntimeRuntime,
@@ -293,7 +294,6 @@ import type {
   SpConsensusGrandpaAppSignature,
   SpConsensusGrandpaEquivocation,
   SpConsensusGrandpaEquivocationProof,
-  SpCoreVoid,
   SpRuntimeDigest,
   SpRuntimeDigestDigestItem,
   SpRuntimeDispatchError,
@@ -370,6 +370,7 @@ declare module '@polkadot/types/types/registry' {
     ArgonPrimitivesVaultVaultArgonotCommitment: ArgonPrimitivesVaultVaultArgonotCommitment;
     ArgonPrimitivesVaultVaultError: ArgonPrimitivesVaultVaultError;
     ArgonPrimitivesVaultVaultTerms: ArgonPrimitivesVaultVaultTerms;
+    ArgonRuntimeGrandpaKeyOwnerProof: ArgonRuntimeGrandpaKeyOwnerProof;
     ArgonRuntimeOriginCaller: ArgonRuntimeOriginCaller;
     ArgonRuntimeProxyType: ArgonRuntimeProxyType;
     ArgonRuntimeRuntime: ArgonRuntimeRuntime;
@@ -596,7 +597,6 @@ declare module '@polkadot/types/types/registry' {
     SpConsensusGrandpaAppSignature: SpConsensusGrandpaAppSignature;
     SpConsensusGrandpaEquivocation: SpConsensusGrandpaEquivocation;
     SpConsensusGrandpaEquivocationProof: SpConsensusGrandpaEquivocationProof;
-    SpCoreVoid: SpCoreVoid;
     SpRuntimeDigest: SpRuntimeDigest;
     SpRuntimeDigestDigestItem: SpRuntimeDigestDigestItem;
     SpRuntimeDispatchError: SpRuntimeDispatchError;

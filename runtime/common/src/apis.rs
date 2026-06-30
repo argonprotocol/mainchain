@@ -3,6 +3,13 @@
 #[macro_export]
 macro_rules! inject_common_apis {
     () => {
+    use sp_consensus_grandpa::{
+        AuthorityList as GrandpaAuthorityList,
+        EquivocationProof as GrandpaReportProof,
+        OpaqueKeyOwnershipProof as GrandpaKeyOwnershipProof,
+        SetId as GrandpaSetId,
+    };
+
     impl_runtime_apis! {
         impl sp_api::Core<Block> for Runtime {
             fn version() -> RuntimeVersion {
@@ -319,29 +326,35 @@ macro_rules! inject_common_apis {
         }
 
         impl sp_consensus_grandpa::GrandpaApi<Block> for Runtime {
-            fn grandpa_authorities() -> sp_consensus_grandpa::AuthorityList {
+            fn grandpa_authorities() -> GrandpaAuthorityList {
                 Grandpa::grandpa_authorities()
             }
 
-            fn current_set_id() -> sp_consensus_grandpa::SetId {
+            fn current_set_id() -> GrandpaSetId {
                 Grandpa::current_set_id()
             }
 
             fn submit_report_equivocation_unsigned_extrinsic(
-                _equivocation_proof: sp_consensus_grandpa::EquivocationProof<
+                equivocation_proof: GrandpaReportProof<
                     <Block as BlockT>::Hash,
                     NumberFor<Block>,
                 >,
-                _key_owner_proof: sp_consensus_grandpa::OpaqueKeyOwnershipProof,
+                key_owner_proof: GrandpaKeyOwnershipProof,
             ) -> Option<()> {
-                None
+                submit_unsigned_equivocation_report(
+                    equivocation_proof,
+                    key_owner_proof,
+                )
             }
 
             fn generate_key_ownership_proof(
-                _set_id: sp_consensus_grandpa::SetId,
-                _authority_id: GrandpaId,
-            ) -> Option<sp_consensus_grandpa::OpaqueKeyOwnershipProof> {
-                None
+                set_id: GrandpaSetId,
+                authority_id: GrandpaId,
+            ) -> Option<GrandpaKeyOwnershipProof> {
+                generate_key_ownership_proof(
+                    set_id,
+                    authority_id,
+                )
             }
         }
 

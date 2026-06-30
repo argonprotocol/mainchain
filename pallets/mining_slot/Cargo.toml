@@ -16,7 +16,7 @@ targets = ["x86_64-unknown-linux-gnu"]
 [dependencies]
 codec = { workspace = true }
 scale-info = { workspace = true }
-polkadot-sdk = { workspace = true, features = ["frame-support", "frame-system", "sp-runtime", "sp-core", "sp-api"] }
+polkadot-sdk = { workspace = true, features = ["frame-support", "frame-system", "sp-runtime", "sp-core", "sp-api", "sp-consensus-grandpa"] }
 pallet-prelude = { workspace = true }
 pallet-ticks = { workspace = true, default-features = false, optional = true }
 pallet-treasury = { workspace = true }

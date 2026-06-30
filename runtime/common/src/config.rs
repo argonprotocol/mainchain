@@ -109,12 +109,16 @@ parameter_types! {
 	pub const FramesPerMiningTerm: u32 = 10;
 	pub const MinCohortSize: u32 = 10;
 	pub const MaxCohortSize: u32 = 144;
-	pub const MaxGrandpas: u32 = 1000;
 	pub const PricePerSeatAdjustmentDamper: FixedU128 = FixedU128::from_rational(20, 100);
 	pub const TargetPricePerSeat: Balance = 1000 * ARGON;
 	pub const InitialArgonotsPerSeat: Balance = ARGONOT_EXISTENTIAL_DEPOSIT;
 	pub const ArgonotBidCollateralMultiple: u128 = 2;
-	pub const GrandpaRotationBlocks: BlockNumber = 260;
+	pub const GrandpaRotationBlocks: BlockNumber = 240;
+	pub const GrandpaRecentActivityWindowInRotations: u32 = 3;
+	pub const GrandpaTotalVoteWeight: u64 = 10_000;
+	pub const GrandpaRecencyWindowFallbackMultiplier: u32 = 2;
+	pub const MaxGrandpaAuthorities: u32 = 100;
+	pub const MaxGrandpaAuthorityWeightPercent: Percent = Percent::from_percent(15);
 	pub const MiningSlotBidIncrement: Balance = 10 * MILLIGONS;
 
 	// ### pallet_vaults
