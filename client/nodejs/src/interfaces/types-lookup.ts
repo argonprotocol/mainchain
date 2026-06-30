@@ -4322,6 +4322,21 @@ declare module '@polkadot/types/lookup' {
   /** @name PalletBlockRewardsError (482) */
   type PalletBlockRewardsError = Null;
 
+  /** @name PalletMintPendingMintUtxo (483) */
+  interface PalletMintPendingMintUtxo extends Struct {
+    readonly utxoId: Compact<u64>;
+    readonly accountId: AccountId32;
+    readonly remainingAmount: Compact<u128>;
+    readonly maxAmountPerFrame: Compact<u128>;
+  }
+
+  /** @name PalletMintMintQueueCursor (485) */
+  interface PalletMintMintQueueCursor extends Struct {
+    readonly payoutStartIndex: Compact<u64>;
+    readonly payoutCursorIndex: Compact<u64>;
+    readonly payoutCursorFrameId: Option<u64>;
+  }
+
   /** @name PalletMintMintAction (488) */
   interface PalletMintMintAction extends Struct {
     readonly argonBurned: u128;
@@ -4329,20 +4344,20 @@ declare module '@polkadot/types/lookup' {
     readonly bitcoinMinted: u128;
   }
 
-  /** @name PalletMintError (489) */
+  /** @name PalletMintError (490) */
   interface PalletMintError extends Enum {
     readonly isTooManyPendingMints: boolean;
     readonly type: 'TooManyPendingMints';
   }
 
-  /** @name PalletBalancesBalanceLock (491) */
+  /** @name PalletBalancesBalanceLock (492) */
   interface PalletBalancesBalanceLock extends Struct {
     readonly id: U8aFixed;
     readonly amount: u128;
     readonly reasons: PalletBalancesReasons;
   }
 
-  /** @name PalletBalancesReasons (492) */
+  /** @name PalletBalancesReasons (493) */
   interface PalletBalancesReasons extends Enum {
     readonly isFee: boolean;
     readonly isMisc: boolean;
@@ -4350,38 +4365,38 @@ declare module '@polkadot/types/lookup' {
     readonly type: 'Fee' | 'Misc' | 'All';
   }
 
-  /** @name PalletBalancesReserveData (495) */
+  /** @name PalletBalancesReserveData (496) */
   interface PalletBalancesReserveData extends Struct {
     readonly id: U8aFixed;
     readonly amount: u128;
   }
 
-  /** @name FrameSupportTokensMiscIdAmountRuntimeHoldReason (498) */
+  /** @name FrameSupportTokensMiscIdAmountRuntimeHoldReason (499) */
   interface FrameSupportTokensMiscIdAmountRuntimeHoldReason extends Struct {
     readonly id: ArgonRuntimeRuntimeHoldReason;
     readonly amount: u128;
   }
 
-  /** @name FrameSupportTokensMiscIdAmountRuntimeFreezeReason (501) */
+  /** @name FrameSupportTokensMiscIdAmountRuntimeFreezeReason (502) */
   interface FrameSupportTokensMiscIdAmountRuntimeFreezeReason extends Struct {
     readonly id: ArgonRuntimeRuntimeFreezeReason;
     readonly amount: u128;
   }
 
-  /** @name ArgonRuntimeRuntimeFreezeReason (502) */
+  /** @name ArgonRuntimeRuntimeFreezeReason (503) */
   interface ArgonRuntimeRuntimeFreezeReason extends Enum {
     readonly isBlockRewards: boolean;
     readonly asBlockRewards: PalletBlockRewardsFreezeReason;
     readonly type: 'BlockRewards';
   }
 
-  /** @name PalletBlockRewardsFreezeReason (503) */
+  /** @name PalletBlockRewardsFreezeReason (504) */
   interface PalletBlockRewardsFreezeReason extends Enum {
     readonly isMaturationPeriod: boolean;
     readonly type: 'MaturationPeriod';
   }
 
-  /** @name PalletBalancesError (505) */
+  /** @name PalletBalancesError (506) */
   interface PalletBalancesError extends Enum {
     readonly isVestingBalance: boolean;
     readonly isLiquidityRestrictions: boolean;
@@ -4410,7 +4425,7 @@ declare module '@polkadot/types/lookup' {
       | 'DeltaZero';
   }
 
-  /** @name PalletTxPauseError (507) */
+  /** @name PalletTxPauseError (508) */
   interface PalletTxPauseError extends Enum {
     readonly isIsPaused: boolean;
     readonly isIsUnpaused: boolean;
@@ -4419,65 +4434,65 @@ declare module '@polkadot/types/lookup' {
     readonly type: 'IsPaused' | 'IsUnpaused' | 'Unpausable' | 'NotFound';
   }
 
-  /** @name PalletTransactionPaymentReleases (508) */
+  /** @name PalletTransactionPaymentReleases (509) */
   interface PalletTransactionPaymentReleases extends Enum {
     readonly isV1Ancient: boolean;
     readonly isV2: boolean;
     readonly type: 'V1Ancient' | 'V2';
   }
 
-  /** @name FrameSupportStorageNoDrop (509) */
+  /** @name FrameSupportStorageNoDrop (510) */
   interface FrameSupportStorageNoDrop extends FrameSupportTokensFungibleImbalance {}
 
-  /** @name FrameSupportTokensFungibleImbalance (510) */
+  /** @name FrameSupportTokensFungibleImbalance (511) */
   interface FrameSupportTokensFungibleImbalance extends Struct {
     readonly amount: u128;
   }
 
-  /** @name PalletUtilityError (511) */
+  /** @name PalletUtilityError (512) */
   interface PalletUtilityError extends Enum {
     readonly isTooManyCalls: boolean;
     readonly type: 'TooManyCalls';
   }
 
-  /** @name PalletSudoError (512) */
+  /** @name PalletSudoError (513) */
   interface PalletSudoError extends Enum {
     readonly isRequireSudo: boolean;
     readonly type: 'RequireSudo';
   }
 
-  /** @name PalletTreasuryFrameVaultCapital (513) */
+  /** @name PalletTreasuryFrameVaultCapital (514) */
   interface PalletTreasuryFrameVaultCapital extends Struct {
     readonly frameId: Compact<u64>;
     readonly vaults: BTreeMap<u32, PalletTreasuryVaultCapital>;
   }
 
-  /** @name PalletTreasuryVaultCapital (515) */
+  /** @name PalletTreasuryVaultCapital (516) */
   interface PalletTreasuryVaultCapital extends Struct {
     readonly bondLotAllocations: Vec<PalletTreasuryBondLotAllocation>;
     readonly eligibleBonds: Compact<u32>;
   }
 
-  /** @name PalletTreasuryBondLotAllocation (517) */
+  /** @name PalletTreasuryBondLotAllocation (518) */
   interface PalletTreasuryBondLotAllocation extends Struct {
     readonly bondLotId: Compact<u64>;
     readonly prorata: u128;
   }
 
-  /** @name PalletTreasuryFrameArgonotBondParticipants (522) */
+  /** @name PalletTreasuryFrameArgonotBondParticipants (523) */
   interface PalletTreasuryFrameArgonotBondParticipants extends Struct {
     readonly frameId: Compact<u64>;
     readonly totalBonds: Compact<u32>;
     readonly bondLots: Vec<PalletTreasuryBondLotSummary>;
   }
 
-  /** @name PalletTreasuryBondLotSummary (524) */
+  /** @name PalletTreasuryBondLotSummary (525) */
   interface PalletTreasuryBondLotSummary extends Struct {
     readonly bondLotId: Compact<u64>;
     readonly bonds: Compact<u32>;
   }
 
-  /** @name PalletTreasuryBondLot (526) */
+  /** @name PalletTreasuryBondLot (527) */
   interface PalletTreasuryBondLot extends Struct {
     readonly owner: AccountId32;
     readonly program: PalletTreasuryBondProgram;
@@ -4491,7 +4506,7 @@ declare module '@polkadot/types/lookup' {
     readonly releaseReason: Option<PalletTreasuryBondReleaseReason>;
   }
 
-  /** @name PalletTreasuryBondProgram (527) */
+  /** @name PalletTreasuryBondProgram (528) */
   interface PalletTreasuryBondProgram extends Enum {
     readonly isVault: boolean;
     readonly asVault: {

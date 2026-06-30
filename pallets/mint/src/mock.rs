@@ -45,13 +45,16 @@ impl pallet_balances::Config for Test {
 }
 
 parameter_types! {
-	pub static MaxPendingMintUtxos: u32 = 10;
+	pub static MaxPendingMintsPerUtxo: u32 = 50;
+	pub static MaxPendingMintPayoutWindowSize: u32 = 1_000;
+	pub static BitcoinMintPayoutPercentPerFrame: Percent = Percent::from_percent(10);
 	pub static BitcoinPricePerUsd: Option<FixedU128> = Some(FixedU128::from_float(62000.00));
 	pub static ArgonPricePerUsd: Option<FixedU128> = Some(FixedU128::from_float(1.00));
 	pub static ArgonCPI: Option<argon_primitives::ArgonCPI> = Some(FixedI128::from_float(-1.00));
 	pub static AverageCPI: argon_primitives::ArgonCPI = FixedI128::from_float(-1.00);
 	pub static MinerRewardsAccounts: Vec<(u64, FrameId)> = vec![];
 	pub static ArgonCirculation: Balance = 100_000;
+	pub static CurrentFrameId: FrameId = 1;
 	pub static IsNewFrameStart: Option<u64> = None;
 	pub static MaxMiners: u32 = 1000;
 	pub static NextMiningTick: Tick = 10;
@@ -64,7 +67,7 @@ impl MiningFrameTransitionProvider for StaticMiningFrameProvider {
 		IsNewFrameStart::get()
 	}
 	fn get_current_frame_id() -> FrameId {
-		IsNewFrameStart::get().unwrap_or_default()
+		CurrentFrameId::get()
 	}
 }
 impl MiningFrameProvider for StaticMiningFrameProvider {
@@ -129,12 +132,14 @@ impl pallet_mint::Config for Test {
 	type WeightInfo = ();
 	type Currency = Balances;
 	type Balance = Balance;
-	type MaxPendingMintUtxos = MaxPendingMintUtxos;
+	type MaxPendingMintsPerUtxo = MaxPendingMintsPerUtxo;
+	type MaxPendingMintPayoutWindowSize = MaxPendingMintPayoutWindowSize;
 	type PriceProvider = StaticPriceProvider;
 	type BlockRewardAccountsProvider = StaticBlockRewardAccountsProvider;
 	type MaxMintHistoryToMaintain = ConstU32<10>;
 	type MaxPossibleMiners = MaxMiners;
 	type MiningFrameProvider = StaticMiningFrameProvider;
+	type BitcoinMintPayoutPercentPerFrame = BitcoinMintPayoutPercentPerFrame;
 }
 
 pub fn new_test_ext() -> TestState {

@@ -206,7 +206,9 @@ import type {
   PalletMintError,
   PalletMintEvent,
   PalletMintMintAction,
+  PalletMintMintQueueCursor,
   PalletMintMintType,
+  PalletMintPendingMintUtxo,
   PalletMultisigCall,
   PalletMultisigError,
   PalletMultisigEvent,
@@ -507,7 +509,9 @@ declare module '@polkadot/types/types/registry' {
     PalletMintError: PalletMintError;
     PalletMintEvent: PalletMintEvent;
     PalletMintMintAction: PalletMintMintAction;
+    PalletMintMintQueueCursor: PalletMintMintQueueCursor;
     PalletMintMintType: PalletMintMintType;
+    PalletMintPendingMintUtxo: PalletMintPendingMintUtxo;
     PalletMultisigCall: PalletMultisigCall;
     PalletMultisigError: PalletMultisigError;
     PalletMultisigEvent: PalletMultisigEvent;

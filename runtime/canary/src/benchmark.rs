@@ -12,6 +12,7 @@ frame_benchmarking::define_benchmarks!(
 	[pallet_price_index, PriceIndex]
 	[pallet_bitcoin_locks, BitcoinLocks]
 	[pallet_bitcoin_utxos, BitcoinUtxos]
+	[pallet_mint, Mint]
 	[pallet_mining_slot, MiningSlot]
 	[pallet_block_seal_spec, BlockSealSpec]
 	[pallet_block_seal, BlockSeal]

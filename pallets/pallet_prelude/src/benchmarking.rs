@@ -17,7 +17,7 @@ use argon_primitives::{
 	notary::{NotaryProvider, NotarySignature},
 	providers::{
 		AuthorityProvider, BitcoinUtxoTracker, BlockRewardAccountsProvider, BlockSealerInfo,
-		BlockSealerProvider, MiningFrameTransitionProvider, NotebookProvider,
+		BlockSealerProvider, MiningFrameProvider, MiningFrameTransitionProvider, NotebookProvider,
 		OperationalRewardsPayer, OperationalRewardsProvider,
 	},
 	tick::{Tick, TickDigest, Ticker},
@@ -30,6 +30,7 @@ use argon_primitives::{
 };
 use codec::{Decode, Encode, FullCodec, HasCompact};
 use core::{iter::Sum, marker::PhantomData};
+use frame_benchmarking::account;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct BenchmarkNotebookProviderCallCounters {
@@ -451,12 +452,24 @@ impl<AccountId: FullCodec> BlockRewardAccountsProvider<AccountId>
 	}
 
 	fn get_mint_rewards_accounts() -> Vec<(AccountId, FrameId)> {
-		Vec::new()
+		let state = benchmark_bitcoin_locks_runtime_state();
+		let starting_frame_id = state.current_frame_id.saturating_sub(1);
+		(0..benchmark_block_reward_accounts_count())
+			.map(|index| (account("mint-miner", index, 0), starting_frame_id))
+			.collect()
 	}
 
 	fn is_compute_block_eligible_for_rewards() -> bool {
 		true
 	}
+}
+
+pub fn set_benchmark_block_reward_accounts_count(count: u32) {
+	block_reward_accounts_count_backend::set(count);
+}
+
+pub fn benchmark_block_reward_accounts_count() -> u32 {
+	block_reward_accounts_count_backend::get()
 }
 
 pub fn set_benchmark_notebook_provider_state(state: BenchmarkNotebookProviderState) {
@@ -677,6 +690,24 @@ mod operational_rewards_provider_state_backend {
 	}
 }
 
+#[cfg(feature = "std")]
+mod block_reward_accounts_count_backend {
+	use super::*;
+	use frame_support::parameter_types;
+
+	parameter_types! {
+		pub static BenchmarkBlockRewardAccountsCountHolder: u32 = 0;
+	}
+
+	pub(super) fn set(count: u32) {
+		BenchmarkBlockRewardAccountsCountHolder::set(count);
+	}
+
+	pub(super) fn get() -> u32 {
+		BenchmarkBlockRewardAccountsCountHolder::get()
+	}
+}
+
 #[cfg(not(feature = "std"))]
 mod state_backend {
 	use super::*;
@@ -733,6 +764,27 @@ mod operational_accounts_state_backend {
 				.clone()
 				.unwrap_or_default()
 		}
+	}
+}
+
+#[cfg(not(feature = "std"))]
+mod block_reward_accounts_count_backend {
+	use core::cell::UnsafeCell;
+
+	struct BenchmarkStateCell(UnsafeCell<u32>);
+	unsafe impl Sync for BenchmarkStateCell {}
+
+	static BENCHMARK_BLOCK_REWARD_ACCOUNTS_COUNT: BenchmarkStateCell =
+		BenchmarkStateCell(UnsafeCell::new(0));
+
+	pub(super) fn set(count: u32) {
+		unsafe {
+			*BENCHMARK_BLOCK_REWARD_ACCOUNTS_COUNT.0.get() = count;
+		}
+	}
+
+	pub(super) fn get() -> u32 {
+		unsafe { *BENCHMARK_BLOCK_REWARD_ACCOUNTS_COUNT.0.get() }
 	}
 }
 
@@ -997,6 +1049,21 @@ impl MiningFrameTransitionProvider for BenchmarkCurrentFrameId {
 
 	fn get_current_frame_id() -> FrameId {
 		benchmark_bitcoin_locks_runtime_state().current_frame_id
+	}
+}
+
+impl MiningFrameProvider for BenchmarkCurrentFrameId {
+	fn get_next_frame_tick() -> Tick {
+		benchmark_bitcoin_locks_runtime_state().current_tick.saturating_add(1)
+	}
+
+	fn is_seat_bidding_started() -> bool {
+		true
+	}
+
+	fn get_tick_range_for_frame(_frame_id: FrameId) -> Option<(Tick, Tick)> {
+		let state = benchmark_bitcoin_locks_runtime_state();
+		Some((state.current_tick.saturating_sub(1), state.current_tick))
 	}
 }
 
@@ -1543,6 +1610,8 @@ where
 	AccountId: Codec + Clone,
 	Balance: Codec + Copy,
 {
+	type Weights = ();
+
 	fn utxo_locked(utxo_id: UtxoId, account_id: &AccountId, amount: Balance) -> DispatchResult {
 		let mut state = benchmark_utxo_lock_events_state::<AccountId, Balance>();
 		state.last_lock_event = Some((utxo_id, account_id.clone(), amount));

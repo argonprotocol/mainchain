@@ -11,6 +11,7 @@ pub mod pallet_ethereum_verifier;
 pub mod pallet_grandpa;
 pub mod pallet_localchain_transfer;
 pub mod pallet_mining_slot;
+pub mod pallet_mint;
 pub mod pallet_multisig;
 pub mod pallet_notebook;
 pub mod pallet_operational_accounts;

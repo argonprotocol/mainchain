@@ -88,6 +88,8 @@ import type {
   PalletLocalchainTransferQueuedTransferOut,
   PalletMiningSlotMinerNonceScoring,
   PalletMintMintAction,
+  PalletMintMintQueueCursor,
+  PalletMintPendingMintUtxo,
   PalletMultisigMultisig,
   PalletOperationalAccountsOperationalAccount,
   PalletOperationalAccountsRewardsConfig,
@@ -1106,14 +1108,35 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       mintedMiningMicrogons: AugmentedQuery<ApiType, () => Observable<u128>, []>;
       /**
-       * Bitcoin UTXOs that have been submitted for minting. This list is FIFO for minting whenever
-       * a) CPI >= 0 and
-       * b) the aggregate minted Bitcoins <= the aggregate minted microgons from mining
+       * The next monotonic queue index to assign to a pending bitcoin mint.
        **/
-      pendingMintUtxos: AugmentedQuery<
+      nextPendingMintUtxoIndex: AugmentedQuery<ApiType, () => Observable<u64>, []>;
+      /**
+       * Queue bookkeeping for pending bitcoin mints, including the bounded payout start and the
+       * current frame scan cursor.
+       **/
+      pendingMintQueueState: AugmentedQuery<
         ApiType,
-        () => Observable<Vec<ITuple<[u64, AccountId32, u128]>>>,
+        () => Observable<PalletMintMintQueueCursor>,
         []
+      >;
+      /**
+       * Reverse lookup from bitcoin UTXO id to all queued mint indices for direct removal and
+       * client lookup.
+       **/
+      pendingMintUtxoIdLookup: AugmentedQuery<
+        ApiType,
+        (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<u64>>,
+        [u64]
+      >;
+      /**
+       * Bitcoin UTXOs that have been submitted for minting, keyed by a monotonic queue index so
+       * payouts can preserve FIFO order while each frame works through a fixed payout cohort.
+       **/
+      pendingMintUtxosByIndex: AugmentedQuery<
+        ApiType,
+        (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<PalletMintPendingMintUtxo>>,
+        [u64]
       >;
     };
     multisig: {
