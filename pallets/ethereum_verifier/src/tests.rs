@@ -10,7 +10,7 @@ use crate::{
 		load_next_sync_committee_update_fixture, load_sync_committee_update_fixture,
 	},
 	sync_committee_sum,
-	types::{CheckpointUpdate, ExecutionHeaderProof, Update},
+	types::{CheckpointUpdate, ExecutionHeaderProof, SyncCommittee, TypeError, Update},
 	verify_merkle_branch, BasicOperatingMode, BeaconHeader, Error, ExecutionHeaderAnchor,
 	ExecutionHeaderAnchors, ExecutionHeaderAnchorsByBlockNumber, ExecutionProof,
 	FinalizedBeaconHeaderState, FinalizedBeaconState, Fork, ForkVersionSchedule, ForkVersions,
@@ -42,7 +42,10 @@ use polkadot_sdk::{
 	sp_core::{hashing::blake2_256, H160, H256},
 	sp_runtime::{traits::ConstU32, DispatchError},
 };
-use snowbridge_beacon_primitives::merkle_proof::{generalized_index_length, subtree_index};
+use snowbridge_beacon_primitives::{
+	merkle_proof::{generalized_index_length, subtree_index},
+	PublicKey, PublicKeyPrepared,
+};
 use std::{fs::File, path::PathBuf};
 
 const MAINNET_SLOTS_PER_EPOCH: u64 = EthereumBeaconPreset::Mainnet.slots_per_epoch() as u64;
@@ -521,6 +524,42 @@ fn find_present_keys() {
 		assert_eq!(pubkeys[2], sync_committee_prepared.pubkeys[26]);
 		assert_eq!(pubkeys[3], sync_committee_prepared.pubkeys[30]);
 	});
+}
+
+#[test]
+fn sync_committee_prepare_rejects_infinity_public_keys() {
+	let infinity_pubkey = PublicKey::from(PublicKeyPrepared::default().as_bytes());
+	let committee = SyncCommittee {
+		pubkeys: vec![infinity_pubkey; MINIMAL_SYNC_COMMITTEE_SIZE]
+			.try_into()
+			.expect("minimal committee length is bounded"),
+		aggregate_pubkey: infinity_pubkey,
+	};
+
+	assert!(matches!(
+		committee.prepare(EthereumBeaconPreset::Minimal),
+		Err(TypeError::PreparePublicKeysFailed)
+	));
+}
+
+#[test]
+fn sync_committee_prepare_rejects_non_subgroup_public_keys() {
+	// Mirrors the compressed `(0, 2)` G1 test vector from `snowbridge-milagro-bls`, which
+	// deserializes on the unchecked path but fails subgroup validation.
+	let mut non_subgroup_bytes = [0u8; 48];
+	non_subgroup_bytes[0] = 128;
+	let non_subgroup_pubkey = PublicKey::from(non_subgroup_bytes);
+	let committee = SyncCommittee {
+		pubkeys: vec![non_subgroup_pubkey; MINIMAL_SYNC_COMMITTEE_SIZE]
+			.try_into()
+			.expect("minimal committee length is bounded"),
+		aggregate_pubkey: non_subgroup_pubkey,
+	};
+
+	assert!(matches!(
+		committee.prepare(EthereumBeaconPreset::Minimal),
+		Err(TypeError::PreparePublicKeysFailed)
+	));
 }
 
 /* SYNC PROCESS TESTS */

@@ -27,8 +27,6 @@ const MAINNET_SYNC_COMMITTEE_BITS_SIZE: usize =
 const MINIMAL_SYNC_COMMITTEE_SIZE: usize = EthereumBeaconPreset::Minimal.sync_committee_size();
 
 type RawSyncCommittee<const COMMITTEE_SIZE: usize> = snowbridge::SyncCommittee<COMMITTEE_SIZE>;
-type RawSyncCommitteePrepared<const COMMITTEE_SIZE: usize> =
-	snowbridge::SyncCommitteePrepared<COMMITTEE_SIZE>;
 type RawSyncAggregate<const COMMITTEE_SIZE: usize, const BITS_SIZE: usize> =
 	snowbridge::SyncAggregate<COMMITTEE_SIZE, BITS_SIZE>;
 type RawNextSyncCommitteeUpdate<const COMMITTEE_SIZE: usize> =
@@ -80,18 +78,10 @@ impl SyncCommittee {
 		preset: EthereumBeaconPreset,
 	) -> Result<SyncCommitteePrepared, TypeError> {
 		match preset {
-			EthereumBeaconPreset::Mainnet => {
-				let committee = self.to_raw::<{ MAINNET_SYNC_COMMITTEE_SIZE }>()?;
-				RawSyncCommitteePrepared::<{ MAINNET_SYNC_COMMITTEE_SIZE }>::try_from(&committee)
-					.map_err(|_| TypeError::PreparePublicKeysFailed)?
-					.try_into()
-			},
-			EthereumBeaconPreset::Minimal => {
-				let committee = self.to_raw::<{ MINIMAL_SYNC_COMMITTEE_SIZE }>()?;
-				RawSyncCommitteePrepared::<{ MINIMAL_SYNC_COMMITTEE_SIZE }>::try_from(&committee)
-					.map_err(|_| TypeError::PreparePublicKeysFailed)?
-					.try_into()
-			},
+			EthereumBeaconPreset::Mainnet =>
+				self.prepare_committee::<{ MAINNET_SYNC_COMMITTEE_SIZE }>(),
+			EthereumBeaconPreset::Minimal =>
+				self.prepare_committee::<{ MINIMAL_SYNC_COMMITTEE_SIZE }>(),
 		}
 	}
 
@@ -106,6 +96,28 @@ impl SyncCommittee {
 				.map_err(|_| TypeError::InvalidBoundedLength)?,
 			aggregate_pubkey: self.aggregate_pubkey,
 		})
+	}
+
+	fn prepare_committee<const COMMITTEE_SIZE: usize>(
+		&self,
+	) -> Result<SyncCommitteePrepared, TypeError> {
+		let committee = self.to_raw::<COMMITTEE_SIZE>()?;
+		let root = committee.hash_tree_root().map_err(|_| TypeError::HashTreeRootFailed)?;
+		let mut pubkeys = BoundedVec::new();
+
+		for pubkey in committee.pubkeys.iter() {
+			pubkeys
+				.try_push(
+					PublicKeyPrepared::from_bytes(&pubkey.0)
+						.map_err(|_| TypeError::PreparePublicKeysFailed)?,
+				)
+				.map_err(|_| TypeError::InvalidBoundedLength)?;
+		}
+
+		let aggregate_pubkey = PublicKeyPrepared::from_bytes(&committee.aggregate_pubkey.0)
+			.map_err(|_| TypeError::PreparePublicKeysFailed)?;
+
+		Ok(SyncCommitteePrepared { root, pubkeys, aggregate_pubkey })
 	}
 }
 
@@ -132,27 +144,6 @@ pub struct SyncCommitteePrepared {
 }
 
 impl DecodeWithMemTracking for SyncCommitteePrepared {}
-
-impl<const COMMITTEE_SIZE: usize> TryFrom<RawSyncCommitteePrepared<COMMITTEE_SIZE>>
-	for SyncCommitteePrepared
-{
-	type Error = TypeError;
-
-	fn try_from(
-		sync_committee: RawSyncCommitteePrepared<COMMITTEE_SIZE>,
-	) -> Result<Self, Self::Error> {
-		Ok(Self {
-			root: sync_committee.root,
-			pubkeys: sync_committee
-				.pubkeys
-				.as_ref()
-				.to_vec()
-				.try_into()
-				.map_err(|_| TypeError::InvalidBoundedLength)?,
-			aggregate_pubkey: sync_committee.aggregate_pubkey,
-		})
-	}
-}
 
 #[derive(Default, Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Debug, TypeInfo)]
 pub struct SyncAggregate {
