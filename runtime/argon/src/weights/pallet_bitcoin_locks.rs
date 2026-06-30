@@ -242,6 +242,33 @@ impl<T: frame_system::Config> pallet_bitcoin_locks::WeightInfo for WeightInfo<T>
 			.saturating_add(T::DbWeight::get().reads(1))
 			.saturating_add(T::DbWeight::get().writes(1))
 		}
+	/// Storage: `BitcoinLocks::FeeCouponsByPublic` (r:1 w:1)
+	/// Proof: `BitcoinLocks::FeeCouponsByPublic` (`max_values`: None, `max_size`: Some(85), added: 2560, mode: `MaxEncodedLen`)
+	/// Storage: `BitcoinLocks::MinimumSatoshis` (r:1 w:0)
+	/// Proof: `BitcoinLocks::MinimumSatoshis` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
+	/// Storage: `BitcoinLocks::FeeCouponsExpiringByFrame` (r:0 w:1)
+	/// Proof: `BitcoinLocks::FeeCouponsExpiringByFrame` (`max_values`: None, `max_size`: Some(64), added: 2539, mode: `MaxEncodedLen`)
+	fn register_fee_coupon() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `3550`
+		// Minimum execution time: 8_000_000 picoseconds.
+		Weight::from_parts(9_000_000, 3550)
+			.saturating_add(T::DbWeight::get().reads(2))
+			.saturating_add(T::DbWeight::get().writes(2))
+		}
+	/// Storage: `BitcoinLocks::UtxoIdsByOwnerAccount` (r:1 w:0)
+	/// Proof: `BitcoinLocks::UtxoIdsByOwnerAccount` (`max_values`: None, `max_size`: Some(40), added: 2515, mode: `MaxEncodedLen`)
+	/// Storage: `BitcoinLocks::LocksByUtxoId` (r:1 w:0)
+	/// Proof: `BitcoinLocks::LocksByUtxoId` (`max_values`: None, `max_size`: Some(9108), added: 11583, mode: `MaxEncodedLen`)
+	fn provider_get_account_funded_bitcoin_amount() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `0`
+		//  Estimated: `14098`
+		// Minimum execution time: 8_000_000 picoseconds.
+		Weight::from_parts(9_000_000, 14098)
+			.saturating_add(T::DbWeight::get().reads(2))
+		}
 	/// Storage: `BitcoinLocks::LocksByUtxoId` (r:1 w:1)
 	/// Proof: `BitcoinLocks::LocksByUtxoId` (`max_values`: None, `max_size`: Some(9108), added: 11583, mode: `MaxEncodedLen`)
 	fn increase_securitization() -> Weight {

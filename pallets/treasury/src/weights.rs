@@ -1,5 +1,5 @@
 use super::Config;
-use argon_primitives::TreasuryPoolProviderWeightInfo;
+use argon_primitives::{OperationalAccountsHook, TreasuryPoolProviderWeightInfo};
 use pallet_prelude::*;
 
 /// Weight functions needed for this pallet.
@@ -12,7 +12,9 @@ pub trait WeightInfo {
 	fn buy_bonds() -> Weight;
 	fn buy_argonot_bonds() -> Weight;
 	fn liquidate_bond_lot() -> Weight;
-	fn provider_has_bond_participation() -> Weight;
+	fn provider_has_vault_bond_participation() -> Weight;
+	fn provider_active_vault_bond_amount() -> Weight;
+	fn provider_active_account_vault_bond_amount() -> Weight;
 	fn provider_encumber_bond_microgons() -> Weight;
 	fn provider_release_encumbered_bond_microgons() -> Weight;
 	fn provider_burn_encumbered_bond_microgons() -> Weight;
@@ -46,7 +48,9 @@ where
 	}
 
 	fn buy_bonds() -> Weight {
-		Base::buy_bonds()
+		Base::buy_bonds().saturating_add(
+			T::OperationalAccountsHook::account_vault_bond_total_updated_weight().saturating_mul(2),
+		)
 	}
 
 	fn buy_argonot_bonds() -> Weight {
@@ -55,10 +59,19 @@ where
 
 	fn liquidate_bond_lot() -> Weight {
 		Base::liquidate_bond_lot()
+			.saturating_add(T::OperationalAccountsHook::account_vault_bond_total_updated_weight())
 	}
 
-	fn provider_has_bond_participation() -> Weight {
-		Base::provider_has_bond_participation()
+	fn provider_has_vault_bond_participation() -> Weight {
+		Base::provider_has_vault_bond_participation()
+	}
+
+	fn provider_active_vault_bond_amount() -> Weight {
+		Base::provider_active_vault_bond_amount()
+	}
+
+	fn provider_active_account_vault_bond_amount() -> Weight {
+		Base::provider_active_account_vault_bond_amount()
 	}
 
 	fn provider_encumber_bond_microgons() -> Weight {
@@ -71,13 +84,22 @@ where
 
 	fn provider_burn_encumbered_bond_microgons() -> Weight {
 		Base::provider_burn_encumbered_bond_microgons()
+			.saturating_add(T::OperationalAccountsHook::account_vault_bond_total_updated_weight())
 	}
 }
 
 pub struct ProviderWeightAdapter<T>(core::marker::PhantomData<T>);
 impl<T: Config> TreasuryPoolProviderWeightInfo for ProviderWeightAdapter<T> {
-	fn has_bond_participation() -> Weight {
-		<T as Config>::WeightInfo::provider_has_bond_participation()
+	fn has_vault_bond_participation() -> Weight {
+		<T as Config>::WeightInfo::provider_has_vault_bond_participation()
+	}
+
+	fn active_vault_bond_amount() -> Weight {
+		<T as Config>::WeightInfo::provider_active_vault_bond_amount()
+	}
+
+	fn active_account_vault_bond_amount() -> Weight {
+		<T as Config>::WeightInfo::provider_active_account_vault_bond_amount()
 	}
 
 	fn encumber_bond_microgons() -> Weight {
@@ -120,7 +142,15 @@ impl WeightInfo for () {
 	fn liquidate_bond_lot() -> Weight {
 		Weight::zero()
 	}
-	fn provider_has_bond_participation() -> Weight {
+	fn provider_has_vault_bond_participation() -> Weight {
+		Weight::zero()
+	}
+
+	fn provider_active_vault_bond_amount() -> Weight {
+		Weight::zero()
+	}
+
+	fn provider_active_account_vault_bond_amount() -> Weight {
 		Weight::zero()
 	}
 

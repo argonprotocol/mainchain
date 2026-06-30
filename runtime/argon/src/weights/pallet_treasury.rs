@@ -116,7 +116,31 @@ impl<T: frame_system::Config> pallet_treasury::WeightInfo for WeightInfo<T> {
 	/// Proof: `Treasury::BondLotsByVault` (`max_values`: None, `max_size`: Some(1214), added: 3689, mode: `MaxEncodedLen`)
 	/// Storage: `Treasury::BondLotById` (r:100 w:0)
 	/// Proof: `Treasury::BondLotById` (`max_values`: None, `max_size`: Some(130), added: 2605, mode: `MaxEncodedLen`)
-	fn provider_has_bond_participation() -> Weight {
+	fn provider_has_vault_bond_participation() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `7511`
+		//  Estimated: `261490`
+		// Minimum execution time: 296_000_000 picoseconds.
+		Weight::from_parts(306_000_000, 261490)
+			.saturating_add(T::DbWeight::get().reads(101))
+		}
+	/// Storage: `Treasury::BondLotsByVault` (r:1 w:0)
+	/// Proof: `Treasury::BondLotsByVault` (`max_values`: None, `max_size`: Some(1214), added: 3689, mode: `MaxEncodedLen`)
+	/// Storage: `Treasury::BondLotById` (r:100 w:0)
+	/// Proof: `Treasury::BondLotById` (`max_values`: None, `max_size`: Some(130), added: 2605, mode: `MaxEncodedLen`)
+	fn provider_active_vault_bond_amount() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `7511`
+		//  Estimated: `261490`
+		// Minimum execution time: 296_000_000 picoseconds.
+		Weight::from_parts(306_000_000, 261490)
+			.saturating_add(T::DbWeight::get().reads(101))
+		}
+	/// Storage: `Treasury::BondLotsByVault` (r:1 w:0)
+	/// Proof: `Treasury::BondLotsByVault` (`max_values`: None, `max_size`: Some(1214), added: 3689, mode: `MaxEncodedLen`)
+	/// Storage: `Treasury::BondLotById` (r:100 w:0)
+	/// Proof: `Treasury::BondLotById` (`max_values`: None, `max_size`: Some(130), added: 2605, mode: `MaxEncodedLen`)
+	fn provider_active_account_vault_bond_amount() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `7511`
 		//  Estimated: `261490`

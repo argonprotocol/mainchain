@@ -1,57 +1,61 @@
 # Operational Accounts
 
-## Operational Eligibility
+## Treasury Certification
 
-An account is eligible to become **operational** once it satisfies all of the following:
+An account becomes treasury certified once all of the following are true:
 
-- The vault has been created.
-- The vault securitization is at least `OperationalMinimumVaultSecuritization`.
-- At least one Argon Uniswap transfer has been recorded.
-- The bitcoin lock total is greater than zero.
-- At least `MiningSeatsForOperational` mining seats have been won.
-- The account has participated in at least one treasury pool.
+- The account has at least `TreasuryMinimumUniswapTransfer` in cumulative qualifying Uniswap
+  transfer amount.
+- The registered account has at least `TreasuryMinimumBitcoin` in bitcoin lock value.
+- The registered account has at least `TreasuryMinimumBonds` in active bonds.
 
-Once eligible, any managed account may call `activate` to make the account operational. Activation
-awards the first referral, starts the vault operational-minimum lock, and records any activation
-rewards.
+The pallet sets `is_treasury_certified` when the account first reaches those requirements. The
+requirements are checked again when a referrer later spends an upgrade code on that account.
 
-## Referral Proof Lifecycle
+## Operations Upgrade
 
-1. A sponsor signs a referral grant over a referral code public key and expiry frame off-chain.
-2. The sponsor sends the referral secret to a recruit.
-3. The recruit registers with a `ReferralProof` containing the referral claim and sponsor grant.
+A treasury-certified account can be moved onto the operations flow through `upgrade_account`.
 
-Registering with a referral proof links the sponsor only if the sponsor currently has referral
-capacity. A linked referral consumes one available referral and may materialize one already-earned
-pending referral if capacity is available. Linked referral codes are tracked so the same referral
-code cannot sponsor more than one registration before the referral proof expires; repeat uses
-register without a sponsor link. Referral codes are cleaned up after expiration.
+- The caller must be the recorded `referrer`, if one was registered.
+- The referrer must have at least one available upgrade code.
+- The account must still satisfy the current treasury certification requirements when the upgrade
+  happens.
 
-## How Referrals Are Earned
+Upgrading marks the account with `is_upgraded_to_operations`, but does not make it operationally
+certified yet.
 
-After an account is operational, it can earn additional referrals through:
+## Operational Certification
 
-- **Sponsored operational recruit:** when a sponsored account becomes operational, the sponsor earns
-  one referral (only if the sponsor is operational).
-- **Bitcoin lock progress:** total locked increases accumulate toward `BitcoinLockSizeForReferral`.
-  Progress decreases if total locked falls. Once a referral is earned, bitcoin progress resets to
-  zero.
-- **Mining seats:** after operational, mining seat wins accumulate toward `MiningSeatsPerReferral`
-  and award a referral. The seats used to become operational count toward this progress. Each
-  earning category keeps at most one pending referral. Additional progress in a category does not
-  stack into a second pending referral until the pending one is materialized.
+An upgraded account becomes operationally certified once all of the following are true:
 
-## Limits
+- The account has at least `OperationalMinimumUniswapTransfer` in cumulative qualifying Uniswap
+  transfer amount.
+- The registered vault account has at least `OperationalMinimumVaultSecuritization` in
+  securitization.
+- The account has at least `MiningSeatsForOperational` mining seats.
 
-- **Available referrals** are capped by `MaxAvailableReferrals`.
-- **Expired referral cleanup work** is capped by `MaxExpiredReferralCodeCleanupsPerBlock` per block.
-  The number of referrals that can expire in the same frame is not capped.
+Once eligible, any managed account may call `activate`.
+
+## Follow-On Upgrade Codes
+
+After an account becomes operationally certified, it can earn additional upgrade codes through:
+
+- Operational referrals: when a downstream account becomes operationally certified, the referrer
+  earns one pending upgrade code.
+- Bitcoin progress: vault bitcoin lock growth accumulates toward `BitcoinLockSizeForUpgradeCode`.
+- Mining seat progress: mining seat wins accumulate toward `MiningSeatsPerUpgradeCode`.
+
+Upgrade codes are capped by `MaxAvailableUpgradeCodes`.
 
 ## Rewards
 
-Operational rewards are triggered when an account becomes operational for both the new operational
-account and its operational sponsor (if present). Referral bonus rewards are paid each time
-`ReferralBonusEveryXOperationalSponsees` sponsored accounts become operational.
+Activation rewards are paid when an account becomes operationally certified.
+
+- `OperationalActivationReward` is paid to the newly activated account.
+- If the account has an operationally certified referrer, that referrer also receives the same
+  activation reward.
+- `OperationalReferralBonusReward` is paid each time `OperationalReferralsPerBonusReward`
+  operational referrals are reached.
 
 Rewards accrue to the operational account and can be claimed in whole-Argon increments from any
-managed account. The claimed funds are paid to the managed account that submits the claim.
+managed account.

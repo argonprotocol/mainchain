@@ -87,14 +87,24 @@ impl OperationalAccountProviderWeightInfo for () {
 }
 
 pub trait TreasuryPoolProviderWeightInfo {
-	fn has_bond_participation() -> Weight;
+	fn has_vault_bond_participation() -> Weight;
+	fn active_vault_bond_amount() -> Weight;
+	fn active_account_vault_bond_amount() -> Weight;
 	fn encumber_bond_microgons() -> Weight;
 	fn release_encumbered_bond_microgons() -> Weight;
 	fn burn_encumbered_bond_microgons() -> Weight;
 }
 
 impl TreasuryPoolProviderWeightInfo for () {
-	fn has_bond_participation() -> Weight {
+	fn has_vault_bond_participation() -> Weight {
+		Weight::zero()
+	}
+
+	fn active_vault_bond_amount() -> Weight {
+		Weight::zero()
+	}
+
+	fn active_account_vault_bond_amount() -> Weight {
 		Weight::zero()
 	}
 
@@ -214,7 +224,7 @@ impl UtxoLockEventsWeightInfo for () {
 pub trait UniswapTransferProviderWeightInfo {
 	fn is_crosschain_activated() -> Weight;
 
-	fn has_recent_argon_transfer() -> Weight;
+	fn account_uniswap_argon_transfers_in_amount() -> Weight;
 }
 
 impl UniswapTransferProviderWeightInfo for () {
@@ -222,28 +232,54 @@ impl UniswapTransferProviderWeightInfo for () {
 		Weight::zero()
 	}
 
-	fn has_recent_argon_transfer() -> Weight {
+	fn account_uniswap_argon_transfers_in_amount() -> Weight {
 		Weight::zero()
 	}
 }
 
 pub trait UniswapTransferProvider<AccountId> {
 	type Weights: UniswapTransferProviderWeightInfo;
+	type Balance: Copy + Default + Saturating;
 
 	fn is_crosschain_activated() -> bool;
 
-	fn has_recent_argon_transfer(account_id: &AccountId) -> bool;
+	fn account_uniswap_argon_transfers_in_amount(account_id: &AccountId) -> Self::Balance;
 }
 
 impl<AccountId> UniswapTransferProvider<AccountId> for () {
 	type Weights = ();
+	type Balance = u128;
 
 	fn is_crosschain_activated() -> bool {
 		false
 	}
 
-	fn has_recent_argon_transfer(_account_id: &AccountId) -> bool {
-		false
+	fn account_uniswap_argon_transfers_in_amount(_account_id: &AccountId) -> Self::Balance {
+		0
+	}
+}
+
+pub trait BitcoinLocksProviderWeightInfo {
+	fn get_account_funded_bitcoin_amount() -> Weight;
+}
+
+impl BitcoinLocksProviderWeightInfo for () {
+	fn get_account_funded_bitcoin_amount() -> Weight {
+		Weight::zero()
+	}
+}
+
+pub trait BitcoinLocksProvider<AccountId, Balance> {
+	type Weights: BitcoinLocksProviderWeightInfo;
+
+	fn get_account_funded_bitcoin_amount(_account_id: &AccountId) -> Balance;
+}
+
+impl<AccountId, Balance: Default> BitcoinLocksProvider<AccountId, Balance> for () {
+	type Weights = ();
+
+	fn get_account_funded_bitcoin_amount(_account_id: &AccountId) -> Balance {
+		Balance::default()
 	}
 }
 
@@ -327,49 +363,6 @@ impl<Balance> CurrentTransactionFeeProvider<Balance> for () {
 	}
 }
 
-#[impl_trait_for_tuples::impl_for_tuples(1, 5)]
-impl UniswapTransferProviderWeightInfo for Tuple {
-	fn is_crosschain_activated() -> Weight {
-		let mut weight = Weight::zero();
-		for_tuples!( #( weight = weight.saturating_add(Tuple::is_crosschain_activated()); )* );
-		weight
-	}
-
-	fn has_recent_argon_transfer() -> Weight {
-		let mut weight = Weight::zero();
-		for_tuples!( #( weight = weight.saturating_add(Tuple::has_recent_argon_transfer()); )* );
-		weight
-	}
-}
-
-#[impl_trait_for_tuples::impl_for_tuples(1, 5)]
-#[tuple_types_custom_trait_bound(UniswapTransferProvider<AccountId>)]
-impl<AccountId> UniswapTransferProvider<AccountId> for Tuple {
-	for_tuples!( type Weights = ( #( Tuple::Weights ),* ); );
-
-	fn is_crosschain_activated() -> bool {
-		for_tuples!(
-			#(
-			if Tuple::is_crosschain_activated() {
-				return true;
-			}
-			)*
-		);
-		false
-	}
-
-	fn has_recent_argon_transfer(account_id: &AccountId) -> bool {
-		for_tuples!(
-			#(
-			if Tuple::has_recent_argon_transfer(account_id) {
-				return true;
-			}
-			)*
-		);
-		false
-	}
-}
-
 pub trait MiningSlotProvider<AccountId> {
 	type Weights: MiningSlotProviderWeightInfo;
 
@@ -394,7 +387,12 @@ pub trait TreasuryPoolProvider<AccountId> {
 	type Weights: TreasuryPoolProviderWeightInfo;
 	type Balance;
 
-	fn has_bond_participation(vault_id: VaultId, account_id: &AccountId) -> bool;
+	/// Whether the account currently has any active vault bond participation in the given vault.
+	fn has_vault_bond_participation(vault_id: VaultId, account_id: &AccountId) -> bool;
+	/// The account's active non-releasing vault bond amount in the given vault.
+	fn active_vault_bond_amount(vault_id: VaultId, account_id: &AccountId) -> Self::Balance;
+	/// The account's active non-releasing vault bond amount across all vaults.
+	fn active_account_vault_bond_amount(account_id: &AccountId) -> Self::Balance;
 	fn encumber_bond_microgons(
 		account_id: &AccountId,
 		microgon_amount: Self::Balance,
@@ -407,6 +405,44 @@ pub trait TreasuryPoolProvider<AccountId> {
 		account_id: &AccountId,
 		microgon_amount: Self::Balance,
 	) -> DispatchResult;
+}
+
+impl<AccountId> TreasuryPoolProvider<AccountId> for () {
+	type Weights = ();
+	type Balance = u128;
+
+	fn has_vault_bond_participation(_vault_id: VaultId, _account_id: &AccountId) -> bool {
+		false
+	}
+
+	fn active_vault_bond_amount(_vault_id: VaultId, _account_id: &AccountId) -> Self::Balance {
+		0
+	}
+
+	fn active_account_vault_bond_amount(_account_id: &AccountId) -> Self::Balance {
+		0
+	}
+
+	fn encumber_bond_microgons(
+		_account_id: &AccountId,
+		_microgon_amount: Self::Balance,
+	) -> DispatchResult {
+		Ok(())
+	}
+
+	fn release_encumbered_bond_microgons(
+		_account_id: &AccountId,
+		_microgon_amount: Self::Balance,
+	) -> DispatchResult {
+		Ok(())
+	}
+
+	fn burn_encumbered_bond_microgons(
+		_account_id: &AccountId,
+		_microgon_amount: Self::Balance,
+	) -> DispatchResult {
+		Ok(())
+	}
 }
 
 pub trait CollectBlockerProviderWeightInfo {
@@ -753,8 +789,11 @@ pub trait UtxoLockEvents<AccountId: Codec, Balance: Codec + Copy> {
 	/// from being unlocked)
 	fn utxo_released(
 		utxo_id: UtxoId,
+		account_id: &AccountId,
 		remove_pending_mints: bool,
 		burned_argons: Balance,
+		// The lock liquidity that existed before this release path mutated the lock.
+		original_liquidity_promised: Balance,
 	) -> DispatchResult;
 }
 #[impl_trait_for_tuples::impl_for_tuples(1, 5)]
@@ -790,10 +829,22 @@ impl<AccountId: Codec, Balance: Codec + Copy> UtxoLockEvents<AccountId, Balance>
 
 	fn utxo_released(
 		utxo_id: UtxoId,
+		account_id: &AccountId,
 		remove_pending_mints: bool,
 		burned_argons: Balance,
+		original_liquidity_promised: Balance,
 	) -> DispatchResult {
-		for_tuples!( #( Tuple::utxo_released(utxo_id, remove_pending_mints, burned_argons)?; )* );
+		for_tuples!(
+			#(
+				Tuple::utxo_released(
+					utxo_id,
+					account_id,
+					remove_pending_mints,
+					burned_argons,
+					original_liquidity_promised,
+				)?;
+			)*
+		);
 		Ok(())
 	}
 }
@@ -801,14 +852,14 @@ impl<AccountId: Codec, Balance: Codec + Copy> UtxoLockEvents<AccountId, Balance>
 pub trait OperationalAccountsHook<AccountId, Balance> {
 	fn vault_created_weight() -> Weight;
 	fn vault_created(_vault_operator_account: &AccountId) {}
-	fn bitcoin_lock_funded_weight() -> Weight;
-	fn bitcoin_lock_funded(_vault_operator_account: &AccountId, _total_locked: Balance) {}
+	fn vault_bitcoin_lock_funded_weight() -> Weight;
+	fn vault_bitcoin_lock_funded(_vault_operator_account: &AccountId, _total_locked: Balance) {}
 	fn mining_seat_won_weight() -> Weight;
 	fn mining_seat_won(_miner_account: &AccountId) {}
-	fn treasury_pool_participated_weight() -> Weight;
-	fn treasury_pool_participated(_vault_operator_account: &AccountId, _amount: Balance) {}
-	fn uniswap_transfer_confirmed_weight() -> Weight;
-	fn uniswap_transfer_confirmed(_account_id: &AccountId, _amount: Balance) {}
+	fn account_vault_bond_total_updated_weight() -> Weight;
+	fn account_vault_bond_total_updated(_account_id: &AccountId, _amount: Balance) {}
+	fn account_uniswap_argon_transfers_in_updated_weight() -> Weight;
+	fn account_uniswap_argon_transfers_in_updated(_account_id: &AccountId) {}
 }
 
 #[allow(clippy::let_and_return)]
@@ -827,14 +878,18 @@ where
 		for_tuples!( #( Tuple::vault_created(vault_operator_account); )* );
 	}
 
-	fn bitcoin_lock_funded_weight() -> Weight {
+	fn vault_bitcoin_lock_funded_weight() -> Weight {
 		let mut weight = Weight::zero();
-		for_tuples!( #( weight = weight.saturating_add(Tuple::bitcoin_lock_funded_weight()); )* );
+		for_tuples!(
+			#( weight = weight.saturating_add(Tuple::vault_bitcoin_lock_funded_weight()); )*
+		);
 		weight
 	}
 
-	fn bitcoin_lock_funded(vault_operator_account: &AccountId, total_locked: Balance) {
-		for_tuples!( #( Tuple::bitcoin_lock_funded(vault_operator_account, total_locked); )* );
+	fn vault_bitcoin_lock_funded(vault_operator_account: &AccountId, total_locked: Balance) {
+		for_tuples!(
+			#( Tuple::vault_bitcoin_lock_funded(vault_operator_account, total_locked); )*
+		);
 	}
 
 	fn mining_seat_won_weight() -> Weight {
@@ -847,28 +902,34 @@ where
 		for_tuples!( #( Tuple::mining_seat_won(miner_account); )* );
 	}
 
-	fn treasury_pool_participated_weight() -> Weight {
+	fn account_vault_bond_total_updated_weight() -> Weight {
 		let mut weight = Weight::zero();
 		for_tuples!(
-			#( weight = weight.saturating_add(Tuple::treasury_pool_participated_weight()); )*
+			#(
+				weight = weight
+					.saturating_add(Tuple::account_vault_bond_total_updated_weight());
+			)*
 		);
 		weight
 	}
 
-	fn treasury_pool_participated(vault_operator_account: &AccountId, amount: Balance) {
-		for_tuples!( #( Tuple::treasury_pool_participated(vault_operator_account, amount); )* );
+	fn account_vault_bond_total_updated(account_id: &AccountId, amount: Balance) {
+		for_tuples!( #( Tuple::account_vault_bond_total_updated(account_id, amount); )* );
 	}
 
-	fn uniswap_transfer_confirmed_weight() -> Weight {
+	fn account_uniswap_argon_transfers_in_updated_weight() -> Weight {
 		let mut weight = Weight::zero();
 		for_tuples!(
-			#( weight = weight.saturating_add(Tuple::uniswap_transfer_confirmed_weight()); )*
+			#(
+				weight = weight
+					.saturating_add(Tuple::account_uniswap_argon_transfers_in_updated_weight());
+			)*
 		);
 		weight
 	}
 
-	fn uniswap_transfer_confirmed(account_id: &AccountId, amount: Balance) {
-		for_tuples!( #( Tuple::uniswap_transfer_confirmed(account_id, amount); )* );
+	fn account_uniswap_argon_transfers_in_updated(account_id: &AccountId) {
+		for_tuples!( #( Tuple::account_uniswap_argon_transfers_in_updated(account_id); )* );
 	}
 }
 
@@ -877,7 +938,7 @@ where
 )]
 pub enum OperationalRewardKind {
 	Activation,
-	ReferralBonus,
+	OperationalReferralBonus,
 }
 
 #[derive(
@@ -1394,7 +1455,7 @@ mod tests {
 			Weight::from_parts(50, 5)
 		}
 
-		fn has_recent_argon_transfer() -> Weight {
+		fn account_uniswap_argon_transfers_in_amount() -> Weight {
 			Weight::from_parts(51, 5)
 		}
 	}
@@ -1404,7 +1465,7 @@ mod tests {
 			Weight::from_parts(60, 6)
 		}
 
-		fn has_recent_argon_transfer() -> Weight {
+		fn account_uniswap_argon_transfers_in_amount() -> Weight {
 			Weight::from_parts(61, 6)
 		}
 	}
@@ -1502,8 +1563,10 @@ mod tests {
 
 		fn utxo_released(
 			_utxo_id: UtxoId,
+			_account_id: &u64,
 			_remove_pending_mints: bool,
 			_burned_argons: u128,
+			_original_liquidity_promised: u128,
 		) -> DispatchResult {
 			Ok(())
 		}
@@ -1518,8 +1581,10 @@ mod tests {
 
 		fn utxo_released(
 			_utxo_id: UtxoId,
+			_account_id: &u64,
 			_remove_pending_mints: bool,
 			_burned_argons: u128,
+			_original_liquidity_promised: u128,
 		) -> DispatchResult {
 			Ok(())
 		}
@@ -1527,25 +1592,27 @@ mod tests {
 
 	impl UniswapTransferProvider<u64> for First {
 		type Weights = FirstWeights;
+		type Balance = u128;
 
 		fn is_crosschain_activated() -> bool {
 			false
 		}
 
-		fn has_recent_argon_transfer(_account_id: &u64) -> bool {
-			false
+		fn account_uniswap_argon_transfers_in_amount(_account_id: &u64) -> Self::Balance {
+			0
 		}
 	}
 
 	impl UniswapTransferProvider<u64> for Second {
 		type Weights = SecondWeights;
+		type Balance = u128;
 
 		fn is_crosschain_activated() -> bool {
 			false
 		}
 
-		fn has_recent_argon_transfer(_account_id: &u64) -> bool {
-			false
+		fn account_uniswap_argon_transfers_in_amount(_account_id: &u64) -> Self::Balance {
+			0
 		}
 	}
 
@@ -1566,12 +1633,5 @@ mod tests {
 		assert_eq!(Weights::utxo_locked(), Weight::from_parts(70, 7));
 		assert_eq!(Weights::utxo_released(), Weight::from_parts(72, 7));
 		assert_eq!(Weights::utxo_released_with_pending_mints(), Weight::from_parts(74, 7));
-	}
-
-	#[test]
-	fn tuple_uniswap_transfer_weights_sum_member_weights() {
-		type Weights = <(First, Second) as UniswapTransferProvider<u64>>::Weights;
-		assert_eq!(Weights::is_crosschain_activated(), Weight::from_parts(110, 11));
-		assert_eq!(Weights::has_recent_argon_transfer(), Weight::from_parts(112, 11));
 	}
 }

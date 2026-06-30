@@ -155,7 +155,7 @@ impl OperationalAccountsHook<u64, Balance> for StaticOperationalAccountsHook {
 		Weight::zero()
 	}
 
-	fn bitcoin_lock_funded_weight() -> Weight {
+	fn vault_bitcoin_lock_funded_weight() -> Weight {
 		Weight::zero()
 	}
 
@@ -163,11 +163,11 @@ impl OperationalAccountsHook<u64, Balance> for StaticOperationalAccountsHook {
 		Weight::zero()
 	}
 
-	fn treasury_pool_participated_weight() -> Weight {
+	fn account_vault_bond_total_updated_weight() -> Weight {
 		Weight::zero()
 	}
 
-	fn uniswap_transfer_confirmed_weight() -> Weight {
+	fn account_uniswap_argon_transfers_in_updated_weight() -> Weight {
 		Weight::zero()
 	}
 

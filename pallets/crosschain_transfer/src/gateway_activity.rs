@@ -285,19 +285,24 @@ impl<T: Config> Pallet<T> {
 						&transfer.to,
 					);
 					if result.is_ok() {
-						Self::retain_recent_argon_transfer(&transfer.to);
-						T::OperationalAccountsHook::uniswap_transfer_confirmed(
+						Self::record_transfer_in(&transfer.to, transfer.asset, transfer.amount);
+						T::OperationalAccountsHook::account_uniswap_argon_transfers_in_updated(
 							&transfer.to,
-							transfer.amount,
 						);
 					}
 					result
 				},
-				AssetKind::Argonot => Self::mint_to::<T::OwnershipCurrency>(
-					context.source_chain,
-					transfer.amount,
-					&transfer.to,
-				),
+				AssetKind::Argonot => {
+					let result = Self::mint_to::<T::OwnershipCurrency>(
+						context.source_chain,
+						transfer.amount,
+						&transfer.to,
+					);
+					if result.is_ok() {
+						Self::record_transfer_in(&transfer.to, transfer.asset, transfer.amount);
+					}
+					result
+				},
 			};
 			if let Err(error) = mint_result {
 				if error == Error::<T>::InsufficientLiquidity.into() {
@@ -739,7 +744,7 @@ mod test {
 	};
 
 	#[test]
-	fn prove_gateway_activity_pays_argon_marks_recent_transfer_and_ignores_zero_amounts() {
+	fn prove_gateway_activity_pays_argon_records_microgons_in_and_ignores_zero_amounts() {
 		new_test_ext().execute_with(|| {
 			System::set_block_number(1);
 
@@ -780,8 +785,15 @@ mod test {
 					argonot_circulation: 0,
 				}),
 			);
-			assert_eq!(RecentArgonTransfersByAccount::<Test>::get(&recipient), 1);
-			assert_eq!(ConfirmedTransfers::get(), vec![(recipient.clone(), 1_250)]);
+			assert_eq!(
+				TransferTotalsByAccount::<Test>::get(&recipient),
+				AccountTransferTotals {
+					microgons_in: 1_250,
+					argon_transfers_in_count: 1,
+					..Default::default()
+				},
+			);
+			assert_eq!(ArgonFlowUpdates::get(), vec![(recipient.clone(), 1_250)]);
 			assert!(System::events().iter().any(|record| match &record.event {
 				RuntimeEvent::CrosschainTransfer(Event::TransferToArgonSettled {
 					source_chain: SourceChain::Ethereum,
@@ -836,8 +848,11 @@ mod test {
 					argonot_circulation: 0,
 				}),
 			);
-			assert_eq!(RecentArgonTransfersByAccount::<Test>::get(&zero_amount_recipient), 0);
-			assert_eq!(ConfirmedTransfers::get(), vec![(recipient, 1_250)]);
+			assert_eq!(
+				TransferTotalsByAccount::<Test>::get(&zero_amount_recipient),
+				AccountTransferTotals::default(),
+			);
+			assert_eq!(ArgonFlowUpdates::get(), vec![(recipient, 1_250)]);
 		});
 	}
 
@@ -870,8 +885,15 @@ mod test {
 			assert!(matches!(result, Ok(post_info) if post_info.pays_fee == Pays::No));
 			assert_eq!(Ownership::balance(&recipient), 777);
 			assert_eq!(Ownership::balance(&burn_account), 0);
-			assert_eq!(RecentArgonTransfersByAccount::<Test>::get(&recipient), 0);
-			assert!(ConfirmedTransfers::get().is_empty());
+			assert_eq!(
+				TransferTotalsByAccount::<Test>::get(&recipient),
+				AccountTransferTotals {
+					micronots_in: 777,
+					argonot_transfers_in_count: 1,
+					..Default::default()
+				},
+			);
+			assert!(ArgonFlowUpdates::get().is_empty());
 		});
 	}
 
@@ -3022,7 +3044,7 @@ mod test {
 				2,
 			);
 			assert_eq!(
-				ConfirmedTransfers::get(),
+				ArgonFlowUpdates::get(),
 				vec![(first_recipient.clone(), 500), (second_recipient.clone(), 750)],
 			);
 		});
@@ -3064,7 +3086,7 @@ mod test {
 				2,
 			);
 			assert_eq!(
-				ConfirmedTransfers::get(),
+				ArgonFlowUpdates::get(),
 				vec![(first_recipient.clone(), 400), (second_recipient.clone(), 600)],
 			);
 		});
@@ -3102,8 +3124,14 @@ mod test {
 			assert_eq!(Balances::balance(&first_recipient), 0);
 			assert_eq!(Balances::balance(&second_recipient), 0);
 			assert_eq!(GatewayStateBySourceChain::<Test>::get(SourceChain::Ethereum), None);
-			assert_eq!(RecentArgonTransfersByAccount::<Test>::get(&first_recipient), 0);
-			assert_eq!(RecentArgonTransfersByAccount::<Test>::get(&second_recipient), 0);
+			assert_eq!(
+				TransferTotalsByAccount::<Test>::get(&first_recipient),
+				AccountTransferTotals::default(),
+			);
+			assert_eq!(
+				TransferTotalsByAccount::<Test>::get(&second_recipient),
+				AccountTransferTotals::default(),
+			);
 			assert!(
 				!System::events()
 					.iter()
@@ -3143,8 +3171,14 @@ mod test {
 			assert_eq!(Balances::balance(&first_recipient), 0);
 			assert_eq!(Balances::balance(&second_recipient), 0);
 			assert_eq!(GatewayStateBySourceChain::<Test>::get(SourceChain::Ethereum), None);
-			assert_eq!(RecentArgonTransfersByAccount::<Test>::get(&first_recipient), 0);
-			assert_eq!(RecentArgonTransfersByAccount::<Test>::get(&second_recipient), 0);
+			assert_eq!(
+				TransferTotalsByAccount::<Test>::get(&first_recipient),
+				AccountTransferTotals::default(),
+			);
+			assert_eq!(
+				TransferTotalsByAccount::<Test>::get(&second_recipient),
+				AccountTransferTotals::default(),
+			);
 			assert!(
 				!System::events()
 					.iter()
@@ -3178,8 +3212,14 @@ mod test {
 			assert_eq!(Balances::balance(&first_recipient), 0);
 			assert_eq!(Balances::balance(&second_recipient), 0);
 			assert_eq!(GatewayStateBySourceChain::<Test>::get(SourceChain::Ethereum), None);
-			assert_eq!(RecentArgonTransfersByAccount::<Test>::get(&first_recipient), 0);
-			assert_eq!(RecentArgonTransfersByAccount::<Test>::get(&second_recipient), 0);
+			assert_eq!(
+				TransferTotalsByAccount::<Test>::get(&first_recipient),
+				AccountTransferTotals::default(),
+			);
+			assert_eq!(
+				TransferTotalsByAccount::<Test>::get(&second_recipient),
+				AccountTransferTotals::default(),
+			);
 			assert!(
 				!System::events()
 					.iter()

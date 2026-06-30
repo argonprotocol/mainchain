@@ -1153,11 +1153,12 @@ declare module '@polkadot/api-base/types/submittable' {
           patch:
             | PalletOperationalAccountsOperationalProgressPatch
             | {
-                hasUniswapTransfer?: any;
+                uniswapArgonTransfersInAmount?: any;
+                accountBitcoinAmount?: any;
+                accountVaultBondAmount?: any;
                 vaultCreated?: any;
-                hasTreasuryPoolParticipation?: any;
-                observedBitcoinTotal?: any;
-                observedMiningSeatTotal?: any;
+                vaultBitcoinAmount?: any;
+                miningSeatCount?: any;
               }
             | string
             | Uint8Array,
@@ -1166,10 +1167,9 @@ declare module '@polkadot/api-base/types/submittable' {
         [AccountId32, PalletOperationalAccountsOperationalProgressPatch, bool]
       >;
       /**
-       * Register vault, mining funding, and bot accounts for an operational account.
+       * Register vault and mining accounts for an operational account.
        * Any account in the registration may submit the transaction.
-       * If a referral proof is provided, the registration records the sponsor relationship.
-       * When invite-only is enabled, a valid referral proof is required.
+       * When invite-only is enabled, the registration must include a referrer.
        **/
       register: AugmentedSubmittable<
         (
@@ -1178,11 +1178,11 @@ declare module '@polkadot/api-base/types/submittable' {
         [PalletOperationalAccountsRegistration]
       >;
       /**
-       * Store an opaque encrypted sponsor server payload for a sponsored operational account.
+       * Store an opaque encrypted referrer server payload for a downstream account.
        **/
-      setEncryptedServerForSponsee: AugmentedSubmittable<
+      setEncryptedServerForDownstreamAccount: AugmentedSubmittable<
         (
-          sponsee: AccountId32 | string | Uint8Array,
+          downstreamAccount: AccountId32 | string | Uint8Array,
           encryptedServer: Bytes | string | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
         [AccountId32, Bytes]
@@ -1192,10 +1192,17 @@ declare module '@polkadot/api-base/types/submittable' {
        **/
       setRewardConfig: AugmentedSubmittable<
         (
-          operationalReferralReward: u128 | AnyNumber | Uint8Array,
-          referralBonusReward: u128 | AnyNumber | Uint8Array,
+          operationalActivationReward: u128 | AnyNumber | Uint8Array,
+          operationalReferralBonusReward: u128 | AnyNumber | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
         [u128, u128]
+      >;
+      /**
+       * Grant a referrer upgrade to an already-registered operational account.
+       **/
+      upgradeAccount: AugmentedSubmittable<
+        (accountId: AccountId32 | string | Uint8Array) => SubmittableExtrinsic<ApiType>,
+        [AccountId32]
       >;
     };
     ownership: {

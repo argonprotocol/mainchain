@@ -963,7 +963,7 @@ mod tests {
 				.try_into()
 				.expect("three council members stay within limit"),
 			));
-			set_active_bond_amount(21, first_council_account.clone(), 10_000);
+			set_active_vault_bond_amount(21, first_council_account.clone(), 10_000);
 			assert_ok!(set_committed_argonots(first_council_account.clone(), 500));
 			assert_ok!(CrosschainTransfer::register_minting_authority(
 				RuntimeOrigin::signed(first_council_account.clone()),

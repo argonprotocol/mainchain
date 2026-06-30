@@ -718,7 +718,6 @@ impl pallet_crosschain_transfer::Config for Runtime {
 		use_unless_benchmark!(GetCurrentFrameId, benchmarking::BenchmarkCurrentFrameId);
 	type CurrentTick = Ticks;
 	type TickProvider = use_unless_benchmark!(Ticks, benchmarking::BenchmarkTickProvider);
-	type RecentTransferRetentionTicks = RecentTransferRetentionTicks;
 	type MaxActivitiesPerReceiptProof = MaxActivitiesPerReceiptProof;
 	type MaxReceiptProofsPerExtrinsic = MaxReceiptProofsPerExtrinsic;
 	type MaxCouncilMembers = MaxCouncilMembers;
@@ -737,16 +736,18 @@ impl pallet_crosschain_transfer::Config for Runtime {
 }
 impl pallet_operational_accounts::Config for Runtime {
 	type Balance = Balance;
-	type FrameProvider = MiningSlot;
-	type MaxAvailableReferrals = MaxAvailableOperationalReferrals;
-	type MaxExpiredReferralCodeCleanupsPerBlock = MaxExpiredReferralCodeCleanupsPerBlock;
+	type MaxAvailableUpgradeCodes = MaxAvailableOperationalUpgradeCodes;
 	type MaxEncryptedServerLen = MaxEncryptedServerLen;
+	type TreasuryMinimumUniswapTransfer = TreasuryMinimumUniswapTransfer;
+	type TreasuryMinimumBitcoin = TreasuryMinimumBitcoin;
+	type TreasuryMinimumBonds = TreasuryMinimumBonds;
+	type OperationalMinimumUniswapTransfer = OperationalMinimumUniswapTransfer;
 	type OperationalMinimumVaultSecuritization = OperationalMinimumVaultSecuritization;
-	type BitcoinLockSizeForReferral = BitcoinLockSizeForReferral;
+	type BitcoinLockSizeForUpgradeCode = BitcoinLockSizeForUpgradeCode;
 	type MiningSeatsForOperational = MiningSeatsForOperational;
-	type MiningSeatsPerReferral = MiningSeatsPerReferral;
-	type ReferralBonusEveryXOperationalSponsees = ReferralBonusEveryXOperationalSponsees;
-	type OperationalReferralReward = OperationalActivationReward;
+	type MiningSeatsPerUpgradeCode = MiningSeatsPerUpgradeCode;
+	type OperationalReferralsPerBonusReward = OperationalReferralsPerBonusReward;
+	type OperationalActivationReward = OperationalActivationReward;
 	type OperationalReferralBonusReward = OperationalReferralBonusReward;
 	type VaultProvider = use_unless_benchmark!(
 		Vaults,
@@ -756,6 +757,10 @@ impl pallet_operational_accounts::Config for Runtime {
 		MiningSlot,
 		benchmarking::BenchmarkOperationalAccountsMiningSlotProvider<AccountId>
 	);
+	type BitcoinLocksProvider = use_unless_benchmark!(
+		BitcoinLocks,
+		benchmarking::BenchmarkOperationalAccountsBitcoinLocksProvider<AccountId, Balance>
+	);
 	type TreasuryPoolProvider = use_unless_benchmark!(
 		Treasury,
 		benchmarking::BenchmarkOperationalAccountsTreasuryPoolProvider<AccountId, Balance>
@@ -764,6 +769,7 @@ impl pallet_operational_accounts::Config for Runtime {
 		CrosschainTransfer,
 		benchmarking::BenchmarkOperationalAccountsUniswapTransferProvider
 	);
+	type Currency = Balances;
 	type OperationalRewardsPayer =
 		use_unless_benchmark!(Treasury, benchmarking::BenchmarkOperationalRewardsPayer);
 	type WeightInfo = pallet_operational_accounts::WithProviderWeights<

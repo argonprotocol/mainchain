@@ -21,8 +21,8 @@ use argon_primitives::{
 	vault::{
 		BitcoinVaultProvider, LockExtension, RegistrationVaultData, Securitization, VaultError,
 	},
-	EthereumVerifyProvider, MiningSlotProvider, Moment, OperationalAccountProvider,
-	TreasuryPoolProvider, UniswapTransferProvider, VaultId,
+	BitcoinLocksProvider, EthereumVerifyProvider, MiningSlotProvider, Moment,
+	OperationalAccountProvider, TreasuryPoolProvider, UniswapTransferProvider, VaultId,
 };
 use pallet_bitcoin_locks::BitcoinVerifier;
 pub use pallet_prelude::benchmarking::{
@@ -298,6 +298,27 @@ impl<AccountId> MiningSlotProvider<AccountId>
 	}
 }
 
+pub struct BenchmarkOperationalAccountsBitcoinLocksProvider<AccountId, Balance>(
+	PhantomData<(AccountId, Balance)>,
+);
+
+impl<AccountId, Balance> BitcoinLocksProvider<AccountId, Balance>
+	for BenchmarkOperationalAccountsBitcoinLocksProvider<AccountId, Balance>
+where
+	Balance: From<u128>,
+{
+	type Weights = ();
+
+	fn get_account_funded_bitcoin_amount(_account_id: &AccountId) -> Balance {
+		let mut state = benchmark_operational_accounts_provider_state();
+		state.call_counters.get_account_funded_bitcoin_amount =
+			state.call_counters.get_account_funded_bitcoin_amount.saturating_add(1);
+		let result = state.account_bitcoin_amount.into();
+		set_benchmark_operational_accounts_provider_state(state);
+		result
+	}
+}
+
 pub struct BenchmarkOperationalAccountProvider<AccountId>(PhantomData<AccountId>);
 
 impl<AccountId> OperationalAccountProvider<AccountId>
@@ -320,15 +341,35 @@ pub struct BenchmarkOperationalAccountsTreasuryPoolProvider<AccountId, Balance>(
 
 impl<AccountId, Balance> TreasuryPoolProvider<AccountId>
 	for BenchmarkOperationalAccountsTreasuryPoolProvider<AccountId, Balance>
+where
+	Balance: From<u128>,
 {
 	type Weights = ();
 	type Balance = Balance;
 
-	fn has_bond_participation(_vault_id: VaultId, _account_id: &AccountId) -> bool {
+	fn has_vault_bond_participation(_vault_id: VaultId, _account_id: &AccountId) -> bool {
 		let mut state = benchmark_operational_accounts_provider_state();
-		state.call_counters.has_bond_participation =
-			state.call_counters.has_bond_participation.saturating_add(1);
-		let result = state.has_bond_participation;
+		state.call_counters.has_vault_bond_participation =
+			state.call_counters.has_vault_bond_participation.saturating_add(1);
+		let result = state.active_account_vault_bond_amount > 0;
+		set_benchmark_operational_accounts_provider_state(state);
+		result
+	}
+
+	fn active_vault_bond_amount(_vault_id: VaultId, _account_id: &AccountId) -> Self::Balance {
+		let mut state = benchmark_operational_accounts_provider_state();
+		state.call_counters.active_vault_bond_amount =
+			state.call_counters.active_vault_bond_amount.saturating_add(1);
+		let result = state.active_account_vault_bond_amount.into();
+		set_benchmark_operational_accounts_provider_state(state);
+		result
+	}
+
+	fn active_account_vault_bond_amount(_account_id: &AccountId) -> Self::Balance {
+		let mut state = benchmark_operational_accounts_provider_state();
+		state.call_counters.active_account_vault_bond_amount =
+			state.call_counters.active_account_vault_bond_amount.saturating_add(1);
+		let result = state.active_account_vault_bond_amount.into();
 		set_benchmark_operational_accounts_provider_state(state);
 		result
 	}
@@ -361,6 +402,7 @@ impl<AccountId> UniswapTransferProvider<AccountId>
 	for BenchmarkOperationalAccountsUniswapTransferProvider
 {
 	type Weights = ();
+	type Balance = u128;
 
 	fn is_crosschain_activated() -> bool {
 		let mut state = benchmark_operational_accounts_provider_state();
@@ -371,11 +413,11 @@ impl<AccountId> UniswapTransferProvider<AccountId>
 		result
 	}
 
-	fn has_recent_argon_transfer(_account_id: &AccountId) -> bool {
+	fn account_uniswap_argon_transfers_in_amount(_account_id: &AccountId) -> Self::Balance {
 		let mut state = benchmark_operational_accounts_provider_state();
-		state.call_counters.has_recent_argon_transfer =
-			state.call_counters.has_recent_argon_transfer.saturating_add(1);
-		let result = state.has_recent_argon_transfer;
+		state.call_counters.account_uniswap_argon_transfers_in_amount =
+			state.call_counters.account_uniswap_argon_transfers_in_amount.saturating_add(1);
+		let result = state.account_uniswap_argon_transfers_in_amount;
 		set_benchmark_operational_accounts_provider_state(state);
 		result
 	}

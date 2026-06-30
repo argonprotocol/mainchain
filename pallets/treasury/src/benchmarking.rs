@@ -196,7 +196,7 @@ mod benchmarks {
 	}
 
 	#[benchmark]
-	fn provider_has_bond_participation() -> Result<(), BenchmarkError> {
+	fn provider_has_vault_bond_participation() -> Result<(), BenchmarkError> {
 		reset_benchmark_state::<T>();
 
 		let lot_bonds = minimum_purchase_bonds::<T>();
@@ -211,10 +211,67 @@ mod benchmarks {
 
 		#[block]
 		{
-			assert!(!<Pallet<T> as TreasuryPoolProvider<T::AccountId>>::has_bond_participation(
-				1,
-				&account_id,
-			));
+			assert!(
+				!<Pallet<T> as TreasuryPoolProvider<T::AccountId>>::has_vault_bond_participation(
+					1,
+					&account_id,
+				)
+			);
+		}
+
+		Ok(())
+	}
+
+	#[benchmark]
+	fn provider_active_vault_bond_amount() -> Result<(), BenchmarkError> {
+		reset_benchmark_state::<T>();
+
+		let lot_bonds = minimum_purchase_bonds::<T>();
+		let _ = seed_accepted_vault_state::<T>(
+			1,
+			T::MaxTreasuryContributors::get(),
+			lot_bonds,
+			scaled_bonds(lot_bonds, T::MaxTreasuryContributors::get()),
+			BENCHMARK_FRAME_ID.saturating_sub(1),
+		)?;
+		let account_id = account("missing-bond-holder", 0, 0);
+
+		#[block]
+		{
+			assert_eq!(
+				<Pallet<T> as TreasuryPoolProvider<T::AccountId>>::active_vault_bond_amount(
+					1,
+					&account_id,
+				),
+				0u128.into(),
+			);
+		}
+
+		Ok(())
+	}
+
+	#[benchmark]
+	fn provider_active_account_vault_bond_amount() -> Result<(), BenchmarkError> {
+		reset_benchmark_state::<T>();
+
+		let lot_bonds = minimum_purchase_bonds::<T>();
+		let _ = seed_accepted_vault_state::<T>(
+			1,
+			T::MaxTreasuryContributors::get(),
+			lot_bonds,
+			scaled_bonds(lot_bonds, T::MaxTreasuryContributors::get()),
+			BENCHMARK_FRAME_ID.saturating_sub(1),
+		)?;
+		let account_id = account("missing-bond-holder", 0, 0);
+
+		#[block]
+		{
+			assert_eq!(
+				<Pallet<T> as TreasuryPoolProvider<T::AccountId>>::active_account_vault_bond_amount(
+					&account_id,
+				),
+				0u128.into(),
+			);
 		}
 
 		Ok(())

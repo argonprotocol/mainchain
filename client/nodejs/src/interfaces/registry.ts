@@ -142,6 +142,7 @@ import type {
   PalletBlockSealSpecCall,
   PalletBlockSealSpecError,
   PalletBlockSealSpecEvent,
+  PalletCrosschainTransferAccountTransferTotals,
   PalletCrosschainTransferAssetKind,
   PalletCrosschainTransferCall,
   PalletCrosschainTransferChainConfig,
@@ -227,7 +228,6 @@ import type {
   PalletOperationalAccountsOpaqueEncryptionPubkey,
   PalletOperationalAccountsOperationalAccount,
   PalletOperationalAccountsOperationalProgressPatch,
-  PalletOperationalAccountsReferralProof,
   PalletOperationalAccountsRegistration,
   PalletOperationalAccountsRegistrationV1,
   PalletOperationalAccountsRewardsConfig,
@@ -445,6 +445,7 @@ declare module '@polkadot/types/types/registry' {
     PalletBlockSealSpecCall: PalletBlockSealSpecCall;
     PalletBlockSealSpecError: PalletBlockSealSpecError;
     PalletBlockSealSpecEvent: PalletBlockSealSpecEvent;
+    PalletCrosschainTransferAccountTransferTotals: PalletCrosschainTransferAccountTransferTotals;
     PalletCrosschainTransferAssetKind: PalletCrosschainTransferAssetKind;
     PalletCrosschainTransferCall: PalletCrosschainTransferCall;
     PalletCrosschainTransferChainConfig: PalletCrosschainTransferChainConfig;
@@ -530,7 +531,6 @@ declare module '@polkadot/types/types/registry' {
     PalletOperationalAccountsOpaqueEncryptionPubkey: PalletOperationalAccountsOpaqueEncryptionPubkey;
     PalletOperationalAccountsOperationalAccount: PalletOperationalAccountsOperationalAccount;
     PalletOperationalAccountsOperationalProgressPatch: PalletOperationalAccountsOperationalProgressPatch;
-    PalletOperationalAccountsReferralProof: PalletOperationalAccountsReferralProof;
     PalletOperationalAccountsRegistration: PalletOperationalAccountsRegistration;
     PalletOperationalAccountsRegistrationV1: PalletOperationalAccountsRegistrationV1;
     PalletOperationalAccountsRewardsConfig: PalletOperationalAccountsRewardsConfig;

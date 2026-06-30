@@ -468,10 +468,15 @@ pub mod pallet {
 			)?;
 
 			if let Some(evicted_summary) = evicted_summary {
+				let evicted_owner = BondLotById::<T>::get(evicted_summary.bond_lot_id)
+					.ok_or(Error::<T>::BondLotNotFound)?
+					.owner
+					.clone();
 				Self::schedule_bond_lot_release(
 					evicted_summary.bond_lot_id,
 					BondReleaseReason::Bumped,
 				)?;
+				Self::update_account_vault_bond_total(&evicted_owner)?;
 			}
 
 			let bond_lot_id = Self::next_bond_lot_id()?;
@@ -512,6 +517,7 @@ pub mod pallet {
 				account_id: who.clone(),
 				bonds,
 			});
+			Self::update_account_vault_bond_total(&who)?;
 			Ok(())
 		}
 
@@ -636,7 +642,7 @@ pub mod pallet {
 			Self::deposit_event(Event::<T>::BondLotPurchased {
 				program_id,
 				bond_lot_id,
-				account_id: who,
+				account_id: who.clone(),
 				bonds,
 			});
 			Ok(())
@@ -1016,26 +1022,6 @@ pub mod pallet {
 			for (vault_id, eligible_bonds, vault_capital) in vault_candidates {
 				total_eligible_bonds = total_eligible_bonds.saturating_add(eligible_bonds as u128);
 				let _ = vaults.try_insert(vault_id, vault_capital);
-
-				if let Some(operator) = T::TreasuryVaultProvider::get_vault_operator(vault_id) {
-					let mut operator_amount = T::Balance::zero();
-					for summary in BondLotsByVault::<T>::get(vault_id) {
-						let Some(bond_lot) = BondLotById::<T>::get(summary.bond_lot_id) else {
-							continue;
-						};
-						if bond_lot.owner == operator {
-							operator_amount
-								.saturating_accrue(Self::bonds_to_balance(bond_lot.bonds));
-						}
-					}
-
-					if !operator_amount.is_zero() {
-						T::OperationalAccountsHook::treasury_pool_participated(
-							&operator,
-							operator_amount,
-						);
-					}
-				}
 			}
 
 			let participating_vaults = vaults.len() as u32;
@@ -1275,6 +1261,36 @@ pub mod pallet {
 			Ok((active_balance, held_balance))
 		}
 
+		fn active_non_releasing_vault_bond_amount(
+			account_id: &T::AccountId,
+			program_id: Option<BondProgramId>,
+		) -> Result<T::Balance, Error<T>> {
+			let mut active_balance = T::Balance::zero();
+
+			for (bond_lot_id, ()) in BondLotIdsByAccount::<T>::iter_prefix(account_id) {
+				let bond_lot =
+					BondLotById::<T>::get(bond_lot_id).ok_or(Error::<T>::BondLotNotFound)?;
+				if bond_lot.release_reason.is_some() {
+					continue;
+				}
+
+				let bond_program_id = match bond_lot.program {
+					BondProgram::Vault { .. } => bond_lot.program.id(),
+					BondProgram::Argonot => continue,
+				};
+
+				if let Some(expected_program_id) = program_id &&
+					bond_program_id != expected_program_id
+				{
+					continue;
+				}
+
+				active_balance.saturating_accrue(Self::bonds_to_balance(bond_lot.bonds));
+			}
+
+			Ok(active_balance)
+		}
+
 		pub(crate) fn encumbered_bond_microgons(account_id: &T::AccountId) -> T::Balance {
 			EncumberedBondMicrogonsByAccount::<T>::get(account_id)
 		}
@@ -1349,6 +1365,16 @@ pub mod pallet {
 
 			Ok(release_frame_id)
 		}
+
+		fn update_account_vault_bond_total(account_id: &T::AccountId) -> DispatchResult {
+			let active_account_vault_bond_amount =
+				Self::active_non_releasing_vault_bond_amount(account_id, None)?;
+			T::OperationalAccountsHook::account_vault_bond_total_updated(
+				account_id,
+				active_account_vault_bond_amount,
+			);
+			Ok(())
+		}
 	}
 
 	impl<T: Config> OperationalRewardsPayer<T::AccountId, T::Balance> for Pallet<T> {
@@ -1387,10 +1413,7 @@ pub mod pallet {
 		}
 
 		fn on_frame_start_weight(_frame_id: FrameId) -> Weight {
-			T::WeightInfo::on_frame_transition().saturating_add(
-				T::OperationalAccountsHook::treasury_pool_participated_weight()
-					.saturating_mul(u64::from(T::MaxVaultsPerPool::get())),
-			)
+			T::WeightInfo::on_frame_transition()
 		}
 	}
 
@@ -1398,14 +1421,25 @@ pub mod pallet {
 		type Weights = ProviderWeightAdapter<T>;
 		type Balance = T::Balance;
 
-		fn has_bond_participation(vault_id: VaultId, account_id: &T::AccountId) -> bool {
-			BondLotsByVault::<T>::get(vault_id).into_iter().any(|summary| {
-				BondLotById::<T>::get(summary.bond_lot_id)
-					.map(|bond_lot| {
-						bond_lot.owner == *account_id && bond_lot.release_reason.is_none()
-					})
-					.unwrap_or(false)
-			})
+		fn has_vault_bond_participation(vault_id: VaultId, account_id: &T::AccountId) -> bool {
+			let active_balance = Self::active_non_releasing_vault_bond_amount(
+				account_id,
+				Some(BondProgramId::Vault { vault_id }),
+			)
+			.unwrap_or_default();
+			!active_balance.is_zero()
+		}
+
+		fn active_vault_bond_amount(vault_id: VaultId, account_id: &T::AccountId) -> Self::Balance {
+			Self::active_non_releasing_vault_bond_amount(
+				account_id,
+				Some(BondProgramId::Vault { vault_id }),
+			)
+			.unwrap_or_default()
+		}
+
+		fn active_account_vault_bond_amount(account_id: &T::AccountId) -> Self::Balance {
+			Self::active_non_releasing_vault_bond_amount(account_id, None).unwrap_or_default()
 		}
 
 		fn encumber_bond_microgons(
@@ -1564,6 +1598,7 @@ pub mod pallet {
 			if !released_amount.is_zero() {
 				Self::release_hold::<T::Currency>(account_id, released_amount)?;
 			}
+			Self::update_account_vault_bond_total(account_id)?;
 			Self::deposit_event(Event::<T>::EncumberedBondMicrogonsBurned {
 				account_id: account_id.clone(),
 				burned_amount: microgon_amount,

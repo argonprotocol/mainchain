@@ -261,30 +261,6 @@ fn register_council_signer_validates_proof_and_applies_queued_replacement() {
 	});
 }
 
-#[test]
-fn on_initialize_expires_recent_transfers() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-		CurrentTick::set(1);
-		CrosschainTransfer::on_initialize(System::block_number());
-
-		let recipient = account(7);
-		let expires_at = CurrentTick::get() + RecentTransferRetentionTicks::get();
-		RecentArgonTransfersByAccount::<Test>::insert(&recipient, 1);
-		InboundTransfersExpiringAt::<Test>::append(expires_at, recipient.clone());
-
-		assert_eq!(RecentArgonTransfersByAccount::<Test>::get(&recipient), 1);
-		assert_eq!(InboundTransfersExpiringAt::<Test>::get(expires_at).len(), 1);
-
-		CurrentTick::set(expires_at + 2);
-		System::set_block_number(2);
-		CrosschainTransfer::on_initialize(System::block_number());
-
-		assert_eq!(RecentArgonTransfersByAccount::<Test>::get(&recipient), 0);
-		assert!(InboundTransfersExpiringAt::<Test>::get(expires_at).is_empty());
-	});
-}
-
 pub(super) fn chain_config() -> ChainConfig {
 	ChainConfig::Evm {
 		chain_id: 1,
@@ -430,7 +406,7 @@ pub(super) fn activate_test_minting_authority(
 		council_pair,
 	);
 	assert_ok!(Balances::mint_into(&operator_account, 1_000));
-	set_active_bond_amount(vault_id, operator_account.clone(), microgon_collateral);
+	set_active_vault_bond_amount(vault_id, operator_account.clone(), microgon_collateral);
 	if micronot_collateral != 0 {
 		assert_ok!(Ownership::mint_into(&operator_account, micronot_collateral));
 		assert_ok!(set_committed_argonots(operator_account.clone(), micronot_collateral,));

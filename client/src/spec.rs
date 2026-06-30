@@ -1168,10 +1168,9 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							158u8, 115u8, 218u8, 125u8, 143u8, 165u8, 254u8, 236u8, 231u8, 243u8,
-							218u8, 78u8, 232u8, 22u8, 199u8, 128u8, 249u8, 75u8, 203u8, 75u8, 67u8,
-							16u8, 102u8, 100u8, 192u8, 87u8, 48u8, 154u8, 102u8, 172u8, 190u8,
-							90u8,
+							70u8, 160u8, 159u8, 96u8, 15u8, 106u8, 144u8, 86u8, 221u8, 95u8, 22u8,
+							255u8, 48u8, 142u8, 71u8, 50u8, 17u8, 227u8, 118u8, 190u8, 223u8, 13u8,
+							235u8, 242u8, 53u8, 106u8, 213u8, 53u8, 148u8, 72u8, 13u8, 241u8,
 						],
 					)
 				}
@@ -1189,10 +1188,10 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							107u8, 209u8, 62u8, 231u8, 201u8, 171u8, 136u8, 24u8, 147u8, 35u8,
-							53u8, 81u8, 121u8, 59u8, 51u8, 78u8, 4u8, 63u8, 91u8, 111u8, 230u8,
-							57u8, 235u8, 94u8, 32u8, 144u8, 205u8, 231u8, 152u8, 248u8, 75u8,
-							117u8,
+							206u8, 227u8, 186u8, 148u8, 251u8, 48u8, 131u8, 95u8, 16u8, 250u8,
+							122u8, 19u8, 186u8, 228u8, 70u8, 209u8, 232u8, 110u8, 254u8, 138u8,
+							103u8, 242u8, 251u8, 245u8, 152u8, 49u8, 141u8, 21u8, 39u8, 140u8,
+							157u8, 67u8,
 						],
 					)
 				}
@@ -3396,9 +3395,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				130u8, 136u8, 102u8, 254u8, 224u8, 175u8, 209u8, 204u8, 149u8, 165u8, 66u8, 155u8,
-				29u8, 62u8, 77u8, 229u8, 14u8, 94u8, 195u8, 71u8, 209u8, 9u8, 75u8, 32u8, 159u8,
-				86u8, 45u8, 95u8, 212u8, 115u8, 172u8, 206u8,
+				137u8, 210u8, 25u8, 99u8, 244u8, 230u8, 227u8, 19u8, 239u8, 45u8, 196u8, 90u8,
+				58u8, 182u8, 212u8, 104u8, 179u8, 177u8, 211u8, 177u8, 149u8, 220u8, 145u8, 158u8,
+				8u8, 194u8, 174u8, 137u8, 68u8, 5u8, 85u8, 35u8,
 			]
 	}
 	pub mod system {
@@ -4522,9 +4521,10 @@ pub mod api {
 						"Events",
 						(),
 						[
-							83u8, 138u8, 153u8, 101u8, 223u8, 151u8, 150u8, 61u8, 206u8, 15u8,
-							54u8, 167u8, 90u8, 142u8, 14u8, 145u8, 86u8, 69u8, 215u8, 248u8, 35u8,
-							47u8, 226u8, 158u8, 159u8, 26u8, 37u8, 124u8, 227u8, 71u8, 44u8, 246u8,
+							249u8, 171u8, 106u8, 73u8, 111u8, 51u8, 18u8, 220u8, 43u8, 126u8, 11u8,
+							192u8, 91u8, 124u8, 190u8, 177u8, 148u8, 242u8, 109u8, 118u8, 140u8,
+							132u8, 201u8, 110u8, 210u8, 172u8, 167u8, 253u8, 242u8, 42u8, 150u8,
+							140u8,
 						],
 					)
 				}
@@ -5432,9 +5432,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							72u8, 127u8, 123u8, 1u8, 110u8, 92u8, 233u8, 172u8, 12u8, 122u8, 76u8,
-							103u8, 240u8, 204u8, 215u8, 50u8, 129u8, 206u8, 251u8, 168u8, 31u8,
-							121u8, 30u8, 166u8, 150u8, 231u8, 13u8, 46u8, 245u8, 209u8, 4u8, 52u8,
+							251u8, 90u8, 206u8, 205u8, 33u8, 31u8, 5u8, 53u8, 184u8, 98u8, 115u8,
+							83u8, 74u8, 35u8, 50u8, 116u8, 71u8, 252u8, 151u8, 154u8, 73u8, 101u8,
+							36u8, 128u8, 101u8, 178u8, 129u8, 165u8, 119u8, 0u8, 201u8, 26u8,
 						],
 					)
 				}
@@ -5499,9 +5499,9 @@ pub mod api {
 							max_weight,
 						},
 						[
-							1u8, 30u8, 138u8, 110u8, 124u8, 56u8, 41u8, 49u8, 136u8, 80u8, 92u8,
-							183u8, 7u8, 35u8, 128u8, 141u8, 105u8, 52u8, 205u8, 164u8, 140u8, 13u8,
-							251u8, 184u8, 58u8, 111u8, 218u8, 240u8, 186u8, 57u8, 126u8, 191u8,
+							44u8, 1u8, 174u8, 74u8, 191u8, 77u8, 219u8, 135u8, 250u8, 234u8, 255u8,
+							22u8, 123u8, 64u8, 12u8, 203u8, 17u8, 2u8, 172u8, 0u8, 109u8, 141u8,
+							59u8, 146u8, 33u8, 104u8, 68u8, 113u8, 125u8, 183u8, 56u8, 219u8,
 						],
 					)
 				}
@@ -6406,10 +6406,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							57u8, 242u8, 173u8, 71u8, 205u8, 39u8, 112u8, 198u8, 190u8, 10u8,
-							249u8, 23u8, 217u8, 17u8, 57u8, 182u8, 17u8, 204u8, 194u8, 187u8,
-							166u8, 62u8, 67u8, 191u8, 67u8, 53u8, 172u8, 96u8, 252u8, 61u8, 40u8,
-							95u8,
+							192u8, 180u8, 162u8, 13u8, 152u8, 125u8, 248u8, 110u8, 113u8, 224u8,
+							8u8, 71u8, 183u8, 22u8, 68u8, 173u8, 125u8, 24u8, 117u8, 244u8, 82u8,
+							172u8, 3u8, 210u8, 56u8, 251u8, 68u8, 72u8, 201u8, 17u8, 184u8, 142u8,
 						],
 					)
 				}
@@ -6673,10 +6672,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							161u8, 100u8, 55u8, 113u8, 135u8, 245u8, 198u8, 222u8, 215u8, 148u8,
-							49u8, 217u8, 228u8, 192u8, 192u8, 207u8, 14u8, 129u8, 36u8, 47u8,
-							121u8, 219u8, 243u8, 118u8, 123u8, 100u8, 80u8, 32u8, 74u8, 107u8,
-							183u8, 185u8,
+							80u8, 107u8, 243u8, 230u8, 144u8, 199u8, 183u8, 132u8, 18u8, 15u8, 5u8,
+							250u8, 162u8, 18u8, 232u8, 98u8, 91u8, 48u8, 140u8, 175u8, 171u8, 43u8,
+							135u8, 96u8, 183u8, 247u8, 29u8, 177u8, 164u8, 66u8, 223u8, 65u8,
 						],
 					)
 				}
@@ -6725,9 +6723,10 @@ pub mod api {
 						],
 						check_permissions::Input { call, proxy_type },
 						[
-							78u8, 193u8, 57u8, 8u8, 16u8, 85u8, 195u8, 83u8, 146u8, 179u8, 6u8,
-							209u8, 237u8, 31u8, 254u8, 144u8, 230u8, 4u8, 172u8, 15u8, 59u8, 148u8,
-							213u8, 83u8, 197u8, 202u8, 212u8, 60u8, 84u8, 215u8, 205u8, 145u8,
+							204u8, 251u8, 175u8, 67u8, 157u8, 153u8, 222u8, 234u8, 84u8, 252u8,
+							86u8, 31u8, 94u8, 195u8, 218u8, 49u8, 177u8, 204u8, 69u8, 233u8, 211u8,
+							192u8, 202u8, 70u8, 31u8, 191u8, 224u8, 163u8, 157u8, 117u8, 29u8,
+							158u8,
 						],
 					)
 				}
@@ -12002,6 +12001,12 @@ pub mod api {
 					pub type Param0 = ::core::primitive::u32;
 					pub type Param1 = ::core::primitive::u64;
 				}
+				pub mod utxo_ids_by_owner_account {
+					use super::runtime_types;
+					pub type UtxoIdsByOwnerAccount = ();
+					pub type Param0 = crate::types::AccountId32;
+					pub type Param1 = ::core::primitive::u64;
+				}
 				pub mod lock_release_cosign_height_by_id {
 					use super::runtime_types;
 					pub type LockReleaseCosignHeightById = ::core::primitive::u32;
@@ -12210,6 +12215,87 @@ pub mod api {
 							238u8, 69u8, 241u8, 1u8, 241u8, 63u8, 254u8, 191u8, 155u8, 243u8,
 							142u8, 22u8, 173u8, 134u8, 121u8, 196u8, 110u8, 14u8, 169u8, 74u8,
 							208u8, 127u8,
+						],
+					)
+				}
+				#[doc = " Index of active UTXO IDs per owner account."]
+				pub fn utxo_ids_by_owner_account_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::utxo_ids_by_owner_account::UtxoIdsByOwnerAccount,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"BitcoinLocks",
+						"UtxoIdsByOwnerAccount",
+						(),
+						[
+							247u8, 43u8, 108u8, 134u8, 167u8, 120u8, 187u8, 60u8, 202u8, 127u8,
+							131u8, 39u8, 43u8, 65u8, 164u8, 58u8, 83u8, 254u8, 28u8, 243u8, 157u8,
+							39u8, 228u8, 109u8, 245u8, 120u8, 179u8, 54u8, 251u8, 77u8, 199u8,
+							114u8,
+						],
+					)
+				}
+				#[doc = " Index of active UTXO IDs per owner account."]
+				pub fn utxo_ids_by_owner_account_iter1(
+					&self,
+					_0: types::utxo_ids_by_owner_account::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::utxo_ids_by_owner_account::Param0,
+					>,
+					types::utxo_ids_by_owner_account::UtxoIdsByOwnerAccount,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"BitcoinLocks",
+						"UtxoIdsByOwnerAccount",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							247u8, 43u8, 108u8, 134u8, 167u8, 120u8, 187u8, 60u8, 202u8, 127u8,
+							131u8, 39u8, 43u8, 65u8, 164u8, 58u8, 83u8, 254u8, 28u8, 243u8, 157u8,
+							39u8, 228u8, 109u8, 245u8, 120u8, 179u8, 54u8, 251u8, 77u8, 199u8,
+							114u8,
+						],
+					)
+				}
+				#[doc = " Index of active UTXO IDs per owner account."]
+				pub fn utxo_ids_by_owner_account(
+					&self,
+					_0: types::utxo_ids_by_owner_account::Param0,
+					_1: types::utxo_ids_by_owner_account::Param1,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+							types::utxo_ids_by_owner_account::Param0,
+						>,
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+							types::utxo_ids_by_owner_account::Param1,
+						>,
+					),
+					types::utxo_ids_by_owner_account::UtxoIdsByOwnerAccount,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"BitcoinLocks",
+						"UtxoIdsByOwnerAccount",
+						(
+							::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+							::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_1),
+						),
+						[
+							247u8, 43u8, 108u8, 134u8, 167u8, 120u8, 187u8, 60u8, 202u8, 127u8,
+							131u8, 39u8, 43u8, 65u8, 164u8, 58u8, 83u8, 254u8, 28u8, 243u8, 157u8,
+							39u8, 228u8, 109u8, 245u8, 120u8, 179u8, 54u8, 251u8, 77u8, 199u8,
+							114u8,
 						],
 					)
 				}
@@ -21597,10 +21683,9 @@ pub mod api {
 						"batch",
 						types::Batch { calls },
 						[
-							109u8, 38u8, 223u8, 175u8, 157u8, 218u8, 126u8, 159u8, 142u8, 37u8,
-							237u8, 97u8, 88u8, 238u8, 228u8, 66u8, 39u8, 175u8, 103u8, 65u8, 207u8,
-							20u8, 148u8, 98u8, 196u8, 93u8, 199u8, 195u8, 120u8, 101u8, 222u8,
-							120u8,
+							196u8, 228u8, 211u8, 235u8, 235u8, 215u8, 188u8, 254u8, 28u8, 233u8,
+							20u8, 89u8, 202u8, 243u8, 41u8, 61u8, 153u8, 145u8, 95u8, 157u8, 234u8,
+							53u8, 111u8, 232u8, 139u8, 40u8, 7u8, 207u8, 51u8, 96u8, 2u8, 254u8,
 						],
 					)
 				}
@@ -21630,9 +21715,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							71u8, 65u8, 222u8, 39u8, 70u8, 81u8, 144u8, 147u8, 0u8, 165u8, 130u8,
-							44u8, 135u8, 48u8, 219u8, 46u8, 102u8, 98u8, 249u8, 57u8, 163u8, 189u8,
-							182u8, 213u8, 50u8, 113u8, 243u8, 152u8, 239u8, 211u8, 31u8, 66u8,
+							127u8, 154u8, 107u8, 23u8, 214u8, 69u8, 224u8, 55u8, 173u8, 203u8,
+							85u8, 2u8, 175u8, 158u8, 104u8, 125u8, 3u8, 240u8, 164u8, 220u8, 96u8,
+							244u8, 45u8, 250u8, 151u8, 80u8, 94u8, 170u8, 230u8, 190u8, 250u8,
+							84u8,
 						],
 					)
 				}
@@ -21658,9 +21744,10 @@ pub mod api {
 						"batch_all",
 						types::BatchAll { calls },
 						[
-							188u8, 109u8, 89u8, 252u8, 8u8, 158u8, 48u8, 208u8, 120u8, 205u8,
-							229u8, 246u8, 222u8, 118u8, 31u8, 30u8, 9u8, 246u8, 31u8, 196u8, 147u8,
-							128u8, 187u8, 133u8, 65u8, 0u8, 211u8, 67u8, 157u8, 46u8, 133u8, 160u8,
+							188u8, 216u8, 175u8, 46u8, 108u8, 62u8, 23u8, 247u8, 255u8, 184u8, 1u8,
+							26u8, 33u8, 65u8, 236u8, 162u8, 232u8, 248u8, 110u8, 198u8, 189u8,
+							156u8, 117u8, 169u8, 59u8, 153u8, 5u8, 248u8, 148u8, 185u8, 102u8,
+							66u8,
 						],
 					)
 				}
@@ -21683,10 +21770,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							200u8, 22u8, 190u8, 237u8, 59u8, 30u8, 176u8, 59u8, 237u8, 171u8,
-							161u8, 36u8, 198u8, 142u8, 20u8, 171u8, 72u8, 158u8, 218u8, 86u8,
-							209u8, 243u8, 194u8, 206u8, 246u8, 36u8, 236u8, 190u8, 123u8, 172u8,
-							136u8, 138u8,
+							108u8, 55u8, 62u8, 50u8, 254u8, 162u8, 201u8, 83u8, 92u8, 22u8, 230u8,
+							194u8, 164u8, 137u8, 207u8, 108u8, 110u8, 120u8, 186u8, 103u8, 209u8,
+							101u8, 24u8, 72u8, 156u8, 221u8, 134u8, 18u8, 210u8, 219u8, 97u8,
+							231u8,
 						],
 					)
 				}
@@ -21712,10 +21799,9 @@ pub mod api {
 						"force_batch",
 						types::ForceBatch { calls },
 						[
-							202u8, 71u8, 8u8, 248u8, 112u8, 187u8, 119u8, 250u8, 107u8, 224u8,
-							137u8, 5u8, 83u8, 231u8, 152u8, 199u8, 34u8, 222u8, 223u8, 144u8,
-							130u8, 205u8, 197u8, 4u8, 255u8, 210u8, 4u8, 213u8, 132u8, 216u8,
-							154u8, 231u8,
+							1u8, 251u8, 184u8, 255u8, 223u8, 78u8, 214u8, 48u8, 155u8, 20u8, 129u8,
+							139u8, 234u8, 63u8, 255u8, 26u8, 38u8, 90u8, 96u8, 110u8, 146u8, 28u8,
+							94u8, 83u8, 171u8, 111u8, 7u8, 180u8, 138u8, 80u8, 181u8, 119u8,
 						],
 					)
 				}
@@ -21738,9 +21824,10 @@ pub mod api {
 							weight,
 						},
 						[
-							49u8, 106u8, 59u8, 93u8, 79u8, 164u8, 19u8, 90u8, 175u8, 138u8, 147u8,
-							8u8, 234u8, 127u8, 214u8, 130u8, 33u8, 48u8, 106u8, 165u8, 251u8, 37u8,
-							17u8, 99u8, 125u8, 106u8, 66u8, 162u8, 134u8, 103u8, 142u8, 119u8,
+							82u8, 77u8, 149u8, 61u8, 111u8, 170u8, 2u8, 185u8, 188u8, 53u8, 218u8,
+							139u8, 217u8, 214u8, 101u8, 93u8, 96u8, 146u8, 224u8, 66u8, 213u8,
+							193u8, 177u8, 122u8, 124u8, 78u8, 62u8, 103u8, 77u8, 187u8, 91u8,
+							184u8,
 						],
 					)
 				}
@@ -21780,10 +21867,10 @@ pub mod api {
 							fallback: ::subxt::ext::subxt_core::alloc::boxed::Box::new(fallback),
 						},
 						[
-							156u8, 62u8, 74u8, 44u8, 222u8, 224u8, 188u8, 246u8, 0u8, 114u8, 246u8,
-							61u8, 164u8, 199u8, 103u8, 154u8, 164u8, 67u8, 152u8, 115u8, 66u8,
-							230u8, 78u8, 219u8, 40u8, 206u8, 43u8, 76u8, 178u8, 248u8, 165u8,
-							253u8,
+							127u8, 53u8, 71u8, 12u8, 224u8, 243u8, 199u8, 0u8, 102u8, 74u8, 36u8,
+							134u8, 82u8, 162u8, 229u8, 246u8, 121u8, 69u8, 206u8, 159u8, 170u8,
+							45u8, 176u8, 240u8, 249u8, 220u8, 119u8, 20u8, 129u8, 71u8, 123u8,
+							63u8,
 						],
 					)
 				}
@@ -21806,10 +21893,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							164u8, 200u8, 129u8, 125u8, 50u8, 245u8, 170u8, 210u8, 102u8, 104u8,
-							95u8, 35u8, 88u8, 249u8, 31u8, 85u8, 15u8, 251u8, 148u8, 210u8, 225u8,
-							37u8, 36u8, 224u8, 128u8, 180u8, 113u8, 236u8, 127u8, 179u8, 116u8,
-							17u8,
+							182u8, 252u8, 217u8, 9u8, 228u8, 85u8, 186u8, 83u8, 87u8, 255u8, 161u8,
+							245u8, 145u8, 80u8, 150u8, 111u8, 144u8, 44u8, 195u8, 213u8, 205u8,
+							214u8, 143u8, 44u8, 217u8, 41u8, 116u8, 123u8, 153u8, 72u8, 132u8, 3u8,
 						],
 					)
 				}
@@ -22145,10 +22231,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							14u8, 206u8, 157u8, 235u8, 89u8, 130u8, 170u8, 16u8, 233u8, 79u8,
-							203u8, 200u8, 86u8, 202u8, 234u8, 247u8, 223u8, 254u8, 147u8, 92u8,
-							173u8, 90u8, 240u8, 12u8, 154u8, 245u8, 192u8, 206u8, 3u8, 18u8, 201u8,
-							76u8,
+							15u8, 250u8, 52u8, 207u8, 238u8, 141u8, 92u8, 204u8, 151u8, 26u8, 26u8,
+							159u8, 178u8, 53u8, 180u8, 220u8, 129u8, 234u8, 182u8, 179u8, 180u8,
+							212u8, 114u8, 251u8, 66u8, 116u8, 139u8, 5u8, 181u8, 156u8, 247u8,
+							182u8,
 						],
 					)
 				}
@@ -22171,10 +22257,10 @@ pub mod api {
 							weight,
 						},
 						[
-							30u8, 86u8, 195u8, 24u8, 198u8, 237u8, 69u8, 64u8, 52u8, 144u8, 29u8,
-							107u8, 207u8, 71u8, 230u8, 122u8, 108u8, 117u8, 149u8, 122u8, 64u8,
-							190u8, 162u8, 146u8, 2u8, 227u8, 107u8, 218u8, 253u8, 187u8, 18u8,
-							37u8,
+							137u8, 19u8, 72u8, 51u8, 136u8, 219u8, 189u8, 153u8, 154u8, 152u8,
+							168u8, 151u8, 145u8, 23u8, 0u8, 30u8, 158u8, 244u8, 217u8, 203u8,
+							148u8, 84u8, 201u8, 95u8, 196u8, 219u8, 5u8, 84u8, 193u8, 176u8, 250u8,
+							46u8,
 						],
 					)
 				}
@@ -22212,10 +22298,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							30u8, 28u8, 66u8, 123u8, 237u8, 100u8, 177u8, 123u8, 198u8, 161u8,
-							222u8, 231u8, 177u8, 155u8, 126u8, 164u8, 119u8, 48u8, 232u8, 234u8,
-							168u8, 213u8, 87u8, 150u8, 4u8, 89u8, 152u8, 193u8, 226u8, 33u8, 62u8,
-							214u8,
+							149u8, 191u8, 174u8, 79u8, 58u8, 169u8, 254u8, 143u8, 240u8, 168u8,
+							243u8, 51u8, 101u8, 90u8, 81u8, 183u8, 173u8, 207u8, 126u8, 59u8,
+							207u8, 216u8, 162u8, 68u8, 31u8, 126u8, 172u8, 189u8, 34u8, 251u8,
+							77u8, 136u8,
 						],
 					)
 				}
@@ -23538,10 +23624,9 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				#[doc = "Register vault, mining funding, and bot accounts for an operational account."]
+				#[doc = "Register vault and mining accounts for an operational account."]
 				#[doc = "Any account in the registration may submit the transaction."]
-				#[doc = "If a referral proof is provided, the registration records the sponsor relationship."]
-				#[doc = "When invite-only is enabled, a valid referral proof is required."]
+				#[doc = "When invite-only is enabled, the registration must include a referrer."]
 				pub struct Register {
 					pub registration: register::Registration,
 				}
@@ -23566,15 +23651,41 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
+				#[doc = "Grant a referrer upgrade to an already-registered operational account."]
+				pub struct UpgradeAccount {
+					pub account_id: upgrade_account::AccountId,
+				}
+				pub mod upgrade_account {
+					use super::runtime_types;
+					pub type AccountId = crate::types::AccountId32;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for UpgradeAccount {
+					const PALLET: &'static str = "OperationalAccounts";
+					const CALL: &'static str = "upgrade_account";
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
 				#[doc = "Update reward amounts for operational accounts."]
 				pub struct SetRewardConfig {
-					pub operational_referral_reward: set_reward_config::OperationalReferralReward,
-					pub referral_bonus_reward: set_reward_config::ReferralBonusReward,
+					pub operational_activation_reward:
+						set_reward_config::OperationalActivationReward,
+					pub operational_referral_bonus_reward:
+						set_reward_config::OperationalReferralBonusReward,
 				}
 				pub mod set_reward_config {
 					use super::runtime_types;
-					pub type OperationalReferralReward = ::core::primitive::u128;
-					pub type ReferralBonusReward = ::core::primitive::u128;
+					pub type OperationalActivationReward = ::core::primitive::u128;
+					pub type OperationalReferralBonusReward = ::core::primitive::u128;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for SetRewardConfig {
 					const PALLET: &'static str = "OperationalAccounts";
@@ -23620,20 +23731,22 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				#[doc = "Store an opaque encrypted sponsor server payload for a sponsored operational account."]
-				pub struct SetEncryptedServerForSponsee {
-					pub sponsee: set_encrypted_server_for_sponsee::Sponsee,
-					pub encrypted_server: set_encrypted_server_for_sponsee::EncryptedServer,
+				#[doc = "Store an opaque encrypted referrer server payload for a downstream account."]
+				pub struct SetEncryptedServerForDownstreamAccount {
+					pub downstream_account:
+						set_encrypted_server_for_downstream_account::DownstreamAccount,
+					pub encrypted_server:
+						set_encrypted_server_for_downstream_account::EncryptedServer,
 				}
-				pub mod set_encrypted_server_for_sponsee {
+				pub mod set_encrypted_server_for_downstream_account {
 					use super::runtime_types;
-					pub type Sponsee = crate::types::AccountId32;
+					pub type DownstreamAccount = crate::types::AccountId32;
 					pub type EncryptedServer =
 						::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u8>;
 				}
-				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for SetEncryptedServerForSponsee {
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for SetEncryptedServerForDownstreamAccount {
 					const PALLET: &'static str = "OperationalAccounts";
-					const CALL: &'static str = "set_encrypted_server_for_sponsee";
+					const CALL: &'static str = "set_encrypted_server_for_downstream_account";
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -23680,10 +23793,9 @@ pub mod api {
 			}
 			pub struct TransactionApi;
 			impl TransactionApi {
-				#[doc = "Register vault, mining funding, and bot accounts for an operational account."]
+				#[doc = "Register vault and mining accounts for an operational account."]
 				#[doc = "Any account in the registration may submit the transaction."]
-				#[doc = "If a referral proof is provided, the registration records the sponsor relationship."]
-				#[doc = "When invite-only is enabled, a valid referral proof is required."]
+				#[doc = "When invite-only is enabled, the registration must include a referrer."]
 				pub fn register(
 					&self,
 					registration: types::register::Registration,
@@ -23693,31 +23805,49 @@ pub mod api {
 						"register",
 						types::Register { registration },
 						[
-							26u8, 247u8, 211u8, 85u8, 122u8, 151u8, 69u8, 232u8, 240u8, 210u8,
-							241u8, 185u8, 7u8, 175u8, 226u8, 103u8, 226u8, 72u8, 105u8, 199u8,
-							100u8, 150u8, 183u8, 42u8, 213u8, 78u8, 231u8, 51u8, 251u8, 180u8,
-							151u8, 167u8,
+							173u8, 5u8, 237u8, 156u8, 66u8, 17u8, 41u8, 109u8, 163u8, 53u8, 202u8,
+							87u8, 206u8, 67u8, 157u8, 98u8, 77u8, 114u8, 18u8, 94u8, 75u8, 232u8,
+							139u8, 90u8, 74u8, 229u8, 220u8, 241u8, 50u8, 23u8, 178u8, 50u8,
+						],
+					)
+				}
+				#[doc = "Grant a referrer upgrade to an already-registered operational account."]
+				pub fn upgrade_account(
+					&self,
+					account_id: types::upgrade_account::AccountId,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::UpgradeAccount>
+				{
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"OperationalAccounts",
+						"upgrade_account",
+						types::UpgradeAccount { account_id },
+						[
+							123u8, 46u8, 184u8, 118u8, 221u8, 154u8, 87u8, 20u8, 253u8, 61u8,
+							219u8, 165u8, 129u8, 226u8, 82u8, 4u8, 134u8, 165u8, 114u8, 225u8,
+							42u8, 205u8, 103u8, 86u8, 105u8, 192u8, 225u8, 112u8, 215u8, 200u8,
+							55u8, 102u8,
 						],
 					)
 				}
 				#[doc = "Update reward amounts for operational accounts."]
 				pub fn set_reward_config(
 					&self,
-					operational_referral_reward : types :: set_reward_config :: OperationalReferralReward,
-					referral_bonus_reward: types::set_reward_config::ReferralBonusReward,
+					operational_activation_reward : types :: set_reward_config :: OperationalActivationReward,
+					operational_referral_bonus_reward : types :: set_reward_config :: OperationalReferralBonusReward,
 				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::SetRewardConfig>
 				{
 					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
 						"OperationalAccounts",
 						"set_reward_config",
 						types::SetRewardConfig {
-							operational_referral_reward,
-							referral_bonus_reward,
+							operational_activation_reward,
+							operational_referral_bonus_reward,
 						},
 						[
-							100u8, 7u8, 16u8, 180u8, 165u8, 125u8, 4u8, 129u8, 93u8, 5u8, 123u8,
-							207u8, 231u8, 91u8, 219u8, 219u8, 22u8, 140u8, 100u8, 66u8, 37u8, 3u8,
-							244u8, 231u8, 131u8, 201u8, 63u8, 235u8, 55u8, 143u8, 149u8, 212u8,
+							150u8, 223u8, 33u8, 219u8, 107u8, 38u8, 137u8, 33u8, 237u8, 172u8,
+							68u8, 175u8, 119u8, 235u8, 32u8, 67u8, 79u8, 203u8, 218u8, 128u8, 13u8,
+							136u8, 146u8, 27u8, 253u8, 171u8, 120u8, 251u8, 45u8, 99u8, 143u8,
+							76u8,
 						],
 					)
 				}
@@ -23734,29 +23864,32 @@ pub mod api {
 						"force_set_progress",
 						types::ForceSetProgress { owner, patch, update_operational_progress },
 						[
-							40u8, 191u8, 114u8, 215u8, 220u8, 54u8, 189u8, 56u8, 231u8, 219u8,
-							197u8, 43u8, 229u8, 17u8, 138u8, 64u8, 185u8, 21u8, 15u8, 131u8, 146u8,
-							85u8, 78u8, 170u8, 222u8, 211u8, 94u8, 37u8, 4u8, 62u8, 4u8, 65u8,
+							151u8, 218u8, 227u8, 148u8, 118u8, 167u8, 85u8, 76u8, 98u8, 97u8, 47u8,
+							138u8, 220u8, 19u8, 3u8, 183u8, 15u8, 127u8, 129u8, 31u8, 175u8, 155u8,
+							21u8, 80u8, 151u8, 155u8, 158u8, 75u8, 177u8, 57u8, 135u8, 30u8,
 						],
 					)
 				}
-				#[doc = "Store an opaque encrypted sponsor server payload for a sponsored operational account."]
-				pub fn set_encrypted_server_for_sponsee(
+				#[doc = "Store an opaque encrypted referrer server payload for a downstream account."]
+				pub fn set_encrypted_server_for_downstream_account(
 					&self,
-					sponsee: types::set_encrypted_server_for_sponsee::Sponsee,
-					encrypted_server: types::set_encrypted_server_for_sponsee::EncryptedServer,
+					downstream_account : types :: set_encrypted_server_for_downstream_account :: DownstreamAccount,
+					encrypted_server : types :: set_encrypted_server_for_downstream_account :: EncryptedServer,
 				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<
-					types::SetEncryptedServerForSponsee,
+					types::SetEncryptedServerForDownstreamAccount,
 				> {
 					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
 						"OperationalAccounts",
-						"set_encrypted_server_for_sponsee",
-						types::SetEncryptedServerForSponsee { sponsee, encrypted_server },
+						"set_encrypted_server_for_downstream_account",
+						types::SetEncryptedServerForDownstreamAccount {
+							downstream_account,
+							encrypted_server,
+						},
 						[
-							146u8, 194u8, 196u8, 181u8, 181u8, 244u8, 138u8, 121u8, 31u8, 94u8,
-							215u8, 181u8, 248u8, 179u8, 149u8, 183u8, 91u8, 10u8, 248u8, 34u8,
-							49u8, 81u8, 202u8, 48u8, 250u8, 108u8, 196u8, 167u8, 214u8, 102u8,
-							52u8, 167u8,
+							28u8, 148u8, 65u8, 188u8, 119u8, 93u8, 199u8, 213u8, 142u8, 59u8,
+							205u8, 132u8, 229u8, 217u8, 55u8, 79u8, 142u8, 74u8, 15u8, 124u8,
+							239u8, 195u8, 75u8, 16u8, 229u8, 192u8, 212u8, 187u8, 202u8, 161u8,
+							161u8, 150u8,
 						],
 					)
 				}
@@ -23809,21 +23942,61 @@ pub mod api {
 			pub struct OperationalAccountRegistered {
 				pub operational_account: operational_account_registered::OperationalAccount,
 				pub vault_account: operational_account_registered::VaultAccount,
-				pub mining_funding_account: operational_account_registered::MiningFundingAccount,
-				pub mining_bot_account: operational_account_registered::MiningBotAccount,
-				pub sponsor: operational_account_registered::Sponsor,
+				pub mining_account: operational_account_registered::MiningAccount,
+				pub referrer: operational_account_registered::Referrer,
 			}
 			pub mod operational_account_registered {
 				use super::runtime_types;
 				pub type OperationalAccount = crate::types::AccountId32;
 				pub type VaultAccount = crate::types::AccountId32;
-				pub type MiningFundingAccount = crate::types::AccountId32;
-				pub type MiningBotAccount = crate::types::AccountId32;
-				pub type Sponsor = ::core::option::Option<crate::types::AccountId32>;
+				pub type MiningAccount = crate::types::AccountId32;
+				pub type Referrer = ::core::option::Option<crate::types::AccountId32>;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for OperationalAccountRegistered {
 				const PALLET: &'static str = "OperationalAccounts";
 				const EVENT: &'static str = "OperationalAccountRegistered";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "A referrer granted an operational upgrade to an existing account."]
+			pub struct AccountUpgradeGranted {
+				pub account: account_upgrade_granted::Account,
+				pub referrer: account_upgrade_granted::Referrer,
+			}
+			pub mod account_upgrade_granted {
+				use super::runtime_types;
+				pub type Account = crate::types::AccountId32;
+				pub type Referrer = crate::types::AccountId32;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for AccountUpgradeGranted {
+				const PALLET: &'static str = "OperationalAccounts";
+				const EVENT: &'static str = "AccountUpgradeGranted";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "Account has become treasury certified."]
+			pub struct AccountBecameTreasuryCertified {
+				pub account: account_became_treasury_certified::Account,
+			}
+			pub mod account_became_treasury_certified {
+				use super::runtime_types;
+				pub type Account = crate::types::AccountId32;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for AccountBecameTreasuryCertified {
+				const PALLET: &'static str = "OperationalAccounts";
+				const EVENT: &'static str = "AccountBecameTreasuryCertified";
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -23906,13 +24079,15 @@ pub mod api {
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
 			#[doc = "Reward config values were updated."]
 			pub struct RewardsConfigUpdated {
-				pub operational_referral_reward: rewards_config_updated::OperationalReferralReward,
-				pub referral_bonus_reward: rewards_config_updated::ReferralBonusReward,
+				pub operational_activation_reward:
+					rewards_config_updated::OperationalActivationReward,
+				pub operational_referral_bonus_reward:
+					rewards_config_updated::OperationalReferralBonusReward,
 			}
 			pub mod rewards_config_updated {
 				use super::runtime_types;
-				pub type OperationalReferralReward = ::core::primitive::u128;
-				pub type ReferralBonusReward = ::core::primitive::u128;
+				pub type OperationalActivationReward = ::core::primitive::u128;
+				pub type OperationalReferralBonusReward = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for RewardsConfigUpdated {
 				const PALLET: &'static str = "OperationalAccounts";
@@ -23931,23 +24106,27 @@ pub mod api {
 				pub account: operational_progress_forced::Account,
 				pub update_operational_progress:
 					operational_progress_forced::UpdateOperationalProgress,
-				pub has_uniswap_transfer: operational_progress_forced::HasUniswapTransfer,
+				pub is_treasury_certified: operational_progress_forced::IsTreasuryCertified,
+				pub uniswap_argon_transfers_in_amount:
+					operational_progress_forced::UniswapArgonTransfersInAmount,
+				pub account_bitcoin_amount: operational_progress_forced::AccountBitcoinAmount,
+				pub account_vault_bond_amount: operational_progress_forced::AccountVaultBondAmount,
 				pub vault_created: operational_progress_forced::VaultCreated,
-				pub has_treasury_pool_participation:
-					operational_progress_forced::HasTreasuryPoolParticipation,
-				pub observed_bitcoin_total: operational_progress_forced::ObservedBitcoinTotal,
-				pub observed_mining_seat_total:
-					operational_progress_forced::ObservedMiningSeatTotal,
+				pub operator_vault_bitcoin_amount:
+					operational_progress_forced::OperatorVaultBitcoinAmount,
+				pub mining_seat_count: operational_progress_forced::MiningSeatCount,
 			}
 			pub mod operational_progress_forced {
 				use super::runtime_types;
 				pub type Account = crate::types::AccountId32;
 				pub type UpdateOperationalProgress = ::core::primitive::bool;
-				pub type HasUniswapTransfer = ::core::primitive::bool;
+				pub type IsTreasuryCertified = ::core::primitive::bool;
+				pub type UniswapArgonTransfersInAmount = ::core::primitive::u128;
+				pub type AccountBitcoinAmount = ::core::primitive::u128;
+				pub type AccountVaultBondAmount = ::core::primitive::u128;
 				pub type VaultCreated = ::core::primitive::bool;
-				pub type HasTreasuryPoolParticipation = ::core::primitive::bool;
-				pub type ObservedBitcoinTotal = ::core::primitive::u128;
-				pub type ObservedMiningSeatTotal = ::core::primitive::u32;
+				pub type OperatorVaultBitcoinAmount = ::core::primitive::u128;
+				pub type MiningSeatCount = ::core::primitive::u32;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for OperationalProgressForced {
 				const PALLET: &'static str = "OperationalAccounts";
@@ -23961,15 +24140,15 @@ pub mod api {
 			)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			#[doc = "A sponsor updated the encrypted server payload for a sponsee."]
+			#[doc = "A referrer updated the encrypted server payload for a downstream account."]
 			pub struct EncryptedServerUpdated {
-				pub sponsor: encrypted_server_updated::Sponsor,
-				pub sponsee: encrypted_server_updated::Sponsee,
+				pub referrer: encrypted_server_updated::Referrer,
+				pub downstream_account: encrypted_server_updated::DownstreamAccount,
 			}
 			pub mod encrypted_server_updated {
 				use super::runtime_types;
-				pub type Sponsor = crate::types::AccountId32;
-				pub type Sponsee = crate::types::AccountId32;
+				pub type Referrer = crate::types::AccountId32;
+				pub type DownstreamAccount = crate::types::AccountId32;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for EncryptedServerUpdated {
 				const PALLET: &'static str = "OperationalAccounts";
@@ -23991,21 +24170,6 @@ pub mod api {
 					pub type OperationalAccountBySubAccount = crate::types::AccountId32;
 					pub type Param0 = crate::types::AccountId32;
 				}
-				pub mod consumed_referral_codes {
-					use super::runtime_types;
-					pub type ConsumedReferralCodes = ::core::primitive::u64;
-					pub type Param0 = [::core::primitive::u8; 32usize];
-				}
-				pub mod consumed_referral_codes_by_expiration {
-					use super::runtime_types;
-					pub type ConsumedReferralCodesByExpiration = ();
-					pub type Param0 = ::core::primitive::u64;
-					pub type Param1 = [::core::primitive::u8; 32usize];
-				}
-				pub mod expired_referral_code_cleanup_frame {
-					use super::runtime_types;
-					pub type ExpiredReferralCodeCleanupFrame = ::core::primitive::u64;
-				}
 				pub mod is_operational_account_invite_only {
 					use super::runtime_types;
 					pub type IsOperationalAccountInviteOnly = ::core::primitive::bool;
@@ -24017,9 +24181,9 @@ pub mod api {
 							::core::primitive::u128,
 						>;
 				}
-				pub mod encrypted_server_by_sponsee {
+				pub mod encrypted_server_by_downstream_account {
 					use super::runtime_types;
-					pub type EncryptedServerBySponsee =
+					pub type EncryptedServerByDownstreamAccount =
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<
 							::core::primitive::u8,
 						>;
@@ -24043,10 +24207,9 @@ pub mod api {
 						"OperationalAccounts",
 						(),
 						[
-							197u8, 166u8, 87u8, 29u8, 194u8, 35u8, 254u8, 19u8, 23u8, 233u8, 106u8,
-							195u8, 2u8, 112u8, 202u8, 179u8, 195u8, 212u8, 127u8, 26u8, 70u8,
-							184u8, 50u8, 253u8, 24u8, 222u8, 224u8, 213u8, 55u8, 78u8, 170u8,
-							219u8,
+							50u8, 4u8, 229u8, 18u8, 229u8, 10u8, 89u8, 134u8, 109u8, 95u8, 31u8,
+							2u8, 149u8, 181u8, 42u8, 195u8, 72u8, 22u8, 111u8, 175u8, 147u8, 72u8,
+							35u8, 240u8, 32u8, 85u8, 174u8, 95u8, 52u8, 195u8, 228u8, 39u8,
 						],
 					)
 				}
@@ -24068,10 +24231,9 @@ pub mod api {
 						"OperationalAccounts",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							197u8, 166u8, 87u8, 29u8, 194u8, 35u8, 254u8, 19u8, 23u8, 233u8, 106u8,
-							195u8, 2u8, 112u8, 202u8, 179u8, 195u8, 212u8, 127u8, 26u8, 70u8,
-							184u8, 50u8, 253u8, 24u8, 222u8, 224u8, 213u8, 55u8, 78u8, 170u8,
-							219u8,
+							50u8, 4u8, 229u8, 18u8, 229u8, 10u8, 89u8, 134u8, 109u8, 95u8, 31u8,
+							2u8, 149u8, 181u8, 42u8, 195u8, 72u8, 22u8, 111u8, 175u8, 147u8, 72u8,
+							35u8, 240u8, 32u8, 85u8, 174u8, 95u8, 52u8, 195u8, 228u8, 39u8,
 						],
 					)
 				}
@@ -24120,159 +24282,9 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Referral codes that have already been linked, keyed to their proof expiration frame."]
-				pub fn consumed_referral_codes_iter(
-					&self,
-				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
-					(),
-					types::consumed_referral_codes::ConsumedReferralCodes,
-					(),
-					(),
-					::subxt::ext::subxt_core::utils::Yes,
-				> {
-					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"OperationalAccounts",
-						"ConsumedReferralCodes",
-						(),
-						[
-							145u8, 130u8, 66u8, 229u8, 238u8, 158u8, 220u8, 31u8, 79u8, 206u8,
-							10u8, 173u8, 93u8, 133u8, 122u8, 188u8, 136u8, 165u8, 234u8, 57u8,
-							18u8, 225u8, 238u8, 36u8, 66u8, 104u8, 193u8, 133u8, 186u8, 69u8,
-							145u8, 104u8,
-						],
-					)
-				}
-				#[doc = " Referral codes that have already been linked, keyed to their proof expiration frame."]
-				pub fn consumed_referral_codes(
-					&self,
-					_0: types::consumed_referral_codes::Param0,
-				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
-					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
-						types::consumed_referral_codes::Param0,
-					>,
-					types::consumed_referral_codes::ConsumedReferralCodes,
-					::subxt::ext::subxt_core::utils::Yes,
-					(),
-					(),
-				> {
-					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"OperationalAccounts",
-						"ConsumedReferralCodes",
-						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
-						[
-							145u8, 130u8, 66u8, 229u8, 238u8, 158u8, 220u8, 31u8, 79u8, 206u8,
-							10u8, 173u8, 93u8, 133u8, 122u8, 188u8, 136u8, 165u8, 234u8, 57u8,
-							18u8, 225u8, 238u8, 36u8, 66u8, 104u8, 193u8, 133u8, 186u8, 69u8,
-							145u8, 104u8,
-						],
-					)
-				}
-				#[doc = " Referral codes to clear after their referral proof expiration frame."]
-				pub fn consumed_referral_codes_by_expiration_iter(
-					&self,
-				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
-					(),
-					types::consumed_referral_codes_by_expiration::ConsumedReferralCodesByExpiration,
-					(),
-					(),
-					::subxt::ext::subxt_core::utils::Yes,
-				> {
-					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"OperationalAccounts",
-						"ConsumedReferralCodesByExpiration",
-						(),
-						[
-							211u8, 139u8, 77u8, 158u8, 172u8, 37u8, 71u8, 94u8, 214u8, 145u8,
-							180u8, 55u8, 216u8, 75u8, 205u8, 91u8, 214u8, 119u8, 231u8, 198u8,
-							104u8, 132u8, 153u8, 226u8, 64u8, 188u8, 15u8, 71u8, 115u8, 187u8,
-							168u8, 91u8,
-						],
-					)
-				}
-				#[doc = " Referral codes to clear after their referral proof expiration frame."]
-				pub fn consumed_referral_codes_by_expiration_iter1(
-					&self,
-					_0: types::consumed_referral_codes_by_expiration::Param0,
-				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
-					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
-						types::consumed_referral_codes_by_expiration::Param0,
-					>,
-					types::consumed_referral_codes_by_expiration::ConsumedReferralCodesByExpiration,
-					(),
-					(),
-					::subxt::ext::subxt_core::utils::Yes,
-				> {
-					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"OperationalAccounts",
-						"ConsumedReferralCodesByExpiration",
-						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
-						[
-							211u8, 139u8, 77u8, 158u8, 172u8, 37u8, 71u8, 94u8, 214u8, 145u8,
-							180u8, 55u8, 216u8, 75u8, 205u8, 91u8, 214u8, 119u8, 231u8, 198u8,
-							104u8, 132u8, 153u8, 226u8, 64u8, 188u8, 15u8, 71u8, 115u8, 187u8,
-							168u8, 91u8,
-						],
-					)
-				}
-				#[doc = " Referral codes to clear after their referral proof expiration frame."]
-				pub fn consumed_referral_codes_by_expiration(
-					&self,
-					_0: types::consumed_referral_codes_by_expiration::Param0,
-					_1: types::consumed_referral_codes_by_expiration::Param1,
-				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
-					(
-						::subxt::ext::subxt_core::storage::address::StaticStorageKey<
-							types::consumed_referral_codes_by_expiration::Param0,
-						>,
-						::subxt::ext::subxt_core::storage::address::StaticStorageKey<
-							types::consumed_referral_codes_by_expiration::Param1,
-						>,
-					),
-					types::consumed_referral_codes_by_expiration::ConsumedReferralCodesByExpiration,
-					::subxt::ext::subxt_core::utils::Yes,
-					(),
-					(),
-				> {
-					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"OperationalAccounts",
-						"ConsumedReferralCodesByExpiration",
-						(
-							::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
-							::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_1),
-						),
-						[
-							211u8, 139u8, 77u8, 158u8, 172u8, 37u8, 71u8, 94u8, 214u8, 145u8,
-							180u8, 55u8, 216u8, 75u8, 205u8, 91u8, 214u8, 119u8, 231u8, 198u8,
-							104u8, 132u8, 153u8, 226u8, 64u8, 188u8, 15u8, 71u8, 115u8, 187u8,
-							168u8, 91u8,
-						],
-					)
-				}
-				#[doc = " Oldest referral expiration frame that still has cleanup work to resume."]
-				pub fn expired_referral_code_cleanup_frame(
-					&self,
-				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
-					(),
-					types::expired_referral_code_cleanup_frame::ExpiredReferralCodeCleanupFrame,
-					::subxt::ext::subxt_core::utils::Yes,
-					(),
-					(),
-				> {
-					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"OperationalAccounts",
-						"ExpiredReferralCodeCleanupFrame",
-						(),
-						[
-							176u8, 33u8, 82u8, 25u8, 192u8, 98u8, 69u8, 146u8, 34u8, 160u8, 59u8,
-							29u8, 48u8, 189u8, 150u8, 52u8, 134u8, 170u8, 212u8, 175u8, 170u8,
-							207u8, 204u8, 227u8, 65u8, 174u8, 213u8, 68u8, 242u8, 192u8, 7u8,
-							202u8,
-						],
-					)
-				}
 				#[doc = " Whether operational-account access is invite-only."]
 				#[doc = ""]
-				#[doc = " When enabled, registration requires a valid referral invite and vault creation plus"]
+				#[doc = " When enabled, registration requires a referrer invite and vault creation plus"]
 				#[doc = " mining-slot bidding remain restricted to registered operational accounts."]
 				#[doc = ""]
 				#[doc = " Existing live raw chain specs do not contain this key, so the default remains invite-only"]
@@ -24313,54 +24325,33 @@ pub mod api {
 						"Rewards",
 						(),
 						[
-							123u8, 13u8, 111u8, 137u8, 113u8, 148u8, 59u8, 164u8, 46u8, 161u8,
-							21u8, 217u8, 226u8, 218u8, 53u8, 75u8, 140u8, 6u8, 94u8, 17u8, 231u8,
-							26u8, 124u8, 1u8, 61u8, 41u8, 198u8, 223u8, 24u8, 162u8, 167u8, 58u8,
+							57u8, 85u8, 162u8, 253u8, 123u8, 142u8, 129u8, 56u8, 136u8, 26u8,
+							193u8, 216u8, 252u8, 146u8, 170u8, 17u8, 254u8, 6u8, 37u8, 98u8, 43u8,
+							32u8, 7u8, 77u8, 57u8, 213u8, 135u8, 221u8, 111u8, 67u8, 115u8, 50u8,
 						],
 					)
 				}
-				#[doc = " Opaque encrypted sponsor server payload keyed by the sponsee operational account."]
-				pub fn encrypted_server_by_sponsee_iter(
-					&self,
-				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
-					(),
-					types::encrypted_server_by_sponsee::EncryptedServerBySponsee,
-					(),
-					(),
-					::subxt::ext::subxt_core::utils::Yes,
-				> {
+				#[doc = " Opaque encrypted referrer server payload keyed by the downstream account."]				pub fn encrypted_server_by_downstream_account_iter (& self ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < () , types :: encrypted_server_by_downstream_account :: EncryptedServerByDownstreamAccount , () , () , :: subxt :: ext :: subxt_core :: utils :: Yes >{
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"OperationalAccounts",
-						"EncryptedServerBySponsee",
+						"EncryptedServerByDownstreamAccount",
 						(),
 						[
-							231u8, 52u8, 30u8, 233u8, 142u8, 119u8, 8u8, 110u8, 172u8, 62u8, 94u8,
-							217u8, 133u8, 7u8, 74u8, 64u8, 57u8, 62u8, 69u8, 171u8, 227u8, 51u8,
-							44u8, 242u8, 153u8, 36u8, 47u8, 54u8, 105u8, 86u8, 154u8, 141u8,
+							82u8, 252u8, 105u8, 231u8, 42u8, 144u8, 99u8, 160u8, 120u8, 157u8,
+							150u8, 18u8, 174u8, 26u8, 122u8, 16u8, 162u8, 0u8, 14u8, 191u8, 175u8,
+							91u8, 60u8, 169u8, 186u8, 212u8, 93u8, 251u8, 75u8, 185u8, 205u8, 13u8,
 						],
 					)
 				}
-				#[doc = " Opaque encrypted sponsor server payload keyed by the sponsee operational account."]
-				pub fn encrypted_server_by_sponsee(
-					&self,
-					_0: types::encrypted_server_by_sponsee::Param0,
-				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
-					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
-						types::encrypted_server_by_sponsee::Param0,
-					>,
-					types::encrypted_server_by_sponsee::EncryptedServerBySponsee,
-					::subxt::ext::subxt_core::utils::Yes,
-					(),
-					(),
-				> {
+				#[doc = " Opaque encrypted referrer server payload keyed by the downstream account."]				pub fn encrypted_server_by_downstream_account (& self , _0 : types :: encrypted_server_by_downstream_account :: Param0 ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < :: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: encrypted_server_by_downstream_account :: Param0 > , types :: encrypted_server_by_downstream_account :: EncryptedServerByDownstreamAccount , :: subxt :: ext :: subxt_core :: utils :: Yes , () , () >{
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"OperationalAccounts",
-						"EncryptedServerBySponsee",
+						"EncryptedServerByDownstreamAccount",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							231u8, 52u8, 30u8, 233u8, 142u8, 119u8, 8u8, 110u8, 172u8, 62u8, 94u8,
-							217u8, 133u8, 7u8, 74u8, 64u8, 57u8, 62u8, 69u8, 171u8, 227u8, 51u8,
-							44u8, 242u8, 153u8, 36u8, 47u8, 54u8, 105u8, 86u8, 154u8, 141u8,
+							82u8, 252u8, 105u8, 231u8, 42u8, 144u8, 99u8, 160u8, 120u8, 157u8,
+							150u8, 18u8, 174u8, 26u8, 122u8, 16u8, 162u8, 0u8, 14u8, 191u8, 175u8,
+							91u8, 60u8, 169u8, 186u8, 212u8, 93u8, 251u8, 75u8, 185u8, 205u8, 13u8,
 						],
 					)
 				}
@@ -24370,15 +24361,16 @@ pub mod api {
 			use super::runtime_types;
 			pub struct ConstantsApi;
 			impl ConstantsApi {
-				#[doc = " Additional argon amount (base units) required per referral after operational."]
-				pub fn bitcoin_lock_size_for_referral(
+				#[doc = " Additional argon amount (base units) required per follow-on upgrade code after"]
+				#[doc = " operational certification."]
+				pub fn bitcoin_lock_size_for_upgrade_code(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
 					::core::primitive::u128,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"OperationalAccounts",
-						"BitcoinLockSizeForReferral",
+						"BitcoinLockSizeForUpgradeCode",
 						[
 							84u8, 157u8, 140u8, 4u8, 93u8, 57u8, 29u8, 133u8, 105u8, 200u8, 214u8,
 							27u8, 144u8, 208u8, 218u8, 160u8, 130u8, 109u8, 101u8, 54u8, 210u8,
@@ -24387,14 +24379,14 @@ pub mod api {
 					)
 				}
 				#[doc = " Default reward paid when an account becomes operational."]
-				pub fn operational_referral_reward(
+				pub fn operational_activation_reward(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
 					::core::primitive::u128,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"OperationalAccounts",
-						"OperationalReferralReward",
+						"OperationalActivationReward",
 						[
 							84u8, 157u8, 140u8, 4u8, 93u8, 57u8, 29u8, 133u8, 105u8, 200u8, 214u8,
 							27u8, 144u8, 208u8, 218u8, 160u8, 130u8, 109u8, 101u8, 54u8, 210u8,
@@ -24402,7 +24394,7 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Default bonus reward paid every referral threshold."]
+				#[doc = " Default bonus reward paid every operational referral threshold."]
 				pub fn operational_referral_bonus_reward(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
@@ -24418,15 +24410,15 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Number of operational sponsees required per referral bonus reward."]
-				pub fn referral_bonus_every_x_operational_sponsees(
+				#[doc = " Number of operational referrals required per bonus reward."]
+				pub fn operational_referrals_per_bonus_reward(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
 					::core::primitive::u32,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"OperationalAccounts",
-						"ReferralBonusEveryXOperationalSponsees",
+						"OperationalReferralsPerBonusReward",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
@@ -24435,15 +24427,15 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Maximum number of available referrals allowed at once."]
-				pub fn max_available_referrals(
+				#[doc = " Maximum number of available upgrade codes allowed at once."]
+				pub fn max_available_upgrade_codes(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
 					::core::primitive::u32,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"OperationalAccounts",
-						"MaxAvailableReferrals",
+						"MaxAvailableUpgradeCodes",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
@@ -24452,24 +24444,7 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Maximum number of expired referral codes cleared per block."]
-				pub fn max_expired_referral_code_cleanups_per_block(
-					&self,
-				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
-					::core::primitive::u32,
-				> {
-					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
-						"OperationalAccounts",
-						"MaxExpiredReferralCodeCleanupsPerBlock",
-						[
-							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
-							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
-							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
-							145u8,
-						],
-					)
-				}
-				#[doc = " Maximum number of encrypted server bytes stored per sponsee."]
+				#[doc = " Maximum number of encrypted server bytes stored per network account."]
 				pub fn max_encrypted_server_len(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
@@ -24483,6 +24458,70 @@ pub mod api {
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
 							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
 							145u8,
+						],
+					)
+				}
+				#[doc = " Minimum Uniswap transfer amount required for treasury certification."]
+				pub fn treasury_minimum_uniswap_transfer(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u128,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"OperationalAccounts",
+						"TreasuryMinimumUniswapTransfer",
+						[
+							84u8, 157u8, 140u8, 4u8, 93u8, 57u8, 29u8, 133u8, 105u8, 200u8, 214u8,
+							27u8, 144u8, 208u8, 218u8, 160u8, 130u8, 109u8, 101u8, 54u8, 210u8,
+							136u8, 71u8, 63u8, 49u8, 237u8, 234u8, 15u8, 178u8, 98u8, 148u8, 156u8,
+						],
+					)
+				}
+				#[doc = " Minimum bitcoin amount required for treasury certification."]
+				pub fn treasury_minimum_bitcoin(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u128,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"OperationalAccounts",
+						"TreasuryMinimumBitcoin",
+						[
+							84u8, 157u8, 140u8, 4u8, 93u8, 57u8, 29u8, 133u8, 105u8, 200u8, 214u8,
+							27u8, 144u8, 208u8, 218u8, 160u8, 130u8, 109u8, 101u8, 54u8, 210u8,
+							136u8, 71u8, 63u8, 49u8, 237u8, 234u8, 15u8, 178u8, 98u8, 148u8, 156u8,
+						],
+					)
+				}
+				#[doc = " Minimum bond amount required for treasury certification."]
+				pub fn treasury_minimum_bonds(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u128,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"OperationalAccounts",
+						"TreasuryMinimumBonds",
+						[
+							84u8, 157u8, 140u8, 4u8, 93u8, 57u8, 29u8, 133u8, 105u8, 200u8, 214u8,
+							27u8, 144u8, 208u8, 218u8, 160u8, 130u8, 109u8, 101u8, 54u8, 210u8,
+							136u8, 71u8, 63u8, 49u8, 237u8, 234u8, 15u8, 178u8, 98u8, 148u8, 156u8,
+						],
+					)
+				}
+				#[doc = " Minimum total Uniswap transfer amount required for operational certification."]
+				pub fn operational_minimum_uniswap_transfer(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u128,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"OperationalAccounts",
+						"OperationalMinimumUniswapTransfer",
+						[
+							84u8, 157u8, 140u8, 4u8, 93u8, 57u8, 29u8, 133u8, 105u8, 200u8, 214u8,
+							27u8, 144u8, 208u8, 218u8, 160u8, 130u8, 109u8, 101u8, 54u8, 210u8,
+							136u8, 71u8, 63u8, 49u8, 237u8, 234u8, 15u8, 178u8, 98u8, 148u8, 156u8,
 						],
 					)
 				}
@@ -24519,15 +24558,15 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Mining seats required per referral after operational."]
-				pub fn mining_seats_per_referral(
+				#[doc = " Mining seats required per follow-on upgrade code after operational certification."]
+				pub fn mining_seats_per_upgrade_code(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
 					::core::primitive::u32,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"OperationalAccounts",
-						"MiningSeatsPerReferral",
+						"MiningSeatsPerUpgradeCode",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
@@ -26642,9 +26681,10 @@ pub mod api {
 					pub type Param0 =
 						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
 				}
-				pub mod recent_argon_transfers_by_account {
+				pub mod transfer_totals_by_account {
 					use super::runtime_types;
-					pub type RecentArgonTransfersByAccount = ::core::primitive::u32;
+					pub type TransferTotalsByAccount =
+						runtime_types::pallet_crosschain_transfer::pallet::AccountTransferTotals;
 					pub type Param0 = crate::types::AccountId32;
 				}
 				pub mod council_approval_cursor_by_destination_chain_and_account_id {
@@ -26654,16 +26694,6 @@ pub mod api {
 					pub type Param0 =
 						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
 					pub type Param1 = crate::types::AccountId32;
-				}
-				pub mod inbound_transfers_expiring_at {
-					use super::runtime_types;
-					pub type InboundTransfersExpiringAt =
-						::subxt::ext::subxt_core::alloc::vec::Vec<crate::types::AccountId32>;
-					pub type Param0 = ::core::primitive::u64;
-				}
-				pub mod last_transfer_expiry_cleanup_tick {
-					use super::runtime_types;
-					pub type LastTransferExpiryCleanupTick = ::core::primitive::u64;
 				}
 				pub mod council_signer_by_destination_chain_and_account_id {
 					use super::runtime_types;
@@ -26923,50 +26953,48 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Count of still-retained qualifying Argon transfers for each local account."]
-				pub fn recent_argon_transfers_by_account_iter(
+				#[doc = " Cumulative inbound and outbound transfer totals for each local account."]
+				pub fn transfer_totals_by_account_iter(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
 					(),
-					types::recent_argon_transfers_by_account::RecentArgonTransfersByAccount,
+					types::transfer_totals_by_account::TransferTotalsByAccount,
 					(),
 					::subxt::ext::subxt_core::utils::Yes,
 					::subxt::ext::subxt_core::utils::Yes,
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"CrosschainTransfer",
-						"RecentArgonTransfersByAccount",
+						"TransferTotalsByAccount",
 						(),
 						[
-							127u8, 125u8, 229u8, 164u8, 182u8, 238u8, 187u8, 72u8, 20u8, 190u8,
-							110u8, 115u8, 44u8, 164u8, 251u8, 219u8, 207u8, 27u8, 163u8, 167u8,
-							77u8, 151u8, 78u8, 45u8, 203u8, 56u8, 227u8, 176u8, 152u8, 238u8,
-							163u8, 142u8,
+							164u8, 71u8, 217u8, 252u8, 92u8, 163u8, 225u8, 114u8, 101u8, 234u8,
+							253u8, 18u8, 131u8, 124u8, 97u8, 22u8, 115u8, 175u8, 40u8, 31u8, 151u8,
+							66u8, 52u8, 165u8, 134u8, 220u8, 27u8, 152u8, 181u8, 197u8, 46u8, 60u8,
 						],
 					)
 				}
-				#[doc = " Count of still-retained qualifying Argon transfers for each local account."]
-				pub fn recent_argon_transfers_by_account(
+				#[doc = " Cumulative inbound and outbound transfer totals for each local account."]
+				pub fn transfer_totals_by_account(
 					&self,
-					_0: types::recent_argon_transfers_by_account::Param0,
+					_0: types::transfer_totals_by_account::Param0,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
 					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
-						types::recent_argon_transfers_by_account::Param0,
+						types::transfer_totals_by_account::Param0,
 					>,
-					types::recent_argon_transfers_by_account::RecentArgonTransfersByAccount,
+					types::transfer_totals_by_account::TransferTotalsByAccount,
 					::subxt::ext::subxt_core::utils::Yes,
 					::subxt::ext::subxt_core::utils::Yes,
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"CrosschainTransfer",
-						"RecentArgonTransfersByAccount",
+						"TransferTotalsByAccount",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							127u8, 125u8, 229u8, 164u8, 182u8, 238u8, 187u8, 72u8, 20u8, 190u8,
-							110u8, 115u8, 44u8, 164u8, 251u8, 219u8, 207u8, 27u8, 163u8, 167u8,
-							77u8, 151u8, 78u8, 45u8, 203u8, 56u8, 227u8, 176u8, 152u8, 238u8,
-							163u8, 142u8,
+							164u8, 71u8, 217u8, 252u8, 92u8, 163u8, 225u8, 114u8, 101u8, 234u8,
+							253u8, 18u8, 131u8, 124u8, 97u8, 22u8, 115u8, 175u8, 40u8, 31u8, 151u8,
+							66u8, 52u8, 165u8, 134u8, 220u8, 27u8, 152u8, 181u8, 197u8, 46u8, 60u8,
 						],
 					)
 				}
@@ -27006,73 +27034,6 @@ pub mod api {
 							49u8, 67u8, 8u8, 150u8, 125u8, 113u8, 15u8, 18u8, 97u8, 170u8, 222u8,
 							190u8, 77u8, 69u8, 254u8, 249u8, 140u8, 66u8, 124u8, 231u8, 47u8,
 							207u8, 51u8, 109u8, 67u8, 68u8, 177u8, 81u8, 195u8, 73u8, 101u8, 239u8,
-						],
-					)
-				}
-				#[doc = " Accounts whose recent-transfer evidence expires at a given tick."]
-				pub fn inbound_transfers_expiring_at_iter(
-					&self,
-				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
-					(),
-					types::inbound_transfers_expiring_at::InboundTransfersExpiringAt,
-					(),
-					::subxt::ext::subxt_core::utils::Yes,
-					::subxt::ext::subxt_core::utils::Yes,
-				> {
-					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"CrosschainTransfer",
-						"InboundTransfersExpiringAt",
-						(),
-						[
-							69u8, 26u8, 171u8, 206u8, 219u8, 52u8, 118u8, 196u8, 10u8, 181u8,
-							173u8, 30u8, 221u8, 213u8, 163u8, 11u8, 159u8, 72u8, 15u8, 187u8, 92u8,
-							135u8, 45u8, 75u8, 51u8, 128u8, 90u8, 202u8, 157u8, 34u8, 120u8, 108u8,
-						],
-					)
-				}
-				#[doc = " Accounts whose recent-transfer evidence expires at a given tick."]
-				pub fn inbound_transfers_expiring_at(
-					&self,
-					_0: types::inbound_transfers_expiring_at::Param0,
-				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
-					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
-						types::inbound_transfers_expiring_at::Param0,
-					>,
-					types::inbound_transfers_expiring_at::InboundTransfersExpiringAt,
-					::subxt::ext::subxt_core::utils::Yes,
-					::subxt::ext::subxt_core::utils::Yes,
-					(),
-				> {
-					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"CrosschainTransfer",
-						"InboundTransfersExpiringAt",
-						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
-						[
-							69u8, 26u8, 171u8, 206u8, 219u8, 52u8, 118u8, 196u8, 10u8, 181u8,
-							173u8, 30u8, 221u8, 213u8, 163u8, 11u8, 159u8, 72u8, 15u8, 187u8, 92u8,
-							135u8, 45u8, 75u8, 51u8, 128u8, 90u8, 202u8, 157u8, 34u8, 120u8, 108u8,
-						],
-					)
-				}
-				#[doc = " Latest tick whose recent-transfer expiration bucket was cleaned up."]
-				pub fn last_transfer_expiry_cleanup_tick(
-					&self,
-				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
-					(),
-					types::last_transfer_expiry_cleanup_tick::LastTransferExpiryCleanupTick,
-					::subxt::ext::subxt_core::utils::Yes,
-					::subxt::ext::subxt_core::utils::Yes,
-					(),
-				> {
-					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"CrosschainTransfer",
-						"LastTransferExpiryCleanupTick",
-						(),
-						[
-							196u8, 191u8, 170u8, 209u8, 132u8, 141u8, 208u8, 71u8, 48u8, 11u8,
-							196u8, 240u8, 21u8, 211u8, 125u8, 132u8, 163u8, 163u8, 217u8, 254u8,
-							191u8, 75u8, 92u8, 159u8, 150u8, 13u8, 29u8, 250u8, 33u8, 219u8, 240u8,
-							113u8,
 						],
 					)
 				}
@@ -27673,24 +27634,6 @@ pub mod api {
 							155u8, 157u8, 224u8, 66u8, 3u8, 250u8, 23u8, 53u8, 88u8, 168u8, 211u8,
 							204u8, 122u8, 166u8, 248u8, 23u8, 174u8, 225u8, 99u8, 108u8, 89u8,
 							135u8,
-						],
-					)
-				}
-				#[doc = " Retention window, in ticks, for recent Argon transfer evidence used by operational"]
-				#[doc = " accounts."]
-				pub fn recent_transfer_retention_ticks(
-					&self,
-				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
-					::core::primitive::u64,
-				> {
-					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
-						"CrosschainTransfer",
-						"RecentTransferRetentionTicks",
-						[
-							128u8, 214u8, 205u8, 242u8, 181u8, 142u8, 124u8, 231u8, 190u8, 146u8,
-							59u8, 226u8, 157u8, 101u8, 103u8, 117u8, 249u8, 65u8, 18u8, 191u8,
-							103u8, 119u8, 53u8, 85u8, 81u8, 96u8, 220u8, 42u8, 184u8, 239u8, 42u8,
-							246u8,
 						],
 					)
 				}
@@ -29548,7 +29491,7 @@ pub mod api {
 					#[codec(index = 0)]
 					Activation,
 					#[codec(index = 1)]
-					ReferralBonus,
+					OperationalReferralBonus,
 				}
 			}
 			pub mod tick {
@@ -32326,6 +32269,32 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
+				pub struct AccountTransferTotals {
+					pub microgons_in: ::core::primitive::u128,
+					pub microgons_out: ::core::primitive::u128,
+					#[codec(compact)]
+					pub argon_transfers_in_count: ::core::primitive::u32,
+					#[codec(compact)]
+					pub argon_transfers_out_count: ::core::primitive::u32,
+					pub micronots_in: ::core::primitive::u128,
+					pub micronots_out: ::core::primitive::u128,
+					#[codec(compact)]
+					pub argonot_transfers_in_count: ::core::primitive::u32,
+					#[codec(compact)]
+					pub argonot_transfers_out_count: ::core::primitive::u32,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
 				pub enum AssetKind {
 					#[codec(index = 0)]
 					Argon,
@@ -34875,7 +34844,7 @@ pub mod api {
 				)]
 				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 				pub enum Call {
-					# [codec (index = 0)] # [doc = "Register vault, mining funding, and bot accounts for an operational account."] # [doc = "Any account in the registration may submit the transaction."] # [doc = "If a referral proof is provided, the registration records the sponsor relationship."] # [doc = "When invite-only is enabled, a valid referral proof is required."] register { registration : runtime_types :: pallet_operational_accounts :: pallet :: Registration , } , # [codec (index = 2)] # [doc = "Update reward amounts for operational accounts."] set_reward_config { operational_referral_reward : :: core :: primitive :: u128 , referral_bonus_reward : :: core :: primitive :: u128 , } , # [codec (index = 3)] # [doc = "Force-update operational progress markers for an account."] force_set_progress { owner : crate :: types :: AccountId32 , patch : runtime_types :: pallet_operational_accounts :: pallet :: OperationalProgressPatch < :: core :: primitive :: u128 > , update_operational_progress : :: core :: primitive :: bool , } , # [codec (index = 4)] # [doc = "Store an opaque encrypted sponsor server payload for a sponsored operational account."] set_encrypted_server_for_sponsee { sponsee : crate :: types :: AccountId32 , encrypted_server : :: subxt :: ext :: subxt_core :: alloc :: vec :: Vec < :: core :: primitive :: u8 > , } , # [codec (index = 5)] # [doc = "Activate an eligible operational account from any managed account."] activate , # [codec (index = 6)] # [doc = "Claim pending operational rewards to any managed account."] claim_rewards { amount : :: core :: primitive :: u128 , } , }
+					# [codec (index = 0)] # [doc = "Register vault and mining accounts for an operational account."] # [doc = "Any account in the registration may submit the transaction."] # [doc = "When invite-only is enabled, the registration must include a referrer."] register { registration : runtime_types :: pallet_operational_accounts :: pallet :: Registration , } , # [codec (index = 1)] # [doc = "Grant a referrer upgrade to an already-registered operational account."] upgrade_account { account_id : crate :: types :: AccountId32 , } , # [codec (index = 2)] # [doc = "Update reward amounts for operational accounts."] set_reward_config { operational_activation_reward : :: core :: primitive :: u128 , operational_referral_bonus_reward : :: core :: primitive :: u128 , } , # [codec (index = 3)] # [doc = "Force-update operational progress markers for an account."] force_set_progress { owner : crate :: types :: AccountId32 , patch : runtime_types :: pallet_operational_accounts :: pallet :: OperationalProgressPatch < :: core :: primitive :: u128 > , update_operational_progress : :: core :: primitive :: bool , } , # [codec (index = 4)] # [doc = "Store an opaque encrypted referrer server payload for a downstream account."] set_encrypted_server_for_downstream_account { downstream_account : crate :: types :: AccountId32 , encrypted_server : :: subxt :: ext :: subxt_core :: alloc :: vec :: Vec < :: core :: primitive :: u8 > , } , # [codec (index = 5)] # [doc = "Activate an eligible operational account from any managed account."] activate , # [codec (index = 6)] # [doc = "Claim pending operational rewards to any managed account."] claim_rewards { amount : :: core :: primitive :: u128 , } , }
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
 					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
@@ -34903,45 +34872,60 @@ pub mod api {
 					#[doc = "One of the linked account ownership proofs is invalid."]
 					InvalidAccountProof,
 					#[codec(index = 4)]
-					#[doc = "The caller has not registered an operational account."]
+					#[doc = "The requested account has not registered operational accounts."]
 					NotOperationalAccount,
 					#[codec(index = 5)]
-					#[doc = "The referral proof or sponsor proof is invalid."]
-					InvalidReferralProof,
-					#[codec(index = 6)]
-					#[doc = "The referral proof has expired."]
-					ReferralProofExpired,
-					#[codec(index = 7)]
 					#[doc = "A valid invite is required to register an operational account."]
 					RegistrationInviteRequired,
+					#[codec(index = 6)]
+					#[doc = "The requested referrer does not have a registered operational account."]
+					ReferrerNotOperationalAccount,
+					#[codec(index = 7)]
+					#[doc = "The requested referrer does not match the referrer recorded during registration."]
+					RegisteredReferrerMismatch,
 					#[codec(index = 8)]
+					#[doc = "The requested account has not reached treasury certification."]
+					NotTreasuryCertified,
+					#[codec(index = 9)]
+					#[doc = "The requested account no longer satisfies treasury certification requirements."]
+					TreasuryCertificationNoLongerMet,
+					#[codec(index = 10)]
+					#[doc = "The requested account is already upgraded to operational."]
+					AccountAlreadyUpgraded,
+					#[codec(index = 11)]
+					#[doc = "The requested referrer does not have an available upgrade to spend."]
+					NoAvailableUpgrades,
+					#[codec(index = 12)]
+					#[doc = "An account cannot upgrade itself."]
+					CannotUpgradeSelf,
+					#[codec(index = 13)]
 					#[doc = "The requested progress patch does not contain any updates."]
 					NoProgressUpdateProvided,
-					#[codec(index = 9)]
+					#[codec(index = 14)]
 					#[doc = "The encrypted server payload exceeds the configured max length."]
 					EncryptedServerTooLong,
-					#[codec(index = 10)]
-					#[doc = "The caller is not the sponsor of the requested sponsee."]
-					NotSponsorOfSponsee,
-					#[codec(index = 11)]
+					#[codec(index = 15)]
+					#[doc = "The caller is not the referrer of the requested downstream account."]
+					NotReferrerOfAccount,
+					#[codec(index = 16)]
 					#[doc = "The operational account has no pending rewards to claim."]
 					NoPendingRewards,
-					#[codec(index = 12)]
+					#[codec(index = 17)]
 					#[doc = "Reward claims must be at least one Argon."]
 					RewardClaimBelowMinimum,
-					#[codec(index = 13)]
+					#[codec(index = 18)]
 					#[doc = "Reward claims must be whole Argon increments."]
 					RewardClaimNotWholeArgon,
-					#[codec(index = 14)]
+					#[codec(index = 19)]
 					#[doc = "The requested reward claim exceeds pending rewards."]
 					RewardClaimExceedsPending,
-					#[codec(index = 15)]
+					#[codec(index = 20)]
 					#[doc = "The treasury does not currently have enough available reserves for the claim."]
 					TreasuryInsufficientFunds,
-					#[codec(index = 16)]
+					#[codec(index = 21)]
 					#[doc = "The account is already operational."]
 					AlreadyOperational,
-					#[codec(index = 17)]
+					#[codec(index = 22)]
 					#[doc = "The account has not satisfied operational requirements yet."]
 					NotEligibleForActivation,
 				}
@@ -34964,14 +34948,22 @@ pub mod api {
 					OperationalAccountRegistered {
 						operational_account: crate::types::AccountId32,
 						vault_account: crate::types::AccountId32,
-						mining_funding_account: crate::types::AccountId32,
-						mining_bot_account: crate::types::AccountId32,
-						sponsor: ::core::option::Option<crate::types::AccountId32>,
+						mining_account: crate::types::AccountId32,
+						referrer: ::core::option::Option<crate::types::AccountId32>,
 					},
 					#[codec(index = 1)]
+					#[doc = "A referrer granted an operational upgrade to an existing account."]
+					AccountUpgradeGranted {
+						account: crate::types::AccountId32,
+						referrer: crate::types::AccountId32,
+					},
+					#[codec(index = 2)]
+					#[doc = "Account has become treasury certified."]
+					AccountBecameTreasuryCertified { account: crate::types::AccountId32 },
+					#[codec(index = 3)]
 					#[doc = "Account has become operational."]
 					AccountWentOperational { account: crate::types::AccountId32 },
-					#[codec(index = 2)]
+					#[codec(index = 4)]
 					#[doc = "A reward is earned for an operational account, but not yet claimed."]
 					OperationalRewardEarned {
 						account: crate::types::AccountId32,
@@ -34979,7 +34971,7 @@ pub mod api {
 							runtime_types::argon_primitives::providers::OperationalRewardKind,
 						amount: ::core::primitive::u128,
 					},
-					#[codec(index = 3)]
+					#[codec(index = 5)]
 					#[doc = "Claimable operational rewards were paid to a managed account."]
 					OperationalRewardsClaimed {
 						operational_account: crate::types::AccountId32,
@@ -34987,28 +34979,30 @@ pub mod api {
 						amount: ::core::primitive::u128,
 						remaining_pending: ::core::primitive::u128,
 					},
-					#[codec(index = 4)]
+					#[codec(index = 6)]
 					#[doc = "Reward config values were updated."]
 					RewardsConfigUpdated {
-						operational_referral_reward: ::core::primitive::u128,
-						referral_bonus_reward: ::core::primitive::u128,
+						operational_activation_reward: ::core::primitive::u128,
+						operational_referral_bonus_reward: ::core::primitive::u128,
 					},
-					#[codec(index = 5)]
+					#[codec(index = 7)]
 					#[doc = "Operational progress was forced by root."]
 					OperationalProgressForced {
 						account: crate::types::AccountId32,
 						update_operational_progress: ::core::primitive::bool,
-						has_uniswap_transfer: ::core::primitive::bool,
+						is_treasury_certified: ::core::primitive::bool,
+						uniswap_argon_transfers_in_amount: ::core::primitive::u128,
+						account_bitcoin_amount: ::core::primitive::u128,
+						account_vault_bond_amount: ::core::primitive::u128,
 						vault_created: ::core::primitive::bool,
-						has_treasury_pool_participation: ::core::primitive::bool,
-						observed_bitcoin_total: ::core::primitive::u128,
-						observed_mining_seat_total: ::core::primitive::u32,
+						operator_vault_bitcoin_amount: ::core::primitive::u128,
+						mining_seat_count: ::core::primitive::u32,
 					},
-					#[codec(index = 6)]
-					#[doc = "A sponsor updated the encrypted server payload for a sponsee."]
+					#[codec(index = 8)]
+					#[doc = "A referrer updated the encrypted server payload for a downstream account."]
 					EncryptedServerUpdated {
-						sponsor: crate::types::AccountId32,
-						sponsee: crate::types::AccountId32,
+						referrer: crate::types::AccountId32,
+						downstream_account: crate::types::AccountId32,
 					},
 				}
 				#[derive(
@@ -35038,30 +35032,32 @@ pub mod api {
 				)]
 				pub struct OperationalAccount {
 					pub vault_account: crate::types::AccountId32,
-					pub mining_funding_account: crate::types::AccountId32,
-					pub mining_bot_account: crate::types::AccountId32,
+					pub mining_account: crate::types::AccountId32,
 					pub encryption_pubkey:
 						runtime_types::pallet_operational_accounts::pallet::OpaqueEncryptionPubkey,
-					pub sponsor: ::core::option::Option<crate::types::AccountId32>,
-					pub has_uniswap_transfer: ::core::primitive::bool,
+					pub referrer: ::core::option::Option<crate::types::AccountId32>,
+					pub is_treasury_certified: ::core::primitive::bool,
+					pub is_upgraded_to_operations: ::core::primitive::bool,
+					pub uniswap_argon_transfers_in_amount: ::core::primitive::u128,
+					pub account_bitcoin_amount: ::core::primitive::u128,
+					pub account_vault_bond_amount: ::core::primitive::u128,
 					pub vault_created: ::core::primitive::bool,
-					pub bitcoin_accrual: ::core::primitive::u128,
-					pub bitcoin_applied_total: ::core::primitive::u128,
-					pub has_treasury_pool_participation: ::core::primitive::bool,
+					pub vault_bitcoin_accrual: ::core::primitive::u128,
+					pub vault_bitcoin_applied_total: ::core::primitive::u128,
 					#[codec(compact)]
 					pub mining_seat_accrual: ::core::primitive::u32,
 					#[codec(compact)]
 					pub mining_seat_applied_total: ::core::primitive::u32,
 					#[codec(compact)]
 					pub operational_referrals_count: ::core::primitive::u32,
-					pub referral_pending: ::core::primitive::bool,
+					pub upgrade_code_pending: ::core::primitive::bool,
 					#[codec(compact)]
-					pub available_referrals: ::core::primitive::u32,
+					pub available_upgrade_codes: ::core::primitive::u32,
 					#[codec(compact)]
 					pub rewards_earned_count: ::core::primitive::u32,
 					pub rewards_earned_amount: ::core::primitive::u128,
 					pub rewards_collected_amount: ::core::primitive::u128,
-					pub is_operational: ::core::primitive::bool,
+					pub is_operationally_certified: ::core::primitive::bool,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -35076,32 +35072,12 @@ pub mod api {
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
 				pub struct OperationalProgressPatch<_0> {
-					pub has_uniswap_transfer: ::core::option::Option<::core::primitive::bool>,
+					pub uniswap_argon_transfers_in_amount: ::core::option::Option<_0>,
+					pub account_bitcoin_amount: ::core::option::Option<_0>,
+					pub account_vault_bond_amount: ::core::option::Option<_0>,
 					pub vault_created: ::core::option::Option<::core::primitive::bool>,
-					pub has_treasury_pool_participation:
-						::core::option::Option<::core::primitive::bool>,
-					pub observed_bitcoin_total: ::core::option::Option<_0>,
-					pub observed_mining_seat_total: ::core::option::Option<::core::primitive::u32>,
-				}
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
-				pub struct ReferralProof<_0> {
-					pub referral_code: [::core::primitive::u8; 32usize],
-					pub referral_signature: [::core::primitive::u8; 64usize],
-					pub sponsor: _0,
-					#[codec(compact)]
-					pub expires_at_frame: ::core::primitive::u64,
-					pub sponsor_signature: runtime_types::sp_runtime::MultiSignature,
+					pub vault_bitcoin_amount: ::core::option::Option<_0>,
+					pub mining_seat_count: ::core::option::Option<::core::primitive::u32>,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -35138,19 +35114,12 @@ pub mod api {
 					pub operational_account_proof:
 						runtime_types::pallet_operational_accounts::pallet::AccountOwnershipProof,
 					pub vault_account: crate::types::AccountId32,
-					pub mining_funding_account: crate::types::AccountId32,
-					pub mining_bot_account: crate::types::AccountId32,
+					pub mining_account: crate::types::AccountId32,
 					pub vault_account_proof:
 						runtime_types::pallet_operational_accounts::pallet::AccountOwnershipProof,
-					pub mining_funding_account_proof:
+					pub mining_account_proof:
 						runtime_types::pallet_operational_accounts::pallet::AccountOwnershipProof,
-					pub mining_bot_account_proof:
-						runtime_types::pallet_operational_accounts::pallet::AccountOwnershipProof,
-					pub referral_proof: ::core::option::Option<
-						runtime_types::pallet_operational_accounts::pallet::ReferralProof<
-							crate::types::AccountId32,
-						>,
-					>,
+					pub referrer: ::core::option::Option<crate::types::AccountId32>,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -35166,9 +35135,9 @@ pub mod api {
 				)]
 				pub struct RewardsConfig<_0> {
 					#[codec(compact)]
-					pub operational_referral_reward: _0,
+					pub operational_activation_reward: _0,
 					#[codec(compact)]
-					pub referral_bonus_reward: _0,
+					pub operational_referral_bonus_reward: _0,
 				}
 			}
 		}

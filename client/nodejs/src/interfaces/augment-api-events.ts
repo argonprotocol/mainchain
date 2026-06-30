@@ -1242,6 +1242,22 @@ declare module '@polkadot/api-base/types/events' {
     };
     operationalAccounts: {
       /**
+       * Account has become treasury certified.
+       **/
+      AccountBecameTreasuryCertified: AugmentedEvent<
+        ApiType,
+        [account: AccountId32],
+        { account: AccountId32 }
+      >;
+      /**
+       * A referrer granted an operational upgrade to an existing account.
+       **/
+      AccountUpgradeGranted: AugmentedEvent<
+        ApiType,
+        [account: AccountId32, referrer: AccountId32],
+        { account: AccountId32; referrer: AccountId32 }
+      >;
+      /**
        * Account has become operational.
        **/
       AccountWentOperational: AugmentedEvent<
@@ -1250,12 +1266,12 @@ declare module '@polkadot/api-base/types/events' {
         { account: AccountId32 }
       >;
       /**
-       * A sponsor updated the encrypted server payload for a sponsee.
+       * A referrer updated the encrypted server payload for a downstream account.
        **/
       EncryptedServerUpdated: AugmentedEvent<
         ApiType,
-        [sponsor: AccountId32, sponsee: AccountId32],
-        { sponsor: AccountId32; sponsee: AccountId32 }
+        [referrer: AccountId32, downstreamAccount: AccountId32],
+        { referrer: AccountId32; downstreamAccount: AccountId32 }
       >;
       /**
        * An operational account was registered with its linked accounts.
@@ -1265,16 +1281,14 @@ declare module '@polkadot/api-base/types/events' {
         [
           operationalAccount: AccountId32,
           vaultAccount: AccountId32,
-          miningFundingAccount: AccountId32,
-          miningBotAccount: AccountId32,
-          sponsor: Option<AccountId32>,
+          miningAccount: AccountId32,
+          referrer: Option<AccountId32>,
         ],
         {
           operationalAccount: AccountId32;
           vaultAccount: AccountId32;
-          miningFundingAccount: AccountId32;
-          miningBotAccount: AccountId32;
-          sponsor: Option<AccountId32>;
+          miningAccount: AccountId32;
+          referrer: Option<AccountId32>;
         }
       >;
       /**
@@ -1285,20 +1299,24 @@ declare module '@polkadot/api-base/types/events' {
         [
           account: AccountId32,
           updateOperationalProgress: bool,
-          hasUniswapTransfer: bool,
+          isTreasuryCertified: bool,
+          uniswapArgonTransfersInAmount: u128,
+          accountBitcoinAmount: u128,
+          accountVaultBondAmount: u128,
           vaultCreated: bool,
-          hasTreasuryPoolParticipation: bool,
-          observedBitcoinTotal: u128,
-          observedMiningSeatTotal: u32,
+          operatorVaultBitcoinAmount: u128,
+          miningSeatCount: u32,
         ],
         {
           account: AccountId32;
           updateOperationalProgress: bool;
-          hasUniswapTransfer: bool;
+          isTreasuryCertified: bool;
+          uniswapArgonTransfersInAmount: u128;
+          accountBitcoinAmount: u128;
+          accountVaultBondAmount: u128;
           vaultCreated: bool;
-          hasTreasuryPoolParticipation: bool;
-          observedBitcoinTotal: u128;
-          observedMiningSeatTotal: u32;
+          operatorVaultBitcoinAmount: u128;
+          miningSeatCount: u32;
         }
       >;
       /**
@@ -1340,8 +1358,8 @@ declare module '@polkadot/api-base/types/events' {
        **/
       RewardsConfigUpdated: AugmentedEvent<
         ApiType,
-        [operationalReferralReward: u128, referralBonusReward: u128],
-        { operationalReferralReward: u128; referralBonusReward: u128 }
+        [operationalActivationReward: u128, operationalReferralBonusReward: u128],
+        { operationalActivationReward: u128; operationalReferralBonusReward: u128 }
       >;
     };
     ownership: {

@@ -400,12 +400,6 @@ mod benchmarks {
 						.then_some(transfer_id)
 				})
 				.ok_or(BenchmarkError::Stop("benchmark expired transfer id missing"))?;
-			TransferOutById::<T>::mutate(transfer_id, |maybe_transfer| {
-				let transfer = maybe_transfer
-					.as_mut()
-					.expect("benchmark transfer should stay present during expiry setup");
-				transfer.valid_until_ethereum_block = u64::from(transfer_index % a);
-			});
 
 			let signature = benchmark_transfer_collateral_signature::<T>(
 				authority_signer,
@@ -423,6 +417,12 @@ mod benchmarks {
 			.map_err(|_| {
 				BenchmarkError::Stop("failed to fully collateralize benchmark transfer")
 			})?;
+			TransferOutById::<T>::mutate(transfer_id, |maybe_transfer| {
+				let transfer = maybe_transfer
+					.as_mut()
+					.expect("benchmark transfer should stay present during expiry setup");
+				transfer.valid_until_ethereum_block = u64::from(transfer_index % a);
+			});
 		}
 
 		let proof_blocks = (0..a)
@@ -589,27 +589,6 @@ mod benchmarks {
 	}
 
 	#[benchmark]
-	fn on_initialize_cleanup(e: Linear<1, 1_000>) -> Result<(), BenchmarkError> {
-		reset_crosschain_benchmark_state::<T>();
-		let current_tick = T::CurrentTick::get();
-
-		for index in 0..e {
-			let account_id: T::AccountId = account("expiring-crosschain-account", index, 0);
-			RecentArgonTransfersByAccount::<T>::insert(&account_id, 1);
-			InboundTransfersExpiringAt::<T>::append(current_tick, account_id);
-		}
-
-		#[block]
-		{
-			CrosschainTransferPallet::<T>::on_initialize(frame_system::Pallet::<T>::block_number());
-		}
-
-		assert!(InboundTransfersExpiringAt::<T>::get(current_tick).is_empty());
-		assert_eq!(LastTransferExpiryCleanupTick::<T>::get(), current_tick);
-		Ok(())
-	}
-
-	#[benchmark]
 	fn provider_is_crosschain_activated() -> Result<(), BenchmarkError> {
 		reset_crosschain_benchmark_state::<T>();
 		seed_chain_config::<T>(0x21);
@@ -625,15 +604,22 @@ mod benchmarks {
 	}
 
 	#[benchmark]
-	fn provider_has_recent_argon_transfer() -> Result<(), BenchmarkError> {
+	fn provider_account_uniswap_argon_transfers_in_amount() -> Result<(), BenchmarkError> {
 		reset_crosschain_benchmark_state::<T>();
-		let account_id: T::AccountId = account("recent-crosschain-transfer-account", 0, 0);
-		RecentArgonTransfersByAccount::<T>::insert(&account_id, 1);
+		let account_id: T::AccountId = account("crosschain-transfer-account", 0, 0);
+		TransferTotalsByAccount::<T>::insert(
+			&account_id,
+			AccountTransferTotals {
+				microgons_in: T::Balance::from(1u128),
+				argon_transfers_in_count: 1,
+				..Default::default()
+			},
+		);
 
 		#[block]
 		{
 			assert!(
-				<CrosschainTransferPallet<T> as UniswapTransferProvider<T::AccountId>>::has_recent_argon_transfer(&account_id)
+				<CrosschainTransferPallet<T> as UniswapTransferProvider<T::AccountId>>::account_uniswap_argon_transfers_in_amount(&account_id) > 0u128.into()
 			);
 		}
 
@@ -715,7 +701,7 @@ fn benchmark_vault_terms<T: Config>() -> VaultTerms<T::Balance> {
 
 fn seed_benchmark_vault<T: Config>(operator: &T::AccountId, vault_id: VaultId, securitization: u128)
 where
-	T::AccountId: Ord,
+	T::AccountId: Ord + Into<[u8; 32]>,
 {
 	let mut state = BenchmarkBitcoinVaultProviderState::<T::AccountId, T::Balance>::default();
 	state.vaults.insert(
@@ -741,6 +727,15 @@ where
 		},
 	);
 	set_benchmark_bitcoin_vault_provider_state(state);
+
+	#[cfg(test)]
+	{
+		crate::mock::register_vault_operator(
+			sp_runtime::AccountId32::new(operator.clone().into()),
+			vault_id,
+			securitization,
+		);
+	}
 }
 
 fn seed_chain_config<T: Config>(gateway_byte: u8) {

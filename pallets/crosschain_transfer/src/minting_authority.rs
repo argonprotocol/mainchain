@@ -434,7 +434,7 @@ mod tests {
 		tests::{
 			account, activate_test_minting_authority, assert_noop, assert_ok, bounded_vec,
 			encumbered_argonot_micronots, encumbered_bond_microgons, h160,
-			minting_authority_registration_signature, new_test_ext, set_active_bond_amount,
+			minting_authority_registration_signature, new_test_ext, set_active_vault_bond_amount,
 			set_committed_argonots, transfer_collateral_signature, Balances, CrosschainTransfer,
 			Mutate, Ownership, RuntimeOrigin, TokenError,
 		},
@@ -483,7 +483,7 @@ mod tests {
 				),
 				Error::<Test>::InvalidMintingAuthoritySigningKeyProof,
 			);
-			set_active_bond_amount(7, owner_vault_operator.clone(), 500);
+			set_active_vault_bond_amount(7, owner_vault_operator.clone(), 500);
 			assert_noop!(
 				CrosschainTransfer::register_minting_authority(
 					RuntimeOrigin::signed(owner_vault_operator.clone()),
@@ -498,7 +498,7 @@ mod tests {
 				),
 				Error::<Test>::InsufficientCommittedMicrogonCollateral,
 			);
-			set_active_bond_amount(7, owner_vault_operator.clone(), 10_000);
+			set_active_vault_bond_amount(7, owner_vault_operator.clone(), 10_000);
 
 			assert_ok!(CrosschainTransfer::register_minting_authority(
 				RuntimeOrigin::signed(owner_vault_operator.clone()),
@@ -660,7 +660,7 @@ mod tests {
 				&council_pair,
 			);
 			assert_ok!(Balances::mint_into(&authority_account, 10_000));
-			set_active_bond_amount(18, authority_account.clone(), 10_000);
+			set_active_vault_bond_amount(18, authority_account.clone(), 10_000);
 
 			let active_council_hash =
 				ActiveGlobalIssuanceCouncilByDestinationChain::<Test>::get(SourceChain::Ethereum)
@@ -873,7 +873,7 @@ mod tests {
 			assert_eq!(authority.active_pending_transfer_ids, vec![transfer_id]);
 
 			let second_signing_key = council_signer(&second_authority_pair);
-			set_active_bond_amount(25, authority_account.clone(), 20_000);
+			set_active_vault_bond_amount(25, authority_account.clone(), 20_000);
 			assert_ok!(CrosschainTransfer::register_minting_authority(
 				RuntimeOrigin::signed(authority_account.clone()),
 				SourceChain::Ethereum,

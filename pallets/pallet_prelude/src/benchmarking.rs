@@ -53,22 +53,26 @@ pub struct BenchmarkNotebookProviderState {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct BenchmarkOperationalAccountsProviderCallCounters {
 	pub get_registration_vault_data: u32,
+	pub get_account_funded_bitcoin_amount: u32,
 	pub is_eligible: u32,
 	pub has_active_rewards_account_seat: u32,
-	pub has_bond_participation: u32,
+	pub has_vault_bond_participation: u32,
+	pub active_vault_bond_amount: u32,
+	pub active_account_vault_bond_amount: u32,
 	pub is_crosschain_activated: u32,
-	pub has_recent_argon_transfer: u32,
+	pub account_uniswap_argon_transfers_in_amount: u32,
 	pub account_became_operational: u32,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BenchmarkOperationalAccountsProviderState {
 	pub vault_registration_data: Option<RegistrationVaultData<u128>>,
+	pub account_bitcoin_amount: u128,
 	pub is_eligible: bool,
 	pub has_active_rewards_account_seat: bool,
-	pub has_bond_participation: bool,
+	pub active_account_vault_bond_amount: u128,
 	pub is_crosschain_activated: bool,
-	pub has_recent_argon_transfer: bool,
+	pub account_uniswap_argon_transfers_in_amount: u128,
 	pub call_counters: BenchmarkOperationalAccountsProviderCallCounters,
 }
 
@@ -76,11 +80,12 @@ impl Default for BenchmarkOperationalAccountsProviderState {
 	fn default() -> Self {
 		Self {
 			vault_registration_data: None,
+			account_bitcoin_amount: 0,
 			is_eligible: true,
 			has_active_rewards_account_seat: false,
-			has_bond_participation: false,
+			active_account_vault_bond_amount: 0,
 			is_crosschain_activated: false,
-			has_recent_argon_transfer: false,
+			account_uniswap_argon_transfers_in_amount: 0,
 			call_counters: Default::default(),
 		}
 	}
@@ -1568,7 +1573,7 @@ where
 	Balance: Codec + Copy,
 {
 	pub last_lock_event: Option<(UtxoId, AccountId, Balance)>,
-	pub last_release_event: Option<(UtxoId, bool, Balance)>,
+	pub last_release_event: Option<(UtxoId, AccountId, bool, Balance, Balance)>,
 }
 
 impl<AccountId, Balance> Default for BenchmarkUtxoLockEventsState<AccountId, Balance>
@@ -1621,11 +1626,19 @@ where
 
 	fn utxo_released(
 		utxo_id: UtxoId,
+		account_id: &AccountId,
 		remove_pending_mints: bool,
 		burned_argons: Balance,
+		original_liquidity_promised: Balance,
 	) -> DispatchResult {
 		let mut state = benchmark_utxo_lock_events_state::<AccountId, Balance>();
-		state.last_release_event = Some((utxo_id, remove_pending_mints, burned_argons));
+		state.last_release_event = Some((
+			utxo_id,
+			account_id.clone(),
+			remove_pending_mints,
+			burned_argons,
+			original_liquidity_promised,
+		));
 		set_benchmark_utxo_lock_events_state(state);
 		Ok(())
 	}

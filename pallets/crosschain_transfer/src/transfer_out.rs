@@ -510,6 +510,7 @@ impl<T: Config> Pallet<T> {
 
 		if let Some(transfer) = local_transfer.as_ref() {
 			Self::pay_transfer_out_minting_authority_tip(transfer, &finalized_collateral_rows)?;
+			Self::record_transfer_out(&transfer.argon_account_id, asset, amount);
 		}
 		Self::deposit_event(Event::TransferOutFinalized { source_chain, transfer_id });
 		Ok(())
@@ -1149,6 +1150,10 @@ mod test {
 				NonTerminalTransferOutCountByDestinationChain::<Test>::get(SourceChain::Ethereum),
 				1,
 			);
+			assert_eq!(
+				TransferTotalsByAccount::<Test>::get(&user),
+				AccountTransferTotals::default(),
+			);
 		});
 	}
 
@@ -1594,6 +1599,18 @@ mod test {
 				NonTerminalTransferOutCountByDestinationChain::<Test>::get(SourceChain::Ethereum),
 				1,
 			);
+			assert_eq!(
+				TransferTotalsByAccount::<Test>::get(&first_user),
+				AccountTransferTotals {
+					microgons_out: 5_000,
+					argon_transfers_out_count: 1,
+					..Default::default()
+				},
+			);
+			assert_eq!(
+				TransferTotalsByAccount::<Test>::get(&second_user),
+				AccountTransferTotals::default(),
+			);
 		});
 	}
 
@@ -1757,6 +1774,14 @@ mod test {
 			assert_eq!(
 				TransferOutById::<Test>::get(second_transfer_id).map(|transfer| transfer.amount),
 				Some(5_000)
+			);
+			assert_eq!(
+				TransferTotalsByAccount::<Test>::get(&user),
+				AccountTransferTotals::default(),
+			);
+			assert_eq!(
+				TransferTotalsByAccount::<Test>::get(&second_user),
+				AccountTransferTotals::default(),
 			);
 			assert_eq!(
 				Balances::balance_on_hold(
