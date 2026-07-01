@@ -286,10 +286,13 @@ methods:
       size: 1
 
   - method: system_name
-    response: Subway
+    cache:
+      size: 1
 
   - method: system_version
-    response: 1.0.0-dev
+    cache:
+      size: 1
+      ttl_seconds: 300
 
   - method: system_chainType
     cache:
@@ -300,7 +303,8 @@ methods:
       size: 1
 
   - method: system_nodeRoles
-    response: [ 'Full' ]
+    cache:
+      size: 1
 
   - method: system_localListenAddresses
     cache:

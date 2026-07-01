@@ -1,6 +1,4 @@
 ARG UPSTREAM_SUBWAY_REF=v0.1.2
-ARG ARGON_RPC_VERSION=dev
-ARG VCS_REF=unknown
 
 FROM docker.io/library/rust:1.86 AS builder
 
@@ -23,17 +21,8 @@ RUN cargo install \
 FROM docker.io/library/ubuntu:22.04
 
 ARG UPSTREAM_SUBWAY_REF
-ARG ARGON_RPC_VERSION
-ARG VCS_REF
 
-LABEL org.opencontainers.image.title="Argon RPC" \
-      org.opencontainers.image.description="Argon RPC gateway packaging Acala Subway with Argon defaults" \
-      org.opencontainers.image.source="https://github.com/argonprotocol/mainchain" \
-      org.opencontainers.image.licenses="MIT" \
-      org.opencontainers.image.vendor="Argon Foundation" \
-      org.opencontainers.image.version="${ARGON_RPC_VERSION}" \
-      org.opencontainers.image.revision="${VCS_REF}" \
-      io.argonprotocol.upstream-subway.repository="https://github.com/AcalaNetwork/subway" \
+LABEL io.argonprotocol.upstream-subway.repository="https://github.com/AcalaNetwork/subway" \
       io.argonprotocol.upstream-subway.ref="${UPSTREAM_SUBWAY_REF}"
 
 RUN apt-get update && \

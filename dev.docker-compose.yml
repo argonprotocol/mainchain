@@ -235,9 +235,6 @@ services:
     build:
       context: .
       dockerfile: docker/argon-rpc/Containerfile
-      args:
-        ARGON_RPC_VERSION: ${VERSION:-dev}
-        VCS_REF: ${VCS_REF:-unknown}
     restart: on-failure
     depends_on:
       archive-node:
@@ -268,9 +265,10 @@ services:
       test:
         - CMD-SHELL
         - >
-          bash -lc "exec 3<>/dev/tcp/127.0.0.1/9944 &&
-          printf 'GET /liveness HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n' >&3 &&
-          grep -q '200 OK' <&3"
+          bash -lc 'exec 3<>/dev/tcp/127.0.0.1/9944 &&
+          printf "GET /liveness HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n" >&3 &&
+          IFS= read -r status <&3 &&
+          [[ $$status == *"200 OK"* ]]'
       interval: 5s
       timeout: 5s
       start_period: 10s

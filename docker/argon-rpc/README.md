@@ -127,17 +127,14 @@ JSON-style array examples above work well in `.env` files.
 
 ## OCI metadata
 
-The image carries both Argon-owned and upstream provenance labels:
+The image adds custom upstream provenance labels:
 
-- `org.opencontainers.image.version`: Argon image version
-- `org.opencontainers.image.revision`: Argon git revision when supplied at build time
 - `io.argonprotocol.upstream-subway.repository`: upstream Subway repository
 - `io.argonprotocol.upstream-subway.ref`: pinned upstream Subway tag or ref
 
-Local compose builds currently set the Argon image version label from `${VERSION:-dev}`. The git
-revision label comes from `VCS_REF` when supplied and otherwise defaults to `unknown`. The shared
-GitHub Docker publish template passes `VCS_REF=${github.sha}` and already emits a build provenance
-attestation for published images.
+Published images already inherit the standard OCI labels and build metadata from the shared GitHub
+Docker metadata workflow, and the shared publish template already emits a build provenance
+attestation. The Dockerfile only adds the Argon-specific upstream Subway labels above.
 
 ## RPC surface
 
@@ -159,6 +156,18 @@ If you need to change the exposed RPC surface, edit [`rpcs.yml`](./rpcs.yml) and
 
 ## Publishing status
 
-The repo already publishes other runtime images through GitHub Actions, but `argon-rpc` is not wired
-into those workflows yet. Today the dev stack builds this image locally from source, but the image
-itself no longer depends on bind-mounted config files from the repo.
+The repo now has one workflow for this image at
+[`publish-argon-rpc.yml`](../../.github/workflows/publish-argon-rpc.yml):
+
+- pushes to `main` build the rolling edge image tags
+- `workflow_dispatch` with `image_tag` publishes an immutable `vX.Y.Z-argon.N` tag from `main`
+
+The manual tag path is intentionally narrow:
+
+- it only accepts the full immutable Argon tag, such as `v0.1.2-argon.2`
+- it does not allow overriding the pinned upstream Subway ref
+- it always publishes current `main`
+- it publishes `ghcr.io/argonprotocol/argon-rpc` only
+
+The dev stack still builds this image locally from source, but the image itself no longer depends on
+bind-mounted config files from the repo.
