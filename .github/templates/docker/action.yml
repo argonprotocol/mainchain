@@ -61,7 +61,9 @@ runs:
         platforms: linux/amd64,linux/arm64
         context: .
         file: ${{ inputs.dockerfile }}
-        build-args: BIN=${{ inputs.bin }}
+        build-args: |
+          BIN=${{ inputs.bin }}
+          VCS_REF=${{ github.sha }}
         push: true
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}

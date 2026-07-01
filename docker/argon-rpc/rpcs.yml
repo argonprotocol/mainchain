@@ -1,0 +1,371 @@
+methods:
+  - method: author_submitExtrinsic
+    cache:
+      size: 0
+    params:
+      - name: extrinsic
+        ty: Bytes
+
+  - method: author_pendingExtrinsics
+    cache:
+      size: 1
+      ttl_seconds: 3
+    rate_limit_weight: 5
+
+  - method: chain_getBlockHash
+    cache:
+      size: 2000
+      ttl_seconds: 300
+    params:
+      - name: blockNumber
+        ty: BlockNumber
+        optional: true
+        inject: true
+
+  - method: chain_getHeader
+    cache:
+      size: 1000
+      ttl_seconds: 300
+    params:
+      - name: hash
+        ty: BlockHash
+        optional: true
+        inject: true
+
+  - method: chain_getBlock
+    cache:
+      size: 200
+      ttl_seconds: 300
+    params:
+      - name: hash
+        ty: BlockHash
+        optional: true
+        inject: true
+
+  - method: chain_getFinalizedHead
+    cache:
+      size: 1
+      ttl_seconds: 6
+
+  # Subway auto-registers `rpc_methods` after loading this RPC config.
+  - method: state_getRuntimeVersion
+    cache:
+      size: 32
+      ttl_seconds: 300
+    params:
+      - name: at
+        ty: BlockHash
+        optional: true
+        inject: true
+
+  - method: state_getMetadata
+    params:
+      - name: at
+        ty: BlockHash
+        optional: true
+        inject: true
+
+  - method: state_getStorage
+    params:
+      - name: key
+        ty: StorageKey
+      - name: at
+        ty: BlockHash
+        optional: true
+        inject: true
+
+  - method: state_getKeysPaged
+    params:
+      - name: key
+        ty: StorageKey
+      - name: count
+        ty: u32
+      - name: startKey
+        ty: StorageKey
+        optional: true
+      - name: at
+        ty: BlockHash
+        optional: true
+        inject: true
+
+  - method: state_queryStorageAt
+    params:
+      - name: keys
+        ty: 'Vec<StorageKey>'
+      - name: at
+        ty: BlockHash
+        optional: true
+        inject: true
+
+  - method: state_call
+    cache:
+      size: 200
+      ttl_seconds: 30
+    rate_limit_weight: 5
+    params:
+      - name: method
+        ty: String
+      - name: data
+        ty: Bytes
+      - name: at
+        ty: BlockHash
+        optional: true
+        inject: true
+
+  - method: state_getReadProof
+    params:
+      - name: keys
+        ty: 'Vec<StorageKey>'
+      - name: at
+        ty: BlockHash
+        optional: true
+        inject: true
+
+  - method: state_getStorageHash
+    cache:
+      size: 2000
+      ttl_seconds: 300
+    params:
+      - name: key
+        ty: StorageKey
+      - name: at
+        ty: BlockHash
+        optional: true
+        inject: true
+
+  - method: state_getStorageSize
+    cache:
+      size: 1000
+      ttl_seconds: 300
+    params:
+      - name: key
+        ty: StorageKey
+      - name: at
+        ty: BlockHash
+        optional: true
+        inject: true
+
+  - method: childstate_getKeysPaged
+    params:
+      - name: childStorageKey
+        ty: StorageKey
+      - name: prefix
+        ty: StorageKey
+      - name: count
+        ty: u32
+      - name: startKey
+        ty: StorageKey
+        optional: true
+      - name: at
+        ty: BlockHash
+        optional: true
+        inject: true
+
+  - method: childstate_getStorage
+    params:
+      - name: childStorageKey
+        ty: StorageKey
+      - name: key
+        ty: StorageKey
+      - name: at
+        ty: BlockHash
+        optional: true
+        inject: true
+
+  - method: payment_queryInfo
+    cache:
+      size: 200
+      ttl_seconds: 30
+    rate_limit_weight: 5
+    params:
+      - name: extrinsic
+        ty: Bytes
+      - name: at
+        ty: BlockHash
+        optional: true
+        inject: true
+
+  - method: payment_queryFeeDetails
+    cache:
+      size: 200
+      ttl_seconds: 30
+    rate_limit_weight: 5
+    params:
+      - name: extrinsic
+        ty: Bytes
+      - name: at
+        ty: BlockHash
+        optional: true
+        inject: true
+
+  # `chainHead_v1_*` is intentionally omitted for now. Subway does not rewrite
+  # downstream follow IDs for the follow-bound spec-v2 methods.
+  - method: chainSpec_v1_chainName
+    cache:
+      size: 1
+      ttl_seconds: 300
+
+  - method: chainSpec_v1_genesisHash
+    cache:
+      size: 1
+      ttl_seconds: 300
+
+  - method: chainSpec_v1_properties
+    cache:
+      size: 1
+      ttl_seconds: 300
+
+  - method: transaction_v1_broadcast
+    cache:
+      size: 0
+    rate_limit_weight: 5
+    params:
+      - name: extrinsic
+        ty: Bytes
+
+  - method: transaction_v1_stop
+    cache:
+      size: 0
+    params:
+      - name: operationId
+        ty: String
+
+  - method: archive_v1_body
+    cache:
+      size: 200
+      ttl_seconds: 300
+    params:
+      - name: hash
+        ty: BlockHash
+
+  - method: archive_v1_call
+    cache:
+      size: 200
+      ttl_seconds: 30
+    rate_limit_weight: 5
+    params:
+      - name: hash
+        ty: BlockHash
+      - name: function
+        ty: String
+      - name: callParameters
+        ty: Bytes
+
+  - method: archive_v1_finalizedHeight
+    cache:
+      size: 1
+      ttl_seconds: 6
+
+  - method: archive_v1_genesisHash
+    cache:
+      size: 1
+      ttl_seconds: 300
+
+  - method: archive_v1_hashByHeight
+    cache:
+      size: 1000
+      ttl_seconds: 300
+    params:
+      - name: height
+        ty: u32
+
+  - method: archive_v1_header
+    cache:
+      size: 1000
+      ttl_seconds: 300
+    params:
+      - name: hash
+        ty: BlockHash
+
+  - method: system_chain
+    cache:
+      size: 1
+
+  - method: system_properties
+    cache:
+      size: 1
+
+  - method: system_name
+    response: Subway
+
+  - method: system_version
+    response: 1.0.0-dev
+
+  - method: system_chainType
+    cache:
+      size: 1
+
+  - method: system_localPeerId
+    cache:
+      size: 1
+
+  - method: system_nodeRoles
+    response: [ 'Full' ]
+
+  - method: system_localListenAddresses
+    cache:
+      size: 1
+
+  - method: system_health
+    cache:
+      size: 1
+      ttl_seconds: 5
+
+  - method: system_accountNextIndex
+    cache:
+      size: 0
+    params:
+      - name: accountId
+        ty: AccountId
+
+  - method: system_peers
+    cache:
+      size: 1
+      ttl_seconds: 5
+
+subscriptions:
+  - subscribe: author_submitAndWatchExtrinsic
+    unsubscribe: author_unwatchExtrinsic
+    name: author_extrinsicUpdate
+
+  - subscribe: transactionWatch_v1_submitAndWatch
+    unsubscribe: transactionWatch_v1_unwatch
+    name: transactionWatch_v1_watchEvent
+
+  - subscribe: chain_subscribeNewHeads
+    unsubscribe: chain_unsubscribeNewHeads
+    name: chain_newHead
+    merge_strategy: replace
+
+  - subscribe: chain_subscribeFinalizedHeads
+    unsubscribe: chain_unsubscribeFinalizedHeads
+    name: chain_finalizedHead
+    merge_strategy: replace
+
+  - subscribe: chain_subscribeAllHeads
+    unsubscribe: chain_unsubscribeAllHeads
+    name: chain_allHead
+    merge_strategy: replace
+
+  - subscribe: state_subscribeRuntimeVersion
+    unsubscribe: state_unsubscribeRuntimeVersion
+    name: state_runtimeVersion
+    merge_strategy: replace
+
+  - subscribe: state_subscribeStorage
+    unsubscribe: state_unsubscribeStorage
+    name: state_storage
+    merge_strategy: merge_storage_changes
+
+  - subscribe: archive_v1_storage
+    unsubscribe: archive_v1_stopStorage
+    name: archive_v1_storageEvent
+
+aliases:
+  - [ chain_subscribeNewHeads, chain_subscribeNewHead ]
+  - [ chain_unsubscribeNewHeads, chain_unsubscribeNewHead ]
+  - [ chain_getBlockHash, chain_getHead ]
+  - [ state_getKeysPaged, state_getKeysPagedAt ]
+  - [ state_getStorage, state_getStorageAt ]
+  - [ state_getRuntimeVersion, chain_getRuntimeVersion ]
+  - [ childstate_getKeysPaged, childstate_getKeysPagedAt ]

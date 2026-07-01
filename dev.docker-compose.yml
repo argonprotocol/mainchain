@@ -1,6 +1,6 @@
 ## Shared configs
 x-oracle-config: &oracle
-  image: ghcr.io/argonprotocol/argon-oracle:${VERSION:-latest}
+  image: ghcr.io/argonprotocol/argon-oracle:${VERSION:-dev}
   user: root
   build:
     context: .
@@ -8,7 +8,7 @@ x-oracle-config: &oracle
     target: oracle
   restart: on-failure
 x-notary-config: &notary
-  image: ghcr.io/argonprotocol/argon-notary:${VERSION:-latest}
+  image: ghcr.io/argonprotocol/argon-notary:${VERSION:-dev}
   user: root
   build:
     context: .
@@ -16,7 +16,7 @@ x-notary-config: &notary
     target: argon-notary
   restart: on-failure
 x-node-config: &node
-  image: ghcr.io/argonprotocol/argon-miner:${VERSION:-latest}
+  image: ghcr.io/argonprotocol/argon-miner:${VERSION:-dev}
   build:
     context: .
     dockerfile: dev.Dockerfile
@@ -212,7 +212,7 @@ services:
       --validator
       --pruning=archive
     ports:
-      - "${RPC_PORT:-9944}:9944"
+      - "${ARCHIVE_NODE_RPC_PORT:-0}:9944"
       - "0:30334"
     volumes:
       - archive-data:/data
@@ -228,6 +228,52 @@ services:
       interval: 5s
       timeout: 5s
       start_period: 30s
+      retries: 12
+
+  archive-rpc:
+    image: ghcr.io/argonprotocol/argon-rpc:${VERSION:-dev}
+    build:
+      context: .
+      dockerfile: docker/argon-rpc/Containerfile
+      args:
+        ARGON_RPC_VERSION: ${VERSION:-dev}
+        VCS_REF: ${VCS_REF:-unknown}
+    restart: on-failure
+    depends_on:
+      archive-node:
+        condition: service_healthy
+    # Forward optional host overrides; config.yml defaults still apply when values are unset or blank.
+    environment:
+      - RUST_LOG=${ARGON_RPC_RUST_LOG:-info,subway=debug}
+      - LOG_FORMAT=${ARGON_RPC_LOG_FORMAT:-compact}
+      - ARGON_RPC_ENDPOINTS
+      - ARGON_RPC_UPSTREAM_REQUEST_TIMEOUT_SECONDS
+      - ARGON_RPC_UPSTREAM_CONNECTION_TIMEOUT_SECONDS
+      - ARGON_RPC_UPSTREAM_RETRIES
+      - ARGON_RPC_STALE_TIMEOUT_SECONDS
+      - ARGON_RPC_CACHE_TTL_SECONDS
+      - ARGON_RPC_CACHE_SIZE
+      - ARGON_RPC_KEEP_ALIVE_SECONDS
+      - ARGON_RPC_MAX_CONNECTIONS
+      - ARGON_RPC_MAX_BATCH_SIZE
+      - ARGON_RPC_CONNECTION_BURST
+      - ARGON_RPC_CONNECTION_PERIOD_SECS
+      - ARGON_RPC_IP_BURST
+      - ARGON_RPC_IP_PERIOD_SECS
+      - ARGON_RPC_USE_XFF
+      - ARGON_RPC_PROMETHEUS_LABEL
+    ports:
+      - "${RPC_PORT:-9944}:9944"
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - >
+          bash -lc "exec 3<>/dev/tcp/127.0.0.1/9944 &&
+          printf 'GET /liveness HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n' >&3 &&
+          grep -q '200 OK' <&3"
+      interval: 5s
+      timeout: 5s
+      start_period: 10s
       retries: 12
 
   miner-1:
@@ -357,7 +403,7 @@ services:
         condition: service_completed_successfully
       notary-migrate:
         condition: service_completed_successfully
-      archive-node:
+      archive-rpc:
         condition: service_healthy
       minio:
         condition: service_healthy
@@ -380,7 +426,7 @@ services:
         aliases:
           - notary.localhost
     environment:
-      - TRUSTED_RPC_URL=ws://archive-node:9944
+      - TRUSTED_RPC_URL=ws://archive-rpc:9944
 
   oracle-btc-insert-key:
     <<: *oracle
@@ -397,7 +443,7 @@ services:
     depends_on:
       oracle-btc-insert-key:
         condition: service_completed_successfully
-      archive-node:
+      archive-rpc:
         condition: service_healthy
     command:
       - bitcoin
@@ -408,7 +454,7 @@ services:
     volumes:
       - oracle-btc-keystore:/keystore
     environment:
-      - TRUSTED_RPC_URL=ws://archive-node:9944
+      - TRUSTED_RPC_URL=ws://archive-rpc:9944
 
   oracle-price-insert-key:
     <<: *oracle
@@ -428,7 +474,7 @@ services:
     depends_on:
       oracle-price-insert-key:
         condition: service_completed_successfully
-      archive-node:
+      archive-rpc:
         condition: service_healthy
     command: >
       price-index
@@ -441,7 +487,7 @@ services:
       - /tmp/oracle/data/:/tmp/oracle/data/
       - ${PRICE_INDEX_FILE_PATH:-./oracle/test-price-index.json}:/price_index.json:ro
     environment:
-      - TRUSTED_RPC_URL=ws://archive-node:9944
+      - TRUSTED_RPC_URL=ws://archive-rpc:9944
     profiles:
       - price-oracle
       - all
@@ -453,7 +499,7 @@ services:
     depends_on:
       oracle-price-insert-key:
         condition: service_completed_successfully
-      archive-node:
+      archive-rpc:
         condition: service_healthy
     command: >
       price-index
@@ -464,7 +510,7 @@ services:
       - oracle-price-keystore:/keystore
       - /tmp/oracle/data/:/tmp/oracle/data/
     environment:
-      - TRUSTED_RPC_URL=ws://archive-node:9944
+      - TRUSTED_RPC_URL=ws://archive-rpc:9944
       - ARGON_TOKEN_ADDRESS=${ARGON_TOKEN_ADDRESS:-3e622317f8C93f7328350cF0B56d9eD4C620C5d6}
       - ARGONOT_TOKEN_ADDRESS=${ARGONOT_TOKEN_ADDRESS:-3e622317f8C93f7328350cF0B56d9eD4C620C5d6}
       - BLS_API_KEY=${BLS_API_KEY}

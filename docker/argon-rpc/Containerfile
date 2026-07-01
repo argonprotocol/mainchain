@@ -1,0 +1,50 @@
+ARG UPSTREAM_SUBWAY_REF=v0.1.2
+ARG ARGON_RPC_VERSION=dev
+ARG VCS_REF=unknown
+
+FROM docker.io/library/rust:1.86 AS builder
+
+# Keep this pinned to upstream Acala releases unless we intentionally need a newer Subway tag.
+ARG UPSTREAM_SUBWAY_REF
+
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      ca-certificates clang git libssl-dev pkg-config protobuf-compiler && \
+    apt-get autoremove -y && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+RUN cargo install \
+    --locked \
+    --git https://github.com/AcalaNetwork/subway.git \
+    --tag ${UPSTREAM_SUBWAY_REF} \
+    subway
+
+FROM docker.io/library/ubuntu:22.04
+
+ARG UPSTREAM_SUBWAY_REF
+ARG ARGON_RPC_VERSION
+ARG VCS_REF
+
+LABEL org.opencontainers.image.title="Argon RPC" \
+      org.opencontainers.image.description="Argon RPC gateway packaging Acala Subway with Argon defaults" \
+      org.opencontainers.image.source="https://github.com/argonprotocol/mainchain" \
+      org.opencontainers.image.licenses="MIT" \
+      org.opencontainers.image.vendor="Argon Foundation" \
+      org.opencontainers.image.version="${ARGON_RPC_VERSION}" \
+      org.opencontainers.image.revision="${VCS_REF}" \
+      io.argonprotocol.upstream-subway.repository="https://github.com/AcalaNetwork/subway" \
+      io.argonprotocol.upstream-subway.ref="${UPSTREAM_SUBWAY_REF}"
+
+RUN apt-get update && \
+    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+      bash ca-certificates libssl3 tini && \
+    apt-get autoremove -y && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY --from=builder /usr/local/cargo/bin/subway /usr/local/bin/subway
+COPY docker/argon-rpc/config.yml /config/argon-rpc.yml
+COPY docker/argon-rpc/rpcs.yml /config/rpcs.yml
+
+ENTRYPOINT ["/usr/bin/tini", "--", "/usr/local/bin/subway", "--config", "/config/argon-rpc.yml"]
