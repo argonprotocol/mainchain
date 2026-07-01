@@ -223,22 +223,33 @@ VERSION=v1.3.0 RPC_PORT=9944 docker compose -f dev.docker-compose.yml up
 The docker compose file has several profiles that can be used to run different parts of the network.
 
 - `Default (no profile)`: If you don't use a profile, it will run the entire network with an argon
-  node, bitcoin node, notary and bitcoin oracle.
+  node, bitcoin node, notary, bitcoin oracle, and the RPC gateway in front of the archive node.
 - `miners`: Adds 2 compute miners.
 - `price-oracle`: Adds a price oracle to the network. You must supply an `Infura` and `BLS` key in
   the `.env` file for this to work (see below).
 - `all`: Run the entire network: 1 archive node, 2 miners, 1 bitcoin node, 1 notary, 1 bitcoin
-  oracle and 1 price oracle.
+  oracle, 1 RPC gateway, and 1 price oracle.
 
 Profiles must be specified with the `--profile` flag in the `docker compose` command. Omitting will
 use the default profile.
 
-To run multiple compose instances, you need to set `RPC_PORT=0`, otherwise, each will bind an rpc
-port on 9944.
+To run multiple compose instances, you need to set `RPC_PORT=0`.
 
 ```sh
 VERSION=v1.3.0 RPC_PORT=0 docker compose -f dev.docker-compose.yml --profile all up
 ```
+
+The RPC gateway listens on `RPC_PORT` (default `9944`). The raw archive node can also be exposed on
+`ARCHIVE_NODE_RPC_PORT`, which defaults to `0` so Docker assigns an ephemeral host port. Set it to
+something like `9946` when you want a stable direct node RPC port for lower-level debugging or
+admin flows. The gateway
+builds locally as `ghcr.io/argonprotocol/argon-rpc:${VERSION:-dev}` from the pinned upstream Acala
+Subway release in `docker/argon-rpc/Containerfile`, bakes in its checked-in config template from
+`docker/argon-rpc/config.yml`, and loads its RPC allowlist/cache tuning from
+`docker/argon-rpc/rpcs.yml`. Runtime tuning is passed through with `ARGON_RPC_*` environment
+variables. By default it proxies to `ws://archive-node:9944`, and optional backup upstreams can be
+supplied with `ARGON_RPC_ENDPOINTS='["ws://archive-node:9944", "ws://backup-node:9944"]'`. See
+[`docker/argon-rpc/README.md`](./docker/argon-rpc/README.md) for the full config reference.
 
 NOTE: You must get a [BLS key](https://data.bls.gov/registrationEngine/) and an
 [Infura](https://docs.metamask.io/services/get-started/infura/) key to run the price oracle. They
