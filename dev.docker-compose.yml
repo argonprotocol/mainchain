@@ -231,7 +231,7 @@ services:
       retries: 12
 
   archive-rpc:
-    image: ghcr.io/argonprotocol/argon-rpc:${VERSION:-dev}
+    image: ghcr.io/argonprotocol/argon-rpc:dev
     build:
       context: .
       dockerfile: docker/argon-rpc/Containerfile
