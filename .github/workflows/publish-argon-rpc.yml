@@ -1,0 +1,58 @@
+name: Publish Argon RPC Image
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Immutable image tag to publish (for example: v0.1.2-argon.2)'
+        required: true
+        type: string
+
+jobs:
+  docker:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    steps:
+      - name: Require main branch workflow
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          if [[ "$GITHUB_REF_NAME" != "${{ github.event.repository.default_branch }}" ]]; then
+            echo "Run this workflow from ${{ github.event.repository.default_branch }} only." >&2
+            exit 1
+          fi
+
+      - uses: actions/checkout@v5
+
+      - name: Choose tags
+        id: tags
+        env:
+          IMAGE_TAG: ${{ github.event.inputs.image_tag }}
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            if [[ ! "$IMAGE_TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+-argon\.[0-9]+$ ]]; then
+              echo "Invalid argon-rpc image tag: $IMAGE_TAG" >&2
+              exit 1
+            fi
+
+            tags="type=raw,value=$IMAGE_TAG"
+          else
+            tags=$'type=raw,dev\ntype=sha'
+          fi
+
+          printf 'tags<<EOF\n%s\nEOF\n' "$tags" >> "$GITHUB_OUTPUT"
+
+      - name: Argon RPC
+        uses: ./.github/templates/docker
+        with:
+          image: ghcr.io/argonprotocol/argon-rpc
+          dockerfile: docker/argon-rpc/Containerfile
+          bin: argon-rpc
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          tags: ${{ steps.tags.outputs.tags }}
