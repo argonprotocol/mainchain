@@ -777,6 +777,64 @@ fn delegation_changes_fee_payer_seen_by_payment_ext_with_proxy() {
 	});
 }
 
+#[test]
+fn delegation_refunds_fees_for_proxy_specific_sponsors() {
+	new_test_ext().execute_with(|| {
+		LastPayer::set(None);
+		LastPostDispatchPaysFee::set(None);
+
+		let real = 7u64;
+		let delegate = 1u64;
+		let key = 33u32;
+		let sponsor_balance: Balance = 2_000_000u128;
+
+		assert_eq!(Balances::free_balance(delegate), 0u128);
+		set_argons(real, sponsor_balance);
+		assert_ok!(Proxy::add_proxy(Some(real).into(), delegate, ProxyType::DummyWrapper, 0,));
+
+		let call = RuntimeCall::Proxy(pallet_proxy::Call::<Test>::proxy {
+			real,
+			force_proxy_type: Some(ProxyType::DummyWrapper),
+			call: Box::new(RuntimeCall::DummyPallet(Call::<Test>::pooled { key })),
+		});
+		let info = call.get_dispatch_info();
+		let len = call.encoded_size();
+		let origin = crate::mock::RuntimeOrigin::signed(delegate);
+		let wrapper =
+			CheckFeeWrapper::<Test, MockChargePaymentExtension>::from(MockChargePaymentExtension);
+		let (_, val, _) = wrapper
+			.validate_only(origin.clone(), &call, &info, len, TransactionSource::External, 0)
+			.unwrap();
+		let pre =
+			CheckFeeWrapper::<Test, MockChargePaymentExtension>::from(MockChargePaymentExtension)
+				.prepare(val, &origin, &call, &info, len)
+				.unwrap();
+
+		let dispatch_result = call.dispatch(origin);
+		let dispatch_outcome = match &dispatch_result {
+			Ok(_) => Ok(()),
+			Err(err) => Err(err.error.clone()),
+		};
+		let post_info = match &dispatch_result {
+			Ok(post_info) => post_info,
+			Err(err) => &err.post_info,
+		};
+
+		CheckFeeWrapper::<Test, MockChargePaymentExtension>::post_dispatch_details(
+			pre,
+			&info,
+			post_info,
+			len,
+			&dispatch_outcome,
+		)
+		.unwrap();
+
+		assert!(dispatch_outcome.is_ok());
+		assert_eq!(LastPayer::get(), Some(real));
+		assert_eq!(LastPostDispatchPaysFee::get(), Some(Pays::No));
+	});
+}
+
 fn set_argons(account_id: u64, amount: Balance) {
 	let _ = Balances::make_free_balance_be(&account_id, amount);
 	drop(Balances::issue(amount));

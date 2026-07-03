@@ -1305,6 +1305,8 @@ pub struct TxSponsor<AccountId, Balance> {
 	/// A unique key to identify this sponsored transaction in the tx pool to prevent dos
 	/// attacks
 	pub unique_tx_key: Option<Vec<u8>>,
+	/// Whether the charged fee should be refunded when the transaction succeeds.
+	pub refund_fee_on_success: bool,
 }
 
 /// A configurable hook that can recognize calls where one account should reimburse another
