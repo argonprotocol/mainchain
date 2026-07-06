@@ -357,7 +357,7 @@ pub mod pallet {
 		BidCannotBeReduced,
 		/// Bids must be in allowed increments
 		InvalidBidAmount,
-		/// Mining slot bidding currently requires prior operational-account registration.
+		/// Mining slot bidding currently requires a prior operational-account upgrade.
 		OperationalAccountRegistrationRequired,
 		/// The argonots on hold cannot be released
 		UnrecoverableHold,

@@ -134,8 +134,8 @@ pub mod pallet {
 
 		/// Hook to notify operational accounts about vault lifecycle events.
 		type OperationalAccountsHook: OperationalAccountsHook<Self::AccountId, Self::Balance>;
-		/// Provider for whether restricted vault creation requires operational-account
-		/// registration.
+		/// Provider for whether restricted vault creation requires an upgraded
+		/// operational account.
 		type OperationalAccountProvider: OperationalAccountProvider<Self::AccountId>;
 		/// External collect blockers that must be cleared before revenue can be collected.
 		type CollectBlockerProvider: CollectBlockerProvider<Self::AccountId>;
@@ -400,7 +400,7 @@ pub mod pallet {
 		OverdueCollectBlockersBeforeCollect,
 		/// An account may only be associated with a single vault
 		AccountAlreadyHasVault,
-		/// Vault creation currently requires prior operational-account registration.
+		/// Vault creation currently requires a prior operational-account upgrade.
 		OperationalAccountRegistrationRequired,
 		/// Committed Argonots cannot be reduced below the amount already crosschain-encumbered.
 		CommittedArgonotsBelowEncumberedBacking,
