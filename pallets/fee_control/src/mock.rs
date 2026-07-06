@@ -97,8 +97,12 @@ impl InstanceFilter<RuntimeCall> for ProxyType {
 	fn filter(&self, c: &RuntimeCall) -> bool {
 		match self {
 			ProxyType::Any => true,
-			ProxyType::DummyWrapper =>
-				matches!(c, RuntimeCall::DummyPallet(pallet_dummy::Call::sponsored { .. })),
+			ProxyType::DummyWrapper => matches!(
+				c,
+				RuntimeCall::DummyPallet(
+					pallet_dummy::Call::sponsored { .. } | pallet_dummy::Call::pooled { .. }
+				)
+			),
 		}
 	}
 	fn is_superset(&self, o: &Self) -> bool {
@@ -386,6 +390,21 @@ pub mod pallet_dummy {
 			_signer: &u64,
 			call: &RuntimeCall,
 		) -> Option<TxSponsor<u64, Balance>> {
+			if let RuntimeCall::Proxy(pallet_proxy::Call::proxy {
+				real,
+				force_proxy_type: Some(crate::mock::ProxyType::DummyWrapper),
+				call,
+			}) = call && let RuntimeCall::DummyPallet(pallet_dummy::Call::pooled { key }) =
+				call.as_ref()
+			{
+				return Some(TxSponsor {
+					payer: *real,
+					max_fee_with_tip: Some(5_000),
+					unique_tx_key: Some((b"proxy", key).encode()),
+					refund_fee_on_success: true,
+				});
+			}
+
 			if let RuntimeCall::DummyPallet(
 				pallet_dummy::Call::sponsored { key } |
 				pallet_dummy::Call::sponsored_pooled { key },
@@ -395,6 +414,7 @@ pub mod pallet_dummy {
 					payer: sponsor,
 					max_fee_with_tip: Some(max_fee_with_tip),
 					unique_tx_key: Some(key.encode()),
+					refund_fee_on_success: false,
 				});
 			}
 			None

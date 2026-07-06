@@ -119,6 +119,7 @@ macro_rules! deal_with_fees {
 								.using_encoded(sp_crypto_hashing::blake2_256)
 								.to_vec(),
 						),
+						refund_fee_on_success: true,
 					});
 				}
 				None

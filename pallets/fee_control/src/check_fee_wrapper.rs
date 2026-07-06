@@ -76,17 +76,17 @@ where
 	T: pallet_utility::Config<RuntimeCall = RuntimeCallOf<T>>,
 	RuntimeCallOf<T>: IsSubType<pallet_proxy::Call<T>> + IsSubType<pallet_utility::Call<T>>,
 {
-	// Determine the call to check for sponsorship. If the outer call is a proxy wrapper,
-	// unwrap to the inner call (recursing through nested proxy wrappers).
-	fn unwrap_proxy(call: &RuntimeCallOf<T>) -> &RuntimeCallOf<T> {
+	// If the outer call is a proxy wrapper, unwrap to the effective inner call (recursing through
+	// nested proxy wrappers). Non-proxy calls return `None`.
+	fn unwrap_proxy(call: &RuntimeCallOf<T>) -> Option<&RuntimeCallOf<T>> {
 		if let Some(
 			pallet_proxy::Call::proxy { call, .. } |
 			pallet_proxy::Call::proxy_announced { call, .. },
 		) = <RuntimeCallOf<T> as IsSubType<pallet_proxy::Call<T>>>::is_sub_type(call)
 		{
-			return Self::unwrap_proxy(call.as_ref());
+			return Some(Self::unwrap_proxy(call.as_ref()).unwrap_or(call.as_ref()));
 		}
-		call
+		None
 	}
 
 	fn validated_pool_key_context(
@@ -321,7 +321,7 @@ where
     type Pre = Intermediate<S::Pre, DispatchOriginOf<RuntimeCallOf<T>>, Option<TxSponsor<<T as frame_system::Config>::AccountId, T::Balance>>>;
 
     fn weight(&self, call: &RuntimeCallOf<T>) -> Weight {
-        self.0.weight(call)
+		self.0.weight(call)
     }
 
     fn validate(
@@ -333,11 +333,12 @@ where
         self_implicit: S::Implicit,
         inherited_implication: &impl Implication,
         source: TransactionSource,
-    ) -> ValidateResult<Self::Val, RuntimeCallOf<T>> {
-        let inner_call = Self::unwrap_proxy(call);
-        let signer = origin.as_signer().cloned();
-        Self::validate_freshness(call, signer.clone())?;
-        let general_pool_keys = Self::collect_pool_keys(call, signer);
+	) -> ValidateResult<Self::Val, RuntimeCallOf<T>> {
+		let unwrapped_proxy_call = Self::unwrap_proxy(call);
+		let inner_call = unwrapped_proxy_call.unwrap_or(call);
+		let signer = origin.as_signer().cloned();
+		Self::validate_freshness(call, signer.clone())?;
+		let general_pool_keys = Self::collect_pool_keys(call, signer);
 		if call.is_feeless(&origin) {
 			let synthetic_fee =
 				pallet_transaction_payment::Pallet::<T>::compute_fee(len as u32, info, Zero::zero());
@@ -351,53 +352,65 @@ where
 				..Default::default()
 			};
 
-            for key in general_pool_keys.iter().cloned() {
-                Self::push_pool_key(&mut validity, key);
-            }
-            if let Some(key) = T::FeelessCallTxPoolKeyProviders::key_for(call) {
-                Self::push_pool_key(&mut validity, key);
-            }
+			for key in general_pool_keys.iter().cloned() {
+				Self::push_pool_key(&mut validity, key);
+			}
+			if let Some(key) = T::FeelessCallTxPoolKeyProviders::key_for(call) {
+				Self::push_pool_key(&mut validity, key);
+			}
 
 			Ok((validity, Feeless(origin.clone()), origin))
 		} else {
 			let mut delegated_origin = origin.clone();
 			let mut tx_sponsor = None;
-			// Proxy wrappers should not affect whether a runtime-defined batch combination refunds
-			// on success, so we evaluate policy against the effective inner call.
-			let refund_fee_on_success = T::CallFeeRefundProviders::refund_fee_on_success(inner_call);
-			if let Some(signer) = origin.as_signer()
-				&& let Some(sponsor) =
-					T::TransactionSponsorProviders::get_transaction_sponsor(signer, inner_call)
-                {
-                    log::debug!("fee sponsor detected: payer={:?}", sponsor.payer);
-                    delegated_origin.set_caller_from_signed(sponsor.payer.clone());
-                    tx_sponsor = Some(sponsor);
-                };
+			// Runtime refund policies are evaluated on the effective call after proxy unwrapping.
+			// Proxy-specific sponsored refunds are carried separately by the sponsor itself.
+			let mut refund_fee_on_success =
+				T::CallFeeRefundProviders::refund_fee_on_success(inner_call);
 
-            let (mut validity, inner_val, origin_out) = self.0.validate(
-                delegated_origin.clone(),
-                call,
-                info,
-                len,
-                self_implicit,
-                inherited_implication,
-                source,
-            )?;
-            if let Some(max_fee_with_tip) = tx_sponsor.as_ref().and_then(|sp| sp.max_fee_with_tip)
-                && let pallet_transaction_payment::Val::<T>::Charge { fee_with_tip, .. } =
-                    &inner_val
-                {
-                    let total_fee: T::Balance = (*fee_with_tip).into();
-                    if total_fee > max_fee_with_tip {
-                        return Err(TransactionValidityError::Invalid(
-                            InvalidTransaction::Custom(INVALID_TX_SPONSORED_FEE_TOO_HIGH),
-                    ));
-                }
-            }
+			if let Some(signer) = origin.as_signer() {
+				let sponsor_for_outer_call =
+					T::TransactionSponsorProviders::get_transaction_sponsor(signer, call);
+				let sponsor = if let Some(sponsor) = sponsor_for_outer_call {
+					Some(sponsor)
+				} else {
+					unwrapped_proxy_call.and_then(|inner_call| {
+						T::TransactionSponsorProviders::get_transaction_sponsor(signer, inner_call)
+					})
+				};
 
-            for key in general_pool_keys {
-                Self::push_pool_key(&mut validity, key);
-            }
+				if let Some(sponsor) = sponsor {
+					log::debug!("fee sponsor detected: payer={:?}", sponsor.payer);
+					refund_fee_on_success |= sponsor.refund_fee_on_success;
+					delegated_origin.set_caller_from_signed(sponsor.payer.clone());
+					tx_sponsor = Some(sponsor);
+				}
+			}
+
+			let (mut validity, inner_val, origin_out) = self.0.validate(
+				delegated_origin.clone(),
+				call,
+				info,
+				len,
+				self_implicit,
+				inherited_implication,
+				source,
+			)?;
+			if let Some(max_fee_with_tip) = tx_sponsor.as_ref().and_then(|sp| sp.max_fee_with_tip)
+				&& let pallet_transaction_payment::Val::<T>::Charge { fee_with_tip, .. } =
+					&inner_val
+			{
+				let total_fee: T::Balance = (*fee_with_tip).into();
+				if total_fee > max_fee_with_tip {
+					return Err(TransactionValidityError::Invalid(
+						InvalidTransaction::Custom(INVALID_TX_SPONSORED_FEE_TOO_HIGH),
+					));
+				}
+			}
+
+			for key in general_pool_keys {
+				Self::push_pool_key(&mut validity, key);
+			}
 			if let Some(key) = tx_sponsor.as_ref().and_then(|sponsor| sponsor.unique_tx_key.clone())
 			{
 				Self::push_pool_key(&mut validity, key);
@@ -464,15 +477,17 @@ where
 				if let (Some(sponsor), Some(from)) = (tx_sponsor, origin.as_signer()) {
 					Pallet::<T>::deposit_event(Event::<T>::FeeDelegated {
 						origin: origin.clone().into_caller(),
-                        from: from.clone(),
-                        to: sponsor.payer
-                    });
-                }
-                Ok(result)
-            },
-            Feeless(origin) => {
-                Pallet::<T>::deposit_event(Event::<T>::FeeSkipped { origin: origin.into_caller() });
-                Ok(Weight::zero())
+						from: from.clone(),
+						to: sponsor.payer,
+					});
+				}
+				Ok(result)
+			},
+			Feeless(origin) => {
+				Pallet::<T>::deposit_event(Event::<T>::FeeSkipped {
+					origin: origin.into_caller(),
+				});
+				Ok(Weight::zero())
 			},
 		}
 	}
