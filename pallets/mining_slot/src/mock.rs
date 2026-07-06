@@ -108,7 +108,7 @@ parameter_types! {
 	pub static GrandaRotations: Vec<FrameId> = vec![];
 	pub static MiningSeatsWon: Vec<u64> = vec![];
 	pub static OperationalAccountsInviteOnly: bool = false;
-	pub static RegisteredOperationalAccounts: BTreeSet<u64> = BTreeSet::new();
+	pub static UpgradedOperationalAccounts: BTreeSet<u64> = BTreeSet::new();
 
 	// set slot bidding active by default
 	pub static ElapsedTicks: u64 = 3;
@@ -182,7 +182,7 @@ impl OperationalAccountProvider<u64> for MockOperationalAccountProvider {
 
 	fn is_eligible(account_id: &u64) -> bool {
 		!OperationalAccountsInviteOnly::get() ||
-			RegisteredOperationalAccounts::get().contains(account_id)
+			UpgradedOperationalAccounts::get().contains(account_id)
 	}
 }
 
@@ -321,7 +321,7 @@ impl pallet_mining_slot::Config for Test {
 pub fn new_test_ext() -> TestState {
 	AverageMicrogonsPerArgonotByFrame::set(BTreeMap::new());
 	OperationalAccountsInviteOnly::set(false);
-	RegisteredOperationalAccounts::set(BTreeSet::new());
+	UpgradedOperationalAccounts::set(BTreeSet::new());
 	new_test_with_genesis::<Test>(|t: &mut Storage| {
 		let mining_config = MiningSlotConfig {
 			slot_bidding_start_after_ticks: SlotBiddingStartAfterTicks::get(),

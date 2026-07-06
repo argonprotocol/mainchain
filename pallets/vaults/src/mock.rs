@@ -106,7 +106,7 @@ parameter_types! {
 	pub static PercentForTreasuryReserves: Percent = Percent::from_percent(20);
 	pub static OverdueCollectBlockers: BTreeSet<u64> = BTreeSet::new();
 	pub static OperationalAccountsInviteOnly: bool = false;
-	pub static RegisteredOperationalAccounts: BTreeSet<u64> = BTreeSet::new();
+	pub static UpgradedOperationalAccounts: BTreeSet<u64> = BTreeSet::new();
 
 }
 pub struct StaticMiningFrameProvider;
@@ -176,7 +176,7 @@ impl OperationalAccountProvider<u64> for MockOperationalAccountProvider {
 
 	fn is_eligible(account_id: &u64) -> bool {
 		!OperationalAccountsInviteOnly::get() ||
-			RegisteredOperationalAccounts::get().contains(account_id)
+			UpgradedOperationalAccounts::get().contains(account_id)
 	}
 }
 
@@ -368,6 +368,6 @@ impl pallet_bitcoin_locks::Config for Test {
 pub fn new_test_ext() -> TestState {
 	OverdueCollectBlockers::set(BTreeSet::new());
 	OperationalAccountsInviteOnly::set(false);
-	RegisteredOperationalAccounts::set(BTreeSet::new());
+	UpgradedOperationalAccounts::set(BTreeSet::new());
 	new_test_with_genesis::<Test>(|_t| {})
 }

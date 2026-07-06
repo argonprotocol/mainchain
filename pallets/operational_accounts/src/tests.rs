@@ -5,7 +5,10 @@ use crate::{
 	RegistrationV1, MINING_ACCOUNT_PROOF_MESSAGE_KEY, OPERATIONAL_ACCOUNT_PROOF_MESSAGE_KEY,
 	VAULT_ACCOUNT_PROOF_MESSAGE_KEY,
 };
-use argon_primitives::{OperationalAccountsHook, Signature, UtxoLockEvents, MICROGONS_PER_ARGON};
+use argon_primitives::{
+	OperationalAccountProvider, OperationalAccountsHook, Signature, UtxoLockEvents,
+	MICROGONS_PER_ARGON,
+};
 use frame_support::{assert_noop, assert_ok};
 use pallet_prelude::*;
 use sp_core::{sr25519, Pair};
@@ -82,6 +85,39 @@ fn test_register_allows_referrer_when_invite_only() {
 		let recruit_account =
 			OperationalAccounts::<Test>::get(&recruit_set.owner).expect("recruit account");
 		assert_eq!(recruit_account.referrer, Some(referrer_set.owner));
+	});
+}
+
+#[test]
+fn test_invite_only_eligibility_requires_operational_upgrade() {
+	new_test_ext().execute_with(|| {
+		let account_set = make_account_set(17, 18, 19);
+		register_account(&account_set, None);
+		IsOperationalAccountInviteOnly::<Test>::put(true);
+
+		assert!(
+			!<OperationalAccountsPallet as OperationalAccountProvider<TestAccountId>>::is_eligible(
+				&account_set.owner,
+			)
+		);
+		assert!(
+			!<OperationalAccountsPallet as OperationalAccountProvider<TestAccountId>>::is_eligible(
+				&account_set.vault,
+			)
+		);
+
+		mark_upgraded_to_operational(&account_set.owner);
+
+		assert!(
+			<OperationalAccountsPallet as OperationalAccountProvider<TestAccountId>>::is_eligible(
+				&account_set.owner,
+			)
+		);
+		assert!(
+			<OperationalAccountsPallet as OperationalAccountProvider<TestAccountId>>::is_eligible(
+				&account_set.vault,
+			)
+		);
 	});
 }
 

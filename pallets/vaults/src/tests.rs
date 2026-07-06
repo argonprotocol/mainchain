@@ -116,7 +116,7 @@ fn it_can_create_a_vault() {
 }
 
 #[test]
-fn it_requires_operational_account_registration_when_invite_only() {
+fn it_requires_operational_account_upgrade_when_invite_only() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		OperationalAccountsInviteOnly::set(true);
@@ -127,7 +127,7 @@ fn it_requires_operational_account_registration_when_invite_only() {
 			Error::<Test>::OperationalAccountRegistrationRequired
 		);
 
-		RegisteredOperationalAccounts::mutate(|accounts| {
+		UpgradedOperationalAccounts::mutate(|accounts| {
 			accounts.insert(1);
 		});
 		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), default_vault()));

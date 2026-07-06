@@ -513,7 +513,7 @@ fn it_holds_ownership_tokens_for_a_slot() {
 }
 
 #[test]
-fn it_requires_operational_account_registration_when_invite_only() {
+fn it_requires_operational_account_upgrade_when_invite_only() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		OperationalAccountsInviteOnly::set(true);
@@ -526,7 +526,7 @@ fn it_requires_operational_account_registration_when_invite_only() {
 			Error::<Test>::OperationalAccountRegistrationRequired
 		);
 
-		RegisteredOperationalAccounts::mutate(|accounts| {
+		UpgradedOperationalAccounts::mutate(|accounts| {
 			accounts.insert(1);
 		});
 		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(1), 0, 1.into(), None));

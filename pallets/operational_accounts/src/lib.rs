@@ -1256,9 +1256,17 @@ pub mod pallet {
 		type Weights = weights::ProviderWeightAdapter<T>;
 
 		fn is_eligible(account_id: &T::AccountId) -> bool {
-			!IsOperationalAccountInviteOnly::<T>::get() ||
-				OperationalAccounts::<T>::contains_key(account_id) ||
-				OperationalAccountBySubAccount::<T>::contains_key(account_id)
+			if !IsOperationalAccountInviteOnly::<T>::get() {
+				return true;
+			}
+
+			let Some(owner) = Self::operational_owner_for(account_id) else {
+				return false;
+			};
+
+			OperationalAccounts::<T>::get(owner)
+				.map(|account| account.is_upgraded_to_operations)
+				.unwrap_or(false)
 		}
 	}
 }
