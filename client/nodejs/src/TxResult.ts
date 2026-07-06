@@ -1,4 +1,4 @@
-import { ArgonClient, GenericEvent, SpRuntimeDispatchError } from './index';
+import { ArgonClient, GenericEvent, SpRuntimeDispatchError, u8aEq } from './index';
 import {
   dispatchErrorToExtrinsicError,
   ExtrinsicError,
@@ -10,9 +10,19 @@ import { DispatchError } from '@polkadot/types/interfaces';
 
 export type ITxProgressCallback = (progressToInBlock: number, result?: TxResult) => void;
 
+type IBlockInclusion = {
+  blockHash: Uint8Array;
+  blockNumber?: number;
+  extrinsicIndex: number;
+  events: GenericEvent[];
+};
+
+type IPendingInBlock = Omit<IBlockInclusion, 'blockNumber'>;
+
 export class TxResult {
   #isBroadcast = false;
   #submissionError?: Error;
+  #pendingInBlock?: IPendingInBlock;
 
   set isBroadcast(value: boolean) {
     this.#isBroadcast = value;
@@ -91,30 +101,55 @@ export class TxResult {
     this.waitForInFirstBlock.catch(() => null);
   }
 
-  public async setSeenInBlock(block: {
-    blockHash: Uint8Array;
-    blockNumber?: number;
-    extrinsicIndex: number;
-    events: GenericEvent[];
-  }): Promise<void> {
-    const { blockHash, blockNumber, events } = block;
-    if (blockHash !== this.blockHash) {
-      this.parseEvents(events);
-      this.blockHash = blockHash;
-      this.blockNumber =
-        blockNumber ??
-        (await this.client.rpc.chain.getHeader(blockHash).then(h => h.number.toNumber()));
-      this.extrinsicIndex = block.extrinsicIndex;
-      this.updateProgress();
-      if (this.extrinsicError) {
-        this.inBlockReject(this.extrinsicError);
-      } else {
-        this.inBlockResolve(blockHash);
-      }
+  public async setSeenInBlock(block: IBlockInclusion): Promise<void> {
+    if (block.blockNumber === undefined) {
+      this.#pendingInBlock = {
+        blockHash: block.blockHash,
+        extrinsicIndex: block.extrinsicIndex,
+        events: block.events,
+      };
+      return;
+    }
+
+    if (
+      this.blockHash &&
+      this.blockNumber === block.blockNumber &&
+      this.extrinsicIndex === block.extrinsicIndex &&
+      u8aEq(this.blockHash, block.blockHash)
+    ) {
+      this.#pendingInBlock = undefined;
+      return;
+    }
+
+    this.#pendingInBlock = undefined;
+    this.parseEvents(block.events);
+    this.blockHash = block.blockHash;
+    this.blockNumber = block.blockNumber;
+    this.extrinsicIndex = block.extrinsicIndex;
+    this.updateProgress();
+    if (this.extrinsicError) {
+      this.inBlockReject(this.extrinsicError);
+    } else {
+      this.inBlockResolve(block.blockHash);
     }
   }
 
-  public setFinalized() {
+  public async setFinalized() {
+    const pendingInBlock = this.#pendingInBlock;
+    if (pendingInBlock) {
+      await this.publishSeenInBlock(pendingInBlock);
+    } else if (this.blockHash && this.blockNumber === undefined) {
+      if (this.extrinsicIndex === undefined) {
+        throw new Error('Cannot finalize transaction before extrinsic index is known');
+      }
+
+      await this.publishSeenInBlock({
+        blockHash: this.blockHash,
+        extrinsicIndex: this.extrinsicIndex,
+        events: this.events,
+      });
+    }
+
     this.isFinalized = true;
     this.updateProgress();
 
@@ -141,33 +176,87 @@ export class TxResult {
       if (result.internalError) this.submissionError = result.internalError;
     }
     if (status.isInBlock) {
-      void this.setSeenInBlock({
-        blockHash: Uint8Array.from(status.asInBlock),
-        events: extrinsicEvents,
-        extrinsicIndex: txIndex!,
-      });
+      try {
+        const pendingInBlock = createPendingInBlock(
+          Uint8Array.from(status.asInBlock),
+          txIndex,
+          extrinsicEvents,
+        );
+        this.#pendingInBlock = pendingInBlock;
+
+        void this.publishSeenInBlock(pendingInBlock).catch(error => {
+          if (!isMissingBlockHeaderError(error)) {
+            this.submissionError = error as Error;
+          }
+        });
+      } catch (error) {
+        this.submissionError = error as Error;
+      }
     }
     if (status.isUsurped) {
+      this.#pendingInBlock = undefined;
       this.submissionError = new TxSubmissionError(
         TxSubmissionErrorCode.Usurped,
         `Transaction was usurped by ${status.asUsurped.toHex()}.`,
       );
     }
     if (status.isDropped) {
+      this.#pendingInBlock = undefined;
       this.submissionError = new TxSubmissionError(
         TxSubmissionErrorCode.Dropped,
         'Transaction was dropped before it was included in a block.',
       );
     }
     if (status.isInvalid) {
+      this.#pendingInBlock = undefined;
       this.submissionError = new TxSubmissionError(
         TxSubmissionErrorCode.Invalid,
         'Transaction was rejected as invalid by the node.',
       );
     }
     if (isFinalized) {
-      this.setFinalized();
+      try {
+        this.#pendingInBlock = createPendingInBlock(
+          Uint8Array.from(status.asFinalized),
+          txIndex ?? this.#pendingInBlock?.extrinsicIndex ?? this.extrinsicIndex,
+          extrinsicEvents.length ? extrinsicEvents : this.events,
+        );
+      } catch (error) {
+        this.submissionError = error as Error;
+        return;
+      }
+
+      void this.setFinalized().catch(error => {
+        this.submissionError = error as Error;
+      });
     }
+  }
+
+  private async publishSeenInBlock(block: IPendingInBlock) {
+    const pendingInBlock = this.#pendingInBlock;
+    if (
+      !pendingInBlock ||
+      pendingInBlock.extrinsicIndex !== block.extrinsicIndex ||
+      !u8aEq(pendingInBlock.blockHash, block.blockHash)
+    ) {
+      return;
+    }
+
+    const blockNumber = await this.client.rpc.chain.getHeader(block.blockHash).then(h => h.number.toNumber());
+
+    const currentPendingInBlock = this.#pendingInBlock;
+    if (
+      !currentPendingInBlock ||
+      currentPendingInBlock.extrinsicIndex !== block.extrinsicIndex ||
+      !u8aEq(currentPendingInBlock.blockHash, block.blockHash)
+    ) {
+      return;
+    }
+
+    await this.setSeenInBlock({
+      ...block,
+      blockNumber,
+    });
   }
 
   private updateProgress() {
@@ -215,4 +304,24 @@ export class TxResult {
     }
     this.events = events;
   }
+}
+
+function createPendingInBlock(
+  blockHash: Uint8Array,
+  extrinsicIndex: number | undefined,
+  events: GenericEvent[],
+): IPendingInBlock {
+  if (extrinsicIndex === undefined) {
+    throw new Error('Cannot publish transaction block state before extrinsic index is known');
+  }
+
+  return {
+    blockHash,
+    extrinsicIndex,
+    events,
+  };
+}
+
+function isMissingBlockHeaderError(error: unknown) {
+  return String(error).includes('Unable to retrieve header and parent from supplied hash');
 }
