@@ -1157,6 +1157,7 @@ declare module '@polkadot/api-base/types/submittable' {
                 accountBitcoinAmount?: any;
                 accountVaultBondAmount?: any;
                 vaultCreated?: any;
+                isUpgradedToOperations?: any;
                 vaultBitcoinAmount?: any;
                 miningSeatCount?: any;
               }

@@ -2758,6 +2758,7 @@ export default {
     accountBitcoinAmount: 'Option<u128>',
     accountVaultBondAmount: 'Option<u128>',
     vaultCreated: 'Option<bool>',
+    isUpgradedToOperations: 'Option<bool>',
     vaultBitcoinAmount: 'Option<u128>',
     miningSeatCount: 'Option<u32>',
   },

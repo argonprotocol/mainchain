@@ -423,6 +423,7 @@ mod benchmarks {
 			account_bitcoin_amount: Some(T::TreasuryMinimumBitcoin::get()),
 			account_vault_bond_amount: Some(T::TreasuryMinimumBonds::get()),
 			vault_created: Some(true),
+			is_upgraded_to_operations: Some(true),
 			vault_bitcoin_amount: Some(T::TreasuryMinimumBitcoin::get()),
 			mining_seat_count: Some(T::MiningSeatsForOperational::get()),
 		};
@@ -434,6 +435,7 @@ mod benchmarks {
 
 		let account = OperationalAccounts::<T>::get(&linked.owner).expect("account exists");
 		assert!(account.is_treasury_certified);
+		assert!(account.is_upgraded_to_operations);
 		assert!(!account.is_operationally_certified);
 	}
 
