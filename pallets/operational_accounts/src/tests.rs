@@ -390,6 +390,7 @@ fn test_force_set_progress_guardrails() {
 					account_bitcoin_amount: None,
 					account_vault_bond_amount: None,
 					vault_created: None,
+					is_upgraded_to_operations: None,
 					vault_bitcoin_amount: None,
 					mining_seat_count: None,
 				},
@@ -422,6 +423,7 @@ fn test_force_set_progress_applies_patch_and_reconciles_totals() {
 				account_bitcoin_amount: Some(TreasuryMinimumBitcoin::get()),
 				account_vault_bond_amount: Some(TreasuryMinimumBonds::get()),
 				vault_created: Some(true),
+				is_upgraded_to_operations: Some(true),
 				vault_bitcoin_amount: Some(BitcoinLockSizeForUpgradeCode::get()),
 				mining_seat_count: Some(2),
 			},
@@ -436,8 +438,65 @@ fn test_force_set_progress_applies_patch_and_reconciles_totals() {
 		);
 		assert_eq!(account.account_bitcoin_amount, TreasuryMinimumBitcoin::get());
 		assert_eq!(account.account_vault_bond_amount, TreasuryMinimumBonds::get());
+		assert!(account.is_upgraded_to_operations);
 		assert_eq!(current_vault_bitcoin_amount(&account), BitcoinLockSizeForUpgradeCode::get(),);
 		assert_eq!(mining_seat_count(&account), 2);
+
+		assert_ok!(OperationalAccountsPallet::force_set_progress(
+			RuntimeOrigin::root(),
+			account_set.owner.clone(),
+			OperationalProgressPatch {
+				uniswap_argon_transfers_in_amount: None,
+				account_bitcoin_amount: None,
+				account_vault_bond_amount: None,
+				vault_created: None,
+				is_upgraded_to_operations: Some(false),
+				vault_bitcoin_amount: None,
+				mining_seat_count: None,
+			},
+			false,
+		));
+		assert!(
+			!OperationalAccounts::<Test>::get(&account_set.owner)
+				.expect("account")
+				.is_upgraded_to_operations
+		);
+
+		assert_ok!(OperationalAccountsPallet::force_set_progress(
+			RuntimeOrigin::root(),
+			account_set.owner.clone(),
+			OperationalProgressPatch {
+				uniswap_argon_transfers_in_amount: None,
+				account_bitcoin_amount: None,
+				account_vault_bond_amount: None,
+				vault_created: None,
+				is_upgraded_to_operations: Some(true),
+				vault_bitcoin_amount: None,
+				mining_seat_count: None,
+			},
+			false,
+		));
+		assert_ok!(OperationalAccountsPallet::activate(RuntimeOrigin::signed(
+			account_set.owner.clone(),
+		)));
+
+		assert_noop!(
+			OperationalAccountsPallet::force_set_progress(
+				RuntimeOrigin::root(),
+				account_set.owner.clone(),
+				OperationalProgressPatch {
+					uniswap_argon_transfers_in_amount: None,
+					account_bitcoin_amount: None,
+					account_vault_bond_amount: None,
+					vault_created: None,
+					is_upgraded_to_operations: Some(false),
+					vault_bitcoin_amount: None,
+					mining_seat_count: None,
+				},
+				false,
+			),
+			Error::<Test>::AlreadyOperational
+		);
 	});
 }
 

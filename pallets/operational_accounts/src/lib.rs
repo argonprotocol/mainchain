@@ -297,6 +297,8 @@ pub mod pallet {
 		pub account_vault_bond_amount: Option<Balance>,
 		/// Override for whether the vault has been created.
 		pub vault_created: Option<bool>,
+		/// Override for whether the account has been upgraded to operations.
+		pub is_upgraded_to_operations: Option<bool>,
 		/// Requested minimum for the operator vault bitcoin amount.
 		///
 		/// This is treated as a monotonic applied-total override: the effective stored
@@ -319,6 +321,7 @@ pub mod pallet {
 				self.account_bitcoin_amount.is_some() ||
 				self.account_vault_bond_amount.is_some() ||
 				self.vault_created.is_some() ||
+				self.is_upgraded_to_operations.is_some() ||
 				self.vault_bitcoin_amount.is_some() ||
 				self.mining_seat_count.is_some()
 		}
@@ -740,6 +743,13 @@ pub mod pallet {
 					}
 					if let Some(value) = patch.vault_created {
 						account.vault_created = value;
+					}
+					if let Some(value) = patch.is_upgraded_to_operations {
+						ensure!(
+							value || !account.is_operationally_certified,
+							Error::<T>::AlreadyOperational
+						);
+						account.is_upgraded_to_operations = value;
 					}
 					if let Some(value) = patch.vault_bitcoin_amount {
 						Self::recalculate_vault_bitcoin_accrual(account, value);

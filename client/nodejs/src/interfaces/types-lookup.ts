@@ -3265,6 +3265,7 @@ declare module '@polkadot/types/lookup' {
     readonly accountBitcoinAmount: Option<u128>;
     readonly accountVaultBondAmount: Option<u128>;
     readonly vaultCreated: Option<bool>;
+    readonly isUpgradedToOperations: Option<bool>;
     readonly vaultBitcoinAmount: Option<u128>;
     readonly miningSeatCount: Option<u32>;
   }
