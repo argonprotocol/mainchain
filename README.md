@@ -241,11 +241,10 @@ VERSION=v1.3.0 RPC_PORT=0 docker compose -f dev.docker-compose.yml --profile all
 
 The RPC gateway listens on `RPC_PORT` (default `9944`). The raw archive node can also be exposed on
 `ARCHIVE_NODE_RPC_PORT`, which defaults to `0` so Docker assigns an ephemeral host port. Set it to
-something like `9946` when you want a stable direct node RPC port for lower-level debugging or
-admin flows. The gateway
-builds locally as `ghcr.io/argonprotocol/argon-rpc:${VERSION:-dev}` from the pinned upstream Acala
-Subway release in `docker/argon-rpc/Containerfile`, bakes in its checked-in config template from
-`docker/argon-rpc/config.yml`, and loads its RPC allowlist/cache tuning from
+something like `9946` when you want a stable direct node RPC port for lower-level debugging or admin
+flows. The gateway builds locally as `ghcr.io/argonprotocol/argon-rpc:${VERSION:-dev}` from the
+pinned upstream Acala Subway release in `docker/argon-rpc/Containerfile`, bakes in its checked-in
+config template from `docker/argon-rpc/config.yml`, and loads its RPC allowlist/cache tuning from
 `docker/argon-rpc/rpcs.yml`. Runtime tuning is passed through with `ARGON_RPC_*` environment
 variables. By default it proxies to `ws://archive-node:9944`, and optional backup upstreams can be
 supplied with `ARGON_RPC_ENDPOINTS='["ws://archive-node:9944", "ws://backup-node:9944"]'`. See
