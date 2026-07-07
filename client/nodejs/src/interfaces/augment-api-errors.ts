@@ -791,7 +791,7 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       InvalidBidAmount: AugmentedError<ApiType>;
       /**
-       * Mining slot bidding currently requires prior operational-account registration.
+       * Mining slot bidding currently requires a prior operational-account upgrade.
        **/
       OperationalAccountRegistrationRequired: AugmentedError<ApiType>;
       /**
@@ -1380,7 +1380,7 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       NoVaultBitcoinPubkeysAvailable: AugmentedError<ApiType>;
       /**
-       * Vault creation currently requires prior operational-account registration.
+       * Vault creation currently requires a prior operational-account upgrade.
        **/
       OperationalAccountRegistrationRequired: AugmentedError<ApiType>;
       /**

@@ -242,7 +242,9 @@ export class TxResult {
       return;
     }
 
-    const blockNumber = await this.client.rpc.chain.getHeader(block.blockHash).then(h => h.number.toNumber());
+    const blockNumber = await this.client.rpc.chain
+      .getHeader(block.blockHash)
+      .then(h => h.number.toNumber());
 
     const currentPendingInBlock = this.#pendingInBlock;
     if (

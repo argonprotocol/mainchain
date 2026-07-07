@@ -68,39 +68,39 @@ file. If a value is unset or blank, the `${...:-default}` expression in the bake
 
 ### Compose-level variables
 
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `VERSION` | `dev` | Image tag used for the local build tag in compose. |
-| `RPC_PORT` | `9944` | Host port for the gateway itself. |
-| `ARCHIVE_NODE_RPC_PORT` | `0` | Optional direct host port for the raw archive node RPC. |
+| Variable                | Default | Purpose                                                 |
+| ----------------------- | ------- | ------------------------------------------------------- |
+| `VERSION`               | `dev`   | Image tag used for the local build tag in compose.      |
+| `RPC_PORT`              | `9944`  | Host port for the gateway itself.                       |
+| `ARCHIVE_NODE_RPC_PORT` | `0`     | Optional direct host port for the raw archive node RPC. |
 
 ### Logging variables
 
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `ARGON_RPC_RUST_LOG` | `info,subway=debug` | Rust log filter passed as `RUST_LOG`. |
-| `ARGON_RPC_LOG_FORMAT` | `compact` | Subway log formatter passed as `LOG_FORMAT`. |
+| Variable               | Default             | Purpose                                      |
+| ---------------------- | ------------------- | -------------------------------------------- |
+| `ARGON_RPC_RUST_LOG`   | `info,subway=debug` | Rust log filter passed as `RUST_LOG`.        |
+| `ARGON_RPC_LOG_FORMAT` | `compact`           | Subway log formatter passed as `LOG_FORMAT`. |
 
 ### Gateway variables
 
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `ARGON_RPC_ENDPOINTS` | `["ws://archive-node:9944"]` | YAML/JSON list of upstream websocket endpoints. Order matters. Put the preferred endpoint first. |
-| `ARGON_RPC_UPSTREAM_REQUEST_TIMEOUT_SECONDS` | `20` | Per-request timeout for upstream RPC calls. |
-| `ARGON_RPC_UPSTREAM_CONNECTION_TIMEOUT_SECONDS` | `5` | Timeout when opening an upstream websocket connection. |
-| `ARGON_RPC_UPSTREAM_RETRIES` | `1` | Number of retry attempts for upstream requests. |
-| `ARGON_RPC_STALE_TIMEOUT_SECONDS` | `180` | How long the substrate API extension tolerates stale head data. |
-| `ARGON_RPC_CACHE_TTL_SECONDS` | `60` | Default cache TTL for methods that use the shared cache. |
-| `ARGON_RPC_CACHE_SIZE` | `500` | Default cache entry limit for methods that use the shared cache. |
-| `ARGON_RPC_KEEP_ALIVE_SECONDS` | `60` | Subscription keepalive interval for merged subscriptions. |
-| `ARGON_RPC_MAX_CONNECTIONS` | `2000` | Maximum concurrent client connections accepted by the server. |
-| `ARGON_RPC_MAX_BATCH_SIZE` | `10` | Maximum JSON-RPC batch size accepted by the server. |
-| `ARGON_RPC_CONNECTION_BURST` | `20` | Burst limit for the connection-level rate limiter. |
-| `ARGON_RPC_CONNECTION_PERIOD_SECS` | `1` | Window size for the connection-level rate limiter. |
-| `ARGON_RPC_IP_BURST` | `500` | Burst limit for the IP-level rate limiter. |
-| `ARGON_RPC_IP_PERIOD_SECS` | `10` | Window size for the IP-level rate limiter. |
-| `ARGON_RPC_USE_XFF` | `true` | Whether to trust `X-Forwarded-For` when applying IP rate limits. |
-| `ARGON_RPC_PROMETHEUS_LABEL` | `argon-rpc` | Label prefix exported by the Prometheus metrics endpoint. |
+| Variable                                        | Default                      | Purpose                                                                                          |
+| ----------------------------------------------- | ---------------------------- | ------------------------------------------------------------------------------------------------ |
+| `ARGON_RPC_ENDPOINTS`                           | `["ws://archive-node:9944"]` | YAML/JSON list of upstream websocket endpoints. Order matters. Put the preferred endpoint first. |
+| `ARGON_RPC_UPSTREAM_REQUEST_TIMEOUT_SECONDS`    | `20`                         | Per-request timeout for upstream RPC calls.                                                      |
+| `ARGON_RPC_UPSTREAM_CONNECTION_TIMEOUT_SECONDS` | `5`                          | Timeout when opening an upstream websocket connection.                                           |
+| `ARGON_RPC_UPSTREAM_RETRIES`                    | `1`                          | Number of retry attempts for upstream requests.                                                  |
+| `ARGON_RPC_STALE_TIMEOUT_SECONDS`               | `180`                        | How long the substrate API extension tolerates stale head data.                                  |
+| `ARGON_RPC_CACHE_TTL_SECONDS`                   | `60`                         | Default cache TTL for methods that use the shared cache.                                         |
+| `ARGON_RPC_CACHE_SIZE`                          | `500`                        | Default cache entry limit for methods that use the shared cache.                                 |
+| `ARGON_RPC_KEEP_ALIVE_SECONDS`                  | `60`                         | Subscription keepalive interval for merged subscriptions.                                        |
+| `ARGON_RPC_MAX_CONNECTIONS`                     | `2000`                       | Maximum concurrent client connections accepted by the server.                                    |
+| `ARGON_RPC_MAX_BATCH_SIZE`                      | `10`                         | Maximum JSON-RPC batch size accepted by the server.                                              |
+| `ARGON_RPC_CONNECTION_BURST`                    | `20`                         | Burst limit for the connection-level rate limiter.                                               |
+| `ARGON_RPC_CONNECTION_PERIOD_SECS`              | `1`                          | Window size for the connection-level rate limiter.                                               |
+| `ARGON_RPC_IP_BURST`                            | `500`                        | Burst limit for the IP-level rate limiter.                                                       |
+| `ARGON_RPC_IP_PERIOD_SECS`                      | `10`                         | Window size for the IP-level rate limiter.                                                       |
+| `ARGON_RPC_USE_XFF`                             | `true`                       | Whether to trust `X-Forwarded-For` when applying IP rate limits.                                 |
+| `ARGON_RPC_PROMETHEUS_LABEL`                    | `argon-rpc`                  | Label prefix exported by the Prometheus metrics endpoint.                                        |
 
 ## Endpoint examples
 
