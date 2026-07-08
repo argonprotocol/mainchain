@@ -1,5 +1,4 @@
 // Auto-generated via `yarn polkadot-types-from-chain`, do not edit
-/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
@@ -365,30 +364,51 @@ declare module '@polkadot/api-base/types/consts' {
     };
     operationalAccounts: {
       /**
-       * Additional argon amount (base units) required per follow-on upgrade code after
-       * operational certification.
+       * Additional argon amount (base units) required per follow-on access code after an account
+       * becomes operational.
        **/
-      bitcoinLockSizeForUpgradeCode: u128 & AugmentedConst<ApiType>;
+      bitcoinLockSizeForAccessCode: u128 & AugmentedConst<ApiType>;
       /**
-       * Maximum number of available upgrade codes allowed at once.
+       * Maximum number of available access codes allowed at once.
        **/
-      maxAvailableUpgradeCodes: u32 & AugmentedConst<ApiType>;
+      maxAvailableAccessCodes: u32 & AugmentedConst<ApiType>;
       /**
        * Maximum number of encrypted server bytes stored per network account.
        **/
       maxEncryptedServerLen: u32 & AugmentedConst<ApiType>;
       /**
+       * Minimum bitcoin amount required to register.
+       **/
+      minimumBitcoin: u128 & AugmentedConst<ApiType>;
+      /**
+       * Minimum bond amount required to register.
+       **/
+      minimumBonds: u128 & AugmentedConst<ApiType>;
+      /**
+       * Minimum Uniswap transfer amount required to register.
+       **/
+      minimumUniswapTransfer: u128 & AugmentedConst<ApiType>;
+      /**
        * Mining seats required to become operational.
        **/
       miningSeatsForOperational: u32 & AugmentedConst<ApiType>;
       /**
-       * Mining seats required per follow-on upgrade code after operational certification.
+       * Mining seats required per follow-on access code after an account becomes
+       * operational.
        **/
-      miningSeatsPerUpgradeCode: u32 & AugmentedConst<ApiType>;
+      miningSeatsPerAccessCode: u32 & AugmentedConst<ApiType>;
       /**
-       * Default reward paid when an account becomes operational.
+       * Default bonus reward paid every operational certification threshold.
        **/
-      operationalActivationReward: u128 & AugmentedConst<ApiType>;
+      operationalCertificationBonusReward: u128 & AugmentedConst<ApiType>;
+      /**
+       * Default reward paid when an account becomes operationally certified.
+       **/
+      operationalCertificationReward: u128 & AugmentedConst<ApiType>;
+      /**
+       * Number of operational certifications required per bonus reward.
+       **/
+      operationalCertificationsPerBonusReward: u32 & AugmentedConst<ApiType>;
       /**
        * Minimum total Uniswap transfer amount required for operational certification.
        **/
@@ -397,26 +417,6 @@ declare module '@polkadot/api-base/types/consts' {
        * Minimum vault securitization required to become operational.
        **/
       operationalMinimumVaultSecuritization: u128 & AugmentedConst<ApiType>;
-      /**
-       * Default bonus reward paid every operational referral threshold.
-       **/
-      operationalReferralBonusReward: u128 & AugmentedConst<ApiType>;
-      /**
-       * Number of operational referrals required per bonus reward.
-       **/
-      operationalReferralsPerBonusReward: u32 & AugmentedConst<ApiType>;
-      /**
-       * Minimum bitcoin amount required for treasury certification.
-       **/
-      treasuryMinimumBitcoin: u128 & AugmentedConst<ApiType>;
-      /**
-       * Minimum bond amount required for treasury certification.
-       **/
-      treasuryMinimumBonds: u128 & AugmentedConst<ApiType>;
-      /**
-       * Minimum Uniswap transfer amount required for treasury certification.
-       **/
-      treasuryMinimumUniswapTransfer: u128 & AugmentedConst<ApiType>;
     };
     ownership: {
       /**

@@ -937,8 +937,10 @@ where
 	Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Eq, TypeInfo, MaxEncodedLen, Debug,
 )]
 pub enum OperationalRewardKind {
-	Activation,
-	OperationalReferralBonus,
+	#[codec(index = 0)]
+	Certification,
+	#[codec(index = 1)]
+	OperationalCertificationBonus,
 }
 
 #[derive(

@@ -3,7 +3,7 @@ use crate::{
 	OperationalAccount, OperationalAccountBySubAccount as OperationalAccountLinks,
 	OperationalAccounts as CurrentOperationalAccounts,
 };
-use argon_primitives::{BitcoinLocksProvider, TreasuryPoolProvider, UniswapTransferProvider};
+use argon_primitives::{BitcoinLocksProvider, TreasuryPoolProvider};
 use codec::{Decode, Encode};
 use frame_support::{storage_alias, traits::UncheckedOnRuntimeUpgrade, weights::Weight};
 use pallet_prelude::*;
@@ -63,16 +63,7 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for MigrateOperationalAccountsV1ToV2<T
 		let mut removed_subaccounts = 0u64;
 
 		CurrentOperationalAccounts::<T>::translate::<OperationalAccountV1<T>, _>(
-			|owner, account| {
-				let account_bitcoin_amount =
-					T::BitcoinLocksProvider::get_account_funded_bitcoin_amount(&owner);
-				let account_vault_bond_amount =
-					T::TreasuryPoolProvider::active_account_vault_bond_amount(&owner);
-				let should_mark_treasury_certified = should_mark_treasury_certified::<T>(
-					&account,
-					account_bitcoin_amount,
-					account_vault_bond_amount,
-				);
+			|_owner, account| {
 				if account.mining_funding_account != account.vault_account &&
 					account.mining_funding_account != account.mining_bot_account
 				{
@@ -81,27 +72,31 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for MigrateOperationalAccountsV1ToV2<T
 				}
 
 				Some(OperationalAccount {
-					vault_account: account.vault_account,
+					vault_account: account.vault_account.clone(),
 					mining_account: account.mining_bot_account,
 					encryption_pubkey: account.encryption_pubkey,
-					referrer: account.sponsor.clone(),
-					is_treasury_certified: should_mark_treasury_certified,
-					is_upgraded_to_operations: account.is_operational || account.sponsor.is_some(),
+					upstream_account: account.sponsor.clone(),
 					uniswap_argon_transfers_in_amount: if account.has_uniswap_transfer {
-						T::TreasuryMinimumUniswapTransfer::get()
+						T::MinimumUniswapTransfer::get()
 					} else {
 						T::Balance::zero()
 					},
-					account_bitcoin_amount,
-					account_vault_bond_amount,
+					account_bitcoin_amount:
+						T::BitcoinLocksProvider::get_account_funded_bitcoin_amount(
+							&account.vault_account,
+						),
+					account_vault_bond_amount:
+						T::TreasuryPoolProvider::active_account_vault_bond_amount(
+							&account.vault_account,
+						),
 					vault_created: account.vault_created,
 					vault_bitcoin_accrual: account.bitcoin_accrual,
 					vault_bitcoin_applied_total: account.bitcoin_applied_total,
 					mining_seat_accrual: account.mining_seat_accrual,
 					mining_seat_applied_total: account.mining_seat_applied_total,
-					operational_referrals_count: account.operational_referrals_count,
-					upgrade_code_pending: account.referral_pending,
-					available_upgrade_codes: account.available_referrals,
+					operational_certifications_count: account.operational_referrals_count,
+					access_code_pending: account.referral_pending,
+					available_access_codes: account.available_referrals,
 					rewards_earned_count: account.rewards_earned_count,
 					rewards_earned_amount: account.rewards_earned_amount,
 					rewards_collected_amount: account.rewards_collected_amount,
@@ -123,15 +118,13 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for MigrateOperationalAccountsV1ToV2<T
 			let migrated_account = CurrentOperationalAccounts::<T>::get(&owner)
 				.ok_or(TryRuntimeError::Other("missing migrated operational account"))?;
 			let expected_account_bitcoin_amount =
-				T::BitcoinLocksProvider::get_account_funded_bitcoin_amount(&owner);
+				T::BitcoinLocksProvider::get_account_funded_bitcoin_amount(
+					&old_account.vault_account,
+				);
 			let expected_account_vault_bond_amount =
-				T::TreasuryPoolProvider::active_account_vault_bond_amount(&owner);
-			let should_mark_treasury_certified = should_mark_treasury_certified::<T>(
-				&old_account,
-				expected_account_bitcoin_amount,
-				expected_account_vault_bond_amount,
-			);
-
+				T::TreasuryPoolProvider::active_account_vault_bond_amount(
+					&old_account.vault_account,
+				);
 			ensure!(
 				migrated_account.vault_account == old_account.vault_account,
 				TryRuntimeError::Other("vault account mismatch"),
@@ -145,18 +138,13 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for MigrateOperationalAccountsV1ToV2<T
 				TryRuntimeError::Other("encryption key mismatch"),
 			);
 			ensure!(
-				migrated_account.referrer == old_account.sponsor,
-				TryRuntimeError::Other("referrer mismatch"),
-			);
-			ensure!(
-				migrated_account.is_upgraded_to_operations ==
-					(old_account.is_operational || old_account.sponsor.is_some()),
-				TryRuntimeError::Other("upgrade flag mismatch"),
+				migrated_account.upstream_account == old_account.sponsor,
+				TryRuntimeError::Other("upstream account mismatch"),
 			);
 			ensure!(
 				migrated_account.uniswap_argon_transfers_in_amount ==
 					if old_account.has_uniswap_transfer {
-						T::TreasuryMinimumUniswapTransfer::get()
+						T::MinimumUniswapTransfer::get()
 					} else {
 						T::Balance::zero()
 					},
@@ -191,17 +179,17 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for MigrateOperationalAccountsV1ToV2<T
 				TryRuntimeError::Other("mining seat applied total mismatch"),
 			);
 			ensure!(
-				migrated_account.operational_referrals_count ==
+				migrated_account.operational_certifications_count ==
 					old_account.operational_referrals_count,
-				TryRuntimeError::Other("operational referrals count mismatch"),
+				TryRuntimeError::Other("operational downstream certifications count mismatch"),
 			);
 			ensure!(
-				migrated_account.upgrade_code_pending == old_account.referral_pending,
-				TryRuntimeError::Other("upgrade code pending mismatch"),
+				migrated_account.access_code_pending == old_account.referral_pending,
+				TryRuntimeError::Other("access code pending mismatch"),
 			);
 			ensure!(
-				migrated_account.available_upgrade_codes == old_account.available_referrals,
-				TryRuntimeError::Other("available upgrade codes mismatch"),
+				migrated_account.available_access_codes == old_account.available_referrals,
+				TryRuntimeError::Other("available access codes mismatch"),
 			);
 			ensure!(
 				migrated_account.rewards_earned_count == old_account.rewards_earned_count,
@@ -219,11 +207,6 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for MigrateOperationalAccountsV1ToV2<T
 				migrated_account.is_operationally_certified == old_account.is_operational,
 				TryRuntimeError::Other("operational certification mismatch"),
 			);
-			ensure!(
-				migrated_account.is_treasury_certified == should_mark_treasury_certified,
-				TryRuntimeError::Other("treasury certification mismatch"),
-			);
-
 			let should_remove_funding_mapping = old_account.mining_funding_account !=
 				old_account.vault_account &&
 				old_account.mining_funding_account != old_account.mining_bot_account;
@@ -240,24 +223,7 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for MigrateOperationalAccountsV1ToV2<T
 	}
 }
 
-fn should_mark_treasury_certified<T: Config>(
-	old_account: &OperationalAccountV1<T>,
-	account_bitcoin_amount: T::Balance,
-	account_vault_bond_amount: T::Balance,
-) -> bool {
-	let has_uniswap_transfer =
-		!T::UniswapTransferProvider::is_crosschain_activated() || old_account.has_uniswap_transfer;
-	let has_current_treasury_certification = has_uniswap_transfer &&
-		account_bitcoin_amount >= T::TreasuryMinimumBitcoin::get() &&
-		account_vault_bond_amount >= T::TreasuryMinimumBonds::get();
-	let had_legacy_treasury_progress = old_account.has_uniswap_transfer &&
-		!account_bitcoin_amount.is_zero() &&
-		!account_vault_bond_amount.is_zero();
-
-	old_account.is_operational || had_legacy_treasury_progress || has_current_treasury_certification
-}
-
-pub type BackfillOperationalUpgradeMigration<T> = frame_support::migrations::VersionedMigration<
+pub type BackfillOperationalAccessMigration<T> = frame_support::migrations::VersionedMigration<
 	1,
 	2,
 	MigrateOperationalAccountsV1ToV2<T>,
@@ -271,8 +237,8 @@ mod test {
 	use crate::{
 		mock::{
 			new_test_ext, record_active_vault_bond_amount, record_funded_bitcoin_amount,
-			set_registration_lookup, OperationalMinimumVaultSecuritization, Test,
-			TreasuryMinimumBitcoin, TreasuryMinimumBonds, TreasuryMinimumUniswapTransfer,
+			set_registration_lookup, MinimumBitcoin, MinimumBonds, MinimumUniswapTransfer,
+			OperationalMinimumVaultSecuritization, Test,
 		},
 		pallet::Pallet as OperationalAccountsPallet,
 		OperationalAccountBySubAccount as OperationalAccountLinks,
@@ -297,12 +263,12 @@ mod test {
 			let upgraded_vault = account_id_from_seed(2);
 			let upgraded_mining_funding = account_id_from_seed(3);
 			let upgraded_mining_bot = account_id_from_seed(4);
-			let referrer = account_id_from_seed(5);
+			let upstream_account = account_id_from_seed(5);
 
-			let treasury_only_owner = account_id_from_seed(6);
-			let treasury_only_vault = account_id_from_seed(7);
-			let treasury_only_mining_funding = account_id_from_seed(8);
-			let treasury_only_mining_bot = account_id_from_seed(9);
+			let not_ready_owner = account_id_from_seed(6);
+			let not_ready_vault = account_id_from_seed(7);
+			let not_ready_mining_funding = account_id_from_seed(8);
+			let not_ready_mining_bot = account_id_from_seed(9);
 			let legacy_progress_owner = account_id_from_seed(10);
 			let legacy_progress_vault = account_id_from_seed(11);
 			let legacy_progress_mining_funding = account_id_from_seed(12);
@@ -315,17 +281,17 @@ mod test {
 			set_registration_lookup(
 				upgraded_vault.clone(),
 				upgraded_mining_bot.clone(),
-				TreasuryMinimumBitcoin::get(),
+				MinimumBitcoin::get(),
 				OperationalMinimumVaultSecuritization::get(),
-				TreasuryMinimumBonds::get(),
+				MinimumBonds::get(),
 				1,
 			);
 			set_registration_lookup(
-				treasury_only_vault.clone(),
-				treasury_only_mining_bot.clone(),
-				TreasuryMinimumBitcoin::get().saturating_sub(1),
+				not_ready_vault.clone(),
+				not_ready_mining_bot.clone(),
+				MinimumBitcoin::get().saturating_sub(1),
 				OperationalMinimumVaultSecuritization::get(),
-				TreasuryMinimumBonds::get(),
+				MinimumBonds::get(),
 				0,
 			);
 			set_registration_lookup(
@@ -344,31 +310,28 @@ mod test {
 				1,
 				2,
 			);
-			record_funded_bitcoin_amount(&upgraded_owner, TreasuryMinimumBitcoin::get());
-			record_funded_bitcoin_amount(
-				&treasury_only_owner,
-				TreasuryMinimumBitcoin::get().saturating_sub(1),
-			);
-			record_funded_bitcoin_amount(&legacy_progress_owner, 1);
-			record_funded_bitcoin_amount(&legacy_operational_owner, 1);
+			record_funded_bitcoin_amount(&upgraded_vault, MinimumBitcoin::get());
+			record_funded_bitcoin_amount(&not_ready_vault, MinimumBitcoin::get().saturating_sub(1));
+			record_funded_bitcoin_amount(&legacy_progress_vault, 1);
+			record_funded_bitcoin_amount(&legacy_operational_vault, 1);
 			record_active_vault_bond_amount(
 				vault_id_from_account(&upgraded_vault),
-				&upgraded_owner,
-				TreasuryMinimumBonds::get(),
+				&upgraded_vault,
+				MinimumBonds::get(),
 			);
 			record_active_vault_bond_amount(
-				vault_id_from_account(&treasury_only_vault),
-				&treasury_only_owner,
-				TreasuryMinimumBonds::get(),
+				vault_id_from_account(&not_ready_vault),
+				&not_ready_vault,
+				MinimumBonds::get(),
 			);
 			record_active_vault_bond_amount(
 				vault_id_from_account(&legacy_progress_vault),
-				&legacy_progress_owner,
+				&legacy_progress_vault,
 				1,
 			);
 			record_active_vault_bond_amount(
 				vault_id_from_account(&legacy_operational_vault),
-				&legacy_operational_owner,
+				&legacy_operational_vault,
 				1,
 			);
 
@@ -381,10 +344,10 @@ mod test {
 					mining_funding_account: upgraded_mining_funding.clone(),
 					mining_bot_account: upgraded_mining_bot.clone(),
 					encryption_pubkey: OpaqueEncryptionPubkey([1u8; 32]),
-					sponsor: Some(referrer.clone()),
+					sponsor: Some(upstream_account.clone()),
 					has_uniswap_transfer: true,
 					vault_created: true,
-					bitcoin_accrual: TreasuryMinimumBitcoin::get(),
+					bitcoin_accrual: MinimumBitcoin::get(),
 					bitcoin_applied_total: 0u128.into(),
 					has_treasury_pool_participation: true,
 					mining_seat_accrual: 1,
@@ -399,16 +362,16 @@ mod test {
 				},
 			);
 			OperationalAccounts::<Test>::insert(
-				&treasury_only_owner,
+				&not_ready_owner,
 				OperationalAccountV1 {
-					vault_account: treasury_only_vault.clone(),
-					mining_funding_account: treasury_only_mining_funding.clone(),
-					mining_bot_account: treasury_only_mining_bot.clone(),
+					vault_account: not_ready_vault.clone(),
+					mining_funding_account: not_ready_mining_funding.clone(),
+					mining_bot_account: not_ready_mining_bot.clone(),
 					encryption_pubkey: OpaqueEncryptionPubkey([2u8; 32]),
 					sponsor: None,
 					has_uniswap_transfer: false,
 					vault_created: false,
-					bitcoin_accrual: TreasuryMinimumBitcoin::get().saturating_sub(1),
+					bitcoin_accrual: MinimumBitcoin::get().saturating_sub(1),
 					bitcoin_applied_total: 0u128.into(),
 					has_treasury_pool_participation: false,
 					mining_seat_accrual: 0,
@@ -475,21 +438,17 @@ mod test {
 			OperationalAccountLinks::<Test>::insert(&upgraded_mining_bot, &upgraded_owner);
 
 			#[cfg(feature = "try-runtime")]
-			let state = BackfillOperationalUpgradeMigration::<Test>::pre_upgrade().expect("pre-upgrade");
-			BackfillOperationalUpgradeMigration::<Test>::on_runtime_upgrade();
+			let state = BackfillOperationalAccessMigration::<Test>::pre_upgrade().expect("pre-upgrade");
+			BackfillOperationalAccessMigration::<Test>::on_runtime_upgrade();
 			#[cfg(feature = "try-runtime")]
-			BackfillOperationalUpgradeMigration::<Test>::post_upgrade(state).expect("post-upgrade");
+			BackfillOperationalAccessMigration::<Test>::post_upgrade(state).expect("post-upgrade");
 
 			let upgraded =
 				CurrentOperationalAccounts::<Test>::get(&upgraded_owner).expect("upgraded");
-			assert_eq!(upgraded.referrer, Some(referrer));
+			assert_eq!(upgraded.upstream_account, Some(upstream_account));
 			assert_eq!(upgraded.mining_account, upgraded_mining_bot);
-			assert!(upgraded.is_upgraded_to_operations);
-			assert!(upgraded.is_treasury_certified);
-			assert_eq!(
-				upgraded.uniswap_argon_transfers_in_amount,
-				TreasuryMinimumUniswapTransfer::get()
-			);
+			assert!(OperationalAccountsPallet::<Test>::meets_minimums(&upgraded,));
+			assert_eq!(upgraded.uniswap_argon_transfers_in_amount, MinimumUniswapTransfer::get());
 			assert!(upgraded.is_operationally_certified);
 			assert!(!OperationalAccountLinks::<Test>::contains_key(&upgraded_mining_funding));
 			assert_eq!(
@@ -497,31 +456,28 @@ mod test {
 				Some(upgraded_owner.clone())
 			);
 
-			let treasury_only = CurrentOperationalAccounts::<Test>::get(&treasury_only_owner)
-				.expect("treasury only");
-			assert!(!treasury_only.is_treasury_certified);
-			assert_eq!(treasury_only.mining_account, treasury_only_mining_bot);
-			assert_eq!(treasury_only.uniswap_argon_transfers_in_amount, 0);
-			assert!(!treasury_only.is_upgraded_to_operations);
-			assert!(!treasury_only.is_operationally_certified);
+			let not_ready =
+				CurrentOperationalAccounts::<Test>::get(&not_ready_owner).expect("not ready");
+			assert!(!OperationalAccountsPallet::<Test>::meets_minimums(&not_ready,));
+			assert_eq!(not_ready.mining_account, not_ready_mining_bot);
+			assert_eq!(not_ready.uniswap_argon_transfers_in_amount, 0);
+			assert!(!not_ready.is_operationally_certified);
 
 			let legacy_progress = CurrentOperationalAccounts::<Test>::get(&legacy_progress_owner)
-				.expect("legacy treasury progress");
-			assert!(legacy_progress.is_treasury_certified);
+				.expect("legacy minimums");
+			assert!(!OperationalAccountsPallet::<Test>::meets_minimums(&legacy_progress,));
 			assert_eq!(legacy_progress.account_bitcoin_amount, 1);
 			assert_eq!(legacy_progress.account_vault_bond_amount, 1);
 			assert_eq!(legacy_progress.mining_account, legacy_progress_mining_bot);
-			assert!(!legacy_progress.is_upgraded_to_operations);
 			assert!(!legacy_progress.is_operationally_certified);
 
 			let legacy_operational =
 				CurrentOperationalAccounts::<Test>::get(&legacy_operational_owner)
 					.expect("legacy operational");
-			assert!(legacy_operational.is_treasury_certified);
+			assert!(!OperationalAccountsPallet::<Test>::meets_minimums(&legacy_operational,));
 			assert_eq!(legacy_operational.account_bitcoin_amount, 1);
 			assert_eq!(legacy_operational.account_vault_bond_amount, 1);
 			assert_eq!(legacy_operational.mining_account, legacy_operational_mining_bot);
-			assert!(legacy_operational.is_upgraded_to_operations);
 			assert!(legacy_operational.is_operationally_certified);
 		});
 	}

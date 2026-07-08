@@ -137,9 +137,9 @@ export function deriveMintingAuthorityActivationPricingRecommendation(
     let variableSignatureGasCost = 0n;
 
     for (let leftIndex = 0; leftIndex < consolidatedAnchors.length - 1; ++leftIndex) {
-      const leftAnchor = consolidatedAnchors[leftIndex]!;
+      const leftAnchor = consolidatedAnchors[leftIndex];
       for (let rightIndex = leftIndex + 1; rightIndex < consolidatedAnchors.length; ++rightIndex) {
-        const rightAnchor = consolidatedAnchors[rightIndex]!;
+        const rightAnchor = consolidatedAnchors[rightIndex];
         const deltaGas =
           rightAnchor.singleActivationGas > leftAnchor.singleActivationGas
             ? rightAnchor.singleActivationGas - leftAnchor.singleActivationGas

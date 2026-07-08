@@ -736,19 +736,19 @@ impl pallet_crosschain_transfer::Config for Runtime {
 }
 impl pallet_operational_accounts::Config for Runtime {
 	type Balance = Balance;
-	type MaxAvailableUpgradeCodes = MaxAvailableOperationalUpgradeCodes;
+	type MaxAvailableAccessCodes = MaxAvailableOperationalAccessCodes;
 	type MaxEncryptedServerLen = MaxEncryptedServerLen;
-	type TreasuryMinimumUniswapTransfer = TreasuryMinimumUniswapTransfer;
-	type TreasuryMinimumBitcoin = TreasuryMinimumBitcoin;
-	type TreasuryMinimumBonds = TreasuryMinimumBonds;
+	type MinimumUniswapTransfer = MinimumUniswapTransfer;
+	type MinimumBitcoin = MinimumBitcoin;
+	type MinimumBonds = MinimumBonds;
 	type OperationalMinimumUniswapTransfer = OperationalMinimumUniswapTransfer;
 	type OperationalMinimumVaultSecuritization = OperationalMinimumVaultSecuritization;
-	type BitcoinLockSizeForUpgradeCode = BitcoinLockSizeForUpgradeCode;
+	type BitcoinLockSizeForAccessCode = BitcoinLockSizeForAccessCode;
 	type MiningSeatsForOperational = MiningSeatsForOperational;
-	type MiningSeatsPerUpgradeCode = MiningSeatsPerUpgradeCode;
-	type OperationalReferralsPerBonusReward = OperationalReferralsPerBonusReward;
-	type OperationalActivationReward = OperationalActivationReward;
-	type OperationalReferralBonusReward = OperationalReferralBonusReward;
+	type MiningSeatsPerAccessCode = MiningSeatsPerAccessCode;
+	type OperationalCertificationsPerBonusReward = OperationalCertificationsPerBonusReward;
+	type OperationalCertificationReward = OperationalCertificationReward;
+	type OperationalCertificationBonusReward = OperationalCertificationBonusReward;
 	type VaultProvider = use_unless_benchmark!(
 		Vaults,
 		benchmarking::BenchmarkOperationalAccountsVaultProvider<Balance, AccountId>

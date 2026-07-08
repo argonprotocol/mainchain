@@ -1,5 +1,4 @@
 // Auto-generated via `yarn polkadot-types-from-chain`, do not edit
-/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
@@ -1262,7 +1261,7 @@ declare module '@polkadot/api-base/types/storage' {
     };
     operationalAccounts: {
       /**
-       * Opaque encrypted referrer server payload keyed by the downstream account.
+       * Opaque encrypted upstream server payload keyed by the downstream account.
        **/
       encryptedServerByDownstreamAccount: AugmentedQuery<
         ApiType,
@@ -1272,7 +1271,7 @@ declare module '@polkadot/api-base/types/storage' {
       /**
        * Whether operational-account access is invite-only.
        *
-       * When enabled, registration requires a referrer invite and vault creation plus
+       * When enabled, registration requires an upstream invite and vault creation plus
        * mining-slot bidding remain restricted to registered operational accounts.
        *
        * Existing live raw chain specs do not contain this key, so the default remains invite-only

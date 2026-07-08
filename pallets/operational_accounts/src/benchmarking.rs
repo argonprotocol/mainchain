@@ -5,8 +5,8 @@ use super::*;
 #[cfg(test)]
 use crate::mock::{
 	new_test_ext, record_funded_bitcoin_amount, record_microgons_in, set_registration_lookup,
-	ClaimableTreasuryBalance, OperationalMinimumVaultSecuritization, Test, TestAccountId,
-	TreasuryMinimumBitcoin, TreasuryMinimumBonds, TreasuryMinimumUniswapTransfer,
+	ClaimableTreasuryBalance, MinimumBitcoin, MinimumBonds, MinimumUniswapTransfer,
+	OperationalMinimumVaultSecuritization, Test, TestAccountId,
 };
 #[allow(unused)]
 use crate::Pallet as OperationalAccountsPallet;
@@ -91,7 +91,7 @@ mod benchmarks {
 			seed_mock_linked_uniswap_argon_transfers_in(&linked);
 			record_funded_bitcoin_amount(
 				&mock_account_id::<T>(&linked.vault),
-				TreasuryMinimumBitcoin::get(),
+				MinimumBitcoin::get(),
 			);
 		}
 		set_benchmark_operational_accounts_provider_state(default_provider_state::<T>());
@@ -103,21 +103,21 @@ mod benchmarks {
 			mining_account: mining.clone(),
 			vault_account_proof: vault_proof,
 			mining_account_proof: mining_proof,
-			referrer: None,
+			access_proof: None,
 		});
 		whitelist_account!(caller);
 		#[extrinsic_call]
 		register(RawOrigin::Signed(caller.clone()), registration);
 
-		let expected_uniswap_argon_transfers_in_amount = T::TreasuryMinimumUniswapTransfer::get()
-			.saturating_add(T::TreasuryMinimumUniswapTransfer::get())
-			.saturating_add(T::TreasuryMinimumUniswapTransfer::get());
+		let expected_uniswap_argon_transfers_in_amount = T::MinimumUniswapTransfer::get()
+			.saturating_add(T::MinimumUniswapTransfer::get())
+			.saturating_add(T::MinimumUniswapTransfer::get());
 		let account = OperationalAccounts::<T>::get(&caller).expect("account stored");
 		assert_eq!(
 			account.uniswap_argon_transfers_in_amount,
 			expected_uniswap_argon_transfers_in_amount
 		);
-		assert_eq!(account.vault_bitcoin_accrual, T::TreasuryMinimumBitcoin::get());
+		assert_eq!(account.vault_bitcoin_accrual, T::MinimumBitcoin::get());
 		assert!(account.vault_created);
 		assert_eq!(account.mining_seat_accrual, 1);
 		assert!(!account.is_operationally_certified);
@@ -138,41 +138,12 @@ mod benchmarks {
 	}
 
 	#[benchmark]
-	fn upgrade_account() {
-		set_benchmark_operational_accounts_provider_state(default_provider_state::<T>());
-		let account = linked_accounts::<T>();
-		let referrer = linked_accounts_with_seed::<T>(1);
-		let mut account_data = default_operational_account::<T>(&account);
-		account_data.is_treasury_certified = true;
-		account_data.uniswap_argon_transfers_in_amount = T::TreasuryMinimumUniswapTransfer::get();
-		account_data.account_bitcoin_amount = T::TreasuryMinimumBitcoin::get();
-		account_data.account_vault_bond_amount = T::TreasuryMinimumBonds::get();
-		let mut referrer_account = default_operational_account::<T>(&referrer);
-		referrer_account.is_operationally_certified = true;
-		referrer_account.available_upgrade_codes = 1;
-		insert_operational_account::<T>(&account, account_data);
-		insert_operational_account::<T>(&referrer, referrer_account);
-		#[cfg(test)]
-		seed_mock_registration_lookup(&account);
-		let caller = referrer.owner.clone();
-		whitelist_account!(caller);
-
-		#[extrinsic_call]
-		upgrade_account(RawOrigin::Signed(caller.clone()), account.owner.clone());
-
-		let account = OperationalAccounts::<T>::get(&account.owner).expect("account should exist");
-		assert_eq!(account.referrer, Some(referrer.owner.clone()));
-		assert!(account.is_upgraded_to_operations);
-	}
-
-	#[benchmark]
 	fn on_vault_created() {
 		set_benchmark_operational_accounts_provider_state(default_provider_state::<T>());
 		let linked = linked_accounts::<T>();
 		let mut account = default_operational_account::<T>(&linked);
-		account.is_treasury_certified = true;
 		account.uniswap_argon_transfers_in_amount = T::OperationalMinimumUniswapTransfer::get();
-		account.vault_bitcoin_accrual = T::TreasuryMinimumBitcoin::get();
+		account.vault_bitcoin_accrual = T::MinimumBitcoin::get();
 		account.mining_seat_accrual = T::MiningSeatsForOperational::get();
 		insert_operational_account::<T>(&linked, account);
 		link_vault_to_owner::<T>(&linked);
@@ -199,7 +170,7 @@ mod benchmarks {
 		set_benchmark_operational_accounts_provider_state(default_provider_state::<T>());
 		let linked = linked_accounts::<T>();
 		let mut account = default_operational_account::<T>(&linked);
-		account.uniswap_argon_transfers_in_amount = T::TreasuryMinimumUniswapTransfer::get();
+		account.uniswap_argon_transfers_in_amount = T::MinimumUniswapTransfer::get();
 		account.vault_created = true;
 		account.mining_seat_accrual = T::MiningSeatsForOperational::get();
 		insert_operational_account::<T>(&linked, account);
@@ -211,12 +182,12 @@ mod benchmarks {
 		{
 			let _ = OperationalAccountsPallet::<T>::vault_bitcoin_lock_funded(
 				&linked.vault,
-				T::TreasuryMinimumBitcoin::get(),
+				T::MinimumBitcoin::get(),
 			);
 		}
 
 		let account = OperationalAccounts::<T>::get(&linked.owner).expect("account should exist");
-		assert_eq!(account.vault_bitcoin_accrual, T::TreasuryMinimumBitcoin::get());
+		assert_eq!(account.vault_bitcoin_accrual, T::MinimumBitcoin::get());
 	}
 
 	#[benchmark]
@@ -224,11 +195,9 @@ mod benchmarks {
 		set_benchmark_operational_accounts_provider_state(default_provider_state::<T>());
 		let linked = linked_accounts::<T>();
 		let mut account = default_operational_account::<T>(&linked);
-		account.is_treasury_certified = true;
-		account.is_upgraded_to_operations = true;
 		account.uniswap_argon_transfers_in_amount = T::OperationalMinimumUniswapTransfer::get();
 		account.vault_created = true;
-		account.vault_bitcoin_accrual = T::TreasuryMinimumBitcoin::get();
+		account.vault_bitcoin_accrual = T::MinimumBitcoin::get();
 		account.mining_seat_accrual = T::MiningSeatsForOperational::get().saturating_sub(1);
 		insert_operational_account::<T>(&linked, account);
 		link_mining_to_owner::<T>(&linked);
@@ -258,8 +227,8 @@ mod benchmarks {
 		{
 			let _ = <OperationalAccountsPallet<T> as UtxoLockEvents<T::AccountId, T::Balance>>::utxo_locked(
 				1u64,
-				&linked.owner,
-				T::TreasuryMinimumBitcoin::get(),
+				&linked.vault,
+				T::MinimumBitcoin::get(),
 			);
 		}
 
@@ -267,7 +236,7 @@ mod benchmarks {
 			OperationalAccounts::<T>::get(&linked.owner)
 				.expect("account should exist")
 				.account_bitcoin_amount,
-			T::TreasuryMinimumBitcoin::get()
+			T::MinimumBitcoin::get()
 		);
 	}
 
@@ -284,7 +253,7 @@ mod benchmarks {
 		{
 			OperationalAccountsPallet::<T>::account_vault_bond_total_updated(
 				&linked.vault,
-				T::TreasuryMinimumBonds::get(),
+				T::MinimumBonds::get(),
 			);
 		}
 
@@ -292,7 +261,7 @@ mod benchmarks {
 			OperationalAccounts::<T>::get(&linked.owner)
 				.expect("account should exist")
 				.account_vault_bond_amount,
-			T::TreasuryMinimumBonds::get()
+			T::MinimumBonds::get()
 		);
 	}
 
@@ -301,10 +270,10 @@ mod benchmarks {
 		set_benchmark_operational_accounts_provider_state(default_provider_state::<T>());
 		let linked = linked_accounts::<T>();
 		let mut account = default_operational_account::<T>(&linked);
-		account.account_bitcoin_amount = T::TreasuryMinimumBitcoin::get();
-		account.account_vault_bond_amount = T::TreasuryMinimumBonds::get();
+		account.account_bitcoin_amount = T::MinimumBitcoin::get();
+		account.account_vault_bond_amount = T::MinimumBonds::get();
 		account.vault_created = true;
-		account.vault_bitcoin_accrual = T::TreasuryMinimumBitcoin::get();
+		account.vault_bitcoin_accrual = T::MinimumBitcoin::get();
 		account.mining_seat_accrual = T::MiningSeatsForOperational::get();
 		insert_operational_account::<T>(&linked, account);
 		link_vault_to_owner::<T>(&linked);
@@ -322,35 +291,33 @@ mod benchmarks {
 		}
 
 		let account = OperationalAccounts::<T>::get(&linked.owner).expect("account should exist");
-		let expected_uniswap_argon_transfers_in_amount = T::TreasuryMinimumUniswapTransfer::get()
-			.saturating_add(T::TreasuryMinimumUniswapTransfer::get())
-			.saturating_add(T::TreasuryMinimumUniswapTransfer::get());
+		let expected_uniswap_argon_transfers_in_amount = T::MinimumUniswapTransfer::get()
+			.saturating_add(T::MinimumUniswapTransfer::get())
+			.saturating_add(T::MinimumUniswapTransfer::get());
 		assert_eq!(
 			account.uniswap_argon_transfers_in_amount,
 			expected_uniswap_argon_transfers_in_amount
 		);
-		assert!(account.is_treasury_certified);
+		assert!(meets_minimums::<T>(&account));
 	}
 
 	#[benchmark]
 	fn activate() {
 		set_benchmark_operational_accounts_provider_state(default_provider_state::<T>());
 		let linked = linked_accounts::<T>();
-		let referrer = linked_accounts_with_seed::<T>(1);
-		let mut referrer_account = default_operational_account::<T>(&referrer);
-		referrer_account.is_operationally_certified = true;
-		referrer_account.operational_referrals_count =
-			T::OperationalReferralsPerBonusReward::get().saturating_sub(1);
-		insert_operational_account::<T>(&referrer, referrer_account);
+		let upstream_account = linked_accounts_with_seed::<T>(1);
+		let mut upstream_account_data = default_operational_account::<T>(&upstream_account);
+		upstream_account_data.is_operationally_certified = true;
+		upstream_account_data.operational_certifications_count =
+			T::OperationalCertificationsPerBonusReward::get().saturating_sub(1);
+		insert_operational_account::<T>(&upstream_account, upstream_account_data);
 		let mut account = default_operational_account::<T>(&linked);
-		account.referrer = Some(referrer.owner.clone());
-		account.is_treasury_certified = true;
-		account.is_upgraded_to_operations = true;
-		account.account_bitcoin_amount = T::TreasuryMinimumBitcoin::get();
-		account.account_vault_bond_amount = T::TreasuryMinimumBonds::get();
+		account.upstream_account = Some(upstream_account.owner.clone());
+		account.account_bitcoin_amount = T::MinimumBitcoin::get();
+		account.account_vault_bond_amount = T::MinimumBonds::get();
 		account.uniswap_argon_transfers_in_amount = T::OperationalMinimumUniswapTransfer::get();
 		account.vault_created = true;
-		account.vault_bitcoin_accrual = T::TreasuryMinimumBitcoin::get();
+		account.vault_bitcoin_accrual = T::MinimumBitcoin::get();
 		account.mining_seat_accrual = T::MiningSeatsForOperational::get();
 		insert_operational_account::<T>(&linked, account);
 		link_mining_to_owner::<T>(&linked);
@@ -367,25 +334,28 @@ mod benchmarks {
 				.expect("account should exist")
 				.is_operationally_certified
 		);
-		let referrer_account =
-			OperationalAccounts::<T>::get(&referrer.owner).expect("referrer account should exist");
-		assert!(referrer_account.operational_referrals_count > 0);
+		let upstream_account_data = OperationalAccounts::<T>::get(&upstream_account.owner)
+			.expect("upstream account should exist");
+		assert!(upstream_account_data.operational_certifications_count > 0);
 	}
 
 	#[benchmark]
 	fn set_reward_config() {
-		let operational_activation_reward = T::Balance::from(1_000u128);
-		let operational_referral_bonus_reward = T::Balance::from(500u128);
+		let operational_certification_reward = T::Balance::from(1_000u128);
+		let operational_certification_bonus_reward = T::Balance::from(500u128);
 		#[extrinsic_call]
 		set_reward_config(
 			RawOrigin::Root,
-			operational_activation_reward,
-			operational_referral_bonus_reward,
+			operational_certification_reward,
+			operational_certification_bonus_reward,
 		);
 
 		let config = Rewards::<T>::get();
-		assert_eq!(config.operational_activation_reward, operational_activation_reward);
-		assert_eq!(config.operational_referral_bonus_reward, operational_referral_bonus_reward);
+		assert_eq!(config.operational_certification_reward, operational_certification_reward);
+		assert_eq!(
+			config.operational_certification_bonus_reward,
+			operational_certification_bonus_reward
+		);
 	}
 
 	#[benchmark]
@@ -420,11 +390,10 @@ mod benchmarks {
 		insert_operational_account::<T>(&linked, account);
 		let patch = OperationalProgressPatch {
 			uniswap_argon_transfers_in_amount: Some(T::OperationalMinimumUniswapTransfer::get()),
-			account_bitcoin_amount: Some(T::TreasuryMinimumBitcoin::get()),
-			account_vault_bond_amount: Some(T::TreasuryMinimumBonds::get()),
+			account_bitcoin_amount: Some(T::MinimumBitcoin::get()),
+			account_vault_bond_amount: Some(T::MinimumBonds::get()),
 			vault_created: Some(true),
-			is_upgraded_to_operations: Some(true),
-			vault_bitcoin_amount: Some(T::TreasuryMinimumBitcoin::get()),
+			vault_bitcoin_amount: Some(T::MinimumBitcoin::get()),
 			mining_seat_count: Some(T::MiningSeatsForOperational::get()),
 		};
 		#[cfg(test)]
@@ -434,30 +403,32 @@ mod benchmarks {
 		force_set_progress(RawOrigin::Root, linked.owner.clone(), patch, true);
 
 		let account = OperationalAccounts::<T>::get(&linked.owner).expect("account exists");
-		assert!(account.is_treasury_certified);
-		assert!(account.is_upgraded_to_operations);
+		assert!(meets_minimums::<T>(&account));
 		assert!(!account.is_operationally_certified);
 	}
 
 	#[benchmark]
 	fn set_encrypted_server_for_downstream_account() {
-		let referrer = linked_accounts::<T>();
+		let upstream_account = linked_accounts::<T>();
 		let downstream_account = LinkedAccounts {
 			owner: account("downstream_account_owner", 0, USER_SEED),
 			vault: account("downstream_account_vault", 0, USER_SEED),
 			mining: account("downstream_account_mining", 0, USER_SEED),
 		};
-		insert_operational_account::<T>(&referrer, default_operational_account::<T>(&referrer));
+		insert_operational_account::<T>(
+			&upstream_account,
+			default_operational_account::<T>(&upstream_account),
+		);
 		let mut downstream_account_data = default_operational_account::<T>(&downstream_account);
-		downstream_account_data.referrer = Some(referrer.owner.clone());
+		downstream_account_data.upstream_account = Some(upstream_account.owner.clone());
 		insert_operational_account::<T>(&downstream_account, downstream_account_data);
 		let encrypted_server = vec![7u8; 32];
-		let referrer_owner = referrer.owner.clone();
-		whitelist_account!(referrer_owner);
+		let upstream_account_owner = upstream_account.owner.clone();
+		whitelist_account!(upstream_account_owner);
 
 		#[extrinsic_call]
 		set_encrypted_server_for_downstream_account(
-			RawOrigin::Signed(referrer_owner),
+			RawOrigin::Signed(upstream_account_owner),
 			downstream_account.owner.clone(),
 			encrypted_server.clone(),
 		);
@@ -501,9 +472,7 @@ mod benchmarks {
 			vault_account: linked.vault.clone(),
 			mining_account: linked.mining.clone(),
 			encryption_pubkey: OpaqueEncryptionPubkey([0u8; 32]),
-			referrer: None,
-			is_treasury_certified: false,
-			is_upgraded_to_operations: false,
+			upstream_account: None,
 			uniswap_argon_transfers_in_amount: <T::Balance as Zero>::zero(),
 			account_bitcoin_amount: <T::Balance as Zero>::zero(),
 			account_vault_bond_amount: <T::Balance as Zero>::zero(),
@@ -512,14 +481,18 @@ mod benchmarks {
 			vault_bitcoin_applied_total: <T::Balance as Zero>::zero(),
 			mining_seat_accrual: 0,
 			mining_seat_applied_total: 0,
-			operational_referrals_count: 0,
-			upgrade_code_pending: false,
-			available_upgrade_codes: 0,
+			operational_certifications_count: 0,
+			access_code_pending: false,
+			available_access_codes: 0,
 			rewards_earned_count: 0,
 			rewards_earned_amount: <T::Balance as Zero>::zero(),
 			rewards_collected_amount: <T::Balance as Zero>::zero(),
 			is_operationally_certified: false,
 		}
+	}
+
+	fn meets_minimums<T: Config>(account: &OperationalAccount<T>) -> bool {
+		OperationalAccountsPallet::<T>::meets_minimums(account)
 	}
 
 	fn insert_operational_account<T: Config>(
@@ -552,27 +525,18 @@ mod benchmarks {
 		set_registration_lookup(
 			vault_account,
 			mining_account,
-			TreasuryMinimumBitcoin::get(),
+			MinimumBitcoin::get(),
 			OperationalMinimumVaultSecuritization::get(),
-			TreasuryMinimumBonds::get(),
+			MinimumBonds::get(),
 			1,
 		);
 	}
 
 	#[cfg(test)]
 	fn seed_mock_linked_uniswap_argon_transfers_in<T: Config>(linked: &LinkedAccounts<T>) {
-		record_microgons_in(
-			&mock_account_id::<T>(&linked.owner),
-			TreasuryMinimumUniswapTransfer::get(),
-		);
-		record_microgons_in(
-			&mock_account_id::<T>(&linked.vault),
-			TreasuryMinimumUniswapTransfer::get(),
-		);
-		record_microgons_in(
-			&mock_account_id::<T>(&linked.mining),
-			TreasuryMinimumUniswapTransfer::get(),
-		);
+		record_microgons_in(&mock_account_id::<T>(&linked.owner), MinimumUniswapTransfer::get());
+		record_microgons_in(&mock_account_id::<T>(&linked.vault), MinimumUniswapTransfer::get());
+		record_microgons_in(&mock_account_id::<T>(&linked.mining), MinimumUniswapTransfer::get());
 	}
 
 	#[cfg(test)]
@@ -585,15 +549,15 @@ mod benchmarks {
 		BenchmarkOperationalAccountsProviderState {
 			vault_registration_data: Some(argon_primitives::vault::RegistrationVaultData {
 				vault_id: 1,
-				activated_securitization: T::TreasuryMinimumBitcoin::get().saturated_into(),
+				activated_securitization: T::MinimumBitcoin::get().saturated_into(),
 				securitization: T::OperationalMinimumVaultSecuritization::get().saturated_into(),
 			}),
-			account_bitcoin_amount: T::TreasuryMinimumBitcoin::get().saturated_into(),
+			account_bitcoin_amount: T::MinimumBitcoin::get().saturated_into(),
 			is_eligible: true,
 			has_active_rewards_account_seat: true,
-			active_account_vault_bond_amount: T::TreasuryMinimumBonds::get().saturated_into(),
+			active_account_vault_bond_amount: T::MinimumBonds::get().saturated_into(),
 			is_crosschain_activated: true,
-			account_uniswap_argon_transfers_in_amount: T::TreasuryMinimumUniswapTransfer::get()
+			account_uniswap_argon_transfers_in_amount: T::MinimumUniswapTransfer::get()
 				.saturated_into(),
 			call_counters: Default::default(),
 		}

@@ -12,7 +12,6 @@ use pallet_prelude::*;
 /// Weight functions needed for this pallet.
 pub trait WeightInfo {
 	fn register() -> Weight;
-	fn upgrade_account() -> Weight;
 	fn set_reward_config() -> Weight;
 	fn force_set_progress() -> Weight;
 	fn set_encrypted_server_for_downstream_account() -> Weight;
@@ -103,10 +102,6 @@ where
 			)
 	}
 
-	fn upgrade_account() -> Weight {
-		Base::upgrade_account()
-	}
-
 	fn set_reward_config() -> Weight {
 		Base::set_reward_config()
 	}
@@ -185,9 +180,6 @@ impl<T: Config> OperationalAccountProviderWeightInfo for ProviderWeightAdapter<T
 // For backwards compatibility and tests.
 impl WeightInfo for () {
 	fn register() -> Weight {
-		Weight::zero()
-	}
-	fn upgrade_account() -> Weight {
 		Weight::zero()
 	}
 	fn set_reward_config() -> Weight {
