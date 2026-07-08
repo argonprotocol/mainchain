@@ -58,20 +58,19 @@ impl pallet_balances::Config for Test {
 }
 
 parameter_types! {
-	pub static CurrentFrameId: FrameId = 1;
-	pub const MaxAvailableUpgradeCodes: u32 = 2;
+	pub const MaxAvailableAccessCodes: u32 = 2;
 	pub const MaxEncryptedServerLen: u32 = 256;
-	pub const TreasuryMinimumUniswapTransfer: Balance = 250;
-	pub const TreasuryMinimumBitcoin: Balance = 500;
-	pub const TreasuryMinimumBonds: Balance = 250;
+	pub const MinimumUniswapTransfer: Balance = 250;
+	pub const MinimumBitcoin: Balance = 500;
+	pub const MinimumBonds: Balance = 250;
 	pub const OperationalMinimumUniswapTransfer: Balance = 3_000;
 	pub const OperationalMinimumVaultSecuritization: Balance = 2_000;
-	pub const BitcoinLockSizeForUpgradeCode: Balance = 5_000;
+	pub const BitcoinLockSizeForAccessCode: Balance = 5_000;
 	pub const MiningSeatsForOperational: u32 = 2;
-	pub const MiningSeatsPerUpgradeCode: u32 = 5;
-	pub const OperationalReferralsPerBonusReward: u32 = 5;
-	pub const OperationalActivationReward: Balance = 1_000;
-	pub const OperationalReferralBonusReward: Balance = 500;
+	pub const MiningSeatsPerAccessCode: u32 = 5;
+	pub const OperationalCertificationsPerBonusReward: u32 = 5;
+	pub const OperationalCertificationReward: Balance = 1_000;
+	pub const OperationalCertificationBonusReward: Balance = 500;
 	pub static IsCrosschainActivated: bool = true;
 	pub static MicrogonsInByAccount:
 		BTreeMap<TestAccountId, Balance> = BTreeMap::new();
@@ -373,19 +372,19 @@ impl OperationalRewardsPayer<TestAccountId, Balance> for MockOperationalRewardsP
 
 impl pallet_operational_accounts::Config for Test {
 	type Balance = Balance;
-	type MaxAvailableUpgradeCodes = MaxAvailableUpgradeCodes;
+	type MaxAvailableAccessCodes = MaxAvailableAccessCodes;
 	type MaxEncryptedServerLen = MaxEncryptedServerLen;
-	type TreasuryMinimumUniswapTransfer = TreasuryMinimumUniswapTransfer;
-	type TreasuryMinimumBitcoin = TreasuryMinimumBitcoin;
-	type TreasuryMinimumBonds = TreasuryMinimumBonds;
+	type MinimumUniswapTransfer = MinimumUniswapTransfer;
+	type MinimumBitcoin = MinimumBitcoin;
+	type MinimumBonds = MinimumBonds;
 	type OperationalMinimumUniswapTransfer = OperationalMinimumUniswapTransfer;
 	type OperationalMinimumVaultSecuritization = OperationalMinimumVaultSecuritization;
-	type BitcoinLockSizeForUpgradeCode = BitcoinLockSizeForUpgradeCode;
+	type BitcoinLockSizeForAccessCode = BitcoinLockSizeForAccessCode;
 	type MiningSeatsForOperational = MiningSeatsForOperational;
-	type MiningSeatsPerUpgradeCode = MiningSeatsPerUpgradeCode;
-	type OperationalReferralsPerBonusReward = OperationalReferralsPerBonusReward;
-	type OperationalActivationReward = OperationalActivationReward;
-	type OperationalReferralBonusReward = OperationalReferralBonusReward;
+	type MiningSeatsPerAccessCode = MiningSeatsPerAccessCode;
+	type OperationalCertificationsPerBonusReward = OperationalCertificationsPerBonusReward;
+	type OperationalCertificationReward = OperationalCertificationReward;
+	type OperationalCertificationBonusReward = OperationalCertificationBonusReward;
 	type VaultProvider = MockVaultProvider;
 	type MiningSlotProvider = MockMiningSlotProvider;
 	type BitcoinLocksProvider = MockBitcoinLocksProvider;
@@ -406,7 +405,6 @@ pub fn new_test_ext() -> TestState {
 		.unwrap();
 	});
 	ext.execute_with(|| {
-		CurrentFrameId::set(1);
 		IsCrosschainActivated::set(true);
 		MicrogonsInByAccount::set(BTreeMap::new());
 		MicrogonsOutByAccount::set(BTreeMap::new());

@@ -1,32 +1,19 @@
 # Operational Accounts
 
-## Treasury Certification
+## Registration Minimums
 
-An account becomes treasury certified once all of the following are true:
+An account may register only once all of the following are true:
 
-- The account has at least `TreasuryMinimumUniswapTransfer` in cumulative qualifying Uniswap
+- The linked accounts have at least `MinimumUniswapTransfer` in cumulative qualifying Uniswap
   transfer amount.
-- The registered account has at least `TreasuryMinimumBitcoin` in bitcoin lock value.
-- The registered account has at least `TreasuryMinimumBonds` in active bonds.
+- The registered vault account has at least `MinimumBitcoin` in bitcoin lock value.
+- The registered vault account has at least `MinimumBonds` in active bonds.
 
-The pallet sets `is_treasury_certified` when the account first reaches those requirements. The
-requirements are checked again when a referrer later spends an upgrade code on that account.
-
-## Operations Upgrade
-
-A treasury-certified account can be moved onto the operations flow through `upgrade_account`.
-
-- The caller must be the recorded `referrer`, if one was registered.
-- The referrer must have at least one available upgrade code.
-- The account must still satisfy the current treasury certification requirements when the upgrade
-  happens.
-
-Upgrading marks the account with `is_upgraded_to_operations`, but does not make it operationally
-certified yet.
+Meeting those minimums means the account is eligible to register.
 
 ## Operational Certification
 
-An upgraded account becomes operationally certified once all of the following are true:
+A registered account becomes operationally certified once all of the following are true:
 
 - The account has at least `OperationalMinimumUniswapTransfer` in cumulative qualifying Uniswap
   transfer amount.
@@ -34,28 +21,28 @@ An upgraded account becomes operationally certified once all of the following ar
   securitization.
 - The account has at least `MiningSeatsForOperational` mining seats.
 
-Once eligible, any managed account may call `activate`.
+Once eligible, any managed account may call `activate` to mark the account operationally certified.
 
-## Follow-On Upgrade Codes
+## Follow-On Access Codes
 
-After an account becomes operationally certified, it can earn additional upgrade codes through:
+After an account becomes operationally certified, it can earn additional access codes through:
 
-- Operational referrals: when a downstream account becomes operationally certified, the referrer
-  earns one pending upgrade code.
-- Bitcoin progress: vault bitcoin lock growth accumulates toward `BitcoinLockSizeForUpgradeCode`.
-- Mining seat progress: mining seat wins accumulate toward `MiningSeatsPerUpgradeCode`.
+- Downstream certifications: when a downstream account becomes operationally certified, the upstream
+  account earns one pending access code.
+- Bitcoin progress: vault bitcoin lock growth accumulates toward `BitcoinLockSizeForAccessCode`.
+- Mining seat progress: mining seat wins accumulate toward `MiningSeatsPerAccessCode`.
 
-Upgrade codes are capped by `MaxAvailableUpgradeCodes`.
+Access codes are capped by `MaxAvailableAccessCodes`.
 
 ## Rewards
 
-Activation rewards are paid when an account becomes operationally certified.
+Certification rewards are paid when an account becomes operationally certified.
 
-- `OperationalActivationReward` is paid to the newly activated account.
-- If the account has an operationally certified referrer, that referrer also receives the same
-  activation reward.
-- `OperationalReferralBonusReward` is paid each time `OperationalReferralsPerBonusReward`
-  operational referrals are reached.
+- `OperationalCertificationReward` is paid to the newly certified account.
+- If the account has an operationally certified upstream account, that upstream account also
+  receives the same certification reward.
+- `OperationalCertificationBonusReward` is paid each time `OperationalCertificationsPerBonusReward`
+  downstream certifications are reached.
 
 Rewards accrue to the operational account and can be claimed in whole-Argon increments from any
 managed account.

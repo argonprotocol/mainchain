@@ -240,18 +240,18 @@ parameter_types! {
 	/// budgeting.
 	pub const MaxReceiptProofsPerExtrinsic: u32 = 10;
 	// ## pallet_operational_accounts
-	/// Maximum number of available operational upgrade codes allowed at once.
-	pub const MaxAvailableOperationalUpgradeCodes: u32 = 3;
+	/// Maximum number of available operational access codes allowed at once.
+	pub const MaxAvailableOperationalAccessCodes: u32 = 3;
 	/// Maximum number of queued operational rewards.
 	pub const OperationalMaxRewardsQueued: u32 = 1_000;
-	/// Maximum number of opaque encrypted referrer server bytes stored per downstream account.
+	/// Maximum number of opaque encrypted upstream server bytes stored per downstream account.
 	pub const MaxEncryptedServerLen: u32 = 256;
-	/// Minimum Uniswap transfer amount required for treasury certification.
-	pub const TreasuryMinimumUniswapTransfer: Balance = 250 * MICROGONS_PER_ARGON;
-	/// Minimum bitcoin amount required for treasury certification.
-	pub const TreasuryMinimumBitcoin: Balance = 500 * MICROGONS_PER_ARGON;
-	/// Minimum bond amount required for treasury certification.
-	pub const TreasuryMinimumBonds: Balance = 250 * MICROGONS_PER_ARGON;
+	/// Minimum Uniswap transfer amount required to register.
+	pub const MinimumUniswapTransfer: Balance = 250 * MICROGONS_PER_ARGON;
+	/// Minimum bitcoin amount required to register.
+	pub const MinimumBitcoin: Balance = 500 * MICROGONS_PER_ARGON;
+	/// Minimum bond amount required to register.
+	pub const MinimumBonds: Balance = 250 * MICROGONS_PER_ARGON;
 	/// Minimum total Uniswap transfer amount required for operational certification.
 	pub const OperationalMinimumUniswapTransfer: Balance = 3_000 * MICROGONS_PER_ARGON;
 	/// Minimum vault securitization (base units) required to become operational.
@@ -265,19 +265,19 @@ parameter_types! {
 	/// One no-fee stale `initialize_for` failure is allowed for each this-many units of lost
 	/// `available_for_lock`.
 	pub const CapacityDropAttemptUnit: Balance = 100 * MICROGONS_PER_ARGON;
-	/// Additional argon amount (base units) required per follow-on upgrade code after
-	/// operational certification.
-	pub const BitcoinLockSizeForUpgradeCode: Balance = 5_000 * MICROGONS_PER_ARGON;
+	/// Additional argon amount (base units) required per follow-on access code after an account
+	/// becomes operational.
+	pub const BitcoinLockSizeForAccessCode: Balance = 5_000 * MICROGONS_PER_ARGON;
 	/// Mining seats required to become operational.
 	pub const MiningSeatsForOperational: u32 = 2;
-	/// Mining seats required per follow-on upgrade code after operational certification.
-	pub const MiningSeatsPerUpgradeCode: u32 = 5;
-	/// Number of operational referrals required per bonus reward.
-	pub const OperationalReferralsPerBonusReward: u32 = 5;
-	/// Default reward paid when an account becomes operational.
-	pub const OperationalActivationReward: Balance = 500 * MICROGONS_PER_ARGON;
-	/// Default bonus reward paid every operational referral threshold.
-	pub const OperationalReferralBonusReward: Balance = 5_000 * MICROGONS_PER_ARGON;
+	/// Mining seats required per follow-on access code after an account becomes operational.
+	pub const MiningSeatsPerAccessCode: u32 = 5;
+	/// Number of operational certifications required per bonus reward.
+	pub const OperationalCertificationsPerBonusReward: u32 = 5;
+	/// Default reward paid when an account becomes operationally certified.
+	pub const OperationalCertificationReward: Balance = 500 * MICROGONS_PER_ARGON;
+	/// Default bonus reward paid every operational certification threshold.
+	pub const OperationalCertificationBonusReward: Balance = 5_000 * MICROGONS_PER_ARGON;
 }
 
 /// Handles converting a weight scalar to a fee value, based on the scale and granularity of the

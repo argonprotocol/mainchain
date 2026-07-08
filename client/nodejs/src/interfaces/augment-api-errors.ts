@@ -975,25 +975,25 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       AccountAlreadyLinked: AugmentedError<ApiType>;
       /**
-       * The requested account is already upgraded to operational.
+       * The account is already operationally certified.
        **/
-      AccountAlreadyUpgraded: AugmentedError<ApiType>;
-      /**
-       * The account is already operational.
-       **/
-      AlreadyOperational: AugmentedError<ApiType>;
+      AlreadyOperationallyCertified: AugmentedError<ApiType>;
       /**
        * The caller already registered an operational account.
        **/
       AlreadyRegistered: AugmentedError<ApiType>;
       /**
-       * An account cannot upgrade itself.
+       * An account cannot grant access to itself.
        **/
-      CannotUpgradeSelf: AugmentedError<ApiType>;
+      CannotGrantAccessToSelf: AugmentedError<ApiType>;
       /**
        * The encrypted server payload exceeds the configured max length.
        **/
       EncryptedServerTooLong: AugmentedError<ApiType>;
+      /**
+       * The upstream access proof is invalid.
+       **/
+      InvalidAccessProof: AugmentedError<ApiType>;
       /**
        * One of the linked account ownership proofs is invalid.
        **/
@@ -1003,9 +1003,9 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       InvalidRegistrationSubmitter: AugmentedError<ApiType>;
       /**
-       * The requested referrer does not have an available upgrade to spend.
+       * The requested account does not currently satisfy the minimums.
        **/
-      NoAvailableUpgrades: AugmentedError<ApiType>;
+      MinimumsNotMet: AugmentedError<ApiType>;
       /**
        * The operational account has no pending rewards to claim.
        **/
@@ -1023,21 +1023,9 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       NotOperationalAccount: AugmentedError<ApiType>;
       /**
-       * The caller is not the referrer of the requested downstream account.
+       * The caller is not the upstream account for the requested downstream account.
        **/
-      NotReferrerOfAccount: AugmentedError<ApiType>;
-      /**
-       * The requested account has not reached treasury certification.
-       **/
-      NotTreasuryCertified: AugmentedError<ApiType>;
-      /**
-       * The requested referrer does not have a registered operational account.
-       **/
-      ReferrerNotOperationalAccount: AugmentedError<ApiType>;
-      /**
-       * The requested referrer does not match the referrer recorded during registration.
-       **/
-      RegisteredReferrerMismatch: AugmentedError<ApiType>;
+      NotUpstreamOfDownstream: AugmentedError<ApiType>;
       /**
        * A valid invite is required to register an operational account.
        **/
@@ -1055,13 +1043,17 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       RewardClaimNotWholeArgon: AugmentedError<ApiType>;
       /**
-       * The requested account no longer satisfies treasury certification requirements.
-       **/
-      TreasuryCertificationNoLongerMet: AugmentedError<ApiType>;
-      /**
        * The treasury does not currently have enough available reserves for the claim.
        **/
       TreasuryInsufficientFunds: AugmentedError<ApiType>;
+      /**
+       * The requested upstream account does not have any available access codes.
+       **/
+      UpstreamHasNoAvailableAccessCodes: AugmentedError<ApiType>;
+      /**
+       * The requested upstream account does not have a registered operational account.
+       **/
+      UpstreamNotOperationalAccount: AugmentedError<ApiType>;
     };
     ownership: {
       /**

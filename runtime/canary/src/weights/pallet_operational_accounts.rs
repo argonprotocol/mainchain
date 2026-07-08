@@ -47,17 +47,6 @@ impl<T: frame_system::Config> pallet_operational_accounts::WeightInfo for Weight
 			.saturating_add(T::DbWeight::get().reads(5))
 			.saturating_add(T::DbWeight::get().writes(3))
 		}
-	/// Storage: `OperationalAccounts::OperationalAccounts` (r:2 w:2)
-	/// Proof: `OperationalAccounts::OperationalAccounts` (`max_values`: None, `max_size`: Some(314), added: 2789, mode: `MaxEncodedLen`)
-	fn upgrade_account() -> Weight {
-		// Proof Size summary in bytes:
-		//  Measured:  `555`
-		//  Estimated: `6568`
-		// Minimum execution time: 16_000_000 picoseconds.
-		Weight::from_parts(16_000_000, 6568)
-			.saturating_add(T::DbWeight::get().reads(2))
-			.saturating_add(T::DbWeight::get().writes(2))
-		}
 	/// Storage: `OperationalAccounts::OperationalAccountBySubAccount` (r:1 w:0)
 	/// Proof: `OperationalAccounts::OperationalAccountBySubAccount` (`max_values`: None, `max_size`: Some(80), added: 2555, mode: `MaxEncodedLen`)
 	/// Storage: `OperationalAccounts::OperationalAccounts` (r:1 w:1)

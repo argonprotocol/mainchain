@@ -1,5 +1,4 @@
 // Auto-generated via `yarn polkadot-types-from-defs`, do not edit
-/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
@@ -231,6 +230,7 @@ import type {
   PalletOperationalAccountsRegistration,
   PalletOperationalAccountsRegistrationV1,
   PalletOperationalAccountsRewardsConfig,
+  PalletOperationalAccountsUpstreamAccessProof,
   PalletPriceIndexArgonotAverageFrameAccumulator,
   PalletPriceIndexCall,
   PalletPriceIndexCpiMeasurementBucket,
@@ -534,6 +534,7 @@ declare module '@polkadot/types/types/registry' {
     PalletOperationalAccountsRegistration: PalletOperationalAccountsRegistration;
     PalletOperationalAccountsRegistrationV1: PalletOperationalAccountsRegistrationV1;
     PalletOperationalAccountsRewardsConfig: PalletOperationalAccountsRewardsConfig;
+    PalletOperationalAccountsUpstreamAccessProof: PalletOperationalAccountsUpstreamAccessProof;
     PalletPriceIndexArgonotAverageFrameAccumulator: PalletPriceIndexArgonotAverageFrameAccumulator;
     PalletPriceIndexCall: PalletPriceIndexCall;
     PalletPriceIndexCpiMeasurementBucket: PalletPriceIndexCpiMeasurementBucket;

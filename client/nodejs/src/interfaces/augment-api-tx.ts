@@ -1157,7 +1157,6 @@ declare module '@polkadot/api-base/types/submittable' {
                 accountBitcoinAmount?: any;
                 accountVaultBondAmount?: any;
                 vaultCreated?: any;
-                isUpgradedToOperations?: any;
                 vaultBitcoinAmount?: any;
                 miningSeatCount?: any;
               }
@@ -1170,7 +1169,7 @@ declare module '@polkadot/api-base/types/submittable' {
       /**
        * Register vault and mining accounts for an operational account.
        * Any account in the registration may submit the transaction.
-       * When invite-only is enabled, the registration must include a referrer.
+       * When invite-only is enabled, the registration must include an upstream access proof.
        **/
       register: AugmentedSubmittable<
         (
@@ -1179,7 +1178,7 @@ declare module '@polkadot/api-base/types/submittable' {
         [PalletOperationalAccountsRegistration]
       >;
       /**
-       * Store an opaque encrypted referrer server payload for a downstream account.
+       * Store an opaque encrypted upstream server payload for a downstream account.
        **/
       setEncryptedServerForDownstreamAccount: AugmentedSubmittable<
         (
@@ -1189,21 +1188,14 @@ declare module '@polkadot/api-base/types/submittable' {
         [AccountId32, Bytes]
       >;
       /**
-       * Update reward amounts for operational accounts.
+       * Update certification reward amounts for operational accounts.
        **/
       setRewardConfig: AugmentedSubmittable<
         (
-          operationalActivationReward: u128 | AnyNumber | Uint8Array,
-          operationalReferralBonusReward: u128 | AnyNumber | Uint8Array,
+          operationalCertificationReward: u128 | AnyNumber | Uint8Array,
+          operationalCertificationBonusReward: u128 | AnyNumber | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
         [u128, u128]
-      >;
-      /**
-       * Grant a referrer upgrade to an already-registered operational account.
-       **/
-      upgradeAccount: AugmentedSubmittable<
-        (accountId: AccountId32 | string | Uint8Array) => SubmittableExtrinsic<ApiType>,
-        [AccountId32]
       >;
     };
     ownership: {

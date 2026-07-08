@@ -28,8 +28,8 @@ pub mod pallet {
 		OperationalRewardsPayer, Signature, TreasuryPoolProvider, UniswapTransferProvider,
 		UtxoLockEvents, MICROGONS_PER_ARGON,
 	};
-	use codec::{Decode, Encode};
-	use core::marker::PhantomData;
+	use codec::{Decode, Encode, EncodeLike};
+	use core::{fmt::Debug, marker::PhantomData};
 	use frame_support::traits::fungible::Mutate;
 	use pallet_prelude::*;
 	use polkadot_sdk::frame_system::ensure_root;
@@ -38,6 +38,7 @@ pub mod pallet {
 		AccountId32,
 	};
 
+	pub const UPSTREAM_ACCESS_PROOF_MESSAGE_KEY: &[u8] = b"operational_access_proof";
 	pub const OPERATIONAL_ACCOUNT_PROOF_MESSAGE_KEY: &[u8; 27] = b"operational_primary_account";
 	pub const VAULT_ACCOUNT_PROOF_MESSAGE_KEY: &[u8; 25] = b"operational_vault_account";
 	pub const MINING_ACCOUNT_PROOF_MESSAGE_KEY: &[u8; 26] = b"operational_mining_account";
@@ -57,41 +58,41 @@ pub mod pallet {
 			+ Copy
 			+ MaybeSerializeDeserialize
 			+ DecodeWithMemTracking
-			+ core::fmt::Debug
+			+ Debug
 			+ Default
 			+ From<u128>
 			+ Into<u128>
 			+ TypeInfo
 			+ MaxEncodedLen;
 
-		/// Additional argon amount (base units) required per follow-on upgrade code after
-		/// operational certification.
+		/// Additional argon amount (base units) required per follow-on access code after an account
+		/// becomes operational.
 		#[pallet::constant]
-		type BitcoinLockSizeForUpgradeCode: Get<Self::Balance>;
-		/// Default reward paid when an account becomes operational.
+		type BitcoinLockSizeForAccessCode: Get<Self::Balance>;
+		/// Default reward paid when an account becomes operationally certified.
 		#[pallet::constant]
-		type OperationalActivationReward: Get<Self::Balance>;
-		/// Default bonus reward paid every operational referral threshold.
+		type OperationalCertificationReward: Get<Self::Balance>;
+		/// Default bonus reward paid every operational certification threshold.
 		#[pallet::constant]
-		type OperationalReferralBonusReward: Get<Self::Balance>;
-		/// Number of operational referrals required per bonus reward.
+		type OperationalCertificationBonusReward: Get<Self::Balance>;
+		/// Number of operational certifications required per bonus reward.
 		#[pallet::constant]
-		type OperationalReferralsPerBonusReward: Get<u32>;
-		/// Maximum number of available upgrade codes allowed at once.
+		type OperationalCertificationsPerBonusReward: Get<u32>;
+		/// Maximum number of available access codes allowed at once.
 		#[pallet::constant]
-		type MaxAvailableUpgradeCodes: Get<u32>;
+		type MaxAvailableAccessCodes: Get<u32>;
 		/// Maximum number of encrypted server bytes stored per network account.
 		#[pallet::constant]
 		type MaxEncryptedServerLen: Get<u32>;
-		/// Minimum Uniswap transfer amount required for treasury certification.
+		/// Minimum Uniswap transfer amount required to register.
 		#[pallet::constant]
-		type TreasuryMinimumUniswapTransfer: Get<Self::Balance>;
-		/// Minimum bitcoin amount required for treasury certification.
+		type MinimumUniswapTransfer: Get<Self::Balance>;
+		/// Minimum bitcoin amount required to register.
 		#[pallet::constant]
-		type TreasuryMinimumBitcoin: Get<Self::Balance>;
-		/// Minimum bond amount required for treasury certification.
+		type MinimumBitcoin: Get<Self::Balance>;
+		/// Minimum bond amount required to register.
 		#[pallet::constant]
-		type TreasuryMinimumBonds: Get<Self::Balance>;
+		type MinimumBonds: Get<Self::Balance>;
 		/// Minimum total Uniswap transfer amount required for operational certification.
 		#[pallet::constant]
 		type OperationalMinimumUniswapTransfer: Get<Self::Balance>;
@@ -101,9 +102,10 @@ pub mod pallet {
 		/// Mining seats required to become operational.
 		#[pallet::constant]
 		type MiningSeatsForOperational: Get<u32>;
-		/// Mining seats required per follow-on upgrade code after operational certification.
+		/// Mining seats required per follow-on access code after an account becomes
+		/// operational.
 		#[pallet::constant]
-		type MiningSeatsPerUpgradeCode: Get<u32>;
+		type MiningSeatsPerAccessCode: Get<u32>;
 
 		/// Provider for current vault state used to initialize registration.
 		type VaultProvider: BitcoinVaultProvider<
@@ -185,6 +187,53 @@ pub mod pallet {
 	pub struct OpaqueEncryptionPubkey(pub [u8; 32]);
 
 	#[derive(
+		Decode,
+		DecodeWithMemTracking,
+		Encode,
+		CloneNoBound,
+		PartialEqNoBound,
+		EqNoBound,
+		DebugNoBound,
+		TypeInfo,
+		MaxEncodedLen,
+	)]
+	pub struct UpstreamAccessProof<AccountId>
+	where
+		AccountId: Clone + PartialEq + Eq + Debug,
+	{
+		/// Upstream account granting access to this downstream registration.
+		pub upstream_account: AccountId,
+		/// Signature from the upstream account over the downstream operational account.
+		pub signature: Signature,
+	}
+
+	impl<AccountId> UpstreamAccessProof<AccountId>
+	where
+		AccountId: Clone + Encode + Eq + PartialEq + Debug,
+	{
+		pub fn verify<Owner: EncodeLike>(&self, operational_account: &Owner) -> bool {
+			let Ok(upstream_account) =
+				AccountId32::decode(&mut self.upstream_account.encode().as_slice())
+			else {
+				return false;
+			};
+			let message =
+				(UPSTREAM_ACCESS_PROOF_MESSAGE_KEY, &self.upstream_account, operational_account)
+					.using_encoded(blake2_256);
+			let verified = self.signature.verify(message.as_slice(), &upstream_account);
+			#[cfg(feature = "runtime-benchmarks")]
+			{
+				let _ = verified;
+				return true;
+			}
+			#[cfg(not(feature = "runtime-benchmarks"))]
+			{
+				verified
+			}
+		}
+	}
+
+	#[derive(
 		Encode,
 		Decode,
 		DecodeWithMemTracking,
@@ -211,8 +260,8 @@ pub mod pallet {
 		pub vault_account_proof: AccountOwnershipProof,
 		/// Proof that the mining account is controlled by the registrant.
 		pub mining_account_proof: AccountOwnershipProof,
-		/// Referrer requested during registration, if known.
-		pub referrer: Option<T::AccountId>,
+		/// Optional upstream access proof used to link this registration to an upstream account.
+		pub access_proof: Option<UpstreamAccessProof<T::AccountId>>,
 	}
 
 	#[derive(
@@ -240,40 +289,35 @@ pub mod pallet {
 		pub mining_account: T::AccountId,
 		/// Opaque public encryption key for this operational account, currently x25519 bytes.
 		pub encryption_pubkey: OpaqueEncryptionPubkey,
-		/// Referrer account, if known.
-		pub referrer: Option<T::AccountId>,
-		/// Whether this account has achieved treasury certification.
-		pub is_treasury_certified: bool,
-		/// Whether this account has been upgraded to the operations flow.
-		pub is_upgraded_to_operations: bool,
-		/// Cumulative linked-account Uniswap Argon transfers-in amount counted toward
-		/// certification.
+		/// Upstream account, if known.
+		pub upstream_account: Option<T::AccountId>,
+		/// Cumulative linked-account Uniswap transfers-in amount counted toward the minimum
+		/// requirements.
 		pub uniswap_argon_transfers_in_amount: T::Balance,
-		/// Account bitcoin amount currently counted toward treasury certification.
+		/// Account bitcoin amount currently counted toward the minimum requirements.
 		pub account_bitcoin_amount: T::Balance,
-		/// Account vault bond amount currently counted toward treasury certification.
+		/// Account vault bond amount currently counted toward the minimum requirements.
 		pub account_vault_bond_amount: T::Balance,
 		/// Whether the vault has been created for this operational account.
 		pub vault_created: bool,
-		/// Vault bitcoin amount accrued above the bitcoin already applied to upgrade code
-		/// issuance.
+		/// Vault bitcoin amount currently tracked above the stored baseline.
 		pub vault_bitcoin_accrual: T::Balance,
-		/// Vault bitcoin already applied to previously issued upgrade codes.
+		/// Vault bitcoin baseline already included in the tracked total.
 		pub vault_bitcoin_applied_total: T::Balance,
-		/// Mining seats accrued since the last upgrade code issuance.
+		/// Mining seats accrued since the stored baseline.
 		#[codec(compact)]
 		pub mining_seat_accrual: u32,
-		/// Mining seats already applied to previously issued upgrade codes.
+		/// Mining seats already included in the stored baseline.
 		#[codec(compact)]
 		pub mining_seat_applied_total: u32,
-		/// Number of referred accounts that have become operational.
+		/// Number of downstream operational certifications credited to this account.
 		#[codec(compact)]
-		pub operational_referrals_count: u32,
-		/// Whether one earned upgrade code is pending materialization.
-		pub upgrade_code_pending: bool,
-		/// Number of upgrade codes this account can still spend.
+		pub operational_certifications_count: u32,
+		/// Whether one earned access code is pending materialization.
+		pub access_code_pending: bool,
+		/// Number of access codes this account can still grant.
 		#[codec(compact)]
-		pub available_upgrade_codes: u32,
+		pub available_access_codes: u32,
 		/// Number of rewards earned.
 		#[codec(compact)]
 		pub rewards_earned_count: u32,
@@ -297,21 +341,17 @@ pub mod pallet {
 		pub account_vault_bond_amount: Option<Balance>,
 		/// Override for whether the vault has been created.
 		pub vault_created: Option<bool>,
-		/// Override for whether the account has been upgraded to operations.
-		pub is_upgraded_to_operations: Option<bool>,
 		/// Requested minimum for the operator vault bitcoin amount.
 		///
-		/// This is treated as a monotonic applied-total override: the effective stored
-		/// `vault_bitcoin_amount` will be at least this value, while preserving the
-		/// bitcoin already applied to issued referrals. If the provided value is
-		/// lower than the applied total, the current total is retained.
+		/// This is treated as a monotonic applied-total override: the effective stored total will
+		/// be at least this value while preserving the previously applied baseline. If the
+		/// provided value is lower than the applied total, the current total is retained.
 		pub vault_bitcoin_amount: Option<Balance>,
 		/// Requested minimum for the total mining seats won.
 		///
-		/// This is treated as a monotonic applied-total override: the effective stored
-		/// `mining_seat_count` will be at least this value, while preserving
-		/// the seats already applied to issued referrals. If the provided value is
-		/// lower than the applied total, the current total is retained.
+		/// This is treated as a monotonic applied-total override: the effective stored total will
+		/// be at least this value while preserving the previously applied baseline. If the
+		/// provided value is lower than the applied total, the current total is retained.
 		pub mining_seat_count: Option<u32>,
 	}
 
@@ -321,7 +361,6 @@ pub mod pallet {
 				self.account_bitcoin_amount.is_some() ||
 				self.account_vault_bond_amount.is_some() ||
 				self.vault_created.is_some() ||
-				self.is_upgraded_to_operations.is_some() ||
 				self.vault_bitcoin_amount.is_some() ||
 				self.mining_seat_count.is_some()
 		}
@@ -345,7 +384,7 @@ pub mod pallet {
 	#[pallet::storage]
 	/// Whether operational-account access is invite-only.
 	///
-	/// When enabled, registration requires a referrer invite and vault creation plus
+	/// When enabled, registration requires an upstream invite and vault creation plus
 	/// mining-slot bidding remain restricted to registered operational accounts.
 	///
 	/// Existing live raw chain specs do not contain this key, so the default remains invite-only
@@ -367,12 +406,12 @@ pub mod pallet {
 		serde::Serialize,
 	)]
 	pub struct RewardsConfig<Balance: Member + MaxEncodedLen + Default> {
-		/// Reward paid when an account becomes operational.
+		/// Reward paid when an account becomes operationally certified.
 		#[codec(compact)]
-		pub operational_activation_reward: Balance,
-		/// Bonus reward paid for every operational referral threshold met.
+		pub operational_certification_reward: Balance,
+		/// Bonus reward paid for every operational certification threshold met.
 		#[codec(compact)]
-		pub operational_referral_bonus_reward: Balance,
+		pub operational_certification_bonus_reward: Balance,
 	}
 
 	#[pallet::genesis_config]
@@ -392,8 +431,9 @@ pub mod pallet {
 	impl<T: Config> BuildGenesisConfig for GenesisConfig<T> {
 		fn build(&self) {
 			Rewards::<T>::put(RewardsConfig {
-				operational_activation_reward: T::OperationalActivationReward::get(),
-				operational_referral_bonus_reward: T::OperationalReferralBonusReward::get(),
+				operational_certification_reward: T::OperationalCertificationReward::get(),
+				operational_certification_bonus_reward: T::OperationalCertificationBonusReward::get(
+				),
 			});
 			IsOperationalAccountInviteOnly::<T>::put(self.is_operational_account_invite_only);
 		}
@@ -404,7 +444,7 @@ pub mod pallet {
 	pub type Rewards<T: Config> = StorageValue<_, RewardsConfig<T::Balance>, ValueQuery>;
 
 	#[pallet::storage]
-	/// Opaque encrypted referrer server payload keyed by the downstream account.
+	/// Opaque encrypted upstream server payload keyed by the downstream account.
 	pub type EncryptedServerByDownstreamAccount<T: Config> = StorageMap<
 		_,
 		Blake2_128Concat,
@@ -421,14 +461,12 @@ pub mod pallet {
 			operational_account: T::AccountId,
 			vault_account: T::AccountId,
 			mining_account: T::AccountId,
-			referrer: Option<T::AccountId>,
+			upstream_account: Option<T::AccountId>,
 		},
-		/// A referrer granted an operational upgrade to an existing account.
-		AccountUpgradeGranted { account: T::AccountId, referrer: T::AccountId },
-		/// Account has become treasury certified.
-		AccountBecameTreasuryCertified { account: T::AccountId },
-		/// Account has become operational.
-		AccountWentOperational { account: T::AccountId },
+		/// Account has met the registration minimums.
+		AccountMeetsMinimums { account: T::AccountId },
+		/// Account has become operationally certified.
+		AccountOperationallyCertified { account: T::AccountId },
 		/// A reward is earned for an operational account, but not yet claimed.
 		OperationalRewardEarned {
 			account: T::AccountId,
@@ -444,14 +482,14 @@ pub mod pallet {
 		},
 		/// Reward config values were updated.
 		RewardsConfigUpdated {
-			operational_activation_reward: T::Balance,
-			operational_referral_bonus_reward: T::Balance,
+			operational_certification_reward: T::Balance,
+			operational_certification_bonus_reward: T::Balance,
 		},
 		/// Operational progress was forced by root.
 		OperationalProgressForced {
 			account: T::AccountId,
 			update_operational_progress: bool,
-			is_treasury_certified: bool,
+			meets_minimums: bool,
 			uniswap_argon_transfers_in_amount: T::Balance,
 			account_bitcoin_amount: T::Balance,
 			account_vault_bond_amount: T::Balance,
@@ -459,8 +497,8 @@ pub mod pallet {
 			operator_vault_bitcoin_amount: T::Balance,
 			mining_seat_count: u32,
 		},
-		/// A referrer updated the encrypted server payload for a downstream account.
-		EncryptedServerUpdated { referrer: T::AccountId, downstream_account: T::AccountId },
+		/// An upstream account updated the encrypted server payload for a downstream account.
+		EncryptedServerUpdated { upstream_account: T::AccountId, downstream_account: T::AccountId },
 	}
 
 	#[pallet::error]
@@ -477,26 +515,20 @@ pub mod pallet {
 		NotOperationalAccount,
 		/// A valid invite is required to register an operational account.
 		RegistrationInviteRequired,
-		/// The requested referrer does not have a registered operational account.
-		ReferrerNotOperationalAccount,
-		/// The requested referrer does not match the referrer recorded during registration.
-		RegisteredReferrerMismatch,
-		/// The requested account has not reached treasury certification.
-		NotTreasuryCertified,
-		/// The requested account no longer satisfies treasury certification requirements.
-		TreasuryCertificationNoLongerMet,
-		/// The requested account is already upgraded to operational.
-		AccountAlreadyUpgraded,
-		/// The requested referrer does not have an available upgrade to spend.
-		NoAvailableUpgrades,
-		/// An account cannot upgrade itself.
-		CannotUpgradeSelf,
+		/// The upstream access proof is invalid.
+		InvalidAccessProof,
+		/// The requested upstream account does not have a registered operational account.
+		UpstreamNotOperationalAccount,
+		/// The requested account does not currently satisfy the minimums.
+		MinimumsNotMet,
+		/// An account cannot grant access to itself.
+		CannotGrantAccessToSelf,
 		/// The requested progress patch does not contain any updates.
 		NoProgressUpdateProvided,
 		/// The encrypted server payload exceeds the configured max length.
 		EncryptedServerTooLong,
-		/// The caller is not the referrer of the requested downstream account.
-		NotReferrerOfAccount,
+		/// The caller is not the upstream account for the requested downstream account.
+		NotUpstreamOfDownstream,
 		/// The operational account has no pending rewards to claim.
 		NoPendingRewards,
 		/// Reward claims must be at least one Argon.
@@ -507,17 +539,19 @@ pub mod pallet {
 		RewardClaimExceedsPending,
 		/// The treasury does not currently have enough available reserves for the claim.
 		TreasuryInsufficientFunds,
-		/// The account is already operational.
-		AlreadyOperational,
+		/// The account is already operationally certified.
+		AlreadyOperationallyCertified,
 		/// The account has not satisfied operational requirements yet.
 		NotEligibleForActivation,
+		/// The requested upstream account does not have any available access codes.
+		UpstreamHasNoAvailableAccessCodes,
 	}
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		/// Register vault and mining accounts for an operational account.
 		/// Any account in the registration may submit the transaction.
-		/// When invite-only is enabled, the registration must include a referrer.
+		/// When invite-only is enabled, the registration must include an upstream access proof.
 		#[pallet::call_index(0)]
 		#[pallet::weight(T::WeightInfo::register())]
 		pub fn register(origin: OriginFor<T>, registration: Registration<T>) -> DispatchResult {
@@ -529,7 +563,7 @@ pub mod pallet {
 				mining_account,
 				vault_account_proof,
 				mining_account_proof,
-				referrer,
+				access_proof,
 			}) = registration;
 			let submitter = ensure_signed(origin)?;
 			ensure!(
@@ -572,16 +606,41 @@ pub mod pallet {
 			);
 
 			let invite_only = IsOperationalAccountInviteOnly::<T>::get();
-			ensure!(!invite_only || referrer.is_some(), Error::<T>::RegistrationInviteRequired);
+			let upstream_account = if let Some(access_proof) = access_proof.as_ref() {
+				ensure!(access_proof.verify(&operational_account), Error::<T>::InvalidAccessProof);
+
+				let upstream_account = access_proof.upstream_account.clone();
+				ensure!(
+					OperationalAccounts::<T>::contains_key(&upstream_account),
+					Error::<T>::UpstreamNotOperationalAccount
+				);
+				ensure!(
+					upstream_account != operational_account,
+					Error::<T>::CannotGrantAccessToSelf
+				);
+				OperationalAccounts::<T>::try_mutate(
+					&upstream_account,
+					|maybe_account| -> Result<T::AccountId, Error<T>> {
+						let Some(upstream_account_data) = maybe_account.as_mut() else {
+							return Err(Error::<T>::UpstreamNotOperationalAccount);
+						};
+						if upstream_account_data.available_access_codes == 0 {
+							return Err(Error::<T>::UpstreamHasNoAvailableAccessCodes);
+						}
+						upstream_account_data.available_access_codes.saturating_reduce(1);
+						Self::materialize_available_access_codes(upstream_account_data);
+
+						Ok(upstream_account.clone())
+					},
+				)
+				.map(Some)?
+			} else {
+				ensure!(!invite_only, Error::<T>::RegistrationInviteRequired);
+				None
+			};
 			let vault_registration = T::VaultProvider::get_registration_vault_data(&vault_account);
 			let mining_seat_count =
 				u32::from(T::MiningSlotProvider::has_active_rewards_account_seat(&mining_account));
-			let referrer = referrer
-				.map(|account_id| {
-					Self::operational_owner_for(&account_id)
-						.ok_or(Error::<T>::ReferrerNotOperationalAccount)
-				})
-				.transpose()?;
 			let vault_created = vault_registration.is_some();
 			let vault_bitcoin_accrual = vault_registration
 				.map(|vault| vault.activated_securitization)
@@ -590,25 +649,23 @@ pub mod pallet {
 				vault_account: vault_account.clone(),
 				mining_account: mining_account.clone(),
 				encryption_pubkey,
-				referrer: referrer.clone(),
-				is_treasury_certified: false,
-				is_upgraded_to_operations: false,
+				upstream_account: upstream_account.clone(),
 				uniswap_argon_transfers_in_amount: T::Balance::zero(),
 				account_bitcoin_amount: T::BitcoinLocksProvider::get_account_funded_bitcoin_amount(
-					&operational_account,
+					&vault_account,
 				),
 				account_vault_bond_amount:
-					T::TreasuryPoolProvider::active_account_vault_bond_amount(&operational_account),
+					T::TreasuryPoolProvider::active_account_vault_bond_amount(&vault_account),
 				vault_created,
 				// Bootstrap lookup seeds current vault bitcoin progress so already-funded vaults
-				// keep their follow-on upgrade-code runway after registration.
+				// preserve their tracked vault bitcoin progress after registration.
 				vault_bitcoin_accrual,
 				vault_bitcoin_applied_total: T::Balance::zero(),
 				mining_seat_accrual: mining_seat_count,
 				mining_seat_applied_total: 0,
-				operational_referrals_count: 0,
-				upgrade_code_pending: false,
-				available_upgrade_codes: 0,
+				operational_certifications_count: 0,
+				access_code_pending: false,
+				available_access_codes: 0,
 				rewards_earned_count: 0,
 				rewards_earned_amount: T::Balance::zero(),
 				rewards_collected_amount: T::Balance::zero(),
@@ -619,7 +676,8 @@ pub mod pallet {
 					&operational_account,
 					&account,
 				);
-			Self::refresh_treasury_certification(&operational_account, &mut account);
+			ensure!(Self::meets_minimums(&account), Error::<T>::MinimumsNotMet);
+			Self::emit_meets_minimums_event_if_newly_met(&operational_account, false, &account);
 
 			OperationalAccounts::<T>::insert(&operational_account, account);
 
@@ -630,78 +688,27 @@ pub mod pallet {
 				operational_account: operational_account.clone(),
 				vault_account: vault_account.clone(),
 				mining_account: mining_account.clone(),
-				referrer,
+				upstream_account,
 			});
 			Ok(())
 		}
 
-		/// Grant a referrer upgrade to an already-registered operational account.
-		#[pallet::call_index(1)]
-		#[pallet::weight(T::WeightInfo::upgrade_account())]
-		pub fn upgrade_account(origin: OriginFor<T>, account_id: T::AccountId) -> DispatchResult {
-			let signer = ensure_signed(origin)?;
-			let referrer = Self::operational_owner_for(&signer)
-				.ok_or(Error::<T>::ReferrerNotOperationalAccount)?;
-			let account_id = Self::operational_owner_for(&account_id)
-				.ok_or(Error::<T>::NotOperationalAccount)?;
-			ensure!(referrer != account_id, Error::<T>::CannotUpgradeSelf);
-
-			let account = OperationalAccounts::<T>::get(&account_id)
-				.ok_or(Error::<T>::NotOperationalAccount)?;
-			ensure!(!account.is_operationally_certified, Error::<T>::AlreadyOperational);
-			ensure!(account.is_treasury_certified, Error::<T>::NotTreasuryCertified);
-			ensure!(
-				Self::has_current_treasury_certification(&account),
-				Error::<T>::TreasuryCertificationNoLongerMet
-			);
-			ensure!(!account.is_upgraded_to_operations, Error::<T>::AccountAlreadyUpgraded);
-			if let Some(requested_referrer) = account.referrer.as_ref() {
-				ensure!(
-					Self::operational_owner_for(requested_referrer).as_ref() == Some(&referrer),
-					Error::<T>::RegisteredReferrerMismatch
-				);
-			}
-
-			OperationalAccounts::<T>::try_mutate(&referrer, |maybe_account| -> DispatchResult {
-				let referrer_account =
-					maybe_account.as_mut().ok_or(Error::<T>::ReferrerNotOperationalAccount)?;
-				ensure!(
-					referrer_account.available_upgrade_codes > 0,
-					Error::<T>::NoAvailableUpgrades
-				);
-
-				referrer_account.available_upgrade_codes.saturating_reduce(1);
-				Self::materialize_available_upgrade_codes(referrer_account);
-				Ok(())
-			})?;
-
-			OperationalAccounts::<T>::mutate(&account_id, |maybe_account| {
-				let Some(account) = maybe_account else {
-					return;
-				};
-				account.referrer.get_or_insert_with(|| referrer.clone());
-				account.is_upgraded_to_operations = true;
-			});
-			Self::deposit_event(Event::AccountUpgradeGranted { account: account_id, referrer });
-			Ok(())
-		}
-
-		/// Update reward amounts for operational accounts.
+		/// Update certification reward amounts for operational accounts.
 		#[pallet::call_index(2)]
 		#[pallet::weight(T::WeightInfo::set_reward_config())]
 		pub fn set_reward_config(
 			origin: OriginFor<T>,
-			operational_activation_reward: T::Balance,
-			operational_referral_bonus_reward: T::Balance,
+			operational_certification_reward: T::Balance,
+			operational_certification_bonus_reward: T::Balance,
 		) -> DispatchResult {
 			ensure_root(origin)?;
 			Rewards::<T>::put(RewardsConfig {
-				operational_activation_reward,
-				operational_referral_bonus_reward,
+				operational_certification_reward,
+				operational_certification_bonus_reward,
 			});
 			Self::deposit_event(Event::RewardsConfigUpdated {
-				operational_activation_reward,
-				operational_referral_bonus_reward,
+				operational_certification_reward,
+				operational_certification_bonus_reward,
 			});
 			Ok(())
 		}
@@ -718,7 +725,7 @@ pub mod pallet {
 			ensure_root(origin)?;
 			ensure!(patch.has_updates(), Error::<T>::NoProgressUpdateProvided);
 
-			let mut is_treasury_certified = false;
+			let mut meets_minimums = false;
 			let mut uniswap_argon_transfers_in_amount = T::Balance::zero();
 			let mut account_bitcoin_amount = T::Balance::zero();
 			let mut account_vault_bond_amount = T::Balance::zero();
@@ -731,6 +738,7 @@ pub mod pallet {
 				|maybe_account| -> Result<(), Error<T>> {
 					let account =
 						maybe_account.as_mut().ok_or(Error::<T>::NotOperationalAccount)?;
+					let previously_met_minimums = Self::meets_minimums(account);
 
 					if let Some(value) = patch.uniswap_argon_transfers_in_amount {
 						account.uniswap_argon_transfers_in_amount = value;
@@ -744,26 +752,22 @@ pub mod pallet {
 					if let Some(value) = patch.vault_created {
 						account.vault_created = value;
 					}
-					if let Some(value) = patch.is_upgraded_to_operations {
-						ensure!(
-							value || !account.is_operationally_certified,
-							Error::<T>::AlreadyOperational
-						);
-						account.is_upgraded_to_operations = value;
-					}
 					if let Some(value) = patch.vault_bitcoin_amount {
 						Self::recalculate_vault_bitcoin_accrual(account, value);
 					}
 					if let Some(value) = patch.mining_seat_count {
 						Self::set_mining_seat_count(account, value);
 					}
-					Self::refresh_treasury_certification(&owner, account);
+					meets_minimums = Self::emit_meets_minimums_event_if_newly_met(
+						&owner,
+						previously_met_minimums,
+						account,
+					);
 
 					if update_operational_progress {
-						Self::materialize_available_upgrade_codes(account);
+						Self::materialize_available_access_codes(account);
 					}
 
-					is_treasury_certified = account.is_treasury_certified;
 					uniswap_argon_transfers_in_amount = account.uniswap_argon_transfers_in_amount;
 					account_bitcoin_amount = account.account_bitcoin_amount;
 					account_vault_bond_amount = account.account_vault_bond_amount;
@@ -777,7 +781,7 @@ pub mod pallet {
 			Self::deposit_event(Event::OperationalProgressForced {
 				account: owner,
 				update_operational_progress,
-				is_treasury_certified,
+				meets_minimums,
 				uniswap_argon_transfers_in_amount,
 				account_bitcoin_amount,
 				account_vault_bond_amount,
@@ -788,7 +792,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Store an opaque encrypted referrer server payload for a downstream account.
+		/// Store an opaque encrypted upstream server payload for a downstream account.
 		#[pallet::call_index(4)]
 		#[pallet::weight(T::WeightInfo::set_encrypted_server_for_downstream_account())]
 		pub fn set_encrypted_server_for_downstream_account(
@@ -796,22 +800,25 @@ pub mod pallet {
 			downstream_account: T::AccountId,
 			encrypted_server: Vec<u8>,
 		) -> DispatchResult {
-			let referrer = ensure_signed(origin)?;
+			let upstream_account = ensure_signed(origin)?;
 			ensure!(
-				OperationalAccounts::<T>::contains_key(&referrer),
+				OperationalAccounts::<T>::contains_key(&upstream_account),
 				Error::<T>::NotOperationalAccount
 			);
 			let downstream_account_data = OperationalAccounts::<T>::get(&downstream_account)
 				.ok_or(Error::<T>::NotOperationalAccount)?;
 			ensure!(
-				downstream_account_data.referrer == Some(referrer.clone()),
-				Error::<T>::NotReferrerOfAccount
+				downstream_account_data.upstream_account == Some(upstream_account.clone()),
+				Error::<T>::NotUpstreamOfDownstream
 			);
 
 			let encrypted_server: BoundedVec<u8, T::MaxEncryptedServerLen> =
 				encrypted_server.try_into().map_err(|_| Error::<T>::EncryptedServerTooLong)?;
 			EncryptedServerByDownstreamAccount::<T>::insert(&downstream_account, encrypted_server);
-			Self::deposit_event(Event::EncryptedServerUpdated { referrer, downstream_account });
+			Self::deposit_event(Event::EncryptedServerUpdated {
+				upstream_account,
+				downstream_account,
+			});
 			Ok(())
 		}
 
@@ -825,58 +832,58 @@ pub mod pallet {
 
 			OperationalAccounts::<T>::try_mutate(&owner, |maybe_account| -> DispatchResult {
 				let account = maybe_account.as_mut().ok_or(Error::<T>::NotOperationalAccount)?;
-				ensure!(!account.is_operationally_certified, Error::<T>::AlreadyOperational);
-				let has_current_treasury_certification =
-					Self::has_current_treasury_certification(account);
 				ensure!(
-					has_current_treasury_certification,
-					Error::<T>::TreasuryCertificationNoLongerMet
+					!account.is_operationally_certified,
+					Error::<T>::AlreadyOperationallyCertified
 				);
-				account.is_treasury_certified = true;
+				ensure!(Self::meets_minimums(account), Error::<T>::MinimumsNotMet);
 				ensure!(
-					Self::has_current_operational_certification(account),
+					Self::meets_activation_requirements(account),
 					Error::<T>::NotEligibleForActivation
 				);
 
 				let reward_config = Rewards::<T>::get();
 				account.is_operationally_certified = true;
-				Self::increment_available_upgrade_codes(account);
-				Self::materialize_available_upgrade_codes(account);
+				Self::increment_available_access_codes(account);
+				Self::materialize_available_access_codes(account);
 				T::VaultProvider::account_became_operational(&account.vault_account);
-				Self::deposit_event(Event::AccountWentOperational { account: owner.clone() });
+				Self::deposit_event(Event::AccountOperationallyCertified {
+					account: owner.clone(),
+				});
 				Self::record_reward(
 					account,
 					&owner,
-					OperationalRewardKind::Activation,
-					reward_config.operational_activation_reward,
+					OperationalRewardKind::Certification,
+					reward_config.operational_certification_reward,
 				);
 
-				if let Some(referrer) = account.referrer.as_ref() {
-					OperationalAccounts::<T>::mutate(referrer, |maybe_account| {
-						let Some(referrer_account) = maybe_account else {
+				if let Some(upstream_account) = account.upstream_account.as_ref() {
+					OperationalAccounts::<T>::mutate(upstream_account, |maybe_account| {
+						let Some(upstream_account_data) = maybe_account else {
 							return;
 						};
-						if !referrer_account.is_operationally_certified {
+						if !upstream_account_data.is_operationally_certified {
 							return;
 						}
-						referrer_account.upgrade_code_pending = true;
-						Self::materialize_available_upgrade_codes(referrer_account);
-						referrer_account.operational_referrals_count.saturating_accrue(1);
+						upstream_account_data.access_code_pending = true;
+						Self::materialize_available_access_codes(upstream_account_data);
+						upstream_account_data.operational_certifications_count.saturating_accrue(1);
 						Self::record_reward(
-							referrer_account,
-							referrer,
-							OperationalRewardKind::Activation,
-							reward_config.operational_activation_reward,
+							upstream_account_data,
+							upstream_account,
+							OperationalRewardKind::Certification,
+							reward_config.operational_certification_reward,
 						);
-						let bonus_every = T::OperationalReferralsPerBonusReward::get();
+						let bonus_every = T::OperationalCertificationsPerBonusReward::get();
 						if bonus_every > 0 &&
-							referrer_account.operational_referrals_count % bonus_every == 0
+							upstream_account_data.operational_certifications_count % bonus_every ==
+								0
 						{
 							Self::record_reward(
-								referrer_account,
-								referrer,
-								OperationalRewardKind::OperationalReferralBonus,
-								reward_config.operational_referral_bonus_reward,
+								upstream_account_data,
+								upstream_account,
+								OperationalRewardKind::OperationalCertificationBonus,
+								reward_config.operational_certification_bonus_reward,
 							);
 						}
 					});
@@ -939,10 +946,15 @@ pub mod pallet {
 				let Some(account) = maybe_account else {
 					return;
 				};
+				let previously_met_minimums = Self::meets_minimums(account);
 
 				account.uniswap_argon_transfers_in_amount =
 					Self::current_linked_account_uniswap_argon_transfers_in_amount(&owner, account);
-				Self::refresh_treasury_certification(&owner, account);
+				Self::emit_meets_minimums_event_if_newly_met(
+					&owner,
+					previously_met_minimums,
+					account,
+				);
 			});
 		}
 
@@ -981,23 +993,20 @@ pub mod pallet {
 				operational_account.uniswap_argon_transfers_in_amount >= minimum
 		}
 
-		fn has_current_treasury_certification(operational_account: &OperationalAccount<T>) -> bool {
+		pub(crate) fn meets_minimums(operational_account: &OperationalAccount<T>) -> bool {
 			let has_uniswap_argon_transfers_in = Self::has_uniswap_argon_transfers_in_requirement(
 				operational_account,
-				T::TreasuryMinimumUniswapTransfer::get(),
+				T::MinimumUniswapTransfer::get(),
 			);
 			let has_account_bitcoin =
-				operational_account.account_bitcoin_amount >= T::TreasuryMinimumBitcoin::get();
+				operational_account.account_bitcoin_amount >= T::MinimumBitcoin::get();
 			let has_account_vault_bonds =
-				operational_account.account_vault_bond_amount >= T::TreasuryMinimumBonds::get();
+				operational_account.account_vault_bond_amount >= T::MinimumBonds::get();
 
 			has_uniswap_argon_transfers_in && has_account_bitcoin && has_account_vault_bonds
 		}
 
-		fn has_current_operational_certification(
-			operational_account: &OperationalAccount<T>,
-		) -> bool {
-			let is_upgraded_to_operations = operational_account.is_upgraded_to_operations;
+		fn meets_activation_requirements(operational_account: &OperationalAccount<T>) -> bool {
 			let has_operational_uniswap_argon_transfers_in =
 				Self::has_uniswap_argon_transfers_in_requirement(
 					operational_account,
@@ -1008,42 +1017,40 @@ pub mod pallet {
 			let has_mining_seats =
 				Self::mining_seat_count(operational_account) >= T::MiningSeatsForOperational::get();
 
-			is_upgraded_to_operations &&
-				has_operational_uniswap_argon_transfers_in &&
+			has_operational_uniswap_argon_transfers_in &&
 				has_vault_securitization &&
 				has_mining_seats
 		}
 
-		fn refresh_treasury_certification(
+		fn emit_meets_minimums_event_if_newly_met(
 			owner: &T::AccountId,
-			account: &mut OperationalAccount<T>,
-		) {
-			let is_treasury_certified = Self::has_current_treasury_certification(account);
-			if !account.is_treasury_certified && is_treasury_certified {
-				Self::deposit_event(Event::AccountBecameTreasuryCertified {
-					account: owner.clone(),
-				});
+			previously_met_minimums: bool,
+			account: &OperationalAccount<T>,
+		) -> bool {
+			let meets_minimums = Self::meets_minimums(account);
+			if !previously_met_minimums && meets_minimums {
+				Self::deposit_event(Event::AccountMeetsMinimums { account: owner.clone() });
 			}
-			account.is_treasury_certified = is_treasury_certified;
+			meets_minimums
 		}
 
-		fn increment_available_upgrade_codes(account: &mut OperationalAccount<T>) {
-			if account.available_upgrade_codes < T::MaxAvailableUpgradeCodes::get() {
-				account.available_upgrade_codes.saturating_accrue(1);
+		fn increment_available_access_codes(account: &mut OperationalAccount<T>) {
+			if account.available_access_codes < T::MaxAvailableAccessCodes::get() {
+				account.available_access_codes.saturating_accrue(1);
 			}
 		}
 
-		fn materialize_available_upgrade_codes(account: &mut OperationalAccount<T>) {
+		fn materialize_available_access_codes(account: &mut OperationalAccount<T>) {
 			if !account.is_operationally_certified {
 				return;
 			}
-			let max_available_upgrade_codes = T::MaxAvailableUpgradeCodes::get();
-			let bitcoin_threshold = T::BitcoinLockSizeForUpgradeCode::get();
-			let mining_seat_threshold = T::MiningSeatsPerUpgradeCode::get();
-			while account.available_upgrade_codes < max_available_upgrade_codes {
-				if account.upgrade_code_pending {
-					account.upgrade_code_pending = false;
-					account.available_upgrade_codes.saturating_accrue(1);
+			let max_available_access_codes = T::MaxAvailableAccessCodes::get();
+			let bitcoin_threshold = T::BitcoinLockSizeForAccessCode::get();
+			let mining_seat_threshold = T::MiningSeatsPerAccessCode::get();
+			while account.available_access_codes < max_available_access_codes {
+				if account.access_code_pending {
+					account.access_code_pending = false;
+					account.available_access_codes.saturating_accrue(1);
 					continue;
 				}
 				if bitcoin_threshold > T::Balance::zero() &&
@@ -1052,14 +1059,14 @@ pub mod pallet {
 					account.vault_bitcoin_applied_total =
 						Self::current_vault_bitcoin_amount(account);
 					account.vault_bitcoin_accrual = T::Balance::zero();
-					account.available_upgrade_codes.saturating_accrue(1);
+					account.available_access_codes.saturating_accrue(1);
 					continue;
 				}
 				if mining_seat_threshold > 0 && account.mining_seat_accrual >= mining_seat_threshold
 				{
 					account.mining_seat_applied_total = Self::mining_seat_count(account);
 					account.mining_seat_accrual = 0;
-					account.available_upgrade_codes.saturating_accrue(1);
+					account.available_access_codes.saturating_accrue(1);
 					continue;
 				}
 				break;
@@ -1067,8 +1074,8 @@ pub mod pallet {
 		}
 
 		fn current_vault_bitcoin_amount(account: &OperationalAccount<T>) -> T::Balance {
-			// Current vault bitcoin equals the amount already consumed for prior upgrade codes plus
-			// the new amount accrued since then.
+			// Current vault bitcoin equals the stored baseline plus the new amount accrued since
+			// then.
 			let previously_applied = account.vault_bitcoin_applied_total;
 			let newly_accrued = account.vault_bitcoin_accrual;
 
@@ -1136,13 +1143,21 @@ pub mod pallet {
 				let Some(account) = maybe_account else {
 					return;
 				};
+				if account.vault_account != *account_id {
+					return;
+				}
+				let previously_met_minimums = Self::meets_minimums(account);
 
 				if is_increase {
 					account.account_bitcoin_amount.saturating_accrue(amount);
 				} else {
 					account.account_bitcoin_amount.saturating_reduce(amount);
 				}
-				Self::refresh_treasury_certification(&owner, account);
+				Self::emit_meets_minimums_event_if_newly_met(
+					&owner,
+					previously_met_minimums,
+					account,
+				);
 			});
 		}
 
@@ -1154,9 +1169,17 @@ pub mod pallet {
 				let Some(account) = maybe_account else {
 					return;
 				};
+				if account.vault_account != *account_id {
+					return;
+				}
+				let previously_met_minimums = Self::meets_minimums(account);
 
 				account.account_vault_bond_amount = total_amount;
-				Self::refresh_treasury_certification(&owner, account);
+				Self::emit_meets_minimums_event_if_newly_met(
+					&owner,
+					previously_met_minimums,
+					account,
+				);
 			});
 		}
 	}
@@ -1200,7 +1223,7 @@ pub mod pallet {
 					return;
 				}
 				Self::recalculate_vault_bitcoin_accrual(account, total_locked);
-				Self::materialize_available_upgrade_codes(account);
+				Self::materialize_available_access_codes(account);
 			});
 		}
 
@@ -1217,7 +1240,7 @@ pub mod pallet {
 					return;
 				};
 				account.mining_seat_accrual.saturating_accrue(1);
-				Self::materialize_available_upgrade_codes(account);
+				Self::materialize_available_access_codes(account);
 			});
 		}
 
@@ -1274,9 +1297,7 @@ pub mod pallet {
 				return false;
 			};
 
-			OperationalAccounts::<T>::get(owner)
-				.map(|account| account.is_upgraded_to_operations)
-				.unwrap_or(false)
+			OperationalAccounts::<T>::contains_key(owner)
 		}
 	}
 }
