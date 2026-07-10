@@ -16,10 +16,10 @@
 use super::*;
 use crate::mock::{
 	new_test_ext,
-	pallet_dummy::{Call, ConsumedPoolKeys, OneUseCodes},
-	Balances, FeeAmount, FeeControl, LastPayer, LastPostDispatchPaysFee,
+	pallet_dummy::{Call, ConsumedPoolKeys, DispatchedPoolKeys, OneUseCodes},
+	Balances, FeeAmount, FeeControl, FeeUnbalancedAmount, LastPayer, LastPostDispatchPaysFee,
 	MockChargePaymentExtension, PrepareCount, Proxy, ProxyType, RuntimeCall, Test, TipAmount,
-	ValidateCount,
+	TipUnbalancedAmount, ValidateCount,
 };
 use codec::Encode;
 use frame_support::dispatch::{DispatchInfo, GetDispatchInfo, Pays};
@@ -778,17 +778,54 @@ fn delegation_changes_fee_payer_seen_by_payment_ext_with_proxy() {
 }
 
 #[test]
-fn delegation_refunds_fees_for_proxy_specific_sponsors() {
+fn proxy_specific_sponsors_require_registered_delegate() {
 	new_test_ext().execute_with(|| {
-		LastPayer::set(None);
-		LastPostDispatchPaysFee::set(None);
+		let real = 7u64;
+		let delegate = 1u64;
+		let attacker = 2u64;
+		let key = 35u32;
+
+		set_argons(real, 1_000_000u128);
+		assert_ok!(Proxy::add_proxy(Some(real).into(), delegate, ProxyType::DummyWrapper, 0,));
+
+		let call = RuntimeCall::Proxy(pallet_proxy::Call::<Test>::proxy {
+			real,
+			force_proxy_type: Some(ProxyType::DummyWrapper),
+			call: Box::new(RuntimeCall::DummyPallet(Call::<Test>::pooled { key })),
+		});
+
+		let result =
+			CheckFeeWrapper::<Test, MockChargePaymentExtension>::from(MockChargePaymentExtension)
+				.validate_only(
+					Some(attacker).into(),
+					&call,
+					&DispatchInfo::default(),
+					0,
+					TransactionSource::External,
+					0,
+				);
+
+		assert!(matches!(
+			result,
+			Err(TransactionValidityError::Invalid(InvalidTransaction::Payment))
+		));
+	});
+}
+
+#[test]
+fn proxy_specific_sponsors_charge_real_account_directly() {
+	new_test_ext().execute_with(|| {
+		FeeUnbalancedAmount::set(0);
+		TipUnbalancedAmount::set(0);
 
 		let real = 7u64;
 		let delegate = 1u64;
 		let key = 33u32;
-		let sponsor_balance: Balance = 2_000_000u128;
+		let delegate_balance: Balance = 1_000_000_000_000u128;
+		let sponsor_balance: Balance = 1_000_000_000_000u128;
+		let tip: Balance = 500u128;
 
-		assert_eq!(Balances::free_balance(delegate), 0u128);
+		set_argons(delegate, delegate_balance);
 		set_argons(real, sponsor_balance);
 		assert_ok!(Proxy::add_proxy(Some(real).into(), delegate, ProxyType::DummyWrapper, 0,));
 
@@ -800,18 +837,22 @@ fn delegation_refunds_fees_for_proxy_specific_sponsors() {
 		let info = call.get_dispatch_info();
 		let len = call.encoded_size();
 		let origin = crate::mock::RuntimeOrigin::signed(delegate);
-		let wrapper =
-			CheckFeeWrapper::<Test, MockChargePaymentExtension>::from(MockChargePaymentExtension);
+		let delegate_before = Balances::free_balance(delegate);
+		let sponsor_before = Balances::free_balance(real);
+		let wrapper = CheckFeeWrapper::<Test, ChargeTransactionPayment<Test>>::from(
+			ChargeTransactionPayment::<Test>::from(tip),
+		);
 		let (_, val, _) = wrapper
 			.validate_only(origin.clone(), &call, &info, len, TransactionSource::External, 0)
 			.unwrap();
-		let pre =
-			CheckFeeWrapper::<Test, MockChargePaymentExtension>::from(MockChargePaymentExtension)
-				.prepare(val, &origin, &call, &info, len)
-				.unwrap();
+		let pre = CheckFeeWrapper::<Test, ChargeTransactionPayment<Test>>::from(
+			ChargeTransactionPayment::<Test>::from(tip),
+		)
+		.prepare(val, &origin, &call, &info, len)
+		.unwrap();
 
 		let dispatch_result = call.dispatch(origin);
-		let dispatch_outcome = match &dispatch_result {
+		let outer_dispatch_outcome = match &dispatch_result {
 			Ok(_) => Ok(()),
 			Err(err) => Err(err.error.clone()),
 		};
@@ -819,19 +860,94 @@ fn delegation_refunds_fees_for_proxy_specific_sponsors() {
 			Ok(post_info) => post_info,
 			Err(err) => &err.post_info,
 		};
+		let actual_fee = pallet_transaction_payment::Pallet::<Test>::compute_actual_fee(
+			len as u32, &info, post_info, tip,
+		);
 
-		CheckFeeWrapper::<Test, MockChargePaymentExtension>::post_dispatch_details(
+		CheckFeeWrapper::<Test, ChargeTransactionPayment<Test>>::post_dispatch_details(
 			pre,
 			&info,
 			post_info,
 			len,
-			&dispatch_outcome,
+			&outer_dispatch_outcome,
 		)
 		.unwrap();
 
-		assert!(dispatch_outcome.is_ok());
-		assert_eq!(LastPayer::get(), Some(real));
-		assert_eq!(LastPostDispatchPaysFee::get(), Some(Pays::No));
+		assert!(outer_dispatch_outcome.is_ok());
+		assert!(DispatchedPoolKeys::<Test>::contains_key(key));
+		assert_eq!(Balances::free_balance(delegate), delegate_before);
+		assert_eq!(Balances::free_balance(real), sponsor_before - actual_fee);
+		assert_eq!(FeeUnbalancedAmount::get() + TipUnbalancedAmount::get(), actual_fee);
+	});
+}
+
+#[test]
+fn proxy_specific_sponsors_charge_real_account_for_failed_calls() {
+	new_test_ext().execute_with(|| {
+		FeeUnbalancedAmount::set(0);
+		TipUnbalancedAmount::set(0);
+
+		let real = 7u64;
+		let delegate = 1u64;
+		let key = 34u32;
+		let delegate_balance: Balance = 1_000_000_000_000u128;
+		let sponsor_balance: Balance = 1_000_000_000_000u128;
+		let tip: Balance = 500u128;
+
+		set_argons(delegate, delegate_balance);
+		set_argons(real, sponsor_balance);
+		assert_ok!(Proxy::add_proxy(Some(real).into(), delegate, ProxyType::DummyWrapper, 0,));
+
+		let call = RuntimeCall::Proxy(pallet_proxy::Call::<Test>::proxy {
+			real,
+			force_proxy_type: Some(ProxyType::DummyWrapper),
+			call: Box::new(RuntimeCall::DummyPallet(Call::<Test>::pooled_fail { key })),
+		});
+		let info = call.get_dispatch_info();
+		let len = call.encoded_size();
+		let origin = crate::mock::RuntimeOrigin::signed(delegate);
+		let delegate_before = Balances::free_balance(delegate);
+		let sponsor_before = Balances::free_balance(real);
+		let wrapper = CheckFeeWrapper::<Test, ChargeTransactionPayment<Test>>::from(
+			ChargeTransactionPayment::<Test>::from(tip),
+		);
+		let (_, val, _) = wrapper
+			.validate_only(origin.clone(), &call, &info, len, TransactionSource::External, 0)
+			.unwrap();
+		let pre = CheckFeeWrapper::<Test, ChargeTransactionPayment<Test>>::from(
+			ChargeTransactionPayment::<Test>::from(tip),
+		)
+		.prepare(val, &origin, &call, &info, len)
+		.unwrap();
+
+		let dispatch_result = call.dispatch(origin);
+		let outer_dispatch_outcome = match &dispatch_result {
+			Ok(_) => Ok(()),
+			Err(err) => Err(err.error.clone()),
+		};
+		let post_info = match &dispatch_result {
+			Ok(post_info) => post_info,
+			Err(err) => &err.post_info,
+		};
+		let actual_fee = pallet_transaction_payment::Pallet::<Test>::compute_actual_fee(
+			len as u32, &info, post_info, tip,
+		);
+
+		CheckFeeWrapper::<Test, ChargeTransactionPayment<Test>>::post_dispatch_details(
+			pre,
+			&info,
+			post_info,
+			len,
+			&outer_dispatch_outcome,
+		)
+		.unwrap();
+
+		// `proxy(...)` returns `Ok(())` even when the proxied call fails.
+		assert!(outer_dispatch_outcome.is_ok());
+		assert!(!DispatchedPoolKeys::<Test>::contains_key(key));
+		assert_eq!(Balances::free_balance(delegate), delegate_before);
+		assert_eq!(Balances::free_balance(real), sponsor_before - actual_fee);
+		assert_eq!(FeeUnbalancedAmount::get() + TipUnbalancedAmount::get(), actual_fee);
 	});
 }
 

@@ -364,8 +364,7 @@ where
 			let mut delegated_origin = origin.clone();
 			let mut tx_sponsor = None;
 			// Runtime refund policies are evaluated on the effective call after proxy unwrapping.
-			// Proxy-specific sponsored refunds are carried separately by the sponsor itself.
-			let mut refund_fee_on_success =
+			let refund_fee_on_success =
 				T::CallFeeRefundProviders::refund_fee_on_success(inner_call);
 
 			if let Some(signer) = origin.as_signer() {
@@ -381,13 +380,12 @@ where
 
 				if let Some(sponsor) = sponsor {
 					log::debug!("fee sponsor detected: payer={:?}", sponsor.payer);
-					refund_fee_on_success |= sponsor.refund_fee_on_success;
 					delegated_origin.set_caller_from_signed(sponsor.payer.clone());
 					tx_sponsor = Some(sponsor);
 				}
 			}
 
-			let (mut validity, inner_val, origin_out) = self.0.validate(
+			let (mut validity, inner_val, _) = self.0.validate(
 				delegated_origin.clone(),
 				call,
 				info,
@@ -424,7 +422,7 @@ where
 					tx_sponsor,
 					refund_fee_on_success,
 				},
-				origin_out,
+				origin,
 			))
 		}
 	}

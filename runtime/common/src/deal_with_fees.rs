@@ -25,13 +25,13 @@ macro_rules! deal_with_fees {
 			}
 		}
 
-		pub struct ProxyFeeDelegate<R>(PhantomData<R>);
+		pub struct MiningBidProxyFeeSponsor<R>(PhantomData<R>);
 		impl<R>
 			TransactionSponsorProvider<
 				R::AccountId,
 				<R as frame_system::Config>::RuntimeCall,
 				Balance,
-			> for ProxyFeeDelegate<R>
+			> for MiningBidProxyFeeSponsor<R>
 		where
 			R: frame_system::Config<RuntimeCall = RuntimeCall, AccountId = AccountId32>
 				+ pallet_balances::Config<ArgonToken, Balance = Balance>
@@ -84,23 +84,15 @@ macro_rules! deal_with_fees {
 						false
 					}
 
-					// Determine the effective proxy type.
-					let effective_proxy_type = if let Some(t) = force_proxy_type {
-						Some(*t)
-					} else {
-						// Look up the stored proxy relationship to determine proxy type.
-						let (defs, _deposit) =
-							pallet_proxy::Pallet::<R>::proxies(real_account.clone());
-						defs.into_iter().find_map(|def| {
-							if def.delegate == *signer {
-								Some(def.proxy_type)
-							} else {
-								None
-							}
-						})
+					let Ok(def) = pallet_proxy::Pallet::<R>::find_proxy(
+						real_account,
+						signer,
+						*force_proxy_type,
+					) else {
+						return None;
 					};
 
-					if !matches!(effective_proxy_type, Some(ProxyType::MiningBidRealPaysFee)) {
+					if def.proxy_type != ProxyType::MiningBidRealPaysFee {
 						return None;
 					}
 
@@ -119,7 +111,6 @@ macro_rules! deal_with_fees {
 								.using_encoded(sp_crypto_hashing::blake2_256)
 								.to_vec(),
 						),
-						refund_fee_on_success: true,
 					});
 				}
 				None
