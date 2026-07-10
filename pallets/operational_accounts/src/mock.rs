@@ -62,7 +62,7 @@ parameter_types! {
 	pub const MaxEncryptedServerLen: u32 = 256;
 	pub const MinimumUniswapTransfer: Balance = 250;
 	pub const MinimumBitcoin: Balance = 500;
-	pub const MinimumBonds: Balance = 250;
+	pub const MinimumBonds: Balance = 200;
 	pub const OperationalMinimumUniswapTransfer: Balance = 3_000;
 	pub const OperationalMinimumVaultSecuritization: Balance = 2_000;
 	pub const BitcoinLockSizeForAccessCode: Balance = 5_000;
