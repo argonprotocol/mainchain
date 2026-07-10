@@ -315,6 +315,10 @@ methods:
       size: 1
       ttl_seconds: 5
 
+  - method: system_syncStatus
+    cache:
+      size: 0
+
   - method: system_accountNextIndex
     cache:
       size: 0

@@ -298,6 +298,7 @@ where
 			block_relay: None,
 			metrics,
 		})?;
+	let starting_block = client.info().best_number;
 
 	let role = config.role;
 	let name = config.network.node_name.clone();
@@ -320,6 +321,7 @@ where
 		let backend = backend.clone();
 		let justification_stream = grandpa_link.justification_stream();
 		let shared_authority_set = grandpa_link.shared_authority_set().clone();
+		let sync_service = sync_service.clone();
 		let finality_proof_provider = GrandpaFinalityProofProvider::new_for_service(
 			backend.clone(),
 			Some(shared_authority_set.clone()),
@@ -329,6 +331,8 @@ where
 			let deps = rpc::FullDeps {
 				client: client.clone(),
 				pool: transaction_pool.clone(),
+				sync_service: sync_service.clone(),
+				starting_block,
 				grandpa: GrandpaDeps {
 					shared_voter_state: shared_voter_state.clone(),
 					shared_authority_set: shared_authority_set.clone(),
