@@ -97,12 +97,27 @@ impl InstanceFilter<RuntimeCall> for ProxyType {
 	fn filter(&self, c: &RuntimeCall) -> bool {
 		match self {
 			ProxyType::Any => true,
-			ProxyType::DummyWrapper => matches!(
-				c,
+			ProxyType::DummyWrapper => match c {
 				RuntimeCall::DummyPallet(
-					pallet_dummy::Call::sponsored { .. } | pallet_dummy::Call::pooled { .. }
-				)
-			),
+					pallet_dummy::Call::sponsored { .. } |
+					pallet_dummy::Call::pooled { .. } |
+					pallet_dummy::Call::pooled_fail { .. },
+				) => true,
+				RuntimeCall::Utility(
+					pallet_utility::Call::batch { calls } |
+					pallet_utility::Call::batch_all { calls } |
+					pallet_utility::Call::force_batch { calls },
+				) => calls.iter().all(|call| {
+					matches!(
+						call,
+						RuntimeCall::DummyPallet(
+							pallet_dummy::Call::pooled { .. } |
+								pallet_dummy::Call::pooled_fail { .. }
+						)
+					)
+				}),
+				_ => false,
+			},
 		}
 	}
 	fn is_superset(&self, o: &Self) -> bool {
@@ -296,6 +311,9 @@ pub mod pallet_dummy {
 	#[pallet::storage]
 	pub type ConsumedPoolKeys<T> = StorageMap<_, Blake2_128Concat, u32, (), OptionQuery>;
 
+	#[pallet::storage]
+	pub type DispatchedPoolKeys<T> = StorageMap<_, Blake2_128Concat, u32, (), OptionQuery>;
+
 	#[pallet::config]
 	pub trait Config: polkadot_sdk::frame_system::Config {}
 
@@ -328,7 +346,13 @@ pub mod pallet_dummy {
 
 		pub fn pooled(_origin: OriginFor<T>, _key: u32) -> DispatchResult {
 			let _who = ensure_signed(_origin)?;
+			DispatchedPoolKeys::<T>::insert(_key, ());
 			Ok(())
+		}
+
+		pub fn pooled_fail(_origin: OriginFor<T>, _key: u32) -> DispatchResult {
+			let _who = ensure_signed(_origin)?;
+			Err(DispatchError::Other("pooled failed"))
 		}
 
 		pub fn sponsored_pooled(_origin: OriginFor<T>, _key: u32) -> DispatchResult {
@@ -359,6 +383,8 @@ pub mod pallet_dummy {
 			match call {
 				RuntimeCall::DummyPallet(pallet_dummy::Call::pooled { key }) =>
 					Some((b"general", key).encode()),
+				RuntimeCall::DummyPallet(pallet_dummy::Call::pooled_fail { key }) =>
+					Some((b"general", key).encode()),
 				RuntimeCall::DummyPallet(pallet_dummy::Call::stacked { key }) =>
 					Some((b"general", key).encode()),
 				RuntimeCall::DummyPallet(pallet_dummy::Call::stacked_operational { key }) =>
@@ -377,6 +403,7 @@ pub mod pallet_dummy {
 			match call {
 				RuntimeCall::DummyPallet(
 					pallet_dummy::Call::pooled { key } |
+					pallet_dummy::Call::pooled_fail { key } |
 					pallet_dummy::Call::sponsored_pooled { key } |
 					pallet_dummy::Call::stacked { key },
 				) if ConsumedPoolKeys::<T>::contains_key(key) =>
@@ -385,24 +412,60 @@ pub mod pallet_dummy {
 			}
 		}
 	}
-	impl<T: Config> TransactionSponsorProvider<u64, RuntimeCall, Balance> for Pallet<T> {
+	impl<T> TransactionSponsorProvider<u64, RuntimeCall, Balance> for Pallet<T>
+	where
+		T: Config
+			+ pallet_proxy::Config<
+				AccountId = u64,
+				RuntimeCall = RuntimeCall,
+				ProxyType = crate::mock::ProxyType,
+			>,
+	{
 		fn get_transaction_sponsor(
-			_signer: &u64,
+			signer: &u64,
 			call: &RuntimeCall,
 		) -> Option<TxSponsor<u64, Balance>> {
-			if let RuntimeCall::Proxy(pallet_proxy::Call::proxy {
-				real,
-				force_proxy_type: Some(crate::mock::ProxyType::DummyWrapper),
-				call,
-			}) = call && let RuntimeCall::DummyPallet(pallet_dummy::Call::pooled { key }) =
-				call.as_ref()
+			if let RuntimeCall::Proxy(pallet_proxy::Call::proxy { real, force_proxy_type, call }) =
+				call
 			{
-				return Some(TxSponsor {
-					payer: *real,
-					max_fee_with_tip: Some(5_000),
-					unique_tx_key: Some((b"proxy", key).encode()),
-					refund_fee_on_success: true,
-				});
+				let Ok(def) =
+					pallet_proxy::Pallet::<T>::find_proxy(real, signer, *force_proxy_type)
+				else {
+					return None;
+				};
+				if def.proxy_type != crate::mock::ProxyType::DummyWrapper {
+					return None;
+				}
+
+				let unique_tx_key = match call.as_ref() {
+					RuntimeCall::DummyPallet(
+						pallet_dummy::Call::pooled { key } |
+						pallet_dummy::Call::pooled_fail { key },
+					) => Some((b"proxy", key).encode()),
+					RuntimeCall::Utility(
+						pallet_utility::Call::batch { calls } |
+						pallet_utility::Call::batch_all { calls } |
+						pallet_utility::Call::force_batch { calls },
+					) if calls.iter().all(|inner| {
+						matches!(
+							inner,
+							RuntimeCall::DummyPallet(
+								pallet_dummy::Call::pooled { .. } |
+									pallet_dummy::Call::pooled_fail { .. }
+							)
+						)
+					}) =>
+						Some((b"proxy-batch", calls).encode()),
+					_ => None,
+				};
+
+				if let Some(unique_tx_key) = unique_tx_key {
+					return Some(TxSponsor {
+						payer: *real,
+						max_fee_with_tip: Some(1_000_000_000_000),
+						unique_tx_key: Some(unique_tx_key),
+					});
+				}
 			}
 
 			if let RuntimeCall::DummyPallet(
@@ -414,7 +477,6 @@ pub mod pallet_dummy {
 					payer: sponsor,
 					max_fee_with_tip: Some(max_fee_with_tip),
 					unique_tx_key: Some(key.encode()),
-					refund_fee_on_success: false,
 				});
 			}
 			None

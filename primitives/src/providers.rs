@@ -1300,22 +1300,20 @@ impl<RuntimeCall, AccountId> CallTxValidityProvider<RuntimeCall, AccountId> for 
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct TxSponsor<AccountId, Balance> {
-	/// The account that will pay for the transaction fee
+	/// The account that will pay for the transaction fee.
 	pub payer: AccountId,
 	/// The maximum fee (including tip) that the sponsor is willing to pay
 	pub max_fee_with_tip: Option<Balance>,
 	/// A unique key to identify this sponsored transaction in the tx pool to prevent dos
 	/// attacks
 	pub unique_tx_key: Option<Vec<u8>>,
-	/// Whether the charged fee should be refunded when the transaction succeeds.
-	pub refund_fee_on_success: bool,
 }
 
-/// A configurable hook that can recognize calls where one account should reimburse another
-/// for the transaction fee after dispatch.
+/// A configurable hook that can recognize calls whose transaction fee should be charged to a
+/// different account during fee validation and payment.
 ///
-/// Return a `Some(account_id)` if another account has explicitly authorized to pay the fee for
-/// the `signer` for the given `call`. Otherwise return `None`.
+/// Return a `Some(TxSponsor)` if another account has explicitly authorized paying the fee for the
+/// `signer` for the given `call`. Otherwise return `None`.
 pub trait TransactionSponsorProvider<AccountId, RuntimeCall, Balance> {
 	fn get_transaction_sponsor(
 		signer: &AccountId,
@@ -1342,7 +1340,8 @@ impl<AccountId, RuntimeCall, Balance> TransactionSponsorProvider<AccountId, Runt
 	}
 }
 
-/// Provides runtime-defined call combinations that should be refunded after successful dispatch.
+/// Provides runtime-defined call combinations whose fees should be refunded after successful
+/// dispatch.
 ///
 /// This is evaluated against the effective call after proxy unwrapping, allowing the runtime to
 /// keep fee-refund policy close to its own call-shape and proxy rules instead of hard-coding
