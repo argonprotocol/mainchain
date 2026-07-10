@@ -251,7 +251,7 @@ parameter_types! {
 	/// Minimum bitcoin amount required to register.
 	pub const MinimumBitcoin: Balance = 500 * MICROGONS_PER_ARGON;
 	/// Minimum bond amount required to register.
-	pub const MinimumBonds: Balance = 250 * MICROGONS_PER_ARGON;
+	pub const MinimumBonds: Balance = 200 * MICROGONS_PER_ARGON;
 	/// Minimum total Uniswap transfer amount required for operational certification.
 	pub const OperationalMinimumUniswapTransfer: Balance = 3_000 * MICROGONS_PER_ARGON;
 	/// Minimum vault securitization (base units) required to become operational.
