@@ -56,7 +56,13 @@ impl<T, S> From<S> for CheckFeeWrapper<T, S> {
 
 pub enum Intermediate<T, O, A> {
 	/// The wrapped extension should be applied.
-	RequiresFee { inner: T, delegated_origin: O, tx_sponsor: A, refund_fee_on_success: bool },
+	RequiresFee {
+		inner: T,
+		transaction_origin: O,
+		delegated_origin: O,
+		tx_sponsor: A,
+		refund_fee_on_success: bool,
+	},
 	/// The wrapped extension should be skipped.
 	Feeless(O),
 }
@@ -418,6 +424,7 @@ where
 				validity,
 				RequiresFee {
 					inner: inner_val,
+					transaction_origin: origin.clone(),
 					delegated_origin,
 					tx_sponsor,
 					refund_fee_on_success,
@@ -438,10 +445,17 @@ where
 		Self::validate_freshness(call, origin.as_signer().cloned())?;
 
 		match val {
-			RequiresFee { inner, delegated_origin, tx_sponsor, refund_fee_on_success } => {
+			RequiresFee {
+				inner,
+				transaction_origin,
+				delegated_origin,
+				tx_sponsor,
+				refund_fee_on_success,
+			} => {
 				let res = self.0.prepare(inner, &delegated_origin, call, info, len)?;
 				Ok(RequiresFee {
 					inner: res,
+					transaction_origin,
 					delegated_origin,
 					tx_sponsor,
 					refund_fee_on_success,
@@ -459,7 +473,13 @@ where
 		result: &DispatchResult,
 	) -> Result<Weight, TransactionValidityError> {
 		match pre {
-			RequiresFee { inner: pre, delegated_origin: origin, tx_sponsor, refund_fee_on_success } => {
+			RequiresFee {
+				inner: pre,
+				transaction_origin,
+				delegated_origin: _,
+				tx_sponsor,
+				refund_fee_on_success,
+			} => {
 				let adjusted_post_info;
 				let post_info = if refund_fee_on_success && result.is_ok() && post_info.pays_fee == Pays::Yes
 				{
@@ -472,9 +492,9 @@ where
 					post_info
 				};
 				let result = S::post_dispatch_details(pre, info, post_info, len, result)?;
-				if let (Some(sponsor), Some(from)) = (tx_sponsor, origin.as_signer()) {
+				if let (Some(sponsor), Some(from)) = (tx_sponsor, transaction_origin.as_signer()) {
 					Pallet::<T>::deposit_event(Event::<T>::FeeDelegated {
-						origin: origin.clone().into_caller(),
+						origin: transaction_origin.clone().into_caller(),
 						from: from.clone(),
 						to: sponsor.payer,
 					});
