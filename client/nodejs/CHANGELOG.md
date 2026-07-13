@@ -1,8 +1,37 @@
 # Changelog
 
-## [v1.4.9](https://github.com/argonprotocol/mainchain/compare/v1.4.8...9f278b47e377936d52802f8ed38d63256de06de4) (2026-06-28)
+## [v1.4.10](https://github.com/argonprotocol/mainchain/compare/v1.4.9...608fbe23a068c1fc9f7d4ed05019525f945ee952) (2026-07-13)
 
 ### Features
+
+* **operational-accounts:** gate registration on minimums and upstream
+approval
+([8772e0d](https://github.com/argonprotocol/mainchain/commit/8772e0d45a87d43f034c617778de7083b211eceb))
+* **operational-accounts:** add certification tiers
+([6089908](https://github.com/argonprotocol/mainchain/commit/60899086e04b696eb9e283d195d7ae7cb594a539))
+* **mint:** batch bitcoin mint payouts across frame windows
+([ec80915](https://github.com/argonprotocol/mainchain/commit/ec80915a676e63c9863a8dcb70ed05f74313a433))
+* **treasury:** add argonot treasury bonds
+([6c9df1c](https://github.com/argonprotocol/mainchain/commit/6c9df1cf93545d33b81e43407526c50530505f85))
+
+### Fixes
+
+* **fee-control:** report fee delegation accounts correctly
+([052c599](https://github.com/argonprotocol/mainchain/commit/052c599f49d8c3ed08a6ff1f6fd9195886f07f54))
+* **operational-accounts:** lower registration bond minimum to 200
+([962fc68](https://github.com/argonprotocol/mainchain/commit/962fc68c5cf416d033fbd1a6d7fb5be62f22d631))
+* align generated client metadata for operational progress
+([da1bef5](https://github.com/argonprotocol/mainchain/commit/da1bef5c5568fa5339c3ec1a2e2ce5b6cdfaef6a))
+* allow force_set_progress to mark operational accounts upgraded
+([9f1c7e5](https://github.com/argonprotocol/mainchain/commit/9f1c7e5f5b1f1c0bd579ee5ecd160da116ca6d3b))
+* **nodejs:** don’t blow up if a block number can’t be looked up
+([e93a60f](https://github.com/argonprotocol/mainchain/commit/e93a60f958e92fe73871b5e36e3570e4ba3c5328))
+* **treasury:** tighten payout accounting guards
+([c9ce32a](https://github.com/argonprotocol/mainchain/commit/c9ce32a62cc7776f9e60d377ac2dc01a61d60a74))
+
+### [v1.4.9](https://github.com/argonprotocol/mainchain/compare/v1.4.8...v1.4.9) (2026-06-28)
+
+#### Features
 
 * **block-rewards:** add voter rewards toggle and disable voter rewards by
 default

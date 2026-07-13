@@ -23,8 +23,8 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@argonprotocol/bitcoin@workspace:bitcoin/nodejs"
   dependencies:
-    "@argonprotocol/mainchain": "npm:1.4.9"
-    "@argonprotocol/testing": "npm:1.4.9"
+    "@argonprotocol/mainchain": "npm:1.4.10"
+    "@argonprotocol/testing": "npm:1.4.10"
     "@noble/secp256k1": "npm:^2.3.0"
     "@scure/bip32": "npm:^1.7.0"
     "@scure/bip39": "npm:^1.6.0"
@@ -106,8 +106,8 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@argonprotocol/localchain@workspace:localchain"
   dependencies:
-    "@argonprotocol/mainchain": "npm:1.4.9"
-    "@argonprotocol/testing": "npm:1.4.9"
+    "@argonprotocol/mainchain": "npm:1.4.10"
+    "@argonprotocol/testing": "npm:1.4.10"
     "@napi-rs/cli": "npm:3.1.4"
     shx: "npm:^0.4.0"
     typescript: "npm:^5.9.2"
@@ -140,12 +140,12 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@argonprotocol/mainchain@npm:1.4.9, @argonprotocol/mainchain@workspace:*, @argonprotocol/mainchain@workspace:client/nodejs":
+"@argonprotocol/mainchain@npm:1.4.10, @argonprotocol/mainchain@workspace:*, @argonprotocol/mainchain@workspace:client/nodejs":
   version: 0.0.0-use.local
   resolution: "@argonprotocol/mainchain@workspace:client/nodejs"
   dependencies:
     "@argonprotocol/ethereum-contracts": "workspace:*"
-    "@argonprotocol/testing": "npm:1.4.9"
+    "@argonprotocol/testing": "npm:1.4.10"
     "@ethereumjs/block": "npm:^10.1.1"
     "@ethereumjs/mpt": "npm:^10.1.1"
     "@polkadot/api": "npm:^16.5.6"
@@ -172,11 +172,11 @@ __metadata:
   languageName: unknown
   linkType: soft
 
-"@argonprotocol/testing@npm:1.4.9, @argonprotocol/testing@workspace:testing/nodejs":
+"@argonprotocol/testing@npm:1.4.10, @argonprotocol/testing@workspace:testing/nodejs":
   version: 0.0.0-use.local
   resolution: "@argonprotocol/testing@workspace:testing/nodejs"
   dependencies:
-    "@argonprotocol/mainchain": "npm:1.4.9"
+    "@argonprotocol/mainchain": "npm:1.4.10"
     "@types/http-proxy": "npm:^1.17.16"
     "@types/node": "npm:^20"
     "@types/pg": "npm:^8.15.5"

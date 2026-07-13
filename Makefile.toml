@@ -142,7 +142,7 @@ dependencies = ["testnet-spec", "release"]
 [tasks.release]
 description = "Complete release process: install dependencies, version bump, changelogs, commit, and push"
 script = [
-    "brew install convco",
+    "if ! convco --version | grep -qx 'convco 0.6.4'; then cargo install convco --version '=0.6.4' --locked --force; fi",
     # A non-flag first arg is treated as an explicit version, for example `cargo make release v1.4.2`.
     "if [ $# -eq 0 ]; then export RELEASE_TYPE=--bump; export VERSION=$(convco version $RELEASE_TYPE); elif printf '%s' \"$1\" | grep -Eq '^v?[0-9]+\\.[0-9]+\\.[0-9]+([.-][0-9A-Za-z.-]+)?$'; then export VERSION=${1#v}; else export RELEASE_TYPE=\"$@\"; export VERSION=$(convco version $RELEASE_TYPE); fi",
     "export COMMIT_MSG=\"chore(release): update changelogs and bump versions to v${VERSION}\"",
