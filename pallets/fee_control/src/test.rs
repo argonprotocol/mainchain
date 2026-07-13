@@ -18,8 +18,8 @@ use crate::mock::{
 	new_test_ext,
 	pallet_dummy::{Call, ConsumedPoolKeys, DispatchedPoolKeys, OneUseCodes},
 	Balances, FeeAmount, FeeControl, FeeUnbalancedAmount, LastPayer, LastPostDispatchPaysFee,
-	MockChargePaymentExtension, PrepareCount, Proxy, ProxyType, RuntimeCall, Test, TipAmount,
-	TipUnbalancedAmount, ValidateCount,
+	MockChargePaymentExtension, PrepareCount, Proxy, ProxyType, RuntimeCall, RuntimeEvent, System,
+	Test, TipAmount, TipUnbalancedAmount, ValidateCount,
 };
 use codec::Encode;
 use frame_support::dispatch::{DispatchInfo, GetDispatchInfo, Pays};
@@ -815,6 +815,7 @@ fn proxy_specific_sponsors_require_registered_delegate() {
 #[test]
 fn proxy_specific_sponsors_charge_real_account_directly() {
 	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
 		FeeUnbalancedAmount::set(0);
 		TipUnbalancedAmount::set(0);
 
@@ -878,6 +879,17 @@ fn proxy_specific_sponsors_charge_real_account_directly() {
 		assert_eq!(Balances::free_balance(delegate), delegate_before);
 		assert_eq!(Balances::free_balance(real), sponsor_before - actual_fee);
 		assert_eq!(FeeUnbalancedAmount::get() + TipUnbalancedAmount::get(), actual_fee);
+		let events = System::events();
+		assert!(
+			events.iter().any(|record| {
+				matches!(
+					&record.event,
+					RuntimeEvent::FeeControl(Event::FeeDelegated { from, to, .. })
+						if *from == delegate && *to == real
+				)
+			}),
+			"{events:?}"
+		);
 	});
 }
 
