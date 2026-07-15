@@ -175,7 +175,7 @@ export class TxResult {
       this.isBroadcast = true;
       if (result.internalError) this.submissionError = result.internalError;
     }
-    if (status.isInBlock) {
+    if (status.isInBlock && txIndex !== undefined) {
       try {
         const pendingInBlock = createPendingInBlock(
           Uint8Array.from(status.asInBlock),
@@ -191,6 +191,23 @@ export class TxResult {
         });
       } catch (error) {
         this.submissionError = error as Error;
+      }
+    }
+    if (status.isRetracted) {
+      const retractedHash = Uint8Array.from(status.asRetracted);
+      if (this.#pendingInBlock && u8aEq(this.#pendingInBlock.blockHash, retractedHash)) {
+        this.#pendingInBlock = undefined;
+      }
+      if (this.blockHash && u8aEq(this.blockHash, retractedHash)) {
+        this.events = [];
+        this.extrinsicError = undefined;
+        this.extrinsicIndex = undefined;
+        this.batchInterruptedIndex = undefined;
+        this.blockHash = undefined;
+        this.blockNumber = undefined;
+        this.finalFee = undefined;
+        this.finalFeeTip = undefined;
+        this.updateProgress();
       }
     }
     if (status.isUsurped) {
