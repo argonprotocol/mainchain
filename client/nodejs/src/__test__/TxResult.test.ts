@@ -57,6 +57,77 @@ describe('TxResult', () => {
     });
   });
 
+  it('keeps watching after an in-block result without a transaction index', async () => {
+    const reIncludedHash = Uint8Array.from([4, 5, 6]);
+    const getHeader = vi.fn().mockResolvedValue({
+      number: {
+        toNumber: () => 145,
+      },
+    });
+    const result = createTxResult({
+      rpc: {
+        chain: {
+          getHeader,
+        },
+      },
+    } as any);
+
+    result.onSubscriptionResult({
+      events: [],
+      isFinalized: false,
+      status: {
+        isBroadcast: false,
+        isDropped: false,
+        isInBlock: true,
+        asInBlock: Uint8Array.from([1, 2, 3]),
+        isInvalid: false,
+        isRetracted: false,
+        isUsurped: false,
+      },
+      txIndex: undefined,
+    } as any);
+
+    expect(result.submissionError).toBeUndefined();
+    expect(getHeader).not.toHaveBeenCalled();
+
+    result.onSubscriptionResult({
+      events: [],
+      isFinalized: false,
+      status: {
+        isBroadcast: false,
+        isDropped: false,
+        isInBlock: true,
+        asInBlock: reIncludedHash,
+        isInvalid: false,
+        isRetracted: false,
+        isUsurped: false,
+      },
+      txIndex: 4,
+    } as any);
+
+    await expect(result.waitForInFirstBlock).resolves.toEqual(reIncludedHash);
+
+    result.onSubscriptionResult({
+      events: [],
+      isFinalized: true,
+      status: {
+        isBroadcast: false,
+        isDropped: false,
+        isFinalized: true,
+        asFinalized: reIncludedHash,
+        isInBlock: false,
+        isInvalid: false,
+        isRetracted: false,
+        isUsurped: false,
+      },
+      txIndex: 4,
+    } as any);
+
+    await expect(result.waitForFinalizedBlock).resolves.toEqual(reIncludedHash);
+    expect(result.submissionError).toBeUndefined();
+    expect(result.isFinalized).toBe(true);
+  });
+
   it('waits to publish in-block until it can resolve a real finalized block', async () => {
     const getHeader = vi
       .fn()
@@ -205,6 +276,123 @@ describe('TxResult', () => {
 
     expect(result.blockHash).toEqual(finalizedHash);
     expect(result.blockNumber).toBe(145);
+  });
+
+  it('ignores an in-block lookup after the transaction is retracted', async () => {
+    const inBlockHash = Uint8Array.from([1, 2, 3]);
+    let resolveInBlockHeader!: (value: unknown) => void;
+    const getHeader = vi.fn().mockImplementation(
+      () =>
+        new Promise(resolve => {
+          resolveInBlockHeader = resolve;
+        }),
+    );
+    const result = createTxResult({
+      rpc: {
+        chain: {
+          getHeader,
+        },
+      },
+    } as any);
+
+    result.onSubscriptionResult({
+      events: [],
+      isFinalized: false,
+      status: {
+        isBroadcast: false,
+        isDropped: false,
+        isInBlock: true,
+        asInBlock: inBlockHash,
+        isInvalid: false,
+        isRetracted: false,
+        isUsurped: false,
+      },
+      txIndex: 4,
+    } as any);
+
+    await Promise.resolve();
+
+    result.onSubscriptionResult({
+      events: [],
+      isFinalized: false,
+      status: {
+        isBroadcast: false,
+        isDropped: false,
+        isInBlock: false,
+        isInvalid: false,
+        isRetracted: true,
+        asRetracted: inBlockHash,
+        isUsurped: false,
+      },
+      txIndex: undefined,
+    } as any);
+
+    resolveInBlockHeader({
+      number: {
+        toNumber: () => 144,
+      },
+    });
+
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(result.blockHash).toBeUndefined();
+    expect(result.blockNumber).toBeUndefined();
+  });
+
+  it('clears a published block inclusion when the transaction is retracted', async () => {
+    const inBlockHash = Uint8Array.from([1, 2, 3]);
+    const result = createTxResult({
+      rpc: {
+        chain: {
+          getHeader: vi.fn().mockResolvedValue({
+            number: {
+              toNumber: () => 144,
+            },
+          }),
+        },
+      },
+    } as any);
+
+    result.onSubscriptionResult({
+      events: [],
+      isFinalized: false,
+      status: {
+        isBroadcast: false,
+        isDropped: false,
+        isInBlock: true,
+        asInBlock: inBlockHash,
+        isInvalid: false,
+        isRetracted: false,
+        isUsurped: false,
+      },
+      txIndex: 4,
+    } as any);
+
+    await expect(result.waitForInFirstBlock).resolves.toEqual(inBlockHash);
+    expect(result.blockNumber).toBe(144);
+    expect(result.extrinsicIndex).toBe(4);
+    expect(result.txProgress).toBe(99);
+
+    result.onSubscriptionResult({
+      events: [],
+      isFinalized: false,
+      status: {
+        isBroadcast: false,
+        isDropped: false,
+        isInBlock: false,
+        isInvalid: false,
+        isRetracted: true,
+        asRetracted: inBlockHash,
+        isUsurped: false,
+      },
+      txIndex: undefined,
+    } as any);
+
+    expect(result.blockHash).toBeUndefined();
+    expect(result.blockNumber).toBeUndefined();
+    expect(result.extrinsicIndex).toBeUndefined();
+    expect(result.txProgress).toBe(10);
   });
 });
 
