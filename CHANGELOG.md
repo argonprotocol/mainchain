@@ -1,14 +1,58 @@
 # Changelog
 
-## [v1.4.9](https://github.com/argonprotocol/mainchain/compare/v1.4.8...9f278b47e377936d52802f8ed38d63256de06de4) (2026-06-28)
+## [v1.4.10](https://github.com/argonprotocol/mainchain/compare/v1.4.9...608fbe23a068c1fc9f7d4ed05019525f945ee952) (2026-07-13)
 
 ### Features
+
+* **node:** expose sync status via rpc
+([4a71b79](https://github.com/argonprotocol/mainchain/commit/4a71b79714df79e2512d766c0c2bd245fc648c4a))
+* **operational-accounts:** gate registration on minimums and upstream
+approval
+([8772e0d](https://github.com/argonprotocol/mainchain/commit/8772e0d45a87d43f034c617778de7083b211eceb))
+* add argon rpc gateway to dev docker stack
+([df00811](https://github.com/argonprotocol/mainchain/commit/df008118d3ed1ba143253387dd6077113412896b),
+[a4fb952](https://github.com/argonprotocol/mainchain/commit/a4fb9521378b69da4a5ca9b3138d9eeec34015e7))
+* **operational-accounts:** add certification tiers
+([6089908](https://github.com/argonprotocol/mainchain/commit/60899086e04b696eb9e283d195d7ae7cb594a539))
+* **mint:** batch bitcoin mint payouts across frame windows
+([ec80915](https://github.com/argonprotocol/mainchain/commit/ec80915a676e63c9863a8dcb70ed05f74313a433))
+* **treasury:** add argonot treasury bonds
+([6c9df1c](https://github.com/argonprotocol/mainchain/commit/6c9df1cf93545d33b81e43407526c50530505f85))
+
+### Fixes
+
+* **fee-control:** report fee delegation accounts correctly
+([052c599](https://github.com/argonprotocol/mainchain/commit/052c599f49d8c3ed08a6ff1f6fd9195886f07f54))
+* **operational-accounts:** lower registration bond minimum to 200
+([962fc68](https://github.com/argonprotocol/mainchain/commit/962fc68c5cf416d033fbd1a6d7fb5be62f22d631))
+* **runtime:** tighten mining proxy fee sponsorship
+([6eef657](https://github.com/argonprotocol/mainchain/commit/6eef65748e9f02b7d0ce5e782dc4ae2fd8752a7e))
+* align generated client metadata for operational progress
+([da1bef5](https://github.com/argonprotocol/mainchain/commit/da1bef5c5568fa5339c3ec1a2e2ce5b6cdfaef6a))
+* allow force_set_progress to mark operational accounts upgraded
+([9f1c7e5](https://github.com/argonprotocol/mainchain/commit/9f1c7e5f5b1f1c0bd579ee5ecd160da116ca6d3b))
+* require operational upgrades for vault and mining entry
+([f94f146](https://github.com/argonprotocol/mainchain/commit/f94f1463a8b0ccea2fa1e39f2aca81e9b5aff80d))
+* **nodejs:** don’t blow up if a block number can’t be looked up
+([e93a60f](https://github.com/argonprotocol/mainchain/commit/e93a60f958e92fe73871b5e36e3570e4ba3c5328))
+* **fee-control:** refund sponsored mining bid fees on success
+([df2198d](https://github.com/argonprotocol/mainchain/commit/df2198dadf74fc755964bce898e64f3e6c360bdf))
+* argon rpc version
+([871817a](https://github.com/argonprotocol/mainchain/commit/871817a16a5bbd37f8addf2e0552a083db2fa392))
+* **ethereum:** validate beacon sync committee public keys
+([0210f46](https://github.com/argonprotocol/mainchain/commit/0210f4641ea62552aea328bb139010bda4724b35))
+* **treasury:** tighten payout accounting guards
+([c9ce32a](https://github.com/argonprotocol/mainchain/commit/c9ce32a62cc7776f9e60d377ac2dc01a61d60a74))
+
+### [v1.4.9](https://github.com/argonprotocol/mainchain/compare/v1.4.8...v1.4.9) (2026-06-28)
+
+#### Features
 
 * **block-rewards:** add voter rewards toggle and disable voter rewards by
 default
 ([fffe0a0](https://github.com/argonprotocol/mainchain/commit/fffe0a0be20833a4b868459aea5f20deab04706c))
 
-### Fixes
+#### Fixes
 
 * **runtime:** enforce invite-only operational account access
 ([cbe619d](https://github.com/argonprotocol/mainchain/commit/cbe619da16d4032a46f646f65b016b6c3df2f41c))
