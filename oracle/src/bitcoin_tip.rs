@@ -3,12 +3,15 @@ use argon_bitcoin::client::Client;
 use argon_client::{
 	api::{runtime_types::argon_primitives::bitcoin as bitcoin_primitives_subxt, storage, tx},
 	signer::Signer,
-	subxt_error, ArgonConfig, FetchAt, ReconnectingClient,
+	subxt_error, ArgonConfig, FetchAt, MainchainClient, ReconnectingClient,
+	TransactionWatchTimeout,
 };
 use argon_primitives::bitcoin::{BitcoinNetwork, H256Le};
 use bitcoincore_rpc::{Auth, RpcApi};
 use std::time::Duration;
 use tokio::time::sleep;
+
+use crate::utils::MIN_TRANSACTION_WATCH_TIMEOUT;
 
 const CONFIRMATIONS: u64 = 6;
 
@@ -28,9 +31,12 @@ pub async fn bitcoin_loop(
 	bitcoin_client.timeout = Duration::from_secs(60);
 	tracing::info!("Oracle Started. Connected to bitcoin at {}", bitcoin_rpc_url);
 
-	let required_bitcoin_network: BitcoinNetwork = mainchain_client
-		.get()
-		.await?
+	let client = mainchain_client.get().await?;
+	let ticker = client.lookup_ticker().await?;
+	let transaction_watch_timeout = Duration::from_millis(ticker.tick_duration_millis)
+		.saturating_mul(2)
+		.max(MIN_TRANSACTION_WATCH_TIMEOUT);
+	let required_bitcoin_network: BitcoinNetwork = client
 		.fetch_storage(&storage().bitcoin_utxos().bitcoin_network(), FetchAt::Finalized)
 		.await?
 		.expect("Expected network")
@@ -64,11 +70,31 @@ pub async fn bitcoin_loop(
 
 		let client = mainchain_client.get().await?;
 		let params = client.params_with_best_nonce(&account_id).await?.build();
-		match client.submit_tx(&latest_block, &signer, Some(params), false).await {
+		let submission = async {
+			let progress = client
+				.live
+				.tx()
+				.sign_and_submit_then_watch(&latest_block, &signer, params)
+				.await?;
+			MainchainClient::wait_for_ext_in_block_with_timeout(
+				progress,
+				false,
+				transaction_watch_timeout,
+			)
+			.await
+		}
+		.await;
+		match submission {
 			Ok(_) => {
 				tracing::info!(bitcoin_confirmed_height, ?bitcoin_tip, "Submitted bitcoin tip",);
 			},
 			Err(e) => {
+				if e.downcast_ref::<TransactionWatchTimeout>().is_some() {
+					return Err(e.context(
+						"Bitcoin tip transaction watch timed out. Throwing to kick off a restart",
+					));
+				}
+
 				// Try to detect the common "Invalid Transaction (1010)" failure mode.
 				// Depending on the RPC stack, this may surface either as a typed `TransactionError`
 				// somewhere in the error chain *or* only as an RPC string message.

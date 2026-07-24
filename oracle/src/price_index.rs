@@ -15,6 +15,7 @@ use crate::{
 	coin_usd_prices::PriceProviderKind,
 	uniswap_oracle::{PriceAndLiquidity, UniswapOracleError},
 	us_cpi::UsCpiRetriever,
+	utils::MIN_TRANSACTION_WATCH_TIMEOUT,
 };
 use argon_client::{
 	api::{constants, price_index::calls::types::submit::Index, storage, tx},
@@ -101,6 +102,9 @@ pub async fn price_index_loop(
 	if cfg!(test) {
 		min_sleep_duration = Duration::from_millis(50);
 	}
+	let transaction_watch_timeout = Duration::from_millis(ticker.tick_duration_millis)
+		.saturating_mul(2)
+		.max(MIN_TRANSACTION_WATCH_TIMEOUT);
 
 	let mut us_cpi = UsCpiRetriever::new(&ticker).await?;
 	let mut usd_price_lookups =
@@ -224,7 +228,13 @@ pub async fn price_index_loop(
 			last_target_price = target_price;
 
 			info!("Submitted price index with progress: {:?}", progress);
-			MainchainClient::wait_for_ext_in_block(progress, false).await.map_err(|e| {
+			MainchainClient::wait_for_ext_in_block_with_timeout(
+				progress,
+				false,
+				transaction_watch_timeout,
+			)
+			.await
+			.map_err(|e| {
 				tracing::warn!("Error processing price index!! {:?}", e);
 				e
 			})?;
@@ -264,6 +274,9 @@ pub async fn price_index_loop_from_file(
 	if cfg!(test) {
 		min_sleep_duration = Duration::from_millis(50);
 	}
+	let transaction_watch_timeout = Duration::from_millis(ticker.tick_duration_millis)
+		.saturating_mul(2)
+		.max(MIN_TRANSACTION_WATCH_TIMEOUT);
 
 	info!("Oracle Started.");
 	let account_id = signer.account_id();
@@ -301,7 +314,13 @@ pub async fn price_index_loop_from_file(
 		last_submitted_tick = tick;
 
 		info!("Submitted price index with progress: {:?}", progress);
-		MainchainClient::wait_for_ext_in_block(progress, false).await.map_err(|e| {
+		MainchainClient::wait_for_ext_in_block_with_timeout(
+			progress,
+			false,
+			transaction_watch_timeout,
+		)
+		.await
+		.map_err(|e| {
 			tracing::warn!("Error processing price index!! {:?}", e);
 			e
 		})?;
