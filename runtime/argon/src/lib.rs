@@ -469,7 +469,7 @@ impl pallet_mining_slot::Config for Runtime {
 	);
 	type OperationalAccountsHook = use_unless_benchmark!(OperationalAccounts, ());
 	type SlotEvents = use_unless_benchmark!(
-		(GrandpaSlotRotation, BlockRewards, Treasury, Vaults),
+		(GrandpaSlotRotation, BlockRewards, Treasury, Vaults, CrosschainTransfer),
 		(GrandpaSlotRotation,)
 	);
 	type GrandpaRotationBlocks = GrandpaRotationBlocks;

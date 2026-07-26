@@ -19,6 +19,8 @@ pub trait WeightInfo {
 	fn deactivate_minting_authority() -> Weight;
 	fn approve_queue_entries(approvals: u32) -> Weight;
 	fn prove_gateway_activity(activities: u32) -> Weight;
+	fn schedule_global_issuance_council_rotation() -> Weight;
+	fn activate_global_issuance_council_signers() -> Weight;
 	fn transfer_out() -> Weight;
 	fn collateralize_transfer() -> Weight;
 	fn provider_is_crosschain_activated() -> Weight;
@@ -124,6 +126,14 @@ where
 		Base::prove_gateway_activity(activities)
 	}
 
+	fn schedule_global_issuance_council_rotation() -> Weight {
+		Base::schedule_global_issuance_council_rotation()
+	}
+
+	fn activate_global_issuance_council_signers() -> Weight {
+		Base::activate_global_issuance_council_signers()
+	}
+
 	fn transfer_out() -> Weight {
 		Base::transfer_out()
 			.saturating_add(EthereumVerifyWeight::latest_execution_block_number())
@@ -202,6 +212,14 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 
+	fn schedule_global_issuance_council_rotation() -> Weight {
+		Weight::zero()
+	}
+
+	fn activate_global_issuance_council_signers() -> Weight {
+		Weight::zero()
+	}
+
 	fn transfer_out() -> Weight {
 		Weight::zero()
 	}
@@ -223,13 +241,28 @@ impl WeightInfo for () {
 	}
 }
 
+pub fn scheduled_council_rotation_with_price_provider<T: Config>() -> Weight {
+	T::WeightInfo::schedule_global_issuance_council_rotation()
+		.saturating_add(PriceProviderWeights::<T>::get_lowest_microgons_per_argonot())
+}
+
 pub fn prove_gateway_activity_with_providers<T: Config>(
 	proof_blocks: u32,
 	activities: u32,
 ) -> Weight {
 	let extra_activities = activities.saturating_sub(proof_blocks);
-	T::WeightInfo::prove_gateway_activity(activities).saturating_add(
-		<<T::EthereumVerifier as EthereumVerifyProvider>::Weights as
-			EthereumVerifyProviderWeightInfo>::verify_receipt_logs(proof_blocks, extra_activities),
-	)
+
+	T::WeightInfo::prove_gateway_activity(activities)
+		.saturating_add(
+			<<T::EthereumVerifier as EthereumVerifyProvider>::Weights as
+				EthereumVerifyProviderWeightInfo>::verify_receipt_logs(
+				proof_blocks,
+				extra_activities,
+			),
+		)
+		// The next rotation cannot be queued until proof-back applies the current one, so a proof
+		// batch can activate at most one council.
+		.saturating_add(
+			T::WeightInfo::activate_global_issuance_council_signers(),
+		)
 }

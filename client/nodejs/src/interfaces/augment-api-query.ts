@@ -1,4 +1,5 @@
 // Auto-generated via `yarn polkadot-types-from-chain`, do not edit
+/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
@@ -656,6 +657,16 @@ declare module '@polkadot/api-base/types/storage' {
         (
           arg: PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
         ) => Observable<u64>,
+        [PalletCrosschainTransferSourceChain]
+      >;
+      /**
+       * First frame where a new council snapshot may be added to a chain's approval queue.
+       **/
+      nextCouncilRotationFrameByDestinationChain: AugmentedQuery<
+        ApiType,
+        (
+          arg: PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
+        ) => Observable<Option<u64>>,
         [PalletCrosschainTransferSourceChain]
       >;
       /**

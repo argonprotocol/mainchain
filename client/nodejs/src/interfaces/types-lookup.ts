@@ -1913,6 +1913,12 @@ declare module '@polkadot/types/lookup' {
       readonly destinationChain: PalletCrosschainTransferSourceChain;
       readonly councilHash: H256;
     } & Struct;
+    readonly isGlobalIssuanceCouncilRotationQueued: boolean;
+    readonly asGlobalIssuanceCouncilRotationQueued: {
+      readonly destinationChain: PalletCrosschainTransferSourceChain;
+      readonly councilHash: H256;
+      readonly approvalQueueNonce: u64;
+    } & Struct;
     readonly isCouncilSignerRegistered: boolean;
     readonly asCouncilSignerRegistered: {
       readonly destinationChain: PalletCrosschainTransferSourceChain;
@@ -2028,6 +2034,7 @@ declare module '@polkadot/types/lookup' {
     readonly type:
       | 'TransferToArgonSettled'
       | 'GlobalIssuanceCouncilForced'
+      | 'GlobalIssuanceCouncilRotationQueued'
       | 'CouncilSignerRegistered'
       | 'CouncilSignerRotationQueued'
       | 'MintingAuthorityRegistered'
@@ -4914,6 +4921,7 @@ declare module '@polkadot/types/lookup' {
     readonly isInsufficientMintingAuthorityCollateral: boolean;
     readonly isTransferCollateralIncrementTooSmall: boolean;
     readonly isTooManyPendingTransferOuts: boolean;
+    readonly isCouncilSignerRotationPending: boolean;
     readonly type:
       | 'InvalidTransferToArgonActivity'
       | 'NoGatewayProofBlocksProvided'
@@ -4968,7 +4976,8 @@ declare module '@polkadot/types/lookup' {
       | 'InvalidTransferCollateralSignature'
       | 'InsufficientMintingAuthorityCollateral'
       | 'TransferCollateralIncrementTooSmall'
-      | 'TooManyPendingTransferOuts';
+      | 'TooManyPendingTransferOuts'
+      | 'CouncilSignerRotationPending';
   }
 
   /** @name FrameSystemExtensionsAuthorizeCall (583) */

@@ -1,4 +1,7 @@
 // Auto-generated via `yarn polkadot-types-from-defs`, do not edit
+/* eslint-disable */
+
+/* eslint-disable sort-keys */
 
 export default {
   /**
@@ -1538,6 +1541,11 @@ export default {
       GlobalIssuanceCouncilForced: {
         destinationChain: 'PalletCrosschainTransferSourceChain',
         councilHash: 'H256',
+      },
+      GlobalIssuanceCouncilRotationQueued: {
+        destinationChain: 'PalletCrosschainTransferSourceChain',
+        councilHash: 'H256',
+        approvalQueueNonce: 'u64',
       },
       CouncilSignerRegistered: {
         destinationChain: 'PalletCrosschainTransferSourceChain',
@@ -4231,6 +4239,7 @@ export default {
       'InsufficientMintingAuthorityCollateral',
       'TransferCollateralIncrementTooSmall',
       'TooManyPendingTransferOuts',
+      'CouncilSignerRotationPending',
     ],
   },
   /**

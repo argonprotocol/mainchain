@@ -13,8 +13,9 @@ use super::{
 	CouncilApprovalQueueByDestinationChainAndNonce, Error, Event, GatewayActivityNonce,
 	GatewayActivityProofBlock, GatewayState, GatewaySyncPause, GatewaySyncPauseReason,
 	GlobalIssuanceCouncilByHash, HoldReason, MintingAuthoritiesBySigner,
-	MintingAuthorityActivationRepaymentPricingByDestinationChain, MintingAuthorityState, Pallet,
-	SourceChain, TransferOutById, TransferToArgonActivity, H160, H256,
+	MintingAuthorityActivationRepaymentPricingByDestinationChain, MintingAuthorityState,
+	NextCouncilRotationFrameByDestinationChain, Pallet, SourceChain, TransferOutById,
+	TransferToArgonActivity, H160, H256,
 };
 
 pub(crate) enum DecodedGatewayActivity<T: Config> {
@@ -511,6 +512,11 @@ impl<T: Config> Pallet<T> {
 			context.source_chain,
 			council_hash,
 			council.epoch_microgons_per_argonot,
+		);
+		Self::activate_global_issuance_council_signers(context.source_chain, &council);
+		NextCouncilRotationFrameByDestinationChain::<T>::insert(
+			context.source_chain,
+			T::CurrentFrameId::get().saturating_add(T::CouncilRotationFrames::get()),
 		);
 
 		if let Some(prunable_council_hash) = prunable_council_hash {
@@ -1040,7 +1046,9 @@ mod test {
 			System::set_block_number(1);
 			let council_account = account(45);
 			let council_pair = council_signing_pair(13);
-			let council_signer = council_signer(&council_pair);
+			let current_signer = council_signer(&council_pair);
+			let replacement_pair = council_signing_pair(14);
+			let replacement_signer = council_signer(&replacement_pair);
 
 			assert_ok!(CrosschainTransfer::set_chain_config(
 				RuntimeOrigin::root(),
@@ -1051,7 +1059,7 @@ mod test {
 			assert_ok!(CrosschainTransfer::register_council_signer(
 				RuntimeOrigin::signed(council_account.clone()),
 				SourceChain::Ethereum,
-				council_signer,
+				current_signer,
 				council_signer_registration_signature(&council_pair, &council_account),
 			));
 
@@ -1080,9 +1088,24 @@ mod test {
 			let active_council_hash =
 				ActiveGlobalIssuanceCouncilByDestinationChain::<Test>::get(SourceChain::Ethereum)
 					.expect("second council should be active");
+			assert_ok!(CrosschainTransfer::register_council_signer(
+				RuntimeOrigin::signed(council_account.clone()),
+				SourceChain::Ethereum,
+				replacement_signer,
+				council_signer_registration_signature(&replacement_pair, &council_account),
+			));
 			let mut next_council = GlobalIssuanceCouncilByHash::<Test>::get(active_council_hash)
 				.expect("active council snapshot should be stored");
 			next_council.epoch_microgons_per_argonot = 6 * argon_primitives::MICROGONS_PER_ARGON;
+			let mut member = next_council
+				.members
+				.remove(&current_signer)
+				.expect("active council member should be stored");
+			member.signer = replacement_signer;
+			next_council
+				.members
+				.try_insert(replacement_signer, member)
+				.expect("replacement signer should fit in the council");
 			let next_council_hash = CrosschainTransfer::hash_global_issuance_council(
 				&next_council.members,
 				next_council.epoch_microgons_per_argonot,
@@ -1109,7 +1132,15 @@ mod test {
 				1,
 				queued_rotation,
 			);
+			CurrentFrameId::set(20);
 
+			assert_eq!(
+				CouncilSignerByDestinationChainAndAccountId::<Test>::get(
+					SourceChain::Ethereum,
+					&council_account,
+				),
+				Some(current_signer),
+			);
 			assert_ok!(CrosschainTransfer::prove_gateway_activity(
 				RuntimeOrigin::signed(account(1)),
 				SourceChain::Ethereum,
@@ -1138,6 +1169,22 @@ mod test {
 				),
 				Some(4 * argon_primitives::MICROGONS_PER_ARGON),
 			);
+			assert_eq!(
+				NextCouncilRotationFrameByDestinationChain::<Test>::get(SourceChain::Ethereum),
+				Some(30),
+			);
+			assert_eq!(
+				CouncilSignerByDestinationChainAndAccountId::<Test>::get(
+					SourceChain::Ethereum,
+					&council_account,
+				),
+				Some(replacement_signer),
+			);
+			assert!(PendingCouncilSignerByDestinationChainAndAccountId::<Test>::get(
+				SourceChain::Ethereum,
+				&council_account,
+			)
+			.is_none());
 			assert!(GlobalIssuanceCouncilByHash::<Test>::get(oldest_council_hash).is_none());
 		});
 	}
