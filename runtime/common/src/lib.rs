@@ -156,10 +156,9 @@ macro_rules! inject_runtime_vars {
 		///
 		/// This can be a tuple of types, each implementing `OnRuntimeUpgrade`.
 		type Migrations = (
-			pallet_treasury::migrations::BondLotProgramMigration<Runtime>,
-			pallet_mint::migrations::PendingMintQueueMigration<Runtime>,
-			pallet_bitcoin_locks::migrations::PopulateOwnerUtxoIndexMigration<Runtime>,
-			pallet_operational_accounts::migrations::BackfillOperationalAccessMigration<Runtime>,
+			pallet_crosschain_transfer::migrations::PrepareScheduledCouncilRotationMigration<
+				Runtime,
+			>,
 		);
 
 		/// Unchecked extrinsic type as expected by this runtime.
