@@ -1119,12 +1119,8 @@ impl<T: Config> Pallet<T> {
 			return;
 		}
 
-		let last_planned_cohort_size: u32 = ScheduledCohortSizeChangeByFrame::<T>::get()
-			.into_iter()
-			.next_back()
-			.map(|(_, size)| size)
-			.unwrap_or(NextCohortSize::<T>::get());
-		let mut next_cohort_size = adjustment_percent.saturating_mul_int(last_planned_cohort_size);
+		let mut next_cohort_size =
+			adjustment_percent.saturating_mul_int(NextCohortSize::<T>::get());
 		if next_cohort_size < min_cohort_size {
 			next_cohort_size = min_cohort_size;
 		} else if next_cohort_size > max_cohort_size {

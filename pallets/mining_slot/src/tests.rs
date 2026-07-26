@@ -1906,7 +1906,7 @@ fn it_adjusts_mining_seats() {
 		assert_eq!(ScheduledCohortSizeChangeByFrame::<Test>::get().len(), 11);
 		assert_eq!(
 			ScheduledCohortSizeChangeByFrame::<Test>::get().into_iter().next_back(),
-			Some((23u32.into(), 11 + 13))
+			Some((23u32.into(), 12))
 		);
 		assert_eq!(AveragePricePerSeat::<Test>::get().len(), 10);
 	});
