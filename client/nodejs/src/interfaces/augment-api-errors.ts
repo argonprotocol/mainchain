@@ -370,6 +370,10 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       CouncilSignerNotRegistered: AugmentedError<ApiType>;
       /**
+       * The account already has a council signer rotation pending for this destination chain.
+       **/
+      CouncilSignerRotationPending: AugmentedError<ApiType>;
+      /**
        * The supplied Global Issuance Council contains the same account more than once.
        **/
       DuplicateGlobalIssuanceCouncilAccount: AugmentedError<ApiType>;

@@ -18,7 +18,7 @@ use polkadot_sdk::sp_core::ecdsa::KeccakSignature;
 use crate::{
 	gateway_activity::{DecodedGatewayActivity, GatewayMintingAuthorityCollateral},
 	ChainConfig, ChainConfigBySourceChain, Config, CouncilApprovalQueueEntry,
-	CouncilApprovalQueueNonce, CouncilApprovalTargetId, Error, GatewayState,
+	CouncilApprovalQueueNonce, CouncilApprovalTargetId, Error, GatewayState, GlobalIssuanceCouncil,
 	GlobalIssuanceCouncilMember, Pallet, SourceChain, H160, H256,
 };
 use polkadot_sdk::sp_runtime::BoundedBTreeMap;
@@ -49,6 +49,27 @@ impl<T: Config> Pallet<T> {
 			)
 			.as_slice(),
 		)
+	}
+
+	pub(crate) fn hash_rotate_global_issuance_council(
+		destination_chain: SourceChain,
+		council: &GlobalIssuanceCouncil<T>,
+	) -> Result<H256, polkadot_sdk::sp_runtime::DispatchError> {
+		let (chain_id, gateway) = Self::evm_gateway_signature_domain(destination_chain)?;
+		let council_hash = Self::hash_global_issuance_council(
+			&council.members,
+			council.epoch_microgons_per_argonot,
+		);
+
+		Ok(H256::from_slice(
+			ethereum_contracts::hash_rotate_global_issuance_council(
+				chain_id,
+				AlloyAddress::from_slice(gateway.as_bytes()),
+				B256::from(council_hash.0),
+				council.epoch_microgons_per_argonot.into(),
+			)
+			.as_slice(),
+		))
 	}
 
 	pub(crate) fn hash_activate_minting_authority(

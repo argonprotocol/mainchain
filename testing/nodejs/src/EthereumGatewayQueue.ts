@@ -8,10 +8,14 @@ import { getAddress, keccak256, type Address, type Hex } from 'viem';
 import { toEvmRecoverableSignature } from './EthereumE2eUtils';
 
 const {
+  encodeMintingGatewayGlobalIssuanceCouncilRotateTarget,
   encodeMintingGatewayMintingAuthorityActivationTarget,
   encodeMintingGatewayMintingAuthorityDeactivateTarget,
   hashMintingGatewayActivateMintingAuthority,
   hashMintingGatewayGatewayUpdateApproval,
+  hashMintingGatewayGlobalIssuanceCouncil,
+  hashMintingGatewayRotateGlobalIssuanceCouncil,
+  hashMintingGatewayRotateGlobalIssuanceCouncilApproval,
   mintingGatewayAbi,
   MINTING_GATEWAY_UPDATE_KINDS,
 } = EvmContracts;
@@ -21,6 +25,9 @@ type MintingGatewayHashContext = Parameters<
 >[0];
 type MintingGatewayMintingAuthorityActivationTarget = Parameters<
   typeof EvmContracts.encodeMintingGatewayMintingAuthorityActivationTarget
+>[0];
+type MintingGatewayGlobalIssuanceCouncilRotateTarget = Parameters<
+  typeof EvmContracts.encodeMintingGatewayGlobalIssuanceCouncilRotateTarget
 >[0];
 type ApplyGatewayUpdatesArgs = ContractFunctionArgs<
   typeof EvmContracts.mintingGatewayAbi,
@@ -45,6 +52,7 @@ export type EthereumGatewayUpdateBatch = {
 };
 
 type LoadedCouncil = {
+  epochMicrogonsPerArgonot: bigint;
   totalWeight: bigint;
   members: {
     signer: Address;
@@ -156,6 +164,7 @@ export async function getReadyEthereumGatewayUpdates(
       const update = await buildGatewayUpdate(client, destinationChain, hashContext, queueNonce, {
         entry,
         approvingCouncilHash,
+        councilCache,
       });
       candidateUpdates.push(update);
       expectedPreviousApprovalHash = toHexValue(entry.approvalHash);
@@ -198,9 +207,48 @@ async function buildGatewayUpdate(
   queueItem: {
     entry: ApprovalQueueEntry;
     approvingCouncilHash: Hex;
+    councilCache: Map<Hex, LoadedCouncil>;
   },
 ): Promise<MintingGatewayGatewayUpdate> {
-  const { entry, approvingCouncilHash } = queueItem;
+  const { entry, approvingCouncilHash, councilCache } = queueItem;
+  if (entry.target.isGlobalIssuanceCouncilRotation) {
+    const signatures = getSortedSignatures(entry.signatures);
+    const nextCouncilHash = toHexValue(entry.target.asGlobalIssuanceCouncilRotation);
+    const nextCouncil = await loadCouncilByHash(client, nextCouncilHash, councilCache);
+    const target: MintingGatewayGlobalIssuanceCouncilRotateTarget = {
+      council: councilToSnapshot(nextCouncil),
+      epochMicrogonsPerArgonot: nextCouncil.epochMicrogonsPerArgonot,
+    };
+    const calculatedCouncilHash = hashMintingGatewayGlobalIssuanceCouncil({
+      ...target.council,
+      epochMicrogonsPerArgonot: target.epochMicrogonsPerArgonot,
+    });
+    const targetPayloadHash = hashMintingGatewayRotateGlobalIssuanceCouncil(hashContext, target);
+    const approvalHash = hashMintingGatewayRotateGlobalIssuanceCouncilApproval(hashContext, {
+      queueNonce,
+      approvingCouncilHash,
+      previousUpdateHash: toHexValue(entry.previousApprovalHash),
+      target,
+    });
+
+    if (calculatedCouncilHash !== nextCouncilHash) {
+      throw new Error(`Queue nonce ${queueNonce} target council hash does not match council`);
+    }
+    if (toHexValue(entry.targetPayloadHash) !== targetPayloadHash) {
+      throw new Error(`Queue nonce ${queueNonce} target payload hash does not match council`);
+    }
+    if (toHexValue(entry.approvalHash) !== approvalHash) {
+      throw new Error(`Queue nonce ${queueNonce} approval hash does not match council rotation`);
+    }
+
+    return {
+      queueNonce,
+      kind: MINTING_GATEWAY_UPDATE_KINDS.globalIssuanceCouncilRotate,
+      payload: encodeMintingGatewayGlobalIssuanceCouncilRotateTarget(target),
+      signatures,
+    };
+  }
+
   if (entry.target.isMintingAuthorityActivation) {
     const signatures = getSortedSignatures(entry.signatures);
     const signingKey = getAddress(toHexValue(entry.target.asMintingAuthorityActivation));
@@ -303,6 +351,7 @@ async function loadCouncilByHash(
 
   const council = councilOption.unwrap();
   const loaded = {
+    epochMicrogonsPerArgonot: council.epochMicrogonsPerArgonot.toBigInt(),
     totalWeight: council.totalWeight.toBigInt(),
     members: [...council.members.entries()]
       .map(([signer, member]) => ({

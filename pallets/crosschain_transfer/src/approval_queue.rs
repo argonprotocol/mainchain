@@ -1,6 +1,8 @@
 use alloc::vec::Vec;
 
-use argon_primitives::block_seal::FrameId;
+use argon_primitives::{
+	block_seal::FrameId, vault::BitcoinVaultProvider, PriceProvider, MICROGONS_PER_ARGON,
+};
 use frame_support::ensure;
 use pallet_prelude::*;
 use polkadot_sdk::sp_runtime::BoundedBTreeMap;
@@ -9,15 +11,218 @@ use super::{
 	ActiveGlobalIssuanceCouncilByDestinationChain, Config,
 	CouncilApprovalCursorByDestinationChainAndAccountId,
 	CouncilApprovalQueueByDestinationChainAndNonce, CouncilApprovalQueueEntry,
-	CouncilApprovalQueueNonce, CouncilApprovalTargetId,
+	CouncilApprovalQueueNonce, CouncilApprovalTargetId, CouncilMemberSource,
+	CouncilSignerByDestinationChainAndAccountId,
 	CurrentTransferOutMicrogonsPerArgonotByDestinationChain, Error, GatewayStateBySourceChain,
 	GlobalIssuanceCouncil, GlobalIssuanceCouncilByHash, LatestQueuedCouncilHashByDestinationChain,
-	MintingAuthoritiesBySigner, NextCouncilApprovalQueueNonceByDestinationChain, Pallet,
+	MintingAuthoritiesBySigner, NextCouncilApprovalQueueNonceByDestinationChain,
+	NextCouncilRotationFrameByDestinationChain, Pallet,
+	PendingCouncilSignerByDestinationChainAndAccountId,
 	PreviousTransferOutMicrogonsPerArgonotByDestinationChain, SourceChain,
 	TransferOutQuoteMicrogonsPerArgonotByDestinationChain, H256,
 };
 
 impl<T: Config> Pallet<T> {
+	pub(crate) fn schedule_global_issuance_council_rotation(
+		destination_chain: SourceChain,
+		frame_id: FrameId,
+	) -> DispatchResult {
+		let Some(next_rotation_frame) =
+			NextCouncilRotationFrameByDestinationChain::<T>::get(destination_chain)
+		else {
+			return Ok(());
+		};
+		if frame_id < next_rotation_frame {
+			return Ok(());
+		}
+
+		let Some(active_council_hash) =
+			ActiveGlobalIssuanceCouncilByDestinationChain::<T>::get(destination_chain)
+		else {
+			return Ok(());
+		};
+		let latest_queued_council_hash =
+			LatestQueuedCouncilHashByDestinationChain::<T>::get(destination_chain)
+				.unwrap_or(active_council_hash);
+		if latest_queued_council_hash != active_council_hash {
+			return Ok(());
+		}
+		let active_council = GlobalIssuanceCouncilByHash::<T>::get(active_council_hash)
+			.ok_or(Error::<T>::GlobalIssuanceCouncilNotFound)?;
+
+		let next_council = Self::build_global_issuance_council(
+			destination_chain,
+			CouncilMemberSource::ExistingCouncil(&active_council),
+		)?;
+		let next_council_hash = Self::hash_global_issuance_council(
+			&next_council.members,
+			next_council.epoch_microgons_per_argonot,
+		);
+		if next_council_hash == active_council_hash &&
+			CurrentTransferOutMicrogonsPerArgonotByDestinationChain::<T>::contains_key(
+				destination_chain,
+			) {
+			NextCouncilRotationFrameByDestinationChain::<T>::insert(
+				destination_chain,
+				frame_id.saturating_add(T::CouncilRotationFrames::get()),
+			);
+			return Ok(());
+		}
+
+		let queue_nonce =
+			NextCouncilApprovalQueueNonceByDestinationChain::<T>::get(destination_chain)
+				.checked_add(1)
+				.ok_or(Error::<T>::InvalidGlobalIssuanceCouncil)?;
+		let previous_approval_hash =
+			Self::previous_gateway_update_hash(destination_chain, queue_nonce)?;
+		let target = CouncilApprovalTargetId::GlobalIssuanceCouncilRotation(next_council_hash);
+		let target_payload_hash =
+			Self::hash_rotate_global_issuance_council(destination_chain, &next_council)?;
+		let mut entry = CouncilApprovalQueueEntry::<T> {
+			approving_council_hash: active_council_hash,
+			target,
+			target_payload_hash,
+			due_frame_id: frame_id.saturating_add(T::CouncilRotationFrames::get()),
+			previous_approval_hash,
+			approval_hash: H256::zero(),
+			approved_total_weight: T::Balance::default(),
+			signatures: BoundedBTreeMap::new(),
+		};
+		entry.approval_hash =
+			Self::hash_council_approval_queue_entry(destination_chain, queue_nonce, &entry)?;
+
+		GlobalIssuanceCouncilByHash::<T>::insert(next_council_hash, next_council);
+		CouncilApprovalQueueByDestinationChainAndNonce::<T>::insert(
+			destination_chain,
+			queue_nonce,
+			entry,
+		);
+		NextCouncilApprovalQueueNonceByDestinationChain::<T>::insert(
+			destination_chain,
+			queue_nonce,
+		);
+		Self::update_destination_chain_queue_tracking_after_insert(
+			destination_chain,
+			active_council_hash,
+			&target,
+		)?;
+		NextCouncilRotationFrameByDestinationChain::<T>::remove(destination_chain);
+		Self::deposit_event(super::Event::GlobalIssuanceCouncilRotationQueued {
+			destination_chain,
+			council_hash: next_council_hash,
+			approval_queue_nonce: queue_nonce,
+		});
+		Ok(())
+	}
+
+	pub(crate) fn build_global_issuance_council(
+		destination_chain: SourceChain,
+		member_source: CouncilMemberSource<'_, T>,
+	) -> Result<GlobalIssuanceCouncil<T>, DispatchError> {
+		let epoch_microgons_per_argonot =
+			T::PriceProvider::get_lowest_microgons_per_argonot(T::CouncilRotationFrames::get())
+				.filter(|price| *price != T::Balance::default())
+				.ok_or(Error::<T>::InvalidMicrogonsPerArgonot)?;
+		let mut members = BoundedBTreeMap::new();
+		let mut total_weight = T::Balance::default();
+
+		let mut insert_member =
+			|account_id: T::AccountId, signer, weight: T::Balance| -> DispatchResult {
+				ensure!(weight != T::Balance::default(), Error::<T>::InvalidGlobalIssuanceCouncil,);
+				ensure!(
+					!members.contains_key(&signer),
+					Error::<T>::DuplicateGlobalIssuanceCouncilSigner,
+				);
+
+				members
+					.try_insert(
+						signer,
+						super::GlobalIssuanceCouncilMember::<T> { account_id, signer, weight },
+					)
+					.map_err(|_| Error::<T>::InvalidGlobalIssuanceCouncil)?;
+				total_weight = total_weight.saturating_add(weight);
+				Ok(())
+			};
+
+		match member_source {
+			CouncilMemberSource::ExistingCouncil(active_council) => {
+				for active_member in active_council.members.values() {
+					let signer = PendingCouncilSignerByDestinationChainAndAccountId::<T>::get(
+						destination_chain,
+						&active_member.account_id,
+					)
+					.unwrap_or(active_member.signer);
+					insert_member(active_member.account_id.clone(), signer, active_member.weight)?;
+				}
+			},
+			CouncilMemberSource::VaultAccounts(member_account_ids) => {
+				let mut seen_accounts = BoundedVec::<T::AccountId, T::MaxCouncilMembers>::new();
+
+				for account_id in member_account_ids {
+					ensure!(
+						!seen_accounts.contains(&account_id),
+						Error::<T>::DuplicateGlobalIssuanceCouncilAccount,
+					);
+					let committed_microgon_collateral =
+						T::VaultProvider::get_committed_securitization(
+							&account_id,
+							T::CouncilRotationFrames::get(),
+						)
+						.ok_or(Error::<T>::UnknownOwnerVault)?;
+					let committed_argonots = T::VaultProvider::get_committed_argonots(&account_id)
+						.ok_or(Error::<T>::UnknownOwnerVault)?;
+					let epoch_rate: u128 = epoch_microgons_per_argonot.into();
+					let argonot_weight = committed_argonots
+						.into()
+						.saturating_mul(epoch_rate)
+						.saturating_div(MICROGONS_PER_ARGON)
+						.into();
+					let weight = committed_microgon_collateral.saturating_add(argonot_weight);
+					let signer = PendingCouncilSignerByDestinationChainAndAccountId::<T>::get(
+						destination_chain,
+						&account_id,
+					)
+					.or_else(|| {
+						CouncilSignerByDestinationChainAndAccountId::<T>::get(
+							destination_chain,
+							&account_id,
+						)
+					})
+					.ok_or(Error::<T>::CouncilSignerNotRegistered)?;
+
+					seen_accounts
+						.try_push(account_id.clone())
+						.map_err(|_| Error::<T>::InvalidGlobalIssuanceCouncil)?;
+					insert_member(account_id, signer, weight)?;
+				}
+			},
+		}
+
+		ensure!(
+			!members.is_empty() && total_weight != T::Balance::default(),
+			Error::<T>::InvalidGlobalIssuanceCouncil,
+		);
+
+		Ok(GlobalIssuanceCouncil::<T> { epoch_microgons_per_argonot, members, total_weight })
+	}
+
+	pub(crate) fn activate_global_issuance_council_signers(
+		destination_chain: SourceChain,
+		council: &GlobalIssuanceCouncil<T>,
+	) {
+		for member in council.members.values() {
+			CouncilSignerByDestinationChainAndAccountId::<T>::insert(
+				destination_chain,
+				&member.account_id,
+				member.signer,
+			);
+			PendingCouncilSignerByDestinationChainAndAccountId::<T>::remove(
+				destination_chain,
+				&member.account_id,
+			);
+		}
+	}
+
 	pub(crate) fn previous_gateway_update_hash(
 		destination_chain: SourceChain,
 		queue_nonce: CouncilApprovalQueueNonce,
@@ -389,6 +594,140 @@ impl<T: Config> Pallet<T> {
 #[cfg(test)]
 mod tests {
 	use crate::tests::*;
+	use argon_primitives::OnNewSlot;
+
+	#[test]
+	fn frame_start_rotates_only_the_existing_council_vaults() {
+		new_test_ext().execute_with(|| {
+			let first_account = account(91);
+			let second_account = account(92);
+			let first_pair = council_signing_pair(91);
+			let second_pair = council_signing_pair(92);
+			let replacement_pair = council_signing_pair(93);
+			let first_signer = council_signer(&first_pair);
+			let second_signer = council_signer(&second_pair);
+			let replacement_signer = council_signer(&replacement_pair);
+
+			assert_ok!(CrosschainTransfer::set_chain_config(
+				RuntimeOrigin::root(),
+				SourceChain::Ethereum,
+				chain_config(),
+			));
+			register_vault_operator(first_account.clone(), 91, 8_000);
+			register_vault_operator(second_account.clone(), 92, 5_000);
+			assert_ok!(CrosschainTransfer::register_council_signer(
+				RuntimeOrigin::signed(first_account.clone()),
+				SourceChain::Ethereum,
+				first_signer,
+				council_signer_registration_signature(&first_pair, &first_account),
+			));
+			assert_ok!(CrosschainTransfer::register_council_signer(
+				RuntimeOrigin::signed(second_account.clone()),
+				SourceChain::Ethereum,
+				second_signer,
+				council_signer_registration_signature(&second_pair, &second_account),
+			));
+
+			LowestMicrogonsPerArgonot::set(Some(2 * argon_primitives::MICROGONS_PER_ARGON));
+			assert_ok!(CrosschainTransfer::force_set_global_issuance_council(
+				RuntimeOrigin::root(),
+				SourceChain::Ethereum,
+				0,
+				vec![first_account.clone()]
+					.try_into()
+					.expect("single council member stays within limit"),
+			));
+			let active_council_hash =
+				ActiveGlobalIssuanceCouncilByDestinationChain::<Test>::get(SourceChain::Ethereum)
+					.expect("active council should exist");
+			let active_council = GlobalIssuanceCouncilByHash::<Test>::get(active_council_hash)
+				.expect("active council should be stored");
+			let active_member_weight = active_council
+				.members
+				.get(&first_signer)
+				.expect("active member should exist")
+				.weight;
+			assert_ok!(CrosschainTransfer::register_council_signer(
+				RuntimeOrigin::signed(first_account.clone()),
+				SourceChain::Ethereum,
+				replacement_signer,
+				council_signer_registration_signature(&replacement_pair, &first_account),
+			));
+
+			assert_ok!(set_committed_argonots(first_account.clone(), 1_000));
+			LowestMicrogonsPerArgonot::set(Some(6 * argon_primitives::MICROGONS_PER_ARGON));
+			CurrentFrameId::set(11);
+			<CrosschainTransfer as OnNewSlot<TestAccountId>>::on_frame_start(11);
+
+			let entry = CouncilApprovalQueueByDestinationChainAndNonce::<Test>::get(
+				SourceChain::Ethereum,
+				1,
+			)
+			.expect("scheduled rotation should be queued");
+			let CouncilApprovalTargetId::GlobalIssuanceCouncilRotation(next_council_hash) =
+				entry.target
+			else {
+				panic!("scheduled entry should rotate the council");
+			};
+			let next_council = GlobalIssuanceCouncilByHash::<Test>::get(next_council_hash)
+				.expect("scheduled council should be stored");
+
+			assert_eq!(
+				entry.approving_council_hash,
+				ActiveGlobalIssuanceCouncilByDestinationChain::<Test>::get(SourceChain::Ethereum)
+					.expect("active council should exist")
+			);
+			assert_eq!(entry.due_frame_id, 21);
+			assert_eq!(
+				next_council.epoch_microgons_per_argonot,
+				6 * argon_primitives::MICROGONS_PER_ARGON
+			);
+			assert_eq!(next_council.members.len(), 1);
+			assert!(next_council.members.contains_key(&replacement_signer));
+			assert!(!next_council.members.contains_key(&second_signer));
+			assert_eq!(
+				next_council
+					.members
+					.get(&replacement_signer)
+					.expect("existing council member should remain")
+					.weight,
+				active_member_weight,
+			);
+			assert_eq!(
+				CouncilSignerByDestinationChainAndAccountId::<Test>::get(
+					SourceChain::Ethereum,
+					&first_account,
+				),
+				Some(first_signer),
+			);
+			assert_eq!(
+				PendingCouncilSignerByDestinationChainAndAccountId::<Test>::get(
+					SourceChain::Ethereum,
+					&first_account,
+				),
+				Some(replacement_signer),
+			);
+			assert_eq!(
+				entry.target_payload_hash,
+				CrosschainTransfer::hash_rotate_global_issuance_council(
+					SourceChain::Ethereum,
+					&next_council,
+				)
+				.expect("rotation payload should hash"),
+			);
+
+			CurrentFrameId::set(12);
+			<CrosschainTransfer as OnNewSlot<TestAccountId>>::on_frame_start(12);
+			assert_eq!(
+				NextCouncilApprovalQueueNonceByDestinationChain::<Test>::get(SourceChain::Ethereum,),
+				1,
+			);
+			assert_eq!(
+				NextCouncilRotationFrameByDestinationChain::<Test>::get(SourceChain::Ethereum),
+				None,
+			);
+		});
+	}
 
 	#[test]
 	fn transfer_out_quote_uses_initialized_floor_and_pending_rotation_rates() {

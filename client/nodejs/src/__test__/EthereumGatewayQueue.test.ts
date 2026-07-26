@@ -1,10 +1,15 @@
 import { expect, it } from 'vitest';
 import {
+  encodeMintingGatewayGlobalIssuanceCouncilRotateTarget,
   hashMintingGatewayActivateMintingAuthority,
   encodeMintingGatewayMintingAuthorityActivationTarget,
   encodeMintingGatewayMintingAuthorityDeactivateTarget,
   hashMintingGatewayActivateMintingAuthorityApproval,
   hashMintingGatewayGatewayUpdateApproval,
+  hashMintingGatewayGlobalIssuanceCouncil,
+  hashMintingGatewayRotateGlobalIssuanceCouncil,
+  hashMintingGatewayRotateGlobalIssuanceCouncilApproval,
+  type MintingGatewayGlobalIssuanceCouncilRotateTarget,
   type MintingGatewayMintingAuthorityActivationTarget,
 } from '../EvmContracts';
 import { getReadyEthereumGatewayUpdates } from '@argonprotocol/testing';
@@ -12,49 +17,87 @@ import { keccak256, type Hex } from 'viem';
 
 const ZERO_HASH: Hex = `0x${'00'.repeat(32)}`;
 
-it('builds the contiguous ready activation prefix from the Argon approval queue', async () => {
+it('builds a rate refresh followed by the contiguous ready activation prefix', async () => {
   const gatewayAddress = repeatHex('11', 20);
   const councilHash = repeatHex('22', 32);
   const authoritySigningKey = repeatHex('33', 20);
   const councilSignerA = repeatHex('44', 20);
   const councilSignerB = repeatHex('55', 20);
+  const hashContext = { chainId: 1n, gatewayAddress };
+  const council = {
+    signers: [councilSignerA, councilSignerB],
+    weights: [70n, 30n],
+  };
+  const rateRefreshTarget: MintingGatewayGlobalIssuanceCouncilRotateTarget = {
+    council,
+    epochMicrogonsPerArgonot: 6_000_000n,
+  };
+  const refreshedCouncilHash = hashMintingGatewayGlobalIssuanceCouncil({
+    ...council,
+    epochMicrogonsPerArgonot: rateRefreshTarget.epochMicrogonsPerArgonot,
+  });
+  const rateRefreshPayloadHash = hashMintingGatewayRotateGlobalIssuanceCouncil(
+    hashContext,
+    rateRefreshTarget,
+  );
+  const rateRefreshApprovalHash = hashMintingGatewayRotateGlobalIssuanceCouncilApproval(
+    hashContext,
+    {
+      queueNonce: 1n,
+      approvingCouncilHash: councilHash,
+      previousUpdateHash: ZERO_HASH,
+      target: rateRefreshTarget,
+    },
+  );
   const activationTarget: MintingGatewayMintingAuthorityActivationTarget = {
     microgonCollateral: 1_500n,
     micronotCollateral: 250n,
     signingKey: authoritySigningKey,
   };
   const activationPayloadHash = hashMintingGatewayActivateMintingAuthority(
-    { chainId: 1n, gatewayAddress },
+    hashContext,
     activationTarget,
   );
-  const activationApprovalHash = hashMintingGatewayActivateMintingAuthorityApproval(
-    { chainId: 1n, gatewayAddress },
-    {
-      queueNonce: 1n,
-      approvingCouncilHash: councilHash,
-      previousUpdateHash: ZERO_HASH,
-      target: activationTarget,
-    },
-  );
-  const secondApprovalHash = hashMintingGatewayActivateMintingAuthorityApproval(
-    { chainId: 1n, gatewayAddress },
-    {
-      queueNonce: 2n,
-      approvingCouncilHash: councilHash,
-      previousUpdateHash: activationApprovalHash,
-      target: activationTarget,
-    },
-  );
+  const activationApprovalHash = hashMintingGatewayActivateMintingAuthorityApproval(hashContext, {
+    queueNonce: 2n,
+    approvingCouncilHash: refreshedCouncilHash,
+    previousUpdateHash: rateRefreshApprovalHash,
+    target: activationTarget,
+  });
+  const secondApprovalHash = hashMintingGatewayActivateMintingAuthorityApproval(hashContext, {
+    queueNonce: 3n,
+    approvingCouncilHash: refreshedCouncilHash,
+    previousUpdateHash: activationApprovalHash,
+    target: activationTarget,
+  });
 
-  const readyEntry = {
+  const rateRefreshEntry = {
     approvingCouncilHash: hexCodec(councilHash),
+    target: {
+      isMintingAuthorityActivation: false,
+      isMintingAuthorityDeactivation: false,
+      isGlobalIssuanceCouncilRotation: true,
+      asGlobalIssuanceCouncilRotation: hexCodec(refreshedCouncilHash),
+      type: 'GlobalIssuanceCouncilRotation',
+    },
+    targetPayloadHash: hexCodec(rateRefreshPayloadHash),
+    previousApprovalHash: hexCodec(ZERO_HASH),
+    approvalHash: hexCodec(rateRefreshApprovalHash),
+    approvedTotalWeight: amount(100n),
+    signatures: new Map([
+      [hexCodec(councilSignerB), hexCodec(repeatHex('66', 65))],
+      [hexCodec(councilSignerA), hexCodec(repeatHex('77', 65))],
+    ]),
+  };
+  const readyEntry = {
+    approvingCouncilHash: hexCodec(refreshedCouncilHash),
     target: {
       isMintingAuthorityActivation: true,
       asMintingAuthorityActivation: hexCodec(authoritySigningKey),
       type: 'MintingAuthorityActivation',
     },
     targetPayloadHash: hexCodec(activationPayloadHash),
-    previousApprovalHash: hexCodec(ZERO_HASH),
+    previousApprovalHash: hexCodec(rateRefreshApprovalHash),
     approvalHash: hexCodec(activationApprovalHash),
     approvedTotalWeight: amount(90n),
     signatures: new Map([
@@ -69,6 +112,7 @@ it('builds the contiguous ready activation prefix from the Argon approval queue'
     approvedTotalWeight: amount(60n),
     signatures: new Map([[hexCodec(councilSignerB), hexCodec(repeatHex('99', 65))]]),
   };
+  let councilLookups = 0;
   const client = {
     query: {
       crosschainTransfer: {
@@ -83,17 +127,25 @@ it('builds the contiguous ready activation prefix from the Argon approval queue'
             },
           }),
         activeGlobalIssuanceCouncilByDestinationChain: async () => some(hexCodec(councilHash)),
-        globalIssuanceCouncilByHash: async () =>
-          some({
+        globalIssuanceCouncilByHash: async (hash: Hex) => {
+          councilLookups += 1;
+          return some({
+            epochMicrogonsPerArgonot: amount(
+              hash === refreshedCouncilHash
+                ? rateRefreshTarget.epochMicrogonsPerArgonot
+                : 2_000_000n,
+            ),
             totalWeight: amount(100n),
             members: new Map([
               [hexCodec(councilSignerB), { weight: amount(30n) }],
               [hexCodec(councilSignerA), { weight: amount(70n) }],
             ]),
-          }),
+          });
+        },
         councilApprovalQueueByDestinationChainAndNonce: async (_chain: string, nonce: bigint) => {
-          if (nonce === 1n) return some(readyEntry);
-          if (nonce === 2n) return some(notReadyEntry);
+          if (nonce === 1n) return some(rateRefreshEntry);
+          if (nonce === 2n) return some(readyEntry);
+          if (nonce === 3n) return some(notReadyEntry);
           return none();
         },
         mintingAuthoritiesBySigner: async () =>
@@ -117,15 +169,19 @@ it('builds the contiguous ready activation prefix from the Argon approval queue'
   const batch = await getReadyEthereumGatewayUpdates(client as any, gatewayClient as any);
 
   expect(batch.currentCouncilHash).toBe(councilHash);
-  expect(batch.currentCouncil).toEqual({
-    signers: [councilSignerA, councilSignerB],
-    weights: [70n, 30n],
-  });
+  expect(batch.currentCouncil).toEqual(council);
   expect(batch.firstQueueNonce).toBe(1n);
-  expect(batch.lastQueueNonce).toBe(1n);
+  expect(batch.lastQueueNonce).toBe(2n);
+  expect(councilLookups).toBe(2);
   expect(batch.updates).toEqual([
     {
       queueNonce: 1n,
+      kind: 0,
+      payload: encodeMintingGatewayGlobalIssuanceCouncilRotateTarget(rateRefreshTarget),
+      signatures: [repeatHex('77', 65), repeatHex('66', 65)],
+    },
+    {
+      queueNonce: 2n,
       kind: 1,
       payload: encodeMintingGatewayMintingAuthorityActivationTarget(activationTarget),
       signatures: [repeatHex('77', 65), repeatHex('66', 65)],
@@ -152,6 +208,7 @@ it('returns no updates while the gateway is paused', async () => {
           some(hexCodec(repeatHex('22', 32))),
         globalIssuanceCouncilByHash: async () =>
           some({
+            epochMicrogonsPerArgonot: amount(2_000_000n),
             totalWeight: amount(100n),
             members: new Map([[hexCodec(repeatHex('44', 20)), { weight: amount(100n) }]]),
           }),
@@ -232,6 +289,7 @@ it('does not relay entries that only have a simple majority of council weight', 
         activeGlobalIssuanceCouncilByDestinationChain: async () => some(hexCodec(councilHash)),
         globalIssuanceCouncilByHash: async () =>
           some({
+            epochMicrogonsPerArgonot: amount(2_000_000n),
             totalWeight: amount(100n),
             members: new Map([
               [hexCodec(councilSignerA), { weight: amount(60n) }],
@@ -357,6 +415,7 @@ it('relays quorum-approved deactivations in the contiguous ready batch', async (
         activeGlobalIssuanceCouncilByDestinationChain: async () => some(hexCodec(councilHash)),
         globalIssuanceCouncilByHash: async () =>
           some({
+            epochMicrogonsPerArgonot: amount(2_000_000n),
             totalWeight: amount(100n),
             members: new Map([
               [hexCodec(councilSignerB), { weight: amount(30n) }],
@@ -495,6 +554,7 @@ it('includes a trailing quorum-approved deactivation instead of peeling it off',
         activeGlobalIssuanceCouncilByDestinationChain: async () => some(hexCodec(councilHash)),
         globalIssuanceCouncilByHash: async () =>
           some({
+            epochMicrogonsPerArgonot: amount(2_000_000n),
             totalWeight: amount(100n),
             members: new Map([
               [hexCodec(councilSignerB), { weight: amount(30n) }],
@@ -633,6 +693,7 @@ it('rejects malformed quorum-approved deactivations', async () => {
         activeGlobalIssuanceCouncilByDestinationChain: async () => some(hexCodec(councilHash)),
         globalIssuanceCouncilByHash: async () =>
           some({
+            epochMicrogonsPerArgonot: amount(2_000_000n),
             totalWeight: amount(100n),
             members: new Map([
               [hexCodec(councilSignerB), { weight: amount(30n) }],

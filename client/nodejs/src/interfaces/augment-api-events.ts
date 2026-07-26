@@ -608,6 +608,22 @@ declare module '@polkadot/api-base/types/events' {
         { destinationChain: PalletCrosschainTransferSourceChain; councilHash: H256 }
       >;
       /**
+       * A frame transition queued a new Global Issuance Council for destination-chain approval.
+       **/
+      GlobalIssuanceCouncilRotationQueued: AugmentedEvent<
+        ApiType,
+        [
+          destinationChain: PalletCrosschainTransferSourceChain,
+          councilHash: H256,
+          approvalQueueNonce: u64,
+        ],
+        {
+          destinationChain: PalletCrosschainTransferSourceChain;
+          councilHash: H256;
+          approvalQueueNonce: u64;
+        }
+      >;
+      /**
        * Root updated the minimum normalized microgon value required to register a Minting
        * Authority on one destination chain.
        **/

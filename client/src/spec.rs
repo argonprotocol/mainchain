@@ -3396,9 +3396,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				231u8, 82u8, 57u8, 166u8, 241u8, 10u8, 35u8, 224u8, 224u8, 25u8, 188u8, 211u8,
-				150u8, 156u8, 0u8, 213u8, 89u8, 21u8, 183u8, 200u8, 66u8, 40u8, 129u8, 36u8, 60u8,
-				167u8, 178u8, 7u8, 162u8, 134u8, 100u8, 17u8,
+				135u8, 87u8, 18u8, 51u8, 243u8, 196u8, 63u8, 9u8, 7u8, 231u8, 60u8, 101u8, 164u8,
+				78u8, 172u8, 245u8, 24u8, 173u8, 187u8, 75u8, 140u8, 221u8, 157u8, 56u8, 185u8,
+				122u8, 94u8, 205u8, 140u8, 114u8, 188u8, 223u8,
 			]
 	}
 	pub mod system {
@@ -4522,10 +4522,9 @@ pub mod api {
 						"Events",
 						(),
 						[
-							139u8, 197u8, 145u8, 242u8, 165u8, 246u8, 169u8, 67u8, 189u8, 56u8,
-							112u8, 237u8, 162u8, 73u8, 167u8, 46u8, 73u8, 96u8, 102u8, 83u8, 12u8,
-							54u8, 130u8, 197u8, 53u8, 110u8, 68u8, 169u8, 202u8, 171u8, 201u8,
-							111u8,
+							49u8, 47u8, 175u8, 176u8, 67u8, 77u8, 174u8, 65u8, 174u8, 178u8, 242u8,
+							26u8, 205u8, 254u8, 92u8, 19u8, 128u8, 3u8, 35u8, 93u8, 200u8, 39u8,
+							248u8, 63u8, 91u8, 172u8, 207u8, 224u8, 232u8, 72u8, 81u8, 245u8,
 						],
 					)
 				}
@@ -26103,6 +26102,32 @@ pub mod api {
 			)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "A frame transition queued a new Global Issuance Council for destination-chain approval."]
+			pub struct GlobalIssuanceCouncilRotationQueued {
+				pub destination_chain: global_issuance_council_rotation_queued::DestinationChain,
+				pub council_hash: global_issuance_council_rotation_queued::CouncilHash,
+				pub approval_queue_nonce:
+					global_issuance_council_rotation_queued::ApprovalQueueNonce,
+			}
+			pub mod global_issuance_council_rotation_queued {
+				use super::runtime_types;
+				pub type DestinationChain =
+					runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				pub type CouncilHash = crate::types::H256;
+				pub type ApprovalQueueNonce = ::core::primitive::u64;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for GlobalIssuanceCouncilRotationQueued {
+				const PALLET: &'static str = "CrosschainTransfer";
+				const EVENT: &'static str = "GlobalIssuanceCouncilRotationQueued";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
 			#[doc = "An account registered its council signer for one destination chain."]
 			pub struct CouncilSignerRegistered {
 				pub destination_chain: council_signer_registered::DestinationChain,
@@ -26694,6 +26719,12 @@ pub mod api {
 					pub type Param0 =
 						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
 				}
+				pub mod next_council_rotation_frame_by_destination_chain {
+					use super::runtime_types;
+					pub type NextCouncilRotationFrameByDestinationChain = ::core::primitive::u64;
+					pub type Param0 =
+						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				}
 				pub mod council_approval_queue_by_destination_chain_and_nonce {
 					use super::runtime_types;
 					pub type CouncilApprovalQueueByDestinationChainAndNonce = runtime_types :: pallet_crosschain_transfer :: pallet :: CouncilApprovalQueueEntry ;
@@ -27258,6 +27289,32 @@ pub mod api {
 							212u8, 100u8, 159u8, 154u8, 112u8, 234u8, 241u8, 190u8, 122u8, 251u8,
 							81u8, 169u8, 152u8, 242u8, 29u8, 126u8, 128u8, 184u8, 185u8, 163u8,
 							26u8, 222u8,
+						],
+					)
+				}
+				#[doc = " First frame where a new council snapshot may be added to a chain's approval queue."]				pub fn next_council_rotation_frame_by_destination_chain_iter (& self ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < () , types :: next_council_rotation_frame_by_destination_chain :: NextCouncilRotationFrameByDestinationChain , () , () , :: subxt :: ext :: subxt_core :: utils :: Yes >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"NextCouncilRotationFrameByDestinationChain",
+						(),
+						[
+							202u8, 248u8, 193u8, 196u8, 134u8, 165u8, 94u8, 67u8, 39u8, 81u8,
+							105u8, 92u8, 216u8, 186u8, 88u8, 25u8, 206u8, 212u8, 138u8, 139u8,
+							25u8, 19u8, 69u8, 8u8, 219u8, 124u8, 141u8, 231u8, 128u8, 243u8, 253u8,
+							73u8,
+						],
+					)
+				}
+				#[doc = " First frame where a new council snapshot may be added to a chain's approval queue."]				pub fn next_council_rotation_frame_by_destination_chain (& self , _0 : types :: next_council_rotation_frame_by_destination_chain :: Param0 ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < :: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: next_council_rotation_frame_by_destination_chain :: Param0 > , types :: next_council_rotation_frame_by_destination_chain :: NextCouncilRotationFrameByDestinationChain , :: subxt :: ext :: subxt_core :: utils :: Yes , () , () >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"NextCouncilRotationFrameByDestinationChain",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							202u8, 248u8, 193u8, 196u8, 134u8, 165u8, 94u8, 67u8, 39u8, 81u8,
+							105u8, 92u8, 216u8, 186u8, 88u8, 25u8, 206u8, 212u8, 138u8, 139u8,
+							25u8, 19u8, 69u8, 8u8, 219u8, 124u8, 141u8, 231u8, 128u8, 243u8, 253u8,
+							73u8,
 						],
 					)
 				}
@@ -32509,6 +32566,9 @@ pub mod api {
 					#[doc = "The destination chain already tracks the maximum number of non-terminal transfer-out"]
 					#[doc = "requests."]
 					TooManyPendingTransferOuts,
+					#[codec(index = 54)]
+					#[doc = "The account already has a council signer rotation pending for this destination chain."]
+					CouncilSignerRotationPending,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -32524,7 +32584,7 @@ pub mod api {
 				)]
 				#[doc = "The `Event` enum of this pallet"]
 				pub enum Event {
-					# [codec (index = 0)] # [doc = "A `TransferToArgonStarted` activity was proven and settled locally."] TransferToArgonSettled { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , transfer : runtime_types :: pallet_crosschain_transfer :: pallet :: TransferToArgonActivity , } , # [codec (index = 1)] # [doc = "Root force-set the active Global Issuance Council for a destination chain."] GlobalIssuanceCouncilForced { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , council_hash : crate :: types :: H256 , } , # [codec (index = 2)] # [doc = "An account registered its council signer for one destination chain."] CouncilSignerRegistered { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , account_id : crate :: types :: AccountId32 , signer : :: subxt :: ext :: subxt_core :: utils :: H160 , } , # [codec (index = 3)] # [doc = "An account queued a replacement council signer for the next council update."] CouncilSignerRotationQueued { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , account_id : crate :: types :: AccountId32 , signer : :: subxt :: ext :: subxt_core :: utils :: H160 , } , # [codec (index = 4)] # [doc = "An operator account registered a Minting Authority and queued it for council approval."] MintingAuthorityRegistered { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , account_id : crate :: types :: AccountId32 , approval_queue_nonce : :: core :: primitive :: u64 , } , # [codec (index = 5)] # [doc = "An operator queued the council-approved Ethereum deactivation for a Minting Authority."] MintingAuthorityDeactivationQueued { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , approval_queue_nonce : :: core :: primitive :: u64 , } , # [codec (index = 6)] # [doc = "Root updated the minimum normalized microgon value required to register a Minting"] # [doc = "Authority on one destination chain."] MinimumMintingAuthorityValueSet { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , minimum_value : :: core :: primitive :: u128 , } , # [codec (index = 7)] # [doc = "Root updated the pricing inputs used to repay relayers for activation batches on one"] # [doc = "destination chain."] MintingAuthorityActivationRepaymentPricingSet { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , } , # [codec (index = 8)] # [doc = "A council member recorded approval for a queued council update entry."] QueueEntryApprovalRecorded { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , target : runtime_types :: pallet_crosschain_transfer :: pallet :: CouncilApprovalTargetId , approval_queue_nonce : :: core :: primitive :: u64 , } , # [codec (index = 9)] # [doc = "The queued council update entry reached local quorum."] QueueEntryApprovalReady { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , target : runtime_types :: pallet_crosschain_transfer :: pallet :: CouncilApprovalTargetId , approval_queue_nonce : :: core :: primitive :: u64 , } , # [codec (index = 10)] # [doc = "A proven Ethereum activation filled the pending local activation fields."] MintingAuthorityActivationFinalized { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , } , # [codec (index = 11)] # [doc = "A proven activation paid or released the held relayer reimbursement and made the"] # [doc = "authority usable."] MintingAuthorityActivationCompleted { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , relayer_argon_account_id : crate :: types :: AccountId32 , repayment_amount : :: core :: primitive :: u128 , } , # [codec (index = 12)] # [doc = "A proven Ethereum deactivation released collateral and removed the local authority"] # [doc = "record."] MintingAuthorityDeactivationFinalized { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , } , # [codec (index = 13)] # [doc = "Gateway proof application paused one source chain at a specific canonical activity."] GatewaySyncPaused { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , pause : runtime_types :: pallet_crosschain_transfer :: pallet :: GatewaySyncPause , } , # [codec (index = 14)] # [doc = "Root manually unpaused one source chain."] GatewayUnpaused { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , } , # [codec (index = 15)] # [doc = "The stored gateway-state snapshot advanced after a proven contiguous batch."] GatewayStateAdvanced { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , gateway_state : runtime_types :: pallet_crosschain_transfer :: pallet :: GatewayState , } , # [codec (index = 16)] # [doc = "A transfer out was opened."] TransferOutStarted { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , transfer_id : crate :: types :: H256 , account_id : crate :: types :: AccountId32 , asset : runtime_types :: pallet_crosschain_transfer :: pallet :: AssetKind , amount : :: core :: primitive :: u128 , minting_authority_tip : :: core :: primitive :: u128 , } , # [codec (index = 17)] # [doc = "A minting authority updated transfer collateral."] TransferCollateralized { transfer_id : crate :: types :: H256 , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , microgon_collateral : :: core :: primitive :: u128 , micronot_collateral : :: core :: primitive :: u128 , } , # [codec (index = 18)] # [doc = "A transfer is ready for finalization."] TransferOutReady { transfer_id : crate :: types :: H256 , } , # [codec (index = 19)] # [doc = "A transfer was finalized on the source chain."] TransferOutFinalized { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , transfer_id : crate :: types :: H256 , } , # [codec (index = 20)] # [doc = "A transfer was canceled on the source chain."] TransferOutCanceled { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , transfer_id : crate :: types :: H256 , } , # [codec (index = 21)] # [doc = "A pending collateral reservation was invalidated."] TransferCollateralInvalidated { transfer_id : crate :: types :: H256 , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , } , }
+					# [codec (index = 0)] # [doc = "A `TransferToArgonStarted` activity was proven and settled locally."] TransferToArgonSettled { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , transfer : runtime_types :: pallet_crosschain_transfer :: pallet :: TransferToArgonActivity , } , # [codec (index = 1)] # [doc = "Root force-set the active Global Issuance Council for a destination chain."] GlobalIssuanceCouncilForced { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , council_hash : crate :: types :: H256 , } , # [codec (index = 2)] # [doc = "A frame transition queued a new Global Issuance Council for destination-chain approval."] GlobalIssuanceCouncilRotationQueued { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , council_hash : crate :: types :: H256 , approval_queue_nonce : :: core :: primitive :: u64 , } , # [codec (index = 3)] # [doc = "An account registered its council signer for one destination chain."] CouncilSignerRegistered { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , account_id : crate :: types :: AccountId32 , signer : :: subxt :: ext :: subxt_core :: utils :: H160 , } , # [codec (index = 4)] # [doc = "An account queued a replacement council signer for the next council update."] CouncilSignerRotationQueued { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , account_id : crate :: types :: AccountId32 , signer : :: subxt :: ext :: subxt_core :: utils :: H160 , } , # [codec (index = 5)] # [doc = "An operator account registered a Minting Authority and queued it for council approval."] MintingAuthorityRegistered { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , account_id : crate :: types :: AccountId32 , approval_queue_nonce : :: core :: primitive :: u64 , } , # [codec (index = 6)] # [doc = "An operator queued the council-approved Ethereum deactivation for a Minting Authority."] MintingAuthorityDeactivationQueued { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , approval_queue_nonce : :: core :: primitive :: u64 , } , # [codec (index = 7)] # [doc = "Root updated the minimum normalized microgon value required to register a Minting"] # [doc = "Authority on one destination chain."] MinimumMintingAuthorityValueSet { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , minimum_value : :: core :: primitive :: u128 , } , # [codec (index = 8)] # [doc = "Root updated the pricing inputs used to repay relayers for activation batches on one"] # [doc = "destination chain."] MintingAuthorityActivationRepaymentPricingSet { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , } , # [codec (index = 9)] # [doc = "A council member recorded approval for a queued council update entry."] QueueEntryApprovalRecorded { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , target : runtime_types :: pallet_crosschain_transfer :: pallet :: CouncilApprovalTargetId , approval_queue_nonce : :: core :: primitive :: u64 , } , # [codec (index = 10)] # [doc = "The queued council update entry reached local quorum."] QueueEntryApprovalReady { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , target : runtime_types :: pallet_crosschain_transfer :: pallet :: CouncilApprovalTargetId , approval_queue_nonce : :: core :: primitive :: u64 , } , # [codec (index = 11)] # [doc = "A proven Ethereum activation filled the pending local activation fields."] MintingAuthorityActivationFinalized { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , } , # [codec (index = 12)] # [doc = "A proven activation paid or released the held relayer reimbursement and made the"] # [doc = "authority usable."] MintingAuthorityActivationCompleted { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , relayer_argon_account_id : crate :: types :: AccountId32 , repayment_amount : :: core :: primitive :: u128 , } , # [codec (index = 13)] # [doc = "A proven Ethereum deactivation released collateral and removed the local authority"] # [doc = "record."] MintingAuthorityDeactivationFinalized { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , } , # [codec (index = 14)] # [doc = "Gateway proof application paused one source chain at a specific canonical activity."] GatewaySyncPaused { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , pause : runtime_types :: pallet_crosschain_transfer :: pallet :: GatewaySyncPause , } , # [codec (index = 15)] # [doc = "Root manually unpaused one source chain."] GatewayUnpaused { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , } , # [codec (index = 16)] # [doc = "The stored gateway-state snapshot advanced after a proven contiguous batch."] GatewayStateAdvanced { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , gateway_state : runtime_types :: pallet_crosschain_transfer :: pallet :: GatewayState , } , # [codec (index = 17)] # [doc = "A transfer out was opened."] TransferOutStarted { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , transfer_id : crate :: types :: H256 , account_id : crate :: types :: AccountId32 , asset : runtime_types :: pallet_crosschain_transfer :: pallet :: AssetKind , amount : :: core :: primitive :: u128 , minting_authority_tip : :: core :: primitive :: u128 , } , # [codec (index = 18)] # [doc = "A minting authority updated transfer collateral."] TransferCollateralized { transfer_id : crate :: types :: H256 , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , microgon_collateral : :: core :: primitive :: u128 , micronot_collateral : :: core :: primitive :: u128 , } , # [codec (index = 19)] # [doc = "A transfer is ready for finalization."] TransferOutReady { transfer_id : crate :: types :: H256 , } , # [codec (index = 20)] # [doc = "A transfer was finalized on the source chain."] TransferOutFinalized { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , transfer_id : crate :: types :: H256 , } , # [codec (index = 21)] # [doc = "A transfer was canceled on the source chain."] TransferOutCanceled { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , transfer_id : crate :: types :: H256 , } , # [codec (index = 22)] # [doc = "A pending collateral reservation was invalidated."] TransferCollateralInvalidated { transfer_id : crate :: types :: H256 , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , } , }
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
 					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,

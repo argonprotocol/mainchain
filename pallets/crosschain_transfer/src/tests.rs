@@ -176,13 +176,21 @@ fn force_set_global_issuance_council_uses_argonot_price_floor_for_combined_weigh
 fn register_council_signer_validates_proof_and_applies_queued_replacement() {
 	new_test_ext().execute_with(|| {
 		let council_account = account(37);
+		let other_council_account = account(38);
 		let current_pair = council_signing_pair(51);
 		let next_pair = council_signing_pair(52);
 		let wrong_pair = council_signing_pair(53);
+		let later_pair = council_signing_pair(54);
+		let other_current_pair = council_signing_pair(55);
+		let other_next_pair = council_signing_pair(56);
 		let current_signer = council_signer(&current_pair);
 		let next_signer = council_signer(&next_pair);
+		let later_signer = council_signer(&later_pair);
+		let other_current_signer = council_signer(&other_current_pair);
+		let other_next_signer = council_signer(&other_next_pair);
 
 		register_vault_operator(council_account.clone(), 15, 9_000);
+		register_vault_operator(other_council_account.clone(), 16, 8_000);
 		assert_noop!(
 			CrosschainTransfer::register_council_signer(
 				RuntimeOrigin::signed(council_account.clone()),
@@ -198,15 +206,45 @@ fn register_council_signer_validates_proof_and_applies_queued_replacement() {
 			current_signer,
 			council_signer_registration_signature(&current_pair, &council_account),
 		));
+		assert_ok!(CrosschainTransfer::register_council_signer(
+			RuntimeOrigin::signed(other_council_account.clone()),
+			SourceChain::Ethereum,
+			other_current_signer,
+			council_signer_registration_signature(&other_current_pair, &other_council_account,),
+		));
 		assert_ok!(CrosschainTransfer::force_set_global_issuance_council(
 			RuntimeOrigin::root(),
 			SourceChain::Ethereum,
 			0,
-			vec![council_account.clone()]
+			vec![council_account.clone(), other_council_account.clone()]
 				.try_into()
-				.expect("single council member stays within limit"),
+				.expect("council members stay within limit"),
 		));
 
+		assert_noop!(
+			CrosschainTransfer::register_council_signer(
+				RuntimeOrigin::signed(council_account.clone()),
+				SourceChain::Ethereum,
+				other_current_signer,
+				council_signer_registration_signature(&other_current_pair, &council_account,),
+			),
+			Error::<Test>::DuplicateGlobalIssuanceCouncilSigner,
+		);
+		assert_ok!(CrosschainTransfer::register_council_signer(
+			RuntimeOrigin::signed(other_council_account.clone()),
+			SourceChain::Ethereum,
+			other_next_signer,
+			council_signer_registration_signature(&other_next_pair, &other_council_account),
+		));
+		assert_noop!(
+			CrosschainTransfer::register_council_signer(
+				RuntimeOrigin::signed(council_account.clone()),
+				SourceChain::Ethereum,
+				other_next_signer,
+				council_signer_registration_signature(&other_next_pair, &council_account),
+			),
+			Error::<Test>::DuplicateGlobalIssuanceCouncilSigner,
+		);
 		assert_ok!(CrosschainTransfer::register_council_signer(
 			RuntimeOrigin::signed(council_account.clone()),
 			SourceChain::Ethereum,
@@ -227,14 +265,30 @@ fn register_council_signer_validates_proof_and_applies_queued_replacement() {
 			),
 			Some(next_signer),
 		);
+		assert_noop!(
+			CrosschainTransfer::register_council_signer(
+				RuntimeOrigin::signed(council_account.clone()),
+				SourceChain::Ethereum,
+				later_signer,
+				council_signer_registration_signature(&later_pair, &council_account),
+			),
+			Error::<Test>::CouncilSignerRotationPending,
+		);
+		assert_eq!(
+			PendingCouncilSignerByDestinationChainAndAccountId::<Test>::get(
+				SourceChain::Ethereum,
+				&council_account,
+			),
+			Some(next_signer),
+		);
 
 		assert_ok!(CrosschainTransfer::force_set_global_issuance_council(
 			RuntimeOrigin::root(),
 			SourceChain::Ethereum,
 			0,
-			vec![council_account.clone()]
+			vec![council_account.clone(), other_council_account]
 				.try_into()
-				.expect("single council member stays within limit"),
+				.expect("council members stay within limit"),
 		));
 
 		let active_council =

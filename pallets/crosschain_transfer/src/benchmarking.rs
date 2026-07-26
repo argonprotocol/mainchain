@@ -234,10 +234,29 @@ mod benchmarks {
 	#[benchmark]
 	fn register_council_signer() -> Result<(), BenchmarkError> {
 		reset_crosschain_benchmark_state::<T>();
-		let caller: T::AccountId = whitelisted_caller();
+		let (active_council, _) = benchmark_max_council_signer_rotation::<T>()?;
+		let active_member = active_council
+			.members
+			.values()
+			.next()
+			.ok_or(BenchmarkError::Stop("benchmark active council missing member"))?;
+		let caller = active_member.account_id.clone();
 		let signer = benchmark_signer(2);
 
 		seed_benchmark_vault::<T>(&caller, 2, 50_000u128);
+		PendingCouncilSignerByDestinationChainAndAccountId::<T>::remove(
+			BENCHMARK_DESTINATION_CHAIN,
+			&caller,
+		);
+		let active_council_hash = Pallet::<T>::hash_global_issuance_council(
+			&active_council.members,
+			active_council.epoch_microgons_per_argonot,
+		);
+		GlobalIssuanceCouncilByHash::<T>::insert(active_council_hash, active_council);
+		ActiveGlobalIssuanceCouncilByDestinationChain::<T>::insert(
+			BENCHMARK_DESTINATION_CHAIN,
+			active_council_hash,
+		);
 		let signature = benchmark_council_signer_registration_signature::<T>(signer, &caller);
 
 		#[extrinsic_call]
@@ -249,7 +268,7 @@ mod benchmarks {
 		);
 
 		assert_eq!(
-			CouncilSignerByDestinationChainAndAccountId::<T>::get(
+			PendingCouncilSignerByDestinationChainAndAccountId::<T>::get(
 				BENCHMARK_DESTINATION_CHAIN,
 				&caller,
 			),
@@ -483,6 +502,57 @@ mod benchmarks {
 	}
 
 	#[benchmark]
+	fn schedule_global_issuance_council_rotation() -> Result<(), BenchmarkError> {
+		reset_crosschain_benchmark_state::<T>();
+		seed_chain_config::<T>(0x21);
+		let (active_council, _) = benchmark_max_council_signer_rotation::<T>()?;
+		let active_council_hash = Pallet::<T>::hash_global_issuance_council(
+			&active_council.members,
+			active_council.epoch_microgons_per_argonot,
+		);
+		CurrentTransferOutMicrogonsPerArgonotByDestinationChain::<T>::insert(
+			BENCHMARK_DESTINATION_CHAIN,
+			active_council.epoch_microgons_per_argonot,
+		);
+		GlobalIssuanceCouncilByHash::<T>::insert(active_council_hash, active_council);
+		ActiveGlobalIssuanceCouncilByDestinationChain::<T>::insert(
+			BENCHMARK_DESTINATION_CHAIN,
+			active_council_hash,
+		);
+		NextCouncilRotationFrameByDestinationChain::<T>::insert(BENCHMARK_DESTINATION_CHAIN, 1);
+
+		#[block]
+		{
+			Pallet::<T>::schedule_global_issuance_council_rotation(BENCHMARK_DESTINATION_CHAIN, 1)
+				.map_err(|_| {
+					BenchmarkError::Stop("failed to schedule benchmark council rotation")
+				})?;
+		}
+
+		assert_eq!(
+			NextCouncilApprovalQueueNonceByDestinationChain::<T>::get(BENCHMARK_DESTINATION_CHAIN,),
+			1,
+		);
+		Ok(())
+	}
+
+	#[benchmark]
+	fn activate_global_issuance_council_signers() -> Result<(), BenchmarkError> {
+		reset_crosschain_benchmark_state::<T>();
+		let (_, council) = benchmark_max_council_signer_rotation::<T>()?;
+
+		#[block]
+		{
+			Pallet::<T>::activate_global_issuance_council_signers(
+				BENCHMARK_DESTINATION_CHAIN,
+				&council,
+			);
+		}
+
+		Ok(())
+	}
+
+	#[benchmark]
 	fn transfer_out() -> Result<(), BenchmarkError> {
 		reset_crosschain_benchmark_state::<T>();
 		let council_account: T::AccountId = account("transfer-council", 0, 0);
@@ -664,6 +734,74 @@ mod benchmarks {
 		}
 
 		Ok(())
+	}
+
+	fn benchmark_max_council_signer_rotation<T: Config>(
+	) -> Result<(GlobalIssuanceCouncil<T>, GlobalIssuanceCouncil<T>), BenchmarkError>
+	where
+		T::AccountId: From<[u8; 32]> + Ord,
+	{
+		let mut active_members = BoundedBTreeMap::new();
+		let mut next_members = BoundedBTreeMap::new();
+		let weight: T::Balance = 1u128.into();
+
+		for member_index in 0..T::MaxCouncilMembers::get() {
+			let account_id: T::AccountId = account("council-signer-rotation", member_index, 0);
+			let mut current_signer_bytes = [0u8; 20];
+			current_signer_bytes[16..]
+				.copy_from_slice(&member_index.saturating_add(1).to_be_bytes());
+			let current_signer = H160::from_slice(&current_signer_bytes);
+			let mut next_signer_bytes = [0u8; 20];
+			next_signer_bytes[16..]
+				.copy_from_slice(&member_index.saturating_add(1_001).to_be_bytes());
+			let next_signer = H160::from_slice(&next_signer_bytes);
+
+			CouncilSignerByDestinationChainAndAccountId::<T>::insert(
+				BENCHMARK_DESTINATION_CHAIN,
+				&account_id,
+				current_signer,
+			);
+			PendingCouncilSignerByDestinationChainAndAccountId::<T>::insert(
+				BENCHMARK_DESTINATION_CHAIN,
+				&account_id,
+				next_signer,
+			);
+			active_members
+				.try_insert(
+					current_signer,
+					GlobalIssuanceCouncilMember::<T> {
+						account_id: account_id.clone(),
+						signer: current_signer,
+						weight,
+					},
+				)
+				.map_err(|_| {
+					BenchmarkError::Stop("benchmark active council exceeded runtime bound")
+				})?;
+			next_members
+				.try_insert(
+					next_signer,
+					GlobalIssuanceCouncilMember::<T> { account_id, signer: next_signer, weight },
+				)
+				.map_err(|_| {
+					BenchmarkError::Stop("benchmark next council exceeded runtime bound")
+				})?;
+		}
+
+		let total_weight: T::Balance = u128::from(T::MaxCouncilMembers::get()).into();
+		let epoch_microgons_per_argonot = argon_primitives::MICROGONS_PER_ARGON.into();
+		Ok((
+			GlobalIssuanceCouncil::<T> {
+				epoch_microgons_per_argonot,
+				members: active_members,
+				total_weight,
+			},
+			GlobalIssuanceCouncil::<T> {
+				epoch_microgons_per_argonot,
+				members: next_members,
+				total_weight,
+			},
+		))
 	}
 
 	impl_benchmark_test_suite!(

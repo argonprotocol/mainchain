@@ -28,12 +28,17 @@ pub use transfer_out::{
 	TransferOutState,
 };
 
+pub(crate) enum CouncilMemberSource<'a, T: Config> {
+	ExistingCouncil(&'a GlobalIssuanceCouncil<T>),
+	VaultAccounts(BoundedVec<T::AccountId, T::MaxCouncilMembers>),
+}
+
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
 	use alloc::vec::Vec;
 	use argon_primitives::{
-		block_seal::FrameId,
+		block_seal::{BlockSealAuthorityId, FrameId},
 		ethereum::{
 			EthereumBlockNumber, EthereumReceiptLogProofBatch as BaseEthereumReceiptLogProofBatch,
 			EthereumReceiptLogProofBlock as BaseEthereumReceiptLogProofBlock,
@@ -41,8 +46,8 @@ pub mod pallet {
 		},
 		vault::BitcoinVaultProvider,
 		CallTxPoolKeyProvider, CallTxValidityProvider, CollectBlockerProvider,
-		EthereumVerifyProvider, OperationalAccountsHook, PriceProvider, TickProvider,
-		TreasuryPoolProvider, UniswapTransferProvider, MICROGONS_PER_ARGON,
+		EthereumVerifyProvider, OnNewSlot, OperationalAccountsHook, TickProvider,
+		TreasuryPoolProvider, UniswapTransferProvider,
 	};
 	use frame_support::{
 		dispatch::{Pays, PostDispatchInfo},
@@ -56,7 +61,7 @@ pub mod pallet {
 		sp_runtime::{transaction_validity::InvalidTransaction, BoundedBTreeMap},
 	};
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(2);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(3);
 
 	pub(super) const WEI_PER_ETH: u128 = 1_000_000_000_000_000_000;
 
@@ -770,6 +775,11 @@ pub mod pallet {
 		StorageMap<_, Blake2_128Concat, SourceChain, CouncilApprovalQueueNonce, ValueQuery>;
 
 	#[pallet::storage]
+	/// First frame where a new council snapshot may be added to a chain's approval queue.
+	pub type NextCouncilRotationFrameByDestinationChain<T: Config> =
+		StorageMap<_, Blake2_128Concat, SourceChain, FrameId, OptionQuery>;
+
+	#[pallet::storage]
 	/// The ordered outbound council approval queue for each destination chain.
 	pub type CouncilApprovalQueueByDestinationChainAndNonce<T: Config> = StorageDoubleMap<
 		_,
@@ -854,6 +864,12 @@ pub mod pallet {
 		TransferToArgonSettled { source_chain: SourceChain, transfer: TransferToArgonActivity<T> },
 		/// Root force-set the active Global Issuance Council for a destination chain.
 		GlobalIssuanceCouncilForced { destination_chain: SourceChain, council_hash: H256 },
+		/// A frame transition queued a new Global Issuance Council for destination-chain approval.
+		GlobalIssuanceCouncilRotationQueued {
+			destination_chain: SourceChain,
+			council_hash: H256,
+			approval_queue_nonce: CouncilApprovalQueueNonce,
+		},
 		/// An account registered its council signer for one destination chain.
 		CouncilSignerRegistered {
 			destination_chain: SourceChain,
@@ -1071,6 +1087,8 @@ pub mod pallet {
 		/// The destination chain already tracks the maximum number of non-terminal transfer-out
 		/// requests.
 		TooManyPendingTransferOuts,
+		/// The account already has a council signer rotation pending for this destination chain.
+		CouncilSignerRotationPending,
 	}
 
 	#[pallet::hooks]
@@ -1079,6 +1097,9 @@ pub mod pallet {
 			use frame_support::traits::OnRuntimeUpgrade;
 
 			migrations::CleanupRecentTransferStateMigration::<T>::on_runtime_upgrade()
+				.saturating_add(
+					migrations::PrepareScheduledCouncilRotationMigration::<T>::on_runtime_upgrade(),
+				)
 		}
 	}
 
@@ -1142,103 +1163,21 @@ pub mod pallet {
 				.map_or(0, |state| state.argon_approvals_nonce);
 			ensure!(after_nonce >= last_synced_nonce, Error::<T>::InvalidForceSetAfterNonce);
 
-			let epoch_microgons_per_argonot =
-				T::PriceProvider::get_lowest_microgons_per_argonot(T::CouncilRotationFrames::get())
-					.filter(|price| *price != T::Balance::default())
-					.ok_or(Error::<T>::InvalidMicrogonsPerArgonot)?;
-			let mut total_weight = T::Balance::default();
-			let mut council_members = BoundedBTreeMap::new();
-			let mut seen_accounts = BoundedVec::<T::AccountId, T::MaxCouncilMembers>::new();
-			let mut promoted_signers = Vec::new();
-
-			for member_account_id in member_account_ids {
-				ensure!(
-					!seen_accounts.contains(&member_account_id),
-					Error::<T>::DuplicateGlobalIssuanceCouncilAccount,
-				);
-				let committed_microgon_collateral = T::VaultProvider::get_committed_securitization(
-					&member_account_id,
-					T::CouncilRotationFrames::get(),
-				)
-				.ok_or(Error::<T>::UnknownOwnerVault)?;
-				let committed_argonots =
-					T::VaultProvider::get_committed_argonots(&member_account_id)
-						.ok_or(Error::<T>::UnknownOwnerVault)?;
-				let epoch_microgons_per_argonot: u128 = epoch_microgons_per_argonot.into();
-				let argonot_weight = committed_argonots
-					.into()
-					.saturating_mul(epoch_microgons_per_argonot)
-					.saturating_div(MICROGONS_PER_ARGON)
-					.into();
-				let member_weight = committed_microgon_collateral.saturating_add(argonot_weight);
-				let pending_signer = PendingCouncilSignerByDestinationChainAndAccountId::<T>::get(
-					destination_chain,
-					&member_account_id,
-				);
-				let signer = pending_signer
-					.or_else(|| {
-						CouncilSignerByDestinationChainAndAccountId::<T>::get(
-							destination_chain,
-							&member_account_id,
-						)
-					})
-					.ok_or(Error::<T>::CouncilSignerNotRegistered)?;
-				ensure!(
-					member_weight != T::Balance::default(),
-					Error::<T>::InvalidGlobalIssuanceCouncil,
-				);
-				ensure!(
-					!council_members.contains_key(&signer),
-					Error::<T>::DuplicateGlobalIssuanceCouncilSigner,
-				);
-
-				seen_accounts
-					.try_push(member_account_id.clone())
-					.map_err(|_| Error::<T>::InvalidGlobalIssuanceCouncil)?;
-				let _ = council_members
-					.try_insert(
-						signer,
-						GlobalIssuanceCouncilMember::<T> {
-							account_id: member_account_id.clone(),
-							signer,
-							weight: member_weight,
-						},
-					)
-					.map_err(|_| Error::<T>::InvalidGlobalIssuanceCouncil)?;
-				total_weight = total_weight.saturating_add(member_weight);
-
-				if pending_signer.is_some() {
-					promoted_signers.push((member_account_id.clone(), signer));
-				}
-			}
-
-			ensure!(
-				total_weight != T::Balance::default(),
-				Error::<T>::InvalidGlobalIssuanceCouncil,
+			let council = Self::build_global_issuance_council(
+				destination_chain,
+				CouncilMemberSource::VaultAccounts(member_account_ids),
+			)?;
+			let epoch_microgons_per_argonot = council.epoch_microgons_per_argonot;
+			let council_hash = Self::hash_global_issuance_council(
+				&council.members,
+				council.epoch_microgons_per_argonot,
 			);
-			let council_hash =
-				Self::hash_global_issuance_council(&council_members, epoch_microgons_per_argonot);
-			let council = GlobalIssuanceCouncil::<T> {
-				epoch_microgons_per_argonot,
-				members: council_members,
-				total_weight,
-			};
-
-			for (account_id, signer) in promoted_signers {
-				CouncilSignerByDestinationChainAndAccountId::<T>::insert(
-					destination_chain,
-					&account_id,
-					signer,
-				);
-				PendingCouncilSignerByDestinationChainAndAccountId::<T>::remove(
-					destination_chain,
-					&account_id,
-				);
-			}
-
 			let previous_council =
 				ActiveGlobalIssuanceCouncilByDestinationChain::<T>::get(destination_chain)
 					.and_then(GlobalIssuanceCouncilByHash::<T>::get);
+
+			Self::activate_global_issuance_council_signers(destination_chain, &council);
+
 			let previous_council_for_cursor_reset =
 				if after_nonce == last_synced_nonce { previous_council.as_ref() } else { None };
 			Self::reset_council_approval_cursor(
@@ -1267,6 +1206,10 @@ pub mod pallet {
 			}
 			Self::rebase_unresolved_queue_entries(destination_chain, after_nonce, council_hash)?;
 			Self::refresh_destination_chain_queue_tracking(destination_chain)?;
+			NextCouncilRotationFrameByDestinationChain::<T>::insert(
+				destination_chain,
+				T::CurrentFrameId::get().saturating_add(T::CouncilRotationFrames::get()),
+			);
 			if let Some(prunable_council_hash) = prunable_council_hash {
 				Self::prune_global_issuance_council_if_unreferenced(
 					destination_chain,
@@ -1379,11 +1322,41 @@ pub mod pallet {
 				) == Some(signing_key),
 				Error::<T>::InvalidCouncilSignerProof,
 			);
-
 			if CouncilSignerByDestinationChainAndAccountId::<T>::contains_key(
 				destination_chain,
 				&account_id,
 			) {
+				ensure!(
+					!PendingCouncilSignerByDestinationChainAndAccountId::<T>::contains_key(
+						destination_chain,
+						&account_id,
+					),
+					Error::<T>::CouncilSignerRotationPending,
+				);
+				if let Some(active_council_hash) =
+					ActiveGlobalIssuanceCouncilByDestinationChain::<T>::get(destination_chain)
+				{
+					let active_council = GlobalIssuanceCouncilByHash::<T>::get(active_council_hash)
+						.ok_or(Error::<T>::GlobalIssuanceCouncilNotFound)?;
+					if active_council.members.values().any(|member| member.account_id == account_id)
+					{
+						for member in active_council.members.values() {
+							if member.account_id == account_id {
+								continue;
+							}
+							let effective_signer =
+								PendingCouncilSignerByDestinationChainAndAccountId::<T>::get(
+									destination_chain,
+									&member.account_id,
+								)
+								.unwrap_or(member.signer);
+							ensure!(
+								signing_key != effective_signer,
+								Error::<T>::DuplicateGlobalIssuanceCouncilSigner,
+							);
+						}
+					}
+				}
 				PendingCouncilSignerByDestinationChainAndAccountId::<T>::insert(
 					destination_chain,
 					&account_id,
@@ -1796,6 +1769,22 @@ pub mod pallet {
 
 		fn account_uniswap_argon_transfers_in_amount(account_id: &T::AccountId) -> Self::Balance {
 			Self::current_account_uniswap_argon_transfers_in_amount(account_id)
+		}
+	}
+
+	impl<T: Config> OnNewSlot<T::AccountId> for Pallet<T> {
+		type Key = BlockSealAuthorityId;
+
+		fn on_frame_start(frame_id: FrameId) {
+			if let Err(error) =
+				Self::schedule_global_issuance_council_rotation(SourceChain::Ethereum, frame_id)
+			{
+				log::error!("Failed to schedule Global Issuance Council rotation: {error:?}");
+			}
+		}
+
+		fn on_frame_start_weight(_frame_id: FrameId) -> Weight {
+			weights::scheduled_council_rotation_with_price_provider::<T>()
 		}
 	}
 

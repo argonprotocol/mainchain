@@ -123,6 +123,24 @@ pub fn hash_global_issuance_council(
 	keccak256((signers, weights, epoch_microgons_per_argonot).abi_encode_params())
 }
 
+pub fn hash_rotate_global_issuance_council(
+	chain_id: u64,
+	gateway: Address,
+	council_hash: B256,
+	epoch_microgons_per_argonot: u128,
+) -> B256 {
+	keccak256(
+		(
+			B256::from(keccak256(b"ARGON_GLOBAL_ISSUANCE_COUNCIL_ROTATION").0),
+			U256::from(chain_id),
+			gateway,
+			council_hash,
+			epoch_microgons_per_argonot,
+		)
+			.abi_encode_params(),
+	)
+}
+
 #[allow(clippy::too_many_arguments)]
 pub fn hash_gateway_update_approval(
 	chain_id: u64,
@@ -433,6 +451,31 @@ mod tests {
 	use alloy_primitives::Bytes;
 	use alloy_sol_types::SolCall;
 	use core::str::FromStr;
+
+	#[test]
+	fn council_rotation_hash_matches_the_typescript_vector() {
+		let council_hash = hash_global_issuance_council(
+			vec![Address::from([0x44; 20]), Address::from([0x55; 20])],
+			vec![U256::from(60), U256::from(40)],
+			6_000_000,
+		);
+
+		assert_eq!(
+			council_hash,
+			B256::from_str("0x0df99e9f55797439ddadf1526e5d5a9fa5be256c168aed2924b5f4cfdb57f5bf")
+				.unwrap(),
+		);
+		assert_eq!(
+			hash_rotate_global_issuance_council(
+				1,
+				Address::from([0x11; 20]),
+				council_hash,
+				6_000_000,
+			),
+			B256::from_str("0x8157fa1ca76b0c2824c5daa0839ba2dac30886d242551736349dd9488aea34e4")
+				.unwrap(),
+		);
+	}
 
 	#[test]
 	fn transfer_out_hashes_match_the_known_vector() {
