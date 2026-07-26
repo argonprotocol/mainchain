@@ -3,6 +3,9 @@ use chrono::{DateTime, NaiveDate, Utc};
 use polkadot_sdk::*;
 use serde::{Deserialize, Deserializer};
 use sp_runtime::{FixedI128, FixedU128};
+use std::time::Duration;
+
+pub const MIN_TRANSACTION_WATCH_TIMEOUT: Duration = Duration::from_secs(5 * 60);
 
 #[allow(dead_code)]
 pub fn to_fixed_u128(value: FixedI128) -> FixedU128 {

@@ -9,7 +9,7 @@ use jsonrpsee::{
 pub(crate) use polkadot_sdk::*;
 use sp_core::{crypto::AccountId32, H256};
 use sp_runtime::{MultiAddress, MultiSignature};
-use std::{fmt::Debug, io::Write, sync::Arc};
+use std::{fmt::Debug, io::Write, sync::Arc, time::Duration};
 use subxt::{
 	backend::{legacy::LegacyRpcMethods, rpc::RpcClient, BackendExt, BlockRef},
 	blocks::ExtrinsicEvents,
@@ -29,6 +29,7 @@ use subxt::{
 use tokio::{
 	sync::{mpsc, Mutex, RwLock},
 	task::JoinHandle,
+	time::timeout,
 };
 use tracing::{info, log::debug, warn};
 
@@ -69,6 +70,13 @@ impl Config for ArgonConfig {
 pub type ArgonExtrinsicParams<T> = DefaultExtrinsicParams<T>;
 
 pub type ArgonTxProgress = TxProgress<ArgonConfig, ArgonOnlineClient>;
+
+#[derive(Debug, thiserror::Error)]
+#[error("Timed out waiting for transaction {extrinsic_hash:?} after {wait_timeout:?}")]
+pub struct TransactionWatchTimeout {
+	pub extrinsic_hash: H256,
+	pub wait_timeout: Duration,
+}
 
 /// A builder which leads to [`ArgonExtrinsicParams`] being constructed.
 /// This is what you provide to methods like `sign_and_submit()`.
@@ -377,6 +385,19 @@ impl MainchainClient {
 		Ok(Self::wait_for_ext_in_block(result, wait_for_finalized).await?)
 	}
 
+	pub async fn wait_for_ext_in_block_with_timeout(
+		tx_progress: ArgonTxProgress,
+		wait_for_finalized: bool,
+		wait_timeout: Duration,
+	) -> anyhow::Result<TxInBlockWithEvents> {
+		let extrinsic_hash = tx_progress.extrinsic_hash();
+		let result =
+			timeout(wait_timeout, Self::wait_for_ext_in_block(tx_progress, wait_for_finalized))
+				.await
+				.map_err(|_| TransactionWatchTimeout { extrinsic_hash, wait_timeout })??;
+		Ok(result)
+	}
+
 	pub async fn wait_for_ext_in_block(
 		mut tx_progress: ArgonTxProgress,
 		wait_for_finalized: bool,
@@ -621,8 +642,33 @@ impl ReconnectingClient {
 #[cfg(test)]
 mod test {
 	use argon_testing::start_argon_test_node;
+	use std::time::Duration;
+	use subxt::backend::{StreamOfResults, TransactionStatus};
 
 	use super::*;
+
+	#[tokio::test]
+	async fn transaction_watch_times_out_when_progress_stops() {
+		let ctx = start_argon_test_node().await;
+		let client =
+			MainchainClient::try_until_connected(&ctx.client.url, 100, 1_000).await.unwrap();
+		let statuses = StreamOfResults::new(Box::pin(futures::stream::pending::<
+			Result<TransactionStatus<H256>, subxt::error::Error>,
+		>()));
+		let progress = ArgonTxProgress::new(statuses, client.live.clone(), H256::repeat_byte(1));
+
+		let error = MainchainClient::wait_for_ext_in_block_with_timeout(
+			progress,
+			false,
+			Duration::from_millis(10),
+		)
+		.await
+		.unwrap_err();
+		let timeout = error.downcast_ref::<TransactionWatchTimeout>().unwrap();
+
+		assert_eq!(timeout.extrinsic_hash, H256::repeat_byte(1));
+		assert_eq!(timeout.wait_timeout, Duration::from_millis(10));
+	}
 
 	#[tokio::test]
 	async fn test_getting_ticker() {
