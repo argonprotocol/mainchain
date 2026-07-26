@@ -1091,18 +1091,6 @@ pub mod pallet {
 		CouncilSignerRotationPending,
 	}
 
-	#[pallet::hooks]
-	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
-		fn on_runtime_upgrade() -> Weight {
-			use frame_support::traits::OnRuntimeUpgrade;
-
-			migrations::CleanupRecentTransferStateMigration::<T>::on_runtime_upgrade()
-				.saturating_add(
-					migrations::PrepareScheduledCouncilRotationMigration::<T>::on_runtime_upgrade(),
-				)
-		}
-	}
-
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
 		#[pallet::call_index(0)]
