@@ -20,6 +20,7 @@ use argon_primitives::{
 	ethereum::{EthereumBlockNumber, EthereumReceiptLogProofBatch, EthereumVerifyError},
 	vault::{
 		BitcoinVaultProvider, LockExtension, RegistrationVaultData, Securitization, VaultError,
+		VaultLockRequest,
 	},
 	BitcoinLocksProvider, EthereumVerifyProvider, MiningSlotProvider, Moment,
 	OperationalAccountProvider, TreasuryPoolProvider, UniswapTransferProvider, VaultId,
@@ -185,10 +186,19 @@ where
 		Err(VaultError::VaultNotFound)
 	}
 
-	fn reduce_securitized_satoshis(
+	fn get_projected_backfill_backing(
 		_vault_id: VaultId,
+		_backfill_securitization_released: Self::Balance,
+		_backfill_securitization_added: Self::Balance,
+	) -> Option<(Self::Balance, Self::Balance)> {
+		None
+	}
+
+	fn set_bitcoin_lock_as_backfill(
+		_vault_id: VaultId,
+		_securitization: &Securitization<Self::Balance>,
 		_satoshis: argon_primitives::bitcoin::Satoshis,
-		_securitization_ratio: FixedU128,
+		_is_backfill: bool,
 	) -> Result<(), VaultError> {
 		Err(VaultError::VaultNotFound)
 	}
@@ -197,9 +207,7 @@ where
 		_vault_id: VaultId,
 		_locker: &Self::AccountId,
 		_securitization: &Securitization<Self::Balance>,
-		_satoshis: argon_primitives::bitcoin::Satoshis,
-		_extension: Option<(FixedU128, &mut LockExtension<Self::Balance>)>,
-		_has_fee_coupon: bool,
+		_request: VaultLockRequest<'_, Self::Balance>,
 	) -> Result<Self::Balance, VaultError> {
 		Err(VaultError::VaultNotFound)
 	}
@@ -209,6 +217,7 @@ where
 		_securitization: &Securitization<Self::Balance>,
 		_satoshis: argon_primitives::bitcoin::Satoshis,
 		_lock_extension: &LockExtension<Self::Balance>,
+		_is_backfill: bool,
 	) -> Result<(), VaultError> {
 		Err(VaultError::VaultNotFound)
 	}
@@ -223,8 +232,10 @@ where
 	fn burn(
 		_vault_id: VaultId,
 		_securitization: &Securitization<Self::Balance>,
+		_satoshis: argon_primitives::bitcoin::Satoshis,
 		_market_rate: Self::Balance,
 		_lock_extension: &LockExtension<Self::Balance>,
+		_is_backfill: bool,
 	) -> Result<Self::Balance, VaultError> {
 		Err(VaultError::VaultNotFound)
 	}
@@ -233,8 +244,10 @@ where
 		_vault_id: VaultId,
 		_beneficiary: &Self::AccountId,
 		_securitization: &Securitization<Self::Balance>,
+		_satoshis: argon_primitives::bitcoin::Satoshis,
 		_market_rate: Self::Balance,
 		_lock_extension: &LockExtension<Self::Balance>,
+		_is_backfill: bool,
 	) -> Result<Self::Balance, VaultError> {
 		Err(VaultError::VaultNotFound)
 	}

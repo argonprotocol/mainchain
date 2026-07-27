@@ -236,9 +236,27 @@ mod benchmarks {
 	}
 
 	#[benchmark]
+	fn set_backfill_securitization_reserved() -> Result<(), BenchmarkError> {
+		let caller: T::AccountId = account("set_backfill_reserved_caller", 0, 0);
+		let vault_id = create_vault::<T>(&caller, 7, 100_000)?;
+		VaultsById::<T>::mutate(vault_id, |vault| {
+			let vault = vault.as_mut().expect("benchmark vault");
+			vault.securitization_locked = 100_000u32.into();
+			vault.backfill_securitization_locked = 100_000u32.into();
+		});
+
+		#[extrinsic_call]
+		_(RawOrigin::Signed(caller), vault_id, 100_000u32.into());
+
+		let vault = VaultsById::<T>::get(vault_id).ok_or(BenchmarkError::Stop("vault missing"))?;
+		assert_eq!(vault.backfill_securitization_reserved, 100_000u32.into());
+		Ok(())
+	}
+
+	#[benchmark]
 	fn set_name() -> Result<(), BenchmarkError> {
 		let caller: T::AccountId = account("set_name_caller", 0, 0);
-		let vault_id = create_vault::<T>(&caller, 7, 100_000)?;
+		let vault_id = create_vault::<T>(&caller, 8, 100_000)?;
 		let name: VaultName = BoundedVec::truncate_from(b"VaultAlpha1".to_vec());
 		let current_tick = T::TickProvider::current_tick();
 

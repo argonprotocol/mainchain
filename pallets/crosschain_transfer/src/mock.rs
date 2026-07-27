@@ -378,10 +378,19 @@ impl BitcoinVaultProvider for MockVaultProvider {
 		unimplemented!()
 	}
 
-	fn reduce_securitized_satoshis(
+	fn get_projected_backfill_backing(
 		_vault_id: VaultId,
+		_backfill_securitization_released: Self::Balance,
+		_backfill_securitization_added: Self::Balance,
+	) -> Option<(Self::Balance, Self::Balance)> {
+		unimplemented!()
+	}
+
+	fn set_bitcoin_lock_as_backfill(
+		_vault_id: VaultId,
+		_securitization: &argon_primitives::vault::Securitization<Self::Balance>,
 		_satoshis: argon_primitives::bitcoin::Satoshis,
-		_securitization_ratio: sp_runtime::FixedU128,
+		_is_backfill: bool,
 	) -> Result<(), argon_primitives::vault::VaultError> {
 		unimplemented!()
 	}
@@ -397,12 +406,7 @@ impl BitcoinVaultProvider for MockVaultProvider {
 		_vault_id: VaultId,
 		_locker: &Self::AccountId,
 		_securitization: &argon_primitives::vault::Securitization<Self::Balance>,
-		_satoshis: argon_primitives::bitcoin::Satoshis,
-		_extension: Option<(
-			sp_runtime::FixedU128,
-			&mut argon_primitives::vault::LockExtension<Self::Balance>,
-		)>,
-		_vault_covers_fee: bool,
+		_request: argon_primitives::vault::VaultLockRequest<'_, Self::Balance>,
 	) -> Result<Self::Balance, argon_primitives::vault::VaultError> {
 		unimplemented!()
 	}
@@ -412,6 +416,7 @@ impl BitcoinVaultProvider for MockVaultProvider {
 		_securitization: &argon_primitives::vault::Securitization<Self::Balance>,
 		_satoshis: argon_primitives::bitcoin::Satoshis,
 		_lock_extension: &argon_primitives::vault::LockExtension<Self::Balance>,
+		_is_backfill: bool,
 	) -> Result<(), argon_primitives::vault::VaultError> {
 		unimplemented!()
 	}
@@ -426,8 +431,10 @@ impl BitcoinVaultProvider for MockVaultProvider {
 	fn burn(
 		_vault_id: VaultId,
 		_securitization: &argon_primitives::vault::Securitization<Self::Balance>,
+		_satoshis: argon_primitives::bitcoin::Satoshis,
 		_market_rate: Self::Balance,
 		_lock_extension: &argon_primitives::vault::LockExtension<Self::Balance>,
+		_is_backfill: bool,
 	) -> Result<Self::Balance, argon_primitives::vault::VaultError> {
 		unimplemented!()
 	}
@@ -436,8 +443,10 @@ impl BitcoinVaultProvider for MockVaultProvider {
 		_vault_id: VaultId,
 		_beneficiary: &Self::AccountId,
 		_securitization: &argon_primitives::vault::Securitization<Self::Balance>,
+		_satoshis: argon_primitives::bitcoin::Satoshis,
 		_market_rate: Self::Balance,
 		_lock_extension: &argon_primitives::vault::LockExtension<Self::Balance>,
+		_is_backfill: bool,
 	) -> Result<Self::Balance, argon_primitives::vault::VaultError> {
 		unimplemented!()
 	}

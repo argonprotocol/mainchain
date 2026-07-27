@@ -60,6 +60,7 @@ pub trait WeightInfo {
 	fn request_orphaned_utxo_release() -> Weight;
 	fn cosign_orphaned_utxo_release() -> Weight;
 	fn increase_securitization() -> Weight;
+	fn set_as_backfill() -> Weight;
 	fn register_fee_coupon() -> Weight;
 
 	fn provider_get_account_funded_bitcoin_amount() -> Weight;
@@ -145,6 +146,10 @@ where
 		Base::increase_securitization()
 	}
 
+	fn set_as_backfill() -> Weight {
+		Base::set_as_backfill()
+	}
+
 	fn register_fee_coupon() -> Weight {
 		Base::register_fee_coupon()
 	}
@@ -227,6 +232,7 @@ impl WeightInfo for () {
 	fn request_orphaned_utxo_release() -> Weight { Weight::zero() }
 	fn cosign_orphaned_utxo_release() -> Weight { Weight::zero() }
 	fn increase_securitization() -> Weight { Weight::zero() }
+	fn set_as_backfill() -> Weight { Weight::zero() }
 	fn register_fee_coupon() -> Weight { Weight::zero() }
 	fn provider_get_account_funded_bitcoin_amount() -> Weight { Weight::zero() }
 	fn provider_funding_received() -> Weight { Weight::zero() }

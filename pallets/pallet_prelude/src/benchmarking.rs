@@ -23,7 +23,7 @@ use argon_primitives::{
 	tick::{Tick, TickDigest, Ticker},
 	vault::{
 		BitcoinVaultProvider, LockExtension, RegistrationVaultData, Securitization,
-		TreasuryVaultProvider, Vault, VaultError, VaultTreasuryFrameEarnings,
+		TreasuryVaultProvider, Vault, VaultError, VaultLockRequest, VaultTreasuryFrameEarnings,
 	},
 	ArgonCPI, NotaryId, NotebookNumber, NotebookSecret, OperationalRewardPayout, PriceProvider,
 	UtxoLockEvents, VaultId, VotingSchedule,
@@ -1290,28 +1290,36 @@ where
 	) -> Result<(), VaultError> {
 		mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
 			let vault = state.vaults.get_mut(&vault_id).ok_or(VaultError::VaultNotFound)?;
-			let securitized_satoshis = securitization_ratio.saturating_mul_int(satoshis);
-			vault.locked_satoshis.saturating_accrue(satoshis);
-			vault.securitized_satoshis.saturating_accrue(securitized_satoshis);
+			vault.add_securitized_satoshis(satoshis, securitization_ratio);
 			Ok(())
 		})
 	}
 
-	fn reduce_securitized_satoshis(
+	fn get_projected_backfill_backing(
 		vault_id: VaultId,
+		backfill_securitization_released: Self::Balance,
+		backfill_securitization_added: Self::Balance,
+	) -> Option<(Self::Balance, Self::Balance)> {
+		benchmark_bitcoin_vault_provider_state::<AccountId, Balance>()
+			.vaults
+			.get(&vault_id)
+			.map(|vault| {
+				vault.projected_backfill_backing(
+					backfill_securitization_released,
+					backfill_securitization_added,
+				)
+			})
+	}
+
+	fn set_bitcoin_lock_as_backfill(
+		vault_id: VaultId,
+		securitization: &Securitization<Self::Balance>,
 		satoshis: Satoshis,
-		securitization_ratio: FixedU128,
+		is_backfill: bool,
 	) -> Result<(), VaultError> {
 		mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
 			let vault = state.vaults.get_mut(&vault_id).ok_or(VaultError::VaultNotFound)?;
-			let securitized_satoshis = securitization_ratio.saturating_mul_int(satoshis);
-			if vault.locked_satoshis < satoshis || vault.securitized_satoshis < securitized_satoshis
-			{
-				return Err(VaultError::InternalError);
-			}
-			vault.locked_satoshis.saturating_reduce(satoshis);
-			vault.securitized_satoshis.saturating_reduce(securitized_satoshis);
-			Ok(())
+			vault.set_bitcoin_lock_as_backfill(securitization, satoshis, is_backfill)
 		})
 	}
 
@@ -1319,24 +1327,30 @@ where
 		vault_id: VaultId,
 		locker: &Self::AccountId,
 		securitization: &Securitization<Self::Balance>,
-		_satoshis: Satoshis,
-		extension: Option<(FixedU128, &mut LockExtension<Self::Balance>)>,
-		_has_fee_coupon: bool,
+		request: VaultLockRequest<'_, Self::Balance>,
 	) -> Result<Self::Balance, VaultError> {
+		let VaultLockRequest {
+			extension, is_backfill, backfill_securitization_to_unreserve, ..
+		} = request;
 		let (total_fee, charge_fee) =
 			mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
 				let charge_fee = state.charge_fee;
 				let vault = state.vaults.get_mut(&vault_id).ok_or(VaultError::VaultNotFound)?;
-				ensure!(
-					vault.available_for_lock() >= securitization.collateral_required,
-					VaultError::InsufficientVaultFunds
-				);
+				let is_operator = vault.operator_account_id == *locker;
 				let term =
 					extension.as_ref().map(|(duration, _)| *duration).unwrap_or(FixedU128::one());
 				if let Some((_, lock_extension)) = extension {
-					vault.extend_lock(securitization, lock_extension)?;
+					vault.extend_lock(securitization, lock_extension, is_backfill)?;
 				} else {
-					vault.lock(securitization)?;
+					ensure!(
+						backfill_securitization_to_unreserve <=
+							vault.backfill_securitization_reserved,
+						VaultError::InsufficientVaultFunds
+					);
+					vault
+						.backfill_securitization_reserved
+						.saturating_reduce(backfill_securitization_to_unreserve);
+					vault.lock(securitization, is_operator)?;
 				}
 				let total_fee = vault
 					.terms
@@ -1364,12 +1378,13 @@ where
 	fn schedule_for_release(
 		vault_id: VaultId,
 		securitization: &Securitization<Self::Balance>,
-		_satoshis: Satoshis,
+		satoshis: Satoshis,
 		lock_extension: &LockExtension<Self::Balance>,
+		is_backfill: bool,
 	) -> Result<(), VaultError> {
 		mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
 			let vault = state.vaults.get_mut(&vault_id).ok_or(VaultError::VaultNotFound)?;
-			vault.schedule_for_release(securitization, lock_extension)?;
+			vault.schedule_for_release(securitization, satoshis, lock_extension, is_backfill)?;
 			Ok(())
 		})
 	}
@@ -1389,12 +1404,16 @@ where
 	fn burn(
 		vault_id: VaultId,
 		securitization: &Securitization<Self::Balance>,
+		satoshis: Satoshis,
 		market_rate: Self::Balance,
 		lock_extension: &LockExtension<Self::Balance>,
+		is_backfill: bool,
 	) -> Result<Self::Balance, VaultError> {
 		mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
 			let vault = state.vaults.get_mut(&vault_id).ok_or(VaultError::VaultNotFound)?;
-			Ok(vault.burn(securitization, market_rate, lock_extension)?.burned_amount)
+			Ok(vault
+				.burn(securitization, satoshis, market_rate, lock_extension, is_backfill)?
+				.burned_amount)
 		})
 	}
 
@@ -1402,10 +1421,12 @@ where
 		vault_id: VaultId,
 		_beneficiary: &Self::AccountId,
 		securitization: &Securitization<Self::Balance>,
+		satoshis: Satoshis,
 		market_rate: Self::Balance,
 		lock_extension: &LockExtension<Self::Balance>,
+		is_backfill: bool,
 	) -> Result<Self::Balance, VaultError> {
-		Self::burn(vault_id, securitization, market_rate, lock_extension)
+		Self::burn(vault_id, securitization, satoshis, market_rate, lock_extension, is_backfill)
 	}
 
 	fn create_utxo_script_pubkey(

@@ -162,6 +162,9 @@ macro_rules! inject_runtime_vars {
 			pallet_operational_accounts::migrations::RemoveLegacyEncryptedServerStorageMigration<
 				Runtime,
 			>,
+			pallet_vaults::migrations::AddBackfillFieldsMigration<Runtime>,
+			pallet_treasury::migrations::AddBondBackfillStateMigration<Runtime>,
+			pallet_bitcoin_locks::migrations::AddBitcoinBackfillFlagMigration<Runtime>,
 		);
 
 		/// Unchecked extrinsic type as expected by this runtime.

@@ -199,7 +199,8 @@ fn initialize_for_requires_vault_permissions_and_covers_lock_fee() {
 				1,
 				SATOSHIS_PER_BITCOIN,
 				pubkey,
-				Some(LockOptions::V1 { microgons_at_target_per_btc: None })
+				Some(LockOptions::V1 { microgons_at_target_per_btc: None }),
+				0,
 			),
 			Error::<Test>::NoPermissions
 		);
@@ -211,6 +212,7 @@ fn initialize_for_requires_vault_permissions_and_covers_lock_fee() {
 			SATOSHIS_PER_BITCOIN,
 			pubkey,
 			Some(LockOptions::V1 { microgons_at_target_per_btc: None }),
+			0,
 		);
 		assert!(matches!(result, Ok(post_info) if post_info.pays_fee == Pays::No));
 
@@ -226,6 +228,7 @@ fn initialize_for_requires_vault_permissions_and_covers_lock_fee() {
 			SATOSHIS_PER_BITCOIN,
 			pubkey,
 			Some(LockOptions::V1 { microgons_at_target_per_btc: None }),
+			0,
 		);
 		assert!(matches!(result, Ok(post_info) if post_info.pays_fee == Pays::No));
 
@@ -234,6 +237,87 @@ fn initialize_for_requires_vault_permissions_and_covers_lock_fee() {
 		assert_eq!(lock.coupon_paid_fees, fee);
 	});
 	set_bitcoin_height(12);
+}
+
+#[test]
+fn initialize_for_unreserves_backfill_securitization_atomically() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		let satoshis = SATOSHIS_PER_BITCOIN;
+		let required_collateral =
+			StaticPriceProvider::get_btc_price_in_market_microgons(satoshis).expect("price");
+		DefaultVault::mutate(|vault| {
+			vault.securitization = required_collateral;
+			vault.securitization_target = required_collateral;
+		});
+		set_argons(1, required_collateral);
+
+		assert_ok!(BitcoinLocks::initialize(
+			RuntimeOrigin::signed(1),
+			1,
+			satoshis,
+			CompressedBitcoinPubkey([1; 33]),
+			None,
+		));
+		assert_ok!(BitcoinLocks::funding_received(1, satoshis));
+		assert_ok!(BitcoinLocks::set_as_backfill(RuntimeOrigin::signed(1), 1, true));
+		DefaultVault::mutate(|vault| {
+			vault
+				.set_backfill_securitization_reserved(required_collateral)
+				.expect("reserve backfill");
+		});
+
+		assert_noop!(
+			BitcoinLocks::initialize(
+				RuntimeOrigin::signed(2),
+				1,
+				satoshis,
+				CompressedBitcoinPubkey([2; 33]),
+				None,
+			),
+			Error::<Test>::InsufficientVaultFunds
+		);
+		assert_ok!(BitcoinLocks::initialize_for(
+			RuntimeOrigin::signed(1),
+			2,
+			1,
+			satoshis,
+			CompressedBitcoinPubkey([2; 33]),
+			None,
+			required_collateral,
+		));
+		assert_eq!(DefaultVault::get().backfill_securitization_reserved, 0);
+		assert_eq!(LocksByUtxoId::<Test>::get(2).expect("new lock").owner_account, 2);
+		assert_noop!(
+			BitcoinLocks::set_as_backfill(RuntimeOrigin::signed(1), 1, false),
+			Error::<Test>::InsufficientVaultFunds
+		);
+		assert!(LocksByUtxoId::<Test>::get(1).expect("backfill lock").is_backfill);
+	});
+}
+
+#[test]
+fn set_as_backfill_rejects_a_missing_vault() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		set_argons(1, 100_000 * MICROGONS_PER_ARGON);
+
+		assert_ok!(BitcoinLocks::initialize(
+			RuntimeOrigin::signed(1),
+			1,
+			SATOSHIS_PER_BITCOIN,
+			CompressedBitcoinPubkey([1; 33]),
+			None,
+		));
+		LocksByUtxoId::<Test>::mutate(1, |lock| {
+			lock.as_mut().expect("lock should exist").vault_id = 2;
+		});
+
+		assert_noop!(
+			BitcoinLocks::set_as_backfill(RuntimeOrigin::signed(1), 1, true),
+			Error::<Test>::VaultNotFound
+		);
+	});
 }
 
 #[test]
@@ -258,6 +342,7 @@ fn initialize_for_stale_vault_capacity_failure_is_no_fee() {
 			SATOSHIS_PER_BITCOIN,
 			pubkey,
 			Some(LockOptions::V1 { microgons_at_target_per_btc: None }),
+			0,
 		)
 		.unwrap_err();
 
@@ -288,6 +373,7 @@ fn initialize_for_non_stale_vault_capacity_failure_still_pays_fees() {
 			SATOSHIS_PER_BITCOIN,
 			pubkey,
 			Some(LockOptions::V1 { microgons_at_target_per_btc: None }),
+			0,
 		)
 		.unwrap_err();
 
@@ -307,6 +393,7 @@ fn initialize_for_has_a_pool_key_per_vault_and_account() {
 			satoshis: SATOSHIS_PER_BITCOIN,
 			bitcoin_pubkey: pubkey,
 			options: Some(LockOptions::V1 { microgons_at_target_per_btc: None }),
+			backfill_securitization_to_unreserve: 0,
 		});
 		let second_call = RuntimeCall::BitcoinLocks(crate::Call::<Test>::initialize_for {
 			account_id: 3,
@@ -314,6 +401,7 @@ fn initialize_for_has_a_pool_key_per_vault_and_account() {
 			satoshis: SATOSHIS_PER_BITCOIN,
 			bitcoin_pubkey: pubkey,
 			options: Some(LockOptions::V1 { microgons_at_target_per_btc: None }),
+			backfill_securitization_to_unreserve: 0,
 		});
 
 		let first_key = <BitcoinLocks as CallTxPoolKeyProvider<RuntimeCall, u64>>::key_for(
@@ -1626,7 +1714,7 @@ fn it_should_allow_a_ratchet_up() {
 		System::set_block_number(1);
 
 		let pubkey = CompressedBitcoinPubkey([1; 33]);
-		let who = 1;
+		let who = 2;
 		let satoshis = SATOSHIS_PER_BITCOIN;
 		let current_block = BitcoinBlockHeightChange::get().1;
 		BitcoinPriceInUsd::set(Some(FixedU128::saturating_from_integer(62_000)));
@@ -1637,7 +1725,8 @@ fn it_should_allow_a_ratchet_up() {
 			a.terms.bitcoin_base_fee = 1000;
 			a.terms.bitcoin_annual_percent_rate = apr;
 
-			a.lock(&securitization).unwrap();
+			a.lock(&securitization, false).unwrap();
+			a.remove_pending_activation(&securitization);
 		});
 		set_argons(who, 5000);
 		assert_ok!(BitcoinLocks::initialize(RuntimeOrigin::signed(who), 1, satoshis, pubkey, None));
@@ -1660,7 +1749,7 @@ fn it_should_allow_a_ratchet_up() {
 		let extension = LockExtension::new(expiration_block + 144);
 		// release funds with an expiration
 		DefaultVault::mutate(|a| {
-			a.schedule_for_release(&securitization, &extension).unwrap();
+			a.schedule_for_release(&securitization, 0, &extension, false).unwrap();
 		});
 
 		assert_ok!(BitcoinLocks::ratchet(RuntimeOrigin::signed(who), 1, None));
@@ -1702,7 +1791,7 @@ fn it_should_charge_ratchet_up_fee_for_remaining_lock_term() {
 		System::set_block_number(1);
 
 		let pubkey = CompressedBitcoinPubkey([1; 33]);
-		let who = 1;
+		let who = 2;
 		let satoshis = SATOSHIS_PER_BITCOIN;
 		let current_block = BitcoinBlockHeightChange::get().1;
 		BitcoinPriceInUsd::set(Some(FixedU128::saturating_from_integer(62_000)));
@@ -1713,7 +1802,8 @@ fn it_should_charge_ratchet_up_fee_for_remaining_lock_term() {
 			a.terms.bitcoin_base_fee = 1000;
 			a.terms.bitcoin_annual_percent_rate = apr;
 
-			a.lock(&securitization).unwrap();
+			a.lock(&securitization, false).unwrap();
+			a.remove_pending_activation(&securitization);
 		});
 		set_argons(who, 5000);
 		assert_ok!(BitcoinLocks::initialize(RuntimeOrigin::signed(who), 1, satoshis, pubkey, None));
@@ -1733,7 +1823,7 @@ fn it_should_charge_ratchet_up_fee_for_remaining_lock_term() {
 		BitcoinPriceInUsd::set(Some(FixedU128::saturating_from_integer(65_000)));
 		let extension = LockExtension::new(expiration_block + 144);
 		DefaultVault::mutate(|a| {
-			a.schedule_for_release(&securitization, &extension).unwrap();
+			a.schedule_for_release(&securitization, 0, &extension, false).unwrap();
 		});
 
 		assert_ok!(BitcoinLocks::ratchet(RuntimeOrigin::signed(who), 1, None));
@@ -1758,7 +1848,7 @@ fn it_should_charge_early_ratchet_up_fee_for_remaining_lock_term() {
 		System::set_block_number(1);
 
 		let pubkey = CompressedBitcoinPubkey([1; 33]);
-		let who = 1;
+		let who = 2;
 		let satoshis = SATOSHIS_PER_BITCOIN;
 		let base_fee = 2 * MICROGONS_PER_ARGON;
 		let apr = FixedU128::from_rational(5, 100);
@@ -1769,7 +1859,8 @@ fn it_should_charge_early_ratchet_up_fee_for_remaining_lock_term() {
 			a.terms.bitcoin_base_fee = base_fee;
 			a.terms.bitcoin_annual_percent_rate = apr;
 
-			a.lock(&securitization).unwrap();
+			a.lock(&securitization, false).unwrap();
+			a.remove_pending_activation(&securitization);
 		});
 		set_argons(who, 1_000_000 * MICROGONS_PER_ARGON);
 		assert_ok!(BitcoinLocks::initialize(RuntimeOrigin::signed(who), 1, satoshis, pubkey, None));
@@ -1785,7 +1876,7 @@ fn it_should_charge_early_ratchet_up_fee_for_remaining_lock_term() {
 		BitcoinPriceInUsd::set(Some(FixedU128::saturating_from_integer(611)));
 		let extension = LockExtension::new(expiration_block + 144);
 		DefaultVault::mutate(|a| {
-			a.schedule_for_release(&securitization, &extension).unwrap();
+			a.schedule_for_release(&securitization, 0, &extension, false).unwrap();
 		});
 
 		assert_ok!(BitcoinLocks::ratchet(RuntimeOrigin::signed(who), 1, None));
@@ -1886,6 +1977,63 @@ fn it_should_allow_a_ratchet_down() {
 }
 
 #[test]
+fn backfill_ratchet_requires_full_aggregate_backing() {
+	new_test_ext().execute_with(|| {
+		set_bitcoin_height(1);
+		System::set_block_number(1);
+		BitcoinPriceInUsd::set(Some(FixedU128::saturating_from_integer(62_000)));
+
+		let operator = 1;
+		let joiner = 2;
+		let satoshis = SATOSHIS_PER_BITCOIN / 2;
+		DefaultVault::mutate(|vault| {
+			vault.securitization = 62_000 * MICROGONS_PER_ARGON;
+			vault.securitization_target = vault.securitization;
+		});
+		set_argons(operator, 100_000 * MICROGONS_PER_ARGON);
+		set_argons(joiner, 10_000 * MICROGONS_PER_ARGON);
+
+		for utxo_id in 1..=2 {
+			assert_ok!(BitcoinLocks::initialize(
+				RuntimeOrigin::signed(operator),
+				1,
+				satoshis,
+				CompressedBitcoinPubkey([utxo_id as u8; 33]),
+				None,
+			));
+			assert_ok!(BitcoinLocks::funding_received(utxo_id, satoshis));
+			assert_ok!(BitcoinLocks::set_as_backfill(
+				RuntimeOrigin::signed(operator),
+				utxo_id,
+				true,
+			));
+		}
+		assert_ok!(BitcoinLocks::initialize(
+			RuntimeOrigin::signed(joiner),
+			1,
+			satoshis,
+			CompressedBitcoinPubkey([3; 33]),
+			None,
+		));
+		assert_eq!(
+			DefaultVault::get().backfill_securitization_backed(),
+			31_000 * MICROGONS_PER_ARGON,
+		);
+
+		BitcoinPriceInUsd::set(Some(FixedU128::saturating_from_integer(52_000)));
+		assert_err!(
+			BitcoinLocks::ratchet(RuntimeOrigin::signed(operator), 1, None),
+			Error::<Test>::InsufficientVaultFunds,
+		);
+
+		DefaultVault::mutate(|vault| {
+			vault.securitization = 93_000 * MICROGONS_PER_ARGON;
+		});
+		assert_ok!(BitcoinLocks::ratchet(RuntimeOrigin::signed(operator), 1, None));
+	});
+}
+
+#[test]
 fn it_should_handle_mismatched_satoshis() {
 	new_test_ext().execute_with(|| {
 		set_bitcoin_height(1);
@@ -1913,6 +2061,8 @@ fn it_should_handle_mismatched_satoshis() {
 		assert_eq!(lock.liquidity_promised, 150_000_000);
 		assert_eq!(lock.utxo_satoshis, Some(satoshis + 5000));
 		assert_eq!(lock.security_fees, 1000 + 1, "fees shouldn't change");
+		assert_eq!(DefaultVault::get().locked_satoshis, satoshis);
+		assert_eq!(DefaultVault::get().securitized_satoshis, satoshis);
 
 		// ensure if we get "less", we reduce the liquidity promised
 		let pubkey2 = CompressedBitcoinPubkey([2; 33]);
@@ -1935,6 +2085,8 @@ fn it_should_handle_mismatched_satoshis() {
 		assert_eq!(lock.satoshis, 100_000_000 - 3000);
 		assert_eq!(lock.security_fees, 1000 + 1, "fees shouldn't change");
 		assert_eq!(lock.locked_target_price, actual_sats);
+		assert_eq!(DefaultVault::get().locked_satoshis, satoshis + actual_sats as u64);
+		assert_eq!(DefaultVault::get().securitized_satoshis, satoshis + actual_sats as u64);
 	});
 }
 

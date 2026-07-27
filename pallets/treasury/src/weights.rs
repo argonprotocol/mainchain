@@ -12,6 +12,8 @@ pub trait WeightInfo {
 	fn buy_bonds() -> Weight;
 	fn buy_argonot_bonds() -> Weight;
 	fn liquidate_bond_lot() -> Weight;
+	fn set_bond_lot_as_backfill() -> Weight;
+	fn set_backfill_bonds_reserved() -> Weight;
 	fn provider_has_vault_bond_participation() -> Weight;
 	fn provider_active_vault_bond_amount() -> Weight;
 	fn provider_active_account_vault_bond_amount() -> Weight;
@@ -60,6 +62,14 @@ where
 	fn liquidate_bond_lot() -> Weight {
 		Base::liquidate_bond_lot()
 			.saturating_add(T::OperationalAccountsHook::account_vault_bond_total_updated_weight())
+	}
+
+	fn set_bond_lot_as_backfill() -> Weight {
+		Base::set_bond_lot_as_backfill()
+	}
+
+	fn set_backfill_bonds_reserved() -> Weight {
+		Base::set_backfill_bonds_reserved()
 	}
 
 	fn provider_has_vault_bond_participation() -> Weight {
@@ -140,6 +150,12 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 	fn liquidate_bond_lot() -> Weight {
+		Weight::zero()
+	}
+	fn set_bond_lot_as_backfill() -> Weight {
+		Weight::zero()
+	}
+	fn set_backfill_bonds_reserved() -> Weight {
 		Weight::zero()
 	}
 	fn provider_has_vault_bond_participation() -> Weight {

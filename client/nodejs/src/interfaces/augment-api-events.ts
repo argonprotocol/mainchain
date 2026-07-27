@@ -317,6 +317,11 @@ declare module '@polkadot/api-base/types/events' {
         [utxoId: u64, vaultId: u32, compensationAmount: u128, compensatedAccountId: AccountId32],
         { utxoId: u64; vaultId: u32; compensationAmount: u128; compensatedAccountId: AccountId32 }
       >;
+      BitcoinLockBackfillChanged: AugmentedEvent<
+        ApiType,
+        [utxoId: u64, vaultId: u32, isBackfill: bool],
+        { utxoId: u64; vaultId: u32; isBackfill: bool }
+      >;
       BitcoinLockBurned: AugmentedEvent<
         ApiType,
         [utxoId: u64, vaultId: u32, wasUtxoSpent: bool],
@@ -1842,6 +1847,16 @@ declare module '@polkadot/api-base/types/events' {
       >;
     };
     treasury: {
+      BackfillBondsReservedChanged: AugmentedEvent<
+        ApiType,
+        [vaultId: u32, backfillBondsReserved: u32],
+        { vaultId: u32; backfillBondsReserved: u32 }
+      >;
+      BondLotBackfillChanged: AugmentedEvent<
+        ApiType,
+        [vaultId: u32, bondLotId: u64, isBackfill: bool],
+        { vaultId: u32; bondLotId: u64; isBackfill: bool }
+      >;
       /**
        * A bond purchase entered its active program set.
        **/
@@ -2086,6 +2101,11 @@ declare module '@polkadot/api-base/types/events' {
       >;
     };
     vaults: {
+      BackfillSecuritizationReservedChanged: AugmentedEvent<
+        ApiType,
+        [vaultId: u32, backfillSecuritizationReserved: u128],
+        { vaultId: u32; backfillSecuritizationReserved: u128 }
+      >;
       CommittedArgonotsSet: AugmentedEvent<
         ApiType,
         [vaultId: u32, operatorAccountId: AccountId32, amount: u128],
