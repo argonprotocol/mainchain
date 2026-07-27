@@ -885,6 +885,7 @@ dependencies = [
  "pallet-block-rewards",
  "pallet-block-seal",
  "pallet-block-seal-spec",
+ "pallet-bootstrap",
  "pallet-crosschain-transfer",
  "pallet-digests",
  "pallet-domains",
@@ -1228,6 +1229,7 @@ dependencies = [
  "pallet-block-rewards",
  "pallet-block-seal",
  "pallet-block-seal-spec",
+ "pallet-bootstrap",
  "pallet-crosschain-transfer",
  "pallet-digests",
  "pallet-domains",
@@ -10766,6 +10768,16 @@ dependencies = [
 
 [[package]]
 name = "pallet-block-seal-spec"
+version = "1.4.10"
+dependencies = [
+ "pallet-prelude",
+ "parity-scale-codec",
+ "polkadot-sdk",
+ "scale-info",
+]
+
+[[package]]
+name = "pallet-bootstrap"
 version = "1.4.10"
 dependencies = [
  "pallet-prelude",

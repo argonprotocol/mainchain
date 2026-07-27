@@ -27,6 +27,7 @@ frame_benchmarking::define_benchmarks!(
 	[pallet_vaults, Vaults]
 	[pallet_treasury, Treasury]
 	[pallet_operational_accounts, OperationalAccounts]
+	[pallet_bootstrap, Bootstrap]
 	[pallet_crosschain_transfer, CrosschainTransfer]
 	[pallet_ethereum_verifier, EthereumVerifier]
 );

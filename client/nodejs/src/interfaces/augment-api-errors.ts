@@ -352,6 +352,20 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       MaxNotebooksAtTickExceeded: AugmentedError<ApiType>;
     };
+    bootstrap: {
+      /**
+       * The encrypted payload exceeds [`Config::MaxEncryptedPayloadLen`].
+       **/
+      EncryptedPayloadTooLong: AugmentedError<ApiType>;
+      /**
+       * The endpoint public key is already owned by a different account.
+       **/
+      EndpointOwnedByAnotherAccount: AugmentedError<ApiType>;
+      /**
+       * The recovery proof does not authorize this writer, public key, and payload.
+       **/
+      InvalidRecoveryProof: AugmentedError<ApiType>;
+    };
     crosschainTransfer: {
       /**
        * The force-set cut would discard a queue entry that already has local quorum.
@@ -991,10 +1005,6 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       CannotGrantAccessToSelf: AugmentedError<ApiType>;
       /**
-       * The encrypted server payload exceeds the configured max length.
-       **/
-      EncryptedServerTooLong: AugmentedError<ApiType>;
-      /**
        * The upstream access proof is invalid.
        **/
       InvalidAccessProof: AugmentedError<ApiType>;
@@ -1026,10 +1036,6 @@ declare module '@polkadot/api-base/types/errors' {
        * The requested account has not registered operational accounts.
        **/
       NotOperationalAccount: AugmentedError<ApiType>;
-      /**
-       * The caller is not the upstream account for the requested downstream account.
-       **/
-      NotUpstreamOfDownstream: AugmentedError<ApiType>;
       /**
        * A valid invite is required to register an operational account.
        **/

@@ -49,6 +49,9 @@ import type {
   ArgonRuntimeSessionKeys,
   PalletBalancesAdjustmentDirection,
   PalletBitcoinLocksLockOptions,
+  PalletBootstrapEndpointPubkey,
+  PalletBootstrapRecoveryProof,
+  PalletBootstrapRecoveryPubkey,
   PalletCrosschainTransferAssetKind,
   PalletCrosschainTransferChainConfig,
   PalletCrosschainTransferMintingAuthorityActivationRepaymentPricing,
@@ -533,6 +536,35 @@ declare module '@polkadot/api-base/types/submittable' {
           computeDifficulty: Option<u128> | null | Uint8Array | u128 | AnyNumber,
         ) => SubmittableExtrinsic<ApiType>,
         [Option<u128>, Option<u128>]
+      >;
+    };
+    bootstrap: {
+      /**
+       * Store or replace an encrypted endpoint payload.
+       *
+       * The first writer for `endpoint_pubkey` becomes its owner. Later updates require the
+       * same signing account.
+       **/
+      setEndpoint: AugmentedSubmittable<
+        (
+          endpointPubkey: PalletBootstrapEndpointPubkey | string | Uint8Array,
+          encryptedEndpoint: Bytes | string | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [PalletBootstrapEndpointPubkey, Bytes]
+      >;
+      /**
+       * Store or replace an encrypted recovery payload.
+       *
+       * The proof must be signed by `recovery_pubkey` and binds the submitting `writer`,
+       * `recovery_pubkey`, and the encrypted payload hash.
+       **/
+      setRecoveryPayload: AugmentedSubmittable<
+        (
+          recoveryPubkey: PalletBootstrapRecoveryPubkey | string | Uint8Array,
+          recoveryProof: PalletBootstrapRecoveryProof | { signature?: any } | string | Uint8Array,
+          encryptedRecoveryPayload: Bytes | string | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [PalletBootstrapRecoveryPubkey, PalletBootstrapRecoveryProof, Bytes]
       >;
     };
     crosschainTransfer: {
@@ -1176,16 +1208,6 @@ declare module '@polkadot/api-base/types/submittable' {
           registration: PalletOperationalAccountsRegistration | { V1: any } | string | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
         [PalletOperationalAccountsRegistration]
-      >;
-      /**
-       * Store an opaque encrypted upstream server payload for a downstream account.
-       **/
-      setEncryptedServerForDownstreamAccount: AugmentedSubmittable<
-        (
-          downstreamAccount: AccountId32 | string | Uint8Array,
-          encryptedServer: Bytes | string | Uint8Array,
-        ) => SubmittableExtrinsic<ApiType>,
-        [AccountId32, Bytes]
       >;
       /**
        * Update certification reward amounts for operational accounts.

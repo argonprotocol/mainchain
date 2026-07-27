@@ -1,10 +1,9 @@
 use crate::{
-	AccountOwnershipProof, EncryptedServerByDownstreamAccount, Error,
-	IsOperationalAccountInviteOnly, OpaqueEncryptionPubkey, OperationalAccount,
-	OperationalAccountBySubAccount, OperationalAccounts, OperationalProgressPatch, Registration,
-	RegistrationV1, UpstreamAccessProof, MINING_ACCOUNT_PROOF_MESSAGE_KEY,
-	OPERATIONAL_ACCOUNT_PROOF_MESSAGE_KEY, UPSTREAM_ACCESS_PROOF_MESSAGE_KEY,
-	VAULT_ACCOUNT_PROOF_MESSAGE_KEY,
+	AccountOwnershipProof, Error, IsOperationalAccountInviteOnly, OpaqueEncryptionPubkey,
+	OperationalAccount, OperationalAccountBySubAccount, OperationalAccounts,
+	OperationalProgressPatch, Registration, RegistrationV1, UpstreamAccessProof,
+	MINING_ACCOUNT_PROOF_MESSAGE_KEY, OPERATIONAL_ACCOUNT_PROOF_MESSAGE_KEY,
+	UPSTREAM_ACCESS_PROOF_MESSAGE_KEY, VAULT_ACCOUNT_PROOF_MESSAGE_KEY,
 };
 use argon_primitives::{
 	OperationalAccountProvider, OperationalAccountsHook, Signature, UtxoLockEvents,
@@ -21,7 +20,7 @@ use crate::mock::{
 	record_active_vault_bond_amount, record_funded_bitcoin_amount, record_microgons_in,
 	record_microgons_out, set_argon_balance, set_crosschain_activated, set_registration_lookup,
 	BitcoinLockSizeForAccessCode, ClaimableTreasuryBalance, ClaimedOperationalRewards,
-	MaxEncryptedServerLen, MinimumBitcoin, MinimumBonds, MinimumUniswapTransfer,
+	MinimumBitcoin, MinimumBonds, MinimumUniswapTransfer,
 	OperationalAccounts as OperationalAccountsPallet, OperationalCertificationReward,
 	OperationalMinimumUniswapTransfer, OperationalMinimumVaultSecuritization, RuntimeOrigin, Test,
 	TestAccountId,
@@ -747,63 +746,6 @@ fn test_claim_rewards_pays_to_managed_signer_and_decrements_pending() {
 		assert_eq!(
 			ClaimedOperationalRewards::get(),
 			vec![(account_set.vault, MICROGONS_PER_ARGON)]
-		);
-	});
-}
-
-#[test]
-fn test_upstream_account_can_set_encrypted_server_for_downstream_account() {
-	new_test_ext().execute_with(|| {
-		let upstream_set = make_account_set(181, 182, 183);
-		let downstream_set = make_account_set(185, 186, 187);
-		seed_vault_registration(&upstream_set);
-		register_account(&upstream_set, None);
-		satisfy_and_activate(&upstream_set);
-		register_account(
-			&downstream_set,
-			Some(make_access_proof(&upstream_set.owner, 181, &downstream_set.owner)),
-		);
-
-		let encrypted_server = vec![7u8; 32];
-		assert_ok!(OperationalAccountsPallet::set_encrypted_server_for_downstream_account(
-			RuntimeOrigin::signed(upstream_set.owner.clone()),
-			downstream_set.owner.clone(),
-			encrypted_server.clone(),
-		));
-
-		assert_eq!(
-			EncryptedServerByDownstreamAccount::<Test>::get(&downstream_set.owner)
-				.expect("payload stored")
-				.to_vec(),
-			encrypted_server
-		);
-	});
-}
-
-#[test]
-fn test_set_encrypted_server_requires_upstream_relationship() {
-	new_test_ext().execute_with(|| {
-		let upstream_set = make_account_set(191, 192, 193);
-		let downstream_set = make_account_set(195, 196, 197);
-		register_account(&upstream_set, None);
-		register_account(&downstream_set, None);
-
-		assert_noop!(
-			OperationalAccountsPallet::set_encrypted_server_for_downstream_account(
-				RuntimeOrigin::signed(upstream_set.owner.clone()),
-				downstream_set.owner.clone(),
-				vec![1u8; 32],
-			),
-			Error::<Test>::NotUpstreamOfDownstream
-		);
-
-		assert_noop!(
-			OperationalAccountsPallet::set_encrypted_server_for_downstream_account(
-				RuntimeOrigin::signed(upstream_set.owner.clone()),
-				downstream_set.owner.clone(),
-				vec![0u8; MaxEncryptedServerLen::get() as usize + 1],
-			),
-			Error::<Test>::NotUpstreamOfDownstream
 		);
 	});
 }

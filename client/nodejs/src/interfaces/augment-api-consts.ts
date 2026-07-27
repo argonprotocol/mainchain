@@ -160,6 +160,12 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       targetBlockVotes: u128 & AugmentedConst<ApiType>;
     };
+    bootstrap: {
+      /**
+       * Maximum number of bytes in an encrypted recovery or endpoint payload.
+       **/
+      maxEncryptedPayloadLen: u32 & AugmentedConst<ApiType>;
+    };
     crosschainTransfer: {
       /**
        * Minimum remaining frame commitment required when reading vault committed collateral
@@ -373,10 +379,6 @@ declare module '@polkadot/api-base/types/consts' {
        * Maximum number of available access codes allowed at once.
        **/
       maxAvailableAccessCodes: u32 & AugmentedConst<ApiType>;
-      /**
-       * Maximum number of encrypted server bytes stored per network account.
-       **/
-      maxEncryptedServerLen: u32 & AugmentedConst<ApiType>;
       /**
        * Minimum bitcoin amount required to register.
        **/

@@ -14,7 +14,6 @@ pub trait WeightInfo {
 	fn register() -> Weight;
 	fn set_reward_config() -> Weight;
 	fn force_set_progress() -> Weight;
-	fn set_encrypted_server_for_downstream_account() -> Weight;
 	fn activate() -> Weight;
 	fn claim_rewards() -> Weight;
 	fn on_vault_created() -> Weight;
@@ -110,10 +109,6 @@ where
 		Base::force_set_progress()
 	}
 
-	fn set_encrypted_server_for_downstream_account() -> Weight {
-		Base::set_encrypted_server_for_downstream_account()
-	}
-
 	fn activate() -> Weight {
 		Base::activate()
 			.saturating_add(VaultProviderWeight::get_registration_vault_data())
@@ -186,9 +181,6 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 	fn force_set_progress() -> Weight {
-		Weight::zero()
-	}
-	fn set_encrypted_server_for_downstream_account() -> Weight {
 		Weight::zero()
 	}
 	fn activate() -> Weight {

@@ -6,7 +6,7 @@ pub mod api {
 	mod root_mod {
 		pub use super::*;
 	}
-	pub static PALLETS: [&str; 32usize] = [
+	pub static PALLETS: [&str; 33usize] = [
 		"System",
 		"Digests",
 		"Timestamp",
@@ -39,6 +39,7 @@ pub mod api {
 		"OperationalAccounts",
 		"EthereumVerifier",
 		"CrosschainTransfer",
+		"Bootstrap",
 	];
 	pub static RUNTIME_APIS: [&str; 21usize] = [
 		"Core",
@@ -1168,10 +1169,10 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							143u8, 38u8, 248u8, 204u8, 175u8, 9u8, 229u8, 110u8, 144u8, 160u8,
-							123u8, 38u8, 155u8, 91u8, 68u8, 65u8, 148u8, 81u8, 43u8, 55u8, 9u8,
-							199u8, 70u8, 125u8, 152u8, 1u8, 198u8, 167u8, 207u8, 115u8, 80u8,
-							219u8,
+							71u8, 197u8, 122u8, 37u8, 70u8, 217u8, 188u8, 69u8, 116u8, 175u8,
+							251u8, 222u8, 83u8, 10u8, 53u8, 227u8, 144u8, 147u8, 197u8, 6u8, 137u8,
+							106u8, 61u8, 244u8, 176u8, 51u8, 103u8, 232u8, 107u8, 214u8, 236u8,
+							254u8,
 						],
 					)
 				}
@@ -1189,10 +1190,10 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							179u8, 156u8, 19u8, 145u8, 185u8, 37u8, 161u8, 235u8, 41u8, 13u8,
-							161u8, 201u8, 215u8, 121u8, 135u8, 97u8, 223u8, 203u8, 50u8, 5u8, 44u8,
-							203u8, 252u8, 169u8, 63u8, 113u8, 129u8, 124u8, 84u8, 85u8, 113u8,
-							22u8,
+							171u8, 184u8, 204u8, 68u8, 167u8, 249u8, 138u8, 110u8, 227u8, 2u8,
+							244u8, 145u8, 192u8, 214u8, 80u8, 19u8, 195u8, 120u8, 132u8, 66u8,
+							215u8, 225u8, 100u8, 123u8, 49u8, 197u8, 252u8, 214u8, 118u8, 26u8,
+							89u8, 200u8,
 						],
 					)
 				}
@@ -3200,6 +3201,9 @@ pub mod api {
 		pub fn crosschain_transfer(&self) -> crosschain_transfer::constants::ConstantsApi {
 			crosschain_transfer::constants::ConstantsApi
 		}
+		pub fn bootstrap(&self) -> bootstrap::constants::ConstantsApi {
+			bootstrap::constants::ConstantsApi
+		}
 	}
 	pub struct StorageApi;
 	impl StorageApi {
@@ -3293,6 +3297,9 @@ pub mod api {
 		pub fn crosschain_transfer(&self) -> crosschain_transfer::storage::StorageApi {
 			crosschain_transfer::storage::StorageApi
 		}
+		pub fn bootstrap(&self) -> bootstrap::storage::StorageApi {
+			bootstrap::storage::StorageApi
+		}
 	}
 	pub struct TransactionApi;
 	impl TransactionApi {
@@ -3380,6 +3387,9 @@ pub mod api {
 		pub fn crosschain_transfer(&self) -> crosschain_transfer::calls::TransactionApi {
 			crosschain_transfer::calls::TransactionApi
 		}
+		pub fn bootstrap(&self) -> bootstrap::calls::TransactionApi {
+			bootstrap::calls::TransactionApi
+		}
 	}
 	pub struct ViewFunctionsApi;
 	impl ViewFunctionsApi {
@@ -3396,9 +3406,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				135u8, 87u8, 18u8, 51u8, 243u8, 196u8, 63u8, 9u8, 7u8, 231u8, 60u8, 101u8, 164u8,
-				78u8, 172u8, 245u8, 24u8, 173u8, 187u8, 75u8, 140u8, 221u8, 157u8, 56u8, 185u8,
-				122u8, 94u8, 205u8, 140u8, 114u8, 188u8, 223u8,
+				30u8, 203u8, 9u8, 83u8, 207u8, 19u8, 109u8, 91u8, 187u8, 17u8, 159u8, 165u8, 188u8,
+				224u8, 219u8, 162u8, 190u8, 184u8, 253u8, 13u8, 208u8, 84u8, 159u8, 97u8, 41u8,
+				232u8, 250u8, 178u8, 52u8, 95u8, 158u8, 223u8,
 			]
 	}
 	pub mod system {
@@ -4522,9 +4532,10 @@ pub mod api {
 						"Events",
 						(),
 						[
-							49u8, 47u8, 175u8, 176u8, 67u8, 77u8, 174u8, 65u8, 174u8, 178u8, 242u8,
-							26u8, 205u8, 254u8, 92u8, 19u8, 128u8, 3u8, 35u8, 93u8, 200u8, 39u8,
-							248u8, 63u8, 91u8, 172u8, 207u8, 224u8, 232u8, 72u8, 81u8, 245u8,
+							186u8, 30u8, 211u8, 97u8, 218u8, 79u8, 95u8, 208u8, 247u8, 243u8,
+							214u8, 202u8, 24u8, 184u8, 29u8, 136u8, 220u8, 195u8, 134u8, 171u8,
+							200u8, 152u8, 196u8, 151u8, 212u8, 55u8, 59u8, 227u8, 96u8, 22u8,
+							189u8, 229u8,
 						],
 					)
 				}
@@ -5432,10 +5443,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							164u8, 84u8, 38u8, 109u8, 218u8, 46u8, 188u8, 133u8, 170u8, 16u8,
-							149u8, 127u8, 246u8, 99u8, 82u8, 197u8, 243u8, 164u8, 164u8, 7u8, 77u8,
-							142u8, 194u8, 27u8, 142u8, 199u8, 183u8, 177u8, 81u8, 4u8, 111u8,
-							175u8,
+							103u8, 67u8, 91u8, 43u8, 175u8, 140u8, 226u8, 186u8, 159u8, 99u8,
+							165u8, 145u8, 131u8, 243u8, 217u8, 151u8, 222u8, 116u8, 201u8, 15u8,
+							249u8, 54u8, 52u8, 239u8, 10u8, 208u8, 54u8, 235u8, 112u8, 43u8, 232u8,
+							62u8,
 						],
 					)
 				}
@@ -5500,9 +5511,9 @@ pub mod api {
 							max_weight,
 						},
 						[
-							149u8, 252u8, 108u8, 63u8, 3u8, 199u8, 10u8, 24u8, 221u8, 246u8, 246u8,
-							6u8, 160u8, 245u8, 217u8, 94u8, 127u8, 27u8, 193u8, 44u8, 53u8, 146u8,
-							66u8, 28u8, 221u8, 112u8, 83u8, 212u8, 251u8, 150u8, 67u8, 226u8,
+							107u8, 175u8, 26u8, 19u8, 125u8, 178u8, 130u8, 92u8, 73u8, 186u8, 62u8,
+							91u8, 215u8, 134u8, 91u8, 202u8, 198u8, 132u8, 159u8, 139u8, 147u8,
+							93u8, 26u8, 51u8, 117u8, 15u8, 62u8, 246u8, 192u8, 166u8, 130u8, 61u8,
 						],
 					)
 				}
@@ -6407,10 +6418,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							58u8, 39u8, 196u8, 226u8, 34u8, 70u8, 129u8, 153u8, 27u8, 109u8, 8u8,
-							29u8, 225u8, 82u8, 113u8, 198u8, 145u8, 105u8, 209u8, 206u8, 19u8,
-							112u8, 200u8, 225u8, 177u8, 236u8, 142u8, 165u8, 185u8, 207u8, 103u8,
-							123u8,
+							192u8, 72u8, 102u8, 221u8, 170u8, 30u8, 108u8, 197u8, 174u8, 9u8,
+							157u8, 53u8, 233u8, 155u8, 147u8, 59u8, 83u8, 53u8, 181u8, 133u8,
+							202u8, 13u8, 18u8, 17u8, 160u8, 94u8, 12u8, 194u8, 66u8, 223u8, 144u8,
+							254u8,
 						],
 					)
 				}
@@ -6674,9 +6685,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							245u8, 108u8, 67u8, 214u8, 147u8, 186u8, 246u8, 8u8, 220u8, 43u8, 5u8,
-							216u8, 236u8, 108u8, 69u8, 21u8, 247u8, 93u8, 77u8, 124u8, 239u8,
-							248u8, 200u8, 217u8, 9u8, 170u8, 186u8, 48u8, 58u8, 14u8, 120u8, 42u8,
+							26u8, 82u8, 5u8, 117u8, 85u8, 79u8, 151u8, 137u8, 31u8, 129u8, 99u8,
+							154u8, 107u8, 10u8, 217u8, 61u8, 142u8, 173u8, 125u8, 192u8, 233u8,
+							193u8, 74u8, 211u8, 193u8, 36u8, 46u8, 32u8, 79u8, 2u8, 130u8, 34u8,
 						],
 					)
 				}
@@ -6725,10 +6736,10 @@ pub mod api {
 						],
 						check_permissions::Input { call, proxy_type },
 						[
-							127u8, 130u8, 232u8, 117u8, 217u8, 216u8, 125u8, 215u8, 182u8, 114u8,
-							47u8, 186u8, 134u8, 40u8, 123u8, 204u8, 122u8, 22u8, 57u8, 111u8,
-							186u8, 29u8, 162u8, 205u8, 217u8, 72u8, 58u8, 57u8, 107u8, 182u8, 62u8,
-							50u8,
+							129u8, 197u8, 228u8, 156u8, 164u8, 254u8, 218u8, 151u8, 156u8, 181u8,
+							146u8, 119u8, 146u8, 155u8, 39u8, 140u8, 114u8, 159u8, 22u8, 95u8,
+							19u8, 13u8, 170u8, 33u8, 241u8, 60u8, 97u8, 187u8, 19u8, 84u8, 115u8,
+							59u8,
 						],
 					)
 				}
@@ -21685,10 +21696,9 @@ pub mod api {
 						"batch",
 						types::Batch { calls },
 						[
-							88u8, 231u8, 139u8, 40u8, 145u8, 252u8, 222u8, 224u8, 116u8, 20u8,
-							113u8, 79u8, 191u8, 251u8, 99u8, 4u8, 205u8, 83u8, 188u8, 118u8, 90u8,
-							33u8, 146u8, 217u8, 141u8, 119u8, 102u8, 116u8, 67u8, 175u8, 118u8,
-							242u8,
+							164u8, 15u8, 62u8, 129u8, 182u8, 81u8, 201u8, 211u8, 7u8, 169u8, 85u8,
+							89u8, 96u8, 69u8, 19u8, 194u8, 131u8, 13u8, 22u8, 2u8, 85u8, 251u8,
+							209u8, 28u8, 25u8, 193u8, 1u8, 190u8, 3u8, 224u8, 105u8, 3u8,
 						],
 					)
 				}
@@ -21718,9 +21728,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							211u8, 149u8, 156u8, 37u8, 238u8, 186u8, 54u8, 25u8, 230u8, 16u8,
-							189u8, 89u8, 37u8, 139u8, 102u8, 187u8, 236u8, 53u8, 127u8, 47u8, 45u8,
-							103u8, 29u8, 188u8, 10u8, 250u8, 35u8, 85u8, 94u8, 54u8, 10u8, 93u8,
+							134u8, 99u8, 98u8, 239u8, 5u8, 252u8, 194u8, 139u8, 19u8, 152u8, 239u8,
+							32u8, 135u8, 154u8, 122u8, 162u8, 179u8, 73u8, 128u8, 101u8, 153u8,
+							108u8, 181u8, 133u8, 160u8, 17u8, 86u8, 79u8, 116u8, 73u8, 181u8,
+							126u8,
 						],
 					)
 				}
@@ -21746,9 +21757,10 @@ pub mod api {
 						"batch_all",
 						types::BatchAll { calls },
 						[
-							60u8, 119u8, 165u8, 208u8, 226u8, 184u8, 89u8, 156u8, 198u8, 22u8,
-							248u8, 179u8, 109u8, 116u8, 62u8, 31u8, 15u8, 0u8, 94u8, 127u8, 222u8,
-							207u8, 238u8, 81u8, 37u8, 149u8, 28u8, 17u8, 16u8, 121u8, 168u8, 28u8,
+							201u8, 226u8, 47u8, 118u8, 141u8, 130u8, 93u8, 48u8, 99u8, 16u8, 94u8,
+							17u8, 195u8, 64u8, 99u8, 129u8, 226u8, 225u8, 135u8, 210u8, 220u8,
+							147u8, 174u8, 227u8, 227u8, 180u8, 165u8, 21u8, 86u8, 187u8, 14u8,
+							104u8,
 						],
 					)
 				}
@@ -21771,10 +21783,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							195u8, 63u8, 226u8, 169u8, 103u8, 224u8, 122u8, 221u8, 173u8, 233u8,
-							185u8, 37u8, 26u8, 26u8, 222u8, 188u8, 117u8, 174u8, 213u8, 101u8,
-							178u8, 193u8, 117u8, 220u8, 237u8, 58u8, 126u8, 243u8, 226u8, 30u8,
-							54u8, 80u8,
+							9u8, 90u8, 64u8, 142u8, 37u8, 207u8, 63u8, 232u8, 91u8, 190u8, 137u8,
+							97u8, 2u8, 223u8, 109u8, 67u8, 169u8, 94u8, 1u8, 231u8, 155u8, 212u8,
+							153u8, 58u8, 175u8, 60u8, 40u8, 116u8, 45u8, 149u8, 78u8, 5u8,
 						],
 					)
 				}
@@ -21800,9 +21811,10 @@ pub mod api {
 						"force_batch",
 						types::ForceBatch { calls },
 						[
-							230u8, 23u8, 178u8, 106u8, 97u8, 60u8, 22u8, 248u8, 11u8, 98u8, 163u8,
-							27u8, 23u8, 75u8, 73u8, 205u8, 131u8, 89u8, 238u8, 128u8, 60u8, 232u8,
-							84u8, 231u8, 192u8, 61u8, 11u8, 9u8, 136u8, 219u8, 40u8, 246u8,
+							103u8, 132u8, 220u8, 167u8, 196u8, 255u8, 44u8, 134u8, 108u8, 211u8,
+							140u8, 171u8, 132u8, 100u8, 86u8, 165u8, 190u8, 102u8, 186u8, 43u8,
+							198u8, 29u8, 57u8, 49u8, 40u8, 52u8, 213u8, 171u8, 145u8, 218u8, 118u8,
+							102u8,
 						],
 					)
 				}
@@ -21825,9 +21837,10 @@ pub mod api {
 							weight,
 						},
 						[
-							117u8, 200u8, 108u8, 27u8, 122u8, 55u8, 30u8, 60u8, 96u8, 52u8, 107u8,
-							91u8, 8u8, 67u8, 86u8, 51u8, 82u8, 185u8, 104u8, 243u8, 189u8, 65u8,
-							27u8, 14u8, 202u8, 127u8, 49u8, 3u8, 3u8, 25u8, 207u8, 213u8,
+							214u8, 64u8, 230u8, 180u8, 108u8, 169u8, 185u8, 184u8, 173u8, 23u8,
+							93u8, 0u8, 87u8, 185u8, 162u8, 30u8, 222u8, 74u8, 78u8, 114u8, 230u8,
+							200u8, 128u8, 15u8, 232u8, 87u8, 115u8, 100u8, 16u8, 160u8, 150u8,
+							141u8,
 						],
 					)
 				}
@@ -21867,10 +21880,9 @@ pub mod api {
 							fallback: ::subxt::ext::subxt_core::alloc::boxed::Box::new(fallback),
 						},
 						[
-							142u8, 160u8, 114u8, 236u8, 196u8, 122u8, 131u8, 165u8, 213u8, 60u8,
-							123u8, 18u8, 13u8, 82u8, 172u8, 42u8, 145u8, 109u8, 76u8, 31u8, 215u8,
-							156u8, 157u8, 16u8, 239u8, 72u8, 172u8, 177u8, 152u8, 157u8, 33u8,
-							93u8,
+							0u8, 192u8, 184u8, 29u8, 83u8, 53u8, 184u8, 173u8, 94u8, 151u8, 21u8,
+							245u8, 34u8, 247u8, 84u8, 73u8, 175u8, 124u8, 56u8, 51u8, 171u8, 138u8,
+							91u8, 197u8, 112u8, 128u8, 42u8, 122u8, 100u8, 225u8, 75u8, 54u8,
 						],
 					)
 				}
@@ -21893,10 +21905,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							178u8, 134u8, 75u8, 12u8, 124u8, 230u8, 162u8, 100u8, 160u8, 40u8,
-							245u8, 56u8, 199u8, 46u8, 70u8, 140u8, 124u8, 177u8, 36u8, 145u8, 62u8,
-							140u8, 98u8, 18u8, 221u8, 236u8, 221u8, 117u8, 97u8, 35u8, 208u8,
-							239u8,
+							242u8, 137u8, 120u8, 220u8, 1u8, 195u8, 84u8, 250u8, 84u8, 132u8,
+							149u8, 142u8, 224u8, 117u8, 199u8, 92u8, 248u8, 147u8, 245u8, 120u8,
+							12u8, 145u8, 120u8, 99u8, 237u8, 110u8, 251u8, 68u8, 57u8, 39u8, 120u8,
+							17u8,
 						],
 					)
 				}
@@ -22232,9 +22244,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							123u8, 105u8, 211u8, 84u8, 60u8, 58u8, 79u8, 4u8, 37u8, 205u8, 219u8,
-							157u8, 220u8, 244u8, 14u8, 152u8, 198u8, 203u8, 197u8, 23u8, 192u8,
-							230u8, 51u8, 143u8, 87u8, 229u8, 81u8, 77u8, 25u8, 108u8, 69u8, 91u8,
+							5u8, 145u8, 78u8, 17u8, 206u8, 98u8, 88u8, 172u8, 148u8, 209u8, 141u8,
+							22u8, 197u8, 72u8, 30u8, 60u8, 133u8, 168u8, 57u8, 135u8, 92u8, 201u8,
+							239u8, 197u8, 30u8, 83u8, 22u8, 179u8, 134u8, 132u8, 106u8, 218u8,
 						],
 					)
 				}
@@ -22257,9 +22269,9 @@ pub mod api {
 							weight,
 						},
 						[
-							37u8, 155u8, 58u8, 220u8, 87u8, 139u8, 0u8, 244u8, 116u8, 57u8, 82u8,
-							35u8, 85u8, 48u8, 69u8, 255u8, 174u8, 157u8, 141u8, 77u8, 58u8, 192u8,
-							1u8, 73u8, 68u8, 175u8, 164u8, 12u8, 158u8, 247u8, 182u8, 113u8,
+							6u8, 179u8, 236u8, 163u8, 153u8, 54u8, 133u8, 129u8, 117u8, 127u8,
+							226u8, 234u8, 53u8, 138u8, 161u8, 176u8, 217u8, 23u8, 43u8, 195u8, 8u8,
+							204u8, 92u8, 80u8, 171u8, 34u8, 99u8, 207u8, 114u8, 130u8, 216u8, 63u8,
 						],
 					)
 				}
@@ -22297,9 +22309,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							7u8, 253u8, 70u8, 60u8, 204u8, 206u8, 129u8, 11u8, 52u8, 224u8, 5u8,
-							128u8, 113u8, 156u8, 29u8, 100u8, 96u8, 37u8, 234u8, 153u8, 5u8, 181u8,
-							18u8, 70u8, 157u8, 76u8, 9u8, 165u8, 154u8, 180u8, 232u8, 195u8,
+							154u8, 226u8, 166u8, 103u8, 148u8, 181u8, 108u8, 161u8, 59u8, 234u8,
+							222u8, 204u8, 28u8, 163u8, 100u8, 59u8, 99u8, 131u8, 85u8, 1u8, 71u8,
+							133u8, 4u8, 230u8, 43u8, 33u8, 188u8, 149u8, 202u8, 111u8, 146u8,
+							155u8,
 						],
 					)
 				}
@@ -23705,35 +23718,6 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				#[doc = "Store an opaque encrypted upstream server payload for a downstream account."]
-				pub struct SetEncryptedServerForDownstreamAccount {
-					pub downstream_account:
-						set_encrypted_server_for_downstream_account::DownstreamAccount,
-					pub encrypted_server:
-						set_encrypted_server_for_downstream_account::EncryptedServer,
-				}
-				pub mod set_encrypted_server_for_downstream_account {
-					use super::runtime_types;
-					pub type DownstreamAccount = crate::types::AccountId32;
-					pub type EncryptedServer =
-						::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u8>;
-				}
-				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for SetEncryptedServerForDownstreamAccount {
-					const PALLET: &'static str = "OperationalAccounts";
-					const CALL: &'static str = "set_encrypted_server_for_downstream_account";
-				}
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
 				#[doc = "Activate an eligible operational account from any managed account."]
 				pub struct Activate;
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for Activate {
@@ -23822,29 +23806,6 @@ pub mod api {
 							151u8, 218u8, 227u8, 148u8, 118u8, 167u8, 85u8, 76u8, 98u8, 97u8, 47u8,
 							138u8, 220u8, 19u8, 3u8, 183u8, 15u8, 127u8, 129u8, 31u8, 175u8, 155u8,
 							21u8, 80u8, 151u8, 155u8, 158u8, 75u8, 177u8, 57u8, 135u8, 30u8,
-						],
-					)
-				}
-				#[doc = "Store an opaque encrypted upstream server payload for a downstream account."]
-				pub fn set_encrypted_server_for_downstream_account(
-					&self,
-					downstream_account : types :: set_encrypted_server_for_downstream_account :: DownstreamAccount,
-					encrypted_server : types :: set_encrypted_server_for_downstream_account :: EncryptedServer,
-				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<
-					types::SetEncryptedServerForDownstreamAccount,
-				> {
-					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
-						"OperationalAccounts",
-						"set_encrypted_server_for_downstream_account",
-						types::SetEncryptedServerForDownstreamAccount {
-							downstream_account,
-							encrypted_server,
-						},
-						[
-							28u8, 148u8, 65u8, 188u8, 119u8, 93u8, 199u8, 213u8, 142u8, 59u8,
-							205u8, 132u8, 229u8, 217u8, 55u8, 79u8, 142u8, 74u8, 15u8, 124u8,
-							239u8, 195u8, 75u8, 16u8, 229u8, 192u8, 212u8, 187u8, 202u8, 161u8,
-							161u8, 150u8,
 						],
 					)
 				}
@@ -24065,28 +24026,6 @@ pub mod api {
 				const PALLET: &'static str = "OperationalAccounts";
 				const EVENT: &'static str = "OperationalProgressForced";
 			}
-			#[derive(
-				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-				Clone,
-				Debug,
-			)]
-			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
-			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			#[doc = "An upstream account updated the encrypted server payload for a downstream account."]
-			pub struct EncryptedServerUpdated {
-				pub upstream_account: encrypted_server_updated::UpstreamAccount,
-				pub downstream_account: encrypted_server_updated::DownstreamAccount,
-			}
-			pub mod encrypted_server_updated {
-				use super::runtime_types;
-				pub type UpstreamAccount = crate::types::AccountId32;
-				pub type DownstreamAccount = crate::types::AccountId32;
-			}
-			impl ::subxt::ext::subxt_core::events::StaticEvent for EncryptedServerUpdated {
-				const PALLET: &'static str = "OperationalAccounts";
-				const EVENT: &'static str = "EncryptedServerUpdated";
-			}
 		}
 		pub mod storage {
 			use super::runtime_types;
@@ -24113,14 +24052,6 @@ pub mod api {
 						runtime_types::pallet_operational_accounts::pallet::RewardsConfig<
 							::core::primitive::u128,
 						>;
-				}
-				pub mod encrypted_server_by_downstream_account {
-					use super::runtime_types;
-					pub type EncryptedServerByDownstreamAccount =
-						runtime_types::bounded_collections::bounded_vec::BoundedVec<
-							::core::primitive::u8,
-						>;
-					pub type Param0 = crate::types::AccountId32;
 				}
 			}
 			pub struct StorageApi;
@@ -24266,30 +24197,6 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Opaque encrypted upstream server payload keyed by the downstream account."]				pub fn encrypted_server_by_downstream_account_iter (& self ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < () , types :: encrypted_server_by_downstream_account :: EncryptedServerByDownstreamAccount , () , () , :: subxt :: ext :: subxt_core :: utils :: Yes >{
-					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"OperationalAccounts",
-						"EncryptedServerByDownstreamAccount",
-						(),
-						[
-							82u8, 252u8, 105u8, 231u8, 42u8, 144u8, 99u8, 160u8, 120u8, 157u8,
-							150u8, 18u8, 174u8, 26u8, 122u8, 16u8, 162u8, 0u8, 14u8, 191u8, 175u8,
-							91u8, 60u8, 169u8, 186u8, 212u8, 93u8, 251u8, 75u8, 185u8, 205u8, 13u8,
-						],
-					)
-				}
-				#[doc = " Opaque encrypted upstream server payload keyed by the downstream account."]				pub fn encrypted_server_by_downstream_account (& self , _0 : types :: encrypted_server_by_downstream_account :: Param0 ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < :: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: encrypted_server_by_downstream_account :: Param0 > , types :: encrypted_server_by_downstream_account :: EncryptedServerByDownstreamAccount , :: subxt :: ext :: subxt_core :: utils :: Yes , () , () >{
-					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"OperationalAccounts",
-						"EncryptedServerByDownstreamAccount",
-						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
-						[
-							82u8, 252u8, 105u8, 231u8, 42u8, 144u8, 99u8, 160u8, 120u8, 157u8,
-							150u8, 18u8, 174u8, 26u8, 122u8, 16u8, 162u8, 0u8, 14u8, 191u8, 175u8,
-							91u8, 60u8, 169u8, 186u8, 212u8, 93u8, 251u8, 75u8, 185u8, 205u8, 13u8,
-						],
-					)
-				}
 			}
 		}
 		pub mod constants {
@@ -24371,23 +24278,6 @@ pub mod api {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"OperationalAccounts",
 						"MaxAvailableAccessCodes",
-						[
-							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
-							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
-							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
-							145u8,
-						],
-					)
-				}
-				#[doc = " Maximum number of encrypted server bytes stored per network account."]
-				pub fn max_encrypted_server_len(
-					&self,
-				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
-					::core::primitive::u32,
-				> {
-					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
-						"OperationalAccounts",
-						"MaxEncryptedServerLen",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
@@ -27841,6 +27731,385 @@ pub mod api {
 			}
 		}
 	}
+	pub mod bootstrap {
+		use super::{root_mod, runtime_types};
+		#[doc = "The `Error` enum of this pallet."]
+		pub type Error = runtime_types::pallet_bootstrap::pallet::Error;
+		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
+		pub type Call = runtime_types::pallet_bootstrap::pallet::Call;
+		pub mod calls {
+			use super::{root_mod, runtime_types};
+			type DispatchError = runtime_types::sp_runtime::DispatchError;
+			pub mod types {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Store or replace an encrypted recovery payload."]
+				#[doc = ""]
+				#[doc = "The proof must be signed by `recovery_pubkey` and binds the submitting `writer`,"]
+				#[doc = "`recovery_pubkey`, and the encrypted payload hash."]
+				pub struct SetRecoveryPayload {
+					pub recovery_pubkey: set_recovery_payload::RecoveryPubkey,
+					pub recovery_proof: set_recovery_payload::RecoveryProof,
+					pub encrypted_recovery_payload: set_recovery_payload::EncryptedRecoveryPayload,
+				}
+				pub mod set_recovery_payload {
+					use super::runtime_types;
+					pub type RecoveryPubkey =
+						runtime_types::pallet_bootstrap::pallet::RecoveryPubkey;
+					pub type RecoveryProof = runtime_types::pallet_bootstrap::pallet::RecoveryProof;
+					pub type EncryptedRecoveryPayload =
+						::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u8>;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for SetRecoveryPayload {
+					const PALLET: &'static str = "Bootstrap";
+					const CALL: &'static str = "set_recovery_payload";
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Store or replace an encrypted endpoint payload."]
+				#[doc = ""]
+				#[doc = "The first writer for `endpoint_pubkey` becomes its owner. Later updates require the"]
+				#[doc = "same signing account."]
+				pub struct SetEndpoint {
+					pub endpoint_pubkey: set_endpoint::EndpointPubkey,
+					pub encrypted_endpoint: set_endpoint::EncryptedEndpoint,
+				}
+				pub mod set_endpoint {
+					use super::runtime_types;
+					pub type EndpointPubkey =
+						runtime_types::pallet_bootstrap::pallet::EndpointPubkey;
+					pub type EncryptedEndpoint =
+						::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u8>;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for SetEndpoint {
+					const PALLET: &'static str = "Bootstrap";
+					const CALL: &'static str = "set_endpoint";
+				}
+			}
+			pub struct TransactionApi;
+			impl TransactionApi {
+				#[doc = "Store or replace an encrypted recovery payload."]
+				#[doc = ""]
+				#[doc = "The proof must be signed by `recovery_pubkey` and binds the submitting `writer`,"]
+				#[doc = "`recovery_pubkey`, and the encrypted payload hash."]
+				pub fn set_recovery_payload(
+					&self,
+					recovery_pubkey: types::set_recovery_payload::RecoveryPubkey,
+					recovery_proof: types::set_recovery_payload::RecoveryProof,
+					encrypted_recovery_payload : types :: set_recovery_payload :: EncryptedRecoveryPayload,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::SetRecoveryPayload>
+				{
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"Bootstrap",
+						"set_recovery_payload",
+						types::SetRecoveryPayload {
+							recovery_pubkey,
+							recovery_proof,
+							encrypted_recovery_payload,
+						},
+						[
+							120u8, 187u8, 250u8, 97u8, 253u8, 146u8, 208u8, 210u8, 119u8, 117u8,
+							116u8, 96u8, 94u8, 106u8, 234u8, 101u8, 172u8, 11u8, 177u8, 203u8,
+							194u8, 211u8, 41u8, 82u8, 149u8, 186u8, 76u8, 39u8, 41u8, 48u8, 106u8,
+							14u8,
+						],
+					)
+				}
+				#[doc = "Store or replace an encrypted endpoint payload."]
+				#[doc = ""]
+				#[doc = "The first writer for `endpoint_pubkey` becomes its owner. Later updates require the"]
+				#[doc = "same signing account."]
+				pub fn set_endpoint(
+					&self,
+					endpoint_pubkey: types::set_endpoint::EndpointPubkey,
+					encrypted_endpoint: types::set_endpoint::EncryptedEndpoint,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::SetEndpoint> {
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"Bootstrap",
+						"set_endpoint",
+						types::SetEndpoint { endpoint_pubkey, encrypted_endpoint },
+						[
+							5u8, 171u8, 205u8, 100u8, 122u8, 207u8, 249u8, 9u8, 159u8, 247u8, 9u8,
+							134u8, 73u8, 250u8, 187u8, 90u8, 41u8, 204u8, 84u8, 132u8, 203u8, 72u8,
+							79u8, 56u8, 232u8, 88u8, 119u8, 141u8, 102u8, 79u8, 163u8, 8u8,
+						],
+					)
+				}
+			}
+		}
+		#[doc = "The `Event` enum of this pallet"]
+		pub type Event = runtime_types::pallet_bootstrap::pallet::Event;
+		pub mod events {
+			use super::runtime_types;
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "An encrypted recovery payload was stored or replaced."]
+			pub struct RecoveryPayloadUpdated {
+				pub writer: recovery_payload_updated::Writer,
+				pub recovery_pubkey: recovery_payload_updated::RecoveryPubkey,
+			}
+			pub mod recovery_payload_updated {
+				use super::runtime_types;
+				pub type Writer = crate::types::AccountId32;
+				pub type RecoveryPubkey = runtime_types::pallet_bootstrap::pallet::RecoveryPubkey;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for RecoveryPayloadUpdated {
+				const PALLET: &'static str = "Bootstrap";
+				const EVENT: &'static str = "RecoveryPayloadUpdated";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "An encrypted endpoint payload was stored or replaced by its owner."]
+			pub struct EndpointUpdated {
+				pub endpoint_owner: endpoint_updated::EndpointOwner,
+				pub endpoint_pubkey: endpoint_updated::EndpointPubkey,
+			}
+			pub mod endpoint_updated {
+				use super::runtime_types;
+				pub type EndpointOwner = crate::types::AccountId32;
+				pub type EndpointPubkey = runtime_types::pallet_bootstrap::pallet::EndpointPubkey;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for EndpointUpdated {
+				const PALLET: &'static str = "Bootstrap";
+				const EVENT: &'static str = "EndpointUpdated";
+			}
+		}
+		pub mod storage {
+			use super::runtime_types;
+			pub mod types {
+				use super::runtime_types;
+				pub mod encrypted_recovery_payload_by_pubkey {
+					use super::runtime_types;
+					pub type EncryptedRecoveryPayloadByPubkey =
+						runtime_types::bounded_collections::bounded_vec::BoundedVec<
+							::core::primitive::u8,
+						>;
+					pub type Param0 = runtime_types::pallet_bootstrap::pallet::RecoveryPubkey;
+				}
+				pub mod encrypted_endpoint_by_pubkey {
+					use super::runtime_types;
+					pub type EncryptedEndpointByPubkey =
+						runtime_types::bounded_collections::bounded_vec::BoundedVec<
+							::core::primitive::u8,
+						>;
+					pub type Param0 = runtime_types::pallet_bootstrap::pallet::EndpointPubkey;
+				}
+				pub mod endpoint_owner_by_pubkey {
+					use super::runtime_types;
+					pub type EndpointOwnerByPubkey = crate::types::AccountId32;
+					pub type Param0 = runtime_types::pallet_bootstrap::pallet::EndpointPubkey;
+				}
+			}
+			pub struct StorageApi;
+			impl StorageApi {
+				#[doc = " Encrypted recovery payload authorized by the corresponding recovery key."]
+				#[doc = ""]
+				#[doc = " The pallet enforces authorization and length but does not parse or verify encryption."]
+				pub fn encrypted_recovery_payload_by_pubkey_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::encrypted_recovery_payload_by_pubkey::EncryptedRecoveryPayloadByPubkey,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Bootstrap",
+						"EncryptedRecoveryPayloadByPubkey",
+						(),
+						[
+							5u8, 220u8, 174u8, 107u8, 213u8, 23u8, 172u8, 232u8, 44u8, 72u8, 85u8,
+							135u8, 211u8, 219u8, 122u8, 57u8, 68u8, 151u8, 97u8, 231u8, 154u8,
+							148u8, 155u8, 5u8, 51u8, 233u8, 126u8, 120u8, 157u8, 45u8, 97u8, 235u8,
+						],
+					)
+				}
+				#[doc = " Encrypted recovery payload authorized by the corresponding recovery key."]
+				#[doc = ""]
+				#[doc = " The pallet enforces authorization and length but does not parse or verify encryption."]
+				pub fn encrypted_recovery_payload_by_pubkey(
+					&self,
+					_0: types::encrypted_recovery_payload_by_pubkey::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::encrypted_recovery_payload_by_pubkey::Param0,
+					>,
+					types::encrypted_recovery_payload_by_pubkey::EncryptedRecoveryPayloadByPubkey,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Bootstrap",
+						"EncryptedRecoveryPayloadByPubkey",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							5u8, 220u8, 174u8, 107u8, 213u8, 23u8, 172u8, 232u8, 44u8, 72u8, 85u8,
+							135u8, 211u8, 219u8, 122u8, 57u8, 68u8, 151u8, 97u8, 231u8, 154u8,
+							148u8, 155u8, 5u8, 51u8, 233u8, 126u8, 120u8, 157u8, 45u8, 97u8, 235u8,
+						],
+					)
+				}
+				#[doc = " Encrypted endpoint payload keyed by its public key."]
+				#[doc = ""]
+				#[doc = " The pallet enforces ownership and length but does not parse or verify encryption."]
+				pub fn encrypted_endpoint_by_pubkey_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::encrypted_endpoint_by_pubkey::EncryptedEndpointByPubkey,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Bootstrap",
+						"EncryptedEndpointByPubkey",
+						(),
+						[
+							201u8, 222u8, 42u8, 194u8, 247u8, 184u8, 8u8, 241u8, 239u8, 183u8,
+							104u8, 181u8, 177u8, 163u8, 86u8, 47u8, 218u8, 59u8, 251u8, 4u8, 87u8,
+							216u8, 47u8, 163u8, 66u8, 33u8, 248u8, 13u8, 217u8, 142u8, 20u8, 125u8,
+						],
+					)
+				}
+				#[doc = " Encrypted endpoint payload keyed by its public key."]
+				#[doc = ""]
+				#[doc = " The pallet enforces ownership and length but does not parse or verify encryption."]
+				pub fn encrypted_endpoint_by_pubkey(
+					&self,
+					_0: types::encrypted_endpoint_by_pubkey::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::encrypted_endpoint_by_pubkey::Param0,
+					>,
+					types::encrypted_endpoint_by_pubkey::EncryptedEndpointByPubkey,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Bootstrap",
+						"EncryptedEndpointByPubkey",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							201u8, 222u8, 42u8, 194u8, 247u8, 184u8, 8u8, 241u8, 239u8, 183u8,
+							104u8, 181u8, 177u8, 163u8, 86u8, 47u8, 218u8, 59u8, 251u8, 4u8, 87u8,
+							216u8, 47u8, 163u8, 66u8, 33u8, 248u8, 13u8, 217u8, 142u8, 20u8, 125u8,
+						],
+					)
+				}
+				#[doc = " Account authorized to update an encrypted endpoint payload."]
+				#[doc = ""]
+				#[doc = " The first successful [`Pallet::set_endpoint`] call for a public key establishes its owner."]
+				pub fn endpoint_owner_by_pubkey_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::endpoint_owner_by_pubkey::EndpointOwnerByPubkey,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Bootstrap",
+						"EndpointOwnerByPubkey",
+						(),
+						[
+							98u8, 63u8, 97u8, 190u8, 227u8, 184u8, 208u8, 97u8, 82u8, 159u8, 171u8,
+							92u8, 106u8, 173u8, 166u8, 233u8, 103u8, 168u8, 192u8, 127u8, 164u8,
+							35u8, 166u8, 231u8, 239u8, 222u8, 217u8, 157u8, 3u8, 240u8, 83u8,
+							169u8,
+						],
+					)
+				}
+				#[doc = " Account authorized to update an encrypted endpoint payload."]
+				#[doc = ""]
+				#[doc = " The first successful [`Pallet::set_endpoint`] call for a public key establishes its owner."]
+				pub fn endpoint_owner_by_pubkey(
+					&self,
+					_0: types::endpoint_owner_by_pubkey::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::endpoint_owner_by_pubkey::Param0,
+					>,
+					types::endpoint_owner_by_pubkey::EndpointOwnerByPubkey,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Bootstrap",
+						"EndpointOwnerByPubkey",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							98u8, 63u8, 97u8, 190u8, 227u8, 184u8, 208u8, 97u8, 82u8, 159u8, 171u8,
+							92u8, 106u8, 173u8, 166u8, 233u8, 103u8, 168u8, 192u8, 127u8, 164u8,
+							35u8, 166u8, 231u8, 239u8, 222u8, 217u8, 157u8, 3u8, 240u8, 83u8,
+							169u8,
+						],
+					)
+				}
+			}
+		}
+		pub mod constants {
+			use super::runtime_types;
+			pub struct ConstantsApi;
+			impl ConstantsApi {
+				#[doc = " Maximum number of bytes in an encrypted recovery or endpoint payload."]
+				pub fn max_encrypted_payload_len(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u32,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"Bootstrap",
+						"MaxEncryptedPayloadLen",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
+						],
+					)
+				}
+			}
+		}
+	}
 	pub mod runtime_types {
 		use super::runtime_types;
 		pub mod argon_notary_audit {
@@ -29786,6 +30055,8 @@ pub mod api {
 				EthereumVerifier(runtime_types::pallet_ethereum_verifier::pallet::Call),
 				#[codec(index = 36)]
 				CrosschainTransfer(runtime_types::pallet_crosschain_transfer::pallet::Call),
+				#[codec(index = 37)]
+				Bootstrap(runtime_types::pallet_bootstrap::pallet::Call),
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -29854,6 +30125,8 @@ pub mod api {
 				EthereumVerifier(runtime_types::pallet_ethereum_verifier::pallet::Error),
 				#[codec(index = 36)]
 				CrosschainTransfer(runtime_types::pallet_crosschain_transfer::pallet::Error),
+				#[codec(index = 37)]
+				Bootstrap(runtime_types::pallet_bootstrap::pallet::Error),
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -29920,6 +30193,8 @@ pub mod api {
 				EthereumVerifier(runtime_types::pallet_ethereum_verifier::pallet::Event),
 				#[codec(index = 36)]
 				CrosschainTransfer(runtime_types::pallet_crosschain_transfer::pallet::Event),
+				#[codec(index = 37)]
+				Bootstrap(runtime_types::pallet_bootstrap::pallet::Event),
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -32245,6 +32520,140 @@ pub mod api {
 						new_difficulty: ::core::primitive::u128,
 					},
 				}
+			}
+		}
+		pub mod pallet_bootstrap {
+			use super::runtime_types;
+			pub mod pallet {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
+				pub enum Call {
+					#[codec(index = 0)]
+					#[doc = "Store or replace an encrypted recovery payload."]
+					#[doc = ""]
+					#[doc = "The proof must be signed by `recovery_pubkey` and binds the submitting `writer`,"]
+					#[doc = "`recovery_pubkey`, and the encrypted payload hash."]
+					set_recovery_payload {
+						recovery_pubkey: runtime_types::pallet_bootstrap::pallet::RecoveryPubkey,
+						recovery_proof: runtime_types::pallet_bootstrap::pallet::RecoveryProof,
+						encrypted_recovery_payload:
+							::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u8>,
+					},
+					#[codec(index = 1)]
+					#[doc = "Store or replace an encrypted endpoint payload."]
+					#[doc = ""]
+					#[doc = "The first writer for `endpoint_pubkey` becomes its owner. Later updates require the"]
+					#[doc = "same signing account."]
+					set_endpoint {
+						endpoint_pubkey: runtime_types::pallet_bootstrap::pallet::EndpointPubkey,
+						encrypted_endpoint:
+							::subxt::ext::subxt_core::alloc::vec::Vec<::core::primitive::u8>,
+					},
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct EndpointPubkey(pub [::core::primitive::u8; 32usize]);
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "The `Error` enum of this pallet."]
+				pub enum Error {
+					#[codec(index = 0)]
+					#[doc = "The encrypted payload exceeds [`Config::MaxEncryptedPayloadLen`]."]
+					EncryptedPayloadTooLong,
+					#[codec(index = 1)]
+					#[doc = "The recovery proof does not authorize this writer, public key, and payload."]
+					InvalidRecoveryProof,
+					#[codec(index = 2)]
+					#[doc = "The endpoint public key is already owned by a different account."]
+					EndpointOwnedByAnotherAccount,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "The `Event` enum of this pallet"]
+				pub enum Event {
+					#[codec(index = 0)]
+					#[doc = "An encrypted recovery payload was stored or replaced."]
+					RecoveryPayloadUpdated {
+						writer: crate::types::AccountId32,
+						recovery_pubkey: runtime_types::pallet_bootstrap::pallet::RecoveryPubkey,
+					},
+					#[codec(index = 1)]
+					#[doc = "An encrypted endpoint payload was stored or replaced by its owner."]
+					EndpointUpdated {
+						endpoint_owner: crate::types::AccountId32,
+						endpoint_pubkey: runtime_types::pallet_bootstrap::pallet::EndpointPubkey,
+					},
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct RecoveryProof {
+					pub signature: [::core::primitive::u8; 64usize],
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct RecoveryPubkey(pub [::core::primitive::u8; 32usize]);
 			}
 		}
 		pub mod pallet_crosschain_transfer {
@@ -34841,7 +35250,7 @@ pub mod api {
 				)]
 				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 				pub enum Call {
-					# [codec (index = 0)] # [doc = "Register vault and mining accounts for an operational account."] # [doc = "Any account in the registration may submit the transaction."] # [doc = "When invite-only is enabled, the registration must include an upstream access proof."] register { registration : runtime_types :: pallet_operational_accounts :: pallet :: Registration , } , # [codec (index = 2)] # [doc = "Update certification reward amounts for operational accounts."] set_reward_config { operational_certification_reward : :: core :: primitive :: u128 , operational_certification_bonus_reward : :: core :: primitive :: u128 , } , # [codec (index = 3)] # [doc = "Force-update operational progress markers for an account."] force_set_progress { owner : crate :: types :: AccountId32 , patch : runtime_types :: pallet_operational_accounts :: pallet :: OperationalProgressPatch < :: core :: primitive :: u128 > , update_operational_progress : :: core :: primitive :: bool , } , # [codec (index = 4)] # [doc = "Store an opaque encrypted upstream server payload for a downstream account."] set_encrypted_server_for_downstream_account { downstream_account : crate :: types :: AccountId32 , encrypted_server : :: subxt :: ext :: subxt_core :: alloc :: vec :: Vec < :: core :: primitive :: u8 > , } , # [codec (index = 5)] # [doc = "Activate an eligible operational account from any managed account."] activate , # [codec (index = 6)] # [doc = "Claim pending operational rewards to any managed account."] claim_rewards { amount : :: core :: primitive :: u128 , } , }
+					# [codec (index = 0)] # [doc = "Register vault and mining accounts for an operational account."] # [doc = "Any account in the registration may submit the transaction."] # [doc = "When invite-only is enabled, the registration must include an upstream access proof."] register { registration : runtime_types :: pallet_operational_accounts :: pallet :: Registration , } , # [codec (index = 2)] # [doc = "Update certification reward amounts for operational accounts."] set_reward_config { operational_certification_reward : :: core :: primitive :: u128 , operational_certification_bonus_reward : :: core :: primitive :: u128 , } , # [codec (index = 3)] # [doc = "Force-update operational progress markers for an account."] force_set_progress { owner : crate :: types :: AccountId32 , patch : runtime_types :: pallet_operational_accounts :: pallet :: OperationalProgressPatch < :: core :: primitive :: u128 > , update_operational_progress : :: core :: primitive :: bool , } , # [codec (index = 5)] # [doc = "Activate an eligible operational account from any managed account."] activate , # [codec (index = 6)] # [doc = "Claim pending operational rewards to any managed account."] claim_rewards { amount : :: core :: primitive :: u128 , } , }
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
 					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
@@ -34890,33 +35299,27 @@ pub mod api {
 					#[doc = "The requested progress patch does not contain any updates."]
 					NoProgressUpdateProvided,
 					#[codec(index = 11)]
-					#[doc = "The encrypted server payload exceeds the configured max length."]
-					EncryptedServerTooLong,
-					#[codec(index = 12)]
-					#[doc = "The caller is not the upstream account for the requested downstream account."]
-					NotUpstreamOfDownstream,
-					#[codec(index = 13)]
 					#[doc = "The operational account has no pending rewards to claim."]
 					NoPendingRewards,
-					#[codec(index = 14)]
+					#[codec(index = 12)]
 					#[doc = "Reward claims must be at least one Argon."]
 					RewardClaimBelowMinimum,
-					#[codec(index = 15)]
+					#[codec(index = 13)]
 					#[doc = "Reward claims must be whole Argon increments."]
 					RewardClaimNotWholeArgon,
-					#[codec(index = 16)]
+					#[codec(index = 14)]
 					#[doc = "The requested reward claim exceeds pending rewards."]
 					RewardClaimExceedsPending,
-					#[codec(index = 17)]
+					#[codec(index = 15)]
 					#[doc = "The treasury does not currently have enough available reserves for the claim."]
 					TreasuryInsufficientFunds,
-					#[codec(index = 18)]
+					#[codec(index = 16)]
 					#[doc = "The account is already operationally certified."]
 					AlreadyOperationallyCertified,
-					#[codec(index = 19)]
+					#[codec(index = 17)]
 					#[doc = "The account has not satisfied operational requirements yet."]
 					NotEligibleForActivation,
-					#[codec(index = 20)]
+					#[codec(index = 18)]
 					#[doc = "The requested upstream account does not have any available access codes."]
 					UpstreamHasNoAvailableAccessCodes,
 				}
@@ -34982,12 +35385,6 @@ pub mod api {
 						vault_created: ::core::primitive::bool,
 						operator_vault_bitcoin_amount: ::core::primitive::u128,
 						mining_seat_count: ::core::primitive::u32,
-					},
-					#[codec(index = 7)]
-					#[doc = "An upstream account updated the encrypted server payload for a downstream account."]
-					EncryptedServerUpdated {
-						upstream_account: crate::types::AccountId32,
-						downstream_account: crate::types::AccountId32,
 					},
 				}
 				#[derive(

@@ -172,17 +172,4 @@ impl<T: frame_system::Config> pallet_operational_accounts::WeightInfo for Weight
 			.saturating_add(T::DbWeight::get().reads(1))
 			.saturating_add(T::DbWeight::get().writes(1))
 		}
-	/// Storage: `OperationalAccounts::OperationalAccounts` (r:2 w:0)
-	/// Proof: `OperationalAccounts::OperationalAccounts` (`max_values`: None, `max_size`: Some(314), added: 2789, mode: `MaxEncodedLen`)
-	/// Storage: `OperationalAccounts::EncryptedServerByDownstreamAccount` (r:0 w:1)
-	/// Proof: `OperationalAccounts::EncryptedServerByDownstreamAccount` (`max_values`: None, `max_size`: Some(306), added: 2781, mode: `MaxEncodedLen`)
-	fn set_encrypted_server_for_downstream_account() -> Weight {
-		// Proof Size summary in bytes:
-		//  Measured:  `395`
-		//  Estimated: `6568`
-		// Minimum execution time: 11_000_000 picoseconds.
-		Weight::from_parts(12_000_000, 6568)
-			.saturating_add(T::DbWeight::get().reads(2))
-			.saturating_add(T::DbWeight::get().writes(1))
-		}
 	}

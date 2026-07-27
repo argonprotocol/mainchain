@@ -127,6 +127,8 @@ mod runtime {
 	pub type EthereumVerifier = pallet_ethereum_verifier;
 	#[runtime::pallet_index(36)]
 	pub type CrosschainTransfer = pallet_crosschain_transfer;
+	#[runtime::pallet_index(37)]
+	pub type Bootstrap = pallet_bootstrap;
 }
 
 argon_runtime_common::call_filters!();
@@ -737,7 +739,6 @@ impl pallet_crosschain_transfer::Config for Runtime {
 impl pallet_operational_accounts::Config for Runtime {
 	type Balance = Balance;
 	type MaxAvailableAccessCodes = MaxAvailableOperationalAccessCodes;
-	type MaxEncryptedServerLen = MaxEncryptedServerLen;
 	type MinimumUniswapTransfer = MinimumUniswapTransfer;
 	type MinimumBitcoin = MinimumBitcoin;
 	type MinimumBonds = MinimumBonds;
@@ -776,6 +777,11 @@ impl pallet_operational_accounts::Config for Runtime {
 		Runtime,
 		weights::pallet_operational_accounts::WeightInfo<Runtime>,
 	>;
+}
+
+impl pallet_bootstrap::Config for Runtime {
+	type MaxEncryptedPayloadLen = MaxEncryptedBootstrapPayloadLen;
+	type WeightInfo = weights::pallet_bootstrap::WeightInfo<Runtime>;
 }
 
 impl pallet_ethereum_verifier::Config for Runtime {

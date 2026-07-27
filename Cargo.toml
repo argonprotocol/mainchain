@@ -7,6 +7,7 @@ members = [
     "node/randomx",
     "pallets/bitcoin_locks",
     "pallets/bitcoin_utxos",
+    "pallets/bootstrap",
     "pallets/block_rewards",
     "pallets/block_seal",
     "pallets/block_seal_spec",
@@ -291,5 +292,6 @@ pallet-ticks = { path = "pallets/ticks", default-features = false }
 pallet-mint = { path = "pallets/mint", default-features = false }
 pallet-price-index = { path = "pallets/price_index", default-features = false }
 pallet-operational-accounts = { path = "pallets/operational_accounts", default-features = false }
+pallet-bootstrap = { path = "pallets/bootstrap", default-features = false }
 pallet-prelude = { path = "pallets/pallet_prelude", default-features = false }
 pallet-vaults = { path = "pallets/vaults", default-features = false }

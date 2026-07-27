@@ -21,7 +21,6 @@ mod weights;
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
-	use alloc::vec::Vec;
 	use argon_primitives::{
 		bitcoin::UtxoId, vault::BitcoinVaultProvider, BitcoinLocksProvider, MiningSlotProvider,
 		OperationalAccountProvider, OperationalAccountsHook, OperationalRewardKind,
@@ -42,7 +41,7 @@ pub mod pallet {
 	pub const OPERATIONAL_ACCOUNT_PROOF_MESSAGE_KEY: &[u8; 27] = b"operational_primary_account";
 	pub const VAULT_ACCOUNT_PROOF_MESSAGE_KEY: &[u8; 25] = b"operational_vault_account";
 	pub const MINING_ACCOUNT_PROOF_MESSAGE_KEY: &[u8; 26] = b"operational_mining_account";
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(2);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(3);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -81,9 +80,6 @@ pub mod pallet {
 		/// Maximum number of available access codes allowed at once.
 		#[pallet::constant]
 		type MaxAvailableAccessCodes: Get<u32>;
-		/// Maximum number of encrypted server bytes stored per network account.
-		#[pallet::constant]
-		type MaxEncryptedServerLen: Get<u32>;
 		/// Minimum Uniswap transfer amount required to register.
 		#[pallet::constant]
 		type MinimumUniswapTransfer: Get<Self::Balance>;
@@ -443,16 +439,6 @@ pub mod pallet {
 	/// Configured reward amounts for operational accounts.
 	pub type Rewards<T: Config> = StorageValue<_, RewardsConfig<T::Balance>, ValueQuery>;
 
-	#[pallet::storage]
-	/// Opaque encrypted upstream server payload keyed by the downstream account.
-	pub type EncryptedServerByDownstreamAccount<T: Config> = StorageMap<
-		_,
-		Blake2_128Concat,
-		T::AccountId,
-		BoundedVec<u8, T::MaxEncryptedServerLen>,
-		OptionQuery,
-	>;
-
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
@@ -497,8 +483,6 @@ pub mod pallet {
 			operator_vault_bitcoin_amount: T::Balance,
 			mining_seat_count: u32,
 		},
-		/// An upstream account updated the encrypted server payload for a downstream account.
-		EncryptedServerUpdated { upstream_account: T::AccountId, downstream_account: T::AccountId },
 	}
 
 	#[pallet::error]
@@ -525,10 +509,6 @@ pub mod pallet {
 		CannotGrantAccessToSelf,
 		/// The requested progress patch does not contain any updates.
 		NoProgressUpdateProvided,
-		/// The encrypted server payload exceeds the configured max length.
-		EncryptedServerTooLong,
-		/// The caller is not the upstream account for the requested downstream account.
-		NotUpstreamOfDownstream,
 		/// The operational account has no pending rewards to claim.
 		NoPendingRewards,
 		/// Reward claims must be at least one Argon.
@@ -788,36 +768,6 @@ pub mod pallet {
 				vault_created,
 				operator_vault_bitcoin_amount,
 				mining_seat_count,
-			});
-			Ok(())
-		}
-
-		/// Store an opaque encrypted upstream server payload for a downstream account.
-		#[pallet::call_index(4)]
-		#[pallet::weight(T::WeightInfo::set_encrypted_server_for_downstream_account())]
-		pub fn set_encrypted_server_for_downstream_account(
-			origin: OriginFor<T>,
-			downstream_account: T::AccountId,
-			encrypted_server: Vec<u8>,
-		) -> DispatchResult {
-			let upstream_account = ensure_signed(origin)?;
-			ensure!(
-				OperationalAccounts::<T>::contains_key(&upstream_account),
-				Error::<T>::NotOperationalAccount
-			);
-			let downstream_account_data = OperationalAccounts::<T>::get(&downstream_account)
-				.ok_or(Error::<T>::NotOperationalAccount)?;
-			ensure!(
-				downstream_account_data.upstream_account == Some(upstream_account.clone()),
-				Error::<T>::NotUpstreamOfDownstream
-			);
-
-			let encrypted_server: BoundedVec<u8, T::MaxEncryptedServerLen> =
-				encrypted_server.try_into().map_err(|_| Error::<T>::EncryptedServerTooLong)?;
-			EncryptedServerByDownstreamAccount::<T>::insert(&downstream_account, encrypted_server);
-			Self::deposit_event(Event::EncryptedServerUpdated {
-				upstream_account,
-				downstream_account,
 			});
 			Ok(())
 		}

@@ -407,40 +407,6 @@ mod benchmarks {
 		assert!(!account.is_operationally_certified);
 	}
 
-	#[benchmark]
-	fn set_encrypted_server_for_downstream_account() {
-		let upstream_account = linked_accounts::<T>();
-		let downstream_account = LinkedAccounts {
-			owner: account("downstream_account_owner", 0, USER_SEED),
-			vault: account("downstream_account_vault", 0, USER_SEED),
-			mining: account("downstream_account_mining", 0, USER_SEED),
-		};
-		insert_operational_account::<T>(
-			&upstream_account,
-			default_operational_account::<T>(&upstream_account),
-		);
-		let mut downstream_account_data = default_operational_account::<T>(&downstream_account);
-		downstream_account_data.upstream_account = Some(upstream_account.owner.clone());
-		insert_operational_account::<T>(&downstream_account, downstream_account_data);
-		let encrypted_server = vec![7u8; 32];
-		let upstream_account_owner = upstream_account.owner.clone();
-		whitelist_account!(upstream_account_owner);
-
-		#[extrinsic_call]
-		set_encrypted_server_for_downstream_account(
-			RawOrigin::Signed(upstream_account_owner),
-			downstream_account.owner.clone(),
-			encrypted_server.clone(),
-		);
-
-		assert_eq!(
-			EncryptedServerByDownstreamAccount::<T>::get(&downstream_account.owner)
-				.expect("payload stored")
-				.to_vec(),
-			encrypted_server
-		);
-	}
-
 	impl_benchmark_test_suite!(OperationalAccountsPallet, new_test_ext(), Test);
 
 	fn assert_provider_calls(expected: BenchmarkOperationalAccountsProviderCallCounters) {
