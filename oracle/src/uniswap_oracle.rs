@@ -176,13 +176,23 @@ impl UniswapOracle {
 					return Err(UniswapOracleError::NoPoolData.into()),
 				Err(e) => {
 					let error_msg = format!("{e:?}");
-					if error_msg.contains("execution reverted: OLD") {
-						if backup_second_options.is_empty() {
-							return Err(anyhow!("All time windows exhausted for fee tier {fee:?}"));
-						}
+					let is_old_observation = error_msg.contains("execution reverted: OLD");
+					let is_internal_rpc_error = matches!(
+						&e,
+						ContractError::TransportError(error)
+							if error.as_error_resp().is_some_and(|response| {
+								response.code == -32603 && response.data.is_none()
+							})
+					);
+					if (is_old_observation || is_internal_rpc_error) &&
+						!backup_second_options.is_empty()
+					{
 						time_window_seconds = backup_second_options.remove(0);
-						trace!(fee = ?fee, new_time_window = ?time_window_seconds, "Reducing time window and retrying observe due to OLD error");
+						trace!(fee = ?fee, new_time_window = ?time_window_seconds, error = ?e, "Reducing time window and retrying observe");
 						continue;
+					}
+					if is_old_observation {
+						return Err(anyhow!("All time windows exhausted for fee tier {fee:?}"));
 					}
 					error!(fee = ?fee, error = ?e, "Error calling observe on fee tier, returning error");
 					return Err(anyhow!("Error calling observe: {e:?}"));
@@ -313,14 +323,61 @@ impl UniswapOracle {
 mod test {
 	use super::*;
 
+	use alloy_primitives::{
+		aliases::{I24, U160},
+		Bytes,
+	};
+	use alloy_provider::ProviderBuilder;
+	use alloy_sol_types::{SolCall, SolValue};
+	use alloy_transport::mock::Asserter;
 	use std::env;
 	use tracing::warn;
+	use uniswap_lens::bindings::iuniswapv3pool::IUniswapV3Pool::{
+		observeCall, observeReturn, slot0Call, slot0Return,
+	};
 	use uniswap_sdk_core::token;
 
 	#[allow(dead_code)]
 	const ARGON_ADDRESS: &str = "0x6A9143639D8b70D50b031fFaD55d4CC65EA55155";
 	#[allow(dead_code)]
 	const ARGONOT_ADDRESS: &str = "0x64cbd3aa07d427e385cb55330406508718e55f01";
+
+	#[tokio::test]
+	async fn retries_internal_rpc_errors_with_a_shorter_window() {
+		let asserter = Asserter::new();
+		let provider = ProviderBuilder::default().connect_mocked_client(asserter.clone());
+		let oracle = UniswapOracle {
+			provider: Arc::new(provider),
+			factory_address: FACTORY_ADDRESS,
+			usd_token: token!(ChainId::MAINNET as u64, USDC_ADDRESS, 6, "USDC"),
+			lookup_token: token!(ChainId::MAINNET as u64, ARGON_ADDRESS, 18, "ARGON"),
+			fee_tiers: vec![FeeAmount::LOW],
+			pool_cache_by_fee: Default::default(),
+		};
+
+		asserter.push_failure_msg("Internal error");
+		asserter.push_success(&Bytes::from(observeCall::abi_encode_returns(&observeReturn {
+			tickCumulatives: vec![I56::ZERO, I56::try_from(1_800).unwrap()],
+			secondsPerLiquidityCumulativeX128s: vec![U160::ZERO, U160::ZERO],
+		})));
+		asserter.push_success(&Bytes::from(slot0Call::abi_encode_returns(&slot0Return {
+			sqrtPriceX96: U160::ZERO,
+			tick: I24::ZERO,
+			observationIndex: 0,
+			observationCardinality: 0,
+			observationCardinalityNext: 0,
+			feeProtocol: 0,
+			unlocked: true,
+		})));
+		asserter.push_success(&Bytes::from(1_000_000u128.abi_encode()));
+
+		let (price, _) = oracle
+			.get_twap_and_liquidity_basis(FeeAmount::LOW)
+			.await
+			.expect("the shorter-window observation should be used");
+
+		assert_eq!(price.to_fixed(4, None), "1000100000000.0000");
+	}
 
 	#[tokio::test]
 	#[ignore] // only activate when turned on
