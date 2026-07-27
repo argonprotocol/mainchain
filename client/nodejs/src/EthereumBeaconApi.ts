@@ -10,7 +10,10 @@ export function buildExecutionHeaderProof(finalizedHeader: EthereumLightClientHe
 
 export async function getBeaconJson<T>(beaconApiUrl: string, path: string): Promise<T> {
   const response = await fetch(
-    new URL(path, beaconApiUrl.endsWith('/') ? beaconApiUrl : `${beaconApiUrl}/`),
+    new URL(
+      path.replace(/^\/+/, ''),
+      beaconApiUrl.endsWith('/') ? beaconApiUrl : `${beaconApiUrl}/`,
+    ),
   );
 
   if (!response.ok) {
