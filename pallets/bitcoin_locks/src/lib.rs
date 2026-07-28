@@ -77,12 +77,14 @@ pub mod pallet {
 			CompressedBitcoinPubkey, Satoshis, UtxoId, UtxoRef, XPubChildNumber, XPubFingerprint,
 			SATOSHIS_PER_BITCOIN,
 		},
-		vault::{BitcoinVaultProvider, LockExtension, Securitization, VaultError},
+		vault::{
+			BitcoinVaultProvider, LockExtension, Securitization, VaultError, VaultLockRequest,
+		},
 		BitcoinUtxoEvents, BitcoinUtxoTracker, PriceProvider, UtxoLockEvents, VaultId,
 	};
 	use codec::HasCompact;
 	use core::iter::Sum;
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(8);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(9);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -319,6 +321,8 @@ pub mod pallet {
 		pub utxo_script_pubkey: BitcoinCosignScriptPubkey,
 		/// Whether this lock has been funded (confirmed) on-bitcoin
 		pub is_funded: bool,
+		/// Whether this operator-owned lock may be displaced by outside vault capital.
+		pub is_backfill: bool,
 		/// Funds used by this bitcoin that will need to be held for extended periods when released
 		/// back to the vault
 		pub fund_hold_extensions: BoundedBTreeMap<BitcoinHeight, T::Balance, ConstU32<366>>,
@@ -489,6 +493,11 @@ pub mod pallet {
 			vault_id: VaultId,
 			new_satoshis: Satoshis,
 			account_id: T::AccountId,
+		},
+		BitcoinLockBackfillChanged {
+			utxo_id: UtxoId,
+			vault_id: VaultId,
+			is_backfill: bool,
 		},
 	}
 
@@ -702,6 +711,7 @@ pub mod pallet {
 				bitcoin_pubkey,
 				options,
 				false,
+				T::Balance::zero(),
 			)?;
 			Ok(())
 		}
@@ -936,6 +946,22 @@ pub mod pallet {
 
 			let new_liquidity_promised = Self::calculate_redemption_amount(new_target_price, None)?;
 
+			if lock.is_backfill {
+				let new_securitization =
+					Securitization::new(new_liquidity_promised, lock.securitization_ratio);
+				let (backfill_securitization, backfill_securitization_backed) =
+					T::VaultProvider::get_projected_backfill_backing(
+						lock.vault_id,
+						lock.get_securitization().collateral_required,
+						new_securitization.collateral_required,
+					)
+					.ok_or(Error::<T>::VaultNotFound)?;
+				ensure!(
+					backfill_securitization_backed >= backfill_securitization,
+					Error::<T>::InsufficientVaultFunds
+				);
+			}
+
 			// We need to determine up/down ratchet based on argon target rate
 			let is_up_ratchet = new_target_price > old_target_price;
 
@@ -978,6 +1004,7 @@ pub mod pallet {
 					&lock.get_securitization(),
 					0,
 					&lock.get_lock_extension(),
+					lock.is_backfill,
 				)
 				.map_err(Error::<T>::from)?;
 
@@ -990,9 +1017,13 @@ pub mod pallet {
 				vault_id,
 				&who,
 				&securitization,
-				0,
-				Some((duration_for_new_funds, &mut lock_extension)),
-				false,
+				VaultLockRequest {
+					satoshis: 0,
+					extension: Some((duration_for_new_funds, &mut lock_extension)),
+					vault_covers_fee: false,
+					is_backfill: lock.is_backfill,
+					backfill_securitization_to_unreserve: T::Balance::zero(),
+				},
 			)
 			.map_err(Error::<T>::from)?;
 
@@ -1117,6 +1148,7 @@ pub mod pallet {
 			#[pallet::compact] satoshis: Satoshis,
 			bitcoin_pubkey: CompressedBitcoinPubkey,
 			options: Option<LockOptions<T>>,
+			#[pallet::compact] backfill_securitization_to_unreserve: T::Balance,
 		) -> DispatchResultWithPostInfo {
 			let who = ensure_signed(origin)?;
 			ensure!(
@@ -1133,6 +1165,7 @@ pub mod pallet {
 				bitcoin_pubkey,
 				options,
 				true,
+				backfill_securitization_to_unreserve,
 			) {
 				Ok(()) => Ok(Pays::No.into()),
 				Err(error)
@@ -1179,9 +1212,13 @@ pub mod pallet {
 					lock.vault_id,
 					&who,
 					&securitization,
-					new_satoshis.saturating_sub(lock.satoshis),
-					Some((duration_for_new_funds, &mut lock_extension)),
-					false,
+					VaultLockRequest {
+						satoshis: new_satoshis.saturating_sub(lock.satoshis),
+						extension: Some((duration_for_new_funds, &mut lock_extension)),
+						vault_covers_fee: false,
+						is_backfill: false,
+						backfill_securitization_to_unreserve: T::Balance::zero(),
+					},
 				)
 				.map_err(Error::<T>::from)?;
 
@@ -1198,6 +1235,46 @@ pub mod pallet {
 				vault_id,
 				new_satoshis,
 				account_id: who,
+			});
+			Ok(())
+		}
+
+		#[pallet::call_index(10)]
+		#[pallet::weight(T::WeightInfo::set_as_backfill())]
+		pub fn set_as_backfill(
+			origin: OriginFor<T>,
+			utxo_id: UtxoId,
+			is_backfill: bool,
+		) -> DispatchResult {
+			let who = ensure_signed(origin)?;
+			let mut lock = LocksByUtxoId::<T>::get(utxo_id).ok_or(Error::<T>::LockNotFound)?;
+			ensure!(lock.owner_account == who, Error::<T>::NoPermissions);
+			let operator = T::VaultProvider::get_vault_operator(lock.vault_id)
+				.ok_or(Error::<T>::VaultNotFound)?;
+			ensure!(operator == who, Error::<T>::NoPermissions);
+			ensure!(lock.is_funded, Error::<T>::LockPendingFunding);
+			ensure!(
+				!LockReleaseRequestsByUtxoId::<T>::contains_key(utxo_id),
+				Error::<T>::LockInProcessOfRelease
+			);
+			if lock.is_backfill == is_backfill {
+				return Ok(());
+			}
+
+			T::VaultProvider::set_bitcoin_lock_as_backfill(
+				lock.vault_id,
+				&lock.get_securitization(),
+				lock.satoshis,
+				is_backfill,
+			)
+			.map_err(Error::<T>::from)?;
+			lock.is_backfill = is_backfill;
+			let vault_id = lock.vault_id;
+			LocksByUtxoId::<T>::insert(utxo_id, lock);
+			Self::deposit_event(Event::BitcoinLockBackfillChanged {
+				utxo_id,
+				vault_id,
+				is_backfill,
 			});
 			Ok(())
 		}
@@ -1251,9 +1328,8 @@ pub mod pallet {
 						&lock.owner_account,
 						lock.liquidity_promised,
 					)?;
-					// Confirm pending with the original securitization (matching what
-					// lock() added) but after all adjustments, so the operational
-					// accounts hook sees the final vault state.
+					// Confirm pending with the original securitization (matching what lock() added)
+					// after the funded totals and lock hooks have been updated.
 					T::VaultProvider::remove_pending(lock.vault_id, &original_securitization)
 						.map_err(Error::<T>::from)?;
 				} else {
@@ -1379,6 +1455,7 @@ pub mod pallet {
 			bitcoin_pubkey: CompressedBitcoinPubkey,
 			options: Option<LockOptions<T>>,
 			vault_covers_fee: bool,
+			backfill_securitization_to_unreserve: T::Balance,
 		) -> DispatchResult {
 			ensure!(
 				satoshis >= MinimumSatoshis::<T>::get(),
@@ -1398,9 +1475,13 @@ pub mod pallet {
 				vault_id,
 				account_id,
 				&securitization,
-				satoshis,
-				None,
-				vault_covers_fee,
+				VaultLockRequest {
+					satoshis,
+					extension: None,
+					vault_covers_fee,
+					is_backfill: false,
+					backfill_securitization_to_unreserve,
+				},
 			)
 			.map_err(Error::<T>::from)?;
 
@@ -1461,6 +1542,7 @@ pub mod pallet {
 					created_at_height: current_bitcoin_height,
 					utxo_script_pubkey: script_pubkey,
 					is_funded: false,
+					is_backfill: false,
 					fund_hold_extensions: BoundedBTreeMap::default(),
 					created_at_argon_block: <frame_system::Pallet<T>>::block_number(),
 				},
@@ -1644,14 +1726,10 @@ pub mod pallet {
 			T::VaultProvider::burn(
 				lock.vault_id,
 				&lock.get_securitization(),
+				lock.satoshis,
 				redemption_amount,
 				&lock.get_lock_extension(),
-			)
-			.map_err(Error::<T>::from)?;
-			T::VaultProvider::reduce_securitized_satoshis(
-				lock.vault_id,
-				lock.satoshis,
-				lock.securitization_ratio,
+				lock.is_backfill,
 			)
 			.map_err(Error::<T>::from)?;
 
@@ -1743,12 +1821,7 @@ pub mod pallet {
 				securitization,
 				lock.satoshis,
 				lock_extension,
-			)
-			.map_err(Error::<T>::from)?;
-			T::VaultProvider::reduce_securitized_satoshis(
-				vault_id,
-				lock.satoshis,
-				lock.securitization_ratio,
+				lock.is_backfill,
 			)
 			.map_err(Error::<T>::from)?;
 
@@ -1790,8 +1863,10 @@ pub mod pallet {
 				vault_id,
 				&lock.owner_account,
 				&lock.get_securitization(),
+				lock.satoshis,
 				adjusted_market_rate,
 				&lock.get_lock_extension(),
+				lock.is_backfill,
 			)
 			.map_err(Error::<T>::from)?;
 
@@ -1805,12 +1880,6 @@ pub mod pallet {
 				)?;
 				frame_system::Pallet::<T>::dec_providers(&lock.owner_account)?;
 			}
-			T::VaultProvider::reduce_securitized_satoshis(
-				vault_id,
-				lock.satoshis,
-				lock.securitization_ratio,
-			)
-			.map_err(Error::<T>::from)?;
 			// count the amount we took from the vault as the burn amount
 			T::LockEvents::utxo_released(
 				utxo_id,

@@ -106,6 +106,7 @@ import type {
   PalletTreasuryBondLotSummary,
   PalletTreasuryFrameArgonotBondParticipants,
   PalletTreasuryFrameVaultCapital,
+  PalletTreasuryVaultBondState,
   PalletVaultsRecentCapacityDrop,
   PalletVaultsVaultFrameRevenue,
   SpConsensusGrandpaAppPublic,
@@ -1687,7 +1688,8 @@ declare module '@polkadot/api-base/types/storage' {
     };
     treasury: {
       /**
-       * The active top Argonot bond lots kept in ascending bond order, then lower ids first.
+       * The active Argonot set keeps the smallest bond amount first, then lower ids first when
+       * amounts tie.
        **/
       argonotBondLots: AugmentedQuery<
         ApiType,
@@ -1714,13 +1716,15 @@ declare module '@polkadot/api-base/types/storage' {
         [AccountId32, u64]
       >;
       /**
-       * The accepted bond lots for a vault.
+       * The active bond state for a vault.
        *
-       * Lots are kept in descending bond order, then lower `bond_lot_id` first for ties.
+       * The bounded payout set keeps the largest bond amount first, then lower `bond_lot_id` first
+       * when amounts tie. Backfill lots remain in `BondLotById` and are represented here by their
+       * aggregate.
        **/
       bondLotsByVault: AugmentedQuery<
         ApiType,
-        (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<PalletTreasuryBondLotSummary>>,
+        (arg: u32 | AnyNumber | Uint8Array) => Observable<PalletTreasuryVaultBondState>,
         [u32]
       >;
       /**

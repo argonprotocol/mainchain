@@ -85,6 +85,7 @@ mod benchmarks {
 			satoshis,
 			owner_pubkey,
 			options,
+			T::Balance::zero(),
 		);
 
 		let utxo_id = NextUtxoId::<T>::get().ok_or(BenchmarkError::Stop("missing utxo id"))?;
@@ -145,14 +146,40 @@ mod benchmarks {
 	fn ratchet() -> Result<(), BenchmarkError> {
 		reset_benchmark_environment::<T>();
 		let context = create_funded_lock::<T>(5)?;
+		let mut lock = LocksByUtxoId::<T>::get(context.utxo_id)
+			.ok_or(BenchmarkError::Stop("missing benchmark lock"))?;
+		let collateral_required = lock.get_securitization().collateral_required;
+
+		UtxoIdsByOwnerAccount::<T>::remove(&context.owner, context.utxo_id);
+		lock.owner_account = context.operator.clone();
+		lock.is_backfill = true;
+		LocksByUtxoId::<T>::insert(context.utxo_id, &lock);
+		UtxoIdsByOwnerAccount::<T>::insert(&context.operator, context.utxo_id, ());
+
+		let mut state = benchmark_bitcoin_vault_provider_state::<T::AccountId, T::Balance>();
+		let vault = state
+			.vaults
+			.get_mut(&context.vault_id)
+			.ok_or(BenchmarkError::Stop("missing benchmark vault"))?;
+		vault.securitization = collateral_required;
+		vault.securitization_target = collateral_required;
+		vault.securitization_locked = collateral_required;
+		vault.backfill_securitization_locked = collateral_required;
+		vault.locked_satoshis = context.satoshis;
+		vault.securitized_satoshis = context.satoshis;
+		vault.backfill_securitized_satoshis = context.satoshis;
+		set_benchmark_bitcoin_vault_provider_state(state);
+
+		T::Currency::mint_into(&context.operator, 1_000_000_000_000u128.into())
+			.map_err(|_| BenchmarkError::Stop("failed to fund benchmark vault operator"))?;
 		seed_price_state(80_000, 1, 1);
 		let options =
-			benchmark_lock_options::<T>(context.vault_id, &context.owner, context.satoshis, 13)?;
-		let owner = context.owner.clone();
-		whitelist_account!(owner);
+			benchmark_lock_options::<T>(context.vault_id, &context.operator, context.satoshis, 13)?;
+		let operator = context.operator.clone();
+		whitelist_account!(operator);
 
 		#[extrinsic_call]
-		_(RawOrigin::Signed(owner), context.utxo_id, options);
+		_(RawOrigin::Signed(operator), context.utxo_id, options);
 
 		let lock = LocksByUtxoId::<T>::get(context.utxo_id)
 			.ok_or(BenchmarkError::Stop("missing lock after ratchet"))?;
@@ -301,6 +328,30 @@ mod benchmarks {
 		let lock = LocksByUtxoId::<T>::get(context.utxo_id)
 			.ok_or(BenchmarkError::Stop("missing lock after increase"))?;
 		assert_eq!(lock.satoshis, new_satoshis);
+		Ok(())
+	}
+
+	#[benchmark]
+	fn set_as_backfill() -> Result<(), BenchmarkError> {
+		reset_benchmark_environment::<T>();
+		let context = create_funded_lock::<T>(17)?;
+		let mut lock = LocksByUtxoId::<T>::get(context.utxo_id)
+			.ok_or(BenchmarkError::Stop("missing benchmark lock"))?;
+		UtxoIdsByOwnerAccount::<T>::remove(&context.owner, context.utxo_id);
+		lock.owner_account = context.operator.clone();
+		LocksByUtxoId::<T>::insert(context.utxo_id, lock);
+		UtxoIdsByOwnerAccount::<T>::insert(&context.operator, context.utxo_id, ());
+		let operator = context.operator;
+		whitelist_account!(operator);
+
+		#[extrinsic_call]
+		_(RawOrigin::Signed(operator), context.utxo_id, true);
+
+		assert!(
+			LocksByUtxoId::<T>::get(context.utxo_id)
+				.ok_or(BenchmarkError::Stop("missing backfill lock"))?
+				.is_backfill
+		);
 		Ok(())
 	}
 
@@ -582,9 +633,12 @@ where
 		securitization: securitization.into(),
 		securitization_target: securitization.into(),
 		securitization_locked: T::Balance::zero(),
+		backfill_securitization_locked: T::Balance::zero(),
+		backfill_securitization_reserved: T::Balance::zero(),
 		securitization_pending_activation: T::Balance::zero(),
 		locked_satoshis: 0,
 		securitized_satoshis: 0,
+		backfill_securitized_satoshis: 0,
 		securitization_release_schedule: BoundedBTreeMap::default(),
 		securitization_ratio: FixedU128::one(),
 		is_closed: false,

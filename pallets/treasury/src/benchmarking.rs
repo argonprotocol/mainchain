@@ -67,6 +67,7 @@ mod benchmarks {
 			vault_id,
 			beneficiary,
 			expires_at_frame: BENCHMARK_FRAME_ID,
+			backfill_bonds_to_unreserve: 0,
 			signature: Signature::Sr25519([0; 64].into()),
 		};
 
@@ -84,7 +85,7 @@ mod benchmarks {
 			},
 		);
 		assert_eq!(
-			BondLotsByVault::<T>::get(vault_id).len(),
+			BondLotsByVault::<T>::get(vault_id).bond_lots.len(),
 			T::MaxTreasuryContributors::get() as usize,
 			"expected accepted bond-lot list to stay full after purchase",
 		);
@@ -165,6 +166,46 @@ mod benchmarks {
 			BondLotById::<T>::get(bond_lot_id).and_then(|bond_lot| bond_lot.release_reason),
 			Some(BondReleaseReason::UserLiquidation),
 		);
+		Ok(())
+	}
+
+	#[benchmark]
+	fn set_bond_lot_as_backfill() -> Result<(), BenchmarkError> {
+		reset_benchmark_state::<T>();
+		let bonds = minimum_purchase_bonds::<T>();
+		seed_accepted_vault_state::<T>(1, 1, bonds, bonds, BENCHMARK_FRAME_ID.saturating_sub(1))?;
+		let caller = benchmark_operator::<T>(0);
+		BondLotById::<T>::mutate(0, |bond_lot| {
+			bond_lot.as_mut().expect("benchmark bond lot").owner = caller.clone();
+		});
+		whitelist_account!(caller);
+
+		#[extrinsic_call]
+		_(RawOrigin::Signed(caller), 0, true);
+
+		assert!(
+			BondLotById::<T>::get(0)
+				.ok_or(BenchmarkError::Stop("missing backfill bond lot"))?
+				.is_backfill
+		);
+		Ok(())
+	}
+
+	#[benchmark]
+	fn set_backfill_bonds_reserved() -> Result<(), BenchmarkError> {
+		reset_benchmark_state::<T>();
+		let bonds = minimum_purchase_bonds::<T>();
+		seed_accepted_vault_state::<T>(1, 0, bonds, bonds, BENCHMARK_FRAME_ID.saturating_sub(1))?;
+		BondLotsByVault::<T>::mutate(1, |vault_bonds| {
+			vault_bonds.backfill_bonds = bonds;
+		});
+		let caller = benchmark_operator::<T>(0);
+		whitelist_account!(caller);
+
+		#[extrinsic_call]
+		_(RawOrigin::Signed(caller), 1, bonds);
+
+		assert_eq!(BondLotsByVault::<T>::get(1).backfill_bonds_reserved, bonds);
 		Ok(())
 	}
 
@@ -590,11 +631,7 @@ where
 		let mut accepted_lots = BoundedVec::default();
 
 		for contributor_index in 0..contributor_count {
-			let owner = if contributor_index == 0 {
-				operator.clone()
-			} else {
-				benchmark_bond_holder::<T>(vault_index, contributor_index)
-			};
+			let owner = benchmark_bond_holder::<T>(vault_index, contributor_index);
 
 			insert_bond_lot::<T, T::Currency>(
 				next_bond_lot_id,
@@ -617,7 +654,14 @@ where
 			next_bond_lot_id = next_bond_lot_id.saturating_add(1);
 		}
 
-		BondLotsByVault::<T>::insert(vault_id, accepted_lots);
+		BondLotsByVault::<T>::insert(
+			vault_id,
+			VaultBondState::<T> {
+				bond_lots: accepted_lots,
+				backfill_bonds: 0,
+				backfill_bonds_reserved: 0,
+			},
+		);
 	}
 
 	NextBondLotId::<T>::put(next_bond_lot_id);
@@ -651,7 +695,10 @@ where
 		None,
 		true,
 	)?;
-	BondLotsByVault::<T>::insert(1, summaries);
+	BondLotsByVault::<T>::insert(
+		1,
+		VaultBondState::<T> { bond_lots: summaries, backfill_bonds: 0, backfill_bonds_reserved: 0 },
+	);
 
 	Ok(account_id)
 }
@@ -733,6 +780,7 @@ where
 			owner: owner.clone(),
 			program,
 			bonds,
+			is_backfill: false,
 			created_frame_id,
 			participated_frames: 0,
 			last_frame_earnings_frame_id: None,
@@ -780,9 +828,12 @@ fn benchmark_vault<T: Config>(
 		securitization: TreasuryBalanceOf::<T>::zero(),
 		securitization_target: TreasuryBalanceOf::<T>::zero(),
 		securitization_locked: TreasuryBalanceOf::<T>::zero(),
+		backfill_securitization_locked: TreasuryBalanceOf::<T>::zero(),
+		backfill_securitization_reserved: TreasuryBalanceOf::<T>::zero(),
 		securitization_pending_activation: TreasuryBalanceOf::<T>::zero(),
 		locked_satoshis: 0,
 		securitized_satoshis,
+		backfill_securitized_satoshis: 0,
 		securitization_release_schedule: Default::default(),
 		securitization_ratio: FixedU128::one(),
 		is_closed: false,

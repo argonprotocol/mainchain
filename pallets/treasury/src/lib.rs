@@ -95,7 +95,7 @@ pub mod pallet {
 	};
 	use tracing::info;
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(6);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(7);
 
 	pub type BondLotId = u64;
 	pub type Bonds = u32;
@@ -259,19 +259,17 @@ pub mod pallet {
 	#[pallet::storage]
 	pub type PendingBondReleaseRetryCursor<T: Config> = StorageValue<_, FrameId, OptionQuery>;
 
-	/// The accepted bond lots for a vault.
+	/// The active bond state for a vault.
 	///
-	/// Lots are kept in descending bond order, then lower `bond_lot_id` first for ties.
+	/// The bounded payout set keeps the largest bond amount first, then lower `bond_lot_id` first
+	/// when amounts tie. Backfill lots remain in `BondLotById` and are represented here by their
+	/// aggregate.
 	#[pallet::storage]
-	pub type BondLotsByVault<T: Config> = StorageMap<
-		_,
-		Twox64Concat,
-		VaultId,
-		BoundedVec<BondLotSummary, T::MaxTreasuryContributors>,
-		ValueQuery,
-	>;
+	pub type BondLotsByVault<T: Config> =
+		StorageMap<_, Twox64Concat, VaultId, VaultBondState<T>, ValueQuery>;
 
-	/// The active top Argonot bond lots kept in ascending bond order, then lower ids first.
+	/// The active Argonot set keeps the smallest bond amount first, then lower ids first when
+	/// amounts tie.
 	#[pallet::storage]
 	pub type ArgonotBondLots<T: Config> =
 		StorageValue<_, BoundedVec<BondLotSummary, T::MaxActiveArgonotBondLots>, ValueQuery>;
@@ -360,6 +358,15 @@ pub mod pallet {
 			account_id: T::AccountId,
 			bonds: Bonds,
 		},
+		BondLotBackfillChanged {
+			vault_id: VaultId,
+			bond_lot_id: BondLotId,
+			is_backfill: bool,
+		},
+		BackfillBondsReservedChanged {
+			vault_id: VaultId,
+			backfill_bonds_reserved: Bonds,
+		},
 		/// Encumbered treasury backing was burned and any no-longer-needed fractional hold was
 		/// returned.
 		EncumberedBondMicrogonsBurned {
@@ -408,6 +415,10 @@ pub mod pallet {
 		ArgonotBondPurchaseBelowCutoff,
 		/// The Argonot bond purchase would exceed the active circulation cap.
 		ArgonotBondPurchaseAboveCap,
+		/// Only an active vault bond owned by its operator can be used as backfill.
+		BondLotNotEligibleForBackfill,
+		/// The caller does not have permission to perform this action.
+		NoPermissions,
 	}
 
 	#[pallet::call]
@@ -438,19 +449,38 @@ pub mod pallet {
 			let sharing_percent =
 				T::TreasuryVaultProvider::get_vault_profit_sharing_percent(vault_id)
 					.unwrap_or_default();
-			let mut accepted_lots = BondLotsByVault::<T>::get(vault_id);
+			let mut vault_bonds = BondLotsByVault::<T>::get(vault_id);
 
-			let sold_bonds = Self::sum_bonds(&accepted_lots);
-			let available_bond_space_now = activated_vault_bonds.saturating_sub(sold_bonds);
+			let bonus_percent = Self::validate_bonus_approval(
+				vault_id,
+				&who,
+				current_frame_id,
+				bonus_approval.as_ref(),
+			)?;
+			let backfill_bonds_to_unreserve = bonus_approval
+				.as_ref()
+				.map(|proof| proof.backfill_bonds_to_unreserve)
+				.unwrap_or_default();
+			ensure!(
+				backfill_bonds_to_unreserve <= vault_bonds.backfill_bonds_reserved,
+				Error::<T>::BondPurchaseAboveSecurity
+			);
+			vault_bonds.backfill_bonds_reserved =
+				vault_bonds.backfill_bonds_reserved.saturating_sub(backfill_bonds_to_unreserve);
 
-			let evicted_summary = if accepted_lots.len() <
+			let bonds_total = Self::sum_bonds(&vault_bonds.bond_lots);
+			let available_bond_space_now = activated_vault_bonds
+				.saturating_sub(bonds_total)
+				.saturating_sub(vault_bonds.backfill_bonds_reserved);
+
+			let evicted_summary = if vault_bonds.bond_lots.len() <
 				T::MaxTreasuryContributors::get() as usize
 			{
 				ensure!(bonds <= available_bond_space_now, Error::<T>::BondPurchaseAboveSecurity);
 				None
 			} else {
 				let evicted_summary =
-					accepted_lots.pop().ok_or(Error::<T>::BondPurchaseRejected)?;
+					vault_bonds.bond_lots.pop().ok_or(Error::<T>::BondPurchaseRejected)?;
 
 				ensure!(bonds > evicted_summary.bonds, Error::<T>::BondPurchaseRejected);
 				ensure!(
@@ -459,13 +489,6 @@ pub mod pallet {
 				);
 				Some(evicted_summary)
 			};
-
-			let bonus_percent = Self::validate_bonus_approval(
-				vault_id,
-				&who,
-				current_frame_id,
-				bonus_approval.as_ref(),
-			)?;
 
 			if let Some(evicted_summary) = evicted_summary {
 				let evicted_owner = BondLotById::<T>::get(evicted_summary.bond_lot_id)
@@ -483,12 +506,13 @@ pub mod pallet {
 			let purchase_amount = Self::bonds_to_balance(bonds);
 			Self::create_hold::<T::Currency>(&who, purchase_amount)?;
 
-			let insert_index = accepted_lots
+			let insert_index = vault_bonds
+				.bond_lots
 				.iter()
 				.position(|summary| summary.bonds < bonds)
-				.unwrap_or(accepted_lots.len());
-
-			accepted_lots
+				.unwrap_or(vault_bonds.bond_lots.len());
+			vault_bonds
+				.bond_lots
 				.try_insert(insert_index, BondLotSummary { bond_lot_id, bonds })
 				.map_err(|_| Error::<T>::MaxAcceptedBondLotsExceeded)?;
 
@@ -499,6 +523,7 @@ pub mod pallet {
 					owner: who.clone(),
 					program,
 					bonds,
+					is_backfill: false,
 					created_frame_id: current_frame_id,
 					participated_frames: 0,
 					last_frame_earnings_frame_id: None,
@@ -509,7 +534,7 @@ pub mod pallet {
 				},
 			);
 			BondLotIdsByAccount::<T>::insert(&who, bond_lot_id, ());
-			BondLotsByVault::<T>::insert(vault_id, accepted_lots);
+			BondLotsByVault::<T>::insert(vault_id, vault_bonds);
 
 			Self::deposit_event(Event::<T>::BondLotPurchased {
 				program_id: program.id(),
@@ -534,6 +559,20 @@ pub mod pallet {
 
 			match bond_lot.program {
 				BondProgram::Vault { vault_id, .. } => {
+					if bond_lot.is_backfill {
+						let vault_bonds = BondLotsByVault::<T>::get(vault_id);
+						let activated_vault_bonds =
+							Self::balance_to_bonds(Self::get_vault_securitized_funds_cap(vault_id));
+						let bonds_total = Self::sum_bonds(&vault_bonds.bond_lots);
+						let remaining_backfill =
+							vault_bonds.backfill_bonds.saturating_sub(bond_lot.bonds);
+						ensure!(
+							vault_bonds.backfill_bonds_reserved <=
+								remaining_backfill
+									.min(activated_vault_bonds.saturating_sub(bonds_total)),
+							Error::<T>::BondPurchaseAboveSecurity
+						);
+					}
 					let (_, current_hold) = Self::account_vault_bond_status(&who)?;
 					let remaining_non_releasing_hold =
 						current_hold.saturating_sub(Self::bonds_to_balance(bond_lot.bonds));
@@ -542,7 +581,7 @@ pub mod pallet {
 						Error::<T>::ActiveBondAmountBelowEncumberedBacking,
 					);
 
-					Self::remove_bond_lot_from_vault(vault_id, bond_lot_id);
+					Self::remove_bond_lot_from_vault(vault_id, bond_lot_id, &bond_lot);
 				},
 				BondProgram::Argonot => {
 					ArgonotBondLots::<T>::try_mutate(|active_lots| -> DispatchResult {
@@ -604,6 +643,7 @@ pub mod pallet {
 					owner: who.clone(),
 					program,
 					bonds,
+					is_backfill: false,
 					created_frame_id: current_frame_id,
 					participated_frames: 0,
 					last_frame_earnings_frame_id: None,
@@ -644,6 +684,115 @@ pub mod pallet {
 				bond_lot_id,
 				account_id: who.clone(),
 				bonds,
+			});
+			Ok(())
+		}
+
+		#[pallet::call_index(7)]
+		#[pallet::weight(T::WeightInfo::set_bond_lot_as_backfill())]
+		pub fn set_bond_lot_as_backfill(
+			origin: OriginFor<T>,
+			bond_lot_id: BondLotId,
+			is_backfill: bool,
+		) -> DispatchResult {
+			let who = ensure_signed(origin)?;
+			let mut bond_lot =
+				BondLotById::<T>::get(bond_lot_id).ok_or(Error::<T>::BondLotNotFound)?;
+			ensure!(bond_lot.owner == who, Error::<T>::NotBondLotOwner);
+			ensure!(bond_lot.release_reason.is_none(), Error::<T>::BondLotAlreadyReleasing);
+			let BondProgram::Vault { vault_id, .. } = bond_lot.program else {
+				return Err(Error::<T>::BondLotNotEligibleForBackfill.into());
+			};
+			ensure!(
+				T::TreasuryVaultProvider::get_vault_operator(vault_id).as_ref() == Some(&who),
+				Error::<T>::BondLotNotEligibleForBackfill
+			);
+			if bond_lot.is_backfill == is_backfill {
+				return Ok(());
+			}
+
+			let activated_vault_bonds =
+				Self::balance_to_bonds(Self::get_vault_securitized_funds_cap(vault_id));
+			BondLotsByVault::<T>::try_mutate(vault_id, |vault_bonds| -> DispatchResult {
+				if is_backfill {
+					let index = vault_bonds
+						.bond_lots
+						.iter()
+						.position(|summary| summary.bond_lot_id == bond_lot_id)
+						.ok_or(Error::<T>::BondLotNotFound)?;
+					vault_bonds.bond_lots.remove(index);
+					vault_bonds.backfill_bonds =
+						vault_bonds.backfill_bonds.saturating_add(bond_lot.bonds);
+				} else {
+					ensure!(
+						vault_bonds.bond_lots.len() < T::MaxTreasuryContributors::get() as usize,
+						Error::<T>::MaxAcceptedBondLotsExceeded
+					);
+					let bonds_total = Self::sum_bonds(&vault_bonds.bond_lots);
+					let new_bonds_total = bonds_total.saturating_add(bond_lot.bonds);
+					let new_backfill_bonds =
+						vault_bonds.backfill_bonds.saturating_sub(bond_lot.bonds);
+					ensure!(
+						new_bonds_total <= activated_vault_bonds &&
+							vault_bonds.backfill_bonds_reserved <=
+								new_backfill_bonds.min(
+									activated_vault_bonds.saturating_sub(new_bonds_total)
+								),
+						Error::<T>::BondPurchaseAboveSecurity
+					);
+					let insert_index = vault_bonds
+						.bond_lots
+						.iter()
+						.position(|summary| summary.bonds < bond_lot.bonds)
+						.unwrap_or(vault_bonds.bond_lots.len());
+					vault_bonds
+						.bond_lots
+						.try_insert(
+							insert_index,
+							BondLotSummary { bond_lot_id, bonds: bond_lot.bonds },
+						)
+						.map_err(|_| Error::<T>::MaxAcceptedBondLotsExceeded)?;
+					vault_bonds.backfill_bonds = new_backfill_bonds;
+				}
+				Ok(())
+			})?;
+			bond_lot.is_backfill = is_backfill;
+			BondLotById::<T>::insert(bond_lot_id, bond_lot);
+			Self::deposit_event(Event::BondLotBackfillChanged {
+				vault_id,
+				bond_lot_id,
+				is_backfill,
+			});
+			Ok(())
+		}
+
+		#[pallet::call_index(8)]
+		#[pallet::weight(T::WeightInfo::set_backfill_bonds_reserved())]
+		pub fn set_backfill_bonds_reserved(
+			origin: OriginFor<T>,
+			vault_id: VaultId,
+			backfill_bonds_reserved: Bonds,
+		) -> DispatchResult {
+			let who = ensure_signed(origin)?;
+			let operator = T::TreasuryVaultProvider::get_vault_operator(vault_id);
+			ensure!(operator.as_ref() == Some(&who), Error::<T>::NoPermissions);
+			let activated_vault_bonds =
+				Self::balance_to_bonds(Self::get_vault_securitized_funds_cap(vault_id));
+			BondLotsByVault::<T>::try_mutate(vault_id, |vault_bonds| -> DispatchResult {
+				let bonds_total = Self::sum_bonds(&vault_bonds.bond_lots);
+				let backed_backfill = vault_bonds
+					.backfill_bonds
+					.min(activated_vault_bonds.saturating_sub(bonds_total));
+				ensure!(
+					backfill_bonds_reserved <= backed_backfill,
+					Error::<T>::BondPurchaseAboveSecurity
+				);
+				vault_bonds.backfill_bonds_reserved = backfill_bonds_reserved;
+				Ok(())
+			})?;
+			Self::deposit_event(Event::BackfillBondsReservedChanged {
+				vault_id,
+				backfill_bonds_reserved,
 			});
 			Ok(())
 		}
@@ -858,7 +1007,6 @@ pub mod pallet {
 
 				let mut gross_lot_yield_total = T::Balance::zero();
 				let mut earnings_for_vault = T::Balance::zero();
-				let mut capital_contributed_by_vault = T::Balance::zero();
 
 				for allocation in vault_capital.bond_lot_allocations.iter() {
 					let Some(bond_lot) = BondLotById::<T>::get(allocation.bond_lot_id) else {
@@ -879,35 +1027,34 @@ pub mod pallet {
 					);
 					let mut paid_payout = bonder_percent.mul_floor(gross_lot_yield);
 
-					if bond_lot.owner == vault_account_id {
-						earnings_for_vault.saturating_accrue(gross_lot_yield);
-						capital_contributed_by_vault
-							.saturating_accrue(Self::bonds_to_balance(bond_lot.bonds));
-					} else {
-						earnings_for_vault
-							.saturating_accrue(gross_lot_yield.saturating_sub(paid_payout));
-						if !paid_payout.is_zero() &&
-							let Err(e) = T::Currency::transfer(
-								&bid_pool_account,
-								&bond_lot.owner,
-								paid_payout,
-								Preservation::Expendable,
-							) {
-							Self::deposit_event(Event::<T>::CouldNotDistributeEarningsToBondLot {
-								frame_id,
-								vault_id: *vault_id,
-								bond_lot_id: allocation.bond_lot_id,
-								account_id: bond_lot.owner,
-								amount: paid_payout,
-								dispatch_error: e,
-							});
-							treasury_refund_total.saturating_accrue(paid_payout);
-							paid_payout = T::Balance::zero();
-						}
+					earnings_for_vault
+						.saturating_accrue(gross_lot_yield.saturating_sub(paid_payout));
+					if !paid_payout.is_zero() &&
+						let Err(e) = T::Currency::transfer(
+							&bid_pool_account,
+							&bond_lot.owner,
+							paid_payout,
+							Preservation::Expendable,
+						) {
+						Self::deposit_event(Event::<T>::CouldNotDistributeEarningsToBondLot {
+							frame_id,
+							vault_id: *vault_id,
+							bond_lot_id: allocation.bond_lot_id,
+							account_id: bond_lot.owner,
+							amount: paid_payout,
+							dispatch_error: e,
+						});
+						treasury_refund_total.saturating_accrue(paid_payout);
+						paid_payout = T::Balance::zero();
 					}
 
 					Self::record_bond_lot_earnings(allocation.bond_lot_id, frame_id, paid_payout);
 				}
+
+				let backfill_yield =
+					vault_capital.backfill_prorata.saturating_mul_int(gross_vault_earnings);
+				gross_lot_yield_total.saturating_accrue(backfill_yield);
+				earnings_for_vault.saturating_accrue(backfill_yield);
 
 				treasury_refund_total
 					.saturating_accrue(gross_vault_earnings.saturating_sub(gross_lot_yield_total));
@@ -921,7 +1068,9 @@ pub mod pallet {
 						earnings_for_vault,
 						earnings: gross_vault_earnings,
 						capital_contributed: Self::bonds_to_balance(vault_capital.eligible_bonds),
-						capital_contributed_by_vault,
+						capital_contributed_by_vault: Self::bonds_to_balance(
+							vault_capital.backfill_bonds_eligible,
+						),
 					},
 				);
 			}
@@ -980,21 +1129,21 @@ pub mod pallet {
 			let mut vault_candidates = Vec::new();
 			let max_vaults = T::MaxVaultsPerPool::get() as usize;
 
-			for (vault_id, accepted_lots) in BondLotsByVault::<T>::iter() {
-				if accepted_lots.is_empty() {
+			for (vault_id, vault_bonds) in BondLotsByVault::<T>::iter() {
+				if vault_bonds.bond_lots.is_empty() && vault_bonds.backfill_bonds.is_zero() {
 					continue;
 				}
 
-				let sold_bonds = Self::sum_bonds(&accepted_lots);
+				let bonds_total = Self::sum_bonds(&vault_bonds.bond_lots);
 				let activated_bitcoin_security_as_bonds =
 					Self::balance_to_bonds(Self::get_vault_securitized_funds_cap(vault_id));
-				let payout_denominator = activated_bitcoin_security_as_bonds.max(sold_bonds);
-				if payout_denominator.is_zero() {
+				if activated_bitcoin_security_as_bonds.is_zero() {
 					continue;
 				}
+				let payout_denominator = activated_bitcoin_security_as_bonds.max(bonds_total);
 
 				let mut bond_lot_allocations = BoundedVec::default();
-				for entry in accepted_lots {
+				for entry in vault_bonds.bond_lots {
 					let prorata =
 						FixedU128::from_rational(entry.bonds as u128, payout_denominator as u128);
 					if bond_lot_allocations
@@ -1005,11 +1154,24 @@ pub mod pallet {
 					}
 				}
 
-				let eligible_bonds = activated_bitcoin_security_as_bonds.min(sold_bonds);
+				let bonds_total_eligible = activated_bitcoin_security_as_bonds.min(bonds_total);
+				let backfill_bonds_eligible = vault_bonds
+					.backfill_bonds
+					.min(activated_bitcoin_security_as_bonds.saturating_sub(bonds_total_eligible));
+				let eligible_bonds = bonds_total_eligible.saturating_add(backfill_bonds_eligible);
+				let backfill_prorata = FixedU128::from_rational(
+					backfill_bonds_eligible as u128,
+					payout_denominator as u128,
+				);
 				vault_candidates.push((
 					vault_id,
 					eligible_bonds,
-					VaultCapital { bond_lot_allocations, eligible_bonds },
+					VaultCapital {
+						bond_lot_allocations,
+						backfill_bonds_eligible,
+						backfill_prorata,
+						eligible_bonds,
+					},
 				));
 			}
 
@@ -1305,20 +1467,35 @@ pub mod pallet {
 			TotalActiveArgonotBonds::<T>::put(total_bonds);
 		}
 
-		fn remove_bond_lot_from_vault(vault_id: VaultId, bond_lot_id: BondLotId) {
-			BondLotsByVault::<T>::mutate_exists(vault_id, |maybe_summaries| {
-				let Some(summaries) = maybe_summaries.as_mut() else {
+		fn remove_bond_lot_from_vault(
+			vault_id: VaultId,
+			bond_lot_id: BondLotId,
+			bond_lot: &BondLot<T>,
+		) {
+			BondLotsByVault::<T>::mutate_exists(vault_id, |maybe_vault_bonds| {
+				let Some(vault_bonds) = maybe_vault_bonds.as_mut() else {
 					return;
 				};
 
-				if let Some(index) =
-					summaries.iter().position(|summary| summary.bond_lot_id == bond_lot_id)
-				{
-					summaries.remove(index);
+				if bond_lot.is_backfill {
+					vault_bonds.backfill_bonds =
+						vault_bonds.backfill_bonds.saturating_sub(bond_lot.bonds);
+				} else {
+					let Some(index) = vault_bonds
+						.bond_lots
+						.iter()
+						.position(|summary| summary.bond_lot_id == bond_lot_id)
+					else {
+						return;
+					};
+					vault_bonds.bond_lots.remove(index);
 				}
 
-				if summaries.is_empty() {
-					*maybe_summaries = None;
+				if vault_bonds.bond_lots.is_empty() &&
+					vault_bonds.backfill_bonds.is_zero() &&
+					vault_bonds.backfill_bonds_reserved.is_zero()
+				{
+					*maybe_vault_bonds = None;
 				}
 			});
 		}
@@ -1556,7 +1733,7 @@ pub mod pallet {
 						BondLotById::<T>::remove(bond_lot_id);
 						BondLotIdsByAccount::<T>::remove(account_id, bond_lot_id);
 						if let BondProgram::Vault { vault_id, .. } = bond_lot.program {
-							Self::remove_bond_lot_from_vault(vault_id, bond_lot_id);
+							Self::remove_bond_lot_from_vault(vault_id, bond_lot_id, &bond_lot);
 						}
 					} else {
 						BondLotById::<T>::mutate_exists(bond_lot_id, |maybe_bond_lot| {
@@ -1568,17 +1745,21 @@ pub mod pallet {
 						let BondProgram::Vault { vault_id, .. } = bond_lot.program else {
 							continue;
 						};
-						BondLotsByVault::<T>::mutate_exists(vault_id, |maybe_summaries| {
-							let Some(summaries) = maybe_summaries.as_mut() else {
+						BondLotsByVault::<T>::mutate_exists(vault_id, |maybe_vault_bonds| {
+							let Some(vault_bonds) = maybe_vault_bonds.as_mut() else {
 								return;
 							};
 
-							if let Some(summary) = summaries
+							if bond_lot.is_backfill {
+								vault_bonds.backfill_bonds =
+									vault_bonds.backfill_bonds.saturating_sub(removed_bonds);
+							} else if let Some(summary) = vault_bonds
+								.bond_lots
 								.iter_mut()
 								.find(|summary| summary.bond_lot_id == bond_lot_id)
 							{
 								summary.bonds = remaining_bonds;
-								summaries.sort_by(|left, right| {
+								vault_bonds.bond_lots.sort_by(|left, right| {
 									right
 										.bonds
 										.cmp(&left.bonds)
@@ -1694,6 +1875,8 @@ pub mod pallet {
 		/// The number of bonds in this lot. `1 ARGON = 1 bond`.
 		#[codec(compact)]
 		pub bonds: Bonds,
+		/// Whether this operator-owned vault lot may yield its capacity to other bond lots.
+		pub is_backfill: bool,
 		/// The frame when this lot was purchased.
 		#[codec(compact)]
 		pub created_frame_id: FrameId,
@@ -1724,14 +1907,37 @@ pub mod pallet {
 		pub bonds: Bonds,
 	}
 
+	/// Active vault bond participation and its backfill accounting.
+	#[derive(
+		Encode,
+		Decode,
+		CloneNoBound,
+		PartialEqNoBound,
+		EqNoBound,
+		DebugNoBound,
+		DefaultNoBound,
+		TypeInfo,
+		MaxEncodedLen,
+	)]
+	#[scale_info(skip_type_params(T))]
+	pub struct VaultBondState<T: Config> {
+		/// Lots in the vault's bounded payout set.
+		pub bond_lots: BoundedVec<BondLotSummary, T::MaxTreasuryContributors>,
+		/// Total active backfill bonds.
+		#[codec(compact)]
+		pub backfill_bonds: Bonds,
+		/// Backfill bonds reserved for future bond purchases.
+		#[codec(compact)]
+		pub backfill_bonds_reserved: Bonds,
+	}
+
 	/// A lot's stored frame allocation.
 	#[derive(Encode, Decode, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 	pub struct BondLotAllocation {
 		/// The lot participating in this frame snapshot.
 		#[codec(compact)]
 		pub bond_lot_id: BondLotId,
-		/// This lot's stored frame share:
-		/// `lot_bonds / max(activated_bitcoin_security_bonds, sold_bonds)`.
+		/// This lot's share of the vault's activated Bitcoin security.
 		pub prorata: FixedU128,
 	}
 
@@ -1741,8 +1947,13 @@ pub mod pallet {
 	pub struct VaultCapital<T: Config> {
 		/// The lots that share this vault's frame earnings.
 		pub bond_lot_allocations: BoundedVec<BondLotAllocation, T::MaxTreasuryContributors>,
+		/// Backfill bonds eligible to participate in this frame.
+		#[codec(compact)]
+		pub backfill_bonds_eligible: Bonds,
+		/// The backfill share of this vault's frame earnings.
+		pub backfill_prorata: FixedU128,
 		/// The cross-vault frame weight:
-		/// `min(activated_bitcoin_security_bonds, sold_bonds)`.
+		/// `min(activated Bitcoin security, bonds in lots + backfill bonds)`.
 		#[codec(compact)]
 		pub eligible_bonds: Bonds,
 	}

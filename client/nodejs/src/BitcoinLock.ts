@@ -78,6 +78,7 @@ export class BitcoinLock implements IBitcoinLock {
   public openClaimHeight: number;
   public createdAtHeight: number;
   public isFunded: boolean;
+  public isBackfill: boolean;
   public createdAtArgonBlock: number;
   public fundHoldExtensionsByBitcoinExpirationHeight: Record<number, bigint>;
   public couponFeesPaid: bigint;
@@ -100,6 +101,7 @@ export class BitcoinLock implements IBitcoinLock {
     this.openClaimHeight = data.openClaimHeight;
     this.createdAtHeight = data.createdAtHeight;
     this.isFunded = data.isFunded;
+    this.isBackfill = data.isBackfill ?? false;
     this.fundHoldExtensionsByBitcoinExpirationHeight =
       data.fundHoldExtensionsByBitcoinExpirationHeight;
     this.createdAtArgonBlock = data.createdAtArgonBlock;
@@ -661,6 +663,7 @@ export class BitcoinLock implements IBitcoinLock {
     const openClaimHeight = utxo.openClaimHeight.toNumber();
     const createdAtHeight = utxo.createdAtHeight.toNumber();
     const isFunded = ((utxo as { isVerified?: bool })?.isVerified ?? utxo.isFunded).toJSON();
+    const isBackfill = utxo.isBackfill?.toJSON() ?? false;
     const fundHoldExtensionsByBitcoinExpirationHeight = Object.fromEntries(
       [...utxo.fundHoldExtensions.entries()].map(([x, y]) => [x.toNumber(), y.toBigInt()]),
     );
@@ -684,6 +687,7 @@ export class BitcoinLock implements IBitcoinLock {
       createdAtHeight,
       securityFees,
       isFunded,
+      isBackfill,
       couponFeesPaid,
       fundHoldExtensionsByBitcoinExpirationHeight,
       createdAtArgonBlock,
@@ -725,6 +729,7 @@ export class BitcoinLock implements IBitcoinLock {
     microgonsAtTargetPerBtc?: bigint;
     tip?: bigint;
     initializeForAccountId?: string;
+    backfillSecuritizationToUnreserve?: bigint;
   }) {
     const {
       vault,
@@ -736,6 +741,7 @@ export class BitcoinLock implements IBitcoinLock {
       client,
       microgonsAtTargetPerBtc = null,
       initializeForAccountId,
+      backfillSecuritizationToUnreserve = 0n,
     } = args;
     if (ownerBitcoinPubkey.length !== 33) {
       throw new Error(
@@ -755,6 +761,7 @@ export class BitcoinLock implements IBitcoinLock {
             microgonsAtTargetPerBtc,
           },
         },
+        backfillSecuritizationToUnreserve,
       );
     } else {
       tx = client.tx.bitcoinLocks.initialize(vault.vaultId, satoshis, ownerBitcoinPubkey, {
@@ -924,6 +931,7 @@ export interface IBitcoinLock {
   openClaimHeight: number;
   createdAtHeight: number;
   isFunded: boolean;
+  isBackfill: boolean;
   createdAtArgonBlock: number;
   fundHoldExtensionsByBitcoinExpirationHeight: Record<number, bigint>;
 }

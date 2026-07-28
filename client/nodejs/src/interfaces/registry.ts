@@ -271,6 +271,7 @@ import type {
   PalletTreasuryFrameArgonotBondParticipants,
   PalletTreasuryFrameVaultCapital,
   PalletTreasuryHoldReason,
+  PalletTreasuryVaultBondState,
   PalletTreasuryVaultCapital,
   PalletTxPauseCall,
   PalletTxPauseError,
@@ -581,6 +582,7 @@ declare module '@polkadot/types/types/registry' {
     PalletTreasuryFrameArgonotBondParticipants: PalletTreasuryFrameArgonotBondParticipants;
     PalletTreasuryFrameVaultCapital: PalletTreasuryFrameVaultCapital;
     PalletTreasuryHoldReason: PalletTreasuryHoldReason;
+    PalletTreasuryVaultBondState: PalletTreasuryVaultBondState;
     PalletTreasuryVaultCapital: PalletTreasuryVaultCapital;
     PalletTxPauseCall: PalletTxPauseCall;
     PalletTxPauseError: PalletTxPauseError;

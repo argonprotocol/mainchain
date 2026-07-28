@@ -12,8 +12,10 @@ use argon_primitives::{
 		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinNetwork, BitcoinSignature, BitcoinXPub,
 		CompressedBitcoinPubkey, NetworkKind, Satoshis, UtxoId, UtxoRef,
 	},
-	ensure,
-	vault::{BitcoinVaultProvider, LockExtension, Securitization, Vault, VaultError, VaultTerms},
+	vault::{
+		BitcoinVaultProvider, LockExtension, Securitization, Vault, VaultError, VaultLockRequest,
+		VaultTerms,
+	},
 	ArgonCPI, BitcoinUtxoTracker, PriceProvider, UtxoLockEvents,
 };
 use frame_support::traits::Currency;
@@ -83,8 +85,11 @@ parameter_types! {
 		securitization:  200_000_000_000,
 		securitization_target: 200_000_000_000,
 		securitization_locked: 0,
+		backfill_securitization_locked: 0,
+		backfill_securitization_reserved: 0,
 		locked_satoshis: 0,
 		securitized_satoshis: 0,
+		backfill_securitized_satoshis: 0,
 		terms: VaultTerms {
 			bitcoin_annual_percent_rate: FixedU128::from_float(0.1),
 			bitcoin_base_fee: 0,
@@ -296,20 +301,28 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 		_vault_id: VaultId,
 		locker: &Self::AccountId,
 		securitization: &Securitization<Balance>,
-		_satoshis: Satoshis,
-		extension: Option<(FixedU128, &mut LockExtension<Self::Balance>)>,
-		vault_covers_fee: bool,
+		request: VaultLockRequest<'_, Self::Balance>,
 	) -> Result<Self::Balance, VaultError> {
-		ensure!(
-			DefaultVault::get().available_for_lock() >= securitization.collateral_required,
-			VaultError::InsufficientVaultFunds
-		);
+		let VaultLockRequest {
+			extension,
+			vault_covers_fee,
+			is_backfill,
+			backfill_securitization_to_unreserve,
+			..
+		} = request;
+		let is_operator = DefaultVault::get().operator_account_id == *locker;
 		let term = extension.as_ref().map(|(a, _)| *a).unwrap_or(FixedU128::one());
 		DefaultVault::mutate(|a| {
 			if let Some((_, lock_extension)) = extension {
-				a.extend_lock(securitization, lock_extension)
+				a.extend_lock(securitization, lock_extension, is_backfill)
 			} else {
-				a.lock(securitization)
+				ensure!(
+					backfill_securitization_to_unreserve <= a.backfill_securitization_reserved,
+					VaultError::InsufficientVaultFunds
+				);
+				a.backfill_securitization_reserved
+					.saturating_reduce(backfill_securitization_to_unreserve);
+				a.lock(securitization, is_operator)
 			}
 		})?;
 		let terms = DefaultVault::get().terms.clone();
@@ -334,10 +347,13 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 	fn schedule_for_release(
 		_vault_id: VaultId,
 		securitization: &Securitization<Balance>,
-		_satoshis: Satoshis,
+		satoshis: Satoshis,
 		lock_extensions: &LockExtension<Self::Balance>,
+		is_backfill: bool,
 	) -> Result<(), VaultError> {
-		DefaultVault::mutate(|a| a.schedule_for_release(securitization, lock_extensions))?;
+		DefaultVault::mutate(|a| {
+			a.schedule_for_release(securitization, satoshis, lock_extensions, is_backfill)
+		})?;
 		Ok(())
 	}
 
@@ -345,21 +361,28 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 		_vault_id: VaultId,
 		_beneficiary: &Self::AccountId,
 		securitization: &Securitization<Balance>,
+		satoshis: Satoshis,
 		market_rate: Self::Balance,
 		lock_extension: &LockExtension<Self::Balance>,
+		is_backfill: bool,
 	) -> Result<Self::Balance, VaultError> {
-		let result = DefaultVault::mutate(|a| a.burn(securitization, market_rate, lock_extension))?;
+		let result = DefaultVault::mutate(|a| {
+			a.burn(securitization, satoshis, market_rate, lock_extension, is_backfill)
+		})?;
 		Ok(result.burned_amount)
 	}
 
 	fn burn(
 		_vault_id: VaultId,
 		securitization: &Securitization<Balance>,
+		satoshis: Satoshis,
 		redemption_amount: Self::Balance,
 		lock_extension: &LockExtension<Self::Balance>,
+		is_backfill: bool,
 	) -> Result<Self::Balance, VaultError> {
-		let result =
-			DefaultVault::mutate(|a| a.burn(securitization, redemption_amount, lock_extension))?;
+		let result = DefaultVault::mutate(|a| {
+			a.burn(securitization, satoshis, redemption_amount, lock_extension, is_backfill)
+		})?;
 		Ok(result.burned_amount)
 	}
 
@@ -396,8 +419,7 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 		securitization: &Securitization<Balance>,
 	) -> Result<(), VaultError> {
 		DefaultVault::mutate(|a| {
-			a.securitization_pending_activation
-				.saturating_reduce(securitization.collateral_required);
+			a.remove_pending_activation(securitization);
 		});
 		Ok(())
 	}
@@ -452,27 +474,30 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 		securitization_ratio: FixedU128,
 	) -> Result<(), VaultError> {
 		DefaultVault::mutate(|vault| {
-			let securitized_satoshis = securitization_ratio.saturating_mul_int(satoshis);
-			vault.locked_satoshis.saturating_accrue(satoshis);
-			vault.securitized_satoshis.saturating_accrue(securitized_satoshis);
+			vault.add_securitized_satoshis(satoshis, securitization_ratio);
 		});
 		Ok(())
 	}
 
-	fn reduce_securitized_satoshis(
+	fn get_projected_backfill_backing(
 		_vault_id: VaultId,
+		backfill_securitization_released: Self::Balance,
+		backfill_securitization_added: Self::Balance,
+	) -> Option<(Self::Balance, Self::Balance)> {
+		Some(DefaultVault::get().projected_backfill_backing(
+			backfill_securitization_released,
+			backfill_securitization_added,
+		))
+	}
+
+	fn set_bitcoin_lock_as_backfill(
+		_vault_id: VaultId,
+		securitization: &Securitization<Self::Balance>,
 		satoshis: Satoshis,
-		securitization_ratio: FixedU128,
+		is_backfill: bool,
 	) -> Result<(), VaultError> {
-		DefaultVault::mutate(|vault| -> Result<(), VaultError> {
-			let securitized_satoshis = securitization_ratio.saturating_mul_int(satoshis);
-			if vault.locked_satoshis < satoshis || vault.securitized_satoshis < securitized_satoshis
-			{
-				return Err(VaultError::InternalError);
-			}
-			vault.locked_satoshis.saturating_reduce(satoshis);
-			vault.securitized_satoshis.saturating_reduce(securitized_satoshis);
-			Ok(())
+		DefaultVault::mutate(|vault| {
+			vault.set_bitcoin_lock_as_backfill(securitization, satoshis, is_backfill)
 		})
 	}
 
@@ -598,8 +623,11 @@ pub fn new_test_ext() -> TestState {
 		securitization: 200_000_000_000,
 		securitization_target: 200_000_000_000,
 		securitization_locked: 0,
+		backfill_securitization_locked: 0,
+		backfill_securitization_reserved: 0,
 		locked_satoshis: 0,
 		securitized_satoshis: 0,
+		backfill_securitized_satoshis: 0,
 		terms: VaultTerms {
 			bitcoin_annual_percent_rate: FixedU128::from_float(0.1),
 			bitcoin_base_fee: 0,

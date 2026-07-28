@@ -5,6 +5,7 @@ import {
   formatArgons,
   fromFixedNumber,
   MICROGONS_PER_ARGON,
+  type PalletTreasuryVaultBondState,
   PERMILL_DECIMALS,
   toFixedNumber,
   TxSubmitter,
@@ -63,6 +64,9 @@ export class Vault {
 
   public lockedSatoshis!: number;
   public securitizedSatoshis!: number;
+  public backfillSecuritizationLocked!: bigint;
+  public backfillSecuritizationReserved!: bigint;
+  public backfillSecuritizedSatoshis!: number;
   public name?: string;
   public lastNameChangeTick?: number;
   public delegateAccountId?: string;
@@ -128,6 +132,15 @@ export class Vault {
       this.lockedSatoshis = 0;
       this.securitizedSatoshis = 0;
     }
+    if ('backfillSecuritizationLocked' in vault) {
+      this.backfillSecuritizationLocked = vault.backfillSecuritizationLocked.toBigInt();
+      this.backfillSecuritizationReserved = vault.backfillSecuritizationReserved.toBigInt();
+      this.backfillSecuritizedSatoshis = vault.backfillSecuritizedSatoshis.toNumber();
+    } else {
+      this.backfillSecuritizationLocked = 0n;
+      this.backfillSecuritizationReserved = 0n;
+      this.backfillSecuritizedSatoshis = 0;
+    }
 
     this.operatorAccountId = vault.operatorAccountId.toString();
     this.isClosed = vault.isClosed.valueOf();
@@ -176,36 +189,54 @@ export class Vault {
     }
   }
 
-  public availableBitcoinSpace(): bigint {
-    const availableSecuritization = this.availableSecuritization();
+  public availableBitcoinSpace(lockOwner?: string): bigint {
+    const availableSecuritization = this.availableSecuritization(lockOwner);
     const microgons = BigNumber(availableSecuritization).div(this.securitizationRatioBN());
     return bigNumberToBigInt(microgons);
   }
 
-  public availableSecuritization(): bigint {
-    return this.securitization - this.securitizationLocked;
+  public availableSecuritization(lockOwner?: string): bigint {
+    if (lockOwner === this.operatorAccountId) {
+      return this.securitization > this.securitizationLocked
+        ? this.securitization - this.securitizationLocked
+        : 0n;
+    }
+
+    const publicSecuritizationLocked =
+      this.securitizationLocked > this.backfillSecuritizationLocked
+        ? this.securitizationLocked - this.backfillSecuritizationLocked
+        : 0n;
+    const unreserved =
+      this.securitization > publicSecuritizationLocked
+        ? this.securitization - publicSecuritizationLocked
+        : 0n;
+    return unreserved > this.backfillSecuritizationReserved
+      ? unreserved - this.backfillSecuritizationReserved
+      : 0n;
   }
 
   public availableBondSpace(
     priceIndex: PriceIndex,
-    bondLots?: Iterable<{ activeBonds: number }>,
+    bondState?: Iterable<{ activeBonds: number }> | PalletTreasuryVaultBondState,
     bondFullCapacityPerFrame?: boolean,
   ): bigint {
-    if (this.securitizedSatoshis <= 0) return 0n;
+    const securitizedSatoshis = this.effectiveSecuritizedSatoshis();
+    if (securitizedSatoshis <= 0n) return 0n;
 
     const microgonsPerBond = BigInt(MICROGONS_PER_ARGON);
-    const totalBondCapacityMicrogons = priceIndex.getSatoshiPriceInTargetMicrogons(
-      BigInt(this.securitizedSatoshis),
-    );
+    const totalBondCapacityMicrogons =
+      priceIndex.getSatoshiPriceInTargetMicrogons(securitizedSatoshis);
     const capacityMicrogons = bondFullCapacityPerFrame
       ? totalBondCapacityMicrogons
       : totalBondCapacityMicrogons / 10n;
     const bondCapacity = Number(capacityMicrogons / microgonsPerBond);
-    const activeBonds = [...(bondLots ?? [])].reduce(
-      (sum, bondLot) => sum + bondLot.activeBonds,
-      0,
-    );
-    const availableBonds = activeBonds < bondCapacity ? bondCapacity - activeBonds : 0;
+    const isVaultBondState = bondState !== undefined && 'bondLots' in bondState;
+    const bondsTotal = isVaultBondState
+      ? [...bondState.bondLots].reduce((sum, bondLot) => sum + bondLot.bonds.toNumber(), 0)
+      : [...(bondState ?? [])].reduce((sum, bondLot) => sum + bondLot.activeBonds, 0);
+    const reservedBonds = isVaultBondState ? bondState.backfillBondsReserved.toNumber() : 0;
+    const unavailableBonds = bondsTotal + reservedBonds;
+    const availableBonds = unavailableBonds < bondCapacity ? bondCapacity - unavailableBonds : 0;
 
     return BigInt(availableBonds) * microgonsPerBond;
   }
@@ -220,6 +251,33 @@ export class Vault {
 
   public activatedSecuritization(): bigint {
     return this.securitizationLocked - this.securitizationPendingActivation;
+  }
+
+  public effectiveSecuritizedSatoshis(): bigint {
+    const totalSatoshis = BigInt(this.securitizedSatoshis);
+    const backfillSatoshis = BigInt(this.backfillSecuritizedSatoshis);
+    if (this.backfillSecuritizationLocked === 0n) return totalSatoshis;
+
+    const confirmedSecuritization =
+      this.securitizationLocked > this.securitizationPendingActivation
+        ? this.securitizationLocked - this.securitizationPendingActivation
+        : 0n;
+    const confirmedPublicSecuritizationLocked =
+      confirmedSecuritization > this.backfillSecuritizationLocked
+        ? confirmedSecuritization - this.backfillSecuritizationLocked
+        : 0n;
+    const availableBackfillBacking =
+      this.securitization > confirmedPublicSecuritizationLocked
+        ? this.securitization - confirmedPublicSecuritizationLocked
+        : 0n;
+    const backedBackfill =
+      this.backfillSecuritizationLocked < availableBackfillBacking
+        ? this.backfillSecuritizationLocked
+        : availableBackfillBacking;
+    const eligibleBackfillSatoshis =
+      (backfillSatoshis * backedBackfill) / this.backfillSecuritizationLocked;
+
+    return totalSatoshis - backfillSatoshis + eligibleBackfillSatoshis;
   }
 
   /**

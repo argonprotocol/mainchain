@@ -1235,6 +1235,10 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       BondLotAlreadyReleasing: AugmentedError<ApiType>;
       /**
+       * Only an active vault bond owned by its operator can be used as backfill.
+       **/
+      BondLotNotEligibleForBackfill: AugmentedError<ApiType>;
+      /**
        * The bond lot could not be found.
        **/
       BondLotNotFound: AugmentedError<ApiType>;
@@ -1282,6 +1286,10 @@ declare module '@polkadot/api-base/types/errors' {
        * Too many bond lot releases are scheduled for the same frame.
        **/
       MaxPendingBondReleasesExceeded: AugmentedError<ApiType>;
+      /**
+       * The caller does not have permission to perform this action.
+       **/
+      NoPermissions: AugmentedError<ApiType>;
       /**
        * The caller does not own the bond lot.
        **/
