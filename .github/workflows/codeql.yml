@@ -50,6 +50,7 @@ jobs:
             echo "CARGO_INCREMENTAL=0"
             echo "SKIP_WASM_BUILD=1"
             echo "SQLX_OFFLINE=true"
+            echo "CODEQL_EXTRACTOR_RUST_OPTION_CARGO_FEATURES=default"
           } >> "$GITHUB_ENV"
 
       - name: Install Rust
