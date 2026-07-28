@@ -38,6 +38,8 @@ import type {
   FrameSupportTokensMiscBalanceStatus,
   FrameSystemDispatchEventInfo,
   PalletBalancesUnexpectedKind,
+  PalletBootstrapEndpointPubkey,
+  PalletBootstrapRecoveryPubkey,
   PalletCrosschainTransferAssetKind,
   PalletCrosschainTransferCouncilApprovalTargetId,
   PalletCrosschainTransferGatewayState,
@@ -528,6 +530,24 @@ declare module '@polkadot/api-base/types/events' {
           startVoteMinimum: u128;
           newVoteMinimum: u128;
         }
+      >;
+    };
+    bootstrap: {
+      /**
+       * An encrypted endpoint payload was stored or replaced by its owner.
+       **/
+      EndpointUpdated: AugmentedEvent<
+        ApiType,
+        [endpointOwner: AccountId32, endpointPubkey: PalletBootstrapEndpointPubkey],
+        { endpointOwner: AccountId32; endpointPubkey: PalletBootstrapEndpointPubkey }
+      >;
+      /**
+       * An encrypted recovery payload was stored or replaced.
+       **/
+      RecoveryPayloadUpdated: AugmentedEvent<
+        ApiType,
+        [writer: AccountId32, recoveryPubkey: PalletBootstrapRecoveryPubkey],
+        { writer: AccountId32; recoveryPubkey: PalletBootstrapRecoveryPubkey }
       >;
     };
     crosschainTransfer: {
@@ -1272,14 +1292,6 @@ declare module '@polkadot/api-base/types/events' {
         ApiType,
         [account: AccountId32],
         { account: AccountId32 }
-      >;
-      /**
-       * An upstream account updated the encrypted server payload for a downstream account.
-       **/
-      EncryptedServerUpdated: AugmentedEvent<
-        ApiType,
-        [upstreamAccount: AccountId32, downstreamAccount: AccountId32],
-        { upstreamAccount: AccountId32; downstreamAccount: AccountId32 }
       >;
       /**
        * An operational account was registered with its linked accounts.

@@ -142,6 +142,12 @@ import type {
   PalletBlockSealSpecCall,
   PalletBlockSealSpecError,
   PalletBlockSealSpecEvent,
+  PalletBootstrapCall,
+  PalletBootstrapEndpointPubkey,
+  PalletBootstrapError,
+  PalletBootstrapEvent,
+  PalletBootstrapRecoveryProof,
+  PalletBootstrapRecoveryPubkey,
   PalletCrosschainTransferAccountTransferTotals,
   PalletCrosschainTransferAssetKind,
   PalletCrosschainTransferCall,
@@ -446,6 +452,12 @@ declare module '@polkadot/types/types/registry' {
     PalletBlockSealSpecCall: PalletBlockSealSpecCall;
     PalletBlockSealSpecError: PalletBlockSealSpecError;
     PalletBlockSealSpecEvent: PalletBlockSealSpecEvent;
+    PalletBootstrapCall: PalletBootstrapCall;
+    PalletBootstrapEndpointPubkey: PalletBootstrapEndpointPubkey;
+    PalletBootstrapError: PalletBootstrapError;
+    PalletBootstrapEvent: PalletBootstrapEvent;
+    PalletBootstrapRecoveryProof: PalletBootstrapRecoveryProof;
+    PalletBootstrapRecoveryPubkey: PalletBootstrapRecoveryPubkey;
     PalletCrosschainTransferAccountTransferTotals: PalletCrosschainTransferAccountTransferTotals;
     PalletCrosschainTransferAssetKind: PalletCrosschainTransferAssetKind;
     PalletCrosschainTransferCall: PalletCrosschainTransferCall;

@@ -159,6 +159,9 @@ macro_rules! inject_runtime_vars {
 			pallet_crosschain_transfer::migrations::PrepareScheduledCouncilRotationMigration<
 				Runtime,
 			>,
+			pallet_operational_accounts::migrations::RemoveLegacyEncryptedServerStorageMigration<
+				Runtime,
+			>,
 		);
 
 		/// Unchecked extrinsic type as expected by this runtime.

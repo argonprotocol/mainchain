@@ -66,6 +66,8 @@ import type {
   PalletBitcoinLocksLockReleaseRequest,
   PalletBitcoinLocksLockedBitcoin,
   PalletBitcoinLocksOrphanedUtxo,
+  PalletBootstrapEndpointPubkey,
+  PalletBootstrapRecoveryPubkey,
   PalletCrosschainTransferAccountTransferTotals,
   PalletCrosschainTransferChainConfig,
   PalletCrosschainTransferCouncilApprovalQueueEntry,
@@ -511,6 +513,40 @@ declare module '@polkadot/api-base/types/storage' {
        * Keeps the last 3 vote minimums. The first one applies to the current block.
        **/
       voteMinimumHistory: AugmentedQuery<ApiType, () => Observable<Vec<u128>>, []>;
+    };
+    bootstrap: {
+      /**
+       * Encrypted endpoint payload keyed by its public key.
+       *
+       * The pallet enforces ownership and length but does not parse or verify encryption.
+       **/
+      encryptedEndpointByPubkey: AugmentedQuery<
+        ApiType,
+        (arg: PalletBootstrapEndpointPubkey | string | Uint8Array) => Observable<Option<Bytes>>,
+        [PalletBootstrapEndpointPubkey]
+      >;
+      /**
+       * Encrypted recovery payload authorized by the corresponding recovery key.
+       *
+       * The pallet enforces authorization and length but does not parse or verify encryption.
+       **/
+      encryptedRecoveryPayloadByPubkey: AugmentedQuery<
+        ApiType,
+        (arg: PalletBootstrapRecoveryPubkey | string | Uint8Array) => Observable<Option<Bytes>>,
+        [PalletBootstrapRecoveryPubkey]
+      >;
+      /**
+       * Account authorized to update an encrypted endpoint payload.
+       *
+       * The first successful [`Pallet::set_endpoint`] call for a public key establishes its owner.
+       **/
+      endpointOwnerByPubkey: AugmentedQuery<
+        ApiType,
+        (
+          arg: PalletBootstrapEndpointPubkey | string | Uint8Array,
+        ) => Observable<Option<AccountId32>>,
+        [PalletBootstrapEndpointPubkey]
+      >;
     };
     crosschainTransfer: {
       /**
@@ -1271,14 +1307,6 @@ declare module '@polkadot/api-base/types/storage' {
       >;
     };
     operationalAccounts: {
-      /**
-       * Opaque encrypted upstream server payload keyed by the downstream account.
-       **/
-      encryptedServerByDownstreamAccount: AugmentedQuery<
-        ApiType,
-        (arg: AccountId32 | string | Uint8Array) => Observable<Option<Bytes>>,
-        [AccountId32]
-      >;
       /**
        * Whether operational-account access is invite-only.
        *

@@ -59,7 +59,6 @@ impl pallet_balances::Config for Test {
 
 parameter_types! {
 	pub const MaxAvailableAccessCodes: u32 = 2;
-	pub const MaxEncryptedServerLen: u32 = 256;
 	pub const MinimumUniswapTransfer: Balance = 250;
 	pub const MinimumBitcoin: Balance = 500;
 	pub const MinimumBonds: Balance = 200;
@@ -373,7 +372,6 @@ impl OperationalRewardsPayer<TestAccountId, Balance> for MockOperationalRewardsP
 impl pallet_operational_accounts::Config for Test {
 	type Balance = Balance;
 	type MaxAvailableAccessCodes = MaxAvailableAccessCodes;
-	type MaxEncryptedServerLen = MaxEncryptedServerLen;
 	type MinimumUniswapTransfer = MinimumUniswapTransfer;
 	type MinimumBitcoin = MinimumBitcoin;
 	type MinimumBonds = MinimumBonds;

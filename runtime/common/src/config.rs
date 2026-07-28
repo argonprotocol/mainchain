@@ -239,13 +239,14 @@ parameter_types! {
 	/// any proof accepted by the runtime envelope is submittable without extra client-side byte
 	/// budgeting.
 	pub const MaxReceiptProofsPerExtrinsic: u32 = 10;
+	// ## pallet_bootstrap
+	/// Maximum number of encrypted bootstrap payload bytes.
+	pub const MaxEncryptedBootstrapPayloadLen: u32 = 256;
 	// ## pallet_operational_accounts
 	/// Maximum number of available operational access codes allowed at once.
 	pub const MaxAvailableOperationalAccessCodes: u32 = 3;
 	/// Maximum number of queued operational rewards.
 	pub const OperationalMaxRewardsQueued: u32 = 1_000;
-	/// Maximum number of opaque encrypted upstream server bytes stored per downstream account.
-	pub const MaxEncryptedServerLen: u32 = 256;
 	/// Minimum Uniswap transfer amount required to register.
 	pub const MinimumUniswapTransfer: Balance = 250 * MICROGONS_PER_ARGON;
 	/// Minimum bitcoin amount required to register.
