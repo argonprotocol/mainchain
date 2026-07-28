@@ -1134,6 +1134,7 @@ dependencies = [
  "alloy-eips",
  "alloy-primitives",
  "alloy-provider",
+ "alloy-sol-types",
  "alloy-transport",
  "anyhow",
  "argon-bitcoin",

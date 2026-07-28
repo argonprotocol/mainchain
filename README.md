@@ -250,13 +250,14 @@ variables. By default it proxies to `ws://archive-node:9944`, and optional backu
 supplied with `ARGON_RPC_ENDPOINTS='["ws://archive-node:9944", "ws://backup-node:9944"]'`. See
 [`docker/argon-rpc/README.md`](./docker/argon-rpc/README.md) for the full config reference.
 
-NOTE: You must get a [BLS key](https://data.bls.gov/registrationEngine/) and an
-[Infura](https://docs.metamask.io/services/get-started/infura/) key to run the price oracle. They
-should be added to an `.env` file that you load with docker compose.
+NOTE: You must get a [BLS key](https://data.bls.gov/registrationEngine/) and at least one Ethereum
+RPC URL to run the price oracle. The URLs are tried once each in their configured order when a
+provider returns an internal JSON-RPC error. They should be added to an `.env` file that you load
+with docker compose.
 
 ```dotenv
 BLS_API_KEY=02c566df8f7d4e8as2342asdf2342
-INFURA_PROJECT_ID=7a5b4a7c036346cfa234234234234
+ETHEREUM_RPC_URLS=https://mainnet.infura.io/v3/your-infura-key,https://eth-mainnet.g.alchemy.com/v2/your-alchemy-key
 ```
 
 ```sh

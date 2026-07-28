@@ -44,6 +44,7 @@ alloy-transport = { workspace = true }
 alloy-provider = { workspace = true }
 
 [dev-dependencies]
+alloy-sol-types = { workspace = true }
 env_logger = { workspace = true }
 polkadot-sdk = { workspace = true, features = ["sp-keyring", "sp-keystore"], default-features = true }
 argon-testing = { workspace = true }

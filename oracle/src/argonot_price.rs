@@ -1,4 +1,7 @@
-use crate::{argon_price::get_usdc_token, uniswap_oracle::UniswapOracle};
+use crate::{
+	argon_price::get_usdc_token,
+	uniswap_oracle::{ethereum_rpc_urls_from_env, UniswapOracle},
+};
 use anyhow::Result;
 use polkadot_sdk::*;
 use sp_runtime::FixedU128;
@@ -13,12 +16,12 @@ pub struct ArgonotPriceLookup {
 
 impl ArgonotPriceLookup {
 	pub async fn new(
-		project_id: String,
+		ethereum_rpc_urls: Vec<String>,
 		usd_token: Token,
 		lookup_token: Token,
 		last_price: FixedU128,
 	) -> Result<Self> {
-		let uniswap_oracle = UniswapOracle::new(project_id, usd_token, lookup_token).await?;
+		let uniswap_oracle = UniswapOracle::new(ethereum_rpc_urls, usd_token, lookup_token).await?;
 
 		Ok(Self { last_price, uniswap_oracle })
 	}
@@ -28,11 +31,11 @@ impl ArgonotPriceLookup {
 		let argonot_token_address =
 			env::var("ARGONOT_TOKEN_ADDRESS").expect("ARGONOT_TOKEN_ADDRESS must be set");
 		let network = if use_sepolia { ChainId::SEPOLIA } else { ChainId::MAINNET };
-		let project_id = env::var("INFURA_PROJECT_ID").expect("INFURA_PROJECT_ID must be set");
+		let ethereum_rpc_urls = ethereum_rpc_urls_from_env()?;
 
 		let usdc_token = get_usdc_token(network);
 		let lookup_token = token!(network as u64, argonot_token_address, 18);
-		Self::new(project_id, usdc_token, lookup_token, last_price).await
+		Self::new(ethereum_rpc_urls, usdc_token, lookup_token, last_price).await
 	}
 
 	pub async fn get_latest_price(&mut self, usd_token_price: FixedU128) -> Result<FixedU128> {
@@ -60,7 +63,7 @@ mod test {
 		dotenv::dotenv().ok();
 		unsafe {
 			env::set_var("USE_SEPOLIA", "true");
-			env::set_var("INFURA_PROJECT_ID", "test");
+			env::set_var("ETHEREUM_RPC_URLS", "http://localhost:8545");
 			env::set_var("ARGONOT_TOKEN_ADDRESS", MOCK_ARGONOT_TOKEN_ADDRESS);
 		}
 	}

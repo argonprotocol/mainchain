@@ -1,4 +1,7 @@
-use crate::uniswap_oracle::{PriceAndLiquidity, UniswapOracle, USDC_ADDRESS, USDC_ADDRESS_SEPOLIA};
+use crate::uniswap_oracle::{
+	ethereum_rpc_urls_from_env, PriceAndLiquidity, UniswapOracle, USDC_ADDRESS,
+	USDC_ADDRESS_SEPOLIA,
+};
 use anyhow::Result;
 use argon_client::api::runtime_types::pallet_price_index::PriceIndex;
 use argon_primitives::{
@@ -28,11 +31,11 @@ impl ArgonPriceLookup {
 	pub async fn new(
 		ticker: &Ticker,
 		last_price: Option<PriceIndex>,
-		project_id: String,
+		ethereum_rpc_urls: Vec<String>,
 		usd_token: Token,
 		lookup_token: Token,
 	) -> Result<Self> {
-		let uniswap_oracle = UniswapOracle::new(project_id, usd_token, lookup_token).await?;
+		let uniswap_oracle = UniswapOracle::new(ethereum_rpc_urls, usd_token, lookup_token).await?;
 
 		Ok(Self {
 			uniswap_oracle,
@@ -55,12 +58,12 @@ impl ArgonPriceLookup {
 		let argon_token_address =
 			env::var("ARGON_TOKEN_ADDRESS").expect("ARGON_TOKEN_ADDRESS must be set");
 		let network = if use_sepolia { ChainId::SEPOLIA } else { ChainId::MAINNET };
-		let project_id = env::var("INFURA_PROJECT_ID").expect("INFURA_PROJECT_ID must be set");
+		let ethereum_rpc_urls = ethereum_rpc_urls_from_env()?;
 
 		let usdc_token = get_usdc_token(network);
 		let lookup_token =
 			token!(network as u64, argon_token_address, 18, ARGON_TOKEN_SYMBOL, "Argon");
-		Self::new(ticker, last_price, project_id, usdc_token, lookup_token).await
+		Self::new(ticker, last_price, ethereum_rpc_urls, usdc_token, lookup_token).await
 	}
 
 	/// Calculates the expected cost of an Argon in USD based on the starting and current U.S. CPI.
@@ -122,7 +125,7 @@ mod test {
 		dotenv::dotenv().ok();
 		unsafe {
 			env::set_var("USE_SEPOLIA", "true");
-			env::set_var("INFURA_PROJECT_ID", "test");
+			env::set_var("ETHEREUM_RPC_URLS", "http://localhost:8545");
 			env::set_var("ARGON_TOKEN_ADDRESS", MOCK_ARGON_TOKEN_ADDRESS);
 			env::set_var("ARGONOT_TOKEN_ADDRESS", MOCK_ARGONOT_TOKEN_ADDRESS);
 		}

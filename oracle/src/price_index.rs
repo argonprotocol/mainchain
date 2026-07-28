@@ -383,7 +383,7 @@ mod tests {
 		unsafe {
 			env::set_var("ARGON_TOKEN_ADDRESS", ARGON_TOKEN_ADDRESS);
 			env::set_var("ARGONOT_TOKEN_ADDRESS", ARGONOT_TOKEN_ADDRESS);
-			env::set_var("INFURA_PROJECT_ID", "test");
+			env::set_var("ETHEREUM_RPC_URLS", "http://localhost:8545");
 		}
 
 		let mut block_sub = node.client.live.blocks().subscribe_best().await.unwrap();
