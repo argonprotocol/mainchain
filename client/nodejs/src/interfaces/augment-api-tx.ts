@@ -64,6 +64,7 @@ import type {
   PalletMultisigTimepoint,
   PalletOperationalAccountsOperationalProgressPatch,
   PalletOperationalAccountsRegistration,
+  PalletPriceIndexEthereumPriceIndex,
   PalletPriceIndexPriceIndex,
   PalletVaultsVaultConfig,
   SnowbridgeBeaconPrimitivesBeaconHeader,
@@ -1457,8 +1458,15 @@ declare module '@polkadot/api-base/types/submittable' {
               }
             | string
             | Uint8Array,
+          ethereum:
+            | Option<PalletPriceIndexEthereumPriceIndex>
+            | null
+            | Uint8Array
+            | PalletPriceIndexEthereumPriceIndex
+            | { ethereumUsdPrice?: any; ethereumGasPriceWei?: any; tick?: any }
+            | string,
         ) => SubmittableExtrinsic<ApiType>,
-        [PalletPriceIndexPriceIndex]
+        [PalletPriceIndexPriceIndex, Option<PalletPriceIndexEthereumPriceIndex>]
       >;
     };
     proxy: {

@@ -610,6 +610,7 @@ impl pallet_price_index::Config for Runtime {
 	type CurrentTick = use_unless_benchmark!(Ticks, benchmarking::BenchmarkCurrentTick);
 	type MaxArgonotFloorHistoryFrames = MaxArgonotFloorHistoryFrames;
 	type MaxArgonotAverageHistoryFrames = MaxArgonotAverageHistoryFrames;
+	type MaxEthereumPriceHistoryFrames = MaxEthereumPriceHistoryFrames;
 	type MaxArgonChangePerTickAwayFromTarget = MaxArgonChangePerTickAwayFromTarget;
 	type MaxArgonTargetChangePerTick = MaxArgonTargetChangePerTick;
 }

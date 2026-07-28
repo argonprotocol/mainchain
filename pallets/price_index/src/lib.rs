@@ -48,6 +48,7 @@ pub struct PriceIndex {
 	#[codec(compact)]
 	pub tick: Tick,
 }
+
 impl PriceIndex {
 	pub fn argon_cpi(&self) -> ArgonCPI {
 		// if the difference is less than 0.001, treat it as normal market slippage/noise
@@ -70,6 +71,79 @@ impl PriceIndex {
 		self.argon_usd_price
 			.checked_div(&self.argon_usd_target_price)
 			.unwrap_or(FixedU128::one())
+	}
+}
+
+#[derive(
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	Eq,
+	PartialEq,
+	Clone,
+	Copy,
+	Ord,
+	PartialOrd,
+	Debug,
+	TypeInfo,
+	MaxEncodedLen,
+)]
+pub struct EthereumPriceIndex {
+	/// Price of one Ether in USD.
+	pub ethereum_usd_price: FixedU128,
+	/// Current Ethereum gas price in wei per gas unit.
+	#[codec(compact)]
+	pub ethereum_gas_price_wei: u128,
+	/// Tick of the corresponding price index.
+	#[codec(compact)]
+	pub tick: Tick,
+}
+
+#[derive(
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	Eq,
+	PartialEq,
+	Clone,
+	Copy,
+	Default,
+	Debug,
+	TypeInfo,
+	MaxEncodedLen,
+)]
+pub struct EthereumPriceFrameAccumulator {
+	pub total_usd_price: FixedU128,
+	#[codec(compact)]
+	pub total_wei_per_gas: u128,
+	#[codec(compact)]
+	pub sample_count: u32,
+}
+
+impl EthereumPriceFrameAccumulator {
+	pub fn record(&mut self, usd_price: FixedU128, wei_per_gas: u128) {
+		self.total_usd_price.saturating_accrue(usd_price);
+		self.total_wei_per_gas.saturating_accrue(wei_per_gas);
+		self.sample_count.saturating_accrue(1);
+	}
+
+	pub fn accrue(&mut self, other: Self) {
+		self.total_usd_price.saturating_accrue(other.total_usd_price);
+		self.total_wei_per_gas.saturating_accrue(other.total_wei_per_gas);
+		self.sample_count.saturating_accrue(other.sample_count);
+	}
+
+	pub fn average_usd_price(&self) -> Option<FixedU128> {
+		(self.sample_count > 0).then(|| {
+			FixedU128::from_inner(
+				self.total_usd_price.into_inner().saturating_div(self.sample_count as u128),
+			)
+		})
+	}
+
+	pub fn average_wei_per_gas(&self) -> Option<u128> {
+		(self.sample_count > 0)
+			.then(|| self.total_wei_per_gas.saturating_div(self.sample_count as u128))
 	}
 }
 
@@ -159,6 +233,10 @@ pub mod pallet {
 		#[pallet::constant]
 		type MaxArgonotAverageHistoryFrames: Get<u32>;
 
+		/// Maximum number of per-frame Ethereum price buckets to retain.
+		#[pallet::constant]
+		type MaxEthereumPriceHistoryFrames: Get<u32>;
+
 		/// The max price difference dropping below target or raising above target per tick. There's
 		/// no corresponding constant for time to recovery to target
 		#[pallet::constant]
@@ -187,6 +265,8 @@ pub mod pallet {
 		PricesTooOld,
 		/// Change in argon price is too large
 		MaxPriceChangePerTickExceeded,
+		/// Ethereum prices must be non-zero and correspond to the submitted price-index tick.
+		InvalidEthereumPrices,
 	}
 
 	/// Stores the active price index
@@ -196,6 +276,18 @@ pub mod pallet {
 	/// Stores the last valid price index
 	#[pallet::storage]
 	pub type LastValid<T: Config> = StorageValue<_, PriceIndex>;
+
+	/// Stores the latest submitted Ethereum pricing.
+	#[pallet::storage]
+	pub type CurrentEthereumPrice<T: Config> = StorageValue<_, EthereumPriceIndex>;
+
+	/// Stores per-frame Ethereum price totals used for the trailing averages.
+	#[pallet::storage]
+	pub type HistoricEthereumPricesByFrame<T: Config> = StorageValue<
+		_,
+		BoundedBTreeMap<FrameId, EthereumPriceFrameAccumulator, T::MaxEthereumPriceHistoryFrames>,
+		ValueQuery,
+	>;
 
 	/// Tracks the average cpi data every 60 ticks
 	#[pallet::storage]
@@ -270,17 +362,31 @@ pub mod pallet {
 		/// Submit the latest price index. Only valid for the configured operator account
 		#[pallet::call_index(0)]
 		#[pallet::weight((T::WeightInfo::submit(), DispatchClass::Operational))]
-		#[pallet::feeless_if(|origin: &OriginFor<T>, _index: &PriceIndex| -> bool {
-			let Ok(who) = ensure_signed(origin.clone()) else {
-				return false;
-			};
-			Some(who) == Operator::<T>::get()
-		})]
-		pub fn submit(origin: OriginFor<T>, index: PriceIndex) -> DispatchResult {
+		#[pallet::feeless_if(
+			|origin: &OriginFor<T>, _index: &PriceIndex, _ethereum: &Option<EthereumPriceIndex>| -> bool {
+				let Ok(who) = ensure_signed(origin.clone()) else {
+					return false;
+				};
+				Some(who) == Operator::<T>::get()
+			}
+		)]
+		pub fn submit(
+			origin: OriginFor<T>,
+			mut index: PriceIndex,
+			ethereum: Option<EthereumPriceIndex>,
+		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
 			let operator = Operator::<T>::get().ok_or(Error::<T>::NotAuthorizedOperator)?;
 			ensure!(operator == who, Error::<T>::NotAuthorizedOperator);
+			ensure!(
+				ethereum.is_none_or(|ethereum| {
+					ethereum.tick == index.tick &&
+						!ethereum.ethereum_usd_price.is_zero() &&
+						ethereum.ethereum_gas_price_wei > 0
+				}),
+				Error::<T>::InvalidEthereumPrices,
+			);
 
 			let oldest_age = T::CurrentTick::get().saturating_sub(T::MaxPriceAgeInTicks::get());
 
@@ -288,7 +394,6 @@ pub mod pallet {
 				return Ok(());
 			}
 
-			let mut index = index;
 			if let Some(current) = Current::<T>::get() {
 				if index.tick <= current.tick {
 					return Ok(());
@@ -298,9 +403,13 @@ pub mod pallet {
 			}
 
 			Current::<T>::put(index);
+			let frame_id = T::MiningFrameTransitionProvider::is_new_frame_started()
+				.unwrap_or_else(T::CurrentFrameId::get);
+			if let Some(ethereum) = ethereum {
+				CurrentEthereumPrice::<T>::put(ethereum);
+				Self::record_ethereum_prices(frame_id, ethereum);
+			}
 			if let Some(microgons_per_argonot) = Self::microgons_per_argonot_from_index(&index) {
-				let frame_id = T::MiningFrameTransitionProvider::is_new_frame_started()
-					.unwrap_or_else(T::CurrentFrameId::get);
 				Self::record_argonot_floor_for_frame(frame_id, microgons_per_argonot);
 			}
 
@@ -357,6 +466,28 @@ pub mod pallet {
 				return None;
 			}
 			Some(price)
+		}
+
+		fn record_ethereum_prices(frame_id: FrameId, prices: EthereumPriceIndex) {
+			HistoricEthereumPricesByFrame::<T>::mutate(|history| {
+				if let Some(average) = history.get_mut(&frame_id) {
+					average.record(prices.ethereum_usd_price, prices.ethereum_gas_price_wei);
+					return;
+				}
+				if history.is_full() {
+					let Some((&oldest_frame_id, _)) = history.iter().next() else {
+						return;
+					};
+					if frame_id <= oldest_frame_id {
+						return;
+					}
+					history.remove(&oldest_frame_id);
+				}
+
+				let mut average = EthereumPriceFrameAccumulator::default();
+				average.record(prices.ethereum_usd_price, prices.ethereum_gas_price_wei);
+				let _ = history.try_insert(frame_id, average);
+			});
 		}
 
 		pub fn has_new_price_index() -> bool {
@@ -515,6 +646,19 @@ pub mod pallet {
 		}
 		fn get_argonot_price_in_usd() -> Option<FixedU128> {
 			Self::get_current().map(|a| a.argonot_usd_price)
+		}
+		fn get_average_ethereum_prices(frames: FrameId) -> Option<(FixedU128, u128)> {
+			let current_frame_id = T::CurrentFrameId::get();
+			let retained_frames = frames.min(T::MaxEthereumPriceHistoryFrames::get().into());
+			let oldest_frame_id =
+				current_frame_id.saturating_sub(retained_frames.saturating_sub(1));
+			let mut trailing_average = EthereumPriceFrameAccumulator::default();
+			for (frame_id, average) in HistoricEthereumPricesByFrame::<T>::get() {
+				if frame_id >= oldest_frame_id {
+					trailing_average.accrue(average);
+				}
+			}
+			Some((trailing_average.average_usd_price()?, trailing_average.average_wei_per_gas()?))
 		}
 		fn get_target_argon_price_in_usd() -> Option<FixedU128> {
 			Self::get_current().map(|a| a.argon_usd_target_price)

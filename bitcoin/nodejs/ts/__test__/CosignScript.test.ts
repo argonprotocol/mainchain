@@ -96,14 +96,17 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
     const currentTick = await vaulterClient.query.ticks.currentTick();
     const txResult = await new TxSubmitter(
       vaulterClient,
-      vaulterClient.tx.priceIndex.submit({
-        btcUsdPrice: toFixedNumber(60_000.5, 18),
-        argonUsdPrice: toFixedNumber(1.0, 18),
-        argonotUsdPrice: toFixedNumber(12.0, 18),
-        argonUsdTargetPrice: toFixedNumber(1.0, 18),
-        argonTimeWeightedAverageLiquidity: toFixedNumber(1_000, 18),
-        tick: currentTick.toBigInt(),
-      }),
+      vaulterClient.tx.priceIndex.submit(
+        {
+          btcUsdPrice: toFixedNumber(60_000.5, 18),
+          argonUsdPrice: toFixedNumber(1.0, 18),
+          argonotUsdPrice: toFixedNumber(12.0, 18),
+          argonUsdTargetPrice: toFixedNumber(1.0, 18),
+          argonTimeWeightedAverageLiquidity: toFixedNumber(1_000, 18),
+          tick: currentTick.toBigInt(),
+        },
+        null,
+      ),
       new Keyring({ type: 'sr25519' }).addFromUri(TestOracle.PriceIndexOperator),
     ).submit();
     await txResult.waitForInFirstBlock;

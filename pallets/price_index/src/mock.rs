@@ -53,6 +53,7 @@ parameter_types! {
 	pub static NewlyStartedFrameId: Option<FrameId> = None;
 	pub const MaxArgonotFloorHistoryFrames: u32 = 10;
 	pub const MaxArgonotAverageHistoryFrames: u32 = 10;
+	pub const MaxEthereumPriceHistoryFrames: u32 = 10;
 	pub const MaxArgonChangePerTickAwayFromTarget: FixedU128 = FixedU128::from_rational(1, 100);
 	pub const MaxArgonTargetChangePerTick: FixedU128 = FixedU128::from_rational(1, 100);
 }
@@ -78,6 +79,7 @@ impl pallet_price_index::Config for Test {
 	type MaxPriceAgeInTicks = MaxPriceAgeInTicks;
 	type MaxArgonotFloorHistoryFrames = MaxArgonotFloorHistoryFrames;
 	type MaxArgonotAverageHistoryFrames = MaxArgonotAverageHistoryFrames;
+	type MaxEthereumPriceHistoryFrames = MaxEthereumPriceHistoryFrames;
 	type MaxArgonChangePerTickAwayFromTarget = MaxArgonChangePerTickAwayFromTarget;
 	type MaxArgonTargetChangePerTick = MaxArgonTargetChangePerTick;
 	type Currency = Balances;

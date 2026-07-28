@@ -471,6 +471,10 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       maxDowntimeTicksBeforeReset: u64 & AugmentedConst<ApiType>;
       /**
+       * Maximum number of per-frame Ethereum price buckets to retain.
+       **/
+      maxEthereumPriceHistoryFrames: u32 & AugmentedConst<ApiType>;
+      /**
        * The oldest history to keep
        **/
       maxPriceAgeInTicks: u64 & AugmentedConst<ApiType>;

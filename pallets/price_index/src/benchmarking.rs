@@ -15,12 +15,19 @@ mod benchmarks {
 	fn submit() -> Result<(), BenchmarkError> {
 		let caller: T::AccountId = whitelisted_caller();
 		let index = benchmark_price_index(1);
+		let ethereum = EthereumPriceIndex {
+			ethereum_usd_price: FixedU128::from_u32(3_000),
+			ethereum_gas_price_wei: 1_000_000_000,
+			tick: index.tick,
+		};
 		Operator::<T>::put(caller.clone());
 
 		#[extrinsic_call]
-		submit(RawOrigin::Signed(caller.clone()), index);
+		submit(RawOrigin::Signed(caller.clone()), index, Some(ethereum));
 
 		assert_eq!(Current::<T>::get(), Some(index));
+		assert_eq!(CurrentEthereumPrice::<T>::get(), Some(ethereum));
+		assert!(!HistoricEthereumPricesByFrame::<T>::get().is_empty());
 
 		Ok(())
 	}
@@ -98,6 +105,39 @@ mod benchmarks {
 					frame_id
 				),
 				Some(price)
+			);
+		}
+
+		Ok(())
+	}
+
+	#[benchmark]
+	fn provider_get_ethereum_prices() -> Result<(), BenchmarkError> {
+		let tick = 10;
+		Current::<T>::put(benchmark_price_index(tick));
+		CurrentEthereumPrice::<T>::put(EthereumPriceIndex {
+			ethereum_usd_price: FixedU128::from_u32(3_000),
+			ethereum_gas_price_wei: 1_000_000_000,
+			tick,
+		});
+		let mut average = EthereumPriceFrameAccumulator::default();
+		average.record(FixedU128::from_u32(3_000), 1_000_000_000);
+		HistoricEthereumPricesByFrame::<T>::mutate(|history| {
+			let _ = history.try_insert(1, average);
+		});
+		set_benchmark_bitcoin_locks_runtime_state(BenchmarkBitcoinLocksRuntimeState {
+			current_frame_id: 1,
+			current_tick: tick,
+			did_start_new_frame: false,
+		});
+
+		#[block]
+		{
+			assert!(
+				<Pallet<T> as PriceProvider<T::Balance>>::get_average_ethereum_prices_in_microgons(
+					10
+				)
+				.is_some()
 			);
 		}
 
