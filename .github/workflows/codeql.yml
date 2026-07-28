@@ -34,12 +34,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
 
-      - name: Clear space
-        if: matrix.language == 'rust'
-        uses: ./.github/templates/clear-space
-        with:
-          preserve-codeql: "true"
-
       - name: Install Rust analysis dependencies
         if: matrix.language == 'rust'
         run: |
@@ -50,6 +44,7 @@ jobs:
             echo "CARGO_INCREMENTAL=0"
             echo "SKIP_WASM_BUILD=1"
             echo "SQLX_OFFLINE=true"
+            # CodeQL otherwise enables all Cargo features, including optional N-API and UniFFI bindings.
             echo "CODEQL_EXTRACTOR_RUST_OPTION_CARGO_FEATURES=default"
           } >> "$GITHUB_ENV"
 
@@ -76,9 +71,6 @@ jobs:
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
-          config-file: .github/codeql/codeql-config.yml
-          ram: 6144
-          threads: 1
 
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4

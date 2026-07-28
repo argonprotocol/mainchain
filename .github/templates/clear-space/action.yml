@@ -2,30 +2,16 @@ name: Clear space
 description: |
   Empty out extra space on the github runner
 
-inputs:
-  preserve-codeql:
-    description: Keep the preinstalled CodeQL bundle
-    default: "false"
-
 runs:
   using: "composite"
   steps:
-    - name: Remove preinstalled CodeQL
-      if: ${{ inputs.preserve-codeql != 'true' }}
-      shell: bash
-      run: |
-        if [[ "${{ runner.os }}" == "Linux" ]]; then
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-        elif [[ "${{ runner.os }}" == "macOS" ]]; then
-          sudo rm -rf /Users/runner/hostedtoolcache/CodeQL
-        fi
-
     - name: Clear space
       if: ${{ runner.os == 'Linux' }}
       shell: bash
       run: |
         df -h
         sudo rm -rf /usr/local/lib/android
+        sudo rm -rf /opt/hostedtoolcache/CodeQL
         sudo rm -rf /opt/hostedtoolcache/go
         sudo rm -rf /opt/hostedtoolcache/Java
         sudo rm -rf /opt/hostedtoolcache/R
@@ -63,6 +49,7 @@ runs:
       run: |
         df -h
         sudo rm -rf /Users/runner/Library/Android/sdk
+        sudo rm -rf /Users/runner/hostedtoolcache/CodeQL
         sudo rm -rf /Users/runner/Library/Developer/CoreSimulator
         sudo rm -rf /Users/runner/Library/Developer/Xcode/DerivedData
         sudo rm -rf /Users/runner/Library/Developer/Xcode/iOS DeviceSupport
