@@ -1,0 +1,10 @@
+name: "Argon CodeQL Config"
+
+paths-ignore:
+  # Substrate's construct_runtime! macro expands into thousands of generated
+  # types, causing rust-analyzer extraction to exceed the runner memory limit.
+  # The security-relevant logic lives in pallets/, not in the runtime glue code.
+  - runtime
+  # Test helpers and fixtures are not security-critical code paths.
+  - testing
+  - end-to-end
