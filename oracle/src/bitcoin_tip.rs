@@ -181,17 +181,29 @@ mod tests {
 		let task = bitcoin_loop(rpc_url.to_string(), auth, argon_node.client.url.clone(), signer);
 		let handle = tokio::spawn(task);
 
+		let target_bitcoin_height = 10_u64;
+		let target_confirmed_height = target_bitcoin_height.saturating_sub(CONFIRMATIONS);
 		let mut block_watch = argon_node.client.live.blocks().subscribe_best().await.unwrap();
-		while let Some(Ok(_block)) = block_watch.next().await {
-			if bitcoind.client.get_blockchain_info().unwrap().blocks == 10 {
-				assert!(get_confirmed_block(&argon_node.client).await.is_some());
-				break;
+		tokio::time::timeout(Duration::from_secs(120), async {
+			while let Some(Ok(_block)) = block_watch.next().await {
+				let bitcoin_height = bitcoind.client.get_blockchain_info().unwrap().blocks;
+				if bitcoin_height == target_bitcoin_height &&
+					get_confirmed_block(&argon_node.client)
+						.await
+						.is_some_and(|block| block.block_height == target_confirmed_height)
+				{
+					break;
+				}
+				if bitcoin_height < target_bitcoin_height {
+					bitcoind.client.generate_to_address(1, &address).unwrap();
+				}
 			}
-			bitcoind.client.generate_to_address(1, &address).unwrap();
-		}
+		})
+		.await
+		.expect("Timed out waiting for the oracle to store the confirmed Bitcoin height");
 
 		let block = get_confirmed_block(&argon_node.client).await.unwrap();
-		assert!(block.block_height >= 1);
+		assert_eq!(block.block_height, target_confirmed_height);
 		assert_eq!(
 			block.block_hash.0,
 			*bitcoind
