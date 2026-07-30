@@ -179,6 +179,7 @@ parameter_types! {
 
 #[derive(Clone)]
 pub struct TestVault {
+	pub securitization: Balance,
 	pub securitized_satoshis: Satoshis,
 	pub sharing_percent: Permill,
 	pub bonus_percent: Permill,
@@ -228,10 +229,10 @@ impl TreasuryVaultProvider for StaticTreasuryVaultProvider {
 	type Balance = Balance;
 	type AccountId = TestAccountId;
 
-	fn get_securitized_satoshis(vault_id: VaultId) -> Satoshis {
+	fn get_securitization_and_securitized_satoshis(vault_id: VaultId) -> (Self::Balance, Satoshis) {
 		VaultsById::get()
 			.get(&vault_id)
-			.map(|a| a.securitized_satoshis)
+			.map(|vault| (vault.securitization, vault.securitized_satoshis))
 			.unwrap_or_default()
 	}
 

@@ -154,8 +154,9 @@ pub trait TreasuryVaultProvider {
 	type Balance: Codec;
 	type AccountId: Codec;
 
-	/// Get the number of securitized satoshis tracked by the vault.
-	fn get_securitized_satoshis(vault_id: VaultId) -> Satoshis;
+	/// Get the vault securitization and effective securitized satoshis eligible as
+	/// Bitcoin-backed Treasury capacity.
+	fn get_securitization_and_securitized_satoshis(vault_id: VaultId) -> (Self::Balance, Satoshis);
 
 	fn get_vault_operator(vault_id: VaultId) -> Option<Self::AccountId>;
 	fn get_vault_delegate(vault_id: VaultId) -> Option<Self::AccountId>;

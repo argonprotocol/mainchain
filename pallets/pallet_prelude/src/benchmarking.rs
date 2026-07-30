@@ -1533,11 +1533,11 @@ where
 	type Balance = Balance;
 	type AccountId = AccountId;
 
-	fn get_securitized_satoshis(vault_id: VaultId) -> Satoshis {
+	fn get_securitization_and_securitized_satoshis(vault_id: VaultId) -> (Self::Balance, Satoshis) {
 		benchmark_bitcoin_vault_provider_state::<AccountId, Balance>()
 			.vaults
 			.get(&vault_id)
-			.map(|vault| vault.securitized_satoshis)
+			.map(|vault| (vault.securitization, vault.securitized_satoshis))
 			.unwrap_or_default()
 	}
 

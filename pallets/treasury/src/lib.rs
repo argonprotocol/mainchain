@@ -55,8 +55,9 @@ pub use pallet::*;
 /// locked the same day as a slot are eligible for instant-liquidity.
 ///
 /// ## Treasury Pool Allocation
-/// Each frame's treasury pool can sell whole bonds up to the full argon value of a vault's
-/// securitized satoshis (`sats * securitization ratio`).
+/// A vault can accept whole bonds up to the greater of its securitization or the full argon value
+/// of its effective securitized satoshis. Frame participation and earnings remain capped by this
+/// effective Bitcoin-backed value.
 ///
 /// ## Profits from Bid Pool
 /// Once each bid pool is closed, 20% of the pool is reserved for treasury reserves. (Operational
@@ -441,9 +442,13 @@ pub mod pallet {
 			);
 			ensure!(bonds >= Self::minimum_purchase_bonds(), Error::<T>::BondPurchaseBelowMinimum);
 
-			let activated_vault_bonds =
-				Self::balance_to_bonds(Self::get_vault_securitized_funds_cap(vault_id));
-			ensure!(!activated_vault_bonds.is_zero(), Error::<T>::VaultNotAcceptingBondPurchases);
+			let (securitization, securitized_satoshis) =
+				T::TreasuryVaultProvider::get_securitization_and_securitized_satoshis(vault_id);
+			let securitized_funds_cap =
+				T::PriceProvider::get_btc_price_in_market_microgons(securitized_satoshis)
+					.unwrap_or_default();
+			let vault_bond_cap = Self::balance_to_bonds(securitization.max(securitized_funds_cap));
+			ensure!(!vault_bond_cap.is_zero(), Error::<T>::VaultNotAcceptingBondPurchases);
 
 			let current_frame_id = T::MiningFrameTransitionProvider::get_current_frame_id();
 			let sharing_percent =
@@ -469,7 +474,7 @@ pub mod pallet {
 				vault_bonds.backfill_bonds_reserved.saturating_sub(backfill_bonds_to_unreserve);
 
 			let bonds_total = Self::sum_bonds(&vault_bonds.bond_lots);
-			let available_bond_space_now = activated_vault_bonds
+			let available_bond_space_now = vault_bond_cap
 				.saturating_sub(bonds_total)
 				.saturating_sub(vault_bonds.backfill_bonds_reserved);
 
@@ -1367,7 +1372,8 @@ pub mod pallet {
 		}
 
 		pub(crate) fn get_vault_securitized_funds_cap(vault_id: VaultId) -> T::Balance {
-			let securitized_satoshis = T::TreasuryVaultProvider::get_securitized_satoshis(vault_id);
+			let (_, securitized_satoshis) =
+				T::TreasuryVaultProvider::get_securitization_and_securitized_satoshis(vault_id);
 			T::PriceProvider::get_btc_price_in_market_microgons(securitized_satoshis)
 				.unwrap_or_default()
 		}

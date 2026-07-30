@@ -45,6 +45,7 @@ fn argonot_bond_lots() -> Vec<BondLotSummary> {
 fn test_vault(account_id: u64, securitized_satoshis: u64, sharing_percent: Permill) -> TestVault {
 	TestVault {
 		account_id: account(account_id),
+		securitization: 0,
 		securitized_satoshis,
 		sharing_percent,
 		bonus_percent: Permill::zero(),
@@ -76,6 +77,44 @@ fn bonus_approval(
 		backfill_bonds_to_unreserve,
 		signature,
 	}
+}
+
+#[test]
+fn buy_bonds_uses_greater_of_vault_securitization_and_securitized_bitcoin_value() {
+	new_test_ext().execute_with(|| {
+		MinimumArgonsPerContributor::set(1);
+
+		let mut securitization_funded_vault =
+			test_vault(10, (4 * MICROGONS_PER_ARGON) as u64, Permill::zero());
+		securitization_funded_vault.securitization = 6 * MICROGONS_PER_ARGON;
+		insert_vault(1, securitization_funded_vault);
+
+		let mut bitcoin_funded_vault =
+			test_vault(11, (6 * MICROGONS_PER_ARGON) as u64, Permill::zero());
+		bitcoin_funded_vault.securitization = 4 * MICROGONS_PER_ARGON;
+		insert_vault(2, bitcoin_funded_vault);
+
+		set_argons(2, 7 * MICROGONS_PER_ARGON);
+		set_argons(3, 7 * MICROGONS_PER_ARGON);
+
+		assert_ok!(Treasury::buy_bonds(origin(2), 1, 6, None));
+		assert_noop!(
+			Treasury::buy_bonds(origin(2), 1, 1, None),
+			Error::<Test>::BondPurchaseAboveSecurity
+		);
+
+		assert_ok!(Treasury::buy_bonds(origin(3), 2, 6, None));
+		assert_noop!(
+			Treasury::buy_bonds(origin(3), 2, 1, None),
+			Error::<Test>::BondPurchaseAboveSecurity
+		);
+
+		Treasury::lock_in_vault_capital(1);
+
+		let frame = CurrentFrameVaultCapital::<Test>::get().expect("frame capital");
+		assert_eq!(frame.vaults.get(&1).map(|vault| vault.eligible_bonds), Some(4));
+		assert_eq!(frame.vaults.get(&2).map(|vault| vault.eligible_bonds), Some(6));
+	});
 }
 
 #[test]
