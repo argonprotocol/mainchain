@@ -14,11 +14,14 @@
   "homepage": "https://github.com/argonprotocol/mainchain#readme",
   "scripts": {
     "build": "yarn generate:defs && yarn generate:meta && node clean-build.js && yarn tsc",
+    "generate:contract-declarations": "tsc -p tsconfig.contracts.json",
     "generate:defs": "polkadot-types-from-defs --endpoint metadata.json --input ./src/interfaces --package @argonprotocol/mainchain/interfaces",
     "generate:meta": "polkadot-types-from-chain --endpoint metadata.json --output ./src/interfaces --package @argonprotocol/mainchain/interfaces --strict",
     "test": "vitest --run --config vitest.config.ts",
-    "tsc": "yarn workspace @argonprotocol/ethereum-contracts build && tsup",
-    "watch": "tsup --watch",
+    "tsc": "yarn workspace @argonprotocol/ethereum-contracts build && yarn generate:contract-declarations && tsup && yarn validate:package",
+    "tsup": "yarn tsc",
+    "validate:package": "tsx src/scripts/validatePackage.ts",
+    "watch": "yarn generate:contract-declarations && tsup --watch",
     "typecheck": "tsc --noEmit -p tsconfig.test.json"
   },
   "files": [

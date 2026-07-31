@@ -1,7 +1,7 @@
 import { waitForLoad } from './index';
 import type { ArgonClient } from './index';
+import type { SignerOptions } from '@polkadot/api-base/types';
 import type { SubmittableExtrinsic } from '@polkadot/api/promise/types';
-import type { SignerOptions } from '@polkadot/api/types';
 import type { KeyringPair } from '@polkadot/keyring/types';
 import { ITxProgressCallback, TxResult } from './TxResult';
 
