@@ -59,6 +59,8 @@ parameter_types! {
 	pub static CurrentTicker: Ticker = Ticker::new(1_000, 2);
 	pub static ArgonPriceInUsd: FixedU128 = FixedU128::one();
 	pub static ArgonotPriceInUsd: FixedU128 = FixedU128::one();
+	pub static EthereumPriceInUsd: Option<FixedU128> = None;
+	pub static EthereumGasPriceInWei: Option<u128> = None;
 	pub static LowestMicrogonsPerArgonot: Option<Balance> = None;
 	pub static ProofVerificationAllowed: bool = true;
 	pub static ProofVerificationRejectedTransactionIndexes: Vec<u64> = Vec::new();
@@ -89,6 +91,10 @@ impl PriceProvider<Balance> for MockPriceProvider {
 
 	fn get_argonot_price_in_usd() -> Option<FixedU128> {
 		Some(ArgonotPriceInUsd::get())
+	}
+
+	fn get_average_ethereum_prices(_frames: FrameId) -> Option<(FixedU128, u128)> {
+		Some((EthereumPriceInUsd::get()?, EthereumGasPriceInWei::get()?))
 	}
 
 	fn get_target_argon_price_in_usd() -> Option<FixedU128> {
@@ -619,6 +625,8 @@ pub fn new_test_ext() -> TestState {
 	CurrentTicker::set(Ticker::new(1_000, 2));
 	ArgonPriceInUsd::set(FixedU128::one());
 	ArgonotPriceInUsd::set(FixedU128::one());
+	EthereumPriceInUsd::set(None);
+	EthereumGasPriceInWei::set(None);
 	LowestMicrogonsPerArgonot::set(None);
 	ProofVerificationAllowed::set(true);
 	ProofVerificationRejectedTransactionIndexes::set(Vec::new());

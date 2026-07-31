@@ -590,10 +590,11 @@ pub mod pallet {
 		/// tranche's shared signed updates.
 		#[codec(compact)]
 		pub signature_gas_cost: u128,
-		/// Estimated wei paid per unit of Ethereum gas.
+		/// Fallback wei paid per unit of Ethereum gas when fresh oracle pricing is unavailable.
 		#[codec(compact)]
 		pub estimated_wei_per_gas: u128,
-		/// Estimated Argon-denominated value of one ETH, expressed in microgons.
+		/// Fallback Argon-denominated value of one ETH, expressed in microgons, when fresh oracle
+		/// pricing is unavailable.
 		pub estimated_microgons_per_eth: T::Balance,
 	}
 

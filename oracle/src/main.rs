@@ -23,6 +23,7 @@ mod argon_price;
 mod argonot_price;
 mod bitcoin_tip;
 mod coin_usd_prices;
+mod ethereum_gas_price;
 mod price_index;
 mod uniswap_oracle;
 mod us_cpi;

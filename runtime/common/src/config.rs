@@ -212,6 +212,8 @@ parameter_types! {
 	pub const MaxArgonotFloorHistoryFrames: u32 = 10;
 	/// Number of frame-level Argonot average buckets retained by the price index.
 	pub const MaxArgonotAverageHistoryFrames: u32 = 10;
+	/// Number of frame-level Ethereum price buckets retained by the price index.
+	pub const MaxEthereumPriceHistoryFrames: u32 = 10;
 	/// Maximum size of the active Global Issuance Council member set.
 	pub const MaxCouncilMembers: u32 = 100;
 	/// Maximum number of contiguous council approval signatures accepted in one extrinsic.

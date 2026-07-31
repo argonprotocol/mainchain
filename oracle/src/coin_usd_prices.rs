@@ -100,12 +100,16 @@ impl CoinUsdPriceLookup {
 		}
 
 		let mut bitcoin_values: Vec<FixedU128> = Vec::new();
+		let mut ethereum_values: Vec<FixedU128> = Vec::new();
 		let mut usdc_values: Vec<FixedU128> = Vec::new();
 
 		while let Some(joined) = join_set.join_next().await {
 			match joined {
 				Ok((_provider, Ok(price))) => {
 					bitcoin_values.push(price.bitcoin);
+					if let Some(ethereum) = price.ethereum {
+						ethereum_values.push(ethereum);
+					}
 					if let Some(usdc) = price.usdc {
 						usdc_values.push(usdc);
 					}
@@ -123,10 +127,12 @@ impl CoinUsdPriceLookup {
 
 		let median_btc = Self::median_fixed(&mut bitcoin_values)
 			.ok_or_else(|| anyhow!("No bitcoin prices available from any provider"))?;
+		let median_ethereum = Self::median_fixed(&mut ethereum_values);
 		let median_usdc =
 			Self::median_fixed(&mut usdc_values).unwrap_or_else(Self::default_usdc_when_missing);
 
-		let latest = PriceLookups { bitcoin: median_btc, usdc: median_usdc };
+		let latest =
+			PriceLookups { bitcoin: median_btc, ethereum: median_ethereum, usdc: median_usdc };
 		self.last_refresh = Some((Instant::now(), latest));
 
 		Ok(latest)
@@ -147,7 +153,7 @@ impl CoinUsdPriceLookup {
 
 	async fn get_kraken_price_with_client(client: &Client) -> Result<PriceLookupMaybe> {
 		let response = client
-			.get("https://api.kraken.com/0/public/Ticker?pair=XXBTZUSD,USDCUSD")
+			.get("https://api.kraken.com/0/public/Ticker?pair=XXBTZUSD,XETHZUSD,USDCUSD")
 			.timeout(Duration::from_secs(5))
 			.send()
 			.await?
@@ -156,12 +162,18 @@ impl CoinUsdPriceLookup {
 		let btc = response.result.get("XXBTZUSD").ok_or(anyhow!("No price data"))?.last_trade_cost
 			[0]
 		.parse::<f64>()?;
+		let ethereum = response
+			.result
+			.get("XETHZUSD")
+			.and_then(|price| price.last_trade_cost[0].parse::<f64>().ok())
+			.map(FixedU128::from_float);
 		let usdc = response.result.get("USDCUSD").ok_or(anyhow!("No price data"))?.last_trade_cost
 			[0]
 		.parse::<f64>()?;
 
 		Ok(PriceLookupMaybe {
 			bitcoin: FixedU128::from_float(btc),
+			ethereum,
 			usdc: Some(FixedU128::from_float(usdc)),
 		})
 	}
@@ -169,7 +181,7 @@ impl CoinUsdPriceLookup {
 	async fn get_coingecko_price_with_client(client: &Client) -> Result<PriceLookupMaybe> {
 		let response = client
 			.get("https://api.coingecko.com/api/v3/simple/price")
-			.query(&[("ids", "bitcoin,usd-coin"), ("vs_currencies", "usd")])
+			.query(&[("ids", "bitcoin,ethereum,usd-coin"), ("vs_currencies", "usd")])
 			.timeout(Duration::from_secs(5))
 			.send()
 			.await?
@@ -178,16 +190,18 @@ impl CoinUsdPriceLookup {
 
 		Ok(PriceLookupMaybe {
 			bitcoin: FixedU128::from_float(response.bitcoin.usd),
+			ethereum: response.ethereum.map(|price| FixedU128::from_float(price.usd)),
 			usdc: Some(FixedU128::from_float(response.usd_coin.usd)),
 		})
 	}
 
 	async fn get_coinbase_prices_with_client(client: &Client) -> Result<PriceLookupMaybe> {
-		let (bitcoin, usdc) = join!(
+		let (bitcoin, ethereum, usdc) = join!(
 			Self::get_coinbase_price_with_client(client, "BTC"),
+			Self::get_coinbase_price_with_client(client, "ETH"),
 			Self::get_coinbase_price_with_client(client, "USDC")
 		);
-		Ok(PriceLookupMaybe { bitcoin: bitcoin?, usdc: usdc.ok() })
+		Ok(PriceLookupMaybe { bitcoin: bitcoin?, ethereum: ethereum.ok(), usdc: usdc.ok() })
 	}
 
 	async fn get_coinbase_price_with_client(client: &Client, coin: &str) -> Result<FixedU128> {
@@ -202,13 +216,15 @@ impl CoinUsdPriceLookup {
 	}
 
 	async fn get_gemini_prices_with_client(client: &Client) -> Result<PriceLookupMaybe> {
-		let (bitcoin_result, usdc_result) = join!(
+		let (bitcoin_result, ethereum_result, usdc_result) = join!(
 			Self::get_gemini_price_with_client(client, "btcusd"),
+			Self::get_gemini_price_with_client(client, "ethusd"),
 			Self::get_gemini_price_with_client(client, "usdcusd")
 		);
 
 		Ok(PriceLookupMaybe {
 			bitcoin: FixedU128::from_float(bitcoin_result?),
+			ethereum: ethereum_result.ok().map(FixedU128::from_float),
 			usdc: Some(FixedU128::from_float(usdc_result?)),
 		})
 	}
@@ -225,13 +241,15 @@ impl CoinUsdPriceLookup {
 	}
 
 	async fn get_bitstamp_prices_with_client(client: &Client) -> Result<PriceLookupMaybe> {
-		let (bitcoin_result, usdc_result) = join!(
+		let (bitcoin_result, ethereum_result, usdc_result) = join!(
 			Self::get_bitstamp_price_with_client(client, "btcusd"),
+			Self::get_bitstamp_price_with_client(client, "ethusd"),
 			Self::get_bitstamp_price_with_client(client, "usdcusd")
 		);
 
 		Ok(PriceLookupMaybe {
 			bitcoin: FixedU128::from_float(bitcoin_result?),
+			ethereum: ethereum_result.ok().map(FixedU128::from_float),
 			usdc: Some(FixedU128::from_float(usdc_result?)),
 		})
 	}
@@ -251,17 +269,20 @@ impl CoinUsdPriceLookup {
 #[derive(Clone, Copy, Debug, PartialOrd, PartialEq)]
 pub struct PriceLookups {
 	pub bitcoin: FixedU128,
+	pub ethereum: Option<FixedU128>,
 	pub usdc: FixedU128,
 }
 
 struct PriceLookupMaybe {
 	bitcoin: FixedU128,
+	ethereum: Option<FixedU128>,
 	usdc: Option<FixedU128>,
 }
 
 #[derive(Deserialize)]
 struct CoinGeckoResponse {
 	bitcoin: CoinGeckoPriceData,
+	ethereum: Option<CoinGeckoPriceData>,
 	#[serde(rename = "usd-coin")]
 	usd_coin: CoinGeckoPriceData,
 }
@@ -320,6 +341,7 @@ mod tests {
 			.await
 			.unwrap();
 		assert!(price_lookups.bitcoin > FixedU128::from_float(30_000.0));
+		assert!(price_lookups.ethereum.unwrap() > FixedU128::from_float(100.0));
 		assert!(price_lookups.usdc > FixedU128::from_float(0.9));
 		assert!(price_lookups.usdc < FixedU128::from_float(1.1));
 	}
@@ -329,6 +351,7 @@ mod tests {
 		let price_lookups =
 			CoinUsdPriceLookup::get_kraken_price_with_client(&Client::new()).await.unwrap();
 		assert!(price_lookups.bitcoin > FixedU128::from_float(30_000.0));
+		assert!(price_lookups.ethereum.unwrap() > FixedU128::from_float(100.0));
 		assert!(price_lookups.usdc.unwrap() > FixedU128::from_float(0.9));
 		assert!(price_lookups.usdc.unwrap() < FixedU128::from_float(1.1));
 	}
@@ -340,6 +363,7 @@ mod tests {
 			.await
 			.unwrap();
 		assert!(price_lookups.bitcoin > FixedU128::from_float(30_000.0));
+		assert!(price_lookups.ethereum.unwrap() > FixedU128::from_float(100.0));
 		assert!(price_lookups.usdc.unwrap() > FixedU128::from_float(0.9));
 		assert!(price_lookups.usdc.unwrap() < FixedU128::from_float(1.1));
 	}
@@ -349,6 +373,7 @@ mod tests {
 		let price_lookups =
 			CoinUsdPriceLookup::get_gemini_prices_with_client(&Client::new()).await.unwrap();
 		assert!(price_lookups.bitcoin > FixedU128::from_float(30_000.0));
+		assert!(price_lookups.ethereum.unwrap() > FixedU128::from_float(100.0));
 		assert!(price_lookups.usdc.unwrap() > FixedU128::from_float(0.9));
 		assert!(price_lookups.usdc.unwrap() < FixedU128::from_float(1.1));
 	}
@@ -359,6 +384,7 @@ mod tests {
 			.await
 			.unwrap();
 		assert!(price_lookups.bitcoin > FixedU128::from_float(30_000.0));
+		assert!(price_lookups.ethereum.unwrap() > FixedU128::from_float(100.0));
 		assert!(price_lookups.usdc.unwrap() > FixedU128::from_float(0.9));
 		assert!(price_lookups.usdc.unwrap() < FixedU128::from_float(1.1));
 	}
@@ -369,6 +395,7 @@ mod tests {
 			.await
 			.unwrap();
 		assert!(price_lookups.bitcoin > FixedU128::from_float(30_000.0));
+		assert!(price_lookups.ethereum.unwrap() > FixedU128::from_float(100.0));
 		assert!(price_lookups.usdc.unwrap() > FixedU128::from_float(0.9));
 		assert!(price_lookups.usdc.unwrap() < FixedU128::from_float(1.1));
 	}

@@ -1158,6 +1158,7 @@ dependencies = [
  "scraper",
  "serde",
  "serde_json",
+ "subxt",
  "tokio",
  "tracing",
  "tracing-subscriber 0.3.19",

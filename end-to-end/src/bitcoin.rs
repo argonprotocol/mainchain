@@ -14,7 +14,7 @@ use argon_client::{
 	},
 	conversion::{to_api_fixed_u128, to_api_per_mill},
 	signer::{Signer, Sr25519Signer},
-	ArgonConfig, FetchAt, MainchainClient,
+	subxt_error, ArgonConfig, FetchAt, MainchainClient,
 };
 use argon_primitives::{
 	bitcoin::{
@@ -482,29 +482,51 @@ async fn submit_price(
 ) -> Tick {
 	let signer = Sr25519Signer::new(price_index_operator.clone());
 	let account_id = signer.account_id();
-	let tick = current_chain_tick(client, ticker).await;
-	let nonce = client.get_account_nonce(&account_id).await.unwrap();
-	let params = MainchainClient::ext_params_builder().nonce(nonce.into()).build();
-	let progress = client
-		.live
-		.tx()
-		.sign_and_submit_then_watch(
-			&tx().price_index().submit(Index {
-				btc_usd_price: FixedU128Ext(FixedU128::from_float(62_000.0).into_inner()),
-				argon_usd_target_price: FixedU128Ext(FixedU128::from_float(1.0).into_inner()),
-				argon_usd_price: FixedU128Ext(FixedU128::from_float(1.6).into_inner()),
-				argon_time_weighted_average_liquidity: 500_000_000_000,
-				argonot_usd_price: FixedU128Ext(FixedU128::from_float(1.0).into_inner()),
-				tick,
-			}),
-			&signer,
-			params,
-		)
-		.await
-		.unwrap();
-	MainchainClient::wait_for_ext_in_block(progress, true).await.unwrap();
-	println!("bitcoin prices submitted at tick {tick}",);
-	tick
+
+	// The two-node mining flow can invalidate a price transaction while switching forks.
+	// Refresh both the tick and nonce once before failing the test.
+	for attempt in 0..2 {
+		let tick = current_chain_tick(client, ticker).await;
+		let nonce = client.get_account_nonce(&account_id).await.unwrap();
+		let params = MainchainClient::ext_params_builder().nonce(nonce.into()).build();
+		let progress = client
+			.live
+			.tx()
+			.sign_and_submit_then_watch(
+				&tx().price_index().submit(
+					Index {
+						btc_usd_price: FixedU128Ext(FixedU128::from_float(62_000.0).into_inner()),
+						argon_usd_target_price: FixedU128Ext(
+							FixedU128::from_float(1.0).into_inner(),
+						),
+						argon_usd_price: FixedU128Ext(FixedU128::from_float(1.6).into_inner()),
+						argon_time_weighted_average_liquidity: 500_000_000_000,
+						argonot_usd_price: FixedU128Ext(FixedU128::from_float(1.0).into_inner()),
+						tick,
+					},
+					None,
+				),
+				&signer,
+				params,
+			)
+			.await
+			.unwrap();
+
+		match MainchainClient::wait_for_ext_in_block(progress, true).await {
+			Ok(_) => {
+				println!("bitcoin prices submitted at tick {tick}");
+				return tick;
+			},
+			Err(subxt_error::Error::Other(message))
+				if attempt == 0 && message.contains("Transaction is invalid") =>
+			{
+				println!("Bitcoin price transaction became invalid; retrying with a fresh nonce");
+			},
+			Err(error) => panic!("Could not submit bitcoin price: {error}"),
+		}
+	}
+
+	unreachable!("bitcoin price submission either succeeds or panics")
 }
 
 async fn submit_price_if_needed(

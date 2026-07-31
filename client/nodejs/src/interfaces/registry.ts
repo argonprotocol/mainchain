@@ -242,6 +242,8 @@ import type {
   PalletPriceIndexCall,
   PalletPriceIndexCpiMeasurementBucket,
   PalletPriceIndexError,
+  PalletPriceIndexEthereumPriceFrameAccumulator,
+  PalletPriceIndexEthereumPriceIndex,
   PalletPriceIndexEvent,
   PalletPriceIndexPriceIndex,
   PalletProxyAnnouncement,
@@ -553,6 +555,8 @@ declare module '@polkadot/types/types/registry' {
     PalletPriceIndexCall: PalletPriceIndexCall;
     PalletPriceIndexCpiMeasurementBucket: PalletPriceIndexCpiMeasurementBucket;
     PalletPriceIndexError: PalletPriceIndexError;
+    PalletPriceIndexEthereumPriceFrameAccumulator: PalletPriceIndexEthereumPriceFrameAccumulator;
+    PalletPriceIndexEthereumPriceIndex: PalletPriceIndexEthereumPriceIndex;
     PalletPriceIndexEvent: PalletPriceIndexEvent;
     PalletPriceIndexPriceIndex: PalletPriceIndexPriceIndex;
     PalletProxyAnnouncement: PalletProxyAnnouncement;

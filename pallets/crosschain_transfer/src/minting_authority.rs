@@ -333,14 +333,20 @@ impl<T: Config> Pallet<T> {
 			destination_chain,
 		)
 		.ok_or(Error::<T>::MissingMintingAuthorityActivationRepaymentPricing)?;
-		let activation_base_repayment_quote = Self::minting_authority_activation_gas_repayment_due(
-			&pricing,
-			pricing.activation_gas_cost,
-		)?;
+		let oracle_prices = T::PriceProvider::get_average_ethereum_prices_in_microgons(
+			T::CouncilRotationFrames::get(),
+		);
+		let activation_base_repayment_quote =
+			Self::minting_authority_activation_gas_repayment_due_with_prices(
+				&pricing,
+				pricing.activation_gas_cost,
+				oracle_prices,
+			)?;
 		let activation_signature_repayment_quote =
-			Self::minting_authority_activation_gas_repayment_due(
+			Self::minting_authority_activation_gas_repayment_due_with_prices(
 				&pricing,
 				pricing.signature_gas_cost,
+				oracle_prices,
 			)?;
 		let mut activation_signature_repayment_quote_count =
 			Self::council_signature_quote(approving_council_hash)?;
@@ -373,8 +379,26 @@ impl<T: Config> Pallet<T> {
 		pricing: &MintingAuthorityActivationRepaymentPricing<T>,
 		gas_units: u128,
 	) -> Result<T::Balance, DispatchError> {
-		let microgons_per_eth: u128 = pricing.estimated_microgons_per_eth.into();
-		let wei_cost = gas_units.saturating_mul(pricing.estimated_wei_per_gas);
+		let oracle_prices = T::PriceProvider::get_average_ethereum_prices_in_microgons(
+			T::CouncilRotationFrames::get(),
+		);
+		Self::minting_authority_activation_gas_repayment_due_with_prices(
+			pricing,
+			gas_units,
+			oracle_prices,
+		)
+	}
+
+	fn minting_authority_activation_gas_repayment_due_with_prices(
+		pricing: &MintingAuthorityActivationRepaymentPricing<T>,
+		gas_units: u128,
+		oracle_prices: Option<(T::Balance, u128)>,
+	) -> Result<T::Balance, DispatchError> {
+		let (wei_per_gas, microgons_per_eth) = match oracle_prices {
+			Some((microgons_per_eth, wei_per_gas)) => (wei_per_gas, microgons_per_eth.into()),
+			None => (pricing.estimated_wei_per_gas, pricing.estimated_microgons_per_eth.into()),
+		};
+		let wei_cost = gas_units.saturating_mul(wei_per_gas);
 		let total_microgons =
 			microgons_per_eth.saturating_mul(wei_cost).saturating_div(WEI_PER_ETH);
 		if total_microgons == 0 {
@@ -435,24 +459,65 @@ mod tests {
 			account, activate_test_minting_authority, assert_noop, assert_ok, bounded_vec,
 			encumbered_argonot_micronots, encumbered_bond_microgons, h160,
 			minting_authority_registration_signature, new_test_ext, set_active_vault_bond_amount,
-			set_committed_argonots, transfer_collateral_signature, Balances, CrosschainTransfer,
-			Mutate, Ownership, RuntimeOrigin, TokenError,
+			set_committed_argonots, transfer_collateral_signature, ArgonPriceInUsd, Balances,
+			CrosschainTransfer, EthereumGasPriceInWei, EthereumPriceInUsd, Mutate, Ownership,
+			RuntimeOrigin, TokenError,
 		},
 		ActiveGlobalIssuanceCouncilByDestinationChain,
 		CouncilApprovalCursorByDestinationChainAndAccountId,
 		CouncilApprovalQueueByDestinationChainAndNonce, CouncilApprovalQueueEntry,
 		CouncilApprovalTargetId, Error, GlobalIssuanceCouncilByHash,
 		MinimumMintingAuthorityValueByDestinationChain, MintingAuthoritiesBySigner,
-		MintingAuthority, MintingAuthorityState, NextCouncilApprovalQueueNonceByDestinationChain,
-		SourceChain,
+		MintingAuthority, MintingAuthorityActivationRepaymentPricing, MintingAuthorityState,
+		NextCouncilApprovalQueueNonceByDestinationChain, SourceChain,
 	};
 	use argon_ethereum_contracts::minting_gateway as ethereum_contracts;
-	use polkadot_sdk::sp_runtime::BoundedBTreeMap;
+	use polkadot_sdk::sp_runtime::{BoundedBTreeMap, FixedU128};
 
 	use crate::tests::{
 		configure_single_member_ethereum_council, council_signer, council_signing_pair,
 		transfer_out_id, AssetKind, Test, H256,
 	};
+
+	#[test]
+	fn activation_repayment_uses_oracle_prices_with_configured_fallbacks() {
+		new_test_ext().execute_with(|| {
+			let pricing = MintingAuthorityActivationRepaymentPricing::<Test> {
+				activation_gas_cost: 100_000,
+				signature_gas_cost: 50_000,
+				estimated_wei_per_gas: 1_000_000_000,
+				estimated_microgons_per_eth: 1_000_000,
+			};
+
+			assert_eq!(
+				CrosschainTransfer::minting_authority_activation_gas_repayment_due(
+					&pricing,
+					pricing.activation_gas_cost,
+				),
+				Ok(100),
+			);
+
+			ArgonPriceInUsd::set(FixedU128::from_u32(1));
+			EthereumPriceInUsd::set(Some(FixedU128::from_u32(3_000)));
+			assert_eq!(
+				CrosschainTransfer::minting_authority_activation_gas_repayment_due(
+					&pricing,
+					pricing.activation_gas_cost,
+				),
+				Ok(100),
+			);
+
+			EthereumGasPriceInWei::set(Some(2_000_000_000));
+
+			assert_eq!(
+				CrosschainTransfer::minting_authority_activation_gas_repayment_due(
+					&pricing,
+					pricing.activation_gas_cost,
+				),
+				Ok(600_000),
+			);
+		});
+	}
 
 	#[test]
 	fn register_minting_authority_validates_inputs_encumbers_collateral_and_queues_approval() {

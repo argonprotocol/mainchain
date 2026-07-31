@@ -550,6 +550,7 @@ fn btc_price_in_microgons<
 pub trait PriceProviderWeightInfo {
 	fn get_lowest_microgons_per_argonot() -> Weight;
 	fn get_average_microgons_per_argonot() -> Weight;
+	fn get_ethereum_prices() -> Weight;
 	fn get_liquidity_change_needed() -> Weight;
 }
 
@@ -559,6 +560,10 @@ impl PriceProviderWeightInfo for () {
 	}
 
 	fn get_average_microgons_per_argonot() -> Weight {
+		Weight::zero()
+	}
+
+	fn get_ethereum_prices() -> Weight {
 		Weight::zero()
 	}
 
@@ -598,6 +603,27 @@ pub trait PriceProvider<
 
 	/// Price of a single Argonot in USD.
 	fn get_argonot_price_in_usd() -> Option<FixedU128>;
+
+	/// Average Ether/USD and wei-per-gas prices across the requested trailing frame horizon.
+	fn get_average_ethereum_prices(_frames: FrameId) -> Option<(FixedU128, u128)> {
+		None
+	}
+
+	/// Average target-microgon value of one Ether and wei-per-gas price across the requested
+	/// trailing frame horizon.
+	fn get_average_ethereum_prices_in_microgons(frames: FrameId) -> Option<(Balance, u128)> {
+		let (ethereum_usd_price, wei_per_gas) = Self::get_average_ethereum_prices(frames)?;
+		let argon_usd_target_price = Self::get_target_argon_price_in_usd()?;
+		if ethereum_usd_price.is_zero() || argon_usd_target_price.is_zero() || wei_per_gas == 0 {
+			return None;
+		}
+
+		let microgons_per_eth = ethereum_usd_price
+			.checked_div(&argon_usd_target_price)?
+			.saturating_mul_int(MICROGONS_PER_ARGON)
+			.into();
+		Some((microgons_per_eth, wei_per_gas))
+	}
 
 	/// Target price of a single argon in USD.
 	fn get_target_argon_price_in_usd() -> Option<FixedU128>;

@@ -98,6 +98,8 @@ import type {
   PalletOperationalAccountsRewardsConfig,
   PalletPriceIndexArgonotAverageFrameAccumulator,
   PalletPriceIndexCpiMeasurementBucket,
+  PalletPriceIndexEthereumPriceFrameAccumulator,
+  PalletPriceIndexEthereumPriceIndex,
   PalletPriceIndexPriceIndex,
   PalletProxyAnnouncement,
   PalletProxyProxyDefinition,
@@ -1433,6 +1435,14 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       current: AugmentedQuery<ApiType, () => Observable<Option<PalletPriceIndexPriceIndex>>, []>;
       /**
+       * Stores Ethereum pricing submitted with the active price index.
+       **/
+      currentEthereumPrice: AugmentedQuery<
+        ApiType,
+        () => Observable<Option<PalletPriceIndexEthereumPriceIndex>>,
+        []
+      >;
+      /**
        * Accumulates the current frame's Argonot price samples until the frame closes.
        **/
       currentFrameArgonotAverage: AugmentedQuery<
@@ -1462,6 +1472,14 @@ declare module '@polkadot/api-base/types/storage' {
       historicArgonotFloorByFrame: AugmentedQuery<
         ApiType,
         () => Observable<BTreeMap<u64, u128>>,
+        []
+      >;
+      /**
+       * Stores per-frame Ethereum price totals used for the trailing averages.
+       **/
+      historicEthereumPricesByFrame: AugmentedQuery<
+        ApiType,
+        () => Observable<BTreeMap<u64, PalletPriceIndexEthereumPriceFrameAccumulator>>,
         []
       >;
       /**

@@ -110,6 +110,7 @@ where
 	fn register_minting_authority() -> Weight {
 		Base::register_minting_authority()
 			.saturating_add(PriceProviderWeight::get_lowest_microgons_per_argonot())
+			.saturating_add(PriceProviderWeight::get_ethereum_prices())
 			.saturating_add(TreasuryPoolWeight::encumber_bond_microgons())
 			.saturating_add(VaultProviderWeight::encumber_argonots())
 	}
@@ -123,7 +124,9 @@ where
 	}
 
 	fn prove_gateway_activity(activities: u32) -> Weight {
-		Base::prove_gateway_activity(activities)
+		Base::prove_gateway_activity(activities).saturating_add(
+			PriceProviderWeight::get_ethereum_prices().saturating_mul(activities.into()),
+		)
 	}
 
 	fn schedule_global_issuance_council_rotation() -> Weight {

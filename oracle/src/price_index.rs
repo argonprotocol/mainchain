@@ -13,17 +13,24 @@ use tracing::info;
 use crate::{
 	argon_price, argonot_price, coin_usd_prices,
 	coin_usd_prices::PriceProviderKind,
+	ethereum_gas_price::EthereumGasPriceLookup,
 	uniswap_oracle::{PriceAndLiquidity, UniswapOracleError},
 	us_cpi::UsCpiRetriever,
 	utils::MIN_TRANSACTION_WATCH_TIMEOUT,
 };
 use argon_client::{
-	api::{constants, price_index::calls::types::submit::Index, storage, tx},
+	api::{
+		constants,
+		runtime_types::pallet_price_index::{
+			EthereumPriceIndex as ApiEthereumPriceIndex, PriceIndex as ApiPriceIndex,
+		},
+		storage, tx,
+	},
 	conversion::{from_api_fixed_u128, to_api_fixed_u128},
 	signer::{KeystoreSigner, Signer},
 	FetchAt, MainchainClient, ReconnectingClient,
 };
-use argon_primitives::prelude::sp_arithmetic::FixedPointNumber;
+use argon_primitives::prelude::{sp_arithmetic::FixedPointNumber, Tick};
 
 fn fixed_u128_from_float<'de, D>(deserializer: D) -> Result<FixedU128, D::Error>
 where
@@ -44,6 +51,15 @@ pub struct PriceIndex {
 	pub argonot_usd_price: FixedU128,
 	#[serde(deserialize_with = "fixed_u128_from_float")]
 	pub btc_usd_price: FixedU128,
+	#[serde(default)]
+	pub ethereum: Option<EthereumPriceIndex>,
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub struct EthereumPriceIndex {
+	#[serde(deserialize_with = "fixed_u128_from_float")]
+	pub ethereum_usd_price: FixedU128,
+	pub ethereum_gas_price_wei: u128,
 }
 
 pub async fn price_index_loop(
@@ -114,9 +130,9 @@ pub async fn price_index_loop(
 		argon_price::ArgonPriceLookup::from_env(&ticker, last_price).await?;
 	let mut argonot_price_lookup =
 		argonot_price::ArgonotPriceLookup::from_env(last_argonot_price).await?;
+	let ethereum_gas_price_lookup = EthereumGasPriceLookup::from_env().await?;
 
 	info!("Oracle Started.");
-	let account_id = signer.account_id();
 
 	loop {
 		let tick = ticker.current();
@@ -140,13 +156,14 @@ pub async fn price_index_loop(
 			last_target_price.saturating_sub(max_argon_target_change_per_tick),
 			last_target_price.saturating_add(max_argon_target_change_per_tick),
 		);
-		let price_result = argon_price_lookup
-			.get_latest_price_and_liquidity(
+		let (price_result, ethereum_gas_price_result) = join!(
+			argon_price_lookup.get_latest_price_and_liquidity(
 				tick,
 				max_argon_change_per_tick_away_from_target,
 				usd_price_lookup.usdc,
-			)
-			.await;
+			),
+			ethereum_gas_price_lookup.get_gas_price(),
+		);
 
 		let argon_usd_price = match price_result {
 			Ok(x) => x,
@@ -198,6 +215,25 @@ pub async fn price_index_loop(
 		let argonot_usd_price = trunc_fixed_u128(argonot_price_lookup, 3);
 		let argon_usd_target_price = trunc_fixed_u128(target_price, 3);
 		let bitcoin_usd_price = trunc_fixed_u128(usd_price_lookup.bitcoin, 3);
+		let ethereum = match (usd_price_lookup.ethereum, ethereum_gas_price_result) {
+			(Some(ethereum_usd_price), Ok(ethereum_gas_price_wei)) => Some(EthereumPriceIndex {
+				ethereum_usd_price: trunc_fixed_u128(ethereum_usd_price, 3),
+				ethereum_gas_price_wei,
+			}),
+			(None, _) => {
+				tracing::warn!(
+					"Couldn't update Ethereum USD price; submitting without Ethereum pricing"
+				);
+				None
+			},
+			(_, Err(error)) => {
+				tracing::warn!(
+					?error,
+					"Couldn't update Ethereum gas price; submitting without Ethereum pricing"
+				);
+				None
+			},
+		};
 
 		info!(
 			"Current target price: {:?} vs price {:?}, liquidity {:?}, at tick {:?}",
@@ -207,38 +243,22 @@ pub async fn price_index_loop(
 			tick
 		);
 
-		let price_index = tx().price_index().submit(Index {
-			argon_usd_target_price: to_api_fixed_u128(argon_usd_target_price),
+		submit_price_index(
+			&mut reconnecting_client,
+			&signer,
 			tick,
-			argon_usd_price: to_api_fixed_u128(argon_usd_price),
-			argon_time_weighted_average_liquidity: argon_liquidity,
-			argonot_usd_price: to_api_fixed_u128(argonot_usd_price),
-			btc_usd_price: to_api_fixed_u128(bitcoin_usd_price),
-		});
-		{
-			let client = reconnecting_client.get().await?;
-			let nonce = client.get_account_nonce(&account_id).await?;
-			let params =
-				MainchainClient::ext_params_builder().nonce(nonce.into()).mortal(5).build();
-			let progress = client
-				.live
-				.tx()
-				.sign_and_submit_then_watch(&price_index, &signer, params)
-				.await?;
-			last_target_price = target_price;
-
-			info!("Submitted price index with progress: {:?}", progress);
-			MainchainClient::wait_for_ext_in_block_with_timeout(
-				progress,
-				false,
-				transaction_watch_timeout,
-			)
-			.await
-			.map_err(|e| {
-				tracing::warn!("Error processing price index!! {:?}", e);
-				e
-			})?;
-		}
+			transaction_watch_timeout,
+			PriceIndex {
+				argon_usd_target_price,
+				argon_usd_price,
+				argon_time_weighted_average_liquidity: argon_liquidity,
+				argonot_usd_price,
+				btc_usd_price: bitcoin_usd_price,
+				ethereum,
+			},
+		)
+		.await?;
+		last_target_price = target_price;
 
 		let sleep_time = ticker.duration_to_next_tick().min(min_sleep_duration);
 		sleep(sleep_time).await;
@@ -279,7 +299,6 @@ pub async fn price_index_loop_from_file(
 		.max(MIN_TRANSACTION_WATCH_TIMEOUT);
 
 	info!("Oracle Started.");
-	let account_id = signer.account_id();
 
 	loop {
 		let tick = ticker.current();
@@ -294,40 +313,71 @@ pub async fn price_index_loop_from_file(
 		let price_data: PriceIndex = serde_json::from_str(&price_data_raw)
 			.map_err(|e| anyhow!("Failed to parse price data from file {file_path:?}: {e:?}"))?;
 
-		let price_index = tx().price_index().submit(Index {
-			argon_usd_target_price: to_api_fixed_u128(price_data.argon_usd_target_price),
+		submit_price_index(
+			&mut reconnecting_client,
+			&signer,
 			tick,
-			argon_usd_price: to_api_fixed_u128(price_data.argon_usd_price),
-			argon_time_weighted_average_liquidity: price_data.argon_time_weighted_average_liquidity,
-			argonot_usd_price: to_api_fixed_u128(price_data.argonot_usd_price),
-			btc_usd_price: to_api_fixed_u128(price_data.btc_usd_price),
-		});
-
-		let client = reconnecting_client.get().await?;
-		let nonce = client.get_account_nonce(&account_id).await?;
-		let params = MainchainClient::ext_params_builder().nonce(nonce.into()).mortal(5).build();
-		let progress = client
-			.live
-			.tx()
-			.sign_and_submit_then_watch(&price_index, &signer, params)
-			.await?;
-		last_submitted_tick = tick;
-
-		info!("Submitted price index with progress: {:?}", progress);
-		MainchainClient::wait_for_ext_in_block_with_timeout(
-			progress,
-			false,
 			transaction_watch_timeout,
+			price_data,
 		)
-		.await
-		.map_err(|e| {
-			tracing::warn!("Error processing price index!! {:?}", e);
-			e
-		})?;
+		.await?;
+		last_submitted_tick = tick;
 
 		let sleep_time = ticker.duration_to_next_tick().min(min_sleep_duration);
 		sleep(sleep_time).await;
 	}
+}
+
+async fn submit_price_index(
+	reconnecting_client: &mut ReconnectingClient,
+	signer: &KeystoreSigner,
+	tick: Tick,
+	transaction_watch_timeout: Duration,
+	price: PriceIndex,
+) -> anyhow::Result<()> {
+	let client = reconnecting_client.get().await?;
+	let account_id = signer.account_id();
+	let nonce = client.get_account_nonce(&account_id).await?;
+	let params = MainchainClient::ext_params_builder().nonce(nonce.into()).mortal(5).build();
+	let metadata = client.live.metadata();
+	let submit_call = metadata
+		.pallet_by_name("PriceIndex")
+		.and_then(|pallet| pallet.call_variant_by_name("submit"))
+		.ok_or_else(|| anyhow!("PriceIndex.submit is missing from the connected runtime"))?;
+	let supports_ethereum_prices =
+		submit_call.fields.iter().any(|field| field.name.as_deref() == Some("ethereum"));
+	let index = ApiPriceIndex {
+		argon_usd_target_price: to_api_fixed_u128(price.argon_usd_target_price),
+		tick,
+		argon_usd_price: to_api_fixed_u128(price.argon_usd_price),
+		argon_time_weighted_average_liquidity: price.argon_time_weighted_average_liquidity,
+		argonot_usd_price: to_api_fixed_u128(price.argonot_usd_price),
+		btc_usd_price: to_api_fixed_u128(price.btc_usd_price),
+	};
+	let ethereum = price.ethereum.map(|ethereum| ApiEthereumPriceIndex {
+		ethereum_usd_price: to_api_fixed_u128(ethereum.ethereum_usd_price),
+		ethereum_gas_price_wei: ethereum.ethereum_gas_price_wei,
+		tick,
+	});
+	let price_index: Box<dyn subxt::tx::Payload + Send + Sync> = if supports_ethereum_prices {
+		Box::new(tx().price_index().submit(index, ethereum))
+	} else {
+		Box::new(subxt::tx::DefaultPayload::new("PriceIndex", "submit", (index,)))
+	};
+	let progress = client
+		.live
+		.tx()
+		.sign_and_submit_then_watch(&price_index, signer, params)
+		.await?;
+
+	info!("Submitted price index with progress: {:?}", progress);
+	MainchainClient::wait_for_ext_in_block_with_timeout(progress, false, transaction_watch_timeout)
+		.await
+		.map_err(|error| {
+			tracing::warn!("Error processing price index!! {:?}", error);
+			error
+		})?;
+	Ok(())
 }
 
 fn should_use_argon_pool_fallback(error: &anyhow::Error) -> bool {
@@ -419,6 +469,7 @@ mod tests {
 		use_mock_uniswap_prices(argonot_address, argonot_prices);
 		use_mock_price_lookups(PriceLookups {
 			bitcoin: FixedU128::from_float(62_000.23),
+			ethereum: None,
 			usdc: FixedU128::from_float(1.0),
 		});
 		use_mock_cpi_values(vec![0.2, 0.1, -0.1, 0.3]).await;
@@ -459,5 +510,21 @@ mod tests {
 
 		let other_error = anyhow::anyhow!("some other uniswap failure");
 		assert!(!super::should_use_argon_pool_fallback(&other_error));
+	}
+
+	#[test]
+	fn file_prices_remain_compatible_without_ethereum_fields() {
+		let price: super::PriceIndex = serde_json::from_str(
+			r#"{
+				"argon_usd_target_price": 1.0,
+				"argon_usd_price": 1.0,
+				"argon_time_weighted_average_liquidity": 100000000,
+				"argonot_usd_price": 2.0,
+				"btc_usd_price": 62000.0
+			}"#,
+		)
+		.unwrap();
+
+		assert!(price.ethereum.is_none());
 	}
 }

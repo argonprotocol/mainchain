@@ -1117,6 +1117,10 @@ declare module '@polkadot/api-base/types/errors' {
     };
     priceIndex: {
       /**
+       * Ethereum prices must be non-zero and correspond to the submitted price-index tick.
+       **/
+      InvalidEthereumPrices: AugmentedError<ApiType>;
+      /**
        * Change in argon price is too large
        **/
       MaxPriceChangePerTickExceeded: AugmentedError<ApiType>;

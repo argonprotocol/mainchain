@@ -28,6 +28,7 @@ directories = { workspace = true }
 argon-bitcoin = { workspace = true, features = ["default"] }
 argon-client = { workspace = true }
 argon-primitives = { workspace = true, features = ["default", "bitcoin"] }
+subxt = { workspace = true }
 url = { workspace = true }
 uniswap-sdk-core = { workspace = true }
 uniswap-v3-sdk = { workspace = true, features = ["extensions"] }
