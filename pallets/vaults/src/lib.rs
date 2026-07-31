@@ -18,8 +18,10 @@ pub mod weights;
 
 /// The Vaults pallet allows a user to fund BitcoinLocks for bitcoin holders. This allows them to
 /// participate in treasury pools. Vaults can define the number of Argons available for bitcoin
-/// locks and the terms of both bitcoin locks and treasury pools. However, bonded argons for
-/// Treasury may only be issued up to the amount of locked bitcoin.
+/// locks and the terms of both bitcoin locks and treasury pools. A Treasury pool can accept bonded
+/// argons up to the greater of the vault's securitization or its effective Bitcoin-backed value.
+/// Bonds above the effective Bitcoin-backed value do not participate in frame earnings until that
+/// capacity grows.
 ///
 /// ** Activated Securitization **
 /// A vault can create treasury pools up to 2x the locked securitization used for Bitcoin. This
@@ -1413,9 +1415,11 @@ pub mod pallet {
 		type Balance = T::Balance;
 		type AccountId = T::AccountId;
 
-		fn get_securitized_satoshis(vault_id: VaultId) -> Satoshis {
+		fn get_securitization_and_securitized_satoshis(
+			vault_id: VaultId,
+		) -> (Self::Balance, Satoshis) {
 			VaultsById::<T>::get(vault_id)
-				.map(|a| a.effective_securitized_satoshis())
+				.map(|vault| (vault.securitization, vault.effective_securitized_satoshis()))
 				.unwrap_or_default()
 		}
 
