@@ -1,5 +1,11 @@
-import { TxSubmitter } from '../TxSubmitter';
+import { TxSubmitter, type ISubmittableOptions } from '../TxSubmitter';
 import { expect, it, vi } from 'vitest';
+
+it('accepts numeric mortal eras', () => {
+  const options: ISubmittableOptions = { era: 64 };
+
+  expect(options.era).toBe(64);
+});
 
 it('supports external signers via address+signer', async () => {
   const address = '5G9v3eN9y1xS7G8fFqL3J4d4G2fG1m3wZ7kH9n1Y2x3p4q5r';

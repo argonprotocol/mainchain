@@ -10,6 +10,12 @@ const contractArtifacts = [
   'artifacts/contracts/ProxyArtifacts.sol/TransparentUpgradeableProxy.json',
 ] as const;
 
+// Bundle contract types from TypeScript's declaration output; tsup cannot parse generated.ts directly.
+const contractDeclarationPaths = {
+  '@argonprotocol/ethereum-contracts/generated': ['.contract-declarations/generated.d.ts'],
+  '@argonprotocol/ethereum-contracts/hashing': ['.contract-declarations/hashing.d.ts'],
+};
+
 async function copyContractArtifacts(outDir: 'lib' | 'browser') {
   const contractsRoot = resolve('..', '..', 'chains', 'ethereum', 'contracts');
 
@@ -25,6 +31,7 @@ export default defineConfig([
     entry: ['src/index.ts'],
     dts: {
       compilerOptions: {
+        paths: contractDeclarationPaths,
         rootDir: '.',
       },
       resolve: ['@argonprotocol/ethereum-contracts'],
@@ -52,6 +59,7 @@ export default defineConfig([
     external: ['@polkadot/types/lookup'],
     dts: {
       compilerOptions: {
+        paths: contractDeclarationPaths,
         rootDir: '.',
       },
       resolve: ['@argonprotocol/ethereum-contracts'],

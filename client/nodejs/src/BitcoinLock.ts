@@ -2,6 +2,8 @@ import {
   ArgonClient,
   ArgonPrimitivesBitcoinBitcoinNetwork,
   ArgonPrimitivesBitcoinUtxoRef,
+  FIXED_U128_DECIMALS,
+  fromFixedNumber,
   getBigIntFallback,
 } from './index';
 import { GenericEvent } from '@polkadot/types';
@@ -63,6 +65,7 @@ export class BitcoinLock implements IBitcoinLock {
   public lockedTargetPrice: bigint;
   public liquidityPromised: bigint;
   public ownerAccount: string;
+  public securitizationRatio: number;
   public satoshis: bigint;
   public utxoSatoshis?: bigint;
   public vaultPubkey: string;
@@ -90,6 +93,7 @@ export class BitcoinLock implements IBitcoinLock {
     this.lockedTargetPrice = data.lockedTargetPrice;
     this.liquidityPromised = data.liquidityPromised;
     this.ownerAccount = data.ownerAccount;
+    this.securitizationRatio = data.securitizationRatio;
     this.satoshis = data.satoshis;
     this.utxoSatoshis = data.utxoSatoshis;
     this.vaultPubkey = data.vaultPubkey;
@@ -645,6 +649,10 @@ export class BitcoinLock implements IBitcoinLock {
     ]);
     const liquidityPromised = utxo.liquidityPromised.toBigInt();
     const ownerAccount = utxo.ownerAccount.toHuman();
+    const securitizationRatio = fromFixedNumber(
+      utxo.securitizationRatio.toBigInt(),
+      FIXED_U128_DECIMALS,
+    ).toNumber();
     const satoshis = utxo.satoshis.toBigInt();
     const utxoSatoshis = utxo.utxoSatoshis?.isSome ? utxo.utxoSatoshis.value.toBigInt() : undefined;
     const vaultPubkey = utxo.vaultPubkey.toHex();
@@ -676,6 +684,7 @@ export class BitcoinLock implements IBitcoinLock {
       lockedTargetPrice,
       liquidityPromised,
       ownerAccount,
+      securitizationRatio,
       satoshis,
       utxoSatoshis,
       vaultPubkey,
@@ -915,6 +924,7 @@ export interface IBitcoinLock {
   lockedTargetPrice: bigint;
   liquidityPromised: bigint;
   ownerAccount: string;
+  securitizationRatio: number;
   satoshis: bigint;
   utxoSatoshis?: bigint;
   vaultPubkey: string;

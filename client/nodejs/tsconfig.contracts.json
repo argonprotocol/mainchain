@@ -1,0 +1,15 @@
+{
+  "extends": "../../chains/ethereum/contracts/tsconfig.json",
+  "compilerOptions": {
+    "declaration": true,
+    "emitDeclarationOnly": true,
+    "noEmit": false,
+    "outDir": ".contract-declarations",
+    "rootDir": "../../chains/ethereum/contracts",
+    "types": []
+  },
+  "include": [
+    "../../chains/ethereum/contracts/generated.ts",
+    "../../chains/ethereum/contracts/hashing.ts"
+  ]
+}

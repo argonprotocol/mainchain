@@ -1,21 +1,32 @@
 import type { Abi, Hex } from 'viem';
 import {
+  MINTING_GATEWAY_RUNTIME_DECIMALS,
+  MINTING_GATEWAY_RUNTIME_TO_ERC20_SCALE,
+  MINTING_GATEWAY_TOKEN_DECIMALS,
+  argonTokenArtifact as rawArgonTokenArtifact,
+  argonotTokenArtifact as rawArgonotTokenArtifact,
+  mintingGatewayArtifact as rawMintingGatewayArtifact,
+  proxyAdminArtifact as rawProxyAdminArtifact,
+  transparentUpgradeableProxyArtifact as rawTransparentUpgradeableProxyArtifact,
+} from '@argonprotocol/ethereum-contracts';
+import {
   ArgonTokenEvents,
   ArgonotTokenEvents,
   CanonicalMintableBurnableERC20Events,
   ICanonicalTokenEvents,
-  MINTING_GATEWAY_RUNTIME_DECIMALS,
-  MINTING_GATEWAY_RUNTIME_TO_ERC20_SCALE,
-  MINTING_GATEWAY_TOKEN_DECIMALS,
-  MINTING_GATEWAY_UPDATE_KINDS,
   MintingGatewayEvents,
   ProxyAdminEvents,
   TransparentUpgradeableProxyEvents,
   argonTokenAbi,
-  argonTokenArtifact as rawArgonTokenArtifact,
   argonotTokenAbi,
-  argonotTokenArtifact as rawArgonotTokenArtifact,
   canonicalMintableBurnableErc20Abi,
+  iCanonicalTokenAbi,
+  mintingGatewayAbi,
+  proxyAdminAbi,
+  transparentUpgradeableProxyAbi,
+} from '@argonprotocol/ethereum-contracts/generated';
+import {
+  MINTING_GATEWAY_UPDATE_KINDS,
   encodeMintingGatewayCouncilSnapshot,
   encodeMintingGatewayGlobalIssuanceCouncilRotateTarget,
   encodeMintingGatewayMintingAuthorityActivationTarget,
@@ -29,16 +40,10 @@ import {
   hashMintingGatewayRotateGlobalIssuanceCouncil,
   hashMintingGatewayRotateGlobalIssuanceCouncilApproval,
   hashMintingGatewayTransferOutOfArgonRequest as rawHashMintingGatewayTransferOutOfArgonRequest,
-  iCanonicalTokenAbi,
-  mintingGatewayAbi,
-  mintingGatewayArtifact as rawMintingGatewayArtifact,
-  proxyAdminAbi,
-  proxyAdminArtifact as rawProxyAdminArtifact,
-  transparentUpgradeableProxyAbi,
-  transparentUpgradeableProxyArtifact as rawTransparentUpgradeableProxyArtifact,
-} from '@argonprotocol/ethereum-contracts';
+} from '@argonprotocol/ethereum-contracts/hashing';
 
-export type * from '@argonprotocol/ethereum-contracts';
+export type * from '@argonprotocol/ethereum-contracts/generated';
+export type * from '@argonprotocol/ethereum-contracts/hashing';
 
 export type EvmContractArtifact = {
   abi: Abi;
