@@ -412,7 +412,7 @@ impl Get<Tick> for TicksSinceGenesis {
 }
 
 parameter_types! {
-	pub const MinimumArgonsPerContributor: Balance = ARGON; // 1 argons minimum
+	pub const MinimumArgonsPerContributor: Balance = 10 * ARGON; // 10 argons minimum
 	pub const MaxPendingUnlocksPerFrame: u32 = 1000;
 	pub const TreasuryExitDelayFrames: FrameId = 10;
 }
