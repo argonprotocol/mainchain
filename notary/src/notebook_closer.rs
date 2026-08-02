@@ -43,17 +43,25 @@ pub struct FinalizedNotebookHeaderListener {
 	completed_notebook_sender: NotificationSender<NotebookHeaderInfo>,
 	last_notebook_number: NotebookNumber,
 	listener: PgListener,
+	notification_timeout: Duration,
 }
 impl FinalizedNotebookHeaderListener {
 	pub async fn connect(
 		pool: PgPool,
 		completed_notebook_sender: NotificationSender<NotebookHeaderInfo>,
+		notification_timeout: Duration,
 	) -> anyhow::Result<Self> {
 		let last_notebook_number =
 			NotebookHeaderStore::latest(&pool).await?.last_closed_notebook_number;
 		let listener = Self::connect_listener(&pool).await?;
 
-		Ok(Self { pool, completed_notebook_sender, last_notebook_number, listener })
+		Ok(Self {
+			pool,
+			completed_notebook_sender,
+			last_notebook_number,
+			listener,
+			notification_timeout,
+		})
 	}
 
 	async fn connect_listener(pool: &PgPool) -> anyhow::Result<PgListener> {
@@ -63,7 +71,18 @@ impl FinalizedNotebookHeaderListener {
 	}
 
 	pub async fn next(&mut self) -> anyhow::Result<Option<SignedNotebookHeader>> {
-		let notification = &self.listener.recv().await?;
+		let notification =
+			match tokio::time::timeout(self.notification_timeout, self.listener.recv()).await {
+				Ok(notification) => notification?,
+				Err(_) => {
+					tracing::warn!(
+					"No finalized notebook notifications received for {:?}; reconnecting listener",
+					self.notification_timeout
+				);
+					self.try_reconnect().await?;
+					return Ok(None);
+				},
+			};
 		let notebook_number = notification
 			.payload()
 			.parse()
@@ -159,6 +178,7 @@ pub fn spawn_notebook_closer(
 	s3_buckets: S3Archive,
 	notary_metrics: Arc<NotaryMetrics>,
 ) -> anyhow::Result<NotebookCloserHandles> {
+	let notification_timeout = Duration::from_millis(ticker.tick_duration_millis.saturating_mul(2));
 	let pool1 = pool.clone();
 	let handle_1 = tokio::spawn(async move {
 		let mut notebook_closer = NotebookCloser {
@@ -175,8 +195,12 @@ pub fn spawn_notebook_closer(
 	});
 
 	let handle_2 = tokio::spawn(async move {
-		let mut listener =
-			FinalizedNotebookHeaderListener::connect(pool, completed_notebook_sender).await?;
+		let mut listener = FinalizedNotebookHeaderListener::connect(
+			pool,
+			completed_notebook_sender,
+			notification_timeout,
+		)
+		.await?;
 		listener.create_task().await?;
 		Ok(())
 	});
@@ -388,6 +412,41 @@ mod tests {
 	use serial_test::serial;
 
 	#[sqlx::test]
+	async fn test_silent_listener_reconnects_and_publishes_latest_closed_notebook(
+		pool: PgPool,
+	) -> anyhow::Result<()> {
+		let keystore = MemoryKeystore::new();
+		let keystore = KeystoreExt::new(keystore);
+		let notary_key =
+			keystore.ed25519_generate_new(NOTARY_KEYID, None).expect("should have a key");
+
+		create_closed_notebook(&pool, &keystore, &notary_key, 1).await?;
+
+		let (completed_notebook_sender, completed_notebook_stream) =
+			NotebookHeaderStream::channel();
+		let mut listener = FinalizedNotebookHeaderListener::connect(
+			pool.clone(),
+			completed_notebook_sender,
+			Duration::from_millis(10),
+		)
+		.await?;
+		let mut subscription = completed_notebook_stream.subscribe(10);
+
+		listener.listener = PgListener::connect_with(&pool).await?;
+		create_closed_notebook(&pool, &keystore, &notary_key, 2).await?;
+
+		listener.next().await?;
+
+		let (header, _) =
+			tokio::time::timeout(Duration::from_secs(1), subscription.next()).await?.expect(
+				"should publish the latest closed notebook after the silent listener times out",
+			);
+		assert_eq!(header.header.notebook_number, 2);
+
+		Ok(())
+	}
+
+	#[sqlx::test]
 	async fn test_reconnect_publishes_latest_closed_notebook(pool: PgPool) -> anyhow::Result<()> {
 		let _ = tracing_subscriber::fmt::try_init();
 		let keystore = MemoryKeystore::new();
@@ -399,9 +458,12 @@ mod tests {
 
 		let (completed_notebook_sender, completed_notebook_stream) =
 			NotebookHeaderStream::channel();
-		let mut listener =
-			FinalizedNotebookHeaderListener::connect(pool.clone(), completed_notebook_sender)
-				.await?;
+		let mut listener = FinalizedNotebookHeaderListener::connect(
+			pool.clone(),
+			completed_notebook_sender,
+			Duration::from_secs(1),
+		)
+		.await?;
 		let mut subscription = completed_notebook_stream.subscribe(10);
 
 		create_closed_notebook(&pool, &keystore, &notary_key, 2).await?;
