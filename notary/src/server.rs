@@ -649,6 +649,7 @@ mod tests {
 		let mut header_listener = FinalizedNotebookHeaderListener::connect(
 			pool.clone(),
 			notary.completed_notebook_sender.clone(),
+			Duration::from_millis(ticker.tick_duration_millis.saturating_mul(2)),
 		)
 		.await?;
 
