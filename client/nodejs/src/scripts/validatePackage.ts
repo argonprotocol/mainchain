@@ -1,16 +1,10 @@
-import { execFileSync } from 'node:child_process';
+import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
 
 const packageRoot = path.resolve(import.meta.dirname, '..', '..');
-const yarnPath = process.env.npm_execpath;
-
-if (!yarnPath) {
-  throw new Error('Yarn executable path is unavailable');
-}
-
-const packOutput = execFileSync(yarnPath, ['pack', '--dry-run', '--json'], {
+const packOutput = execSync('yarn pack --dry-run --json', {
   cwd: packageRoot,
   encoding: 'utf8',
 });
