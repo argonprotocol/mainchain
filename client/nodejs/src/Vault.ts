@@ -33,6 +33,8 @@ import { ArgonPrimitivesVaultVaultTerms } from '@polkadot/types/lookup';
 
 interface ArgonPrimitivesVaultV144 extends Struct {
   readonly operatorAccountId: AccountId32;
+  readonly name: Option<Bytes>;
+  readonly lastNameChangeTick: Option<u64>;
   readonly securitization: Compact<u128>;
   readonly argonsLocked: Compact<u128>;
   readonly argonsPendingActivation: Compact<u128>;
@@ -320,7 +322,6 @@ export class Vault {
       baseFee: bigint | number;
       bitcoinXpub: string;
       delegateAccountId?: string;
-      name?: string;
       treasuryProfitSharing: number;
       treasuryBonusProfitSharing: number;
       doNotExceedBalance?: bigint;
@@ -334,7 +335,6 @@ export class Vault {
       baseFee,
       bitcoinXpub,
       delegateAccountId,
-      name,
       tip,
       doNotExceedBalance,
     } = args;
@@ -355,7 +355,6 @@ export class Vault {
     if (securitizationRatio < 1 || securitizationRatio > 2) {
       throw new Error('Securitization ratio must be between 1 and 2');
     }
-    const encodedName = encodeVaultName(name);
     const vaultParams = {
       terms: {
         // convert to fixed u128
@@ -371,7 +370,6 @@ export class Vault {
       securitization: BigInt(securitization),
       bitcoinXpubkey: xpubBytes,
       delegateAccountId: delegateAccountId ?? null,
-      name: encodedName,
     };
     const tx = new TxSubmitter(client, client.tx.vaults.create(vaultParams), txSigner);
     if (doNotExceedBalance) {
@@ -419,11 +417,17 @@ export class Vault {
       name?: string | null;
     } & ISubmittableOptions,
   ): Promise<TxResult> {
-    const tx = new TxSubmitter(
-      client,
-      client.tx.vaults.setName(encodeVaultName(args.name)),
-      txSigner,
+    const legacySetName: typeof client.tx.operationalAccounts.setName | undefined = Reflect.get(
+      client.tx.vaults,
+      'setName',
     );
+    const setName = client.tx.operationalAccounts.setName?.meta
+      ? client.tx.operationalAccounts.setName
+      : legacySetName;
+    if (!setName) {
+      throw new Error('The connected runtime does not support setting an operational name');
+    }
+    const tx = new TxSubmitter(client, setName(encodeVaultName(args.name)), txSigner);
 
     return tx.submit({
       ...args,

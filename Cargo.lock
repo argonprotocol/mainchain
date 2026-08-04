@@ -12722,6 +12722,7 @@ dependencies = [
  "k256",
  "pallet-bitcoin-locks",
  "pallet-bitcoin-utxos",
+ "pallet-operational-accounts",
  "pallet-prelude",
  "pallet-treasury 1.4.10",
  "parity-scale-codec",

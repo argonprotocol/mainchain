@@ -823,8 +823,6 @@ fn benchmark_vault<T: Config>(
 	Vault {
 		operator_account_id,
 		delegate_account_id: Some(benchmark_bonus_approval_delegate_account()),
-		name: None,
-		last_name_change_tick: None,
 		securitization: TreasuryBalanceOf::<T>::zero(),
 		securitization_target: TreasuryBalanceOf::<T>::zero(),
 		securitization_locked: TreasuryBalanceOf::<T>::zero(),

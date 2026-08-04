@@ -147,19 +147,6 @@ impl<T: frame_system::Config> pallet_vaults::WeightInfo for WeightInfo<T> {
 		}
 	/// Storage: `Vaults::VaultIdByOperator` (r:1 w:0)
 	/// Proof: `Vaults::VaultIdByOperator` (`max_values`: None, `max_size`: Some(44), added: 2519, mode: `MaxEncodedLen`)
-	/// Storage: `Vaults::VaultsById` (r:1 w:1)
-	/// Proof: `Vaults::VaultsById` (`max_values`: None, `max_size`: Some(9135), added: 11610, mode: `MaxEncodedLen`)
-	fn set_name() -> Weight {
-		// Proof Size summary in bytes:
-		//  Measured:  `228`
-		//  Estimated: `12600`
-		// Minimum execution time: 10_000_000 picoseconds.
-		Weight::from_parts(11_000_000, 12600)
-			.saturating_add(T::DbWeight::get().reads(2))
-			.saturating_add(T::DbWeight::get().writes(1))
-		}
-	/// Storage: `Vaults::VaultIdByOperator` (r:1 w:0)
-	/// Proof: `Vaults::VaultIdByOperator` (`max_values`: None, `max_size`: Some(44), added: 2519, mode: `MaxEncodedLen`)
 	/// Storage: `Vaults::ArgonotCommitmentByVaultId` (r:1 w:1)
 	/// Proof: `Vaults::ArgonotCommitmentByVaultId` (`max_values`: None, `max_size`: Some(44), added: 2519, mode: `MaxEncodedLen`)
 	/// Storage: `Ownership::Holds` (r:1 w:1)

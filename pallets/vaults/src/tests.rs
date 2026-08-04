@@ -10,7 +10,7 @@ use crate::{
 };
 use argon_primitives::{
 	bitcoin::{CompressedBitcoinPubkey, OpaqueBitcoinXpub, Satoshis},
-	vault::{BitcoinVaultProvider, VaultError, VaultLockRequest, VaultName, VaultTerms},
+	vault::{BitcoinVaultProvider, VaultError, VaultLockRequest, VaultTerms},
 };
 use bitcoin::{
 	bip32::{ChildNumber, Xpriv, Xpub},
@@ -69,16 +69,11 @@ fn standard_lock_request(satoshis: Satoshis) -> VaultLockRequest<'static, Balanc
 fn default_vault() -> VaultConfig<u64, Balance> {
 	VaultConfig {
 		terms: default_terms(TEN_PCT),
-		name: None,
 		delegate_account_id: None,
 		bitcoin_xpubkey: keys(),
 		securitization: 50_000,
 		securitization_ratio: FixedU128::one(),
 	}
-}
-
-fn vault_name(name: &str) -> VaultName {
-	BoundedVec::truncate_from(name.as_bytes().to_vec())
 }
 
 #[test]
@@ -416,63 +411,6 @@ fn only_vault_operator_can_reserve_backfill_securitization() {
 }
 
 #[test]
-fn it_can_create_and_update_a_vault_name() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-
-		let mut config = default_vault();
-		config.name = Some(vault_name("VaultAlpha1"));
-
-		set_argons(1, 100_010);
-		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), config));
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().name, Some(vault_name("VaultAlpha1")));
-		assert_eq!(
-			VaultsById::<Test>::get(1).unwrap().last_name_change_tick,
-			Some(CurrentTick::get())
-		);
-
-		CurrentTick::set(10);
-		assert_ok!(Vaults::set_name(RuntimeOrigin::signed(1), Some(vault_name("VaultBeta2"))));
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().name, Some(vault_name("VaultBeta2")));
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().last_name_change_tick, Some(10));
-
-		CurrentTick::set(11);
-		assert_ok!(Vaults::set_name(RuntimeOrigin::signed(1), Some(vault_name("VaultBeta2"))));
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().last_name_change_tick, Some(10));
-
-		CurrentTick::set(12);
-		assert_ok!(Vaults::set_name(RuntimeOrigin::signed(1), None));
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().name, None);
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().last_name_change_tick, Some(12));
-	});
-}
-
-#[test]
-fn it_rejects_invalid_vault_names() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-
-		set_argons(1, 100_010);
-		let mut config = default_vault();
-		config.name = Some(vault_name("vault"));
-		assert_noop!(
-			Vaults::create(RuntimeOrigin::signed(1), config),
-			Error::<Test>::InvalidVaultName
-		);
-
-		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), default_vault()));
-		assert_noop!(
-			Vaults::set_name(RuntimeOrigin::signed(1), Some(vault_name(""))),
-			Error::<Test>::InvalidVaultName
-		);
-		assert_noop!(
-			Vaults::set_name(RuntimeOrigin::signed(1), Some(vault_name("Vault-1"))),
-			Error::<Test>::InvalidVaultName
-		);
-	});
-}
-
-#[test]
 fn it_will_reject_non_hardened_xpubs() {
 	new_test_ext().execute_with(|| {
 		// Go past genesis block so events get deposited
@@ -657,7 +595,6 @@ fn it_can_reduce_vault_funds_down_to_activated() {
 			RuntimeOrigin::signed(1),
 			VaultConfig {
 				terms: default_terms(TEN_PCT),
-				name: None,
 				delegate_account_id: None,
 				bitcoin_xpubkey: keys(),
 				securitization: 1000,
@@ -734,7 +671,6 @@ fn it_can_close_a_vault() {
 			RuntimeOrigin::signed(1),
 			VaultConfig {
 				terms,
-				name: None,
 				delegate_account_id: None,
 				bitcoin_xpubkey: keys(),
 				securitization: 100_000,
@@ -794,7 +730,6 @@ fn it_can_lock_funds() {
 			RuntimeOrigin::signed(1),
 			VaultConfig {
 				terms,
-				name: None,
 				delegate_account_id: None,
 				bitcoin_xpubkey: keys(),
 				securitization: 500_000,
@@ -877,7 +812,6 @@ fn it_doesnt_charge_lock_fees_to_operator() {
 			RuntimeOrigin::signed(1),
 			VaultConfig {
 				terms,
-				name: None,
 				delegate_account_id: None,
 				bitcoin_xpubkey: keys(),
 				securitization: 500_000,
@@ -989,7 +923,6 @@ fn it_handles_overflowing_metrics() {
 			let account_id = i as u64;
 			let vault = VaultConfig {
 				terms: default_terms(TEN_PCT),
-				name: None,
 				delegate_account_id: None,
 				bitcoin_xpubkey: keys(),
 				securitization: 10_000 + (i * 1000) as Balance,
@@ -1076,7 +1009,6 @@ fn it_accounts_for_pending_bitcoins() {
 					treasury_profit_sharing: Permill::zero(),
 					treasury_bonus_profit_sharing: Permill::zero(),
 				},
-				name: None,
 				delegate_account_id: None,
 				bitcoin_xpubkey: keys(),
 				securitization: 100_000,
@@ -1184,7 +1116,6 @@ fn it_can_burn_funds() {
 			RuntimeOrigin::signed(1),
 			VaultConfig {
 				terms,
-				name: None,
 				delegate_account_id: None,
 				bitcoin_xpubkey: keys(),
 				securitization: 100_000,
@@ -1258,7 +1189,6 @@ fn vault_equilibrium_scenario(scenario: VaultScenario) {
 					treasury_profit_sharing: Permill::zero(),
 					treasury_bonus_profit_sharing: Permill::zero(),
 				},
-				name: None,
 				delegate_account_id: None,
 				bitcoin_xpubkey: keys(),
 				securitization,
@@ -1337,7 +1267,6 @@ fn it_records_use_of_fee_coupons() {
 			RuntimeOrigin::signed(1),
 			VaultConfig {
 				terms: terms.clone(),
-				name: None,
 				delegate_account_id: None,
 				bitcoin_xpubkey: keys(),
 				securitization: 500_000,
@@ -1435,7 +1364,6 @@ fn it_should_allow_vaults_to_rotate_xpubs() {
 			RuntimeOrigin::signed(1),
 			VaultConfig {
 				terms,
-				name: None,
 				delegate_account_id: None,
 				bitcoin_xpubkey: keys(),
 				securitization: 100_000,
@@ -1479,7 +1407,6 @@ fn it_can_schedule_term_changes() {
 		let mut terms = default_terms(TEN_PCT);
 		let config = VaultConfig {
 			terms: terms.clone(),
-			name: None,
 			delegate_account_id: None,
 			bitcoin_xpubkey: keys(),
 			securitization: 100_000,
@@ -1544,7 +1471,6 @@ fn it_can_schedule_terms_changes_before_bidding_starts() {
 		let mut terms = default_terms(TEN_PCT);
 		let config = VaultConfig {
 			terms: terms.clone(),
-			name: None,
 			delegate_account_id: None,
 			bitcoin_xpubkey: keys(),
 			securitization: 100_000,
@@ -1589,7 +1515,6 @@ fn it_can_cleanup_at_bitcoin_heights() {
 		let terms = default_terms(FixedU128::from_float(0.01));
 		let config = VaultConfig {
 			terms: terms.clone(),
-			name: None,
 			delegate_account_id: None,
 			bitcoin_xpubkey: keys(),
 			securitization: 1_000_000_000,
@@ -1656,7 +1581,6 @@ fn it_can_reuse_locked_argons() {
 		let terms = default_terms(FixedU128::from_float(0.01));
 		let config = VaultConfig {
 			terms: terms.clone(),
-			name: None,
 			delegate_account_id: None,
 			bitcoin_xpubkey: keys(),
 			securitization: 10_000_000,
@@ -1735,7 +1659,6 @@ fn vaults_can_collect_revenue() {
 			RuntimeOrigin::signed(1),
 			VaultConfig {
 				terms,
-				name: None,
 				delegate_account_id: None,
 				bitcoin_xpubkey: keys(),
 				securitization: 500_000,
@@ -1878,7 +1801,6 @@ fn it_burns_uncollected_revenue() {
 			RuntimeOrigin::signed(1),
 			VaultConfig {
 				terms,
-				name: None,
 				delegate_account_id: None,
 				bitcoin_xpubkey: keys(),
 				securitization: 500_000,

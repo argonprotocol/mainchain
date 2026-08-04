@@ -4,7 +4,7 @@ use super::*;
 use argon_bitcoin::{derive_xpub, xpriv_from_seed};
 use argon_primitives::{
 	bitcoin::{BitcoinHeight, OpaqueBitcoinXpub},
-	vault::{VaultName, VaultTerms},
+	vault::VaultTerms,
 };
 use frame_benchmarking::v2::*;
 use frame_system::RawOrigin;
@@ -39,7 +39,6 @@ fn benchmark_vault_config<T: Config>(
 ) -> VaultConfig<T::AccountId, T::Balance> {
 	VaultConfig {
 		terms: benchmark_terms::<T>(),
-		name: None,
 		delegate_account_id: None,
 		securitization: securitization.into(),
 		bitcoin_xpubkey: benchmark_xpub::<T>(seed_hint),
@@ -250,22 +249,6 @@ mod benchmarks {
 
 		let vault = VaultsById::<T>::get(vault_id).ok_or(BenchmarkError::Stop("vault missing"))?;
 		assert_eq!(vault.backfill_securitization_reserved, 100_000u32.into());
-		Ok(())
-	}
-
-	#[benchmark]
-	fn set_name() -> Result<(), BenchmarkError> {
-		let caller: T::AccountId = account("set_name_caller", 0, 0);
-		let vault_id = create_vault::<T>(&caller, 8, 100_000)?;
-		let name: VaultName = BoundedVec::truncate_from(b"VaultAlpha1".to_vec());
-		let current_tick = T::TickProvider::current_tick();
-
-		#[extrinsic_call]
-		_(RawOrigin::Signed(caller.clone()), Some(name.clone()));
-
-		let vault = VaultsById::<T>::get(vault_id).ok_or(BenchmarkError::Stop("vault missing"))?;
-		assert_eq!(vault.name, Some(name));
-		assert_eq!(vault.last_name_change_tick, Some(current_tick));
 		Ok(())
 	}
 

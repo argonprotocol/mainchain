@@ -9,8 +9,8 @@ use argon_bitcoin::{
 use argon_primitives::{
 	bitcoin::{BitcoinHeight, BitcoinNetwork},
 	tick::Ticker,
-	CollectBlockerProvider, MiningFrameProvider, OperationalAccountProvider, TickProvider,
-	VotingSchedule,
+	CollectBlockerProvider, MiningFrameProvider, MiningSlotProvider, OperationalAccountProvider,
+	TickProvider, VotingSchedule,
 };
 use frame_support::traits::Currency;
 use pallet_bitcoin_locks::BitcoinVerifier;
@@ -30,6 +30,7 @@ frame_support::construct_runtime!(
 	{
 		System: frame_system,
 		Balances: pallet_balances,
+		OperationalAccounts: pallet_operational_accounts,
 		Vaults: pallet_vaults,
 		BitcoinLocks: pallet_bitcoin_locks
 	}
@@ -98,6 +99,17 @@ parameter_types! {
 	pub static TreasuryExitDelayFrames: FrameId = 10;
 	pub static VaultPalletId: PalletId = PalletId(*b"bidPools");
 	pub const OperationalMinimumVaultSecuritization: Balance = 2_000;
+	pub const BitcoinLockSizeForAccessCode: Balance = 5_000;
+	pub const OperationalCertificationReward: Balance = 1_000;
+	pub const OperationalCertificationBonusReward: Balance = 500;
+	pub const OperationalCertificationsPerBonusReward: u32 = 5;
+	pub const MaxAvailableAccessCodes: u32 = 2;
+	pub const MinimumUniswapTransfer: Balance = 250;
+	pub const MinimumBitcoin: Balance = 500;
+	pub const MinimumBonds: Balance = 200;
+	pub const OperationalMinimumUniswapTransfer: Balance = 3_000;
+	pub const MiningSeatsForOperational: u32 = 2;
+	pub const MiningSeatsPerAccessCode: u32 = 5;
 	pub const OperationalMinimumVaultLockTicks: Tick = 1_440 * 365;
 	pub const RecentCapacityDropBlockWindow: u32 = 8;
 	pub const MaxRecentCapacityDropsPerVault: u32 = 64;
@@ -178,6 +190,40 @@ impl OperationalAccountProvider<u64> for MockOperationalAccountProvider {
 		!OperationalAccountsInviteOnly::get() ||
 			UpgradedOperationalAccounts::get().contains(account_id)
 	}
+}
+
+pub struct MockMiningSlotProvider;
+impl MiningSlotProvider<u64> for MockMiningSlotProvider {
+	type Weights = ();
+
+	fn has_active_rewards_account_seat(_: &u64) -> bool {
+		false
+	}
+}
+
+impl pallet_operational_accounts::Config for Test {
+	type Balance = Balance;
+	type BitcoinLockSizeForAccessCode = BitcoinLockSizeForAccessCode;
+	type OperationalCertificationReward = OperationalCertificationReward;
+	type OperationalCertificationBonusReward = OperationalCertificationBonusReward;
+	type OperationalCertificationsPerBonusReward = OperationalCertificationsPerBonusReward;
+	type MaxAvailableAccessCodes = MaxAvailableAccessCodes;
+	type MinimumUniswapTransfer = MinimumUniswapTransfer;
+	type MinimumBitcoin = MinimumBitcoin;
+	type MinimumBonds = MinimumBonds;
+	type OperationalMinimumUniswapTransfer = OperationalMinimumUniswapTransfer;
+	type OperationalMinimumVaultSecuritization = OperationalMinimumVaultSecuritization;
+	type MiningSeatsForOperational = MiningSeatsForOperational;
+	type MiningSeatsPerAccessCode = MiningSeatsPerAccessCode;
+	type VaultProvider = Vaults;
+	type MiningSlotProvider = MockMiningSlotProvider;
+	type BitcoinLocksProvider = ();
+	type TreasuryPoolProvider = ();
+	type UniswapTransferProvider = ();
+	type Currency = Balances;
+	type OperationalRewardsPayer = ();
+	type TickProvider = StaticTickProvider;
+	type WeightInfo = ();
 }
 
 impl pallet_vaults::Config for Test {

@@ -21,6 +21,7 @@ pallet-treasury = { workspace = true, default-features = false }
 argon-bitcoin = { workspace = true, default-features = false }
 pallet-bitcoin-locks = { workspace = true, default-features = false }
 pallet-bitcoin-utxos = { workspace = true, default-features = false }
+pallet-operational-accounts = { workspace = true, default-features = false }
 polkadot-sdk = { workspace = true, features = ["frame-support", "frame-system", "sp-runtime", "sp-core"] }
 pallet-prelude = { workspace = true }
 tracing = { workspace = true }
@@ -41,6 +42,7 @@ std = [
 	"k256/std",
 	"pallet-bitcoin-locks/std",
 	"pallet-bitcoin-utxos/std",
+	"pallet-operational-accounts/std",
 	"pallet-prelude/std",
 	"pallet-treasury/std",
 	"polkadot-sdk/std",
@@ -50,6 +52,7 @@ std = [
 runtime-benchmarks = [
 	"pallet-bitcoin-locks/runtime-benchmarks",
 	"pallet-bitcoin-utxos/runtime-benchmarks",
+	"pallet-operational-accounts/runtime-benchmarks",
 	"pallet-prelude/runtime-benchmarks",
 	"pallet-treasury/runtime-benchmarks",
 	"polkadot-sdk/frame-benchmarking",
@@ -58,6 +61,7 @@ runtime-benchmarks = [
 try-runtime = [
 	"pallet-bitcoin-locks/try-runtime",
 	"pallet-bitcoin-utxos/try-runtime",
+	"pallet-operational-accounts/try-runtime",
 	"pallet-treasury/try-runtime",
 	"polkadot-sdk/try-runtime",
 ]

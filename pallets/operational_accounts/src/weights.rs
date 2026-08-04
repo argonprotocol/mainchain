@@ -2,9 +2,9 @@ use crate::Config;
 use argon_primitives::{
 	vault::{BitcoinVaultProvider, BitcoinVaultProviderWeightInfo},
 	BitcoinLocksProvider, BitcoinLocksProviderWeightInfo, MiningSlotProvider,
-	MiningSlotProviderWeightInfo, OperationalAccountProviderWeightInfo, TreasuryPoolProvider,
-	TreasuryPoolProviderWeightInfo, UniswapTransferProvider, UniswapTransferProviderWeightInfo,
-	UtxoLockEventsWeightInfo,
+	MiningSlotProviderWeightInfo, OperationalAccountProviderWeightInfo, TickProvider,
+	TickProviderWeightInfo, TreasuryPoolProvider, TreasuryPoolProviderWeightInfo,
+	UniswapTransferProvider, UniswapTransferProviderWeightInfo, UtxoLockEventsWeightInfo,
 };
 use core::marker::PhantomData;
 use pallet_prelude::*;
@@ -12,6 +12,7 @@ use pallet_prelude::*;
 /// Weight functions needed for this pallet.
 pub trait WeightInfo {
 	fn register() -> Weight;
+	fn set_name() -> Weight;
 	fn set_reward_config() -> Weight;
 	fn force_set_progress() -> Weight;
 	fn activate() -> Weight;
@@ -41,7 +42,10 @@ type BitcoinLocksProviderWeights<T> =
 		<T as frame_system::Config>::AccountId,
 		<T as Config>::Balance,
 	>>::Weights;
+type TickProviderWeights<T> =
+	<<T as Config>::TickProvider as TickProvider<<T as frame_system::Config>::Block>>::Weights;
 
+#[allow(clippy::type_complexity)]
 pub struct WithProviderWeights<
 	T,
 	Base,
@@ -50,6 +54,7 @@ pub struct WithProviderWeights<
 	UniswapTransferWeight = UniswapTransferProviderWeights<T>,
 	TreasuryPoolProviderWeight = TreasuryPoolProviderWeights<T>,
 	BitcoinLocksProviderWeight = BitcoinLocksProviderWeights<T>,
+	TickProviderWeight = TickProviderWeights<T>,
 >(
 	PhantomData<(
 		T,
@@ -59,6 +64,7 @@ pub struct WithProviderWeights<
 		UniswapTransferWeight,
 		TreasuryPoolProviderWeight,
 		BitcoinLocksProviderWeight,
+		TickProviderWeight,
 	)>,
 );
 impl<
@@ -69,6 +75,7 @@ impl<
 		UniswapTransferWeight,
 		TreasuryPoolProviderWeight,
 		BitcoinLocksProviderWeight,
+		TickProviderWeight,
 	> WeightInfo
 	for WithProviderWeights<
 		T,
@@ -78,6 +85,7 @@ impl<
 		UniswapTransferWeight,
 		TreasuryPoolProviderWeight,
 		BitcoinLocksProviderWeight,
+		TickProviderWeight,
 	>
 where
 	T: Config,
@@ -87,6 +95,7 @@ where
 	UniswapTransferWeight: UniswapTransferProviderWeightInfo,
 	TreasuryPoolProviderWeight: TreasuryPoolProviderWeightInfo,
 	BitcoinLocksProviderWeight: BitcoinLocksProviderWeightInfo,
+	TickProviderWeight: TickProviderWeightInfo,
 {
 	fn register() -> Weight {
 		Base::register()
@@ -94,7 +103,7 @@ where
 			.saturating_add(BitcoinLocksProviderWeight::get_account_funded_bitcoin_amount())
 			.saturating_add(MiningSlotProviderWeight::has_active_rewards_account_seat())
 			.saturating_add(TreasuryPoolProviderWeight::active_account_vault_bond_amount())
-			.saturating_add(UniswapTransferWeight::is_crosschain_activated())
+			.saturating_add(UniswapTransferWeight::is_crosschain_activated().saturating_mul(2))
 			.saturating_add(
 				UniswapTransferWeight::account_uniswap_argon_transfers_in_amount()
 					.saturating_mul(3),
@@ -103,6 +112,10 @@ where
 
 	fn set_reward_config() -> Weight {
 		Base::set_reward_config()
+	}
+
+	fn set_name() -> Weight {
+		Base::set_name().saturating_add(TickProviderWeight::current_tick())
 	}
 
 	fn force_set_progress() -> Weight {
@@ -175,6 +188,9 @@ impl<T: Config> OperationalAccountProviderWeightInfo for ProviderWeightAdapter<T
 // For backwards compatibility and tests.
 impl WeightInfo for () {
 	fn register() -> Weight {
+		Weight::zero()
+	}
+	fn set_name() -> Weight {
 		Weight::zero()
 	}
 	fn set_reward_config() -> Weight {

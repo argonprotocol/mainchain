@@ -113,7 +113,7 @@ macro_rules! inject_runtime_vars {
 			// `spec_name`,   `spec_version`, and `authoring_version` are the same between Wasm and
 			// native. This value is set to 100 to notify Polkadot-JS App (https://polkadot.js.org/apps) to use
 			//   the compatible custom types.
-			spec_version: 157,
+			spec_version: 158,
 			impl_version: 10,
 			apis: RUNTIME_API_VERSIONS,
 			transaction_version: 5,
@@ -156,15 +156,7 @@ macro_rules! inject_runtime_vars {
 		///
 		/// This can be a tuple of types, each implementing `OnRuntimeUpgrade`.
 		type Migrations = (
-			pallet_crosschain_transfer::migrations::PrepareScheduledCouncilRotationMigration<
-				Runtime,
-			>,
-			pallet_operational_accounts::migrations::RemoveLegacyEncryptedServerStorageMigration<
-				Runtime,
-			>,
-			pallet_vaults::migrations::AddBackfillFieldsMigration<Runtime>,
-			pallet_treasury::migrations::AddBondBackfillStateMigration<Runtime>,
-			pallet_bitcoin_locks::migrations::AddBitcoinBackfillFlagMigration<Runtime>,
+			pallet_vaults::migrations::MoveVaultNameToOperationalAccountProfileMigration<Runtime>,
 		);
 
 		/// Unchecked extrinsic type as expected by this runtime.

@@ -1,8 +1,9 @@
 use crate as pallet_operational_accounts;
 use argon_primitives::{
+	tick::Ticker,
 	vault::{BitcoinVaultProvider, RegistrationVaultData},
-	BitcoinLocksProvider, MiningSlotProvider, OperationalRewardsPayer, TreasuryPoolProvider,
-	UniswapTransferProvider,
+	BitcoinLocksProvider, MiningSlotProvider, OperationalRewardsPayer, TickProvider,
+	TreasuryPoolProvider, UniswapTransferProvider, VotingSchedule,
 };
 use frame_support::traits::{
 	fungible::{Inspect, Mutate},
@@ -38,6 +39,36 @@ impl frame_system::Config for Test {
 
 parameter_types! {
 	pub static ExistentialDeposit: Balance = 10;
+	pub static CurrentTick: Tick = 1;
+}
+
+pub struct MockTickProvider;
+impl TickProvider<Block> for MockTickProvider {
+	type Weights = ();
+
+	fn previous_tick() -> Tick {
+		CurrentTick::get().saturating_sub(1)
+	}
+
+	fn current_tick() -> Tick {
+		CurrentTick::get()
+	}
+
+	fn elapsed_ticks() -> Tick {
+		1
+	}
+
+	fn voting_schedule() -> VotingSchedule {
+		unimplemented!()
+	}
+
+	fn ticker() -> Ticker {
+		Ticker::new(1, 2)
+	}
+
+	fn blocks_at_tick(_: Tick) -> Vec<H256> {
+		Vec::new()
+	}
 }
 
 impl pallet_balances::Config for Test {
@@ -402,6 +433,7 @@ impl pallet_operational_accounts::Config for Test {
 	type UniswapTransferProvider = MockUniswapTransferProvider;
 	type Currency = Balances;
 	type OperationalRewardsPayer = MockOperationalRewardsPayer;
+	type TickProvider = MockTickProvider;
 	type WeightInfo = ();
 }
 
@@ -415,6 +447,7 @@ pub fn new_test_ext() -> TestState {
 		.unwrap();
 	});
 	ext.execute_with(|| {
+		CurrentTick::set(1);
 		IsCrosschainActivated::set(true);
 		MicrogonsInByAccount::set(BTreeMap::new());
 		MicrogonsOutByAccount::set(BTreeMap::new());

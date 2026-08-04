@@ -1435,7 +1435,7 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       current: AugmentedQuery<ApiType, () => Observable<Option<PalletPriceIndexPriceIndex>>, []>;
       /**
-       * Stores Ethereum pricing submitted with the active price index.
+       * Stores the latest submitted Ethereum pricing.
        **/
       currentEthereumPrice: AugmentedQuery<
         ApiType,
