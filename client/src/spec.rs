@@ -1169,10 +1169,10 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							87u8, 68u8, 70u8, 157u8, 164u8, 173u8, 183u8, 222u8, 38u8, 216u8,
-							149u8, 19u8, 172u8, 236u8, 250u8, 27u8, 236u8, 174u8, 28u8, 243u8,
-							127u8, 34u8, 111u8, 2u8, 220u8, 130u8, 55u8, 107u8, 246u8, 233u8, 84u8,
-							50u8,
+							180u8, 109u8, 204u8, 144u8, 49u8, 38u8, 250u8, 45u8, 228u8, 22u8,
+							212u8, 143u8, 142u8, 176u8, 12u8, 87u8, 240u8, 57u8, 63u8, 197u8, 75u8,
+							190u8, 30u8, 156u8, 116u8, 189u8, 95u8, 79u8, 194u8, 193u8, 35u8,
+							159u8,
 						],
 					)
 				}
@@ -1190,10 +1190,10 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							36u8, 140u8, 148u8, 248u8, 26u8, 230u8, 242u8, 161u8, 46u8, 106u8,
-							205u8, 193u8, 194u8, 5u8, 134u8, 217u8, 147u8, 156u8, 126u8, 168u8,
-							127u8, 176u8, 60u8, 188u8, 9u8, 240u8, 57u8, 235u8, 235u8, 210u8,
-							186u8, 66u8,
+							75u8, 144u8, 131u8, 144u8, 123u8, 119u8, 223u8, 97u8, 30u8, 10u8,
+							151u8, 194u8, 224u8, 145u8, 101u8, 18u8, 36u8, 115u8, 237u8, 53u8,
+							60u8, 108u8, 171u8, 85u8, 194u8, 252u8, 225u8, 2u8, 129u8, 221u8,
+							236u8, 113u8,
 						],
 					)
 				}
@@ -3406,9 +3406,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				49u8, 9u8, 30u8, 0u8, 140u8, 113u8, 177u8, 187u8, 47u8, 176u8, 153u8, 59u8, 127u8,
-				73u8, 160u8, 205u8, 84u8, 82u8, 230u8, 66u8, 209u8, 186u8, 227u8, 114u8, 88u8,
-				64u8, 126u8, 26u8, 60u8, 72u8, 179u8, 93u8,
+				103u8, 43u8, 100u8, 66u8, 119u8, 27u8, 114u8, 84u8, 177u8, 21u8, 129u8, 80u8,
+				157u8, 159u8, 45u8, 98u8, 209u8, 236u8, 47u8, 91u8, 211u8, 59u8, 71u8, 7u8, 245u8,
+				115u8, 65u8, 183u8, 248u8, 100u8, 22u8, 187u8,
 			]
 	}
 	pub mod system {
@@ -5442,10 +5442,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							172u8, 115u8, 170u8, 242u8, 199u8, 238u8, 54u8, 183u8, 61u8, 177u8,
-							156u8, 93u8, 218u8, 238u8, 156u8, 159u8, 36u8, 33u8, 112u8, 63u8,
-							114u8, 191u8, 84u8, 65u8, 231u8, 202u8, 119u8, 180u8, 247u8, 157u8,
-							24u8, 177u8,
+							1u8, 0u8, 6u8, 84u8, 44u8, 120u8, 209u8, 112u8, 65u8, 67u8, 12u8,
+							252u8, 206u8, 179u8, 143u8, 224u8, 98u8, 90u8, 3u8, 175u8, 171u8,
+							180u8, 112u8, 173u8, 134u8, 235u8, 20u8, 222u8, 66u8, 37u8, 116u8,
+							15u8,
 						],
 					)
 				}
@@ -5510,9 +5510,10 @@ pub mod api {
 							max_weight,
 						},
 						[
-							36u8, 198u8, 131u8, 205u8, 164u8, 70u8, 100u8, 250u8, 77u8, 10u8, 9u8,
-							224u8, 40u8, 94u8, 138u8, 35u8, 169u8, 111u8, 185u8, 208u8, 57u8, 56u8,
-							150u8, 126u8, 97u8, 53u8, 36u8, 197u8, 100u8, 71u8, 157u8, 237u8,
+							101u8, 230u8, 150u8, 219u8, 214u8, 228u8, 227u8, 59u8, 247u8, 66u8,
+							103u8, 208u8, 202u8, 118u8, 13u8, 132u8, 228u8, 106u8, 199u8, 48u8,
+							231u8, 199u8, 213u8, 249u8, 191u8, 50u8, 137u8, 126u8, 55u8, 171u8,
+							82u8, 112u8,
 						],
 					)
 				}
@@ -6417,10 +6418,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							114u8, 28u8, 25u8, 152u8, 149u8, 135u8, 149u8, 216u8, 185u8, 12u8,
-							218u8, 87u8, 194u8, 67u8, 234u8, 143u8, 215u8, 92u8, 137u8, 136u8,
-							170u8, 125u8, 242u8, 109u8, 205u8, 22u8, 236u8, 165u8, 127u8, 198u8,
-							153u8, 105u8,
+							78u8, 166u8, 116u8, 78u8, 243u8, 202u8, 252u8, 245u8, 174u8, 136u8,
+							162u8, 34u8, 186u8, 102u8, 111u8, 112u8, 216u8, 242u8, 255u8, 186u8,
+							38u8, 91u8, 202u8, 191u8, 220u8, 142u8, 116u8, 9u8, 174u8, 197u8,
+							195u8, 130u8,
 						],
 					)
 				}
@@ -6684,10 +6685,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							221u8, 231u8, 35u8, 31u8, 34u8, 172u8, 165u8, 62u8, 127u8, 207u8,
-							203u8, 164u8, 1u8, 176u8, 255u8, 244u8, 218u8, 80u8, 74u8, 123u8, 51u8,
-							153u8, 53u8, 112u8, 208u8, 244u8, 176u8, 92u8, 231u8, 107u8, 231u8,
-							210u8,
+							13u8, 2u8, 26u8, 128u8, 249u8, 124u8, 23u8, 22u8, 75u8, 174u8, 59u8,
+							234u8, 114u8, 105u8, 156u8, 128u8, 22u8, 135u8, 12u8, 128u8, 122u8,
+							152u8, 237u8, 73u8, 232u8, 21u8, 47u8, 116u8, 70u8, 95u8, 111u8, 180u8,
 						],
 					)
 				}
@@ -6736,10 +6736,9 @@ pub mod api {
 						],
 						check_permissions::Input { call, proxy_type },
 						[
-							26u8, 247u8, 116u8, 116u8, 158u8, 63u8, 110u8, 139u8, 254u8, 25u8,
-							238u8, 151u8, 214u8, 211u8, 208u8, 32u8, 148u8, 189u8, 150u8, 89u8,
-							100u8, 172u8, 99u8, 154u8, 40u8, 209u8, 6u8, 235u8, 22u8, 87u8, 224u8,
-							127u8,
+							114u8, 26u8, 18u8, 173u8, 101u8, 58u8, 164u8, 111u8, 222u8, 224u8,
+							133u8, 3u8, 42u8, 17u8, 86u8, 136u8, 131u8, 202u8, 5u8, 172u8, 183u8,
+							124u8, 164u8, 229u8, 76u8, 19u8, 121u8, 17u8, 209u8, 192u8, 12u8, 7u8,
 						],
 					)
 				}
@@ -10350,17 +10349,6 @@ pub mod api {
 					use super::runtime_types;
 					pub type RevenuePerFrameByVaultCount = ::core::primitive::u32;
 				}
-				pub mod recent_capacity_drops_by_vault {
-					use super::runtime_types;
-					pub type RecentCapacityDropsByVault =
-						runtime_types::bounded_collections::bounded_vec::BoundedVec<
-							runtime_types::pallet_vaults::pallet::RecentCapacityDrop<
-								::core::primitive::u128,
-								::core::primitive::u32,
-							>,
-						>;
-					pub type Param0 = ::core::primitive::u32;
-				}
 			}
 			pub struct StorageApi;
 			impl StorageApi {
@@ -10935,51 +10923,6 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Recent reductions in `available_for_lock`, grouped by vault."]
-				pub fn recent_capacity_drops_by_vault_iter(
-					&self,
-				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
-					(),
-					types::recent_capacity_drops_by_vault::RecentCapacityDropsByVault,
-					(),
-					::subxt::ext::subxt_core::utils::Yes,
-					::subxt::ext::subxt_core::utils::Yes,
-				> {
-					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"Vaults",
-						"RecentCapacityDropsByVault",
-						(),
-						[
-							178u8, 129u8, 19u8, 233u8, 156u8, 255u8, 135u8, 53u8, 252u8, 48u8,
-							42u8, 181u8, 48u8, 141u8, 126u8, 52u8, 129u8, 72u8, 233u8, 187u8, 50u8,
-							166u8, 173u8, 219u8, 74u8, 211u8, 3u8, 76u8, 238u8, 27u8, 86u8, 171u8,
-						],
-					)
-				}
-				#[doc = " Recent reductions in `available_for_lock`, grouped by vault."]
-				pub fn recent_capacity_drops_by_vault(
-					&self,
-					_0: types::recent_capacity_drops_by_vault::Param0,
-				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
-					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
-						types::recent_capacity_drops_by_vault::Param0,
-					>,
-					types::recent_capacity_drops_by_vault::RecentCapacityDropsByVault,
-					::subxt::ext::subxt_core::utils::Yes,
-					::subxt::ext::subxt_core::utils::Yes,
-					(),
-				> {
-					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"Vaults",
-						"RecentCapacityDropsByVault",
-						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
-						[
-							178u8, 129u8, 19u8, 233u8, 156u8, 255u8, 135u8, 53u8, 252u8, 48u8,
-							42u8, 181u8, 48u8, 141u8, 126u8, 52u8, 129u8, 72u8, 233u8, 187u8, 50u8,
-							166u8, 173u8, 219u8, 74u8, 211u8, 3u8, 76u8, 238u8, 27u8, 86u8, 171u8,
-						],
-					)
-				}
 			}
 		}
 		pub mod constants {
@@ -11084,57 +11027,6 @@ pub mod api {
 							59u8, 226u8, 157u8, 101u8, 103u8, 117u8, 249u8, 65u8, 18u8, 191u8,
 							103u8, 119u8, 53u8, 85u8, 81u8, 96u8, 220u8, 42u8, 184u8, 239u8, 42u8,
 							246u8,
-						],
-					)
-				}
-				#[doc = " Number of Argon blocks to keep recent `available_for_lock` drops for stale init checks."]
-				pub fn recent_capacity_drop_block_window(
-					&self,
-				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
-					::core::primitive::u32,
-				> {
-					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
-						"Vaults",
-						"RecentCapacityDropBlockWindow",
-						[
-							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
-							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
-							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
-							145u8,
-						],
-					)
-				}
-				#[doc = " Maximum number of recent `available_for_lock` drops retained per vault."]
-				pub fn max_recent_capacity_drops_per_vault(
-					&self,
-				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
-					::core::primitive::u32,
-				> {
-					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
-						"Vaults",
-						"MaxRecentCapacityDropsPerVault",
-						[
-							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
-							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
-							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
-							145u8,
-						],
-					)
-				}
-				#[doc = " One no-fee stale `initialize_for` failure is allowed for each this-many units of lost"]
-				#[doc = " `available_for_lock`."]
-				pub fn capacity_drop_attempt_unit(
-					&self,
-				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
-					::core::primitive::u128,
-				> {
-					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
-						"Vaults",
-						"CapacityDropAttemptUnit",
-						[
-							84u8, 157u8, 140u8, 4u8, 93u8, 57u8, 29u8, 133u8, 105u8, 200u8, 214u8,
-							27u8, 144u8, 208u8, 218u8, 160u8, 130u8, 109u8, 101u8, 54u8, 210u8,
-							136u8, 71u8, 63u8, 49u8, 237u8, 234u8, 15u8, 178u8, 98u8, 148u8, 156u8,
 						],
 					)
 				}
@@ -11395,45 +11287,6 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				pub struct InitializeFor {
-					pub account_id: initialize_for::AccountId,
-					pub vault_id: initialize_for::VaultId,
-					#[codec(compact)]
-					pub satoshis: initialize_for::Satoshis,
-					pub bitcoin_pubkey: initialize_for::BitcoinPubkey,
-					pub options: initialize_for::Options,
-					#[codec(compact)]
-					pub backfill_securitization_to_unreserve:
-						initialize_for::BackfillSecuritizationToUnreserve,
-				}
-				pub mod initialize_for {
-					use super::runtime_types;
-					pub type AccountId = crate::types::AccountId32;
-					pub type VaultId = ::core::primitive::u32;
-					pub type Satoshis = ::core::primitive::u64;
-					pub type BitcoinPubkey =
-						runtime_types::argon_primitives::bitcoin::CompressedBitcoinPubkey;
-					pub type Options = ::core::option::Option<
-						runtime_types::pallet_bitcoin_locks::pallet::LockOptions,
-					>;
-					pub type BackfillSecuritizationToUnreserve = ::core::primitive::u128;
-				}
-				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for InitializeFor {
-					const PALLET: &'static str = "BitcoinLocks";
-					const CALL: &'static str = "initialize_for";
-				}
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
 				pub struct IncreaseSecuritization {
 					pub utxo_id: increase_securitization::UtxoId,
 					#[codec(compact)]
@@ -11496,9 +11349,9 @@ pub mod api {
 						"initialize",
 						types::Initialize { vault_id, satoshis, bitcoin_pubkey, options },
 						[
-							209u8, 98u8, 143u8, 202u8, 84u8, 126u8, 53u8, 202u8, 129u8, 232u8,
-							141u8, 208u8, 70u8, 224u8, 230u8, 158u8, 2u8, 53u8, 43u8, 28u8, 185u8,
-							210u8, 121u8, 87u8, 190u8, 230u8, 246u8, 109u8, 6u8, 96u8, 65u8, 165u8,
+							241u8, 235u8, 226u8, 31u8, 12u8, 62u8, 211u8, 90u8, 8u8, 187u8, 147u8,
+							68u8, 66u8, 128u8, 24u8, 185u8, 70u8, 235u8, 175u8, 117u8, 27u8, 8u8,
+							226u8, 118u8, 34u8, 231u8, 55u8, 78u8, 251u8, 87u8, 35u8, 122u8,
 						],
 					)
 				}
@@ -11573,10 +11426,9 @@ pub mod api {
 						"ratchet",
 						types::Ratchet { utxo_id, options },
 						[
-							39u8, 219u8, 240u8, 253u8, 65u8, 46u8, 122u8, 33u8, 119u8, 220u8, 43u8,
-							248u8, 143u8, 142u8, 29u8, 56u8, 232u8, 200u8, 39u8, 245u8, 192u8,
-							32u8, 113u8, 103u8, 212u8, 207u8, 199u8, 50u8, 177u8, 113u8, 29u8,
-							73u8,
+							140u8, 129u8, 7u8, 17u8, 65u8, 172u8, 154u8, 165u8, 126u8, 166u8, 23u8,
+							95u8, 185u8, 46u8, 100u8, 37u8, 71u8, 194u8, 23u8, 183u8, 195u8, 104u8,
+							62u8, 57u8, 45u8, 199u8, 205u8, 176u8, 178u8, 132u8, 16u8, 48u8,
 						],
 					)
 				}
@@ -11644,34 +11496,6 @@ pub mod api {
 							137u8, 41u8, 118u8, 211u8, 143u8, 162u8, 49u8, 239u8, 156u8, 68u8,
 							173u8, 152u8, 165u8, 233u8, 94u8, 210u8, 54u8, 108u8, 187u8, 88u8,
 							168u8, 177u8,
-						],
-					)
-				}
-				pub fn initialize_for(
-					&self,
-					account_id: types::initialize_for::AccountId,
-					vault_id: types::initialize_for::VaultId,
-					satoshis: types::initialize_for::Satoshis,
-					bitcoin_pubkey: types::initialize_for::BitcoinPubkey,
-					options: types::initialize_for::Options,
-					backfill_securitization_to_unreserve : types :: initialize_for :: BackfillSecuritizationToUnreserve,
-				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::InitializeFor>
-				{
-					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
-						"BitcoinLocks",
-						"initialize_for",
-						types::InitializeFor {
-							account_id,
-							vault_id,
-							satoshis,
-							bitcoin_pubkey,
-							options,
-							backfill_securitization_to_unreserve,
-						},
-						[
-							150u8, 54u8, 190u8, 251u8, 227u8, 114u8, 156u8, 182u8, 156u8, 37u8,
-							22u8, 43u8, 198u8, 198u8, 185u8, 83u8, 105u8, 171u8, 104u8, 69u8, 99u8,
-							91u8, 131u8, 185u8, 77u8, 2u8, 69u8, 169u8, 219u8, 242u8, 104u8, 44u8,
 						],
 					)
 				}
@@ -12174,6 +11998,12 @@ pub mod api {
 							::core::primitive::u64,
 							::core::primitive::u128,
 						)>;
+				}
+				pub mod last_fee_coupon_nonce_by_vault_and_account {
+					use super::runtime_types;
+					pub type LastFeeCouponNonceByVaultAndAccount = ::core::primitive::u64;
+					pub type Param0 = ::core::primitive::u32;
+					pub type Param1 = crate::types::AccountId32;
 				}
 			}
 			pub struct StorageApi;
@@ -12758,6 +12588,45 @@ pub mod api {
 							121u8, 236u8, 187u8, 124u8, 251u8, 122u8, 143u8, 25u8, 37u8, 187u8,
 							254u8, 106u8, 233u8, 157u8, 23u8, 225u8, 177u8, 198u8, 114u8, 94u8,
 							0u8, 92u8,
+						],
+					)
+				}				pub fn last_fee_coupon_nonce_by_vault_and_account_iter (& self ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < () , types :: last_fee_coupon_nonce_by_vault_and_account :: LastFeeCouponNonceByVaultAndAccount , () , () , :: subxt :: ext :: subxt_core :: utils :: Yes >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"BitcoinLocks",
+						"LastFeeCouponNonceByVaultAndAccount",
+						(),
+						[
+							163u8, 227u8, 9u8, 201u8, 122u8, 114u8, 106u8, 94u8, 106u8, 30u8,
+							114u8, 96u8, 78u8, 238u8, 250u8, 204u8, 194u8, 100u8, 232u8, 32u8,
+							59u8, 101u8, 218u8, 31u8, 55u8, 111u8, 146u8, 163u8, 42u8, 81u8, 100u8,
+							59u8,
+						],
+					)
+				}				pub fn last_fee_coupon_nonce_by_vault_and_account_iter1 (& self , _0 : types :: last_fee_coupon_nonce_by_vault_and_account :: Param0 ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < :: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: last_fee_coupon_nonce_by_vault_and_account :: Param0 > , types :: last_fee_coupon_nonce_by_vault_and_account :: LastFeeCouponNonceByVaultAndAccount , () , () , :: subxt :: ext :: subxt_core :: utils :: Yes >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"BitcoinLocks",
+						"LastFeeCouponNonceByVaultAndAccount",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							163u8, 227u8, 9u8, 201u8, 122u8, 114u8, 106u8, 94u8, 106u8, 30u8,
+							114u8, 96u8, 78u8, 238u8, 250u8, 204u8, 194u8, 100u8, 232u8, 32u8,
+							59u8, 101u8, 218u8, 31u8, 55u8, 111u8, 146u8, 163u8, 42u8, 81u8, 100u8,
+							59u8,
+						],
+					)
+				}				pub fn last_fee_coupon_nonce_by_vault_and_account (& self , _0 : types :: last_fee_coupon_nonce_by_vault_and_account :: Param0 , _1 : types :: last_fee_coupon_nonce_by_vault_and_account :: Param1 ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < (:: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: last_fee_coupon_nonce_by_vault_and_account :: Param0 > , :: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: last_fee_coupon_nonce_by_vault_and_account :: Param1 > ,) , types :: last_fee_coupon_nonce_by_vault_and_account :: LastFeeCouponNonceByVaultAndAccount , :: subxt :: ext :: subxt_core :: utils :: Yes , () , () >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"BitcoinLocks",
+						"LastFeeCouponNonceByVaultAndAccount",
+						(
+							::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+							::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_1),
+						),
+						[
+							163u8, 227u8, 9u8, 201u8, 122u8, 114u8, 106u8, 94u8, 106u8, 30u8,
+							114u8, 96u8, 78u8, 238u8, 250u8, 204u8, 194u8, 100u8, 232u8, 32u8,
+							59u8, 101u8, 218u8, 31u8, 55u8, 111u8, 146u8, 163u8, 42u8, 81u8, 100u8,
+							59u8,
 						],
 					)
 				}
@@ -21868,9 +21737,10 @@ pub mod api {
 						"batch",
 						types::Batch { calls },
 						[
-							18u8, 250u8, 61u8, 131u8, 156u8, 128u8, 108u8, 13u8, 29u8, 61u8, 102u8,
-							189u8, 58u8, 73u8, 52u8, 184u8, 43u8, 216u8, 162u8, 46u8, 64u8, 37u8,
-							118u8, 211u8, 30u8, 86u8, 5u8, 4u8, 1u8, 165u8, 178u8, 173u8,
+							217u8, 219u8, 70u8, 76u8, 240u8, 171u8, 44u8, 33u8, 70u8, 229u8, 191u8,
+							224u8, 121u8, 28u8, 32u8, 183u8, 17u8, 125u8, 130u8, 161u8, 183u8,
+							140u8, 243u8, 47u8, 23u8, 139u8, 228u8, 34u8, 237u8, 77u8, 108u8,
+							223u8,
 						],
 					)
 				}
@@ -21900,10 +21770,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							87u8, 148u8, 160u8, 200u8, 173u8, 20u8, 139u8, 150u8, 215u8, 234u8,
-							25u8, 222u8, 128u8, 203u8, 38u8, 96u8, 155u8, 93u8, 252u8, 114u8,
-							250u8, 149u8, 80u8, 235u8, 233u8, 245u8, 192u8, 76u8, 236u8, 201u8,
-							142u8, 147u8,
+							219u8, 222u8, 29u8, 208u8, 22u8, 150u8, 246u8, 86u8, 163u8, 233u8,
+							176u8, 146u8, 97u8, 60u8, 15u8, 155u8, 63u8, 160u8, 16u8, 131u8, 207u8,
+							174u8, 158u8, 47u8, 128u8, 57u8, 86u8, 42u8, 11u8, 79u8, 162u8, 77u8,
 						],
 					)
 				}
@@ -21929,10 +21798,9 @@ pub mod api {
 						"batch_all",
 						types::BatchAll { calls },
 						[
-							158u8, 17u8, 193u8, 31u8, 188u8, 67u8, 10u8, 89u8, 27u8, 162u8, 6u8,
-							255u8, 135u8, 118u8, 176u8, 52u8, 27u8, 148u8, 151u8, 26u8, 242u8,
-							45u8, 244u8, 226u8, 96u8, 253u8, 52u8, 252u8, 160u8, 220u8, 201u8,
-							130u8,
+							82u8, 170u8, 120u8, 211u8, 81u8, 71u8, 160u8, 132u8, 156u8, 170u8,
+							21u8, 141u8, 142u8, 92u8, 92u8, 163u8, 169u8, 134u8, 246u8, 47u8, 14u8,
+							174u8, 144u8, 4u8, 2u8, 223u8, 125u8, 42u8, 81u8, 18u8, 248u8, 146u8,
 						],
 					)
 				}
@@ -21955,9 +21823,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							42u8, 192u8, 117u8, 97u8, 58u8, 1u8, 22u8, 193u8, 112u8, 247u8, 184u8,
-							97u8, 29u8, 55u8, 204u8, 22u8, 183u8, 191u8, 65u8, 236u8, 157u8, 244u8,
-							242u8, 171u8, 47u8, 159u8, 0u8, 231u8, 228u8, 176u8, 14u8, 253u8,
+							252u8, 146u8, 250u8, 211u8, 49u8, 62u8, 122u8, 22u8, 0u8, 185u8, 179u8,
+							150u8, 45u8, 243u8, 99u8, 65u8, 135u8, 211u8, 254u8, 141u8, 55u8, 9u8,
+							109u8, 117u8, 106u8, 99u8, 15u8, 51u8, 166u8, 7u8, 99u8, 91u8,
 						],
 					)
 				}
@@ -21983,9 +21851,9 @@ pub mod api {
 						"force_batch",
 						types::ForceBatch { calls },
 						[
-							13u8, 1u8, 112u8, 234u8, 176u8, 140u8, 137u8, 231u8, 21u8, 42u8, 47u8,
-							125u8, 161u8, 112u8, 21u8, 52u8, 46u8, 250u8, 123u8, 17u8, 58u8, 243u8,
-							29u8, 190u8, 59u8, 180u8, 22u8, 82u8, 73u8, 255u8, 126u8, 71u8,
+							251u8, 210u8, 12u8, 84u8, 66u8, 38u8, 49u8, 76u8, 244u8, 173u8, 159u8,
+							86u8, 8u8, 148u8, 251u8, 26u8, 194u8, 11u8, 155u8, 28u8, 41u8, 149u8,
+							14u8, 8u8, 121u8, 185u8, 104u8, 20u8, 208u8, 169u8, 253u8, 26u8,
 						],
 					)
 				}
@@ -22008,9 +21876,10 @@ pub mod api {
 							weight,
 						},
 						[
-							29u8, 183u8, 3u8, 32u8, 137u8, 174u8, 60u8, 16u8, 128u8, 87u8, 235u8,
-							31u8, 155u8, 56u8, 61u8, 32u8, 244u8, 156u8, 73u8, 141u8, 25u8, 168u8,
-							196u8, 6u8, 74u8, 122u8, 97u8, 122u8, 124u8, 52u8, 61u8, 226u8,
+							209u8, 17u8, 72u8, 233u8, 95u8, 129u8, 220u8, 160u8, 211u8, 69u8,
+							159u8, 241u8, 64u8, 209u8, 140u8, 128u8, 188u8, 172u8, 174u8, 166u8,
+							183u8, 30u8, 222u8, 31u8, 255u8, 94u8, 73u8, 149u8, 15u8, 192u8, 176u8,
+							6u8,
 						],
 					)
 				}
@@ -22050,9 +21919,10 @@ pub mod api {
 							fallback: ::subxt::ext::subxt_core::alloc::boxed::Box::new(fallback),
 						},
 						[
-							154u8, 90u8, 175u8, 171u8, 228u8, 174u8, 116u8, 154u8, 118u8, 186u8,
-							128u8, 90u8, 23u8, 235u8, 111u8, 141u8, 242u8, 210u8, 8u8, 74u8, 130u8,
-							74u8, 253u8, 11u8, 124u8, 192u8, 15u8, 9u8, 104u8, 152u8, 131u8, 107u8,
+							106u8, 48u8, 163u8, 183u8, 180u8, 105u8, 111u8, 223u8, 62u8, 247u8,
+							133u8, 66u8, 143u8, 98u8, 236u8, 89u8, 115u8, 194u8, 247u8, 122u8,
+							134u8, 26u8, 208u8, 178u8, 188u8, 164u8, 43u8, 129u8, 29u8, 46u8, 24u8,
+							218u8,
 						],
 					)
 				}
@@ -22075,10 +21945,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							210u8, 20u8, 250u8, 215u8, 48u8, 129u8, 205u8, 14u8, 73u8, 102u8,
-							116u8, 14u8, 245u8, 199u8, 120u8, 13u8, 86u8, 133u8, 130u8, 149u8,
-							183u8, 119u8, 150u8, 130u8, 49u8, 35u8, 69u8, 243u8, 98u8, 236u8, 54u8,
-							229u8,
+							135u8, 164u8, 123u8, 226u8, 193u8, 100u8, 84u8, 153u8, 184u8, 42u8,
+							128u8, 70u8, 137u8, 189u8, 38u8, 107u8, 172u8, 73u8, 143u8, 245u8,
+							201u8, 220u8, 205u8, 96u8, 88u8, 62u8, 170u8, 140u8, 200u8, 238u8,
+							146u8, 78u8,
 						],
 					)
 				}
@@ -22414,10 +22284,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							162u8, 123u8, 156u8, 228u8, 65u8, 47u8, 56u8, 118u8, 198u8, 247u8,
-							74u8, 223u8, 48u8, 179u8, 73u8, 84u8, 116u8, 10u8, 40u8, 230u8, 247u8,
-							209u8, 80u8, 111u8, 150u8, 121u8, 27u8, 186u8, 18u8, 17u8, 164u8,
-							113u8,
+							251u8, 148u8, 44u8, 196u8, 23u8, 101u8, 191u8, 57u8, 238u8, 174u8,
+							143u8, 47u8, 218u8, 32u8, 183u8, 152u8, 100u8, 14u8, 214u8, 249u8,
+							152u8, 187u8, 58u8, 194u8, 188u8, 70u8, 35u8, 83u8, 215u8, 157u8, 83u8,
+							44u8,
 						],
 					)
 				}
@@ -22440,10 +22310,10 @@ pub mod api {
 							weight,
 						},
 						[
-							196u8, 156u8, 130u8, 86u8, 177u8, 207u8, 251u8, 137u8, 159u8, 119u8,
-							115u8, 208u8, 218u8, 2u8, 242u8, 85u8, 110u8, 143u8, 174u8, 171u8,
-							25u8, 247u8, 211u8, 27u8, 79u8, 255u8, 118u8, 98u8, 110u8, 156u8, 57u8,
-							107u8,
+							251u8, 89u8, 190u8, 141u8, 14u8, 216u8, 182u8, 50u8, 227u8, 188u8,
+							229u8, 119u8, 67u8, 117u8, 131u8, 102u8, 153u8, 139u8, 225u8, 168u8,
+							31u8, 16u8, 200u8, 74u8, 15u8, 19u8, 142u8, 186u8, 18u8, 64u8, 39u8,
+							19u8,
 						],
 					)
 				}
@@ -22481,9 +22351,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							182u8, 205u8, 250u8, 5u8, 49u8, 41u8, 108u8, 84u8, 208u8, 43u8, 46u8,
-							163u8, 166u8, 175u8, 113u8, 80u8, 63u8, 82u8, 19u8, 220u8, 19u8, 137u8,
-							227u8, 111u8, 29u8, 232u8, 132u8, 132u8, 34u8, 153u8, 1u8, 43u8,
+							172u8, 187u8, 166u8, 116u8, 128u8, 66u8, 28u8, 166u8, 82u8, 207u8,
+							31u8, 65u8, 10u8, 230u8, 156u8, 123u8, 9u8, 37u8, 150u8, 169u8, 232u8,
+							234u8, 218u8, 132u8, 238u8, 8u8, 237u8, 137u8, 141u8, 223u8, 247u8,
+							175u8,
 						],
 					)
 				}
@@ -24458,7 +24329,8 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Operational accounts that have met both follow-on access-code thresholds."]
+				#[doc = " Set of operational accounts that have met both follow-on access-code thresholds."]
+				#[doc = " The key count weights frame processing without scanning the set twice."]
 				pub fn access_code_ready_accounts_iter(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
@@ -24480,7 +24352,8 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Operational accounts that have met both follow-on access-code thresholds."]
+				#[doc = " Set of operational accounts that have met both follow-on access-code thresholds."]
+				#[doc = " The key count weights frame processing without scanning the set twice."]
 				pub fn access_code_ready_accounts(
 					&self,
 					_0: types::access_code_ready_accounts::Param0,
@@ -32102,20 +31975,6 @@ pub mod api {
 						utxo_ref: runtime_types::argon_primitives::bitcoin::UtxoRef,
 						signature: runtime_types::argon_primitives::bitcoin::BitcoinSignature,
 					},
-					#[codec(index = 8)]
-					initialize_for {
-						account_id: crate::types::AccountId32,
-						vault_id: ::core::primitive::u32,
-						#[codec(compact)]
-						satoshis: ::core::primitive::u64,
-						bitcoin_pubkey:
-							runtime_types::argon_primitives::bitcoin::CompressedBitcoinPubkey,
-						options: ::core::option::Option<
-							runtime_types::pallet_bitcoin_locks::pallet::LockOptions,
-						>,
-						#[codec(compact)]
-						backfill_securitization_to_unreserve: ::core::primitive::u128,
-					},
 					#[codec(index = 9)]
 					increase_securitization {
 						utxo_id: ::core::primitive::u64,
@@ -32234,15 +32093,36 @@ pub mod api {
 					#[doc = "An ineligible microgon rate per btc was requested"]
 					IneligibleMicrogonRateRequested,
 					#[codec(index = 31)]
+					#[doc = "The fee coupon was issued for a different vault."]
+					FeeCouponWrongVault,
+					#[codec(index = 32)]
+					#[doc = "The fee coupon was issued for a different chain."]
+					FeeCouponWrongChain,
+					#[codec(index = 33)]
+					#[doc = "The fee coupon was issued for a different beneficiary."]
+					FeeCouponWrongAccount,
+					#[codec(index = 34)]
+					#[doc = "The fee coupon is past its expiration frame."]
+					FeeCouponExpired,
+					#[codec(index = 35)]
+					#[doc = "The fee coupon was not signed by the vault delegate."]
+					InvalidFeeCouponSignature,
+					#[codec(index = 36)]
+					#[doc = "The fee coupon nonce has already been consumed or superseded."]
+					FeeCouponAlreadyUsed,
+					#[codec(index = 37)]
+					#[doc = "Fee coupons can only be applied when initializing a lock."]
+					FeeCouponOnlyForInitialization,
+					#[codec(index = 38)]
 					#[doc = "Cannot fund with an orphaned utxo after lock funding is confirmed"]
 					OrphanedUtxoFundingConflict,
-					#[codec(index = 32)]
+					#[codec(index = 39)]
 					#[doc = "Cannot lock an orphaned utxo with a pending release request"]
 					OrphanedUtxoReleaseRequested,
-					#[codec(index = 33)]
+					#[codec(index = 40)]
 					#[doc = "Cannot request an orphaned release for the funding UTXO"]
 					FundingUtxoCannotBeReleased,
-					#[codec(index = 34)]
+					#[codec(index = 41)]
 					#[doc = "Too many orphaned utxo release requests for a lock"]
 					MaxOrphanedUtxoReleaseRequestsExceeded,
 				}
@@ -32377,6 +32257,33 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
+				pub struct FeeCoupon {
+					#[codec(compact)]
+					pub vault_id: ::core::primitive::u32,
+					pub genesis_hash: crate::types::H256,
+					pub beneficiary: crate::types::AccountId32,
+					#[codec(compact)]
+					pub fee_discount: ::core::primitive::u128,
+					#[codec(compact)]
+					pub backfill_securitization_to_unreserve: ::core::primitive::u128,
+					#[codec(compact)]
+					pub expires_at_frame: ::core::primitive::u64,
+					#[codec(compact)]
+					pub nonce: ::core::primitive::u64,
+					pub signature: runtime_types::sp_runtime::MultiSignature,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
 				pub enum HoldReason {
 					#[codec(index = 0)]
 					ReleaseBitcoinLock,
@@ -32398,6 +32305,14 @@ pub mod api {
 					V1 {
 						microgons_at_target_per_btc:
 							::core::option::Option<::core::primitive::u128>,
+					},
+					#[codec(index = 1)]
+					V2 {
+						microgons_at_target_per_btc:
+							::core::option::Option<::core::primitive::u128>,
+						fee_coupon: ::core::option::Option<
+							runtime_types::pallet_bitcoin_locks::pallet::FeeCoupon,
+						>,
 					},
 				}
 				#[derive(
@@ -38017,28 +37932,6 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				pub struct RecentCapacityDrop<_0, _1> {
-					#[codec(compact)]
-					pub block_number: _1,
-					#[codec(compact)]
-					pub available_before_drop: _0,
-					#[codec(compact)]
-					pub available_after_drop: _0,
-					#[codec(compact)]
-					pub no_fee_failures_used: _1,
-				}
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
 				pub struct VaultConfig<_0, _1> {
 					pub terms: runtime_types::argon_primitives::vault::VaultTerms<_1>,
 					pub delegate_account_id: ::core::option::Option<_0>,
@@ -39458,6 +39351,24 @@ pub mod api {
 				Ecdsa([::core::primitive::u8; 65usize]),
 				#[codec(index = 3)]
 				Eth([::core::primitive::u8; 65usize]),
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub enum MultiSigner {
+				#[codec(index = 0)]
+				Ed25519([::core::primitive::u8; 32usize]),
+				#[codec(index = 1)]
+				Sr25519([::core::primitive::u8; 32usize]),
+				#[codec(index = 2)]
+				Ecdsa([::core::primitive::u8; 33usize]),
+				#[codec(index = 3)]
+				Eth([::core::primitive::u8; 33usize]),
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,

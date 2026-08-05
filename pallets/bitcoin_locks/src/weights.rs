@@ -24,7 +24,6 @@ use pallet_prelude::*;
 pub trait WeightInfo {
 	// Core extrinsics
 	fn initialize() -> Weight;
-	fn initialize_for() -> Weight;
 	fn request_release() -> Weight;
 	fn cosign_release() -> Weight;
 	fn ratchet() -> Weight;
@@ -61,7 +60,6 @@ pub trait WeightInfo {
 	fn cosign_orphaned_utxo_release() -> Weight;
 	fn increase_securitization() -> Weight;
 	fn set_as_backfill() -> Weight;
-	fn register_fee_coupon() -> Weight;
 
 	fn provider_get_account_funded_bitcoin_amount() -> Weight;
 	// Bitcoin UTXO event handler provider weights
@@ -92,10 +90,6 @@ where
 {
 	fn initialize() -> Weight {
 		Base::initialize()
-	}
-
-	fn initialize_for() -> Weight {
-		Base::initialize_for()
 	}
 
 	fn request_release() -> Weight {
@@ -148,10 +142,6 @@ where
 
 	fn set_as_backfill() -> Weight {
 		Base::set_as_backfill()
-	}
-
-	fn register_fee_coupon() -> Weight {
-		Base::register_fee_coupon()
 	}
 
 	fn provider_get_account_funded_bitcoin_amount() -> Weight {
@@ -220,7 +210,6 @@ impl<T: Config> BitcoinUtxoEventsWeightInfo for ProviderWeightAdapter<T> {
 // For backwards compatibility and tests.
 impl WeightInfo for () {
 	fn initialize() -> Weight { Weight::zero() }
-	fn initialize_for() -> Weight { Weight::zero() }
 	fn request_release() -> Weight { Weight::zero() }
 	fn cosign_release() -> Weight { Weight::zero() }
 	fn ratchet() -> Weight { Weight::zero() }
@@ -233,7 +222,6 @@ impl WeightInfo for () {
 	fn cosign_orphaned_utxo_release() -> Weight { Weight::zero() }
 	fn increase_securitization() -> Weight { Weight::zero() }
 	fn set_as_backfill() -> Weight { Weight::zero() }
-	fn register_fee_coupon() -> Weight { Weight::zero() }
 	fn provider_get_account_funded_bitcoin_amount() -> Weight { Weight::zero() }
 	fn provider_funding_received() -> Weight { Weight::zero() }
 	fn provider_timeout_waiting_for_funding() -> Weight { Weight::zero() }

@@ -125,10 +125,6 @@ parameter_types! {
 
 	pub static VaultViewOfCosignPendingLocks: BTreeMap<VaultId,  BTreeSet<UtxoId>> = BTreeMap::new();
 	pub static VaultViewOfOrphanedUtxoCosigns: BTreeMap<VaultId,  BTreeMap<u64, u32>> = BTreeMap::new();
-	pub static CanConsumeRecentCapacityDropBudget: bool = false;
-	pub static ConsumedRecentCapacityDropBudget:
-		Vec<(VaultId, Balance)> = Vec::new();
-
 	pub const TicksPerBitcoinBlock: u64 = 10;
 	pub const ArgonTicksPerDay: u64 = 1440;
 	pub static CurrentTick: Tick = 1;
@@ -213,18 +209,16 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 		false
 	}
 
-	fn can_initialize_bitcoin_locks(vault_id: VaultId, account_id: &Self::AccountId) -> bool {
-		if vault_id == 1 {
-			let vault = DefaultVault::get();
-			return vault.operator_account_id == *account_id ||
-				vault.delegate_account_id == Some(*account_id);
-		}
-		false
-	}
-
 	fn get_vault_operator(vault_id: VaultId) -> Option<Self::AccountId> {
 		if vault_id == 1 {
 			return Some(DefaultVault::get().operator_account_id);
+		}
+		None
+	}
+
+	fn get_vault_delegate(vault_id: VaultId) -> Option<Self::AccountId> {
+		if vault_id == 1 {
+			return DefaultVault::get().delegate_account_id;
 		}
 		None
 	}
@@ -300,10 +294,10 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 		locker: &Self::AccountId,
 		securitization: &Securitization<Balance>,
 		request: VaultLockRequest<'_, Self::Balance>,
-	) -> Result<Self::Balance, VaultError> {
+	) -> Result<(Self::Balance, Self::Balance), VaultError> {
 		let VaultLockRequest {
 			extension,
-			vault_covers_fee,
+			fee_discount,
 			is_backfill,
 			backfill_securitization_to_unreserve,
 			..
@@ -314,10 +308,6 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 			if let Some((_, lock_extension)) = extension {
 				a.extend_lock(securitization, lock_extension, is_backfill)
 			} else {
-				ensure!(
-					backfill_securitization_to_unreserve <= a.backfill_securitization_reserved,
-					VaultError::InsufficientVaultFunds
-				);
 				a.backfill_securitization_reserved
 					.saturating_reduce(backfill_securitization_to_unreserve);
 				a.lock(securitization, is_operator)
@@ -329,17 +319,18 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 			.saturating_mul(term)
 			.saturating_mul_int(securitization.liquidity_promised)
 			.saturating_add(terms.bitcoin_base_fee);
-		if ChargeFee::get() && !vault_covers_fee {
+		let fee_discount = if is_operator { total_fee } else { fee_discount.min(total_fee) };
+		if ChargeFee::get() {
 			Balances::burn_from(
 				locker,
-				total_fee,
+				total_fee.saturating_sub(fee_discount),
 				Preservation::Expendable,
 				Precision::Exact,
 				Fortitude::Force,
 			)
 			.map_err(|_| VaultError::InsufficientFunds)?;
 		}
-		Ok(total_fee)
+		Ok((total_fee, fee_discount))
 	}
 
 	fn schedule_for_release(
@@ -498,16 +489,6 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 			vault.set_bitcoin_lock_as_backfill(securitization, satoshis, is_backfill)
 		})
 	}
-
-	fn consume_recent_capacity_drop_budget(
-		vault_id: VaultId,
-		required_collateral: Self::Balance,
-	) -> Result<bool, VaultError> {
-		ConsumedRecentCapacityDropBudget::mutate(|entries| {
-			entries.push((vault_id, required_collateral));
-		});
-		Ok(CanConsumeRecentCapacityDropBudget::get())
-	}
 }
 
 pub struct StaticBitcoinVerifier;
@@ -594,6 +575,8 @@ impl pallet_bitcoin_locks::Config for Test {
 	type BitcoinUtxoTracker = StaticBitcoinUtxoTracker;
 	type PriceProvider = StaticPriceProvider;
 	type BitcoinSignatureVerifier = StaticBitcoinVerifier;
+	type FeeCouponSigner = polkadot_sdk::sp_runtime::testing::UintAuthorityId;
+	type FeeCouponSignature = polkadot_sdk::sp_runtime::testing::TestSignature;
 	type GetBitcoinNetwork = GetBitcoinNetwork;
 	type VaultProvider = StaticVaultProvider;
 	type ArgonTicksPerDay = ArgonTicksPerDay;
@@ -638,9 +621,6 @@ pub fn new_test_ext() -> TestState {
 		securitization_pending_activation: 0,
 		operational_minimum_release_tick: None,
 	});
-	CanConsumeRecentCapacityDropBudget::set(false);
-	ConsumedRecentCapacityDropBudget::set(Vec::new());
-
 	new_test_with_genesis::<Test>(|t: &mut Storage| {
 		pallet_bitcoin_locks::GenesisConfig::<Test> {
 			minimum_bitcoin_lock_satoshis: MinimumLockSatoshis::get(),

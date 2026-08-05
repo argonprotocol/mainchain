@@ -45,27 +45,7 @@ mod benchmarks {
 		let owner_pubkey = benchmark_pubkey::<T>(1)?;
 		seed_price_state(100_000, 1, 1);
 		let vault_id = create_vault::<T>(&operator, 1, benchmark_vault_securitization())?;
-		let options = benchmark_lock_options::<T>(vault_id, &owner, satoshis, 11)?;
-		whitelist_account!(owner);
-
-		#[extrinsic_call]
-		_(RawOrigin::Signed(owner.clone()), vault_id, satoshis, owner_pubkey, options);
-
-		let utxo_id = NextUtxoId::<T>::get().ok_or(BenchmarkError::Stop("missing utxo id"))?;
-		assert!(LocksByUtxoId::<T>::contains_key(utxo_id));
-		Ok(())
-	}
-
-	#[benchmark]
-	fn initialize_for() -> Result<(), BenchmarkError> {
-		reset_benchmark_environment::<T>();
 		let delegate: T::AccountId = account("bitcoin-lock-delegate", 0, 0);
-		let beneficiary: T::AccountId = account("bitcoin-lock-beneficiary", 0, 0);
-		let operator: T::AccountId = account("vault-operator", 0, 0);
-		let satoshis = benchmark_satoshis::<T>();
-		let owner_pubkey = benchmark_pubkey::<T>(2)?;
-		seed_price_state(100_000, 1, 1);
-		let vault_id = create_vault::<T>(&operator, 2, benchmark_vault_securitization())?;
 		let mut state = benchmark_bitcoin_vault_provider_state::<T::AccountId, T::Balance>();
 		state
 			.vaults
@@ -73,25 +53,32 @@ mod benchmarks {
 			.ok_or(BenchmarkError::Stop("missing benchmark vault"))?
 			.delegate_account_id = Some(delegate.clone());
 		set_benchmark_bitcoin_vault_provider_state(state);
-		let options = benchmark_lock_options::<T>(vault_id, &beneficiary, satoshis, 12)?;
-		whitelist_account!(delegate);
-		whitelist_account!(beneficiary);
+		let microgons_at_target_per_btc = benchmark_microgons_at_target_per_btc::<T>()?;
+		seed_microgons_at_target_per_btc_history::<T>(microgons_at_target_per_btc)?;
+		let signature = T::FeeCouponSignature::decode(
+			&mut polkadot_sdk::sp_runtime::traits::TrailingZeroInput::zeroes(),
+		)
+		.map_err(|_| BenchmarkError::Stop("failed to decode benchmark fee coupon signature"))?;
+		let options = Some(LockOptions::V2 {
+			microgons_at_target_per_btc: Some(microgons_at_target_per_btc),
+			fee_coupon: Some(FeeCoupon {
+				vault_id,
+				genesis_hash: frame_system::Pallet::<T>::block_hash(BlockNumberFor::<T>::zero()),
+				beneficiary: owner.clone(),
+				fee_discount: T::Balance::zero(),
+				backfill_securitization_to_unreserve: T::Balance::zero(),
+				expires_at_frame: T::CurrentFrameId::get(),
+				nonce: 1,
+				signature,
+			}),
+		});
+		whitelist_account!(owner);
 
 		#[extrinsic_call]
-		_(
-			RawOrigin::Signed(delegate),
-			beneficiary.clone(),
-			vault_id,
-			satoshis,
-			owner_pubkey,
-			options,
-			T::Balance::zero(),
-		);
+		_(RawOrigin::Signed(owner.clone()), vault_id, satoshis, owner_pubkey, options);
 
 		let utxo_id = NextUtxoId::<T>::get().ok_or(BenchmarkError::Stop("missing utxo id"))?;
-		let lock = LocksByUtxoId::<T>::get(utxo_id)
-			.ok_or(BenchmarkError::Stop("missing initialized lock"))?;
-		assert_eq!(lock.owner_account, beneficiary);
+		assert!(LocksByUtxoId::<T>::contains_key(utxo_id));
 		Ok(())
 	}
 

@@ -348,6 +348,7 @@ declare module '@polkadot/api-base/types/submittable' {
             | Uint8Array
             | PalletBitcoinLocksLockOptions
             | { V1: any }
+            | { V2: any }
             | string,
         ) => SubmittableExtrinsic<ApiType>,
         [
@@ -355,30 +356,6 @@ declare module '@polkadot/api-base/types/submittable' {
           Compact<u64>,
           ArgonPrimitivesBitcoinCompressedBitcoinPubkey,
           Option<PalletBitcoinLocksLockOptions>,
-        ]
-      >;
-      initializeFor: AugmentedSubmittable<
-        (
-          accountId: AccountId32 | string | Uint8Array,
-          vaultId: u32 | AnyNumber | Uint8Array,
-          satoshis: Compact<u64> | AnyNumber | Uint8Array,
-          bitcoinPubkey: ArgonPrimitivesBitcoinCompressedBitcoinPubkey | string | Uint8Array,
-          options:
-            | Option<PalletBitcoinLocksLockOptions>
-            | null
-            | Uint8Array
-            | PalletBitcoinLocksLockOptions
-            | { V1: any }
-            | string,
-          backfillSecuritizationToUnreserve: Compact<u128> | AnyNumber | Uint8Array,
-        ) => SubmittableExtrinsic<ApiType>,
-        [
-          AccountId32,
-          u32,
-          Compact<u64>,
-          ArgonPrimitivesBitcoinCompressedBitcoinPubkey,
-          Option<PalletBitcoinLocksLockOptions>,
-          Compact<u128>,
         ]
       >;
       /**
@@ -406,6 +383,7 @@ declare module '@polkadot/api-base/types/submittable' {
             | Uint8Array
             | PalletBitcoinLocksLockOptions
             | { V1: any }
+            | { V2: any }
             | string,
         ) => SubmittableExtrinsic<ApiType>,
         [u64, Option<PalletBitcoinLocksLockOptions>]

@@ -1186,22 +1186,18 @@ where
 			.unwrap_or(false)
 	}
 
-	fn can_initialize_bitcoin_locks(vault_id: VaultId, account_id: &Self::AccountId) -> bool {
-		benchmark_bitcoin_vault_provider_state::<AccountId, Balance>()
-			.vaults
-			.get(&vault_id)
-			.map(|vault| {
-				vault.operator_account_id == *account_id ||
-					vault.delegate_account_id.as_ref() == Some(account_id)
-			})
-			.unwrap_or(false)
-	}
-
 	fn get_vault_operator(vault_id: VaultId) -> Option<Self::AccountId> {
 		benchmark_bitcoin_vault_provider_state::<AccountId, Balance>()
 			.vaults
 			.get(&vault_id)
 			.map(|vault| vault.operator_account_id.clone())
+	}
+
+	fn get_vault_delegate(vault_id: VaultId) -> Option<Self::AccountId> {
+		benchmark_bitcoin_vault_provider_state::<AccountId, Balance>()
+			.vaults
+			.get(&vault_id)
+			.and_then(|vault| vault.delegate_account_id.clone())
 	}
 
 	fn get_vault_id(account_id: &Self::AccountId) -> Option<VaultId> {
@@ -1328,11 +1324,15 @@ where
 		locker: &Self::AccountId,
 		securitization: &Securitization<Self::Balance>,
 		request: VaultLockRequest<'_, Self::Balance>,
-	) -> Result<Self::Balance, VaultError> {
+	) -> Result<(Self::Balance, Self::Balance), VaultError> {
 		let VaultLockRequest {
-			extension, is_backfill, backfill_securitization_to_unreserve, ..
+			extension,
+			fee_discount,
+			is_backfill,
+			backfill_securitization_to_unreserve,
+			..
 		} = request;
-		let (total_fee, charge_fee) =
+		let (total_fee, fee_discount, charge_fee) =
 			mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
 				let charge_fee = state.charge_fee;
 				let vault = state.vaults.get_mut(&vault_id).ok_or(VaultError::VaultNotFound)?;
@@ -1342,11 +1342,6 @@ where
 				if let Some((_, lock_extension)) = extension {
 					vault.extend_lock(securitization, lock_extension, is_backfill)?;
 				} else {
-					ensure!(
-						backfill_securitization_to_unreserve <=
-							vault.backfill_securitization_reserved,
-						VaultError::InsufficientVaultFunds
-					);
 					vault
 						.backfill_securitization_reserved
 						.saturating_reduce(backfill_securitization_to_unreserve);
@@ -1358,13 +1353,15 @@ where
 					.saturating_mul(term)
 					.saturating_mul_int(securitization.liquidity_promised)
 					.saturating_add(vault.terms.bitcoin_base_fee);
-				Ok::<_, VaultError>((total_fee, charge_fee))
+				let fee_discount =
+					if is_operator { total_fee } else { fee_discount.min(total_fee) };
+				Ok::<_, VaultError>((total_fee, fee_discount, charge_fee))
 			})?;
 
 		if charge_fee {
 			Currency::burn_from(
 				locker,
-				total_fee,
+				total_fee.saturating_sub(fee_discount),
 				Preservation::Expendable,
 				Precision::Exact,
 				Fortitude::Force,
@@ -1372,7 +1369,7 @@ where
 			.map_err(|_| VaultError::InsufficientFunds)?;
 		}
 
-		Ok(total_fee)
+		Ok((total_fee, fee_discount))
 	}
 
 	fn schedule_for_release(
@@ -1503,13 +1500,6 @@ where
 			}
 			Ok(())
 		})
-	}
-
-	fn consume_recent_capacity_drop_budget(
-		_vault_id: VaultId,
-		_required_collateral: Self::Balance,
-	) -> Result<bool, VaultError> {
-		Ok(false)
 	}
 }
 

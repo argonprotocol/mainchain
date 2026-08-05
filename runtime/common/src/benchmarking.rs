@@ -106,11 +106,11 @@ where
 		false
 	}
 
-	fn can_initialize_bitcoin_locks(_vault_id: VaultId, _account_id: &Self::AccountId) -> bool {
-		false
+	fn get_vault_operator(_vault_id: VaultId) -> Option<Self::AccountId> {
+		None
 	}
 
-	fn get_vault_operator(_vault_id: VaultId) -> Option<Self::AccountId> {
+	fn get_vault_delegate(_vault_id: VaultId) -> Option<Self::AccountId> {
 		None
 	}
 
@@ -208,7 +208,7 @@ where
 		_locker: &Self::AccountId,
 		_securitization: &Securitization<Self::Balance>,
 		_request: VaultLockRequest<'_, Self::Balance>,
-	) -> Result<Self::Balance, VaultError> {
+	) -> Result<(Self::Balance, Self::Balance), VaultError> {
 		Err(VaultError::VaultNotFound)
 	}
 
@@ -284,13 +284,6 @@ where
 		_should_remove: bool,
 	) -> Result<(), VaultError> {
 		Err(VaultError::VaultNotFound)
-	}
-
-	fn consume_recent_capacity_drop_budget(
-		_vault_id: VaultId,
-		_required_collateral: Self::Balance,
-	) -> Result<bool, VaultError> {
-		Ok(false)
 	}
 }
 

@@ -111,10 +111,6 @@ parameter_types! {
 	pub const MiningSeatsForOperational: u32 = 2;
 	pub const MiningSeatsPerAccessCode: u32 = 5;
 	pub const OperationalMinimumVaultLockTicks: Tick = 1_440 * 365;
-	pub const RecentCapacityDropBlockWindow: u32 = 8;
-	pub const MaxRecentCapacityDropsPerVault: u32 = 64;
-	pub const CapacityDropAttemptUnit: Balance = 100;
-
 	pub static PercentForTreasuryReserves: Percent = Percent::from_percent(20);
 	pub static OverdueCollectBlockers: BTreeSet<u64> = BTreeSet::new();
 	pub static OperationalAccountsInviteOnly: bool = false;
@@ -246,9 +242,6 @@ impl pallet_vaults::Config for Test {
 	type RevenueCollectionExpirationFrames = ConstU64<10>;
 	type OperationalMinimumVaultSecuritization = OperationalMinimumVaultSecuritization;
 	type OperationalMinimumVaultLockTicks = OperationalMinimumVaultLockTicks;
-	type RecentCapacityDropBlockWindow = RecentCapacityDropBlockWindow;
-	type MaxRecentCapacityDropsPerVault = MaxRecentCapacityDropsPerVault;
-	type CapacityDropAttemptUnit = CapacityDropAttemptUnit;
 	type OperationalAccountsHook = ();
 	type OperationalAccountProvider = MockOperationalAccountProvider;
 	type CollectBlockerProvider = MockCollectBlockerProvider;
@@ -395,6 +388,8 @@ impl pallet_bitcoin_locks::Config for Test {
 	type BitcoinUtxoTracker = StaticBitcoinUtxoTracker;
 	type PriceProvider = StaticPriceProvider;
 	type BitcoinSignatureVerifier = StaticBitcoinVerifier;
+	type FeeCouponSigner = polkadot_sdk::sp_runtime::testing::UintAuthorityId;
+	type FeeCouponSignature = polkadot_sdk::sp_runtime::testing::TestSignature;
 	type GetBitcoinNetwork = GetBitcoinNetwork;
 	type VaultProvider = Vaults;
 	type ArgonTicksPerDay = ArgonTicksPerDay;
