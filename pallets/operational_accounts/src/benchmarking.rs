@@ -10,7 +10,9 @@ use crate::mock::{
 };
 #[allow(unused)]
 use crate::Pallet as OperationalAccountsPallet;
-use argon_primitives::{OperationalAccountsHook, UtxoLockEvents, MICROGONS_PER_ARGON};
+use argon_primitives::{
+	OperationalAccountsHook, TickProvider, UtxoLockEvents, MICROGONS_PER_ARGON,
+};
 use codec::Decode;
 #[cfg(test)]
 use codec::Encode;
@@ -131,10 +133,27 @@ mod benchmarks {
 			has_vault_bond_participation: 0,
 			active_vault_bond_amount: 0,
 			active_account_vault_bond_amount: 1,
-			is_crosschain_activated: 1,
+			is_crosschain_activated: 2,
 			account_uniswap_argon_transfers_in_amount: 3,
 			account_became_operational: 0,
 		});
+	}
+
+	#[benchmark]
+	fn set_name() {
+		let linked = linked_accounts::<T>();
+		insert_operational_account::<T>(&linked, default_operational_account::<T>(&linked));
+		let name: OperationalAccountName = BoundedVec::truncate_from(b"VaultAlpha1".to_vec());
+		let current_tick = T::TickProvider::current_tick();
+		let caller = linked.owner.clone();
+		whitelist_account!(caller);
+
+		#[extrinsic_call]
+		set_name(RawOrigin::Signed(caller), Some(name.clone()));
+
+		let account = OperationalAccounts::<T>::get(&linked.owner).expect("account exists");
+		assert_eq!(account.name, Some(name));
+		assert_eq!(account.last_name_change_tick, Some(current_tick));
 	}
 
 	#[benchmark]
@@ -222,6 +241,7 @@ mod benchmarks {
 		set_benchmark_operational_accounts_provider_state(default_provider_state::<T>());
 		let linked = linked_accounts::<T>();
 		insert_operational_account::<T>(&linked, default_operational_account::<T>(&linked));
+		link_vault_to_owner::<T>(&linked);
 
 		#[block]
 		{
@@ -439,6 +459,8 @@ mod benchmarks {
 			mining_account: linked.mining.clone(),
 			encryption_pubkey: OpaqueEncryptionPubkey([0u8; 32]),
 			upstream_account: None,
+			name: None,
+			last_name_change_tick: None,
 			uniswap_argon_transfers_in_amount: <T::Balance as Zero>::zero(),
 			account_bitcoin_amount: <T::Balance as Zero>::zero(),
 			account_vault_bond_amount: <T::Balance as Zero>::zero(),

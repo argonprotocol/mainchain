@@ -8,7 +8,7 @@ use sp_arithmetic::{FixedPointNumber, FixedU128, Permill};
 use sp_core::blake2_256;
 use sp_runtime::{
 	traits::{AtLeast32BitUnsigned, SaturatedConversion, Saturating, Verify},
-	AccountId32, BoundedVec,
+	AccountId32,
 };
 
 use crate::{
@@ -61,8 +61,6 @@ impl BitcoinVaultProviderWeightInfo for () {
 		Weight::zero()
 	}
 }
-
-pub type VaultName = BoundedVec<u8, ConstU32<18>>;
 
 pub const TREASURY_BONUS_APPROVAL_PROOF_MESSAGE_KEY: &[u8] = b"treasury_bonus_approval";
 
@@ -417,10 +415,6 @@ where
 	pub operator_account_id: AccountId,
 	/// Optional delegated hot account allowed to act on behalf of this vault.
 	pub delegate_account_id: Option<AccountId>,
-	/// Optional display name for the vault.
-	pub name: Option<VaultName>,
-	/// Tick of the most recent vault name change.
-	pub last_name_change_tick: Option<Tick>,
 	/// The securitization in the vault
 	#[codec(compact)]
 	pub securitization: Balance,
@@ -1300,8 +1294,6 @@ mod test {
 		Vault::<u64, Balance> {
 			operator_account_id: 0,
 			delegate_account_id: None,
-			name: None,
-			last_name_change_tick: None,
 			securitization,
 			securitization_target: securitization,
 			securitization_locked: 0,

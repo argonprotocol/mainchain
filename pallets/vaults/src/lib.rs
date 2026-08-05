@@ -39,7 +39,7 @@ pub mod pallet {
 		},
 		vault::{
 			BitcoinVaultProvider, RegistrationVaultData, TreasuryVaultProvider, Vault,
-			VaultArgonotCommitment, VaultError, VaultLockRequest, VaultName, VaultTerms,
+			VaultArgonotCommitment, VaultError, VaultLockRequest, VaultTerms,
 		},
 		CollectBlockerProvider, MiningFrameProvider, OperationalAccountProvider, TickProvider,
 	};
@@ -51,7 +51,7 @@ pub mod pallet {
 	};
 	use sp_runtime::traits::SaturatedConversion;
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(16);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(17);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -395,9 +395,6 @@ pub mod pallet {
 		FundingChangeAlreadyScheduled,
 		/// Treasury bond sharing plus bonus cannot exceed 100%.
 		InvalidBondSharingTerms,
-		/// Vault names must start with an uppercase ASCII letter and otherwise be ASCII
-		/// alphanumeric.
-		InvalidVaultName,
 		/// A vault must clear out all pending cosigns before it can collect
 		PendingCosignsBeforeCollect,
 		/// A vault must clear out all pending orphan cosigns before it can collect
@@ -475,8 +472,6 @@ pub mod pallet {
 	{
 		/// Terms of this vault configuration
 		pub terms: VaultTerms<Balance>,
-		/// Optional display name for the vault.
-		pub name: Option<VaultName>,
 		/// Optional account allowed to perform delegated vault actions.
 		pub delegate_account_id: Option<AccountId>,
 		/// The amount of argons to be vaulted for bitcoin locks
@@ -561,7 +556,6 @@ pub mod pallet {
 				Error::<T>::OperationalAccountRegistrationRequired
 			);
 			let VaultConfig {
-				name,
 				delegate_account_id,
 				securitization_ratio,
 				securitization,
@@ -569,9 +563,6 @@ pub mod pallet {
 				bitcoin_xpubkey,
 			} = vault_config;
 
-			if let Some(name) = name.as_ref() {
-				Self::ensure_valid_name(name)?;
-			}
 			ensure!(Self::is_valid_bond_sharing_terms(&terms), Error::<T>::InvalidBondSharingTerms);
 
 			ensure!(
@@ -609,8 +600,6 @@ pub mod pallet {
 			let vault = Vault {
 				operator_account_id: who.clone(),
 				delegate_account_id,
-				last_name_change_tick: name.as_ref().map(|_| opened_tick),
-				name,
 				securitization,
 				securitization_target: securitization,
 				securitization_locked: 0u32.into(),
@@ -859,28 +848,6 @@ pub mod pallet {
 			Ok(())
 		}
 
-		#[pallet::call_index(7)]
-		#[pallet::weight(T::WeightInfo::set_name())]
-		pub fn set_name(origin: OriginFor<T>, name: Option<VaultName>) -> DispatchResult {
-			let who = ensure_signed(origin)?;
-			if let Some(name) = name.as_ref() {
-				Self::ensure_valid_name(name)?;
-			}
-			let current_tick = T::TickProvider::current_tick();
-			let vault_id = VaultIdByOperator::<T>::get(&who).ok_or(Error::<T>::VaultNotFound)?;
-
-			VaultsById::<T>::try_mutate(vault_id, |vault| {
-				let vault = vault.as_mut().ok_or::<Error<T>>(Error::<T>::VaultNotFound)?;
-				if vault.name != name {
-					vault.name = name.clone();
-					vault.last_name_change_tick = Some(current_tick);
-				}
-				Ok::<(), Error<T>>(())
-			})?;
-
-			Ok(())
-		}
-
 		#[pallet::call_index(8)]
 		#[pallet::weight(T::WeightInfo::set_committed_argonots())]
 		pub fn set_committed_argonots(
@@ -986,16 +953,6 @@ pub mod pallet {
 					encumbered_micronots: T::Balance::default(),
 				}
 			})
-		}
-
-		fn ensure_valid_name(name: &VaultName) -> Result<(), Error<T>> {
-			ensure!(!name.is_empty(), Error::<T>::InvalidVaultName);
-			ensure!(name[0].is_ascii_uppercase(), Error::<T>::InvalidVaultName);
-			ensure!(
-				name.iter().all(|char| char.is_ascii_alphanumeric()),
-				Error::<T>::InvalidVaultName
-			);
-			Ok(())
 		}
 
 		pub(crate) fn is_valid_bond_sharing_terms(terms: &VaultTerms<T::Balance>) -> bool {

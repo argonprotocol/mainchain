@@ -1,6 +1,6 @@
 use argon_primitives::{
 	bitcoin::{BitcoinHeight, Satoshis},
-	vault::{Vault, VaultName, VaultTerms},
+	vault::{Vault, VaultTerms},
 	VaultId,
 };
 use codec::{Decode, Encode};
@@ -8,6 +8,8 @@ use frame_support::{storage_alias, traits::UncheckedOnRuntimeUpgrade};
 use pallet_prelude::*;
 
 use crate::{Config, Pallet, VaultsById};
+
+type VaultName = BoundedVec<u8, ConstU32<18>>;
 
 #[cfg(feature = "try-runtime")]
 use alloc::vec::Vec;
@@ -17,7 +19,7 @@ use frame_support::{ensure, traits::StorageVersion};
 use sp_runtime::TryRuntimeError;
 
 #[derive(Encode, Decode)]
-struct VaultV15<AccountId, Balance>
+struct VaultV16<AccountId, Balance>
 where
 	AccountId: Codec,
 	Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned + TypeInfo,
@@ -33,11 +35,17 @@ where
 	#[codec(compact)]
 	securitization_locked: Balance,
 	#[codec(compact)]
+	backfill_securitization_locked: Balance,
+	#[codec(compact)]
+	backfill_securitization_reserved: Balance,
+	#[codec(compact)]
 	securitization_pending_activation: Balance,
 	#[codec(compact)]
 	locked_satoshis: Satoshis,
 	#[codec(compact)]
 	securitized_satoshis: Satoshis,
+	#[codec(compact)]
+	backfill_securitized_satoshis: Satoshis,
 	securitization_release_schedule: BoundedBTreeMap<BitcoinHeight, Balance, ConstU32<366>>,
 	#[codec(compact)]
 	securitization_ratio: FixedU128,
@@ -49,7 +57,35 @@ where
 	operational_minimum_release_tick: Option<Tick>,
 }
 
-mod v15 {
+#[derive(Encode, Decode)]
+struct OperationalAccountV3<T: pallet_operational_accounts::Config> {
+	vault_account: T::AccountId,
+	mining_account: T::AccountId,
+	encryption_pubkey: pallet_operational_accounts::OpaqueEncryptionPubkey,
+	upstream_account: Option<T::AccountId>,
+	uniswap_argon_transfers_in_amount: T::Balance,
+	account_bitcoin_amount: T::Balance,
+	account_vault_bond_amount: T::Balance,
+	vault_created: bool,
+	vault_bitcoin_accrual: T::Balance,
+	vault_bitcoin_applied_total: T::Balance,
+	#[codec(compact)]
+	mining_seat_accrual: u32,
+	#[codec(compact)]
+	mining_seat_applied_total: u32,
+	#[codec(compact)]
+	operational_certifications_count: u32,
+	access_code_pending: bool,
+	#[codec(compact)]
+	available_access_codes: u32,
+	#[codec(compact)]
+	rewards_earned_count: u32,
+	rewards_earned_amount: T::Balance,
+	rewards_collected_amount: T::Balance,
+	is_operationally_certified: bool,
+}
+
+mod v16 {
 	use super::*;
 
 	#[storage_alias]
@@ -57,35 +93,112 @@ mod v15 {
 		Pallet<T>,
 		Twox64Concat,
 		VaultId,
-		VaultV15<<T as frame_system::Config>::AccountId, <T as crate::Config>::Balance>,
+		VaultV16<<T as frame_system::Config>::AccountId, <T as crate::Config>::Balance>,
 		OptionQuery,
 	>;
 }
 
-pub struct AddBackfillFields<T: Config>(core::marker::PhantomData<T>);
+pub struct MoveVaultNameToOperationalAccountProfile<T>(core::marker::PhantomData<T>);
 
-impl<T: Config> UncheckedOnRuntimeUpgrade for AddBackfillFields<T> {
+impl<T> UncheckedOnRuntimeUpgrade for MoveVaultNameToOperationalAccountProfile<T>
+where
+	T: Config + pallet_operational_accounts::Config,
+{
+	#[cfg(feature = "try-runtime")]
+	fn pre_upgrade() -> Result<Vec<u8>, TryRuntimeError> {
+		ensure!(
+			StorageVersion::get::<Pallet<T>>() == 16,
+			TryRuntimeError::Other("vault storage version must be 16 before profile migration"),
+		);
+		ensure!(
+			StorageVersion::get::<pallet_operational_accounts::Pallet<T>>() == 3,
+			TryRuntimeError::Other(
+				"operational account storage version must be 3 before profile migration",
+			),
+		);
+
+		let operational_account_count =
+			pallet_operational_accounts::OperationalAccounts::<T>::iter_keys()
+				.fold(0u64, |count, _| count.saturating_add(1));
+		let vault_count =
+			v16::VaultsById::<T>::iter_keys().fold(0u64, |count, _| count.saturating_add(1));
+		let linked_named_vault_count = v16::VaultsById::<T>::iter()
+			.filter(|(_, vault)| {
+				(vault.name.is_some() || vault.last_name_change_tick.is_some()) &&
+					pallet_operational_accounts::OperationalAccountBySubAccount::<T>::contains_key(
+						&vault.operator_account_id,
+					)
+			})
+			.fold(0u64, |count, _| count.saturating_add(1));
+
+		Ok((operational_account_count, vault_count, linked_named_vault_count).encode())
+	}
+
 	fn on_runtime_upgrade() -> Weight {
+		let mut operational_account_count = 0u64;
+		pallet_operational_accounts::OperationalAccounts::<T>::translate::<
+			OperationalAccountV3<T>,
+			_,
+		>(|_, account| {
+			operational_account_count = operational_account_count.saturating_add(1);
+			Some(pallet_operational_accounts::OperationalAccount {
+				vault_account: account.vault_account,
+				mining_account: account.mining_account,
+				encryption_pubkey: account.encryption_pubkey,
+				upstream_account: account.upstream_account,
+				name: None,
+				last_name_change_tick: None,
+				uniswap_argon_transfers_in_amount: account.uniswap_argon_transfers_in_amount,
+				account_bitcoin_amount: account.account_bitcoin_amount,
+				account_vault_bond_amount: account.account_vault_bond_amount,
+				vault_created: account.vault_created,
+				vault_bitcoin_accrual: account.vault_bitcoin_accrual,
+				vault_bitcoin_applied_total: account.vault_bitcoin_applied_total,
+				mining_seat_accrual: account.mining_seat_accrual,
+				mining_seat_applied_total: account.mining_seat_applied_total,
+				operational_certifications_count: account.operational_certifications_count,
+				access_code_pending: account.access_code_pending,
+				available_access_codes: account.available_access_codes,
+				rewards_earned_count: account.rewards_earned_count,
+				rewards_earned_amount: account.rewards_earned_amount,
+				rewards_collected_amount: account.rewards_collected_amount,
+				is_operationally_certified: account.is_operationally_certified,
+			})
+		});
+
 		let mut vault_count = 0u64;
 		VaultsById::<T>::translate::<
-			VaultV15<<T as frame_system::Config>::AccountId, <T as crate::Config>::Balance>,
+			VaultV16<<T as frame_system::Config>::AccountId, <T as crate::Config>::Balance>,
 			_,
 		>(|_, vault| {
 			vault_count = vault_count.saturating_add(1);
+			if let Some(owner) =
+				pallet_operational_accounts::OperationalAccountBySubAccount::<T>::get(
+					&vault.operator_account_id,
+				) {
+				pallet_operational_accounts::OperationalAccounts::<T>::mutate(
+					owner,
+					|maybe_account| {
+						if let Some(account) = maybe_account {
+							account.name = vault.name;
+							account.last_name_change_tick = vault.last_name_change_tick;
+						}
+					},
+				);
+			}
+
 			Some(Vault {
 				operator_account_id: vault.operator_account_id,
 				delegate_account_id: vault.delegate_account_id,
-				name: vault.name,
-				last_name_change_tick: vault.last_name_change_tick,
 				securitization: vault.securitization,
 				securitization_target: vault.securitization_target,
 				securitization_locked: vault.securitization_locked,
-				backfill_securitization_locked: T::Balance::zero(),
-				backfill_securitization_reserved: T::Balance::zero(),
+				backfill_securitization_locked: vault.backfill_securitization_locked,
+				backfill_securitization_reserved: vault.backfill_securitization_reserved,
 				securitization_pending_activation: vault.securitization_pending_activation,
 				locked_satoshis: vault.locked_satoshis,
 				securitized_satoshis: vault.securitized_satoshis,
-				backfill_securitized_satoshis: 0,
+				backfill_securitized_satoshis: vault.backfill_securitized_satoshis,
 				securitization_release_schedule: vault.securitization_release_schedule,
 				securitization_ratio: vault.securitization_ratio,
 				is_closed: vault.is_closed,
@@ -96,106 +209,180 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for AddBackfillFields<T> {
 			})
 		});
 
-		T::DbWeight::get().reads_writes(vault_count, vault_count)
-	}
-
-	#[cfg(feature = "try-runtime")]
-	fn pre_upgrade() -> Result<Vec<u8>, TryRuntimeError> {
-		ensure!(
-			StorageVersion::get::<Pallet<T>>() == 15,
-			TryRuntimeError::Other("vault storage version must be 15 before migration"),
-		);
-
-		let vault_count =
-			v15::VaultsById::<T>::iter().fold(0u64, |count, _| count.saturating_add(1));
-		Ok(vault_count.encode())
+		frame_support::traits::StorageVersion::new(17).put::<Pallet<T>>();
+		T::DbWeight::get().reads_writes(
+			operational_account_count.saturating_add(vault_count.saturating_mul(3)),
+			operational_account_count
+				.saturating_add(vault_count.saturating_mul(2))
+				.saturating_add(1),
+		)
 	}
 
 	#[cfg(feature = "try-runtime")]
 	fn post_upgrade(state: Vec<u8>) -> Result<(), TryRuntimeError> {
 		ensure!(
-			StorageVersion::get::<Pallet<T>>() == 16,
+			StorageVersion::get::<Pallet<T>>() == 17,
 			TryRuntimeError::Other("vault storage version was not updated"),
 		);
-
-		let expected_vault_count = u64::decode(&mut state.as_slice())
-			.map_err(|_| TryRuntimeError::Other("could not decode vault count"))?;
-		let mut migrated_vault_count = 0u64;
-		for (_, vault) in VaultsById::<T>::iter() {
-			migrated_vault_count = migrated_vault_count.saturating_add(1);
-			ensure!(
-				vault.backfill_securitization_locked.is_zero() &&
-					vault.backfill_securitization_reserved.is_zero() &&
-					vault.backfill_securitized_satoshis == 0,
-				TryRuntimeError::Other("migrated vault has nonzero backfill state"),
-			);
-		}
 		ensure!(
-			migrated_vault_count == expected_vault_count,
-			TryRuntimeError::Other("vault count changed during migration"),
+			StorageVersion::get::<pallet_operational_accounts::Pallet<T>>() == 4,
+			TryRuntimeError::Other("operational account storage version was not updated"),
+		);
+
+		let (expected_operational_account_count, expected_vault_count, expected_named_count) =
+			<(u64, u64, u64)>::decode(&mut state.as_slice())
+				.map_err(|_| TryRuntimeError::Other("could not decode profile migration state"))?;
+		let operational_account_count =
+			pallet_operational_accounts::OperationalAccounts::<T>::iter_keys()
+				.fold(0u64, |count, _| count.saturating_add(1));
+		let vault_count =
+			VaultsById::<T>::iter_keys().fold(0u64, |count, _| count.saturating_add(1));
+		let named_account_count = pallet_operational_accounts::OperationalAccounts::<T>::iter()
+			.filter(|(_, account)| {
+				account.name.is_some() || account.last_name_change_tick.is_some()
+			})
+			.fold(0u64, |count, _| count.saturating_add(1));
+
+		ensure!(
+			operational_account_count == expected_operational_account_count,
+			TryRuntimeError::Other("operational account count changed during profile migration"),
+		);
+		ensure!(
+			vault_count == expected_vault_count,
+			TryRuntimeError::Other("vault count changed during profile migration"),
+		);
+		ensure!(
+			named_account_count == expected_named_count,
+			TryRuntimeError::Other("linked vault names were not moved into account profiles"),
 		);
 
 		Ok(())
 	}
 }
 
-pub type AddBackfillFieldsMigration<T> = frame_support::migrations::VersionedMigration<
-	15,
-	16,
-	AddBackfillFields<T>,
-	Pallet<T>,
-	<T as frame_system::Config>::DbWeight,
->;
+pub type MoveVaultNameToOperationalAccountProfileMigration<T> =
+	frame_support::migrations::VersionedMigration<
+		3,
+		4,
+		MoveVaultNameToOperationalAccountProfile<T>,
+		pallet_operational_accounts::Pallet<T>,
+		<T as frame_system::Config>::DbWeight,
+	>;
 
 #[cfg(all(feature = "try-runtime", test))]
 mod test {
 	use super::*;
 	use crate::mock::{new_test_ext, Test};
-	use frame_support::traits::OnRuntimeUpgrade;
+	use frame_support::{assert_ok, traits::OnRuntimeUpgrade};
+
+	mod operational_v3 {
+		use super::*;
+
+		#[storage_alias]
+		pub(super) type OperationalAccounts<T: pallet_operational_accounts::Config> = StorageMap<
+			pallet_operational_accounts::Pallet<T>,
+			Blake2_128Concat,
+			<T as frame_system::Config>::AccountId,
+			OperationalAccountV3<T>,
+			OptionQuery,
+		>;
+	}
 
 	#[test]
-	fn adds_empty_backfill_state() {
+	fn moves_vault_name_into_operational_account_profile() {
 		new_test_ext().execute_with(|| {
-			v15::VaultsById::<Test>::insert(
-				1,
-				VaultV15 {
-					operator_account_id: 1,
-					delegate_account_id: Some(2),
-					name: None,
-					last_name_change_tick: None,
-					securitization: 100,
-					securitization_target: 100,
-					securitization_locked: 40,
-					securitization_pending_activation: 10,
-					locked_satoshis: 20,
-					securitized_satoshis: 20,
-					securitization_release_schedule: BoundedBTreeMap::default(),
-					securitization_ratio: FixedU128::one(),
-					is_closed: false,
-					terms: VaultTerms {
-						bitcoin_annual_percent_rate: FixedU128::zero(),
-						bitcoin_base_fee: 0,
-						treasury_profit_sharing: Permill::zero(),
-						treasury_bonus_profit_sharing: Permill::zero(),
-					},
-					pending_terms: None,
-					opened_tick: 1,
-					operational_minimum_release_tick: None,
+			let owner = 1;
+			let vault_account = 2;
+			let mining_account = 3;
+			let vault_id = 1;
+			let name = VaultName::truncate_from(b"VaultAlpha1".to_vec());
+			let last_name_change_tick = 42;
+
+			operational_v3::OperationalAccounts::<Test>::insert(
+				owner,
+				OperationalAccountV3::<Test> {
+					vault_account,
+					mining_account,
+					encryption_pubkey: pallet_operational_accounts::OpaqueEncryptionPubkey(
+						[7u8; 32],
+					),
+					upstream_account: Some(4),
+					uniswap_argon_transfers_in_amount: 10,
+					account_bitcoin_amount: 11,
+					account_vault_bond_amount: 12,
+					vault_created: true,
+					vault_bitcoin_accrual: 13,
+					vault_bitcoin_applied_total: 14,
+					mining_seat_accrual: 15,
+					mining_seat_applied_total: 16,
+					operational_certifications_count: 17,
+					access_code_pending: true,
+					available_access_codes: 18,
+					rewards_earned_count: 19,
+					rewards_earned_amount: 20,
+					rewards_collected_amount: 21,
+					is_operationally_certified: true,
 				},
 			);
-			StorageVersion::new(15).put::<Pallet<Test>>();
+			pallet_operational_accounts::OperationalAccountBySubAccount::<Test>::insert(
+				vault_account,
+				owner,
+			);
+			v16::VaultsById::<Test>::insert(
+				vault_id,
+				VaultV16 {
+					operator_account_id: vault_account,
+					delegate_account_id: Some(5),
+					name: Some(name.clone()),
+					last_name_change_tick: Some(last_name_change_tick),
+					securitization: 100,
+					securitization_target: 101,
+					securitization_locked: 102,
+					backfill_securitization_locked: 103,
+					backfill_securitization_reserved: 104,
+					securitization_pending_activation: 105,
+					locked_satoshis: 106,
+					securitized_satoshis: 107,
+					backfill_securitized_satoshis: 108,
+					securitization_release_schedule: BoundedBTreeMap::new(),
+					securitization_ratio: FixedU128::from_rational(3, 2),
+					is_closed: true,
+					terms: VaultTerms {
+						bitcoin_annual_percent_rate: FixedU128::from_rational(11, 10),
+						bitcoin_base_fee: 109,
+						treasury_profit_sharing: Permill::from_percent(10),
+						treasury_bonus_profit_sharing: Permill::from_percent(5),
+					},
+					pending_terms: None,
+					opened_tick: 110,
+					operational_minimum_release_tick: Some(111),
+				},
+			);
+			StorageVersion::new(16).put::<Pallet<Test>>();
+			StorageVersion::new(3).put::<pallet_operational_accounts::Pallet<Test>>();
 
-			let state = AddBackfillFieldsMigration::<Test>::pre_upgrade().unwrap();
-			AddBackfillFieldsMigration::<Test>::on_runtime_upgrade();
-			AddBackfillFieldsMigration::<Test>::post_upgrade(state).unwrap();
+			let state = MoveVaultNameToOperationalAccountProfileMigration::<Test>::pre_upgrade()
+				.expect("pre-upgrade checks");
+			let _ = MoveVaultNameToOperationalAccountProfileMigration::<Test>::on_runtime_upgrade();
+			assert_ok!(MoveVaultNameToOperationalAccountProfileMigration::<Test>::post_upgrade(
+				state
+			));
 
-			let vault = VaultsById::<Test>::get(1).expect("migrated vault");
-			assert_eq!(vault.backfill_securitization_locked, 0);
-			assert_eq!(vault.backfill_securitization_reserved, 0);
-			assert_eq!(vault.backfill_securitized_satoshis, 0);
-			assert_eq!(vault.available_for_lock(false), 60);
-			assert_eq!(vault.available_for_lock(true), 60);
-			assert_eq!(StorageVersion::get::<Pallet<Test>>(), 16);
+			let account = pallet_operational_accounts::OperationalAccounts::<Test>::get(owner)
+				.expect("migrated operational account");
+			assert_eq!(account.name, Some(name));
+			assert_eq!(account.last_name_change_tick, Some(last_name_change_tick));
+			assert_eq!(account.rewards_collected_amount, 21);
+
+			let vault = VaultsById::<Test>::get(vault_id).expect("migrated vault");
+			assert_eq!(vault.operator_account_id, vault_account);
+			assert_eq!(vault.delegate_account_id, Some(5));
+			assert_eq!(vault.backfill_securitization_locked, 103);
+			assert_eq!(vault.backfill_securitization_reserved, 104);
+			assert_eq!(vault.backfill_securitized_satoshis, 108);
+			assert_eq!(vault.operational_minimum_release_tick, Some(111));
+			assert_eq!(StorageVersion::get::<Pallet<Test>>(), 17);
+			assert_eq!(StorageVersion::get::<pallet_operational_accounts::Pallet<Test>>(), 4);
 		});
 	}
 }

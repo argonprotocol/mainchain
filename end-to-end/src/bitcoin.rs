@@ -633,7 +633,6 @@ async fn create_vault(
 	println!("creating a vault");
 	let params = client.params_with_best_nonce(&vault_owner_account_id32.clone()).await?.build();
 	let vault_config = api::vaults::calls::types::create::VaultConfig {
-		name: None,
 		bitcoin_xpubkey: xpubkey.encode().into(),
 		terms: api::runtime_types::argon_primitives::vault::VaultTerms::<u128> {
 			bitcoin_base_fee: 0,

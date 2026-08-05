@@ -1013,6 +1013,11 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       InvalidAccountProof: AugmentedError<ApiType>;
       /**
+       * Profile names must start with an uppercase ASCII letter and otherwise be ASCII
+       * alphanumeric.
+       **/
+      InvalidName: AugmentedError<ApiType>;
+      /**
        * The caller is not one of the accounts included in the registration.
        **/
       InvalidRegistrationSubmitter: AugmentedError<ApiType>;
@@ -1375,11 +1380,6 @@ declare module '@polkadot/api-base/types/errors' {
        * Funding would result in an overflow of the balance type
        **/
       InvalidVaultAmount: AugmentedError<ApiType>;
-      /**
-       * Vault names must start with an uppercase ASCII letter and otherwise be ASCII
-       * alphanumeric.
-       **/
-      InvalidVaultName: AugmentedError<ApiType>;
       /**
        * Unable to decode xpubkey
        **/

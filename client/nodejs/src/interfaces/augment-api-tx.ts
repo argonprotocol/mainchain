@@ -1220,6 +1220,13 @@ declare module '@polkadot/api-base/types/submittable' {
         [PalletOperationalAccountsRegistration]
       >;
       /**
+       * Update the display name on an operational account profile.
+       **/
+      setName: AugmentedSubmittable<
+        (name: Option<Bytes> | null | Uint8Array | Bytes | string) => SubmittableExtrinsic<ApiType>,
+        [Option<Bytes>]
+      >;
+      /**
        * Update certification reward amounts for operational accounts.
        **/
       setRewardConfig: AugmentedSubmittable<
@@ -2318,7 +2325,6 @@ declare module '@polkadot/api-base/types/submittable' {
             | PalletVaultsVaultConfig
             | {
                 terms?: any;
-                name?: any;
                 delegateAccountId?: any;
                 securitization?: any;
                 bitcoinXpubkey?: any;
@@ -2395,10 +2401,6 @@ declare module '@polkadot/api-base/types/submittable' {
           delegateAccountId: Option<AccountId32> | null | Uint8Array | AccountId32 | string,
         ) => SubmittableExtrinsic<ApiType>,
         [Option<AccountId32>]
-      >;
-      setName: AugmentedSubmittable<
-        (name: Option<Bytes> | null | Uint8Array | Bytes | string) => SubmittableExtrinsic<ApiType>,
-        [Option<Bytes>]
       >;
     };
   } // AugmentedSubmittables

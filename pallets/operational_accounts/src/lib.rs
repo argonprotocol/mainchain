@@ -24,8 +24,8 @@ pub mod pallet {
 	use argon_primitives::{
 		bitcoin::UtxoId, vault::BitcoinVaultProvider, BitcoinLocksProvider, MiningSlotProvider,
 		OperationalAccountProvider, OperationalAccountsHook, OperationalRewardKind,
-		OperationalRewardsPayer, Signature, TreasuryPoolProvider, UniswapTransferProvider,
-		UtxoLockEvents, MICROGONS_PER_ARGON,
+		OperationalRewardsPayer, Signature, TickProvider, TreasuryPoolProvider,
+		UniswapTransferProvider, UtxoLockEvents, MICROGONS_PER_ARGON,
 	};
 	use codec::{Decode, Encode, EncodeLike};
 	use core::{fmt::Debug, marker::PhantomData};
@@ -41,7 +41,7 @@ pub mod pallet {
 	pub const OPERATIONAL_ACCOUNT_PROOF_MESSAGE_KEY: &[u8; 27] = b"operational_primary_account";
 	pub const VAULT_ACCOUNT_PROOF_MESSAGE_KEY: &[u8; 25] = b"operational_vault_account";
 	pub const MINING_ACCOUNT_PROOF_MESSAGE_KEY: &[u8; 26] = b"operational_mining_account";
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(3);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(4);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -124,6 +124,8 @@ pub mod pallet {
 		type Currency: Mutate<Self::AccountId, Balance = Self::Balance>;
 		/// Payout adapter for explicitly claimed operational rewards.
 		type OperationalRewardsPayer: OperationalRewardsPayer<Self::AccountId, Self::Balance>;
+		/// Provider for the current tick recorded on profile name changes.
+		type TickProvider: TickProvider<Self::Block>;
 
 		/// Weight information for this pallet.
 		type WeightInfo: WeightInfo;
@@ -181,6 +183,8 @@ pub mod pallet {
 		Default,
 	)]
 	pub struct OpaqueEncryptionPubkey(pub [u8; 32]);
+
+	pub type OperationalAccountName = BoundedVec<u8, ConstU32<18>>;
 
 	#[derive(
 		Decode,
@@ -287,6 +291,10 @@ pub mod pallet {
 		pub encryption_pubkey: OpaqueEncryptionPubkey,
 		/// Upstream account, if known.
 		pub upstream_account: Option<T::AccountId>,
+		/// Optional display name for this operational account profile.
+		pub name: Option<OperationalAccountName>,
+		/// Tick of the most recent profile name change.
+		pub last_name_change_tick: Option<Tick>,
 		/// Cumulative linked-account Uniswap transfers-in amount counted toward the minimum
 		/// requirements.
 		pub uniswap_argon_transfers_in_amount: T::Balance,
@@ -525,6 +533,9 @@ pub mod pallet {
 		NotEligibleForActivation,
 		/// The requested upstream account does not have any available access codes.
 		UpstreamHasNoAvailableAccessCodes,
+		/// Profile names must start with an uppercase ASCII letter and otherwise be ASCII
+		/// alphanumeric.
+		InvalidName,
 	}
 
 	#[pallet::call]
@@ -630,6 +641,8 @@ pub mod pallet {
 				mining_account: mining_account.clone(),
 				encryption_pubkey,
 				upstream_account: upstream_account.clone(),
+				name: None,
+				last_name_change_tick: None,
 				uniswap_argon_transfers_in_amount: T::Balance::zero(),
 				account_bitcoin_amount: T::BitcoinLocksProvider::get_account_funded_bitcoin_amount(
 					&vault_account,
@@ -670,6 +683,31 @@ pub mod pallet {
 				mining_account: mining_account.clone(),
 				upstream_account,
 			});
+			Ok(())
+		}
+
+		/// Update the display name on an operational account profile.
+		#[pallet::call_index(1)]
+		#[pallet::weight(T::WeightInfo::set_name())]
+		pub fn set_name(
+			origin: OriginFor<T>,
+			name: Option<OperationalAccountName>,
+		) -> DispatchResult {
+			let owner = ensure_signed(origin)?;
+			if let Some(name) = name.as_ref() {
+				Self::ensure_valid_name(name)?;
+			}
+
+			let mut account =
+				OperationalAccounts::<T>::get(&owner).ok_or(Error::<T>::NotOperationalAccount)?;
+			if account.name == name {
+				return Ok(());
+			}
+
+			account.name = name;
+			account.last_name_change_tick = Some(T::TickProvider::current_tick());
+			OperationalAccounts::<T>::insert(owner, account);
+
 			Ok(())
 		}
 
@@ -885,6 +923,13 @@ pub mod pallet {
 	}
 
 	impl<T: Config> Pallet<T> {
+		fn ensure_valid_name(name: &OperationalAccountName) -> Result<(), Error<T>> {
+			ensure!(!name.is_empty(), Error::<T>::InvalidName);
+			ensure!(name[0].is_ascii_uppercase(), Error::<T>::InvalidName);
+			ensure!(name.iter().all(|char| char.is_ascii_alphanumeric()), Error::<T>::InvalidName);
+			Ok(())
+		}
+
 		/// Refresh the stored linked-account Uniswap Argon transfers-in amount for a linked
 		/// operational account.
 		pub fn refresh_account_uniswap_argon_transfers_in_amount(account_id: &T::AccountId) {

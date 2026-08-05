@@ -17,7 +17,6 @@ pub trait WeightInfo {
 	fn replace_bitcoin_xpub() -> Weight;
 	fn set_delegate_account() -> Weight;
 	fn set_backfill_securitization_reserved() -> Weight;
-	fn set_name() -> Weight;
 	fn set_committed_argonots() -> Weight;
 	fn on_initialize_with_vault_releases(
 		height_range: u32,
@@ -105,10 +104,6 @@ where
 
 	fn set_backfill_securitization_reserved() -> Weight {
 		Base::set_backfill_securitization_reserved()
-	}
-
-	fn set_name() -> Weight {
-		Base::set_name().saturating_add(TickProviderWeight::current_tick())
 	}
 
 	fn set_committed_argonots() -> Weight {
@@ -219,9 +214,6 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 	fn set_backfill_securitization_reserved() -> Weight {
-		Weight::zero()
-	}
-	fn set_name() -> Weight {
 		Weight::zero()
 	}
 	fn set_committed_argonots() -> Weight {

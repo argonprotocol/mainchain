@@ -1,8 +1,8 @@
 use crate::{
 	AccountOwnershipProof, Error, IsOperationalAccountInviteOnly, OpaqueEncryptionPubkey,
-	OperationalAccount, OperationalAccountBySubAccount, OperationalAccounts,
-	OperationalProgressPatch, Registration, RegistrationV1, UpstreamAccessProof,
-	MINING_ACCOUNT_PROOF_MESSAGE_KEY, OPERATIONAL_ACCOUNT_PROOF_MESSAGE_KEY,
+	OperationalAccount, OperationalAccountBySubAccount, OperationalAccountName,
+	OperationalAccounts, OperationalProgressPatch, Registration, RegistrationV1,
+	UpstreamAccessProof, MINING_ACCOUNT_PROOF_MESSAGE_KEY, OPERATIONAL_ACCOUNT_PROOF_MESSAGE_KEY,
 	UPSTREAM_ACCESS_PROOF_MESSAGE_KEY, VAULT_ACCOUNT_PROOF_MESSAGE_KEY,
 };
 use argon_primitives::{
@@ -19,7 +19,7 @@ use crate::mock::{
 	funded_bitcoin_amount, has_vault_operational_mark, new_test_ext,
 	record_active_vault_bond_amount, record_funded_bitcoin_amount, record_microgons_in,
 	record_microgons_out, set_argon_balance, set_crosschain_activated, set_registration_lookup,
-	BitcoinLockSizeForAccessCode, ClaimableTreasuryBalance, ClaimedOperationalRewards,
+	BitcoinLockSizeForAccessCode, ClaimableTreasuryBalance, ClaimedOperationalRewards, CurrentTick,
 	MinimumBitcoin, MinimumBonds, MinimumUniswapTransfer,
 	OperationalAccounts as OperationalAccountsPallet, OperationalCertificationReward,
 	OperationalMinimumUniswapTransfer, OperationalMinimumVaultSecuritization, RuntimeOrigin, Test,
@@ -47,6 +47,75 @@ fn test_register_creates_operational_account() {
 		assert_eq!(
 			OperationalAccountBySubAccount::<Test>::get(&account_set.mining),
 			Some(account_set.owner.clone())
+		);
+	});
+}
+
+#[test]
+fn test_operational_account_can_update_profile_name() {
+	new_test_ext().execute_with(|| {
+		let account_set = make_account_set(4, 5, 6);
+		register_account(&account_set, None);
+		let first_name = operational_account_name("VaultAlpha1");
+
+		assert_noop!(
+			OperationalAccountsPallet::set_name(
+				RuntimeOrigin::signed(account_set.vault.clone()),
+				Some(first_name.clone()),
+			),
+			Error::<Test>::NotOperationalAccount
+		);
+
+		CurrentTick::set(10);
+		assert_ok!(OperationalAccountsPallet::set_name(
+			RuntimeOrigin::signed(account_set.owner.clone()),
+			Some(first_name.clone()),
+		));
+		let account = OperationalAccounts::<Test>::get(&account_set.owner).expect("account");
+		assert_eq!(account.name, Some(first_name.clone()));
+		assert_eq!(account.last_name_change_tick, Some(10));
+
+		CurrentTick::set(11);
+		assert_ok!(OperationalAccountsPallet::set_name(
+			RuntimeOrigin::signed(account_set.owner.clone()),
+			Some(first_name),
+		));
+		assert_eq!(
+			OperationalAccounts::<Test>::get(&account_set.owner)
+				.expect("account")
+				.last_name_change_tick,
+			Some(10)
+		);
+
+		CurrentTick::set(12);
+		assert_ok!(OperationalAccountsPallet::set_name(
+			RuntimeOrigin::signed(account_set.owner.clone()),
+			None,
+		));
+		let account = OperationalAccounts::<Test>::get(&account_set.owner).expect("account");
+		assert_eq!(account.name, None);
+		assert_eq!(account.last_name_change_tick, Some(12));
+
+		assert_noop!(
+			OperationalAccountsPallet::set_name(
+				RuntimeOrigin::signed(account_set.owner.clone()),
+				Some(operational_account_name("")),
+			),
+			Error::<Test>::InvalidName
+		);
+		assert_noop!(
+			OperationalAccountsPallet::set_name(
+				RuntimeOrigin::signed(account_set.owner.clone()),
+				Some(operational_account_name("vault")),
+			),
+			Error::<Test>::InvalidName
+		);
+		assert_noop!(
+			OperationalAccountsPallet::set_name(
+				RuntimeOrigin::signed(account_set.owner.clone()),
+				Some(operational_account_name("Vault-1")),
+			),
+			Error::<Test>::InvalidName
 		);
 	});
 }
@@ -832,6 +901,10 @@ fn seed_pending_rewards(owner: &TestAccountId, amount: Balance) {
 
 fn pending_rewards_amount(account: &OperationalAccount<Test>) -> Balance {
 	account.rewards_earned_amount.saturating_sub(account.rewards_collected_amount)
+}
+
+fn operational_account_name(name: &str) -> OperationalAccountName {
+	BoundedVec::truncate_from(name.as_bytes().to_vec())
 }
 
 fn meets_minimums(account: &OperationalAccount<Test>) -> bool {

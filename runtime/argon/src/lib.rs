@@ -774,6 +774,7 @@ impl pallet_operational_accounts::Config for Runtime {
 	type Currency = Balances;
 	type OperationalRewardsPayer =
 		use_unless_benchmark!(Treasury, benchmarking::BenchmarkOperationalRewardsPayer);
+	type TickProvider = use_unless_benchmark!(Ticks, benchmarking::BenchmarkTickProvider);
 	type WeightInfo = pallet_operational_accounts::WithProviderWeights<
 		Runtime,
 		weights::pallet_operational_accounts::WeightInfo<Runtime>,

@@ -628,8 +628,6 @@ where
 	let vault = Vault {
 		operator_account_id: operator.clone(),
 		delegate_account_id: None,
-		name: None,
-		last_name_change_tick: None,
 		securitization: securitization.into(),
 		securitization_target: securitization.into(),
 		securitization_locked: T::Balance::zero(),

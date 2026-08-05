@@ -1169,9 +1169,10 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							220u8, 170u8, 53u8, 219u8, 52u8, 203u8, 43u8, 145u8, 90u8, 220u8, 85u8,
-							226u8, 3u8, 216u8, 79u8, 119u8, 77u8, 122u8, 66u8, 47u8, 54u8, 123u8,
-							134u8, 202u8, 60u8, 36u8, 192u8, 55u8, 249u8, 105u8, 131u8, 6u8,
+							87u8, 68u8, 70u8, 157u8, 164u8, 173u8, 183u8, 222u8, 38u8, 216u8,
+							149u8, 19u8, 172u8, 236u8, 250u8, 27u8, 236u8, 174u8, 28u8, 243u8,
+							127u8, 34u8, 111u8, 2u8, 220u8, 130u8, 55u8, 107u8, 246u8, 233u8, 84u8,
+							50u8,
 						],
 					)
 				}
@@ -1189,10 +1190,10 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							82u8, 35u8, 61u8, 108u8, 121u8, 57u8, 190u8, 129u8, 116u8, 101u8,
-							217u8, 41u8, 132u8, 187u8, 120u8, 122u8, 120u8, 158u8, 57u8, 122u8,
-							118u8, 249u8, 107u8, 92u8, 219u8, 211u8, 206u8, 89u8, 37u8, 180u8,
-							210u8, 96u8,
+							36u8, 140u8, 148u8, 248u8, 26u8, 230u8, 242u8, 161u8, 46u8, 106u8,
+							205u8, 193u8, 194u8, 5u8, 134u8, 217u8, 147u8, 156u8, 126u8, 168u8,
+							127u8, 176u8, 60u8, 188u8, 9u8, 240u8, 57u8, 235u8, 235u8, 210u8,
+							186u8, 66u8,
 						],
 					)
 				}
@@ -3405,9 +3406,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				113u8, 65u8, 28u8, 72u8, 113u8, 190u8, 254u8, 109u8, 160u8, 165u8, 206u8, 228u8,
-				206u8, 206u8, 181u8, 217u8, 126u8, 18u8, 74u8, 89u8, 129u8, 27u8, 101u8, 227u8,
-				51u8, 3u8, 27u8, 70u8, 77u8, 170u8, 76u8, 165u8,
+				124u8, 195u8, 113u8, 217u8, 223u8, 206u8, 121u8, 132u8, 4u8, 187u8, 162u8, 174u8,
+				196u8, 34u8, 15u8, 156u8, 72u8, 18u8, 106u8, 250u8, 17u8, 166u8, 203u8, 202u8,
+				162u8, 118u8, 12u8, 236u8, 168u8, 198u8, 66u8, 249u8,
 			]
 	}
 	pub mod system {
@@ -5441,10 +5442,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							21u8, 247u8, 184u8, 128u8, 48u8, 182u8, 64u8, 113u8, 165u8, 11u8,
-							217u8, 173u8, 134u8, 120u8, 255u8, 37u8, 116u8, 191u8, 199u8, 113u8,
-							88u8, 197u8, 255u8, 85u8, 76u8, 117u8, 197u8, 228u8, 84u8, 210u8,
-							234u8, 231u8,
+							172u8, 115u8, 170u8, 242u8, 199u8, 238u8, 54u8, 183u8, 61u8, 177u8,
+							156u8, 93u8, 218u8, 238u8, 156u8, 159u8, 36u8, 33u8, 112u8, 63u8,
+							114u8, 191u8, 84u8, 65u8, 231u8, 202u8, 119u8, 180u8, 247u8, 157u8,
+							24u8, 177u8,
 						],
 					)
 				}
@@ -5509,10 +5510,9 @@ pub mod api {
 							max_weight,
 						},
 						[
-							216u8, 81u8, 226u8, 161u8, 144u8, 116u8, 39u8, 217u8, 39u8, 246u8,
-							239u8, 121u8, 32u8, 186u8, 123u8, 194u8, 113u8, 86u8, 132u8, 178u8,
-							189u8, 251u8, 152u8, 218u8, 2u8, 124u8, 161u8, 170u8, 180u8, 102u8,
-							91u8, 103u8,
+							36u8, 198u8, 131u8, 205u8, 164u8, 70u8, 100u8, 250u8, 77u8, 10u8, 9u8,
+							224u8, 40u8, 94u8, 138u8, 35u8, 169u8, 111u8, 185u8, 208u8, 57u8, 56u8,
+							150u8, 126u8, 97u8, 53u8, 36u8, 197u8, 100u8, 71u8, 157u8, 237u8,
 						],
 					)
 				}
@@ -6417,9 +6417,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							205u8, 151u8, 160u8, 162u8, 85u8, 98u8, 254u8, 248u8, 182u8, 145u8,
-							82u8, 50u8, 233u8, 134u8, 83u8, 41u8, 246u8, 98u8, 252u8, 67u8, 131u8,
-							28u8, 9u8, 82u8, 35u8, 217u8, 108u8, 32u8, 159u8, 175u8, 168u8, 218u8,
+							114u8, 28u8, 25u8, 152u8, 149u8, 135u8, 149u8, 216u8, 185u8, 12u8,
+							218u8, 87u8, 194u8, 67u8, 234u8, 143u8, 215u8, 92u8, 137u8, 136u8,
+							170u8, 125u8, 242u8, 109u8, 205u8, 22u8, 236u8, 165u8, 127u8, 198u8,
+							153u8, 105u8,
 						],
 					)
 				}
@@ -6683,10 +6684,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							23u8, 187u8, 217u8, 186u8, 157u8, 109u8, 34u8, 245u8, 47u8, 176u8,
-							59u8, 4u8, 189u8, 26u8, 20u8, 170u8, 130u8, 254u8, 228u8, 18u8, 115u8,
-							136u8, 155u8, 220u8, 87u8, 10u8, 188u8, 196u8, 32u8, 66u8, 130u8,
-							255u8,
+							221u8, 231u8, 35u8, 31u8, 34u8, 172u8, 165u8, 62u8, 127u8, 207u8,
+							203u8, 164u8, 1u8, 176u8, 255u8, 244u8, 218u8, 80u8, 74u8, 123u8, 51u8,
+							153u8, 53u8, 112u8, 208u8, 244u8, 176u8, 92u8, 231u8, 107u8, 231u8,
+							210u8,
 						],
 					)
 				}
@@ -6735,10 +6736,10 @@ pub mod api {
 						],
 						check_permissions::Input { call, proxy_type },
 						[
-							141u8, 250u8, 120u8, 208u8, 183u8, 104u8, 64u8, 21u8, 152u8, 223u8,
-							99u8, 156u8, 187u8, 5u8, 122u8, 208u8, 12u8, 84u8, 4u8, 88u8, 53u8,
-							130u8, 37u8, 243u8, 108u8, 130u8, 78u8, 75u8, 79u8, 201u8, 139u8,
-							140u8,
+							26u8, 247u8, 116u8, 116u8, 158u8, 63u8, 110u8, 139u8, 254u8, 25u8,
+							238u8, 151u8, 214u8, 211u8, 208u8, 32u8, 148u8, 189u8, 150u8, 89u8,
+							100u8, 172u8, 99u8, 154u8, 40u8, 209u8, 6u8, 235u8, 22u8, 87u8, 224u8,
+							127u8,
 						],
 					)
 				}
@@ -9654,33 +9655,6 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				pub struct SetName {
-					pub name: set_name::Name,
-				}
-				pub mod set_name {
-					use super::runtime_types;
-					pub type Name = ::core::option::Option<
-						runtime_types::bounded_collections::bounded_vec::BoundedVec<
-							::core::primitive::u8,
-						>,
-					>;
-				}
-				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for SetName {
-					const PALLET: &'static str = "Vaults";
-					const CALL: &'static str = "set_name";
-				}
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
 				pub struct SetCommittedArgonots {
 					#[codec(compact)]
 					pub amount: set_committed_argonots::Amount,
@@ -9731,10 +9705,9 @@ pub mod api {
 						"create",
 						types::Create { vault_config },
 						[
-							64u8, 230u8, 22u8, 50u8, 97u8, 249u8, 227u8, 254u8, 18u8, 128u8, 104u8,
-							193u8, 197u8, 51u8, 85u8, 229u8, 137u8, 236u8, 95u8, 96u8, 142u8,
-							149u8, 29u8, 70u8, 68u8, 238u8, 141u8, 132u8, 173u8, 137u8, 83u8,
-							178u8,
+							97u8, 113u8, 140u8, 64u8, 85u8, 157u8, 28u8, 84u8, 120u8, 190u8, 39u8,
+							128u8, 214u8, 175u8, 129u8, 82u8, 112u8, 93u8, 14u8, 45u8, 3u8, 163u8,
+							215u8, 180u8, 149u8, 237u8, 159u8, 156u8, 155u8, 215u8, 144u8, 86u8,
 						],
 					)
 				}
@@ -9848,22 +9821,6 @@ pub mod api {
 							116u8, 122u8, 143u8, 174u8, 52u8, 215u8, 223u8, 4u8, 67u8, 23u8, 74u8,
 							36u8, 204u8, 97u8, 13u8, 7u8, 14u8, 186u8, 140u8, 254u8, 148u8, 132u8,
 							208u8, 25u8, 223u8, 137u8, 6u8, 112u8, 108u8, 63u8, 197u8, 173u8,
-						],
-					)
-				}
-				pub fn set_name(
-					&self,
-					name: types::set_name::Name,
-				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::SetName> {
-					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
-						"Vaults",
-						"set_name",
-						types::SetName { name },
-						[
-							56u8, 223u8, 78u8, 53u8, 202u8, 139u8, 97u8, 13u8, 34u8, 11u8, 160u8,
-							212u8, 127u8, 125u8, 140u8, 248u8, 76u8, 240u8, 51u8, 149u8, 197u8,
-							144u8, 28u8, 166u8, 218u8, 83u8, 181u8, 108u8, 155u8, 213u8, 52u8,
-							125u8,
 						],
 					)
 				}
@@ -10443,9 +10400,10 @@ pub mod api {
 						"VaultsById",
 						(),
 						[
-							7u8, 205u8, 209u8, 63u8, 205u8, 51u8, 217u8, 176u8, 199u8, 79u8, 79u8,
-							59u8, 98u8, 236u8, 142u8, 38u8, 78u8, 19u8, 206u8, 70u8, 231u8, 63u8,
-							164u8, 207u8, 113u8, 35u8, 200u8, 242u8, 101u8, 189u8, 209u8, 107u8,
+							54u8, 19u8, 49u8, 214u8, 5u8, 154u8, 228u8, 140u8, 101u8, 46u8, 217u8,
+							235u8, 208u8, 194u8, 20u8, 14u8, 118u8, 209u8, 157u8, 148u8, 83u8,
+							245u8, 156u8, 106u8, 52u8, 179u8, 142u8, 243u8, 136u8, 106u8, 196u8,
+							254u8,
 						],
 					)
 				}
@@ -10467,9 +10425,10 @@ pub mod api {
 						"VaultsById",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							7u8, 205u8, 209u8, 63u8, 205u8, 51u8, 217u8, 176u8, 199u8, 79u8, 79u8,
-							59u8, 98u8, 236u8, 142u8, 38u8, 78u8, 19u8, 206u8, 70u8, 231u8, 63u8,
-							164u8, 207u8, 113u8, 35u8, 200u8, 242u8, 101u8, 189u8, 209u8, 107u8,
+							54u8, 19u8, 49u8, 214u8, 5u8, 154u8, 228u8, 140u8, 101u8, 46u8, 217u8,
+							235u8, 208u8, 194u8, 20u8, 14u8, 118u8, 209u8, 157u8, 148u8, 83u8,
+							245u8, 156u8, 106u8, 52u8, 179u8, 142u8, 243u8, 136u8, 106u8, 196u8,
+							254u8,
 						],
 					)
 				}
@@ -15688,7 +15647,7 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Stores Ethereum pricing submitted with the active price index."]
+				#[doc = " Stores the latest submitted Ethereum pricing."]
 				pub fn current_ethereum_price(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
@@ -21909,10 +21868,9 @@ pub mod api {
 						"batch",
 						types::Batch { calls },
 						[
-							98u8, 66u8, 93u8, 57u8, 219u8, 76u8, 188u8, 27u8, 254u8, 144u8, 124u8,
-							250u8, 17u8, 29u8, 245u8, 205u8, 98u8, 74u8, 112u8, 125u8, 226u8,
-							150u8, 20u8, 208u8, 187u8, 220u8, 249u8, 7u8, 105u8, 171u8, 187u8,
-							71u8,
+							18u8, 250u8, 61u8, 131u8, 156u8, 128u8, 108u8, 13u8, 29u8, 61u8, 102u8,
+							189u8, 58u8, 73u8, 52u8, 184u8, 43u8, 216u8, 162u8, 46u8, 64u8, 37u8,
+							118u8, 211u8, 30u8, 86u8, 5u8, 4u8, 1u8, 165u8, 178u8, 173u8,
 						],
 					)
 				}
@@ -21942,9 +21900,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							78u8, 223u8, 35u8, 168u8, 215u8, 225u8, 163u8, 64u8, 141u8, 183u8,
-							26u8, 68u8, 218u8, 191u8, 88u8, 165u8, 181u8, 18u8, 30u8, 134u8, 43u8,
-							99u8, 55u8, 135u8, 158u8, 173u8, 4u8, 174u8, 69u8, 157u8, 213u8, 110u8,
+							87u8, 148u8, 160u8, 200u8, 173u8, 20u8, 139u8, 150u8, 215u8, 234u8,
+							25u8, 222u8, 128u8, 203u8, 38u8, 96u8, 155u8, 93u8, 252u8, 114u8,
+							250u8, 149u8, 80u8, 235u8, 233u8, 245u8, 192u8, 76u8, 236u8, 201u8,
+							142u8, 147u8,
 						],
 					)
 				}
@@ -21970,9 +21929,10 @@ pub mod api {
 						"batch_all",
 						types::BatchAll { calls },
 						[
-							223u8, 122u8, 201u8, 204u8, 218u8, 3u8, 254u8, 2u8, 20u8, 249u8, 108u8,
-							3u8, 176u8, 229u8, 213u8, 42u8, 202u8, 161u8, 15u8, 106u8, 181u8,
-							221u8, 120u8, 222u8, 59u8, 90u8, 21u8, 105u8, 20u8, 39u8, 80u8, 132u8,
+							158u8, 17u8, 193u8, 31u8, 188u8, 67u8, 10u8, 89u8, 27u8, 162u8, 6u8,
+							255u8, 135u8, 118u8, 176u8, 52u8, 27u8, 148u8, 151u8, 26u8, 242u8,
+							45u8, 244u8, 226u8, 96u8, 253u8, 52u8, 252u8, 160u8, 220u8, 201u8,
+							130u8,
 						],
 					)
 				}
@@ -21995,9 +21955,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							39u8, 186u8, 102u8, 144u8, 209u8, 159u8, 143u8, 0u8, 153u8, 54u8,
-							135u8, 150u8, 73u8, 91u8, 57u8, 145u8, 70u8, 95u8, 178u8, 187u8, 111u8,
-							30u8, 130u8, 50u8, 84u8, 156u8, 8u8, 3u8, 55u8, 140u8, 98u8, 200u8,
+							42u8, 192u8, 117u8, 97u8, 58u8, 1u8, 22u8, 193u8, 112u8, 247u8, 184u8,
+							97u8, 29u8, 55u8, 204u8, 22u8, 183u8, 191u8, 65u8, 236u8, 157u8, 244u8,
+							242u8, 171u8, 47u8, 159u8, 0u8, 231u8, 228u8, 176u8, 14u8, 253u8,
 						],
 					)
 				}
@@ -22023,9 +21983,9 @@ pub mod api {
 						"force_batch",
 						types::ForceBatch { calls },
 						[
-							102u8, 88u8, 91u8, 220u8, 79u8, 209u8, 94u8, 220u8, 51u8, 96u8, 241u8,
-							33u8, 80u8, 232u8, 216u8, 221u8, 49u8, 79u8, 233u8, 26u8, 230u8, 97u8,
-							59u8, 219u8, 104u8, 42u8, 148u8, 94u8, 164u8, 117u8, 141u8, 47u8,
+							13u8, 1u8, 112u8, 234u8, 176u8, 140u8, 137u8, 231u8, 21u8, 42u8, 47u8,
+							125u8, 161u8, 112u8, 21u8, 52u8, 46u8, 250u8, 123u8, 17u8, 58u8, 243u8,
+							29u8, 190u8, 59u8, 180u8, 22u8, 82u8, 73u8, 255u8, 126u8, 71u8,
 						],
 					)
 				}
@@ -22048,9 +22008,9 @@ pub mod api {
 							weight,
 						},
 						[
-							37u8, 94u8, 107u8, 46u8, 8u8, 160u8, 164u8, 208u8, 5u8, 207u8, 237u8,
-							175u8, 190u8, 140u8, 122u8, 111u8, 192u8, 183u8, 4u8, 39u8, 179u8,
-							69u8, 251u8, 13u8, 221u8, 48u8, 192u8, 42u8, 82u8, 22u8, 235u8, 48u8,
+							29u8, 183u8, 3u8, 32u8, 137u8, 174u8, 60u8, 16u8, 128u8, 87u8, 235u8,
+							31u8, 155u8, 56u8, 61u8, 32u8, 244u8, 156u8, 73u8, 141u8, 25u8, 168u8,
+							196u8, 6u8, 74u8, 122u8, 97u8, 122u8, 124u8, 52u8, 61u8, 226u8,
 						],
 					)
 				}
@@ -22090,9 +22050,9 @@ pub mod api {
 							fallback: ::subxt::ext::subxt_core::alloc::boxed::Box::new(fallback),
 						},
 						[
-							15u8, 238u8, 179u8, 26u8, 179u8, 3u8, 166u8, 96u8, 84u8, 19u8, 74u8,
-							231u8, 185u8, 75u8, 44u8, 119u8, 249u8, 245u8, 248u8, 252u8, 240u8,
-							33u8, 215u8, 97u8, 86u8, 198u8, 44u8, 7u8, 28u8, 98u8, 60u8, 46u8,
+							154u8, 90u8, 175u8, 171u8, 228u8, 174u8, 116u8, 154u8, 118u8, 186u8,
+							128u8, 90u8, 23u8, 235u8, 111u8, 141u8, 242u8, 210u8, 8u8, 74u8, 130u8,
+							74u8, 253u8, 11u8, 124u8, 192u8, 15u8, 9u8, 104u8, 152u8, 131u8, 107u8,
 						],
 					)
 				}
@@ -22115,10 +22075,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							191u8, 16u8, 55u8, 214u8, 13u8, 84u8, 189u8, 218u8, 132u8, 210u8,
-							179u8, 96u8, 105u8, 220u8, 182u8, 154u8, 103u8, 8u8, 2u8, 213u8, 64u8,
-							67u8, 129u8, 33u8, 155u8, 176u8, 227u8, 42u8, 198u8, 124u8, 182u8,
-							34u8,
+							210u8, 20u8, 250u8, 215u8, 48u8, 129u8, 205u8, 14u8, 73u8, 102u8,
+							116u8, 14u8, 245u8, 199u8, 120u8, 13u8, 86u8, 133u8, 130u8, 149u8,
+							183u8, 119u8, 150u8, 130u8, 49u8, 35u8, 69u8, 243u8, 98u8, 236u8, 54u8,
+							229u8,
 						],
 					)
 				}
@@ -22454,9 +22414,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							47u8, 53u8, 157u8, 111u8, 50u8, 19u8, 144u8, 192u8, 57u8, 213u8, 235u8,
-							139u8, 233u8, 68u8, 47u8, 31u8, 229u8, 17u8, 23u8, 232u8, 14u8, 192u8,
-							150u8, 22u8, 231u8, 158u8, 71u8, 38u8, 10u8, 60u8, 175u8, 239u8,
+							162u8, 123u8, 156u8, 228u8, 65u8, 47u8, 56u8, 118u8, 198u8, 247u8,
+							74u8, 223u8, 48u8, 179u8, 73u8, 84u8, 116u8, 10u8, 40u8, 230u8, 247u8,
+							209u8, 80u8, 111u8, 150u8, 121u8, 27u8, 186u8, 18u8, 17u8, 164u8,
+							113u8,
 						],
 					)
 				}
@@ -22479,10 +22440,10 @@ pub mod api {
 							weight,
 						},
 						[
-							25u8, 234u8, 118u8, 87u8, 146u8, 164u8, 121u8, 237u8, 178u8, 219u8,
-							98u8, 211u8, 148u8, 125u8, 208u8, 245u8, 183u8, 70u8, 28u8, 152u8,
-							237u8, 107u8, 208u8, 186u8, 156u8, 185u8, 29u8, 28u8, 179u8, 46u8,
-							11u8, 94u8,
+							196u8, 156u8, 130u8, 86u8, 177u8, 207u8, 251u8, 137u8, 159u8, 119u8,
+							115u8, 208u8, 218u8, 2u8, 242u8, 85u8, 110u8, 143u8, 174u8, 171u8,
+							25u8, 247u8, 211u8, 27u8, 79u8, 255u8, 118u8, 98u8, 110u8, 156u8, 57u8,
+							107u8,
 						],
 					)
 				}
@@ -22520,9 +22481,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							136u8, 211u8, 97u8, 181u8, 156u8, 93u8, 136u8, 29u8, 219u8, 35u8,
-							209u8, 239u8, 64u8, 77u8, 36u8, 24u8, 16u8, 239u8, 248u8, 36u8, 47u8,
-							9u8, 124u8, 129u8, 189u8, 150u8, 157u8, 2u8, 205u8, 66u8, 56u8, 52u8,
+							182u8, 205u8, 250u8, 5u8, 49u8, 41u8, 108u8, 84u8, 208u8, 43u8, 46u8,
+							163u8, 166u8, 175u8, 113u8, 80u8, 63u8, 82u8, 19u8, 220u8, 19u8, 137u8,
+							227u8, 111u8, 29u8, 232u8, 132u8, 132u8, 34u8, 153u8, 1u8, 43u8,
 						],
 					)
 				}
@@ -24004,6 +23965,34 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
+				#[doc = "Update the display name on an operational account profile."]
+				pub struct SetName {
+					pub name: set_name::Name,
+				}
+				pub mod set_name {
+					use super::runtime_types;
+					pub type Name = ::core::option::Option<
+						runtime_types::bounded_collections::bounded_vec::BoundedVec<
+							::core::primitive::u8,
+						>,
+					>;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for SetName {
+					const PALLET: &'static str = "OperationalAccounts";
+					const CALL: &'static str = "set_name";
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
 				#[doc = "Update certification reward amounts for operational accounts."]
 				pub struct SetRewardConfig {
 					pub operational_certification_reward:
@@ -24108,6 +24097,23 @@ pub mod api {
 							80u8, 102u8, 95u8, 202u8, 173u8, 205u8, 168u8, 16u8, 93u8, 173u8, 3u8,
 							193u8, 213u8, 68u8, 238u8, 4u8, 174u8, 175u8, 59u8, 51u8, 136u8, 14u8,
 							128u8, 137u8, 56u8, 64u8, 206u8, 27u8, 2u8, 96u8, 157u8, 164u8,
+						],
+					)
+				}
+				#[doc = "Update the display name on an operational account profile."]
+				pub fn set_name(
+					&self,
+					name: types::set_name::Name,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::SetName> {
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"OperationalAccounts",
+						"set_name",
+						types::SetName { name },
+						[
+							56u8, 223u8, 78u8, 53u8, 202u8, 139u8, 97u8, 13u8, 34u8, 11u8, 160u8,
+							212u8, 127u8, 125u8, 140u8, 248u8, 76u8, 240u8, 51u8, 149u8, 197u8,
+							144u8, 28u8, 166u8, 218u8, 83u8, 181u8, 108u8, 155u8, 213u8, 52u8,
+							125u8,
 						],
 					)
 				}
@@ -24413,10 +24419,9 @@ pub mod api {
 						"OperationalAccounts",
 						(),
 						[
-							140u8, 165u8, 37u8, 252u8, 177u8, 215u8, 48u8, 223u8, 151u8, 25u8,
-							228u8, 203u8, 199u8, 228u8, 30u8, 39u8, 79u8, 95u8, 146u8, 208u8,
-							222u8, 219u8, 116u8, 78u8, 171u8, 184u8, 95u8, 95u8, 0u8, 157u8, 22u8,
-							144u8,
+							54u8, 54u8, 144u8, 124u8, 31u8, 5u8, 225u8, 179u8, 117u8, 252u8, 100u8,
+							7u8, 56u8, 236u8, 62u8, 137u8, 191u8, 234u8, 80u8, 127u8, 75u8, 135u8,
+							118u8, 171u8, 215u8, 135u8, 46u8, 91u8, 29u8, 157u8, 43u8, 73u8,
 						],
 					)
 				}
@@ -24438,10 +24443,9 @@ pub mod api {
 						"OperationalAccounts",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							140u8, 165u8, 37u8, 252u8, 177u8, 215u8, 48u8, 223u8, 151u8, 25u8,
-							228u8, 203u8, 199u8, 228u8, 30u8, 39u8, 79u8, 95u8, 146u8, 208u8,
-							222u8, 219u8, 116u8, 78u8, 171u8, 184u8, 95u8, 95u8, 0u8, 157u8, 22u8,
-							144u8,
+							54u8, 54u8, 144u8, 124u8, 31u8, 5u8, 225u8, 179u8, 117u8, 252u8, 100u8,
+							7u8, 56u8, 236u8, 62u8, 137u8, 191u8, 234u8, 80u8, 127u8, 75u8, 135u8,
+							118u8, 171u8, 215u8, 135u8, 46u8, 91u8, 29u8, 157u8, 43u8, 73u8,
 						],
 					)
 				}
@@ -30172,12 +30176,6 @@ pub mod api {
 				pub struct Vault<_0, _1> {
 					pub operator_account_id: _0,
 					pub delegate_account_id: ::core::option::Option<_0>,
-					pub name: ::core::option::Option<
-						runtime_types::bounded_collections::bounded_vec::BoundedVec<
-							::core::primitive::u8,
-						>,
-					>,
-					pub last_name_change_tick: ::core::option::Option<::core::primitive::u64>,
 					#[codec(compact)]
 					pub securitization: _1,
 					#[codec(compact)]
@@ -35614,7 +35612,7 @@ pub mod api {
 				)]
 				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 				pub enum Call {
-					# [codec (index = 0)] # [doc = "Register vault and mining accounts for an operational account."] # [doc = "Any account in the registration may submit the transaction."] # [doc = "When invite-only is enabled, the registration must include an upstream access proof."] register { registration : runtime_types :: pallet_operational_accounts :: pallet :: Registration , } , # [codec (index = 2)] # [doc = "Update certification reward amounts for operational accounts."] set_reward_config { operational_certification_reward : :: core :: primitive :: u128 , operational_certification_bonus_reward : :: core :: primitive :: u128 , } , # [codec (index = 3)] # [doc = "Force-update operational progress markers for an account."] force_set_progress { owner : crate :: types :: AccountId32 , patch : runtime_types :: pallet_operational_accounts :: pallet :: OperationalProgressPatch < :: core :: primitive :: u128 > , update_operational_progress : :: core :: primitive :: bool , } , # [codec (index = 5)] # [doc = "Activate an eligible operational account from any managed account."] activate , # [codec (index = 6)] # [doc = "Claim pending operational rewards to any managed account."] claim_rewards { amount : :: core :: primitive :: u128 , } , }
+					# [codec (index = 0)] # [doc = "Register vault and mining accounts for an operational account."] # [doc = "Any account in the registration may submit the transaction."] # [doc = "When invite-only is enabled, the registration must include an upstream access proof."] register { registration : runtime_types :: pallet_operational_accounts :: pallet :: Registration , } , # [codec (index = 1)] # [doc = "Update the display name on an operational account profile."] set_name { name : :: core :: option :: Option < runtime_types :: bounded_collections :: bounded_vec :: BoundedVec < :: core :: primitive :: u8 > > , } , # [codec (index = 2)] # [doc = "Update certification reward amounts for operational accounts."] set_reward_config { operational_certification_reward : :: core :: primitive :: u128 , operational_certification_bonus_reward : :: core :: primitive :: u128 , } , # [codec (index = 3)] # [doc = "Force-update operational progress markers for an account."] force_set_progress { owner : crate :: types :: AccountId32 , patch : runtime_types :: pallet_operational_accounts :: pallet :: OperationalProgressPatch < :: core :: primitive :: u128 > , update_operational_progress : :: core :: primitive :: bool , } , # [codec (index = 5)] # [doc = "Activate an eligible operational account from any managed account."] activate , # [codec (index = 6)] # [doc = "Claim pending operational rewards to any managed account."] claim_rewards { amount : :: core :: primitive :: u128 , } , }
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
 					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
@@ -35686,6 +35684,10 @@ pub mod api {
 					#[codec(index = 18)]
 					#[doc = "The requested upstream account does not have any available access codes."]
 					UpstreamHasNoAvailableAccessCodes,
+					#[codec(index = 19)]
+					#[doc = "Profile names must start with an uppercase ASCII letter and otherwise be ASCII"]
+					#[doc = "alphanumeric."]
+					InvalidName,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -35782,6 +35784,12 @@ pub mod api {
 					pub encryption_pubkey:
 						runtime_types::pallet_operational_accounts::pallet::OpaqueEncryptionPubkey,
 					pub upstream_account: ::core::option::Option<crate::types::AccountId32>,
+					pub name: ::core::option::Option<
+						runtime_types::bounded_collections::bounded_vec::BoundedVec<
+							::core::primitive::u8,
+						>,
+					>,
+					pub last_name_change_tick: ::core::option::Option<::core::primitive::u64>,
 					pub uniswap_argon_transfers_in_amount: ::core::primitive::u128,
 					pub account_bitcoin_amount: ::core::primitive::u128,
 					pub account_vault_bond_amount: ::core::primitive::u128,
@@ -37658,14 +37666,6 @@ pub mod api {
 					set_delegate_account {
 						delegate_account_id: ::core::option::Option<crate::types::AccountId32>,
 					},
-					#[codec(index = 7)]
-					set_name {
-						name: ::core::option::Option<
-							runtime_types::bounded_collections::bounded_vec::BoundedVec<
-								::core::primitive::u8,
-							>,
-						>,
-					},
 					#[codec(index = 8)]
 					set_committed_argonots {
 						#[codec(compact)]
@@ -37770,25 +37770,21 @@ pub mod api {
 					#[doc = "Treasury bond sharing plus bonus cannot exceed 100%."]
 					InvalidBondSharingTerms,
 					#[codec(index = 27)]
-					#[doc = "Vault names must start with an uppercase ASCII letter and otherwise be ASCII"]
-					#[doc = "alphanumeric."]
-					InvalidVaultName,
-					#[codec(index = 28)]
 					#[doc = "A vault must clear out all pending cosigns before it can collect"]
 					PendingCosignsBeforeCollect,
-					#[codec(index = 29)]
+					#[codec(index = 28)]
 					#[doc = "A vault must clear out all pending orphan cosigns before it can collect"]
 					PendingOrphanedUtxoCosignsBeforeCollect,
-					#[codec(index = 30)]
+					#[codec(index = 29)]
 					#[doc = "A vault must clear out all overdue external collect blockers before it can collect."]
 					OverdueCollectBlockersBeforeCollect,
-					#[codec(index = 31)]
+					#[codec(index = 30)]
 					#[doc = "An account may only be associated with a single vault"]
 					AccountAlreadyHasVault,
-					#[codec(index = 32)]
+					#[codec(index = 31)]
 					#[doc = "Vault creation currently requires a prior operational-account upgrade."]
 					OperationalAccountRegistrationRequired,
-					#[codec(index = 33)]
+					#[codec(index = 32)]
 					#[doc = "Committed Argonots cannot be reduced below the amount already crosschain-encumbered."]
 					CommittedArgonotsBelowEncumberedBacking,
 				}
@@ -37961,11 +37957,6 @@ pub mod api {
 				)]
 				pub struct VaultConfig<_0, _1> {
 					pub terms: runtime_types::argon_primitives::vault::VaultTerms<_1>,
-					pub name: ::core::option::Option<
-						runtime_types::bounded_collections::bounded_vec::BoundedVec<
-							::core::primitive::u8,
-						>,
-					>,
 					pub delegate_account_id: ::core::option::Option<_0>,
 					#[codec(compact)]
 					pub securitization: _1,
