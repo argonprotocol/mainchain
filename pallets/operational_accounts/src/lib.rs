@@ -21,11 +21,13 @@ mod weights;
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
+	use alloc::vec::Vec;
 	use argon_primitives::{
-		bitcoin::UtxoId, vault::BitcoinVaultProvider, BitcoinLocksProvider, MiningSlotProvider,
-		OperationalAccountProvider, OperationalAccountsHook, OperationalRewardKind,
-		OperationalRewardsPayer, Signature, TickProvider, TreasuryPoolProvider,
-		UniswapTransferProvider, UtxoLockEvents, MICROGONS_PER_ARGON,
+		bitcoin::UtxoId, block_seal::BlockSealAuthorityId, vault::BitcoinVaultProvider,
+		BitcoinLocksProvider, MiningSlotProvider, OnNewSlot, OperationalAccountProvider,
+		OperationalAccountsHook, OperationalRewardKind, OperationalRewardsPayer, Signature,
+		TickProvider, TreasuryPoolProvider, UniswapTransferProvider, UtxoLockEvents,
+		MICROGONS_PER_ARGON,
 	};
 	use codec::{Decode, Encode, EncodeLike};
 	use core::{fmt::Debug, marker::PhantomData};
@@ -80,6 +82,9 @@ pub mod pallet {
 		/// Maximum number of available access codes allowed at once.
 		#[pallet::constant]
 		type MaxAvailableAccessCodes: Get<u32>;
+		/// Maximum number of accrued access codes awarded at one frame boundary.
+		#[pallet::constant]
+		type MaxAccessCodeAwardsPerFrame: Get<u32>;
 		/// Minimum Uniswap transfer amount required to register.
 		#[pallet::constant]
 		type MinimumUniswapTransfer: Get<Self::Balance>;
@@ -317,8 +322,6 @@ pub mod pallet {
 		/// Number of downstream operational certifications credited to this account.
 		#[codec(compact)]
 		pub operational_certifications_count: u32,
-		/// Whether one earned access code is pending materialization.
-		pub access_code_pending: bool,
 		/// Number of access codes this account can still grant.
 		#[codec(compact)]
 		pub available_access_codes: u32,
@@ -374,6 +377,12 @@ pub mod pallet {
 	/// Registered operational accounts keyed by the primary account id.
 	pub type OperationalAccounts<T: Config> =
 		StorageMap<_, Blake2_128Concat, T::AccountId, OperationalAccount<T>, OptionQuery>;
+
+	#[pallet::storage]
+	/// Set of operational accounts that have met both follow-on access-code thresholds.
+	/// The key count weights frame processing without scanning the set twice.
+	pub type AccessCodeReadyAccounts<T: Config> =
+		CountedStorageMap<_, Blake2_128Concat, T::AccountId, (), OptionQuery>;
 
 	#[pallet::storage]
 	/// Reverse lookup of any linked account to its operational account id.
@@ -619,7 +628,6 @@ pub mod pallet {
 							return Err(Error::<T>::UpstreamHasNoAvailableAccessCodes);
 						}
 						upstream_account_data.available_access_codes.saturating_reduce(1);
-						Self::materialize_available_access_codes(upstream_account_data);
 
 						Ok(upstream_account.clone())
 					},
@@ -657,7 +665,6 @@ pub mod pallet {
 				mining_seat_accrual: mining_seat_count,
 				mining_seat_applied_total: 0,
 				operational_certifications_count: 0,
-				access_code_pending: false,
 				available_access_codes: 0,
 				rewards_earned_count: 0,
 				rewards_earned_amount: T::Balance::zero(),
@@ -782,8 +789,8 @@ pub mod pallet {
 						account,
 					);
 
-					if update_operational_progress {
-						Self::materialize_available_access_codes(account);
+					if update_operational_progress && Self::is_ready_for_access_code(account) {
+						Self::award_accrued_access_code(account);
 					}
 
 					uniswap_argon_transfers_in_amount = account.uniswap_argon_transfers_in_amount;
@@ -832,8 +839,7 @@ pub mod pallet {
 
 				let reward_config = Rewards::<T>::get();
 				account.is_operationally_certified = true;
-				Self::increment_available_access_codes(account);
-				Self::materialize_available_access_codes(account);
+				account.available_access_codes = 1;
 				T::VaultProvider::account_became_operational(&account.vault_account);
 				Self::deposit_event(Event::AccountOperationallyCertified {
 					account: owner.clone(),
@@ -853,8 +859,11 @@ pub mod pallet {
 						if !upstream_account_data.is_operationally_certified {
 							return;
 						}
-						upstream_account_data.access_code_pending = true;
-						Self::materialize_available_access_codes(upstream_account_data);
+						if upstream_account_data.available_access_codes <
+							T::MaxAvailableAccessCodes::get()
+						{
+							upstream_account_data.available_access_codes.saturating_accrue(1);
+						}
 						upstream_account_data.operational_certifications_count.saturating_accrue(1);
 						Self::record_reward(
 							upstream_account_data,
@@ -876,6 +885,7 @@ pub mod pallet {
 						}
 					});
 				}
+				Self::queue_access_code_if_ready(&owner, account);
 
 				Ok(())
 			})
@@ -1029,42 +1039,32 @@ pub mod pallet {
 			meets_minimums
 		}
 
-		fn increment_available_access_codes(account: &mut OperationalAccount<T>) {
-			if account.available_access_codes < T::MaxAvailableAccessCodes::get() {
-				account.available_access_codes.saturating_accrue(1);
-			}
+		fn award_accrued_access_code(account: &mut OperationalAccount<T>) {
+			account.vault_bitcoin_applied_total = Self::current_vault_bitcoin_amount(account);
+			account.vault_bitcoin_accrual = T::Balance::zero();
+			account.mining_seat_applied_total = Self::mining_seat_count(account);
+			account.mining_seat_accrual = 0;
+			account.available_access_codes.saturating_accrue(1);
 		}
 
-		fn materialize_available_access_codes(account: &mut OperationalAccount<T>) {
-			if !account.is_operationally_certified {
-				return;
-			}
-			let max_available_access_codes = T::MaxAvailableAccessCodes::get();
+		fn is_ready_for_access_code(account: &OperationalAccount<T>) -> bool {
 			let bitcoin_threshold = T::BitcoinLockSizeForAccessCode::get();
 			let mining_seat_threshold = T::MiningSeatsPerAccessCode::get();
-			while account.available_access_codes < max_available_access_codes {
-				if account.access_code_pending {
-					account.access_code_pending = false;
-					account.available_access_codes.saturating_accrue(1);
-					continue;
-				}
-				if bitcoin_threshold > T::Balance::zero() &&
-					account.vault_bitcoin_accrual >= bitcoin_threshold
-				{
-					account.vault_bitcoin_applied_total =
-						Self::current_vault_bitcoin_amount(account);
-					account.vault_bitcoin_accrual = T::Balance::zero();
-					account.available_access_codes.saturating_accrue(1);
-					continue;
-				}
-				if mining_seat_threshold > 0 && account.mining_seat_accrual >= mining_seat_threshold
-				{
-					account.mining_seat_applied_total = Self::mining_seat_count(account);
-					account.mining_seat_accrual = 0;
-					account.available_access_codes.saturating_accrue(1);
-					continue;
-				}
-				break;
+			let has_bitcoin = bitcoin_threshold > T::Balance::zero() &&
+				account.vault_bitcoin_accrual >= bitcoin_threshold;
+			let has_mining =
+				mining_seat_threshold > 0 && account.mining_seat_accrual >= mining_seat_threshold;
+
+			account.is_operationally_certified &&
+				account.available_access_codes < T::MaxAvailableAccessCodes::get() &&
+				has_bitcoin && has_mining
+		}
+
+		fn queue_access_code_if_ready(owner: &T::AccountId, account: &OperationalAccount<T>) {
+			if Self::is_ready_for_access_code(account) &&
+				!AccessCodeReadyAccounts::<T>::contains_key(owner)
+			{
+				AccessCodeReadyAccounts::<T>::insert(owner, ());
 			}
 		}
 
@@ -1218,7 +1218,7 @@ pub mod pallet {
 					return;
 				}
 				Self::recalculate_vault_bitcoin_accrual(account, total_locked);
-				Self::materialize_available_access_codes(account);
+				Self::queue_access_code_if_ready(&owner, account);
 			});
 		}
 
@@ -1235,7 +1235,7 @@ pub mod pallet {
 					return;
 				};
 				account.mining_seat_accrual.saturating_accrue(1);
-				Self::materialize_available_access_codes(account);
+				Self::queue_access_code_if_ready(&owner, account);
 			});
 		}
 
@@ -1253,6 +1253,36 @@ pub mod pallet {
 
 		fn account_uniswap_argon_transfers_in_updated(account_id: &T::AccountId) {
 			Self::refresh_account_uniswap_argon_transfers_in_amount(account_id)
+		}
+	}
+
+	impl<T: Config> OnNewSlot<T::AccountId> for Pallet<T> {
+		type Key = BlockSealAuthorityId;
+
+		fn on_frame_start(_frame_id: FrameId) {
+			let ready_accounts = AccessCodeReadyAccounts::<T>::iter_keys()
+				.take(T::MaxAccessCodeAwardsPerFrame::get() as usize)
+				.collect::<Vec<_>>();
+
+			for owner in ready_accounts {
+				AccessCodeReadyAccounts::<T>::remove(&owner);
+				OperationalAccounts::<T>::mutate(owner, |maybe_account| {
+					if let Some(account) = maybe_account {
+						// Readiness may have changed since this account was queued.
+						if Self::is_ready_for_access_code(account) {
+							Self::award_accrued_access_code(account);
+						}
+					}
+				});
+			}
+		}
+
+		fn on_frame_start_weight(_frame_id: FrameId) -> Weight {
+			let ready_count =
+				AccessCodeReadyAccounts::<T>::count().min(T::MaxAccessCodeAwardsPerFrame::get());
+			T::DbWeight::get()
+				.reads(1)
+				.saturating_add(T::WeightInfo::on_frame_start(ready_count))
 		}
 	}
 

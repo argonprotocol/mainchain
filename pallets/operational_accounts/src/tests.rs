@@ -1,12 +1,13 @@
 use crate::{
-	AccountOwnershipProof, Error, IsOperationalAccountInviteOnly, OpaqueEncryptionPubkey,
-	OperationalAccount, OperationalAccountBySubAccount, OperationalAccountName,
-	OperationalAccounts, OperationalProgressPatch, Registration, RegistrationV1,
-	UpstreamAccessProof, MINING_ACCOUNT_PROOF_MESSAGE_KEY, OPERATIONAL_ACCOUNT_PROOF_MESSAGE_KEY,
-	UPSTREAM_ACCESS_PROOF_MESSAGE_KEY, VAULT_ACCOUNT_PROOF_MESSAGE_KEY,
+	AccessCodeReadyAccounts, AccountOwnershipProof, Error, IsOperationalAccountInviteOnly,
+	OpaqueEncryptionPubkey, OperationalAccount, OperationalAccountBySubAccount,
+	OperationalAccountName, OperationalAccounts, OperationalProgressPatch, Registration,
+	RegistrationV1, UpstreamAccessProof, MINING_ACCOUNT_PROOF_MESSAGE_KEY,
+	OPERATIONAL_ACCOUNT_PROOF_MESSAGE_KEY, UPSTREAM_ACCESS_PROOF_MESSAGE_KEY,
+	VAULT_ACCOUNT_PROOF_MESSAGE_KEY,
 };
 use argon_primitives::{
-	OperationalAccountProvider, OperationalAccountsHook, Signature, UtxoLockEvents,
+	OnNewSlot, OperationalAccountProvider, OperationalAccountsHook, Signature, UtxoLockEvents,
 	MICROGONS_PER_ARGON,
 };
 use frame_support::{assert_noop, assert_ok};
@@ -20,10 +21,10 @@ use crate::mock::{
 	record_active_vault_bond_amount, record_funded_bitcoin_amount, record_microgons_in,
 	record_microgons_out, set_argon_balance, set_crosschain_activated, set_registration_lookup,
 	BitcoinLockSizeForAccessCode, ClaimableTreasuryBalance, ClaimedOperationalRewards, CurrentTick,
-	MinimumBitcoin, MinimumBonds, MinimumUniswapTransfer,
-	OperationalAccounts as OperationalAccountsPallet, OperationalCertificationReward,
-	OperationalMinimumUniswapTransfer, OperationalMinimumVaultSecuritization, RuntimeOrigin, Test,
-	TestAccountId,
+	MaxAvailableAccessCodes, MinimumBitcoin, MinimumBonds, MinimumUniswapTransfer,
+	MiningSeatsPerAccessCode, OperationalAccounts as OperationalAccountsPallet,
+	OperationalCertificationReward, OperationalMinimumUniswapTransfer,
+	OperationalMinimumVaultSecuritization, RuntimeOrigin, Test, TestAccountId,
 };
 
 #[test]
@@ -34,6 +35,7 @@ fn test_register_creates_operational_account() {
 
 		let operational_account = OperationalAccounts::<Test>::get(&account_set.owner)
 			.expect("operational account created");
+		assert_eq!(AccessCodeReadyAccounts::<Test>::count(), 0);
 		assert_eq!(operational_account.vault_account, account_set.vault);
 		assert_eq!(operational_account.mining_account, account_set.mining);
 		assert_eq!(operational_account.encryption_pubkey, account_set.encryption_pubkey);
@@ -152,7 +154,7 @@ fn test_register_requires_minimums() {
 }
 
 #[test]
-fn test_register_allows_upstream_account_when_invite_only() {
+fn test_referred_operational_account_replenishes_upstream_access_code() {
 	new_test_ext().execute_with(|| {
 		let upstream_set = make_account_set(9, 10, 11);
 		let downstream_set = make_account_set(13, 14, 15);
@@ -165,12 +167,19 @@ fn test_register_allows_upstream_account_when_invite_only() {
 
 		register_account(&downstream_set, Some(access_proof));
 
-		let downstream_account =
-			OperationalAccounts::<Test>::get(&downstream_set.owner).expect("downstream account");
-		assert_eq!(downstream_account.upstream_account, Some(upstream_set.owner.clone()));
 		let upstream_account =
 			OperationalAccounts::<Test>::get(&upstream_set.owner).expect("upstream account");
 		assert_eq!(upstream_account.available_access_codes, 0);
+
+		satisfy_and_activate(&downstream_set);
+
+		let downstream_account =
+			OperationalAccounts::<Test>::get(&downstream_set.owner).expect("downstream account");
+		assert_eq!(downstream_account.upstream_account, Some(upstream_set.owner.clone()));
+		assert_eq!(downstream_account.available_access_codes, 1);
+		let upstream_account =
+			OperationalAccounts::<Test>::get(&upstream_set.owner).expect("upstream account");
+		assert_eq!(upstream_account.available_access_codes, 1);
 	});
 }
 
@@ -287,7 +296,7 @@ fn test_register_records_upstream_account() {
 }
 
 #[test]
-fn test_access_registration_consumes_available_and_materializes_ready_access_code() {
+fn test_access_registration_does_not_materialize_accrual_access_code() {
 	new_test_ext().execute_with(|| {
 		let upstream_set = make_account_set(48, 49, 50);
 		let downstream_set = make_account_set(51, 52, 53);
@@ -297,9 +306,18 @@ fn test_access_registration_consumes_available_and_materializes_ready_access_cod
 		let bitcoin_threshold = BitcoinLockSizeForAccessCode::get();
 		OperationalAccounts::<Test>::mutate(&upstream_set.owner, |maybe| {
 			let upstream_account = maybe.as_mut().expect("upstream account");
-			upstream_account.available_access_codes = 1;
-			upstream_account.vault_bitcoin_accrual = bitcoin_threshold;
+			upstream_account.available_access_codes = MaxAvailableAccessCodes::get();
+			upstream_account.mining_seat_applied_total = mining_seat_count(upstream_account);
+			upstream_account.mining_seat_accrual = 0;
 		});
+		for _ in 0..MiningSeatsPerAccessCode::get() {
+			OperationalAccountsPallet::mining_seat_won(&upstream_set.mining);
+		}
+		OperationalAccountsPallet::vault_bitcoin_lock_funded(
+			&upstream_set.vault,
+			bitcoin_threshold,
+		);
+		assert!(!AccessCodeReadyAccounts::<Test>::contains_key(&upstream_set.owner));
 
 		register_account(
 			&downstream_set,
@@ -312,7 +330,19 @@ fn test_access_registration_consumes_available_and_materializes_ready_access_cod
 		let upstream_account =
 			OperationalAccounts::<Test>::get(&upstream_set.owner).expect("upstream account");
 		assert_eq!(upstream_account.available_access_codes, 1);
+		assert_eq!(upstream_account.vault_bitcoin_accrual, bitcoin_threshold);
+		assert_eq!(upstream_account.mining_seat_accrual, MiningSeatsPerAccessCode::get());
+		assert!(!AccessCodeReadyAccounts::<Test>::contains_key(&upstream_set.owner));
+
+		OperationalAccountsPallet::mining_seat_won(&upstream_set.mining);
+		assert!(AccessCodeReadyAccounts::<Test>::contains_key(&upstream_set.owner));
+
+		<OperationalAccountsPallet as OnNewSlot<TestAccountId>>::on_frame_start(1);
+		let upstream_account =
+			OperationalAccounts::<Test>::get(&upstream_set.owner).expect("upstream account");
+		assert_eq!(upstream_account.available_access_codes, MaxAvailableAccessCodes::get());
 		assert_eq!(upstream_account.vault_bitcoin_accrual, 0);
+		assert_eq!(upstream_account.mining_seat_accrual, 0);
 	});
 }
 
@@ -638,6 +668,42 @@ fn test_force_set_progress_applies_patch_and_reconciles_totals() {
 		assert_ok!(OperationalAccountsPallet::activate(RuntimeOrigin::signed(
 			account_set.owner.clone(),
 		)));
+
+		assert_ok!(OperationalAccountsPallet::force_set_progress(
+			RuntimeOrigin::root(),
+			account_set.owner.clone(),
+			OperationalProgressPatch {
+				uniswap_argon_transfers_in_amount: None,
+				account_bitcoin_amount: None,
+				account_vault_bond_amount: None,
+				vault_created: None,
+				vault_bitcoin_amount: None,
+				mining_seat_count: Some(MiningSeatsPerAccessCode::get()),
+			},
+			false,
+		));
+		let account = OperationalAccounts::<Test>::get(&account_set.owner).expect("account");
+		assert_eq!(account.available_access_codes, 1);
+		assert!(!AccessCodeReadyAccounts::<Test>::contains_key(&account_set.owner));
+
+		assert_ok!(OperationalAccountsPallet::force_set_progress(
+			RuntimeOrigin::root(),
+			account_set.owner.clone(),
+			OperationalProgressPatch {
+				uniswap_argon_transfers_in_amount: None,
+				account_bitcoin_amount: None,
+				account_vault_bond_amount: None,
+				vault_created: None,
+				vault_bitcoin_amount: None,
+				mining_seat_count: Some(MiningSeatsPerAccessCode::get()),
+			},
+			true,
+		));
+
+		let account = OperationalAccounts::<Test>::get(&account_set.owner).expect("account");
+		assert_eq!(account.available_access_codes, 2);
+		assert_eq!(account.vault_bitcoin_accrual, 0);
+		assert_eq!(account.mining_seat_accrual, 0);
 	});
 }
 
@@ -820,46 +886,155 @@ fn test_claim_rewards_pays_to_managed_signer_and_decrements_pending() {
 }
 
 #[test]
-fn test_follow_on_access_codes_only_count_vault_bitcoin() {
+fn test_follow_on_access_codes_only_materialize_once_on_mining_frame_turn() {
 	new_test_ext().execute_with(|| {
 		let account_set = make_account_set(151, 152, 153);
 		register_account(&account_set, None);
 		satisfy_and_activate(&account_set);
-		set_available_access_codes(&account_set.owner, 0);
-		let prior_account = OperationalAccounts::<Test>::get(&account_set.owner).expect("account");
-		let prior_account_bitcoin_amount = prior_account.account_bitcoin_amount;
+		OperationalAccounts::<Test>::mutate(&account_set.owner, |maybe| {
+			let account = maybe.as_mut().expect("account");
+			account.available_access_codes = 0;
+			account.mining_seat_applied_total = mining_seat_count(account);
+			account.mining_seat_accrual = 0;
+		});
 
-		record_account_bitcoin(&account_set.vault, BitcoinLockSizeForAccessCode::get());
+		for _ in 0..MiningSeatsPerAccessCode::get() {
+			OperationalAccountsPallet::mining_seat_won(&account_set.mining);
+		}
+
 		let account = OperationalAccounts::<Test>::get(&account_set.owner).expect("account");
-		let prior_vault_bitcoin_amount = current_vault_bitcoin_amount(&account);
 		assert_eq!(account.available_access_codes, 0);
-		assert_eq!(
-			account.account_bitcoin_amount,
-			prior_account_bitcoin_amount.saturating_add(BitcoinLockSizeForAccessCode::get()),
-		);
+		assert_eq!(account.mining_seat_accrual, MiningSeatsPerAccessCode::get());
 
 		OperationalAccountsPallet::vault_bitcoin_lock_funded(
 			&account_set.vault,
 			BitcoinLockSizeForAccessCode::get(),
 		);
 		let account = OperationalAccounts::<Test>::get(&account_set.owner).expect("account");
+		assert_eq!(account.available_access_codes, 0);
+		assert_eq!(account.vault_bitcoin_accrual, BitcoinLockSizeForAccessCode::get());
+		assert_eq!(account.mining_seat_accrual, MiningSeatsPerAccessCode::get());
+
+		<OperationalAccountsPallet as OnNewSlot<TestAccountId>>::on_frame_start(1);
+		let account = OperationalAccounts::<Test>::get(&account_set.owner).expect("account");
 		assert_eq!(account.available_access_codes, 1);
-		assert_eq!(
-			current_vault_bitcoin_amount(&account),
-			prior_vault_bitcoin_amount.saturating_add(BitcoinLockSizeForAccessCode::get()),
-		);
+		assert_eq!(account.vault_bitcoin_accrual, 0);
+		assert_eq!(account.mining_seat_accrual, 0);
+		assert_eq!(current_vault_bitcoin_amount(&account), BitcoinLockSizeForAccessCode::get());
+
+		OperationalAccounts::<Test>::mutate(&account_set.owner, |maybe| {
+			let account = maybe.as_mut().expect("account");
+			account.available_access_codes = 0;
+			account.vault_bitcoin_accrual = 2 * BitcoinLockSizeForAccessCode::get();
+			account.mining_seat_accrual = 2 * MiningSeatsPerAccessCode::get() - 1;
+		});
+		AccessCodeReadyAccounts::<Test>::insert(&account_set.owner, ());
+		<OperationalAccountsPallet as OnNewSlot<TestAccountId>>::on_frame_start(2);
+
+		let account = OperationalAccounts::<Test>::get(&account_set.owner).expect("account");
+		assert_eq!(account.available_access_codes, 1);
+		assert_eq!(account.vault_bitcoin_accrual, 0);
+		assert_eq!(account.mining_seat_accrual, 0);
 	});
 }
 
 #[test]
-fn test_activate_records_certification_reward() {
+fn test_frame_rechecks_access_code_thresholds_before_awarding() {
+	new_test_ext().execute_with(|| {
+		let account_set = make_account_set(181, 182, 183);
+		register_account(&account_set, None);
+		OperationalAccounts::<Test>::mutate(&account_set.owner, |maybe| {
+			let account = maybe.as_mut().expect("account");
+			account.is_operationally_certified = true;
+			account.vault_bitcoin_accrual = BitcoinLockSizeForAccessCode::get();
+			account.mining_seat_accrual = MiningSeatsPerAccessCode::get();
+		});
+		AccessCodeReadyAccounts::<Test>::insert(&account_set.owner, ());
+
+		OperationalAccounts::<Test>::mutate(&account_set.owner, |maybe| {
+			let account = maybe.as_mut().expect("account");
+			account.mining_seat_accrual = MiningSeatsPerAccessCode::get() - 1;
+		});
+
+		<OperationalAccountsPallet as OnNewSlot<TestAccountId>>::on_frame_start(1);
+
+		let account = OperationalAccounts::<Test>::get(&account_set.owner).expect("account");
+		assert_eq!(account.available_access_codes, 0);
+		assert_eq!(account.vault_bitcoin_accrual, BitcoinLockSizeForAccessCode::get());
+		assert_eq!(account.mining_seat_accrual, MiningSeatsPerAccessCode::get() - 1);
+		assert!(!AccessCodeReadyAccounts::<Test>::contains_key(&account_set.owner));
+	});
+}
+
+#[test]
+fn test_activation_grants_single_code_without_materializing_progress() {
 	new_test_ext().execute_with(|| {
 		let account_set = make_account_set(201, 202, 203);
 		register_account(&account_set, None);
-		satisfy_and_activate(&account_set);
+		satisfy_operational_requirements(&account_set.mining, &account_set.vault);
+		for _ in 2..MiningSeatsPerAccessCode::get() {
+			OperationalAccountsPallet::mining_seat_won(&account_set.mining);
+		}
+		OperationalAccountsPallet::vault_bitcoin_lock_funded(
+			&account_set.vault,
+			BitcoinLockSizeForAccessCode::get(),
+		);
+
+		assert_ok!(OperationalAccountsPallet::activate(RuntimeOrigin::signed(
+			account_set.mining.clone()
+		)));
 
 		let account = OperationalAccounts::<Test>::get(&account_set.owner).expect("account");
 		assert_eq!(pending_rewards_amount(&account), OperationalCertificationReward::get());
+		assert_eq!(account.available_access_codes, 1);
+		assert_eq!(account.vault_bitcoin_accrual, BitcoinLockSizeForAccessCode::get());
+		assert_eq!(account.mining_seat_accrual, MiningSeatsPerAccessCode::get());
+		assert!(AccessCodeReadyAccounts::<Test>::contains_key(&account_set.owner));
+	});
+}
+
+#[test]
+fn test_frame_awards_are_bounded_and_remaining_accounts_stay_ready() {
+	new_test_ext().execute_with(|| {
+		let account_sets = [
+			make_account_set(211, 212, 213),
+			make_account_set(221, 222, 223),
+			make_account_set(231, 232, 233),
+		];
+
+		for account_set in &account_sets {
+			register_account(account_set, None);
+			OperationalAccounts::<Test>::mutate(&account_set.owner, |maybe| {
+				let account = maybe.as_mut().expect("account");
+				account.is_operationally_certified = true;
+				account.vault_bitcoin_accrual = BitcoinLockSizeForAccessCode::get();
+				account.mining_seat_accrual = MiningSeatsPerAccessCode::get();
+			});
+			AccessCodeReadyAccounts::<Test>::insert(&account_set.owner, ());
+		}
+
+		<OperationalAccountsPallet as OnNewSlot<TestAccountId>>::on_frame_start(1);
+
+		let awarded = account_sets
+			.iter()
+			.filter(|account_set| {
+				OperationalAccounts::<Test>::get(&account_set.owner)
+					.expect("account")
+					.available_access_codes ==
+					1
+			})
+			.count();
+		assert_eq!(awarded, 2);
+		assert_eq!(AccessCodeReadyAccounts::<Test>::count(), 1);
+
+		<OperationalAccountsPallet as OnNewSlot<TestAccountId>>::on_frame_start(2);
+		assert!(account_sets.iter().all(|account_set| {
+			OperationalAccounts::<Test>::get(&account_set.owner)
+				.expect("account")
+				.available_access_codes ==
+				1
+		}));
+		assert_eq!(AccessCodeReadyAccounts::<Test>::count(), 0);
 	});
 }
 

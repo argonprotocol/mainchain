@@ -152,12 +152,15 @@ where
 				account_bitcoin_amount: account.account_bitcoin_amount,
 				account_vault_bond_amount: account.account_vault_bond_amount,
 				vault_created: account.vault_created,
-				vault_bitcoin_accrual: account.vault_bitcoin_accrual,
-				vault_bitcoin_applied_total: account.vault_bitcoin_applied_total,
-				mining_seat_accrual: account.mining_seat_accrual,
-				mining_seat_applied_total: account.mining_seat_applied_total,
+				vault_bitcoin_accrual: Zero::zero(),
+				vault_bitcoin_applied_total: account
+					.vault_bitcoin_applied_total
+					.saturating_add(account.vault_bitcoin_accrual),
+				mining_seat_accrual: 0,
+				mining_seat_applied_total: account
+					.mining_seat_applied_total
+					.saturating_add(account.mining_seat_accrual),
 				operational_certifications_count: account.operational_certifications_count,
-				access_code_pending: account.access_code_pending,
 				available_access_codes: account.available_access_codes,
 				rewards_earned_count: account.rewards_earned_count,
 				rewards_earned_amount: account.rewards_earned_amount,
@@ -165,7 +168,6 @@ where
 				is_operationally_certified: account.is_operationally_certified,
 			})
 		});
-
 		let mut vault_count = 0u64;
 		VaultsById::<T>::translate::<
 			VaultV16<<T as frame_system::Config>::AccountId, <T as crate::Config>::Balance>,
@@ -232,16 +234,19 @@ where
 		let (expected_operational_account_count, expected_vault_count, expected_named_count) =
 			<(u64, u64, u64)>::decode(&mut state.as_slice())
 				.map_err(|_| TryRuntimeError::Other("could not decode profile migration state"))?;
-		let operational_account_count =
-			pallet_operational_accounts::OperationalAccounts::<T>::iter_keys()
-				.fold(0u64, |count, _| count.saturating_add(1));
+		let mut operational_account_count = 0u64;
+		let mut named_account_count = 0u64;
+		let mut has_uncleared_access_code_progress = false;
+		for (_, account) in pallet_operational_accounts::OperationalAccounts::<T>::iter() {
+			operational_account_count.saturating_accrue(1);
+			if account.name.is_some() || account.last_name_change_tick.is_some() {
+				named_account_count.saturating_accrue(1);
+			}
+			has_uncleared_access_code_progress |=
+				!account.vault_bitcoin_accrual.is_zero() || account.mining_seat_accrual > 0;
+		}
 		let vault_count =
 			VaultsById::<T>::iter_keys().fold(0u64, |count, _| count.saturating_add(1));
-		let named_account_count = pallet_operational_accounts::OperationalAccounts::<T>::iter()
-			.filter(|(_, account)| {
-				account.name.is_some() || account.last_name_change_tick.is_some()
-			})
-			.fold(0u64, |count, _| count.saturating_add(1));
 
 		ensure!(
 			operational_account_count == expected_operational_account_count,
@@ -254,6 +259,10 @@ where
 		ensure!(
 			named_account_count == expected_named_count,
 			TryRuntimeError::Other("linked vault names were not moved into account profiles"),
+		);
+		ensure!(
+			!has_uncleared_access_code_progress,
+			TryRuntimeError::Other("access code progress was not reset"),
 		);
 
 		Ok(())
@@ -372,6 +381,10 @@ mod test {
 				.expect("migrated operational account");
 			assert_eq!(account.name, Some(name));
 			assert_eq!(account.last_name_change_tick, Some(last_name_change_tick));
+			assert_eq!(account.vault_bitcoin_accrual, 0);
+			assert_eq!(account.vault_bitcoin_applied_total, 27);
+			assert_eq!(account.mining_seat_accrual, 0);
+			assert_eq!(account.mining_seat_applied_total, 31);
 			assert_eq!(account.rewards_collected_amount, 21);
 
 			let vault = VaultsById::<Test>::get(vault_id).expect("migrated vault");

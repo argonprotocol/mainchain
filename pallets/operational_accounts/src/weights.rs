@@ -20,6 +20,7 @@ pub trait WeightInfo {
 	fn on_vault_created() -> Weight;
 	fn on_vault_bitcoin_lock_funded() -> Weight;
 	fn on_mining_seat_won() -> Weight;
+	fn on_frame_start(ready_count: u32) -> Weight;
 	fn on_account_bitcoin_amount_updated() -> Weight;
 	fn on_account_vault_bond_total_updated() -> Weight;
 	fn on_account_uniswap_argon_transfers_in_updated() -> Weight;
@@ -149,6 +150,10 @@ where
 		Base::on_mining_seat_won()
 	}
 
+	fn on_frame_start(ready_count: u32) -> Weight {
+		Base::on_frame_start(ready_count)
+	}
+
 	fn on_account_bitcoin_amount_updated() -> Weight {
 		Base::on_account_bitcoin_amount_updated()
 	}
@@ -212,6 +217,9 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 	fn on_mining_seat_won() -> Weight {
+		Weight::zero()
+	}
+	fn on_frame_start(_ready_count: u32) -> Weight {
 		Weight::zero()
 	}
 	fn on_account_bitcoin_amount_updated() -> Weight {

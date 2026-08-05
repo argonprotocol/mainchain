@@ -208,6 +208,7 @@ impl pallet_operational_accounts::Config for Test {
 	type OperationalCertificationBonusReward = OperationalCertificationBonusReward;
 	type OperationalCertificationsPerBonusReward = OperationalCertificationsPerBonusReward;
 	type MaxAvailableAccessCodes = MaxAvailableAccessCodes;
+	type MaxAccessCodeAwardsPerFrame = ConstU32<1_000>;
 	type MinimumUniswapTransfer = MinimumUniswapTransfer;
 	type MinimumBitcoin = MinimumBitcoin;
 	type MinimumBonds = MinimumBonds;

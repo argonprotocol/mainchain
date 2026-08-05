@@ -1225,7 +1225,7 @@ pub trait SlotEvents<AccountId> {
 	}
 }
 
-#[impl_trait_for_tuples::impl_for_tuples(0, 5)]
+#[impl_trait_for_tuples::impl_for_tuples(0, 6)]
 #[tuple_types_custom_trait_bound(OnNewSlot<AId>)]
 impl<AId> SlotEvents<AId> for Tuple {
 	fn on_frame_start(frame_id: FrameId) {

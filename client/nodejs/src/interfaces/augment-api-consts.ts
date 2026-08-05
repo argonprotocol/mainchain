@@ -376,6 +376,10 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       bitcoinLockSizeForAccessCode: u128 & AugmentedConst<ApiType>;
       /**
+       * Maximum number of accrued access codes awarded at one frame boundary.
+       **/
+      maxAccessCodeAwardsPerFrame: u32 & AugmentedConst<ApiType>;
+      /**
        * Maximum number of available access codes allowed at once.
        **/
       maxAvailableAccessCodes: u32 & AugmentedConst<ApiType>;
