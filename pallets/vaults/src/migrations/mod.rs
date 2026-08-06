@@ -19,6 +19,18 @@ use frame_support::{ensure, traits::StorageVersion};
 use sp_runtime::TryRuntimeError;
 
 #[derive(Encode, Decode)]
+struct VaultTermsV16<Balance> {
+	#[codec(compact)]
+	bitcoin_annual_percent_rate: FixedU128,
+	#[codec(compact)]
+	bitcoin_base_fee: Balance,
+	#[codec(compact)]
+	treasury_profit_sharing: Permill,
+	#[codec(compact)]
+	treasury_bonus_profit_sharing: Permill,
+}
+
+#[derive(Encode, Decode)]
 struct VaultV16<AccountId, Balance>
 where
 	AccountId: Codec,
@@ -50,8 +62,8 @@ where
 	#[codec(compact)]
 	securitization_ratio: FixedU128,
 	is_closed: bool,
-	terms: VaultTerms<Balance>,
-	pending_terms: Option<(Tick, VaultTerms<Balance>)>,
+	terms: VaultTermsV16<Balance>,
+	pending_terms: Option<(Tick, VaultTermsV16<Balance>)>,
 	#[codec(compact)]
 	opened_tick: Tick,
 	operational_minimum_release_tick: Option<Tick>,
@@ -204,8 +216,21 @@ where
 				securitization_release_schedule: vault.securitization_release_schedule,
 				securitization_ratio: vault.securitization_ratio,
 				is_closed: vault.is_closed,
-				terms: vault.terms,
-				pending_terms: vault.pending_terms,
+				terms: VaultTerms {
+					bitcoin_annual_percent_rate: vault.terms.bitcoin_annual_percent_rate,
+					bitcoin_base_fee: vault.terms.bitcoin_base_fee,
+					treasury_profit_sharing: vault.terms.treasury_profit_sharing,
+				},
+				pending_terms: vault.pending_terms.map(|(tick, terms)| {
+					(
+						tick,
+						VaultTerms {
+							bitcoin_annual_percent_rate: terms.bitcoin_annual_percent_rate,
+							bitcoin_base_fee: terms.bitcoin_base_fee,
+							treasury_profit_sharing: terms.treasury_profit_sharing,
+						},
+					)
+				}),
 				opened_tick: vault.opened_tick,
 				operational_minimum_release_tick: vault.operational_minimum_release_tick,
 			})
@@ -356,13 +381,21 @@ mod test {
 					securitization_release_schedule: BoundedBTreeMap::new(),
 					securitization_ratio: FixedU128::from_rational(3, 2),
 					is_closed: true,
-					terms: VaultTerms {
+					terms: VaultTermsV16 {
 						bitcoin_annual_percent_rate: FixedU128::from_rational(11, 10),
 						bitcoin_base_fee: 109,
 						treasury_profit_sharing: Permill::from_percent(10),
 						treasury_bonus_profit_sharing: Permill::from_percent(5),
 					},
-					pending_terms: None,
+					pending_terms: Some((
+						120,
+						VaultTermsV16 {
+							bitcoin_annual_percent_rate: FixedU128::from_rational(12, 10),
+							bitcoin_base_fee: 110,
+							treasury_profit_sharing: Permill::from_percent(20),
+							treasury_bonus_profit_sharing: Permill::from_percent(15),
+						},
+					)),
 					opened_tick: 110,
 					operational_minimum_release_tick: Some(111),
 				},
@@ -393,6 +426,15 @@ mod test {
 			assert_eq!(vault.backfill_securitization_locked, 103);
 			assert_eq!(vault.backfill_securitization_reserved, 104);
 			assert_eq!(vault.backfill_securitized_satoshis, 108);
+			assert_eq!(vault.terms.bitcoin_annual_percent_rate, FixedU128::from_rational(11, 10));
+			assert_eq!(vault.terms.bitcoin_base_fee, 109);
+			assert_eq!(vault.terms.treasury_profit_sharing, Permill::from_percent(10));
+			let (change_tick, pending_terms) =
+				vault.pending_terms.expect("pending terms preserved");
+			assert_eq!(change_tick, 120);
+			assert_eq!(pending_terms.bitcoin_annual_percent_rate, FixedU128::from_rational(12, 10));
+			assert_eq!(pending_terms.bitcoin_base_fee, 110);
+			assert_eq!(pending_terms.treasury_profit_sharing, Permill::from_percent(20));
 			assert_eq!(vault.operational_minimum_release_tick, Some(111));
 			assert_eq!(StorageVersion::get::<Pallet<Test>>(), 17);
 			assert_eq!(StorageVersion::get::<pallet_operational_accounts::Pallet<Test>>(), 4);

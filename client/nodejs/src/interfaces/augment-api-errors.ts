@@ -1292,6 +1292,10 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       BondPurchaseRejected: AugmentedError<ApiType>;
       /**
+       * The approved bonus plus the vault's profit sharing exceeds 100%.
+       **/
+      BonusApprovalExceedsProfitSharing: AugmentedError<ApiType>;
+      /**
        * The beneficiary already has a bond lot for this vault.
        **/
       BonusApprovalExistingBondLot: AugmentedError<ApiType>;
@@ -1395,10 +1399,6 @@ declare module '@polkadot/api-base/types/errors' {
        * The bitcoin script to lock this bitcoin has errors
        **/
       InvalidBitcoinScript: AugmentedError<ApiType>;
-      /**
-       * Treasury bond sharing plus bonus cannot exceed 100%.
-       **/
-      InvalidBondSharingTerms: AugmentedError<ApiType>;
       /**
        * An invalid securitization percent was provided for the vault. NOTE: it cannot be
        * decreased (or negative)

@@ -66,6 +66,7 @@ mod benchmarks {
 		let bonus_approval = TreasuryBonusApprovalProof {
 			vault_id,
 			beneficiary,
+			bonus_percent: Permill::zero(),
 			expires_at_frame: BENCHMARK_FRAME_ID,
 			backfill_bonds_to_unreserve: 0,
 			signature: Signature::Sr25519([0; 64].into()),
@@ -839,7 +840,6 @@ fn benchmark_vault<T: Config>(
 			bitcoin_annual_percent_rate: FixedU128::one(),
 			bitcoin_base_fee: TreasuryBalanceOf::<T>::zero(),
 			treasury_profit_sharing: Permill::from_percent(20),
-			treasury_bonus_profit_sharing: Permill::zero(),
 		},
 		pending_terms: None,
 		opened_tick: 0,

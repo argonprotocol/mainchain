@@ -48,7 +48,6 @@ fn test_vault(account_id: u64, securitized_satoshis: u64, sharing_percent: Permi
 		securitization: 0,
 		securitized_satoshis,
 		sharing_percent,
-		bonus_percent: Permill::zero(),
 		delegate_account_id: None,
 		is_closed: false,
 	}
@@ -57,6 +56,7 @@ fn test_vault(account_id: u64, securitized_satoshis: u64, sharing_percent: Permi
 fn bonus_approval(
 	vault_id: u32,
 	beneficiary: u64,
+	bonus_percent: Permill,
 	expires_at_frame: FrameId,
 	backfill_bonds_to_unreserve: Bonds,
 ) -> TreasuryBonusApprovalProof {
@@ -65,6 +65,7 @@ fn bonus_approval(
 		TREASURY_BONUS_APPROVAL_PROOF_MESSAGE_KEY,
 		vault_id,
 		beneficiary.clone(),
+		bonus_percent,
 		expires_at_frame,
 		backfill_bonds_to_unreserve,
 	)
@@ -73,6 +74,7 @@ fn bonus_approval(
 	TreasuryBonusApprovalProof {
 		vault_id,
 		beneficiary,
+		bonus_percent,
 		expires_at_frame,
 		backfill_bonds_to_unreserve,
 		signature,
@@ -123,16 +125,19 @@ fn buy_bonds_store_plain_and_bonus_terms_and_track_pool_participation() {
 		MinimumArgonsPerContributor::set(1);
 		CurrentFrameId::set(1);
 
-		let mut vault =
-			test_vault(10, (100 * MICROGONS_PER_ARGON) as u64, Permill::from_percent(20));
-		vault.bonus_percent = Permill::from_percent(15);
+		let vault = test_vault(10, (100 * MICROGONS_PER_ARGON) as u64, Permill::from_percent(20));
 		insert_vault(1, vault);
 
 		set_argons(2, 20 * MICROGONS_PER_ARGON);
 		set_argons(3, 20 * MICROGONS_PER_ARGON);
 
 		assert_ok!(Treasury::buy_bonds(origin(2), 1, 5, None));
-		assert_ok!(Treasury::buy_bonds(origin(3), 1, 5, Some(bonus_approval(1, 3, 1, 0)),));
+		assert_ok!(Treasury::buy_bonds(
+			origin(3),
+			1,
+			5,
+			Some(bonus_approval(1, 3, Permill::from_percent(15), 1, 0)),
+		));
 
 		let plain_bond_lot_ids = account_bond_lot_ids(2);
 		assert_eq!(plain_bond_lot_ids.len(), 1);
@@ -247,7 +252,12 @@ fn bond_purchase_unreserves_backfill_from_approval() {
 			Treasury::buy_bonds(origin(2), 1, 10, None),
 			Error::<Test>::BondPurchaseAboveSecurity
 		);
-		assert_ok!(Treasury::buy_bonds(origin(2), 1, 6, Some(bonus_approval(1, 2, 1, 10)),));
+		assert_ok!(Treasury::buy_bonds(
+			origin(2),
+			1,
+			6,
+			Some(bonus_approval(1, 2, Permill::from_percent(15), 1, 10)),
+		));
 		let vault_bonds = BondLotsByVault::<Test>::get(1);
 		assert_eq!(vault_bonds.backfill_bonds_reserved, 0);
 		assert_eq!(vault_bonds.bond_lots.iter().map(|lot| lot.bonds).sum::<u32>(), 6);
@@ -265,38 +275,99 @@ fn bonus_approval_rejects_existing_lot_wrong_vault_account_expiry_and_signature(
 		MinimumArgonsPerContributor::set(1);
 		CurrentFrameId::set(1);
 
-		let mut vault =
-			test_vault(10, (100 * MICROGONS_PER_ARGON) as u64, Permill::from_percent(20));
-		vault.bonus_percent = Permill::from_percent(15);
+		let vault = test_vault(10, (100 * MICROGONS_PER_ARGON) as u64, Permill::from_percent(20));
 		insert_vault(1, vault);
 
 		set_argons(2, 20 * MICROGONS_PER_ARGON);
 		set_argons(3, 20 * MICROGONS_PER_ARGON);
-		assert_ok!(Treasury::buy_bonds(origin(2), 1, 5, Some(bonus_approval(1, 2, 1, 0)),));
+		assert_ok!(Treasury::buy_bonds(
+			origin(2),
+			1,
+			5,
+			Some(bonus_approval(1, 2, Permill::from_percent(15), 1, 0)),
+		));
 
 		assert_err!(
-			Treasury::buy_bonds(origin(2), 1, 5, Some(bonus_approval(1, 2, 2, 0))),
+			Treasury::buy_bonds(
+				origin(2),
+				1,
+				5,
+				Some(bonus_approval(1, 2, Permill::from_percent(15), 2, 0)),
+			),
 			Error::<Test>::BonusApprovalExistingBondLot,
 		);
 
 		assert_err!(
-			Treasury::buy_bonds(origin(2), 1, 5, Some(bonus_approval(2, 2, 1, 0)),),
+			Treasury::buy_bonds(
+				origin(2),
+				1,
+				5,
+				Some(bonus_approval(2, 2, Permill::from_percent(15), 1, 0)),
+			),
 			Error::<Test>::BonusApprovalWrongVault,
 		);
 		assert_err!(
-			Treasury::buy_bonds(origin(2), 1, 5, Some(bonus_approval(1, 3, 1, 0)),),
+			Treasury::buy_bonds(
+				origin(2),
+				1,
+				5,
+				Some(bonus_approval(1, 3, Permill::from_percent(15), 1, 0)),
+			),
 			Error::<Test>::BonusApprovalWrongAccount,
 		);
 		assert_err!(
-			Treasury::buy_bonds(origin(2), 1, 5, Some(bonus_approval(1, 2, 0, 0)),),
+			Treasury::buy_bonds(
+				origin(2),
+				1,
+				5,
+				Some(bonus_approval(1, 2, Permill::from_percent(15), 0, 0)),
+			),
 			Error::<Test>::BonusApprovalExpired,
 		);
 
-		let mut invalid_signature = bonus_approval(1, 3, 1, 0);
+		let mut invalid_signature = bonus_approval(1, 3, Permill::from_percent(15), 1, 0);
 		invalid_signature.signature = Signature::Sr25519([1; 64].into());
 		assert_err!(
 			Treasury::buy_bonds(origin(3), 1, 5, Some(invalid_signature)),
 			Error::<Test>::InvalidBonusApprovalSignature,
+		);
+	});
+}
+
+#[test]
+fn bonus_approval_rejects_a_bonus_percent_changed_after_signing() {
+	new_test_ext().execute_with(|| {
+		MinimumArgonsPerContributor::set(1);
+		CurrentFrameId::set(1);
+
+		let vault = test_vault(10, (100 * MICROGONS_PER_ARGON) as u64, Permill::from_percent(20));
+		insert_vault(1, vault);
+		set_argons(2, 20 * MICROGONS_PER_ARGON);
+
+		let mut approval = bonus_approval(1, 2, Permill::from_percent(10), 1, 0);
+		approval.bonus_percent = Permill::from_percent(15);
+
+		assert_err!(
+			Treasury::buy_bonds(origin(2), 1, 5, Some(approval)),
+			Error::<Test>::InvalidBonusApprovalSignature,
+		);
+	});
+}
+
+#[test]
+fn bonus_approval_rejects_total_profit_sharing_above_one_hundred_percent() {
+	new_test_ext().execute_with(|| {
+		MinimumArgonsPerContributor::set(1);
+		CurrentFrameId::set(1);
+
+		let vault = test_vault(10, (100 * MICROGONS_PER_ARGON) as u64, Permill::from_percent(90));
+		insert_vault(1, vault);
+		set_argons(2, 20 * MICROGONS_PER_ARGON);
+
+		let approval = bonus_approval(1, 2, Permill::from_percent(11), 1, 0);
+		assert_err!(
+			Treasury::buy_bonds(origin(2), 1, 5, Some(approval)),
+			Error::<Test>::BonusApprovalExceedsProfitSharing,
 		);
 	});
 }
@@ -307,19 +378,27 @@ fn bonus_approval_rejects_reuse_while_lot_is_releasing() {
 		MinimumArgonsPerContributor::set(1);
 		CurrentFrameId::set(1);
 
-		let mut vault =
-			test_vault(10, (100 * MICROGONS_PER_ARGON) as u64, Permill::from_percent(20));
-		vault.bonus_percent = Permill::from_percent(15);
+		let vault = test_vault(10, (100 * MICROGONS_PER_ARGON) as u64, Permill::from_percent(20));
 		insert_vault(1, vault);
 
 		set_argons(2, 20 * MICROGONS_PER_ARGON);
-		assert_ok!(Treasury::buy_bonds(origin(2), 1, 5, Some(bonus_approval(1, 2, 1, 0)),));
+		assert_ok!(Treasury::buy_bonds(
+			origin(2),
+			1,
+			5,
+			Some(bonus_approval(1, 2, Permill::from_percent(15), 1, 0)),
+		));
 		let bond_lot_id = account_bond_lot_ids(2)[0];
 
 		assert_ok!(Treasury::liquidate_bond_lot(origin(2), bond_lot_id));
 		CurrentFrameId::set(2);
 		assert_err!(
-			Treasury::buy_bonds(origin(2), 1, 5, Some(bonus_approval(1, 2, 2, 0))),
+			Treasury::buy_bonds(
+				origin(2),
+				1,
+				5,
+				Some(bonus_approval(1, 2, Permill::from_percent(15), 2, 0)),
+			),
 			Error::<Test>::BonusApprovalExistingBondLot,
 		);
 	});
@@ -825,15 +904,18 @@ fn bonus_backed_lots_increase_bonder_payout_and_reduce_vault_remainder() {
 		MinimumArgonsPerContributor::set(1);
 		CurrentFrameId::set(1);
 
-		let mut vault =
-			test_vault(10, (20 * MICROGONS_PER_ARGON) as u64, Permill::from_percent(20));
-		vault.bonus_percent = Permill::from_percent(10);
+		let vault = test_vault(10, (20 * MICROGONS_PER_ARGON) as u64, Permill::from_percent(20));
 		insert_vault(1, vault);
 
 		set_argons(2, 50 * MICROGONS_PER_ARGON);
 		set_argons(3, 50 * MICROGONS_PER_ARGON);
 		assert_ok!(Treasury::buy_bonds(origin(2), 1, 4, None));
-		assert_ok!(Treasury::buy_bonds(origin(3), 1, 4, Some(bonus_approval(1, 3, 1, 0)),));
+		assert_ok!(Treasury::buy_bonds(
+			origin(3),
+			1,
+			4,
+			Some(bonus_approval(1, 3, Permill::from_percent(10), 1, 0)),
+		));
 
 		let plain_lot_id = account_bond_lot_ids(2)[0];
 		let bonus_lot_id = account_bond_lot_ids(3)[0];

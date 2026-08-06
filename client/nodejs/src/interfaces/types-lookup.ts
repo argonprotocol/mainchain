@@ -2699,7 +2699,6 @@ declare module '@polkadot/types/lookup' {
     readonly bitcoinAnnualPercentRate: Compact<u128>;
     readonly bitcoinBaseFee: Compact<u128>;
     readonly treasuryProfitSharing: Compact<Permill>;
-    readonly treasuryBonusProfitSharing: Compact<Permill>;
   }
 
   /** @name ArgonPrimitivesBitcoinOpaqueBitcoinXpub (214) */
@@ -3266,6 +3265,7 @@ declare module '@polkadot/types/lookup' {
   interface ArgonPrimitivesVaultTreasuryBonusApprovalProof extends Struct {
     readonly vaultId: Compact<u32>;
     readonly beneficiary: AccountId32;
+    readonly bonusPercent: Compact<Permill>;
     readonly expiresAtFrame: Compact<u64>;
     readonly backfillBondsToUnreserve: Compact<u32>;
     readonly signature: SpRuntimeMultiSignature;
@@ -3964,7 +3964,6 @@ declare module '@polkadot/types/lookup' {
     readonly isInternalError: boolean;
     readonly isUnableToGenerateVaultBitcoinPubkey: boolean;
     readonly isFundingChangeAlreadyScheduled: boolean;
-    readonly isInvalidBondSharingTerms: boolean;
     readonly isPendingCosignsBeforeCollect: boolean;
     readonly isPendingOrphanedUtxoCosignsBeforeCollect: boolean;
     readonly isOverdueCollectBlockersBeforeCollect: boolean;
@@ -3998,7 +3997,6 @@ declare module '@polkadot/types/lookup' {
       | 'InternalError'
       | 'UnableToGenerateVaultBitcoinPubkey'
       | 'FundingChangeAlreadyScheduled'
-      | 'InvalidBondSharingTerms'
       | 'PendingCosignsBeforeCollect'
       | 'PendingOrphanedUtxoCosignsBeforeCollect'
       | 'OverdueCollectBlockersBeforeCollect'
@@ -4669,6 +4667,7 @@ declare module '@polkadot/types/lookup' {
     readonly isBonusApprovalExpired: boolean;
     readonly isBonusApprovalExistingBondLot: boolean;
     readonly isInvalidBonusApprovalSignature: boolean;
+    readonly isBonusApprovalExceedsProfitSharing: boolean;
     readonly isArgonotBondPurchaseBelowCutoff: boolean;
     readonly isArgonotBondPurchaseAboveCap: boolean;
     readonly isBondLotNotEligibleForBackfill: boolean;
@@ -4690,6 +4689,7 @@ declare module '@polkadot/types/lookup' {
       | 'BonusApprovalExpired'
       | 'BonusApprovalExistingBondLot'
       | 'InvalidBonusApprovalSignature'
+      | 'BonusApprovalExceedsProfitSharing'
       | 'ArgonotBondPurchaseBelowCutoff'
       | 'ArgonotBondPurchaseAboveCap'
       | 'BondLotNotEligibleForBackfill'

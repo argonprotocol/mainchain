@@ -412,6 +412,8 @@ pub mod pallet {
 		BonusApprovalExistingBondLot,
 		/// The bonus approval signature is invalid or unauthorized.
 		InvalidBonusApprovalSignature,
+		/// The approved bonus plus the vault's profit sharing exceeds 100%.
+		BonusApprovalExceedsProfitSharing,
 		/// The Argonot bond purchase did not beat the current active-set cutoff.
 		ArgonotBondPurchaseBelowCutoff,
 		/// The Argonot bond purchase would exceed the active circulation cap.
@@ -462,6 +464,10 @@ pub mod pallet {
 				current_frame_id,
 				bonus_approval.as_ref(),
 			)?;
+			ensure!(
+				sharing_percent.checked_add(&bonus_percent).is_some(),
+				Error::<T>::BonusApprovalExceedsProfitSharing
+			);
 			let backfill_bonds_to_unreserve = bonus_approval
 				.as_ref()
 				.map(|proof| proof.backfill_bonds_to_unreserve)
@@ -888,8 +894,7 @@ pub mod pallet {
 				}
 			}
 
-			Ok(T::TreasuryVaultProvider::get_vault_treasury_bonus_profit_sharing(vault_id)
-				.unwrap_or_default())
+			Ok(bonus_approval.bonus_percent)
 		}
 
 		/// Once the frame is complete, this fn distributes frame earnings to Argonot bond lots

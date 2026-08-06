@@ -2050,6 +2050,7 @@ declare module '@polkadot/api-base/types/submittable' {
             | {
                 vaultId?: any;
                 beneficiary?: any;
+                bonusPercent?: any;
                 expiresAtFrame?: any;
                 backfillBondsToUnreserve?: any;
                 signature?: any;
@@ -2340,12 +2341,7 @@ declare module '@polkadot/api-base/types/submittable' {
           vaultId: u32 | AnyNumber | Uint8Array,
           terms:
             | ArgonPrimitivesVaultVaultTerms
-            | {
-                bitcoinAnnualPercentRate?: any;
-                bitcoinBaseFee?: any;
-                treasuryProfitSharing?: any;
-                treasuryBonusProfitSharing?: any;
-              }
+            | { bitcoinAnnualPercentRate?: any; bitcoinBaseFee?: any; treasuryProfitSharing?: any }
             | string
             | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
