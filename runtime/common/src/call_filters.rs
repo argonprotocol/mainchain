@@ -127,9 +127,6 @@ macro_rules! call_filters {
 						_ => VaultAdminCallFilter::is_single_vault_admin_call(c),
 					},
 					ProxyType::VaultDelegate => match c {
-						RuntimeCall::BitcoinLocks(pallet_bitcoin_locks::Call::initialize_for {
-							..
-						}) |
 						RuntimeCall::CrosschainTransfer(
 							pallet_crosschain_transfer::Call::prove_gateway_activity { .. }
 						) => true,
@@ -139,9 +136,7 @@ macro_rules! call_filters {
 							calls.iter().all(|sc| {
 								matches!(
 									sc,
-									RuntimeCall::BitcoinLocks(
-										pallet_bitcoin_locks::Call::initialize_for { .. }
-									) | RuntimeCall::CrosschainTransfer(
+									RuntimeCall::CrosschainTransfer(
 										pallet_crosschain_transfer::Call::prove_gateway_activity { .. }
 									)
 								)

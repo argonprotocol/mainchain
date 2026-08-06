@@ -99,6 +99,30 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       ExpirationAtBlockOverflow: AugmentedError<ApiType>;
       /**
+       * The fee coupon nonce has already been consumed or superseded.
+       **/
+      FeeCouponAlreadyUsed: AugmentedError<ApiType>;
+      /**
+       * The fee coupon is past its expiration frame.
+       **/
+      FeeCouponExpired: AugmentedError<ApiType>;
+      /**
+       * Fee coupons can only be applied when initializing a lock.
+       **/
+      FeeCouponOnlyForInitialization: AugmentedError<ApiType>;
+      /**
+       * The fee coupon was issued for a different beneficiary.
+       **/
+      FeeCouponWrongAccount: AugmentedError<ApiType>;
+      /**
+       * The fee coupon was issued for a different chain.
+       **/
+      FeeCouponWrongChain: AugmentedError<ApiType>;
+      /**
+       * The fee coupon was issued for a different vault.
+       **/
+      FeeCouponWrongVault: AugmentedError<ApiType>;
+      /**
        * Cannot request an orphaned release for the funding UTXO
        **/
       FundingUtxoCannotBeReleased: AugmentedError<ApiType>;
@@ -124,6 +148,10 @@ declare module '@polkadot/api-base/types/errors' {
        * The bitcoin script to lock this bitcoin has errors
        **/
       InvalidBitcoinScript: AugmentedError<ApiType>;
+      /**
+       * The fee coupon was not signed by the vault delegate.
+       **/
+      InvalidFeeCouponSignature: AugmentedError<ApiType>;
       /**
        * Funding would result in an overflow of the balance type
        **/

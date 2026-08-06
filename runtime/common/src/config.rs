@@ -263,13 +263,6 @@ parameter_types! {
 	pub const OperationalMinimumVaultSecuritization: Balance = 2_000 * MICROGONS_PER_ARGON;
 	/// Duration that the operational minimum vault securitization remains locked.
 	pub const OperationalMinimumVaultLockTicks: Tick = 1_440 * 365;
-	/// Number of Argon blocks to preserve recent vault capacity drops for stale init checks.
-	pub const RecentCapacityDropBlockWindow: u32 = 8;
-	/// Maximum number of recent vault capacity drop events retained per vault.
-	pub const MaxRecentCapacityDropsPerVault: u32 = 64;
-	/// One no-fee stale `initialize_for` failure is allowed for each this-many units of lost
-	/// `available_for_lock`.
-	pub const CapacityDropAttemptUnit: Balance = 100 * MICROGONS_PER_ARGON;
 	/// Additional argon amount (base units) required per follow-on access code after an account
 	/// becomes operational.
 	pub const BitcoinLockSizeForAccessCode: Balance = 5_000 * MICROGONS_PER_ARGON;

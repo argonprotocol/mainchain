@@ -129,11 +129,11 @@ impl BitcoinVaultProvider for MockVaultProvider {
 		false
 	}
 
-	fn can_initialize_bitcoin_locks(_vault_id: VaultId, _account_id: &Self::AccountId) -> bool {
-		false
+	fn get_vault_operator(_vault_id: VaultId) -> Option<Self::AccountId> {
+		None
 	}
 
-	fn get_vault_operator(_vault_id: VaultId) -> Option<Self::AccountId> {
+	fn get_vault_delegate(_vault_id: VaultId) -> Option<Self::AccountId> {
 		None
 	}
 
@@ -218,19 +218,12 @@ impl BitcoinVaultProvider for MockVaultProvider {
 		unimplemented!()
 	}
 
-	fn consume_recent_capacity_drop_budget(
-		_vault_id: VaultId,
-		_required_collateral: Self::Balance,
-	) -> Result<bool, argon_primitives::vault::VaultError> {
-		Ok(false)
-	}
-
 	fn lock(
 		_vault_id: VaultId,
 		_locker: &Self::AccountId,
 		_securitization: &argon_primitives::vault::Securitization<Self::Balance>,
 		_request: argon_primitives::vault::VaultLockRequest<'_, Self::Balance>,
-	) -> Result<Self::Balance, argon_primitives::vault::VaultError> {
+	) -> Result<(Self::Balance, Self::Balance), argon_primitives::vault::VaultError> {
 		unimplemented!()
 	}
 

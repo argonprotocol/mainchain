@@ -109,7 +109,6 @@ import type {
   PalletTreasuryFrameArgonotBondParticipants,
   PalletTreasuryFrameVaultCapital,
   PalletTreasuryVaultBondState,
-  PalletVaultsRecentCapacityDrop,
   PalletVaultsVaultFrameRevenue,
   SpConsensusGrandpaAppPublic,
   SpRuntimeDigest,
@@ -211,6 +210,14 @@ declare module '@polkadot/api-base/types/storage' {
       totalIssuance: AugmentedQuery<ApiType, () => Observable<u128>, []>;
     };
     bitcoinLocks: {
+      lastFeeCouponNonceByVaultAndAccount: AugmentedQuery<
+        ApiType,
+        (
+          arg1: u32 | AnyNumber | Uint8Array,
+          arg2: AccountId32 | string | Uint8Array,
+        ) => Observable<Option<u64>>,
+        [u32, AccountId32]
+      >;
       /**
        * Utxos that have been requested to be cosigned for releasing
        **/
@@ -1311,7 +1318,8 @@ declare module '@polkadot/api-base/types/storage' {
     };
     operationalAccounts: {
       /**
-       * Operational accounts that have met both follow-on access-code thresholds.
+       * Set of operational accounts that have met both follow-on access-code thresholds.
+       * The key count weights frame processing without scanning the set twice.
        **/
       accessCodeReadyAccounts: AugmentedQuery<
         ApiType,
@@ -1870,14 +1878,6 @@ declare module '@polkadot/api-base/types/storage' {
         ApiType,
         (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<u32>>,
         [u64]
-      >;
-      /**
-       * Recent reductions in `available_for_lock`, grouped by vault.
-       **/
-      recentCapacityDropsByVault: AugmentedQuery<
-        ApiType,
-        (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<PalletVaultsRecentCapacityDrop>>,
-        [u32]
       >;
       /**
        * Tracks revenue from Bitcoin Locks and Treasury Pools for the trailing frames for each vault

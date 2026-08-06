@@ -123,6 +123,7 @@ import type {
   PalletBitcoinLocksCall,
   PalletBitcoinLocksError,
   PalletBitcoinLocksEvent,
+  PalletBitcoinLocksFeeCoupon,
   PalletBitcoinLocksHoldReason,
   PalletBitcoinLocksLockOptions,
   PalletBitcoinLocksLockReleaseRequest,
@@ -285,7 +286,6 @@ import type {
   PalletVaultsError,
   PalletVaultsEvent,
   PalletVaultsHoldReason,
-  PalletVaultsRecentCapacityDrop,
   PalletVaultsVaultConfig,
   PalletVaultsVaultFrameRevenue,
   SnowbridgeAmclBls381Big,
@@ -436,6 +436,7 @@ declare module '@polkadot/types/types/registry' {
     PalletBitcoinLocksCall: PalletBitcoinLocksCall;
     PalletBitcoinLocksError: PalletBitcoinLocksError;
     PalletBitcoinLocksEvent: PalletBitcoinLocksEvent;
+    PalletBitcoinLocksFeeCoupon: PalletBitcoinLocksFeeCoupon;
     PalletBitcoinLocksHoldReason: PalletBitcoinLocksHoldReason;
     PalletBitcoinLocksLockOptions: PalletBitcoinLocksLockOptions;
     PalletBitcoinLocksLockReleaseRequest: PalletBitcoinLocksLockReleaseRequest;
@@ -598,7 +599,6 @@ declare module '@polkadot/types/types/registry' {
     PalletVaultsError: PalletVaultsError;
     PalletVaultsEvent: PalletVaultsEvent;
     PalletVaultsHoldReason: PalletVaultsHoldReason;
-    PalletVaultsRecentCapacityDrop: PalletVaultsRecentCapacityDrop;
     PalletVaultsVaultConfig: PalletVaultsVaultConfig;
     PalletVaultsVaultFrameRevenue: PalletVaultsVaultFrameRevenue;
     SnowbridgeAmclBls381Big: SnowbridgeAmclBls381Big;

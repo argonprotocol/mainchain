@@ -2,8 +2,8 @@ use crate::{
 	mock::{Vaults, *},
 	pallet::{
 		ArgonotCommitmentByVaultId, BitcoinLockUpdate, NextVaultId,
-		PendingTermsModificationsByTick, RecentCapacityDropsByVault, RevenuePerFrameByVault,
-		RevenuePerFrameByVaultCount, VaultFundsReleasingByHeight, VaultXPubById, VaultsById,
+		PendingTermsModificationsByTick, RevenuePerFrameByVault, RevenuePerFrameByVaultCount,
+		VaultFundsReleasingByHeight, VaultXPubById, VaultsById,
 	},
 	Error, Event, HoldReason, LastCollectFrameByVaultId, OrphanedUtxoAccountsByVaultId,
 	PendingCosignByVaultId, VaultConfig, VaultIdByOperator,
@@ -60,7 +60,7 @@ fn standard_lock_request(satoshis: Satoshis) -> VaultLockRequest<'static, Balanc
 	VaultLockRequest {
 		satoshis,
 		extension: None,
-		vault_covers_fee: false,
+		fee_discount: 0,
 		is_backfill: false,
 		backfill_securitization_to_unreserve: 0,
 	}
@@ -152,8 +152,6 @@ fn it_can_create_a_vault_with_a_delegate_account() {
 
 		let vault = VaultsById::<Test>::get(1).expect("vault should exist");
 		assert_eq!(vault.delegate_account_id, Some(9));
-		assert!(Vaults::can_initialize_bitcoin_locks(1, &1));
-		assert!(Vaults::can_initialize_bitcoin_locks(1, &9));
 	});
 }
 
@@ -362,14 +360,9 @@ fn it_can_set_a_vault_delegate_account() {
 
 		assert_ok!(Vaults::set_delegate_account(RuntimeOrigin::signed(1), Some(9)));
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().delegate_account_id, Some(9));
-		assert!(Vaults::can_initialize_bitcoin_locks(1, &1));
-		assert!(Vaults::can_initialize_bitcoin_locks(1, &9));
-		assert!(!Vaults::can_initialize_bitcoin_locks(1, &2));
 
 		assert_ok!(Vaults::set_delegate_account(RuntimeOrigin::signed(1), None));
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().delegate_account_id, None);
-		assert!(Vaults::can_initialize_bitcoin_locks(1, &1));
-		assert!(!Vaults::can_initialize_bitcoin_locks(1, &9));
 	});
 }
 
@@ -681,7 +674,7 @@ fn it_can_close_a_vault() {
 		assert_eq!(Balances::balance_on_hold(&HoldReason::EnterVault.into(), &1), 100_000);
 
 		let amount = 40_000;
-		let fee = Vaults::lock(1, &2, &securitization(amount), standard_lock_request(500))
+		let (fee, _) = Vaults::lock(1, &2, &securitization(amount), standard_lock_request(500))
 			.expect("bonding failed");
 		assert_eq!(fee, 401);
 		let vault = VaultsById::<Test>::get(1).unwrap();
@@ -739,7 +732,7 @@ fn it_can_lock_funds() {
 		assert_eq!(Balances::free_balance(1), 500_000);
 
 		set_argons(2, 6_000);
-		let fee = Vaults::lock(1, &2, &securitization(500_000), standard_lock_request(500))
+		let (fee, _) = Vaults::lock(1, &2, &securitization(500_000), standard_lock_request(500))
 			.expect("bonding failed");
 
 		let apr_fee = (0.01f64 * 500_000f64) as u128;
@@ -766,7 +759,7 @@ fn it_can_lock_funds() {
 }
 
 #[test]
-fn lock_can_release_unused_backfill_reservation() {
+fn lock_saturates_backfill_reservation_release() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		set_argons(1, 100);
@@ -787,7 +780,7 @@ fn lock_can_release_unused_backfill_reservation() {
 			&2,
 			&securitization(40),
 			VaultLockRequest {
-				backfill_securitization_to_unreserve: 100,
+				backfill_securitization_to_unreserve: 150,
 				..standard_lock_request(500)
 			},
 		));
@@ -820,18 +813,20 @@ fn it_doesnt_charge_lock_fees_to_operator() {
 		));
 		assert_eq!(Balances::free_balance(1), 500_000);
 
-		let fee = Vaults::lock(1, &1, &securitization(500_000), standard_lock_request(500))
-			.expect("bonding failed");
+		let (fee, fee_discount) =
+			Vaults::lock(1, &1, &securitization(500_000), standard_lock_request(500))
+				.expect("bonding failed");
 
 		assert_eq!(Balances::free_balance(1), 500_000);
 		assert_eq!(fee, 6000);
+		assert_eq!(fee_discount, fee);
 
 		let current_frame_id = CurrentFrameId::get();
 		let vault_revenue = RevenuePerFrameByVault::<Test>::get(1).to_vec();
 		assert_eq!(vault_revenue.len(), 1);
 		assert_eq!(vault_revenue[0].frame_id, current_frame_id);
 		assert_eq!(vault_revenue[0].bitcoin_lock_fee_revenue, fee);
-		assert_eq!(vault_revenue[0].bitcoin_lock_fee_coupon_value_used, fee);
+		assert_eq!(vault_revenue[0].bitcoin_lock_fee_coupon_value_used, fee_discount);
 		assert_eq!(vault_revenue[0].bitcoin_locks_new_liquidity_promised, 500_000);
 		assert_eq!(vault_revenue[0].bitcoin_locks_added_satoshis, 500);
 		assert_eq!(vault_revenue[0].bitcoin_locks_created, 1);
@@ -839,78 +834,29 @@ fn it_doesnt_charge_lock_fees_to_operator() {
 }
 
 #[test]
-fn it_consumes_recent_capacity_drop_budget_for_stale_initialize_for_failures() {
+fn fee_discount_is_capped_at_the_lock_fee() {
 	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
+		System::set_block_number(5);
+		set_argons(1, 1_000_000);
+		set_argons(2, 0);
 
-		set_argons(1, 100_000);
-		set_argons(2, 100_000);
 		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), default_vault()));
+		let (fee, fee_discount) = Vaults::lock(
+			1,
+			&2,
+			&securitization(50_000),
+			VaultLockRequest { fee_discount: 100_000, ..standard_lock_request(500) },
+		)
+		.expect("bonding failed");
 
-		let lock_amount = 500;
-		assert_ok!(Vaults::lock(1, &2, &securitization(lock_amount), standard_lock_request(500),));
+		assert_eq!(fee, 55_000);
+		assert_eq!(fee_discount, fee);
+		assert_eq!(Balances::free_balance(2), 0);
 
-		let drops = RecentCapacityDropsByVault::<Test>::get(1);
-		assert_eq!(drops.len(), 1);
-		assert_eq!(drops[0].available_before_drop, 50_000);
-		assert_eq!(drops[0].available_after_drop, 49_500);
-		assert_eq!(drops[0].no_fee_failures_used, 0);
-
-		assert!(Vaults::consume_recent_capacity_drop_budget(1, 49_750).unwrap());
-
-		let drops = RecentCapacityDropsByVault::<Test>::get(1);
-		assert_eq!(drops[0].no_fee_failures_used, 1);
-		for expected in 2..=5 {
-			assert!(Vaults::consume_recent_capacity_drop_budget(1, 49_750).unwrap());
-			assert_eq!(
-				RecentCapacityDropsByVault::<Test>::get(1)[0].no_fee_failures_used,
-				expected
-			);
-		}
-		assert!(!Vaults::consume_recent_capacity_drop_budget(1, 49_750).unwrap());
-	});
-}
-
-#[test]
-fn it_tracks_same_block_capacity_drops_separately() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-
-		set_argons(1, 100_000);
-		set_argons(2, 100_000);
-		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), default_vault()));
-
-		assert_ok!(Vaults::lock(1, &2, &securitization(150), standard_lock_request(500)));
-		assert_ok!(Vaults::lock(1, &2, &securitization(200), standard_lock_request(500)));
-
-		let drops = RecentCapacityDropsByVault::<Test>::get(1);
-		assert_eq!(drops.len(), 2);
-		assert_eq!(drops[0].available_before_drop, 50_000);
-		assert_eq!(drops[0].available_after_drop, 49_850);
-		assert_eq!(drops[1].available_before_drop, 49_850);
-		assert_eq!(drops[1].available_after_drop, 49_650);
-
-		assert!(Vaults::consume_recent_capacity_drop_budget(1, 49_700).unwrap());
-
-		let drops = RecentCapacityDropsByVault::<Test>::get(1);
-		assert_eq!(drops[0].no_fee_failures_used, 0);
-		assert_eq!(drops[1].no_fee_failures_used, 1);
-	});
-}
-
-#[test]
-fn close_clears_recent_capacity_drops() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-
-		set_argons(1, 100_000);
-		set_argons(2, 100_000);
-		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), default_vault()));
-		assert_ok!(Vaults::lock(1, &2, &securitization(500), standard_lock_request(500)));
-		assert!(!RecentCapacityDropsByVault::<Test>::get(1).is_empty());
-
-		assert_ok!(Vaults::close(RuntimeOrigin::signed(1), 1));
-		assert!(RecentCapacityDropsByVault::<Test>::get(1).is_empty());
+		let vault_revenue = RevenuePerFrameByVault::<Test>::get(1);
+		assert_eq!(vault_revenue[0].bitcoin_lock_fee_revenue, fee);
+		assert_eq!(vault_revenue[0].bitcoin_lock_fee_coupon_value_used, fee);
+		assert_eq!(vault_revenue[0].uncollected_revenue, 0);
 	});
 }
 
@@ -950,7 +896,7 @@ fn it_handles_overflowing_metrics() {
 					Vaults::update_vault_bitcoin_metrics(BitcoinLockUpdate {
 						vault_id,
 						total_fee: 1000,
-						has_fee_coupon: false,
+						fee_discount: 0,
 						locks_created: 1,
 						securitization_released: 0,
 						satoshis_locked: 1000,
@@ -1125,7 +1071,7 @@ fn it_can_burn_funds() {
 		assert_eq!(Balances::free_balance(1), 900_000);
 
 		set_argons(2, 2_000);
-		let fee = Vaults::lock(1, &2, &securitization(100_000), standard_lock_request(500))
+		let (fee, _) = Vaults::lock(1, &2, &securitization(100_000), standard_lock_request(500))
 			.expect("bonding failed");
 
 		assert_eq!(fee, 0);
@@ -1214,7 +1160,7 @@ fn vault_equilibrium_scenario(scenario: VaultScenario) {
 			VaultLockRequest {
 				satoshis: 500,
 				extension: Some((FixedU128::one(), &mut lock_extensions)),
-				vault_covers_fee: false,
+				fee_discount: 0,
 				is_backfill: false,
 				backfill_securitization_to_unreserve: 0,
 			},
@@ -1276,14 +1222,15 @@ fn it_records_use_of_fee_coupons() {
 		assert_eq!(Balances::free_balance(1), 500_000);
 
 		set_argons(2, 6_000);
-		let fee = Vaults::lock(
+		let fee_discount = 2_000;
+		let (fee, discount_applied) = Vaults::lock(
 			1,
 			&2,
 			&Securitization::new(500_000, FixedU128::one()),
 			VaultLockRequest {
 				satoshis: 500,
 				extension: None,
-				vault_covers_fee: true,
+				fee_discount,
 				is_backfill: false,
 				backfill_securitization_to_unreserve: 0,
 			},
@@ -1292,12 +1239,13 @@ fn it_records_use_of_fee_coupons() {
 
 		let calculated_fee = terms.bitcoin_base_fee + (0.01f64 * 500_000f64) as u128;
 		assert_eq!(fee, calculated_fee);
-		assert_eq!(Balances::free_balance(2), 6_000, "fee coupon used, no fee taken");
+		assert_eq!(discount_applied, fee_discount);
+		assert_eq!(Balances::free_balance(2), 2_000, "fee discount applied");
 		let revenue = RevenuePerFrameByVault::<Test>::get(1).to_vec();
 		assert_eq!(revenue.len(), 1);
 		assert_eq!(revenue[0].bitcoin_lock_fee_revenue, fee, "revenue recorded correctly");
 		assert_eq!(
-			revenue[0].bitcoin_lock_fee_coupon_value_used, fee,
+			revenue[0].bitcoin_lock_fee_coupon_value_used, fee_discount,
 			"records fee coupons correctly"
 		);
 	});
@@ -1674,7 +1622,7 @@ fn vaults_can_collect_revenue() {
 		assert_eq!(RevenuePerFrameByVaultCount::<Test>::get(), 0);
 
 		set_argons(2, 6_000);
-		let fee = Vaults::lock(1, &2, &securitization(500_000), standard_lock_request(500))
+		let (fee, _) = Vaults::lock(1, &2, &securitization(500_000), standard_lock_request(500))
 			.expect("bonding failed");
 
 		let current_frame_id = CurrentFrameId::get();

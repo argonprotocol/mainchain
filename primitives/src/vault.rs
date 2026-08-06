@@ -225,7 +225,7 @@ impl<Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned>
 pub struct VaultLockRequest<'a, Balance> {
 	pub satoshis: Satoshis,
 	pub extension: Option<(FixedU128, &'a mut LockExtension<Balance>)>,
-	pub vault_covers_fee: bool,
+	pub fee_discount: Balance,
 	pub is_backfill: bool,
 	pub backfill_securitization_to_unreserve: Balance,
 }
@@ -236,8 +236,8 @@ pub trait BitcoinVaultProvider {
 	type AccountId: Codec;
 
 	fn is_owner(vault_id: VaultId, account_id: &Self::AccountId) -> bool;
-	fn can_initialize_bitcoin_locks(vault_id: VaultId, account_id: &Self::AccountId) -> bool;
 	fn get_vault_operator(vault_id: VaultId) -> Option<Self::AccountId>;
+	fn get_vault_delegate(vault_id: VaultId) -> Option<Self::AccountId>;
 	fn get_vault_id(account_id: &Self::AccountId) -> Option<VaultId>;
 	fn get_registration_vault_data(
 		account_id: &Self::AccountId,
@@ -287,20 +287,13 @@ pub trait BitcoinVaultProvider {
 		is_backfill: bool,
 	) -> Result<(), VaultError>;
 
-	/// Consume a recent-capacity-drop budget entry if a sponsored initialize-for request should
-	/// avoid transaction fees after failing due to recent vault capacity churn.
-	fn consume_recent_capacity_drop_budget(
-		vault_id: VaultId,
-		required_collateral: Self::Balance,
-	) -> Result<bool, VaultError>;
-
-	/// Holds the given "securitization" from the vault. Returns the fee amount
+	/// Holds the given "securitization" from the vault. Returns the total fee and discount applied.
 	fn lock(
 		vault_id: VaultId,
 		locker: &Self::AccountId,
 		securitization: &Securitization<Self::Balance>,
 		request: VaultLockRequest<'_, Self::Balance>,
-	) -> Result<Self::Balance, VaultError>;
+	) -> Result<(Self::Balance, Self::Balance), VaultError>;
 
 	/// Release the lock and move into holding, eligible for relock
 	fn schedule_for_release(

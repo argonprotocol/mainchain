@@ -16,7 +16,7 @@ import { ApiDecoration } from '@polkadot/api/types';
 import { PriceIndex } from './PriceIndex';
 import { bool, Option } from '@polkadot/types-codec';
 import type { AccountId32 } from '@polkadot/types/interfaces/runtime';
-import type { ITuple } from '@polkadot/types-codec/types';
+import type { AnyJson, ITuple } from '@polkadot/types-codec/types';
 import type { u128, u64, Vec } from '@polkadot/types-codec';
 import { formatArgons } from './utils';
 import type { Vault } from './Vault';
@@ -40,6 +40,17 @@ type UtxoRefLike =
   | { txid: string | Uint8Array; outputIndex: number };
 
 type UtxoRefOption = { unwrap: () => ArgonPrimitivesBitcoinUtxoRef };
+
+export type BitcoinLockFeeCoupon = {
+  vaultId: number;
+  genesisHash: string;
+  beneficiary: string;
+  feeDiscount: bigint;
+  backfillSecuritizationToUnreserve: bigint;
+  expiresAtFrame: bigint;
+  nonce: bigint;
+  signature: AnyJson;
+};
 
 function normalizeUtxoRef(utxoRef: UtxoRefLike): {
   txid: string;
@@ -737,6 +748,7 @@ export class BitcoinLock implements IBitcoinLock {
     reducedBalanceBy?: bigint;
     microgonsAtTargetPerBtc?: bigint;
     tip?: bigint;
+    feeCoupon?: BitcoinLockFeeCoupon;
     initializeForAccountId?: string;
     backfillSecuritizationToUnreserve?: bigint;
   }) {
@@ -749,6 +761,7 @@ export class BitcoinLock implements IBitcoinLock {
       ownerBitcoinPubkey,
       client,
       microgonsAtTargetPerBtc = null,
+      feeCoupon,
       initializeForAccountId,
       backfillSecuritizationToUnreserve = 0n,
     } = args;
@@ -757,10 +770,16 @@ export class BitcoinLock implements IBitcoinLock {
         `Invalid Bitcoin key length: ${ownerBitcoinPubkey.length}. Must be a compressed pukey (33 bytes).`,
       );
     }
+    if (initializeForAccountId !== undefined && feeCoupon) {
+      throw new Error('Cannot provide both initializeForAccountId and feeCoupon');
+    }
+
+    const supportsInitializeFor = this.supportsInitializeFor(client);
+    const useInitializeFor = supportsInitializeFor && initializeForAccountId !== undefined;
 
     let tx: SubmittableExtrinsic;
-    if (initializeForAccountId) {
-      tx = client.tx.bitcoinLocks.initializeFor(
+    if (useInitializeFor) {
+      tx = (client.tx.bitcoinLocks as any).initializeFor(
         initializeForAccountId,
         vault.vaultId,
         satoshis,
@@ -773,20 +792,42 @@ export class BitcoinLock implements IBitcoinLock {
         backfillSecuritizationToUnreserve,
       );
     } else {
-      tx = client.tx.bitcoinLocks.initialize(vault.vaultId, satoshis, ownerBitcoinPubkey, {
-        V1: {
-          microgonsAtTargetPerBtc,
-        },
-      });
+      if (supportsInitializeFor && feeCoupon) {
+        throw new Error('The connected runtime does not support Bitcoin lock fee coupons');
+      }
+      if (initializeForAccountId !== undefined && !feeCoupon) {
+        throw new Error('The connected runtime no longer supports initializeFor');
+      }
+
+      const options = feeCoupon
+        ? {
+            V2: {
+              microgonsAtTargetPerBtc,
+              feeCoupon,
+            },
+          }
+        : {
+            V1: {
+              microgonsAtTargetPerBtc,
+            },
+          };
+      tx = client.tx.bitcoinLocks.initialize(vault.vaultId, satoshis, ownerBitcoinPubkey, options);
     }
     const submitter = new TxSubmitter(client, tx, txSigner);
-    const targetPrice =
-      microgonsAtTargetPerBtc !== null
-        ? (microgonsAtTargetPerBtc * satoshis) / SATS_PER_BTC
-        : priceIndex.getSatoshiPriceInTargetMicrogons(satoshis);
-    const unlockAmount = this.calculateRedemptionAmount(priceIndex, targetPrice);
     const isVaultOwner = txSigner.address === vault.operatorAccountId;
-    const securityFee = isVaultOwner ? 0n : vault.calculateBitcoinFee(unlockAmount);
+    let securityFee = 0n;
+    if (!isVaultOwner && !useInitializeFor) {
+      const targetPrice =
+        microgonsAtTargetPerBtc !== null
+          ? (microgonsAtTargetPerBtc * satoshis) / SATS_PER_BTC
+          : priceIndex.getSatoshiPriceInTargetMicrogons(satoshis);
+      const unlockAmount = this.calculateRedemptionAmount(priceIndex, targetPrice);
+      const fullSecurityFee = vault.calculateBitcoinFee(unlockAmount);
+      securityFee = fullSecurityFee - (feeCoupon?.feeDiscount ?? 0n);
+      if (securityFee < 0n) {
+        securityFee = 0n;
+      }
+    }
 
     const { canAfford, availableBalance, txFee } = await submitter.canAfford({
       tip,
@@ -803,6 +844,10 @@ export class BitcoinLock implements IBitcoinLock {
     };
   }
 
+  public static supportsInitializeFor(client: ArgonClient): boolean {
+    return typeof (client.tx.bitcoinLocks as any).initializeFor === 'function';
+  }
+
   public static async initialize(
     args: {
       client: ArgonClient;
@@ -811,6 +856,7 @@ export class BitcoinLock implements IBitcoinLock {
       ownerBitcoinPubkey: Uint8Array;
       txSigner: TxSigningAccount;
       satoshis: bigint;
+      feeCoupon?: BitcoinLockFeeCoupon;
     } & ISubmittableOptions,
   ): Promise<{
     getLock(): Promise<{ lock: BitcoinLock; createdAtHeight: number }>;

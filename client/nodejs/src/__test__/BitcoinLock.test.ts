@@ -131,6 +131,102 @@ describe('BitcoinLock.createInitializeTx', () => {
     };
   }
 
+  it('detects whether the connected runtime still exposes initializeFor', () => {
+    const currentClient = client();
+    const legacyClient = client();
+    Object.assign(legacyClient.tx.bitcoinLocks, { initializeFor: vi.fn(() => ({})) });
+
+    expect(BitcoinLock.supportsInitializeFor(currentClient as any)).toBe(false);
+    expect(BitcoinLock.supportsInitializeFor(legacyClient as any)).toBe(true);
+  });
+
+  it('routes delegated initialization through initializeFor on a legacy runtime', async () => {
+    canAffordMock.mockClear();
+    const testClient = client();
+    const initializeFor = vi.fn(() => ({}));
+    Object.assign(testClient.tx.bitcoinLocks, { initializeFor });
+    const vault = {
+      vaultId: 1,
+      operatorAccountId: 'vault-owner',
+      calculateBitcoinFee: vi.fn(() => 100_000n),
+    };
+
+    const result = await BitcoinLock.createInitializeTx({
+      client: testClient as any,
+      vault: vault as any,
+      priceIndex: priceIndex(),
+      ownerBitcoinPubkey: new Uint8Array(33),
+      satoshis: 50_000_000n,
+      txSigner: { address: 'vault-delegate', signer: {} as any },
+      initializeForAccountId: 'lock-owner',
+      backfillSecuritizationToUnreserve: 20_000n,
+    });
+
+    expect(initializeFor).toHaveBeenCalledWith(
+      'lock-owner',
+      1,
+      50_000_000n,
+      new Uint8Array(33),
+      { V1: { microgonsAtTargetPerBtc: null } },
+      20_000n,
+    );
+    expect(testClient.tx.bitcoinLocks.initialize).not.toHaveBeenCalled();
+    expect(result.securityFee).toBe(0n);
+  });
+
+  it('rejects conflicting or unsupported initialization options', async () => {
+    const currentClient = client();
+    const legacyClient = client();
+    Object.assign(legacyClient.tx.bitcoinLocks, { initializeFor: vi.fn(() => ({})) });
+    const vault = {
+      vaultId: 1,
+      operatorAccountId: 'vault-owner',
+      calculateBitcoinFee: vi.fn(() => 100_000n),
+    };
+    const args = {
+      vault: vault as any,
+      priceIndex: priceIndex(),
+      ownerBitcoinPubkey: new Uint8Array(33),
+      satoshis: 50_000_000n,
+      txSigner: { address: 'lock-owner', signer: {} as any },
+    };
+    const feeCoupon = {
+      vaultId: 1,
+      genesisHash: '0x00',
+      beneficiary: 'lock-owner',
+      feeDiscount: 40_000n,
+      backfillSecuritizationToUnreserve: 0n,
+      expiresAtFrame: 10n,
+      nonce: 1n,
+      signature: {} as any,
+    };
+
+    await expect(
+      BitcoinLock.createInitializeTx({
+        ...args,
+        client: legacyClient as any,
+        feeCoupon,
+        initializeForAccountId: 'lock-owner',
+      }),
+    ).rejects.toThrow('Cannot provide both initializeForAccountId and feeCoupon');
+
+    await expect(
+      BitcoinLock.createInitializeTx({
+        ...args,
+        client: legacyClient as any,
+        feeCoupon,
+      }),
+    ).rejects.toThrow('The connected runtime does not support Bitcoin lock fee coupons');
+
+    await expect(
+      BitcoinLock.createInitializeTx({
+        ...args,
+        client: currentClient as any,
+        initializeForAccountId: 'lock-owner',
+      }),
+    ).rejects.toThrow('The connected runtime no longer supports initializeFor');
+  });
+
   it('uses a requested target BTC rate when estimating the initialization security fee', async () => {
     canAffordMock.mockClear();
     const vault = {
@@ -153,6 +249,87 @@ describe('BitcoinLock.createInitializeTx', () => {
     expect(canAffordMock).toHaveBeenCalledWith({
       tip: 0n,
       unavailableBalance: 100_000n,
+      includeExistentialDeposit: true,
+    });
+  });
+
+  it('submits a signed fee coupon and estimates only the remaining security fee', async () => {
+    canAffordMock.mockClear();
+    const testClient = client();
+    const vault = {
+      vaultId: 1,
+      operatorAccountId: 'vault-owner',
+      calculateBitcoinFee: vi.fn(() => 100_000n),
+    };
+    const feeCoupon = {
+      vaultId: 1,
+      genesisHash: '0x00',
+      beneficiary: 'lock-owner',
+      feeDiscount: 40_000n,
+      backfillSecuritizationToUnreserve: 0n,
+      expiresAtFrame: 10n,
+      nonce: 1n,
+      signature: {} as any,
+    };
+
+    await BitcoinLock.createInitializeTx({
+      client: testClient as any,
+      vault: vault as any,
+      priceIndex: priceIndex(),
+      ownerBitcoinPubkey: new Uint8Array(33),
+      satoshis: 50_000_000n,
+      txSigner: { address: 'lock-owner', signer: {} as any },
+      feeCoupon,
+    });
+
+    expect(testClient.tx.bitcoinLocks.initialize).toHaveBeenCalledWith(
+      1,
+      50_000_000n,
+      new Uint8Array(33),
+      {
+        V2: {
+          microgonsAtTargetPerBtc: null,
+          feeCoupon,
+        },
+      },
+    );
+    expect(canAffordMock).toHaveBeenCalledWith({
+      tip: 0n,
+      unavailableBalance: 60_000n,
+      includeExistentialDeposit: true,
+    });
+  });
+
+  it('caps the estimated fee discount at the full security fee', async () => {
+    canAffordMock.mockClear();
+    const vault = {
+      vaultId: 1,
+      operatorAccountId: 'vault-owner',
+      calculateBitcoinFee: vi.fn(() => 100_000n),
+    };
+
+    await BitcoinLock.createInitializeTx({
+      client: client() as any,
+      vault: vault as any,
+      priceIndex: priceIndex(),
+      ownerBitcoinPubkey: new Uint8Array(33),
+      satoshis: 50_000_000n,
+      txSigner: { address: 'lock-owner', signer: {} as any },
+      feeCoupon: {
+        vaultId: 1,
+        genesisHash: '0x00',
+        beneficiary: 'lock-owner',
+        feeDiscount: 200_000n,
+        backfillSecuritizationToUnreserve: 0n,
+        expiresAtFrame: 10n,
+        nonce: 1n,
+        signature: {} as any,
+      },
+    });
+
+    expect(canAffordMock).toHaveBeenCalledWith({
+      tip: 0n,
+      unavailableBalance: 0n,
       includeExistentialDeposit: true,
     });
   });

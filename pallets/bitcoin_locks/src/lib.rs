@@ -6,14 +6,13 @@ extern crate core;
 
 use alloc::vec::Vec;
 use codec::Encode;
-use frame_support::{dispatch::DispatchErrorWithPostInfo, traits::IsSubType};
 use pallet_prelude::*;
+use polkadot_sdk::sp_runtime::traits::{IdentifyAccount, Verify};
 
 use argon_bitcoin::CosignReleaser;
 use argon_primitives::{
 	bitcoin::{BitcoinNetwork, BitcoinSignature, CompressedBitcoinPubkey},
-	vault::BitcoinVaultProvider,
-	BitcoinLocksProvider, CallTxPoolKeyProvider,
+	BitcoinLocksProvider,
 };
 pub use pallet::*;
 pub use weights::*;
@@ -124,6 +123,10 @@ pub mod pallet {
 		type PriceProvider: PriceProvider<Self::Balance>;
 
 		type BitcoinSignatureVerifier: BitcoinVerifier<Self>;
+
+		type FeeCouponSigner: Parameter + IdentifyAccount<AccountId = Self::AccountId>;
+
+		type FeeCouponSignature: Parameter + Verify<Signer = Self::FeeCouponSigner>;
 
 		/// Bitcoin time provider
 		type BitcoinBlockHeightChange: Get<(BitcoinHeight, BitcoinHeight)>;
@@ -271,6 +274,17 @@ pub mod pallet {
 	#[pallet::storage]
 	pub type MicrogonPerBtcHistory<T: Config> =
 		StorageValue<_, BoundedVec<(Tick, T::Balance), T::MaxBtcPriceTickAge>, ValueQuery>;
+
+	#[pallet::storage]
+	pub type LastFeeCouponNonceByVaultAndAccount<T: Config> = StorageDoubleMap<
+		_,
+		Twox64Concat,
+		VaultId,
+		Blake2_128Concat,
+		T::AccountId,
+		u64,
+		OptionQuery,
+	>;
 
 	#[derive(Decode, Encode, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 	#[scale_info(skip_type_params(T))]
@@ -563,6 +577,20 @@ pub mod pallet {
 		OverflowError,
 		/// An ineligible microgon rate per btc was requested
 		IneligibleMicrogonRateRequested,
+		/// The fee coupon was issued for a different vault.
+		FeeCouponWrongVault,
+		/// The fee coupon was issued for a different chain.
+		FeeCouponWrongChain,
+		/// The fee coupon was issued for a different beneficiary.
+		FeeCouponWrongAccount,
+		/// The fee coupon is past its expiration frame.
+		FeeCouponExpired,
+		/// The fee coupon was not signed by the vault delegate.
+		InvalidFeeCouponSignature,
+		/// The fee coupon nonce has already been consumed or superseded.
+		FeeCouponAlreadyUsed,
+		/// Fee coupons can only be applied when initializing a lock.
+		FeeCouponOnlyForInitialization,
 		/// Cannot fund with an orphaned utxo after lock funding is confirmed
 		OrphanedUtxoFundingConflict,
 		/// Cannot lock an orphaned utxo with a pending release request
@@ -665,7 +693,69 @@ pub mod pallet {
 		EqNoBound,
 		DebugNoBound,
 		TypeInfo,
-		MaxEncodedLen,
+	)]
+	#[scale_info(skip_type_params(T))]
+	pub struct FeeCoupon<T: Config> {
+		/// Vault whose delegate issued this coupon.
+		#[codec(compact)]
+		pub vault_id: VaultId,
+		/// Genesis hash of the chain where this coupon can be used.
+		pub genesis_hash: <T as frame_system::Config>::Hash,
+		/// Account allowed to use this coupon.
+		pub beneficiary: T::AccountId,
+		/// Maximum amount deducted from the vault's Bitcoin lock fee.
+		#[codec(compact)]
+		pub fee_discount: T::Balance,
+		/// Existing backfill reservation released atomically when this lock is created.
+		#[codec(compact)]
+		pub backfill_securitization_to_unreserve: T::Balance,
+		/// Last frame in which this coupon can be used.
+		#[codec(compact)]
+		pub expires_at_frame: FrameId,
+		/// Monotonically increasing value preventing replay for this vault and beneficiary.
+		#[codec(compact)]
+		pub nonce: u64,
+		/// Vault delegate signature over the coupon fields.
+		pub signature: T::FeeCouponSignature,
+	}
+
+	pub const FEE_COUPON_MESSAGE_KEY: &[u8] = b"bitcoin_lock_fee_coupon";
+
+	impl<T: Config> FeeCoupon<T> {
+		pub fn verify(&self, signer: &T::AccountId) -> bool {
+			let message = (
+				FEE_COUPON_MESSAGE_KEY,
+				self.genesis_hash,
+				self.vault_id,
+				&self.beneficiary,
+				self.fee_discount,
+				self.backfill_securitization_to_unreserve,
+				self.expires_at_frame,
+				self.nonce,
+			)
+				.using_encoded(blake2_256);
+			let verified = self.signature.verify(message.as_slice(), signer);
+			#[cfg(feature = "runtime-benchmarks")]
+			{
+				let _ = verified;
+				true
+			}
+			#[cfg(not(feature = "runtime-benchmarks"))]
+			{
+				verified
+			}
+		}
+	}
+
+	#[derive(
+		Decode,
+		Encode,
+		DecodeWithMemTracking,
+		CloneNoBound,
+		PartialEqNoBound,
+		EqNoBound,
+		DebugNoBound,
+		TypeInfo,
 	)]
 	#[scale_info(skip_type_params(T))]
 	pub enum LockOptions<T: Config> {
@@ -673,13 +763,19 @@ pub mod pallet {
 			/// The microgons per btc rate if Argon were trading at target price.
 			microgons_at_target_per_btc: Option<T::Balance>,
 		},
+		V2 {
+			/// The microgons per btc rate if Argon were trading at target price.
+			microgons_at_target_per_btc: Option<T::Balance>,
+			/// Optional vault-delegate authorization for a fixed fee discount.
+			fee_coupon: Option<FeeCoupon<T>>,
+		},
 	}
 
 	impl<T: Config> LockOptions<T> {
 		pub fn microgons_at_target_per_btc(&self) -> Option<T::Balance> {
 			match self {
-				LockOptions::<T>::V1 { microgons_at_target_per_btc } =>
-					*microgons_at_target_per_btc,
+				LockOptions::<T>::V1 { microgons_at_target_per_btc } |
+				LockOptions::<T>::V2 { microgons_at_target_per_btc, .. } => *microgons_at_target_per_btc,
 			}
 		}
 	}
@@ -696,6 +792,7 @@ pub mod pallet {
 		/// LockedBitcoin and be added to the Bitcoin Mint line.
 		#[pallet::call_index(0)]
 		#[pallet::weight(T::WeightInfo::initialize())]
+		#[frame_support::transactional]
 		pub fn initialize(
 			origin: OriginFor<T>,
 			vault_id: VaultId,
@@ -704,15 +801,55 @@ pub mod pallet {
 			options: Option<LockOptions<T>>,
 		) -> DispatchResult {
 			let account_id = ensure_signed(origin)?;
+			let coupon = match options.as_ref() {
+				Some(LockOptions::V2 { fee_coupon, .. }) => fee_coupon.as_ref(),
+				_ => None,
+			};
+			let (fee_discount, backfill_securitization_to_unreserve, coupon_nonce) =
+				if let Some(coupon) = coupon {
+					ensure!(coupon.vault_id == vault_id, Error::<T>::FeeCouponWrongVault);
+					ensure!(
+						coupon.genesis_hash ==
+							frame_system::Pallet::<T>::block_hash(BlockNumberFor::<T>::zero()),
+						Error::<T>::FeeCouponWrongChain
+					);
+					ensure!(coupon.beneficiary == account_id, Error::<T>::FeeCouponWrongAccount);
+					ensure!(
+						T::CurrentFrameId::get() <= coupon.expires_at_frame,
+						Error::<T>::FeeCouponExpired
+					);
+					let delegate = T::VaultProvider::get_vault_delegate(vault_id)
+						.ok_or(Error::<T>::InvalidFeeCouponSignature)?;
+					ensure!(coupon.verify(&delegate), Error::<T>::InvalidFeeCouponSignature);
+					ensure!(
+						LastFeeCouponNonceByVaultAndAccount::<T>::get(vault_id, &account_id)
+							.is_none_or(|nonce| coupon.nonce > nonce),
+						Error::<T>::FeeCouponAlreadyUsed
+					);
+					(
+						coupon.fee_discount,
+						coupon.backfill_securitization_to_unreserve,
+						Some(coupon.nonce),
+					)
+				} else {
+					(T::Balance::zero(), T::Balance::zero(), None)
+				};
 			Self::create_bitcoin_lock(
 				&account_id,
 				vault_id,
 				satoshis,
 				bitcoin_pubkey,
 				options,
-				false,
-				T::Balance::zero(),
+				fee_discount,
+				backfill_securitization_to_unreserve,
 			)?;
+			if let Some(coupon_nonce) = coupon_nonce {
+				LastFeeCouponNonceByVaultAndAccount::<T>::insert(
+					vault_id,
+					account_id,
+					coupon_nonce,
+				);
+			}
 			Ok(())
 		}
 
@@ -923,6 +1060,10 @@ pub mod pallet {
 			options: Option<LockOptions<T>>,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
+			ensure!(
+				!matches!(options.as_ref(), Some(LockOptions::V2 { fee_coupon: Some(_), .. })),
+				Error::<T>::FeeCouponOnlyForInitialization
+			);
 			let mut lock = LocksByUtxoId::<T>::get(utxo_id).ok_or(Error::<T>::LockNotFound)?;
 			ensure!(lock.owner_account == who, Error::<T>::NoPermissions);
 			ensure!(lock.is_funded, Error::<T>::LockPendingFunding);
@@ -1013,14 +1154,14 @@ pub mod pallet {
 
 			let mut lock_extension = lock.get_lock_extension();
 			let securitization = Securitization::new(amount_to_mint, lock.securitization_ratio);
-			let fee = T::VaultProvider::lock(
+			let (fee, _) = T::VaultProvider::lock(
 				vault_id,
 				&who,
 				&securitization,
 				VaultLockRequest {
 					satoshis: 0,
 					extension: Some((duration_for_new_funds, &mut lock_extension)),
-					vault_covers_fee: false,
+					fee_discount: T::Balance::zero(),
 					is_backfill: lock.is_backfill,
 					backfill_securitization_to_unreserve: T::Balance::zero(),
 				},
@@ -1139,47 +1280,6 @@ pub mod pallet {
 			Ok(())
 		}
 
-		#[pallet::call_index(8)]
-		#[pallet::weight(T::WeightInfo::initialize_for())]
-		pub fn initialize_for(
-			origin: OriginFor<T>,
-			account_id: T::AccountId,
-			vault_id: VaultId,
-			#[pallet::compact] satoshis: Satoshis,
-			bitcoin_pubkey: CompressedBitcoinPubkey,
-			options: Option<LockOptions<T>>,
-			#[pallet::compact] backfill_securitization_to_unreserve: T::Balance,
-		) -> DispatchResultWithPostInfo {
-			let who = ensure_signed(origin)?;
-			ensure!(
-				T::VaultProvider::can_initialize_bitcoin_locks(vault_id, &who),
-				Error::<T>::NoPermissions
-			);
-			let (securitization, _) =
-				Self::prepare_lock_securitization(vault_id, satoshis, options.as_ref())?;
-
-			match Self::create_bitcoin_lock(
-				&account_id,
-				vault_id,
-				satoshis,
-				bitcoin_pubkey,
-				options,
-				true,
-				backfill_securitization_to_unreserve,
-			) {
-				Ok(()) => Ok(Pays::No.into()),
-				Err(error)
-					if error == Error::<T>::InsufficientVaultFunds.into() &&
-						T::VaultProvider::consume_recent_capacity_drop_budget(
-							vault_id,
-							securitization.collateral_required,
-						)
-						.map_err(Error::<T>::from)? =>
-					Err(DispatchErrorWithPostInfo { post_info: Pays::No.into(), error }),
-				Err(error) => Err(error.into()),
-			}
-		}
-
 		#[pallet::call_index(9)]
 		#[pallet::weight(T::WeightInfo::increase_securitization())]
 		pub fn increase_securitization(
@@ -1208,14 +1308,14 @@ pub mod pallet {
 				let mut lock_extension = lock.get_lock_extension();
 				let securitization =
 					Securitization::new(additional_liquidity, lock.securitization_ratio);
-				let fee = T::VaultProvider::lock(
+				let (fee, _) = T::VaultProvider::lock(
 					lock.vault_id,
 					&who,
 					&securitization,
 					VaultLockRequest {
 						satoshis: new_satoshis.saturating_sub(lock.satoshis),
 						extension: Some((duration_for_new_funds, &mut lock_extension)),
-						vault_covers_fee: false,
+						fee_discount: T::Balance::zero(),
 						is_backfill: false,
 						backfill_securitization_to_unreserve: T::Balance::zero(),
 					},
@@ -1454,7 +1554,7 @@ pub mod pallet {
 			satoshis: Satoshis,
 			bitcoin_pubkey: CompressedBitcoinPubkey,
 			options: Option<LockOptions<T>>,
-			vault_covers_fee: bool,
+			fee_discount: T::Balance,
 			backfill_securitization_to_unreserve: T::Balance,
 		) -> DispatchResult {
 			ensure!(
@@ -1471,14 +1571,14 @@ pub mod pallet {
 			let (securitization, locked_target_price) =
 				Self::prepare_lock_securitization(vault_id, satoshis, options.as_ref())?;
 
-			let fee = T::VaultProvider::lock(
+			let (fee, coupon_paid_fees) = T::VaultProvider::lock(
 				vault_id,
 				account_id,
 				&securitization,
 				VaultLockRequest {
 					satoshis,
 					extension: None,
-					vault_covers_fee,
+					fee_discount,
 					is_backfill: false,
 					backfill_securitization_to_unreserve,
 				},
@@ -1530,7 +1630,7 @@ pub mod pallet {
 					liquidity_promised: securitization.liquidity_promised,
 					security_fees: fee,
 					securitization_ratio: securitization.securitization_ratio,
-					coupon_paid_fees: if vault_covers_fee { fee } else { T::Balance::zero() },
+					coupon_paid_fees,
 					utxo_satoshis: None,
 					satoshis,
 					vault_pubkey,
@@ -2053,29 +2153,6 @@ impl<T: Config> BitcoinLocksProvider<T::AccountId, T::Balance> for Pallet<T> {
 		}
 
 		amount
-	}
-}
-
-type RuntimeCallOf<T> = <T as frame_system::Config>::RuntimeCall;
-
-impl<T: Config> CallTxPoolKeyProvider<RuntimeCallOf<T>, T::AccountId> for Pallet<T>
-where
-	RuntimeCallOf<T>: IsSubType<Call<T>>,
-{
-	fn key_for(call: &RuntimeCallOf<T>, signer: Option<&T::AccountId>) -> Option<Vec<u8>> {
-		let call = <RuntimeCallOf<T> as IsSubType<Call<T>>>::is_sub_type(call)?;
-		match call {
-			Call::initialize_for { account_id, vault_id, .. }
-				if signer.is_some_and(|signer| {
-					T::VaultProvider::can_initialize_bitcoin_locks(*vault_id, signer)
-				}) =>
-				Some(
-					(b"bitcoin_locks:init_for", vault_id, account_id)
-						.using_encoded(sp_crypto_hashing::blake2_256)
-						.to_vec(),
-				),
-			_ => None,
-		}
 	}
 }
 

@@ -11,8 +11,9 @@ use crate::{
 		LockCosignDueByFrame, LockReleaseCosignHeightById, LockReleaseRequestsByUtxoId,
 		LocksByUtxoId, UtxoIdsByVaultId,
 	},
-	Error, Event, HoldReason, LockExpirationsByBitcoinHeight, LockOptions, LockReleaseRequest,
-	MicrogonPerBtcHistory, OrphanedUtxoExpirationByFrame, OrphanedUtxosByAccount,
+	Error, Event, FeeCoupon, HoldReason, LockExpirationsByBitcoinHeight, LockOptions,
+	LockReleaseRequest, MicrogonPerBtcHistory, OrphanedUtxoExpirationByFrame,
+	OrphanedUtxosByAccount, FEE_COUPON_MESSAGE_KEY,
 };
 use argon_bitcoin::{Amount, CosignReleaser, CosignScriptArgs, ReleaseStep};
 use argon_primitives::{
@@ -21,7 +22,7 @@ use argon_primitives::{
 		SATOSHIS_PER_BITCOIN,
 	},
 	vault::{LockExtension, Securitization},
-	BitcoinUtxoEvents, CallTxPoolKeyProvider, PriceProvider, MICROGONS_PER_ARGON,
+	BitcoinUtxoEvents, PriceProvider, MICROGONS_PER_ARGON,
 };
 
 #[test]
@@ -183,7 +184,7 @@ fn cleans_up_a_funding_timed_out_bitcoin() {
 }
 
 #[test]
-fn initialize_for_requires_vault_permissions_and_covers_lock_fee() {
+fn initialize_applies_a_delegate_signed_fee_discount() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		let pubkey = CompressedBitcoinPubkey([1; 33]);
@@ -191,56 +192,121 @@ fn initialize_for_requires_vault_permissions_and_covers_lock_fee() {
 			.expect("should have price") /
 			10;
 
-		set_argons(2, 2_000_000);
-		assert_err!(
-			BitcoinLocks::initialize_for(
-				RuntimeOrigin::signed(3),
-				2,
-				1,
-				SATOSHIS_PER_BITCOIN,
-				pubkey,
-				Some(LockOptions::V1 { microgons_at_target_per_btc: None }),
-				0,
-			),
-			Error::<Test>::NoPermissions
-		);
-
-		let result = BitcoinLocks::initialize_for(
-			RuntimeOrigin::signed(1),
-			2,
+		DefaultVault::mutate(|vault| vault.delegate_account_id = Some(9));
+		ChargeFee::set(true);
+		set_argons(2, fee);
+		assert_ok!(BitcoinLocks::initialize(
+			RuntimeOrigin::signed(2),
 			1,
 			SATOSHIS_PER_BITCOIN,
 			pubkey,
-			Some(LockOptions::V1 { microgons_at_target_per_btc: None }),
-			0,
-		);
-		assert!(matches!(result, Ok(post_info) if post_info.pays_fee == Pays::No));
+			Some(LockOptions::V2 {
+				microgons_at_target_per_btc: None,
+				fee_coupon: Some(fee_coupon(2, fee / 2, 0, 2, 1)),
+			}),
+		));
 
 		let lock = LocksByUtxoId::<Test>::get(1).unwrap();
 		assert_eq!(lock.owner_account, 2);
-		assert_eq!(lock.coupon_paid_fees, fee);
-
-		DefaultVault::mutate(|vault| vault.delegate_account_id = Some(9));
-		let result = BitcoinLocks::initialize_for(
-			RuntimeOrigin::signed(9),
-			3,
-			1,
-			SATOSHIS_PER_BITCOIN,
-			pubkey,
-			Some(LockOptions::V1 { microgons_at_target_per_btc: None }),
-			0,
-		);
-		assert!(matches!(result, Ok(post_info) if post_info.pays_fee == Pays::No));
-
-		let lock = LocksByUtxoId::<Test>::get(2).unwrap();
-		assert_eq!(lock.owner_account, 3);
-		assert_eq!(lock.coupon_paid_fees, fee);
+		assert_eq!(lock.coupon_paid_fees, fee / 2);
+		assert_eq!(Balances::free_balance(2), fee / 2);
 	});
 	set_bitcoin_height(12);
 }
 
 #[test]
-fn initialize_for_unreserves_backfill_securitization_atomically() {
+fn fee_coupon_must_match_the_lock_and_delegate_signature() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		DefaultVault::mutate(|vault| vault.delegate_account_id = Some(9));
+		set_argons(2, 2_000_000);
+
+		let initialize = |coupon| {
+			BitcoinLocks::initialize(
+				RuntimeOrigin::signed(2),
+				1,
+				SATOSHIS_PER_BITCOIN,
+				CompressedBitcoinPubkey([1; 33]),
+				Some(LockOptions::V2 {
+					microgons_at_target_per_btc: None,
+					fee_coupon: Some(coupon),
+				}),
+			)
+		};
+
+		assert_err!(initialize(fee_coupon(3, 100, 0, 2, 1)), Error::<Test>::FeeCouponWrongAccount);
+
+		let mut wrong_vault = fee_coupon(2, 100, 0, 2, 1);
+		wrong_vault.vault_id = 2;
+		assert_err!(initialize(wrong_vault), Error::<Test>::FeeCouponWrongVault);
+
+		let mut wrong_chain = fee_coupon(2, 100, 0, 2, 1);
+		wrong_chain.genesis_hash = polkadot_sdk::sp_core::H256::repeat_byte(1);
+		assert_err!(initialize(wrong_chain), Error::<Test>::FeeCouponWrongChain);
+
+		let mut invalid_signature = fee_coupon(2, 100, 0, 2, 1);
+		invalid_signature.signature = polkadot_sdk::sp_runtime::testing::TestSignature(8, vec![]);
+		assert_err!(initialize(invalid_signature), Error::<Test>::InvalidFeeCouponSignature);
+
+		let mut tampered_discount = fee_coupon(2, 100, 0, 2, 1);
+		tampered_discount.fee_discount += 1;
+		assert_err!(initialize(tampered_discount), Error::<Test>::InvalidFeeCouponSignature);
+
+		let mut tampered_backfill = fee_coupon(2, 100, 100, 2, 1);
+		tampered_backfill.backfill_securitization_to_unreserve += 1;
+		assert_err!(initialize(tampered_backfill), Error::<Test>::InvalidFeeCouponSignature);
+
+		CurrentFrameId::set(3);
+		assert_err!(initialize(fee_coupon(2, 100, 0, 2, 1)), Error::<Test>::FeeCouponExpired);
+	});
+}
+
+#[test]
+fn fee_coupon_cannot_be_reused() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		DefaultVault::mutate(|vault| vault.delegate_account_id = Some(9));
+		set_argons(2, 2_000_000);
+		let coupon = fee_coupon(2, 100, 0, 2, 1);
+
+		assert_ok!(BitcoinLocks::initialize(
+			RuntimeOrigin::signed(2),
+			1,
+			SATOSHIS_PER_BITCOIN,
+			CompressedBitcoinPubkey([1; 33]),
+			Some(LockOptions::V2 {
+				microgons_at_target_per_btc: None,
+				fee_coupon: Some(coupon.clone()),
+			}),
+		));
+		assert_err!(
+			BitcoinLocks::initialize(
+				RuntimeOrigin::signed(2),
+				1,
+				SATOSHIS_PER_BITCOIN,
+				CompressedBitcoinPubkey([2; 33]),
+				Some(LockOptions::V2 {
+					microgons_at_target_per_btc: None,
+					fee_coupon: Some(coupon),
+				}),
+			),
+			Error::<Test>::FeeCouponAlreadyUsed
+		);
+		assert_ok!(BitcoinLocks::initialize(
+			RuntimeOrigin::signed(2),
+			1,
+			SATOSHIS_PER_BITCOIN,
+			CompressedBitcoinPubkey([3; 33]),
+			Some(LockOptions::V2 {
+				microgons_at_target_per_btc: None,
+				fee_coupon: Some(fee_coupon(2, 100, 0, 2, 2)),
+			}),
+		));
+	});
+}
+
+#[test]
+fn fee_coupon_unreserves_backfill_securitization_atomically() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		let satoshis = SATOSHIS_PER_BITCOIN;
@@ -277,14 +343,16 @@ fn initialize_for_unreserves_backfill_securitization_atomically() {
 			),
 			Error::<Test>::InsufficientVaultFunds
 		);
-		assert_ok!(BitcoinLocks::initialize_for(
-			RuntimeOrigin::signed(1),
-			2,
+		DefaultVault::mutate(|vault| vault.delegate_account_id = Some(9));
+		assert_ok!(BitcoinLocks::initialize(
+			RuntimeOrigin::signed(2),
 			1,
 			satoshis,
 			CompressedBitcoinPubkey([2; 33]),
-			None,
-			required_collateral,
+			Some(LockOptions::V2 {
+				microgons_at_target_per_btc: None,
+				fee_coupon: Some(fee_coupon(2, 0, required_collateral.saturating_mul(2), 2, 1,)),
+			}),
 		));
 		assert_eq!(DefaultVault::get().backfill_securitization_reserved, 0);
 		assert_eq!(LocksByUtxoId::<Test>::get(2).expect("new lock").owner_account, 2);
@@ -317,121 +385,6 @@ fn set_as_backfill_rejects_a_missing_vault() {
 			BitcoinLocks::set_as_backfill(RuntimeOrigin::signed(1), 1, true),
 			Error::<Test>::VaultNotFound
 		);
-	});
-}
-
-#[test]
-fn initialize_for_stale_vault_capacity_failure_is_no_fee() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-		let pubkey = CompressedBitcoinPubkey([1; 33]);
-		let required_collateral =
-			StaticPriceProvider::get_btc_price_in_market_microgons(SATOSHIS_PER_BITCOIN)
-				.expect("should have price");
-
-		DefaultVault::mutate(|vault| {
-			vault.securitization = required_collateral.saturating_sub(1);
-			vault.securitization_target = vault.securitization;
-		});
-		CanConsumeRecentCapacityDropBudget::set(true);
-
-		let error = BitcoinLocks::initialize_for(
-			RuntimeOrigin::signed(1),
-			2,
-			1,
-			SATOSHIS_PER_BITCOIN,
-			pubkey,
-			Some(LockOptions::V1 { microgons_at_target_per_btc: None }),
-			0,
-		)
-		.unwrap_err();
-
-		assert_eq!(error.error, Error::<Test>::InsufficientVaultFunds.into());
-		assert_eq!(error.post_info.pays_fee, Pays::No);
-		assert_eq!(ConsumedRecentCapacityDropBudget::get(), vec![(1, required_collateral)]);
-	});
-}
-
-#[test]
-fn initialize_for_non_stale_vault_capacity_failure_still_pays_fees() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-		let pubkey = CompressedBitcoinPubkey([1; 33]);
-		let required_collateral =
-			StaticPriceProvider::get_btc_price_in_market_microgons(SATOSHIS_PER_BITCOIN)
-				.expect("should have price");
-
-		DefaultVault::mutate(|vault| {
-			vault.securitization = required_collateral.saturating_sub(1);
-			vault.securitization_target = vault.securitization;
-		});
-
-		let error = BitcoinLocks::initialize_for(
-			RuntimeOrigin::signed(1),
-			2,
-			1,
-			SATOSHIS_PER_BITCOIN,
-			pubkey,
-			Some(LockOptions::V1 { microgons_at_target_per_btc: None }),
-			0,
-		)
-		.unwrap_err();
-
-		assert_eq!(error.error, Error::<Test>::InsufficientVaultFunds.into());
-		assert_eq!(error.post_info.pays_fee, Pays::Yes);
-		assert_eq!(ConsumedRecentCapacityDropBudget::get(), vec![(1, required_collateral)]);
-	});
-}
-
-#[test]
-fn initialize_for_has_a_pool_key_per_vault_and_account() {
-	new_test_ext().execute_with(|| {
-		let pubkey = CompressedBitcoinPubkey([1; 33]);
-		let first_call = RuntimeCall::BitcoinLocks(crate::Call::<Test>::initialize_for {
-			account_id: 2,
-			vault_id: 1,
-			satoshis: SATOSHIS_PER_BITCOIN,
-			bitcoin_pubkey: pubkey,
-			options: Some(LockOptions::V1 { microgons_at_target_per_btc: None }),
-			backfill_securitization_to_unreserve: 0,
-		});
-		let second_call = RuntimeCall::BitcoinLocks(crate::Call::<Test>::initialize_for {
-			account_id: 3,
-			vault_id: 1,
-			satoshis: SATOSHIS_PER_BITCOIN,
-			bitcoin_pubkey: pubkey,
-			options: Some(LockOptions::V1 { microgons_at_target_per_btc: None }),
-			backfill_securitization_to_unreserve: 0,
-		});
-
-		let first_key = <BitcoinLocks as CallTxPoolKeyProvider<RuntimeCall, u64>>::key_for(
-			&first_call,
-			Some(&1),
-		)
-		.expect("initialize_for should publish a pool key");
-		let second_key = <BitcoinLocks as CallTxPoolKeyProvider<RuntimeCall, u64>>::key_for(
-			&second_call,
-			Some(&1),
-		)
-		.expect("initialize_for should publish a pool key");
-
-		assert_ne!(first_key, second_key);
-		assert_eq!(
-			first_key,
-			(b"bitcoin_locks:init_for", 1u32, 2u64)
-				.using_encoded(sp_crypto_hashing::blake2_256)
-				.to_vec()
-		);
-		assert!(<BitcoinLocks as CallTxPoolKeyProvider<RuntimeCall, u64>>::key_for(
-			&first_call,
-			Some(&99),
-		)
-		.is_none());
-		assert!(<BitcoinLocks as CallTxPoolKeyProvider<RuntimeCall, u64>>::key_for(
-			&first_call,
-			None
-		)
-		.is_none());
 	});
 }
 
@@ -1937,7 +1890,6 @@ fn it_should_allow_a_ratchet_down() {
 		let mut balance = 5000;
 		set_argons(who, balance);
 		assert_ok!(BitcoinLocks::initialize(RuntimeOrigin::signed(who), 1, satoshis, pubkey, None));
-		balance.saturating_reduce(1000 + 620);
 		assert_eq!(Balances::free_balance(who), balance);
 
 		// Mint the argons into account
@@ -1966,8 +1918,8 @@ fn it_should_allow_a_ratchet_down() {
 			Some((1, who, 52_000 * MICROGONS_PER_ARGON)),
 			"should record locking the new amount"
 		);
-		// should only pay base fee
-		balance.saturating_reduce(redemption_amount + 1000);
+		// Vault operators do not pay their own lock fees.
+		balance.saturating_reduce(redemption_amount);
 		assert_eq!(Balances::free_balance(who), balance);
 		assert!(
 			Balances::free_balance(who) > 10_000 * MICROGONS_PER_ARGON,
@@ -2135,6 +2087,23 @@ fn down_ratchet_redemption_uses_requested_microgons_at_target_per_btc() {
 }
 
 #[test]
+fn ratchet_rejects_fee_coupons() {
+	new_test_ext().execute_with(|| {
+		assert_noop!(
+			BitcoinLocks::ratchet(
+				RuntimeOrigin::signed(1),
+				1,
+				Some(LockOptions::V2 {
+					microgons_at_target_per_btc: None,
+					fee_coupon: Some(fee_coupon(1, 100, 0, 2, 1)),
+				}),
+			),
+			Error::<Test>::FeeCouponOnlyForInitialization,
+		);
+	});
+}
+
+#[test]
 fn redemption_amount_matches_market_rate_at_non_one_dollar_target() {
 	new_test_ext().execute_with(|| {
 		BitcoinPriceInUsd::set(Some(FixedU128::saturating_from_integer(55_000)));
@@ -2235,6 +2204,37 @@ fn it_should_record_btc_history() {
 			vec![(12, 100_000 * MICROGONS_PER_ARGON), (13, 120_000 * MICROGONS_PER_ARGON)]
 		);
 	});
+}
+
+fn fee_coupon(
+	beneficiary: u64,
+	fee_discount: Balance,
+	backfill_securitization_to_unreserve: Balance,
+	expires_at_frame: FrameId,
+	nonce: u64,
+) -> FeeCoupon<Test> {
+	let genesis_hash = System::block_hash(0);
+	let message = (
+		FEE_COUPON_MESSAGE_KEY,
+		genesis_hash,
+		1u32,
+		beneficiary,
+		fee_discount,
+		backfill_securitization_to_unreserve,
+		expires_at_frame,
+		nonce,
+	)
+		.using_encoded(blake2_256);
+	FeeCoupon {
+		vault_id: 1,
+		genesis_hash,
+		beneficiary,
+		fee_discount,
+		backfill_securitization_to_unreserve,
+		expires_at_frame,
+		nonce,
+		signature: polkadot_sdk::sp_runtime::testing::TestSignature(9, message.to_vec()),
+	}
 }
 
 fn make_script_pubkey(vec: &[u8]) -> BitcoinScriptPubkey {

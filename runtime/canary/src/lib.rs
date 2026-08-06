@@ -304,9 +304,6 @@ impl pallet_vaults::Config for Runtime {
 	type RevenueCollectionExpirationFrames = LockReleaseCosignDeadlineFrames;
 	type OperationalMinimumVaultSecuritization = OperationalMinimumVaultSecuritization;
 	type OperationalMinimumVaultLockTicks = OperationalMinimumVaultLockTicks;
-	type RecentCapacityDropBlockWindow = RecentCapacityDropBlockWindow;
-	type MaxRecentCapacityDropsPerVault = MaxRecentCapacityDropsPerVault;
-	type CapacityDropAttemptUnit = CapacityDropAttemptUnit;
 	type OperationalAccountsHook = use_unless_benchmark!(OperationalAccounts, ());
 	type OperationalAccountProvider = use_unless_benchmark!(
 		OperationalAccounts,
@@ -349,6 +346,8 @@ impl pallet_bitcoin_locks::Config for Runtime {
 		BitcoinSignatureVerifier,
 		benchmarking::BenchmarkBitcoinSignatureVerifier
 	);
+	type FeeCouponSigner = polkadot_sdk::sp_runtime::MultiSigner;
+	type FeeCouponSignature = Signature;
 	type BitcoinBlockHeightChange =
 		use_unless_benchmark!(BitcoinUtxos, benchmarking::BenchmarkBitcoinBlockHeightChange);
 	type GetBitcoinNetwork =
@@ -803,7 +802,7 @@ impl pallet_ethereum_verifier::Config for Runtime {
 impl pallet_fee_control::Config for Runtime {
 	type Balance = Balance;
 	type FeelessCallTxPoolKeyProviders = ();
-	type CallTxPoolKeyProviders = (BitcoinLocks, EthereumVerifier, CrosschainTransfer);
+	type CallTxPoolKeyProviders = (EthereumVerifier, CrosschainTransfer);
 	type CallTxValidityProviders = (EthereumVerifier, CrosschainTransfer);
 	type TransactionSponsorProviders = MiningBidProxyFeeSponsor<Runtime>;
 	type CallFeeRefundProviders = VaultAdminFeeRefundPolicy;
