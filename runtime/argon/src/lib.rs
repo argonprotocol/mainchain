@@ -471,7 +471,14 @@ impl pallet_mining_slot::Config for Runtime {
 	);
 	type OperationalAccountsHook = use_unless_benchmark!(OperationalAccounts, ());
 	type SlotEvents = use_unless_benchmark!(
-		(GrandpaSlotRotation, BlockRewards, Treasury, Vaults, CrosschainTransfer),
+		(
+			GrandpaSlotRotation,
+			BlockRewards,
+			Treasury,
+			Vaults,
+			CrosschainTransfer,
+			OperationalAccounts
+		),
 		(GrandpaSlotRotation,)
 	);
 	type GrandpaRotationBlocks = GrandpaRotationBlocks;
@@ -740,6 +747,7 @@ impl pallet_crosschain_transfer::Config for Runtime {
 impl pallet_operational_accounts::Config for Runtime {
 	type Balance = Balance;
 	type MaxAvailableAccessCodes = MaxAvailableOperationalAccessCodes;
+	type MaxAccessCodeAwardsPerFrame = MaxOperationalAccessCodeAwardsPerFrame;
 	type MinimumUniswapTransfer = MinimumUniswapTransfer;
 	type MinimumBitcoin = MinimumBitcoin;
 	type MinimumBonds = MinimumBonds;

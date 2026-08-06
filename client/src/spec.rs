@@ -3406,9 +3406,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				124u8, 195u8, 113u8, 217u8, 223u8, 206u8, 121u8, 132u8, 4u8, 187u8, 162u8, 174u8,
-				196u8, 34u8, 15u8, 156u8, 72u8, 18u8, 106u8, 250u8, 17u8, 166u8, 203u8, 202u8,
-				162u8, 118u8, 12u8, 236u8, 168u8, 198u8, 66u8, 249u8,
+				49u8, 9u8, 30u8, 0u8, 140u8, 113u8, 177u8, 187u8, 47u8, 176u8, 153u8, 59u8, 127u8,
+				73u8, 160u8, 205u8, 84u8, 82u8, 230u8, 66u8, 209u8, 186u8, 227u8, 114u8, 88u8,
+				64u8, 126u8, 26u8, 60u8, 72u8, 179u8, 93u8,
 			]
 	}
 	pub mod system {
@@ -24385,6 +24385,15 @@ pub mod api {
 						runtime_types::pallet_operational_accounts::pallet::OperationalAccount;
 					pub type Param0 = crate::types::AccountId32;
 				}
+				pub mod access_code_ready_accounts {
+					use super::runtime_types;
+					pub type AccessCodeReadyAccounts = ();
+					pub type Param0 = crate::types::AccountId32;
+				}
+				pub mod counter_for_access_code_ready_accounts {
+					use super::runtime_types;
+					pub type CounterForAccessCodeReadyAccounts = ::core::primitive::u32;
+				}
 				pub mod operational_account_by_sub_account {
 					use super::runtime_types;
 					pub type OperationalAccountBySubAccount = crate::types::AccountId32;
@@ -24419,9 +24428,9 @@ pub mod api {
 						"OperationalAccounts",
 						(),
 						[
-							54u8, 54u8, 144u8, 124u8, 31u8, 5u8, 225u8, 179u8, 117u8, 252u8, 100u8,
-							7u8, 56u8, 236u8, 62u8, 137u8, 191u8, 234u8, 80u8, 127u8, 75u8, 135u8,
-							118u8, 171u8, 215u8, 135u8, 46u8, 91u8, 29u8, 157u8, 43u8, 73u8,
+							126u8, 122u8, 28u8, 91u8, 41u8, 61u8, 59u8, 168u8, 4u8, 181u8, 59u8,
+							212u8, 211u8, 37u8, 195u8, 214u8, 204u8, 94u8, 239u8, 44u8, 108u8,
+							221u8, 46u8, 49u8, 90u8, 107u8, 11u8, 129u8, 41u8, 157u8, 168u8, 4u8,
 						],
 					)
 				}
@@ -24443,9 +24452,68 @@ pub mod api {
 						"OperationalAccounts",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							54u8, 54u8, 144u8, 124u8, 31u8, 5u8, 225u8, 179u8, 117u8, 252u8, 100u8,
-							7u8, 56u8, 236u8, 62u8, 137u8, 191u8, 234u8, 80u8, 127u8, 75u8, 135u8,
-							118u8, 171u8, 215u8, 135u8, 46u8, 91u8, 29u8, 157u8, 43u8, 73u8,
+							126u8, 122u8, 28u8, 91u8, 41u8, 61u8, 59u8, 168u8, 4u8, 181u8, 59u8,
+							212u8, 211u8, 37u8, 195u8, 214u8, 204u8, 94u8, 239u8, 44u8, 108u8,
+							221u8, 46u8, 49u8, 90u8, 107u8, 11u8, 129u8, 41u8, 157u8, 168u8, 4u8,
+						],
+					)
+				}
+				#[doc = " Operational accounts that have met both follow-on access-code thresholds."]
+				pub fn access_code_ready_accounts_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::access_code_ready_accounts::AccessCodeReadyAccounts,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"OperationalAccounts",
+						"AccessCodeReadyAccounts",
+						(),
+						[
+							218u8, 129u8, 75u8, 235u8, 177u8, 26u8, 33u8, 129u8, 51u8, 199u8,
+							253u8, 14u8, 102u8, 17u8, 66u8, 166u8, 142u8, 153u8, 248u8, 158u8,
+							112u8, 13u8, 103u8, 193u8, 244u8, 237u8, 18u8, 254u8, 94u8, 112u8,
+							194u8, 37u8,
+						],
+					)
+				}
+				#[doc = " Operational accounts that have met both follow-on access-code thresholds."]
+				pub fn access_code_ready_accounts(
+					&self,
+					_0: types::access_code_ready_accounts::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::access_code_ready_accounts::Param0,
+					>,
+					types::access_code_ready_accounts::AccessCodeReadyAccounts,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"OperationalAccounts",
+						"AccessCodeReadyAccounts",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							218u8, 129u8, 75u8, 235u8, 177u8, 26u8, 33u8, 129u8, 51u8, 199u8,
+							253u8, 14u8, 102u8, 17u8, 66u8, 166u8, 142u8, 153u8, 248u8, 158u8,
+							112u8, 13u8, 103u8, 193u8, 244u8, 237u8, 18u8, 254u8, 94u8, 112u8,
+							194u8, 37u8,
+						],
+					)
+				}
+				#[doc = "Counter for the related counted storage map"]				pub fn counter_for_access_code_ready_accounts (& self ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < () , types :: counter_for_access_code_ready_accounts :: CounterForAccessCodeReadyAccounts , :: subxt :: ext :: subxt_core :: utils :: Yes , :: subxt :: ext :: subxt_core :: utils :: Yes , () >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"OperationalAccounts",
+						"CounterForAccessCodeReadyAccounts",
+						(),
+						[
+							93u8, 1u8, 98u8, 251u8, 51u8, 170u8, 156u8, 84u8, 40u8, 124u8, 253u8,
+							115u8, 5u8, 122u8, 128u8, 248u8, 150u8, 50u8, 111u8, 24u8, 151u8, 21u8,
+							88u8, 130u8, 156u8, 13u8, 88u8, 220u8, 237u8, 144u8, 98u8, 192u8,
 						],
 					)
 				}
@@ -24624,6 +24692,23 @@ pub mod api {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"OperationalAccounts",
 						"MaxAvailableAccessCodes",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
+						],
+					)
+				}
+				#[doc = " Maximum number of accrued access codes awarded at one frame boundary."]
+				pub fn max_access_code_awards_per_frame(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u32,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"OperationalAccounts",
+						"MaxAccessCodeAwardsPerFrame",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
@@ -35802,7 +35887,6 @@ pub mod api {
 					pub mining_seat_applied_total: ::core::primitive::u32,
 					#[codec(compact)]
 					pub operational_certifications_count: ::core::primitive::u32,
-					pub access_code_pending: ::core::primitive::bool,
 					#[codec(compact)]
 					pub available_access_codes: ::core::primitive::u32,
 					#[codec(compact)]

@@ -11,7 +11,7 @@ use crate::mock::{
 #[allow(unused)]
 use crate::Pallet as OperationalAccountsPallet;
 use argon_primitives::{
-	OperationalAccountsHook, TickProvider, UtxoLockEvents, MICROGONS_PER_ARGON,
+	OnNewSlot, OperationalAccountsHook, TickProvider, UtxoLockEvents, MICROGONS_PER_ARGON,
 };
 use codec::Decode;
 #[cfg(test)]
@@ -36,6 +36,7 @@ use polkadot_sdk::{
 };
 
 const USER_SEED: u32 = 0;
+const MAX_ACCESS_CODE_AWARDS_PER_FRAME: u32 = 1_000;
 const BENCH_OPERATIONAL_ACCOUNT: [u8; 32] = [
 	106, 16, 190, 2, 157, 30, 210, 131, 68, 101, 135, 20, 90, 79, 136, 82, 37, 72, 155, 73, 4, 36,
 	160, 50, 141, 204, 226, 164, 138, 230, 254, 97,
@@ -191,7 +192,8 @@ mod benchmarks {
 		let mut account = default_operational_account::<T>(&linked);
 		account.uniswap_argon_transfers_in_amount = T::MinimumUniswapTransfer::get();
 		account.vault_created = true;
-		account.mining_seat_accrual = T::MiningSeatsForOperational::get();
+		account.mining_seat_accrual = T::MiningSeatsPerAccessCode::get();
+		account.is_operationally_certified = true;
 		insert_operational_account::<T>(&linked, account);
 		link_vault_to_owner::<T>(&linked);
 		#[cfg(test)]
@@ -201,12 +203,13 @@ mod benchmarks {
 		{
 			let _ = OperationalAccountsPallet::<T>::vault_bitcoin_lock_funded(
 				&linked.vault,
-				T::MinimumBitcoin::get(),
+				T::BitcoinLockSizeForAccessCode::get(),
 			);
 		}
 
 		let account = OperationalAccounts::<T>::get(&linked.owner).expect("account should exist");
-		assert_eq!(account.vault_bitcoin_accrual, T::MinimumBitcoin::get());
+		assert_eq!(account.vault_bitcoin_accrual, T::BitcoinLockSizeForAccessCode::get());
+		assert!(AccessCodeReadyAccounts::<T>::contains_key(&linked.owner));
 	}
 
 	#[benchmark]
@@ -216,8 +219,9 @@ mod benchmarks {
 		let mut account = default_operational_account::<T>(&linked);
 		account.uniswap_argon_transfers_in_amount = T::OperationalMinimumUniswapTransfer::get();
 		account.vault_created = true;
-		account.vault_bitcoin_accrual = T::MinimumBitcoin::get();
-		account.mining_seat_accrual = T::MiningSeatsForOperational::get().saturating_sub(1);
+		account.vault_bitcoin_accrual = T::BitcoinLockSizeForAccessCode::get();
+		account.mining_seat_accrual = T::MiningSeatsPerAccessCode::get().saturating_sub(1);
+		account.is_operationally_certified = true;
 		insert_operational_account::<T>(&linked, account);
 		link_mining_to_owner::<T>(&linked);
 		#[cfg(test)]
@@ -232,7 +236,36 @@ mod benchmarks {
 			OperationalAccounts::<T>::get(&linked.owner)
 				.expect("account should exist")
 				.mining_seat_accrual,
-			T::MiningSeatsForOperational::get()
+			T::MiningSeatsPerAccessCode::get()
+		);
+		assert!(AccessCodeReadyAccounts::<T>::contains_key(&linked.owner));
+	}
+
+	#[benchmark]
+	fn on_frame_start(r: Linear<1, MAX_ACCESS_CODE_AWARDS_PER_FRAME>) {
+		for seed in 0..r {
+			let linked = linked_accounts_with_seed::<T>(seed);
+			let mut account = default_operational_account::<T>(&linked);
+			account.vault_bitcoin_accrual = T::BitcoinLockSizeForAccessCode::get();
+			account.mining_seat_accrual = T::MiningSeatsPerAccessCode::get();
+			account.is_operationally_certified = true;
+			insert_operational_account::<T>(&linked, account);
+			AccessCodeReadyAccounts::<T>::insert(&linked.owner, ());
+		}
+		assert_eq!(AccessCodeReadyAccounts::<T>::count(), r);
+
+		#[block]
+		{
+			<OperationalAccountsPallet<T> as OnNewSlot<T::AccountId>>::on_frame_start(1);
+		}
+
+		let expected_awards = r.min(T::MaxAccessCodeAwardsPerFrame::get());
+		assert_eq!(AccessCodeReadyAccounts::<T>::count(), r.saturating_sub(expected_awards));
+		assert_eq!(
+			OperationalAccounts::<T>::iter_values()
+				.filter(|account| account.available_access_codes == 1)
+				.count(),
+			expected_awards as usize
 		);
 	}
 
@@ -337,8 +370,8 @@ mod benchmarks {
 		account.account_vault_bond_amount = T::MinimumBonds::get();
 		account.uniswap_argon_transfers_in_amount = T::OperationalMinimumUniswapTransfer::get();
 		account.vault_created = true;
-		account.vault_bitcoin_accrual = T::MinimumBitcoin::get();
-		account.mining_seat_accrual = T::MiningSeatsForOperational::get();
+		account.vault_bitcoin_accrual = T::BitcoinLockSizeForAccessCode::get();
+		account.mining_seat_accrual = T::MiningSeatsPerAccessCode::get();
 		insert_operational_account::<T>(&linked, account);
 		link_mining_to_owner::<T>(&linked);
 		#[cfg(test)]
@@ -354,6 +387,7 @@ mod benchmarks {
 				.expect("account should exist")
 				.is_operationally_certified
 		);
+		assert!(AccessCodeReadyAccounts::<T>::contains_key(&linked.owner));
 		let upstream_account_data = OperationalAccounts::<T>::get(&upstream_account.owner)
 			.expect("upstream account should exist");
 		assert!(upstream_account_data.operational_certifications_count > 0);
@@ -470,7 +504,6 @@ mod benchmarks {
 			mining_seat_accrual: 0,
 			mining_seat_applied_total: 0,
 			operational_certifications_count: 0,
-			access_code_pending: false,
 			available_access_codes: 0,
 			rewards_earned_count: 0,
 			rewards_earned_amount: <T::Balance as Zero>::zero(),

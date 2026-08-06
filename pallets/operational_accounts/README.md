@@ -21,17 +21,21 @@ A registered account becomes operationally certified once all of the following a
   securitization.
 - The account has at least `MiningSeatsForOperational` mining seats.
 
-Once eligible, any managed account may call `activate` to mark the account operationally certified.
+Once eligible, any managed account may call `activate` to mark the account operationally certified
+and grant its first access code.
 
 ## Follow-On Access Codes
 
-After an account becomes operationally certified, it can earn additional access codes through:
+After an account becomes operationally certified, it can earn additional access codes in two ways:
 
 - Downstream certifications: when a downstream account becomes operationally certified, the upstream
-  account earns one pending access code.
-- Bitcoin progress: vault bitcoin lock growth accumulates toward `BitcoinLockSizeForAccessCode`.
-- Mining seat progress: mining seat wins accumulate toward `MiningSeatsPerAccessCode`.
+  account immediately earns one access code.
+- Frame turns: an account earns at most one access code when both its vault bitcoin accrual reaches
+  `BitcoinLockSizeForAccessCode` and its mining seat accrual reaches `MiningSeatsPerAccessCode`. An
+  award resets both accruals completely.
 
+Ready accounts are indexed as they cross both thresholds. Each frame awards up to
+`MaxAccessCodeAwardsPerFrame` indexed accounts; any remainder stays ready for the following frame.
 Access codes are capped by `MaxAvailableAccessCodes`.
 
 ## Rewards

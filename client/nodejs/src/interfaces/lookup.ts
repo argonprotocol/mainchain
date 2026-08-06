@@ -4042,7 +4042,6 @@ export default {
     miningSeatAccrual: 'Compact<u32>',
     miningSeatAppliedTotal: 'Compact<u32>',
     operationalCertificationsCount: 'Compact<u32>',
-    accessCodePending: 'bool',
     availableAccessCodes: 'Compact<u32>',
     rewardsEarnedCount: 'Compact<u32>',
     rewardsEarnedAmount: 'u128',

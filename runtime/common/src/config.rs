@@ -247,6 +247,8 @@ parameter_types! {
 	// ## pallet_operational_accounts
 	/// Maximum number of available operational access codes allowed at once.
 	pub const MaxAvailableOperationalAccessCodes: u32 = 3;
+	/// Maximum number of accrued operational access codes awarded at one frame boundary.
+	pub const MaxOperationalAccessCodeAwardsPerFrame: u32 = 1_000;
 	/// Maximum number of queued operational rewards.
 	pub const OperationalMaxRewardsQueued: u32 = 1_000;
 	/// Minimum Uniswap transfer amount required to register.

@@ -4706,7 +4706,6 @@ declare module '@polkadot/types/lookup' {
     readonly miningSeatAccrual: Compact<u32>;
     readonly miningSeatAppliedTotal: Compact<u32>;
     readonly operationalCertificationsCount: Compact<u32>;
-    readonly accessCodePending: bool;
     readonly availableAccessCodes: Compact<u32>;
     readonly rewardsEarnedCount: Compact<u32>;
     readonly rewardsEarnedAmount: u128;

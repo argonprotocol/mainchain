@@ -1311,6 +1311,18 @@ declare module '@polkadot/api-base/types/storage' {
     };
     operationalAccounts: {
       /**
+       * Operational accounts that have met both follow-on access-code thresholds.
+       **/
+      accessCodeReadyAccounts: AugmentedQuery<
+        ApiType,
+        (arg: AccountId32 | string | Uint8Array) => Observable<Option<Null>>,
+        [AccountId32]
+      >;
+      /**
+       * Counter for the related counted storage map
+       **/
+      counterForAccessCodeReadyAccounts: AugmentedQuery<ApiType, () => Observable<u32>, []>;
+      /**
        * Whether operational-account access is invite-only.
        *
        * When enabled, registration requires an upstream invite and vault creation plus
