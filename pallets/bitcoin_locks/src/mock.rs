@@ -307,7 +307,7 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 		let term = extension.as_ref().map(|(a, _)| *a).unwrap_or(FixedU128::one());
 		DefaultVault::mutate(|a| {
 			if let Some((_, lock_extension)) = extension {
-				a.extend_lock(securitization, lock_extension, is_flexible)
+				a.extend_lock(securitization, lock_extension, is_flexible, may_use_flexible_space)
 			} else {
 				a.reserved_securitization_space
 					.saturating_reduce(securitization_space_to_unreserve);

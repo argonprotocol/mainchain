@@ -1341,7 +1341,12 @@ where
 				let term =
 					extension.as_ref().map(|(duration, _)| *duration).unwrap_or(FixedU128::one());
 				if let Some((_, lock_extension)) = extension {
-					vault.extend_lock(securitization, lock_extension, is_flexible)?;
+					vault.extend_lock(
+						securitization,
+						lock_extension,
+						is_flexible,
+						may_use_flexible_space,
+					)?;
 				} else {
 					vault
 						.reserved_securitization_space
