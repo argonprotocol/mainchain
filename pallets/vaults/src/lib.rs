@@ -1630,7 +1630,12 @@ pub mod pallet {
 				// locks must be held for a minimum of a year, so when we are looking to re-use
 				// locked funds, they must be getting a new expiration of > 1 year from their
 				// original date
-				vault.extend_lock(securitization, extension, is_flexible)?;
+				vault.extend_lock(
+					securitization,
+					extension,
+					is_flexible,
+					may_use_flexible_space,
+				)?;
 			} else {
 				vault
 					.reserved_securitization_space

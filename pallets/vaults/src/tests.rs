@@ -367,7 +367,7 @@ fn it_can_set_a_vault_delegate_account() {
 }
 
 #[test]
-fn only_vault_operator_can_reserve_available_securitization() {
+fn operator_can_reserve_securitization_space_for_own_vault() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		set_argons(1, 100_010);
@@ -398,6 +398,40 @@ fn only_vault_operator_can_reserve_available_securitization() {
 			}
 			.into(),
 		);
+	});
+}
+
+#[test]
+fn operator_extension_uses_releasing_funds_before_flexible_space() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		set_argons(1, 100);
+		assert_ok!(Vaults::create(
+			RuntimeOrigin::signed(1),
+			VaultConfig { securitization: 100, ..default_vault() }
+		));
+		VaultsById::<Test>::mutate(1, |vault| {
+			let vault = vault.as_mut().expect("vault");
+			vault.securitization_locked = 60;
+			vault.flexible_securitization_locked = 40;
+			vault.securitization_release_schedule.try_insert(288, 20).unwrap();
+		});
+
+		let mut extension = LockExtension::new(143);
+		assert_ok!(Vaults::lock(
+			1,
+			&1,
+			&securitization(40),
+			VaultLockRequest {
+				extension: Some((FixedU128::one(), &mut extension)),
+				..standard_lock_request(0)
+			},
+		));
+
+		let vault = VaultsById::<Test>::get(1).expect("vault");
+		assert_eq!(vault.securitization_locked, 100);
+		assert!(vault.securitization_release_schedule.is_empty());
+		assert_eq!(extension.get(&288), Some(&20));
 	});
 }
 

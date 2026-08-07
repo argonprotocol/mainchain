@@ -734,9 +734,11 @@ impl<
 		securitization: &Securitization<Balance>,
 		lock_extension: &mut LockExtension<Balance>,
 		is_flexible: bool,
+		may_use_flexible_space: bool,
 	) -> Result<(), VaultError> {
 		ensure!(
-			securitization.collateral_required <= self.available_securitization_space(true),
+			securitization.collateral_required <=
+				self.available_securitization_space(may_use_flexible_space),
 			VaultError::InsufficientVaultFunds
 		);
 
@@ -749,7 +751,10 @@ impl<
 		// `available_securitization()` includes scheduled-for-release amounts, but step (2) must
 		// not consume those, because step (3) handles scheduled funds beyond the max expiration.
 		let mut uninhibited_securitization = self.uninhibited_securitization();
-		uninhibited_securitization.saturating_accrue(self.undisplaced_flexible_securitization());
+		if may_use_flexible_space {
+			uninhibited_securitization
+				.saturating_accrue(self.undisplaced_flexible_securitization());
+		}
 		let amount_to_lock = remaining.min(uninhibited_securitization);
 		self.securitization_locked.saturating_accrue(amount_to_lock);
 		remaining.saturating_reduce(amount_to_lock);
@@ -1195,7 +1200,7 @@ mod test {
 		assert_eq!(vault.securitized_satoshis, 40);
 
 		vault
-			.extend_lock(&securitization(20), &mut LockExtension::new(200), true)
+			.extend_lock(&securitization(20), &mut LockExtension::new(200), true, true)
 			.unwrap();
 
 		assert_eq!(vault.flexible_securitization_locked, 100);
@@ -1277,7 +1282,7 @@ mod test {
 		assert_eq!(vault.available_securitization_space(true), 500);
 
 		let lock_extensions = &mut LockExtension::new(100);
-		vault.extend_lock(&securitization(100), lock_extensions, false).unwrap();
+		vault.extend_lock(&securitization(100), lock_extensions, false, true).unwrap();
 		assert_eq!(vault.securitization_release_schedule.len(), 0);
 		assert_eq!(vault.securitization_locked, 100);
 		assert_eq!(vault.available_securitization_space(true), 400);
@@ -1329,7 +1334,7 @@ mod test {
 		// if the expiration is within the other expirations, it will prefer the securitization
 		// already scheduled for release
 		let lock_extensions = &mut LockExtension::new(143);
-		vault.extend_lock(&securitization(25), lock_extensions, false).unwrap();
+		vault.extend_lock(&securitization(25), lock_extensions, false, true).unwrap();
 		assert_eq!(lock_extensions.len(), 0);
 		assert_eq!(vault.securitization_locked, 125);
 		assert_eq!(vault.securitization_release_schedule.len(), 2);
@@ -1350,7 +1355,7 @@ mod test {
 		assert_eq!(vault.available_securitization_space(true), 375);
 		assert_eq!(vault.securitization_locked, 125);
 		let lock_extensions = &mut LockExtension::new(143);
-		vault.extend_lock(&securitization(370), lock_extensions, false).unwrap();
+		vault.extend_lock(&securitization(370), lock_extensions, false, true).unwrap();
 		assert_eq!(lock_extensions.len(), 2);
 		assert_eq!(lock_extensions.get(&288).unwrap(), &75);
 		assert_eq!(lock_extensions.get(&432).unwrap(), &20);
