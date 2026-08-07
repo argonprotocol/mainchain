@@ -56,7 +56,8 @@ pub mod pallet {
 		#[pallet::constant]
 		type MaxCandidateUtxosPerLock: Get<u32>;
 
-		/// Maximum bitcoin blocks to watch a Utxo for confirmation before canceling
+		/// Maximum bitcoin blocks to accept a UTXO for confirmation. Expired locks remain watched
+		/// for this many additional blocks so late funding can be detected as orphaned.
 		#[pallet::constant]
 		type MaxPendingConfirmationBlocks: Get<BitcoinHeight>;
 
@@ -89,7 +90,8 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
-	/// Pending funding entries that have expired and are awaiting bounded cleanup.
+	/// Pending funding entries that have expired. These remain watched until their additional
+	/// orphan-detection window ends, then await bounded cleanup.
 	#[pallet::storage]
 	pub type ExpiredPendingFunding<T: Config> = StorageValue<
 		_,
@@ -545,6 +547,9 @@ pub mod pallet {
 			for (utxo, entry) in LockedUtxos::<T>::iter() {
 				utxos.push((Some(utxo), entry));
 			}
+			for (_, entry) in ExpiredPendingFunding::<T>::get() {
+				utxos.push((None, entry));
+			}
 			let pending = LocksPendingFunding::<T>::get();
 			for (utxo_id, entry) in pending.iter() {
 				utxos.push((None, entry.clone()));
@@ -611,6 +616,14 @@ pub mod pallet {
 						satoshis_received: satoshis,
 						rejected_reason,
 					});
+				} else if ExpiredPendingFunding::<T>::get().contains_key(&utxo_id) {
+					T::EventHandler::orphaned_utxo_detected(utxo_id, satoshis, utxo_ref.clone())?;
+					Self::deposit_event(Event::UtxoRejected {
+						utxo_id,
+						utxo_ref,
+						satoshis_received: satoshis,
+						rejected_reason: BitcoinRejectedReason::VerificationExpired,
+					});
 				} else {
 					tracing::info!(utxo_id = ?utxo_id, satoshis = ?satoshis, utxo_ref = ?utxo_ref, bitcoin_height,
 						"UTXO not being waited for");
@@ -670,9 +683,27 @@ pub mod pallet {
 
 		// Separated so the benchmark measures the real hook setup and full expired-queue decode.
 		pub(crate) fn prepare_expired_pending_funding_cleanup(limit: u32) -> Vec<UtxoId> {
-			TempParentHasSyncState::<T>::put(ConfirmedBitcoinBlockTip::<T>::get().is_some());
-			PreviousBitcoinBlockTip::<T>::set(ConfirmedBitcoinBlockTip::<T>::get());
-			ExpiredPendingFunding::<T>::get().keys().take(limit as usize).copied().collect()
+			let confirmed_tip = ConfirmedBitcoinBlockTip::<T>::get();
+			TempParentHasSyncState::<T>::put(confirmed_tip.is_some());
+			PreviousBitcoinBlockTip::<T>::set(confirmed_tip.clone());
+			let Some(confirmed_height) = confirmed_tip.map(|tip| tip.block_height) else {
+				return vec![];
+			};
+			let funding_window = T::MaxPendingConfirmationBlocks::get();
+			// The inherent built from this parent state must process the final orphan-only block
+			// before its lock is removed during on_initialize.
+			ExpiredPendingFunding::<T>::get()
+				.iter()
+				.filter(|(_, entry)| {
+					entry
+						.submitted_at_height
+						.saturating_add(funding_window)
+						.saturating_add(funding_window) <
+						confirmed_height
+				})
+				.map(|(utxo_id, _)| *utxo_id)
+				.take(limit as usize)
+				.collect()
 		}
 
 		// Separated so the benchmark measures the real one-item cleanup body.
