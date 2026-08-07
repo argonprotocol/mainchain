@@ -9127,7 +9127,8 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Pending funding entries that have expired and are awaiting bounded cleanup."]
+				#[doc = " Pending funding entries that have expired. These remain watched until their additional"]
+				#[doc = " orphan-detection window ends, then await bounded cleanup."]
 				pub fn expired_pending_funding(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
@@ -9402,7 +9403,8 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Maximum bitcoin blocks to watch a Utxo for confirmation before canceling"]
+				#[doc = " Maximum bitcoin blocks to accept a UTXO for confirmation. Expired locks remain watched"]
+				#[doc = " for this many additional blocks so late funding can be detected as orphaned."]
 				pub fn max_pending_confirmation_blocks(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<

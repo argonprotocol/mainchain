@@ -350,7 +350,8 @@ declare module '@polkadot/api-base/types/storage' {
         []
       >;
       /**
-       * Pending funding entries that have expired and are awaiting bounded cleanup.
+       * Pending funding entries that have expired. These remain watched until their additional
+       * orphan-detection window ends, then await bounded cleanup.
        **/
       expiredPendingFunding: AugmentedQuery<
         ApiType,
