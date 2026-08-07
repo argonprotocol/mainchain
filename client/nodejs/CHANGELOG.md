@@ -1,8 +1,28 @@
 # Changelog
 
-## [v1.4.10](https://github.com/argonprotocol/mainchain/compare/v1.4.9...608fbe23a068c1fc9f7d4ed05019525f945ee952) (2026-07-13)
+## [v1.4.11](https://github.com/argonprotocol/mainchain/compare/v1.4.10...d386c4ce0e6ecc6d18cdfabe92db7a195d0d67d5) (2026-07-31)
 
 ### Features
+
+* **price-index:** add ethereum repayment pricing
+([b6f1709](https://github.com/argonprotocol/mainchain/commit/b6f1709ea4e2f7d502320a45843ded72ae6fa013))
+* **vaults:** add backfill capacity
+([f3d3f20](https://github.com/argonprotocol/mainchain/commit/f3d3f20625b54104a7c07c105c6cb2f65197a488))
+* **bootstrap:** add chain-backed recovery lookup
+([46a37b1](https://github.com/argonprotocol/mainchain/commit/46a37b1a3e72c391813dd00f636132981603e324))
+* **crosschain:** schedule global issuance council rotations
+([f3cb236](https://github.com/argonprotocol/mainchain/commit/f3cb236a6d70ad4538b87ad840efa646395942a3))
+
+### Fixes
+
+* **client:** preserve Beacon API base paths
+([fda12c9](https://github.com/argonprotocol/mainchain/commit/fda12c91c0d1af43b25438b6852dde9fccd9628d))
+* **nodejs:** handle retracted transaction results
+([3ccc4a1](https://github.com/argonprotocol/mainchain/commit/3ccc4a1c9a49d9cec90534b00c2de78908a021b7))
+
+### [v1.4.10](https://github.com/argonprotocol/mainchain/compare/v1.4.9...v1.4.10) (2026-07-13)
+
+#### Features
 
 * **operational-accounts:** gate registration on minimums and upstream
 approval
@@ -14,7 +34,7 @@ approval
 * **treasury:** add argonot treasury bonds
 ([6c9df1c](https://github.com/argonprotocol/mainchain/commit/6c9df1cf93545d33b81e43407526c50530505f85))
 
-### Fixes
+#### Fixes
 
 * **fee-control:** report fee delegation accounts correctly
 ([052c599](https://github.com/argonprotocol/mainchain/commit/052c599f49d8c3ed08a6ff1f6fd9195886f07f54))
