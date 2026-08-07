@@ -547,13 +547,11 @@ pub mod pallet {
 			for (utxo, entry) in LockedUtxos::<T>::iter() {
 				utxos.push((Some(utxo), entry));
 			}
-			for (_, entry) in ExpiredPendingFunding::<T>::get() {
-				utxos.push((None, entry));
-			}
+			let expired = ExpiredPendingFunding::<T>::get();
 			let pending = LocksPendingFunding::<T>::get();
-			for (utxo_id, entry) in pending.iter() {
+			for (utxo_id, entry) in expired.iter().chain(pending.iter()) {
 				utxos.push((None, entry.clone()));
-				// Make sure to only look at all candidate utxos if a utxo is still pending funding
+				// Candidates remain watched until the pending or orphan-detection window ends.
 				let candidate_refs = CandidateUtxoRefsByUtxoId::<T>::get(*utxo_id);
 				for (utxo_ref, _) in candidate_refs {
 					utxos.push((Some(utxo_ref), entry.clone()));

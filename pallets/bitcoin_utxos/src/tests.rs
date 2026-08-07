@@ -671,7 +671,7 @@ fn promotes_candidates_to_orphans_on_timeout() {
 
 		assert!(!LocksPendingFunding::<Test>::get().contains_key(&1));
 		assert!(ExpiredPendingFunding::<Test>::get().contains_key(&1));
-		assert!(!BitcoinUtxos::active_utxos().iter().any(|(utxo_ref, entry)| {
+		assert!(BitcoinUtxos::active_utxos().iter().any(|(utxo_ref, entry)| {
 			utxo_ref == &Some(orphan_ref.clone()) && entry.utxo_id == 1
 		}));
 		assert_noop!(
@@ -842,9 +842,9 @@ fn reject_candidate_rolls_back_on_handler_error() {
 	});
 }
 
-/// Clears candidates and pending funding when a tracked UTXO is reported spent.
+/// Clears spent candidates while an expired lock remains in its orphan-detection window.
 #[test]
-fn spent_clears_candidates_and_pending() {
+fn spent_clears_candidates_during_orphan_watch() {
 	MinimumSatoshisPerCandidateUtxo::set(1000);
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
@@ -874,8 +874,32 @@ fn spent_clears_candidates_and_pending() {
 		));
 		assert!(CandidateUtxoRefsByUtxoId::<Test>::get(1).contains_key(&candidate_ref));
 
+		let expiration_height = 2 + MaxPendingConfirmationBlocks::get() as BitcoinHeight + 1;
 		InherentIncluded::<Test>::set(false);
 		System::set_block_number(2);
+		ConfirmedBitcoinBlockTip::<Test>::put(BitcoinBlock {
+			block_height: expiration_height,
+			block_hash: H256Le([1; 32]),
+		});
+		assert_ok!(BitcoinUtxos::sync(
+			RuntimeOrigin::none(),
+			BitcoinUtxoSync {
+				funded: Default::default(),
+				spent: Default::default(),
+				sync_to_block: BitcoinBlock {
+					block_height: expiration_height,
+					block_hash: H256Le([1; 32]),
+				},
+			},
+		));
+		assert!(LocksPendingFunding::<Test>::get().is_empty());
+		assert!(ExpiredPendingFunding::<Test>::get().contains_key(&1));
+		assert!(BitcoinUtxos::active_utxos().iter().any(|(utxo_ref, entry)| {
+			utxo_ref == &Some(candidate_ref.clone()) && entry.utxo_id == 1
+		}));
+
+		InherentIncluded::<Test>::set(false);
+		System::set_block_number(3);
 		assert_ok!(BitcoinUtxos::sync(
 			RuntimeOrigin::none(),
 			BitcoinUtxoSync {
@@ -883,14 +907,17 @@ fn spent_clears_candidates_and_pending() {
 				spent: vec![BitcoinUtxoSpend {
 					utxo_id: 1,
 					utxo_ref: Some(candidate_ref.clone()),
-					bitcoin_height: 2,
+					bitcoin_height: expiration_height,
 				}],
-				sync_to_block: BitcoinBlock { block_height: 2, block_hash: H256Le([0; 32]) },
+				sync_to_block: BitcoinBlock {
+					block_height: expiration_height,
+					block_hash: H256Le([1; 32]),
+				},
 			},
 		));
 
 		assert!(CandidateUtxoRefsByUtxoId::<Test>::get(1).is_empty());
-		assert!(LocksPendingFunding::<Test>::get().contains_key(&1));
+		assert!(ExpiredPendingFunding::<Test>::get().contains_key(&1));
 		assert_eq!(UtxoIdToFundingUtxoRef::<Test>::get(1), None);
 		assert!(LockedUtxos::<Test>::get(&candidate_ref).is_none());
 	});
