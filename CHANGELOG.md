@@ -1,8 +1,58 @@
 # Changelog
 
-## [v1.4.10](https://github.com/argonprotocol/mainchain/compare/v1.4.9...608fbe23a068c1fc9f7d4ed05019525f945ee952) (2026-07-13)
+## [v1.4.11](https://github.com/argonprotocol/mainchain/compare/v1.4.10...d386c4ce0e6ecc6d18cdfabe92db7a195d0d67d5) (2026-07-31)
 
 ### Features
+
+* **price-index:** add ethereum repayment pricing
+([b6f1709](https://github.com/argonprotocol/mainchain/commit/b6f1709ea4e2f7d502320a45843ded72ae6fa013))
+* **vaults:** add backfill capacity
+([f3d3f20](https://github.com/argonprotocol/mainchain/commit/f3d3f20625b54104a7c07c105c6cb2f65197a488))
+* **bootstrap:** add chain-backed recovery lookup
+([46a37b1](https://github.com/argonprotocol/mainchain/commit/46a37b1a3e72c391813dd00f636132981603e324))
+* **crosschain:** schedule global issuance council rotations
+([f3cb236](https://github.com/argonprotocol/mainchain/commit/f3cb236a6d70ad4538b87ad840efa646395942a3))
+
+### Fixes
+
+* **treasury:** allow bonds against vault securitization
+([9eb1522](https://github.com/argonprotocol/mainchain/commit/9eb15223f995163b15e27422211f612ce05a2581))
+* **ci:** restore full Rust CodeQL coverage
+([0930113](https://github.com/argonprotocol/mainchain/commit/09301135816e16127d5d7101701bf1484f780175))
+* **ci:** restrict CodeQL to default Rust features
+([af3f618](https://github.com/argonprotocol/mainchain/commit/af3f6187f8b318e5314eff53721a36ad402cbde3))
+* **ci:** free space before Rust CodeQL
+([311504f](https://github.com/argonprotocol/mainchain/commit/311504f9a69f94e8dc7ff9c43e7e43610efcf3c1))
+* **ci:** narrow CodeQL paths-ignore to macro-heavy runtime entrypoints only
+([711affb](https://github.com/argonprotocol/mainchain/commit/711affb2b8817cec1237e48f7e32ee161cb540d1))
+* **ci:** use glob wildcards in CodeQL paths-ignore patterns
+([f1f8864](https://github.com/argonprotocol/mainchain/commit/f1f8864cbd5a93417c9782f8f9e12ace48bd8fcf))
+* **ci:** reduce CodeQL Rust extraction scope and memory limits
+([766ec7e](https://github.com/argonprotocol/mainchain/commit/766ec7ea774b6176f513e76aca3c0fc60807ea44))
+* **ci:** prepare Rust dependencies for CodeQL
+([34bbf9d](https://github.com/argonprotocol/mainchain/commit/34bbf9dc994bdb108f51ef19fc827c4c25e5bce2))
+* **ci:** leave more capacity for CodeQL runner
+([06f6d25](https://github.com/argonprotocol/mainchain/commit/06f6d25185a7b4d14646fc43be28b4618b3a6fda))
+* **ci:** limit CodeQL runner resource usage
+([f0c9467](https://github.com/argonprotocol/mainchain/commit/f0c94671c7f276a92c40325fdb9f8a9b3d79e887))
+* **ethereum:** read bootstrap bonds from vault state
+([7322767](https://github.com/argonprotocol/mainchain/commit/73227679643144f4c25e880972957a0ee1d63e26))
+* **oracle:** use RPC fallbacks with Uniswap TWAL
+([ba0f802](https://github.com/argonprotocol/mainchain/commit/ba0f802db950a85eae3faa856c177c9726ef0bf0))
+* **client:** preserve Beacon API base paths
+([fda12c9](https://github.com/argonprotocol/mainchain/commit/fda12c91c0d1af43b25438b6852dde9fccd9628d))
+* **oracle:** retry opaque internal RPC errors
+([5a3cf7b](https://github.com/argonprotocol/mainchain/commit/5a3cf7b7b545c77ba185978b1b1c763afc595f67))
+* **mining-slot:** prevent scheduled seat compounding
+([488b38b](https://github.com/argonprotocol/mainchain/commit/488b38bc42787e7e3d0da5cb88b6fa9f99f68c64))
+* **oracle:** timeout stalled transaction watchers
+([e46f028](https://github.com/argonprotocol/mainchain/commit/e46f028dfe4e8af623b4014e7c96c5b24b2fd8f9))
+* **nodejs:** handle retracted transaction results
+([3ccc4a1](https://github.com/argonprotocol/mainchain/commit/3ccc4a1c9a49d9cec90534b00c2de78908a021b7))
+
+### [v1.4.10](https://github.com/argonprotocol/mainchain/compare/v1.4.9...v1.4.10) (2026-07-13)
+
+#### Features
 
 * **node:** expose sync status via rpc
 ([4a71b79](https://github.com/argonprotocol/mainchain/commit/4a71b79714df79e2512d766c0c2bd245fc648c4a))
@@ -10,8 +60,9 @@
 approval
 ([8772e0d](https://github.com/argonprotocol/mainchain/commit/8772e0d45a87d43f034c617778de7083b211eceb))
 * add argon rpc gateway to dev docker stack
-([df00811](https://github.com/argonprotocol/mainchain/commit/df008118d3ed1ba143253387dd6077113412896b),
-[a4fb952](https://github.com/argonprotocol/mainchain/commit/a4fb9521378b69da4a5ca9b3138d9eeec34015e7))
+([df00811](https://github.com/argonprotocol/mainchain/commit/df008118d3ed1ba143253387dd6077113412896b))
+* add argon rpc gateway to dev docker stack
+([a4fb952](https://github.com/argonprotocol/mainchain/commit/a4fb9521378b69da4a5ca9b3138d9eeec34015e7))
 * **operational-accounts:** add certification tiers
 ([6089908](https://github.com/argonprotocol/mainchain/commit/60899086e04b696eb9e283d195d7ae7cb594a539))
 * **mint:** batch bitcoin mint payouts across frame windows
@@ -19,7 +70,7 @@ approval
 * **treasury:** add argonot treasury bonds
 ([6c9df1c](https://github.com/argonprotocol/mainchain/commit/6c9df1cf93545d33b81e43407526c50530505f85))
 
-### Fixes
+#### Fixes
 
 * **fee-control:** report fee delegation accounts correctly
 ([052c599](https://github.com/argonprotocol/mainchain/commit/052c599f49d8c3ed08a6ff1f6fd9195886f07f54))
