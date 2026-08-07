@@ -1242,29 +1242,31 @@ fn burn_encumbered_flexible_bonds_preserves_reserved_bond_space() {
 		let bond_lot_id = account_bond_lot_ids(10)[0];
 		assert_ok!(Treasury::set_bond_lot_flexible(origin(10), bond_lot_id, true));
 		assert_ok!(Treasury::set_reserved_bond_space(origin(10), 1, 10));
-		assert_ok!(<Treasury as TreasuryPoolProvider<TestAccountId>>::encumber_bond_microgons(
-			&account(10),
-			10 * MICROGONS_PER_ARGON,
-		));
+		let encumber_result =
+			<Treasury as TreasuryPoolProvider<TestAccountId>>::encumber_bond_microgons(
+				&account(10),
+				10 * MICROGONS_PER_ARGON,
+			);
+		assert!(encumber_result.is_ok());
 
-		assert_ok!(
+		let burn_result =
 			<Treasury as TreasuryPoolProvider<TestAccountId>>::burn_encumbered_bond_microgons(
 				&account(10),
 				5 * MICROGONS_PER_ARGON,
-			)
-		);
+			);
+		assert!(burn_result.is_ok());
 
 		let vault_bonds = BondLotsByVault::<Test>::get(1);
 		assert_eq!(vault_bonds.flexible_bonds, 5);
 		assert_eq!(vault_bonds.reserved_bond_space, 10);
 		assert_eq!(BondLotById::<Test>::get(bond_lot_id).expect("bond lot").bonds, 5);
 
-		assert_ok!(
+		let burn_result =
 			<Treasury as TreasuryPoolProvider<TestAccountId>>::burn_encumbered_bond_microgons(
 				&account(10),
 				5 * MICROGONS_PER_ARGON,
-			)
-		);
+			);
+		assert!(burn_result.is_ok());
 		let vault_bonds = BondLotsByVault::<Test>::get(1);
 		assert_eq!(vault_bonds.flexible_bonds, 0);
 		assert_eq!(vault_bonds.reserved_bond_space, 10);
@@ -1292,17 +1294,19 @@ fn burn_encumbered_flexible_lots_preserves_reserved_bond_space() {
 			.expect("second bond lot");
 		assert_ok!(Treasury::set_bond_lot_flexible(origin(10), second_bond_lot_id, true,));
 		assert_ok!(Treasury::set_reserved_bond_space(origin(10), 1, 10));
-		assert_ok!(<Treasury as TreasuryPoolProvider<TestAccountId>>::encumber_bond_microgons(
-			&account(10),
-			10 * MICROGONS_PER_ARGON,
-		));
+		let encumber_result =
+			<Treasury as TreasuryPoolProvider<TestAccountId>>::encumber_bond_microgons(
+				&account(10),
+				10 * MICROGONS_PER_ARGON,
+			);
+		assert!(encumber_result.is_ok());
 
-		assert_ok!(
+		let burn_result =
 			<Treasury as TreasuryPoolProvider<TestAccountId>>::burn_encumbered_bond_microgons(
 				&account(10),
 				10 * MICROGONS_PER_ARGON,
-			)
-		);
+			);
+		assert!(burn_result.is_ok());
 
 		let vault_bonds = BondLotsByVault::<Test>::get(1);
 		assert_eq!(vault_bonds.flexible_bonds, 0);

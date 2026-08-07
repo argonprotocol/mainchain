@@ -220,6 +220,7 @@ fn fee_coupon_must_match_the_lock_and_delegate_signature() {
 		System::set_block_number(1);
 		DefaultVault::mutate(|vault| vault.delegate_account_id = Some(9));
 		set_argons(2, 2_000_000);
+		let nonce = System::block_number();
 
 		let initialize = |coupon| {
 			BitcoinLocks::initialize(
@@ -234,30 +235,33 @@ fn fee_coupon_must_match_the_lock_and_delegate_signature() {
 			)
 		};
 
-		assert_err!(initialize(fee_coupon(3, 100, 0, 2, 1)), Error::<Test>::FeeCouponWrongAccount);
+		assert_err!(
+			initialize(fee_coupon(3, 100, 0, 2, nonce)),
+			Error::<Test>::FeeCouponWrongAccount
+		);
 
-		let mut wrong_vault = fee_coupon(2, 100, 0, 2, 1);
+		let mut wrong_vault = fee_coupon(2, 100, 0, 2, nonce);
 		wrong_vault.vault_id = 2;
 		assert_err!(initialize(wrong_vault), Error::<Test>::FeeCouponWrongVault);
 
-		let mut wrong_chain = fee_coupon(2, 100, 0, 2, 1);
+		let mut wrong_chain = fee_coupon(2, 100, 0, 2, nonce);
 		wrong_chain.genesis_hash = polkadot_sdk::sp_core::H256::repeat_byte(1);
 		assert_err!(initialize(wrong_chain), Error::<Test>::FeeCouponWrongChain);
 
-		let mut invalid_signature = fee_coupon(2, 100, 0, 2, 1);
+		let mut invalid_signature = fee_coupon(2, 100, 0, 2, nonce);
 		invalid_signature.signature = polkadot_sdk::sp_runtime::testing::TestSignature(8, vec![]);
 		assert_err!(initialize(invalid_signature), Error::<Test>::InvalidFeeCouponSignature);
 
-		let mut tampered_discount = fee_coupon(2, 100, 0, 2, 1);
+		let mut tampered_discount = fee_coupon(2, 100, 0, 2, nonce);
 		tampered_discount.fee_discount += 1;
 		assert_err!(initialize(tampered_discount), Error::<Test>::InvalidFeeCouponSignature);
 
-		let mut tampered_flexible = fee_coupon(2, 100, 100, 2, 1);
+		let mut tampered_flexible = fee_coupon(2, 100, 100, 2, nonce);
 		tampered_flexible.securitization_space_to_unreserve += 1;
 		assert_err!(initialize(tampered_flexible), Error::<Test>::InvalidFeeCouponSignature);
 
 		CurrentFrameId::set(3);
-		assert_err!(initialize(fee_coupon(2, 100, 0, 2, 1)), Error::<Test>::FeeCouponExpired);
+		assert_err!(initialize(fee_coupon(2, 100, 0, 2, nonce)), Error::<Test>::FeeCouponExpired);
 	});
 }
 
