@@ -336,7 +336,7 @@ pub mod pallet {
 		/// Whether this lock has been funded (confirmed) on-bitcoin
 		pub is_funded: bool,
 		/// Whether this operator-owned lock may be displaced by outside vault capital.
-		pub is_backfill: bool,
+		pub is_flexible: bool,
 		/// Funds used by this bitcoin that will need to be held for extended periods when released
 		/// back to the vault
 		pub fund_hold_extensions: BoundedBTreeMap<BitcoinHeight, T::Balance, ConstU32<366>>,
@@ -508,10 +508,10 @@ pub mod pallet {
 			new_satoshis: Satoshis,
 			account_id: T::AccountId,
 		},
-		BitcoinLockBackfillChanged {
+		BitcoinLockFlexibleChanged {
 			utxo_id: UtxoId,
 			vault_id: VaultId,
-			is_backfill: bool,
+			is_flexible: bool,
 		},
 	}
 
@@ -706,9 +706,10 @@ pub mod pallet {
 		/// Maximum amount deducted from the vault's Bitcoin lock fee.
 		#[codec(compact)]
 		pub fee_discount: T::Balance,
-		/// Existing backfill reservation released atomically when this lock is created.
+		/// Existing securitization space reservation released atomically when this lock is
+		/// created.
 		#[codec(compact)]
-		pub backfill_securitization_to_unreserve: T::Balance,
+		pub securitization_space_to_unreserve: T::Balance,
 		/// Last frame in which this coupon can be used.
 		#[codec(compact)]
 		pub expires_at_frame: FrameId,
@@ -729,7 +730,7 @@ pub mod pallet {
 				self.vault_id,
 				&self.beneficiary,
 				self.fee_discount,
-				self.backfill_securitization_to_unreserve,
+				self.securitization_space_to_unreserve,
 				self.expires_at_frame,
 				self.nonce,
 			)
@@ -805,7 +806,7 @@ pub mod pallet {
 				Some(LockOptions::V2 { fee_coupon, .. }) => fee_coupon.as_ref(),
 				_ => None,
 			};
-			let (fee_discount, backfill_securitization_to_unreserve, coupon_nonce) =
+			let (fee_discount, securitization_space_to_unreserve, coupon_nonce) =
 				if let Some(coupon) = coupon {
 					ensure!(coupon.vault_id == vault_id, Error::<T>::FeeCouponWrongVault);
 					ensure!(
@@ -828,7 +829,7 @@ pub mod pallet {
 					);
 					(
 						coupon.fee_discount,
-						coupon.backfill_securitization_to_unreserve,
+						coupon.securitization_space_to_unreserve,
 						Some(coupon.nonce),
 					)
 				} else {
@@ -841,7 +842,7 @@ pub mod pallet {
 				bitcoin_pubkey,
 				options,
 				fee_discount,
-				backfill_securitization_to_unreserve,
+				securitization_space_to_unreserve,
 			)?;
 			if let Some(coupon_nonce) = coupon_nonce {
 				LastFeeCouponNonceByVaultAndAccount::<T>::insert(
@@ -1087,18 +1088,18 @@ pub mod pallet {
 
 			let new_liquidity_promised = Self::calculate_redemption_amount(new_target_price, None)?;
 
-			if lock.is_backfill {
+			if lock.is_flexible {
 				let new_securitization =
 					Securitization::new(new_liquidity_promised, lock.securitization_ratio);
-				let (backfill_securitization, backfill_securitization_backed) =
-					T::VaultProvider::get_projected_backfill_backing(
+				let (flexible_securitization, undisplaced_flexible_securitization) =
+					T::VaultProvider::get_projected_flexible_securitization(
 						lock.vault_id,
 						lock.get_securitization().collateral_required,
 						new_securitization.collateral_required,
 					)
 					.ok_or(Error::<T>::VaultNotFound)?;
 				ensure!(
-					backfill_securitization_backed >= backfill_securitization,
+					undisplaced_flexible_securitization >= flexible_securitization,
 					Error::<T>::InsufficientVaultFunds
 				);
 			}
@@ -1145,7 +1146,7 @@ pub mod pallet {
 					&lock.get_securitization(),
 					0,
 					&lock.get_lock_extension(),
-					lock.is_backfill,
+					lock.is_flexible,
 				)
 				.map_err(Error::<T>::from)?;
 
@@ -1162,8 +1163,8 @@ pub mod pallet {
 					satoshis: 0,
 					extension: Some((duration_for_new_funds, &mut lock_extension)),
 					fee_discount: T::Balance::zero(),
-					is_backfill: lock.is_backfill,
-					backfill_securitization_to_unreserve: T::Balance::zero(),
+					is_flexible: lock.is_flexible,
+					securitization_space_to_unreserve: T::Balance::zero(),
 				},
 			)
 			.map_err(Error::<T>::from)?;
@@ -1316,8 +1317,8 @@ pub mod pallet {
 						satoshis: new_satoshis.saturating_sub(lock.satoshis),
 						extension: Some((duration_for_new_funds, &mut lock_extension)),
 						fee_discount: T::Balance::zero(),
-						is_backfill: false,
-						backfill_securitization_to_unreserve: T::Balance::zero(),
+						is_flexible: false,
+						securitization_space_to_unreserve: T::Balance::zero(),
 					},
 				)
 				.map_err(Error::<T>::from)?;
@@ -1340,11 +1341,11 @@ pub mod pallet {
 		}
 
 		#[pallet::call_index(10)]
-		#[pallet::weight(T::WeightInfo::set_as_backfill())]
-		pub fn set_as_backfill(
+		#[pallet::weight(T::WeightInfo::set_flexible())]
+		pub fn set_flexible(
 			origin: OriginFor<T>,
 			utxo_id: UtxoId,
-			is_backfill: bool,
+			is_flexible: bool,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 			let mut lock = LocksByUtxoId::<T>::get(utxo_id).ok_or(Error::<T>::LockNotFound)?;
@@ -1357,24 +1358,24 @@ pub mod pallet {
 				!LockReleaseRequestsByUtxoId::<T>::contains_key(utxo_id),
 				Error::<T>::LockInProcessOfRelease
 			);
-			if lock.is_backfill == is_backfill {
+			if lock.is_flexible == is_flexible {
 				return Ok(());
 			}
 
-			T::VaultProvider::set_bitcoin_lock_as_backfill(
+			T::VaultProvider::set_bitcoin_lock_flexible(
 				lock.vault_id,
 				&lock.get_securitization(),
 				lock.satoshis,
-				is_backfill,
+				is_flexible,
 			)
 			.map_err(Error::<T>::from)?;
-			lock.is_backfill = is_backfill;
+			lock.is_flexible = is_flexible;
 			let vault_id = lock.vault_id;
 			LocksByUtxoId::<T>::insert(utxo_id, lock);
-			Self::deposit_event(Event::BitcoinLockBackfillChanged {
+			Self::deposit_event(Event::BitcoinLockFlexibleChanged {
 				utxo_id,
 				vault_id,
-				is_backfill,
+				is_flexible,
 			});
 			Ok(())
 		}
@@ -1555,7 +1556,7 @@ pub mod pallet {
 			bitcoin_pubkey: CompressedBitcoinPubkey,
 			options: Option<LockOptions<T>>,
 			fee_discount: T::Balance,
-			backfill_securitization_to_unreserve: T::Balance,
+			securitization_space_to_unreserve: T::Balance,
 		) -> DispatchResult {
 			ensure!(
 				satoshis >= MinimumSatoshis::<T>::get(),
@@ -1579,8 +1580,8 @@ pub mod pallet {
 					satoshis,
 					extension: None,
 					fee_discount,
-					is_backfill: false,
-					backfill_securitization_to_unreserve,
+					is_flexible: false,
+					securitization_space_to_unreserve,
 				},
 			)
 			.map_err(Error::<T>::from)?;
@@ -1642,7 +1643,7 @@ pub mod pallet {
 					created_at_height: current_bitcoin_height,
 					utxo_script_pubkey: script_pubkey,
 					is_funded: false,
-					is_backfill: false,
+					is_flexible: false,
 					fund_hold_extensions: BoundedBTreeMap::default(),
 					created_at_argon_block: <frame_system::Pallet<T>>::block_number(),
 				},
@@ -1829,7 +1830,7 @@ pub mod pallet {
 				lock.satoshis,
 				redemption_amount,
 				&lock.get_lock_extension(),
-				lock.is_backfill,
+				lock.is_flexible,
 			)
 			.map_err(Error::<T>::from)?;
 
@@ -1921,7 +1922,7 @@ pub mod pallet {
 				securitization,
 				lock.satoshis,
 				lock_extension,
-				lock.is_backfill,
+				lock.is_flexible,
 			)
 			.map_err(Error::<T>::from)?;
 
@@ -1966,7 +1967,7 @@ pub mod pallet {
 				lock.satoshis,
 				adjusted_market_rate,
 				&lock.get_lock_extension(),
-				lock.is_backfill,
+				lock.is_flexible,
 			)
 			.map_err(Error::<T>::from)?;
 

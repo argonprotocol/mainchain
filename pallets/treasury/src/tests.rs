@@ -58,7 +58,7 @@ fn bonus_approval(
 	vault_id: u32,
 	beneficiary: u64,
 	expires_at_frame: FrameId,
-	backfill_bonds_to_unreserve: Bonds,
+	bond_space_to_unreserve: Bonds,
 ) -> TreasuryBonusApprovalProof {
 	let beneficiary = account(beneficiary);
 	let message = (
@@ -66,7 +66,7 @@ fn bonus_approval(
 		vault_id,
 		beneficiary.clone(),
 		expires_at_frame,
-		backfill_bonds_to_unreserve,
+		bond_space_to_unreserve,
 	)
 		.using_encoded(blake2_256);
 	let signature: Signature = account_pair_from_seed(10).sign(message.as_slice()).into();
@@ -74,13 +74,13 @@ fn bonus_approval(
 		vault_id,
 		beneficiary,
 		expires_at_frame,
-		backfill_bonds_to_unreserve,
+		bond_space_to_unreserve,
 		signature,
 	}
 }
 
 #[test]
-fn buy_bonds_uses_greater_of_vault_securitization_and_securitized_bitcoin_value() {
+fn buy_bonds_uses_only_securitized_bitcoin_value() {
 	new_test_ext().execute_with(|| {
 		MinimumArgonsPerContributor::set(1);
 
@@ -97,16 +97,16 @@ fn buy_bonds_uses_greater_of_vault_securitization_and_securitized_bitcoin_value(
 		set_argons(2, 7 * MICROGONS_PER_ARGON);
 		set_argons(3, 7 * MICROGONS_PER_ARGON);
 
-		assert_ok!(Treasury::buy_bonds(origin(2), 1, 6, None));
+		assert_ok!(Treasury::buy_bonds(origin(2), 1, 4, None));
 		assert_noop!(
 			Treasury::buy_bonds(origin(2), 1, 1, None),
-			Error::<Test>::BondPurchaseAboveSecurity
+			Error::<Test>::InsufficientBondSpace
 		);
 
 		assert_ok!(Treasury::buy_bonds(origin(3), 2, 6, None));
 		assert_noop!(
 			Treasury::buy_bonds(origin(3), 2, 1, None),
-			Error::<Test>::BondPurchaseAboveSecurity
+			Error::<Test>::InsufficientBondSpace
 		);
 
 		Treasury::lock_in_vault_capital(1);
@@ -173,7 +173,7 @@ fn buy_bonds_store_plain_and_bonus_terms_and_track_pool_participation() {
 			),
 			5 * MICROGONS_PER_ARGON,
 		);
-		assert_eq!(BondLotsByVault::<Test>::get(1).bond_lots.len(), 2);
+		assert_eq!(BondLotsByVault::<Test>::get(1).regular_bond_lots.len(), 2);
 		assert!(<Treasury as TreasuryPoolProvider<TestAccountId>>::has_vault_bond_participation(
 			1,
 			&account(2),
@@ -186,7 +186,7 @@ fn buy_bonds_store_plain_and_bonus_terms_and_track_pool_participation() {
 }
 
 #[test]
-fn operator_can_mark_vault_bonds_as_backfill() {
+fn operator_can_mark_vault_bonds_as_flexible() {
 	new_test_ext().execute_with(|| {
 		MinimumArgonsPerContributor::set(1);
 		insert_vault(
@@ -199,23 +199,61 @@ fn operator_can_mark_vault_bonds_as_backfill() {
 
 		assert_ok!(Treasury::buy_bonds(origin(10), 1, 10, None));
 		let operator_lot_id = account_bond_lot_ids(10)[0];
-		assert_ok!(Treasury::set_bond_lot_as_backfill(origin(10), operator_lot_id, true));
+		assert_ok!(Treasury::set_bond_lot_flexible(origin(10), operator_lot_id, true));
 		assert_ok!(Treasury::buy_bonds(origin(2), 1, 10, None));
 
 		let vault_bonds = BondLotsByVault::<Test>::get(1);
-		assert_eq!(vault_bonds.backfill_bonds, 10);
-		assert_eq!(vault_bonds.bond_lots.iter().map(|lot| lot.bonds).sum::<u32>(), 10);
+		assert_eq!(vault_bonds.flexible_bonds, 10);
+		assert_eq!(vault_bonds.regular_bond_lots.iter().map(|lot| lot.bonds).sum::<u32>(), 10);
 
 		assert_ok!(Treasury::liquidate_bond_lot(origin(10), operator_lot_id));
 
 		let vault_bonds = BondLotsByVault::<Test>::get(1);
-		assert_eq!(vault_bonds.backfill_bonds, 0);
-		assert_eq!(vault_bonds.bond_lots.iter().map(|lot| lot.bonds).sum::<u32>(), 10);
+		assert_eq!(vault_bonds.flexible_bonds, 0);
+		assert_eq!(vault_bonds.regular_bond_lots.iter().map(|lot| lot.bonds).sum::<u32>(), 10);
 	});
 }
 
 #[test]
-fn bond_purchase_unreserves_backfill_from_approval() {
+fn reservation_uses_bond_space_without_counting_flexible_bonds_twice() {
+	new_test_ext().execute_with(|| {
+		MinimumArgonsPerContributor::set(1);
+		CurrentFrameId::set(1);
+		insert_vault(
+			1,
+			test_vault(10, (10 * MICROGONS_PER_ARGON) as u64, Permill::from_percent(20)),
+		);
+		set_argons(10, 10 * MICROGONS_PER_ARGON);
+		set_argons(2, 10 * MICROGONS_PER_ARGON);
+
+		assert_ok!(Treasury::buy_bonds(origin(10), 1, 10, None));
+		let operator_lot_id = account_bond_lot_ids(10)[0];
+		assert_ok!(Treasury::set_bond_lot_flexible(origin(10), operator_lot_id, true));
+		assert_noop!(
+			Treasury::set_reserved_bond_space(origin(10), 1, 11),
+			Error::<Test>::InsufficientBondSpace
+		);
+		assert_ok!(Treasury::set_reserved_bond_space(origin(10), 1, 10));
+
+		assert_ok!(Treasury::buy_bonds(origin(2), 1, 10, Some(bonus_approval(1, 2, 1, 10)),));
+		let vault_bonds = BondLotsByVault::<Test>::get(1);
+		assert_eq!(vault_bonds.flexible_bonds, 10);
+		assert_eq!(vault_bonds.regular_bond_lots.iter().map(|lot| lot.bonds).sum::<u32>(), 10);
+		assert_eq!(vault_bonds.reserved_bond_space, 0);
+		assert_noop!(
+			Treasury::set_reserved_bond_space(origin(10), 1, 1),
+			Error::<Test>::InsufficientBondSpace
+		);
+		assert_noop!(
+			Treasury::set_bond_lot_flexible(origin(10), operator_lot_id, false),
+			Error::<Test>::InsufficientBondSpace
+		);
+		assert_ok!(Treasury::liquidate_bond_lot(origin(10), operator_lot_id));
+	});
+}
+
+#[test]
+fn bond_purchase_unreserves_reserved_bond_space_from_approval() {
 	new_test_ext().execute_with(|| {
 		MinimumArgonsPerContributor::set(1);
 		CurrentFrameId::set(1);
@@ -223,39 +261,30 @@ fn bond_purchase_unreserves_backfill_from_approval() {
 			test_vault(10, (10 * MICROGONS_PER_ARGON) as u64, Permill::from_percent(20));
 		vault.delegate_account_id = Some(account(3));
 		insert_vault(1, vault);
-		set_argons(10, 10 * MICROGONS_PER_ARGON);
 		set_argons(2, 10 * MICROGONS_PER_ARGON);
 
-		assert_ok!(Treasury::buy_bonds(origin(10), 1, 10, None));
-		let backfill_lot_id = account_bond_lot_ids(10)[0];
-		assert_ok!(Treasury::set_bond_lot_as_backfill(origin(10), backfill_lot_id, true));
 		assert_noop!(
-			Treasury::set_backfill_bonds_reserved(origin(2), 1, 10),
+			Treasury::set_reserved_bond_space(origin(2), 1, 10),
 			Error::<Test>::NoPermissions
 		);
 		assert_noop!(
-			Treasury::set_backfill_bonds_reserved(origin(3), 1, 10),
+			Treasury::set_reserved_bond_space(origin(3), 1, 10),
 			Error::<Test>::NoPermissions
 		);
-		assert_ok!(Treasury::set_backfill_bonds_reserved(origin(10), 1, 10));
 		assert_noop!(
-			Treasury::liquidate_bond_lot(origin(10), backfill_lot_id),
-			Error::<Test>::BondPurchaseAboveSecurity
+			Treasury::set_reserved_bond_space(origin(10), 1, 11),
+			Error::<Test>::InsufficientBondSpace
 		);
+		assert_ok!(Treasury::set_reserved_bond_space(origin(10), 1, 10));
 
 		assert_noop!(
 			Treasury::buy_bonds(origin(2), 1, 10, None),
-			Error::<Test>::BondPurchaseAboveSecurity
+			Error::<Test>::InsufficientBondSpace
 		);
 		assert_ok!(Treasury::buy_bonds(origin(2), 1, 6, Some(bonus_approval(1, 2, 1, 10)),));
 		let vault_bonds = BondLotsByVault::<Test>::get(1);
-		assert_eq!(vault_bonds.backfill_bonds_reserved, 0);
-		assert_eq!(vault_bonds.bond_lots.iter().map(|lot| lot.bonds).sum::<u32>(), 6);
-		assert_noop!(
-			Treasury::set_bond_lot_as_backfill(origin(10), backfill_lot_id, false),
-			Error::<Test>::BondPurchaseAboveSecurity
-		);
-		assert!(BondLotById::<Test>::get(backfill_lot_id).expect("backfill lot").is_backfill);
+		assert_eq!(vault_bonds.reserved_bond_space, 0);
+		assert_eq!(vault_bonds.regular_bond_lots.iter().map(|lot| lot.bonds).sum::<u32>(), 6);
 	});
 }
 
@@ -345,8 +374,8 @@ fn liquidate_bond_lot_removes_it_from_future_frames_and_releases_on_maturity() {
 		assert_eq!(bond_lot.release_reason, Some(BondReleaseReason::UserLiquidation));
 		assert_eq!(bond_lot.release_frame_id, Some(11));
 		let vault_bonds = BondLotsByVault::<Test>::get(1);
-		assert!(vault_bonds.bond_lots.is_empty());
-		assert_eq!(vault_bonds.backfill_bonds, 0);
+		assert!(vault_bonds.regular_bond_lots.is_empty());
+		assert_eq!(vault_bonds.flexible_bonds, 0);
 		assert_eq!(PendingBondReleasesByFrame::<Test>::get(11), vec![bond_lot_id]);
 
 		Treasury::release_pending_bond_lots(11);
@@ -386,7 +415,7 @@ fn liquidate_bond_lot_rejects_when_it_would_drop_below_encumbered_backing() {
 			Treasury::liquidate_bond_lot(origin(2), bond_lot_ids[0]),
 			Error::<Test>::ActiveBondAmountBelowEncumberedBacking,
 		);
-		assert_eq!(BondLotsByVault::<Test>::get(1).bond_lots.len(), 2);
+		assert_eq!(BondLotsByVault::<Test>::get(1).regular_bond_lots.len(), 2);
 		assert_eq!(
 			BondLotById::<Test>::get(bond_lot_ids[0]).expect("bond lot").release_reason,
 			None,
@@ -599,7 +628,7 @@ fn accepted_lots_keep_largest_bond_amount_first() {
 		assert_ok!(Treasury::buy_bonds(origin(2), 1, 5, None));
 		assert_ok!(Treasury::buy_bonds(origin(3), 1, 6, None));
 
-		let accepted_lots = BondLotsByVault::<Test>::get(1).bond_lots;
+		let accepted_lots = BondLotsByVault::<Test>::get(1).regular_bond_lots;
 		assert_eq!(accepted_lots.len(), 2);
 
 		let first_lot =
@@ -615,12 +644,12 @@ fn accepted_lots_keep_largest_bond_amount_first() {
 		let operator_lot = BondLotById::<Test>::get(operator_lot_id).expect("operator lot");
 		assert_eq!(operator_lot.release_reason, Some(BondReleaseReason::Bumped));
 		assert!(operator_lot.release_frame_id.is_some());
-		assert_eq!(BondLotsByVault::<Test>::get(1).backfill_bonds, 0);
+		assert_eq!(BondLotsByVault::<Test>::get(1).flexible_bonds, 0);
 	});
 }
 
 #[test]
-fn backfill_frame_snapshot_prioritizes_bond_lots() {
+fn flexible_frame_snapshot_prioritizes_bond_lots() {
 	new_test_ext().execute_with(|| {
 		MinimumArgonsPerContributor::set(1);
 		insert_vault(
@@ -631,8 +660,8 @@ fn backfill_frame_snapshot_prioritizes_bond_lots() {
 		set_argons(10, 10 * MICROGONS_PER_ARGON);
 		set_argons(2, 10 * MICROGONS_PER_ARGON);
 		assert_ok!(Treasury::buy_bonds(origin(10), 1, 10, None));
-		let backfill_lot_id = account_bond_lot_ids(10)[0];
-		assert_ok!(Treasury::set_bond_lot_as_backfill(origin(10), backfill_lot_id, true));
+		let flexible_lot_id = account_bond_lot_ids(10)[0];
+		assert_ok!(Treasury::set_bond_lot_flexible(origin(10), flexible_lot_id, true));
 		assert_ok!(Treasury::buy_bonds(origin(2), 1, 6, None));
 
 		Treasury::lock_in_vault_capital(1);
@@ -640,10 +669,10 @@ fn backfill_frame_snapshot_prioritizes_bond_lots() {
 		let frame = CurrentFrameVaultCapital::<Test>::get().expect("frame capital");
 		let capital = frame.vaults.get(&1).expect("vault capital");
 		assert_eq!(capital.eligible_bonds, 10);
-		assert_eq!(capital.backfill_bonds_eligible, 4);
-		assert_eq!(capital.backfill_prorata, FixedU128::from_rational(4, 10));
-		assert_eq!(capital.bond_lot_allocations.len(), 1);
-		assert_eq!(capital.bond_lot_allocations[0].prorata, FixedU128::from_rational(6, 10));
+		assert_eq!(capital.flexible_bonds_eligible, 4);
+		assert_eq!(capital.flexible_prorata, FixedU128::from_rational(4, 10));
+		assert_eq!(capital.regular_bond_allocations.len(), 1);
+		assert_eq!(capital.regular_bond_allocations[0].prorata, FixedU128::from_rational(6, 10));
 	});
 }
 
@@ -667,9 +696,9 @@ fn frame_snapshot_caps_bond_lot_payouts_after_security_drops() {
 		let frame = CurrentFrameVaultCapital::<Test>::get().expect("frame capital");
 		let capital = frame.vaults.get(&1).expect("vault capital");
 		assert_eq!(capital.eligible_bonds, 5);
-		assert_eq!(capital.backfill_bonds_eligible, 0);
-		assert_eq!(capital.bond_lot_allocations.len(), 1);
-		assert_eq!(capital.bond_lot_allocations[0].prorata, FixedU128::one());
+		assert_eq!(capital.flexible_bonds_eligible, 0);
+		assert_eq!(capital.regular_bond_allocations.len(), 1);
+		assert_eq!(capital.regular_bond_allocations[0].prorata, FixedU128::one());
 	});
 }
 
@@ -696,9 +725,9 @@ fn distribution_uses_frame_snapshot_payouts_and_refunds_underfill_to_treasury() 
 		assert_eq!(current.frame_id, 1);
 		let vault_capital = current.vaults.get(&1).expect("vault capital");
 		assert_eq!(vault_capital.eligible_bonds, 4);
-		assert_eq!(vault_capital.bond_lot_allocations.len(), 1);
+		assert_eq!(vault_capital.regular_bond_allocations.len(), 1);
 		assert_eq!(
-			vault_capital.bond_lot_allocations[0].prorata,
+			vault_capital.regular_bond_allocations[0].prorata,
 			FixedU128::from_rational(4u128, 10u128),
 		);
 
@@ -939,8 +968,8 @@ fn locked_frame_still_pays_after_lot_is_liquidated() {
 		Treasury::lock_in_vault_capital(1);
 		assert_ok!(Treasury::liquidate_bond_lot(origin(2), bond_lot_id));
 		let vault_bonds = BondLotsByVault::<Test>::get(1);
-		assert!(vault_bonds.bond_lots.is_empty());
-		assert_eq!(vault_bonds.backfill_bonds, 0);
+		assert!(vault_bonds.regular_bond_lots.is_empty());
+		assert_eq!(vault_bonds.flexible_bonds, 0);
 
 		let bid_pool_account = BidPoolAccountId::get();
 		assert_ok!(Balances::mint_into(&bid_pool_account, 100 * MICROGONS_PER_ARGON));
@@ -985,8 +1014,8 @@ fn locked_frame_skips_lot_after_it_is_fully_burned() {
 			)
 		);
 		let vault_bonds = BondLotsByVault::<Test>::get(1);
-		assert!(vault_bonds.bond_lots.is_empty());
-		assert_eq!(vault_bonds.backfill_bonds, 0);
+		assert!(vault_bonds.regular_bond_lots.is_empty());
+		assert_eq!(vault_bonds.flexible_bonds, 0);
 		assert!(account_bond_lot_ids(2).is_empty());
 		assert_eq!(Treasury::encumbered_bond_microgons(&account(2)), 0);
 		assert!(BondLotById::<Test>::get(bond_lot_id).is_none());
@@ -1016,7 +1045,7 @@ fn failed_bond_lot_payout_is_not_recorded_as_earned() {
 					bonus_percent: Permill::zero(),
 				},
 				bonds: 1,
-				is_backfill: false,
+				is_flexible: false,
 				created_frame_id: 1,
 				participated_frames: 0,
 				last_frame_earnings_frame_id: None,
@@ -1031,12 +1060,12 @@ fn failed_bond_lot_payout_is_not_recorded_as_earned() {
 			.try_insert(
 				1,
 				VaultCapital {
-					bond_lot_allocations: BoundedVec::truncate_from(vec![BondLotAllocation {
+					regular_bond_allocations: BoundedVec::truncate_from(vec![BondLotAllocation {
 						bond_lot_id: 0,
 						prorata: FixedU128::one(),
 					}]),
-					backfill_bonds_eligible: 0,
-					backfill_prorata: FixedU128::zero(),
+					flexible_bonds_eligible: 0,
+					flexible_prorata: FixedU128::zero(),
 					eligible_bonds: 1,
 				},
 			)
@@ -1200,6 +1229,89 @@ fn burn_encumbered_bond_microgons_releases_fractional_slack_when_whole_bonds_sti
 }
 
 #[test]
+fn burn_encumbered_flexible_bonds_preserves_reserved_bond_space() {
+	new_test_ext().execute_with(|| {
+		MinimumArgonsPerContributor::set(1);
+		insert_vault(
+			1,
+			test_vault(10, (10 * MICROGONS_PER_ARGON) as u64, Permill::from_percent(20)),
+		);
+		set_argons(10, 10 * MICROGONS_PER_ARGON);
+
+		assert_ok!(Treasury::buy_bonds(origin(10), 1, 10, None));
+		let bond_lot_id = account_bond_lot_ids(10)[0];
+		assert_ok!(Treasury::set_bond_lot_flexible(origin(10), bond_lot_id, true));
+		assert_ok!(Treasury::set_reserved_bond_space(origin(10), 1, 10));
+		assert_ok!(<Treasury as TreasuryPoolProvider<TestAccountId>>::encumber_bond_microgons(
+			&account(10),
+			10 * MICROGONS_PER_ARGON,
+		));
+
+		assert_ok!(
+			<Treasury as TreasuryPoolProvider<TestAccountId>>::burn_encumbered_bond_microgons(
+				&account(10),
+				5 * MICROGONS_PER_ARGON,
+			)
+		);
+
+		let vault_bonds = BondLotsByVault::<Test>::get(1);
+		assert_eq!(vault_bonds.flexible_bonds, 5);
+		assert_eq!(vault_bonds.reserved_bond_space, 10);
+		assert_eq!(BondLotById::<Test>::get(bond_lot_id).expect("bond lot").bonds, 5);
+
+		assert_ok!(
+			<Treasury as TreasuryPoolProvider<TestAccountId>>::burn_encumbered_bond_microgons(
+				&account(10),
+				5 * MICROGONS_PER_ARGON,
+			)
+		);
+		let vault_bonds = BondLotsByVault::<Test>::get(1);
+		assert_eq!(vault_bonds.flexible_bonds, 0);
+		assert_eq!(vault_bonds.reserved_bond_space, 10);
+		assert!(BondLotById::<Test>::get(bond_lot_id).is_none());
+	});
+}
+
+#[test]
+fn burn_encumbered_flexible_lots_preserves_reserved_bond_space() {
+	new_test_ext().execute_with(|| {
+		MinimumArgonsPerContributor::set(1);
+		insert_vault(
+			1,
+			test_vault(10, (10 * MICROGONS_PER_ARGON) as u64, Permill::from_percent(20)),
+		);
+		set_argons(10, 10 * MICROGONS_PER_ARGON);
+
+		assert_ok!(Treasury::buy_bonds(origin(10), 1, 5, None));
+		let first_bond_lot_id = account_bond_lot_ids(10)[0];
+		assert_ok!(Treasury::set_bond_lot_flexible(origin(10), first_bond_lot_id, true,));
+		assert_ok!(Treasury::buy_bonds(origin(10), 1, 5, None));
+		let second_bond_lot_id = account_bond_lot_ids(10)
+			.into_iter()
+			.find(|bond_lot_id| *bond_lot_id != first_bond_lot_id)
+			.expect("second bond lot");
+		assert_ok!(Treasury::set_bond_lot_flexible(origin(10), second_bond_lot_id, true,));
+		assert_ok!(Treasury::set_reserved_bond_space(origin(10), 1, 10));
+		assert_ok!(<Treasury as TreasuryPoolProvider<TestAccountId>>::encumber_bond_microgons(
+			&account(10),
+			10 * MICROGONS_PER_ARGON,
+		));
+
+		assert_ok!(
+			<Treasury as TreasuryPoolProvider<TestAccountId>>::burn_encumbered_bond_microgons(
+				&account(10),
+				10 * MICROGONS_PER_ARGON,
+			)
+		);
+
+		let vault_bonds = BondLotsByVault::<Test>::get(1);
+		assert_eq!(vault_bonds.flexible_bonds, 0);
+		assert_eq!(vault_bonds.reserved_bond_space, 10);
+		assert!(account_bond_lot_ids(10).is_empty());
+	});
+}
+
+#[test]
 fn burn_encumbered_bond_microgons_keeps_fractional_remainder_held_until_it_is_released() {
 	new_test_ext().execute_with(|| {
 		MinimumArgonsPerContributor::set(1);
@@ -1223,8 +1335,8 @@ fn burn_encumbered_bond_microgons_keeps_fractional_remainder_held_until_it_is_re
 		);
 
 		let vault_bonds = BondLotsByVault::<Test>::get(1);
-		assert!(vault_bonds.bond_lots.is_empty());
-		assert_eq!(vault_bonds.backfill_bonds, 0);
+		assert!(vault_bonds.regular_bond_lots.is_empty());
+		assert_eq!(vault_bonds.flexible_bonds, 0);
 		assert!(account_bond_lot_ids(2).is_empty());
 		assert_eq!(
 			Balances::balance_on_hold(
@@ -1274,7 +1386,7 @@ fn failed_release_retries_and_does_not_block_current_frame_releases() {
 					bonus_percent: Permill::zero(),
 				},
 				bonds: 1,
-				is_backfill: false,
+				is_flexible: false,
 				created_frame_id: 1,
 				participated_frames: 0,
 				last_frame_earnings_frame_id: None,
@@ -1299,7 +1411,7 @@ fn failed_release_retries_and_does_not_block_current_frame_releases() {
 					bonus_percent: Permill::zero(),
 				},
 				bonds: 1,
-				is_backfill: false,
+				is_flexible: false,
 				created_frame_id: 1,
 				participated_frames: 0,
 				last_frame_earnings_frame_id: None,

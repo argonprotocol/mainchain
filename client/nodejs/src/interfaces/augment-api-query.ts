@@ -1757,7 +1757,7 @@ declare module '@polkadot/api-base/types/storage' {
        * The active bond state for a vault.
        *
        * The bounded payout set keeps the largest bond amount first, then lower `bond_lot_id` first
-       * when amounts tie. Backfill lots remain in `BondLotById` and are represented here by their
+       * when amounts tie. Flexible lots remain in `BondLotById` and are represented here by their
        * aggregate.
        **/
       bondLotsByVault: AugmentedQuery<

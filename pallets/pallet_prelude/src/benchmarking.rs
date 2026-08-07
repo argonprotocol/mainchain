@@ -1291,31 +1291,31 @@ where
 		})
 	}
 
-	fn get_projected_backfill_backing(
+	fn get_projected_flexible_securitization(
 		vault_id: VaultId,
-		backfill_securitization_released: Self::Balance,
-		backfill_securitization_added: Self::Balance,
+		flexible_securitization_released: Self::Balance,
+		flexible_securitization_added: Self::Balance,
 	) -> Option<(Self::Balance, Self::Balance)> {
 		benchmark_bitcoin_vault_provider_state::<AccountId, Balance>()
 			.vaults
 			.get(&vault_id)
 			.map(|vault| {
-				vault.projected_backfill_backing(
-					backfill_securitization_released,
-					backfill_securitization_added,
+				vault.projected_flexible_securitization(
+					flexible_securitization_released,
+					flexible_securitization_added,
 				)
 			})
 	}
 
-	fn set_bitcoin_lock_as_backfill(
+	fn set_bitcoin_lock_flexible(
 		vault_id: VaultId,
 		securitization: &Securitization<Self::Balance>,
 		satoshis: Satoshis,
-		is_backfill: bool,
+		is_flexible: bool,
 	) -> Result<(), VaultError> {
 		mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
 			let vault = state.vaults.get_mut(&vault_id).ok_or(VaultError::VaultNotFound)?;
-			vault.set_bitcoin_lock_as_backfill(securitization, satoshis, is_backfill)
+			vault.set_bitcoin_lock_flexible(securitization, satoshis, is_flexible)
 		})
 	}
 
@@ -1328,8 +1328,8 @@ where
 		let VaultLockRequest {
 			extension,
 			fee_discount,
-			is_backfill,
-			backfill_securitization_to_unreserve,
+			is_flexible,
+			securitization_space_to_unreserve,
 			..
 		} = request;
 		let (total_fee, fee_discount, charge_fee) =
@@ -1337,15 +1337,16 @@ where
 				let charge_fee = state.charge_fee;
 				let vault = state.vaults.get_mut(&vault_id).ok_or(VaultError::VaultNotFound)?;
 				let is_operator = vault.operator_account_id == *locker;
+				let may_use_flexible_space = !is_operator;
 				let term =
 					extension.as_ref().map(|(duration, _)| *duration).unwrap_or(FixedU128::one());
 				if let Some((_, lock_extension)) = extension {
-					vault.extend_lock(securitization, lock_extension, is_backfill)?;
+					vault.extend_lock(securitization, lock_extension, is_flexible)?;
 				} else {
 					vault
-						.backfill_securitization_reserved
-						.saturating_reduce(backfill_securitization_to_unreserve);
-					vault.lock(securitization, is_operator)?;
+						.reserved_securitization_space
+						.saturating_reduce(securitization_space_to_unreserve);
+					vault.lock(securitization, may_use_flexible_space)?;
 				}
 				let total_fee = vault
 					.terms
@@ -1377,11 +1378,11 @@ where
 		securitization: &Securitization<Self::Balance>,
 		satoshis: Satoshis,
 		lock_extension: &LockExtension<Self::Balance>,
-		is_backfill: bool,
+		is_flexible: bool,
 	) -> Result<(), VaultError> {
 		mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
 			let vault = state.vaults.get_mut(&vault_id).ok_or(VaultError::VaultNotFound)?;
-			vault.schedule_for_release(securitization, satoshis, lock_extension, is_backfill)?;
+			vault.schedule_for_release(securitization, satoshis, lock_extension, is_flexible)?;
 			Ok(())
 		})
 	}
@@ -1404,12 +1405,12 @@ where
 		satoshis: Satoshis,
 		market_rate: Self::Balance,
 		lock_extension: &LockExtension<Self::Balance>,
-		is_backfill: bool,
+		is_flexible: bool,
 	) -> Result<Self::Balance, VaultError> {
 		mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
 			let vault = state.vaults.get_mut(&vault_id).ok_or(VaultError::VaultNotFound)?;
 			Ok(vault
-				.burn(securitization, satoshis, market_rate, lock_extension, is_backfill)?
+				.burn(securitization, satoshis, market_rate, lock_extension, is_flexible)?
 				.burned_amount)
 		})
 	}
@@ -1421,9 +1422,9 @@ where
 		satoshis: Satoshis,
 		market_rate: Self::Balance,
 		lock_extension: &LockExtension<Self::Balance>,
-		is_backfill: bool,
+		is_flexible: bool,
 	) -> Result<Self::Balance, VaultError> {
-		Self::burn(vault_id, securitization, satoshis, market_rate, lock_extension, is_backfill)
+		Self::burn(vault_id, securitization, satoshis, market_rate, lock_extension, is_flexible)
 	}
 
 	fn create_utxo_script_pubkey(

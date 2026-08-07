@@ -61,8 +61,8 @@ fn standard_lock_request(satoshis: Satoshis) -> VaultLockRequest<'static, Balanc
 		satoshis,
 		extension: None,
 		fee_discount: 0,
-		is_backfill: false,
-		backfill_securitization_to_unreserve: 0,
+		is_flexible: false,
+		securitization_space_to_unreserve: 0,
 	}
 }
 
@@ -341,7 +341,7 @@ fn it_can_set_securitization_ratio_for_a_vault() {
 		assert_eq!(vault.operator_account_id, 1);
 		assert_eq!(vault.securitization_ratio, TEN_PCT);
 		// uses 10% for recovery
-		assert_eq!(vault.available_for_lock(false), 50_000);
+		assert_eq!(vault.available_securitization_space(true), 50_000);
 	});
 }
 
@@ -367,36 +367,34 @@ fn it_can_set_a_vault_delegate_account() {
 }
 
 #[test]
-fn only_vault_operator_can_reserve_backfill_securitization() {
+fn only_vault_operator_can_reserve_available_securitization() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		set_argons(1, 100_010);
 		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), default_vault()));
 		VaultsById::<Test>::mutate(1, |vault| {
 			let vault = vault.as_mut().expect("vault");
-			vault.securitization_locked = 100;
-			vault.backfill_securitization_locked = 100;
 			vault.delegate_account_id = Some(3);
 		});
 
 		assert_noop!(
-			Vaults::set_backfill_securitization_reserved(RuntimeOrigin::signed(2), 1, 50),
-			Error::<Test>::NoPermissions
+			Vaults::set_reserved_securitization_space(RuntimeOrigin::signed(2), 50),
+			Error::<Test>::VaultNotFound
 		);
 		assert_noop!(
-			Vaults::set_backfill_securitization_reserved(RuntimeOrigin::signed(3), 1, 50),
-			Error::<Test>::NoPermissions
+			Vaults::set_reserved_securitization_space(RuntimeOrigin::signed(3), 50),
+			Error::<Test>::VaultNotFound
 		);
 		assert_noop!(
-			Vaults::set_backfill_securitization_reserved(RuntimeOrigin::signed(1), 1, 101),
+			Vaults::set_reserved_securitization_space(RuntimeOrigin::signed(1), 50_001),
 			Error::<Test>::InsufficientVaultFunds
 		);
-		assert_ok!(Vaults::set_backfill_securitization_reserved(RuntimeOrigin::signed(1), 1, 50,));
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().backfill_securitization_reserved, 50);
+		assert_ok!(Vaults::set_reserved_securitization_space(RuntimeOrigin::signed(1), 50_000,));
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().reserved_securitization_space, 50_000);
 		System::assert_last_event(
-			Event::BackfillSecuritizationReservedChanged {
+			Event::ReservedSecuritizationSpaceChanged {
 				vault_id: 1,
-				backfill_securitization_reserved: 50,
+				reserved_securitization_space: 50_000,
 			}
 			.into(),
 		);
@@ -456,7 +454,7 @@ fn it_can_modify_a_vault_funds() {
 			VaultsById::<Test>::get(1).unwrap().securitization_ratio,
 			FixedU128::from_float(2.0)
 		);
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().available_for_lock(false), 1000);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().available_securitization_space(true), 1000);
 		System::assert_last_event(
 			Event::VaultModified {
 				vault_id: 1,
@@ -479,6 +477,19 @@ fn it_can_modify_a_vault_funds() {
 			FixedU128::from_float(2.0)
 		);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization, 2000);
+
+		assert_ok!(Vaults::set_reserved_securitization_space(RuntimeOrigin::signed(1), 1500,));
+		assert_ok!(Vaults::modify_funding(
+			RuntimeOrigin::signed(1),
+			1,
+			0,
+			FixedU128::from_float(2.0)
+		));
+		let vault = VaultsById::<Test>::get(1).unwrap();
+		assert_eq!(vault.securitization, 1500);
+		assert_eq!(vault.securitization_target, 0);
+		assert_eq!(vault.available_securitization_space(true), 0);
+		assert_eq!(Balances::reserved_balance(1), 1500);
 	});
 }
 
@@ -617,7 +628,7 @@ fn it_can_reduce_vault_funds_down_to_activated() {
 			VaultsById::<Test>::get(1).unwrap().securitization_ratio,
 			FixedU128::from_float(2.0)
 		);
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().available_for_lock(false), 0);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().available_securitization_space(true), 0);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().uninhibited_securitization(), 0);
 
 		System::assert_last_event(
@@ -759,7 +770,7 @@ fn it_can_lock_funds() {
 }
 
 #[test]
-fn lock_saturates_backfill_reservation_release() {
+fn lock_saturates_securitization_space_release() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		set_argons(1, 100);
@@ -771,8 +782,8 @@ fn lock_saturates_backfill_reservation_release() {
 		VaultsById::<Test>::mutate(1, |vault| {
 			let vault = vault.as_mut().expect("vault");
 			vault.securitization_locked = 100;
-			vault.backfill_securitization_locked = 100;
-			vault.backfill_securitization_reserved = 100;
+			vault.flexible_securitization_locked = 100;
+			vault.reserved_securitization_space = 100;
 		});
 
 		assert_ok!(Vaults::lock(
@@ -780,13 +791,13 @@ fn lock_saturates_backfill_reservation_release() {
 			&2,
 			&securitization(40),
 			VaultLockRequest {
-				backfill_securitization_to_unreserve: 150,
+				securitization_space_to_unreserve: 150,
 				..standard_lock_request(500)
 			},
 		));
 
 		let vault = VaultsById::<Test>::get(1).expect("vault");
-		assert_eq!(vault.backfill_securitization_reserved, 0);
+		assert_eq!(vault.reserved_securitization_space, 0);
 		assert_eq!(vault.securitization_locked, 140);
 		assert_eq!(vault.securitization_pending_activation, 40);
 	});
@@ -1161,8 +1172,8 @@ fn vault_equilibrium_scenario(scenario: VaultScenario) {
 				satoshis: 500,
 				extension: Some((FixedU128::one(), &mut lock_extensions)),
 				fee_discount: 0,
-				is_backfill: false,
-				backfill_securitization_to_unreserve: 0,
+				is_flexible: false,
+				securitization_space_to_unreserve: 0,
 			},
 		)
 		.expect("bonding failed");
@@ -1231,8 +1242,8 @@ fn it_records_use_of_fee_coupons() {
 				satoshis: 500,
 				extension: None,
 				fee_discount,
-				is_backfill: false,
-				backfill_securitization_to_unreserve: 0,
+				is_flexible: false,
+				securitization_space_to_unreserve: 0,
 			},
 		)
 		.expect("bonding failed");
@@ -1475,7 +1486,7 @@ fn it_can_cleanup_at_bitcoin_heights() {
 		CurrentTick::set(1);
 		assert_ok!(Vaults::lock(1, &2, &securitization(amount), standard_lock_request(500),));
 		assert_eq!(
-			VaultsById::<Test>::get(1).unwrap().available_for_lock(false),
+			VaultsById::<Test>::get(1).unwrap().available_securitization_space(true),
 			1_000_000_000 - 1_000_000
 		);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_locked, 1_000_000);
@@ -1491,7 +1502,10 @@ fn it_can_cleanup_at_bitcoin_heights() {
 			&LockExtension::new(365),
 			false,
 		));
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().available_for_lock(false), 1_000_000_000);
+		assert_eq!(
+			VaultsById::<Test>::get(1).unwrap().available_securitization_space(true),
+			1_000_000_000
+		);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_locked, 0);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_release_schedule.len(), 1);
 		assert_eq!(
@@ -1541,7 +1555,7 @@ fn it_can_reuse_locked_argons() {
 		CurrentTick::set(1);
 		assert_ok!(Vaults::lock(1, &2, &securitization(amount), standard_lock_request(500),));
 		assert_eq!(
-			VaultsById::<Test>::get(1).unwrap().available_for_lock(false),
+			VaultsById::<Test>::get(1).unwrap().available_securitization_space(true),
 			10_000_000 - amount
 		);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_locked, amount);
@@ -1556,7 +1570,10 @@ fn it_can_reuse_locked_argons() {
 			&LockExtension::new(365),
 			false,
 		));
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().available_for_lock(false), 10_000_000);
+		assert_eq!(
+			VaultsById::<Test>::get(1).unwrap().available_securitization_space(true),
+			10_000_000
+		);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_locked, 0);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_release_schedule.len(), 1);
 		assert_eq!(
@@ -1569,7 +1586,7 @@ fn it_can_reuse_locked_argons() {
 		assert_ok!(Vaults::add_securitized_satoshis(1, 2500, FixedU128::one()));
 		assert_ok!(Vaults::remove_pending(1, &securitization(2_500_000)));
 		assert_eq!(
-			VaultsById::<Test>::get(1).unwrap().available_for_lock(false),
+			VaultsById::<Test>::get(1).unwrap().available_securitization_space(true),
 			10_000_000 - 2_500_000
 		);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_locked, 2_500_000);
@@ -1582,7 +1599,10 @@ fn it_can_reuse_locked_argons() {
 			&LockExtension::new(365),
 			false,
 		));
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().available_for_lock(false), 10_000_000);
+		assert_eq!(
+			VaultsById::<Test>::get(1).unwrap().available_securitization_space(true),
+			10_000_000
+		);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_locked, 0);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_release_schedule.len(), 1);
 		assert_eq!(

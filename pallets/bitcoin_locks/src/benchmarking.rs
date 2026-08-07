@@ -66,7 +66,7 @@ mod benchmarks {
 				genesis_hash: frame_system::Pallet::<T>::block_hash(BlockNumberFor::<T>::zero()),
 				beneficiary: owner.clone(),
 				fee_discount: T::Balance::zero(),
-				backfill_securitization_to_unreserve: T::Balance::zero(),
+				securitization_space_to_unreserve: T::Balance::zero(),
 				expires_at_frame: T::CurrentFrameId::get(),
 				nonce: 1,
 				signature,
@@ -139,7 +139,7 @@ mod benchmarks {
 
 		UtxoIdsByOwnerAccount::<T>::remove(&context.owner, context.utxo_id);
 		lock.owner_account = context.operator.clone();
-		lock.is_backfill = true;
+		lock.is_flexible = true;
 		LocksByUtxoId::<T>::insert(context.utxo_id, &lock);
 		UtxoIdsByOwnerAccount::<T>::insert(&context.operator, context.utxo_id, ());
 
@@ -151,10 +151,10 @@ mod benchmarks {
 		vault.securitization = collateral_required;
 		vault.securitization_target = collateral_required;
 		vault.securitization_locked = collateral_required;
-		vault.backfill_securitization_locked = collateral_required;
+		vault.flexible_securitization_locked = collateral_required;
 		vault.locked_satoshis = context.satoshis;
 		vault.securitized_satoshis = context.satoshis;
-		vault.backfill_securitized_satoshis = context.satoshis;
+		vault.flexible_securitized_satoshis = context.satoshis;
 		set_benchmark_bitcoin_vault_provider_state(state);
 
 		T::Currency::mint_into(&context.operator, 1_000_000_000_000u128.into())
@@ -319,7 +319,7 @@ mod benchmarks {
 	}
 
 	#[benchmark]
-	fn set_as_backfill() -> Result<(), BenchmarkError> {
+	fn set_flexible() -> Result<(), BenchmarkError> {
 		reset_benchmark_environment::<T>();
 		let context = create_funded_lock::<T>(17)?;
 		let mut lock = LocksByUtxoId::<T>::get(context.utxo_id)
@@ -336,8 +336,8 @@ mod benchmarks {
 
 		assert!(
 			LocksByUtxoId::<T>::get(context.utxo_id)
-				.ok_or(BenchmarkError::Stop("missing backfill lock"))?
-				.is_backfill
+				.ok_or(BenchmarkError::Stop("missing flexible lock"))?
+				.is_flexible
 		);
 		Ok(())
 	}
@@ -618,12 +618,12 @@ where
 		securitization: securitization.into(),
 		securitization_target: securitization.into(),
 		securitization_locked: T::Balance::zero(),
-		backfill_securitization_locked: T::Balance::zero(),
-		backfill_securitization_reserved: T::Balance::zero(),
+		flexible_securitization_locked: T::Balance::zero(),
+		reserved_securitization_space: T::Balance::zero(),
 		securitization_pending_activation: T::Balance::zero(),
 		locked_satoshis: 0,
 		securitized_satoshis: 0,
-		backfill_securitized_satoshis: 0,
+		flexible_securitized_satoshis: 0,
 		securitization_release_schedule: BoundedBTreeMap::default(),
 		securitization_ratio: FixedU128::one(),
 		is_closed: false,

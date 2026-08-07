@@ -46,6 +46,24 @@ interface ArgonPrimitivesVaultV144 extends Struct {
   readonly openedTick: Compact<u64>;
 }
 
+type PreviousArgonPrimitivesVault = Omit<
+  ArgonPrimitivesVault,
+  'flexibleSecuritizationLocked' | 'reservedSecuritizationSpace' | 'flexibleSecuritizedSatoshis'
+> & {
+  readonly backfillSecuritizationLocked: ArgonPrimitivesVault['flexibleSecuritizationLocked'];
+  readonly backfillSecuritizationReserved: ArgonPrimitivesVault['reservedSecuritizationSpace'];
+  readonly backfillSecuritizedSatoshis: ArgonPrimitivesVault['flexibleSecuritizedSatoshis'];
+};
+
+type PreviousPalletTreasuryVaultBondState = Omit<
+  PalletTreasuryVaultBondState,
+  'regularBondLots' | 'flexibleBonds' | 'reservedBondSpace'
+> & {
+  readonly bondLots: PalletTreasuryVaultBondState['regularBondLots'];
+  readonly backfillBonds: PalletTreasuryVaultBondState['flexibleBonds'];
+  readonly backfillBondsReserved: PalletTreasuryVaultBondState['reservedBondSpace'];
+};
+
 export class Vault {
   public securitization!: bigint;
   public securitizationLocked!: bigint;
@@ -66,9 +84,9 @@ export class Vault {
 
   public lockedSatoshis!: number;
   public securitizedSatoshis!: number;
-  public backfillSecuritizationLocked!: bigint;
-  public backfillSecuritizationReserved!: bigint;
-  public backfillSecuritizedSatoshis!: number;
+  public flexibleSecuritizationLocked!: bigint;
+  public reservedSecuritizationSpace!: bigint;
+  public flexibleSecuritizedSatoshis!: number;
   public name?: string;
   public lastNameChangeTick?: number;
   public delegateAccountId?: string;
@@ -85,7 +103,9 @@ export class Vault {
     this.load(vault);
   }
 
-  public load(vault: ArgonPrimitivesVault | ArgonPrimitivesVaultV144): void {
+  public load(
+    vault: ArgonPrimitivesVault | PreviousArgonPrimitivesVault | ArgonPrimitivesVaultV144,
+  ): void {
     this.securitization = vault.securitization.toBigInt();
     this.securitizationRatio = fromFixedNumber(
       vault.securitizationRatio.toBigInt(),
@@ -134,14 +154,18 @@ export class Vault {
       this.lockedSatoshis = 0;
       this.securitizedSatoshis = 0;
     }
-    if ('backfillSecuritizationLocked' in vault) {
-      this.backfillSecuritizationLocked = vault.backfillSecuritizationLocked.toBigInt();
-      this.backfillSecuritizationReserved = vault.backfillSecuritizationReserved.toBigInt();
-      this.backfillSecuritizedSatoshis = vault.backfillSecuritizedSatoshis.toNumber();
+    if ('flexibleSecuritizationLocked' in vault) {
+      this.flexibleSecuritizationLocked = vault.flexibleSecuritizationLocked.toBigInt();
+      this.reservedSecuritizationSpace = vault.reservedSecuritizationSpace.toBigInt();
+      this.flexibleSecuritizedSatoshis = vault.flexibleSecuritizedSatoshis.toNumber();
+    } else if ('backfillSecuritizationLocked' in vault) {
+      this.flexibleSecuritizationLocked = vault.backfillSecuritizationLocked.toBigInt();
+      this.reservedSecuritizationSpace = vault.backfillSecuritizationReserved.toBigInt();
+      this.flexibleSecuritizedSatoshis = vault.backfillSecuritizedSatoshis.toNumber();
     } else {
-      this.backfillSecuritizationLocked = 0n;
-      this.backfillSecuritizationReserved = 0n;
-      this.backfillSecuritizedSatoshis = 0;
+      this.flexibleSecuritizationLocked = 0n;
+      this.reservedSecuritizationSpace = 0n;
+      this.flexibleSecuritizedSatoshis = 0;
     }
 
     this.operatorAccountId = vault.operatorAccountId.toString();
@@ -192,52 +216,73 @@ export class Vault {
   }
 
   public availableBitcoinSpace(lockOwner?: string): bigint {
-    const availableSecuritization = this.availableSecuritization(lockOwner);
+    const availableSecuritization = this.availableSecuritizationSpace(lockOwner);
     const microgons = BigNumber(availableSecuritization).div(this.securitizationRatioBN());
     return bigNumberToBigInt(microgons);
   }
 
-  public availableSecuritization(lockOwner?: string): bigint {
-    if (lockOwner === this.operatorAccountId) {
-      return this.securitization > this.securitizationLocked
-        ? this.securitization - this.securitizationLocked
+  public availableSecuritizationSpace(lockOwner?: string): bigint {
+    const regularSecuritizationLocked =
+      this.securitizationLocked > this.flexibleSecuritizationLocked
+        ? this.securitizationLocked - this.flexibleSecuritizationLocked
         : 0n;
+    const securitizationSpace =
+      this.securitization > regularSecuritizationLocked
+        ? this.securitization - regularSecuritizationLocked
+        : 0n;
+    const available =
+      securitizationSpace > this.reservedSecuritizationSpace
+        ? securitizationSpace - this.reservedSecuritizationSpace
+        : 0n;
+
+    if (lockOwner === this.operatorAccountId) {
+      const physicallyAvailable =
+        this.securitization > this.securitizationLocked
+          ? this.securitization - this.securitizationLocked
+          : 0n;
+      return available < physicallyAvailable ? available : physicallyAvailable;
     }
 
-    const publicSecuritizationLocked =
-      this.securitizationLocked > this.backfillSecuritizationLocked
-        ? this.securitizationLocked - this.backfillSecuritizationLocked
-        : 0n;
-    const unreserved =
-      this.securitization > publicSecuritizationLocked
-        ? this.securitization - publicSecuritizationLocked
-        : 0n;
-    return unreserved > this.backfillSecuritizationReserved
-      ? unreserved - this.backfillSecuritizationReserved
-      : 0n;
+    return available;
   }
 
   public availableBondSpace(
     priceIndex: PriceIndex,
-    bondState?: Iterable<{ activeBonds: number }> | PalletTreasuryVaultBondState,
+    bondState?:
+      | Iterable<{ activeBonds: number }>
+      | PalletTreasuryVaultBondState
+      | PreviousPalletTreasuryVaultBondState,
     bondFullCapacityPerFrame?: boolean,
   ): bigint {
     const securitizedSatoshis = this.effectiveSecuritizedSatoshis();
-    if (securitizedSatoshis <= 0n) return 0n;
-
     const microgonsPerBond = BigInt(MICROGONS_PER_ARGON);
-    const totalBondCapacityMicrogons =
-      priceIndex.getSatoshiPriceInTargetMicrogons(securitizedSatoshis);
-    const capacityMicrogons = bondFullCapacityPerFrame
-      ? totalBondCapacityMicrogons
-      : totalBondCapacityMicrogons / 10n;
-    const bondCapacity = Number(capacityMicrogons / microgonsPerBond);
-    const isVaultBondState = bondState !== undefined && 'bondLots' in bondState;
-    const bondsTotal = isVaultBondState
-      ? [...bondState.bondLots].reduce((sum, bondLot) => sum + bondLot.bonds.toNumber(), 0)
-      : [...(bondState ?? [])].reduce((sum, bondLot) => sum + bondLot.activeBonds, 0);
-    const reservedBonds = isVaultBondState ? bondState.backfillBondsReserved.toNumber() : 0;
-    const unavailableBonds = bondsTotal + reservedBonds;
+    let bondCapacity = 0;
+    if (securitizedSatoshis > 0n) {
+      const totalBondCapacityMicrogons =
+        priceIndex.getSatoshiPriceInTargetMicrogons(securitizedSatoshis);
+      const capacityMicrogons = bondFullCapacityPerFrame
+        ? totalBondCapacityMicrogons
+        : totalBondCapacityMicrogons / 10n;
+      bondCapacity = Number(capacityMicrogons / microgonsPerBond);
+    }
+    let regularBonds = 0;
+    let reservedBondSpace = 0;
+    if (bondState && 'regularBondLots' in bondState) {
+      regularBonds = [...bondState.regularBondLots].reduce(
+        (sum, bondLot) => sum + bondLot.bonds.toNumber(),
+        0,
+      );
+      reservedBondSpace = bondState.reservedBondSpace.toNumber();
+    } else if (bondState && 'bondLots' in bondState) {
+      regularBonds = [...bondState.bondLots].reduce(
+        (sum, bondLot) => sum + bondLot.bonds.toNumber(),
+        0,
+      );
+      reservedBondSpace = bondState.backfillBondsReserved.toNumber();
+    } else {
+      regularBonds = [...(bondState ?? [])].reduce((sum, bondLot) => sum + bondLot.activeBonds, 0);
+    }
+    const unavailableBonds = regularBonds + reservedBondSpace;
     const availableBonds = unavailableBonds < bondCapacity ? bondCapacity - unavailableBonds : 0;
 
     return BigInt(availableBonds) * microgonsPerBond;
@@ -257,29 +302,29 @@ export class Vault {
 
   public effectiveSecuritizedSatoshis(): bigint {
     const totalSatoshis = BigInt(this.securitizedSatoshis);
-    const backfillSatoshis = BigInt(this.backfillSecuritizedSatoshis);
-    if (this.backfillSecuritizationLocked === 0n) return totalSatoshis;
+    const flexibleSatoshis = BigInt(this.flexibleSecuritizedSatoshis);
+    if (this.flexibleSecuritizationLocked === 0n) return totalSatoshis;
 
     const confirmedSecuritization =
       this.securitizationLocked > this.securitizationPendingActivation
         ? this.securitizationLocked - this.securitizationPendingActivation
         : 0n;
-    const confirmedPublicSecuritizationLocked =
-      confirmedSecuritization > this.backfillSecuritizationLocked
-        ? confirmedSecuritization - this.backfillSecuritizationLocked
+    const confirmedRegularSecuritizationLocked =
+      confirmedSecuritization > this.flexibleSecuritizationLocked
+        ? confirmedSecuritization - this.flexibleSecuritizationLocked
         : 0n;
-    const availableBackfillBacking =
-      this.securitization > confirmedPublicSecuritizationLocked
-        ? this.securitization - confirmedPublicSecuritizationLocked
+    const flexibleSecuritizationSpace =
+      this.securitization > confirmedRegularSecuritizationLocked
+        ? this.securitization - confirmedRegularSecuritizationLocked
         : 0n;
-    const backedBackfill =
-      this.backfillSecuritizationLocked < availableBackfillBacking
-        ? this.backfillSecuritizationLocked
-        : availableBackfillBacking;
-    const eligibleBackfillSatoshis =
-      (backfillSatoshis * backedBackfill) / this.backfillSecuritizationLocked;
+    const undisplacedFlexibleSecuritization =
+      this.flexibleSecuritizationLocked < flexibleSecuritizationSpace
+        ? this.flexibleSecuritizationLocked
+        : flexibleSecuritizationSpace;
+    const earningFlexibleSatoshis =
+      (flexibleSatoshis * undisplacedFlexibleSecuritization) / this.flexibleSecuritizationLocked;
 
-    return totalSatoshis - backfillSatoshis + eligibleBackfillSatoshis;
+    return totalSatoshis - flexibleSatoshis + earningFlexibleSatoshis;
   }
 
   /**

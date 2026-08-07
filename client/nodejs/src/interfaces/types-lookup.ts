@@ -602,10 +602,10 @@ declare module '@polkadot/types/lookup' {
     readonly asVaultBitcoinXpubChange: {
       readonly vaultId: u32;
     } & Struct;
-    readonly isBackfillSecuritizationReservedChanged: boolean;
-    readonly asBackfillSecuritizationReservedChanged: {
+    readonly isReservedSecuritizationSpaceChanged: boolean;
+    readonly asReservedSecuritizationSpaceChanged: {
       readonly vaultId: u32;
-      readonly backfillSecuritizationReserved: u128;
+      readonly reservedSecuritizationSpace: u128;
     } & Struct;
     readonly isVaultRevenueUncollected: boolean;
     readonly asVaultRevenueUncollected: {
@@ -675,7 +675,7 @@ declare module '@polkadot/types/lookup' {
       | 'VaultTermsChanged'
       | 'VaultClosed'
       | 'VaultBitcoinXpubChange'
-      | 'BackfillSecuritizationReservedChanged'
+      | 'ReservedSecuritizationSpaceChanged'
       | 'VaultRevenueUncollected'
       | 'VaultCollected'
       | 'FundsLocked'
@@ -786,11 +786,11 @@ declare module '@polkadot/types/lookup' {
       readonly newSatoshis: u64;
       readonly accountId: AccountId32;
     } & Struct;
-    readonly isBitcoinLockBackfillChanged: boolean;
-    readonly asBitcoinLockBackfillChanged: {
+    readonly isBitcoinLockFlexibleChanged: boolean;
+    readonly asBitcoinLockFlexibleChanged: {
       readonly utxoId: u64;
       readonly vaultId: u32;
-      readonly isBackfill: bool;
+      readonly isFlexible: bool;
     } & Struct;
     readonly type:
       | 'BitcoinLockCreated'
@@ -807,7 +807,7 @@ declare module '@polkadot/types/lookup' {
       | 'OrphanedUtxoCosigned'
       | 'UtxoFundedFromCandidate'
       | 'SecuritizationIncreased'
-      | 'BitcoinLockBackfillChanged';
+      | 'BitcoinLockFlexibleChanged';
   }
 
   /** @name PalletNotariesEvent (60) */
@@ -1733,16 +1733,16 @@ declare module '@polkadot/types/lookup' {
       readonly accountId: AccountId32;
       readonly bonds: u32;
     } & Struct;
-    readonly isBondLotBackfillChanged: boolean;
-    readonly asBondLotBackfillChanged: {
+    readonly isBondLotFlexibilityChanged: boolean;
+    readonly asBondLotFlexibilityChanged: {
       readonly vaultId: u32;
       readonly bondLotId: u64;
-      readonly isBackfill: bool;
+      readonly isFlexible: bool;
     } & Struct;
-    readonly isBackfillBondsReservedChanged: boolean;
-    readonly asBackfillBondsReservedChanged: {
+    readonly isReservedBondSpaceChanged: boolean;
+    readonly asReservedBondSpaceChanged: {
       readonly vaultId: u32;
-      readonly backfillBondsReserved: u32;
+      readonly reservedBondSpace: u32;
     } & Struct;
     readonly isEncumberedBondMicrogonsBurned: boolean;
     readonly asEncumberedBondMicrogonsBurned: {
@@ -1760,8 +1760,8 @@ declare module '@polkadot/types/lookup' {
       | 'BondLotPurchased'
       | 'BondLotReleaseScheduled'
       | 'BondLotReleased'
-      | 'BondLotBackfillChanged'
-      | 'BackfillBondsReservedChanged'
+      | 'BondLotFlexibilityChanged'
+      | 'ReservedBondSpaceChanged'
       | 'EncumberedBondMicrogonsBurned';
   }
 
@@ -2668,10 +2668,9 @@ declare module '@polkadot/types/lookup' {
     readonly asSetCommittedArgonots: {
       readonly amount: Compact<u128>;
     } & Struct;
-    readonly isSetBackfillSecuritizationReserved: boolean;
-    readonly asSetBackfillSecuritizationReserved: {
-      readonly vaultId: u32;
-      readonly backfillSecuritizationReserved: u128;
+    readonly isSetReservedSecuritizationSpace: boolean;
+    readonly asSetReservedSecuritizationSpace: {
+      readonly reservedSecuritizationSpace: u128;
     } & Struct;
     readonly type:
       | 'Create'
@@ -2682,7 +2681,7 @@ declare module '@polkadot/types/lookup' {
       | 'Collect'
       | 'SetDelegateAccount'
       | 'SetCommittedArgonots'
-      | 'SetBackfillSecuritizationReserved';
+      | 'SetReservedSecuritizationSpace';
   }
 
   /** @name PalletVaultsVaultConfig (209) */
@@ -2751,10 +2750,10 @@ declare module '@polkadot/types/lookup' {
       readonly utxoId: u64;
       readonly newSatoshis: Compact<u64>;
     } & Struct;
-    readonly isSetAsBackfill: boolean;
-    readonly asSetAsBackfill: {
+    readonly isSetFlexible: boolean;
+    readonly asSetFlexible: {
       readonly utxoId: u64;
-      readonly isBackfill: bool;
+      readonly isFlexible: bool;
     } & Struct;
     readonly type:
       | 'Initialize'
@@ -2765,7 +2764,7 @@ declare module '@polkadot/types/lookup' {
       | 'RequestOrphanedUtxoRelease'
       | 'CosignOrphanedUtxoRelease'
       | 'IncreaseSecuritization'
-      | 'SetAsBackfill';
+      | 'SetFlexible';
   }
 
   /** @name ArgonPrimitivesBitcoinCompressedBitcoinPubkey (217) */
@@ -2791,7 +2790,7 @@ declare module '@polkadot/types/lookup' {
     readonly genesisHash: H256;
     readonly beneficiary: AccountId32;
     readonly feeDiscount: Compact<u128>;
-    readonly backfillSecuritizationToUnreserve: Compact<u128>;
+    readonly securitizationSpaceToUnreserve: Compact<u128>;
     readonly expiresAtFrame: Compact<u64>;
     readonly nonce: Compact<u64>;
     readonly signature: SpRuntimeMultiSignature;
@@ -3244,22 +3243,22 @@ declare module '@polkadot/types/lookup' {
     readonly asBuyArgonotBonds: {
       readonly bonds: u32;
     } & Struct;
-    readonly isSetBondLotAsBackfill: boolean;
-    readonly asSetBondLotAsBackfill: {
+    readonly isSetBondLotFlexible: boolean;
+    readonly asSetBondLotFlexible: {
       readonly bondLotId: u64;
-      readonly isBackfill: bool;
+      readonly isFlexible: bool;
     } & Struct;
-    readonly isSetBackfillBondsReserved: boolean;
-    readonly asSetBackfillBondsReserved: {
+    readonly isSetReservedBondSpace: boolean;
+    readonly asSetReservedBondSpace: {
       readonly vaultId: u32;
-      readonly backfillBondsReserved: u32;
+      readonly reservedBondSpace: u32;
     } & Struct;
     readonly type:
       | 'BuyBonds'
       | 'LiquidateBondLot'
       | 'BuyArgonotBonds'
-      | 'SetBondLotAsBackfill'
-      | 'SetBackfillBondsReserved';
+      | 'SetBondLotFlexible'
+      | 'SetReservedBondSpace';
   }
 
   /** @name ArgonPrimitivesVaultTreasuryBonusApprovalProof (278) */
@@ -3267,7 +3266,7 @@ declare module '@polkadot/types/lookup' {
     readonly vaultId: Compact<u32>;
     readonly beneficiary: AccountId32;
     readonly expiresAtFrame: Compact<u64>;
-    readonly backfillBondsToUnreserve: Compact<u32>;
+    readonly bondSpaceToUnreserve: Compact<u32>;
     readonly signature: SpRuntimeMultiSignature;
   }
 
@@ -3878,12 +3877,12 @@ declare module '@polkadot/types/lookup' {
     readonly securitization: Compact<u128>;
     readonly securitizationTarget: Compact<u128>;
     readonly securitizationLocked: Compact<u128>;
-    readonly backfillSecuritizationLocked: Compact<u128>;
-    readonly backfillSecuritizationReserved: Compact<u128>;
+    readonly flexibleSecuritizationLocked: Compact<u128>;
+    readonly reservedSecuritizationSpace: Compact<u128>;
     readonly securitizationPendingActivation: Compact<u128>;
     readonly lockedSatoshis: Compact<u64>;
     readonly securitizedSatoshis: Compact<u64>;
-    readonly backfillSecuritizedSatoshis: Compact<u64>;
+    readonly flexibleSecuritizedSatoshis: Compact<u64>;
     readonly securitizationReleaseSchedule: BTreeMap<u64, u128>;
     readonly securitizationRatio: Compact<u128>;
     readonly isClosed: bool;
@@ -4027,7 +4026,7 @@ declare module '@polkadot/types/lookup' {
     readonly createdAtHeight: Compact<u64>;
     readonly utxoScriptPubkey: ArgonPrimitivesBitcoinBitcoinCosignScriptPubkey;
     readonly isFunded: bool;
-    readonly isBackfill: bool;
+    readonly isFlexible: bool;
     readonly fundHoldExtensions: BTreeMap<u64, u128>;
     readonly createdAtArgonBlock: Compact<u32>;
   }
@@ -4592,9 +4591,9 @@ declare module '@polkadot/types/lookup' {
 
   /** @name PalletTreasuryVaultCapital (528) */
   interface PalletTreasuryVaultCapital extends Struct {
-    readonly bondLotAllocations: Vec<PalletTreasuryBondLotAllocation>;
-    readonly backfillBondsEligible: Compact<u32>;
-    readonly backfillProrata: u128;
+    readonly regularBondAllocations: Vec<PalletTreasuryBondLotAllocation>;
+    readonly flexibleBondsEligible: Compact<u32>;
+    readonly flexibleProrata: u128;
     readonly eligibleBonds: Compact<u32>;
   }
 
@@ -4622,7 +4621,7 @@ declare module '@polkadot/types/lookup' {
     readonly owner: AccountId32;
     readonly program: PalletTreasuryBondProgram;
     readonly bonds: Compact<u32>;
-    readonly isBackfill: bool;
+    readonly isFlexible: bool;
     readonly createdFrameId: Compact<u64>;
     readonly participatedFrames: Compact<u32>;
     readonly lastFrameEarningsFrameId: Option<u64>;
@@ -4646,9 +4645,9 @@ declare module '@polkadot/types/lookup' {
 
   /** @name PalletTreasuryVaultBondState (543) */
   interface PalletTreasuryVaultBondState extends Struct {
-    readonly bondLots: Vec<PalletTreasuryBondLotSummary>;
-    readonly backfillBonds: Compact<u32>;
-    readonly backfillBondsReserved: Compact<u32>;
+    readonly regularBondLots: Vec<PalletTreasuryBondLotSummary>;
+    readonly flexibleBonds: Compact<u32>;
+    readonly reservedBondSpace: Compact<u32>;
   }
 
   /** @name PalletTreasuryError (545) */
@@ -4662,7 +4661,7 @@ declare module '@polkadot/types/lookup' {
     readonly isBondLotNotFound: boolean;
     readonly isNotBondLotOwner: boolean;
     readonly isBondLotAlreadyReleasing: boolean;
-    readonly isBondPurchaseAboveSecurity: boolean;
+    readonly isInsufficientBondSpace: boolean;
     readonly isActiveBondAmountBelowEncumberedBacking: boolean;
     readonly isBonusApprovalWrongVault: boolean;
     readonly isBonusApprovalWrongAccount: boolean;
@@ -4671,7 +4670,7 @@ declare module '@polkadot/types/lookup' {
     readonly isInvalidBonusApprovalSignature: boolean;
     readonly isArgonotBondPurchaseBelowCutoff: boolean;
     readonly isArgonotBondPurchaseAboveCap: boolean;
-    readonly isBondLotNotEligibleForBackfill: boolean;
+    readonly isBondLotCannotBeFlexible: boolean;
     readonly isNoPermissions: boolean;
     readonly type:
       | 'BondPurchaseRejected'
@@ -4683,7 +4682,7 @@ declare module '@polkadot/types/lookup' {
       | 'BondLotNotFound'
       | 'NotBondLotOwner'
       | 'BondLotAlreadyReleasing'
-      | 'BondPurchaseAboveSecurity'
+      | 'InsufficientBondSpace'
       | 'ActiveBondAmountBelowEncumberedBacking'
       | 'BonusApprovalWrongVault'
       | 'BonusApprovalWrongAccount'
@@ -4692,7 +4691,7 @@ declare module '@polkadot/types/lookup' {
       | 'InvalidBonusApprovalSignature'
       | 'ArgonotBondPurchaseBelowCutoff'
       | 'ArgonotBondPurchaseAboveCap'
-      | 'BondLotNotEligibleForBackfill'
+      | 'BondLotCannotBeFlexible'
       | 'NoPermissions';
   }
 

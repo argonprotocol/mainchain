@@ -4,7 +4,7 @@ use super::*;
 use argon_bitcoin::{derive_xpub, xpriv_from_seed};
 use argon_primitives::{
 	bitcoin::{BitcoinHeight, OpaqueBitcoinXpub},
-	vault::VaultTerms,
+	vault::{Securitization, VaultTerms},
 };
 use frame_benchmarking::v2::*;
 use frame_system::RawOrigin;
@@ -235,20 +235,20 @@ mod benchmarks {
 	}
 
 	#[benchmark]
-	fn set_backfill_securitization_reserved() -> Result<(), BenchmarkError> {
-		let caller: T::AccountId = account("set_backfill_reserved_caller", 0, 0);
+	fn set_reserved_securitization_space() -> Result<(), BenchmarkError> {
+		let caller: T::AccountId = account("set_capacity_reserved_caller", 0, 0);
 		let vault_id = create_vault::<T>(&caller, 7, 100_000)?;
 		VaultsById::<T>::mutate(vault_id, |vault| {
 			let vault = vault.as_mut().expect("benchmark vault");
 			vault.securitization_locked = 100_000u32.into();
-			vault.backfill_securitization_locked = 100_000u32.into();
+			vault.flexible_securitization_locked = 100_000u32.into();
 		});
 
 		#[extrinsic_call]
-		_(RawOrigin::Signed(caller), vault_id, 100_000u32.into());
+		_(RawOrigin::Signed(caller), 100_000u32.into());
 
 		let vault = VaultsById::<T>::get(vault_id).ok_or(BenchmarkError::Stop("vault missing"))?;
-		assert_eq!(vault.backfill_securitization_reserved, 100_000u32.into());
+		assert_eq!(vault.reserved_securitization_space, 100_000u32.into());
 		Ok(())
 	}
 
@@ -381,6 +381,38 @@ mod benchmarks {
 			);
 		}
 
+		Ok(())
+	}
+
+	#[benchmark]
+	fn provider_set_bitcoin_lock_flexible() -> Result<(), BenchmarkError> {
+		let operator: T::AccountId = account("provider_flexible_lock", 0, 0);
+		let vault_id = create_vault::<T>(&operator, 10, 100_000)?;
+		let collateral_required: T::Balance = 10_000u128.into();
+		let satoshis = 10_000;
+		VaultsById::<T>::mutate(vault_id, |vault| {
+			let vault = vault.as_mut().expect("benchmark vault should exist");
+			vault.securitization_locked = collateral_required;
+			vault.locked_satoshis = satoshis;
+			vault.securitized_satoshis = satoshis;
+		});
+		let securitization = Securitization::new(collateral_required, FixedU128::one());
+
+		#[block]
+		{
+			<Pallet<T> as BitcoinVaultProvider>::set_bitcoin_lock_flexible(
+				vault_id,
+				&securitization,
+				satoshis,
+				true,
+			)
+			.map_err(|_| BenchmarkError::Stop("failed to mark Bitcoin lock flexible"))?;
+		}
+
+		let vault = VaultsById::<T>::get(vault_id)
+			.ok_or(BenchmarkError::Stop("vault missing after flexible lock update"))?;
+		assert_eq!(vault.flexible_securitization_locked, collateral_required);
+		assert_eq!(vault.flexible_securitized_satoshis, satoshis);
 		Ok(())
 	}
 
