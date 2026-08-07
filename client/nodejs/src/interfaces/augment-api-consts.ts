@@ -103,7 +103,8 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       maximumSatoshiThresholdFromExpected: u64 & AugmentedConst<ApiType>;
       /**
-       * Maximum bitcoin blocks to watch a Utxo for confirmation before canceling
+       * Maximum bitcoin blocks to accept a UTXO for confirmation. Expired locks remain watched
+       * for this many additional blocks so late funding can be detected as orphaned.
        **/
       maxPendingConfirmationBlocks: u64 & AugmentedConst<ApiType>;
       /**
