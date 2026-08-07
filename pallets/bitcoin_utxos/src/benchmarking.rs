@@ -51,6 +51,7 @@ mod benchmarks {
 		let sync_to_block =
 			BitcoinBlock { block_height: 1_000, block_hash: benchmark_block_hash(201) };
 		ConfirmedBitcoinBlockTip::<T>::put(sync_to_block.clone());
+		SynchedBitcoinBlock::<T>::put(sync_to_block.clone());
 		PreviousBitcoinBlockTip::<T>::kill();
 		TempParentHasSyncState::<T>::put(false);
 		let satoshis = benchmark_satoshis::<T>();

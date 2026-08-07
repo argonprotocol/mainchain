@@ -685,13 +685,14 @@ pub mod pallet {
 		pub(crate) fn prepare_expired_pending_funding_cleanup(limit: u32) -> Vec<UtxoId> {
 			let confirmed_tip = ConfirmedBitcoinBlockTip::<T>::get();
 			TempParentHasSyncState::<T>::put(confirmed_tip.is_some());
-			PreviousBitcoinBlockTip::<T>::set(confirmed_tip.clone());
-			let Some(confirmed_height) = confirmed_tip.map(|tip| tip.block_height) else {
+			PreviousBitcoinBlockTip::<T>::set(confirmed_tip);
+			let Some(synched_height) = SynchedBitcoinBlock::<T>::get().map(|tip| tip.block_height)
+			else {
 				return vec![];
 			};
 			let funding_window = T::MaxPendingConfirmationBlocks::get();
-			// The inherent built from this parent state must process the final orphan-only block
-			// before its lock is removed during on_initialize.
+			// Only remove locks after an inherent has already synced past their final orphan-only
+			// block. The confirmed tip can advance before the current inherent is processed.
 			ExpiredPendingFunding::<T>::get()
 				.iter()
 				.filter(|(_, entry)| {
@@ -699,7 +700,7 @@ pub mod pallet {
 						.submitted_at_height
 						.saturating_add(funding_window)
 						.saturating_add(funding_window) <
-						confirmed_height
+						synched_height
 				})
 				.map(|(utxo_id, _)| *utxo_id)
 				.take(limit as usize)
