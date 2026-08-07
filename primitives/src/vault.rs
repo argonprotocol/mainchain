@@ -77,6 +77,9 @@ pub struct TreasuryBonusApprovalProof {
 	pub expires_at_frame: FrameId,
 	#[codec(compact)]
 	pub backfill_bonds_to_unreserve: u32,
+	/// Monotonically increasing value preventing replay for this vault and beneficiary.
+	#[codec(compact)]
+	pub nonce: u64,
 	pub signature: Signature,
 }
 
@@ -89,6 +92,7 @@ impl TreasuryBonusApprovalProof {
 			self.bonus_percent,
 			self.expires_at_frame,
 			self.backfill_bonds_to_unreserve,
+			self.nonce,
 		)
 			.using_encoded(blake2_256);
 		let verified = self.signature.verify(message.as_slice(), signer);

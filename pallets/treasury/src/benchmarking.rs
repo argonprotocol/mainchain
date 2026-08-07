@@ -69,6 +69,7 @@ mod benchmarks {
 			bonus_percent: Permill::zero(),
 			expires_at_frame: BENCHMARK_FRAME_ID,
 			backfill_bonds_to_unreserve: 0,
+			nonce: 1,
 			signature: Signature::Sr25519([0; 64].into()),
 		};
 

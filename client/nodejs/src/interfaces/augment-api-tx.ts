@@ -2053,6 +2053,7 @@ declare module '@polkadot/api-base/types/submittable' {
                 bonusPercent?: any;
                 expiresAtFrame?: any;
                 backfillBondsToUnreserve?: any;
+                nonce?: any;
                 signature?: any;
               }
             | string,

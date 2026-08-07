@@ -1169,10 +1169,9 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							244u8, 195u8, 16u8, 56u8, 121u8, 231u8, 30u8, 176u8, 213u8, 95u8,
-							173u8, 219u8, 241u8, 30u8, 85u8, 158u8, 237u8, 236u8, 44u8, 156u8,
-							138u8, 66u8, 60u8, 19u8, 39u8, 236u8, 18u8, 174u8, 133u8, 193u8, 106u8,
-							98u8,
+							46u8, 255u8, 54u8, 80u8, 226u8, 182u8, 255u8, 78u8, 16u8, 30u8, 171u8,
+							35u8, 14u8, 74u8, 113u8, 101u8, 78u8, 224u8, 89u8, 246u8, 144u8, 97u8,
+							40u8, 143u8, 147u8, 130u8, 11u8, 136u8, 77u8, 91u8, 93u8, 177u8,
 						],
 					)
 				}
@@ -1190,9 +1189,9 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							203u8, 75u8, 147u8, 33u8, 235u8, 72u8, 246u8, 88u8, 106u8, 113u8,
-							143u8, 210u8, 19u8, 241u8, 3u8, 32u8, 76u8, 0u8, 41u8, 98u8, 40u8,
-							155u8, 187u8, 171u8, 2u8, 139u8, 41u8, 222u8, 190u8, 12u8, 117u8, 37u8,
+							251u8, 68u8, 157u8, 219u8, 83u8, 103u8, 26u8, 72u8, 181u8, 255u8,
+							233u8, 181u8, 19u8, 158u8, 8u8, 101u8, 76u8, 129u8, 86u8, 61u8, 122u8,
+							40u8, 237u8, 91u8, 171u8, 210u8, 156u8, 38u8, 202u8, 48u8, 212u8, 34u8,
 						],
 					)
 				}
@@ -3405,9 +3404,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				189u8, 49u8, 179u8, 3u8, 71u8, 219u8, 23u8, 129u8, 75u8, 34u8, 167u8, 29u8, 244u8,
-				164u8, 29u8, 218u8, 101u8, 85u8, 73u8, 14u8, 66u8, 250u8, 187u8, 50u8, 158u8,
-				139u8, 169u8, 49u8, 77u8, 144u8, 103u8, 46u8,
+				121u8, 77u8, 145u8, 235u8, 20u8, 155u8, 163u8, 185u8, 183u8, 57u8, 160u8, 22u8,
+				214u8, 15u8, 29u8, 146u8, 182u8, 103u8, 253u8, 247u8, 87u8, 177u8, 86u8, 212u8,
+				112u8, 80u8, 254u8, 53u8, 137u8, 156u8, 183u8, 20u8,
 			]
 	}
 	pub mod system {
@@ -5441,10 +5440,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							78u8, 60u8, 44u8, 202u8, 45u8, 129u8, 181u8, 35u8, 215u8, 157u8, 145u8,
-							181u8, 105u8, 119u8, 227u8, 114u8, 14u8, 164u8, 108u8, 47u8, 184u8,
-							80u8, 219u8, 24u8, 139u8, 227u8, 195u8, 253u8, 25u8, 182u8, 22u8,
-							150u8,
+							29u8, 58u8, 53u8, 137u8, 9u8, 159u8, 37u8, 13u8, 133u8, 205u8, 250u8,
+							228u8, 128u8, 123u8, 233u8, 43u8, 226u8, 178u8, 89u8, 95u8, 224u8,
+							245u8, 100u8, 48u8, 144u8, 2u8, 42u8, 164u8, 89u8, 48u8, 213u8, 59u8,
 						],
 					)
 				}
@@ -5509,10 +5507,10 @@ pub mod api {
 							max_weight,
 						},
 						[
-							245u8, 111u8, 189u8, 82u8, 198u8, 10u8, 206u8, 142u8, 178u8, 182u8,
-							53u8, 52u8, 148u8, 211u8, 223u8, 53u8, 26u8, 124u8, 167u8, 122u8,
-							140u8, 180u8, 148u8, 16u8, 23u8, 52u8, 52u8, 20u8, 207u8, 211u8, 252u8,
-							11u8,
+							214u8, 42u8, 76u8, 88u8, 49u8, 50u8, 24u8, 250u8, 171u8, 158u8, 192u8,
+							194u8, 117u8, 65u8, 175u8, 148u8, 98u8, 64u8, 146u8, 164u8, 44u8,
+							239u8, 95u8, 66u8, 98u8, 174u8, 227u8, 123u8, 170u8, 71u8, 151u8,
+							166u8,
 						],
 					)
 				}
@@ -6417,10 +6415,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							184u8, 60u8, 249u8, 158u8, 180u8, 3u8, 45u8, 107u8, 111u8, 219u8,
-							152u8, 184u8, 24u8, 131u8, 196u8, 86u8, 86u8, 84u8, 67u8, 194u8, 37u8,
-							206u8, 192u8, 110u8, 123u8, 175u8, 242u8, 83u8, 22u8, 253u8, 18u8,
-							120u8,
+							14u8, 194u8, 200u8, 49u8, 189u8, 178u8, 19u8, 231u8, 38u8, 115u8, 95u8,
+							138u8, 90u8, 155u8, 19u8, 102u8, 145u8, 104u8, 196u8, 151u8, 131u8,
+							112u8, 158u8, 93u8, 44u8, 108u8, 107u8, 133u8, 2u8, 38u8, 179u8, 106u8,
 						],
 					)
 				}
@@ -6684,9 +6681,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							53u8, 242u8, 33u8, 168u8, 189u8, 246u8, 46u8, 158u8, 222u8, 110u8,
-							50u8, 28u8, 41u8, 222u8, 118u8, 161u8, 53u8, 56u8, 166u8, 225u8, 107u8,
-							79u8, 163u8, 125u8, 91u8, 11u8, 153u8, 1u8, 1u8, 64u8, 122u8, 62u8,
+							125u8, 239u8, 126u8, 21u8, 91u8, 24u8, 187u8, 250u8, 107u8, 157u8,
+							215u8, 113u8, 20u8, 192u8, 25u8, 48u8, 170u8, 135u8, 182u8, 56u8,
+							168u8, 49u8, 10u8, 239u8, 174u8, 221u8, 131u8, 178u8, 172u8, 254u8,
+							161u8, 12u8,
 						],
 					)
 				}
@@ -6735,10 +6733,10 @@ pub mod api {
 						],
 						check_permissions::Input { call, proxy_type },
 						[
-							187u8, 92u8, 187u8, 161u8, 208u8, 237u8, 144u8, 93u8, 94u8, 173u8,
-							183u8, 66u8, 53u8, 21u8, 160u8, 94u8, 171u8, 243u8, 208u8, 90u8, 239u8,
-							164u8, 177u8, 152u8, 104u8, 152u8, 38u8, 227u8, 206u8, 91u8, 201u8,
-							21u8,
+							222u8, 221u8, 5u8, 218u8, 82u8, 122u8, 245u8, 41u8, 92u8, 90u8, 194u8,
+							235u8, 16u8, 245u8, 239u8, 240u8, 100u8, 223u8, 216u8, 242u8, 183u8,
+							208u8, 143u8, 87u8, 65u8, 38u8, 228u8, 177u8, 65u8, 243u8, 152u8,
+							187u8,
 						],
 					)
 				}
@@ -21739,9 +21737,9 @@ pub mod api {
 						"batch",
 						types::Batch { calls },
 						[
-							221u8, 33u8, 214u8, 6u8, 45u8, 201u8, 218u8, 203u8, 226u8, 49u8, 147u8,
-							104u8, 48u8, 130u8, 58u8, 57u8, 114u8, 185u8, 134u8, 215u8, 182u8,
-							120u8, 38u8, 145u8, 141u8, 54u8, 131u8, 72u8, 232u8, 239u8, 20u8, 54u8,
+							78u8, 32u8, 192u8, 20u8, 101u8, 70u8, 58u8, 7u8, 182u8, 156u8, 130u8,
+							96u8, 100u8, 165u8, 104u8, 93u8, 248u8, 49u8, 177u8, 83u8, 64u8, 163u8,
+							14u8, 176u8, 247u8, 223u8, 230u8, 113u8, 1u8, 107u8, 246u8, 154u8,
 						],
 					)
 				}
@@ -21771,9 +21769,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							229u8, 229u8, 111u8, 14u8, 217u8, 143u8, 237u8, 98u8, 106u8, 21u8,
-							211u8, 26u8, 208u8, 60u8, 1u8, 36u8, 91u8, 204u8, 110u8, 161u8, 116u8,
-							122u8, 81u8, 192u8, 41u8, 239u8, 43u8, 197u8, 161u8, 175u8, 14u8, 18u8,
+							198u8, 115u8, 42u8, 216u8, 43u8, 68u8, 32u8, 222u8, 166u8, 101u8,
+							171u8, 146u8, 29u8, 212u8, 187u8, 60u8, 170u8, 25u8, 245u8, 121u8,
+							150u8, 188u8, 153u8, 147u8, 251u8, 100u8, 171u8, 171u8, 91u8, 62u8,
+							135u8, 214u8,
 						],
 					)
 				}
@@ -21799,9 +21798,9 @@ pub mod api {
 						"batch_all",
 						types::BatchAll { calls },
 						[
-							11u8, 77u8, 107u8, 25u8, 119u8, 180u8, 30u8, 137u8, 161u8, 200u8,
-							232u8, 69u8, 94u8, 105u8, 83u8, 37u8, 89u8, 88u8, 227u8, 2u8, 185u8,
-							5u8, 23u8, 12u8, 1u8, 5u8, 191u8, 34u8, 83u8, 79u8, 131u8, 110u8,
+							140u8, 136u8, 131u8, 242u8, 29u8, 69u8, 112u8, 107u8, 75u8, 116u8,
+							20u8, 191u8, 167u8, 88u8, 18u8, 220u8, 232u8, 62u8, 27u8, 198u8, 138u8,
+							193u8, 31u8, 89u8, 55u8, 226u8, 132u8, 70u8, 172u8, 4u8, 161u8, 97u8,
 						],
 					)
 				}
@@ -21824,9 +21823,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							170u8, 206u8, 6u8, 251u8, 0u8, 232u8, 51u8, 81u8, 169u8, 89u8, 246u8,
-							13u8, 122u8, 113u8, 191u8, 99u8, 147u8, 176u8, 206u8, 136u8, 19u8,
-							239u8, 238u8, 40u8, 21u8, 67u8, 32u8, 13u8, 97u8, 58u8, 237u8, 61u8,
+							243u8, 109u8, 222u8, 64u8, 184u8, 187u8, 250u8, 82u8, 60u8, 218u8,
+							59u8, 85u8, 219u8, 172u8, 101u8, 252u8, 173u8, 170u8, 22u8, 37u8,
+							153u8, 76u8, 79u8, 182u8, 56u8, 75u8, 40u8, 74u8, 91u8, 162u8, 181u8,
+							35u8,
 						],
 					)
 				}
@@ -21852,9 +21852,10 @@ pub mod api {
 						"force_batch",
 						types::ForceBatch { calls },
 						[
-							250u8, 69u8, 233u8, 139u8, 35u8, 193u8, 105u8, 204u8, 0u8, 3u8, 63u8,
-							10u8, 221u8, 144u8, 128u8, 31u8, 162u8, 101u8, 103u8, 182u8, 117u8,
-							160u8, 38u8, 5u8, 145u8, 83u8, 21u8, 233u8, 109u8, 169u8, 145u8, 217u8,
+							174u8, 138u8, 89u8, 139u8, 43u8, 88u8, 177u8, 248u8, 151u8, 82u8,
+							119u8, 42u8, 186u8, 53u8, 25u8, 119u8, 136u8, 126u8, 252u8, 170u8,
+							232u8, 84u8, 222u8, 65u8, 32u8, 190u8, 97u8, 120u8, 187u8, 9u8, 230u8,
+							243u8,
 						],
 					)
 				}
@@ -21877,10 +21878,9 @@ pub mod api {
 							weight,
 						},
 						[
-							133u8, 159u8, 173u8, 46u8, 176u8, 9u8, 164u8, 124u8, 178u8, 29u8, 49u8,
-							86u8, 36u8, 125u8, 182u8, 62u8, 165u8, 241u8, 205u8, 243u8, 190u8,
-							53u8, 110u8, 132u8, 181u8, 218u8, 42u8, 78u8, 31u8, 244u8, 193u8,
-							216u8,
+							193u8, 133u8, 19u8, 228u8, 21u8, 119u8, 180u8, 60u8, 93u8, 104u8, 62u8,
+							202u8, 60u8, 218u8, 13u8, 146u8, 200u8, 146u8, 133u8, 164u8, 249u8,
+							62u8, 246u8, 74u8, 124u8, 162u8, 2u8, 121u8, 57u8, 64u8, 151u8, 135u8,
 						],
 					)
 				}
@@ -21920,9 +21920,9 @@ pub mod api {
 							fallback: ::subxt::ext::subxt_core::alloc::boxed::Box::new(fallback),
 						},
 						[
-							232u8, 228u8, 6u8, 243u8, 7u8, 227u8, 215u8, 212u8, 54u8, 165u8, 210u8,
-							234u8, 79u8, 48u8, 12u8, 198u8, 131u8, 64u8, 130u8, 125u8, 6u8, 152u8,
-							132u8, 176u8, 153u8, 122u8, 68u8, 80u8, 148u8, 157u8, 135u8, 114u8,
+							58u8, 37u8, 58u8, 161u8, 98u8, 11u8, 117u8, 126u8, 151u8, 176u8, 205u8,
+							89u8, 12u8, 54u8, 34u8, 73u8, 136u8, 190u8, 189u8, 94u8, 237u8, 203u8,
+							1u8, 18u8, 88u8, 239u8, 122u8, 164u8, 14u8, 125u8, 217u8, 246u8,
 						],
 					)
 				}
@@ -21945,10 +21945,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							208u8, 171u8, 98u8, 120u8, 189u8, 170u8, 192u8, 61u8, 201u8, 115u8,
-							247u8, 155u8, 111u8, 106u8, 152u8, 106u8, 140u8, 154u8, 10u8, 48u8,
-							68u8, 35u8, 35u8, 171u8, 55u8, 110u8, 0u8, 240u8, 35u8, 180u8, 123u8,
-							1u8,
+							57u8, 234u8, 84u8, 213u8, 96u8, 36u8, 201u8, 43u8, 206u8, 227u8, 119u8,
+							126u8, 125u8, 134u8, 127u8, 87u8, 91u8, 222u8, 161u8, 174u8, 241u8,
+							17u8, 9u8, 102u8, 38u8, 136u8, 186u8, 211u8, 93u8, 46u8, 14u8, 87u8,
 						],
 					)
 				}
@@ -22284,10 +22283,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							57u8, 109u8, 131u8, 249u8, 238u8, 165u8, 11u8, 166u8, 70u8, 116u8,
-							42u8, 125u8, 59u8, 129u8, 73u8, 184u8, 140u8, 240u8, 160u8, 127u8,
-							180u8, 195u8, 152u8, 251u8, 240u8, 211u8, 196u8, 159u8, 141u8, 76u8,
-							60u8, 89u8,
+							146u8, 233u8, 82u8, 60u8, 93u8, 254u8, 204u8, 151u8, 33u8, 187u8,
+							237u8, 155u8, 106u8, 146u8, 196u8, 208u8, 128u8, 159u8, 182u8, 54u8,
+							103u8, 254u8, 28u8, 34u8, 67u8, 214u8, 240u8, 91u8, 180u8, 37u8, 210u8,
+							113u8,
 						],
 					)
 				}
@@ -22310,10 +22309,9 @@ pub mod api {
 							weight,
 						},
 						[
-							11u8, 85u8, 183u8, 87u8, 141u8, 237u8, 196u8, 107u8, 213u8, 128u8,
-							137u8, 127u8, 181u8, 162u8, 167u8, 178u8, 32u8, 140u8, 149u8, 194u8,
-							39u8, 228u8, 32u8, 65u8, 178u8, 119u8, 64u8, 81u8, 57u8, 147u8, 248u8,
-							252u8,
+							173u8, 222u8, 16u8, 82u8, 253u8, 119u8, 50u8, 171u8, 226u8, 234u8,
+							98u8, 209u8, 87u8, 3u8, 200u8, 110u8, 97u8, 116u8, 129u8, 14u8, 215u8,
+							171u8, 6u8, 23u8, 249u8, 39u8, 102u8, 188u8, 62u8, 208u8, 166u8, 110u8,
 						],
 					)
 				}
@@ -22351,10 +22349,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							125u8, 19u8, 220u8, 113u8, 105u8, 183u8, 7u8, 225u8, 145u8, 113u8,
-							206u8, 225u8, 144u8, 177u8, 176u8, 129u8, 207u8, 136u8, 108u8, 153u8,
-							30u8, 239u8, 250u8, 67u8, 23u8, 107u8, 62u8, 93u8, 106u8, 170u8, 18u8,
-							47u8,
+							31u8, 107u8, 18u8, 93u8, 77u8, 38u8, 119u8, 198u8, 91u8, 230u8, 239u8,
+							109u8, 2u8, 255u8, 19u8, 129u8, 244u8, 99u8, 69u8, 54u8, 180u8, 42u8,
+							226u8, 76u8, 125u8, 11u8, 123u8, 221u8, 109u8, 102u8, 183u8, 214u8,
 						],
 					)
 				}
@@ -22656,9 +22653,10 @@ pub mod api {
 						"buy_bonds",
 						types::BuyBonds { vault_id, bonds, bonus_approval },
 						[
-							166u8, 118u8, 193u8, 44u8, 51u8, 102u8, 81u8, 17u8, 10u8, 240u8, 52u8,
-							63u8, 14u8, 237u8, 53u8, 51u8, 3u8, 227u8, 31u8, 202u8, 136u8, 213u8,
-							184u8, 244u8, 66u8, 157u8, 128u8, 85u8, 81u8, 200u8, 168u8, 73u8,
+							21u8, 131u8, 67u8, 145u8, 76u8, 117u8, 97u8, 143u8, 73u8, 251u8, 37u8,
+							231u8, 111u8, 171u8, 200u8, 72u8, 218u8, 212u8, 249u8, 61u8, 245u8,
+							152u8, 219u8, 194u8, 250u8, 117u8, 132u8, 144u8, 167u8, 107u8, 222u8,
+							229u8,
 						],
 					)
 				}
@@ -23093,6 +23091,12 @@ pub mod api {
 					pub type Param0 = crate::types::AccountId32;
 					pub type Param1 = ::core::primitive::u64;
 				}
+				pub mod last_bonus_approval_nonce_by_vault_and_account {
+					use super::runtime_types;
+					pub type LastBonusApprovalNonceByVaultAndAccount = ::core::primitive::u64;
+					pub type Param0 = ::core::primitive::u32;
+					pub type Param1 = crate::types::AccountId32;
+				}
 				pub mod encumbered_bond_microgons_by_account {
 					use super::runtime_types;
 					pub type EncumberedBondMicrogonsByAccount = ::core::primitive::u128;
@@ -23311,6 +23315,42 @@ pub mod api {
 							171u8, 64u8, 104u8, 112u8, 16u8, 30u8, 217u8, 145u8, 216u8, 111u8,
 							96u8, 151u8, 114u8, 24u8, 77u8, 129u8, 175u8, 249u8, 130u8, 135u8, 0u8,
 							215u8,
+						],
+					)
+				}				pub fn last_bonus_approval_nonce_by_vault_and_account_iter (& self ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < () , types :: last_bonus_approval_nonce_by_vault_and_account :: LastBonusApprovalNonceByVaultAndAccount , () , () , :: subxt :: ext :: subxt_core :: utils :: Yes >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Treasury",
+						"LastBonusApprovalNonceByVaultAndAccount",
+						(),
+						[
+							96u8, 227u8, 38u8, 161u8, 121u8, 216u8, 44u8, 80u8, 210u8, 223u8, 67u8,
+							31u8, 230u8, 6u8, 182u8, 133u8, 110u8, 181u8, 23u8, 11u8, 224u8, 4u8,
+							167u8, 91u8, 31u8, 21u8, 160u8, 156u8, 154u8, 141u8, 55u8, 57u8,
+						],
+					)
+				}				pub fn last_bonus_approval_nonce_by_vault_and_account_iter1 (& self , _0 : types :: last_bonus_approval_nonce_by_vault_and_account :: Param0 ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < :: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: last_bonus_approval_nonce_by_vault_and_account :: Param0 > , types :: last_bonus_approval_nonce_by_vault_and_account :: LastBonusApprovalNonceByVaultAndAccount , () , () , :: subxt :: ext :: subxt_core :: utils :: Yes >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Treasury",
+						"LastBonusApprovalNonceByVaultAndAccount",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							96u8, 227u8, 38u8, 161u8, 121u8, 216u8, 44u8, 80u8, 210u8, 223u8, 67u8,
+							31u8, 230u8, 6u8, 182u8, 133u8, 110u8, 181u8, 23u8, 11u8, 224u8, 4u8,
+							167u8, 91u8, 31u8, 21u8, 160u8, 156u8, 154u8, 141u8, 55u8, 57u8,
+						],
+					)
+				}				pub fn last_bonus_approval_nonce_by_vault_and_account (& self , _0 : types :: last_bonus_approval_nonce_by_vault_and_account :: Param0 , _1 : types :: last_bonus_approval_nonce_by_vault_and_account :: Param1 ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < (:: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: last_bonus_approval_nonce_by_vault_and_account :: Param0 > , :: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: last_bonus_approval_nonce_by_vault_and_account :: Param1 > ,) , types :: last_bonus_approval_nonce_by_vault_and_account :: LastBonusApprovalNonceByVaultAndAccount , :: subxt :: ext :: subxt_core :: utils :: Yes , () , () >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Treasury",
+						"LastBonusApprovalNonceByVaultAndAccount",
+						(
+							::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+							::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_1),
+						),
+						[
+							96u8, 227u8, 38u8, 161u8, 121u8, 216u8, 44u8, 80u8, 210u8, 223u8, 67u8,
+							31u8, 230u8, 6u8, 182u8, 133u8, 110u8, 181u8, 23u8, 11u8, 224u8, 4u8,
+							167u8, 91u8, 31u8, 21u8, 160u8, 156u8, 154u8, 141u8, 55u8, 57u8,
 						],
 					)
 				}
@@ -30119,6 +30159,8 @@ pub mod api {
 					pub expires_at_frame: ::core::primitive::u64,
 					#[codec(compact)]
 					pub backfill_bonds_to_unreserve: ::core::primitive::u32,
+					#[codec(compact)]
+					pub nonce: ::core::primitive::u64,
 					pub signature: runtime_types::sp_runtime::MultiSignature,
 				}
 				#[derive(
@@ -37004,8 +37046,8 @@ pub mod api {
 					#[doc = "The bonus approval already expired."]
 					BonusApprovalExpired,
 					#[codec(index = 14)]
-					#[doc = "The beneficiary already has a bond lot for this vault."]
-					BonusApprovalExistingBondLot,
+					#[doc = "The bonus approval nonce has already been consumed or superseded."]
+					BonusApprovalAlreadyUsed,
 					#[codec(index = 15)]
 					#[doc = "The bonus approval signature is invalid or unauthorized."]
 					InvalidBonusApprovalSignature,

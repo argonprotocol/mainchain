@@ -59,6 +59,7 @@ fn bonus_approval(
 	bonus_percent: Permill,
 	expires_at_frame: FrameId,
 	backfill_bonds_to_unreserve: Bonds,
+	nonce: u64,
 ) -> TreasuryBonusApprovalProof {
 	let beneficiary = account(beneficiary);
 	let message = (
@@ -68,6 +69,7 @@ fn bonus_approval(
 		bonus_percent,
 		expires_at_frame,
 		backfill_bonds_to_unreserve,
+		nonce,
 	)
 		.using_encoded(blake2_256);
 	let signature: Signature = account_pair_from_seed(10).sign(message.as_slice()).into();
@@ -77,6 +79,7 @@ fn bonus_approval(
 		bonus_percent,
 		expires_at_frame,
 		backfill_bonds_to_unreserve,
+		nonce,
 		signature,
 	}
 }
@@ -136,7 +139,7 @@ fn buy_bonds_store_plain_and_bonus_terms_and_track_pool_participation() {
 			origin(3),
 			1,
 			5,
-			Some(bonus_approval(1, 3, Permill::from_percent(15), 1, 0)),
+			Some(bonus_approval(1, 3, Permill::from_percent(15), 1, 0, 1)),
 		));
 
 		let plain_bond_lot_ids = account_bond_lot_ids(2);
@@ -256,7 +259,7 @@ fn bond_purchase_unreserves_backfill_from_approval() {
 			origin(2),
 			1,
 			6,
-			Some(bonus_approval(1, 2, Permill::from_percent(15), 1, 10)),
+			Some(bonus_approval(1, 2, Permill::from_percent(15), 1, 10, 1)),
 		));
 		let vault_bonds = BondLotsByVault::<Test>::get(1);
 		assert_eq!(vault_bonds.backfill_bonds_reserved, 0);
@@ -270,7 +273,7 @@ fn bond_purchase_unreserves_backfill_from_approval() {
 }
 
 #[test]
-fn bonus_approval_rejects_existing_lot_wrong_vault_account_expiry_and_signature() {
+fn bonus_approval_rejects_wrong_vault_account_expiry_and_signature() {
 	new_test_ext().execute_with(|| {
 		MinimumArgonsPerContributor::set(1);
 		CurrentFrameId::set(1);
@@ -284,7 +287,7 @@ fn bonus_approval_rejects_existing_lot_wrong_vault_account_expiry_and_signature(
 			origin(2),
 			1,
 			5,
-			Some(bonus_approval(1, 2, Permill::from_percent(15), 1, 0)),
+			Some(bonus_approval(1, 2, Permill::from_percent(15), 1, 0, 1)),
 		));
 
 		assert_err!(
@@ -292,17 +295,7 @@ fn bonus_approval_rejects_existing_lot_wrong_vault_account_expiry_and_signature(
 				origin(2),
 				1,
 				5,
-				Some(bonus_approval(1, 2, Permill::from_percent(15), 2, 0)),
-			),
-			Error::<Test>::BonusApprovalExistingBondLot,
-		);
-
-		assert_err!(
-			Treasury::buy_bonds(
-				origin(2),
-				1,
-				5,
-				Some(bonus_approval(2, 2, Permill::from_percent(15), 1, 0)),
+				Some(bonus_approval(2, 2, Permill::from_percent(15), 1, 0, 2)),
 			),
 			Error::<Test>::BonusApprovalWrongVault,
 		);
@@ -311,7 +304,7 @@ fn bonus_approval_rejects_existing_lot_wrong_vault_account_expiry_and_signature(
 				origin(2),
 				1,
 				5,
-				Some(bonus_approval(1, 3, Permill::from_percent(15), 1, 0)),
+				Some(bonus_approval(1, 3, Permill::from_percent(15), 1, 0, 2)),
 			),
 			Error::<Test>::BonusApprovalWrongAccount,
 		);
@@ -320,12 +313,12 @@ fn bonus_approval_rejects_existing_lot_wrong_vault_account_expiry_and_signature(
 				origin(2),
 				1,
 				5,
-				Some(bonus_approval(1, 2, Permill::from_percent(15), 0, 0)),
+				Some(bonus_approval(1, 2, Permill::from_percent(15), 0, 0, 2)),
 			),
 			Error::<Test>::BonusApprovalExpired,
 		);
 
-		let mut invalid_signature = bonus_approval(1, 3, Permill::from_percent(15), 1, 0);
+		let mut invalid_signature = bonus_approval(1, 3, Permill::from_percent(15), 1, 0, 2);
 		invalid_signature.signature = Signature::Sr25519([1; 64].into());
 		assert_err!(
 			Treasury::buy_bonds(origin(3), 1, 5, Some(invalid_signature)),
@@ -335,7 +328,7 @@ fn bonus_approval_rejects_existing_lot_wrong_vault_account_expiry_and_signature(
 }
 
 #[test]
-fn bonus_approval_rejects_a_bonus_percent_changed_after_signing() {
+fn bonus_approval_rejects_fields_changed_after_signing() {
 	new_test_ext().execute_with(|| {
 		MinimumArgonsPerContributor::set(1);
 		CurrentFrameId::set(1);
@@ -344,8 +337,16 @@ fn bonus_approval_rejects_a_bonus_percent_changed_after_signing() {
 		insert_vault(1, vault);
 		set_argons(2, 20 * MICROGONS_PER_ARGON);
 
-		let mut approval = bonus_approval(1, 2, Permill::from_percent(10), 1, 0);
+		let mut approval = bonus_approval(1, 2, Permill::from_percent(10), 1, 0, 1);
 		approval.bonus_percent = Permill::from_percent(15);
+
+		assert_err!(
+			Treasury::buy_bonds(origin(2), 1, 5, Some(approval)),
+			Error::<Test>::InvalidBonusApprovalSignature,
+		);
+
+		let mut approval = bonus_approval(1, 2, Permill::from_percent(10), 1, 0, 1);
+		approval.nonce = 2;
 
 		assert_err!(
 			Treasury::buy_bonds(origin(2), 1, 5, Some(approval)),
@@ -364,7 +365,7 @@ fn bonus_approval_rejects_total_profit_sharing_above_one_hundred_percent() {
 		insert_vault(1, vault);
 		set_argons(2, 20 * MICROGONS_PER_ARGON);
 
-		let approval = bonus_approval(1, 2, Permill::from_percent(11), 1, 0);
+		let approval = bonus_approval(1, 2, Permill::from_percent(11), 1, 0, 1);
 		assert_err!(
 			Treasury::buy_bonds(origin(2), 1, 5, Some(approval)),
 			Error::<Test>::BonusApprovalExceedsProfitSharing,
@@ -373,7 +374,7 @@ fn bonus_approval_rejects_total_profit_sharing_above_one_hundred_percent() {
 }
 
 #[test]
-fn bonus_approval_rejects_reuse_while_lot_is_releasing() {
+fn bonus_approval_allows_multiple_coupons_and_rejects_reuse() {
 	new_test_ext().execute_with(|| {
 		MinimumArgonsPerContributor::set(1);
 		CurrentFrameId::set(1);
@@ -386,20 +387,33 @@ fn bonus_approval_rejects_reuse_while_lot_is_releasing() {
 			origin(2),
 			1,
 			5,
-			Some(bonus_approval(1, 2, Permill::from_percent(15), 1, 0)),
+			Some(bonus_approval(1, 2, Permill::from_percent(15), 2, 0, 1)),
 		));
-		let bond_lot_id = account_bond_lot_ids(2)[0];
+		assert_ok!(Treasury::buy_bonds(
+			origin(2),
+			1,
+			5,
+			Some(bonus_approval(1, 2, Permill::from_percent(10), 2, 0, 2)),
+		));
+		assert_eq!(account_bond_lot_ids(2).len(), 2);
 
-		assert_ok!(Treasury::liquidate_bond_lot(origin(2), bond_lot_id));
-		CurrentFrameId::set(2);
 		assert_err!(
 			Treasury::buy_bonds(
 				origin(2),
 				1,
 				5,
-				Some(bonus_approval(1, 2, Permill::from_percent(15), 2, 0)),
+				Some(bonus_approval(1, 2, Permill::from_percent(10), 2, 0, 2)),
 			),
-			Error::<Test>::BonusApprovalExistingBondLot,
+			Error::<Test>::BonusApprovalAlreadyUsed,
+		);
+		assert_err!(
+			Treasury::buy_bonds(
+				origin(2),
+				1,
+				5,
+				Some(bonus_approval(1, 2, Permill::from_percent(10), 2, 0, 1)),
+			),
+			Error::<Test>::BonusApprovalAlreadyUsed,
 		);
 	});
 }
@@ -914,7 +928,7 @@ fn bonus_backed_lots_increase_bonder_payout_and_reduce_vault_remainder() {
 			origin(3),
 			1,
 			4,
-			Some(bonus_approval(1, 3, Permill::from_percent(10), 1, 0)),
+			Some(bonus_approval(1, 3, Permill::from_percent(10), 1, 0, 1)),
 		));
 
 		let plain_lot_id = account_bond_lot_ids(2)[0];

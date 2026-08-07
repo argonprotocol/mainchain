@@ -3268,6 +3268,7 @@ declare module '@polkadot/types/lookup' {
     readonly bonusPercent: Compact<Permill>;
     readonly expiresAtFrame: Compact<u64>;
     readonly backfillBondsToUnreserve: Compact<u32>;
+    readonly nonce: Compact<u64>;
     readonly signature: SpRuntimeMultiSignature;
   }
 
@@ -4665,7 +4666,7 @@ declare module '@polkadot/types/lookup' {
     readonly isBonusApprovalWrongVault: boolean;
     readonly isBonusApprovalWrongAccount: boolean;
     readonly isBonusApprovalExpired: boolean;
-    readonly isBonusApprovalExistingBondLot: boolean;
+    readonly isBonusApprovalAlreadyUsed: boolean;
     readonly isInvalidBonusApprovalSignature: boolean;
     readonly isBonusApprovalExceedsProfitSharing: boolean;
     readonly isArgonotBondPurchaseBelowCutoff: boolean;
@@ -4687,7 +4688,7 @@ declare module '@polkadot/types/lookup' {
       | 'BonusApprovalWrongVault'
       | 'BonusApprovalWrongAccount'
       | 'BonusApprovalExpired'
-      | 'BonusApprovalExistingBondLot'
+      | 'BonusApprovalAlreadyUsed'
       | 'InvalidBonusApprovalSignature'
       | 'BonusApprovalExceedsProfitSharing'
       | 'ArgonotBondPurchaseBelowCutoff'

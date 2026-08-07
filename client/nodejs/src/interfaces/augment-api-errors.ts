@@ -1292,13 +1292,13 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       BondPurchaseRejected: AugmentedError<ApiType>;
       /**
+       * The bonus approval nonce has already been consumed or superseded.
+       **/
+      BonusApprovalAlreadyUsed: AugmentedError<ApiType>;
+      /**
        * The approved bonus plus the vault's profit sharing exceeds 100%.
        **/
       BonusApprovalExceedsProfitSharing: AugmentedError<ApiType>;
-      /**
-       * The beneficiary already has a bond lot for this vault.
-       **/
-      BonusApprovalExistingBondLot: AugmentedError<ApiType>;
       /**
        * The bonus approval already expired.
        **/

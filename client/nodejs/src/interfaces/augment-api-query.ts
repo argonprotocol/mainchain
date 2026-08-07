@@ -1799,6 +1799,14 @@ declare module '@polkadot/api-base/types/storage' {
         (arg: AccountId32 | string | Uint8Array) => Observable<u128>,
         [AccountId32]
       >;
+      lastBonusApprovalNonceByVaultAndAccount: AugmentedQuery<
+        ApiType,
+        (
+          arg1: u32 | AnyNumber | Uint8Array,
+          arg2: AccountId32 | string | Uint8Array,
+        ) => Observable<Option<u64>>,
+        [u32, AccountId32]
+      >;
       /**
        * The next bond lot id.
        **/

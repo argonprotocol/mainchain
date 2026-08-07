@@ -2759,6 +2759,7 @@ export default {
     bonusPercent: 'Compact<Permill>',
     expiresAtFrame: 'Compact<u64>',
     backfillBondsToUnreserve: 'Compact<u32>',
+    nonce: 'Compact<u64>',
     signature: 'SpRuntimeMultiSignature',
   },
   /**
@@ -4016,7 +4017,7 @@ export default {
       'BonusApprovalWrongVault',
       'BonusApprovalWrongAccount',
       'BonusApprovalExpired',
-      'BonusApprovalExistingBondLot',
+      'BonusApprovalAlreadyUsed',
       'InvalidBonusApprovalSignature',
       'BonusApprovalExceedsProfitSharing',
       'ArgonotBondPurchaseBelowCutoff',
