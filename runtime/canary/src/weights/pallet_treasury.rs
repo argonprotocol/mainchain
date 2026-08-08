@@ -36,12 +36,14 @@ impl<T: frame_system::Config> pallet_treasury::WeightInfo for WeightInfo<T> {
 	/// Proof: `MiningSlot::NextFrameId` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
 	/// Storage: `Treasury::BondLotsByVault` (r:1 w:1)
 	/// Proof: `Treasury::BondLotsByVault` (`max_values`: None, `max_size`: Some(1222), added: 3697, mode: `MaxEncodedLen`)
-	/// Storage: `Treasury::BondLotIdsByAccount` (r:4 w:1)
-	/// Proof: `Treasury::BondLotIdsByAccount` (`max_values`: None, `max_size`: Some(56), added: 2531, mode: `MaxEncodedLen`)
+	/// Storage: `Treasury::LastBonusApprovalNonceByVaultAndAccount` (r:1 w:1)
+	/// Proof: `Treasury::LastBonusApprovalNonceByVaultAndAccount` (`max_values`: None, `max_size`: Some(68), added: 2543, mode: `MaxEncodedLen`)
 	/// Storage: `Treasury::BondLotById` (r:1 w:2)
 	/// Proof: `Treasury::BondLotById` (`max_values`: None, `max_size`: Some(131), added: 2606, mode: `MaxEncodedLen`)
 	/// Storage: `Treasury::PendingBondReleasesByFrame` (r:1 w:1)
 	/// Proof: `Treasury::PendingBondReleasesByFrame` (`max_values`: None, `max_size`: Some(8018), added: 10493, mode: `MaxEncodedLen`)
+	/// Storage: `Treasury::BondLotIdsByAccount` (r:4 w:1)
+	/// Proof: `Treasury::BondLotIdsByAccount` (`max_values`: None, `max_size`: Some(56), added: 2531, mode: `MaxEncodedLen`)
 	/// Storage: `Treasury::NextBondLotId` (r:1 w:1)
 	/// Proof: `Treasury::NextBondLotId` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
 	/// Storage: `Balances::Holds` (r:1 w:1)
@@ -52,8 +54,8 @@ impl<T: frame_system::Config> pallet_treasury::WeightInfo for WeightInfo<T> {
 		//  Estimated: `11483`
 		// Minimum execution time: 111_000_000 picoseconds.
 		Weight::from_parts(121_000_000, 11483)
-			.saturating_add(T::DbWeight::get().reads(10))
-			.saturating_add(T::DbWeight::get().writes(7))
+			.saturating_add(T::DbWeight::get().reads(11))
+			.saturating_add(T::DbWeight::get().writes(8))
 		}
 	/// Storage: `Treasury::TotalActiveArgonotBonds` (r:1 w:1)
 	/// Proof: `Treasury::TotalActiveArgonotBonds` (`max_values`: Some(1), `max_size`: Some(4), added: 499, mode: `MaxEncodedLen`)
@@ -77,7 +79,7 @@ impl<T: frame_system::Config> pallet_treasury::WeightInfo for WeightInfo<T> {
 		// Proof Size summary in bytes:
 		//  Measured:  `7212`
 		//  Estimated: `13487`
-		// Minimum execution time: 170_000_000 picoseconds.
+		// Minimum execution time: 172_000_000 picoseconds.
 		Weight::from_parts(202_000_000, 13487)
 			.saturating_add(T::DbWeight::get().reads(8))
 			.saturating_add(T::DbWeight::get().writes(9))
@@ -237,8 +239,8 @@ impl<T: frame_system::Config> pallet_treasury::WeightInfo for WeightInfo<T> {
 		// Proof Size summary in bytes:
 		//  Measured:  `297757`
 		//  Estimated: `2686990`
-		// Minimum execution time: 47_417_000_000 picoseconds.
-		Weight::from_parts(49_065_000_000, 2686990)
+		// Minimum execution time: 48_700_000_000 picoseconds.
+		Weight::from_parts(51_504_000_000, 2686990)
 			.saturating_add(T::DbWeight::get().reads(3002))
 			.saturating_add(T::DbWeight::get().writes(4001))
 		}
@@ -254,8 +256,8 @@ impl<T: frame_system::Config> pallet_treasury::WeightInfo for WeightInfo<T> {
 		// Proof Size summary in bytes:
 		//  Measured:  `1091717`
 		//  Estimated: `28666990`
-		// Minimum execution time: 523_303_000_000 picoseconds.
-		Weight::from_parts(568_369_000_000, 28666990)
+		// Minimum execution time: 537_393_000_000 picoseconds.
+		Weight::from_parts(585_689_000_000, 28666990)
 			.saturating_add(T::DbWeight::get().reads(22004))
 			.saturating_add(T::DbWeight::get().writes(22004))
 		}
@@ -267,8 +269,8 @@ impl<T: frame_system::Config> pallet_treasury::WeightInfo for WeightInfo<T> {
 		// Proof Size summary in bytes:
 		//  Measured:  `32701`
 		//  Estimated: `378084`
-		// Minimum execution time: 9_573_000_000 picoseconds.
-		Weight::from_parts(9_933_000_000, 378084)
+		// Minimum execution time: 9_233_000_000 picoseconds.
+		Weight::from_parts(10_144_000_000, 378084)
 			.saturating_add(T::DbWeight::get().reads(102))
 			.saturating_add(T::DbWeight::get().writes(1))
 		}
@@ -298,8 +300,8 @@ impl<T: frame_system::Config> pallet_treasury::WeightInfo for WeightInfo<T> {
 		// Proof Size summary in bytes:
 		//  Measured:  `1354881`
 		//  Estimated: `28666990`
-		// Minimum execution time: 534_363_000_000 picoseconds.
-		Weight::from_parts(553_268_000_000, 28666990)
+		// Minimum execution time: 553_405_000_000 picoseconds.
+		Weight::from_parts(584_054_000_000, 28666990)
 			.saturating_add(T::DbWeight::get().reads(23110))
 			.saturating_add(T::DbWeight::get().writes(24005))
 		}

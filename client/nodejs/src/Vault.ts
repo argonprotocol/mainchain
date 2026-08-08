@@ -128,10 +128,6 @@ export class Vault {
         this.securitizationReleaseSchedule.set(bitcoinHeight.toNumber(), amount.toBigInt());
       }
     }
-    const currentBonusSharingPercent =
-      'treasuryBonusProfitSharing' in vault.terms
-        ? vault.terms.treasuryBonusProfitSharing
-        : undefined;
     this.terms = {
       bitcoinAnnualPercentRate: fromFixedNumber(
         vault.terms.bitcoinAnnualPercentRate.toBigInt(),
@@ -140,10 +136,6 @@ export class Vault {
       bitcoinBaseFee: vault.terms.bitcoinBaseFee.toBigInt(),
       treasuryProfitSharing: fromFixedNumber(
         vault.terms.treasuryProfitSharing.toBigInt(),
-        PERMILL_DECIMALS,
-      ),
-      treasuryBonusProfitSharing: fromFixedNumber(
-        currentBonusSharingPercent?.toBigInt() ?? 0n,
         PERMILL_DECIMALS,
       ),
     };
@@ -177,8 +169,6 @@ export class Vault {
     this.delegateAccountId = undefined;
     if (vault.pendingTerms.isSome) {
       const [tickApply, terms] = vault.pendingTerms.value;
-      const pendingBonusSharingPercent =
-        'treasuryBonusProfitSharing' in terms ? terms.treasuryBonusProfitSharing : undefined;
       this.pendingTermsChangeTick = tickApply.toNumber();
       this.pendingTerms = {
         bitcoinAnnualPercentRate: fromFixedNumber(
@@ -188,10 +178,6 @@ export class Vault {
         bitcoinBaseFee: terms.bitcoinBaseFee.toBigInt(),
         treasuryProfitSharing: fromFixedNumber(
           terms.treasuryProfitSharing.toBigInt(),
-          PERMILL_DECIMALS,
-        ),
-        treasuryBonusProfitSharing: fromFixedNumber(
-          pendingBonusSharingPercent?.toBigInt() ?? 0n,
           PERMILL_DECIMALS,
         ),
       };
@@ -368,7 +354,6 @@ export class Vault {
       bitcoinXpub: string;
       delegateAccountId?: string;
       treasuryProfitSharing: number;
-      treasuryBonusProfitSharing: number;
       doNotExceedBalance?: bigint;
     } & ISubmittableOptions,
     config: { tickDurationMillis?: number } = {},
@@ -406,10 +391,7 @@ export class Vault {
         bitcoinAnnualPercentRate: toFixedNumber(annualPercentRate, FIXED_U128_DECIMALS),
         bitcoinBaseFee: BigInt(baseFee),
         treasuryProfitSharing: toFixedNumber(args.treasuryProfitSharing, PERMILL_DECIMALS),
-        treasuryBonusProfitSharing: toFixedNumber(
-          args.treasuryBonusProfitSharing,
-          PERMILL_DECIMALS,
-        ),
+        treasuryBonusProfitSharing: toFixedNumber(0, PERMILL_DECIMALS),
       },
       securitizationRatio: toFixedNumber(securitizationRatio, FIXED_U128_DECIMALS),
       securitization: BigInt(securitization),
@@ -485,7 +467,6 @@ export interface ITerms {
   readonly bitcoinAnnualPercentRate: BigNumber;
   readonly bitcoinBaseFee: bigint;
   readonly treasuryProfitSharing: BigNumber;
-  readonly treasuryBonusProfitSharing: BigNumber;
 }
 function bigNumberToBigInt(bn: BigNumber): bigint {
   return BigInt(bn.integerValue(BigNumber.ROUND_DOWN).toString());

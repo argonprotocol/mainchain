@@ -610,7 +610,6 @@ where
 		bitcoin_annual_percent_rate: FixedU128::from_rational(110u128, 100u128),
 		bitcoin_base_fee: 1_000u128.into(),
 		treasury_profit_sharing: Permill::from_percent(20),
-		treasury_bonus_profit_sharing: Permill::zero(),
 	};
 	let vault = Vault {
 		operator_account_id: operator.clone(),

@@ -1558,13 +1558,6 @@ where
 			.map(|vault| vault.terms.treasury_profit_sharing)
 	}
 
-	fn get_vault_treasury_bonus_profit_sharing(vault_id: VaultId) -> Option<Permill> {
-		benchmark_bitcoin_vault_provider_state::<AccountId, Balance>()
-			.vaults
-			.get(&vault_id)
-			.map(|vault| vault.terms.treasury_bonus_profit_sharing)
-	}
-
 	fn is_vault_open(vault_id: VaultId) -> bool {
 		benchmark_bitcoin_vault_provider_state::<AccountId, Balance>()
 			.vaults

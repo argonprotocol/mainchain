@@ -833,7 +833,6 @@ fn benchmark_vault_terms<T: Config>() -> VaultTerms<T::Balance> {
 		bitcoin_annual_percent_rate: FixedU128::one(),
 		bitcoin_base_fee: 1u128.into(),
 		treasury_profit_sharing: Permill::zero(),
-		treasury_bonus_profit_sharing: Permill::zero(),
 	}
 }
 

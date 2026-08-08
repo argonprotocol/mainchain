@@ -77,9 +77,14 @@ pub struct TreasuryBonusApprovalProof {
 	pub vault_id: VaultId,
 	pub beneficiary: AccountId32,
 	#[codec(compact)]
+	pub bonus_percent: Permill,
+	#[codec(compact)]
 	pub expires_at_frame: FrameId,
 	#[codec(compact)]
 	pub bond_space_to_unreserve: u32,
+	/// Monotonically increasing value preventing replay for this vault and beneficiary.
+	#[codec(compact)]
+	pub nonce: u64,
 	pub signature: Signature,
 }
 
@@ -89,8 +94,10 @@ impl TreasuryBonusApprovalProof {
 			TREASURY_BONUS_APPROVAL_PROOF_MESSAGE_KEY,
 			self.vault_id,
 			&self.beneficiary,
+			self.bonus_percent,
 			self.expires_at_frame,
 			self.bond_space_to_unreserve,
+			self.nonce,
 		)
 			.using_encoded(blake2_256);
 		let verified = self.signature.verify(message.as_slice(), signer);
@@ -165,8 +172,6 @@ pub trait TreasuryVaultProvider {
 	fn get_vault_delegate(vault_id: VaultId) -> Option<Self::AccountId>;
 	/// Gets the bonder-side percent of lot yield shared to the bond holder.
 	fn get_vault_profit_sharing_percent(vault_id: VaultId) -> Option<Permill>;
-	/// Gets the bonus bonder-side percent of lot yield shared to the bond holder.
-	fn get_vault_treasury_bonus_profit_sharing(vault_id: VaultId) -> Option<Permill>;
 
 	/// Ensure a vault is open
 	fn is_vault_open(vault_id: VaultId) -> bool;
@@ -476,9 +481,6 @@ where
 	/// The bonder-side percent of lot yield shared to the bond holder.
 	#[codec(compact)]
 	pub treasury_profit_sharing: Permill,
-	/// An extra bonder-side percent of lot yield shared to the bond holder when approved.
-	#[codec(compact)]
-	pub treasury_bonus_profit_sharing: Permill,
 }
 
 pub struct BurnResult<Balance> {
@@ -1402,7 +1404,6 @@ mod test {
 				bitcoin_annual_percent_rate: 0.into(),
 				bitcoin_base_fee: 0,
 				treasury_profit_sharing: Default::default(),
-				treasury_bonus_profit_sharing: Default::default(),
 			},
 			pending_terms: None,
 			opened_tick: 0,

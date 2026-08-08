@@ -368,8 +368,6 @@ pub mod pallet {
 		UnableToGenerateVaultBitcoinPubkey,
 		/// A funding change is already scheduled
 		FundingChangeAlreadyScheduled,
-		/// Treasury bond sharing plus bonus cannot exceed 100%.
-		InvalidBondSharingTerms,
 		/// A vault must clear out all pending cosigns before it can collect
 		PendingCosignsBeforeCollect,
 		/// A vault must clear out all pending orphan cosigns before it can collect
@@ -516,8 +514,6 @@ pub mod pallet {
 				bitcoin_xpubkey,
 			} = vault_config;
 
-			ensure!(Self::is_valid_bond_sharing_terms(&terms), Error::<T>::InvalidBondSharingTerms);
-
 			ensure!(
 				securitization_ratio >= FixedU128::one() &&
 					securitization_ratio <= FixedU128::from_u32(2),
@@ -660,8 +656,6 @@ pub mod pallet {
 
 			ensure!(vault.operator_account_id == who, Error::<T>::NoPermissions);
 			ensure!(vault.pending_terms.is_none(), Error::<T>::TermsChangeAlreadyScheduled);
-			ensure!(Self::is_valid_bond_sharing_terms(&terms), Error::<T>::InvalidBondSharingTerms);
-
 			let terms_change_tick = Self::get_terms_active_tick();
 
 			PendingTermsModificationsByTick::<T>::mutate(terms_change_tick, |a| {
@@ -904,12 +898,6 @@ pub mod pallet {
 					encumbered_micronots: T::Balance::default(),
 				}
 			})
-		}
-
-		pub(crate) fn is_valid_bond_sharing_terms(terms: &VaultTerms<T::Balance>) -> bool {
-			let sharing_parts = terms.treasury_profit_sharing.deconstruct();
-			let bonus_parts = terms.treasury_bonus_profit_sharing.deconstruct();
-			sharing_parts.saturating_add(bonus_parts) <= Permill::one().deconstruct()
 		}
 
 		pub(crate) fn get_terms_active_tick() -> Tick {
@@ -1280,10 +1268,6 @@ pub mod pallet {
 
 		fn get_vault_profit_sharing_percent(vault_id: VaultId) -> Option<Permill> {
 			VaultsById::<T>::get(vault_id).map(|a| a.terms.treasury_profit_sharing)
-		}
-
-		fn get_vault_treasury_bonus_profit_sharing(vault_id: VaultId) -> Option<Permill> {
-			VaultsById::<T>::get(vault_id).map(|a| a.terms.treasury_bonus_profit_sharing)
 		}
 
 		fn is_vault_open(vault_id: VaultId) -> bool {

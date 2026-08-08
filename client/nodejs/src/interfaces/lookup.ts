@@ -2215,7 +2215,6 @@ export default {
     bitcoinAnnualPercentRate: 'Compact<u128>',
     bitcoinBaseFee: 'Compact<u128>',
     treasuryProfitSharing: 'Compact<Permill>',
-    treasuryBonusProfitSharing: 'Compact<Permill>',
   },
   /**
    * Lookup214: argon_primitives::bitcoin::OpaqueBitcoinXpub
@@ -2756,8 +2755,10 @@ export default {
   ArgonPrimitivesVaultTreasuryBonusApprovalProof: {
     vaultId: 'Compact<u32>',
     beneficiary: 'AccountId32',
+    bonusPercent: 'Compact<Permill>',
     expiresAtFrame: 'Compact<u64>',
     bondSpaceToUnreserve: 'Compact<u32>',
+    nonce: 'Compact<u64>',
     signature: 'SpRuntimeMultiSignature',
   },
   /**
@@ -3417,7 +3418,6 @@ export default {
       'InternalError',
       'UnableToGenerateVaultBitcoinPubkey',
       'FundingChangeAlreadyScheduled',
-      'InvalidBondSharingTerms',
       'PendingCosignsBeforeCollect',
       'PendingOrphanedUtxoCosignsBeforeCollect',
       'OverdueCollectBlockersBeforeCollect',
@@ -4016,8 +4016,9 @@ export default {
       'BonusApprovalWrongVault',
       'BonusApprovalWrongAccount',
       'BonusApprovalExpired',
-      'BonusApprovalExistingBondLot',
+      'BonusApprovalAlreadyUsed',
       'InvalidBonusApprovalSignature',
+      'BonusApprovalExceedsProfitSharing',
       'ArgonotBondPurchaseBelowCutoff',
       'ArgonotBondPurchaseAboveCap',
       'BondLotCannotBeFlexible',

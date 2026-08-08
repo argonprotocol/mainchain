@@ -182,7 +182,6 @@ pub struct TestVault {
 	pub securitization: Balance,
 	pub securitized_satoshis: Satoshis,
 	pub sharing_percent: Permill,
-	pub bonus_percent: Permill,
 	pub account_id: TestAccountId,
 	pub delegate_account_id: Option<TestAccountId>,
 	pub is_closed: bool,
@@ -238,10 +237,6 @@ impl TreasuryVaultProvider for StaticTreasuryVaultProvider {
 
 	fn get_vault_profit_sharing_percent(vault_id: VaultId) -> Option<Permill> {
 		VaultsById::get().get(&vault_id).map(|a| a.sharing_percent)
-	}
-
-	fn get_vault_treasury_bonus_profit_sharing(vault_id: VaultId) -> Option<Permill> {
-		VaultsById::get().get(&vault_id).map(|a| a.bonus_percent)
 	}
 
 	fn get_vault_operator(vault_id: VaultId) -> Option<Self::AccountId> {

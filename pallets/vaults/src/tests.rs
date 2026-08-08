@@ -48,7 +48,6 @@ fn default_terms(pct: FixedU128) -> VaultTerms<Balance> {
 		bitcoin_annual_percent_rate: pct,
 		bitcoin_base_fee: 0,
 		treasury_profit_sharing: Permill::zero(),
-		treasury_bonus_profit_sharing: Permill::zero(),
 	}
 }
 
@@ -152,23 +151,6 @@ fn it_can_create_a_vault_with_a_delegate_account() {
 
 		let vault = VaultsById::<Test>::get(1).expect("vault should exist");
 		assert_eq!(vault.delegate_account_id, Some(9));
-	});
-}
-
-#[test]
-fn it_rejects_vault_terms_above_one_hundred_percent_on_create() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-		set_argons(1, 100_010);
-
-		let mut vault = default_vault();
-		vault.terms.treasury_profit_sharing = Permill::from_percent(60);
-		vault.terms.treasury_bonus_profit_sharing = Permill::from_percent(50);
-
-		assert_noop!(
-			Vaults::create(RuntimeOrigin::signed(1), vault),
-			Error::<Test>::InvalidBondSharingTerms,
-		);
 	});
 }
 
@@ -998,7 +980,6 @@ fn it_accounts_for_pending_bitcoins() {
 					bitcoin_annual_percent_rate: FixedU128::from_float(0.0),
 					bitcoin_base_fee: 0,
 					treasury_profit_sharing: Permill::zero(),
-					treasury_bonus_profit_sharing: Permill::zero(),
 				},
 				delegate_account_id: None,
 				bitcoin_xpubkey: keys(),
@@ -1178,7 +1159,6 @@ fn vault_equilibrium_scenario(scenario: VaultScenario) {
 					bitcoin_annual_percent_rate: FixedU128::zero(),
 					bitcoin_base_fee: 0,
 					treasury_profit_sharing: Permill::zero(),
-					treasury_bonus_profit_sharing: Permill::zero(),
 				},
 				delegate_account_id: None,
 				bitcoin_xpubkey: keys(),
@@ -1435,24 +1415,6 @@ fn it_can_schedule_term_changes() {
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().terms.bitcoin_base_fee, 1000);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().pending_terms, None);
 		assert_eq!(PendingTermsModificationsByTick::<Test>::get(100).first(), None);
-	});
-}
-
-#[test]
-fn it_rejects_vault_terms_above_one_hundred_percent_on_modify_terms() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-		set_argons(1, 100_010);
-		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), default_vault()));
-
-		let mut terms = default_terms(TEN_PCT);
-		terms.treasury_profit_sharing = Permill::from_percent(60);
-		terms.treasury_bonus_profit_sharing = Permill::from_percent(50);
-
-		assert_noop!(
-			Vaults::modify_terms(RuntimeOrigin::signed(1), 1, terms),
-			Error::<Test>::InvalidBondSharingTerms,
-		);
 	});
 }
 
