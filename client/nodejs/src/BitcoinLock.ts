@@ -46,7 +46,7 @@ export type BitcoinLockFeeCoupon = {
   genesisHash: string;
   beneficiary: string;
   feeDiscount: bigint;
-  backfillSecuritizationToUnreserve: bigint;
+  securitizationSpaceToUnreserve: bigint;
   expiresAtFrame: bigint;
   nonce: bigint;
   signature: AnyJson;
@@ -92,7 +92,7 @@ export class BitcoinLock implements IBitcoinLock {
   public openClaimHeight: number;
   public createdAtHeight: number;
   public isFunded: boolean;
-  public isBackfill: boolean;
+  public isFlexible: boolean;
   public createdAtArgonBlock: number;
   public fundHoldExtensionsByBitcoinExpirationHeight: Record<number, bigint>;
   public couponFeesPaid: bigint;
@@ -116,7 +116,7 @@ export class BitcoinLock implements IBitcoinLock {
     this.openClaimHeight = data.openClaimHeight;
     this.createdAtHeight = data.createdAtHeight;
     this.isFunded = data.isFunded;
-    this.isBackfill = data.isBackfill ?? false;
+    this.isFlexible = data.isFlexible ?? false;
     this.fundHoldExtensionsByBitcoinExpirationHeight =
       data.fundHoldExtensionsByBitcoinExpirationHeight;
     this.createdAtArgonBlock = data.createdAtArgonBlock;
@@ -682,7 +682,10 @@ export class BitcoinLock implements IBitcoinLock {
     const openClaimHeight = utxo.openClaimHeight.toNumber();
     const createdAtHeight = utxo.createdAtHeight.toNumber();
     const isFunded = ((utxo as { isVerified?: bool })?.isVerified ?? utxo.isFunded).toJSON();
-    const isBackfill = utxo.isBackfill?.toJSON() ?? false;
+    const isFlexible =
+      (
+        (utxo as { isFlexible?: bool }).isFlexible ?? (utxo as { isBackfill?: bool }).isBackfill
+      )?.toJSON() ?? false;
     const fundHoldExtensionsByBitcoinExpirationHeight = Object.fromEntries(
       [...utxo.fundHoldExtensions.entries()].map(([x, y]) => [x.toNumber(), y.toBigInt()]),
     );
@@ -707,7 +710,7 @@ export class BitcoinLock implements IBitcoinLock {
       createdAtHeight,
       securityFees,
       isFunded,
-      isBackfill,
+      isFlexible,
       couponFeesPaid,
       fundHoldExtensionsByBitcoinExpirationHeight,
       createdAtArgonBlock,
@@ -750,7 +753,7 @@ export class BitcoinLock implements IBitcoinLock {
     tip?: bigint;
     feeCoupon?: BitcoinLockFeeCoupon;
     initializeForAccountId?: string;
-    backfillSecuritizationToUnreserve?: bigint;
+    securitizationSpaceToUnreserve?: bigint;
   }) {
     const {
       vault,
@@ -763,7 +766,7 @@ export class BitcoinLock implements IBitcoinLock {
       microgonsAtTargetPerBtc = null,
       feeCoupon,
       initializeForAccountId,
-      backfillSecuritizationToUnreserve = 0n,
+      securitizationSpaceToUnreserve = 0n,
     } = args;
     if (ownerBitcoinPubkey.length !== 33) {
       throw new Error(
@@ -775,6 +778,7 @@ export class BitcoinLock implements IBitcoinLock {
     }
 
     const supportsInitializeFor = this.supportsInitializeFor(client);
+    const supportsFeeCoupons = !supportsInitializeFor;
     const useInitializeFor = supportsInitializeFor && initializeForAccountId !== undefined;
 
     let tx: SubmittableExtrinsic;
@@ -789,10 +793,10 @@ export class BitcoinLock implements IBitcoinLock {
             microgonsAtTargetPerBtc,
           },
         },
-        backfillSecuritizationToUnreserve,
+        securitizationSpaceToUnreserve,
       );
     } else {
-      if (supportsInitializeFor && feeCoupon) {
+      if (!supportsFeeCoupons && feeCoupon) {
         throw new Error('The connected runtime does not support Bitcoin lock fee coupons');
       }
       if (initializeForAccountId !== undefined && !feeCoupon) {
@@ -987,7 +991,7 @@ export interface IBitcoinLock {
   openClaimHeight: number;
   createdAtHeight: number;
   isFunded: boolean;
-  isBackfill: boolean;
+  isFlexible: boolean;
   createdAtArgonBlock: number;
   fundHoldExtensionsByBitcoinExpirationHeight: Record<number, bigint>;
 }
