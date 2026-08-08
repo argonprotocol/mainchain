@@ -119,10 +119,6 @@ where
 	#[cfg(feature = "try-runtime")]
 	fn pre_upgrade() -> Result<Vec<u8>, TryRuntimeError> {
 		ensure!(
-			StorageVersion::get::<Pallet<T>>() == 16,
-			TryRuntimeError::Other("vault storage version must be 16 before profile migration"),
-		);
-		ensure!(
 			StorageVersion::get::<pallet_operational_accounts::Pallet<T>>() == 3,
 			TryRuntimeError::Other(
 				"operational account storage version must be 3 before profile migration",
@@ -236,26 +232,14 @@ where
 			})
 		});
 
-		frame_support::traits::StorageVersion::new(17).put::<Pallet<T>>();
 		T::DbWeight::get().reads_writes(
 			operational_account_count.saturating_add(vault_count.saturating_mul(3)),
-			operational_account_count
-				.saturating_add(vault_count.saturating_mul(2))
-				.saturating_add(1),
+			operational_account_count.saturating_add(vault_count.saturating_mul(2)),
 		)
 	}
 
 	#[cfg(feature = "try-runtime")]
 	fn post_upgrade(state: Vec<u8>) -> Result<(), TryRuntimeError> {
-		ensure!(
-			StorageVersion::get::<Pallet<T>>() == 17,
-			TryRuntimeError::Other("vault storage version was not updated"),
-		);
-		ensure!(
-			StorageVersion::get::<pallet_operational_accounts::Pallet<T>>() == 4,
-			TryRuntimeError::Other("operational account storage version was not updated"),
-		);
-
 		let (expected_operational_account_count, expected_vault_count, expected_named_count) =
 			<(u64, u64, u64)>::decode(&mut state.as_slice())
 				.map_err(|_| TryRuntimeError::Other("could not decode profile migration state"))?;
@@ -289,17 +273,16 @@ where
 			!has_uncleared_access_code_progress,
 			TryRuntimeError::Other("access code progress was not reset"),
 		);
-
 		Ok(())
 	}
 }
 
 pub type MoveVaultNameToOperationalAccountProfileMigration<T> =
 	frame_support::migrations::VersionedMigration<
-		3,
-		4,
+		16,
+		17,
 		MoveVaultNameToOperationalAccountProfile<T>,
-		pallet_operational_accounts::Pallet<T>,
+		Pallet<T>,
 		<T as frame_system::Config>::DbWeight,
 	>;
 
@@ -307,7 +290,7 @@ pub type MoveVaultNameToOperationalAccountProfileMigration<T> =
 mod test {
 	use super::*;
 	use crate::mock::{new_test_ext, Test};
-	use frame_support::{assert_ok, traits::OnRuntimeUpgrade};
+	use frame_support::traits::OnRuntimeUpgrade;
 
 	mod operational_v3 {
 		use super::*;
@@ -403,12 +386,8 @@ mod test {
 			StorageVersion::new(16).put::<Pallet<Test>>();
 			StorageVersion::new(3).put::<pallet_operational_accounts::Pallet<Test>>();
 
-			let state = MoveVaultNameToOperationalAccountProfileMigration::<Test>::pre_upgrade()
-				.expect("pre-upgrade checks");
-			let _ = MoveVaultNameToOperationalAccountProfileMigration::<Test>::on_runtime_upgrade();
-			assert_ok!(MoveVaultNameToOperationalAccountProfileMigration::<Test>::post_upgrade(
-				state
-			));
+			MoveVaultNameToOperationalAccountProfileMigration::<Test>::try_on_runtime_upgrade(true)
+				.expect("runtime upgrade checks");
 
 			let account = pallet_operational_accounts::OperationalAccounts::<Test>::get(owner)
 				.expect("migrated operational account");
@@ -437,7 +416,7 @@ mod test {
 			assert_eq!(pending_terms.treasury_profit_sharing, Permill::from_percent(20));
 			assert_eq!(vault.operational_minimum_release_tick, Some(111));
 			assert_eq!(StorageVersion::get::<Pallet<Test>>(), 17);
-			assert_eq!(StorageVersion::get::<pallet_operational_accounts::Pallet<Test>>(), 4);
+			assert_eq!(StorageVersion::get::<pallet_operational_accounts::Pallet<Test>>(), 3);
 		});
 	}
 }

@@ -1003,8 +1003,10 @@ pub mod pallet {
 				operational_account,
 				T::MinimumUniswapTransfer::get(),
 			);
-			let has_account_bitcoin =
-				operational_account.account_bitcoin_amount >= T::MinimumBitcoin::get();
+			let has_account_bitcoin = Self::meets_amount_with_rounding_tolerance(
+				operational_account.account_bitcoin_amount,
+				T::MinimumBitcoin::get(),
+			);
 			let has_account_vault_bonds =
 				operational_account.account_vault_bond_amount >= T::MinimumBonds::get();
 
@@ -1017,8 +1019,10 @@ pub mod pallet {
 					operational_account,
 					T::OperationalMinimumUniswapTransfer::get(),
 				);
-			let has_vault_securitization = Self::vault_amount(operational_account) >=
-				T::OperationalMinimumVaultSecuritization::get();
+			let has_vault_securitization = Self::meets_amount_with_rounding_tolerance(
+				Self::vault_amount(operational_account),
+				T::OperationalMinimumVaultSecuritization::get(),
+			);
 			let has_mining_seats =
 				Self::mining_seat_count(operational_account) >= T::MiningSeatsForOperational::get();
 
@@ -1037,6 +1041,12 @@ pub mod pallet {
 				Self::deposit_event(Event::AccountMeetsMinimums { account: owner.clone() });
 			}
 			meets_minimums
+		}
+
+		fn meets_amount_with_rounding_tolerance(amount: T::Balance, minimum: T::Balance) -> bool {
+			let tolerance = T::Balance::from(MICROGONS_PER_ARGON);
+
+			amount >= minimum.saturating_sub(tolerance)
 		}
 
 		fn award_accrued_access_code(account: &mut OperationalAccount<T>) {
