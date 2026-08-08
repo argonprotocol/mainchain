@@ -247,7 +247,7 @@ fn reservation_uses_bond_space_without_counting_flexible_bonds_twice() {
 			origin(2),
 			1,
 			10,
-			Some(bonus_approval(1, 2, Permill::zero(), 1, 10, 1)),
+			Some(bonus_approval(1, 2, Permill::zero(), 1, 10, System::block_number(),)),
 		));
 		let vault_bonds = BondLotsByVault::<Test>::get(1);
 		assert_eq!(vault_bonds.flexible_bonds, 10);
