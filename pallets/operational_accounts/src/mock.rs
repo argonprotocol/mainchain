@@ -3,7 +3,7 @@ use argon_primitives::{
 	tick::Ticker,
 	vault::{BitcoinVaultProvider, RegistrationVaultData},
 	BitcoinLocksProvider, MiningSlotProvider, OperationalRewardsPayer, TickProvider,
-	TreasuryPoolProvider, UniswapTransferProvider, VotingSchedule,
+	TreasuryPoolProvider, UniswapTransferProvider, VotingSchedule, MICROGONS_PER_ARGON,
 };
 use frame_support::traits::{
 	fungible::{Inspect, Mutate},
@@ -92,10 +92,10 @@ parameter_types! {
 	pub const MaxAvailableAccessCodes: u32 = 2;
 	pub const MaxAccessCodeAwardsPerFrame: u32 = 2;
 	pub const MinimumUniswapTransfer: Balance = 250;
-	pub const MinimumBitcoin: Balance = 500;
+	pub const MinimumBitcoin: Balance = 2_000 * MICROGONS_PER_ARGON;
 	pub const MinimumBonds: Balance = 200;
 	pub const OperationalMinimumUniswapTransfer: Balance = 3_000;
-	pub const OperationalMinimumVaultSecuritization: Balance = 2_000;
+	pub const OperationalMinimumVaultSecuritization: Balance = 2_000 * MICROGONS_PER_ARGON;
 	pub const BitcoinLockSizeForAccessCode: Balance = 5_000;
 	pub const MiningSeatsForOperational: u32 = 2;
 	pub const MiningSeatsPerAccessCode: u32 = 5;

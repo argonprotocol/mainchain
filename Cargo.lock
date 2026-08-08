@@ -1279,6 +1279,7 @@ dependencies = [
  "pallet-mint",
  "pallet-notaries",
  "pallet-notebook",
+ "pallet-operational-accounts",
  "pallet-prelude",
  "pallet-price-index",
  "pallet-ticks",
