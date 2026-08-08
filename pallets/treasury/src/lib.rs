@@ -236,6 +236,17 @@ pub mod pallet {
 	pub type BondLotIdsByAccount<T: Config> =
 		StorageDoubleMap<_, Twox64Concat, T::AccountId, Twox64Concat, BondLotId, (), OptionQuery>;
 
+	#[pallet::storage]
+	pub type LastBonusApprovalNonceByVaultAndAccount<T: Config> = StorageDoubleMap<
+		_,
+		Twox64Concat,
+		VaultId,
+		Blake2_128Concat,
+		T::AccountId,
+		u64,
+		OptionQuery,
+	>;
+
 	/// Exact treasury bond backing reserved for crosschain minting authorities by account.
 	///
 	/// This is an exact microgon claim, not a mirror of the account's active whole-bond lots.
@@ -408,10 +419,12 @@ pub mod pallet {
 		BonusApprovalWrongAccount,
 		/// The bonus approval already expired.
 		BonusApprovalExpired,
-		/// The beneficiary already has a bond lot for this vault.
-		BonusApprovalExistingBondLot,
+		/// The bonus approval nonce has already been consumed or superseded.
+		BonusApprovalAlreadyUsed,
 		/// The bonus approval signature is invalid or unauthorized.
 		InvalidBonusApprovalSignature,
+		/// The approved bonus plus the vault's profit sharing exceeds 100%.
+		BonusApprovalExceedsProfitSharing,
 		/// The Argonot bond purchase did not beat the current active-set cutoff.
 		ArgonotBondPurchaseBelowCutoff,
 		/// The Argonot bond purchase would exceed the active circulation cap.
@@ -462,6 +475,10 @@ pub mod pallet {
 				current_frame_id,
 				bonus_approval.as_ref(),
 			)?;
+			ensure!(
+				sharing_percent.checked_add(&bonus_percent).is_some(),
+				Error::<T>::BonusApprovalExceedsProfitSharing
+			);
 			let backfill_bonds_to_unreserve = bonus_approval
 				.as_ref()
 				.map(|proof| proof.backfill_bonds_to_unreserve)
@@ -548,6 +565,13 @@ pub mod pallet {
 				bonds,
 			});
 			Self::update_account_vault_bond_total(&who)?;
+			if let Some(bonus_approval) = bonus_approval {
+				LastBonusApprovalNonceByVaultAndAccount::<T>::insert(
+					vault_id,
+					who,
+					bonus_approval.nonce,
+				);
+			}
 			Ok(())
 		}
 
@@ -876,20 +900,13 @@ pub mod pallet {
 				signed_by_operator || signed_by_delegate,
 				Error::<T>::InvalidBonusApprovalSignature
 			);
+			ensure!(
+				LastBonusApprovalNonceByVaultAndAccount::<T>::get(vault_id, beneficiary)
+					.is_none_or(|nonce| bonus_approval.nonce > nonce),
+				Error::<T>::BonusApprovalAlreadyUsed
+			);
 
-			for (bond_lot_id, ()) in BondLotIdsByAccount::<T>::iter_prefix(beneficiary) {
-				let bond_lot =
-					BondLotById::<T>::get(bond_lot_id).ok_or(Error::<T>::BondLotNotFound)?;
-				if matches!(
-					bond_lot.program,
-					BondProgram::Vault { vault_id: lot_vault_id, .. } if lot_vault_id == vault_id
-				) {
-					return Err(Error::<T>::BonusApprovalExistingBondLot);
-				}
-			}
-
-			Ok(T::TreasuryVaultProvider::get_vault_treasury_bonus_profit_sharing(vault_id)
-				.unwrap_or_default())
+			Ok(bonus_approval.bonus_percent)
 		}
 
 		/// Once the frame is complete, this fn distributes frame earnings to Argonot bond lots

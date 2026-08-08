@@ -19,7 +19,6 @@ fn benchmark_terms<T: Config>() -> VaultTerms<T::Balance> {
 		bitcoin_annual_percent_rate: FixedU128::from_rational(110u128, 100u128),
 		bitcoin_base_fee: 1_000u128.into(),
 		treasury_profit_sharing: Permill::from_percent(20),
-		treasury_bonus_profit_sharing: Permill::from_percent(10),
 	}
 }
 
@@ -166,7 +165,6 @@ mod benchmarks {
 			bitcoin_annual_percent_rate: FixedU128::from_rational(120u128, 100u128),
 			bitcoin_base_fee: 2_000u128.into(),
 			treasury_profit_sharing: Permill::from_percent(25),
-			treasury_bonus_profit_sharing: Permill::from_percent(5),
 		};
 
 		#[extrinsic_call]
