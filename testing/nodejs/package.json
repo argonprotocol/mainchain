@@ -13,8 +13,8 @@
   },
   "homepage": "https://github.com/argonprotocol/mainchain#readme",
   "scripts": {
-    "build": "yarn workspace @argonprotocol/ethereum-contracts run build && tsup",
-    "tsc": "yarn workspace @argonprotocol/ethereum-contracts run build && tsup",
+    "build": "yarn workspace @argonprotocol/mainchain run tsc && tsup",
+    "tsc": "yarn workspace @argonprotocol/mainchain run tsc && tsup",
     "watch": "tsup --watch",
     "typecheck": "tsc --noEmit -p tsconfig.test.json"
   },
