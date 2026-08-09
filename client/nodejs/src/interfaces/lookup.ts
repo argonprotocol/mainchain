@@ -469,9 +469,9 @@ export default {
       VaultBitcoinXpubChange: {
         vaultId: 'u32',
       },
-      BackfillSecuritizationReservedChanged: {
+      ReservedSecuritizationSpaceChanged: {
         vaultId: 'u32',
-        backfillSecuritizationReserved: 'u128',
+        reservedSecuritizationSpace: 'u128',
       },
       VaultRevenueUncollected: {
         vaultId: 'u32',
@@ -613,10 +613,10 @@ export default {
         newSatoshis: 'u64',
         accountId: 'AccountId32',
       },
-      BitcoinLockBackfillChanged: {
+      BitcoinLockFlexibleChanged: {
         utxoId: 'u64',
         vaultId: 'u32',
-        isBackfill: 'bool',
+        isFlexible: 'bool',
       },
     },
   },
@@ -1392,14 +1392,14 @@ export default {
         accountId: 'AccountId32',
         bonds: 'u32',
       },
-      BondLotBackfillChanged: {
+      BondLotFlexibilityChanged: {
         vaultId: 'u32',
         bondLotId: 'u64',
-        isBackfill: 'bool',
+        isFlexible: 'bool',
       },
-      BackfillBondsReservedChanged: {
+      ReservedBondSpaceChanged: {
         vaultId: 'u32',
-        backfillBondsReserved: 'u32',
+        reservedBondSpace: 'u32',
       },
       EncumberedBondMicrogonsBurned: {
         accountId: 'AccountId32',
@@ -2193,9 +2193,8 @@ export default {
       set_committed_argonots: {
         amount: 'Compact<u128>',
       },
-      set_backfill_securitization_reserved: {
-        vaultId: 'u32',
-        backfillSecuritizationReserved: 'u128',
+      set_reserved_securitization_space: {
+        reservedSecuritizationSpace: 'u128',
       },
     },
   },
@@ -2264,9 +2263,9 @@ export default {
         utxoId: 'u64',
         newSatoshis: 'Compact<u64>',
       },
-      set_as_backfill: {
+      set_flexible: {
         utxoId: 'u64',
-        isBackfill: 'bool',
+        isFlexible: 'bool',
       },
     },
   },
@@ -2296,7 +2295,7 @@ export default {
     genesisHash: 'H256',
     beneficiary: 'AccountId32',
     feeDiscount: 'Compact<u128>',
-    backfillSecuritizationToUnreserve: 'Compact<u128>',
+    securitizationSpaceToUnreserve: 'Compact<u128>',
     expiresAtFrame: 'Compact<u64>',
     nonce: 'Compact<u64>',
     signature: 'SpRuntimeMultiSignature',
@@ -2740,13 +2739,13 @@ export default {
       buy_argonot_bonds: {
         bonds: 'u32',
       },
-      set_bond_lot_as_backfill: {
+      set_bond_lot_flexible: {
         bondLotId: 'u64',
-        isBackfill: 'bool',
+        isFlexible: 'bool',
       },
-      set_backfill_bonds_reserved: {
+      set_reserved_bond_space: {
         vaultId: 'u32',
-        backfillBondsReserved: 'u32',
+        reservedBondSpace: 'u32',
       },
     },
   },
@@ -2758,7 +2757,7 @@ export default {
     beneficiary: 'AccountId32',
     bonusPercent: 'Compact<Permill>',
     expiresAtFrame: 'Compact<u64>',
-    backfillBondsToUnreserve: 'Compact<u32>',
+    bondSpaceToUnreserve: 'Compact<u32>',
     nonce: 'Compact<u64>',
     signature: 'SpRuntimeMultiSignature',
   },
@@ -3329,12 +3328,12 @@ export default {
     securitization: 'Compact<u128>',
     securitizationTarget: 'Compact<u128>',
     securitizationLocked: 'Compact<u128>',
-    backfillSecuritizationLocked: 'Compact<u128>',
-    backfillSecuritizationReserved: 'Compact<u128>',
+    flexibleSecuritizationLocked: 'Compact<u128>',
+    reservedSecuritizationSpace: 'Compact<u128>',
     securitizationPendingActivation: 'Compact<u128>',
     lockedSatoshis: 'Compact<u64>',
     securitizedSatoshis: 'Compact<u64>',
-    backfillSecuritizedSatoshis: 'Compact<u64>',
+    flexibleSecuritizedSatoshis: 'Compact<u64>',
     securitizationReleaseSchedule: 'BTreeMap<u64, u128>',
     securitizationRatio: 'Compact<u128>',
     isClosed: 'bool',
@@ -3449,7 +3448,7 @@ export default {
     createdAtHeight: 'Compact<u64>',
     utxoScriptPubkey: 'ArgonPrimitivesBitcoinBitcoinCosignScriptPubkey',
     isFunded: 'bool',
-    isBackfill: 'bool',
+    isFlexible: 'bool',
     fundHoldExtensions: 'BTreeMap<u64, u128>',
     createdAtArgonBlock: 'Compact<u32>',
   },
@@ -3934,9 +3933,9 @@ export default {
    * Lookup528: pallet_treasury::pallet::VaultCapital<T>
    **/
   PalletTreasuryVaultCapital: {
-    bondLotAllocations: 'Vec<PalletTreasuryBondLotAllocation>',
-    backfillBondsEligible: 'Compact<u32>',
-    backfillProrata: 'u128',
+    regularBondAllocations: 'Vec<PalletTreasuryBondLotAllocation>',
+    flexibleBondsEligible: 'Compact<u32>',
+    flexibleProrata: 'u128',
     eligibleBonds: 'Compact<u32>',
   },
   /**
@@ -3968,7 +3967,7 @@ export default {
     owner: 'AccountId32',
     program: 'PalletTreasuryBondProgram',
     bonds: 'Compact<u32>',
-    isBackfill: 'bool',
+    isFlexible: 'bool',
     createdFrameId: 'Compact<u64>',
     participatedFrames: 'Compact<u32>',
     lastFrameEarningsFrameId: 'Option<u64>',
@@ -3994,9 +3993,9 @@ export default {
    * Lookup543: pallet_treasury::pallet::VaultBondState<T>
    **/
   PalletTreasuryVaultBondState: {
-    bondLots: 'Vec<PalletTreasuryBondLotSummary>',
-    backfillBonds: 'Compact<u32>',
-    backfillBondsReserved: 'Compact<u32>',
+    regularBondLots: 'Vec<PalletTreasuryBondLotSummary>',
+    flexibleBonds: 'Compact<u32>',
+    reservedBondSpace: 'Compact<u32>',
   },
   /**
    * Lookup545: pallet_treasury::pallet::Error<T>
@@ -4012,7 +4011,7 @@ export default {
       'BondLotNotFound',
       'NotBondLotOwner',
       'BondLotAlreadyReleasing',
-      'BondPurchaseAboveSecurity',
+      'InsufficientBondSpace',
       'ActiveBondAmountBelowEncumberedBacking',
       'BonusApprovalWrongVault',
       'BonusApprovalWrongAccount',
@@ -4022,7 +4021,7 @@ export default {
       'BonusApprovalExceedsProfitSharing',
       'ArgonotBondPurchaseBelowCutoff',
       'ArgonotBondPurchaseAboveCap',
-      'BondLotNotEligibleForBackfill',
+      'BondLotCannotBeFlexible',
       'NoPermissions',
     ],
   },

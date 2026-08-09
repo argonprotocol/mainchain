@@ -83,11 +83,11 @@ parameter_types! {
 		securitization:  200_000_000_000,
 		securitization_target: 200_000_000_000,
 		securitization_locked: 0,
-		backfill_securitization_locked: 0,
-		backfill_securitization_reserved: 0,
+		flexible_securitization_locked: 0,
+		reserved_securitization_space: 0,
 		locked_satoshis: 0,
 		securitized_satoshis: 0,
-		backfill_securitized_satoshis: 0,
+		flexible_securitized_satoshis: 0,
 		terms: VaultTerms {
 			bitcoin_annual_percent_rate: FixedU128::from_float(0.1),
 			bitcoin_base_fee: 0,
@@ -297,19 +297,20 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 		let VaultLockRequest {
 			extension,
 			fee_discount,
-			is_backfill,
-			backfill_securitization_to_unreserve,
+			is_flexible,
+			securitization_space_to_unreserve,
 			..
 		} = request;
 		let is_operator = DefaultVault::get().operator_account_id == *locker;
+		let may_use_flexible_space = !is_operator;
 		let term = extension.as_ref().map(|(a, _)| *a).unwrap_or(FixedU128::one());
 		DefaultVault::mutate(|a| {
 			if let Some((_, lock_extension)) = extension {
-				a.extend_lock(securitization, lock_extension, is_backfill)
+				a.extend_lock(securitization, lock_extension, is_flexible, may_use_flexible_space)
 			} else {
-				a.backfill_securitization_reserved
-					.saturating_reduce(backfill_securitization_to_unreserve);
-				a.lock(securitization, is_operator)
+				a.reserved_securitization_space
+					.saturating_reduce(securitization_space_to_unreserve);
+				a.lock(securitization, may_use_flexible_space)
 			}
 		})?;
 		let terms = DefaultVault::get().terms.clone();
@@ -337,10 +338,10 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 		securitization: &Securitization<Balance>,
 		satoshis: Satoshis,
 		lock_extensions: &LockExtension<Self::Balance>,
-		is_backfill: bool,
+		is_flexible: bool,
 	) -> Result<(), VaultError> {
 		DefaultVault::mutate(|a| {
-			a.schedule_for_release(securitization, satoshis, lock_extensions, is_backfill)
+			a.schedule_for_release(securitization, satoshis, lock_extensions, is_flexible)
 		})?;
 		Ok(())
 	}
@@ -352,10 +353,10 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 		satoshis: Satoshis,
 		market_rate: Self::Balance,
 		lock_extension: &LockExtension<Self::Balance>,
-		is_backfill: bool,
+		is_flexible: bool,
 	) -> Result<Self::Balance, VaultError> {
 		let result = DefaultVault::mutate(|a| {
-			a.burn(securitization, satoshis, market_rate, lock_extension, is_backfill)
+			a.burn(securitization, satoshis, market_rate, lock_extension, is_flexible)
 		})?;
 		Ok(result.burned_amount)
 	}
@@ -366,10 +367,10 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 		satoshis: Satoshis,
 		redemption_amount: Self::Balance,
 		lock_extension: &LockExtension<Self::Balance>,
-		is_backfill: bool,
+		is_flexible: bool,
 	) -> Result<Self::Balance, VaultError> {
 		let result = DefaultVault::mutate(|a| {
-			a.burn(securitization, satoshis, redemption_amount, lock_extension, is_backfill)
+			a.burn(securitization, satoshis, redemption_amount, lock_extension, is_flexible)
 		})?;
 		Ok(result.burned_amount)
 	}
@@ -467,25 +468,25 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 		Ok(())
 	}
 
-	fn get_projected_backfill_backing(
+	fn get_projected_flexible_securitization(
 		_vault_id: VaultId,
-		backfill_securitization_released: Self::Balance,
-		backfill_securitization_added: Self::Balance,
+		flexible_securitization_released: Self::Balance,
+		flexible_securitization_added: Self::Balance,
 	) -> Option<(Self::Balance, Self::Balance)> {
-		Some(DefaultVault::get().projected_backfill_backing(
-			backfill_securitization_released,
-			backfill_securitization_added,
+		Some(DefaultVault::get().projected_flexible_securitization(
+			flexible_securitization_released,
+			flexible_securitization_added,
 		))
 	}
 
-	fn set_bitcoin_lock_as_backfill(
+	fn set_bitcoin_lock_flexible(
 		_vault_id: VaultId,
 		securitization: &Securitization<Self::Balance>,
 		satoshis: Satoshis,
-		is_backfill: bool,
+		is_flexible: bool,
 	) -> Result<(), VaultError> {
 		DefaultVault::mutate(|vault| {
-			vault.set_bitcoin_lock_as_backfill(securitization, satoshis, is_backfill)
+			vault.set_bitcoin_lock_flexible(securitization, satoshis, is_flexible)
 		})
 	}
 }
@@ -601,11 +602,11 @@ pub fn new_test_ext() -> TestState {
 		securitization: 200_000_000_000,
 		securitization_target: 200_000_000_000,
 		securitization_locked: 0,
-		backfill_securitization_locked: 0,
-		backfill_securitization_reserved: 0,
+		flexible_securitization_locked: 0,
+		reserved_securitization_space: 0,
 		locked_satoshis: 0,
 		securitized_satoshis: 0,
-		backfill_securitized_satoshis: 0,
+		flexible_securitized_satoshis: 0,
 		terms: VaultTerms {
 			bitcoin_annual_percent_rate: FixedU128::from_float(0.1),
 			bitcoin_base_fee: 0,

@@ -19,9 +19,8 @@ pub mod weights;
 /// The Vaults pallet allows a user to fund BitcoinLocks for bitcoin holders. This allows them to
 /// participate in treasury pools. Vaults can define the number of Argons available for bitcoin
 /// locks and the terms of both bitcoin locks and treasury pools. A Treasury pool can accept bonded
-/// argons up to the greater of the vault's securitization or its effective Bitcoin-backed value.
-/// Bonds above the effective Bitcoin-backed value do not participate in frame earnings until that
-/// capacity grows.
+/// argons up to the effective Bitcoin-backed value. Existing bonds remain held if that value later
+/// falls, but only the currently Bitcoin-backed portion participates in frame earnings.
 ///
 /// ** Activated Securitization **
 /// A vault can create treasury pools up to 2x the locked securitization used for Bitcoin. This
@@ -259,9 +258,9 @@ pub mod pallet {
 		VaultBitcoinXpubChange {
 			vault_id: VaultId,
 		},
-		BackfillSecuritizationReservedChanged {
+		ReservedSecuritizationSpaceChanged {
 			vault_id: VaultId,
-			backfill_securitization_reserved: T::Balance,
+			reserved_securitization_space: T::Balance,
 		},
 		/// Vault revenue was not collected within the required window, so has been burned
 		VaultRevenueUncollected {
@@ -553,11 +552,11 @@ pub mod pallet {
 				securitization,
 				securitization_target: securitization,
 				securitization_locked: 0u32.into(),
-				backfill_securitization_locked: 0u32.into(),
-				backfill_securitization_reserved: 0u32.into(),
+				flexible_securitization_locked: 0u32.into(),
+				reserved_securitization_space: 0u32.into(),
 				locked_satoshis: 0,
 				securitized_satoshis: 0,
-				backfill_securitized_satoshis: 0,
+				flexible_securitized_satoshis: 0,
 				terms,
 				securitization_ratio,
 				opened_tick,
@@ -864,22 +863,22 @@ pub mod pallet {
 		}
 
 		#[pallet::call_index(9)]
-		#[pallet::weight(T::WeightInfo::set_backfill_securitization_reserved())]
-		pub fn set_backfill_securitization_reserved(
+		#[pallet::weight(T::WeightInfo::set_reserved_securitization_space())]
+		/// Reserve vault securitization space for future Bitcoin locks.
+		pub fn set_reserved_securitization_space(
 			origin: OriginFor<T>,
-			vault_id: VaultId,
-			backfill_securitization_reserved: T::Balance,
+			reserved_securitization_space: T::Balance,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
+			let vault_id = VaultIdByOperator::<T>::get(&who).ok_or(Error::<T>::VaultNotFound)?;
 			VaultsById::<T>::try_mutate(vault_id, |vault| {
 				let vault = vault.as_mut().ok_or(Error::<T>::VaultNotFound)?;
-				ensure!(vault.operator_account_id == who, Error::<T>::NoPermissions);
-				vault.set_backfill_securitization_reserved(backfill_securitization_reserved)?;
+				vault.set_reserved_securitization_space(reserved_securitization_space)?;
 				Ok::<(), Error<T>>(())
 			})?;
-			Self::deposit_event(Event::BackfillSecuritizationReservedChanged {
+			Self::deposit_event(Event::ReservedSecuritizationSpaceChanged {
 				vault_id,
-				backfill_securitization_reserved,
+				reserved_securitization_space,
 			});
 			Ok(())
 		}
@@ -1038,7 +1037,9 @@ pub mod pallet {
 		fn shrink_vault_securitization(
 			vault: &mut Vault<T::AccountId, T::Balance>,
 		) -> Result<(), VaultError> {
-			let uninhibited_securitization = vault.uninhibited_securitization();
+			let uninhibited_securitization = vault
+				.uninhibited_securitization()
+				.min(vault.available_securitization_space(true));
 			let minimum_remaining_securitization =
 				vault.securitization_target.max(Self::minimum_reducible_securitization_at_tick(
 					vault,
@@ -1512,28 +1513,28 @@ pub mod pallet {
 			})
 		}
 
-		fn get_projected_backfill_backing(
+		fn get_projected_flexible_securitization(
 			vault_id: VaultId,
-			backfill_securitization_released: Self::Balance,
-			backfill_securitization_added: Self::Balance,
+			flexible_securitization_released: Self::Balance,
+			flexible_securitization_added: Self::Balance,
 		) -> Option<(Self::Balance, Self::Balance)> {
 			VaultsById::<T>::get(vault_id).map(|vault| {
-				vault.projected_backfill_backing(
-					backfill_securitization_released,
-					backfill_securitization_added,
+				vault.projected_flexible_securitization(
+					flexible_securitization_released,
+					flexible_securitization_added,
 				)
 			})
 		}
 
-		fn set_bitcoin_lock_as_backfill(
+		fn set_bitcoin_lock_flexible(
 			vault_id: VaultId,
 			securitization: &Securitization<Self::Balance>,
 			satoshis: Satoshis,
-			is_backfill: bool,
+			is_flexible: bool,
 		) -> Result<(), VaultError> {
 			VaultsById::<T>::try_mutate(vault_id, |maybe_vault| {
 				let vault = maybe_vault.as_mut().ok_or(VaultError::VaultNotFound)?;
-				vault.set_bitcoin_lock_as_backfill(securitization, satoshis, is_backfill)
+				vault.set_bitcoin_lock_flexible(securitization, satoshis, is_flexible)
 			})
 		}
 
@@ -1547,12 +1548,13 @@ pub mod pallet {
 				satoshis,
 				extension,
 				fee_discount,
-				is_backfill,
-				backfill_securitization_to_unreserve,
+				is_flexible,
+				securitization_space_to_unreserve,
 			} = request;
 			let mut vault =
 				VaultsById::<T>::get(vault_id).ok_or::<VaultError>(VaultError::VaultNotFound)?;
 			let is_operator = vault.operator_account_id == *account_id;
+			let may_use_flexible_space = !is_operator;
 			ensure!(
 				vault.opened_tick <= T::TickProvider::current_tick(),
 				VaultError::VaultNotYetActive
@@ -1612,12 +1614,17 @@ pub mod pallet {
 				// locks must be held for a minimum of a year, so when we are looking to re-use
 				// locked funds, they must be getting a new expiration of > 1 year from their
 				// original date
-				vault.extend_lock(securitization, extension, is_backfill)?;
+				vault.extend_lock(
+					securitization,
+					extension,
+					is_flexible,
+					may_use_flexible_space,
+				)?;
 			} else {
 				vault
-					.backfill_securitization_reserved
-					.saturating_reduce(backfill_securitization_to_unreserve);
-				vault.lock(securitization, is_operator)?;
+					.reserved_securitization_space
+					.saturating_reduce(securitization_space_to_unreserve);
+				vault.lock(securitization, may_use_flexible_space)?;
 			}
 
 			Self::deposit_event(Event::FundsLocked {
@@ -1637,7 +1644,7 @@ pub mod pallet {
 			securitization: &Securitization<Self::Balance>,
 			satoshis: Satoshis,
 			lock_extension: &LockExtension<T::Balance>,
-			is_backfill: bool,
+			is_flexible: bool,
 		) -> Result<(), VaultError> {
 			Self::update_vault_bitcoin_metrics(BitcoinLockUpdate {
 				vault_id,
@@ -1655,7 +1662,7 @@ pub mod pallet {
 				securitization,
 				satoshis,
 				lock_extension,
-				is_backfill,
+				is_flexible,
 			)?;
 			Self::track_vault_release_schedule(vault_id, &mut vault, release_heights)?;
 			VaultsById::<T>::insert(vault_id, vault);
@@ -1681,12 +1688,12 @@ pub mod pallet {
 			satoshis: Satoshis,
 			market_rate: Self::Balance,
 			lock_extension: &LockExtension<T::Balance>,
-			is_backfill: bool,
+			is_flexible: bool,
 		) -> Result<Self::Balance, VaultError> {
 			let mut vault = VaultsById::<T>::get(vault_id).ok_or(VaultError::VaultNotFound)?;
 
 			let burn_result =
-				vault.burn(securitization, satoshis, market_rate, lock_extension, is_backfill)?;
+				vault.burn(securitization, satoshis, market_rate, lock_extension, is_flexible)?;
 
 			let securitized_amount = burn_result.burned_amount;
 			Self::track_vault_release_schedule(vault_id, &mut vault, burn_result.release_heights)?;
@@ -1735,12 +1742,12 @@ pub mod pallet {
 			satoshis: Satoshis,
 			market_rate: T::Balance,
 			lock_extension: &LockExtension<T::Balance>,
-			is_backfill: bool,
+			is_flexible: bool,
 		) -> Result<T::Balance, VaultError> {
 			let mut vault = VaultsById::<T>::get(vault_id).ok_or(VaultError::VaultNotFound)?;
 
 			let burn_result =
-				vault.burn(securitization, satoshis, market_rate, lock_extension, is_backfill)?;
+				vault.burn(securitization, satoshis, market_rate, lock_extension, is_flexible)?;
 
 			let burn_amount = burn_result.burned_amount;
 			Self::track_vault_release_schedule(vault_id, &mut vault, burn_result.release_heights)?;

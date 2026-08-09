@@ -416,10 +416,10 @@ declare module '@polkadot/api-base/types/submittable' {
         ) => SubmittableExtrinsic<ApiType>,
         [u64, Bytes, u64]
       >;
-      setAsBackfill: AugmentedSubmittable<
+      setFlexible: AugmentedSubmittable<
         (
           utxoId: u64 | AnyNumber | Uint8Array,
-          isBackfill: bool | boolean | Uint8Array,
+          isFlexible: bool | boolean | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
         [u64, bool]
       >;
@@ -2052,7 +2052,7 @@ declare module '@polkadot/api-base/types/submittable' {
                 beneficiary?: any;
                 bonusPercent?: any;
                 expiresAtFrame?: any;
-                backfillBondsToUnreserve?: any;
+                bondSpaceToUnreserve?: any;
                 nonce?: any;
                 signature?: any;
               }
@@ -2069,19 +2069,22 @@ declare module '@polkadot/api-base/types/submittable' {
         (bondLotId: u64 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>,
         [u64]
       >;
-      setBackfillBondsReserved: AugmentedSubmittable<
-        (
-          vaultId: u32 | AnyNumber | Uint8Array,
-          backfillBondsReserved: u32 | AnyNumber | Uint8Array,
-        ) => SubmittableExtrinsic<ApiType>,
-        [u32, u32]
-      >;
-      setBondLotAsBackfill: AugmentedSubmittable<
+      setBondLotFlexible: AugmentedSubmittable<
         (
           bondLotId: u64 | AnyNumber | Uint8Array,
-          isBackfill: bool | boolean | Uint8Array,
+          isFlexible: bool | boolean | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
         [u64, bool]
+      >;
+      /**
+       * Reserve vault bond space for future bond purchases.
+       **/
+      setReservedBondSpace: AugmentedSubmittable<
+        (
+          vaultId: u32 | AnyNumber | Uint8Array,
+          reservedBondSpace: u32 | AnyNumber | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [u32, u32]
       >;
     };
     txPause: {
@@ -2360,13 +2363,6 @@ declare module '@polkadot/api-base/types/submittable' {
         ) => SubmittableExtrinsic<ApiType>,
         [u32, ArgonPrimitivesBitcoinOpaqueBitcoinXpub]
       >;
-      setBackfillSecuritizationReserved: AugmentedSubmittable<
-        (
-          vaultId: u32 | AnyNumber | Uint8Array,
-          backfillSecuritizationReserved: u128 | AnyNumber | Uint8Array,
-        ) => SubmittableExtrinsic<ApiType>,
-        [u32, u128]
-      >;
       setCommittedArgonots: AugmentedSubmittable<
         (amount: Compact<u128> | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>,
         [Compact<u128>]
@@ -2376,6 +2372,15 @@ declare module '@polkadot/api-base/types/submittable' {
           delegateAccountId: Option<AccountId32> | null | Uint8Array | AccountId32 | string,
         ) => SubmittableExtrinsic<ApiType>,
         [Option<AccountId32>]
+      >;
+      /**
+       * Reserve vault securitization space for future Bitcoin locks.
+       **/
+      setReservedSecuritizationSpace: AugmentedSubmittable<
+        (
+          reservedSecuritizationSpace: u128 | AnyNumber | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [u128]
       >;
     };
   } // AugmentedSubmittables

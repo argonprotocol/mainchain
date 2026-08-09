@@ -186,19 +186,19 @@ where
 		Err(VaultError::VaultNotFound)
 	}
 
-	fn get_projected_backfill_backing(
+	fn get_projected_flexible_securitization(
 		_vault_id: VaultId,
-		_backfill_securitization_released: Self::Balance,
-		_backfill_securitization_added: Self::Balance,
+		_flexible_securitization_released: Self::Balance,
+		_flexible_securitization_added: Self::Balance,
 	) -> Option<(Self::Balance, Self::Balance)> {
 		None
 	}
 
-	fn set_bitcoin_lock_as_backfill(
+	fn set_bitcoin_lock_flexible(
 		_vault_id: VaultId,
 		_securitization: &Securitization<Self::Balance>,
 		_satoshis: argon_primitives::bitcoin::Satoshis,
-		_is_backfill: bool,
+		_is_flexible: bool,
 	) -> Result<(), VaultError> {
 		Err(VaultError::VaultNotFound)
 	}
@@ -217,7 +217,7 @@ where
 		_securitization: &Securitization<Self::Balance>,
 		_satoshis: argon_primitives::bitcoin::Satoshis,
 		_lock_extension: &LockExtension<Self::Balance>,
-		_is_backfill: bool,
+		_is_flexible: bool,
 	) -> Result<(), VaultError> {
 		Err(VaultError::VaultNotFound)
 	}
@@ -235,7 +235,7 @@ where
 		_satoshis: argon_primitives::bitcoin::Satoshis,
 		_market_rate: Self::Balance,
 		_lock_extension: &LockExtension<Self::Balance>,
-		_is_backfill: bool,
+		_is_flexible: bool,
 	) -> Result<Self::Balance, VaultError> {
 		Err(VaultError::VaultNotFound)
 	}
@@ -247,7 +247,7 @@ where
 		_satoshis: argon_primitives::bitcoin::Satoshis,
 		_market_rate: Self::Balance,
 		_lock_extension: &LockExtension<Self::Balance>,
-		_is_backfill: bool,
+		_is_flexible: bool,
 	) -> Result<Self::Balance, VaultError> {
 		Err(VaultError::VaultNotFound)
 	}

@@ -201,19 +201,19 @@ impl BitcoinVaultProvider for MockVaultProvider {
 		unimplemented!()
 	}
 
-	fn get_projected_backfill_backing(
+	fn get_projected_flexible_securitization(
 		_vault_id: VaultId,
-		_backfill_securitization_released: Self::Balance,
-		_backfill_securitization_added: Self::Balance,
+		_flexible_securitization_released: Self::Balance,
+		_flexible_securitization_added: Self::Balance,
 	) -> Option<(Self::Balance, Self::Balance)> {
 		unimplemented!()
 	}
 
-	fn set_bitcoin_lock_as_backfill(
+	fn set_bitcoin_lock_flexible(
 		_vault_id: VaultId,
 		_securitization: &argon_primitives::vault::Securitization<Self::Balance>,
 		_satoshis: argon_primitives::bitcoin::Satoshis,
-		_is_backfill: bool,
+		_is_flexible: bool,
 	) -> Result<(), argon_primitives::vault::VaultError> {
 		unimplemented!()
 	}
@@ -232,7 +232,7 @@ impl BitcoinVaultProvider for MockVaultProvider {
 		_securitization: &argon_primitives::vault::Securitization<Self::Balance>,
 		_satoshis: argon_primitives::bitcoin::Satoshis,
 		_lock_extension: &argon_primitives::vault::LockExtension<Self::Balance>,
-		_is_backfill: bool,
+		_is_flexible: bool,
 	) -> Result<(), argon_primitives::vault::VaultError> {
 		unimplemented!()
 	}
@@ -250,7 +250,7 @@ impl BitcoinVaultProvider for MockVaultProvider {
 		_satoshis: argon_primitives::bitcoin::Satoshis,
 		_market_rate: Self::Balance,
 		_lock_extension: &argon_primitives::vault::LockExtension<Self::Balance>,
-		_is_backfill: bool,
+		_is_flexible: bool,
 	) -> Result<Self::Balance, argon_primitives::vault::VaultError> {
 		unimplemented!()
 	}
@@ -262,7 +262,7 @@ impl BitcoinVaultProvider for MockVaultProvider {
 		_satoshis: argon_primitives::bitcoin::Satoshis,
 		_market_rate: Self::Balance,
 		_lock_extension: &argon_primitives::vault::LockExtension<Self::Balance>,
-		_is_backfill: bool,
+		_is_flexible: bool,
 	) -> Result<Self::Balance, argon_primitives::vault::VaultError> {
 		unimplemented!()
 	}

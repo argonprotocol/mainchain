@@ -252,7 +252,7 @@ impl<T: frame_system::Config> pallet_bitcoin_locks::WeightInfo for WeightInfo<T>
 	/// Proof: `BitcoinLocks::LocksByUtxoId` (`max_values`: None, `max_size`: Some(9109), added: 11584, mode: `MaxEncodedLen`)
 	/// Storage: `BitcoinLocks::LockReleaseRequestsByUtxoId` (r:1 w:0)
 	/// Proof: `BitcoinLocks::LockReleaseRequestsByUtxoId` (`max_values`: None, `max_size`: Some(95), added: 2570, mode: `MaxEncodedLen`)
-	fn set_as_backfill() -> Weight {
+	fn set_flexible() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `282`
 		//  Estimated: `12574`

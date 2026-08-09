@@ -16,7 +16,7 @@ pub trait WeightInfo {
 	fn close() -> Weight;
 	fn replace_bitcoin_xpub() -> Weight;
 	fn set_delegate_account() -> Weight;
-	fn set_backfill_securitization_reserved() -> Weight;
+	fn set_reserved_securitization_space() -> Weight;
 	fn set_committed_argonots() -> Weight;
 	fn on_initialize_with_vault_releases(
 		height_range: u32,
@@ -32,6 +32,7 @@ pub trait WeightInfo {
 	fn provider_release_encumbered_argonots() -> Weight;
 	fn provider_burn_encumbered_argonots() -> Weight;
 	fn provider_account_became_operational() -> Weight;
+	fn provider_set_bitcoin_lock_flexible() -> Weight;
 }
 
 type TickProviderWeights<T> = <<T as crate::Config>::TickProvider as TickProvider<
@@ -102,8 +103,8 @@ where
 		Base::set_delegate_account()
 	}
 
-	fn set_backfill_securitization_reserved() -> Weight {
-		Base::set_backfill_securitization_reserved()
+	fn set_reserved_securitization_space() -> Weight {
+		Base::set_reserved_securitization_space()
 	}
 
 	fn set_committed_argonots() -> Weight {
@@ -160,6 +161,10 @@ where
 		Base::provider_account_became_operational()
 			.saturating_add(TickProviderWeight::current_tick())
 	}
+
+	fn provider_set_bitcoin_lock_flexible() -> Weight {
+		Base::provider_set_bitcoin_lock_flexible()
+	}
 }
 
 pub struct ProviderWeightAdapter<T>(PhantomData<T>);
@@ -191,6 +196,10 @@ impl<T: crate::Config> BitcoinVaultProviderWeightInfo for ProviderWeightAdapter<
 	fn account_became_operational() -> Weight {
 		<T as crate::Config>::WeightInfo::provider_account_became_operational()
 	}
+
+	fn set_bitcoin_lock_flexible() -> Weight {
+		<T as crate::Config>::WeightInfo::provider_set_bitcoin_lock_flexible()
+	}
 }
 
 // For backwards compatibility and tests.
@@ -213,7 +222,7 @@ impl WeightInfo for () {
 	fn set_delegate_account() -> Weight {
 		Weight::zero()
 	}
-	fn set_backfill_securitization_reserved() -> Weight {
+	fn set_reserved_securitization_space() -> Weight {
 		Weight::zero()
 	}
 	fn set_committed_argonots() -> Weight {
@@ -257,6 +266,9 @@ impl WeightInfo for () {
 	}
 
 	fn provider_account_became_operational() -> Weight {
+		Weight::zero()
+	}
+	fn provider_set_bitcoin_lock_flexible() -> Weight {
 		Weight::zero()
 	}
 }

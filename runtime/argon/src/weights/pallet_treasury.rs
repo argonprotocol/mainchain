@@ -107,18 +107,18 @@ impl<T: frame_system::Config> pallet_treasury::WeightInfo for WeightInfo<T> {
 	/// Proof: `Treasury::BondLotById` (`max_values`: None, `max_size`: Some(131), added: 2606, mode: `MaxEncodedLen`)
 	/// Storage: `Treasury::BondLotsByVault` (r:1 w:1)
 	/// Proof: `Treasury::BondLotsByVault` (`max_values`: None, `max_size`: Some(1222), added: 3697, mode: `MaxEncodedLen`)
-	fn set_bond_lot_as_backfill() -> Weight {
+	fn set_bond_lot_flexible() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `177`
 		//  Estimated: `4687`
 		// Minimum execution time: 16_000_000 picoseconds.
-		Weight::from_parts(17_000_000, 4687)
+		Weight::from_parts(16_000_000, 4687)
 			.saturating_add(T::DbWeight::get().reads(2))
 			.saturating_add(T::DbWeight::get().writes(2))
 		}
 	/// Storage: `Treasury::BondLotsByVault` (r:1 w:1)
 	/// Proof: `Treasury::BondLotsByVault` (`max_values`: None, `max_size`: Some(1222), added: 3697, mode: `MaxEncodedLen`)
-	fn set_backfill_bonds_reserved() -> Weight {
+	fn set_reserved_bond_space() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `51`
 		//  Estimated: `4687`

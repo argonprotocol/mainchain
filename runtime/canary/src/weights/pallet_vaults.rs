@@ -130,15 +130,17 @@ impl<T: frame_system::Config> pallet_vaults::WeightInfo for WeightInfo<T> {
 			.saturating_add(T::DbWeight::get().reads(2))
 			.saturating_add(T::DbWeight::get().writes(1))
 		}
+	/// Storage: `Vaults::VaultIdByOperator` (r:1 w:0)
+	/// Proof: `Vaults::VaultIdByOperator` (`max_values`: None, `max_size`: Some(44), added: 2519, mode: `MaxEncodedLen`)
 	/// Storage: `Vaults::VaultsById` (r:1 w:1)
 	/// Proof: `Vaults::VaultsById` (`max_values`: None, `max_size`: Some(9135), added: 11610, mode: `MaxEncodedLen`)
-	fn set_backfill_securitization_reserved() -> Weight {
+	fn set_reserved_securitization_space() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `202`
 		//  Estimated: `12600`
 		// Minimum execution time: 10_000_000 picoseconds.
 		Weight::from_parts(10_000_000, 12600)
-			.saturating_add(T::DbWeight::get().reads(1))
+			.saturating_add(T::DbWeight::get().reads(2))
 			.saturating_add(T::DbWeight::get().writes(1))
 		}
 	/// Storage: `Vaults::VaultIdByOperator` (r:1 w:0)
@@ -286,6 +288,17 @@ impl<T: frame_system::Config> pallet_vaults::WeightInfo for WeightInfo<T> {
 		Weight::from_parts(12_000_000, 43483)
 			.saturating_add(T::DbWeight::get().reads(3))
 			.saturating_add(T::DbWeight::get().writes(2))
+		}
+	/// Storage: `Vaults::VaultsById` (r:1 w:1)
+	/// Proof: `Vaults::VaultsById` (`max_values`: None, `max_size`: Some(9106), added: 11581, mode: `MaxEncodedLen`)
+	fn provider_set_bitcoin_lock_flexible() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `197`
+		//  Estimated: `12571`
+		// Minimum execution time: 5_000_000 picoseconds.
+		Weight::from_parts(6_000_000, 12571)
+			.saturating_add(T::DbWeight::get().reads(1))
+			.saturating_add(T::DbWeight::get().writes(1))
 		}
 	/// Storage: `Vaults::RevenuePerFrameByVault` (r:101 w:100)
 	/// Proof: `Vaults::RevenuePerFrameByVault` (`max_values`: None, `max_size`: Some(2653), added: 5128, mode: `MaxEncodedLen`)

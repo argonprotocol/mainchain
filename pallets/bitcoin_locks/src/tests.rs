@@ -220,6 +220,7 @@ fn fee_coupon_must_match_the_lock_and_delegate_signature() {
 		System::set_block_number(1);
 		DefaultVault::mutate(|vault| vault.delegate_account_id = Some(9));
 		set_argons(2, 2_000_000);
+		let nonce = System::block_number();
 
 		let initialize = |coupon| {
 			BitcoinLocks::initialize(
@@ -234,30 +235,33 @@ fn fee_coupon_must_match_the_lock_and_delegate_signature() {
 			)
 		};
 
-		assert_err!(initialize(fee_coupon(3, 100, 0, 2, 1)), Error::<Test>::FeeCouponWrongAccount);
+		assert_err!(
+			initialize(fee_coupon(3, 100, 0, 2, nonce)),
+			Error::<Test>::FeeCouponWrongAccount
+		);
 
-		let mut wrong_vault = fee_coupon(2, 100, 0, 2, 1);
+		let mut wrong_vault = fee_coupon(2, 100, 0, 2, nonce);
 		wrong_vault.vault_id = 2;
 		assert_err!(initialize(wrong_vault), Error::<Test>::FeeCouponWrongVault);
 
-		let mut wrong_chain = fee_coupon(2, 100, 0, 2, 1);
+		let mut wrong_chain = fee_coupon(2, 100, 0, 2, nonce);
 		wrong_chain.genesis_hash = polkadot_sdk::sp_core::H256::repeat_byte(1);
 		assert_err!(initialize(wrong_chain), Error::<Test>::FeeCouponWrongChain);
 
-		let mut invalid_signature = fee_coupon(2, 100, 0, 2, 1);
+		let mut invalid_signature = fee_coupon(2, 100, 0, 2, nonce);
 		invalid_signature.signature = polkadot_sdk::sp_runtime::testing::TestSignature(8, vec![]);
 		assert_err!(initialize(invalid_signature), Error::<Test>::InvalidFeeCouponSignature);
 
-		let mut tampered_discount = fee_coupon(2, 100, 0, 2, 1);
+		let mut tampered_discount = fee_coupon(2, 100, 0, 2, nonce);
 		tampered_discount.fee_discount += 1;
 		assert_err!(initialize(tampered_discount), Error::<Test>::InvalidFeeCouponSignature);
 
-		let mut tampered_backfill = fee_coupon(2, 100, 100, 2, 1);
-		tampered_backfill.backfill_securitization_to_unreserve += 1;
-		assert_err!(initialize(tampered_backfill), Error::<Test>::InvalidFeeCouponSignature);
+		let mut tampered_flexible = fee_coupon(2, 100, 100, 2, nonce);
+		tampered_flexible.securitization_space_to_unreserve += 1;
+		assert_err!(initialize(tampered_flexible), Error::<Test>::InvalidFeeCouponSignature);
 
 		CurrentFrameId::set(3);
-		assert_err!(initialize(fee_coupon(2, 100, 0, 2, 1)), Error::<Test>::FeeCouponExpired);
+		assert_err!(initialize(fee_coupon(2, 100, 0, 2, nonce)), Error::<Test>::FeeCouponExpired);
 	});
 }
 
@@ -306,7 +310,7 @@ fn fee_coupon_cannot_be_reused() {
 }
 
 #[test]
-fn fee_coupon_unreserves_backfill_securitization_atomically() {
+fn fee_coupon_unreserves_securitization_space_atomically() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		let satoshis = SATOSHIS_PER_BITCOIN;
@@ -326,11 +330,11 @@ fn fee_coupon_unreserves_backfill_securitization_atomically() {
 			None,
 		));
 		assert_ok!(BitcoinLocks::funding_received(1, satoshis));
-		assert_ok!(BitcoinLocks::set_as_backfill(RuntimeOrigin::signed(1), 1, true));
+		assert_ok!(BitcoinLocks::set_flexible(RuntimeOrigin::signed(1), 1, true));
 		DefaultVault::mutate(|vault| {
 			vault
-				.set_backfill_securitization_reserved(required_collateral)
-				.expect("reserve backfill");
+				.set_reserved_securitization_space(required_collateral)
+				.expect("reserve securitization space");
 		});
 
 		assert_noop!(
@@ -354,18 +358,18 @@ fn fee_coupon_unreserves_backfill_securitization_atomically() {
 				fee_coupon: Some(fee_coupon(2, 0, required_collateral.saturating_mul(2), 2, 1,)),
 			}),
 		));
-		assert_eq!(DefaultVault::get().backfill_securitization_reserved, 0);
+		assert_eq!(DefaultVault::get().reserved_securitization_space, 0);
 		assert_eq!(LocksByUtxoId::<Test>::get(2).expect("new lock").owner_account, 2);
 		assert_noop!(
-			BitcoinLocks::set_as_backfill(RuntimeOrigin::signed(1), 1, false),
+			BitcoinLocks::set_flexible(RuntimeOrigin::signed(1), 1, false),
 			Error::<Test>::InsufficientVaultFunds
 		);
-		assert!(LocksByUtxoId::<Test>::get(1).expect("backfill lock").is_backfill);
+		assert!(LocksByUtxoId::<Test>::get(1).expect("flexible lock").is_flexible);
 	});
 }
 
 #[test]
-fn set_as_backfill_rejects_a_missing_vault() {
+fn set_flexible_rejects_a_missing_vault() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		set_argons(1, 100_000 * MICROGONS_PER_ARGON);
@@ -382,7 +386,7 @@ fn set_as_backfill_rejects_a_missing_vault() {
 		});
 
 		assert_noop!(
-			BitcoinLocks::set_as_backfill(RuntimeOrigin::signed(1), 1, true),
+			BitcoinLocks::set_flexible(RuntimeOrigin::signed(1), 1, true),
 			Error::<Test>::VaultNotFound
 		);
 	});
@@ -1678,7 +1682,7 @@ fn it_should_allow_a_ratchet_up() {
 			a.terms.bitcoin_base_fee = 1000;
 			a.terms.bitcoin_annual_percent_rate = apr;
 
-			a.lock(&securitization, false).unwrap();
+			a.lock(&securitization, true).unwrap();
 			a.remove_pending_activation(&securitization);
 		});
 		set_argons(who, 5000);
@@ -1755,7 +1759,7 @@ fn it_should_charge_ratchet_up_fee_for_remaining_lock_term() {
 			a.terms.bitcoin_base_fee = 1000;
 			a.terms.bitcoin_annual_percent_rate = apr;
 
-			a.lock(&securitization, false).unwrap();
+			a.lock(&securitization, true).unwrap();
 			a.remove_pending_activation(&securitization);
 		});
 		set_argons(who, 5000);
@@ -1812,7 +1816,7 @@ fn it_should_charge_early_ratchet_up_fee_for_remaining_lock_term() {
 			a.terms.bitcoin_base_fee = base_fee;
 			a.terms.bitcoin_annual_percent_rate = apr;
 
-			a.lock(&securitization, false).unwrap();
+			a.lock(&securitization, true).unwrap();
 			a.remove_pending_activation(&securitization);
 		});
 		set_argons(who, 1_000_000 * MICROGONS_PER_ARGON);
@@ -1929,7 +1933,7 @@ fn it_should_allow_a_ratchet_down() {
 }
 
 #[test]
-fn backfill_ratchet_requires_full_aggregate_backing() {
+fn flexible_ratchet_requires_all_flexible_securitization_to_be_undisplaced() {
 	new_test_ext().execute_with(|| {
 		set_bitcoin_height(1);
 		System::set_block_number(1);
@@ -1954,11 +1958,7 @@ fn backfill_ratchet_requires_full_aggregate_backing() {
 				None,
 			));
 			assert_ok!(BitcoinLocks::funding_received(utxo_id, satoshis));
-			assert_ok!(BitcoinLocks::set_as_backfill(
-				RuntimeOrigin::signed(operator),
-				utxo_id,
-				true,
-			));
+			assert_ok!(BitcoinLocks::set_flexible(RuntimeOrigin::signed(operator), utxo_id, true,));
 		}
 		assert_ok!(BitcoinLocks::initialize(
 			RuntimeOrigin::signed(joiner),
@@ -1968,7 +1968,7 @@ fn backfill_ratchet_requires_full_aggregate_backing() {
 			None,
 		));
 		assert_eq!(
-			DefaultVault::get().backfill_securitization_backed(),
+			DefaultVault::get().undisplaced_flexible_securitization(),
 			31_000 * MICROGONS_PER_ARGON,
 		);
 
@@ -2209,7 +2209,7 @@ fn it_should_record_btc_history() {
 fn fee_coupon(
 	beneficiary: u64,
 	fee_discount: Balance,
-	backfill_securitization_to_unreserve: Balance,
+	securitization_space_to_unreserve: Balance,
 	expires_at_frame: FrameId,
 	nonce: u64,
 ) -> FeeCoupon<Test> {
@@ -2220,7 +2220,7 @@ fn fee_coupon(
 		1u32,
 		beneficiary,
 		fee_discount,
-		backfill_securitization_to_unreserve,
+		securitization_space_to_unreserve,
 		expires_at_frame,
 		nonce,
 	)
@@ -2230,7 +2230,7 @@ fn fee_coupon(
 		genesis_hash,
 		beneficiary,
 		fee_discount,
-		backfill_securitization_to_unreserve,
+		securitization_space_to_unreserve,
 		expires_at_frame,
 		nonce,
 		signature: polkadot_sdk::sp_runtime::testing::TestSignature(9, message.to_vec()),

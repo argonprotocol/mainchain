@@ -159,7 +159,7 @@ describe('BitcoinLock.createInitializeTx', () => {
       satoshis: 50_000_000n,
       txSigner: { address: 'vault-delegate', signer: {} as any },
       initializeForAccountId: 'lock-owner',
-      backfillSecuritizationToUnreserve: 20_000n,
+      securitizationSpaceToUnreserve: 20_000n,
     });
 
     expect(initializeFor).toHaveBeenCalledWith(
@@ -195,7 +195,7 @@ describe('BitcoinLock.createInitializeTx', () => {
       genesisHash: '0x00',
       beneficiary: 'lock-owner',
       feeDiscount: 40_000n,
-      backfillSecuritizationToUnreserve: 0n,
+      securitizationSpaceToUnreserve: 0n,
       expiresAtFrame: 10n,
       nonce: 1n,
       signature: {} as any,
@@ -266,7 +266,7 @@ describe('BitcoinLock.createInitializeTx', () => {
       genesisHash: '0x00',
       beneficiary: 'lock-owner',
       feeDiscount: 40_000n,
-      backfillSecuritizationToUnreserve: 0n,
+      securitizationSpaceToUnreserve: 0n,
       expiresAtFrame: 10n,
       nonce: 1n,
       signature: {} as any,
@@ -320,7 +320,7 @@ describe('BitcoinLock.createInitializeTx', () => {
         genesisHash: '0x00',
         beneficiary: 'lock-owner',
         feeDiscount: 200_000n,
-        backfillSecuritizationToUnreserve: 0n,
+        securitizationSpaceToUnreserve: 0n,
         expiresAtFrame: 10n,
         nonce: 1n,
         signature: {} as any,

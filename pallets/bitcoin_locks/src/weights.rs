@@ -17,6 +17,7 @@ use super::Config;
 use argon_primitives::providers::{
 	BitcoinLocksProviderWeightInfo, BitcoinUtxoEventsWeightInfo, UtxoLockEvents,
 };
+use argon_primitives::vault::{BitcoinVaultProvider, BitcoinVaultProviderWeightInfo};
 use argon_primitives::UtxoLockEventsWeightInfo;
 use pallet_prelude::*;
 
@@ -59,7 +60,7 @@ pub trait WeightInfo {
 	fn request_orphaned_utxo_release() -> Weight;
 	fn cosign_orphaned_utxo_release() -> Weight;
 	fn increase_securitization() -> Weight;
-	fn set_as_backfill() -> Weight;
+	fn set_flexible() -> Weight;
 
 	fn provider_get_account_funded_bitcoin_amount() -> Weight;
 	// Bitcoin UTXO event handler provider weights
@@ -75,6 +76,7 @@ type LockEventWeights<T> = <<T as Config>::LockEvents as UtxoLockEvents<
 	<T as frame_system::Config>::AccountId,
 	<T as Config>::Balance,
 >>::Weights;
+type VaultProviderWeights<T> = <<T as Config>::VaultProvider as BitcoinVaultProvider>::Weights;
 
 /// Placeholder implementation for tests and no-std environments
 pub struct SubstrateWeight<T>(PhantomData<T>);
@@ -140,8 +142,8 @@ where
 		Base::increase_securitization()
 	}
 
-	fn set_as_backfill() -> Weight {
-		Base::set_as_backfill()
+	fn set_flexible() -> Weight {
+		Base::set_flexible().saturating_add(VaultProviderWeights::<T>::set_bitcoin_lock_flexible())
 	}
 
 	fn provider_get_account_funded_bitcoin_amount() -> Weight {
@@ -221,7 +223,7 @@ impl WeightInfo for () {
 	fn request_orphaned_utxo_release() -> Weight { Weight::zero() }
 	fn cosign_orphaned_utxo_release() -> Weight { Weight::zero() }
 	fn increase_securitization() -> Weight { Weight::zero() }
-	fn set_as_backfill() -> Weight { Weight::zero() }
+	fn set_flexible() -> Weight { Weight::zero() }
 	fn provider_get_account_funded_bitcoin_amount() -> Weight { Weight::zero() }
 	fn provider_funding_received() -> Weight { Weight::zero() }
 	fn provider_timeout_waiting_for_funding() -> Weight { Weight::zero() }

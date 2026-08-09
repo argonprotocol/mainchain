@@ -1272,17 +1272,13 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       BondLotAlreadyReleasing: AugmentedError<ApiType>;
       /**
-       * Only an active vault bond owned by its operator can be used as backfill.
+       * Only an active vault bond owned by its operator can be used as flexible.
        **/
-      BondLotNotEligibleForBackfill: AugmentedError<ApiType>;
+      BondLotCannotBeFlexible: AugmentedError<ApiType>;
       /**
        * The bond lot could not be found.
        **/
       BondLotNotFound: AugmentedError<ApiType>;
-      /**
-       * The vault doesn't have enough bitcoin security to support this bond purchase
-       **/
-      BondPurchaseAboveSecurity: AugmentedError<ApiType>;
       /**
        * The purchase is below the minimum amount.
        **/
@@ -1311,6 +1307,10 @@ declare module '@polkadot/api-base/types/errors' {
        * The bonus approval was signed for a different vault.
        **/
       BonusApprovalWrongVault: AugmentedError<ApiType>;
+      /**
+       * The vault doesn't have enough bitcoin security to support this bond purchase
+       **/
+      InsufficientBondSpace: AugmentedError<ApiType>;
       /**
        * An internal error occurred.
        **/
