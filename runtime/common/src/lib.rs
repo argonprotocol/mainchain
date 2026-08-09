@@ -157,6 +157,9 @@ macro_rules! inject_runtime_vars {
 		/// This can be a tuple of types, each implementing `OnRuntimeUpgrade`.
 		type Migrations = (
 			pallet_vaults::migrations::MoveVaultNameToOperationalAccountProfileMigration<Runtime>,
+			pallet_operational_accounts::migrations::ReconcileAccountBitcoinAmountsMigration<
+				Runtime,
+			>,
 		);
 
 		/// Unchecked extrinsic type as expected by this runtime.

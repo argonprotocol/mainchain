@@ -70,6 +70,7 @@ pallet-fee-control = { workspace = true }
 pallet-treasury = { workspace = true }
 pallet-mining-slot = { workspace = true }
 pallet-price-index = { workspace = true }
+pallet-operational-accounts = { workspace = true }
 pallet-ticks = { workspace = true }
 pallet-mint = { workspace = true }
 pallet-vaults = { workspace = true }
@@ -102,6 +103,7 @@ std = [
 	"pallet-mint/std",
 	"pallet-notaries/std",
 	"pallet-notebook/std",
+	"pallet-operational-accounts/std",
 	"pallet-prelude/std",
 	"pallet-price-index/std",
 	"pallet-ticks/std",
@@ -128,6 +130,7 @@ runtime-benchmarks = [
 	"pallet-mint/runtime-benchmarks",
 	"pallet-notaries/runtime-benchmarks",
 	"pallet-notebook/runtime-benchmarks",
+	"pallet-operational-accounts/runtime-benchmarks",
 	"pallet-prelude/runtime-benchmarks",
 	"pallet-price-index/runtime-benchmarks",
 	"pallet-ticks/runtime-benchmarks",
@@ -151,6 +154,7 @@ try-runtime = [
 	"pallet-mint/try-runtime",
 	"pallet-notaries/try-runtime",
 	"pallet-notebook/try-runtime",
+	"pallet-operational-accounts/try-runtime",
 	"pallet-price-index/try-runtime",
 	"pallet-ticks/try-runtime",
 	"pallet-treasury/try-runtime",
