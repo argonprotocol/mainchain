@@ -332,7 +332,7 @@ fn test_register_records_upstream_account() {
 }
 
 #[test]
-fn test_access_registration_does_not_materialize_accrual_access_code() {
+fn test_access_registration_queues_ready_accrual_access_code() {
 	new_test_ext().execute_with(|| {
 		let upstream_set = make_account_set(48, 49, 50);
 		let downstream_set = make_account_set(51, 52, 53);
@@ -368,9 +368,6 @@ fn test_access_registration_does_not_materialize_accrual_access_code() {
 		assert_eq!(upstream_account.available_access_codes, 1);
 		assert_eq!(upstream_account.vault_bitcoin_accrual, bitcoin_threshold);
 		assert_eq!(upstream_account.mining_seat_accrual, MiningSeatsPerAccessCode::get());
-		assert!(!AccessCodeReadyAccounts::<Test>::contains_key(&upstream_set.owner));
-
-		OperationalAccountsPallet::mining_seat_won(&upstream_set.mining);
 		assert!(AccessCodeReadyAccounts::<Test>::contains_key(&upstream_set.owner));
 
 		<OperationalAccountsPallet as OnNewSlot<TestAccountId>>::on_frame_start(1);

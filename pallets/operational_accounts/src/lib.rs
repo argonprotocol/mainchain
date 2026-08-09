@@ -628,6 +628,7 @@ pub mod pallet {
 							return Err(Error::<T>::UpstreamHasNoAvailableAccessCodes);
 						}
 						upstream_account_data.available_access_codes.saturating_reduce(1);
+						Self::queue_access_code_if_ready(&upstream_account, upstream_account_data);
 
 						Ok(upstream_account.clone())
 					},
