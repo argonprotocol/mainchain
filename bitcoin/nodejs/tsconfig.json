@@ -15,6 +15,9 @@
     "skipDefaultLibCheck": true,
     "allowSyntheticDefaultImports": true,
     "baseUrl": "./",
+    "paths": {
+      "@argonprotocol/bitcoin": ["ts/index.ts"]
+    },
     "rootDir": "./ts",
     "outDir": "./lib",
     "types": ["vitest/globals", "node"]
