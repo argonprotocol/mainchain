@@ -144,9 +144,10 @@ mod benchmarks {
 	fn set_name() {
 		let linked = linked_accounts::<T>();
 		insert_operational_account::<T>(&linked, default_operational_account::<T>(&linked));
+		link_vault_to_owner::<T>(&linked);
 		let name: OperationalAccountName = BoundedVec::truncate_from(b"VaultAlpha1".to_vec());
 		let current_tick = T::TickProvider::current_tick();
-		let caller = linked.owner.clone();
+		let caller = linked.vault.clone();
 		whitelist_account!(caller);
 
 		#[extrinsic_call]
