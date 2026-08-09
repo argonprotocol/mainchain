@@ -60,17 +60,9 @@ fn test_operational_account_can_update_profile_name() {
 		register_account(&account_set, None);
 		let first_name = operational_account_name("VaultAlpha1");
 
-		assert_noop!(
-			OperationalAccountsPallet::set_name(
-				RuntimeOrigin::signed(account_set.vault.clone()),
-				Some(first_name.clone()),
-			),
-			Error::<Test>::NotOperationalAccount
-		);
-
 		CurrentTick::set(10);
 		assert_ok!(OperationalAccountsPallet::set_name(
-			RuntimeOrigin::signed(account_set.owner.clone()),
+			RuntimeOrigin::signed(account_set.vault.clone()),
 			Some(first_name.clone()),
 		));
 		let account = OperationalAccounts::<Test>::get(&account_set.owner).expect("account");
@@ -79,7 +71,7 @@ fn test_operational_account_can_update_profile_name() {
 
 		CurrentTick::set(11);
 		assert_ok!(OperationalAccountsPallet::set_name(
-			RuntimeOrigin::signed(account_set.owner.clone()),
+			RuntimeOrigin::signed(account_set.mining.clone()),
 			Some(first_name),
 		));
 		assert_eq!(
@@ -97,6 +89,14 @@ fn test_operational_account_can_update_profile_name() {
 		let account = OperationalAccounts::<Test>::get(&account_set.owner).expect("account");
 		assert_eq!(account.name, None);
 		assert_eq!(account.last_name_change_tick, Some(12));
+
+		assert_noop!(
+			OperationalAccountsPallet::set_name(
+				RuntimeOrigin::signed(account_id_from_seed(99)),
+				Some(operational_account_name("VaultBeta2")),
+			),
+			Error::<Test>::NotOperationalAccount
+		);
 
 		assert_noop!(
 			OperationalAccountsPallet::set_name(

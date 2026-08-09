@@ -693,18 +693,20 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Update the display name on an operational account profile.
+		/// Update the display name on an operational account profile from any linked account.
 		#[pallet::call_index(1)]
 		#[pallet::weight(T::WeightInfo::set_name())]
 		pub fn set_name(
 			origin: OriginFor<T>,
 			name: Option<OperationalAccountName>,
 		) -> DispatchResult {
-			let owner = ensure_signed(origin)?;
+			let signer = ensure_signed(origin)?;
 			if let Some(name) = name.as_ref() {
 				Self::ensure_valid_name(name)?;
 			}
 
+			let owner =
+				Self::operational_owner_for(&signer).ok_or(Error::<T>::NotOperationalAccount)?;
 			let mut account =
 				OperationalAccounts::<T>::get(&owner).ok_or(Error::<T>::NotOperationalAccount)?;
 			if account.name == name {
