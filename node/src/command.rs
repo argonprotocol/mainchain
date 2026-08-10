@@ -82,12 +82,13 @@ macro_rules! construct_async_run {
 		let mining_config = MiningConfig::new(&$cli);
 		if runner.config().chain_spec.is_canary() {
 			runner.async_run(|$config| {
-				let $components = new_partial::<CanaryRuntimeApi>(&$config, &mining_config)?;
+				let $components =
+					new_partial::<CanaryRuntimeApi>(&$config, &mining_config, false)?;
 				Ok::<_, sc_cli::Error>(( { $( $code )* }, $components.task_manager))
 			})
 		} else {
 			runner.async_run(|$config| {
-				let $components = new_partial::<ArgonRuntimeApi>(&$config, &mining_config)?;
+				let $components = new_partial::<ArgonRuntimeApi>(&$config, &mining_config, false)?;
 				Ok::<_, sc_cli::Error>(( { $( $code )* }, $components.task_manager))
 			})
 		}

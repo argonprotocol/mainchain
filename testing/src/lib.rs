@@ -18,6 +18,7 @@ pub use argon_node::ArgonTestNode;
 pub use argon_notary::ArgonTestNotary;
 pub use argon_oracle::ArgonTestOracle;
 pub use bitcoind::*;
+pub use log_watcher::LogWatcher;
 
 pub async fn start_argon_test_node() -> ArgonTestNode {
 	let start_args = ArgonNodeStartArgs::new("alice", test_miner_count(), "").unwrap();
