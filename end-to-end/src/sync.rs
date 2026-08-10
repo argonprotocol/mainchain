@@ -92,8 +92,8 @@ async fn test_warp_sync_recovers_after_state_sync_restart() {
 
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
-#[ignore = "runs two live node processes"]
-async fn test_interrupted_fast_sync_is_rejected_on_restart() {
+#[ignore = "sync recovery scenario runs in the sync action"]
+async fn test_normal_interrupted_fast_sync_is_rejected_on_restart() {
 	let mut source_args = ArgonNodeStartArgs::new("alice", 1, "").unwrap();
 	source_args.bitcoin_rpc = "http://127.0.0.1:1".to_string();
 	let source = ArgonTestNode::start(source_args).await.unwrap();
