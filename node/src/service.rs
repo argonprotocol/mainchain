@@ -20,7 +20,7 @@ use argon_primitives::{
 	AccountId, TickApis,
 };
 use polkadot_sdk::*;
-use sc_client_api::{BlockBackend, HeaderBackend};
+use sc_client_api::{backend::Backend as BackendT, BlockBackend, HeaderBackend};
 use sc_consensus::BasicQueue;
 use sc_consensus_grandpa::{
 	BeforeBestBlockBy, FinalityProofProvider as GrandpaFinalityProofProvider,
@@ -74,6 +74,7 @@ pub type Service<Runtime> = sc_service::PartialComponents<
 pub fn new_partial<Runtime>(
 	config: &Configuration,
 	mining_config: &MiningConfig,
+	validate_persisted_chain_state: bool,
 ) -> Result<Service<Runtime>, ServiceError>
 where
 	Runtime: ConstructRuntimeApi<Block, FullClient<Runtime>> + Send + Sync + 'static,
@@ -92,12 +93,33 @@ where
 
 	let executor = sc_service::new_wasm_executor::<sp_io::SubstrateHostFunctions>(&config.executor);
 
+	// Mirror sc_service::new_full_parts so node startup can inspect the opened backend before
+	// client initialization writes genesis state or warms the best block's trie.
+	let backend = sc_service::new_db_backend(config.db_config())?;
+	if validate_persisted_chain_state {
+		let info = backend.blockchain().info();
+		if info.best_number > 0 && !backend.have_state_at(info.best_hash, info.best_number) {
+			return Err(ServiceError::Other(format!(
+				"ARGON_RECOVERY_REQUIRED: missing-state-anchor; database best block #{} ({}) has no state",
+				info.best_number, info.best_hash
+			)));
+		}
+	}
+
+	let genesis_block_builder = sc_service::GenesisBlockBuilder::new(
+		config.chain_spec.as_storage_builder(),
+		!config.no_genesis(),
+		backend.clone(),
+		executor.clone(),
+	)?;
 	let (client, backend, keystore_container, task_manager) =
-		sc_service::new_full_parts::<Block, Runtime, _>(
+		sc_service::new_full_parts_with_genesis_builder::<Block, Runtime, _, _>(
 			config,
 			telemetry.as_ref().map(|(_, telemetry)| telemetry.handle()),
 			executor,
-			Vec::new(),
+			backend,
+			genesis_block_builder,
+			false,
 		)?;
 	// let runtime_overrides =
 	// 	GrandpaStateOverrider::for_chain(Chain::from_str(config.chain_spec.name())?);
@@ -230,7 +252,7 @@ where
 		config.network.min_peers_to_start_warp_sync = Some(1);
 	}
 
-	let params = new_partial::<Runtime>(&config, &mining_config)?;
+	let params = new_partial::<Runtime>(&config, &mining_config, true)?;
 	let Service {
 		select_chain,
 		client,

@@ -77,6 +77,47 @@ impl ArgonNodeStartArgs {
 		keyring.to_account_id()
 	}
 
+	pub fn command(&self) -> Command {
+		let mut more_args = self.extra_flags.clone();
+		if !self.bootnodes.is_empty() {
+			more_args.push(format!("--bootnodes={}", &self.bootnodes));
+		}
+		if !self.notebook_archive_urls.is_empty() {
+			more_args
+				.push(format!("--notebook-archive-hosts={}", self.notebook_archive_urls.join(",")));
+		}
+		if self.is_validator {
+			more_args.push("--validator".to_string());
+		}
+		if self.is_archive_node {
+			more_args.push("--state-pruning=archive".to_string());
+			more_args.push("--blocks-pruning=archive".to_string());
+		}
+
+		let mut command = Command::new("./argon-node");
+		command
+			.current_dir(self.target_dir.clone())
+			.env("RUST_LOG", &self.rust_log)
+			.stderr(process::Stdio::piped())
+			.stdout(process::Stdio::null())
+			.arg("--no-mdns")
+			.arg(format!("--base-path={}", self.base_data_path.display()))
+			.arg("--detailed-log-output")
+			.arg("--unsafe-force-node-key-generation")
+			.arg("--allow-private-ipv4")
+			.arg("--no-telemetry")
+			.arg("--no-prometheus")
+			.arg("--chain=dev")
+			.arg(format!("--{}", self.authority.to_lowercase()))
+			.arg(format!("--name={}", self.authority.to_lowercase()))
+			.arg("--port=0")
+			.arg(format!("--rpc-port={}", self.rpc_port))
+			.arg(format!("--compute-miners={}", self.compute_miners))
+			.arg(format!("--bitcoin-rpc-url={}", &self.bitcoin_rpc))
+			.args(more_args);
+		command
+	}
+
 	pub fn new(authority: &str, compute_miners: u16, bootnodes: &str) -> anyhow::Result<Self> {
 		let target_dir = get_target_dir();
 
@@ -199,47 +240,9 @@ impl ArgonTestNode {
 	async fn start_process(
 		args: &mut ArgonNodeStartArgs,
 	) -> anyhow::Result<(process::Child, LogWatcher)> {
-		let mut more_args = args.extra_flags.clone();
-		if !args.bootnodes.is_empty() {
-			more_args.push(format!("--bootnodes={}", &args.bootnodes))
-		};
-		if !args.notebook_archive_urls.is_empty() {
-			more_args
-				.push(format!("--notebook-archive-hosts={}", args.notebook_archive_urls.join(",")))
-		};
+		println!("Starting argon-node with args: {args:?}");
 
-		if args.is_validator {
-			more_args.push("--validator".to_string());
-		}
-
-		if args.is_archive_node {
-			more_args.push("--state-pruning=archive".to_string());
-			more_args.push("--blocks-pruning=archive".to_string());
-		}
-
-		println!("Starting argon-node with args: {args:?}. {more_args:?}");
-
-		let mut proc = Command::new("./argon-node")
-			.current_dir(args.target_dir.clone())
-			.env("RUST_LOG", &args.rust_log)
-			.stderr(process::Stdio::piped())
-			.stdout(process::Stdio::null()) // Redirect stdout to /dev/null
-			.arg("--no-mdns")
-			.arg(format!("--base-path={}", args.base_data_path.display()))
-			.arg("--detailed-log-output")
-			.arg("--unsafe-force-node-key-generation")
-			.arg("--allow-private-ipv4")
-			.arg("--no-telemetry")
-			.arg("--no-prometheus")
-			.arg("--chain=dev")
-			.arg(format!("--{}", &args.authority.to_lowercase()))
-			.arg(format!("--name={}", &args.authority.to_lowercase()))
-			.arg("--port=0")
-			.arg(format!("--rpc-port={}", args.rpc_port))
-			.arg(format!("--compute-miners={}", args.compute_miners))
-			.arg(format!("--bitcoin-rpc-url={}", &args.bitcoin_rpc))
-			.args(more_args.into_iter())
-			.spawn()?;
+		let mut proc = args.command().spawn()?;
 
 		// Wait for RPC port to be logged (it's logged to stderr).
 		let stderr = proc.stderr.take().unwrap();

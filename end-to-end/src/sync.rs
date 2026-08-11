@@ -5,7 +5,9 @@ use crate::utils::{
 use argon_client::{api::storage, conversion::SubxtRuntime, FetchAt};
 use argon_notary_audit::VerifyError;
 use argon_primitives::{ArgonDigests, BlockSealDigest};
-use argon_testing::{test_miner_count, ArgonNodeStartArgs, ArgonTestNode, ArgonTestNotary};
+use argon_testing::{
+	test_miner_count, ArgonNodeStartArgs, ArgonTestNode, ArgonTestNotary, LogWatcher,
+};
 use polkadot_sdk::sp_core::{DeriveJunction, Pair, H256};
 use serial_test::serial;
 use std::{
@@ -13,7 +15,7 @@ use std::{
 	fs::{copy, create_dir_all, read_dir, read_to_string, remove_dir_all, write},
 	io,
 	path::{Path, PathBuf},
-	process::Command,
+	process::{Child, Command},
 	sync::{
 		atomic::{AtomicBool, Ordering},
 		Arc,
@@ -90,6 +92,41 @@ async fn test_warp_sync_recovers_after_state_sync_restart() {
 
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
+#[ignore = "sync recovery scenario runs in the sync action"]
+async fn test_normal_interrupted_fast_sync_is_rejected_on_restart() {
+	let mut source_args = ArgonNodeStartArgs::new("alice", 1, "").unwrap();
+	source_args.bitcoin_rpc = "http://127.0.0.1:1".to_string();
+	let source = ArgonTestNode::start(source_args).await.unwrap();
+
+	let mut sync_args = source.get_fork_args("bob", 0);
+	sync_args.bootnodes.clear();
+	sync_args.is_validator = false;
+	sync_args.is_archive_node = false;
+	sync_args.rust_log = "warn,sync=debug".to_string();
+	sync_args.extra_flags.extend([
+		"--sync=fast".to_string(),
+		"--reserved-only".to_string(),
+		format!("--reserved-nodes={}", source.boot_url),
+	]);
+
+	let mut initial_sync = SyncNodeProcess::start(&sync_args, "fast-sync").unwrap();
+	initial_sync
+		.log_watcher
+		.wait_for_log_for_secs("Starting state sync for #", 1, 5 * 60)
+		.await
+		.unwrap();
+	initial_sync.stop().unwrap();
+
+	let restarted_sync = SyncNodeProcess::start(&sync_args, "fast-sync-restart").unwrap();
+	restarted_sync
+		.log_watcher
+		.wait_for_log_for_secs("ARGON_RECOVERY_REQUIRED: missing-state-anchor", 1, 30)
+		.await
+		.unwrap();
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
 #[ignore = "slow live sync soak"]
 async fn test_soak_late_node_catches_up() {
 	let settings = SyncSoakSettings::from_env();
@@ -155,6 +192,40 @@ struct SyncHarness {
 	archive_bucket: String,
 	archive_host: String,
 	reused_state: bool,
+}
+
+struct SyncNodeProcess {
+	child: Child,
+	log_watcher: LogWatcher,
+	cleanup_data_path: Option<PathBuf>,
+}
+
+impl SyncNodeProcess {
+	fn start(args: &ArgonNodeStartArgs, name: &str) -> anyhow::Result<Self> {
+		let mut child = args.command().spawn()?;
+		let stderr = child.stderr.take().expect("node stderr should be piped");
+		let log_watcher = LogWatcher::new(stderr, name);
+		let cleanup_data_path = args.cleanup_base_data_path.then(|| args.base_data_path.clone());
+		Ok(Self { child, log_watcher, cleanup_data_path })
+	}
+
+	fn stop(&mut self) -> anyhow::Result<()> {
+		if self.child.try_wait()?.is_none() {
+			self.child.kill()?;
+		}
+		let _ = self.child.wait();
+		self.log_watcher.close();
+		Ok(())
+	}
+}
+
+impl Drop for SyncNodeProcess {
+	fn drop(&mut self) {
+		let _ = self.stop();
+		if let Some(data_path) = &self.cleanup_data_path {
+			let _ = remove_dir_all(data_path);
+		}
+	}
 }
 
 #[derive(Debug)]
