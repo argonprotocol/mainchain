@@ -78,11 +78,18 @@ mod benchmarks {
 		reset_benchmark_operational_accounts_provider_call_counters();
 		IsOperationalAccountInviteOnly::<T>::put(false);
 		let caller = benchmark_account_id::<T>(BENCH_OPERATIONAL_ACCOUNT);
+		let upstream = linked_accounts_with_seed::<T>(1);
 		let operational_account_proof = benchmark_account_proof(BENCH_OPERATIONAL_SIGNATURE);
 		let vault = benchmark_account_id::<T>(BENCH_VAULT_ACCOUNT);
 		let mining = benchmark_account_id::<T>(BENCH_MINING_ACCOUNT);
 		let vault_proof = benchmark_account_proof(BENCH_VAULT_SIGNATURE);
 		let mining_proof = benchmark_account_proof(BENCH_MINING_ACCOUNT_SIGNATURE);
+		let mut upstream_account = default_operational_account::<T>(&upstream);
+		upstream_account.available_access_codes = T::MaxAvailableAccessCodes::get();
+		upstream_account.vault_bitcoin_accrual = T::BitcoinLockSizeForAccessCode::get();
+		upstream_account.mining_seat_accrual = T::MiningSeatsPerAccessCode::get();
+		upstream_account.is_operationally_certified = true;
+		insert_operational_account::<T>(&upstream, upstream_account);
 		#[cfg(test)]
 		{
 			let linked = LinkedAccounts::<T> {
@@ -106,7 +113,10 @@ mod benchmarks {
 			mining_account: mining.clone(),
 			vault_account_proof: vault_proof,
 			mining_account_proof: mining_proof,
-			access_proof: None,
+			access_proof: Some(UpstreamAccessProof {
+				upstream_account: upstream.owner.clone(),
+				signature: sr25519::Signature::from_raw([0u8; 64]).into(),
+			}),
 		});
 		whitelist_account!(caller);
 		#[extrinsic_call]
@@ -126,6 +136,7 @@ mod benchmarks {
 		assert!(!account.is_operationally_certified);
 		assert!(OperationalAccountBySubAccount::<T>::contains_key(vault));
 		assert!(OperationalAccountBySubAccount::<T>::contains_key(mining));
+		assert!(AccessCodeReadyAccounts::<T>::contains_key(&upstream.owner));
 		assert_provider_calls(BenchmarkOperationalAccountsProviderCallCounters {
 			get_registration_vault_data: 1,
 			get_account_funded_bitcoin_amount: 1,
