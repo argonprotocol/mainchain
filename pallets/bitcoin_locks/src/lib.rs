@@ -83,7 +83,7 @@ pub mod pallet {
 	};
 	use codec::HasCompact;
 	use core::iter::Sum;
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(9);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(10);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -1086,7 +1086,32 @@ pub mod pallet {
 
 			let mut duration_for_new_funds = FixedU128::zero();
 
-			let new_liquidity_promised = Self::calculate_redemption_amount(new_target_price, None)?;
+			// We need to determine up/down ratchet based on argon target rate
+			let is_up_ratchet = new_target_price > old_target_price;
+
+			// up-ratcheting
+			let (amount_to_mint, amount_to_burn, new_liquidity_promised) = if is_up_ratchet {
+				let start_height = lock.created_at_height;
+				let current_bitcoin_height = T::BitcoinBlockHeightChange::get().1;
+				let elapsed_blocks = current_bitcoin_height.saturating_sub(start_height);
+				let full_term = expiration_height.saturating_sub(start_height).max(1);
+				let remaining_blocks = full_term.saturating_sub(elapsed_blocks);
+				let diff_target_amount = new_target_price - old_target_price;
+				let amount_to_mint = Self::calculate_redemption_amount(diff_target_amount, None)?;
+				duration_for_new_funds =
+					FixedU128::from_rational(remaining_blocks as u128, full_term as u128);
+				let new_liquidity_promised = lock
+					.liquidity_promised
+					.checked_add(&amount_to_mint)
+					.ok_or(Error::<T>::OverflowError)?;
+				(amount_to_mint, T::Balance::zero(), new_liquidity_promised)
+
+			// down-ratcheting
+			} else {
+				let new_liquidity_promised =
+					Self::calculate_redemption_amount(new_target_price, None)?;
+				(new_liquidity_promised, new_liquidity_promised, new_liquidity_promised)
+			};
 
 			if lock.is_flexible {
 				let new_securitization =
@@ -1104,27 +1129,7 @@ pub mod pallet {
 				);
 			}
 
-			// We need to determine up/down ratchet based on argon target rate
-			let is_up_ratchet = new_target_price > old_target_price;
-
-			// up-ratcheting
-			let (amount_to_mint, amount_to_burn) = if is_up_ratchet {
-				let start_height = lock.created_at_height;
-				let current_bitcoin_height = T::BitcoinBlockHeightChange::get().1;
-				let elapsed_blocks = current_bitcoin_height.saturating_sub(start_height);
-				let full_term = expiration_height.saturating_sub(start_height).max(1);
-				let remaining_blocks = full_term.saturating_sub(elapsed_blocks);
-				let diff_target_amount = new_target_price - old_target_price;
-				let amount_to_mint = Self::calculate_redemption_amount(diff_target_amount, None)?;
-				duration_for_new_funds =
-					FixedU128::from_rational(remaining_blocks as u128, full_term as u128);
-				(amount_to_mint, T::Balance::zero())
-
-			// down-ratcheting
-			} else {
-				let amount_to_burn = new_liquidity_promised;
-				let amount_to_mint = new_liquidity_promised;
-
+			if !amount_to_burn.is_zero() {
 				// NOTE: we send amount_to_burn to be released
 				T::LockEvents::utxo_released(
 					utxo_id,
@@ -1149,9 +1154,7 @@ pub mod pallet {
 					lock.is_flexible,
 				)
 				.map_err(Error::<T>::from)?;
-
-				(amount_to_mint, amount_to_burn)
-			};
+			}
 
 			let mut lock_extension = lock.get_lock_extension();
 			let securitization = Securitization::new(amount_to_mint, lock.securitization_ratio);
