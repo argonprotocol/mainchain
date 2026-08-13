@@ -229,6 +229,10 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 		None
 	}
 
+	fn get_locked_securitization(vault_id: VaultId) -> Option<Self::Balance> {
+		(vault_id == 1).then(|| DefaultVault::get().securitization_locked)
+	}
+
 	fn get_registration_vault_data(
 		account_id: &Self::AccountId,
 	) -> Option<argon_primitives::vault::RegistrationVaultData<Self::Balance>> {

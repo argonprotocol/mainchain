@@ -1343,6 +1343,10 @@ pub mod pallet {
 			VaultIdByOperator::<T>::get(account_id)
 		}
 
+		fn get_locked_securitization(vault_id: VaultId) -> Option<Self::Balance> {
+			VaultsById::<T>::get(vault_id).map(|vault| vault.securitization_locked)
+		}
+
 		fn get_registration_vault_data(
 			account_id: &Self::AccountId,
 		) -> Option<RegistrationVaultData<Self::Balance>> {

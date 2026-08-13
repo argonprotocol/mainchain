@@ -249,6 +249,9 @@ pub trait BitcoinVaultProvider {
 	fn get_vault_operator(vault_id: VaultId) -> Option<Self::AccountId>;
 	fn get_vault_delegate(vault_id: VaultId) -> Option<Self::AccountId>;
 	fn get_vault_id(account_id: &Self::AccountId) -> Option<VaultId>;
+	fn get_locked_securitization(_vault_id: VaultId) -> Option<Self::Balance> {
+		None
+	}
 	fn get_registration_vault_data(
 		account_id: &Self::AccountId,
 	) -> Option<RegistrationVaultData<Self::Balance>>;
@@ -738,9 +741,14 @@ impl<
 		is_flexible: bool,
 		may_use_flexible_space: bool,
 	) -> Result<(), VaultError> {
+		// Flexible extensions replace capacity that can already back reservations.
+		let available_securitization = if is_flexible {
+			self.securitization_space().saturating_sub(self.flexible_securitization_locked)
+		} else {
+			self.available_securitization_space(may_use_flexible_space)
+		};
 		ensure!(
-			securitization.collateral_required <=
-				self.available_securitization_space(may_use_flexible_space),
+			securitization.collateral_required <= available_securitization,
 			VaultError::InsufficientVaultFunds
 		);
 

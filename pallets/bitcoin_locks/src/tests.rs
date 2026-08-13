@@ -1741,6 +1741,52 @@ fn it_should_allow_a_ratchet_up() {
 }
 
 #[test]
+fn up_ratchet_adds_newly_secured_liquidity_to_the_existing_lock() {
+	new_test_ext().execute_with(|| {
+		set_bitcoin_height(1);
+		System::set_block_number(1);
+
+		let who = 1;
+		let initial_target = 500_000 * MICROGONS_PER_ARGON;
+		let ratchet_target = 600_000 * MICROGONS_PER_ARGON;
+		MicrogonPerBtcHistory::<Test>::mutate(|history| {
+			_ = history.try_push((1, initial_target));
+			_ = history.try_push((2, ratchet_target));
+		});
+		ArgonPriceInUsd::set(Some(FixedU128::from_float(1.0)));
+		ArgonTargetPriceInUsd::set(Some(FixedU128::from_float(1.1)));
+		DefaultVault::mutate(|vault| {
+			vault.securitization = 700_000 * MICROGONS_PER_ARGON;
+			vault.securitization_target = vault.securitization;
+		});
+
+		assert_ok!(BitcoinLocks::initialize(
+			RuntimeOrigin::signed(who),
+			1,
+			SATOSHIS_PER_BITCOIN,
+			CompressedBitcoinPubkey([1; 33]),
+			Some(LockOptions::V1 { microgons_at_target_per_btc: Some(initial_target) }),
+		));
+		assert_ok!(BitcoinLocks::funding_received(1, SATOSHIS_PER_BITCOIN));
+		let initial_liquidity = 491_735_537_190;
+		assert_eq!(LocksByUtxoId::<Test>::get(1).unwrap().liquidity_promised, initial_liquidity);
+
+		ArgonTargetPriceInUsd::set(Some(FixedU128::from_float(1.0)));
+		assert_ok!(BitcoinLocks::ratchet(
+			RuntimeOrigin::signed(who),
+			1,
+			Some(LockOptions::V1 { microgons_at_target_per_btc: Some(ratchet_target) }),
+		));
+
+		let expected_liquidity = 591_735_537_190;
+		let lock = LocksByUtxoId::<Test>::get(1).unwrap();
+		assert_eq!(lock.liquidity_promised, expected_liquidity);
+		assert_eq!(DefaultVault::get().securitization_locked, expected_liquidity);
+		assert_eq!(LastLockEvent::get(), Some((1, who, 100_000 * MICROGONS_PER_ARGON)));
+	});
+}
+
+#[test]
 fn it_should_charge_ratchet_up_fee_for_remaining_lock_term() {
 	ChargeFee::set(true);
 	new_test_ext().execute_with(|| {
@@ -1929,6 +1975,47 @@ fn it_should_allow_a_ratchet_down() {
 			Balances::free_balance(who) > 10_000 * MICROGONS_PER_ARGON,
 			"user should pocket the 10k"
 		);
+	});
+}
+
+#[test]
+fn down_ratchet_reuses_reserved_flexible_securitization() {
+	new_test_ext().execute_with(|| {
+		set_bitcoin_height(1);
+		System::set_block_number(1);
+
+		let operator = 1;
+		let satoshis = SATOSHIS_PER_BITCOIN;
+		let initial_securitization = 62_000 * MICROGONS_PER_ARGON;
+		BitcoinPriceInUsd::set(Some(FixedU128::saturating_from_integer(62_000)));
+		DefaultVault::mutate(|vault| {
+			vault.securitization = initial_securitization;
+			vault.securitization_target = initial_securitization;
+		});
+		set_argons(operator, initial_securitization);
+
+		assert_ok!(BitcoinLocks::initialize(
+			RuntimeOrigin::signed(operator),
+			1,
+			satoshis,
+			CompressedBitcoinPubkey([1; 33]),
+			None,
+		));
+		assert_ok!(BitcoinLocks::funding_received(1, satoshis));
+		assert_ok!(BitcoinLocks::set_flexible(RuntimeOrigin::signed(operator), 1, true));
+		DefaultVault::mutate(|vault| {
+			vault
+				.set_reserved_securitization_space(initial_securitization)
+				.expect("reserve the flexible securitization");
+		});
+		assert_ok!(Balances::mint_into(&operator, initial_securitization));
+
+		BitcoinPriceInUsd::set(Some(FixedU128::saturating_from_integer(52_000)));
+
+		assert_ok!(BitcoinLocks::ratchet(RuntimeOrigin::signed(operator), 1, None));
+		let vault = DefaultVault::get();
+		assert_eq!(vault.flexible_securitization_locked, 52_000 * MICROGONS_PER_ARGON);
+		assert_eq!(vault.reserved_securitization_space, initial_securitization);
 	});
 }
 

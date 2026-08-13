@@ -157,6 +157,8 @@ macro_rules! inject_runtime_vars {
 		/// This can be a tuple of types, each implementing `OnRuntimeUpgrade`.
 		type Migrations = (
 			pallet_vaults::migrations::MoveVaultNameToOperationalAccountProfileMigration<Runtime>,
+			// Account reconciliation must read the corrected lock liquidity.
+			pallet_bitcoin_locks::migrations::CorrectLegacyRatchetedLiquidityMigration<Runtime>,
 			pallet_operational_accounts::migrations::ReconcileAccountBitcoinAmountsMigration<
 				Runtime,
 			>,
