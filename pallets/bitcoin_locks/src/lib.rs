@@ -587,7 +587,7 @@ pub mod pallet {
 		FeeCouponExpired,
 		/// The fee coupon was not signed by the vault delegate.
 		InvalidFeeCouponSignature,
-		/// The fee coupon nonce has already been consumed or superseded.
+		/// The fee coupon nonce is not the next unconsumed nonce.
 		FeeCouponAlreadyUsed,
 		/// Fee coupons can only be applied when initializing a lock.
 		FeeCouponOnlyForInitialization,
@@ -599,6 +599,10 @@ pub mod pallet {
 		FundingUtxoCannotBeReleased,
 		/// Too many orphaned utxo release requests for a lock
 		MaxOrphanedUtxoReleaseRequestsExceeded,
+		/// The fee coupon was issued for a different number of requested satoshis.
+		FeeCouponWrongSatoshis,
+		/// The fee coupon was issued for a different target price.
+		FeeCouponWrongTargetPrice,
 	}
 
 	impl<T> From<VaultError> for Error<T> {
@@ -703,6 +707,11 @@ pub mod pallet {
 		pub genesis_hash: <T as frame_system::Config>::Hash,
 		/// Account allowed to use this coupon.
 		pub beneficiary: T::AccountId,
+		/// Number of satoshis authorized for this lock.
+		#[codec(compact)]
+		pub requested_satoshis: Satoshis,
+		/// Target-price rate authorized for this lock.
+		pub microgons_at_target_per_btc: Option<T::Balance>,
 		/// Maximum amount deducted from the vault's Bitcoin lock fee.
 		#[codec(compact)]
 		pub fee_discount: T::Balance,
@@ -729,6 +738,8 @@ pub mod pallet {
 				self.genesis_hash,
 				self.vault_id,
 				&self.beneficiary,
+				self.requested_satoshis,
+				self.microgons_at_target_per_btc,
 				self.fee_discount,
 				self.securitization_space_to_unreserve,
 				self.expires_at_frame,
@@ -802,6 +813,8 @@ pub mod pallet {
 			options: Option<LockOptions<T>>,
 		) -> DispatchResult {
 			let account_id = ensure_signed(origin)?;
+			let microgons_at_target_per_btc =
+				options.as_ref().and_then(LockOptions::microgons_at_target_per_btc);
 			let coupon = match options.as_ref() {
 				Some(LockOptions::V2 { fee_coupon, .. }) => fee_coupon.as_ref(),
 				_ => None,
@@ -816,17 +829,25 @@ pub mod pallet {
 					);
 					ensure!(coupon.beneficiary == account_id, Error::<T>::FeeCouponWrongAccount);
 					ensure!(
+						coupon.requested_satoshis == satoshis,
+						Error::<T>::FeeCouponWrongSatoshis
+					);
+					ensure!(
+						coupon.microgons_at_target_per_btc == microgons_at_target_per_btc,
+						Error::<T>::FeeCouponWrongTargetPrice
+					);
+					ensure!(
 						T::CurrentFrameId::get() <= coupon.expires_at_frame,
 						Error::<T>::FeeCouponExpired
 					);
 					let delegate = T::VaultProvider::get_vault_delegate(vault_id)
 						.ok_or(Error::<T>::InvalidFeeCouponSignature)?;
 					ensure!(coupon.verify(&delegate), Error::<T>::InvalidFeeCouponSignature);
-					ensure!(
+					let next_nonce =
 						LastFeeCouponNonceByVaultAndAccount::<T>::get(vault_id, &account_id)
-							.is_none_or(|nonce| coupon.nonce > nonce),
-						Error::<T>::FeeCouponAlreadyUsed
-					);
+							.unwrap_or_default()
+							.checked_add(1);
+					ensure!(next_nonce == Some(coupon.nonce), Error::<T>::FeeCouponAlreadyUsed);
 					(
 						coupon.fee_discount,
 						coupon.securitization_space_to_unreserve,

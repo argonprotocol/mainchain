@@ -65,6 +65,8 @@ mod benchmarks {
 				vault_id,
 				genesis_hash: frame_system::Pallet::<T>::block_hash(BlockNumberFor::<T>::zero()),
 				beneficiary: owner.clone(),
+				requested_satoshis: satoshis,
+				microgons_at_target_per_btc: Some(microgons_at_target_per_btc),
 				fee_discount: T::Balance::zero(),
 				securitization_space_to_unreserve: T::Balance::zero(),
 				expires_at_frame: T::CurrentFrameId::get(),
