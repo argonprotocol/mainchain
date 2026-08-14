@@ -1198,7 +1198,7 @@ declare module '@polkadot/api-base/types/submittable' {
         [PalletOperationalAccountsRegistration]
       >;
       /**
-       * Update the display name on an operational account profile.
+       * Update the display name on an operational account profile from any linked account.
        **/
       setName: AugmentedSubmittable<
         (name: Option<Bytes> | null | Uint8Array | Bytes | string) => SubmittableExtrinsic<ApiType>,

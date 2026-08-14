@@ -99,7 +99,7 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       ExpirationAtBlockOverflow: AugmentedError<ApiType>;
       /**
-       * The fee coupon nonce has already been consumed or superseded.
+       * The fee coupon nonce is not the next unconsumed nonce.
        **/
       FeeCouponAlreadyUsed: AugmentedError<ApiType>;
       /**
@@ -118,6 +118,14 @@ declare module '@polkadot/api-base/types/errors' {
        * The fee coupon was issued for a different chain.
        **/
       FeeCouponWrongChain: AugmentedError<ApiType>;
+      /**
+       * The fee coupon was issued for a different number of requested satoshis.
+       **/
+      FeeCouponWrongSatoshis: AugmentedError<ApiType>;
+      /**
+       * The fee coupon was issued for a different target price.
+       **/
+      FeeCouponWrongTargetPrice: AugmentedError<ApiType>;
       /**
        * The fee coupon was issued for a different vault.
        **/

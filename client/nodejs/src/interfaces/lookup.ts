@@ -2294,6 +2294,8 @@ export default {
     vaultId: 'Compact<u32>',
     genesisHash: 'H256',
     beneficiary: 'AccountId32',
+    requestedSatoshis: 'Compact<u64>',
+    microgonsAtTargetPerBtc: 'Option<u128>',
     feeDiscount: 'Compact<u128>',
     securitizationSpaceToUnreserve: 'Compact<u128>',
     expiresAtFrame: 'Compact<u64>',
@@ -3528,6 +3530,8 @@ export default {
       OrphanedUtxoReleaseRequested: 'Null',
       FundingUtxoCannotBeReleased: 'Null',
       MaxOrphanedUtxoReleaseRequestsExceeded: 'Null',
+      FeeCouponWrongSatoshis: 'Null',
+      FeeCouponWrongTargetPrice: 'Null',
     },
   },
   /**

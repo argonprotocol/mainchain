@@ -45,6 +45,8 @@ export type BitcoinLockFeeCoupon = {
   vaultId: number;
   genesisHash: string;
   beneficiary: string;
+  requestedSatoshis: bigint;
+  microgonsAtTargetPerBtc: bigint | null;
   feeDiscount: bigint;
   securitizationSpaceToUnreserve: bigint;
   expiresAtFrame: bigint;

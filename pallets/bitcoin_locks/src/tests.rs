@@ -8,8 +8,8 @@ use pallet_prelude::*;
 use crate::{
 	mock::*,
 	pallet::{
-		LockCosignDueByFrame, LockReleaseCosignHeightById, LockReleaseRequestsByUtxoId,
-		LocksByUtxoId, UtxoIdsByVaultId,
+		LastFeeCouponNonceByVaultAndAccount, LockCosignDueByFrame, LockReleaseCosignHeightById,
+		LockReleaseRequestsByUtxoId, LocksByUtxoId, UtxoIdsByVaultId,
 	},
 	Error, Event, FeeCoupon, HoldReason, LockExpirationsByBitcoinHeight, LockOptions,
 	LockReleaseRequest, MicrogonPerBtcHistory, OrphanedUtxoExpirationByFrame,
@@ -18,7 +18,7 @@ use crate::{
 use argon_bitcoin::{Amount, CosignReleaser, CosignScriptArgs, ReleaseStep};
 use argon_primitives::{
 	bitcoin::{
-		BitcoinScriptPubkey, BitcoinSignature, CompressedBitcoinPubkey, H256Le, UtxoRef,
+		BitcoinScriptPubkey, BitcoinSignature, CompressedBitcoinPubkey, H256Le, Satoshis, UtxoRef,
 		SATOSHIS_PER_BITCOIN,
 	},
 	vault::{LockExtension, Securitization},
@@ -202,7 +202,7 @@ fn initialize_applies_a_delegate_signed_fee_discount() {
 			pubkey,
 			Some(LockOptions::V2 {
 				microgons_at_target_per_btc: None,
-				fee_coupon: Some(fee_coupon(2, fee / 2, 0, 2, 1)),
+				fee_coupon: Some(fee_coupon(2, SATOSHIS_PER_BITCOIN, None, fee / 2, 0, 2, 1,)),
 			}),
 		));
 
@@ -236,42 +236,197 @@ fn fee_coupon_must_match_the_lock_and_delegate_signature() {
 		};
 
 		assert_err!(
-			initialize(fee_coupon(3, 100, 0, 2, nonce)),
+			initialize(fee_coupon(3, SATOSHIS_PER_BITCOIN, None, 100, 0, 2, nonce)),
 			Error::<Test>::FeeCouponWrongAccount
 		);
 
-		let mut wrong_vault = fee_coupon(2, 100, 0, 2, nonce);
+		let mut wrong_vault = fee_coupon(2, SATOSHIS_PER_BITCOIN, None, 100, 0, 2, nonce);
 		wrong_vault.vault_id = 2;
 		assert_err!(initialize(wrong_vault), Error::<Test>::FeeCouponWrongVault);
 
-		let mut wrong_chain = fee_coupon(2, 100, 0, 2, nonce);
+		let mut wrong_chain = fee_coupon(2, SATOSHIS_PER_BITCOIN, None, 100, 0, 2, nonce);
 		wrong_chain.genesis_hash = polkadot_sdk::sp_core::H256::repeat_byte(1);
 		assert_err!(initialize(wrong_chain), Error::<Test>::FeeCouponWrongChain);
 
-		let mut invalid_signature = fee_coupon(2, 100, 0, 2, nonce);
+		let mut invalid_signature = fee_coupon(2, SATOSHIS_PER_BITCOIN, None, 100, 0, 2, nonce);
 		invalid_signature.signature = polkadot_sdk::sp_runtime::testing::TestSignature(8, vec![]);
 		assert_err!(initialize(invalid_signature), Error::<Test>::InvalidFeeCouponSignature);
 
-		let mut tampered_discount = fee_coupon(2, 100, 0, 2, nonce);
+		let mut tampered_discount = fee_coupon(2, SATOSHIS_PER_BITCOIN, None, 100, 0, 2, nonce);
 		tampered_discount.fee_discount += 1;
 		assert_err!(initialize(tampered_discount), Error::<Test>::InvalidFeeCouponSignature);
 
-		let mut tampered_flexible = fee_coupon(2, 100, 100, 2, nonce);
+		let mut tampered_flexible = fee_coupon(2, SATOSHIS_PER_BITCOIN, None, 100, 100, 2, nonce);
 		tampered_flexible.securitization_space_to_unreserve += 1;
 		assert_err!(initialize(tampered_flexible), Error::<Test>::InvalidFeeCouponSignature);
 
 		CurrentFrameId::set(3);
-		assert_err!(initialize(fee_coupon(2, 100, 0, 2, nonce)), Error::<Test>::FeeCouponExpired);
+		assert_err!(
+			initialize(fee_coupon(2, SATOSHIS_PER_BITCOIN, None, 100, 0, 2, nonce)),
+			Error::<Test>::FeeCouponExpired
+		);
 	});
 }
 
 #[test]
-fn fee_coupon_cannot_be_reused() {
+fn fee_coupon_rejects_tampered_lock_terms() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		DefaultVault::mutate(|vault| vault.delegate_account_id = Some(9));
 		set_argons(2, 2_000_000);
-		let coupon = fee_coupon(2, 100, 0, 2, 1);
+
+		let coupon = fee_coupon(2, SATOSHIS_PER_BITCOIN, None, 100, 0, 2, 1);
+		assert_err!(
+			BitcoinLocks::initialize(
+				RuntimeOrigin::signed(2),
+				1,
+				SATOSHIS_PER_BITCOIN - 1,
+				CompressedBitcoinPubkey([1; 33]),
+				Some(LockOptions::V2 {
+					microgons_at_target_per_btc: None,
+					fee_coupon: Some(coupon),
+				}),
+			),
+			Error::<Test>::FeeCouponWrongSatoshis
+		);
+		let mut coupon = fee_coupon(2, SATOSHIS_PER_BITCOIN, None, 100, 0, 2, 1);
+		coupon.requested_satoshis -= 1;
+		assert_err!(
+			BitcoinLocks::initialize(
+				RuntimeOrigin::signed(2),
+				1,
+				SATOSHIS_PER_BITCOIN - 1,
+				CompressedBitcoinPubkey([1; 33]),
+				Some(LockOptions::V2 {
+					microgons_at_target_per_btc: None,
+					fee_coupon: Some(coupon),
+				}),
+			),
+			Error::<Test>::InvalidFeeCouponSignature
+		);
+
+		let target_price = 100_000 * MICROGONS_PER_ARGON;
+		let coupon = fee_coupon(2, SATOSHIS_PER_BITCOIN, Some(target_price), 100, 0, 2, 1);
+		assert_err!(
+			BitcoinLocks::initialize(
+				RuntimeOrigin::signed(2),
+				1,
+				SATOSHIS_PER_BITCOIN,
+				CompressedBitcoinPubkey([1; 33]),
+				Some(LockOptions::V2 {
+					microgons_at_target_per_btc: None,
+					fee_coupon: Some(coupon),
+				}),
+			),
+			Error::<Test>::FeeCouponWrongTargetPrice
+		);
+		let mut coupon = fee_coupon(2, SATOSHIS_PER_BITCOIN, Some(target_price), 100, 0, 2, 1);
+		coupon.microgons_at_target_per_btc = None;
+		assert_err!(
+			BitcoinLocks::initialize(
+				RuntimeOrigin::signed(2),
+				1,
+				SATOSHIS_PER_BITCOIN,
+				CompressedBitcoinPubkey([1; 33]),
+				Some(LockOptions::V2 {
+					microgons_at_target_per_btc: None,
+					fee_coupon: Some(coupon),
+				}),
+			),
+			Error::<Test>::InvalidFeeCouponSignature
+		);
+	});
+}
+
+#[test]
+fn replacement_fee_coupons_share_the_next_nonce_until_consumed() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		DefaultVault::mutate(|vault| vault.delegate_account_id = Some(9));
+		ChargeFee::set(true);
+		let fee = StaticPriceProvider::get_btc_price_in_market_microgons(SATOSHIS_PER_BITCOIN)
+			.expect("should have price") /
+			10;
+		set_argons(2, fee / 2);
+
+		let original = fee_coupon(2, SATOSHIS_PER_BITCOIN, None, 0, 0, 2, 1);
+		assert_noop!(
+			BitcoinLocks::initialize(
+				RuntimeOrigin::signed(2),
+				1,
+				SATOSHIS_PER_BITCOIN,
+				CompressedBitcoinPubkey([1; 33]),
+				Some(LockOptions::V2 {
+					microgons_at_target_per_btc: None,
+					fee_coupon: Some(original.clone()),
+				}),
+			),
+			Error::<Test>::InsufficientFunds
+		);
+		assert_eq!(LastFeeCouponNonceByVaultAndAccount::<Test>::get(1, 2), None);
+
+		let replacement = fee_coupon(2, SATOSHIS_PER_BITCOIN, None, fee / 2, 0, 2, 1);
+		assert_ok!(BitcoinLocks::initialize(
+			RuntimeOrigin::signed(2),
+			1,
+			SATOSHIS_PER_BITCOIN,
+			CompressedBitcoinPubkey([2; 33]),
+			Some(LockOptions::V2 {
+				microgons_at_target_per_btc: None,
+				fee_coupon: Some(replacement),
+			}),
+		));
+		assert_eq!(LastFeeCouponNonceByVaultAndAccount::<Test>::get(1, 2), Some(1));
+		assert_err!(
+			BitcoinLocks::initialize(
+				RuntimeOrigin::signed(2),
+				1,
+				SATOSHIS_PER_BITCOIN,
+				CompressedBitcoinPubkey([3; 33]),
+				Some(LockOptions::V2 {
+					microgons_at_target_per_btc: None,
+					fee_coupon: Some(original),
+				}),
+			),
+			Error::<Test>::FeeCouponAlreadyUsed
+		);
+	});
+}
+
+#[test]
+fn fee_coupon_nonce_must_be_exactly_next() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		DefaultVault::mutate(|vault| vault.delegate_account_id = Some(9));
+		set_argons(2, 2_000_000);
+
+		let initialize = |nonce, pubkey_byte| {
+			BitcoinLocks::initialize(
+				RuntimeOrigin::signed(2),
+				1,
+				SATOSHIS_PER_BITCOIN,
+				CompressedBitcoinPubkey([pubkey_byte; 33]),
+				Some(LockOptions::V2 {
+					microgons_at_target_per_btc: None,
+					fee_coupon: Some(fee_coupon(2, SATOSHIS_PER_BITCOIN, None, 100, 0, 2, nonce)),
+				}),
+			)
+		};
+
+		assert_err!(initialize(2, 1), Error::<Test>::FeeCouponAlreadyUsed);
+		assert_ok!(initialize(1, 2));
+		assert_err!(initialize(3, 3), Error::<Test>::FeeCouponAlreadyUsed);
+		assert_ok!(initialize(2, 4));
+	});
+}
+
+#[test]
+fn fee_coupon_replay_is_rejected_after_consumption() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		DefaultVault::mutate(|vault| vault.delegate_account_id = Some(9));
+		set_argons(2, 2_000_000);
+		let coupon = fee_coupon(2, SATOSHIS_PER_BITCOIN, None, 100, 0, 2, 1);
 
 		assert_ok!(BitcoinLocks::initialize(
 			RuntimeOrigin::signed(2),
@@ -296,16 +451,6 @@ fn fee_coupon_cannot_be_reused() {
 			),
 			Error::<Test>::FeeCouponAlreadyUsed
 		);
-		assert_ok!(BitcoinLocks::initialize(
-			RuntimeOrigin::signed(2),
-			1,
-			SATOSHIS_PER_BITCOIN,
-			CompressedBitcoinPubkey([3; 33]),
-			Some(LockOptions::V2 {
-				microgons_at_target_per_btc: None,
-				fee_coupon: Some(fee_coupon(2, 100, 0, 2, 2)),
-			}),
-		));
 	});
 }
 
@@ -355,7 +500,15 @@ fn fee_coupon_unreserves_securitization_space_atomically() {
 			CompressedBitcoinPubkey([2; 33]),
 			Some(LockOptions::V2 {
 				microgons_at_target_per_btc: None,
-				fee_coupon: Some(fee_coupon(2, 0, required_collateral.saturating_mul(2), 2, 1,)),
+				fee_coupon: Some(fee_coupon(
+					2,
+					satoshis,
+					None,
+					0,
+					required_collateral.saturating_mul(2),
+					2,
+					1,
+				)),
 			}),
 		));
 		assert_eq!(DefaultVault::get().reserved_securitization_space, 0);
@@ -2182,7 +2335,7 @@ fn ratchet_rejects_fee_coupons() {
 				1,
 				Some(LockOptions::V2 {
 					microgons_at_target_per_btc: None,
-					fee_coupon: Some(fee_coupon(1, 100, 0, 2, 1)),
+					fee_coupon: Some(fee_coupon(1, SATOSHIS_PER_BITCOIN, None, 100, 0, 2, 1,)),
 				}),
 			),
 			Error::<Test>::FeeCouponOnlyForInitialization,
@@ -2295,6 +2448,8 @@ fn it_should_record_btc_history() {
 
 fn fee_coupon(
 	beneficiary: u64,
+	requested_satoshis: Satoshis,
+	microgons_at_target_per_btc: Option<Balance>,
 	fee_discount: Balance,
 	securitization_space_to_unreserve: Balance,
 	expires_at_frame: FrameId,
@@ -2306,6 +2461,8 @@ fn fee_coupon(
 		genesis_hash,
 		1u32,
 		beneficiary,
+		requested_satoshis,
+		microgons_at_target_per_btc,
 		fee_discount,
 		securitization_space_to_unreserve,
 		expires_at_frame,
@@ -2316,6 +2473,8 @@ fn fee_coupon(
 		vault_id: 1,
 		genesis_hash,
 		beneficiary,
+		requested_satoshis,
+		microgons_at_target_per_btc,
 		fee_discount,
 		securitization_space_to_unreserve,
 		expires_at_frame,

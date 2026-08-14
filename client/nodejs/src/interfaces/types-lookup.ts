@@ -2788,6 +2788,8 @@ declare module '@polkadot/types/lookup' {
     readonly vaultId: Compact<u32>;
     readonly genesisHash: H256;
     readonly beneficiary: AccountId32;
+    readonly requestedSatoshis: Compact<u64>;
+    readonly microgonsAtTargetPerBtc: Option<u128>;
     readonly feeDiscount: Compact<u128>;
     readonly securitizationSpaceToUnreserve: Compact<u128>;
     readonly expiresAtFrame: Compact<u64>;
@@ -4101,6 +4103,8 @@ declare module '@polkadot/types/lookup' {
     readonly isOrphanedUtxoReleaseRequested: boolean;
     readonly isFundingUtxoCannotBeReleased: boolean;
     readonly isMaxOrphanedUtxoReleaseRequestsExceeded: boolean;
+    readonly isFeeCouponWrongSatoshis: boolean;
+    readonly isFeeCouponWrongTargetPrice: boolean;
     readonly type:
       | 'InsufficientFunds'
       | 'InsufficientVaultFunds'
@@ -4143,7 +4147,9 @@ declare module '@polkadot/types/lookup' {
       | 'OrphanedUtxoFundingConflict'
       | 'OrphanedUtxoReleaseRequested'
       | 'FundingUtxoCannotBeReleased'
-      | 'MaxOrphanedUtxoReleaseRequestsExceeded';
+      | 'MaxOrphanedUtxoReleaseRequestsExceeded'
+      | 'FeeCouponWrongSatoshis'
+      | 'FeeCouponWrongTargetPrice';
   }
 
   /** @name ArgonPrimitivesVaultVaultError (437) */
