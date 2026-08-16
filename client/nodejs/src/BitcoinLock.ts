@@ -785,6 +785,9 @@ export class BitcoinLock implements IBitcoinLock {
     if (initializeForAccountId !== undefined && feeCoupon) {
       throw new Error('Cannot provide both initializeForAccountId and feeCoupon');
     }
+    if (feeCoupon && microgonsAtTargetPerBtc === undefined) {
+      throw new Error('microgonsAtTargetPerBtc is required when feeCoupon is provided');
+    }
 
     const supportsInitializeFor = this.supportsInitializeFor(client);
     const supportsFeeCoupons = !supportsInitializeFor;

@@ -211,6 +211,14 @@ describe('BitcoinLock.createInitializeTx', () => {
     await expect(
       BitcoinLock.createInitializeTx({
         ...args,
+        client: currentClient as any,
+        feeCoupon,
+      } as any),
+    ).rejects.toThrow('microgonsAtTargetPerBtc is required when feeCoupon is provided');
+
+    await expect(
+      BitcoinLock.createInitializeTx({
+        ...args,
         client: legacyClient as any,
         feeCoupon,
         microgonsAtTargetPerBtc: 2_000_000n,
