@@ -577,12 +577,6 @@ pub mod pallet {
 		OverflowError,
 		/// An ineligible microgon rate per btc was requested
 		IneligibleMicrogonRateRequested,
-		/// The fee coupon was issued for a different vault.
-		FeeCouponWrongVault,
-		/// The fee coupon was issued for a different chain.
-		FeeCouponWrongChain,
-		/// The fee coupon was issued for a different beneficiary.
-		FeeCouponWrongAccount,
 		/// The fee coupon is past its expiration frame.
 		FeeCouponExpired,
 		/// The fee coupon was not signed by the vault delegate.
@@ -599,10 +593,6 @@ pub mod pallet {
 		FundingUtxoCannotBeReleased,
 		/// Too many orphaned utxo release requests for a lock
 		MaxOrphanedUtxoReleaseRequestsExceeded,
-		/// The fee coupon was issued for a different number of requested satoshis.
-		FeeCouponWrongSatoshis,
-		/// The fee coupon was issued for a different target price.
-		FeeCouponWrongTargetPrice,
 	}
 
 	impl<T> From<VaultError> for Error<T> {
@@ -700,18 +690,6 @@ pub mod pallet {
 	)]
 	#[scale_info(skip_type_params(T))]
 	pub struct FeeCoupon<T: Config> {
-		/// Vault whose delegate issued this coupon.
-		#[codec(compact)]
-		pub vault_id: VaultId,
-		/// Genesis hash of the chain where this coupon can be used.
-		pub genesis_hash: <T as frame_system::Config>::Hash,
-		/// Account allowed to use this coupon.
-		pub beneficiary: T::AccountId,
-		/// Number of satoshis authorized for this lock.
-		#[codec(compact)]
-		pub requested_satoshis: Satoshis,
-		/// Target-price rate authorized for this lock.
-		pub microgons_at_target_per_btc: Option<T::Balance>,
 		/// Maximum amount deducted from the vault's Bitcoin lock fee.
 		#[codec(compact)]
 		pub fee_discount: T::Balance,
@@ -725,21 +703,29 @@ pub mod pallet {
 		/// Monotonically increasing value preventing replay for this vault and beneficiary.
 		#[codec(compact)]
 		pub nonce: u64,
-		/// Vault delegate signature over the coupon fields.
+		/// Vault delegate signature over the coupon and lock terms.
 		pub signature: T::FeeCouponSignature,
 	}
 
 	pub const FEE_COUPON_MESSAGE_KEY: &[u8] = b"bitcoin_lock_fee_coupon";
 
 	impl<T: Config> FeeCoupon<T> {
-		pub fn verify(&self, signer: &T::AccountId) -> bool {
+		pub fn verify(
+			&self,
+			signer: &T::AccountId,
+			vault_id: VaultId,
+			beneficiary: &T::AccountId,
+			satoshis: Satoshis,
+			microgons_at_target_per_btc: T::Balance,
+		) -> bool {
+			// FRAME preserves block zero and uses this lookup for CheckGenesis.
 			let message = (
 				FEE_COUPON_MESSAGE_KEY,
-				self.genesis_hash,
-				self.vault_id,
-				&self.beneficiary,
-				self.requested_satoshis,
-				self.microgons_at_target_per_btc,
+				frame_system::Pallet::<T>::block_hash(BlockNumberFor::<T>::zero()),
+				vault_id,
+				beneficiary,
+				satoshis,
+				microgons_at_target_per_btc,
 				self.fee_discount,
 				self.securitization_space_to_unreserve,
 				self.expires_at_frame,
@@ -777,17 +763,20 @@ pub mod pallet {
 		},
 		V2 {
 			/// The microgons per btc rate if Argon were trading at target price.
-			microgons_at_target_per_btc: Option<T::Balance>,
-			/// Optional vault-delegate authorization for a fixed fee discount.
-			fee_coupon: Option<FeeCoupon<T>>,
+			#[codec(compact)]
+			microgons_at_target_per_btc: T::Balance,
+			/// Vault-delegate authorization for the lock terms and fixed fee discount.
+			fee_coupon: FeeCoupon<T>,
 		},
 	}
 
 	impl<T: Config> LockOptions<T> {
 		pub fn microgons_at_target_per_btc(&self) -> Option<T::Balance> {
 			match self {
-				LockOptions::<T>::V1 { microgons_at_target_per_btc } |
-				LockOptions::<T>::V2 { microgons_at_target_per_btc, .. } => *microgons_at_target_per_btc,
+				LockOptions::<T>::V1 { microgons_at_target_per_btc } =>
+					*microgons_at_target_per_btc,
+				LockOptions::<T>::V2 { microgons_at_target_per_btc, .. } =>
+					Some(*microgons_at_target_per_btc),
 			}
 		}
 	}
@@ -813,36 +802,29 @@ pub mod pallet {
 			options: Option<LockOptions<T>>,
 		) -> DispatchResult {
 			let account_id = ensure_signed(origin)?;
-			let microgons_at_target_per_btc =
-				options.as_ref().and_then(LockOptions::microgons_at_target_per_btc);
 			let coupon = match options.as_ref() {
-				Some(LockOptions::V2 { fee_coupon, .. }) => fee_coupon.as_ref(),
+				Some(LockOptions::V2 { microgons_at_target_per_btc, fee_coupon }) =>
+					Some((*microgons_at_target_per_btc, fee_coupon)),
 				_ => None,
 			};
 			let (fee_discount, securitization_space_to_unreserve, coupon_nonce) =
-				if let Some(coupon) = coupon {
-					ensure!(coupon.vault_id == vault_id, Error::<T>::FeeCouponWrongVault);
-					ensure!(
-						coupon.genesis_hash ==
-							frame_system::Pallet::<T>::block_hash(BlockNumberFor::<T>::zero()),
-						Error::<T>::FeeCouponWrongChain
-					);
-					ensure!(coupon.beneficiary == account_id, Error::<T>::FeeCouponWrongAccount);
-					ensure!(
-						coupon.requested_satoshis == satoshis,
-						Error::<T>::FeeCouponWrongSatoshis
-					);
-					ensure!(
-						coupon.microgons_at_target_per_btc == microgons_at_target_per_btc,
-						Error::<T>::FeeCouponWrongTargetPrice
-					);
+				if let Some((microgons_at_target_per_btc, coupon)) = coupon {
 					ensure!(
 						T::CurrentFrameId::get() <= coupon.expires_at_frame,
 						Error::<T>::FeeCouponExpired
 					);
 					let delegate = T::VaultProvider::get_vault_delegate(vault_id)
 						.ok_or(Error::<T>::InvalidFeeCouponSignature)?;
-					ensure!(coupon.verify(&delegate), Error::<T>::InvalidFeeCouponSignature);
+					ensure!(
+						coupon.verify(
+							&delegate,
+							vault_id,
+							&account_id,
+							satoshis,
+							microgons_at_target_per_btc,
+						),
+						Error::<T>::InvalidFeeCouponSignature
+					);
 					let next_nonce =
 						LastFeeCouponNonceByVaultAndAccount::<T>::get(vault_id, &account_id)
 							.unwrap_or_default()
@@ -1083,7 +1065,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 			ensure!(
-				!matches!(options.as_ref(), Some(LockOptions::V2 { fee_coupon: Some(_), .. })),
+				!matches!(options.as_ref(), Some(LockOptions::V2 { .. })),
 				Error::<T>::FeeCouponOnlyForInitialization
 			);
 			let mut lock = LocksByUtxoId::<T>::get(utxo_id).ok_or(Error::<T>::LockNotFound)?;

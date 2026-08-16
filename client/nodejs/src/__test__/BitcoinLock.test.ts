@@ -191,11 +191,6 @@ describe('BitcoinLock.createInitializeTx', () => {
       txSigner: { address: 'lock-owner', signer: {} as any },
     };
     const feeCoupon = {
-      vaultId: 1,
-      genesisHash: '0x00',
-      beneficiary: 'lock-owner',
-      requestedSatoshis: 50_000_000n,
-      microgonsAtTargetPerBtc: null,
       feeDiscount: 40_000n,
       securitizationSpaceToUnreserve: 0n,
       expiresAtFrame: 10n,
@@ -208,15 +203,25 @@ describe('BitcoinLock.createInitializeTx', () => {
         ...args,
         client: legacyClient as any,
         feeCoupon,
+        microgonsAtTargetPerBtc: 2_000_000n,
         initializeForAccountId: 'lock-owner',
-      }),
+      } as any),
     ).rejects.toThrow('Cannot provide both initializeForAccountId and feeCoupon');
+
+    await expect(
+      BitcoinLock.createInitializeTx({
+        ...args,
+        client: currentClient as any,
+        feeCoupon,
+      } as any),
+    ).rejects.toThrow('microgonsAtTargetPerBtc is required when feeCoupon is provided');
 
     await expect(
       BitcoinLock.createInitializeTx({
         ...args,
         client: legacyClient as any,
         feeCoupon,
+        microgonsAtTargetPerBtc: 2_000_000n,
       }),
     ).rejects.toThrow('The connected runtime does not support Bitcoin lock fee coupons');
 
@@ -264,11 +269,6 @@ describe('BitcoinLock.createInitializeTx', () => {
       calculateBitcoinFee: vi.fn(() => 100_000n),
     };
     const feeCoupon = {
-      vaultId: 1,
-      genesisHash: '0x00',
-      beneficiary: 'lock-owner',
-      requestedSatoshis: 50_000_000n,
-      microgonsAtTargetPerBtc: null,
       feeDiscount: 40_000n,
       securitizationSpaceToUnreserve: 0n,
       expiresAtFrame: 10n,
@@ -283,6 +283,7 @@ describe('BitcoinLock.createInitializeTx', () => {
       ownerBitcoinPubkey: new Uint8Array(33),
       satoshis: 50_000_000n,
       txSigner: { address: 'lock-owner', signer: {} as any },
+      microgonsAtTargetPerBtc: 2_000_000n,
       feeCoupon,
     });
 
@@ -292,11 +293,12 @@ describe('BitcoinLock.createInitializeTx', () => {
       new Uint8Array(33),
       {
         V2: {
-          microgonsAtTargetPerBtc: null,
+          microgonsAtTargetPerBtc: 2_000_000n,
           feeCoupon,
         },
       },
     );
+    expect(vault.calculateBitcoinFee).toHaveBeenCalledWith(1_000_000n);
     expect(canAffordMock).toHaveBeenCalledWith({
       tip: 0n,
       unavailableBalance: 60_000n,
@@ -319,12 +321,8 @@ describe('BitcoinLock.createInitializeTx', () => {
       ownerBitcoinPubkey: new Uint8Array(33),
       satoshis: 50_000_000n,
       txSigner: { address: 'lock-owner', signer: {} as any },
+      microgonsAtTargetPerBtc: 2_000_000n,
       feeCoupon: {
-        vaultId: 1,
-        genesisHash: '0x00',
-        beneficiary: 'lock-owner',
-        requestedSatoshis: 50_000_000n,
-        microgonsAtTargetPerBtc: null,
         feeDiscount: 200_000n,
         securitizationSpaceToUnreserve: 0n,
         expiresAtFrame: 10n,
