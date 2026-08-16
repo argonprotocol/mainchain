@@ -42,17 +42,24 @@ type UtxoRefLike =
 type UtxoRefOption = { unwrap: () => ArgonPrimitivesBitcoinUtxoRef };
 
 export type BitcoinLockFeeCoupon = {
-  vaultId: number;
-  genesisHash: string;
-  beneficiary: string;
-  requestedSatoshis: bigint;
-  microgonsAtTargetPerBtc: bigint | null;
   feeDiscount: bigint;
   securitizationSpaceToUnreserve: bigint;
   expiresAtFrame: bigint;
   nonce: bigint;
   signature: AnyJson;
 };
+
+type BitcoinLockInitializationTerms =
+  | {
+      feeCoupon: BitcoinLockFeeCoupon;
+      microgonsAtTargetPerBtc: bigint;
+      initializeForAccountId?: never;
+    }
+  | {
+      feeCoupon?: undefined;
+      microgonsAtTargetPerBtc?: bigint;
+      initializeForAccountId?: string;
+    };
 
 function normalizeUtxoRef(utxoRef: UtxoRefLike): {
   txid: string;
@@ -743,20 +750,19 @@ export class BitcoinLock implements IBitcoinLock {
     return undefined;
   }
 
-  public static async createInitializeTx(args: {
-    client: ArgonClient;
-    vault: Vault;
-    priceIndex: PriceIndex;
-    ownerBitcoinPubkey: Uint8Array;
-    satoshis: bigint;
-    txSigner: TxSigningAccount;
-    reducedBalanceBy?: bigint;
-    microgonsAtTargetPerBtc?: bigint;
-    tip?: bigint;
-    feeCoupon?: BitcoinLockFeeCoupon;
-    initializeForAccountId?: string;
-    securitizationSpaceToUnreserve?: bigint;
-  }) {
+  public static async createInitializeTx(
+    args: {
+      client: ArgonClient;
+      vault: Vault;
+      priceIndex: PriceIndex;
+      ownerBitcoinPubkey: Uint8Array;
+      satoshis: bigint;
+      txSigner: TxSigningAccount;
+      reducedBalanceBy?: bigint;
+      tip?: bigint;
+      securitizationSpaceToUnreserve?: bigint;
+    } & BitcoinLockInitializationTerms,
+  ) {
     const {
       vault,
       priceIndex,
@@ -765,11 +771,12 @@ export class BitcoinLock implements IBitcoinLock {
       tip = 0n,
       ownerBitcoinPubkey,
       client,
-      microgonsAtTargetPerBtc = null,
+      microgonsAtTargetPerBtc,
       feeCoupon,
       initializeForAccountId,
       securitizationSpaceToUnreserve = 0n,
     } = args;
+    const requestedTargetPrice = microgonsAtTargetPerBtc ?? null;
     if (ownerBitcoinPubkey.length !== 33) {
       throw new Error(
         `Invalid Bitcoin key length: ${ownerBitcoinPubkey.length}. Must be a compressed pukey (33 bytes).`,
@@ -792,7 +799,7 @@ export class BitcoinLock implements IBitcoinLock {
         ownerBitcoinPubkey,
         {
           V1: {
-            microgonsAtTargetPerBtc,
+            microgonsAtTargetPerBtc: requestedTargetPrice,
           },
         },
         securitizationSpaceToUnreserve,
@@ -814,7 +821,7 @@ export class BitcoinLock implements IBitcoinLock {
           }
         : {
             V1: {
-              microgonsAtTargetPerBtc,
+              microgonsAtTargetPerBtc: requestedTargetPrice,
             },
           };
       tx = client.tx.bitcoinLocks.initialize(vault.vaultId, satoshis, ownerBitcoinPubkey, options);
@@ -824,8 +831,8 @@ export class BitcoinLock implements IBitcoinLock {
     let securityFee = 0n;
     if (!isVaultOwner && !useInitializeFor) {
       const targetPrice =
-        microgonsAtTargetPerBtc !== null
-          ? (microgonsAtTargetPerBtc * satoshis) / SATS_PER_BTC
+        requestedTargetPrice !== null
+          ? (requestedTargetPrice * satoshis) / SATS_PER_BTC
           : priceIndex.getSatoshiPriceInTargetMicrogons(satoshis);
       const unlockAmount = this.calculateRedemptionAmount(priceIndex, targetPrice);
       const fullSecurityFee = vault.calculateBitcoinFee(unlockAmount);
@@ -862,8 +869,8 @@ export class BitcoinLock implements IBitcoinLock {
       ownerBitcoinPubkey: Uint8Array;
       txSigner: TxSigningAccount;
       satoshis: bigint;
-      feeCoupon?: BitcoinLockFeeCoupon;
-    } & ISubmittableOptions,
+    } & BitcoinLockInitializationTerms &
+      ISubmittableOptions,
   ): Promise<{
     getLock(): Promise<{ lock: BitcoinLock; createdAtHeight: number }>;
     txResult: TxResult;

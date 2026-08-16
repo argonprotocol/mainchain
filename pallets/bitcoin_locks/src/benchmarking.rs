@@ -60,19 +60,14 @@ mod benchmarks {
 		)
 		.map_err(|_| BenchmarkError::Stop("failed to decode benchmark fee coupon signature"))?;
 		let options = Some(LockOptions::V2 {
-			microgons_at_target_per_btc: Some(microgons_at_target_per_btc),
-			fee_coupon: Some(FeeCoupon {
-				vault_id,
-				genesis_hash: frame_system::Pallet::<T>::block_hash(BlockNumberFor::<T>::zero()),
-				beneficiary: owner.clone(),
-				requested_satoshis: satoshis,
-				microgons_at_target_per_btc: Some(microgons_at_target_per_btc),
+			microgons_at_target_per_btc,
+			fee_coupon: FeeCoupon {
 				fee_discount: T::Balance::zero(),
 				securitization_space_to_unreserve: T::Balance::zero(),
 				expires_at_frame: T::CurrentFrameId::get(),
 				nonce: 1,
 				signature,
-			}),
+			},
 		});
 		whitelist_account!(owner);
 

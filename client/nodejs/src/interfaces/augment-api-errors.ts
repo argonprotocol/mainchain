@@ -111,26 +111,6 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       FeeCouponOnlyForInitialization: AugmentedError<ApiType>;
       /**
-       * The fee coupon was issued for a different beneficiary.
-       **/
-      FeeCouponWrongAccount: AugmentedError<ApiType>;
-      /**
-       * The fee coupon was issued for a different chain.
-       **/
-      FeeCouponWrongChain: AugmentedError<ApiType>;
-      /**
-       * The fee coupon was issued for a different number of requested satoshis.
-       **/
-      FeeCouponWrongSatoshis: AugmentedError<ApiType>;
-      /**
-       * The fee coupon was issued for a different target price.
-       **/
-      FeeCouponWrongTargetPrice: AugmentedError<ApiType>;
-      /**
-       * The fee coupon was issued for a different vault.
-       **/
-      FeeCouponWrongVault: AugmentedError<ApiType>;
-      /**
        * Cannot request an orphaned release for the funding UTXO
        **/
       FundingUtxoCannotBeReleased: AugmentedError<ApiType>;
