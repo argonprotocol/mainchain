@@ -58,8 +58,8 @@ jobs:
     strategy:
       matrix:
         runtime:
-          - { artifact: "argon_canary_runtime", uri: "wss://rpc.testnet.argonprotocol.org" }
-          - { artifact: "argon_runtime", uri: "wss://rpc.argon.network" }
+          - { artifact: "argon_canary_runtime", uri_secret: "TRY_RUNTIME_TESTNET_URI" }
+          - { artifact: "argon_runtime", uri_secret: "TRY_RUNTIME_MAINNET_URI" }
     steps:
       - name: Download try-runtime-cli
         run: |
@@ -78,12 +78,20 @@ jobs:
       - name: List runtimes
         run: ls -R runtimes
 
-      - name: Try testnet runtime upgrades
+      - name: Try runtime upgrade
+        env:
+          TRY_RUNTIME_URI: ${{ secrets[matrix.runtime.uri_secret] }}
         run: |
+          set -eu
+          if [[ -z "$TRY_RUNTIME_URI" ]]; then
+            echo "::error::Missing repository secret ${{ matrix.runtime.uri_secret }}"
+            exit 1
+          fi
+
           ./try-runtime \
             --runtime ./runtimes/${{ matrix.runtime.artifact }}.compact.compressed.wasm \
             on-runtime-upgrade \
               --print-storage-diff \
               --blocktime 60000 \
               --disable-mbm-checks \
-            live --uri ${{ matrix.runtime.uri }}
+            live --uri "$TRY_RUNTIME_URI"
