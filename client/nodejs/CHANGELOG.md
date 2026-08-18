@@ -1,8 +1,40 @@
 # Changelog
 
-## [v1.4.11](https://github.com/argonprotocol/mainchain/compare/v1.4.10...d386c4ce0e6ecc6d18cdfabe92db7a195d0d67d5) (2026-07-31)
+## [v1.4.12](https://github.com/argonprotocol/mainchain/compare/v1.4.11...f3bdc948e7dbce3e56bbd89b5ce4f6cbcb89b4e4) (2026-08-16)
 
 ### Features
+
+* reserve unused vault and bond capacity
+([9882b55](https://github.com/argonprotocol/mainchain/commit/9882b5550459e0c1b6fee2c7fa264e69a97cab00))
+* **treasury:** sign bond bonuses per purchase
+([788c939](https://github.com/argonprotocol/mainchain/commit/788c939bb9d581924a515f5ba8380027560f7aee))
+* **bitcoin:** authorize lock fee discounts with coupons
+([3891d56](https://github.com/argonprotocol/mainchain/commit/3891d56181b747e4caa9d04b99f7b2c864a5a7b7))
+* **operational-accounts:** make upgrade codes exclusive
+([cbae401](https://github.com/argonprotocol/mainchain/commit/cbae4011fe35d15bfc0763563b9f944682f95a57))
+* move vault names to operational account profiles
+([21efd27](https://github.com/argonprotocol/mainchain/commit/21efd27400a28cd374c459884cecff87c01d1875))
+
+### Fixes
+
+* **nodejs:** validate coupon target rate
+([7be5f79](https://github.com/argonprotocol/mainchain/commit/7be5f794a8dbafd60f9eab8f191391e8dbb9ec0c))
+* **bitcoin-locks:** remove duplicate fee coupon terms
+([ff13b83](https://github.com/argonprotocol/mainchain/commit/ff13b836849599dee2950bb52ecff6805f63b4c3))
+* **bitcoin-locks:** bind fee coupons to lock terms
+([d4f360f](https://github.com/argonprotocol/mainchain/commit/d4f360f2fb2bfed5b3d112df84e5c12687169ecb))
+* **treasury:** allow multiple bonus coupons
+([651d592](https://github.com/argonprotocol/mainchain/commit/651d5921636dc06b60ab3ec5adb2d07b06e807b0))
+* **bitcoin:** extend expired lock orphan detection
+([e8a1ce5](https://github.com/argonprotocol/mainchain/commit/e8a1ce53f2f550e202fbd5de8c91073b960d5b92))
+* **nodejs:** run package validation on Windows
+([6de7afe](https://github.com/argonprotocol/mainchain/commit/6de7afe03672c7a192b779e5dcf6151d9266dfe6))
+* **nodejs:** correct published client declarations
+([1d47389](https://github.com/argonprotocol/mainchain/commit/1d473892a2efa33fc0bf4b6c66463d01bc4c745a))
+
+### [v1.4.11](https://github.com/argonprotocol/mainchain/compare/v1.4.10...v1.4.11) (2026-07-31)
+
+#### Features
 
 * **price-index:** add ethereum repayment pricing
 ([b6f1709](https://github.com/argonprotocol/mainchain/commit/b6f1709ea4e2f7d502320a45843ded72ae6fa013))
@@ -13,7 +45,7 @@
 * **crosschain:** schedule global issuance council rotations
 ([f3cb236](https://github.com/argonprotocol/mainchain/commit/f3cb236a6d70ad4538b87ad840efa646395942a3))
 
-### Fixes
+#### Fixes
 
 * **client:** preserve Beacon API base paths
 ([fda12c9](https://github.com/argonprotocol/mainchain/commit/fda12c91c0d1af43b25438b6852dde9fccd9628d))

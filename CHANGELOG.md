@@ -1,8 +1,76 @@
 # Changelog
 
-## [v1.4.11](https://github.com/argonprotocol/mainchain/compare/v1.4.10...d386c4ce0e6ecc6d18cdfabe92db7a195d0d67d5) (2026-07-31)
+## [v1.4.12](https://github.com/argonprotocol/mainchain/compare/v1.4.11...f3bdc948e7dbce3e56bbd89b5ce4f6cbcb89b4e4) (2026-08-16)
 
 ### Features
+
+* reserve unused vault and bond capacity
+([9882b55](https://github.com/argonprotocol/mainchain/commit/9882b5550459e0c1b6fee2c7fa264e69a97cab00))
+* **treasury:** sign bond bonuses per purchase
+([788c939](https://github.com/argonprotocol/mainchain/commit/788c939bb9d581924a515f5ba8380027560f7aee))
+* **bitcoin:** authorize lock fee discounts with coupons
+([3891d56](https://github.com/argonprotocol/mainchain/commit/3891d56181b747e4caa9d04b99f7b2c864a5a7b7))
+* **operational-accounts:** make upgrade codes exclusive
+([cbae401](https://github.com/argonprotocol/mainchain/commit/cbae4011fe35d15bfc0763563b9f944682f95a57))
+* move vault names to operational account profiles
+([21efd27](https://github.com/argonprotocol/mainchain/commit/21efd27400a28cd374c459884cecff87c01d1875))
+* increase the MinimumArgonsPerContributor on canary from 1 to 10
+([5743fb5](https://github.com/argonprotocol/mainchain/commit/5743fb5c4dd08acbc85a6d5477400c70b21732c7))
+
+### Fixes
+
+* **nodejs:** validate coupon target rate
+([7be5f79](https://github.com/argonprotocol/mainchain/commit/7be5f794a8dbafd60f9eab8f191391e8dbb9ec0c))
+* **bitcoin-locks:** remove duplicate fee coupon terms
+([ff13b83](https://github.com/argonprotocol/mainchain/commit/ff13b836849599dee2950bb52ecff6805f63b4c3))
+* **bitcoin-locks:** bind fee coupons to lock terms
+([d4f360f](https://github.com/argonprotocol/mainchain/commit/d4f360f2fb2bfed5b3d112df84e5c12687169ecb))
+* **bitcoin-locks:** correct ratchet liquidity accounting
+([f873206](https://github.com/argonprotocol/mainchain/commit/f8732062f0b9559875704b5b53aaad678491f665))
+* **ci:** run interrupted fast-sync recovery test
+([26ac26f](https://github.com/argonprotocol/mainchain/commit/26ac26f260693436af17350016e1cea57ef32372))
+* **node:** reject stateless best block on startup
+([bcb711b](https://github.com/argonprotocol/mainchain/commit/bcb711bf5bf1737159d57e78a91485701dbea66f))
+* **runtime:** regenerate operational account weights
+([124a9ef](https://github.com/argonprotocol/mainchain/commit/124a9efa8d1cee87595d13c01326de354371bba6))
+* **operational-accounts:** benchmark invited register path
+([0535bbe](https://github.com/argonprotocol/mainchain/commit/0535bbe376888cbff884f1063948845c8ccdec6f))
+* **operational-accounts:** requeue ready upstream access code awards
+([2a05c20](https://github.com/argonprotocol/mainchain/commit/2a05c200606cf0b000352c0f43c2931f76d1a867))
+* **nodejs:** restore clean typechecking
+([344c20c](https://github.com/argonprotocol/mainchain/commit/344c20c6903bf00b36a36db337f46435785ebc21))
+* **operations:** allow linked accounts to set names
+([f230cd5](https://github.com/argonprotocol/mainchain/commit/f230cd51a11ca004f23884da62238433139828e0))
+* **operations:** reconcile funded bitcoin accounting
+([e16ae3f](https://github.com/argonprotocol/mainchain/commit/e16ae3faafbd9cb026a8e189fd9803905ad27a10))
+* **ci:** derive test bonus nonce from runtime state
+([14d3e34](https://github.com/argonprotocol/mainchain/commit/14d3e34018808e538356f7426be221b955170846))
+* **ci:** avoid test-only CodeQL false positives
+([f73807e](https://github.com/argonprotocol/mainchain/commit/f73807eb7817e4d7b93ac5eb872eecc4cdb755c7))
+* charge reservation operator lookup weight
+([c7430e4](https://github.com/argonprotocol/mainchain/commit/c7430e4c0d3a6b61542e99d04ac736f9afc420f5))
+* update vault provider extension callers
+([5dd6e30](https://github.com/argonprotocol/mainchain/commit/5dd6e303138b5bf99808af9de088acf7fb050f17))
+* honor flexible capacity permissions for extensions
+([370eaf7](https://github.com/argonprotocol/mainchain/commit/370eaf7b390c7c5f9467067f9dae2ebc193e12e0))
+* **treasury:** allow multiple bonus coupons
+([651d592](https://github.com/argonprotocol/mainchain/commit/651d5921636dc06b60ab3ec5adb2d07b06e807b0))
+* **bitcoin:** keep expired candidates watched
+([96cdbac](https://github.com/argonprotocol/mainchain/commit/96cdbacc163e4c92d5954e7b84aef3c7ee6379ed))
+* **bitcoin:** wait for sync before expired cleanup
+([886452a](https://github.com/argonprotocol/mainchain/commit/886452a8c83e7e3f708fea724b541b91dc2eb907))
+* **bitcoin:** extend expired lock orphan detection
+([e8a1ce5](https://github.com/argonprotocol/mainchain/commit/e8a1ce53f2f550e202fbd5de8c91073b960d5b92))
+* **notary:** recover silent notebook listeners
+([7b94ad8](https://github.com/argonprotocol/mainchain/commit/7b94ad8e3eed8ef63fc60512d7fafbb597c060cd))
+* **nodejs:** run package validation on Windows
+([6de7afe](https://github.com/argonprotocol/mainchain/commit/6de7afe03672c7a192b779e5dcf6151d9266dfe6))
+* **nodejs:** correct published client declarations
+([1d47389](https://github.com/argonprotocol/mainchain/commit/1d473892a2efa33fc0bf4b6c66463d01bc4c745a))
+
+### [v1.4.11](https://github.com/argonprotocol/mainchain/compare/v1.4.10...v1.4.11) (2026-07-31)
+
+#### Features
 
 * **price-index:** add ethereum repayment pricing
 ([b6f1709](https://github.com/argonprotocol/mainchain/commit/b6f1709ea4e2f7d502320a45843ded72ae6fa013))
@@ -13,7 +81,7 @@
 * **crosschain:** schedule global issuance council rotations
 ([f3cb236](https://github.com/argonprotocol/mainchain/commit/f3cb236a6d70ad4538b87ad840efa646395942a3))
 
-### Fixes
+#### Fixes
 
 * **treasury:** allow bonds against vault securitization
 ([9eb1522](https://github.com/argonprotocol/mainchain/commit/9eb15223f995163b15e27422211f612ce05a2581))
