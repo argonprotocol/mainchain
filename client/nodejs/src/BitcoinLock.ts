@@ -14,10 +14,9 @@ import { TxResult } from './TxResult';
 import { u8aToHex } from '@polkadot/util';
 import { ApiDecoration } from '@polkadot/api/types';
 import { PriceIndex } from './PriceIndex';
-import { bool, Option } from '@polkadot/types-codec';
 import type { AccountId32 } from '@polkadot/types/interfaces/runtime';
 import type { AnyJson, ITuple } from '@polkadot/types-codec/types';
-import type { u128, u64, Vec } from '@polkadot/types-codec';
+import type { bool, Option, u128, u64, Vec } from '@polkadot/types-codec';
 import { formatArgons } from './utils';
 import type { Vault } from './Vault';
 import BigNumber from 'bignumber.js';
@@ -38,8 +37,6 @@ type PendingMintQueryableClient = {
 type UtxoRefLike =
   | ArgonPrimitivesBitcoinUtxoRef
   | { txid: string | Uint8Array; outputIndex: number };
-
-type UtxoRefOption = { unwrap: () => ArgonPrimitivesBitcoinUtxoRef };
 
 export type BitcoinLockFeeCoupon = {
   feeDiscount: bigint;
@@ -669,10 +666,9 @@ export class BitcoinLock implements IBitcoinLock {
     ]);
     const liquidityPromised = utxo.liquidityPromised.toBigInt();
     const ownerAccount = utxo.ownerAccount.toHuman();
-    const securitizationRatio = fromFixedNumber(
-      utxo.securitizationRatio.toBigInt(),
-      FIXED_U128_DECIMALS,
-    ).toNumber();
+    const securitizationRatio = !!utxo.securitizationRatio
+      ? fromFixedNumber(utxo.securitizationRatio.toBigInt(), FIXED_U128_DECIMALS).toNumber()
+      : 1;
     const satoshis = utxo.satoshis.toBigInt();
     const utxoSatoshis = utxo.utxoSatoshis?.isSome ? utxo.utxoSatoshis.value.toBigInt() : undefined;
     const vaultPubkey = utxo.vaultPubkey.toHex();
@@ -795,6 +791,7 @@ export class BitcoinLock implements IBitcoinLock {
 
     let tx: SubmittableExtrinsic;
     if (useInitializeFor) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
       tx = (client.tx.bitcoinLocks as any).initializeFor(
         initializeForAccountId,
         vault.vaultId,
