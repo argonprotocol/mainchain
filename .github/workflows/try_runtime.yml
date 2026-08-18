@@ -58,8 +58,8 @@ jobs:
     strategy:
       matrix:
         runtime:
-          - { artifact: "argon_canary_runtime", uri: "wss://rpc.testnet.argonprotocol.org" }
-          - { artifact: "argon_runtime", uri: "wss://rpc.argon.network" }
+          - { artifact: "argon_canary_runtime", network: "testnet" }
+          - { artifact: "argon_runtime", network: "mainnet" }
     steps:
       - name: Download try-runtime-cli
         run: |
@@ -78,12 +78,37 @@ jobs:
       - name: List runtimes
         run: ls -R runtimes
 
-      - name: Try testnet runtime upgrades
+      - name: Configure testnet RPC
+        if: matrix.runtime.network == 'testnet'
+        env:
+          TRY_RUNTIME_URI: ${{ secrets.TRY_RUNTIME_TESTNET_URI }}
         run: |
+          set -eu
+          if [[ -z "$TRY_RUNTIME_URI" ]]; then
+            echo "::error::Missing repository secret TRY_RUNTIME_TESTNET_URI"
+            exit 1
+          fi
+          printf 'TRY_RUNTIME_URI=%s\n' "$TRY_RUNTIME_URI" >> "$GITHUB_ENV"
+
+      - name: Configure mainnet RPC
+        if: matrix.runtime.network == 'mainnet'
+        env:
+          TRY_RUNTIME_URI: ${{ secrets.TRY_RUNTIME_MAINNET_URI }}
+        run: |
+          set -eu
+          if [[ -z "$TRY_RUNTIME_URI" ]]; then
+            echo "::error::Missing repository secret TRY_RUNTIME_MAINNET_URI"
+            exit 1
+          fi
+          printf 'TRY_RUNTIME_URI=%s\n' "$TRY_RUNTIME_URI" >> "$GITHUB_ENV"
+
+      - name: Try runtime upgrade
+        run: |
+          set -eu
           ./try-runtime \
             --runtime ./runtimes/${{ matrix.runtime.artifact }}.compact.compressed.wasm \
             on-runtime-upgrade \
               --print-storage-diff \
               --blocktime 60000 \
               --disable-mbm-checks \
-            live --uri ${{ matrix.runtime.uri }}
+            live --uri "$TRY_RUNTIME_URI"
