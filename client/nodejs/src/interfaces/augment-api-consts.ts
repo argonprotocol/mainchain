@@ -83,6 +83,10 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       maxConcurrentlyReleasingLocks: u32 & AugmentedConst<ApiType>;
       /**
+       * Max bitcoin blocks up to which the first observed output may fund the Lock.
+       **/
+      maxPendingConfirmationBlocks: u64 & AugmentedConst<ApiType>;
+      /**
        * Number of frames orphaned UTXO release entries are retained after a lock lifecycle
        * transition before being cleaned up.
        **/
@@ -94,27 +98,9 @@ declare module '@polkadot/api-base/types/consts' {
     };
     bitcoinUtxos: {
       /**
-       * Maximum number of candidate UTXOs stored per lock
+       * Maximum number of outputs tracked for a single Lock address.
        **/
-      maxCandidateUtxosPerLock: u32 & AugmentedConst<ApiType>;
-      /**
-       * Maximum number of satoshi difference allowed from expected to consider a UTXO as
-       * "confirmed"
-       **/
-      maximumSatoshiThresholdFromExpected: u64 & AugmentedConst<ApiType>;
-      /**
-       * Maximum bitcoin blocks to accept a UTXO for confirmation. Expired locks remain watched
-       * for this many additional blocks so late funding can be detected as orphaned.
-       **/
-      maxPendingConfirmationBlocks: u64 & AugmentedConst<ApiType>;
-      /**
-       * The maximum number of UTXOs that can be watched in a block and/or expiring at same block
-       **/
-      maxPendingConfirmationUtxos: u32 & AugmentedConst<ApiType>;
-      /**
-       * The maximum number of expired pending funding entries cleaned up in a block
-       **/
-      maxPendingFundingExpirationsPerBlock: u32 & AugmentedConst<ApiType>;
+      maxUtxosPerLock: u32 & AugmentedConst<ApiType>;
     };
     blockRewards: {
       /**

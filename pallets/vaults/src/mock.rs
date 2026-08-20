@@ -48,6 +48,7 @@ parameter_types! {
 	pub static ExistentialDeposit: Balance = 10;
 	pub const BlocksPerYear:u32 = 1440*365;
 	pub static GetBitcoinNetwork: BitcoinNetwork = BitcoinNetwork::Regtest;
+	pub const MaxPendingConfirmationBlocks: BitcoinHeight = 144;
 }
 
 impl pallet_balances::Config for Test {
@@ -249,18 +250,16 @@ impl pallet_vaults::Config for Test {
 
 pub struct StaticBitcoinUtxoTracker;
 impl BitcoinUtxoTracker for StaticBitcoinUtxoTracker {
-	fn get_funding_utxo_ref(_utxo_id: UtxoId) -> Option<UtxoRef> {
-		GetUtxoRef::get()
+	fn unwatch_utxo(_utxo_id: UtxoId, utxo_ref: &UtxoRef) {
+		let _ = utxo_ref;
 	}
 
 	fn watch_for_utxo(
 		utxo_id: UtxoId,
 		script_pubkey: BitcoinCosignScriptPubkey,
-		satoshis: Satoshis,
-		watch_for_spent_until: BitcoinHeight,
 	) -> Result<(), DispatchError> {
 		WatchedUtxosById::mutate(|watched_utxos| {
-			watched_utxos.insert(utxo_id, (script_pubkey, satoshis, watch_for_spent_until));
+			watched_utxos.insert(utxo_id, script_pubkey);
 		});
 		Ok(())
 	}
@@ -269,11 +268,6 @@ impl BitcoinUtxoTracker for StaticBitcoinUtxoTracker {
 		WatchedUtxosById::mutate(|watched_utxos| {
 			watched_utxos.remove(&utxo_id);
 		});
-	}
-
-	fn unwatch_candidate(utxo_id: UtxoId, utxo_ref: &UtxoRef) -> Option<(UtxoRef, Satoshis)> {
-		let _ = (utxo_id, utxo_ref);
-		None
 	}
 }
 
@@ -290,9 +284,7 @@ parameter_types! {
 	pub static MinimumLockSatoshis: Satoshis = 10_000_000;
 
 	pub static NextUtxoId: UtxoId = 1;
-	pub static WatchedUtxosById: BTreeMap<UtxoId, (BitcoinCosignScriptPubkey, Satoshis, BitcoinHeight)> = BTreeMap::new();
-
-	pub static GetUtxoRef: Option<UtxoRef> = None;
+	pub static WatchedUtxosById: BTreeMap<UtxoId, BitcoinCosignScriptPubkey> = BTreeMap::new();
 
 	pub static LastLockEvent: Option<(UtxoId, u64, Balance)> = None;
 	pub static LastReleaseEvent: Option<(UtxoId, bool, Balance, Balance)> = None;
@@ -395,6 +387,7 @@ impl pallet_bitcoin_locks::Config for Test {
 	type ArgonTicksPerDay = ArgonTicksPerDay;
 	type MaxConcurrentlyReleasingLocks = MaxConcurrentlyReleasingLocks;
 	type LockDurationBlocks = LockDurationBlocks;
+	type MaxPendingConfirmationBlocks = MaxPendingConfirmationBlocks;
 	type LockReclamationBlocks = LockReclamationBlocks;
 	type LockReleaseCosignDeadlineFrames = LockReleaseCosignDeadlineFrames;
 	type OrphanedUtxoReleaseExpiryFrames = OrphanedUtxoReleaseExpiryFrames;

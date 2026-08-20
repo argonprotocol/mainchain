@@ -921,9 +921,7 @@ where
 
 #[derive(Clone, Encode, Decode, PartialEq, Eq)]
 pub struct BenchmarkBitcoinUtxoTrackerState {
-	pub watched_utxos_by_id: BTreeMap<UtxoId, (BitcoinCosignScriptPubkey, Satoshis, BitcoinHeight)>,
-	pub funding_utxo_refs_by_id: BTreeMap<UtxoId, UtxoRef>,
-	pub candidate_utxos_by_ref: BTreeMap<UtxoRef, (UtxoId, Satoshis)>,
+	pub watched_utxos_by_id: BTreeMap<UtxoId, BitcoinCosignScriptPubkey>,
 	pub bitcoin_network: BitcoinNetwork,
 	pub bitcoin_block_height_change: (BitcoinHeight, BitcoinHeight),
 }
@@ -932,8 +930,6 @@ impl Default for BenchmarkBitcoinUtxoTrackerState {
 	fn default() -> Self {
 		Self {
 			watched_utxos_by_id: BTreeMap::new(),
-			funding_utxo_refs_by_id: BTreeMap::new(),
-			candidate_utxos_by_ref: BTreeMap::new(),
 			bitcoin_network: BitcoinNetwork::Regtest,
 			bitcoin_block_height_change: (0, 0),
 		}
@@ -957,46 +953,19 @@ impl BitcoinUtxoTracker for BenchmarkBitcoinUtxoTracker {
 	fn watch_for_utxo(
 		utxo_id: UtxoId,
 		script_pubkey: BitcoinCosignScriptPubkey,
-		satoshis: Satoshis,
-		watch_for_spent_until: BitcoinHeight,
 	) -> Result<(), DispatchError> {
 		let mut state = benchmark_bitcoin_utxo_tracker_state();
-		state
-			.watched_utxos_by_id
-			.insert(utxo_id, (script_pubkey, satoshis, watch_for_spent_until));
+		state.watched_utxos_by_id.insert(utxo_id, script_pubkey);
 		set_benchmark_bitcoin_utxo_tracker_state(state);
 		Ok(())
 	}
 
-	fn get_funding_utxo_ref(utxo_id: UtxoId) -> Option<UtxoRef> {
-		benchmark_bitcoin_utxo_tracker_state()
-			.funding_utxo_refs_by_id
-			.get(&utxo_id)
-			.cloned()
-	}
+	fn unwatch_utxo(_utxo_id: UtxoId, _utxo_ref: &UtxoRef) {}
 
 	fn unwatch(utxo_id: UtxoId) {
 		let mut state = benchmark_bitcoin_utxo_tracker_state();
 		state.watched_utxos_by_id.remove(&utxo_id);
-		state.funding_utxo_refs_by_id.remove(&utxo_id);
-		state.candidate_utxos_by_ref.retain(|_, (id, _)| *id != utxo_id);
 		set_benchmark_bitcoin_utxo_tracker_state(state);
-	}
-
-	fn unwatch_candidate(utxo_id: UtxoId, utxo_ref: &UtxoRef) -> Option<(UtxoRef, Satoshis)> {
-		let mut state = benchmark_bitcoin_utxo_tracker_state();
-		let mut removed = None;
-		if let Some((candidate_utxo_id, satoshis)) = state.candidate_utxos_by_ref.remove(utxo_ref) {
-			if candidate_utxo_id == utxo_id {
-				removed = Some((utxo_ref.clone(), satoshis));
-			} else {
-				state
-					.candidate_utxos_by_ref
-					.insert(utxo_ref.clone(), (candidate_utxo_id, satoshis));
-			}
-		}
-		set_benchmark_bitcoin_utxo_tracker_state(state);
-		removed
 	}
 }
 
@@ -1392,7 +1361,7 @@ where
 		})
 	}
 
-	fn cancel(
+	fn return_securitization(
 		vault_id: VaultId,
 		securitization: &Securitization<Self::Balance>,
 	) -> Result<(), VaultError> {

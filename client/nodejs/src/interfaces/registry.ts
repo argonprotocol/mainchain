@@ -14,14 +14,13 @@ import type {
   ArgonPrimitivesBitcoinBitcoinBlock,
   ArgonPrimitivesBitcoinBitcoinCosignScriptPubkey,
   ArgonPrimitivesBitcoinBitcoinNetwork,
-  ArgonPrimitivesBitcoinBitcoinRejectedReason,
   ArgonPrimitivesBitcoinBitcoinXPub,
   ArgonPrimitivesBitcoinCompressedBitcoinPubkey,
   ArgonPrimitivesBitcoinH256Le,
   ArgonPrimitivesBitcoinNetworkKind,
   ArgonPrimitivesBitcoinOpaqueBitcoinXpub,
+  ArgonPrimitivesBitcoinUtxoAddress,
   ArgonPrimitivesBitcoinUtxoRef,
-  ArgonPrimitivesBitcoinUtxoValue,
   ArgonPrimitivesBlockSealAppPublic,
   ArgonPrimitivesBlockSealBlockPayout,
   ArgonPrimitivesBlockSealBlockRewardType,
@@ -327,14 +326,13 @@ declare module '@polkadot/types/types/registry' {
     ArgonPrimitivesBitcoinBitcoinBlock: ArgonPrimitivesBitcoinBitcoinBlock;
     ArgonPrimitivesBitcoinBitcoinCosignScriptPubkey: ArgonPrimitivesBitcoinBitcoinCosignScriptPubkey;
     ArgonPrimitivesBitcoinBitcoinNetwork: ArgonPrimitivesBitcoinBitcoinNetwork;
-    ArgonPrimitivesBitcoinBitcoinRejectedReason: ArgonPrimitivesBitcoinBitcoinRejectedReason;
     ArgonPrimitivesBitcoinBitcoinXPub: ArgonPrimitivesBitcoinBitcoinXPub;
     ArgonPrimitivesBitcoinCompressedBitcoinPubkey: ArgonPrimitivesBitcoinCompressedBitcoinPubkey;
     ArgonPrimitivesBitcoinH256Le: ArgonPrimitivesBitcoinH256Le;
     ArgonPrimitivesBitcoinNetworkKind: ArgonPrimitivesBitcoinNetworkKind;
     ArgonPrimitivesBitcoinOpaqueBitcoinXpub: ArgonPrimitivesBitcoinOpaqueBitcoinXpub;
+    ArgonPrimitivesBitcoinUtxoAddress: ArgonPrimitivesBitcoinUtxoAddress;
     ArgonPrimitivesBitcoinUtxoRef: ArgonPrimitivesBitcoinUtxoRef;
-    ArgonPrimitivesBitcoinUtxoValue: ArgonPrimitivesBitcoinUtxoValue;
     ArgonPrimitivesBlockSealAppPublic: ArgonPrimitivesBlockSealAppPublic;
     ArgonPrimitivesBlockSealBlockPayout: ArgonPrimitivesBlockSealBlockPayout;
     ArgonPrimitivesBlockSealBlockRewardType: ArgonPrimitivesBlockSealBlockRewardType;

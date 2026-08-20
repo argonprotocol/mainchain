@@ -1835,7 +1835,7 @@ pub mod pallet {
 			})
 		}
 
-		fn cancel(
+		fn return_securitization(
 			vault_id: VaultId,
 			securitization: &Securitization<Self::Balance>,
 		) -> Result<(), VaultError> {

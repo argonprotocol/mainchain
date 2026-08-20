@@ -724,8 +724,8 @@ fn it_can_close_a_vault() {
 
 		// set to full fee block
 		CurrentTick::set(1440 * 365 + 1);
-		// now when we cancel, it should return the funds to the vault
-		assert_ok!(Vaults::cancel(1, &securitization(amount)));
+		// now when we return the securitization, it should return the funds to the vault
+		assert_ok!(Vaults::return_securitization(1, &securitization(amount)));
 		// should release the 1000 from the bitcoin lock and the 2000 in securitization
 		assert_eq!(Balances::free_balance(1), vault_owner_balance);
 		assert_eq!(Balances::balance_on_hold(&HoldReason::PendingCollect.into(), &1), fee);
@@ -767,8 +767,8 @@ fn it_can_lock_funds() {
 		assert_eq!(Balances::free_balance(2), 6_000 - fee);
 		assert_eq!(Balances::free_balance(1), 500_000);
 		assert_eq!(Balances::balance_on_hold(&HoldReason::PendingCollect.into(), &1), fee);
-		// if we cancel the lock, the fee won't be returned
-		assert_ok!(Vaults::cancel(1, &securitization(500_000)));
+		// if we return the securitization, the fee won't be returned
+		assert_ok!(Vaults::return_securitization(1, &securitization(500_000)));
 		assert_eq!(Balances::free_balance(1), 500_000);
 		assert_eq!(Balances::balance_on_hold(&HoldReason::PendingCollect.into(), &1), fee);
 		assert_eq!(Balances::free_balance(2), 6_000 - fee);

@@ -222,7 +222,7 @@ where
 		Err(VaultError::VaultNotFound)
 	}
 
-	fn cancel(
+	fn return_securitization(
 		_vault_id: VaultId,
 		_securitization: &Securitization<Self::Balance>,
 	) -> Result<(), VaultError> {

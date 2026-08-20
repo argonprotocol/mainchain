@@ -196,10 +196,7 @@ parameter_types! {
 	pub const MaxArgonTargetChangePerTick: FixedU128 = FixedU128::from_rational(1, 100); // 1 centagon
 
 	pub const MaxPendingConfirmationBlocks: BitcoinHeight = 6 * 24; // 1 day of bitcoin blocks
-	pub const MaximumSatoshiThresholdFromExpected: Satoshis = 1_000;
-	pub const MaxPendingConfirmationUtxos: u32 = 10_000;
-	pub const MaxPendingFundingExpirationsPerBlock: u32 = 100;
-	pub const MaxCandidateUtxosPerLock: u32 = 100;
+	pub const MaxUtxosPerLock: u32 = 100;
 
 	// Fees
 	pub FeeMultiplier: Multiplier = Multiplier::one();

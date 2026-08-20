@@ -426,37 +426,6 @@ declare module '@polkadot/api-base/types/submittable' {
     };
     bitcoinUtxos: {
       /**
-       * Bind a candidate UTXO ref as the funding UTXO for its lock.
-       * The locks pallet authorizes the promotion; this pallet binds the ref and begins
-       * tracking.
-       **/
-      fundWithUtxoCandidate: AugmentedSubmittable<
-        (
-          utxoId: u64 | AnyNumber | Uint8Array,
-          utxoRef:
-            | ArgonPrimitivesBitcoinUtxoRef
-            | { txid?: any; outputIndex?: any }
-            | string
-            | Uint8Array,
-        ) => SubmittableExtrinsic<ApiType>,
-        [u64, ArgonPrimitivesBitcoinUtxoRef]
-      >;
-      /**
-       * Reject a pending candidate UTXO and materialize it as an orphan through the locks
-       * pallet.
-       **/
-      rejectUtxoCandidate: AugmentedSubmittable<
-        (
-          utxoId: u64 | AnyNumber | Uint8Array,
-          utxoRef:
-            | ArgonPrimitivesBitcoinUtxoRef
-            | { txid?: any; outputIndex?: any }
-            | string
-            | Uint8Array,
-        ) => SubmittableExtrinsic<ApiType>,
-        [u64, ArgonPrimitivesBitcoinUtxoRef]
-      >;
-      /**
        * Sets the most recent confirmed bitcoin block height (only executable by the Oracle
        * Operator account)
        *

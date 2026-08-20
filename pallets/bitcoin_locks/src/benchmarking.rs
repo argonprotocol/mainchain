@@ -29,6 +29,7 @@ use pallet_prelude::benchmarking::{
 const EXPIRING_LOCKS_BENCH_RANGE_END: u32 = 20;
 const OVERDUE_RELEASES_BENCH_RANGE_END: u32 = 20;
 const ORPHAN_EXPIRATIONS_BENCH_RANGE_END: u32 = 20;
+const PENDING_FUNDING_BENCH_RANGE_END: u32 = 20;
 
 #[benchmarks(where <T as frame_system::Config>::AccountId: Ord)]
 mod benchmarks {
@@ -250,6 +251,29 @@ mod benchmarks {
 	}
 
 	#[benchmark]
+	fn on_initialize_pending_funding(
+		p: Linear<1, PENDING_FUNDING_BENCH_RANGE_END>,
+	) -> Result<(), BenchmarkError> {
+		reset_benchmark_environment::<T>();
+		let mut pending_utxo_ids = Vec::new();
+
+		for index in 0..p {
+			let context = create_unfunded_lock::<T>(100u8.saturating_add(index as u8))?;
+			pending_utxo_ids.push(context.utxo_id);
+		}
+
+		#[block]
+		{
+			let _ = Pallet::<T>::process_pending_funding_expirations(
+				pending_utxo_ids,
+				T::BitcoinBlockHeightChange::get().1.saturating_add(1),
+			);
+		}
+
+		Ok(())
+	}
+
+	#[benchmark]
 	fn admin_modify_minimum_locked_sats() -> Result<(), BenchmarkError> {
 		reset_benchmark_environment::<T>();
 		let new_minimum = benchmark_satoshis::<T>().saturating_add(1_000);
@@ -286,7 +310,6 @@ mod benchmarks {
 		let context = create_unfunded_lock::<T>(7)?;
 		let orphan_ref = benchmark_utxo_ref(1_002);
 		seed_orphan_with_request::<T>(&context, orphan_ref.clone())?;
-		seed_candidate(context.utxo_id, orphan_ref.clone(), context.satoshis);
 		let signature = benchmark_signature()?;
 		let operator = context.operator.clone();
 		whitelist_account!(operator);
@@ -340,109 +363,26 @@ mod benchmarks {
 	}
 
 	#[benchmark]
-	fn provider_funding_received() -> Result<(), BenchmarkError> {
+	fn provider_utxo_detected() -> Result<(), BenchmarkError> {
 		reset_benchmark_environment::<T>();
 		let context = create_unfunded_lock::<T>(11)?;
 		let received_satoshis = context.satoshis.saturating_sub(1_000);
 
 		#[block]
 		{
-			<Pallet<T> as BitcoinUtxoEvents<T::AccountId>>::funding_received(
+			<Pallet<T> as BitcoinUtxoEvents<T::AccountId>>::utxo_detected(
 				context.utxo_id,
+				benchmark_utxo_ref(1_099),
 				received_satoshis,
+				T::BitcoinBlockHeightChange::get().1,
 			)
-			.map_err(|_| BenchmarkError::Stop("funding_received failed"))?;
+			.map_err(|_| BenchmarkError::Stop("utxo_detected failed"))?;
 		}
 
 		let lock = LocksByUtxoId::<T>::get(context.utxo_id)
 			.ok_or(BenchmarkError::Stop("missing funded lock"))?;
 		assert!(lock.is_funded);
 		assert_eq!(lock.satoshis, received_satoshis);
-		Ok(())
-	}
-
-	#[benchmark]
-	fn provider_timeout_waiting_for_funding() -> Result<(), BenchmarkError> {
-		reset_benchmark_environment::<T>();
-		let context = create_unfunded_lock::<T>(12)?;
-		seed_orphan::<T>(&context, benchmark_utxo_ref(1_100))?;
-
-		#[block]
-		{
-			<Pallet<T> as BitcoinUtxoEvents<T::AccountId>>::timeout_waiting_for_funding(
-				context.utxo_id,
-			)
-			.map_err(|_| BenchmarkError::Stop("timeout_waiting_for_funding failed"))?;
-		}
-
-		assert!(!LocksByUtxoId::<T>::contains_key(context.utxo_id));
-		Ok(())
-	}
-
-	#[benchmark]
-	fn provider_funding_promoted_by_account() -> Result<(), BenchmarkError> {
-		reset_benchmark_environment::<T>();
-		let context = create_unfunded_lock::<T>(13)?;
-		let orphan_ref = benchmark_utxo_ref(1_101);
-		let received_satoshis = context.satoshis.saturating_sub(1_000);
-		seed_orphan::<T>(&context, orphan_ref.clone())?;
-
-		#[block]
-		{
-			<Pallet<T> as BitcoinUtxoEvents<T::AccountId>>::funding_promoted_by_account(
-				context.utxo_id,
-				received_satoshis,
-				&context.owner,
-				&orphan_ref,
-			)
-			.map_err(|_| BenchmarkError::Stop("funding_promoted_by_account failed"))?;
-		}
-
-		let lock = LocksByUtxoId::<T>::get(context.utxo_id)
-			.ok_or(BenchmarkError::Stop("missing promoted lock"))?;
-		assert!(lock.is_funded);
-		assert!(!OrphanedUtxosByAccount::<T>::contains_key(&context.owner, &orphan_ref));
-		Ok(())
-	}
-
-	#[benchmark]
-	fn provider_candidate_rejected_by_account() -> Result<(), BenchmarkError> {
-		reset_benchmark_environment::<T>();
-		let context = create_unfunded_lock::<T>(14)?;
-		let orphan_ref = benchmark_utxo_ref(1_102);
-
-		#[block]
-		{
-			<Pallet<T> as BitcoinUtxoEvents<T::AccountId>>::candidate_rejected_by_account(
-				context.utxo_id,
-				context.satoshis,
-				&context.owner,
-				&orphan_ref,
-			)
-			.map_err(|_| BenchmarkError::Stop("candidate_rejected_by_account failed"))?;
-		}
-
-		assert!(OrphanedUtxosByAccount::<T>::contains_key(&context.owner, &orphan_ref));
-		Ok(())
-	}
-
-	#[benchmark]
-	fn provider_orphaned_utxo_detected() -> Result<(), BenchmarkError> {
-		reset_benchmark_environment::<T>();
-		let context = create_unfunded_lock::<T>(15)?;
-		let orphan_ref = benchmark_utxo_ref(1_103);
-
-		#[block]
-		{
-			<Pallet<T> as BitcoinUtxoEvents<T::AccountId>>::orphaned_utxo_detected(
-				context.utxo_id,
-				context.satoshis,
-				orphan_ref.clone(),
-			)
-			.map_err(|_| BenchmarkError::Stop("orphaned_utxo_detected failed"))?;
-		}
-
-		assert!(OrphanedUtxosByAccount::<T>::contains_key(&context.owner, &orphan_ref));
 		Ok(())
 	}
 
@@ -463,7 +403,9 @@ mod benchmarks {
 
 		#[block]
 		{
-			<Pallet<T> as BitcoinUtxoEvents<T::AccountId>>::spent(context.utxo_id)
+			let funding_ref = UtxoIdToFundingUtxoRef::<T>::get(context.utxo_id)
+				.ok_or(BenchmarkError::Stop("missing funding UTXO ref"))?;
+			<Pallet<T> as BitcoinUtxoEvents<T::AccountId>>::spent(context.utxo_id, funding_ref)
 				.map_err(|_| BenchmarkError::Stop("spent failed"))?;
 		}
 
@@ -671,23 +613,15 @@ where
 	T::AccountId: Ord,
 {
 	let context = create_unfunded_lock::<T>(seed_hint)?;
-	let mut tracker_state = benchmark_bitcoin_utxo_tracker_state();
-	tracker_state
-		.funding_utxo_refs_by_id
-		.insert(context.utxo_id, benchmark_utxo_ref(10_000u32.saturating_add(seed_hint as u32)));
-	set_benchmark_bitcoin_utxo_tracker_state(tracker_state);
-	<Pallet<T> as BitcoinUtxoEvents<T::AccountId>>::funding_received(
+	let funding_ref = benchmark_utxo_ref(10_000u32.saturating_add(seed_hint as u32));
+	<Pallet<T> as BitcoinUtxoEvents<T::AccountId>>::utxo_detected(
 		context.utxo_id,
+		funding_ref,
 		context.satoshis,
+		T::BitcoinBlockHeightChange::get().1,
 	)
 	.map_err(|_| BenchmarkError::Stop("failed to fund benchmark lock"))?;
 	Ok(context)
-}
-
-fn seed_candidate(utxo_id: UtxoId, utxo_ref: UtxoRef, satoshis: Satoshis) {
-	let mut state = benchmark_bitcoin_utxo_tracker_state();
-	state.candidate_utxos_by_ref.insert(utxo_ref, (utxo_id, satoshis));
-	set_benchmark_bitcoin_utxo_tracker_state(state);
 }
 
 fn seed_orphan<T>(
@@ -697,12 +631,8 @@ fn seed_orphan<T>(
 where
 	T: Config,
 {
-	<Pallet<T> as BitcoinUtxoEvents<T::AccountId>>::orphaned_utxo_detected(
-		context.utxo_id,
-		context.satoshis,
-		utxo_ref,
-	)
-	.map_err(|_| BenchmarkError::Stop("failed to seed orphan"))
+	Pallet::<T>::orphaned_utxo_detected(context.utxo_id, context.satoshis, utxo_ref)
+		.map_err(|_| BenchmarkError::Stop("failed to seed orphan"))
 }
 
 fn seed_orphan_with_request<T>(

@@ -25,16 +25,15 @@ pub mod pallet {
 	use argon_primitives::{
 		bitcoin::{
 			BitcoinBlock, BitcoinBlockHash, BitcoinCosignScriptPubkey, BitcoinHeight,
-			BitcoinSyncStatus, Satoshis, UtxoId, UtxoRef, UtxoValue,
+			BitcoinSyncStatus, Satoshis, UtxoAddress, UtxoId, UtxoRef, UtxoValue,
 		},
-		inherents::{BitcoinInherentData, BitcoinInherentError, BitcoinUtxoSync},
+		inherents::{
+			BitcoinInherentData, BitcoinInherentError, BitcoinUtxoFunding, BitcoinUtxoSync,
+		},
 		BitcoinUtxoEvents, BitcoinUtxoTracker,
 	};
-	use pallet_prelude::argon_primitives::{
-		bitcoin::BitcoinRejectedReason, inherents::BitcoinUtxoFunding,
-	};
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(2);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(3);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -46,74 +45,31 @@ pub mod pallet {
 
 		type EventHandler: BitcoinUtxoEvents<Self::AccountId>;
 
-		/// The maximum number of UTXOs that can be watched in a block and/or expiring at same block
+		/// Maximum number of outputs tracked for a single Lock address.
 		#[pallet::constant]
-		type MaxPendingConfirmationUtxos: Get<u32>;
-		/// The maximum number of expired pending funding entries cleaned up in a block
-		#[pallet::constant]
-		type MaxPendingFundingExpirationsPerBlock: Get<u32>;
-		/// Maximum number of candidate UTXOs stored per lock
-		#[pallet::constant]
-		type MaxCandidateUtxosPerLock: Get<u32>;
+		type MaxUtxosPerLock: Get<u32>;
 
-		/// Maximum bitcoin blocks to accept a UTXO for confirmation. Expired locks remain watched
-		/// for this many additional blocks so late funding can be detected as orphaned.
-		#[pallet::constant]
-		type MaxPendingConfirmationBlocks: Get<BitcoinHeight>;
-
-		/// Minimum number of satoshis required to consider a UTXO as a candidate
-		type MinimumSatoshisPerCandidateUtxo: Get<Satoshis>;
-
-		/// Maximum number of satoshi difference allowed from expected to consider a UTXO as
-		/// "confirmed"
-		#[pallet::constant]
-		type MaximumSatoshiThresholdFromExpected: Get<Satoshis>;
+		/// Minimum output size tracked and reported for a watched Lock address.
+		type MinimumSatoshisPerUtxo: Get<Satoshis>;
 	}
 
-	/// Locked Bitcoin UTXOs that have been funded with a UtxoRef from the Bitcoin network and
-	/// amounts within the MinimumSatoshiThreshold of the expected. If a Bitcoin UTXO is moved
-	/// before the expiration block, the funds are burned and the UTXO is unlocked.
+	/// The Lock ID identified by each watched script pubkey.
 	#[pallet::storage]
-	pub type LockedUtxos<T: Config> =
-		StorageMap<_, Blake2_128Concat, UtxoRef, UtxoValue, OptionQuery>;
+	pub type UtxoIdByScriptPubkey<T: Config> =
+		StorageMap<_, Blake2_128Concat, BitcoinCosignScriptPubkey, UtxoId, OptionQuery>;
 
-	/// A mapping of utxo id to the confirmed utxo reference
+	/// Watched Lock addresses and the scan height needed to observe them.
 	#[pallet::storage]
-	pub type UtxoIdToFundingUtxoRef<T: Config> =
-		StorageMap<_, Twox64Concat, UtxoId, UtxoRef, OptionQuery>;
+	pub type UtxoAddressByUtxoId<T: Config> =
+		StorageMap<_, Twox64Concat, UtxoId, UtxoAddress, OptionQuery>;
 
-	/// Bitcoin locks that are pending full funding on the bitcoin network
+	/// Every output observed at a watched Lock address, retained until explicitly removed.
 	#[pallet::storage]
-	pub type LocksPendingFunding<T: Config> = StorageValue<
-		_,
-		BoundedBTreeMap<UtxoId, UtxoValue, T::MaxPendingConfirmationUtxos>,
-		ValueQuery,
-	>;
-
-	/// Pending funding entries that have expired. These remain watched until their additional
-	/// orphan-detection window ends, then await bounded cleanup.
-	#[pallet::storage]
-	pub type ExpiredPendingFunding<T: Config> = StorageValue<
-		_,
-		BoundedBTreeMap<UtxoId, UtxoValue, T::MaxPendingConfirmationUtxos>,
-		ValueQuery,
-	>;
-
-	#[derive(Clone, PartialEq, Eq, Encode, Decode, Debug, TypeInfo, MaxEncodedLen)]
-	pub struct CandidateUtxo {
-		#[codec(compact)]
-		pub utxo_id: UtxoId,
-		#[codec(compact)]
-		pub satoshis: Satoshis,
-	}
-
-	/// Candidate UTXOs associated with a lock (mismatches, extra funding, etc.).
-	#[pallet::storage]
-	pub type CandidateUtxoRefsByUtxoId<T: Config> = StorageMap<
+	pub type UtxoRefsByUtxoId<T: Config> = StorageMap<
 		_,
 		Twox64Concat,
 		UtxoId,
-		BoundedBTreeMap<UtxoRef, Satoshis, T::MaxCandidateUtxosPerLock>,
+		BoundedBTreeSet<UtxoRef, T::MaxUtxosPerLock>,
 		ValueQuery,
 	>;
 
@@ -148,18 +104,15 @@ pub mod pallet {
 	#[pallet::event]
 	#[pallet::generate_deposit(fn deposit_event)]
 	pub enum Event<T: Config> {
-		UtxoVerified {
-			utxo_id: UtxoId,
-			satoshis_received: Satoshis,
-		},
-		UtxoRejected {
+		UtxoDetected {
 			utxo_id: UtxoId,
 			utxo_ref: UtxoRef,
-			rejected_reason: BitcoinRejectedReason,
 			satoshis_received: Satoshis,
+			bitcoin_height: BitcoinHeight,
 		},
 		UtxoSpent {
 			utxo_id: UtxoId,
+			utxo_ref: UtxoRef,
 			block_height: BitcoinHeight,
 		},
 		UtxoUnwatched {
@@ -170,11 +123,7 @@ pub mod pallet {
 			utxo_id: UtxoId,
 			error: DispatchError,
 		},
-		UtxoVerifiedError {
-			utxo_id: UtxoId,
-			error: DispatchError,
-		},
-		UtxoRejectedError {
+		UtxoDetectedError {
 			utxo_id: UtxoId,
 			error: DispatchError,
 		},
@@ -192,7 +141,7 @@ pub mod pallet {
 		NoBitcoinPricesAvailable,
 		/// ScriptPubKey is already being waited for
 		ScriptPubkeyConflict,
-		/// Locked Utxo Not Found
+		/// Watched Lock or attached UTXO not found.
 		UtxoNotLocked,
 		/// Redemptions not currently available
 		RedemptionsUnavailable,
@@ -206,12 +155,8 @@ pub mod pallet {
 		InvalidBitcoinScript,
 		/// Duplicated UtxoId. Already in use
 		DuplicateUtxoId,
-		/// Too many candidate UTXOs are being stored for this lock
-		MaxCandidateUtxosExceeded,
-		/// The UTXO reference does not map to a candidate entry
-		UtxoNotCandidate,
-		/// This Lock already has an attached funding UTXO
-		LockAlreadyFunded,
+		/// Too many outputs have been observed at one Lock address.
+		MaxUtxosPerLockExceeded,
 	}
 
 	#[pallet::genesis_config]
@@ -233,14 +178,10 @@ pub mod pallet {
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(_: BlockNumberFor<T>) -> Weight {
-			let utxo_ids = Self::prepare_expired_pending_funding_cleanup(
-				T::MaxPendingFundingExpirationsPerBlock::get(),
-			);
-			let processed = utxo_ids.len() as u32;
-			for utxo_id in utxo_ids {
-				Self::process_expired_pending_funding_entry(utxo_id);
-			}
-			T::WeightInfo::on_initialize(processed)
+			let confirmed_tip = ConfirmedBitcoinBlockTip::<T>::get();
+			TempParentHasSyncState::<T>::put(confirmed_tip.is_some());
+			PreviousBitcoinBlockTip::<T>::set(confirmed_tip);
+			T::WeightInfo::on_initialize()
 		}
 
 		fn on_finalize(_: BlockNumberFor<T>) {
@@ -277,11 +218,9 @@ pub mod pallet {
 			);
 
 			ensure!(!InherentIncluded::<T>::get(), "Inherent already included");
-			// this ensures we can be sure the inherent was included in a relay chain
 			InherentIncluded::<T>::put(true);
 
 			let BitcoinUtxoSync { sync_to_block, funded, spent } = utxo_sync;
-
 			let current_confirmed =
 				ConfirmedBitcoinBlockTip::<T>::get().ok_or(Error::<T>::NoBitcoinConfirmedBlock)?;
 			ensure!(
@@ -295,55 +234,27 @@ pub mod pallet {
 				);
 			}
 
-			for funding in funded {
-				let BitcoinUtxoFunding { utxo_id, utxo_ref, satoshis, bitcoin_height, .. } =
-					funding;
-				let res = with_storage_layer(|| {
-					Self::lock_funding_received(utxo_id, utxo_ref, satoshis, bitcoin_height)
+			for BitcoinUtxoFunding { utxo_id, utxo_ref, satoshis, bitcoin_height, .. } in funded {
+				let result = with_storage_layer(|| {
+					Self::utxo_detected(utxo_id, utxo_ref, satoshis, bitcoin_height)
 				});
-				if let Err(e) = res {
-					log::warn!("Failed to verify UTXO {utxo_id}: {e:?}");
-					Self::deposit_event(Event::UtxoVerifiedError { utxo_id, error: e });
+				if let Err(error) = result {
+					log::warn!("Failed to process UTXO {utxo_id}: {error:?}");
+					Self::deposit_event(Event::UtxoDetectedError { utxo_id, error });
 				}
 			}
 
-			// process funding first, so any funded + spent received in the same block are handled
-			// correctly
 			for spend in spent {
-				let err = with_storage_layer(|| {
+				let result = with_storage_layer(|| {
 					Self::utxo_spent(spend.utxo_id, spend.utxo_ref, spend.bitcoin_height)
 				});
-				if let Err(e) = err {
-					log::warn!("Failed to mark UTXO {} as spent: {:?}", spend.utxo_id, e);
-					Self::deposit_event(Event::UtxoSpentError { utxo_id: spend.utxo_id, error: e });
+				if let Err(error) = result {
+					log::warn!("Failed to mark UTXO {} as spent: {error:?}", spend.utxo_id);
+					Self::deposit_event(Event::UtxoSpentError { utxo_id: spend.utxo_id, error });
 				}
 			}
 
-			let oldest_pending_funding_height = sync_to_block
-				.block_height
-				.saturating_sub(T::MaxPendingConfirmationBlocks::get());
-			let mut newly_expired = Vec::new();
-			LocksPendingFunding::<T>::mutate(|pending| {
-				pending.retain(|utxo_id, entry| {
-					let is_expired = entry.submitted_at_height < oldest_pending_funding_height;
-					if is_expired {
-						newly_expired.push((*utxo_id, entry.clone()));
-					}
-					!is_expired
-				});
-			});
-			ExpiredPendingFunding::<T>::mutate(|expired| {
-				for (utxo_id, entry) in newly_expired {
-					if expired.try_insert(utxo_id, entry).is_err() {
-						log::error!(
-							"Expired pending funding queue full — utxo {utxo_id:?} dropped"
-						);
-					}
-				}
-			});
-
 			SynchedBitcoinBlock::<T>::set(Some(sync_to_block));
-
 			Ok(())
 		}
 
@@ -390,126 +301,47 @@ pub mod pallet {
 			OracleOperatorAccount::<T>::put(account_id.clone());
 			Ok(())
 		}
-
-		/// Bind a candidate UTXO ref as the funding UTXO for its lock.
-		/// The locks pallet authorizes the promotion; this pallet binds the ref and begins
-		/// tracking.
-		#[pallet::call_index(3)]
-		#[pallet::weight(T::WeightInfo::fund_with_utxo_candidate())]
-		pub fn fund_with_utxo_candidate(
-			origin: OriginFor<T>,
-			utxo_id: UtxoId,
-			utxo_ref: UtxoRef,
-		) -> DispatchResult {
-			let who = ensure_signed(origin)?;
-			ensure!(
-				!UtxoIdToFundingUtxoRef::<T>::contains_key(utxo_id),
-				Error::<T>::LockAlreadyFunded
-			);
-			ensure!(!LockedUtxos::<T>::contains_key(&utxo_ref), Error::<T>::LockAlreadyFunded);
-
-			let mut candidates = CandidateUtxoRefsByUtxoId::<T>::take(utxo_id);
-			let satoshis = candidates.remove(&utxo_ref).ok_or(Error::<T>::UtxoNotCandidate)?;
-
-			T::EventHandler::funding_promoted_by_account(utxo_id, satoshis, &who, &utxo_ref)?;
-			let mut entry = LocksPendingFunding::<T>::mutate(|a| a.remove(&utxo_id))
-				.ok_or(Error::<T>::UtxoNotLocked)?;
-			entry.satoshis = satoshis;
-			LockedUtxos::<T>::insert(utxo_ref.clone(), entry);
-			UtxoIdToFundingUtxoRef::<T>::insert(utxo_id, utxo_ref.clone());
-			for (candidate, satoshis) in candidates {
-				T::EventHandler::orphaned_utxo_detected(utxo_id, satoshis, candidate)?;
-			}
-
-			Ok(())
-		}
-
-		/// Reject a pending candidate UTXO and materialize it as an orphan through the locks
-		/// pallet.
-		#[pallet::call_index(4)]
-		#[pallet::weight(T::WeightInfo::reject_utxo_candidate())]
-		pub fn reject_utxo_candidate(
-			origin: OriginFor<T>,
-			utxo_id: UtxoId,
-			utxo_ref: UtxoRef,
-		) -> DispatchResult {
-			let who = ensure_signed(origin)?;
-			let (_, satoshis) =
-				Self::unwatch_candidate(utxo_id, &utxo_ref).ok_or(Error::<T>::UtxoNotCandidate)?;
-			T::EventHandler::candidate_rejected_by_account(utxo_id, satoshis, &who, &utxo_ref)?;
-			Ok(())
-		}
 	}
 
 	impl<T: Config> BitcoinUtxoTracker for Pallet<T> {
 		fn watch_for_utxo(
 			utxo_id: UtxoId,
 			script_pubkey: BitcoinCosignScriptPubkey,
-			satoshis: Satoshis,
-			watch_for_spent_until: BitcoinHeight,
 		) -> Result<(), DispatchError> {
+			ensure!(!UtxoAddressByUtxoId::<T>::contains_key(utxo_id), Error::<T>::DuplicateUtxoId);
 			ensure!(
-				!UtxoIdToFundingUtxoRef::<T>::contains_key(utxo_id),
-				Error::<T>::DuplicateUtxoId
+				!UtxoIdByScriptPubkey::<T>::contains_key(script_pubkey),
+				Error::<T>::ScriptPubkeyConflict
 			);
-			let expired_count = ExpiredPendingFunding::<T>::get().len();
-			LocksPendingFunding::<T>::try_mutate(|utxo_pending_confirmation| {
-				ensure!(
-					utxo_pending_confirmation.len().saturating_add(expired_count) <
-						T::MaxPendingConfirmationUtxos::get() as usize,
-					Error::<T>::MaxUtxosExceeded
-				);
-				ensure!(
-					!utxo_pending_confirmation
-						.iter()
-						.any(|(_, a)| a.script_pubkey == script_pubkey),
-					Error::<T>::ScriptPubkeyConflict
-				);
-				utxo_pending_confirmation
-					.try_insert(
-						utxo_id,
-						UtxoValue {
-							utxo_id,
-							satoshis,
-							script_pubkey,
-							watch_for_spent_until_height: watch_for_spent_until,
-							submitted_at_height: <ConfirmedBitcoinBlockTip<T>>::get()
-								.map(|a| a.block_height)
-								.unwrap_or_default(),
-						},
-					)
-					.map_err(|_| Error::<T>::MaxUtxosExceeded)?;
-				Ok::<(), Error<T>>(())
-			})?;
+			let address = UtxoAddress {
+				utxo_id,
+				script_pubkey,
+				submitted_at_height: ConfirmedBitcoinBlockTip::<T>::get()
+					.map(|block| block.block_height)
+					.unwrap_or_default(),
+			};
+			UtxoIdByScriptPubkey::<T>::insert(script_pubkey, utxo_id);
+			UtxoAddressByUtxoId::<T>::insert(utxo_id, address);
 			Ok(())
 		}
 
-		fn get_funding_utxo_ref(utxo_id: UtxoId) -> Option<UtxoRef> {
-			UtxoIdToFundingUtxoRef::<T>::get(utxo_id)
-		}
-
-		fn unwatch(utxo_id: UtxoId) {
-			if let Some(utxo_ref) = UtxoIdToFundingUtxoRef::<T>::take(utxo_id) {
-				LockedUtxos::<T>::take(utxo_ref);
-			}
-			LocksPendingFunding::<T>::mutate(|a| a.remove(&utxo_id));
-			ExpiredPendingFunding::<T>::mutate(|a| a.remove(&utxo_id));
-			let _ = CandidateUtxoRefsByUtxoId::<T>::take(utxo_id);
-		}
-
-		fn unwatch_candidate(utxo_id: UtxoId, utxo_ref: &UtxoRef) -> Option<(UtxoRef, Satoshis)> {
-			let mut result = None;
-			CandidateUtxoRefsByUtxoId::<T>::mutate_exists(utxo_id, |refs| {
-				if let Some(inner) = refs.as_mut() {
-					if let Some(sats) = inner.remove(utxo_ref) {
-						result = Some((utxo_ref.clone(), sats));
-					}
-					if inner.is_empty() {
-						*refs = None;
+		fn unwatch_utxo(utxo_id: UtxoId, utxo_ref: &UtxoRef) {
+			UtxoRefsByUtxoId::<T>::mutate_exists(utxo_id, |maybe_refs| {
+				if let Some(refs) = maybe_refs.as_mut() {
+					refs.remove(utxo_ref);
+					if refs.is_empty() {
+						*maybe_refs = None;
 					}
 				}
 			});
-			result
+		}
+
+		fn unwatch(utxo_id: UtxoId) {
+			if let Some(address) = UtxoAddressByUtxoId::<T>::get(utxo_id) {
+				UtxoIdByScriptPubkey::<T>::remove(address.script_pubkey);
+			}
+			UtxoAddressByUtxoId::<T>::remove(utxo_id);
+			UtxoRefsByUtxoId::<T>::remove(utxo_id);
 		}
 	}
 
@@ -532,7 +364,7 @@ pub mod pallet {
 				x.block_height
 			} else {
 				let mut oldest = confirmed_block.block_height;
-				for (_, entry) in LocksPendingFunding::<T>::get() {
+				for entry in UtxoAddressByUtxoId::<T>::iter_values() {
 					if entry.submitted_at_height < oldest {
 						oldest = entry.submitted_at_height;
 					}
@@ -542,176 +374,78 @@ pub mod pallet {
 			Some(BitcoinSyncStatus { confirmed_block, synched_block, oldest_allowed_block_height })
 		}
 
-		pub fn active_utxos() -> Vec<(Option<UtxoRef>, UtxoValue)> {
+		pub fn active_utxo_addresses() -> Vec<(Option<UtxoRef>, UtxoAddress)> {
 			let mut utxos = vec![];
-			for (utxo, entry) in LockedUtxos::<T>::iter() {
-				utxos.push((Some(utxo), entry));
-			}
-			let expired = ExpiredPendingFunding::<T>::get();
-			let pending = LocksPendingFunding::<T>::get();
-			for (utxo_id, entry) in expired.iter().chain(pending.iter()) {
-				utxos.push((None, entry.clone()));
-				// Candidates remain watched until the pending or orphan-detection window ends.
-				let candidate_refs = CandidateUtxoRefsByUtxoId::<T>::get(*utxo_id);
-				for (utxo_ref, _) in candidate_refs {
-					utxos.push((Some(utxo_ref), entry.clone()));
+			for (utxo_id, watch) in UtxoAddressByUtxoId::<T>::iter() {
+				let refs = UtxoRefsByUtxoId::<T>::get(utxo_id);
+				if refs.is_empty() {
+					utxos.push((None, watch));
+				} else {
+					utxos.extend(refs.into_iter().map(|utxo_ref| (Some(utxo_ref), watch.clone())));
 				}
 			}
 			utxos
 		}
 
-		fn send_candidates_as_orphans(utxo_id: UtxoId) -> DispatchResult {
-			let candidate_refs = CandidateUtxoRefsByUtxoId::<T>::take(utxo_id);
-			for (utxo_ref, satoshis) in candidate_refs {
-				T::EventHandler::orphaned_utxo_detected(utxo_id, satoshis, utxo_ref)?;
-			}
-			Ok(())
+		/// Legacy API projection retained for nodes that have not adopted the address-only API.
+		pub fn active_utxos() -> Vec<(Option<UtxoRef>, UtxoValue)> {
+			Self::active_utxo_addresses()
+				.into_iter()
+				.map(|(utxo_ref, address)| {
+					(
+						utxo_ref,
+						UtxoValue {
+							utxo_id: address.utxo_id,
+							script_pubkey: address.script_pubkey,
+							satoshis: 0,
+							submitted_at_height: address.submitted_at_height,
+							watch_for_spent_until_height: BitcoinHeight::MAX,
+						},
+					)
+				})
+				.collect()
 		}
 
-		fn record_candidate(
-			utxo_id: UtxoId,
-			utxo_ref: UtxoRef,
-			satoshis: Satoshis,
-		) -> DispatchResult {
-			CandidateUtxoRefsByUtxoId::<T>::try_mutate(utxo_id, |refs| {
-				if refs.contains_key(&utxo_ref) {
-					return Ok::<(), Error<T>>(());
-				}
-				refs.try_insert(utxo_ref.clone(), satoshis)
-					.map_err(|_| Error::<T>::MaxCandidateUtxosExceeded)?;
-				Ok::<(), Error<T>>(())
-			})?;
-			Ok(())
-		}
-
-		pub fn lock_funding_received(
+		pub fn utxo_detected(
 			utxo_id: UtxoId,
 			utxo_ref: UtxoRef,
 			satoshis: Satoshis,
 			bitcoin_height: BitcoinHeight,
 		) -> DispatchResult {
-			if satoshis < T::MinimumSatoshisPerCandidateUtxo::get() {
+			if satoshis < T::MinimumSatoshisPerUtxo::get() {
 				tracing::info!(utxo_id = ?utxo_id, satoshis = ?satoshis,
-					"UTXO funding below minimum threshold");
+					"UTXO below minimum tracking threshold");
 				return Ok(())
 			}
 
-			if LockedUtxos::<T>::contains_key(&utxo_ref) {
+			let Some(address) = UtxoAddressByUtxoId::<T>::get(utxo_id) else { return Ok(()) };
+			if UtxoIdByScriptPubkey::<T>::get(address.script_pubkey) != Some(utxo_id) {
+				tracing::info!(utxo_id = ?utxo_id, "UTXO address is not being watched");
+				return Ok(())
+			}
+
+			let inserted = UtxoRefsByUtxoId::<T>::try_mutate(utxo_id, |refs| {
+				if refs.contains(&utxo_ref) {
+					return Ok(false)
+				}
+				refs.try_insert(utxo_ref.clone())
+					.map_err(|_| Error::<T>::MaxUtxosPerLockExceeded)?;
+				Ok::<bool, Error<T>>(true)
+			})?;
+			if !inserted {
 				tracing::info!(utxo_id = ?utxo_id, satoshis = ?satoshis, utxo_ref = ?utxo_ref, bitcoin_height,
 					"UTXO duplicate received");
 				return Ok(());
 			}
 
-			let mut rejected_reason = BitcoinRejectedReason::AlreadyVerified;
-			let pending_funding = LocksPendingFunding::<T>::get();
-			let Some(entry) = pending_funding.get(&utxo_id) else {
-				if UtxoIdToFundingUtxoRef::<T>::contains_key(utxo_id) {
-					T::EventHandler::orphaned_utxo_detected(utxo_id, satoshis, utxo_ref.clone())?;
-					// If the lock is already funded, this is treated as an unbacked candidate UTXO.
-					Self::deposit_event(Event::UtxoRejected {
-						utxo_id,
-						utxo_ref: utxo_ref.clone(),
-						satoshis_received: satoshis,
-						rejected_reason,
-					});
-				} else if ExpiredPendingFunding::<T>::get().contains_key(&utxo_id) {
-					T::EventHandler::orphaned_utxo_detected(utxo_id, satoshis, utxo_ref.clone())?;
-					Self::deposit_event(Event::UtxoRejected {
-						utxo_id,
-						utxo_ref,
-						satoshis_received: satoshis,
-						rejected_reason: BitcoinRejectedReason::VerificationExpired,
-					});
-				} else {
-					tracing::info!(utxo_id = ?utxo_id, satoshis = ?satoshis, utxo_ref = ?utxo_ref, bitcoin_height,
-						"UTXO not being waited for");
-				}
-				return Ok(())
-			};
-			let max_acceptance_height =
-				entry.submitted_at_height.saturating_add(T::MaxPendingConfirmationBlocks::get());
-
-			let is_within_threshold = if satoshis >= entry.satoshis {
-				satoshis.saturating_sub(entry.satoshis) <=
-					T::MaximumSatoshiThresholdFromExpected::get()
-			} else {
-				entry.satoshis.saturating_sub(satoshis) <=
-					T::MaximumSatoshiThresholdFromExpected::get()
-			};
-			let is_within_allowed_height = bitcoin_height <= max_acceptance_height;
-			if !is_within_threshold {
-				rejected_reason = BitcoinRejectedReason::SatoshisOutsideAcceptedRange;
-			} else if !is_within_allowed_height {
-				rejected_reason = BitcoinRejectedReason::VerificationExpired;
-			}
-
-			if is_within_allowed_height && is_within_threshold {
-				LockedUtxos::<T>::insert(utxo_ref.clone(), entry.clone());
-				UtxoIdToFundingUtxoRef::<T>::insert(utxo_id, utxo_ref.clone());
-				LocksPendingFunding::<T>::mutate(|a| a.remove(&utxo_id));
-				// this shouldn't be possible, but remove just as a defensive measure
-				Self::unwatch_candidate(utxo_id, &utxo_ref);
-				// at this point, any other candidates are now orphans
-				Self::send_candidates_as_orphans(utxo_id)?;
-
-				T::EventHandler::funding_received(utxo_id, satoshis)?;
-				Self::deposit_event(Event::UtxoVerified { utxo_id, satoshis_received: satoshis });
-			} else {
-				Self::record_candidate(utxo_id, utxo_ref.clone(), satoshis)?;
-				Self::deposit_event(Event::UtxoRejected {
-					utxo_id,
-					utxo_ref: utxo_ref.clone(),
-					satoshis_received: satoshis,
-					rejected_reason,
-				});
-			}
-
+			T::EventHandler::utxo_detected(utxo_id, utxo_ref.clone(), satoshis, bitcoin_height)?;
+			Self::deposit_event(Event::UtxoDetected {
+				utxo_id,
+				utxo_ref,
+				satoshis_received: satoshis,
+				bitcoin_height,
+			});
 			Ok(())
-		}
-
-		pub fn lock_timeout_pending_funding(utxo_id: UtxoId) -> DispatchResult {
-			ExpiredPendingFunding::<T>::mutate(|a| a.remove(&utxo_id));
-			// send candidates first!
-			Self::send_candidates_as_orphans(utxo_id)?;
-			<Self as BitcoinUtxoTracker>::unwatch(utxo_id);
-			T::EventHandler::timeout_waiting_for_funding(utxo_id)?;
-			Self::deposit_event(Event::UtxoUnwatched { utxo_id });
-			Ok(())
-		}
-
-		// Separated so the benchmark measures the real hook setup and full expired-queue decode.
-		pub(crate) fn prepare_expired_pending_funding_cleanup(limit: u32) -> Vec<UtxoId> {
-			let confirmed_tip = ConfirmedBitcoinBlockTip::<T>::get();
-			TempParentHasSyncState::<T>::put(confirmed_tip.is_some());
-			PreviousBitcoinBlockTip::<T>::set(confirmed_tip);
-			let Some(synched_height) = SynchedBitcoinBlock::<T>::get().map(|tip| tip.block_height)
-			else {
-				return vec![];
-			};
-			let funding_window = T::MaxPendingConfirmationBlocks::get();
-			// Only remove locks after an inherent has already synced past their final orphan-only
-			// block. The confirmed tip can advance before the current inherent is processed.
-			ExpiredPendingFunding::<T>::get()
-				.iter()
-				.filter(|(_, entry)| {
-					entry
-						.submitted_at_height
-						.saturating_add(funding_window)
-						.saturating_add(funding_window) <
-						synched_height
-				})
-				.map(|(utxo_id, _)| *utxo_id)
-				.take(limit as usize)
-				.collect()
-		}
-
-		// Separated so the benchmark measures the real one-item cleanup body.
-		pub(crate) fn process_expired_pending_funding_entry(utxo_id: UtxoId) {
-			let res = with_storage_layer(|| Self::lock_timeout_pending_funding(utxo_id));
-			if let Err(e) = res {
-				log::warn!("Failed to reject UTXO {utxo_id:?} due to lookup expiration: {e:?}");
-				Self::deposit_event(Event::UtxoRejectedError { utxo_id, error: e });
-			}
 		}
 
 		pub fn utxo_spent(
@@ -719,37 +453,31 @@ pub mod pallet {
 			utxo_ref: Option<UtxoRef>,
 			block_height: BitcoinHeight,
 		) -> DispatchResult {
-			if let Some(ref utxo_ref) = utxo_ref {
-				if let Some(locked_ref) = UtxoIdToFundingUtxoRef::<T>::get(utxo_id) &&
-					&locked_ref == utxo_ref
-				{
-					LockedUtxos::<T>::take(locked_ref);
-					UtxoIdToFundingUtxoRef::<T>::remove(utxo_id);
-					LocksPendingFunding::<T>::mutate(|a| a.remove(&utxo_id));
-					ExpiredPendingFunding::<T>::mutate(|a| a.remove(&utxo_id));
-					let _ = CandidateUtxoRefsByUtxoId::<T>::take(utxo_id);
+			let refs = match utxo_ref {
+				Some(utxo_ref) => alloc::vec![utxo_ref],
+				None => UtxoRefsByUtxoId::<T>::get(utxo_id).into_iter().collect(),
+			};
+			for utxo_ref in refs {
+				let was_spent = UtxoRefsByUtxoId::<T>::try_mutate_exists(utxo_id, |maybe_refs| {
+					let Some(refs) = maybe_refs.as_mut() else {
+						return Ok::<bool, DispatchError>(false)
+					};
+					if !refs.remove(&utxo_ref) {
+						return Ok(false)
+					}
 
-					T::EventHandler::spent(utxo_id)?;
-					Self::deposit_event(Event::UtxoSpent { utxo_id, block_height });
-					return Ok(());
+					T::EventHandler::spent(utxo_id, utxo_ref.clone())?;
+					if refs.is_empty() {
+						*maybe_refs = None;
+					}
+					Ok(true)
+				})?;
+				if !was_spent {
+					continue
 				}
 
-				if Self::unwatch_candidate(utxo_id, utxo_ref).is_some() {
-					return Ok(());
-				}
-
-				return Ok(());
+				Self::deposit_event(Event::UtxoSpent { utxo_id, utxo_ref, block_height });
 			}
-
-			if let Some(locked_ref) = UtxoIdToFundingUtxoRef::<T>::take(utxo_id) {
-				LockedUtxos::<T>::take(locked_ref);
-			}
-			LocksPendingFunding::<T>::mutate(|a| a.remove(&utxo_id));
-			ExpiredPendingFunding::<T>::mutate(|a| a.remove(&utxo_id));
-			let _ = CandidateUtxoRefsByUtxoId::<T>::take(utxo_id);
-
-			T::EventHandler::spent(utxo_id)?;
-			Self::deposit_event(Event::UtxoSpent { utxo_id, block_height });
 			Ok(())
 		}
 	}
@@ -770,18 +498,18 @@ pub mod pallet {
 		}
 
 		fn check_inherent(call: &Self::Call, data: &InherentData) -> Result<(), Self::Error> {
-			let sync = match call {
-				Call::sync { utxo_sync } => utxo_sync,
+			match call {
+				Call::sync { utxo_sync } => {
+					let Some(data_sync) =
+						data.bitcoin_sync().expect("Could not decode bitcoin inherent data")
+					else {
+						return Err(BitcoinInherentError::InvalidInherentData);
+					};
+					if data_sync != *utxo_sync {
+						return Err(BitcoinInherentError::InvalidInherentData);
+					}
+				},
 				_ => return Ok(()),
-			};
-
-			let Some(data_v2) =
-				data.bitcoin_sync().expect("Could not decode bitcoin inherent data")
-			else {
-				return Err(BitcoinInherentError::InvalidInherentData);
-			};
-			if data_v2 != *sync {
-				return Err(BitcoinInherentError::InvalidInherentData);
 			}
 
 			Ok(())

@@ -75,6 +75,7 @@ parameter_types! {
 	pub static OrphanedUtxoReleaseExpiryFrames: FrameId = 5;
 	pub static LockReclamationBlocks: BitcoinHeight = 30;
 	pub static LockDurationBlocks: BitcoinHeight = 144 * 365;
+	pub static MaxPendingConfirmationBlocks: BitcoinHeight = 144;
 	pub static BitcoinBlockHeightChange: (BitcoinHeight, BitcoinHeight) = (0, 0);
 	pub static MinimumLockSatoshis: Satoshis = 10_000_000;
 	pub static DefaultVault: Vault<u64, Balance> = Vault {
@@ -103,10 +104,7 @@ parameter_types! {
 	};
 
 	pub static NextUtxoId: UtxoId = 1;
-	pub static WatchedUtxosById: BTreeMap<UtxoId, (BitcoinCosignScriptPubkey, Satoshis, BitcoinHeight)> = BTreeMap::new();
-
-	pub static GetUtxoRef: Option<UtxoRef> = None;
-	pub static CandidateUtxosByRef: BTreeMap<UtxoRef, (UtxoId, Satoshis)> = BTreeMap::new();
+	pub static WatchedUtxosById: BTreeMap<UtxoId, BitcoinCosignScriptPubkey> = BTreeMap::new();
 
 	pub static LastLockEvent: Option<(UtxoId, u64, Balance)> = None;
 	pub static LastReleaseEvent: Option<(UtxoId, u64, bool, Balance, Balance)> = None;
@@ -121,6 +119,7 @@ parameter_types! {
 	pub static CanceledLocks: Vec<(VaultId, Balance)> = Vec::new();
 
 	pub static ChargeFee: bool = false;
+	pub static FailRemovePendingSecuritization: bool = false;
 
 	pub static VaultViewOfCosignPendingLocks: BTreeMap<VaultId,  BTreeSet<UtxoId>> = BTreeMap::new();
 	pub static VaultViewOfOrphanedUtxoCosigns: BTreeMap<VaultId,  BTreeMap<u64, u32>> = BTreeMap::new();
@@ -281,7 +280,7 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 		Ok(())
 	}
 
-	fn cancel(
+	fn return_securitization(
 		vault_id: VaultId,
 		securitization: &Securitization<Balance>,
 	) -> Result<(), VaultError> {
@@ -411,6 +410,9 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 		_vault_id: VaultId,
 		securitization: &Securitization<Balance>,
 	) -> Result<(), VaultError> {
+		if FailRemovePendingSecuritization::get() {
+			return Err(VaultError::InternalError);
+		}
 		DefaultVault::mutate(|a| {
 			a.remove_pending_activation(securitization);
 		});
@@ -520,18 +522,16 @@ impl BitcoinVerifier<Test> for StaticBitcoinVerifier {
 
 pub struct StaticBitcoinUtxoTracker;
 impl BitcoinUtxoTracker for StaticBitcoinUtxoTracker {
-	fn get_funding_utxo_ref(_utxo_id: UtxoId) -> Option<UtxoRef> {
-		GetUtxoRef::get()
+	fn unwatch_utxo(_utxo_id: UtxoId, utxo_ref: &UtxoRef) {
+		let _ = utxo_ref;
 	}
 
 	fn watch_for_utxo(
 		utxo_id: UtxoId,
 		script_pubkey: BitcoinCosignScriptPubkey,
-		satoshis: Satoshis,
-		watch_for_spent_until: BitcoinHeight,
 	) -> Result<(), DispatchError> {
 		WatchedUtxosById::mutate(|watched_utxos| {
-			watched_utxos.insert(utxo_id, (script_pubkey, satoshis, watch_for_spent_until));
+			watched_utxos.insert(utxo_id, script_pubkey);
 		});
 		Ok(())
 	}
@@ -540,30 +540,7 @@ impl BitcoinUtxoTracker for StaticBitcoinUtxoTracker {
 		WatchedUtxosById::mutate(|watched_utxos| {
 			watched_utxos.remove(&utxo_id);
 		});
-		CandidateUtxosByRef::mutate(|candidates| {
-			candidates.retain(|_utxo_ref, (id, _)| *id != utxo_id);
-		});
 	}
-
-	fn unwatch_candidate(utxo_id: UtxoId, utxo_ref: &UtxoRef) -> Option<(UtxoRef, Satoshis)> {
-		let mut removed = None;
-		CandidateUtxosByRef::mutate(|candidates| {
-			if let Some((id, satoshis)) = candidates.remove(utxo_ref) {
-				if id == utxo_id {
-					removed = Some((utxo_ref.clone(), satoshis));
-				} else {
-					candidates.insert(utxo_ref.clone(), (id, satoshis));
-				}
-			}
-		});
-		removed
-	}
-}
-
-pub(crate) fn insert_candidate_utxo(utxo_ref: UtxoRef, utxo_id: UtxoId, satoshis: Satoshis) {
-	CandidateUtxosByRef::mutate(|candidates| {
-		candidates.insert(utxo_ref, (utxo_id, satoshis));
-	});
 }
 
 pub(crate) fn set_bitcoin_height(height: BitcoinHeight) {
@@ -586,6 +563,7 @@ impl pallet_bitcoin_locks::Config for Test {
 	type ArgonTicksPerDay = ArgonTicksPerDay;
 	type MaxConcurrentlyReleasingLocks = MaxConcurrentlyReleasingLocks;
 	type LockDurationBlocks = LockDurationBlocks;
+	type MaxPendingConfirmationBlocks = MaxPendingConfirmationBlocks;
 	type LockReclamationBlocks = LockReclamationBlocks;
 	type LockReleaseCosignDeadlineFrames = LockReleaseCosignDeadlineFrames;
 	type OrphanedUtxoReleaseExpiryFrames = OrphanedUtxoReleaseExpiryFrames;
@@ -600,6 +578,7 @@ impl pallet_bitcoin_locks::Config for Test {
 
 // Build genesis storage according to the mock runtime.
 pub fn new_test_ext() -> TestState {
+	FailRemovePendingSecuritization::set(false);
 	DefaultVault::set(Vault {
 		operator_account_id: 1,
 		delegate_account_id: None,

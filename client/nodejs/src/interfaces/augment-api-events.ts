@@ -24,7 +24,6 @@ import type { ITuple } from '@polkadot/types-codec/types';
 import type { AccountId32, H160, H256 } from '@polkadot/types/interfaces/runtime';
 import type {
   ArgonNotaryAuditErrorVerifyError,
-  ArgonPrimitivesBitcoinBitcoinRejectedReason,
   ArgonPrimitivesBitcoinUtxoRef,
   ArgonPrimitivesBlockSealBlockPayout,
   ArgonPrimitivesBlockSealMiningRegistration,
@@ -439,42 +438,32 @@ declare module '@polkadot/api-base/types/events' {
         [utxoId: u64, vaultId: u32, newSatoshis: u64, accountId: AccountId32],
         { utxoId: u64; vaultId: u32; newSatoshis: u64; accountId: AccountId32 }
       >;
-      UtxoFundedFromCandidate: AugmentedEvent<
-        ApiType,
-        [utxoId: u64, utxoRef: ArgonPrimitivesBitcoinUtxoRef, vaultId: u32, accountId: AccountId32],
-        {
-          utxoId: u64;
-          utxoRef: ArgonPrimitivesBitcoinUtxoRef;
-          vaultId: u32;
-          accountId: AccountId32;
-        }
-      >;
     };
     bitcoinUtxos: {
-      UtxoRejected: AugmentedEvent<
+      UtxoDetected: AugmentedEvent<
         ApiType,
         [
           utxoId: u64,
           utxoRef: ArgonPrimitivesBitcoinUtxoRef,
-          rejectedReason: ArgonPrimitivesBitcoinBitcoinRejectedReason,
           satoshisReceived: u64,
+          bitcoinHeight: u64,
         ],
         {
           utxoId: u64;
           utxoRef: ArgonPrimitivesBitcoinUtxoRef;
-          rejectedReason: ArgonPrimitivesBitcoinBitcoinRejectedReason;
           satoshisReceived: u64;
+          bitcoinHeight: u64;
         }
       >;
-      UtxoRejectedError: AugmentedEvent<
+      UtxoDetectedError: AugmentedEvent<
         ApiType,
         [utxoId: u64, error: SpRuntimeDispatchError],
         { utxoId: u64; error: SpRuntimeDispatchError }
       >;
       UtxoSpent: AugmentedEvent<
         ApiType,
-        [utxoId: u64, blockHeight: u64],
-        { utxoId: u64; blockHeight: u64 }
+        [utxoId: u64, utxoRef: ArgonPrimitivesBitcoinUtxoRef, blockHeight: u64],
+        { utxoId: u64; utxoRef: ArgonPrimitivesBitcoinUtxoRef; blockHeight: u64 }
       >;
       UtxoSpentError: AugmentedEvent<
         ApiType,
@@ -482,16 +471,6 @@ declare module '@polkadot/api-base/types/events' {
         { utxoId: u64; error: SpRuntimeDispatchError }
       >;
       UtxoUnwatched: AugmentedEvent<ApiType, [utxoId: u64], { utxoId: u64 }>;
-      UtxoVerified: AugmentedEvent<
-        ApiType,
-        [utxoId: u64, satoshisReceived: u64],
-        { utxoId: u64; satoshisReceived: u64 }
-      >;
-      UtxoVerifiedError: AugmentedEvent<
-        ApiType,
-        [utxoId: u64, error: SpRuntimeDispatchError],
-        { utxoId: u64; error: SpRuntimeDispatchError }
-      >;
     };
     blockRewards: {
       RewardCreated: AugmentedEvent<

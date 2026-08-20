@@ -235,17 +235,13 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       InvalidBitcoinSyncHeight: AugmentedError<ApiType>;
       /**
-       * This Lock already has an attached funding UTXO
-       **/
-      LockAlreadyFunded: AugmentedError<ApiType>;
-      /**
-       * Too many candidate UTXOs are being stored for this lock
-       **/
-      MaxCandidateUtxosExceeded: AugmentedError<ApiType>;
-      /**
        * Too many UTXOs are being watched
        **/
       MaxUtxosExceeded: AugmentedError<ApiType>;
+      /**
+       * Too many outputs have been observed at one Lock address.
+       **/
+      MaxUtxosPerLockExceeded: AugmentedError<ApiType>;
       /**
        * No Oracle-provided bitcoin block has been provided to the network
        **/
@@ -267,11 +263,7 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       ScriptPubkeyConflict: AugmentedError<ApiType>;
       /**
-       * The UTXO reference does not map to a candidate entry
-       **/
-      UtxoNotCandidate: AugmentedError<ApiType>;
-      /**
-       * Locked Utxo Not Found
+       * Watched Lock or attached UTXO not found.
        **/
       UtxoNotLocked: AugmentedError<ApiType>;
     };
