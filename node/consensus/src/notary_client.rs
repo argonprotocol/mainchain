@@ -321,6 +321,7 @@ pub struct NotaryClient<B: BlockT, C: AuxStore, AC> {
 	tick_voting_power_sender: Arc<Mutex<TracingUnboundedSender<VotingPowerInfo>>>,
 	pub tick_voting_power_receiver: Arc<Mutex<TracingUnboundedReceiver<VotingPowerInfo>>>,
 	notebook_queue_by_id: Arc<RwLock<BTreeMap<NotaryId, Vec<PendingNotebook>>>>,
+	header_retry_after_by_notary: RwLock<BTreeMap<NotaryId, Instant>>,
 	last_notebook_tick_by_id: Arc<RwLock<BTreeMap<NotaryId, Tick>>>,
 	aux_client: ArgonAux<B, C>,
 	notebook_downloader: NotebookDownloader,
@@ -373,6 +374,7 @@ where
 			notary_archive_host_by_id: Default::default(),
 			notaries_by_id: Default::default(),
 			notebook_queue_by_id: Default::default(),
+			header_retry_after_by_notary: Default::default(),
 			last_notebook_tick_by_id: Default::default(),
 			tick_voting_power_sender: Arc::new(Mutex::new(tick_voting_power_sender)),
 			tick_voting_power_receiver: Arc::new(Mutex::new(tick_voting_power_receiver)),
@@ -584,13 +586,30 @@ where
 
 			let self_clone: Arc<Self> = Arc::clone(self);
 			tokio::spawn(async move {
+				let retry_after =
+					self_clone.header_retry_after_by_notary.read().await.get(&notary_id).copied();
+				if retry_after.is_some_and(|retry_after| retry_after > Instant::now()) {
+					return Ok::<_, Error>(true);
+				}
+				if retry_after.is_some() {
+					self_clone.header_retry_after_by_notary.write().await.remove(&notary_id);
+				}
+
 				let Some((notebook_number, raw_header, time)) =
 					self_clone.get_next(notary_id, finalized_notebook_number).await
 				else {
 					// `get_next` also returns `None` after requeueing a notebook whose header is
 					// still unavailable, so queue depth distinguishes pending work from an empty
 					// queue.
-					return Ok::<_, Error>(self_clone.queue_depth(notary_id).await > 0);
+					let has_more_work = self_clone.queue_depth(notary_id).await > 0;
+					if has_more_work {
+						self_clone
+							.header_retry_after_by_notary
+							.write()
+							.await
+							.insert(notary_id, Instant::now() + Duration::from_secs(1));
+					}
+					return Ok::<_, Error>(has_more_work);
 				};
 				match self_clone
 					.process_notebook(
@@ -2007,9 +2026,7 @@ mod test {
 		println!("result: {result}");
 		assert!(result.to_string().contains("#9..=9"));
 
-		for _ in 0..9 {
-			notary_client.process_queues(None).await.expect("Could not process queues");
-		}
+		notary_client.process_queues(None).await.expect("Could not process queues");
 		assert_eq!(
 			notary_client
 				.notebook_queue_by_id
@@ -2024,8 +2041,9 @@ mod test {
 		);
 		for _ in 0..10 {
 			test_notary.create_notebook_header(vec![]).await;
-			notary_client.process_queues(None).await.expect("Could not process queues");
 		}
+		tokio::time::sleep(Duration::from_millis(1010)).await;
+		notary_client.process_queues(None).await.expect("Could not process queues");
 		let mut rx = notary_client.tick_voting_power_receiver.lock().await;
 		let next_rx = rx.next().await.expect("Could not receive");
 		assert_eq!(next_rx.0, 9);
@@ -2226,6 +2244,51 @@ mod test {
 			.expect("Could not process queues");
 		assert!(has_more_work);
 		assert_eq!(notary_client.queue_depth(1).await, 1);
+	}
+
+	#[tokio::test]
+	async fn unavailable_notary_backs_off_without_delaying_other_notaries() {
+		let (test_notary, client, notary_client) = system().await;
+		notary_client
+			.update_notaries(&client.best_hash())
+			.await
+			.expect("Could not update notaries");
+
+		let mut test_notary2 = MockNotary::new(2);
+		test_notary2.start().await.expect("could not start notary");
+		test_notary2.create_notebook_header(vec![]).await;
+		client.add_notary(&test_notary2);
+		notary_client
+			.update_notaries(&client.best_hash())
+			.await
+			.expect("Could not update notaries");
+
+		notary_client
+			.enqueue_notebook(1, 1, None, None)
+			.await
+			.expect("Could not enqueue unavailable notebook");
+		notary_client
+			.enqueue_notebook(2, 1, None, None)
+			.await
+			.expect("Could not enqueue available notebook");
+
+		let started = Instant::now();
+		let has_more_work =
+			notary_client.process_queues(None).await.expect("Could not process queues");
+
+		assert!(has_more_work);
+		assert!(started.elapsed() < Duration::from_millis(900));
+		assert_eq!(notary_client.queue_depth(1).await, 1);
+		assert_eq!(notary_client.queue_depth(2).await, 0);
+
+		test_notary.create_notebook_header(vec![]).await;
+		assert!(notary_client.process_queues(None).await.expect("Could not process queues"));
+		assert_eq!(notary_client.queue_depth(1).await, 1);
+
+		tokio::time::sleep(Duration::from_millis(1010)).await;
+		assert!(!notary_client.process_queues(None).await.expect("Could not process queues"));
+		assert_eq!(notary_client.queue_depth(1).await, 0);
+		test_notary2.stop().await;
 	}
 
 	#[tokio::test]
