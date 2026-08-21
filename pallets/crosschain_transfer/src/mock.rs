@@ -420,7 +420,7 @@ impl BitcoinVaultProvider for MockVaultProvider {
 		unimplemented!()
 	}
 
-	fn cancel(
+	fn return_securitization(
 		_vault_id: VaultId,
 		_securitization: &argon_primitives::vault::Securitization<Self::Balance>,
 	) -> Result<(), argon_primitives::vault::VaultError> {

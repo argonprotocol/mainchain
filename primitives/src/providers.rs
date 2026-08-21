@@ -167,32 +167,12 @@ impl OperationalRewardsProviderWeightInfo for () {
 }
 
 pub trait BitcoinUtxoEventsWeightInfo {
-	fn funding_received() -> Weight;
-	fn timeout_waiting_for_funding() -> Weight;
-	fn funding_promoted_by_account() -> Weight;
-	fn candidate_rejected_by_account() -> Weight;
-	fn orphaned_utxo_detected() -> Weight;
+	fn utxo_detected() -> Weight;
 	fn spent() -> Weight;
 }
 
 impl BitcoinUtxoEventsWeightInfo for () {
-	fn funding_received() -> Weight {
-		Weight::zero()
-	}
-
-	fn timeout_waiting_for_funding() -> Weight {
-		Weight::zero()
-	}
-
-	fn funding_promoted_by_account() -> Weight {
-		Weight::zero()
-	}
-
-	fn candidate_rejected_by_account() -> Weight {
-		Weight::zero()
-	}
-
-	fn orphaned_utxo_detected() -> Weight {
+	fn utxo_detected() -> Weight {
 		Weight::zero()
 	}
 
@@ -684,69 +664,28 @@ pub trait BitcoinUtxoTracker {
 	fn watch_for_utxo(
 		utxo_id: UtxoId,
 		script_pubkey: BitcoinCosignScriptPubkey,
-		satoshis: Satoshis,
-		watch_for_spent_until: BitcoinHeight,
 	) -> Result<(), DispatchError>;
-	fn get_funding_utxo_ref(utxo_id: UtxoId) -> Option<UtxoRef>;
+	fn unwatch_utxo(utxo_id: UtxoId, utxo_ref: &UtxoRef);
 	fn unwatch(utxo_id: UtxoId);
-	/// Remove a candidate UTXO by reference after it is released.
-	fn unwatch_candidate(utxo_id: UtxoId, utxo_ref: &UtxoRef) -> Option<(UtxoRef, Satoshis)>;
 }
 
 pub trait BitcoinUtxoEvents<AccountId> {
 	type Weights: BitcoinUtxoEventsWeightInfo;
 
-	fn funding_received(utxo_id: UtxoId, received_satoshis: Satoshis) -> DispatchResult;
-	fn timeout_waiting_for_funding(utxo_id: UtxoId) -> DispatchResult;
-	fn funding_promoted_by_account(
+	fn utxo_detected(
 		utxo_id: UtxoId,
-		received_satoshis: Satoshis,
-		account_id: &AccountId,
-		utxo_ref: &UtxoRef,
-	) -> DispatchResult;
-	fn candidate_rejected_by_account(
-		utxo_id: UtxoId,
-		satoshis: Satoshis,
-		account_id: &AccountId,
-		utxo_ref: &UtxoRef,
-	) -> DispatchResult;
-	fn orphaned_utxo_detected(
-		utxo_id: UtxoId,
-		satoshis: Satoshis,
 		utxo_ref: UtxoRef,
+		satoshis: Satoshis,
+		bitcoin_height: BitcoinHeight,
 	) -> DispatchResult;
-	fn spent(utxo_id: UtxoId) -> DispatchResult;
+	fn spent(utxo_id: UtxoId, utxo_ref: UtxoRef) -> DispatchResult;
 }
 
 #[impl_trait_for_tuples::impl_for_tuples(1, 5)]
 impl BitcoinUtxoEventsWeightInfo for Tuple {
-	fn funding_received() -> Weight {
+	fn utxo_detected() -> Weight {
 		let mut weight = Weight::zero();
-		for_tuples!( #( weight = weight.saturating_add(Tuple::funding_received()); )* );
-		weight
-	}
-
-	fn timeout_waiting_for_funding() -> Weight {
-		let mut weight = Weight::zero();
-		for_tuples!( #( weight = weight.saturating_add(Tuple::timeout_waiting_for_funding()); )* );
-		weight
-	}
-
-	fn funding_promoted_by_account() -> Weight {
-		let mut weight = Weight::zero();
-		for_tuples!( #( weight = weight.saturating_add(Tuple::funding_promoted_by_account()); )* );
-		weight
-	}
-
-	fn candidate_rejected_by_account() -> Weight {
-		let mut weight = Weight::zero();
-		for_tuples!( #( weight = weight.saturating_add(Tuple::candidate_rejected_by_account()); )* );
-		weight
-	}
-
-	fn orphaned_utxo_detected() -> Weight {
-		let mut weight = Weight::zero();
-		for_tuples!( #( weight = weight.saturating_add(Tuple::orphaned_utxo_detected()); )* );
+		for_tuples!( #( weight = weight.saturating_add(Tuple::utxo_detected()); )* );
 		weight
 	}
 
@@ -762,47 +701,18 @@ impl BitcoinUtxoEventsWeightInfo for Tuple {
 impl<AccountId> BitcoinUtxoEvents<AccountId> for Tuple {
 	for_tuples!( type Weights = ( #( Tuple::Weights ),* ); );
 
-	fn funding_received(utxo_id: UtxoId, received_satoshis: Satoshis) -> DispatchResult {
-		for_tuples!( #( Tuple::funding_received(utxo_id, received_satoshis)?; )* );
-		Ok(())
-	}
-
-	fn timeout_waiting_for_funding(utxo_id: UtxoId) -> DispatchResult {
-		for_tuples!( #( Tuple::timeout_waiting_for_funding(utxo_id)?; )* );
-		Ok(())
-	}
-
-	fn funding_promoted_by_account(
+	fn utxo_detected(
 		utxo_id: UtxoId,
-		received_satoshis: Satoshis,
-		account_id: &AccountId,
-		utxo_ref: &UtxoRef,
-	) -> DispatchResult {
-		for_tuples!( #( Tuple::funding_promoted_by_account(utxo_id, received_satoshis, account_id, utxo_ref)?; )* );
-		Ok(())
-	}
-
-	fn candidate_rejected_by_account(
-		utxo_id: UtxoId,
-		satoshis: Satoshis,
-		account_id: &AccountId,
-		utxo_ref: &UtxoRef,
-	) -> DispatchResult {
-		for_tuples!( #( Tuple::candidate_rejected_by_account(utxo_id, satoshis, account_id, utxo_ref)?; )* );
-		Ok(())
-	}
-
-	fn orphaned_utxo_detected(
-		utxo_id: UtxoId,
-		satoshis: Satoshis,
 		utxo_ref: UtxoRef,
+		satoshis: Satoshis,
+		bitcoin_height: BitcoinHeight,
 	) -> DispatchResult {
-		for_tuples!( #( Tuple::orphaned_utxo_detected(utxo_id, satoshis, utxo_ref.clone())?; )* );
+		for_tuples!( #( Tuple::utxo_detected(utxo_id, utxo_ref.clone(), satoshis, bitcoin_height)?; )* );
 		Ok(())
 	}
 
-	fn spent(utxo_id: UtxoId) -> DispatchResult {
-		for_tuples!( #( Tuple::spent(utxo_id)?; )* );
+	fn spent(utxo_id: UtxoId, utxo_ref: UtxoRef) -> DispatchResult {
+		for_tuples!( #( Tuple::spent(utxo_id, utxo_ref.clone())?; )* );
 		Ok(())
 	}
 }
@@ -1400,54 +1310,22 @@ mod tests {
 	struct SecondWeights;
 
 	impl BitcoinUtxoEventsWeightInfo for FirstWeights {
-		fn funding_received() -> Weight {
+		fn utxo_detected() -> Weight {
 			Weight::from_parts(10, 1)
 		}
 
-		fn timeout_waiting_for_funding() -> Weight {
-			Weight::from_parts(11, 1)
-		}
-
-		fn funding_promoted_by_account() -> Weight {
-			Weight::from_parts(12, 1)
-		}
-
-		fn candidate_rejected_by_account() -> Weight {
-			Weight::from_parts(13, 1)
-		}
-
-		fn orphaned_utxo_detected() -> Weight {
-			Weight::from_parts(14, 1)
-		}
-
 		fn spent() -> Weight {
-			Weight::from_parts(15, 1)
+			Weight::from_parts(11, 1)
 		}
 	}
 
 	impl BitcoinUtxoEventsWeightInfo for SecondWeights {
-		fn funding_received() -> Weight {
+		fn utxo_detected() -> Weight {
 			Weight::from_parts(20, 2)
 		}
 
-		fn timeout_waiting_for_funding() -> Weight {
-			Weight::from_parts(21, 2)
-		}
-
-		fn funding_promoted_by_account() -> Weight {
-			Weight::from_parts(22, 2)
-		}
-
-		fn candidate_rejected_by_account() -> Weight {
-			Weight::from_parts(23, 2)
-		}
-
-		fn orphaned_utxo_detected() -> Weight {
-			Weight::from_parts(24, 2)
-		}
-
 		fn spent() -> Weight {
-			Weight::from_parts(25, 2)
+			Weight::from_parts(21, 2)
 		}
 	}
 
@@ -1502,41 +1380,16 @@ mod tests {
 	impl BitcoinUtxoEvents<u64> for First {
 		type Weights = FirstWeights;
 
-		fn funding_received(_utxo_id: UtxoId, _received_satoshis: Satoshis) -> DispatchResult {
-			Ok(())
-		}
-
-		fn timeout_waiting_for_funding(_utxo_id: UtxoId) -> DispatchResult {
-			Ok(())
-		}
-
-		fn funding_promoted_by_account(
+		fn utxo_detected(
 			_utxo_id: UtxoId,
-			_received_satoshis: Satoshis,
-			_account_id: &u64,
-			_utxo_ref: &UtxoRef,
-		) -> DispatchResult {
-			Ok(())
-		}
-
-		fn candidate_rejected_by_account(
-			_utxo_id: UtxoId,
-			_satoshis: Satoshis,
-			_account_id: &u64,
-			_utxo_ref: &UtxoRef,
-		) -> DispatchResult {
-			Ok(())
-		}
-
-		fn orphaned_utxo_detected(
-			_utxo_id: UtxoId,
-			_satoshis: Satoshis,
 			_utxo_ref: UtxoRef,
+			_received_satoshis: Satoshis,
+			_bitcoin_height: BitcoinHeight,
 		) -> DispatchResult {
 			Ok(())
 		}
 
-		fn spent(_utxo_id: UtxoId) -> DispatchResult {
+		fn spent(_utxo_id: UtxoId, _utxo_ref: UtxoRef) -> DispatchResult {
 			Ok(())
 		}
 	}
@@ -1544,41 +1397,16 @@ mod tests {
 	impl BitcoinUtxoEvents<u64> for Second {
 		type Weights = SecondWeights;
 
-		fn funding_received(_utxo_id: UtxoId, _received_satoshis: Satoshis) -> DispatchResult {
-			Ok(())
-		}
-
-		fn timeout_waiting_for_funding(_utxo_id: UtxoId) -> DispatchResult {
-			Ok(())
-		}
-
-		fn funding_promoted_by_account(
+		fn utxo_detected(
 			_utxo_id: UtxoId,
-			_received_satoshis: Satoshis,
-			_account_id: &u64,
-			_utxo_ref: &UtxoRef,
-		) -> DispatchResult {
-			Ok(())
-		}
-
-		fn candidate_rejected_by_account(
-			_utxo_id: UtxoId,
-			_satoshis: Satoshis,
-			_account_id: &u64,
-			_utxo_ref: &UtxoRef,
-		) -> DispatchResult {
-			Ok(())
-		}
-
-		fn orphaned_utxo_detected(
-			_utxo_id: UtxoId,
-			_satoshis: Satoshis,
 			_utxo_ref: UtxoRef,
+			_received_satoshis: Satoshis,
+			_bitcoin_height: BitcoinHeight,
 		) -> DispatchResult {
 			Ok(())
 		}
 
-		fn spent(_utxo_id: UtxoId) -> DispatchResult {
+		fn spent(_utxo_id: UtxoId, _utxo_ref: UtxoRef) -> DispatchResult {
 			Ok(())
 		}
 	}
@@ -1648,12 +1476,8 @@ mod tests {
 	#[test]
 	fn tuple_bitcoin_utxo_event_weights_sum_member_weights() {
 		type Weights = <(First, Second) as BitcoinUtxoEvents<u64>>::Weights;
-		assert_eq!(Weights::funding_received(), Weight::from_parts(30, 3));
-		assert_eq!(Weights::timeout_waiting_for_funding(), Weight::from_parts(32, 3));
-		assert_eq!(Weights::funding_promoted_by_account(), Weight::from_parts(34, 3));
-		assert_eq!(Weights::candidate_rejected_by_account(), Weight::from_parts(36, 3));
-		assert_eq!(Weights::orphaned_utxo_detected(), Weight::from_parts(38, 3));
-		assert_eq!(Weights::spent(), Weight::from_parts(40, 3));
+		assert_eq!(Weights::utxo_detected(), Weight::from_parts(30, 3));
+		assert_eq!(Weights::spent(), Weight::from_parts(32, 3));
 	}
 
 	#[test]

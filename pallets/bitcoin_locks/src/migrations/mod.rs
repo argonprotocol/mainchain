@@ -1,4 +1,4 @@
-use crate::{Config, LockedBitcoin, LocksByUtxoId, Pallet};
+use crate::{Config, LockedBitcoin, LocksByUtxoId, LocksPendingFundingByBitcoinHeight, Pallet};
 use alloc::{collections::BTreeMap, vec::Vec};
 use argon_primitives::{bitcoin::UtxoId, vault::BitcoinVaultProvider, VaultId};
 use frame_support::traits::UncheckedOnRuntimeUpgrade;
@@ -147,12 +147,65 @@ pub type CorrectLegacyRatchetedLiquidityMigration<T> =
 		<T as frame_system::Config>::DbWeight,
 	>;
 
+/// Move the funding reference map when ownership moves from the UTXO observer pallet to the Lock
+/// pallet. `VersionedMigration` owns the 10 -> 11 version bump.
+pub struct MoveFundingUtxoRef<T>(core::marker::PhantomData<T>);
+
+impl<T: Config> UncheckedOnRuntimeUpgrade for MoveFundingUtxoRef<T> {
+	fn on_runtime_upgrade() -> Weight {
+		frame_support::storage::migration::move_storage_from_pallet(
+			b"UtxoIdToFundingUtxoRef",
+			b"BitcoinUtxos",
+			b"BitcoinLocks",
+		);
+
+		let current_bitcoin_height = T::BitcoinBlockHeightChange::get().1;
+		let mut reads = 1u64;
+		let mut writes = 0u64;
+		for (utxo_id, lock) in LocksByUtxoId::<T>::iter() {
+			reads = reads.saturating_add(1);
+			if lock.is_funded {
+				continue;
+			}
+
+			let expiration_height = lock
+				.created_at_height
+				.saturating_add(T::MaxPendingConfirmationBlocks::get())
+				.saturating_add(1);
+			// Keep already-due locks in the queue so the next hook returns their pending
+			// securitization; skipping them would leave the vault reservation stranded.
+			let expiration_height = expiration_height.max(current_bitcoin_height.saturating_add(1));
+			let inserted =
+				LocksPendingFundingByBitcoinHeight::<T>::try_mutate(expiration_height, |locks| {
+					locks.try_insert(utxo_id)
+				});
+			if inserted.is_ok() {
+				writes = writes.saturating_add(1);
+			} else {
+				log::error!(
+					"Unable to schedule pending funding expiration for bitcoin lock {utxo_id:?}"
+				);
+			}
+		}
+
+		T::DbWeight::get().reads_writes(reads, writes)
+	}
+}
+
+pub type MoveFundingUtxoRefMigration<T> = frame_support::migrations::VersionedMigration<
+	10,
+	11,
+	MoveFundingUtxoRef<T>,
+	Pallet<T>,
+	<T as frame_system::Config>::DbWeight,
+>;
+
 #[cfg(test)]
 mod tests {
 	use super::*;
 	use crate::{mock::*, LockOptions, LocksByUtxoId, MicrogonPerBtcHistory, Pallet};
 	use argon_primitives::{
-		bitcoin::{CompressedBitcoinPubkey, SATOSHIS_PER_BITCOIN},
+		bitcoin::{CompressedBitcoinPubkey, H256Le, UtxoRef, SATOSHIS_PER_BITCOIN},
 		BitcoinUtxoEvents, MICROGONS_PER_ARGON,
 	};
 	use frame_support::traits::{OnRuntimeUpgrade, StorageVersion};
@@ -291,7 +344,12 @@ mod tests {
 			CompressedBitcoinPubkey([1; 33]),
 			Some(LockOptions::V1 { microgons_at_target_per_btc: Some(target) }),
 		));
-		assert_ok!(BitcoinLocks::funding_received(1, SATOSHIS_PER_BITCOIN));
+		assert_ok!(<BitcoinLocks as BitcoinUtxoEvents<u64>>::utxo_detected(
+			1,
+			UtxoRef { txid: H256Le([0; 32]), output_index: 0 },
+			SATOSHIS_PER_BITCOIN,
+			1,
+		));
 		LocksByUtxoId::<Test>::mutate(1, |lock| {
 			lock.as_mut().expect("initialized lock").liquidity_promised = liquidity_promised;
 		});

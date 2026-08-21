@@ -3,7 +3,7 @@
 #![allow(clippy::multiple_bound_locations)]
 
 use crate::{
-	bitcoin::{BitcoinNetwork, BitcoinSyncStatus, Satoshis, UtxoRef, UtxoValue},
+	bitcoin::{BitcoinNetwork, BitcoinSyncStatus, Satoshis, UtxoAddress, UtxoRef, UtxoValue},
 	block_seal::{BlockPayout, ComputePuzzle, MiningAuthority},
 	notary::{
 		NotaryId, NotaryNotebookAuditSummary, NotaryNotebookDetails, NotaryNotebookRawVotes,
@@ -105,6 +105,8 @@ sp_api::decl_runtime_apis! {
 	pub trait BitcoinApis<Balance: Codec> {
 		fn get_sync_status() -> Option<BitcoinSyncStatus>;
 		fn active_utxos() -> Vec<(Option<UtxoRef>, UtxoValue)>;
+		#[api_version(4)]
+		fn active_utxo_addresses() -> Vec<(Option<UtxoRef>, UtxoAddress)>;
 		#[api_version(2)]
 		fn get_minimum_satoshis() -> Satoshis;
 		fn redemption_rate(satoshis: Satoshis) -> Option<Balance>;

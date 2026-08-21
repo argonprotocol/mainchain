@@ -4,8 +4,8 @@ use crate::client::Client;
 use anyhow::bail;
 use argon_primitives::{
 	bitcoin::{
-		BitcoinBlock, BitcoinHeight, BitcoinNetwork, BitcoinSyncStatus, H256Le, Satoshis, UtxoRef,
-		UtxoValue,
+		BitcoinBlock, BitcoinHeight, BitcoinNetwork, BitcoinSyncStatus, H256Le, Satoshis,
+		UtxoAddress, UtxoRef,
 	},
 	inherents::{BitcoinUtxoFunding, BitcoinUtxoSpend, BitcoinUtxoSync},
 };
@@ -108,7 +108,7 @@ impl UtxoSpendFilter {
 	/// Synchronize with the latest blocks on the network.
 	pub fn refresh_utxo_status(
 		&self,
-		tracked_utxos: Vec<(Option<UtxoRef>, UtxoValue)>,
+		tracked_utxos: Vec<(Option<UtxoRef>, UtxoAddress)>,
 		minimum_satoshis: Satoshis,
 	) -> anyhow::Result<BitcoinUtxoSync> {
 		let mut scripts: Vec<Vec<u8>> = vec![];
@@ -164,7 +164,7 @@ impl UtxoSpendFilter {
 						utxo_id: utxo_value.utxo_id,
 						utxo_ref: utxo_ref.clone(),
 						satoshis: sats,
-						expected_satoshis: utxo_value.satoshis,
+						expected_satoshis: 0,
 						bitcoin_height: height,
 					});
 					utxo_ref_to_utxo_id.insert(utxo_ref, utxo_value.utxo_id);

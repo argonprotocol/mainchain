@@ -780,21 +780,23 @@ async fn wait_for_mint(
 	last_submitted_tick: &mut Tick,
 ) -> anyhow::Result<()> {
 	let mut finalized_sub = client.live.blocks().subscribe_finalized().await?;
-	let pending_utxos = client
-		.fetch_storage(&storage().bitcoin_utxos().locks_pending_funding(), FetchAt::Finalized)
+	if client
+		.fetch_storage(
+			&storage().bitcoin_locks().utxo_id_to_funding_utxo_ref(*utxo_id),
+			FetchAt::Finalized,
+		)
 		.await?
-		.unwrap()
-		.0;
-	if !pending_utxos.is_empty() {
-		println!("Waiting for pending utxo to be verified {pending_utxos:?}");
+		.is_none()
+	{
+		println!("Waiting for funding utxo {utxo_id} to be detected");
 		let mut counter = 0;
 		while let Some(block) = finalized_sub.next().await {
 			let block = block?;
-			let utxo_verified =
-				block.events().await?.find_first::<api::bitcoin_utxos::events::UtxoVerified>()?;
-			if let Some(utxo_verified) = utxo_verified {
-				if utxo_verified.utxo_id == 1 {
-					println!("Utxo verified in Argon mainchain");
+			let utxo_detected =
+				block.events().await?.find_first::<api::bitcoin_utxos::events::UtxoDetected>()?;
+			if let Some(utxo_detected) = utxo_detected {
+				if utxo_detected.utxo_id == *utxo_id {
+					println!("Utxo detected in Argon mainchain");
 					break;
 				}
 			}
@@ -810,7 +812,7 @@ async fn wait_for_mint(
 	}
 	let utxo_ref = client
 		.fetch_storage(
-			&storage().bitcoin_utxos().utxo_id_to_funding_utxo_ref(*utxo_id),
+			&storage().bitcoin_locks().utxo_id_to_funding_utxo_ref(*utxo_id),
 			FetchAt::Finalized,
 		)
 		.await?
@@ -1154,7 +1156,7 @@ async fn load_cosign_releaser(
 	at_block: FetchAt,
 ) -> anyhow::Result<CosignReleaser> {
 	let utxo_ref = client
-		.fetch_storage(&storage().bitcoin_utxos().utxo_id_to_funding_utxo_ref(utxo_id), at_block)
+		.fetch_storage(&storage().bitcoin_locks().utxo_id_to_funding_utxo_ref(utxo_id), at_block)
 		.await?
 		.ok_or_else(|| anyhow!("No funding utxo found for lock {utxo_id}"))?;
 	let release_request = client

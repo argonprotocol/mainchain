@@ -153,18 +153,27 @@ pub type UtxoId = u64;
 #[derive(
 	Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen,
 )]
-pub struct UtxoValue {
+pub struct UtxoAddress {
 	/// Tracking id for the BitcoinLock used across Bitcoin pallets
 	pub utxo_id: UtxoId,
 	/// The script pubkey of the Lock UTXOs
 	pub script_pubkey: BitcoinCosignScriptPubkey,
-	/// Number of satoshis received
-	#[codec(compact)]
-	pub satoshis: Satoshis,
-	/// The block height at which this UTXO was submitted for tracking
+	/// The Bitcoin height from which the node must scan for outputs to this script.
 	#[codec(compact)]
 	pub submitted_at_height: BitcoinHeight,
-	/// The block height until which we should watch for these UTXOs to be spent
+}
+
+/// Legacy runtime-API representation retained for `BitcoinApis::active_utxos` compatibility.
+#[derive(
+	Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen,
+)]
+pub struct UtxoValue {
+	pub utxo_id: UtxoId,
+	pub script_pubkey: BitcoinCosignScriptPubkey,
+	#[codec(compact)]
+	pub satoshis: Satoshis,
+	#[codec(compact)]
+	pub submitted_at_height: BitcoinHeight,
 	#[codec(compact)]
 	pub watch_for_spent_until_height: BitcoinHeight,
 }

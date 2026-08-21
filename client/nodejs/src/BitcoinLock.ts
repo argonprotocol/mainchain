@@ -16,7 +16,7 @@ import { ApiDecoration } from '@polkadot/api/types';
 import { PriceIndex } from './PriceIndex';
 import type { AccountId32 } from '@polkadot/types/interfaces/runtime';
 import type { AnyJson, ITuple } from '@polkadot/types-codec/types';
-import type { bool, Option, u128, u64, Vec } from '@polkadot/types-codec';
+import type { bool, Option, u128, U64, u64, Vec } from '@polkadot/types-codec';
 import { formatArgons } from './utils';
 import type { Vault } from './Vault';
 import BigNumber from 'bignumber.js';
@@ -141,14 +141,18 @@ export class BitcoinLock implements IBitcoinLock {
     client: IQueryableClient,
   ): Promise<{ txid: string; vout: number; bitcoinTxid: string } | undefined> {
     let refRaw: Option<ArgonPrimitivesBitcoinUtxoRef>;
-    if (
-      'utxoIdToRef' in client.query.bitcoinUtxos &&
-      typeof client.query.bitcoinUtxos.utxoIdToRef === 'function'
+    const bitcoinUtxos = client.query.bitcoinUtxos;
+    if ('utxoIdToRef' in bitcoinUtxos && typeof bitcoinUtxos.utxoIdToRef === 'function') {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+      refRaw = await bitcoinUtxos.utxoIdToRef(this.utxoId);
+    } else if (
+      'utxoIdToFundingUtxoRef' in bitcoinUtxos &&
+      typeof bitcoinUtxos.utxoIdToFundingUtxoRef === 'function'
     ) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-      refRaw = await client.query.bitcoinUtxos.utxoIdToRef(this.utxoId);
+      refRaw = await bitcoinUtxos.utxoIdToFundingUtxoRef(this.utxoId);
     } else {
-      refRaw = await client.query.bitcoinUtxos.utxoIdToFundingUtxoRef(this.utxoId);
+      refRaw = await client.query.bitcoinLocks.utxoIdToFundingUtxoRef(this.utxoId);
     }
     if (!refRaw || refRaw.isNone) {
       return;
@@ -526,17 +530,24 @@ export class BitcoinLock implements IBitcoinLock {
 
   public static async getConfig(client: IQueryableClient): Promise<IBitcoinLockConfig> {
     const bitcoinNetwork = await client.query.bitcoinUtxos.bitcoinNetwork();
+    type IOldUtxoConsts = {
+      maxPendingConfirmationBlocks?: U64;
+      maximumSatoshiThresholdFromExpected?: U64;
+    };
     return {
       lockReleaseCosignDeadlineFrames:
         client.consts.bitcoinLocks.lockReleaseCosignDeadlineFrames.toNumber(),
       pendingConfirmationExpirationBlocks:
-        client.consts.bitcoinUtxos.maxPendingConfirmationBlocks.toNumber(),
+        (client.consts.bitcoinUtxos as IOldUtxoConsts).maxPendingConfirmationBlocks?.toNumber() ??
+        client.consts.bitcoinLocks.maxPendingConfirmationBlocks.toNumber(),
       tickDurationMillis: await client.query.ticks
         .genesisTicker()
         .then(x => x.tickDurationMillis.toNumber()),
       bitcoinNetwork,
       lockSatoshiAllowedVariance:
-        client.consts.bitcoinUtxos.maximumSatoshiThresholdFromExpected?.toNumber() ?? 10_000,
+        (
+          client.consts.bitcoinUtxos as IOldUtxoConsts
+        ).maximumSatoshiThresholdFromExpected?.toNumber() ?? 10_000,
     };
   }
 
@@ -590,10 +601,12 @@ export class BitcoinLock implements IBitcoinLock {
     } & ISubmittableOptions,
   ): Promise<SubmittableExtrinsic | undefined> {
     const { client, utxoId, utxoRef } = args;
-    const txBuilder = client.tx.bitcoinUtxos?.fundWithUtxoCandidate;
+
+    const txBuilder = (client.tx.bitcoinUtxos as any)?.fundWithUtxoCandidate;
     if (!txBuilder?.meta) {
       return undefined;
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return,@typescript-eslint/no-unsafe-call
     return txBuilder(utxoId, normalizeUtxoRef(utxoRef));
   }
 

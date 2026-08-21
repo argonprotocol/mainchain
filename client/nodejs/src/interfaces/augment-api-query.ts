@@ -27,10 +27,11 @@ import type {
   ArgonNotaryAuditErrorVerifyError,
   ArgonPrimitivesBalanceChangeAccountOrigin,
   ArgonPrimitivesBitcoinBitcoinBlock,
+  ArgonPrimitivesBitcoinBitcoinCosignScriptPubkey,
   ArgonPrimitivesBitcoinBitcoinNetwork,
   ArgonPrimitivesBitcoinBitcoinXPub,
+  ArgonPrimitivesBitcoinUtxoAddress,
   ArgonPrimitivesBitcoinUtxoRef,
-  ArgonPrimitivesBitcoinUtxoValue,
   ArgonPrimitivesBlockSealBlockPayout,
   ArgonPrimitivesBlockSealMiningBidStats,
   ArgonPrimitivesBlockSealMiningRegistration,
@@ -262,6 +263,15 @@ declare module '@polkadot/api-base/types/storage' {
         [u64]
       >;
       /**
+       * Unfunded locks whose pending securitization reservation expires at the indexed height.
+       * Expiry releases the reservation but leaves the lock address watched for late orphan output.
+       **/
+      locksPendingFundingByBitcoinHeight: AugmentedQuery<
+        ApiType,
+        (arg: u64 | AnyNumber | Uint8Array) => Observable<BTreeSet<u64>>,
+        [u64]
+      >;
+      /**
        * History of target microgons per btc.
        **/
       microgonPerBtcHistory: AugmentedQuery<
@@ -321,6 +331,14 @@ declare module '@polkadot/api-base/types/storage' {
         ) => Observable<Option<Null>>,
         [u32, u64]
       >;
+      /**
+       * The utxo funding this lock. In the current runtime, this is just the first utxo received
+       **/
+      utxoIdToFundingUtxoRef: AugmentedQuery<
+        ApiType,
+        (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<ArgonPrimitivesBitcoinUtxoRef>>,
+        [u64]
+      >;
     };
     bitcoinUtxos: {
       /**
@@ -332,16 +350,6 @@ declare module '@polkadot/api-base/types/storage' {
         []
       >;
       /**
-       * Candidate UTXOs associated with a lock (mismatches, extra funding, etc.).
-       **/
-      candidateUtxoRefsByUtxoId: AugmentedQuery<
-        ApiType,
-        (
-          arg: u64 | AnyNumber | Uint8Array,
-        ) => Observable<BTreeMap<ArgonPrimitivesBitcoinUtxoRef, u64>>,
-        [u64]
-      >;
-      /**
        * An oracle-provided confirmed bitcoin block (eg, 6 blocks back)
        **/
       confirmedBitcoinBlockTip: AugmentedQuery<
@@ -350,42 +358,9 @@ declare module '@polkadot/api-base/types/storage' {
         []
       >;
       /**
-       * Pending funding entries that have expired. These remain watched until their additional
-       * orphan-detection window ends, then await bounded cleanup.
-       **/
-      expiredPendingFunding: AugmentedQuery<
-        ApiType,
-        () => Observable<BTreeMap<u64, ArgonPrimitivesBitcoinUtxoValue>>,
-        []
-      >;
-      /**
        * Check if the inherent was included
        **/
       inherentIncluded: AugmentedQuery<ApiType, () => Observable<bool>, []>;
-      /**
-       * Locked Bitcoin UTXOs that have been funded with a UtxoRef from the Bitcoin network and
-       * amounts within the MinimumSatoshiThreshold of the expected. If a Bitcoin UTXO is moved
-       * before the expiration block, the funds are burned and the UTXO is unlocked.
-       **/
-      lockedUtxos: AugmentedQuery<
-        ApiType,
-        (
-          arg:
-            | ArgonPrimitivesBitcoinUtxoRef
-            | { txid?: any; outputIndex?: any }
-            | string
-            | Uint8Array,
-        ) => Observable<Option<ArgonPrimitivesBitcoinUtxoValue>>,
-        [ArgonPrimitivesBitcoinUtxoRef]
-      >;
-      /**
-       * Bitcoin locks that are pending full funding on the bitcoin network
-       **/
-      locksPendingFunding: AugmentedQuery<
-        ApiType,
-        () => Observable<BTreeMap<u64, ArgonPrimitivesBitcoinUtxoValue>>,
-        []
-      >;
       /**
        * Bitcoin Oracle Operator Account
        **/
@@ -408,11 +383,35 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       tempParentHasSyncState: AugmentedQuery<ApiType, () => Observable<bool>, []>;
       /**
-       * A mapping of utxo id to the confirmed utxo reference
+       * Watched Lock addresses and the scan height needed to observe them.
        **/
-      utxoIdToFundingUtxoRef: AugmentedQuery<
+      utxoAddressByUtxoId: AugmentedQuery<
         ApiType,
-        (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<ArgonPrimitivesBitcoinUtxoRef>>,
+        (
+          arg: u64 | AnyNumber | Uint8Array,
+        ) => Observable<Option<ArgonPrimitivesBitcoinUtxoAddress>>,
+        [u64]
+      >;
+      /**
+       * The Lock ID identified by each watched script pubkey.
+       **/
+      utxoIdByScriptPubkey: AugmentedQuery<
+        ApiType,
+        (
+          arg:
+            | ArgonPrimitivesBitcoinBitcoinCosignScriptPubkey
+            | { P2WSH: any }
+            | string
+            | Uint8Array,
+        ) => Observable<Option<u64>>,
+        [ArgonPrimitivesBitcoinBitcoinCosignScriptPubkey]
+      >;
+      /**
+       * Every output observed at a watched Lock address, retained until explicitly removed.
+       **/
+      utxoRefsByUtxoId: AugmentedQuery<
+        ApiType,
+        (arg: u64 | AnyNumber | Uint8Array) => Observable<BTreeSet<ArgonPrimitivesBitcoinUtxoRef>>,
         [u64]
       >;
     };

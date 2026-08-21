@@ -14,9 +14,7 @@
 #![allow(unused_imports)]
 
 use super::Config;
-use argon_primitives::providers::{
-	BitcoinLocksProviderWeightInfo, BitcoinUtxoEventsWeightInfo, UtxoLockEvents,
-};
+use argon_primitives::providers::{BitcoinLocksProviderWeightInfo, BitcoinUtxoEventsWeightInfo, UtxoLockEvents};
 use argon_primitives::vault::{BitcoinVaultProvider, BitcoinVaultProviderWeightInfo};
 use argon_primitives::UtxoLockEventsWeightInfo;
 use pallet_prelude::*;
@@ -34,6 +32,7 @@ pub trait WeightInfo {
 		expiring_count: u32,
 		overdue_count: u32,
 		orphan_expiring_count: u32,
+		pending_funding_count: u32,
 	) -> Weight {
 		let mut weight = Self::on_initialize_base();
 		if expiring_count > 0 {
@@ -46,12 +45,16 @@ pub trait WeightInfo {
 			weight = weight
 				.saturating_add(Self::on_initialize_orphan_expirations(orphan_expiring_count));
 		}
+		if pending_funding_count > 0 {
+			weight = weight.saturating_add(Self::on_initialize_pending_funding(pending_funding_count));
+		}
 		weight
 	}
 	fn on_initialize_base() -> Weight;
 	fn on_initialize_expiring_locks(n: u32) -> Weight;
 	fn on_initialize_overdue_releases(n: u32) -> Weight;
 	fn on_initialize_orphan_expirations(n: u32) -> Weight;
+	fn on_initialize_pending_funding(n: u32) -> Weight;
 
 	// Admin function
 	fn admin_modify_minimum_locked_sats() -> Weight;
@@ -64,11 +67,7 @@ pub trait WeightInfo {
 
 	fn provider_get_account_funded_bitcoin_amount() -> Weight;
 	// Bitcoin UTXO event handler provider weights
-	fn provider_funding_received() -> Weight;
-	fn provider_timeout_waiting_for_funding() -> Weight;
-	fn provider_funding_promoted_by_account() -> Weight;
-	fn provider_candidate_rejected_by_account() -> Weight;
-	fn provider_orphaned_utxo_detected() -> Weight;
+	fn provider_utxo_detected() -> Weight;
 	fn provider_spent() -> Weight;
 }
 
@@ -126,6 +125,11 @@ where
 		Base::on_initialize_orphan_expirations(n)
 	}
 
+	fn on_initialize_pending_funding(n: u32) -> Weight {
+		Base::on_initialize_pending_funding(n)
+			.saturating_add(T::DbWeight::get().writes(n.into()))
+	}
+
 	fn admin_modify_minimum_locked_sats() -> Weight {
 		Base::admin_modify_minimum_locked_sats()
 	}
@@ -150,25 +154,8 @@ where
 		Base::provider_get_account_funded_bitcoin_amount()
 	}
 
-	fn provider_funding_received() -> Weight {
-		Base::provider_funding_received().saturating_add(LockEventWeight::utxo_locked())
-	}
-
-	fn provider_timeout_waiting_for_funding() -> Weight {
-		Base::provider_timeout_waiting_for_funding()
-	}
-
-	fn provider_funding_promoted_by_account() -> Weight {
-		Base::provider_funding_promoted_by_account()
-			.saturating_add(LockEventWeight::utxo_locked())
-	}
-
-	fn provider_candidate_rejected_by_account() -> Weight {
-		Base::provider_candidate_rejected_by_account()
-	}
-
-	fn provider_orphaned_utxo_detected() -> Weight {
-		Base::provider_orphaned_utxo_detected()
+	fn provider_utxo_detected() -> Weight {
+		Base::provider_utxo_detected().saturating_add(LockEventWeight::utxo_locked())
 	}
 
 	fn provider_spent() -> Weight {
@@ -184,24 +171,8 @@ impl<T: Config> BitcoinLocksProviderWeightInfo for ProviderWeightAdapter<T> {
 	}
 }
 impl<T: Config> BitcoinUtxoEventsWeightInfo for ProviderWeightAdapter<T> {
-	fn funding_received() -> Weight {
-		<T as Config>::WeightInfo::provider_funding_received()
-	}
-
-	fn timeout_waiting_for_funding() -> Weight {
-		<T as Config>::WeightInfo::provider_timeout_waiting_for_funding()
-	}
-
-	fn funding_promoted_by_account() -> Weight {
-		<T as Config>::WeightInfo::provider_funding_promoted_by_account()
-	}
-
-	fn candidate_rejected_by_account() -> Weight {
-		<T as Config>::WeightInfo::provider_candidate_rejected_by_account()
-	}
-
-	fn orphaned_utxo_detected() -> Weight {
-		<T as Config>::WeightInfo::provider_orphaned_utxo_detected()
+	fn utxo_detected() -> Weight {
+		<T as Config>::WeightInfo::provider_utxo_detected()
 	}
 
 	fn spent() -> Weight {
@@ -219,16 +190,13 @@ impl WeightInfo for () {
 	fn on_initialize_expiring_locks(_n: u32) -> Weight { Weight::zero() }
 	fn on_initialize_overdue_releases(_n: u32) -> Weight { Weight::zero() }
 	fn on_initialize_orphan_expirations(_n: u32) -> Weight { Weight::zero() }
+	fn on_initialize_pending_funding(_n: u32) -> Weight { Weight::zero() }
 	fn admin_modify_minimum_locked_sats() -> Weight { Weight::zero() }
 	fn request_orphaned_utxo_release() -> Weight { Weight::zero() }
 	fn cosign_orphaned_utxo_release() -> Weight { Weight::zero() }
 	fn increase_securitization() -> Weight { Weight::zero() }
 	fn set_flexible() -> Weight { Weight::zero() }
 	fn provider_get_account_funded_bitcoin_amount() -> Weight { Weight::zero() }
-	fn provider_funding_received() -> Weight { Weight::zero() }
-	fn provider_timeout_waiting_for_funding() -> Weight { Weight::zero() }
-	fn provider_funding_promoted_by_account() -> Weight { Weight::zero() }
-	fn provider_candidate_rejected_by_account() -> Weight { Weight::zero() }
-	fn provider_orphaned_utxo_detected() -> Weight { Weight::zero() }
+	fn provider_utxo_detected() -> Weight { Weight::zero() }
 	fn provider_spent() -> Weight { Weight::zero() }
 }

@@ -12,8 +12,6 @@ pub struct BitcoinMetrics {
 	bitcoin_utxos_verify_time: HistogramVec,
 	/// Number of bitcoin utxos being tracked
 	bitcoin_utxos_tracked_total: Gauge<U64>,
-	/// Amount of utxos being tracked
-	bitcoin_utxos_satoshis_total: Gauge<U64>,
 	/// Bitcoins spent
 	bitcoin_utxos_spent_total: CounterVec<U64>,
 	/// Bitcoins verified
@@ -42,10 +40,6 @@ impl BitcoinMetrics {
 				)?,
 				metrics_registry,
 			)?,
-			bitcoin_utxos_satoshis_total: register(
-				Gauge::new("argon_bitcoin_utxos_satoshis_total", "Amount of utxos being tracked")?,
-				metrics_registry,
-			)?,
 			bitcoin_utxos_spent_total: register(
 				CounterVec::new(
 					Opts::new("argon_bitcoin_utxos_spent_total", "Bitcoins spent"),
@@ -63,13 +57,7 @@ impl BitcoinMetrics {
 		})
 	}
 
-	pub fn track(
-		&self,
-		sync_state: &BitcoinUtxoSync,
-		count: u64,
-		satoshis: u64,
-		start_time: Instant,
-	) {
+	pub fn track(&self, sync_state: &BitcoinUtxoSync, count: u64, start_time: Instant) {
 		self.bitcoin_utxos_verified_total
 			.with_label_values(&[])
 			.inc_by(sync_state.funded.len() as u64);
@@ -79,6 +67,5 @@ impl BitcoinMetrics {
 		let elapsed = start_time.elapsed().as_micros() as f64;
 		self.bitcoin_utxos_verify_time.with_label_values(&[]).observe(elapsed);
 		self.bitcoin_utxos_tracked_total.set(count);
-		self.bitcoin_utxos_satoshis_total.set(satoshis);
 	}
 }

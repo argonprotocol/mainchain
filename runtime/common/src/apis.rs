@@ -280,7 +280,7 @@ macro_rules! inject_common_apis {
             }
         }
 
-        #[api_version(3)]
+        #[api_version(4)]
         impl argon_primitives::BitcoinApis<Block,Balance> for Runtime {
             fn get_sync_status() -> Option<BitcoinSyncStatus> {
                 BitcoinUtxos::get_sync_status()
@@ -290,8 +290,12 @@ macro_rules! inject_common_apis {
                 BitcoinLocks::minimum_satoshis()
             }
 
-            fn active_utxos() -> Vec<(Option<UtxoRef>, UtxoValue)>{
+            fn active_utxos() -> Vec<(Option<UtxoRef>, UtxoValue)> {
                 BitcoinUtxos::active_utxos()
+            }
+
+            fn active_utxo_addresses() -> Vec<(Option<UtxoRef>, UtxoAddress)> {
+                BitcoinUtxos::active_utxo_addresses()
             }
 
             fn redemption_rate(satoshis: Satoshis) -> Option<Balance> {

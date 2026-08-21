@@ -318,7 +318,7 @@ pub trait BitcoinVaultProvider {
 	) -> Result<(), VaultError>;
 
 	/// The lock is complete and remaining funds can be returned to the vault
-	fn cancel(
+	fn return_securitization(
 		vault_id: VaultId,
 		securitization: &Securitization<Self::Balance>,
 	) -> Result<(), VaultError>;

@@ -209,7 +209,8 @@ mod test {
 
 	use argon_primitives::bitcoin::{
 		BitcoinBlock, BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinScriptPubkey,
-		BitcoinSignature, BitcoinSyncStatus, CompressedBitcoinPubkey, Satoshis, UtxoRef, UtxoValue,
+		BitcoinSignature, BitcoinSyncStatus, CompressedBitcoinPubkey, Satoshis, UtxoAddress,
+		UtxoRef,
 	};
 	use argon_testing::*;
 	use serial_test::serial;
@@ -398,12 +399,10 @@ mod test {
 			&tracker,
 			&bitcoind,
 			UtxoRef { txid: txid.into(), output_index: vout },
-			UtxoValue {
+			UtxoAddress {
 				utxo_id: 1,
-				satoshis: Amount::ONE_BTC.to_sat(),
 				script_pubkey: cosign_script.get_script_pubkey().try_into().unwrap(),
 				submitted_at_height: register_height,
-				watch_for_spent_until_height: open_claim_height,
 			},
 			&block_address,
 		);
@@ -512,12 +511,10 @@ mod test {
 				&tracker,
 				&bitcoind,
 				UtxoRef { txid: txid.into(), output_index: vout },
-				UtxoValue {
+				UtxoAddress {
 					utxo_id: 1,
-					satoshis: Amount::ONE_BTC.to_sat(),
 					script_pubkey: cosign_script.get_script_pubkey().try_into().unwrap(),
 					submitted_at_height: register_height,
-					watch_for_spent_until_height: open_claim_height,
 				},
 				&block_address,
 			);
@@ -640,12 +637,10 @@ mod test {
 				&tracker,
 				&bitcoind,
 				UtxoRef { txid: txid.into(), output_index: vout },
-				UtxoValue {
+				UtxoAddress {
 					utxo_id: 1,
-					satoshis: Amount::ONE_BTC.to_sat(),
 					script_pubkey: cosign_script.get_script_pubkey().try_into().unwrap(),
 					submitted_at_height: register_height,
-					watch_for_spent_until_height: open_claim_height,
 				},
 				&block_address,
 			);
@@ -714,12 +709,10 @@ mod test {
 			.refresh_utxo_status(
 				vec![(
 					None,
-					UtxoValue {
+					UtxoAddress {
 						utxo_id: 1,
-						satoshis: amount,
 						script_pubkey: utxo_script_pubkey,
 						submitted_at_height: block_height,
-						watch_for_spent_until_height: open_claim_height,
 					},
 				)],
 				1000,
@@ -809,12 +802,10 @@ mod test {
 			&tracker,
 			&bitcoind,
 			utxo.clone(),
-			UtxoValue {
+			UtxoAddress {
 				utxo_id: 1,
-				satoshis: amount,
 				script_pubkey: utxo_script_pubkey,
 				submitted_at_height: register_height,
-				watch_for_spent_until_height: open_claim_height,
 			},
 			&block_address,
 		);
@@ -876,7 +867,7 @@ mod test {
 		tracker: &UtxoSpendFilter,
 		bitcoind: &BitcoinD,
 		utxo_ref: UtxoRef,
-		utxo_value: UtxoValue,
+		utxo_value: UtxoAddress,
 		block_address: &Address,
 	) {
 		let final_txid = bitcoind.client.send_raw_transaction(tx_hex).expect("sent");

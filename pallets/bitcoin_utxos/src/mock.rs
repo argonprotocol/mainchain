@@ -4,9 +4,7 @@ use crate as pallet_bitcoin_utxos;
 use argon_primitives::{bitcoin::UtxoId, BitcoinUtxoEvents};
 use pallet_prelude::argon_primitives::bitcoin::{Satoshis, UtxoRef};
 
-type UtxoVerifiedCallbackFn = fn((UtxoId, Satoshis)) -> DispatchResult;
-type OrphanDetectedCallbackFn = fn((UtxoId, UtxoRef, Satoshis)) -> DispatchResult;
-type CandidateRejectedCallbackFn = fn((UtxoId, u64, UtxoRef, Satoshis)) -> DispatchResult;
+type UtxoDetectedCallbackFn = fn((UtxoId, UtxoRef, Satoshis)) -> DispatchResult;
 
 // Configure a mock runtime to test the pallet.
 frame_support::construct_runtime!(
@@ -24,93 +22,40 @@ impl frame_system::Config for Test {
 
 parameter_types! {
 	pub const BitcoinBondDuration: u32 = 60 * 24 * 365; // 1 year
-	pub static MinimumSatoshisPerCandidateUtxo: u64 = 100_000_000; // 1 bitcoin minimum
+	pub static MinimumSatoshisPerUtxo: u64 = 100_000_000; // 1 bitcoin minimum
 
-	pub const MaxPendingConfirmationUtxos: u32 = 10;
-	pub const MaxPendingFundingExpirationsPerBlock: u32 = 2;
-	pub const MaxCandidateUtxosPerLock: u32 = 10;
-
-	pub const MaxPendingConfirmationBlocks: u32 = 10;
-	pub const MaximumSatoshiThresholdFromExpected: Satoshis = 10_000;
-	pub static UtxoVerifiedCallback: Option<UtxoVerifiedCallbackFn> = None;
-	pub static OrphanDetectedCallback: Option<OrphanDetectedCallbackFn> = None;
-	pub static LastOrphanDetected: Option<(UtxoId, UtxoRef, Satoshis)> = None;
-	pub static CandidateRejectedCallback: Option<CandidateRejectedCallbackFn> = None;
-	pub static LastCandidateRejected: Option<(UtxoId, u64, UtxoRef, Satoshis)> = None;
+	pub const MaxUtxosPerLock: u32 = 10;
+	pub static UtxoDetectedCallback: Option<UtxoDetectedCallbackFn> = None;
+	pub static LastSpent: Option<(UtxoId, UtxoRef)> = None;
 }
 
 pub struct StaticEventHandler;
 impl BitcoinUtxoEvents<u64> for StaticEventHandler {
 	type Weights = ();
 
-	fn funding_received(
+	fn utxo_detected(
 		utxo_id: UtxoId,
+		utxo_ref: UtxoRef,
 		received_satoshis: Satoshis,
+		_bitcoin_height: u64,
 	) -> sp_runtime::DispatchResult {
-		if let Some(callback) = UtxoVerifiedCallback::get() {
-			callback((utxo_id, received_satoshis))
+		if let Some(callback) = UtxoDetectedCallback::get() {
+			callback((utxo_id, utxo_ref, received_satoshis))
 		} else {
 			Ok(())
 		}
 	}
-	fn spent(_utxo_id: UtxoId) -> DispatchResult {
-		Ok(())
-	}
-
-	fn funding_promoted_by_account(
-		_utxo_id: UtxoId,
-		_received_satoshis: Satoshis,
-		_account_id: &u64,
-		_utxo_ref: &UtxoRef,
-	) -> DispatchResult {
-		Ok(())
-	}
-
-	fn candidate_rejected_by_account(
-		_utxo_id: UtxoId,
-		_satoshis: Satoshis,
-		_account_id: &u64,
-		_utxo_ref: &UtxoRef,
-	) -> DispatchResult {
-		if let Some(callback) = CandidateRejectedCallback::get() {
-			callback((_utxo_id, *_account_id, _utxo_ref.clone(), _satoshis))
-		} else {
-			LastCandidateRejected::set(Some((
-				_utxo_id,
-				*_account_id,
-				_utxo_ref.clone(),
-				_satoshis,
-			)));
-			Ok(())
-		}
-	}
-
-	fn orphaned_utxo_detected(
-		_utxo_id: UtxoId,
-		_satoshis: Satoshis,
-		_utxo_ref: UtxoRef,
-	) -> DispatchResult {
-		if let Some(callback) = OrphanDetectedCallback::get() {
-			callback((_utxo_id, _utxo_ref, _satoshis))
-		} else {
-			Ok(())
-		}
-	}
-
-	fn timeout_waiting_for_funding(_utxo_id: UtxoId) -> sp_runtime::DispatchResult {
+	fn spent(_utxo_id: UtxoId, _utxo_ref: UtxoRef) -> DispatchResult {
+		LastSpent::set(Some((_utxo_id, _utxo_ref)));
 		Ok(())
 	}
 }
 
 impl pallet_bitcoin_utxos::Config for Test {
 	type WeightInfo = ();
-	type MaxPendingConfirmationUtxos = MaxPendingConfirmationUtxos;
-	type MaxPendingFundingExpirationsPerBlock = MaxPendingFundingExpirationsPerBlock;
-	type MaxCandidateUtxosPerLock = MaxCandidateUtxosPerLock;
-	type MaxPendingConfirmationBlocks = MaxPendingConfirmationBlocks;
+	type MaxUtxosPerLock = MaxUtxosPerLock;
 	type EventHandler = StaticEventHandler;
-	type MaximumSatoshiThresholdFromExpected = MaximumSatoshiThresholdFromExpected;
-	type MinimumSatoshisPerCandidateUtxo = MinimumSatoshisPerCandidateUtxo;
+	type MinimumSatoshisPerUtxo = MinimumSatoshisPerUtxo;
 }
 
 pub fn new_test_ext() -> TestState {
