@@ -984,6 +984,7 @@ export default {
     _enum: {
       BitcoinMint: {
         accountId: 'AccountId32',
+        fissionId: 'u64',
         utxoId: 'Option<u64>',
         amount: 'u128',
       },
@@ -996,6 +997,7 @@ export default {
       MintError: {
         mintType: 'PalletMintMintType',
         accountId: 'AccountId32',
+        fissionId: 'Option<u64>',
         utxoId: 'Option<u64>',
         amount: 'u128',
         error: 'SpRuntimeDispatchError',
@@ -1311,12 +1313,16 @@ export default {
         accountId: 'AccountId32',
         fissionId: 'u64',
         liquidId: 'u64',
+        utxoId: 'u64',
+        satoshis: 'u64',
+        microgonsAtTargetPerBtc: 'u128',
         liquidityPromised: 'u128',
       },
       FissionRatcheted: {
         accountId: 'AccountId32',
         fissionId: 'u64',
         ratchetNumber: 'u32',
+        microgonsAtTargetPerBtc: 'u128',
         liquidityPromised: 'u128',
         amountMinted: 'u128',
         amountBurned: 'u128',

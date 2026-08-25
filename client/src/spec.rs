@@ -3457,9 +3457,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				54u8, 67u8, 204u8, 142u8, 134u8, 246u8, 163u8, 30u8, 225u8, 23u8, 1u8, 53u8, 210u8,
-				115u8, 35u8, 74u8, 121u8, 244u8, 124u8, 127u8, 186u8, 251u8, 209u8, 250u8, 163u8,
-				17u8, 255u8, 234u8, 78u8, 246u8, 136u8, 255u8,
+				164u8, 60u8, 198u8, 192u8, 168u8, 205u8, 217u8, 184u8, 62u8, 10u8, 101u8, 43u8,
+				82u8, 75u8, 149u8, 98u8, 0u8, 193u8, 3u8, 248u8, 255u8, 51u8, 216u8, 80u8, 122u8,
+				64u8, 228u8, 199u8, 125u8, 150u8, 10u8, 39u8,
 			]
 	}
 	pub mod system {
@@ -4583,9 +4583,9 @@ pub mod api {
 						"Events",
 						(),
 						[
-							54u8, 122u8, 152u8, 25u8, 3u8, 235u8, 64u8, 33u8, 171u8, 129u8, 67u8,
-							47u8, 193u8, 252u8, 198u8, 11u8, 57u8, 191u8, 62u8, 43u8, 32u8, 245u8,
-							139u8, 37u8, 77u8, 30u8, 21u8, 117u8, 197u8, 11u8, 255u8, 164u8,
+							173u8, 1u8, 243u8, 226u8, 7u8, 10u8, 254u8, 226u8, 113u8, 10u8, 171u8,
+							136u8, 223u8, 159u8, 126u8, 137u8, 15u8, 132u8, 198u8, 174u8, 1u8,
+							217u8, 133u8, 16u8, 194u8, 220u8, 43u8, 172u8, 8u8, 248u8, 85u8, 69u8,
 						],
 					)
 				}
@@ -17010,12 +17010,14 @@ pub mod api {
 			#[doc = "Any bitcoins minted"]
 			pub struct BitcoinMint {
 				pub account_id: bitcoin_mint::AccountId,
+				pub fission_id: bitcoin_mint::FissionId,
 				pub utxo_id: bitcoin_mint::UtxoId,
 				pub amount: bitcoin_mint::Amount,
 			}
 			pub mod bitcoin_mint {
 				use super::runtime_types;
 				pub type AccountId = crate::types::AccountId32;
+				pub type FissionId = ::core::primitive::u64;
 				pub type UtxoId = ::core::option::Option<::core::primitive::u64>;
 				pub type Amount = ::core::primitive::u128;
 			}
@@ -17063,6 +17065,7 @@ pub mod api {
 			pub struct MintError {
 				pub mint_type: mint_error::MintType,
 				pub account_id: mint_error::AccountId,
+				pub fission_id: mint_error::FissionId,
 				pub utxo_id: mint_error::UtxoId,
 				pub amount: mint_error::Amount,
 				pub error: mint_error::Error,
@@ -17071,6 +17074,7 @@ pub mod api {
 				use super::runtime_types;
 				pub type MintType = runtime_types::pallet_mint::pallet::MintType;
 				pub type AccountId = crate::types::AccountId32;
+				pub type FissionId = ::core::option::Option<::core::primitive::u64>;
 				pub type UtxoId = ::core::option::Option<::core::primitive::u64>;
 				pub type Amount = ::core::primitive::u128;
 				pub type Error = runtime_types::sp_runtime::DispatchError;
@@ -22545,6 +22549,9 @@ pub mod api {
 				pub account_id: fission_created::AccountId,
 				pub fission_id: fission_created::FissionId,
 				pub liquid_id: fission_created::LiquidId,
+				pub utxo_id: fission_created::UtxoId,
+				pub satoshis: fission_created::Satoshis,
+				pub microgons_at_target_per_btc: fission_created::MicrogonsAtTargetPerBtc,
 				pub liquidity_promised: fission_created::LiquidityPromised,
 			}
 			pub mod fission_created {
@@ -22552,6 +22559,9 @@ pub mod api {
 				pub type AccountId = crate::types::AccountId32;
 				pub type FissionId = ::core::primitive::u64;
 				pub type LiquidId = ::core::primitive::u64;
+				pub type UtxoId = ::core::primitive::u64;
+				pub type Satoshis = ::core::primitive::u64;
+				pub type MicrogonsAtTargetPerBtc = ::core::primitive::u128;
 				pub type LiquidityPromised = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for FissionCreated {
@@ -22571,6 +22581,7 @@ pub mod api {
 				pub account_id: fission_ratcheted::AccountId,
 				pub fission_id: fission_ratcheted::FissionId,
 				pub ratchet_number: fission_ratcheted::RatchetNumber,
+				pub microgons_at_target_per_btc: fission_ratcheted::MicrogonsAtTargetPerBtc,
 				pub liquidity_promised: fission_ratcheted::LiquidityPromised,
 				pub amount_minted: fission_ratcheted::AmountMinted,
 				pub amount_burned: fission_ratcheted::AmountBurned,
@@ -22580,6 +22591,7 @@ pub mod api {
 				pub type AccountId = crate::types::AccountId32;
 				pub type FissionId = ::core::primitive::u64;
 				pub type RatchetNumber = ::core::primitive::u32;
+				pub type MicrogonsAtTargetPerBtc = ::core::primitive::u128;
 				pub type LiquidityPromised = ::core::primitive::u128;
 				pub type AmountMinted = ::core::primitive::u128;
 				pub type AmountBurned = ::core::primitive::u128;
@@ -32441,6 +32453,9 @@ pub mod api {
 						account_id: crate::types::AccountId32,
 						fission_id: ::core::primitive::u64,
 						liquid_id: ::core::primitive::u64,
+						utxo_id: ::core::primitive::u64,
+						satoshis: ::core::primitive::u64,
+						microgons_at_target_per_btc: ::core::primitive::u128,
 						liquidity_promised: ::core::primitive::u128,
 					},
 					#[codec(index = 1)]
@@ -32449,6 +32464,7 @@ pub mod api {
 						account_id: crate::types::AccountId32,
 						fission_id: ::core::primitive::u64,
 						ratchet_number: ::core::primitive::u32,
+						microgons_at_target_per_btc: ::core::primitive::u128,
 						liquidity_promised: ::core::primitive::u128,
 						amount_minted: ::core::primitive::u128,
 						amount_burned: ::core::primitive::u128,
@@ -35462,6 +35478,7 @@ pub mod api {
 					#[doc = "Any bitcoins minted"]
 					BitcoinMint {
 						account_id: crate::types::AccountId32,
+						fission_id: ::core::primitive::u64,
 						utxo_id: ::core::option::Option<::core::primitive::u64>,
 						amount: ::core::primitive::u128,
 					},
@@ -35480,6 +35497,7 @@ pub mod api {
 					MintError {
 						mint_type: runtime_types::pallet_mint::pallet::MintType,
 						account_id: crate::types::AccountId32,
+						fission_id: ::core::option::Option<::core::primitive::u64>,
 						utxo_id: ::core::option::Option<::core::primitive::u64>,
 						amount: ::core::primitive::u128,
 						error: runtime_types::sp_runtime::DispatchError,
