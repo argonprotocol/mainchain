@@ -140,6 +140,9 @@ pub mod pallet {
 			account_id: T::AccountId,
 			fission_id: FissionId,
 			liquid_id: LiquidId,
+			utxo_id: UtxoId,
+			satoshis: Satoshis,
+			microgons_at_target_per_btc: T::Balance,
 			liquidity_promised: T::Balance,
 		},
 		/// A Fission ratchet changed its target-normalized BTC value and liability.
@@ -147,6 +150,7 @@ pub mod pallet {
 			account_id: T::AccountId,
 			fission_id: FissionId,
 			ratchet_number: u32,
+			microgons_at_target_per_btc: T::Balance,
 			liquidity_promised: T::Balance,
 			amount_minted: T::Balance,
 			amount_burned: T::Balance,
@@ -292,6 +296,9 @@ pub mod pallet {
 				account_id,
 				fission_id,
 				liquid_id,
+				utxo_id,
+				satoshis,
+				microgons_at_target_per_btc,
 				liquidity_promised,
 			});
 
@@ -388,6 +395,7 @@ pub mod pallet {
 				account_id,
 				fission_id,
 				ratchet_number,
+				microgons_at_target_per_btc,
 				liquidity_promised,
 				amount_minted,
 				amount_burned,

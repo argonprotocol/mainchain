@@ -132,7 +132,12 @@ pub mod pallet {
 	#[pallet::generate_deposit(fn deposit_event)]
 	pub enum Event<T: Config> {
 		/// Any bitcoins minted
-		BitcoinMint { account_id: T::AccountId, utxo_id: Option<UtxoId>, amount: T::Balance },
+		BitcoinMint {
+			account_id: T::AccountId,
+			fission_id: FissionId,
+			utxo_id: Option<UtxoId>,
+			amount: T::Balance,
+		},
 		/// The amount of microgons minted for mining. NOTE: accounts below Existential Deposit
 		/// will not be able to mint
 		MiningMint {
@@ -146,6 +151,7 @@ pub mod pallet {
 		MintError {
 			mint_type: MintType,
 			account_id: T::AccountId,
+			fission_id: Option<FissionId>,
 			utxo_id: Option<UtxoId>,
 			amount: T::Balance,
 			error: DispatchError,
@@ -230,6 +236,7 @@ pub mod pallet {
 
 							Self::deposit_event(Event::<T>::BitcoinMint {
 								account_id: mint.account_id.clone(),
+								fission_id: mint.fission_id,
 								utxo_id: Some(mint.utxo_id),
 								amount: amount_to_mint,
 							});
@@ -266,6 +273,7 @@ pub mod pallet {
 							Self::deposit_event(Event::<T>::MintError {
 								mint_type: MintType::Bitcoin,
 								account_id: mint.account_id.clone(),
+								fission_id: Some(mint.fission_id),
 								utxo_id: Some(mint.utxo_id),
 								amount: amount_to_mint,
 								error: e,
@@ -344,6 +352,7 @@ pub mod pallet {
 							Self::deposit_event(Event::<T>::MintError {
 								mint_type: MintType::Mining,
 								account_id: miner.clone(),
+								fission_id: None,
 								utxo_id: None,
 								amount,
 								error: e,

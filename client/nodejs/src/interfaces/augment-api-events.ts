@@ -332,8 +332,24 @@ declare module '@polkadot/api-base/types/events' {
        **/
       FissionCreated: AugmentedEvent<
         ApiType,
-        [accountId: AccountId32, fissionId: u64, liquidId: u64, liquidityPromised: u128],
-        { accountId: AccountId32; fissionId: u64; liquidId: u64; liquidityPromised: u128 }
+        [
+          accountId: AccountId32,
+          fissionId: u64,
+          liquidId: u64,
+          utxoId: u64,
+          satoshis: u64,
+          microgonsAtTargetPerBtc: u128,
+          liquidityPromised: u128,
+        ],
+        {
+          accountId: AccountId32;
+          fissionId: u64;
+          liquidId: u64;
+          utxoId: u64;
+          satoshis: u64;
+          microgonsAtTargetPerBtc: u128;
+          liquidityPromised: u128;
+        }
       >;
       /**
        * A Fission ratchet changed its target-normalized BTC value and liability.
@@ -344,6 +360,7 @@ declare module '@polkadot/api-base/types/events' {
           accountId: AccountId32,
           fissionId: u64,
           ratchetNumber: u32,
+          microgonsAtTargetPerBtc: u128,
           liquidityPromised: u128,
           amountMinted: u128,
           amountBurned: u128,
@@ -352,6 +369,7 @@ declare module '@polkadot/api-base/types/events' {
           accountId: AccountId32;
           fissionId: u64;
           ratchetNumber: u32;
+          microgonsAtTargetPerBtc: u128;
           liquidityPromised: u128;
           amountMinted: u128;
           amountBurned: u128;
@@ -1144,8 +1162,8 @@ declare module '@polkadot/api-base/types/events' {
        **/
       BitcoinMint: AugmentedEvent<
         ApiType,
-        [accountId: AccountId32, utxoId: Option<u64>, amount: u128],
-        { accountId: AccountId32; utxoId: Option<u64>; amount: u128 }
+        [accountId: AccountId32, fissionId: u64, utxoId: Option<u64>, amount: u128],
+        { accountId: AccountId32; fissionId: u64; utxoId: Option<u64>; amount: u128 }
       >;
       /**
        * The amount of microgons minted for mining. NOTE: accounts below Existential Deposit
@@ -1165,6 +1183,7 @@ declare module '@polkadot/api-base/types/events' {
         [
           mintType: PalletMintMintType,
           accountId: AccountId32,
+          fissionId: Option<u64>,
           utxoId: Option<u64>,
           amount: u128,
           error: SpRuntimeDispatchError,
@@ -1172,6 +1191,7 @@ declare module '@polkadot/api-base/types/events' {
         {
           mintType: PalletMintMintType;
           accountId: AccountId32;
+          fissionId: Option<u64>;
           utxoId: Option<u64>;
           amount: u128;
           error: SpRuntimeDispatchError;

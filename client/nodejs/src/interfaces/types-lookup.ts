@@ -1261,6 +1261,7 @@ declare module '@polkadot/types/lookup' {
     readonly isBitcoinMint: boolean;
     readonly asBitcoinMint: {
       readonly accountId: AccountId32;
+      readonly fissionId: u64;
       readonly utxoId: Option<u64>;
       readonly amount: u128;
     } & Struct;
@@ -1275,6 +1276,7 @@ declare module '@polkadot/types/lookup' {
     readonly asMintError: {
       readonly mintType: PalletMintMintType;
       readonly accountId: AccountId32;
+      readonly fissionId: Option<u64>;
       readonly utxoId: Option<u64>;
       readonly amount: u128;
       readonly error: SpRuntimeDispatchError;
@@ -1636,6 +1638,9 @@ declare module '@polkadot/types/lookup' {
       readonly accountId: AccountId32;
       readonly fissionId: u64;
       readonly liquidId: u64;
+      readonly utxoId: u64;
+      readonly satoshis: u64;
+      readonly microgonsAtTargetPerBtc: u128;
       readonly liquidityPromised: u128;
     } & Struct;
     readonly isFissionRatcheted: boolean;
@@ -1643,6 +1648,7 @@ declare module '@polkadot/types/lookup' {
       readonly accountId: AccountId32;
       readonly fissionId: u64;
       readonly ratchetNumber: u32;
+      readonly microgonsAtTargetPerBtc: u128;
       readonly liquidityPromised: u128;
       readonly amountMinted: u128;
       readonly amountBurned: u128;

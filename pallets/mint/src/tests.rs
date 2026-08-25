@@ -290,6 +290,7 @@ fn it_records_failed_mints() {
 			Event::MintError {
 				mint_type: MintType::Mining,
 				account_id: 1,
+				fission_id: None,
 				utxo_id: None,
 				error: DispatchError::Token(TokenError::BelowMinimum),
 				amount,
@@ -300,6 +301,26 @@ fn it_records_failed_mints() {
 		assert_eq!(MintedMiningMicrogons::<Test>::get(), 0);
 		assert_eq!(MiningMintPerCohort::<Test>::get().get(&1), None);
 		assert_eq!(Balances::total_issuance(), amount);
+
+		System::reset_events();
+		assert_ok!(Mint::request_mint(&1, 10, 9, 1));
+		MintedMiningMicrogons::<Test>::set(1);
+		CurrentFrameId::set(1);
+		set_cpi(-0.1);
+
+		Mint::on_initialize(2);
+
+		System::assert_last_event(
+			Event::MintError {
+				mint_type: MintType::Bitcoin,
+				account_id: 1,
+				fission_id: Some(10),
+				utxo_id: Some(9),
+				amount: 1,
+				error: DispatchError::Token(TokenError::BelowMinimum),
+			}
+			.into(),
+		);
 	});
 }
 
@@ -552,10 +573,17 @@ fn it_pays_bitcoin_mints() {
 		assert_eq!(queue_cursor.payout_cursor_index, 2);
 		assert_eq!(queue_cursor.payout_cursor_frame_id, Some(1));
 		System::assert_has_event(
-			Event::BitcoinMint { account_id, utxo_id: Some(utxo_id), amount: 6_200_000 }.into(),
+			Event::BitcoinMint {
+				account_id,
+				fission_id: 0,
+				utxo_id: Some(utxo_id),
+				amount: 6_200_000,
+			}
+			.into(),
 		);
 		System::assert_last_event(
-			Event::BitcoinMint { account_id: 2, utxo_id: Some(2), amount: 50 }.into(),
+			Event::BitcoinMint { account_id: 2, fission_id: 0, utxo_id: Some(2), amount: 50 }
+				.into(),
 		);
 		assert_eq!(MintedBitcoinMicrogons::<Test>::get(), 6_200_050);
 		assert_eq!(Balances::total_issuance(), 6_200_050u128);
@@ -589,10 +617,17 @@ fn it_pays_bitcoin_mints() {
 		assert_eq!(queue_cursor.payout_cursor_index, 2);
 		assert_eq!(queue_cursor.payout_cursor_frame_id, Some(2));
 		System::assert_has_event(
-			Event::BitcoinMint { account_id, utxo_id: Some(utxo_id), amount: 6_200_000 }.into(),
+			Event::BitcoinMint {
+				account_id,
+				fission_id: 0,
+				utxo_id: Some(utxo_id),
+				amount: 6_200_000,
+			}
+			.into(),
 		);
 		System::assert_has_event(
-			Event::BitcoinMint { account_id: 2, utxo_id: Some(2), amount: 50 }.into(),
+			Event::BitcoinMint { account_id: 2, fission_id: 0, utxo_id: Some(2), amount: 50 }
+				.into(),
 		);
 		assert_eq!(MintedBitcoinMicrogons::<Test>::get(), 12_400_100);
 		assert_eq!(Balances::total_issuance(), 12_400_110);
@@ -729,8 +764,8 @@ fn it_does_not_backfill_the_frame_payout_window() {
 #[test]
 fn it_tracks_multiple_pending_mints_for_the_same_utxo() {
 	new_test_ext().execute_with(|| {
-		assert_ok!(Mint::request_mint(&1, 0, 1, 100));
-		assert_ok!(Mint::request_mint(&1, 0, 1, 50));
+		assert_ok!(Mint::request_mint(&1, 10, 1, 100));
+		assert_ok!(Mint::request_mint(&1, 11, 1, 50));
 
 		assert_eq!(PendingMintUtxoIdLookup::<Test>::get(1).to_vec(), vec![0, 1]);
 		assert_eq!(
@@ -739,7 +774,7 @@ fn it_tracks_multiple_pending_mints_for_the_same_utxo() {
 				(
 					0,
 					PendingMintUtxo {
-						fission_id: 0,
+						fission_id: 10,
 						utxo_id: 1,
 						account_id: 1,
 						remaining_amount: 100,
@@ -749,7 +784,7 @@ fn it_tracks_multiple_pending_mints_for_the_same_utxo() {
 				(
 					1,
 					PendingMintUtxo {
-						fission_id: 0,
+						fission_id: 11,
 						utxo_id: 1,
 						account_id: 1,
 						remaining_amount: 50,
@@ -757,6 +792,23 @@ fn it_tracks_multiple_pending_mints_for_the_same_utxo() {
 					},
 				),
 			]
+		);
+
+		System::set_block_number(1);
+		MintedMiningMicrogons::<Test>::set(20);
+		MinerRewardsAccounts::set(vec![(10, 1)]);
+		CurrentFrameId::set(1);
+		set_cpi(-0.1);
+
+		Mint::on_initialize(1);
+
+		System::assert_has_event(
+			Event::BitcoinMint { account_id: 1, fission_id: 10, utxo_id: Some(1), amount: 10 }
+				.into(),
+		);
+		System::assert_last_event(
+			Event::BitcoinMint { account_id: 1, fission_id: 11, utxo_id: Some(1), amount: 5 }
+				.into(),
 		);
 	});
 }
