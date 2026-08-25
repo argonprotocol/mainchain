@@ -30,6 +30,7 @@ import type {
   H160,
   H256,
   MultiAddress,
+  Percent,
 } from '@polkadot/types/interfaces/runtime';
 import type {
   ArgonPrimitivesBitcoinCompressedBitcoinPubkey,
@@ -2061,6 +2062,13 @@ declare module '@polkadot/api-base/types/submittable' {
           reservedBondSpace: u32 | AnyNumber | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
         [u32, u32]
+      >;
+      /**
+       * Set the share of vault bond earnings guaranteed without Argonot securitization.
+       **/
+      setVaultBondEarningsGuaranteePercent: AugmentedSubmittable<
+        (percent: Percent | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>,
+        [Percent]
       >;
     };
     txPause: {

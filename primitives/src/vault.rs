@@ -140,6 +140,12 @@ pub struct VaultTreasuryFrameEarnings<Balance, AccountId> {
 	pub earnings_for_vault: Balance,
 	/// Contributed capital by the vault
 	pub capital_contributed_by_vault: Balance,
+	/// Argonot securitization in the vault at the frame turn.
+	pub argonot_securitization: Balance,
+	/// Argonots needed for the vault to realize its maximum Treasury earnings.
+	pub argonots_for_max_earnings: Balance,
+	/// Vault Treasury earnings not realized because of its Argonot securitization.
+	pub treasury_unrealized_earnings: Balance,
 }
 
 #[derive(
@@ -167,12 +173,33 @@ where
 	pub encumbered_micronots: Balance,
 }
 
+pub struct VaultBondEarningsSnapshot<Balance> {
+	/// Raw securitized satoshis used for the vault's pro-rata Argonot requirement.
+	pub securitized_satoshis: Satoshis,
+	/// Argonot securitization in the vault, denominated in micronots.
+	pub argonot_securitization: Balance,
+}
+
+pub trait TreasuryVaultProviderWeightInfo {
+	fn get_bond_earnings_snapshot() -> Weight;
+}
+
+impl TreasuryVaultProviderWeightInfo for () {
+	fn get_bond_earnings_snapshot() -> Weight {
+		Weight::zero()
+	}
+}
+
 pub trait TreasuryVaultProvider {
+	type Weights: TreasuryVaultProviderWeightInfo;
 	type Balance: Codec;
 	type AccountId: Codec;
 
 	/// Get the vault capital and effective Bitcoin-backed Treasury capacity.
 	fn get_eligible_capacity(vault_id: VaultId) -> (Self::Balance, Satoshis);
+
+	/// Get the values used to determine the vault's bond earnings eligibility.
+	fn get_bond_earnings_snapshot(vault_id: VaultId) -> VaultBondEarningsSnapshot<Self::Balance>;
 
 	fn get_vault_operator(vault_id: VaultId) -> Option<Self::AccountId>;
 	fn get_vault_delegate(vault_id: VaultId) -> Option<Self::AccountId>;

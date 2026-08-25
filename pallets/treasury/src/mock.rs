@@ -1,6 +1,8 @@
 use crate as pallet_treasury;
 use argon_primitives::{
-	bitcoin::Satoshis, providers::PriceProvider, vault::TreasuryVaultProvider,
+	bitcoin::Satoshis,
+	providers::PriceProvider,
+	vault::{TreasuryVaultProvider, VaultBondEarningsSnapshot},
 	OperationalAccountsHook,
 };
 use frame_support::traits::{Currency, StorageMapShim};
@@ -170,6 +172,7 @@ parameter_types! {
 	pub const PercentForTreasuryReserves: Percent = Percent::from_percent(20);
 	pub const PercentForArgonotBondPool: Percent = Percent::from_percent(10);
 	pub static MaxArgonotBondedPercentOfCirculation: Percent = Percent::from_percent(40);
+	pub const InitialVaultBondEarningsGuaranteePercent: Percent = Percent::from_percent(10);
 	pub static CurrentFrameId: FrameId = 1;
 
 	pub static VaultsById: HashMap<VaultId, TestVault> = HashMap::new();
@@ -185,6 +188,8 @@ parameter_types! {
 pub struct TestVault {
 	pub securitization: Balance,
 	pub eligible_satoshis: Satoshis,
+	pub securitized_satoshis: Satoshis,
+	pub committed_argonots: Balance,
 	pub sharing_percent: Permill,
 	pub account_id: TestAccountId,
 	pub delegate_account_id: Option<TestAccountId>,
@@ -229,6 +234,7 @@ impl PriceProvider<Balance> for StaticPriceProvider {
 
 pub struct StaticTreasuryVaultProvider;
 impl TreasuryVaultProvider for StaticTreasuryVaultProvider {
+	type Weights = ();
 	type Balance = Balance;
 	type AccountId = TestAccountId;
 
@@ -237,6 +243,14 @@ impl TreasuryVaultProvider for StaticTreasuryVaultProvider {
 			.get(&vault_id)
 			.map(|vault| (vault.securitization, vault.eligible_satoshis))
 			.unwrap_or_default()
+	}
+
+	fn get_bond_earnings_snapshot(vault_id: VaultId) -> VaultBondEarningsSnapshot<Self::Balance> {
+		let (securitized_satoshis, argonot_securitization) = VaultsById::get()
+			.get(&vault_id)
+			.map(|vault| (vault.securitized_satoshis, vault.committed_argonots))
+			.unwrap_or_default();
+		VaultBondEarningsSnapshot { securitized_satoshis, argonot_securitization }
 	}
 
 	fn get_vault_profit_sharing_percent(vault_id: VaultId) -> Option<Permill> {
@@ -293,6 +307,7 @@ impl pallet_treasury::Config for Test {
 	type MinimumArgonsPerContributor = MinimumArgonsPerContributor;
 	type MaxActiveArgonotBondLots = MaxActiveArgonotBondLots;
 	type MaxArgonotBondedPercentOfCirculation = MaxArgonotBondedPercentOfCirculation;
+	type InitialVaultBondEarningsGuaranteePercent = InitialVaultBondEarningsGuaranteePercent;
 	type PalletId = VaultPalletId;
 	type MiningBidPoolAccount = BidPoolAccountId;
 	type TreasuryReservesAccount = TreasuryReservesAccountId;

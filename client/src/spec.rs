@@ -1170,10 +1170,9 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							197u8, 109u8, 253u8, 58u8, 101u8, 122u8, 135u8, 125u8, 199u8, 19u8,
-							51u8, 181u8, 240u8, 239u8, 169u8, 134u8, 201u8, 64u8, 38u8, 20u8,
-							224u8, 52u8, 131u8, 231u8, 215u8, 236u8, 82u8, 231u8, 203u8, 181u8,
-							182u8, 46u8,
+							199u8, 20u8, 101u8, 90u8, 138u8, 236u8, 97u8, 225u8, 252u8, 49u8, 60u8,
+							12u8, 29u8, 220u8, 161u8, 22u8, 153u8, 54u8, 82u8, 129u8, 175u8, 202u8,
+							183u8, 221u8, 191u8, 207u8, 131u8, 233u8, 99u8, 249u8, 7u8, 136u8,
 						],
 					)
 				}
@@ -1191,9 +1190,9 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							11u8, 81u8, 152u8, 165u8, 131u8, 68u8, 72u8, 233u8, 199u8, 22u8, 175u8,
-							99u8, 82u8, 174u8, 156u8, 182u8, 81u8, 30u8, 34u8, 163u8, 191u8, 254u8,
-							254u8, 27u8, 11u8, 22u8, 73u8, 242u8, 3u8, 238u8, 48u8, 161u8,
+							176u8, 81u8, 158u8, 19u8, 203u8, 46u8, 145u8, 154u8, 129u8, 156u8,
+							134u8, 254u8, 247u8, 238u8, 52u8, 173u8, 8u8, 103u8, 56u8, 43u8, 220u8,
+							174u8, 91u8, 68u8, 186u8, 15u8, 112u8, 15u8, 1u8, 216u8, 129u8, 198u8,
 						],
 					)
 				}
@@ -3457,9 +3456,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				164u8, 60u8, 198u8, 192u8, 168u8, 205u8, 217u8, 184u8, 62u8, 10u8, 101u8, 43u8,
-				82u8, 75u8, 149u8, 98u8, 0u8, 193u8, 3u8, 248u8, 255u8, 51u8, 216u8, 80u8, 122u8,
-				64u8, 228u8, 199u8, 125u8, 150u8, 10u8, 39u8,
+				87u8, 197u8, 57u8, 246u8, 58u8, 46u8, 255u8, 24u8, 253u8, 127u8, 253u8, 5u8, 115u8,
+				241u8, 64u8, 231u8, 205u8, 165u8, 114u8, 162u8, 235u8, 59u8, 140u8, 107u8, 38u8,
+				241u8, 48u8, 171u8, 132u8, 188u8, 53u8, 247u8,
 			]
 	}
 	pub mod system {
@@ -4583,9 +4582,9 @@ pub mod api {
 						"Events",
 						(),
 						[
-							173u8, 1u8, 243u8, 226u8, 7u8, 10u8, 254u8, 226u8, 113u8, 10u8, 171u8,
-							136u8, 223u8, 159u8, 126u8, 137u8, 15u8, 132u8, 198u8, 174u8, 1u8,
-							217u8, 133u8, 16u8, 194u8, 220u8, 43u8, 172u8, 8u8, 248u8, 85u8, 69u8,
+							160u8, 48u8, 175u8, 123u8, 42u8, 138u8, 108u8, 182u8, 216u8, 217u8,
+							105u8, 213u8, 28u8, 174u8, 104u8, 14u8, 33u8, 5u8, 205u8, 94u8, 66u8,
+							88u8, 166u8, 30u8, 96u8, 131u8, 248u8, 151u8, 99u8, 97u8, 185u8, 28u8,
 						],
 					)
 				}
@@ -5493,10 +5492,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							117u8, 200u8, 32u8, 115u8, 212u8, 4u8, 204u8, 127u8, 82u8, 106u8,
-							245u8, 198u8, 22u8, 141u8, 5u8, 104u8, 226u8, 148u8, 22u8, 145u8,
-							243u8, 254u8, 126u8, 184u8, 193u8, 23u8, 157u8, 239u8, 225u8, 168u8,
-							22u8, 169u8,
+							164u8, 85u8, 76u8, 127u8, 174u8, 128u8, 13u8, 75u8, 218u8, 192u8,
+							246u8, 148u8, 14u8, 185u8, 61u8, 127u8, 81u8, 100u8, 233u8, 30u8,
+							148u8, 4u8, 29u8, 205u8, 90u8, 159u8, 244u8, 51u8, 90u8, 42u8, 114u8,
+							21u8,
 						],
 					)
 				}
@@ -5561,9 +5560,10 @@ pub mod api {
 							max_weight,
 						},
 						[
-							162u8, 24u8, 218u8, 58u8, 144u8, 118u8, 56u8, 64u8, 80u8, 63u8, 34u8,
-							62u8, 184u8, 146u8, 39u8, 224u8, 69u8, 11u8, 69u8, 177u8, 139u8, 234u8,
-							199u8, 60u8, 93u8, 89u8, 224u8, 105u8, 8u8, 33u8, 91u8, 132u8,
+							162u8, 4u8, 6u8, 164u8, 201u8, 142u8, 247u8, 235u8, 239u8, 191u8,
+							148u8, 151u8, 220u8, 146u8, 127u8, 131u8, 32u8, 201u8, 249u8, 143u8,
+							156u8, 103u8, 9u8, 155u8, 39u8, 241u8, 192u8, 198u8, 114u8, 98u8,
+							152u8, 25u8,
 						],
 					)
 				}
@@ -6468,9 +6468,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							162u8, 65u8, 127u8, 162u8, 202u8, 142u8, 58u8, 181u8, 10u8, 156u8, 4u8,
-							159u8, 13u8, 240u8, 171u8, 122u8, 110u8, 223u8, 245u8, 213u8, 131u8,
-							38u8, 58u8, 53u8, 42u8, 173u8, 204u8, 120u8, 248u8, 242u8, 43u8, 157u8,
+							46u8, 68u8, 5u8, 133u8, 182u8, 200u8, 213u8, 42u8, 110u8, 136u8, 199u8,
+							62u8, 82u8, 226u8, 177u8, 212u8, 175u8, 125u8, 79u8, 158u8, 114u8,
+							182u8, 19u8, 220u8, 136u8, 211u8, 193u8, 7u8, 180u8, 74u8, 56u8, 44u8,
 						],
 					)
 				}
@@ -6734,9 +6734,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							182u8, 197u8, 60u8, 207u8, 231u8, 65u8, 147u8, 156u8, 144u8, 13u8,
-							22u8, 37u8, 20u8, 214u8, 56u8, 89u8, 44u8, 125u8, 142u8, 219u8, 210u8,
-							84u8, 139u8, 125u8, 153u8, 104u8, 38u8, 195u8, 158u8, 2u8, 170u8, 7u8,
+							200u8, 106u8, 141u8, 246u8, 13u8, 77u8, 8u8, 212u8, 195u8, 126u8,
+							189u8, 142u8, 80u8, 20u8, 80u8, 33u8, 224u8, 116u8, 171u8, 180u8,
+							252u8, 78u8, 109u8, 171u8, 25u8, 17u8, 41u8, 79u8, 248u8, 202u8, 111u8,
+							90u8,
 						],
 					)
 				}
@@ -6785,9 +6786,10 @@ pub mod api {
 						],
 						check_permissions::Input { call, proxy_type },
 						[
-							159u8, 207u8, 85u8, 126u8, 221u8, 149u8, 207u8, 160u8, 127u8, 43u8,
-							54u8, 5u8, 130u8, 149u8, 145u8, 250u8, 243u8, 8u8, 109u8, 239u8, 252u8,
-							243u8, 179u8, 143u8, 64u8, 4u8, 68u8, 119u8, 76u8, 119u8, 185u8, 195u8,
+							119u8, 73u8, 37u8, 81u8, 189u8, 180u8, 48u8, 248u8, 136u8, 111u8,
+							249u8, 41u8, 171u8, 180u8, 26u8, 222u8, 215u8, 216u8, 69u8, 218u8,
+							214u8, 146u8, 253u8, 167u8, 239u8, 254u8, 207u8, 209u8, 86u8, 136u8,
+							126u8, 64u8,
 						],
 					)
 				}
@@ -10643,9 +10645,10 @@ pub mod api {
 						"RevenuePerFrameByVault",
 						(),
 						[
-							38u8, 248u8, 25u8, 9u8, 98u8, 26u8, 166u8, 207u8, 99u8, 11u8, 241u8,
-							211u8, 37u8, 3u8, 224u8, 112u8, 36u8, 194u8, 210u8, 91u8, 68u8, 53u8,
-							232u8, 140u8, 220u8, 216u8, 5u8, 36u8, 157u8, 227u8, 122u8, 24u8,
+							129u8, 115u8, 47u8, 47u8, 121u8, 134u8, 38u8, 209u8, 139u8, 142u8,
+							171u8, 120u8, 185u8, 238u8, 248u8, 213u8, 104u8, 202u8, 237u8, 207u8,
+							197u8, 176u8, 36u8, 92u8, 164u8, 238u8, 57u8, 161u8, 124u8, 108u8,
+							115u8, 86u8,
 						],
 					)
 				}
@@ -10669,9 +10672,10 @@ pub mod api {
 						"RevenuePerFrameByVault",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							38u8, 248u8, 25u8, 9u8, 98u8, 26u8, 166u8, 207u8, 99u8, 11u8, 241u8,
-							211u8, 37u8, 3u8, 224u8, 112u8, 36u8, 194u8, 210u8, 91u8, 68u8, 53u8,
-							232u8, 140u8, 220u8, 216u8, 5u8, 36u8, 157u8, 227u8, 122u8, 24u8,
+							129u8, 115u8, 47u8, 47u8, 121u8, 134u8, 38u8, 209u8, 139u8, 142u8,
+							171u8, 120u8, 185u8, 238u8, 248u8, 213u8, 104u8, 202u8, 237u8, 207u8,
+							197u8, 176u8, 36u8, 92u8, 164u8, 238u8, 57u8, 161u8, 124u8, 108u8,
+							115u8, 86u8,
 						],
 					)
 				}
@@ -21608,10 +21612,10 @@ pub mod api {
 						"batch",
 						types::Batch { calls },
 						[
-							212u8, 39u8, 67u8, 234u8, 47u8, 191u8, 72u8, 237u8, 182u8, 127u8, 46u8,
-							18u8, 139u8, 136u8, 247u8, 62u8, 54u8, 128u8, 49u8, 186u8, 111u8,
-							119u8, 110u8, 175u8, 27u8, 251u8, 131u8, 47u8, 20u8, 77u8, 142u8,
-							165u8,
+							113u8, 220u8, 243u8, 195u8, 238u8, 16u8, 83u8, 178u8, 84u8, 167u8,
+							11u8, 239u8, 93u8, 199u8, 85u8, 100u8, 122u8, 85u8, 37u8, 160u8, 124u8,
+							72u8, 194u8, 150u8, 189u8, 200u8, 253u8, 164u8, 148u8, 52u8, 33u8,
+							110u8,
 						],
 					)
 				}
@@ -21641,9 +21645,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							230u8, 120u8, 98u8, 64u8, 240u8, 106u8, 111u8, 0u8, 237u8, 67u8, 130u8,
-							154u8, 191u8, 243u8, 64u8, 32u8, 94u8, 65u8, 1u8, 142u8, 13u8, 237u8,
-							97u8, 113u8, 168u8, 230u8, 25u8, 246u8, 5u8, 45u8, 201u8, 101u8,
+							28u8, 0u8, 5u8, 119u8, 84u8, 121u8, 198u8, 219u8, 63u8, 131u8, 187u8,
+							37u8, 29u8, 168u8, 195u8, 107u8, 160u8, 40u8, 42u8, 126u8, 52u8, 61u8,
+							89u8, 78u8, 103u8, 250u8, 212u8, 41u8, 115u8, 134u8, 43u8, 152u8,
 						],
 					)
 				}
@@ -21669,9 +21673,9 @@ pub mod api {
 						"batch_all",
 						types::BatchAll { calls },
 						[
-							38u8, 230u8, 112u8, 177u8, 88u8, 87u8, 226u8, 44u8, 25u8, 218u8, 136u8,
-							25u8, 15u8, 41u8, 176u8, 100u8, 236u8, 86u8, 12u8, 24u8, 127u8, 134u8,
-							102u8, 4u8, 149u8, 166u8, 112u8, 50u8, 5u8, 226u8, 63u8, 9u8,
+							41u8, 28u8, 109u8, 43u8, 80u8, 10u8, 217u8, 86u8, 92u8, 87u8, 70u8,
+							106u8, 91u8, 23u8, 185u8, 168u8, 205u8, 161u8, 142u8, 201u8, 34u8,
+							64u8, 17u8, 129u8, 175u8, 4u8, 181u8, 210u8, 80u8, 117u8, 251u8, 98u8,
 						],
 					)
 				}
@@ -21694,10 +21698,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							156u8, 220u8, 28u8, 232u8, 15u8, 108u8, 126u8, 200u8, 170u8, 188u8,
-							21u8, 169u8, 223u8, 194u8, 190u8, 24u8, 53u8, 184u8, 111u8, 48u8,
-							111u8, 202u8, 226u8, 58u8, 105u8, 104u8, 41u8, 154u8, 7u8, 49u8, 214u8,
-							126u8,
+							193u8, 159u8, 104u8, 2u8, 204u8, 92u8, 91u8, 66u8, 244u8, 136u8, 205u8,
+							224u8, 9u8, 7u8, 166u8, 61u8, 12u8, 236u8, 33u8, 9u8, 198u8, 250u8,
+							49u8, 112u8, 171u8, 23u8, 34u8, 46u8, 189u8, 244u8, 29u8, 94u8,
 						],
 					)
 				}
@@ -21723,10 +21726,10 @@ pub mod api {
 						"force_batch",
 						types::ForceBatch { calls },
 						[
-							97u8, 252u8, 130u8, 33u8, 18u8, 22u8, 96u8, 184u8, 30u8, 111u8, 144u8,
-							172u8, 88u8, 168u8, 107u8, 186u8, 223u8, 12u8, 213u8, 157u8, 207u8,
-							183u8, 255u8, 186u8, 204u8, 132u8, 78u8, 58u8, 216u8, 123u8, 81u8,
-							164u8,
+							110u8, 191u8, 110u8, 218u8, 99u8, 41u8, 110u8, 107u8, 253u8, 133u8,
+							200u8, 6u8, 249u8, 127u8, 56u8, 166u8, 247u8, 112u8, 69u8, 132u8,
+							191u8, 59u8, 230u8, 3u8, 26u8, 142u8, 43u8, 199u8, 48u8, 96u8, 14u8,
+							59u8,
 						],
 					)
 				}
@@ -21749,9 +21752,10 @@ pub mod api {
 							weight,
 						},
 						[
-							17u8, 47u8, 63u8, 46u8, 7u8, 89u8, 38u8, 60u8, 98u8, 162u8, 114u8,
-							144u8, 53u8, 200u8, 245u8, 250u8, 153u8, 197u8, 193u8, 238u8, 71u8,
-							206u8, 77u8, 64u8, 110u8, 45u8, 11u8, 17u8, 90u8, 2u8, 13u8, 161u8,
+							198u8, 153u8, 104u8, 66u8, 170u8, 212u8, 168u8, 102u8, 156u8, 197u8,
+							39u8, 57u8, 72u8, 18u8, 0u8, 160u8, 78u8, 23u8, 219u8, 64u8, 100u8,
+							198u8, 57u8, 235u8, 108u8, 252u8, 38u8, 178u8, 182u8, 210u8, 86u8,
+							35u8,
 						],
 					)
 				}
@@ -21791,9 +21795,10 @@ pub mod api {
 							fallback: ::subxt::ext::subxt_core::alloc::boxed::Box::new(fallback),
 						},
 						[
-							32u8, 195u8, 46u8, 21u8, 254u8, 48u8, 40u8, 29u8, 39u8, 181u8, 241u8,
-							54u8, 5u8, 162u8, 46u8, 173u8, 222u8, 92u8, 36u8, 74u8, 158u8, 58u8,
-							160u8, 171u8, 14u8, 170u8, 77u8, 22u8, 172u8, 236u8, 181u8, 228u8,
+							121u8, 32u8, 77u8, 187u8, 108u8, 142u8, 26u8, 253u8, 7u8, 83u8, 187u8,
+							76u8, 54u8, 247u8, 116u8, 104u8, 236u8, 180u8, 255u8, 207u8, 110u8,
+							205u8, 183u8, 170u8, 183u8, 234u8, 189u8, 1u8, 75u8, 140u8, 77u8,
+							228u8,
 						],
 					)
 				}
@@ -21816,10 +21821,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							62u8, 156u8, 226u8, 139u8, 218u8, 119u8, 36u8, 171u8, 59u8, 17u8,
-							247u8, 38u8, 139u8, 27u8, 201u8, 93u8, 131u8, 27u8, 21u8, 233u8, 207u8,
-							220u8, 164u8, 71u8, 56u8, 140u8, 130u8, 36u8, 229u8, 66u8, 128u8,
-							194u8,
+							75u8, 63u8, 181u8, 183u8, 172u8, 163u8, 197u8, 26u8, 4u8, 231u8, 142u8,
+							251u8, 245u8, 54u8, 92u8, 15u8, 118u8, 210u8, 43u8, 198u8, 218u8,
+							164u8, 225u8, 111u8, 138u8, 140u8, 1u8, 174u8, 121u8, 21u8, 63u8,
+							119u8,
 						],
 					)
 				}
@@ -22155,10 +22160,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							87u8, 104u8, 191u8, 90u8, 106u8, 242u8, 214u8, 106u8, 162u8, 246u8,
-							158u8, 228u8, 181u8, 146u8, 184u8, 251u8, 144u8, 107u8, 203u8, 3u8,
-							64u8, 105u8, 216u8, 86u8, 42u8, 28u8, 100u8, 169u8, 40u8, 153u8, 119u8,
-							228u8,
+							172u8, 67u8, 73u8, 42u8, 13u8, 191u8, 122u8, 42u8, 104u8, 210u8, 66u8,
+							208u8, 216u8, 67u8, 100u8, 96u8, 61u8, 250u8, 181u8, 157u8, 22u8,
+							238u8, 127u8, 5u8, 98u8, 37u8, 231u8, 132u8, 243u8, 129u8, 205u8, 97u8,
 						],
 					)
 				}
@@ -22181,9 +22185,10 @@ pub mod api {
 							weight,
 						},
 						[
-							54u8, 193u8, 38u8, 178u8, 120u8, 171u8, 9u8, 7u8, 227u8, 92u8, 91u8,
-							197u8, 126u8, 23u8, 13u8, 150u8, 50u8, 82u8, 164u8, 124u8, 33u8, 254u8,
-							26u8, 191u8, 102u8, 193u8, 174u8, 254u8, 159u8, 224u8, 255u8, 10u8,
+							226u8, 154u8, 179u8, 171u8, 61u8, 29u8, 179u8, 171u8, 218u8, 134u8,
+							225u8, 104u8, 82u8, 24u8, 106u8, 6u8, 147u8, 101u8, 87u8, 88u8, 240u8,
+							118u8, 119u8, 29u8, 197u8, 203u8, 169u8, 178u8, 182u8, 221u8, 11u8,
+							40u8,
 						],
 					)
 				}
@@ -22221,10 +22226,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							148u8, 130u8, 15u8, 235u8, 65u8, 136u8, 209u8, 6u8, 193u8, 71u8, 132u8,
-							49u8, 214u8, 164u8, 57u8, 234u8, 134u8, 36u8, 172u8, 148u8, 156u8,
-							136u8, 180u8, 171u8, 79u8, 119u8, 160u8, 53u8, 111u8, 68u8, 238u8,
-							183u8,
+							75u8, 238u8, 126u8, 232u8, 63u8, 252u8, 16u8, 135u8, 234u8, 129u8,
+							250u8, 147u8, 61u8, 139u8, 160u8, 153u8, 86u8, 128u8, 172u8, 13u8,
+							175u8, 112u8, 149u8, 136u8, 17u8, 61u8, 157u8, 210u8, 121u8, 235u8,
+							120u8, 86u8,
 						],
 					)
 				}
@@ -23033,6 +23038,30 @@ pub mod api {
 					const PALLET: &'static str = "Treasury";
 					const CALL: &'static str = "set_reserved_bond_space";
 				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Set the share of vault bond earnings guaranteed without Argonot securitization."]
+				pub struct SetVaultBondEarningsGuaranteePercent {
+					pub percent: set_vault_bond_earnings_guarantee_percent::Percent,
+				}
+				pub mod set_vault_bond_earnings_guarantee_percent {
+					use super::runtime_types;
+					pub type Percent = runtime_types::sp_arithmetic::per_things::Percent;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for SetVaultBondEarningsGuaranteePercent {
+					const PALLET: &'static str = "Treasury";
+					const CALL: &'static str = "set_vault_bond_earnings_guarantee_percent";
+				}
 			}
 			pub struct TransactionApi;
 			impl TransactionApi {
@@ -23125,6 +23154,24 @@ pub mod api {
 							230u8, 101u8, 178u8, 2u8, 45u8, 9u8, 130u8, 210u8, 223u8, 147u8, 39u8,
 							60u8, 73u8, 66u8, 60u8, 114u8, 112u8, 82u8, 120u8, 78u8, 137u8, 201u8,
 							250u8, 49u8, 79u8, 207u8, 7u8, 22u8, 35u8, 141u8, 137u8, 137u8,
+						],
+					)
+				}
+				#[doc = "Set the share of vault bond earnings guaranteed without Argonot securitization."]
+				pub fn set_vault_bond_earnings_guarantee_percent(
+					&self,
+					percent: types::set_vault_bond_earnings_guarantee_percent::Percent,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<
+					types::SetVaultBondEarningsGuaranteePercent,
+				> {
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"Treasury",
+						"set_vault_bond_earnings_guarantee_percent",
+						types::SetVaultBondEarningsGuaranteePercent { percent },
+						[
+							75u8, 98u8, 176u8, 53u8, 76u8, 143u8, 157u8, 45u8, 4u8, 157u8, 134u8,
+							198u8, 8u8, 34u8, 221u8, 68u8, 138u8, 81u8, 86u8, 171u8, 144u8, 128u8,
+							186u8, 247u8, 58u8, 174u8, 17u8, 114u8, 150u8, 42u8, 46u8, 0u8,
 						],
 					)
 				}
@@ -23231,9 +23278,10 @@ pub mod api {
 				pub bid_pool_distributed: frame_earnings_distributed::BidPoolDistributed,
 				pub argonot_bond_pool_distributed:
 					frame_earnings_distributed::ArgonotBondPoolDistributed,
+				pub argonot_bond_pool_burned: frame_earnings_distributed::ArgonotBondPoolBurned,
 				pub vault_bid_pool_distributed: frame_earnings_distributed::VaultBidPoolDistributed,
-				pub treasury_refunds: frame_earnings_distributed::TreasuryRefunds,
 				pub treasury_reserves: frame_earnings_distributed::TreasuryReserves,
+				pub vault_bid_pool_burned: frame_earnings_distributed::VaultBidPoolBurned,
 				pub participating_vaults: frame_earnings_distributed::ParticipatingVaults,
 			}
 			pub mod frame_earnings_distributed {
@@ -23241,9 +23289,10 @@ pub mod api {
 				pub type FrameId = ::core::primitive::u64;
 				pub type BidPoolDistributed = ::core::primitive::u128;
 				pub type ArgonotBondPoolDistributed = ::core::primitive::u128;
+				pub type ArgonotBondPoolBurned = ::core::primitive::u128;
 				pub type VaultBidPoolDistributed = ::core::primitive::u128;
-				pub type TreasuryRefunds = ::core::primitive::u128;
 				pub type TreasuryReserves = ::core::primitive::u128;
+				pub type VaultBidPoolBurned = ::core::primitive::u128;
 				pub type ParticipatingVaults = ::core::primitive::u32;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for FrameEarningsDistributed {
@@ -23262,12 +23311,14 @@ pub mod api {
 			pub struct FrameVaultCapitalLocked {
 				pub frame_id: frame_vault_capital_locked::FrameId,
 				pub total_eligible_bonds: frame_vault_capital_locked::TotalEligibleBonds,
+				pub argonots_for_max_earnings: frame_vault_capital_locked::ArgonotsForMaxEarnings,
 				pub participating_vaults: frame_vault_capital_locked::ParticipatingVaults,
 			}
 			pub mod frame_vault_capital_locked {
 				use super::runtime_types;
 				pub type FrameId = ::core::primitive::u64;
 				pub type TotalEligibleBonds = ::core::primitive::u128;
+				pub type ArgonotsForMaxEarnings = ::core::primitive::u128;
 				pub type ParticipatingVaults = ::core::primitive::u32;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for FrameVaultCapitalLocked {
@@ -23457,6 +23508,26 @@ pub mod api {
 				const PALLET: &'static str = "Treasury";
 				const EVENT: &'static str = "EncumberedBondMicrogonsBurned";
 			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "The guaranteed share of vault bond earnings was updated."]
+			pub struct VaultBondEarningsGuaranteeUpdated {
+				pub percent: vault_bond_earnings_guarantee_updated::Percent,
+			}
+			pub mod vault_bond_earnings_guarantee_updated {
+				use super::runtime_types;
+				pub type Percent = runtime_types::sp_arithmetic::per_things::Percent;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for VaultBondEarningsGuaranteeUpdated {
+				const PALLET: &'static str = "Treasury";
+				const EVENT: &'static str = "VaultBondEarningsGuaranteeUpdated";
+			}
 		}
 		pub mod storage {
 			use super::runtime_types;
@@ -23527,6 +23598,11 @@ pub mod api {
 					use super::runtime_types;
 					pub type TotalActiveArgonotBonds = ::core::primitive::u32;
 				}
+				pub mod vault_bond_earnings_guarantee_percent {
+					use super::runtime_types;
+					pub type VaultBondEarningsGuaranteePercent =
+						runtime_types::sp_arithmetic::per_things::Percent;
+				}
 			}
 			pub struct StorageApi;
 			impl StorageApi {
@@ -23547,10 +23623,9 @@ pub mod api {
 						"CurrentFrameVaultCapital",
 						(),
 						[
-							225u8, 206u8, 127u8, 227u8, 200u8, 16u8, 96u8, 252u8, 68u8, 70u8, 40u8,
-							243u8, 155u8, 196u8, 72u8, 36u8, 172u8, 15u8, 181u8, 209u8, 81u8,
-							168u8, 112u8, 29u8, 167u8, 55u8, 40u8, 148u8, 231u8, 229u8, 156u8,
-							21u8,
+							109u8, 230u8, 73u8, 234u8, 156u8, 237u8, 104u8, 87u8, 78u8, 84u8, 29u8,
+							113u8, 45u8, 157u8, 138u8, 208u8, 221u8, 195u8, 73u8, 82u8, 50u8,
+							133u8, 4u8, 26u8, 254u8, 63u8, 22u8, 239u8, 71u8, 40u8, 142u8, 148u8,
 						],
 					)
 				}
@@ -23973,6 +24048,28 @@ pub mod api {
 						],
 					)
 				}
+				#[doc = " Share of vault bond earnings guaranteed without Argonot securitization."]
+				pub fn vault_bond_earnings_guarantee_percent(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::vault_bond_earnings_guarantee_percent::VaultBondEarningsGuaranteePercent,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Treasury",
+						"VaultBondEarningsGuaranteePercent",
+						(),
+						[
+							187u8, 186u8, 120u8, 25u8, 51u8, 222u8, 249u8, 123u8, 218u8, 240u8,
+							184u8, 158u8, 206u8, 41u8, 37u8, 71u8, 131u8, 65u8, 45u8, 18u8, 169u8,
+							178u8, 171u8, 103u8, 247u8, 102u8, 222u8, 179u8, 200u8, 10u8, 247u8,
+							175u8,
+						],
+					)
+				}
 			}
 		}
 		pub mod constants {
@@ -24038,6 +24135,23 @@ pub mod api {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"Treasury",
 						"MaxArgonotBondedPercentOfCirculation",
+						[
+							40u8, 171u8, 69u8, 196u8, 34u8, 184u8, 50u8, 128u8, 139u8, 192u8, 63u8,
+							231u8, 249u8, 200u8, 252u8, 73u8, 244u8, 170u8, 51u8, 177u8, 106u8,
+							47u8, 114u8, 234u8, 84u8, 104u8, 62u8, 118u8, 227u8, 50u8, 225u8,
+							122u8,
+						],
+					)
+				}
+				#[doc = " Initial share of a vault's bond earnings guaranteed without an Argonot commitment."]
+				pub fn initial_vault_bond_earnings_guarantee_percent(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					runtime_types::sp_arithmetic::per_things::Percent,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"Treasury",
+						"InitialVaultBondEarningsGuaranteePercent",
 						[
 							40u8, 171u8, 69u8, 196u8, 34u8, 184u8, 50u8, 128u8, 139u8, 192u8, 63u8,
 							231u8, 249u8, 200u8, 252u8, 73u8, 244u8, 170u8, 51u8, 177u8, 106u8,
@@ -37536,6 +37650,11 @@ pub mod api {
 						vault_id: ::core::primitive::u32,
 						reserved_bond_space: ::core::primitive::u32,
 					},
+					#[codec(index = 9)]
+					#[doc = "Set the share of vault bond earnings guaranteed without Argonot securitization."]
+					set_vault_bond_earnings_guarantee_percent {
+						percent: runtime_types::sp_arithmetic::per_things::Percent,
+					},
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -37662,9 +37781,10 @@ pub mod api {
 						frame_id: ::core::primitive::u64,
 						bid_pool_distributed: ::core::primitive::u128,
 						argonot_bond_pool_distributed: ::core::primitive::u128,
+						argonot_bond_pool_burned: ::core::primitive::u128,
 						vault_bid_pool_distributed: ::core::primitive::u128,
-						treasury_refunds: ::core::primitive::u128,
 						treasury_reserves: ::core::primitive::u128,
+						vault_bid_pool_burned: ::core::primitive::u128,
 						participating_vaults: ::core::primitive::u32,
 					},
 					#[codec(index = 4)]
@@ -37672,6 +37792,7 @@ pub mod api {
 					FrameVaultCapitalLocked {
 						frame_id: ::core::primitive::u64,
 						total_eligible_bonds: ::core::primitive::u128,
+						argonots_for_max_earnings: ::core::primitive::u128,
 						participating_vaults: ::core::primitive::u32,
 					},
 					#[codec(index = 5)]
@@ -37729,6 +37850,11 @@ pub mod api {
 						account_id: crate::types::AccountId32,
 						burned_amount: ::core::primitive::u128,
 						released_amount: ::core::primitive::u128,
+					},
+					#[codec(index = 12)]
+					#[doc = "The guaranteed share of vault bond earnings was updated."]
+					VaultBondEarningsGuaranteeUpdated {
+						percent: runtime_types::sp_arithmetic::per_things::Percent,
 					},
 				}
 				#[derive(
@@ -37833,6 +37959,12 @@ pub mod api {
 					pub flexible_prorata: runtime_types::sp_arithmetic::fixed_point::FixedU128,
 					#[codec(compact)]
 					pub eligible_bonds: ::core::primitive::u32,
+					#[codec(compact)]
+					pub argonot_securitization: ::core::primitive::u128,
+					#[codec(compact)]
+					pub argonots_for_max_earnings: ::core::primitive::u128,
+					pub bond_earnings_eligibility:
+						runtime_types::sp_arithmetic::fixed_point::FixedU128,
 				}
 			}
 		}
@@ -38571,6 +38703,12 @@ pub mod api {
 					pub treasury_vault_earnings: ::core::primitive::u128,
 					#[codec(compact)]
 					pub treasury_total_earnings: ::core::primitive::u128,
+					#[codec(compact)]
+					pub argonot_securitization: ::core::primitive::u128,
+					#[codec(compact)]
+					pub argonots_for_max_earnings: ::core::primitive::u128,
+					#[codec(compact)]
+					pub treasury_unrealized_earnings: ::core::primitive::u128,
 					#[codec(compact)]
 					pub treasury_vault_capital: ::core::primitive::u128,
 					#[codec(compact)]

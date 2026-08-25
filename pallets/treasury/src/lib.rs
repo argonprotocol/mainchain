@@ -62,10 +62,18 @@ pub use pallet::*;
 ///
 /// ## Profits from Bid Pool
 /// Once each bid pool is closed, 20% of the pool is reserved for treasury reserves. (Operational
-/// rewards are one use of these reserves.) Then 10% of the full bid pool is paid to Argonot bond
-/// lots, and the remaining funds are distributed pro-rata to each vault's frame treasury pool.
+/// rewards are one use of these reserves.) Then up to 10% of the full bid pool is paid to Argonot
+/// bond lots, with any unused allocation burned. The remaining funds are distributed pro-rata to
+/// each vault's frame treasury pool.
 /// Vaults disperse funds to bond lots based on the vault's sharing percent, each lot's stored
-/// frame share, and any underfilled-vault remainder is returned to treasury reserves.
+/// frame share. Any vault-pool funds not paid or preserved as vault earnings are burned once per
+/// frame.
+///
+/// A vault earns its full bond payout by holding its pro-rata share of the maximum Argonot
+/// securitization, based on its share of the participating vaults' securitized satoshis at the
+/// frame turn. Every vault receives `VaultBondEarningsGuaranteePercent`; its Argonot securitization
+/// earns the same proportion of the remaining payout. The eligibility shortfall is included in
+/// the frame burn; Bitcoin lock fee revenue is unaffected.
 ///
 /// The limitations on bond purchases are:
 /// - the maximum number of accepted bond lots in an active vault pool (`MaxTreasuryContributors`)
@@ -97,7 +105,7 @@ pub mod pallet {
 	};
 	use tracing::info;
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(7);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(8);
 
 	pub type BondLotId = u64;
 	pub type Bonds = u32;
@@ -163,6 +171,10 @@ pub mod pallet {
 		/// The maximum percent of ownership-token circulation that can be bonded.
 		#[pallet::constant]
 		type MaxArgonotBondedPercentOfCirculation: Get<Percent>;
+
+		/// Initial share of a vault's bond earnings guaranteed without an Argonot commitment.
+		#[pallet::constant]
+		type InitialVaultBondEarningsGuaranteePercent: Get<Percent>;
 
 		/// Treasury pallet id retained in metadata for account derivation.
 		#[pallet::constant]
@@ -291,6 +303,16 @@ pub mod pallet {
 	#[pallet::storage]
 	pub type TotalActiveArgonotBonds<T: Config> = StorageValue<_, Bonds, ValueQuery>;
 
+	#[pallet::type_value]
+	pub fn InitialVaultBondEarningsGuaranteePercent<T: Config>() -> Percent {
+		T::InitialVaultBondEarningsGuaranteePercent::get()
+	}
+
+	/// Share of vault bond earnings guaranteed without Argonot securitization.
+	#[pallet::storage]
+	pub type VaultBondEarningsGuaranteePercent<T: Config> =
+		StorageValue<_, Percent, ValueQuery, InitialVaultBondEarningsGuaranteePercent<T>>;
+
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
@@ -322,20 +344,24 @@ pub mod pallet {
 			frame_id: FrameId,
 			/// The total gross bid-pool allocation made to non-reserve recipients this frame.
 			bid_pool_distributed: T::Balance,
-			/// The gross slice allocated to Argonot bond lots before any refunds.
+			/// The amount paid to Argonot bond lots.
 			argonot_bond_pool_distributed: T::Balance,
-			/// The gross slice allocated to vault treasury pools before any refunds.
+			/// Unused Argonot bond-pool funds that were burned.
+			argonot_bond_pool_burned: T::Balance,
+			/// The gross slice allocated to vault treasury pools.
 			vault_bid_pool_distributed: T::Balance,
-			/// The portion of non-reserve allocations that was returned to treasury reserves.
-			treasury_refunds: T::Balance,
-			/// The total amount moved into treasury reserves, including refunds.
+			/// The amount moved into treasury reserves.
 			treasury_reserves: T::Balance,
+			/// Vault bid-pool earnings that were not distributed and were burned.
+			vault_bid_pool_burned: T::Balance,
 			participating_vaults: u32,
 		},
 		/// The current frame's vault capital was locked in.
 		FrameVaultCapitalLocked {
 			frame_id: FrameId,
 			total_eligible_bonds: u128,
+			/// Argonots collectively needed for the selected vaults to realize maximum earnings.
+			argonots_for_max_earnings: T::Balance,
 			participating_vaults: u32,
 		},
 		/// An error occurred while releasing a bond lot.
@@ -386,6 +412,10 @@ pub mod pallet {
 			account_id: T::AccountId,
 			burned_amount: T::Balance,
 			released_amount: T::Balance,
+		},
+		/// The guaranteed share of vault bond earnings was updated.
+		VaultBondEarningsGuaranteeUpdated {
+			percent: Percent,
 		},
 	}
 
@@ -797,6 +827,19 @@ pub mod pallet {
 			Self::deposit_event(Event::ReservedBondSpaceChanged { vault_id, reserved_bond_space });
 			Ok(())
 		}
+
+		/// Set the share of vault bond earnings guaranteed without Argonot securitization.
+		#[pallet::call_index(9)]
+		#[pallet::weight(T::DbWeight::get().writes(1))]
+		pub fn set_vault_bond_earnings_guarantee_percent(
+			origin: OriginFor<T>,
+			percent: Percent,
+		) -> DispatchResult {
+			ensure_root(origin)?;
+			VaultBondEarningsGuaranteePercent::<T>::put(percent);
+			Self::deposit_event(Event::VaultBondEarningsGuaranteeUpdated { percent });
+			Ok(())
+		}
 	}
 
 	impl<T: Config> Pallet<T> {
@@ -935,7 +978,7 @@ pub mod pallet {
 
 			let total_argonot_bond_pool =
 				T::PercentForArgonotBondPool::get().mul_floor(full_bid_pool_amount);
-			let (vault_bid_pool_amount, mut treasury_refund_total, argonot_bond_pool_distributed) =
+			let (vault_bid_pool_amount, argonot_bond_pool_distributed, argonot_bond_pool_unclaimed) =
 				Self::distribute_argonot_bond_pool(
 					frame_id,
 					&bid_pool_account,
@@ -943,43 +986,14 @@ pub mod pallet {
 					total_argonot_bond_pool,
 					argonot_participants,
 				);
+			let frame_capital = frame_capital
+				.unwrap_or(FrameVaultCapital { frame_id, vaults: BoundedBTreeMap::new() });
 
-			let Some(frame_capital) = frame_capital else {
-				if !treasury_refund_total.is_zero() {
-					if let Err(e) = T::Currency::transfer(
-						&bid_pool_account,
-						&reserves_account,
-						treasury_refund_total,
-						Preservation::Expendable,
-					) {
-						Self::deposit_event(Event::<T>::CouldNotTransferToTreasuryReserves {
-							frame_id,
-							amount: treasury_refund_total,
-							dispatch_error: e,
-						});
-					} else {
-						total_treasury_reserves.saturating_accrue(treasury_refund_total);
-					}
-				}
-
-				Self::deposit_event(Event::<T>::FrameEarningsDistributed {
-					frame_id,
-					bid_pool_distributed: argonot_bond_pool_distributed,
-					argonot_bond_pool_distributed,
-					vault_bid_pool_distributed: T::Balance::zero(),
-					treasury_refunds: treasury_refund_total,
-					treasury_reserves: total_treasury_reserves,
-					participating_vaults: 0,
-				});
-				return;
-			};
-
-			let total_bid_pool_amount = vault_bid_pool_amount;
-			let mut remaining_bid_pool = vault_bid_pool_amount;
+			let mut vault_bid_pool_distributed = T::Balance::zero();
 			let frame_total_eligible_bonds = frame_capital
 				.vaults
 				.values()
-				.fold(0u128, |acc, vault| acc.saturating_add(vault.eligible_bonds as u128));
+				.fold(0u128, |acc, vault| acc.saturating_add(vault.eligible_bonds.into()));
 
 			for (vault_id, vault_capital) in frame_capital.vaults.iter() {
 				if frame_total_eligible_bonds.is_zero() {
@@ -992,14 +1006,19 @@ pub mod pallet {
 					continue;
 				};
 
-				let gross_vault_earnings = Perbill::from_rational(
-					vault_capital.eligible_bonds as u128,
+				let potential_vault_earnings = Perbill::from_rational(
+					vault_capital.eligible_bonds.into(),
 					frame_total_eligible_bonds,
 				)
-				.mul_floor(total_bid_pool_amount);
-				remaining_bid_pool.saturating_reduce(gross_vault_earnings);
+				.mul_floor(vault_bid_pool_amount);
+				let gross_vault_earnings = vault_capital
+					.bond_earnings_eligibility
+					.saturating_mul_int(potential_vault_earnings);
+				vault_bid_pool_distributed.saturating_accrue(gross_vault_earnings);
 
-				let mut gross_lot_yield_total = T::Balance::zero();
+				let unqualified_earnings =
+					potential_vault_earnings.saturating_sub(gross_vault_earnings);
+
 				let mut earnings_for_vault = T::Balance::zero();
 
 				for allocation in vault_capital.regular_bond_allocations.iter() {
@@ -1014,15 +1033,14 @@ pub mod pallet {
 
 					let gross_lot_yield =
 						allocation.prorata.saturating_mul_int(gross_vault_earnings);
-					gross_lot_yield_total.saturating_accrue(gross_lot_yield);
 
 					let bonder_percent = Permill::from_parts(
 						sharing_percent.deconstruct().saturating_add(bonus_percent.deconstruct()),
 					);
 					let mut paid_payout = bonder_percent.mul_floor(gross_lot_yield);
+					let vault_lot_earnings = gross_lot_yield.saturating_sub(paid_payout);
 
-					earnings_for_vault
-						.saturating_accrue(gross_lot_yield.saturating_sub(paid_payout));
+					earnings_for_vault.saturating_accrue(vault_lot_earnings);
 					if !paid_payout.is_zero() &&
 						let Err(e) = T::Currency::transfer(
 							&bid_pool_account,
@@ -1038,7 +1056,6 @@ pub mod pallet {
 							amount: paid_payout,
 							dispatch_error: e,
 						});
-						treasury_refund_total.saturating_accrue(paid_payout);
 						paid_payout = T::Balance::zero();
 					}
 
@@ -1047,11 +1064,7 @@ pub mod pallet {
 
 				let flexible_bond_yield =
 					vault_capital.flexible_prorata.saturating_mul_int(gross_vault_earnings);
-				gross_lot_yield_total.saturating_accrue(flexible_bond_yield);
 				earnings_for_vault.saturating_accrue(flexible_bond_yield);
-
-				treasury_refund_total
-					.saturating_accrue(gross_vault_earnings.saturating_sub(gross_lot_yield_total));
 
 				T::TreasuryVaultProvider::record_vault_frame_earnings(
 					&bid_pool_account,
@@ -1065,39 +1078,45 @@ pub mod pallet {
 						capital_contributed_by_vault: Self::bonds_to_balance(
 							vault_capital.flexible_bonds_eligible,
 						),
+						argonot_securitization: vault_capital.argonot_securitization,
+						argonots_for_max_earnings: vault_capital.argonots_for_max_earnings,
+						treasury_unrealized_earnings: unqualified_earnings,
 					},
 				);
 			}
 
-			let participating_vaults = frame_capital.vaults.len() as u32;
-			let vault_bid_pool_distributed =
-				total_bid_pool_amount.saturating_sub(remaining_bid_pool);
-
-			if !treasury_refund_total.is_zero() {
-				if let Err(e) = T::Currency::transfer(
+			let vault_bid_pool_to_burn = T::Currency::balance(&bid_pool_account);
+			let bid_pool_burned = if vault_bid_pool_to_burn.is_zero() {
+				T::Balance::zero()
+			} else {
+				T::Currency::burn_from(
 					&bid_pool_account,
-					&reserves_account,
-					treasury_refund_total,
+					vault_bid_pool_to_burn,
 					Preservation::Expendable,
-				) {
-					Self::deposit_event(Event::<T>::CouldNotTransferToTreasuryReserves {
-						frame_id,
-						amount: treasury_refund_total,
-						dispatch_error: e,
-					});
-				} else {
-					total_treasury_reserves.saturating_accrue(treasury_refund_total);
-				}
-			}
+					Precision::BestEffort,
+					Fortitude::Force,
+				)
+				.unwrap_or_else(|error| {
+					log::error!(
+							"Unable to burn undistributed bond earnings for frame {frame_id}: {error:?}"
+						);
+					T::Balance::zero()
+				})
+			};
+			let argonot_bond_pool_burned = argonot_bond_pool_unclaimed.min(bid_pool_burned);
+			let vault_bid_pool_burned = bid_pool_burned.saturating_sub(argonot_bond_pool_burned);
+
+			let participating_vaults = frame_capital.vaults.len() as u32;
 
 			Self::deposit_event(Event::<T>::FrameEarningsDistributed {
 				frame_id,
 				bid_pool_distributed: argonot_bond_pool_distributed
 					.saturating_add(vault_bid_pool_distributed),
 				argonot_bond_pool_distributed,
+				argonot_bond_pool_burned,
 				vault_bid_pool_distributed,
-				treasury_refunds: treasury_refund_total,
 				treasury_reserves: total_treasury_reserves,
+				vault_bid_pool_burned,
 				participating_vaults,
 			});
 		}
@@ -1122,6 +1141,8 @@ pub mod pallet {
 		pub(crate) fn lock_in_vault_capital(frame_id: FrameId) {
 			let mut vault_candidates = Vec::new();
 			let max_vaults = T::MaxVaultsPerPool::get() as usize;
+			let baseline_earnings_eligibility =
+				FixedU128::from(VaultBondEarningsGuaranteePercent::<T>::get());
 
 			for (vault_id, vault_bonds) in BondLotsByVault::<T>::iter() {
 				if vault_bonds.regular_bond_lots.is_empty() && vault_bonds.flexible_bonds.is_zero()
@@ -1140,7 +1161,7 @@ pub mod pallet {
 				let mut regular_bond_allocations = BoundedVec::default();
 				for entry in vault_bonds.regular_bond_lots {
 					let prorata =
-						FixedU128::from_rational(entry.bonds as u128, payout_denominator as u128);
+						FixedU128::saturating_from_rational(entry.bonds, payout_denominator);
 					if regular_bond_allocations
 						.try_push(BondLotAllocation { bond_lot_id: entry.bond_lot_id, prorata })
 						.is_err()
@@ -1154,9 +1175,9 @@ pub mod pallet {
 					.flexible_bonds
 					.min(bond_capacity.saturating_sub(regular_bonds_eligible));
 				let eligible_bonds = regular_bonds_eligible.saturating_add(flexible_bonds_eligible);
-				let flexible_prorata = FixedU128::from_rational(
-					flexible_bonds_eligible as u128,
-					payout_denominator as u128,
+				let flexible_prorata = FixedU128::saturating_from_rational(
+					flexible_bonds_eligible,
+					payout_denominator,
 				);
 				vault_candidates.push((
 					vault_id,
@@ -1166,6 +1187,9 @@ pub mod pallet {
 						flexible_bonds_eligible,
 						flexible_prorata,
 						eligible_bonds,
+						argonot_securitization: T::Balance::zero(),
+						argonots_for_max_earnings: T::Balance::zero(),
+						bond_earnings_eligibility: baseline_earnings_eligibility,
 					},
 				));
 			}
@@ -1173,11 +1197,52 @@ pub mod pallet {
 			vault_candidates.sort_by(|a, b| b.1.cmp(&a.1).then_with(|| a.0.cmp(&b.0)));
 			vault_candidates.truncate(max_vaults);
 
+			let mut selected_vaults = Vec::with_capacity(vault_candidates.len());
+			let mut total_securitized_satoshis = 0u128;
+			for (vault_id, eligible_bonds, vault_capital) in vault_candidates {
+				let earnings_snapshot =
+					T::TreasuryVaultProvider::get_bond_earnings_snapshot(vault_id);
+				total_securitized_satoshis = total_securitized_satoshis
+					.saturating_add(earnings_snapshot.securitized_satoshis.into());
+				selected_vaults.push((vault_id, eligible_bonds, vault_capital, earnings_snapshot));
+			}
+
+			let argonots_for_max_earnings = T::MaxArgonotBondedPercentOfCirculation::get()
+				.mul_floor(T::OwnershipCurrency::total_issuance());
 			let mut vaults = BoundedBTreeMap::new();
 			let mut total_eligible_bonds = 0u128;
 
-			for (vault_id, eligible_bonds, vault_capital) in vault_candidates {
-				total_eligible_bonds = total_eligible_bonds.saturating_add(eligible_bonds as u128);
+			for (vault_id, eligible_bonds, mut vault_capital, earnings_snapshot) in selected_vaults
+			{
+				total_eligible_bonds = total_eligible_bonds.saturating_add(eligible_bonds.into());
+				let vault_argonots_for_max_earnings = if total_securitized_satoshis == 0 {
+					T::Balance::zero()
+				} else {
+					FixedU128::saturating_from_rational(
+						earnings_snapshot.securitized_satoshis,
+						total_securitized_satoshis,
+					)
+					.saturating_mul_int(argonots_for_max_earnings)
+				};
+				let argonot_securitization =
+					earnings_snapshot.argonot_securitization.min(vault_argonots_for_max_earnings);
+				vault_capital.argonot_securitization = earnings_snapshot.argonot_securitization;
+				vault_capital.argonots_for_max_earnings = vault_argonots_for_max_earnings;
+				let commitment_coverage = if vault_argonots_for_max_earnings.is_zero() {
+					FixedU128::one()
+				} else {
+					FixedU128::saturating_from_rational(
+						argonot_securitization,
+						vault_argonots_for_max_earnings,
+					)
+				};
+				let remaining_earnings_eligibility =
+					FixedU128::one().saturating_sub(baseline_earnings_eligibility);
+				vault_capital.bond_earnings_eligibility = baseline_earnings_eligibility
+					.saturating_add(
+						remaining_earnings_eligibility.saturating_mul(commitment_coverage),
+					)
+					.min(FixedU128::one());
 				let _ = vaults.try_insert(vault_id, vault_capital);
 			}
 
@@ -1187,6 +1252,7 @@ pub mod pallet {
 			Self::deposit_event(Event::<T>::FrameVaultCapitalLocked {
 				frame_id,
 				total_eligible_bonds,
+				argonots_for_max_earnings,
 				participating_vaults,
 			});
 		}
@@ -1213,21 +1279,26 @@ pub mod pallet {
 			total_argonot_bond_pool: T::Balance,
 			argonot_participants: Option<FrameArgonotBondParticipants<T>>,
 		) -> (T::Balance, T::Balance, T::Balance) {
-			let mut remaining_bid_pool = total_bid_pool_amount;
-			let mut treasury_refund_total = T::Balance::zero();
 			let mut argonot_bond_pool_distributed = T::Balance::zero();
+			let capped_argonot_bond_pool = total_argonot_bond_pool.min(total_bid_pool_amount);
+			let vault_bid_pool_amount =
+				total_bid_pool_amount.saturating_sub(capped_argonot_bond_pool);
 
 			let Some(argonot_participants) = argonot_participants else {
-				return (remaining_bid_pool, treasury_refund_total, argonot_bond_pool_distributed);
+				return (
+					vault_bid_pool_amount,
+					argonot_bond_pool_distributed,
+					capped_argonot_bond_pool,
+				);
 			};
 			if argonot_participants.total_bonds == 0 {
-				return (remaining_bid_pool, treasury_refund_total, argonot_bond_pool_distributed);
+				return (
+					vault_bid_pool_amount,
+					argonot_bond_pool_distributed,
+					capped_argonot_bond_pool,
+				);
 			}
-			let capped_argonot_bond_pool = total_argonot_bond_pool.min(total_bid_pool_amount);
-			remaining_bid_pool.saturating_reduce(capped_argonot_bond_pool);
-			argonot_bond_pool_distributed = capped_argonot_bond_pool;
 
-			let mut gross_argonot_yield_total = T::Balance::zero();
 			for participant in argonot_participants.bond_lots.iter() {
 				let Some(bond_lot) = BondLotById::<T>::get(participant.bond_lot_id) else {
 					continue;
@@ -1241,7 +1312,6 @@ pub mod pallet {
 					argonot_participants.total_bonds as u128,
 				)
 				.mul_floor(capped_argonot_bond_pool);
-				gross_argonot_yield_total.saturating_accrue(gross_lot_yield);
 
 				let mut paid_payout = gross_lot_yield;
 				if !paid_payout.is_zero() &&
@@ -1258,18 +1328,18 @@ pub mod pallet {
 						amount: paid_payout,
 						dispatch_error: e,
 					});
-					treasury_refund_total.saturating_accrue(paid_payout);
 					paid_payout = T::Balance::zero();
 				}
 
+				argonot_bond_pool_distributed.saturating_accrue(paid_payout);
 				Self::record_bond_lot_earnings(participant.bond_lot_id, frame_id, paid_payout);
 			}
 
-			treasury_refund_total.saturating_accrue(
-				capped_argonot_bond_pool.saturating_sub(gross_argonot_yield_total),
-			);
-
-			(remaining_bid_pool, treasury_refund_total, argonot_bond_pool_distributed)
+			(
+				vault_bid_pool_amount,
+				argonot_bond_pool_distributed,
+				capped_argonot_bond_pool.saturating_sub(argonot_bond_pool_distributed),
+			)
 		}
 
 		/// Releases bond lots whose release delay has matured.
@@ -1954,6 +2024,14 @@ pub mod pallet {
 		/// `min(activated Bitcoin security, bonds in lots + flexible bonds)`.
 		#[codec(compact)]
 		pub eligible_bonds: Bonds,
+		/// Argonot securitization in this vault at the frame turn.
+		#[codec(compact)]
+		pub argonot_securitization: T::Balance,
+		/// Argonots needed for this vault to realize its maximum Treasury earnings.
+		#[codec(compact)]
+		pub argonots_for_max_earnings: T::Balance,
+		/// The share of potential bond earnings qualified for this vault.
+		pub bond_earnings_eligibility: FixedU128,
 	}
 
 	/// The frame-wide locked capital object.

@@ -557,15 +557,22 @@ async fn ratchet_first_fission(
 	initial_liquidity_promised: Balance,
 	last_submitted_tick: &mut Tick,
 ) -> anyhow::Result<()> {
-	submit_price(ticker, client, price_index_operator, 60_000.0).await;
+	// The mint payout loop can submit its 62k price during the current tick. PriceIndex ignores
+	// another price at that tick, so advance before recording the older ratchet rate used below.
+	while current_chain_tick(client, ticker).await <= *last_submitted_tick {
+		sleep(Duration::from_millis(100)).await;
+	}
+	let submitted_older_ratchet_tick =
+		submit_price(ticker, client, price_index_operator, 60_000.0).await;
 	let rate_history = client
 		.fetch_storage(&storage().bitcoin_locks().microgon_per_btc_history(), FetchAt::Best)
 		.await?
 		.expect("Bitcoin rate history");
 	let (older_ratchet_tick, older_ratchet_rate) =
 		*rate_history.0.last().expect("older Bitcoin rate");
-	// Submit against the same best-chain tick source used by submit_price so this rate cannot reuse
-	// the older history entry while finalization trails the active chain.
+	assert!(older_ratchet_tick >= submitted_older_ratchet_tick);
+	assert!(older_ratchet_rate < microgons_at_target_per_btc);
+
 	while current_chain_tick(client, ticker).await <= older_ratchet_tick {
 		sleep(Duration::from_millis(100)).await;
 	}
@@ -577,7 +584,7 @@ async fn ratchet_first_fission(
 		.expect("Bitcoin rate history");
 	let (ratchet_tick, ratchet_rate) = *rate_history.0.last().expect("latest Bitcoin rate");
 	assert!(ratchet_tick > older_ratchet_tick);
-	assert!(ratchet_rate < microgons_at_target_per_btc);
+	assert!(ratchet_rate < older_ratchet_rate);
 
 	submit_rejected_bitcoin_call(
 		client,

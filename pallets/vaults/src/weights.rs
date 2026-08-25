@@ -3,7 +3,7 @@ use argon_primitives::{
 		CollectBlockerProvider, OperationalAccountProvider, OperationalAccountProviderWeightInfo,
 		TickProvider, TickProviderWeightInfo,
 	},
-	vault::BitcoinVaultProviderWeightInfo,
+	vault::{BitcoinVaultProviderWeightInfo, TreasuryVaultProviderWeightInfo},
 };
 use core::marker::PhantomData;
 use pallet_prelude::*;
@@ -28,6 +28,7 @@ pub trait WeightInfo {
 	fn provider_get_registration_vault_data() -> Weight;
 	fn provider_get_committed_securitization() -> Weight;
 	fn provider_get_committed_argonots() -> Weight;
+	fn provider_get_bond_earnings_snapshot() -> Weight;
 	fn provider_encumber_argonots() -> Weight;
 	fn provider_release_encumbered_argonots() -> Weight;
 	fn provider_burn_encumbered_argonots() -> Weight;
@@ -146,6 +147,10 @@ where
 		Base::provider_get_committed_argonots()
 	}
 
+	fn provider_get_bond_earnings_snapshot() -> Weight {
+		Base::provider_get_bond_earnings_snapshot()
+	}
+
 	fn provider_encumber_argonots() -> Weight {
 		Base::provider_encumber_argonots()
 	}
@@ -213,6 +218,12 @@ impl<T: crate::Config> BitcoinVaultProviderWeightInfo for ProviderWeightAdapter<
 	}
 }
 
+impl<T: crate::Config> TreasuryVaultProviderWeightInfo for ProviderWeightAdapter<T> {
+	fn get_bond_earnings_snapshot() -> Weight {
+		<T as crate::Config>::WeightInfo::provider_get_bond_earnings_snapshot()
+	}
+}
+
 // For backwards compatibility and tests.
 impl WeightInfo for () {
 	fn create() -> Weight {
@@ -261,6 +272,10 @@ impl WeightInfo for () {
 	}
 
 	fn provider_get_committed_argonots() -> Weight {
+		Weight::zero()
+	}
+
+	fn provider_get_bond_earnings_snapshot() -> Weight {
 		Weight::zero()
 	}
 

@@ -1,4 +1,5 @@
 // Auto-generated via `yarn polkadot-types-from-chain`, do not edit
+/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
@@ -586,6 +587,10 @@ declare module '@polkadot/api-base/types/consts' {
       operationalFeeMultiplier: u8 & AugmentedConst<ApiType>;
     };
     treasury: {
+      /**
+       * Initial share of a vault's bond earnings guaranteed without an Argonot commitment.
+       **/
+      initialVaultBondEarningsGuaranteePercent: Percent & AugmentedConst<ApiType>;
       /**
        * The maximum number of active Argonot bond lots.
        **/

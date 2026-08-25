@@ -21,7 +21,7 @@ import type {
   u64,
 } from '@polkadot/types-codec';
 import type { ITuple } from '@polkadot/types-codec/types';
-import type { AccountId32, H160, H256 } from '@polkadot/types/interfaces/runtime';
+import type { AccountId32, H160, H256, Percent } from '@polkadot/types/interfaces/runtime';
 import type {
   ArgonNotaryAuditErrorVerifyError,
   ArgonPrimitivesBitcoinUtxoRef,
@@ -2062,18 +2062,20 @@ declare module '@polkadot/api-base/types/events' {
           frameId: u64,
           bidPoolDistributed: u128,
           argonotBondPoolDistributed: u128,
+          argonotBondPoolBurned: u128,
           vaultBidPoolDistributed: u128,
-          treasuryRefunds: u128,
           treasuryReserves: u128,
+          vaultBidPoolBurned: u128,
           participatingVaults: u32,
         ],
         {
           frameId: u64;
           bidPoolDistributed: u128;
           argonotBondPoolDistributed: u128;
+          argonotBondPoolBurned: u128;
           vaultBidPoolDistributed: u128;
-          treasuryRefunds: u128;
           treasuryReserves: u128;
+          vaultBidPoolBurned: u128;
           participatingVaults: u32;
         }
       >;
@@ -2082,13 +2084,31 @@ declare module '@polkadot/api-base/types/events' {
        **/
       FrameVaultCapitalLocked: AugmentedEvent<
         ApiType,
-        [frameId: u64, totalEligibleBonds: u128, participatingVaults: u32],
-        { frameId: u64; totalEligibleBonds: u128; participatingVaults: u32 }
+        [
+          frameId: u64,
+          totalEligibleBonds: u128,
+          argonotsForMaxEarnings: u128,
+          participatingVaults: u32,
+        ],
+        {
+          frameId: u64;
+          totalEligibleBonds: u128;
+          argonotsForMaxEarnings: u128;
+          participatingVaults: u32;
+        }
       >;
       ReservedBondSpaceChanged: AugmentedEvent<
         ApiType,
         [vaultId: u32, reservedBondSpace: u32],
         { vaultId: u32; reservedBondSpace: u32 }
+      >;
+      /**
+       * The guaranteed share of vault bond earnings was updated.
+       **/
+      VaultBondEarningsGuaranteeUpdated: AugmentedEvent<
+        ApiType,
+        [percent: Percent],
+        { percent: Percent }
       >;
     };
     txPause: {
