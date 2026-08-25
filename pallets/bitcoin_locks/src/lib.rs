@@ -859,16 +859,24 @@ pub mod pallet {
 			options: Option<LockOptions<T>>,
 		) -> DispatchResult {
 			let account_id = ensure_signed(origin)?;
-			let (fee_discount, securitization_space_to_unreserve, coupon_nonce) =
+			let fee_coupon =
 				Self::validate_fee_coupon(vault_id, &account_id, None, satoshis, options.as_ref())?;
+			let securitization_request = ReserveSecuritizationRequest {
+				fee_discount: fee_coupon
+					.map(|coupon| coupon.fee_discount)
+					.unwrap_or_else(T::Balance::zero),
+				securitization_space_to_unreserve: fee_coupon
+					.map(|coupon| coupon.securitization_space_to_unreserve)
+					.unwrap_or_else(T::Balance::zero),
+			};
+			let coupon_nonce = fee_coupon.map(|coupon| coupon.nonce);
 			Self::create_bitcoin_lock(
 				&account_id,
 				vault_id,
 				satoshis,
 				bitcoin_pubkey,
 				options,
-				fee_discount,
-				securitization_space_to_unreserve,
+				securitization_request,
 			)?;
 			if let Some(coupon_nonce) = coupon_nonce {
 				LastFeeCouponNonceByVaultAndAccount::<T>::insert(
@@ -1154,14 +1162,22 @@ pub mod pallet {
 				Self::resolve_microgons_at_target_per_btc(
 					options.as_ref().map(|options| options.microgons_at_target_per_btc),
 				)?;
-			let (fee_discount, securitization_space_to_unreserve, coupon_nonce) =
-				Self::validate_fee_coupon(
-					lock.vault_id,
-					&who,
-					Some(utxo_id),
-					satoshis,
-					options.as_ref(),
-				)?;
+			let fee_coupon = Self::validate_fee_coupon(
+				lock.vault_id,
+				&who,
+				Some(utxo_id),
+				satoshis,
+				options.as_ref(),
+			)?;
+			let securitization_request = ReserveSecuritizationRequest {
+				fee_discount: fee_coupon
+					.map(|coupon| coupon.fee_discount)
+					.unwrap_or_else(T::Balance::zero),
+				securitization_space_to_unreserve: fee_coupon
+					.map(|coupon| coupon.securitization_space_to_unreserve)
+					.unwrap_or_else(T::Balance::zero),
+			};
+			let coupon_nonce = fee_coupon.map(|coupon| coupon.nonce);
 			ensure!(
 				satoshis != lock.securitized_satoshis ||
 					microgons_at_target_per_btc != lock.microgons_at_target_per_btc,
@@ -1218,8 +1234,9 @@ pub mod pallet {
 					remaining_term,
 					lock_extension: &mut lock_extension,
 					is_flexible: lock.is_flexible,
-					fee_discount,
-					securitization_space_to_unreserve,
+					fee_discount: securitization_request.fee_discount,
+					securitization_space_to_unreserve: securitization_request
+						.securitization_space_to_unreserve,
 				},
 			)
 			.map_err(Error::<T>::from)?;
@@ -1337,17 +1354,16 @@ pub mod pallet {
 			};
 			if UtxoIdToFundingUtxoRef::<T>::get(utxo_id).as_ref() != Some(&utxo_ref) {
 				if let Some(orphan) =
-					OrphanedUtxosByAccount::<T>::take(&lock.owner_account, &utxo_ref)
+					OrphanedUtxosByAccount::<T>::take(&lock.owner_account, &utxo_ref) &&
+					orphan.cosign_request.is_some()
 				{
-					if orphan.cosign_request.is_some() {
-						T::VaultProvider::update_orphan_cosign_list(
-							orphan.vault_id,
-							orphan.utxo_id,
-							&lock.owner_account,
-							true,
-						)
-						.map_err(Error::<T>::from)?;
-					}
+					T::VaultProvider::update_orphan_cosign_list(
+						orphan.vault_id,
+						orphan.utxo_id,
+						&lock.owner_account,
+						true,
+					)
+					.map_err(Error::<T>::from)?;
 				}
 				T::BitcoinUtxoTracker::unwatch_utxo(utxo_id, &utxo_ref);
 				return Ok(());
@@ -1404,19 +1420,15 @@ pub mod pallet {
 	where
 		<T as frame_system::Config>::AccountId: Codec,
 	{
-		fn validate_fee_coupon(
+		fn validate_fee_coupon<'a>(
 			vault_id: VaultId,
 			account_id: &T::AccountId,
 			utxo_id: Option<UtxoId>,
 			satoshis: Satoshis,
-			options: Option<&LockOptions<T>>,
-		) -> Result<(T::Balance, T::Balance, Option<u64>), Error<T>> {
-			let Some(options) = options else {
-				return Ok((T::Balance::zero(), T::Balance::zero(), None))
-			};
-			let Some(coupon) = options.fee_coupon.as_ref() else {
-				return Ok((T::Balance::zero(), T::Balance::zero(), None))
-			};
+			options: Option<&'a LockOptions<T>>,
+		) -> Result<Option<&'a FeeCoupon<T>>, Error<T>> {
+			let Some(options) = options else { return Ok(None) };
+			let Some(coupon) = options.fee_coupon.as_ref() else { return Ok(None) };
 
 			ensure!(
 				T::CurrentFrameId::get() <= coupon.expires_at_frame,
@@ -1440,7 +1452,7 @@ pub mod pallet {
 				.checked_add(1);
 			ensure!(next_nonce == Some(coupon.nonce), Error::<T>::FeeCouponAlreadyUsed);
 
-			Ok((coupon.fee_discount, coupon.securitization_space_to_unreserve, Some(coupon.nonce)))
+			Ok(Some(coupon))
 		}
 
 		fn create_bitcoin_lock(
@@ -1449,8 +1461,7 @@ pub mod pallet {
 			satoshis: Satoshis,
 			bitcoin_pubkey: CompressedBitcoinPubkey,
 			options: Option<LockOptions<T>>,
-			fee_discount: T::Balance,
-			securitization_space_to_unreserve: T::Balance,
+			securitization_request: ReserveSecuritizationRequest<T::Balance>,
 		) -> DispatchResult {
 			let current_bitcoin_height = T::BitcoinBlockHeightChange::get().1;
 			let vault_claim_height =
@@ -1465,7 +1476,7 @@ pub mod pallet {
 				vault_id,
 				account_id,
 				&securitization,
-				ReserveSecuritizationRequest { fee_discount, securitization_space_to_unreserve },
+				securitization_request,
 			)
 			.map_err(Error::<T>::from)?;
 
