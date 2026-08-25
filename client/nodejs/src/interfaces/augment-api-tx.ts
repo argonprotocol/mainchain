@@ -280,6 +280,38 @@ declare module '@polkadot/api-base/types/submittable' {
         [Vec<AccountId32>]
       >;
     };
+    bitcoinFissions: {
+      /**
+       * Close a Fission without moving Bitcoin and remove its active record.
+       **/
+      close: AugmentedSubmittable<
+        (fissionId: Compact<u64> | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>,
+        [Compact<u64>]
+      >;
+      /**
+       * Create a Fission from one owner-held Lock and associate it with a Liquid ID.
+       **/
+      create: AugmentedSubmittable<
+        (
+          fissionId: Compact<u64> | AnyNumber | Uint8Array,
+          liquidId: Compact<u64> | AnyNumber | Uint8Array,
+          utxoId: Compact<u64> | AnyNumber | Uint8Array,
+          satoshis: Compact<u64> | AnyNumber | Uint8Array,
+          microgonsAtTargetPerBtc: Compact<u128> | AnyNumber | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [Compact<u64>, Compact<u64>, Compact<u64>, Compact<u64>, Compact<u128>]
+      >;
+      /**
+       * Ratchet an active Fission to a replacement target-normalized BTC value.
+       **/
+      ratchet: AugmentedSubmittable<
+        (
+          fissionId: Compact<u64> | AnyNumber | Uint8Array,
+          microgonsAtTargetPerBtc: Compact<u128> | AnyNumber | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [Compact<u64>, Compact<u128>]
+      >;
+    };
     bitcoinLocks: {
       adminModifyMinimumLockedSats: AugmentedSubmittable<
         (satoshis: u64 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>,
@@ -307,8 +339,8 @@ declare module '@polkadot/api-base/types/submittable' {
         [AccountId32, ArgonPrimitivesBitcoinUtxoRef, Bytes]
       >;
       /**
-       * Submitted by a Vault operator to cosign the release of a bitcoin utxo. The Bitcoin owner
-       * release fee will be burned, and the lock will be allowed to expire without a penalty.
+       * Submitted by a Vault operator to cosign the release of a bitcoin UTXO. The Lock's
+       * securitization will be scheduled for release without a penalty.
        *
        * This is submitted as a no-fee transaction off chain to allow keys to remain in cold
        * wallets.
@@ -320,24 +352,13 @@ declare module '@polkadot/api-base/types/submittable' {
         ) => SubmittableExtrinsic<ApiType>,
         [u64, Bytes]
       >;
-      increaseSecuritization: AugmentedSubmittable<
-        (
-          utxoId: u64 | AnyNumber | Uint8Array,
-          newSatoshis: Compact<u64> | AnyNumber | Uint8Array,
-        ) => SubmittableExtrinsic<ApiType>,
-        [u64, Compact<u64>]
-      >;
       /**
-       * Initialize a bitcoin lock. This will create a LockedBitcoin for the submitting account
-       * and log the Bitcoin Script hash to Events.
+       * Create a Bitcoin receive address backed by a Lock for the submitting account.
        *
        * The pubkey submitted here will be used to create a script pubkey that will be used in a
        * timelock multisig script to lock the bitcoin.
-       *
-       * NOTE: A "lock-er" must send btc to the cosigner UTXO address to "complete" the
-       * LockedBitcoin and be added to the Bitcoin Mint line.
        **/
-      initialize: AugmentedSubmittable<
+      createReceiveAddress: AugmentedSubmittable<
         (
           vaultId: u32 | AnyNumber | Uint8Array,
           satoshis: Compact<u64> | AnyNumber | Uint8Array,
@@ -347,8 +368,7 @@ declare module '@polkadot/api-base/types/submittable' {
             | null
             | Uint8Array
             | PalletBitcoinLocksLockOptions
-            | { V1: any }
-            | { V2: any }
+            | { microgonsAtTargetPerBtc?: any; feeCoupon?: any }
             | string,
         ) => SubmittableExtrinsic<ApiType>,
         [
@@ -357,36 +377,6 @@ declare module '@polkadot/api-base/types/submittable' {
           ArgonPrimitivesBitcoinCompressedBitcoinPubkey,
           Option<PalletBitcoinLocksLockOptions>,
         ]
-      >;
-      /**
-       * Ratcheting allows a user to change the lock price of their bitcoin lock. This is
-       * functionally the same as releasing and re-initializing, but it allows a user to skip
-       * sending transactions through bitcoin and any associated fees. It also allows you to stay
-       * on your original lock expiration without having to pay the full year of fees again.
-       *
-       * Ratcheting "down" - when the price of bitcoin is lower than your lock price, you pay the
-       * full release price and get added back to the mint queue at the current market rate. You
-       * pocket the difference between the already minted "lock price" and the new market value
-       * (which you just had burned). Your new lock price is set to the market low, so you can
-       * take advantage of ratchets "up" in the future.
-       *
-       * Ratcheting "up" - when the price of bitcoin is higher than your lock price, you pay a
-       * prorated fee for the remainder of your existing lock duration. You are added to the mint
-       * queue for the difference in your new lock price vs the previous lock price.
-       **/
-      ratchet: AugmentedSubmittable<
-        (
-          utxoId: u64 | AnyNumber | Uint8Array,
-          options:
-            | Option<PalletBitcoinLocksLockOptions>
-            | null
-            | Uint8Array
-            | PalletBitcoinLocksLockOptions
-            | { V1: any }
-            | { V2: any }
-            | string,
-        ) => SubmittableExtrinsic<ApiType>,
-        [u64, Option<PalletBitcoinLocksLockOptions>]
       >;
       requestOrphanedUtxoRelease: AugmentedSubmittable<
         (
@@ -415,6 +405,23 @@ declare module '@polkadot/api-base/types/submittable' {
           bitcoinNetworkFee: u64 | AnyNumber | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
         [u64, Bytes, u64]
+      >;
+      /**
+       * Replace this Lock's BTC coverage and target value for its remaining term.
+       **/
+      resecuritize: AugmentedSubmittable<
+        (
+          utxoId: u64 | AnyNumber | Uint8Array,
+          satoshis: Compact<u64> | AnyNumber | Uint8Array,
+          options:
+            | Option<PalletBitcoinLocksLockOptions>
+            | null
+            | Uint8Array
+            | PalletBitcoinLocksLockOptions
+            | { microgonsAtTargetPerBtc?: any; feeCoupon?: any }
+            | string,
+        ) => SubmittableExtrinsic<ApiType>,
+        [u64, Compact<u64>, Option<PalletBitcoinLocksLockOptions>]
       >;
       setFlexible: AugmentedSubmittable<
         (

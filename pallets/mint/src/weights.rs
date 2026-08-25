@@ -1,27 +1,22 @@
 use super::Config;
-use argon_primitives::UtxoLockEventsWeightInfo;
+use argon_primitives::BitcoinFissionMintingWeightInfo;
 use pallet_prelude::*;
 
 /// Weight functions needed for this pallet.
 pub trait WeightInfo {
 	fn on_initialize(utxo_count: u32) -> Weight;
-	fn provider_utxo_locked() -> Weight;
-	fn provider_utxo_released() -> Weight;
-	fn provider_utxo_released_with_pending_mints() -> Weight;
+	fn provider_mint_requested() -> Weight;
+	fn provider_mint_repaid() -> Weight;
 }
 
-pub struct ProviderWeightAdapter<T>(PhantomData<T>);
-impl<T: Config> UtxoLockEventsWeightInfo for ProviderWeightAdapter<T> {
-	fn utxo_locked() -> Weight {
-		<T as Config>::WeightInfo::provider_utxo_locked()
+pub struct FissionMintingWeightAdapter<T>(PhantomData<T>);
+impl<T: Config> BitcoinFissionMintingWeightInfo for FissionMintingWeightAdapter<T> {
+	fn request_mint() -> Weight {
+		<T as Config>::WeightInfo::provider_mint_requested()
 	}
 
-	fn utxo_released() -> Weight {
-		<T as Config>::WeightInfo::provider_utxo_released()
-	}
-
-	fn utxo_released_with_pending_mints() -> Weight {
-		<T as Config>::WeightInfo::provider_utxo_released_with_pending_mints()
+	fn record_mint_repayment() -> Weight {
+		<T as Config>::WeightInfo::provider_mint_repaid()
 	}
 }
 
@@ -31,15 +26,11 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 
-	fn provider_utxo_locked() -> Weight {
+	fn provider_mint_requested() -> Weight {
 		Weight::zero()
 	}
 
-	fn provider_utxo_released() -> Weight {
-		Weight::zero()
-	}
-
-	fn provider_utxo_released_with_pending_mints() -> Weight {
+	fn provider_mint_repaid() -> Weight {
 		Weight::zero()
 	}
 }

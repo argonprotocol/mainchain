@@ -2,7 +2,7 @@ import { customAlphabet } from 'nanoid';
 import type { Client } from 'pg';
 import pg from 'pg';
 import * as child_process from 'node:child_process';
-import { ArgonClient, Keyring, KeyringPair, TxSubmitter } from '@argonprotocol/mainchain';
+import { ArgonClient, Keyring, KeyringPair } from '@argonprotocol/mainchain';
 import * as fs from 'node:fs';
 import * as readline from 'node:readline';
 import {
@@ -16,6 +16,7 @@ import {
 import * as process from 'node:process';
 import { Readable } from 'node:stream';
 import * as Path from 'node:path';
+import { submitTx } from './submitTx';
 
 const { Client: PgClient } = pg;
 
@@ -176,7 +177,7 @@ export default class TestNotary implements ITeardownable {
 
   public async register(client: ArgonClient): Promise<void> {
     const address = new URL(this.address);
-    const result = await new TxSubmitter(
+    await submitTx(
       client,
       client.tx.notaries.propose({
         public: this.registeredPublicKey,
@@ -184,8 +185,7 @@ export default class TestNotary implements ITeardownable {
         name: 'Test Notary',
       }),
       this.operator!,
-    ).submit();
-    await result.waitForInFirstBlock;
+    );
   }
 
   public async teardown(): Promise<void> {

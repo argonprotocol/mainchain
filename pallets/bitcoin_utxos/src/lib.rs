@@ -304,6 +304,12 @@ pub mod pallet {
 	}
 
 	impl<T: Config> BitcoinUtxoTracker for Pallet<T> {
+		fn get_synched_height() -> BitcoinHeight {
+			SynchedBitcoinBlock::<T>::get()
+				.map(|block| block.block_height)
+				.unwrap_or_default()
+		}
+
 		fn watch_for_utxo(
 			utxo_id: UtxoId,
 			script_pubkey: BitcoinCosignScriptPubkey,
@@ -458,23 +464,10 @@ pub mod pallet {
 				None => UtxoRefsByUtxoId::<T>::get(utxo_id).into_iter().collect(),
 			};
 			for utxo_ref in refs {
-				let was_spent = UtxoRefsByUtxoId::<T>::try_mutate_exists(utxo_id, |maybe_refs| {
-					let Some(refs) = maybe_refs.as_mut() else {
-						return Ok::<bool, DispatchError>(false)
-					};
-					if !refs.remove(&utxo_ref) {
-						return Ok(false)
-					}
-
-					T::EventHandler::spent(utxo_id, utxo_ref.clone())?;
-					if refs.is_empty() {
-						*maybe_refs = None;
-					}
-					Ok(true)
-				})?;
-				if !was_spent {
+				if !UtxoRefsByUtxoId::<T>::get(utxo_id).contains(&utxo_ref) {
 					continue
 				}
+				T::EventHandler::spent(utxo_id, utxo_ref.clone())?;
 
 				Self::deposit_event(Event::UtxoSpent { utxo_id, utxo_ref, block_height });
 			}

@@ -1,5 +1,4 @@
 // Auto-generated via `yarn polkadot-types-from-defs`, do not edit
-/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
@@ -119,6 +118,10 @@ import type {
   PalletBalancesReasons,
   PalletBalancesReserveData,
   PalletBalancesUnexpectedKind,
+  PalletBitcoinFissionsCall,
+  PalletBitcoinFissionsError,
+  PalletBitcoinFissionsEvent,
+  PalletBitcoinFissionsFission,
   PalletBitcoinLocksCall,
   PalletBitcoinLocksError,
   PalletBitcoinLocksEvent,
@@ -431,6 +434,10 @@ declare module '@polkadot/types/types/registry' {
     PalletBalancesReasons: PalletBalancesReasons;
     PalletBalancesReserveData: PalletBalancesReserveData;
     PalletBalancesUnexpectedKind: PalletBalancesUnexpectedKind;
+    PalletBitcoinFissionsCall: PalletBitcoinFissionsCall;
+    PalletBitcoinFissionsError: PalletBitcoinFissionsError;
+    PalletBitcoinFissionsEvent: PalletBitcoinFissionsEvent;
+    PalletBitcoinFissionsFission: PalletBitcoinFissionsFission;
     PalletBitcoinLocksCall: PalletBitcoinLocksCall;
     PalletBitcoinLocksError: PalletBitcoinLocksError;
     PalletBitcoinLocksEvent: PalletBitcoinLocksEvent;

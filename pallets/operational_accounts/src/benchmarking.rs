@@ -4,15 +4,13 @@ use super::*;
 
 #[cfg(test)]
 use crate::mock::{
-	new_test_ext, record_funded_bitcoin_amount, record_microgons_in, set_registration_lookup,
+	new_test_ext, record_fission_liquidity, record_microgons_in, set_registration_lookup,
 	ClaimableTreasuryBalance, MinimumBitcoin, MinimumBonds, MinimumUniswapTransfer,
 	OperationalMinimumVaultSecuritization, Test, TestAccountId,
 };
 #[allow(unused)]
 use crate::Pallet as OperationalAccountsPallet;
-use argon_primitives::{
-	OnNewSlot, OperationalAccountsHook, TickProvider, UtxoLockEvents, MICROGONS_PER_ARGON,
-};
+use argon_primitives::{OnNewSlot, OperationalAccountsHook, TickProvider, MICROGONS_PER_ARGON};
 use codec::Decode;
 #[cfg(test)]
 use codec::Encode;
@@ -99,10 +97,7 @@ mod benchmarks {
 			};
 			seed_mock_registration_lookup(&linked);
 			seed_mock_linked_uniswap_argon_transfers_in(&linked);
-			record_funded_bitcoin_amount(
-				&mock_account_id::<T>(&linked.vault),
-				MinimumBitcoin::get(),
-			);
+			record_fission_liquidity(&mock_account_id::<T>(&linked.vault), MinimumBitcoin::get());
 		}
 		set_benchmark_operational_accounts_provider_state(default_provider_state::<T>());
 		let registration = Registration::V1(RegistrationV1 {
@@ -139,7 +134,7 @@ mod benchmarks {
 		assert!(AccessCodeReadyAccounts::<T>::contains_key(&upstream.owner));
 		assert_provider_calls(BenchmarkOperationalAccountsProviderCallCounters {
 			get_registration_vault_data: 1,
-			get_account_funded_bitcoin_amount: 1,
+			get_account_fission_liquidity: 1,
 			is_eligible: 0,
 			has_active_rewards_account_seat: 1,
 			has_vault_bond_participation: 0,
@@ -290,10 +285,13 @@ mod benchmarks {
 
 		#[block]
 		{
-			let _ = <OperationalAccountsPallet<T> as UtxoLockEvents<T::AccountId, T::Balance>>::utxo_locked(
-				1u64,
+			<OperationalAccountsPallet<T> as OperationalAccountsHook<
+				T::AccountId,
+				T::Balance,
+			>>::account_bitcoin_amount_changed(
 				&linked.vault,
 				T::MinimumBitcoin::get(),
+				true,
 			);
 		}
 

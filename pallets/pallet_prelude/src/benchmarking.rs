@@ -22,11 +22,12 @@ use argon_primitives::{
 	},
 	tick::{Tick, TickDigest, Ticker},
 	vault::{
-		BitcoinVaultProvider, LockExtension, RegistrationVaultData, Securitization,
-		TreasuryVaultProvider, Vault, VaultError, VaultLockRequest, VaultTreasuryFrameEarnings,
+		BitcoinResecuritization, BitcoinSecuritization, BitcoinVaultProvider, LockExtension,
+		LostBitcoinCompensation, RegistrationVaultData, ReserveSecuritizationRequest,
+		TreasuryVaultProvider, Vault, VaultError, VaultTreasuryFrameEarnings,
 	},
 	ArgonCPI, NotaryId, NotebookNumber, NotebookSecret, OperationalRewardPayout, PriceProvider,
-	UtxoLockEvents, VaultId, VotingSchedule,
+	VaultId, VotingSchedule,
 };
 use codec::{Decode, Encode, FullCodec, HasCompact};
 use core::{iter::Sum, marker::PhantomData};
@@ -53,7 +54,7 @@ pub struct BenchmarkNotebookProviderState {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct BenchmarkOperationalAccountsProviderCallCounters {
 	pub get_registration_vault_data: u32,
-	pub get_account_funded_bitcoin_amount: u32,
+	pub get_account_fission_liquidity: u32,
 	pub is_eligible: u32,
 	pub has_active_rewards_account_seat: u32,
 	pub has_vault_bond_participation: u32,
@@ -950,6 +951,10 @@ pub fn benchmark_bitcoin_utxo_tracker_state() -> BenchmarkBitcoinUtxoTrackerStat
 
 pub struct BenchmarkBitcoinUtxoTracker;
 impl BitcoinUtxoTracker for BenchmarkBitcoinUtxoTracker {
+	fn get_synched_height() -> BitcoinHeight {
+		0
+	}
+
 	fn watch_for_utxo(
 		utxo_id: UtxoId,
 		script_pubkey: BitcoinCosignScriptPubkey,
@@ -1248,15 +1253,14 @@ where
 			.ok_or(VaultError::VaultNotFound)
 	}
 
-	fn add_securitized_satoshis(
+	fn activate_securitization(
 		vault_id: VaultId,
-		satoshis: Satoshis,
-		securitization_ratio: FixedU128,
+		securitization: &BitcoinSecuritization<Self::Balance>,
+		funded_satoshis: Satoshis,
 	) -> Result<(), VaultError> {
 		mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
 			let vault = state.vaults.get_mut(&vault_id).ok_or(VaultError::VaultNotFound)?;
-			vault.add_securitized_satoshis(satoshis, securitization_ratio);
-			Ok(())
+			vault.activate_securitization(securitization, funded_satoshis)
 		})
 	}
 
@@ -1278,55 +1282,38 @@ where
 
 	fn set_bitcoin_lock_flexible(
 		vault_id: VaultId,
-		securitization: &Securitization<Self::Balance>,
-		satoshis: Satoshis,
+		securitization: &BitcoinSecuritization<Self::Balance>,
+		funded_satoshis: Satoshis,
 		is_flexible: bool,
 	) -> Result<(), VaultError> {
 		mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
 			let vault = state.vaults.get_mut(&vault_id).ok_or(VaultError::VaultNotFound)?;
-			vault.set_bitcoin_lock_flexible(securitization, satoshis, is_flexible)
+			vault.set_bitcoin_lock_flexible(securitization, funded_satoshis, is_flexible)
 		})
 	}
 
-	fn lock(
+	fn reserve_securitization(
 		vault_id: VaultId,
 		locker: &Self::AccountId,
-		securitization: &Securitization<Self::Balance>,
-		request: VaultLockRequest<'_, Self::Balance>,
+		securitization: &BitcoinSecuritization<Self::Balance>,
+		request: ReserveSecuritizationRequest<Self::Balance>,
 	) -> Result<(Self::Balance, Self::Balance), VaultError> {
-		let VaultLockRequest {
-			extension,
-			fee_discount,
-			is_flexible,
-			securitization_space_to_unreserve,
-			..
-		} = request;
+		let ReserveSecuritizationRequest { fee_discount, securitization_space_to_unreserve } =
+			request;
 		let (total_fee, fee_discount, charge_fee) =
 			mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
 				let charge_fee = state.charge_fee;
 				let vault = state.vaults.get_mut(&vault_id).ok_or(VaultError::VaultNotFound)?;
 				let is_operator = vault.operator_account_id == *locker;
 				let may_use_flexible_space = !is_operator;
-				let term =
-					extension.as_ref().map(|(duration, _)| *duration).unwrap_or(FixedU128::one());
-				if let Some((_, lock_extension)) = extension {
-					vault.extend_lock(
-						securitization,
-						lock_extension,
-						is_flexible,
-						may_use_flexible_space,
-					)?;
-				} else {
-					vault
-						.reserved_securitization_space
-						.saturating_reduce(securitization_space_to_unreserve);
-					vault.lock(securitization, may_use_flexible_space)?;
-				}
+				vault
+					.reserved_securitization_space
+					.saturating_reduce(securitization_space_to_unreserve);
+				vault.reserve_securitization(securitization, may_use_flexible_space)?;
 				let total_fee = vault
 					.terms
 					.bitcoin_annual_percent_rate
-					.saturating_mul(term)
-					.saturating_mul_int(securitization.liquidity_promised)
+					.saturating_mul_int(securitization.btc_value_in_microgons())
 					.saturating_add(vault.terms.bitcoin_base_fee);
 				let fee_discount =
 					if is_operator { total_fee } else { fee_discount.min(total_fee) };
@@ -1347,36 +1334,104 @@ where
 		Ok((total_fee, fee_discount))
 	}
 
-	fn schedule_for_release(
+	fn resecuritize(
 		vault_id: VaultId,
-		securitization: &Securitization<Self::Balance>,
-		satoshis: Satoshis,
+		locker: &Self::AccountId,
+		request: BitcoinResecuritization<'_, Self::Balance>,
+	) -> Result<(Self::Balance, Self::Balance), VaultError> {
+		let BitcoinResecuritization {
+			current,
+			replacement,
+			funded_satoshis,
+			remaining_term,
+			lock_extension,
+			is_flexible,
+			fee_discount,
+			securitization_space_to_unreserve,
+		} = request;
+		let (total_fee, fee_discount, charge_fee, is_operator) =
+			mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
+				let charge_fee = state.charge_fee;
+				let vault = state.vaults.get_mut(&vault_id).ok_or(VaultError::VaultNotFound)?;
+				let is_operator = vault.operator_account_id == *locker;
+				let additional_securitization_coverage_microgons = replacement
+					.securitization_coverage_microgons
+					.saturating_sub(current.securitization_coverage_microgons);
+				let total_fee = if additional_securitization_coverage_microgons.is_zero() {
+					Balance::zero()
+				} else {
+					vault
+						.terms
+						.bitcoin_annual_percent_rate
+						.saturating_mul(remaining_term)
+						.saturating_mul_int(additional_securitization_coverage_microgons)
+						.saturating_add(vault.terms.bitcoin_base_fee)
+				};
+				let fee_discount =
+					if is_operator { total_fee } else { fee_discount.min(total_fee) };
+				vault
+					.reserved_securitization_space
+					.saturating_reduce(securitization_space_to_unreserve);
+				vault.replace_securitization(
+					current,
+					replacement,
+					funded_satoshis,
+					lock_extension,
+					is_flexible,
+					!is_operator,
+				)?;
+				Ok::<_, VaultError>((total_fee, fee_discount, charge_fee, is_operator))
+			})?;
+
+		if charge_fee && !is_operator {
+			Currency::burn_from(
+				locker,
+				total_fee.saturating_sub(fee_discount),
+				Preservation::Expendable,
+				Precision::Exact,
+				Fortitude::Force,
+			)
+			.map_err(|_| VaultError::InsufficientFunds)?;
+		}
+
+		Ok((total_fee, fee_discount))
+	}
+
+	fn schedule_securitization_release(
+		vault_id: VaultId,
+		securitization: &BitcoinSecuritization<Self::Balance>,
+		funded_satoshis: Satoshis,
 		lock_extension: &LockExtension<Self::Balance>,
 		is_flexible: bool,
 	) -> Result<(), VaultError> {
 		mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
 			let vault = state.vaults.get_mut(&vault_id).ok_or(VaultError::VaultNotFound)?;
-			vault.schedule_for_release(securitization, satoshis, lock_extension, is_flexible)?;
+			vault.schedule_securitization_release(
+				securitization,
+				funded_satoshis,
+				lock_extension,
+				is_flexible,
+			)?;
 			Ok(())
 		})
 	}
 
 	fn return_securitization(
 		vault_id: VaultId,
-		securitization: &Securitization<Self::Balance>,
+		securitization: &BitcoinSecuritization<Self::Balance>,
 	) -> Result<(), VaultError> {
 		mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
 			let vault = state.vaults.get_mut(&vault_id).ok_or(VaultError::VaultNotFound)?;
-			vault.release_lock(securitization);
-			state.canceled_locks.push((vault_id, securitization.liquidity_promised));
+			vault.return_securitization(securitization)?;
+			state.canceled_locks.push((vault_id, securitization.btc_value_in_microgons()));
 			Ok(())
 		})
 	}
 
 	fn burn(
 		vault_id: VaultId,
-		securitization: &Securitization<Self::Balance>,
-		satoshis: Satoshis,
+		securitization: &BitcoinSecuritization<Self::Balance>,
+		funded_satoshis: Satoshis,
 		market_rate: Self::Balance,
 		lock_extension: &LockExtension<Self::Balance>,
 		is_flexible: bool,
@@ -1384,7 +1439,7 @@ where
 		mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
 			let vault = state.vaults.get_mut(&vault_id).ok_or(VaultError::VaultNotFound)?;
 			Ok(vault
-				.burn(securitization, satoshis, market_rate, lock_extension, is_flexible)?
+				.burn(securitization, funded_satoshis, market_rate, lock_extension, is_flexible)?
 				.burned_amount)
 		})
 	}
@@ -1392,13 +1447,23 @@ where
 	fn compensate_lost_bitcoin(
 		vault_id: VaultId,
 		_beneficiary: &Self::AccountId,
-		securitization: &Securitization<Self::Balance>,
-		satoshis: Satoshis,
+		securitization: &BitcoinSecuritization<Self::Balance>,
+		funded_satoshis: Satoshis,
 		market_rate: Self::Balance,
 		lock_extension: &LockExtension<Self::Balance>,
 		is_flexible: bool,
-	) -> Result<Self::Balance, VaultError> {
-		Self::burn(vault_id, securitization, satoshis, market_rate, lock_extension, is_flexible)
+	) -> Result<LostBitcoinCompensation<Self::Balance>, VaultError> {
+		let total_burned = Self::burn(
+			vault_id,
+			securitization,
+			funded_satoshis,
+			market_rate,
+			lock_extension,
+			is_flexible,
+		)?;
+		let to_beneficiary = total_burned.saturating_sub(securitization.btc_value_in_microgons());
+		let burned = total_burned.saturating_sub(to_beneficiary);
+		Ok(LostBitcoinCompensation { to_beneficiary, burned })
 	}
 
 	fn create_utxo_script_pubkey(
@@ -1419,19 +1484,6 @@ where
 			vault_claim_xpub,
 			BitcoinCosignScriptPubkey::P2WSH { wscript_hash: H256::repeat_byte(vault_id as u8) },
 		))
-	}
-
-	fn remove_pending(
-		vault_id: VaultId,
-		securitization: &Securitization<Self::Balance>,
-	) -> Result<(), VaultError> {
-		mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
-			let vault = state.vaults.get_mut(&vault_id).ok_or(VaultError::VaultNotFound)?;
-			vault
-				.securitization_pending_activation
-				.saturating_reduce(securitization.collateral_required);
-			Ok(())
-		})
 	}
 
 	fn update_pending_cosign_list(
@@ -1498,11 +1550,11 @@ where
 	type Balance = Balance;
 	type AccountId = AccountId;
 
-	fn get_securitization_and_securitized_satoshis(vault_id: VaultId) -> (Self::Balance, Satoshis) {
+	fn get_eligible_capacity(vault_id: VaultId) -> (Self::Balance, Satoshis) {
 		benchmark_bitcoin_vault_provider_state::<AccountId, Balance>()
 			.vaults
 			.get(&vault_id)
-			.map(|vault| (vault.securitization, vault.securitized_satoshis))
+			.map(|vault| (vault.securitization, vault.ratio_adjusted_satoshis))
 			.unwrap_or_default()
 	}
 
@@ -1542,84 +1594,6 @@ where
 		mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
 			state.treasury_frame_earnings.push((profit.vault_id, profit.earnings_for_vault));
 		});
-	}
-}
-
-#[derive(Clone, Encode, Decode, PartialEq, Eq)]
-pub struct BenchmarkUtxoLockEventsState<AccountId, Balance>
-where
-	AccountId: Codec,
-	Balance: Codec + Copy,
-{
-	pub last_lock_event: Option<(UtxoId, AccountId, Balance)>,
-	pub last_release_event: Option<(UtxoId, AccountId, bool, Balance, Balance)>,
-}
-
-impl<AccountId, Balance> Default for BenchmarkUtxoLockEventsState<AccountId, Balance>
-where
-	AccountId: Codec,
-	Balance: Codec + Copy,
-{
-	fn default() -> Self {
-		Self { last_lock_event: None, last_release_event: None }
-	}
-}
-
-pub fn set_benchmark_utxo_lock_events_state<AccountId, Balance>(
-	state: BenchmarkUtxoLockEventsState<AccountId, Balance>,
-) where
-	AccountId: Codec,
-	Balance: Codec + Copy,
-{
-	utxo_lock_events_state_backend::set(state.encode());
-}
-
-pub fn reset_benchmark_utxo_lock_events_state() {
-	utxo_lock_events_state_backend::reset();
-}
-
-pub fn benchmark_utxo_lock_events_state<AccountId, Balance>(
-) -> BenchmarkUtxoLockEventsState<AccountId, Balance>
-where
-	AccountId: Codec,
-	Balance: Codec + Copy,
-{
-	decode_benchmark_state(utxo_lock_events_state_backend::get())
-}
-
-pub struct BenchmarkUtxoLockEvents<AccountId, Balance>(PhantomData<(AccountId, Balance)>);
-impl<AccountId, Balance> UtxoLockEvents<AccountId, Balance>
-	for BenchmarkUtxoLockEvents<AccountId, Balance>
-where
-	AccountId: Codec + Clone,
-	Balance: Codec + Copy,
-{
-	type Weights = ();
-
-	fn utxo_locked(utxo_id: UtxoId, account_id: &AccountId, amount: Balance) -> DispatchResult {
-		let mut state = benchmark_utxo_lock_events_state::<AccountId, Balance>();
-		state.last_lock_event = Some((utxo_id, account_id.clone(), amount));
-		set_benchmark_utxo_lock_events_state(state);
-		Ok(())
-	}
-
-	fn utxo_released(
-		utxo_id: UtxoId,
-		account_id: &AccountId,
-		remove_pending_mints: bool,
-		burned_argons: Balance,
-		original_liquidity_promised: Balance,
-	) -> DispatchResult {
-		let mut state = benchmark_utxo_lock_events_state::<AccountId, Balance>();
-		state.last_release_event = Some((
-			utxo_id,
-			account_id.clone(),
-			remove_pending_mints,
-			burned_argons,
-			original_liquidity_promised,
-		));
-		set_benchmark_utxo_lock_events_state(state);
-		Ok(())
 	}
 }
 
@@ -1820,55 +1794,5 @@ mod bitcoin_vault_provider_state_backend {
 
 	pub(super) fn get() -> Vec<u8> {
 		unsafe { (*BENCHMARK_BITCOIN_VAULT_PROVIDER_STATE.0.get()).clone().unwrap_or_default() }
-	}
-}
-
-#[cfg(feature = "std")]
-mod utxo_lock_events_state_backend {
-	use super::*;
-	use frame_support::parameter_types;
-
-	parameter_types! {
-		pub static BenchmarkUtxoLockEventsStateHolder: Vec<u8> = Vec::new();
-	}
-
-	pub(super) fn set(state: Vec<u8>) {
-		BenchmarkUtxoLockEventsStateHolder::set(state);
-	}
-
-	pub(super) fn reset() {
-		BenchmarkUtxoLockEventsStateHolder::reset();
-	}
-
-	pub(super) fn get() -> Vec<u8> {
-		BenchmarkUtxoLockEventsStateHolder::get()
-	}
-}
-
-#[cfg(not(feature = "std"))]
-mod utxo_lock_events_state_backend {
-	use super::*;
-	use core::cell::UnsafeCell;
-
-	struct BenchmarkStateCell(UnsafeCell<Option<Vec<u8>>>);
-	unsafe impl Sync for BenchmarkStateCell {}
-
-	static BENCHMARK_UTXO_LOCK_EVENTS_STATE: BenchmarkStateCell =
-		BenchmarkStateCell(UnsafeCell::new(None));
-
-	pub(super) fn set(state: Vec<u8>) {
-		unsafe {
-			*BENCHMARK_UTXO_LOCK_EVENTS_STATE.0.get() = Some(state);
-		}
-	}
-
-	pub(super) fn reset() {
-		unsafe {
-			*BENCHMARK_UTXO_LOCK_EVENTS_STATE.0.get() = None;
-		}
-	}
-
-	pub(super) fn get() -> Vec<u8> {
-		unsafe { (*BENCHMARK_UTXO_LOCK_EVENTS_STATE.0.get()).clone().unwrap_or_default() }
 	}
 }

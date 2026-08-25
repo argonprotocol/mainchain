@@ -1362,9 +1362,8 @@ pub mod pallet {
 		}
 
 		pub(crate) fn get_vault_securitized_funds_cap(vault_id: VaultId) -> T::Balance {
-			let (_, securitized_satoshis) =
-				T::TreasuryVaultProvider::get_securitization_and_securitized_satoshis(vault_id);
-			T::PriceProvider::get_btc_price_in_market_microgons(securitized_satoshis)
+			let (_, eligible_satoshis) = T::TreasuryVaultProvider::get_eligible_capacity(vault_id);
+			T::PriceProvider::get_btc_price_in_market_microgons(eligible_satoshis)
 				.unwrap_or_default()
 		}
 

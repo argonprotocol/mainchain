@@ -3,7 +3,8 @@ use polkadot_sdk::*;
 
 use super::{
 	bitcoin::{
-		BitcoinCosignScriptPubkey, BitcoinHeight, Satoshis, UtxoId, UtxoRef, SATOSHIS_PER_BITCOIN,
+		BitcoinCosignScriptPubkey, BitcoinHeight, FissionId, Satoshis, UtxoId, UtxoRef,
+		SATOSHIS_PER_BITCOIN,
 	},
 	block_seal::{BlockPayout, FrameId, MiningAuthority},
 	inherents::BlockSealInherent,
@@ -181,22 +182,17 @@ impl BitcoinUtxoEventsWeightInfo for () {
 	}
 }
 
-pub trait UtxoLockEventsWeightInfo {
-	fn utxo_locked() -> Weight;
-	fn utxo_released() -> Weight;
-	fn utxo_released_with_pending_mints() -> Weight;
+pub trait BitcoinFissionMintingWeightInfo {
+	fn request_mint() -> Weight;
+	fn record_mint_repayment() -> Weight;
 }
 
-impl UtxoLockEventsWeightInfo for () {
-	fn utxo_locked() -> Weight {
+impl BitcoinFissionMintingWeightInfo for () {
+	fn request_mint() -> Weight {
 		Weight::zero()
 	}
 
-	fn utxo_released() -> Weight {
-		Weight::zero()
-	}
-
-	fn utxo_released_with_pending_mints() -> Weight {
+	fn record_mint_repayment() -> Weight {
 		Weight::zero()
 	}
 }
@@ -239,27 +235,248 @@ impl<AccountId> UniswapTransferProvider<AccountId> for () {
 	}
 }
 
-pub trait BitcoinLocksProviderWeightInfo {
-	fn get_account_funded_bitcoin_amount() -> Weight;
+pub trait BitcoinFissionsProviderWeightInfo {
+	fn get_account_fission_liquidity() -> Weight;
+	fn get_lock_fission_requirements() -> Weight;
+	fn close_for_lock() -> Weight;
 }
 
-impl BitcoinLocksProviderWeightInfo for () {
-	fn get_account_funded_bitcoin_amount() -> Weight {
+impl BitcoinFissionsProviderWeightInfo for () {
+	fn get_account_fission_liquidity() -> Weight {
+		Weight::zero()
+	}
+
+	fn get_lock_fission_requirements() -> Weight {
+		Weight::zero()
+	}
+
+	fn close_for_lock() -> Weight {
 		Weight::zero()
 	}
 }
 
-pub trait BitcoinLocksProvider<AccountId, Balance> {
-	type Weights: BitcoinLocksProviderWeightInfo;
-
-	fn get_account_funded_bitcoin_amount(_account_id: &AccountId) -> Balance;
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct BitcoinFissionRequirements<Balance> {
+	/// Highest target-normalized BTC value used by an active Fission.
+	pub microgons_at_target_per_btc: Balance,
+	/// Aggregate redemption-curve liability of the active Fissions.
+	pub liquidity_promised: Balance,
+	/// Most recent price-history tick used by an active Fission.
+	pub last_ratchet_tick: Tick,
 }
 
-impl<AccountId, Balance: Default> BitcoinLocksProvider<AccountId, Balance> for () {
+pub trait BitcoinFissionsProvider<AccountId, Balance> {
+	type Weights: BitcoinFissionsProviderWeightInfo;
+
+	fn get_account_fission_liquidity(_account_id: &AccountId) -> Balance;
+
+	/// Return the aggregate securitization requirements of a Lock's active Fissions.
+	fn get_lock_fission_requirements(
+		_account_id: &AccountId,
+		_utxo_id: UtxoId,
+	) -> Option<BitcoinFissionRequirements<Balance>> {
+		None
+	}
+
+	/// Close every active Fission sourced from a terminal Lock and apply Argons actually burned
+	/// during that Lock transition against their mint liability.
+	fn close_for_lock(
+		_account_id: &AccountId,
+		_utxo_id: UtxoId,
+		_burned_argons: Balance,
+	) -> DispatchResult {
+		Ok(())
+	}
+}
+
+impl<AccountId, Balance: Default> BitcoinFissionsProvider<AccountId, Balance> for () {
 	type Weights = ();
 
-	fn get_account_funded_bitcoin_amount(_account_id: &AccountId) -> Balance {
+	fn get_account_fission_liquidity(_account_id: &AccountId) -> Balance {
 		Balance::default()
+	}
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum BitcoinFissionLockError {
+	/// The requested source Lock does not exist.
+	LockNotFound,
+	/// The Fission owner does not own the source Lock.
+	NoPermissions,
+	/// The source Lock has no confirmed funding satoshis.
+	LockNotFunded,
+	/// The source Lock is already in the release process.
+	LockReleasePending,
+	/// The source Lock does not have enough unallocated funded satoshis.
+	InsufficientFundedSatoshis,
+	/// The source Lock's securitization does not cover the requested allocation and liability.
+	InsufficientSecuritization,
+	/// The requested target-normalized BTC value is not present in recent price history.
+	IneligibleMicrogonsAtTargetPerBtc,
+	/// The requested price-history entry predates the Fission or Lock coverage floor.
+	MicrogonsAtTargetPerBtcTickOlderThanCurrent,
+	/// The Lock has fewer active Fission satoshis than the position being settled.
+	InsufficientFissionedSatoshis,
+	/// No current Bitcoin price is available to calculate the redemption amount.
+	NoBitcoinPricesAvailable,
+	/// The Lock allocation or resulting liability overflowed.
+	Overflow,
+}
+
+pub trait BitcoinFissionLockProviderWeightInfo {
+	fn fission_satoshis() -> Weight;
+	fn validate_fission() -> Weight;
+	fn calculate_liquidity_promised() -> Weight;
+	fn fuse_satoshis() -> Weight;
+}
+
+impl BitcoinFissionLockProviderWeightInfo for () {
+	fn fission_satoshis() -> Weight {
+		Weight::zero()
+	}
+
+	fn validate_fission() -> Weight {
+		Weight::zero()
+	}
+
+	fn calculate_liquidity_promised() -> Weight {
+		Weight::zero()
+	}
+
+	fn fuse_satoshis() -> Weight {
+		Weight::zero()
+	}
+}
+
+/// Lock-side validation and accounting required when funded satoshis are fissioned or fused.
+pub trait BitcoinFissionLockProvider<AccountId, Balance> {
+	type Weights: BitcoinFissionLockProviderWeightInfo;
+
+	/// Fission satoshis from one Lock and return their formula-derived liability and the history
+	/// tick for the submitted target-normalized BTC value.
+	fn fission_satoshis(
+		account_id: &AccountId,
+		utxo_id: UtxoId,
+		satoshis: Satoshis,
+		microgons_at_target_per_btc: Balance,
+	) -> Result<(Balance, Tick), BitcoinFissionLockError>;
+
+	/// Validate that an existing Fission allocation remains covered at the submitted
+	/// target-normalized BTC value.
+	fn validate_fission(
+		account_id: &AccountId,
+		utxo_id: UtxoId,
+		satoshis: Satoshis,
+		microgons_at_target_per_btc: Balance,
+		minimum_last_ratchet_tick: Tick,
+		current_liquidity_promised: Balance,
+		replacement_liquidity_promised: Balance,
+	) -> Result<Tick, BitcoinFissionLockError>;
+
+	/// Calculate the formula-derived liability for satoshis at a target-normalized BTC value.
+	fn calculate_liquidity_promised(
+		satoshis: Satoshis,
+		microgons_at_target_per_btc: Balance,
+	) -> Result<Balance, BitcoinFissionLockError>;
+
+	/// Fuse one Fission's satoshis back into its Lock and return the redemption amount.
+	fn fuse_satoshis(
+		account_id: &AccountId,
+		utxo_id: UtxoId,
+		satoshis: Satoshis,
+		microgons_at_target_per_btc: Balance,
+	) -> Result<Balance, BitcoinFissionLockError>;
+}
+
+impl<AccountId, Balance> BitcoinFissionLockProvider<AccountId, Balance> for () {
+	type Weights = ();
+
+	fn fission_satoshis(
+		_account_id: &AccountId,
+		_utxo_id: UtxoId,
+		_satoshis: Satoshis,
+		_microgons_at_target_per_btc: Balance,
+	) -> Result<(Balance, Tick), BitcoinFissionLockError> {
+		Err(BitcoinFissionLockError::LockNotFound)
+	}
+
+	fn validate_fission(
+		_account_id: &AccountId,
+		_utxo_id: UtxoId,
+		_satoshis: Satoshis,
+		_microgons_at_target_per_btc: Balance,
+		_minimum_last_ratchet_tick: Tick,
+		_current_liquidity_promised: Balance,
+		_replacement_liquidity_promised: Balance,
+	) -> Result<Tick, BitcoinFissionLockError> {
+		Err(BitcoinFissionLockError::LockNotFound)
+	}
+
+	fn calculate_liquidity_promised(
+		_satoshis: Satoshis,
+		_microgons_at_target_per_btc: Balance,
+	) -> Result<Balance, BitcoinFissionLockError> {
+		Err(BitcoinFissionLockError::LockNotFound)
+	}
+
+	fn fuse_satoshis(
+		_account_id: &AccountId,
+		_utxo_id: UtxoId,
+		_satoshis: Satoshis,
+		_microgons_at_target_per_btc: Balance,
+	) -> Result<Balance, BitcoinFissionLockError> {
+		Err(BitcoinFissionLockError::LockNotFound)
+	}
+}
+
+/// Mint requests and repayment accounting produced by owner-scoped Fissions.
+pub trait BitcoinFissionMinting<AccountId: Codec, Balance: Codec + Copy> {
+	type Weights: BitcoinFissionMintingWeightInfo;
+
+	/// Queue a Fission's mint entitlement without minting it immediately.
+	fn request_mint(
+		account_id: &AccountId,
+		fission_id: FissionId,
+		utxo_id: UtxoId,
+		amount: Balance,
+	) -> DispatchResult;
+
+	/// Reduce the global Bitcoin-minted total after Argons are burned to settle Fission liability.
+	fn record_mint_repayment(amount: Balance);
+}
+
+#[impl_trait_for_tuples::impl_for_tuples(1, 5)]
+impl BitcoinFissionMintingWeightInfo for Tuple {
+	fn request_mint() -> Weight {
+		let mut weight = Weight::zero();
+		for_tuples!( #( weight = weight.saturating_add(Tuple::request_mint()); )* );
+		weight
+	}
+
+	fn record_mint_repayment() -> Weight {
+		let mut weight = Weight::zero();
+		for_tuples!( #( weight = weight.saturating_add(Tuple::record_mint_repayment()); )* );
+		weight
+	}
+}
+
+#[impl_trait_for_tuples::impl_for_tuples(1, 5)]
+#[tuple_types_custom_trait_bound(BitcoinFissionMinting<AccountId, Balance>)]
+impl<AccountId: Codec, Balance: Codec + Copy> BitcoinFissionMinting<AccountId, Balance> for Tuple {
+	for_tuples!( type Weights = ( #( Tuple::Weights ),* ); );
+
+	fn request_mint(
+		account_id: &AccountId,
+		fission_id: FissionId,
+		utxo_id: UtxoId,
+		amount: Balance,
+	) -> DispatchResult {
+		for_tuples!( #( Tuple::request_mint(account_id, fission_id, utxo_id, amount)?; )* );
+		Ok(())
+	}
+
+	fn record_mint_repayment(amount: Balance) {
+		for_tuples!( #( Tuple::record_mint_repayment(amount); )* );
 	}
 }
 
@@ -661,6 +878,9 @@ pub trait PriceProvider<
 }
 
 pub trait BitcoinUtxoTracker {
+	/// Highest Bitcoin block whose UTXO changes have been processed by the tracker.
+	fn get_synched_height() -> BitcoinHeight;
+
 	fn watch_for_utxo(
 		utxo_id: UtxoId,
 		script_pubkey: BitcoinCosignScriptPubkey,
@@ -678,6 +898,8 @@ pub trait BitcoinUtxoEvents<AccountId> {
 		satoshis: Satoshis,
 		bitcoin_height: BitcoinHeight,
 	) -> DispatchResult;
+	/// Apply consumer policy for a spent output, including removing the exact output or its entire
+	/// watched address from the UTXO tracker.
 	fn spent(utxo_id: UtxoId, utxo_ref: UtxoRef) -> DispatchResult;
 }
 
@@ -717,74 +939,6 @@ impl<AccountId> BitcoinUtxoEvents<AccountId> for Tuple {
 	}
 }
 
-pub trait UtxoLockEvents<AccountId: Codec, Balance: Codec + Copy> {
-	type Weights: UtxoLockEventsWeightInfo;
-
-	fn utxo_locked(utxo_id: UtxoId, account_id: &AccountId, amount: Balance) -> DispatchResult;
-	/// Called when a bitcoin is unlocked (whether from being spent outside the system, or
-	/// from being unlocked)
-	fn utxo_released(
-		utxo_id: UtxoId,
-		account_id: &AccountId,
-		remove_pending_mints: bool,
-		burned_argons: Balance,
-		// The lock liquidity that existed before this release path mutated the lock.
-		original_liquidity_promised: Balance,
-	) -> DispatchResult;
-}
-#[impl_trait_for_tuples::impl_for_tuples(1, 5)]
-impl UtxoLockEventsWeightInfo for Tuple {
-	fn utxo_locked() -> Weight {
-		let mut weight = Weight::zero();
-		for_tuples!( #( weight = weight.saturating_add(Tuple::utxo_locked()); )* );
-		weight
-	}
-
-	fn utxo_released() -> Weight {
-		let mut weight = Weight::zero();
-		for_tuples!( #( weight = weight.saturating_add(Tuple::utxo_released()); )* );
-		weight
-	}
-
-	fn utxo_released_with_pending_mints() -> Weight {
-		let mut weight = Weight::zero();
-		for_tuples!( #( weight = weight.saturating_add(Tuple::utxo_released_with_pending_mints()); )* );
-		weight
-	}
-}
-
-#[impl_trait_for_tuples::impl_for_tuples(1, 5)]
-#[tuple_types_custom_trait_bound(UtxoLockEvents<AccountId, Balance>)]
-impl<AccountId: Codec, Balance: Codec + Copy> UtxoLockEvents<AccountId, Balance> for Tuple {
-	for_tuples!( type Weights = ( #( Tuple::Weights ),* ); );
-
-	fn utxo_locked(utxo_id: UtxoId, account_id: &AccountId, amount: Balance) -> DispatchResult {
-		for_tuples!( #( Tuple::utxo_locked(utxo_id, account_id, amount)?; )* );
-		Ok(())
-	}
-
-	fn utxo_released(
-		utxo_id: UtxoId,
-		account_id: &AccountId,
-		remove_pending_mints: bool,
-		burned_argons: Balance,
-		original_liquidity_promised: Balance,
-	) -> DispatchResult {
-		for_tuples!(
-			#(
-				Tuple::utxo_released(
-					utxo_id,
-					account_id,
-					remove_pending_mints,
-					burned_argons,
-					original_liquidity_promised,
-				)?;
-			)*
-		);
-		Ok(())
-	}
-}
-
 pub trait OperationalAccountsHook<AccountId, Balance> {
 	fn vault_created_weight() -> Weight;
 	fn vault_created(_vault_operator_account: &AccountId) {}
@@ -792,6 +946,13 @@ pub trait OperationalAccountsHook<AccountId, Balance> {
 	fn vault_bitcoin_lock_funded(_vault_operator_account: &AccountId, _total_locked: Balance) {}
 	fn mining_seat_won_weight() -> Weight;
 	fn mining_seat_won(_miner_account: &AccountId) {}
+	fn account_bitcoin_amount_changed_weight() -> Weight;
+	fn account_bitcoin_amount_changed(
+		_account_id: &AccountId,
+		_amount: Balance,
+		_is_increase: bool,
+	) {
+	}
 	fn account_vault_bond_total_updated_weight() -> Weight;
 	fn account_vault_bond_total_updated(_account_id: &AccountId, _amount: Balance) {}
 	fn account_uniswap_argon_transfers_in_updated_weight() -> Weight;
@@ -836,6 +997,23 @@ where
 
 	fn mining_seat_won(miner_account: &AccountId) {
 		for_tuples!( #( Tuple::mining_seat_won(miner_account); )* );
+	}
+
+	fn account_bitcoin_amount_changed_weight() -> Weight {
+		let mut weight = Weight::zero();
+		for_tuples!(
+			#(
+				weight = weight
+					.saturating_add(Tuple::account_bitcoin_amount_changed_weight());
+			)*
+		);
+		weight
+	}
+
+	fn account_bitcoin_amount_changed(account_id: &AccountId, amount: Balance, is_increase: bool) {
+		for_tuples!(
+			#( Tuple::account_bitcoin_amount_changed(account_id, amount, is_increase); )*
+		);
 	}
 
 	fn account_vault_bond_total_updated_weight() -> Weight {
@@ -1329,34 +1507,6 @@ mod tests {
 		}
 	}
 
-	impl UtxoLockEventsWeightInfo for FirstWeights {
-		fn utxo_locked() -> Weight {
-			Weight::from_parts(30, 3)
-		}
-
-		fn utxo_released() -> Weight {
-			Weight::from_parts(31, 3)
-		}
-
-		fn utxo_released_with_pending_mints() -> Weight {
-			Weight::from_parts(32, 3)
-		}
-	}
-
-	impl UtxoLockEventsWeightInfo for SecondWeights {
-		fn utxo_locked() -> Weight {
-			Weight::from_parts(40, 4)
-		}
-
-		fn utxo_released() -> Weight {
-			Weight::from_parts(41, 4)
-		}
-
-		fn utxo_released_with_pending_mints() -> Weight {
-			Weight::from_parts(42, 4)
-		}
-	}
-
 	impl UniswapTransferProviderWeightInfo for FirstWeights {
 		fn is_crosschain_activated() -> Weight {
 			Weight::from_parts(50, 5)
@@ -1411,42 +1561,6 @@ mod tests {
 		}
 	}
 
-	impl UtxoLockEvents<u64, u128> for First {
-		type Weights = FirstWeights;
-
-		fn utxo_locked(_utxo_id: UtxoId, _account_id: &u64, _amount: u128) -> DispatchResult {
-			Ok(())
-		}
-
-		fn utxo_released(
-			_utxo_id: UtxoId,
-			_account_id: &u64,
-			_remove_pending_mints: bool,
-			_burned_argons: u128,
-			_original_liquidity_promised: u128,
-		) -> DispatchResult {
-			Ok(())
-		}
-	}
-
-	impl UtxoLockEvents<u64, u128> for Second {
-		type Weights = SecondWeights;
-
-		fn utxo_locked(_utxo_id: UtxoId, _account_id: &u64, _amount: u128) -> DispatchResult {
-			Ok(())
-		}
-
-		fn utxo_released(
-			_utxo_id: UtxoId,
-			_account_id: &u64,
-			_remove_pending_mints: bool,
-			_burned_argons: u128,
-			_original_liquidity_promised: u128,
-		) -> DispatchResult {
-			Ok(())
-		}
-	}
-
 	impl UniswapTransferProvider<u64> for First {
 		type Weights = FirstWeights;
 		type Balance = u128;
@@ -1478,13 +1592,5 @@ mod tests {
 		type Weights = <(First, Second) as BitcoinUtxoEvents<u64>>::Weights;
 		assert_eq!(Weights::utxo_detected(), Weight::from_parts(30, 3));
 		assert_eq!(Weights::spent(), Weight::from_parts(32, 3));
-	}
-
-	#[test]
-	fn tuple_utxo_lock_event_weights_sum_member_weights() {
-		type Weights = <(First, Second) as UtxoLockEvents<u64, u128>>::Weights;
-		assert_eq!(Weights::utxo_locked(), Weight::from_parts(70, 7));
-		assert_eq!(Weights::utxo_released(), Weight::from_parts(72, 7));
-		assert_eq!(Weights::utxo_released_with_pending_mints(), Weight::from_parts(74, 7));
 	}
 }

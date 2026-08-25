@@ -163,6 +163,10 @@ impl OperationalAccountsHook<u64, Balance> for StaticOperationalAccountsHook {
 		Weight::zero()
 	}
 
+	fn account_bitcoin_amount_changed_weight() -> Weight {
+		Weight::zero()
+	}
+
 	fn account_vault_bond_total_updated_weight() -> Weight {
 		Weight::zero()
 	}

@@ -3,8 +3,6 @@ import { p2pkh, p2sh, p2wpkh, p2wsh, Transaction } from '@scure/btc-signer';
 import {
   ArgonPrimitivesBitcoinBitcoinNetwork,
   hexToU8a,
-  IBitcoinLock,
-  IReleaseRequest,
   u8aEq,
   u8aToHex,
 } from '@argonprotocol/mainchain';
@@ -16,20 +14,41 @@ import {
   signPsbt,
   signPsbtDerived,
 } from './wasm/bitcoin_bindings.js';
-import { addressBytesHex, getChildXpriv, getScureNetwork, keyToU8a } from './KeysHelper';
+import { addressBytesHex, getScureNetwork, keyToU8a } from './KeysHelper';
+
+export type ICosignScriptLock = {
+  createdAtHeight: number;
+  fundedSatoshis: bigint;
+  openClaimHeight: number;
+  ownerPubkey: string;
+  p2wshScriptHashHex: string;
+  securitizedSatoshis: bigint;
+  vaultClaimHeight: number;
+  vaultClaimPubkey: string;
+  vaultPubkey: string;
+  vaultXpubSources: {
+    parentFingerprint: Uint8Array;
+    cosignHdIndex: number;
+  };
+};
+
+export type IBitcoinReleaseRequest = {
+  bitcoinNetworkFee: bigint;
+  toScriptPubkey: string;
+};
 
 export class CosignScript {
   constructor(
-    readonly lock: IBitcoinLock,
+    readonly lock: ICosignScriptLock,
     private network: BitcoinNetwork,
   ) {}
 
   public getFundingPsbt(): Uint8Array {
-    const { lock, network } = this;
+    const { lock } = this;
     const tx = new Transaction();
     tx.addOutput({
       script: keyToU8a(lock.p2wshScriptHashHex),
-      amount: lock.utxoSatoshis ?? lock.satoshis,
+      amount: lock.securitizedSatoshis,
     });
     return tx.toPSBT(0);
   }
@@ -65,19 +84,18 @@ export class CosignScript {
 
   public getCosignPsbt(args: {
     utxoRef: { txid: string; vout: number };
-    releaseRequest: IReleaseRequest;
-    // Optional override for orphaned UTXOs that don't match the lock's expected amount.
-    utxoSatoshis?: bigint;
+    releaseRequest: IBitcoinReleaseRequest;
+    utxoSatoshis: bigint;
   }) {
     const { lock, network } = this;
     const { releaseRequest, utxoRef, utxoSatoshis } = args;
 
-    releaseRequest.toScriptPubkey = addressBytesHex(releaseRequest.toScriptPubkey, network);
+    const toScriptPubkey = addressBytesHex(releaseRequest.toScriptPubkey, network);
 
     const psbtStr = getCosignPsbt(
       utxoRef.txid,
       utxoRef.vout,
-      utxoSatoshis ?? lock.utxoSatoshis ?? lock.satoshis,
+      utxoSatoshis,
       lock.vaultPubkey,
       lock.vaultClaimPubkey,
       lock.ownerPubkey,
@@ -85,7 +103,7 @@ export class CosignScript {
       BigInt(lock.openClaimHeight),
       BigInt(lock.createdAtHeight),
       network,
-      releaseRequest.toScriptPubkey,
+      toScriptPubkey,
       releaseRequest.bitcoinNetworkFee,
     );
     return this.psbtFromHex(psbtStr);
@@ -109,7 +127,11 @@ export class CosignScript {
    * @param lock - The Bitcoin lock containing the vault information.
    * @param vaultXpriv - The vault's extended private key of which the xpub was used to create the vault.
    */
-  public vaultCosignPsbt(psbt: Transaction, lock: IBitcoinLock, vaultXpriv: HDKey): Transaction {
+  public vaultCosignPsbt(
+    psbt: Transaction,
+    lock: ICosignScriptLock,
+    vaultXpriv: HDKey,
+  ): Transaction {
     const parentFingerprint = lock.vaultXpubSources.parentFingerprint;
     const vaultFingerprint = vaultXpriv.identifier?.slice(0, 4);
     if (!vaultFingerprint) {
@@ -147,9 +169,10 @@ export class CosignScript {
    * Cosigns the transaction.
    */
   public cosignAndGenerateTx(args: {
-    releaseRequest: IReleaseRequest;
+    releaseRequest: IBitcoinReleaseRequest;
     vaultCosignature: Uint8Array;
     utxoRef: { txid: string; vout: number };
+    utxoSatoshis: bigint;
     ownerXpriv: HDKey;
     ownerXprivChildHdPath?: string;
     addTx?: string;

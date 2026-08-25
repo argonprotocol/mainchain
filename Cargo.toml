@@ -5,7 +5,8 @@ members = [
     "node/consensus",
     "node/bitcoin_utxo_tracker",
     "node/randomx",
-    "pallets/bitcoin_locks",
+	"pallets/bitcoin_locks",
+	"pallets/bitcoin_fissions",
     "pallets/bitcoin_utxos",
     "pallets/bootstrap",
     "pallets/block_rewards",
@@ -276,6 +277,7 @@ argon-primitives = { path = "primitives", default-features = false }
 pallet-block-seal = { path = "pallets/block_seal", default-features = false }
 pallet-block-seal-spec = { path = "pallets/block_seal_spec", default-features = false }
 pallet-bitcoin-locks = { path = "pallets/bitcoin_locks", default-features = false }
+pallet-bitcoin-fissions = { path = "pallets/bitcoin_fissions", default-features = false }
 pallet-bitcoin-utxos = { path = "pallets/bitcoin_utxos", default-features = false }
 pallet-block-rewards = { path = "pallets/block_rewards", default-features = false }
 pallet-localchain-transfer = { path = "pallets/localchain_transfer", default-features = false }

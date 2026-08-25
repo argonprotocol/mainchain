@@ -30,6 +30,10 @@ impl OperationalAccountsHook<TestAccountId, Balance> for TestOperationalAccounts
 		Weight::zero()
 	}
 
+	fn account_bitcoin_amount_changed_weight() -> Weight {
+		Weight::zero()
+	}
+
 	fn account_vault_bond_total_updated_weight() -> Weight {
 		Weight::zero()
 	}
@@ -180,7 +184,7 @@ parameter_types! {
 #[derive(Clone)]
 pub struct TestVault {
 	pub securitization: Balance,
-	pub securitized_satoshis: Satoshis,
+	pub eligible_satoshis: Satoshis,
 	pub sharing_percent: Permill,
 	pub account_id: TestAccountId,
 	pub delegate_account_id: Option<TestAccountId>,
@@ -228,10 +232,10 @@ impl TreasuryVaultProvider for StaticTreasuryVaultProvider {
 	type Balance = Balance;
 	type AccountId = TestAccountId;
 
-	fn get_securitization_and_securitized_satoshis(vault_id: VaultId) -> (Self::Balance, Satoshis) {
+	fn get_eligible_capacity(vault_id: VaultId) -> (Self::Balance, Satoshis) {
 		VaultsById::get()
 			.get(&vault_id)
-			.map(|vault| (vault.securitization, vault.securitized_satoshis))
+			.map(|vault| (vault.securitization, vault.eligible_satoshis))
 			.unwrap_or_default()
 	}
 

@@ -16,7 +16,7 @@ use frame_support::traits::Currency;
 use pallet_bitcoin_locks::BitcoinVerifier;
 use pallet_prelude::{
 	argon_primitives::{
-		ArgonCPI, BitcoinUtxoTracker, MiningFrameTransitionProvider, PriceProvider, UtxoLockEvents,
+		ArgonCPI, BitcoinUtxoTracker, MiningFrameTransitionProvider, PriceProvider,
 	},
 	*,
 };
@@ -215,7 +215,7 @@ impl pallet_operational_accounts::Config for Test {
 	type MiningSeatsPerAccessCode = MiningSeatsPerAccessCode;
 	type VaultProvider = Vaults;
 	type MiningSlotProvider = MockMiningSlotProvider;
-	type BitcoinLocksProvider = ();
+	type BitcoinFissionsProvider = ();
 	type TreasuryPoolProvider = ();
 	type UniswapTransferProvider = ();
 	type Currency = Balances;
@@ -250,6 +250,10 @@ impl pallet_vaults::Config for Test {
 
 pub struct StaticBitcoinUtxoTracker;
 impl BitcoinUtxoTracker for StaticBitcoinUtxoTracker {
+	fn get_synched_height() -> BitcoinHeight {
+		0
+	}
+
 	fn unwatch_utxo(_utxo_id: UtxoId, utxo_ref: &UtxoRef) {
 		let _ = utxo_ref;
 	}
@@ -286,9 +290,6 @@ parameter_types! {
 	pub static NextUtxoId: UtxoId = 1;
 	pub static WatchedUtxosById: BTreeMap<UtxoId, BitcoinCosignScriptPubkey> = BTreeMap::new();
 
-	pub static LastLockEvent: Option<(UtxoId, u64, Balance)> = None;
-	pub static LastReleaseEvent: Option<(UtxoId, bool, Balance, Balance)> = None;
-
 	pub static CanceledLocks: Vec<(VaultId, Balance)> = Vec::new();
 
 	pub static ChargeFee: bool = false;
@@ -297,36 +298,6 @@ parameter_types! {
 
 	pub const TicksPerBitcoinBlock: u64 = 10;
 	pub const ArgonTicksPerDay: u64 = 1440;
-}
-
-pub struct EventHandler;
-impl UtxoLockEvents<u64, Balance> for EventHandler {
-	type Weights = ();
-
-	fn utxo_locked(
-		utxo_id: UtxoId,
-		account_id: &u64,
-		amount: Balance,
-	) -> Result<(), DispatchError> {
-		LastLockEvent::set(Some((utxo_id, *account_id, amount)));
-		Ok(())
-	}
-	fn utxo_released(
-		utxo_id: UtxoId,
-		_account_id: &u64,
-		remove_pending_mints: bool,
-		amount_burned: Balance,
-		original_liquidity_promised: Balance,
-	) -> DispatchResult {
-		LastReleaseEvent::set(Some((
-			utxo_id,
-			remove_pending_mints,
-			amount_burned,
-			original_liquidity_promised,
-		)));
-
-		Ok(())
-	}
 }
 
 pub struct StaticPriceProvider;
@@ -376,7 +347,7 @@ impl pallet_bitcoin_locks::Config for Test {
 	type Currency = Balances;
 	type Balance = Balance;
 	type RuntimeHoldReason = RuntimeHoldReason;
-	type LockEvents = (EventHandler,);
+	type FissionsProvider = ();
 	type BitcoinUtxoTracker = StaticBitcoinUtxoTracker;
 	type PriceProvider = StaticPriceProvider;
 	type BitcoinSignatureVerifier = StaticBitcoinVerifier;

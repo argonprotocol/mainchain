@@ -8,13 +8,13 @@ import {
   type EthereumBeaconHeaderDetailsResponse,
   type EthereumReceipt,
   type KeyringPair,
-  TxSubmitter,
   u8aToHex,
 } from '@argonprotocol/mainchain';
 import { privateKeyToAccount } from 'viem/accounts';
 import type { Hex, RpcTransactionReceipt } from 'viem';
 import { createWalletClient, defineChain, parseSignature } from 'viem';
 import TestEthereum from './TestEthereum';
+import { submitTx } from './submitTx';
 
 export async function signGatewayPermit(args: {
   account: ReturnType<typeof privateKeyToAccount>;
@@ -202,8 +202,7 @@ export async function syncEthereumVerifierUntilAnchorCovers(
     let shouldRetry = false;
     for (const tx of txs) {
       try {
-        const result = await new TxSubmitter(mainchainClient, tx, relayer).submit();
-        await result.waitForInFirstBlock;
+        await submitTx(mainchainClient, tx, relayer);
         lastRetryableError = undefined;
       } catch (error) {
         if (isRetryableEthereumVerifierSyncError(error)) {

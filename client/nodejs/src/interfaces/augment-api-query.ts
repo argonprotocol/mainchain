@@ -1,5 +1,4 @@
 // Auto-generated via `yarn polkadot-types-from-chain`, do not edit
-/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
@@ -64,6 +63,7 @@ import type {
   PalletBalancesAccountData,
   PalletBalancesBalanceLock,
   PalletBalancesReserveData,
+  PalletBitcoinFissionsFission,
   PalletBitcoinLocksLockReleaseRequest,
   PalletBitcoinLocksLockedBitcoin,
   PalletBitcoinLocksOrphanedUtxo,
@@ -210,6 +210,35 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       totalIssuance: AugmentedQuery<ApiType, () => Observable<u128>, []>;
     };
+    bitcoinFissions: {
+      /**
+       * Active Fission records addressed by their owner and owner-local Fission ID.
+       **/
+      fissionByOwnerAndId: AugmentedQuery<
+        ApiType,
+        (
+          arg1: AccountId32 | string | Uint8Array,
+          arg2: u64 | AnyNumber | Uint8Array,
+        ) => Observable<Option<PalletBitcoinFissionsFission>>,
+        [AccountId32, u64]
+      >;
+      /**
+       * Active Fission IDs allocating satoshis from each Lock.
+       **/
+      fissionIdsByLockId: AugmentedQuery<
+        ApiType,
+        (arg: u64 | AnyNumber | Uint8Array) => Observable<BTreeSet<u64>>,
+        [u64]
+      >;
+      /**
+       * Minimum Fission ID accepted from each owner.
+       **/
+      nextFissionIdByOwner: AugmentedQuery<
+        ApiType,
+        (arg: AccountId32 | string | Uint8Array) => Observable<u64>,
+        [AccountId32]
+      >;
+    };
     bitcoinLocks: {
       lastFeeCouponNonceByVaultAndAccount: AugmentedQuery<
         ApiType,
@@ -218,6 +247,14 @@ declare module '@polkadot/api-base/types/storage' {
           arg2: AccountId32 | string | Uint8Array,
         ) => Observable<Option<u64>>,
         [u32, AccountId32]
+      >;
+      /**
+       * Highest Bitcoin UTXO sync height processed for pending-funding expirations.
+       **/
+      lastPendingFundingExpirationHeight: AugmentedQuery<
+        ApiType,
+        () => Observable<Option<u64>>,
+        []
       >;
       /**
        * Utxos that have been requested to be cosigned for releasing
@@ -272,7 +309,7 @@ declare module '@polkadot/api-base/types/storage' {
         [u64]
       >;
       /**
-       * History of target microgons per btc.
+       * Recent target-normalized microgon values per BTC and their observed ticks.
        **/
       microgonPerBtcHistory: AugmentedQuery<
         ApiType,
@@ -280,7 +317,18 @@ declare module '@polkadot/api-base/types/storage' {
         []
       >;
       /**
-       * The minimum number of satoshis that can be locked
+       * Release amounts identified by the version 10 to 11 migration.
+       *
+       * Current release requests do not create currency holds. Each migrated entry is removed when
+       * its in-flight release request terminates.
+       **/
+      migratedReleaseHoldByUtxoId: AugmentedQuery<
+        ApiType,
+        (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<u128>>,
+        [u64]
+      >;
+      /**
+       * The minimum number of satoshis accepted in one watched funding UTXO.
        **/
       minimumSatoshis: AugmentedQuery<ApiType, () => Observable<u64>, []>;
       nextUtxoId: AugmentedQuery<ApiType, () => Observable<Option<u64>>, []>;

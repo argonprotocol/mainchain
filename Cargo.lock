@@ -880,6 +880,7 @@ dependencies = [
  "argon-runtime-common",
  "frame-benchmarking",
  "log",
+ "pallet-bitcoin-fissions",
  "pallet-bitcoin-locks",
  "pallet-bitcoin-utxos",
  "pallet-block-rewards",
@@ -1226,6 +1227,7 @@ dependencies = [
  "argon-runtime-common",
  "frame-benchmarking",
  "log",
+ "pallet-bitcoin-fissions",
  "pallet-bitcoin-locks",
  "pallet-bitcoin-utxos",
  "pallet-block-rewards",
@@ -1265,6 +1267,7 @@ dependencies = [
  "argon-primitives",
  "frame-benchmarking",
  "log",
+ "pallet-bitcoin-fissions",
  "pallet-bitcoin-locks",
  "pallet-bitcoin-utxos",
  "pallet-block-rewards",
@@ -10724,12 +10727,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-bitcoin-fissions"
+version = "1.4.12"
+dependencies = [
+ "argon-primitives",
+ "pallet-prelude",
+ "parity-scale-codec",
+ "polkadot-sdk",
+ "scale-info",
+]
+
+[[package]]
 name = "pallet-bitcoin-locks"
 version = "1.4.12"
 dependencies = [
  "argon-bitcoin",
  "argon-primitives",
  "bitcoin",
+ "pallet-bitcoin-fissions",
+ "pallet-bitcoin-utxos",
+ "pallet-mint",
  "pallet-prelude",
  "parity-scale-codec",
  "polkadot-sdk",

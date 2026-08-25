@@ -3,7 +3,7 @@
 use super::*;
 use frame_support::traits::Hooks;
 use pallet_prelude::{
-	argon_primitives::{bitcoin::UtxoId, UtxoLockEvents},
+	argon_primitives::{bitcoin::UtxoId, BitcoinFissionMinting},
 	benchmarking::{
 		set_benchmark_bitcoin_locks_runtime_state, set_benchmark_price_provider_state,
 		BenchmarkBitcoinLocksRuntimeState, BenchmarkPriceProviderState,
@@ -40,6 +40,7 @@ mod benchmarks {
 			PendingMintUtxosByIndex::<T>::insert(
 				i as MintIndex,
 				PendingMintUtxo::<T> {
+					fission_id: 0,
 					utxo_id,
 					account_id,
 					remaining_amount: queued_amount,
@@ -94,7 +95,7 @@ mod benchmarks {
 	}
 
 	#[benchmark]
-	fn provider_utxo_locked() -> Result<(), BenchmarkError> {
+	fn provider_mint_requested() -> Result<(), BenchmarkError> {
 		let utxo_id = 1u64;
 		let account_id: T::AccountId = account("mint-provider-lock", 0, 0);
 		let amount = T::Balance::from(100u128);
@@ -104,6 +105,7 @@ mod benchmarks {
 			PendingMintUtxosByIndex::<T>::insert(
 				i as MintIndex,
 				PendingMintUtxo::<T> {
+					fission_id: 0,
 					utxo_id,
 					account_id: account_id.clone(),
 					remaining_amount: amount,
@@ -120,9 +122,10 @@ mod benchmarks {
 
 		#[block]
 		{
-			<Pallet<T> as UtxoLockEvents<T::AccountId, T::Balance>>::utxo_locked(
-				utxo_id,
+			<Pallet<T> as BitcoinFissionMinting<T::AccountId, T::Balance>>::request_mint(
 				&account_id,
+				0,
+				utxo_id,
 				amount,
 			)?;
 		}
@@ -135,67 +138,18 @@ mod benchmarks {
 	}
 
 	#[benchmark]
-	fn provider_utxo_released() -> Result<(), BenchmarkError> {
-		let account_id: T::AccountId = account("mint-provider-release", 0, 0);
-		let amount_burned = T::Balance::from(100u128);
-		MintedBitcoinMicrogons::<T>::put(amount_burned);
-
-		#[block]
-		{
-			<Pallet<T> as UtxoLockEvents<T::AccountId, T::Balance>>::utxo_released(
-				1u64,
-				&account_id,
-				false,
-				amount_burned,
-				amount_burned,
-			)?;
-		}
-
-		assert_eq!(MintedBitcoinMicrogons::<T>::get(), T::Balance::zero());
-
-		Ok(())
-	}
-
-	#[benchmark]
-	fn provider_utxo_released_with_pending_mints() -> Result<(), BenchmarkError> {
-		let utxo_id = 1u64;
-		let account_id: T::AccountId = account("mint-provider-release", 0, 0);
+	fn provider_mint_repaid() -> Result<(), BenchmarkError> {
 		let amount = T::Balance::from(100u128);
-		let pending_count = T::MaxPendingMintsPerUtxo::get();
-
-		for i in 0..pending_count {
-			PendingMintUtxosByIndex::<T>::insert(
-				i as MintIndex,
-				PendingMintUtxo::<T> {
-					utxo_id,
-					account_id: account_id.clone(),
-					remaining_amount: amount,
-					max_amount_per_frame: Pallet::<T>::get_bitcoin_mint_payout_cap(amount),
-				},
-			);
-			PendingMintUtxoIdLookup::<T>::try_mutate(utxo_id, |pending_indices| {
-				pending_indices
-					.try_push(i as MintIndex)
-					.map_err(|_| BenchmarkError::Stop("pending mint lookup capacity exceeded"))
-			})?;
-		}
 		MintedBitcoinMicrogons::<T>::put(amount);
 
 		#[block]
 		{
-			<Pallet<T> as UtxoLockEvents<T::AccountId, T::Balance>>::utxo_released(
-				utxo_id,
-				&account_id,
-				true,
+			<Pallet<T> as BitcoinFissionMinting<T::AccountId, T::Balance>>::record_mint_repayment(
 				amount,
-				amount,
-			)?;
+			);
 		}
 
-		assert!(PendingMintUtxoIdLookup::<T>::get(utxo_id).is_empty());
-		for i in 0..pending_count {
-			assert!(!PendingMintUtxosByIndex::<T>::contains_key(i as MintIndex));
-		}
+		assert_eq!(MintedBitcoinMicrogons::<T>::get(), T::Balance::zero());
 
 		Ok(())
 	}

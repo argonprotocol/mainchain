@@ -1,9 +1,11 @@
-import { ArgonClient, Keyring, KeyringPair, TxSubmitter } from '@argonprotocol/mainchain';
+import { ArgonClient, Keyring, KeyringPair } from '@argonprotocol/mainchain';
 import TestNotary from './TestNotary';
 import TestMainchain from './TestMainchain';
 import TestOracle from './TestOracle';
 import TestEthereum from './TestEthereum';
 import { startNetwork } from './TestNetwork';
+import { submitTx } from './submitTx';
+export { submitTx, type TestTxResult } from './submitTx';
 export {
   addTeardown,
   cleanHostForDocker,
@@ -62,10 +64,9 @@ export function sudo(): KeyringPair {
 
 export async function activateNotary(sudo: KeyringPair, client: ArgonClient, notary: TestNotary) {
   await notary.register(client);
-  const txResult = await new TxSubmitter(
+  await submitTx(
     client,
     client.tx.sudo.sudo(client.tx.notaries.activate(notary.operator!.publicKey)),
     sudo,
-  ).submit();
-  await txResult.waitForInFirstBlock;
+  );
 }

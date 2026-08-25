@@ -1,5 +1,4 @@
 // Auto-generated via `yarn polkadot-types-from-chain`, do not edit
-/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
@@ -50,6 +49,16 @@ declare module '@polkadot/api-base/types/consts' {
        * Use of reserves is deprecated in favour of holds. See `https://github.com/paritytech/substrate/pull/12951/`
        **/
       maxReserves: u32 & AugmentedConst<ApiType>;
+    };
+    bitcoinFissions: {
+      /**
+       * Maximum number of active Fissions that may allocate satoshis from one Lock.
+       **/
+      maxFissionsPerLock: u32 & AugmentedConst<ApiType>;
+      /**
+       * Minimum percentage change required to ratchet a Fission.
+       **/
+      minimumRatchetPercent: Percent & AugmentedConst<ApiType>;
     };
     bitcoinLocks: {
       /**

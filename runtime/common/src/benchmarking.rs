@@ -14,15 +14,17 @@ use argon_bitcoin::CosignReleaser;
 use argon_primitives::{
 	bitcoin::{
 		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinSignature, BitcoinXPub,
-		CompressedBitcoinPubkey, UtxoId,
+		CompressedBitcoinPubkey, FissionId, Satoshis, UtxoId,
 	},
 	block_seal::FrameId,
 	ethereum::{EthereumBlockNumber, EthereumReceiptLogProofBatch, EthereumVerifyError},
+	prelude::Tick,
 	vault::{
-		BitcoinVaultProvider, LockExtension, RegistrationVaultData, Securitization, VaultError,
-		VaultLockRequest,
+		BitcoinSecuritization, BitcoinVaultProvider, LockExtension, LostBitcoinCompensation,
+		RegistrationVaultData, ReserveSecuritizationRequest, VaultError,
 	},
-	BitcoinLocksProvider, EthereumVerifyProvider, MiningSlotProvider, Moment,
+	BitcoinFissionLockError, BitcoinFissionLockProvider, BitcoinFissionMinting,
+	BitcoinFissionsProvider, EthereumVerifyProvider, MiningSlotProvider, Moment,
 	OperationalAccountProvider, TreasuryPoolProvider, UniswapTransferProvider, VaultId,
 };
 use pallet_bitcoin_locks::BitcoinVerifier;
@@ -31,9 +33,8 @@ pub use pallet_prelude::benchmarking::{
 	reset_benchmark_bitcoin_locks_runtime_state, reset_benchmark_bitcoin_utxo_tracker_state,
 	reset_benchmark_bitcoin_vault_provider_state,
 	reset_benchmark_operational_rewards_provider_state, reset_benchmark_price_provider_state,
-	reset_benchmark_utxo_lock_events_state, set_benchmark_bitcoin_locks_runtime_state,
-	set_benchmark_bitcoin_utxo_tracker_state, set_benchmark_bitcoin_vault_provider_state,
-	set_benchmark_operational_accounts_provider_state,
+	set_benchmark_bitcoin_locks_runtime_state, set_benchmark_bitcoin_utxo_tracker_state,
+	set_benchmark_bitcoin_vault_provider_state, set_benchmark_operational_accounts_provider_state,
 	set_benchmark_operational_rewards_provider_state, set_benchmark_price_provider_state,
 	BenchmarkAuthorityProvider, BenchmarkBitcoinBlockHeightChange,
 	BenchmarkBitcoinLocksRuntimeState, BenchmarkBitcoinNetwork, BenchmarkBitcoinUtxoTracker,
@@ -44,7 +45,6 @@ pub use pallet_prelude::benchmarking::{
 	BenchmarkOperationalAccountsProviderState, BenchmarkOperationalRewardsPayer,
 	BenchmarkOperationalRewardsProvider, BenchmarkOperationalRewardsProviderState,
 	BenchmarkPriceProvider, BenchmarkPriceProviderState, BenchmarkTickProvider,
-	BenchmarkUtxoLockEvents,
 };
 use pallet_prelude::DispatchResult;
 
@@ -57,6 +57,75 @@ impl<T: pallet_bitcoin_locks::Config> BitcoinVerifier<T> for BenchmarkBitcoinSig
 	) -> Result<bool, DispatchError> {
 		Ok(true)
 	}
+}
+
+pub struct BenchmarkBitcoinFissionLockProvider<AccountId, Balance>(
+	PhantomData<(AccountId, Balance)>,
+);
+impl<AccountId, Balance> BitcoinFissionLockProvider<AccountId, Balance>
+	for BenchmarkBitcoinFissionLockProvider<AccountId, Balance>
+where
+	Balance: From<u128>,
+{
+	type Weights = ();
+
+	fn fission_satoshis(
+		_account_id: &AccountId,
+		_utxo_id: UtxoId,
+		satoshis: Satoshis,
+		_microgons_at_target_per_btc: Balance,
+	) -> Result<(Balance, Tick), BitcoinFissionLockError> {
+		Ok((Balance::from(satoshis as u128), 0))
+	}
+
+	fn validate_fission(
+		_account_id: &AccountId,
+		_utxo_id: UtxoId,
+		_satoshis: Satoshis,
+		_microgons_at_target_per_btc: Balance,
+		minimum_last_ratchet_tick: Tick,
+		_current_liquidity_promised: Balance,
+		_replacement_liquidity_promised: Balance,
+	) -> Result<Tick, BitcoinFissionLockError> {
+		Ok(minimum_last_ratchet_tick)
+	}
+
+	fn calculate_liquidity_promised(
+		satoshis: Satoshis,
+		_microgons_at_target_per_btc: Balance,
+	) -> Result<Balance, BitcoinFissionLockError> {
+		Ok(Balance::from(satoshis as u128))
+	}
+
+	fn fuse_satoshis(
+		_account_id: &AccountId,
+		_utxo_id: UtxoId,
+		satoshis: Satoshis,
+		_microgons_at_target_per_btc: Balance,
+	) -> Result<Balance, BitcoinFissionLockError> {
+		Ok(Balance::from(satoshis as u128))
+	}
+}
+
+pub struct BenchmarkBitcoinFissionMinting<AccountId, Balance>(PhantomData<(AccountId, Balance)>);
+impl<AccountId, Balance> BitcoinFissionMinting<AccountId, Balance>
+	for BenchmarkBitcoinFissionMinting<AccountId, Balance>
+where
+	AccountId: codec::Codec,
+	Balance: codec::Codec + Copy,
+{
+	type Weights = ();
+
+	fn request_mint(
+		_account_id: &AccountId,
+		_fission_id: FissionId,
+		_utxo_id: UtxoId,
+		_amount: Balance,
+	) -> DispatchResult {
+		Ok(())
+	}
+
+	fn record_mint_repayment(_amount: Balance) {}
 }
 
 pub struct BenchmarkCrosschainTransferEthereumVerifier;
@@ -178,10 +247,10 @@ where
 		Err(VaultError::VaultNotFound)
 	}
 
-	fn add_securitized_satoshis(
+	fn activate_securitization(
 		_vault_id: VaultId,
-		_satoshis: argon_primitives::bitcoin::Satoshis,
-		_securitization_ratio: FixedU128,
+		_securitization: &BitcoinSecuritization<Self::Balance>,
+		_funded_satoshis: argon_primitives::bitcoin::Satoshis,
 	) -> Result<(), VaultError> {
 		Err(VaultError::VaultNotFound)
 	}
@@ -196,26 +265,26 @@ where
 
 	fn set_bitcoin_lock_flexible(
 		_vault_id: VaultId,
-		_securitization: &Securitization<Self::Balance>,
-		_satoshis: argon_primitives::bitcoin::Satoshis,
+		_securitization: &BitcoinSecuritization<Self::Balance>,
+		_funded_satoshis: argon_primitives::bitcoin::Satoshis,
 		_is_flexible: bool,
 	) -> Result<(), VaultError> {
 		Err(VaultError::VaultNotFound)
 	}
 
-	fn lock(
+	fn reserve_securitization(
 		_vault_id: VaultId,
 		_locker: &Self::AccountId,
-		_securitization: &Securitization<Self::Balance>,
-		_request: VaultLockRequest<'_, Self::Balance>,
+		_securitization: &BitcoinSecuritization<Self::Balance>,
+		_request: ReserveSecuritizationRequest<Self::Balance>,
 	) -> Result<(Self::Balance, Self::Balance), VaultError> {
 		Err(VaultError::VaultNotFound)
 	}
 
-	fn schedule_for_release(
+	fn schedule_securitization_release(
 		_vault_id: VaultId,
-		_securitization: &Securitization<Self::Balance>,
-		_satoshis: argon_primitives::bitcoin::Satoshis,
+		_securitization: &BitcoinSecuritization<Self::Balance>,
+		_funded_satoshis: argon_primitives::bitcoin::Satoshis,
 		_lock_extension: &LockExtension<Self::Balance>,
 		_is_flexible: bool,
 	) -> Result<(), VaultError> {
@@ -224,15 +293,15 @@ where
 
 	fn return_securitization(
 		_vault_id: VaultId,
-		_securitization: &Securitization<Self::Balance>,
+		_securitization: &BitcoinSecuritization<Self::Balance>,
 	) -> Result<(), VaultError> {
 		Err(VaultError::VaultNotFound)
 	}
 
 	fn burn(
 		_vault_id: VaultId,
-		_securitization: &Securitization<Self::Balance>,
-		_satoshis: argon_primitives::bitcoin::Satoshis,
+		_securitization: &BitcoinSecuritization<Self::Balance>,
+		_funded_satoshis: argon_primitives::bitcoin::Satoshis,
 		_market_rate: Self::Balance,
 		_lock_extension: &LockExtension<Self::Balance>,
 		_is_flexible: bool,
@@ -243,12 +312,12 @@ where
 	fn compensate_lost_bitcoin(
 		_vault_id: VaultId,
 		_beneficiary: &Self::AccountId,
-		_securitization: &Securitization<Self::Balance>,
-		_satoshis: argon_primitives::bitcoin::Satoshis,
+		_securitization: &BitcoinSecuritization<Self::Balance>,
+		_funded_satoshis: argon_primitives::bitcoin::Satoshis,
 		_market_rate: Self::Balance,
 		_lock_extension: &LockExtension<Self::Balance>,
 		_is_flexible: bool,
-	) -> Result<Self::Balance, VaultError> {
+	) -> Result<LostBitcoinCompensation<Self::Balance>, VaultError> {
 		Err(VaultError::VaultNotFound)
 	}
 
@@ -259,13 +328,6 @@ where
 		_open_claim_height: BitcoinHeight,
 		_current_height: BitcoinHeight,
 	) -> Result<(BitcoinXPub, BitcoinXPub, BitcoinCosignScriptPubkey), VaultError> {
-		Err(VaultError::VaultNotFound)
-	}
-
-	fn remove_pending(
-		_vault_id: VaultId,
-		_securitization: &Securitization<Self::Balance>,
-	) -> Result<(), VaultError> {
 		Err(VaultError::VaultNotFound)
 	}
 
@@ -304,21 +366,21 @@ impl<AccountId> MiningSlotProvider<AccountId>
 	}
 }
 
-pub struct BenchmarkOperationalAccountsBitcoinLocksProvider<AccountId, Balance>(
+pub struct BenchmarkOperationalAccountsBitcoinFissionsProvider<AccountId, Balance>(
 	PhantomData<(AccountId, Balance)>,
 );
 
-impl<AccountId, Balance> BitcoinLocksProvider<AccountId, Balance>
-	for BenchmarkOperationalAccountsBitcoinLocksProvider<AccountId, Balance>
+impl<AccountId, Balance> BitcoinFissionsProvider<AccountId, Balance>
+	for BenchmarkOperationalAccountsBitcoinFissionsProvider<AccountId, Balance>
 where
 	Balance: From<u128>,
 {
 	type Weights = ();
 
-	fn get_account_funded_bitcoin_amount(_account_id: &AccountId) -> Balance {
+	fn get_account_fission_liquidity(_account_id: &AccountId) -> Balance {
 		let mut state = benchmark_operational_accounts_provider_state();
-		state.call_counters.get_account_funded_bitcoin_amount =
-			state.call_counters.get_account_funded_bitcoin_amount.saturating_add(1);
+		state.call_counters.get_account_fission_liquidity =
+			state.call_counters.get_account_fission_liquidity.saturating_add(1);
 		let result = state.account_bitcoin_amount.into();
 		set_benchmark_operational_accounts_provider_state(state);
 		result

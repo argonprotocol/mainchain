@@ -42,8 +42,8 @@ const PROOF_RELAYER_URI = '//Charlie';
 const ACTIVATION_RELAYER_URI = '//Ferdie';
 const QUEUE_RELAY_OPERATOR_URI = '//Dave';
 const ROUNDTRIP_ETHEREUM_RECIPIENT_PRIVATE_KEY = repeatByteHex('03', 32);
-const TEST_VAULT_XPUB =
-  'tpubD8t2diXwgDwRaNt8NNY6pb19U3SwmUzxFhFtSaKb79cfkPqqWX8vSqPzsW2NkhkMsxye6fuB2wNqs5sGTZPpM63UaAb3e69LvNcFpci6JZt';
+const TEST_VAULT_XPUB_BYTES_HEX =
+  '0x043587cf015436d724800000008f5e2b22b8e08d61a920bc2006ccd532b6e1304ce07b3a28d86c3595db6fed2303ca6a577de236ac2477e0fc7b6e93ba5df2e4556845952446645114d002c4add2';
 const QUEUE_RELAY_COUNCIL_PRIVATE_KEY = repeatByteHex('01', 32);
 const QUEUE_RELAY_AUTHORITY_PRIVATE_KEY = repeatByteHex('02', 32);
 
@@ -97,7 +97,7 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
         freeBalance: 3_000_000_000n,
         ownershipBalance: 5_000_000n,
         committedArgonots: 1_000_000n,
-        bitcoinXpub: TEST_VAULT_XPUB,
+        bitcoinXpubBytesHex: TEST_VAULT_XPUB_BYTES_HEX,
       });
       await authorityActor.registerCouncilSigner();
 

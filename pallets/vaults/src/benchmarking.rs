@@ -4,12 +4,14 @@ use super::*;
 use argon_bitcoin::{derive_xpub, xpriv_from_seed};
 use argon_primitives::{
 	bitcoin::{BitcoinHeight, OpaqueBitcoinXpub},
-	vault::{Securitization, VaultTerms},
+	vault::{
+		BitcoinResecuritization, BitcoinSecuritization, LockExtension, VaultTerms,
+		MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES,
+	},
 };
 use frame_benchmarking::v2::*;
 use frame_system::RawOrigin;
 
-const MAX_RELEASE_SCHEDULE_ENTRIES: u32 = 366;
 // on_frame_start and on_initialize_with_vault_releases are linear in v. Runtime charging uses
 // T::MaxVaults in on_frame_start_weight, so a smaller benchmark cap is enough to fit the slope.
 const MAX_RELEASE_COMPLETIONS: u32 = 100;
@@ -128,7 +130,7 @@ mod benchmarks {
 		seed_release_schedule_for_benchmark::<T>(
 			vault_id,
 			30_000,
-			MAX_RELEASE_SCHEDULE_ENTRIES,
+			MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES,
 			100u128.into(),
 			200_000u128.into(),
 			100_000u128.into(),
@@ -184,7 +186,7 @@ mod benchmarks {
 		seed_release_schedule_for_benchmark::<T>(
 			vault_id,
 			40_000,
-			MAX_RELEASE_SCHEDULE_ENTRIES,
+			MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES,
 			100u128.into(),
 			200_000u128.into(),
 			100_000u128.into(),
@@ -392,9 +394,14 @@ mod benchmarks {
 			let vault = vault.as_mut().expect("benchmark vault should exist");
 			vault.securitization_locked = collateral_required;
 			vault.locked_satoshis = satoshis;
-			vault.securitized_satoshis = satoshis;
+			vault.ratio_adjusted_satoshis = satoshis;
 		});
-		let securitization = Securitization::new(collateral_required, FixedU128::one());
+		let securitization = BitcoinSecuritization {
+			securitized_satoshis: satoshis,
+			microgons_at_target_per_btc: 100_000_000u128.into(),
+			securitization_coverage_microgons: collateral_required,
+			securitization_ratio: FixedU128::one(),
+		};
 
 		#[block]
 		{
@@ -410,7 +417,77 @@ mod benchmarks {
 		let vault = VaultsById::<T>::get(vault_id)
 			.ok_or(BenchmarkError::Stop("vault missing after flexible lock update"))?;
 		assert_eq!(vault.flexible_securitization_locked, collateral_required);
-		assert_eq!(vault.flexible_securitized_satoshis, satoshis);
+		assert_eq!(vault.flexible_ratio_adjusted_satoshis, satoshis);
+		Ok(())
+	}
+
+	#[benchmark]
+	fn provider_resecuritize(
+		e: Linear<1, MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES>,
+	) -> Result<(), BenchmarkError> {
+		let operator: T::AccountId = account("provider_resecuritize_operator", 0, 0);
+		let locker: T::AccountId = account("provider_resecuritize_locker", 0, 0);
+		let current = BitcoinSecuritization {
+			securitized_satoshis: 5_000,
+			microgons_at_target_per_btc: 100_000_000u128.into(),
+			securitization_coverage_microgons: 5_000u128.into(),
+			securitization_ratio: FixedU128::one(),
+		};
+		let replacement_satoshis = 5_000u64.saturating_add(u64::from(e).saturating_mul(1_000));
+		let replacement = BitcoinSecuritization {
+			securitized_satoshis: replacement_satoshis,
+			securitization_coverage_microgons: u128::from(replacement_satoshis).into(),
+			..current
+		};
+		let vault_id =
+			create_vault::<T>(&operator, 11, u128::from(replacement.securitized_satoshis))?;
+		let _ = T::Currency::mint_into(&locker, 1_000_000u128.into());
+		let funded_satoshis = 10_000;
+		VaultsById::<T>::try_mutate(vault_id, |vault| {
+			let vault =
+				vault.as_mut().ok_or(BenchmarkError::Stop("benchmark vault should exist"))?;
+			vault
+				.reserve_securitization(&current, true)
+				.map_err(|_| BenchmarkError::Stop("failed to reserve current securitization"))?;
+			vault
+				.activate_securitization(&current, funded_satoshis)
+				.map_err(|_| BenchmarkError::Stop("failed to activate current securitization"))?;
+			Ok::<_, BenchmarkError>(())
+		})?;
+		let mut lock_extension = LockExtension::new(144);
+		seed_release_schedule_for_benchmark::<T>(
+			vault_id,
+			lock_extension.expiration_day(),
+			e,
+			1_000u128.into(),
+			current.collateral_required(),
+			replacement.collateral_required(),
+		)?;
+
+		#[block]
+		{
+			<Pallet<T> as BitcoinVaultProvider>::resecuritize(
+				vault_id,
+				&locker,
+				BitcoinResecuritization {
+					current: &current,
+					replacement: &replacement,
+					funded_satoshis,
+					remaining_term: FixedU128::one(),
+					lock_extension: &mut lock_extension,
+					is_flexible: false,
+					fee_discount: T::Balance::zero(),
+					securitization_space_to_unreserve: T::Balance::zero(),
+				},
+			)
+			.map_err(|_| BenchmarkError::Stop("failed to resecuritize Bitcoin lock"))?;
+		}
+
+		let vault = VaultsById::<T>::get(vault_id)
+			.ok_or(BenchmarkError::Stop("vault missing after resecuritization"))?;
+		assert_eq!(vault.locked_satoshis, funded_satoshis);
+		assert_eq!(vault.ratio_adjusted_satoshis, replacement.eligible_satoshis(funded_satoshis));
+		assert_eq!(vault.securitization_locked, replacement.collateral_required());
 		Ok(())
 	}
 
@@ -601,7 +678,7 @@ mod benchmarks {
 			seed_release_schedule_for_benchmark::<T>(
 				vault_id,
 				release_height,
-				MAX_RELEASE_SCHEDULE_ENTRIES,
+				MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES,
 				release_amount,
 				200_000u128.into(),
 				100_000u128.into(),

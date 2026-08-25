@@ -150,6 +150,9 @@ pub struct UtxoRef {
 }
 
 pub type UtxoId = u64;
+pub type FissionId = u64;
+pub type LiquidId = u64;
+
 #[derive(
 	Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen,
 )]

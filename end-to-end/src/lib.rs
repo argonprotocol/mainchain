@@ -110,7 +110,7 @@ pub(crate) mod utils {
 	) -> anyhow::Result<TxInBlockWithEvents> {
 		let from = Sr25519Signer::new(Alice.pair());
 		let client = test_node.client.clone();
-		let params = client.params_with_best_nonce(&from.account_id()).await?.build();
+		let params = client.params_with_best_nonce(&from.account_id()).await?.immortal().build();
 		test_node
 			.client
 			.submit_tx(&tx().sudo().sudo(call), &from, Some(params), wait_for_finalized)
