@@ -823,7 +823,7 @@ fn benchmark_vault<T: Config>(
 	operator_account_id: T::AccountId,
 	securitized_bonds: Bonds,
 ) -> Vault<T::AccountId, T::Balance> {
-	let securitized_satoshis = ((securitized_bonds as u128).saturating_mul(MICROGONS_PER_ARGON))
+	let eligible_satoshis = ((securitized_bonds as u128).saturating_mul(MICROGONS_PER_ARGON))
 		.min(u64::MAX as u128) as Satoshis;
 
 	Vault {
@@ -836,8 +836,8 @@ fn benchmark_vault<T: Config>(
 		reserved_securitization_space: TreasuryBalanceOf::<T>::zero(),
 		securitization_pending_activation: TreasuryBalanceOf::<T>::zero(),
 		locked_satoshis: 0,
-		securitized_satoshis,
-		flexible_securitized_satoshis: 0,
+		ratio_adjusted_satoshis: eligible_satoshis,
+		flexible_ratio_adjusted_satoshis: 0,
 		securitization_release_schedule: Default::default(),
 		securitization_ratio: FixedU128::one(),
 		is_closed: false,

@@ -1,4 +1,4 @@
-use crate::utils::{create_active_notary, register_miner_keys, register_miners, sudo};
+use crate::utils::{create_active_notary, sudo};
 use anyhow::anyhow;
 use argon_bitcoin::{
 	derive_pubkey, derive_xpub, xpriv_from_seed, CosignReleaser, CosignScript, CosignScriptArgs,
@@ -8,7 +8,12 @@ use argon_client::{
 	api::{
 		price_index::calls::types::submit::Index,
 		runtime_types::{
-			argon_runtime::RuntimeCall, sp_arithmetic::fixed_point::FixedU128 as FixedU128Ext,
+			argon_runtime::{RuntimeCall, RuntimeError},
+			pallet_bitcoin_fissions::pallet::Error as BitcoinFissionsError,
+			pallet_bitcoin_locks::pallet::{
+				Error as BitcoinLocksError, LockOptions as BitcoinLockOptions,
+			},
+			sp_arithmetic::fixed_point::FixedU128 as FixedU128Ext,
 		},
 		storage, tx,
 	},
@@ -19,7 +24,7 @@ use argon_client::{
 use argon_primitives::{
 	bitcoin::{
 		BitcoinCosignScriptPubkey, BitcoinNetwork, BitcoinScriptPubkey, BitcoinSignature,
-		CompressedBitcoinPubkey, H256Le, Satoshis, UtxoId,
+		CompressedBitcoinPubkey, FissionId, H256Le, LiquidId, Satoshis, UtxoId,
 	},
 	block_seal::MiningSlotConfig,
 	prelude::sp_core::Encode,
@@ -49,6 +54,7 @@ use sp_core::{crypto::AccountId32, sr25519, Pair};
 use sp_keyring::Sr25519Keyring::{Alice, Bob, Eve};
 use sp_runtime::Permill;
 use std::{str::FromStr, sync::Arc, time::Duration};
+use subxt::ext::scale_encode::EncodeAsType;
 use tokio::time::sleep;
 use url::Url;
 
@@ -62,7 +68,7 @@ async fn test_bitcoin_minting_e2e() {
 	let block_creator = add_wallet_address(bitcoind);
 	bitcoind.client.generate_to_address(101, &block_creator).unwrap();
 
-	// 1. Owner creates a new pubkey and submits to blockchain
+	println!("\n1. Create the Bitcoin owner key");
 	let network: BitcoinNetwork = test_node
 		.client
 		.fetch_storage(&storage().bitcoin_utxos().bitcoin_network(), FetchAt::Finalized)
@@ -93,6 +99,8 @@ async fn test_bitcoin_minting_e2e() {
 	let alice_sr25519 = Alice.pair();
 	let price_index_operator = Eve.pair();
 	let bitcoin_owner_pair = Bob.pair();
+	let bitcoin_owner_account_id: AccountId32 = bitcoin_owner_pair.public().into();
+	let bitcoin_owner_signer = Sr25519Signer::new(bitcoin_owner_pair.clone());
 
 	let client = test_node.client.clone();
 	let client = Arc::new(client);
@@ -107,18 +115,17 @@ async fn test_bitcoin_minting_e2e() {
 	let vault_owner = alice_sr25519.clone();
 	let vault_owner_account_id32: AccountId32 = vault_owner.public().into();
 
-	// 2. A vault is setup with enough funds
+	println!("\n2. Create a funded Vault");
 	let vault_id = create_vault(&test_node, &vault_xpub, &vault_owner_account_id32, &vault_signer)
 		.await
 		.unwrap();
 
 	let ticker = client.lookup_ticker().await.expect("ticker");
-	let mut last_bitcoin_price_tick = submit_price(&ticker, &client, &price_index_operator).await;
+	let mut last_bitcoin_price_tick =
+		submit_price(&ticker, &client, &price_index_operator, 62_000.0).await;
 
-	let alice_signer = Sr25519Signer::new(alice_sr25519.clone());
-
-	// 3. Owner calls api to request a bitcoin lock
-	let utxo_id = request_bitcoin_lock(
+	println!("\n3. Create a Bitcoin receive address backed by a Lock");
+	let utxo_id = create_receive_address(
 		&test_node,
 		vault_id,
 		utxo_satoshis,
@@ -128,7 +135,7 @@ async fn test_bitcoin_minting_e2e() {
 	.await
 	.unwrap();
 
-	let (script_address, lock_amount) = confirm_lock(
+	let (cosign_script_pubkey, microgons_at_target_per_btc) = verify_lock(
 		&secp,
 		owner_compressed_pubkey,
 		utxo_satoshis,
@@ -141,120 +148,49 @@ async fn test_bitcoin_minting_e2e() {
 	.await
 	.unwrap();
 
-	// 4. Owner funds the LockedBitcoin utxo and submits it
-	let scriptbuf: ScriptBuf = script_address.into();
-	let scriptaddress = bitcoin::Address::from_script(scriptbuf.as_script(), network).unwrap();
-	println!("Checking for {utxo_satoshis} satoshis to {scriptaddress}");
+	println!("\n4. Fund the Lock's Bitcoin address");
+	let funding_script_pubkey: ScriptBuf = cosign_script_pubkey.into();
+	let funding_address =
+		bitcoin::Address::from_script(funding_script_pubkey.as_script(), network).unwrap();
+	println!("Checking for {utxo_satoshis} satoshis to {funding_address}");
 
 	let (txid, vout, _) =
-		fund_script_address(bitcoind, &scriptaddress, utxo_satoshis, &block_creator);
+		fund_script_address(bitcoind, &funding_address, utxo_satoshis, &block_creator);
 
 	add_blocks(bitcoind, 5, &block_creator);
-	let vote_miner = Eve;
-	let vote_miner_account = vote_miner.to_account_id();
-	let miner_node = test_node.fork_node("eve", 0).await.unwrap();
-	// wait for miner_node to catch up
-
-	let finalized =
-		test_node.client.latest_finalized_block_hash().await.expect("should get latest");
-	let block_number = test_node
-		.client
-		.block_number(finalized.hash())
-		.await
-		.expect("should get number");
-	let mut miner_node_catchup_sub =
-		miner_node.client.live.blocks().subscribe_finalized().await.unwrap();
-	while let Some(next) = miner_node_catchup_sub.next().await {
-		let next = next.unwrap();
-		println!(
-			"Got next finalized catching up to main node {:?}. Waiting for {}",
-			next.header().number,
-			block_number
-		);
-		if next.hash().as_ref() == finalized.hash().as_ref() || next.number() >= block_number {
-			break;
-		}
-	}
-	let nonce_miner_node = miner_node.client.get_account_nonce(&vote_miner_account).await.unwrap();
-	let nonce_test_node = client.get_account_nonce(&vote_miner_account).await.unwrap();
-	assert_eq!(nonce_miner_node, nonce_test_node);
-	println!("System health of miner node {:?}", miner_node.client.methods.system_health().await);
-	let keys = register_miner_keys(&miner_node, vote_miner, 1)
-		.await
-		.expect("Couldn't register vote miner");
-
-	// Register the miner against the test node since we are having fork issues
-	register_miners(&test_node, alice_signer, vec![(vote_miner_account.clone(), keys)], None)
+	wait_for_lock_funding(&client, utxo_id, utxo_satoshis, txid, vout)
 		.await
 		.unwrap();
 
-	// increase the mining mint so we can match it without waiting
-	sudo(
-		&test_node,
-		RuntimeCall::System(
-			argon_client::api::runtime_types::frame_system::pallet::Call::set_storage {
-				items: vec![(
-					storage().mint().minted_mining_microgons().to_root_bytes(),
-					Balance::from(100_000_000_000u64).encode(),
-				)],
-			},
-		),
-		false,
+	let fission_id: FissionId = 1;
+	let second_fission_id: FissionId = 3;
+	let liquid_id: LiquidId = 1;
+	let fission_satoshis = utxo_satoshis / 2;
+	let second_fission_satoshis = utxo_satoshis - fission_satoshis;
+	println!("\n5. Create the first Fission and check its active constraints");
+	let liquidity_promised = create_first_fission_and_check_constraints(
+		bitcoind,
+		network,
+		&client,
+		&bitcoin_owner_signer,
+		&bitcoin_owner_account_id,
+		utxo_id,
+		fission_id,
+		liquid_id,
+		fission_satoshis,
+		microgons_at_target_per_btc,
 	)
-	.await
-	.unwrap();
+	.await;
 
-	// Speed up frame transitions so the 10%-per-frame mint payout completes within the e2e window.
-	let fetched_mining_config = client
-		.fetch_storage(&storage().mining_slot().mining_config(), FetchAt::Finalized)
-		.await
-		.unwrap()
-		.expect("mining config");
-	let original_mining_config = MiningSlotConfig {
-		ticks_between_slots: fetched_mining_config.ticks_between_slots,
-		ticks_before_bid_end_for_vrf_close: fetched_mining_config
-			.ticks_before_bid_end_for_vrf_close,
-		slot_bidding_start_after_ticks: fetched_mining_config.slot_bidding_start_after_ticks,
-	};
-	let original_frame_reward_ticks_remaining = client
-		.fetch_storage(&storage().mining_slot().frame_reward_ticks_remaining(), FetchAt::Finalized)
-		.await
-		.unwrap()
-		.expect("frame reward ticks remaining");
-	let mining_config = MiningSlotConfig {
-		ticks_between_slots: 1,
-		ticks_before_bid_end_for_vrf_close: original_mining_config
-			.ticks_before_bid_end_for_vrf_close,
-		slot_bidding_start_after_ticks: original_mining_config.slot_bidding_start_after_ticks,
-	};
-	sudo(
-		&test_node,
-		RuntimeCall::System(
-			argon_client::api::runtime_types::frame_system::pallet::Call::set_storage {
-				items: vec![
-					(
-						storage().mining_slot().mining_config().to_root_bytes(),
-						mining_config.encode(),
-					),
-					(
-						storage().mining_slot().frame_reward_ticks_remaining().to_root_bytes(),
-						1u64.encode(),
-					),
-				],
-			},
-		),
-		false,
-	)
-	.await
-	.unwrap();
+	let original_mining_cadence = speed_up_minting(&test_node, &client).await;
 
+	println!("\n6. Pay the first Fission's mint entitlement");
 	wait_for_mint(
 		&bitcoin_owner_pair,
 		&client,
 		&utxo_id,
-		lock_amount,
-		txid,
-		vout,
+		fission_id,
+		liquidity_promised,
 		&ticker,
 		&price_index_operator,
 		&mut last_bitcoin_price_tick,
@@ -262,41 +198,65 @@ async fn test_bitcoin_minting_e2e() {
 	.await
 	.unwrap();
 
-	// Restore the original frame cadence before the release flow so the cosign deadline timing
-	// matches the rest of the bitcoin lock lifecycle.
-	sudo(
-		&test_node,
-		RuntimeCall::System(
-			argon_client::api::runtime_types::frame_system::pallet::Call::set_storage {
-				items: vec![
-					(
-						storage().mining_slot().mining_config().to_root_bytes(),
-						original_mining_config.encode(),
-					),
-					(
-						storage().mining_slot().frame_reward_ticks_remaining().to_root_bytes(),
-						original_frame_reward_ticks_remaining.encode(),
-					),
-				],
-			},
-		),
-		false,
+	println!("\n7. Allocate the remaining Lock satoshis to a second Fission");
+	create_second_fission_and_check_allocation(
+		&bitcoin_owner_pair,
+		&client,
+		&bitcoin_owner_signer,
+		utxo_id,
+		fission_id,
+		second_fission_id,
+		liquid_id,
+		second_fission_satoshis,
+		microgons_at_target_per_btc,
+		utxo_satoshis,
+		&ticker,
+		&price_index_operator,
+		&mut last_bitcoin_price_tick,
 	)
 	.await
 	.unwrap();
 
-	println!("Submitting new bitcoin price");
+	println!("\n8. Ratchet the first Fission and pay its replacement entitlement");
+	ratchet_first_fission(
+		&client,
+		&ticker,
+		&price_index_operator,
+		&bitcoin_owner_signer,
+		&bitcoin_owner_pair,
+		&bitcoin_owner_account_id,
+		utxo_id,
+		fission_id,
+		utxo_satoshis,
+		microgons_at_target_per_btc,
+		liquidity_promised,
+		&mut last_bitcoin_price_tick,
+	)
+	.await
+	.unwrap();
+
+	println!("\n9. Close both Fissions and return their Lock allocations");
+	close_fissions(
+		&client,
+		&bitcoin_owner_signer,
+		&bitcoin_owner_account_id,
+		utxo_id,
+		fission_id,
+		second_fission_id,
+		second_fission_satoshis,
+	)
+	.await;
+	restore_mining_cadence(&test_node, original_mining_cadence).await;
+
 	submit_price_if_needed(&ticker, &client, &price_index_operator, &mut last_bitcoin_price_tick)
 		.await;
 
-	// 5. Ask for the bitcoin to be released
-	println!("\nOwner requests release");
+	println!("\n10. Request the Lock's Bitcoin release");
 	owner_requests_release(bitcoind, network, &bitcoin_owner_pair, &client, vault_id, utxo_id)
 		.await
 		.unwrap();
 
-	// 5. vault sees release request (outaddress, fee) and creates a transaction
-	println!("\nVault publishes cosign tx");
+	println!("\n11. Vault cosigns the release request");
 	vault_cosigns_release(
 		client.as_ref(),
 		&vault_signer,
@@ -308,8 +268,7 @@ async fn test_bitcoin_minting_e2e() {
 	.await
 	.unwrap();
 
-	println!("\nOwner sees the transaction and cosigns");
-	// 6. Owner sees the transaction and can submit it
+	println!("\n12. Owner cosigns and broadcasts the Bitcoin transaction");
 	owner_sees_signature_and_releases(
 		client.as_ref(),
 		bitcoind,
@@ -324,15 +283,13 @@ async fn test_bitcoin_minting_e2e() {
 
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
-async fn test_bitcoin_xpriv_lock_e2e() {
+async fn test_bitcoin_xpriv_release_e2e() {
 	let test_node = start_argon_test_node().await;
 	let bitcoind = test_node.bitcoind.as_ref().expect("bitcoind");
-	let (bitcoin_url, auth) = test_node.get_bitcoin_url();
-	let bitcoind_client = bitcoincore_rpc::Client::new(&bitcoin_url, auth).unwrap();
 	let block_creator = add_wallet_address(bitcoind);
 	bitcoind.client.generate_to_address(101, &block_creator).unwrap();
 
-	// 1. Owner creates a new pubkey and submits to blockchain
+	println!("\n1. Set up a Lock with an xpriv-derived owner key");
 	let network: BitcoinNetwork = test_node
 		.client
 		.fetch_storage(&storage().bitcoin_utxos().bitcoin_network(), FetchAt::Finalized)
@@ -342,7 +299,6 @@ async fn test_bitcoin_xpriv_lock_e2e() {
 		.unwrap()
 		.into();
 	let network: Network = network.into();
-	let secp = Secp256k1::new();
 
 	let (owner_xpriv, owner_compressed_pubkey, owner_hd_path) = create_xpriv_and_derive().unwrap();
 
@@ -364,16 +320,14 @@ async fn test_bitcoin_xpriv_lock_e2e() {
 	let vault_owner = alice_sr25519.clone();
 	let vault_owner_account_id32: AccountId32 = vault_owner.public().into();
 
-	// 2. A vault is setup with enough funds
 	let vault_id = create_vault(&test_node, &vault_xpub, &vault_owner_account_id32, &vault_signer)
 		.await
 		.unwrap();
 
 	let ticker = client.lookup_ticker().await.expect("ticker");
-	let mut last_bitcoin_price_tick = submit_price(&ticker, &client, &price_index_operator).await;
+	submit_price(&ticker, &client, &price_index_operator, 62_000.0).await;
 
-	// 3. Owner calls api to request a bitcoin lock
-	let utxo_id = request_bitcoin_lock(
+	let utxo_id = create_receive_address(
 		&test_node,
 		vault_id,
 		utxo_satoshis,
@@ -383,59 +337,33 @@ async fn test_bitcoin_xpriv_lock_e2e() {
 	.await
 	.unwrap();
 
-	let (script_address, _lock_amount) = confirm_lock(
-		&secp,
-		owner_compressed_pubkey,
-		utxo_satoshis,
-		&client,
-		&vault_xpub,
-		network,
-		vault_id,
-		&utxo_id,
-	)
-	.await
-	.unwrap();
+	let lock = client
+		.fetch_storage(&storage().bitcoin_locks().locks_by_utxo_id(utxo_id), FetchAt::Finalized)
+		.await
+		.unwrap()
+		.expect("xpriv-owned Lock");
+	let cosign_script_pubkey: BitcoinCosignScriptPubkey = lock.utxo_script_pubkey.into();
 
-	// 4. Owner funds the LockedBitcoin utxo and submits it
-	let scriptbuf: ScriptBuf = script_address.into();
-	let scriptaddress = bitcoin::Address::from_script(scriptbuf.as_script(), network).unwrap();
-	println!("Checking for {utxo_satoshis} satoshis to {scriptaddress}");
+	println!("\n2. Fund the xpriv-owned Lock");
+	let funding_script_pubkey: ScriptBuf = cosign_script_pubkey.into();
+	let funding_address =
+		bitcoin::Address::from_script(funding_script_pubkey.as_script(), network).unwrap();
+	println!("Checking for {utxo_satoshis} satoshis to {funding_address}");
 
-	let _ = fund_script_address(bitcoind, &scriptaddress, utxo_satoshis, &block_creator);
+	let (txid, vout, _) =
+		fund_script_address(bitcoind, &funding_address, utxo_satoshis, &block_creator);
 
 	add_blocks(bitcoind, 5, &block_creator);
-	let mut max_blocks = 100;
-	let mut block_sub = test_node.client.live.blocks().subscribe_finalized().await.unwrap();
-	while let Some(next) = block_sub.next().await {
-		let utxo_lock = test_node
-			.client
-			.fetch_storage(&storage().bitcoin_locks().locks_by_utxo_id(utxo_id), FetchAt::Finalized)
-			.await
-			.unwrap()
-			.expect("Utxo state should be present");
-		if utxo_lock.is_funded {
-			println!("Utxo lock is funded in block {:?}", next.unwrap().hash());
-			break;
-		}
-		println!("Waiting for utxo lock to be funded in block {:?}", next.unwrap().hash());
-		max_blocks -= 1;
-		if max_blocks == 0 {
-			panic!("No utxo lock funded after 100 blocks");
-		}
-	}
+	wait_for_lock_funding(&client, utxo_id, utxo_satoshis, txid, vout)
+		.await
+		.unwrap();
 
-	println!("Submitting new bitcoin price");
-	submit_price_if_needed(&ticker, &client, &price_index_operator, &mut last_bitcoin_price_tick)
-		.await;
-
-	// 5. Ask for the bitcoin to be releaseed
-	println!("\nOwner requests release");
+	println!("\n3. Request the Lock's Bitcoin release");
 	owner_requests_release(bitcoind, network, &bitcoin_owner_pair, &client, vault_id, utxo_id)
 		.await
 		.unwrap();
 
-	// 5. vault sees release request (outaddress, fee) and creates a transaction
-	println!("\nVault publishes cosign tx");
+	println!("\n4. Vault cosigns the release request");
 	vault_cosigns_release(
 		client.as_ref(),
 		&vault_signer,
@@ -447,12 +375,13 @@ async fn test_bitcoin_xpriv_lock_e2e() {
 	.await
 	.unwrap();
 
-	println!("\nOwner sees the transaction and cosigns");
+	println!("\n5. Owner signs the release with the xpriv and broadcasts it");
 	let (bitcoin_url, auth) = test_node.get_bitcoin_url();
-	let mut bitcoin_url = Url::parse(&bitcoin_url).unwrap();
+	let bitcoind_client = bitcoincore_rpc::Client::new(&bitcoin_url, auth.clone()).unwrap();
+	let mut authenticated_bitcoin_url = Url::parse(&bitcoin_url).unwrap();
 	if let Auth::UserPass(user, pass) = auth {
-		bitcoin_url.set_username(&user).unwrap();
-		bitcoin_url.set_password(Some(&pass)).unwrap();
+		authenticated_bitcoin_url.set_username(&user).unwrap();
+		authenticated_bitcoin_url.set_password(Some(&pass)).unwrap();
 	}
 	println!("Owner pubkey is {owner_compressed_pubkey}");
 	tokio::spawn(async move {
@@ -462,23 +391,599 @@ async fn test_bitcoin_xpriv_lock_e2e() {
 			sleep(Duration::from_secs(5)).await;
 		}
 	});
-	// 6. Owner sees the transaction and can submit it
 	owner_signs_and_releases(
 		client.as_ref(),
 		&utxo_id,
 		&owner_xpriv,
 		&owner_hd_path,
-		bitcoin_url.as_ref(),
+		authenticated_bitcoin_url.as_ref(),
 	)
 	.await
 	.unwrap();
 	drop(test_node);
 }
 
+#[allow(clippy::too_many_arguments)]
+async fn create_first_fission_and_check_constraints(
+	bitcoind: &BitcoinD,
+	network: Network,
+	client: &Arc<MainchainClient>,
+	bitcoin_owner_signer: &Sr25519Signer,
+	bitcoin_owner_account_id: &AccountId32,
+	utxo_id: UtxoId,
+	fission_id: FissionId,
+	liquid_id: LiquidId,
+	fission_satoshis: Satoshis,
+	microgons_at_target_per_btc: Balance,
+) -> Balance {
+	let liquidity_promised = create_fission(
+		client,
+		bitcoin_owner_signer,
+		utxo_id,
+		fission_id,
+		liquid_id,
+		fission_satoshis,
+		microgons_at_target_per_btc,
+	)
+	.await
+	.unwrap();
+
+	let release_address = bitcoind
+		.client
+		.get_new_address(Some("blocked-release"), Some(AddressType::Bech32m))
+		.unwrap()
+		.require_network(network)
+		.unwrap();
+	let release_script: BitcoinScriptPubkey = release_address.script_pubkey().into();
+	submit_rejected_bitcoin_call(
+		client,
+		bitcoin_owner_signer,
+		RuntimeCall::BitcoinLocks(
+			api::runtime_types::pallet_bitcoin_locks::pallet::Call::request_release {
+				utxo_id,
+				to_script_pubkey: release_script.into(),
+				bitcoin_network_fee: 0,
+			},
+		),
+		RuntimeError::BitcoinLocks(BitcoinLocksError::LockHasActiveFissions),
+	)
+	.await;
+	let release_request = client
+		.fetch_storage(
+			&storage().bitcoin_locks().lock_release_requests_by_utxo_id(utxo_id),
+			FetchAt::Best,
+		)
+		.await
+		.unwrap();
+	assert!(release_request.is_none());
+
+	submit_rejected_bitcoin_call(
+		client,
+		bitcoin_owner_signer,
+		RuntimeCall::BitcoinFissions(
+			api::runtime_types::pallet_bitcoin_fissions::pallet::Call::ratchet {
+				fission_id,
+				microgons_at_target_per_btc,
+			},
+		),
+		RuntimeError::BitcoinFissions(BitcoinFissionsError::NoRatchetingAvailable),
+	)
+	.await;
+	let unchanged_fission = client
+		.fetch_storage(
+			&storage()
+				.bitcoin_fissions()
+				.fission_by_owner_and_id(bitcoin_owner_account_id.clone().into(), fission_id),
+			FetchAt::Best,
+		)
+		.await
+		.unwrap()
+		.expect("active Fission");
+	assert_eq!(unchanged_fission.ratchet_number, 0);
+	assert_eq!(unchanged_fission.microgons_at_target_per_btc, microgons_at_target_per_btc);
+
+	liquidity_promised
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn create_second_fission_and_check_allocation(
+	bitcoin_owner: &sr25519::Pair,
+	client: &Arc<MainchainClient>,
+	bitcoin_owner_signer: &Sr25519Signer,
+	utxo_id: UtxoId,
+	first_fission_id: FissionId,
+	fission_id: FissionId,
+	liquid_id: LiquidId,
+	fission_satoshis: Satoshis,
+	microgons_at_target_per_btc: Balance,
+	total_fissioned_satoshis: Satoshis,
+	ticker: &Ticker,
+	price_index_operator: &sr25519::Pair,
+	last_submitted_tick: &mut Tick,
+) -> anyhow::Result<()> {
+	let liquidity_promised = create_fission(
+		client,
+		bitcoin_owner_signer,
+		utxo_id,
+		fission_id,
+		liquid_id,
+		fission_satoshis,
+		microgons_at_target_per_btc,
+	)
+	.await?;
+
+	wait_for_mint(
+		bitcoin_owner,
+		client,
+		&utxo_id,
+		fission_id,
+		liquidity_promised,
+		ticker,
+		price_index_operator,
+		last_submitted_tick,
+	)
+	.await?;
+
+	let active_fission_ids = client
+		.fetch_storage(&storage().bitcoin_fissions().fission_ids_by_lock_id(utxo_id), FetchAt::Best)
+		.await?
+		.expect("active Fission IDs");
+	assert_eq!(
+		active_fission_ids.0.into_iter().collect::<Vec<_>>(),
+		vec![first_fission_id, fission_id]
+	);
+
+	let lock = client
+		.fetch_storage(&storage().bitcoin_locks().locks_by_utxo_id(utxo_id), FetchAt::Best)
+		.await?
+		.expect("funded Lock");
+	assert_eq!(lock.fissioned_satoshis, total_fissioned_satoshis);
+
+	Ok(())
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn ratchet_first_fission(
+	client: &Arc<MainchainClient>,
+	ticker: &Ticker,
+	price_index_operator: &sr25519::Pair,
+	bitcoin_owner_signer: &Sr25519Signer,
+	bitcoin_owner: &sr25519::Pair,
+	bitcoin_owner_account_id: &AccountId32,
+	utxo_id: UtxoId,
+	fission_id: FissionId,
+	securitized_satoshis: Satoshis,
+	microgons_at_target_per_btc: Balance,
+	initial_liquidity_promised: Balance,
+	last_submitted_tick: &mut Tick,
+) -> anyhow::Result<()> {
+	submit_price(ticker, client, price_index_operator, 60_000.0).await;
+	let rate_history = client
+		.fetch_storage(&storage().bitcoin_locks().microgon_per_btc_history(), FetchAt::Best)
+		.await?
+		.expect("Bitcoin rate history");
+	let (older_ratchet_tick, older_ratchet_rate) =
+		*rate_history.0.last().expect("older Bitcoin rate");
+	// Submit against the same best-chain tick source used by submit_price so this rate cannot reuse
+	// the older history entry while finalization trails the active chain.
+	while current_chain_tick(client, ticker).await <= older_ratchet_tick {
+		sleep(Duration::from_millis(100)).await;
+	}
+
+	*last_submitted_tick = submit_price(ticker, client, price_index_operator, 55_000.0).await;
+	let rate_history = client
+		.fetch_storage(&storage().bitcoin_locks().microgon_per_btc_history(), FetchAt::Best)
+		.await?
+		.expect("Bitcoin rate history");
+	let (ratchet_tick, ratchet_rate) = *rate_history.0.last().expect("latest Bitcoin rate");
+	assert!(ratchet_tick > older_ratchet_tick);
+	assert!(ratchet_rate < microgons_at_target_per_btc);
+
+	submit_rejected_bitcoin_call(
+		client,
+		bitcoin_owner_signer,
+		RuntimeCall::BitcoinLocks(
+			api::runtime_types::pallet_bitcoin_locks::pallet::Call::resecuritize {
+				utxo_id,
+				satoshis: securitized_satoshis,
+				options: Some(BitcoinLockOptions {
+					microgons_at_target_per_btc: ratchet_rate,
+					fee_coupon: None,
+				}),
+			},
+		),
+		RuntimeError::BitcoinLocks(BitcoinLocksError::InsufficientSecuritizationForFissions),
+	)
+	.await;
+	let unchanged_lock = client
+		.fetch_storage(&storage().bitcoin_locks().locks_by_utxo_id(utxo_id), FetchAt::Best)
+		.await?
+		.expect("funded Lock");
+	assert_eq!(unchanged_lock.securitized_satoshis, securitized_satoshis);
+	assert_eq!(unchanged_lock.microgons_at_target_per_btc, microgons_at_target_per_btc);
+
+	let params = client
+		.params_with_best_nonce(&bitcoin_owner_signer.account_id())
+		.await?
+		.immortal()
+		.build();
+	let fission_ratchet_tx = client
+		.submit_tx(
+			&tx().bitcoin_fissions().ratchet(fission_id, ratchet_rate),
+			bitcoin_owner_signer,
+			Some(params),
+			false,
+		)
+		.await?;
+	let fission_ratcheted = fission_ratchet_tx
+		.events
+		.iter()
+		.find_map(|event| {
+			event.as_event::<api::bitcoin_fissions::events::FissionRatcheted>().transpose()
+		})
+		.transpose()?
+		.expect("fission ratcheted event");
+	assert_eq!(fission_ratcheted.fission_id, fission_id);
+	assert_eq!(fission_ratcheted.ratchet_number, 1);
+
+	let ratcheted_fission = client
+		.fetch_storage(
+			&storage()
+				.bitcoin_fissions()
+				.fission_by_owner_and_id(bitcoin_owner_account_id.clone().into(), fission_id),
+			FetchAt::Best,
+		)
+		.await?
+		.expect("active Fission");
+	assert_eq!(ratcheted_fission.ratchet_number, 1);
+	assert!(ratcheted_fission.last_ratchet_tick >= ratchet_tick);
+	assert_eq!(ratcheted_fission.microgons_at_target_per_btc, ratchet_rate);
+	assert!(ratcheted_fission.liquidity_promised < initial_liquidity_promised);
+
+	submit_rejected_bitcoin_call(
+		client,
+		bitcoin_owner_signer,
+		RuntimeCall::BitcoinFissions(
+			api::runtime_types::pallet_bitcoin_fissions::pallet::Call::ratchet {
+				fission_id,
+				microgons_at_target_per_btc: older_ratchet_rate,
+			},
+		),
+		RuntimeError::BitcoinFissions(
+			BitcoinFissionsError::MicrogonsAtTargetPerBtcTickOlderThanCurrent,
+		),
+	)
+	.await;
+	let unchanged_fission = client
+		.fetch_storage(
+			&storage()
+				.bitcoin_fissions()
+				.fission_by_owner_and_id(bitcoin_owner_account_id.clone().into(), fission_id),
+			FetchAt::Best,
+		)
+		.await?
+		.expect("active Fission");
+	assert_eq!(unchanged_fission.ratchet_number, 1);
+	assert_eq!(unchanged_fission.last_ratchet_tick, ratcheted_fission.last_ratchet_tick);
+	assert_eq!(unchanged_fission.microgons_at_target_per_btc, ratchet_rate);
+
+	let pending_mint_indices = client
+		.fetch_storage(&storage().mint().pending_mint_utxo_id_lookup(utxo_id), FetchAt::Best)
+		.await?
+		.expect("ratchet pending mint lookup");
+	let pending_mint_index = *pending_mint_indices.0.last().expect("ratchet pending mint index");
+	let pending_mint = client
+		.fetch_storage(
+			&storage().mint().pending_mint_utxos_by_index(pending_mint_index),
+			FetchAt::Best,
+		)
+		.await?
+		.expect("ratchet pending mint");
+	assert_eq!(pending_mint.fission_id, fission_id);
+	assert_eq!(pending_mint.account_id, bitcoin_owner_account_id.clone().into());
+	assert!(pending_mint.remaining_amount > 0);
+	assert!(pending_mint.remaining_amount <= ratcheted_fission.liquidity_promised);
+
+	wait_for_mint(
+		bitcoin_owner,
+		client,
+		&utxo_id,
+		fission_id,
+		ratcheted_fission.liquidity_promised,
+		ticker,
+		price_index_operator,
+		last_submitted_tick,
+	)
+	.await
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn close_fissions(
+	client: &Arc<MainchainClient>,
+	bitcoin_owner_signer: &Sr25519Signer,
+	bitcoin_owner_account_id: &AccountId32,
+	utxo_id: UtxoId,
+	fission_id: FissionId,
+	second_fission_id: FissionId,
+	second_fission_satoshis: Satoshis,
+) {
+	let params = client
+		.params_with_best_nonce(&bitcoin_owner_signer.account_id())
+		.await
+		.unwrap()
+		.immortal()
+		.build();
+	let fission_close_tx = client
+		.submit_tx(
+			&tx().bitcoin_fissions().close(fission_id),
+			bitcoin_owner_signer,
+			Some(params),
+			false,
+		)
+		.await
+		.unwrap();
+	let fission_closed = fission_close_tx
+		.events
+		.iter()
+		.find_map(|event| {
+			event.as_event::<api::bitcoin_fissions::events::FissionClosed>().transpose()
+		})
+		.transpose()
+		.unwrap()
+		.expect("fission closed event");
+	assert_eq!(fission_closed.fission_id, fission_id);
+
+	let closed_fission = client
+		.fetch_storage(
+			&storage()
+				.bitcoin_fissions()
+				.fission_by_owner_and_id(bitcoin_owner_account_id.clone().into(), fission_id),
+			FetchAt::Best,
+		)
+		.await
+		.unwrap();
+	assert!(closed_fission.is_none());
+	let fission_ids = client
+		.fetch_storage(&storage().bitcoin_fissions().fission_ids_by_lock_id(utxo_id), FetchAt::Best)
+		.await
+		.unwrap()
+		.expect("second Fission remains active");
+	assert_eq!(fission_ids.0.into_iter().collect::<Vec<_>>(), vec![second_fission_id]);
+	let lock = client
+		.fetch_storage(&storage().bitcoin_locks().locks_by_utxo_id(utxo_id), FetchAt::Best)
+		.await
+		.unwrap()
+		.expect("Lock remains active after its Fission closes");
+	assert_eq!(lock.fissioned_satoshis, second_fission_satoshis);
+
+	submit_rejected_bitcoin_call(
+		client,
+		bitcoin_owner_signer,
+		RuntimeCall::BitcoinFissions(
+			api::runtime_types::pallet_bitcoin_fissions::pallet::Call::close { fission_id },
+		),
+		RuntimeError::BitcoinFissions(BitcoinFissionsError::FissionNotFound),
+	)
+	.await;
+
+	let params = client
+		.params_with_best_nonce(&bitcoin_owner_signer.account_id())
+		.await
+		.unwrap()
+		.immortal()
+		.build();
+	client
+		.submit_tx(
+			&tx().bitcoin_fissions().close(second_fission_id),
+			bitcoin_owner_signer,
+			Some(params),
+			false,
+		)
+		.await
+		.unwrap();
+	let second_closed_fission = client
+		.fetch_storage(
+			&storage().bitcoin_fissions().fission_by_owner_and_id(
+				bitcoin_owner_account_id.clone().into(),
+				second_fission_id,
+			),
+			FetchAt::Best,
+		)
+		.await
+		.unwrap();
+	assert!(second_closed_fission.is_none());
+	let fission_ids = client
+		.fetch_storage(&storage().bitcoin_fissions().fission_ids_by_lock_id(utxo_id), FetchAt::Best)
+		.await
+		.unwrap();
+	assert!(fission_ids.map(|ids| ids.0.is_empty()).unwrap_or(true));
+	let lock = client
+		.fetch_storage(&storage().bitcoin_locks().locks_by_utxo_id(utxo_id), FetchAt::Best)
+		.await
+		.unwrap()
+		.expect("Lock remains active after all Fissions close");
+	assert_eq!(lock.fissioned_satoshis, 0);
+}
+
+#[allow(clippy::too_many_arguments)]
+async fn create_fission(
+	client: &MainchainClient,
+	bitcoin_owner_signer: &Sr25519Signer,
+	utxo_id: UtxoId,
+	fission_id: FissionId,
+	liquid_id: LiquidId,
+	satoshis: Satoshis,
+	microgons_at_target_per_btc: Balance,
+) -> anyhow::Result<Balance> {
+	let params = client
+		.params_with_best_nonce(&bitcoin_owner_signer.account_id())
+		.await?
+		.immortal()
+		.build();
+	let result = client
+		.submit_tx(
+			&tx().bitcoin_fissions().create(
+				fission_id,
+				liquid_id,
+				utxo_id,
+				satoshis,
+				microgons_at_target_per_btc,
+			),
+			bitcoin_owner_signer,
+			Some(params),
+			false,
+		)
+		.await?;
+	let created = result
+		.events
+		.iter()
+		.find_map(|event| {
+			event.as_event::<api::bitcoin_fissions::events::FissionCreated>().transpose()
+		})
+		.transpose()?
+		.expect("fission created event");
+	assert_eq!(created.fission_id, fission_id);
+	assert_eq!(created.liquid_id, liquid_id);
+
+	Ok(created.liquidity_promised)
+}
+
+async fn speed_up_minting(
+	test_node: &ArgonTestNode,
+	client: &MainchainClient,
+) -> (MiningSlotConfig, Tick) {
+	let mining_config = client
+		.fetch_storage(&storage().mining_slot().mining_config(), FetchAt::Best)
+		.await
+		.unwrap()
+		.expect("mining config");
+	let original_mining_config = MiningSlotConfig {
+		ticks_between_slots: mining_config.ticks_between_slots,
+		ticks_before_bid_end_for_vrf_close: mining_config.ticks_before_bid_end_for_vrf_close,
+		slot_bidding_start_after_ticks: mining_config.slot_bidding_start_after_ticks,
+	};
+	let original_frame_reward_ticks_remaining = client
+		.fetch_storage(&storage().mining_slot().frame_reward_ticks_remaining(), FetchAt::Best)
+		.await
+		.unwrap()
+		.expect("frame reward ticks remaining");
+	let accelerated_mining_config =
+		MiningSlotConfig { ticks_between_slots: 1, ..original_mining_config.clone() };
+
+	sudo(
+		test_node,
+		RuntimeCall::System(
+			argon_client::api::runtime_types::frame_system::pallet::Call::set_storage {
+				items: vec![
+					(
+						storage().mint().minted_mining_microgons().to_root_bytes(),
+						Balance::from(100_000_000_000u64).encode(),
+					),
+					(
+						storage().mining_slot().mining_config().to_root_bytes(),
+						accelerated_mining_config.encode(),
+					),
+					(
+						storage().mining_slot().frame_reward_ticks_remaining().to_root_bytes(),
+						1u64.encode(),
+					),
+				],
+			},
+		),
+		false,
+	)
+	.await
+	.unwrap();
+
+	(original_mining_config, original_frame_reward_ticks_remaining)
+}
+
+async fn restore_mining_cadence(
+	test_node: &ArgonTestNode,
+	(original_mining_config, original_frame_reward_ticks_remaining): (MiningSlotConfig, Tick),
+) {
+	// Release and cosign deadlines are frame-based, so restore normal cadence before handing the
+	// request to the Vault and wait until the restoration is finalized.
+	sudo(
+		test_node,
+		RuntimeCall::System(
+			argon_client::api::runtime_types::frame_system::pallet::Call::set_storage {
+				items: vec![
+					(
+						storage().mining_slot().mining_config().to_root_bytes(),
+						original_mining_config.encode(),
+					),
+					(
+						storage().mining_slot().frame_reward_ticks_remaining().to_root_bytes(),
+						original_frame_reward_ticks_remaining.encode(),
+					),
+				],
+			},
+		),
+		true,
+	)
+	.await
+	.unwrap();
+}
+
+async fn submit_rejected_bitcoin_call(
+	client: &MainchainClient,
+	signer: &Sr25519Signer,
+	call: RuntimeCall,
+	expected_error: RuntimeError,
+) {
+	let params = client
+		.params_with_best_nonce(&signer.account_id())
+		.await
+		.unwrap()
+		.immortal()
+		.build();
+	let result = client
+		.submit_tx(&tx().utility().force_batch(vec![call]), signer, Some(params), false)
+		.await
+		.unwrap();
+	let failed = result
+		.events
+		.iter()
+		.find_map(|event| event.as_event::<api::utility::events::ItemFailed>().transpose())
+		.transpose()
+		.unwrap()
+		.expect("Bitcoin call unexpectedly succeeded");
+
+	let metadata = client.live.metadata();
+	let dispatch_error_type = metadata.dispatch_error_ty().expect("DispatchError metadata");
+	let encoded_dispatch_error = failed
+		.error
+		.encode_as_type(dispatch_error_type, metadata.types())
+		.expect("DispatchError should encode against runtime metadata");
+	let actual_error =
+		subxt_error::DispatchError::decode_from(encoded_dispatch_error, metadata.clone())
+			.expect("ItemFailed should contain a valid DispatchError");
+	let subxt_error::DispatchError::Module(actual_error) = actual_error else {
+		panic!("expected {expected_error:?}, got {actual_error:?}");
+	};
+	let actual_error = actual_error
+		.as_root_error::<RuntimeError>()
+		.expect("module error should decode as a runtime error");
+	let runtime_error_type = metadata.outer_enums().error_enum_ty();
+	let actual_error_bytes = actual_error
+		.encode_as_type(runtime_error_type, metadata.types())
+		.expect("actual runtime error should encode");
+	let expected_error_bytes = expected_error
+		.encode_as_type(runtime_error_type, metadata.types())
+		.expect("expected runtime error should encode");
+
+	assert_eq!(
+		actual_error_bytes, expected_error_bytes,
+		"expected {expected_error:?}, got {actual_error:?}"
+	);
+}
+
 async fn submit_price(
 	ticker: &Ticker,
 	client: &MainchainClient,
 	price_index_operator: &sr25519::Pair,
+	btc_usd_price: f64,
 ) -> Tick {
 	let signer = Sr25519Signer::new(price_index_operator.clone());
 	let account_id = signer.account_id();
@@ -488,14 +993,16 @@ async fn submit_price(
 	for attempt in 0..2 {
 		let tick = current_chain_tick(client, ticker).await;
 		let nonce = client.get_account_nonce(&account_id).await.unwrap();
-		let params = MainchainClient::ext_params_builder().nonce(nonce.into()).build();
+		let params = MainchainClient::ext_params_builder().nonce(nonce.into()).immortal().build();
 		let progress = client
 			.live
 			.tx()
 			.sign_and_submit_then_watch(
 				&tx().price_index().submit(
 					Index {
-						btc_usd_price: FixedU128Ext(FixedU128::from_float(62_000.0).into_inner()),
+						btc_usd_price: FixedU128Ext(
+							FixedU128::from_float(btc_usd_price).into_inner(),
+						),
 						argon_usd_target_price: FixedU128Ext(
 							FixedU128::from_float(1.0).into_inner(),
 						),
@@ -512,7 +1019,7 @@ async fn submit_price(
 			.await
 			.unwrap();
 
-		match MainchainClient::wait_for_ext_in_block(progress, true).await {
+		match MainchainClient::wait_for_ext_in_block(progress, false).await {
 			Ok(_) => {
 				println!("bitcoin prices submitted at tick {tick}");
 				return tick;
@@ -540,7 +1047,7 @@ async fn submit_price_if_needed(
 		return;
 	}
 
-	*last_submitted_tick = submit_price(ticker, client, price_index_operator).await;
+	*last_submitted_tick = submit_price(ticker, client, price_index_operator, 62_000.0).await;
 }
 
 async fn current_chain_tick(client: &MainchainClient, ticker: &Ticker) -> Tick {
@@ -659,7 +1166,7 @@ async fn create_vault(
 	Ok(vault_creation.vault_id)
 }
 
-async fn request_bitcoin_lock(
+async fn create_receive_address(
 	test_node: &ArgonTestNode,
 	vault_id: VaultId,
 	satoshis: Satoshis,
@@ -688,20 +1195,25 @@ async fn request_bitcoin_lock(
 		tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 	}
 
-	println!("Owner locked bitcoin with pubkey: {owner_compressed_pubkey}");
+	println!("Owner creates a Bitcoin receive address with pubkey: {owner_compressed_pubkey}");
 	let owner_pubkey: CompressedBitcoinPubkey = (*owner_compressed_pubkey).into();
 
-	let lock_tx = test_node
+	let receive_address_tx = test_node
 		.client
 		.submit_tx(
-			&tx().bitcoin_locks().initialize(vault_id, satoshis, owner_pubkey.into(), None),
+			&tx().bitcoin_locks().create_receive_address(
+				vault_id,
+				satoshis,
+				owner_pubkey.into(),
+				None,
+			),
 			&Sr25519Signer::new(bitcoin_owner.clone()),
 			None,
 			true,
 		)
 		.await?;
-	println!("bitcoin lock submitted (owner watches for utxo id)");
-	let lock_event = lock_tx
+	println!("Bitcoin receive address created for Lock");
+	let lock_created = receive_address_tx
 		.events
 		.iter()
 		.find_map(|event| {
@@ -709,12 +1221,12 @@ async fn request_bitcoin_lock(
 		})
 		.transpose()?
 		.expect("lock event");
-	let utxo_id = lock_event.utxo_id;
+	let utxo_id = lock_created.utxo_id;
 	Ok(utxo_id)
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn confirm_lock(
+async fn verify_lock(
 	secp: &Secp256k1<All>,
 	owner_compressed_pubkey: PublicKey,
 	utxo_satoshis: Satoshis,
@@ -724,21 +1236,18 @@ async fn confirm_lock(
 	vault_id: VaultId,
 	utxo_id: &UtxoId,
 ) -> anyhow::Result<(BitcoinCosignScriptPubkey, Balance)> {
-	let lock_api = client
+	let lock = client
 		.fetch_storage(&storage().bitcoin_locks().locks_by_utxo_id(*utxo_id), FetchAt::Finalized)
 		.await?
 		.expect("should be able to retrieve");
-	assert_eq!(lock_api.vault_id, vault_id);
+	assert_eq!(lock.vault_id, vault_id);
 	{
-		assert_eq!(lock_api.satoshis, utxo_satoshis);
-		assert_eq!(lock_api.owner_pubkey.0, owner_compressed_pubkey.inner.serialize());
-		assert_eq!(lock_api.vault_xpub_sources.0, xpubkey.fingerprint().to_bytes());
+		assert_eq!(lock.securitized_satoshis, utxo_satoshis);
+		assert_eq!(lock.owner_pubkey.0, owner_compressed_pubkey.inner.serialize());
+		assert_eq!(lock.vault_xpub_sources.0, xpubkey.fingerprint().to_bytes());
+		assert_eq!(lock.vault_xpub_sources.1, Into::<u32>::into(ChildNumber::from_normal_idx(1)?));
 		assert_eq!(
-			lock_api.vault_xpub_sources.1,
-			Into::<u32>::into(ChildNumber::from_normal_idx(1)?)
-		);
-		assert_eq!(
-			lock_api.vault_pubkey.0,
+			lock.vault_pubkey.0,
 			xpubkey
 				.derive_pub(secp, &DerivationPath::from_str("1")?)?
 				.public_key
@@ -746,12 +1255,12 @@ async fn confirm_lock(
 		);
 		let cosign_script = CosignScript::new(
 			CosignScriptArgs {
-				vault_pubkey: lock_api.vault_pubkey.clone().into(),
-				owner_pubkey: lock_api.owner_pubkey.into(),
-				vault_claim_pubkey: lock_api.vault_claim_pubkey.into(),
-				vault_claim_height: lock_api.vault_claim_height,
-				open_claim_height: lock_api.open_claim_height,
-				created_at_height: lock_api.created_at_height,
+				vault_pubkey: lock.vault_pubkey.clone().into(),
+				owner_pubkey: lock.owner_pubkey.into(),
+				vault_claim_pubkey: lock.vault_claim_pubkey.into(),
+				vault_claim_height: lock.vault_claim_height,
+				open_claim_height: lock.open_claim_height,
+				created_at_height: lock.created_at_height,
 			},
 			bitcoin_network,
 		)
@@ -759,12 +1268,58 @@ async fn confirm_lock(
 		let cosign_key = cosign_script.script.to_p2wsh();
 		let cosign_script_pubkey: BitcoinCosignScriptPubkey =
 			cosign_key.try_into().map_err(|_| anyhow!("Unable to convert script pubkey"))?;
-		assert_eq!(cosign_script_pubkey, lock_api.utxo_script_pubkey.clone().into());
+		assert_eq!(cosign_script_pubkey, lock.utxo_script_pubkey.clone().into());
 	}
 
-	assert!(!lock_api.is_funded);
-	let liquidity_promised = lock_api.liquidity_promised;
-	Ok((lock_api.utxo_script_pubkey.into(), liquidity_promised))
+	assert_eq!(lock.funded_satoshis, 0);
+	assert_eq!(lock.fissioned_satoshis, 0);
+	Ok((lock.utxo_script_pubkey.into(), lock.microgons_at_target_per_btc))
+}
+
+async fn wait_for_lock_funding(
+	client: &Arc<MainchainClient>,
+	utxo_id: UtxoId,
+	funded_satoshis: Satoshis,
+	txid: Txid,
+	vout: u32,
+) -> anyhow::Result<()> {
+	let mut finalized_sub = client.live.blocks().subscribe_finalized().await?;
+	let mut finalized_hash = client.latest_finalized_block_hash().await?.hash();
+
+	for remaining_blocks in (1..=100).rev() {
+		let lock = client
+			.fetch_storage(
+				&storage().bitcoin_locks().locks_by_utxo_id(utxo_id),
+				FetchAt::Block(finalized_hash),
+			)
+			.await?
+			.expect("Lock state should be present");
+		if lock.funded_satoshis == funded_satoshis {
+			break;
+		}
+
+		let block = finalized_sub
+			.next()
+			.await
+			.ok_or_else(|| anyhow!("Stopped waiting for Lock {utxo_id} funding"))??;
+		finalized_hash = block.hash();
+		println!("Waiting for Lock {utxo_id} funding in block {:?}", block.hash());
+		if remaining_blocks == 1 {
+			panic!("Lock {utxo_id} was not funded after 100 blocks");
+		}
+	}
+
+	let utxo_ref = client
+		.fetch_storage(
+			&storage().bitcoin_locks().utxo_id_to_funding_utxo_ref(utxo_id),
+			FetchAt::Block(finalized_hash),
+		)
+		.await?
+		.expect("funding UTXO");
+	assert_eq!(utxo_ref.txid.0, txid.to_byte_array());
+	assert_eq!(utxo_ref.output_index, vout);
+
+	Ok(())
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -772,63 +1327,22 @@ async fn wait_for_mint(
 	bitcoin_owner: &sr25519::Pair,
 	client: &Arc<MainchainClient>,
 	utxo_id: &UtxoId,
+	fission_id: FissionId,
 	liquidity_promised: Balance,
-	txid: Txid,
-	vout: u32,
 	ticker: &Ticker,
 	price_index_operator: &sr25519::Pair,
 	last_submitted_tick: &mut Tick,
 ) -> anyhow::Result<()> {
-	let mut finalized_sub = client.live.blocks().subscribe_finalized().await?;
-	if client
-		.fetch_storage(
-			&storage().bitcoin_locks().utxo_id_to_funding_utxo_ref(*utxo_id),
-			FetchAt::Finalized,
-		)
-		.await?
-		.is_none()
-	{
-		println!("Waiting for funding utxo {utxo_id} to be detected");
-		let mut counter = 0;
-		while let Some(block) = finalized_sub.next().await {
-			let block = block?;
-			let utxo_detected =
-				block.events().await?.find_first::<api::bitcoin_utxos::events::UtxoDetected>()?;
-			if let Some(utxo_detected) = utxo_detected {
-				if utxo_detected.utxo_id == *utxo_id {
-					println!("Utxo detected in Argon mainchain");
-					break;
-				}
-			}
-			counter += 1;
-			if counter >= 20 {
-				panic!("No mint after 100 blocks")
-			}
-		}
-	}
-	// load 2 more blocks
-	for _ in 0..2 {
-		let _ = finalized_sub.next().await;
-	}
-	let utxo_ref = client
-		.fetch_storage(
-			&storage().bitcoin_locks().utxo_id_to_funding_utxo_ref(*utxo_id),
-			FetchAt::Finalized,
-		)
-		.await?
-		.expect("utxo");
-	assert_eq!(utxo_ref.txid.0, txid.to_byte_array());
-	assert_eq!(utxo_ref.output_index, vout);
-
+	let mut best_block_sub = client.live.blocks().subscribe_best().await?;
 	let pending_mint_index = client
-		.fetch_storage(&storage().mint().pending_mint_utxo_id_lookup(*utxo_id), FetchAt::Finalized)
+		.fetch_storage(&storage().mint().pending_mint_utxo_id_lookup(*utxo_id), FetchAt::Best)
 		.await?
 		.and_then(|lookup| lookup.0.first().copied());
 	let pending_mint = if let Some(pending_mint_index) = pending_mint_index {
 		client
 			.fetch_storage(
 				&storage().mint().pending_mint_utxos_by_index(pending_mint_index),
-				FetchAt::Finalized,
+				FetchAt::Best,
 			)
 			.await?
 	} else {
@@ -837,111 +1351,78 @@ async fn wait_for_mint(
 
 	let owner_account_id32: AccountId32 = bitcoin_owner.clone().public().into();
 	let owner_account_id = owner_account_id32.clone().into();
-	if pending_mint.is_none() {
+	let Some(mut pending_mint) = pending_mint else {
 		let balance = client.get_argons(&owner_account_id32).await.expect("pending mint balance");
 		assert!(balance.free >= liquidity_promised);
-	} else {
-		let mut pending_mint = pending_mint.expect("checked is_some");
-		let mut counter = 0;
-		while pending_mint.remaining_amount == liquidity_promised {
-			let Some(_block) = finalized_sub.next().await else {
-				panic!("Stopped waiting for pending mint to start paying out");
-			};
-			submit_price_if_needed(ticker, client, price_index_operator, last_submitted_tick).await;
+		return Ok(())
+	};
+	assert_eq!(pending_mint.account_id, owner_account_id);
+	assert_eq!(pending_mint.fission_id, fission_id);
 
-			let pending_mint_index = client
-				.fetch_storage(
-					&storage().mint().pending_mint_utxo_id_lookup(*utxo_id),
-					FetchAt::Finalized,
-				)
-				.await?
-				.and_then(|lookup| lookup.0.first().copied());
-			let pending_mint_after_block = if let Some(pending_mint_index) = pending_mint_index {
-				client
-					.fetch_storage(
-						&storage().mint().pending_mint_utxos_by_index(pending_mint_index),
-						FetchAt::Finalized,
-					)
-					.await?
-			} else {
-				None
-			};
-			let Some(updated_pending_mint) = pending_mint_after_block else {
-				let balance =
-					client.get_argons(&owner_account_id32).await.expect("pending mint balance");
-				assert!(balance.free >= liquidity_promised);
-				return Ok(());
-			};
-			assert_eq!(updated_pending_mint.account_id, owner_account_id);
-			pending_mint = updated_pending_mint;
-			counter += 1;
+	let mut last_remaining_amount = pending_mint.remaining_amount;
+	let mut highest_frame_id = client
+		.fetch_storage(&storage().mining_slot().next_frame_id(), FetchAt::Best)
+		.await?
+		.unwrap_or_default();
+	let mut frames_waited = 0u64;
+	let deadline = tokio::time::Instant::now() + Duration::from_secs(90);
 
-			if counter >= 30 {
-				panic!(
-					"Timed out waiting for pending mint payout to start. Last mint was {:?}",
-					pending_mint
-				);
-			}
+	loop {
+		let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+		let block = tokio::time::timeout(remaining, best_block_sub.next())
+			.await
+			.map_err(|_| anyhow!("Timed out waiting for pending mint payout"))?
+			.ok_or_else(|| anyhow!("Best block subscription ended during pending mint payout"))??;
+		let fetch_at = FetchAt::Block(block.hash());
+
+		let frame_id = client
+			.fetch_storage(&storage().mining_slot().next_frame_id(), fetch_at)
+			.await?
+			.unwrap_or_default();
+		if frame_id > highest_frame_id {
+			frames_waited = frames_waited.saturating_add(frame_id - highest_frame_id);
+			highest_frame_id = frame_id;
 		}
 
-		let balance = client.get_argons(&owner_account_id32).await.expect("pending mint balance");
+		let pending_mint_index = client
+			.fetch_storage(&storage().mint().pending_mint_utxo_id_lookup(*utxo_id), fetch_at)
+			.await?
+			.and_then(|lookup| lookup.0.first().copied());
+		let Some(pending_mint_index) = pending_mint_index else { break };
+		pending_mint = client
+			.fetch_storage(
+				&storage().mint().pending_mint_utxos_by_index(pending_mint_index),
+				fetch_at,
+			)
+			.await?
+			.ok_or_else(|| anyhow!("Pending mint lookup referenced a missing mint"))?;
 		assert_eq!(pending_mint.account_id, owner_account_id);
-		println!(
-			"Owner mint pending remaining = {} (balance={})",
-			pending_mint.remaining_amount, balance.free
-		);
-		assert!(balance.free > (liquidity_promised - pending_mint.remaining_amount));
+		assert_eq!(pending_mint.fission_id, fission_id);
 
-		let mut counter = 0;
-		while let Some(_block) = finalized_sub.next().await {
-			let pending_mint_index = client
-				.fetch_storage(
-					&storage().mint().pending_mint_utxo_id_lookup(*utxo_id),
-					FetchAt::Finalized,
-				)
-				.await?
-				.and_then(|lookup| lookup.0.first().copied());
-			let pending_mint = if let Some(pending_mint_index) = pending_mint_index {
-				client
-					.fetch_storage(
-						&storage().mint().pending_mint_utxos_by_index(pending_mint_index),
-						FetchAt::Finalized,
-					)
-					.await?
-			} else {
-				None
-			};
-			println!("Pending mint {:?}", pending_mint.as_ref().map(|mint| mint.remaining_amount));
-			if pending_mint.is_none() {
-				break;
-			}
-			counter += 1;
-
-			submit_price_if_needed(ticker, client, price_index_operator, last_submitted_tick).await;
-			if counter >= 30 {
-				let registered_miners = client
-					.fetch_storage(
-						&storage().mining_slot().active_miners_count(),
-						FetchAt::Finalized,
-					)
-					.await?
-					.expect("registered miners");
-				let bitcoin_minted = client
-					.fetch_storage(&storage().mint().minted_bitcoin_microgons(), FetchAt::Finalized)
-					.await?
-					.expect("mining mint");
-				let mining_minted = client
-					.fetch_storage(&storage().mint().minted_mining_microgons(), FetchAt::Finalized)
-					.await?
-					.expect("mining mint");
-				panic!(
-					"Timed out waiting for remaining mint. Last mint was {:?}. Miners registered {:?}. Mining Minted {} microgons, Bitcoin Minted {} microgons",
-					pending_mint, registered_miners, mining_minted, bitcoin_minted
-				);
-			}
+		if pending_mint.remaining_amount < last_remaining_amount {
+			last_remaining_amount = pending_mint.remaining_amount;
+			println!("Owner mint pending remaining = {last_remaining_amount}");
 		}
-		println!("Owner minted full bitcoin")
+		submit_price_if_needed(ticker, client, price_index_operator, last_submitted_tick).await;
+
+		if frames_waited >= 15 {
+			let bitcoin_minted = client
+				.fetch_storage(&storage().mint().minted_bitcoin_microgons(), FetchAt::Best)
+				.await?
+				.expect("Bitcoin minted amount");
+			let mining_minted = client
+				.fetch_storage(&storage().mint().minted_mining_microgons(), FetchAt::Best)
+				.await?
+				.expect("mining minted amount");
+			anyhow::bail!(
+				"Pending mint did not complete after {frames_waited} frames. Last mint: {pending_mint:?}. Mining minted: {mining_minted}. Bitcoin minted: {bitcoin_minted}"
+			);
+		}
 	}
+
+	let balance = client.get_argons(&owner_account_id32).await.expect("completed mint balance");
+	assert!(balance.free >= liquidity_promised);
+	println!("Owner minted full Fission liquidity");
 	Ok(())
 }
 
@@ -1179,7 +1660,7 @@ async fn load_cosign_releaser(
 
 	Ok(CosignReleaser::from_script(
 		get_cosign_script(lock, bitcoin_network.into())?,
-		lock.satoshis,
+		lock.funded_satoshis,
 		txid,
 		utxo_ref.output_index,
 		argon_bitcoin::ReleaseStep::VaultCosign,

@@ -4,6 +4,7 @@ import { HDKey, Versions } from '@scure/bip32';
 import { hexToU8a, u8aToHex } from '@argonprotocol/mainchain';
 import * as secp256k1 from '@noble/secp256k1';
 import { BTC_NETWORK } from '@scure/btc-signer/utils';
+import bs58check from 'bs58check';
 import { BitcoinNetwork } from './wasm/bitcoin_bindings';
 
 export { HDKey, BitcoinNetwork };
@@ -40,6 +41,14 @@ export function getChildXpriv(
 
 export function getXpubFromXpriv(xpriv: HDKey): string {
   return xpriv.publicExtendedKey;
+}
+
+export function getXpubBytes(xpub: string): Uint8Array {
+  const bytes = bs58check.decode(xpub);
+  if (bytes.length !== 78) {
+    throw new Error('Invalid Bitcoin xpub key length, must be 78 bytes');
+  }
+  return bytes;
 }
 
 export function getCompressedPubkey(pubkey: string | Uint8Array): Uint8Array {

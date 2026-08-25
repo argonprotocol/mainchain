@@ -182,6 +182,10 @@ parameter_types! {
 	pub const MaxBtcPriceTickAge: u32 = 30; // 30 minutes of btc prices allowed for locks
 
 	pub const BitcoinLockDuration: u32 = 60 * 24 * 365; // 1 year
+	/// Maximum number of active Fissions that may allocate one Lock's funded satoshis.
+	pub const MaxFissionsPerLock: u32 = 50;
+	/// Minimum percentage rate movement required before a Fission may ratchet.
+	pub const MinimumFissionRatchetPercent: Percent = Percent::from_percent(5);
 	pub const MaxPendingMintsPerUtxo: u32 = 50;
 	pub const MaxPendingMintPayoutWindowSize: u32 = 1_000;
 	/// The maximum share of a queued bitcoin mint that may be paid in a single frame.

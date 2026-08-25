@@ -42,11 +42,11 @@ fn argonot_bond_lots() -> Vec<BondLotSummary> {
 	ArgonotBondLots::<Test>::get().into_inner()
 }
 
-fn test_vault(account_id: u64, securitized_satoshis: u64, sharing_percent: Permill) -> TestVault {
+fn test_vault(account_id: u64, eligible_satoshis: u64, sharing_percent: Permill) -> TestVault {
 	TestVault {
 		account_id: account(account_id),
 		securitization: 0,
-		securitized_satoshis,
+		eligible_satoshis,
 		sharing_percent,
 		delegate_account_id: None,
 		is_closed: false,

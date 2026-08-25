@@ -310,6 +310,54 @@ declare module '@polkadot/api-base/types/events' {
         { who: AccountId32; amount: u128 }
       >;
     };
+    bitcoinFissions: {
+      /**
+       * A Fission was closed and its source Lock allocation was released.
+       **/
+      FissionClosed: AugmentedEvent<
+        ApiType,
+        [accountId: AccountId32, fissionId: u64, redemptionAmount: u128],
+        { accountId: AccountId32; fissionId: u64; redemptionAmount: u128 }
+      >;
+      /**
+       * An active Fission was closed because its source Lock was spent.
+       **/
+      FissionClosedByLock: AugmentedEvent<
+        ApiType,
+        [accountId: AccountId32, fissionId: u64, utxoId: u64],
+        { accountId: AccountId32; fissionId: u64; utxoId: u64 }
+      >;
+      /**
+       * A Fission was created and allocated from its source Lock.
+       **/
+      FissionCreated: AugmentedEvent<
+        ApiType,
+        [accountId: AccountId32, fissionId: u64, liquidId: u64, liquidityPromised: u128],
+        { accountId: AccountId32; fissionId: u64; liquidId: u64; liquidityPromised: u128 }
+      >;
+      /**
+       * A Fission ratchet changed its target-normalized BTC value and liability.
+       **/
+      FissionRatcheted: AugmentedEvent<
+        ApiType,
+        [
+          accountId: AccountId32,
+          fissionId: u64,
+          ratchetNumber: u32,
+          liquidityPromised: u128,
+          amountMinted: u128,
+          amountBurned: u128,
+        ],
+        {
+          accountId: AccountId32;
+          fissionId: u64;
+          ratchetNumber: u32;
+          liquidityPromised: u128;
+          amountMinted: u128;
+          amountBurned: u128;
+        }
+      >;
+    };
     bitcoinLocks: {
       BitcoinCosignPastDue: AugmentedEvent<
         ApiType,
@@ -326,18 +374,18 @@ declare module '@polkadot/api-base/types/events' {
         [
           utxoId: u64,
           vaultId: u32,
-          liquidityPromised: u128,
-          securitization: u128,
-          lockedTargetPrice: u128,
+          securitizedSatoshis: u64,
+          microgonsAtTargetPerBtc: u128,
+          collateralRequired: u128,
           accountId: AccountId32,
           securityFee: u128,
         ],
         {
           utxoId: u64;
           vaultId: u32;
-          liquidityPromised: u128;
-          securitization: u128;
-          lockedTargetPrice: u128;
+          securitizedSatoshis: u64;
+          microgonsAtTargetPerBtc: u128;
+          collateralRequired: u128;
           accountId: AccountId32;
           securityFee: u128;
         }
@@ -347,26 +395,20 @@ declare module '@polkadot/api-base/types/events' {
         [utxoId: u64, vaultId: u32, isFlexible: bool],
         { utxoId: u64; vaultId: u32; isFlexible: bool }
       >;
-      BitcoinLockRatcheted: AugmentedEvent<
+      BitcoinLockResecuritized: AugmentedEvent<
         ApiType,
         [
           utxoId: u64,
           vaultId: u32,
-          liquidityPromised: u128,
-          oldTargetPrice: u128,
-          securityFee: u128,
-          newTargetPrice: u128,
-          amountBurned: u128,
+          securitizedSatoshis: u64,
+          microgonsAtTargetPerBtc: u128,
           accountId: AccountId32,
         ],
         {
           utxoId: u64;
           vaultId: u32;
-          liquidityPromised: u128;
-          oldTargetPrice: u128;
-          securityFee: u128;
-          newTargetPrice: u128;
-          amountBurned: u128;
+          securitizedSatoshis: u64;
+          microgonsAtTargetPerBtc: u128;
           accountId: AccountId32;
         }
       >;
@@ -401,6 +443,14 @@ declare module '@polkadot/api-base/types/events' {
         [utxoId: u64, error: SpRuntimeDispatchError],
         { utxoId: u64; error: SpRuntimeDispatchError }
       >;
+      /**
+       * Not all orphaned UTXOs for a retired Lock fit in the cleanup schedule.
+       **/
+      OrphanedUtxoCleanupScheduleOverflow: AugmentedEvent<
+        ApiType,
+        [accountId: AccountId32, utxoId: u64, expirationFrame: u64],
+        { accountId: AccountId32; utxoId: u64; expirationFrame: u64 }
+      >;
       OrphanedUtxoCosigned: AugmentedEvent<
         ApiType,
         [
@@ -418,6 +468,22 @@ declare module '@polkadot/api-base/types/events' {
           signature: Bytes;
         }
       >;
+      /**
+       * An orphaned UTXO expiration could not reconcile its pending Vault cosign state.
+       **/
+      OrphanedUtxoExpirationError: AugmentedEvent<
+        ApiType,
+        [
+          accountId: AccountId32,
+          utxoRef: ArgonPrimitivesBitcoinUtxoRef,
+          error: SpRuntimeDispatchError,
+        ],
+        {
+          accountId: AccountId32;
+          utxoRef: ArgonPrimitivesBitcoinUtxoRef;
+          error: SpRuntimeDispatchError;
+        }
+      >;
       OrphanedUtxoReceived: AugmentedEvent<
         ApiType,
         [utxoId: u64, utxoRef: ArgonPrimitivesBitcoinUtxoRef, vaultId: u32, satoshis: u64],
@@ -432,11 +498,6 @@ declare module '@polkadot/api-base/types/events' {
           vaultId: u32;
           accountId: AccountId32;
         }
-      >;
-      SecuritizationIncreased: AugmentedEvent<
-        ApiType,
-        [utxoId: u64, vaultId: u32, newSatoshis: u64, accountId: AccountId32],
-        { utxoId: u64; vaultId: u32; newSatoshis: u64; accountId: AccountId32 }
       >;
     };
     bitcoinUtxos: {
@@ -2085,30 +2146,6 @@ declare module '@polkadot/api-base/types/events' {
         [vaultId: u32, operatorAccountId: AccountId32, amount: u128],
         { vaultId: u32; operatorAccountId: AccountId32; amount: u128 }
       >;
-      FundLockCanceled: AugmentedEvent<
-        ApiType,
-        [vaultId: u32, amount: u128],
-        { vaultId: u32; amount: u128 }
-      >;
-      FundsLocked: AugmentedEvent<
-        ApiType,
-        [
-          vaultId: u32,
-          locker: AccountId32,
-          liquidityPromised: u128,
-          isRatchet: bool,
-          feeRevenue: u128,
-          didUseFeeCoupon: bool,
-        ],
-        {
-          vaultId: u32;
-          locker: AccountId32;
-          liquidityPromised: u128;
-          isRatchet: bool;
-          feeRevenue: u128;
-          didUseFeeCoupon: bool;
-        }
-      >;
       FundsReleased: AugmentedEvent<
         ApiType,
         [vaultId: u32, securitization: u128],
@@ -2133,6 +2170,28 @@ declare module '@polkadot/api-base/types/events' {
         ApiType,
         [vaultId: u32, reservedSecuritizationSpace: u128],
         { vaultId: u32; reservedSecuritizationSpace: u128 }
+      >;
+      SecuritizationReserved: AugmentedEvent<
+        ApiType,
+        [
+          vaultId: u32,
+          locker: AccountId32,
+          securitizationCoverageMicrogons: u128,
+          feeRevenue: u128,
+          didUseFeeCoupon: bool,
+        ],
+        {
+          vaultId: u32;
+          locker: AccountId32;
+          securitizationCoverageMicrogons: u128;
+          feeRevenue: u128;
+          didUseFeeCoupon: bool;
+        }
+      >;
+      SecuritizationReturned: AugmentedEvent<
+        ApiType,
+        [vaultId: u32, amount: u128],
+        { vaultId: u32; amount: u128 }
       >;
       TreasuryRecordingError: AugmentedEvent<
         ApiType,

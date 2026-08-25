@@ -1,5 +1,5 @@
 [package]
-name = "pallet-bitcoin-locks"
+name = "pallet-bitcoin-fissions"
 version.workspace = true
 authors.workspace = true
 edition.workspace = true
@@ -10,46 +10,31 @@ documentation.workspace = true
 homepage.workspace = true
 publish = false
 
-
-[package.metadata.docs.rs]
-targets = ["x86_64-unknown-linux-gnu"]
-
 [dependencies]
 codec = { workspace = true }
 scale-info = { workspace = true }
 argon-primitives = { workspace = true, features = ["bitcoin"] }
-polkadot-sdk = { workspace = true, features = ["frame-support", "frame-system", "sp-runtime", "sp-arithmetic", "sp-core", "sp-api"] }
-argon-bitcoin = { workspace = true, default-features = false }
+polkadot-sdk = { workspace = true, features = ["frame-support", "frame-system", "sp-runtime", "sp-arithmetic"] }
 pallet-prelude = { workspace = true, default-features = false }
-pallet-bitcoin-fissions = { workspace = true, default-features = false }
 
 [dev-dependencies]
 polkadot-sdk = { workspace = true, features = ["pallet-balances", "sp-io", "sp-arithmetic"], default-features = true }
-bitcoin = { workspace = true, features = ["rand-std"] }
 pallet-prelude = { workspace = true, features = ["test"], default-features = true }
-pallet-mint = { workspace = true, default-features = true }
-pallet-bitcoin-utxos = { workspace = true, default-features = true }
 
 [features]
 default = [ "std" ]
 std = [
-	"argon-bitcoin/std",
 	"argon-primitives/bitcoin",
 	"argon-primitives/std",
 	"codec/std",
-	"pallet-bitcoin-fissions/std",
 	"pallet-prelude/std",
 	"polkadot-sdk/std",
 	"scale-info/std",
 ]
 runtime-benchmarks = [
 	"argon-primitives/runtime-benchmarks",
-	"pallet-bitcoin-fissions/runtime-benchmarks",
 	"pallet-prelude/runtime-benchmarks",
 	"polkadot-sdk/frame-benchmarking",
 	"polkadot-sdk/runtime-benchmarks",
 ]
-try-runtime = [
-	"pallet-bitcoin-fissions/try-runtime",
-	"polkadot-sdk/try-runtime",
-]
+try-runtime = [ "polkadot-sdk/try-runtime" ]

@@ -11,6 +11,7 @@ use argon_primitives::{
 		CompressedBitcoinPubkey, H256Le, OpaqueBitcoinXpub, Satoshis, UtxoId, UtxoRef,
 		SATOSHIS_PER_BITCOIN,
 	},
+	providers::BitcoinFissionLockProvider,
 	vault::{Vault, VaultTerms},
 	BitcoinUtxoEvents, PriceProvider,
 };
@@ -19,10 +20,10 @@ use pallet_prelude::benchmarking::{
 	benchmark_bitcoin_utxo_tracker_state, benchmark_bitcoin_vault_provider_state,
 	reset_benchmark_bitcoin_locks_runtime_state, reset_benchmark_bitcoin_utxo_tracker_state,
 	reset_benchmark_bitcoin_vault_provider_state, reset_benchmark_price_provider_state,
-	reset_benchmark_utxo_lock_events_state, set_benchmark_bitcoin_locks_runtime_state,
-	set_benchmark_bitcoin_utxo_tracker_state, set_benchmark_bitcoin_vault_provider_state,
-	set_benchmark_price_provider_state, BenchmarkBitcoinLocksRuntimeState,
-	BenchmarkBitcoinUtxoTrackerState, BenchmarkPriceProviderState,
+	set_benchmark_bitcoin_locks_runtime_state, set_benchmark_bitcoin_utxo_tracker_state,
+	set_benchmark_bitcoin_vault_provider_state, set_benchmark_price_provider_state,
+	BenchmarkBitcoinLocksRuntimeState, BenchmarkBitcoinUtxoTrackerState,
+	BenchmarkPriceProviderState,
 };
 
 // Small linear fit ranges used to generate the per-item slope for hook weight components.
@@ -31,14 +32,18 @@ const OVERDUE_RELEASES_BENCH_RANGE_END: u32 = 20;
 const ORPHAN_EXPIRATIONS_BENCH_RANGE_END: u32 = 20;
 const PENDING_FUNDING_BENCH_RANGE_END: u32 = 20;
 
-#[benchmarks(where <T as frame_system::Config>::AccountId: Ord)]
+#[benchmarks(
+	where
+		<T as frame_system::Config>::AccountId: Ord,
+		T: pallet_bitcoin_fissions::Config<Balance = <T as Config>::Balance>,
+)]
 mod benchmarks {
 	use super::*;
 	use frame_support::traits::Hooks;
 	use frame_system::RawOrigin;
 
 	#[benchmark]
-	fn initialize() -> Result<(), BenchmarkError> {
+	fn create_receive_address() -> Result<(), BenchmarkError> {
 		reset_benchmark_environment::<T>();
 		let owner: T::AccountId = account("bitcoin-lock-owner", 0, 0);
 		let operator: T::AccountId = account("vault-operator", 0, 0);
@@ -47,7 +52,8 @@ mod benchmarks {
 		seed_price_state(100_000, 1, 1);
 		let vault_id = create_vault::<T>(&operator, 1, benchmark_vault_securitization())?;
 		let delegate: T::AccountId = account("bitcoin-lock-delegate", 0, 0);
-		let mut state = benchmark_bitcoin_vault_provider_state::<T::AccountId, T::Balance>();
+		let mut state =
+			benchmark_bitcoin_vault_provider_state::<T::AccountId, <T as Config>::Balance>();
 		state
 			.vaults
 			.get_mut(&vault_id)
@@ -60,15 +66,15 @@ mod benchmarks {
 			&mut polkadot_sdk::sp_runtime::traits::TrailingZeroInput::zeroes(),
 		)
 		.map_err(|_| BenchmarkError::Stop("failed to decode benchmark fee coupon signature"))?;
-		let options = Some(LockOptions::V2 {
+		let options = Some(LockOptions {
 			microgons_at_target_per_btc,
-			fee_coupon: FeeCoupon {
-				fee_discount: T::Balance::zero(),
-				securitization_space_to_unreserve: T::Balance::zero(),
+			fee_coupon: Some(FeeCoupon {
+				fee_discount: <T as Config>::Balance::zero(),
+				securitization_space_to_unreserve: <T as Config>::Balance::zero(),
 				expires_at_frame: T::CurrentFrameId::get(),
 				nonce: 1,
 				signature,
-			},
+			}),
 		});
 		whitelist_account!(owner);
 
@@ -117,6 +123,7 @@ mod benchmarks {
 			1_000,
 		)
 		.map_err(|_| BenchmarkError::Stop("failed to seed release request"))?;
+		seed_migrated_release_hold::<T>(&context)?;
 		let operator = context.operator.clone();
 		whitelist_account!(operator);
 
@@ -124,51 +131,6 @@ mod benchmarks {
 		_(RawOrigin::Signed(operator), context.utxo_id, signature);
 
 		assert!(!LocksByUtxoId::<T>::contains_key(context.utxo_id));
-		Ok(())
-	}
-
-	#[benchmark]
-	fn ratchet() -> Result<(), BenchmarkError> {
-		reset_benchmark_environment::<T>();
-		let context = create_funded_lock::<T>(5)?;
-		let mut lock = LocksByUtxoId::<T>::get(context.utxo_id)
-			.ok_or(BenchmarkError::Stop("missing benchmark lock"))?;
-		let collateral_required = lock.get_securitization().collateral_required;
-
-		UtxoIdsByOwnerAccount::<T>::remove(&context.owner, context.utxo_id);
-		lock.owner_account = context.operator.clone();
-		lock.is_flexible = true;
-		LocksByUtxoId::<T>::insert(context.utxo_id, &lock);
-		UtxoIdsByOwnerAccount::<T>::insert(&context.operator, context.utxo_id, ());
-
-		let mut state = benchmark_bitcoin_vault_provider_state::<T::AccountId, T::Balance>();
-		let vault = state
-			.vaults
-			.get_mut(&context.vault_id)
-			.ok_or(BenchmarkError::Stop("missing benchmark vault"))?;
-		vault.securitization = collateral_required;
-		vault.securitization_target = collateral_required;
-		vault.securitization_locked = collateral_required;
-		vault.flexible_securitization_locked = collateral_required;
-		vault.locked_satoshis = context.satoshis;
-		vault.securitized_satoshis = context.satoshis;
-		vault.flexible_securitized_satoshis = context.satoshis;
-		set_benchmark_bitcoin_vault_provider_state(state);
-
-		T::Currency::mint_into(&context.operator, 1_000_000_000_000u128.into())
-			.map_err(|_| BenchmarkError::Stop("failed to fund benchmark vault operator"))?;
-		seed_price_state(80_000, 1, 1);
-		let options =
-			benchmark_lock_options::<T>(context.vault_id, &context.operator, context.satoshis, 13)?;
-		let operator = context.operator.clone();
-		whitelist_account!(operator);
-
-		#[extrinsic_call]
-		_(RawOrigin::Signed(operator), context.utxo_id, options);
-
-		let lock = LocksByUtxoId::<T>::get(context.utxo_id)
-			.ok_or(BenchmarkError::Stop("missing lock after ratchet"))?;
-		assert!(lock.is_funded);
 		Ok(())
 	}
 
@@ -217,6 +179,7 @@ mod benchmarks {
 		for index in 0..o {
 			let context = create_funded_lock::<T>(40u8.saturating_add(index as u8))?;
 			seed_overdue_release_request::<T>(&context, current_frame)?;
+			seed_migrated_release_hold::<T>(&context)?;
 			overdue_utxo_ids.push(context.utxo_id);
 		}
 
@@ -266,7 +229,7 @@ mod benchmarks {
 		{
 			let _ = Pallet::<T>::process_pending_funding_expirations(
 				pending_utxo_ids,
-				T::BitcoinBlockHeightChange::get().1.saturating_add(1),
+				T::BitcoinBlockHeightChange::get().1,
 			);
 		}
 
@@ -322,19 +285,51 @@ mod benchmarks {
 	}
 
 	#[benchmark]
-	fn increase_securitization() -> Result<(), BenchmarkError> {
+	fn resecuritize() -> Result<(), BenchmarkError> {
 		reset_benchmark_environment::<T>();
 		let context = create_unfunded_lock::<T>(9)?;
-		let new_satoshis = context.satoshis.saturating_add(10_000);
+		let lock = LocksByUtxoId::<T>::get(context.utxo_id)
+			.ok_or(BenchmarkError::Stop("missing benchmark lock"))?;
+		let securitized_satoshis = context.satoshis.saturating_add(10_000);
+		let microgons_at_target_per_btc = lock.microgons_at_target_per_btc;
+		seed_microgons_at_target_per_btc_history::<T>(microgons_at_target_per_btc)?;
+		seed_bitcoin_heights(100, 101);
+		let delegate: T::AccountId = account("bitcoin-lock-delegate", 9, 0);
+		let mut state =
+			benchmark_bitcoin_vault_provider_state::<T::AccountId, <T as Config>::Balance>();
+		state
+			.vaults
+			.get_mut(&lock.vault_id)
+			.ok_or(BenchmarkError::Stop("missing benchmark vault"))?
+			.delegate_account_id = Some(delegate);
+		set_benchmark_bitcoin_vault_provider_state(state);
+		let signature = T::FeeCouponSignature::decode(
+			&mut polkadot_sdk::sp_runtime::traits::TrailingZeroInput::zeroes(),
+		)
+		.map_err(|_| BenchmarkError::Stop("failed to decode benchmark fee coupon signature"))?;
 		let owner = context.owner.clone();
 		whitelist_account!(owner);
 
 		#[extrinsic_call]
-		_(RawOrigin::Signed(owner), context.utxo_id, new_satoshis);
+		_(
+			RawOrigin::Signed(owner),
+			context.utxo_id,
+			securitized_satoshis,
+			Some(LockOptions {
+				microgons_at_target_per_btc,
+				fee_coupon: Some(FeeCoupon {
+					fee_discount: <T as Config>::Balance::zero(),
+					securitization_space_to_unreserve: <T as Config>::Balance::zero(),
+					expires_at_frame: T::CurrentFrameId::get(),
+					nonce: 1,
+					signature,
+				}),
+			}),
+		);
 
 		let lock = LocksByUtxoId::<T>::get(context.utxo_id)
-			.ok_or(BenchmarkError::Stop("missing lock after increase"))?;
-		assert_eq!(lock.satoshis, new_satoshis);
+			.ok_or(BenchmarkError::Stop("missing lock after resecuritization"))?;
+		assert_eq!(lock.securitized_satoshis, securitized_satoshis);
 		Ok(())
 	}
 
@@ -363,17 +358,173 @@ mod benchmarks {
 	}
 
 	#[benchmark]
+	fn provider_fission_satoshis() -> Result<(), BenchmarkError> {
+		reset_benchmark_environment::<T>();
+		let context = create_funded_lock::<T>(18)?;
+		let lock = LocksByUtxoId::<T>::get(context.utxo_id)
+			.ok_or(BenchmarkError::Stop("missing benchmark lock"))?;
+		let fissioned_satoshis = context.satoshis / 2;
+		seed_microgons_at_target_per_btc_history::<T>(lock.microgons_at_target_per_btc)?;
+
+		#[block]
+		{
+			<Pallet<T> as BitcoinFissionLockProvider<
+				T::AccountId,
+				<T as Config>::Balance,
+			>>::fission_satoshis(
+				&context.owner,
+				context.utxo_id,
+				fissioned_satoshis,
+				lock.microgons_at_target_per_btc,
+			)
+			.map_err(|_| BenchmarkError::Stop("Fission allocation failed"))?;
+		}
+
+		assert_eq!(
+			LocksByUtxoId::<T>::get(context.utxo_id)
+				.ok_or(BenchmarkError::Stop("missing allocated lock"))?
+				.fissioned_satoshis,
+			fissioned_satoshis
+		);
+		Ok(())
+	}
+
+	#[benchmark]
+	fn provider_validate_fission() -> Result<(), BenchmarkError> {
+		reset_benchmark_environment::<T>();
+		let context = create_funded_lock::<T>(19)?;
+		let lock = LocksByUtxoId::<T>::get(context.utxo_id)
+			.ok_or(BenchmarkError::Stop("missing benchmark lock"))?;
+		let fissioned_satoshis = context.satoshis / 2;
+		seed_microgons_at_target_per_btc_history::<T>(lock.microgons_at_target_per_btc)?;
+		let (liquidity_promised, last_ratchet_tick) = <Pallet<T> as BitcoinFissionLockProvider<
+			T::AccountId,
+			<T as Config>::Balance,
+		>>::fission_satoshis(
+			&context.owner,
+			context.utxo_id,
+			fissioned_satoshis,
+			lock.microgons_at_target_per_btc,
+		)
+		.map_err(|_| BenchmarkError::Stop("failed to seed Fission allocation"))?;
+		pallet_bitcoin_fissions::FissionByOwnerAndId::<T>::insert(
+			&context.owner,
+			0,
+			pallet_bitcoin_fissions::Fission {
+				liquid_id: 0,
+				utxo_id: context.utxo_id,
+				satoshis: fissioned_satoshis,
+				microgons_at_target_per_btc: lock.microgons_at_target_per_btc,
+				last_ratchet_tick,
+				liquidity_promised,
+				created_at_argon_block: frame_system::Pallet::<T>::block_number(),
+				ratchet_number: 0,
+				last_updated_argon_block: frame_system::Pallet::<T>::block_number(),
+			},
+		);
+		pallet_bitcoin_fissions::FissionIdsByLockId::<T>::try_mutate(
+			context.utxo_id,
+			|fission_ids| fission_ids.try_insert(0).map(|_| ()),
+		)
+		.map_err(|_| BenchmarkError::Stop("failed to index benchmark Fission"))?;
+
+		#[block]
+		{
+			<Pallet<T> as BitcoinFissionLockProvider<
+				T::AccountId,
+				<T as Config>::Balance,
+			>>::validate_fission(
+				&context.owner,
+				context.utxo_id,
+				fissioned_satoshis,
+				lock.microgons_at_target_per_btc,
+				lock.securitization_tick,
+				liquidity_promised,
+				liquidity_promised,
+			)
+			.map_err(|_| BenchmarkError::Stop("Fission validation failed"))?;
+		}
+
+		Ok(())
+	}
+
+	#[benchmark]
+	fn provider_calculate_liquidity_promised() -> Result<(), BenchmarkError> {
+		reset_benchmark_environment::<T>();
+		seed_price_state(100_000, 1, 1);
+		let fissioned_satoshis = benchmark_satoshis::<T>() / 2;
+		let microgons_at_target_per_btc = benchmark_microgons_at_target_per_btc::<T>()?;
+		let liquidity_promised;
+
+		#[block]
+		{
+			liquidity_promised = <Pallet<T> as BitcoinFissionLockProvider<
+				T::AccountId,
+				<T as Config>::Balance,
+			>>::calculate_liquidity_promised(
+				fissioned_satoshis, microgons_at_target_per_btc
+			)
+			.map_err(|_| BenchmarkError::Stop("Fission liability calculation failed"))?;
+		}
+
+		assert!(!liquidity_promised.is_zero());
+		Ok(())
+	}
+
+	#[benchmark]
+	fn provider_fuse_satoshis() -> Result<(), BenchmarkError> {
+		reset_benchmark_environment::<T>();
+		let context = create_funded_lock::<T>(20)?;
+		let lock = LocksByUtxoId::<T>::get(context.utxo_id)
+			.ok_or(BenchmarkError::Stop("missing benchmark lock"))?;
+		let fissioned_satoshis = context.satoshis / 2;
+		seed_microgons_at_target_per_btc_history::<T>(lock.microgons_at_target_per_btc)?;
+		<Pallet<T> as BitcoinFissionLockProvider<
+			T::AccountId,
+			<T as Config>::Balance,
+		>>::fission_satoshis(
+			&context.owner,
+			context.utxo_id,
+			fissioned_satoshis,
+			lock.microgons_at_target_per_btc,
+		)
+		.map_err(|_| BenchmarkError::Stop("failed to seed Fission allocation"))?;
+
+		#[block]
+		{
+			<Pallet<T> as BitcoinFissionLockProvider<
+				T::AccountId,
+				<T as Config>::Balance,
+			>>::fuse_satoshis(
+				&context.owner,
+				context.utxo_id,
+				fissioned_satoshis,
+				lock.microgons_at_target_per_btc,
+			)
+			.map_err(|_| BenchmarkError::Stop("Fission deallocation failed"))?;
+		}
+
+		assert_eq!(
+			LocksByUtxoId::<T>::get(context.utxo_id)
+				.ok_or(BenchmarkError::Stop("missing deallocated lock"))?
+				.fissioned_satoshis,
+			0
+		);
+		Ok(())
+	}
+
+	#[benchmark]
 	fn provider_utxo_detected() -> Result<(), BenchmarkError> {
 		reset_benchmark_environment::<T>();
 		let context = create_unfunded_lock::<T>(11)?;
-		let received_satoshis = context.satoshis.saturating_sub(1_000);
+		let funded_satoshis = context.satoshis.saturating_sub(1_000);
 
 		#[block]
 		{
 			<Pallet<T> as BitcoinUtxoEvents<T::AccountId>>::utxo_detected(
 				context.utxo_id,
 				benchmark_utxo_ref(1_099),
-				received_satoshis,
+				funded_satoshis,
 				T::BitcoinBlockHeightChange::get().1,
 			)
 			.map_err(|_| BenchmarkError::Stop("utxo_detected failed"))?;
@@ -381,8 +532,8 @@ mod benchmarks {
 
 		let lock = LocksByUtxoId::<T>::get(context.utxo_id)
 			.ok_or(BenchmarkError::Stop("missing funded lock"))?;
-		assert!(lock.is_funded);
-		assert_eq!(lock.satoshis, received_satoshis);
+		assert!(lock.is_funded());
+		assert_eq!(lock.funded_satoshis, funded_satoshis);
 		Ok(())
 	}
 
@@ -400,6 +551,7 @@ mod benchmarks {
 			1_000,
 		)
 		.map_err(|_| BenchmarkError::Stop("failed to seed release request"))?;
+		seed_migrated_release_hold::<T>(&context)?;
 
 		#[block]
 		{
@@ -417,7 +569,6 @@ mod benchmarks {
 struct LockBenchmarkContext<T: Config> {
 	owner: T::AccountId,
 	operator: T::AccountId,
-	vault_id: VaultId,
 	utxo_id: UtxoId,
 	satoshis: Satoshis,
 }
@@ -430,7 +581,6 @@ where
 	reset_benchmark_bitcoin_utxo_tracker_state();
 	reset_benchmark_bitcoin_locks_runtime_state();
 	reset_benchmark_bitcoin_vault_provider_state();
-	reset_benchmark_utxo_lock_events_state();
 	set_benchmark_price_provider_state(BenchmarkPriceProviderState::default());
 	set_benchmark_bitcoin_utxo_tracker_state(BenchmarkBitcoinUtxoTrackerState {
 		bitcoin_network: BitcoinNetwork::Regtest,
@@ -441,7 +591,7 @@ where
 	frame_system::Pallet::<T>::set_block_number(1u32.into());
 	NextUtxoId::<T>::kill();
 	MinimumSatoshis::<T>::put(benchmark_satoshis::<T>().saturating_sub(1));
-	MicrogonPerBtcHistory::<T>::kill();
+	MicrogonsAtTargetPerBtcHistory::<T>::kill();
 }
 
 fn benchmark_satoshis<T: Config>() -> Satoshis {
@@ -465,19 +615,8 @@ fn seed_microgons_at_target_per_btc_history<T: Config>(
 ) -> Result<(), BenchmarkError> {
 	let history = BoundedVec::try_from(vec![(T::CurrentTick::get(), microgons_at_target_per_btc)])
 		.map_err(|_| BenchmarkError::Stop("benchmark microgons per btc history overflow"))?;
-	MicrogonPerBtcHistory::<T>::put(history);
+	MicrogonsAtTargetPerBtcHistory::<T>::put(history);
 	Ok(())
-}
-
-fn benchmark_lock_options<T: Config>(
-	_vault_id: VaultId,
-	_account_id: &T::AccountId,
-	_max_satoshis: Satoshis,
-	_seed_hint: u8,
-) -> Result<Option<LockOptions<T>>, BenchmarkError> {
-	let microgons_at_target_per_btc = benchmark_microgons_at_target_per_btc::<T>()?;
-	seed_microgons_at_target_per_btc_history::<T>(microgons_at_target_per_btc)?;
-	Ok(Some(LockOptions::V1 { microgons_at_target_per_btc: Some(microgons_at_target_per_btc) }))
 }
 
 fn benchmark_block_hash(seed: u8) -> H256Le {
@@ -560,8 +699,8 @@ where
 		reserved_securitization_space: T::Balance::zero(),
 		securitization_pending_activation: T::Balance::zero(),
 		locked_satoshis: 0,
-		securitized_satoshis: 0,
-		flexible_securitized_satoshis: 0,
+		ratio_adjusted_satoshis: 0,
+		flexible_ratio_adjusted_satoshis: 0,
 		securitization_release_schedule: BoundedBTreeMap::default(),
 		securitization_ratio: FixedU128::one(),
 		is_closed: false,
@@ -591,10 +730,8 @@ where
 	let owner_pubkey = benchmark_pubkey::<T>(seed_hint.saturating_add(100))?;
 	seed_price_state(100_000, 1, 1);
 	seed_bitcoin_heights(100, 100);
-	T::Currency::mint_into(&owner, 1_000_000_000_000u128.into())
-		.map_err(|_| BenchmarkError::Stop("failed to fund benchmark lock owner"))?;
 	let vault_id = create_vault::<T>(&operator, seed_hint, benchmark_vault_securitization())?;
-	Pallet::<T>::initialize(
+	Pallet::<T>::create_receive_address(
 		frame_system::RawOrigin::Signed(owner.clone()).into(),
 		vault_id,
 		satoshis,
@@ -604,7 +741,7 @@ where
 	.map_err(|_| BenchmarkError::Stop("failed to create benchmark lock"))?;
 	let utxo_id =
 		NextUtxoId::<T>::get().ok_or(BenchmarkError::Stop("missing benchmark utxo id"))?;
-	Ok(LockBenchmarkContext { owner, operator, vault_id, utxo_id, satoshis })
+	Ok(LockBenchmarkContext { owner, operator, utxo_id, satoshis })
 }
 
 fn create_funded_lock<T>(seed_hint: u8) -> Result<LockBenchmarkContext<T>, BenchmarkError>
@@ -678,5 +815,22 @@ where
 			.try_insert(context.utxo_id)
 			.map_err(|_| BenchmarkError::Stop("overdue cosign set overflow"))
 	})?;
+	Ok(())
+}
+
+fn seed_migrated_release_hold<T>(context: &LockBenchmarkContext<T>) -> Result<(), BenchmarkError>
+where
+	T: Config,
+{
+	let release_hold = LockReleaseRequestsByUtxoId::<T>::get(context.utxo_id)
+		.ok_or(BenchmarkError::Stop("missing seeded release request"))?
+		.securitization_at_risk;
+	let owner_balance = T::Currency::minimum_balance().saturating_add(release_hold);
+	T::Currency::mint_into(&context.owner, owner_balance)
+		.map_err(|_| BenchmarkError::Stop("failed to seed release hold balance"))?;
+	T::Currency::hold(&HoldReason::ReleaseBitcoinLock.into(), &context.owner, release_hold)
+		.map_err(|_| BenchmarkError::Stop("failed to seed migrated release hold"))?;
+	frame_system::Pallet::<T>::inc_providers(&context.owner);
+	MigratedReleaseHoldByUtxoId::<T>::insert(context.utxo_id, release_hold);
 	Ok(())
 }

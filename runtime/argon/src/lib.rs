@@ -116,6 +116,8 @@ mod runtime {
 	pub type Utility = pallet_utility;
 	#[runtime::pallet_index(26)]
 	pub type Sudo = pallet_sudo;
+	#[runtime::pallet_index(27)]
+	pub type BitcoinFissions = pallet_bitcoin_fissions;
 
 	#[runtime::pallet_index(31)]
 	pub type Treasury = pallet_treasury;
@@ -331,13 +333,10 @@ impl pallet_bitcoin_locks::Config for Runtime {
 		Runtime,
 		weights::pallet_bitcoin_locks::WeightInfo<Runtime>,
 	>;
-	type Currency = Balances;
 	type Balance = Balance;
+	type Currency = Balances;
 	type RuntimeHoldReason = RuntimeHoldReason;
-	type LockEvents = use_unless_benchmark!(
-		(Mint, OperationalAccounts),
-		benchmarking::BenchmarkUtxoLockEvents<AccountId, Balance>
-	);
+	type FissionsProvider = BitcoinFissions;
 	type BitcoinUtxoTracker =
 		use_unless_benchmark!(BitcoinUtxos, benchmarking::BenchmarkBitcoinUtxoTracker);
 	type PriceProvider =
@@ -641,6 +640,26 @@ impl pallet_bitcoin_utxos::Config for Runtime {
 	type MinimumSatoshisPerUtxo = GetMinimumSatoshisPerLock;
 }
 
+impl pallet_bitcoin_fissions::Config for Runtime {
+	type WeightInfo = pallet_bitcoin_fissions::WithProviderWeights<
+		Runtime,
+		weights::pallet_bitcoin_fissions::WeightInfo<Runtime>,
+	>;
+	type Balance = Balance;
+	type LockProvider = use_unless_benchmark!(
+		BitcoinLocks,
+		benchmarking::BenchmarkBitcoinFissionLockProvider<AccountId, Balance>
+	);
+	type Minting = use_unless_benchmark!(
+		Mint,
+		benchmarking::BenchmarkBitcoinFissionMinting<AccountId, Balance>
+	);
+	type OperationalAccountsHook = use_unless_benchmark!(OperationalAccounts, ());
+	type Currency = Balances;
+	type MaxFissionsPerLock = MaxFissionsPerLock;
+	type MinimumRatchetPercent = MinimumFissionRatchetPercent;
+}
+
 impl pallet_mint::Config for Runtime {
 	type WeightInfo = weights::pallet_mint::WeightInfo<Runtime>;
 	type Currency = Balances;
@@ -765,9 +784,9 @@ impl pallet_operational_accounts::Config for Runtime {
 		MiningSlot,
 		benchmarking::BenchmarkOperationalAccountsMiningSlotProvider<AccountId>
 	);
-	type BitcoinLocksProvider = use_unless_benchmark!(
-		BitcoinLocks,
-		benchmarking::BenchmarkOperationalAccountsBitcoinLocksProvider<AccountId, Balance>
+	type BitcoinFissionsProvider = use_unless_benchmark!(
+		BitcoinFissions,
+		benchmarking::BenchmarkOperationalAccountsBitcoinFissionsProvider<AccountId, Balance>
 	);
 	type TreasuryPoolProvider = use_unless_benchmark!(
 		Treasury,

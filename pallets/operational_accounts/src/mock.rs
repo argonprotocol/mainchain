@@ -2,7 +2,7 @@ use crate as pallet_operational_accounts;
 use argon_primitives::{
 	tick::Ticker,
 	vault::{BitcoinVaultProvider, RegistrationVaultData},
-	BitcoinLocksProvider, MiningSlotProvider, OperationalRewardsPayer, TickProvider,
+	BitcoinFissionsProvider, MiningSlotProvider, OperationalRewardsPayer, TickProvider,
 	TreasuryPoolProvider, UniswapTransferProvider, VotingSchedule, MICROGONS_PER_ARGON,
 };
 use frame_support::traits::{
@@ -107,7 +107,7 @@ parameter_types! {
 		BTreeMap<TestAccountId, Balance> = BTreeMap::new();
 	pub static MicrogonsOutByAccount:
 		BTreeMap<TestAccountId, Balance> = BTreeMap::new();
-	pub static FundedBitcoinAmountsByAccount:
+	pub static FissionLiquidityByAccount:
 		BTreeMap<TestAccountId, Balance> = BTreeMap::new();
 	pub static RegistrationVaultDataByAccount:
 		BTreeMap<TestAccountId, RegistrationVaultData<Balance>> = BTreeMap::new();
@@ -193,10 +193,10 @@ impl BitcoinVaultProvider for MockVaultProvider {
 		unimplemented!()
 	}
 
-	fn add_securitized_satoshis(
+	fn activate_securitization(
 		_vault_id: VaultId,
-		_satoshis: argon_primitives::bitcoin::Satoshis,
-		_securitization_ratio: FixedU128,
+		_securitization: &argon_primitives::vault::BitcoinSecuritization<Self::Balance>,
+		_funded_satoshis: argon_primitives::bitcoin::Satoshis,
 	) -> Result<(), argon_primitives::vault::VaultError> {
 		unimplemented!()
 	}
@@ -211,26 +211,26 @@ impl BitcoinVaultProvider for MockVaultProvider {
 
 	fn set_bitcoin_lock_flexible(
 		_vault_id: VaultId,
-		_securitization: &argon_primitives::vault::Securitization<Self::Balance>,
-		_satoshis: argon_primitives::bitcoin::Satoshis,
+		_securitization: &argon_primitives::vault::BitcoinSecuritization<Self::Balance>,
+		_funded_satoshis: argon_primitives::bitcoin::Satoshis,
 		_is_flexible: bool,
 	) -> Result<(), argon_primitives::vault::VaultError> {
 		unimplemented!()
 	}
 
-	fn lock(
+	fn reserve_securitization(
 		_vault_id: VaultId,
 		_locker: &Self::AccountId,
-		_securitization: &argon_primitives::vault::Securitization<Self::Balance>,
-		_request: argon_primitives::vault::VaultLockRequest<'_, Self::Balance>,
+		_securitization: &argon_primitives::vault::BitcoinSecuritization<Self::Balance>,
+		_request: argon_primitives::vault::ReserveSecuritizationRequest<Self::Balance>,
 	) -> Result<(Self::Balance, Self::Balance), argon_primitives::vault::VaultError> {
 		unimplemented!()
 	}
 
-	fn schedule_for_release(
+	fn schedule_securitization_release(
 		_vault_id: VaultId,
-		_securitization: &argon_primitives::vault::Securitization<Self::Balance>,
-		_satoshis: argon_primitives::bitcoin::Satoshis,
+		_securitization: &argon_primitives::vault::BitcoinSecuritization<Self::Balance>,
+		_funded_satoshis: argon_primitives::bitcoin::Satoshis,
 		_lock_extension: &argon_primitives::vault::LockExtension<Self::Balance>,
 		_is_flexible: bool,
 	) -> Result<(), argon_primitives::vault::VaultError> {
@@ -239,15 +239,15 @@ impl BitcoinVaultProvider for MockVaultProvider {
 
 	fn return_securitization(
 		_vault_id: VaultId,
-		_securitization: &argon_primitives::vault::Securitization<Self::Balance>,
+		_securitization: &argon_primitives::vault::BitcoinSecuritization<Self::Balance>,
 	) -> Result<(), argon_primitives::vault::VaultError> {
 		unimplemented!()
 	}
 
 	fn burn(
 		_vault_id: VaultId,
-		_securitization: &argon_primitives::vault::Securitization<Self::Balance>,
-		_satoshis: argon_primitives::bitcoin::Satoshis,
+		_securitization: &argon_primitives::vault::BitcoinSecuritization<Self::Balance>,
+		_funded_satoshis: argon_primitives::bitcoin::Satoshis,
 		_market_rate: Self::Balance,
 		_lock_extension: &argon_primitives::vault::LockExtension<Self::Balance>,
 		_is_flexible: bool,
@@ -258,12 +258,15 @@ impl BitcoinVaultProvider for MockVaultProvider {
 	fn compensate_lost_bitcoin(
 		_vault_id: VaultId,
 		_beneficiary: &Self::AccountId,
-		_securitization: &argon_primitives::vault::Securitization<Self::Balance>,
-		_satoshis: argon_primitives::bitcoin::Satoshis,
+		_securitization: &argon_primitives::vault::BitcoinSecuritization<Self::Balance>,
+		_funded_satoshis: argon_primitives::bitcoin::Satoshis,
 		_market_rate: Self::Balance,
 		_lock_extension: &argon_primitives::vault::LockExtension<Self::Balance>,
 		_is_flexible: bool,
-	) -> Result<Self::Balance, argon_primitives::vault::VaultError> {
+	) -> Result<
+		argon_primitives::vault::LostBitcoinCompensation<Self::Balance>,
+		argon_primitives::vault::VaultError,
+	> {
 		unimplemented!()
 	}
 
@@ -281,13 +284,6 @@ impl BitcoinVaultProvider for MockVaultProvider {
 		),
 		argon_primitives::vault::VaultError,
 	> {
-		unimplemented!()
-	}
-
-	fn remove_pending(
-		_vault_id: VaultId,
-		_securitization: &argon_primitives::vault::Securitization<Self::Balance>,
-	) -> Result<(), argon_primitives::vault::VaultError> {
 		unimplemented!()
 	}
 
@@ -318,15 +314,12 @@ impl MiningSlotProvider<TestAccountId> for MockMiningSlotProvider {
 	}
 }
 
-pub struct MockBitcoinLocksProvider;
-impl BitcoinLocksProvider<TestAccountId, Balance> for MockBitcoinLocksProvider {
+pub struct MockBitcoinFissionsProvider;
+impl BitcoinFissionsProvider<TestAccountId, Balance> for MockBitcoinFissionsProvider {
 	type Weights = ();
 
-	fn get_account_funded_bitcoin_amount(account_id: &TestAccountId) -> Balance {
-		FundedBitcoinAmountsByAccount::get()
-			.get(account_id)
-			.copied()
-			.unwrap_or_default()
+	fn get_account_fission_liquidity(account_id: &TestAccountId) -> Balance {
+		FissionLiquidityByAccount::get().get(account_id).copied().unwrap_or_default()
 	}
 }
 
@@ -423,7 +416,7 @@ impl pallet_operational_accounts::Config for Test {
 	type OperationalCertificationBonusReward = OperationalCertificationBonusReward;
 	type VaultProvider = MockVaultProvider;
 	type MiningSlotProvider = MockMiningSlotProvider;
-	type BitcoinLocksProvider = MockBitcoinLocksProvider;
+	type BitcoinFissionsProvider = MockBitcoinFissionsProvider;
 	type TreasuryPoolProvider = MockTreasuryPoolProvider;
 	type UniswapTransferProvider = MockUniswapTransferProvider;
 	type Currency = Balances;
@@ -446,7 +439,7 @@ pub fn new_test_ext() -> TestState {
 		IsCrosschainActivated::set(true);
 		MicrogonsInByAccount::set(BTreeMap::new());
 		MicrogonsOutByAccount::set(BTreeMap::new());
-		FundedBitcoinAmountsByAccount::set(BTreeMap::new());
+		FissionLiquidityByAccount::set(BTreeMap::new());
 		RegistrationVaultDataByAccount::set(BTreeMap::new());
 		ActiveBondAmountsByVaultAndAccount::set(BTreeMap::new());
 		ActiveMiningRewardsAccounts::set(BTreeSet::new());
@@ -473,17 +466,14 @@ pub fn record_microgons_out(account_id: &TestAccountId, amount: Balance) {
 	});
 }
 
-pub fn record_funded_bitcoin_amount(account_id: &TestAccountId, amount: Balance) {
-	FundedBitcoinAmountsByAccount::mutate(|accounts| {
+pub fn record_fission_liquidity(account_id: &TestAccountId, amount: Balance) {
+	FissionLiquidityByAccount::mutate(|accounts| {
 		accounts.insert(account_id.clone(), amount);
 	});
 }
 
-pub fn funded_bitcoin_amount(account_id: &TestAccountId) -> Balance {
-	FundedBitcoinAmountsByAccount::get()
-		.get(account_id)
-		.copied()
-		.unwrap_or_default()
+pub fn fission_liquidity(account_id: &TestAccountId) -> Balance {
+	FissionLiquidityByAccount::get().get(account_id).copied().unwrap_or_default()
 }
 
 pub fn record_active_vault_bond_amount(

@@ -61,6 +61,88 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       VestingBalance: AugmentedError<ApiType>;
     };
+    bitcoinFissions: {
+      /**
+       * A Fission already exists under this owner and Fission ID.
+       **/
+      FissionAlreadyExists: AugmentedError<ApiType>;
+      /**
+       * A Fission must allocate at least one satoshi.
+       **/
+      FissionHasNoSatoshis: AugmentedError<ApiType>;
+      /**
+       * The submitted Fission ID is below the owner's current minimum.
+       **/
+      FissionIdBelowMinimum: AugmentedError<ApiType>;
+      /**
+       * The owner's Fission ID counter cannot be incremented.
+       **/
+      FissionIdOverflow: AugmentedError<ApiType>;
+      /**
+       * No Fission exists under this owner and Fission ID.
+       **/
+      FissionNotFound: AugmentedError<ApiType>;
+      /**
+       * The requested target-normalized BTC value is not present in recent price history.
+       **/
+      IneligibleMicrogonsAtTargetPerBtc: AugmentedError<ApiType>;
+      /**
+       * A source Lock has fewer active Fission satoshis than the Fission being closed.
+       **/
+      InsufficientFissionedSatoshis: AugmentedError<ApiType>;
+      /**
+       * A requested source Lock does not have enough unallocated funded satoshis.
+       **/
+      InsufficientFundedSatoshis: AugmentedError<ApiType>;
+      /**
+       * The Fission owner cannot burn the complete redemption amount.
+       **/
+      InsufficientFunds: AugmentedError<ApiType>;
+      /**
+       * A source Lock's securitization does not cover the requested allocation and liability.
+       **/
+      InsufficientSecuritization: AugmentedError<ApiType>;
+      /**
+       * The requested source Lock does not exist.
+       **/
+      LockNotFound: AugmentedError<ApiType>;
+      /**
+       * A requested source Lock has no confirmed funding satoshis.
+       **/
+      LockNotFunded: AugmentedError<ApiType>;
+      /**
+       * A requested source Lock is already in the release process.
+       **/
+      LockReleasePending: AugmentedError<ApiType>;
+      /**
+       * The requested price-history entry predates the Fission or Lock coverage floor.
+       **/
+      MicrogonsAtTargetPerBtcTickOlderThanCurrent: AugmentedError<ApiType>;
+      /**
+       * No current Bitcoin price is available to calculate the redemption amount.
+       **/
+      NoBitcoinPricesAvailable: AugmentedError<ApiType>;
+      /**
+       * The caller does not own a requested source Lock.
+       **/
+      NoPermissions: AugmentedError<ApiType>;
+      /**
+       * The Fission did not meet both the minimum change and Lock coverage requirements.
+       **/
+      NoRatchetingAvailable: AugmentedError<ApiType>;
+      /**
+       * A Fission allocation, liability, or identifier overflowed.
+       **/
+      Overflow: AugmentedError<ApiType>;
+      /**
+       * The Fission's ratchet counter cannot be incremented.
+       **/
+      RatchetNumberOverflow: AugmentedError<ApiType>;
+      /**
+       * The source Lock already has the maximum number of active Fissions.
+       **/
+      TooManyFissionsForLock: AugmentedError<ApiType>;
+    };
     bitcoinLocks: {
       /**
        * The proposed transaction would take the account below the minimum (existential) balance
@@ -107,9 +189,9 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       FeeCouponExpired: AugmentedError<ApiType>;
       /**
-       * Fee coupons can only be applied when initializing a lock.
+       * The Lock records fissioned satoshis without matching active Fission requirements.
        **/
-      FeeCouponOnlyForInitialization: AugmentedError<ApiType>;
+      FissionStateMismatch: AugmentedError<ApiType>;
       /**
        * Cannot request an orphaned release for the funding UTXO
        **/
@@ -123,14 +205,18 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       HoldUnexpectedlyModified: AugmentedError<ApiType>;
       /**
-       * An ineligible microgon rate per btc was requested
+       * The requested target-normalized BTC value is not present in recent price history.
        **/
-      IneligibleMicrogonRateRequested: AugmentedError<ApiType>;
+      IneligibleMicrogonsAtTargetPerBtcRequested: AugmentedError<ApiType>;
       InsufficientFunds: AugmentedError<ApiType>;
       /**
-       * The minimum number of satoshis was not met
+       * The requested Lock securitization has fewer satoshis than its active Fissions.
        **/
-      InsufficientSatoshisLocked: AugmentedError<ApiType>;
+      InsufficientSatoshisForFissions: AugmentedError<ApiType>;
+      /**
+       * The requested Lock securitization does not cover its active Fission liabilities.
+       **/
+      InsufficientSecuritizationForFissions: AugmentedError<ApiType>;
       InsufficientVaultFunds: AugmentedError<ApiType>;
       /**
        * The bitcoin script to lock this bitcoin has errors
@@ -145,7 +231,11 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       InvalidVaultAmount: AugmentedError<ApiType>;
       /**
-       * A lock in process of release cannot be ratcheted
+       * The Lock cannot be released while it has active Fissions.
+       **/
+      LockHasActiveFissions: AugmentedError<ApiType>;
+      /**
+       * A Lock in the release process cannot be resecuritized.
        **/
       LockInProcessOfRelease: AugmentedError<ApiType>;
       /**
@@ -161,6 +251,10 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       MaxOrphanedUtxoReleaseRequestsExceeded: AugmentedError<ApiType>;
       /**
+       * The requested price-history entry predates the Lock's current securitization.
+       **/
+      MicrogonsAtTargetPerBtcTickOlderThanCurrent: AugmentedError<ApiType>;
+      /**
        * The price provider has no bitcoin prices available. This is a temporary error
        **/
       NoBitcoinPricesAvailable: AugmentedError<ApiType>;
@@ -169,9 +263,9 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       NoPermissions: AugmentedError<ApiType>;
       /**
-       * Nothing to ratchet
+       * The requested securitization matches the Lock's current securitization.
        **/
-      NoRatchetingAvailable: AugmentedError<ApiType>;
+      NoResecuritizationChange: AugmentedError<ApiType>;
       /**
        * No Vault public keys are available
        **/

@@ -47,7 +47,9 @@ macro_rules! call_filters {
 					RuntimeCall::Vaults(..) |
 						RuntimeCall::Treasury(pallet_treasury::Call::buy_bonds { .. }) |
 						RuntimeCall::Treasury(pallet_treasury::Call::liquidate_bond_lot { .. }) |
-						RuntimeCall::BitcoinLocks(pallet_bitcoin_locks::Call::initialize { .. }) |
+						RuntimeCall::BitcoinLocks(
+							pallet_bitcoin_locks::Call::create_receive_address { .. }
+						) |
 						RuntimeCall::BitcoinLocks(
 							pallet_bitcoin_locks::Call::cosign_release { .. }
 						) | RuntimeCall::BitcoinLocks(

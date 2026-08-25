@@ -70,46 +70,34 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for MigrateUtxoTracking<T> {
 
 		let locked_utxos = old_storage::LockedUtxos::<T>::iter().collect::<Vec<_>>();
 		for (utxo_ref, watch) in locked_utxos {
-			let inserted = UtxoRefsByUtxoId::<T>::try_mutate(watch.utxo_id, |refs| {
+			UtxoRefsByUtxoId::<T>::try_mutate(watch.utxo_id, |refs| {
 				refs.try_insert(utxo_ref.clone()).map_err(|_| ())
-			});
-			if inserted.is_ok() {
-				let watch = UtxoAddress::from(watch);
-				UtxoIdByScriptPubkey::<T>::insert(watch.script_pubkey, watch.utxo_id);
-				UtxoAddressByUtxoId::<T>::insert(watch.utxo_id, watch);
-				old_storage::LockedUtxos::<T>::remove(&utxo_ref);
-				weight.saturating_accrue(T::DbWeight::get().writes(3));
-			}
+			})
+			.expect("known legacy UTXO refs fit in the new tracker");
+			let watch = UtxoAddress::from(watch);
+			UtxoIdByScriptPubkey::<T>::insert(watch.script_pubkey, watch.utxo_id);
+			UtxoAddressByUtxoId::<T>::insert(watch.utxo_id, watch);
+			old_storage::LockedUtxos::<T>::remove(&utxo_ref);
+			weight.saturating_accrue(T::DbWeight::get().writes(3));
 		}
 
 		let candidate_utxos =
 			old_storage::CandidateUtxoRefsByUtxoId::<T>::iter().collect::<Vec<_>>();
 		for (utxo_id, candidates) in candidate_utxos {
-			let mut migrated = true;
 			for (utxo_ref, satoshis) in candidates {
-				if UtxoRefsByUtxoId::<T>::try_mutate(utxo_id, |refs| {
+				UtxoRefsByUtxoId::<T>::try_mutate(utxo_id, |refs| {
 					if refs.contains(&utxo_ref) {
 						Ok(())
 					} else {
 						refs.try_insert(utxo_ref.clone()).map(|_| ())
 					}
 				})
-				.is_err() || T::EventHandler::utxo_detected(
-					utxo_id,
-					utxo_ref,
-					satoshis,
-					BitcoinHeight::MAX,
-				)
-				.is_err()
-				{
-					migrated = false;
-					break;
-				}
+				.expect("known legacy candidate UTXO refs fit in the new tracker");
+				T::EventHandler::utxo_detected(utxo_id, utxo_ref, satoshis, BitcoinHeight::MAX)
+					.expect("legacy candidate UTXOs replay after Bitcoin Locks are migrated");
 			}
-			if migrated {
-				old_storage::CandidateUtxoRefsByUtxoId::<T>::remove(utxo_id);
-				weight.saturating_accrue(T::DbWeight::get().writes(2));
-			}
+			old_storage::CandidateUtxoRefsByUtxoId::<T>::remove(utxo_id);
+			weight.saturating_accrue(T::DbWeight::get().writes(2));
 		}
 
 		weight

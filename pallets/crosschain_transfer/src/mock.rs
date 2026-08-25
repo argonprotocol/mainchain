@@ -376,10 +376,10 @@ impl BitcoinVaultProvider for MockVaultProvider {
 		unimplemented!()
 	}
 
-	fn add_securitized_satoshis(
+	fn activate_securitization(
 		_vault_id: VaultId,
-		_satoshis: argon_primitives::bitcoin::Satoshis,
-		_securitization_ratio: sp_runtime::FixedU128,
+		_securitization: &argon_primitives::vault::BitcoinSecuritization<Self::Balance>,
+		_funded_satoshis: argon_primitives::bitcoin::Satoshis,
 	) -> Result<(), argon_primitives::vault::VaultError> {
 		unimplemented!()
 	}
@@ -394,26 +394,26 @@ impl BitcoinVaultProvider for MockVaultProvider {
 
 	fn set_bitcoin_lock_flexible(
 		_vault_id: VaultId,
-		_securitization: &argon_primitives::vault::Securitization<Self::Balance>,
-		_satoshis: argon_primitives::bitcoin::Satoshis,
+		_securitization: &argon_primitives::vault::BitcoinSecuritization<Self::Balance>,
+		_funded_satoshis: argon_primitives::bitcoin::Satoshis,
 		_is_flexible: bool,
 	) -> Result<(), argon_primitives::vault::VaultError> {
 		unimplemented!()
 	}
 
-	fn lock(
+	fn reserve_securitization(
 		_vault_id: VaultId,
 		_locker: &Self::AccountId,
-		_securitization: &argon_primitives::vault::Securitization<Self::Balance>,
-		_request: argon_primitives::vault::VaultLockRequest<'_, Self::Balance>,
+		_securitization: &argon_primitives::vault::BitcoinSecuritization<Self::Balance>,
+		_request: argon_primitives::vault::ReserveSecuritizationRequest<Self::Balance>,
 	) -> Result<(Self::Balance, Self::Balance), argon_primitives::vault::VaultError> {
 		unimplemented!()
 	}
 
-	fn schedule_for_release(
+	fn schedule_securitization_release(
 		_vault_id: VaultId,
-		_securitization: &argon_primitives::vault::Securitization<Self::Balance>,
-		_satoshis: argon_primitives::bitcoin::Satoshis,
+		_securitization: &argon_primitives::vault::BitcoinSecuritization<Self::Balance>,
+		_funded_satoshis: argon_primitives::bitcoin::Satoshis,
 		_lock_extension: &argon_primitives::vault::LockExtension<Self::Balance>,
 		_is_flexible: bool,
 	) -> Result<(), argon_primitives::vault::VaultError> {
@@ -422,15 +422,15 @@ impl BitcoinVaultProvider for MockVaultProvider {
 
 	fn return_securitization(
 		_vault_id: VaultId,
-		_securitization: &argon_primitives::vault::Securitization<Self::Balance>,
+		_securitization: &argon_primitives::vault::BitcoinSecuritization<Self::Balance>,
 	) -> Result<(), argon_primitives::vault::VaultError> {
 		unimplemented!()
 	}
 
 	fn burn(
 		_vault_id: VaultId,
-		_securitization: &argon_primitives::vault::Securitization<Self::Balance>,
-		_satoshis: argon_primitives::bitcoin::Satoshis,
+		_securitization: &argon_primitives::vault::BitcoinSecuritization<Self::Balance>,
+		_funded_satoshis: argon_primitives::bitcoin::Satoshis,
 		_market_rate: Self::Balance,
 		_lock_extension: &argon_primitives::vault::LockExtension<Self::Balance>,
 		_is_flexible: bool,
@@ -441,12 +441,15 @@ impl BitcoinVaultProvider for MockVaultProvider {
 	fn compensate_lost_bitcoin(
 		_vault_id: VaultId,
 		_beneficiary: &Self::AccountId,
-		_securitization: &argon_primitives::vault::Securitization<Self::Balance>,
-		_satoshis: argon_primitives::bitcoin::Satoshis,
+		_securitization: &argon_primitives::vault::BitcoinSecuritization<Self::Balance>,
+		_funded_satoshis: argon_primitives::bitcoin::Satoshis,
 		_market_rate: Self::Balance,
 		_lock_extension: &argon_primitives::vault::LockExtension<Self::Balance>,
 		_is_flexible: bool,
-	) -> Result<Self::Balance, argon_primitives::vault::VaultError> {
+	) -> Result<
+		argon_primitives::vault::LostBitcoinCompensation<Self::Balance>,
+		argon_primitives::vault::VaultError,
+	> {
 		unimplemented!()
 	}
 
@@ -464,13 +467,6 @@ impl BitcoinVaultProvider for MockVaultProvider {
 		),
 		argon_primitives::vault::VaultError,
 	> {
-		unimplemented!()
-	}
-
-	fn remove_pending(
-		_vault_id: VaultId,
-		_securitization: &argon_primitives::vault::Securitization<Self::Balance>,
-	) -> Result<(), argon_primitives::vault::VaultError> {
 		unimplemented!()
 	}
 

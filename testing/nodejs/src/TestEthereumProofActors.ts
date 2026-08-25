@@ -4,13 +4,15 @@ import {
   decodeAddress,
   dispatchErrorToString,
   EvmContracts,
+  FIXED_U128_DECIMALS,
   getEthereumBeaconSyncBootstrapTx,
+  hexToU8a,
   Keyring,
   type KeyringPair,
+  PERMILL_DECIMALS,
+  type SubmittableExtrinsic,
   toFixedNumber,
-  TxSubmitter,
   U8aFixed,
-  Vault,
   Vec,
 } from '@argonprotocol/mainchain';
 import { privateKeyToAccount } from 'viem/accounts';
@@ -34,6 +36,7 @@ import {
 } from './EthereumE2eUtils';
 import TestEthereum from './TestEthereum';
 import TestMainchain from './TestMainchain';
+import { submitTx } from './submitTx';
 
 const { argonTokenAbi, mintingGatewayAbi, MINTING_GATEWAY_RUNTIME_TO_ERC20_SCALE } = EvmContracts;
 const MINIMAL_BOOTSTRAP_FINALIZED_SLOT = 64n;
@@ -144,17 +147,12 @@ export class EthereumProofE2eHarness {
     );
   }
 
-  async submit(tx: unknown, signer: KeyringPair) {
-    const result = await new TxSubmitter(this.mainchainClient, tx as never, signer).submit();
-    await result.waitForInFirstBlock;
-    return result;
+  async submit(tx: SubmittableExtrinsic, signer: KeyringPair) {
+    return submitTx(this.mainchainClient, tx, signer);
   }
 
-  async sudoSubmit(tx: unknown) {
-    const result = await this.submit(
-      this.mainchainClient.tx.sudo.sudo(tx as never),
-      this.sudoSigner,
-    );
+  async sudoSubmit(tx: SubmittableExtrinsic) {
+    const result = await this.submit(this.mainchainClient.tx.sudo.sudo(tx.method), this.sudoSigner);
     const sudoEvent = result.events.find(event => this.mainchainClient.events.sudo.Sudid.is(event));
     if (!sudoEvent || !this.mainchainClient.events.sudo.Sudid.is(sudoEvent)) {
       throw new Error('sudo did not emit sudo.Sudid');
@@ -533,20 +531,26 @@ export class TestMintingAuthorityActor {
     freeBalance: bigint;
     ownershipBalance: bigint;
     committedArgonots: bigint;
-    bitcoinXpub: string;
+    bitcoinXpubBytesHex: string;
   }) {
     await this.harness.forceSetBalance(this.operator.address, args.freeBalance);
     await this.harness.forceSetOwnership(this.operator.address, args.ownershipBalance);
 
-    const vault = await Vault.create(this.harness.mainchainClient, this.operator, {
-      securitization: 1_000_000_000n,
-      securitizationRatio: 1,
-      annualPercentRate: 0.05,
-      baseFee: 0n,
-      bitcoinXpub: args.bitcoinXpub,
-      treasuryProfitSharing: 0,
-    });
-    await vault.getVault();
+    await this.harness.submit(
+      this.harness.mainchainClient.tx.vaults.create({
+        terms: {
+          bitcoinAnnualPercentRate: toFixedNumber(0.05, FIXED_U128_DECIMALS),
+          bitcoinBaseFee: 0n,
+          treasuryProfitSharing: toFixedNumber(0, PERMILL_DECIMALS),
+          treasuryBonusProfitSharing: toFixedNumber(0, PERMILL_DECIMALS),
+        },
+        securitizationRatio: toFixedNumber(1, FIXED_U128_DECIMALS),
+        securitization: 1_000_000_000n,
+        bitcoinXpubkey: hexToU8a(args.bitcoinXpubBytesHex),
+        delegateAccountId: null,
+      }),
+      this.operator,
+    );
 
     await this.harness.sudoSubmit(
       this.harness.mainchainClient.tx.priceIndex.setOperator(this.operator.address),

@@ -37,17 +37,16 @@ pub mod pallet {
 			CompressedBitcoinPubkey, OpaqueBitcoinXpub, Satoshis,
 		},
 		vault::{
-			BitcoinVaultProvider, RegistrationVaultData, TreasuryVaultProvider, Vault,
-			VaultArgonotCommitment, VaultError, VaultLockRequest, VaultTerms,
+			BitcoinResecuritization, BitcoinSecuritization, BitcoinVaultProvider, LockExtension,
+			LostBitcoinCompensation, RegistrationVaultData, ReserveSecuritizationRequest,
+			TreasuryVaultProvider, Vault, VaultArgonotCommitment, VaultError, VaultTerms,
+			VaultTreasuryFrameEarnings,
 		},
 		CollectBlockerProvider, MiningFrameProvider, OperationalAccountProvider, TickProvider,
 	};
 	use core::iter::Sum;
 	use frame_support::traits::Incrementable;
-	use pallet_prelude::argon_primitives::{
-		vault::{LockExtension, Securitization, VaultTreasuryFrameEarnings},
-		OnNewSlot, OperationalAccountsHook,
-	};
+	use pallet_prelude::argon_primitives::{OnNewSlot, OperationalAccountsHook};
 	use sp_runtime::traits::SaturatedConversion;
 
 	const STORAGE_VERSION: StorageVersion = StorageVersion::new(17);
@@ -273,15 +272,14 @@ pub mod pallet {
 			vault_id: VaultId,
 			revenue: T::Balance,
 		},
-		FundsLocked {
+		SecuritizationReserved {
 			vault_id: VaultId,
 			locker: T::AccountId,
-			liquidity_promised: T::Balance,
-			is_ratchet: bool,
+			securitization_coverage_microgons: T::Balance,
 			fee_revenue: T::Balance,
 			did_use_fee_coupon: bool,
 		},
-		FundLockCanceled {
+		SecuritizationReturned {
 			vault_id: VaultId,
 			amount: T::Balance,
 		},
@@ -555,8 +553,8 @@ pub mod pallet {
 				flexible_securitization_locked: 0u32.into(),
 				reserved_securitization_space: 0u32.into(),
 				locked_satoshis: 0,
-				securitized_satoshis: 0,
-				flexible_securitized_satoshis: 0,
+				ratio_adjusted_satoshis: 0,
+				flexible_ratio_adjusted_satoshis: 0,
 				terms,
 				securitization_ratio,
 				opened_tick,
@@ -1129,10 +1127,10 @@ pub mod pallet {
 				revenue.bitcoin_locks_created.saturating_accrue(locks_created);
 				revenue.bitcoin_locks_added_satoshis.saturating_accrue(satoshis_locked);
 				revenue
-					.bitcoin_locks_new_liquidity_promised
+					.bitcoin_locks_new_securitization
 					.saturating_accrue(securitization_locked);
 				revenue
-					.bitcoin_locks_released_liquidity
+					.bitcoin_locks_released_securitization
 					.saturating_accrue(securitization_released);
 				revenue.bitcoin_locks_released_satoshis.saturating_accrue(satoshis_released);
 				Ok(())
@@ -1250,11 +1248,9 @@ pub mod pallet {
 		type Balance = T::Balance;
 		type AccountId = T::AccountId;
 
-		fn get_securitization_and_securitized_satoshis(
-			vault_id: VaultId,
-		) -> (Self::Balance, Satoshis) {
+		fn get_eligible_capacity(vault_id: VaultId) -> (Self::Balance, Satoshis) {
 			VaultsById::<T>::get(vault_id)
-				.map(|vault| (vault.securitization, vault.effective_securitized_satoshis()))
+				.map(|vault| (vault.securitization, vault.effective_eligible_satoshis()))
 				.unwrap_or_default()
 		}
 
@@ -1505,14 +1501,29 @@ pub mod pallet {
 			Ok(vault.securitization_ratio)
 		}
 
-		fn add_securitized_satoshis(
+		fn activate_securitization(
 			vault_id: VaultId,
-			satoshis: Satoshis,
-			securitization_ratio: FixedU128,
+			securitization: &BitcoinSecuritization<Self::Balance>,
+			funded_satoshis: Satoshis,
 		) -> Result<(), VaultError> {
-			VaultsById::<T>::try_mutate(vault_id, |vault| {
-				let vault = vault.as_mut().ok_or(VaultError::VaultNotFound)?;
-				vault.add_securitized_satoshis(satoshis, securitization_ratio);
+			Self::update_vault_bitcoin_metrics(BitcoinLockUpdate {
+				vault_id,
+				locks_created: 0,
+				total_fee: T::Balance::zero(),
+				fee_discount: T::Balance::zero(),
+				securitization_locked: T::Balance::zero(),
+				securitization_released: T::Balance::zero(),
+				satoshis_locked: funded_satoshis,
+				satoshis_released: 0,
+			})?;
+
+			VaultsById::<T>::try_mutate(vault_id, |maybe_vault| {
+				let vault = maybe_vault.as_mut().ok_or(VaultError::VaultNotFound)?;
+				vault.activate_securitization(securitization, funded_satoshis)?;
+				T::OperationalAccountsHook::vault_bitcoin_lock_funded(
+					&vault.operator_account_id,
+					vault.get_activated_securitization(),
+				);
 				Ok(())
 			})
 		}
@@ -1532,29 +1543,24 @@ pub mod pallet {
 
 		fn set_bitcoin_lock_flexible(
 			vault_id: VaultId,
-			securitization: &Securitization<Self::Balance>,
-			satoshis: Satoshis,
+			securitization: &BitcoinSecuritization<Self::Balance>,
+			funded_satoshis: Satoshis,
 			is_flexible: bool,
 		) -> Result<(), VaultError> {
 			VaultsById::<T>::try_mutate(vault_id, |maybe_vault| {
 				let vault = maybe_vault.as_mut().ok_or(VaultError::VaultNotFound)?;
-				vault.set_bitcoin_lock_flexible(securitization, satoshis, is_flexible)
+				vault.set_bitcoin_lock_flexible(securitization, funded_satoshis, is_flexible)
 			})
 		}
 
-		fn lock(
+		fn reserve_securitization(
 			vault_id: VaultId,
 			account_id: &T::AccountId,
-			securitization: &Securitization<Self::Balance>,
-			request: VaultLockRequest<'_, Self::Balance>,
+			securitization: &BitcoinSecuritization<Self::Balance>,
+			request: ReserveSecuritizationRequest<Self::Balance>,
 		) -> Result<(T::Balance, T::Balance), VaultError> {
-			let VaultLockRequest {
-				satoshis,
-				extension,
-				fee_discount,
-				is_flexible,
-				securitization_space_to_unreserve,
-			} = request;
+			let ReserveSecuritizationRequest { fee_discount, securitization_space_to_unreserve } =
+				request;
 			let mut vault =
 				VaultsById::<T>::get(vault_id).ok_or::<VaultError>(VaultError::VaultNotFound)?;
 			let is_operator = vault.operator_account_id == *account_id;
@@ -1566,34 +1572,29 @@ pub mod pallet {
 
 			ensure!(!vault.is_closed, VaultError::VaultClosed);
 
-			let total_fee = {
-				let apr = vault.terms.bitcoin_annual_percent_rate;
-				let base_fee = vault.terms.bitcoin_base_fee;
-				let term = extension.as_ref().map(|(term, _)| *term).unwrap_or(FixedU128::one());
-
-				apr.saturating_mul(term)
-					.saturating_mul_int(securitization.liquidity_promised)
-					.saturating_add(base_fee)
-			};
+			let total_fee = vault
+				.terms
+				.bitcoin_annual_percent_rate
+				.saturating_mul_int(securitization.securitization_coverage_microgons)
+				.saturating_add(vault.terms.bitcoin_base_fee);
 			let fee_discount = if is_operator { total_fee } else { fee_discount.min(total_fee) };
 			let fee_due = total_fee.saturating_sub(fee_discount);
 
 			log::trace!(
 				"Vault {vault_id} trying to reserve {:?} for total fee {:?} with discount {:?}",
-				securitization.collateral_required,
+				securitization.collateral_required(),
 				total_fee,
 				fee_discount
 			);
 
-			let is_ratchet = extension.is_some();
 			Self::update_vault_bitcoin_metrics(BitcoinLockUpdate {
 				vault_id,
-				locks_created: if is_ratchet { 0 } else { 1 },
+				locks_created: 1,
 				total_fee,
 				fee_discount,
-				securitization_locked: securitization.collateral_required,
+				securitization_locked: securitization.collateral_required(),
 				securitization_released: 0u32.into(),
-				satoshis_locked: satoshis,
+				satoshis_locked: 0,
 				satoshis_released: 0,
 			})?;
 
@@ -1614,39 +1615,124 @@ pub mod pallet {
 				})?;
 			}
 
-			if let Some((_, extension)) = extension {
-				// locks must be held for a minimum of a year, so when we are looking to re-use
-				// locked funds, they must be getting a new expiration of > 1 year from their
-				// original date
-				vault.extend_lock(
-					securitization,
-					extension,
-					is_flexible,
-					may_use_flexible_space,
-				)?;
-			} else {
-				vault
-					.reserved_securitization_space
-					.saturating_reduce(securitization_space_to_unreserve);
-				vault.lock(securitization, may_use_flexible_space)?;
-			}
+			vault
+				.reserved_securitization_space
+				.saturating_reduce(securitization_space_to_unreserve);
+			vault.reserve_securitization(securitization, may_use_flexible_space)?;
 
-			Self::deposit_event(Event::FundsLocked {
+			Self::deposit_event(Event::SecuritizationReserved {
 				vault_id,
 				locker: account_id.clone(),
-				liquidity_promised: securitization.liquidity_promised,
+				securitization_coverage_microgons: securitization.securitization_coverage_microgons,
 				fee_revenue: total_fee,
 				did_use_fee_coupon: fee_discount > T::Balance::zero(),
-				is_ratchet,
 			});
 			VaultsById::<T>::insert(vault_id, vault);
 			Ok((total_fee, fee_discount))
 		}
 
-		fn schedule_for_release(
+		fn resecuritize(
 			vault_id: VaultId,
-			securitization: &Securitization<Self::Balance>,
-			satoshis: Satoshis,
+			account_id: &T::AccountId,
+			request: BitcoinResecuritization<'_, T::Balance>,
+		) -> Result<(T::Balance, T::Balance), VaultError> {
+			let BitcoinResecuritization {
+				current,
+				replacement,
+				funded_satoshis,
+				remaining_term,
+				lock_extension,
+				is_flexible,
+				fee_discount,
+				securitization_space_to_unreserve,
+			} = request;
+			let mut vault =
+				VaultsById::<T>::get(vault_id).ok_or::<VaultError>(VaultError::VaultNotFound)?;
+			ensure!(
+				vault.opened_tick <= T::TickProvider::current_tick(),
+				VaultError::VaultNotYetActive
+			);
+			ensure!(!vault.is_closed, VaultError::VaultClosed);
+
+			let additional_coverage_microgons = replacement
+				.securitization_coverage_microgons
+				.saturating_sub(current.securitization_coverage_microgons);
+			let total_fee = if additional_coverage_microgons.is_zero() {
+				T::Balance::zero()
+			} else {
+				vault
+					.terms
+					.bitcoin_annual_percent_rate
+					.saturating_mul(remaining_term)
+					.saturating_mul_int(additional_coverage_microgons)
+					.saturating_add(vault.terms.bitcoin_base_fee)
+			};
+			let fee_discount = if vault.operator_account_id == *account_id {
+				total_fee
+			} else {
+				fee_discount.min(total_fee)
+			};
+
+			Self::update_vault_bitcoin_metrics(BitcoinLockUpdate {
+				vault_id,
+				locks_created: 0,
+				total_fee,
+				fee_discount,
+				securitization_locked: replacement
+					.collateral_required()
+					.saturating_sub(current.collateral_required()),
+				securitization_released: current
+					.collateral_required()
+					.saturating_sub(replacement.collateral_required()),
+				satoshis_locked: 0,
+				satoshis_released: 0,
+			})?;
+
+			vault
+				.reserved_securitization_space
+				.saturating_reduce(securitization_space_to_unreserve);
+			let release_heights = vault.replace_securitization(
+				current,
+				replacement,
+				funded_satoshis,
+				lock_extension,
+				is_flexible,
+				vault.operator_account_id != *account_id,
+			)?;
+			Self::track_vault_release_schedule(vault_id, &mut vault, release_heights)?;
+
+			let fee_due = total_fee.saturating_sub(fee_discount);
+			if !fee_due.is_zero() {
+				T::Currency::transfer_and_hold(
+					&HoldReason::PendingCollect.into(),
+					account_id,
+					&vault.operator_account_id,
+					fee_due,
+					Precision::Exact,
+					Preservation::Expendable,
+					Fortitude::Force,
+				)
+				.map_err(|e| match e {
+					Token(TokenError::BelowMinimum) => VaultError::AccountWouldBeBelowMinimum,
+					_ => VaultError::InsufficientFunds,
+				})?;
+			}
+
+			if funded_satoshis > 0 {
+				T::OperationalAccountsHook::vault_bitcoin_lock_funded(
+					&vault.operator_account_id,
+					vault.get_activated_securitization(),
+				);
+			}
+			VaultsById::<T>::insert(vault_id, vault);
+
+			Ok((total_fee, fee_discount))
+		}
+
+		fn schedule_securitization_release(
+			vault_id: VaultId,
+			securitization: &BitcoinSecuritization<Self::Balance>,
+			funded_satoshis: Satoshis,
 			lock_extension: &LockExtension<T::Balance>,
 			is_flexible: bool,
 		) -> Result<(), VaultError> {
@@ -1656,15 +1742,15 @@ pub mod pallet {
 				total_fee: 0u32.into(),
 				fee_discount: T::Balance::zero(),
 				securitization_locked: 0u32.into(),
-				securitization_released: securitization.collateral_required,
+				securitization_released: securitization.collateral_required(),
 				satoshis_locked: 0,
-				satoshis_released: satoshis,
+				satoshis_released: funded_satoshis,
 			})?;
 
 			let mut vault = VaultsById::<T>::get(vault_id).ok_or(VaultError::VaultNotFound)?;
-			let release_heights = vault.schedule_for_release(
+			let release_heights = vault.schedule_securitization_release(
 				securitization,
-				satoshis,
+				funded_satoshis,
 				lock_extension,
 				is_flexible,
 			)?;
@@ -1672,7 +1758,7 @@ pub mod pallet {
 			VaultsById::<T>::insert(vault_id, vault);
 			Self::deposit_event(Event::FundsScheduledForRelease {
 				vault_id,
-				securitization: securitization.collateral_required,
+				securitization: securitization.collateral_required(),
 				release_height: lock_extension.lock_expiration,
 			});
 
@@ -1684,26 +1770,31 @@ pub mod pallet {
 		///
 		/// The compensation is up to the market rate but capped at the securitization of the lock.
 		///
-		/// Returns the amount sent to the beneficiary.
+		/// Returns the amounts sent to the beneficiary and burned.
 		fn compensate_lost_bitcoin(
 			vault_id: VaultId,
 			beneficiary: &T::AccountId,
-			securitization: &Securitization<Self::Balance>,
-			satoshis: Satoshis,
+			securitization: &BitcoinSecuritization<Self::Balance>,
+			funded_satoshis: Satoshis,
 			market_rate: Self::Balance,
 			lock_extension: &LockExtension<T::Balance>,
 			is_flexible: bool,
-		) -> Result<Self::Balance, VaultError> {
+		) -> Result<LostBitcoinCompensation<Self::Balance>, VaultError> {
 			let mut vault = VaultsById::<T>::get(vault_id).ok_or(VaultError::VaultNotFound)?;
 
-			let burn_result =
-				vault.burn(securitization, satoshis, market_rate, lock_extension, is_flexible)?;
+			let burn_result = vault.burn(
+				securitization,
+				funded_satoshis,
+				market_rate,
+				lock_extension,
+				is_flexible,
+			)?;
 
 			let securitized_amount = burn_result.burned_amount;
 			Self::track_vault_release_schedule(vault_id, &mut vault, burn_result.release_heights)?;
 
 			let to_beneficiary =
-				securitized_amount.saturating_sub(securitization.liquidity_promised);
+				securitized_amount.saturating_sub(securitization.securitization_coverage_microgons);
 			if !to_beneficiary.is_zero() {
 				T::Currency::transfer_on_hold(
 					&HoldReason::EnterVault.into(),
@@ -1736,22 +1827,27 @@ pub mod pallet {
 			});
 			VaultsById::<T>::insert(vault_id, vault);
 
-			Ok(to_beneficiary)
+			Ok(LostBitcoinCompensation { to_beneficiary, burned: to_burn })
 		}
 
 		/// Burn the funds from the vault.
 		fn burn(
 			vault_id: VaultId,
-			securitization: &Securitization<Self::Balance>,
-			satoshis: Satoshis,
+			securitization: &BitcoinSecuritization<Self::Balance>,
+			funded_satoshis: Satoshis,
 			market_rate: T::Balance,
 			lock_extension: &LockExtension<T::Balance>,
 			is_flexible: bool,
 		) -> Result<T::Balance, VaultError> {
 			let mut vault = VaultsById::<T>::get(vault_id).ok_or(VaultError::VaultNotFound)?;
 
-			let burn_result =
-				vault.burn(securitization, satoshis, market_rate, lock_extension, is_flexible)?;
+			let burn_result = vault.burn(
+				securitization,
+				funded_satoshis,
+				market_rate,
+				lock_extension,
+				is_flexible,
+			)?;
 
 			let burn_amount = burn_result.burned_amount;
 			Self::track_vault_release_schedule(vault_id, &mut vault, burn_result.release_heights)?;
@@ -1820,36 +1916,31 @@ pub mod pallet {
 			))
 		}
 
-		fn remove_pending(
-			vault_id: VaultId,
-			securitization: &Securitization<Self::Balance>,
-		) -> Result<(), VaultError> {
-			VaultsById::<T>::try_mutate(vault_id, |vault| {
-				let vault = vault.as_mut().ok_or(VaultError::VaultNotFound)?;
-				vault.remove_pending_activation(securitization);
-				T::OperationalAccountsHook::vault_bitcoin_lock_funded(
-					&vault.operator_account_id,
-					vault.get_activated_securitization(),
-				);
-				Ok(())
-			})
-		}
-
 		fn return_securitization(
 			vault_id: VaultId,
-			securitization: &Securitization<Self::Balance>,
+			securitization: &BitcoinSecuritization<Self::Balance>,
 		) -> Result<(), VaultError> {
+			Self::update_vault_bitcoin_metrics(BitcoinLockUpdate {
+				vault_id,
+				locks_created: 0,
+				total_fee: T::Balance::zero(),
+				fee_discount: T::Balance::zero(),
+				securitization_locked: T::Balance::zero(),
+				securitization_released: securitization.collateral_required(),
+				satoshis_locked: 0,
+				satoshis_released: 0,
+			})?;
 			VaultsById::<T>::mutate(vault_id, |vault| {
 				let vault = vault.as_mut().ok_or(VaultError::VaultNotFound)?;
-				vault.release_lock(securitization);
+				vault.return_securitization(securitization)?;
 
 				// after reducing the bonded, we can check the minimum securitization needed
 				Self::shrink_vault_securitization(vault)?;
 				Ok::<(), VaultError>(())
 			})?;
-			Self::deposit_event(Event::FundLockCanceled {
+			Self::deposit_event(Event::SecuritizationReturned {
 				vault_id,
-				amount: securitization.collateral_required,
+				amount: securitization.collateral_required(),
 			});
 
 			Ok(())
@@ -1921,12 +2012,12 @@ pub mod pallet {
 		/// The number of bitcoin locks created
 		#[codec(compact)]
 		pub bitcoin_locks_created: u32,
-		/// The argon market value of the locked satoshis added
+		/// The securitization newly locked for Bitcoin.
 		#[codec(compact)]
-		pub bitcoin_locks_new_liquidity_promised: T::Balance,
+		pub bitcoin_locks_new_securitization: T::Balance,
 		/// The amount of securitization released
 		#[codec(compact)]
-		pub bitcoin_locks_released_liquidity: T::Balance,
+		pub bitcoin_locks_released_securitization: T::Balance,
 		/// The number of satoshis locked into the vault during this period
 		#[codec(compact)]
 		pub bitcoin_locks_added_satoshis: Satoshis,
@@ -1966,8 +2057,8 @@ pub mod pallet {
 				bitcoin_lock_fee_revenue: T::Balance::zero(),
 				bitcoin_lock_fee_coupon_value_used: T::Balance::zero(),
 				bitcoin_locks_created: 0,
-				bitcoin_locks_new_liquidity_promised: T::Balance::zero(),
-				bitcoin_locks_released_liquidity: T::Balance::zero(),
+				bitcoin_locks_new_securitization: T::Balance::zero(),
+				bitcoin_locks_released_securitization: T::Balance::zero(),
 				bitcoin_locks_added_satoshis: 0,
 				bitcoin_locks_released_satoshis: 0,
 				securitization_relockable: T::Balance::zero(),

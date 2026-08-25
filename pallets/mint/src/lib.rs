@@ -22,15 +22,15 @@ pub mod weights;
 pub mod pallet {
 	use super::*;
 	use argon_primitives::{
-		bitcoin::UtxoId,
+		bitcoin::{FissionId, UtxoId},
 		block_seal::{BlockPayout, FrameId},
-		ArgonCPI, BlockRewardAccountsProvider, BlockRewardsEventHandler, BurnEventHandler,
-		PriceProvider, UtxoLockEvents,
+		ArgonCPI, BitcoinFissionMinting, BlockRewardAccountsProvider, BlockRewardsEventHandler,
+		BurnEventHandler, PriceProvider,
 	};
 	use pallet_prelude::argon_primitives::{MiningFrameProvider, MiningFrameTransitionProvider};
 	use sp_runtime::FixedPointNumber;
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(2);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(3);
 	pub type MintIndex = u64;
 
 	#[pallet::pallet]
@@ -436,16 +436,17 @@ pub mod pallet {
 		}
 	}
 
-	impl<T: Config> UtxoLockEvents<T::AccountId, T::Balance> for Pallet<T>
+	impl<T: Config> BitcoinFissionMinting<T::AccountId, T::Balance> for Pallet<T>
 	where
 		<T as Config>::Balance: From<u128>,
 		<T as Config>::Balance: Into<u128>,
 	{
-		type Weights = ProviderWeightAdapter<T>;
+		type Weights = FissionMintingWeightAdapter<T>;
 
-		fn utxo_locked(
-			utxo_id: UtxoId,
+		fn request_mint(
 			account_id: &T::AccountId,
+			fission_id: FissionId,
+			utxo_id: UtxoId,
 			amount: T::Balance,
 		) -> sp_runtime::DispatchResult {
 			if amount.is_zero() {
@@ -462,10 +463,10 @@ pub mod pallet {
 					.try_push(pending_index)
 					.map_err(|_| Error::<T>::TooManyPendingMints)
 			})?;
-
 			PendingMintUtxosByIndex::<T>::insert(
 				pending_index,
 				PendingMintUtxo {
+					fission_id,
 					utxo_id,
 					account_id: account_id.clone(),
 					remaining_amount: amount,
@@ -476,22 +477,8 @@ pub mod pallet {
 			Ok(())
 		}
 
-		fn utxo_released(
-			utxo_id: UtxoId,
-			_account_id: &T::AccountId,
-			remove_pending_mints: bool,
-			amount_burned: T::Balance,
-			_original_liquidity_promised: T::Balance,
-		) -> sp_runtime::DispatchResult {
-			if remove_pending_mints {
-				let pending_indices = PendingMintUtxoIdLookup::<T>::take(utxo_id);
-				for pending_index in pending_indices {
-					let _ = PendingMintUtxosByIndex::<T>::take(pending_index);
-				}
-			}
-
-			MintedBitcoinMicrogons::<T>::mutate(|mint| *mint = mint.saturating_sub(amount_burned));
-			Ok(())
+		fn record_mint_repayment(amount: T::Balance) {
+			MintedBitcoinMicrogons::<T>::mutate(|mint| *mint = mint.saturating_sub(amount));
 		}
 	}
 
@@ -565,11 +552,18 @@ pub mod pallet {
 		T::AccountId: Codec + MaxEncodedLen,
 		T::Balance: Codec + MaxEncodedLen,
 	{
+		/// Owner-local Fission containing this mint position.
+		#[codec(compact)]
+		pub fission_id: FissionId,
+		/// Source Lock backing this Fission position.
 		#[codec(compact)]
 		pub utxo_id: UtxoId,
+		/// Owner of the Fission and recipient of its eventual mint.
 		pub account_id: T::AccountId,
+		/// Unpaid position liability remaining in the FIFO queue.
 		#[codec(compact)]
 		pub remaining_amount: T::Balance,
+		/// Maximum amount this position may mint in one frame.
 		#[codec(compact)]
 		pub max_amount_per_frame: T::Balance,
 	}

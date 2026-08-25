@@ -207,8 +207,8 @@ where
 				reserved_securitization_space: vault.securitization_capacity_reserved,
 				securitization_pending_activation: vault.securitization_pending_activation,
 				locked_satoshis: vault.locked_satoshis,
-				securitized_satoshis: vault.securitized_satoshis,
-				flexible_securitized_satoshis: vault.backfill_securitized_satoshis,
+				ratio_adjusted_satoshis: vault.securitized_satoshis,
+				flexible_ratio_adjusted_satoshis: vault.backfill_securitized_satoshis,
 				securitization_release_schedule: vault.securitization_release_schedule,
 				securitization_ratio: vault.securitization_ratio,
 				is_closed: vault.is_closed,
@@ -404,7 +404,7 @@ mod test {
 			assert_eq!(vault.delegate_account_id, Some(5));
 			assert_eq!(vault.flexible_securitization_locked, 103);
 			assert_eq!(vault.reserved_securitization_space, 104);
-			assert_eq!(vault.flexible_securitized_satoshis, 108);
+			assert_eq!(vault.flexible_ratio_adjusted_satoshis, 108);
 			assert_eq!(vault.terms.bitcoin_annual_percent_rate, FixedU128::from_rational(11, 10));
 			assert_eq!(vault.terms.bitcoin_base_fee, 109);
 			assert_eq!(vault.terms.treasury_profit_sharing, Permill::from_percent(10));

@@ -53,13 +53,3 @@ interface IArgonCpiSnapshot {
   tick: bigint;
 }
 ```
-
-## Bitcoin Locks
-
-The client also has a `BitcoinLock` class that can be used to create, ratchet and release bitcoin
-locks
-
-## Vaults
-
-The client also has a `Vault` class that can be used to create and manage vaults, as well as
-calculate bitcoin fees.

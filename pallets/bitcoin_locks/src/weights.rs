@@ -14,18 +14,19 @@
 #![allow(unused_imports)]
 
 use super::Config;
-use argon_primitives::providers::{BitcoinLocksProviderWeightInfo, BitcoinUtxoEventsWeightInfo, UtxoLockEvents};
+use argon_primitives::providers::{
+	BitcoinFissionLockProviderWeightInfo, BitcoinFissionsProvider, BitcoinFissionsProviderWeightInfo,
+	BitcoinUtxoEventsWeightInfo,
+};
 use argon_primitives::vault::{BitcoinVaultProvider, BitcoinVaultProviderWeightInfo};
-use argon_primitives::UtxoLockEventsWeightInfo;
 use pallet_prelude::*;
 
 /// Weight functions needed for pallet_bitcoin_locks.
 pub trait WeightInfo {
 	// Core extrinsics
-	fn initialize() -> Weight;
+	fn create_receive_address() -> Weight;
 	fn request_release() -> Weight;
 	fn cosign_release() -> Weight;
-	fn ratchet() -> Weight;
 
 	// Hooks with variance
 	fn on_initialize_with_expirations_and_overdue(
@@ -62,35 +63,42 @@ pub trait WeightInfo {
 	// Orphaned Utxo process
 	fn request_orphaned_utxo_release() -> Weight;
 	fn cosign_orphaned_utxo_release() -> Weight;
-	fn increase_securitization() -> Weight;
+	fn resecuritize() -> Weight;
 	fn set_flexible() -> Weight;
 
-	fn provider_get_account_funded_bitcoin_amount() -> Weight;
+	fn provider_fission_satoshis() -> Weight;
+	fn provider_validate_fission() -> Weight;
+	fn provider_calculate_liquidity_promised() -> Weight;
+	fn provider_fuse_satoshis() -> Weight;
 	// Bitcoin UTXO event handler provider weights
 	fn provider_utxo_detected() -> Weight;
 	fn provider_spent() -> Weight;
 }
 
-type LockEventWeights<T> = <<T as Config>::LockEvents as UtxoLockEvents<
+type VaultProviderWeights<T> = <<T as Config>::VaultProvider as BitcoinVaultProvider>::Weights;
+type FissionsProviderWeights<T> = <<T as Config>::FissionsProvider as BitcoinFissionsProvider<
 	<T as frame_system::Config>::AccountId,
 	<T as Config>::Balance,
 >>::Weights;
-type VaultProviderWeights<T> = <<T as Config>::VaultProvider as BitcoinVaultProvider>::Weights;
-
 /// Placeholder implementation for tests and no-std environments
 pub struct SubstrateWeight<T>(PhantomData<T>);
 
-pub struct WithProviderWeights<T, Base, LockEventWeight = LockEventWeights<T>>(
-	PhantomData<(T, Base, LockEventWeight)>,
-);
-impl<T, Base, LockEventWeight> WeightInfo for WithProviderWeights<T, Base, LockEventWeight>
+pub struct WithProviderWeights<
+	T,
+	Base,
+	VaultProviderWeight = VaultProviderWeights<T>,
+	FissionsProviderWeight = FissionsProviderWeights<T>,
+>(PhantomData<(T, Base, VaultProviderWeight, FissionsProviderWeight)>);
+impl<T, Base, VaultProviderWeight, FissionsProviderWeight> WeightInfo
+	for WithProviderWeights<T, Base, VaultProviderWeight, FissionsProviderWeight>
 where
 	T: Config,
 	Base: WeightInfo,
-	LockEventWeight: UtxoLockEventsWeightInfo,
+	VaultProviderWeight: BitcoinVaultProviderWeightInfo,
+	FissionsProviderWeight: BitcoinFissionsProviderWeightInfo,
 {
-	fn initialize() -> Weight {
-		Base::initialize()
+	fn create_receive_address() -> Weight {
+		Base::create_receive_address()
 	}
 
 	fn request_release() -> Weight {
@@ -98,13 +106,7 @@ where
 	}
 
 	fn cosign_release() -> Weight {
-		Base::cosign_release().saturating_add(LockEventWeight::utxo_released())
-	}
-
-	fn ratchet() -> Weight {
-		Base::ratchet()
-			.saturating_add(LockEventWeight::utxo_locked())
-			.saturating_add(LockEventWeight::utxo_released())
+		Base::cosign_release().saturating_add(FissionsProviderWeight::close_for_lock())
 	}
 
 	fn on_initialize_base() -> Weight {
@@ -113,12 +115,12 @@ where
 
 	fn on_initialize_expiring_locks(n: u32) -> Weight {
 		Base::on_initialize_expiring_locks(n)
-			.saturating_add(LockEventWeight::utxo_released().saturating_mul(n.into()))
+			.saturating_add(FissionsProviderWeight::close_for_lock().saturating_mul(n.into()))
 	}
 
 	fn on_initialize_overdue_releases(n: u32) -> Weight {
 		Base::on_initialize_overdue_releases(n)
-			.saturating_add(LockEventWeight::utxo_released().saturating_mul(n.into()))
+			.saturating_add(FissionsProviderWeight::close_for_lock().saturating_mul(n.into()))
 	}
 
 	fn on_initialize_orphan_expirations(n: u32) -> Weight {
@@ -142,32 +144,59 @@ where
 		Base::cosign_orphaned_utxo_release()
 	}
 
-	fn increase_securitization() -> Weight {
-		Base::increase_securitization()
+	fn resecuritize() -> Weight {
+		Base::resecuritize()
+			.saturating_add(VaultProviderWeight::resecuritize())
+			.saturating_add(FissionsProviderWeight::get_lock_fission_requirements())
 	}
 
 	fn set_flexible() -> Weight {
 		Base::set_flexible().saturating_add(VaultProviderWeights::<T>::set_bitcoin_lock_flexible())
 	}
 
-	fn provider_get_account_funded_bitcoin_amount() -> Weight {
-		Base::provider_get_account_funded_bitcoin_amount()
+	fn provider_fission_satoshis() -> Weight {
+		Base::provider_fission_satoshis()
+			.saturating_add(FissionsProviderWeight::get_lock_fission_requirements())
+	}
+
+	fn provider_validate_fission() -> Weight {
+		Base::provider_validate_fission()
+			.saturating_add(FissionsProviderWeight::get_lock_fission_requirements())
+	}
+
+	fn provider_calculate_liquidity_promised() -> Weight {
+		Base::provider_calculate_liquidity_promised()
+	}
+
+	fn provider_fuse_satoshis() -> Weight {
+		Base::provider_fuse_satoshis()
 	}
 
 	fn provider_utxo_detected() -> Weight {
-		Base::provider_utxo_detected().saturating_add(LockEventWeight::utxo_locked())
+		Base::provider_utxo_detected()
 	}
 
 	fn provider_spent() -> Weight {
-		Base::provider_spent()
-			.saturating_add(LockEventWeight::utxo_released_with_pending_mints())
+		Base::provider_spent().saturating_add(FissionsProviderWeight::close_for_lock())
 	}
 }
 
 pub struct ProviderWeightAdapter<T>(PhantomData<T>);
-impl<T: Config> BitcoinLocksProviderWeightInfo for ProviderWeightAdapter<T> {
-	fn get_account_funded_bitcoin_amount() -> Weight {
-		<T as Config>::WeightInfo::provider_get_account_funded_bitcoin_amount()
+impl<T: Config> BitcoinFissionLockProviderWeightInfo for ProviderWeightAdapter<T> {
+	fn fission_satoshis() -> Weight {
+		<T as Config>::WeightInfo::provider_fission_satoshis()
+	}
+
+	fn validate_fission() -> Weight {
+		<T as Config>::WeightInfo::provider_validate_fission()
+	}
+
+	fn calculate_liquidity_promised() -> Weight {
+		<T as Config>::WeightInfo::provider_calculate_liquidity_promised()
+	}
+
+	fn fuse_satoshis() -> Weight {
+		<T as Config>::WeightInfo::provider_fuse_satoshis()
 	}
 }
 impl<T: Config> BitcoinUtxoEventsWeightInfo for ProviderWeightAdapter<T> {
@@ -182,10 +211,9 @@ impl<T: Config> BitcoinUtxoEventsWeightInfo for ProviderWeightAdapter<T> {
 
 // For backwards compatibility and tests.
 impl WeightInfo for () {
-	fn initialize() -> Weight { Weight::zero() }
+	fn create_receive_address() -> Weight { Weight::zero() }
 	fn request_release() -> Weight { Weight::zero() }
 	fn cosign_release() -> Weight { Weight::zero() }
-	fn ratchet() -> Weight { Weight::zero() }
 	fn on_initialize_base() -> Weight { Weight::zero() }
 	fn on_initialize_expiring_locks(_n: u32) -> Weight { Weight::zero() }
 	fn on_initialize_overdue_releases(_n: u32) -> Weight { Weight::zero() }
@@ -194,9 +222,12 @@ impl WeightInfo for () {
 	fn admin_modify_minimum_locked_sats() -> Weight { Weight::zero() }
 	fn request_orphaned_utxo_release() -> Weight { Weight::zero() }
 	fn cosign_orphaned_utxo_release() -> Weight { Weight::zero() }
-	fn increase_securitization() -> Weight { Weight::zero() }
+	fn resecuritize() -> Weight { Weight::zero() }
 	fn set_flexible() -> Weight { Weight::zero() }
-	fn provider_get_account_funded_bitcoin_amount() -> Weight { Weight::zero() }
+	fn provider_fission_satoshis() -> Weight { Weight::zero() }
+	fn provider_validate_fission() -> Weight { Weight::zero() }
+	fn provider_calculate_liquidity_promised() -> Weight { Weight::zero() }
+	fn provider_fuse_satoshis() -> Weight { Weight::zero() }
 	fn provider_utxo_detected() -> Weight { Weight::zero() }
 	fn provider_spent() -> Weight { Weight::zero() }
 }

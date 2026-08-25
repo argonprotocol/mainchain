@@ -13,10 +13,11 @@ use argon_primitives::{
 		CompressedBitcoinPubkey, NetworkKind, Satoshis, UtxoId, UtxoRef,
 	},
 	vault::{
-		BitcoinVaultProvider, LockExtension, Securitization, Vault, VaultError, VaultLockRequest,
-		VaultTerms,
+		BitcoinResecuritization, BitcoinSecuritization, BitcoinVaultProvider, LockExtension,
+		LostBitcoinCompensation, ReserveSecuritizationRequest, Vault, VaultError, VaultTerms,
 	},
-	ArgonCPI, BitcoinUtxoTracker, PriceProvider, UtxoLockEvents,
+	ArgonCPI, BitcoinUtxoTracker, BlockRewardAccountsProvider, MiningFrameProvider,
+	MiningFrameTransitionProvider, OperationalAccountsHook, PriceProvider,
 };
 use frame_support::traits::Currency;
 
@@ -28,7 +29,10 @@ frame_support::construct_runtime!(
 	{
 		System: frame_system,
 		Balances: pallet_balances,
-		BitcoinLocks: pallet_bitcoin_locks
+		BitcoinUtxos: pallet_bitcoin_utxos,
+		BitcoinLocks: pallet_bitcoin_locks,
+		BitcoinFissions: pallet_bitcoin_fissions,
+		Mint: pallet_mint,
 	}
 );
 
@@ -87,8 +91,8 @@ parameter_types! {
 		flexible_securitization_locked: 0,
 		reserved_securitization_space: 0,
 		locked_satoshis: 0,
-		securitized_satoshis: 0,
-		flexible_securitized_satoshis: 0,
+		ratio_adjusted_satoshis: 0,
+		flexible_ratio_adjusted_satoshis: 0,
 		terms: VaultTerms {
 			bitcoin_annual_percent_rate: FixedU128::from_float(0.1),
 			bitcoin_base_fee: 0,
@@ -106,9 +110,6 @@ parameter_types! {
 	pub static NextUtxoId: UtxoId = 1;
 	pub static WatchedUtxosById: BTreeMap<UtxoId, BitcoinCosignScriptPubkey> = BTreeMap::new();
 
-	pub static LastLockEvent: Option<(UtxoId, u64, Balance)> = None;
-	pub static LastReleaseEvent: Option<(UtxoId, u64, bool, Balance, Balance)> = None;
-
 	pub static GetBitcoinNetwork: BitcoinNetwork = BitcoinNetwork::Regtest;
 
 	pub static DefaultVaultBitcoinPubkey: PublicKey = "02e3af28965693b9ce1228f9d468149b831d6a0540b25e8a9900f71372c11fb277".parse::<PublicKey>().unwrap();
@@ -119,7 +120,7 @@ parameter_types! {
 	pub static CanceledLocks: Vec<(VaultId, Balance)> = Vec::new();
 
 	pub static ChargeFee: bool = false;
-	pub static FailRemovePendingSecuritization: bool = false;
+	pub static FailReturnSecuritization: bool = false;
 
 	pub static VaultViewOfCosignPendingLocks: BTreeMap<VaultId,  BTreeSet<UtxoId>> = BTreeMap::new();
 	pub static VaultViewOfOrphanedUtxoCosigns: BTreeMap<VaultId,  BTreeMap<u64, u32>> = BTreeMap::new();
@@ -128,36 +129,83 @@ parameter_types! {
 	pub static CurrentTick: Tick = 1;
 	pub static DidStartNewFrame: bool = true;
 	pub static UseRealBitcoinVerifier: bool = false;
+	pub static MinimumRatchetPercent: Percent = Percent::from_percent(10);
+	pub static MaxPendingMintsPerUtxo: u32 = 50;
+	pub static MaxPendingMintPayoutWindowSize: u32 = 1_000;
+	pub static BitcoinMintPayoutPercentPerFrame: Percent = Percent::from_percent(10);
+	pub static AccountBitcoinChanges: Vec<(u64, Balance, bool)> = Vec::new();
 }
 
-pub struct EventHandler;
-impl UtxoLockEvents<u64, Balance> for EventHandler {
+pub struct StaticMiningFrameProvider;
+impl MiningFrameTransitionProvider for StaticMiningFrameProvider {
+	fn is_new_frame_started() -> Option<FrameId> {
+		None
+	}
+
+	fn get_current_frame_id() -> FrameId {
+		CurrentFrameId::get()
+	}
+}
+
+impl MiningFrameProvider for StaticMiningFrameProvider {
+	fn get_next_frame_tick() -> Tick {
+		CurrentTick::get().saturating_add(1)
+	}
+
+	fn is_seat_bidding_started() -> bool {
+		true
+	}
+
+	fn get_tick_range_for_frame(_frame_id: FrameId) -> Option<(Tick, Tick)> {
+		Some((0, CurrentTick::get()))
+	}
+}
+
+pub struct StaticBlockRewardAccountsProvider;
+impl BlockRewardAccountsProvider<u64> for StaticBlockRewardAccountsProvider {
 	type Weights = ();
 
-	fn utxo_locked(
-		utxo_id: UtxoId,
-		account_id: &u64,
-		amount: Balance,
-	) -> Result<(), DispatchError> {
-		LastLockEvent::set(Some((utxo_id, *account_id, amount)));
-		Ok(())
+	fn get_block_rewards_account(_author: &u64) -> Option<(u64, FrameId)> {
+		None
 	}
-	fn utxo_released(
-		utxo_id: UtxoId,
-		account_id: &u64,
-		remove_pending_mints: bool,
-		amount_burned: Balance,
-		original_liquidity_promised: Balance,
-	) -> DispatchResult {
-		LastReleaseEvent::set(Some((
-			utxo_id,
-			*account_id,
-			remove_pending_mints,
-			amount_burned,
-			original_liquidity_promised,
-		)));
 
-		Ok(())
+	fn get_mint_rewards_accounts() -> Vec<(u64, FrameId)> {
+		Vec::new()
+	}
+
+	fn is_compute_block_eligible_for_rewards() -> bool {
+		false
+	}
+}
+
+pub struct MockOperationalAccounts;
+impl OperationalAccountsHook<u64, Balance> for MockOperationalAccounts {
+	fn vault_created_weight() -> Weight {
+		Weight::zero()
+	}
+
+	fn vault_bitcoin_lock_funded_weight() -> Weight {
+		Weight::zero()
+	}
+
+	fn mining_seat_won_weight() -> Weight {
+		Weight::zero()
+	}
+
+	fn account_bitcoin_amount_changed_weight() -> Weight {
+		Weight::zero()
+	}
+
+	fn account_bitcoin_amount_changed(account_id: &u64, amount: Balance, is_increase: bool) {
+		AccountBitcoinChanges::mutate(|changes| changes.push((*account_id, amount, is_increase)));
+	}
+
+	fn account_vault_bond_total_updated_weight() -> Weight {
+		Weight::zero()
+	}
+
+	fn account_uniswap_argon_transfers_in_updated_weight() -> Weight {
+		Weight::zero()
 	}
 }
 
@@ -282,45 +330,38 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 
 	fn return_securitization(
 		vault_id: VaultId,
-		securitization: &Securitization<Balance>,
+		securitization: &BitcoinSecuritization<Balance>,
 	) -> Result<(), VaultError> {
-		DefaultVault::mutate(|v| {
-			v.release_lock(securitization);
+		if FailReturnSecuritization::get() {
+			return Err(VaultError::InternalError);
+		}
+		DefaultVault::mutate(|vault| vault.return_securitization(securitization))?;
+		CanceledLocks::mutate(|locks| {
+			locks.push((vault_id, securitization.btc_value_in_microgons()));
 		});
-		CanceledLocks::mutate(|a| a.push((vault_id, securitization.liquidity_promised)));
 		Ok(())
 	}
 
-	fn lock(
+	fn reserve_securitization(
 		_vault_id: VaultId,
 		locker: &Self::AccountId,
-		securitization: &Securitization<Balance>,
-		request: VaultLockRequest<'_, Self::Balance>,
+		securitization: &BitcoinSecuritization<Balance>,
+		request: ReserveSecuritizationRequest<Self::Balance>,
 	) -> Result<(Self::Balance, Self::Balance), VaultError> {
-		let VaultLockRequest {
-			extension,
-			fee_discount,
-			is_flexible,
-			securitization_space_to_unreserve,
-			..
-		} = request;
+		let ReserveSecuritizationRequest { fee_discount, securitization_space_to_unreserve } =
+			request;
 		let is_operator = DefaultVault::get().operator_account_id == *locker;
 		let may_use_flexible_space = !is_operator;
-		let term = extension.as_ref().map(|(a, _)| *a).unwrap_or(FixedU128::one());
-		DefaultVault::mutate(|a| {
-			if let Some((_, lock_extension)) = extension {
-				a.extend_lock(securitization, lock_extension, is_flexible, may_use_flexible_space)
-			} else {
-				a.reserved_securitization_space
-					.saturating_reduce(securitization_space_to_unreserve);
-				a.lock(securitization, may_use_flexible_space)
-			}
+		DefaultVault::mutate(|vault| {
+			vault
+				.reserved_securitization_space
+				.saturating_reduce(securitization_space_to_unreserve);
+			vault.reserve_securitization(securitization, may_use_flexible_space)
 		})?;
 		let terms = DefaultVault::get().terms.clone();
 		let total_fee = terms
 			.bitcoin_annual_percent_rate
-			.saturating_mul(term)
-			.saturating_mul_int(securitization.liquidity_promised)
+			.saturating_mul_int(securitization.securitization_coverage_microgons)
 			.saturating_add(terms.bitcoin_base_fee);
 		let fee_discount = if is_operator { total_fee } else { fee_discount.min(total_fee) };
 		if ChargeFee::get() {
@@ -336,15 +377,77 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 		Ok((total_fee, fee_discount))
 	}
 
-	fn schedule_for_release(
+	fn resecuritize(
 		_vault_id: VaultId,
-		securitization: &Securitization<Balance>,
-		satoshis: Satoshis,
+		locker: &Self::AccountId,
+		request: BitcoinResecuritization<'_, Self::Balance>,
+	) -> Result<(Self::Balance, Self::Balance), VaultError> {
+		let BitcoinResecuritization {
+			current,
+			replacement,
+			funded_satoshis,
+			remaining_term,
+			lock_extension,
+			is_flexible,
+			fee_discount,
+			securitization_space_to_unreserve,
+		} = request;
+		let vault = DefaultVault::get();
+		let is_operator = vault.operator_account_id == *locker;
+		let additional_securitization_coverage_microgons = replacement
+			.securitization_coverage_microgons
+			.saturating_sub(current.securitization_coverage_microgons);
+		let total_fee = if additional_securitization_coverage_microgons.is_zero() {
+			Balance::zero()
+		} else {
+			vault
+				.terms
+				.bitcoin_annual_percent_rate
+				.saturating_mul(remaining_term)
+				.saturating_mul_int(additional_securitization_coverage_microgons)
+				.saturating_add(vault.terms.bitcoin_base_fee)
+		};
+		let fee_discount = if is_operator { total_fee } else { fee_discount.min(total_fee) };
+		DefaultVault::mutate(|vault| {
+			vault
+				.reserved_securitization_space
+				.saturating_reduce(securitization_space_to_unreserve);
+			vault.replace_securitization(
+				current,
+				replacement,
+				funded_satoshis,
+				lock_extension,
+				is_flexible,
+				!is_operator,
+			)
+		})?;
+		if ChargeFee::get() && !is_operator {
+			Balances::burn_from(
+				locker,
+				total_fee.saturating_sub(fee_discount),
+				Preservation::Expendable,
+				Precision::Exact,
+				Fortitude::Force,
+			)
+			.map_err(|_| VaultError::InsufficientFunds)?;
+		}
+		Ok((total_fee, fee_discount))
+	}
+
+	fn schedule_securitization_release(
+		_vault_id: VaultId,
+		securitization: &BitcoinSecuritization<Balance>,
+		funded_satoshis: Satoshis,
 		lock_extensions: &LockExtension<Self::Balance>,
 		is_flexible: bool,
 	) -> Result<(), VaultError> {
-		DefaultVault::mutate(|a| {
-			a.schedule_for_release(securitization, satoshis, lock_extensions, is_flexible)
+		DefaultVault::mutate(|vault| {
+			vault.schedule_securitization_release(
+				securitization,
+				funded_satoshis,
+				lock_extensions,
+				is_flexible,
+			)
 		})?;
 		Ok(())
 	}
@@ -352,21 +455,25 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 	fn compensate_lost_bitcoin(
 		_vault_id: VaultId,
 		_beneficiary: &Self::AccountId,
-		securitization: &Securitization<Balance>,
+		securitization: &BitcoinSecuritization<Balance>,
 		satoshis: Satoshis,
 		market_rate: Self::Balance,
 		lock_extension: &LockExtension<Self::Balance>,
 		is_flexible: bool,
-	) -> Result<Self::Balance, VaultError> {
+	) -> Result<LostBitcoinCompensation<Self::Balance>, VaultError> {
 		let result = DefaultVault::mutate(|a| {
 			a.burn(securitization, satoshis, market_rate, lock_extension, is_flexible)
 		})?;
-		Ok(result.burned_amount)
+		let to_beneficiary = result
+			.burned_amount
+			.saturating_sub(securitization.securitization_coverage_microgons);
+		let burned = result.burned_amount.saturating_sub(to_beneficiary);
+		Ok(LostBitcoinCompensation { to_beneficiary, burned })
 	}
 
 	fn burn(
 		_vault_id: VaultId,
-		securitization: &Securitization<Balance>,
+		securitization: &BitcoinSecuritization<Balance>,
 		satoshis: Satoshis,
 		redemption_amount: Self::Balance,
 		lock_extension: &LockExtension<Self::Balance>,
@@ -404,19 +511,6 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 			},
 			BitcoinCosignScriptPubkey::P2WSH { wscript_hash: H256::from([0; 32]) },
 		))
-	}
-
-	fn remove_pending(
-		_vault_id: VaultId,
-		securitization: &Securitization<Balance>,
-	) -> Result<(), VaultError> {
-		if FailRemovePendingSecuritization::get() {
-			return Err(VaultError::InternalError);
-		}
-		DefaultVault::mutate(|a| {
-			a.remove_pending_activation(securitization);
-		});
-		Ok(())
 	}
 
 	fn update_pending_cosign_list(
@@ -463,15 +557,12 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 		Ok(DefaultVault::get().securitization_ratio)
 	}
 
-	fn add_securitized_satoshis(
+	fn activate_securitization(
 		_vault_id: VaultId,
-		satoshis: Satoshis,
-		securitization_ratio: FixedU128,
+		securitization: &BitcoinSecuritization<Self::Balance>,
+		funded_satoshis: Satoshis,
 	) -> Result<(), VaultError> {
-		DefaultVault::mutate(|vault| {
-			vault.add_securitized_satoshis(satoshis, securitization_ratio);
-		});
-		Ok(())
+		DefaultVault::mutate(|vault| vault.activate_securitization(securitization, funded_satoshis))
 	}
 
 	fn get_projected_flexible_securitization(
@@ -487,12 +578,12 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 
 	fn set_bitcoin_lock_flexible(
 		_vault_id: VaultId,
-		securitization: &Securitization<Self::Balance>,
-		satoshis: Satoshis,
+		securitization: &BitcoinSecuritization<Self::Balance>,
+		funded_satoshis: Satoshis,
 		is_flexible: bool,
 	) -> Result<(), VaultError> {
 		DefaultVault::mutate(|vault| {
-			vault.set_bitcoin_lock_flexible(securitization, satoshis, is_flexible)
+			vault.set_bitcoin_lock_flexible(securitization, funded_satoshis, is_flexible)
 		})
 	}
 }
@@ -522,6 +613,12 @@ impl BitcoinVerifier<Test> for StaticBitcoinVerifier {
 
 pub struct StaticBitcoinUtxoTracker;
 impl BitcoinUtxoTracker for StaticBitcoinUtxoTracker {
+	fn get_synched_height() -> BitcoinHeight {
+		pallet_bitcoin_utxos::SynchedBitcoinBlock::<Test>::get()
+			.map(|block| block.block_height)
+			.unwrap_or_else(|| BitcoinBlockHeightChange::get().1)
+	}
+
 	fn unwatch_utxo(_utxo_id: UtxoId, utxo_ref: &UtxoRef) {
 		let _ = utxo_ref;
 	}
@@ -543,6 +640,13 @@ impl BitcoinUtxoTracker for StaticBitcoinUtxoTracker {
 	}
 }
 
+impl pallet_bitcoin_utxos::Config for Test {
+	type WeightInfo = ();
+	type MaxUtxosPerLock = ConstU32<10>;
+	type EventHandler = BitcoinLocks;
+	type MinimumSatoshisPerUtxo = MinimumLockSatoshis;
+}
+
 pub(crate) fn set_bitcoin_height(height: BitcoinHeight) {
 	BitcoinBlockHeightChange::set((height, height));
 }
@@ -552,7 +656,7 @@ impl pallet_bitcoin_locks::Config for Test {
 	type Currency = Balances;
 	type Balance = Balance;
 	type RuntimeHoldReason = RuntimeHoldReason;
-	type LockEvents = (EventHandler,);
+	type FissionsProvider = BitcoinFissions;
 	type BitcoinUtxoTracker = StaticBitcoinUtxoTracker;
 	type PriceProvider = StaticPriceProvider;
 	type BitcoinSignatureVerifier = StaticBitcoinVerifier;
@@ -576,9 +680,35 @@ impl pallet_bitcoin_locks::Config for Test {
 	type DidStartNewFrame = DidStartNewFrame;
 }
 
+impl pallet_bitcoin_fissions::Config for Test {
+	type WeightInfo = ();
+	type Balance = Balance;
+	type LockProvider = BitcoinLocks;
+	type Minting = Mint;
+	type OperationalAccountsHook = MockOperationalAccounts;
+	type Currency = Balances;
+	type MaxFissionsPerLock = ConstU32<10>;
+	type MinimumRatchetPercent = MinimumRatchetPercent;
+}
+
+impl pallet_mint::Config for Test {
+	type WeightInfo = ();
+	type Currency = Balances;
+	type Balance = Balance;
+	type MaxPendingMintsPerUtxo = MaxPendingMintsPerUtxo;
+	type MaxPendingMintPayoutWindowSize = MaxPendingMintPayoutWindowSize;
+	type PriceProvider = StaticPriceProvider;
+	type BlockRewardAccountsProvider = StaticBlockRewardAccountsProvider;
+	type MaxMintHistoryToMaintain = ConstU32<10>;
+	type MaxPossibleMiners = ConstU32<100>;
+	type MiningFrameProvider = StaticMiningFrameProvider;
+	type BitcoinMintPayoutPercentPerFrame = BitcoinMintPayoutPercentPerFrame;
+}
+
 // Build genesis storage according to the mock runtime.
 pub fn new_test_ext() -> TestState {
-	FailRemovePendingSecuritization::set(false);
+	FailReturnSecuritization::set(false);
+	AccountBitcoinChanges::set(Vec::new());
 	DefaultVault::set(Vault {
 		operator_account_id: 1,
 		delegate_account_id: None,
@@ -588,8 +718,8 @@ pub fn new_test_ext() -> TestState {
 		flexible_securitization_locked: 0,
 		reserved_securitization_space: 0,
 		locked_satoshis: 0,
-		securitized_satoshis: 0,
-		flexible_securitized_satoshis: 0,
+		ratio_adjusted_satoshis: 0,
+		flexible_ratio_adjusted_satoshis: 0,
 		terms: VaultTerms {
 			bitcoin_annual_percent_rate: FixedU128::from_float(0.1),
 			bitcoin_base_fee: 0,

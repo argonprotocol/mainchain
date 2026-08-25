@@ -23,11 +23,10 @@ pub mod pallet {
 	use super::*;
 	use alloc::vec::Vec;
 	use argon_primitives::{
-		bitcoin::UtxoId, block_seal::BlockSealAuthorityId, vault::BitcoinVaultProvider,
-		BitcoinLocksProvider, MiningSlotProvider, OnNewSlot, OperationalAccountProvider,
-		OperationalAccountsHook, OperationalRewardKind, OperationalRewardsPayer, Signature,
-		TickProvider, TreasuryPoolProvider, UniswapTransferProvider, UtxoLockEvents,
-		MICROGONS_PER_ARGON,
+		block_seal::BlockSealAuthorityId, vault::BitcoinVaultProvider, BitcoinFissionsProvider,
+		MiningSlotProvider, OnNewSlot, OperationalAccountProvider, OperationalAccountsHook,
+		OperationalRewardKind, OperationalRewardsPayer, Signature, TickProvider,
+		TreasuryPoolProvider, UniswapTransferProvider, MICROGONS_PER_ARGON,
 	};
 	use codec::{Decode, Encode, EncodeLike};
 	use core::{fmt::Debug, marker::PhantomData};
@@ -115,8 +114,8 @@ pub mod pallet {
 		>;
 		/// Provider for whether a linked mining rewards account currently has an active seat.
 		type MiningSlotProvider: MiningSlotProvider<Self::AccountId>;
-		/// Provider for an account's currently funded bitcoin lock amount at registration time.
-		type BitcoinLocksProvider: BitcoinLocksProvider<Self::AccountId, Self::Balance>;
+		/// Provider for an account's active Fission liquidity at registration time.
+		type BitcoinFissionsProvider: BitcoinFissionsProvider<Self::AccountId, Self::Balance>;
 		/// Provider for current account bond participation.
 		type TreasuryPoolProvider: TreasuryPoolProvider<Self::AccountId, Balance = Self::Balance>;
 		/// Provider for whether crosschain transfer tracking is active and whether linked accounts
@@ -653,7 +652,7 @@ pub mod pallet {
 				name: None,
 				last_name_change_tick: None,
 				uniswap_argon_transfers_in_amount: T::Balance::zero(),
-				account_bitcoin_amount: T::BitcoinLocksProvider::get_account_funded_bitcoin_amount(
+				account_bitcoin_amount: T::BitcoinFissionsProvider::get_account_fission_liquidity(
 					&vault_account,
 				),
 				account_vault_bond_amount:
@@ -1252,6 +1251,18 @@ pub mod pallet {
 			});
 		}
 
+		fn account_bitcoin_amount_changed_weight() -> Weight {
+			<T as Config>::WeightInfo::on_account_bitcoin_amount_updated()
+		}
+
+		fn account_bitcoin_amount_changed(
+			account_id: &T::AccountId,
+			amount: T::Balance,
+			is_increase: bool,
+		) {
+			Self::adjust_account_bitcoin_amount(account_id, amount, is_increase);
+		}
+
 		fn account_vault_bond_total_updated_weight() -> Weight {
 			<T as Config>::WeightInfo::on_account_vault_bond_total_updated()
 		}
@@ -1296,30 +1307,6 @@ pub mod pallet {
 			T::DbWeight::get()
 				.reads(1)
 				.saturating_add(T::WeightInfo::on_frame_start(ready_count))
-		}
-	}
-
-	impl<T: Config> UtxoLockEvents<T::AccountId, T::Balance> for Pallet<T> {
-		type Weights = weights::ProviderWeightAdapter<T>;
-
-		fn utxo_locked(
-			_utxo_id: UtxoId,
-			account_id: &T::AccountId,
-			amount: T::Balance,
-		) -> DispatchResult {
-			Self::adjust_account_bitcoin_amount(account_id, amount, true);
-			Ok(())
-		}
-
-		fn utxo_released(
-			_utxo_id: UtxoId,
-			account_id: &T::AccountId,
-			_remove_pending_mints: bool,
-			_burned_argons: T::Balance,
-			original_liquidity_promised: T::Balance,
-		) -> DispatchResult {
-			Self::adjust_account_bitcoin_amount(account_id, original_liquidity_promised, false);
-			Ok(())
 		}
 	}
 

@@ -1,40 +1,42 @@
 import {
   SKIP_E2E,
   stringifyExt,
+  submitTx,
   sudo,
   teardown,
   TestMainchain,
   TestOracle,
 } from '@argonprotocol/testing';
 import {
-  ArgonClient,
-  BitcoinLock,
-  IBitcoinLockConfig,
+  type ArgonClient,
+  FIXED_U128_DECIMALS,
   Keyring,
-  KeyringPair,
+  type KeyringPair,
+  PERMILL_DECIMALS,
   PriceIndex,
-  SATS_PER_BTC,
   toFixedNumber,
-  TxSubmitter,
   u8aToHex,
-  Vault,
 } from '@argonprotocol/mainchain';
 import { afterAll, beforeAll, describe, expect, test } from 'vitest';
 import {
   addressBytesHex,
   bip39,
+  type IBitcoinReleaseRequest,
   BitcoinNetwork,
   CosignScript,
+  type ICosignScriptLock,
   getBitcoinNetworkFromApi,
   getChildXpriv,
   getCompressedPubkey,
+  getXpubBytes,
   getXpubFromXpriv,
-  HDKey,
+  type HDKey,
   p2wshScriptHexToAddress,
 } from '@argonprotocol/bitcoin';
 import { wordlist as english } from '@scure/bip39/wordlists/english';
 
 const { generateMnemonic, mnemonicToSeedSync } = bip39;
+const SATOSHIS_PER_BITCOIN = 100_000_000n;
 
 afterAll(teardown);
 
@@ -42,18 +44,21 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
   let vaulterchain: TestMainchain;
   let vaulterClient: ArgonClient;
   let vaulter: KeyringPair;
-  let lock: BitcoinLock;
   let bitcoinLocker: KeyringPair;
+  let bitcoinNetwork: BitcoinNetwork;
+  let vaultXpriv: HDKey;
+  let lock: ICosignScriptLock;
+  let vaultId: number;
+  let utxoId: number;
+  let releaseRequest: IBitcoinReleaseRequest;
+  let fundingUtxoRef: { txid: string; vout: number };
+  let vaultCosignature: Uint8Array;
+
   const vaulterMnemonic = generateMnemonic(english);
   const bitcoinMnemonic = generateMnemonic(english);
   const devSeed = mnemonicToSeedSync(vaulterMnemonic);
   const vaulterHdPath = "m/84'/0'/0'";
 
-  let config: IBitcoinLockConfig;
-  let bitcoinNetwork: BitcoinNetwork;
-  let vaultXpriv: HDKey;
-  let vaultMasterXpub: string;
-  let vault: Vault;
   beforeAll(async () => {
     console.log('Starting vaulterchain with bitcoin...');
     vaulterchain = new TestMainchain();
@@ -73,73 +78,79 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
 
     vaulter = sudo();
     bitcoinLocker = new Keyring({ type: 'sr25519' }).addFromUri('//Bob');
-    config = await BitcoinLock.getConfig(vaulterClient);
-    console.log('Bitcoin Locks config:', stringifyExt(config));
-    bitcoinNetwork = getBitcoinNetworkFromApi(config.bitcoinNetwork);
+    bitcoinNetwork = getBitcoinNetworkFromApi(
+      await vaulterClient.query.bitcoinUtxos.bitcoinNetwork(),
+    );
+    console.log('Bitcoin network:', bitcoinNetwork);
 
     vaultXpriv = getChildXpriv(devSeed, vaulterHdPath, bitcoinNetwork);
-    // get the xpub from the xpriv
-    vaultMasterXpub = getXpubFromXpriv(vaultXpriv);
   }, 60e3);
 
   test.sequential('Test price apis', async () => {
-    // wait for first block to be mined
     await new Promise<void>(resolve => {
-      const sub = vaulterClient.rpc.chain.subscribeAllHeads(h => {
-        if (h.number.toNumber() > 1) {
+      const subscription = vaulterClient.rpc.chain.subscribeAllHeads(header => {
+        if (header.number.toNumber() > 1) {
           resolve();
-          void sub.then(x => x());
+          void subscription.then(unsubscribe => unsubscribe());
         }
       });
     });
 
     const currentTick = await vaulterClient.query.ticks.currentTick();
-    const txResult = await new TxSubmitter(
+    await submitTx(
       vaulterClient,
       vaulterClient.tx.priceIndex.submit(
         {
-          btcUsdPrice: toFixedNumber(60_000.5, 18),
-          argonUsdPrice: toFixedNumber(1.0, 18),
-          argonotUsdPrice: toFixedNumber(12.0, 18),
-          argonUsdTargetPrice: toFixedNumber(1.0, 18),
-          argonTimeWeightedAverageLiquidity: toFixedNumber(1_000, 18),
+          btcUsdPrice: toFixedNumber(60_000.5, FIXED_U128_DECIMALS),
+          argonUsdPrice: toFixedNumber(1, FIXED_U128_DECIMALS),
+          argonotUsdPrice: toFixedNumber(12, FIXED_U128_DECIMALS),
+          argonUsdTargetPrice: toFixedNumber(1, FIXED_U128_DECIMALS),
+          argonTimeWeightedAverageLiquidity: toFixedNumber(1_000, FIXED_U128_DECIMALS),
           tick: currentTick.toBigInt(),
         },
         null,
       ),
       new Keyring({ type: 'sr25519' }).addFromUri(TestOracle.PriceIndexOperator),
-    ).submit();
-    await txResult.waitForInFirstBlock;
-    await new Promise(resolve => setTimeout(resolve, 0));
+    );
+
     const priceIndex = new PriceIndex();
     await priceIndex.load(vaulterClient);
     expect(priceIndex.argonotUsdPrice).toBeDefined();
     expect(priceIndex.getSatoshiPriceInTargetMicrogons(100n)).toStrictEqual(60_000n);
-    expect(
-      BitcoinLock.calculateRedemptionAmountFromSatoshis(priceIndex, 100n, 60_000n),
-    ).toStrictEqual(60_000n);
-    expect(
-      BitcoinLock.calculateRedemptionAmountFromSatoshis(priceIndex, 100n, 50_000n),
-    ).toStrictEqual(50_000n);
   });
 
-  test.sequential('it can lock a bitcoin', async () => {
-    const vaultResult = await Vault.create(vaulterClient, vaulter, {
-      securitization: 10_000_000n,
-      securitizationRatio: 1,
-      annualPercentRate: 0.05,
-      baseFee: 500_000n,
-      bitcoinXpub: vaultMasterXpub,
-      treasuryProfitSharing: 0.5,
-    });
-    vault = await vaultResult.getVault();
+  test.sequential('it can create and fund a bitcoin lock', async () => {
+    const vaultResult = await submitTx(
+      vaulterClient,
+      vaulterClient.tx.vaults.create({
+        terms: {
+          bitcoinAnnualPercentRate: toFixedNumber(0.05, FIXED_U128_DECIMALS),
+          bitcoinBaseFee: 500_000n,
+          treasuryProfitSharing: toFixedNumber(0.5, PERMILL_DECIMALS),
+          treasuryBonusProfitSharing: toFixedNumber(0, PERMILL_DECIMALS),
+        },
+        securitizationRatio: toFixedNumber(1, FIXED_U128_DECIMALS),
+        securitization: 10_000_000n,
+        bitcoinXpubkey: getXpubBytes(getXpubFromXpriv(vaultXpriv)),
+        delegateAccountId: null,
+      }),
+      vaulter,
+    );
+    const vaultCreated = vaultResult.events.find(event =>
+      vaulterClient.events.vaults.VaultCreated.is(event),
+    );
+    if (!vaultCreated || !vaulterClient.events.vaults.VaultCreated.is(vaultCreated)) {
+      throw new Error('Vault creation event not found');
+    }
+    vaultId = vaultCreated.data.vaultId.toNumber();
 
     const btcClient = vaulterchain.getBitcoinClient();
     await btcClient.command('createwallet', 'default').catch(() => null);
     await btcClient.command('loadwallet', 'default').catch(() => null);
     const newAddress = await btcClient.command('getnewaddress');
     expect(newAddress).toBeTypeOf('string');
-    console.log(`Mining to ${newAddress}`);
+
+    console.log(`Mining initial Bitcoin blocks to ${newAddress}`);
     await btcClient.command('generatetoaddress', 101, newAddress);
 
     const ownerBitcoinXpriv = getChildXpriv(
@@ -147,167 +158,149 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
       "m/84'/0'/0'/0/0'",
     );
     const ownerBitcoinPubkey = getCompressedPubkey(ownerBitcoinXpriv.publicKey!);
-    console.log('Owner Bitcoin Pubkey:', u8aToHex(ownerBitcoinPubkey), ownerBitcoinPubkey.length);
-    const priceIndex = new PriceIndex();
-    await priceIndex.load(vaulterClient);
-    const result = await BitcoinLock.initialize({
-      client: vaulterClient,
-      vault,
-      priceIndex,
-      satoshis: 2000n,
-      ownerBitcoinPubkey,
-      txSigner: bitcoinLocker,
-    });
-    const { lock } = await result.getLock();
-    console.log('Locked bitcoin', lock);
-    expect(lock.vaultId).toBe(1);
-    expect(lock.satoshis).toBeGreaterThan(1000);
-    expect(lock.utxoId).toBe(1);
+    console.log(
+      'Owner Bitcoin public key:',
+      u8aToHex(ownerBitcoinPubkey),
+      `(${ownerBitcoinPubkey.length} bytes)`,
+    );
+
+    const lockResult = await submitTx(
+      vaulterClient,
+      vaulterClient.tx.bitcoinLocks.createReceiveAddress(vaultId, 2_000n, ownerBitcoinPubkey, null),
+      bitcoinLocker,
+    );
+    const lockCreated = lockResult.events.find(event =>
+      vaulterClient.events.bitcoinLocks.BitcoinLockCreated.is(event),
+    );
+    if (!lockCreated || !vaulterClient.events.bitcoinLocks.BitcoinLockCreated.is(lockCreated)) {
+      throw new Error('Bitcoin Lock creation event not found');
+    }
+    utxoId = lockCreated.data.utxoId.toNumber();
+    lock = await loadCosignScriptLock(vaulterClient, utxoId);
+    console.log('Created Bitcoin Lock:', stringifyExt(lock));
+
+    expect(lock.securitizedSatoshis).toBe(2_000n);
     const cosignScript = new CosignScript(lock, bitcoinNetwork);
-    const scriptPubkey = cosignScript.calculateScriptPubkey();
-    console.log(`ScriptPubkey: ${scriptPubkey} vs calculated ${lock.p2wshScriptHashHex}`);
-    expect(scriptPubkey).toBe(lock.p2wshScriptHashHex);
+    const calculatedScriptPubkey = cosignScript.calculateScriptPubkey();
+    console.log('Lock script pubkey:', {
+      stored: lock.p2wshScriptHashHex,
+      calculated: calculatedScriptPubkey,
+    });
+    expect(calculatedScriptPubkey).toBe(lock.p2wshScriptHashHex);
 
-    const walletBalance = await btcClient.command('getbalances');
-    const btc = Number(lock.satoshis) / Number(SATS_PER_BTC);
-    console.log('Wallet balance:', walletBalance, 'Needed:', btc);
-
+    const btc = Number(lock.securitizedSatoshis) / Number(SATOSHIS_PER_BITCOIN);
     const paytoScriptAddress = p2wshScriptHexToAddress(lock.p2wshScriptHashHex, bitcoinNetwork);
+    const walletBalance = await btcClient.command('getbalance');
+    console.log('Funding Bitcoin Lock:', {
+      walletBalance,
+      amountBtc: btc,
+      address: paytoScriptAddress,
+    });
 
     const { psbt: fundingPsbt } = await btcClient.command(
       'walletcreatefundedpsbt',
       [],
-      {
-        [paytoScriptAddress]: btc,
-      },
+      { [paytoScriptAddress]: btc },
       0,
-      {
-        lockUnspents: true,
-        feeRate: 0.00001,
-      },
+      { lockUnspents: true, feeRate: 0.00001 },
     );
-    console.log('Created PSBT:', fundingPsbt);
-    // Ensure we process the PSBT returned from walletcreatefundedpsbt
+    console.log('Created funding PSBT:', fundingPsbt);
+
     const processed = await btcClient.command('walletprocesspsbt', fundingPsbt);
-    console.log('Processed PSBT:', processed);
+    console.log('Processed funding PSBT:', processed);
     if (!processed.complete) {
       const decoded = await btcClient.command('decodepsbt', processed.psbt);
       console.dir(decoded.inputs, { depth: null });
       throw new Error('PSBT could not be finalized: incomplete signing');
     }
-    // Pass processed.psbt into finalizepsbt
+
     const finalizedPsbt = await btcClient.command('finalizepsbt', processed.psbt);
-    console.log('Finalized PSBT:', finalizedPsbt);
-    // Diagnostic logging: log txid from finalizepsbt (if present)
-    if (finalizedPsbt.txid) {
-      console.log('Finalized TXID (from finalizepsbt):', finalizedPsbt.txid);
-    }
+    console.log('Finalized funding PSBT:', finalizedPsbt);
+
     const txid: string = await btcClient.command('sendrawtransaction', finalizedPsbt.hex);
-    console.log('Broadcast TXID (from sendrawtransaction):', txid);
-    console.log('TXID normalized:', txid.split('').reverse().join(''));
-    // Fetch decoded transaction and log its TXID
-    const decoded = await btcClient.command('getrawtransaction', txid, true);
-    console.log('Decoded TXID from getrawtransaction:', decoded.txid);
+    console.log('Broadcast funding transaction:', txid);
 
+    const decodedFundingTx = await btcClient.command('getrawtransaction', txid, true);
+    console.log('Bitcoin node decoded funding transaction:', decodedFundingTx.txid);
+
+    console.log(`Mining confirmations to ${newAddress}`);
     await btcClient.command('generatetoaddress', 7, newAddress);
+    for (let attempt = 0; attempt < 60; attempt += 1) {
+      lock = await loadCosignScriptLock(vaulterClient, utxoId);
+      if (lock.fundedSatoshis > 0n) break;
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+    expect(lock.fundedSatoshis).toBe(2_000n);
+    console.log('Bitcoin Lock funding detected:', stringifyExt(lock));
 
-    // wait for the bitcoin to verify
-    await new Promise<void>(async (resolve, reject) => {
-      const unsub = await vaulterClient.query.bitcoinLocks.locksByUtxoId(1, y => {
-        if (!y.isSome) reject('No lock found');
-        const lock = y.unwrap();
-        if (lock.isFunded.isTrue) {
-          resolve();
-          unsub();
-        }
-      });
-    });
-
-    await expect(lock.getFundingUtxoRef(vaulterClient)).resolves.toEqual({
-      bitcoinTxid: `0x${txid}`, // this is the little-endian representation.
-      vout: expect.any(Number),
-      txid: expect.any(String),
-    });
-
-    const pendingMints = await lock.findPendingMints(vaulterClient);
-    expect(pendingMints).toHaveLength(1);
+    const fundingRef = await vaulterClient.query.bitcoinLocks.utxoIdToFundingUtxoRef(utxoId);
+    if (fundingRef.isNone) throw new Error('Funding UTXO reference not found');
+    const reference = fundingRef.unwrap();
+    fundingUtxoRef = {
+      txid: u8aToHex(reference.txid),
+      vout: reference.outputIndex.toNumber(),
+    };
+    console.log('Runtime funding UTXO reference:', fundingUtxoRef);
+    expect(u8aToHex(reference.txid.slice().reverse())).toBe(`0x${txid}`);
   });
 
   test.sequential('it can release a bitcoin lock', async () => {
-    const lookup = await BitcoinLock.get(vaulterClient, 1);
-    if (!lookup) {
-      throw new Error('Lock not found');
-    }
-    lock = lookup;
-    expect(lock.isFunded).toBe(true);
-    const priceIndex = new PriceIndex();
-    await priceIndex.load(vaulterClient);
-
-    expect(lock.calculateRedemptionAmount(priceIndex)).toEqual(lock.lockedTargetPrice);
-
     const btcClient = vaulterchain.getBitcoinClient();
     const nextAddress = await btcClient.command('getnewaddress');
-    console.log(`Next address for release: ${nextAddress}`);
+    console.log('Bitcoin release address:', nextAddress);
+
     const toScriptPubkey = addressBytesHex(nextAddress, bitcoinNetwork);
-    const cosignScript = new CosignScript(lock, bitcoinNetwork);
-    const networkFee = cosignScript.calculateFee(5n, toScriptPubkey);
+    const networkFee = new CosignScript(lock, bitcoinNetwork).calculateFee(5n, toScriptPubkey);
+    console.log('Bitcoin release network fee:', `${networkFee} satoshis`);
     expect(networkFee).toBeGreaterThan(5n);
-    console.log(`Network fee for release: ${networkFee} satoshis, next address: ${nextAddress}`);
-    const result = await lock.requestRelease({
-      client: vaulterClient,
-      priceIndex,
-      releaseRequest: { bitcoinNetworkFee: networkFee, toScriptPubkey },
-      txSigner: bitcoinLocker,
-    });
-    await result.waitForFinalizedBlock;
-    console.log('Release request result:', result);
-    expect(result.blockNumber).toBeGreaterThan(1);
+
+    const result = await submitTx(
+      vaulterClient,
+      vaulterClient.tx.bitcoinLocks.requestRelease(utxoId, toScriptPubkey, networkFee),
+      bitcoinLocker,
+    );
+    console.log('Release request included in block:', result.blockHash);
+
+    const request = await vaulterClient.query.bitcoinLocks.lockReleaseRequestsByUtxoId(utxoId);
+    if (request.isNone) throw new Error('Release request not found');
+    const value = request.unwrap();
+    releaseRequest = {
+      toScriptPubkey: value.toScriptPubkey.toHex(),
+      bitcoinNetworkFee: value.bitcoinNetworkFee.toBigInt(),
+    };
+    console.log('Stored release request:', stringifyExt(releaseRequest));
   });
 
   test.sequential('it can cosign as vault', async () => {
-    const lookup = await BitcoinLock.get(vaulterClient, 1);
-    if (!lookup) {
-      throw new Error('Lock not found');
-    }
-    lock = lookup;
     const cosignScript = new CosignScript(lock, bitcoinNetwork);
-    const releaseRequest = await lock.getReleaseRequest(vaulterClient);
-    expect(releaseRequest).toBeTruthy();
-    if (!releaseRequest) {
-      throw new Error('Release request not found');
-    }
-    const utxoRef = await lock.getFundingUtxoRef(vaulterClient);
-    if (!utxoRef) {
-      throw new Error('UTXO reference not found');
-    }
-    expect(utxoRef).toBeTruthy();
-    const psbt = cosignScript.getCosignPsbt({ releaseRequest, utxoRef });
+    const psbt = cosignScript.getCosignPsbt({
+      releaseRequest,
+      utxoRef: fundingUtxoRef,
+      utxoSatoshis: lock.fundedSatoshis,
+    });
     const signedPsbt = cosignScript.vaultCosignPsbt(psbt, lock, vaultXpriv);
     expect(signedPsbt.getInput(0).partialSig).toHaveLength(1);
-    const [_, signature] = signedPsbt.getInput(0).partialSig?.[0] ?? [];
-    expect(signature).toBeDefined();
+    const signature = signedPsbt.getInput(0).partialSig?.[0]?.[1];
     if (!signature) throw new Error('Signature not found in PSBT');
 
-    const tx = await BitcoinLock.submitVaultSignature({
-      client: vaulterClient,
-      utxoId: lock.utxoId,
-      vaultSignature: signature,
-      txSigner: vaulter,
-    });
-    await tx.waitForFinalizedBlock;
-    const { blockHash } = tx;
-    expect(blockHash).toBeTruthy();
-    if (!blockHash) throw new Error('Cosign transaction block hash not found');
-
-    console.log('Cosign transaction included in block:', blockHash);
+    const result = await submitTx(
+      vaulterClient,
+      vaulterClient.tx.bitcoinLocks.cosignRelease(utxoId, u8aToHex(signature)),
+      vaulter,
+    );
     const blockHeight = await vaulterClient
-      .at(blockHash)
-      .then(x => x.query.system.number())
-      .then(x => x.toNumber());
-    console.log('Cosign transaction block height:', blockHeight);
+      .at(result.blockHash)
+      .then(client => client.query.system.number())
+      .then(number => number.toNumber());
+    console.log('Vault cosign included:', { blockHash: result.blockHash, blockHeight });
 
-    const cosign = await lock.findVaultCosignSignature(vaulterClient);
-    expect(cosign).toBeDefined();
+    const cosigned = result.events.find(event =>
+      vaulterClient.events.bitcoinLocks.BitcoinUtxoCosigned.is(event),
+    );
+    if (!cosigned || !vaulterClient.events.bitcoinLocks.BitcoinUtxoCosigned.is(cosigned)) {
+      throw new Error('Bitcoin cosign event not found');
+    }
+    vaultCosignature = new Uint8Array(cosigned.data.signature);
   });
 
   test.sequential('user can cosign a bitcoin lock', async () => {
@@ -315,38 +308,50 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
       mnemonicToSeedSync(bitcoinMnemonic),
       "m/84'/0'/0'/0/0'",
     );
-    // can't load the lock now, as it is removed from the locksByUtxoId map
-    const cosignScript = new CosignScript(lock, bitcoinNetwork);
-    const cosign = await lock.findVaultCosignSignature(vaulterClient);
-    expect(cosign).toBeDefined();
-    if (!cosign) throw new Error('Cosign not found');
-
-    const dataStillAvailableHeight = cosign.blockHeight - 1;
-
-    const blockHash = await vaulterClient.rpc.chain.getBlockHash(dataStillAvailableHeight);
-    const clientAtHeight = await vaulterClient.at(blockHash);
-
-    const releaseRequest = await lock.getReleaseRequest(clientAtHeight);
-    const utxoRef = await lock.getFundingUtxoRef(clientAtHeight);
-    expect(utxoRef).toBeTruthy();
-    console.log('Got release request:', releaseRequest, utxoRef, cosign);
-    const cosignedTx = cosignScript.cosignAndGenerateTx({
-      releaseRequest: releaseRequest!,
-      vaultCosignature: cosign.signature,
-      utxoRef: utxoRef!,
+    const cosignedTx = new CosignScript(lock, bitcoinNetwork).cosignAndGenerateTx({
+      releaseRequest,
+      vaultCosignature,
+      utxoRef: fundingUtxoRef,
+      utxoSatoshis: lock.fundedSatoshis,
       ownerXpriv: ownerBitcoinXpriv,
     });
     console.log('Cosigned Tx:', stringifyExt(cosignedTx));
+
     const btcClient = vaulterchain.getBitcoinClient();
     const txHex = u8aToHex(cosignedTx.toBytes(true, true), undefined, false);
     const txid = await btcClient.command('sendrawtransaction', txHex);
-    console.log('Broadcasted cosigned transaction with TXID:', txid);
-    expect(txid).toBeDefined();
-    // Wait for the transaction to be included in the bitcoin wallet
+    console.log('Broadcast cosigned release transaction:', txid);
 
-    const tx = await btcClient.command('gettransaction', txid);
-    // If no error, the tx is in your wallet
-    expect(tx).toBeDefined();
-    console.log('Transaction is in wallet:', tx);
+    const transaction = await btcClient.command('gettransaction', txid);
+    console.log('Release transaction found in wallet:', stringifyExt(transaction));
+    expect(transaction).toBeDefined();
   });
 });
+
+async function loadCosignScriptLock(
+  client: ArgonClient,
+  utxoId: number,
+): Promise<ICosignScriptLock> {
+  const lock = await client.query.bitcoinLocks.locksByUtxoId(utxoId);
+  if (lock.isNone) throw new Error(`Bitcoin Lock ${utxoId} not found`);
+
+  const value = lock.unwrap();
+  const [parentFingerprint, cosignHdIndex] = value.vaultXpubSources;
+  const wscriptHash = value.utxoScriptPubkey.asP2wsh.wscriptHash.toHex().replace('0x', '');
+
+  return {
+    createdAtHeight: value.createdAtHeight.toNumber(),
+    fundedSatoshis: value.fundedSatoshis.toBigInt(),
+    openClaimHeight: value.openClaimHeight.toNumber(),
+    ownerPubkey: value.ownerPubkey.toHex(),
+    p2wshScriptHashHex: `0x0020${wscriptHash}`,
+    securitizedSatoshis: value.securitizedSatoshis.toBigInt(),
+    vaultClaimHeight: value.vaultClaimHeight.toNumber(),
+    vaultClaimPubkey: value.vaultClaimPubkey.toHex(),
+    vaultPubkey: value.vaultPubkey.toHex(),
+    vaultXpubSources: {
+      parentFingerprint: new Uint8Array(parentFingerprint),
+      cosignHdIndex: cosignHdIndex.toNumber(),
+    },
+  };
+}

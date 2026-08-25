@@ -1,10 +1,10 @@
 use crate::Config;
 use argon_primitives::{
 	vault::{BitcoinVaultProvider, BitcoinVaultProviderWeightInfo},
-	BitcoinLocksProvider, BitcoinLocksProviderWeightInfo, MiningSlotProvider,
+	BitcoinFissionsProvider, BitcoinFissionsProviderWeightInfo, MiningSlotProvider,
 	MiningSlotProviderWeightInfo, OperationalAccountProviderWeightInfo, TickProvider,
 	TickProviderWeightInfo, TreasuryPoolProvider, TreasuryPoolProviderWeightInfo,
-	UniswapTransferProvider, UniswapTransferProviderWeightInfo, UtxoLockEventsWeightInfo,
+	UniswapTransferProvider, UniswapTransferProviderWeightInfo,
 };
 use core::marker::PhantomData;
 use pallet_prelude::*;
@@ -38,8 +38,8 @@ type TreasuryPoolProviderWeights<T> =
 	<<T as Config>::TreasuryPoolProvider as TreasuryPoolProvider<
 		<T as frame_system::Config>::AccountId,
 	>>::Weights;
-type BitcoinLocksProviderWeights<T> =
-	<<T as Config>::BitcoinLocksProvider as BitcoinLocksProvider<
+type BitcoinFissionsProviderWeights<T> =
+	<<T as Config>::BitcoinFissionsProvider as BitcoinFissionsProvider<
 		<T as frame_system::Config>::AccountId,
 		<T as Config>::Balance,
 	>>::Weights;
@@ -54,7 +54,7 @@ pub struct WithProviderWeights<
 	MiningSlotProviderWeight = MiningSlotProviderWeights<T>,
 	UniswapTransferWeight = UniswapTransferProviderWeights<T>,
 	TreasuryPoolProviderWeight = TreasuryPoolProviderWeights<T>,
-	BitcoinLocksProviderWeight = BitcoinLocksProviderWeights<T>,
+	BitcoinFissionsProviderWeight = BitcoinFissionsProviderWeights<T>,
 	TickProviderWeight = TickProviderWeights<T>,
 >(
 	PhantomData<(
@@ -64,7 +64,7 @@ pub struct WithProviderWeights<
 		MiningSlotProviderWeight,
 		UniswapTransferWeight,
 		TreasuryPoolProviderWeight,
-		BitcoinLocksProviderWeight,
+		BitcoinFissionsProviderWeight,
 		TickProviderWeight,
 	)>,
 );
@@ -75,7 +75,7 @@ impl<
 		MiningSlotProviderWeight,
 		UniswapTransferWeight,
 		TreasuryPoolProviderWeight,
-		BitcoinLocksProviderWeight,
+		BitcoinFissionsProviderWeight,
 		TickProviderWeight,
 	> WeightInfo
 	for WithProviderWeights<
@@ -85,7 +85,7 @@ impl<
 		MiningSlotProviderWeight,
 		UniswapTransferWeight,
 		TreasuryPoolProviderWeight,
-		BitcoinLocksProviderWeight,
+		BitcoinFissionsProviderWeight,
 		TickProviderWeight,
 	>
 where
@@ -95,13 +95,13 @@ where
 	MiningSlotProviderWeight: MiningSlotProviderWeightInfo,
 	UniswapTransferWeight: UniswapTransferProviderWeightInfo,
 	TreasuryPoolProviderWeight: TreasuryPoolProviderWeightInfo,
-	BitcoinLocksProviderWeight: BitcoinLocksProviderWeightInfo,
+	BitcoinFissionsProviderWeight: BitcoinFissionsProviderWeightInfo,
 	TickProviderWeight: TickProviderWeightInfo,
 {
 	fn register() -> Weight {
 		Base::register()
 			.saturating_add(VaultProviderWeight::get_registration_vault_data())
-			.saturating_add(BitcoinLocksProviderWeight::get_account_funded_bitcoin_amount())
+			.saturating_add(BitcoinFissionsProviderWeight::get_account_fission_liquidity())
 			.saturating_add(MiningSlotProviderWeight::has_active_rewards_account_seat())
 			.saturating_add(TreasuryPoolProviderWeight::active_account_vault_bond_amount())
 			.saturating_add(UniswapTransferWeight::is_crosschain_activated().saturating_mul(2))
@@ -170,20 +170,6 @@ where
 }
 
 pub struct ProviderWeightAdapter<T>(PhantomData<T>);
-impl<T: Config> UtxoLockEventsWeightInfo for ProviderWeightAdapter<T> {
-	fn utxo_locked() -> Weight {
-		T::WeightInfo::on_account_bitcoin_amount_updated()
-	}
-
-	fn utxo_released() -> Weight {
-		T::WeightInfo::on_account_bitcoin_amount_updated()
-	}
-
-	fn utxo_released_with_pending_mints() -> Weight {
-		T::WeightInfo::on_account_bitcoin_amount_updated()
-	}
-}
-
 impl<T: Config> OperationalAccountProviderWeightInfo for ProviderWeightAdapter<T> {
 	fn is_eligible() -> Weight {
 		T::DbWeight::get().reads(3)

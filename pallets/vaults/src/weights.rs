@@ -33,6 +33,7 @@ pub trait WeightInfo {
 	fn provider_burn_encumbered_argonots() -> Weight;
 	fn provider_account_became_operational() -> Weight;
 	fn provider_set_bitcoin_lock_flexible() -> Weight;
+	fn provider_resecuritize(release_schedule_entries: u32) -> Weight;
 }
 
 type TickProviderWeights<T> = <<T as crate::Config>::TickProvider as TickProvider<
@@ -165,6 +166,10 @@ where
 	fn provider_set_bitcoin_lock_flexible() -> Weight {
 		Base::provider_set_bitcoin_lock_flexible()
 	}
+
+	fn provider_resecuritize(release_schedule_entries: u32) -> Weight {
+		Base::provider_resecuritize(release_schedule_entries)
+	}
 }
 
 pub struct ProviderWeightAdapter<T>(PhantomData<T>);
@@ -199,6 +204,12 @@ impl<T: crate::Config> BitcoinVaultProviderWeightInfo for ProviderWeightAdapter<
 
 	fn set_bitcoin_lock_flexible() -> Weight {
 		<T as crate::Config>::WeightInfo::provider_set_bitcoin_lock_flexible()
+	}
+
+	fn resecuritize() -> Weight {
+		<T as crate::Config>::WeightInfo::provider_resecuritize(
+			argon_primitives::vault::MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES,
+		)
 	}
 }
 
@@ -269,6 +280,9 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 	fn provider_set_bitcoin_lock_flexible() -> Weight {
+		Weight::zero()
+	}
+	fn provider_resecuritize(_release_schedule_entries: u32) -> Weight {
 		Weight::zero()
 	}
 }

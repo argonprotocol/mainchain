@@ -6,7 +6,7 @@ pub mod api {
 	mod root_mod {
 		pub use super::*;
 	}
-	pub static PALLETS: [&str; 33usize] = [
+	pub static PALLETS: [&str; 34usize] = [
 		"System",
 		"Digests",
 		"Timestamp",
@@ -34,6 +34,7 @@ pub mod api {
 		"TransactionPayment",
 		"Utility",
 		"Sudo",
+		"BitcoinFissions",
 		"Treasury",
 		"FeeControl",
 		"OperationalAccounts",
@@ -1169,10 +1170,10 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							240u8, 168u8, 63u8, 65u8, 23u8, 155u8, 60u8, 76u8, 49u8, 108u8, 160u8,
-							146u8, 114u8, 246u8, 34u8, 213u8, 239u8, 16u8, 216u8, 67u8, 204u8,
-							90u8, 250u8, 253u8, 102u8, 161u8, 118u8, 153u8, 3u8, 125u8, 104u8,
-							161u8,
+							197u8, 109u8, 253u8, 58u8, 101u8, 122u8, 135u8, 125u8, 199u8, 19u8,
+							51u8, 181u8, 240u8, 239u8, 169u8, 134u8, 201u8, 64u8, 38u8, 20u8,
+							224u8, 52u8, 131u8, 231u8, 215u8, 236u8, 82u8, 231u8, 203u8, 181u8,
+							182u8, 46u8,
 						],
 					)
 				}
@@ -1190,10 +1191,9 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							211u8, 78u8, 162u8, 143u8, 197u8, 147u8, 137u8, 143u8, 135u8, 225u8,
-							167u8, 43u8, 116u8, 129u8, 96u8, 63u8, 166u8, 35u8, 140u8, 41u8, 176u8,
-							225u8, 105u8, 249u8, 2u8, 79u8, 133u8, 141u8, 14u8, 134u8, 127u8,
-							169u8,
+							11u8, 81u8, 152u8, 165u8, 131u8, 68u8, 72u8, 233u8, 199u8, 22u8, 175u8,
+							99u8, 82u8, 174u8, 156u8, 182u8, 81u8, 30u8, 34u8, 163u8, 191u8, 254u8,
+							254u8, 27u8, 11u8, 22u8, 73u8, 242u8, 3u8, 238u8, 48u8, 161u8,
 						],
 					)
 				}
@@ -3231,6 +3231,9 @@ pub mod api {
 		pub fn utility(&self) -> utility::constants::ConstantsApi {
 			utility::constants::ConstantsApi
 		}
+		pub fn bitcoin_fissions(&self) -> bitcoin_fissions::constants::ConstantsApi {
+			bitcoin_fissions::constants::ConstantsApi
+		}
 		pub fn treasury(&self) -> treasury::constants::ConstantsApi {
 			treasury::constants::ConstantsApi
 		}
@@ -3327,6 +3330,9 @@ pub mod api {
 		pub fn sudo(&self) -> sudo::storage::StorageApi {
 			sudo::storage::StorageApi
 		}
+		pub fn bitcoin_fissions(&self) -> bitcoin_fissions::storage::StorageApi {
+			bitcoin_fissions::storage::StorageApi
+		}
 		pub fn treasury(&self) -> treasury::storage::StorageApi {
 			treasury::storage::StorageApi
 		}
@@ -3417,6 +3423,9 @@ pub mod api {
 		pub fn sudo(&self) -> sudo::calls::TransactionApi {
 			sudo::calls::TransactionApi
 		}
+		pub fn bitcoin_fissions(&self) -> bitcoin_fissions::calls::TransactionApi {
+			bitcoin_fissions::calls::TransactionApi
+		}
 		pub fn treasury(&self) -> treasury::calls::TransactionApi {
 			treasury::calls::TransactionApi
 		}
@@ -3448,9 +3457,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				116u8, 206u8, 102u8, 0u8, 232u8, 243u8, 80u8, 33u8, 117u8, 62u8, 70u8, 116u8, 66u8,
-				163u8, 235u8, 186u8, 242u8, 177u8, 35u8, 7u8, 68u8, 16u8, 151u8, 59u8, 191u8, 50u8,
-				98u8, 34u8, 255u8, 143u8, 66u8, 232u8,
+				54u8, 67u8, 204u8, 142u8, 134u8, 246u8, 163u8, 30u8, 225u8, 23u8, 1u8, 53u8, 210u8,
+				115u8, 35u8, 74u8, 121u8, 244u8, 124u8, 127u8, 186u8, 251u8, 209u8, 250u8, 163u8,
+				17u8, 255u8, 234u8, 78u8, 246u8, 136u8, 255u8,
 			]
 	}
 	pub mod system {
@@ -4574,9 +4583,9 @@ pub mod api {
 						"Events",
 						(),
 						[
-							74u8, 19u8, 1u8, 130u8, 231u8, 59u8, 190u8, 149u8, 228u8, 180u8, 0u8,
-							41u8, 25u8, 38u8, 249u8, 71u8, 15u8, 103u8, 43u8, 200u8, 108u8, 130u8,
-							226u8, 250u8, 124u8, 112u8, 4u8, 215u8, 100u8, 139u8, 222u8, 212u8,
+							54u8, 122u8, 152u8, 25u8, 3u8, 235u8, 64u8, 33u8, 171u8, 129u8, 67u8,
+							47u8, 193u8, 252u8, 198u8, 11u8, 57u8, 191u8, 62u8, 43u8, 32u8, 245u8,
+							139u8, 37u8, 77u8, 30u8, 21u8, 117u8, 197u8, 11u8, 255u8, 164u8,
 						],
 					)
 				}
@@ -5484,10 +5493,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							109u8, 151u8, 144u8, 103u8, 90u8, 242u8, 247u8, 157u8, 161u8, 34u8,
-							46u8, 199u8, 7u8, 92u8, 154u8, 220u8, 19u8, 205u8, 131u8, 103u8, 236u8,
-							73u8, 247u8, 57u8, 143u8, 210u8, 123u8, 128u8, 123u8, 127u8, 245u8,
-							196u8,
+							117u8, 200u8, 32u8, 115u8, 212u8, 4u8, 204u8, 127u8, 82u8, 106u8,
+							245u8, 198u8, 22u8, 141u8, 5u8, 104u8, 226u8, 148u8, 22u8, 145u8,
+							243u8, 254u8, 126u8, 184u8, 193u8, 23u8, 157u8, 239u8, 225u8, 168u8,
+							22u8, 169u8,
 						],
 					)
 				}
@@ -5552,10 +5561,9 @@ pub mod api {
 							max_weight,
 						},
 						[
-							41u8, 10u8, 189u8, 109u8, 174u8, 181u8, 251u8, 109u8, 117u8, 103u8,
-							203u8, 218u8, 186u8, 174u8, 66u8, 202u8, 88u8, 243u8, 8u8, 157u8,
-							103u8, 96u8, 223u8, 190u8, 118u8, 159u8, 192u8, 91u8, 76u8, 137u8,
-							188u8, 29u8,
+							162u8, 24u8, 218u8, 58u8, 144u8, 118u8, 56u8, 64u8, 80u8, 63u8, 34u8,
+							62u8, 184u8, 146u8, 39u8, 224u8, 69u8, 11u8, 69u8, 177u8, 139u8, 234u8,
+							199u8, 60u8, 93u8, 89u8, 224u8, 105u8, 8u8, 33u8, 91u8, 132u8,
 						],
 					)
 				}
@@ -6460,9 +6468,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							45u8, 202u8, 152u8, 173u8, 126u8, 84u8, 234u8, 255u8, 105u8, 255u8,
-							250u8, 5u8, 77u8, 168u8, 197u8, 121u8, 15u8, 196u8, 35u8, 0u8, 210u8,
-							78u8, 44u8, 28u8, 190u8, 219u8, 141u8, 9u8, 140u8, 235u8, 18u8, 129u8,
+							162u8, 65u8, 127u8, 162u8, 202u8, 142u8, 58u8, 181u8, 10u8, 156u8, 4u8,
+							159u8, 13u8, 240u8, 171u8, 122u8, 110u8, 223u8, 245u8, 213u8, 131u8,
+							38u8, 58u8, 53u8, 42u8, 173u8, 204u8, 120u8, 248u8, 242u8, 43u8, 157u8,
 						],
 					)
 				}
@@ -6726,9 +6734,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							102u8, 34u8, 55u8, 137u8, 167u8, 151u8, 217u8, 10u8, 16u8, 50u8, 171u8,
-							66u8, 164u8, 70u8, 116u8, 53u8, 72u8, 52u8, 199u8, 79u8, 85u8, 45u8,
-							167u8, 92u8, 199u8, 96u8, 62u8, 118u8, 30u8, 35u8, 155u8, 212u8,
+							182u8, 197u8, 60u8, 207u8, 231u8, 65u8, 147u8, 156u8, 144u8, 13u8,
+							22u8, 37u8, 20u8, 214u8, 56u8, 89u8, 44u8, 125u8, 142u8, 219u8, 210u8,
+							84u8, 139u8, 125u8, 153u8, 104u8, 38u8, 195u8, 158u8, 2u8, 170u8, 7u8,
 						],
 					)
 				}
@@ -6777,10 +6785,9 @@ pub mod api {
 						],
 						check_permissions::Input { call, proxy_type },
 						[
-							135u8, 159u8, 78u8, 73u8, 202u8, 229u8, 142u8, 164u8, 91u8, 124u8,
-							151u8, 44u8, 118u8, 188u8, 216u8, 209u8, 218u8, 98u8, 150u8, 57u8,
-							154u8, 173u8, 38u8, 1u8, 213u8, 36u8, 92u8, 248u8, 100u8, 176u8, 32u8,
-							59u8,
+							159u8, 207u8, 85u8, 126u8, 221u8, 149u8, 207u8, 160u8, 127u8, 43u8,
+							54u8, 5u8, 130u8, 149u8, 145u8, 250u8, 243u8, 8u8, 109u8, 239u8, 252u8,
+							243u8, 179u8, 143u8, 64u8, 4u8, 68u8, 119u8, 76u8, 119u8, 185u8, 195u8,
 						],
 					)
 				}
@@ -9843,26 +9850,25 @@ pub mod api {
 			)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			pub struct FundsLocked {
-				pub vault_id: funds_locked::VaultId,
-				pub locker: funds_locked::Locker,
-				pub liquidity_promised: funds_locked::LiquidityPromised,
-				pub is_ratchet: funds_locked::IsRatchet,
-				pub fee_revenue: funds_locked::FeeRevenue,
-				pub did_use_fee_coupon: funds_locked::DidUseFeeCoupon,
+			pub struct SecuritizationReserved {
+				pub vault_id: securitization_reserved::VaultId,
+				pub locker: securitization_reserved::Locker,
+				pub securitization_coverage_microgons:
+					securitization_reserved::SecuritizationCoverageMicrogons,
+				pub fee_revenue: securitization_reserved::FeeRevenue,
+				pub did_use_fee_coupon: securitization_reserved::DidUseFeeCoupon,
 			}
-			pub mod funds_locked {
+			pub mod securitization_reserved {
 				use super::runtime_types;
 				pub type VaultId = ::core::primitive::u32;
 				pub type Locker = crate::types::AccountId32;
-				pub type LiquidityPromised = ::core::primitive::u128;
-				pub type IsRatchet = ::core::primitive::bool;
+				pub type SecuritizationCoverageMicrogons = ::core::primitive::u128;
 				pub type FeeRevenue = ::core::primitive::u128;
 				pub type DidUseFeeCoupon = ::core::primitive::bool;
 			}
-			impl ::subxt::ext::subxt_core::events::StaticEvent for FundsLocked {
+			impl ::subxt::ext::subxt_core::events::StaticEvent for SecuritizationReserved {
 				const PALLET: &'static str = "Vaults";
-				const EVENT: &'static str = "FundsLocked";
+				const EVENT: &'static str = "SecuritizationReserved";
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -9872,18 +9878,18 @@ pub mod api {
 			)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			pub struct FundLockCanceled {
-				pub vault_id: fund_lock_canceled::VaultId,
-				pub amount: fund_lock_canceled::Amount,
+			pub struct SecuritizationReturned {
+				pub vault_id: securitization_returned::VaultId,
+				pub amount: securitization_returned::Amount,
 			}
-			pub mod fund_lock_canceled {
+			pub mod securitization_returned {
 				use super::runtime_types;
 				pub type VaultId = ::core::primitive::u32;
 				pub type Amount = ::core::primitive::u128;
 			}
-			impl ::subxt::ext::subxt_core::events::StaticEvent for FundLockCanceled {
+			impl ::subxt::ext::subxt_core::events::StaticEvent for SecuritizationReturned {
 				const PALLET: &'static str = "Vaults";
-				const EVENT: &'static str = "FundLockCanceled";
+				const EVENT: &'static str = "SecuritizationReturned";
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -10155,9 +10161,10 @@ pub mod api {
 						"VaultsById",
 						(),
 						[
-							166u8, 208u8, 76u8, 139u8, 117u8, 65u8, 6u8, 15u8, 138u8, 61u8, 97u8,
-							150u8, 199u8, 119u8, 44u8, 122u8, 212u8, 153u8, 13u8, 39u8, 205u8,
-							95u8, 166u8, 49u8, 28u8, 220u8, 40u8, 27u8, 223u8, 128u8, 3u8, 221u8,
+							213u8, 25u8, 111u8, 195u8, 193u8, 97u8, 231u8, 125u8, 166u8, 236u8,
+							205u8, 135u8, 147u8, 7u8, 52u8, 195u8, 229u8, 195u8, 94u8, 198u8,
+							214u8, 35u8, 58u8, 23u8, 251u8, 82u8, 5u8, 145u8, 113u8, 243u8, 238u8,
+							225u8,
 						],
 					)
 				}
@@ -10179,9 +10186,10 @@ pub mod api {
 						"VaultsById",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							166u8, 208u8, 76u8, 139u8, 117u8, 65u8, 6u8, 15u8, 138u8, 61u8, 97u8,
-							150u8, 199u8, 119u8, 44u8, 122u8, 212u8, 153u8, 13u8, 39u8, 205u8,
-							95u8, 166u8, 49u8, 28u8, 220u8, 40u8, 27u8, 223u8, 128u8, 3u8, 221u8,
+							213u8, 25u8, 111u8, 195u8, 193u8, 97u8, 231u8, 125u8, 166u8, 236u8,
+							205u8, 135u8, 147u8, 7u8, 52u8, 195u8, 229u8, 195u8, 94u8, 198u8,
+							214u8, 35u8, 58u8, 23u8, 251u8, 82u8, 5u8, 145u8, 113u8, 243u8, 238u8,
+							225u8,
 						],
 					)
 				}
@@ -10635,9 +10643,9 @@ pub mod api {
 						"RevenuePerFrameByVault",
 						(),
 						[
-							218u8, 76u8, 104u8, 3u8, 160u8, 121u8, 96u8, 61u8, 159u8, 114u8, 15u8,
-							64u8, 117u8, 224u8, 220u8, 144u8, 174u8, 10u8, 34u8, 8u8, 144u8, 81u8,
-							222u8, 79u8, 242u8, 249u8, 64u8, 36u8, 64u8, 30u8, 195u8, 45u8,
+							38u8, 248u8, 25u8, 9u8, 98u8, 26u8, 166u8, 207u8, 99u8, 11u8, 241u8,
+							211u8, 37u8, 3u8, 224u8, 112u8, 36u8, 194u8, 210u8, 91u8, 68u8, 53u8,
+							232u8, 140u8, 220u8, 216u8, 5u8, 36u8, 157u8, 227u8, 122u8, 24u8,
 						],
 					)
 				}
@@ -10661,9 +10669,9 @@ pub mod api {
 						"RevenuePerFrameByVault",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							218u8, 76u8, 104u8, 3u8, 160u8, 121u8, 96u8, 61u8, 159u8, 114u8, 15u8,
-							64u8, 117u8, 224u8, 220u8, 144u8, 174u8, 10u8, 34u8, 8u8, 144u8, 81u8,
-							222u8, 79u8, 242u8, 249u8, 64u8, 36u8, 64u8, 30u8, 195u8, 45u8,
+							38u8, 248u8, 25u8, 9u8, 98u8, 26u8, 166u8, 207u8, 99u8, 11u8, 241u8,
+							211u8, 37u8, 3u8, 224u8, 112u8, 36u8, 194u8, 210u8, 91u8, 68u8, 53u8,
+							232u8, 140u8, 220u8, 216u8, 5u8, 36u8, 157u8, 227u8, 122u8, 24u8,
 						],
 					)
 				}
@@ -10821,22 +10829,18 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				#[doc = "Initialize a bitcoin lock. This will create a LockedBitcoin for the submitting account"]
-				#[doc = "and log the Bitcoin Script hash to Events."]
+				#[doc = "Create a Bitcoin receive address backed by a Lock for the submitting account."]
 				#[doc = ""]
 				#[doc = "The pubkey submitted here will be used to create a script pubkey that will be used in a"]
 				#[doc = "timelock multisig script to lock the bitcoin."]
-				#[doc = ""]
-				#[doc = "NOTE: A \"lock-er\" must send btc to the cosigner UTXO address to \"complete\" the"]
-				#[doc = "LockedBitcoin and be added to the Bitcoin Mint line."]
-				pub struct Initialize {
-					pub vault_id: initialize::VaultId,
+				pub struct CreateReceiveAddress {
+					pub vault_id: create_receive_address::VaultId,
 					#[codec(compact)]
-					pub satoshis: initialize::Satoshis,
-					pub bitcoin_pubkey: initialize::BitcoinPubkey,
-					pub options: initialize::Options,
+					pub satoshis: create_receive_address::Satoshis,
+					pub bitcoin_pubkey: create_receive_address::BitcoinPubkey,
+					pub options: create_receive_address::Options,
 				}
-				pub mod initialize {
+				pub mod create_receive_address {
 					use super::runtime_types;
 					pub type VaultId = ::core::primitive::u32;
 					pub type Satoshis = ::core::primitive::u64;
@@ -10846,9 +10850,9 @@ pub mod api {
 						runtime_types::pallet_bitcoin_locks::pallet::LockOptions,
 					>;
 				}
-				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for Initialize {
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for CreateReceiveAddress {
 					const PALLET: &'static str = "BitcoinLocks";
-					const CALL: &'static str = "initialize";
+					const CALL: &'static str = "create_receive_address";
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -10896,8 +10900,8 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				#[doc = "Submitted by a Vault operator to cosign the release of a bitcoin utxo. The Bitcoin owner"]
-				#[doc = "release fee will be burned, and the lock will be allowed to expire without a penalty."]
+				#[doc = "Submitted by a Vault operator to cosign the release of a bitcoin UTXO. The Lock's"]
+				#[doc = "securitization will be scheduled for release without a penalty."]
 				#[doc = ""]
 				#[doc = "This is submitted as a no-fee transaction off chain to allow keys to remain in cold"]
 				#[doc = "wallets."]
@@ -10913,47 +10917,6 @@ pub mod api {
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for CosignRelease {
 					const PALLET: &'static str = "BitcoinLocks";
 					const CALL: &'static str = "cosign_release";
-				}
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
-				#[doc = "Ratcheting allows a user to change the lock price of their bitcoin lock. This is"]
-				#[doc = "functionally the same as releasing and re-initializing, but it allows a user to skip"]
-				#[doc = "sending transactions through bitcoin and any associated fees. It also allows you to stay"]
-				#[doc = "on your original lock expiration without having to pay the full year of fees again."]
-				#[doc = ""]
-				#[doc = "Ratcheting \"down\" - when the price of bitcoin is lower than your lock price, you pay the"]
-				#[doc = "full release price and get added back to the mint queue at the current market rate. You"]
-				#[doc = "pocket the difference between the already minted \"lock price\" and the new market value"]
-				#[doc = "(which you just had burned). Your new lock price is set to the market low, so you can"]
-				#[doc = "take advantage of ratchets \"up\" in the future."]
-				#[doc = ""]
-				#[doc = "Ratcheting \"up\" - when the price of bitcoin is higher than your lock price, you pay a"]
-				#[doc = "prorated fee for the remainder of your existing lock duration. You are added to the mint"]
-				#[doc = "queue for the difference in your new lock price vs the previous lock price."]
-				pub struct Ratchet {
-					pub utxo_id: ratchet::UtxoId,
-					pub options: ratchet::Options,
-				}
-				pub mod ratchet {
-					use super::runtime_types;
-					pub type UtxoId = ::core::primitive::u64;
-					pub type Options = ::core::option::Option<
-						runtime_types::pallet_bitcoin_locks::pallet::LockOptions,
-					>;
-				}
-				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for Ratchet {
-					const PALLET: &'static str = "BitcoinLocks";
-					const CALL: &'static str = "ratchet";
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -11052,19 +11015,24 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				pub struct IncreaseSecuritization {
-					pub utxo_id: increase_securitization::UtxoId,
+				#[doc = "Replace this Lock's BTC coverage and target value for its remaining term."]
+				pub struct Resecuritize {
+					pub utxo_id: resecuritize::UtxoId,
 					#[codec(compact)]
-					pub new_satoshis: increase_securitization::NewSatoshis,
+					pub satoshis: resecuritize::Satoshis,
+					pub options: resecuritize::Options,
 				}
-				pub mod increase_securitization {
+				pub mod resecuritize {
 					use super::runtime_types;
 					pub type UtxoId = ::core::primitive::u64;
-					pub type NewSatoshis = ::core::primitive::u64;
+					pub type Satoshis = ::core::primitive::u64;
+					pub type Options = ::core::option::Option<
+						runtime_types::pallet_bitcoin_locks::pallet::LockOptions,
+					>;
 				}
-				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for IncreaseSecuritization {
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for Resecuritize {
 					const PALLET: &'static str = "BitcoinLocks";
-					const CALL: &'static str = "increase_securitization";
+					const CALL: &'static str = "resecuritize";
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -11094,29 +11062,27 @@ pub mod api {
 			}
 			pub struct TransactionApi;
 			impl TransactionApi {
-				#[doc = "Initialize a bitcoin lock. This will create a LockedBitcoin for the submitting account"]
-				#[doc = "and log the Bitcoin Script hash to Events."]
+				#[doc = "Create a Bitcoin receive address backed by a Lock for the submitting account."]
 				#[doc = ""]
 				#[doc = "The pubkey submitted here will be used to create a script pubkey that will be used in a"]
 				#[doc = "timelock multisig script to lock the bitcoin."]
-				#[doc = ""]
-				#[doc = "NOTE: A \"lock-er\" must send btc to the cosigner UTXO address to \"complete\" the"]
-				#[doc = "LockedBitcoin and be added to the Bitcoin Mint line."]
-				pub fn initialize(
+				pub fn create_receive_address(
 					&self,
-					vault_id: types::initialize::VaultId,
-					satoshis: types::initialize::Satoshis,
-					bitcoin_pubkey: types::initialize::BitcoinPubkey,
-					options: types::initialize::Options,
-				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::Initialize> {
+					vault_id: types::create_receive_address::VaultId,
+					satoshis: types::create_receive_address::Satoshis,
+					bitcoin_pubkey: types::create_receive_address::BitcoinPubkey,
+					options: types::create_receive_address::Options,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::CreateReceiveAddress>
+				{
 					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
 						"BitcoinLocks",
-						"initialize",
-						types::Initialize { vault_id, satoshis, bitcoin_pubkey, options },
+						"create_receive_address",
+						types::CreateReceiveAddress { vault_id, satoshis, bitcoin_pubkey, options },
 						[
-							136u8, 217u8, 27u8, 34u8, 13u8, 167u8, 67u8, 234u8, 223u8, 84u8, 75u8,
-							246u8, 207u8, 38u8, 53u8, 18u8, 86u8, 220u8, 157u8, 208u8, 154u8, 94u8,
-							43u8, 123u8, 104u8, 171u8, 236u8, 29u8, 221u8, 101u8, 111u8, 252u8,
+							69u8, 95u8, 37u8, 25u8, 192u8, 201u8, 133u8, 213u8, 223u8, 193u8,
+							182u8, 39u8, 237u8, 72u8, 254u8, 174u8, 174u8, 108u8, 153u8, 221u8,
+							16u8, 232u8, 76u8, 94u8, 125u8, 86u8, 232u8, 112u8, 146u8, 163u8, 68u8,
+							143u8,
 						],
 					)
 				}
@@ -11145,8 +11111,8 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = "Submitted by a Vault operator to cosign the release of a bitcoin utxo. The Bitcoin owner"]
-				#[doc = "release fee will be burned, and the lock will be allowed to expire without a penalty."]
+				#[doc = "Submitted by a Vault operator to cosign the release of a bitcoin UTXO. The Lock's"]
+				#[doc = "securitization will be scheduled for release without a penalty."]
 				#[doc = ""]
 				#[doc = "This is submitted as a no-fee transaction off chain to allow keys to remain in cold"]
 				#[doc = "wallets."]
@@ -11164,37 +11130,6 @@ pub mod api {
 							170u8, 33u8, 75u8, 172u8, 143u8, 127u8, 166u8, 162u8, 5u8, 71u8, 63u8,
 							208u8, 220u8, 182u8, 39u8, 105u8, 64u8, 176u8, 246u8, 255u8, 254u8,
 							221u8, 11u8, 79u8, 180u8, 149u8, 6u8, 217u8, 246u8, 72u8, 24u8, 167u8,
-						],
-					)
-				}
-				#[doc = "Ratcheting allows a user to change the lock price of their bitcoin lock. This is"]
-				#[doc = "functionally the same as releasing and re-initializing, but it allows a user to skip"]
-				#[doc = "sending transactions through bitcoin and any associated fees. It also allows you to stay"]
-				#[doc = "on your original lock expiration without having to pay the full year of fees again."]
-				#[doc = ""]
-				#[doc = "Ratcheting \"down\" - when the price of bitcoin is lower than your lock price, you pay the"]
-				#[doc = "full release price and get added back to the mint queue at the current market rate. You"]
-				#[doc = "pocket the difference between the already minted \"lock price\" and the new market value"]
-				#[doc = "(which you just had burned). Your new lock price is set to the market low, so you can"]
-				#[doc = "take advantage of ratchets \"up\" in the future."]
-				#[doc = ""]
-				#[doc = "Ratcheting \"up\" - when the price of bitcoin is higher than your lock price, you pay a"]
-				#[doc = "prorated fee for the remainder of your existing lock duration. You are added to the mint"]
-				#[doc = "queue for the difference in your new lock price vs the previous lock price."]
-				pub fn ratchet(
-					&self,
-					utxo_id: types::ratchet::UtxoId,
-					options: types::ratchet::Options,
-				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::Ratchet> {
-					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
-						"BitcoinLocks",
-						"ratchet",
-						types::Ratchet { utxo_id, options },
-						[
-							167u8, 198u8, 74u8, 147u8, 55u8, 56u8, 161u8, 55u8, 205u8, 206u8,
-							105u8, 172u8, 172u8, 222u8, 31u8, 45u8, 136u8, 153u8, 123u8, 139u8,
-							193u8, 19u8, 5u8, 119u8, 40u8, 104u8, 139u8, 21u8, 168u8, 19u8, 163u8,
-							76u8,
 						],
 					)
 				}
@@ -11265,22 +11200,21 @@ pub mod api {
 						],
 					)
 				}
-				pub fn increase_securitization(
+				#[doc = "Replace this Lock's BTC coverage and target value for its remaining term."]
+				pub fn resecuritize(
 					&self,
-					utxo_id: types::increase_securitization::UtxoId,
-					new_satoshis: types::increase_securitization::NewSatoshis,
-				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<
-					types::IncreaseSecuritization,
-				> {
+					utxo_id: types::resecuritize::UtxoId,
+					satoshis: types::resecuritize::Satoshis,
+					options: types::resecuritize::Options,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::Resecuritize> {
 					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
 						"BitcoinLocks",
-						"increase_securitization",
-						types::IncreaseSecuritization { utxo_id, new_satoshis },
+						"resecuritize",
+						types::Resecuritize { utxo_id, satoshis, options },
 						[
-							126u8, 238u8, 78u8, 78u8, 11u8, 23u8, 204u8, 174u8, 244u8, 40u8, 134u8,
-							121u8, 242u8, 184u8, 248u8, 226u8, 174u8, 93u8, 44u8, 234u8, 245u8,
-							173u8, 193u8, 152u8, 149u8, 109u8, 116u8, 147u8, 3u8, 37u8, 164u8,
-							194u8,
+							85u8, 100u8, 164u8, 74u8, 26u8, 78u8, 106u8, 201u8, 49u8, 129u8, 123u8,
+							78u8, 174u8, 24u8, 119u8, 131u8, 203u8, 113u8, 92u8, 1u8, 214u8, 232u8,
+							8u8, 162u8, 71u8, 227u8, 94u8, 244u8, 191u8, 5u8, 254u8, 180u8,
 						],
 					)
 				}
@@ -11317,9 +11251,9 @@ pub mod api {
 			pub struct BitcoinLockCreated {
 				pub utxo_id: bitcoin_lock_created::UtxoId,
 				pub vault_id: bitcoin_lock_created::VaultId,
-				pub liquidity_promised: bitcoin_lock_created::LiquidityPromised,
-				pub securitization: bitcoin_lock_created::Securitization,
-				pub locked_target_price: bitcoin_lock_created::LockedTargetPrice,
+				pub securitized_satoshis: bitcoin_lock_created::SecuritizedSatoshis,
+				pub microgons_at_target_per_btc: bitcoin_lock_created::MicrogonsAtTargetPerBtc,
+				pub collateral_required: bitcoin_lock_created::CollateralRequired,
 				pub account_id: bitcoin_lock_created::AccountId,
 				pub security_fee: bitcoin_lock_created::SecurityFee,
 			}
@@ -11327,48 +11261,15 @@ pub mod api {
 				use super::runtime_types;
 				pub type UtxoId = ::core::primitive::u64;
 				pub type VaultId = ::core::primitive::u32;
-				pub type LiquidityPromised = ::core::primitive::u128;
-				pub type Securitization = ::core::primitive::u128;
-				pub type LockedTargetPrice = ::core::primitive::u128;
+				pub type SecuritizedSatoshis = ::core::primitive::u64;
+				pub type MicrogonsAtTargetPerBtc = ::core::primitive::u128;
+				pub type CollateralRequired = ::core::primitive::u128;
 				pub type AccountId = crate::types::AccountId32;
 				pub type SecurityFee = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for BitcoinLockCreated {
 				const PALLET: &'static str = "BitcoinLocks";
 				const EVENT: &'static str = "BitcoinLockCreated";
-			}
-			#[derive(
-				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-				Clone,
-				Debug,
-			)]
-			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
-			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			pub struct BitcoinLockRatcheted {
-				pub utxo_id: bitcoin_lock_ratcheted::UtxoId,
-				pub vault_id: bitcoin_lock_ratcheted::VaultId,
-				pub liquidity_promised: bitcoin_lock_ratcheted::LiquidityPromised,
-				pub old_target_price: bitcoin_lock_ratcheted::OldTargetPrice,
-				pub security_fee: bitcoin_lock_ratcheted::SecurityFee,
-				pub new_target_price: bitcoin_lock_ratcheted::NewTargetPrice,
-				pub amount_burned: bitcoin_lock_ratcheted::AmountBurned,
-				pub account_id: bitcoin_lock_ratcheted::AccountId,
-			}
-			pub mod bitcoin_lock_ratcheted {
-				use super::runtime_types;
-				pub type UtxoId = ::core::primitive::u64;
-				pub type VaultId = ::core::primitive::u32;
-				pub type LiquidityPromised = ::core::primitive::u128;
-				pub type OldTargetPrice = ::core::primitive::u128;
-				pub type SecurityFee = ::core::primitive::u128;
-				pub type NewTargetPrice = ::core::primitive::u128;
-				pub type AmountBurned = ::core::primitive::u128;
-				pub type AccountId = crate::types::AccountId32;
-			}
-			impl ::subxt::ext::subxt_core::events::StaticEvent for BitcoinLockRatcheted {
-				const PALLET: &'static str = "BitcoinLocks";
-				const EVENT: &'static str = "BitcoinLockRatcheted";
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -11612,22 +11513,73 @@ pub mod api {
 			)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			pub struct SecuritizationIncreased {
-				pub utxo_id: securitization_increased::UtxoId,
-				pub vault_id: securitization_increased::VaultId,
-				pub new_satoshis: securitization_increased::NewSatoshis,
-				pub account_id: securitization_increased::AccountId,
+			#[doc = "An orphaned UTXO expiration could not reconcile its pending Vault cosign state."]
+			pub struct OrphanedUtxoExpirationError {
+				pub account_id: orphaned_utxo_expiration_error::AccountId,
+				pub utxo_ref: orphaned_utxo_expiration_error::UtxoRef,
+				pub error: orphaned_utxo_expiration_error::Error,
 			}
-			pub mod securitization_increased {
+			pub mod orphaned_utxo_expiration_error {
+				use super::runtime_types;
+				pub type AccountId = crate::types::AccountId32;
+				pub type UtxoRef = runtime_types::argon_primitives::bitcoin::UtxoRef;
+				pub type Error = runtime_types::sp_runtime::DispatchError;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for OrphanedUtxoExpirationError {
+				const PALLET: &'static str = "BitcoinLocks";
+				const EVENT: &'static str = "OrphanedUtxoExpirationError";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "Not all orphaned UTXOs for a retired Lock fit in the cleanup schedule."]
+			pub struct OrphanedUtxoCleanupScheduleOverflow {
+				pub account_id: orphaned_utxo_cleanup_schedule_overflow::AccountId,
+				pub utxo_id: orphaned_utxo_cleanup_schedule_overflow::UtxoId,
+				pub expiration_frame: orphaned_utxo_cleanup_schedule_overflow::ExpirationFrame,
+			}
+			pub mod orphaned_utxo_cleanup_schedule_overflow {
+				use super::runtime_types;
+				pub type AccountId = crate::types::AccountId32;
+				pub type UtxoId = ::core::primitive::u64;
+				pub type ExpirationFrame = ::core::primitive::u64;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for OrphanedUtxoCleanupScheduleOverflow {
+				const PALLET: &'static str = "BitcoinLocks";
+				const EVENT: &'static str = "OrphanedUtxoCleanupScheduleOverflow";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub struct BitcoinLockResecuritized {
+				pub utxo_id: bitcoin_lock_resecuritized::UtxoId,
+				pub vault_id: bitcoin_lock_resecuritized::VaultId,
+				pub securitized_satoshis: bitcoin_lock_resecuritized::SecuritizedSatoshis,
+				pub microgons_at_target_per_btc:
+					bitcoin_lock_resecuritized::MicrogonsAtTargetPerBtc,
+				pub account_id: bitcoin_lock_resecuritized::AccountId,
+			}
+			pub mod bitcoin_lock_resecuritized {
 				use super::runtime_types;
 				pub type UtxoId = ::core::primitive::u64;
 				pub type VaultId = ::core::primitive::u32;
-				pub type NewSatoshis = ::core::primitive::u64;
+				pub type SecuritizedSatoshis = ::core::primitive::u64;
+				pub type MicrogonsAtTargetPerBtc = ::core::primitive::u128;
 				pub type AccountId = crate::types::AccountId32;
 			}
-			impl ::subxt::ext::subxt_core::events::StaticEvent for SecuritizationIncreased {
+			impl ::subxt::ext::subxt_core::events::StaticEvent for BitcoinLockResecuritized {
 				const PALLET: &'static str = "BitcoinLocks";
-				const EVENT: &'static str = "SecuritizationIncreased";
+				const EVENT: &'static str = "BitcoinLockResecuritized";
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -11698,6 +11650,11 @@ pub mod api {
 						>;
 					pub type Param0 = ::core::primitive::u64;
 				}
+				pub mod migrated_release_hold_by_utxo_id {
+					use super::runtime_types;
+					pub type MigratedReleaseHoldByUtxoId = ::core::primitive::u128;
+					pub type Param0 = ::core::primitive::u64;
+				}
 				pub mod orphaned_utxos_by_account {
 					use super::runtime_types;
 					pub type OrphanedUtxosByAccount =
@@ -11734,6 +11691,10 @@ pub mod api {
 							::core::primitive::u64,
 						>;
 					pub type Param0 = ::core::primitive::u64;
+				}
+				pub mod last_pending_funding_expiration_height {
+					use super::runtime_types;
+					pub type LastPendingFundingExpirationHeight = ::core::primitive::u64;
 				}
 				pub mod orphaned_utxo_expiration_by_frame {
 					use super::runtime_types;
@@ -11797,10 +11758,9 @@ pub mod api {
 						"LocksByUtxoId",
 						(),
 						[
-							202u8, 245u8, 105u8, 100u8, 166u8, 118u8, 104u8, 59u8, 63u8, 120u8,
-							102u8, 30u8, 68u8, 46u8, 72u8, 169u8, 59u8, 13u8, 155u8, 225u8, 46u8,
-							73u8, 35u8, 131u8, 211u8, 244u8, 158u8, 26u8, 146u8, 90u8, 110u8,
-							171u8,
+							215u8, 66u8, 219u8, 12u8, 18u8, 84u8, 153u8, 52u8, 149u8, 134u8, 155u8,
+							3u8, 192u8, 95u8, 116u8, 182u8, 141u8, 191u8, 199u8, 195u8, 159u8,
+							45u8, 161u8, 169u8, 84u8, 56u8, 51u8, 81u8, 171u8, 135u8, 7u8, 244u8,
 						],
 					)
 				}
@@ -11822,10 +11782,9 @@ pub mod api {
 						"LocksByUtxoId",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							202u8, 245u8, 105u8, 100u8, 166u8, 118u8, 104u8, 59u8, 63u8, 120u8,
-							102u8, 30u8, 68u8, 46u8, 72u8, 169u8, 59u8, 13u8, 155u8, 225u8, 46u8,
-							73u8, 35u8, 131u8, 211u8, 244u8, 158u8, 26u8, 146u8, 90u8, 110u8,
-							171u8,
+							215u8, 66u8, 219u8, 12u8, 18u8, 84u8, 153u8, 52u8, 149u8, 134u8, 155u8,
+							3u8, 192u8, 95u8, 116u8, 182u8, 141u8, 191u8, 199u8, 195u8, 159u8,
+							45u8, 161u8, 169u8, 84u8, 56u8, 51u8, 81u8, 171u8, 135u8, 7u8, 244u8,
 						],
 					)
 				}
@@ -12100,10 +12059,10 @@ pub mod api {
 						"LockReleaseRequestsByUtxoId",
 						(),
 						[
-							6u8, 18u8, 175u8, 140u8, 128u8, 141u8, 127u8, 210u8, 43u8, 176u8,
-							220u8, 250u8, 118u8, 160u8, 71u8, 167u8, 65u8, 158u8, 184u8, 1u8,
-							215u8, 5u8, 92u8, 168u8, 236u8, 135u8, 76u8, 127u8, 232u8, 86u8, 134u8,
-							170u8,
+							115u8, 134u8, 115u8, 127u8, 102u8, 80u8, 213u8, 209u8, 224u8, 79u8,
+							223u8, 57u8, 160u8, 115u8, 107u8, 109u8, 65u8, 213u8, 36u8, 22u8,
+							147u8, 214u8, 180u8, 9u8, 169u8, 176u8, 159u8, 13u8, 139u8, 31u8, 26u8,
+							60u8,
 						],
 					)
 				}
@@ -12125,10 +12084,63 @@ pub mod api {
 						"LockReleaseRequestsByUtxoId",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							6u8, 18u8, 175u8, 140u8, 128u8, 141u8, 127u8, 210u8, 43u8, 176u8,
-							220u8, 250u8, 118u8, 160u8, 71u8, 167u8, 65u8, 158u8, 184u8, 1u8,
-							215u8, 5u8, 92u8, 168u8, 236u8, 135u8, 76u8, 127u8, 232u8, 86u8, 134u8,
-							170u8,
+							115u8, 134u8, 115u8, 127u8, 102u8, 80u8, 213u8, 209u8, 224u8, 79u8,
+							223u8, 57u8, 160u8, 115u8, 107u8, 109u8, 65u8, 213u8, 36u8, 22u8,
+							147u8, 214u8, 180u8, 9u8, 169u8, 176u8, 159u8, 13u8, 139u8, 31u8, 26u8,
+							60u8,
+						],
+					)
+				}
+				#[doc = " Release amounts identified by the version 10 to 11 migration."]
+				#[doc = ""]
+				#[doc = " Current release requests do not create currency holds. Each migrated entry is removed when"]
+				#[doc = " its in-flight release request terminates."]
+				pub fn migrated_release_hold_by_utxo_id_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::migrated_release_hold_by_utxo_id::MigratedReleaseHoldByUtxoId,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"BitcoinLocks",
+						"MigratedReleaseHoldByUtxoId",
+						(),
+						[
+							115u8, 11u8, 138u8, 248u8, 188u8, 217u8, 254u8, 172u8, 110u8, 121u8,
+							22u8, 12u8, 54u8, 126u8, 102u8, 120u8, 2u8, 100u8, 128u8, 126u8, 181u8,
+							188u8, 85u8, 189u8, 225u8, 150u8, 29u8, 117u8, 246u8, 65u8, 95u8,
+							143u8,
+						],
+					)
+				}
+				#[doc = " Release amounts identified by the version 10 to 11 migration."]
+				#[doc = ""]
+				#[doc = " Current release requests do not create currency holds. Each migrated entry is removed when"]
+				#[doc = " its in-flight release request terminates."]
+				pub fn migrated_release_hold_by_utxo_id(
+					&self,
+					_0: types::migrated_release_hold_by_utxo_id::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::migrated_release_hold_by_utxo_id::Param0,
+					>,
+					types::migrated_release_hold_by_utxo_id::MigratedReleaseHoldByUtxoId,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"BitcoinLocks",
+						"MigratedReleaseHoldByUtxoId",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							115u8, 11u8, 138u8, 248u8, 188u8, 217u8, 254u8, 172u8, 110u8, 121u8,
+							22u8, 12u8, 54u8, 126u8, 102u8, 120u8, 2u8, 100u8, 128u8, 126u8, 181u8,
+							188u8, 85u8, 189u8, 225u8, 150u8, 29u8, 117u8, 246u8, 65u8, 95u8,
+							143u8,
 						],
 					)
 				}
@@ -12210,7 +12222,7 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " The minimum number of satoshis that can be locked"]
+				#[doc = " The minimum number of satoshis accepted in one watched funding UTXO."]
 				pub fn minimum_satoshis(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
@@ -12352,6 +12364,18 @@ pub mod api {
 						],
 					)
 				}
+				#[doc = " Highest Bitcoin UTXO sync height processed for pending-funding expirations."]				pub fn last_pending_funding_expiration_height (& self ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < () , types :: last_pending_funding_expiration_height :: LastPendingFundingExpirationHeight , :: subxt :: ext :: subxt_core :: utils :: Yes , () , () >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"BitcoinLocks",
+						"LastPendingFundingExpirationHeight",
+						(),
+						[
+							172u8, 82u8, 157u8, 63u8, 8u8, 219u8, 9u8, 90u8, 84u8, 146u8, 133u8,
+							175u8, 238u8, 13u8, 161u8, 16u8, 46u8, 250u8, 73u8, 93u8, 111u8, 215u8,
+							84u8, 153u8, 246u8, 113u8, 14u8, 105u8, 69u8, 154u8, 75u8, 253u8,
+						],
+					)
+				}
 				#[doc = " Expiration of orphaned utxo refs by user account"]
 				pub fn orphaned_utxo_expiration_by_frame_iter(
 					&self,
@@ -12397,7 +12421,7 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " History of target microgons per btc."]
+				#[doc = " Recent target-normalized microgon values per BTC and their observed ticks."]
 				pub fn microgon_per_btc_history(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
@@ -17125,10 +17149,9 @@ pub mod api {
 						"PendingMintUtxosByIndex",
 						(),
 						[
-							202u8, 43u8, 219u8, 218u8, 20u8, 74u8, 174u8, 43u8, 114u8, 151u8,
-							194u8, 61u8, 150u8, 3u8, 138u8, 129u8, 90u8, 163u8, 16u8, 118u8, 1u8,
-							196u8, 194u8, 197u8, 211u8, 23u8, 252u8, 213u8, 167u8, 20u8, 153u8,
-							109u8,
+							245u8, 17u8, 116u8, 227u8, 55u8, 55u8, 50u8, 52u8, 198u8, 2u8, 166u8,
+							7u8, 6u8, 10u8, 213u8, 63u8, 196u8, 166u8, 91u8, 28u8, 4u8, 26u8,
+							149u8, 76u8, 186u8, 140u8, 20u8, 127u8, 81u8, 216u8, 191u8, 182u8,
 						],
 					)
 				}
@@ -17151,10 +17174,9 @@ pub mod api {
 						"PendingMintUtxosByIndex",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							202u8, 43u8, 219u8, 218u8, 20u8, 74u8, 174u8, 43u8, 114u8, 151u8,
-							194u8, 61u8, 150u8, 3u8, 138u8, 129u8, 90u8, 163u8, 16u8, 118u8, 1u8,
-							196u8, 194u8, 197u8, 211u8, 23u8, 252u8, 213u8, 167u8, 20u8, 153u8,
-							109u8,
+							245u8, 17u8, 116u8, 227u8, 55u8, 55u8, 50u8, 52u8, 198u8, 2u8, 166u8,
+							7u8, 6u8, 10u8, 213u8, 63u8, 196u8, 166u8, 91u8, 28u8, 4u8, 26u8,
+							149u8, 76u8, 186u8, 140u8, 20u8, 127u8, 81u8, 216u8, 191u8, 182u8,
 						],
 					)
 				}
@@ -21582,9 +21604,10 @@ pub mod api {
 						"batch",
 						types::Batch { calls },
 						[
-							104u8, 165u8, 45u8, 136u8, 134u8, 48u8, 17u8, 63u8, 133u8, 1u8, 41u8,
-							5u8, 74u8, 21u8, 64u8, 74u8, 42u8, 224u8, 24u8, 157u8, 211u8, 232u8,
-							59u8, 255u8, 22u8, 90u8, 86u8, 177u8, 237u8, 71u8, 210u8, 87u8,
+							212u8, 39u8, 67u8, 234u8, 47u8, 191u8, 72u8, 237u8, 182u8, 127u8, 46u8,
+							18u8, 139u8, 136u8, 247u8, 62u8, 54u8, 128u8, 49u8, 186u8, 111u8,
+							119u8, 110u8, 175u8, 27u8, 251u8, 131u8, 47u8, 20u8, 77u8, 142u8,
+							165u8,
 						],
 					)
 				}
@@ -21614,10 +21637,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							177u8, 95u8, 77u8, 218u8, 244u8, 88u8, 105u8, 138u8, 236u8, 143u8,
-							143u8, 46u8, 212u8, 85u8, 227u8, 48u8, 59u8, 186u8, 249u8, 149u8,
-							178u8, 95u8, 149u8, 6u8, 232u8, 82u8, 154u8, 192u8, 72u8, 29u8, 50u8,
-							39u8,
+							230u8, 120u8, 98u8, 64u8, 240u8, 106u8, 111u8, 0u8, 237u8, 67u8, 130u8,
+							154u8, 191u8, 243u8, 64u8, 32u8, 94u8, 65u8, 1u8, 142u8, 13u8, 237u8,
+							97u8, 113u8, 168u8, 230u8, 25u8, 246u8, 5u8, 45u8, 201u8, 101u8,
 						],
 					)
 				}
@@ -21643,9 +21665,9 @@ pub mod api {
 						"batch_all",
 						types::BatchAll { calls },
 						[
-							70u8, 45u8, 44u8, 103u8, 174u8, 85u8, 224u8, 209u8, 202u8, 229u8, 14u8,
-							112u8, 71u8, 213u8, 149u8, 251u8, 252u8, 239u8, 100u8, 251u8, 56u8,
-							212u8, 36u8, 179u8, 235u8, 111u8, 80u8, 48u8, 6u8, 190u8, 209u8, 83u8,
+							38u8, 230u8, 112u8, 177u8, 88u8, 87u8, 226u8, 44u8, 25u8, 218u8, 136u8,
+							25u8, 15u8, 41u8, 176u8, 100u8, 236u8, 86u8, 12u8, 24u8, 127u8, 134u8,
+							102u8, 4u8, 149u8, 166u8, 112u8, 50u8, 5u8, 226u8, 63u8, 9u8,
 						],
 					)
 				}
@@ -21668,10 +21690,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							36u8, 241u8, 232u8, 111u8, 90u8, 86u8, 127u8, 154u8, 79u8, 146u8,
-							246u8, 0u8, 28u8, 176u8, 39u8, 190u8, 239u8, 49u8, 106u8, 3u8, 131u8,
-							235u8, 124u8, 238u8, 146u8, 221u8, 118u8, 46u8, 73u8, 53u8, 151u8,
-							161u8,
+							156u8, 220u8, 28u8, 232u8, 15u8, 108u8, 126u8, 200u8, 170u8, 188u8,
+							21u8, 169u8, 223u8, 194u8, 190u8, 24u8, 53u8, 184u8, 111u8, 48u8,
+							111u8, 202u8, 226u8, 58u8, 105u8, 104u8, 41u8, 154u8, 7u8, 49u8, 214u8,
+							126u8,
 						],
 					)
 				}
@@ -21697,10 +21719,10 @@ pub mod api {
 						"force_batch",
 						types::ForceBatch { calls },
 						[
-							247u8, 15u8, 77u8, 113u8, 172u8, 102u8, 188u8, 14u8, 137u8, 23u8,
-							130u8, 31u8, 205u8, 249u8, 250u8, 147u8, 170u8, 90u8, 157u8, 77u8,
-							16u8, 158u8, 74u8, 213u8, 3u8, 162u8, 25u8, 14u8, 205u8, 47u8, 228u8,
-							98u8,
+							97u8, 252u8, 130u8, 33u8, 18u8, 22u8, 96u8, 184u8, 30u8, 111u8, 144u8,
+							172u8, 88u8, 168u8, 107u8, 186u8, 223u8, 12u8, 213u8, 157u8, 207u8,
+							183u8, 255u8, 186u8, 204u8, 132u8, 78u8, 58u8, 216u8, 123u8, 81u8,
+							164u8,
 						],
 					)
 				}
@@ -21723,9 +21745,9 @@ pub mod api {
 							weight,
 						},
 						[
-							210u8, 240u8, 165u8, 237u8, 131u8, 87u8, 13u8, 11u8, 43u8, 37u8, 165u8,
-							135u8, 70u8, 6u8, 183u8, 216u8, 32u8, 152u8, 148u8, 8u8, 198u8, 198u8,
-							241u8, 216u8, 103u8, 61u8, 114u8, 83u8, 122u8, 118u8, 78u8, 64u8,
+							17u8, 47u8, 63u8, 46u8, 7u8, 89u8, 38u8, 60u8, 98u8, 162u8, 114u8,
+							144u8, 53u8, 200u8, 245u8, 250u8, 153u8, 197u8, 193u8, 238u8, 71u8,
+							206u8, 77u8, 64u8, 110u8, 45u8, 11u8, 17u8, 90u8, 2u8, 13u8, 161u8,
 						],
 					)
 				}
@@ -21765,9 +21787,9 @@ pub mod api {
 							fallback: ::subxt::ext::subxt_core::alloc::boxed::Box::new(fallback),
 						},
 						[
-							97u8, 213u8, 50u8, 157u8, 1u8, 3u8, 113u8, 26u8, 109u8, 251u8, 175u8,
-							181u8, 2u8, 192u8, 129u8, 49u8, 207u8, 181u8, 13u8, 27u8, 47u8, 189u8,
-							142u8, 46u8, 52u8, 191u8, 176u8, 118u8, 140u8, 178u8, 159u8, 202u8,
+							32u8, 195u8, 46u8, 21u8, 254u8, 48u8, 40u8, 29u8, 39u8, 181u8, 241u8,
+							54u8, 5u8, 162u8, 46u8, 173u8, 222u8, 92u8, 36u8, 74u8, 158u8, 58u8,
+							160u8, 171u8, 14u8, 170u8, 77u8, 22u8, 172u8, 236u8, 181u8, 228u8,
 						],
 					)
 				}
@@ -21790,10 +21812,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							73u8, 21u8, 164u8, 106u8, 230u8, 147u8, 244u8, 124u8, 172u8, 232u8,
-							137u8, 46u8, 142u8, 66u8, 118u8, 152u8, 126u8, 33u8, 55u8, 235u8, 69u8,
-							137u8, 150u8, 83u8, 62u8, 66u8, 160u8, 181u8, 212u8, 45u8, 196u8,
-							157u8,
+							62u8, 156u8, 226u8, 139u8, 218u8, 119u8, 36u8, 171u8, 59u8, 17u8,
+							247u8, 38u8, 139u8, 27u8, 201u8, 93u8, 131u8, 27u8, 21u8, 233u8, 207u8,
+							220u8, 164u8, 71u8, 56u8, 140u8, 130u8, 36u8, 229u8, 66u8, 128u8,
+							194u8,
 						],
 					)
 				}
@@ -22129,10 +22151,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							12u8, 127u8, 119u8, 249u8, 186u8, 45u8, 253u8, 249u8, 251u8, 231u8,
-							15u8, 209u8, 104u8, 55u8, 167u8, 149u8, 183u8, 180u8, 240u8, 155u8,
-							210u8, 123u8, 23u8, 241u8, 0u8, 217u8, 12u8, 19u8, 109u8, 179u8, 206u8,
-							233u8,
+							87u8, 104u8, 191u8, 90u8, 106u8, 242u8, 214u8, 106u8, 162u8, 246u8,
+							158u8, 228u8, 181u8, 146u8, 184u8, 251u8, 144u8, 107u8, 203u8, 3u8,
+							64u8, 105u8, 216u8, 86u8, 42u8, 28u8, 100u8, 169u8, 40u8, 153u8, 119u8,
+							228u8,
 						],
 					)
 				}
@@ -22155,9 +22177,9 @@ pub mod api {
 							weight,
 						},
 						[
-							80u8, 207u8, 79u8, 101u8, 83u8, 162u8, 133u8, 220u8, 199u8, 52u8, 1u8,
-							153u8, 188u8, 41u8, 127u8, 7u8, 188u8, 210u8, 95u8, 33u8, 189u8, 226u8,
-							117u8, 38u8, 128u8, 57u8, 165u8, 51u8, 192u8, 115u8, 12u8, 241u8,
+							54u8, 193u8, 38u8, 178u8, 120u8, 171u8, 9u8, 7u8, 227u8, 92u8, 91u8,
+							197u8, 126u8, 23u8, 13u8, 150u8, 50u8, 82u8, 164u8, 124u8, 33u8, 254u8,
+							26u8, 191u8, 102u8, 193u8, 174u8, 254u8, 159u8, 224u8, 255u8, 10u8,
 						],
 					)
 				}
@@ -22195,9 +22217,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							167u8, 139u8, 91u8, 241u8, 98u8, 38u8, 20u8, 252u8, 23u8, 232u8, 232u8,
-							65u8, 155u8, 108u8, 93u8, 43u8, 58u8, 125u8, 242u8, 28u8, 253u8, 23u8,
-							87u8, 74u8, 9u8, 128u8, 128u8, 50u8, 28u8, 10u8, 159u8, 184u8,
+							148u8, 130u8, 15u8, 235u8, 65u8, 136u8, 209u8, 6u8, 193u8, 71u8, 132u8,
+							49u8, 214u8, 164u8, 57u8, 234u8, 134u8, 36u8, 172u8, 148u8, 156u8,
+							136u8, 180u8, 171u8, 79u8, 119u8, 160u8, 53u8, 111u8, 68u8, 238u8,
+							183u8,
 						],
 					)
 				}
@@ -22333,6 +22356,521 @@ pub mod api {
 							72u8, 14u8, 225u8, 162u8, 205u8, 247u8, 227u8, 105u8, 116u8, 57u8, 4u8,
 							31u8, 84u8, 137u8, 227u8, 228u8, 133u8, 245u8, 206u8, 227u8, 117u8,
 							36u8, 252u8, 151u8, 107u8, 15u8, 180u8, 4u8, 4u8, 152u8, 195u8, 144u8,
+						],
+					)
+				}
+			}
+		}
+	}
+	pub mod bitcoin_fissions {
+		use super::{root_mod, runtime_types};
+		#[doc = "The `Error` enum of this pallet."]
+		pub type Error = runtime_types::pallet_bitcoin_fissions::pallet::Error;
+		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
+		pub type Call = runtime_types::pallet_bitcoin_fissions::pallet::Call;
+		pub mod calls {
+			use super::{root_mod, runtime_types};
+			type DispatchError = runtime_types::sp_runtime::DispatchError;
+			pub mod types {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Create a Fission from one owner-held Lock and associate it with a Liquid ID."]
+				pub struct Create {
+					#[codec(compact)]
+					pub fission_id: create::FissionId,
+					#[codec(compact)]
+					pub liquid_id: create::LiquidId,
+					#[codec(compact)]
+					pub utxo_id: create::UtxoId,
+					#[codec(compact)]
+					pub satoshis: create::Satoshis,
+					#[codec(compact)]
+					pub microgons_at_target_per_btc: create::MicrogonsAtTargetPerBtc,
+				}
+				pub mod create {
+					use super::runtime_types;
+					pub type FissionId = ::core::primitive::u64;
+					pub type LiquidId = ::core::primitive::u64;
+					pub type UtxoId = ::core::primitive::u64;
+					pub type Satoshis = ::core::primitive::u64;
+					pub type MicrogonsAtTargetPerBtc = ::core::primitive::u128;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for Create {
+					const PALLET: &'static str = "BitcoinFissions";
+					const CALL: &'static str = "create";
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Ratchet an active Fission to a replacement target-normalized BTC value."]
+				pub struct Ratchet {
+					#[codec(compact)]
+					pub fission_id: ratchet::FissionId,
+					#[codec(compact)]
+					pub microgons_at_target_per_btc: ratchet::MicrogonsAtTargetPerBtc,
+				}
+				pub mod ratchet {
+					use super::runtime_types;
+					pub type FissionId = ::core::primitive::u64;
+					pub type MicrogonsAtTargetPerBtc = ::core::primitive::u128;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for Ratchet {
+					const PALLET: &'static str = "BitcoinFissions";
+					const CALL: &'static str = "ratchet";
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Close a Fission without moving Bitcoin and remove its active record."]
+				pub struct Close {
+					#[codec(compact)]
+					pub fission_id: close::FissionId,
+				}
+				pub mod close {
+					use super::runtime_types;
+					pub type FissionId = ::core::primitive::u64;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for Close {
+					const PALLET: &'static str = "BitcoinFissions";
+					const CALL: &'static str = "close";
+				}
+			}
+			pub struct TransactionApi;
+			impl TransactionApi {
+				#[doc = "Create a Fission from one owner-held Lock and associate it with a Liquid ID."]
+				pub fn create(
+					&self,
+					fission_id: types::create::FissionId,
+					liquid_id: types::create::LiquidId,
+					utxo_id: types::create::UtxoId,
+					satoshis: types::create::Satoshis,
+					microgons_at_target_per_btc: types::create::MicrogonsAtTargetPerBtc,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::Create> {
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"BitcoinFissions",
+						"create",
+						types::Create {
+							fission_id,
+							liquid_id,
+							utxo_id,
+							satoshis,
+							microgons_at_target_per_btc,
+						},
+						[
+							20u8, 178u8, 108u8, 245u8, 56u8, 97u8, 154u8, 12u8, 190u8, 221u8,
+							190u8, 72u8, 244u8, 82u8, 27u8, 52u8, 172u8, 93u8, 82u8, 160u8, 155u8,
+							88u8, 97u8, 215u8, 123u8, 118u8, 248u8, 107u8, 150u8, 111u8, 79u8,
+							174u8,
+						],
+					)
+				}
+				#[doc = "Ratchet an active Fission to a replacement target-normalized BTC value."]
+				pub fn ratchet(
+					&self,
+					fission_id: types::ratchet::FissionId,
+					microgons_at_target_per_btc: types::ratchet::MicrogonsAtTargetPerBtc,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::Ratchet> {
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"BitcoinFissions",
+						"ratchet",
+						types::Ratchet { fission_id, microgons_at_target_per_btc },
+						[
+							142u8, 237u8, 188u8, 243u8, 216u8, 0u8, 37u8, 198u8, 51u8, 194u8, 63u8,
+							227u8, 78u8, 100u8, 36u8, 126u8, 78u8, 181u8, 207u8, 11u8, 183u8, 24u8,
+							116u8, 26u8, 81u8, 48u8, 152u8, 236u8, 232u8, 67u8, 143u8, 98u8,
+						],
+					)
+				}
+				#[doc = "Close a Fission without moving Bitcoin and remove its active record."]
+				pub fn close(
+					&self,
+					fission_id: types::close::FissionId,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::Close> {
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"BitcoinFissions",
+						"close",
+						types::Close { fission_id },
+						[
+							128u8, 176u8, 90u8, 243u8, 144u8, 48u8, 54u8, 139u8, 0u8, 201u8, 19u8,
+							163u8, 22u8, 121u8, 35u8, 16u8, 175u8, 74u8, 209u8, 237u8, 91u8, 84u8,
+							52u8, 178u8, 201u8, 184u8, 11u8, 228u8, 246u8, 213u8, 113u8, 127u8,
+						],
+					)
+				}
+			}
+		}
+		#[doc = "The `Event` enum of this pallet"]
+		pub type Event = runtime_types::pallet_bitcoin_fissions::pallet::Event;
+		pub mod events {
+			use super::runtime_types;
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "A Fission was created and allocated from its source Lock."]
+			pub struct FissionCreated {
+				pub account_id: fission_created::AccountId,
+				pub fission_id: fission_created::FissionId,
+				pub liquid_id: fission_created::LiquidId,
+				pub liquidity_promised: fission_created::LiquidityPromised,
+			}
+			pub mod fission_created {
+				use super::runtime_types;
+				pub type AccountId = crate::types::AccountId32;
+				pub type FissionId = ::core::primitive::u64;
+				pub type LiquidId = ::core::primitive::u64;
+				pub type LiquidityPromised = ::core::primitive::u128;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for FissionCreated {
+				const PALLET: &'static str = "BitcoinFissions";
+				const EVENT: &'static str = "FissionCreated";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "A Fission ratchet changed its target-normalized BTC value and liability."]
+			pub struct FissionRatcheted {
+				pub account_id: fission_ratcheted::AccountId,
+				pub fission_id: fission_ratcheted::FissionId,
+				pub ratchet_number: fission_ratcheted::RatchetNumber,
+				pub liquidity_promised: fission_ratcheted::LiquidityPromised,
+				pub amount_minted: fission_ratcheted::AmountMinted,
+				pub amount_burned: fission_ratcheted::AmountBurned,
+			}
+			pub mod fission_ratcheted {
+				use super::runtime_types;
+				pub type AccountId = crate::types::AccountId32;
+				pub type FissionId = ::core::primitive::u64;
+				pub type RatchetNumber = ::core::primitive::u32;
+				pub type LiquidityPromised = ::core::primitive::u128;
+				pub type AmountMinted = ::core::primitive::u128;
+				pub type AmountBurned = ::core::primitive::u128;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for FissionRatcheted {
+				const PALLET: &'static str = "BitcoinFissions";
+				const EVENT: &'static str = "FissionRatcheted";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "A Fission was closed and its source Lock allocation was released."]
+			pub struct FissionClosed {
+				pub account_id: fission_closed::AccountId,
+				pub fission_id: fission_closed::FissionId,
+				pub redemption_amount: fission_closed::RedemptionAmount,
+			}
+			pub mod fission_closed {
+				use super::runtime_types;
+				pub type AccountId = crate::types::AccountId32;
+				pub type FissionId = ::core::primitive::u64;
+				pub type RedemptionAmount = ::core::primitive::u128;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for FissionClosed {
+				const PALLET: &'static str = "BitcoinFissions";
+				const EVENT: &'static str = "FissionClosed";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "An active Fission was closed because its source Lock was spent."]
+			pub struct FissionClosedByLock {
+				pub account_id: fission_closed_by_lock::AccountId,
+				pub fission_id: fission_closed_by_lock::FissionId,
+				pub utxo_id: fission_closed_by_lock::UtxoId,
+			}
+			pub mod fission_closed_by_lock {
+				use super::runtime_types;
+				pub type AccountId = crate::types::AccountId32;
+				pub type FissionId = ::core::primitive::u64;
+				pub type UtxoId = ::core::primitive::u64;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for FissionClosedByLock {
+				const PALLET: &'static str = "BitcoinFissions";
+				const EVENT: &'static str = "FissionClosedByLock";
+			}
+		}
+		pub mod storage {
+			use super::runtime_types;
+			pub mod types {
+				use super::runtime_types;
+				pub mod next_fission_id_by_owner {
+					use super::runtime_types;
+					pub type NextFissionIdByOwner = ::core::primitive::u64;
+					pub type Param0 = crate::types::AccountId32;
+				}
+				pub mod fission_by_owner_and_id {
+					use super::runtime_types;
+					pub type FissionByOwnerAndId =
+						runtime_types::pallet_bitcoin_fissions::pallet::Fission;
+					pub type Param0 = crate::types::AccountId32;
+					pub type Param1 = ::core::primitive::u64;
+				}
+				pub mod fission_ids_by_lock_id {
+					use super::runtime_types;
+					pub type FissionIdsByLockId =
+						runtime_types::bounded_collections::bounded_btree_set::BoundedBTreeSet<
+							::core::primitive::u64,
+						>;
+					pub type Param0 = ::core::primitive::u64;
+				}
+			}
+			pub struct StorageApi;
+			impl StorageApi {
+				#[doc = " Minimum Fission ID accepted from each owner."]
+				pub fn next_fission_id_by_owner_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::next_fission_id_by_owner::NextFissionIdByOwner,
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"BitcoinFissions",
+						"NextFissionIdByOwner",
+						(),
+						[
+							187u8, 40u8, 178u8, 18u8, 222u8, 167u8, 124u8, 174u8, 185u8, 51u8,
+							50u8, 237u8, 70u8, 33u8, 252u8, 147u8, 169u8, 113u8, 136u8, 49u8,
+							126u8, 96u8, 65u8, 202u8, 200u8, 75u8, 232u8, 5u8, 11u8, 21u8, 22u8,
+							162u8,
+						],
+					)
+				}
+				#[doc = " Minimum Fission ID accepted from each owner."]
+				pub fn next_fission_id_by_owner(
+					&self,
+					_0: types::next_fission_id_by_owner::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::next_fission_id_by_owner::Param0,
+					>,
+					types::next_fission_id_by_owner::NextFissionIdByOwner,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"BitcoinFissions",
+						"NextFissionIdByOwner",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							187u8, 40u8, 178u8, 18u8, 222u8, 167u8, 124u8, 174u8, 185u8, 51u8,
+							50u8, 237u8, 70u8, 33u8, 252u8, 147u8, 169u8, 113u8, 136u8, 49u8,
+							126u8, 96u8, 65u8, 202u8, 200u8, 75u8, 232u8, 5u8, 11u8, 21u8, 22u8,
+							162u8,
+						],
+					)
+				}
+				#[doc = " Active Fission records addressed by their owner and owner-local Fission ID."]
+				pub fn fission_by_owner_and_id_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::fission_by_owner_and_id::FissionByOwnerAndId,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"BitcoinFissions",
+						"FissionByOwnerAndId",
+						(),
+						[
+							2u8, 43u8, 34u8, 111u8, 206u8, 102u8, 78u8, 212u8, 244u8, 244u8, 173u8,
+							108u8, 42u8, 103u8, 249u8, 179u8, 126u8, 126u8, 231u8, 80u8, 33u8,
+							32u8, 197u8, 21u8, 157u8, 8u8, 187u8, 100u8, 55u8, 28u8, 127u8, 131u8,
+						],
+					)
+				}
+				#[doc = " Active Fission records addressed by their owner and owner-local Fission ID."]
+				pub fn fission_by_owner_and_id_iter1(
+					&self,
+					_0: types::fission_by_owner_and_id::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::fission_by_owner_and_id::Param0,
+					>,
+					types::fission_by_owner_and_id::FissionByOwnerAndId,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"BitcoinFissions",
+						"FissionByOwnerAndId",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							2u8, 43u8, 34u8, 111u8, 206u8, 102u8, 78u8, 212u8, 244u8, 244u8, 173u8,
+							108u8, 42u8, 103u8, 249u8, 179u8, 126u8, 126u8, 231u8, 80u8, 33u8,
+							32u8, 197u8, 21u8, 157u8, 8u8, 187u8, 100u8, 55u8, 28u8, 127u8, 131u8,
+						],
+					)
+				}
+				#[doc = " Active Fission records addressed by their owner and owner-local Fission ID."]
+				pub fn fission_by_owner_and_id(
+					&self,
+					_0: types::fission_by_owner_and_id::Param0,
+					_1: types::fission_by_owner_and_id::Param1,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+							types::fission_by_owner_and_id::Param0,
+						>,
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+							types::fission_by_owner_and_id::Param1,
+						>,
+					),
+					types::fission_by_owner_and_id::FissionByOwnerAndId,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"BitcoinFissions",
+						"FissionByOwnerAndId",
+						(
+							::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+							::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_1),
+						),
+						[
+							2u8, 43u8, 34u8, 111u8, 206u8, 102u8, 78u8, 212u8, 244u8, 244u8, 173u8,
+							108u8, 42u8, 103u8, 249u8, 179u8, 126u8, 126u8, 231u8, 80u8, 33u8,
+							32u8, 197u8, 21u8, 157u8, 8u8, 187u8, 100u8, 55u8, 28u8, 127u8, 131u8,
+						],
+					)
+				}
+				#[doc = " Active Fission IDs allocating satoshis from each Lock."]
+				pub fn fission_ids_by_lock_id_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::fission_ids_by_lock_id::FissionIdsByLockId,
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"BitcoinFissions",
+						"FissionIdsByLockId",
+						(),
+						[
+							19u8, 10u8, 248u8, 119u8, 131u8, 160u8, 69u8, 75u8, 255u8, 78u8, 86u8,
+							176u8, 160u8, 166u8, 50u8, 94u8, 18u8, 122u8, 177u8, 0u8, 117u8, 219u8,
+							104u8, 50u8, 165u8, 73u8, 47u8, 223u8, 234u8, 84u8, 30u8, 54u8,
+						],
+					)
+				}
+				#[doc = " Active Fission IDs allocating satoshis from each Lock."]
+				pub fn fission_ids_by_lock_id(
+					&self,
+					_0: types::fission_ids_by_lock_id::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::fission_ids_by_lock_id::Param0,
+					>,
+					types::fission_ids_by_lock_id::FissionIdsByLockId,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"BitcoinFissions",
+						"FissionIdsByLockId",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							19u8, 10u8, 248u8, 119u8, 131u8, 160u8, 69u8, 75u8, 255u8, 78u8, 86u8,
+							176u8, 160u8, 166u8, 50u8, 94u8, 18u8, 122u8, 177u8, 0u8, 117u8, 219u8,
+							104u8, 50u8, 165u8, 73u8, 47u8, 223u8, 234u8, 84u8, 30u8, 54u8,
+						],
+					)
+				}
+			}
+		}
+		pub mod constants {
+			use super::runtime_types;
+			pub struct ConstantsApi;
+			impl ConstantsApi {
+				#[doc = " Maximum number of active Fissions that may allocate satoshis from one Lock."]
+				pub fn max_fissions_per_lock(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u32,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"BitcoinFissions",
+						"MaxFissionsPerLock",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
+						],
+					)
+				}
+				#[doc = " Minimum percentage change required to ratchet a Fission."]
+				pub fn minimum_ratchet_percent(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					runtime_types::sp_arithmetic::per_things::Percent,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"BitcoinFissions",
+						"MinimumRatchetPercent",
+						[
+							40u8, 171u8, 69u8, 196u8, 34u8, 184u8, 50u8, 128u8, 139u8, 192u8, 63u8,
+							231u8, 249u8, 200u8, 252u8, 73u8, 244u8, 170u8, 51u8, 177u8, 106u8,
+							47u8, 114u8, 234u8, 84u8, 104u8, 62u8, 118u8, 227u8, 50u8, 225u8,
+							122u8,
 						],
 					)
 				}
@@ -30035,9 +30573,9 @@ pub mod api {
 					#[codec(compact)]
 					pub locked_satoshis: ::core::primitive::u64,
 					#[codec(compact)]
-					pub securitized_satoshis: ::core::primitive::u64,
+					pub ratio_adjusted_satoshis: ::core::primitive::u64,
 					#[codec(compact)]
-					pub flexible_securitized_satoshis: ::core::primitive::u64,
+					pub flexible_ratio_adjusted_satoshis: ::core::primitive::u64,
 					pub securitization_release_schedule:
 						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap1<
 							::core::primitive::u64,
@@ -30236,6 +30774,8 @@ pub mod api {
 				Utility(runtime_types::pallet_utility::pallet::Call),
 				#[codec(index = 26)]
 				Sudo(runtime_types::pallet_sudo::pallet::Call),
+				#[codec(index = 27)]
+				BitcoinFissions(runtime_types::pallet_bitcoin_fissions::pallet::Call),
 				#[codec(index = 31)]
 				Treasury(runtime_types::pallet_treasury::pallet::Call),
 				#[codec(index = 34)]
@@ -30304,6 +30844,8 @@ pub mod api {
 				Utility(runtime_types::pallet_utility::pallet::Error),
 				#[codec(index = 26)]
 				Sudo(runtime_types::pallet_sudo::pallet::Error),
+				#[codec(index = 27)]
+				BitcoinFissions(runtime_types::pallet_bitcoin_fissions::pallet::Error),
 				#[codec(index = 31)]
 				Treasury(runtime_types::pallet_treasury::pallet::Error),
 				#[codec(index = 32)]
@@ -30372,6 +30914,8 @@ pub mod api {
 				Utility(runtime_types::pallet_utility::pallet::Event),
 				#[codec(index = 26)]
 				Sudo(runtime_types::pallet_sudo::pallet::Event),
+				#[codec(index = 27)]
+				BitcoinFissions(runtime_types::pallet_bitcoin_fissions::pallet::Event),
 				#[codec(index = 31)]
 				Treasury(runtime_types::pallet_treasury::pallet::Event),
 				#[codec(index = 32)]
@@ -31755,6 +32299,209 @@ pub mod api {
 				}
 			}
 		}
+		pub mod pallet_bitcoin_fissions {
+			use super::runtime_types;
+			pub mod pallet {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
+				pub enum Call {
+					#[codec(index = 0)]
+					#[doc = "Create a Fission from one owner-held Lock and associate it with a Liquid ID."]
+					create {
+						#[codec(compact)]
+						fission_id: ::core::primitive::u64,
+						#[codec(compact)]
+						liquid_id: ::core::primitive::u64,
+						#[codec(compact)]
+						utxo_id: ::core::primitive::u64,
+						#[codec(compact)]
+						satoshis: ::core::primitive::u64,
+						#[codec(compact)]
+						microgons_at_target_per_btc: ::core::primitive::u128,
+					},
+					#[codec(index = 1)]
+					#[doc = "Ratchet an active Fission to a replacement target-normalized BTC value."]
+					ratchet {
+						#[codec(compact)]
+						fission_id: ::core::primitive::u64,
+						#[codec(compact)]
+						microgons_at_target_per_btc: ::core::primitive::u128,
+					},
+					#[codec(index = 2)]
+					#[doc = "Close a Fission without moving Bitcoin and remove its active record."]
+					close {
+						#[codec(compact)]
+						fission_id: ::core::primitive::u64,
+					},
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "The `Error` enum of this pallet."]
+				pub enum Error {
+					#[codec(index = 0)]
+					#[doc = "The submitted Fission ID is below the owner's current minimum."]
+					FissionIdBelowMinimum,
+					#[codec(index = 1)]
+					#[doc = "The owner's Fission ID counter cannot be incremented."]
+					FissionIdOverflow,
+					#[codec(index = 2)]
+					#[doc = "A Fission already exists under this owner and Fission ID."]
+					FissionAlreadyExists,
+					#[codec(index = 3)]
+					#[doc = "No Fission exists under this owner and Fission ID."]
+					FissionNotFound,
+					#[codec(index = 4)]
+					#[doc = "The Fission did not meet both the minimum change and Lock coverage requirements."]
+					NoRatchetingAvailable,
+					#[codec(index = 5)]
+					#[doc = "The Fission's ratchet counter cannot be incremented."]
+					RatchetNumberOverflow,
+					#[codec(index = 6)]
+					#[doc = "A Fission must allocate at least one satoshi."]
+					FissionHasNoSatoshis,
+					#[codec(index = 7)]
+					#[doc = "The source Lock already has the maximum number of active Fissions."]
+					TooManyFissionsForLock,
+					#[codec(index = 8)]
+					#[doc = "The requested source Lock does not exist."]
+					LockNotFound,
+					#[codec(index = 9)]
+					#[doc = "The caller does not own a requested source Lock."]
+					NoPermissions,
+					#[codec(index = 10)]
+					#[doc = "A requested source Lock has no confirmed funding satoshis."]
+					LockNotFunded,
+					#[codec(index = 11)]
+					#[doc = "A requested source Lock is already in the release process."]
+					LockReleasePending,
+					#[codec(index = 12)]
+					#[doc = "A requested source Lock does not have enough unallocated funded satoshis."]
+					InsufficientFundedSatoshis,
+					#[codec(index = 13)]
+					#[doc = "A source Lock's securitization does not cover the requested allocation and liability."]
+					InsufficientSecuritization,
+					#[codec(index = 14)]
+					#[doc = "The requested target-normalized BTC value is not present in recent price history."]
+					IneligibleMicrogonsAtTargetPerBtc,
+					#[codec(index = 15)]
+					#[doc = "The requested price-history entry predates the Fission or Lock coverage floor."]
+					MicrogonsAtTargetPerBtcTickOlderThanCurrent,
+					#[codec(index = 16)]
+					#[doc = "A source Lock has fewer active Fission satoshis than the Fission being closed."]
+					InsufficientFissionedSatoshis,
+					#[codec(index = 17)]
+					#[doc = "No current Bitcoin price is available to calculate the redemption amount."]
+					NoBitcoinPricesAvailable,
+					#[codec(index = 18)]
+					#[doc = "The Fission owner cannot burn the complete redemption amount."]
+					InsufficientFunds,
+					#[codec(index = 19)]
+					#[doc = "A Fission allocation, liability, or identifier overflowed."]
+					Overflow,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "The `Event` enum of this pallet"]
+				pub enum Event {
+					#[codec(index = 0)]
+					#[doc = "A Fission was created and allocated from its source Lock."]
+					FissionCreated {
+						account_id: crate::types::AccountId32,
+						fission_id: ::core::primitive::u64,
+						liquid_id: ::core::primitive::u64,
+						liquidity_promised: ::core::primitive::u128,
+					},
+					#[codec(index = 1)]
+					#[doc = "A Fission ratchet changed its target-normalized BTC value and liability."]
+					FissionRatcheted {
+						account_id: crate::types::AccountId32,
+						fission_id: ::core::primitive::u64,
+						ratchet_number: ::core::primitive::u32,
+						liquidity_promised: ::core::primitive::u128,
+						amount_minted: ::core::primitive::u128,
+						amount_burned: ::core::primitive::u128,
+					},
+					#[codec(index = 2)]
+					#[doc = "A Fission was closed and its source Lock allocation was released."]
+					FissionClosed {
+						account_id: crate::types::AccountId32,
+						fission_id: ::core::primitive::u64,
+						redemption_amount: ::core::primitive::u128,
+					},
+					#[codec(index = 3)]
+					#[doc = "An active Fission was closed because its source Lock was spent."]
+					FissionClosedByLock {
+						account_id: crate::types::AccountId32,
+						fission_id: ::core::primitive::u64,
+						utxo_id: ::core::primitive::u64,
+					},
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct Fission {
+					#[codec(compact)]
+					pub liquid_id: ::core::primitive::u64,
+					#[codec(compact)]
+					pub utxo_id: ::core::primitive::u64,
+					#[codec(compact)]
+					pub satoshis: ::core::primitive::u64,
+					#[codec(compact)]
+					pub microgons_at_target_per_btc: ::core::primitive::u128,
+					#[codec(compact)]
+					pub liquidity_promised: ::core::primitive::u128,
+					#[codec(compact)]
+					pub created_at_argon_block: ::core::primitive::u32,
+					#[codec(compact)]
+					pub ratchet_number: ::core::primitive::u32,
+					#[codec(compact)]
+					pub last_ratchet_tick: ::core::primitive::u64,
+					#[codec(compact)]
+					pub last_updated_argon_block: ::core::primitive::u32,
+				}
+			}
+		}
 		pub mod pallet_bitcoin_locks {
 			use super::runtime_types;
 			pub mod pallet {
@@ -31774,15 +32521,11 @@ pub mod api {
 				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 				pub enum Call {
 					#[codec(index = 0)]
-					#[doc = "Initialize a bitcoin lock. This will create a LockedBitcoin for the submitting account"]
-					#[doc = "and log the Bitcoin Script hash to Events."]
+					#[doc = "Create a Bitcoin receive address backed by a Lock for the submitting account."]
 					#[doc = ""]
 					#[doc = "The pubkey submitted here will be used to create a script pubkey that will be used in a"]
 					#[doc = "timelock multisig script to lock the bitcoin."]
-					#[doc = ""]
-					#[doc = "NOTE: A \"lock-er\" must send btc to the cosigner UTXO address to \"complete\" the"]
-					#[doc = "LockedBitcoin and be added to the Bitcoin Mint line."]
-					initialize {
+					create_receive_address {
 						vault_id: ::core::primitive::u32,
 						#[codec(compact)]
 						satoshis: ::core::primitive::u64,
@@ -31806,35 +32549,14 @@ pub mod api {
 						bitcoin_network_fee: ::core::primitive::u64,
 					},
 					#[codec(index = 2)]
-					#[doc = "Submitted by a Vault operator to cosign the release of a bitcoin utxo. The Bitcoin owner"]
-					#[doc = "release fee will be burned, and the lock will be allowed to expire without a penalty."]
+					#[doc = "Submitted by a Vault operator to cosign the release of a bitcoin UTXO. The Lock's"]
+					#[doc = "securitization will be scheduled for release without a penalty."]
 					#[doc = ""]
 					#[doc = "This is submitted as a no-fee transaction off chain to allow keys to remain in cold"]
 					#[doc = "wallets."]
 					cosign_release {
 						utxo_id: ::core::primitive::u64,
 						signature: runtime_types::argon_primitives::bitcoin::BitcoinSignature,
-					},
-					#[codec(index = 3)]
-					#[doc = "Ratcheting allows a user to change the lock price of their bitcoin lock. This is"]
-					#[doc = "functionally the same as releasing and re-initializing, but it allows a user to skip"]
-					#[doc = "sending transactions through bitcoin and any associated fees. It also allows you to stay"]
-					#[doc = "on your original lock expiration without having to pay the full year of fees again."]
-					#[doc = ""]
-					#[doc = "Ratcheting \"down\" - when the price of bitcoin is lower than your lock price, you pay the"]
-					#[doc = "full release price and get added back to the mint queue at the current market rate. You"]
-					#[doc = "pocket the difference between the already minted \"lock price\" and the new market value"]
-					#[doc = "(which you just had burned). Your new lock price is set to the market low, so you can"]
-					#[doc = "take advantage of ratchets \"up\" in the future."]
-					#[doc = ""]
-					#[doc = "Ratcheting \"up\" - when the price of bitcoin is higher than your lock price, you pay a"]
-					#[doc = "prorated fee for the remainder of your existing lock duration. You are added to the mint"]
-					#[doc = "queue for the difference in your new lock price vs the previous lock price."]
-					ratchet {
-						utxo_id: ::core::primitive::u64,
-						options: ::core::option::Option<
-							runtime_types::pallet_bitcoin_locks::pallet::LockOptions,
-						>,
 					},
 					#[codec(index = 4)]
 					admin_modify_minimum_locked_sats { satoshis: ::core::primitive::u64 },
@@ -31859,10 +32581,14 @@ pub mod api {
 						signature: runtime_types::argon_primitives::bitcoin::BitcoinSignature,
 					},
 					#[codec(index = 9)]
-					increase_securitization {
+					#[doc = "Replace this Lock's BTC coverage and target value for its remaining term."]
+					resecuritize {
 						utxo_id: ::core::primitive::u64,
 						#[codec(compact)]
-						new_satoshis: ::core::primitive::u64,
+						satoshis: ::core::primitive::u64,
+						options: ::core::option::Option<
+							runtime_types::pallet_bitcoin_locks::pallet::LockOptions,
+						>,
 					},
 					#[codec(index = 10)]
 					set_flexible {
@@ -31922,81 +32648,90 @@ pub mod api {
 					#[doc = "The cosign signature is not valid for the bitcoin release"]
 					BitcoinInvalidCosignature,
 					#[codec(index = 13)]
-					#[doc = "The minimum number of satoshis was not met"]
-					InsufficientSatoshisLocked,
-					#[codec(index = 14)]
 					#[doc = "The price provider has no bitcoin prices available. This is a temporary error"]
 					NoBitcoinPricesAvailable,
-					#[codec(index = 15)]
+					#[codec(index = 14)]
 					#[doc = "The bitcoin script to lock this bitcoin has errors"]
 					InvalidBitcoinScript,
-					#[codec(index = 16)]
+					#[codec(index = 15)]
 					#[doc = "The user does not have permissions to perform this action"]
 					NoPermissions,
+					#[codec(index = 16)]
+					#[doc = "The Lock cannot be released while it has active Fissions."]
+					LockHasActiveFissions,
 					#[codec(index = 17)]
+					#[doc = "The requested Lock securitization has fewer satoshis than its active Fissions."]
+					InsufficientSatoshisForFissions,
+					#[codec(index = 18)]
+					#[doc = "The Lock records fissioned satoshis without matching active Fission requirements."]
+					FissionStateMismatch,
+					#[codec(index = 19)]
+					#[doc = "The requested Lock securitization does not cover its active Fission liabilities."]
+					InsufficientSecuritizationForFissions,
+					#[codec(index = 20)]
 					#[doc = "The expected amount of funds to return from hold was not available"]
 					HoldUnexpectedlyModified,
-					#[codec(index = 18)]
+					#[codec(index = 21)]
 					#[doc = "The hold on funds could not be recovered"]
 					UnrecoverableHold,
-					#[codec(index = 19)]
+					#[codec(index = 22)]
 					#[doc = "The vault was not found"]
 					VaultNotFound,
-					#[codec(index = 20)]
+					#[codec(index = 23)]
 					#[doc = "An error occurred in the vault module"]
 					GenericVaultError(runtime_types::argon_primitives::vault::VaultError),
-					#[codec(index = 21)]
+					#[codec(index = 24)]
 					#[doc = "The Bitcoin Lock record was not found"]
 					LockNotFound,
-					#[codec(index = 22)]
+					#[codec(index = 25)]
 					#[doc = "No Vault public keys are available"]
 					NoVaultBitcoinPubkeysAvailable,
-					#[codec(index = 23)]
+					#[codec(index = 26)]
 					#[doc = "Unable to generate a new vault public key"]
 					UnableToGenerateVaultBitcoinPubkey,
-					#[codec(index = 24)]
+					#[codec(index = 27)]
 					#[doc = "This vault is not yet active"]
 					VaultNotYetActive,
-					#[codec(index = 25)]
+					#[codec(index = 28)]
 					#[doc = "An overflow occurred recording a lock expiration"]
 					ExpirationAtBlockOverflow,
-					#[codec(index = 26)]
-					#[doc = "Nothing to ratchet"]
-					NoRatchetingAvailable,
-					#[codec(index = 27)]
-					#[doc = "A lock in process of release cannot be ratcheted"]
+					#[codec(index = 29)]
+					#[doc = "The requested securitization matches the Lock's current securitization."]
+					NoResecuritizationChange,
+					#[codec(index = 30)]
+					#[doc = "A Lock in the release process cannot be resecuritized."]
 					LockInProcessOfRelease,
-					#[codec(index = 28)]
+					#[codec(index = 31)]
 					#[doc = "The lock funding has not been confirmed on bitcoin"]
 					LockPendingFunding,
-					#[codec(index = 29)]
+					#[codec(index = 32)]
 					#[doc = "An overflow or underflow occurred while calculating the redemption price"]
 					OverflowError,
-					#[codec(index = 30)]
-					#[doc = "An ineligible microgon rate per btc was requested"]
-					IneligibleMicrogonRateRequested,
-					#[codec(index = 31)]
+					#[codec(index = 33)]
+					#[doc = "The requested target-normalized BTC value is not present in recent price history."]
+					IneligibleMicrogonsAtTargetPerBtcRequested,
+					#[codec(index = 34)]
+					#[doc = "The requested price-history entry predates the Lock's current securitization."]
+					MicrogonsAtTargetPerBtcTickOlderThanCurrent,
+					#[codec(index = 35)]
 					#[doc = "The fee coupon is past its expiration frame."]
 					FeeCouponExpired,
-					#[codec(index = 32)]
+					#[codec(index = 36)]
 					#[doc = "The fee coupon was not signed by the vault delegate."]
 					InvalidFeeCouponSignature,
-					#[codec(index = 33)]
+					#[codec(index = 37)]
 					#[doc = "The fee coupon nonce is not the next unconsumed nonce."]
 					FeeCouponAlreadyUsed,
-					#[codec(index = 34)]
-					#[doc = "Fee coupons can only be applied when initializing a lock."]
-					FeeCouponOnlyForInitialization,
-					#[codec(index = 35)]
+					#[codec(index = 38)]
 					#[doc = "Cannot fund with an orphaned utxo after lock funding is confirmed"]
 					OrphanedUtxoFundingConflict,
-					#[codec(index = 36)]
+					#[codec(index = 39)]
 					#[doc = "Cannot lock an orphaned utxo with a pending release request"]
 					OrphanedUtxoReleaseRequested,
-					#[codec(index = 37)]
+					#[codec(index = 40)]
 					#[doc = "Cannot request an orphaned release for the funding UTXO"]
 					FundingUtxoCannotBeReleased,
-					#[codec(index = 38)]
+					#[codec(index = 41)]
 					#[doc = "Too many orphaned utxo release requests for a lock"]
 					MaxOrphanedUtxoReleaseRequestsExceeded,
 				}
@@ -32018,79 +32753,68 @@ pub mod api {
 					BitcoinLockCreated {
 						utxo_id: ::core::primitive::u64,
 						vault_id: ::core::primitive::u32,
-						liquidity_promised: ::core::primitive::u128,
-						securitization: ::core::primitive::u128,
-						locked_target_price: ::core::primitive::u128,
+						securitized_satoshis: ::core::primitive::u64,
+						microgons_at_target_per_btc: ::core::primitive::u128,
+						collateral_required: ::core::primitive::u128,
 						account_id: crate::types::AccountId32,
 						security_fee: ::core::primitive::u128,
 					},
 					#[codec(index = 1)]
-					BitcoinLockRatcheted {
-						utxo_id: ::core::primitive::u64,
-						vault_id: ::core::primitive::u32,
-						liquidity_promised: ::core::primitive::u128,
-						old_target_price: ::core::primitive::u128,
-						security_fee: ::core::primitive::u128,
-						new_target_price: ::core::primitive::u128,
-						amount_burned: ::core::primitive::u128,
-						account_id: crate::types::AccountId32,
-					},
-					#[codec(index = 2)]
 					BitcoinLockBurned {
 						utxo_id: ::core::primitive::u64,
 						vault_id: ::core::primitive::u32,
 						was_utxo_spent: ::core::primitive::bool,
 					},
-					#[codec(index = 3)]
+					#[codec(index = 2)]
 					BitcoinUtxoCosignRequested {
 						utxo_id: ::core::primitive::u64,
 						vault_id: ::core::primitive::u32,
 					},
-					#[codec(index = 4)]
+					#[codec(index = 3)]
 					BitcoinUtxoCosigned {
 						utxo_id: ::core::primitive::u64,
 						vault_id: ::core::primitive::u32,
 						signature: runtime_types::argon_primitives::bitcoin::BitcoinSignature,
 					},
-					#[codec(index = 5)]
+					#[codec(index = 4)]
 					BitcoinSpentAfterRelease {
 						utxo_id: ::core::primitive::u64,
 						vault_id: ::core::primitive::u32,
 					},
-					#[codec(index = 6)]
+					#[codec(index = 5)]
 					BitcoinCosignPastDue {
 						utxo_id: ::core::primitive::u64,
 						vault_id: ::core::primitive::u32,
 						compensation_amount: ::core::primitive::u128,
 						compensated_account_id: crate::types::AccountId32,
 					},
-					#[codec(index = 7)]
+					#[codec(index = 6)]
 					#[doc = "An error occurred while refunding an overdue cosigned bitcoin lock"]
 					CosignOverdueError {
 						utxo_id: ::core::primitive::u64,
 						error: runtime_types::sp_runtime::DispatchError,
 					},
-					#[codec(index = 8)]
+					#[codec(index = 7)]
 					#[doc = "An error occurred while completing a lock"]
 					LockExpirationError {
 						utxo_id: ::core::primitive::u64,
 						error: runtime_types::sp_runtime::DispatchError,
 					},
-					#[codec(index = 9)]
+					#[codec(index = 8)]
 					OrphanedUtxoReceived {
 						utxo_id: ::core::primitive::u64,
 						utxo_ref: runtime_types::argon_primitives::bitcoin::UtxoRef,
 						vault_id: ::core::primitive::u32,
 						satoshis: ::core::primitive::u64,
 					},
-					#[codec(index = 10)]
+					#[codec(index = 9)]
 					OrphanedUtxoReleaseRequested {
 						utxo_id: ::core::primitive::u64,
 						utxo_ref: runtime_types::argon_primitives::bitcoin::UtxoRef,
 						vault_id: ::core::primitive::u32,
 						account_id: crate::types::AccountId32,
 					},
-					#[codec(index = 11)]
+					#[codec(index = 10)]
 					OrphanedUtxoCosigned {
 						utxo_id: ::core::primitive::u64,
 						utxo_ref: runtime_types::argon_primitives::bitcoin::UtxoRef,
@@ -32098,14 +32822,29 @@ pub mod api {
 						account_id: crate::types::AccountId32,
 						signature: runtime_types::argon_primitives::bitcoin::BitcoinSignature,
 					},
-					#[codec(index = 12)]
-					SecuritizationIncreased {
-						utxo_id: ::core::primitive::u64,
-						vault_id: ::core::primitive::u32,
-						new_satoshis: ::core::primitive::u64,
+					#[codec(index = 11)]
+					#[doc = "An orphaned UTXO expiration could not reconcile its pending Vault cosign state."]
+					OrphanedUtxoExpirationError {
 						account_id: crate::types::AccountId32,
+						utxo_ref: runtime_types::argon_primitives::bitcoin::UtxoRef,
+						error: runtime_types::sp_runtime::DispatchError,
+					},
+					#[codec(index = 12)]
+					#[doc = "Not all orphaned UTXOs for a retired Lock fit in the cleanup schedule."]
+					OrphanedUtxoCleanupScheduleOverflow {
+						account_id: crate::types::AccountId32,
+						utxo_id: ::core::primitive::u64,
+						expiration_frame: ::core::primitive::u64,
 					},
 					#[codec(index = 13)]
+					BitcoinLockResecuritized {
+						utxo_id: ::core::primitive::u64,
+						vault_id: ::core::primitive::u32,
+						securitized_satoshis: ::core::primitive::u64,
+						microgons_at_target_per_btc: ::core::primitive::u128,
+						account_id: crate::types::AccountId32,
+					},
+					#[codec(index = 14)]
 					BitcoinLockFlexibleChanged {
 						utxo_id: ::core::primitive::u64,
 						vault_id: ::core::primitive::u32,
@@ -32163,18 +32902,12 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				pub enum LockOptions {
-					#[codec(index = 0)]
-					V1 {
-						microgons_at_target_per_btc:
-							::core::option::Option<::core::primitive::u128>,
-					},
-					#[codec(index = 1)]
-					V2 {
-						#[codec(compact)]
-						microgons_at_target_per_btc: ::core::primitive::u128,
-						fee_coupon: runtime_types::pallet_bitcoin_locks::pallet::FeeCoupon,
-					},
+				pub struct LockOptions {
+					#[codec(compact)]
+					pub microgons_at_target_per_btc: ::core::primitive::u128,
+					pub fee_coupon: ::core::option::Option<
+						runtime_types::pallet_bitcoin_locks::pallet::FeeCoupon,
+					>,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -32200,7 +32933,7 @@ pub mod api {
 					pub to_script_pubkey:
 						runtime_types::argon_primitives::bitcoin::BitcoinScriptPubkey,
 					#[codec(compact)]
-					pub redemption_amount: _0,
+					pub securitization_at_risk: _0,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -32218,18 +32951,23 @@ pub mod api {
 					#[codec(compact)]
 					pub vault_id: ::core::primitive::u32,
 					#[codec(compact)]
-					pub liquidity_promised: ::core::primitive::u128,
+					pub securitized_satoshis: ::core::primitive::u64,
 					#[codec(compact)]
-					pub locked_target_price: ::core::primitive::u128,
+					pub microgons_at_target_per_btc: ::core::primitive::u128,
+					#[codec(compact)]
+					pub securitization_coverage_microgons: ::core::primitive::u128,
+					#[codec(compact)]
+					pub securitization_tick: ::core::primitive::u64,
+					#[codec(compact)]
+					pub funded_satoshis: ::core::primitive::u64,
+					#[codec(compact)]
+					pub fissioned_satoshis: ::core::primitive::u64,
 					pub owner_account: crate::types::AccountId32,
 					pub securitization_ratio: runtime_types::sp_arithmetic::fixed_point::FixedU128,
 					#[codec(compact)]
 					pub security_fees: ::core::primitive::u128,
 					#[codec(compact)]
 					pub coupon_paid_fees: ::core::primitive::u128,
-					#[codec(compact)]
-					pub satoshis: ::core::primitive::u64,
-					pub utxo_satoshis: ::core::option::Option<::core::primitive::u64>,
 					pub vault_pubkey:
 						runtime_types::argon_primitives::bitcoin::CompressedBitcoinPubkey,
 					pub vault_claim_pubkey:
@@ -32247,9 +32985,10 @@ pub mod api {
 					pub open_claim_height: ::core::primitive::u64,
 					#[codec(compact)]
 					pub created_at_height: ::core::primitive::u64,
+					#[codec(compact)]
+					pub funding_expiration_height: ::core::primitive::u64,
 					pub utxo_script_pubkey:
 						runtime_types::argon_primitives::bitcoin::BitcoinCosignScriptPubkey,
-					pub is_funded: ::core::primitive::bool,
 					pub is_flexible: ::core::primitive::bool,
 					pub fund_hold_extensions:
 						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap1<
@@ -34813,6 +35552,8 @@ pub mod api {
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
 				pub struct PendingMintUtxo {
+					#[codec(compact)]
+					pub fission_id: ::core::primitive::u64,
 					#[codec(compact)]
 					pub utxo_id: ::core::primitive::u64,
 					pub account_id: crate::types::AccountId32,
@@ -37682,16 +38423,15 @@ pub mod api {
 						revenue: ::core::primitive::u128,
 					},
 					#[codec(index = 9)]
-					FundsLocked {
+					SecuritizationReserved {
 						vault_id: ::core::primitive::u32,
 						locker: crate::types::AccountId32,
-						liquidity_promised: ::core::primitive::u128,
-						is_ratchet: ::core::primitive::bool,
+						securitization_coverage_microgons: ::core::primitive::u128,
 						fee_revenue: ::core::primitive::u128,
 						did_use_fee_coupon: ::core::primitive::bool,
 					},
 					#[codec(index = 10)]
-					FundLockCanceled {
+					SecuritizationReturned {
 						vault_id: ::core::primitive::u32,
 						amount: ::core::primitive::u128,
 					},
@@ -37796,9 +38536,9 @@ pub mod api {
 					#[codec(compact)]
 					pub bitcoin_locks_created: ::core::primitive::u32,
 					#[codec(compact)]
-					pub bitcoin_locks_new_liquidity_promised: ::core::primitive::u128,
+					pub bitcoin_locks_new_securitization: ::core::primitive::u128,
 					#[codec(compact)]
-					pub bitcoin_locks_released_liquidity: ::core::primitive::u128,
+					pub bitcoin_locks_released_securitization: ::core::primitive::u128,
 					#[codec(compact)]
 					pub bitcoin_locks_added_satoshis: ::core::primitive::u64,
 					#[codec(compact)]

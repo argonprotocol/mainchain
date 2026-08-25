@@ -7,8 +7,7 @@ use crate::{
 	VAULT_ACCOUNT_PROOF_MESSAGE_KEY,
 };
 use argon_primitives::{
-	OnNewSlot, OperationalAccountProvider, OperationalAccountsHook, Signature, UtxoLockEvents,
-	MICROGONS_PER_ARGON,
+	OnNewSlot, OperationalAccountProvider, OperationalAccountsHook, Signature, MICROGONS_PER_ARGON,
 };
 use frame_support::{assert_noop, assert_ok};
 use pallet_prelude::*;
@@ -17,14 +16,14 @@ use sp_io::hashing::blake2_256;
 use sp_runtime::{traits::IdentifyAccount, AccountId32, MultiSigner};
 
 use crate::mock::{
-	funded_bitcoin_amount, has_vault_operational_mark, new_test_ext,
-	record_active_vault_bond_amount, record_funded_bitcoin_amount, record_microgons_in,
-	record_microgons_out, set_argon_balance, set_crosschain_activated, set_registration_lookup,
-	BitcoinLockSizeForAccessCode, ClaimableTreasuryBalance, ClaimedOperationalRewards, CurrentTick,
-	MaxAvailableAccessCodes, MinimumBitcoin, MinimumBonds, MinimumUniswapTransfer,
-	MiningSeatsPerAccessCode, OperationalAccounts as OperationalAccountsPallet,
-	OperationalCertificationReward, OperationalMinimumUniswapTransfer,
-	OperationalMinimumVaultSecuritization, RuntimeOrigin, Test, TestAccountId,
+	fission_liquidity, has_vault_operational_mark, new_test_ext, record_active_vault_bond_amount,
+	record_fission_liquidity, record_microgons_in, record_microgons_out, set_argon_balance,
+	set_crosschain_activated, set_registration_lookup, BitcoinLockSizeForAccessCode,
+	ClaimableTreasuryBalance, ClaimedOperationalRewards, CurrentTick, MaxAvailableAccessCodes,
+	MinimumBitcoin, MinimumBonds, MinimumUniswapTransfer, MiningSeatsPerAccessCode,
+	OperationalAccounts as OperationalAccountsPallet, OperationalCertificationReward,
+	OperationalMinimumUniswapTransfer, OperationalMinimumVaultSecuritization, RuntimeOrigin, Test,
+	TestAccountId,
 };
 
 #[test]
@@ -571,6 +570,35 @@ fn test_minimums_clear_when_account_bitcoin_is_released() {
 		let account = OperationalAccounts::<Test>::get(&account_set.owner).expect("account");
 		assert_eq!(account.account_bitcoin_amount, MinimumBitcoin::get());
 		assert!(meets_minimums(&account));
+	});
+}
+
+#[test]
+fn fission_ratchets_adjust_account_bitcoin_by_the_liquidity_delta() {
+	new_test_ext().execute_with(|| {
+		let account_set = make_account_set(87, 88, 89);
+		register_account(&account_set, None);
+		let current = MinimumBitcoin::get();
+		let reduced = current / 2;
+		let delta = current.saturating_sub(reduced);
+
+		record_fission_liquidity(&account_set.vault, reduced);
+		OperationalAccountsPallet::account_bitcoin_amount_changed(&account_set.vault, delta, false);
+		assert_eq!(
+			OperationalAccounts::<Test>::get(&account_set.owner)
+				.expect("account")
+				.account_bitcoin_amount,
+			reduced
+		);
+
+		record_fission_liquidity(&account_set.vault, current);
+		OperationalAccountsPallet::account_bitcoin_amount_changed(&account_set.vault, delta, true);
+		assert_eq!(
+			OperationalAccounts::<Test>::get(&account_set.owner)
+				.expect("account")
+				.account_bitcoin_amount,
+			current
+		);
 	});
 }
 
@@ -1285,38 +1313,20 @@ fn set_linked_account_uniswap_argon_transfers_in_amount(
 	OperationalAccountsPallet::refresh_account_uniswap_argon_transfers_in_amount(account_id);
 }
 
-fn account_utxo_id(account_id: &TestAccountId) -> u64 {
-	let account_bytes: &[u8] = account_id.as_ref();
-	u64::from_le_bytes(account_bytes[0..8].try_into().expect("utxo id bytes"))
-}
-
 fn source_vault_id(account_id: &TestAccountId) -> u32 {
 	let account_bytes: &[u8] = account_id.as_ref();
 	u32::from_le_bytes(account_bytes[0..4].try_into().expect("vault id bytes"))
 }
 
 fn record_account_bitcoin(account_id: &TestAccountId, amount: Balance) {
-	record_funded_bitcoin_amount(
-		account_id,
-		funded_bitcoin_amount(account_id).saturating_add(amount),
-	);
-	assert_ok!(OperationalAccountsPallet::utxo_locked(
-		account_utxo_id(account_id),
-		account_id,
-		amount,
-	));
+	record_fission_liquidity(account_id, fission_liquidity(account_id).saturating_add(amount));
+	OperationalAccountsPallet::account_bitcoin_amount_changed(account_id, amount, true);
 }
 
 fn release_account_bitcoin(account_id: &TestAccountId) {
-	let amount = funded_bitcoin_amount(account_id);
-	record_funded_bitcoin_amount(account_id, 0);
-	assert_ok!(OperationalAccountsPallet::utxo_released(
-		account_utxo_id(account_id),
-		account_id,
-		false,
-		amount,
-		amount,
-	));
+	let amount = fission_liquidity(account_id);
+	record_fission_liquidity(account_id, 0);
+	OperationalAccountsPallet::account_bitcoin_amount_changed(account_id, amount, false);
 }
 
 fn record_account_vault_bond_amount(account_id: &TestAccountId, amount: Balance) {

@@ -9,7 +9,7 @@ use crate::{
 };
 use argon_primitives::{
 	block_seal::{BlockPayout, BlockRewardType},
-	BlockRewardsEventHandler, UtxoLockEvents,
+	BitcoinFissionMinting, BlockRewardsEventHandler,
 };
 use frame_support::traits::fungible::Unbalanced;
 use pallet_prelude::*;
@@ -18,6 +18,120 @@ fn pending_mints() -> Vec<(MintIndex, PendingMintUtxo<Test>)> {
 	let mut pending = PendingMintUtxosByIndex::<Test>::iter().collect::<Vec<_>>();
 	pending.sort_by_key(|(queue_index, _)| *queue_index);
 	pending
+}
+
+#[test]
+fn it_queues_fission_entitlement() {
+	new_test_ext().execute_with(|| {
+		assert_ok!(Mint::request_mint(&1, 0, 9, 100));
+
+		assert_eq!(
+			pending_mints(),
+			vec![(
+				0,
+				PendingMintUtxo {
+					fission_id: 0,
+					utxo_id: 9,
+					account_id: 1,
+					remaining_amount: 100,
+					max_amount_per_frame: 10,
+				},
+			)]
+		);
+		assert_eq!(PendingMintUtxoIdLookup::<Test>::get(9).to_vec(), vec![0]);
+	});
+}
+
+#[test]
+fn it_reopens_capacity_without_removing_pending_entitlements_when_a_fission_closes() {
+	new_test_ext().execute_with(|| {
+		assert_ok!(Mint::request_mint(&1, 0, 9, 100));
+		assert_ok!(Mint::request_mint(&2, 0, 9, 80));
+		assert_ok!(Mint::request_mint(&1, 1, 9, 60));
+		MintedBitcoinMicrogons::<Test>::set(100);
+
+		Mint::record_mint_repayment(40);
+
+		assert_eq!(PendingMintUtxoIdLookup::<Test>::get(9).to_vec(), vec![0, 1, 2]);
+		assert_eq!(
+			pending_mints(),
+			vec![
+				(
+					0,
+					PendingMintUtxo {
+						fission_id: 0,
+						utxo_id: 9,
+						account_id: 1,
+						remaining_amount: 100,
+						max_amount_per_frame: 10,
+					},
+				),
+				(
+					1,
+					PendingMintUtxo {
+						fission_id: 0,
+						utxo_id: 9,
+						account_id: 2,
+						remaining_amount: 80,
+						max_amount_per_frame: 8,
+					},
+				),
+				(
+					2,
+					PendingMintUtxo {
+						fission_id: 1,
+						utxo_id: 9,
+						account_id: 1,
+						remaining_amount: 60,
+						max_amount_per_frame: 6,
+					},
+				),
+			]
+		);
+		assert_eq!(MintedBitcoinMicrogons::<Test>::get(), 60);
+
+		assert_ok!(Balances::mint_into(&2, ExistentialDeposit::get()));
+		MintedMiningMicrogons::<Test>::set(100);
+		MinerRewardsAccounts::set(vec![(10, 1)]);
+		CurrentFrameId::set(1);
+		set_cpi(-0.1);
+		Mint::on_initialize(1);
+
+		assert_eq!(MintedBitcoinMicrogons::<Test>::get(), 84);
+		assert_eq!(Balances::free_balance(1), 16);
+		assert_eq!(Balances::free_balance(2), ExistentialDeposit::get() + 8);
+	});
+}
+
+#[test]
+fn fission_up_ratchet_appends_only_the_additional_mint_entitlement() {
+	new_test_ext().execute_with(|| {
+		assert_ok!(Mint::request_mint(&1, 0, 9, 100));
+		MintedBitcoinMicrogons::<Test>::set(40);
+
+		assert_ok!(Mint::request_mint(&1, 0, 9, 25));
+
+		assert_eq!(PendingMintUtxoIdLookup::<Test>::get(9).to_vec(), vec![0, 1]);
+		assert_eq!(pending_mints()[0].1.remaining_amount, 100);
+		assert_eq!(pending_mints()[1].1.remaining_amount, 25);
+		assert_eq!(MintedBitcoinMicrogons::<Test>::get(), 40);
+	});
+}
+
+#[test]
+fn fission_down_ratchet_reopens_global_capacity_and_appends_the_replacement_entitlement() {
+	new_test_ext().execute_with(|| {
+		assert_ok!(Mint::request_mint(&1, 0, 9, 100));
+		MintedBitcoinMicrogons::<Test>::set(100);
+
+		assert_ok!(Mint::request_mint(&1, 0, 9, 60));
+		Mint::record_mint_repayment(60);
+
+		assert_eq!(PendingMintUtxoIdLookup::<Test>::get(9).to_vec(), vec![0, 1]);
+		assert_eq!(pending_mints()[0].1.remaining_amount, 100);
+		assert_eq!(pending_mints()[1].1.remaining_amount, 60);
+		assert_eq!(MintedBitcoinMicrogons::<Test>::get(), 40);
+	});
 }
 
 #[test]
@@ -265,7 +379,7 @@ fn it_does_not_mint_bitcoin_with_cpi_gt_zero() {
 		let utxo_id = 1;
 		let account_id = 1;
 		let amount = 1000u128;
-		assert_ok!(Mint::utxo_locked(utxo_id, &account_id, amount));
+		assert_ok!(Mint::request_mint(&account_id, 0, utxo_id, amount));
 
 		assert_eq!(Balances::total_issuance(), 0u128);
 		assert_eq!(
@@ -273,6 +387,7 @@ fn it_does_not_mint_bitcoin_with_cpi_gt_zero() {
 			vec![(
 				0,
 				PendingMintUtxo {
+					fission_id: 0,
 					utxo_id,
 					account_id,
 					remaining_amount: amount,
@@ -297,6 +412,7 @@ fn it_does_not_mint_bitcoin_with_cpi_gt_zero() {
 			vec![(
 				0,
 				PendingMintUtxo {
+					fission_id: 0,
 					utxo_id,
 					account_id,
 					remaining_amount: amount,
@@ -314,6 +430,7 @@ fn it_does_not_mint_bitcoin_with_cpi_gt_zero() {
 			vec![(
 				0,
 				PendingMintUtxo {
+					fission_id: 0,
 					utxo_id,
 					account_id,
 					remaining_amount: amount,
@@ -332,14 +449,15 @@ fn it_pays_bitcoin_mints() {
 		let account_id = 1;
 		let amount = 62_000_000u128;
 		ArgonCirculation::set(0);
-		assert_ok!(Mint::utxo_locked(utxo_id, &account_id, amount));
-		assert_ok!(Mint::utxo_locked(2, &2, 500));
+		assert_ok!(Mint::request_mint(&account_id, 0, utxo_id, amount));
+		assert_ok!(Mint::request_mint(&2, 0, 2, 500));
 		assert_eq!(
 			pending_mints(),
 			vec![
 				(
 					0,
 					PendingMintUtxo {
+						fission_id: 0,
 						utxo_id,
 						account_id,
 						remaining_amount: amount,
@@ -349,6 +467,7 @@ fn it_pays_bitcoin_mints() {
 				(
 					1,
 					PendingMintUtxo {
+						fission_id: 0,
 						utxo_id: 2,
 						account_id: 2,
 						remaining_amount: 500,
@@ -376,6 +495,7 @@ fn it_pays_bitcoin_mints() {
 				(
 					0,
 					PendingMintUtxo {
+						fission_id: 0,
 						utxo_id,
 						account_id,
 						remaining_amount: amount,
@@ -385,6 +505,7 @@ fn it_pays_bitcoin_mints() {
 				(
 					1,
 					PendingMintUtxo {
+						fission_id: 0,
 						utxo_id: 2,
 						account_id: 2,
 						remaining_amount: 500,
@@ -407,6 +528,7 @@ fn it_pays_bitcoin_mints() {
 				(
 					0,
 					PendingMintUtxo {
+						fission_id: 0,
 						utxo_id,
 						account_id,
 						remaining_amount: amount - 6_200_000,
@@ -416,6 +538,7 @@ fn it_pays_bitcoin_mints() {
 				(
 					1,
 					PendingMintUtxo {
+						fission_id: 0,
 						utxo_id: 2,
 						account_id: 2,
 						remaining_amount: 450,
@@ -491,9 +614,9 @@ fn it_pays_bitcoin_mints() {
 #[test]
 fn it_keeps_later_pending_mints_behind_the_frame_payout_window() {
 	new_test_ext().execute_with(|| {
-		assert_ok!(Mint::utxo_locked(1, &1, 100));
-		assert_ok!(Mint::utxo_locked(2, &2, 100));
-		assert_ok!(Mint::utxo_locked(3, &3, 100));
+		assert_ok!(Mint::request_mint(&1, 0, 1, 100));
+		assert_ok!(Mint::request_mint(&2, 0, 2, 100));
+		assert_ok!(Mint::request_mint(&3, 0, 3, 100));
 		MaxPendingMintPayoutWindowSize::set(2);
 
 		MintedMiningMicrogons::<Test>::set(30);
@@ -524,8 +647,8 @@ fn it_keeps_later_pending_mints_behind_the_frame_payout_window() {
 #[test]
 fn it_does_not_partially_pay_or_advance_when_block_cannot_cover_frame_chunk() {
 	new_test_ext().execute_with(|| {
-		assert_ok!(Mint::utxo_locked(1, &1, 100));
-		assert_ok!(Mint::utxo_locked(2, &2, 100));
+		assert_ok!(Mint::request_mint(&1, 0, 1, 100));
+		assert_ok!(Mint::request_mint(&2, 0, 2, 100));
 		MaxPendingMintPayoutWindowSize::set(2);
 
 		MintedMiningMicrogons::<Test>::set(5);
@@ -541,6 +664,7 @@ fn it_does_not_partially_pay_or_advance_when_block_cannot_cover_frame_chunk() {
 				(
 					0,
 					PendingMintUtxo {
+						fission_id: 0,
 						utxo_id: 1,
 						account_id: 1,
 						remaining_amount: 100,
@@ -550,6 +674,7 @@ fn it_does_not_partially_pay_or_advance_when_block_cannot_cover_frame_chunk() {
 				(
 					1,
 					PendingMintUtxo {
+						fission_id: 0,
 						utxo_id: 2,
 						account_id: 2,
 						remaining_amount: 100,
@@ -579,9 +704,9 @@ fn it_does_not_partially_pay_or_advance_when_block_cannot_cover_frame_chunk() {
 fn it_does_not_backfill_the_frame_payout_window() {
 	new_test_ext().execute_with(|| {
 		assert_ok!(Balances::mint_into(&1, ExistentialDeposit::get()));
-		assert_ok!(Mint::utxo_locked(1, &1, 1));
-		assert_ok!(Mint::utxo_locked(2, &2, 100));
-		assert_ok!(Mint::utxo_locked(3, &3, 100));
+		assert_ok!(Mint::request_mint(&1, 0, 1, 1));
+		assert_ok!(Mint::request_mint(&2, 0, 2, 100));
+		assert_ok!(Mint::request_mint(&3, 0, 3, 100));
 		MaxPendingMintPayoutWindowSize::set(2);
 
 		MintedMiningMicrogons::<Test>::set(21);
@@ -604,8 +729,8 @@ fn it_does_not_backfill_the_frame_payout_window() {
 #[test]
 fn it_tracks_multiple_pending_mints_for_the_same_utxo() {
 	new_test_ext().execute_with(|| {
-		assert_ok!(Mint::utxo_locked(1, &1, 100));
-		assert_ok!(Mint::utxo_locked(1, &1, 50));
+		assert_ok!(Mint::request_mint(&1, 0, 1, 100));
+		assert_ok!(Mint::request_mint(&1, 0, 1, 50));
 
 		assert_eq!(PendingMintUtxoIdLookup::<Test>::get(1).to_vec(), vec![0, 1]);
 		assert_eq!(
@@ -614,6 +739,7 @@ fn it_tracks_multiple_pending_mints_for_the_same_utxo() {
 				(
 					0,
 					PendingMintUtxo {
+						fission_id: 0,
 						utxo_id: 1,
 						account_id: 1,
 						remaining_amount: 100,
@@ -623,6 +749,7 @@ fn it_tracks_multiple_pending_mints_for_the_same_utxo() {
 				(
 					1,
 					PendingMintUtxo {
+						fission_id: 0,
 						utxo_id: 1,
 						account_id: 1,
 						remaining_amount: 50,
@@ -631,25 +758,19 @@ fn it_tracks_multiple_pending_mints_for_the_same_utxo() {
 				),
 			]
 		);
-
-		assert_ok!(Mint::utxo_released(1, &1, true, 0, 100));
-		assert!(PendingMintUtxoIdLookup::<Test>::get(1).is_empty());
-		assert!(pending_mints().is_empty());
-		let queue_cursor = PendingMintQueueState::<Test>::get();
-		assert_eq!(queue_cursor.payout_start_index, 0);
-		assert_eq!(queue_cursor.payout_cursor_index, 0);
 	});
 }
 
 #[test]
-fn it_advances_payout_start_when_loop_reaches_released_front_entry() {
+fn it_advances_payout_start_when_loop_reaches_a_missing_front_entry() {
 	new_test_ext().execute_with(|| {
-		assert_ok!(Mint::utxo_locked(1, &1, 100));
-		assert_ok!(Mint::utxo_locked(2, &2, 100));
-		assert_ok!(Mint::utxo_locked(3, &3, 100));
+		assert_ok!(Mint::request_mint(&1, 0, 1, 100));
+		assert_ok!(Mint::request_mint(&2, 0, 2, 100));
+		assert_ok!(Mint::request_mint(&3, 0, 3, 100));
 		MaxPendingMintPayoutWindowSize::set(2);
 
-		assert_ok!(Mint::utxo_released(1, &1, true, 0, 100));
+		PendingMintUtxosByIndex::<Test>::remove(0);
+		PendingMintUtxoIdLookup::<Test>::remove(1);
 		let queue_cursor = PendingMintQueueState::<Test>::get();
 		assert_eq!(queue_cursor.payout_start_index, 0);
 		assert_eq!(queue_cursor.payout_cursor_index, 0);
@@ -675,9 +796,9 @@ fn it_limits_pending_mints_per_utxo() {
 	new_test_ext().execute_with(|| {
 		MaxPendingMintsPerUtxo::set(2);
 
-		assert_ok!(Mint::utxo_locked(1, &1, 100));
-		assert_ok!(Mint::utxo_locked(1, &1, 50));
-		assert_noop!(Mint::utxo_locked(1, &1, 25), Error::<Test>::TooManyPendingMints);
+		assert_ok!(Mint::request_mint(&1, 0, 1, 100));
+		assert_ok!(Mint::request_mint(&1, 0, 1, 50));
+		assert_noop!(Mint::request_mint(&1, 0, 1, 25), Error::<Test>::TooManyPendingMints);
 
 		MaxPendingMintsPerUtxo::set(50);
 	});
@@ -686,47 +807,10 @@ fn it_limits_pending_mints_per_utxo() {
 #[test]
 fn it_ignores_zero_amount_pending_mints() {
 	new_test_ext().execute_with(|| {
-		assert_ok!(Mint::utxo_locked(1, &1, 0));
+		assert_ok!(Mint::request_mint(&1, 0, 1, 0));
 
 		assert!(pending_mints().is_empty());
 		assert!(PendingMintUtxoIdLookup::<Test>::get(1).is_empty());
 		assert_eq!(NextPendingMintUtxoIndex::<Test>::get(), 0);
-	});
-}
-
-#[test]
-fn it_decrements_unlocked_bitcoins() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-		MintedBitcoinMicrogons::<Test>::set(100);
-
-		assert_ok!(Mint::utxo_released(1, &1, true, 50, 50));
-		assert_eq!(MintedBitcoinMicrogons::<Test>::get(), 50);
-
-		assert_ok!(Mint::utxo_locked(1, &1, 10));
-
-		assert_ok!(Mint::utxo_released(1, &1, false, 10, 10));
-
-		assert_eq!(MintedBitcoinMicrogons::<Test>::get(), 40);
-		// Releasing without removing pending mints should keep the queue entry in place.
-		assert_eq!(
-			pending_mints(),
-			vec![(
-				0,
-				PendingMintUtxo {
-					utxo_id: 1,
-					account_id: 1,
-					remaining_amount: 10,
-					max_amount_per_frame: 1,
-				},
-			)]
-		);
-
-		assert_ok!(Mint::utxo_released(1, &1, true, 40, 40));
-		assert_eq!(MintedBitcoinMicrogons::<Test>::get(), 0);
-		assert!(pending_mints().is_empty());
-		let queue_cursor = PendingMintQueueState::<Test>::get();
-		assert_eq!(queue_cursor.payout_start_index, 0);
-		assert_eq!(queue_cursor.payout_cursor_index, 0);
 	});
 }
