@@ -459,6 +459,7 @@ impl NotebookTickChecker {
 		block_tick: Tick,
 		ticker: &Ticker,
 		miner_nonce_score: Option<(U256, Permill)>,
+		active_miner_count: u32,
 	) -> Option<Instant> {
 		let (_, percentile) = miner_nonce_score?;
 		if block_tick == ticker.current() {
@@ -466,7 +467,8 @@ impl NotebookTickChecker {
 			let duration_to_next_tick = ticker.duration_to_next_tick();
 			let duration_per_tick = Duration::from_millis(ticker.tick_duration_millis);
 			let elapsed = duration_per_tick.saturating_sub(duration_to_next_tick);
-			let target_offset = Self::percentile_tick_offset(duration_per_tick, percentile);
+			let target_offset =
+				Self::percentile_tick_offset(duration_per_tick, percentile, active_miner_count);
 			if let Some(remaining_delay) =
 				Self::remaining_delay_for_target_offset(target_offset, elapsed)
 			{
@@ -511,11 +513,18 @@ impl NotebookTickChecker {
 		}
 	}
 
-	fn percentile_tick_offset(duration_per_tick: Duration, percentile: Permill) -> Duration {
-		let millis_u128 = duration_per_tick.as_millis();
-		let millis_u64 = millis_u128.min(u64::MAX as u128) as u64;
-		let millis_offset = percentile.mul_floor(millis_u64);
-		Duration::from_millis(millis_offset)
+	fn percentile_tick_offset(
+		duration_per_tick: Duration,
+		percentile: Permill,
+		active_miner_count: u32,
+	) -> Duration {
+		let fallback_rank = percentile.mul_ceil(active_miner_count) as f64;
+		let remaining_tick = (11f64 / 12f64).powf(fallback_rank);
+		let tick_millis = duration_per_tick.as_millis() as f64;
+		let offset_millis = ((1f64 - remaining_tick) * tick_millis) as u64;
+		let offset = Duration::from_millis(offset_millis);
+		let max_offset = duration_per_tick.saturating_sub(Duration::from_millis(1));
+		offset.min(max_offset)
 	}
 }
 
@@ -572,55 +581,79 @@ mod test {
 	}
 
 	#[test]
-	fn test_notebook_tick_checker_remaining_delay_for_percentile() {
-		let tick_duration = Duration::from_secs(2);
-
+	fn test_notebook_tick_checker_remaining_delay_for_target_offset() {
 		assert_eq!(
 			NotebookTickChecker::remaining_delay_for_target_offset(
-				NotebookTickChecker::percentile_tick_offset(
-					tick_duration,
-					Permill::from_percent(50),
-				),
+				Duration::from_secs(1),
 				Duration::ZERO,
 			),
 			Some(Duration::from_secs(1))
 		);
 		assert_eq!(
 			NotebookTickChecker::remaining_delay_for_target_offset(
-				NotebookTickChecker::percentile_tick_offset(
-					tick_duration,
-					Permill::from_percent(50),
-				),
+				Duration::from_secs(1),
 				Duration::from_millis(500),
 			),
 			Some(Duration::from_millis(500))
 		);
 		assert_eq!(
 			NotebookTickChecker::remaining_delay_for_target_offset(
-				NotebookTickChecker::percentile_tick_offset(
-					tick_duration,
-					Permill::from_percent(75),
-				),
+				Duration::from_millis(1500),
 				Duration::from_secs(1),
 			),
 			Some(Duration::from_millis(500))
 		);
 		assert_eq!(
 			NotebookTickChecker::remaining_delay_for_target_offset(
-				NotebookTickChecker::percentile_tick_offset(
-					tick_duration,
-					Permill::from_percent(50),
-				),
+				Duration::from_secs(1),
 				Duration::from_millis(1500),
 			),
 			None
 		);
 		assert_eq!(
 			NotebookTickChecker::remaining_delay_for_target_offset(
-				NotebookTickChecker::percentile_tick_offset(tick_duration, Permill::zero(),),
+				Duration::ZERO,
 				Duration::from_millis(250),
 			),
 			None
+		);
+	}
+
+	#[test]
+	fn delays_early_vote_fallbacks_for_propagation() {
+		let tick_duration = Duration::from_secs(60);
+
+		assert_eq!(
+			NotebookTickChecker::percentile_tick_offset(
+				tick_duration,
+				Permill::from_rational(1u32, 1_440u32),
+				1_440,
+			),
+			Duration::from_secs(5)
+		);
+		assert_eq!(
+			NotebookTickChecker::percentile_tick_offset(
+				tick_duration,
+				Permill::from_rational(2u32, 1_440u32),
+				1_440,
+			),
+			Duration::from_millis(9_583)
+		);
+		assert_eq!(
+			NotebookTickChecker::percentile_tick_offset(
+				tick_duration,
+				Permill::from_rational(3u32, 1_440u32),
+				1_440,
+			),
+			Duration::from_millis(13_784)
+		);
+		assert_eq!(
+			NotebookTickChecker::percentile_tick_offset(
+				Duration::from_secs(2),
+				Permill::from_rational(1u32, 2u32),
+				2,
+			),
+			Duration::from_millis(166)
 		);
 	}
 }

@@ -156,6 +156,9 @@ macro_rules! inject_common_apis {
             fn get_block_payouts() -> Vec<BlockPayout<AccountId, Balance>> {
                 BlockRewards::block_payouts()
             }
+            fn active_miner_count() -> u32 {
+                MiningSlot::authority_count()
+            }
         }
 
         impl argon_primitives::BlockSealApis<Block, AccountId, BlockSealAuthorityId> for Runtime {
