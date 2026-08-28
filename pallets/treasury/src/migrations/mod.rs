@@ -55,6 +55,7 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for AddVaultBondEarningsEligibility<T>
 					flexible_bonds_eligible: vault.flexible_bonds_eligible,
 					flexible_prorata: vault.flexible_prorata,
 					eligible_bonds: vault.eligible_bonds,
+					argon_securitization: T::Balance::zero(),
 					argonot_securitization: T::Balance::zero(),
 					argonots_for_max_earnings: T::Balance::zero(),
 					bond_earnings_eligibility: FixedU128::one(),
@@ -83,10 +84,8 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for AddVaultBondEarningsEligibility<T>
 					TryRuntimeError::Other("treasury frame capital was not preserved"),
 				);
 				ensure!(
-					frame
-						.vaults
-						.values()
-						.all(|vault| vault.bond_earnings_eligibility == FixedU128::one()),
+					frame.vaults.values().all(|vault| vault.argon_securitization.is_zero() &&
+						vault.bond_earnings_eligibility == FixedU128::one()),
 					TryRuntimeError::Other("legacy vault earnings did not retain full eligibility"),
 				);
 			},
@@ -146,6 +145,7 @@ mod tests {
 			assert_eq!(vault.flexible_bonds_eligible, 2);
 			assert_eq!(vault.flexible_prorata, FixedU128::from_rational(1, 2));
 			assert_eq!(vault.eligible_bonds, 4);
+			assert_eq!(vault.argon_securitization, 0);
 			assert_eq!(vault.bond_earnings_eligibility, FixedU128::one());
 			assert_eq!(StorageVersion::get::<Pallet<Test>>(), 8);
 		});

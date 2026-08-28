@@ -438,6 +438,7 @@ impl pallet_treasury::Config for Runtime {
 	type MaxActiveArgonotBondLots = MaxActiveArgonotBondLots;
 	type MaxArgonotBondedPercentOfCirculation = MaxArgonotBondedPercentOfCirculation;
 	type InitialVaultBondEarningsGuaranteePercent = InitialVaultBondEarningsGuaranteePercent;
+	type InitialVaultBondEarningsMaximumPerFrameRate = InitialVaultBondEarningsMaximumPerFrameRate;
 	type PalletId = TreasuryInternalPalletId;
 	type MiningBidPoolAccount = TreasuryMiningBidPoolAccount;
 	type TreasuryReservesAccount = TreasuryReservesAccount;

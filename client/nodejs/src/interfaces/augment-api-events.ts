@@ -21,7 +21,7 @@ import type {
   u64,
 } from '@polkadot/types-codec';
 import type { ITuple } from '@polkadot/types-codec/types';
-import type { AccountId32, H160, H256, Percent } from '@polkadot/types/interfaces/runtime';
+import type { AccountId32, H160, H256, Perbill, Percent } from '@polkadot/types/interfaces/runtime';
 import type {
   ArgonNotaryAuditErrorVerifyError,
   ArgonPrimitivesBitcoinUtxoRef,
@@ -2103,12 +2103,12 @@ declare module '@polkadot/api-base/types/events' {
         { vaultId: u32; reservedBondSpace: u32 }
       >;
       /**
-       * The guaranteed share of vault bond earnings was updated.
+       * The vault bond earnings clamp was updated.
        **/
-      VaultBondEarningsGuaranteeUpdated: AugmentedEvent<
+      VaultBondEarningsClampUpdated: AugmentedEvent<
         ApiType,
-        [percent: Percent],
-        { percent: Percent }
+        [guaranteePercent: Option<Percent>, maximumPerFrameRate: Option<Perbill>],
+        { guaranteePercent: Option<Percent>; maximumPerFrameRate: Option<Perbill> }
       >;
     };
     txPause: {

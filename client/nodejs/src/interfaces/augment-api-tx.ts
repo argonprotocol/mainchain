@@ -30,6 +30,7 @@ import type {
   H160,
   H256,
   MultiAddress,
+  Perbill,
   Percent,
 } from '@polkadot/types/interfaces/runtime';
 import type {
@@ -2064,11 +2065,14 @@ declare module '@polkadot/api-base/types/submittable' {
         [u32, u32]
       >;
       /**
-       * Set the share of vault bond earnings guaranteed without Argonot securitization.
+       * Update the vault bond earnings clamp. A zero maximum rate disables the cap.
        **/
-      setVaultBondEarningsGuaranteePercent: AugmentedSubmittable<
-        (percent: Percent | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>,
-        [Percent]
+      setVaultBondEarningsClamp: AugmentedSubmittable<
+        (
+          guaranteePercent: Option<Percent> | null | Uint8Array | Percent | AnyNumber,
+          maximumPerFrameRate: Option<Perbill> | null | Uint8Array | Perbill | AnyNumber,
+        ) => SubmittableExtrinsic<ApiType>,
+        [Option<Percent>, Option<Perbill>]
       >;
     };
     txPause: {

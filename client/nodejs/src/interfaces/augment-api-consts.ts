@@ -8,7 +8,7 @@ import type {} from '@polkadot/api-base/types/consts';
 import type { ApiTypes, AugmentedConst } from '@polkadot/api-base/types';
 import type { u128, u16, u32, u64, u8 } from '@polkadot/types-codec';
 import type { ITuple } from '@polkadot/types-codec/types';
-import type { AccountId32, Percent } from '@polkadot/types/interfaces/runtime';
+import type { AccountId32, Perbill, Percent } from '@polkadot/types/interfaces/runtime';
 import type {
   FrameSupportPalletId,
   FrameSystemLimitsBlockLength,
@@ -591,6 +591,10 @@ declare module '@polkadot/api-base/types/consts' {
        * Initial share of a vault's bond earnings guaranteed without an Argonot commitment.
        **/
       initialVaultBondEarningsGuaranteePercent: Percent & AugmentedConst<ApiType>;
+      /**
+       * Initial per-frame rate that caps vault bond-pool earnings. A zero rate disables the cap.
+       **/
+      initialVaultBondEarningsMaximumPerFrameRate: Perbill & AugmentedConst<ApiType>;
       /**
        * The maximum number of active Argonot bond lots.
        **/

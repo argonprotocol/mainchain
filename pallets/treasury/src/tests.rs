@@ -2,16 +2,17 @@ use super::{
 	ArgonotBondLots, BondLot, BondLotById, BondLotIdsByAccount, BondLotSummary, BondLotsByVault,
 	BondProgram, BondReleaseReason, CurrentFrameArgonotBondParticipants, CurrentFrameVaultCapital,
 	HoldReason, PendingBondReleaseRetryCursor, PendingBondReleasesByFrame, TotalActiveArgonotBonds,
-	VaultBondEarningsGuaranteePercent,
+	VaultBondEarningsGuaranteePercent, VaultBondEarningsMaximumPerFrameRate,
 };
 use crate::{
 	mock::{
 		account_id_from_seed, account_pair_from_seed, insert_vault, new_test_ext, set_argons,
-		set_ownership, Balances, BidPoolAccountId, CurrentFrameId, ExistentialDeposit,
-		LastVaultProfits, MaxActiveArgonotBondLots, MaxArgonotBondedPercentOfCirculation,
-		MaxTreasuryContributors, MaxVaultsPerPool, MinimumArgonsPerContributor, Ownership,
-		RuntimeEvent, RuntimeHoldReason, RuntimeOrigin, System, Test, TestAccountId, TestVault,
-		Treasury, TreasuryExitDelayFrames, TreasuryReservesAccountId, VaultsById,
+		set_ownership, ArgonotPricePerUsd, Balances, BidPoolAccountId, CurrentFrameId,
+		ExistentialDeposit, LastVaultProfits, MaxActiveArgonotBondLots,
+		MaxArgonotBondedPercentOfCirculation, MaxTreasuryContributors, MaxVaultsPerPool,
+		MinimumArgonsPerContributor, Ownership, RuntimeEvent, RuntimeHoldReason, RuntimeOrigin,
+		System, Test, TestAccountId, TestVault, Treasury, TreasuryExitDelayFrames,
+		TreasuryReservesAccountId, VaultsById,
 	},
 	pallet::{BondLotAllocation, Bonds, Error, FrameVaultCapital, VaultCapital},
 };
@@ -25,7 +26,7 @@ use frame_support::{
 };
 use pallet_prelude::*;
 use sp_core::{blake2_256, Pair};
-use sp_runtime::{BoundedBTreeMap, DispatchError, FixedU128, Permill, TokenError};
+use sp_runtime::{BoundedBTreeMap, DispatchError, FixedU128, Perbill, Permill, TokenError};
 
 fn account_bond_lot_ids(account_id: u64) -> Vec<u64> {
 	BondLotIdsByAccount::<Test>::iter_key_prefix(account(account_id)).collect()
@@ -930,7 +931,7 @@ fn bond_payouts_use_the_frame_turn_argonot_securitization_for_every_vault_member
 }
 
 #[test]
-fn root_configured_vault_bond_earnings_guarantee_is_used_for_future_frames() {
+fn root_configured_vault_bond_earnings_clamp_preserves_omitted_settings() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		MinimumArgonsPerContributor::set(1);
@@ -945,19 +946,31 @@ fn root_configured_vault_bond_earnings_guarantee_is_used_for_future_frames() {
 		assert_ok!(Treasury::buy_bonds(origin(2), 1, 4, None));
 
 		assert_err!(
-			Treasury::set_vault_bond_earnings_guarantee_percent(
+			Treasury::set_vault_bond_earnings_clamp(
 				origin(2),
-				Percent::from_percent(100),
+				Some(Percent::from_percent(100)),
+				None,
 			),
 			DispatchError::BadOrigin
 		);
 		assert_eq!(VaultBondEarningsGuaranteePercent::<Test>::get(), Percent::from_percent(10));
 
-		assert_ok!(Treasury::set_vault_bond_earnings_guarantee_percent(
+		assert_ok!(Treasury::set_vault_bond_earnings_clamp(
 			RuntimeOrigin::root(),
-			Percent::from_percent(100),
+			Some(Percent::from_percent(100)),
+			None,
 		));
 		assert_eq!(VaultBondEarningsGuaranteePercent::<Test>::get(), Percent::from_percent(100));
+		assert_eq!(VaultBondEarningsMaximumPerFrameRate::<Test>::get(), Perbill::zero());
+		assert!(System::events().iter().any(|record| {
+			matches!(
+				&record.event,
+				RuntimeEvent::Treasury(crate::Event::VaultBondEarningsClampUpdated {
+					guarantee_percent: Some(percent),
+					maximum_per_frame_rate: None,
+				}) if *percent == Percent::from_percent(100)
+			)
+		}));
 
 		let bond_lot_id = account_bond_lot_ids(2)[0];
 		Treasury::lock_in_vault_capital(1);
@@ -968,6 +981,96 @@ fn root_configured_vault_bond_earnings_guarantee_is_used_for_future_frames() {
 		let bond_lot = BondLotById::<Test>::get(bond_lot_id).expect("paid bond lot");
 		assert_eq!(bond_lot.last_frame_earnings, Some(5_600_000));
 		assert_eq!(LastVaultProfits::get()[0].earnings, 70 * MICROGONS_PER_ARGON);
+
+		assert_ok!(Treasury::set_vault_bond_earnings_clamp(
+			RuntimeOrigin::root(),
+			None,
+			Some(Perbill::from_percent(1)),
+		));
+		assert_eq!(VaultBondEarningsGuaranteePercent::<Test>::get(), Percent::from_percent(100));
+		assert_eq!(VaultBondEarningsMaximumPerFrameRate::<Test>::get(), Perbill::from_percent(1));
+	});
+}
+
+#[test]
+fn vault_bond_earnings_cap_applies_before_argonot_eligibility() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		MinimumArgonsPerContributor::set(1);
+		CurrentFrameId::set(1);
+		ArgonotPricePerUsd::set(Some(FixedU128::from_float(2.00)));
+
+		let mut vault =
+			test_vault(10, (10 * MICROGONS_PER_ARGON) as u64, Permill::from_percent(20));
+		vault.securitization = 10 * MICROGONS_PER_ARGON;
+		vault.committed_argonots = 20 * MICROGONS_PER_ARGON;
+		insert_vault(1, vault);
+		set_ownership(10, 100 * MICROGONS_PER_ARGON);
+		set_argons(2, 50 * MICROGONS_PER_ARGON);
+		assert_ok!(Treasury::buy_bonds(origin(2), 1, 4, None));
+
+		assert_err!(
+			Treasury::set_vault_bond_earnings_clamp(
+				origin(2),
+				Some(Percent::from_percent(10)),
+				Some(Perbill::from_percent(10)),
+			),
+			DispatchError::BadOrigin
+		);
+		assert_ok!(Treasury::set_vault_bond_earnings_clamp(
+			RuntimeOrigin::root(),
+			Some(Percent::from_percent(10)),
+			Some(Perbill::from_percent(10)),
+		));
+		assert_eq!(VaultBondEarningsMaximumPerFrameRate::<Test>::get(), Perbill::from_percent(10));
+
+		Treasury::lock_in_vault_capital(1);
+		VaultsById::mutate(|vaults| {
+			let vault = vaults.get_mut(&1).expect("vault exists");
+			vault.securitization = 0;
+			vault.committed_argonots = 0;
+		});
+		assert_ok!(Balances::mint_into(&BidPoolAccountId::get(), 100 * MICROGONS_PER_ARGON));
+		Treasury::distribute_bid_pool(1);
+
+		let frame_earnings = &LastVaultProfits::get()[0];
+		assert_eq!(frame_earnings.earnings, 2_970_000);
+		assert_eq!(frame_earnings.treasury_unrealized_earnings, 2_430_000);
+	});
+}
+
+#[test]
+fn vault_bond_earnings_cap_excludes_unpriced_argonots() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		MinimumArgonsPerContributor::set(1);
+		CurrentFrameId::set(1);
+
+		let mut vault =
+			test_vault(10, (10 * MICROGONS_PER_ARGON) as u64, Permill::from_percent(20));
+		vault.securitization = 10 * MICROGONS_PER_ARGON;
+		vault.committed_argonots = 20 * MICROGONS_PER_ARGON;
+		insert_vault(1, vault);
+		set_ownership(10, 100 * MICROGONS_PER_ARGON);
+		set_argons(2, 50 * MICROGONS_PER_ARGON);
+		assert_ok!(Treasury::buy_bonds(origin(2), 1, 4, None));
+		assert_ok!(Treasury::set_vault_bond_earnings_clamp(
+			RuntimeOrigin::root(),
+			Some(Percent::from_percent(10)),
+			Some(Perbill::from_percent(10)),
+		));
+
+		Treasury::lock_in_vault_capital(1);
+		// Runtime frames normally carry the last Argonot average forward. `None` here represents
+		// no price ever being recorded: the 20 Argonots add no capital, but the 10 Argons and four
+		// eligible bonds still produce a 1.4-Argon cap.
+		ArgonotPricePerUsd::set(None);
+		assert_ok!(Balances::mint_into(&BidPoolAccountId::get(), 100 * MICROGONS_PER_ARGON));
+		Treasury::distribute_bid_pool(1);
+
+		let frame_earnings = &LastVaultProfits::get()[0];
+		assert_eq!(frame_earnings.earnings, 770_000);
+		assert_eq!(frame_earnings.treasury_unrealized_earnings, 630_000);
 	});
 }
 
@@ -1465,6 +1568,7 @@ fn failed_bond_lot_payout_is_not_recorded_as_earned() {
 					flexible_bonds_eligible: 0,
 					flexible_prorata: FixedU128::zero(),
 					eligible_bonds: 1,
+					argon_securitization: 0,
 					argonot_securitization: 0,
 					argonots_for_max_earnings: 0,
 					bond_earnings_eligibility: FixedU128::one(),

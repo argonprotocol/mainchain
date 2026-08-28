@@ -173,6 +173,7 @@ parameter_types! {
 	pub const PercentForArgonotBondPool: Percent = Percent::from_percent(10);
 	pub static MaxArgonotBondedPercentOfCirculation: Percent = Percent::from_percent(40);
 	pub const InitialVaultBondEarningsGuaranteePercent: Percent = Percent::from_percent(10);
+	pub const InitialVaultBondEarningsMaximumPerFrameRate: Perbill = Perbill::zero();
 	pub static CurrentFrameId: FrameId = 1;
 
 	pub static VaultsById: HashMap<VaultId, TestVault> = HashMap::new();
@@ -180,6 +181,7 @@ parameter_types! {
 	// BTC=$100 / argon=$1 makes 1 sat = 1 microgon for clean test math
 	pub static BitcoinPricePerUsd: Option<FixedU128> = Some(FixedU128::from_float(100.00));
 	pub static ArgonPricePerUsd: Option<FixedU128> = Some(FixedU128::from_float(1.00));
+	pub static ArgonotPricePerUsd: Option<FixedU128> = Some(FixedU128::from_float(1.00));
 
 	pub static LastVaultProfits: Vec<VaultTreasuryFrameEarnings<Balance, TestAccountId>> = vec![];
 }
@@ -213,7 +215,7 @@ impl PriceProvider<Balance> for StaticPriceProvider {
 		ArgonPricePerUsd::get()
 	}
 	fn get_argonot_price_in_usd() -> Option<FixedU128> {
-		ArgonPricePerUsd::get()
+		ArgonotPricePerUsd::get()
 	}
 	fn get_target_argon_price_in_usd() -> Option<FixedU128> {
 		ArgonPricePerUsd::get()
@@ -308,6 +310,7 @@ impl pallet_treasury::Config for Test {
 	type MaxActiveArgonotBondLots = MaxActiveArgonotBondLots;
 	type MaxArgonotBondedPercentOfCirculation = MaxArgonotBondedPercentOfCirculation;
 	type InitialVaultBondEarningsGuaranteePercent = InitialVaultBondEarningsGuaranteePercent;
+	type InitialVaultBondEarningsMaximumPerFrameRate = InitialVaultBondEarningsMaximumPerFrameRate;
 	type PalletId = VaultPalletId;
 	type MiningBidPoolAccount = BidPoolAccountId;
 	type TreasuryReservesAccount = TreasuryReservesAccountId;

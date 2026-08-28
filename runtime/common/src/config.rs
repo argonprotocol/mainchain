@@ -105,6 +105,7 @@ parameter_types! {
 	pub const PercentForArgonotBondPool: Percent = Percent::from_percent(10);
 	pub const MaxArgonotBondedPercentOfCirculation: Percent = Percent::from_percent(40);
 	pub const InitialVaultBondEarningsGuaranteePercent: Percent = Percent::from_percent(100);
+	pub const InitialVaultBondEarningsMaximumPerFrameRate: Perbill = Perbill::zero();
 
 	// ### pallet_mining_slot
 	pub const FramesPerMiningTerm: u32 = 10;

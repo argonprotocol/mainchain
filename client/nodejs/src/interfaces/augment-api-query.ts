@@ -22,7 +22,7 @@ import type {
   u8,
 } from '@polkadot/types-codec';
 import type { AnyNumber, ITuple } from '@polkadot/types-codec/types';
-import type { AccountId32, H160, H256, Percent } from '@polkadot/types/interfaces/runtime';
+import type { AccountId32, H160, H256, Perbill, Percent } from '@polkadot/types/interfaces/runtime';
 import type {
   ArgonNotaryAuditErrorVerifyError,
   ArgonPrimitivesBalanceChangeAccountOrigin,
@@ -1879,6 +1879,10 @@ declare module '@polkadot/api-base/types/storage' {
        * Share of vault bond earnings guaranteed without Argonot securitization.
        **/
       vaultBondEarningsGuaranteePercent: AugmentedQuery<ApiType, () => Observable<Percent>, []>;
+      /**
+       * Per-frame rate that caps vault bond-pool earnings. A zero rate disables the cap.
+       **/
+      vaultBondEarningsMaximumPerFrameRate: AugmentedQuery<ApiType, () => Observable<Perbill>, []>;
     };
     txPause: {
       /**

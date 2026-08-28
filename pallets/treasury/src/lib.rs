@@ -73,7 +73,11 @@ pub use pallet::*;
 /// securitization, based on its share of the participating vaults' securitized satoshis at the
 /// frame turn. Every vault receives `VaultBondEarningsGuaranteePercent`; its Argonot securitization
 /// earns the same proportion of the remaining payout. The eligibility shortfall is included in
-/// the frame burn; Bitcoin lock fee revenue is unaffected.
+/// the frame burn along with any cap excess; Bitcoin lock fee revenue is unaffected.
+///
+/// The vault bond-pool earnings may also be limited by a root-configured per-frame rate on the
+/// participating vault Argon securitization, eligible bonds, and price-converted Argonot
+/// securitization. A zero rate disables this ceiling.
 ///
 /// The limitations on bond purchases are:
 /// - the maximum number of accepted bond lots in an active vault pool (`MaxTreasuryContributors`)
@@ -175,6 +179,10 @@ pub mod pallet {
 		/// Initial share of a vault's bond earnings guaranteed without an Argonot commitment.
 		#[pallet::constant]
 		type InitialVaultBondEarningsGuaranteePercent: Get<Percent>;
+
+		/// Initial per-frame rate that caps vault bond-pool earnings. A zero rate disables the cap.
+		#[pallet::constant]
+		type InitialVaultBondEarningsMaximumPerFrameRate: Get<Perbill>;
 
 		/// Treasury pallet id retained in metadata for account derivation.
 		#[pallet::constant]
@@ -313,6 +321,16 @@ pub mod pallet {
 	pub type VaultBondEarningsGuaranteePercent<T: Config> =
 		StorageValue<_, Percent, ValueQuery, InitialVaultBondEarningsGuaranteePercent<T>>;
 
+	#[pallet::type_value]
+	pub fn InitialVaultBondEarningsMaximumPerFrameRate<T: Config>() -> Perbill {
+		T::InitialVaultBondEarningsMaximumPerFrameRate::get()
+	}
+
+	/// Per-frame rate that caps vault bond-pool earnings. A zero rate disables the cap.
+	#[pallet::storage]
+	pub type VaultBondEarningsMaximumPerFrameRate<T: Config> =
+		StorageValue<_, Perbill, ValueQuery, InitialVaultBondEarningsMaximumPerFrameRate<T>>;
+
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
@@ -413,9 +431,10 @@ pub mod pallet {
 			burned_amount: T::Balance,
 			released_amount: T::Balance,
 		},
-		/// The guaranteed share of vault bond earnings was updated.
-		VaultBondEarningsGuaranteeUpdated {
-			percent: Percent,
+		/// The vault bond earnings clamp was updated.
+		VaultBondEarningsClampUpdated {
+			guarantee_percent: Option<Percent>,
+			maximum_per_frame_rate: Option<Perbill>,
 		},
 	}
 
@@ -828,16 +847,25 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Set the share of vault bond earnings guaranteed without Argonot securitization.
+		/// Update the vault bond earnings clamp. A zero maximum rate disables the cap.
 		#[pallet::call_index(9)]
-		#[pallet::weight(T::DbWeight::get().writes(1))]
-		pub fn set_vault_bond_earnings_guarantee_percent(
+		#[pallet::weight(T::DbWeight::get().writes(2))]
+		pub fn set_vault_bond_earnings_clamp(
 			origin: OriginFor<T>,
-			percent: Percent,
+			guarantee_percent: Option<Percent>,
+			maximum_per_frame_rate: Option<Perbill>,
 		) -> DispatchResult {
 			ensure_root(origin)?;
-			VaultBondEarningsGuaranteePercent::<T>::put(percent);
-			Self::deposit_event(Event::VaultBondEarningsGuaranteeUpdated { percent });
+			if let Some(percent) = guarantee_percent {
+				VaultBondEarningsGuaranteePercent::<T>::put(percent);
+			}
+			if let Some(rate) = maximum_per_frame_rate {
+				VaultBondEarningsMaximumPerFrameRate::<T>::put(rate);
+			}
+			Self::deposit_event(Event::VaultBondEarningsClampUpdated {
+				guarantee_percent,
+				maximum_per_frame_rate,
+			});
 			Ok(())
 		}
 	}
@@ -978,14 +1006,17 @@ pub mod pallet {
 
 			let total_argonot_bond_pool =
 				T::PercentForArgonotBondPool::get().mul_floor(full_bid_pool_amount);
-			let (vault_bid_pool_amount, argonot_bond_pool_distributed, argonot_bond_pool_unclaimed) =
-				Self::distribute_argonot_bond_pool(
-					frame_id,
-					&bid_pool_account,
-					total_bid_pool_amount,
-					total_argonot_bond_pool,
-					argonot_participants,
-				);
+			let (
+				uncapped_vault_bid_pool_amount,
+				argonot_bond_pool_distributed,
+				argonot_bond_pool_unclaimed,
+			) = Self::distribute_argonot_bond_pool(
+				frame_id,
+				&bid_pool_account,
+				total_bid_pool_amount,
+				total_argonot_bond_pool,
+				argonot_participants,
+			);
 			let frame_capital = frame_capital
 				.unwrap_or(FrameVaultCapital { frame_id, vaults: BoundedBTreeMap::new() });
 
@@ -994,6 +1025,34 @@ pub mod pallet {
 				.vaults
 				.values()
 				.fold(0u128, |acc, vault| acc.saturating_add(vault.eligible_bonds.into()));
+			let vault_bond_earnings_maximum_per_frame_rate =
+				VaultBondEarningsMaximumPerFrameRate::<T>::get();
+			let vault_bid_pool_amount = if vault_bond_earnings_maximum_per_frame_rate.is_zero() {
+				uncapped_vault_bid_pool_amount
+			} else {
+				// The runtime price index carries the last known average into frames without
+				// samples. If no average has ever been recorded, unpriced Argonots contribute
+				// zero while the vault's Argon securitization and eligible bonds remain subject
+				// to the cap.
+				let microgons_per_argonot =
+					T::PriceProvider::get_average_microgons_per_argonot(frame_id)
+						.unwrap_or_default();
+				let total_locked_capital =
+					frame_capital.vaults.values().fold(T::Balance::zero(), |total, vault| {
+						total
+							.saturating_add(vault.argon_securitization)
+							.saturating_add(Self::bonds_to_balance(vault.eligible_bonds))
+							.saturating_add(
+								FixedU128::saturating_from_rational(
+									vault.argonot_securitization.into(),
+									MICROGONS_PER_ARGON,
+								)
+								.saturating_mul_int(microgons_per_argonot),
+							)
+					});
+				uncapped_vault_bid_pool_amount
+					.min(vault_bond_earnings_maximum_per_frame_rate.mul_floor(total_locked_capital))
+			};
 
 			for (vault_id, vault_capital) in frame_capital.vaults.iter() {
 				if frame_total_eligible_bonds.is_zero() {
@@ -1006,11 +1065,11 @@ pub mod pallet {
 					continue;
 				};
 
-				let potential_vault_earnings = Perbill::from_rational(
+				let vault_pool_prorata = Perbill::from_rational(
 					vault_capital.eligible_bonds.into(),
 					frame_total_eligible_bonds,
-				)
-				.mul_floor(vault_bid_pool_amount);
+				);
+				let potential_vault_earnings = vault_pool_prorata.mul_floor(vault_bid_pool_amount);
 				let gross_vault_earnings = vault_capital
 					.bond_earnings_eligibility
 					.saturating_mul_int(potential_vault_earnings);
@@ -1151,8 +1210,12 @@ pub mod pallet {
 				}
 
 				let regular_bonds = vault_bonds.regular_bonds();
-				let bond_capacity =
-					Self::balance_to_bonds(Self::get_vault_securitized_funds_cap(vault_id));
+				let (argon_securitization, eligible_satoshis) =
+					T::TreasuryVaultProvider::get_eligible_capacity(vault_id);
+				let bond_capacity = Self::balance_to_bonds(
+					T::PriceProvider::get_btc_price_in_market_microgons(eligible_satoshis)
+						.unwrap_or_default(),
+				);
 				if bond_capacity.is_zero() {
 					continue;
 				}
@@ -1187,6 +1250,7 @@ pub mod pallet {
 						flexible_bonds_eligible,
 						flexible_prorata,
 						eligible_bonds,
+						argon_securitization,
 						argonot_securitization: T::Balance::zero(),
 						argonots_for_max_earnings: T::Balance::zero(),
 						bond_earnings_eligibility: baseline_earnings_eligibility,
@@ -2024,6 +2088,9 @@ pub mod pallet {
 		/// `min(activated Bitcoin security, bonds in lots + flexible bonds)`.
 		#[codec(compact)]
 		pub eligible_bonds: Bonds,
+		/// Full Argon securitization in this vault at the frame turn.
+		#[codec(compact)]
+		pub argon_securitization: T::Balance,
 		/// Argonot securitization in this vault at the frame turn.
 		#[codec(compact)]
 		pub argonot_securitization: T::Balance,
