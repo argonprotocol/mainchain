@@ -16,6 +16,7 @@ use argon_primitives::{
 	BitcoinUtxoEvents, PriceProvider,
 };
 use frame_benchmarking::v2::*;
+use frame_support::dispatch::CheckIfFeeless;
 use pallet_prelude::benchmarking::{
 	benchmark_bitcoin_utxo_tracker_state, benchmark_bitcoin_vault_provider_state,
 	reset_benchmark_bitcoin_locks_runtime_state, reset_benchmark_bitcoin_utxo_tracker_state,
@@ -42,6 +43,30 @@ mod benchmarks {
 	use super::*;
 	use frame_support::traits::Hooks;
 	use frame_system::RawOrigin;
+
+	#[benchmark]
+	fn provider_is_feeless() -> Result<(), BenchmarkError> {
+		reset_benchmark_environment::<T>();
+		let context = create_unfunded_lock::<T>(4)?;
+		fund_lock_with_utxos::<T>(&context, T::MaxUtxosPerLock::get(), 20_000)?;
+		LocksById::<T>::mutate(context.lock_id, |lock| {
+			let lock = lock.as_mut().expect("benchmark lock exists");
+			for height in 0..argon_primitives::vault::MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES {
+				lock.fund_hold_extensions.try_insert(height.into(), u128::MAX.into()).unwrap();
+			}
+		});
+		let call = Call::<T>::cosign_release {
+			lock_id: context.lock_id,
+			signatures: BoundedVec::default(),
+		};
+		let origin = RawOrigin::Signed(context.operator).into();
+
+		#[block]
+		{
+			assert!(core::hint::black_box(&call).is_feeless(&origin));
+		}
+		Ok(())
+	}
 
 	#[benchmark]
 	fn provider_account_position() -> Result<(), BenchmarkError> {

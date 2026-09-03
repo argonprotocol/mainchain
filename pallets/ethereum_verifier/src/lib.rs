@@ -971,6 +971,8 @@ pub mod pallet {
 	where
 		RuntimeCallOf<T>: IsSubType<Call<T>>,
 	{
+		type Weights = crate::weights::ProviderWeightAdapter<T>;
+
 		fn key_for(call: &RuntimeCallOf<T>, _signer: Option<&T::AccountId>) -> Option<Vec<u8>> {
 			let call = <RuntimeCallOf<T> as IsSubType<Call<T>>>::is_sub_type(call)?;
 
@@ -995,6 +997,8 @@ pub mod pallet {
 	where
 		RuntimeCallOf<T>: IsSubType<Call<T>>,
 	{
+		type Weights = crate::weights::ProviderWeightAdapter<T>;
+
 		fn validate(
 			call: &RuntimeCallOf<T>,
 			_signer: Option<&T::AccountId>,

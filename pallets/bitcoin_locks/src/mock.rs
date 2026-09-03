@@ -609,6 +609,8 @@ impl BitcoinVerifier<Test> for StaticBitcoinVerifier {
 
 pub struct StaticBitcoinUtxoTracker;
 impl BitcoinUtxoTracker for StaticBitcoinUtxoTracker {
+	type Weights = ();
+
 	fn get_synched_height() -> BitcoinHeight {
 		pallet_bitcoin_utxos::SynchedBitcoinBlock::<Test>::get()
 			.map(|block| block.block_height)

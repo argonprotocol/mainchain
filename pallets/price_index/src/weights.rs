@@ -1,9 +1,10 @@
-use argon_primitives::providers::PriceProviderWeightInfo;
+use argon_primitives::providers::{FeelessCallWeightInfo, PriceProviderWeightInfo};
 use core::marker::PhantomData;
 use pallet_prelude::*;
 
 /// Weight functions needed for this pallet.
 pub trait WeightInfo {
+	fn provider_is_feeless() -> Weight;
 	fn on_initialize() -> Weight;
 	fn submit() -> Weight;
 	fn set_operator() -> Weight;
@@ -14,6 +15,20 @@ pub trait WeightInfo {
 }
 
 pub struct ProviderWeightAdapter<T>(PhantomData<T>);
+impl<T: crate::Config> FeelessCallWeightInfo<T::RuntimeCall> for ProviderWeightAdapter<T>
+where
+	T::RuntimeCall: frame_support::traits::IsSubType<crate::Call<T>>,
+{
+	fn is_feeless(call: &T::RuntimeCall) -> Weight {
+		if matches!(
+			<T::RuntimeCall as frame_support::traits::IsSubType<crate::Call<T>>>::is_sub_type(call),
+			Some(crate::Call::submit { .. })
+		) {
+			return T::WeightInfo::provider_is_feeless();
+		}
+		Weight::zero()
+	}
+}
 impl<T: crate::Config> PriceProviderWeightInfo for ProviderWeightAdapter<T> {
 	fn get_lowest_microgons_per_argonot() -> Weight {
 		<T as crate::Config>::WeightInfo::provider_get_lowest_microgons_per_argonot()
@@ -34,6 +49,9 @@ impl<T: crate::Config> PriceProviderWeightInfo for ProviderWeightAdapter<T> {
 
 // For backwards compatibility and tests.
 impl WeightInfo for () {
+	fn provider_is_feeless() -> Weight {
+		Weight::zero()
+	}
 	fn on_initialize() -> Weight {
 		Weight::zero()
 	}

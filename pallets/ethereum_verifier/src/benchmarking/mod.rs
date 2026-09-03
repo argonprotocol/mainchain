@@ -25,7 +25,7 @@ use frame_benchmarking::v2::*;
 use frame_system::RawOrigin;
 use hex_literal::hex;
 use polkadot_sdk::{
-	frame_support::traits::ConstU32,
+	frame_support::{traits::ConstU32, BoundedVec},
 	sp_core::{H160, H256},
 };
 use scenarios::{
@@ -82,9 +82,66 @@ fn benchmark_finalized_header_update() -> Result<crate::types::Update, Benchmark
 	.map_err(|_| BenchmarkError::Stop("finalized header fixture exceeds verifier bounds"))
 }
 
-#[benchmarks]
+#[benchmarks(where T::RuntimeCall: From<Call<T>> + frame_support::traits::IsSubType<Call<T>>)]
 mod benchmarks {
 	use super::*;
+	use argon_primitives::{CallTxPoolKeyProvider, CallTxValidityProvider};
+
+	#[benchmark]
+	fn provider_tx_pool_key(n: Linear<0, 5_242_880>) -> Result<(), BenchmarkError> {
+		let mut update = benchmark_sync_committee_update()?;
+		let next = update.next_sync_committee_update.as_mut().expect("committee fixture");
+		let public = next.next_sync_committee.pubkeys[0];
+		next.next_sync_committee.pubkeys = BoundedVec::truncate_from(vec![public; 512]);
+		next.next_sync_committee_branch = BoundedVec::truncate_from(vec![H256::repeat_byte(1); 32]);
+		update.finality_branch = BoundedVec::truncate_from(vec![H256::repeat_byte(2); 32]);
+		update.execution_header_proof.execution_branch =
+			BoundedVec::truncate_from(vec![H256::repeat_byte(3); 32]);
+		match &mut update.execution_header_proof.execution_header {
+			snowbridge_beacon_primitives::VersionedExecutionPayloadHeader::Capella(header) => {
+				header.extra_data = vec![0xff; n as usize];
+			},
+			snowbridge_beacon_primitives::VersionedExecutionPayloadHeader::Deneb(header) => {
+				header.extra_data = vec![0xff; n as usize];
+			},
+		}
+		let call = T::RuntimeCall::from(Call::<T>::submit { update: Box::new(update) });
+
+		#[block]
+		{
+			let key = <Pallet<T> as CallTxPoolKeyProvider<T::RuntimeCall, T::AccountId>>::key_for(
+				core::hint::black_box(&call),
+				None,
+			)
+			.expect("submit has a pool key");
+			assert_eq!(key.len(), 32);
+		}
+		Ok(())
+	}
+
+	#[benchmark]
+	fn provider_validate_transaction() -> Result<(), BenchmarkError> {
+		let update = benchmark_sync_committee_update()?;
+		let root = H256::repeat_byte(1);
+		LatestFinalizedBlockRoot::<T>::put(root);
+		FinalizedBeaconState::<T>::insert(
+			root,
+			crate::types::FinalizedBeaconHeaderState { slot: 0 },
+		);
+		BeaconPreset::<T>::put(argon_primitives::EthereumBeaconPreset::Mainnet);
+		NextSyncCommittee::<T>::put(crate::types::SyncCommitteePrepared::default());
+		let call = T::RuntimeCall::from(Call::<T>::submit { update: Box::new(update) });
+
+		#[block]
+		{
+			<Pallet<T> as CallTxValidityProvider<T::RuntimeCall, T::AccountId>>::validate(
+				core::hint::black_box(&call),
+				None,
+			)
+			.expect("update advances the finalized slot");
+		}
+		Ok(())
+	}
 
 	#[benchmark]
 	fn force_checkpoint() -> Result<(), BenchmarkError> {

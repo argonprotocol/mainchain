@@ -1,8 +1,15 @@
-use argon_primitives::providers::{BitcoinUtxoEvents, BitcoinUtxoEventsWeightInfo};
+use argon_primitives::providers::{
+	BitcoinUtxoEvents, BitcoinUtxoEventsWeightInfo, BitcoinUtxoTrackerWeightInfo,
+	FeelessCallWeightInfo,
+};
 use pallet_prelude::*;
 
 /// Weight functions needed for pallet_bitcoin_utxos.
 pub trait WeightInfo {
+	fn provider_is_feeless() -> Weight;
+	fn provider_watch_for_utxo() -> Weight;
+	fn provider_unwatch_utxo() -> Weight;
+	fn provider_unwatch() -> Weight;
 	// Actual extrinsics
 	fn sync(spent: u32, verified: u32) -> Weight {
 		let mut weight = Self::sync_base();
@@ -40,6 +47,18 @@ where
 	Base: WeightInfo,
 	EventHandlerWeight: BitcoinUtxoEventsWeightInfo,
 {
+	fn provider_is_feeless() -> Weight {
+		Base::provider_is_feeless()
+	}
+	fn provider_watch_for_utxo() -> Weight {
+		Base::provider_watch_for_utxo()
+	}
+	fn provider_unwatch_utxo() -> Weight {
+		Base::provider_unwatch_utxo()
+	}
+	fn provider_unwatch() -> Weight {
+		Base::provider_unwatch()
+	}
 	fn on_initialize_base() -> Weight {
 		Base::on_initialize_base()
 	}
@@ -66,8 +85,50 @@ where
 	}
 }
 
+pub struct ProviderWeightAdapter<T>(PhantomData<T>);
+impl<T: crate::Config> BitcoinUtxoTrackerWeightInfo for ProviderWeightAdapter<T> {
+	fn watch_for_utxo() -> Weight {
+		T::WeightInfo::provider_watch_for_utxo()
+	}
+
+	fn unwatch_utxo() -> Weight {
+		T::WeightInfo::provider_unwatch_utxo()
+	}
+
+	fn unwatch() -> Weight {
+		T::WeightInfo::provider_unwatch()
+	}
+}
+
+impl<T: crate::Config> FeelessCallWeightInfo<T::RuntimeCall> for ProviderWeightAdapter<T>
+where
+	T::RuntimeCall: frame_support::traits::IsSubType<crate::Call<T>>,
+{
+	fn is_feeless(call: &T::RuntimeCall) -> Weight {
+		if matches!(
+			<T::RuntimeCall as frame_support::traits::IsSubType<crate::Call<T>>>::is_sub_type(call),
+			Some(crate::Call::set_confirmed_block { .. })
+		) {
+			return T::WeightInfo::provider_is_feeless();
+		}
+		Weight::zero()
+	}
+}
+
 // For backwards compatibility and tests.
 impl WeightInfo for () {
+	fn provider_watch_for_utxo() -> Weight {
+		Weight::zero()
+	}
+	fn provider_unwatch_utxo() -> Weight {
+		Weight::zero()
+	}
+	fn provider_unwatch() -> Weight {
+		Weight::zero()
+	}
+	fn provider_is_feeless() -> Weight {
+		Weight::zero()
+	}
 	fn on_initialize_base() -> Weight {
 		Weight::zero()
 	}

@@ -41,6 +41,8 @@ impl frame_system::Config for Test {
 }
 
 impl pallet_fee_control::Config for Test {
+	type WeightInfo = ();
+	type FeelessCallWeights = ();
 	type TransactionSponsorProviders = DummyPallet;
 	type Balance = Balance;
 	type FeelessCallTxPoolKeyProviders = DummyPallet;
@@ -212,7 +214,7 @@ impl TransactionExtension<RuntimeCall> for MockChargePaymentExtension {
 	type Pre = pallet_transaction_payment::Pre<Test>;
 
 	fn weight(&self, _: &RuntimeCall) -> Weight {
-		Weight::zero()
+		Weight::from_parts(5, 0)
 	}
 
 	fn validate(
@@ -379,6 +381,8 @@ pub mod pallet_dummy {
 		}
 	}
 	impl<T: Config> CallTxPoolKeyProvider<RuntimeCall, u64> for Pallet<T> {
+		type Weights = ();
+
 		fn key_for(call: &RuntimeCall, _signer: Option<&u64>) -> Option<Vec<u8>> {
 			match call {
 				RuntimeCall::DummyPallet(pallet_dummy::Call::pooled { key }) =>
@@ -396,6 +400,8 @@ pub mod pallet_dummy {
 		}
 	}
 	impl<T: Config> CallTxValidityProvider<RuntimeCall, u64> for Pallet<T> {
+		type Weights = ();
+
 		fn validate(
 			call: &RuntimeCall,
 			_signer: Option<&u64>,
@@ -483,6 +489,8 @@ pub mod pallet_dummy {
 		}
 	}
 	impl<T: Config> CallFeeRefundProvider<RuntimeCall> for Pallet<T> {
+		type Weights = ();
+
 		fn refund_fee_on_success(call: &RuntimeCall) -> bool {
 			matches!(
 				call,

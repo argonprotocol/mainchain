@@ -28,9 +28,16 @@
 #![allow(unused_parens)]
 #![allow(unused_imports)]
 
-use argon_primitives::EthereumVerifyProviderWeightInfo;
+use argon_primitives::{
+	CallTxPoolKeyProviderWeightInfo, CallTxValidityProviderWeightInfo,
+	EthereumVerifyProviderWeightInfo,
+};
+use codec::Encode;
 use core::marker::PhantomData;
-use polkadot_sdk::frame_support::{traits::Get, weights::{Weight, constants::RocksDbWeight}};
+use polkadot_sdk::{
+	frame_support::{self, traits::Get, weights::{Weight, constants::RocksDbWeight}},
+	frame_system,
+};
 
 /// Weight functions needed for ethereum_beacon_client.
 pub trait WeightInfo {
@@ -41,10 +48,20 @@ pub trait WeightInfo {
 	fn provider_verify_receipt_logs(proof_blocks: u32, extra_activities: u32) -> Weight;
 	fn provider_latest_execution_block_number() -> Weight;
 	fn provider_latest_execution_block_timestamp() -> Weight;
+	fn provider_tx_pool_key(bytes: u32) -> Weight;
+	fn provider_validate_transaction() -> Weight;
 }
 
 // For backwards compatibility and tests
 impl WeightInfo for () {
+	fn provider_tx_pool_key(_bytes: u32) -> Weight {
+		Weight::zero()
+	}
+
+	fn provider_validate_transaction() -> Weight {
+		Weight::zero()
+	}
+
 	fn force_checkpoint() -> Weight {
 		Weight::from_parts(97_263_571_000_u64, 0)
 			.saturating_add(Weight::from_parts(0, 3501))
@@ -85,6 +102,47 @@ impl WeightInfo for () {
 }
 
 pub struct ProviderWeightAdapter<T>(PhantomData<T>);
+
+impl<T: super::Config>
+	CallTxPoolKeyProviderWeightInfo<<T as frame_system::Config>::RuntimeCall>
+	for ProviderWeightAdapter<T>
+where
+	<T as frame_system::Config>::RuntimeCall:
+		frame_support::traits::IsSubType<super::Call<T>>,
+{
+	fn key_for(call: &<T as frame_system::Config>::RuntimeCall) -> Weight {
+		if let Some(super::Call::submit { update }) =
+			<<T as frame_system::Config>::RuntimeCall as frame_support::traits::IsSubType<
+				super::Call<T>,
+			>>::is_sub_type(call)
+		{
+			return T::WeightInfo::provider_tx_pool_key(update.encoded_size() as u32);
+		}
+
+		Weight::zero()
+	}
+}
+
+impl<T: super::Config>
+	CallTxValidityProviderWeightInfo<<T as frame_system::Config>::RuntimeCall>
+	for ProviderWeightAdapter<T>
+where
+	<T as frame_system::Config>::RuntimeCall:
+		frame_support::traits::IsSubType<super::Call<T>>,
+{
+	fn validate(call: &<T as frame_system::Config>::RuntimeCall) -> Weight {
+		if matches!(
+			<<T as frame_system::Config>::RuntimeCall as frame_support::traits::IsSubType<
+				super::Call<T>,
+			>>::is_sub_type(call),
+			Some(super::Call::submit { .. })
+		) {
+			return T::WeightInfo::provider_validate_transaction();
+		}
+
+		Weight::zero()
+	}
+}
 
 impl<T: super::Config> EthereumVerifyProviderWeightInfo for ProviderWeightAdapter<T> {
 	fn verify_receipt_logs(proof_blocks: u32, extra_activities: u32) -> Weight {

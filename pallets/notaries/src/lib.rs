@@ -5,6 +5,9 @@ pub use pallet::*;
 use pallet_prelude::*;
 pub use weights::*;
 
+#[cfg(feature = "runtime-benchmarks")]
+mod benchmarking;
+
 #[cfg(test)]
 mod mock;
 
@@ -185,6 +188,7 @@ pub mod pallet {
 		fn on_initialize(n: BlockNumberFor<T>) -> Weight {
 			let current_tick = T::TickProvider::current_tick();
 			let meta_changes = QueuedNotaryMetaChanges::<T>::take(current_tick);
+			let meta_change_count = meta_changes.len() as u32;
 			if !meta_changes.is_empty() {
 				let old_block_to_preserve =
 					current_tick.saturating_sub(T::MaxTicksForKeyHistory::get() as Tick);
@@ -219,7 +223,17 @@ pub mod pallet {
 					}
 				});
 			}
-			T::DbWeight::get().reads_writes(2, 1)
+			let expiring_proposal_count =
+				ExpiringProposals::<T>::decode_len(n).unwrap_or_default() as u32;
+			let initialize_weight = if meta_change_count == 0 {
+				T::WeightInfo::on_initialize_without_meta_changes()
+			} else {
+				T::WeightInfo::on_initialize_with_meta_changes(meta_change_count)
+			};
+
+			initialize_weight.saturating_add(T::WeightInfo::on_finalize_with_expiring_proposals(
+				expiring_proposal_count,
+			))
 		}
 
 		fn on_finalize(n: BlockNumberFor<T>) {
