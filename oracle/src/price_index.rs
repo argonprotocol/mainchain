@@ -338,7 +338,7 @@ async fn submit_price_index(
 	let client = reconnecting_client.get().await?;
 	let account_id = signer.account_id();
 	let nonce = client.get_account_nonce(&account_id).await?;
-	let params = MainchainClient::ext_params_builder().nonce(nonce.into()).mortal(5).build();
+	let params = MainchainClient::ext_params_builder().nonce(nonce.into()).mortal(32).build();
 	let metadata = client.live.metadata();
 	let submit_call = metadata
 		.pallet_by_name("PriceIndex")
