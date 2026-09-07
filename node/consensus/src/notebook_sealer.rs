@@ -6,9 +6,10 @@ use argon_primitives::{
 	digests::ArgonDigests,
 	fork_power::ForkPower,
 	notary::NotaryNotebookRawVotes,
+	prelude::sp_api::ApiExt,
 	tick::{Tick, Ticker},
 	BestBlockVoteSeal, BlockCreatorApis, BlockSealApis, BlockSealAuthorityId, BlockSealDigest,
-	BlockVote, TickApis, VotingSchedule,
+	BlockVote, MiningApis, TickApis, VotingSchedule,
 };
 use argon_runtime::NotebookVerifyError;
 use codec::Codec;
@@ -66,6 +67,7 @@ where
 	C: ProvideRuntimeApi<B> + HeaderBackend<B> + AuxStore + 'static,
 	C::Api: BlockSealApis<B, AC, BlockSealAuthorityId>
 		+ TickApis<B>
+		+ MiningApis<B, AC, BlockSealAuthorityId>
 		+ BlockCreatorApis<B, AC, NotebookVerifyError>,
 	SC: SelectChain<B> + 'static,
 	AC: Codec + Clone,
@@ -191,10 +193,21 @@ where
 			tracing::trace!(build_on_block = ?block_hash, strength = ?vote_seal.seal_strength, miner_nonce_score = ?vote_seal.miner_nonce_score,
 				"Found vote-eligible block");
 			let block_tick = voting_schedule.block_tick();
+			let runtime_api = self.client.runtime_api();
+			let api_version = runtime_api
+				.api_version::<dyn MiningApis<B, AC, BlockSealAuthorityId>>(block_hash)
+				.ok()
+				.flatten();
+			let active_miner_count = if api_version.is_some_and(|version| version >= 2) {
+				runtime_api.active_miner_count(block_hash)?
+			} else {
+				100
+			};
 			if let Some(recheck_at) = NotebookTickChecker::should_delay_block_attempt(
 				block_tick,
 				&self.ticker,
 				vote_seal.miner_nonce_score,
+				active_miner_count,
 			) {
 				result.recheck_notebook_tick_time = Some(recheck_at);
 				return Ok(result);

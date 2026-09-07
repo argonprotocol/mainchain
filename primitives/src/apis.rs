@@ -73,9 +73,12 @@ sp_api::decl_runtime_apis! {
 }
 
 sp_api::decl_runtime_apis! {
+	#[api_version(2)]
 	pub trait MiningApis<AccountId, BlockSealAuthorityId> where BlockSealAuthorityId: Codec + PartialEq, AccountId: Codec {
 		fn get_authority_id(account_id: &AccountId) -> Option<MiningAuthority<BlockSealAuthorityId,AccountId>>;
 		fn get_block_payouts() -> Vec<BlockPayout<AccountId, Balance>>;
+		#[api_version(2)]
+		fn active_miner_count() -> u32;
 	}
 }
 
