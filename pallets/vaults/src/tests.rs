@@ -1208,6 +1208,32 @@ fn provider_resecuritization_applies_coupon_terms() {
 }
 
 #[test]
+fn bond_earnings_snapshot_uses_all_ratio_adjusted_satoshis() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		set_argons(1, 100);
+		assert_ok!(Vaults::create(
+			RuntimeOrigin::signed(1),
+			VaultConfig { securitization: 100, ..default_vault() }
+		));
+		VaultsById::<Test>::mutate(1, |vault| {
+			let vault = vault.as_mut().expect("vault");
+			vault.securitization_locked = 200;
+			vault.flexible_securitization_locked = 100;
+			vault.ratio_adjusted_satoshis = 200;
+			vault.flexible_ratio_adjusted_satoshis = 100;
+		});
+
+		let (_, effective_securitized_satoshis) =
+			<Vaults as TreasuryVaultProvider>::get_eligible_capacity(1);
+		let earnings_snapshot = <Vaults as TreasuryVaultProvider>::get_bond_earnings_snapshot(1);
+
+		assert_eq!(effective_securitized_satoshis, 100);
+		assert_eq!(earnings_snapshot.securitized_satoshis, 200);
+	});
+}
+
+#[test]
 fn it_errors_when_releasing_more_funded_satoshis_than_the_vault_tracks() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
@@ -1843,6 +1869,9 @@ fn vaults_can_collect_revenue() {
 				capital_contributed: 100_000,
 				earnings_for_vault: vault_lp_earnings,
 				capital_contributed_by_vault: 10_000,
+				argonot_securitization: 20_000,
+				argonots_for_max_earnings: 40_000,
+				treasury_unrealized_earnings: 40_000,
 			},
 		);
 		assert_eq!(Balances::free_balance(100), 0);
@@ -1857,6 +1886,9 @@ fn vaults_can_collect_revenue() {
 		assert_eq!(vault_revenue[0].treasury_total_earnings, 50_000);
 		assert_eq!(vault_revenue[0].treasury_vault_capital, 10_000);
 		assert_eq!(vault_revenue[0].treasury_external_capital, 90_000);
+		assert_eq!(vault_revenue[0].argonot_securitization, 20_000);
+		assert_eq!(vault_revenue[0].argonots_for_max_earnings, 40_000);
+		assert_eq!(vault_revenue[0].treasury_unrealized_earnings, 40_000);
 		assert_eq!(vault_revenue[0].uncollected_revenue, fee + vault_lp_earnings);
 
 		assert!(LastCollectFrameByVaultId::<Test>::get(1).is_none());
@@ -1918,6 +1950,9 @@ fn vaults_can_collect_revenue() {
 				capital_contributed: 100_000,
 				earnings_for_vault: vault_lp_earnings,
 				capital_contributed_by_vault: 10_000,
+				argonot_securitization: 0,
+				argonots_for_max_earnings: 0,
+				treasury_unrealized_earnings: 0,
 			},
 		);
 		let vault_revenue = RevenuePerFrameByVault::<Test>::get(1).to_vec();
@@ -1966,6 +2001,9 @@ fn it_burns_uncollected_revenue() {
 					capital_contributed: 100_000,
 					earnings_for_vault: 100_000,
 					capital_contributed_by_vault: 100_000,
+					argonot_securitization: 0,
+					argonots_for_max_earnings: 0,
+					treasury_unrealized_earnings: 0,
 				},
 			);
 		}

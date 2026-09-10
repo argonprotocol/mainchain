@@ -24,7 +24,8 @@ use argon_primitives::{
 	vault::{
 		BitcoinResecuritization, BitcoinSecuritization, BitcoinVaultProvider, LockExtension,
 		LostBitcoinCompensation, RegistrationVaultData, ReserveSecuritizationRequest,
-		TreasuryVaultProvider, Vault, VaultError, VaultTreasuryFrameEarnings,
+		TreasuryVaultProvider, Vault, VaultBondEarningsSnapshot, VaultError,
+		VaultTreasuryFrameEarnings,
 	},
 	ArgonCPI, NotaryId, NotebookNumber, NotebookSecret, OperationalRewardPayout, PriceProvider,
 	VaultId, VotingSchedule,
@@ -1547,6 +1548,7 @@ where
 		+ Eq
 		+ Sum,
 {
+	type Weights = ();
 	type Balance = Balance;
 	type AccountId = AccountId;
 
@@ -1556,6 +1558,18 @@ where
 			.get(&vault_id)
 			.map(|vault| (vault.securitization, vault.ratio_adjusted_satoshis))
 			.unwrap_or_default()
+	}
+
+	fn get_bond_earnings_snapshot(vault_id: VaultId) -> VaultBondEarningsSnapshot<Self::Balance> {
+		let securitized_satoshis = benchmark_bitcoin_vault_provider_state::<AccountId, Balance>()
+			.vaults
+			.get(&vault_id)
+			.map(|vault| vault.ratio_adjusted_satoshis)
+			.unwrap_or_default();
+		VaultBondEarningsSnapshot {
+			securitized_satoshis,
+			argonot_securitization: Self::Balance::zero(),
+		}
 	}
 
 	fn get_vault_operator(vault_id: VaultId) -> Option<Self::AccountId> {

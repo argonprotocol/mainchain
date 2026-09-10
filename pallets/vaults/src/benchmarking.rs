@@ -293,6 +293,9 @@ mod benchmarks {
 					capital_contributed: earnings_for_vault,
 					earnings_for_vault,
 					capital_contributed_by_vault: earnings_for_vault,
+					argonot_securitization: T::Balance::zero(),
+					argonots_for_max_earnings: T::Balance::zero(),
+					treasury_unrealized_earnings: T::Balance::zero(),
 				},
 			);
 		}
@@ -379,6 +382,21 @@ mod benchmarks {
 				<Pallet<T> as BitcoinVaultProvider>::get_committed_argonots(&caller),
 				Some(amount),
 			);
+		}
+
+		Ok(())
+	}
+
+	#[benchmark]
+	fn provider_get_bond_earnings_snapshot() -> Result<(), BenchmarkError> {
+		let caller: T::AccountId = account("provider_bond_earnings_snapshot", 0, 0);
+		let vault_id = create_vault::<T>(&caller, 9, 100_000)?;
+
+		#[block]
+		{
+			let snapshot =
+				<Pallet<T> as TreasuryVaultProvider>::get_bond_earnings_snapshot(vault_id);
+			assert_eq!(snapshot.argonot_securitization, T::Balance::zero());
 		}
 
 		Ok(())
@@ -631,6 +649,9 @@ mod benchmarks {
 						capital_contributed: earnings_for_vault,
 						earnings_for_vault,
 						capital_contributed_by_vault: earnings_for_vault,
+						argonot_securitization: T::Balance::zero(),
+						argonots_for_max_earnings: T::Balance::zero(),
+						treasury_unrealized_earnings: T::Balance::zero(),
 					},
 				);
 			}

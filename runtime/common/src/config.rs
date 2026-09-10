@@ -104,6 +104,7 @@ parameter_types! {
 	pub const PercentForTreasuryReserves: Percent = Percent::from_percent(20);
 	pub const PercentForArgonotBondPool: Percent = Percent::from_percent(10);
 	pub const MaxArgonotBondedPercentOfCirculation: Percent = Percent::from_percent(40);
+	pub const InitialVaultBondEarningsGuaranteePercent: Percent = Percent::from_percent(100);
 
 	// ### pallet_mining_slot
 	pub const FramesPerMiningTerm: u32 = 10;

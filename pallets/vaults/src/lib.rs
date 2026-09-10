@@ -39,8 +39,8 @@ pub mod pallet {
 		vault::{
 			BitcoinResecuritization, BitcoinSecuritization, BitcoinVaultProvider, LockExtension,
 			LostBitcoinCompensation, RegistrationVaultData, ReserveSecuritizationRequest,
-			TreasuryVaultProvider, Vault, VaultArgonotCommitment, VaultError, VaultTerms,
-			VaultTreasuryFrameEarnings,
+			TreasuryVaultProvider, Vault, VaultArgonotCommitment, VaultBondEarningsSnapshot,
+			VaultError, VaultTerms, VaultTreasuryFrameEarnings,
 		},
 		CollectBlockerProvider, MiningFrameProvider, OperationalAccountProvider, TickProvider,
 	};
@@ -49,7 +49,7 @@ pub mod pallet {
 	use pallet_prelude::argon_primitives::{OnNewSlot, OperationalAccountsHook};
 	use sp_runtime::traits::SaturatedConversion;
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(17);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(18);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -1245,6 +1245,7 @@ pub mod pallet {
 	}
 
 	impl<T: Config> TreasuryVaultProvider for Pallet<T> {
+		type Weights = crate::weights::ProviderWeightAdapter<T>;
 		type Balance = T::Balance;
 		type AccountId = T::AccountId;
 
@@ -1252,6 +1253,23 @@ pub mod pallet {
 			VaultsById::<T>::get(vault_id)
 				.map(|vault| (vault.securitization, vault.effective_eligible_satoshis()))
 				.unwrap_or_default()
+		}
+
+		fn get_bond_earnings_snapshot(
+			vault_id: VaultId,
+		) -> VaultBondEarningsSnapshot<Self::Balance> {
+			let Some(vault) = VaultsById::<T>::get(vault_id) else {
+				return VaultBondEarningsSnapshot {
+					securitized_satoshis: 0,
+					argonot_securitization: T::Balance::zero(),
+				};
+			};
+			let argonot_securitization =
+				Self::argonot_commitment(vault_id, &vault.operator_account_id).committed_micronots;
+			VaultBondEarningsSnapshot {
+				securitized_satoshis: vault.ratio_adjusted_satoshis,
+				argonot_securitization,
+			}
 		}
 
 		fn get_vault_operator(vault_id: VaultId) -> Option<Self::AccountId> {
@@ -1282,11 +1300,17 @@ pub mod pallet {
 				capital_contributed,
 				capital_contributed_by_vault,
 				earnings,
+				argonot_securitization,
+				argonots_for_max_earnings,
+				treasury_unrealized_earnings,
 			} = profit;
 
 			if let Err(e) = Self::mutate_frame_revenue(vault_id, frame_id, |revenue| {
 				revenue.treasury_total_earnings = earnings;
 				revenue.treasury_vault_earnings = earnings_for_vault;
+				revenue.argonot_securitization = argonot_securitization;
+				revenue.argonots_for_max_earnings = argonots_for_max_earnings;
+				revenue.treasury_unrealized_earnings = treasury_unrealized_earnings;
 				revenue.treasury_external_capital =
 					capital_contributed.saturating_sub(capital_contributed_by_vault);
 				revenue.treasury_vault_capital = capital_contributed_by_vault;
@@ -2039,6 +2063,15 @@ pub mod pallet {
 		/// The treasury pool aggregate profit
 		#[codec(compact)]
 		pub treasury_total_earnings: T::Balance,
+		/// Argonot securitization in the vault at the frame turn.
+		#[codec(compact)]
+		pub argonot_securitization: T::Balance,
+		/// Argonots needed for this vault to realize its maximum Treasury earnings.
+		#[codec(compact)]
+		pub argonots_for_max_earnings: T::Balance,
+		/// Treasury earnings not realized because of the vault's Argonot securitization.
+		#[codec(compact)]
+		pub treasury_unrealized_earnings: T::Balance,
 		/// Vault treasury pool capital capital
 		#[codec(compact)]
 		pub treasury_vault_capital: T::Balance,
@@ -2066,6 +2099,9 @@ pub mod pallet {
 				securitization: T::Balance::zero(),
 				treasury_vault_earnings: T::Balance::zero(),
 				treasury_total_earnings: T::Balance::zero(),
+				argonot_securitization: T::Balance::zero(),
+				argonots_for_max_earnings: T::Balance::zero(),
+				treasury_unrealized_earnings: T::Balance::zero(),
 				treasury_vault_capital: T::Balance::zero(),
 				treasury_external_capital: T::Balance::zero(),
 				uncollected_revenue: T::Balance::zero(),

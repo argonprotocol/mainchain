@@ -1,5 +1,8 @@
 use super::Config;
-use argon_primitives::{OperationalAccountsHook, TreasuryPoolProviderWeightInfo};
+use argon_primitives::{
+	vault::{TreasuryVaultProvider, TreasuryVaultProviderWeightInfo},
+	OperationalAccountsHook, TreasuryPoolProviderWeightInfo,
+};
 use pallet_prelude::*;
 
 /// Weight functions needed for this pallet.
@@ -31,6 +34,12 @@ where
 {
 	fn on_frame_transition() -> Weight {
 		Base::on_frame_transition()
+			.saturating_add(
+				<T::TreasuryVaultProvider as TreasuryVaultProvider>::Weights::get_bond_earnings_snapshot()
+					.saturating_mul(T::MaxVaultsPerPool::get().into()),
+			)
+			// Total issuance is a benchmark-whitelisted storage key.
+			.saturating_add(T::DbWeight::get().reads(1))
 	}
 
 	fn release_pending_bond_lots() -> Weight {
@@ -43,6 +52,12 @@ where
 
 	fn lock_in_vault_capital() -> Weight {
 		Base::lock_in_vault_capital()
+			.saturating_add(
+				<T::TreasuryVaultProvider as TreasuryVaultProvider>::Weights::get_bond_earnings_snapshot()
+					.saturating_mul(T::MaxVaultsPerPool::get().into()),
+			)
+			// Total issuance is a benchmark-whitelisted storage key.
+			.saturating_add(T::DbWeight::get().reads(1))
 	}
 
 	fn claim_reward() -> Weight {

@@ -2,6 +2,7 @@ use super::{
 	ArgonotBondLots, BondLot, BondLotById, BondLotIdsByAccount, BondLotSummary, BondLotsByVault,
 	BondProgram, BondReleaseReason, CurrentFrameArgonotBondParticipants, CurrentFrameVaultCapital,
 	HoldReason, PendingBondReleaseRetryCursor, PendingBondReleasesByFrame, TotalActiveArgonotBonds,
+	VaultBondEarningsGuaranteePercent,
 };
 use crate::{
 	mock::{
@@ -10,7 +11,7 @@ use crate::{
 		LastVaultProfits, MaxActiveArgonotBondLots, MaxArgonotBondedPercentOfCirculation,
 		MaxTreasuryContributors, MaxVaultsPerPool, MinimumArgonsPerContributor, Ownership,
 		RuntimeEvent, RuntimeHoldReason, RuntimeOrigin, System, Test, TestAccountId, TestVault,
-		Treasury, TreasuryExitDelayFrames, TreasuryReservesAccountId,
+		Treasury, TreasuryExitDelayFrames, TreasuryReservesAccountId, VaultsById,
 	},
 	pallet::{BondLotAllocation, Bonds, Error, FrameVaultCapital, VaultCapital},
 };
@@ -24,7 +25,7 @@ use frame_support::{
 };
 use pallet_prelude::*;
 use sp_core::{blake2_256, Pair};
-use sp_runtime::{BoundedBTreeMap, FixedU128, Permill, TokenError};
+use sp_runtime::{BoundedBTreeMap, DispatchError, FixedU128, Permill, TokenError};
 
 fn account_bond_lot_ids(account_id: u64) -> Vec<u64> {
 	BondLotIdsByAccount::<Test>::iter_key_prefix(account(account_id)).collect()
@@ -47,6 +48,8 @@ fn test_vault(account_id: u64, eligible_satoshis: u64, sharing_percent: Permill)
 		account_id: account(account_id),
 		securitization: 0,
 		eligible_satoshis,
+		securitized_satoshis: eligible_satoshis,
+		committed_argonots: Balance::MAX,
 		sharing_percent,
 		delegate_account_id: None,
 		is_closed: false,
@@ -801,7 +804,7 @@ fn frame_snapshot_caps_bond_lot_payouts_after_security_drops() {
 }
 
 #[test]
-fn distribution_uses_frame_snapshot_payouts_and_refunds_underfill_to_treasury() {
+fn distribution_uses_frame_snapshot_payouts_and_burns_underfill() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		MinimumArgonsPerContributor::set(1);
@@ -842,16 +845,18 @@ fn distribution_uses_frame_snapshot_payouts_and_refunds_underfill_to_treasury() 
 					frame_id,
 					bid_pool_distributed,
 					argonot_bond_pool_distributed,
+					argonot_bond_pool_burned,
 					vault_bid_pool_distributed,
-					treasury_refunds,
 					treasury_reserves,
+					vault_bid_pool_burned,
 					participating_vaults,
 				}) if *frame_id == 1
-					&& *bid_pool_distributed == 80 * MICROGONS_PER_ARGON
+					&& *bid_pool_distributed == 70 * MICROGONS_PER_ARGON
 					&& *argonot_bond_pool_distributed == 0
-					&& *vault_bid_pool_distributed == 80 * MICROGONS_PER_ARGON
-					&& *treasury_refunds == 48 * MICROGONS_PER_ARGON
-					&& *treasury_reserves == 68 * MICROGONS_PER_ARGON
+					&& *argonot_bond_pool_burned == 10 * MICROGONS_PER_ARGON
+					&& *vault_bid_pool_distributed == 70 * MICROGONS_PER_ARGON
+					&& *treasury_reserves == 20 * MICROGONS_PER_ARGON
+					&& *vault_bid_pool_burned == 42 * MICROGONS_PER_ARGON
 					&& *participating_vaults == 1
 			)
 		}));
@@ -859,17 +864,307 @@ fn distribution_uses_frame_snapshot_payouts_and_refunds_underfill_to_treasury() 
 		let bond_lot = BondLotById::<Test>::get(bond_lot_id).expect("paid bond lot");
 		assert_eq!(bond_lot.participated_frames, 1);
 		assert_eq!(bond_lot.last_frame_earnings_frame_id, Some(1));
-		assert_eq!(bond_lot.last_frame_earnings, Some(6_400_000));
-		assert_eq!(bond_lot.cumulative_earnings, 6_400_000);
-		assert_eq!(Balances::balance(&account(2)), balance_before + 6_400_000);
-		assert_eq!(Balances::balance(&TreasuryReservesAccountId::get()), 68_000_000);
+		assert_eq!(bond_lot.last_frame_earnings, Some(5_600_000));
+		assert_eq!(bond_lot.cumulative_earnings, 5_600_000);
+		assert_eq!(Balances::balance(&account(2)), balance_before + 5_600_000);
+		assert_eq!(Balances::balance(&TreasuryReservesAccountId::get()), 20_000_000);
 
 		assert_eq!(LastVaultProfits::get().len(), 1);
 		assert_eq!(LastVaultProfits::get()[0].vault_id, 1);
-		assert_eq!(LastVaultProfits::get()[0].earnings, 80 * MICROGONS_PER_ARGON);
-		assert_eq!(LastVaultProfits::get()[0].earnings_for_vault, 25_600_000);
+		assert_eq!(LastVaultProfits::get()[0].earnings, 70 * MICROGONS_PER_ARGON);
+		assert_eq!(LastVaultProfits::get()[0].earnings_for_vault, 22_400_000);
 		assert_eq!(LastVaultProfits::get()[0].capital_contributed, 4 * MICROGONS_PER_ARGON);
 		assert_eq!(LastVaultProfits::get()[0].capital_contributed_by_vault, 0);
+	});
+}
+
+#[test]
+fn bond_payouts_use_the_frame_turn_argonot_securitization_for_every_vault_member() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		MinimumArgonsPerContributor::set(1);
+		CurrentFrameId::set(1);
+
+		let mut vault =
+			test_vault(10, (10 * MICROGONS_PER_ARGON) as u64, Permill::from_percent(20));
+		vault.committed_argonots = 20 * MICROGONS_PER_ARGON;
+		insert_vault(1, vault);
+		set_ownership(10, 100 * MICROGONS_PER_ARGON);
+		set_argons(2, 50 * MICROGONS_PER_ARGON);
+		assert_ok!(Treasury::buy_bonds(origin(2), 1, 4, None));
+
+		let bond_lot_id = account_bond_lot_ids(2)[0];
+		let balance_before = Balances::balance(&account(2));
+		Treasury::lock_in_vault_capital(1);
+		assert!(System::events().iter().any(|record| {
+			matches!(
+				&record.event,
+				RuntimeEvent::Treasury(crate::Event::FrameVaultCapitalLocked {
+					frame_id: 1,
+					argonots_for_max_earnings,
+					..
+				}) if *argonots_for_max_earnings == 40 * MICROGONS_PER_ARGON
+			)
+		}));
+		let frame_capital = CurrentFrameVaultCapital::<Test>::take().expect("frame capital");
+		CurrentFrameVaultCapital::<Test>::put(frame_capital);
+
+		VaultsById::mutate(|vaults| {
+			vaults.get_mut(&1).expect("vault").committed_argonots = 40 * MICROGONS_PER_ARGON;
+		});
+		let bid_pool_account = BidPoolAccountId::get();
+		assert_ok!(Balances::mint_into(&bid_pool_account, 100 * MICROGONS_PER_ARGON));
+
+		Treasury::distribute_bid_pool(1);
+
+		let bond_lot = BondLotById::<Test>::get(bond_lot_id).expect("paid bond lot");
+		assert_eq!(bond_lot.last_frame_earnings, Some(3_080_000));
+		assert_eq!(Balances::balance(&account(2)), balance_before + 3_080_000);
+		assert_eq!(LastVaultProfits::get()[0].earnings, 38_500_000);
+		assert_eq!(LastVaultProfits::get()[0].earnings_for_vault, 12_320_000);
+		assert_eq!(LastVaultProfits::get()[0].argonot_securitization, 20 * MICROGONS_PER_ARGON);
+		assert_eq!(LastVaultProfits::get()[0].argonots_for_max_earnings, 40 * MICROGONS_PER_ARGON);
+		assert_eq!(LastVaultProfits::get()[0].treasury_unrealized_earnings, 31_500_000);
+		assert_eq!(Balances::balance(&TreasuryReservesAccountId::get()), 20_000_000);
+	});
+}
+
+#[test]
+fn root_configured_vault_bond_earnings_guarantee_is_used_for_future_frames() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		MinimumArgonsPerContributor::set(1);
+		CurrentFrameId::set(1);
+
+		let mut vault =
+			test_vault(10, (10 * MICROGONS_PER_ARGON) as u64, Permill::from_percent(20));
+		vault.committed_argonots = 0;
+		insert_vault(1, vault);
+		set_ownership(10, 100 * MICROGONS_PER_ARGON);
+		set_argons(2, 50 * MICROGONS_PER_ARGON);
+		assert_ok!(Treasury::buy_bonds(origin(2), 1, 4, None));
+
+		assert_err!(
+			Treasury::set_vault_bond_earnings_guarantee_percent(
+				origin(2),
+				Percent::from_percent(100),
+			),
+			DispatchError::BadOrigin
+		);
+		assert_eq!(VaultBondEarningsGuaranteePercent::<Test>::get(), Percent::from_percent(10));
+
+		assert_ok!(Treasury::set_vault_bond_earnings_guarantee_percent(
+			RuntimeOrigin::root(),
+			Percent::from_percent(100),
+		));
+		assert_eq!(VaultBondEarningsGuaranteePercent::<Test>::get(), Percent::from_percent(100));
+
+		let bond_lot_id = account_bond_lot_ids(2)[0];
+		Treasury::lock_in_vault_capital(1);
+		assert_ok!(Balances::mint_into(&BidPoolAccountId::get(), 100 * MICROGONS_PER_ARGON));
+
+		Treasury::distribute_bid_pool(1);
+
+		let bond_lot = BondLotById::<Test>::get(bond_lot_id).expect("paid bond lot");
+		assert_eq!(bond_lot.last_frame_earnings, Some(5_600_000));
+		assert_eq!(LastVaultProfits::get()[0].earnings, 70 * MICROGONS_PER_ARGON);
+	});
+}
+
+#[test]
+fn vault_bond_payouts_keep_a_ten_percent_baseline_without_argonots() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		MinimumArgonsPerContributor::set(1);
+		CurrentFrameId::set(1);
+
+		let mut vault =
+			test_vault(10, (10 * MICROGONS_PER_ARGON) as u64, Permill::from_percent(20));
+		vault.committed_argonots = 0;
+		insert_vault(1, vault);
+		set_ownership(10, 100 * MICROGONS_PER_ARGON);
+		set_argons(2, 50 * MICROGONS_PER_ARGON);
+		assert_ok!(Treasury::buy_bonds(origin(2), 1, 4, None));
+
+		let bond_lot_id = account_bond_lot_ids(2)[0];
+		Treasury::lock_in_vault_capital(1);
+		assert_ok!(Balances::mint_into(&BidPoolAccountId::get(), 100 * MICROGONS_PER_ARGON,));
+
+		Treasury::distribute_bid_pool(1);
+
+		let bond_lot = BondLotById::<Test>::get(bond_lot_id).expect("paid bond lot");
+		assert_eq!(bond_lot.last_frame_earnings, Some(560_000));
+		assert_eq!(LastVaultProfits::get()[0].earnings, 7 * MICROGONS_PER_ARGON);
+		assert_eq!(LastVaultProfits::get()[0].earnings_for_vault, 2_240_000);
+		assert_eq!(Balances::balance(&TreasuryReservesAccountId::get()), 20_000_000);
+		assert!(System::events().iter().any(|record| {
+			matches!(
+				&record.event,
+				RuntimeEvent::Treasury(crate::Event::FrameEarningsDistributed {
+					frame_id: 1,
+					argonot_bond_pool_burned,
+					vault_bid_pool_burned,
+					..
+				}) if *argonot_bond_pool_burned == 10_000_000
+					&& *vault_bid_pool_burned == 67_200_000
+			)
+		}));
+	});
+}
+
+#[test]
+fn partial_argonot_securitization_increases_bond_earnings_above_the_baseline() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		MinimumArgonsPerContributor::set(1);
+		CurrentFrameId::set(1);
+
+		let mut vault =
+			test_vault(10, (10 * MICROGONS_PER_ARGON) as u64, Permill::from_percent(20));
+		vault.committed_argonots = 2 * MICROGONS_PER_ARGON;
+		insert_vault(1, vault);
+		set_ownership(10, 100 * MICROGONS_PER_ARGON);
+		set_argons(2, 50 * MICROGONS_PER_ARGON);
+		assert_ok!(Treasury::buy_bonds(origin(2), 1, 4, None));
+
+		let bond_lot_id = account_bond_lot_ids(2)[0];
+		Treasury::lock_in_vault_capital(1);
+		assert_ok!(Balances::mint_into(&BidPoolAccountId::get(), 100 * MICROGONS_PER_ARGON,));
+
+		Treasury::distribute_bid_pool(1);
+
+		let bond_lot = BondLotById::<Test>::get(bond_lot_id).expect("paid bond lot");
+		assert_eq!(bond_lot.last_frame_earnings, Some(812_000));
+		assert_eq!(LastVaultProfits::get()[0].earnings, 10_150_000);
+		assert!(System::events().iter().any(|record| {
+			matches!(
+				&record.event,
+				RuntimeEvent::Treasury(crate::Event::FrameEarningsDistributed {
+					frame_id: 1,
+					argonot_bond_pool_burned,
+					vault_bid_pool_burned,
+					..
+				}) if *argonot_bond_pool_burned == 10_000_000
+					&& *vault_bid_pool_burned == 65_940_000
+			)
+		}));
+	});
+}
+
+#[test]
+fn excess_argonot_securitization_does_not_exceed_full_bond_earnings() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		MinimumArgonsPerContributor::set(1);
+		CurrentFrameId::set(1);
+
+		let mut vault =
+			test_vault(10, (10 * MICROGONS_PER_ARGON) as u64, Permill::from_percent(20));
+		vault.committed_argonots = 80 * MICROGONS_PER_ARGON;
+		insert_vault(1, vault);
+		set_ownership(10, 100 * MICROGONS_PER_ARGON);
+		set_argons(2, 50 * MICROGONS_PER_ARGON);
+		assert_ok!(Treasury::buy_bonds(origin(2), 1, 4, None));
+
+		let bond_lot_id = account_bond_lot_ids(2)[0];
+		Treasury::lock_in_vault_capital(1);
+		assert_ok!(Balances::mint_into(&BidPoolAccountId::get(), 100 * MICROGONS_PER_ARGON,));
+
+		Treasury::distribute_bid_pool(1);
+
+		let bond_lot = BondLotById::<Test>::get(bond_lot_id).expect("paid bond lot");
+		assert_eq!(bond_lot.last_frame_earnings, Some(5_600_000));
+		assert_eq!(LastVaultProfits::get()[0].earnings, 70 * MICROGONS_PER_ARGON);
+		assert!(System::events().iter().any(|record| {
+			matches!(
+				&record.event,
+				RuntimeEvent::Treasury(crate::Event::FrameEarningsDistributed {
+					frame_id: 1,
+					argonot_bond_pool_burned,
+					vault_bid_pool_burned,
+					..
+				}) if *argonot_bond_pool_burned == 10 * MICROGONS_PER_ARGON
+					&& *vault_bid_pool_burned == 42 * MICROGONS_PER_ARGON
+			)
+		}));
+	});
+}
+
+#[test]
+fn undistributed_vault_earnings_are_reported_once_per_frame() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		MinimumArgonsPerContributor::set(1);
+		CurrentFrameId::set(1);
+
+		let mut first_vault =
+			test_vault(10, (10 * MICROGONS_PER_ARGON) as u64, Permill::from_percent(20));
+		first_vault.committed_argonots = 0;
+		insert_vault(1, first_vault);
+
+		let mut second_vault =
+			test_vault(11, (10 * MICROGONS_PER_ARGON) as u64, Permill::from_percent(20));
+		second_vault.committed_argonots = 0;
+		insert_vault(2, second_vault);
+
+		set_ownership(10, 100 * MICROGONS_PER_ARGON);
+		set_argons(2, 50 * MICROGONS_PER_ARGON);
+		set_argons(3, 50 * MICROGONS_PER_ARGON);
+		assert_ok!(Treasury::buy_bonds(origin(2), 1, 4, None));
+		assert_ok!(Treasury::buy_bonds(origin(3), 2, 4, None));
+
+		Treasury::lock_in_vault_capital(1);
+		assert_ok!(Balances::mint_into(&BidPoolAccountId::get(), 100 * MICROGONS_PER_ARGON));
+		Treasury::distribute_bid_pool(1);
+
+		let burn_reports = System::events()
+			.iter()
+			.filter(|record| {
+				matches!(
+					&record.event,
+					RuntimeEvent::Treasury(crate::Event::FrameEarningsDistributed {
+						frame_id: 1,
+						argonot_bond_pool_burned,
+						vault_bid_pool_burned,
+						..
+					}) if *argonot_bond_pool_burned == 10_000_000
+						&& *vault_bid_pool_burned == 67_200_000
+				)
+			})
+			.count();
+		assert_eq!(burn_reports, 1);
+	});
+}
+
+#[test]
+fn argonot_requirement_uses_participating_vault_securitized_satoshis() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		MinimumArgonsPerContributor::set(1);
+		CurrentFrameId::set(1);
+
+		let mut earning_vault =
+			test_vault(10, (10 * MICROGONS_PER_ARGON) as u64, Permill::from_percent(100));
+		earning_vault.committed_argonots = 10 * MICROGONS_PER_ARGON;
+		insert_vault(1, earning_vault);
+		insert_vault(
+			2,
+			test_vault(11, (30 * MICROGONS_PER_ARGON) as u64, Permill::from_percent(100)),
+		);
+		set_ownership(10, 100 * MICROGONS_PER_ARGON);
+		set_argons(2, 20 * MICROGONS_PER_ARGON);
+		assert_ok!(Treasury::buy_bonds(origin(2), 1, 10, None));
+
+		let bond_lot_id = account_bond_lot_ids(2)[0];
+		Treasury::lock_in_vault_capital(1);
+		assert_ok!(Balances::mint_into(&BidPoolAccountId::get(), 100 * MICROGONS_PER_ARGON,));
+
+		Treasury::distribute_bid_pool(1);
+
+		let bond_lot = BondLotById::<Test>::get(bond_lot_id).expect("paid bond lot");
+		assert_eq!(bond_lot.last_frame_earnings, Some(22_750_000));
+		assert_eq!(LastVaultProfits::get()[0].earnings, 22_750_000);
+		assert_eq!(Balances::balance(&TreasuryReservesAccountId::get()), 20_000_000);
 	});
 }
 
@@ -916,16 +1211,18 @@ fn argonot_bonds_are_paid_before_vault_bonds() {
 					frame_id,
 					bid_pool_distributed,
 					argonot_bond_pool_distributed,
+					argonot_bond_pool_burned,
 					vault_bid_pool_distributed,
-					treasury_refunds,
 					treasury_reserves,
+					vault_bid_pool_burned,
 					participating_vaults,
 				}) if *frame_id == 1
 					&& *bid_pool_distributed == 80 * MICROGONS_PER_ARGON
 					&& *argonot_bond_pool_distributed == 10 * MICROGONS_PER_ARGON
+					&& *argonot_bond_pool_burned == 0
 					&& *vault_bid_pool_distributed == 70 * MICROGONS_PER_ARGON
-					&& *treasury_refunds == 0
 					&& *treasury_reserves == 20 * MICROGONS_PER_ARGON
+					&& *vault_bid_pool_burned == 0
 					&& *participating_vaults == 1
 			)
 		}));
@@ -977,10 +1274,10 @@ fn bonus_backed_lots_increase_bonder_payout_and_reduce_vault_remainder() {
 
 		let plain_lot = BondLotById::<Test>::get(plain_lot_id).expect("plain bond lot");
 		let bonus_lot = BondLotById::<Test>::get(bonus_lot_id).expect("bonus bond lot");
-		assert_eq!(plain_lot.last_frame_earnings, Some(3_200_000));
-		assert_eq!(bonus_lot.last_frame_earnings, Some(4_800_000));
+		assert_eq!(plain_lot.last_frame_earnings, Some(2_800_000));
+		assert_eq!(bonus_lot.last_frame_earnings, Some(4_200_000));
 		assert!(bonus_lot.cumulative_earnings > plain_lot.cumulative_earnings);
-		assert_eq!(LastVaultProfits::get()[0].earnings_for_vault, 24_000_000);
+		assert_eq!(LastVaultProfits::get()[0].earnings_for_vault, 21_000_000);
 	});
 }
 
@@ -1081,9 +1378,9 @@ fn locked_frame_still_pays_after_lot_is_liquidated() {
 		assert_eq!(bond_lot.release_reason, Some(BondReleaseReason::UserLiquidation));
 		assert_eq!(bond_lot.participated_frames, 1);
 		assert_eq!(bond_lot.last_frame_earnings_frame_id, Some(1));
-		assert_eq!(bond_lot.last_frame_earnings, Some(6_400_000));
-		assert_eq!(bond_lot.cumulative_earnings, 6_400_000);
-		assert_eq!(Balances::balance(&account(2)), balance_before + 6_400_000);
+		assert_eq!(bond_lot.last_frame_earnings, Some(5_600_000));
+		assert_eq!(bond_lot.cumulative_earnings, 5_600_000);
+		assert_eq!(Balances::balance(&account(2)), balance_before + 5_600_000);
 	});
 }
 
@@ -1168,6 +1465,9 @@ fn failed_bond_lot_payout_is_not_recorded_as_earned() {
 					flexible_bonds_eligible: 0,
 					flexible_prorata: FixedU128::zero(),
 					eligible_bonds: 1,
+					argonot_securitization: 0,
+					argonots_for_max_earnings: 0,
+					bond_earnings_eligibility: FixedU128::one(),
 				},
 			)
 			.is_ok());
@@ -1241,7 +1541,7 @@ fn run_frame_transition_releases_distributes_and_locks_without_paying_operationa
 		let payout_lot = BondLotById::<Test>::get(payout_bond_lot_id).expect("payout lot");
 		assert_eq!(payout_lot.participated_frames, 1);
 		assert_eq!(payout_lot.last_frame_earnings_frame_id, Some(1));
-		assert_eq!(payout_lot.last_frame_earnings, Some(6_400_000));
+		assert_eq!(payout_lot.last_frame_earnings, Some(5_600_000));
 	});
 }
 

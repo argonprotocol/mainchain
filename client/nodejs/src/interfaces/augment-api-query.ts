@@ -1,4 +1,5 @@
 // Auto-generated via `yarn polkadot-types-from-chain`, do not edit
+/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
@@ -21,7 +22,7 @@ import type {
   u8,
 } from '@polkadot/types-codec';
 import type { AnyNumber, ITuple } from '@polkadot/types-codec/types';
-import type { AccountId32, H160, H256 } from '@polkadot/types/interfaces/runtime';
+import type { AccountId32, H160, H256, Percent } from '@polkadot/types/interfaces/runtime';
 import type {
   ArgonNotaryAuditErrorVerifyError,
   ArgonPrimitivesBalanceChangeAccountOrigin,
@@ -1874,6 +1875,10 @@ declare module '@polkadot/api-base/types/storage' {
        * The total number of active Argonot bonds in the active set.
        **/
       totalActiveArgonotBonds: AugmentedQuery<ApiType, () => Observable<u32>, []>;
+      /**
+       * Share of vault bond earnings guaranteed without Argonot securitization.
+       **/
+      vaultBondEarningsGuaranteePercent: AugmentedQuery<ApiType, () => Observable<Percent>, []>;
     };
     txPause: {
       /**
