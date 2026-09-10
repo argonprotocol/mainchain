@@ -20,6 +20,12 @@ export enum BitcoinNetwork {
   Regtest = 3,
 }
 
+export interface CosignUtxo {
+  txid: string;
+  vout: number;
+  satoshis: bigint;
+}
+
 export function calculateFee(
   vault_pubkey_hex: string,
   vault_claim_pubkey_hex: string,
@@ -29,6 +35,7 @@ export function calculateFee(
   created_at_height: bigint,
   bitcoin_network: BitcoinNetwork,
   fee_rate_sats_per_vb: bigint,
+  input_count: number,
   to_script_pubkey: string,
 ): bigint;
 
@@ -43,9 +50,7 @@ export function createCosignPubkey(
 ): string;
 
 export function getCosignPsbt(
-  txid: string,
-  vout: number,
-  satoshis: bigint,
+  utxos: CosignUtxo[],
   vault_pubkey_hex: string,
   vault_claim_pubkey_hex: string,
   owner_pubkey_hex: string,

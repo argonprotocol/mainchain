@@ -1,5 +1,5 @@
 use crate::Error;
-use alloc::vec;
+use alloc::{vec, vec::Vec};
 use argon_primitives::{
 	bitcoin::{BitcoinSignature, CompressedBitcoinPubkey},
 	ensure,
@@ -31,12 +31,12 @@ pub fn extract_tx(psbt: &mut Psbt) -> Result<Transaction, Error> {
 	};
 
 	// Clear all the data fields as per the spec.
-	{
-		psbt.inputs[0].partial_sigs.clear();
-		psbt.inputs[0].sighash_type = None;
-		psbt.inputs[0].redeem_script = None;
-		psbt.inputs[0].witness_script = None;
-		psbt.inputs[0].bip32_derivation.clear();
+	for input in &mut psbt.inputs {
+		input.partial_sigs.clear();
+		input.sighash_type = None;
+		input.redeem_script = None;
+		input.witness_script = None;
+		input.bip32_derivation.clear();
 	}
 
 	Ok(tx)
@@ -99,19 +99,23 @@ where
 /// No std friendly version of verifying a signature
 pub fn verify_signature_raw(
 	psbt: &Psbt,
+	input_index: usize,
 	pubkey: CompressedBitcoinPubkey,
 	signature_der_bytes: &BitcoinSignature,
 ) -> Result<bool, Error> {
 	let mut cache = SighashCache::new(&psbt.unsigned_tx);
 
 	// Get the sighash message
-	let (msg, _) = match psbt.sighash_ecdsa(0, &mut cache) {
+	let (msg, sighash_type) = match psbt.sighash_ecdsa(input_index, &mut cache) {
 		Ok(result) => result,
 		Err(_) => return Ok(false),
 	};
 
-	let (_sighash_type, sigdata) =
+	let (signature_sighash_type, sigdata) =
 		signature_der_bytes.0.split_last().ok_or(Error::InvalidSignatureBytes)?;
+	if u32::from(*signature_sighash_type) != sighash_type.to_u32() {
+		return Ok(false)
+	}
 
 	let signature =
 		k256::ecdsa::Signature::from_der(sigdata).map_err(|_| Error::InvalidSignatureBytes)?;
@@ -122,7 +126,7 @@ pub fn verify_signature_raw(
 	Ok(pubkey.verify_prehash(msg.as_ref(), &signature).is_ok())
 }
 
-pub fn sign(psbt: &mut Psbt, privkey: PrivateKey) -> Result<(Signature, PublicKey), Error> {
+pub fn sign(psbt: &mut Psbt, privkey: PrivateKey) -> Result<Vec<(Signature, PublicKey)>, Error> {
 	let mut cache = SighashCache::new(&psbt.unsigned_tx);
 	let mut signatures = vec![];
 	let secp = Secp256k1::new();
@@ -131,49 +135,41 @@ pub fn sign(psbt: &mut Psbt, privkey: PrivateKey) -> Result<(Signature, PublicKe
 		let (msg, ecdsa_type) = psbt.sighash_ecdsa(i, &mut cache).map_err(Error::from)?;
 		let sig = secp.sign_ecdsa(&msg, &privkey.inner);
 		let signature = Signature { signature: sig, sighash_type: ecdsa_type };
-		signatures.push((pubkey, signature));
+		signatures.push((signature, pubkey));
 	}
-	let mut result = None;
-	for (i, (pubkey, signature)) in signatures.into_iter().enumerate() {
-		psbt.inputs[i].partial_sigs.insert(pubkey, signature);
-		if i == 0 {
-			result = Some((signature, pubkey));
-		}
+	for (i, (signature, pubkey)) in signatures.iter().enumerate() {
+		psbt.inputs[i].partial_sigs.insert(*pubkey, *signature);
 	}
-	Ok(result.expect("At least one signature should be added"))
+	Ok(signatures)
 }
 
 pub fn sign_derived(
 	psbt: &mut Psbt,
 	master_xpriv: Xpriv,
 	hd_path: DerivationPath,
-) -> Result<(Signature, PublicKey), Error> {
+) -> Result<Vec<(Signature, PublicKey)>, Error> {
 	let secp = Secp256k1::new();
 	let child_xpriv = master_xpriv.derive_priv(&secp, &hd_path).map_err(Error::from)?;
 	let master_xpub = Xpub::from_priv(&Secp256k1::new(), &master_xpriv);
-	let mut signatures = vec![];
-
 	let child_priv = child_xpriv.to_priv();
 	let pubkey = child_priv.public_key(&secp);
-	for i in 0..psbt.inputs.len() {
-		psbt.inputs[i]
+	for input in &mut psbt.inputs {
+		input
 			.bip32_derivation
 			.insert(pubkey.inner, (master_xpub.fingerprint(), hd_path.clone()));
-
-		trace!("Signing with derived key: {pubkey}");
-
-		let _ = psbt.sign(&master_xpriv, &secp).map_err(|(_, errs)| Error::from(errs))?;
-
-		ensure!(!psbt.inputs[i].partial_sigs.is_empty(), Error::SignatureExpected);
-
+	}
+	trace!("Signing with derived key: {pubkey}");
+	let _ = psbt.sign(&master_xpriv, &secp).map_err(|(_, errs)| Error::from(errs))?;
+	let mut signatures = vec![];
+	for (i, input) in psbt.inputs.iter().enumerate() {
+		ensure!(!input.partial_sigs.is_empty(), Error::SignatureExpected);
 		trace!("Signed {i}: {:?} sigs", psbt.inputs[i].partial_sigs.len());
-		let Some((_, signature)) =
-			psbt.inputs[i].partial_sigs.iter().find(|(k, _)| k.inner == pubkey.inner)
+		let Some((_, signature)) = input.partial_sigs.iter().find(|(k, _)| k.inner == pubkey.inner)
 		else {
 			return Err(Error::DerivedKeySignError);
 		};
 		signatures.push((*signature, pubkey));
 	}
 
-	Ok(signatures.remove(0))
+	Ok(signatures)
 }

@@ -112,14 +112,14 @@ impl UtxoSpendFilter {
 		minimum_satoshis: Satoshis,
 	) -> anyhow::Result<BitcoinUtxoSync> {
 		let mut scripts: Vec<Vec<u8>> = vec![];
-		let mut utxo_ref_to_utxo_id = BTreeMap::new();
+		let mut utxo_ref_to_lock_id = BTreeMap::new();
 		let mut funding_address_to_utxo_value = BTreeMap::new();
 
 		for (utxo_ref, lookup) in tracked_utxos {
 			let script_bytes = lookup.script_pubkey.to_script_bytes();
 			scripts.push(script_bytes.clone());
 			if let Some(utxo_ref) = utxo_ref {
-				utxo_ref_to_utxo_id.insert(utxo_ref, lookup.utxo_id);
+				utxo_ref_to_lock_id.insert(utxo_ref, lookup.lock_id);
 			}
 			funding_address_to_utxo_value.insert(script_bytes, lookup);
 		}
@@ -161,22 +161,22 @@ impl UtxoSpendFilter {
 					let txid = tx.compute_txid().into();
 					let utxo_ref = UtxoRef { txid, output_index: idx as u32 };
 					result.funded.push(BitcoinUtxoFunding {
-						utxo_id: utxo_value.utxo_id,
+						lock_id: utxo_value.lock_id,
 						utxo_ref: utxo_ref.clone(),
 						satoshis: sats,
 						expected_satoshis: 0,
 						bitcoin_height: height,
 					});
-					utxo_ref_to_utxo_id.insert(utxo_ref, utxo_value.utxo_id);
+					utxo_ref_to_lock_id.insert(utxo_ref, utxo_value.lock_id);
 				}
 				// Check inputs to see if any tracked UTXOs were spent
 				for input in &tx.input {
 					let utxo_ref = input.previous_output.into();
 					// If we're tracking the UTXO, it has been spent
-					if let Some(id) = utxo_ref_to_utxo_id.get(&utxo_ref) {
+					if let Some(id) = utxo_ref_to_lock_id.get(&utxo_ref) {
 						// TODO: should we figure out who spent it here?
 						result.spent.push(BitcoinUtxoSpend {
-							utxo_id: *id,
+							lock_id: *id,
 							utxo_ref: Some(utxo_ref),
 							bitcoin_height: height,
 						});

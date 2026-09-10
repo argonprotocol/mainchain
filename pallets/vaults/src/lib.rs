@@ -30,17 +30,17 @@ pub mod weights;
 pub mod pallet {
 	use super::*;
 	use alloc::collections::BTreeSet;
-	use argon_bitcoin::{primitives::UtxoId, CosignScript, CosignScriptArgs};
+	use argon_bitcoin::{primitives::BitcoinLockId, CosignScript, CosignScriptArgs};
 	use argon_primitives::{
 		bitcoin::{
 			BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinNetwork, BitcoinXPub,
 			CompressedBitcoinPubkey, OpaqueBitcoinXpub, Satoshis,
 		},
 		vault::{
-			BitcoinResecuritization, BitcoinSecuritization, BitcoinVaultProvider, LockExtension,
-			LostBitcoinCompensation, RegistrationVaultData, ReserveSecuritizationRequest,
-			TreasuryVaultProvider, Vault, VaultArgonotCommitment, VaultError, VaultTerms,
-			VaultTreasuryFrameEarnings,
+			BitcoinLockFundingUpdate, BitcoinResecuritization, BitcoinSecuritization,
+			BitcoinVaultProvider, LockExtension, LostBitcoinCompensation, RegistrationVaultData,
+			ReserveSecuritizationRequest, TreasuryVaultProvider, Vault, VaultArgonotCommitment,
+			VaultError, VaultTerms, VaultTreasuryFrameEarnings,
 		},
 		CollectBlockerProvider, MiningFrameProvider, OperationalAccountProvider, TickProvider,
 	};
@@ -49,7 +49,7 @@ pub mod pallet {
 	use pallet_prelude::argon_primitives::{OnNewSlot, OperationalAccountsHook};
 	use sp_runtime::traits::SaturatedConversion;
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(17);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(18);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -185,7 +185,7 @@ pub mod pallet {
 		_,
 		Twox64Concat,
 		VaultId,
-		BoundedBTreeSet<UtxoId, T::MaxPendingCosignsPerVault>,
+		BoundedBTreeSet<BitcoinLockId, T::MaxPendingCosignsPerVault>,
 		ValueQuery,
 	>;
 
@@ -552,7 +552,7 @@ pub mod pallet {
 				securitization_locked: 0u32.into(),
 				flexible_securitization_locked: 0u32.into(),
 				reserved_securitization_space: 0u32.into(),
-				locked_satoshis: 0,
+				securitized_satoshis: 0,
 				ratio_adjusted_satoshis: 0,
 				flexible_ratio_adjusted_satoshis: 0,
 				terms,
@@ -1248,9 +1248,9 @@ pub mod pallet {
 		type Balance = T::Balance;
 		type AccountId = T::AccountId;
 
-		fn get_eligible_capacity(vault_id: VaultId) -> (Self::Balance, Satoshis) {
+		fn get_eligible_satoshis(vault_id: VaultId) -> Satoshis {
 			VaultsById::<T>::get(vault_id)
-				.map(|vault| (vault.securitization, vault.effective_eligible_satoshis()))
+				.map(|vault| vault.effective_eligible_satoshis())
 				.unwrap_or_default()
 		}
 
@@ -1501,11 +1501,11 @@ pub mod pallet {
 			Ok(vault.securitization_ratio)
 		}
 
-		fn activate_securitization(
+		fn record_bitcoin_lock_funding(
 			vault_id: VaultId,
-			securitization: &BitcoinSecuritization<Self::Balance>,
-			funded_satoshis: Satoshis,
+			update: BitcoinLockFundingUpdate<Self::Balance>,
 		) -> Result<(), VaultError> {
+			let securitized_satoshis = update.securitized_satoshis;
 			Self::update_vault_bitcoin_metrics(BitcoinLockUpdate {
 				vault_id,
 				locks_created: 0,
@@ -1513,13 +1513,13 @@ pub mod pallet {
 				fee_discount: T::Balance::zero(),
 				securitization_locked: T::Balance::zero(),
 				securitization_released: T::Balance::zero(),
-				satoshis_locked: funded_satoshis,
+				satoshis_locked: securitized_satoshis,
 				satoshis_released: 0,
 			})?;
 
 			VaultsById::<T>::try_mutate(vault_id, |maybe_vault| {
 				let vault = maybe_vault.as_mut().ok_or(VaultError::VaultNotFound)?;
-				vault.activate_securitization(securitization, funded_satoshis)?;
+				vault.record_bitcoin_lock_funding(update)?;
 				T::OperationalAccountsHook::vault_bitcoin_lock_funded(
 					&vault.operator_account_id,
 					vault.get_activated_securitization(),
@@ -1729,28 +1729,34 @@ pub mod pallet {
 			Ok((total_fee, fee_discount))
 		}
 
-		fn schedule_securitization_release(
+		fn release_bitcoin_lock_securitization(
 			vault_id: VaultId,
-			securitization: &BitcoinSecuritization<Self::Balance>,
-			funded_satoshis: Satoshis,
+			current_securitization: &BitcoinSecuritization<Self::Balance>,
+			lock_funded_satoshis: Satoshis,
 			lock_extension: &LockExtension<T::Balance>,
 			is_flexible: bool,
 		) -> Result<(), VaultError> {
+			let securitized_satoshis_to_release =
+				lock_funded_satoshis.min(current_securitization.basis.satoshis);
+			let securitization_to_schedule =
+				current_securitization.collateral_for_satoshis(securitized_satoshis_to_release);
+			// All current securitization leaves the Lock: the funded share is scheduled below,
+			// while the unactivated share is released immediately by the Vault model.
 			Self::update_vault_bitcoin_metrics(BitcoinLockUpdate {
 				vault_id,
 				locks_created: 0,
 				total_fee: 0u32.into(),
 				fee_discount: T::Balance::zero(),
 				securitization_locked: 0u32.into(),
-				securitization_released: securitization.collateral_required(),
+				securitization_released: current_securitization.collateral_required(),
 				satoshis_locked: 0,
-				satoshis_released: funded_satoshis,
+				satoshis_released: securitized_satoshis_to_release,
 			})?;
 
 			let mut vault = VaultsById::<T>::get(vault_id).ok_or(VaultError::VaultNotFound)?;
-			let release_heights = vault.schedule_securitization_release(
-				securitization,
-				funded_satoshis,
+			let release_heights = vault.release_bitcoin_lock_securitization(
+				current_securitization,
+				lock_funded_satoshis,
 				lock_extension,
 				is_flexible,
 			)?;
@@ -1758,7 +1764,7 @@ pub mod pallet {
 			VaultsById::<T>::insert(vault_id, vault);
 			Self::deposit_event(Event::FundsScheduledForRelease {
 				vault_id,
-				securitization: securitization.collateral_required(),
+				securitization: securitization_to_schedule,
 				release_height: lock_extension.lock_expiration,
 			});
 
@@ -1793,8 +1799,8 @@ pub mod pallet {
 			let securitized_amount = burn_result.burned_amount;
 			Self::track_vault_release_schedule(vault_id, &mut vault, burn_result.release_heights)?;
 
-			let to_beneficiary =
-				securitized_amount.saturating_sub(securitization.securitization_coverage_microgons);
+			let to_beneficiary = securitized_amount
+				.saturating_sub(securitization.coverage_for_satoshis(funded_satoshis));
 			if !to_beneficiary.is_zero() {
 				T::Currency::transfer_on_hold(
 					&HoldReason::EnterVault.into(),
@@ -1916,9 +1922,9 @@ pub mod pallet {
 			))
 		}
 
-		fn return_securitization(
+		fn release_unactivated_securitization(
 			vault_id: VaultId,
-			securitization: &BitcoinSecuritization<Self::Balance>,
+			amount: Self::Balance,
 		) -> Result<(), VaultError> {
 			Self::update_vault_bitcoin_metrics(BitcoinLockUpdate {
 				vault_id,
@@ -1926,36 +1932,33 @@ pub mod pallet {
 				total_fee: T::Balance::zero(),
 				fee_discount: T::Balance::zero(),
 				securitization_locked: T::Balance::zero(),
-				securitization_released: securitization.collateral_required(),
+				securitization_released: amount,
 				satoshis_locked: 0,
 				satoshis_released: 0,
 			})?;
 			VaultsById::<T>::mutate(vault_id, |vault| {
 				let vault = vault.as_mut().ok_or(VaultError::VaultNotFound)?;
-				vault.return_securitization(securitization)?;
+				vault.release_unactivated_securitization(amount)?;
 
 				// after reducing the bonded, we can check the minimum securitization needed
 				Self::shrink_vault_securitization(vault)?;
 				Ok::<(), VaultError>(())
 			})?;
-			Self::deposit_event(Event::SecuritizationReturned {
-				vault_id,
-				amount: securitization.collateral_required(),
-			});
+			Self::deposit_event(Event::SecuritizationReturned { vault_id, amount });
 
 			Ok(())
 		}
 
 		fn update_pending_cosign_list(
 			vault_id: VaultId,
-			utxo_id: UtxoId,
+			lock_id: BitcoinLockId,
 			should_remove: bool,
 		) -> Result<(), VaultError> {
 			PendingCosignByVaultId::<T>::try_mutate(vault_id, |pending| {
 				if should_remove {
-					pending.remove(&utxo_id);
+					pending.remove(&lock_id);
 				} else {
-					pending.try_insert(utxo_id).map_err(|_| VaultError::InternalError)?;
+					pending.try_insert(lock_id).map_err(|_| VaultError::InternalError)?;
 				}
 				Ok(())
 			})
@@ -1963,7 +1966,7 @@ pub mod pallet {
 
 		fn update_orphan_cosign_list(
 			vault_id: VaultId,
-			_utxo_id: UtxoId,
+			_lock_id: BitcoinLockId,
 			account_id: &Self::AccountId,
 			should_remove: bool,
 		) -> Result<(), VaultError> {

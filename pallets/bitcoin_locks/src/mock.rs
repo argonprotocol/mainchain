@@ -9,12 +9,13 @@ use crate::BitcoinVerifier;
 use argon_bitcoin::CosignReleaser;
 use argon_primitives::{
 	bitcoin::{
-		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinNetwork, BitcoinSignature, BitcoinXPub,
-		CompressedBitcoinPubkey, NetworkKind, Satoshis, UtxoId, UtxoRef,
+		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinLockId, BitcoinNetwork, BitcoinSignature,
+		BitcoinXPub, CompressedBitcoinPubkey, NetworkKind, Satoshis, UtxoRef,
 	},
 	vault::{
-		BitcoinResecuritization, BitcoinSecuritization, BitcoinVaultProvider, LockExtension,
-		LostBitcoinCompensation, ReserveSecuritizationRequest, Vault, VaultError, VaultTerms,
+		BitcoinLockFundingUpdate, BitcoinResecuritization, BitcoinSecuritization,
+		BitcoinVaultProvider, LockExtension, LostBitcoinCompensation, ReserveSecuritizationRequest,
+		Vault, VaultError, VaultTerms,
 	},
 	ArgonCPI, BitcoinUtxoTracker, BlockRewardAccountsProvider, MiningFrameProvider,
 	MiningFrameTransitionProvider, OperationalAccountsHook, PriceProvider,
@@ -79,7 +80,7 @@ parameter_types! {
 	pub static OrphanedUtxoReleaseExpiryFrames: FrameId = 5;
 	pub static LockReclamationBlocks: BitcoinHeight = 30;
 	pub static LockDurationBlocks: BitcoinHeight = 144 * 365;
-	pub static MaxPendingConfirmationBlocks: BitcoinHeight = 144;
+	pub static SecuritizationHoldBlocks: BitcoinHeight = 144;
 	pub static BitcoinBlockHeightChange: (BitcoinHeight, BitcoinHeight) = (0, 0);
 	pub static MinimumLockSatoshis: Satoshis = 10_000_000;
 	pub static DefaultVault: Vault<u64, Balance> = Vault {
@@ -90,7 +91,7 @@ parameter_types! {
 		securitization_locked: 0,
 		flexible_securitization_locked: 0,
 		reserved_securitization_space: 0,
-		locked_satoshis: 0,
+		securitized_satoshis: 0,
 		ratio_adjusted_satoshis: 0,
 		flexible_ratio_adjusted_satoshis: 0,
 		terms: VaultTerms {
@@ -107,8 +108,8 @@ parameter_types! {
 		operational_minimum_release_tick: None,
 	};
 
-	pub static NextUtxoId: UtxoId = 1;
-	pub static WatchedUtxosById: BTreeMap<UtxoId, BitcoinCosignScriptPubkey> = BTreeMap::new();
+	pub static NextBitcoinLockId: BitcoinLockId = 1;
+	pub static WatchedUtxosById: BTreeMap<BitcoinLockId, BitcoinCosignScriptPubkey> = BTreeMap::new();
 
 	pub static GetBitcoinNetwork: BitcoinNetwork = BitcoinNetwork::Regtest;
 
@@ -122,7 +123,7 @@ parameter_types! {
 	pub static ChargeFee: bool = false;
 	pub static FailReturnSecuritization: bool = false;
 
-	pub static VaultViewOfCosignPendingLocks: BTreeMap<VaultId,  BTreeSet<UtxoId>> = BTreeMap::new();
+	pub static VaultViewOfCosignPendingLocks: BTreeMap<VaultId,  BTreeSet<BitcoinLockId>> = BTreeMap::new();
 	pub static VaultViewOfOrphanedUtxoCosigns: BTreeMap<VaultId,  BTreeMap<u64, u32>> = BTreeMap::new();
 	pub const TicksPerBitcoinBlock: u64 = 10;
 	pub const ArgonTicksPerDay: u64 = 1440;
@@ -328,16 +329,16 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 		Ok(())
 	}
 
-	fn return_securitization(
+	fn release_unactivated_securitization(
 		vault_id: VaultId,
-		securitization: &BitcoinSecuritization<Balance>,
+		amount: Balance,
 	) -> Result<(), VaultError> {
 		if FailReturnSecuritization::get() {
 			return Err(VaultError::InternalError);
 		}
-		DefaultVault::mutate(|vault| vault.return_securitization(securitization))?;
+		DefaultVault::mutate(|vault| vault.release_unactivated_securitization(amount))?;
 		CanceledLocks::mutate(|locks| {
-			locks.push((vault_id, securitization.btc_value_in_microgons()));
+			locks.push((vault_id, amount));
 		});
 		Ok(())
 	}
@@ -434,17 +435,17 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 		Ok((total_fee, fee_discount))
 	}
 
-	fn schedule_securitization_release(
+	fn release_bitcoin_lock_securitization(
 		_vault_id: VaultId,
-		securitization: &BitcoinSecuritization<Balance>,
-		funded_satoshis: Satoshis,
+		current_securitization: &BitcoinSecuritization<Balance>,
+		lock_funded_satoshis: Satoshis,
 		lock_extensions: &LockExtension<Self::Balance>,
 		is_flexible: bool,
 	) -> Result<(), VaultError> {
 		DefaultVault::mutate(|vault| {
-			vault.schedule_securitization_release(
-				securitization,
-				funded_satoshis,
+			vault.release_bitcoin_lock_securitization(
+				current_securitization,
+				lock_funded_satoshis,
 				lock_extensions,
 				is_flexible,
 			)
@@ -515,15 +516,15 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 
 	fn update_pending_cosign_list(
 		vault_id: VaultId,
-		utxo_id: UtxoId,
+		lock_id: BitcoinLockId,
 		should_remove: bool,
 	) -> Result<(), VaultError> {
 		VaultViewOfCosignPendingLocks::mutate(|l| {
 			let list = l.entry(vault_id).or_default();
 			if should_remove {
-				list.remove(&utxo_id);
+				list.remove(&lock_id);
 			} else {
-				list.insert(utxo_id);
+				list.insert(lock_id);
 			}
 		});
 		Ok(())
@@ -531,7 +532,7 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 
 	fn update_orphan_cosign_list(
 		vault_id: VaultId,
-		_utxo_id: UtxoId,
+		_lock_id: BitcoinLockId,
 		account_id: &Self::AccountId,
 		should_remove: bool,
 	) -> Result<(), VaultError> {
@@ -557,12 +558,11 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 		Ok(DefaultVault::get().securitization_ratio)
 	}
 
-	fn activate_securitization(
+	fn record_bitcoin_lock_funding(
 		_vault_id: VaultId,
-		securitization: &BitcoinSecuritization<Self::Balance>,
-		funded_satoshis: Satoshis,
+		update: BitcoinLockFundingUpdate<Self::Balance>,
 	) -> Result<(), VaultError> {
-		DefaultVault::mutate(|vault| vault.activate_securitization(securitization, funded_satoshis))
+		DefaultVault::mutate(|vault| vault.record_bitcoin_lock_funding(update))
 	}
 
 	fn get_projected_flexible_securitization(
@@ -590,13 +590,13 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 
 pub struct StaticBitcoinVerifier;
 impl BitcoinVerifier<Test> for StaticBitcoinVerifier {
-	fn verify_signature(
+	fn verify_signatures(
 		utxo_releaseer: CosignReleaser,
 		pubkey: CompressedBitcoinPubkey,
-		signature: &BitcoinSignature,
+		signatures: &[BitcoinSignature],
 	) -> Result<bool, DispatchError> {
 		if UseRealBitcoinVerifier::get() {
-			return utxo_releaseer.verify_signature_raw(pubkey, signature).map_err(|e| {
+			return utxo_releaseer.verify_signatures_raw(pubkey, signatures).map_err(|e| {
 				match e {
 					argon_bitcoin::Error::InvalidCompressPubkeyBytes =>
 						pallet_bitcoin_locks::Error::<Test>::BitcoinPubkeyUnableToBeDecoded,
@@ -619,23 +619,23 @@ impl BitcoinUtxoTracker for StaticBitcoinUtxoTracker {
 			.unwrap_or_else(|| BitcoinBlockHeightChange::get().1)
 	}
 
-	fn unwatch_utxo(_utxo_id: UtxoId, utxo_ref: &UtxoRef) {
+	fn unwatch_utxo(_lock_id: BitcoinLockId, utxo_ref: &UtxoRef) {
 		let _ = utxo_ref;
 	}
 
 	fn watch_for_utxo(
-		utxo_id: UtxoId,
+		lock_id: BitcoinLockId,
 		script_pubkey: BitcoinCosignScriptPubkey,
 	) -> Result<(), DispatchError> {
 		WatchedUtxosById::mutate(|watched_utxos| {
-			watched_utxos.insert(utxo_id, script_pubkey);
+			watched_utxos.insert(lock_id, script_pubkey);
 		});
 		Ok(())
 	}
 
-	fn unwatch(utxo_id: UtxoId) {
+	fn unwatch(lock_id: BitcoinLockId) {
 		WatchedUtxosById::mutate(|watched_utxos| {
-			watched_utxos.remove(&utxo_id);
+			watched_utxos.remove(&lock_id);
 		});
 	}
 }
@@ -653,9 +653,7 @@ pub(crate) fn set_bitcoin_height(height: BitcoinHeight) {
 
 impl pallet_bitcoin_locks::Config for Test {
 	type WeightInfo = ();
-	type Currency = Balances;
 	type Balance = Balance;
-	type RuntimeHoldReason = RuntimeHoldReason;
 	type FissionsProvider = BitcoinFissions;
 	type BitcoinUtxoTracker = StaticBitcoinUtxoTracker;
 	type PriceProvider = StaticPriceProvider;
@@ -667,7 +665,8 @@ impl pallet_bitcoin_locks::Config for Test {
 	type ArgonTicksPerDay = ArgonTicksPerDay;
 	type MaxConcurrentlyReleasingLocks = MaxConcurrentlyReleasingLocks;
 	type LockDurationBlocks = LockDurationBlocks;
-	type MaxPendingConfirmationBlocks = MaxPendingConfirmationBlocks;
+	type SecuritizationHoldBlocks = SecuritizationHoldBlocks;
+	type MaxUtxosPerLock = ConstU32<10>;
 	type LockReclamationBlocks = LockReclamationBlocks;
 	type LockReleaseCosignDeadlineFrames = LockReleaseCosignDeadlineFrames;
 	type OrphanedUtxoReleaseExpiryFrames = OrphanedUtxoReleaseExpiryFrames;
@@ -717,7 +716,7 @@ pub fn new_test_ext() -> TestState {
 		securitization_locked: 0,
 		flexible_securitization_locked: 0,
 		reserved_securitization_space: 0,
-		locked_satoshis: 0,
+		securitized_satoshis: 0,
 		ratio_adjusted_satoshis: 0,
 		flexible_ratio_adjusted_satoshis: 0,
 		terms: VaultTerms {

@@ -23,8 +23,8 @@ use argon_client::{
 };
 use argon_primitives::{
 	bitcoin::{
-		BitcoinCosignScriptPubkey, BitcoinNetwork, BitcoinScriptPubkey, BitcoinSignature,
-		CompressedBitcoinPubkey, FissionId, H256Le, LiquidId, Satoshis, UtxoId,
+		BitcoinCosignScriptPubkey, BitcoinLockId, BitcoinNetwork, BitcoinScriptPubkey,
+		BitcoinSignature, CompressedBitcoinPubkey, FissionId, H256Le, LiquidId, Satoshis, UtxoRef,
 	},
 	block_seal::MiningSlotConfig,
 	prelude::sp_core::Encode,
@@ -125,7 +125,7 @@ async fn test_bitcoin_minting_e2e() {
 		submit_price(&ticker, &client, &price_index_operator, 62_000.0).await;
 
 	println!("\n3. Create a Bitcoin receive address backed by a Lock");
-	let utxo_id = create_receive_address(
+	let lock_id = create_receive_address(
 		&test_node,
 		vault_id,
 		utxo_satoshis,
@@ -143,7 +143,7 @@ async fn test_bitcoin_minting_e2e() {
 		&vault_xpub,
 		network,
 		vault_id,
-		&utxo_id,
+		&lock_id,
 	)
 	.await
 	.unwrap();
@@ -154,13 +154,24 @@ async fn test_bitcoin_minting_e2e() {
 		bitcoin::Address::from_script(funding_script_pubkey.as_script(), network).unwrap();
 	println!("Checking for {utxo_satoshis} satoshis to {funding_address}");
 
-	let (txid, vout, _) =
-		fund_script_address(bitcoind, &funding_address, utxo_satoshis, &block_creator);
+	let first_funding_satoshis = utxo_satoshis / 2;
+	let second_funding_satoshis = utxo_satoshis - first_funding_satoshis;
+	let (first_txid, first_vout, _) =
+		fund_script_address(bitcoind, &funding_address, first_funding_satoshis, &block_creator);
+	let (second_txid, second_vout, _) =
+		fund_script_address(bitcoind, &funding_address, second_funding_satoshis, &block_creator);
 
 	add_blocks(bitcoind, 5, &block_creator);
-	wait_for_lock_funding(&client, utxo_id, utxo_satoshis, txid, vout)
-		.await
-		.unwrap();
+	wait_for_lock_funding(
+		&client,
+		lock_id,
+		&[
+			(first_txid, first_vout, first_funding_satoshis),
+			(second_txid, second_vout, second_funding_satoshis),
+		],
+	)
+	.await
+	.unwrap();
 
 	let fission_id: FissionId = 1;
 	let second_fission_id: FissionId = 3;
@@ -174,7 +185,7 @@ async fn test_bitcoin_minting_e2e() {
 		&client,
 		&bitcoin_owner_signer,
 		&bitcoin_owner_account_id,
-		utxo_id,
+		lock_id,
 		fission_id,
 		liquid_id,
 		fission_satoshis,
@@ -188,7 +199,7 @@ async fn test_bitcoin_minting_e2e() {
 	wait_for_mint(
 		&bitcoin_owner_pair,
 		&client,
-		&utxo_id,
+		&lock_id,
 		fission_id,
 		liquidity_promised,
 		&ticker,
@@ -203,7 +214,7 @@ async fn test_bitcoin_minting_e2e() {
 		&bitcoin_owner_pair,
 		&client,
 		&bitcoin_owner_signer,
-		utxo_id,
+		lock_id,
 		fission_id,
 		second_fission_id,
 		liquid_id,
@@ -225,7 +236,7 @@ async fn test_bitcoin_minting_e2e() {
 		&bitcoin_owner_signer,
 		&bitcoin_owner_pair,
 		&bitcoin_owner_account_id,
-		utxo_id,
+		lock_id,
 		fission_id,
 		utxo_satoshis,
 		microgons_at_target_per_btc,
@@ -240,7 +251,7 @@ async fn test_bitcoin_minting_e2e() {
 		&client,
 		&bitcoin_owner_signer,
 		&bitcoin_owner_account_id,
-		utxo_id,
+		lock_id,
 		fission_id,
 		second_fission_id,
 		second_fission_satoshis,
@@ -252,7 +263,7 @@ async fn test_bitcoin_minting_e2e() {
 		.await;
 
 	println!("\n10. Request the Lock's Bitcoin release");
-	owner_requests_release(bitcoind, network, &bitcoin_owner_pair, &client, vault_id, utxo_id)
+	owner_requests_release(bitcoind, network, &bitcoin_owner_pair, &client, vault_id, lock_id)
 		.await
 		.unwrap();
 
@@ -261,7 +272,7 @@ async fn test_bitcoin_minting_e2e() {
 		client.as_ref(),
 		&vault_signer,
 		&vault_id,
-		&utxo_id,
+		&lock_id,
 		&vault_xpriv,
 		&vault_xpub_hd_path,
 	)
@@ -272,7 +283,7 @@ async fn test_bitcoin_minting_e2e() {
 	owner_sees_signature_and_releases(
 		client.as_ref(),
 		bitcoind,
-		&utxo_id,
+		&lock_id,
 		&owner_hd_key_path.to_string(),
 		&owner_hd_fingerprint.to_string(),
 	)
@@ -327,7 +338,7 @@ async fn test_bitcoin_xpriv_release_e2e() {
 	let ticker = client.lookup_ticker().await.expect("ticker");
 	submit_price(&ticker, &client, &price_index_operator, 62_000.0).await;
 
-	let utxo_id = create_receive_address(
+	let lock_id = create_receive_address(
 		&test_node,
 		vault_id,
 		utxo_satoshis,
@@ -338,7 +349,7 @@ async fn test_bitcoin_xpriv_release_e2e() {
 	.unwrap();
 
 	let lock = client
-		.fetch_storage(&storage().bitcoin_locks().locks_by_utxo_id(utxo_id), FetchAt::Finalized)
+		.fetch_storage(&storage().bitcoin_locks().locks_by_id(lock_id), FetchAt::Finalized)
 		.await
 		.unwrap()
 		.expect("xpriv-owned Lock");
@@ -354,12 +365,12 @@ async fn test_bitcoin_xpriv_release_e2e() {
 		fund_script_address(bitcoind, &funding_address, utxo_satoshis, &block_creator);
 
 	add_blocks(bitcoind, 5, &block_creator);
-	wait_for_lock_funding(&client, utxo_id, utxo_satoshis, txid, vout)
+	wait_for_lock_funding(&client, lock_id, &[(txid, vout, utxo_satoshis)])
 		.await
 		.unwrap();
 
 	println!("\n3. Request the Lock's Bitcoin release");
-	owner_requests_release(bitcoind, network, &bitcoin_owner_pair, &client, vault_id, utxo_id)
+	owner_requests_release(bitcoind, network, &bitcoin_owner_pair, &client, vault_id, lock_id)
 		.await
 		.unwrap();
 
@@ -368,7 +379,7 @@ async fn test_bitcoin_xpriv_release_e2e() {
 		client.as_ref(),
 		&vault_signer,
 		&vault_id,
-		&utxo_id,
+		&lock_id,
 		&vault_xpriv,
 		&vault_xpub_hd_path,
 	)
@@ -393,7 +404,7 @@ async fn test_bitcoin_xpriv_release_e2e() {
 	});
 	owner_signs_and_releases(
 		client.as_ref(),
-		&utxo_id,
+		&lock_id,
 		&owner_xpriv,
 		&owner_hd_path,
 		authenticated_bitcoin_url.as_ref(),
@@ -410,7 +421,7 @@ async fn create_first_fission_and_check_constraints(
 	client: &Arc<MainchainClient>,
 	bitcoin_owner_signer: &Sr25519Signer,
 	bitcoin_owner_account_id: &AccountId32,
-	utxo_id: UtxoId,
+	lock_id: BitcoinLockId,
 	fission_id: FissionId,
 	liquid_id: LiquidId,
 	fission_satoshis: Satoshis,
@@ -419,7 +430,7 @@ async fn create_first_fission_and_check_constraints(
 	let liquidity_promised = create_fission(
 		client,
 		bitcoin_owner_signer,
-		utxo_id,
+		lock_id,
 		fission_id,
 		liquid_id,
 		fission_satoshis,
@@ -440,7 +451,7 @@ async fn create_first_fission_and_check_constraints(
 		bitcoin_owner_signer,
 		RuntimeCall::BitcoinLocks(
 			api::runtime_types::pallet_bitcoin_locks::pallet::Call::request_release {
-				utxo_id,
+				lock_id,
 				to_script_pubkey: release_script.into(),
 				bitcoin_network_fee: 0,
 			},
@@ -450,7 +461,7 @@ async fn create_first_fission_and_check_constraints(
 	.await;
 	let release_request = client
 		.fetch_storage(
-			&storage().bitcoin_locks().lock_release_requests_by_utxo_id(utxo_id),
+			&storage().bitcoin_locks().lock_release_requests_by_id(lock_id),
 			FetchAt::Best,
 		)
 		.await
@@ -490,7 +501,7 @@ async fn create_second_fission_and_check_allocation(
 	bitcoin_owner: &sr25519::Pair,
 	client: &Arc<MainchainClient>,
 	bitcoin_owner_signer: &Sr25519Signer,
-	utxo_id: UtxoId,
+	lock_id: BitcoinLockId,
 	first_fission_id: FissionId,
 	fission_id: FissionId,
 	liquid_id: LiquidId,
@@ -504,7 +515,7 @@ async fn create_second_fission_and_check_allocation(
 	let liquidity_promised = create_fission(
 		client,
 		bitcoin_owner_signer,
-		utxo_id,
+		lock_id,
 		fission_id,
 		liquid_id,
 		fission_satoshis,
@@ -515,7 +526,7 @@ async fn create_second_fission_and_check_allocation(
 	wait_for_mint(
 		bitcoin_owner,
 		client,
-		&utxo_id,
+		&lock_id,
 		fission_id,
 		liquidity_promised,
 		ticker,
@@ -525,7 +536,7 @@ async fn create_second_fission_and_check_allocation(
 	.await?;
 
 	let active_fission_ids = client
-		.fetch_storage(&storage().bitcoin_fissions().fission_ids_by_lock_id(utxo_id), FetchAt::Best)
+		.fetch_storage(&storage().bitcoin_fissions().fission_ids_by_lock_id(lock_id), FetchAt::Best)
 		.await?
 		.expect("active Fission IDs");
 	assert_eq!(
@@ -534,7 +545,7 @@ async fn create_second_fission_and_check_allocation(
 	);
 
 	let lock = client
-		.fetch_storage(&storage().bitcoin_locks().locks_by_utxo_id(utxo_id), FetchAt::Best)
+		.fetch_storage(&storage().bitcoin_locks().locks_by_id(lock_id), FetchAt::Best)
 		.await?
 		.expect("funded Lock");
 	assert_eq!(lock.fissioned_satoshis, total_fissioned_satoshis);
@@ -550,7 +561,7 @@ async fn ratchet_first_fission(
 	bitcoin_owner_signer: &Sr25519Signer,
 	bitcoin_owner: &sr25519::Pair,
 	bitcoin_owner_account_id: &AccountId32,
-	utxo_id: UtxoId,
+	lock_id: BitcoinLockId,
 	fission_id: FissionId,
 	securitized_satoshis: Satoshis,
 	microgons_at_target_per_btc: Balance,
@@ -584,7 +595,7 @@ async fn ratchet_first_fission(
 		bitcoin_owner_signer,
 		RuntimeCall::BitcoinLocks(
 			api::runtime_types::pallet_bitcoin_locks::pallet::Call::resecuritize {
-				utxo_id,
+				lock_id,
 				satoshis: securitized_satoshis,
 				options: Some(BitcoinLockOptions {
 					microgons_at_target_per_btc: ratchet_rate,
@@ -596,11 +607,14 @@ async fn ratchet_first_fission(
 	)
 	.await;
 	let unchanged_lock = client
-		.fetch_storage(&storage().bitcoin_locks().locks_by_utxo_id(utxo_id), FetchAt::Best)
+		.fetch_storage(&storage().bitcoin_locks().locks_by_id(lock_id), FetchAt::Best)
 		.await?
 		.expect("funded Lock");
-	assert_eq!(unchanged_lock.securitized_satoshis, securitized_satoshis);
-	assert_eq!(unchanged_lock.microgons_at_target_per_btc, microgons_at_target_per_btc);
+	assert_eq!(unchanged_lock.securitization_basis.satoshis, securitized_satoshis);
+	assert_eq!(
+		unchanged_lock.securitization_basis.microgons_at_target_per_btc,
+		microgons_at_target_per_btc
+	);
 
 	let params = client
 		.params_with_best_nonce(&bitcoin_owner_signer.account_id())
@@ -668,13 +682,13 @@ async fn ratchet_first_fission(
 	assert_eq!(unchanged_fission.microgons_at_target_per_btc, ratchet_rate);
 
 	let pending_mint_indices = client
-		.fetch_storage(&storage().mint().pending_mint_utxo_id_lookup(utxo_id), FetchAt::Best)
+		.fetch_storage(&storage().mint().pending_mint_indices_by_lock_id(lock_id), FetchAt::Best)
 		.await?
 		.expect("ratchet pending mint lookup");
 	let pending_mint_index = *pending_mint_indices.0.last().expect("ratchet pending mint index");
 	let pending_mint = client
 		.fetch_storage(
-			&storage().mint().pending_mint_utxos_by_index(pending_mint_index),
+			&storage().mint().pending_bitcoin_mints_by_index(pending_mint_index),
 			FetchAt::Best,
 		)
 		.await?
@@ -687,7 +701,7 @@ async fn ratchet_first_fission(
 	wait_for_mint(
 		bitcoin_owner,
 		client,
-		&utxo_id,
+		&lock_id,
 		fission_id,
 		ratcheted_fission.liquidity_promised,
 		ticker,
@@ -702,7 +716,7 @@ async fn close_fissions(
 	client: &Arc<MainchainClient>,
 	bitcoin_owner_signer: &Sr25519Signer,
 	bitcoin_owner_account_id: &AccountId32,
-	utxo_id: UtxoId,
+	lock_id: BitcoinLockId,
 	fission_id: FissionId,
 	second_fission_id: FissionId,
 	second_fission_satoshis: Satoshis,
@@ -744,13 +758,13 @@ async fn close_fissions(
 		.unwrap();
 	assert!(closed_fission.is_none());
 	let fission_ids = client
-		.fetch_storage(&storage().bitcoin_fissions().fission_ids_by_lock_id(utxo_id), FetchAt::Best)
+		.fetch_storage(&storage().bitcoin_fissions().fission_ids_by_lock_id(lock_id), FetchAt::Best)
 		.await
 		.unwrap()
 		.expect("second Fission remains active");
 	assert_eq!(fission_ids.0.into_iter().collect::<Vec<_>>(), vec![second_fission_id]);
 	let lock = client
-		.fetch_storage(&storage().bitcoin_locks().locks_by_utxo_id(utxo_id), FetchAt::Best)
+		.fetch_storage(&storage().bitcoin_locks().locks_by_id(lock_id), FetchAt::Best)
 		.await
 		.unwrap()
 		.expect("Lock remains active after its Fission closes");
@@ -793,12 +807,12 @@ async fn close_fissions(
 		.unwrap();
 	assert!(second_closed_fission.is_none());
 	let fission_ids = client
-		.fetch_storage(&storage().bitcoin_fissions().fission_ids_by_lock_id(utxo_id), FetchAt::Best)
+		.fetch_storage(&storage().bitcoin_fissions().fission_ids_by_lock_id(lock_id), FetchAt::Best)
 		.await
 		.unwrap();
 	assert!(fission_ids.map(|ids| ids.0.is_empty()).unwrap_or(true));
 	let lock = client
-		.fetch_storage(&storage().bitcoin_locks().locks_by_utxo_id(utxo_id), FetchAt::Best)
+		.fetch_storage(&storage().bitcoin_locks().locks_by_id(lock_id), FetchAt::Best)
 		.await
 		.unwrap()
 		.expect("Lock remains active after all Fissions close");
@@ -809,7 +823,7 @@ async fn close_fissions(
 async fn create_fission(
 	client: &MainchainClient,
 	bitcoin_owner_signer: &Sr25519Signer,
-	utxo_id: UtxoId,
+	lock_id: BitcoinLockId,
 	fission_id: FissionId,
 	liquid_id: LiquidId,
 	satoshis: Satoshis,
@@ -825,7 +839,7 @@ async fn create_fission(
 			&tx().bitcoin_fissions().create(
 				fission_id,
 				liquid_id,
-				utxo_id,
+				lock_id,
 				satoshis,
 				microgons_at_target_per_btc,
 			),
@@ -1172,7 +1186,7 @@ async fn create_receive_address(
 	satoshis: Satoshis,
 	owner_compressed_pubkey: &bitcoin::PublicKey,
 	bitcoin_owner: &sr25519::Pair,
-) -> anyhow::Result<UtxoId> {
+) -> anyhow::Result<BitcoinLockId> {
 	// wait for the vault to be open
 
 	loop {
@@ -1221,8 +1235,8 @@ async fn create_receive_address(
 		})
 		.transpose()?
 		.expect("lock event");
-	let utxo_id = lock_created.utxo_id;
-	Ok(utxo_id)
+	let lock_id = lock_created.lock_id;
+	Ok(lock_id)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1234,15 +1248,15 @@ async fn verify_lock(
 	xpubkey: &Xpub,
 	bitcoin_network: Network,
 	vault_id: VaultId,
-	utxo_id: &UtxoId,
+	lock_id: &BitcoinLockId,
 ) -> anyhow::Result<(BitcoinCosignScriptPubkey, Balance)> {
 	let lock = client
-		.fetch_storage(&storage().bitcoin_locks().locks_by_utxo_id(*utxo_id), FetchAt::Finalized)
+		.fetch_storage(&storage().bitcoin_locks().locks_by_id(*lock_id), FetchAt::Finalized)
 		.await?
 		.expect("should be able to retrieve");
 	assert_eq!(lock.vault_id, vault_id);
 	{
-		assert_eq!(lock.securitized_satoshis, utxo_satoshis);
+		assert_eq!(lock.securitization_basis.satoshis, utxo_satoshis);
 		assert_eq!(lock.owner_pubkey.0, owner_compressed_pubkey.inner.serialize());
 		assert_eq!(lock.vault_xpub_sources.0, xpubkey.fingerprint().to_bytes());
 		assert_eq!(lock.vault_xpub_sources.1, Into::<u32>::into(ChildNumber::from_normal_idx(1)?));
@@ -1273,23 +1287,23 @@ async fn verify_lock(
 
 	assert_eq!(lock.funded_satoshis, 0);
 	assert_eq!(lock.fissioned_satoshis, 0);
-	Ok((lock.utxo_script_pubkey.into(), lock.microgons_at_target_per_btc))
+	Ok((lock.utxo_script_pubkey.into(), lock.securitization_basis.microgons_at_target_per_btc))
 }
 
 async fn wait_for_lock_funding(
 	client: &Arc<MainchainClient>,
-	utxo_id: UtxoId,
-	funded_satoshis: Satoshis,
-	txid: Txid,
-	vout: u32,
+	lock_id: BitcoinLockId,
+	expected_utxos: &[(Txid, u32, Satoshis)],
 ) -> anyhow::Result<()> {
 	let mut finalized_sub = client.live.blocks().subscribe_finalized().await?;
 	let mut finalized_hash = client.latest_finalized_block_hash().await?.hash();
+	let funded_satoshis: Satoshis =
+		expected_utxos.iter().map(|(_, _, satoshis)| satoshis).copied().sum();
 
 	for remaining_blocks in (1..=100).rev() {
 		let lock = client
 			.fetch_storage(
-				&storage().bitcoin_locks().locks_by_utxo_id(utxo_id),
+				&storage().bitcoin_locks().locks_by_id(lock_id),
 				FetchAt::Block(finalized_hash),
 			)
 			.await?
@@ -1301,23 +1315,29 @@ async fn wait_for_lock_funding(
 		let block = finalized_sub
 			.next()
 			.await
-			.ok_or_else(|| anyhow!("Stopped waiting for Lock {utxo_id} funding"))??;
+			.ok_or_else(|| anyhow!("Stopped waiting for Lock {lock_id} funding"))??;
 		finalized_hash = block.hash();
-		println!("Waiting for Lock {utxo_id} funding in block {:?}", block.hash());
+		println!("Waiting for Lock {lock_id} funding in block {:?}", block.hash());
 		if remaining_blocks == 1 {
-			panic!("Lock {utxo_id} was not funded after 100 blocks");
+			panic!("Lock {lock_id} was not funded after 100 blocks");
 		}
 	}
 
-	let utxo_ref = client
+	let lock = client
 		.fetch_storage(
-			&storage().bitcoin_locks().utxo_id_to_funding_utxo_ref(utxo_id),
+			&storage().bitcoin_locks().locks_by_id(lock_id),
 			FetchAt::Block(finalized_hash),
 		)
 		.await?
-		.expect("funding UTXO");
-	assert_eq!(utxo_ref.txid.0, txid.to_byte_array());
-	assert_eq!(utxo_ref.output_index, vout);
+		.expect("funded Lock");
+	assert_eq!(lock.funding_utxos.0.len(), expected_utxos.len());
+	for (txid, output_index, satoshis) in expected_utxos {
+		assert!(lock.funding_utxos.0.iter().any(|(utxo_ref, tracked_satoshis)| {
+			utxo_ref.txid.0 == txid.to_byte_array() &&
+				utxo_ref.output_index == *output_index &&
+				tracked_satoshis == satoshis
+		}));
+	}
 
 	Ok(())
 }
@@ -1326,7 +1346,7 @@ async fn wait_for_lock_funding(
 async fn wait_for_mint(
 	bitcoin_owner: &sr25519::Pair,
 	client: &Arc<MainchainClient>,
-	utxo_id: &UtxoId,
+	lock_id: &BitcoinLockId,
 	fission_id: FissionId,
 	liquidity_promised: Balance,
 	ticker: &Ticker,
@@ -1335,13 +1355,13 @@ async fn wait_for_mint(
 ) -> anyhow::Result<()> {
 	let mut best_block_sub = client.live.blocks().subscribe_best().await?;
 	let pending_mint_index = client
-		.fetch_storage(&storage().mint().pending_mint_utxo_id_lookup(*utxo_id), FetchAt::Best)
+		.fetch_storage(&storage().mint().pending_mint_indices_by_lock_id(*lock_id), FetchAt::Best)
 		.await?
 		.and_then(|lookup| lookup.0.first().copied());
 	let pending_mint = if let Some(pending_mint_index) = pending_mint_index {
 		client
 			.fetch_storage(
-				&storage().mint().pending_mint_utxos_by_index(pending_mint_index),
+				&storage().mint().pending_bitcoin_mints_by_index(pending_mint_index),
 				FetchAt::Best,
 			)
 			.await?
@@ -1385,13 +1405,13 @@ async fn wait_for_mint(
 		}
 
 		let pending_mint_index = client
-			.fetch_storage(&storage().mint().pending_mint_utxo_id_lookup(*utxo_id), fetch_at)
+			.fetch_storage(&storage().mint().pending_mint_indices_by_lock_id(*lock_id), fetch_at)
 			.await?
 			.and_then(|lookup| lookup.0.first().copied());
 		let Some(pending_mint_index) = pending_mint_index else { break };
 		pending_mint = client
 			.fetch_storage(
-				&storage().mint().pending_mint_utxos_by_index(pending_mint_index),
+				&storage().mint().pending_bitcoin_mints_by_index(pending_mint_index),
 				fetch_at,
 			)
 			.await?
@@ -1432,7 +1452,7 @@ async fn owner_requests_release(
 	bitcoin_owner: &sr25519::Pair,
 	client: &Arc<MainchainClient>,
 	vault_id: VaultId,
-	utxo_id: UtxoId,
+	lock_id: BitcoinLockId,
 ) -> anyhow::Result<()> {
 	let out_script_pubkey = bitcoind
 		.client
@@ -1440,13 +1460,14 @@ async fn owner_requests_release(
 		.unwrap()
 		.require_network(network)?;
 	let lock = client
-		.fetch_storage(&storage().bitcoin_locks().locks_by_utxo_id(utxo_id), FetchAt::Finalized)
+		.fetch_storage(&storage().bitcoin_locks().locks_by_id(lock_id), FetchAt::Finalized)
 		.await?
-		.ok_or_else(|| anyhow!("No finalized lock found for utxo {utxo_id}"))?;
+		.ok_or_else(|| anyhow!("No finalized lock found for utxo {lock_id}"))?;
 	let cosign = get_cosign_script(&lock, network)?;
 	let bitcoin_network_fee = cosign
 		.calculate_fee(
 			true,
+			lock.funding_utxos.0.len(),
 			out_script_pubkey.script_pubkey(),
 			bitcoin::FeeRate::from_sat_per_vb(5).ok_or_else(|| anyhow!("Invalid fee rate"))?,
 		)?
@@ -1456,7 +1477,7 @@ async fn owner_requests_release(
 	let release_tx = client
 		.submit_tx(
 			&tx().bitcoin_locks().request_release(
-				utxo_id,
+				lock_id,
 				to_script_pubkey.into(),
 				bitcoin_network_fee,
 			),
@@ -1477,7 +1498,7 @@ async fn owner_requests_release(
 		})
 		.transpose()?
 		.expect("release event");
-	assert_eq!(release_event.utxo_id, utxo_id);
+	assert_eq!(release_event.lock_id, lock_id);
 	assert_eq!(release_event.vault_id, vault_id);
 
 	Ok(())
@@ -1488,7 +1509,7 @@ async fn vault_cosigns_release(
 	client: &MainchainClient,
 	vault_signer: &Sr25519Signer,
 	vault_id: &VaultId,
-	utxo_id: &UtxoId,
+	lock_id: &BitcoinLockId,
 	vault_xpriv: &bitcoin::bip32::Xpriv,
 	uploaded_xpub_hd_path: &str,
 ) -> anyhow::Result<()> {
@@ -1500,37 +1521,45 @@ async fn vault_cosigns_release(
 		.await?
 		.ok_or_else(|| anyhow!("No pending cosign requests found for vault {vault_id}"))?;
 	assert!(
-		pending_cosigns.0.contains(utxo_id),
-		"Missing utxo {utxo_id} from pending cosign requests for vault {vault_id}: {:?}",
+		pending_cosigns.0.contains(lock_id),
+		"Missing utxo {lock_id} from pending cosign requests for vault {vault_id}: {:?}",
 		pending_cosigns.0
 	);
 
 	let pending_request = client
 		.fetch_storage(
-			&storage().bitcoin_locks().lock_release_requests_by_utxo_id(*utxo_id),
+			&storage().bitcoin_locks().lock_release_requests_by_id(*lock_id),
 			FetchAt::Finalized,
 		)
 		.await?;
-	assert!(pending_request.is_some(), "Missing finalized release request for utxo {utxo_id}");
+	assert!(pending_request.is_some(), "Missing finalized release request for utxo {lock_id}");
 
 	let lock = client
-		.fetch_storage(&storage().bitcoin_locks().locks_by_utxo_id(*utxo_id), FetchAt::Finalized)
+		.fetch_storage(&storage().bitcoin_locks().locks_by_id(*lock_id), FetchAt::Finalized)
 		.await?
-		.ok_or_else(|| anyhow!("No finalized lock found for utxo {utxo_id}"))?;
-	let mut releaser = load_cosign_releaser(client, *utxo_id, &lock, FetchAt::Finalized).await?;
+		.ok_or_else(|| anyhow!("No finalized lock found for utxo {lock_id}"))?;
+	let mut releaser = load_cosign_releaser(client, *lock_id, &lock, FetchAt::Finalized).await?;
 	// The runtime derives each lock pubkey from the uploaded vault xpub, so we need to sign from
 	// that xpub root and then derive the per-lock child number stored on the lock.
 	let uploaded_vault_xpriv = vault_xpriv
 		.derive_priv(&Secp256k1::new(), &DerivationPath::from_str(uploaded_xpub_hd_path)?)?;
 	let vault_hd_path = DerivationPath::from(vec![ChildNumber::from(lock.vault_xpub_sources.1)]);
-	let (signature, _) = releaser.sign_derived(uploaded_vault_xpriv, vault_hd_path)?;
-	let signature: BitcoinSignature = signature
-		.try_into()
-		.map_err(|_| anyhow!("Unable to translate signature to bytes"))?;
+	let signatures = releaser
+		.sign_derived(uploaded_vault_xpriv, vault_hd_path)?
+		.into_iter()
+		.map(|(signature, _)| {
+			signature
+				.try_into()
+				.map_err(|_| anyhow!("Unable to translate signature to bytes"))
+		})
+		.collect::<anyhow::Result<Vec<BitcoinSignature>>>()?
+		.into_iter()
+		.map(Into::into)
+		.collect::<Vec<api::runtime_types::argon_primitives::bitcoin::BitcoinSignature>>();
 
 	let _ = client
 		.submit_tx(
-			&tx().bitcoin_locks().cosign_release(*utxo_id, signature.into()),
+			&tx().bitcoin_locks().cosign_release(*lock_id, signatures.into()),
 			vault_signer,
 			None,
 			true,
@@ -1543,20 +1572,22 @@ async fn vault_cosigns_release(
 async fn owner_sees_signature_and_releases(
 	client: &MainchainClient,
 	bitcoind: &BitcoinD,
-	utxo_id: &UtxoId,
+	lock_id: &BitcoinLockId,
 	hd_path: &str,
 	fingerprint: &str,
 ) -> anyhow::Result<()> {
-	let mut releaser = load_owner_release_releaser(client, *utxo_id).await?;
+	let mut releaser = load_owner_release_releaser(client, *lock_id).await?;
 	let owner_pubkey = releaser
 		.cosign_script
 		.script_args
 		.bitcoin_owner_pubkey()
 		.map_err(|e| anyhow!("Could not convert owner pubkey {e:?}"))?;
-	releaser.psbt.inputs[0].bip32_derivation.insert(
-		bitcoin::secp256k1::PublicKey::from_slice(&owner_pubkey.to_bytes())?,
-		(Fingerprint::from_str(fingerprint)?, DerivationPath::from_str(hd_path)?),
-	);
+	let owner_pubkey = bitcoin::secp256k1::PublicKey::from_slice(&owner_pubkey.to_bytes())?;
+	let owner_key_source =
+		(Fingerprint::from_str(fingerprint)?, DerivationPath::from_str(hd_path)?);
+	for input in &mut releaser.psbt.inputs {
+		input.bip32_derivation.insert(owner_pubkey, owner_key_source.clone());
+	}
 	let psbt_text = general_purpose::STANDARD.encode(&releaser.psbt.serialize()[..]);
 
 	println!("Processing with wallet");
@@ -1603,12 +1634,12 @@ async fn owner_sees_signature_and_releases(
 
 async fn owner_signs_and_releases(
 	client: &MainchainClient,
-	utxo_id: &UtxoId,
+	lock_id: &BitcoinLockId,
 	owner_xpriv: &bitcoin::bip32::Xpriv,
 	owner_hd_path: &str,
 	bitcoin_rpc_url: &str,
 ) -> anyhow::Result<()> {
-	let mut releaser = load_owner_release_releaser(client, *utxo_id).await?;
+	let mut releaser = load_owner_release_releaser(client, *lock_id).await?;
 	releaser.sign_derived(owner_xpriv.clone(), DerivationPath::from_str(owner_hd_path)?)?;
 	let confirmations = Arc::new(std::sync::Mutex::new(0));
 
@@ -1632,22 +1663,14 @@ async fn owner_signs_and_releases(
 
 async fn load_cosign_releaser(
 	client: &MainchainClient,
-	utxo_id: UtxoId,
+	lock_id: BitcoinLockId,
 	lock: &api::runtime_types::pallet_bitcoin_locks::pallet::LockedBitcoin,
 	at_block: FetchAt,
 ) -> anyhow::Result<CosignReleaser> {
-	let utxo_ref = client
-		.fetch_storage(&storage().bitcoin_locks().utxo_id_to_funding_utxo_ref(utxo_id), at_block)
-		.await?
-		.ok_or_else(|| anyhow!("No funding utxo found for lock {utxo_id}"))?;
 	let release_request = client
-		.fetch_storage(
-			&storage().bitcoin_locks().lock_release_requests_by_utxo_id(utxo_id),
-			at_block,
-		)
+		.fetch_storage(&storage().bitcoin_locks().lock_release_requests_by_id(lock_id), at_block)
 		.await?
-		.ok_or_else(|| anyhow!("No release request found for lock {utxo_id}"))?;
-	let txid: Txid = H256Le(utxo_ref.txid.0).into();
+		.ok_or_else(|| anyhow!("No release request found for lock {lock_id}"))?;
 	let to_script_pubkey: BitcoinScriptPubkey = release_request
 		.to_script_pubkey
 		.try_into()
@@ -1660,9 +1683,16 @@ async fn load_cosign_releaser(
 
 	Ok(CosignReleaser::from_script(
 		get_cosign_script(lock, bitcoin_network.into())?,
-		lock.funded_satoshis,
-		txid,
-		utxo_ref.output_index,
+		lock.funding_utxos
+			.0
+			.iter()
+			.map(|(utxo_ref, satoshis)| {
+				(
+					UtxoRef { txid: H256Le(utxo_ref.txid.0), output_index: utxo_ref.output_index },
+					*satoshis,
+				)
+			})
+			.collect(),
 		argon_bitcoin::ReleaseStep::VaultCosign,
 		argon_bitcoin::Amount::from_sat(release_request.bitcoin_network_fee),
 		to_script_pubkey.into(),
@@ -1671,57 +1701,88 @@ async fn load_cosign_releaser(
 
 async fn load_owner_release_releaser(
 	client: &MainchainClient,
-	utxo_id: UtxoId,
+	lock_id: BitcoinLockId,
 ) -> anyhow::Result<CosignReleaser> {
 	let release_height = client
 		.fetch_storage(
-			&storage().bitcoin_locks().lock_release_cosign_height_by_id(utxo_id),
+			&storage().bitcoin_locks().lock_release_cosign_height_by_id(lock_id),
 			FetchAt::Finalized,
 		)
 		.await?
-		.ok_or_else(|| anyhow!("No release cosign height found for utxo {utxo_id}"))?;
+		.ok_or_else(|| anyhow!("No release cosign height found for utxo {lock_id}"))?;
 	let release_block = client
 		.block_at_height(release_height)
 		.await?
 		.ok_or_else(|| anyhow!("No block found for release height {release_height}"))?;
-	let release_event = client
-		.live
-		.blocks()
-		.at(release_block)
-		.await?
-		.events()
-		.await?
-		.find_first::<api::bitcoin_locks::events::BitcoinUtxoCosigned>()?
-		.ok_or_else(|| anyhow!("No corresponding cosign event found for utxo {utxo_id}"))?;
+	let release_events = client.live.blocks().at(release_block).await?.events().await?;
+	let release_event = find_cosign_event_for_lock(
+		release_events.find::<api::bitcoin_locks::events::BitcoinUtxoCosigned>(),
+		lock_id,
+	)?
+	.ok_or_else(|| anyhow!("No corresponding cosign event found for utxo {lock_id}"))?;
 	let active_height = client.block_at_height(release_height.saturating_sub(1)).await?;
 	let fetch_at = active_height.map(Into::into).unwrap_or_default();
 	let lock = client
-		.fetch_storage(&storage().bitcoin_locks().locks_by_utxo_id(utxo_id), fetch_at)
+		.fetch_storage(&storage().bitcoin_locks().locks_by_id(lock_id), fetch_at)
 		.await?
-		.ok_or_else(|| anyhow!("No lock found for utxo {utxo_id}"))?;
-	let mut releaser = load_cosign_releaser(client, utxo_id, &lock, fetch_at).await?;
-	let vault_signature: BitcoinSignature = release_event
-		.signature
-		.try_into()
-		.map_err(|_| anyhow!("Unable to decode vault signature"))?;
-
-	releaser.add_signature(
-		releaser
-			.cosign_script
-			.script_args
-			.bitcoin_vault_pubkey()
-			.map_err(|e| anyhow!("Could not convert vault pubkey {e:?}"))?,
-		vault_signature.try_into()?,
-	);
+		.ok_or_else(|| anyhow!("No lock found for utxo {lock_id}"))?;
+	let mut releaser = load_cosign_releaser(client, lock_id, &lock, fetch_at).await?;
+	let vault_pubkey = releaser
+		.cosign_script
+		.script_args
+		.bitcoin_vault_pubkey()
+		.map_err(|e| anyhow!("Could not convert vault pubkey {e:?}"))?;
+	for (input_index, vault_signature) in release_event.signatures.0.into_iter().enumerate() {
+		let vault_signature: BitcoinSignature = vault_signature
+			.try_into()
+			.map_err(|_| anyhow!("Unable to decode vault signature"))?;
+		releaser.add_signature(input_index, vault_pubkey, vault_signature.try_into()?)?;
+	}
 
 	let vault_pubkey: CompressedBitcoinPubkey = lock.vault_pubkey.into();
 	let vault_pubkey: bitcoin::CompressedPublicKey = vault_pubkey.try_into()?;
 	let vault_hd_path = DerivationPath::from(vec![ChildNumber::from(lock.vault_xpub_sources.1)]);
-	releaser.psbt.inputs[0]
-		.bip32_derivation
-		.insert(vault_pubkey.0, (Fingerprint::from(lock.vault_xpub_sources.0), vault_hd_path));
+	let vault_key_source = (Fingerprint::from(lock.vault_xpub_sources.0), vault_hd_path);
+	for input in &mut releaser.psbt.inputs {
+		input.bip32_derivation.insert(vault_pubkey.0, vault_key_source.clone());
+	}
 
 	Ok(releaser)
+}
+
+fn find_cosign_event_for_lock(
+	events: impl IntoIterator<
+		Item = Result<api::bitcoin_locks::events::BitcoinUtxoCosigned, subxt::Error>,
+	>,
+	lock_id: BitcoinLockId,
+) -> Result<Option<api::bitcoin_locks::events::BitcoinUtxoCosigned>, subxt::Error> {
+	for event in events {
+		let event = event?;
+		if event.lock_id == lock_id {
+			return Ok(Some(event));
+		}
+	}
+	Ok(None)
+}
+
+#[test]
+fn owner_release_selects_the_cosign_event_for_its_lock() {
+	fn event(lock_id: BitcoinLockId) -> api::bitcoin_locks::events::BitcoinUtxoCosigned {
+		api::bitcoin_locks::events::BitcoinUtxoCosigned {
+			lock_id,
+			vault_id: 1,
+			signatures: Vec::new().into(),
+		}
+	}
+
+	let selected = find_cosign_event_for_lock(
+		vec![Ok::<_, subxt::Error>(event(1)), Ok::<_, subxt::Error>(event(2))].into_iter(),
+		2,
+	)
+	.expect("events decode")
+	.expect("matching event");
+
+	assert_eq!(selected.lock_id, 2);
 }
 
 fn get_cosign_script(

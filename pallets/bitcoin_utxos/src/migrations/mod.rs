@@ -1,7 +1,9 @@
-use crate::{Config, Pallet, UtxoAddressByUtxoId, UtxoIdByScriptPubkey, UtxoRefsByUtxoId};
+use crate::{Config, LockIdByScriptPubkey, Pallet, UtxoAddressByLockId, UtxoRefsByLockId};
 use alloc::collections::BTreeMap;
 use argon_primitives::{
-	bitcoin::{BitcoinCosignScriptPubkey, BitcoinHeight, Satoshis, UtxoAddress, UtxoId, UtxoRef},
+	bitcoin::{
+		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinLockId, Satoshis, UtxoAddress, UtxoRef,
+	},
 	BitcoinUtxoEvents,
 };
 use frame_support::{storage_alias, traits::UncheckedOnRuntimeUpgrade};
@@ -12,7 +14,7 @@ mod old_storage {
 
 	#[derive(Clone, Encode, Decode, TypeInfo, MaxEncodedLen)]
 	pub struct UtxoAddress {
-		pub utxo_id: UtxoId,
+		pub lock_id: BitcoinLockId,
 		pub script_pubkey: BitcoinCosignScriptPubkey,
 		#[codec(compact)]
 		pub satoshis: Satoshis,
@@ -28,20 +30,20 @@ mod old_storage {
 
 	#[storage_alias]
 	pub type LocksPendingFunding<T: Config> =
-		StorageValue<Pallet<T>, BTreeMap<UtxoId, UtxoAddress>, ValueQuery>;
+		StorageValue<Pallet<T>, BTreeMap<BitcoinLockId, UtxoAddress>, ValueQuery>;
 
 	#[storage_alias]
 	pub type ExpiredPendingFunding<T: Config> =
-		StorageValue<Pallet<T>, BTreeMap<UtxoId, UtxoAddress>, ValueQuery>;
+		StorageValue<Pallet<T>, BTreeMap<BitcoinLockId, UtxoAddress>, ValueQuery>;
 
 	#[storage_alias]
 	pub type CandidateUtxoRefsByUtxoId<T: Config> =
-		StorageMap<Pallet<T>, Twox64Concat, UtxoId, BTreeMap<UtxoRef, Satoshis>, ValueQuery>;
+		StorageMap<Pallet<T>, Twox64Concat, BitcoinLockId, BTreeMap<UtxoRef, Satoshis>, ValueQuery>;
 
 	impl From<UtxoAddress> for argon_primitives::bitcoin::UtxoAddress {
 		fn from(value: UtxoAddress) -> Self {
 			Self {
-				utxo_id: value.utxo_id,
+				lock_id: value.lock_id,
 				script_pubkey: value.script_pubkey,
 				submitted_at_height: value.submitted_at_height,
 			}
@@ -57,35 +59,35 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for MigrateUtxoTracking<T> {
 
 		for (_, watch) in old_storage::LocksPendingFunding::<T>::take() {
 			let watch = UtxoAddress::from(watch);
-			UtxoIdByScriptPubkey::<T>::insert(watch.script_pubkey, watch.utxo_id);
-			UtxoAddressByUtxoId::<T>::insert(watch.utxo_id, watch);
+			LockIdByScriptPubkey::<T>::insert(watch.script_pubkey, watch.lock_id);
+			UtxoAddressByLockId::<T>::insert(watch.lock_id, watch);
 			weight.saturating_accrue(T::DbWeight::get().writes(2));
 		}
 		for (_, watch) in old_storage::ExpiredPendingFunding::<T>::take() {
 			let watch = UtxoAddress::from(watch);
-			UtxoIdByScriptPubkey::<T>::insert(watch.script_pubkey, watch.utxo_id);
-			UtxoAddressByUtxoId::<T>::insert(watch.utxo_id, watch);
+			LockIdByScriptPubkey::<T>::insert(watch.script_pubkey, watch.lock_id);
+			UtxoAddressByLockId::<T>::insert(watch.lock_id, watch);
 			weight.saturating_accrue(T::DbWeight::get().writes(2));
 		}
 
 		let locked_utxos = old_storage::LockedUtxos::<T>::iter().collect::<Vec<_>>();
 		for (utxo_ref, watch) in locked_utxos {
-			UtxoRefsByUtxoId::<T>::try_mutate(watch.utxo_id, |refs| {
+			UtxoRefsByLockId::<T>::try_mutate(watch.lock_id, |refs| {
 				refs.try_insert(utxo_ref.clone()).map_err(|_| ())
 			})
 			.expect("known legacy UTXO refs fit in the new tracker");
 			let watch = UtxoAddress::from(watch);
-			UtxoIdByScriptPubkey::<T>::insert(watch.script_pubkey, watch.utxo_id);
-			UtxoAddressByUtxoId::<T>::insert(watch.utxo_id, watch);
+			LockIdByScriptPubkey::<T>::insert(watch.script_pubkey, watch.lock_id);
+			UtxoAddressByLockId::<T>::insert(watch.lock_id, watch);
 			old_storage::LockedUtxos::<T>::remove(&utxo_ref);
 			weight.saturating_accrue(T::DbWeight::get().writes(3));
 		}
 
 		let candidate_utxos =
 			old_storage::CandidateUtxoRefsByUtxoId::<T>::iter().collect::<Vec<_>>();
-		for (utxo_id, candidates) in candidate_utxos {
+		for (lock_id, candidates) in candidate_utxos {
 			for (utxo_ref, satoshis) in candidates {
-				UtxoRefsByUtxoId::<T>::try_mutate(utxo_id, |refs| {
+				UtxoRefsByLockId::<T>::try_mutate(lock_id, |refs| {
 					if refs.contains(&utxo_ref) {
 						Ok(())
 					} else {
@@ -93,10 +95,10 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for MigrateUtxoTracking<T> {
 					}
 				})
 				.expect("known legacy candidate UTXO refs fit in the new tracker");
-				T::EventHandler::utxo_detected(utxo_id, utxo_ref, satoshis, BitcoinHeight::MAX)
+				T::EventHandler::utxo_detected(lock_id, utxo_ref, satoshis, BitcoinHeight::MAX)
 					.expect("legacy candidate UTXOs replay after Bitcoin Locks are migrated");
 			}
-			old_storage::CandidateUtxoRefsByUtxoId::<T>::remove(utxo_id);
+			old_storage::CandidateUtxoRefsByUtxoId::<T>::remove(lock_id);
 			weight.saturating_accrue(T::DbWeight::get().writes(2));
 		}
 
@@ -141,7 +143,7 @@ mod tests {
 		new_test_ext().execute_with(|| {
 			StorageVersion::new(2).put::<Pallet<Test>>();
 			let first_old_watch = old_storage::UtxoAddress {
-				utxo_id: 1,
+				lock_id: 1,
 				script_pubkey: BitcoinCosignScriptPubkey::P2WSH {
 					wscript_hash: sp_core::H256::repeat_byte(1),
 				},
@@ -150,7 +152,7 @@ mod tests {
 				watch_for_spent_until_height: 50,
 			};
 			let second_old_watch = old_storage::UtxoAddress {
-				utxo_id: 2,
+				lock_id: 2,
 				script_pubkey: BitcoinCosignScriptPubkey::P2WSH {
 					wscript_hash: sp_core::H256::repeat_byte(2),
 				},
@@ -177,12 +179,12 @@ mod tests {
 
 			MigrateUtxoTrackingMigration::<Test>::on_runtime_upgrade();
 
-			assert_eq!(UtxoAddressByUtxoId::<Test>::get(1), Some(first_watch));
-			assert_eq!(UtxoAddressByUtxoId::<Test>::get(2), Some(second_watch));
-			let first_refs = UtxoRefsByUtxoId::<Test>::get(1);
+			assert_eq!(UtxoAddressByLockId::<Test>::get(1), Some(first_watch));
+			assert_eq!(UtxoAddressByLockId::<Test>::get(2), Some(second_watch));
+			let first_refs = UtxoRefsByLockId::<Test>::get(1);
 			assert!(first_refs.contains(&first_funding_ref));
 			assert!(first_refs.contains(&first_candidate_ref));
-			let second_refs = UtxoRefsByUtxoId::<Test>::get(2);
+			let second_refs = UtxoRefsByLockId::<Test>::get(2);
 			assert!(second_refs.contains(&second_funding_ref));
 			assert!(second_refs.contains(&second_candidate_ref));
 			assert!(old_storage::LockedUtxos::<Test>::iter_keys().next().is_none());

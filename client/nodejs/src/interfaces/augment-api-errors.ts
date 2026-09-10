@@ -245,11 +245,15 @@ declare module '@polkadot/api-base/types/errors' {
       /**
        * The lock funding has not been confirmed on bitcoin
        **/
-      LockPendingFunding: AugmentedError<ApiType>;
+      LockNotFunded: AugmentedError<ApiType>;
       /**
        * Too many orphaned utxo release requests for a lock
        **/
       MaxOrphanedUtxoReleaseRequestsExceeded: AugmentedError<ApiType>;
+      /**
+       * Too many confirmed Bitcoin outputs were assigned to one Lock.
+       **/
+      MaxUtxosPerLockExceeded: AugmentedError<ApiType>;
       /**
        * The requested price-history entry predates the Lock's current securitization.
        **/
@@ -313,9 +317,9 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       BitcoinHeightNotConfirmed: AugmentedError<ApiType>;
       /**
-       * Duplicated UtxoId. Already in use
+       * Duplicated BitcoinLockId. Already in use
        **/
-      DuplicateUtxoId: AugmentedError<ApiType>;
+      DuplicateLockId: AugmentedError<ApiType>;
       /**
        * Insufficient bitcoin amount
        **/
@@ -332,10 +336,6 @@ declare module '@polkadot/api-base/types/errors' {
        * Too many UTXOs are being watched
        **/
       MaxUtxosExceeded: AugmentedError<ApiType>;
-      /**
-       * Too many outputs have been observed at one Lock address.
-       **/
-      MaxUtxosPerLockExceeded: AugmentedError<ApiType>;
       /**
        * No Oracle-provided bitcoin block has been provided to the network
        **/

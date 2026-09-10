@@ -18,6 +18,7 @@ set -e
 RUNTIME_TYPE=${1:-all}
 REPEAT_COUNT=${2:-20}
 SPECIFIC_PALLET=${3:-all}
+BUILD_DIR=$(cargo metadata --format-version 1 --no-deps | jq -e -r '.build_directory // .target_directory')
 
 # Function to get dynamic list of pallets for a runtime
 get_pallets_for_runtime() {
@@ -51,9 +52,9 @@ dedupe_component_ranges() {
 function benchmark_runtime() {
     local runtime_name=$1
     if [ "$runtime_name" = "canary" ]; then
-        local runtime_path="./target/release/wbuild/argon-canary-runtime/argon_canary_runtime.compact.wasm"
+        local runtime_path="$BUILD_DIR/release/wbuild/argon-canary-runtime/argon_canary_runtime.compact.wasm"
     else
-        local runtime_path="./target/release/wbuild/${runtime_name}-runtime/${runtime_name}_runtime.compact.wasm"
+        local runtime_path="$BUILD_DIR/release/wbuild/${runtime_name}-runtime/${runtime_name}_runtime.compact.wasm"
     fi
     local output_dir="runtime/${runtime_name}/src/weights"
 

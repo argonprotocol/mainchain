@@ -2,8 +2,8 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use argon_primitives::{
-	bitcoin::UtxoId, BitcoinFissionMinting, BitcoinFissionRequirements, BitcoinFissionsProvider,
-	OperationalAccountsHook,
+	bitcoin::BitcoinLockId, BitcoinFissionMinting, BitcoinFissionRequirements,
+	BitcoinFissionsProvider, OperationalAccountsHook,
 };
 use pallet_prelude::*;
 
@@ -22,7 +22,7 @@ mod weights;
 pub mod pallet {
 	use super::*;
 	use argon_primitives::{
-		bitcoin::{FissionId, LiquidId, Satoshis, UtxoId},
+		bitcoin::{BitcoinLockId, FissionId, LiquidId, Satoshis},
 		providers::{BitcoinFissionLockError, BitcoinFissionLockProvider},
 	};
 	use codec::HasCompact;
@@ -84,7 +84,7 @@ pub mod pallet {
 	pub type FissionIdsByLockId<T: Config> = StorageMap<
 		_,
 		Twox64Concat,
-		UtxoId,
+		BitcoinLockId,
 		BoundedBTreeSet<FissionId, T::MaxFissionsPerLock>,
 		ValueQuery,
 	>;
@@ -108,7 +108,7 @@ pub mod pallet {
 		pub liquid_id: LiquidId,
 		/// Source Lock whose funded satoshis back this Fission.
 		#[codec(compact)]
-		pub utxo_id: UtxoId,
+		pub lock_id: BitcoinLockId,
 		/// Satoshis allocated from the source Lock.
 		#[codec(compact)]
 		pub satoshis: Satoshis,
@@ -140,7 +140,7 @@ pub mod pallet {
 			account_id: T::AccountId,
 			fission_id: FissionId,
 			liquid_id: LiquidId,
-			utxo_id: UtxoId,
+			lock_id: BitcoinLockId,
 			satoshis: Satoshis,
 			microgons_at_target_per_btc: T::Balance,
 			liquidity_promised: T::Balance,
@@ -162,7 +162,11 @@ pub mod pallet {
 			redemption_amount: T::Balance,
 		},
 		/// An active Fission was closed because its source Lock was spent.
-		FissionClosedByLock { account_id: T::AccountId, fission_id: FissionId, utxo_id: UtxoId },
+		FissionClosedByLock {
+			account_id: T::AccountId,
+			fission_id: FissionId,
+			lock_id: BitcoinLockId,
+		},
 	}
 
 	#[pallet::error]
@@ -241,7 +245,7 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			#[pallet::compact] fission_id: FissionId,
 			#[pallet::compact] liquid_id: LiquidId,
-			#[pallet::compact] utxo_id: UtxoId,
+			#[pallet::compact] lock_id: BitcoinLockId,
 			#[pallet::compact] satoshis: Satoshis,
 			#[pallet::compact] microgons_at_target_per_btc: T::Balance,
 		) -> DispatchResult {
@@ -255,7 +259,7 @@ pub mod pallet {
 			);
 			let next_fission_id = fission_id.checked_add(1).ok_or(Error::<T>::FissionIdOverflow)?;
 
-			FissionIdsByLockId::<T>::try_mutate(utxo_id, |fission_ids| {
+			FissionIdsByLockId::<T>::try_mutate(lock_id, |fission_ids| {
 				fission_ids
 					.try_insert(fission_id)
 					.map(|_| ())
@@ -263,12 +267,12 @@ pub mod pallet {
 			})?;
 			let (liquidity_promised, last_ratchet_tick) = T::LockProvider::fission_satoshis(
 				&account_id,
-				utxo_id,
+				lock_id,
 				satoshis,
 				microgons_at_target_per_btc,
 			)
 			.map_err(Error::<T>::from)?;
-			T::Minting::request_mint(&account_id, fission_id, utxo_id, liquidity_promised)?;
+			T::Minting::request_mint(&account_id, fission_id, lock_id, liquidity_promised)?;
 
 			let block_number = frame_system::Pallet::<T>::block_number();
 			FissionByOwnerAndId::<T>::insert(
@@ -276,7 +280,7 @@ pub mod pallet {
 				fission_id,
 				Fission {
 					liquid_id,
-					utxo_id,
+					lock_id,
 					satoshis,
 					microgons_at_target_per_btc,
 					last_ratchet_tick,
@@ -296,7 +300,7 @@ pub mod pallet {
 				account_id,
 				fission_id,
 				liquid_id,
-				utxo_id,
+				lock_id,
 				satoshis,
 				microgons_at_target_per_btc,
 				liquidity_promised,
@@ -344,7 +348,7 @@ pub mod pallet {
 			};
 			let last_ratchet_tick = match T::LockProvider::validate_fission(
 				&account_id,
-				fission.utxo_id,
+				fission.lock_id,
 				fission.satoshis,
 				microgons_at_target_per_btc,
 				fission.last_ratchet_tick,
@@ -356,7 +360,7 @@ pub mod pallet {
 					return Err(Error::<T>::NoRatchetingAvailable.into()),
 				Err(error) => return Err(Error::<T>::from(error).into()),
 			};
-			T::Minting::request_mint(&account_id, fission_id, fission.utxo_id, amount_minted)?;
+			T::Minting::request_mint(&account_id, fission_id, fission.lock_id, amount_minted)?;
 
 			if !amount_burned.is_zero() {
 				T::Currency::burn_from(
@@ -417,12 +421,12 @@ pub mod pallet {
 
 			let redemption_amount = T::LockProvider::fuse_satoshis(
 				&account_id,
-				fission.utxo_id,
+				fission.lock_id,
 				fission.satoshis,
 				fission.microgons_at_target_per_btc,
 			)
 			.map_err(Error::<T>::from)?;
-			FissionIdsByLockId::<T>::mutate_exists(fission.utxo_id, |fission_ids| {
+			FissionIdsByLockId::<T>::mutate_exists(fission.lock_id, |fission_ids| {
 				let is_empty = fission_ids
 					.as_mut()
 					.map(|fission_ids| {
@@ -471,10 +475,10 @@ impl<T: Config> BitcoinFissionsProvider<T::AccountId, T::Balance> for Pallet<T> 
 
 	fn get_lock_fission_requirements(
 		account_id: &T::AccountId,
-		utxo_id: UtxoId,
+		lock_id: BitcoinLockId,
 	) -> Option<BitcoinFissionRequirements<T::Balance>> {
 		let mut requirements: Option<BitcoinFissionRequirements<T::Balance>> = None;
-		for fission_id in FissionIdsByLockId::<T>::get(utxo_id) {
+		for fission_id in FissionIdsByLockId::<T>::get(lock_id) {
 			let Some(fission) = FissionByOwnerAndId::<T>::get(account_id, fission_id) else {
 				continue
 			};
@@ -499,11 +503,11 @@ impl<T: Config> BitcoinFissionsProvider<T::AccountId, T::Balance> for Pallet<T> 
 
 	fn close_for_lock(
 		account_id: &T::AccountId,
-		utxo_id: UtxoId,
+		lock_id: BitcoinLockId,
 		burned_argons: T::Balance,
 	) -> DispatchResult {
 		let mut fission_liability = T::Balance::zero();
-		for fission_id in FissionIdsByLockId::<T>::take(utxo_id) {
+		for fission_id in FissionIdsByLockId::<T>::take(lock_id) {
 			FissionByOwnerAndId::<T>::try_mutate_exists(
 				account_id,
 				fission_id,
@@ -521,7 +525,7 @@ impl<T: Config> BitcoinFissionsProvider<T::AccountId, T::Balance> for Pallet<T> 
 					Self::deposit_event(Event::FissionClosedByLock {
 						account_id: account_id.clone(),
 						fission_id,
-						utxo_id,
+						lock_id,
 					});
 					Ok(())
 				},

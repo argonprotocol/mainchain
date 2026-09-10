@@ -38,16 +38,16 @@ impl<T: frame_system::Config> pallet_mint::WeightInfo for WeightInfo<T> {
 	/// Proof: `Mint::MintedBitcoinMicrogons` (`max_values`: Some(1), `max_size`: Some(16), added: 511, mode: `MaxEncodedLen`)
 	/// Storage: `Mint::MintedMiningMicrogons` (r:1 w:0)
 	/// Proof: `Mint::MintedMiningMicrogons` (`max_values`: Some(1), `max_size`: Some(16), added: 511, mode: `MaxEncodedLen`)
-	/// Storage: `Mint::NextPendingMintUtxoIndex` (r:1 w:0)
-	/// Proof: `Mint::NextPendingMintUtxoIndex` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
+	/// Storage: `Mint::NextPendingBitcoinMintIndex` (r:1 w:0)
+	/// Proof: `Mint::NextPendingBitcoinMintIndex` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
 	/// Storage: `Mint::PendingMintQueueState` (r:1 w:1)
 	/// Proof: `Mint::PendingMintQueueState` (`max_values`: Some(1), `max_size`: Some(25), added: 520, mode: `MaxEncodedLen`)
-	/// Storage: `Mint::PendingMintUtxosByIndex` (r:1000 w:1000)
-	/// Proof: `Mint::PendingMintUtxosByIndex` (`max_values`: None, `max_size`: Some(104), added: 2579, mode: `MaxEncodedLen`)
+	/// Storage: `Mint::PendingBitcoinMintsByIndex` (r:1000 w:1000)
+	/// Proof: `Mint::PendingBitcoinMintsByIndex` (`max_values`: None, `max_size`: Some(104), added: 2579, mode: `MaxEncodedLen`)
 	/// Storage: `System::Account` (r:1000 w:1000)
 	/// Proof: `System::Account` (`max_values`: None, `max_size`: Some(128), added: 2603, mode: `MaxEncodedLen`)
-	/// Storage: `Mint::PendingMintUtxoIdLookup` (r:20 w:20)
-	/// Proof: `Mint::PendingMintUtxoIdLookup` (`max_values`: None, `max_size`: Some(425), added: 2900, mode: `MaxEncodedLen`)
+	/// Storage: `Mint::PendingMintIndicesByLockId` (r:20 w:20)
+	/// Proof: `Mint::PendingMintIndicesByLockId` (`max_values`: None, `max_size`: Some(425), added: 2900, mode: `MaxEncodedLen`)
 	/// The range of component `u` is `[0, 1000]`.
 	fn on_initialize(u: u32, ) -> Weight {
 		// Proof Size summary in bytes:
@@ -63,12 +63,12 @@ impl<T: frame_system::Config> pallet_mint::WeightInfo for WeightInfo<T> {
 			.saturating_add(T::DbWeight::get().writes((2_u64).saturating_mul(u.into())))
 				.saturating_add(Weight::from_parts(0, 2603).saturating_mul(u.into()))
 		}
-	/// Storage: `Mint::NextPendingMintUtxoIndex` (r:1 w:1)
-	/// Proof: `Mint::NextPendingMintUtxoIndex` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
-	/// Storage: `Mint::PendingMintUtxoIdLookup` (r:1 w:1)
-	/// Proof: `Mint::PendingMintUtxoIdLookup` (`max_values`: None, `max_size`: Some(425), added: 2900, mode: `MaxEncodedLen`)
-	/// Storage: `Mint::PendingMintUtxosByIndex` (r:0 w:1)
-	/// Proof: `Mint::PendingMintUtxosByIndex` (`max_values`: None, `max_size`: Some(104), added: 2579, mode: `MaxEncodedLen`)
+	/// Storage: `Mint::NextPendingBitcoinMintIndex` (r:1 w:1)
+	/// Proof: `Mint::NextPendingBitcoinMintIndex` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
+	/// Storage: `Mint::PendingMintIndicesByLockId` (r:1 w:1)
+	/// Proof: `Mint::PendingMintIndicesByLockId` (`max_values`: None, `max_size`: Some(425), added: 2900, mode: `MaxEncodedLen`)
+	/// Storage: `Mint::PendingBitcoinMintsByIndex` (r:0 w:1)
+	/// Proof: `Mint::PendingBitcoinMintsByIndex` (`max_values`: None, `max_size`: Some(104), added: 2579, mode: `MaxEncodedLen`)
 	fn provider_mint_requested() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `408`

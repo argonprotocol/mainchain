@@ -85,8 +85,8 @@ impl<T: frame_system::Config> pallet_bitcoin_utxos::WeightInfo for WeightInfo<T>
 		Weight::from_parts(2_000_000, 0)
 			.saturating_add(T::DbWeight::get().writes(1))
 		}
-	/// Storage: `BitcoinUtxos::UtxoRefsByUtxoId` (r:20 w:20)
-	/// Proof: `BitcoinUtxos::UtxoRefsByUtxoId` (`max_values`: None, `max_size`: Some(3618), added: 6093, mode: `MaxEncodedLen`)
+	/// Storage: `BitcoinUtxos::UtxoRefsByLockId` (r:20 w:20)
+	/// Proof: `BitcoinUtxos::UtxoRefsByLockId` (`max_values`: None, `max_size`: Some(3618), added: 6093, mode: `MaxEncodedLen`)
 	/// The range of component `n` is `[1, 20]`.
 	fn utxo_spent(n: u32, ) -> Weight {
 		// Proof Size summary in bytes:
@@ -102,12 +102,12 @@ impl<T: frame_system::Config> pallet_bitcoin_utxos::WeightInfo for WeightInfo<T>
 		}
 	/// Storage: `BitcoinLocks::MinimumSatoshis` (r:1 w:0)
 	/// Proof: `BitcoinLocks::MinimumSatoshis` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
-	/// Storage: `BitcoinUtxos::UtxoAddressByUtxoId` (r:20 w:0)
-	/// Proof: `BitcoinUtxos::UtxoAddressByUtxoId` (`max_values`: None, `max_size`: Some(65), added: 2540, mode: `MaxEncodedLen`)
-	/// Storage: `BitcoinUtxos::UtxoIdByScriptPubkey` (r:20 w:0)
-	/// Proof: `BitcoinUtxos::UtxoIdByScriptPubkey` (`max_values`: None, `max_size`: Some(57), added: 2532, mode: `MaxEncodedLen`)
-	/// Storage: `BitcoinUtxos::UtxoRefsByUtxoId` (r:20 w:20)
-	/// Proof: `BitcoinUtxos::UtxoRefsByUtxoId` (`max_values`: None, `max_size`: Some(3618), added: 6093, mode: `MaxEncodedLen`)
+	/// Storage: `BitcoinUtxos::UtxoAddressByLockId` (r:20 w:0)
+	/// Proof: `BitcoinUtxos::UtxoAddressByLockId` (`max_values`: None, `max_size`: Some(65), added: 2540, mode: `MaxEncodedLen`)
+	/// Storage: `BitcoinUtxos::LockIdByScriptPubkey` (r:20 w:0)
+	/// Proof: `BitcoinUtxos::LockIdByScriptPubkey` (`max_values`: None, `max_size`: Some(57), added: 2532, mode: `MaxEncodedLen`)
+	/// Storage: `BitcoinUtxos::UtxoRefsByLockId` (r:20 w:20)
+	/// Proof: `BitcoinUtxos::UtxoRefsByLockId` (`max_values`: None, `max_size`: Some(3618), added: 6093, mode: `MaxEncodedLen`)
 	/// The range of component `n` is `[1, 20]`.
 	fn lock_verified(n: u32, ) -> Weight {
 		// Proof Size summary in bytes:

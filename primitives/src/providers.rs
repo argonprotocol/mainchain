@@ -3,7 +3,7 @@ use polkadot_sdk::*;
 
 use super::{
 	bitcoin::{
-		BitcoinCosignScriptPubkey, BitcoinHeight, FissionId, Satoshis, UtxoId, UtxoRef,
+		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinLockId, FissionId, Satoshis, UtxoRef,
 		SATOSHIS_PER_BITCOIN,
 	},
 	block_seal::{BlockPayout, FrameId, MiningAuthority},
@@ -273,7 +273,7 @@ pub trait BitcoinFissionsProvider<AccountId, Balance> {
 	/// Return the aggregate securitization requirements of a Lock's active Fissions.
 	fn get_lock_fission_requirements(
 		_account_id: &AccountId,
-		_utxo_id: UtxoId,
+		_lock_id: BitcoinLockId,
 	) -> Option<BitcoinFissionRequirements<Balance>> {
 		None
 	}
@@ -282,7 +282,7 @@ pub trait BitcoinFissionsProvider<AccountId, Balance> {
 	/// during that Lock transition against their mint liability.
 	fn close_for_lock(
 		_account_id: &AccountId,
-		_utxo_id: UtxoId,
+		_lock_id: BitcoinLockId,
 		_burned_argons: Balance,
 	) -> DispatchResult {
 		Ok(())
@@ -356,7 +356,7 @@ pub trait BitcoinFissionLockProvider<AccountId, Balance> {
 	/// tick for the submitted target-normalized BTC value.
 	fn fission_satoshis(
 		account_id: &AccountId,
-		utxo_id: UtxoId,
+		lock_id: BitcoinLockId,
 		satoshis: Satoshis,
 		microgons_at_target_per_btc: Balance,
 	) -> Result<(Balance, Tick), BitcoinFissionLockError>;
@@ -365,7 +365,7 @@ pub trait BitcoinFissionLockProvider<AccountId, Balance> {
 	/// target-normalized BTC value.
 	fn validate_fission(
 		account_id: &AccountId,
-		utxo_id: UtxoId,
+		lock_id: BitcoinLockId,
 		satoshis: Satoshis,
 		microgons_at_target_per_btc: Balance,
 		minimum_last_ratchet_tick: Tick,
@@ -382,7 +382,7 @@ pub trait BitcoinFissionLockProvider<AccountId, Balance> {
 	/// Fuse one Fission's satoshis back into its Lock and return the redemption amount.
 	fn fuse_satoshis(
 		account_id: &AccountId,
-		utxo_id: UtxoId,
+		lock_id: BitcoinLockId,
 		satoshis: Satoshis,
 		microgons_at_target_per_btc: Balance,
 	) -> Result<Balance, BitcoinFissionLockError>;
@@ -393,7 +393,7 @@ impl<AccountId, Balance> BitcoinFissionLockProvider<AccountId, Balance> for () {
 
 	fn fission_satoshis(
 		_account_id: &AccountId,
-		_utxo_id: UtxoId,
+		_lock_id: BitcoinLockId,
 		_satoshis: Satoshis,
 		_microgons_at_target_per_btc: Balance,
 	) -> Result<(Balance, Tick), BitcoinFissionLockError> {
@@ -402,7 +402,7 @@ impl<AccountId, Balance> BitcoinFissionLockProvider<AccountId, Balance> for () {
 
 	fn validate_fission(
 		_account_id: &AccountId,
-		_utxo_id: UtxoId,
+		_lock_id: BitcoinLockId,
 		_satoshis: Satoshis,
 		_microgons_at_target_per_btc: Balance,
 		_minimum_last_ratchet_tick: Tick,
@@ -421,7 +421,7 @@ impl<AccountId, Balance> BitcoinFissionLockProvider<AccountId, Balance> for () {
 
 	fn fuse_satoshis(
 		_account_id: &AccountId,
-		_utxo_id: UtxoId,
+		_lock_id: BitcoinLockId,
 		_satoshis: Satoshis,
 		_microgons_at_target_per_btc: Balance,
 	) -> Result<Balance, BitcoinFissionLockError> {
@@ -437,7 +437,7 @@ pub trait BitcoinFissionMinting<AccountId: Codec, Balance: Codec + Copy> {
 	fn request_mint(
 		account_id: &AccountId,
 		fission_id: FissionId,
-		utxo_id: UtxoId,
+		lock_id: BitcoinLockId,
 		amount: Balance,
 	) -> DispatchResult;
 
@@ -468,10 +468,10 @@ impl<AccountId: Codec, Balance: Codec + Copy> BitcoinFissionMinting<AccountId, B
 	fn request_mint(
 		account_id: &AccountId,
 		fission_id: FissionId,
-		utxo_id: UtxoId,
+		lock_id: BitcoinLockId,
 		amount: Balance,
 	) -> DispatchResult {
-		for_tuples!( #( Tuple::request_mint(account_id, fission_id, utxo_id, amount)?; )* );
+		for_tuples!( #( Tuple::request_mint(account_id, fission_id, lock_id, amount)?; )* );
 		Ok(())
 	}
 
@@ -882,25 +882,25 @@ pub trait BitcoinUtxoTracker {
 	fn get_synched_height() -> BitcoinHeight;
 
 	fn watch_for_utxo(
-		utxo_id: UtxoId,
+		lock_id: BitcoinLockId,
 		script_pubkey: BitcoinCosignScriptPubkey,
 	) -> Result<(), DispatchError>;
-	fn unwatch_utxo(utxo_id: UtxoId, utxo_ref: &UtxoRef);
-	fn unwatch(utxo_id: UtxoId);
+	fn unwatch_utxo(lock_id: BitcoinLockId, utxo_ref: &UtxoRef);
+	fn unwatch(lock_id: BitcoinLockId);
 }
 
 pub trait BitcoinUtxoEvents<AccountId> {
 	type Weights: BitcoinUtxoEventsWeightInfo;
 
 	fn utxo_detected(
-		utxo_id: UtxoId,
+		lock_id: BitcoinLockId,
 		utxo_ref: UtxoRef,
 		satoshis: Satoshis,
 		bitcoin_height: BitcoinHeight,
 	) -> DispatchResult;
 	/// Apply consumer policy for a spent output, including removing the exact output or its entire
 	/// watched address from the UTXO tracker.
-	fn spent(utxo_id: UtxoId, utxo_ref: UtxoRef) -> DispatchResult;
+	fn spent(lock_id: BitcoinLockId, utxo_ref: UtxoRef) -> DispatchResult;
 }
 
 #[impl_trait_for_tuples::impl_for_tuples(1, 5)]
@@ -924,17 +924,17 @@ impl<AccountId> BitcoinUtxoEvents<AccountId> for Tuple {
 	for_tuples!( type Weights = ( #( Tuple::Weights ),* ); );
 
 	fn utxo_detected(
-		utxo_id: UtxoId,
+		lock_id: BitcoinLockId,
 		utxo_ref: UtxoRef,
 		satoshis: Satoshis,
 		bitcoin_height: BitcoinHeight,
 	) -> DispatchResult {
-		for_tuples!( #( Tuple::utxo_detected(utxo_id, utxo_ref.clone(), satoshis, bitcoin_height)?; )* );
+		for_tuples!( #( Tuple::utxo_detected(lock_id, utxo_ref.clone(), satoshis, bitcoin_height)?; )* );
 		Ok(())
 	}
 
-	fn spent(utxo_id: UtxoId, utxo_ref: UtxoRef) -> DispatchResult {
-		for_tuples!( #( Tuple::spent(utxo_id, utxo_ref.clone())?; )* );
+	fn spent(lock_id: BitcoinLockId, utxo_ref: UtxoRef) -> DispatchResult {
+		for_tuples!( #( Tuple::spent(lock_id, utxo_ref.clone())?; )* );
 		Ok(())
 	}
 }
@@ -1531,7 +1531,7 @@ mod tests {
 		type Weights = FirstWeights;
 
 		fn utxo_detected(
-			_utxo_id: UtxoId,
+			_lock_id: BitcoinLockId,
 			_utxo_ref: UtxoRef,
 			_received_satoshis: Satoshis,
 			_bitcoin_height: BitcoinHeight,
@@ -1539,7 +1539,7 @@ mod tests {
 			Ok(())
 		}
 
-		fn spent(_utxo_id: UtxoId, _utxo_ref: UtxoRef) -> DispatchResult {
+		fn spent(_lock_id: BitcoinLockId, _utxo_ref: UtxoRef) -> DispatchResult {
 			Ok(())
 		}
 	}
@@ -1548,7 +1548,7 @@ mod tests {
 		type Weights = SecondWeights;
 
 		fn utxo_detected(
-			_utxo_id: UtxoId,
+			_lock_id: BitcoinLockId,
 			_utxo_ref: UtxoRef,
 			_received_satoshis: Satoshis,
 			_bitcoin_height: BitcoinHeight,
@@ -1556,7 +1556,7 @@ mod tests {
 			Ok(())
 		}
 
-		fn spent(_utxo_id: UtxoId, _utxo_ref: UtxoRef) -> DispatchResult {
+		fn spent(_lock_id: BitcoinLockId, _utxo_ref: UtxoRef) -> DispatchResult {
 			Ok(())
 		}
 	}

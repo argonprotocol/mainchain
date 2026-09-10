@@ -3,7 +3,7 @@ use polkadot_sdk::frame_support::traits::StorageInstance;
 
 use crate as pallet_bitcoin_fissions;
 use argon_primitives::{
-	bitcoin::{FissionId, Satoshis, UtxoId},
+	bitcoin::{BitcoinLockId, FissionId, Satoshis},
 	providers::{
 		BitcoinFissionLockError, BitcoinFissionLockProvider, BitcoinFissionMinting,
 		OperationalAccountsHook,
@@ -82,7 +82,8 @@ impl StorageInstance for MockLocksInstance {
 	const STORAGE_PREFIX: &'static str = "Locks";
 }
 
-pub type MockLocks = StorageMap<MockLocksInstance, Twox64Concat, UtxoId, MockLock, OptionQuery>;
+pub type MockLocks =
+	StorageMap<MockLocksInstance, Twox64Concat, BitcoinLockId, MockLock, OptionQuery>;
 
 pub struct MockMintRequestsInstance;
 impl StorageInstance for MockMintRequestsInstance {
@@ -94,7 +95,7 @@ impl StorageInstance for MockMintRequestsInstance {
 }
 
 pub type MockMintRequests =
-	StorageValue<MockMintRequestsInstance, Vec<(u64, FissionId, UtxoId, u128)>, ValueQuery>;
+	StorageValue<MockMintRequestsInstance, Vec<(u64, FissionId, BitcoinLockId, u128)>, ValueQuery>;
 
 pub struct MockFissionRedemptionBurnsInstance;
 impl StorageInstance for MockFissionRedemptionBurnsInstance {
@@ -160,11 +161,11 @@ impl BitcoinFissionMinting<u64, u128> for MockFissionMinting {
 	fn request_mint(
 		account_id: &u64,
 		fission_id: FissionId,
-		utxo_id: UtxoId,
+		lock_id: BitcoinLockId,
 		amount: u128,
 	) -> DispatchResult {
 		MockMintRequests::mutate(|requests| {
-			requests.push((*account_id, fission_id, utxo_id, amount))
+			requests.push((*account_id, fission_id, lock_id, amount))
 		});
 		Ok(())
 	}
@@ -180,11 +181,11 @@ impl BitcoinFissionLockProvider<u64, u128> for MockLockProvider {
 
 	fn fission_satoshis(
 		account_id: &u64,
-		utxo_id: UtxoId,
+		lock_id: BitcoinLockId,
 		satoshis: Satoshis,
 		microgons_at_target_per_btc: u128,
 	) -> Result<(u128, Tick), BitcoinFissionLockError> {
-		MockLocks::try_mutate(utxo_id, |lock| {
+		MockLocks::try_mutate(lock_id, |lock| {
 			let lock = lock.as_mut().ok_or(BitcoinFissionLockError::LockNotFound)?;
 			if lock.owner != *account_id {
 				return Err(BitcoinFissionLockError::NoPermissions);
@@ -209,14 +210,14 @@ impl BitcoinFissionLockProvider<u64, u128> for MockLockProvider {
 
 	fn validate_fission(
 		account_id: &u64,
-		utxo_id: UtxoId,
+		lock_id: BitcoinLockId,
 		satoshis: Satoshis,
 		microgons_at_target_per_btc: u128,
 		minimum_last_ratchet_tick: Tick,
 		_current_liquidity_promised: u128,
 		_replacement_liquidity_promised: u128,
 	) -> Result<Tick, BitcoinFissionLockError> {
-		let lock = MockLocks::get(utxo_id).ok_or(BitcoinFissionLockError::LockNotFound)?;
+		let lock = MockLocks::get(lock_id).ok_or(BitcoinFissionLockError::LockNotFound)?;
 		if lock.owner != *account_id {
 			return Err(BitcoinFissionLockError::NoPermissions);
 		}
@@ -247,11 +248,11 @@ impl BitcoinFissionLockProvider<u64, u128> for MockLockProvider {
 
 	fn fuse_satoshis(
 		account_id: &u64,
-		utxo_id: UtxoId,
+		lock_id: BitcoinLockId,
 		satoshis: Satoshis,
 		_microgons_at_target_per_btc: u128,
 	) -> Result<u128, BitcoinFissionLockError> {
-		MockLocks::try_mutate(utxo_id, |lock| {
+		MockLocks::try_mutate(lock_id, |lock| {
 			let lock = lock.as_mut().ok_or(BitcoinFissionLockError::LockNotFound)?;
 			if lock.owner != *account_id {
 				return Err(BitcoinFissionLockError::NoPermissions);

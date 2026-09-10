@@ -3,8 +3,8 @@
 use super::*;
 use argon_primitives::{
 	bitcoin::{
-		BitcoinBlock, BitcoinCosignScriptPubkey, BitcoinHeight, H256Le, Satoshis, UtxoAddress,
-		UtxoId, UtxoRef,
+		BitcoinBlock, BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinLockId, H256Le, Satoshis,
+		UtxoAddress, UtxoRef,
 	},
 	inherents::BitcoinUtxoSync,
 };
@@ -92,26 +92,26 @@ mod benchmarks {
 		let satoshis = benchmark_satoshis::<T>();
 		let block_height: BitcoinHeight = 10;
 		for i in 0..n {
-			let utxo_id = i.saturating_add(1) as UtxoId;
+			let lock_id = i.saturating_add(1) as BitcoinLockId;
 			let funding_ref = benchmark_utxo_ref(10_000 + i);
-			UtxoAddressByUtxoId::<T>::insert(utxo_id, benchmark_utxo_value(utxo_id, satoshis));
-			UtxoRefsByUtxoId::<T>::try_mutate(utxo_id, |refs| refs.try_insert(funding_ref.clone()))
+			UtxoAddressByLockId::<T>::insert(lock_id, benchmark_utxo_value(lock_id, satoshis));
+			UtxoRefsByLockId::<T>::try_mutate(lock_id, |refs| refs.try_insert(funding_ref.clone()))
 				.map_err(|_| BenchmarkError::Stop("UTXO refs full"))?;
 		}
 
 		#[block]
 		{
 			for i in 0..n {
-				let utxo_id = i.saturating_add(1) as UtxoId;
+				let lock_id = i.saturating_add(1) as BitcoinLockId;
 				let funding_ref = benchmark_utxo_ref(10_000 + i);
-				Pallet::<T>::utxo_spent(utxo_id, Some(funding_ref), block_height)
+				Pallet::<T>::utxo_spent(lock_id, Some(funding_ref), block_height)
 					.map_err(|_| BenchmarkError::Stop("utxo spent failed"))?;
 			}
 		}
 
 		for i in 0..n {
-			let utxo_id = i.saturating_add(1) as UtxoId;
-			assert!(UtxoRefsByUtxoId::<T>::get(utxo_id).is_empty());
+			let lock_id = i.saturating_add(1) as BitcoinLockId;
+			assert!(UtxoRefsByLockId::<T>::get(lock_id).is_empty());
 		}
 		Ok(())
 	}
@@ -121,25 +121,25 @@ mod benchmarks {
 		let satoshis = benchmark_satoshis::<T>();
 		let bitcoin_height: BitcoinHeight = 10;
 		for i in 0..n {
-			let utxo_id = i.saturating_add(1) as UtxoId;
-			let address = benchmark_utxo_value(utxo_id, satoshis);
-			UtxoIdByScriptPubkey::<T>::insert(&address.script_pubkey, utxo_id);
-			UtxoAddressByUtxoId::<T>::insert(utxo_id, address);
+			let lock_id = i.saturating_add(1) as BitcoinLockId;
+			let address = benchmark_utxo_value(lock_id, satoshis);
+			LockIdByScriptPubkey::<T>::insert(&address.script_pubkey, lock_id);
+			UtxoAddressByLockId::<T>::insert(lock_id, address);
 		}
 
 		#[block]
 		{
 			for i in 0..n {
-				let utxo_id = i.saturating_add(1) as UtxoId;
+				let lock_id = i.saturating_add(1) as BitcoinLockId;
 				let verified_ref = benchmark_utxo_ref(20_000 + i);
-				Pallet::<T>::utxo_detected(utxo_id, verified_ref, satoshis, bitcoin_height)
+				Pallet::<T>::utxo_detected(lock_id, verified_ref, satoshis, bitcoin_height)
 					.map_err(|_| BenchmarkError::Stop("lock verification failed"))?;
 			}
 		}
 
 		for i in 0..n {
-			let utxo_id = i.saturating_add(1) as UtxoId;
-			assert_eq!(UtxoRefsByUtxoId::<T>::get(utxo_id).len(), 1);
+			let lock_id = i.saturating_add(1) as BitcoinLockId;
+			assert_eq!(UtxoRefsByLockId::<T>::get(lock_id).len(), 1);
 		}
 		Ok(())
 	}
@@ -161,10 +161,10 @@ fn benchmark_utxo_ref(seed: u32) -> UtxoRef {
 	UtxoRef { txid: benchmark_block_hash(seed as u8), output_index: seed }
 }
 
-fn benchmark_utxo_value(utxo_id: UtxoId, _satoshis: Satoshis) -> UtxoAddress {
+fn benchmark_utxo_value(lock_id: BitcoinLockId, _satoshis: Satoshis) -> UtxoAddress {
 	UtxoAddress {
-		utxo_id,
-		script_pubkey: benchmark_script_pubkey(utxo_id as u32),
+		lock_id,
+		script_pubkey: benchmark_script_pubkey(lock_id as u32),
 		submitted_at_height: 1,
 	}
 }

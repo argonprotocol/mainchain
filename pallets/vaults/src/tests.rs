@@ -11,8 +11,9 @@ use crate::{
 use argon_primitives::{
 	bitcoin::{CompressedBitcoinPubkey, OpaqueBitcoinXpub, SATOSHIS_PER_BITCOIN},
 	vault::{
-		BitcoinResecuritization, BitcoinSecuritization, BitcoinVaultProvider,
-		ReserveSecuritizationRequest, VaultError, VaultTerms,
+		BitcoinLockFundingUpdate, BitcoinResecuritization, BitcoinSecuritization,
+		BitcoinSecuritizationBasis, BitcoinVaultProvider, ReserveSecuritizationRequest, VaultError,
+		VaultTerms,
 	},
 };
 use bitcoin::{
@@ -56,10 +57,24 @@ fn default_terms(pct: FixedU128) -> VaultTerms<Balance> {
 
 fn securitization(amount: Balance) -> BitcoinSecuritization<Balance> {
 	BitcoinSecuritization {
-		securitized_satoshis: amount.saturated_into(),
-		microgons_at_target_per_btc: SATOSHIS_PER_BITCOIN.into(),
+		basis: BitcoinSecuritizationBasis {
+			satoshis: amount.saturated_into(),
+			microgons_at_target_per_btc: SATOSHIS_PER_BITCOIN.into(),
+		},
 		securitization_coverage_microgons: amount,
 		securitization_ratio: FixedU128::one(),
+	}
+}
+
+fn funding_update(
+	securitization: &BitcoinSecuritization<Balance>,
+	funded_satoshis: u64,
+) -> BitcoinLockFundingUpdate<Balance> {
+	BitcoinLockFundingUpdate {
+		securitized_satoshis: funded_satoshis.min(securitization.basis.satoshis),
+		collateral_required: securitization.collateral_for_satoshis(funded_satoshis),
+		securitization_ratio: securitization.securitization_ratio,
+		is_flexible: false,
 	}
 }
 
@@ -398,7 +413,7 @@ fn operator_resecuritization_uses_releasing_funds_before_flexible_space() {
 			let vault = vault.as_mut().expect("vault");
 			vault.securitization_locked = 60;
 			vault.flexible_securitization_locked = 40;
-			vault.locked_satoshis = 20;
+			vault.securitized_satoshis = 20;
 			vault.ratio_adjusted_satoshis = 20;
 			vault.securitization_release_schedule.try_insert(288, 20).unwrap();
 		});
@@ -742,7 +757,7 @@ fn it_can_close_a_vault() {
 		// set to full fee block
 		CurrentTick::set(1440 * 365 + 1);
 		// now when we return the securitization, it should return the funds to the vault
-		assert_ok!(Vaults::return_securitization(1, &securitization(amount)));
+		assert_ok!(Vaults::release_unactivated_securitization(1, amount));
 		// should release the 1000 from the bitcoin lock and the 2000 in securitization
 		assert_eq!(Balances::free_balance(1), vault_owner_balance);
 		assert_eq!(Balances::balance_on_hold(&HoldReason::PendingCollect.into(), &1), fee);
@@ -795,7 +810,7 @@ fn it_can_lock_funds() {
 		assert_eq!(Balances::free_balance(1), 500_000);
 		assert_eq!(Balances::balance_on_hold(&HoldReason::PendingCollect.into(), &1), fee);
 		// if we return the securitization, the fee won't be returned
-		assert_ok!(Vaults::return_securitization(1, &securitization(500_000)));
+		assert_ok!(Vaults::release_unactivated_securitization(1, 500_000));
 		assert_eq!(Balances::free_balance(1), 500_000);
 		assert_eq!(Balances::balance_on_hold(&HoldReason::PendingCollect.into(), &1), fee);
 		assert_eq!(Balances::free_balance(2), 6_000 - fee);
@@ -1034,8 +1049,9 @@ fn it_accounts_for_pending_bitcoins() {
 
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().get_activated_securitization(), 0);
 
-		Vaults::activate_securitization(1, &securitization(100_000), 0).unwrap();
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().get_activated_securitization(), 100_000);
+		Vaults::record_bitcoin_lock_funding(1, funding_update(&securitization(100_000), 0))
+			.unwrap();
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().get_activated_securitization(), 0);
 	});
 }
 
@@ -1047,7 +1063,7 @@ fn it_tracks_funded_and_ratio_adjusted_satoshis_via_provider_methods() {
 		set_argons(1, 100_010);
 		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), default_vault()));
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().ratio_adjusted_satoshis, 0);
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().locked_satoshis, 0);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitized_satoshis, 0);
 
 		assert_ok!(Vaults::reserve_securitization(
 			1,
@@ -1055,18 +1071,24 @@ fn it_tracks_funded_and_ratio_adjusted_satoshis_via_provider_methods() {
 			&securitization(1_000),
 			standard_reservation_request(),
 		));
-		assert_ok!(Vaults::activate_securitization(1, &securitization(1_000), 1_000));
+		assert_ok!(Vaults::record_bitcoin_lock_funding(
+			1,
+			funding_update(&securitization(1_000), 1_000),
+		));
 		assert_ok!(Vaults::reserve_securitization(
 			1,
 			&1,
 			&securitization(500),
 			standard_reservation_request(),
 		));
-		assert_ok!(Vaults::activate_securitization(1, &securitization(500), 500));
+		assert_ok!(Vaults::record_bitcoin_lock_funding(
+			1,
+			funding_update(&securitization(500), 500),
+		));
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().ratio_adjusted_satoshis, 1_500);
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().locked_satoshis, 1_500);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitized_satoshis, 1_500);
 
-		assert_ok!(Vaults::schedule_securitization_release(
+		assert_ok!(Vaults::release_bitcoin_lock_securitization(
 			1,
 			&securitization(600),
 			600,
@@ -1074,7 +1096,7 @@ fn it_tracks_funded_and_ratio_adjusted_satoshis_via_provider_methods() {
 			false,
 		));
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().ratio_adjusted_satoshis, 900);
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().locked_satoshis, 900);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitized_satoshis, 900);
 
 		let mut config = default_vault();
 		config.securitization_ratio = FixedU128::from_u32(2);
@@ -1091,12 +1113,15 @@ fn it_tracks_funded_and_ratio_adjusted_satoshis_via_provider_methods() {
 			&doubled_securitization,
 			standard_reservation_request(),
 		));
-		assert_ok!(Vaults::activate_securitization(2, &doubled_securitization, 1_000));
+		assert_ok!(Vaults::record_bitcoin_lock_funding(
+			2,
+			funding_update(&doubled_securitization, 1_000),
+		));
 		let vault = VaultsById::<Test>::get(2).unwrap();
-		assert_eq!(vault.locked_satoshis, 1_000);
+		assert_eq!(vault.securitized_satoshis, 1_000);
 		assert_eq!(vault.ratio_adjusted_satoshis, 2_000);
 
-		assert_ok!(Vaults::schedule_securitization_release(
+		assert_ok!(Vaults::release_bitcoin_lock_securitization(
 			2,
 			&BitcoinSecuritization {
 				securitization_ratio: FixedU128::from_u32(2),
@@ -1107,7 +1132,7 @@ fn it_tracks_funded_and_ratio_adjusted_satoshis_via_provider_methods() {
 			false,
 		));
 		let vault = VaultsById::<Test>::get(2).unwrap();
-		assert_eq!(vault.locked_satoshis, 400);
+		assert_eq!(vault.securitized_satoshis, 400);
 		assert_eq!(vault.ratio_adjusted_satoshis, 800);
 	});
 }
@@ -1124,7 +1149,7 @@ fn provider_resecuritizes_a_funded_lock_and_reuses_its_backing() {
 		assert_ok!(
 			Vaults::reserve_securitization(1, &1, &current, standard_reservation_request(),)
 		);
-		assert_ok!(Vaults::activate_securitization(1, &current, 1_000));
+		assert_ok!(Vaults::record_bitcoin_lock_funding(1, funding_update(&current, 1_000),));
 		CurrentFrameId::set(2);
 
 		let mut lock_extension = LockExtension::new(100);
@@ -1150,7 +1175,7 @@ fn provider_resecuritizes_a_funded_lock_and_reuses_its_backing() {
 		let vault = VaultsById::<Test>::get(1).unwrap();
 		assert_eq!(vault.securitization_locked, 800);
 		assert_eq!(vault.securitization_pending_activation, 0);
-		assert_eq!(vault.locked_satoshis, 1_000);
+		assert_eq!(vault.securitized_satoshis, 800);
 		assert_eq!(vault.ratio_adjusted_satoshis, 800);
 		assert_eq!(vault.get_relock_capacity(), 200);
 		let revenue = RevenuePerFrameByVault::<Test>::get(1);
@@ -1215,12 +1240,15 @@ fn it_errors_when_releasing_more_funded_satoshis_than_the_vault_tracks() {
 		set_argons(1, 100_010);
 		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), default_vault()));
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().ratio_adjusted_satoshis, 0);
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().locked_satoshis, 0);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitized_satoshis, 0);
+		VaultsById::<Test>::mutate(1, |vault| {
+			vault.as_mut().expect("vault").securitization_locked = 1;
+		});
 
 		assert_err!(
-			Vaults::schedule_securitization_release(
+			Vaults::release_bitcoin_lock_securitization(
 				1,
-				&securitization(0),
+				&securitization(1),
 				1,
 				&LockExtension::new(100),
 				false,
@@ -1228,7 +1256,7 @@ fn it_errors_when_releasing_more_funded_satoshis_than_the_vault_tracks() {
 			VaultError::InternalError
 		);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().ratio_adjusted_satoshis, 0);
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().locked_satoshis, 0);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitized_satoshis, 0);
 	});
 }
 
@@ -1263,7 +1291,10 @@ fn it_can_burn_funds() {
 
 		assert_eq!(fee, 0);
 		assert_eq!(Balances::free_balance(2), 2_000);
-		assert_ok!(Vaults::activate_securitization(1, &securitization(100_000), 500));
+		assert_ok!(Vaults::record_bitcoin_lock_funding(
+			1,
+			funding_update(&securitization(100_000), 500),
+		));
 		assert_ok!(Vaults::burn(
 			1,
 			&securitization(100_000),
@@ -1274,10 +1305,10 @@ fn it_can_burn_funds() {
 		));
 
 		assert_eq!(Balances::free_balance(1), 900_000);
-		assert_eq!(Balances::total_balance(&1), 900_000, "Burned from the vault owner");
+		assert_eq!(Balances::total_balance(&1), 999_500, "Burned from the vault owner");
 		assert_eq!(Balances::free_balance(2), 2_000);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_locked, 0);
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization, 0);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization, 99_500);
 	});
 }
 
@@ -1339,11 +1370,13 @@ fn vault_equilibrium_scenario(scenario: VaultScenario) {
 		let lock_extensions = LockExtension::new(1440 * 365);
 		let btc_value_in_microgons = securitization_coverage_microgons / 2;
 		let bitcoin_securitization = BitcoinSecuritization {
-			securitized_satoshis: 500,
-			microgons_at_target_per_btc: btc_value_in_microgons
-				.saturating_mul(SATOSHIS_PER_BITCOIN.into())
-				.checked_div(500)
-				.unwrap(),
+			basis: BitcoinSecuritizationBasis {
+				satoshis: 500,
+				microgons_at_target_per_btc: btc_value_in_microgons
+					.saturating_mul(SATOSHIS_PER_BITCOIN.into())
+					.checked_div(500)
+					.unwrap(),
+			},
 			securitization_coverage_microgons,
 			securitization_ratio,
 		};
@@ -1355,7 +1388,7 @@ fn vault_equilibrium_scenario(scenario: VaultScenario) {
 			standard_reservation_request(),
 		)
 		.expect("bonding failed");
-		Vaults::activate_securitization(1, &bitcoin_securitization, 500)
+		Vaults::record_bitcoin_lock_funding(1, funding_update(&bitcoin_securitization, 500))
 			.expect("activation failed");
 
 		let compensation = Vaults::compensate_lost_bitcoin(
@@ -1651,10 +1684,13 @@ fn it_can_cleanup_at_bitcoin_heights() {
 		);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_locked, 1_000_000);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_release_schedule.len(), 0);
-		assert_ok!(Vaults::activate_securitization(1, &securitization(amount), 500));
+		assert_ok!(Vaults::record_bitcoin_lock_funding(
+			1,
+			funding_update(&securitization(amount), 500),
+		));
 		CurrentFrameId::set(2);
 
-		assert_ok!(Vaults::schedule_securitization_release(
+		assert_ok!(Vaults::release_bitcoin_lock_securitization(
 			1,
 			&securitization(amount),
 			500,
@@ -1667,10 +1703,7 @@ fn it_can_cleanup_at_bitcoin_heights() {
 		);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_locked, 0);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_release_schedule.len(), 1);
-		assert_eq!(
-			VaultsById::<Test>::get(1).unwrap().securitization_release_schedule[&432],
-			1_000_000
-		);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_release_schedule[&432], 500);
 		assert_eq!(VaultFundsReleasingByHeight::<Test>::get(432).len(), 1);
 		assert_eq!(VaultFundsReleasingByHeight::<Test>::get(432).first().unwrap(), &1);
 		let vault_revenue = RevenuePerFrameByVault::<Test>::get(1).to_vec();
@@ -1678,6 +1711,7 @@ fn it_can_cleanup_at_bitcoin_heights() {
 		assert_eq!(vault_revenue[0].frame_id, 2);
 		assert_eq!(vault_revenue[0].bitcoin_locks_new_securitization, 0);
 		assert_eq!(vault_revenue[0].bitcoin_locks_released_securitization, 1_000_000);
+		assert_eq!(vault_revenue[0].bitcoin_locks_released_satoshis, 500);
 		assert_eq!(vault_revenue[0].bitcoin_locks_created, 0);
 		assert_eq!(vault_revenue[0].uncollected_revenue, 0);
 
@@ -1724,9 +1758,12 @@ fn it_can_reuse_locked_argons() {
 		);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_locked, amount);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_release_schedule.len(), 0);
-		assert_ok!(Vaults::activate_securitization(1, &securitization(amount), 500));
+		assert_ok!(Vaults::record_bitcoin_lock_funding(
+			1,
+			funding_update(&securitization(amount), 500),
+		));
 
-		assert_ok!(Vaults::schedule_securitization_release(
+		assert_ok!(Vaults::release_bitcoin_lock_securitization(
 			1,
 			&securitization(amount),
 			500,
@@ -1739,10 +1776,7 @@ fn it_can_reuse_locked_argons() {
 		);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_locked, 0);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_release_schedule.len(), 1);
-		assert_eq!(
-			VaultsById::<Test>::get(1).unwrap().securitization_release_schedule[&432],
-			amount
-		);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_release_schedule[&432], 500);
 
 		set_argons(3, 3_000_000);
 		assert_ok!(Vaults::reserve_securitization(
@@ -1751,7 +1785,10 @@ fn it_can_reuse_locked_argons() {
 			&securitization(2_500_000),
 			standard_reservation_request(),
 		));
-		assert_ok!(Vaults::activate_securitization(1, &securitization(2_500_000), 2500,));
+		assert_ok!(Vaults::record_bitcoin_lock_funding(
+			1,
+			funding_update(&securitization(2_500_000), 2_500),
+		));
 		assert_eq!(
 			VaultsById::<Test>::get(1).unwrap().available_securitization_space(true),
 			10_000_000 - 2_500_000
@@ -1759,7 +1796,7 @@ fn it_can_reuse_locked_argons() {
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_locked, 2_500_000);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_release_schedule.len(), 0);
 
-		assert_ok!(Vaults::schedule_securitization_release(
+		assert_ok!(Vaults::release_bitcoin_lock_securitization(
 			1,
 			&securitization(2_500_000),
 			2500,
@@ -1774,7 +1811,7 @@ fn it_can_reuse_locked_argons() {
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_release_schedule.len(), 1);
 		assert_eq!(
 			VaultsById::<Test>::get(1).unwrap().securitization_release_schedule[&432],
-			2_500_000
+			2_500
 		);
 	});
 }

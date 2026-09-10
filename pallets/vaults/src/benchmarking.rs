@@ -5,7 +5,8 @@ use argon_bitcoin::{derive_xpub, xpriv_from_seed};
 use argon_primitives::{
 	bitcoin::{BitcoinHeight, OpaqueBitcoinXpub},
 	vault::{
-		BitcoinResecuritization, BitcoinSecuritization, LockExtension, VaultTerms,
+		BitcoinLockFundingUpdate, BitcoinResecuritization, BitcoinSecuritization,
+		BitcoinSecuritizationBasis, LockExtension, VaultTerms,
 		MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES,
 	},
 };
@@ -393,12 +394,14 @@ mod benchmarks {
 		VaultsById::<T>::mutate(vault_id, |vault| {
 			let vault = vault.as_mut().expect("benchmark vault should exist");
 			vault.securitization_locked = collateral_required;
-			vault.locked_satoshis = satoshis;
+			vault.securitized_satoshis = satoshis;
 			vault.ratio_adjusted_satoshis = satoshis;
 		});
 		let securitization = BitcoinSecuritization {
-			securitized_satoshis: satoshis,
-			microgons_at_target_per_btc: 100_000_000u128.into(),
+			basis: BitcoinSecuritizationBasis {
+				satoshis,
+				microgons_at_target_per_btc: 100_000_000u128.into(),
+			},
 			securitization_coverage_microgons: collateral_required,
 			securitization_ratio: FixedU128::one(),
 		};
@@ -428,19 +431,20 @@ mod benchmarks {
 		let operator: T::AccountId = account("provider_resecuritize_operator", 0, 0);
 		let locker: T::AccountId = account("provider_resecuritize_locker", 0, 0);
 		let current = BitcoinSecuritization {
-			securitized_satoshis: 5_000,
-			microgons_at_target_per_btc: 100_000_000u128.into(),
+			basis: BitcoinSecuritizationBasis {
+				satoshis: 5_000,
+				microgons_at_target_per_btc: 100_000_000u128.into(),
+			},
 			securitization_coverage_microgons: 5_000u128.into(),
 			securitization_ratio: FixedU128::one(),
 		};
 		let replacement_satoshis = 5_000u64.saturating_add(u64::from(e).saturating_mul(1_000));
 		let replacement = BitcoinSecuritization {
-			securitized_satoshis: replacement_satoshis,
+			basis: BitcoinSecuritizationBasis { satoshis: replacement_satoshis, ..current.basis },
 			securitization_coverage_microgons: u128::from(replacement_satoshis).into(),
 			..current
 		};
-		let vault_id =
-			create_vault::<T>(&operator, 11, u128::from(replacement.securitized_satoshis))?;
+		let vault_id = create_vault::<T>(&operator, 11, u128::from(replacement.basis.satoshis))?;
 		let _ = T::Currency::mint_into(&locker, 1_000_000u128.into());
 		let funded_satoshis = 10_000;
 		VaultsById::<T>::try_mutate(vault_id, |vault| {
@@ -450,7 +454,12 @@ mod benchmarks {
 				.reserve_securitization(&current, true)
 				.map_err(|_| BenchmarkError::Stop("failed to reserve current securitization"))?;
 			vault
-				.activate_securitization(&current, funded_satoshis)
+				.record_bitcoin_lock_funding(BitcoinLockFundingUpdate {
+					securitized_satoshis: funded_satoshis.min(current.basis.satoshis),
+					collateral_required: current.collateral_between(0, funded_satoshis),
+					securitization_ratio: current.securitization_ratio,
+					is_flexible: false,
+				})
 				.map_err(|_| BenchmarkError::Stop("failed to activate current securitization"))?;
 			Ok::<_, BenchmarkError>(())
 		})?;
@@ -485,7 +494,7 @@ mod benchmarks {
 
 		let vault = VaultsById::<T>::get(vault_id)
 			.ok_or(BenchmarkError::Stop("vault missing after resecuritization"))?;
-		assert_eq!(vault.locked_satoshis, funded_satoshis);
+		assert_eq!(vault.securitized_satoshis, funded_satoshis);
 		assert_eq!(vault.ratio_adjusted_satoshis, replacement.eligible_satoshis(funded_satoshis));
 		assert_eq!(vault.securitization_locked, replacement.collateral_required());
 		Ok(())

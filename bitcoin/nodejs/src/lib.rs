@@ -13,10 +13,34 @@ use argon_bitcoin::{
 	primitives::*, psbt_utils, Amount, CosignReleaser, CosignScript, CosignScriptArgs, ReleaseStep,
 };
 use argon_primitives::bitcoin::{
-	BitcoinHeight, BitcoinNetwork, BitcoinScriptPubkey, H256Le, Satoshis,
+	BitcoinHeight, BitcoinNetwork, BitcoinScriptPubkey, H256Le, Satoshis, UtxoRef,
 };
 use core::str::FromStr;
 use wasm_bindgen::prelude::*;
+
+#[wasm_bindgen(typescript_custom_section)]
+const COSIGN_UTXO_TYPE: &str = r#"
+export interface CosignUtxo {
+  txid: string;
+  vout: number;
+  satoshis: bigint;
+}
+"#;
+
+#[wasm_bindgen]
+extern "C" {
+	#[wasm_bindgen(typescript_type = "CosignUtxo")]
+	pub type CosignUtxo;
+
+	#[wasm_bindgen(method, getter)]
+	fn txid(this: &CosignUtxo) -> String;
+
+	#[wasm_bindgen(method, getter)]
+	fn vout(this: &CosignUtxo) -> u32;
+
+	#[wasm_bindgen(method, getter)]
+	fn satoshis(this: &CosignUtxo) -> Satoshis;
+}
 
 fn create_cosign(
 	vault_pubkey_hex: &str,
@@ -77,6 +101,7 @@ pub fn calculate_fee(
 	created_at_height: BitcoinHeight,
 	bitcoin_network: BitcoinNetwork,
 	fee_rate_sats_per_vb: Satoshis,
+	input_count: u32,
 	to_script_pubkey: &str,
 ) -> Result<u64, String> {
 	console_error_panic_hook::set_once();
@@ -93,7 +118,7 @@ pub fn calculate_fee(
 	let fee_rate_sats_per_vb =
 		FeeRate::from_sat_per_vb(fee_rate_sats_per_vb).ok_or("Invalid fee rate")?;
 	Ok(cosign_script
-		.calculate_fee(true, to_scriptpub.into(), fee_rate_sats_per_vb)
+		.calculate_fee(true, input_count as usize, to_scriptpub.into(), fee_rate_sats_per_vb)
 		.map_err(|err| err.to_string())?
 		.to_sat())
 }
@@ -143,9 +168,7 @@ pub fn sign_psbt(
 #[wasm_bindgen(js_name = "getCosignPsbt")]
 #[allow(clippy::too_many_arguments)]
 pub fn get_cosigned_psbt(
-	txid: &str,
-	vout: u32,
-	satoshis: Satoshis,
+	utxos: Vec<CosignUtxo>,
 	vault_pubkey_hex: &str,
 	vault_claim_pubkey_hex: &str,
 	owner_pubkey_hex: &str,
@@ -156,7 +179,21 @@ pub fn get_cosigned_psbt(
 	to_script_pubkey_hex: &str,
 	bitcoin_network_fee: Satoshis,
 ) -> Result<String, String> {
-	let txid: [u8; 32] = from_hex(txid)?;
+	if utxos.is_empty() {
+		return Err("At least one UTXO is required".into())
+	}
+	let utxos = utxos
+		.into_iter()
+		.map(|utxo| {
+			Ok((
+				UtxoRef {
+					txid: H256Le(from_hex::<[u8; 32]>(utxo.txid())?),
+					output_index: utxo.vout(),
+				},
+				utxo.satoshis(),
+			))
+		})
+		.collect::<Result<Vec<_>, String>>()?;
 	let pay_scriptpub: BitcoinScriptPubkey = from_hex(to_script_pubkey_hex)?;
 
 	let cosign_script = create_cosign(
@@ -170,9 +207,7 @@ pub fn get_cosigned_psbt(
 	)?;
 	let releaser = CosignReleaser::from_script(
 		cosign_script,
-		satoshis,
-		H256Le(txid).into(),
-		vout,
+		utxos,
 		ReleaseStep::VaultCosign, // this doesn't matter
 		Amount::from_sat(bitcoin_network_fee),
 		pay_scriptpub.into(),
