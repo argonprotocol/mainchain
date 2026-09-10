@@ -1,8 +1,8 @@
 use crate as pallet_vaults;
 use argon_bitcoin::{
 	primitives::{
-		BitcoinCosignScriptPubkey, BitcoinSignature, CompressedBitcoinPubkey, Satoshis, UtxoId,
-		UtxoRef,
+		BitcoinCosignScriptPubkey, BitcoinLockId, BitcoinSignature, CompressedBitcoinPubkey,
+		Satoshis, UtxoRef,
 	},
 	CosignReleaser,
 };
@@ -48,7 +48,7 @@ parameter_types! {
 	pub static ExistentialDeposit: Balance = 10;
 	pub const BlocksPerYear:u32 = 1440*365;
 	pub static GetBitcoinNetwork: BitcoinNetwork = BitcoinNetwork::Regtest;
-	pub const MaxPendingConfirmationBlocks: BitcoinHeight = 144;
+	pub const SecuritizationHoldBlocks: BitcoinHeight = 144;
 }
 
 impl pallet_balances::Config for Test {
@@ -254,23 +254,23 @@ impl BitcoinUtxoTracker for StaticBitcoinUtxoTracker {
 		0
 	}
 
-	fn unwatch_utxo(_utxo_id: UtxoId, utxo_ref: &UtxoRef) {
+	fn unwatch_utxo(_lock_id: BitcoinLockId, utxo_ref: &UtxoRef) {
 		let _ = utxo_ref;
 	}
 
 	fn watch_for_utxo(
-		utxo_id: UtxoId,
+		lock_id: BitcoinLockId,
 		script_pubkey: BitcoinCosignScriptPubkey,
 	) -> Result<(), DispatchError> {
 		WatchedUtxosById::mutate(|watched_utxos| {
-			watched_utxos.insert(utxo_id, script_pubkey);
+			watched_utxos.insert(lock_id, script_pubkey);
 		});
 		Ok(())
 	}
 
-	fn unwatch(utxo_id: UtxoId) {
+	fn unwatch(lock_id: BitcoinLockId) {
 		WatchedUtxosById::mutate(|watched_utxos| {
-			watched_utxos.remove(&utxo_id);
+			watched_utxos.remove(&lock_id);
 		});
 	}
 }
@@ -287,14 +287,14 @@ parameter_types! {
 	pub static BitcoinBlockHeightChange: (BitcoinHeight, BitcoinHeight) = (0, 0);
 	pub static MinimumLockSatoshis: Satoshis = 10_000_000;
 
-	pub static NextUtxoId: UtxoId = 1;
-	pub static WatchedUtxosById: BTreeMap<UtxoId, BitcoinCosignScriptPubkey> = BTreeMap::new();
+	pub static NextBitcoinLockId: BitcoinLockId = 1;
+	pub static WatchedUtxosById: BTreeMap<BitcoinLockId, BitcoinCosignScriptPubkey> = BTreeMap::new();
 
 	pub static CanceledLocks: Vec<(VaultId, Balance)> = Vec::new();
 
 	pub static ChargeFee: bool = false;
 
-	pub static VaultViewOfCosignPendingLocks: BTreeMap<VaultId,  BTreeSet<UtxoId>> = BTreeMap::new();
+	pub static VaultViewOfCosignPendingLocks: BTreeMap<VaultId,  BTreeSet<BitcoinLockId>> = BTreeMap::new();
 
 	pub const TicksPerBitcoinBlock: u64 = 10;
 	pub const ArgonTicksPerDay: u64 = 1440;
@@ -334,19 +334,17 @@ impl PriceProvider<Balance> for StaticPriceProvider {
 
 pub struct StaticBitcoinVerifier;
 impl BitcoinVerifier<Test> for StaticBitcoinVerifier {
-	fn verify_signature(
+	fn verify_signatures(
 		_utxo_releaseer: CosignReleaser,
 		_pubkey: CompressedBitcoinPubkey,
-		_signature: &BitcoinSignature,
+		_signatures: &[BitcoinSignature],
 	) -> Result<bool, DispatchError> {
 		Ok(true)
 	}
 }
 impl pallet_bitcoin_locks::Config for Test {
 	type WeightInfo = ();
-	type Currency = Balances;
 	type Balance = Balance;
-	type RuntimeHoldReason = RuntimeHoldReason;
 	type FissionsProvider = ();
 	type BitcoinUtxoTracker = StaticBitcoinUtxoTracker;
 	type PriceProvider = StaticPriceProvider;
@@ -358,7 +356,7 @@ impl pallet_bitcoin_locks::Config for Test {
 	type ArgonTicksPerDay = ArgonTicksPerDay;
 	type MaxConcurrentlyReleasingLocks = MaxConcurrentlyReleasingLocks;
 	type LockDurationBlocks = LockDurationBlocks;
-	type MaxPendingConfirmationBlocks = MaxPendingConfirmationBlocks;
+	type SecuritizationHoldBlocks = SecuritizationHoldBlocks;
 	type LockReclamationBlocks = LockReclamationBlocks;
 	type LockReleaseCosignDeadlineFrames = LockReleaseCosignDeadlineFrames;
 	type OrphanedUtxoReleaseExpiryFrames = OrphanedUtxoReleaseExpiryFrames;
@@ -368,6 +366,7 @@ impl pallet_bitcoin_locks::Config for Test {
 	type TicksPerBitcoinBlock = TicksPerBitcoinBlock;
 	type DidStartNewFrame = DidStartNewFrame;
 	type MaxBtcPriceTickAge = ConstU32<100>;
+	type MaxUtxosPerLock = ConstU32<10>;
 	type CurrentTick = CurrentTick;
 }
 

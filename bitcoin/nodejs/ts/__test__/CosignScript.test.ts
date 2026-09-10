@@ -49,7 +49,7 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
   let vaultXpriv: HDKey;
   let lock: ICosignScriptLock;
   let vaultId: number;
-  let utxoId: number;
+  let lockId: number;
   let releaseRequest: IBitcoinReleaseRequest;
   let fundingUtxoRef: { txid: string; vout: number };
   let vaultCosignature: Uint8Array;
@@ -175,8 +175,8 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
     if (!lockCreated || !vaulterClient.events.bitcoinLocks.BitcoinLockCreated.is(lockCreated)) {
       throw new Error('Bitcoin Lock creation event not found');
     }
-    utxoId = lockCreated.data.utxoId.toNumber();
-    lock = await loadCosignScriptLock(vaulterClient, utxoId);
+    lockId = lockCreated.data.lockId.toNumber();
+    lock = await loadCosignScriptLock(vaulterClient, lockId);
     console.log('Created Bitcoin Lock:', stringifyExt(lock));
 
     expect(lock.securitizedSatoshis).toBe(2_000n);
@@ -226,20 +226,22 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
     console.log(`Mining confirmations to ${newAddress}`);
     await btcClient.command('generatetoaddress', 7, newAddress);
     for (let attempt = 0; attempt < 60; attempt += 1) {
-      lock = await loadCosignScriptLock(vaulterClient, utxoId);
+      lock = await loadCosignScriptLock(vaulterClient, lockId);
       if (lock.fundedSatoshis > 0n) break;
       await new Promise(resolve => setTimeout(resolve, 500));
     }
     expect(lock.fundedSatoshis).toBe(2_000n);
     console.log('Bitcoin Lock funding detected:', stringifyExt(lock));
 
-    const fundingRef = await vaulterClient.query.bitcoinLocks.utxoIdToFundingUtxoRef(utxoId);
-    if (fundingRef.isNone) throw new Error('Funding UTXO reference not found');
-    const reference = fundingRef.unwrap();
+    const runtimeLock = await vaulterClient.query.bitcoinLocks.locksById(lockId);
+    if (runtimeLock.isNone) throw new Error('Funded Bitcoin Lock not found');
+    const [[reference, satoshis]] = [...runtimeLock.unwrap().fundingUtxos.entries()];
+    if (!reference || !satoshis) throw new Error('Funding UTXO reference not found');
     fundingUtxoRef = {
       txid: u8aToHex(reference.txid),
       vout: reference.outputIndex.toNumber(),
     };
+    expect(satoshis.toBigInt()).toBe(lock.fundedSatoshis);
     console.log('Runtime funding UTXO reference:', fundingUtxoRef);
     expect(u8aToHex(reference.txid.slice().reverse())).toBe(`0x${txid}`);
   });
@@ -250,18 +252,18 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
     console.log('Bitcoin release address:', nextAddress);
 
     const toScriptPubkey = addressBytesHex(nextAddress, bitcoinNetwork);
-    const networkFee = new CosignScript(lock, bitcoinNetwork).calculateFee(5n, toScriptPubkey);
+    const networkFee = new CosignScript(lock, bitcoinNetwork).calculateFee(5n, 1, toScriptPubkey);
     console.log('Bitcoin release network fee:', `${networkFee} satoshis`);
     expect(networkFee).toBeGreaterThan(5n);
 
     const result = await submitTx(
       vaulterClient,
-      vaulterClient.tx.bitcoinLocks.requestRelease(utxoId, toScriptPubkey, networkFee),
+      vaulterClient.tx.bitcoinLocks.requestRelease(lockId, toScriptPubkey, networkFee),
       bitcoinLocker,
     );
     console.log('Release request included in block:', result.blockHash);
 
-    const request = await vaulterClient.query.bitcoinLocks.lockReleaseRequestsByUtxoId(utxoId);
+    const request = await vaulterClient.query.bitcoinLocks.lockReleaseRequestsById(lockId);
     if (request.isNone) throw new Error('Release request not found');
     const value = request.unwrap();
     releaseRequest = {
@@ -275,8 +277,7 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
     const cosignScript = new CosignScript(lock, bitcoinNetwork);
     const psbt = cosignScript.getCosignPsbt({
       releaseRequest,
-      utxoRef: fundingUtxoRef,
-      utxoSatoshis: lock.fundedSatoshis,
+      utxos: [{ utxoRef: fundingUtxoRef, satoshis: lock.fundedSatoshis }],
     });
     const signedPsbt = cosignScript.vaultCosignPsbt(psbt, lock, vaultXpriv);
     expect(signedPsbt.getInput(0).partialSig).toHaveLength(1);
@@ -285,7 +286,7 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
 
     const result = await submitTx(
       vaulterClient,
-      vaulterClient.tx.bitcoinLocks.cosignRelease(utxoId, u8aToHex(signature)),
+      vaulterClient.tx.bitcoinLocks.cosignRelease(lockId, [u8aToHex(signature)]),
       vaulter,
     );
     const blockHeight = await vaulterClient
@@ -300,7 +301,7 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
     if (!cosigned || !vaulterClient.events.bitcoinLocks.BitcoinUtxoCosigned.is(cosigned)) {
       throw new Error('Bitcoin cosign event not found');
     }
-    vaultCosignature = new Uint8Array(cosigned.data.signature);
+    vaultCosignature = new Uint8Array(cosigned.data.signatures[0]);
   });
 
   test.sequential('user can cosign a bitcoin lock', async () => {
@@ -310,9 +311,8 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
     );
     const cosignedTx = new CosignScript(lock, bitcoinNetwork).cosignAndGenerateTx({
       releaseRequest,
-      vaultCosignature,
-      utxoRef: fundingUtxoRef,
-      utxoSatoshis: lock.fundedSatoshis,
+      vaultCosignatures: [vaultCosignature],
+      utxos: [{ utxoRef: fundingUtxoRef, satoshis: lock.fundedSatoshis }],
       ownerXpriv: ownerBitcoinXpriv,
     });
     console.log('Cosigned Tx:', stringifyExt(cosignedTx));
@@ -330,10 +330,10 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
 
 async function loadCosignScriptLock(
   client: ArgonClient,
-  utxoId: number,
+  lockId: number,
 ): Promise<ICosignScriptLock> {
-  const lock = await client.query.bitcoinLocks.locksByUtxoId(utxoId);
-  if (lock.isNone) throw new Error(`Bitcoin Lock ${utxoId} not found`);
+  const lock = await client.query.bitcoinLocks.locksById(lockId);
+  if (lock.isNone) throw new Error(`Bitcoin Lock ${lockId} not found`);
 
   const value = lock.unwrap();
   const [parentFingerprint, cosignHdIndex] = value.vaultXpubSources;
@@ -345,7 +345,7 @@ async function loadCosignScriptLock(
     openClaimHeight: value.openClaimHeight.toNumber(),
     ownerPubkey: value.ownerPubkey.toHex(),
     p2wshScriptHashHex: `0x0020${wscriptHash}`,
-    securitizedSatoshis: value.securitizedSatoshis.toBigInt(),
+    securitizedSatoshis: value.securitizationBasis.satoshis.toBigInt(),
     vaultClaimHeight: value.vaultClaimHeight.toNumber(),
     vaultClaimPubkey: value.vaultClaimPubkey.toHex(),
     vaultPubkey: value.vaultPubkey.toHex(),

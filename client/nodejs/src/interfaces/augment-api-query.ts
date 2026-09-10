@@ -1,4 +1,5 @@
 // Auto-generated via `yarn polkadot-types-from-chain`, do not edit
+/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
@@ -93,7 +94,7 @@ import type {
   PalletMiningSlotMinerNonceScoring,
   PalletMintMintAction,
   PalletMintMintQueueCursor,
-  PalletMintPendingMintUtxo,
+  PalletMintPendingBitcoinMint,
   PalletMultisigMultisig,
   PalletOperationalAccountsOperationalAccount,
   PalletOperationalAccountsRewardsConfig,
@@ -249,9 +250,9 @@ declare module '@polkadot/api-base/types/storage' {
         [u32, AccountId32]
       >;
       /**
-       * Highest Bitcoin UTXO sync height processed for pending-funding expirations.
+       * Highest Bitcoin UTXO sync height processed for securitization hold expirations.
        **/
-      lastPendingFundingExpirationHeight: AugmentedQuery<
+      lastProcessedSecuritizationHoldBitcoinHeight: AugmentedQuery<
         ApiType,
         () => Observable<Option<u64>>,
         []
@@ -274,6 +275,28 @@ declare module '@polkadot/api-base/types/storage' {
         [u64]
       >;
       /**
+       * Index of active UTXO IDs per owner account.
+       **/
+      lockIdsByOwnerAccount: AugmentedQuery<
+        ApiType,
+        (
+          arg1: AccountId32 | string | Uint8Array,
+          arg2: u64 | AnyNumber | Uint8Array,
+        ) => Observable<Option<Null>>,
+        [AccountId32, u64]
+      >;
+      /**
+       * Index of active UTXO IDs per vault
+       **/
+      lockIdsByVaultId: AugmentedQuery<
+        ApiType,
+        (
+          arg1: u32 | AnyNumber | Uint8Array,
+          arg2: u64 | AnyNumber | Uint8Array,
+        ) => Observable<Option<Null>>,
+        [u32, u64]
+      >;
+      /**
        * Stores the block number where a release was cosigned by the vault.
        **/
       lockReleaseCosignHeightById: AugmentedQuery<
@@ -284,7 +307,7 @@ declare module '@polkadot/api-base/types/storage' {
       /**
        * Stores bitcoin locks that have requested to be released
        **/
-      lockReleaseRequestsByUtxoId: AugmentedQuery<
+      lockReleaseRequestsById: AugmentedQuery<
         ApiType,
         (
           arg: u64 | AnyNumber | Uint8Array,
@@ -294,18 +317,9 @@ declare module '@polkadot/api-base/types/storage' {
       /**
        * Stores bitcoin utxos that have requested to be released
        **/
-      locksByUtxoId: AugmentedQuery<
+      locksById: AugmentedQuery<
         ApiType,
         (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<PalletBitcoinLocksLockedBitcoin>>,
-        [u64]
-      >;
-      /**
-       * Unfunded locks whose pending securitization reservation expires at the indexed height.
-       * Expiry releases the reservation but leaves the lock address watched for late orphan output.
-       **/
-      locksPendingFundingByBitcoinHeight: AugmentedQuery<
-        ApiType,
-        (arg: u64 | AnyNumber | Uint8Array) => Observable<BTreeSet<u64>>,
         [u64]
       >;
       /**
@@ -317,21 +331,10 @@ declare module '@polkadot/api-base/types/storage' {
         []
       >;
       /**
-       * Release amounts identified by the version 10 to 11 migration.
-       *
-       * Current release requests do not create currency holds. Each migrated entry is removed when
-       * its in-flight release request terminates.
-       **/
-      migratedReleaseHoldByUtxoId: AugmentedQuery<
-        ApiType,
-        (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<u128>>,
-        [u64]
-      >;
-      /**
        * The minimum number of satoshis accepted in one watched funding UTXO.
        **/
       minimumSatoshis: AugmentedQuery<ApiType, () => Observable<u64>, []>;
-      nextUtxoId: AugmentedQuery<ApiType, () => Observable<Option<u64>>, []>;
+      nextBitcoinLockId: AugmentedQuery<ApiType, () => Observable<Option<u64>>, []>;
       /**
        * Expiration of orphaned utxo refs by user account
        **/
@@ -358,33 +361,12 @@ declare module '@polkadot/api-base/types/storage' {
         [AccountId32, ArgonPrimitivesBitcoinUtxoRef]
       >;
       /**
-       * Index of active UTXO IDs per owner account.
+       * Lock IDs whose securitization hold expires at the indexed Bitcoin height.
+       * Expiry releases only the unactivated portion and leaves the lock address watched.
        **/
-      utxoIdsByOwnerAccount: AugmentedQuery<
+      securitizationHoldExpirationsByBitcoinHeight: AugmentedQuery<
         ApiType,
-        (
-          arg1: AccountId32 | string | Uint8Array,
-          arg2: u64 | AnyNumber | Uint8Array,
-        ) => Observable<Option<Null>>,
-        [AccountId32, u64]
-      >;
-      /**
-       * Index of active UTXO IDs per vault
-       **/
-      utxoIdsByVaultId: AugmentedQuery<
-        ApiType,
-        (
-          arg1: u32 | AnyNumber | Uint8Array,
-          arg2: u64 | AnyNumber | Uint8Array,
-        ) => Observable<Option<Null>>,
-        [u32, u64]
-      >;
-      /**
-       * The utxo funding this lock. In the current runtime, this is just the first utxo received
-       **/
-      utxoIdToFundingUtxoRef: AugmentedQuery<
-        ApiType,
-        (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<ArgonPrimitivesBitcoinUtxoRef>>,
+        (arg: u64 | AnyNumber | Uint8Array) => Observable<BTreeSet<u64>>,
         [u64]
       >;
     };
@@ -410,6 +392,20 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       inherentIncluded: AugmentedQuery<ApiType, () => Observable<bool>, []>;
       /**
+       * The Lock ID identified by each watched script pubkey.
+       **/
+      lockIdByScriptPubkey: AugmentedQuery<
+        ApiType,
+        (
+          arg:
+            | ArgonPrimitivesBitcoinBitcoinCosignScriptPubkey
+            | { P2WSH: any }
+            | string
+            | Uint8Array,
+        ) => Observable<Option<u64>>,
+        [ArgonPrimitivesBitcoinBitcoinCosignScriptPubkey]
+      >;
+      /**
        * Bitcoin Oracle Operator Account
        **/
       oracleOperatorAccount: AugmentedQuery<ApiType, () => Observable<Option<AccountId32>>, []>;
@@ -433,7 +429,7 @@ declare module '@polkadot/api-base/types/storage' {
       /**
        * Watched Lock addresses and the scan height needed to observe them.
        **/
-      utxoAddressByUtxoId: AugmentedQuery<
+      utxoAddressByLockId: AugmentedQuery<
         ApiType,
         (
           arg: u64 | AnyNumber | Uint8Array,
@@ -441,23 +437,9 @@ declare module '@polkadot/api-base/types/storage' {
         [u64]
       >;
       /**
-       * The Lock ID identified by each watched script pubkey.
-       **/
-      utxoIdByScriptPubkey: AugmentedQuery<
-        ApiType,
-        (
-          arg:
-            | ArgonPrimitivesBitcoinBitcoinCosignScriptPubkey
-            | { P2WSH: any }
-            | string
-            | Uint8Array,
-        ) => Observable<Option<u64>>,
-        [ArgonPrimitivesBitcoinBitcoinCosignScriptPubkey]
-      >;
-      /**
        * Every output observed at a watched Lock address, retained until explicitly removed.
        **/
-      utxoRefsByUtxoId: AugmentedQuery<
+      utxoRefsByLockId: AugmentedQuery<
         ApiType,
         (arg: u64 | AnyNumber | Uint8Array) => Observable<BTreeSet<ArgonPrimitivesBitcoinUtxoRef>>,
         [u64]
@@ -1216,7 +1198,25 @@ declare module '@polkadot/api-base/types/storage' {
       /**
        * The next monotonic queue index to assign to a pending bitcoin mint.
        **/
-      nextPendingMintUtxoIndex: AugmentedQuery<ApiType, () => Observable<u64>, []>;
+      nextPendingBitcoinMintIndex: AugmentedQuery<ApiType, () => Observable<u64>, []>;
+      /**
+       * Bitcoin UTXOs that have been submitted for minting, keyed by a monotonic queue index so
+       * payouts can preserve FIFO order while each frame works through a fixed payout cohort.
+       **/
+      pendingBitcoinMintsByIndex: AugmentedQuery<
+        ApiType,
+        (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<PalletMintPendingBitcoinMint>>,
+        [u64]
+      >;
+      /**
+       * Reverse lookup from bitcoin UTXO id to all queued mint indices for direct removal and
+       * client lookup.
+       **/
+      pendingMintIndicesByLockId: AugmentedQuery<
+        ApiType,
+        (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<u64>>,
+        [u64]
+      >;
       /**
        * Queue bookkeeping for pending bitcoin mints, including the bounded payout start and the
        * current frame scan cursor.
@@ -1225,24 +1225,6 @@ declare module '@polkadot/api-base/types/storage' {
         ApiType,
         () => Observable<PalletMintMintQueueCursor>,
         []
-      >;
-      /**
-       * Reverse lookup from bitcoin UTXO id to all queued mint indices for direct removal and
-       * client lookup.
-       **/
-      pendingMintUtxoIdLookup: AugmentedQuery<
-        ApiType,
-        (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<u64>>,
-        [u64]
-      >;
-      /**
-       * Bitcoin UTXOs that have been submitted for minting, keyed by a monotonic queue index so
-       * payouts can preserve FIFO order while each frame works through a fixed payout cohort.
-       **/
-      pendingMintUtxosByIndex: AugmentedQuery<
-        ApiType,
-        (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<PalletMintPendingMintUtxo>>,
-        [u64]
       >;
     };
     multisig: {

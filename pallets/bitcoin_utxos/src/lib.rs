@@ -25,7 +25,7 @@ pub mod pallet {
 	use argon_primitives::{
 		bitcoin::{
 			BitcoinBlock, BitcoinBlockHash, BitcoinCosignScriptPubkey, BitcoinHeight,
-			BitcoinSyncStatus, Satoshis, UtxoAddress, UtxoId, UtxoRef, UtxoValue,
+			BitcoinLockId, BitcoinSyncStatus, Satoshis, UtxoAddress, UtxoRef, UtxoValue,
 		},
 		inherents::{
 			BitcoinInherentData, BitcoinInherentError, BitcoinUtxoFunding, BitcoinUtxoSync,
@@ -55,20 +55,20 @@ pub mod pallet {
 
 	/// The Lock ID identified by each watched script pubkey.
 	#[pallet::storage]
-	pub type UtxoIdByScriptPubkey<T: Config> =
-		StorageMap<_, Blake2_128Concat, BitcoinCosignScriptPubkey, UtxoId, OptionQuery>;
+	pub type LockIdByScriptPubkey<T: Config> =
+		StorageMap<_, Blake2_128Concat, BitcoinCosignScriptPubkey, BitcoinLockId, OptionQuery>;
 
 	/// Watched Lock addresses and the scan height needed to observe them.
 	#[pallet::storage]
-	pub type UtxoAddressByUtxoId<T: Config> =
-		StorageMap<_, Twox64Concat, UtxoId, UtxoAddress, OptionQuery>;
+	pub type UtxoAddressByLockId<T: Config> =
+		StorageMap<_, Twox64Concat, BitcoinLockId, UtxoAddress, OptionQuery>;
 
 	/// Every output observed at a watched Lock address, retained until explicitly removed.
 	#[pallet::storage]
-	pub type UtxoRefsByUtxoId<T: Config> = StorageMap<
+	pub type UtxoRefsByLockId<T: Config> = StorageMap<
 		_,
 		Twox64Concat,
-		UtxoId,
+		BitcoinLockId,
 		BoundedBTreeSet<UtxoRef, T::MaxUtxosPerLock>,
 		ValueQuery,
 	>;
@@ -105,26 +105,26 @@ pub mod pallet {
 	#[pallet::generate_deposit(fn deposit_event)]
 	pub enum Event<T: Config> {
 		UtxoDetected {
-			utxo_id: UtxoId,
+			lock_id: BitcoinLockId,
 			utxo_ref: UtxoRef,
 			satoshis_received: Satoshis,
 			bitcoin_height: BitcoinHeight,
 		},
 		UtxoSpent {
-			utxo_id: UtxoId,
+			lock_id: BitcoinLockId,
 			utxo_ref: UtxoRef,
 			block_height: BitcoinHeight,
 		},
 		UtxoUnwatched {
-			utxo_id: UtxoId,
+			lock_id: BitcoinLockId,
 		},
 
 		UtxoSpentError {
-			utxo_id: UtxoId,
+			lock_id: BitcoinLockId,
 			error: DispatchError,
 		},
 		UtxoDetectedError {
-			utxo_id: UtxoId,
+			lock_id: BitcoinLockId,
 			error: DispatchError,
 		},
 	}
@@ -153,10 +153,8 @@ pub mod pallet {
 		MaxUtxosExceeded,
 		/// Locking script has errors
 		InvalidBitcoinScript,
-		/// Duplicated UtxoId. Already in use
-		DuplicateUtxoId,
-		/// Too many outputs have been observed at one Lock address.
-		MaxUtxosPerLockExceeded,
+		/// Duplicated BitcoinLockId. Already in use
+		DuplicateLockId,
 	}
 
 	#[pallet::genesis_config]
@@ -234,23 +232,23 @@ pub mod pallet {
 				);
 			}
 
-			for BitcoinUtxoFunding { utxo_id, utxo_ref, satoshis, bitcoin_height, .. } in funded {
+			for BitcoinUtxoFunding { lock_id, utxo_ref, satoshis, bitcoin_height, .. } in funded {
 				let result = with_storage_layer(|| {
-					Self::utxo_detected(utxo_id, utxo_ref, satoshis, bitcoin_height)
+					Self::utxo_detected(lock_id, utxo_ref, satoshis, bitcoin_height)
 				});
 				if let Err(error) = result {
-					log::warn!("Failed to process UTXO {utxo_id}: {error:?}");
-					Self::deposit_event(Event::UtxoDetectedError { utxo_id, error });
+					log::warn!("Failed to process UTXO {lock_id}: {error:?}");
+					Self::deposit_event(Event::UtxoDetectedError { lock_id, error });
 				}
 			}
 
 			for spend in spent {
 				let result = with_storage_layer(|| {
-					Self::utxo_spent(spend.utxo_id, spend.utxo_ref, spend.bitcoin_height)
+					Self::utxo_spent(spend.lock_id, spend.utxo_ref, spend.bitcoin_height)
 				});
 				if let Err(error) = result {
-					log::warn!("Failed to mark UTXO {} as spent: {error:?}", spend.utxo_id);
-					Self::deposit_event(Event::UtxoSpentError { utxo_id: spend.utxo_id, error });
+					log::warn!("Failed to mark UTXO {} as spent: {error:?}", spend.lock_id);
+					Self::deposit_event(Event::UtxoSpentError { lock_id: spend.lock_id, error });
 				}
 			}
 
@@ -311,28 +309,28 @@ pub mod pallet {
 		}
 
 		fn watch_for_utxo(
-			utxo_id: UtxoId,
+			lock_id: BitcoinLockId,
 			script_pubkey: BitcoinCosignScriptPubkey,
 		) -> Result<(), DispatchError> {
-			ensure!(!UtxoAddressByUtxoId::<T>::contains_key(utxo_id), Error::<T>::DuplicateUtxoId);
+			ensure!(!UtxoAddressByLockId::<T>::contains_key(lock_id), Error::<T>::DuplicateLockId);
 			ensure!(
-				!UtxoIdByScriptPubkey::<T>::contains_key(script_pubkey),
+				!LockIdByScriptPubkey::<T>::contains_key(script_pubkey),
 				Error::<T>::ScriptPubkeyConflict
 			);
 			let address = UtxoAddress {
-				utxo_id,
+				lock_id,
 				script_pubkey,
 				submitted_at_height: ConfirmedBitcoinBlockTip::<T>::get()
 					.map(|block| block.block_height)
 					.unwrap_or_default(),
 			};
-			UtxoIdByScriptPubkey::<T>::insert(script_pubkey, utxo_id);
-			UtxoAddressByUtxoId::<T>::insert(utxo_id, address);
+			LockIdByScriptPubkey::<T>::insert(script_pubkey, lock_id);
+			UtxoAddressByLockId::<T>::insert(lock_id, address);
 			Ok(())
 		}
 
-		fn unwatch_utxo(utxo_id: UtxoId, utxo_ref: &UtxoRef) {
-			UtxoRefsByUtxoId::<T>::mutate_exists(utxo_id, |maybe_refs| {
+		fn unwatch_utxo(lock_id: BitcoinLockId, utxo_ref: &UtxoRef) {
+			UtxoRefsByLockId::<T>::mutate_exists(lock_id, |maybe_refs| {
 				if let Some(refs) = maybe_refs.as_mut() {
 					refs.remove(utxo_ref);
 					if refs.is_empty() {
@@ -342,12 +340,12 @@ pub mod pallet {
 			});
 		}
 
-		fn unwatch(utxo_id: UtxoId) {
-			if let Some(address) = UtxoAddressByUtxoId::<T>::get(utxo_id) {
-				UtxoIdByScriptPubkey::<T>::remove(address.script_pubkey);
+		fn unwatch(lock_id: BitcoinLockId) {
+			if let Some(address) = UtxoAddressByLockId::<T>::get(lock_id) {
+				LockIdByScriptPubkey::<T>::remove(address.script_pubkey);
 			}
-			UtxoAddressByUtxoId::<T>::remove(utxo_id);
-			UtxoRefsByUtxoId::<T>::remove(utxo_id);
+			UtxoAddressByLockId::<T>::remove(lock_id);
+			UtxoRefsByLockId::<T>::remove(lock_id);
 		}
 	}
 
@@ -370,7 +368,7 @@ pub mod pallet {
 				x.block_height
 			} else {
 				let mut oldest = confirmed_block.block_height;
-				for entry in UtxoAddressByUtxoId::<T>::iter_values() {
+				for entry in UtxoAddressByLockId::<T>::iter_values() {
 					if entry.submitted_at_height < oldest {
 						oldest = entry.submitted_at_height;
 					}
@@ -382,8 +380,8 @@ pub mod pallet {
 
 		pub fn active_utxo_addresses() -> Vec<(Option<UtxoRef>, UtxoAddress)> {
 			let mut utxos = vec![];
-			for (utxo_id, watch) in UtxoAddressByUtxoId::<T>::iter() {
-				let refs = UtxoRefsByUtxoId::<T>::get(utxo_id);
+			for (lock_id, watch) in UtxoAddressByLockId::<T>::iter() {
+				let refs = UtxoRefsByLockId::<T>::get(lock_id);
 				if refs.is_empty() {
 					utxos.push((None, watch));
 				} else {
@@ -401,7 +399,7 @@ pub mod pallet {
 					(
 						utxo_ref,
 						UtxoValue {
-							utxo_id: address.utxo_id,
+							lock_id: address.lock_id,
 							script_pubkey: address.script_pubkey,
 							satoshis: 0,
 							submitted_at_height: address.submitted_at_height,
@@ -413,40 +411,41 @@ pub mod pallet {
 		}
 
 		pub fn utxo_detected(
-			utxo_id: UtxoId,
+			lock_id: BitcoinLockId,
 			utxo_ref: UtxoRef,
 			satoshis: Satoshis,
 			bitcoin_height: BitcoinHeight,
 		) -> DispatchResult {
 			if satoshis < T::MinimumSatoshisPerUtxo::get() {
-				tracing::info!(utxo_id = ?utxo_id, satoshis = ?satoshis,
+				tracing::info!(lock_id = ?lock_id, satoshis = ?satoshis,
 					"UTXO below minimum tracking threshold");
 				return Ok(())
 			}
 
-			let Some(address) = UtxoAddressByUtxoId::<T>::get(utxo_id) else { return Ok(()) };
-			if UtxoIdByScriptPubkey::<T>::get(address.script_pubkey) != Some(utxo_id) {
-				tracing::info!(utxo_id = ?utxo_id, "UTXO address is not being watched");
+			let Some(address) = UtxoAddressByLockId::<T>::get(lock_id) else { return Ok(()) };
+			if LockIdByScriptPubkey::<T>::get(address.script_pubkey) != Some(lock_id) {
+				tracing::info!(lock_id = ?lock_id, "UTXO address is not being watched");
 				return Ok(())
 			}
 
-			let inserted = UtxoRefsByUtxoId::<T>::try_mutate(utxo_id, |refs| {
-				if refs.contains(&utxo_ref) {
-					return Ok(false)
-				}
-				refs.try_insert(utxo_ref.clone())
-					.map_err(|_| Error::<T>::MaxUtxosPerLockExceeded)?;
-				Ok::<bool, Error<T>>(true)
-			})?;
-			if !inserted {
-				tracing::info!(utxo_id = ?utxo_id, satoshis = ?satoshis, utxo_ref = ?utxo_ref, bitcoin_height,
+			if UtxoRefsByLockId::<T>::get(lock_id).contains(&utxo_ref) {
+				tracing::info!(lock_id = ?lock_id, satoshis = ?satoshis, utxo_ref = ?utxo_ref, bitcoin_height,
 					"UTXO duplicate received");
 				return Ok(());
 			}
 
-			T::EventHandler::utxo_detected(utxo_id, utxo_ref.clone(), satoshis, bitcoin_height)?;
+			// Let the consumer classify the output before bounded tracker retention. Bitcoin Locks
+			// records outputs beyond its Lock limit as orphans.
+			T::EventHandler::utxo_detected(lock_id, utxo_ref.clone(), satoshis, bitcoin_height)?;
+			let is_tracked = UtxoRefsByLockId::<T>::try_mutate(lock_id, |refs| {
+				refs.try_insert(utxo_ref.clone()).map_err(|_| ())
+			});
+			if is_tracked.is_err() {
+				tracing::info!(lock_id = ?lock_id, satoshis = ?satoshis, utxo_ref = ?utxo_ref, bitcoin_height,
+					"UTXO handled but not retained because the lock tracking limit was reached");
+			}
 			Self::deposit_event(Event::UtxoDetected {
-				utxo_id,
+				lock_id,
 				utxo_ref,
 				satoshis_received: satoshis,
 				bitcoin_height,
@@ -455,21 +454,21 @@ pub mod pallet {
 		}
 
 		pub fn utxo_spent(
-			utxo_id: UtxoId,
+			lock_id: BitcoinLockId,
 			utxo_ref: Option<UtxoRef>,
 			block_height: BitcoinHeight,
 		) -> DispatchResult {
 			let refs = match utxo_ref {
 				Some(utxo_ref) => alloc::vec![utxo_ref],
-				None => UtxoRefsByUtxoId::<T>::get(utxo_id).into_iter().collect(),
+				None => UtxoRefsByLockId::<T>::get(lock_id).into_iter().collect(),
 			};
 			for utxo_ref in refs {
-				if !UtxoRefsByUtxoId::<T>::get(utxo_id).contains(&utxo_ref) {
+				if !UtxoRefsByLockId::<T>::get(lock_id).contains(&utxo_ref) {
 					continue
 				}
-				T::EventHandler::spent(utxo_id, utxo_ref.clone())?;
+				T::EventHandler::spent(lock_id, utxo_ref.clone())?;
 
-				Self::deposit_event(Event::UtxoSpent { utxo_id, utxo_ref, block_height });
+				Self::deposit_event(Event::UtxoSpent { lock_id, utxo_ref, block_height });
 			}
 			Ok(())
 		}

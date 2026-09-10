@@ -1,4 +1,5 @@
 // Auto-generated via `yarn polkadot-types-from-chain`, do not edit
+/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
@@ -92,14 +93,18 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       maxConcurrentlyReleasingLocks: u32 & AugmentedConst<ApiType>;
       /**
-       * Max bitcoin blocks up to which the first observed output may fund the Lock.
+       * Maximum number of confirmed Bitcoin outputs that may fund one Lock.
        **/
-      maxPendingConfirmationBlocks: u64 & AugmentedConst<ApiType>;
+      maxUtxosPerLock: u32 & AugmentedConst<ApiType>;
       /**
        * Number of frames orphaned UTXO release entries are retained after a lock lifecycle
        * transition before being cleaned up.
        **/
       orphanedUtxoReleaseExpiryFrames: u64 & AugmentedConst<ApiType>;
+      /**
+       * Number of Bitcoin blocks to reserve securitization that has not yet been activated.
+       **/
+      securitizationHoldBlocks: u64 & AugmentedConst<ApiType>;
       /**
        * Number of ticks per bitcoin block
        **/

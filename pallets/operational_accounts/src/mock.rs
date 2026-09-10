@@ -193,10 +193,9 @@ impl BitcoinVaultProvider for MockVaultProvider {
 		unimplemented!()
 	}
 
-	fn activate_securitization(
+	fn record_bitcoin_lock_funding(
 		_vault_id: VaultId,
-		_securitization: &argon_primitives::vault::BitcoinSecuritization<Self::Balance>,
-		_funded_satoshis: argon_primitives::bitcoin::Satoshis,
+		_update: argon_primitives::vault::BitcoinLockFundingUpdate<Self::Balance>,
 	) -> Result<(), argon_primitives::vault::VaultError> {
 		unimplemented!()
 	}
@@ -227,19 +226,19 @@ impl BitcoinVaultProvider for MockVaultProvider {
 		unimplemented!()
 	}
 
-	fn schedule_securitization_release(
+	fn release_bitcoin_lock_securitization(
 		_vault_id: VaultId,
-		_securitization: &argon_primitives::vault::BitcoinSecuritization<Self::Balance>,
-		_funded_satoshis: argon_primitives::bitcoin::Satoshis,
+		_current_securitization: &argon_primitives::vault::BitcoinSecuritization<Self::Balance>,
+		_lock_funded_satoshis: argon_primitives::bitcoin::Satoshis,
 		_lock_extension: &argon_primitives::vault::LockExtension<Self::Balance>,
 		_is_flexible: bool,
 	) -> Result<(), argon_primitives::vault::VaultError> {
 		unimplemented!()
 	}
 
-	fn return_securitization(
+	fn release_unactivated_securitization(
 		_vault_id: VaultId,
-		_securitization: &argon_primitives::vault::BitcoinSecuritization<Self::Balance>,
+		_amount: Self::Balance,
 	) -> Result<(), argon_primitives::vault::VaultError> {
 		unimplemented!()
 	}
@@ -289,7 +288,7 @@ impl BitcoinVaultProvider for MockVaultProvider {
 
 	fn update_pending_cosign_list(
 		_vault_id: VaultId,
-		_utxo_id: argon_primitives::bitcoin::UtxoId,
+		_lock_id: argon_primitives::bitcoin::BitcoinLockId,
 		_should_remove: bool,
 	) -> Result<(), argon_primitives::vault::VaultError> {
 		unimplemented!()
@@ -297,7 +296,7 @@ impl BitcoinVaultProvider for MockVaultProvider {
 
 	fn update_orphan_cosign_list(
 		_vault_id: VaultId,
-		_utxo_id: argon_primitives::bitcoin::UtxoId,
+		_lock_id: argon_primitives::bitcoin::BitcoinLockId,
 		_account_id: &Self::AccountId,
 		_should_remove: bool,
 	) -> Result<(), argon_primitives::vault::VaultError> {

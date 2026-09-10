@@ -232,10 +232,10 @@ impl TreasuryVaultProvider for StaticTreasuryVaultProvider {
 	type Balance = Balance;
 	type AccountId = TestAccountId;
 
-	fn get_eligible_capacity(vault_id: VaultId) -> (Self::Balance, Satoshis) {
+	fn get_eligible_satoshis(vault_id: VaultId) -> Satoshis {
 		VaultsById::get()
 			.get(&vault_id)
-			.map(|vault| (vault.securitization, vault.eligible_satoshis))
+			.map(|vault| vault.eligible_satoshis)
 			.unwrap_or_default()
 	}
 

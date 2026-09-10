@@ -13,15 +13,15 @@ use polkadot_sdk::{
 use argon_bitcoin::CosignReleaser;
 use argon_primitives::{
 	bitcoin::{
-		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinSignature, BitcoinXPub,
-		CompressedBitcoinPubkey, FissionId, Satoshis, UtxoId,
+		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinLockId, BitcoinSignature, BitcoinXPub,
+		CompressedBitcoinPubkey, FissionId, Satoshis,
 	},
 	block_seal::FrameId,
 	ethereum::{EthereumBlockNumber, EthereumReceiptLogProofBatch, EthereumVerifyError},
 	prelude::Tick,
 	vault::{
-		BitcoinSecuritization, BitcoinVaultProvider, LockExtension, LostBitcoinCompensation,
-		RegistrationVaultData, ReserveSecuritizationRequest, VaultError,
+		BitcoinLockFundingUpdate, BitcoinSecuritization, BitcoinVaultProvider, LockExtension,
+		LostBitcoinCompensation, RegistrationVaultData, ReserveSecuritizationRequest, VaultError,
 	},
 	BitcoinFissionLockError, BitcoinFissionLockProvider, BitcoinFissionMinting,
 	BitcoinFissionsProvider, EthereumVerifyProvider, MiningSlotProvider, Moment,
@@ -50,10 +50,10 @@ use pallet_prelude::DispatchResult;
 
 pub struct BenchmarkBitcoinSignatureVerifier;
 impl<T: pallet_bitcoin_locks::Config> BitcoinVerifier<T> for BenchmarkBitcoinSignatureVerifier {
-	fn verify_signature(
-		_utxo_releaser: CosignReleaser,
+	fn verify_signatures(
+		_lock_releaser: CosignReleaser,
 		_pubkey: CompressedBitcoinPubkey,
-		_signature: &BitcoinSignature,
+		_signatures: &[BitcoinSignature],
 	) -> Result<bool, DispatchError> {
 		Ok(true)
 	}
@@ -71,7 +71,7 @@ where
 
 	fn fission_satoshis(
 		_account_id: &AccountId,
-		_utxo_id: UtxoId,
+		_lock_id: BitcoinLockId,
 		satoshis: Satoshis,
 		_microgons_at_target_per_btc: Balance,
 	) -> Result<(Balance, Tick), BitcoinFissionLockError> {
@@ -80,7 +80,7 @@ where
 
 	fn validate_fission(
 		_account_id: &AccountId,
-		_utxo_id: UtxoId,
+		_lock_id: BitcoinLockId,
 		_satoshis: Satoshis,
 		_microgons_at_target_per_btc: Balance,
 		minimum_last_ratchet_tick: Tick,
@@ -99,7 +99,7 @@ where
 
 	fn fuse_satoshis(
 		_account_id: &AccountId,
-		_utxo_id: UtxoId,
+		_lock_id: BitcoinLockId,
 		satoshis: Satoshis,
 		_microgons_at_target_per_btc: Balance,
 	) -> Result<Balance, BitcoinFissionLockError> {
@@ -119,7 +119,7 @@ where
 	fn request_mint(
 		_account_id: &AccountId,
 		_fission_id: FissionId,
-		_utxo_id: UtxoId,
+		_lock_id: BitcoinLockId,
 		_amount: Balance,
 	) -> DispatchResult {
 		Ok(())
@@ -247,10 +247,9 @@ where
 		Err(VaultError::VaultNotFound)
 	}
 
-	fn activate_securitization(
+	fn record_bitcoin_lock_funding(
 		_vault_id: VaultId,
-		_securitization: &BitcoinSecuritization<Self::Balance>,
-		_funded_satoshis: argon_primitives::bitcoin::Satoshis,
+		_update: BitcoinLockFundingUpdate<Self::Balance>,
 	) -> Result<(), VaultError> {
 		Err(VaultError::VaultNotFound)
 	}
@@ -281,19 +280,19 @@ where
 		Err(VaultError::VaultNotFound)
 	}
 
-	fn schedule_securitization_release(
+	fn release_bitcoin_lock_securitization(
 		_vault_id: VaultId,
-		_securitization: &BitcoinSecuritization<Self::Balance>,
-		_funded_satoshis: argon_primitives::bitcoin::Satoshis,
+		_current_securitization: &BitcoinSecuritization<Self::Balance>,
+		_lock_funded_satoshis: argon_primitives::bitcoin::Satoshis,
 		_lock_extension: &LockExtension<Self::Balance>,
 		_is_flexible: bool,
 	) -> Result<(), VaultError> {
 		Err(VaultError::VaultNotFound)
 	}
 
-	fn return_securitization(
+	fn release_unactivated_securitization(
 		_vault_id: VaultId,
-		_securitization: &BitcoinSecuritization<Self::Balance>,
+		_amount: Self::Balance,
 	) -> Result<(), VaultError> {
 		Err(VaultError::VaultNotFound)
 	}
@@ -333,7 +332,7 @@ where
 
 	fn update_pending_cosign_list(
 		_vault_id: VaultId,
-		_utxo_id: UtxoId,
+		_lock_id: BitcoinLockId,
 		_should_remove: bool,
 	) -> Result<(), VaultError> {
 		Err(VaultError::VaultNotFound)
@@ -341,7 +340,7 @@ where
 
 	fn update_orphan_cosign_list(
 		_vault_id: VaultId,
-		_utxo_id: UtxoId,
+		_lock_id: BitcoinLockId,
 		_account_id: &Self::AccountId,
 		_should_remove: bool,
 	) -> Result<(), VaultError> {

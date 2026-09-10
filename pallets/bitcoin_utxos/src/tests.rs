@@ -1,11 +1,13 @@
 use crate::{
 	mock::{System, *},
 	pallet::{ConfirmedBitcoinBlockTip, InherentIncluded},
-	Error, Event, UtxoAddressByUtxoId, UtxoRefsByUtxoId,
+	Error, Event, UtxoAddressByLockId, UtxoRefsByLockId,
 };
 use pallet_prelude::{
 	argon_primitives::{
-		bitcoin::{BitcoinBlock, BitcoinCosignScriptPubkey, H256Le, UtxoAddress, UtxoId, UtxoRef},
+		bitcoin::{
+			BitcoinBlock, BitcoinCosignScriptPubkey, BitcoinLockId, H256Le, UtxoAddress, UtxoRef,
+		},
 		inherents::{BitcoinUtxoFunding, BitcoinUtxoSpend, BitcoinUtxoSync},
 		BitcoinUtxoTracker,
 	},
@@ -20,17 +22,17 @@ fn watches_a_lock_address_until_explicitly_unwatched() {
 
 		assert_ok!(BitcoinUtxos::watch_for_utxo(1, script));
 		assert_eq!(
-			UtxoAddressByUtxoId::<Test>::get(1),
-			Some(UtxoAddress { utxo_id: 1, script_pubkey: script, submitted_at_height: 1 })
+			UtxoAddressByLockId::<Test>::get(1),
+			Some(UtxoAddress { lock_id: 1, script_pubkey: script, submitted_at_height: 1 })
 		);
 		assert_noop!(BitcoinUtxos::watch_for_utxo(2, script), Error::<Test>::ScriptPubkeyConflict);
 
 		ConfirmedBitcoinBlockTip::<Test>::put(block(500));
 		BitcoinUtxos::on_initialize(2);
-		assert!(UtxoAddressByUtxoId::<Test>::contains_key(1));
+		assert!(UtxoAddressByLockId::<Test>::contains_key(1));
 
 		BitcoinUtxos::unwatch(1);
-		assert!(!UtxoAddressByUtxoId::<Test>::contains_key(1));
+		assert!(!UtxoAddressByLockId::<Test>::contains_key(1));
 	});
 }
 
@@ -52,7 +54,7 @@ fn attaches_every_output_without_classifying_it() {
 			),
 		));
 
-		let refs = UtxoRefsByUtxoId::<Test>::get(1);
+		let refs = UtxoRefsByLockId::<Test>::get(1);
 		assert!(refs.contains(&first));
 		assert!(refs.contains(&second));
 		assert_eq!(BitcoinUtxos::active_utxos().len(), 2);
@@ -100,20 +102,20 @@ fn spends_remove_only_the_exact_attached_output() {
 				3,
 				vec![],
 				vec![BitcoinUtxoSpend {
-					utxo_id: 1,
+					lock_id: 1,
 					utxo_ref: Some(first.clone()),
 					bitcoin_height: 3,
 				}],
 			),
 		));
 
-		let refs = UtxoRefsByUtxoId::<Test>::get(1);
+		let refs = UtxoRefsByLockId::<Test>::get(1);
 		assert!(!refs.contains(&first));
 		assert!(refs.contains(&second));
-		assert!(UtxoAddressByUtxoId::<Test>::contains_key(1));
+		assert!(UtxoAddressByLockId::<Test>::contains_key(1));
 		assert_eq!(LastSpent::get(), Some((1, first.clone())));
 		System::assert_last_event(
-			Event::UtxoSpent { utxo_id: 1, utxo_ref: first, block_height: 3 }.into(),
+			Event::UtxoSpent { lock_id: 1, utxo_ref: first, block_height: 3 }.into(),
 		);
 	});
 }
@@ -133,9 +135,9 @@ fn callback_failure_rolls_back_the_attachment() {
 			sync(2, vec![funding(1, utxo_ref.clone(), 100, 2)], vec![]),
 		));
 
-		assert!(!UtxoRefsByUtxoId::<Test>::get(1).contains(&utxo_ref));
+		assert!(!UtxoRefsByLockId::<Test>::get(1).contains(&utxo_ref));
 		System::assert_last_event(
-			Event::UtxoDetectedError { utxo_id: 1, error: DispatchError::Other("") }.into(),
+			Event::UtxoDetectedError { lock_id: 1, error: DispatchError::Other("") }.into(),
 		);
 	});
 }
@@ -154,15 +156,31 @@ fn duplicate_reports_do_not_duplicate_attachments() {
 			sync(2, vec![report.clone(), report], vec![]),
 		));
 
-		assert_eq!(UtxoRefsByUtxoId::<Test>::get(1).len(), 1);
+		assert_eq!(UtxoRefsByLockId::<Test>::get(1).len(), 1);
 	});
 }
 
-fn select_funding(_: (UtxoId, UtxoRef, u64)) -> DispatchResult {
+#[test]
+fn outputs_over_the_tracking_limit_still_reach_the_consumer() {
+	MinimumSatoshisPerUtxo::set(1);
+	UtxoDetectionCount::set(0);
+	new_test_ext().execute_with(|| {
+		ConfirmedBitcoinBlockTip::<Test>::put(block(11));
+		assert_ok!(BitcoinUtxos::watch_for_utxo(1, script([1; 34])));
+		let funded = (1..=11).map(|value| funding(1, utxo_ref(value), 100, 11)).collect();
+
+		assert_ok!(BitcoinUtxos::sync(RuntimeOrigin::none(), sync(11, funded, vec![])));
+
+		assert_eq!(UtxoDetectionCount::get(), 11);
+		assert_eq!(UtxoRefsByLockId::<Test>::get(1).len(), 10);
+	});
+}
+
+fn select_funding(_: (BitcoinLockId, UtxoRef, u64)) -> DispatchResult {
 	Ok(())
 }
 
-fn fail_detection(_: (UtxoId, UtxoRef, u64)) -> DispatchResult {
+fn fail_detection(_: (BitcoinLockId, UtxoRef, u64)) -> DispatchResult {
 	Err(DispatchError::Other("failed"))
 }
 
@@ -174,8 +192,13 @@ fn sync(
 	BitcoinUtxoSync { funded, spent, sync_to_block: block(height) }
 }
 
-fn funding(utxo_id: UtxoId, utxo_ref: UtxoRef, satoshis: u64, height: u64) -> BitcoinUtxoFunding {
-	BitcoinUtxoFunding { utxo_id, utxo_ref, satoshis, expected_satoshis: 0, bitcoin_height: height }
+fn funding(
+	lock_id: BitcoinLockId,
+	utxo_ref: UtxoRef,
+	satoshis: u64,
+	height: u64,
+) -> BitcoinUtxoFunding {
+	BitcoinUtxoFunding { lock_id, utxo_ref, satoshis, expected_satoshis: 0, bitcoin_height: height }
 }
 
 fn block(height: u64) -> BitcoinBlock {

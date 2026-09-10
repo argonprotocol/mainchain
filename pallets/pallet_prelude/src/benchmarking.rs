@@ -6,8 +6,8 @@ use alloc::{
 };
 use argon_primitives::{
 	bitcoin::{
-		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinNetwork, BitcoinXPub,
-		CompressedBitcoinPubkey, Satoshis, UtxoId, UtxoRef,
+		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinLockId, BitcoinNetwork, BitcoinXPub,
+		CompressedBitcoinPubkey, Satoshis, UtxoRef,
 	},
 	block_seal::{FrameId, MiningAuthority},
 	digests::{
@@ -22,9 +22,10 @@ use argon_primitives::{
 	},
 	tick::{Tick, TickDigest, Ticker},
 	vault::{
-		BitcoinResecuritization, BitcoinSecuritization, BitcoinVaultProvider, LockExtension,
-		LostBitcoinCompensation, RegistrationVaultData, ReserveSecuritizationRequest,
-		TreasuryVaultProvider, Vault, VaultError, VaultTreasuryFrameEarnings,
+		BitcoinLockFundingUpdate, BitcoinResecuritization, BitcoinSecuritization,
+		BitcoinVaultProvider, LockExtension, LostBitcoinCompensation, RegistrationVaultData,
+		ReserveSecuritizationRequest, TreasuryVaultProvider, Vault, VaultError,
+		VaultTreasuryFrameEarnings,
 	},
 	ArgonCPI, NotaryId, NotebookNumber, NotebookSecret, OperationalRewardPayout, PriceProvider,
 	VaultId, VotingSchedule,
@@ -922,7 +923,7 @@ where
 
 #[derive(Clone, Encode, Decode, PartialEq, Eq)]
 pub struct BenchmarkBitcoinUtxoTrackerState {
-	pub watched_utxos_by_id: BTreeMap<UtxoId, BitcoinCosignScriptPubkey>,
+	pub watched_utxos_by_id: BTreeMap<BitcoinLockId, BitcoinCosignScriptPubkey>,
 	pub bitcoin_network: BitcoinNetwork,
 	pub bitcoin_block_height_change: (BitcoinHeight, BitcoinHeight),
 }
@@ -956,20 +957,20 @@ impl BitcoinUtxoTracker for BenchmarkBitcoinUtxoTracker {
 	}
 
 	fn watch_for_utxo(
-		utxo_id: UtxoId,
+		lock_id: BitcoinLockId,
 		script_pubkey: BitcoinCosignScriptPubkey,
 	) -> Result<(), DispatchError> {
 		let mut state = benchmark_bitcoin_utxo_tracker_state();
-		state.watched_utxos_by_id.insert(utxo_id, script_pubkey);
+		state.watched_utxos_by_id.insert(lock_id, script_pubkey);
 		set_benchmark_bitcoin_utxo_tracker_state(state);
 		Ok(())
 	}
 
-	fn unwatch_utxo(_utxo_id: UtxoId, _utxo_ref: &UtxoRef) {}
+	fn unwatch_utxo(_lock_id: BitcoinLockId, _utxo_ref: &UtxoRef) {}
 
-	fn unwatch(utxo_id: UtxoId) {
+	fn unwatch(lock_id: BitcoinLockId) {
 		let mut state = benchmark_bitcoin_utxo_tracker_state();
-		state.watched_utxos_by_id.remove(&utxo_id);
+		state.watched_utxos_by_id.remove(&lock_id);
 		set_benchmark_bitcoin_utxo_tracker_state(state);
 	}
 }
@@ -1071,7 +1072,7 @@ where
 	pub canceled_locks: Vec<(VaultId, Balance)>,
 	pub treasury_frame_earnings: Vec<(VaultId, Balance)>,
 	pub charge_fee: bool,
-	pub pending_cosigns: BTreeMap<VaultId, BTreeSet<UtxoId>>,
+	pub pending_cosigns: BTreeMap<VaultId, BTreeSet<BitcoinLockId>>,
 	pub orphaned_utxo_cosigns: BTreeMap<VaultId, BTreeMap<AccountId, u32>>,
 }
 
@@ -1253,14 +1254,13 @@ where
 			.ok_or(VaultError::VaultNotFound)
 	}
 
-	fn activate_securitization(
+	fn record_bitcoin_lock_funding(
 		vault_id: VaultId,
-		securitization: &BitcoinSecuritization<Self::Balance>,
-		funded_satoshis: Satoshis,
+		update: BitcoinLockFundingUpdate<Self::Balance>,
 	) -> Result<(), VaultError> {
 		mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
 			let vault = state.vaults.get_mut(&vault_id).ok_or(VaultError::VaultNotFound)?;
-			vault.activate_securitization(securitization, funded_satoshis)
+			vault.record_bitcoin_lock_funding(update)
 		})
 	}
 
@@ -1397,18 +1397,18 @@ where
 		Ok((total_fee, fee_discount))
 	}
 
-	fn schedule_securitization_release(
+	fn release_bitcoin_lock_securitization(
 		vault_id: VaultId,
-		securitization: &BitcoinSecuritization<Self::Balance>,
-		funded_satoshis: Satoshis,
+		current_securitization: &BitcoinSecuritization<Self::Balance>,
+		lock_funded_satoshis: Satoshis,
 		lock_extension: &LockExtension<Self::Balance>,
 		is_flexible: bool,
 	) -> Result<(), VaultError> {
 		mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
 			let vault = state.vaults.get_mut(&vault_id).ok_or(VaultError::VaultNotFound)?;
-			vault.schedule_securitization_release(
-				securitization,
-				funded_satoshis,
+			vault.release_bitcoin_lock_securitization(
+				current_securitization,
+				lock_funded_satoshis,
 				lock_extension,
 				is_flexible,
 			)?;
@@ -1416,14 +1416,14 @@ where
 		})
 	}
 
-	fn return_securitization(
+	fn release_unactivated_securitization(
 		vault_id: VaultId,
-		securitization: &BitcoinSecuritization<Self::Balance>,
+		amount: Self::Balance,
 	) -> Result<(), VaultError> {
 		mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
 			let vault = state.vaults.get_mut(&vault_id).ok_or(VaultError::VaultNotFound)?;
-			vault.return_securitization(securitization)?;
-			state.canceled_locks.push((vault_id, securitization.btc_value_in_microgons()));
+			vault.release_unactivated_securitization(amount)?;
+			state.canceled_locks.push((vault_id, amount));
 			Ok(())
 		})
 	}
@@ -1488,18 +1488,18 @@ where
 
 	fn update_pending_cosign_list(
 		vault_id: VaultId,
-		utxo_id: UtxoId,
+		lock_id: BitcoinLockId,
 		should_remove: bool,
 	) -> Result<(), VaultError> {
 		mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
 			let entries = state.pending_cosigns.entry(vault_id).or_default();
 			if should_remove {
-				entries.remove(&utxo_id);
+				entries.remove(&lock_id);
 				if entries.is_empty() {
 					state.pending_cosigns.remove(&vault_id);
 				}
 			} else {
-				entries.insert(utxo_id);
+				entries.insert(lock_id);
 			}
 			Ok(())
 		})
@@ -1507,7 +1507,7 @@ where
 
 	fn update_orphan_cosign_list(
 		vault_id: VaultId,
-		_utxo_id: UtxoId,
+		_lock_id: BitcoinLockId,
 		account_id: &Self::AccountId,
 		should_remove: bool,
 	) -> Result<(), VaultError> {
@@ -1550,11 +1550,11 @@ where
 	type Balance = Balance;
 	type AccountId = AccountId;
 
-	fn get_eligible_capacity(vault_id: VaultId) -> (Self::Balance, Satoshis) {
+	fn get_eligible_satoshis(vault_id: VaultId) -> Satoshis {
 		benchmark_bitcoin_vault_provider_state::<AccountId, Balance>()
 			.vaults
 			.get(&vault_id)
-			.map(|vault| (vault.securitization, vault.ratio_adjusted_satoshis))
+			.map(|vault| vault.ratio_adjusted_satoshis)
 			.unwrap_or_default()
 	}
 

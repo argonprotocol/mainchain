@@ -26,14 +26,14 @@ pub trait WeightInfo {
 	// Core extrinsics
 	fn create_receive_address() -> Weight;
 	fn request_release() -> Weight;
-	fn cosign_release() -> Weight;
+	fn cosign_release(input_count: u32) -> Weight;
 
 	// Hooks with variance
 	fn on_initialize_with_expirations_and_overdue(
 		expiring_count: u32,
 		overdue_count: u32,
 		orphan_expiring_count: u32,
-		pending_funding_count: u32,
+		securitization_hold_expiration_count: u32,
 	) -> Weight {
 		let mut weight = Self::on_initialize_base();
 		if expiring_count > 0 {
@@ -46,8 +46,10 @@ pub trait WeightInfo {
 			weight = weight
 				.saturating_add(Self::on_initialize_orphan_expirations(orphan_expiring_count));
 		}
-		if pending_funding_count > 0 {
-			weight = weight.saturating_add(Self::on_initialize_pending_funding(pending_funding_count));
+		if securitization_hold_expiration_count > 0 {
+			weight = weight.saturating_add(Self::on_initialize_securitization_hold_expirations(
+				securitization_hold_expiration_count,
+			));
 		}
 		weight
 	}
@@ -55,7 +57,7 @@ pub trait WeightInfo {
 	fn on_initialize_expiring_locks(n: u32) -> Weight;
 	fn on_initialize_overdue_releases(n: u32) -> Weight;
 	fn on_initialize_orphan_expirations(n: u32) -> Weight;
-	fn on_initialize_pending_funding(n: u32) -> Weight;
+	fn on_initialize_securitization_hold_expirations(n: u32) -> Weight;
 
 	// Admin function
 	fn admin_modify_minimum_locked_sats() -> Weight;
@@ -105,8 +107,9 @@ where
 		Base::request_release()
 	}
 
-	fn cosign_release() -> Weight {
-		Base::cosign_release().saturating_add(FissionsProviderWeight::close_for_lock())
+	fn cosign_release(input_count: u32) -> Weight {
+		Base::cosign_release(input_count)
+			.saturating_add(FissionsProviderWeight::close_for_lock())
 	}
 
 	fn on_initialize_base() -> Weight {
@@ -127,8 +130,8 @@ where
 		Base::on_initialize_orphan_expirations(n)
 	}
 
-	fn on_initialize_pending_funding(n: u32) -> Weight {
-		Base::on_initialize_pending_funding(n)
+	fn on_initialize_securitization_hold_expirations(n: u32) -> Weight {
+		Base::on_initialize_securitization_hold_expirations(n)
 			.saturating_add(T::DbWeight::get().writes(n.into()))
 	}
 
@@ -213,12 +216,12 @@ impl<T: Config> BitcoinUtxoEventsWeightInfo for ProviderWeightAdapter<T> {
 impl WeightInfo for () {
 	fn create_receive_address() -> Weight { Weight::zero() }
 	fn request_release() -> Weight { Weight::zero() }
-	fn cosign_release() -> Weight { Weight::zero() }
+	fn cosign_release(_input_count: u32) -> Weight { Weight::zero() }
 	fn on_initialize_base() -> Weight { Weight::zero() }
 	fn on_initialize_expiring_locks(_n: u32) -> Weight { Weight::zero() }
 	fn on_initialize_overdue_releases(_n: u32) -> Weight { Weight::zero() }
 	fn on_initialize_orphan_expirations(_n: u32) -> Weight { Weight::zero() }
-	fn on_initialize_pending_funding(_n: u32) -> Weight { Weight::zero() }
+	fn on_initialize_securitization_hold_expirations(_n: u32) -> Weight { Weight::zero() }
 	fn admin_modify_minimum_locked_sats() -> Weight { Weight::zero() }
 	fn request_orphaned_utxo_release() -> Weight { Weight::zero() }
 	fn cosign_orphaned_utxo_release() -> Weight { Weight::zero() }

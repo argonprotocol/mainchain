@@ -3,9 +3,9 @@ use crate::{
 	errors::Error,
 	psbt_utils::*,
 };
-use alloc::vec;
+use alloc::{vec, vec::Vec};
 use argon_primitives::bitcoin::{
-	BitcoinError, BitcoinSignature, CompressedBitcoinPubkey, Satoshis,
+	BitcoinError, BitcoinSignature, CompressedBitcoinPubkey, Satoshis, UtxoRef,
 };
 use bitcoin::{
 	absolute::LockTime,
@@ -26,49 +26,62 @@ pub struct CosignReleaser {
 }
 
 impl CosignReleaser {
+	/// Builds a release with inputs ordered by `UtxoRef` (`txid`, then `output_index`).
 	pub fn from_script(
 		cosign_script: CosignScript,
-		utxo_satoshis: Satoshis,
-		utxo_txid: bitcoin::Txid,
-		utxo_vout: u32,
+		mut utxos: Vec<(UtxoRef, Satoshis)>,
 		release_step: ReleaseStep,
 		fee: Amount,
 		to_script_pubkey: ScriptBuf,
 	) -> Result<Self, Error> {
+		if utxos.is_empty() {
+			return Err(Error::NoUtxos)
+		}
+		utxos.sort_by(|(left, _), (right, _)| left.cmp(right));
 		let lock_time = cosign_script.unlock_height(release_step);
-		let out_point = OutPoint { txid: utxo_txid, vout: utxo_vout };
-		let out_amount = Amount::from_sat(utxo_satoshis);
+		let total_satoshis = utxos.iter().try_fold(0u64, |total, (_, satoshis)| {
+			total.checked_add(*satoshis).ok_or(Error::FeeOverflow)
+		})?;
 		let unsigned_tx = Transaction {
 			version: Version::TWO, // Post BIP-68.
 			lock_time: LockTime::from_height(lock_time)
 				.map_err(|_| BitcoinError::InvalidLockTime)?,
-			input: vec![TxIn {
-				previous_output: out_point,
-				sequence: Sequence::ENABLE_LOCKTIME_NO_RBF,
-				..TxIn::default()
-			}],
+			input: utxos
+				.iter()
+				.map(|(utxo_ref, _)| TxIn {
+					previous_output: OutPoint {
+						txid: utxo_ref.txid.clone().into(),
+						vout: utxo_ref.output_index,
+					},
+					sequence: Sequence::ENABLE_LOCKTIME_NO_RBF,
+					..TxIn::default()
+				})
+				.collect(),
 			output: vec![TxOut {
-				value: out_amount.checked_sub(fee).ok_or(Error::FeeOverflow)?,
+				value: Amount::from_sat(total_satoshis)
+					.checked_sub(fee)
+					.ok_or(Error::FeeOverflow)?,
 				script_pubkey: to_script_pubkey,
 			}],
 		};
 
 		let mut psbt = Psbt::from_unsigned_tx(unsigned_tx).map_err(Error::from)?;
-
-		psbt.inputs[0] = Input {
-			witness_utxo: Some(TxOut {
-				value: out_amount,
-				script_pubkey: cosign_script.get_script_pubkey(),
-			}),
-			witness_script: Some(cosign_script.script.clone()),
-			sighash_type: Some(EcdsaSighashType::AllPlusAnyoneCanPay.into()),
-			..Input::default()
-		};
 		let descriptor = cosign_script.create_descriptor()?;
-		psbt.update_input_with_descriptor(0, &descriptor).map_err(|_| {
-			log::error!("Error updating PSBT with descriptor: {descriptor:#?}");
-			Error::PsbtFinalizeError
-		})?;
+		for (index, (_, satoshis)) in utxos.iter().enumerate() {
+			psbt.inputs[index] = Input {
+				witness_utxo: Some(TxOut {
+					value: Amount::from_sat(*satoshis),
+					script_pubkey: cosign_script.get_script_pubkey(),
+				}),
+				witness_script: Some(cosign_script.script.clone()),
+				sighash_type: Some(EcdsaSighashType::AllPlusAnyoneCanPay.into()),
+				..Input::default()
+			};
+			psbt.update_input_with_descriptor(index, &descriptor).map_err(|_| {
+				log::error!("Error updating PSBT input {index} with descriptor: {descriptor:#?}");
+				Error::PsbtFinalizeError
+			})?;
+		}
 
 		Ok(Self { cosign_script, release_step, psbt })
 	}
@@ -76,9 +89,7 @@ impl CosignReleaser {
 	#[allow(clippy::too_many_arguments)]
 	pub fn new(
 		cosign_script_args: CosignScriptArgs,
-		utxo_satoshis: Satoshis,
-		utxo_txid: bitcoin::Txid,
-		utxo_vout: u32,
+		utxos: Vec<(UtxoRef, Satoshis)>,
 		release_step: ReleaseStep,
 		fee: Amount,
 		pay_to_script_pubkey: ScriptBuf,
@@ -86,29 +97,42 @@ impl CosignReleaser {
 	) -> Result<Self, Error> {
 		Self::from_script(
 			CosignScript::new(cosign_script_args, network)?,
-			utxo_satoshis,
-			utxo_txid,
-			utxo_vout,
+			utxos,
 			release_step,
 			fee,
 			pay_to_script_pubkey,
 		)
 	}
 
-	pub fn add_signature(&mut self, pubkey: PublicKey, signature: Signature) {
-		self.psbt.inputs[0].partial_sigs.insert(pubkey, signature);
+	pub fn add_signature(
+		&mut self,
+		input_index: usize,
+		pubkey: PublicKey,
+		signature: Signature,
+	) -> Result<(), Error> {
+		let input = self.psbt.inputs.get_mut(input_index).ok_or(Error::SignatureCountMismatch)?;
+		input.partial_sigs.insert(pubkey, signature);
+		Ok(())
 	}
 
 	/// No std friendly version of verifying a signature
-	pub fn verify_signature_raw(
+	pub fn verify_signatures_raw(
 		&self,
 		pubkey: CompressedBitcoinPubkey,
-		signature_der_bytes: &BitcoinSignature,
+		signatures: &[BitcoinSignature],
 	) -> Result<bool, Error> {
-		verify_signature_raw(&self.psbt, pubkey, signature_der_bytes)
+		if signatures.len() != self.psbt.inputs.len() {
+			return Ok(false)
+		}
+		for (input_index, signature) in signatures.iter().enumerate() {
+			if !verify_signature_raw(&self.psbt, input_index, pubkey, signature)? {
+				return Ok(false)
+			}
+		}
+		Ok(true)
 	}
 
-	pub fn sign(&mut self, privkey: PrivateKey) -> Result<(Signature, PublicKey), Error> {
+	pub fn sign(&mut self, privkey: PrivateKey) -> Result<Vec<(Signature, PublicKey)>, Error> {
 		sign(&mut self.psbt, privkey)
 	}
 
@@ -116,33 +140,28 @@ impl CosignReleaser {
 		&mut self,
 		master_xpriv: Xpriv,
 		hd_path: DerivationPath,
-	) -> Result<(Signature, PublicKey), Error> {
+	) -> Result<Vec<(Signature, PublicKey)>, Error> {
 		sign_derived(&mut self.psbt, master_xpriv, hd_path)
 	}
 
 	pub fn create_witness(&mut self) -> Result<(), Error> {
-		let mut witness = Witness::new();
-		let psbt = &mut self.psbt;
-		let partial_sigs = &psbt.inputs[0].partial_sigs;
 		let owner_pubkey = self.cosign_script.script_args.bitcoin_owner_pubkey()?;
-
 		let vault_pubkey = self.cosign_script.script_args.bitcoin_vault_pubkey()?;
-
 		let vault_claim_pubkey = self.cosign_script.script_args.bitcoin_vault_claim_pubkey()?;
-
-		if let Some(sig) = partial_sigs.get(&vault_pubkey) {
-			witness.push(sig.to_vec());
+		for input in &mut self.psbt.inputs {
+			let mut witness = Witness::new();
+			if let Some(sig) = input.partial_sigs.get(&vault_pubkey) {
+				witness.push(sig.to_vec());
+			}
+			if let Some(sig) = input.partial_sigs.get(&vault_claim_pubkey) {
+				witness.push(sig.to_vec());
+			}
+			if let Some(sig) = input.partial_sigs.get(&owner_pubkey) {
+				witness.push(sig.to_vec());
+			}
+			witness.push(self.cosign_script.script.clone());
+			input.final_script_witness = Some(witness);
 		}
-		if let Some(sig) = partial_sigs.get(&vault_claim_pubkey) {
-			witness.push(sig.to_vec());
-		}
-
-		if let Some(sig) = partial_sigs.get(&owner_pubkey) {
-			witness.push(sig.to_vec());
-		}
-		witness.push(self.cosign_script.script.clone());
-
-		psbt.inputs[0].final_script_witness = Some(witness);
 		Ok(())
 	}
 

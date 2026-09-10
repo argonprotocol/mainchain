@@ -295,7 +295,7 @@ declare module '@polkadot/api-base/types/submittable' {
         (
           fissionId: Compact<u64> | AnyNumber | Uint8Array,
           liquidId: Compact<u64> | AnyNumber | Uint8Array,
-          utxoId: Compact<u64> | AnyNumber | Uint8Array,
+          lockId: Compact<u64> | AnyNumber | Uint8Array,
           satoshis: Compact<u64> | AnyNumber | Uint8Array,
           microgonsAtTargetPerBtc: Compact<u128> | AnyNumber | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
@@ -339,18 +339,19 @@ declare module '@polkadot/api-base/types/submittable' {
         [AccountId32, ArgonPrimitivesBitcoinUtxoRef, Bytes]
       >;
       /**
-       * Submitted by a Vault operator to cosign the release of a bitcoin UTXO. The Lock's
-       * securitization will be scheduled for release without a penalty.
+       * Submitted by a Vault operator to cosign every input in a Bitcoin Lock release. The
+       * signatures must follow ascending `UtxoRef` order: transaction ID, then output index.
+       * Its securitization will be scheduled for release without a penalty.
        *
        * This is submitted as a no-fee transaction off chain to allow keys to remain in cold
        * wallets.
        **/
       cosignRelease: AugmentedSubmittable<
         (
-          utxoId: u64 | AnyNumber | Uint8Array,
-          signature: Bytes | string | Uint8Array,
+          lockId: u64 | AnyNumber | Uint8Array,
+          signatures: Vec<Bytes> | (Bytes | string | Uint8Array)[],
         ) => SubmittableExtrinsic<ApiType>,
-        [u64, Bytes]
+        [u64, Vec<Bytes>]
       >;
       /**
        * Create a Bitcoin receive address backed by a Lock for the submitting account.
@@ -391,16 +392,16 @@ declare module '@polkadot/api-base/types/submittable' {
         [ArgonPrimitivesBitcoinUtxoRef, Bytes, u64]
       >;
       /**
-       * Submitted by a Bitcoin holder to trigger the release of their Utxo out of the cosign
-       * script. A transaction spending the UTXO should be pre-created so that the sighash
-       * can be submitted here. The vault operator will have 10 days to counter-sign the
-       * transaction. It will be published with the public key as a BitcoinUtxoCosigned Event.
+       * Submitted by a Bitcoin holder to release every UTXO in a Lock from its cosign script.
+       * The destination and fee determine the transaction the vault must sign. The vault
+       * operator has 10 days to publish one signature per input in a BitcoinUtxoCosigned
+       * event.
        *
        * Owner must submit a script pubkey and also a fee to pay to the bitcoin network.
        **/
       requestRelease: AugmentedSubmittable<
         (
-          utxoId: u64 | AnyNumber | Uint8Array,
+          lockId: u64 | AnyNumber | Uint8Array,
           toScriptPubkey: Bytes | string | Uint8Array,
           bitcoinNetworkFee: u64 | AnyNumber | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
@@ -411,7 +412,7 @@ declare module '@polkadot/api-base/types/submittable' {
        **/
       resecuritize: AugmentedSubmittable<
         (
-          utxoId: u64 | AnyNumber | Uint8Array,
+          lockId: u64 | AnyNumber | Uint8Array,
           satoshis: Compact<u64> | AnyNumber | Uint8Array,
           options:
             | Option<PalletBitcoinLocksLockOptions>
@@ -425,7 +426,7 @@ declare module '@polkadot/api-base/types/submittable' {
       >;
       setFlexible: AugmentedSubmittable<
         (
-          utxoId: u64 | AnyNumber | Uint8Array,
+          lockId: u64 | AnyNumber | Uint8Array,
           isFlexible: bool | boolean | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
         [u64, bool]

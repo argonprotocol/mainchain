@@ -1,7 +1,9 @@
 #![cfg(feature = "runtime-benchmarks")]
 
 use super::*;
-use argon_primitives::{bitcoin::UtxoId, BitcoinFissionRequirements, BitcoinFissionsProvider};
+use argon_primitives::{
+	bitcoin::BitcoinLockId, BitcoinFissionRequirements, BitcoinFissionsProvider,
+};
 use polkadot_sdk::frame_benchmarking::v2::*;
 
 const MAX_FISSIONS_PER_LOCK_BENCH: u32 = 50;
@@ -36,7 +38,7 @@ mod benchmarks {
 			0,
 			Fission {
 				liquid_id: 0,
-				utxo_id: 1,
+				lock_id: 1,
 				satoshis: 1,
 				microgons_at_target_per_btc: current_rate,
 				last_ratchet_tick: 0,
@@ -72,7 +74,7 @@ mod benchmarks {
 			0,
 			Fission {
 				liquid_id: 0,
-				utxo_id: 1,
+				lock_id: 1,
 				satoshis: 1,
 				microgons_at_target_per_btc: T::Balance::from(100u128),
 				last_ratchet_tick: 0,
@@ -103,11 +105,11 @@ mod benchmarks {
 	#[benchmark]
 	fn lock_spent(l: Linear<0, MAX_FISSIONS_PER_LOCK_BENCH>) -> Result<(), BenchmarkError> {
 		let account_id: T::AccountId = account("fission-owner", 0, 0);
-		let utxo_id: UtxoId = 1;
+		let lock_id: BitcoinLockId = 1;
 		let block_number = frame_system::Pallet::<T>::block_number();
 
 		for fission_id in 0..l as u64 {
-			FissionIdsByLockId::<T>::try_mutate(utxo_id, |fission_ids| {
+			FissionIdsByLockId::<T>::try_mutate(lock_id, |fission_ids| {
 				fission_ids
 					.try_insert(fission_id)
 					.map(|_| ())
@@ -118,7 +120,7 @@ mod benchmarks {
 				fission_id,
 				Fission {
 					liquid_id: 0,
-					utxo_id,
+					lock_id,
 					satoshis: 1,
 					microgons_at_target_per_btc: T::Balance::from(100u128),
 					last_ratchet_tick: 0,
@@ -134,12 +136,12 @@ mod benchmarks {
 		{
 			<Pallet<T> as BitcoinFissionsProvider<T::AccountId, T::Balance>>::close_for_lock(
 				&account_id,
-				utxo_id,
+				lock_id,
 				T::Balance::from(100u128.saturating_mul(l as u128)),
 			)?;
 		}
 
-		assert!(FissionIdsByLockId::<T>::get(utxo_id).is_empty());
+		assert!(FissionIdsByLockId::<T>::get(lock_id).is_empty());
 		assert!((0..l as u64)
 			.all(|fission_id| !FissionByOwnerAndId::<T>::contains_key(&account_id, fission_id)));
 		Ok(())
@@ -154,7 +156,7 @@ mod benchmarks {
 			0,
 			Fission {
 				liquid_id: 0,
-				utxo_id: 1,
+				lock_id: 1,
 				satoshis: 1,
 				microgons_at_target_per_btc: T::Balance::from(100u128),
 				last_ratchet_tick: 0,
@@ -182,7 +184,7 @@ mod benchmarks {
 	fn provider_get_lock_fission_requirements() -> Result<(), BenchmarkError> {
 		let account_id: T::AccountId = account("fission-owner", 0, 0);
 		let block_number = frame_system::Pallet::<T>::block_number();
-		let utxo_id = 1;
+		let lock_id = 1;
 		let mut fission_ids = BoundedBTreeSet::new();
 		for fission_id in 0..T::MaxFissionsPerLock::get() as u64 {
 			fission_ids.try_insert(fission_id).expect("bounded by MaxFissionsPerLock");
@@ -191,7 +193,7 @@ mod benchmarks {
 				fission_id,
 				Fission {
 					liquid_id: 0,
-					utxo_id,
+					lock_id,
 					satoshis: 1,
 					microgons_at_target_per_btc: T::Balance::from(100u128 + fission_id as u128),
 					last_ratchet_tick: 0,
@@ -202,7 +204,7 @@ mod benchmarks {
 				},
 			);
 		}
-		FissionIdsByLockId::<T>::insert(utxo_id, fission_ids);
+		FissionIdsByLockId::<T>::insert(lock_id, fission_ids);
 		let requirements;
 
 		#[block]
@@ -210,7 +212,7 @@ mod benchmarks {
 			requirements = <Pallet<T> as BitcoinFissionsProvider<
 				T::AccountId,
 				T::Balance,
-			>>::get_lock_fission_requirements(&account_id, utxo_id);
+			>>::get_lock_fission_requirements(&account_id, lock_id);
 		}
 
 		assert_eq!(

@@ -6,7 +6,9 @@ use sp_core::U256;
 use sp_inherents::{InherentData, InherentIdentifier, IsFatalError};
 
 use crate::{
-	bitcoin::{BitcoinBlock, BitcoinHeight, BitcoinRejectedReason, Satoshis, UtxoId, UtxoRef},
+	bitcoin::{
+		BitcoinBlock, BitcoinHeight, BitcoinLockId, BitcoinRejectedReason, Satoshis, UtxoRef,
+	},
 	notary::SignedHeaderBytes,
 	BestBlockVoteSeal, BlockSealDigest, BlockVote, MerkleProof, NotaryId, NotebookNumber,
 	SignedNotebookHeader,
@@ -291,15 +293,15 @@ impl BitcoinInherentData for InherentData {
 
 #[derive(Clone, PartialEq, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo)]
 pub struct BitcoinUtxoSyncV0 {
-	pub spent: BTreeMap<UtxoId, BitcoinHeight>,
-	pub verified: BTreeMap<UtxoId, UtxoRef>,
-	pub invalid: BTreeMap<UtxoId, BitcoinRejectedReason>,
+	pub spent: BTreeMap<BitcoinLockId, BitcoinHeight>,
+	pub verified: BTreeMap<BitcoinLockId, UtxoRef>,
+	pub invalid: BTreeMap<BitcoinLockId, BitcoinRejectedReason>,
 	pub sync_to_block: BitcoinBlock,
 }
 
 #[derive(Clone, PartialEq, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo)]
 pub struct BitcoinUtxoSyncV1 {
-	pub spent: BTreeMap<UtxoId, BitcoinHeight>,
+	pub spent: BTreeMap<BitcoinLockId, BitcoinHeight>,
 	pub funded: Vec<BitcoinUtxoFunding>,
 	pub sync_to_block: BitcoinBlock,
 }
@@ -314,7 +316,7 @@ pub struct BitcoinUtxoSync {
 #[derive(Clone, PartialEq, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo)]
 pub struct BitcoinUtxoSpend {
 	#[codec(compact)]
-	pub utxo_id: UtxoId,
+	pub lock_id: BitcoinLockId,
 	pub utxo_ref: Option<UtxoRef>,
 	#[codec(compact)]
 	pub bitcoin_height: BitcoinHeight,
@@ -323,7 +325,7 @@ pub struct BitcoinUtxoSpend {
 #[derive(Clone, PartialEq, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo)]
 pub struct BitcoinUtxoFunding {
 	#[codec(compact)]
-	pub utxo_id: UtxoId,
+	pub lock_id: BitcoinLockId,
 	pub utxo_ref: UtxoRef,
 	#[codec(compact)]
 	pub satoshis: Satoshis,
@@ -349,9 +351,9 @@ impl From<BitcoinUtxoSyncV1> for BitcoinUtxoSyncV0 {
 					if funding.satoshis != funding.expected_satoshis {
 						return None;
 					}
-					let utxo_id = &funding.utxo_id;
+					let lock_id = &funding.lock_id;
 					let utxo_ref = &funding.utxo_ref;
-					Some((*utxo_id, utxo_ref.clone()))
+					Some((*lock_id, utxo_ref.clone()))
 				})
 				.collect(),
 			invalid: value
@@ -361,9 +363,9 @@ impl From<BitcoinUtxoSyncV1> for BitcoinUtxoSyncV0 {
 					if funding.satoshis == funding.expected_satoshis {
 						return None;
 					}
-					let utxo_id = &funding.utxo_id;
+					let lock_id = &funding.lock_id;
 					// zero tolerance in version 0
-					Some((*utxo_id, BitcoinRejectedReason::SatoshisOutsideAcceptedRange))
+					Some((*lock_id, BitcoinRejectedReason::SatoshisOutsideAcceptedRange))
 				})
 				.collect(),
 			sync_to_block: value.sync_to_block,
@@ -375,7 +377,7 @@ impl From<BitcoinUtxoSync> for BitcoinUtxoSyncV1 {
 	fn from(value: BitcoinUtxoSync) -> Self {
 		let mut spent = BTreeMap::new();
 		for entry in value.spent {
-			spent.insert(entry.utxo_id, entry.bitcoin_height);
+			spent.insert(entry.lock_id, entry.bitcoin_height);
 		}
 		Self { spent, funded: value.funded, sync_to_block: value.sync_to_block }
 	}
@@ -386,8 +388,8 @@ impl From<BitcoinUtxoSyncV1> for BitcoinUtxoSync {
 		let spent = value
 			.spent
 			.into_iter()
-			.map(|(utxo_id, bitcoin_height)| BitcoinUtxoSpend {
-				utxo_id,
+			.map(|(lock_id, bitcoin_height)| BitcoinUtxoSpend {
+				lock_id,
 				utxo_ref: None,
 				bitcoin_height,
 			})

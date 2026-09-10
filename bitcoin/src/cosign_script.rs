@@ -103,6 +103,7 @@ impl CosignScript {
 	pub fn calculate_fee(
 		&self,
 		is_cosign: bool,
+		input_count: usize,
 		to_script_pubkey: ScriptBuf,
 		fee_rate: FeeRate,
 	) -> Result<Amount, Error> {
@@ -116,8 +117,14 @@ impl CosignScript {
 			witness_element_lengths.push(MAX_SIGNATURE_SIZE);
 			witness_element_lengths.push(COMPRESSED_PUBKEY_SIZE);
 		}
+		if input_count == 0 {
+			return Err(Error::NoUtxos)
+		}
 		let weight = predict_weight(
-			vec![InputWeightPrediction::from_slice(0, witness_element_lengths.as_slice())],
+			vec![
+				InputWeightPrediction::from_slice(0, witness_element_lengths.as_slice());
+				input_count
+			],
 			vec![to_script_pubkey.len()],
 		);
 		let Some(fee) = fee_rate.fee_wu(weight) else { return Err(Error::FeeTooLow) };
@@ -299,16 +306,14 @@ mod test {
 
 		let pay_to_script_pubkey = vault_compressed_pubkey.p2wpkh_script_code();
 		let fee = cosign_script
-			.calculate_fee(false, pay_to_script_pubkey.clone(), fee_rate)
+			.calculate_fee(false, 1, pay_to_script_pubkey.clone(), fee_rate)
 			.unwrap();
 
 		// fails locktime if not cleared
 		{
 			let mut unlocker = CosignReleaser::from_script(
 				cosign_script.clone(),
-				Amount::ONE_BTC.to_sat(),
-				txid,
-				vout,
+				vec![(UtxoRef { txid: txid.into(), output_index: vout }, Amount::ONE_BTC.to_sat())],
 				ReleaseStep::VaultClaim,
 				fee,
 				pay_to_script_pubkey.clone(),
@@ -324,9 +329,7 @@ mod test {
 		{
 			let mut unlocker = CosignReleaser::from_script(
 				cosign_script.clone(),
-				Amount::ONE_BTC.to_sat(),
-				txid,
-				vout,
+				vec![(UtxoRef { txid: txid.into(), output_index: vout }, Amount::ONE_BTC.to_sat())],
 				ReleaseStep::VaultClaim,
 				fee,
 				pay_to_script_pubkey.clone(),
@@ -343,9 +346,7 @@ mod test {
 
 		let mut unlocker = CosignReleaser::from_script(
 			cosign_script.clone(),
-			Amount::ONE_BTC.to_sat(),
-			txid,
-			vout,
+			vec![(UtxoRef { txid: txid.into(), output_index: vout }, Amount::ONE_BTC.to_sat())],
 			ReleaseStep::VaultClaim,
 			fee,
 			pay_to_script_pubkey.clone(),
@@ -400,10 +401,11 @@ mod test {
 			&bitcoind,
 			UtxoRef { txid: txid.into(), output_index: vout },
 			UtxoAddress {
-				utxo_id: 1,
+				lock_id: 1,
 				script_pubkey: cosign_script.get_script_pubkey().try_into().unwrap(),
 				submitted_at_height: register_height,
 			},
+			1,
 			&block_address,
 		);
 		drop(bitcoind);
@@ -453,7 +455,7 @@ mod test {
 
 		let pay_to_script_pubkey = owner_compressed_pubkey.p2wpkh_script_code().unwrap();
 		let fee = cosign_script
-			.calculate_fee(false, pay_to_script_pubkey.clone(), fee_rate)
+			.calculate_fee(false, 1, pay_to_script_pubkey.clone(), fee_rate)
 			.unwrap();
 
 		// cannot accept until the cosign height
@@ -461,9 +463,7 @@ mod test {
 		while block_height < open_claim_height {
 			let mut unlocker = CosignReleaser::from_script(
 				cosign_script.clone(),
-				amount,
-				txid,
-				vout,
+				vec![(UtxoRef { txid: txid.into(), output_index: vout }, amount)],
 				ReleaseStep::OwnerClaim,
 				fee,
 				pay_to_script_pubkey.clone(),
@@ -484,9 +484,7 @@ mod test {
 		{
 			let mut unlocker = CosignReleaser::from_script(
 				cosign_script.clone(),
-				amount,
-				txid,
-				vout,
+				vec![(UtxoRef { txid: txid.into(), output_index: vout }, amount)],
 				ReleaseStep::OwnerClaim,
 				fee,
 				pay_to_script_pubkey.clone(),
@@ -512,10 +510,11 @@ mod test {
 				&bitcoind,
 				UtxoRef { txid: txid.into(), output_index: vout },
 				UtxoAddress {
-					utxo_id: 1,
+					lock_id: 1,
 					script_pubkey: cosign_script.get_script_pubkey().try_into().unwrap(),
 					submitted_at_height: register_height,
 				},
+				1,
 				&block_address,
 			);
 		}
@@ -571,7 +570,7 @@ mod test {
 
 		let pay_to_script_pubkey = owner_pubkey.p2wpkh_script_code().unwrap();
 		let fee = cosign_script
-			.calculate_fee(false, pay_to_script_pubkey.clone(), fee_rate)
+			.calculate_fee(false, 1, pay_to_script_pubkey.clone(), fee_rate)
 			.unwrap();
 
 		// cannot accept until the cosign height
@@ -581,9 +580,7 @@ mod test {
 		{
 			let unlocker = CosignReleaser::from_script(
 				cosign_script.clone(),
-				amount,
-				txid,
-				vout,
+				vec![(UtxoRef { txid: txid.into(), output_index: vout }, amount)],
 				ReleaseStep::OwnerClaim,
 				fee,
 				pay_to_script_pubkey.clone(),
@@ -638,10 +635,11 @@ mod test {
 				&bitcoind,
 				UtxoRef { txid: txid.into(), output_index: vout },
 				UtxoAddress {
-					utxo_id: 1,
+					lock_id: 1,
 					script_pubkey: cosign_script.get_script_pubkey().try_into().unwrap(),
 					submitted_at_height: register_height,
 				},
+				1,
 				&block_address,
 			);
 		}
@@ -689,11 +687,16 @@ mod test {
 		let utxo_script_pubkey: BitcoinCosignScriptPubkey =
 			script_address.clone().try_into().expect("can convert address to script");
 
-		let (txid, _vout, tx) =
-			fund_script_address(&bitcoind, &script_address, amount, &block_address);
+		let first_amount = amount / 2;
+		let second_amount = amount - first_amount;
+		let (first_txid, _first_vout, first_tx) =
+			fund_script_address(&bitcoind, &script_address, first_amount, &block_address);
+		let (second_txid, _second_vout, second_tx) =
+			fund_script_address(&bitcoind, &script_address, second_amount, &block_address);
 
-		let source_txin = tx.transaction().unwrap().raw_hex();
-		let block_hash = tx.blockhash.unwrap();
+		let source_txins =
+			[first_tx.transaction().unwrap().raw_hex(), second_tx.transaction().unwrap().raw_hex()];
+		let block_hash = second_tx.blockhash.unwrap();
 		let block_height = bitcoind.client.get_block_count().unwrap();
 		let register_height = block_height;
 
@@ -710,7 +713,7 @@ mod test {
 				vec![(
 					None,
 					UtxoAddress {
-						utxo_id: 1,
+						lock_id: 1,
 						script_pubkey: utxo_script_pubkey,
 						submitted_at_height: block_height,
 					},
@@ -718,9 +721,14 @@ mod test {
 				1000,
 			)
 			.unwrap();
-		assert_eq!(sync.funded.len(), 1);
-		let utxo = sync.funded[0].utxo_ref.clone();
-		assert_eq!(utxo.txid, txid.into());
+		assert_eq!(sync.funded.len(), 2);
+		assert!(sync.funded.iter().any(|funding| funding.utxo_ref.txid == first_txid.into()));
+		assert!(sync.funded.iter().any(|funding| funding.utxo_ref.txid == second_txid.into()));
+		let utxos = sync
+			.funded
+			.iter()
+			.map(|funding| (funding.utxo_ref.clone(), funding.satoshis))
+			.collect::<Vec<_>>();
 
 		// 4. User submits the out address
 		let out_script_pubkey: BitcoinScriptPubkey =
@@ -736,11 +744,11 @@ mod test {
 		};
 		let user_cosign_script = CosignScript::new(script_args, network).unwrap();
 		let fee = user_cosign_script
-			.calculate_fee(true, out_script_pubkey.clone().into(), feerate)
+			.calculate_fee(true, utxos.len(), out_script_pubkey.clone().into(), feerate)
 			.unwrap();
 
 		// 5. vault sees unlock request (outaddress, fee) and creates a transaction
-		let (vault_signature, vault_pubkey) = {
+		let vault_signatures = {
 			let script_args = CosignScriptArgs {
 				vault_pubkey,
 				vault_claim_pubkey: vault_claim_pubkey.into(),
@@ -751,9 +759,7 @@ mod test {
 			};
 			let mut unlocker = CosignReleaser::new(
 				script_args,
-				amount,
-				utxo.txid.clone().into(),
-				utxo.output_index,
+				utxos.clone(),
 				ReleaseStep::VaultCosign,
 				fee,
 				out_script_pubkey.clone().into(),
@@ -761,29 +767,37 @@ mod test {
 			)
 			.expect("unlocker");
 
-			let (vault_signature, vault_pubkey) =
+			let vault_signatures =
 				unlocker.sign_derived(vault_master_xpriv, vault_hd_path).expect("sign");
+			assert_eq!(vault_signatures.len(), 2);
 
 			// test can verify signature
-			let vault_signature_api: BitcoinSignature = vault_signature.try_into().unwrap();
-			let vault_pubkey_api: CompressedBitcoinPubkey = vault_pubkey.into();
-			assert!(unlocker.verify_signature_raw(vault_pubkey_api, &vault_signature_api).is_ok());
-			(vault_signature, vault_pubkey)
+			let vault_signature_api = vault_signatures
+				.iter()
+				.map(|(signature, _)| signature.clone().try_into().unwrap())
+				.collect::<Vec<BitcoinSignature>>();
+			let vault_pubkey_api: CompressedBitcoinPubkey = vault_signatures[0].1.into();
+			assert!(unlocker
+				.verify_signatures_raw(vault_pubkey_api, &vault_signature_api)
+				.unwrap());
+			vault_signatures
 		};
 
 		// 6. User sees the transaction and cosigns
 		let tx = {
 			let mut unlocker = CosignReleaser::from_script(
 				user_cosign_script.clone(),
-				amount,
-				utxo.txid.clone().into(),
-				utxo.output_index,
+				utxos.clone(),
 				ReleaseStep::OwnerCosign,
 				fee,
 				out_script_pubkey.clone().into(),
 			)
 			.unwrap();
-			unlocker.add_signature(vault_pubkey, vault_signature);
+			for (input_index, (vault_signature, vault_pubkey)) in
+				vault_signatures.into_iter().enumerate()
+			{
+				unlocker.add_signature(input_index, vault_pubkey, vault_signature).unwrap();
+			}
 			unlocker.sign(owner_keypair).expect("sign");
 			unlocker.extract_tx().expect("tx")
 		};
@@ -794,19 +808,20 @@ mod test {
 		let acceptance = bitcoind.client.test_mempool_accept(&[tx_hex.clone()]).expect("checked");
 		let did_accept = acceptance.first().unwrap();
 		println!("{did_accept:?}");
-		println!("btcdeb --tx={tx_hex:?} --txin={source_txin:?}");
+		println!("btcdeb --tx={tx_hex:?} --txin={source_txins:?}");
 		assert!(did_accept.allowed);
 
 		check_spent(
 			tx_hex.as_str(),
 			&tracker,
 			&bitcoind,
-			utxo.clone(),
+			utxos[0].0.clone(),
 			UtxoAddress {
-				utxo_id: 1,
+				lock_id: 1,
 				script_pubkey: utxo_script_pubkey,
 				submitted_at_height: register_height,
 			},
+			2,
 			&block_address,
 		);
 		drop(bitcoind);
@@ -828,38 +843,83 @@ mod test {
 			PrivateKey::generate(network).public_key(&secp).into();
 		let vault_pubkey: CompressedBitcoinPubkey = vault_compressed_pubkey.into();
 		let out_script_pubkey = vault_compressed_pubkey.p2wpkh_script_code();
+		let script_args = CosignScriptArgs {
+			vault_pubkey,
+			vault_claim_pubkey: vault_claim_pubkey.into(),
+			owner_pubkey,
+			vault_claim_height: 120,
+			open_claim_height: 240,
+			created_at_height: 100,
+		};
+		let cosign_script = CosignScript::new(script_args.clone(), network).unwrap();
+		let fee_rate = FeeRate::from_sat_per_vb(15).unwrap();
+		let one_input_fee = cosign_script
+			.calculate_fee(true, 1, out_script_pubkey.clone(), fee_rate)
+			.unwrap();
+		let two_input_fee = cosign_script
+			.calculate_fee(true, 2, out_script_pubkey.clone(), fee_rate)
+			.unwrap();
+		assert!(two_input_fee > one_input_fee);
 		let fee = Amount::from_sat(500);
+		let first_utxo_ref = UtxoRef {
+			txid: "0000000000000000000000000000000000000000000000000000000000000001"
+				.parse::<bitcoin::Txid>()
+				.unwrap()
+				.into(),
+			output_index: 0,
+		};
+		let second_utxo_ref = UtxoRef {
+			txid: "0000000000000000000000000000000000000000000000000000000000000002"
+				.parse::<bitcoin::Txid>()
+				.unwrap()
+				.into(),
+			output_index: 1,
+		};
 		let mut releaser = CosignReleaser::new(
-			CosignScriptArgs {
-				vault_pubkey,
-				vault_claim_pubkey: vault_claim_pubkey.into(),
-				owner_pubkey,
-				vault_claim_height: 120,
-				open_claim_height: 240,
-				created_at_height: 100,
-			},
-			amount,
-			"0000000000000000000000000000000000000000000000000000000000000001"
-				.parse()
-				.unwrap(),
-			0,
+			script_args,
+			vec![(second_utxo_ref.clone(), amount / 2), (first_utxo_ref.clone(), amount / 2)],
 			ReleaseStep::VaultCosign,
 			fee,
 			out_script_pubkey,
 			network,
 		)
 		.expect("unlocker");
+		assert_eq!(
+			releaser.psbt.unsigned_tx.input[0].previous_output,
+			bitcoin::OutPoint {
+				txid: first_utxo_ref.txid.into(),
+				vout: first_utxo_ref.output_index,
+			}
+		);
+		assert_eq!(
+			releaser.psbt.unsigned_tx.input[1].previous_output,
+			bitcoin::OutPoint {
+				txid: second_utxo_ref.txid.into(),
+				vout: second_utxo_ref.output_index,
+			}
+		);
 
-		let (vault_signature, signed_pubkey) = releaser
+		let mut signatures = releaser
 			.sign_derived(
 				uploaded_vault_xpriv,
 				alloc::vec![bitcoin::bip32::ChildNumber::from_normal_idx(1).unwrap()].into(),
 			)
 			.expect("sign");
+		assert_eq!(signatures.len(), 2);
+		let signed_pubkey = signatures[0].1;
 
 		assert_eq!(signed_pubkey, vault_compressed_pubkey.into());
-		let vault_signature_api: BitcoinSignature = vault_signature.try_into().unwrap();
-		assert!(releaser.verify_signature_raw(vault_pubkey, &vault_signature_api).unwrap());
+		let vault_signatures_api = signatures
+			.drain(..)
+			.map(|(signature, _)| signature.try_into().unwrap())
+			.collect::<Vec<BitcoinSignature>>();
+		assert!(!releaser
+			.verify_signatures_raw(vault_pubkey, &vault_signatures_api[..1])
+			.unwrap());
+		let mut wrong_sighash_signatures = vault_signatures_api.clone();
+		*wrong_sighash_signatures[0].0.last_mut().unwrap() = EcdsaSighashType::All.to_u32() as u8;
+		assert!(!releaser.verify_signatures_raw(vault_pubkey, &wrong_sighash_signatures).unwrap());
+		assert!(releaser.verify_signatures_raw(vault_pubkey, &vault_signatures_api).unwrap());
 	}
 
 	fn check_spent(
@@ -868,6 +928,7 @@ mod test {
 		bitcoind: &BitcoinD,
 		utxo_ref: UtxoRef,
 		utxo_value: UtxoAddress,
+		expected_spent: usize,
 		block_address: &Address,
 	) {
 		let final_txid = bitcoind.client.send_raw_transaction(tx_hex).expect("sent");
@@ -891,9 +952,9 @@ mod test {
 		let latest = tracker
 			.refresh_utxo_status(vec![(Some(utxo_ref), utxo_value)], 1000)
 			.expect("sync 2");
-		assert_eq!(latest.spent.len(), 1);
+		assert_eq!(latest.spent.len(), expected_spent);
 		let spend = &latest.spent[0];
-		assert_eq!(spend.utxo_id, 1);
+		assert_eq!(spend.lock_id, 1);
 		assert_eq!(spend.bitcoin_height, tx_block_height as BitcoinHeight);
 	}
 }

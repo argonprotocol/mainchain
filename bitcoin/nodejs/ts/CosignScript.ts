@@ -53,7 +53,7 @@ export class CosignScript {
     return tx.toPSBT(0);
   }
 
-  public calculateFee(feeRatePerSatVb: bigint, toScriptPubkey: string): bigint {
+  public calculateFee(feeRatePerSatVb: bigint, inputCount: number, toScriptPubkey: string): bigint {
     toScriptPubkey = addressBytesHex(toScriptPubkey, this.network);
     const { lock, network } = this;
     return calculateFee(
@@ -65,6 +65,7 @@ export class CosignScript {
       BigInt(lock.createdAtHeight),
       network,
       feeRatePerSatVb,
+      inputCount,
       toScriptPubkey,
     );
   }
@@ -83,19 +84,20 @@ export class CosignScript {
   }
 
   public getCosignPsbt(args: {
-    utxoRef: { txid: string; vout: number };
+    utxos: { utxoRef: { txid: string; vout: number }; satoshis: bigint }[];
     releaseRequest: IBitcoinReleaseRequest;
-    utxoSatoshis: bigint;
   }) {
     const { lock, network } = this;
-    const { releaseRequest, utxoRef, utxoSatoshis } = args;
+    const { releaseRequest, utxos } = args;
 
     const toScriptPubkey = addressBytesHex(releaseRequest.toScriptPubkey, network);
 
     const psbtStr = getCosignPsbt(
-      utxoRef.txid,
-      utxoRef.vout,
-      utxoSatoshis,
+      utxos.map(x => ({
+        txid: x.utxoRef.txid,
+        vout: x.utxoRef.vout,
+        satoshis: x.satoshis,
+      })),
       lock.vaultPubkey,
       lock.vaultClaimPubkey,
       lock.ownerPubkey,
@@ -170,21 +172,24 @@ export class CosignScript {
    */
   public cosignAndGenerateTx(args: {
     releaseRequest: IBitcoinReleaseRequest;
-    vaultCosignature: Uint8Array;
-    utxoRef: { txid: string; vout: number };
-    utxoSatoshis: bigint;
+    vaultCosignatures: Uint8Array[];
+    utxos: { utxoRef: { txid: string; vout: number }; satoshis: bigint }[];
     ownerXpriv: HDKey;
     ownerXprivChildHdPath?: string;
     addTx?: string;
   }): Transaction {
     const { lock } = this;
     const psbt = this.getCosignPsbt(args);
-    const { addTx, vaultCosignature, ownerXpriv, ownerXprivChildHdPath } = args;
+    const { addTx, vaultCosignatures, ownerXpriv, ownerXprivChildHdPath } = args;
 
-    // add the vault signature to the PSBT
-    psbt.updateInput(0, {
-      partialSig: [[keyToU8a(lock.vaultPubkey), vaultCosignature]],
-    });
+    if (vaultCosignatures.length !== psbt.inputsLength) {
+      throw new Error('Vault signature count does not match the Bitcoin lock input count');
+    }
+    for (let i = 0; i < vaultCosignatures.length; i++) {
+      psbt.updateInput(i, {
+        partialSig: [[keyToU8a(lock.vaultPubkey), vaultCosignatures[i]!]],
+      });
+    }
     const derivePubkey = ownerXprivChildHdPath
       ? ownerXpriv.derive(ownerXprivChildHdPath).publicKey
       : ownerXpriv.publicKey;

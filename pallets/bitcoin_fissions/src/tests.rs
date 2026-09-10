@@ -17,7 +17,7 @@ fn create_stores_one_lock_allocation_with_an_opaque_liquid_id() {
 
 		let fission = FissionByOwnerAndId::<Test>::get(1, 10).expect("fission");
 		assert_eq!(fission.liquid_id, 77);
-		assert_eq!(fission.utxo_id, 1);
+		assert_eq!(fission.lock_id, 1);
 		assert_eq!(fission.satoshis, 40);
 		assert_eq!(fission.microgons_at_target_per_btc, 90);
 		assert_eq!(fission.last_ratchet_tick, 1);
@@ -35,7 +35,7 @@ fn create_stores_one_lock_allocation_with_an_opaque_liquid_id() {
 				account_id: 1,
 				fission_id: 10,
 				liquid_id: 77,
-				utxo_id: 1,
+				lock_id: 1,
 				satoshis: 40,
 				microgons_at_target_per_btc: 90,
 				liquidity_promised: 3_600,
@@ -179,7 +179,7 @@ fn an_external_lock_spend_closes_only_active_fissions_and_preserves_their_unpaid
 			vec![(1, 3_600, true), (1, 900, true), (1, 3_600, false), (1, 900, false),]
 		);
 		System::assert_last_event(
-			Event::FissionClosedByLock { account_id: 1, fission_id: 1, utxo_id: 1 }.into(),
+			Event::FissionClosedByLock { account_id: 1, fission_id: 1, lock_id: 1 }.into(),
 		);
 	});
 }

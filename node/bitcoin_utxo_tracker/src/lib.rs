@@ -53,7 +53,7 @@ where
 				(
 					utxo_ref,
 					argon_primitives::bitcoin::UtxoAddress {
-						utxo_id: address.utxo_id,
+						lock_id: address.lock_id,
 						script_pubkey: address.script_pubkey,
 						submitted_at_height: address.submitted_at_height,
 					},
@@ -224,7 +224,7 @@ mod test {
 		assert_eq!(updated_filters[10].block_hash, sync_status.confirmed_block.block_hash);
 
 		let tracked = UtxoAddress {
-			utxo_id: 1,
+			lock_id: 1,
 			script_pubkey: script_address.try_into().expect("can convert address to script"),
 			submitted_at_height,
 		};
@@ -237,7 +237,7 @@ mod test {
 			assert_eq!(
 				result.funded[0],
 				BitcoinUtxoFunding {
-					utxo_id: 1,
+					lock_id: 1,
 					utxo_ref: UtxoRef { txid: txid.into(), output_index: vout },
 					satoshis: Amount::ONE_BTC.to_sat(),
 					expected_satoshis: 0,

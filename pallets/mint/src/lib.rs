@@ -22,7 +22,7 @@ pub mod weights;
 pub mod pallet {
 	use super::*;
 	use argon_primitives::{
-		bitcoin::{FissionId, UtxoId},
+		bitcoin::{BitcoinLockId, FissionId},
 		block_seal::{BlockPayout, FrameId},
 		ArgonCPI, BitcoinFissionMinting, BlockRewardAccountsProvider, BlockRewardsEventHandler,
 		BurnEventHandler, PriceProvider,
@@ -85,23 +85,23 @@ pub mod pallet {
 	/// Bitcoin UTXOs that have been submitted for minting, keyed by a monotonic queue index so
 	/// payouts can preserve FIFO order while each frame works through a fixed payout cohort.
 	#[pallet::storage]
-	pub type PendingMintUtxosByIndex<T: Config> =
-		StorageMap<_, Blake2_128Concat, MintIndex, PendingMintUtxo<T>, OptionQuery>;
+	pub type PendingBitcoinMintsByIndex<T: Config> =
+		StorageMap<_, Blake2_128Concat, MintIndex, PendingBitcoinMint<T>, OptionQuery>;
 
 	/// Reverse lookup from bitcoin UTXO id to all queued mint indices for direct removal and
 	/// client lookup.
 	#[pallet::storage]
-	pub type PendingMintUtxoIdLookup<T: Config> = StorageMap<
+	pub type PendingMintIndicesByLockId<T: Config> = StorageMap<
 		_,
 		Blake2_128Concat,
-		UtxoId,
+		BitcoinLockId,
 		BoundedVec<MintIndex, T::MaxPendingMintsPerUtxo>,
 		ValueQuery,
 	>;
 
 	/// The next monotonic queue index to assign to a pending bitcoin mint.
 	#[pallet::storage]
-	pub type NextPendingMintUtxoIndex<T: Config> = StorageValue<_, MintIndex, ValueQuery>;
+	pub type NextPendingBitcoinMintIndex<T: Config> = StorageValue<_, MintIndex, ValueQuery>;
 
 	/// Queue bookkeeping for pending bitcoin mints, including the bounded payout start and the
 	/// current frame scan cursor.
@@ -135,7 +135,7 @@ pub mod pallet {
 		BitcoinMint {
 			account_id: T::AccountId,
 			fission_id: FissionId,
-			utxo_id: Option<UtxoId>,
+			lock_id: Option<BitcoinLockId>,
 			amount: T::Balance,
 		},
 		/// The amount of microgons minted for mining. NOTE: accounts below Existential Deposit
@@ -152,7 +152,7 @@ pub mod pallet {
 			mint_type: MintType,
 			account_id: T::AccountId,
 			fission_id: Option<FissionId>,
-			utxo_id: Option<UtxoId>,
+			lock_id: Option<BitcoinLockId>,
 			amount: T::Balance,
 			error: DispatchError,
 		},
@@ -192,7 +192,7 @@ pub mod pallet {
 			let mut payout_window_utxo_count = 0;
 			if available_bitcoin_to_mint > T::Balance::zero() {
 				let current_frame_id = T::MiningFrameProvider::get_current_frame_id();
-				let next_utxo_index = NextPendingMintUtxoIndex::<T>::get();
+				let next_utxo_index = NextPendingBitcoinMintIndex::<T>::get();
 				let mut queue_cursor = PendingMintQueueState::<T>::get();
 
 				if queue_cursor.payout_cursor_frame_id != Some(current_frame_id) {
@@ -214,7 +214,7 @@ pub mod pallet {
 				{
 					let pending_index = queue_cursor.payout_cursor_index;
 
-					let Some(mut mint) = PendingMintUtxosByIndex::<T>::get(pending_index) else {
+					let Some(mut mint) = PendingBitcoinMintsByIndex::<T>::get(pending_index) else {
 						if pending_index == queue_cursor.payout_start_index {
 							queue_cursor.payout_start_index.saturating_accrue(1);
 						}
@@ -237,20 +237,20 @@ pub mod pallet {
 							Self::deposit_event(Event::<T>::BitcoinMint {
 								account_id: mint.account_id.clone(),
 								fission_id: mint.fission_id,
-								utxo_id: Some(mint.utxo_id),
+								lock_id: Some(mint.lock_id),
 								amount: amount_to_mint,
 							});
 
 							if mint.remaining_amount > T::Balance::zero() {
-								PendingMintUtxosByIndex::<T>::insert(pending_index, mint);
+								PendingBitcoinMintsByIndex::<T>::insert(pending_index, mint);
 							} else {
-								PendingMintUtxosByIndex::<T>::remove(pending_index);
+								PendingBitcoinMintsByIndex::<T>::remove(pending_index);
 								let mut pending_indices =
-									PendingMintUtxoIdLookup::<T>::take(mint.utxo_id);
+									PendingMintIndicesByLockId::<T>::take(mint.lock_id);
 								pending_indices.retain(|index| *index != pending_index);
 								if !pending_indices.is_empty() {
-									PendingMintUtxoIdLookup::<T>::insert(
-										mint.utxo_id,
+									PendingMintIndicesByLockId::<T>::insert(
+										mint.lock_id,
 										pending_indices,
 									);
 								}
@@ -267,14 +267,14 @@ pub mod pallet {
 							log::warn!(
 								"Failed to mint {:?} microgons for bitcoin UTXO {:?}: {:?}",
 								amount_to_mint,
-								&mint.utxo_id,
+								&mint.lock_id,
 								e
 							);
 							Self::deposit_event(Event::<T>::MintError {
 								mint_type: MintType::Bitcoin,
 								account_id: mint.account_id.clone(),
 								fission_id: Some(mint.fission_id),
-								utxo_id: Some(mint.utxo_id),
+								lock_id: Some(mint.lock_id),
 								amount: amount_to_mint,
 								error: e,
 							});
@@ -353,7 +353,7 @@ pub mod pallet {
 								mint_type: MintType::Mining,
 								account_id: miner.clone(),
 								fission_id: None,
-								utxo_id: None,
+								lock_id: None,
 								amount,
 								error: e,
 							});
@@ -455,15 +455,15 @@ pub mod pallet {
 		fn request_mint(
 			account_id: &T::AccountId,
 			fission_id: FissionId,
-			utxo_id: UtxoId,
+			lock_id: BitcoinLockId,
 			amount: T::Balance,
 		) -> sp_runtime::DispatchResult {
 			if amount.is_zero() {
 				return Ok(());
 			}
 
-			let pending_index = NextPendingMintUtxoIndex::<T>::get();
-			PendingMintUtxoIdLookup::<T>::try_mutate(utxo_id, |pending_indices| {
+			let pending_index = NextPendingBitcoinMintIndex::<T>::get();
+			PendingMintIndicesByLockId::<T>::try_mutate(lock_id, |pending_indices| {
 				ensure!(
 					pending_indices.len() < T::MaxPendingMintsPerUtxo::get() as usize,
 					Error::<T>::TooManyPendingMints
@@ -472,17 +472,17 @@ pub mod pallet {
 					.try_push(pending_index)
 					.map_err(|_| Error::<T>::TooManyPendingMints)
 			})?;
-			PendingMintUtxosByIndex::<T>::insert(
+			PendingBitcoinMintsByIndex::<T>::insert(
 				pending_index,
-				PendingMintUtxo {
+				PendingBitcoinMint {
 					fission_id,
-					utxo_id,
+					lock_id,
 					account_id: account_id.clone(),
 					remaining_amount: amount,
 					max_amount_per_frame: Self::get_bitcoin_mint_payout_cap(amount),
 				},
 			);
-			NextPendingMintUtxoIndex::<T>::put(pending_index.saturating_add(1));
+			NextPendingBitcoinMintIndex::<T>::put(pending_index.saturating_add(1));
 			Ok(())
 		}
 
@@ -556,7 +556,7 @@ pub mod pallet {
 		Debug, Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, TypeInfo, MaxEncodedLen,
 	)]
 	#[scale_info(skip_type_params(T))]
-	pub struct PendingMintUtxo<T: Config>
+	pub struct PendingBitcoinMint<T: Config>
 	where
 		T::AccountId: Codec + MaxEncodedLen,
 		T::Balance: Codec + MaxEncodedLen,
@@ -566,7 +566,7 @@ pub mod pallet {
 		pub fission_id: FissionId,
 		/// Source Lock backing this Fission position.
 		#[codec(compact)]
-		pub utxo_id: UtxoId,
+		pub lock_id: BitcoinLockId,
 		/// Owner of the Fission and recipient of its eventual mint.
 		pub account_id: T::AccountId,
 		/// Unpaid position liability remaining in the FIFO queue.

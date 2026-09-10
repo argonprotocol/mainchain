@@ -149,7 +149,7 @@ pub struct UtxoRef {
 	pub output_index: u32,
 }
 
-pub type UtxoId = u64;
+pub type BitcoinLockId = u64;
 pub type FissionId = u64;
 pub type LiquidId = u64;
 
@@ -158,7 +158,7 @@ pub type LiquidId = u64;
 )]
 pub struct UtxoAddress {
 	/// Tracking id for the BitcoinLock used across Bitcoin pallets
-	pub utxo_id: UtxoId,
+	pub lock_id: BitcoinLockId,
 	/// The script pubkey of the Lock UTXOs
 	pub script_pubkey: BitcoinCosignScriptPubkey,
 	/// The Bitcoin height from which the node must scan for outputs to this script.
@@ -171,7 +171,7 @@ pub struct UtxoAddress {
 	Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen,
 )]
 pub struct UtxoValue {
-	pub utxo_id: UtxoId,
+	pub lock_id: BitcoinLockId,
 	pub script_pubkey: BitcoinCosignScriptPubkey,
 	#[codec(compact)]
 	pub satoshis: Satoshis,

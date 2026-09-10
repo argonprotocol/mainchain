@@ -1,4 +1,5 @@
 // Auto-generated via `yarn polkadot-types-from-defs`, do not edit
+/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
@@ -61,6 +62,7 @@ import type {
   ArgonPrimitivesProvidersOperationalRewardKind,
   ArgonPrimitivesTickTicker,
   ArgonPrimitivesVault,
+  ArgonPrimitivesVaultBitcoinSecuritizationBasis,
   ArgonPrimitivesVaultTreasuryBonusApprovalProof,
   ArgonPrimitivesVaultVaultArgonotCommitment,
   ArgonPrimitivesVaultVaultError,
@@ -126,7 +128,6 @@ import type {
   PalletBitcoinLocksError,
   PalletBitcoinLocksEvent,
   PalletBitcoinLocksFeeCoupon,
-  PalletBitcoinLocksHoldReason,
   PalletBitcoinLocksLockOptions,
   PalletBitcoinLocksLockReleaseRequest,
   PalletBitcoinLocksLockedBitcoin,
@@ -218,7 +219,7 @@ import type {
   PalletMintMintAction,
   PalletMintMintQueueCursor,
   PalletMintMintType,
-  PalletMintPendingMintUtxo,
+  PalletMintPendingBitcoinMint,
   PalletMultisigCall,
   PalletMultisigError,
   PalletMultisigEvent,
@@ -377,6 +378,7 @@ declare module '@polkadot/types/types/registry' {
     ArgonPrimitivesProvidersOperationalRewardKind: ArgonPrimitivesProvidersOperationalRewardKind;
     ArgonPrimitivesTickTicker: ArgonPrimitivesTickTicker;
     ArgonPrimitivesVault: ArgonPrimitivesVault;
+    ArgonPrimitivesVaultBitcoinSecuritizationBasis: ArgonPrimitivesVaultBitcoinSecuritizationBasis;
     ArgonPrimitivesVaultTreasuryBonusApprovalProof: ArgonPrimitivesVaultTreasuryBonusApprovalProof;
     ArgonPrimitivesVaultVaultArgonotCommitment: ArgonPrimitivesVaultVaultArgonotCommitment;
     ArgonPrimitivesVaultVaultError: ArgonPrimitivesVaultVaultError;
@@ -442,7 +444,6 @@ declare module '@polkadot/types/types/registry' {
     PalletBitcoinLocksError: PalletBitcoinLocksError;
     PalletBitcoinLocksEvent: PalletBitcoinLocksEvent;
     PalletBitcoinLocksFeeCoupon: PalletBitcoinLocksFeeCoupon;
-    PalletBitcoinLocksHoldReason: PalletBitcoinLocksHoldReason;
     PalletBitcoinLocksLockOptions: PalletBitcoinLocksLockOptions;
     PalletBitcoinLocksLockReleaseRequest: PalletBitcoinLocksLockReleaseRequest;
     PalletBitcoinLocksLockedBitcoin: PalletBitcoinLocksLockedBitcoin;
@@ -534,7 +535,7 @@ declare module '@polkadot/types/types/registry' {
     PalletMintMintAction: PalletMintMintAction;
     PalletMintMintQueueCursor: PalletMintMintQueueCursor;
     PalletMintMintType: PalletMintMintType;
-    PalletMintPendingMintUtxo: PalletMintPendingMintUtxo;
+    PalletMintPendingBitcoinMint: PalletMintPendingBitcoinMint;
     PalletMultisigCall: PalletMultisigCall;
     PalletMultisigError: PalletMultisigError;
     PalletMultisigEvent: PalletMultisigEvent;

@@ -3,7 +3,7 @@
 use super::*;
 use frame_support::traits::Hooks;
 use pallet_prelude::{
-	argon_primitives::{bitcoin::UtxoId, BitcoinFissionMinting},
+	argon_primitives::{bitcoin::BitcoinLockId, BitcoinFissionMinting},
 	benchmarking::{
 		set_benchmark_bitcoin_locks_runtime_state, set_benchmark_price_provider_state,
 		BenchmarkBitcoinLocksRuntimeState, BenchmarkPriceProviderState,
@@ -30,30 +30,31 @@ mod benchmarks {
 		let max_amount_per_frame = Pallet::<T>::get_bitcoin_mint_payout_cap(queued_amount);
 		let minimum_balance = T::Currency::minimum_balance();
 		for i in 0..utxo_count {
-			let utxo_id = i.saturating_div(max_pending_mints_per_utxo).saturating_add(1) as UtxoId;
+			let lock_id =
+				i.saturating_div(max_pending_mints_per_utxo).saturating_add(1) as BitcoinLockId;
 			let account_id = account("mint-queue", i, 0);
 			if minimum_balance > T::Balance::zero() {
 				let initial_balance = minimum_balance.saturating_add(queued_amount);
 				T::Currency::mint_into(&account_id, initial_balance)
 					.map_err(|_| BenchmarkError::Stop("failed to seed benchmark mint account"))?;
 			}
-			PendingMintUtxosByIndex::<T>::insert(
+			PendingBitcoinMintsByIndex::<T>::insert(
 				i as MintIndex,
-				PendingMintUtxo::<T> {
+				PendingBitcoinMint::<T> {
 					fission_id: 0,
-					utxo_id,
+					lock_id,
 					account_id,
 					remaining_amount: queued_amount,
 					max_amount_per_frame,
 				},
 			);
-			PendingMintUtxoIdLookup::<T>::try_mutate(utxo_id, |pending_indices| {
+			PendingMintIndicesByLockId::<T>::try_mutate(lock_id, |pending_indices| {
 				pending_indices
 					.try_push(i as MintIndex)
 					.map_err(|_| BenchmarkError::Stop("pending mint lookup capacity exceeded"))
 			})?;
 		}
-		NextPendingMintUtxoIndex::<T>::put(utxo_count as MintIndex);
+		NextPendingBitcoinMintIndex::<T>::put(utxo_count as MintIndex);
 
 		let total_frame_payout: T::Balance = T::Balance::from(utxo_count.max(1) as u128);
 		MintedMiningMicrogons::<T>::put(total_frame_payout);
@@ -79,13 +80,13 @@ mod benchmarks {
 		}
 
 		let queue_cursor = PendingMintQueueState::<T>::get();
-		assert_eq!(NextPendingMintUtxoIndex::<T>::get(), utxo_count as MintIndex);
+		assert_eq!(NextPendingBitcoinMintIndex::<T>::get(), utxo_count as MintIndex);
 		assert_eq!(queue_cursor.payout_start_index, utxo_count as MintIndex);
 		assert_eq!(queue_cursor.payout_cursor_index, utxo_count as MintIndex);
 		for i in 0..utxo_count {
-			assert!(PendingMintUtxosByIndex::<T>::get(i as MintIndex).is_none());
-			assert!(PendingMintUtxoIdLookup::<T>::get(
-				i.saturating_div(max_pending_mints_per_utxo).saturating_add(1) as UtxoId
+			assert!(PendingBitcoinMintsByIndex::<T>::get(i as MintIndex).is_none());
+			assert!(PendingMintIndicesByLockId::<T>::get(
+				i.saturating_div(max_pending_mints_per_utxo).saturating_add(1) as BitcoinLockId
 			)
 			.is_empty());
 		}
@@ -96,43 +97,43 @@ mod benchmarks {
 
 	#[benchmark]
 	fn provider_mint_requested() -> Result<(), BenchmarkError> {
-		let utxo_id = 1u64;
+		let lock_id = 1u64;
 		let account_id: T::AccountId = account("mint-provider-lock", 0, 0);
 		let amount = T::Balance::from(100u128);
 		let existing_pending = T::MaxPendingMintsPerUtxo::get().saturating_sub(1);
 
 		for i in 0..existing_pending {
-			PendingMintUtxosByIndex::<T>::insert(
+			PendingBitcoinMintsByIndex::<T>::insert(
 				i as MintIndex,
-				PendingMintUtxo::<T> {
+				PendingBitcoinMint::<T> {
 					fission_id: 0,
-					utxo_id,
+					lock_id,
 					account_id: account_id.clone(),
 					remaining_amount: amount,
 					max_amount_per_frame: Pallet::<T>::get_bitcoin_mint_payout_cap(amount),
 				},
 			);
-			PendingMintUtxoIdLookup::<T>::try_mutate(utxo_id, |pending_indices| {
+			PendingMintIndicesByLockId::<T>::try_mutate(lock_id, |pending_indices| {
 				pending_indices
 					.try_push(i as MintIndex)
 					.map_err(|_| BenchmarkError::Stop("pending mint lookup capacity exceeded"))
 			})?;
 		}
-		NextPendingMintUtxoIndex::<T>::put(existing_pending as MintIndex);
+		NextPendingBitcoinMintIndex::<T>::put(existing_pending as MintIndex);
 
 		#[block]
 		{
 			<Pallet<T> as BitcoinFissionMinting<T::AccountId, T::Balance>>::request_mint(
 				&account_id,
 				0,
-				utxo_id,
+				lock_id,
 				amount,
 			)?;
 		}
 
-		let pending_indices = PendingMintUtxoIdLookup::<T>::get(utxo_id);
+		let pending_indices = PendingMintIndicesByLockId::<T>::get(lock_id);
 		assert_eq!(pending_indices.len(), existing_pending.saturating_add(1) as usize);
-		assert!(PendingMintUtxosByIndex::<T>::contains_key(existing_pending as MintIndex));
+		assert!(PendingBitcoinMintsByIndex::<T>::contains_key(existing_pending as MintIndex));
 
 		Ok(())
 	}

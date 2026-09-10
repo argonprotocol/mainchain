@@ -15,6 +15,14 @@ pub enum Error {
 	#[error("Insufficient fees.")]
 	FeeTooLow,
 
+	/// No UTXOs were supplied for the transaction.
+	#[error("No UTXOs were supplied.")]
+	NoUtxos,
+
+	/// The number of signatures does not match the number of transaction inputs.
+	#[error("The signature count does not match the input count.")]
+	SignatureCountMismatch,
+
 	/// An error occurred creating the timelock multisig script
 	#[error("An error occurred creating the timelock multisig script. {0:?}")]
 	TimelockScriptError(Box<BitcoinError>),

@@ -334,8 +334,6 @@ impl pallet_bitcoin_locks::Config for Runtime {
 		weights::pallet_bitcoin_locks::WeightInfo<Runtime>,
 	>;
 	type Balance = Balance;
-	type Currency = Balances;
-	type RuntimeHoldReason = RuntimeHoldReason;
 	type FissionsProvider = BitcoinFissions;
 	type BitcoinUtxoTracker =
 		use_unless_benchmark!(BitcoinUtxos, benchmarking::BenchmarkBitcoinUtxoTracker);
@@ -358,7 +356,8 @@ impl pallet_bitcoin_locks::Config for Runtime {
 	type ArgonTicksPerDay = TicksPerDay;
 	type MaxConcurrentlyReleasingLocks = MaxConcurrentlyReleasingLocks;
 	type LockDurationBlocks = BitcoinLockDurationBlocks;
-	type MaxPendingConfirmationBlocks = MaxPendingConfirmationBlocks;
+	type SecuritizationHoldBlocks = SecuritizationHoldBlocks;
+	type MaxUtxosPerLock = MaxUtxosPerLock;
 	type LockReclamationBlocks = BitcoinLockReclamationBlocks;
 	type LockReleaseCosignDeadlineFrames = LockReleaseCosignDeadlineFrames;
 	type OrphanedUtxoReleaseExpiryFrames = OrphanedUtxoReleaseExpiryFrames;
