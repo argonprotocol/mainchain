@@ -289,6 +289,7 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
       destinationSatoshis: value.destinationSatoshis.toBigInt(),
       changeSatoshis: value.changeSatoshis.toBigInt(),
     };
+    expect(releaseRequest.changeSatoshis).toBe(changeSatoshis);
     console.log('Stored release request:', stringifyExt(releaseRequest));
   });
 

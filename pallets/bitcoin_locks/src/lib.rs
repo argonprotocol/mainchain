@@ -419,14 +419,14 @@ pub mod pallet {
 		pub cosign_height: BlockNumber,
 		/// Argon block containing the preceding cosigned release, if one exists.
 		pub previous_cosign_height: Option<BlockNumber>,
-		/// Monotonic number of this release within its Lock.
+		/// Number of this release in the Lock's canonical cosign history.
 		#[codec(compact)]
 		pub release_number: u32,
 	}
 
 	#[derive(Decode, Encode, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
 	pub struct PendingPartialRelease {
-		/// Release number shared by the request and its recovery tombstone.
+		/// Number correlating this pending change with its request, cosign, and settlement.
 		#[codec(compact)]
 		pub release_number: u32,
 		/// Exact change output committed by the cosigned transaction.
@@ -448,7 +448,7 @@ pub mod pallet {
 		/// The vault id this request is related to
 		#[codec(compact)]
 		pub vault_id: VaultId,
-		/// Monotonic number of this release within its Lock.
+		/// Number correlating this request with its cosign and settlement.
 		#[codec(compact)]
 		pub release_number: u32,
 		/// The network fee to take out of the bitcoin being released
@@ -618,7 +618,7 @@ pub mod pallet {
 		BitcoinFeeTooHigh,
 		/// The external destination amount must be nonzero and fit with the network fee.
 		InvalidBitcoinReleaseAmount,
-		/// A partial release would leave less than the minimum watched Lock amount.
+		/// A configured or requested Lock amount is below the required minimum.
 		BitcoinReleaseChangeBelowMinimum,
 		/// The minimum cannot increase while a release is pending.
 		MinimumSatoshisIncreaseBlockedByPendingRelease,
@@ -965,7 +965,8 @@ pub mod pallet {
 			ensure!(bitcoin_network_fee < lock.funded_satoshis, Error::<T>::BitcoinFeeTooHigh);
 			let destination_script: ScriptBuf = to_script_pubkey.clone().into();
 			ensure!(
-				destination_satoshis >= destination_script.minimal_non_dust().to_sat(),
+				destination_satoshis > 0 &&
+					destination_satoshis >= destination_script.minimal_non_dust().to_sat(),
 				Error::<T>::InvalidBitcoinReleaseAmount
 			);
 			ensure!(
@@ -1154,6 +1155,12 @@ pub mod pallet {
 			satoshis: Satoshis,
 		) -> DispatchResult {
 			ensure_root(origin)?;
+			let p2wsh_script: ScriptBuf =
+				BitcoinCosignScriptPubkey::P2WSH { wscript_hash: Default::default() }.into();
+			ensure!(
+				satoshis >= p2wsh_script.minimal_non_dust().to_sat(),
+				Error::<T>::BitcoinReleaseChangeBelowMinimum
+			);
 			if satoshis > MinimumSatoshis::<T>::get() {
 				ensure!(
 					!LockReleaseRequestsById::<T>::iter_values().any(|request| {
@@ -1434,6 +1441,7 @@ pub mod pallet {
 				return Ok(());
 			}
 			if let Some(expected_change) = PendingPartialReleaseByLockId::<T>::get(lock_id) {
+				// UtxoRef equality checks the txid and output index; the txid commits the amount.
 				if utxo_ref == expected_change.expected_change_utxo_ref {
 					return Self::complete_partial_release(
 						lock_id,
@@ -1449,6 +1457,7 @@ pub mod pallet {
 			if let Some(request) = LockReleaseRequestsById::<T>::get(lock_id) {
 				let expected_change_ref =
 					UtxoRef { txid: request.expected_transaction_id.clone(), output_index: 1 };
+				// UtxoRef equality checks the txid and output index; the txid commits the amount.
 				if request.change_satoshis > 0 && utxo_ref == expected_change_ref {
 					return Self::complete_partial_release(
 						lock_id,

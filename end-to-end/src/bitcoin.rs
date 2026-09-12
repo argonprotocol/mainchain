@@ -122,7 +122,7 @@ async fn test_bitcoin_minting_e2e() {
 
 	let ticker = client.lookup_ticker().await.expect("ticker");
 	let mut last_bitcoin_price_tick =
-		submit_price(&ticker, &client, &price_index_operator, 62_000.0).await;
+		submit_price(&ticker, &client, &price_index_operator, 62_000.0, false).await;
 
 	println!("\n3. Create a Bitcoin receive address backed by a Lock");
 	let lock_id = create_receive_address(
@@ -336,7 +336,7 @@ async fn test_bitcoin_xpriv_release_e2e() {
 		.unwrap();
 
 	let ticker = client.lookup_ticker().await.expect("ticker");
-	submit_price(&ticker, &client, &price_index_operator, 62_000.0).await;
+	submit_price(&ticker, &client, &price_index_operator, 62_000.0, false).await;
 
 	let lock_id = create_receive_address(
 		&test_node,
@@ -604,7 +604,7 @@ async fn ratchet_first_fission(
 	initial_liquidity_promised: Balance,
 	last_submitted_tick: &mut Tick,
 ) -> anyhow::Result<()> {
-	submit_price(ticker, client, price_index_operator, 60_000.0).await;
+	submit_price(ticker, client, price_index_operator, 60_000.0, true).await;
 	let rate_history = client
 		.fetch_storage(&storage().bitcoin_locks().microgon_per_btc_history(), FetchAt::Best)
 		.await?
@@ -617,7 +617,7 @@ async fn ratchet_first_fission(
 		sleep(Duration::from_millis(100)).await;
 	}
 
-	*last_submitted_tick = submit_price(ticker, client, price_index_operator, 55_000.0).await;
+	*last_submitted_tick = submit_price(ticker, client, price_index_operator, 55_000.0, true).await;
 	let rate_history = client
 		.fetch_storage(&storage().bitcoin_locks().microgon_per_btc_history(), FetchAt::Best)
 		.await?
@@ -1034,6 +1034,7 @@ async fn submit_price(
 	client: &MainchainClient,
 	price_index_operator: &sr25519::Pair,
 	btc_usd_price: f64,
+	wait_for_finalized: bool,
 ) -> Tick {
 	let signer = Sr25519Signer::new(price_index_operator.clone());
 	let account_id = signer.account_id();
@@ -1069,7 +1070,7 @@ async fn submit_price(
 			.await
 			.unwrap();
 
-		match MainchainClient::wait_for_ext_in_block(progress, false).await {
+		match MainchainClient::wait_for_ext_in_block(progress, wait_for_finalized).await {
 			Ok(_) => {
 				println!("bitcoin prices submitted at tick {tick}");
 				return tick;
@@ -1097,7 +1098,8 @@ async fn submit_price_if_needed(
 		return;
 	}
 
-	*last_submitted_tick = submit_price(ticker, client, price_index_operator, 62_000.0).await;
+	*last_submitted_tick =
+		submit_price(ticker, client, price_index_operator, 62_000.0, false).await;
 }
 
 async fn current_chain_tick(client: &MainchainClient, ticker: &Ticker) -> Tick {

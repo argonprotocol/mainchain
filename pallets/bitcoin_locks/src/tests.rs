@@ -685,6 +685,7 @@ fn partial_release_change_settles_if_the_cosign_block_was_reorged() {
 		// Model canonical state after the Argon cosign block is reorged, while its published
 		// Bitcoin signatures remain usable and the exact transaction later confirms.
 		PendingPartialReleaseByLockId::<Test>::remove(1);
+		LockReleaseCosignHeightById::<Test>::remove(1);
 		LockReleaseRequestsById::<Test>::insert(1, request.clone());
 		LockCosignDueByFrame::<Test>::mutate(request.cosign_due_frame, |locks| {
 			locks.try_insert(1).expect("release deadline has capacity");
@@ -701,6 +702,7 @@ fn partial_release_change_settles_if_the_cosign_block_was_reorged() {
 		assert_eq!(lock.funding_utxos.get(&change_ref), Some(&request.change_satoshis));
 		assert!(!LockReleaseRequestsById::<Test>::contains_key(1));
 		assert!(!LockCosignDueByFrame::<Test>::get(request.cosign_due_frame).contains(&1));
+		assert!(!LockReleaseCosignHeightById::<Test>::contains_key(1));
 	});
 }
 
@@ -721,6 +723,16 @@ fn partial_release_rejects_invalid_destination_and_change_amounts() {
 		let lock = LocksById::<Test>::get(1).expect("lock");
 		let lock_script: bitcoin::ScriptBuf = lock.utxo_script_pubkey.into();
 
+		assert_noop!(
+			BitcoinLocks::request_release(
+				RuntimeOrigin::signed(2),
+				1,
+				make_script_pubkey(&[0x6a]),
+				0,
+				1_000,
+			),
+			Error::<Test>::InvalidBitcoinReleaseAmount
+		);
 		assert_noop!(
 			BitcoinLocks::request_release(
 				RuntimeOrigin::signed(2),
@@ -761,6 +773,17 @@ fn partial_release_rejects_invalid_destination_and_change_amounts() {
 			),
 			Error::<Test>::BitcoinReleaseDestinationIsLockScript
 		);
+	});
+}
+
+#[test]
+fn minimum_satoshis_cannot_be_set_below_p2wsh_dust() {
+	new_test_ext().execute_with(|| {
+		assert_noop!(
+			BitcoinLocks::admin_modify_minimum_locked_sats(RuntimeOrigin::root(), 329),
+			Error::<Test>::BitcoinReleaseChangeBelowMinimum
+		);
+		assert_ok!(BitcoinLocks::admin_modify_minimum_locked_sats(RuntimeOrigin::root(), 330));
 	});
 }
 
