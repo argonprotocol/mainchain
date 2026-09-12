@@ -122,7 +122,7 @@ async fn test_bitcoin_minting_e2e() {
 
 	let ticker = client.lookup_ticker().await.expect("ticker");
 	let mut last_bitcoin_price_tick =
-		submit_price(&ticker, &client, &price_index_operator, 62_000.0).await;
+		submit_price(&ticker, &client, &price_index_operator, 62_000.0, false).await;
 
 	println!("\n3. Create a Bitcoin receive address backed by a Lock");
 	let lock_id = create_receive_address(
@@ -336,7 +336,7 @@ async fn test_bitcoin_xpriv_release_e2e() {
 		.unwrap();
 
 	let ticker = client.lookup_ticker().await.expect("ticker");
-	submit_price(&ticker, &client, &price_index_operator, 62_000.0).await;
+	submit_price(&ticker, &client, &price_index_operator, 62_000.0, false).await;
 
 	let lock_id = create_receive_address(
 		&test_node,
@@ -492,7 +492,7 @@ async fn create_first_fission_and_check_constraints(
 				bitcoin_network_fee: 0,
 			},
 		),
-		RuntimeError::BitcoinLocks(BitcoinLocksError::LockHasActiveFissions),
+		&[RuntimeError::BitcoinLocks(BitcoinLocksError::LockHasActiveFissions)],
 	)
 	.await;
 	let release_request = client
@@ -513,7 +513,7 @@ async fn create_first_fission_and_check_constraints(
 				microgons_at_target_per_btc,
 			},
 		),
-		RuntimeError::BitcoinFissions(BitcoinFissionsError::NoRatchetingAvailable),
+		&[RuntimeError::BitcoinFissions(BitcoinFissionsError::NoRatchetingAvailable)],
 	)
 	.await;
 	let unchanged_fission = client
@@ -604,7 +604,7 @@ async fn ratchet_first_fission(
 	initial_liquidity_promised: Balance,
 	last_submitted_tick: &mut Tick,
 ) -> anyhow::Result<()> {
-	submit_price(ticker, client, price_index_operator, 60_000.0).await;
+	submit_price(ticker, client, price_index_operator, 60_000.0, true).await;
 	let rate_history = client
 		.fetch_storage(&storage().bitcoin_locks().microgon_per_btc_history(), FetchAt::Best)
 		.await?
@@ -617,7 +617,7 @@ async fn ratchet_first_fission(
 		sleep(Duration::from_millis(100)).await;
 	}
 
-	*last_submitted_tick = submit_price(ticker, client, price_index_operator, 55_000.0).await;
+	*last_submitted_tick = submit_price(ticker, client, price_index_operator, 55_000.0, true).await;
 	let rate_history = client
 		.fetch_storage(&storage().bitcoin_locks().microgon_per_btc_history(), FetchAt::Best)
 		.await?
@@ -639,7 +639,7 @@ async fn ratchet_first_fission(
 				}),
 			},
 		),
-		RuntimeError::BitcoinLocks(BitcoinLocksError::InsufficientSecuritizationForFissions),
+		&[RuntimeError::BitcoinLocks(BitcoinLocksError::InsufficientSecuritizationForFissions)],
 	)
 	.await;
 	let unchanged_lock = client
@@ -690,6 +690,8 @@ async fn ratchet_first_fission(
 	assert_eq!(ratcheted_fission.microgons_at_target_per_btc, ratchet_rate);
 	assert!(ratcheted_fission.liquidity_promised < initial_liquidity_promised);
 
+	// Finality can push the older rate out of the bounded history before this call is included.
+	// Either error proves that the previous rate can no longer ratchet the Fission.
 	submit_rejected_bitcoin_call(
 		client,
 		bitcoin_owner_signer,
@@ -699,9 +701,12 @@ async fn ratchet_first_fission(
 				microgons_at_target_per_btc: older_ratchet_rate,
 			},
 		),
-		RuntimeError::BitcoinFissions(
-			BitcoinFissionsError::MicrogonsAtTargetPerBtcTickOlderThanCurrent,
-		),
+		&[
+			RuntimeError::BitcoinFissions(
+				BitcoinFissionsError::MicrogonsAtTargetPerBtcTickOlderThanCurrent,
+			),
+			RuntimeError::BitcoinFissions(BitcoinFissionsError::IneligibleMicrogonsAtTargetPerBtc),
+		],
 	)
 	.await;
 	let unchanged_fission = client
@@ -812,7 +817,7 @@ async fn close_fissions(
 		RuntimeCall::BitcoinFissions(
 			api::runtime_types::pallet_bitcoin_fissions::pallet::Call::close { fission_id },
 		),
-		RuntimeError::BitcoinFissions(BitcoinFissionsError::FissionNotFound),
+		&[RuntimeError::BitcoinFissions(BitcoinFissionsError::FissionNotFound)],
 	)
 	.await;
 
@@ -980,7 +985,7 @@ async fn submit_rejected_bitcoin_call(
 	client: &MainchainClient,
 	signer: &Sr25519Signer,
 	call: RuntimeCall,
-	expected_error: RuntimeError,
+	expected_errors: &[RuntimeError],
 ) {
 	let params = client
 		.params_with_best_nonce(&signer.account_id())
@@ -1010,7 +1015,7 @@ async fn submit_rejected_bitcoin_call(
 		subxt_error::DispatchError::decode_from(encoded_dispatch_error, metadata.clone())
 			.expect("ItemFailed should contain a valid DispatchError");
 	let subxt_error::DispatchError::Module(actual_error) = actual_error else {
-		panic!("expected {expected_error:?}, got {actual_error:?}");
+		panic!("expected one of {expected_errors:?}, got {actual_error:?}");
 	};
 	let actual_error = actual_error
 		.as_root_error::<RuntimeError>()
@@ -1019,13 +1024,18 @@ async fn submit_rejected_bitcoin_call(
 	let actual_error_bytes = actual_error
 		.encode_as_type(runtime_error_type, metadata.types())
 		.expect("actual runtime error should encode");
-	let expected_error_bytes = expected_error
-		.encode_as_type(runtime_error_type, metadata.types())
-		.expect("expected runtime error should encode");
+	let expected_error_bytes = expected_errors
+		.iter()
+		.map(|expected_error| {
+			expected_error
+				.encode_as_type(runtime_error_type, metadata.types())
+				.expect("expected runtime error should encode")
+		})
+		.collect::<Vec<_>>();
 
-	assert_eq!(
-		actual_error_bytes, expected_error_bytes,
-		"expected {expected_error:?}, got {actual_error:?}"
+	assert!(
+		expected_error_bytes.contains(&actual_error_bytes),
+		"expected one of {expected_errors:?}, got {actual_error:?}"
 	);
 }
 
@@ -1034,6 +1044,7 @@ async fn submit_price(
 	client: &MainchainClient,
 	price_index_operator: &sr25519::Pair,
 	btc_usd_price: f64,
+	wait_for_finalized: bool,
 ) -> Tick {
 	let signer = Sr25519Signer::new(price_index_operator.clone());
 	let account_id = signer.account_id();
@@ -1069,7 +1080,7 @@ async fn submit_price(
 			.await
 			.unwrap();
 
-		match MainchainClient::wait_for_ext_in_block(progress, false).await {
+		match MainchainClient::wait_for_ext_in_block(progress, wait_for_finalized).await {
 			Ok(_) => {
 				println!("bitcoin prices submitted at tick {tick}");
 				return tick;
@@ -1097,7 +1108,8 @@ async fn submit_price_if_needed(
 		return;
 	}
 
-	*last_submitted_tick = submit_price(ticker, client, price_index_operator, 62_000.0).await;
+	*last_submitted_tick =
+		submit_price(ticker, client, price_index_operator, 62_000.0, false).await;
 }
 
 async fn current_chain_tick(client: &MainchainClient, ticker: &Ticker) -> Tick {
@@ -1518,6 +1530,8 @@ async fn owner_requests_release(
 				.ok_or_else(|| anyhow!("Release amount overflowed"))?,
 		)
 		.ok_or_else(|| anyhow!("Release fee exceeded the Lock balance"))?;
+	let signer = Sr25519Signer::new(bitcoin_owner.clone());
+	let params = client.params_with_best_nonce(&signer.account_id()).await?.immortal().build();
 
 	let release_tx = client
 		.submit_tx(
@@ -1527,8 +1541,8 @@ async fn owner_requests_release(
 				destination_satoshis,
 				bitcoin_network_fee,
 			),
-			&Sr25519Signer::new(bitcoin_owner.clone()),
-			None,
+			&signer,
+			Some(params),
 			true,
 		)
 		.await?;

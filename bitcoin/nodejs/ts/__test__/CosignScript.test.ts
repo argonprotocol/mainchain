@@ -86,7 +86,7 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
     vaultXpriv = getChildXpriv(devSeed, vaulterHdPath, bitcoinNetwork);
   }, 60e3);
 
-  test.sequential('Test price apis', async () => {
+  test('Test price apis', async () => {
     await new Promise<void>(resolve => {
       const subscription = vaulterClient.rpc.chain.subscribeAllHeads(header => {
         if (header.number.toNumber() > 1) {
@@ -119,7 +119,7 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
     expect(priceIndex.getSatoshiPriceInTargetMicrogons(100n)).toStrictEqual(60_000n);
   });
 
-  test.sequential('it can create and fund a bitcoin lock', async () => {
+  test('it can create and fund a bitcoin lock', async () => {
     const vaultResult = await submitTx(
       vaulterClient,
       vaulterClient.tx.vaults.create({
@@ -251,7 +251,7 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
     expect(u8aToHex(reference.txid.slice().reverse())).toBe(`0x${txid}`);
   });
 
-  test.sequential('it can release a bitcoin lock', async () => {
+  test('it can release a bitcoin lock', async () => {
     const btcClient = vaulterchain.getBitcoinClient();
     const nextAddress = await btcClient.command('getnewaddress');
     console.log('Bitcoin release address:', nextAddress);
@@ -289,10 +289,11 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
       destinationSatoshis: value.destinationSatoshis.toBigInt(),
       changeSatoshis: value.changeSatoshis.toBigInt(),
     };
+    expect(releaseRequest.changeSatoshis).toBe(changeSatoshis);
     console.log('Stored release request:', stringifyExt(releaseRequest));
   });
 
-  test.sequential('it can cosign as vault', async () => {
+  test('it can cosign as vault', async () => {
     const cosignScript = new CosignScript(lock, bitcoinNetwork);
     const psbt = cosignScript.getCosignPsbt({
       releaseRequest,
@@ -326,7 +327,7 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
     vaultCosignature = new Uint8Array(cosigned.data.signatures[0]);
   });
 
-  test.sequential('user can cosign a bitcoin lock', async () => {
+  test('user can cosign a bitcoin lock', async () => {
     const ownerBitcoinXpriv = getChildXpriv(
       mnemonicToSeedSync(bitcoinMnemonic),
       "m/84'/0'/0'/0/0'",

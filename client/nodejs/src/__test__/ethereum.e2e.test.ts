@@ -48,7 +48,7 @@ const QUEUE_RELAY_COUNCIL_PRIVATE_KEY = repeatByteHex('01', 32);
 const QUEUE_RELAY_AUTHORITY_PRIVATE_KEY = repeatByteHex('02', 32);
 
 describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', () => {
-  describe.sequential('roundtrip saga', () => {
+  describe('roundtrip saga', () => {
     let harness!: Harness;
     let authorityActor!: AuthorityActor;
     let gateway!: Gateway;

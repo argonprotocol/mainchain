@@ -186,7 +186,9 @@ where
 	}
 
 	fn provider_spent() -> Weight {
-		Base::provider_spent().saturating_add(FissionsProviderWeight::close_for_lock())
+		Base::provider_spent()
+			.saturating_add(VaultProviderWeight::burn())
+			.saturating_add(FissionsProviderWeight::close_for_lock())
 	}
 }
 
