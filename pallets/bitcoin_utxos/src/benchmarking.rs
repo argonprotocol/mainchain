@@ -6,7 +6,7 @@ use argon_primitives::{
 		BitcoinBlock, BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinLockId, H256Le, Satoshis,
 		UtxoAddress, UtxoRef,
 	},
-	inherents::BitcoinUtxoSync,
+	inherents::BitcoinUtxoSyncV2,
 };
 use frame_benchmarking::v2::*;
 
@@ -27,8 +27,11 @@ mod benchmarks {
 			block_hash: benchmark_block_hash(199),
 		});
 		InherentIncluded::<T>::put(false);
-		let utxo_sync =
-			BitcoinUtxoSync { spent: vec![], funded: vec![], sync_to_block: sync_to_block.clone() };
+		let utxo_sync = BitcoinUtxoSyncV2 {
+			spent: vec![],
+			funded: vec![],
+			sync_to_block: sync_to_block.clone(),
+		};
 
 		#[block]
 		{

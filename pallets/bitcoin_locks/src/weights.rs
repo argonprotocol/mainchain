@@ -176,7 +176,13 @@ where
 	}
 
 	fn provider_utxo_detected() -> Weight {
+		let max_utxos = T::MaxUtxosPerLock::get().into();
+		// MaxEncodedLen proof charged by bitcoin_utxos::UtxoRefsByLockId.
 		Base::provider_utxo_detected()
+			.saturating_add(VaultProviderWeight::burn())
+			.saturating_add(FissionsProviderWeight::close_for_lock())
+			.saturating_add(T::DbWeight::get().reads_writes(max_utxos, max_utxos))
+			.saturating_add(Weight::from_parts(0, 6_093).saturating_mul(max_utxos))
 	}
 
 	fn provider_spent() -> Weight {

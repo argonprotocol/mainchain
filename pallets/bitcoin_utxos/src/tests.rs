@@ -3,16 +3,57 @@ use crate::{
 	pallet::{ConfirmedBitcoinBlockTip, InherentIncluded},
 	Error, Event, UtxoAddressByLockId, UtxoRefsByLockId,
 };
+use frame_support::inherent::{InherentData, ProvideInherent};
 use pallet_prelude::{
 	argon_primitives::{
 		bitcoin::{
 			BitcoinBlock, BitcoinCosignScriptPubkey, BitcoinLockId, H256Le, UtxoAddress, UtxoRef,
 		},
-		inherents::{BitcoinUtxoFunding, BitcoinUtxoSpend, BitcoinUtxoSync},
+		inherents::{
+			BitcoinUtxoFunding, BitcoinUtxoSpend, BitcoinUtxoSpendV2, BitcoinUtxoSync,
+			BitcoinUtxoSyncV2, BITCOIN_INHERENT_IDENTIFIER, BITCOIN_INHERENT_IDENTIFIER_V2,
+		},
 		BitcoinUtxoTracker,
 	},
 	*,
 };
+
+#[test]
+fn creates_inherent_from_data_provided_by_pre_upgrade_nodes() {
+	let mut inherent_data = InherentData::new();
+	inherent_data
+		.put_data(
+			BITCOIN_INHERENT_IDENTIFIER_V2,
+			&BitcoinUtxoSyncV2 { spent: vec![], funded: vec![], sync_to_block: block(1) },
+		)
+		.expect("valid legacy inherent data");
+
+	assert!(BitcoinUtxos::create_inherent(&inherent_data).is_some());
+}
+
+#[test]
+fn converts_current_inherent_data_to_the_existing_sync_call() {
+	let mut inherent_data = InherentData::new();
+	let utxo_ref = utxo_ref(7);
+	let sync = BitcoinUtxoSync {
+		spent: vec![BitcoinUtxoSpend {
+			lock_id: 1,
+			utxo_ref: Some(utxo_ref.clone()),
+			bitcoin_height: 2,
+			spending_txid: H256Le([9; 32]),
+		}],
+		funded: vec![],
+		sync_to_block: block(2),
+	};
+	let expected_sync: BitcoinUtxoSyncV2 = sync.clone().into();
+	inherent_data
+		.put_data(BITCOIN_INHERENT_IDENTIFIER, &sync)
+		.expect("valid current inherent data");
+
+	let call =
+		BitcoinUtxos::create_inherent(&inherent_data).expect("current data creates inherent");
+	assert_eq!(call, crate::Call::sync { utxo_sync: expected_sync });
+}
 
 #[test]
 fn watches_a_lock_address_until_explicitly_unwatched() {
@@ -101,7 +142,7 @@ fn spends_remove_only_the_exact_attached_output() {
 			sync(
 				3,
 				vec![],
-				vec![BitcoinUtxoSpend {
+				vec![BitcoinUtxoSpendV2 {
 					lock_id: 1,
 					utxo_ref: Some(first.clone()),
 					bitcoin_height: 3,
@@ -113,7 +154,7 @@ fn spends_remove_only_the_exact_attached_output() {
 		assert!(!refs.contains(&first));
 		assert!(refs.contains(&second));
 		assert!(UtxoAddressByLockId::<Test>::contains_key(1));
-		assert_eq!(LastSpent::get(), Some((1, first.clone())));
+		assert_eq!(LastSpent::get(), Some((1, first.clone(), 3)));
 		System::assert_last_event(
 			Event::UtxoSpent { lock_id: 1, utxo_ref: first, block_height: 3 }.into(),
 		);
@@ -187,9 +228,9 @@ fn fail_detection(_: (BitcoinLockId, UtxoRef, u64)) -> DispatchResult {
 fn sync(
 	height: u64,
 	funded: Vec<BitcoinUtxoFunding>,
-	spent: Vec<BitcoinUtxoSpend>,
-) -> BitcoinUtxoSync {
-	BitcoinUtxoSync { funded, spent, sync_to_block: block(height) }
+	spent: Vec<BitcoinUtxoSpendV2>,
+) -> BitcoinUtxoSyncV2 {
+	BitcoinUtxoSyncV2 { funded, spent, sync_to_block: block(height) }
 }
 
 fn funding(

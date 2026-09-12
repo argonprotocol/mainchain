@@ -6,6 +6,7 @@ extern crate core;
 use alloc::{
 	format,
 	string::{String, ToString},
+	vec,
 	vec::Vec,
 };
 use anyhow::Result;
@@ -103,6 +104,7 @@ pub fn calculate_fee(
 	fee_rate_sats_per_vb: Satoshis,
 	input_count: u32,
 	to_script_pubkey: &str,
+	has_change: bool,
 ) -> Result<u64, String> {
 	console_error_panic_hook::set_once();
 	let cosign_script = create_cosign(
@@ -117,8 +119,12 @@ pub fn calculate_fee(
 	let to_scriptpub: BitcoinScriptPubkey = from_hex(to_script_pubkey)?;
 	let fee_rate_sats_per_vb =
 		FeeRate::from_sat_per_vb(fee_rate_sats_per_vb).ok_or("Invalid fee rate")?;
+	let mut output_script_pubkeys = vec![to_scriptpub.into()];
+	if has_change {
+		output_script_pubkeys.push(cosign_script.get_script_pubkey());
+	}
 	Ok(cosign_script
-		.calculate_fee(true, input_count as usize, to_scriptpub.into(), fee_rate_sats_per_vb)
+		.calculate_fee(true, input_count as usize, output_script_pubkeys, fee_rate_sats_per_vb)
 		.map_err(|err| err.to_string())?
 		.to_sat())
 }
@@ -177,6 +183,8 @@ pub fn get_cosigned_psbt(
 	created_at_height: BitcoinHeight,
 	bitcoin_network: BitcoinNetwork,
 	to_script_pubkey_hex: &str,
+	destination_satoshis: Satoshis,
+	change_satoshis: Satoshis,
 	bitcoin_network_fee: Satoshis,
 ) -> Result<String, String> {
 	if utxos.is_empty() {
@@ -205,12 +213,31 @@ pub fn get_cosigned_psbt(
 		created_at_height,
 		bitcoin_network,
 	)?;
-	let releaser = CosignReleaser::from_script(
+	let input_satoshis = utxos.iter().try_fold(0u64, |total, (_, satoshis)| {
+		total.checked_add(*satoshis).ok_or("Input satoshis overflow")
+	})?;
+	let committed_satoshis = destination_satoshis
+		.checked_add(change_satoshis)
+		.and_then(|total| total.checked_add(bitcoin_network_fee))
+		.ok_or("Release satoshis overflow")?;
+	if committed_satoshis != input_satoshis {
+		return Err("Release outputs and fee must equal the input satoshis".into())
+	}
+	let mut outputs = vec![TxOut {
+		value: Amount::from_sat(destination_satoshis),
+		script_pubkey: pay_scriptpub.into(),
+	}];
+	if change_satoshis > 0 {
+		outputs.push(TxOut {
+			value: Amount::from_sat(change_satoshis),
+			script_pubkey: cosign_script.get_script_pubkey(),
+		});
+	}
+	let releaser = CosignReleaser::from_script_outputs(
 		cosign_script,
 		utxos,
 		ReleaseStep::VaultCosign, // this doesn't matter
-		Amount::from_sat(bitcoin_network_fee),
-		pay_scriptpub.into(),
+		outputs,
 	)
 	.map_err(|err| err.to_string())?;
 	Ok(format!("0x{}", releaser.psbt.serialize_hex()))

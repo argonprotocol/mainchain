@@ -835,6 +835,7 @@ fn benchmark_vault<T: Config>(
 		flexible_securitization_locked: TreasuryBalanceOf::<T>::zero(),
 		reserved_securitization_space: TreasuryBalanceOf::<T>::zero(),
 		securitization_pending_activation: TreasuryBalanceOf::<T>::zero(),
+		total_satoshis: 0,
 		securitized_satoshis: 0,
 		ratio_adjusted_satoshis: eligible_satoshis,
 		flexible_ratio_adjusted_satoshis: 0,

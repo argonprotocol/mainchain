@@ -254,6 +254,13 @@ where
 		Err(VaultError::VaultNotFound)
 	}
 
+	fn record_bitcoin_lock_funding_reduction(
+		_vault_id: VaultId,
+		_update: BitcoinLockFundingUpdate<Self::Balance>,
+	) -> Result<(), VaultError> {
+		Err(VaultError::VaultNotFound)
+	}
+
 	fn get_projected_flexible_securitization(
 		_vault_id: VaultId,
 		_flexible_securitization_released: Self::Balance,
@@ -265,7 +272,7 @@ where
 	fn set_bitcoin_lock_flexible(
 		_vault_id: VaultId,
 		_securitization: &BitcoinSecuritization<Self::Balance>,
-		_funded_satoshis: argon_primitives::bitcoin::Satoshis,
+		_securitized_satoshis: argon_primitives::bitcoin::Satoshis,
 		_is_flexible: bool,
 	) -> Result<(), VaultError> {
 		Err(VaultError::VaultNotFound)

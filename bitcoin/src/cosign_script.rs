@@ -1,4 +1,4 @@
-use alloc::{format, string::ToString, vec};
+use alloc::{format, string::ToString, vec, vec::Vec};
 use core::str::FromStr;
 
 pub use bitcoin::Amount;
@@ -104,7 +104,7 @@ impl CosignScript {
 		&self,
 		is_cosign: bool,
 		input_count: usize,
-		to_script_pubkey: ScriptBuf,
+		output_script_pubkeys: Vec<ScriptBuf>,
 		fee_rate: FeeRate,
 	) -> Result<Amount, Error> {
 		const MAX_SIGNATURE_SIZE: usize = 73;
@@ -125,7 +125,7 @@ impl CosignScript {
 				InputWeightPrediction::from_slice(0, witness_element_lengths.as_slice());
 				input_count
 			],
-			vec![to_script_pubkey.len()],
+			output_script_pubkeys.iter().map(|script| script.len()),
 		);
 		let Some(fee) = fee_rate.fee_wu(weight) else { return Err(Error::FeeTooLow) };
 		Ok(fee)
@@ -306,7 +306,7 @@ mod test {
 
 		let pay_to_script_pubkey = vault_compressed_pubkey.p2wpkh_script_code();
 		let fee = cosign_script
-			.calculate_fee(false, 1, pay_to_script_pubkey.clone(), fee_rate)
+			.calculate_fee(false, 1, vec![pay_to_script_pubkey.clone()], fee_rate)
 			.unwrap();
 
 		// fails locktime if not cleared
@@ -455,7 +455,7 @@ mod test {
 
 		let pay_to_script_pubkey = owner_compressed_pubkey.p2wpkh_script_code().unwrap();
 		let fee = cosign_script
-			.calculate_fee(false, 1, pay_to_script_pubkey.clone(), fee_rate)
+			.calculate_fee(false, 1, vec![pay_to_script_pubkey.clone()], fee_rate)
 			.unwrap();
 
 		// cannot accept until the cosign height
@@ -570,7 +570,7 @@ mod test {
 
 		let pay_to_script_pubkey = owner_pubkey.p2wpkh_script_code().unwrap();
 		let fee = cosign_script
-			.calculate_fee(false, 1, pay_to_script_pubkey.clone(), fee_rate)
+			.calculate_fee(false, 1, vec![pay_to_script_pubkey.clone()], fee_rate)
 			.unwrap();
 
 		// cannot accept until the cosign height
@@ -604,7 +604,7 @@ mod test {
 				.wallet_process_psbt(
 					&psbt_text,
 					Some(true),
-					Some(EcdsaSighashType::AllPlusAnyoneCanPay.into()),
+					Some(EcdsaSighashType::All.into()),
 					None,
 				)
 				.unwrap();
@@ -744,7 +744,7 @@ mod test {
 		};
 		let user_cosign_script = CosignScript::new(script_args, network).unwrap();
 		let fee = user_cosign_script
-			.calculate_fee(true, utxos.len(), out_script_pubkey.clone().into(), feerate)
+			.calculate_fee(true, utxos.len(), vec![out_script_pubkey.clone().into()], feerate)
 			.unwrap();
 
 		// 5. vault sees unlock request (outaddress, fee) and creates a transaction
@@ -854,10 +854,10 @@ mod test {
 		let cosign_script = CosignScript::new(script_args.clone(), network).unwrap();
 		let fee_rate = FeeRate::from_sat_per_vb(15).unwrap();
 		let one_input_fee = cosign_script
-			.calculate_fee(true, 1, out_script_pubkey.clone(), fee_rate)
+			.calculate_fee(true, 1, vec![out_script_pubkey.clone()], fee_rate)
 			.unwrap();
 		let two_input_fee = cosign_script
-			.calculate_fee(true, 2, out_script_pubkey.clone(), fee_rate)
+			.calculate_fee(true, 2, vec![out_script_pubkey.clone()], fee_rate)
 			.unwrap();
 		assert!(two_input_fee > one_input_fee);
 		let fee = Amount::from_sat(500);
@@ -917,7 +917,8 @@ mod test {
 			.verify_signatures_raw(vault_pubkey, &vault_signatures_api[..1])
 			.unwrap());
 		let mut wrong_sighash_signatures = vault_signatures_api.clone();
-		*wrong_sighash_signatures[0].0.last_mut().unwrap() = EcdsaSighashType::All.to_u32() as u8;
+		*wrong_sighash_signatures[0].0.last_mut().unwrap() =
+			EcdsaSighashType::AllPlusAnyoneCanPay.to_u32() as u8;
 		assert!(!releaser.verify_signatures_raw(vault_pubkey, &wrong_sighash_signatures).unwrap());
 		assert!(releaser.verify_signatures_raw(vault_pubkey, &vault_signatures_api).unwrap());
 	}
@@ -956,5 +957,6 @@ mod test {
 		let spend = &latest.spent[0];
 		assert_eq!(spend.lock_id, 1);
 		assert_eq!(spend.bitcoin_height, tx_block_height as BitcoinHeight);
+		assert_eq!(spend.spending_txid, final_txid.into());
 	}
 }

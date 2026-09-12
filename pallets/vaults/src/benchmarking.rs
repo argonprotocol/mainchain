@@ -455,9 +455,10 @@ mod benchmarks {
 				.map_err(|_| BenchmarkError::Stop("failed to reserve current securitization"))?;
 			vault
 				.record_bitcoin_lock_funding(BitcoinLockFundingUpdate {
-					securitized_satoshis: funded_satoshis.min(current.basis.satoshis),
+					funded_satoshis,
+					securitized_satoshis: current.securitized_satoshis(funded_satoshis),
 					collateral_required: current.collateral_between(0, funded_satoshis),
-					securitization_ratio: current.securitization_ratio,
+					eligible_satoshis: current.eligible_satoshis(funded_satoshis),
 					is_flexible: false,
 				})
 				.map_err(|_| BenchmarkError::Stop("failed to activate current securitization"))?;
@@ -494,9 +495,70 @@ mod benchmarks {
 
 		let vault = VaultsById::<T>::get(vault_id)
 			.ok_or(BenchmarkError::Stop("vault missing after resecuritization"))?;
-		assert_eq!(vault.securitized_satoshis, funded_satoshis);
+		assert_eq!(vault.securitized_satoshis, replacement.securitized_satoshis(funded_satoshis));
 		assert_eq!(vault.ratio_adjusted_satoshis, replacement.eligible_satoshis(funded_satoshis));
 		assert_eq!(vault.securitization_locked, replacement.collateral_required());
+		Ok(())
+	}
+
+	#[benchmark]
+	fn provider_burn(
+		e: Linear<1, MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES>,
+	) -> Result<(), BenchmarkError> {
+		let operator: T::AccountId = account("provider_burn_operator", 0, 0);
+		let collateral = e.saturating_add(1) as u128;
+		let securitization = BitcoinSecuritization {
+			basis: BitcoinSecuritizationBasis {
+				satoshis: u64::from(e.saturating_add(1)),
+				microgons_at_target_per_btc: 100_000_000u128.into(),
+			},
+			securitization_coverage_microgons: collateral.into(),
+			securitization_ratio: FixedU128::one(),
+		};
+		let vault_id = create_vault::<T>(&operator, 13, collateral.saturating_add(1_000))?;
+		VaultsById::<T>::try_mutate(vault_id, |vault| {
+			let vault =
+				vault.as_mut().ok_or(BenchmarkError::Stop("benchmark vault should exist"))?;
+			vault
+				.reserve_securitization(&securitization, true)
+				.map_err(|_| BenchmarkError::Stop("failed to reserve securitization"))?;
+			vault
+				.record_bitcoin_lock_funding(BitcoinLockFundingUpdate {
+					funded_satoshis: securitization.basis.satoshis,
+					securitized_satoshis: securitization.basis.satoshis,
+					collateral_required: securitization.collateral_required(),
+					eligible_satoshis: securitization
+						.eligible_satoshis(securitization.basis.satoshis),
+					is_flexible: false,
+				})
+				.map_err(|_| BenchmarkError::Stop("failed to activate securitization"))?;
+			Ok::<_, BenchmarkError>(())
+		})?;
+		let mut lock_extension = LockExtension::new(10_000);
+		for index in 0..e {
+			lock_extension
+				.extended_expiration_funds
+				.try_insert(10_001u64.saturating_add(index.into()), 1u128.into())
+				.map_err(|_| BenchmarkError::Stop("unable to seed Lock extension"))?;
+		}
+
+		#[block]
+		{
+			<Pallet<T> as BitcoinVaultProvider>::burn(
+				vault_id,
+				&securitization,
+				securitization.basis.satoshis,
+				1u128.into(),
+				&lock_extension,
+				false,
+			)
+			.map_err(|_| BenchmarkError::Stop("failed to burn Bitcoin Lock securitization"))?;
+		}
+
+		let vault = VaultsById::<T>::get(vault_id)
+			.ok_or(BenchmarkError::Stop("vault missing after burn"))?;
+		assert_eq!(vault.securitization_locked, T::Balance::zero());
+		assert_eq!(vault.securitized_satoshis, 0);
 		Ok(())
 	}
 

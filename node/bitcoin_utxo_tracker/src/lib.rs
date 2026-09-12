@@ -6,8 +6,8 @@ use anyhow::ensure;
 use argon_bitcoin::{BlockFilter, UtxoSpendFilter};
 use argon_primitives::{
 	bitcoin::{BitcoinSyncStatus, Satoshis, UtxoAddress, UtxoRef},
-	inherents::BitcoinUtxoSync,
-	prelude::sp_api::ApiExt,
+	inherents::{BitcoinUtxoSync, BitcoinUtxoSyncVersion, BITCOIN_SPENDING_TXID_SPEC_VERSION},
+	prelude::sp_api::{ApiExt, Core},
 	Balance, BitcoinApis,
 };
 use codec::{Decode, Encode};
@@ -25,11 +25,11 @@ pub fn get_bitcoin_inherent<C, B>(
 	tracker: &Arc<UtxoTracker>,
 	client: &Arc<C>,
 	block_hash: &B::Hash,
-) -> anyhow::Result<Option<BitcoinUtxoSync>>
+) -> anyhow::Result<Option<BitcoinUtxoSyncVersion>>
 where
 	B: BlockT,
 	C: ProvideRuntimeApi<B> + AuxStore + 'static,
-	C::Api: BitcoinApis<B, Balance>,
+	C::Api: BitcoinApis<B, Balance> + sp_api::Core<B>,
 {
 	let api = client.runtime_api();
 	let mut minimum_satoshis: Satoshis = 1000;
@@ -66,7 +66,12 @@ where
 	if let Some(ref metrics) = tracker.metrics {
 		metrics.track(&result, utxo_count, start_time);
 	}
-	Ok(Some(result))
+	let runtime_version = api.version(*block_hash)?;
+	if runtime_version.spec_version >= BITCOIN_SPENDING_TXID_SPEC_VERSION {
+		Ok(Some(BitcoinUtxoSyncVersion::Current(result)))
+	} else {
+		Ok(Some(BitcoinUtxoSyncVersion::V2(result.into())))
+	}
 }
 
 pub struct UtxoTracker {

@@ -40,7 +40,7 @@ use bitcoin::{
 	bip32::{ChildNumber, DerivationPath, Fingerprint, Xpub},
 	hashes::Hash,
 	secp256k1::{All, Secp256k1},
-	Amount, EcdsaSighashType, Network, Psbt, PublicKey, ScriptBuf, Txid,
+	Amount, EcdsaSighashType, Network, Psbt, PublicKey, ScriptBuf, TxOut, Txid,
 };
 use bitcoind::{
 	anyhow,
@@ -353,6 +353,7 @@ async fn test_bitcoin_xpriv_release_e2e() {
 		.await
 		.unwrap()
 		.expect("xpriv-owned Lock");
+	let original_securitization_basis_satoshis = lock.securitization_basis.satoshis;
 	let cosign_script_pubkey: BitcoinCosignScriptPubkey = lock.utxo_script_pubkey.into();
 
 	println!("\n2. Fund the xpriv-owned Lock");
@@ -370,9 +371,10 @@ async fn test_bitcoin_xpriv_release_e2e() {
 		.unwrap();
 
 	println!("\n3. Request the Lock's Bitcoin release");
-	owner_requests_release(bitcoind, network, &bitcoin_owner_pair, &client, vault_id, lock_id)
-		.await
-		.unwrap();
+	let change_satoshis =
+		owner_requests_release(bitcoind, network, &bitcoin_owner_pair, &client, vault_id, lock_id)
+			.await
+			.unwrap();
 
 	println!("\n4. Vault cosigns the release request");
 	vault_cosigns_release(
@@ -402,7 +404,7 @@ async fn test_bitcoin_xpriv_release_e2e() {
 			sleep(Duration::from_secs(5)).await;
 		}
 	});
-	owner_signs_and_releases(
+	let release_txid = owner_signs_and_releases(
 		client.as_ref(),
 		&lock_id,
 		&owner_xpriv,
@@ -411,6 +413,33 @@ async fn test_bitcoin_xpriv_release_e2e() {
 	)
 	.await
 	.unwrap();
+	wait_for_lock_funding(&client, lock_id, &[(release_txid, 1, change_satoshis)])
+		.await
+		.unwrap();
+	let lock = client
+		.fetch_storage(&storage().bitcoin_locks().locks_by_id(lock_id), FetchAt::Finalized)
+		.await
+		.unwrap()
+		.expect("partially released Lock");
+	assert_eq!(lock.funded_satoshis, change_satoshis);
+	assert_eq!(lock.securitization_basis.satoshis, original_securitization_basis_satoshis);
+	assert!(client
+		.fetch_storage(
+			&storage().bitcoin_locks().pending_partial_release_by_lock_id(lock_id),
+			FetchAt::Finalized,
+		)
+		.await
+		.unwrap()
+		.is_none());
+	let release_cosign = client
+		.fetch_storage(
+			&storage().bitcoin_locks().lock_release_cosign_height_by_id(lock_id),
+			FetchAt::Finalized,
+		)
+		.await
+		.unwrap()
+		.expect("partial release cosign history");
+	assert_eq!(release_cosign.release_number, 1);
 	drop(test_node);
 }
 
@@ -446,6 +475,12 @@ async fn create_first_fission_and_check_constraints(
 		.require_network(network)
 		.unwrap();
 	let release_script: BitcoinScriptPubkey = release_address.script_pubkey().into();
+	let funded_satoshis = client
+		.fetch_storage(&storage().bitcoin_locks().locks_by_id(lock_id), FetchAt::Best)
+		.await
+		.unwrap()
+		.expect("funded Lock")
+		.funded_satoshis;
 	submit_rejected_bitcoin_call(
 		client,
 		bitcoin_owner_signer,
@@ -453,6 +488,7 @@ async fn create_first_fission_and_check_constraints(
 			api::runtime_types::pallet_bitcoin_locks::pallet::Call::request_release {
 				lock_id,
 				to_script_pubkey: release_script.into(),
+				destination_satoshis: funded_satoshis,
 				bitcoin_network_fee: 0,
 			},
 		),
@@ -1453,7 +1489,7 @@ async fn owner_requests_release(
 	client: &Arc<MainchainClient>,
 	vault_id: VaultId,
 	lock_id: BitcoinLockId,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<Satoshis> {
 	let out_script_pubkey = bitcoind
 		.client
 		.get_new_address(Some("takeback"), Some(AddressType::Bech32m))
@@ -1464,21 +1500,31 @@ async fn owner_requests_release(
 		.await?
 		.ok_or_else(|| anyhow!("No finalized lock found for utxo {lock_id}"))?;
 	let cosign = get_cosign_script(&lock, network)?;
+	let destination_satoshis = lock.funded_satoshis / 2;
 	let bitcoin_network_fee = cosign
 		.calculate_fee(
 			true,
 			lock.funding_utxos.0.len(),
-			out_script_pubkey.script_pubkey(),
+			vec![out_script_pubkey.script_pubkey(), cosign.get_script_pubkey()],
 			bitcoin::FeeRate::from_sat_per_vb(5).ok_or_else(|| anyhow!("Invalid fee rate"))?,
 		)?
 		.to_sat();
 	let to_script_pubkey: BitcoinScriptPubkey = out_script_pubkey.script_pubkey().into();
+	let change_satoshis = lock
+		.funded_satoshis
+		.checked_sub(
+			destination_satoshis
+				.checked_add(bitcoin_network_fee)
+				.ok_or_else(|| anyhow!("Release amount overflowed"))?,
+		)
+		.ok_or_else(|| anyhow!("Release fee exceeded the Lock balance"))?;
 
 	let release_tx = client
 		.submit_tx(
 			&tx().bitcoin_locks().request_release(
 				lock_id,
 				to_script_pubkey.into(),
+				destination_satoshis,
 				bitcoin_network_fee,
 			),
 			&Sr25519Signer::new(bitcoin_owner.clone()),
@@ -1501,7 +1547,7 @@ async fn owner_requests_release(
 	assert_eq!(release_event.lock_id, lock_id);
 	assert_eq!(release_event.vault_id, vault_id);
 
-	Ok(())
+	Ok(change_satoshis)
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1603,7 +1649,7 @@ async fn owner_sees_signature_and_releases(
 	let import = bitcoind.client.wallet_process_psbt(
 		&psbt_text,
 		Some(true),
-		Some(EcdsaSighashType::AllPlusAnyoneCanPay.into()),
+		Some(EcdsaSighashType::All.into()),
 		None,
 	)?;
 	println!("Processed with wallet {import:?}");
@@ -1638,8 +1684,9 @@ async fn owner_signs_and_releases(
 	owner_xpriv: &bitcoin::bip32::Xpriv,
 	owner_hd_path: &str,
 	bitcoin_rpc_url: &str,
-) -> anyhow::Result<()> {
+) -> anyhow::Result<Txid> {
 	let mut releaser = load_owner_release_releaser(client, *lock_id).await?;
+	let transaction_id = releaser.psbt.unsigned_tx.compute_txid();
 	releaser.sign_derived(owner_xpriv.clone(), DerivationPath::from_str(owner_hd_path)?)?;
 	let confirmations = Arc::new(std::sync::Mutex::new(0));
 
@@ -1658,7 +1705,7 @@ async fn owner_signs_and_releases(
 		})
 		.await
 		.map_err(|e| anyhow!("Failed to broadcast release transaction: {e:?}"))?;
-	Ok(())
+	Ok(transaction_id)
 }
 
 async fn load_cosign_releaser(
@@ -1681,7 +1728,18 @@ async fn load_cosign_releaser(
 		.ok_or_else(|| anyhow!("No bitcoin network found"))?
 		.into();
 
-	Ok(CosignReleaser::from_script(
+	let mut outputs = vec![TxOut {
+		value: Amount::from_sat(release_request.destination_satoshis),
+		script_pubkey: to_script_pubkey.into(),
+	}];
+	if release_request.change_satoshis > 0 {
+		let lock_script_pubkey: BitcoinCosignScriptPubkey = lock.utxo_script_pubkey.clone().into();
+		outputs.push(TxOut {
+			value: Amount::from_sat(release_request.change_satoshis),
+			script_pubkey: lock_script_pubkey.into(),
+		});
+	}
+	let releaser = CosignReleaser::from_script_outputs(
 		get_cosign_script(lock, bitcoin_network.into())?,
 		lock.funding_utxos
 			.0
@@ -1694,22 +1752,28 @@ async fn load_cosign_releaser(
 			})
 			.collect(),
 		argon_bitcoin::ReleaseStep::VaultCosign,
-		argon_bitcoin::Amount::from_sat(release_request.bitcoin_network_fee),
-		to_script_pubkey.into(),
-	)?)
+		outputs,
+	)?;
+	if releaser.psbt.unsigned_tx.compute_txid().to_byte_array() !=
+		release_request.expected_transaction_id.0
+	{
+		anyhow::bail!("Release transaction did not match its runtime commitment");
+	}
+	Ok(releaser)
 }
 
 async fn load_owner_release_releaser(
 	client: &MainchainClient,
 	lock_id: BitcoinLockId,
 ) -> anyhow::Result<CosignReleaser> {
-	let release_height = client
+	let release_cosign = client
 		.fetch_storage(
 			&storage().bitcoin_locks().lock_release_cosign_height_by_id(lock_id),
 			FetchAt::Finalized,
 		)
 		.await?
 		.ok_or_else(|| anyhow!("No release cosign height found for utxo {lock_id}"))?;
+	let release_height = release_cosign.cosign_height;
 	let release_block = client
 		.block_at_height(release_height)
 		.await?
@@ -1771,6 +1835,7 @@ fn owner_release_selects_the_cosign_event_for_its_lock() {
 		api::bitcoin_locks::events::BitcoinUtxoCosigned {
 			lock_id,
 			vault_id: 1,
+			release_number: 1,
 			signatures: Vec::new().into(),
 		}
 	}

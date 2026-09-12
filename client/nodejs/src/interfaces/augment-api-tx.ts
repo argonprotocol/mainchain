@@ -38,7 +38,7 @@ import type {
   ArgonPrimitivesBitcoinUtxoRef,
   ArgonPrimitivesDomainZoneRecord,
   ArgonPrimitivesEthereumEthereumReceiptLogProofBatch,
-  ArgonPrimitivesInherentsBitcoinUtxoSync,
+  ArgonPrimitivesInherentsBitcoinUtxoSyncV2,
   ArgonPrimitivesInherentsBlockSealInherent,
   ArgonPrimitivesNotaryNotaryMeta,
   ArgonPrimitivesNotebookSignedNotebookHeader,
@@ -341,7 +341,7 @@ declare module '@polkadot/api-base/types/submittable' {
       /**
        * Submitted by a Vault operator to cosign every input in a Bitcoin Lock release. The
        * signatures must follow ascending `UtxoRef` order: transaction ID, then output index.
-       * Its securitization will be scheduled for release without a penalty.
+       * The Lock remains frozen until the exact cosigned transaction is observed on Bitcoin.
        *
        * This is submitted as a no-fee transaction off chain to allow keys to remain in cold
        * wallets.
@@ -392,10 +392,10 @@ declare module '@polkadot/api-base/types/submittable' {
         [ArgonPrimitivesBitcoinUtxoRef, Bytes, u64]
       >;
       /**
-       * Submitted by a Bitcoin holder to release every UTXO in a Lock from its cosign script.
-       * The destination and fee determine the transaction the vault must sign. The vault
-       * operator has 10 days to publish one signature per input in a BitcoinUtxoCosigned
-       * event.
+       * Submitted by a Bitcoin holder to spend every current UTXO in a Lock. The exact external
+       * amount and network fee determine whether the transaction fully releases the Lock or
+       * returns one consolidated change output to the same Lock script. The vault operator has
+       * 10 days to publish one signature per frozen input in a BitcoinUtxoCosigned event.
        *
        * Owner must submit a script pubkey and also a fee to pay to the bitcoin network.
        **/
@@ -403,9 +403,10 @@ declare module '@polkadot/api-base/types/submittable' {
         (
           lockId: u64 | AnyNumber | Uint8Array,
           toScriptPubkey: Bytes | string | Uint8Array,
+          destinationSatoshis: u64 | AnyNumber | Uint8Array,
           bitcoinNetworkFee: u64 | AnyNumber | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
-        [u64, Bytes, u64]
+        [u64, Bytes, u64, u64]
       >;
       /**
        * Replace this Lock's BTC coverage and target value for its remaining term.
@@ -463,12 +464,12 @@ declare module '@polkadot/api-base/types/submittable' {
       sync: AugmentedSubmittable<
         (
           utxoSync:
-            | ArgonPrimitivesInherentsBitcoinUtxoSync
+            | ArgonPrimitivesInherentsBitcoinUtxoSyncV2
             | { spent?: any; funded?: any; syncToBlock?: any }
             | string
             | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
-        [ArgonPrimitivesInherentsBitcoinUtxoSync]
+        [ArgonPrimitivesInherentsBitcoinUtxoSyncV2]
       >;
     };
     blockRewards: {
