@@ -34,6 +34,7 @@ pub trait BitcoinVaultProviderWeightInfo {
 	fn account_became_operational() -> Weight;
 	fn set_bitcoin_lock_flexible() -> Weight;
 	fn resecuritize() -> Weight;
+	fn burn() -> Weight;
 }
 
 impl BitcoinVaultProviderWeightInfo for () {
@@ -70,6 +71,10 @@ impl BitcoinVaultProviderWeightInfo for () {
 	}
 
 	fn resecuritize() -> Weight {
+		Weight::zero()
+	}
+
+	fn burn() -> Weight {
 		Weight::zero()
 	}
 }
@@ -270,12 +275,16 @@ impl<Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned>
 			.saturating_mul_int(self.securitization_coverage_microgons)
 	}
 
+	pub fn securitized_satoshis(&self, funded_satoshis: Satoshis) -> Satoshis {
+		funded_satoshis.min(self.basis.satoshis)
+	}
+
 	pub fn coverage_for_satoshis(&self, funded_satoshis: Satoshis) -> Balance {
 		if self.basis.satoshis == 0 {
 			return Balance::zero();
 		}
 		FixedU128::from_rational(
-			funded_satoshis.min(self.basis.satoshis) as u128,
+			self.securitized_satoshis(funded_satoshis) as u128,
 			self.basis.satoshis as u128,
 		)
 		.saturating_mul_int(self.securitization_coverage_microgons)
@@ -288,11 +297,11 @@ impl<Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned>
 
 	pub fn collateral_between(
 		&self,
-		previous_funded_satoshis: Satoshis,
-		funded_satoshis: Satoshis,
+		lower_funded_satoshis: Satoshis,
+		upper_funded_satoshis: Satoshis,
 	) -> Balance {
-		self.collateral_for_satoshis(funded_satoshis)
-			.saturating_sub(self.collateral_for_satoshis(previous_funded_satoshis))
+		self.collateral_for_satoshis(upper_funded_satoshis)
+			.saturating_sub(self.collateral_for_satoshis(lower_funded_satoshis))
 	}
 
 	pub fn unactivated_collateral(&self, funded_satoshis: Satoshis) -> Balance {
@@ -303,26 +312,28 @@ impl<Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned>
 	/// Ratio-adjusted funded satoshis eligible for vault capacity.
 	pub fn eligible_satoshis(&self, funded_satoshis: Satoshis) -> Satoshis {
 		self.securitization_ratio
-			.saturating_mul_int(funded_satoshis.min(self.basis.satoshis))
+			.saturating_mul_int(self.securitized_satoshis(funded_satoshis))
 	}
 
 	pub fn eligible_satoshis_between(
 		&self,
-		previous_funded_satoshis: Satoshis,
-		funded_satoshis: Satoshis,
+		lower_funded_satoshis: Satoshis,
+		upper_funded_satoshis: Satoshis,
 	) -> Satoshis {
-		self.eligible_satoshis(funded_satoshis)
-			.saturating_sub(self.eligible_satoshis(previous_funded_satoshis))
+		self.eligible_satoshis(upper_funded_satoshis)
+			.saturating_sub(self.eligible_satoshis(lower_funded_satoshis))
 	}
 }
 
 pub struct BitcoinLockFundingUpdate<Balance> {
-	/// Newly funded satoshis that activated reserved securitization.
+	/// Confirmed satoshis added to or removed from the Vault's Locks.
+	pub funded_satoshis: Satoshis,
+	/// The subset moving between pending and activated securitization.
 	pub securitized_satoshis: Satoshis,
-	/// Vault collateral required for the newly securitized satoshis.
+	/// Vault collateral corresponding to `securitized_satoshis`.
 	pub collateral_required: Balance,
-	/// Ratio applied to the newly securitized satoshis for Treasury reward eligibility.
-	pub securitization_ratio: FixedU128,
+	/// Exact ratio-adjusted satoshi change for Treasury reward eligibility.
+	pub eligible_satoshis: Satoshis,
 	/// Whether the Lock uses flexible vault collateral.
 	pub is_flexible: bool,
 }
@@ -400,6 +411,12 @@ pub trait BitcoinVaultProvider {
 		update: BitcoinLockFundingUpdate<Self::Balance>,
 	) -> Result<(), VaultError>;
 
+	/// Record confirmed satoshis removed from a Lock while preserving its securitization contract.
+	fn record_bitcoin_lock_funding_reduction(
+		vault_id: VaultId,
+		update: BitcoinLockFundingUpdate<Self::Balance>,
+	) -> Result<(), VaultError>;
+
 	/// Return projected `(flexible requirement, undisplaced flexible requirement)` after replacing
 	/// a funded flexible lock's released securitization with its newly added securitization.
 	fn get_projected_flexible_securitization(
@@ -408,11 +425,12 @@ pub trait BitcoinVaultProvider {
 		flexible_securitization_added: Self::Balance,
 	) -> Option<(Self::Balance, Self::Balance)>;
 
-	/// Move a funded Bitcoin lock into or out of the vault's flexible totals.
+	/// Move a funded Bitcoin lock's activated securitization into or out of the vault's flexible
+	/// totals.
 	fn set_bitcoin_lock_flexible(
 		vault_id: VaultId,
 		securitization: &BitcoinSecuritization<Self::Balance>,
-		funded_satoshis: Satoshis,
+		securitized_satoshis: Satoshis,
 		is_flexible: bool,
 	) -> Result<(), VaultError>;
 
@@ -564,6 +582,9 @@ where
 	/// Confirmed satoshis currently backed by activated securitization.
 	#[codec(compact)]
 	pub securitized_satoshis: Satoshis,
+	/// Total confirmed satoshis currently held across this Vault's Locks.
+	#[codec(compact)]
+	pub total_satoshis: Satoshis,
 	/// Funded satoshis adjusted by each Lock's securitization ratio.
 	#[codec(compact)]
 	pub ratio_adjusted_satoshis: Satoshis,
@@ -669,6 +690,12 @@ impl<
 			self.flexible_ratio_adjusted_satoshis,
 			self.ratio_adjusted_satoshis
 		);
+		debug_assert!(
+			self.securitized_satoshis <= self.total_satoshis,
+			"[{where_}] invariant failed: securitized satoshis ({:?}) exceed total satoshis ({:?})",
+			self.securitized_satoshis,
+			self.total_satoshis,
+		);
 	}
 
 	#[cfg(debug_assertions)]
@@ -757,11 +784,11 @@ impl<
 	pub fn set_bitcoin_lock_flexible(
 		&mut self,
 		securitization: &BitcoinSecuritization<Balance>,
-		funded_satoshis: Satoshis,
+		securitized_satoshis: Satoshis,
 		is_flexible: bool,
 	) -> Result<(), VaultError> {
-		let collateral_required = securitization.collateral_for_satoshis(funded_satoshis);
-		let eligible_satoshis = securitization.eligible_satoshis(funded_satoshis);
+		let collateral_required = securitization.collateral_for_satoshis(securitized_satoshis);
+		let eligible_satoshis = securitization.eligible_satoshis(securitized_satoshis);
 		if is_flexible {
 			self.flexible_securitization_locked.saturating_accrue(collateral_required);
 			self.flexible_ratio_adjusted_satoshis.saturating_accrue(eligible_satoshis);
@@ -795,7 +822,8 @@ impl<
 		lock_extension: &LockExtension<Balance>,
 		is_flexible: bool,
 	) -> Result<BurnResult<Balance>, VaultError> {
-		let securitized_satoshis = funded_satoshis.min(securitization.basis.satoshis);
+		ensure!(funded_satoshis <= self.total_satoshis, VaultError::InternalError);
+		let securitized_satoshis = securitization.securitized_satoshis(funded_satoshis);
 		let collateral_required = securitization.collateral_for_satoshis(securitized_satoshis);
 		self.release_unactivated_securitization(
 			securitization.unactivated_collateral(securitized_satoshis),
@@ -829,6 +857,7 @@ impl<
 			lock_extension,
 			is_flexible,
 		)?;
+		self.total_satoshis.saturating_reduce(funded_satoshis);
 
 		self.debug_assert_invariants_at("burn:after");
 
@@ -955,24 +984,66 @@ impl<
 		update: BitcoinLockFundingUpdate<Balance>,
 	) -> Result<(), VaultError> {
 		let BitcoinLockFundingUpdate {
+			funded_satoshis,
 			securitized_satoshis,
 			collateral_required,
-			securitization_ratio,
+			eligible_satoshis,
 			is_flexible,
 		} = update;
+		ensure!(securitized_satoshis <= funded_satoshis, VaultError::InternalError);
 		ensure!(
 			collateral_required <= self.securitization_pending_activation,
 			VaultError::InternalError
 		);
 		self.securitization_pending_activation.saturating_reduce(collateral_required);
+		self.total_satoshis.saturating_accrue(funded_satoshis);
 		self.securitized_satoshis.saturating_accrue(securitized_satoshis);
-		let eligible_satoshis = securitization_ratio.saturating_mul_int(securitized_satoshis);
 		self.ratio_adjusted_satoshis.saturating_accrue(eligible_satoshis);
 		if is_flexible {
 			self.flexible_securitization_locked.saturating_accrue(collateral_required);
 			self.flexible_ratio_adjusted_satoshis.saturating_accrue(eligible_satoshis);
 		}
 		self.debug_assert_invariants_at("record_bitcoin_lock_funding:after");
+		Ok(())
+	}
+
+	pub fn record_bitcoin_lock_funding_reduction(
+		&mut self,
+		update: BitcoinLockFundingUpdate<Balance>,
+	) -> Result<(), VaultError> {
+		let BitcoinLockFundingUpdate {
+			funded_satoshis,
+			securitized_satoshis,
+			collateral_required,
+			eligible_satoshis,
+			is_flexible,
+		} = update;
+		ensure!(
+			securitized_satoshis <= funded_satoshis &&
+				funded_satoshis <= self.total_satoshis &&
+				securitized_satoshis <= self.securitized_satoshis &&
+				eligible_satoshis <= self.ratio_adjusted_satoshis &&
+				self.securitization_pending_activation.saturating_add(collateral_required) <=
+					self.securitization_locked,
+			VaultError::InternalError
+		);
+		if is_flexible {
+			ensure!(
+				collateral_required <= self.flexible_securitization_locked &&
+					eligible_satoshis <= self.flexible_ratio_adjusted_satoshis,
+				VaultError::InternalError
+			);
+		}
+
+		self.total_satoshis.saturating_reduce(funded_satoshis);
+		self.securitization_pending_activation.saturating_accrue(collateral_required);
+		self.securitized_satoshis.saturating_reduce(securitized_satoshis);
+		self.ratio_adjusted_satoshis.saturating_reduce(eligible_satoshis);
+		if is_flexible {
+			self.flexible_securitization_locked.saturating_reduce(collateral_required);
+			self.flexible_ratio_adjusted_satoshis.saturating_reduce(eligible_satoshis);
+		}
+		self.debug_assert_invariants_at("record_bitcoin_lock_funding_reduction:after");
 		Ok(())
 	}
 
@@ -991,7 +1062,7 @@ impl<
 			return Ok(BTreeSet::new());
 		}
 
-		let release_heights = self.release_bitcoin_lock_securitization(
+		let release_heights = self.unwind_bitcoin_lock_securitization(
 			current,
 			funded_satoshis,
 			lock_extension,
@@ -1004,7 +1075,7 @@ impl<
 			is_flexible,
 			may_use_flexible_space,
 		)?;
-		let replacement_securitized_satoshis = funded_satoshis.min(replacement.basis.satoshis);
+		let replacement_securitized_satoshis = replacement.securitized_satoshis(funded_satoshis);
 		let replacement_unactivated_securitization =
 			replacement.unactivated_collateral(replacement_securitized_satoshis);
 		self.securitization_pending_activation
@@ -1044,17 +1115,36 @@ impl<
 		lock_extension: &LockExtension<Balance>,
 		is_flexible: bool,
 	) -> Result<BTreeSet<BitcoinHeight>, VaultError> {
-		let securitized_satoshis_to_release =
-			lock_funded_satoshis.min(current_securitization.basis.satoshis);
+		let release_heights = self.unwind_bitcoin_lock_securitization(
+			current_securitization,
+			lock_funded_satoshis,
+			lock_extension,
+			is_flexible,
+		)?;
+		self.total_satoshis.saturating_reduce(lock_funded_satoshis);
+		self.debug_assert_invariants_at("release_bitcoin_lock_securitization:after");
+		Ok(release_heights)
+	}
+
+	fn unwind_bitcoin_lock_securitization(
+		&mut self,
+		current_securitization: &BitcoinSecuritization<Balance>,
+		lock_funded_satoshis: Satoshis,
+		lock_extension: &LockExtension<Balance>,
+		is_flexible: bool,
+	) -> Result<BTreeSet<BitcoinHeight>, VaultError> {
+		ensure!(lock_funded_satoshis <= self.total_satoshis, VaultError::InternalError);
+		let lock_securitized_satoshis =
+			current_securitization.securitized_satoshis(lock_funded_satoshis);
 		let securitization_to_schedule =
-			current_securitization.collateral_for_satoshis(securitized_satoshis_to_release);
+			current_securitization.collateral_for_satoshis(lock_securitized_satoshis);
 		let unactivated_securitization_to_release =
-			current_securitization.unactivated_collateral(securitized_satoshis_to_release);
+			current_securitization.unactivated_collateral(lock_securitized_satoshis);
 		self.release_unactivated_securitization(unactivated_securitization_to_release)?;
 		self.schedule_release(
 			securitization_to_schedule,
-			securitized_satoshis_to_release,
-			current_securitization.eligible_satoshis(securitized_satoshis_to_release),
+			lock_securitized_satoshis,
+			current_securitization.eligible_satoshis(lock_securitized_satoshis),
 			lock_extension,
 			is_flexible,
 		)
@@ -1063,7 +1153,7 @@ impl<
 	fn schedule_release(
 		&mut self,
 		collateral_required: Balance,
-		funded_satoshis: Satoshis,
+		securitized_satoshis: Satoshis,
 		eligible_satoshis: Satoshis,
 		lock_extension: &LockExtension<Balance>,
 		is_flexible: bool,
@@ -1081,11 +1171,11 @@ impl<
 		);
 		self.securitization_locked.saturating_reduce(collateral_required);
 		ensure!(
-			funded_satoshis <= self.securitized_satoshis &&
+			securitized_satoshis <= self.securitized_satoshis &&
 				eligible_satoshis <= self.ratio_adjusted_satoshis,
 			VaultError::InternalError
 		);
-		self.securitized_satoshis.saturating_reduce(funded_satoshis);
+		self.securitized_satoshis.saturating_reduce(securitized_satoshis);
 		self.ratio_adjusted_satoshis.saturating_reduce(eligible_satoshis);
 		if is_flexible {
 			ensure!(
@@ -1249,8 +1339,110 @@ mod test {
 		vault.record_bitcoin_lock_funding(funding_update(80, 80, false)).unwrap();
 
 		assert_eq!(vault.securitization_pending_activation, 0);
+		assert_eq!(vault.total_satoshis, 80);
 		assert_eq!(vault.securitized_satoshis, 80);
 		assert_eq!(vault.ratio_adjusted_satoshis, 80);
+	}
+
+	#[test]
+	fn fractional_ratio_updates_remain_exact_across_partial_and_full_release() {
+		let mut vault = default_vault(10, 1.0);
+		let securitization = BitcoinSecuritization {
+			basis: BitcoinSecuritizationBasis { satoshis: 2, microgons_at_target_per_btc: 2 },
+			securitization_coverage_microgons: 2,
+			securitization_ratio: FixedU128::from_rational(3, 2),
+		};
+		vault.reserve_securitization(&securitization, false).unwrap();
+		vault
+			.record_bitcoin_lock_funding(BitcoinLockFundingUpdate {
+				funded_satoshis: 1,
+				securitized_satoshis: 1,
+				collateral_required: securitization.collateral_between(0, 1),
+				eligible_satoshis: securitization.eligible_satoshis_between(0, 1),
+				is_flexible: false,
+			})
+			.unwrap();
+		vault
+			.record_bitcoin_lock_funding(BitcoinLockFundingUpdate {
+				funded_satoshis: 1,
+				securitized_satoshis: 1,
+				collateral_required: securitization.collateral_between(1, 2),
+				eligible_satoshis: securitization.eligible_satoshis_between(1, 2),
+				is_flexible: false,
+			})
+			.unwrap();
+		assert_eq!(vault.ratio_adjusted_satoshis, 3);
+
+		vault
+			.record_bitcoin_lock_funding_reduction(BitcoinLockFundingUpdate {
+				funded_satoshis: 1,
+				securitized_satoshis: 1,
+				collateral_required: securitization.collateral_between(1, 2),
+				eligible_satoshis: securitization.eligible_satoshis_between(1, 2),
+				is_flexible: false,
+			})
+			.unwrap();
+		assert_eq!(vault.total_satoshis, 1);
+		assert_eq!(vault.securitized_satoshis, 1);
+		assert_eq!(vault.ratio_adjusted_satoshis, 1);
+
+		vault
+			.release_bitcoin_lock_securitization(
+				&securitization,
+				1,
+				&LockExtension::new(100),
+				false,
+			)
+			.unwrap();
+
+		assert_eq!(vault.total_satoshis, 0);
+		assert_eq!(vault.securitized_satoshis, 0);
+		assert_eq!(vault.ratio_adjusted_satoshis, 0);
+	}
+
+	#[test]
+	fn reducing_funding_preserves_the_contract_and_reclassifies_only_backed_satoshis() {
+		let mut vault = default_vault(100, 1.0);
+		let securitization = bitcoin_securitization(100);
+		vault.reserve_securitization(&securitization, false).unwrap();
+		vault
+			.record_bitcoin_lock_funding(BitcoinLockFundingUpdate {
+				funded_satoshis: 150,
+				securitized_satoshis: 100,
+				collateral_required: 100,
+				eligible_satoshis: 100,
+				is_flexible: false,
+			})
+			.unwrap();
+
+		vault
+			.record_bitcoin_lock_funding_reduction(BitcoinLockFundingUpdate {
+				funded_satoshis: 30,
+				securitized_satoshis: 0,
+				collateral_required: 0,
+				eligible_satoshis: 0,
+				is_flexible: false,
+			})
+			.unwrap();
+		assert_eq!(vault.total_satoshis, 120);
+		assert_eq!(vault.securitized_satoshis, 100);
+		assert_eq!(vault.securitization_locked, 100);
+		assert_eq!(vault.securitization_pending_activation, 0);
+
+		vault
+			.record_bitcoin_lock_funding_reduction(BitcoinLockFundingUpdate {
+				funded_satoshis: 70,
+				securitized_satoshis: 50,
+				collateral_required: 50,
+				eligible_satoshis: 50,
+				is_flexible: false,
+			})
+			.unwrap();
+		assert_eq!(vault.total_satoshis, 50);
+		assert_eq!(vault.securitized_satoshis, 50);
+		assert_eq!(vault.ratio_adjusted_satoshis, 50);
+		assert_eq!(vault.securitization_locked, 100);
+		assert_eq!(vault.securitization_pending_activation, 50);
 	}
 
 	#[test]
@@ -1320,9 +1512,10 @@ mod test {
 
 		vault
 			.record_bitcoin_lock_funding(BitcoinLockFundingUpdate {
+				funded_satoshis: 50,
 				securitized_satoshis: 50,
 				collateral_required: 100,
-				securitization_ratio: requested.securitization_ratio,
+				eligible_satoshis: requested.eligible_satoshis(50),
 				is_flexible: false,
 			})
 			.unwrap();
@@ -1441,6 +1634,7 @@ mod test {
 		let mut vault = default_vault(100, 1.0);
 		vault.securitization_locked = 50;
 		vault.flexible_securitization_locked = 50;
+		vault.total_satoshis = 50;
 		vault.securitized_satoshis = 50;
 		vault.ratio_adjusted_satoshis = 50;
 		vault.flexible_ratio_adjusted_satoshis = 50;
@@ -1543,6 +1737,7 @@ mod test {
 		let mut vault = default_vault(100, 1.0);
 		vault.securitization_locked = 100;
 		vault.flexible_securitization_locked = 50;
+		vault.total_satoshis = 75;
 		vault.securitized_satoshis = 75;
 		vault.ratio_adjusted_satoshis = 75;
 		vault.flexible_ratio_adjusted_satoshis = 50;
@@ -1716,9 +1911,10 @@ mod test {
 		is_flexible: bool,
 	) -> BitcoinLockFundingUpdate<Balance> {
 		BitcoinLockFundingUpdate {
+			funded_satoshis: securitized_satoshis,
 			securitized_satoshis,
 			collateral_required,
-			securitization_ratio: FixedU128::one(),
+			eligible_satoshis: securitized_satoshis,
 			is_flexible,
 		}
 	}
@@ -1733,6 +1929,7 @@ mod test {
 			flexible_securitization_locked: 0,
 			reserved_securitization_space: 0,
 			securitization_pending_activation: 0,
+			total_satoshis: 0,
 			securitized_satoshis: 0,
 			ratio_adjusted_satoshis: 0,
 			flexible_ratio_adjusted_satoshis: 0,

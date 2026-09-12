@@ -29,19 +29,42 @@ impl CosignReleaser {
 	/// Builds a release with inputs ordered by `UtxoRef` (`txid`, then `output_index`).
 	pub fn from_script(
 		cosign_script: CosignScript,
-		mut utxos: Vec<(UtxoRef, Satoshis)>,
+		utxos: Vec<(UtxoRef, Satoshis)>,
 		release_step: ReleaseStep,
 		fee: Amount,
 		to_script_pubkey: ScriptBuf,
+	) -> Result<Self, Error> {
+		let total_satoshis = utxos.iter().try_fold(0u64, |total, (_, satoshis)| {
+			total.checked_add(*satoshis).ok_or(Error::FeeOverflow)
+		})?;
+		let outputs = vec![TxOut {
+			value: Amount::from_sat(total_satoshis).checked_sub(fee).ok_or(Error::FeeOverflow)?,
+			script_pubkey: to_script_pubkey,
+		}];
+		Self::from_script_outputs(cosign_script, utxos, release_step, outputs)
+	}
+
+	/// Builds a release with inputs ordered by `UtxoRef` and exact caller-specified outputs.
+	pub fn from_script_outputs(
+		cosign_script: CosignScript,
+		mut utxos: Vec<(UtxoRef, Satoshis)>,
+		release_step: ReleaseStep,
+		outputs: Vec<TxOut>,
 	) -> Result<Self, Error> {
 		if utxos.is_empty() {
 			return Err(Error::NoUtxos)
 		}
 		utxos.sort_by(|(left, _), (right, _)| left.cmp(right));
 		let lock_time = cosign_script.unlock_height(release_step);
-		let total_satoshis = utxos.iter().try_fold(0u64, |total, (_, satoshis)| {
+		let input_satoshis = utxos.iter().try_fold(0u64, |total, (_, satoshis)| {
 			total.checked_add(*satoshis).ok_or(Error::FeeOverflow)
 		})?;
+		let output_satoshis = outputs.iter().try_fold(0u64, |total, output| {
+			total.checked_add(output.value.to_sat()).ok_or(Error::FeeOverflow)
+		})?;
+		if output_satoshis > input_satoshis {
+			return Err(Error::FeeOverflow)
+		}
 		let unsigned_tx = Transaction {
 			version: Version::TWO, // Post BIP-68.
 			lock_time: LockTime::from_height(lock_time)
@@ -57,12 +80,7 @@ impl CosignReleaser {
 					..TxIn::default()
 				})
 				.collect(),
-			output: vec![TxOut {
-				value: Amount::from_sat(total_satoshis)
-					.checked_sub(fee)
-					.ok_or(Error::FeeOverflow)?,
-				script_pubkey: to_script_pubkey,
-			}],
+			output: outputs,
 		};
 
 		let mut psbt = Psbt::from_unsigned_tx(unsigned_tx).map_err(Error::from)?;
@@ -74,7 +92,7 @@ impl CosignReleaser {
 					script_pubkey: cosign_script.get_script_pubkey(),
 				}),
 				witness_script: Some(cosign_script.script.clone()),
-				sighash_type: Some(EcdsaSighashType::AllPlusAnyoneCanPay.into()),
+				sighash_type: Some(EcdsaSighashType::All.into()),
 				..Input::default()
 			};
 			psbt.update_input_with_descriptor(index, &descriptor).map_err(|_| {
@@ -188,5 +206,59 @@ impl CosignReleaser {
 		F: Fn(bitcoincore_rpc::json::GetRawTransactionResult) -> bool + Send + Sync + 'static,
 	{
 		broadcast(&mut self.psbt, url, status_check_delay, on_status).await
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use argon_primitives::bitcoin::H256Le;
+	use bitcoin::{secp256k1::Secp256k1, Network};
+
+	#[test]
+	fn builds_exact_outputs_while_sorting_inputs() {
+		let network = Network::Regtest;
+		let secp = Secp256k1::new();
+		let script = CosignScript::new(
+			CosignScriptArgs {
+				vault_pubkey: PrivateKey::generate(network).public_key(&secp).into(),
+				owner_pubkey: PrivateKey::generate(network).public_key(&secp).into(),
+				vault_claim_pubkey: PrivateKey::generate(network).public_key(&secp).into(),
+				created_at_height: 100,
+				vault_claim_height: 200,
+				open_claim_height: 300,
+			},
+			network,
+		)
+		.expect("script");
+		let first = UtxoRef { txid: H256Le([1; 32]), output_index: 0 };
+		let second = UtxoRef { txid: H256Le([2; 32]), output_index: 1 };
+		let outputs = vec![
+			TxOut { value: Amount::from_sat(400), script_pubkey: ScriptBuf::from_bytes(vec![1]) },
+			TxOut { value: Amount::from_sat(590), script_pubkey: script.get_script_pubkey() },
+		];
+
+		let releaser = CosignReleaser::from_script_outputs(
+			script,
+			vec![(second.clone(), 500), (first.clone(), 500)],
+			ReleaseStep::VaultCosign,
+			outputs.clone(),
+		)
+		.expect("release");
+
+		assert_eq!(releaser.psbt.unsigned_tx.output, outputs);
+		assert!(releaser
+			.psbt
+			.inputs
+			.iter()
+			.all(|input| input.sighash_type == Some(EcdsaSighashType::All.into())));
+		assert_eq!(
+			releaser.psbt.unsigned_tx.input[0].previous_output,
+			OutPoint { txid: first.txid.into(), vout: first.output_index }
+		);
+		assert_eq!(
+			releaser.psbt.unsigned_tx.input[1].previous_output,
+			OutPoint { txid: second.txid.into(), vout: second.output_index }
+		);
 	}
 }

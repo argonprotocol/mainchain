@@ -158,7 +158,7 @@ macro_rules! inject_runtime_vars {
 		type Migrations = (
 			pallet_bitcoin_locks::migrations::MigrateLockModelMigration<Runtime>,
 			// Reconcile Vault totals after Locks use the new multi-UTXO accounting model.
-			pallet_vaults::migrations::ReconcileSecuritizedSatoshisMigration<Runtime>,
+			pallet_vaults::migrations::ReconcileBitcoinLockAccountingMigration<Runtime>,
 			// Candidate UTXOs are replayed through Bitcoin Locks after both migrations.
 			pallet_bitcoin_utxos::migrations::MigrateUtxoTrackingMigration<Runtime>,
 			pallet_mint::migrations::AddFissionIdToPendingMintsMigration<Runtime>,

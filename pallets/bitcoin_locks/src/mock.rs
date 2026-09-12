@@ -91,6 +91,7 @@ parameter_types! {
 		securitization_locked: 0,
 		flexible_securitization_locked: 0,
 		reserved_securitization_space: 0,
+		total_satoshis: 0,
 		securitized_satoshis: 0,
 		ratio_adjusted_satoshis: 0,
 		flexible_ratio_adjusted_satoshis: 0,
@@ -565,6 +566,13 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 		DefaultVault::mutate(|vault| vault.record_bitcoin_lock_funding(update))
 	}
 
+	fn record_bitcoin_lock_funding_reduction(
+		_vault_id: VaultId,
+		update: BitcoinLockFundingUpdate<Self::Balance>,
+	) -> Result<(), VaultError> {
+		DefaultVault::mutate(|vault| vault.record_bitcoin_lock_funding_reduction(update))
+	}
+
 	fn get_projected_flexible_securitization(
 		_vault_id: VaultId,
 		flexible_securitization_released: Self::Balance,
@@ -579,11 +587,11 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 	fn set_bitcoin_lock_flexible(
 		_vault_id: VaultId,
 		securitization: &BitcoinSecuritization<Self::Balance>,
-		funded_satoshis: Satoshis,
+		securitized_satoshis: Satoshis,
 		is_flexible: bool,
 	) -> Result<(), VaultError> {
 		DefaultVault::mutate(|vault| {
-			vault.set_bitcoin_lock_flexible(securitization, funded_satoshis, is_flexible)
+			vault.set_bitcoin_lock_flexible(securitization, securitized_satoshis, is_flexible)
 		})
 	}
 }
@@ -716,6 +724,7 @@ pub fn new_test_ext() -> TestState {
 		securitization_locked: 0,
 		flexible_securitization_locked: 0,
 		reserved_securitization_space: 0,
+		total_satoshis: 0,
 		securitized_satoshis: 0,
 		ratio_adjusted_satoshis: 0,
 		flexible_ratio_adjusted_satoshis: 0,

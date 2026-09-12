@@ -13,7 +13,7 @@ pub mod primitives {
 	pub use argon_primitives::bitcoin::*;
 	pub use bitcoin::{
 		bip32::{DerivationPath, Xpriv, Xpub},
-		CompressedPublicKey, FeeRate, Network, PrivateKey, Psbt, ScriptBuf, Txid,
+		CompressedPublicKey, FeeRate, Network, PrivateKey, Psbt, ScriptBuf, TxOut, Txid,
 	};
 }
 

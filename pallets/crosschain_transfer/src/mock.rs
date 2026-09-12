@@ -387,6 +387,13 @@ impl BitcoinVaultProvider for MockVaultProvider {
 		unimplemented!()
 	}
 
+	fn record_bitcoin_lock_funding_reduction(
+		_vault_id: VaultId,
+		_update: argon_primitives::vault::BitcoinLockFundingUpdate<Self::Balance>,
+	) -> Result<(), argon_primitives::vault::VaultError> {
+		unimplemented!()
+	}
+
 	fn get_projected_flexible_securitization(
 		_vault_id: VaultId,
 		_flexible_securitization_released: Self::Balance,

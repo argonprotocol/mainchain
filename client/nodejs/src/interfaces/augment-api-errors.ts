@@ -161,6 +161,14 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       BitcoinPubkeyUnableToBeDecoded: AugmentedError<ApiType>;
       /**
+       * A partial release would leave less than the minimum watched Lock amount.
+       **/
+      BitcoinReleaseChangeBelowMinimum: AugmentedError<ApiType>;
+      /**
+       * The release destination cannot be the Lock's own script.
+       **/
+      BitcoinReleaseDestinationIsLockScript: AugmentedError<ApiType>;
+      /**
        * The bitcoin has passed the deadline to release it
        **/
       BitcoinReleaseInitiationDeadlinePassed: AugmentedError<ApiType>;
@@ -219,6 +227,10 @@ declare module '@polkadot/api-base/types/errors' {
       InsufficientSecuritizationForFissions: AugmentedError<ApiType>;
       InsufficientVaultFunds: AugmentedError<ApiType>;
       /**
+       * The external destination amount must be nonzero and fit with the network fee.
+       **/
+      InvalidBitcoinReleaseAmount: AugmentedError<ApiType>;
+      /**
        * The bitcoin script to lock this bitcoin has errors
        **/
       InvalidBitcoinScript: AugmentedError<ApiType>;
@@ -258,6 +270,10 @@ declare module '@polkadot/api-base/types/errors' {
        * The requested price-history entry predates the Lock's current securitization.
        **/
       MicrogonsAtTargetPerBtcTickOlderThanCurrent: AugmentedError<ApiType>;
+      /**
+       * The minimum cannot increase while a release is pending.
+       **/
+      MinimumSatoshisIncreaseBlockedByPendingRelease: AugmentedError<ApiType>;
       /**
        * The price provider has no bitcoin prices available. This is a temporary error
        **/
