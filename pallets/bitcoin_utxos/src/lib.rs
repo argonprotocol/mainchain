@@ -28,7 +28,7 @@ pub mod pallet {
 			BitcoinLockId, BitcoinSyncStatus, Satoshis, UtxoAddress, UtxoRef, UtxoValue,
 		},
 		inherents::{
-			BitcoinInherentData, BitcoinInherentError, BitcoinUtxoFunding, BitcoinUtxoSync,
+			BitcoinInherentData, BitcoinInherentError, BitcoinUtxoFunding, BitcoinUtxoSyncV2,
 		},
 		BitcoinUtxoEvents, BitcoinUtxoTracker,
 	};
@@ -207,7 +207,7 @@ pub mod pallet {
 				),
 				DispatchClass::Mandatory
 			))]
-		pub fn sync(origin: OriginFor<T>, utxo_sync: BitcoinUtxoSync) -> DispatchResult {
+		pub fn sync(origin: OriginFor<T>, utxo_sync: BitcoinUtxoSyncV2) -> DispatchResult {
 			ensure_none(origin)?;
 			log::info!(
 				"Bitcoin UTXO sync submitted (spent: {:?}, funded {})",
@@ -218,7 +218,7 @@ pub mod pallet {
 			ensure!(!InherentIncluded::<T>::get(), "Inherent already included");
 			InherentIncluded::<T>::put(true);
 
-			let BitcoinUtxoSync { sync_to_block, funded, spent } = utxo_sync;
+			let BitcoinUtxoSyncV2 { sync_to_block, funded, spent } = utxo_sync;
 			let current_confirmed =
 				ConfirmedBitcoinBlockTip::<T>::get().ok_or(Error::<T>::NoBitcoinConfirmedBlock)?;
 			ensure!(
@@ -466,7 +466,7 @@ pub mod pallet {
 				if !UtxoRefsByLockId::<T>::get(lock_id).contains(&utxo_ref) {
 					continue
 				}
-				T::EventHandler::spent(lock_id, utxo_ref.clone())?;
+				T::EventHandler::spent(lock_id, utxo_ref.clone(), block_height)?;
 
 				Self::deposit_event(Event::UtxoSpent { lock_id, utxo_ref, block_height });
 			}
@@ -479,21 +479,22 @@ pub mod pallet {
 		type Call = Call<T>;
 		type Error = BitcoinInherentError;
 		const INHERENT_IDENTIFIER: InherentIdentifier =
-			argon_primitives::inherents::BITCOIN_INHERENT_IDENTIFIER_V2;
+			argon_primitives::inherents::BITCOIN_INHERENT_IDENTIFIER;
 
 		fn create_inherent(data: &InherentData) -> Option<Self::Call>
 		where
 			InherentData: BitcoinInherentData,
 		{
-			let utxo_sync = data.bitcoin_sync().expect("Could not decode bitcoin inherent data");
+			let utxo_sync = Self::bitcoin_sync_from_inherent(data)
+				.expect("Could not decode bitcoin inherent data");
 			utxo_sync.map(|utxo_sync| Call::sync { utxo_sync })
 		}
 
 		fn check_inherent(call: &Self::Call, data: &InherentData) -> Result<(), Self::Error> {
 			match call {
 				Call::sync { utxo_sync } => {
-					let Some(data_sync) =
-						data.bitcoin_sync().expect("Could not decode bitcoin inherent data")
+					let Some(data_sync) = Self::bitcoin_sync_from_inherent(data)
+						.expect("Could not decode bitcoin inherent data")
 					else {
 						return Err(BitcoinInherentError::InvalidInherentData);
 					};
@@ -513,6 +514,17 @@ pub mod pallet {
 
 		fn is_inherent(call: &Self::Call) -> bool {
 			matches!(call, Call::sync { .. })
+		}
+	}
+
+	impl<T: Config> Pallet<T> {
+		fn bitcoin_sync_from_inherent(
+			data: &InherentData,
+		) -> Result<Option<BitcoinUtxoSyncV2>, sp_inherents::Error> {
+			if let Some(sync) = data.bitcoin_sync()? {
+				return Ok(Some(sync.into()));
+			}
+			data.bitcoin_sync_v2()
 		}
 	}
 

@@ -71,9 +71,10 @@ fn funding_update(
 	funded_satoshis: u64,
 ) -> BitcoinLockFundingUpdate<Balance> {
 	BitcoinLockFundingUpdate {
-		securitized_satoshis: funded_satoshis.min(securitization.basis.satoshis),
+		funded_satoshis,
+		securitized_satoshis: securitization.securitized_satoshis(funded_satoshis),
 		collateral_required: securitization.collateral_for_satoshis(funded_satoshis),
-		securitization_ratio: securitization.securitization_ratio,
+		eligible_satoshis: securitization.eligible_satoshis(funded_satoshis),
 		is_flexible: false,
 	}
 }
@@ -413,6 +414,7 @@ fn operator_resecuritization_uses_releasing_funds_before_flexible_space() {
 			let vault = vault.as_mut().expect("vault");
 			vault.securitization_locked = 60;
 			vault.flexible_securitization_locked = 40;
+			vault.total_satoshis = 20;
 			vault.securitized_satoshis = 20;
 			vault.ratio_adjusted_satoshis = 20;
 			vault.securitization_release_schedule.try_insert(288, 20).unwrap();
@@ -975,8 +977,8 @@ fn it_handles_overflowing_metrics() {
 						fee_discount: 0,
 						locks_created: 1,
 						securitization_released: 0,
-						satoshis_locked: 1000,
-						satoshis_released: 0,
+						total_satoshis_added: 1000,
+						total_satoshis_released: 0,
 						securitization_locked: 10_000,
 					})
 					.unwrap();

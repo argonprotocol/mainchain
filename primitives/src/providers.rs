@@ -900,7 +900,11 @@ pub trait BitcoinUtxoEvents<AccountId> {
 	) -> DispatchResult;
 	/// Apply consumer policy for a spent output, including removing the exact output or its entire
 	/// watched address from the UTXO tracker.
-	fn spent(lock_id: BitcoinLockId, utxo_ref: UtxoRef) -> DispatchResult;
+	fn spent(
+		lock_id: BitcoinLockId,
+		utxo_ref: UtxoRef,
+		bitcoin_height: BitcoinHeight,
+	) -> DispatchResult;
 }
 
 #[impl_trait_for_tuples::impl_for_tuples(1, 5)]
@@ -933,8 +937,12 @@ impl<AccountId> BitcoinUtxoEvents<AccountId> for Tuple {
 		Ok(())
 	}
 
-	fn spent(lock_id: BitcoinLockId, utxo_ref: UtxoRef) -> DispatchResult {
-		for_tuples!( #( Tuple::spent(lock_id, utxo_ref.clone())?; )* );
+	fn spent(
+		lock_id: BitcoinLockId,
+		utxo_ref: UtxoRef,
+		bitcoin_height: BitcoinHeight,
+	) -> DispatchResult {
+		for_tuples!( #( Tuple::spent(lock_id, utxo_ref.clone(), bitcoin_height)?; )* );
 		Ok(())
 	}
 }
@@ -1539,7 +1547,11 @@ mod tests {
 			Ok(())
 		}
 
-		fn spent(_lock_id: BitcoinLockId, _utxo_ref: UtxoRef) -> DispatchResult {
+		fn spent(
+			_lock_id: BitcoinLockId,
+			_utxo_ref: UtxoRef,
+			_bitcoin_height: BitcoinHeight,
+		) -> DispatchResult {
 			Ok(())
 		}
 	}
@@ -1556,7 +1568,11 @@ mod tests {
 			Ok(())
 		}
 
-		fn spent(_lock_id: BitcoinLockId, _utxo_ref: UtxoRef) -> DispatchResult {
+		fn spent(
+			_lock_id: BitcoinLockId,
+			_utxo_ref: UtxoRef,
+			_bitcoin_height: BitcoinHeight,
+		) -> DispatchResult {
 			Ok(())
 		}
 	}

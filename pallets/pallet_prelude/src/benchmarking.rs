@@ -1264,6 +1264,16 @@ where
 		})
 	}
 
+	fn record_bitcoin_lock_funding_reduction(
+		vault_id: VaultId,
+		update: BitcoinLockFundingUpdate<Self::Balance>,
+	) -> Result<(), VaultError> {
+		mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
+			let vault = state.vaults.get_mut(&vault_id).ok_or(VaultError::VaultNotFound)?;
+			vault.record_bitcoin_lock_funding_reduction(update)
+		})
+	}
+
 	fn get_projected_flexible_securitization(
 		vault_id: VaultId,
 		flexible_securitization_released: Self::Balance,
@@ -1283,12 +1293,12 @@ where
 	fn set_bitcoin_lock_flexible(
 		vault_id: VaultId,
 		securitization: &BitcoinSecuritization<Self::Balance>,
-		funded_satoshis: Satoshis,
+		securitized_satoshis: Satoshis,
 		is_flexible: bool,
 	) -> Result<(), VaultError> {
 		mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
 			let vault = state.vaults.get_mut(&vault_id).ok_or(VaultError::VaultNotFound)?;
-			vault.set_bitcoin_lock_flexible(securitization, funded_satoshis, is_flexible)
+			vault.set_bitcoin_lock_flexible(securitization, securitized_satoshis, is_flexible)
 		})
 	}
 

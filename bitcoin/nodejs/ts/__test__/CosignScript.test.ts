@@ -86,7 +86,7 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
     vaultXpriv = getChildXpriv(devSeed, vaulterHdPath, bitcoinNetwork);
   }, 60e3);
 
-  test.sequential('Test price apis', async () => {
+  test('Test price apis', async () => {
     await new Promise<void>(resolve => {
       const subscription = vaulterClient.rpc.chain.subscribeAllHeads(header => {
         if (header.number.toNumber() > 1) {
@@ -119,7 +119,7 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
     expect(priceIndex.getSatoshiPriceInTargetMicrogons(100n)).toStrictEqual(60_000n);
   });
 
-  test.sequential('it can create and fund a bitcoin lock', async () => {
+  test('it can create and fund a bitcoin lock', async () => {
     const vaultResult = await submitTx(
       vaulterClient,
       vaulterClient.tx.vaults.create({
@@ -130,7 +130,7 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
           treasuryBonusProfitSharing: toFixedNumber(0, PERMILL_DECIMALS),
         },
         securitizationRatio: toFixedNumber(1, FIXED_U128_DECIMALS),
-        securitization: 10_000_000n,
+        securitization: 200_000_000n,
         bitcoinXpubkey: getXpubBytes(getXpubFromXpriv(vaultXpriv)),
         delegateAccountId: null,
       }),
@@ -166,7 +166,12 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
 
     const lockResult = await submitTx(
       vaulterClient,
-      vaulterClient.tx.bitcoinLocks.createReceiveAddress(vaultId, 2_000n, ownerBitcoinPubkey, null),
+      vaulterClient.tx.bitcoinLocks.createReceiveAddress(
+        vaultId,
+        200_000n,
+        ownerBitcoinPubkey,
+        null,
+      ),
       bitcoinLocker,
     );
     const lockCreated = lockResult.events.find(event =>
@@ -179,7 +184,7 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
     lock = await loadCosignScriptLock(vaulterClient, lockId);
     console.log('Created Bitcoin Lock:', stringifyExt(lock));
 
-    expect(lock.securitizedSatoshis).toBe(2_000n);
+    expect(lock.securitizedSatoshis).toBe(200_000n);
     const cosignScript = new CosignScript(lock, bitcoinNetwork);
     const calculatedScriptPubkey = cosignScript.calculateScriptPubkey();
     console.log('Lock script pubkey:', {
@@ -230,7 +235,7 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
       if (lock.fundedSatoshis > 0n) break;
       await new Promise(resolve => setTimeout(resolve, 500));
     }
-    expect(lock.fundedSatoshis).toBe(2_000n);
+    expect(lock.fundedSatoshis).toBe(200_000n);
     console.log('Bitcoin Lock funding detected:', stringifyExt(lock));
 
     const runtimeLock = await vaulterClient.query.bitcoinLocks.locksById(lockId);
@@ -246,19 +251,31 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
     expect(u8aToHex(reference.txid.slice().reverse())).toBe(`0x${txid}`);
   });
 
-  test.sequential('it can release a bitcoin lock', async () => {
+  test('it can release a bitcoin lock', async () => {
     const btcClient = vaulterchain.getBitcoinClient();
     const nextAddress = await btcClient.command('getnewaddress');
     console.log('Bitcoin release address:', nextAddress);
 
     const toScriptPubkey = addressBytesHex(nextAddress, bitcoinNetwork);
-    const networkFee = new CosignScript(lock, bitcoinNetwork).calculateFee(5n, 1, toScriptPubkey);
+    const networkFee = new CosignScript(lock, bitcoinNetwork).calculateFee(
+      5n,
+      1,
+      toScriptPubkey,
+      true,
+    );
+    const destinationSatoshis = 50_000n;
+    const changeSatoshis = lock.fundedSatoshis - destinationSatoshis - networkFee;
     console.log('Bitcoin release network fee:', `${networkFee} satoshis`);
     expect(networkFee).toBeGreaterThan(5n);
 
     const result = await submitTx(
       vaulterClient,
-      vaulterClient.tx.bitcoinLocks.requestRelease(lockId, toScriptPubkey, networkFee),
+      vaulterClient.tx.bitcoinLocks.requestRelease(
+        lockId,
+        toScriptPubkey,
+        destinationSatoshis,
+        networkFee,
+      ),
       bitcoinLocker,
     );
     console.log('Release request included in block:', result.blockHash);
@@ -269,16 +286,22 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
     releaseRequest = {
       toScriptPubkey: value.toScriptPubkey.toHex(),
       bitcoinNetworkFee: value.bitcoinNetworkFee.toBigInt(),
+      destinationSatoshis: value.destinationSatoshis.toBigInt(),
+      changeSatoshis: value.changeSatoshis.toBigInt(),
     };
+    expect(releaseRequest.changeSatoshis).toBe(changeSatoshis);
     console.log('Stored release request:', stringifyExt(releaseRequest));
   });
 
-  test.sequential('it can cosign as vault', async () => {
+  test('it can cosign as vault', async () => {
     const cosignScript = new CosignScript(lock, bitcoinNetwork);
     const psbt = cosignScript.getCosignPsbt({
       releaseRequest,
       utxos: [{ utxoRef: fundingUtxoRef, satoshis: lock.fundedSatoshis }],
     });
+    expect(psbt.outputsLength).toBe(2);
+    expect(psbt.getOutput(0).amount).toBe(releaseRequest.destinationSatoshis);
+    expect(psbt.getOutput(1).amount).toBe(releaseRequest.changeSatoshis);
     const signedPsbt = cosignScript.vaultCosignPsbt(psbt, lock, vaultXpriv);
     expect(signedPsbt.getInput(0).partialSig).toHaveLength(1);
     const signature = signedPsbt.getInput(0).partialSig?.[0]?.[1];
@@ -304,7 +327,7 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
     vaultCosignature = new Uint8Array(cosigned.data.signatures[0]);
   });
 
-  test.sequential('user can cosign a bitcoin lock', async () => {
+  test('user can cosign a bitcoin lock', async () => {
     const ownerBitcoinXpriv = getChildXpriv(
       mnemonicToSeedSync(bitcoinMnemonic),
       "m/84'/0'/0'/0/0'",

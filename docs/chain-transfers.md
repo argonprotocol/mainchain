@@ -16,11 +16,15 @@ Argon currently supports an Ethereum inbound transfer flow.
 
 The ERC-20 token contracts and MintingGateway on Ethereum mainnet are:
 
-- **Argon (ARGN):** [`0xf3D6b714dc93bc6C44bc766cc92F4A0D99344932`](https://etherscan.io/token/0xf3D6b714dc93bc6C44bc766cc92F4A0D99344932)
-- **Argonots (ARGNOT):** [`0x6B93a120829558C18f8CD54a96E8024EF973cE52`](https://etherscan.io/token/0x6B93a120829558C18f8CD54a96E8024EF973cE52)
-- **MintingGateway (proxy):** [`0x57Bd330f43e03665564734cC7518541157b8A0Af`](https://etherscan.io/address/0x57Bd330f43e03665564734cC7518541157b8A0Af)
+- **Argon (ARGN):**
+  [`0xf3D6b714dc93bc6C44bc766cc92F4A0D99344932`](https://etherscan.io/token/0xf3D6b714dc93bc6C44bc766cc92F4A0D99344932)
+- **Argonots (ARGNOT):**
+  [`0x6B93a120829558C18f8CD54a96E8024EF973cE52`](https://etherscan.io/token/0x6B93a120829558C18f8CD54a96E8024EF973cE52)
+- **MintingGateway (proxy):**
+  [`0x57Bd330f43e03665564734cC7518541157b8A0Af`](https://etherscan.io/address/0x57Bd330f43e03665564734cC7518541157b8A0Af)
 
-Source of truth: [`chains/ethereum/deploy/mainnet/deployment-manifest.json`](../chains/ethereum/deploy/mainnet/deployment-manifest.json).
+Source of truth:
+[`chains/ethereum/deploy/mainnet/deployment-manifest.json`](../chains/ethereum/deploy/mainnet/deployment-manifest.json).
 
 Use the MintingGateway **proxy** address above. Implementations can change; the proxy does not.
 
@@ -29,8 +33,8 @@ Use the MintingGateway **proxy** address above. Implementations can change; the 
 - Old ARGN: `0x6A9143639D8b70D50b031fFaD55d4CC65EA55155`
 - Old ARGNOT: `0x64cbd3aa07d427e385cb55330406508718e55f01`
 
-These older contracts may still appear in search results or historical docs. They are not the current Argon Network tokens.
-
+These older contracts may still appear in search results or historical docs. They are not the
+current Argon Network tokens.
 
 The current implemented flow is:
 

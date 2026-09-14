@@ -852,6 +852,7 @@ where
 			flexible_securitization_locked: T::Balance::default(),
 			reserved_securitization_space: T::Balance::default(),
 			securitization_pending_activation: T::Balance::default(),
+			total_satoshis: 0,
 			securitized_satoshis: 0,
 			ratio_adjusted_satoshis: 0,
 			flexible_ratio_adjusted_satoshis: 0,

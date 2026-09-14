@@ -380,8 +380,20 @@ declare module '@polkadot/api-base/types/events' {
     bitcoinLocks: {
       BitcoinCosignPastDue: AugmentedEvent<
         ApiType,
-        [lockId: u64, vaultId: u32, compensationAmount: u128, compensatedAccountId: AccountId32],
-        { lockId: u64; vaultId: u32; compensationAmount: u128; compensatedAccountId: AccountId32 }
+        [
+          lockId: u64,
+          vaultId: u32,
+          releaseNumber: u32,
+          compensationAmount: u128,
+          compensatedAccountId: AccountId32,
+        ],
+        {
+          lockId: u64;
+          vaultId: u32;
+          releaseNumber: u32;
+          compensationAmount: u128;
+          compensatedAccountId: AccountId32;
+        }
       >;
       BitcoinLockBurned: AugmentedEvent<
         ApiType,
@@ -429,18 +441,18 @@ declare module '@polkadot/api-base/types/events' {
       >;
       BitcoinSpentAfterRelease: AugmentedEvent<
         ApiType,
-        [lockId: u64, vaultId: u32],
-        { lockId: u64; vaultId: u32 }
+        [lockId: u64, vaultId: u32, releaseNumber: u32, bitcoinHeight: u64],
+        { lockId: u64; vaultId: u32; releaseNumber: u32; bitcoinHeight: u64 }
       >;
       BitcoinUtxoCosigned: AugmentedEvent<
         ApiType,
-        [lockId: u64, vaultId: u32, signatures: Vec<Bytes>],
-        { lockId: u64; vaultId: u32; signatures: Vec<Bytes> }
+        [lockId: u64, vaultId: u32, releaseNumber: u32, signatures: Vec<Bytes>],
+        { lockId: u64; vaultId: u32; releaseNumber: u32; signatures: Vec<Bytes> }
       >;
       BitcoinUtxoCosignRequested: AugmentedEvent<
         ApiType,
-        [lockId: u64, vaultId: u32],
-        { lockId: u64; vaultId: u32 }
+        [lockId: u64, vaultId: u32, releaseNumber: u32],
+        { lockId: u64; vaultId: u32; releaseNumber: u32 }
       >;
       /**
        * An error occurred while refunding an overdue cosigned bitcoin lock

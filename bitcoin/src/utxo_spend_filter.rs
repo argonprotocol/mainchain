@@ -144,6 +144,7 @@ impl UtxoSpendFilter {
 			let block = self.client.get_block(&block_hash)?;
 			let height = filter.block_height;
 			for tx in block.txdata {
+				let transaction_id: H256Le = tx.compute_txid().into();
 				for (idx, output) in tx.output.iter().enumerate() {
 					let Some(utxo_value) =
 						funding_address_to_utxo_value.get(output.script_pubkey.as_bytes())
@@ -154,12 +155,12 @@ impl UtxoSpendFilter {
 					let sats = output.value.to_sat();
 					// Ignore UTXOs below the minimum. This is a potential DoS vector, where an
 					// attacker tries to fill blocks with micro-utxos, so we'll ignore before they
-					// hit the node
+					// hit the node.
 					if sats < minimum_satoshis {
 						continue;
 					}
-					let txid = tx.compute_txid().into();
-					let utxo_ref = UtxoRef { txid, output_index: idx as u32 };
+					let utxo_ref =
+						UtxoRef { txid: transaction_id.clone(), output_index: idx as u32 };
 					result.funded.push(BitcoinUtxoFunding {
 						lock_id: utxo_value.lock_id,
 						utxo_ref: utxo_ref.clone(),
@@ -174,11 +175,11 @@ impl UtxoSpendFilter {
 					let utxo_ref = input.previous_output.into();
 					// If we're tracking the UTXO, it has been spent
 					if let Some(id) = utxo_ref_to_lock_id.get(&utxo_ref) {
-						// TODO: should we figure out who spent it here?
 						result.spent.push(BitcoinUtxoSpend {
 							lock_id: *id,
 							utxo_ref: Some(utxo_ref),
 							bitcoin_height: height,
+							spending_txid: transaction_id.clone(),
 						});
 					}
 				}

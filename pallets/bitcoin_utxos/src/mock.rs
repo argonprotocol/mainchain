@@ -1,11 +1,14 @@
 use pallet_prelude::*;
 
 use crate as pallet_bitcoin_utxos;
-use argon_primitives::{bitcoin::BitcoinLockId, BitcoinUtxoEvents, BitcoinUtxoTracker};
+use argon_primitives::{
+	bitcoin::{BitcoinHeight, BitcoinLockId},
+	BitcoinUtxoEvents, BitcoinUtxoTracker,
+};
 use pallet_prelude::argon_primitives::bitcoin::{Satoshis, UtxoRef};
 
 type UtxoDetectedCallbackFn = fn((BitcoinLockId, UtxoRef, Satoshis)) -> DispatchResult;
-type SpentCallbackFn = fn((BitcoinLockId, UtxoRef)) -> DispatchResult;
+type SpentCallbackFn = fn((BitcoinLockId, UtxoRef, BitcoinHeight)) -> DispatchResult;
 
 // Configure a mock runtime to test the pallet.
 frame_support::construct_runtime!(
@@ -24,12 +27,11 @@ impl frame_system::Config for Test {
 parameter_types! {
 	pub const BitcoinBondDuration: u32 = 60 * 24 * 365; // 1 year
 	pub static MinimumSatoshisPerUtxo: u64 = 100_000_000; // 1 bitcoin minimum
-
 	pub const MaxUtxosPerLock: u32 = 10;
 	pub static UtxoDetectedCallback: Option<UtxoDetectedCallbackFn> = None;
 	pub static UtxoDetectionCount: u32 = 0;
 	pub static SpentCallback: Option<SpentCallbackFn> = None;
-	pub static LastSpent: Option<(BitcoinLockId, UtxoRef)> = None;
+	pub static LastSpent: Option<(BitcoinLockId, UtxoRef, BitcoinHeight)> = None;
 }
 
 pub struct StaticEventHandler;
@@ -49,10 +51,14 @@ impl BitcoinUtxoEvents<u64> for StaticEventHandler {
 			Ok(())
 		}
 	}
-	fn spent(lock_id: BitcoinLockId, utxo_ref: UtxoRef) -> DispatchResult {
-		LastSpent::set(Some((lock_id, utxo_ref.clone())));
+	fn spent(
+		lock_id: BitcoinLockId,
+		utxo_ref: UtxoRef,
+		bitcoin_height: BitcoinHeight,
+	) -> DispatchResult {
+		LastSpent::set(Some((lock_id, utxo_ref.clone(), bitcoin_height)));
 		if let Some(callback) = SpentCallback::get() {
-			callback((lock_id, utxo_ref))
+			callback((lock_id, utxo_ref, bitcoin_height))
 		} else {
 			BitcoinUtxos::unwatch_utxo(lock_id, &utxo_ref);
 			Ok(())

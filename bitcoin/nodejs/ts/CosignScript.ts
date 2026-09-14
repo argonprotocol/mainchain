@@ -1,5 +1,5 @@
 import { HDKey } from '@scure/bip32';
-import { p2pkh, p2sh, p2wpkh, p2wsh, Transaction } from '@scure/btc-signer';
+import { Transaction } from '@scure/btc-signer';
 import {
   ArgonPrimitivesBitcoinBitcoinNetwork,
   hexToU8a,
@@ -14,7 +14,7 @@ import {
   signPsbt,
   signPsbtDerived,
 } from './wasm/bitcoin_bindings.js';
-import { addressBytesHex, getScureNetwork, keyToU8a } from './KeysHelper';
+import { addressBytesHex, keyToU8a } from './KeysHelper';
 
 export type ICosignScriptLock = {
   createdAtHeight: number;
@@ -34,6 +34,8 @@ export type ICosignScriptLock = {
 
 export type IBitcoinReleaseRequest = {
   bitcoinNetworkFee: bigint;
+  destinationSatoshis: bigint;
+  changeSatoshis: bigint;
   toScriptPubkey: string;
 };
 
@@ -53,7 +55,12 @@ export class CosignScript {
     return tx.toPSBT(0);
   }
 
-  public calculateFee(feeRatePerSatVb: bigint, inputCount: number, toScriptPubkey: string): bigint {
+  public calculateFee(
+    feeRatePerSatVb: bigint,
+    inputCount: number,
+    toScriptPubkey: string,
+    hasChange: boolean,
+  ): bigint {
     toScriptPubkey = addressBytesHex(toScriptPubkey, this.network);
     const { lock, network } = this;
     return calculateFee(
@@ -67,6 +74,7 @@ export class CosignScript {
       feeRatePerSatVb,
       inputCount,
       toScriptPubkey,
+      hasChange,
     );
   }
 
@@ -106,6 +114,8 @@ export class CosignScript {
       BigInt(lock.createdAtHeight),
       network,
       toScriptPubkey,
+      releaseRequest.destinationSatoshis,
+      releaseRequest.changeSatoshis,
       releaseRequest.bitcoinNetworkFee,
     );
     return this.psbtFromHex(psbtStr);
@@ -176,18 +186,17 @@ export class CosignScript {
     utxos: { utxoRef: { txid: string; vout: number }; satoshis: bigint }[];
     ownerXpriv: HDKey;
     ownerXprivChildHdPath?: string;
-    addTx?: string;
   }): Transaction {
     const { lock } = this;
     const psbt = this.getCosignPsbt(args);
-    const { addTx, vaultCosignatures, ownerXpriv, ownerXprivChildHdPath } = args;
+    const { vaultCosignatures, ownerXpriv, ownerXprivChildHdPath } = args;
 
     if (vaultCosignatures.length !== psbt.inputsLength) {
       throw new Error('Vault signature count does not match the Bitcoin lock input count');
     }
     for (let i = 0; i < vaultCosignatures.length; i++) {
       psbt.updateInput(i, {
-        partialSig: [[keyToU8a(lock.vaultPubkey), vaultCosignatures[i]!]],
+        partialSig: [[keyToU8a(lock.vaultPubkey), vaultCosignatures[i]]],
       });
     }
     const derivePubkey = ownerXprivChildHdPath
@@ -201,32 +210,6 @@ export class CosignScript {
       throw new Error(
         `Owner pubkey ${u8aToHex(ownerPubkey)} does not match the derived pubkey ${u8aToHex(derivePubkey)}`,
       );
-    }
-
-    if (addTx) {
-      const addTxBytes = hexToU8a(addTx);
-      const tx = Transaction.fromPSBT(addTxBytes);
-      for (let i = 0; i < tx.outputsLength; i++) {
-        const output = tx.getOutput(i);
-        const network = getScureNetwork(this.network);
-        const scripts = [
-          p2wpkh(ownerPubkey, network).script,
-          p2wsh(p2wpkh(ownerPubkey, network), network).script,
-          p2sh(p2pkh(ownerPubkey, network), network).script,
-          p2pkh(ownerPubkey, network).script,
-        ];
-
-        if (scripts.some(x => x && output.script && u8aEq(output.script, x))) {
-          psbt.addInput({
-            txid: tx.id,
-            index: i,
-            witnessUtxo: {
-              script: output.script!,
-              amount: output.amount!,
-            },
-          });
-        }
-      }
     }
 
     const psbtBytes = u8aToHex(psbt.toPSBT());

@@ -1,5 +1,4 @@
 // Auto-generated via `yarn polkadot-types-from-chain`, do not edit
-/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
@@ -65,9 +64,11 @@ import type {
   PalletBalancesBalanceLock,
   PalletBalancesReserveData,
   PalletBitcoinFissionsFission,
+  PalletBitcoinLocksLockReleaseCosignHeight,
   PalletBitcoinLocksLockReleaseRequest,
   PalletBitcoinLocksLockedBitcoin,
   PalletBitcoinLocksOrphanedUtxo,
+  PalletBitcoinLocksPendingPartialRelease,
   PalletBootstrapEndpointPubkey,
   PalletBootstrapRecoveryPubkey,
   PalletCrosschainTransferAccountTransferTotals,
@@ -297,15 +298,17 @@ declare module '@polkadot/api-base/types/storage' {
         [u32, u64]
       >;
       /**
-       * Stores the block number where a release was cosigned by the vault.
+       * Latest cosigned release for each Lock, retained for signature recovery.
        **/
       lockReleaseCosignHeightById: AugmentedQuery<
         ApiType,
-        (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<u32>>,
+        (
+          arg: u64 | AnyNumber | Uint8Array,
+        ) => Observable<Option<PalletBitcoinLocksLockReleaseCosignHeight>>,
         [u64]
       >;
       /**
-       * Stores bitcoin locks that have requested to be released
+       * Release requests awaiting a Vault cosignature.
        **/
       lockReleaseRequestsById: AugmentedQuery<
         ApiType,
@@ -359,6 +362,16 @@ declare module '@polkadot/api-base/types/storage' {
             | Uint8Array,
         ) => Observable<Option<PalletBitcoinLocksOrphanedUtxo>>,
         [AccountId32, ArgonPrimitivesBitcoinUtxoRef]
+      >;
+      /**
+       * Cosigned partial releases awaiting confirmation on Bitcoin.
+       **/
+      pendingPartialReleaseByLockId: AugmentedQuery<
+        ApiType,
+        (
+          arg: u64 | AnyNumber | Uint8Array,
+        ) => Observable<Option<PalletBitcoinLocksPendingPartialRelease>>,
+        [u64]
       >;
       /**
        * Lock IDs whose securitization hold expires at the indexed Bitcoin height.

@@ -1,5 +1,4 @@
 // Auto-generated via `yarn polkadot-types-from-defs`, do not edit
-/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
@@ -47,8 +46,8 @@ import type {
   ArgonPrimitivesEthereumEthereumReceiptProofReceipt,
   ArgonPrimitivesForkPower,
   ArgonPrimitivesInherentsBitcoinUtxoFunding,
-  ArgonPrimitivesInherentsBitcoinUtxoSpend,
-  ArgonPrimitivesInherentsBitcoinUtxoSync,
+  ArgonPrimitivesInherentsBitcoinUtxoSpendV2,
+  ArgonPrimitivesInherentsBitcoinUtxoSyncV2,
   ArgonPrimitivesInherentsBlockSealInherent,
   ArgonPrimitivesNotaryNotaryMeta,
   ArgonPrimitivesNotaryNotaryNotebookKeyDetails,
@@ -129,10 +128,12 @@ import type {
   PalletBitcoinLocksEvent,
   PalletBitcoinLocksFeeCoupon,
   PalletBitcoinLocksLockOptions,
+  PalletBitcoinLocksLockReleaseCosignHeight,
   PalletBitcoinLocksLockReleaseRequest,
   PalletBitcoinLocksLockedBitcoin,
   PalletBitcoinLocksOrphanedUtxo,
   PalletBitcoinLocksOrphanedUtxoCosignRequest,
+  PalletBitcoinLocksPendingPartialRelease,
   PalletBitcoinUtxosCall,
   PalletBitcoinUtxosError,
   PalletBitcoinUtxosEvent,
@@ -363,8 +364,8 @@ declare module '@polkadot/types/types/registry' {
     ArgonPrimitivesEthereumEthereumReceiptProofReceipt: ArgonPrimitivesEthereumEthereumReceiptProofReceipt;
     ArgonPrimitivesForkPower: ArgonPrimitivesForkPower;
     ArgonPrimitivesInherentsBitcoinUtxoFunding: ArgonPrimitivesInherentsBitcoinUtxoFunding;
-    ArgonPrimitivesInherentsBitcoinUtxoSpend: ArgonPrimitivesInherentsBitcoinUtxoSpend;
-    ArgonPrimitivesInherentsBitcoinUtxoSync: ArgonPrimitivesInherentsBitcoinUtxoSync;
+    ArgonPrimitivesInherentsBitcoinUtxoSpendV2: ArgonPrimitivesInherentsBitcoinUtxoSpendV2;
+    ArgonPrimitivesInherentsBitcoinUtxoSyncV2: ArgonPrimitivesInherentsBitcoinUtxoSyncV2;
     ArgonPrimitivesInherentsBlockSealInherent: ArgonPrimitivesInherentsBlockSealInherent;
     ArgonPrimitivesNotaryNotaryMeta: ArgonPrimitivesNotaryNotaryMeta;
     ArgonPrimitivesNotaryNotaryNotebookKeyDetails: ArgonPrimitivesNotaryNotaryNotebookKeyDetails;
@@ -445,10 +446,12 @@ declare module '@polkadot/types/types/registry' {
     PalletBitcoinLocksEvent: PalletBitcoinLocksEvent;
     PalletBitcoinLocksFeeCoupon: PalletBitcoinLocksFeeCoupon;
     PalletBitcoinLocksLockOptions: PalletBitcoinLocksLockOptions;
+    PalletBitcoinLocksLockReleaseCosignHeight: PalletBitcoinLocksLockReleaseCosignHeight;
     PalletBitcoinLocksLockReleaseRequest: PalletBitcoinLocksLockReleaseRequest;
     PalletBitcoinLocksLockedBitcoin: PalletBitcoinLocksLockedBitcoin;
     PalletBitcoinLocksOrphanedUtxo: PalletBitcoinLocksOrphanedUtxo;
     PalletBitcoinLocksOrphanedUtxoCosignRequest: PalletBitcoinLocksOrphanedUtxoCosignRequest;
+    PalletBitcoinLocksPendingPartialRelease: PalletBitcoinLocksPendingPartialRelease;
     PalletBitcoinUtxosCall: PalletBitcoinUtxosCall;
     PalletBitcoinUtxosError: PalletBitcoinUtxosError;
     PalletBitcoinUtxosEvent: PalletBitcoinUtxosEvent;
