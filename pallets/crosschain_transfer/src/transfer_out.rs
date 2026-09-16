@@ -1119,7 +1119,7 @@ mod test {
 			let burn_account = CrosschainTransfer::burn_account(SourceChain::Ethereum);
 			let transfer_id = transfer_out_id(&user, 1);
 			assert_eq!(Balances::balance(&burn_account), 20_000);
-			assert_eq!(Balances::balance(&user), 4_980);
+			assert_eq!(Balances::balance(&user), 4_700);
 			assert_eq!(
 				Balances::balance_on_hold(
 					&RuntimeHoldReason::CrosschainTransfer(
@@ -1127,7 +1127,7 @@ mod test {
 					),
 					&user,
 				),
-				20,
+				300,
 			);
 			let transfer =
 				TransferOutById::<Test>::get(transfer_id).expect("transfer should be stored");
@@ -1143,7 +1143,7 @@ mod test {
 				vec![PendingCollateralizationRequest::<Test> {
 					transfer_id,
 					remaining_collateral: 20_000,
-					remaining_minting_authority_tip: 20,
+					remaining_minting_authority_tip: 300,
 				}],
 			);
 			assert_eq!(
@@ -1358,7 +1358,7 @@ mod test {
 				vec![PendingCollateralizationRequest::<Test> {
 					transfer_id: second_transfer_id,
 					remaining_collateral: 20_000,
-					remaining_minting_authority_tip: 20,
+					remaining_minting_authority_tip: 300,
 				}],
 			);
 
@@ -1592,7 +1592,7 @@ mod test {
 				vec![PendingCollateralizationRequest::<Test> {
 					transfer_id: second_transfer_id,
 					remaining_collateral: 10_000,
-					remaining_minting_authority_tip: 10,
+					remaining_minting_authority_tip: 150,
 				}],
 			);
 			assert_eq!(
@@ -1685,7 +1685,7 @@ mod test {
 				vec![PendingCollateralizationRequest::<Test> {
 					transfer_id: local_transfer_id,
 					remaining_collateral: 10_000,
-					remaining_minting_authority_tip: 10,
+					remaining_minting_authority_tip: 150,
 				}],
 			);
 			assert_eq!(
