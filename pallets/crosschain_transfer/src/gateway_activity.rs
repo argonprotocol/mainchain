@@ -1871,12 +1871,12 @@ mod test {
 			assert!(pending_requests.contains(&PendingCollateralizationRequest::<Test> {
 				transfer_id: first_transfer_id,
 				remaining_collateral: 4_000,
-				remaining_minting_authority_tip: 4,
+				remaining_minting_authority_tip: 60,
 			}));
 			assert!(pending_requests.contains(&PendingCollateralizationRequest::<Test> {
 				transfer_id: second_transfer_id,
 				remaining_collateral: 3_000,
-				remaining_minting_authority_tip: 3,
+				remaining_minting_authority_tip: 45,
 			}));
 			assert_eq!(GatewaySyncPauseBySourceChain::<Test>::get(SourceChain::Ethereum), None);
 			assert!(System::events().iter().any(|record| match &record.event {
@@ -1952,7 +1952,7 @@ mod test {
 				vec![PendingCollateralizationRequest::<Test> {
 					transfer_id,
 					remaining_collateral: 20_000,
-					remaining_minting_authority_tip: 20,
+					remaining_minting_authority_tip: 300,
 				}],
 			);
 			assert_eq!(
@@ -2300,7 +2300,7 @@ mod test {
 				vec![PendingCollateralizationRequest::<Test> {
 					transfer_id,
 					remaining_collateral: 20_000,
-					remaining_minting_authority_tip: 20,
+					remaining_minting_authority_tip: 300,
 				}],
 			);
 			assert_eq!(
@@ -2320,7 +2320,7 @@ mod test {
 					),
 					&user,
 				),
-				20,
+				300,
 			);
 		});
 	}

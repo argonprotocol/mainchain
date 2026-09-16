@@ -49,7 +49,7 @@ parameter_types! {
 	pub const MaxQueueApprovalsPerCall: u32 = 32;
 	pub const TransferOutValidityEthereumBlocks: EthereumBlockNumber = 72_000;
 	pub const MaxVerifiedExecutionBlockAgeTicks: Tick = 60;
-	pub const TransferOutMintingAuthorityTipBasisPoints: u32 = 10;
+	pub const TransferOutMintingAuthorityTipBasisPoints: u32 = 150;
 	pub const MinTransferCollateralIncrement: Balance = 10_000;
 	pub const DefaultMinimumMintingAuthorityMicrogonValue: Balance = 10_000;
 	pub const MaxPendingTransferOutsPerDestinationChain: u32 = 100;

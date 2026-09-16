@@ -226,7 +226,7 @@ parameter_types! {
 	/// out.
 	pub const MaxVerifiedExecutionBlockAgeTicks: Tick = 60;
 	/// Minting authority tip charged on transfer-out requests in basis points.
-	pub const TransferOutMintingAuthorityTipBasisPoints: u32 = 10;
+	pub const TransferOutMintingAuthorityTipBasisPoints: u32 = 150;
 	/// Minimum normalized collateral increment accepted for one transfer-out row unless the row
 	/// fills the remaining uncovered amount.
 	pub const MinTransferCollateralIncrement: Balance = 10_000;
