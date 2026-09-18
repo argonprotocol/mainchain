@@ -1924,7 +1924,9 @@ fn vaults_can_collect_revenue() {
 			entries.remove(&1);
 		});
 
+		let providers_before_collect = System::providers(&1);
 		assert_ok!(Vaults::collect(RuntimeOrigin::signed(1), 1));
+		assert_eq!(System::providers(&1), providers_before_collect);
 		assert_eq!(Balances::free_balance(1), 1_000_000 - 500_000 + fee + vault_lp_earnings);
 		assert_eq!(Balances::free_balance(100), 0);
 		assert_eq!(LastCollectFrameByVaultId::<Test>::get(1), Some(CurrentFrameId::get()));
