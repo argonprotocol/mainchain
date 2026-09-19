@@ -766,7 +766,12 @@ pub mod pallet {
 				let amount_to_collect =
 					T::Currency::balance_on_hold(&HoldReason::PendingCollect.into(), &who);
 				if amount_to_collect > T::Balance::zero() {
-					Self::release_hold(&who, amount_to_collect, HoldReason::PendingCollect)?;
+					T::Currency::release(
+						&HoldReason::PendingCollect.into(),
+						&who,
+						amount_to_collect,
+						Precision::Exact,
+					)?;
 					Self::deposit_event(Event::VaultCollected {
 						vault_id,
 						revenue: amount_to_collect,

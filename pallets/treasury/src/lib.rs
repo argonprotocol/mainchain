@@ -97,7 +97,7 @@ pub mod pallet {
 	};
 	use tracing::info;
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(7);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(8);
 
 	pub type BondLotId = u64;
 	pub type Bonds = u32;
@@ -837,7 +837,7 @@ pub mod pallet {
 			C::release(&reason.into(), who, amount, Precision::Exact)?;
 
 			if C::balance_on_hold(&reason.into(), who).is_zero() {
-				frame_system::Pallet::<T>::dec_providers(who)?;
+				let _ = frame_system::Pallet::<T>::dec_providers(who);
 			}
 			Ok(())
 		}

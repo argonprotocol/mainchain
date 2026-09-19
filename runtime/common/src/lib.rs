@@ -162,6 +162,7 @@ macro_rules! inject_runtime_vars {
 			// Candidate UTXOs are replayed through Bitcoin Locks after both migrations.
 			pallet_bitcoin_utxos::migrations::MigrateUtxoTrackingMigration<Runtime>,
 			pallet_mint::migrations::AddFissionIdToPendingMintsMigration<Runtime>,
+			pallet_treasury::migrations::CleanupStrandedBondLotsMigration<Runtime>,
 		);
 
 		/// Unchecked extrinsic type as expected by this runtime.

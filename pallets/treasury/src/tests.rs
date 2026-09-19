@@ -1,7 +1,8 @@
 use super::{
 	ArgonotBondLots, BondLot, BondLotById, BondLotIdsByAccount, BondLotSummary, BondLotsByVault,
-	BondProgram, BondReleaseReason, CurrentFrameArgonotBondParticipants, CurrentFrameVaultCapital,
-	HoldReason, PendingBondReleaseRetryCursor, PendingBondReleasesByFrame, TotalActiveArgonotBonds,
+	BondProgram, BondProgramId, BondReleaseReason, CurrentFrameArgonotBondParticipants,
+	CurrentFrameVaultCapital, HoldReason, PendingBondReleaseRetryCursor,
+	PendingBondReleasesByFrame, TotalActiveArgonotBonds,
 };
 use crate::{
 	mock::{
@@ -1562,5 +1563,60 @@ fn failed_release_retries_and_does_not_block_current_frame_releases() {
 			),
 			0,
 		);
+	});
+}
+
+#[test]
+fn release_succeeds_when_other_consumers_need_the_last_provider() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		let owner = account(2);
+		set_ownership(&owner, MICROGONS_PER_ARGON);
+		assert_ok!(Treasury::create_hold::<Ownership>(&owner, MICROGONS_PER_ARGON));
+		assert_ok!(frame_system::Pallet::<Test>::inc_consumers(&owner));
+		assert_eq!(System::providers(&owner), 1);
+		assert_eq!(System::consumers(&owner), 2);
+
+		BondLotById::<Test>::insert(
+			0,
+			BondLot {
+				owner: owner.clone(),
+				program: BondProgram::Argonot,
+				bonds: 1,
+				is_flexible: false,
+				created_frame_id: 1,
+				participated_frames: 0,
+				last_frame_earnings_frame_id: None,
+				last_frame_earnings: None,
+				cumulative_earnings: 0,
+				release_frame_id: Some(11),
+				release_reason: Some(BondReleaseReason::UserLiquidation),
+			},
+		);
+		BondLotIdsByAccount::<Test>::insert(&owner, 0, ());
+		PendingBondReleasesByFrame::<Test>::insert(11, BoundedVec::truncate_from(vec![0]));
+
+		Treasury::release_pending_bond_lots(11);
+
+		assert_eq!(
+			Ownership::balance_on_hold(
+				&RuntimeHoldReason::from(HoldReason::ContributedToTreasury),
+				&owner,
+			),
+			0,
+		);
+		assert_eq!(System::providers(&owner), 1);
+		assert_eq!(System::consumers(&owner), 1);
+		assert!(!BondLotById::<Test>::contains_key(0));
+		assert!(!BondLotIdsByAccount::<Test>::contains_key(&owner, 0));
+		assert!(PendingBondReleasesByFrame::<Test>::get(11).is_empty());
+		assert_eq!(PendingBondReleaseRetryCursor::<Test>::get(), None);
+		System::assert_last_event(RuntimeEvent::Treasury(super::Event::BondLotReleased {
+			frame_id: 11,
+			program_id: BondProgramId::Argonot,
+			bond_lot_id: 0,
+			account_id: owner,
+			bonds: 1,
+		}));
 	});
 }
