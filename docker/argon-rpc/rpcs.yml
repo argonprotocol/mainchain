@@ -363,7 +363,6 @@ subscriptions:
   - subscribe: state_subscribeStorage
     unsubscribe: state_unsubscribeStorage
     name: state_storage
-    merge_strategy: merge_storage_changes
 
   - subscribe: archive_v1_storage
     unsubscribe: archive_v1_stopStorage
