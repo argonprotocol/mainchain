@@ -1,8 +1,55 @@
 # Changelog
 
-## [v1.4.12](https://github.com/argonprotocol/mainchain/compare/v1.4.11...f3bdc948e7dbce3e56bbd89b5ce4f6cbcb89b4e4) (2026-08-16)
+## [v1.4.13](https://github.com/argonprotocol/mainchain/compare/v1.4.12...34f249057e1c7da83b02c6bac7abd0ab33e5b637) (2026-09-21)
 
 ### Features
+
+* **bitcoin:** support exact partial lock releases
+([7ed6bbf](https://github.com/argonprotocol/mainchain/commit/7ed6bbf70100e0b85eb9065ee3a78fbca9bbbbc1))
+* **bitcoin:** support multi-utxo locks
+([c217e1f](https://github.com/argonprotocol/mainchain/commit/c217e1f14106c27c5859e64b4763397a86d825fe))
+* add bitcoin fissions
+([3b19218](https://github.com/argonprotocol/mainchain/commit/3b19218f71fb1a85d41ca09f8899f049fbf4b3f6))
+
+### Fixes
+
+* **treasury:** recover stranded bond releases
+([229fa51](https://github.com/argonprotocol/mainchain/commit/229fa51493b3507b4f8aa8560de497fdedc05c3f))
+* **crosschain:** set transfer-out fee to 1.5%
+([7537221](https://github.com/argonprotocol/mainchain/commit/753722195b68a876d0c1a3fee1806d19a28aa6e5))
+* **bitcoin:** tighten partial release validation (#621)
+([27d1332](https://github.com/argonprotocol/mainchain/commit/27d1332613422f8f3762ddd85280d2eb22fdfc36)),
+closes [#621](https://github.com/argonprotocol/mainchain/issues/621)
+* **ci:** install Go before building MinIO
+([6c975e2](https://github.com/argonprotocol/mainchain/commit/6c975e296811b9e9ea9de8bf837735a2428f3f8a))
+* use pinned MinIO image everywhere
+([79cd637](https://github.com/argonprotocol/mainchain/commit/79cd637e6ca04945624d72dfbfcaed775a3ed681))
+* **ci:** build MinIO from pinned source
+([773b1ed](https://github.com/argonprotocol/mainchain/commit/773b1ed9bcab20907c5414d1421ca79a6c1d4337))
+* pin MinIO image to Quay
+([3999a9f](https://github.com/argonprotocol/mainchain/commit/3999a9f5f788cd921d00ac8108c9ad99e2a41675))
+* **oracle:** extend price transaction mortality
+([ddc78ce](https://github.com/argonprotocol/mainchain/commit/ddc78ced34022d0b1114cf0ab1caf8ab9b307a38))
+* **consensus:** space vote block attempts
+([cfe2439](https://github.com/argonprotocol/mainchain/commit/cfe243970c9f4bb575745fae5b8fbb54e045169f))
+* **bitcoin:** expose fission lifecycle event context
+([0cb6072](https://github.com/argonprotocol/mainchain/commit/0cb60726888d51495d1a4d8c87bca1643033baad))
+* **ci:** complete operational account test hooks
+([60aef16](https://github.com/argonprotocol/mainchain/commit/60aef16190cf04889ae78497feec0af899fa452a))
+* **ci:** satisfy bitcoin locks clippy checks
+([0ad9bc0](https://github.com/argonprotocol/mainchain/commit/0ad9bc0bb8d5718f0e32c7bfabf67a3ec342e940))
+* **consensus:** back off unavailable notebook headers
+([eae31df](https://github.com/argonprotocol/mainchain/commit/eae31dfe3acff5a887d3a7a379650cc252b30861))
+* historical securitization ratio can be undefined
+([ab3b4cf](https://github.com/argonprotocol/mainchain/commit/ab3b4cf787d93a07a7c47e88d92f7232435df8cc))
+* **ci:** limit try-runtime secret exposure
+([503c18f](https://github.com/argonprotocol/mainchain/commit/503c18fe7bb7f25d03db78761d6fba4e119dad5a))
+* **ci:** use protected RPC for try-runtime
+([530d824](https://github.com/argonprotocol/mainchain/commit/530d824dad5cd8a00187b49593a6197558ddad9c))
+
+### [v1.4.12](https://github.com/argonprotocol/mainchain/compare/v1.4.11...v1.4.12) (2026-08-17)
+
+#### Features
 
 * reserve unused vault and bond capacity
 ([9882b55](https://github.com/argonprotocol/mainchain/commit/9882b5550459e0c1b6fee2c7fa264e69a97cab00))
@@ -17,7 +64,7 @@
 * increase the MinimumArgonsPerContributor on canary from 1 to 10
 ([5743fb5](https://github.com/argonprotocol/mainchain/commit/5743fb5c4dd08acbc85a6d5477400c70b21732c7))
 
-### Fixes
+#### Fixes
 
 * **nodejs:** validate coupon target rate
 ([7be5f79](https://github.com/argonprotocol/mainchain/commit/7be5f794a8dbafd60f9eab8f191391e8dbb9ec0c))
