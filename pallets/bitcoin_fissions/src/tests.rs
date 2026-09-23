@@ -157,7 +157,7 @@ fn close_uses_owner_scoped_lookup_and_removes_the_closed_fission() {
 }
 
 #[test]
-fn an_external_lock_spend_closes_only_active_fissions_and_preserves_their_unpaid_mints() {
+fn lock_cleanup_closes_only_active_fissions_and_preserves_pending_mints() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(7);
 		MockLocks::insert(1, lock(1, 100));
@@ -185,18 +185,35 @@ fn an_external_lock_spend_closes_only_active_fissions_and_preserves_their_unpaid
 }
 
 #[test]
-fn an_approved_lock_release_closes_a_migrated_fission_and_preserves_its_mints() {
+fn terminal_redemption_records_the_full_vault_burn() {
 	new_test_ext().execute_with(|| {
 		MockLocks::insert(1, lock(1, 100));
 		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 0, 77, 1, 40, 90));
 
 		assert_ok!(<BitcoinFissions as BitcoinFissionsProvider<u64, u128>>::close_for_lock(
-			&1, 1, 3_600,
+			&1, 1, 4_000,
 		));
 
 		assert_eq!(MockMintRequests::get(), vec![(1, 0, 1, 3_600)]);
+		assert_eq!(MockFissionRedemptionBurns::get(), 4_000);
 		assert!(!FissionByOwnerAndId::<Test>::contains_key(1, 0));
 		assert!(FissionIdsByLockId::<Test>::get(1).is_empty());
+	});
+}
+
+#[test]
+fn terminal_settlement_uses_each_active_fission_basis() {
+	new_test_ext().execute_with(|| {
+		MockLocks::insert(1, lock(1, 100));
+		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 0, 77, 1, 40, 90));
+		let bases =
+			<BitcoinFissions as BitcoinFissionsProvider<u64, u128>>::get_lock_fission_redemption_bases(
+				&1, 1,
+			)
+			.expect("active fission basis");
+		assert_eq!(bases.len(), 1);
+		assert_eq!(bases[0].satoshis, 40);
+		assert_eq!(bases[0].microgons_at_target_per_btc, 90);
 	});
 }
 

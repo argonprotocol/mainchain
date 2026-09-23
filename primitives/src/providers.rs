@@ -25,7 +25,10 @@ use sp_runtime::{
 	DispatchError, DispatchResult, FixedU128, Saturating,
 };
 
-use super::ethereum::{EthereumBlockNumber, EthereumReceiptLogProofBatch, EthereumVerifyError};
+use super::{
+	ethereum::{EthereumBlockNumber, EthereumReceiptLogProofBatch, EthereumVerifyError},
+	vault::BitcoinSecuritizationBasis,
+};
 
 pub trait NotebookProviderWeightInfo {
 	fn notebooks_in_block() -> Weight;
@@ -238,6 +241,9 @@ impl<AccountId> UniswapTransferProvider<AccountId> for () {
 pub trait BitcoinFissionsProviderWeightInfo {
 	fn get_account_fission_liquidity() -> Weight;
 	fn get_lock_fission_requirements() -> Weight;
+	fn get_lock_fission_redemption_bases() -> Weight {
+		Self::get_lock_fission_requirements()
+	}
 	fn close_for_lock() -> Weight;
 }
 
@@ -278,8 +284,19 @@ pub trait BitcoinFissionsProvider<AccountId, Balance> {
 		None
 	}
 
-	/// Close every active Fission sourced from a terminal Lock and apply Argons actually burned
-	/// during that Lock transition against their mint liability.
+	/// Return the active Fissions' Bitcoin amounts and target bases for terminal settlement.
+	fn get_lock_fission_redemption_bases(
+		_account_id: &AccountId,
+		_lock_id: BitcoinLockId,
+	) -> Option<Vec<BitcoinSecuritizationBasis<Balance>>>
+	where
+		Balance: Codec + MaxEncodedLen,
+	{
+		None
+	}
+
+	/// Close every active Fission sourced from a terminal Lock and record only the
+	/// Argons actually burned by the vault as mint repayment.
 	fn close_for_lock(
 		_account_id: &AccountId,
 		_lock_id: BitcoinLockId,

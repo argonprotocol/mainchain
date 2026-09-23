@@ -459,18 +459,16 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 		_beneficiary: &Self::AccountId,
 		securitization: &BitcoinSecuritization<Balance>,
 		satoshis: Satoshis,
-		market_rate: Self::Balance,
+		redemption_amount: Self::Balance,
 		lock_extension: &LockExtension<Self::Balance>,
 		is_flexible: bool,
 	) -> Result<LostBitcoinCompensation<Self::Balance>, VaultError> {
+		let compensation_amount =
+			redemption_amount.min(securitization.coverage_for_satoshis(satoshis));
 		let result = DefaultVault::mutate(|a| {
-			a.burn(securitization, satoshis, market_rate, lock_extension, is_flexible)
+			a.burn(securitization, satoshis, compensation_amount, lock_extension, is_flexible)
 		})?;
-		let to_beneficiary = result
-			.burned_amount
-			.saturating_sub(securitization.securitization_coverage_microgons);
-		let burned = result.burned_amount.saturating_sub(to_beneficiary);
-		Ok(LostBitcoinCompensation { to_beneficiary, burned })
+		Ok(LostBitcoinCompensation { to_beneficiary: result.burned_amount, burned: 0 })
 	}
 
 	fn burn(
@@ -663,6 +661,8 @@ impl pallet_bitcoin_locks::Config for Test {
 	type WeightInfo = ();
 	type Balance = Balance;
 	type FissionsProvider = BitcoinFissions;
+	type Currency = Balances;
+	type RuntimeHoldReason = RuntimeHoldReason;
 	type BitcoinUtxoTracker = StaticBitcoinUtxoTracker;
 	type PriceProvider = StaticPriceProvider;
 	type BitcoinSignatureVerifier = StaticBitcoinVerifier;

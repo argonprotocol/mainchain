@@ -335,6 +335,8 @@ impl pallet_bitcoin_locks::Config for Runtime {
 	>;
 	type Balance = Balance;
 	type FissionsProvider = BitcoinFissions;
+	type Currency = Balances;
+	type RuntimeHoldReason = RuntimeHoldReason;
 	type BitcoinUtxoTracker =
 		use_unless_benchmark!(BitcoinUtxos, benchmarking::BenchmarkBitcoinUtxoTracker);
 	type PriceProvider =

@@ -82,6 +82,7 @@ type FissionsProviderWeights<T> = <<T as Config>::FissionsProvider as BitcoinFis
 	<T as frame_system::Config>::AccountId,
 	<T as Config>::Balance,
 >>::Weights;
+
 /// Placeholder implementation for tests and no-std environments
 pub struct SubstrateWeight<T>(PhantomData<T>);
 
@@ -109,7 +110,6 @@ where
 
 	fn cosign_release(input_count: u32) -> Weight {
 		Base::cosign_release(input_count)
-			.saturating_add(FissionsProviderWeight::close_for_lock())
 	}
 
 	fn on_initialize_base() -> Weight {
@@ -118,6 +118,7 @@ where
 
 	fn on_initialize_expiring_locks(n: u32) -> Weight {
 		Base::on_initialize_expiring_locks(n)
+			.saturating_add(FissionsProviderWeight::get_lock_fission_redemption_bases().saturating_mul(n.into()))
 			.saturating_add(FissionsProviderWeight::close_for_lock().saturating_mul(n.into()))
 	}
 
@@ -180,6 +181,7 @@ where
 		// MaxEncodedLen proof charged by bitcoin_utxos::UtxoRefsByLockId.
 		Base::provider_utxo_detected()
 			.saturating_add(VaultProviderWeight::burn())
+			.saturating_add(FissionsProviderWeight::get_lock_fission_redemption_bases())
 			.saturating_add(FissionsProviderWeight::close_for_lock())
 			.saturating_add(T::DbWeight::get().reads_writes(max_utxos, max_utxos))
 			.saturating_add(Weight::from_parts(0, 6_093).saturating_mul(max_utxos))
@@ -188,6 +190,7 @@ where
 	fn provider_spent() -> Weight {
 		Base::provider_spent()
 			.saturating_add(VaultProviderWeight::burn())
+			.saturating_add(FissionsProviderWeight::get_lock_fission_redemption_bases())
 			.saturating_add(FissionsProviderWeight::close_for_lock())
 	}
 }

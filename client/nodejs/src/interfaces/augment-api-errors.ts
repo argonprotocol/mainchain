@@ -161,7 +161,7 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       BitcoinPubkeyUnableToBeDecoded: AugmentedError<ApiType>;
       /**
-       * A partial release would leave less than the minimum watched Lock amount.
+       * A configured or requested Lock amount is below the required minimum.
        **/
       BitcoinReleaseChangeBelowMinimum: AugmentedError<ApiType>;
       /**
