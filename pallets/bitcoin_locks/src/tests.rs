@@ -25,6 +25,7 @@ use argon_primitives::{
 	},
 	inherents::{BitcoinUtxoFunding, BitcoinUtxoSyncV2},
 	providers::{BitcoinFissionLockError, BitcoinFissionLockProvider},
+	vault::BitcoinSecuritizationBasis,
 	BitcoinUtxoEvents, BitcoinUtxoTracker, PriceProvider, MICROGONS_PER_ARGON,
 };
 
@@ -3230,9 +3231,141 @@ fn externally_spent_bitcoin_without_fissions_releases_the_vault_securitization()
 		assert_eq!(DefaultVault::get().securitization, allocated);
 		assert_eq!(DefaultVault::get().get_relock_capacity(), locked_before_spend);
 		assert_eq!(DefaultVault::get().ratio_adjusted_satoshis, 0);
-		assert!(!System::events().iter().any(|record| matches!(
+		assert!(System::events().iter().any(|record| matches!(
 			record.event,
-			RuntimeEvent::BitcoinLocks(Event::<Test>::BitcoinLockBurned { lock_id: 1, .. })
+			RuntimeEvent::BitcoinLocks(Event::<Test>::BitcoinLockTerminated {
+				lock_id: 1,
+				was_utxo_spent: true,
+				burned_argons: 0,
+				..
+			})
+		)));
+	});
+}
+
+#[test]
+fn outside_spend_and_expiry_burn_the_same_fission_redemption_value() {
+	set_bitcoin_height(12);
+	let mut outcomes = Vec::new();
+	for is_externally_spent in [true, false] {
+		outcomes.push(new_test_ext().execute_with(|| {
+			System::set_block_number(1);
+			ArgonPriceInUsd::set(Some(FixedU128::one()));
+			let account_id = 2;
+			set_argons(account_id, 100_000 * MICROGONS_PER_ARGON);
+			assert_ok!(BitcoinLocks::create_receive_address(
+				RuntimeOrigin::signed(account_id),
+				1,
+				SATOSHIS_PER_BITCOIN,
+				CompressedBitcoinPubkey([1; 33]),
+				None,
+			));
+			assert_ok!(funding_received(1, SATOSHIS_PER_BITCOIN));
+			let lock = LocksById::<Test>::get(1).expect("funded lock");
+			let rate = lock.securitization_basis.microgons_at_target_per_btc;
+			MicrogonsAtTargetPerBtcHistory::<Test>::mutate(|rates| {
+				_ = rates.try_push((12, rate));
+			});
+			assert_ok!(BitcoinFissions::create(
+				RuntimeOrigin::signed(account_id),
+				0,
+				77,
+				1,
+				SATOSHIS_PER_BITCOIN / 2,
+				rate,
+			));
+			ArgonPriceInUsd::set(Some(FixedU128::from_rational(1, 2)));
+			let fission = pallet_bitcoin_fissions::FissionByOwnerAndId::<Test>::get(account_id, 0)
+				.expect("active fission");
+			let fission_basis = BitcoinSecuritizationBasis {
+				satoshis: fission.satoshis,
+				microgons_at_target_per_btc: fission.microgons_at_target_per_btc,
+			};
+			let redemption = BitcoinLocks::calculate_redemption_amount_from_satoshis(
+				&fission.satoshis,
+				Some(fission_basis.btc_value_in_microgons()),
+			)
+			.expect("redemption quote");
+			let whole_lock_redemption = BitcoinLocks::calculate_redemption_amount_from_satoshis(
+				&lock.funded_satoshis,
+				Some(lock.btc_value_in_microgons()),
+			)
+			.expect("whole-Lock redemption quote");
+			assert!(redemption < whole_lock_redemption);
+			let insured_fission_amount =
+				lock.get_securitization().coverage_for_satoshis(fission.satoshis);
+			assert!(
+				insured_fission_amount <
+					lock.get_securitization().coverage_for_satoshis(lock.funded_satoshis)
+			);
+			let vault_before = DefaultVault::get();
+
+			if is_externally_spent {
+				assert_ok!(spent(1));
+			} else {
+				assert_eq!(BitcoinLocks::process_expiring_locks([1]), 1);
+			}
+			let vault_after = DefaultVault::get();
+			let burned = vault_before.securitization - vault_after.securitization;
+			assert_eq!(burned, redemption.min(insured_fission_amount));
+			assert!(System::events().iter().any(|record| matches!(
+				record.event,
+				RuntimeEvent::BitcoinLocks(Event::<Test>::BitcoinLockTerminated {
+					lock_id: 1,
+					was_utxo_spent,
+					burned_argons,
+					..
+				}) if was_utxo_spent == is_externally_spent && burned_argons == burned
+			)));
+			assert_eq!(vault_after.total_satoshis, 0);
+			assert_eq!(vault_after.securitized_satoshis, 0);
+			assert_eq!(vault_after.ratio_adjusted_satoshis, 0);
+			assert_eq!(vault_after.securitization_locked, 0);
+			assert_eq!(
+				vault_after.get_relock_capacity(),
+				vault_before.get_relock_capacity() +
+					lock.get_securitization().collateral_for_satoshis(lock.funded_satoshis) -
+					burned
+			);
+			assert!(!LocksById::<Test>::contains_key(1));
+			burned
+		}));
+	}
+	assert_eq!(outcomes[0], outcomes[1]);
+}
+
+#[test]
+fn expiring_bitcoin_without_fissions_releases_the_vault_securitization() {
+	set_bitcoin_height(12);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		set_argons(1, 2_000);
+		let allocated = DefaultVault::get().securitization;
+		assert_ok!(BitcoinLocks::create_receive_address(
+			RuntimeOrigin::signed(1),
+			1,
+			SATOSHIS_PER_BITCOIN,
+			CompressedBitcoinPubkey([1; 33]),
+			None,
+		));
+		assert_ok!(funding_received(1, SATOSHIS_PER_BITCOIN));
+		let locked_before_expiry = DefaultVault::get().securitization_locked;
+		pallet_mint::MintedBitcoinMicrogons::<Test>::set(123);
+
+		assert_eq!(BitcoinLocks::process_expiring_locks([1]), 1);
+		assert!(!LocksById::<Test>::contains_key(1));
+		assert_eq!(DefaultVault::get().securitization, allocated);
+		assert_eq!(DefaultVault::get().get_relock_capacity(), locked_before_expiry);
+		assert_eq!(DefaultVault::get().securitization_locked, 0);
+		assert_eq!(pallet_mint::MintedBitcoinMicrogons::<Test>::get(), 123);
+		assert!(System::events().iter().any(|record| matches!(
+			record.event,
+			RuntimeEvent::BitcoinLocks(Event::<Test>::BitcoinLockTerminated {
+				lock_id: 1,
+				was_utxo_spent: false,
+				burned_argons: 0,
+				..
+			})
 		)));
 	});
 }
@@ -3270,28 +3403,39 @@ fn external_spend_closes_the_fission_without_removing_its_pending_mint() {
 
 		let fission = pallet_bitcoin_fissions::FissionByOwnerAndId::<Test>::get(account_id, 0)
 			.expect("fission");
+		let vault_securitization = DefaultVault::get().securitization;
 		let pending_indices = pallet_mint::PendingMintIndicesByLockId::<Test>::get(1);
 		assert_eq!(pending_indices.as_slice(), &[0]);
 
-		let redemption_amount = BitcoinLocks::calculate_redemption_amount_from_satoshis(
+		ArgonPriceInUsd::set(Some(FixedU128::from_rational(1, 2)));
+		let whole_lock_redemption = BitcoinLocks::calculate_redemption_amount_from_satoshis(
 			&lock.funded_satoshis,
 			Some(lock.btc_value_in_microgons()),
 		)
-		.expect("redemption amount");
-		let settlement_burned = lock.securitization_coverage_microgons.min(redemption_amount);
-		assert!(settlement_burned >= fission.liquidity_promised);
+		.expect("whole-lock redemption amount");
+		let fission_basis = BitcoinSecuritizationBasis {
+			satoshis: fission.satoshis,
+			microgons_at_target_per_btc: fission.microgons_at_target_per_btc,
+		};
+		let fission_redemption = BitcoinLocks::calculate_redemption_amount_from_satoshis(
+			&fission.satoshis,
+			Some(fission_basis.btc_value_in_microgons()),
+		)
+		.expect("Fission redemption amount");
+		let settlement_burned = fission_redemption
+			.min(lock.get_securitization().coverage_for_satoshis(fission.satoshis));
+		assert!(settlement_burned < whole_lock_redemption);
+		assert!(fission_redemption > settlement_burned);
 		pallet_mint::MintedBitcoinMicrogons::<Test>::set(settlement_burned);
 
 		assert_ok!(spent(1));
 
 		assert!(!LocksById::<Test>::contains_key(1));
+		assert_eq!(DefaultVault::get().securitization, vault_securitization - settlement_burned);
 		assert!(!pallet_bitcoin_fissions::FissionByOwnerAndId::<Test>::contains_key(account_id, 0));
 		assert_eq!(pallet_mint::PendingMintIndicesByLockId::<Test>::get(1), pending_indices);
 		assert!(pallet_mint::PendingBitcoinMintsByIndex::<Test>::contains_key(0));
-		assert_eq!(
-			pallet_mint::MintedBitcoinMicrogons::<Test>::get(),
-			settlement_burned - fission.liquidity_promised
-		);
+		assert_eq!(pallet_mint::MintedBitcoinMicrogons::<Test>::get(), 0);
 		assert_eq!(
 			AccountBitcoinChanges::get(),
 			vec![
@@ -3299,6 +3443,236 @@ fn external_spend_closes_the_fission_without_removing_its_pending_mint() {
 				(account_id, fission.liquidity_promised, false),
 			]
 		);
+	});
+}
+
+#[test]
+fn external_spend_does_not_burn_beyond_insured_coverage() {
+	set_bitcoin_height(12);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		let account_id = 2;
+		set_argons(account_id, 100_000 * MICROGONS_PER_ARGON);
+		assert_ok!(BitcoinLocks::create_receive_address(
+			RuntimeOrigin::signed(account_id),
+			1,
+			SATOSHIS_PER_BITCOIN,
+			CompressedBitcoinPubkey([1; 33]),
+			None,
+		));
+		assert_ok!(funding_received(1, SATOSHIS_PER_BITCOIN));
+		let lock = LocksById::<Test>::get(1).expect("funded lock");
+		let rate = lock.securitization_basis.microgons_at_target_per_btc;
+		MicrogonsAtTargetPerBtcHistory::<Test>::mutate(|rates| {
+			_ = rates.try_push((12, rate));
+		});
+		assert_ok!(BitcoinFissions::create(
+			RuntimeOrigin::signed(account_id),
+			0,
+			77,
+			1,
+			SATOSHIS_PER_BITCOIN,
+			rate,
+		));
+		ArgonPriceInUsd::set(Some(FixedU128::from_rational(1, 2)));
+		let redemption = BitcoinLocks::calculate_redemption_amount_from_satoshis(
+			&SATOSHIS_PER_BITCOIN,
+			Some(lock.btc_value_in_microgons()),
+		)
+		.expect("redemption quote");
+		let lock_collateral =
+			lock.get_securitization().collateral_for_satoshis(lock.funded_satoshis);
+		let coverage = lock.get_securitization().coverage_for_satoshis(lock.funded_satoshis);
+		let vault_before = DefaultVault::get().securitization;
+		assert!(redemption > lock_collateral);
+		assert_eq!(coverage, lock_collateral);
+		assert!(redemption < vault_before);
+		pallet_mint::MintedBitcoinMicrogons::<Test>::set(coverage);
+
+		assert_ok!(spent(1));
+
+		assert_eq!(DefaultVault::get().securitization, vault_before - coverage);
+		assert_eq!(pallet_mint::MintedBitcoinMicrogons::<Test>::get(), 0);
+		assert!(!pallet_bitcoin_fissions::FissionByOwnerAndId::<Test>::contains_key(account_id, 0));
+	});
+}
+
+#[test]
+fn expiring_fission_burns_only_its_insured_redemption_value() {
+	set_bitcoin_height(12);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		let account_id = 2;
+		set_argons(account_id, 100_000 * MICROGONS_PER_ARGON);
+		assert_ok!(BitcoinLocks::create_receive_address(
+			RuntimeOrigin::signed(account_id),
+			1,
+			SATOSHIS_PER_BITCOIN,
+			CompressedBitcoinPubkey([1; 33]),
+			None,
+		));
+		assert_ok!(funding_received(1, SATOSHIS_PER_BITCOIN));
+		let lock = LocksById::<Test>::get(1).expect("lock");
+		let fission_rate = lock.securitization_basis.microgons_at_target_per_btc;
+		MicrogonsAtTargetPerBtcHistory::<Test>::mutate(|rates| {
+			_ = rates.try_push((12, fission_rate));
+		});
+		assert_ok!(BitcoinFissions::create(
+			RuntimeOrigin::signed(account_id),
+			0,
+			77,
+			1,
+			SATOSHIS_PER_BITCOIN / 2,
+			fission_rate,
+		));
+		let fission = pallet_bitcoin_fissions::FissionByOwnerAndId::<Test>::get(account_id, 0)
+			.expect("fission");
+		ArgonPriceInUsd::set(Some(FixedU128::from_rational(1, 2)));
+		let fission_btc_value =
+			FixedU128::from_rational(fission.satoshis as u128, SATOSHIS_PER_BITCOIN as u128)
+				.saturating_mul_int(fission.microgons_at_target_per_btc);
+		let redemption = BitcoinLocks::calculate_redemption_amount_from_satoshis(
+			&fission.satoshis,
+			Some(fission_btc_value),
+		)
+		.expect("redemption quote");
+		let expected_burn =
+			redemption.min(lock.get_securitization().coverage_for_satoshis(fission.satoshis));
+		let whole_lock_redemption = BitcoinLocks::calculate_redemption_amount_from_satoshis(
+			&lock.funded_satoshis,
+			Some(lock.btc_value_in_microgons()),
+		)
+		.expect("whole-Lock redemption quote");
+		assert!(expected_burn < whole_lock_redemption);
+		let allocated = DefaultVault::get().securitization;
+		assert!(expected_burn < allocated);
+		assert!(redemption > expected_burn);
+		assert!(fission_btc_value < lock.btc_value_in_microgons());
+		pallet_mint::MintedBitcoinMicrogons::<Test>::set(expected_burn);
+
+		assert_eq!(BitcoinLocks::process_expiring_locks([1]), 1);
+		assert!(!LocksById::<Test>::contains_key(1));
+		assert!(!pallet_bitcoin_fissions::FissionByOwnerAndId::<Test>::contains_key(account_id, 0));
+		assert_eq!(DefaultVault::get().securitization, allocated - expected_burn);
+		assert_eq!(pallet_mint::MintedBitcoinMicrogons::<Test>::get(), 0);
+	});
+}
+
+#[test]
+fn expiry_sums_each_fission_redemption_basis() {
+	set_bitcoin_height(12);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		let account_id = 2;
+		set_argons(account_id, 100_000 * MICROGONS_PER_ARGON);
+		assert_ok!(BitcoinLocks::create_receive_address(
+			RuntimeOrigin::signed(account_id),
+			1,
+			SATOSHIS_PER_BITCOIN,
+			CompressedBitcoinPubkey([1; 33]),
+			None,
+		));
+		assert_ok!(funding_received(1, SATOSHIS_PER_BITCOIN));
+		let lock = LocksById::<Test>::get(1).expect("lock");
+		let rate = lock.securitization_basis.microgons_at_target_per_btc;
+		MicrogonsAtTargetPerBtcHistory::<Test>::mutate(|rates| {
+			_ = rates.try_push((12, rate));
+			_ = rates.try_push((13, rate / 2));
+		});
+		for (fission_id, fission_rate) in [(0, rate), (1, rate / 2)] {
+			assert_ok!(BitcoinFissions::create(
+				RuntimeOrigin::signed(account_id),
+				fission_id,
+				77,
+				1,
+				SATOSHIS_PER_BITCOIN / 4,
+				fission_rate,
+			));
+		}
+		ArgonPriceInUsd::set(Some(FixedU128::from_rational(1, 2)));
+		let fission_redemption = [0, 1]
+			.into_iter()
+			.map(|fission_id| {
+				let fission = pallet_bitcoin_fissions::FissionByOwnerAndId::<Test>::get(
+					account_id, fission_id,
+				)
+				.expect("active fission");
+				let basis = BitcoinSecuritizationBasis {
+					satoshis: fission.satoshis,
+					microgons_at_target_per_btc: fission.microgons_at_target_per_btc,
+				};
+				BitcoinLocks::calculate_redemption_amount_from_satoshis(
+					&fission.satoshis,
+					Some(basis.btc_value_in_microgons()),
+				)
+				.expect("Fission redemption quote")
+			})
+			.sum::<u128>();
+		let expected_burn = fission_redemption
+			.min(lock.get_securitization().coverage_for_satoshis(SATOSHIS_PER_BITCOIN / 2));
+		let whole_lock_redemption = BitcoinLocks::calculate_redemption_amount_from_satoshis(
+			&lock.funded_satoshis,
+			Some(lock.btc_value_in_microgons()),
+		)
+		.expect("whole-Lock redemption quote");
+		assert!(expected_burn < whole_lock_redemption);
+		let vault_before = DefaultVault::get().securitization;
+		assert!(expected_burn < vault_before);
+		assert!(fission_redemption > expected_burn);
+		pallet_mint::MintedBitcoinMicrogons::<Test>::set(expected_burn);
+
+		assert_eq!(BitcoinLocks::process_expiring_locks([1]), 1);
+
+		assert_eq!(DefaultVault::get().securitization, vault_before - expected_burn);
+		assert_eq!(pallet_mint::MintedBitcoinMicrogons::<Test>::get(), 0);
+		assert!(!pallet_bitcoin_fissions::FissionByOwnerAndId::<Test>::contains_key(account_id, 0));
+		assert!(!pallet_bitcoin_fissions::FissionByOwnerAndId::<Test>::contains_key(account_id, 1));
+	});
+}
+
+#[test]
+fn expiring_fission_burn_is_capped_at_insurance_coverage() {
+	set_bitcoin_height(12);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		let account_id = 2;
+		set_argons(account_id, 100_000 * MICROGONS_PER_ARGON);
+		DefaultVault::mutate(|vault| vault.securitization_ratio = FixedU128::from_u32(2));
+		assert_ok!(BitcoinLocks::create_receive_address(
+			RuntimeOrigin::signed(account_id),
+			1,
+			SATOSHIS_PER_BITCOIN,
+			CompressedBitcoinPubkey([1; 33]),
+			None,
+		));
+		assert_ok!(funding_received(1, SATOSHIS_PER_BITCOIN));
+		let lock = LocksById::<Test>::get(1).expect("lock");
+		let rate = lock.securitization_basis.microgons_at_target_per_btc;
+		MicrogonsAtTargetPerBtcHistory::<Test>::mutate(|rates| {
+			_ = rates.try_push((12, rate));
+		});
+		assert_ok!(BitcoinFissions::create(
+			RuntimeOrigin::signed(account_id),
+			0,
+			77,
+			1,
+			SATOSHIS_PER_BITCOIN,
+			rate,
+		));
+		ArgonPriceInUsd::set(Some(FixedU128::from_rational(1, 2)));
+		let current_redemption = BitcoinLocks::calculate_redemption_amount_from_satoshis(
+			&SATOSHIS_PER_BITCOIN,
+			Some(lock.btc_value_in_microgons()),
+		)
+		.expect("redemption quote");
+		let coverage = lock.get_securitization().coverage_for_satoshis(lock.funded_satoshis);
+		let expected_burn = coverage;
+		assert!(current_redemption > coverage);
+		assert!(lock.get_securitization().collateral_for_satoshis(lock.funded_satoshis) > coverage);
+		let vault_before = DefaultVault::get().securitization;
+
+		assert_eq!(BitcoinLocks::process_expiring_locks([1]), 1);
+		assert_eq!(DefaultVault::get().securitization, vault_before - expected_burn);
 	});
 }
 
@@ -3352,7 +3726,7 @@ fn spent_after_release_request_schedules_securitization_release() {
 }
 
 #[test]
-fn overdue_cosign_uses_the_frozen_securitization_at_risk() {
+fn overdue_full_release_pays_insured_redemption() {
 	set_bitcoin_height(1);
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
@@ -3377,6 +3751,11 @@ fn overdue_cosign_uses_the_frozen_securitization_at_risk() {
 		));
 		let request = LockReleaseRequestsById::<Test>::get(1).unwrap();
 		let cosign_due_frame = request.cosign_due_frame;
+		let lock = LocksById::<Test>::get(1).expect("funded lock");
+		let insurance = lock.get_securitization().coverage_for_satoshis(lock.funded_satoshis);
+		let expected_compensation = insurance.min(request.securitization_at_risk);
+		let vault_before = DefaultVault::get().securitization;
+		assert!(insurance > 0);
 		BitcoinPriceInUsd::set(Some(FixedU128::saturating_from_integer(10_000)));
 
 		CurrentFrameId::set(cosign_due_frame);
@@ -3387,16 +3766,82 @@ fn overdue_cosign_uses_the_frozen_securitization_at_risk() {
 		assert!(!LockReleaseRequestsById::<Test>::contains_key(1));
 		assert!(LockCosignDueByFrame::<Test>::get(cosign_due_frame).is_empty());
 		assert_eq!(DefaultVault::get().ratio_adjusted_satoshis, 0);
+		assert_eq!(DefaultVault::get().securitization, vault_before - expected_compensation);
 		System::assert_last_event(
 			Event::<Test>::BitcoinCosignPastDue {
 				vault_id: 1,
 				lock_id: 1,
 				release_number: 1,
-				compensation_amount: 0,
+				compensation_amount: expected_compensation,
 				compensated_account_id: who,
 			}
 			.into(),
 		);
+	});
+}
+
+#[test]
+fn overdue_partial_release_keeps_the_lock_and_fissions_active() {
+	set_bitcoin_height(12);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		let owner = 2;
+		set_argons(owner, 100_000 * MICROGONS_PER_ARGON);
+		assert_ok!(BitcoinLocks::create_receive_address(
+			RuntimeOrigin::signed(owner),
+			1,
+			SATOSHIS_PER_BITCOIN,
+			DefaultVaultBitcoinPubkey::get().into(),
+			None,
+		));
+		assert_ok!(funding_received(1, SATOSHIS_PER_BITCOIN));
+		let target_rate = LocksById::<Test>::get(1)
+			.expect("funded lock")
+			.securitization_basis
+			.microgons_at_target_per_btc;
+		MicrogonsAtTargetPerBtcHistory::<Test>::mutate(|rates| {
+			_ = rates.try_push((12, target_rate));
+		});
+		assert_ok!(BitcoinFissions::create(
+			RuntimeOrigin::signed(owner),
+			0,
+			77,
+			1,
+			SATOSHIS_PER_BITCOIN / 2,
+			target_rate,
+		));
+		let promised = pallet_bitcoin_fissions::FissionByOwnerAndId::<Test>::get(owner, 0)
+			.expect("active fission")
+			.liquidity_promised;
+		pallet_mint::MintedBitcoinMicrogons::<Test>::set(promised);
+		let vault_before = DefaultVault::get().securitization;
+		assert_ok!(BitcoinLocks::request_release(
+			RuntimeOrigin::signed(owner),
+			1,
+			make_script_pubkey(&[3; 32]),
+			SATOSHIS_PER_BITCOIN / 4,
+			1_000,
+		));
+		assert!(
+			LockReleaseRequestsById::<Test>::get(1).unwrap().change_satoshis >=
+				SATOSHIS_PER_BITCOIN / 2
+		);
+
+		assert_ok!(BitcoinLocks::cosign_bitcoin_overdue(1));
+
+		assert!(LocksById::<Test>::contains_key(1));
+		assert!(!LockReleaseRequestsById::<Test>::contains_key(1));
+		assert!(pallet_bitcoin_fissions::FissionByOwnerAndId::<Test>::contains_key(owner, 0));
+		assert_eq!(pallet_mint::MintedBitcoinMicrogons::<Test>::get(), promised);
+		assert_eq!(DefaultVault::get().securitization, vault_before);
+		assert_eq!(WatchedUtxosById::get().len(), 1);
+		assert_ok!(BitcoinLocks::request_release(
+			RuntimeOrigin::signed(owner),
+			1,
+			make_script_pubkey(&[4; 32]),
+			SATOSHIS_PER_BITCOIN / 4,
+			1_000,
+		));
 	});
 }
 

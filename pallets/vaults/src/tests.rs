@@ -1307,39 +1307,75 @@ fn it_can_burn_funds() {
 		));
 
 		assert_eq!(Balances::free_balance(1), 900_000);
-		assert_eq!(Balances::total_balance(&1), 999_500, "Burned from the vault owner");
+		assert_eq!(Balances::total_balance(&1), 900_000, "Burned from the vault owner");
 		assert_eq!(Balances::free_balance(2), 2_000);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_locked, 0);
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization, 99_500);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization, 0);
 	});
 }
 
-struct VaultScenario {
-	pub securitization: Balance,
-	pub securitization_ratio: f32,
-	pub securitization_coverage_microgons: Balance,
-	pub release_price: Balance,
-	pub user_should_get: Balance,
-	pub vault_should_lose: Balance,
-	pub vault_should_have_hold: Balance,
+#[test]
+fn zero_burn_retires_funded_satoshis_and_schedules_funded_collateral() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(5);
+		set_argons(1, 1_000_000);
+		assert_ok!(Vaults::create(
+			RuntimeOrigin::signed(1),
+			VaultConfig {
+				terms: default_terms(FixedU128::zero()),
+				delegate_account_id: None,
+				bitcoin_xpubkey: keys(),
+				securitization: 100_000,
+				securitization_ratio: FixedU128::one(),
+			}
+		));
+		set_argons(2, 2_000);
+		assert_ok!(Vaults::reserve_securitization(
+			1,
+			&2,
+			&securitization(100_000),
+			standard_reservation_request(),
+		));
+		assert_ok!(Vaults::record_bitcoin_lock_funding(
+			1,
+			funding_update(&securitization(100_000), 500),
+		));
+		CurrentFrameId::set(2);
+
+		assert_eq!(
+			Vaults::burn(1, &securitization(100_000), 500, 0, &LockExtension::new(2440), false),
+			Ok(0),
+		);
+		let vault = VaultsById::<Test>::get(1).expect("vault remains");
+		assert_eq!(vault.securitization, 100_000);
+		assert_eq!(vault.securitization_locked, 0);
+		assert_eq!(vault.total_satoshis, 0);
+		assert_eq!(vault.securitized_satoshis, 0);
+		assert_eq!(
+			vault.get_relock_capacity(),
+			securitization(100_000).collateral_for_satoshis(500)
+		);
+		assert_eq!(Balances::total_balance(&1), 1_000_000);
+		let revenue = RevenuePerFrameByVault::<Test>::get(1);
+		let release_frame = revenue.iter().find(|entry| entry.frame_id == 2).unwrap();
+		assert_eq!(release_frame.bitcoin_locks_released_securitization, 100_000);
+		assert_eq!(release_frame.bitcoin_locks_released_satoshis, 500);
+	});
 }
 
-fn vault_equilibrium_scenario(scenario: VaultScenario) {
-	let VaultScenario {
-		release_price,
-		securitization_coverage_microgons,
-		securitization,
-		securitization_ratio,
-		user_should_get,
-		vault_should_lose,
-		vault_should_have_hold,
-	} = scenario;
+fn insured_redemption_compensation_scenario(
+	securitization_ratio: f32,
+	redemption_amount: u128,
+	expected_compensation: u128,
+) {
 	new_test_ext().execute_with(|| {
 		// Go past genesis block so events get deposited
 		System::set_block_number(1);
 
 		let vault_operator = 1;
 		let bitcoin_locker = 2;
+		let securitization = 200_000;
+		let securitization_coverage_microgons = 100_000;
 		let securitization_ratio = FixedU128::from_float(securitization_ratio as f64);
 
 		set_argons(bitcoin_locker, 0);
@@ -1376,7 +1412,7 @@ fn vault_equilibrium_scenario(scenario: VaultScenario) {
 				satoshis: 500,
 				microgons_at_target_per_btc: btc_value_in_microgons
 					.saturating_mul(SATOSHIS_PER_BITCOIN.into())
-					.checked_div(500)
+					.checked_div(&500)
 					.unwrap(),
 			},
 			securitization_coverage_microgons,
@@ -1398,30 +1434,37 @@ fn vault_equilibrium_scenario(scenario: VaultScenario) {
 			&bitcoin_locker,
 			&bitcoin_securitization,
 			500,
-			release_price,
+			redemption_amount,
 			&lock_extensions,
 			false,
 		)
 		.expect("compensation failed");
-		assert_eq!(compensation.to_beneficiary, user_should_get);
-		assert_eq!(compensation.burned, vault_should_lose.saturating_sub(user_should_get));
+		assert_eq!(compensation.to_beneficiary, expected_compensation);
+		assert_eq!(compensation.burned, 0);
 
 		assert_eq!(
 			Balances::total_balance(&vault_operator),
-			securitization - vault_should_lose,
+			securitization - expected_compensation,
 			"vault operator total balance"
 		);
 		// should keep the rest on hold
 		assert_eq!(
 			Balances::balance_on_hold(&HoldReason::EnterVault.into(), &vault_operator),
-			securitization - vault_should_lose,
+			securitization - expected_compensation,
 			"vault operator balance on hold"
 		);
 		let vault = VaultsById::<Test>::get(1).unwrap();
-		assert_eq!(vault.get_relock_capacity(), vault_should_have_hold, "relock capacity");
+		let remaining_lock_collateral = securitization_ratio
+			.saturating_mul_int(securitization_coverage_microgons)
+			.saturating_sub(expected_compensation);
+		assert_eq!(vault.get_relock_capacity(), remaining_lock_collateral, "relock capacity");
 		assert_eq!(vault.securitization_locked, 0, "argons locked");
-		assert_eq!(vault.securitization, securitization - vault_should_lose, "securitization");
-		assert_eq!(Balances::free_balance(bitcoin_locker), user_should_get, "locker free balance");
+		assert_eq!(vault.securitization, securitization - expected_compensation, "securitization");
+		assert_eq!(
+			Balances::free_balance(bitcoin_locker),
+			expected_compensation,
+			"locker free balance"
+		);
 	});
 }
 
@@ -1471,51 +1514,70 @@ fn it_records_use_of_fee_coupons() {
 }
 
 #[test]
-fn it_compensates_1x_securitization_when_over_pegged_price() {
-	vault_equilibrium_scenario(VaultScenario {
-		securitization: 200_000,
-		securitization_ratio: 1.0,
-		securitization_coverage_microgons: 100_000,
-		release_price: 200_000,
-		user_should_get: 0,
-		vault_should_lose: 100_000,
-		vault_should_have_hold: 0,
-	});
+fn full_insurance_is_paid_with_a_1x_vault_ratio() {
+	insured_redemption_compensation_scenario(1.0, 150_000, 100_000);
 }
+
 #[test]
-fn it_compensates_1x_securitization_when_under_pegged_price() {
-	vault_equilibrium_scenario(VaultScenario {
-		securitization: 200_000,
-		securitization_ratio: 1.0,
-		securitization_coverage_microgons: 100_000,
-		release_price: 50_000,
-		user_should_get: 0,
-		vault_should_lose: 50_000,
-		vault_should_have_hold: 50_000,
-	});
+fn full_insurance_is_paid_with_a_2x_vault_ratio() {
+	insured_redemption_compensation_scenario(2.0, 150_000, 100_000);
 }
+
 #[test]
-fn it_compensates_2x_securitization_when_over_pegged_price() {
-	vault_equilibrium_scenario(VaultScenario {
-		securitization: 200_000,
-		securitization_ratio: 2.0,
-		securitization_coverage_microgons: 100_000,
-		release_price: 200_000,
-		user_should_get: 100_000,
-		vault_should_lose: 200_000,
-		vault_should_have_hold: 0,
-	});
+fn redemption_below_insurance_limits_compensation() {
+	insured_redemption_compensation_scenario(1.0, 60_000, 60_000);
 }
+
 #[test]
-fn it_compensates_2x_securitization_when_under_securitized_amount() {
-	vault_equilibrium_scenario(VaultScenario {
-		securitization: 200_000,
-		securitization_ratio: 2.0,
-		securitization_coverage_microgons: 100_000,
-		release_price: 250_000,
-		user_should_get: 100_000,
-		vault_should_lose: 200_000,
-		vault_should_have_hold: 0,
+fn compensation_pays_available_collateral_when_insurance_exceeds_vault_funds() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		set_argons(1, 50_000);
+		set_argons(2, 0);
+		assert_ok!(Vaults::create(
+			RuntimeOrigin::signed(1),
+			VaultConfig {
+				terms: default_terms(FixedU128::zero()),
+				delegate_account_id: None,
+				bitcoin_xpubkey: keys(),
+				securitization: 50_000,
+				securitization_ratio: FixedU128::one(),
+			}
+		));
+		// Model a Lock whose insured amount exceeds its allocated collateral.
+		let mut insured_lock = securitization(100_000);
+		insured_lock.securitization_ratio = FixedU128::from_rational(1, 2);
+		assert_ok!(Vaults::reserve_securitization(
+			1,
+			&2,
+			&insured_lock,
+			standard_reservation_request(),
+		));
+		assert_ok!(Vaults::record_bitcoin_lock_funding(1, funding_update(&insured_lock, 100_000),));
+
+		let compensation = Vaults::compensate_lost_bitcoin(
+			1,
+			&2,
+			&insured_lock,
+			100_000,
+			100_000,
+			&LockExtension::new(365),
+			false,
+		)
+		.expect("available collateral should still be paid");
+		assert_eq!(compensation.to_beneficiary, 50_000);
+		assert_eq!(Balances::free_balance(2), 50_000);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization, 0);
+		System::assert_last_event(
+			Event::LostBitcoinCompensated {
+				vault_id: 1,
+				beneficiary: 2,
+				to_beneficiary: 50_000,
+				shortfall: 50_000,
+				burned: 0,
+			}
+			.into(),
+		);
 	});
 }
 

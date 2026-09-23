@@ -292,6 +292,7 @@ pub mod pallet {
 			vault_id: VaultId,
 			beneficiary: T::AccountId,
 			to_beneficiary: T::Balance,
+			shortfall: T::Balance,
 			burned: T::Balance,
 		},
 		FundsReleased {
@@ -1805,36 +1806,31 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Recoup funds from the vault. This will be called if a vault has performed an illegal
-		/// activity, like not moving cosigned UTXOs in the appropriate timeframe.
-		///
-		/// The compensation is up to the market rate but capped at the securitization of the lock.
-		///
-		/// Returns the amounts sent to the beneficiary and burned.
+		/// Pay the lesser of the funded Lock's insurance and its frozen redemption value.
 		fn compensate_lost_bitcoin(
 			vault_id: VaultId,
 			beneficiary: &T::AccountId,
 			securitization: &BitcoinSecuritization<Self::Balance>,
 			funded_satoshis: Satoshis,
-			market_rate: Self::Balance,
+			redemption_amount: Self::Balance,
 			lock_extension: &LockExtension<T::Balance>,
 			is_flexible: bool,
 		) -> Result<LostBitcoinCompensation<Self::Balance>, VaultError> {
+			let compensation_amount =
+				redemption_amount.min(securitization.coverage_for_satoshis(funded_satoshis));
 			let mut vault = VaultsById::<T>::get(vault_id).ok_or(VaultError::VaultNotFound)?;
 
 			let burn_result = vault.burn(
 				securitization,
 				funded_satoshis,
-				market_rate,
+				compensation_amount,
 				lock_extension,
 				is_flexible,
 			)?;
 
-			let securitized_amount = burn_result.burned_amount;
 			Self::track_vault_release_schedule(vault_id, &mut vault, burn_result.release_heights)?;
 
-			let to_beneficiary = securitized_amount
-				.saturating_sub(securitization.coverage_for_satoshis(funded_satoshis));
+			let to_beneficiary = burn_result.burned_amount;
 			if !to_beneficiary.is_zero() {
 				T::Currency::transfer_on_hold(
 					&HoldReason::EnterVault.into(),
@@ -1847,27 +1843,16 @@ pub mod pallet {
 				)
 				.map_err(|_| VaultError::UnrecoverableHold)?;
 			}
-			let to_burn = securitized_amount.saturating_sub(to_beneficiary);
-			if !to_burn.is_zero() {
-				T::Currency::burn_held(
-					&HoldReason::EnterVault.into(),
-					&vault.operator_account_id,
-					to_burn,
-					Precision::Exact,
-					Fortitude::Force,
-				)
-				.map_err(|_| VaultError::UnrecoverableHold)?;
-			}
-
 			Self::deposit_event(Event::LostBitcoinCompensated {
 				vault_id,
 				beneficiary: beneficiary.clone(),
 				to_beneficiary,
-				burned: to_burn,
+				shortfall: compensation_amount.saturating_sub(to_beneficiary),
+				burned: T::Balance::zero(),
 			});
 			VaultsById::<T>::insert(vault_id, vault);
 
-			Ok(LostBitcoinCompensation { to_beneficiary, burned: to_burn })
+			Ok(LostBitcoinCompensation { to_beneficiary, burned: T::Balance::zero() })
 		}
 
 		/// Burn the funds from the vault.
@@ -1888,18 +1873,30 @@ pub mod pallet {
 				lock_extension,
 				is_flexible,
 			)?;
+			Self::update_vault_bitcoin_metrics(BitcoinLockUpdate {
+				vault_id,
+				locks_created: 0,
+				total_fee: T::Balance::zero(),
+				fee_discount: T::Balance::zero(),
+				securitization_locked: T::Balance::zero(),
+				securitization_released: securitization.collateral_required(),
+				total_satoshis_added: 0,
+				total_satoshis_released: funded_satoshis,
+			})?;
 
 			let burn_amount = burn_result.burned_amount;
 			Self::track_vault_release_schedule(vault_id, &mut vault, burn_result.release_heights)?;
 
-			T::Currency::burn_held(
-				&HoldReason::EnterVault.into(),
-				&vault.operator_account_id,
-				burn_amount,
-				Precision::Exact,
-				Fortitude::Force,
-			)
-			.map_err(|_| VaultError::UnrecoverableHold)?;
+			if !burn_amount.is_zero() {
+				T::Currency::burn_held(
+					&HoldReason::EnterVault.into(),
+					&vault.operator_account_id,
+					burn_amount,
+					Precision::Exact,
+					Fortitude::Force,
+				)
+				.map_err(|_| VaultError::UnrecoverableHold)?;
+			}
 
 			VaultsById::<T>::insert(vault_id, vault);
 

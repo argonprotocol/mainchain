@@ -1459,21 +1459,21 @@ where
 		_beneficiary: &Self::AccountId,
 		securitization: &BitcoinSecuritization<Self::Balance>,
 		funded_satoshis: Satoshis,
-		market_rate: Self::Balance,
+		redemption_amount: Self::Balance,
 		lock_extension: &LockExtension<Self::Balance>,
 		is_flexible: bool,
 	) -> Result<LostBitcoinCompensation<Self::Balance>, VaultError> {
+		let compensation_amount =
+			redemption_amount.min(securitization.coverage_for_satoshis(funded_satoshis));
 		let total_burned = Self::burn(
 			vault_id,
 			securitization,
 			funded_satoshis,
-			market_rate,
+			compensation_amount,
 			lock_extension,
 			is_flexible,
 		)?;
-		let to_beneficiary = total_burned.saturating_sub(securitization.btc_value_in_microgons());
-		let burned = total_burned.saturating_sub(to_beneficiary);
-		Ok(LostBitcoinCompensation { to_beneficiary, burned })
+		Ok(LostBitcoinCompensation { to_beneficiary: total_burned, burned: Self::Balance::zero() })
 	}
 
 	fn create_utxo_script_pubkey(

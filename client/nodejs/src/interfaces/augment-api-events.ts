@@ -395,11 +395,6 @@ declare module '@polkadot/api-base/types/events' {
           compensatedAccountId: AccountId32;
         }
       >;
-      BitcoinLockBurned: AugmentedEvent<
-        ApiType,
-        [lockId: u64, vaultId: u32, wasUtxoSpent: bool],
-        { lockId: u64; vaultId: u32; wasUtxoSpent: bool }
-      >;
       BitcoinLockCreated: AugmentedEvent<
         ApiType,
         [
@@ -438,6 +433,11 @@ declare module '@polkadot/api-base/types/events' {
           securitizationBasis: ArgonPrimitivesVaultBitcoinSecuritizationBasis;
           accountId: AccountId32;
         }
+      >;
+      BitcoinLockTerminated: AugmentedEvent<
+        ApiType,
+        [lockId: u64, vaultId: u32, wasUtxoSpent: bool, burnedArgons: u128],
+        { lockId: u64; vaultId: u32; wasUtxoSpent: bool; burnedArgons: u128 }
       >;
       BitcoinSpentAfterRelease: AugmentedEvent<
         ApiType,
@@ -2192,8 +2192,20 @@ declare module '@polkadot/api-base/types/events' {
       >;
       LostBitcoinCompensated: AugmentedEvent<
         ApiType,
-        [vaultId: u32, beneficiary: AccountId32, toBeneficiary: u128, burned: u128],
-        { vaultId: u32; beneficiary: AccountId32; toBeneficiary: u128; burned: u128 }
+        [
+          vaultId: u32,
+          beneficiary: AccountId32,
+          toBeneficiary: u128,
+          shortfall: u128,
+          burned: u128,
+        ],
+        {
+          vaultId: u32;
+          beneficiary: AccountId32;
+          toBeneficiary: u128;
+          shortfall: u128;
+          burned: u128;
+        }
       >;
       ReservedSecuritizationSpaceChanged: AugmentedEvent<
         ApiType,

@@ -92,6 +92,13 @@ impl<T: Config> BitcoinFissionsProviderWeightInfo for ProviderWeightAdapter<T> {
 		T::WeightInfo::provider_get_lock_fission_requirements()
 	}
 
+	fn get_lock_fission_redemption_bases() -> Weight {
+		T::WeightInfo::provider_get_lock_fission_requirements().saturating_add(
+			LockProviderWeights::<T>::fuse_satoshis()
+				.saturating_mul(T::MaxFissionsPerLock::get().into()),
+		)
+	}
+
 	fn close_for_lock() -> Weight {
 		T::WeightInfo::lock_spent(T::MaxFissionsPerLock::get())
 	}

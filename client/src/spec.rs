@@ -3496,9 +3496,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				98u8, 180u8, 154u8, 19u8, 32u8, 50u8, 37u8, 94u8, 52u8, 188u8, 19u8, 52u8, 26u8,
-				146u8, 37u8, 222u8, 195u8, 76u8, 207u8, 201u8, 197u8, 220u8, 209u8, 207u8, 230u8,
-				89u8, 63u8, 40u8, 84u8, 143u8, 227u8, 187u8,
+				64u8, 12u8, 191u8, 128u8, 18u8, 78u8, 230u8, 21u8, 96u8, 91u8, 91u8, 229u8, 157u8,
+				59u8, 235u8, 211u8, 153u8, 6u8, 130u8, 180u8, 20u8, 223u8, 66u8, 129u8, 222u8,
+				183u8, 103u8, 165u8, 233u8, 139u8, 57u8, 81u8,
 			]
 	}
 	pub mod system {
@@ -4622,10 +4622,9 @@ pub mod api {
 						"Events",
 						(),
 						[
-							224u8, 29u8, 108u8, 210u8, 119u8, 251u8, 28u8, 229u8, 131u8, 65u8,
-							157u8, 254u8, 233u8, 127u8, 99u8, 124u8, 12u8, 21u8, 173u8, 116u8,
-							131u8, 156u8, 81u8, 27u8, 140u8, 171u8, 207u8, 172u8, 151u8, 166u8,
-							196u8, 45u8,
+							125u8, 37u8, 20u8, 209u8, 128u8, 202u8, 27u8, 58u8, 25u8, 25u8, 135u8,
+							27u8, 226u8, 146u8, 190u8, 39u8, 105u8, 148u8, 130u8, 255u8, 176u8,
+							145u8, 199u8, 4u8, 67u8, 200u8, 105u8, 94u8, 241u8, 202u8, 191u8, 75u8,
 						],
 					)
 				}
@@ -9965,6 +9964,7 @@ pub mod api {
 				pub vault_id: lost_bitcoin_compensated::VaultId,
 				pub beneficiary: lost_bitcoin_compensated::Beneficiary,
 				pub to_beneficiary: lost_bitcoin_compensated::ToBeneficiary,
+				pub shortfall: lost_bitcoin_compensated::Shortfall,
 				pub burned: lost_bitcoin_compensated::Burned,
 			}
 			pub mod lost_bitcoin_compensated {
@@ -9972,6 +9972,7 @@ pub mod api {
 				pub type VaultId = ::core::primitive::u32;
 				pub type Beneficiary = crate::types::AccountId32;
 				pub type ToBeneficiary = ::core::primitive::u128;
+				pub type Shortfall = ::core::primitive::u128;
 				pub type Burned = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for LostBitcoinCompensated {
@@ -11333,20 +11334,22 @@ pub mod api {
 			)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			pub struct BitcoinLockBurned {
-				pub lock_id: bitcoin_lock_burned::LockId,
-				pub vault_id: bitcoin_lock_burned::VaultId,
-				pub was_utxo_spent: bitcoin_lock_burned::WasUtxoSpent,
+			pub struct BitcoinLockTerminated {
+				pub lock_id: bitcoin_lock_terminated::LockId,
+				pub vault_id: bitcoin_lock_terminated::VaultId,
+				pub was_utxo_spent: bitcoin_lock_terminated::WasUtxoSpent,
+				pub burned_argons: bitcoin_lock_terminated::BurnedArgons,
 			}
-			pub mod bitcoin_lock_burned {
+			pub mod bitcoin_lock_terminated {
 				use super::runtime_types;
 				pub type LockId = ::core::primitive::u64;
 				pub type VaultId = ::core::primitive::u32;
 				pub type WasUtxoSpent = ::core::primitive::bool;
+				pub type BurnedArgons = ::core::primitive::u128;
 			}
-			impl ::subxt::ext::subxt_core::events::StaticEvent for BitcoinLockBurned {
+			impl ::subxt::ext::subxt_core::events::StaticEvent for BitcoinLockTerminated {
 				const PALLET: &'static str = "BitcoinLocks";
-				const EVENT: &'static str = "BitcoinLockBurned";
+				const EVENT: &'static str = "BitcoinLockTerminated";
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -18998,9 +19001,10 @@ pub mod api {
 						"Holds",
 						(),
 						[
-							78u8, 22u8, 112u8, 151u8, 136u8, 5u8, 68u8, 105u8, 220u8, 187u8, 38u8,
-							235u8, 70u8, 200u8, 233u8, 204u8, 3u8, 82u8, 22u8, 148u8, 201u8, 21u8,
-							124u8, 114u8, 134u8, 20u8, 2u8, 19u8, 132u8, 226u8, 112u8, 174u8,
+							221u8, 172u8, 211u8, 30u8, 147u8, 139u8, 52u8, 178u8, 225u8, 37u8,
+							99u8, 193u8, 227u8, 183u8, 96u8, 201u8, 211u8, 142u8, 205u8, 209u8,
+							181u8, 144u8, 88u8, 54u8, 6u8, 63u8, 214u8, 200u8, 145u8, 94u8, 38u8,
+							183u8,
 						],
 					)
 				}
@@ -19022,9 +19026,10 @@ pub mod api {
 						"Holds",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							78u8, 22u8, 112u8, 151u8, 136u8, 5u8, 68u8, 105u8, 220u8, 187u8, 38u8,
-							235u8, 70u8, 200u8, 233u8, 204u8, 3u8, 82u8, 22u8, 148u8, 201u8, 21u8,
-							124u8, 114u8, 134u8, 20u8, 2u8, 19u8, 132u8, 226u8, 112u8, 174u8,
+							221u8, 172u8, 211u8, 30u8, 147u8, 139u8, 52u8, 178u8, 225u8, 37u8,
+							99u8, 193u8, 227u8, 183u8, 96u8, 201u8, 211u8, 142u8, 205u8, 209u8,
+							181u8, 144u8, 88u8, 54u8, 6u8, 63u8, 214u8, 200u8, 145u8, 94u8, 38u8,
+							183u8,
 						],
 					)
 				}
@@ -20683,9 +20688,10 @@ pub mod api {
 						"Holds",
 						(),
 						[
-							78u8, 22u8, 112u8, 151u8, 136u8, 5u8, 68u8, 105u8, 220u8, 187u8, 38u8,
-							235u8, 70u8, 200u8, 233u8, 204u8, 3u8, 82u8, 22u8, 148u8, 201u8, 21u8,
-							124u8, 114u8, 134u8, 20u8, 2u8, 19u8, 132u8, 226u8, 112u8, 174u8,
+							221u8, 172u8, 211u8, 30u8, 147u8, 139u8, 52u8, 178u8, 225u8, 37u8,
+							99u8, 193u8, 227u8, 183u8, 96u8, 201u8, 211u8, 142u8, 205u8, 209u8,
+							181u8, 144u8, 88u8, 54u8, 6u8, 63u8, 214u8, 200u8, 145u8, 94u8, 38u8,
+							183u8,
 						],
 					)
 				}
@@ -20707,9 +20713,10 @@ pub mod api {
 						"Holds",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							78u8, 22u8, 112u8, 151u8, 136u8, 5u8, 68u8, 105u8, 220u8, 187u8, 38u8,
-							235u8, 70u8, 200u8, 233u8, 204u8, 3u8, 82u8, 22u8, 148u8, 201u8, 21u8,
-							124u8, 114u8, 134u8, 20u8, 2u8, 19u8, 132u8, 226u8, 112u8, 174u8,
+							221u8, 172u8, 211u8, 30u8, 147u8, 139u8, 52u8, 178u8, 225u8, 37u8,
+							99u8, 193u8, 227u8, 183u8, 96u8, 201u8, 211u8, 142u8, 205u8, 209u8,
+							181u8, 144u8, 88u8, 54u8, 6u8, 63u8, 214u8, 200u8, 145u8, 94u8, 38u8,
+							183u8,
 						],
 					)
 				}
@@ -31004,6 +31011,8 @@ pub mod api {
 				MiningSlot(runtime_types::pallet_mining_slot::pallet::HoldReason),
 				#[codec(index = 8)]
 				Vaults(runtime_types::pallet_vaults::pallet::HoldReason),
+				#[codec(index = 9)]
+				BitcoinLocks(runtime_types::pallet_bitcoin_locks::pallet::HoldReason),
 				#[codec(index = 19)]
 				BlockRewards(runtime_types::pallet_block_rewards::pallet::HoldReason),
 				#[codec(index = 31)]
@@ -32692,7 +32701,7 @@ pub mod api {
 					#[doc = "The external destination amount must be nonzero and fit with the network fee."]
 					InvalidBitcoinReleaseAmount,
 					#[codec(index = 9)]
-					#[doc = "A partial release would leave less than the minimum watched Lock amount."]
+					#[doc = "A configured or requested Lock amount is below the required minimum."]
 					BitcoinReleaseChangeBelowMinimum,
 					#[codec(index = 10)]
 					#[doc = "The minimum cannot increase while a release is pending."]
@@ -32833,10 +32842,11 @@ pub mod api {
 						security_fee: ::core::primitive::u128,
 					},
 					#[codec(index = 1)]
-					BitcoinLockBurned {
+					BitcoinLockTerminated {
 						lock_id: ::core::primitive::u64,
 						vault_id: ::core::primitive::u32,
 						was_utxo_spent: ::core::primitive::bool,
+						burned_argons: ::core::primitive::u128,
 					},
 					#[codec(index = 2)]
 					BitcoinUtxoCosignRequested {
@@ -32955,6 +32965,22 @@ pub mod api {
 					#[codec(compact)]
 					pub nonce: ::core::primitive::u64,
 					pub signature: runtime_types::sp_runtime::MultiSignature,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub enum HoldReason {
+					#[codec(index = 0)]
+					ReleaseBitcoinLock,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -38563,6 +38589,7 @@ pub mod api {
 						vault_id: ::core::primitive::u32,
 						beneficiary: crate::types::AccountId32,
 						to_beneficiary: ::core::primitive::u128,
+						shortfall: ::core::primitive::u128,
 						burned: ::core::primitive::u128,
 					},
 					#[codec(index = 13)]

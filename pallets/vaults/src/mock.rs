@@ -346,6 +346,8 @@ impl pallet_bitcoin_locks::Config for Test {
 	type WeightInfo = ();
 	type Balance = Balance;
 	type FissionsProvider = ();
+	type Currency = Balances;
+	type RuntimeHoldReason = RuntimeHoldReason;
 	type BitcoinUtxoTracker = StaticBitcoinUtxoTracker;
 	type PriceProvider = StaticPriceProvider;
 	type BitcoinSignatureVerifier = StaticBitcoinVerifier;

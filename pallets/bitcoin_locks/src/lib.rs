@@ -13,9 +13,9 @@ use argon_bitcoin::CosignReleaser;
 use argon_primitives::{
 	bitcoin::{
 		BitcoinLockId, BitcoinNetwork, BitcoinSignature, CompressedBitcoinPubkey, H256Le, Satoshis,
-		SATOSHIS_PER_BITCOIN,
 	},
 	providers::{BitcoinFissionLockError, BitcoinFissionLockProvider, BitcoinFissionsProvider},
+	vault::BitcoinSecuritizationBasis,
 };
 pub use pallet::*;
 pub use weights::*;
@@ -117,6 +117,17 @@ pub mod pallet {
 
 		type FissionsProvider: BitcoinFissionsProvider<Self::AccountId, Self::Balance>;
 
+		/// Currency used to retire pre-Fission release holds during migration.
+		type Currency: MutateHold<
+			Self::AccountId,
+			Reason = Self::RuntimeHoldReason,
+			Balance = Self::Balance,
+		>;
+
+		/// Runtime hold reason containing the deprecated Bitcoin Lock release variant for
+		/// migration.
+		type RuntimeHoldReason: From<HoldReason>;
+
 		/// Utxo tracker for bitcoin
 		type BitcoinUtxoTracker: BitcoinUtxoTracker;
 
@@ -192,6 +203,15 @@ pub mod pallet {
 
 		/// Gets the current tick
 		type CurrentTick: Get<Tick>;
+	}
+
+	/// Compatibility reason for pre-Fission release holds.
+	///
+	/// Remove after an upgrade has verified that no balances remain held for this reason.
+	#[pallet::composite_enum]
+	pub enum HoldReason {
+		#[deprecated(note = "retained only to migrate pre-Fission Bitcoin release holds")]
+		ReleaseBitcoinLock,
 	}
 
 	#[pallet::storage]
@@ -398,7 +418,7 @@ pub mod pallet {
 		}
 
 		pub fn btc_value_in_microgons(&self) -> T::Balance {
-			self.get_securitization().btc_value_in_microgons()
+			self.securitization_basis.btc_value_in_microgons()
 		}
 
 		pub fn get_securitization(&self) -> BitcoinSecuritization<T::Balance> {
@@ -517,10 +537,11 @@ pub mod pallet {
 			account_id: T::AccountId,
 			security_fee: T::Balance,
 		},
-		BitcoinLockBurned {
+		BitcoinLockTerminated {
 			lock_id: BitcoinLockId,
 			vault_id: VaultId,
 			was_utxo_spent: bool,
+			burned_argons: T::Balance,
 		},
 		BitcoinUtxoCosignRequested {
 			lock_id: BitcoinLockId,
@@ -1307,13 +1328,11 @@ pub mod pallet {
 				lock.fissioned_satoshis == 0 || fission_requirements.is_some(),
 				Error::<T>::FissionStateMismatch
 			);
-			let btc_value_in_microgons =
-				FixedU128::from_rational(satoshis as u128, SATOSHIS_PER_BITCOIN as u128)
-					.saturating_mul_int(microgons_at_target_per_btc);
+			let basis = BitcoinSecuritizationBasis { satoshis, microgons_at_target_per_btc };
 			let securitization_coverage_microgons =
-				Self::calculate_redemption_amount(btc_value_in_microgons, None)?;
+				Self::calculate_redemption_amount(basis.btc_value_in_microgons(), None)?;
 			let replacement_securitization = BitcoinSecuritization {
-				basis: BitcoinSecuritizationBasis { satoshis, microgons_at_target_per_btc },
+				basis,
 				securitization_coverage_microgons,
 				securitization_ratio: lock.securitization_ratio,
 			};
@@ -1746,15 +1765,13 @@ pub mod pallet {
 				)?;
 			let securitization_ratio =
 				T::VaultProvider::get_securitization_ratio(vault_id).map_err(Error::<T>::from)?;
-			let btc_value_in_microgons =
-				FixedU128::from_rational(satoshis as u128, SATOSHIS_PER_BITCOIN as u128)
-					.saturating_mul_int(microgons_at_target_per_btc);
+			let basis = BitcoinSecuritizationBasis { satoshis, microgons_at_target_per_btc };
 			let securitization_coverage_microgons =
-				Self::calculate_redemption_amount(btc_value_in_microgons, None)?;
+				Self::calculate_redemption_amount(basis.btc_value_in_microgons(), None)?;
 
 			Ok((
 				BitcoinSecuritization {
-					basis: BitcoinSecuritizationBasis { satoshis, microgons_at_target_per_btc },
+					basis,
 					securitization_coverage_microgons,
 					securitization_ratio,
 				},
@@ -1793,7 +1810,7 @@ pub mod pallet {
 			MinimumSatoshis::<T>::get()
 		}
 
-		fn create_release_releaser(
+		pub(crate) fn create_release_releaser(
 			lock: &LockedBitcoin<T>,
 			to_script_pubkey: BitcoinScriptPubkey,
 			destination_satoshis: Satoshis,
@@ -1922,25 +1939,34 @@ pub mod pallet {
 				.map_err(Error::<T>::from)?;
 				return Ok(());
 			}
-			if is_externally_spent && lock.fissioned_satoshis == 0 {
-				T::VaultProvider::release_bitcoin_lock_securitization(
-					lock.vault_id,
-					&lock.get_securitization(),
-					lock.funded_satoshis,
-					&lock.get_lock_extension(),
-					lock.is_flexible,
-				)
-				.map_err(Error::<T>::from)?;
-				return Ok(())
+			// Both terminal paths settle only the Bitcoin represented by active Fissions.
+			let fission_bases = T::FissionsProvider::get_lock_fission_redemption_bases(
+				&lock.owner_account,
+				lock_id,
+			)
+			.unwrap_or_default();
+			let mut fissioned_satoshis = 0u64;
+			let mut redemption_amount = T::Balance::zero();
+			for basis in fission_bases {
+				fissioned_satoshis = fissioned_satoshis
+					.checked_add(basis.satoshis)
+					.ok_or(Error::<T>::OverflowError)?;
+				redemption_amount = redemption_amount
+					.checked_add(&Self::calculate_redemption_amount_from_satoshis(
+						&basis.satoshis,
+						Some(basis.btc_value_in_microgons()),
+					)?)
+					.ok_or(Error::<T>::OverflowError)?;
 			}
+			ensure!(
+				fissioned_satoshis == lock.fissioned_satoshis,
+				Error::<T>::FissionStateMismatch
+			);
+			// Fission settlement cannot consume more than the Lock insures for those sats.
+			let redemption_amount = redemption_amount
+				.min(lock.get_securitization().coverage_for_satoshis(fissioned_satoshis));
 
-			// burn the current redemption price from the vault at value of actual satoshis locked
-			let redemption_amount = Self::calculate_redemption_amount_from_satoshis(
-				&lock.funded_satoshis,
-				Some(lock.btc_value_in_microgons()),
-			)?;
-
-			let burned_argons = T::VaultProvider::burn(
+			let actual_fission_burn = T::VaultProvider::burn(
 				lock.vault_id,
 				&lock.get_securitization(),
 				lock.funded_satoshis,
@@ -1949,12 +1975,13 @@ pub mod pallet {
 				lock.is_flexible,
 			)
 			.map_err(Error::<T>::from)?;
-			T::FissionsProvider::close_for_lock(&lock.owner_account, lock_id, burned_argons)?;
+			T::FissionsProvider::close_for_lock(&lock.owner_account, lock_id, actual_fission_burn)?;
 
-			Self::deposit_event(Event::BitcoinLockBurned {
+			Self::deposit_event(Event::BitcoinLockTerminated {
 				lock_id,
 				vault_id: lock.vault_id,
 				was_utxo_spent: is_externally_spent,
+				burned_argons: actual_fission_burn,
 			});
 
 			Ok(())
@@ -2028,7 +2055,6 @@ pub mod pallet {
 			let lock = Self::take_lock(lock_id)?;
 			let vault_id = lock.vault_id;
 			ensure!(lock.is_funded(), Error::<T>::LockNotFunded);
-			T::FissionsProvider::close_for_lock(&lock.owner_account, lock_id, T::Balance::zero())?;
 			T::VaultProvider::release_bitcoin_lock_securitization(
 				vault_id,
 				&lock.get_securitization(),
@@ -2076,10 +2102,24 @@ pub mod pallet {
 		pub(crate) fn cosign_bitcoin_overdue(lock_id: BitcoinLockId) -> DispatchResult {
 			let entry = LockReleaseRequestsById::<T>::get(lock_id)
 				.ok_or(Error::<T>::RedemptionNotLocked)?;
+			let lock = LocksById::<T>::get(lock_id).ok_or(Error::<T>::LockNotFound)?;
+			if entry.change_satoshis > 0 {
+				// No Bitcoin has moved, and the remaining Lock may still back active Fissions.
+				Self::take_release_request(lock_id)?;
+				Self::deposit_event(Event::BitcoinCosignPastDue {
+					lock_id,
+					vault_id: lock.vault_id,
+					release_number: entry.release_number,
+					compensation_amount: T::Balance::zero(),
+					compensated_account_id: lock.owner_account,
+				});
+				return Ok(())
+			}
+			ensure!(lock.fissioned_satoshis == 0, Error::<T>::LockHasActiveFissions);
 			let lock = Self::take_lock(lock_id)?;
 			let vault_id = lock.vault_id;
 
-			// Compensate the Bitcoin owner up to the securitization frozen when release began.
+			// The redemption was already settled; the vault owes up to the insured Bitcoin value.
 			let compensation = T::VaultProvider::compensate_lost_bitcoin(
 				vault_id,
 				&lock.owner_account,
@@ -2090,7 +2130,6 @@ pub mod pallet {
 				lock.is_flexible,
 			)
 			.map_err(Error::<T>::from)?;
-			T::FissionsProvider::close_for_lock(&lock.owner_account, lock_id, compensation.burned)?;
 			Self::deposit_event(Event::BitcoinCosignPastDue {
 				lock_id,
 				vault_id,
@@ -2356,8 +2395,8 @@ impl<T: Config> BitcoinFissionLockProvider<T::AccountId, T::Balance> for Pallet<
 				BitcoinFissionLockError::InsufficientFundedSatoshis
 			);
 			let btc_value_in_microgons =
-				FixedU128::from_rational(satoshis as u128, SATOSHIS_PER_BITCOIN as u128)
-					.saturating_mul_int(microgons_at_target_per_btc);
+				BitcoinSecuritizationBasis { satoshis, microgons_at_target_per_btc }
+					.btc_value_in_microgons();
 			let liquidity_promised =
 				Self::calculate_redemption_amount(btc_value_in_microgons, None)
 					.map_err(|_| BitcoinFissionLockError::Overflow)?;
@@ -2434,8 +2473,8 @@ impl<T: Config> BitcoinFissionLockProvider<T::AccountId, T::Balance> for Pallet<
 		microgons_at_target_per_btc: T::Balance,
 	) -> Result<T::Balance, BitcoinFissionLockError> {
 		let btc_value_in_microgons =
-			FixedU128::from_rational(satoshis as u128, SATOSHIS_PER_BITCOIN as u128)
-				.saturating_mul_int(microgons_at_target_per_btc);
+			BitcoinSecuritizationBasis { satoshis, microgons_at_target_per_btc }
+				.btc_value_in_microgons();
 		Self::calculate_redemption_amount(btc_value_in_microgons, None)
 			.map_err(|_| BitcoinFissionLockError::Overflow)
 	}
@@ -2456,8 +2495,8 @@ impl<T: Config> BitcoinFissionLockProvider<T::AccountId, T::Balance> for Pallet<
 				.ok_or(BitcoinFissionLockError::InsufficientFissionedSatoshis)?;
 
 			let fission_btc_value_in_microgons =
-				FixedU128::from_rational(satoshis as u128, SATOSHIS_PER_BITCOIN as u128)
-					.saturating_mul_int(microgons_at_target_per_btc);
+				BitcoinSecuritizationBasis { satoshis, microgons_at_target_per_btc }
+					.btc_value_in_microgons();
 			let redemption_amount = Self::calculate_redemption_amount_from_satoshis(
 				&satoshis,
 				Some(fission_btc_value_in_microgons),

@@ -2,8 +2,8 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use argon_primitives::{
-	bitcoin::BitcoinLockId, BitcoinFissionMinting, BitcoinFissionRequirements,
-	BitcoinFissionsProvider, OperationalAccountsHook,
+	bitcoin::BitcoinLockId, vault::BitcoinSecuritizationBasis, BitcoinFissionMinting,
+	BitcoinFissionRequirements, BitcoinFissionsProvider, OperationalAccountsHook,
 };
 use pallet_prelude::*;
 
@@ -501,12 +501,30 @@ impl<T: Config> BitcoinFissionsProvider<T::AccountId, T::Balance> for Pallet<T> 
 		requirements
 	}
 
+	fn get_lock_fission_redemption_bases(
+		account_id: &T::AccountId,
+		lock_id: BitcoinLockId,
+	) -> Option<Vec<BitcoinSecuritizationBasis<T::Balance>>> {
+		let fission_ids = FissionIdsByLockId::<T>::get(lock_id);
+		if fission_ids.is_empty() {
+			return None;
+		}
+		let mut bases = Vec::with_capacity(fission_ids.len());
+		for fission_id in fission_ids {
+			let fission = FissionByOwnerAndId::<T>::get(account_id, fission_id)?;
+			bases.push(BitcoinSecuritizationBasis {
+				satoshis: fission.satoshis,
+				microgons_at_target_per_btc: fission.microgons_at_target_per_btc,
+			});
+		}
+		Some(bases)
+	}
+
 	fn close_for_lock(
 		account_id: &T::AccountId,
 		lock_id: BitcoinLockId,
 		burned_argons: T::Balance,
 	) -> DispatchResult {
-		let mut fission_liability = T::Balance::zero();
 		for fission_id in FissionIdsByLockId::<T>::take(lock_id) {
 			FissionByOwnerAndId::<T>::try_mutate_exists(
 				account_id,
@@ -515,8 +533,6 @@ impl<T: Config> BitcoinFissionsProvider<T::AccountId, T::Balance> for Pallet<T> 
 					let Some(fission) = fission.take() else {
 						return Ok(());
 					};
-					fission_liability.saturating_accrue(fission.liquidity_promised);
-
 					T::OperationalAccountsHook::account_bitcoin_amount_changed(
 						account_id,
 						fission.liquidity_promised,
@@ -531,9 +547,8 @@ impl<T: Config> BitcoinFissionsProvider<T::AccountId, T::Balance> for Pallet<T> 
 				},
 			)?;
 		}
-		let repayment_amount = fission_liability.min(burned_argons);
-		if !repayment_amount.is_zero() {
-			T::Minting::record_mint_repayment(repayment_amount);
+		if !burned_argons.is_zero() {
+			T::Minting::record_mint_repayment(burned_argons);
 		}
 
 		Ok(())

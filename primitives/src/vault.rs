@@ -249,6 +249,15 @@ where
 	pub microgons_at_target_per_btc: Balance,
 }
 
+impl<Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned>
+	BitcoinSecuritizationBasis<Balance>
+{
+	pub fn btc_value_in_microgons(&self) -> Balance {
+		FixedU128::from_rational(self.satoshis as u128, SATOSHIS_PER_BITCOIN as u128)
+			.saturating_mul_int(self.microgons_at_target_per_btc)
+	}
+}
+
 #[derive(Clone, Copy)]
 pub struct BitcoinSecuritization<Balance>
 where
@@ -266,8 +275,7 @@ impl<Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned>
 	BitcoinSecuritization<Balance>
 {
 	pub fn btc_value_in_microgons(&self) -> Balance {
-		FixedU128::from_rational(self.basis.satoshis as u128, SATOSHIS_PER_BITCOIN as u128)
-			.saturating_mul_int(self.basis.microgons_at_target_per_btc)
+		self.basis.btc_value_in_microgons()
 	}
 
 	pub fn collateral_required(&self) -> Balance {
@@ -481,11 +489,8 @@ pub trait BitcoinVaultProvider {
 		is_flexible: bool,
 	) -> Result<Self::Balance, VaultError>;
 
-	/// Recoup funds from the vault. This will be called if a vault has performed an illegal
-	/// activity, like not moving cosigned UTXOs in the appropriate timeframe.
-	///
-	/// The recouped funds is up to the market rate, but capped at securitization rate of the
-	/// vault.
+	/// Pay the Bitcoin owner the lesser of the funded Lock's insurance and redemption amount
+	/// when a full release is not cosigned.
 	///
 	/// Returns the amounts sent to the beneficiary and burned.
 	fn compensate_lost_bitcoin(
@@ -493,7 +498,7 @@ pub trait BitcoinVaultProvider {
 		beneficiary: &Self::AccountId,
 		securitization: &BitcoinSecuritization<Self::Balance>,
 		funded_satoshis: Satoshis,
-		market_rate: Self::Balance,
+		redemption_amount: Self::Balance,
 		lock_extension: &LockExtension<Self::Balance>,
 		is_flexible: bool,
 	) -> Result<LostBitcoinCompensation<Self::Balance>, VaultError>;
@@ -829,12 +834,38 @@ impl<
 			securitization.unactivated_collateral(securitized_satoshis),
 		)?;
 
-		let burn_amount = collateral_required.min(market_rate);
-		if burn_amount > self.securitization || burn_amount > self.securitization_locked {
+		let burn_from_lock = collateral_required.min(market_rate);
+		// A terminal Bitcoin spend can owe more than this Lock's collateral. Draw unused
+		// vault securitization without taking collateral from other Locks or reservations.
+		let additional_available = self
+			.securitization
+			.saturating_sub(self.securitization_locked)
+			.saturating_sub(self.reserved_securitization_space);
+		let additional_burn = market_rate.saturating_sub(burn_from_lock).min(additional_available);
+		let burn_amount = burn_from_lock.saturating_add(additional_burn);
+		if burn_amount > self.securitization || burn_from_lock > self.securitization_locked {
 			return Err(VaultError::InsufficientVaultFunds);
 		}
 		if is_flexible && collateral_required > self.flexible_securitization_locked {
 			return Err(VaultError::InternalError);
+		}
+		let unscheduled_available = self
+			.uninhibited_securitization()
+			.saturating_sub(self.reserved_securitization_space);
+		// Once unscheduled funds are exhausted, consume scheduled funds as well so they cannot
+		// later be released or committed a second time.
+		let mut scheduled_burn = additional_burn.saturating_sub(unscheduled_available);
+		if !scheduled_burn.is_zero() {
+			for (_, release_amount) in self.securitization_release_schedule.iter_mut() {
+				let amount_to_burn = scheduled_burn.min(*release_amount);
+				release_amount.saturating_reduce(amount_to_burn);
+				scheduled_burn.saturating_reduce(amount_to_burn);
+				if scheduled_burn.is_zero() {
+					break;
+				}
+			}
+			ensure!(scheduled_burn.is_zero(), VaultError::InternalError);
+			self.securitization_release_schedule.retain(|_, amount| !amount.is_zero());
 		}
 		if is_flexible {
 			let securitization_after_burn = self.securitization.saturating_sub(burn_amount);
@@ -844,12 +875,12 @@ impl<
 				self.reserved_securitization_space.min(securitization_space_after_burn);
 		}
 		self.securitization.saturating_reduce(burn_amount);
-		self.securitization_locked.saturating_reduce(burn_amount);
+		self.securitization_locked.saturating_reduce(burn_from_lock);
 		if is_flexible {
-			self.flexible_securitization_locked.saturating_reduce(burn_amount);
+			self.flexible_securitization_locked.saturating_reduce(burn_from_lock);
 		}
 
-		let amount_to_future_release = collateral_required.saturating_sub(burn_amount);
+		let amount_to_future_release = collateral_required.saturating_sub(burn_from_lock);
 		let release_height = self.schedule_release(
 			amount_to_future_release,
 			securitized_satoshis,
@@ -1324,6 +1355,7 @@ mod test {
 			securitization_ratio: FixedU128::from_rational(3u128, 2u128),
 		};
 
+		assert_eq!(securitization.basis.btc_value_in_microgons(), 500_000);
 		assert_eq!(securitization.btc_value_in_microgons(), 500_000);
 		assert_eq!(securitization.collateral_required(), 750_000);
 		assert_eq!(securitization.eligible_satoshis(25_000_000), 37_500_000);
@@ -1773,6 +1805,68 @@ mod test {
 		assert_eq!(vault.securitization_release_schedule.get(&432).unwrap(), &50);
 		assert_eq!(vault.securitization, 50);
 		assert_eq!(vault.available_securitization_space(true), 50);
+	}
+
+	#[test]
+	fn burn_uses_uncommitted_securitization_above_the_lock_collateral() {
+		let mut vault = default_vault(300, 1.0);
+		for _ in 0..2 {
+			vault.reserve_securitization(&securitization(100), false).unwrap();
+			vault.record_bitcoin_lock_funding(funding_update(100, 100, false)).unwrap();
+		}
+
+		let result = vault
+			.burn(&securitization(100), 100, 150, &LockExtension::new(365), false)
+			.unwrap();
+		assert_eq!(result.burned_amount, 150);
+		assert_eq!(result.held_for_release, 0);
+		assert_eq!(vault.securitization, 150);
+		assert_eq!(vault.securitization_locked, 100);
+		assert_eq!(vault.total_satoshis, 100);
+	}
+
+	#[test]
+	fn burn_does_not_use_collateral_committed_to_another_lock() {
+		let mut vault = default_vault(200, 1.0);
+		for _ in 0..2 {
+			vault.reserve_securitization(&securitization(100), false).unwrap();
+			vault.record_bitcoin_lock_funding(funding_update(100, 100, false)).unwrap();
+		}
+
+		let result = vault
+			.burn(&securitization(100), 100, 150, &LockExtension::new(365), false)
+			.unwrap();
+		assert_eq!(result.burned_amount, 100);
+		assert_eq!(vault.securitization, 100);
+		assert_eq!(vault.securitization_locked, 100);
+		assert_eq!(vault.total_satoshis, 100);
+	}
+
+	#[test]
+	fn burn_reduces_scheduled_collateral_when_extra_collateral_is_needed() {
+		let mut vault = default_vault(300, 1.0);
+		for _ in 0..2 {
+			vault.reserve_securitization(&securitization(100), false).unwrap();
+			vault.record_bitcoin_lock_funding(funding_update(100, 100, false)).unwrap();
+		}
+		vault
+			.release_bitcoin_lock_securitization(
+				&securitization(100),
+				100,
+				&LockExtension::new(365),
+				false,
+			)
+			.unwrap();
+
+		let result = vault
+			.burn(&securitization(100), 100, 250, &LockExtension::new(365), false)
+			.unwrap();
+
+		assert_eq!(result.burned_amount, 250);
+		assert_eq!(vault.securitization, 50);
+		assert_eq!(vault.securitization_locked, 0);
+		assert_eq!(vault.get_relock_capacity(), 50);
+		assert_eq!(vault.securitization_release_schedule.get(&432), Some(&50));
 	}
 
 	#[test]
