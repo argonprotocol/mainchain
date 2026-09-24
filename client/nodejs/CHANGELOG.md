@@ -1,8 +1,29 @@
 # Changelog
 
-## [v1.4.12](https://github.com/argonprotocol/mainchain/compare/v1.4.11...f3bdc948e7dbce3e56bbd89b5ce4f6cbcb89b4e4) (2026-08-16)
+## [v1.4.13](https://github.com/argonprotocol/mainchain/compare/v1.4.12...34f249057e1c7da83b02c6bac7abd0ab33e5b637) (2026-09-21)
 
 ### Features
+
+* **bitcoin:** support exact partial lock releases
+([7ed6bbf](https://github.com/argonprotocol/mainchain/commit/7ed6bbf70100e0b85eb9065ee3a78fbca9bbbbc1))
+* **bitcoin:** support multi-utxo locks
+([c217e1f](https://github.com/argonprotocol/mainchain/commit/c217e1f14106c27c5859e64b4763397a86d825fe))
+* add bitcoin fissions
+([3b19218](https://github.com/argonprotocol/mainchain/commit/3b19218f71fb1a85d41ca09f8899f049fbf4b3f6))
+
+### Fixes
+
+* **bitcoin:** tighten partial release validation (#621)
+([27d1332](https://github.com/argonprotocol/mainchain/commit/27d1332613422f8f3762ddd85280d2eb22fdfc36)),
+closes [#621](https://github.com/argonprotocol/mainchain/issues/621)
+* **bitcoin:** expose fission lifecycle event context
+([0cb6072](https://github.com/argonprotocol/mainchain/commit/0cb60726888d51495d1a4d8c87bca1643033baad))
+* historical securitization ratio can be undefined
+([ab3b4cf](https://github.com/argonprotocol/mainchain/commit/ab3b4cf787d93a07a7c47e88d92f7232435df8cc))
+
+### [v1.4.12](https://github.com/argonprotocol/mainchain/compare/v1.4.11...v1.4.12) (2026-08-17)
+
+#### Features
 
 * reserve unused vault and bond capacity
 ([9882b55](https://github.com/argonprotocol/mainchain/commit/9882b5550459e0c1b6fee2c7fa264e69a97cab00))
@@ -15,7 +36,7 @@
 * move vault names to operational account profiles
 ([21efd27](https://github.com/argonprotocol/mainchain/commit/21efd27400a28cd374c459884cecff87c01d1875))
 
-### Fixes
+#### Fixes
 
 * **nodejs:** validate coupon target rate
 ([7be5f79](https://github.com/argonprotocol/mainchain/commit/7be5f794a8dbafd60f9eab8f191391e8dbb9ec0c))
