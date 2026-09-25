@@ -280,14 +280,13 @@ jobs:
 
       - name: Run MinIO container
         run: |
-          mkdir -p /tmp/minio-data
           docker run -d \
-            -e MINIO_ACCESS_KEY=minioadmin \
-            -e MINIO_SECRET_KEY=minioadmin \
-            -v /tmp/minio-data:/data \
+            -e MINIO_ROOT_USER=minioadmin \
+            -e MINIO_ROOT_PASSWORD=minioadmin \
+            --mount type=tmpfs,destination=/data \
             -p 9000:9000 \
             --name minio \
-            quay.io/minio/minio:RELEASE.2025-09-07T16-13-09Z@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e server /data
+            cgr.dev/chainguard/minio@sha256:bd014394a80898e68c149f2311fdf8d5a2c2f3bb2c33b9327ae6d02b4b065ae1 server /data
 
       - name: Wait for MinIO to start
         run: |
