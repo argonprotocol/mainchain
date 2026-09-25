@@ -1,8 +1,8 @@
-ARG UPSTREAM_SUBWAY_REF=v0.1.2
+ARG UPSTREAM_SUBWAY_REF=9709314a01dc7f572104c5ca1e9c3dd8c7c19d07
 
 FROM docker.io/library/rust:1.86 AS builder
 
-# Keep this pinned to upstream Acala releases unless we intentionally need a newer Subway tag.
+# Pin a commit merged into argonprotocol/subway master for reproducible builds.
 ARG UPSTREAM_SUBWAY_REF
 
 RUN apt-get update && \
@@ -14,15 +14,15 @@ RUN apt-get update && \
 
 RUN cargo install \
     --locked \
-    --git https://github.com/AcalaNetwork/subway.git \
-    --tag ${UPSTREAM_SUBWAY_REF} \
+    --git https://github.com/argonprotocol/subway.git \
+    --rev ${UPSTREAM_SUBWAY_REF} \
     subway
 
 FROM docker.io/library/ubuntu:22.04
 
 ARG UPSTREAM_SUBWAY_REF
 
-LABEL io.argonprotocol.upstream-subway.repository="https://github.com/AcalaNetwork/subway" \
+LABEL io.argonprotocol.upstream-subway.repository="https://github.com/argonprotocol/subway" \
       io.argonprotocol.upstream-subway.ref="${UPSTREAM_SUBWAY_REF}"
 
 RUN apt-get update && \
