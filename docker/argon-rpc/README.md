@@ -1,11 +1,12 @@
 # Argon RPC
 
-This image wraps the upstream Acala `subway` binary with Argon's checked-in RPC config and method
-allowlist.
+This image builds `subway` from Argon's fork and packages it with the checked-in RPC config
+and method allowlist.
 
 ## How it works
 
-1. [`Containerfile`](./Containerfile) builds `subway` from the pinned upstream Acala release in
+1. [`Containerfile`](./Containerfile) builds `subway` from the pinned commit on
+   [`argonprotocol/subway` master](https://github.com/argonprotocol/subway/tree/master) in
    `UPSTREAM_SUBWAY_REF`.
 2. The runtime image copies [`config.yml`](./config.yml) into `/config/argon-rpc.yml`.
 3. The runtime image copies [`rpcs.yml`](./rpcs.yml) into `/config/rpcs.yml`.
@@ -22,7 +23,7 @@ allowlist.
 
 ## Files
 
-- [`Containerfile`](./Containerfile): builds the pinned upstream `subway` binary and packages the
+- [`Containerfile`](./Containerfile): builds the pinned Argon `subway` commit and packages the
   checked-in RPC config and allowlist.
 - [`config.yml`](./config.yml): the main Subway config template with env-driven defaults.
 - [`rpcs.yml`](./rpcs.yml): the allowed RPC surface, cache settings, and subscription middleware
@@ -44,8 +45,8 @@ the gateway.
 
 ## Versioning
 
-For published images, the immutable tag should be Argon-owned while still showing the upstream
-Subway base:
+For published images, the immutable tag should be Argon-owned while still showing the
+Subway base version:
 
 - `v0.1.2-argon.1`
 - `v0.1.2-argon.2`
@@ -53,9 +54,9 @@ Subway base:
 
 That means:
 
-- bump `argon.N` when we change Argon packaging, config, or RPC policy on top of the same upstream
-  Subway release
-- reset to `.1` when we move to a new upstream Acala Subway tag
+- bump `argon.N` when we change the pinned Subway commit, Argon packaging, config, or RPC policy
+  on top of the same Subway release
+- reset to `.1` when we move to a new Subway release
 
 The current dev compose stack still builds and tags locally with `${VERSION:-dev}` because it is not
 consuming a published `argon-rpc` image yet.
@@ -127,10 +128,10 @@ JSON-style array examples above work well in `.env` files.
 
 ## OCI metadata
 
-The image adds custom upstream provenance labels:
+The image adds custom Subway source provenance labels:
 
-- `io.argonprotocol.upstream-subway.repository`: upstream Subway repository
-- `io.argonprotocol.upstream-subway.ref`: pinned upstream Subway tag or ref
+- `io.argonprotocol.upstream-subway.repository`: Subway source repository
+- `io.argonprotocol.upstream-subway.ref`: pinned Subway commit
 
 Published images already inherit the standard OCI labels and build metadata from the shared GitHub
 Docker metadata workflow, and the shared publish template already emits a build provenance
@@ -165,7 +166,7 @@ The repo now has one workflow for this image at
 The manual tag path is intentionally narrow:
 
 - it only accepts the full immutable Argon tag, such as `v0.1.2-argon.2`
-- it does not allow overriding the pinned upstream Subway ref
+- it does not allow overriding the pinned Subway commit
 - it always publishes current `main`
 - it publishes `ghcr.io/argonprotocol/argon-rpc` only
 
