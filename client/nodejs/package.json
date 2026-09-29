@@ -71,11 +71,13 @@
     "@polkadot/typegen": "^17.0.1",
     "@substrate/ss58-registry": "^1.51.0",
     "@types/node": "^20",
+    "@types/ws": "^8.18.1",
     "shx": "^0.4.0",
     "tsup": "^8.5.0",
     "tsx": "^4.20.4",
     "typescript": "^5.9.2",
-    "vitest": "^5.0.0"
+    "vitest": "^5.0.0",
+    "ws": "^8.18.0"
   },
   "packageManager": "yarn@4.1.0"
 }
