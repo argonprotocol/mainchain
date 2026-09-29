@@ -141,14 +141,9 @@ export async function waitForLoad(): Promise<void> {
  * @returns The client
  */
 export async function getClient(host: string, options?: ApiOptions): Promise<ArgonClient> {
-  let provider: ProviderInterface;
-  if (host.startsWith('http')) {
-    provider = new HttpProvider(host);
-  } else {
-    provider = new WsProvider(host);
-  }
-
   options ??= {};
+  const provider: ProviderInterface =
+    options.provider ?? (host.startsWith('http') ? new HttpProvider(host) : new WsProvider(host));
   options.metadata ??= {};
 
   for (const genesisHash of Object.values(Genesis)) {
