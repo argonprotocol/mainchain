@@ -44,6 +44,7 @@ pub mod notary;
 pub mod vault;
 
 pub mod account;
+pub mod amount_rank;
 pub mod bitcoin;
 pub mod note;
 pub mod notebook;
@@ -76,6 +77,7 @@ pub const ADDRESS_PREFIX: u16 = Ss58AddressFormatRegistry::SubstrateAccount as u
 
 /// Balance of an account.
 pub type Balance = u128;
+pub use amount_rank::AmountRankKey;
 
 /// Index of a transaction in the chain.
 pub type Nonce = u32;

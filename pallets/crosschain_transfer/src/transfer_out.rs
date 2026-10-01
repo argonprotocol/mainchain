@@ -1730,7 +1730,7 @@ mod test {
 			assert_eq!(encumbered_bond_microgons(&authority_account), 6_000);
 			assert_eq!(active_bond_microgons(&authority_account), 6_000);
 			assert_eq!(encumbered_argonot_micronots(&authority_account), 150);
-			assert_eq!(committed_argonot_micronots(&authority_account), 150);
+			assert_eq!(held_argonot_micronots(&authority_account), 150);
 		});
 	}
 

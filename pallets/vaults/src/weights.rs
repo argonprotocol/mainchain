@@ -3,7 +3,10 @@ use argon_primitives::{
 		CollectBlockerProvider, OperationalAccountProvider, OperationalAccountProviderWeightInfo,
 		TickProvider, TickProviderWeightInfo,
 	},
-	vault::BitcoinVaultProviderWeightInfo,
+	vault::{
+		BitcoinVaultProviderWeightInfo, TreasuryVaultProviderWeightInfo,
+		MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES,
+	},
 };
 use core::marker::PhantomData;
 use pallet_prelude::*;
@@ -17,17 +20,16 @@ pub trait WeightInfo {
 	fn replace_bitcoin_xpub() -> Weight;
 	fn set_delegate_account() -> Weight;
 	fn set_reserved_securitization_space() -> Weight;
-	fn set_committed_argonots() -> Weight;
+	fn set_argonot_securitization() -> Weight;
 	fn on_initialize_with_vault_releases(
 		height_range: u32,
 		bitcoin_release_vault_count: u32,
-		operational_unlock_work: u32,
 	) -> Weight;
 	fn collect() -> Weight;
 	fn on_frame_start(vault_count: u32) -> Weight;
 	fn provider_get_registration_vault_data() -> Weight;
 	fn provider_get_committed_securitization() -> Weight;
-	fn provider_get_committed_argonots() -> Weight;
+	fn provider_get_held_argonots() -> Weight;
 	fn provider_encumber_argonots() -> Weight;
 	fn provider_release_encumbered_argonots() -> Weight;
 	fn provider_burn_encumbered_argonots() -> Weight;
@@ -35,6 +37,9 @@ pub trait WeightInfo {
 	fn provider_set_bitcoin_lock_flexible() -> Weight;
 	fn provider_resecuritize(release_schedule_entries: u32) -> Weight;
 	fn provider_burn(release_schedule_entries: u32) -> Weight;
+	fn provider_get_top_vaults_by_securitization(vaults: u32) -> Weight;
+	fn provider_commit_securitization_for_rewards() -> Weight;
+	fn provider_record_vault_frame_earnings() -> Weight;
 }
 
 type TickProviderWeights<T> = <<T as crate::Config>::TickProvider as TickProvider<
@@ -109,22 +114,15 @@ where
 		Base::set_reserved_securitization_space()
 	}
 
-	fn set_committed_argonots() -> Weight {
-		Base::set_committed_argonots()
+	fn set_argonot_securitization() -> Weight {
+		Base::set_argonot_securitization()
 	}
 
 	fn on_initialize_with_vault_releases(
 		height_range: u32,
 		bitcoin_release_vault_count: u32,
-		operational_unlock_work: u32,
 	) -> Weight {
-		Base::on_initialize_with_vault_releases(
-			height_range,
-			bitcoin_release_vault_count,
-			operational_unlock_work,
-		)
-		.saturating_add(TickProviderWeight::previous_tick())
-		.saturating_add(TickProviderWeight::current_tick())
+		Base::on_initialize_with_vault_releases(height_range, bitcoin_release_vault_count)
 	}
 
 	fn collect() -> Weight {
@@ -143,8 +141,8 @@ where
 		Base::provider_get_committed_securitization()
 	}
 
-	fn provider_get_committed_argonots() -> Weight {
-		Base::provider_get_committed_argonots()
+	fn provider_get_held_argonots() -> Weight {
+		Base::provider_get_held_argonots()
 	}
 
 	fn provider_encumber_argonots() -> Weight {
@@ -161,7 +159,6 @@ where
 
 	fn provider_account_became_operational() -> Weight {
 		Base::provider_account_became_operational()
-			.saturating_add(TickProviderWeight::current_tick())
 	}
 
 	fn provider_set_bitcoin_lock_flexible() -> Weight {
@@ -175,6 +172,40 @@ where
 	fn provider_burn(release_schedule_entries: u32) -> Weight {
 		Base::provider_burn(release_schedule_entries)
 	}
+
+	fn provider_get_top_vaults_by_securitization(vaults: u32) -> Weight {
+		Base::provider_get_top_vaults_by_securitization(vaults)
+	}
+
+	fn provider_commit_securitization_for_rewards() -> Weight {
+		Base::provider_commit_securitization_for_rewards()
+	}
+
+	fn provider_record_vault_frame_earnings() -> Weight {
+		Base::provider_record_vault_frame_earnings()
+	}
+}
+
+impl<T: crate::Config> TreasuryVaultProviderWeightInfo for ProviderWeightAdapter<T> {
+	fn get_top_vaults_by_securitization(vaults: u32) -> Weight {
+		<T as crate::Config>::WeightInfo::provider_get_top_vaults_by_securitization(vaults)
+	}
+
+	fn commit_securitization_for_bonds() -> Weight {
+		// This path scans the bounded daily schedule. Resecuritization covers the same
+		// maximum schedule walk and additional storage writes.
+		<T as crate::Config>::WeightInfo::provider_resecuritize(
+			MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES,
+		)
+	}
+
+	fn commit_securitization_for_rewards() -> Weight {
+		<T as crate::Config>::WeightInfo::provider_commit_securitization_for_rewards()
+	}
+
+	fn record_vault_frame_earnings() -> Weight {
+		<T as crate::Config>::WeightInfo::provider_record_vault_frame_earnings()
+	}
 }
 
 pub struct ProviderWeightAdapter<T>(PhantomData<T>);
@@ -187,8 +218,8 @@ impl<T: crate::Config> BitcoinVaultProviderWeightInfo for ProviderWeightAdapter<
 		<T as crate::Config>::WeightInfo::provider_get_committed_securitization()
 	}
 
-	fn get_committed_argonots() -> Weight {
-		<T as crate::Config>::WeightInfo::provider_get_committed_argonots()
+	fn get_held_argonots() -> Weight {
+		<T as crate::Config>::WeightInfo::provider_get_held_argonots()
 	}
 
 	fn encumber_argonots() -> Weight {
@@ -213,14 +244,12 @@ impl<T: crate::Config> BitcoinVaultProviderWeightInfo for ProviderWeightAdapter<
 
 	fn resecuritize() -> Weight {
 		<T as crate::Config>::WeightInfo::provider_resecuritize(
-			argon_primitives::vault::MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES,
+			MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES,
 		)
 	}
 
 	fn burn() -> Weight {
-		<T as crate::Config>::WeightInfo::provider_burn(
-			argon_primitives::vault::MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES,
-		)
+		<T as crate::Config>::WeightInfo::provider_burn(MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES)
 	}
 }
 
@@ -247,13 +276,12 @@ impl WeightInfo for () {
 	fn set_reserved_securitization_space() -> Weight {
 		Weight::zero()
 	}
-	fn set_committed_argonots() -> Weight {
+	fn set_argonot_securitization() -> Weight {
 		Weight::zero()
 	}
 	fn on_initialize_with_vault_releases(
 		_height_range: u32,
 		_bitcoin_release_vault_count: u32,
-		_operational_unlock_work: u32,
 	) -> Weight {
 		Weight::zero()
 	}
@@ -271,7 +299,7 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 
-	fn provider_get_committed_argonots() -> Weight {
+	fn provider_get_held_argonots() -> Weight {
 		Weight::zero()
 	}
 
@@ -297,6 +325,15 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 	fn provider_burn(_release_schedule_entries: u32) -> Weight {
+		Weight::zero()
+	}
+	fn provider_get_top_vaults_by_securitization(_vaults: u32) -> Weight {
+		Weight::zero()
+	}
+	fn provider_commit_securitization_for_rewards() -> Weight {
+		Weight::zero()
+	}
+	fn provider_record_vault_frame_earnings() -> Weight {
 		Weight::zero()
 	}
 }

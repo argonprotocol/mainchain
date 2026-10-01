@@ -169,7 +169,7 @@ impl<T: Config> Pallet<T> {
 							T::CouncilRotationFrames::get(),
 						)
 						.ok_or(Error::<T>::UnknownOwnerVault)?;
-					let committed_argonots = T::VaultProvider::get_committed_argonots(&account_id)
+					let committed_argonots = T::VaultProvider::get_held_argonots(&account_id)
 						.ok_or(Error::<T>::UnknownOwnerVault)?;
 					let epoch_rate: u128 = epoch_microgons_per_argonot.into();
 					let argonot_weight = committed_argonots
@@ -654,7 +654,7 @@ mod tests {
 				council_signer_registration_signature(&replacement_pair, &first_account),
 			));
 
-			assert_ok!(set_committed_argonots(first_account.clone(), 1_000));
+			assert_ok!(set_argonot_securitization(first_account.clone(), 1_000));
 			LowestMicrogonsPerArgonot::set(Some(6 * argon_primitives::MICROGONS_PER_ARGON));
 			CurrentFrameId::set(11);
 			<CrosschainTransfer as OnNewSlot<TestAccountId>>::on_frame_start(11);
@@ -1057,7 +1057,7 @@ mod tests {
 				SourceChain::Ethereum,
 				3_000,
 			));
-			assert_ok!(set_committed_argonots(original_council_account.clone(), 500));
+			assert_ok!(set_argonot_securitization(original_council_account.clone(), 500));
 
 			assert_ok!(CrosschainTransfer::register_minting_authority(
 				RuntimeOrigin::signed(original_council_account.clone()),
@@ -1189,7 +1189,7 @@ mod tests {
 			);
 			assert_ok!(Balances::mint_into(&owner_vault_operator, 10_000));
 			assert_ok!(Ownership::mint_into(&owner_vault_operator, 900));
-			assert_ok!(set_committed_argonots(owner_vault_operator.clone(), 500));
+			assert_ok!(set_argonot_securitization(owner_vault_operator.clone(), 500));
 			assert_ok!(CrosschainTransfer::register_minting_authority(
 				RuntimeOrigin::signed(owner_vault_operator.clone()),
 				SourceChain::Ethereum,
@@ -1303,7 +1303,7 @@ mod tests {
 				.expect("three council members stay within limit"),
 			));
 			set_active_vault_bond_amount(21, first_council_account.clone(), 10_000);
-			assert_ok!(set_committed_argonots(first_council_account.clone(), 500));
+			assert_ok!(set_argonot_securitization(first_council_account.clone(), 500));
 			assert_ok!(CrosschainTransfer::register_minting_authority(
 				RuntimeOrigin::signed(first_council_account.clone()),
 				SourceChain::Ethereum,
@@ -1425,7 +1425,7 @@ mod tests {
 					.try_into()
 					.expect("single council member stays within limit"),
 			));
-			assert_ok!(set_committed_argonots(owner_vault_operator.clone(), 600));
+			assert_ok!(set_argonot_securitization(owner_vault_operator.clone(), 600));
 			assert_ok!(CrosschainTransfer::register_minting_authority(
 				RuntimeOrigin::signed(owner_vault_operator.clone()),
 				SourceChain::Ethereum,
@@ -1545,7 +1545,7 @@ mod tests {
 				SourceChain::Ethereum,
 				4_000,
 			));
-			assert_ok!(set_committed_argonots(queued_council_account.clone(), 300));
+			assert_ok!(set_argonot_securitization(queued_council_account.clone(), 300));
 			assert_ok!(CrosschainTransfer::register_minting_authority(
 				RuntimeOrigin::signed(queued_council_account.clone()),
 				SourceChain::Ethereum,
@@ -1657,7 +1657,7 @@ mod tests {
 				SourceChain::Ethereum,
 				3_000,
 			));
-			assert_ok!(set_committed_argonots(original_council_account.clone(), 500));
+			assert_ok!(set_argonot_securitization(original_council_account.clone(), 500));
 			assert_ok!(CrosschainTransfer::register_minting_authority(
 				RuntimeOrigin::signed(original_council_account.clone()),
 				SourceChain::Ethereum,

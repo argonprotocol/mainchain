@@ -3,7 +3,7 @@
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
-import type {} from '@polkadot/api-base/types/events';
+import '@polkadot/api-base/types/events';
 
 import type { ApiTypes, AugmentedEvent } from '@polkadot/api-base/types';
 import type {
@@ -21,7 +21,7 @@ import type {
   u64,
 } from '@polkadot/types-codec';
 import type { ITuple } from '@polkadot/types-codec/types';
-import type { AccountId32, H160, H256 } from '@polkadot/types/interfaces/runtime';
+import type { AccountId32, H160, H256, Percent } from '@polkadot/types/interfaces/runtime';
 import type {
   ArgonNotaryAuditErrorVerifyError,
   ArgonPrimitivesBitcoinUtxoRef,
@@ -1916,6 +1916,15 @@ declare module '@polkadot/api-base/types/events' {
       >;
     };
     treasury: {
+      /**
+       * Historical flexible-bond earnings were attributed to a surviving vault lot. No funds
+       * move.
+       **/
+      BondLotEarningsBackfilled: AugmentedEvent<
+        ApiType,
+        [bondLotId: u64, addedFrames: u32, addedEarnings: u128],
+        { bondLotId: u64; addedFrames: u32; addedEarnings: u128 }
+      >;
       BondLotFlexibilityChanged: AugmentedEvent<
         ApiType,
         [vaultId: u32, bondLotId: u64, isFlexible: bool],
@@ -1980,6 +1989,14 @@ declare module '@polkadot/api-base/types/events' {
           releaseFrameId: u64;
           reason: PalletTreasuryBondReleaseReason;
         }
+      >;
+      /**
+       * A fixed or unearned reward allocation could not be burned.
+       **/
+      CouldNotBurnRewardAllocation: AugmentedEvent<
+        ApiType,
+        [frameId: u64, amount: u128, dispatchError: SpRuntimeDispatchError],
+        { frameId: u64; amount: u128; dispatchError: SpRuntimeDispatchError }
       >;
       /**
        * An error occurred while paying frame earnings for an Argonot bond lot.
@@ -2070,18 +2087,20 @@ declare module '@polkadot/api-base/types/events' {
         [
           frameId: u64,
           bidPoolDistributed: u128,
-          argonotBondPoolDistributed: u128,
-          vaultBidPoolDistributed: u128,
-          treasuryRefunds: u128,
+          stakePoolDistributed: u128,
+          argonBondPoolDistributed: u128,
+          vaultPoolDistributed: u128,
+          burned: u128,
           treasuryReserves: u128,
           participatingVaults: u32,
         ],
         {
           frameId: u64;
           bidPoolDistributed: u128;
-          argonotBondPoolDistributed: u128;
-          vaultBidPoolDistributed: u128;
-          treasuryRefunds: u128;
+          stakePoolDistributed: u128;
+          argonBondPoolDistributed: u128;
+          vaultPoolDistributed: u128;
+          burned: u128;
           treasuryReserves: u128;
           participatingVaults: u32;
         }
@@ -2091,13 +2110,18 @@ declare module '@polkadot/api-base/types/events' {
        **/
       FrameVaultCapitalLocked: AugmentedEvent<
         ApiType,
-        [frameId: u64, totalEligibleBonds: u128, participatingVaults: u32],
-        { frameId: u64; totalEligibleBonds: u128; participatingVaults: u32 }
+        [frameId: u64, totalActiveBonds: u128, participatingVaults: u32],
+        { frameId: u64; totalActiveBonds: u128; participatingVaults: u32 }
       >;
       ReservedBondSpaceChanged: AugmentedEvent<
         ApiType,
         [vaultId: u32, reservedBondSpace: u32],
         { vaultId: u32; reservedBondSpace: u32 }
+      >;
+      RewardEconomicsConfigured: AugmentedEvent<
+        ApiType,
+        [targetBitcoinPercent: Percent],
+        { targetBitcoinPercent: Percent }
       >;
     };
     txPause: {
@@ -2170,7 +2194,17 @@ declare module '@polkadot/api-base/types/events' {
       >;
     };
     vaults: {
-      CommittedArgonotsSet: AugmentedEvent<
+      ArgonotExitReleased: AugmentedEvent<
+        ApiType,
+        [vaultId: u32, amount: u128],
+        { vaultId: u32; amount: u128 }
+      >;
+      ArgonotExitRequested: AugmentedEvent<
+        ApiType,
+        [vaultId: u32, amount: u128, noticeEndsAt: u64],
+        { vaultId: u32; amount: u128; noticeEndsAt: u64 }
+      >;
+      ArgonotSecuritizationSet: AugmentedEvent<
         ApiType,
         [vaultId: u32, operatorAccountId: AccountId32, amount: u128],
         { vaultId: u32; operatorAccountId: AccountId32; amount: u128 }
@@ -2211,6 +2245,16 @@ declare module '@polkadot/api-base/types/events' {
         ApiType,
         [vaultId: u32, reservedSecuritizationSpace: u128],
         { vaultId: u32; reservedSecuritizationSpace: u128 }
+      >;
+      SecuritizationExitReleased: AugmentedEvent<
+        ApiType,
+        [vaultId: u32, amount: u128],
+        { vaultId: u32; amount: u128 }
+      >;
+      SecuritizationExitRequested: AugmentedEvent<
+        ApiType,
+        [vaultId: u32, amount: u128, noticeEndsAt: u64],
+        { vaultId: u32; amount: u128; noticeEndsAt: u64 }
       >;
       SecuritizationReserved: AugmentedEvent<
         ApiType,

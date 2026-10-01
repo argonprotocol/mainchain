@@ -98,15 +98,14 @@ parameter_types! {
 		terms: VaultTerms {
 			bitcoin_annual_percent_rate: FixedU128::from_float(0.1),
 			bitcoin_base_fee: 0,
-			treasury_profit_sharing: Permill::from_float(0.0),
 		},
 		opened_tick: 1,
 		securitization_ratio: FixedU128::from_float(1.0),
 		securitization_release_schedule: BoundedBTreeMap::new(),
+		committed_microgons: 0,
 		is_closed: false,
 		pending_terms: None,
 		securitization_pending_activation: 0,
-		operational_minimum_release_tick: None,
 	};
 
 	pub static NextBitcoinLockId: BitcoinLockId = 1;
@@ -305,7 +304,7 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 		})
 	}
 
-	fn get_committed_argonots(account_id: &Self::AccountId) -> Option<Self::Balance> {
+	fn get_held_argonots(account_id: &Self::AccountId) -> Option<Self::Balance> {
 		Self::get_vault_id(account_id).map(|_| Default::default())
 	}
 
@@ -333,11 +332,21 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 	fn release_unactivated_securitization(
 		vault_id: VaultId,
 		amount: Balance,
+		lock_extension: &LockExtension<Self::Balance>,
+		retained_securitization: Self::Balance,
 	) -> Result<(), VaultError> {
 		if FailReturnSecuritization::get() {
 			return Err(VaultError::InternalError);
 		}
-		DefaultVault::mutate(|vault| vault.release_unactivated_securitization(amount))?;
+		DefaultVault::mutate(|vault| {
+			vault.update_locked_commitments(
+				lock_extension,
+				retained_securitization,
+				amount,
+				false,
+			)?;
+			vault.release_unactivated_securitization(amount)
+		})?;
 		CanceledLocks::mutate(|locks| {
 			locks.push((vault_id, amount));
 		});
@@ -350,15 +359,18 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 		securitization: &BitcoinSecuritization<Balance>,
 		request: ReserveSecuritizationRequest<Self::Balance>,
 	) -> Result<(Self::Balance, Self::Balance), VaultError> {
-		let ReserveSecuritizationRequest { fee_discount, securitization_space_to_unreserve } =
-			request;
+		let ReserveSecuritizationRequest {
+			fee_discount,
+			lock_expiration,
+			securitization_space_to_unreserve,
+		} = request;
 		let is_operator = DefaultVault::get().operator_account_id == *locker;
 		let may_use_flexible_space = !is_operator;
 		DefaultVault::mutate(|vault| {
 			vault
 				.reserved_securitization_space
 				.saturating_reduce(securitization_space_to_unreserve);
-			vault.reserve_securitization(securitization, may_use_flexible_space)
+			vault.reserve_securitization(securitization, may_use_flexible_space, lock_expiration)
 		})?;
 		let terms = DefaultVault::get().terms.clone();
 		let total_fee = terms
@@ -731,15 +743,14 @@ pub fn new_test_ext() -> TestState {
 		terms: VaultTerms {
 			bitcoin_annual_percent_rate: FixedU128::from_float(0.1),
 			bitcoin_base_fee: 0,
-			treasury_profit_sharing: Permill::from_float(0.0),
 		},
 		opened_tick: 1,
 		securitization_ratio: FixedU128::from_float(1.0),
 		securitization_release_schedule: BoundedBTreeMap::new(),
+		committed_microgons: 0,
 		is_closed: false,
 		pending_terms: None,
 		securitization_pending_activation: 0,
-		operational_minimum_release_tick: None,
 	});
 	new_test_with_genesis::<Test>(|t: &mut Storage| {
 		pallet_bitcoin_locks::GenesisConfig::<Test> {

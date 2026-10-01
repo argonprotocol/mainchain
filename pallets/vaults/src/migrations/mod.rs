@@ -1,120 +1,245 @@
-use crate::{Config, Pallet};
-use alloc::collections::BTreeMap;
+use crate::{
+	ArgonotSecuritizationByVaultId, Config, Pallet, TotalVaultSecuritization,
+	VaultFundsReleasingByHeight, VaultSecuritizationRanks, VaultsById,
+};
 use argon_primitives::{
 	bitcoin::{BitcoinHeight, Satoshis},
-	vault::{Vault, VaultTerms, MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES},
-	VaultId,
+	tick::Tick,
+	vault::{SecuritizationScheduleEntry, Vault, VaultArgonotSecuritization, VaultTerms},
+	AmountRankKey, VaultId,
 };
-use codec::{Decode, Encode};
-use frame_support::{storage_alias, traits::UncheckedOnRuntimeUpgrade};
+use frame_support::{
+	migrations::VersionedMigration, storage_alias, traits::UncheckedOnRuntimeUpgrade,
+};
+use pallet_bitcoin_locks::{Config as BitcoinLocksConfig, LockIdsByVaultId, LocksById};
 use pallet_prelude::*;
+use sp_runtime::{traits::SaturatedConversion, BoundedBTreeMap, BoundedBTreeSet, Permill};
 
 #[cfg(feature = "try-runtime")]
-use alloc::vec::Vec;
+use alloc::{collections::BTreeMap, vec::Vec};
+use codec::{Decode, Encode, HasCompact};
 #[cfg(feature = "try-runtime")]
 use frame_support::ensure;
 #[cfg(feature = "try-runtime")]
 use sp_runtime::TryRuntimeError;
 
-#[derive(Decode, Encode)]
-struct VaultV17<T: Config> {
-	operator_account_id: T::AccountId,
-	delegate_account_id: Option<T::AccountId>,
-	#[codec(compact)]
-	securitization: T::Balance,
-	#[codec(compact)]
-	securitization_target: T::Balance,
-	#[codec(compact)]
-	securitization_locked: T::Balance,
-	#[codec(compact)]
-	flexible_securitization_locked: T::Balance,
-	#[codec(compact)]
-	reserved_securitization_space: T::Balance,
-	#[codec(compact)]
-	securitization_pending_activation: T::Balance,
-	#[codec(compact)]
-	securitized_satoshis: Satoshis,
-	#[codec(compact)]
-	ratio_adjusted_satoshis: Satoshis,
-	#[codec(compact)]
-	flexible_ratio_adjusted_satoshis: Satoshis,
-	securitization_release_schedule: BoundedBTreeMap<
-		BitcoinHeight,
-		T::Balance,
-		ConstU32<MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES>,
-	>,
-	#[codec(compact)]
-	securitization_ratio: FixedU128,
-	is_closed: bool,
-	terms: VaultTerms<T::Balance>,
-	pending_terms: Option<(Tick, VaultTerms<T::Balance>)>,
-	#[codec(compact)]
-	opened_tick: Tick,
-	operational_minimum_release_tick: Option<Tick>,
-}
-
-mod v17 {
+mod old {
 	use super::*;
 
-	#[storage_alias]
-	pub(super) type VaultsById<T: Config> =
-		StorageMap<Pallet<T>, Twox64Concat, VaultId, VaultV17<T>, OptionQuery>;
-}
-
-#[derive(Default)]
-struct VaultBitcoinLockAccounting {
-	total_satoshis: Satoshis,
-	securitized_satoshis: Satoshis,
-	ratio_adjusted_satoshis: Satoshis,
-	flexible_ratio_adjusted_satoshis: Satoshis,
-}
-
-fn collect_bitcoin_lock_accounting<T>() -> (BTreeMap<VaultId, VaultBitcoinLockAccounting>, u64)
-where
-	T: Config + pallet_bitcoin_locks::Config<Balance = <T as Config>::Balance>,
-{
-	let mut accounting_by_vault = BTreeMap::<VaultId, VaultBitcoinLockAccounting>::new();
-	let mut reads = 0u64;
-	for (_, lock) in pallet_bitcoin_locks::LocksById::<T>::iter() {
-		reads.saturating_accrue(1);
-		let securitization = lock.get_securitization();
-		let accounting = accounting_by_vault.entry(lock.vault_id).or_default();
-		accounting.total_satoshis.saturating_accrue(lock.funded_satoshis);
-		accounting
-			.securitized_satoshis
-			.saturating_accrue(securitization.securitized_satoshis(lock.funded_satoshis));
-		let eligible_satoshis = securitization.eligible_satoshis(lock.funded_satoshis);
-		accounting.ratio_adjusted_satoshis.saturating_accrue(eligible_satoshis);
-		if lock.is_flexible {
-			accounting.flexible_ratio_adjusted_satoshis.saturating_accrue(eligible_satoshis);
-		}
+	#[derive(Encode, Decode)]
+	pub struct VaultTerms<Balance: HasCompact> {
+		#[codec(compact)]
+		pub bitcoin_annual_percent_rate: FixedU128,
+		#[codec(compact)]
+		pub bitcoin_base_fee: Balance,
+		#[codec(compact)]
+		pub treasury_profit_sharing: Permill,
 	}
-	(accounting_by_vault, reads)
+
+	#[derive(Encode, Decode)]
+	pub struct Vault<T: Config> {
+		pub operator_account_id: T::AccountId,
+		pub delegate_account_id: Option<T::AccountId>,
+		#[codec(compact)]
+		pub securitization: T::Balance,
+		#[codec(compact)]
+		pub securitization_target: T::Balance,
+		#[codec(compact)]
+		pub securitization_locked: T::Balance,
+		#[codec(compact)]
+		pub flexible_securitization_locked: T::Balance,
+		#[codec(compact)]
+		pub reserved_securitization_space: T::Balance,
+		#[codec(compact)]
+		pub securitization_pending_activation: T::Balance,
+		#[codec(compact)]
+		pub securitized_satoshis: Satoshis,
+		#[codec(compact)]
+		pub total_satoshis: Satoshis,
+		#[codec(compact)]
+		pub ratio_adjusted_satoshis: Satoshis,
+		#[codec(compact)]
+		pub flexible_ratio_adjusted_satoshis: Satoshis,
+		pub securitization_release_schedule:
+			BoundedBTreeMap<BitcoinHeight, T::Balance, ConstU32<366>>,
+		#[codec(compact)]
+		pub securitization_ratio: FixedU128,
+		pub is_closed: bool,
+		pub terms: VaultTerms<T::Balance>,
+		pub pending_terms: Option<(Tick, VaultTerms<T::Balance>)>,
+		#[codec(compact)]
+		pub opened_tick: Tick,
+		pub operational_minimum_release_tick: Option<Tick>,
+	}
+
+	#[storage_alias]
+	pub type VaultsById<T: Config> =
+		StorageMap<Pallet<T>, Twox64Concat, VaultId, Vault<T>, OptionQuery>;
+
+	#[storage_alias]
+	pub type VaultsReleasingOperationalMinimumByTick<T: Config> = StorageMap<
+		Pallet<T>,
+		Twox64Concat,
+		Tick,
+		BoundedBTreeSet<VaultId, <T as Config>::MaxVaults>,
+		ValueQuery,
+	>;
+
+	#[derive(Encode, Decode)]
+	pub struct VaultArgonotCommitment<Balance: HasCompact> {
+		#[codec(compact)]
+		pub committed_micronots: Balance,
+		#[codec(compact)]
+		pub encumbered_micronots: Balance,
+	}
+
+	#[storage_alias]
+	pub type ArgonotCommitmentByVaultId<T: Config> = StorageMap<
+		Pallet<T>,
+		Twox64Concat,
+		VaultId,
+		VaultArgonotCommitment<<T as Config>::Balance>,
+		OptionQuery,
+	>;
 }
 
-/// Reconcile Vault Bitcoin accounting from the authoritative funded Locks.
-pub struct ReconcileBitcoinLockAccounting<T>(core::marker::PhantomData<T>);
+/// Populate the ordered reward index and remove vault-wide profit-sharing terms.
+pub struct IndexVaultSecuritizationAndRemoveProfitSharing<T>(core::marker::PhantomData<T>);
 
-impl<T> UncheckedOnRuntimeUpgrade for ReconcileBitcoinLockAccounting<T>
+impl<T> UncheckedOnRuntimeUpgrade for IndexVaultSecuritizationAndRemoveProfitSharing<T>
 where
-	T: Config + pallet_bitcoin_locks::Config<Balance = <T as Config>::Balance>,
+	T: Config + BitcoinLocksConfig<Balance = <T as Config>::Balance>,
 {
 	#[cfg(feature = "try-runtime")]
 	fn pre_upgrade() -> Result<Vec<u8>, TryRuntimeError> {
-		Ok(v17::VaultsById::<T>::iter_keys()
-			.fold(0u64, |count, _| count.saturating_add(1))
-			.encode())
+		let mut ranks = Vec::new();
+		let mut terms = Vec::new();
+		let mut total = 0u128;
+		let current_height = <T as Config>::BitcoinBlockHeightChange::get().1;
+		for (vault_id, vault) in old::VaultsById::<T>::iter() {
+			let mut schedule = BTreeMap::<
+				BitcoinHeight,
+				SecuritizationScheduleEntry<<T as Config>::Balance>,
+			>::new();
+			for (height, amount) in &vault.securitization_release_schedule {
+				schedule.entry(*height).or_default().relockable_commitments = *amount;
+			}
+			let pending_reduction =
+				vault.securitization.saturating_sub(vault.securitization_target);
+			if !pending_reduction.is_zero() {
+				schedule.entry(current_height).or_default().argon_withdrawals = pending_reduction;
+			}
+			for lock_id in LockIdsByVaultId::<T>::iter_key_prefix(vault_id) {
+				let Some(lock) = LocksById::<T>::get(lock_id) else { continue };
+				let extension = lock.get_lock_extension();
+				for (height, amount) in extension
+					.collateral_expirations(lock.get_securitization().collateral_required())
+				{
+					if height > current_height {
+						schedule
+							.entry(height)
+							.or_default()
+							.locked_commitments
+							.saturating_accrue(amount);
+					}
+				}
+			}
+			terms.push((
+				vault_id,
+				VaultTerms {
+					bitcoin_annual_percent_rate: vault.terms.bitcoin_annual_percent_rate,
+					bitcoin_base_fee: vault.terms.bitcoin_base_fee,
+				},
+				vault.pending_terms.map(|(tick, pending)| {
+					(
+						tick,
+						VaultTerms {
+							bitcoin_annual_percent_rate: pending.bitcoin_annual_percent_rate,
+							bitcoin_base_fee: pending.bitcoin_base_fee,
+						},
+					)
+				}),
+				schedule,
+				if vault.operational_minimum_release_tick.is_some() {
+					<T as Config>::OperationalMinimumVaultSecuritization::get()
+						.min(vault.securitization)
+				} else {
+					Zero::zero()
+				},
+			));
+			if vault.is_closed || vault.securitization.is_zero() {
+				continue;
+			}
+			let amount = vault.securitization.saturated_into::<u128>();
+			total = total.saturating_add(amount);
+			ranks.push(AmountRankKey::new(amount, vault_id));
+		}
+		ranks.sort_by(|left, right| {
+			right
+				.amount()
+				.cmp(&left.amount())
+				.then_with(|| left.holder_id().cmp(&right.holder_id()))
+		});
+		let argonots = old::ArgonotCommitmentByVaultId::<T>::iter()
+			.map(|(vault_id, backing)| {
+				(vault_id, backing.committed_micronots, backing.encumbered_micronots)
+			})
+			.collect::<Vec<_>>();
+		Ok((ranks, total, terms, argonots).encode())
 	}
 
 	fn on_runtime_upgrade() -> Weight {
-		let (mut accounting_by_vault, mut reads) = collect_bitcoin_lock_accounting::<T>();
-		let mut writes = 0u64;
-
-		crate::VaultsById::<T>::translate::<VaultV17<T>, _>(|vault_id, vault| {
+		let mut total = <T as Config>::Balance::zero();
+		let current_height = <T as Config>::BitcoinBlockHeightChange::get().1;
+		let mut reads = 0u64;
+		let mut writes = 1u64;
+		let removed = old::VaultsReleasingOperationalMinimumByTick::<T>::drain().count() as u64;
+		reads.saturating_accrue(removed);
+		writes.saturating_accrue(removed);
+		for (vault_id, backing) in old::ArgonotCommitmentByVaultId::<T>::drain() {
+			ArgonotSecuritizationByVaultId::<T>::insert(
+				vault_id,
+				VaultArgonotSecuritization {
+					held_micronots: backing.committed_micronots,
+					committed_micronots: <T as Config>::Balance::zero(),
+					encumbered_micronots: backing.encumbered_micronots,
+				},
+			);
+			reads.saturating_accrue(1);
+			writes.saturating_accrue(2);
+		}
+		VaultsById::<T>::translate::<old::Vault<T>, _>(|vault_id, vault| {
 			reads.saturating_accrue(1);
 			writes.saturating_accrue(1);
-			let accounting = accounting_by_vault.remove(&vault_id).unwrap_or_default();
-			Some(Vault {
+			if !vault.is_closed && !vault.securitization.is_zero() {
+				VaultSecuritizationRanks::<T>::insert(
+					AmountRankKey::new(vault.securitization.saturated_into::<u128>(), vault_id),
+					(),
+				);
+				total.saturating_accrue(vault.securitization);
+				writes.saturating_accrue(1);
+			}
+			let pending_reduction =
+				vault.securitization.saturating_sub(vault.securitization_target);
+			if !pending_reduction.is_zero() {
+				VaultFundsReleasingByHeight::<T>::mutate(current_height.saturating_add(1), |ids| {
+					ids.try_insert(vault_id).expect("all existing vaults fit the release index");
+				});
+				writes.saturating_accrue(1);
+			}
+			let mut securitization_release_schedule = BoundedBTreeMap::new();
+			for (height, amount) in vault.securitization_release_schedule {
+				securitization_release_schedule
+					.try_insert(
+						height,
+						SecuritizationScheduleEntry {
+							relockable_commitments: amount,
+							..Default::default()
+						},
+					)
+					.expect("existing releases fit the combined daily schedule");
+			}
+			let mut migrated = Vault {
 				operator_account_id: vault.operator_account_id,
 				delegate_account_id: vault.delegate_account_id,
 				securitization: vault.securitization,
@@ -123,69 +248,133 @@ where
 				flexible_securitization_locked: vault.flexible_securitization_locked,
 				reserved_securitization_space: vault.reserved_securitization_space,
 				securitization_pending_activation: vault.securitization_pending_activation,
-				total_satoshis: accounting.total_satoshis,
-				securitized_satoshis: accounting.securitized_satoshis,
-				ratio_adjusted_satoshis: accounting.ratio_adjusted_satoshis,
-				flexible_ratio_adjusted_satoshis: accounting.flexible_ratio_adjusted_satoshis,
-				securitization_release_schedule: vault.securitization_release_schedule,
+				securitized_satoshis: vault.securitized_satoshis,
+				total_satoshis: vault.total_satoshis,
+				ratio_adjusted_satoshis: vault.ratio_adjusted_satoshis,
+				flexible_ratio_adjusted_satoshis: vault.flexible_ratio_adjusted_satoshis,
+				securitization_release_schedule,
+				committed_microgons: if vault.operational_minimum_release_tick.is_some() {
+					<T as Config>::OperationalMinimumVaultSecuritization::get()
+						.min(vault.securitization)
+				} else {
+					Zero::zero()
+				},
 				securitization_ratio: vault.securitization_ratio,
 				is_closed: vault.is_closed,
-				terms: vault.terms,
-				pending_terms: vault.pending_terms,
+				terms: VaultTerms {
+					bitcoin_annual_percent_rate: vault.terms.bitcoin_annual_percent_rate,
+					bitcoin_base_fee: vault.terms.bitcoin_base_fee,
+				},
+				pending_terms: vault.pending_terms.map(|(tick, terms)| {
+					(
+						tick,
+						VaultTerms {
+							bitcoin_annual_percent_rate: terms.bitcoin_annual_percent_rate,
+							bitcoin_base_fee: terms.bitcoin_base_fee,
+						},
+					)
+				}),
 				opened_tick: vault.opened_tick,
-				operational_minimum_release_tick: vault.operational_minimum_release_tick,
-			})
+			};
+			if !pending_reduction.is_zero() {
+				// Existing reductions remain immediately due rather than starting a new notice.
+				migrated
+					.scheduled_release(current_height)
+					.expect("one grandfathered notice fits")
+					.argon_withdrawals = pending_reduction;
+			}
+			for lock_id in LockIdsByVaultId::<T>::iter_key_prefix(vault_id) {
+				reads.saturating_accrue(2);
+				let Some(lock) = LocksById::<T>::get(lock_id) else { continue };
+				let extension = lock.get_lock_extension();
+				for (height, amount) in extension
+					.collateral_expirations(lock.get_securitization().collateral_required())
+				{
+					if height > current_height {
+						migrated
+							.scheduled_release(height)
+							.expect("existing commitments fit the combined daily schedule")
+							.locked_commitments
+							.saturating_accrue(amount);
+					}
+				}
+			}
+			Some(migrated)
 		});
-
+		TotalVaultSecuritization::<T>::put(total);
 		T::DbWeight::get().reads_writes(reads, writes)
 	}
 
 	#[cfg(feature = "try-runtime")]
 	fn post_upgrade(state: Vec<u8>) -> Result<(), TryRuntimeError> {
-		let expected_vault_count = u64::decode(&mut state.as_slice())
-			.map_err(|_| TryRuntimeError::Other("could not decode vault migration state"))?;
-		let vault_count =
-			crate::VaultsById::<T>::iter_keys().fold(0u64, |count, _| count.saturating_add(1));
+		let (expected_ranks, expected_total, expected_terms, expected_argonots) =
+			<(
+				Vec<AmountRankKey<VaultId>>,
+				u128,
+				Vec<(
+					VaultId,
+					VaultTerms<<T as Config>::Balance>,
+					Option<(Tick, VaultTerms<<T as Config>::Balance>)>,
+					BTreeMap<BitcoinHeight, SecuritizationScheduleEntry<<T as Config>::Balance>>,
+					<T as Config>::Balance,
+				)>,
+				Vec<(VaultId, <T as Config>::Balance, <T as Config>::Balance)>,
+			)>::decode(&mut state.as_slice())
+			.map_err(|_| TryRuntimeError::Other("invalid vault rank migration state"))?;
 		ensure!(
-			vault_count == expected_vault_count,
-			TryRuntimeError::Other("vault count changed during securitized satoshi reconciliation"),
+			VaultSecuritizationRanks::<T>::iter_keys().collect::<Vec<_>>() == expected_ranks,
+			TryRuntimeError::Other("vault securitization rank mismatch"),
 		);
-
-		let (mut accounting_by_vault, _) = collect_bitcoin_lock_accounting::<T>();
-		for (vault_id, vault) in crate::VaultsById::<T>::iter() {
-			let accounting = accounting_by_vault.remove(&vault_id).unwrap_or_default();
+		ensure!(
+			TotalVaultSecuritization::<T>::get().saturated_into::<u128>() == expected_total,
+			TryRuntimeError::Other("vault securitization total mismatch"),
+		);
+		ensure!(
+			VaultsById::<T>::iter().count() == expected_terms.len(),
+			TryRuntimeError::Other("vault count changed during terms migration"),
+		);
+		for (vault_id, terms, pending_terms, schedule, committed_microgons) in expected_terms {
+			let vault = VaultsById::<T>::get(vault_id)
+				.ok_or(TryRuntimeError::Other("vault missing after terms migration"))?;
 			ensure!(
-				vault.total_satoshis == accounting.total_satoshis,
-				TryRuntimeError::Other("vault total satoshis were not reconciled"),
-			);
-			ensure!(
-				vault.securitized_satoshis == accounting.securitized_satoshis,
-				TryRuntimeError::Other("vault securitized satoshis were not reconciled"),
-			);
-			ensure!(
-				vault.ratio_adjusted_satoshis == accounting.ratio_adjusted_satoshis,
-				TryRuntimeError::Other("vault ratio-adjusted satoshis were not reconciled"),
-			);
-			ensure!(
-				vault.flexible_ratio_adjusted_satoshis ==
-					accounting.flexible_ratio_adjusted_satoshis,
-				TryRuntimeError::Other(
-					"vault flexible ratio-adjusted satoshis were not reconciled"
-				),
+				vault.terms == terms &&
+					vault.pending_terms == pending_terms &&
+					vault.committed_microgons == committed_microgons &&
+					vault.securitization_release_schedule == schedule,
+				TryRuntimeError::Other("vault terms changed during migration"),
 			);
 		}
 		ensure!(
-			accounting_by_vault.is_empty(),
-			TryRuntimeError::Other("migrated bitcoin lock references a missing vault"),
+			old::VaultsReleasingOperationalMinimumByTick::<T>::iter_keys().next().is_none(),
+			TryRuntimeError::Other("old operational minimum release queue remains after migration")
 		);
+		ensure!(
+			old::ArgonotCommitmentByVaultId::<T>::iter_keys().next().is_none(),
+			TryRuntimeError::Other("old Argonot backing remains after migration")
+		);
+		ensure!(
+			ArgonotSecuritizationByVaultId::<T>::iter_keys().count() == expected_argonots.len(),
+			TryRuntimeError::Other("Argonot backing count changed during migration")
+		);
+		for (vault_id, held_micronots, encumbered_micronots) in expected_argonots {
+			ensure!(
+				ArgonotSecuritizationByVaultId::<T>::get(vault_id) ==
+					Some(VaultArgonotSecuritization {
+						held_micronots,
+						committed_micronots: <T as Config>::Balance::zero(),
+						encumbered_micronots,
+					}),
+				TryRuntimeError::Other("Argonot backing changed during migration")
+			);
+		}
 		Ok(())
 	}
 }
 
-pub type ReconcileBitcoinLockAccountingMigration<T> = frame_support::migrations::VersionedMigration<
-	17,
+pub type IndexVaultSecuritizationAndRemoveProfitSharingMigration<T> = VersionedMigration<
 	18,
-	ReconcileBitcoinLockAccounting<T>,
+	19,
+	IndexVaultSecuritizationAndRemoveProfitSharing<T>,
 	Pallet<T>,
 	<T as frame_system::Config>::DbWeight,
 >;
@@ -193,98 +382,194 @@ pub type ReconcileBitcoinLockAccountingMigration<T> = frame_support::migrations:
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::{mock::*, VaultsById};
-	use argon_primitives::{
-		bitcoin::{BitcoinCosignScriptPubkey, CompressedBitcoinPubkey},
-		vault::{BitcoinSecuritizationBasis, VaultTerms},
+	use crate::{
+		mock::{
+			new_test_ext, set_argons, BitcoinLocks, CurrentFrameId, RuntimeOrigin, Test, Vaults,
+		},
+		tests::keys,
+		VaultConfig,
 	};
+	use argon_primitives::{bitcoin::SATOSHIS_PER_BITCOIN, MICROGONS_PER_ARGON};
+	use bitcoin::bip32::Xpub;
 	use frame_support::traits::{OnRuntimeUpgrade, StorageVersion};
-	use pallet_bitcoin_locks::{LockedBitcoin, LocksById};
-	use polkadot_sdk::sp_core::H256;
 
-	fn vault(securitized_satoshis: u64) -> VaultV17<Test> {
-		VaultV17 {
-			operator_account_id: 1,
+	fn vault(operator: u64, securitization: u128, is_closed: bool) -> old::Vault<Test> {
+		old::Vault {
+			operator_account_id: operator,
 			delegate_account_id: None,
-			securitization: 1_000,
-			securitization_target: 1_000,
-			securitization_locked: 100,
+			securitization,
+			securitization_target: securitization,
+			securitization_locked: 0,
 			flexible_securitization_locked: 0,
 			reserved_securitization_space: 0,
-			securitization_pending_activation: 0,
-			securitized_satoshis,
-			ratio_adjusted_satoshis: 77,
+			securitized_satoshis: 0,
+			ratio_adjusted_satoshis: 0,
 			flexible_ratio_adjusted_satoshis: 0,
-			securitization_release_schedule: BoundedBTreeMap::new(),
-			securitization_ratio: FixedU128::one(),
-			is_closed: false,
-			terms: VaultTerms {
+			terms: old::VaultTerms {
 				bitcoin_annual_percent_rate: FixedU128::zero(),
 				bitcoin_base_fee: 0,
-				treasury_profit_sharing: Permill::zero(),
+				treasury_profit_sharing: Permill::from_percent(30),
 			},
-			pending_terms: None,
+			securitization_ratio: FixedU128::one(),
 			opened_tick: 1,
+			securitization_release_schedule: Default::default(),
+			is_closed,
+			pending_terms: Some((
+				3,
+				old::VaultTerms {
+					bitcoin_annual_percent_rate: FixedU128::from_rational(1, 10),
+					bitcoin_base_fee: 7,
+					treasury_profit_sharing: Permill::from_percent(40),
+				},
+			)),
+			securitization_pending_activation: 0,
+			total_satoshis: 0,
 			operational_minimum_release_tick: None,
 		}
 	}
 
-	fn lock(vault_id: u32, basis_satoshis: u64, funded_satoshis: u64) -> LockedBitcoin<Test> {
-		LockedBitcoin {
-			vault_id,
-			securitization_basis: BitcoinSecuritizationBasis {
-				satoshis: basis_satoshis,
-				microgons_at_target_per_btc: 1,
-			},
-			securitization_coverage_microgons: 1,
-			securitization_tick: 1,
-			funded_satoshis,
-			funding_utxos: BoundedBTreeMap::new(),
-			fissioned_satoshis: 0,
-			owner_account: 2,
-			securitization_ratio: FixedU128::one(),
-			security_fees: 0,
-			coupon_paid_fees: 0,
-			vault_pubkey: CompressedBitcoinPubkey([1; 33]),
-			vault_claim_pubkey: CompressedBitcoinPubkey([2; 33]),
-			vault_xpub_sources: ([3; 4], 4, 5),
-			owner_pubkey: CompressedBitcoinPubkey([6; 33]),
-			vault_claim_height: 100,
-			open_claim_height: 130,
-			created_at_height: 1,
-			securitization_hold_expiration_bitcoin_height: 10,
-			utxo_script_pubkey: BitcoinCosignScriptPubkey::P2WSH {
-				wscript_hash: H256::repeat_byte(7),
-			},
-			is_flexible: false,
-			fund_hold_extensions: BoundedBTreeMap::new(),
-			created_at_argon_block: 1,
-		}
+	#[test]
+	fn seeds_only_open_vaults_and_the_full_reward_total() {
+		new_test_ext().execute_with(|| {
+			StorageVersion::new(18).put::<Pallet<Test>>();
+			let mut pending_exit = vault(1, 50_000, false);
+			pending_exit.securitization_target = 40_000;
+			old::VaultsById::<Test>::insert(1, pending_exit);
+			let mut operational = vault(2, 70_000, false);
+			operational.operational_minimum_release_tick = Some(40);
+			old::VaultsById::<Test>::insert(2, operational);
+			old::VaultsReleasingOperationalMinimumByTick::<Test>::mutate(40, |ids| {
+				ids.try_insert(2).unwrap();
+			});
+			old::VaultsById::<Test>::insert(3, vault(3, 90_000, true));
+			#[cfg(feature = "try-runtime")]
+			let upgrade_state =
+				IndexVaultSecuritizationAndRemoveProfitSharing::<Test>::pre_upgrade().unwrap();
+
+			IndexVaultSecuritizationAndRemoveProfitSharingMigration::<Test>::on_runtime_upgrade();
+			#[cfg(feature = "try-runtime")]
+			IndexVaultSecuritizationAndRemoveProfitSharing::<Test>::post_upgrade(upgrade_state)
+				.unwrap();
+
+			let ranked_ids = VaultSecuritizationRanks::<Test>::iter_keys()
+				.map(|rank| rank.holder_id())
+				.collect::<Vec<_>>();
+			assert_eq!(ranked_ids, vec![2, 1]);
+			assert_eq!(TotalVaultSecuritization::<Test>::get(), 120_000);
+			let migrated = VaultsById::<Test>::get(1).expect("migrated vault");
+			assert_eq!(migrated.exit_notice_amount(), 10_000);
+			assert_eq!(migrated.committed_microgons, 0);
+			assert_eq!(
+				VaultsById::<Test>::get(2).unwrap().committed_microgons,
+				<Test as Config>::OperationalMinimumVaultSecuritization::get(),
+			);
+			assert!(old::VaultsReleasingOperationalMinimumByTick::<Test>::iter_keys()
+				.next()
+				.is_none());
+			let next_height = <Test as Config>::BitcoinBlockHeightChange::get().1 + 1;
+			assert!(VaultFundsReleasingByHeight::<Test>::get(next_height).contains(&1));
+			assert_eq!(migrated.terms.bitcoin_base_fee, 0);
+			assert_eq!(
+				migrated.pending_terms.as_ref().map(|(_, terms)| terms.bitcoin_base_fee),
+				Some(7)
+			);
+			assert_eq!(migrated.pending_terms.map(|(tick, _)| tick), Some(3));
+			assert_eq!(StorageVersion::get::<Pallet<Test>>(), StorageVersion::new(19));
+		});
 	}
 
 	#[test]
-	fn caps_migrated_vault_satoshis_at_each_locks_securitization_basis() {
+	fn seeds_existing_bitcoin_maturities_without_releasing_or_rotating() {
 		new_test_ext().execute_with(|| {
-			v17::VaultsById::<Test>::insert(1, vault(99_000));
-			LocksById::<Test>::insert(1, lock(1, 10_000, 12_000));
-			let mut flexible_lock = lock(1, 10_000, 4_000);
-			flexible_lock.securitization_ratio = FixedU128::from_rational(3, 2);
-			flexible_lock.is_flexible = true;
-			LocksById::<Test>::insert(2, flexible_lock);
-			StorageVersion::new(17).put::<Pallet<Test>>();
-
-			#[cfg(not(feature = "try-runtime"))]
-			ReconcileBitcoinLockAccountingMigration::<Test>::on_runtime_upgrade();
+			let amount = 100_000 * MICROGONS_PER_ARGON;
+			set_argons(1, amount);
+			let xpub = keys();
+			let owner_pubkey = Xpub::decode(&xpub.0).unwrap().public_key.serialize().into();
+			assert_ok!(Vaults::create(
+				RuntimeOrigin::signed(1),
+				VaultConfig {
+					terms: VaultTerms {
+						bitcoin_annual_percent_rate: FixedU128::zero(),
+						bitcoin_base_fee: 0
+					},
+					delegate_account_id: None,
+					securitization: amount,
+					bitcoin_xpubkey: xpub,
+					securitization_ratio: FixedU128::one(),
+				}
+			));
+			assert_ok!(BitcoinLocks::create_receive_address(
+				RuntimeOrigin::signed(2),
+				1,
+				SATOSHIS_PER_BITCOIN,
+				owner_pubkey,
+				None
+			));
+			let lock = LocksById::<Test>::get(1).unwrap();
+			let collateral = lock.get_securitization().collateral_required();
+			let expiration = lock.get_lock_extension().expiration_day();
+			LocksById::<Test>::mutate(1, |lock| {
+				lock.as_mut()
+					.unwrap()
+					.fund_hold_extensions
+					.try_insert(expiration + 144, collateral / 2)
+					.unwrap();
+			});
+			let mut existing = vault(1, amount, false);
+			existing.securitization_locked = collateral;
+			existing.securitization_pending_activation = collateral;
+			existing.securitization_target = amount - 7;
+			existing.securitization_release_schedule.try_insert(expiration, 11).unwrap();
+			let current_height = <Test as Config>::BitcoinBlockHeightChange::get().1;
+			existing.securitization_release_schedule.try_insert(current_height, 13).unwrap();
+			old::VaultsById::<Test>::insert(1, existing);
+			old::ArgonotCommitmentByVaultId::<Test>::insert(
+				1,
+				old::VaultArgonotCommitment { committed_micronots: 100, encumbered_micronots: 30 },
+			);
+			StorageVersion::new(18).put::<Pallet<Test>>();
 			#[cfg(feature = "try-runtime")]
-			ReconcileBitcoinLockAccountingMigration::<Test>::try_on_runtime_upgrade(true)
-				.expect("runtime upgrade checks");
+			let state = IndexVaultSecuritizationAndRemoveProfitSharing::<Test>::pre_upgrade().unwrap();
 
-			let vault = VaultsById::<Test>::get(1).expect("vault");
-			assert_eq!(vault.total_satoshis, 16_000);
-			assert_eq!(vault.securitized_satoshis, 14_000);
-			assert_eq!(vault.ratio_adjusted_satoshis, 16_000);
-			assert_eq!(vault.flexible_ratio_adjusted_satoshis, 6_000);
-			assert_eq!(StorageVersion::get::<Pallet<Test>>(), StorageVersion::new(18));
+			IndexVaultSecuritizationAndRemoveProfitSharingMigration::<Test>::on_runtime_upgrade();
+
+			#[cfg(feature = "try-runtime")]
+			IndexVaultSecuritizationAndRemoveProfitSharing::<Test>::post_upgrade(state).unwrap();
+			let migrated = VaultsById::<Test>::get(1).unwrap();
+			assert_eq!(
+				migrated.securitization_release_schedule[&expiration],
+				SecuritizationScheduleEntry {
+					locked_commitments: collateral / 2,
+					relockable_commitments: 11,
+					argon_withdrawals: 0,
+					argonot_withdrawals: 0,
+				}
+			);
+			assert_eq!(
+				migrated.securitization_release_schedule[&(expiration + 144)].locked_commitments,
+				collateral / 2
+			);
+			assert_eq!(migrated.securitization, amount);
+			assert_eq!(migrated.securitization_locked, collateral);
+			assert_eq!(migrated.get_relock_capacity(), 24);
+			assert_eq!(
+				migrated.securitization_release_schedule[&current_height],
+				SecuritizationScheduleEntry {
+					locked_commitments: 0,
+					relockable_commitments: 13,
+					argon_withdrawals: 7,
+					argonot_withdrawals: 0,
+				}
+			);
+			assert_eq!(CurrentFrameId::get(), 1);
+			assert_eq!(
+				ArgonotSecuritizationByVaultId::<Test>::get(1),
+				Some(VaultArgonotSecuritization {
+					held_micronots: 100,
+					committed_micronots: 0,
+					encumbered_micronots: 30,
+				})
+			);
 		});
 	}
 }

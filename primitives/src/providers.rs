@@ -601,6 +601,9 @@ pub trait TreasuryPoolProvider<AccountId> {
 	type Weights: TreasuryPoolProviderWeightInfo;
 	type Balance;
 
+	/// Refresh flexible-bond displacement after a vault's open securitization changes.
+	fn vault_securitization_changed(vault_id: VaultId, securitization: Self::Balance);
+
 	/// Whether the account currently has any active vault bond participation in the given vault.
 	fn has_vault_bond_participation(vault_id: VaultId, account_id: &AccountId) -> bool;
 	/// The account's active non-releasing vault bond amount in the given vault.
@@ -624,6 +627,8 @@ pub trait TreasuryPoolProvider<AccountId> {
 impl<AccountId> TreasuryPoolProvider<AccountId> for () {
 	type Weights = ();
 	type Balance = u128;
+
+	fn vault_securitization_changed(_vault_id: VaultId, _securitization: Self::Balance) {}
 
 	fn has_vault_bond_participation(_vault_id: VaultId, _account_id: &AccountId) -> bool {
 		false
@@ -1199,6 +1204,11 @@ pub trait BlockRewardAccountsProvider<AccountId: FullCodec> {
 pub trait MiningFrameTransitionProvider {
 	fn is_new_frame_started() -> Option<FrameId>;
 	fn get_current_frame_id() -> FrameId;
+}
+
+/// Provides the Bitcoin-minted Argons that have not been explicitly repaid.
+pub trait BitcoinMintedProvider<Balance> {
+	fn minted_bitcoin_microgons() -> Balance;
 }
 
 pub trait MiningFrameProvider {

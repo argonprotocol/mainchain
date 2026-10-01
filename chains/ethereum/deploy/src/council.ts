@@ -110,8 +110,6 @@ export async function deriveRuntimeCouncilSnapshot(
 
   const councilRotationFrames = client.consts.crosschainTransfer.councilRotationFrames.toBigInt();
   const ticksPerBitcoinBlock = client.consts.bitcoinLocks.ticksPerBitcoinBlock.toBigInt();
-  const operationalMinimumVaultSecuritization =
-    client.consts.vaults.operationalMinimumVaultSecuritization.toBigInt();
 
   if (ticksPerBitcoinBlock === 0n) {
     throw new Error(
@@ -150,8 +148,6 @@ export async function deriveRuntimeCouncilSnapshot(
           councilRotationFrames,
           currentBitcoinHeight,
           currentTick: currentTickValue,
-          epochMicrogonsPerArgonot,
-          operationalMinimumVaultSecuritization,
           ticksPerBitcoinBlock,
           ticksPerFrame,
           vault,
@@ -184,15 +180,16 @@ export async function deriveRuntimeCouncilSnapshot(
 }
 
 function getActivatedSecuritization(vault: ArgonPrimitivesVault) {
-  return vault.securitizationLocked.toBigInt() - vault.securitizationPendingActivation.toBigInt();
+  return saturatingSub(
+    vault.securitizationLocked.toBigInt(),
+    vault.securitizationPendingActivation.toBigInt(),
+  );
 }
 
 function getCommittedSecuritization(args: {
   councilRotationFrames: bigint;
   currentBitcoinHeight: bigint;
   currentTick: bigint;
-  epochMicrogonsPerArgonot: bigint;
-  operationalMinimumVaultSecuritization: bigint;
   ticksPerBitcoinBlock: bigint;
   ticksPerFrame: bigint;
   vault: ArgonPrimitivesVault;
@@ -206,18 +203,19 @@ function getCommittedSecuritization(args: {
   const bitcoinReleaseHorizonHeight =
     args.currentBitcoinHeight +
     (ticksUntilHorizon + saturatingSub(args.ticksPerBitcoinBlock, 1n)) / args.ticksPerBitcoinBlock;
-  const relockCapacity = [...args.vault.securitizationReleaseSchedule.entries()]
-    .filter(([height]) => height.toBigInt() > bitcoinReleaseHorizonHeight)
-    .reduce((sum, [, amount]) => sum + amount.toBigInt(), 0n);
-  const minimumReducibleSecuritization =
-    args.vault.operationalMinimumReleaseTick.isSome &&
-    args.vault.operationalMinimumReleaseTick.unwrap().toBigInt() > commitmentHorizonTick
-      ? args.operationalMinimumVaultSecuritization
-      : 0n;
+  let relockCapacity = 0n;
+  let withdrawalsDue = 0n;
+  for (const [height, entry] of args.vault.securitizationReleaseSchedule) {
+    if (height.toBigInt() > bitcoinReleaseHorizonHeight) {
+      relockCapacity += entry.relockableCommitments.toBigInt();
+    } else {
+      withdrawalsDue += entry.argonWithdrawals.toBigInt();
+    }
+  }
 
   return maxBigInt(
     getActivatedSecuritization(args.vault) + relockCapacity,
-    minimumReducibleSecuritization,
+    saturatingSub(args.vault.committedMicrogons.toBigInt(), withdrawalsDue),
   );
 }
 
@@ -262,7 +260,7 @@ function getCurrentMicrogonsPerArgonot(priceIndex: PalletPriceIndexPriceIndex) {
 }
 
 async function loadCommittedArgonots(client: ArgonClient, accountId: string, vaultId: number) {
-  const commitment = await client.query.vaults.argonotCommitmentByVaultId(vaultId);
+  const commitment = await client.query.vaults.argonotSecuritizationByVaultId(vaultId);
   if (commitment.isSome) {
     return commitment.unwrap().committedMicronots.toBigInt();
   }

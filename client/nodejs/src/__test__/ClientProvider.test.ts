@@ -20,7 +20,7 @@ it('uses one supplied connection and bundled metadata for historical reads', asy
   server.on('connection', socket => {
     connections += 1;
     socket.on('message', bytes => {
-      const { id, method, params } = JSON.parse(bytes.toString());
+      const { id, method, params } = JSON.parse((bytes as Buffer).toString());
       let result: unknown;
       switch (method) {
         case 'chain_getBlockHash':

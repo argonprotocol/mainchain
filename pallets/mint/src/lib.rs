@@ -24,13 +24,13 @@ pub mod pallet {
 	use argon_primitives::{
 		bitcoin::{BitcoinLockId, FissionId},
 		block_seal::{BlockPayout, FrameId},
-		ArgonCPI, BitcoinFissionMinting, BlockRewardAccountsProvider, BlockRewardsEventHandler,
-		BurnEventHandler, PriceProvider,
+		ArgonCPI, BitcoinFissionMinting, BitcoinMintedProvider, BlockRewardAccountsProvider,
+		BlockRewardsEventHandler, BurnEventHandler, PriceProvider,
 	};
 	use pallet_prelude::argon_primitives::{MiningFrameProvider, MiningFrameTransitionProvider};
 	use sp_runtime::FixedPointNumber;
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(3);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(4);
 	pub type MintIndex = u64;
 
 	#[pallet::pallet]
@@ -108,11 +108,7 @@ pub mod pallet {
 	#[pallet::storage]
 	pub type PendingMintQueueState<T: Config> = StorageValue<_, MintQueueCursor, ValueQuery>;
 
-	/// The total amount of microgons minted for mining
-	#[pallet::storage]
-	pub type MintedMiningMicrogons<T: Config> = StorageValue<_, T::Balance, ValueQuery>;
-
-	/// The total amount of Bitcoin microgons minted. Cannot exceed `MintedMiningMicrogons`.
+	/// Bitcoin-minted Argons that have not been explicitly repaid through Fission settlement.
 	#[pallet::storage]
 	pub type MintedBitcoinMicrogons<T: Config> = StorageValue<_, T::Balance, ValueQuery>;
 
@@ -187,7 +183,7 @@ pub mod pallet {
 			}
 
 			let mut bitcoin_mint = MintedBitcoinMicrogons::<T>::get();
-			let mining_mint = MintedMiningMicrogons::<T>::get();
+			let mining_mint = T::Currency::total_issuance().saturating_sub(bitcoin_mint);
 			let mut available_bitcoin_to_mint = mining_mint.saturating_sub(bitcoin_mint);
 			let mut payout_window_utxo_count = 0;
 			if available_bitcoin_to_mint > T::Balance::zero() {
@@ -319,7 +315,6 @@ pub mod pallet {
 			let microgons_to_print_per_miner =
 				Self::get_microgons_to_print_per_miner(reward_accounts.len() as u128);
 
-			let mut mining_mint = MintedMiningMicrogons::<T>::get();
 			let mut block_mint_action = BlockMintAction::<T>::get().1;
 			if microgons_to_print_per_miner > T::Balance::zero() {
 				let mut mining_mint_history = MiningMintPerCohort::<T>::get().into_inner();
@@ -328,7 +323,6 @@ pub mod pallet {
 					let amount = microgons_to_print_per_miner;
 					match T::Currency::mint_into(&miner, amount) {
 						Ok(_) => {
-							mining_mint.saturating_accrue(amount);
 							amount_minted.saturating_accrue(amount);
 							block_mint_action.argon_minted.saturating_accrue(amount);
 							if !mining_mint_history.contains_key(&starting_frame_id) &&
@@ -360,8 +354,6 @@ pub mod pallet {
 						},
 					};
 				}
-
-				MintedMiningMicrogons::<T>::put(mining_mint);
 
 				if let Ok(result) = BoundedBTreeMap::try_from(mining_mint_history) {
 					MiningMintPerCohort::<T>::put(result);
@@ -417,11 +409,9 @@ pub mod pallet {
 				}
 				data.argon_minted.saturating_accrue(amount);
 			});
-			MintedMiningMicrogons::<T>::mutate(|mint| mint.saturating_accrue(amount));
 		}
 
 		pub fn on_argon_burn(amount: T::Balance) {
-			let bitcoin_utxos = MintedBitcoinMicrogons::<T>::get();
 			BlockMintAction::<T>::mutate(|(b, data)| {
 				let block = <frame_system::Pallet<T>>::block_number();
 				if *b != block {
@@ -430,18 +420,10 @@ pub mod pallet {
 				}
 				data.argon_burned.saturating_accrue(amount);
 			});
-
-			let mining_mint = MintedMiningMicrogons::<T>::get();
-			let total_minted = mining_mint + bitcoin_utxos;
-			let mining_prorata = (amount * mining_mint).checked_div(&total_minted);
-			if let Some(microgons) = mining_prorata {
-				MintedMiningMicrogons::<T>::mutate(|mint| mint.saturating_reduce(microgons));
-			}
-
-			let bitcoin_prorata = (amount * bitcoin_utxos).checked_div(&total_minted);
-			if let Some(microgons) = bitcoin_prorata {
-				MintedBitcoinMicrogons::<T>::mutate(|mint| mint.saturating_reduce(microgons));
-			}
+			// Split unattributable burns evenly between Bitcoin- and mining-minted issuance.
+			MintedBitcoinMicrogons::<T>::mutate(|mint| {
+				mint.saturating_reduce(amount / 2u128.into())
+			});
 		}
 	}
 
@@ -498,6 +480,12 @@ pub mod pallet {
 	{
 		fn on_argon_burn(microgons: &T::Balance) {
 			Self::on_argon_burn(*microgons);
+		}
+	}
+
+	impl<T: Config> BitcoinMintedProvider<T::Balance> for Pallet<T> {
+		fn minted_bitcoin_microgons() -> T::Balance {
+			MintedBitcoinMicrogons::<T>::get()
 		}
 	}
 

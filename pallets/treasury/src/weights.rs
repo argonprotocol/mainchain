@@ -4,7 +4,8 @@ use pallet_prelude::*;
 
 /// Weight functions needed for this pallet.
 pub trait WeightInfo {
-	fn on_frame_transition() -> Weight;
+	fn on_frame_transition(argon_lots_scanned: u32, argonot_lots: u32, due_releases: u32)
+		-> Weight;
 	fn release_pending_bond_lots() -> Weight;
 	fn distribute_bid_pool() -> Weight;
 	fn lock_in_vault_capital() -> Weight;
@@ -14,6 +15,8 @@ pub trait WeightInfo {
 	fn liquidate_bond_lot() -> Weight;
 	fn set_bond_lot_flexible() -> Weight;
 	fn set_reserved_bond_space() -> Weight;
+	fn configure_reward_economics() -> Weight;
+	fn backfill_bond_lot_earnings() -> Weight;
 	fn provider_has_vault_bond_participation() -> Weight;
 	fn provider_active_vault_bond_amount() -> Weight;
 	fn provider_active_account_vault_bond_amount() -> Weight;
@@ -29,8 +32,12 @@ where
 	T: Config,
 	Base: WeightInfo,
 {
-	fn on_frame_transition() -> Weight {
-		Base::on_frame_transition()
+	fn on_frame_transition(
+		argon_lots_scanned: u32,
+		argonot_lots: u32,
+		due_releases: u32,
+	) -> Weight {
+		Base::on_frame_transition(argon_lots_scanned, argonot_lots, due_releases)
 	}
 
 	fn release_pending_bond_lots() -> Weight {
@@ -70,6 +77,14 @@ where
 
 	fn set_reserved_bond_space() -> Weight {
 		Base::set_reserved_bond_space()
+	}
+
+	fn configure_reward_economics() -> Weight {
+		Base::configure_reward_economics()
+	}
+
+	fn backfill_bond_lot_earnings() -> Weight {
+		Base::backfill_bond_lot_earnings()
 	}
 
 	fn provider_has_vault_bond_participation() -> Weight {
@@ -127,7 +142,11 @@ impl<T: Config> TreasuryPoolProviderWeightInfo for ProviderWeightAdapter<T> {
 
 // For backwards compatibility and tests.
 impl WeightInfo for () {
-	fn on_frame_transition() -> Weight {
+	fn on_frame_transition(
+		_argon_lots_scanned: u32,
+		_argonot_lots: u32,
+		_due_releases: u32,
+	) -> Weight {
 		Weight::zero()
 	}
 	fn release_pending_bond_lots() -> Weight {
@@ -156,6 +175,12 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 	fn set_reserved_bond_space() -> Weight {
+		Weight::zero()
+	}
+	fn configure_reward_economics() -> Weight {
+		Weight::zero()
+	}
+	fn backfill_bond_lot_earnings() -> Weight {
 		Weight::zero()
 	}
 	fn provider_has_vault_bond_participation() -> Weight {

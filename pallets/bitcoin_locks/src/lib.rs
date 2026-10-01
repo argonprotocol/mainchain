@@ -931,6 +931,9 @@ pub mod pallet {
 			let fee_coupon =
 				Self::validate_fee_coupon(vault_id, &account_id, None, satoshis, options.as_ref())?;
 			let securitization_request = ReserveSecuritizationRequest {
+				lock_expiration: T::BitcoinBlockHeightChange::get()
+					.1
+					.saturating_add(T::LockDurationBlocks::get()),
 				fee_discount: fee_coupon
 					.map(|coupon| coupon.fee_discount)
 					.unwrap_or_else(T::Balance::zero),
@@ -1304,6 +1307,9 @@ pub mod pallet {
 				options.as_ref(),
 			)?;
 			let securitization_request = ReserveSecuritizationRequest {
+				lock_expiration: T::BitcoinBlockHeightChange::get()
+					.1
+					.saturating_add(T::LockDurationBlocks::get()),
 				fee_discount: fee_coupon
 					.map(|coupon| coupon.fee_discount)
 					.unwrap_or_else(T::Balance::zero),
@@ -1935,6 +1941,8 @@ pub mod pallet {
 				T::VaultProvider::release_unactivated_securitization(
 					lock.vault_id,
 					lock.get_securitization().collateral_required(),
+					&lock.get_lock_extension(),
+					T::Balance::zero(),
 				)
 				.map_err(Error::<T>::from)?;
 				return Ok(());
@@ -2210,6 +2218,8 @@ pub mod pallet {
 			T::VaultProvider::release_unactivated_securitization(
 				lock.vault_id,
 				lock.get_securitization().collateral_required(),
+				&lock.get_lock_extension(),
+				T::Balance::zero(),
 			)
 			.map_err(Error::<T>::from)?;
 			Self::schedule_orphans_for_cleanup(lock_id, &lock);
@@ -2267,6 +2277,8 @@ pub mod pallet {
 					T::VaultProvider::release_unactivated_securitization(
 						lock.vault_id,
 						securitization.collateral_required().saturating_sub(collateral_required),
+						&lock.get_lock_extension(),
+						collateral_required,
 					)
 					.map_err(Error::<T>::from)?;
 					lock.securitization_basis.satoshis = lock.funded_satoshis;

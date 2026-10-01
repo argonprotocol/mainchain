@@ -1,9 +1,8 @@
 // Auto-generated via `yarn polkadot-types-from-defs`, do not edit
-/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
-import type {} from '@polkadot/types/types/registry';
+import '@polkadot/types/types/registry';
 
 import type { Data, StorageKey } from '@polkadot/types';
 import type {

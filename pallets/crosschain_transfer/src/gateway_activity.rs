@@ -921,7 +921,7 @@ mod test {
 			);
 			assert_ok!(Balances::mint_into(&owner_vault_operator, 10_000));
 			assert_ok!(Ownership::mint_into(&owner_vault_operator, 500));
-			assert_ok!(set_committed_argonots(owner_vault_operator.clone(), 200));
+			assert_ok!(set_argonot_securitization(owner_vault_operator.clone(), 200));
 			assert_ok!(CrosschainTransfer::register_minting_authority(
 				RuntimeOrigin::signed(owner_vault_operator.clone()),
 				SourceChain::Ethereum,
@@ -1675,7 +1675,7 @@ mod test {
 				SourceChain::Ethereum,
 				3_000,
 			));
-			assert_ok!(set_committed_argonots(owner_vault_operator.clone(), 250));
+			assert_ok!(set_argonot_securitization(owner_vault_operator.clone(), 250));
 			assert_ok!(CrosschainTransfer::register_minting_authority(
 				RuntimeOrigin::signed(owner_vault_operator.clone()),
 				SourceChain::Ethereum,
@@ -1730,7 +1730,7 @@ mod test {
 			assert_eq!(encumbered_bond_microgons(&owner_vault_operator), 0);
 			assert_eq!(encumbered_argonot_micronots(&owner_vault_operator), 0);
 			assert_eq!(active_bond_microgons(&owner_vault_operator), 3_000);
-			assert_eq!(committed_argonot_micronots(&owner_vault_operator), 200);
+			assert_eq!(held_argonot_micronots(&owner_vault_operator), 200);
 			assert_eq!(GatewaySyncPauseBySourceChain::<Test>::get(SourceChain::Ethereum), None,);
 			assert_ok!(CrosschainTransfer::register_minting_authority(
 				RuntimeOrigin::signed(owner_vault_operator.clone()),

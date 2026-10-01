@@ -773,7 +773,6 @@ where
 	let terms = VaultTerms {
 		bitcoin_annual_percent_rate: FixedU128::from_rational(110u128, 100u128),
 		bitcoin_base_fee: 1_000u128.into(),
-		treasury_profit_sharing: Permill::from_percent(20),
 	};
 	let vault = Vault {
 		operator_account_id: operator.clone(),
@@ -789,12 +788,12 @@ where
 		ratio_adjusted_satoshis: 0,
 		flexible_ratio_adjusted_satoshis: 0,
 		securitization_release_schedule: BoundedBTreeMap::default(),
+		committed_microgons: T::Balance::zero(),
 		securitization_ratio: FixedU128::one(),
 		is_closed: false,
 		terms,
 		pending_terms: None,
 		opened_tick: 1,
-		operational_minimum_release_tick: None,
 	};
 	let mut state = benchmark_bitcoin_vault_provider_state::<T::AccountId, T::Balance>();
 	state.vaults.insert(vault_id, vault);
