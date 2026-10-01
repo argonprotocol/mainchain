@@ -113,7 +113,7 @@ macro_rules! inject_runtime_vars {
 			// `spec_name`,   `spec_version`, and `authoring_version` are the same between Wasm and
 			// native. This value is set to 100 to notify Polkadot-JS App (https://polkadot.js.org/apps) to use
 			//   the compatible custom types.
-			spec_version: 159,
+			spec_version: 160,
 			impl_version: 10,
 			apis: RUNTIME_API_VERSIONS,
 			transaction_version: 5,
@@ -156,13 +156,11 @@ macro_rules! inject_runtime_vars {
 		///
 		/// This can be a tuple of types, each implementing `OnRuntimeUpgrade`.
 		type Migrations = (
-			pallet_bitcoin_locks::migrations::MigrateLockModelMigration<Runtime>,
-			// Reconcile Vault totals after Locks use the new multi-UTXO accounting model.
-			pallet_vaults::migrations::ReconcileBitcoinLockAccountingMigration<Runtime>,
-			// Candidate UTXOs are replayed through Bitcoin Locks after both migrations.
-			pallet_bitcoin_utxos::migrations::MigrateUtxoTrackingMigration<Runtime>,
-			pallet_mint::migrations::AddFissionIdToPendingMintsMigration<Runtime>,
-			pallet_treasury::migrations::CleanupStrandedBondLotsMigration<Runtime>,
+			pallet_mint::migrations::RemoveMiningMintCounterMigration<Runtime>,
+			pallet_vaults::migrations::IndexVaultSecuritizationAndRemoveProfitSharingMigration<
+				Runtime,
+			>,
+			pallet_treasury::migrations::SeedRewardStateMigration<Runtime>,
 		);
 
 		/// Unchecked extrinsic type as expected by this runtime.

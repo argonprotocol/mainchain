@@ -459,7 +459,7 @@ mod tests {
 			account, activate_test_minting_authority, assert_noop, assert_ok, bounded_vec,
 			encumbered_argonot_micronots, encumbered_bond_microgons, h160,
 			minting_authority_registration_signature, new_test_ext, set_active_vault_bond_amount,
-			set_committed_argonots, transfer_collateral_signature, ArgonPriceInUsd, Balances,
+			set_argonot_securitization, transfer_collateral_signature, ArgonPriceInUsd, Balances,
 			CrosschainTransfer, EthereumGasPriceInWei, EthereumPriceInUsd, Mutate, Ownership,
 			RuntimeOrigin, TokenError,
 		},
@@ -536,7 +536,7 @@ mod tests {
 			);
 			assert_ok!(Balances::mint_into(&owner_vault_operator, 10_000));
 			assert_ok!(Ownership::mint_into(&owner_vault_operator, 900));
-			assert_ok!(set_committed_argonots(owner_vault_operator.clone(), 500));
+			assert_ok!(set_argonot_securitization(owner_vault_operator.clone(), 500));
 			assert_noop!(
 				CrosschainTransfer::register_minting_authority(
 					RuntimeOrigin::signed(owner_vault_operator.clone()),
@@ -597,7 +597,7 @@ mod tests {
 			assert_eq!(encumbered_bond_microgons(&owner_vault_operator), 10_000);
 			assert_eq!(encumbered_argonot_micronots(&owner_vault_operator), 300);
 			assert_noop!(
-				set_committed_argonots(owner_vault_operator.clone(), 299),
+				set_argonot_securitization(owner_vault_operator.clone(), 299),
 				TokenError::Frozen,
 			);
 
@@ -670,7 +670,7 @@ mod tests {
 			);
 			assert_ok!(Balances::mint_into(&owner_vault_operator, 10_000));
 			assert_ok!(Ownership::mint_into(&owner_vault_operator, 900));
-			assert_ok!(set_committed_argonots(owner_vault_operator.clone(), 300));
+			assert_ok!(set_argonot_securitization(owner_vault_operator.clone(), 300));
 
 			assert_noop!(
 				CrosschainTransfer::register_minting_authority(

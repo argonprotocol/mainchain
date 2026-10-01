@@ -17,15 +17,13 @@ pub mod migrations;
 pub mod weights;
 
 /// The Vaults pallet allows a user to fund BitcoinLocks for bitcoin holders. This allows them to
-/// participate in treasury pools. Vaults can define the number of Argons available for bitcoin
-/// locks and the terms of both bitcoin locks and treasury pools. A Treasury pool can accept bonded
-/// argons up to the effective Bitcoin-backed value. Existing bonds remain held if that value later
-/// falls, but only the currently Bitcoin-backed portion participates in frame earnings.
+/// participate in treasury pools. Vaults define the securitization available for Bitcoin locks
+/// and the Bitcoin lock terms. Regular bonds can be bought up to the vault's securitization;
+/// flexible bonds yield admission space to regular bonds.
 ///
 /// ** Activated Securitization **
-/// A vault can create treasury pools up to 2x the locked securitization used for Bitcoin. This
-/// added securitization is locked up for the duration of the bitcoin locks, and will be taken in
-/// the case of bitcoins not being cosigned on release.
+/// Securitization backing funded Bitcoin is locked for the duration of its locks and can be taken
+/// if the Bitcoin is not cosigned on release.
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
@@ -33,23 +31,24 @@ pub mod pallet {
 	use argon_bitcoin::{primitives::BitcoinLockId, CosignScript, CosignScriptArgs};
 	use argon_primitives::{
 		bitcoin::{
-			BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinNetwork, BitcoinXPub,
-			CompressedBitcoinPubkey, OpaqueBitcoinXpub, Satoshis,
+			get_rounded_up_bitcoin_day_height, BitcoinCosignScriptPubkey, BitcoinHeight,
+			BitcoinNetwork, BitcoinXPub, CompressedBitcoinPubkey, OpaqueBitcoinXpub, Satoshis,
 		},
 		vault::{
 			BitcoinLockFundingUpdate, BitcoinResecuritization, BitcoinSecuritization,
 			BitcoinVaultProvider, LockExtension, LostBitcoinCompensation, RegistrationVaultData,
-			ReserveSecuritizationRequest, TreasuryVaultProvider, Vault, VaultArgonotCommitment,
-			VaultError, VaultTerms, VaultTreasuryFrameEarnings,
+			ReserveSecuritizationRequest, TreasuryVaultProvider, Vault, VaultArgonotSecuritization,
+			VaultError, VaultSecuritization, VaultTerms, VaultTreasuryFrameEarnings,
 		},
-		CollectBlockerProvider, MiningFrameProvider, OperationalAccountProvider, TickProvider,
+		AmountRankKey, CollectBlockerProvider, MiningFrameProvider, OperationalAccountProvider,
+		TickProvider, TreasuryPoolProvider,
 	};
 	use core::iter::Sum;
 	use frame_support::traits::Incrementable;
 	use pallet_prelude::argon_primitives::{OnNewSlot, OperationalAccountsHook};
 	use sp_runtime::traits::SaturatedConversion;
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(18);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(19);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -95,6 +94,9 @@ pub mod pallet {
 		type GetBitcoinNetwork: Get<BitcoinNetwork>;
 		/// Bitcoin time provider
 		type BitcoinBlockHeightChange: Get<(BitcoinHeight, BitcoinHeight)>;
+		/// Bitcoin blocks in the securitization exit notice period.
+		#[pallet::constant]
+		type SecuritizationExitNoticeBlocks: Get<BitcoinHeight>;
 		/// Estimated ticks per bitcoin block for release-schedule horizon calculations.
 		type TicksPerBitcoinBlock: Get<Tick>;
 		/// Ticks in one frame for commitment horizon calculations.
@@ -115,14 +117,13 @@ pub mod pallet {
 		/// The number of frames within which revenue must be collected
 		#[pallet::constant]
 		type RevenueCollectionExpirationFrames: Get<FrameId>;
-		/// Minimum vault securitization required while the operational floor lock is active.
+		/// Vault securitization committed when the operator becomes operational.
 		#[pallet::constant]
 		type OperationalMinimumVaultSecuritization: Get<Self::Balance>;
-		/// Duration to keep the operational minimum securitization locked from vault creation.
-		#[pallet::constant]
-		type OperationalMinimumVaultLockTicks: Get<Tick>;
 		/// Hook to notify operational accounts about vault lifecycle events.
 		type OperationalAccountsHook: OperationalAccountsHook<Self::AccountId, Self::Balance>;
+		/// Updates flexible-bond eligibility when open securitization changes.
+		type TreasuryPoolProvider: TreasuryPoolProvider<Self::AccountId, Balance = Self::Balance>;
 		/// Provider for whether restricted vault creation requires an upgraded
 		/// operational account.
 		type OperationalAccountProvider: OperationalAccountProvider<Self::AccountId>;
@@ -148,15 +149,24 @@ pub mod pallet {
 	pub type VaultsById<T: Config> =
 		StorageMap<_, Twox64Concat, VaultId, Vault<T::AccountId, T::Balance>, OptionQuery>;
 
+	/// Open vaults ordered by raw securitization (largest first), then vault ID.
+	#[pallet::storage]
+	pub type VaultSecuritizationRanks<T: Config> =
+		StorageMap<_, Identity, AmountRankKey<VaultId>, (), OptionQuery>;
+
+	/// Raw securitization across all open vaults, including those below the payout cutoff.
+	#[pallet::storage]
+	pub type TotalVaultSecuritization<T: Config> = StorageValue<_, T::Balance, ValueQuery>;
+
 	/// Vaults by owner
 	#[pallet::storage]
 	pub type VaultIdByOperator<T: Config> =
 		StorageMap<_, Twox64Concat, T::AccountId, VaultId, OptionQuery>;
 
-	/// Vault-side committed and crosschain-encumbered argonot backing.
+	/// Argonots held for the vault, with reward commitments and cross-chain encumbrances.
 	#[pallet::storage]
-	pub type ArgonotCommitmentByVaultId<T: Config> =
-		StorageMap<_, Twox64Concat, VaultId, VaultArgonotCommitment<T::Balance>, OptionQuery>;
+	pub type ArgonotSecuritizationByVaultId<T: Config> =
+		StorageMap<_, Twox64Concat, VaultId, VaultArgonotSecuritization<T::Balance>, OptionQuery>;
 
 	/// Vault Bitcoin Xpub and current child counter by VaultId
 	#[pallet::storage]
@@ -204,11 +214,6 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
-	/// Vaults whose temporary operational minimum may be released at a given tick.
-	#[pallet::storage]
-	pub type VaultsReleasingOperationalMinimumByTick<T: Config> =
-		StorageMap<_, Twox64Concat, Tick, BoundedBTreeSet<VaultId, T::MaxVaults>, ValueQuery>;
-
 	/// Tracks revenue from Bitcoin Locks and Treasury Pools for the trailing frames for each vault
 	/// (a frame is a "mining day" in Argon). Newest frames are first. Frames are removed after the
 	/// collect expiration window (`RevenueCollectionExpirationFrames`).
@@ -253,6 +258,15 @@ pub mod pallet {
 			vault_id: VaultId,
 			securitization_remaining: T::Balance,
 			securitization_released: T::Balance,
+		},
+		SecuritizationExitRequested {
+			vault_id: VaultId,
+			amount: T::Balance,
+			notice_ends_at: BitcoinHeight,
+		},
+		SecuritizationExitReleased {
+			vault_id: VaultId,
+			amount: T::Balance,
 		},
 		VaultBitcoinXpubChange {
 			vault_id: VaultId,
@@ -309,9 +323,18 @@ pub mod pallet {
 			vault_earnings: T::Balance,
 			error: DispatchError,
 		},
-		CommittedArgonotsSet {
+		ArgonotSecuritizationSet {
 			vault_id: VaultId,
 			operator_account_id: T::AccountId,
+			amount: T::Balance,
+		},
+		ArgonotExitRequested {
+			vault_id: VaultId,
+			amount: T::Balance,
+			notice_ends_at: BitcoinHeight,
+		},
+		ArgonotExitReleased {
+			vault_id: VaultId,
 			amount: T::Balance,
 		},
 	}
@@ -377,8 +400,8 @@ pub mod pallet {
 		AccountAlreadyHasVault,
 		/// Vault creation currently requires a prior operational-account upgrade.
 		OperationalAccountRegistrationRequired,
-		/// Committed Argonots cannot be reduced below the amount already crosschain-encumbered.
-		CommittedArgonotsBelowEncumberedBacking,
+		/// Held Argonots cannot be reduced below the amount already crosschain-encumbered.
+		ArgonotsBelowEncumberedBacking,
 	}
 
 	impl<T> From<VaultError> for Error<T> {
@@ -398,8 +421,8 @@ pub mod pallet {
 				VaultError::UnableToGenerateVaultBitcoinPubkey =>
 					Error::<T>::UnableToGenerateVaultBitcoinPubkey,
 				VaultError::VaultNotYetActive => Error::<T>::VaultNotYetActive,
-				VaultError::CommittedArgonotsBelowEncumberedBacking =>
-					Error::<T>::CommittedArgonotsBelowEncumberedBacking,
+				VaultError::ArgonotsBelowEncumberedBacking =>
+					Error::<T>::ArgonotsBelowEncumberedBacking,
 			}
 		}
 	}
@@ -438,35 +461,29 @@ pub mod pallet {
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(_n: BlockNumberFor<T>) -> Weight {
 			let (start_bitcoin_height, bitcoin_block_height) = T::BitcoinBlockHeightChange::get();
-			let bitcoin_completions = (start_bitcoin_height..=bitcoin_block_height)
-				.flat_map(VaultFundsReleasingByHeight::<T>::take);
 			let mut completions = 0u32;
-			for vault_id in bitcoin_completions {
-				completions += 1;
-				let res = with_storage_layer(|| {
-					Self::release_funds(vault_id, bitcoin_block_height)
-						.map_err(Error::<T>::from)
-						.map_err(DispatchError::from)
-				});
-				if let Err(e) = res {
-					log::error!("Vault `{vault_id}` unable to recoupd released funds {e:?}");
-					Self::deposit_event(Event::<T>::FundsReleasedError { vault_id, error: e });
+			for height in start_bitcoin_height..=bitcoin_block_height {
+				for vault_id in VaultFundsReleasingByHeight::<T>::take(height) {
+					completions.saturating_accrue(1);
+					let res = with_storage_layer(|| {
+						Self::release_funds(vault_id, bitcoin_block_height)
+							.map_err(Error::<T>::from)
+							.map_err(DispatchError::from)
+					});
+					if let Err(e) = res {
+						let retry_height = bitcoin_block_height.saturating_add(1);
+						VaultFundsReleasingByHeight::<T>::mutate(retry_height, |ids| {
+							let _ = ids.try_insert(vault_id);
+						});
+						log::error!("Vault `{vault_id}` unable to recoup released funds {e:?}");
+						Self::deposit_event(Event::<T>::FundsReleasedError { vault_id, error: e });
+					}
 				}
 			}
 
-			let previous_tick = T::TickProvider::previous_tick();
-			let current_tick = T::TickProvider::current_tick();
-			let operational_unlocks =
-				Self::clear_expired_operational_minimums(previous_tick, current_tick);
 			let height_range =
 				bitcoin_block_height.saturating_sub(start_bitcoin_height).saturating_add(1) as u32;
-			let operational_unlock_tick_count =
-				current_tick.saturating_sub(previous_tick).try_into().unwrap_or(u32::MAX);
-			T::WeightInfo::on_initialize_with_vault_releases(
-				height_range,
-				completions,
-				operational_unlock_tick_count.saturating_add(operational_unlocks),
-			)
+			T::WeightInfo::on_initialize_with_vault_releases(height_range, completions)
 		}
 
 		fn on_finalize(_n: BlockNumberFor<T>) {
@@ -560,17 +577,18 @@ pub mod pallet {
 				securitization_ratio,
 				opened_tick,
 				securitization_release_schedule: Default::default(),
+				committed_microgons: T::Balance::zero(),
 				is_closed: false,
 				pending_terms: None,
 				securitization_pending_activation: 0u32.into(),
 				total_satoshis: 0,
-				operational_minimum_release_tick: None,
 			};
 			VaultXPubById::<T>::insert(vault_id, (xpub, 0));
 
 			Self::hold(&who, securitization, HoldReason::EnterVault).map_err(Error::<T>::from)?;
 
 			VaultsById::<T>::insert(vault_id, vault);
+			Self::update_vault_rank(vault_id, T::Balance::zero(), securitization);
 			T::OperationalAccountsHook::vault_created(&who);
 			Self::deposit_event(Event::VaultCreated {
 				vault_id,
@@ -583,14 +601,14 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Modify funds allocated by the vault. This will not affect issued bitcoin locks, but will
-		/// affect the amount of funds available for new ones.
+		/// Modify funds allocated by the vault without changing existing Bitcoin locks.
 		///
 		/// The securitization percent must be maintained or increased.
 		///
-		/// The amount allocated may not go below the existing reserved amounts, but you can release
-		/// funds in this vault as bitcoin locks are released. To stop issuing any more bitcoin
-		/// locks, use the `close` api.
+		/// Funds not yet used in a reward snapshot may leave without notice if not needed for
+		/// Bitcoin commitments. Reward-committed funds require a one-year Bitcoin-height exit
+		/// notice and remain held until both the notice and any Bitcoin commitment have ended.
+		/// To stop issuing locks, use `close`.
 		#[pallet::call_index(1)]
 		#[pallet::weight(T::WeightInfo::modify_funding())]
 		pub fn modify_funding(
@@ -601,6 +619,8 @@ pub mod pallet {
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 			let mut vault = VaultsById::<T>::get(vault_id).ok_or(Error::<T>::VaultNotFound)?;
+			let old_open_securitization =
+				if vault.is_closed { T::Balance::zero() } else { vault.securitization };
 			// mutable because if it increases, we need to delay it to keep bidding markets fair.
 			ensure!(vault.operator_account_id == who, Error::<T>::NoPermissions);
 
@@ -610,25 +630,9 @@ pub mod pallet {
 				Error::<T>::InvalidSecuritization
 			);
 
-			let amount_to_hold =
-				balance_to_i128::<T>(securitization) - balance_to_i128::<T>(vault.securitization);
-
 			vault.securitization_ratio = securitization_ratio;
-			vault.securitization_target = securitization;
-
-			match amount_to_hold {
-				x if x > 0 => {
-					// increasing securitization
-					Self::hold(&who, (x as u128).into(), HoldReason::EnterVault)
-						.map_err(Error::<T>::from)?;
-					vault.securitization = securitization;
-				},
-				x if x < 0 => {
-					// decreasing securitization
-					Self::shrink_vault_securitization(&mut vault).map_err(Error::<T>::from)?;
-				},
-				_ => { /* no change */ },
-			}
+			Self::change_securitization_target(vault_id, &mut vault, securitization)
+				.map_err(Error::<T>::from)?;
 
 			Self::deposit_event(Event::VaultModified {
 				vault_id,
@@ -636,7 +640,10 @@ pub mod pallet {
 				securitization: vault.securitization,
 				securitization_ratio,
 			});
+			let next_open_securitization =
+				if vault.is_closed { T::Balance::zero() } else { vault.securitization };
 			VaultsById::<T>::insert(vault_id, vault);
+			Self::update_vault_rank(vault_id, old_open_securitization, next_open_securitization);
 
 			Ok(())
 		}
@@ -676,8 +683,8 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Stop offering additional bitcoin locks from this vault. Will not affect existing
-		/// locks. As funds are returned, they will be released to the vault owner.
+		/// Stop offering new Bitcoin locks. Existing locks continue; securitization exits after
+		/// its notice and any existing Bitcoin commitment.
 		#[pallet::call_index(3)]
 		#[pallet::weight(T::WeightInfo::close())]
 		pub fn close(origin: OriginFor<T>, vault_id: VaultId) -> DispatchResult {
@@ -687,11 +694,13 @@ pub mod pallet {
 				VaultsById::<T>::get(vault_id).ok_or::<Error<T>>(Error::<T>::VaultNotFound)?;
 
 			ensure!(vault.operator_account_id == who, Error::<T>::NoPermissions);
+			let previous_reward_securitization =
+				if vault.is_closed { T::Balance::zero() } else { vault.securitization };
 
 			vault.is_closed = true;
-			vault.securitization_target = T::Balance::zero();
 			let start_securitization = vault.securitization;
-			Self::shrink_vault_securitization(&mut vault).map_err(Error::<T>::from)?;
+			Self::change_securitization_target(vault_id, &mut vault, T::Balance::zero())
+				.map_err(Error::<T>::from)?;
 			let securitization_remaining = vault.securitization;
 
 			Self::deposit_event(Event::VaultClosed {
@@ -701,6 +710,7 @@ pub mod pallet {
 					.saturating_sub(securitization_remaining),
 			});
 			VaultsById::<T>::insert(vault_id, vault);
+			Self::update_vault_rank(vault_id, previous_reward_securitization, T::Balance::zero());
 
 			Ok(())
 		}
@@ -799,23 +809,63 @@ pub mod pallet {
 		}
 
 		#[pallet::call_index(8)]
-		#[pallet::weight(T::WeightInfo::set_committed_argonots())]
-		pub fn set_committed_argonots(
+		#[pallet::weight(T::WeightInfo::set_argonot_securitization())]
+		/// Set the desired Argonot backing. Unused funds release immediately; reward commitments
+		/// withdraw after one-year notice, continuing to participate until released.
+		pub fn set_argonot_securitization(
 			origin: OriginFor<T>,
 			#[pallet::compact] amount: T::Balance,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 			let vault_id = VaultIdByOperator::<T>::get(&who).ok_or(Error::<T>::VaultNotFound)?;
-			let mut commitment = Self::argonot_commitment(vault_id, &who);
+			let mut vault = VaultsById::<T>::get(vault_id).ok_or(Error::<T>::VaultNotFound)?;
+			let mut commitment = Self::argonot_securitization(vault_id, &who);
 			ensure!(
 				amount >= commitment.encumbered_micronots,
-				Error::<T>::CommittedArgonotsBelowEncumberedBacking,
+				Error::<T>::ArgonotsBelowEncumberedBacking,
 			);
+			let pending: T::Balance = vault
+				.securitization_release_schedule
+				.values()
+				.map(|entry| entry.argonot_withdrawals)
+				.sum();
+			let current_target = commitment.held_micronots.saturating_sub(pending);
+			let mut held = commitment.held_micronots;
+			if amount > current_target {
+				vault.cancel_argonot_exits(amount.saturating_sub(current_target));
+				held = held.max(amount);
+			} else if amount < current_target {
+				let reduction = current_target.saturating_sub(amount);
+				let immediate = reduction.min(held.saturating_sub(
+					commitment.committed_micronots.max(commitment.encumbered_micronots),
+				));
+				held.saturating_reduce(immediate);
+				let notice = reduction.saturating_sub(immediate);
+				if !notice.is_zero() {
+					let notice_height = get_rounded_up_bitcoin_day_height(
+						T::BitcoinBlockHeightChange::get()
+							.1
+							.saturating_add(T::SecuritizationExitNoticeBlocks::get()),
+					);
+					vault
+						.scheduled_release(notice_height)
+						.map_err(Error::<T>::from)?
+						.argonot_withdrawals
+						.saturating_accrue(notice);
+					Self::track_securitization_withdrawal_schedule(vault_id, notice_height)
+						.map_err(Error::<T>::from)?;
+					Self::deposit_event(Event::ArgonotExitRequested {
+						vault_id,
+						amount: notice,
+						notice_ends_at: notice_height,
+					});
+				}
+			}
 			let hold_reason = HoldReason::EnterVault;
 			let current = T::OwnershipCurrency::balance_on_hold(&hold_reason.into(), &who);
 
-			if amount > current {
-				let additional = amount.saturating_sub(current);
+			if held > current {
+				let additional = held.saturating_sub(current);
 				if current.is_zero() {
 					let _ = frame_system::Pallet::<T>::inc_providers(&who);
 				}
@@ -841,8 +891,8 @@ pub mod pallet {
 						}
 					},
 				)?;
-			} else if amount < current {
-				let release_amount = current.saturating_sub(amount);
+			} else if held < current {
+				let release_amount = current.saturating_sub(held);
 				T::OwnershipCurrency::release(
 					&hold_reason.into(),
 					&who,
@@ -856,10 +906,11 @@ pub mod pallet {
 				}
 			}
 
-			commitment.committed_micronots = amount;
-			ArgonotCommitmentByVaultId::<T>::insert(vault_id, commitment);
+			commitment.held_micronots = held;
+			ArgonotSecuritizationByVaultId::<T>::insert(vault_id, commitment);
+			VaultsById::<T>::insert(vault_id, vault);
 
-			Self::deposit_event(Event::CommittedArgonotsSet {
+			Self::deposit_event(Event::ArgonotSecuritizationSet {
 				vault_id,
 				operator_account_id: who,
 				amount,
@@ -890,16 +941,17 @@ pub mod pallet {
 	}
 
 	impl<T: Config> Pallet<T> {
-		fn argonot_commitment(
+		fn argonot_securitization(
 			vault_id: VaultId,
 			account_id: &T::AccountId,
-		) -> VaultArgonotCommitment<T::Balance> {
-			ArgonotCommitmentByVaultId::<T>::get(vault_id).unwrap_or_else(|| {
-				VaultArgonotCommitment {
-					committed_micronots: T::OwnershipCurrency::balance_on_hold(
+		) -> VaultArgonotSecuritization<T::Balance> {
+			ArgonotSecuritizationByVaultId::<T>::get(vault_id).unwrap_or_else(|| {
+				VaultArgonotSecuritization {
+					held_micronots: T::OwnershipCurrency::balance_on_hold(
 						&HoldReason::EnterVault.into(),
 						account_id,
 					),
+					committed_micronots: T::Balance::zero(),
 					encumbered_micronots: T::Balance::default(),
 				}
 			})
@@ -910,19 +962,6 @@ pub mod pallet {
 				return T::MiningFrameProvider::get_next_frame_tick();
 			}
 			T::TickProvider::current_tick()
-		}
-
-		fn minimum_reducible_securitization_at_tick(
-			vault: &Vault<T::AccountId, T::Balance>,
-			tick: Tick,
-		) -> T::Balance {
-			if vault
-				.operational_minimum_release_tick
-				.is_some_and(|unlock_tick| unlock_tick > tick)
-			{
-				return T::OperationalMinimumVaultSecuritization::get();
-			}
-			T::Balance::zero()
 		}
 
 		pub(crate) fn bitcoin_height_after_tick_range(
@@ -942,41 +981,6 @@ pub mod pallet {
 						.saturated_into::<BitcoinHeight>(),
 				),
 			)
-		}
-
-		fn clear_expired_operational_minimums(previous_tick: Tick, current_tick: Tick) -> u32 {
-			if current_tick <= previous_tick {
-				return 0;
-			}
-
-			let mut cleared = 0u32;
-			for tick in previous_tick.saturating_add(1)..=current_tick {
-				let vaults = VaultsReleasingOperationalMinimumByTick::<T>::take(tick);
-				for vault_id in vaults {
-					cleared = cleared.saturating_add(1);
-					let release_result = VaultsById::<T>::mutate(vault_id, |maybe_vault| {
-						let Some(vault) = maybe_vault.as_mut() else {
-							return Ok(());
-						};
-						if vault
-							.operational_minimum_release_tick
-							.is_none_or(|unlock_tick| unlock_tick > current_tick)
-						{
-							return Ok(());
-						}
-
-						vault.operational_minimum_release_tick = None;
-						Self::shrink_vault_securitization(vault)
-					});
-					if let Err(error) = release_result {
-						log::error!(
-							"Vault `{vault_id}` unable to release expired operational minimum {error:?}"
-						);
-					}
-				}
-			}
-
-			cleared
 		}
 
 		fn hold(
@@ -1031,50 +1035,152 @@ pub mod pallet {
 
 		fn release_funds(vault_id: VaultId, block_height: BitcoinHeight) -> Result<(), VaultError> {
 			let mut vault = VaultsById::<T>::get(vault_id).ok_or(VaultError::VaultNotFound)?;
+			let previous_open_securitization =
+				if vault.is_closed { T::Balance::zero() } else { vault.securitization };
 
 			let swept = vault.sweep_released(block_height);
 			Self::deposit_event(Event::FundsReleased { vault_id, securitization: swept });
-			Self::shrink_vault_securitization(&mut vault)?;
+			Self::release_due_securitization_exits(vault_id, &mut vault, block_height)?;
+			let next_open_securitization =
+				if vault.is_closed { T::Balance::zero() } else { vault.securitization };
 			VaultsById::<T>::insert(vault_id, vault);
+			Self::update_vault_rank(
+				vault_id,
+				previous_open_securitization,
+				next_open_securitization,
+			);
 			Ok(())
 		}
 
-		fn shrink_vault_securitization(
+		fn release_due_securitization_exits(
+			vault_id: VaultId,
 			vault: &mut Vault<T::AccountId, T::Balance>,
+			block_height: BitcoinHeight,
 		) -> Result<(), VaultError> {
-			let uninhibited_securitization = vault
-				.uninhibited_securitization()
-				.min(vault.available_securitization_space(true));
-			let minimum_remaining_securitization =
-				vault.securitization_target.max(Self::minimum_reducible_securitization_at_tick(
-					vault,
-					T::TickProvider::current_tick(),
-				));
-
-			if uninhibited_securitization.is_zero() ||
-				vault.securitization <= minimum_remaining_securitization
-			{
-				return Ok(());
-			}
-			let amount_to_release =
-				vault.securitization.saturating_sub(minimum_remaining_securitization);
-			let free_securitization = uninhibited_securitization.min(amount_to_release);
-
-			ensure!(
-				T::Currency::balance_on_hold(
-					&HoldReason::EnterVault.into(),
-					&vault.operator_account_id
-				) >= free_securitization,
-				VaultError::HoldUnexpectedlyModified
+			let amount = vault.release_matured_securitization_exits(
+				block_height,
+				vault.securitization.saturating_sub(
+					vault
+						.securitization_target
+						.max(
+							vault.securitization_locked.saturating_add(vault.get_relock_capacity()),
+						)
+						.max(
+							vault
+								.regular_securitization_locked()
+								.saturating_add(vault.reserved_securitization_space),
+						),
+				),
 			);
+			Self::release_hold(&vault.operator_account_id, amount, HoldReason::EnterVault)
+				.map_err(|_| VaultError::UnrecoverableHold)?;
+			if !amount.is_zero() {
+				Self::deposit_event(Event::SecuritizationExitReleased { vault_id, amount });
+			}
+			let mut argonots = Self::argonot_securitization(vault_id, &vault.operator_account_id);
+			let mut available =
+				argonots.held_micronots.saturating_sub(argonots.encumbered_micronots);
+			let mut released = T::Balance::zero();
+			for (height, entry) in vault.securitization_release_schedule.iter_mut() {
+				if *height > block_height || entry.argonot_withdrawals > available {
+					break;
+				}
+				available.saturating_reduce(entry.argonot_withdrawals);
+				released.saturating_accrue(entry.argonot_withdrawals);
+				entry.argonot_withdrawals = T::Balance::zero();
+			}
+			if !released.is_zero() {
+				T::OwnershipCurrency::release(
+					&HoldReason::EnterVault.into(),
+					&vault.operator_account_id,
+					released,
+					Precision::Exact,
+				)
+				.map_err(|_| VaultError::UnrecoverableHold)?;
+				argonots.held_micronots.saturating_reduce(released);
+				argonots.committed_micronots.saturating_reduce(released);
+				if argonots.held_micronots.is_zero() {
+					let _ = frame_system::Pallet::<T>::dec_providers(&vault.operator_account_id);
+				}
+				ArgonotSecuritizationByVaultId::<T>::insert(vault_id, argonots);
+				Self::deposit_event(Event::ArgonotExitReleased { vault_id, amount: released });
+			}
+			vault.securitization_release_schedule.retain(|_, entry| !entry.is_empty());
+			if vault.securitization_release_schedule.iter().any(|(height, entry)| {
+				*height <= block_height &&
+					(!entry.argon_withdrawals.is_zero() || !entry.argonot_withdrawals.is_zero())
+			}) {
+				let retry_height =
+					get_rounded_up_bitcoin_day_height(block_height.saturating_add(1));
+				Self::track_securitization_withdrawal_schedule(vault_id, retry_height)?;
+			}
+			Ok(())
+		}
 
-			Self::release_hold(
-				&vault.operator_account_id,
-				free_securitization,
-				HoldReason::EnterVault,
-			)
-			.map_err(|_| VaultError::UnrecoverableHold)?;
-			vault.securitization.saturating_reduce(free_securitization);
+		fn update_vault_rank(vault_id: VaultId, previous: T::Balance, next: T::Balance) {
+			if previous == next {
+				return;
+			}
+			if !previous.is_zero() {
+				VaultSecuritizationRanks::<T>::remove(AmountRankKey::new(
+					previous.saturated_into::<u128>(),
+					vault_id,
+				));
+			}
+			if !next.is_zero() {
+				VaultSecuritizationRanks::<T>::insert(
+					AmountRankKey::new(next.saturated_into::<u128>(), vault_id),
+					(),
+				);
+			}
+			TotalVaultSecuritization::<T>::mutate(|total| {
+				*total = total.saturating_sub(previous).saturating_add(next);
+			});
+			T::TreasuryPoolProvider::vault_securitization_changed(vault_id, next);
+		}
+
+		fn change_securitization_target(
+			vault_id: VaultId,
+			vault: &mut Vault<T::AccountId, T::Balance>,
+			new_target: T::Balance,
+		) -> Result<(), VaultError> {
+			let previous_target = vault.securitization_target;
+			let current_height = T::BitcoinBlockHeightChange::get().1;
+			if new_target > previous_target {
+				let cancelled =
+					new_target.saturating_sub(previous_target).min(vault.exit_notice_amount());
+				vault.cancel_securitization_exits(cancelled);
+				let added = new_target.saturating_sub(vault.securitization);
+				Self::hold(&vault.operator_account_id, added, HoldReason::EnterVault)?;
+				vault.securitization.saturating_accrue(added);
+			} else if new_target < previous_target {
+				let reduction = previous_target.saturating_sub(new_target);
+				let immediately_releasable = reduction
+					.min(vault.securitization.saturating_sub(vault.committed_microgons))
+					.min(vault.uninhibited_securitization())
+					.min(vault.available_securitization_space(true));
+				Self::release_hold(
+					&vault.operator_account_id,
+					immediately_releasable,
+					HoldReason::EnterVault,
+				)
+				.map_err(|_| VaultError::UnrecoverableHold)?;
+				vault.securitization.saturating_reduce(immediately_releasable);
+				let notice = reduction.saturating_sub(immediately_releasable);
+				if !notice.is_zero() {
+					let notice_height = get_rounded_up_bitcoin_day_height(
+						current_height.saturating_add(T::SecuritizationExitNoticeBlocks::get()),
+					);
+					vault.request_securitization_exit(notice, notice_height)?;
+					Self::track_securitization_withdrawal_schedule(vault_id, notice_height)?;
+					Self::deposit_event(Event::SecuritizationExitRequested {
+						vault_id,
+						amount: notice,
+						notice_ends_at: notice_height,
+					});
+				}
+			}
+			vault.securitization_target = new_target;
 			Ok(())
 		}
 
@@ -1163,6 +1269,15 @@ pub mod pallet {
 			if !swept.is_zero() {
 				Self::deposit_event(Event::FundsReleased { vault_id, securitization: swept });
 			}
+			Ok(())
+		}
+
+		fn track_securitization_withdrawal_schedule(
+			vault_id: VaultId,
+			height: BitcoinHeight,
+		) -> Result<(), VaultError> {
+			VaultFundsReleasingByHeight::<T>::mutate(height, |ids| ids.try_insert(vault_id))
+				.map_err(|_| VaultError::InternalError)?;
 			Ok(())
 		}
 	}
@@ -1254,13 +1369,75 @@ pub mod pallet {
 	}
 
 	impl<T: Config> TreasuryVaultProvider for Pallet<T> {
+		type Weights = crate::weights::ProviderWeightAdapter<T>;
 		type Balance = T::Balance;
 		type AccountId = T::AccountId;
 
-		fn get_eligible_satoshis(vault_id: VaultId) -> Satoshis {
+		fn get_vault_securitization(vault_id: VaultId) -> Option<Self::Balance> {
 			VaultsById::<T>::get(vault_id)
-				.map(|vault| vault.effective_eligible_satoshis())
-				.unwrap_or_default()
+				.filter(|vault| !vault.is_closed)
+				.map(|vault| vault.securitization)
+		}
+
+		fn commit_securitization_for_bonds(
+			vault_id: VaultId,
+			regular_bond_microgons: Self::Balance,
+		) -> Result<(), VaultError> {
+			VaultsById::<T>::try_mutate(vault_id, |vault| {
+				let vault = vault.as_mut().ok_or(VaultError::VaultNotFound)?;
+				ensure!(!vault.is_closed, VaultError::VaultClosed);
+				ensure!(
+					regular_bond_microgons <=
+						vault.securitization.saturating_sub(vault.exit_notice_amount()),
+					VaultError::InsufficientVaultFunds
+				);
+				vault.committed_microgons = vault.committed_microgons.max(regular_bond_microgons);
+				Ok(())
+			})
+		}
+
+		fn get_top_vaults_by_securitization(
+			max_vaults: u32,
+		) -> (Vec<VaultSecuritization<Self::Balance, Self::AccountId>>, Self::Balance) {
+			let positions = VaultSecuritizationRanks::<T>::iter_keys()
+				.take(max_vaults as usize)
+				.filter_map(|rank| {
+					let vault_id = rank.holder_id();
+					VaultsById::<T>::get(vault_id).map(|vault| VaultSecuritization {
+						vault_id,
+						activated_securitization: vault.get_activated_securitization(),
+						securitization_micronots: Self::argonot_securitization(
+							vault_id,
+							&vault.operator_account_id,
+						)
+						.held_micronots,
+						bitcoin_locked_satoshis: vault.total_satoshis,
+						operator_account_id: vault.operator_account_id,
+						securitization: vault.securitization,
+					})
+				})
+				.collect();
+			(positions, TotalVaultSecuritization::<T>::get())
+		}
+
+		fn commit_securitization_for_rewards(vault_id: VaultId, micronots: Self::Balance) {
+			let Some(mut vault) = VaultsById::<T>::get(vault_id) else { return };
+			if vault.committed_microgons != vault.securitization {
+				vault.committed_microgons = vault.securitization;
+				VaultsById::<T>::insert(vault_id, &vault);
+			}
+			if micronots.is_zero() {
+				return;
+			}
+			let mut securitization =
+				Self::argonot_securitization(vault_id, &vault.operator_account_id);
+			let committed = securitization
+				.committed_micronots
+				.max(micronots.min(securitization.held_micronots));
+			if committed != securitization.committed_micronots {
+				securitization.committed_micronots = committed;
+				ArgonotSecuritizationByVaultId::<T>::insert(vault_id, securitization);
+			}
 		}
 
 		fn get_vault_operator(vault_id: VaultId) -> Option<Self::AccountId> {
@@ -1271,10 +1448,6 @@ pub mod pallet {
 			VaultsById::<T>::get(vault_id).and_then(|a| a.delegate_account_id)
 		}
 
-		fn get_vault_profit_sharing_percent(vault_id: VaultId) -> Option<Permill> {
-			VaultsById::<T>::get(vault_id).map(|a| a.terms.treasury_profit_sharing)
-		}
-
 		fn is_vault_open(vault_id: VaultId) -> bool {
 			VaultsById::<T>::get(vault_id).map(|a| !a.is_closed).unwrap_or_default()
 		}
@@ -1282,7 +1455,7 @@ pub mod pallet {
 		fn record_vault_frame_earnings(
 			source_account_id: &Self::AccountId,
 			profit: VaultTreasuryFrameEarnings<Self::Balance, Self::AccountId>,
-		) {
+		) -> DispatchResult {
 			let VaultTreasuryFrameEarnings {
 				vault_id,
 				vault_operator_account_id,
@@ -1293,7 +1466,7 @@ pub mod pallet {
 				earnings,
 			} = profit;
 
-			if let Err(e) = Self::mutate_frame_revenue(vault_id, frame_id, |revenue| {
+			Self::mutate_frame_revenue(vault_id, frame_id, |revenue| {
 				revenue.treasury_total_earnings = earnings;
 				revenue.treasury_vault_earnings = earnings_for_vault;
 				revenue.treasury_external_capital =
@@ -1311,16 +1484,18 @@ pub mod pallet {
 				)
 				.map_err(|_| VaultError::UnrecoverableHold)?;
 				Ok(())
-			}) {
+			})
+			.map_err(|e| {
 				log::error!("Unable to record vault frame profits for vault {vault_id}: {e:?}");
-				let error: Error<T> = e.into();
+				let dispatch_error: DispatchError = Error::<T>::from(e).into();
 				Self::deposit_event(Event::TreasuryRecordingError {
 					vault_id,
 					frame_id,
 					vault_earnings: earnings_for_vault,
-					error: error.into(),
+					error: dispatch_error,
 				});
-			}
+				dispatch_error
+			})
 		}
 	}
 
@@ -1386,21 +1561,23 @@ pub mod pallet {
 			let bitcoin_release_horizon_height = Self::bitcoin_height_after_tick_range(
 				current_height,
 				commitment_horizon_tick.saturating_sub(current_tick),
-			);
+			)?;
+			let withdrawals_due: T::Balance = vault
+				.securitization_release_schedule
+				.iter()
+				.filter(|(height, _)| **height <= bitcoin_release_horizon_height)
+				.map(|(_, entry)| entry.argon_withdrawals)
+				.sum();
 			let committed_securitization = vault
 				.get_activated_securitization()
-				.saturating_add(vault.get_relock_capacity_after(bitcoin_release_horizon_height?))
-				.max(Self::minimum_reducible_securitization_at_tick(
-					&vault,
-					commitment_horizon_tick,
-				));
-
+				.saturating_add(vault.get_relock_capacity_after(bitcoin_release_horizon_height))
+				.max(vault.committed_microgons.saturating_sub(withdrawals_due));
 			Some(committed_securitization)
 		}
 
-		fn get_committed_argonots(account_id: &Self::AccountId) -> Option<Self::Balance> {
+		fn get_held_argonots(account_id: &Self::AccountId) -> Option<Self::Balance> {
 			let vault_id = VaultIdByOperator::<T>::get(account_id)?;
-			Some(Self::argonot_commitment(vault_id, account_id).committed_micronots)
+			Some(Self::argonot_securitization(vault_id, account_id).held_micronots)
 		}
 
 		fn encumber_argonots(
@@ -1409,15 +1586,15 @@ pub mod pallet {
 		) -> Result<(), VaultError> {
 			let vault_id =
 				VaultIdByOperator::<T>::get(account_id).ok_or(VaultError::VaultNotFound)?;
-			let mut commitment = Self::argonot_commitment(vault_id, account_id);
+			let mut commitment = Self::argonot_securitization(vault_id, account_id);
 			let Some(next_encumbered) = commitment.encumbered_micronots.checked_add(&amount) else {
 				return Err(VaultError::InternalError);
 			};
-			if next_encumbered > commitment.committed_micronots {
-				return Err(VaultError::CommittedArgonotsBelowEncumberedBacking);
+			if next_encumbered > commitment.held_micronots {
+				return Err(VaultError::ArgonotsBelowEncumberedBacking);
 			}
 			commitment.encumbered_micronots = next_encumbered;
-			ArgonotCommitmentByVaultId::<T>::insert(vault_id, commitment);
+			ArgonotSecuritizationByVaultId::<T>::insert(vault_id, commitment);
 			Ok(())
 		}
 
@@ -1427,12 +1604,12 @@ pub mod pallet {
 		) -> Result<(), VaultError> {
 			let vault_id =
 				VaultIdByOperator::<T>::get(account_id).ok_or(VaultError::VaultNotFound)?;
-			let mut commitment = Self::argonot_commitment(vault_id, account_id);
+			let mut commitment = Self::argonot_securitization(vault_id, account_id);
 			commitment.encumbered_micronots = commitment
 				.encumbered_micronots
 				.checked_sub(&amount)
-				.ok_or(VaultError::CommittedArgonotsBelowEncumberedBacking)?;
-			ArgonotCommitmentByVaultId::<T>::insert(vault_id, commitment);
+				.ok_or(VaultError::ArgonotsBelowEncumberedBacking)?;
+			ArgonotSecuritizationByVaultId::<T>::insert(vault_id, commitment);
 			Ok(())
 		}
 
@@ -1442,15 +1619,15 @@ pub mod pallet {
 		) -> Result<(), VaultError> {
 			let vault_id =
 				VaultIdByOperator::<T>::get(account_id).ok_or(VaultError::VaultNotFound)?;
-			let mut commitment = Self::argonot_commitment(vault_id, account_id);
-			commitment.committed_micronots = commitment
-				.committed_micronots
+			let mut commitment = Self::argonot_securitization(vault_id, account_id);
+			commitment.held_micronots = commitment
+				.held_micronots
 				.checked_sub(&amount)
-				.ok_or(VaultError::CommittedArgonotsBelowEncumberedBacking)?;
+				.ok_or(VaultError::ArgonotsBelowEncumberedBacking)?;
 			commitment.encumbered_micronots = commitment
 				.encumbered_micronots
 				.checked_sub(&amount)
-				.ok_or(VaultError::CommittedArgonotsBelowEncumberedBacking)?;
+				.ok_or(VaultError::ArgonotsBelowEncumberedBacking)?;
 			T::OwnershipCurrency::burn_held(
 				&HoldReason::EnterVault.into(),
 				account_id,
@@ -1464,7 +1641,21 @@ pub mod pallet {
 			{
 				let _ = frame_system::Pallet::<T>::dec_providers(account_id);
 			}
-			ArgonotCommitmentByVaultId::<T>::insert(vault_id, commitment);
+			commitment.committed_micronots =
+				commitment.committed_micronots.min(commitment.held_micronots);
+			VaultsById::<T>::mutate(vault_id, |vault| {
+				if let Some(vault) = vault {
+					let pending: T::Balance = vault
+						.securitization_release_schedule
+						.values()
+						.map(|entry| entry.argonot_withdrawals)
+						.sum();
+					vault.cancel_argonot_exits(
+						pending.saturating_sub(commitment.committed_micronots),
+					);
+				}
+			});
+			ArgonotSecuritizationByVaultId::<T>::insert(vault_id, commitment);
 			Ok(())
 		}
 
@@ -1472,34 +1663,11 @@ pub mod pallet {
 			let Some(vault_id) = VaultIdByOperator::<T>::get(vault_operator_account) else {
 				return;
 			};
-			let current_tick = T::TickProvider::current_tick();
-			let Some(unlock_tick) = VaultsById::<T>::get(vault_id).and_then(|vault| {
-				if vault.operational_minimum_release_tick.is_some() {
-					return None;
-				}
-
-				let unlock_tick =
-					vault.opened_tick.saturating_add(T::OperationalMinimumVaultLockTicks::get());
-				(unlock_tick > current_tick).then_some(unlock_tick)
-			}) else {
-				return;
-			};
-
-			if VaultsReleasingOperationalMinimumByTick::<T>::try_mutate(unlock_tick, |vaults| {
-				vaults.try_insert(vault_id)
-			})
-			.is_err()
-			{
-				log::error!("Unable to track operational minimum release for vault {vault_id}");
-				return;
-			}
-
 			VaultsById::<T>::mutate(vault_id, |maybe_vault| {
-				let Some(vault) = maybe_vault.as_mut() else {
-					return;
-				};
-				if vault.operational_minimum_release_tick.is_none() {
-					vault.operational_minimum_release_tick = Some(unlock_tick);
+				if let Some(vault) = maybe_vault {
+					vault.committed_microgons = vault.committed_microgons.max(
+						T::OperationalMinimumVaultSecuritization::get().min(vault.securitization),
+					);
 				}
 			});
 		}
@@ -1594,8 +1762,11 @@ pub mod pallet {
 			securitization: &BitcoinSecuritization<Self::Balance>,
 			request: ReserveSecuritizationRequest<Self::Balance>,
 		) -> Result<(T::Balance, T::Balance), VaultError> {
-			let ReserveSecuritizationRequest { fee_discount, securitization_space_to_unreserve } =
-				request;
+			let ReserveSecuritizationRequest {
+				fee_discount,
+				lock_expiration,
+				securitization_space_to_unreserve,
+			} = request;
 			let mut vault =
 				VaultsById::<T>::get(vault_id).ok_or::<VaultError>(VaultError::VaultNotFound)?;
 			let is_operator = vault.operator_account_id == *account_id;
@@ -1653,7 +1824,18 @@ pub mod pallet {
 			vault
 				.reserved_securitization_space
 				.saturating_reduce(securitization_space_to_unreserve);
-			vault.reserve_securitization(securitization, may_use_flexible_space)?;
+			let current_height = T::BitcoinBlockHeightChange::get().1;
+			vault.securitization_release_schedule.retain(|height, entry| {
+				if *height <= current_height {
+					entry.locked_commitments = T::Balance::zero();
+				}
+				!entry.is_empty()
+			});
+			vault.reserve_securitization(
+				securitization,
+				may_use_flexible_space,
+				lock_expiration,
+			)?;
 
 			Self::deposit_event(Event::SecuritizationReserved {
 				vault_id,
@@ -1819,6 +2001,8 @@ pub mod pallet {
 			let compensation_amount =
 				redemption_amount.min(securitization.coverage_for_satoshis(funded_satoshis));
 			let mut vault = VaultsById::<T>::get(vault_id).ok_or(VaultError::VaultNotFound)?;
+			let previous_open =
+				if vault.is_closed { T::Balance::zero() } else { vault.securitization };
 
 			let burn_result = vault.burn(
 				securitization,
@@ -1850,7 +2034,9 @@ pub mod pallet {
 				shortfall: compensation_amount.saturating_sub(to_beneficiary),
 				burned: T::Balance::zero(),
 			});
+			let next_open = if vault.is_closed { T::Balance::zero() } else { vault.securitization };
 			VaultsById::<T>::insert(vault_id, vault);
+			Self::update_vault_rank(vault_id, previous_open, next_open);
 
 			Ok(LostBitcoinCompensation { to_beneficiary, burned: T::Balance::zero() })
 		}
@@ -1865,6 +2051,8 @@ pub mod pallet {
 			is_flexible: bool,
 		) -> Result<T::Balance, VaultError> {
 			let mut vault = VaultsById::<T>::get(vault_id).ok_or(VaultError::VaultNotFound)?;
+			let previous_open =
+				if vault.is_closed { T::Balance::zero() } else { vault.securitization };
 
 			let burn_result = vault.burn(
 				securitization,
@@ -1898,7 +2086,9 @@ pub mod pallet {
 				.map_err(|_| VaultError::UnrecoverableHold)?;
 			}
 
+			let next_open = if vault.is_closed { T::Balance::zero() } else { vault.securitization };
 			VaultsById::<T>::insert(vault_id, vault);
+			Self::update_vault_rank(vault_id, previous_open, next_open);
 
 			Ok(burn_amount)
 		}
@@ -1956,6 +2146,8 @@ pub mod pallet {
 		fn release_unactivated_securitization(
 			vault_id: VaultId,
 			amount: Self::Balance,
+			lock_extension: &LockExtension<Self::Balance>,
+			retained_securitization: Self::Balance,
 		) -> Result<(), VaultError> {
 			Self::update_vault_bitcoin_metrics(BitcoinLockUpdate {
 				vault_id,
@@ -1969,10 +2161,18 @@ pub mod pallet {
 			})?;
 			VaultsById::<T>::mutate(vault_id, |vault| {
 				let vault = vault.as_mut().ok_or(VaultError::VaultNotFound)?;
+				let previous =
+					if vault.is_closed { T::Balance::zero() } else { vault.securitization };
+				vault.update_locked_commitments(
+					lock_extension,
+					retained_securitization,
+					amount,
+					false,
+				)?;
 				vault.release_unactivated_securitization(amount)?;
-
-				// after reducing the bonded, we can check the minimum securitization needed
-				Self::shrink_vault_securitization(vault)?;
+				if !vault.is_closed {
+					Self::update_vault_rank(vault_id, previous, vault.securitization);
+				}
 				Ok::<(), VaultError>(())
 			})?;
 			Self::deposit_event(Event::SecuritizationReturned { vault_id, amount });
@@ -2014,10 +2214,6 @@ pub mod pallet {
 			}
 			Ok(())
 		}
-	}
-
-	fn balance_to_i128<T: Config>(balance: T::Balance) -> i128 {
-		UniqueSaturatedInto::<u128>::unique_saturated_into(balance) as i128
 	}
 
 	/// Tracks the fee revenue for a Vault for a single Frame (mining day). Includes the associated

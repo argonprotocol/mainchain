@@ -305,8 +305,9 @@ impl pallet_vaults::Config for Runtime {
 	type MaxPendingCosignsPerVault = MaxPendingCosignsPerVault;
 	type RevenueCollectionExpirationFrames = LockReleaseCosignDeadlineFrames;
 	type OperationalMinimumVaultSecuritization = OperationalMinimumVaultSecuritization;
-	type OperationalMinimumVaultLockTicks = OperationalMinimumVaultLockTicks;
+	type SecuritizationExitNoticeBlocks = BitcoinLockDurationBlocks;
 	type OperationalAccountsHook = use_unless_benchmark!(OperationalAccounts, ());
+	type TreasuryPoolProvider = Treasury;
 	type OperationalAccountProvider = use_unless_benchmark!(
 		OperationalAccounts,
 		benchmarking::BenchmarkOperationalAccountProvider<AccountId>
@@ -432,17 +433,24 @@ impl pallet_treasury::Config for Runtime {
 		Vaults,
 		benchmarking::BenchmarkBitcoinVaultProvider<Balances, AccountId, Balance>
 	);
+	type BitcoinMintedProvider = Mint;
 	type PriceProvider =
 		use_unless_benchmark!(PriceIndex, benchmarking::BenchmarkPriceProvider<Balance>);
-	type MaxTreasuryContributors = MaxTreasuryContributors;
+	type BurnEventHandler = use_unless_benchmark!(Mint, ());
 	type MinimumArgonsPerContributor = MinimumArgonsPerContributor;
 	type MaxActiveArgonotBondLots = MaxActiveArgonotBondLots;
+	type MaxArgonBondLots = MaxArgonBondLots;
 	type MaxArgonotBondedPercentOfCirculation = MaxArgonotBondedPercentOfCirculation;
 	type PalletId = TreasuryInternalPalletId;
 	type MiningBidPoolAccount = TreasuryMiningBidPoolAccount;
 	type TreasuryReservesAccount = TreasuryReservesAccount;
 	type PercentForTreasuryReserves = PercentForTreasuryReserves;
-	type PercentForArgonotBondPool = PercentForArgonotBondPool;
+	type PercentForStakePool = PercentForStakePool;
+	type PercentForMiningOperatorPool = PercentForMiningOperatorPool;
+	type PercentForBitcoinLiquidPool = PercentForBitcoinLiquidPool;
+	type PercentForArgonBondPool = PercentForArgonBondPool;
+	type PercentForVaultPool = PercentForVaultPool;
+	type DefaultTargetBitcoinPercent = DefaultTargetBitcoinPercent;
 	type MaxVaultsPerPool = MaxVaultsPerPool;
 	type MaxPendingUnlocksPerFrame = MaxPendingUnlocksPerFrame;
 	type TreasuryExitDelayFrames = TreasuryExitDelayFrames;

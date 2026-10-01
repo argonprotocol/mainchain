@@ -6,7 +6,7 @@ use argon_primitives::{
 	bitcoin::{BitcoinHeight, OpaqueBitcoinXpub},
 	vault::{
 		BitcoinLockFundingUpdate, BitcoinResecuritization, BitcoinSecuritization,
-		BitcoinSecuritizationBasis, LockExtension, VaultTerms,
+		BitcoinSecuritizationBasis, LockExtension, VaultArgonotSecuritization, VaultTerms,
 		MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES,
 	},
 };
@@ -21,7 +21,6 @@ fn benchmark_terms<T: Config>() -> VaultTerms<T::Balance> {
 	VaultTerms {
 		bitcoin_annual_percent_rate: FixedU128::from_rational(110u128, 100u128),
 		bitcoin_base_fee: 1_000u128.into(),
-		treasury_profit_sharing: Permill::from_percent(20),
 	}
 }
 
@@ -82,15 +81,15 @@ fn seed_release_schedule_for_benchmark<T: Config>(
 		vault.securitization_pending_activation = 0u32.into();
 		vault.securitization_target = target;
 		vault
-			.securitization_release_schedule
-			.try_insert(release_at_or_before, entry_amount)
-			.map_err(|_| BenchmarkError::Stop("unable to seed release schedule"))?;
+			.scheduled_release(release_at_or_before)
+			.map_err(|_| BenchmarkError::Stop("unable to seed release schedule"))?
+			.relockable_commitments = entry_amount;
 		for i in 1..entries {
 			let h = release_at_or_before.saturating_add(i.into());
 			vault
-				.securitization_release_schedule
-				.try_insert(h, entry_amount)
-				.map_err(|_| BenchmarkError::Stop("unable to seed release schedule"))?;
+				.scheduled_release(h)
+				.map_err(|_| BenchmarkError::Stop("unable to seed release schedule"))?
+				.relockable_commitments = entry_amount;
 		}
 		Ok(())
 	})
@@ -134,9 +133,9 @@ mod benchmarks {
 			MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES,
 			100u128.into(),
 			200_000u128.into(),
-			100_000u128.into(),
+			1_000_000u128.into(),
 		)?;
-		let securitization: T::Balance = 500_000u128.into();
+		let securitization: T::Balance = 100_000u128.into();
 		let ratio = FixedU128::one();
 
 		#[extrinsic_call]
@@ -167,7 +166,6 @@ mod benchmarks {
 		let new_terms = VaultTerms {
 			bitcoin_annual_percent_rate: FixedU128::from_rational(120u128, 100u128),
 			bitcoin_base_fee: 2_000u128.into(),
-			treasury_profit_sharing: Permill::from_percent(25),
 		};
 
 		#[extrinsic_call]
@@ -190,7 +188,7 @@ mod benchmarks {
 			MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES,
 			100u128.into(),
 			200_000u128.into(),
-			100_000u128.into(),
+			1_000_000u128.into(),
 		)?;
 
 		#[extrinsic_call]
@@ -254,8 +252,8 @@ mod benchmarks {
 	}
 
 	#[benchmark]
-	fn set_committed_argonots() -> Result<(), BenchmarkError> {
-		let caller: T::AccountId = account("set_committed_argonots_caller", 0, 0);
+	fn set_argonot_securitization() -> Result<(), BenchmarkError> {
+		let caller: T::AccountId = account("set_argonot_securitization_caller", 0, 0);
 		let vault_id = create_vault::<T>(&caller, 8, 100_000)?;
 		let amount: T::Balance = 25_000u128.into();
 		let _ = T::OwnershipCurrency::mint_into(&caller, 1_000_000u128.into());
@@ -267,10 +265,7 @@ mod benchmarks {
 			T::OwnershipCurrency::balance_on_hold(&HoldReason::EnterVault.into(), &caller),
 			amount,
 		);
-		assert_eq!(
-			<Pallet<T> as BitcoinVaultProvider>::get_committed_argonots(&caller),
-			Some(amount),
-		);
+		assert_eq!(<Pallet<T> as BitcoinVaultProvider>::get_held_argonots(&caller), Some(amount),);
 		assert_eq!(<Pallet<T> as BitcoinVaultProvider>::get_vault_id(&caller), Some(vault_id),);
 		Ok(())
 	}
@@ -295,7 +290,7 @@ mod benchmarks {
 					earnings_for_vault,
 					capital_contributed_by_vault: earnings_for_vault,
 				},
-			);
+			)?;
 		}
 		assert_eq!(RevenuePerFrameByVault::<T>::get(vault_id).len(), 12);
 		assert!(
@@ -366,22 +361,108 @@ mod benchmarks {
 	}
 
 	#[benchmark]
-	fn provider_get_committed_argonots() -> Result<(), BenchmarkError> {
+	fn provider_get_held_argonots() -> Result<(), BenchmarkError> {
 		let caller: T::AccountId = account("provider_committed_argonots", 0, 0);
 		create_vault::<T>(&caller, 9, 100_000)?;
 		let amount: T::Balance = 40_000u128.into();
 		let _ = T::OwnershipCurrency::mint_into(&caller, 1_000_000u128.into());
-		Pallet::<T>::set_committed_argonots(RawOrigin::Signed(caller.clone()).into(), amount)
+		Pallet::<T>::set_argonot_securitization(RawOrigin::Signed(caller.clone()).into(), amount)
 			.map_err(|_| BenchmarkError::Stop("failed to set committed argonots"))?;
 
 		#[block]
 		{
 			assert_eq!(
-				<Pallet<T> as BitcoinVaultProvider>::get_committed_argonots(&caller),
+				<Pallet<T> as BitcoinVaultProvider>::get_held_argonots(&caller),
 				Some(amount),
 			);
 		}
 
+		Ok(())
+	}
+
+	#[benchmark]
+	fn provider_get_top_vaults_by_securitization(
+		v: Linear<1, MAX_RELEASE_COMPLETIONS>,
+	) -> Result<(), BenchmarkError> {
+		for index in 0..v {
+			let operator: T::AccountId = account("ranked_vault_operator", index, 0);
+			create_vault::<T>(&operator, index as u8, 100_000)?;
+		}
+
+		#[block]
+		{
+			let (vaults, _) =
+				<Pallet<T> as TreasuryVaultProvider>::get_top_vaults_by_securitization(v);
+			assert_eq!(vaults.len(), v as usize);
+		}
+
+		Ok(())
+	}
+
+	#[benchmark]
+	fn provider_commit_securitization_for_rewards() -> Result<(), BenchmarkError> {
+		let operator: T::AccountId = account("reward_operator", 0, 0);
+		let vault_id = create_vault::<T>(&operator, 8, 100_000)?;
+		let amount: T::Balance = 25_000u128.into();
+		ArgonotSecuritizationByVaultId::<T>::insert(
+			vault_id,
+			VaultArgonotSecuritization {
+				held_micronots: amount,
+				committed_micronots: T::Balance::zero(),
+				encumbered_micronots: T::Balance::zero(),
+			},
+		);
+
+		#[block]
+		{
+			<Pallet<T> as TreasuryVaultProvider>::commit_securitization_for_rewards(
+				vault_id, amount,
+			);
+		}
+
+		assert_eq!(
+			ArgonotSecuritizationByVaultId::<T>::get(vault_id)
+				.ok_or(BenchmarkError::Stop("Argonot securitization missing"))?
+				.committed_micronots,
+			amount,
+		);
+		assert_eq!(
+			VaultsById::<T>::get(vault_id)
+				.ok_or(BenchmarkError::Stop("vault missing"))?
+				.committed_microgons,
+			100_000u128.into(),
+		);
+		Ok(())
+	}
+
+	#[benchmark]
+	fn provider_record_vault_frame_earnings() -> Result<(), BenchmarkError> {
+		let operator: T::AccountId = account("reward_vault_operator", 0, 0);
+		let vault_id = create_vault::<T>(&operator, 8, 100_000)?;
+		let source: T::AccountId = account("reward_source", 0, 0);
+		let earnings: T::Balance = 50_000u128.into();
+		T::Currency::mint_into(&source, 1_000_000u128.into())
+			.map_err(|_| BenchmarkError::Stop("failed to fund reward source"))?;
+		let frame_id = T::CurrentFrameId::get();
+
+		#[block]
+		{
+			<Pallet<T> as TreasuryVaultProvider>::record_vault_frame_earnings(
+				&source,
+				VaultTreasuryFrameEarnings {
+					vault_id,
+					vault_operator_account_id: operator,
+					frame_id,
+					earnings_for_vault: earnings,
+					capital_contributed: T::Balance::zero(),
+					capital_contributed_by_vault: T::Balance::zero(),
+					earnings,
+				},
+			)
+			.expect("benchmark reward should be recorded");
+		}
+
+		assert_eq!(RevenuePerFrameByVault::<T>::get(vault_id).len(), 1);
 		Ok(())
 	}
 
@@ -444,14 +525,18 @@ mod benchmarks {
 			securitization_coverage_microgons: u128::from(replacement_satoshis).into(),
 			..current
 		};
-		let vault_id = create_vault::<T>(&operator, 11, u128::from(replacement.basis.satoshis))?;
+		let vault_id = create_vault::<T>(
+			&operator,
+			11,
+			5_000 + u128::from(MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES) * 1_000,
+		)?;
 		let _ = T::Currency::mint_into(&locker, 1_000_000u128.into());
 		let funded_satoshis = 10_000;
 		VaultsById::<T>::try_mutate(vault_id, |vault| {
 			let vault =
 				vault.as_mut().ok_or(BenchmarkError::Stop("benchmark vault should exist"))?;
 			vault
-				.reserve_securitization(&current, true)
+				.reserve_securitization(&current, true, 144)
 				.map_err(|_| BenchmarkError::Stop("failed to reserve current securitization"))?;
 			vault
 				.record_bitcoin_lock_funding(BitcoinLockFundingUpdate {
@@ -468,7 +553,7 @@ mod benchmarks {
 		seed_release_schedule_for_benchmark::<T>(
 			vault_id,
 			lock_extension.expiration_day(),
-			e,
+			MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES,
 			1_000u128.into(),
 			current.collateral_required(),
 			replacement.collateral_required(),
@@ -520,7 +605,7 @@ mod benchmarks {
 			let vault =
 				vault.as_mut().ok_or(BenchmarkError::Stop("benchmark vault should exist"))?;
 			vault
-				.reserve_securitization(&securitization, true)
+				.reserve_securitization(&securitization, true, 144)
 				.map_err(|_| BenchmarkError::Stop("failed to reserve securitization"))?;
 			vault
 				.record_bitcoin_lock_funding(BitcoinLockFundingUpdate {
@@ -568,7 +653,7 @@ mod benchmarks {
 		let vault_id = create_vault::<T>(&caller, 10, 100_000)?;
 		let amount: T::Balance = 40_000u128.into();
 		let _ = T::OwnershipCurrency::mint_into(&caller, 1_000_000u128.into());
-		Pallet::<T>::set_committed_argonots(RawOrigin::Signed(caller.clone()).into(), amount)
+		Pallet::<T>::set_argonot_securitization(RawOrigin::Signed(caller.clone()).into(), amount)
 			.map_err(|_| BenchmarkError::Stop("failed to set committed argonots"))?;
 
 		#[block]
@@ -577,7 +662,7 @@ mod benchmarks {
 		}
 
 		assert_eq!(
-			ArgonotCommitmentByVaultId::<T>::get(vault_id)
+			ArgonotSecuritizationByVaultId::<T>::get(vault_id)
 				.map(|commitment| commitment.encumbered_micronots),
 			Some(amount),
 		);
@@ -594,7 +679,7 @@ mod benchmarks {
 		let vault_id = create_vault::<T>(&caller, 10, 100_000)?;
 		let amount: T::Balance = 40_000u128.into();
 		let _ = T::OwnershipCurrency::mint_into(&caller, 1_000_000u128.into());
-		Pallet::<T>::set_committed_argonots(RawOrigin::Signed(caller.clone()).into(), amount)
+		Pallet::<T>::set_argonot_securitization(RawOrigin::Signed(caller.clone()).into(), amount)
 			.map_err(|_| BenchmarkError::Stop("failed to set committed argonots"))?;
 		<Pallet<T> as BitcoinVaultProvider>::encumber_argonots(&caller, amount)
 			.map_err(|_| BenchmarkError::Stop("failed to encumber argonots"))?;
@@ -608,7 +693,7 @@ mod benchmarks {
 		}
 
 		assert_eq!(
-			ArgonotCommitmentByVaultId::<T>::get(vault_id)
+			ArgonotSecuritizationByVaultId::<T>::get(vault_id)
 				.map(|commitment| commitment.encumbered_micronots),
 			Some(T::Balance::zero()),
 		);
@@ -625,7 +710,7 @@ mod benchmarks {
 		let vault_id = create_vault::<T>(&caller, 10, 100_000)?;
 		let amount: T::Balance = 40_000u128.into();
 		let _ = T::OwnershipCurrency::mint_into(&caller, 1_000_000u128.into());
-		Pallet::<T>::set_committed_argonots(RawOrigin::Signed(caller.clone()).into(), amount)
+		Pallet::<T>::set_argonot_securitization(RawOrigin::Signed(caller.clone()).into(), amount)
 			.map_err(|_| BenchmarkError::Stop("failed to set committed argonots"))?;
 		<Pallet<T> as BitcoinVaultProvider>::encumber_argonots(&caller, amount)
 			.map_err(|_| BenchmarkError::Stop("failed to encumber argonots"))?;
@@ -637,11 +722,11 @@ mod benchmarks {
 		}
 
 		assert_eq!(
-			<Pallet<T> as BitcoinVaultProvider>::get_committed_argonots(&caller),
+			<Pallet<T> as BitcoinVaultProvider>::get_held_argonots(&caller),
 			Some(T::Balance::zero()),
 		);
 		assert_eq!(
-			ArgonotCommitmentByVaultId::<T>::get(vault_id)
+			ArgonotSecuritizationByVaultId::<T>::get(vault_id)
 				.map(|commitment| commitment.encumbered_micronots),
 			Some(T::Balance::zero()),
 		);
@@ -656,8 +741,6 @@ mod benchmarks {
 	fn provider_account_became_operational() -> Result<(), BenchmarkError> {
 		let caller: T::AccountId = account("provider_became_operational", 0, 0);
 		let vault_id = create_vault::<T>(&caller, 9, 100_000)?;
-		let expected_unlock_tick = T::TickProvider::current_tick()
-			.saturating_add(T::OperationalMinimumVaultLockTicks::get());
 
 		#[block]
 		{
@@ -666,11 +749,9 @@ mod benchmarks {
 
 		let vault = VaultsById::<T>::get(vault_id)
 			.ok_or(BenchmarkError::Stop("vault missing after operational callback"))?;
-		assert_eq!(vault.operational_minimum_release_tick, Some(expected_unlock_tick));
-		assert!(
-			VaultsReleasingOperationalMinimumByTick::<T>::get(expected_unlock_tick)
-				.contains(&vault_id),
-			"expected vault to be indexed by operational minimum release tick"
+		assert_eq!(
+			vault.committed_microgons,
+			T::OperationalMinimumVaultSecuritization::get().min(vault.securitization)
 		);
 
 		Ok(())
@@ -703,7 +784,7 @@ mod benchmarks {
 						earnings_for_vault,
 						capital_contributed_by_vault: earnings_for_vault,
 					},
-				);
+				)?;
 			}
 		}
 		assert_eq!(RevenuePerFrameByVault::<T>::iter_keys().count(), v as usize);
@@ -724,7 +805,6 @@ mod benchmarks {
 	fn on_initialize_with_vault_releases(
 		h: Linear<1, 366>,
 		v: Linear<1, MAX_RELEASE_COMPLETIONS>,
-		o: Linear<1, MAX_RELEASE_COMPLETIONS>,
 	) -> Result<(), BenchmarkError> {
 		let start_height: BitcoinHeight = 10_000;
 		let end_height = start_height.saturating_add((h.saturating_sub(1)).into());
@@ -732,11 +812,9 @@ mod benchmarks {
 		let current_tip = BitcoinBlock::new(end_height, H256Le([2u8; 32]));
 		pallet_bitcoin_utxos::PreviousBitcoinBlockTip::<T>::put(previous_tip);
 		pallet_bitcoin_utxos::ConfirmedBitcoinBlockTip::<T>::put(current_tip);
-		let current_tick = T::TickProvider::current_tick();
 		frame_system::Pallet::<T>::set_block_number(1u32.into());
 
 		let mut first_vault_id: Option<VaultId> = None;
-		let mut first_operational_unlock_vault_id: Option<VaultId> = None;
 		let release_amount: T::Balance = 1_000u128.into();
 		for i in 0..v {
 			let operator: T::AccountId = account("vault_operator", i, 0);
@@ -749,36 +827,31 @@ mod benchmarks {
 			seed_release_schedule_for_benchmark::<T>(
 				vault_id,
 				release_height,
-				MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES,
-				release_amount,
+				MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES - 1,
+				100u128.into(),
 				200_000u128.into(),
 				100_000u128.into(),
 			)?;
+			VaultsById::<T>::mutate(vault_id, |vault| {
+				let vault = vault.as_mut().expect("benchmark vault should exist");
+				vault.securitization_target = 799_000u128.into();
+				vault
+					.scheduled_release(
+						end_height.saturating_add(T::SecuritizationExitNoticeBlocks::get()),
+					)
+					.expect("one exit notice fits")
+					.argon_withdrawals = 200_000u128.into();
+				vault
+					.scheduled_release(release_height)
+					.expect("one due exit fits")
+					.argon_withdrawals = release_amount;
+			});
 			VaultFundsReleasingByHeight::<T>::mutate(release_height, |vaults| {
 				vaults
 					.try_insert(vault_id)
 					.map_err(|_| BenchmarkError::Stop("vault release set overflow"))
 			})?;
 		}
-		for i in 0..o {
-			let operator: T::AccountId = account("operational_unlock_operator", i, 1);
-			let seed = ((i + 200) % 250) as u8;
-			let vault_id = create_vault::<T>(&operator, seed, 100_000)?;
-			if first_operational_unlock_vault_id.is_none() {
-				first_operational_unlock_vault_id = Some(vault_id);
-			}
-			VaultsById::<T>::mutate(vault_id, |vault| {
-				let vault = vault.as_mut().expect("benchmark vault should exist");
-				vault.securitization_target = T::Balance::zero();
-				vault.operational_minimum_release_tick = Some(current_tick);
-			});
-			VaultsReleasingOperationalMinimumByTick::<T>::mutate(current_tick, |vaults| {
-				vaults
-					.try_insert(vault_id)
-					.map_err(|_| BenchmarkError::Stop("operational unlock set overflow"))
-			})?;
-		}
-
 		#[block]
 		{
 			let _ = Pallet::<T>::on_initialize(1u32.into());
@@ -796,23 +869,6 @@ mod benchmarks {
 		assert!(
 			vault.securitization < 1_000_000u128.into(),
 			"vault securitization should shrink after releases"
-		);
-		assert!(
-			VaultsReleasingOperationalMinimumByTick::<T>::get(current_tick).is_empty(),
-			"operational minimum release index should be drained for the processed tick"
-		);
-		let first_operational_unlock = first_operational_unlock_vault_id
-			.ok_or(BenchmarkError::Stop("missing operational unlock benchmark vault"))?;
-		let operational_unlock_vault = VaultsById::<T>::get(first_operational_unlock)
-			.ok_or(BenchmarkError::Stop("missing operational unlock vault"))?;
-		assert_eq!(
-			operational_unlock_vault.operational_minimum_release_tick, None,
-			"expected processed operational minimum lock to clear"
-		);
-		assert_eq!(
-			operational_unlock_vault.securitization,
-			T::Balance::zero(),
-			"expected processed operational unlock to release to the stored target"
 		);
 		Ok(())
 	}

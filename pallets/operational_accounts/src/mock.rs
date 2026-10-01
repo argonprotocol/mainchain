@@ -1,7 +1,7 @@
 use crate as pallet_operational_accounts;
 use argon_primitives::{
 	tick::Ticker,
-	vault::{BitcoinVaultProvider, RegistrationVaultData},
+	vault::{BitcoinVaultProvider, LockExtension, RegistrationVaultData},
 	BitcoinFissionsProvider, MiningSlotProvider, OperationalRewardsPayer, TickProvider,
 	TreasuryPoolProvider, UniswapTransferProvider, VotingSchedule, MICROGONS_PER_ARGON,
 };
@@ -156,7 +156,7 @@ impl BitcoinVaultProvider for MockVaultProvider {
 		Self::get_registration_vault_data(account_id).map(|entry| entry.activated_securitization)
 	}
 
-	fn get_committed_argonots(account_id: &Self::AccountId) -> Option<Self::Balance> {
+	fn get_held_argonots(account_id: &Self::AccountId) -> Option<Self::Balance> {
 		Self::get_vault_id(account_id).map(|_| Default::default())
 	}
 
@@ -237,7 +237,7 @@ impl BitcoinVaultProvider for MockVaultProvider {
 		_vault_id: VaultId,
 		_current_securitization: &argon_primitives::vault::BitcoinSecuritization<Self::Balance>,
 		_lock_funded_satoshis: argon_primitives::bitcoin::Satoshis,
-		_lock_extension: &argon_primitives::vault::LockExtension<Self::Balance>,
+		_lock_extension: &LockExtension<Self::Balance>,
 		_is_flexible: bool,
 	) -> Result<(), argon_primitives::vault::VaultError> {
 		unimplemented!()
@@ -246,6 +246,8 @@ impl BitcoinVaultProvider for MockVaultProvider {
 	fn release_unactivated_securitization(
 		_vault_id: VaultId,
 		_amount: Self::Balance,
+		_lock_extension: &LockExtension<Self::Balance>,
+		_retained_securitization: Self::Balance,
 	) -> Result<(), argon_primitives::vault::VaultError> {
 		unimplemented!()
 	}
@@ -255,7 +257,7 @@ impl BitcoinVaultProvider for MockVaultProvider {
 		_securitization: &argon_primitives::vault::BitcoinSecuritization<Self::Balance>,
 		_funded_satoshis: argon_primitives::bitcoin::Satoshis,
 		_market_rate: Self::Balance,
-		_lock_extension: &argon_primitives::vault::LockExtension<Self::Balance>,
+		_lock_extension: &LockExtension<Self::Balance>,
 		_is_flexible: bool,
 	) -> Result<Self::Balance, argon_primitives::vault::VaultError> {
 		unimplemented!()
@@ -267,7 +269,7 @@ impl BitcoinVaultProvider for MockVaultProvider {
 		_securitization: &argon_primitives::vault::BitcoinSecuritization<Self::Balance>,
 		_funded_satoshis: argon_primitives::bitcoin::Satoshis,
 		_market_rate: Self::Balance,
-		_lock_extension: &argon_primitives::vault::LockExtension<Self::Balance>,
+		_lock_extension: &LockExtension<Self::Balance>,
 		_is_flexible: bool,
 	) -> Result<
 		argon_primitives::vault::LostBitcoinCompensation<Self::Balance>,
@@ -333,6 +335,8 @@ pub struct MockTreasuryPoolProvider;
 impl TreasuryPoolProvider<TestAccountId> for MockTreasuryPoolProvider {
 	type Weights = ();
 	type Balance = Balance;
+
+	fn vault_securitization_changed(_vault_id: VaultId, _securitization: Self::Balance) {}
 
 	fn has_vault_bond_participation(vault_id: VaultId, account_id: &TestAccountId) -> bool {
 		Self::active_vault_bond_amount(vault_id, account_id) > 0

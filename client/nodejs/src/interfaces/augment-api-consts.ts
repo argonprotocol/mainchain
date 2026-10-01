@@ -1,9 +1,8 @@
 // Auto-generated via `yarn polkadot-types-from-chain`, do not edit
-/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
-import type {} from '@polkadot/api-base/types/consts';
+import '@polkadot/api-base/types/consts';
 
 import type { ApiTypes, AugmentedConst } from '@polkadot/api-base/types';
 import type { u128, u16, u32, u64, u8 } from '@polkadot/types-codec';
@@ -592,9 +591,17 @@ declare module '@polkadot/api-base/types/consts' {
     };
     treasury: {
       /**
+       * Default percent of maximum Bitcoin-mintable Argons targeted by the network.
+       **/
+      defaultTargetBitcoinPercent: Percent & AugmentedConst<ApiType>;
+      /**
        * The maximum number of active Argonot bond lots.
        **/
       maxActiveArgonotBondLots: u32 & AugmentedConst<ApiType>;
+      /**
+       * Maximum live Argon bond lots while direct frame payouts iterate every lot.
+       **/
+      maxArgonBondLots: u32 & AugmentedConst<ApiType>;
       /**
        * The maximum percent of ownership-token circulation that can be bonded.
        **/
@@ -603,10 +610,6 @@ declare module '@polkadot/api-base/types/consts' {
        * The maximum number of bond lots whose release delay may mature in a single frame.
        **/
       maxPendingUnlocksPerFrame: u32 & AugmentedConst<ApiType>;
-      /**
-       * The maximum number of accepted bond lots in a vault's accepted bond-lot list.
-       **/
-      maxTreasuryContributors: u32 & AugmentedConst<ApiType>;
       /**
        * The maximum number of vaults that can participate in one frame's locked vault capital.
        **/
@@ -620,13 +623,29 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       palletId: FrameSupportPalletId & AugmentedConst<ApiType>;
       /**
-       * Percent of the full bid pool paid to Argonot bonds before vault distribution.
+       * Maximum percent paid to Argon bonds when the network target is filled.
        **/
-      percentForArgonotBondPool: Percent & AugmentedConst<ApiType>;
+      percentForArgonBondPool: Percent & AugmentedConst<ApiType>;
+      /**
+       * Percent reserved for Bitcoin Liquids and burned in this release.
+       **/
+      percentForBitcoinLiquidPool: Percent & AugmentedConst<ApiType>;
+      /**
+       * Percent reserved for future mining-operator rewards and burned in this release.
+       **/
+      percentForMiningOperatorPool: Percent & AugmentedConst<ApiType>;
+      /**
+       * Percent of the full bid pool paid to Argonot Stakes.
+       **/
+      percentForStakePool: Percent & AugmentedConst<ApiType>;
       /**
        * Percent of the bid pool reserved for treasury reserves.
        **/
       percentForTreasuryReserves: Percent & AugmentedConst<ApiType>;
+      /**
+       * Maximum percent paid to vaults when the network target is filled.
+       **/
+      percentForVaultPool: Percent & AugmentedConst<ApiType>;
       /**
        * The number of frames a releasing bond lot remains held before release.
        **/
@@ -664,17 +683,17 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       maxVaults: u32 & AugmentedConst<ApiType>;
       /**
-       * Duration to keep the operational minimum securitization locked from vault creation.
-       **/
-      operationalMinimumVaultLockTicks: u64 & AugmentedConst<ApiType>;
-      /**
-       * Minimum vault securitization required while the operational floor lock is active.
+       * Vault securitization committed when the operator becomes operational.
        **/
       operationalMinimumVaultSecuritization: u128 & AugmentedConst<ApiType>;
       /**
        * The number of frames within which revenue must be collected
        **/
       revenueCollectionExpirationFrames: u64 & AugmentedConst<ApiType>;
+      /**
+       * Bitcoin blocks in the securitization exit notice period.
+       **/
+      securitizationExitNoticeBlocks: u64 & AugmentedConst<ApiType>;
     };
   } // AugmentedConsts
 } // declare module

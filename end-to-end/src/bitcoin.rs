@@ -17,7 +17,7 @@ use argon_client::{
 		},
 		storage, tx,
 	},
-	conversion::{to_api_fixed_u128, to_api_per_mill},
+	conversion::to_api_fixed_u128,
 	signer::{Signer, Sr25519Signer},
 	subxt_error, ArgonConfig, FetchAt, MainchainClient,
 };
@@ -52,7 +52,6 @@ use serial_test::serial;
 use sp_arithmetic::FixedU128;
 use sp_core::{crypto::AccountId32, sr25519, Pair};
 use sp_keyring::Sr25519Keyring::{Alice, Bob, Eve};
-use sp_runtime::Permill;
 use std::{str::FromStr, sync::Arc, time::Duration};
 use subxt::ext::scale_encode::EncodeAsType;
 use tokio::time::sleep;
@@ -604,13 +603,21 @@ async fn ratchet_first_fission(
 	initial_liquidity_promised: Balance,
 	last_submitted_tick: &mut Tick,
 ) -> anyhow::Result<()> {
-	submit_price(ticker, client, price_index_operator, 60_000.0, true).await;
+	// The mint loop may have submitted its price in this tick. PriceIndex ignores a second price
+	// at the same tick, so wait before recording the older ratchet rate.
+	while current_chain_tick(client, ticker).await <= *last_submitted_tick {
+		sleep(Duration::from_millis(100)).await;
+	}
+	let submitted_older_ratchet_tick =
+		submit_price(ticker, client, price_index_operator, 60_000.0, true).await;
 	let rate_history = client
 		.fetch_storage(&storage().bitcoin_locks().microgon_per_btc_history(), FetchAt::Best)
 		.await?
 		.expect("Bitcoin rate history");
 	let (older_ratchet_tick, older_ratchet_rate) =
 		*rate_history.0.last().expect("older Bitcoin rate");
+	assert!(older_ratchet_tick >= submitted_older_ratchet_tick);
+	assert!(older_ratchet_rate < microgons_at_target_per_btc);
 	// Submit against the same best-chain tick source used by submit_price so this rate cannot reuse
 	// the older history entry while finalization trails the active chain.
 	while current_chain_tick(client, ticker).await <= older_ratchet_tick {
@@ -624,7 +631,7 @@ async fn ratchet_first_fission(
 		.expect("Bitcoin rate history");
 	let (ratchet_tick, ratchet_rate) = *rate_history.0.last().expect("latest Bitcoin rate");
 	assert!(ratchet_tick > older_ratchet_tick);
-	assert!(ratchet_rate < microgons_at_target_per_btc);
+	assert!(ratchet_rate < older_ratchet_rate);
 
 	submit_rejected_bitcoin_call(
 		client,
@@ -927,13 +934,23 @@ async fn speed_up_minting(
 
 	sudo(
 		test_node,
+		RuntimeCall::Balances(
+			api::runtime_types::pallet_balances::pallet::Call::force_adjust_total_issuance {
+				direction:
+					api::runtime_types::pallet_balances::types::AdjustmentDirection::Increase,
+				delta: 100_000_000_000u64.into(),
+			},
+		),
+		false,
+	)
+	.await
+	.unwrap();
+
+	sudo(
+		test_node,
 		RuntimeCall::System(
 			argon_client::api::runtime_types::frame_system::pallet::Call::set_storage {
 				items: vec![
-					(
-						storage().mint().minted_mining_microgons().to_root_bytes(),
-						Balance::from(100_000_000_000u64).encode(),
-					),
 					(
 						storage().mining_slot().mining_config().to_root_bytes(),
 						accelerated_mining_config.encode(),
@@ -1206,7 +1223,6 @@ async fn create_vault(
 		terms: api::runtime_types::argon_primitives::vault::VaultTerms::<u128> {
 			bitcoin_base_fee: 0,
 			bitcoin_annual_percent_rate: to_api_fixed_u128(FixedU128::from_float(0.01)),
-			treasury_profit_sharing: to_api_per_mill(Permill::from_percent(50)),
 		},
 		delegate_account_id: None,
 		securitization_ratio: to_api_fixed_u128(FixedU128::from_u32(1)),
@@ -1478,10 +1494,11 @@ async fn wait_for_mint(
 				.fetch_storage(&storage().mint().minted_bitcoin_microgons(), FetchAt::Best)
 				.await?
 				.expect("Bitcoin minted amount");
-			let mining_minted = client
-				.fetch_storage(&storage().mint().minted_mining_microgons(), FetchAt::Best)
+			let total_issuance = client
+				.fetch_storage(&storage().balances().total_issuance(), FetchAt::Best)
 				.await?
-				.expect("mining minted amount");
+				.expect("total issuance");
+			let mining_minted = total_issuance.saturating_sub(bitcoin_minted);
 			anyhow::bail!(
 				"Pending mint did not complete after {frames_waited} frames. Last mint: {pending_mint:?}. Mining minted: {mining_minted}. Bitcoin minted: {bitcoin_minted}"
 			);

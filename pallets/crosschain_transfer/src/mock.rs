@@ -1,7 +1,10 @@
 use crate as pallet_crosschain_transfer;
 use argon_primitives::{
 	tick::Ticker,
-	vault::{BitcoinVaultProvider, RegistrationVaultData, VaultArgonotCommitment, VaultError},
+	vault::{
+		BitcoinVaultProvider, LockExtension, RegistrationVaultData, VaultArgonotSecuritization,
+		VaultError,
+	},
 	EthereumBlockNumber, EthereumReceiptLog, EthereumReceiptLogProofBatch, EthereumVerifyError,
 	EthereumVerifyProvider, OperationalAccountsHook, PriceProvider, TickProvider,
 	TreasuryPoolProvider, VaultId, VotingSchedule,
@@ -69,8 +72,8 @@ parameter_types! {
 	pub static ArgonFlowUpdates: Vec<(TestAccountId, Balance)> = Vec::new();
 pub static RegistrationVaultDataByOperator:
 	BTreeMap<TestAccountId, RegistrationVaultData<Balance>> = BTreeMap::new();
-pub static ArgonotCommitmentByOperator:
-	BTreeMap<TestAccountId, VaultArgonotCommitment<Balance>> = BTreeMap::new();
+pub static ArgonotSecuritizationByOperator:
+	BTreeMap<TestAccountId, VaultArgonotSecuritization<Balance>> = BTreeMap::new();
 pub static ActiveBondAmountsByVaultAndAccount:
 	BTreeMap<(VaultId, TestAccountId), Balance> = BTreeMap::new();
 pub static EncumberedBondMicrogonsByAccount:
@@ -310,11 +313,11 @@ impl BitcoinVaultProvider for MockVaultProvider {
 		Self::get_registration_vault_data(account_id).map(|entry| entry.activated_securitization)
 	}
 
-	fn get_committed_argonots(account_id: &Self::AccountId) -> Option<Self::Balance> {
+	fn get_held_argonots(account_id: &Self::AccountId) -> Option<Self::Balance> {
 		Self::get_vault_id(account_id).map(|_| {
-			ArgonotCommitmentByOperator::get()
+			ArgonotSecuritizationByOperator::get()
 				.get(account_id)
-				.map(|commitment| commitment.committed_micronots)
+				.map(|commitment| commitment.held_micronots)
 				.unwrap_or_default()
 		})
 	}
@@ -324,16 +327,18 @@ impl BitcoinVaultProvider for MockVaultProvider {
 		amount: Self::Balance,
 	) -> Result<(), VaultError> {
 		Self::get_vault_id(account_id).ok_or(VaultError::VaultNotFound)?;
-		let mut commitment =
-			ArgonotCommitmentByOperator::get().get(account_id).cloned().unwrap_or_default();
+		let mut commitment = ArgonotSecuritizationByOperator::get()
+			.get(account_id)
+			.cloned()
+			.unwrap_or_default();
 		let Some(next_encumbered) = commitment.encumbered_micronots.checked_add(amount) else {
 			return Err(VaultError::InternalError);
 		};
-		if next_encumbered > commitment.committed_micronots {
-			return Err(VaultError::CommittedArgonotsBelowEncumberedBacking);
+		if next_encumbered > commitment.held_micronots {
+			return Err(VaultError::ArgonotsBelowEncumberedBacking);
 		}
 		commitment.encumbered_micronots = next_encumbered;
-		ArgonotCommitmentByOperator::mutate(|entries| {
+		ArgonotSecuritizationByOperator::mutate(|entries| {
 			entries.insert(account_id.clone(), commitment);
 		});
 		Ok(())
@@ -344,10 +349,12 @@ impl BitcoinVaultProvider for MockVaultProvider {
 		amount: Self::Balance,
 	) -> Result<(), VaultError> {
 		Self::get_vault_id(account_id).ok_or(VaultError::VaultNotFound)?;
-		let mut commitment =
-			ArgonotCommitmentByOperator::get().get(account_id).cloned().unwrap_or_default();
+		let mut commitment = ArgonotSecuritizationByOperator::get()
+			.get(account_id)
+			.cloned()
+			.unwrap_or_default();
 		commitment.encumbered_micronots = commitment.encumbered_micronots.saturating_sub(amount);
-		ArgonotCommitmentByOperator::mutate(|entries| {
+		ArgonotSecuritizationByOperator::mutate(|entries| {
 			entries.insert(account_id.clone(), commitment);
 		});
 		Ok(())
@@ -358,17 +365,19 @@ impl BitcoinVaultProvider for MockVaultProvider {
 		amount: Self::Balance,
 	) -> Result<(), VaultError> {
 		Self::get_vault_id(account_id).ok_or(VaultError::VaultNotFound)?;
-		let mut commitment =
-			ArgonotCommitmentByOperator::get().get(account_id).cloned().unwrap_or_default();
-		commitment.committed_micronots = commitment
-			.committed_micronots
+		let mut commitment = ArgonotSecuritizationByOperator::get()
+			.get(account_id)
+			.cloned()
+			.unwrap_or_default();
+		commitment.held_micronots = commitment
+			.held_micronots
 			.checked_sub(amount)
-			.ok_or(VaultError::CommittedArgonotsBelowEncumberedBacking)?;
+			.ok_or(VaultError::ArgonotsBelowEncumberedBacking)?;
 		commitment.encumbered_micronots = commitment
 			.encumbered_micronots
 			.checked_sub(amount)
-			.ok_or(VaultError::CommittedArgonotsBelowEncumberedBacking)?;
-		ArgonotCommitmentByOperator::mutate(|entries| {
+			.ok_or(VaultError::ArgonotsBelowEncumberedBacking)?;
+		ArgonotSecuritizationByOperator::mutate(|entries| {
 			entries.insert(account_id.clone(), commitment);
 		});
 		Ok(())
@@ -424,7 +433,7 @@ impl BitcoinVaultProvider for MockVaultProvider {
 		_vault_id: VaultId,
 		_current_securitization: &argon_primitives::vault::BitcoinSecuritization<Self::Balance>,
 		_lock_funded_satoshis: argon_primitives::bitcoin::Satoshis,
-		_lock_extension: &argon_primitives::vault::LockExtension<Self::Balance>,
+		_lock_extension: &LockExtension<Self::Balance>,
 		_is_flexible: bool,
 	) -> Result<(), argon_primitives::vault::VaultError> {
 		unimplemented!()
@@ -433,6 +442,8 @@ impl BitcoinVaultProvider for MockVaultProvider {
 	fn release_unactivated_securitization(
 		_vault_id: VaultId,
 		_amount: Self::Balance,
+		_lock_extension: &LockExtension<Self::Balance>,
+		_retained_securitization: Self::Balance,
 	) -> Result<(), argon_primitives::vault::VaultError> {
 		unimplemented!()
 	}
@@ -442,7 +453,7 @@ impl BitcoinVaultProvider for MockVaultProvider {
 		_securitization: &argon_primitives::vault::BitcoinSecuritization<Self::Balance>,
 		_funded_satoshis: argon_primitives::bitcoin::Satoshis,
 		_market_rate: Self::Balance,
-		_lock_extension: &argon_primitives::vault::LockExtension<Self::Balance>,
+		_lock_extension: &LockExtension<Self::Balance>,
 		_is_flexible: bool,
 	) -> Result<Self::Balance, argon_primitives::vault::VaultError> {
 		unimplemented!()
@@ -454,7 +465,7 @@ impl BitcoinVaultProvider for MockVaultProvider {
 		_securitization: &argon_primitives::vault::BitcoinSecuritization<Self::Balance>,
 		_funded_satoshis: argon_primitives::bitcoin::Satoshis,
 		_market_rate: Self::Balance,
-		_lock_extension: &argon_primitives::vault::LockExtension<Self::Balance>,
+		_lock_extension: &LockExtension<Self::Balance>,
 		_is_flexible: bool,
 	) -> Result<
 		argon_primitives::vault::LostBitcoinCompensation<Self::Balance>,
@@ -502,6 +513,8 @@ pub struct MockTreasuryPoolProvider;
 impl TreasuryPoolProvider<TestAccountId> for MockTreasuryPoolProvider {
 	type Weights = ();
 	type Balance = Balance;
+
+	fn vault_securitization_changed(_vault_id: VaultId, _securitization: Self::Balance) {}
 
 	fn has_vault_bond_participation(vault_id: VaultId, account_id: &TestAccountId) -> bool {
 		Self::active_vault_bond_amount(vault_id, account_id) > 0
@@ -633,7 +646,7 @@ pub fn new_test_ext() -> TestState {
 	LatestExecutionBlockTimestamp::set(Some(0));
 	ArgonFlowUpdates::set(Vec::new());
 	RegistrationVaultDataByOperator::set(BTreeMap::new());
-	ArgonotCommitmentByOperator::set(BTreeMap::new());
+	ArgonotSecuritizationByOperator::set(BTreeMap::new());
 	ActiveBondAmountsByVaultAndAccount::set(BTreeMap::new());
 	EncumberedBondMicrogonsByAccount::set(BTreeMap::new());
 
@@ -686,20 +699,23 @@ pub fn register_vault_operator(
 	ActiveBondAmountsByVaultAndAccount::mutate(|entries| {
 		entries.insert((vault_id, operator_account_clone), activated_securitization);
 	});
-	ArgonotCommitmentByOperator::mutate(|entries| {
+	ArgonotSecuritizationByOperator::mutate(|entries| {
 		entries.entry(operator_account_for_commitment).or_default();
 	});
 }
 
-pub fn set_committed_argonots(operator_account: TestAccountId, amount: Balance) -> DispatchResult {
-	let encumbered = ArgonotCommitmentByOperator::get()
+pub fn set_argonot_securitization(
+	operator_account: TestAccountId,
+	amount: Balance,
+) -> DispatchResult {
+	let encumbered = ArgonotSecuritizationByOperator::get()
 		.get(&operator_account)
 		.map(|entry| entry.encumbered_micronots)
 		.unwrap_or_default();
 	ensure!(amount >= encumbered, TokenError::Frozen);
-	ArgonotCommitmentByOperator::mutate(|entries| {
+	ArgonotSecuritizationByOperator::mutate(|entries| {
 		let entry = entries.entry(operator_account).or_default();
-		entry.committed_micronots = amount;
+		entry.held_micronots = amount;
 	});
 	Ok(())
 }
@@ -728,15 +744,15 @@ pub fn encumbered_bond_microgons(operator_account: &TestAccountId) -> Balance {
 		.unwrap_or_default()
 }
 
-pub fn committed_argonot_micronots(operator_account: &TestAccountId) -> Balance {
-	ArgonotCommitmentByOperator::get()
+pub fn held_argonot_micronots(operator_account: &TestAccountId) -> Balance {
+	ArgonotSecuritizationByOperator::get()
 		.get(operator_account)
-		.map(|entry| entry.committed_micronots)
+		.map(|entry| entry.held_micronots)
 		.unwrap_or_default()
 }
 
 pub fn encumbered_argonot_micronots(operator_account: &TestAccountId) -> Balance {
-	ArgonotCommitmentByOperator::get()
+	ArgonotSecuritizationByOperator::get()
 		.get(operator_account)
 		.map(|entry| entry.encumbered_micronots)
 		.unwrap_or_default()

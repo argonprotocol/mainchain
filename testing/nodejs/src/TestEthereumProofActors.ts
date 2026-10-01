@@ -573,7 +573,7 @@ export class TestMintingAuthorityActor {
     );
 
     await this.harness.submit(
-      this.harness.mainchainClient.tx.vaults.setCommittedArgonots(args.committedArgonots),
+      this.harness.mainchainClient.tx.vaults.setArgonotSecuritization(args.committedArgonots),
       this.operator,
     );
   }

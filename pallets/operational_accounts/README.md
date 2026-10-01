@@ -24,6 +24,10 @@ A registered account becomes operationally certified once all of the following a
 Once eligible, any managed account may call `activate` to mark the account operationally certified
 and grant its first access code.
 
+Certification commits the minimum vault securitization to the normal one-year withdrawal notice.
+Funds above that minimum remain immediately withdrawable until used by Bitcoin locks, bonds, or a
+vault reward snapshot.
+
 ## Follow-On Access Codes
 
 After an account becomes operationally certified, it can earn additional access codes in two ways:

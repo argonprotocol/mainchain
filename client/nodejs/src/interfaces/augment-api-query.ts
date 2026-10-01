@@ -1,9 +1,8 @@
 // Auto-generated via `yarn polkadot-types-from-chain`, do not edit
-/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
-import type {} from '@polkadot/api-base/types/storage';
+import '@polkadot/api-base/types/storage';
 
 import type { ApiTypes, AugmentedQuery, QueryableStorageEntry } from '@polkadot/api-base/types';
 import type {
@@ -22,9 +21,10 @@ import type {
   u8,
 } from '@polkadot/types-codec';
 import type { AnyNumber, ITuple } from '@polkadot/types-codec/types';
-import type { AccountId32, H160, H256 } from '@polkadot/types/interfaces/runtime';
+import type { AccountId32, H160, H256, Percent } from '@polkadot/types/interfaces/runtime';
 import type {
   ArgonNotaryAuditErrorVerifyError,
+  ArgonPrimitivesAmountRankAmountRankKey,
   ArgonPrimitivesBalanceChangeAccountOrigin,
   ArgonPrimitivesBitcoinBitcoinBlock,
   ArgonPrimitivesBitcoinBitcoinCosignScriptPubkey,
@@ -51,7 +51,7 @@ import type {
   ArgonPrimitivesProvidersBlockSealerInfo,
   ArgonPrimitivesTickTicker,
   ArgonPrimitivesVault,
-  ArgonPrimitivesVaultVaultArgonotCommitment,
+  ArgonPrimitivesVaultVaultArgonotSecuritization,
   FrameSupportDispatchPerDispatchClassWeight,
   FrameSupportTokensFungibleImbalance,
   FrameSupportTokensMiscIdAmountRuntimeFreezeReason,
@@ -1202,13 +1202,9 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       miningMintPerCohort: AugmentedQuery<ApiType, () => Observable<BTreeMap<u64, u128>>, []>;
       /**
-       * The total amount of Bitcoin microgons minted. Cannot exceed `MintedMiningMicrogons`.
+       * Bitcoin-minted Argons that have not been explicitly repaid through Fission settlement.
        **/
       mintedBitcoinMicrogons: AugmentedQuery<ApiType, () => Observable<u128>, []>;
-      /**
-       * The total amount of microgons minted for mining
-       **/
-      mintedMiningMicrogons: AugmentedQuery<ApiType, () => Observable<u128>, []>;
       /**
        * The next monotonic queue index to assign to a pending bitcoin mint.
        **/
@@ -1798,11 +1794,21 @@ declare module '@polkadot/api-base/types/storage' {
         [AccountId32, u64]
       >;
       /**
+       * Live Argon bond lot ids associated with a vault, including lots awaiting release. Direct
+       * frame payouts iterate this admission-bounded index.
+       **/
+      bondLotIdsByVault: AugmentedQuery<
+        ApiType,
+        (
+          arg1: u32 | AnyNumber | Uint8Array,
+          arg2: u64 | AnyNumber | Uint8Array,
+        ) => Observable<Option<Null>>,
+        [u32, u64]
+      >;
+      /**
        * The active bond state for a vault.
        *
-       * The bounded payout set keeps the largest bond amount first, then lower `bond_lot_id` first
-       * when amounts tie. Flexible lots remain in `BondLotById` and are represented here by their
-       * aggregate.
+       * Admission totals and flexible displacement; individual lots live in `BondLotById`.
        **/
       bondLotsByVault: AugmentedQuery<
         ApiType,
@@ -1822,7 +1828,7 @@ declare module '@polkadot/api-base/types/storage' {
       /**
        * The vault capital locked for the current frame.
        *
-       * Payout uses this to see which vaults and bond lots are participating in the frame.
+       * Payout uses this for the network bond total and participating vault positions.
        **/
       currentFrameVaultCapital: AugmentedQuery<
         ApiType,
@@ -1867,9 +1873,18 @@ declare module '@polkadot/api-base/types/storage' {
         [u64]
       >;
       /**
+       * Configurable percent of maximum Bitcoin-mintable Argons targeted by the network.
+       **/
+      targetBitcoinPercent: AugmentedQuery<ApiType, () => Observable<Percent>, []>;
+      /**
        * The total number of active Argonot bonds in the active set.
        **/
       totalActiveArgonotBonds: AugmentedQuery<ApiType, () => Observable<u32>, []>;
+      /**
+       * Live Argon bond lots, including those awaiting release; stakes have a separate admission
+       * limit.
+       **/
+      totalArgonBondLots: AugmentedQuery<ApiType, () => Observable<u32>, []>;
     };
     txPause: {
       /**
@@ -1885,13 +1900,13 @@ declare module '@polkadot/api-base/types/storage' {
     };
     vaults: {
       /**
-       * Vault-side committed and crosschain-encumbered argonot backing.
+       * Argonots held for the vault, with reward commitments and cross-chain encumbrances.
        **/
-      argonotCommitmentByVaultId: AugmentedQuery<
+      argonotSecuritizationByVaultId: AugmentedQuery<
         ApiType,
         (
           arg: u32 | AnyNumber | Uint8Array,
-        ) => Observable<Option<ArgonPrimitivesVaultVaultArgonotCommitment>>,
+        ) => Observable<Option<ArgonPrimitivesVaultVaultArgonotSecuritization>>,
         [u32]
       >;
       /**
@@ -1943,6 +1958,10 @@ declare module '@polkadot/api-base/types/storage' {
       >;
       revenuePerFrameByVaultCount: AugmentedQuery<ApiType, () => Observable<u32>, []>;
       /**
+       * Raw securitization across all open vaults, including those below the payout cutoff.
+       **/
+      totalVaultSecuritization: AugmentedQuery<ApiType, () => Observable<u128>, []>;
+      /**
        * The vaults that have funds releasing at a given bitcoin height
        **/
       vaultFundsReleasingByHeight: AugmentedQuery<
@@ -1967,12 +1986,18 @@ declare module '@polkadot/api-base/types/storage' {
         [u32]
       >;
       /**
-       * Vaults whose temporary operational minimum may be released at a given tick.
+       * Open vaults ordered by raw securitization (largest first), then vault ID.
        **/
-      vaultsReleasingOperationalMinimumByTick: AugmentedQuery<
+      vaultSecuritizationRanks: AugmentedQuery<
         ApiType,
-        (arg: u64 | AnyNumber | Uint8Array) => Observable<BTreeSet<u32>>,
-        [u64]
+        (
+          arg:
+            | ArgonPrimitivesAmountRankAmountRankKey
+            | { descendingAmount?: any; orderedId?: any }
+            | string
+            | Uint8Array,
+        ) => Observable<Option<Null>>,
+        [ArgonPrimitivesAmountRankAmountRankKey]
       >;
       /**
        * Vault Bitcoin Xpub and current child counter by VaultId

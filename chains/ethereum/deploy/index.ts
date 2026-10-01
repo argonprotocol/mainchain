@@ -59,10 +59,8 @@ async function main() {
       await Promise.all(
         registeredCouncilMembers.map(async member => {
           const bondState = await argonClient.query.treasury.bondLotsByVault(member.vaultId);
-          const activeBonds = bondState.regularBondLots.reduce(
-            (sum, bondLot) => sum + bondLot.bonds.toNumber(),
-            bondState.flexibleBonds.toNumber(),
-          );
+          const activeBonds =
+            bondState.regularBonds.toNumber() + bondState.flexibleBonds.toNumber();
           return activeBonds > MIN_BOOTSTRAP_COUNCIL_BONDS ? member : undefined;
         }),
       )

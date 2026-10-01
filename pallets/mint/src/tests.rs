@@ -1,9 +1,9 @@
 use crate::{
 	mock::*,
 	pallet::{
-		BlockMintAction, MintIndex, MintedBitcoinMicrogons, MintedMiningMicrogons,
-		NextPendingBitcoinMintIndex, PendingBitcoinMint, PendingBitcoinMintsByIndex,
-		PendingMintIndicesByLockId, PendingMintQueueState,
+		BlockMintAction, MintIndex, MintedBitcoinMicrogons, NextPendingBitcoinMintIndex,
+		PendingBitcoinMint, PendingBitcoinMintsByIndex, PendingMintIndicesByLockId,
+		PendingMintQueueState,
 	},
 	Error, Event, MiningMintPerCohort, MintType,
 };
@@ -18,6 +18,15 @@ fn pending_mints() -> Vec<(MintIndex, PendingBitcoinMint<Test>)> {
 	let mut pending = PendingBitcoinMintsByIndex::<Test>::iter().collect::<Vec<_>>();
 	pending.sort_by_key(|(queue_index, _)| *queue_index);
 	pending
+}
+
+fn set_issuance_sources(mining: Balance, bitcoin: Balance) {
+	MintedBitcoinMicrogons::<Test>::set(bitcoin);
+	Balances::set_total_issuance(mining.saturating_add(bitcoin));
+}
+
+fn mining_issuance() -> Balance {
+	Balances::total_issuance().saturating_sub(MintedBitcoinMicrogons::<Test>::get())
 }
 
 #[test]
@@ -91,7 +100,7 @@ fn it_reopens_capacity_without_removing_pending_entitlements_when_a_fission_clos
 		assert_eq!(MintedBitcoinMicrogons::<Test>::get(), 60);
 
 		assert_ok!(Balances::mint_into(&2, ExistentialDeposit::get()));
-		MintedMiningMicrogons::<Test>::set(100);
+		set_issuance_sources(100, MintedBitcoinMicrogons::<Test>::get());
 		MinerRewardsAccounts::set(vec![(10, 1)]);
 		CurrentFrameId::set(1);
 		set_cpi(-0.1);
@@ -135,36 +144,15 @@ fn fission_down_ratchet_reopens_global_capacity_and_appends_the_replacement_enti
 }
 
 #[test]
-fn it_records_burnt_argons_by_prorata() {
+fn generic_argon_burns_reduce_bitcoin_and_mining_issuance_equally() {
 	new_test_ext().execute_with(|| {
-		MintedMiningMicrogons::<Test>::set(100);
-		MintedBitcoinMicrogons::<Test>::set(100);
+		set_issuance_sources(100, 100);
+		Balances::set_total_issuance(150);
 		Mint::on_argon_burn(50);
-		assert_eq!(MintedBitcoinMicrogons::<Test>::get(), 100 - 25);
-		assert_eq!(MintedMiningMicrogons::<Test>::get(), 100 - 25);
 
-		MintedMiningMicrogons::<Test>::set(200);
-		MintedBitcoinMicrogons::<Test>::set(0);
-		Mint::on_argon_burn(50);
-		assert_eq!(MintedMiningMicrogons::<Test>::get(), 200 - 50);
-		assert_eq!(MintedBitcoinMicrogons::<Test>::get(), 0);
-
-		MintedMiningMicrogons::<Test>::set(0);
-		MintedBitcoinMicrogons::<Test>::set(100);
-		Mint::on_argon_burn(50);
-		assert_eq!(MintedMiningMicrogons::<Test>::get(), 0);
-
-		MintedMiningMicrogons::<Test>::set(33);
-		MintedBitcoinMicrogons::<Test>::set(66);
-		Mint::on_argon_burn(10);
-		assert_eq!(MintedMiningMicrogons::<Test>::get(), 33 - 3);
-
-		// Burns larger than the tracked mint totals should saturate both buckets to zero.
-		MintedMiningMicrogons::<Test>::set(5);
-		MintedBitcoinMicrogons::<Test>::set(5);
-		Mint::on_argon_burn(100);
-		assert_eq!(MintedMiningMicrogons::<Test>::get(), 0);
-		assert_eq!(MintedBitcoinMicrogons::<Test>::get(), 0);
+		assert_eq!(MintedBitcoinMicrogons::<Test>::get(), 75);
+		assert_eq!(mining_issuance(), 75);
+		assert_eq!(BlockMintAction::<Test>::get().1.argon_burned, 50);
 	});
 }
 
@@ -195,7 +183,6 @@ fn it_tracks_block_rewards() {
 			},
 		]);
 
-		assert_eq!(MintedMiningMicrogons::<Test>::get(), 106);
 		assert_eq!(BlockMintAction::<Test>::get().1.argon_minted, 106);
 	});
 }
@@ -244,7 +231,6 @@ fn it_can_mint() {
 		Balances::set_total_issuance(25_000);
 		ArgonCirculation::set(25_000);
 
-		MintedMiningMicrogons::<Test>::set(500);
 		MintedBitcoinMicrogons::<Test>::set(0);
 
 		IsNewFrameStart::set(Some(2));
@@ -261,7 +247,7 @@ fn it_can_mint() {
 			.into(),
 		);
 
-		assert_eq!(MintedMiningMicrogons::<Test>::get(), mint_amount + 500);
+		assert_eq!(mining_issuance(), 25_000 + mint_amount);
 		assert_eq!(MiningMintPerCohort::<Test>::get().get(&1), Some(&mint_amount));
 		assert_eq!(Balances::total_issuance(), 25_000 + mint_amount);
 		assert_eq!(Balances::free_balance(1), mint_amount);
@@ -282,8 +268,6 @@ fn it_records_failed_mints() {
 		ArgonCirculation::set(amount);
 		IsNewFrameStart::set(Some(2));
 
-		MintedMiningMicrogons::<Test>::set(0);
-
 		Mint::on_initialize(1);
 		Mint::on_finalize(1);
 		System::assert_last_event(
@@ -298,13 +282,11 @@ fn it_records_failed_mints() {
 			.into(),
 		);
 
-		assert_eq!(MintedMiningMicrogons::<Test>::get(), 0);
 		assert_eq!(MiningMintPerCohort::<Test>::get().get(&1), None);
 		assert_eq!(Balances::total_issuance(), amount);
 
 		System::reset_events();
 		assert_ok!(Mint::request_mint(&1, 10, 9, 1));
-		MintedMiningMicrogons::<Test>::set(1);
 		CurrentFrameId::set(1);
 		set_cpi(-0.1);
 
@@ -340,7 +322,6 @@ fn it_cleans_old_cohorts() {
 		Balances::set_total_issuance(60_000);
 		ArgonCirculation::set(60_000);
 
-		MintedMiningMicrogons::<Test>::set(500);
 		MintedBitcoinMicrogons::<Test>::set(0);
 
 		IsNewFrameStart::set(Some(2));
@@ -357,7 +338,7 @@ fn it_cleans_old_cohorts() {
 			.into(),
 		);
 
-		assert_eq!(MintedMiningMicrogons::<Test>::get(), mint_amount + 500);
+		assert_eq!(mining_issuance(), 60_000 + mint_amount);
 		assert_eq!(MiningMintPerCohort::<Test>::get().get(&1), Some(&15100u128));
 		assert_eq!(MiningMintPerCohort::<Test>::get().get(&2), Some(&15100u128));
 		assert_eq!(MiningMintPerCohort::<Test>::get().get(&3), Some(&30100u128));
@@ -384,7 +365,6 @@ fn it_doesnt_mint_before_active_miners() {
 		Balances::set_total_issuance(1000);
 		ArgonCirculation::set(1000);
 
-		MintedMiningMicrogons::<Test>::set(0);
 		MintedBitcoinMicrogons::<Test>::set(0);
 
 		Mint::on_initialize(1);
@@ -421,8 +401,7 @@ fn it_does_not_mint_bitcoin_with_cpi_gt_zero() {
 		assert_eq!(queue_cursor.payout_start_index, 0);
 		assert_eq!(queue_cursor.payout_cursor_index, 0);
 
-		MintedMiningMicrogons::<Test>::set(1000);
-		MintedBitcoinMicrogons::<Test>::set(0);
+		set_issuance_sources(1000, 0);
 		ArgonCPI::set(Some(FixedI128::from_float(0.01)));
 		IsNewFrameStart::set(Some(2));
 
@@ -503,8 +482,7 @@ fn it_pays_bitcoin_mints() {
 
 		assert_eq!(Balances::total_issuance(), 0u128);
 
-		MintedMiningMicrogons::<Test>::set(0);
-		MintedBitcoinMicrogons::<Test>::set(0);
+		set_issuance_sources(0, 0);
 		// Bitcoin mint payouts still require an eligible miner set for the frame.
 		MinerRewardsAccounts::set(vec![(10, 1)]);
 
@@ -539,7 +517,7 @@ fn it_pays_bitcoin_mints() {
 
 		System::set_block_number(2);
 		CurrentFrameId::set(1);
-		MintedMiningMicrogons::<Test>::set(amount);
+		set_issuance_sources(amount, 0);
 		set_cpi(-0.1);
 
 		Mint::on_initialize(2);
@@ -586,7 +564,7 @@ fn it_pays_bitcoin_mints() {
 				.into(),
 		);
 		assert_eq!(MintedBitcoinMicrogons::<Test>::get(), 6_200_050);
-		assert_eq!(Balances::total_issuance(), 6_200_050u128);
+		assert_eq!(Balances::total_issuance(), amount + 6_200_050);
 
 		assert_eq!(BlockMintAction::<Test>::get().1.argon_minted, 0);
 		assert_eq!(BlockMintAction::<Test>::get().1.bitcoin_minted, 6_200_050);
@@ -594,17 +572,17 @@ fn it_pays_bitcoin_mints() {
 		System::set_block_number(3);
 		Mint::on_initialize(3);
 		assert_eq!(MintedBitcoinMicrogons::<Test>::get(), 6_200_050);
-		assert_eq!(Balances::total_issuance(), 6_200_050u128);
+		assert_eq!(Balances::total_issuance(), amount + 6_200_050);
 
 		ArgonCirculation::set(100);
-		MintedMiningMicrogons::<Test>::set(amount);
+		set_issuance_sources(amount, MintedBitcoinMicrogons::<Test>::get());
 		IsNewFrameStart::set(Some(2));
 		CurrentFrameId::set(2);
 		MinerRewardsAccounts::set(vec![(10, 1)]);
 		BlockMintAction::<Test>::kill();
 		Mint::on_finalize(3);
 		let miner_amount = 10;
-		assert_eq!(MintedMiningMicrogons::<Test>::get(), amount + miner_amount);
+		assert_eq!(mining_issuance(), amount + miner_amount);
 		assert_eq!(Balances::free_balance(10), miner_amount);
 		assert_eq!(BlockMintAction::<Test>::get().1.argon_minted, miner_amount);
 		assert_eq!(BlockMintAction::<Test>::get().1.bitcoin_minted, 0);
@@ -630,12 +608,13 @@ fn it_pays_bitcoin_mints() {
 				.into(),
 		);
 		assert_eq!(MintedBitcoinMicrogons::<Test>::get(), 12_400_100);
-		assert_eq!(Balances::total_issuance(), 12_400_110);
+		assert_eq!(Balances::total_issuance(), amount + 12_400_100 + miner_amount);
 
 		assert_eq!(BlockMintAction::<Test>::get().1.bitcoin_minted, 6_200_050);
 
 		BlockMintAction::<Test>::kill();
 		System::set_block_number(4);
+		Balances::set_total_issuance(Balances::total_issuance().saturating_sub(100));
 		Mint::on_argon_burn(100);
 		assert_eq!(BlockMintAction::<Test>::get().1.argon_burned, 100);
 		assert_eq!(BlockMintAction::<Test>::get().1.argon_minted, 0);
@@ -654,7 +633,7 @@ fn it_keeps_later_pending_mints_behind_the_frame_payout_window() {
 		assert_ok!(Mint::request_mint(&3, 0, 3, 100));
 		MaxPendingMintPayoutWindowSize::set(2);
 
-		MintedMiningMicrogons::<Test>::set(30);
+		set_issuance_sources(30, 0);
 		CurrentFrameId::set(1);
 		set_cpi(-0.1);
 		Mint::on_initialize(1);
@@ -667,7 +646,7 @@ fn it_keeps_later_pending_mints_behind_the_frame_payout_window() {
 		assert_eq!(queue_cursor.payout_cursor_index, 2);
 
 		CurrentFrameId::set(2);
-		MintedMiningMicrogons::<Test>::set(60);
+		set_issuance_sources(60, MintedBitcoinMicrogons::<Test>::get());
 		Mint::on_initialize(2);
 
 		assert_eq!(Balances::free_balance(1), 20);
@@ -686,7 +665,7 @@ fn it_does_not_partially_pay_or_advance_when_block_cannot_cover_frame_chunk() {
 		assert_ok!(Mint::request_mint(&2, 0, 2, 100));
 		MaxPendingMintPayoutWindowSize::set(2);
 
-		MintedMiningMicrogons::<Test>::set(5);
+		set_issuance_sources(5, 0);
 		CurrentFrameId::set(1);
 		set_cpi(-0.1);
 		Mint::on_initialize(1);
@@ -723,7 +702,7 @@ fn it_does_not_partially_pay_or_advance_when_block_cannot_cover_frame_chunk() {
 		assert_eq!(queue_cursor.payout_cursor_index, 0);
 		assert_eq!(queue_cursor.payout_cursor_frame_id, Some(1));
 
-		MintedMiningMicrogons::<Test>::set(10);
+		set_issuance_sources(10, MintedBitcoinMicrogons::<Test>::get());
 		Mint::on_initialize(2);
 
 		assert_eq!(Balances::free_balance(1), 10);
@@ -744,7 +723,7 @@ fn it_does_not_backfill_the_frame_payout_window() {
 		assert_ok!(Mint::request_mint(&3, 0, 3, 100));
 		MaxPendingMintPayoutWindowSize::set(2);
 
-		MintedMiningMicrogons::<Test>::set(21);
+		set_issuance_sources(21, 0);
 		CurrentFrameId::set(1);
 		set_cpi(-0.1);
 		Mint::on_initialize(1);
@@ -795,7 +774,7 @@ fn it_tracks_multiple_pending_mints_for_the_same_utxo() {
 		);
 
 		System::set_block_number(1);
-		MintedMiningMicrogons::<Test>::set(20);
+		set_issuance_sources(20, 0);
 		MinerRewardsAccounts::set(vec![(10, 1)]);
 		CurrentFrameId::set(1);
 		set_cpi(-0.1);
@@ -827,7 +806,7 @@ fn it_advances_payout_start_when_loop_reaches_a_missing_front_entry() {
 		assert_eq!(queue_cursor.payout_start_index, 0);
 		assert_eq!(queue_cursor.payout_cursor_index, 0);
 
-		MintedMiningMicrogons::<Test>::set(20);
+		set_issuance_sources(20, 0);
 		CurrentFrameId::set(1);
 		set_cpi(-0.1);
 		Mint::on_initialize(1);

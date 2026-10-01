@@ -111,7 +111,6 @@ parameter_types! {
 	pub const OperationalMinimumUniswapTransfer: Balance = 3_000;
 	pub const MiningSeatsForOperational: u32 = 2;
 	pub const MiningSeatsPerAccessCode: u32 = 5;
-	pub const OperationalMinimumVaultLockTicks: Tick = 1_440 * 365;
 	pub static PercentForTreasuryReserves: Percent = Percent::from_percent(20);
 	pub static OverdueCollectBlockers: BTreeSet<u64> = BTreeSet::new();
 	pub static OperationalAccountsInviteOnly: bool = false;
@@ -235,6 +234,7 @@ impl pallet_vaults::Config for Test {
 	type MiningFrameProvider = StaticMiningFrameProvider;
 	type GetBitcoinNetwork = GetBitcoinNetwork;
 	type BitcoinBlockHeightChange = LastBitcoinHeightChange;
+	type SecuritizationExitNoticeBlocks = ConstU64<52_560>;
 	type TicksPerBitcoinBlock = TicksPerBitcoinBlock;
 	type TicksPerFrame = TicksPerFrame;
 	type TickProvider = StaticTickProvider;
@@ -242,8 +242,8 @@ impl pallet_vaults::Config for Test {
 	type MaxPendingCosignsPerVault = ConstU32<100>;
 	type RevenueCollectionExpirationFrames = ConstU64<10>;
 	type OperationalMinimumVaultSecuritization = OperationalMinimumVaultSecuritization;
-	type OperationalMinimumVaultLockTicks = OperationalMinimumVaultLockTicks;
 	type OperationalAccountsHook = ();
+	type TreasuryPoolProvider = ();
 	type OperationalAccountProvider = MockOperationalAccountProvider;
 	type CollectBlockerProvider = MockCollectBlockerProvider;
 }

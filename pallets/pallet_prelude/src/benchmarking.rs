@@ -25,7 +25,7 @@ use argon_primitives::{
 		BitcoinLockFundingUpdate, BitcoinResecuritization, BitcoinSecuritization,
 		BitcoinVaultProvider, LockExtension, LostBitcoinCompensation, RegistrationVaultData,
 		ReserveSecuritizationRequest, TreasuryVaultProvider, Vault, VaultError,
-		VaultTreasuryFrameEarnings,
+		VaultSecuritization, VaultTreasuryFrameEarnings,
 	},
 	ArgonCPI, NotaryId, NotebookNumber, NotebookSecret, OperationalRewardPayout, PriceProvider,
 	VaultId, VotingSchedule,
@@ -1221,7 +1221,7 @@ where
 			})
 	}
 
-	fn get_committed_argonots(account_id: &Self::AccountId) -> Option<Self::Balance> {
+	fn get_held_argonots(account_id: &Self::AccountId) -> Option<Self::Balance> {
 		Self::get_vault_id(account_id).map(|_| Default::default())
 	}
 
@@ -1308,8 +1308,11 @@ where
 		securitization: &BitcoinSecuritization<Self::Balance>,
 		request: ReserveSecuritizationRequest<Self::Balance>,
 	) -> Result<(Self::Balance, Self::Balance), VaultError> {
-		let ReserveSecuritizationRequest { fee_discount, securitization_space_to_unreserve } =
-			request;
+		let ReserveSecuritizationRequest {
+			fee_discount,
+			lock_expiration,
+			securitization_space_to_unreserve,
+		} = request;
 		let (total_fee, fee_discount, charge_fee) =
 			mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
 				let charge_fee = state.charge_fee;
@@ -1319,7 +1322,11 @@ where
 				vault
 					.reserved_securitization_space
 					.saturating_reduce(securitization_space_to_unreserve);
-				vault.reserve_securitization(securitization, may_use_flexible_space)?;
+				vault.reserve_securitization(
+					securitization,
+					may_use_flexible_space,
+					lock_expiration,
+				)?;
 				let total_fee = vault
 					.terms
 					.bitcoin_annual_percent_rate
@@ -1429,9 +1436,17 @@ where
 	fn release_unactivated_securitization(
 		vault_id: VaultId,
 		amount: Self::Balance,
+		lock_extension: &LockExtension<Self::Balance>,
+		retained_securitization: Self::Balance,
 	) -> Result<(), VaultError> {
 		mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
 			let vault = state.vaults.get_mut(&vault_id).ok_or(VaultError::VaultNotFound)?;
+			vault.update_locked_commitments(
+				lock_extension,
+				retained_securitization,
+				amount,
+				false,
+			)?;
 			vault.release_unactivated_securitization(amount)?;
 			state.canceled_locks.push((vault_id, amount));
 			Ok(())
@@ -1557,16 +1572,58 @@ where
 		+ Eq
 		+ Sum,
 {
+	type Weights = ();
 	type Balance = Balance;
 	type AccountId = AccountId;
 
-	fn get_eligible_satoshis(vault_id: VaultId) -> Satoshis {
+	fn get_vault_securitization(vault_id: VaultId) -> Option<Self::Balance> {
 		benchmark_bitcoin_vault_provider_state::<AccountId, Balance>()
 			.vaults
 			.get(&vault_id)
-			.map(|vault| vault.ratio_adjusted_satoshis)
-			.unwrap_or_default()
+			.filter(|vault| !vault.is_closed)
+			.map(|vault| vault.securitization)
 	}
+
+	fn commit_securitization_for_bonds(
+		_vault_id: VaultId,
+		_regular_bond_microgons: Self::Balance,
+	) -> Result<(), VaultError> {
+		Ok(())
+	}
+
+	fn get_top_vaults_by_securitization(
+		max_vaults: u32,
+	) -> (Vec<VaultSecuritization<Self::Balance, Self::AccountId>>, Self::Balance) {
+		let mut positions: Vec<_> = benchmark_bitcoin_vault_provider_state::<AccountId, Balance>()
+			.vaults
+			.into_iter()
+			.filter_map(|(vault_id, vault)| {
+				if vault.is_closed || vault.securitization.is_zero() {
+					return None;
+				}
+				Some(VaultSecuritization {
+					vault_id,
+					operator_account_id: vault.operator_account_id.clone(),
+					securitization: vault.securitization,
+					activated_securitization: vault.get_activated_securitization(),
+					bitcoin_locked_satoshis: vault.total_satoshis,
+					securitization_micronots: Balance::zero(),
+				})
+			})
+			.collect();
+		let total = positions
+			.iter()
+			.fold(Balance::zero(), |sum, vault| sum.saturating_add(vault.securitization));
+		positions.sort_by(|a, b| {
+			b.securitization
+				.cmp(&a.securitization)
+				.then_with(|| a.vault_id.cmp(&b.vault_id))
+		});
+		positions.truncate(max_vaults as usize);
+		(positions, total)
+	}
+
+	fn commit_securitization_for_rewards(_vault_id: VaultId, _micronots: Self::Balance) {}
 
 	fn get_vault_operator(vault_id: VaultId) -> Option<Self::AccountId> {
 		benchmark_bitcoin_vault_provider_state::<AccountId, Balance>()
@@ -1582,13 +1639,6 @@ where
 			.and_then(|vault| vault.delegate_account_id.clone())
 	}
 
-	fn get_vault_profit_sharing_percent(vault_id: VaultId) -> Option<Permill> {
-		benchmark_bitcoin_vault_provider_state::<AccountId, Balance>()
-			.vaults
-			.get(&vault_id)
-			.map(|vault| vault.terms.treasury_profit_sharing)
-	}
-
 	fn is_vault_open(vault_id: VaultId) -> bool {
 		benchmark_bitcoin_vault_provider_state::<AccountId, Balance>()
 			.vaults
@@ -1600,10 +1650,11 @@ where
 	fn record_vault_frame_earnings(
 		_source_account_id: &Self::AccountId,
 		profit: VaultTreasuryFrameEarnings<Self::Balance, Self::AccountId>,
-	) {
+	) -> DispatchResult {
 		mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
 			state.treasury_frame_earnings.push((profit.vault_id, profit.earnings_for_vault));
 		});
+		Ok(())
 	}
 }
 

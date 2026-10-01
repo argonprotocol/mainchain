@@ -109,7 +109,7 @@ fn force_set_global_issuance_council_uses_argonot_price_floor_for_combined_weigh
 		let council_signer = council_signer(&council_pair);
 
 		register_vault_operator(council_account.clone(), 10, 8_000);
-		assert_ok!(set_committed_argonots(council_account.clone(), 500));
+		assert_ok!(set_argonot_securitization(council_account.clone(), 500));
 		assert_ok!(CrosschainTransfer::register_council_signer(
 			RuntimeOrigin::signed(council_account.clone()),
 			SourceChain::Ethereum,
@@ -463,7 +463,7 @@ pub(super) fn activate_test_minting_authority(
 	set_active_vault_bond_amount(vault_id, operator_account.clone(), microgon_collateral);
 	if micronot_collateral != 0 {
 		assert_ok!(Ownership::mint_into(&operator_account, micronot_collateral));
-		assert_ok!(set_committed_argonots(operator_account.clone(), micronot_collateral,));
+		assert_ok!(set_argonot_securitization(operator_account.clone(), micronot_collateral,));
 	}
 
 	let signing_key = council_signer(authority_pair);

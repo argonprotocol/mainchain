@@ -93,8 +93,8 @@ parameter_types! {
 	pub const BlockRewardsDampener: FixedU128 = FixedU128::from_rational(75, 100); // 75% dampener
 
 	// ### pallet_treasury
-	pub const MaxTreasuryContributors: u32 = 100;
 	pub const MaxActiveArgonotBondLots: u32 = 1_000;
+	pub const MaxArgonBondLots: u32 = 15_000;
 	pub const MaxVaultsPerPool: u32 = 100;
 	pub const TreasuryInternalPalletId: PalletId = PalletId(*b"lqdPools");
 	pub TreasuryMiningBidPoolAccount: AccountId =
@@ -102,8 +102,13 @@ parameter_types! {
 	pub TreasuryReservesAccount: AccountId =
 		TreasuryInternalPalletId::get().into_sub_account_truncating(*b"treasury-reserve");
 	pub const PercentForTreasuryReserves: Percent = Percent::from_percent(20);
-	pub const PercentForArgonotBondPool: Percent = Percent::from_percent(10);
-	pub const MaxArgonotBondedPercentOfCirculation: Percent = Percent::from_percent(40);
+	pub const PercentForStakePool: Percent = Percent::from_percent(15);
+	pub const PercentForMiningOperatorPool: Percent = Percent::from_percent(6);
+	pub const PercentForBitcoinLiquidPool: Percent = Percent::from_percent(3);
+	pub const PercentForArgonBondPool: Percent = Percent::from_percent(5);
+	pub const PercentForVaultPool: Percent = Percent::from_percent(51);
+	pub const DefaultTargetBitcoinPercent: Percent = Percent::from_percent(15);
+	pub const MaxArgonotBondedPercentOfCirculation: Percent = Percent::from_percent(60);
 
 	// ### pallet_mining_slot
 	pub const FramesPerMiningTerm: u32 = 10;
@@ -262,8 +267,6 @@ parameter_types! {
 	pub const OperationalMinimumUniswapTransfer: Balance = 3_000 * MICROGONS_PER_ARGON;
 	/// Minimum vault securitization (base units) required to become operational.
 	pub const OperationalMinimumVaultSecuritization: Balance = 2_000 * MICROGONS_PER_ARGON;
-	/// Duration that the operational minimum vault securitization remains locked.
-	pub const OperationalMinimumVaultLockTicks: Tick = 1_440 * 365;
 	/// Additional argon amount (base units) required per follow-on access code after an account
 	/// becomes operational.
 	pub const BitcoinLockSizeForAccessCode: Balance = 5_000 * MICROGONS_PER_ARGON;

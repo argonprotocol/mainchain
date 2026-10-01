@@ -1,7 +1,8 @@
 use crate as pallet_treasury;
 use argon_primitives::{
-	bitcoin::Satoshis, providers::PriceProvider, vault::TreasuryVaultProvider,
-	OperationalAccountsHook,
+	providers::{BitcoinMintedProvider, BurnEventHandler},
+	vault::{TreasuryVaultProvider, VaultError, VaultSecuritization},
+	ArgonCPI, OperationalAccountsHook, PriceProvider, TreasuryPoolProvider, MICROGONS_PER_ARGON,
 };
 use frame_support::traits::{Currency, StorageMapShim};
 use pallet_prelude::{
@@ -36,6 +37,10 @@ impl OperationalAccountsHook<TestAccountId, Balance> for TestOperationalAccounts
 
 	fn account_vault_bond_total_updated_weight() -> Weight {
 		Weight::zero()
+	}
+
+	fn account_vault_bond_total_updated(account_id: &TestAccountId, amount: Balance) {
+		LastOperationalBondTotal::set(Some((account_id.clone(), amount)));
 	}
 
 	fn account_uniswap_argon_transfers_in_updated_weight() -> Weight {
@@ -159,88 +164,135 @@ parameter_types! {
 
 	pub const LastBidPoolDistribution: (FrameId, Tick) = (0, 0);
 
-	pub static MaxTreasuryContributors: u32 = 10;
 	pub static MinimumArgonsPerContributor: u128 = 100_000_000;
 	pub static MaxActiveArgonotBondLots: u32 = 1_000;
+	pub static MaxArgonBondLots: u32 = 15_000;
 	pub static MaxVaultsPerPool: u32 = 100;
 	pub static MaxPendingUnlocksPerFrame: u32 = 100;
 	pub static TreasuryExitDelayFrames: FrameId = 10;
 	pub const VaultPalletId: PalletId = PalletId(*b"bidPools");
 
 	pub const PercentForTreasuryReserves: Percent = Percent::from_percent(20);
-	pub const PercentForArgonotBondPool: Percent = Percent::from_percent(10);
-	pub static MaxArgonotBondedPercentOfCirculation: Percent = Percent::from_percent(40);
+	pub const PercentForStakePool: Percent = Percent::from_percent(15);
+	pub const PercentForMiningOperatorPool: Percent = Percent::from_percent(6);
+	pub const PercentForBitcoinLiquidPool: Percent = Percent::from_percent(3);
+	pub const PercentForArgonBondPool: Percent = Percent::from_percent(5);
+	pub const PercentForVaultPool: Percent = Percent::from_percent(51);
+	pub const DefaultTargetBitcoinPercent: Percent = Percent::from_percent(15);
+	pub static MaxArgonotBondedPercentOfCirculation: Percent = Percent::from_percent(60);
 	pub static CurrentFrameId: FrameId = 1;
 
 	pub static VaultsById: HashMap<VaultId, TestVault> = HashMap::new();
-
-	// BTC=$100 / argon=$1 makes 1 sat = 1 microgon for clean test math
-	pub static BitcoinPricePerUsd: Option<FixedU128> = Some(FixedU128::from_float(100.00));
-	pub static ArgonPricePerUsd: Option<FixedU128> = Some(FixedU128::from_float(1.00));
+	pub static VaultBitcoinSatoshis: HashMap<VaultId, u64> = HashMap::new();
+	pub static VaultArgonotMicronots: HashMap<VaultId, Balance> = HashMap::new();
+	pub static VaultRewardCommittedMicronots: HashMap<VaultId, Balance> = HashMap::new();
+	pub static BitcoinPriceInUsd: FixedU128 = FixedU128::from_u32(10);
+	pub static ArgonPriceInUsd: FixedU128 = FixedU128::from_u32(1);
+	pub static ArgonotPriceInUsd: FixedU128 = FixedU128::from_u32(1);
+	pub static AverageArgonotPriceInMicrogons: Balance = MICROGONS_PER_ARGON;
+	pub static LastAverageArgonotPriceFrame: Option<FrameId> = None;
+	pub static MintedBitcoinMicrogons: Balance = 0;
 
 	pub static LastVaultProfits: Vec<VaultTreasuryFrameEarnings<Balance, TestAccountId>> = vec![];
+	pub static LastOperationalBondTotal: Option<(TestAccountId, Balance)> = None;
 }
 
 #[derive(Clone)]
 pub struct TestVault {
 	pub securitization: Balance,
-	pub eligible_satoshis: Satoshis,
-	pub sharing_percent: Permill,
+	pub exit_notice_amount: Balance,
+	pub committed_microgons: Balance,
+	pub activated_securitization: Balance,
 	pub account_id: TestAccountId,
 	pub delegate_account_id: Option<TestAccountId>,
 	pub is_closed: bool,
 }
 
 pub(crate) fn insert_vault(vault_id: VaultId, vault: TestVault) {
+	let securitization = if vault.is_closed { 0 } else { vault.securitization };
 	VaultsById::mutate(|x| {
 		x.insert(vault_id, vault);
 	});
-}
-
-pub struct StaticPriceProvider;
-impl PriceProvider<Balance> for StaticPriceProvider {
-	type Weights = ();
-
-	fn get_latest_btc_price_in_usd() -> Option<FixedU128> {
-		BitcoinPricePerUsd::get()
-	}
-	fn get_latest_argon_price_in_usd() -> Option<FixedU128> {
-		ArgonPricePerUsd::get()
-	}
-	fn get_argonot_price_in_usd() -> Option<FixedU128> {
-		ArgonPricePerUsd::get()
-	}
-	fn get_target_argon_price_in_usd() -> Option<FixedU128> {
-		ArgonPricePerUsd::get()
-	}
-	fn get_argon_cpi() -> Option<argon_primitives::ArgonCPI> {
-		None
-	}
-	fn get_redemption_r_value() -> Option<FixedU128> {
-		None
-	}
-	fn get_circulation() -> Balance {
-		0
-	}
-	fn get_average_cpi_for_ticks(_tick_range: (Tick, Tick)) -> argon_primitives::ArgonCPI {
-		FixedI128::zero()
-	}
+	Treasury::vault_securitization_changed(vault_id, securitization);
 }
 
 pub struct StaticTreasuryVaultProvider;
 impl TreasuryVaultProvider for StaticTreasuryVaultProvider {
+	type Weights = ();
 	type Balance = Balance;
 	type AccountId = TestAccountId;
 
-	fn get_eligible_satoshis(vault_id: VaultId) -> Satoshis {
+	fn get_vault_securitization(vault_id: VaultId) -> Option<Self::Balance> {
 		VaultsById::get()
 			.get(&vault_id)
-			.map(|vault| vault.eligible_satoshis)
-			.unwrap_or_default()
+			.filter(|vault| !vault.is_closed)
+			.map(|vault| vault.securitization)
 	}
 
-	fn get_vault_profit_sharing_percent(vault_id: VaultId) -> Option<Permill> {
-		VaultsById::get().get(&vault_id).map(|a| a.sharing_percent)
+	fn commit_securitization_for_bonds(
+		vault_id: VaultId,
+		regular_bond_microgons: Self::Balance,
+	) -> Result<(), VaultError> {
+		let mut vaults = VaultsById::get();
+		let vault = vaults.get_mut(&vault_id).ok_or(VaultError::VaultNotFound)?;
+		if vault.is_closed {
+			return Err(VaultError::VaultClosed);
+		}
+		if regular_bond_microgons > vault.securitization.saturating_sub(vault.exit_notice_amount) {
+			return Err(VaultError::InsufficientVaultFunds);
+		}
+		vault.committed_microgons = vault.committed_microgons.max(regular_bond_microgons);
+		VaultsById::set(vaults);
+		Ok(())
+	}
+
+	fn get_top_vaults_by_securitization(
+		max_vaults: u32,
+	) -> (Vec<VaultSecuritization<Self::Balance, Self::AccountId>>, Self::Balance) {
+		let mut positions: Vec<_> = VaultsById::get()
+			.into_iter()
+			.filter_map(|(vault_id, vault)| {
+				if vault.is_closed || vault.securitization.is_zero() {
+					return None;
+				}
+				Some(VaultSecuritization {
+					vault_id,
+					operator_account_id: vault.account_id,
+					securitization: vault.securitization,
+					activated_securitization: vault.activated_securitization,
+					bitcoin_locked_satoshis: VaultBitcoinSatoshis::get()
+						.get(&vault_id)
+						.copied()
+						.unwrap_or_default(),
+					securitization_micronots: VaultArgonotMicronots::get()
+						.get(&vault_id)
+						.copied()
+						.unwrap_or_default(),
+				})
+			})
+			.collect();
+		let total = positions
+			.iter()
+			.fold(0u128, |sum, vault| sum.saturating_add(vault.securitization));
+		positions.sort_by(|a, b| {
+			b.securitization
+				.cmp(&a.securitization)
+				.then_with(|| a.vault_id.cmp(&b.vault_id))
+		});
+		positions.truncate(max_vaults as usize);
+		(positions, total)
+	}
+
+	fn commit_securitization_for_rewards(vault_id: VaultId, micronots: Self::Balance) {
+		VaultsById::mutate(|vaults| {
+			if let Some(vault) = vaults.get_mut(&vault_id) {
+				vault.committed_microgons = vault.securitization;
+			}
+		});
+		VaultRewardCommittedMicronots::mutate(|commitments| {
+			let amount = commitments.entry(vault_id).or_default();
+			*amount = (*amount).max(micronots);
+		});
 	}
 
 	fn get_vault_operator(vault_id: VaultId) -> Option<Self::AccountId> {
@@ -258,7 +310,7 @@ impl TreasuryVaultProvider for StaticTreasuryVaultProvider {
 	fn record_vault_frame_earnings(
 		_source_account_id: &Self::AccountId,
 		profit: VaultTreasuryFrameEarnings<Self::Balance, Self::AccountId>,
-	) {
+	) -> DispatchResult {
 		let _ = Balances::burn_from(
 			&BidPoolAccountId::get(),
 			profit.earnings_for_vault,
@@ -267,7 +319,62 @@ impl TreasuryVaultProvider for StaticTreasuryVaultProvider {
 			Fortitude::Force,
 		);
 		LastVaultProfits::mutate(|a| a.push(profit));
+		Ok(())
 	}
+}
+
+pub struct StaticBitcoinMintedProvider;
+impl BitcoinMintedProvider<Balance> for StaticBitcoinMintedProvider {
+	fn minted_bitcoin_microgons() -> Balance {
+		MintedBitcoinMicrogons::get()
+	}
+}
+
+pub struct StaticPriceProvider;
+impl PriceProvider<Balance> for StaticPriceProvider {
+	type Weights = ();
+
+	fn get_average_microgons_per_argonot(frame_id: FrameId) -> Option<Balance> {
+		LastAverageArgonotPriceFrame::set(Some(frame_id));
+		Some(AverageArgonotPriceInMicrogons::get())
+	}
+
+	fn get_latest_btc_price_in_usd() -> Option<FixedU128> {
+		Some(BitcoinPriceInUsd::get())
+	}
+
+	fn get_latest_argon_price_in_usd() -> Option<FixedU128> {
+		Some(ArgonPriceInUsd::get())
+	}
+
+	fn get_argonot_price_in_usd() -> Option<FixedU128> {
+		Some(ArgonotPriceInUsd::get())
+	}
+
+	fn get_target_argon_price_in_usd() -> Option<FixedU128> {
+		Some(ArgonPriceInUsd::get())
+	}
+
+	fn get_argon_cpi() -> Option<ArgonCPI> {
+		None
+	}
+
+	fn get_average_cpi_for_ticks(_tick_range: (Tick, Tick)) -> ArgonCPI {
+		ArgonCPI::zero()
+	}
+
+	fn get_circulation() -> Balance {
+		0
+	}
+
+	fn get_redemption_r_value() -> Option<FixedU128> {
+		None
+	}
+}
+
+pub struct StaticBurnEventHandler;
+impl BurnEventHandler<Balance> for StaticBurnEventHandler {
+	fn on_argon_burn(_amount: &Balance) {}
 }
 
 pub struct StaticMiningFrameTransitionProvider;
@@ -288,16 +395,23 @@ impl pallet_treasury::Config for Test {
 	type OwnershipCurrency = Ownership;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type TreasuryVaultProvider = StaticTreasuryVaultProvider;
+	type BitcoinMintedProvider = StaticBitcoinMintedProvider;
 	type PriceProvider = StaticPriceProvider;
-	type MaxTreasuryContributors = MaxTreasuryContributors;
+	type BurnEventHandler = StaticBurnEventHandler;
 	type MinimumArgonsPerContributor = MinimumArgonsPerContributor;
 	type MaxActiveArgonotBondLots = MaxActiveArgonotBondLots;
+	type MaxArgonBondLots = MaxArgonBondLots;
 	type MaxArgonotBondedPercentOfCirculation = MaxArgonotBondedPercentOfCirculation;
 	type PalletId = VaultPalletId;
 	type MiningBidPoolAccount = BidPoolAccountId;
 	type TreasuryReservesAccount = TreasuryReservesAccountId;
 	type PercentForTreasuryReserves = PercentForTreasuryReserves;
-	type PercentForArgonotBondPool = PercentForArgonotBondPool;
+	type PercentForStakePool = PercentForStakePool;
+	type PercentForMiningOperatorPool = PercentForMiningOperatorPool;
+	type PercentForBitcoinLiquidPool = PercentForBitcoinLiquidPool;
+	type PercentForArgonBondPool = PercentForArgonBondPool;
+	type PercentForVaultPool = PercentForVaultPool;
+	type DefaultTargetBitcoinPercent = DefaultTargetBitcoinPercent;
 	type MaxVaultsPerPool = MaxVaultsPerPool;
 	type MaxPendingUnlocksPerFrame = MaxPendingUnlocksPerFrame;
 	type TreasuryExitDelayFrames = TreasuryExitDelayFrames;

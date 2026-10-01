@@ -1,5 +1,4 @@
 // Auto-generated via `yarn polkadot-types-from-defs`, do not edit
-/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
@@ -9,6 +8,7 @@ import type {
   ArgonNotaryAuditAccountHistoryLookupError,
   ArgonNotaryAuditErrorVerifyError,
   ArgonPrimitivesAccountAccountType,
+  ArgonPrimitivesAmountRankAmountRankKey,
   ArgonPrimitivesBalanceChangeAccountOrigin,
   ArgonPrimitivesBalanceChangeMerkleProof,
   ArgonPrimitivesBitcoinBitcoinBlock,
@@ -63,8 +63,9 @@ import type {
   ArgonPrimitivesTickTicker,
   ArgonPrimitivesVault,
   ArgonPrimitivesVaultBitcoinSecuritizationBasis,
+  ArgonPrimitivesVaultSecuritizationScheduleEntry,
   ArgonPrimitivesVaultTreasuryBonusApprovalProof,
-  ArgonPrimitivesVaultVaultArgonotCommitment,
+  ArgonPrimitivesVaultVaultArgonotSecuritization,
   ArgonPrimitivesVaultVaultError,
   ArgonPrimitivesVaultVaultTerms,
   ArgonRuntimeOriginCaller,
@@ -269,7 +270,7 @@ import type {
   PalletTransactionPaymentEvent,
   PalletTransactionPaymentReleases,
   PalletTreasuryBondLot,
-  PalletTreasuryBondLotAllocation,
+  PalletTreasuryBondLotEarningsMetrics,
   PalletTreasuryBondLotSummary,
   PalletTreasuryBondProgram,
   PalletTreasuryBondProgramId,
@@ -280,8 +281,10 @@ import type {
   PalletTreasuryFrameArgonotBondParticipants,
   PalletTreasuryFrameVaultCapital,
   PalletTreasuryHoldReason,
+  PalletTreasuryLockedFrameBondTerms,
+  PalletTreasuryLockedFrameVaultTerms,
   PalletTreasuryVaultBondState,
-  PalletTreasuryVaultCapital,
+  PalletTreasuryVaultSecuritizationPosition,
   PalletTxPauseCall,
   PalletTxPauseError,
   PalletTxPauseEvent,
@@ -328,6 +331,7 @@ declare module '@polkadot/types/types/registry' {
     ArgonNotaryAuditAccountHistoryLookupError: ArgonNotaryAuditAccountHistoryLookupError;
     ArgonNotaryAuditErrorVerifyError: ArgonNotaryAuditErrorVerifyError;
     ArgonPrimitivesAccountAccountType: ArgonPrimitivesAccountAccountType;
+    ArgonPrimitivesAmountRankAmountRankKey: ArgonPrimitivesAmountRankAmountRankKey;
     ArgonPrimitivesBalanceChangeAccountOrigin: ArgonPrimitivesBalanceChangeAccountOrigin;
     ArgonPrimitivesBalanceChangeMerkleProof: ArgonPrimitivesBalanceChangeMerkleProof;
     ArgonPrimitivesBitcoinBitcoinBlock: ArgonPrimitivesBitcoinBitcoinBlock;
@@ -382,8 +386,9 @@ declare module '@polkadot/types/types/registry' {
     ArgonPrimitivesTickTicker: ArgonPrimitivesTickTicker;
     ArgonPrimitivesVault: ArgonPrimitivesVault;
     ArgonPrimitivesVaultBitcoinSecuritizationBasis: ArgonPrimitivesVaultBitcoinSecuritizationBasis;
+    ArgonPrimitivesVaultSecuritizationScheduleEntry: ArgonPrimitivesVaultSecuritizationScheduleEntry;
     ArgonPrimitivesVaultTreasuryBonusApprovalProof: ArgonPrimitivesVaultTreasuryBonusApprovalProof;
-    ArgonPrimitivesVaultVaultArgonotCommitment: ArgonPrimitivesVaultVaultArgonotCommitment;
+    ArgonPrimitivesVaultVaultArgonotSecuritization: ArgonPrimitivesVaultVaultArgonotSecuritization;
     ArgonPrimitivesVaultVaultError: ArgonPrimitivesVaultVaultError;
     ArgonPrimitivesVaultVaultTerms: ArgonPrimitivesVaultVaultTerms;
     ArgonRuntimeOriginCaller: ArgonRuntimeOriginCaller;
@@ -588,7 +593,7 @@ declare module '@polkadot/types/types/registry' {
     PalletTransactionPaymentEvent: PalletTransactionPaymentEvent;
     PalletTransactionPaymentReleases: PalletTransactionPaymentReleases;
     PalletTreasuryBondLot: PalletTreasuryBondLot;
-    PalletTreasuryBondLotAllocation: PalletTreasuryBondLotAllocation;
+    PalletTreasuryBondLotEarningsMetrics: PalletTreasuryBondLotEarningsMetrics;
     PalletTreasuryBondLotSummary: PalletTreasuryBondLotSummary;
     PalletTreasuryBondProgram: PalletTreasuryBondProgram;
     PalletTreasuryBondProgramId: PalletTreasuryBondProgramId;
@@ -599,8 +604,10 @@ declare module '@polkadot/types/types/registry' {
     PalletTreasuryFrameArgonotBondParticipants: PalletTreasuryFrameArgonotBondParticipants;
     PalletTreasuryFrameVaultCapital: PalletTreasuryFrameVaultCapital;
     PalletTreasuryHoldReason: PalletTreasuryHoldReason;
+    PalletTreasuryLockedFrameBondTerms: PalletTreasuryLockedFrameBondTerms;
+    PalletTreasuryLockedFrameVaultTerms: PalletTreasuryLockedFrameVaultTerms;
     PalletTreasuryVaultBondState: PalletTreasuryVaultBondState;
-    PalletTreasuryVaultCapital: PalletTreasuryVaultCapital;
+    PalletTreasuryVaultSecuritizationPosition: PalletTreasuryVaultSecuritizationPosition;
     PalletTxPauseCall: PalletTxPauseCall;
     PalletTxPauseError: PalletTxPauseError;
     PalletTxPauseEvent: PalletTxPauseEvent;

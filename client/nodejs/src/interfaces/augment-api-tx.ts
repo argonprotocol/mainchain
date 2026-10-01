@@ -3,7 +3,7 @@
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
-import type {} from '@polkadot/api-base/types/submittable';
+import '@polkadot/api-base/types/submittable';
 
 import type {
   ApiTypes,
@@ -30,6 +30,7 @@ import type {
   H160,
   H256,
   MultiAddress,
+  Percent,
 } from '@polkadot/types/interfaces/runtime';
 import type {
   ArgonPrimitivesBitcoinCompressedBitcoinPubkey,
@@ -66,6 +67,7 @@ import type {
   PalletOperationalAccountsRegistration,
   PalletPriceIndexEthereumPriceIndex,
   PalletPriceIndexPriceIndex,
+  PalletTreasuryBondLotEarningsMetrics,
   PalletVaultsVaultConfig,
   SnowbridgeBeaconPrimitivesBeaconHeader,
   SpConsensusGrandpaEquivocationProof,
@@ -2005,6 +2007,37 @@ declare module '@polkadot/api-base/types/submittable' {
     };
     treasury: {
       /**
+       * Attribute earnings already paid to a vault under the old aggregate flexible-bond model.
+       * This changes bond-lot metrics only; it never pays, holds, or releases funds. `expected`
+       * guards against overwriting a newer payout, and replaying `updated` is a no-op.
+       **/
+      backfillBondLotEarnings: AugmentedSubmittable<
+        (
+          bondLotId: u64 | AnyNumber | Uint8Array,
+          expected:
+            | PalletTreasuryBondLotEarningsMetrics
+            | {
+                participatedFrames?: any;
+                lastFrameEarningsFrameId?: any;
+                lastFrameEarnings?: any;
+                cumulativeEarnings?: any;
+              }
+            | string
+            | Uint8Array,
+          updated:
+            | PalletTreasuryBondLotEarningsMetrics
+            | {
+                participatedFrames?: any;
+                lastFrameEarningsFrameId?: any;
+                lastFrameEarnings?: any;
+                cumulativeEarnings?: any;
+              }
+            | string
+            | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [u64, PalletTreasuryBondLotEarningsMetrics, PalletTreasuryBondLotEarningsMetrics]
+      >;
+      /**
        * Buy whole bond units for the Argonot active set.
        **/
       buyArgonotBonds: AugmentedSubmittable<
@@ -2014,7 +2047,7 @@ declare module '@polkadot/api-base/types/submittable' {
       /**
        * Buy whole `1 ARGON` bonds for a vault.
        *
-       * The purchase either enters the accepted list or fails.
+       * The purchase either creates a bond lot or fails.
        **/
       buyBonds: AugmentedSubmittable<
         (
@@ -2039,9 +2072,17 @@ declare module '@polkadot/api-base/types/submittable' {
         [u32, u32, Option<ArgonPrimitivesVaultTreasuryBonusApprovalProof>]
       >;
       /**
-       * Liquidate one full bond lot.
-       *
-       * The lot stops participating right away and is released after the delay.
+       * Update reward economics without resetting fields omitted by the caller.
+       **/
+      configureRewardEconomics: AugmentedSubmittable<
+        (
+          targetBitcoinPercent: Option<Percent> | null | Uint8Array | Percent | AnyNumber,
+        ) => SubmittableExtrinsic<ApiType>,
+        [Option<Percent>]
+      >;
+      /**
+       * Liquidate one full bond lot. It keeps the locked frame's payout terms and is
+       * released after the delay.
        **/
       liquidateBondLot: AugmentedSubmittable<
         (bondLotId: u64 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>,
@@ -2269,8 +2310,8 @@ declare module '@polkadot/api-base/types/submittable' {
     };
     vaults: {
       /**
-       * Stop offering additional bitcoin locks from this vault. Will not affect existing
-       * locks. As funds are returned, they will be released to the vault owner.
+       * Stop offering new Bitcoin locks. Existing locks continue; securitization exits after
+       * its notice and any existing Bitcoin commitment.
        **/
       close: AugmentedSubmittable<
         (vaultId: u32 | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>,
@@ -2297,14 +2338,14 @@ declare module '@polkadot/api-base/types/submittable' {
         [PalletVaultsVaultConfig]
       >;
       /**
-       * Modify funds allocated by the vault. This will not affect issued bitcoin locks, but will
-       * affect the amount of funds available for new ones.
+       * Modify funds allocated by the vault without changing existing Bitcoin locks.
        *
        * The securitization percent must be maintained or increased.
        *
-       * The amount allocated may not go below the existing reserved amounts, but you can release
-       * funds in this vault as bitcoin locks are released. To stop issuing any more bitcoin
-       * locks, use the `close` api.
+       * Funds not yet used in a reward snapshot may leave without notice if not needed for
+       * Bitcoin commitments. Reward-committed funds require a one-year Bitcoin-height exit
+       * notice and remain held until both the notice and any Bitcoin commitment have ended.
+       * To stop issuing locks, use `close`.
        **/
       modifyFunding: AugmentedSubmittable<
         (
@@ -2323,7 +2364,7 @@ declare module '@polkadot/api-base/types/submittable' {
           vaultId: u32 | AnyNumber | Uint8Array,
           terms:
             | ArgonPrimitivesVaultVaultTerms
-            | { bitcoinAnnualPercentRate?: any; bitcoinBaseFee?: any; treasuryProfitSharing?: any }
+            | { bitcoinAnnualPercentRate?: any; bitcoinBaseFee?: any }
             | string
             | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
@@ -2341,7 +2382,11 @@ declare module '@polkadot/api-base/types/submittable' {
         ) => SubmittableExtrinsic<ApiType>,
         [u32, ArgonPrimitivesBitcoinOpaqueBitcoinXpub]
       >;
-      setCommittedArgonots: AugmentedSubmittable<
+      /**
+       * Set the desired Argonot backing. Unused funds release immediately; reward commitments
+       * withdraw after one-year notice, continuing to participate until released.
+       **/
+      setArgonotSecuritization: AugmentedSubmittable<
         (amount: Compact<u128> | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>,
         [Compact<u128>]
       >;

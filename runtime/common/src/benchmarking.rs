@@ -211,7 +211,7 @@ where
 			.map(|data| data.activated_securitization.saturated_into())
 	}
 
-	fn get_committed_argonots(account_id: &Self::AccountId) -> Option<Self::Balance> {
+	fn get_held_argonots(account_id: &Self::AccountId) -> Option<Self::Balance> {
 		Self::get_vault_id(account_id).map(|_| Balance::default())
 	}
 
@@ -300,6 +300,8 @@ where
 	fn release_unactivated_securitization(
 		_vault_id: VaultId,
 		_amount: Self::Balance,
+		_lock_extension: &LockExtension<Self::Balance>,
+		_collateral_offset: Self::Balance,
 	) -> Result<(), VaultError> {
 		Err(VaultError::VaultNotFound)
 	}
@@ -420,6 +422,8 @@ where
 {
 	type Weights = ();
 	type Balance = Balance;
+
+	fn vault_securitization_changed(_vault_id: VaultId, _securitization: Self::Balance) {}
 
 	fn has_vault_bond_participation(_vault_id: VaultId, _account_id: &AccountId) -> bool {
 		let mut state = benchmark_operational_accounts_provider_state();

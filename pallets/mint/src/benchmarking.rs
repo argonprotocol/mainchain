@@ -33,11 +33,9 @@ mod benchmarks {
 			let lock_id =
 				i.saturating_div(max_pending_mints_per_utxo).saturating_add(1) as BitcoinLockId;
 			let account_id = account("mint-queue", i, 0);
-			if minimum_balance > T::Balance::zero() {
-				let initial_balance = minimum_balance.saturating_add(queued_amount);
-				T::Currency::mint_into(&account_id, initial_balance)
-					.map_err(|_| BenchmarkError::Stop("failed to seed benchmark mint account"))?;
-			}
+			let initial_balance = minimum_balance.saturating_add(queued_amount);
+			T::Currency::mint_into(&account_id, initial_balance)
+				.map_err(|_| BenchmarkError::Stop("failed to seed benchmark mint account"))?;
 			PendingBitcoinMintsByIndex::<T>::insert(
 				i as MintIndex,
 				PendingBitcoinMint::<T> {
@@ -56,8 +54,6 @@ mod benchmarks {
 		}
 		NextPendingBitcoinMintIndex::<T>::put(utxo_count as MintIndex);
 
-		let total_frame_payout: T::Balance = T::Balance::from(utxo_count.max(1) as u128);
-		MintedMiningMicrogons::<T>::put(total_frame_payout);
 		MintedBitcoinMicrogons::<T>::put(T::Balance::from(0u128));
 
 		set_benchmark_bitcoin_locks_runtime_state(BenchmarkBitcoinLocksRuntimeState {

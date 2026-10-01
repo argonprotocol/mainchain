@@ -3,7 +3,7 @@
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
-import type {} from '@polkadot/api-base/types/errors';
+import '@polkadot/api-base/types/errors';
 
 import type { ApiTypes, AugmentedError } from '@polkadot/api-base/types';
 
@@ -1362,9 +1362,17 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       BondLotAlreadyReleasing: AugmentedError<ApiType>;
       /**
+       * Historical metrics can only be backfilled for vault bond lots.
+       **/
+      BondLotCannotBeBackfilled: AugmentedError<ApiType>;
+      /**
        * Only an active vault bond owned by its operator can be used as flexible.
        **/
       BondLotCannotBeFlexible: AugmentedError<ApiType>;
+      /**
+       * The lot's metrics changed since the backfill was calculated.
+       **/
+      BondLotMetricsChanged: AugmentedError<ApiType>;
       /**
        * The bond lot could not be found.
        **/
@@ -1382,10 +1390,6 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       BonusApprovalAlreadyUsed: AugmentedError<ApiType>;
       /**
-       * The approved bonus plus the vault's profit sharing exceeds 100%.
-       **/
-      BonusApprovalExceedsProfitSharing: AugmentedError<ApiType>;
-      /**
        * The bonus approval already expired.
        **/
       BonusApprovalExpired: AugmentedError<ApiType>;
@@ -1398,7 +1402,7 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       BonusApprovalWrongVault: AugmentedError<ApiType>;
       /**
-       * The vault doesn't have enough bitcoin security to support this bond purchase
+       * The vault doesn't have enough raw securitization to support this bond purchase.
        **/
       InsufficientBondSpace: AugmentedError<ApiType>;
       /**
@@ -1406,13 +1410,21 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       InternalError: AugmentedError<ApiType>;
       /**
+       * The proposed backfill would reduce or corrupt the lot's earnings metrics.
+       **/
+      InvalidBondLotMetrics: AugmentedError<ApiType>;
+      /**
        * The bonus approval signature is invalid or unauthorized.
        **/
       InvalidBonusApprovalSignature: AugmentedError<ApiType>;
       /**
-       * The vault already has the maximum number of accepted bond lots.
+       * The network has reached the direct-payout vault bond lot admission limit.
        **/
-      MaxAcceptedBondLotsExceeded: AugmentedError<ApiType>;
+      MaxArgonBondLotsExceeded: AugmentedError<ApiType>;
+      /**
+       * The vault already has the maximum number of flexible bond lots.
+       **/
+      MaxFlexibleBondLotsExceeded: AugmentedError<ApiType>;
       /**
        * Too many bond lot releases are scheduled for the same frame.
        **/
@@ -1461,13 +1473,13 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       AccountBelowMinimumBalance: AugmentedError<ApiType>;
       /**
+       * Held Argonots cannot be reduced below the amount already crosschain-encumbered.
+       **/
+      ArgonotsBelowEncumberedBacking: AugmentedError<ApiType>;
+      /**
        * Bitcoin conversion to compressed pubkey failed
        **/
       BitcoinConversionFailed: AugmentedError<ApiType>;
-      /**
-       * Committed Argonots cannot be reduced below the amount already crosschain-encumbered.
-       **/
-      CommittedArgonotsBelowEncumberedBacking: AugmentedError<ApiType>;
       /**
        * A funding change is already scheduled
        **/

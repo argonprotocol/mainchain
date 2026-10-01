@@ -21,6 +21,7 @@
     "tsc": "yarn workspace @argonprotocol/ethereum-contracts build && yarn generate:contract-declarations && tsup && yarn validate:package",
     "tsup": "yarn tsc",
     "validate:package": "tsx src/scripts/validatePackage.ts",
+    "backfill:flexible-bond-metrics": "tsx src/scripts/backfillFlexibleBondMetrics.ts",
     "watch": "yarn generate:contract-declarations && tsup --watch",
     "typecheck": "tsc --noEmit -p tsconfig.test.json"
   },

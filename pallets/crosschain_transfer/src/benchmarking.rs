@@ -31,7 +31,6 @@ use polkadot_sdk::{
 	frame_system::RawOrigin,
 	sp_arithmetic::FixedU128,
 	sp_core::ecdsa::KeccakSignature,
-	sp_runtime::Permill,
 };
 
 const BENCHMARK_DESTINATION_CHAIN: SourceChain = SourceChain::Ethereum;
@@ -829,11 +828,7 @@ fn benchmark_chain_config(gateway_byte: u8) -> ChainConfig {
 }
 
 fn benchmark_vault_terms<T: Config>() -> VaultTerms<T::Balance> {
-	VaultTerms {
-		bitcoin_annual_percent_rate: FixedU128::one(),
-		bitcoin_base_fee: 1u128.into(),
-		treasury_profit_sharing: Permill::zero(),
-	}
+	VaultTerms { bitcoin_annual_percent_rate: FixedU128::one(), bitcoin_base_fee: 1u128.into() }
 }
 
 fn seed_benchmark_vault<T: Config>(operator: &T::AccountId, vault_id: VaultId, securitization: u128)
@@ -857,12 +852,12 @@ where
 			ratio_adjusted_satoshis: 0,
 			flexible_ratio_adjusted_satoshis: 0,
 			securitization_release_schedule: BoundedBTreeMap::new(),
+			committed_microgons: T::Balance::zero(),
 			securitization_ratio: FixedU128::one(),
 			is_closed: false,
 			terms: benchmark_vault_terms::<T>(),
 			pending_terms: None,
 			opened_tick: 0,
-			operational_minimum_release_tick: None,
 		},
 	);
 	set_benchmark_bitcoin_vault_provider_state(state);
