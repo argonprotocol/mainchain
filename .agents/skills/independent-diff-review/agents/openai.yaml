@@ -1,0 +1,4 @@
+interface:
+  display_name: "Independent Diff Review"
+  short_description: "Find concrete bugs with a fresh, evidence-led review"
+  default_prompt: "Use $independent-diff-review to review this change for actionable bugs, validate each finding against the real contracts, and report the evidence."
