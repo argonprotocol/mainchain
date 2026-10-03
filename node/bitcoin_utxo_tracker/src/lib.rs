@@ -106,11 +106,15 @@ impl UtxoTracker {
 		Ok(())
 	}
 
-	fn update_filters(
+	/// Synchronize filters and derive UTXO status for the requested Bitcoin range.
+	pub fn sync(
 		&self,
-		sync_status: &BitcoinSyncStatus,
+		sync_status: BitcoinSyncStatus,
+		tracked_utxos: Vec<(Option<UtxoRef>, UtxoAddress)>,
+		minimum_satoshis: Satoshis,
 		aux_store: &Arc<impl AuxStore>,
-	) -> anyhow::Result<()> {
+	) -> anyhow::Result<BitcoinUtxoSync> {
+		// Another Argon parent must not replace this range before we derive its UTXO status.
 		let filter = self.filter.lock();
 		const UTXO_KEY: &[u8; 28] = b"bitcoin_utxo_tracker_filters";
 
@@ -124,32 +128,31 @@ impl UtxoTracker {
 				filter.load_filters(synched_filters);
 			}
 		}
-		filter.sync_to_block(sync_status)?;
+		filter.sync_to_block(&sync_status)?;
 
 		let encoded = filter.get_stored_filters().encode();
 		aux_store.insert_aux(&[(&UTXO_KEY[..], encoded.as_slice())], &[])?;
-		Ok(())
-	}
-
-	/// Synchronize with the latest blocks on the network.
-	pub fn sync(
-		&self,
-		sync_status: BitcoinSyncStatus,
-		tracked_utxos: Vec<(Option<UtxoRef>, UtxoAddress)>,
-		minimum_satoshis: Satoshis,
-		aux_store: &Arc<impl AuxStore>,
-	) -> anyhow::Result<BitcoinUtxoSync> {
-		self.update_filters(&sync_status, aux_store)?;
-
-		self.filter.lock().refresh_utxo_status(tracked_utxos, minimum_satoshis)
+		filter.refresh_utxo_status(tracked_utxos, minimum_satoshis)
 	}
 }
 
 #[cfg(test)]
 mod test {
-	use std::{collections::BTreeMap, sync::Arc};
+	use std::{
+		collections::BTreeMap,
+		sync::{
+			atomic::{AtomicBool, Ordering},
+			mpsc, Arc,
+		},
+		thread,
+		time::Duration,
+	};
 
-	use bitcoin::{hashes::Hash, Address, Amount, CompressedPublicKey, Network};
+	use bitcoin::{
+		absolute::LockTime, hashes::Hash, opcodes::OP_TRUE, script::Builder, transaction::Version,
+		Address, Amount, CompressedPublicKey, Network, OutPoint, ScriptBuf, Sequence, Transaction,
+		TxIn, TxOut, Witness,
+	};
 	use bitcoincore_rpc::RpcApi;
 	use bitcoind::BitcoinD;
 	use lazy_static::lazy_static;
@@ -159,7 +162,7 @@ mod test {
 	use argon_bitcoin::{CosignScript, CosignScriptArgs};
 	use argon_primitives::{
 		bitcoin::{BitcoinBlock, BitcoinSyncStatus, H256Le, UtxoAddress, UtxoRef},
-		inherents::BitcoinUtxoFunding,
+		inherents::{BitcoinUtxoFunding, BitcoinUtxoSpend},
 	};
 	use argon_testing::{add_blocks, add_wallet_address, fund_script_address, get_txid_height};
 
@@ -220,7 +223,7 @@ mod test {
 			synched_block: None,
 			oldest_allowed_block_height: block_height - 10,
 		};
-		tracker.update_filters(&sync_status, &aux).unwrap();
+		tracker.sync(sync_status.clone(), vec![], 1000, &aux).unwrap();
 
 		let updated_filters = tracker.filter.lock().get_stored_filters();
 		assert_eq!(updated_filters.len(), 11);
@@ -253,6 +256,231 @@ mod test {
 		drop(bitcoind);
 	}
 
+	#[test]
+	fn concurrent_sync_keeps_each_callers_bitcoin_tip_and_utxos() {
+		let (bitcoind, tracker, block_address, network) = start_bitcoind();
+		let witness_script = Builder::new().push_opcode(OP_TRUE).into_script();
+		let script_address = Address::p2wsh(&witness_script, network);
+		let submitted_at_height = bitcoind.client.get_block_count().unwrap() + 1;
+		let (txid, vout, _) =
+			fund_script_address(&bitcoind, &script_address, 20_000, &block_address);
+		let funding_height = get_txid_height(&bitcoind, &txid).unwrap();
+		let earlier = BitcoinSyncStatus {
+			confirmed_block: BitcoinBlock {
+				block_hash: bitcoind.client.get_best_block_hash().unwrap().into(),
+				block_height: bitcoind.client.get_block_count().unwrap(),
+			},
+			synched_block: None,
+			oldest_allowed_block_height: submitted_at_height,
+		};
+		let utxo_ref = UtxoRef { txid: txid.into(), output_index: vout };
+		let tracked = vec![(
+			Some(utxo_ref.clone()),
+			UtxoAddress {
+				lock_id: 1,
+				script_pubkey: script_address.try_into().unwrap(),
+				submitted_at_height,
+			},
+		)];
+		let spending_tx = Transaction {
+			version: Version::TWO,
+			lock_time: LockTime::ZERO,
+			input: vec![TxIn {
+				previous_output: OutPoint { txid, vout },
+				script_sig: ScriptBuf::new(),
+				sequence: Sequence::MAX,
+				witness: Witness::from_slice(&[witness_script.as_bytes()]),
+			}],
+			output: vec![TxOut {
+				value: Amount::from_sat(19_000),
+				script_pubkey: block_address.script_pubkey(),
+			}],
+		};
+		let spending_txid = bitcoind.client.send_raw_transaction(&spending_tx).unwrap();
+		add_blocks(&bitcoind, 8, &block_address);
+		let spending_height = earlier.confirmed_block.block_height + 1;
+		assert_eq!(get_txid_height(&bitcoind, &spending_txid).unwrap(), spending_height);
+		let expected_funding = vec![BitcoinUtxoFunding {
+			lock_id: 1,
+			utxo_ref: utxo_ref.clone(),
+			satoshis: 20_000,
+			expected_satoshis: 0,
+			bitcoin_height: funding_height,
+		}];
+		let expected_spend = vec![BitcoinUtxoSpend {
+			lock_id: 1,
+			utxo_ref: Some(utxo_ref),
+			bitcoin_height: spending_height,
+			spending_txid: spending_txid.into(),
+		}];
+
+		for gap in [1, 8] {
+			let later_height = earlier.confirmed_block.block_height + gap;
+			let later = BitcoinSyncStatus {
+				confirmed_block: BitcoinBlock {
+					block_hash: bitcoind.client.get_block_hash(later_height).unwrap().into(),
+					block_height: later_height,
+				},
+				..earlier.clone()
+			};
+			let aux = Arc::new(TestAuxStore::new());
+			let earlier_result =
+				tracker.sync(earlier.clone(), tracked.clone(), 1000, &aux).unwrap();
+			assert_eq!(earlier_result.sync_to_block, earlier.confirmed_block);
+			assert_eq!(earlier_result.funded, expected_funding);
+			assert!(earlier_result.spent.is_empty());
+			let later_result = tracker.sync(later.clone(), tracked.clone(), 1000, &aux).unwrap();
+			assert_eq!(later_result.sync_to_block, later.confirmed_block);
+			assert_eq!(later_result.funded, expected_funding);
+			assert_eq!(later_result.spent, expected_spend);
+
+			for (first_status, first_expected, second_status, second_expected) in [
+				(earlier.clone(), &earlier_result, later.clone(), &later_result),
+				(later.clone(), &later_result, earlier.clone(), &earlier_result),
+			] {
+				let (persisted_tx, persisted_rx) = mpsc::channel();
+				let (release_tx, release_rx) = mpsc::channel();
+				*aux.pause_first_write.lock() = Some((persisted_tx, release_rx));
+				let (started_tx, started_rx) = mpsc::channel();
+				let (finished_tx, finished_rx) = mpsc::channel();
+				let (first, second) = thread::scope(|scope| {
+					let first =
+						scope.spawn(|| tracker.sync(first_status, tracked.clone(), 1000, &aux));
+					persisted_rx.recv_timeout(Duration::from_secs(10)).unwrap();
+					let second = scope.spawn(|| {
+						started_tx.send(()).unwrap();
+						let result = tracker.sync(second_status, tracked.clone(), 1000, &aux);
+						finished_tx.send(()).unwrap();
+						result
+					});
+					started_rx.recv_timeout(Duration::from_secs(10)).unwrap();
+					// Queue a competing public sync while the first holds the tracker lock in
+					// AuxStore. Holding it >1ms gives parking_lot a fair handoff at unlock.
+					let blocked = finished_rx.recv_timeout(Duration::from_millis(50));
+					release_tx.send(()).unwrap();
+					assert_eq!(blocked, Err(mpsc::RecvTimeoutError::Timeout));
+					(first.join().unwrap().unwrap(), second.join().unwrap().unwrap())
+				});
+				eprintln!(
+					"gap={gap}: first tip={} spends={}, second tip={} spends={}",
+					first.sync_to_block.block_height,
+					first.spent.len(),
+					second.sync_to_block.block_height,
+					second.spent.len()
+				);
+				assert_eq!(
+					first.sync_to_block, first_expected.sync_to_block,
+					"first caller's tip was replaced"
+				);
+				assert_eq!(first.funded, first_expected.funded);
+				assert_eq!(
+					first.spent, first_expected.spent,
+					"first caller used another parent's spends"
+				);
+				assert_eq!(&second, second_expected);
+			}
+			// Rebuild the tracker from a persisted later range and query both parents again.
+			tracker.sync(later.clone(), tracked.clone(), 1000, &aux).unwrap();
+			let rpc_url = argon_testing::read_rpc_url(&bitcoind).unwrap();
+			let auth =
+				Some((rpc_url.username().to_string(), rpc_url.password().unwrap().to_string()));
+			let restarted =
+				UtxoTracker::new(rpc_url.origin().unicode_serialization(), auth, None).unwrap();
+			assert_eq!(
+				restarted.sync(earlier.clone(), tracked.clone(), 1000, &aux).unwrap(),
+				earlier_result
+			);
+			assert_eq!(restarted.sync(later, tracked.clone(), 1000, &aux).unwrap(), later_result);
+		}
+	}
+
+	#[test]
+	fn sync_recovers_from_errors_and_reanchors_persisted_filters_after_restart() {
+		let (bitcoind, tracker, _, _) = start_bitcoind();
+		let height = bitcoind.client.get_block_count().unwrap();
+		let earlier = BitcoinSyncStatus {
+			confirmed_block: BitcoinBlock {
+				block_hash: bitcoind.client.get_block_hash(height - 1).unwrap().into(),
+				block_height: height - 1,
+			},
+			synched_block: None,
+			oldest_allowed_block_height: height - 2,
+		};
+		let later = BitcoinSyncStatus {
+			confirmed_block: BitcoinBlock {
+				block_hash: bitcoind.client.get_best_block_hash().unwrap().into(),
+				block_height: height,
+			},
+			..earlier.clone()
+		};
+		let aux = Arc::new(TestAuxStore::new());
+		let earlier_result = tracker.sync(earlier.clone(), vec![], 1000, &aux).unwrap();
+		assert_eq!(earlier_result.sync_to_block, earlier.confirmed_block);
+		let persisted = aux.aux.lock().clone();
+
+		aux.fail_next_write.store(true, Ordering::SeqCst);
+		let error = tracker.sync(later.clone(), vec![], 1000, &aux).unwrap_err();
+		assert!(error.to_string().contains("test auxiliary write failure"));
+		assert_eq!(*aux.aux.lock(), persisted);
+		assert_eq!(
+			tracker.filter.lock().get_stored_filters().last().unwrap().to_block(),
+			later.confirmed_block
+		);
+		assert_eq!(
+			tracker.sync(later.clone(), vec![], 1000, &aux).unwrap().sync_to_block,
+			later.confirmed_block
+		);
+
+		let persisted = aux.aux.lock().clone();
+		let invalid = BitcoinSyncStatus {
+			confirmed_block: BitcoinBlock { block_hash: H256Le([0; 32]), block_height: height + 1 },
+			..later.clone()
+		};
+		assert!(tracker.sync(invalid, vec![], 1000, &aux).is_err());
+		assert_eq!(*aux.aux.lock(), persisted);
+		assert_eq!(tracker.sync(earlier.clone(), vec![], 1000, &aux).unwrap(), earlier_result);
+		tracker.sync(later.clone(), vec![], 1000, &aux).unwrap();
+
+		let rpc_url = argon_testing::read_rpc_url(&bitcoind).unwrap();
+		let auth = Some((rpc_url.username().to_string(), rpc_url.password().unwrap().to_string()));
+		let restarted =
+			UtxoTracker::new(rpc_url.origin().unicode_serialization(), auth, None).unwrap();
+		assert!(restarted.filter.lock().get_stored_filters().is_empty());
+		// Persisted filters are ahead of this parent's Bitcoin status.
+		assert_eq!(restarted.sync(earlier.clone(), vec![], 1000, &aux).unwrap(), earlier_result);
+		restarted.sync(later.clone(), vec![], 1000, &aux).unwrap();
+
+		// A same-height Bitcoin fork must replace the cached hash, including after restart.
+		bitcoind
+			.client
+			.invalidate_block(&bitcoind.client.get_best_block_hash().unwrap())
+			.unwrap();
+		let fork_address = add_wallet_address(&bitcoind);
+		add_blocks(&bitcoind, 1, &fork_address);
+		let fork = BitcoinSyncStatus {
+			confirmed_block: BitcoinBlock {
+				block_hash: bitcoind.client.get_best_block_hash().unwrap().into(),
+				block_height: height,
+			},
+			..later.clone()
+		};
+		assert_ne!(fork.confirmed_block.block_hash, later.confirmed_block.block_hash);
+		let rpc_url = argon_testing::read_rpc_url(&bitcoind).unwrap();
+		let auth = Some((rpc_url.username().to_string(), rpc_url.password().unwrap().to_string()));
+		let restarted =
+			UtxoTracker::new(rpc_url.origin().unicode_serialization(), auth, None).unwrap();
+		assert_eq!(
+			restarted.sync(fork.clone(), vec![], 1000, &aux).unwrap().sync_to_block,
+			fork.confirmed_block
+		);
+		let filters = restarted.filter.lock().get_stored_filters();
+		assert_eq!(filters.len(), 3);
+		assert_eq!(filters.last().unwrap().to_block(), fork.confirmed_block);
+		for pair in filters.windows(2) {
+			assert_eq!(pair[1].previous_block_hash, Some(pair[0].block_hash.clone()));
+		}
+	}
+
 	lazy_static! {
 		static ref BITCOIND_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
 	}
@@ -281,10 +509,16 @@ mod test {
 
 	struct TestAuxStore {
 		aux: Mutex<BTreeMap<Vec<u8>, Vec<u8>>>,
+		pause_first_write: Mutex<Option<(mpsc::Sender<()>, mpsc::Receiver<()>)>>,
+		fail_next_write: AtomicBool,
 	}
 	impl TestAuxStore {
 		fn new() -> Self {
-			Self { aux: Mutex::new(BTreeMap::new()) }
+			Self {
+				aux: Mutex::new(BTreeMap::new()),
+				pause_first_write: Mutex::new(None),
+				fail_next_write: AtomicBool::new(false),
+			}
 		}
 	}
 
@@ -300,12 +534,23 @@ mod test {
 			insert: I,
 			delete: D,
 		) -> sc_client_api::blockchain::Result<()> {
+			if self.fail_next_write.swap(false, Ordering::SeqCst) {
+				return Err(sc_client_api::blockchain::Error::Backend(
+					"test auxiliary write failure".into(),
+				));
+			}
 			let mut aux = self.aux.lock();
 			for (k, v) in insert {
 				aux.insert(k.to_vec(), v.to_vec());
 			}
 			for k in delete {
 				aux.remove(*k);
+			}
+			drop(aux);
+			let pause = self.pause_first_write.lock().take();
+			if let Some((persisted, release)) = pause {
+				persisted.send(()).unwrap();
+				release.recv_timeout(Duration::from_secs(10)).unwrap();
 			}
 			Ok(())
 		}
