@@ -36,7 +36,6 @@ jobs:
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           name: check-x86_64-unknown-linux-gnu
-          save: false
 
       - name: Clippy
         run: cargo clippy --workspace

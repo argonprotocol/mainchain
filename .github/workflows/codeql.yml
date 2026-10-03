@@ -8,6 +8,10 @@ on:
   schedule:
     - cron: '29 13 * * 3'
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 permissions:
   contents: read
   packages: read
@@ -54,17 +58,13 @@ jobs:
         with:
           cache: 'false'
 
-      - name: Cache Cargo registry
+      - name: Restore Cargo build cache
         if: matrix.language == 'rust'
-        uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        uses: ./.github/templates/rust-cache
         with:
-          path: |
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: codeql-cargo-${{ runner.os }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            codeql-cargo-${{ runner.os }}-
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          name: check-x86_64-unknown-linux-gnu
+          save: false
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4
@@ -74,5 +74,7 @@ jobs:
 
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4
+        env:
+          CODEQL_EXTRACTOR_RUST_OPTION_CARGO_TARGET_DIR: ${{ env.CARGO_TARGET_DIR }}
         with:
           category: /language:${{ matrix.language }}

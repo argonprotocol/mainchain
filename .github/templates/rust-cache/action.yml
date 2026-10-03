@@ -43,14 +43,30 @@ runs:
           echo "version=windows-$(echo $ver_str | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')" >> $GITHUB_OUTPUT
         fi
     - name: Cache cargo
-      uses: actions/cache@v5
+      if: inputs.save == 'true'
+      uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
       with:
         path: |
           ~/.cargo/registry/index/
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/
           .cargo-cache
-          target/
+          ${{ env.CARGO_TARGET_DIR || 'target' }}/
+        key: ${{ inputs.name }}-${{ steps.os_version.outputs.version }}-${{ steps.rust-version.outputs.version }}-${{ hashFiles('./Cargo.lock') }}
+        restore-keys: |
+          ${{ inputs.name }}-${{ steps.os_version.outputs.version }}-${{ steps.rust-version.outputs.version }}-
+      env:
+        GITHUB_TOKEN: ${{ inputs.github-token }}
+    - name: Restore cargo cache
+      if: inputs.save != 'true'
+      uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+      with:
+        path: |
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+          .cargo-cache
+          ${{ env.CARGO_TARGET_DIR || 'target' }}/
         key: ${{ inputs.name }}-${{ steps.os_version.outputs.version }}-${{ steps.rust-version.outputs.version }}-${{ hashFiles('./Cargo.lock') }}
         restore-keys: |
           ${{ inputs.name }}-${{ steps.os_version.outputs.version }}-${{ steps.rust-version.outputs.version }}-
