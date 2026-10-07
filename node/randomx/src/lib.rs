@@ -45,7 +45,6 @@ pub mod full_vm {
 			atomic::{AtomicUsize, Ordering},
 			Arc, OnceLock,
 		},
-		thread::spawn,
 	};
 
 	// Caches are shared cross threads
@@ -55,9 +54,17 @@ pub mod full_vm {
 	}
 	static CACHE_GENERATION: AtomicUsize = AtomicUsize::new(0);
 
+	struct MiningVm {
+		generation: usize,
+		key_hash: H256,
+		vm: RandomXVM,
+		// Keep the cache entry marked in use while this VM references its dataset.
+		_data: Arc<VMData>,
+	}
+
 	// VMs are stored in thread local storage to avoid locking
 	thread_local! {
-		static VM: RefCell<Option<(usize, H256, RandomXVM)>> = const { RefCell::new(None) };
+		static VM: RefCell<Option<MiningVm>> = const { RefCell::new(None) };
 	}
 
 	pub(crate) fn calculate_hash(
@@ -69,8 +76,8 @@ pub mod full_vm {
 			return Ok(None);
 		}
 		VM.with_borrow_mut(|vm| {
-			let (_, _, vm) = vm.as_mut().expect("Local VMS always set to Some above; qed");
-			vm.calculate_hash(pre_hash).map(|e| Some(H256::from_slice(e.as_ref())))
+			let vm = vm.as_mut().expect("Local VMS always set to Some above; qed");
+			vm.vm.calculate_hash(pre_hash).map(|e| Some(H256::from_slice(e.as_ref())))
 		})
 	}
 
@@ -97,35 +104,10 @@ pub mod full_vm {
 	pub fn release_vm_if_evicted() {
 		let generation = CACHE_GENERATION.load(Ordering::SeqCst);
 		VM.with_borrow_mut(|entry| {
-			if entry.as_ref().is_some_and(|(vm_generation, _, _)| *vm_generation != generation) {
+			if entry.as_ref().is_some_and(|vm| vm.generation != generation) {
 				*entry = None;
 			}
 		});
-	}
-
-	fn set_vm_data(data: &VMData, key_hash: &H256, generation: usize) -> Result<(), RandomXError> {
-		VM.with_borrow_mut(|entry| {
-			if let Some((_, _, mut vm)) = entry.take() {
-				data.reinit(&mut vm, &key_hash[..])?;
-
-				*entry = Some((generation, *key_hash, vm));
-			} else {
-				let new_vm = data.new_vm()?;
-				*entry = Some((generation, *key_hash, new_vm));
-			};
-
-			Ok::<_, RandomXError>(())
-		})?;
-		Ok(())
-	}
-
-	fn vm_has_key(key_hash: &H256) -> bool {
-		VM.with(|vm| {
-			if let Some((_, key, _)) = vm.borrow().as_ref() {
-				return key == key_hash;
-			}
-			false
-		})
 	}
 
 	fn alloc_vm_if_needed(key_hash: &H256, generation: usize) -> Result<bool, RandomXError> {
@@ -133,9 +115,12 @@ pub mod full_vm {
 		if generation != cache_generation() {
 			return Ok(false);
 		}
-		if vm_has_key(key_hash) {
+		if VM.with_borrow(|entry| entry.as_ref().is_some_and(|vm| vm.key_hash == *key_hash)) {
 			return Ok(true);
 		}
+
+		// Release the previous key's VM before looking for an unused dataset to replace.
+		VM.with_borrow_mut(|entry| *entry = None);
 
 		let mut shared_caches = CACHES.lock();
 		// Eviction advances the generation under this same lock. Recheck work admitted before
@@ -160,13 +145,19 @@ pub mod full_vm {
 				.map(|(key, _)| *key)
 				.ok_or(RandomXError::Other("Cache space not available".to_string()))?;
 
-			// we'll use the previous entry and just update it
-			shared_caches.remove(&key_to_replace).expect("key exists; qed")
+			let data = shared_caches.remove(&key_to_replace).expect("key exists; qed");
+			data.cache.init(&key_hash[..])?;
+			data.init_dataset()?;
+			data
 		};
+		// Only fully initialized data can be reused by another worker or a retry.
 		shared_caches.insert(*key_hash, data.clone());
 		drop(shared_caches);
 
-		set_vm_data(&data, key_hash, generation)?;
+		let vm = data.new_vm()?;
+		VM.with_borrow_mut(|entry| {
+			*entry = Some(MiningVm { generation, key_hash: *key_hash, vm, _data: data });
+		});
 		Ok(true)
 	}
 
@@ -215,6 +206,7 @@ pub mod full_vm {
 			RandomXVM::new(self.flags, Some(self.cache.clone()), self.dataset.clone())
 		}
 
+		#[cfg(test)]
 		pub fn attach_to_vm(&self, vm: &mut RandomXVM) -> Result<(), RandomXError> {
 			if let Some(dataset) = self.dataset.clone() {
 				vm.reinit_dataset(dataset)?;
@@ -234,31 +226,43 @@ pub mod full_vm {
 			let init_per_thread = dataset_count / cpus_to_use;
 			let remainder = dataset_count % cpus_to_use;
 
-			// dataset.init(0, dataset_count)?;
 			let mut start_ticker = 0;
-			let dataset_arc = Arc::new(dataset);
-			let spawned = (0..cpus_to_use)
-				.map(|i| {
-					let dataset = dataset_arc.clone();
+			let mut spawned = Vec::with_capacity(cpus_to_use as usize);
+			let mut initialization = Ok(());
+			for i in 0..cpus_to_use {
+				let dataset = dataset.clone();
+				let mut count = init_per_thread;
+				if i == cpus_to_use - 1 {
+					count += remainder;
+				}
+				let start = start_ticker;
+				start_ticker += count;
 
-					let mut count = init_per_thread;
-					if i == cpus_to_use - 1 {
-						count += remainder;
-					}
-					let start = start_ticker;
-					start_ticker += count;
-					spawn(move || dataset.init(start, count))
-				})
-				.collect::<Vec<_>>();
-
-			for handle in spawned {
-				handle.join().map_err(|e| {
-					RandomXError::CreationError(format!("Dataset init error: {e:?}"))
-				})??;
+				match std::thread::Builder::new().spawn(move || dataset.init(start, count)) {
+					Ok(thread) => spawned.push(thread),
+					Err(err) => {
+						initialization = Err(RandomXError::CreationError(format!(
+							"Dataset init thread creation failed: {err}"
+						)));
+						break;
+					},
+				}
 			}
-			Ok(())
+
+			// Finish every started initializer before returning, including after a spawn failure.
+			for handle in spawned {
+				let result = handle
+					.join()
+					.map_err(|e| RandomXError::CreationError(format!("Dataset init error: {e:?}")))
+					.and_then(|result| result);
+				if initialization.is_ok() {
+					initialization = result;
+				}
+			}
+			initialization
 		}
 
+		#[cfg(test)]
 		pub fn reinit(&self, vm: &mut RandomXVM, key: &[u8]) -> Result<(), RandomXError> {
 			self.cache.init(key)?;
 			self.init_dataset()?;
@@ -270,42 +274,52 @@ pub mod full_vm {
 	#[cfg(test)]
 	mod tests {
 		use super::*;
-		use std::{sync::mpsc, time::Duration};
+		use std::{sync::mpsc, thread, time::Duration};
 
 		#[test]
 		fn eviction_releases_idle_worker_vms_and_allows_mining_to_restart() {
 			let _mining_memory_guard = crate::MINING_MEMORY_TEST_LOCK.lock();
 			let key = H256::repeat_byte(71);
-			let (ready_tx, ready_rx) = mpsc::channel();
-			let mut release_txs = Vec::new();
-			let mut workers = Vec::new();
-			for _ in 0..2 {
-				let (release_tx, release_rx) = mpsc::channel();
-				release_txs.push(release_tx);
-				let ready_tx = ready_tx.clone();
-				workers.push(spawn(move || {
-					let hash = calculate_hash(&key, b"fallback block", cache_generation())
-						.unwrap()
-						.unwrap();
-					assert!(VM.with_borrow(|entry| entry.is_some()));
-					ready_tx.send(hash).unwrap();
-					release_rx.recv().unwrap();
-					release_vm_if_evicted();
-					assert!(VM.with_borrow(|entry| entry.is_none()));
-				}));
-			}
 
-			let hash = ready_rx.recv_timeout(Duration::from_secs(60)).unwrap();
-			assert_eq!(hash, ready_rx.recv_timeout(Duration::from_secs(60)).unwrap());
-			assert!(CACHES.lock().get_mut(&key).unwrap().dataset.is_some());
-			assert!(evict_mining_memory());
-			assert!(!has_cached_data());
-			for release_tx in release_txs {
-				release_tx.send(()).unwrap();
-			}
-			for worker in workers {
-				worker.join().unwrap();
-			}
+			// Dataset initialization can exceed a minute on CI. Time only worker coordination.
+			let hash =
+				calculate_hash(&key, b"fallback block", cache_generation()).unwrap().unwrap();
+			VM.with_borrow_mut(|entry| *entry = None);
+
+			thread::scope(|scope| {
+				let (ready_tx, ready_rx) = mpsc::channel();
+				let mut release_txs = Vec::new();
+				for _ in 0..2 {
+					let (release_tx, release_rx) = mpsc::channel();
+					release_txs.push(release_tx);
+					let ready_tx = ready_tx.clone();
+					scope.spawn(move || {
+						let hash = calculate_hash(&key, b"fallback block", cache_generation())
+							.unwrap()
+							.unwrap();
+						assert!(VM.with_borrow(|entry| entry.is_some()));
+						if ready_tx.send(hash).is_err() {
+							return;
+						}
+						if release_rx.recv().is_err() {
+							return;
+						}
+						release_vm_if_evicted();
+						assert!(VM.with_borrow(|entry| entry.is_none()));
+					});
+				}
+				drop(ready_tx);
+
+				for _ in 0..2 {
+					assert_eq!(hash, ready_rx.recv_timeout(Duration::from_secs(60)).unwrap());
+				}
+				assert!(CACHES.lock().get_mut(&key).unwrap().dataset.is_some());
+				assert!(evict_mining_memory());
+				assert!(!has_cached_data());
+				for release_tx in release_txs {
+					release_tx.send(()).unwrap();
+				}
+			});
 
 			assert_eq!(
 				calculate_hash(&key, b"fallback block", cache_generation()).unwrap(),

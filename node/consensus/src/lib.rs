@@ -269,6 +269,9 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 				},
 				block_next = import_stream.next() => {
 					if let Some(block) = block_next {
+						if is_compute_enabled {
+							compute_handle.on_block_import(block.hash, &block.header);
+						}
 						if block.origin == BlockOrigin::Own || sync_oracle.is_major_syncing() {
 							continue;
 						}
@@ -385,7 +388,12 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 			if !is_compute_enabled {
 				continue;
 			}
-			compute_handle.on_best_block(&*client, best_hash);
+			// Notebook checks can allow another import to change the selected branch. Retry before
+			// making a destructive memory decision or preparing work for the earlier snapshot.
+			if client.info().best_hash != best_hash {
+				continue;
+			}
+			compute_handle.on_best_block(best_hash);
 
 			// don't deal with compute blocks if we don't have a compute author
 			let Some(ref compute_author) = compute_author else {

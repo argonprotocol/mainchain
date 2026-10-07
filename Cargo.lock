@@ -15739,7 +15739,7 @@ dependencies = [
 [[package]]
 name = "randomx-rs"
 version = "1.3.0"
-source = "git+https://github.com/argonprotocol/randomx-rs?rev=4bea9f8c9d01152eff7431eeae49ef2b22af84e1#4bea9f8c9d01152eff7431eeae49ef2b22af84e1"
+source = "git+https://github.com/argonprotocol/randomx-rs?rev=826e9843835420ff9335cb003a1591c854cc0770#826e9843835420ff9335cb003a1591c854cc0770"
 dependencies = [
  "bitflags 2.10.0",
  "libc",
