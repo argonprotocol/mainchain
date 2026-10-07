@@ -385,6 +385,7 @@ pub fn run_block_builder_task<Block, BI, C, PF, A, SC, SO, JS, B>(
 			if !is_compute_enabled {
 				continue;
 			}
+			compute_handle.on_best_block(&*client, best_hash);
 
 			// don't deal with compute blocks if we don't have a compute author
 			let Some(ref compute_author) = compute_author else {

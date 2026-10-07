@@ -2,6 +2,9 @@ use polkadot_sdk::sp_core::H256;
 pub use randomx_rs::RandomXError;
 use randomx_rs::{RandomXCache, RandomXFlag, RandomXVM};
 
+#[cfg(test)]
+static MINING_MEMORY_TEST_LOCK: parking_lot::Mutex<()> = parking_lot::Mutex::new(());
+
 pub fn calculate_hash(key_hash: &H256, pre_hash: &[u8]) -> Result<H256, RandomXError> {
 	let flags = RandomXFlag::get_recommended_flags();
 	let cache = RandomXCache::new(flags, key_hash.as_ref())?;
@@ -9,8 +12,12 @@ pub fn calculate_hash(key_hash: &H256, pre_hash: &[u8]) -> Result<H256, RandomXE
 	vm.calculate_hash(pre_hash).map(|e| H256::from_slice(e.as_ref()))
 }
 
-pub fn calculate_mining_hash(key_hash: &H256, pre_hash: &[u8]) -> Result<H256, RandomXError> {
-	full_vm::calculate_hash(key_hash, pre_hash)
+pub fn calculate_mining_hash(
+	key_hash: &H256,
+	pre_hash: &[u8],
+	generation: usize,
+) -> Result<Option<H256>, RandomXError> {
+	full_vm::calculate_hash(key_hash, pre_hash, generation)
 }
 
 #[derive(Debug, Clone, Default)]
@@ -34,7 +41,10 @@ pub mod full_vm {
 	use log::info;
 	use std::{
 		cell::RefCell,
-		sync::{Arc, OnceLock},
+		sync::{
+			atomic::{AtomicUsize, Ordering},
+			Arc, OnceLock,
+		},
 		thread::spawn,
 	};
 
@@ -43,30 +53,65 @@ pub mod full_vm {
 		static ref CACHES: Arc<Mutex<LruCache<H256, Arc<VMData>>>> =
 			Arc::new(Mutex::new(LruCache::new(2)));
 	}
+	static CACHE_GENERATION: AtomicUsize = AtomicUsize::new(0);
 
 	// VMs are stored in thread local storage to avoid locking
 	thread_local! {
-		// FULL uses a dataset (4gb of storage) but solves way faster
-		static VM: RefCell<Option<(H256, RandomXVM)>> = const { RefCell::new(None) };
+		static VM: RefCell<Option<(usize, H256, RandomXVM)>> = const { RefCell::new(None) };
 	}
 
-	pub(crate) fn calculate_hash(key_hash: &H256, pre_hash: &[u8]) -> Result<H256, RandomXError> {
-		alloc_vm_if_needed(key_hash)?;
+	pub(crate) fn calculate_hash(
+		key_hash: &H256,
+		pre_hash: &[u8],
+		generation: usize,
+	) -> Result<Option<H256>, RandomXError> {
+		if !alloc_vm_if_needed(key_hash, generation)? {
+			return Ok(None);
+		}
 		VM.with_borrow_mut(|vm| {
-			let (_, vm) = vm.as_mut().expect("Local VMS always set to Some above; qed");
-			vm.calculate_hash(pre_hash).map(|e| H256::from_slice(e.as_ref()))
+			let (_, _, vm) = vm.as_mut().expect("Local VMS always set to Some above; qed");
+			vm.calculate_hash(pre_hash).map(|e| Some(H256::from_slice(e.as_ref())))
 		})
 	}
 
-	fn set_vm_data(data: &VMData, key_hash: &H256) -> Result<(), RandomXError> {
+	/// Capture when creating work so cancelled solvers cannot allocate after eviction.
+	pub fn cache_generation() -> usize {
+		CACHE_GENERATION.load(Ordering::SeqCst)
+	}
+
+	/// Release shared datasets and ask every mining thread to release its VM.
+	pub fn evict_mining_memory() -> bool {
+		let Some(mut shared_caches) = CACHES.try_lock() else {
+			return false;
+		};
+		CACHE_GENERATION.fetch_add(1, Ordering::SeqCst);
+		shared_caches.clear();
+		true
+	}
+
+	pub fn has_cached_data() -> bool {
+		CACHES.try_lock().is_some_and(|caches| !caches.is_empty())
+	}
+
+	/// Call on the mining thread, including while it has no work to solve.
+	pub fn release_vm_if_evicted() {
+		let generation = CACHE_GENERATION.load(Ordering::SeqCst);
 		VM.with_borrow_mut(|entry| {
-			if let Some((_, mut vm)) = entry.take() {
+			if entry.as_ref().is_some_and(|(vm_generation, _, _)| *vm_generation != generation) {
+				*entry = None;
+			}
+		});
+	}
+
+	fn set_vm_data(data: &VMData, key_hash: &H256, generation: usize) -> Result<(), RandomXError> {
+		VM.with_borrow_mut(|entry| {
+			if let Some((_, _, mut vm)) = entry.take() {
 				data.reinit(&mut vm, &key_hash[..])?;
 
-				*entry = Some((*key_hash, vm));
+				*entry = Some((generation, *key_hash, vm));
 			} else {
 				let new_vm = data.new_vm()?;
-				*entry = Some((*key_hash, new_vm));
+				*entry = Some((generation, *key_hash, new_vm));
 			};
 
 			Ok::<_, RandomXError>(())
@@ -76,20 +121,30 @@ pub mod full_vm {
 
 	fn vm_has_key(key_hash: &H256) -> bool {
 		VM.with(|vm| {
-			if let Some((key, _)) = vm.borrow().as_ref() {
+			if let Some((_, key, _)) = vm.borrow().as_ref() {
 				return key == key_hash;
 			}
 			false
 		})
 	}
 
-	fn alloc_vm_if_needed(key_hash: &H256) -> Result<(), RandomXError> {
+	fn alloc_vm_if_needed(key_hash: &H256, generation: usize) -> Result<bool, RandomXError> {
+		release_vm_if_evicted();
+		if generation != cache_generation() {
+			return Ok(false);
+		}
 		if vm_has_key(key_hash) {
-			return Ok(());
+			return Ok(true);
 		}
 
 		let mut shared_caches = CACHES.lock();
-		// caches are static, while vms are per thread, so we this code is creating a new vm
+		// Eviction advances the generation under this same lock. Recheck work admitted before
+		// eviction so it cannot recreate a dataset after the shared caches have been cleared.
+		if generation != cache_generation() {
+			return Ok(false);
+		}
+
+		// Caches are shared, while VMs are local to each mining thread.
 		let data: Arc<VMData> = if let Some(data) = shared_caches.get_mut(key_hash) {
 			data.clone()
 		} else if shared_caches.len() < shared_caches.capacity() || !global_config().large_pages {
@@ -111,7 +166,8 @@ pub mod full_vm {
 		shared_caches.insert(*key_hash, data.clone());
 		drop(shared_caches);
 
-		set_vm_data(&data, key_hash)
+		set_vm_data(&data, key_hash, generation)?;
+		Ok(true)
 	}
 
 	static GLOBAL_CONFIG: OnceLock<Config> = OnceLock::new();
@@ -210,6 +266,57 @@ pub mod full_vm {
 			Ok(())
 		}
 	}
+
+	#[cfg(test)]
+	mod tests {
+		use super::*;
+		use std::{sync::mpsc, time::Duration};
+
+		#[test]
+		fn eviction_releases_idle_worker_vms_and_allows_mining_to_restart() {
+			let _mining_memory_guard = crate::MINING_MEMORY_TEST_LOCK.lock();
+			let key = H256::repeat_byte(71);
+			let (ready_tx, ready_rx) = mpsc::channel();
+			let mut release_txs = Vec::new();
+			let mut workers = Vec::new();
+			for _ in 0..2 {
+				let (release_tx, release_rx) = mpsc::channel();
+				release_txs.push(release_tx);
+				let ready_tx = ready_tx.clone();
+				workers.push(spawn(move || {
+					let hash = calculate_hash(&key, b"fallback block", cache_generation())
+						.unwrap()
+						.unwrap();
+					assert!(VM.with_borrow(|entry| entry.is_some()));
+					ready_tx.send(hash).unwrap();
+					release_rx.recv().unwrap();
+					release_vm_if_evicted();
+					assert!(VM.with_borrow(|entry| entry.is_none()));
+				}));
+			}
+
+			let hash = ready_rx.recv_timeout(Duration::from_secs(60)).unwrap();
+			assert_eq!(hash, ready_rx.recv_timeout(Duration::from_secs(60)).unwrap());
+			assert!(CACHES.lock().get_mut(&key).unwrap().dataset.is_some());
+			assert!(evict_mining_memory());
+			assert!(!has_cached_data());
+			for release_tx in release_txs {
+				release_tx.send(()).unwrap();
+			}
+			for worker in workers {
+				worker.join().unwrap();
+			}
+
+			assert_eq!(
+				calculate_hash(&key, b"fallback block", cache_generation()).unwrap(),
+				Some(hash)
+			);
+			assert!(has_cached_data());
+			assert!(evict_mining_memory());
+			release_vm_if_evicted();
+			assert!(VM.with_borrow(|entry| entry.is_none()));
+		}
+	}
 }
 
 #[cfg(test)]
@@ -273,6 +380,7 @@ mod tests {
 
 	#[test]
 	fn should_work_with_vm() {
+		let _mining_memory_guard = crate::MINING_MEMORY_TEST_LOCK.lock();
 		let light_cache =
 			VMData::new(&b"RandomX example key"[..], &Default::default(), false).unwrap();
 		let light_vm = light_cache.new_vm().expect("Failed to create VM");
@@ -286,6 +394,7 @@ mod tests {
 
 	#[test]
 	fn reinit_should_work() -> Result<(), String> {
+		let _mining_memory_guard = crate::MINING_MEMORY_TEST_LOCK.lock();
 		let cache = VMData::new(&b"RandomX example key"[..], &Default::default(), true).unwrap();
 		let mut vm = cache.new_vm().unwrap();
 		let hash1 = vm.calculate_hash(&b"RandomX example input"[..]).unwrap();
