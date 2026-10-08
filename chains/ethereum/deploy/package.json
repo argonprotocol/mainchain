@@ -22,9 +22,9 @@
   "dependencies": {
     "@argonprotocol/ethereum-contracts": "workspace:*",
     "@argonprotocol/mainchain": "workspace:*",
-    "@nomicfoundation/hardhat-ethers": "^4.0.10",
+    "@nomicfoundation/hardhat-ethers": "4.0.10",
     "ethers": "^6.15.0",
-    "hardhat": "^3.4.4",
+    "hardhat": "^3.18.1",
     "viem": "^2.38.5"
   },
   "devDependencies": {
