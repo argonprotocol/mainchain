@@ -17,6 +17,7 @@ frame_support::construct_runtime!(
 		System: frame_system,
 		Balances: pallet_balances,
 		BitcoinFissions: pallet_bitcoin_fissions,
+		TreasuryPositions: pallet_treasury_positions,
 	}
 );
 
@@ -52,10 +53,19 @@ impl pallet_bitcoin_fissions::Config for Test {
 	type Balance = u128;
 	type LockProvider = MockLockProvider;
 	type Minting = MockFissionMinting;
+	type PositionProvider = TreasuryPositions;
 	type OperationalAccountsHook = MockOperationalAccounts;
 	type Currency = Balances;
 	type MaxFissionsPerLock = ConstU32<2>;
 	type MinimumRatchetPercent = MinimumRatchetPercent;
+}
+
+impl pallet_treasury_positions::Config for Test {
+	type Balance = u128;
+	type BitcoinPositionProvider = ();
+	type TreasuryPoolProvider = ();
+	type OperationalAccountProvider = ();
+	type WeightInfo = ();
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen)]
@@ -123,34 +133,11 @@ pub type MockAccountBitcoinChanges =
 
 pub struct MockOperationalAccounts;
 impl OperationalAccountsHook<u64, u128> for MockOperationalAccounts {
-	fn vault_created_weight() -> Weight {
-		Weight::zero()
-	}
-
-	fn vault_bitcoin_lock_funded_weight() -> Weight {
-		Weight::zero()
-	}
-
-	fn mining_seat_won_weight() -> Weight {
-		Weight::zero()
-	}
-
-	fn account_bitcoin_amount_changed_weight() -> Weight {
-		Weight::zero()
-	}
-
+	type Weights = ();
 	fn account_bitcoin_amount_changed(account_id: &u64, amount: u128, is_increase: bool) {
 		MockAccountBitcoinChanges::mutate(|changes| {
 			changes.push((*account_id, amount, is_increase))
 		});
-	}
-
-	fn account_vault_bond_total_updated_weight() -> Weight {
-		Weight::zero()
-	}
-
-	fn account_uniswap_argon_transfers_in_updated_weight() -> Weight {
-		Weight::zero()
 	}
 }
 

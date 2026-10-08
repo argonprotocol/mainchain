@@ -1,9 +1,11 @@
 use crate::Config;
 use argon_primitives::{
+	treasury::{TreasuryPositionProvider, TreasuryPositionProviderWeightInfo},
 	vault::{BitcoinVaultProvider, BitcoinVaultProviderWeightInfo},
 	BitcoinFissionsProvider, BitcoinFissionsProviderWeightInfo, MiningSlotProvider,
-	MiningSlotProviderWeightInfo, OperationalAccountProviderWeightInfo, TickProvider,
-	TickProviderWeightInfo, TreasuryPoolProvider, TreasuryPoolProviderWeightInfo,
+	MiningSlotProviderWeightInfo, OperationalAccountProviderWeightInfo,
+	OperationalAccountsHookWeightInfo, OperationalRewardsPayer, OperationalRewardsPayerWeightInfo,
+	TickProvider, TickProviderWeightInfo, TreasuryPoolProvider, TreasuryPoolProviderWeightInfo,
 	UniswapTransferProvider, UniswapTransferProviderWeightInfo,
 };
 use core::marker::PhantomData;
@@ -11,6 +13,9 @@ use pallet_prelude::*;
 
 /// Weight functions needed for this pallet.
 pub trait WeightInfo {
+	fn provider_upstream_vault() -> Weight {
+		Weight::zero()
+	}
 	fn register() -> Weight;
 	fn set_name() -> Weight;
 	fn set_reward_config() -> Weight;
@@ -98,8 +103,17 @@ where
 	BitcoinFissionsProviderWeight: BitcoinFissionsProviderWeightInfo,
 	TickProviderWeight: TickProviderWeightInfo,
 {
+	fn provider_upstream_vault() -> Weight {
+		Base::provider_upstream_vault()
+			.saturating_add(VaultProviderWeight::get_registration_vault_data())
+	}
+
 	fn register() -> Weight {
 		Base::register()
+			.saturating_add(<T::PositionProvider as TreasuryPositionProvider<
+				T::AccountId,
+				T::Balance,
+			>>::Weights::operational_account_registered())
 			.saturating_add(VaultProviderWeight::get_registration_vault_data())
 			.saturating_add(BitcoinFissionsProviderWeight::get_account_fission_liquidity())
 			.saturating_add(MiningSlotProviderWeight::has_active_rewards_account_seat())
@@ -130,12 +144,11 @@ where
 	}
 
 	fn claim_rewards() -> Weight {
-		Base::claim_rewards().saturating_add(
-			<<T as Config>::OperationalRewardsPayer as argon_primitives::OperationalRewardsPayer<
-				<T as frame_system::Config>::AccountId,
-				<T as Config>::Balance,
-			>>::claim_reward_weight(),
-		)
+		Base::claim_rewards()
+			.saturating_add(<T::OperationalRewardsPayer as OperationalRewardsPayer<
+			T::AccountId,
+			T::Balance,
+		>>::Weights::claim_reward())
 	}
 
 	fn on_vault_created() -> Weight {
@@ -171,6 +184,9 @@ where
 
 pub struct ProviderWeightAdapter<T>(PhantomData<T>);
 impl<T: Config> OperationalAccountProviderWeightInfo for ProviderWeightAdapter<T> {
+	fn upstream_vault() -> Weight {
+		T::WeightInfo::provider_upstream_vault()
+	}
 	fn is_eligible() -> Weight {
 		T::DbWeight::get().reads(3)
 	}
@@ -216,5 +232,26 @@ impl WeightInfo for () {
 	}
 	fn on_account_uniswap_argon_transfers_in_updated() -> Weight {
 		Weight::zero()
+	}
+}
+
+impl<T: Config> OperationalAccountsHookWeightInfo for ProviderWeightAdapter<T> {
+	fn vault_created() -> Weight {
+		T::WeightInfo::on_vault_created()
+	}
+	fn vault_bitcoin_lock_funded() -> Weight {
+		T::WeightInfo::on_vault_bitcoin_lock_funded()
+	}
+	fn mining_seat_won() -> Weight {
+		T::WeightInfo::on_mining_seat_won()
+	}
+	fn account_bitcoin_amount_changed() -> Weight {
+		T::WeightInfo::on_account_bitcoin_amount_updated()
+	}
+	fn account_vault_bond_total_updated() -> Weight {
+		T::WeightInfo::on_account_vault_bond_total_updated()
+	}
+	fn account_uniswap_argon_transfers_in_updated() -> Weight {
+		T::WeightInfo::on_account_uniswap_argon_transfers_in_updated()
 	}
 }

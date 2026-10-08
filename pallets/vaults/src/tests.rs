@@ -13,7 +13,7 @@ use argon_primitives::{
 	vault::{
 		BitcoinLockFundingUpdate, BitcoinResecuritization, BitcoinSecuritization,
 		BitcoinSecuritizationBasis, BitcoinVaultProvider, ReserveSecuritizationRequest, VaultError,
-		VaultTerms,
+		VaultTerms, MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES,
 	},
 };
 use bitcoin::{
@@ -508,7 +508,7 @@ fn it_can_set_securitization_ratio_for_a_vault() {
 		assert_eq!(vault.operator_account_id, 1);
 		assert_eq!(vault.securitization_ratio, TEN_PCT);
 		// uses 10% for recovery
-		assert_eq!(vault.available_securitization_space(true), 50_000);
+		assert_eq!(vault.available_securitization_space(true, None), 50_000);
 	});
 }
 
@@ -564,6 +564,165 @@ fn operator_can_reserve_securitization_space_for_own_vault() {
 				reserved_securitization_space: 50_000,
 			}
 			.into(),
+		);
+	});
+}
+
+#[test]
+fn participation_capacity_excludes_space_needed_before_a_new_lock_matures() {
+	new_test_ext().execute_with(|| {
+		LastBitcoinHeightChange::set((0, 0));
+		set_argons(1, 5_000);
+		assert_ok!(Vaults::create(
+			RuntimeOrigin::signed(1),
+			VaultConfig {
+				securitization: 5_000,
+				terms: default_terms(FixedU128::zero()),
+				..default_vault()
+			}
+		));
+		<Vaults as TreasuryVaultProvider>::commit_securitization_for_rewards(1, 0);
+		assert_ok!(Vaults::modify_funding(RuntimeOrigin::signed(1), 1, 0, FixedU128::one()));
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().exit_notice_amount(), 5_000);
+
+		// At the request height, a new lock would mature at the withdrawal deadline.
+		assert_eq!(
+			Vaults::get_participation_capacity(1).unwrap().available_securitization_space,
+			5_000
+		);
+		LastBitcoinHeightChange::set((143, 144));
+		let capacity = Vaults::get_participation_capacity(1).unwrap();
+		assert_eq!(capacity.available_securitization_space, 0);
+		assert_eq!(capacity.regular_bond_capacity, 0);
+		assert_err!(
+			Vaults::reserve_securitization(
+				1,
+				&2,
+				&securitization(1),
+				ReserveSecuritizationRequest {
+					lock_expiration: 144 + LockDurationBlocks::get(),
+					fee_discount: 0,
+					securitization_space_to_unreserve: 0,
+				}
+			),
+			VaultError::InsufficientVaultFunds
+		);
+	});
+}
+
+#[test]
+fn participation_capacity_prunes_matured_commitments_without_mutating_storage() {
+	new_test_ext().execute_with(|| {
+		LastBitcoinHeightChange::set((0, 0));
+		set_argons(1, 50_000);
+		assert_ok!(Vaults::create(
+			RuntimeOrigin::signed(1),
+			VaultConfig { terms: default_terms(FixedU128::zero()), ..default_vault() }
+		));
+
+		let first_maturity = LockDurationBlocks::get();
+		for day in 0..MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES {
+			let collateral = securitization(if day == 0 { 20 } else { 10 });
+			assert_ok!(Vaults::reserve_securitization(
+				1,
+				&2,
+				&collateral,
+				ReserveSecuritizationRequest {
+					lock_expiration: first_maturity + u64::from(day) * 144,
+					..standard_reservation_request()
+				},
+			));
+			assert_ok!(Vaults::record_bitcoin_lock_funding(
+				1,
+				funding_update(&collateral, collateral.basis.satoshis)
+			));
+		}
+		assert_ok!(Vaults::release_bitcoin_lock_securitization(
+			1,
+			&securitization(10),
+			10,
+			&LockExtension::new(first_maturity),
+			false,
+		));
+		VaultsById::<Test>::mutate(1, |vault| {
+			let vault = vault.as_mut().unwrap();
+			vault.request_securitization_exit(100, first_maturity).unwrap();
+		});
+
+		let current_height = first_maturity + 144 + 1;
+		LastBitcoinHeightChange::set((current_height - 1, current_height));
+		let stored = VaultsById::<Test>::get(1).unwrap();
+		let capacity = Vaults::get_participation_capacity(1).unwrap();
+		assert_eq!(capacity.available_securitization_space, 46_260);
+		assert_eq!(capacity.regular_bond_capacity, 49_900);
+		assert_eq!(VaultsById::<Test>::get(1).unwrap(), stored);
+
+		assert_ok!(Vaults::reserve_securitization(
+			1,
+			&2,
+			&securitization(capacity.available_securitization_space),
+			ReserveSecuritizationRequest {
+				lock_expiration: current_height + LockDurationBlocks::get(),
+				..standard_reservation_request()
+			},
+		));
+		let admitted = VaultsById::<Test>::get(1).unwrap();
+		assert!(!admitted.securitization_release_schedule.contains_key(&(first_maturity + 144)));
+		let mixed = &admitted.securitization_release_schedule[&first_maturity];
+		assert_eq!(mixed.locked_commitments, 0);
+		assert_eq!(mixed.relockable_commitments, 0);
+		assert_eq!(mixed.argon_withdrawals, 100);
+	});
+}
+
+#[test]
+fn participation_capacity_includes_flexible_bitcoin_and_protects_reserved_space() {
+	new_test_ext().execute_with(|| {
+		set_argons(1, 1_000);
+		assert_ok!(Vaults::create(
+			RuntimeOrigin::signed(1),
+			VaultConfig {
+				securitization: 100,
+				terms: default_terms(FixedU128::zero()),
+				..default_vault()
+			}
+		));
+
+		let collateral = securitization(100);
+		assert_ok!(Vaults::reserve_securitization(
+			1,
+			&1,
+			&collateral,
+			standard_reservation_request()
+		));
+		assert_ok!(Vaults::record_bitcoin_lock_funding(1, funding_update(&collateral, 100)));
+		assert_eq!(
+			Vaults::get_participation_capacity(1).unwrap().available_securitization_space,
+			0
+		);
+
+		assert_ok!(Vaults::set_bitcoin_lock_flexible(1, &collateral, 100, true));
+		assert_eq!(
+			Vaults::get_participation_capacity(1).unwrap().available_securitization_space,
+			100
+		);
+
+		assert_ok!(Vaults::set_reserved_securitization_space(RuntimeOrigin::signed(1), 30));
+		assert_eq!(
+			Vaults::get_participation_capacity(1).unwrap().available_securitization_space,
+			70
+		);
+
+		// The public account can actually reserve the reported space, displacing flexible Bitcoin.
+		assert_ok!(Vaults::reserve_securitization(
+			1,
+			&2,
+			&securitization(70),
+			standard_reservation_request()
+		));
+		assert_eq!(
+			Vaults::get_participation_capacity(1).unwrap().available_securitization_space,
+			0
 		);
 	});
 }
@@ -666,7 +825,10 @@ fn it_can_modify_a_vault_funds() {
 			VaultsById::<Test>::get(1).unwrap().securitization_ratio,
 			FixedU128::from_float(2.0)
 		);
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().available_securitization_space(true), 1000);
+		assert_eq!(
+			VaultsById::<Test>::get(1).unwrap().available_securitization_space(true, None),
+			1000
+		);
 		System::assert_last_event(
 			Event::VaultModified {
 				vault_id: 1,
@@ -700,7 +862,7 @@ fn it_can_modify_a_vault_funds() {
 		let vault = VaultsById::<Test>::get(1).unwrap();
 		assert_eq!(vault.securitization, 1500);
 		assert_eq!(vault.securitization_target, 0);
-		assert_eq!(vault.available_securitization_space(true), 0);
+		assert_eq!(vault.available_securitization_space(true, None), 0);
 		assert_eq!(Balances::reserved_balance(1), 1500);
 	});
 }
@@ -787,7 +949,7 @@ fn exit_notice_keeps_other_securitization_available() {
 		let vault = VaultsById::<Test>::get(1).unwrap();
 		assert_eq!(vault.securitization, 1_000);
 		assert_eq!(vault.exit_notice_amount(), 500);
-		assert_eq!(vault.available_securitization_space(true), 500);
+		assert_eq!(vault.available_securitization_space(true, None), 500);
 		assert_eq!(Balances::balance_on_hold(&HoldReason::EnterVault.into(), &1), 1_000);
 
 		let exit_height = *vault
@@ -818,7 +980,7 @@ fn exit_notice_keeps_other_securitization_available() {
 		assert_eq!(vault.exit_notice_amount(), 500);
 		assert!(exit_height >= LastBitcoinHeightChange::get().1 + 52_560);
 		assert_eq!(vault.securitization_release_schedule[&exit_height].argon_withdrawals, 500);
-		assert_eq!(vault.available_securitization_space(true), 500);
+		assert_eq!(vault.available_securitization_space(true, None), 500);
 
 		LastBitcoinHeightChange::set((exit_height, exit_height));
 		Vaults::on_initialize(2);
@@ -906,13 +1068,13 @@ fn raising_the_target_cancels_the_unmatured_exit() {
 		assert_ok!(Vaults::modify_funding(RuntimeOrigin::signed(1), 1, 500, FixedU128::one()));
 		let vault = VaultsById::<Test>::get(1).unwrap();
 		assert_eq!(vault.exit_notice_amount(), 500);
-		assert_eq!(vault.available_securitization_space(false), 1_000);
+		assert_eq!(vault.available_securitization_space(false, None), 1_000);
 
 		assert_ok!(Vaults::modify_funding(RuntimeOrigin::signed(1), 1, 750, FixedU128::one()));
 		let vault = VaultsById::<Test>::get(1).unwrap();
 		assert_eq!(vault.securitization, 1_000);
 		assert_eq!(vault.exit_notice_amount(), 250);
-		assert_eq!(vault.available_securitization_space(false), 1_000);
+		assert_eq!(vault.available_securitization_space(false, None), 1_000);
 		assert_eq!(Balances::balance_on_hold(&HoldReason::EnterVault.into(), &1), 1_000);
 
 		let exit_height = *vault
@@ -1109,7 +1271,10 @@ fn it_can_reduce_vault_funds_down_to_activated() {
 			VaultsById::<Test>::get(1).unwrap().securitization_ratio,
 			FixedU128::from_float(2.0)
 		);
-		assert_eq!(VaultsById::<Test>::get(1).unwrap().available_securitization_space(true), 0);
+		assert_eq!(
+			VaultsById::<Test>::get(1).unwrap().available_securitization_space(true, None),
+			0
+		);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().uninhibited_securitization(), 0);
 
 		System::assert_last_event(
@@ -2275,7 +2440,7 @@ fn it_can_cleanup_at_bitcoin_heights() {
 			standard_reservation_request(),
 		));
 		assert_eq!(
-			VaultsById::<Test>::get(1).unwrap().available_securitization_space(true),
+			VaultsById::<Test>::get(1).unwrap().available_securitization_space(true, None),
 			1_000_000_000 - 1_000_000
 		);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_locked, 1_000_000);
@@ -2294,7 +2459,7 @@ fn it_can_cleanup_at_bitcoin_heights() {
 			false,
 		));
 		assert_eq!(
-			VaultsById::<Test>::get(1).unwrap().available_securitization_space(true),
+			VaultsById::<Test>::get(1).unwrap().available_securitization_space(true, None),
 			1_000_000_000
 		);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_locked, 0);
@@ -2353,7 +2518,7 @@ fn it_can_reuse_locked_argons() {
 			standard_reservation_request(),
 		));
 		assert_eq!(
-			VaultsById::<Test>::get(1).unwrap().available_securitization_space(true),
+			VaultsById::<Test>::get(1).unwrap().available_securitization_space(true, None),
 			10_000_000 - amount
 		);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_locked, amount);
@@ -2371,7 +2536,7 @@ fn it_can_reuse_locked_argons() {
 			false,
 		));
 		assert_eq!(
-			VaultsById::<Test>::get(1).unwrap().available_securitization_space(true),
+			VaultsById::<Test>::get(1).unwrap().available_securitization_space(true, None),
 			10_000_000
 		);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_locked, 0);
@@ -2394,7 +2559,7 @@ fn it_can_reuse_locked_argons() {
 			funding_update(&securitization(2_500_000), 2_500),
 		));
 		assert_eq!(
-			VaultsById::<Test>::get(1).unwrap().available_securitization_space(true),
+			VaultsById::<Test>::get(1).unwrap().available_securitization_space(true, None),
 			10_000_000 - 2_500_000
 		);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_locked, 2_500_000);
@@ -2408,7 +2573,7 @@ fn it_can_reuse_locked_argons() {
 			false,
 		));
 		assert_eq!(
-			VaultsById::<Test>::get(1).unwrap().available_securitization_space(true),
+			VaultsById::<Test>::get(1).unwrap().available_securitization_space(true, None),
 			10_000_000
 		);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_locked, 0);

@@ -11,7 +11,10 @@ use argon_primitives::{
 		SATOSHIS_PER_BITCOIN,
 	},
 	prelude::FrameId,
-	providers::{BitcoinFissionMinting, BitcoinFissionMintingWeightInfo, OperationalAccountsHook},
+	providers::{
+		BitcoinFissionMinting, BitcoinFissionMintingWeightInfo, OperationalAccountsHook,
+		OperationalAccountsHookWeightInfo,
+	},
 	vault::{BitcoinSecuritizationBasis, BitcoinVaultProvider},
 	VaultId,
 };
@@ -367,7 +370,7 @@ where
 					false,
 				);
 				fission_migration_weight.saturating_accrue(
-					<T as pallet_bitcoin_fissions::Config>::OperationalAccountsHook::account_bitcoin_amount_changed_weight(),
+					<<T as pallet_bitcoin_fissions::Config>::OperationalAccountsHook as OperationalAccountsHook<T::AccountId, <T as pallet_bitcoin_fissions::Config>::Balance>>::Weights::account_bitcoin_amount_changed(),
 				);
 			}
 			migrated_release_requests = migrated_release_requests.saturating_add(1);

@@ -2,9 +2,10 @@ use crate::Config;
 use argon_primitives::{
 	providers::{
 		BitcoinFissionLockProvider, BitcoinFissionLockProviderWeightInfo, BitcoinFissionMinting,
-		BitcoinFissionMintingWeightInfo, OperationalAccountsHook,
+		BitcoinFissionMintingWeightInfo,
 	},
-	BitcoinFissionsProviderWeightInfo,
+	treasury::{TreasuryPositionProvider, TreasuryPositionProviderWeightInfo},
+	BitcoinFissionsProviderWeightInfo, OperationalAccountsHook, OperationalAccountsHookWeightInfo,
 };
 use pallet_prelude::*;
 
@@ -22,6 +23,10 @@ type FissionMintingWeights<T> = <<T as Config>::Minting as BitcoinFissionMinting
 	<T as Config>::Balance,
 >>::Weights;
 type LockProviderWeights<T> = <<T as Config>::LockProvider as BitcoinFissionLockProvider<
+	<T as frame_system::Config>::AccountId,
+	<T as Config>::Balance,
+>>::Weights;
+type PositionProviderWeights<T> = <<T as Config>::PositionProvider as TreasuryPositionProvider<
 	<T as frame_system::Config>::AccountId,
 	<T as Config>::Balance,
 >>::Weights;
@@ -43,38 +48,55 @@ where
 {
 	fn create() -> Weight {
 		Base::create()
+			.saturating_add(PositionProviderWeights::<T>::account_quantity_updated())
 			.saturating_add(LockProviderWeight::fission_satoshis())
 			.saturating_add(MintingWeight::request_mint())
-			.saturating_add(T::OperationalAccountsHook::account_bitcoin_amount_changed_weight())
+			.saturating_add(<T::OperationalAccountsHook as OperationalAccountsHook<
+				T::AccountId,
+				T::Balance,
+			>>::Weights::account_bitcoin_amount_changed())
 	}
 
 	fn ratchet() -> Weight {
 		Base::ratchet()
+			.saturating_add(PositionProviderWeights::<T>::account_quantity_updated())
 			.saturating_add(LockProviderWeight::validate_fission())
 			.saturating_add(LockProviderWeight::calculate_liquidity_promised())
 			.saturating_add(MintingWeight::request_mint())
 			.saturating_add(MintingWeight::record_mint_repayment())
-			.saturating_add(T::OperationalAccountsHook::account_bitcoin_amount_changed_weight())
+			.saturating_add(<T::OperationalAccountsHook as OperationalAccountsHook<
+				T::AccountId,
+				T::Balance,
+			>>::Weights::account_bitcoin_amount_changed())
 	}
 
 	fn close() -> Weight {
 		Base::close()
+			.saturating_add(PositionProviderWeights::<T>::account_quantity_updated())
 			.saturating_add(LockProviderWeight::fuse_satoshis())
 			.saturating_add(MintingWeight::record_mint_repayment())
-			.saturating_add(T::OperationalAccountsHook::account_bitcoin_amount_changed_weight())
+			.saturating_add(<T::OperationalAccountsHook as OperationalAccountsHook<
+				T::AccountId,
+				T::Balance,
+			>>::Weights::account_bitcoin_amount_changed())
 	}
 
 	fn lock_spent(fissions: u32) -> Weight {
 		Base::lock_spent(fissions)
+			.saturating_add(PositionProviderWeights::<T>::account_quantity_updated().saturating_mul(fissions.into()))
 			.saturating_add(
-				T::OperationalAccountsHook::account_bitcoin_amount_changed_weight()
-					.saturating_mul(fissions.into()),
+				<T::OperationalAccountsHook as OperationalAccountsHook<
+					T::AccountId,
+					T::Balance,
+				>>::Weights::account_bitcoin_amount_changed()
+				.saturating_mul(fissions.into()),
 			)
 			.saturating_add(MintingWeight::record_mint_repayment())
 	}
 
 	fn provider_get_account_fission_liquidity() -> Weight {
 		Base::provider_get_account_fission_liquidity()
+			.saturating_add(PositionProviderWeights::<T>::account_quantities())
 	}
 
 	fn provider_get_lock_fission_requirements() -> Weight {

@@ -29,6 +29,7 @@ frame_support::construct_runtime!(
 	pub enum Test
 	{
 		System: frame_system,
+		TreasuryPositions: pallet_treasury_positions,
 		Balances: pallet_balances,
 		OperationalAccounts: pallet_operational_accounts,
 		Vaults: pallet_vaults,
@@ -107,6 +108,7 @@ parameter_types! {
 	pub const MaxAvailableAccessCodes: u32 = 2;
 	pub const MinimumUniswapTransfer: Balance = 250;
 	pub const MinimumBitcoin: Balance = 500;
+	pub const BitcoinLiquidityTolerance: Percent = Percent::from_percent(1);
 	pub const MinimumBonds: Balance = 200;
 	pub const OperationalMinimumUniswapTransfer: Balance = 3_000;
 	pub const MiningSeatsForOperational: u32 = 2;
@@ -198,6 +200,7 @@ impl MiningSlotProvider<u64> for MockMiningSlotProvider {
 }
 
 impl pallet_operational_accounts::Config for Test {
+	type PositionProvider = TreasuryPositions;
 	type Balance = Balance;
 	type BitcoinLockSizeForAccessCode = BitcoinLockSizeForAccessCode;
 	type OperationalCertificationReward = OperationalCertificationReward;
@@ -207,6 +210,7 @@ impl pallet_operational_accounts::Config for Test {
 	type MaxAccessCodeAwardsPerFrame = ConstU32<1_000>;
 	type MinimumUniswapTransfer = MinimumUniswapTransfer;
 	type MinimumBitcoin = MinimumBitcoin;
+	type BitcoinLiquidityTolerance = BitcoinLiquidityTolerance;
 	type MinimumBonds = MinimumBonds;
 	type OperationalMinimumUniswapTransfer = OperationalMinimumUniswapTransfer;
 	type OperationalMinimumVaultSecuritization = OperationalMinimumVaultSecuritization;
@@ -235,6 +239,7 @@ impl pallet_vaults::Config for Test {
 	type GetBitcoinNetwork = GetBitcoinNetwork;
 	type BitcoinBlockHeightChange = LastBitcoinHeightChange;
 	type SecuritizationExitNoticeBlocks = ConstU64<52_560>;
+	type BitcoinLockDurationBlocks = LockDurationBlocks;
 	type TicksPerBitcoinBlock = TicksPerBitcoinBlock;
 	type TicksPerFrame = TicksPerFrame;
 	type TickProvider = StaticTickProvider;
@@ -343,6 +348,7 @@ impl BitcoinVerifier<Test> for StaticBitcoinVerifier {
 	}
 }
 impl pallet_bitcoin_locks::Config for Test {
+	type PositionProvider = TreasuryPositions;
 	type WeightInfo = ();
 	type Balance = Balance;
 	type FissionsProvider = ();
@@ -377,4 +383,12 @@ pub fn new_test_ext() -> TestState {
 	OperationalAccountsInviteOnly::set(false);
 	UpgradedOperationalAccounts::set(BTreeSet::new());
 	new_test_with_genesis::<Test>(|_t| {})
+}
+
+impl pallet_treasury_positions::Config for Test {
+	type BitcoinPositionProvider = BitcoinLocks;
+	type TreasuryPoolProvider = ();
+	type OperationalAccountProvider = OperationalAccounts;
+	type Balance = Balance;
+	type WeightInfo = ();
 }

@@ -20,6 +20,10 @@ tracing = { workspace = true }
 impl-trait-for-tuples = { workspace = true }
 polkadot-sdk = { workspace = true, features = ["frame-support", "frame-system", "sp-runtime", "sp-core"] }
 pallet-prelude = { workspace = true }
+pallet-bitcoin-fissions = { workspace = true }
+pallet-bitcoin-locks = { workspace = true }
+pallet-operational-accounts = { workspace = true }
+pallet-treasury-positions = { workspace = true }
 
 [dev-dependencies]
 polkadot-sdk = { workspace = true, features = ["sp-io", "pallet-balances"], default-features = true }
@@ -29,14 +33,28 @@ pallet-prelude = { workspace = true, features = ["test"], default-features = tru
 default = [ "std" ]
 std = [
 	"codec/std",
+	"pallet-bitcoin-fissions/std",
+	"pallet-bitcoin-locks/std",
+	"pallet-operational-accounts/std",
 	"pallet-prelude/std",
+	"pallet-treasury-positions/std",
 	"polkadot-sdk/std",
 	"scale-info/std",
 	"tracing/std",
 ]
 runtime-benchmarks = [
+	"pallet-bitcoin-fissions/runtime-benchmarks",
+	"pallet-bitcoin-locks/runtime-benchmarks",
+	"pallet-operational-accounts/runtime-benchmarks",
 	"pallet-prelude/runtime-benchmarks",
+	"pallet-treasury-positions/runtime-benchmarks",
 	"polkadot-sdk/frame-benchmarking",
 	"polkadot-sdk/runtime-benchmarks",
 ]
-try-runtime = [ "polkadot-sdk/try-runtime" ]
+try-runtime = [
+	"pallet-bitcoin-fissions/try-runtime",
+	"pallet-bitcoin-locks/try-runtime",
+	"pallet-operational-accounts/try-runtime",
+	"pallet-treasury-positions/try-runtime",
+	"polkadot-sdk/try-runtime",
+]

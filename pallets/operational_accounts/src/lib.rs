@@ -3,6 +3,7 @@
 
 extern crate alloc;
 
+use argon_primitives::treasury::TreasuryPositionProvider;
 pub use pallet::*;
 use pallet_prelude::frame_support;
 pub use weights::{WeightInfo, WithProviderWeights};
@@ -87,9 +88,12 @@ pub mod pallet {
 		/// Minimum Uniswap transfer amount required to register.
 		#[pallet::constant]
 		type MinimumUniswapTransfer: Get<Self::Balance>;
-		/// Minimum bitcoin amount required to register.
+		/// Minimum Bitcoin-backed ARGON liquidity required to register and activate.
 		#[pallet::constant]
 		type MinimumBitcoin: Get<Self::Balance>;
+		/// Allowed Bitcoin valuation shortfall below the liquidity minimum.
+		#[pallet::constant]
+		type BitcoinLiquidityTolerance: Get<Percent>;
 		/// Minimum bond amount required to register.
 		#[pallet::constant]
 		type MinimumBonds: Get<Self::Balance>;
@@ -116,6 +120,7 @@ pub mod pallet {
 		type MiningSlotProvider: MiningSlotProvider<Self::AccountId>;
 		/// Provider for an account's active Fission liquidity at registration time.
 		type BitcoinFissionsProvider: BitcoinFissionsProvider<Self::AccountId, Self::Balance>;
+		type PositionProvider: TreasuryPositionProvider<Self::AccountId, Self::Balance>;
 		/// Provider for current account bond participation.
 		type TreasuryPoolProvider: TreasuryPoolProvider<Self::AccountId, Balance = Self::Balance>;
 		/// Provider for whether crosschain transfer tracking is active and whether linked accounts
@@ -683,6 +688,7 @@ pub mod pallet {
 
 			OperationalAccountBySubAccount::<T>::insert(&vault_account, &operational_account);
 			OperationalAccountBySubAccount::<T>::insert(&mining_account, &operational_account);
+			T::PositionProvider::operational_account_registered(&vault_account)?;
 
 			Self::deposit_event(Event::OperationalAccountRegistered {
 				operational_account: operational_account.clone(),
@@ -1005,10 +1011,12 @@ pub mod pallet {
 				operational_account,
 				T::MinimumUniswapTransfer::get(),
 			);
-			let has_account_bitcoin = Self::meets_amount_with_rounding_tolerance(
-				operational_account.account_bitcoin_amount,
-				T::MinimumBitcoin::get(),
-			);
+
+			let bitcoin_minimum = T::MinimumBitcoin::get();
+			let bitcoin_tolerance = T::BitcoinLiquidityTolerance::get().mul_floor(bitcoin_minimum);
+			let has_account_bitcoin = operational_account.account_bitcoin_amount >=
+				bitcoin_minimum.saturating_sub(bitcoin_tolerance);
+
 			let has_account_vault_bonds =
 				operational_account.account_vault_bond_amount >= T::MinimumBonds::get();
 
@@ -1021,10 +1029,10 @@ pub mod pallet {
 					operational_account,
 					T::OperationalMinimumUniswapTransfer::get(),
 				);
-			let has_vault_securitization = Self::meets_amount_with_rounding_tolerance(
-				Self::vault_amount(operational_account),
-				T::OperationalMinimumVaultSecuritization::get(),
-			);
+
+			let has_vault_securitization = Self::vault_amount(operational_account) >=
+				T::OperationalMinimumVaultSecuritization::get();
+
 			let has_mining_seats =
 				Self::mining_seat_count(operational_account) >= T::MiningSeatsForOperational::get();
 
@@ -1043,12 +1051,6 @@ pub mod pallet {
 				Self::deposit_event(Event::AccountMeetsMinimums { account: owner.clone() });
 			}
 			meets_minimums
-		}
-
-		fn meets_amount_with_rounding_tolerance(amount: T::Balance, minimum: T::Balance) -> bool {
-			let tolerance = T::Balance::from(MICROGONS_PER_ARGON);
-
-			amount >= minimum.saturating_sub(tolerance)
 		}
 
 		fn award_accrued_access_code(account: &mut OperationalAccount<T>) {
@@ -1192,9 +1194,7 @@ pub mod pallet {
 	}
 
 	impl<T: Config> OperationalAccountsHook<T::AccountId, T::Balance> for Pallet<T> {
-		fn vault_created_weight() -> Weight {
-			<T as Config>::WeightInfo::on_vault_created()
-		}
+		type Weights = weights::ProviderWeightAdapter<T>;
 
 		fn vault_created(account_id: &T::AccountId) {
 			let Some(owner) = OperationalAccountBySubAccount::<T>::get(account_id) else {
@@ -1208,10 +1208,6 @@ pub mod pallet {
 
 				account.vault_created = true;
 			});
-		}
-
-		fn vault_bitcoin_lock_funded_weight() -> Weight {
-			<T as Config>::WeightInfo::on_vault_bitcoin_lock_funded()
 		}
 
 		fn vault_bitcoin_lock_funded(
@@ -1234,10 +1230,6 @@ pub mod pallet {
 			});
 		}
 
-		fn mining_seat_won_weight() -> Weight {
-			<T as Config>::WeightInfo::on_mining_seat_won()
-		}
-
 		fn mining_seat_won(miner_account: &T::AccountId) {
 			let Some(owner) = Self::operational_owner_for(miner_account) else {
 				return;
@@ -1251,10 +1243,6 @@ pub mod pallet {
 			});
 		}
 
-		fn account_bitcoin_amount_changed_weight() -> Weight {
-			<T as Config>::WeightInfo::on_account_bitcoin_amount_updated()
-		}
-
 		fn account_bitcoin_amount_changed(
 			account_id: &T::AccountId,
 			amount: T::Balance,
@@ -1263,16 +1251,8 @@ pub mod pallet {
 			Self::adjust_account_bitcoin_amount(account_id, amount, is_increase);
 		}
 
-		fn account_vault_bond_total_updated_weight() -> Weight {
-			<T as Config>::WeightInfo::on_account_vault_bond_total_updated()
-		}
-
 		fn account_vault_bond_total_updated(account_id: &T::AccountId, total_amount: T::Balance) {
 			Self::set_account_vault_bond_amount(account_id, total_amount);
-		}
-
-		fn account_uniswap_argon_transfers_in_updated_weight() -> Weight {
-			<T as Config>::WeightInfo::on_account_uniswap_argon_transfers_in_updated()
 		}
 
 		fn account_uniswap_argon_transfers_in_updated(account_id: &T::AccountId) {
@@ -1312,6 +1292,13 @@ pub mod pallet {
 
 	impl<T: Config> OperationalAccountProvider<T::AccountId> for Pallet<T> {
 		type Weights = weights::ProviderWeightAdapter<T>;
+		fn upstream_vault(account: &T::AccountId) -> Option<(T::AccountId, VaultId)> {
+			let owner = Self::operational_owner_for(account)?;
+			let account = OperationalAccounts::<T>::get(owner)?;
+			let upstream = OperationalAccounts::<T>::get(account.upstream_account?)?;
+			let vault = T::VaultProvider::get_registration_vault_data(&upstream.vault_account)?;
+			Some((account.vault_account, vault.vault_id))
+		}
 
 		fn is_eligible(account_id: &T::AccountId) -> bool {
 			if !IsOperationalAccountInviteOnly::<T>::get() {

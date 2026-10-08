@@ -2,8 +2,11 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 
 use argon_primitives::{
-	bitcoin::BitcoinLockId, vault::BitcoinSecuritizationBasis, BitcoinFissionMinting,
-	BitcoinFissionRequirements, BitcoinFissionsProvider, OperationalAccountsHook,
+	bitcoin::BitcoinLockId,
+	treasury::{PositionQuantity, TreasuryPositionProvider},
+	vault::BitcoinSecuritizationBasis,
+	BitcoinFissionMinting, BitcoinFissionRequirements, BitcoinFissionsProvider,
+	OperationalAccountsHook,
 };
 use pallet_prelude::*;
 
@@ -50,6 +53,7 @@ pub mod pallet {
 			+ HasCompact;
 		type LockProvider: BitcoinFissionLockProvider<Self::AccountId, Self::Balance>;
 		type Minting: BitcoinFissionMinting<Self::AccountId, Self::Balance>;
+		type PositionProvider: TreasuryPositionProvider<Self::AccountId, Self::Balance>;
 		type OperationalAccountsHook: OperationalAccountsHook<Self::AccountId, Self::Balance>;
 		type Currency: Mutate<Self::AccountId, Balance = Self::Balance>;
 
@@ -291,6 +295,12 @@ pub mod pallet {
 				},
 			);
 			NextFissionIdByOwner::<T>::insert(&account_id, next_fission_id);
+			T::PositionProvider::account_quantity_updated(
+				&account_id,
+				PositionQuantity::FissionLiquidity,
+				T::Balance::zero(),
+				liquidity_promised,
+			)?;
 			T::OperationalAccountsHook::account_bitcoin_amount_changed(
 				&account_id,
 				liquidity_promised,
@@ -375,6 +385,12 @@ pub mod pallet {
 			}
 
 			let prior_liquidity_promised = fission.liquidity_promised;
+			T::PositionProvider::account_quantity_updated(
+				&account_id,
+				PositionQuantity::FissionLiquidity,
+				prior_liquidity_promised,
+				liquidity_promised,
+			)?;
 			let (liquidity_change, is_increase) = if liquidity_promised >= prior_liquidity_promised
 			{
 				(liquidity_promised.saturating_sub(prior_liquidity_promised), true)
@@ -449,6 +465,12 @@ pub mod pallet {
 			.map_err(|_| Error::<T>::InsufficientFunds)?;
 			T::Minting::record_mint_repayment(redemption_amount);
 
+			T::PositionProvider::account_quantity_updated(
+				&account_id,
+				PositionQuantity::FissionLiquidity,
+				fission.liquidity_promised,
+				T::Balance::zero(),
+			)?;
 			T::OperationalAccountsHook::account_bitcoin_amount_changed(
 				&account_id,
 				fission.liquidity_promised,
@@ -466,11 +488,7 @@ impl<T: Config> BitcoinFissionsProvider<T::AccountId, T::Balance> for Pallet<T> 
 	type Weights = weights::ProviderWeightAdapter<T>;
 
 	fn get_account_fission_liquidity(account_id: &T::AccountId) -> T::Balance {
-		let mut liquidity = T::Balance::zero();
-		for (_, fission) in FissionByOwnerAndId::<T>::iter_prefix(account_id) {
-			liquidity.saturating_accrue(fission.liquidity_promised);
-		}
-		liquidity
+		T::PositionProvider::account_quantities(account_id).fission_liquidity
 	}
 
 	fn get_lock_fission_requirements(
@@ -533,6 +551,12 @@ impl<T: Config> BitcoinFissionsProvider<T::AccountId, T::Balance> for Pallet<T> 
 					let Some(fission) = fission.take() else {
 						return Ok(());
 					};
+					T::PositionProvider::account_quantity_updated(
+						account_id,
+						PositionQuantity::FissionLiquidity,
+						fission.liquidity_promised,
+						T::Balance::zero(),
+					)?;
 					T::OperationalAccountsHook::account_bitcoin_amount_changed(
 						account_id,
 						fission.liquidity_promised,

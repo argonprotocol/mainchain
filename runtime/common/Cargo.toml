@@ -69,6 +69,7 @@ pallet-notebook = { workspace = true }
 pallet-notaries = { workspace = true }
 pallet-fee-control = { workspace = true }
 pallet-treasury = { workspace = true }
+pallet-treasury-positions = { workspace = true }
 pallet-mining-slot = { workspace = true }
 pallet-price-index = { workspace = true }
 pallet-operational-accounts = { workspace = true }
@@ -80,6 +81,10 @@ argon-primitives = { workspace = true }
 argon-bitcoin = { workspace = true }
 
 frame-benchmarking = { workspace = true, optional = true }
+
+[dev-dependencies]
+argon-runtime = { workspace = true, default-features = true }
+polkadot-sdk = { workspace = true, features = ["sp-io", "sp-tracing"], default-features = true }
 
 [features]
 default = [ "std" ]
@@ -109,6 +114,7 @@ std = [
 	"pallet-prelude/std",
 	"pallet-price-index/std",
 	"pallet-ticks/std",
+	"pallet-treasury-positions/std",
 	"pallet-treasury/std",
 	"pallet-vaults/std",
 	"polkadot-sdk/std",
@@ -137,6 +143,7 @@ runtime-benchmarks = [
 	"pallet-prelude/runtime-benchmarks",
 	"pallet-price-index/runtime-benchmarks",
 	"pallet-ticks/runtime-benchmarks",
+	"pallet-treasury-positions/runtime-benchmarks",
 	"pallet-treasury/runtime-benchmarks",
 	"pallet-vaults/runtime-benchmarks",
 	"polkadot-sdk/frame-system-benchmarking",
@@ -161,6 +168,7 @@ try-runtime = [
 	"pallet-operational-accounts/try-runtime",
 	"pallet-price-index/try-runtime",
 	"pallet-ticks/try-runtime",
+	"pallet-treasury-positions/try-runtime",
 	"pallet-treasury/try-runtime",
 	"pallet-vaults/try-runtime",
 	"polkadot-sdk/try-runtime",

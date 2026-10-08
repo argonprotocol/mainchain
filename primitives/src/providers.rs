@@ -81,6 +81,9 @@ impl MiningSlotProviderWeightInfo for () {
 }
 
 pub trait OperationalAccountProviderWeightInfo {
+	fn upstream_vault() -> Weight {
+		Weight::zero()
+	}
 	fn is_eligible() -> Weight;
 }
 
@@ -91,6 +94,9 @@ impl OperationalAccountProviderWeightInfo for () {
 }
 
 pub trait TreasuryPoolProviderWeightInfo {
+	fn vault_securitization_changed() -> Weight {
+		Weight::zero()
+	}
 	fn has_vault_bond_participation() -> Weight;
 	fn active_vault_bond_amount() -> Weight;
 	fn active_account_vault_bond_amount() -> Weight;
@@ -584,6 +590,9 @@ pub trait MiningSlotProvider<AccountId> {
 }
 
 pub trait OperationalAccountProvider<AccountId> {
+	fn upstream_vault(_account: &AccountId) -> Option<(AccountId, VaultId)> {
+		None
+	}
 	type Weights: OperationalAccountProviderWeightInfo;
 
 	fn is_eligible(account_id: &AccountId) -> bool;
@@ -602,7 +611,10 @@ pub trait TreasuryPoolProvider<AccountId> {
 	type Balance;
 
 	/// Refresh flexible-bond displacement after a vault's open securitization changes.
-	fn vault_securitization_changed(vault_id: VaultId, securitization: Self::Balance);
+	fn vault_securitization_changed(
+		vault_id: VaultId,
+		securitization: Self::Balance,
+	) -> DispatchResult;
 
 	/// Whether the account currently has any active vault bond participation in the given vault.
 	fn has_vault_bond_participation(vault_id: VaultId, account_id: &AccountId) -> bool;
@@ -618,6 +630,8 @@ pub trait TreasuryPoolProvider<AccountId> {
 		account_id: &AccountId,
 		microgon_amount: Self::Balance,
 	) -> DispatchResult;
+	/// Run in the caller's storage layer so currency, lot and position changes roll back together
+	/// if any part of the burn fails.
 	fn burn_encumbered_bond_microgons(
 		account_id: &AccountId,
 		microgon_amount: Self::Balance,
@@ -628,7 +642,12 @@ impl<AccountId> TreasuryPoolProvider<AccountId> for () {
 	type Weights = ();
 	type Balance = u128;
 
-	fn vault_securitization_changed(_vault_id: VaultId, _securitization: Self::Balance) {}
+	fn vault_securitization_changed(
+		_vault_id: VaultId,
+		_securitization: Self::Balance,
+	) -> DispatchResult {
+		Ok(())
+	}
 
 	fn has_vault_bond_participation(_vault_id: VaultId, _account_id: &AccountId) -> bool {
 		false
@@ -969,48 +988,95 @@ impl<AccountId> BitcoinUtxoEvents<AccountId> for Tuple {
 	}
 }
 
+pub trait OperationalAccountsHookWeightInfo {
+	fn vault_created() -> Weight;
+	fn vault_bitcoin_lock_funded() -> Weight;
+	fn mining_seat_won() -> Weight;
+	fn account_bitcoin_amount_changed() -> Weight;
+	fn account_vault_bond_total_updated() -> Weight;
+	fn account_uniswap_argon_transfers_in_updated() -> Weight;
+}
+
+impl OperationalAccountsHookWeightInfo for () {
+	fn vault_created() -> Weight {
+		Weight::zero()
+	}
+	fn vault_bitcoin_lock_funded() -> Weight {
+		Weight::zero()
+	}
+	fn mining_seat_won() -> Weight {
+		Weight::zero()
+	}
+	fn account_bitcoin_amount_changed() -> Weight {
+		Weight::zero()
+	}
+	fn account_vault_bond_total_updated() -> Weight {
+		Weight::zero()
+	}
+	fn account_uniswap_argon_transfers_in_updated() -> Weight {
+		Weight::zero()
+	}
+}
+
+#[impl_trait_for_tuples::impl_for_tuples(1, 5)]
+impl OperationalAccountsHookWeightInfo for Tuple {
+	fn vault_created() -> Weight {
+		let mut weight = Weight::zero();
+		for_tuples!( #( weight = weight.saturating_add(Tuple::vault_created()); )* );
+		weight
+	}
+	fn vault_bitcoin_lock_funded() -> Weight {
+		let mut weight = Weight::zero();
+		for_tuples!( #( weight = weight.saturating_add(Tuple::vault_bitcoin_lock_funded()); )* );
+		weight
+	}
+	fn mining_seat_won() -> Weight {
+		let mut weight = Weight::zero();
+		for_tuples!( #( weight = weight.saturating_add(Tuple::mining_seat_won()); )* );
+		weight
+	}
+	fn account_bitcoin_amount_changed() -> Weight {
+		let mut weight = Weight::zero();
+		for_tuples!( #( weight = weight.saturating_add(Tuple::account_bitcoin_amount_changed()); )* );
+		weight
+	}
+	fn account_vault_bond_total_updated() -> Weight {
+		let mut weight = Weight::zero();
+		for_tuples!( #( weight = weight.saturating_add(Tuple::account_vault_bond_total_updated()); )* );
+		weight
+	}
+	fn account_uniswap_argon_transfers_in_updated() -> Weight {
+		let mut weight = Weight::zero();
+		for_tuples!( #( weight = weight.saturating_add(Tuple::account_uniswap_argon_transfers_in_updated()); )* );
+		weight
+	}
+}
+
 pub trait OperationalAccountsHook<AccountId, Balance> {
-	fn vault_created_weight() -> Weight;
+	type Weights: OperationalAccountsHookWeightInfo;
 	fn vault_created(_vault_operator_account: &AccountId) {}
-	fn vault_bitcoin_lock_funded_weight() -> Weight;
 	fn vault_bitcoin_lock_funded(_vault_operator_account: &AccountId, _total_locked: Balance) {}
-	fn mining_seat_won_weight() -> Weight;
 	fn mining_seat_won(_miner_account: &AccountId) {}
-	fn account_bitcoin_amount_changed_weight() -> Weight;
 	fn account_bitcoin_amount_changed(
 		_account_id: &AccountId,
 		_amount: Balance,
 		_is_increase: bool,
 	) {
 	}
-	fn account_vault_bond_total_updated_weight() -> Weight;
 	fn account_vault_bond_total_updated(_account_id: &AccountId, _amount: Balance) {}
-	fn account_uniswap_argon_transfers_in_updated_weight() -> Weight;
 	fn account_uniswap_argon_transfers_in_updated(_account_id: &AccountId) {}
 }
 
 #[allow(clippy::let_and_return)]
 #[impl_trait_for_tuples::impl_for_tuples(0, 5)]
+#[tuple_types_custom_trait_bound(OperationalAccountsHook<AccountId, Balance>)]
 impl<AccountId, Balance> OperationalAccountsHook<AccountId, Balance> for Tuple
 where
 	Balance: Copy,
 {
-	fn vault_created_weight() -> Weight {
-		let mut weight = Weight::zero();
-		for_tuples!( #( weight = weight.saturating_add(Tuple::vault_created_weight()); )* );
-		weight
-	}
-
+	for_tuples!( type Weights = ( #(Tuple::Weights),* ); );
 	fn vault_created(vault_operator_account: &AccountId) {
 		for_tuples!( #( Tuple::vault_created(vault_operator_account); )* );
-	}
-
-	fn vault_bitcoin_lock_funded_weight() -> Weight {
-		let mut weight = Weight::zero();
-		for_tuples!(
-			#( weight = weight.saturating_add(Tuple::vault_bitcoin_lock_funded_weight()); )*
-		);
-		weight
 	}
 
 	fn vault_bitcoin_lock_funded(vault_operator_account: &AccountId, total_locked: Balance) {
@@ -1019,25 +1085,8 @@ where
 		);
 	}
 
-	fn mining_seat_won_weight() -> Weight {
-		let mut weight = Weight::zero();
-		for_tuples!( #( weight = weight.saturating_add(Tuple::mining_seat_won_weight()); )* );
-		weight
-	}
-
 	fn mining_seat_won(miner_account: &AccountId) {
 		for_tuples!( #( Tuple::mining_seat_won(miner_account); )* );
-	}
-
-	fn account_bitcoin_amount_changed_weight() -> Weight {
-		let mut weight = Weight::zero();
-		for_tuples!(
-			#(
-				weight = weight
-					.saturating_add(Tuple::account_bitcoin_amount_changed_weight());
-			)*
-		);
-		weight
 	}
 
 	fn account_bitcoin_amount_changed(account_id: &AccountId, amount: Balance, is_increase: bool) {
@@ -1046,30 +1095,8 @@ where
 		);
 	}
 
-	fn account_vault_bond_total_updated_weight() -> Weight {
-		let mut weight = Weight::zero();
-		for_tuples!(
-			#(
-				weight = weight
-					.saturating_add(Tuple::account_vault_bond_total_updated_weight());
-			)*
-		);
-		weight
-	}
-
 	fn account_vault_bond_total_updated(account_id: &AccountId, amount: Balance) {
 		for_tuples!( #( Tuple::account_vault_bond_total_updated(account_id, amount); )* );
-	}
-
-	fn account_uniswap_argon_transfers_in_updated_weight() -> Weight {
-		let mut weight = Weight::zero();
-		for_tuples!(
-			#(
-				weight = weight
-					.saturating_add(Tuple::account_uniswap_argon_transfers_in_updated_weight());
-			)*
-		);
-		weight
 	}
 
 	fn account_uniswap_argon_transfers_in_updated(account_id: &AccountId) {
@@ -1126,17 +1153,25 @@ impl<AccountId: FullCodec, Balance: FullCodec> OperationalRewardsProvider<Accoun
 	}
 }
 
-pub trait OperationalRewardsPayer<AccountId: FullCodec, Balance: FullCodec> {
-	fn claim_reward_weight() -> Weight {
+pub trait OperationalRewardsPayerWeightInfo {
+	fn claim_reward() -> Weight;
+}
+impl OperationalRewardsPayerWeightInfo for () {
+	fn claim_reward() -> Weight {
 		Weight::zero()
 	}
+}
 
+pub trait OperationalRewardsPayer<AccountId: FullCodec, Balance: FullCodec> {
+	type Weights: OperationalRewardsPayerWeightInfo;
 	fn claim_reward(_account_id: &AccountId, _amount: Balance) -> DispatchResult {
 		Err(DispatchError::Other("operational reward payer unavailable"))
 	}
 }
 
-impl<AccountId: FullCodec, Balance: FullCodec> OperationalRewardsPayer<AccountId, Balance> for () {}
+impl<AccountId: FullCodec, Balance: FullCodec> OperationalRewardsPayer<AccountId, Balance> for () {
+	type Weights = ();
+}
 
 /// Argon CPI is the US CPI deconstructed by the Argon market price in Dollars
 pub type ArgonCPI = FixedI128;

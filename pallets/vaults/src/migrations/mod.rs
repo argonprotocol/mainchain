@@ -23,7 +23,8 @@ use frame_support::ensure;
 #[cfg(feature = "try-runtime")]
 use sp_runtime::TryRuntimeError;
 
-mod old {
+/// Previous storage layouts, also used by the runtime's combined upgrade test.
+pub mod old {
 	use super::*;
 
 	#[derive(Encode, Decode)]

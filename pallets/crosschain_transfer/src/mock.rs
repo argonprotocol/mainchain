@@ -241,30 +241,7 @@ impl MockEthereumVerifier {
 
 pub struct MockOperationalAccountsHook;
 impl OperationalAccountsHook<TestAccountId, Balance> for MockOperationalAccountsHook {
-	fn vault_created_weight() -> Weight {
-		Weight::zero()
-	}
-
-	fn vault_bitcoin_lock_funded_weight() -> Weight {
-		Weight::zero()
-	}
-
-	fn mining_seat_won_weight() -> Weight {
-		Weight::zero()
-	}
-
-	fn account_bitcoin_amount_changed_weight() -> Weight {
-		Weight::zero()
-	}
-
-	fn account_vault_bond_total_updated_weight() -> Weight {
-		Weight::zero()
-	}
-
-	fn account_uniswap_argon_transfers_in_updated_weight() -> Weight {
-		Weight::zero()
-	}
-
+	type Weights = ();
 	fn account_uniswap_argon_transfers_in_updated(account_id: &TestAccountId) {
 		let amount = crate::TransferTotalsByAccount::<Test>::get(account_id).microgons_in;
 		ArgonFlowUpdates::mutate(|updates| updates.push((account_id.clone(), amount)));
@@ -514,7 +491,12 @@ impl TreasuryPoolProvider<TestAccountId> for MockTreasuryPoolProvider {
 	type Weights = ();
 	type Balance = Balance;
 
-	fn vault_securitization_changed(_vault_id: VaultId, _securitization: Self::Balance) {}
+	fn vault_securitization_changed(
+		_vault_id: VaultId,
+		_securitization: Self::Balance,
+	) -> DispatchResult {
+		Ok(())
+	}
 
 	fn has_vault_bond_participation(vault_id: VaultId, account_id: &TestAccountId) -> bool {
 		Self::active_vault_bond_amount(vault_id, account_id) > 0

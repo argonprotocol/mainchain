@@ -19,11 +19,13 @@ use argon_primitives::{
 	block_seal::FrameId,
 	ethereum::{EthereumBlockNumber, EthereumReceiptLogProofBatch, EthereumVerifyError},
 	prelude::Tick,
+	treasury::TreasuryPositionProvider,
 	vault::{
-		BitcoinLockFundingUpdate, BitcoinSecuritization, BitcoinVaultProvider, LockExtension,
-		LostBitcoinCompensation, RegistrationVaultData, ReserveSecuritizationRequest, VaultError,
+		BitcoinLockFundingUpdate, BitcoinSecuritization, BitcoinSecuritizationBasis,
+		BitcoinVaultProvider, LockExtension, LostBitcoinCompensation, RegistrationVaultData,
+		ReserveSecuritizationRequest, VaultError,
 	},
-	BitcoinFissionLockError, BitcoinFissionLockProvider, BitcoinFissionMinting,
+	Balance, BitcoinFissionLockError, BitcoinFissionLockProvider, BitcoinFissionMinting,
 	BitcoinFissionsProvider, EthereumVerifyProvider, MiningSlotProvider, Moment,
 	OperationalAccountProvider, TreasuryPoolProvider, UniswapTransferProvider, VaultId,
 };
@@ -45,6 +47,7 @@ pub use pallet_prelude::benchmarking::{
 	BenchmarkOperationalAccountsProviderState, BenchmarkOperationalRewardsPayer,
 	BenchmarkOperationalRewardsProvider, BenchmarkOperationalRewardsProviderState,
 	BenchmarkPriceProvider, BenchmarkPriceProviderState, BenchmarkTickProvider,
+	BenchmarkTreasuryPositionProvider,
 };
 use pallet_prelude::DispatchResult;
 
@@ -65,7 +68,7 @@ pub struct BenchmarkBitcoinFissionLockProvider<AccountId, Balance>(
 impl<AccountId, Balance> BitcoinFissionLockProvider<AccountId, Balance>
 	for BenchmarkBitcoinFissionLockProvider<AccountId, Balance>
 where
-	Balance: From<u128>,
+	Balance: codec::Codec + codec::MaxEncodedLen + Copy + Default + AtLeast32BitUnsigned,
 {
 	type Weights = ();
 
@@ -73,9 +76,9 @@ where
 		_account_id: &AccountId,
 		_lock_id: BitcoinLockId,
 		satoshis: Satoshis,
-		_microgons_at_target_per_btc: Balance,
+		microgons_at_target_per_btc: Balance,
 	) -> Result<(Balance, Tick), BitcoinFissionLockError> {
-		Ok((Balance::from(satoshis as u128), 0))
+		Ok((Self::calculate_liquidity_promised(satoshis, microgons_at_target_per_btc)?, 0))
 	}
 
 	fn validate_fission(
@@ -92,18 +95,20 @@ where
 
 	fn calculate_liquidity_promised(
 		satoshis: Satoshis,
-		_microgons_at_target_per_btc: Balance,
+		microgons_at_target_per_btc: Balance,
 	) -> Result<Balance, BitcoinFissionLockError> {
-		Ok(Balance::from(satoshis as u128))
+		Ok(BitcoinSecuritizationBasis { satoshis, microgons_at_target_per_btc }
+			.btc_value_in_microgons())
 	}
 
 	fn fuse_satoshis(
 		_account_id: &AccountId,
 		_lock_id: BitcoinLockId,
 		satoshis: Satoshis,
-		_microgons_at_target_per_btc: Balance,
+		microgons_at_target_per_btc: Balance,
 	) -> Result<Balance, BitcoinFissionLockError> {
-		Ok(Balance::from(satoshis as u128))
+		Ok(BitcoinSecuritizationBasis { satoshis, microgons_at_target_per_btc }
+			.btc_value_in_microgons())
 	}
 }
 
@@ -399,7 +404,14 @@ pub struct BenchmarkOperationalAccountProvider<AccountId>(PhantomData<AccountId>
 
 impl<AccountId> OperationalAccountProvider<AccountId>
 	for BenchmarkOperationalAccountProvider<AccountId>
+where
+	AccountId: Clone + codec::Codec,
 {
+	fn upstream_vault(account: &AccountId) -> Option<(AccountId, VaultId)> {
+		BenchmarkTreasuryPositionProvider::<AccountId, Balance>::upstream_position(account)
+			.map(|position| (account.clone(), position.vault_id))
+	}
+
 	type Weights = ();
 
 	fn is_eligible(_account_id: &AccountId) -> bool {
@@ -423,7 +435,12 @@ where
 	type Weights = ();
 	type Balance = Balance;
 
-	fn vault_securitization_changed(_vault_id: VaultId, _securitization: Self::Balance) {}
+	fn vault_securitization_changed(
+		_vault_id: VaultId,
+		_securitization: Self::Balance,
+	) -> DispatchResult {
+		Ok(())
+	}
 
 	fn has_vault_bond_participation(_vault_id: VaultId, _account_id: &AccountId) -> bool {
 		let mut state = benchmark_operational_accounts_provider_state();

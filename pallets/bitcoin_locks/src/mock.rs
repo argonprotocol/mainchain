@@ -29,6 +29,7 @@ frame_support::construct_runtime!(
 	pub enum Test
 	{
 		System: frame_system,
+		TreasuryPositions: pallet_treasury_positions,
 		Balances: pallet_balances,
 		BitcoinUtxos: pallet_bitcoin_utxos,
 		BitcoinLocks: pallet_bitcoin_locks,
@@ -181,32 +182,9 @@ impl BlockRewardAccountsProvider<u64> for StaticBlockRewardAccountsProvider {
 
 pub struct MockOperationalAccounts;
 impl OperationalAccountsHook<u64, Balance> for MockOperationalAccounts {
-	fn vault_created_weight() -> Weight {
-		Weight::zero()
-	}
-
-	fn vault_bitcoin_lock_funded_weight() -> Weight {
-		Weight::zero()
-	}
-
-	fn mining_seat_won_weight() -> Weight {
-		Weight::zero()
-	}
-
-	fn account_bitcoin_amount_changed_weight() -> Weight {
-		Weight::zero()
-	}
-
+	type Weights = ();
 	fn account_bitcoin_amount_changed(account_id: &u64, amount: Balance, is_increase: bool) {
 		AccountBitcoinChanges::mutate(|changes| changes.push((*account_id, amount, is_increase)));
-	}
-
-	fn account_vault_bond_total_updated_weight() -> Weight {
-		Weight::zero()
-	}
-
-	fn account_uniswap_argon_transfers_in_updated_weight() -> Weight {
-		Weight::zero()
 	}
 }
 
@@ -670,6 +648,7 @@ pub(crate) fn set_bitcoin_height(height: BitcoinHeight) {
 }
 
 impl pallet_bitcoin_locks::Config for Test {
+	type PositionProvider = TreasuryPositions;
 	type WeightInfo = ();
 	type Balance = Balance;
 	type FissionsProvider = BitcoinFissions;
@@ -700,6 +679,7 @@ impl pallet_bitcoin_locks::Config for Test {
 }
 
 impl pallet_bitcoin_fissions::Config for Test {
+	type PositionProvider = TreasuryPositions;
 	type WeightInfo = ();
 	type Balance = Balance;
 	type LockProvider = BitcoinLocks;
@@ -760,4 +740,12 @@ pub fn new_test_ext() -> TestState {
 		.assimilate_storage(t)
 		.unwrap();
 	})
+}
+
+impl pallet_treasury_positions::Config for Test {
+	type BitcoinPositionProvider = BitcoinLocks;
+	type TreasuryPoolProvider = ();
+	type OperationalAccountProvider = ();
+	type Balance = Balance;
+	type WeightInfo = ();
 }

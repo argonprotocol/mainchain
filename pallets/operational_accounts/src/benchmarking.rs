@@ -71,6 +71,24 @@ mod benchmarks {
 	use super::*;
 
 	#[benchmark]
+	fn provider_upstream_vault() {
+		set_benchmark_operational_accounts_provider_state(default_provider_state::<T>());
+		let linked = linked_accounts::<T>();
+		let upstream = linked_accounts_with_seed::<T>(1);
+		let mut record = default_operational_account::<T>(&linked);
+		record.upstream_account = Some(upstream.owner.clone());
+		insert_operational_account::<T>(&linked, record);
+		insert_operational_account::<T>(&upstream, default_operational_account::<T>(&upstream));
+		link_vault_to_owner::<T>(&linked);
+		#[cfg(test)]
+		seed_mock_registration_lookup::<T>(&upstream);
+		#[block]
+		{
+			assert_eq!(<Pallet<T> as argon_primitives::OperationalAccountProvider<T::AccountId>>::upstream_vault(&linked.vault), Some((linked.vault.clone(), 1)));
+		}
+	}
+
+	#[benchmark]
 	fn register() {
 		reset_benchmark_operational_accounts_provider_state();
 		reset_benchmark_operational_accounts_provider_call_counters();

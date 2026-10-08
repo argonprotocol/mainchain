@@ -4777,6 +4777,7 @@ declare module '@polkadot/types/lookup' {
     readonly bitcoinLockedMicrogons: Compact<u128>;
     readonly argonotSecuritizationInMicrogons: Compact<u128>;
     readonly activeBondMicrogons: Compact<u128>;
+    readonly upstreamParticipation: u128;
   }
 
   /** @name PalletTreasuryFrameArgonotBondParticipants (549) */
@@ -5316,45 +5317,67 @@ declare module '@polkadot/types/lookup' {
       | 'EndpointOwnedByAnotherAccount';
   }
 
-  /** @name FrameSystemExtensionsAuthorizeCall (613) */
+  /** @name PalletTreasuryPositionsPosition (611) */
+  interface PalletTreasuryPositionsPosition extends Struct {
+    readonly bondPrincipal: Compact<u128>;
+    readonly quantities: ArgonPrimitivesTreasuryPositionQuantities;
+    readonly upstream: Option<ArgonPrimitivesTreasuryUpstreamPosition>;
+  }
+
+  /** @name ArgonPrimitivesTreasuryPositionQuantities (612) */
+  interface ArgonPrimitivesTreasuryPositionQuantities extends Struct {
+    readonly bonds: Compact<u128>;
+    readonly stakes: Compact<u128>;
+    readonly fissionLiquidity: Compact<u128>;
+  }
+
+  /** @name ArgonPrimitivesTreasuryUpstreamPosition (614) */
+  interface ArgonPrimitivesTreasuryUpstreamPosition extends Struct {
+    readonly vaultId: Compact<u32>;
+    readonly bitcoinSecuritization: Compact<u128>;
+    readonly bitcoinAllocatedSecuritization: Compact<u128>;
+    readonly bondPrincipal: Compact<u128>;
+  }
+
+  /** @name FrameSystemExtensionsAuthorizeCall (617) */
   type FrameSystemExtensionsAuthorizeCall = Null;
 
-  /** @name FrameSystemExtensionsCheckNonZeroSender (614) */
+  /** @name FrameSystemExtensionsCheckNonZeroSender (618) */
   type FrameSystemExtensionsCheckNonZeroSender = Null;
 
-  /** @name FrameSystemExtensionsCheckSpecVersion (615) */
+  /** @name FrameSystemExtensionsCheckSpecVersion (619) */
   type FrameSystemExtensionsCheckSpecVersion = Null;
 
-  /** @name FrameSystemExtensionsCheckTxVersion (616) */
+  /** @name FrameSystemExtensionsCheckTxVersion (620) */
   type FrameSystemExtensionsCheckTxVersion = Null;
 
-  /** @name FrameSystemExtensionsCheckGenesis (617) */
+  /** @name FrameSystemExtensionsCheckGenesis (621) */
   type FrameSystemExtensionsCheckGenesis = Null;
 
-  /** @name FrameSystemExtensionsCheckNonce (620) */
+  /** @name FrameSystemExtensionsCheckNonce (624) */
   interface FrameSystemExtensionsCheckNonce extends Compact<u32> {}
 
-  /** @name FrameSystemExtensionsCheckWeight (621) */
+  /** @name FrameSystemExtensionsCheckWeight (625) */
   type FrameSystemExtensionsCheckWeight = Null;
 
-  /** @name PalletTransactionPaymentChargeTransactionPayment (622) */
+  /** @name PalletTransactionPaymentChargeTransactionPayment (626) */
   interface PalletTransactionPaymentChargeTransactionPayment extends Compact<u128> {}
 
-  /** @name FrameMetadataHashExtensionCheckMetadataHash (623) */
+  /** @name FrameMetadataHashExtensionCheckMetadataHash (627) */
   interface FrameMetadataHashExtensionCheckMetadataHash extends Struct {
     readonly mode: FrameMetadataHashExtensionMode;
   }
 
-  /** @name FrameMetadataHashExtensionMode (624) */
+  /** @name FrameMetadataHashExtensionMode (628) */
   interface FrameMetadataHashExtensionMode extends Enum {
     readonly isDisabled: boolean;
     readonly isEnabled: boolean;
     readonly type: 'Disabled' | 'Enabled';
   }
 
-  /** @name FrameSystemExtensionsWeightReclaim (625) */
+  /** @name FrameSystemExtensionsWeightReclaim (629) */
   type FrameSystemExtensionsWeightReclaim = Null;
 
-  /** @name ArgonRuntimeRuntime (627) */
+  /** @name ArgonRuntimeRuntime (631) */
   type ArgonRuntimeRuntime = Null;
 } // declare module

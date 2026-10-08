@@ -27,6 +27,7 @@ pallet-prelude = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
+pallet-treasury-positions = { workspace = true, default-features = true }
 polkadot-sdk = { workspace = true, features = ["sp-io", "pallet-balances"], default-features = true }
 pallet-prelude = { workspace = true, features = ["test"], default-features = true }
 bitcoin = { workspace = true }

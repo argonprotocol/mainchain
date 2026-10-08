@@ -15,6 +15,7 @@ use argon_primitives::{
 		BitcoinLockId, BitcoinNetwork, BitcoinSignature, CompressedBitcoinPubkey, H256Le, Satoshis,
 	},
 	providers::{BitcoinFissionLockError, BitcoinFissionLockProvider, BitcoinFissionsProvider},
+	treasury::{BitcoinLockPosition, BitcoinLockPositionProvider, TreasuryPositionProvider},
 	vault::BitcoinSecuritizationBasis,
 };
 pub use pallet::*;
@@ -116,6 +117,7 @@ pub mod pallet {
 			+ HasCompact;
 
 		type FissionsProvider: BitcoinFissionsProvider<Self::AccountId, Self::Balance>;
+		type PositionProvider: TreasuryPositionProvider<Self::AccountId, Self::Balance>;
 
 		/// Currency used to retire pre-Fission release holds during migration.
 		type Currency: MutateHold<
@@ -419,6 +421,16 @@ pub mod pallet {
 
 		pub fn btc_value_in_microgons(&self) -> T::Balance {
 			self.securitization_basis.btc_value_in_microgons()
+		}
+
+		/// Absolute collateral contribution used by upstream participation accounting.
+		pub fn upstream_collateral(&self) -> BitcoinLockPosition<T::Balance> {
+			let securitization = self.get_securitization();
+			BitcoinLockPosition {
+				activated_securitization: securitization
+					.collateral_for_satoshis(self.funded_satoshis),
+				allocated_securitization: securitization.collateral_required(),
+			}
 		}
 
 		pub fn get_securitization(&self) -> BitcoinSecuritization<T::Balance> {
@@ -1360,6 +1372,7 @@ pub mod pallet {
 			let remaining_blocks = full_term.saturating_sub(elapsed_blocks);
 			let remaining_term =
 				FixedU128::from_rational(remaining_blocks as u128, full_term as u128);
+			let previous_position = lock.upstream_collateral();
 			let current_securitization = lock.get_securitization();
 			let mut lock_extension = lock.get_lock_extension();
 			let (fee, coupon_paid_fees) = T::VaultProvider::resecuritize(
@@ -1400,6 +1413,7 @@ pub mod pallet {
 			lock.securitization_coverage_microgons = securitization_coverage_microgons;
 			lock.securitization_tick = microgons_at_target_per_btc_tick;
 			let vault_id = lock.vault_id;
+			Self::report_upstream_position(&lock, previous_position)?;
 			LocksById::<T>::insert(lock_id, lock);
 			if let Some(coupon_nonce) = coupon_nonce {
 				LastFeeCouponNonceByVaultAndAccount::<T>::insert(vault_id, &who, coupon_nonce);
@@ -1495,6 +1509,7 @@ pub mod pallet {
 				}
 				return Self::orphaned_utxo_detected(lock_id, utxo_satoshis, utxo_ref)
 			}
+			let previous_position = lock.upstream_collateral();
 			let previous_funded_satoshis = lock.funded_satoshis;
 			let funded_satoshis = previous_funded_satoshis
 				.checked_add(utxo_satoshis)
@@ -1529,6 +1544,7 @@ pub mod pallet {
 					lock.securitization_hold_expiration_bitcoin_height,
 				);
 			}
+			Self::report_upstream_position(&lock, previous_position)?;
 			LocksById::<T>::insert(lock_id, lock);
 			Ok(())
 		}
@@ -1620,6 +1636,18 @@ pub mod pallet {
 	where
 		<T as frame_system::Config>::AccountId: Codec,
 	{
+		fn report_upstream_position(
+			lock: &LockedBitcoin<T>,
+			previous: BitcoinLockPosition<T::Balance>,
+		) -> DispatchResult {
+			T::PositionProvider::bitcoin_position_updated(
+				&lock.owner_account,
+				lock.vault_id,
+				previous,
+				lock.upstream_collateral(),
+			)
+		}
+
 		fn validate_fee_coupon<'a>(
 			vault_id: VaultId,
 			account_id: &T::AccountId,
@@ -1717,6 +1745,16 @@ pub mod pallet {
 
 			T::BitcoinUtxoTracker::watch_for_utxo(lock_id, script_pubkey)?;
 
+			// The new lock reserves collateral before any Bitcoin funding activates it.
+			T::PositionProvider::bitcoin_position_updated(
+				account_id,
+				vault_id,
+				BitcoinLockPosition::default(),
+				BitcoinLockPosition {
+					allocated_securitization: securitization.collateral_required(),
+					..Default::default()
+				},
+			)?;
 			LocksById::<T>::insert(
 				lock_id,
 				LockedBitcoin {
@@ -2004,6 +2042,7 @@ pub mod pallet {
 			bitcoin_height: BitcoinHeight,
 		) -> DispatchResult {
 			let vault_id = lock.vault_id;
+			let previous_position = lock.upstream_collateral();
 			let previous_funded_satoshis = lock.funded_satoshis;
 			let removed_satoshis = previous_funded_satoshis
 				.checked_sub(change_satoshis)
@@ -2046,6 +2085,7 @@ pub mod pallet {
 			} else {
 				PendingPartialReleaseByLockId::<T>::remove(lock_id);
 			}
+			Self::report_upstream_position(&lock, previous_position)?;
 			LocksById::<T>::insert(lock_id, lock);
 			Self::deposit_event(Event::BitcoinSpentAfterRelease {
 				lock_id,
@@ -2093,11 +2133,17 @@ pub mod pallet {
 				PendingPartialReleaseByLockId::<T>::contains_key(lock_id)
 		}
 
-		fn take_lock(lock_id: BitcoinLockId) -> Result<LockedBitcoin<T>, Error<T>> {
+		fn take_lock(lock_id: BitcoinLockId) -> Result<LockedBitcoin<T>, DispatchError> {
 			let lock = LocksById::<T>::get(lock_id).ok_or(Error::<T>::LockNotFound)?;
 			if LockReleaseRequestsById::<T>::contains_key(lock_id) {
 				Self::take_release_request(lock_id)?;
 			}
+			T::PositionProvider::bitcoin_position_updated(
+				&lock.owner_account,
+				lock.vault_id,
+				lock.upstream_collateral(),
+				BitcoinLockPosition::default(),
+			)?;
 			LocksById::<T>::remove(lock_id);
 			LockIdsByVaultId::<T>::remove(lock.vault_id, lock_id);
 			LockIdsByOwnerAccount::<T>::remove(&lock.owner_account, lock_id);
@@ -2268,6 +2314,7 @@ pub mod pallet {
 				}
 
 				let result = with_storage_layer(|| {
+					let previous_position = lock.upstream_collateral();
 					let securitization = lock.get_securitization();
 					let securitization_coverage_microgons =
 						securitization.coverage_for_satoshis(lock.funded_satoshis);
@@ -2286,6 +2333,7 @@ pub mod pallet {
 					if !lock.is_funded() {
 						lock.securitization_basis.microgons_at_target_per_btc = T::Balance::zero();
 					}
+					Self::report_upstream_position(&lock, previous_position)?;
 					LocksById::<T>::insert(lock_id, &lock);
 					Ok::<(), DispatchError>(())
 				});
@@ -2541,5 +2589,31 @@ pub trait BitcoinVerifier<T: Config> {
 			}
 			.into()
 		})
+	}
+}
+
+impl<T: Config> BitcoinLockPositionProvider<T::AccountId, T::Balance> for Pallet<T> {
+	type Weights = ProviderWeightAdapter<T>;
+	/// Seed a newly registered account's upstream subset from locks that predate registration.
+	/// Later lock mutations update Treasury Positions directly; frame calculators do not call this.
+	fn account_position(
+		account: &T::AccountId,
+		vault: VaultId,
+	) -> Result<BitcoinLockPosition<T::Balance>, DispatchError> {
+		let mut position = BitcoinLockPosition::<T::Balance>::default();
+		for (id, ()) in LockIdsByOwnerAccount::<T>::iter_prefix(account) {
+			if let Some(lock) = LocksById::<T>::get(id).filter(|lock| lock.vault_id == vault) {
+				let contribution = lock.upstream_collateral();
+				position.activated_securitization = position
+					.activated_securitization
+					.checked_add(&contribution.activated_securitization)
+					.ok_or(sp_runtime::ArithmeticError::Overflow)?;
+				position.allocated_securitization = position
+					.allocated_securitization
+					.checked_add(&contribution.allocated_securitization)
+					.ok_or(sp_runtime::ArithmeticError::Overflow)?;
+			}
+		}
+		Ok(position)
 	}
 }

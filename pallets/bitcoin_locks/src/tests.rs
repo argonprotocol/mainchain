@@ -2,6 +2,7 @@
 #![allow(clippy::multiple_bound_locations)]
 #![allow(clippy::inconsistent_digit_grouping)]
 
+use argon_primitives::treasury::{TreasuryPositionProvider, UpstreamPosition};
 use codec::Encode;
 use pallet_prelude::*;
 
@@ -316,6 +317,10 @@ fn partial_release_keeps_the_lock_pending_until_the_bitcoin_transaction_is_obser
 	set_bitcoin_height(12);
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		TreasuryPositions::set_upstream_position(
+			&2,
+			Some(UpstreamPosition { vault_id: 1, ..Default::default() }),
+		);
 		set_argons(2, 2_000_000);
 		let secp = bitcoin::secp256k1::Secp256k1::new();
 		let owner_pubkey =
@@ -338,6 +343,17 @@ fn partial_release_keeps_the_lock_pending_until_the_bitcoin_transaction_is_obser
 			));
 		}
 		let lock = LocksById::<Test>::get(1).expect("lock");
+		let collateral = lock.get_securitization().collateral_required();
+		assert_eq!(
+			TreasuryPositions::upstream_position(&2).unwrap().bitcoin_securitization,
+			collateral
+		);
+		assert_eq!(
+			TreasuryPositions::upstream_position(&2)
+				.unwrap()
+				.bitcoin_allocated_securitization,
+			collateral
+		);
 		let target_rate = lock.securitization_basis.microgons_at_target_per_btc;
 		MicrogonsAtTargetPerBtcHistory::<Test>::mutate(|rates| {
 			_ = rates.try_push((12, target_rate));
@@ -375,6 +391,10 @@ fn partial_release_keeps_the_lock_pending_until_the_bitcoin_transaction_is_obser
 		));
 
 		assert!(LocksById::<Test>::contains_key(1));
+		assert_eq!(
+			TreasuryPositions::upstream_position(&2).unwrap().bitcoin_securitization,
+			collateral
+		);
 		assert!(!LockReleaseRequestsById::<Test>::contains_key(1));
 		assert_eq!(
 			LockReleaseCosignHeightById::<Test>::get(1),
@@ -413,6 +433,16 @@ fn partial_release_keeps_the_lock_pending_until_the_bitcoin_transaction_is_obser
 
 		let lock = LocksById::<Test>::get(1).expect("partial release keeps the Lock");
 		assert_eq!(lock.funded_satoshis, 69_999_000);
+		assert_eq!(
+			TreasuryPositions::upstream_position(&2).unwrap().bitcoin_securitization,
+			lock.get_securitization().collateral_for_satoshis(69_999_000)
+		);
+		assert_eq!(
+			TreasuryPositions::upstream_position(&2)
+				.unwrap()
+				.bitcoin_allocated_securitization,
+			collateral
+		);
 		assert_eq!(lock.fissioned_satoshis, 40_000_000);
 		assert_eq!(lock.funding_utxos.len(), 1);
 		assert_eq!(lock.funding_utxos.get(&change_ref), Some(&69_999_000));
@@ -1914,6 +1944,10 @@ fn expires_the_securitization_hold_without_unwatching_the_lock() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		let who = 1;
+		TreasuryPositions::set_upstream_position(
+			&who,
+			Some(UpstreamPosition { vault_id: 1, ..Default::default() }),
+		);
 		set_argons(who, 2_000_000);
 
 		assert_ok!(BitcoinLocks::create_receive_address(
@@ -1924,6 +1958,12 @@ fn expires_the_securitization_hold_without_unwatching_the_lock() {
 			None
 		));
 		let lock = LocksById::<Test>::get(1).expect("lock should exist");
+		assert!(
+			TreasuryPositions::upstream_position(&who)
+				.unwrap()
+				.bitcoin_allocated_securitization >
+				0
+		);
 		let expiration_height = lock.created_at_height + SecuritizationHoldBlocks::get() + 1;
 		assert!(SecuritizationHoldExpirationsByBitcoinHeight::<Test>::get(expiration_height)
 			.contains(&1));
@@ -1933,6 +1973,12 @@ fn expires_the_securitization_hold_without_unwatching_the_lock() {
 
 		let lock = LocksById::<Test>::get(1).expect("lock should remain watched");
 		assert_eq!(lock.securitization_hold_expiration_bitcoin_height, expiration_height);
+		assert_eq!(
+			TreasuryPositions::upstream_position(&who)
+				.unwrap()
+				.bitcoin_allocated_securitization,
+			0
+		);
 		assert_eq!(DefaultVault::get().securitization_locked, 0);
 		assert_eq!(DefaultVault::get().securitization_pending_activation, 0);
 		assert!(LockIdsByVaultId::<Test>::contains_key(1, 1));
@@ -4382,4 +4428,122 @@ fn allow_fee_coupon_target_rate() {
 
 fn make_script_pubkey(vec: &[u8]) -> BitcoinScriptPubkey {
 	BitcoinScriptPubkey(BoundedVec::try_from(vec.to_vec()).unwrap())
+}
+
+#[test]
+fn upstream_collateral_tracks_reservations_funding_resecuritization_and_termination() {
+	set_bitcoin_height(12);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		set_argons(2, 2_000_000);
+		TreasuryPositions::set_upstream_position(
+			&2,
+			Some(UpstreamPosition { vault_id: 1, ..Default::default() }),
+		);
+		assert_ok!(BitcoinLocks::create_receive_address(
+			RuntimeOrigin::signed(2),
+			1,
+			SATOSHIS_PER_BITCOIN,
+			CompressedBitcoinPubkey([1; 33]),
+			None
+		));
+		let lock = LocksById::<Test>::get(1).unwrap();
+		let collateral = lock.get_securitization().collateral_required();
+		assert_eq!(TreasuryPositions::upstream_position(&2).unwrap().bitcoin_securitization, 0);
+		assert_eq!(
+			TreasuryPositions::upstream_position(&2)
+				.unwrap()
+				.bitcoin_allocated_securitization,
+			collateral
+		);
+		assert_ok!(funding_received(1, SATOSHIS_PER_BITCOIN / 2));
+		let position = TreasuryPositions::upstream_position(&2).unwrap();
+		assert_eq!(position.bitcoin_securitization, collateral / 2);
+		assert_eq!(position.bitcoin_allocated_securitization, collateral);
+		MicrogonsAtTargetPerBtcHistory::<Test>::mutate(|rates| {
+			_ = rates.try_push((12, lock.securitization_basis.microgons_at_target_per_btc));
+		});
+		assert_ok!(BitcoinLocks::resecuritize(
+			RuntimeOrigin::signed(2),
+			1,
+			SATOSHIS_PER_BITCOIN / 2,
+			lock_options(lock.securitization_basis.microgons_at_target_per_btc)
+		));
+		assert_eq!(
+			TreasuryPositions::upstream_position(&2).unwrap().bitcoin_securitization,
+			collateral / 2
+		);
+		assert_eq!(
+			TreasuryPositions::upstream_position(&2)
+				.unwrap()
+				.bitcoin_allocated_securitization,
+			collateral / 2
+		);
+		assert_ok!(spent(1));
+		assert!(!LocksById::<Test>::contains_key(1));
+		assert_eq!(TreasuryPositions::upstream_position(&2).unwrap().bitcoin_securitization, 0);
+		assert_eq!(
+			TreasuryPositions::upstream_position(&2)
+				.unwrap()
+				.bitcoin_allocated_securitization,
+			0
+		);
+	});
+}
+
+#[test]
+fn funding_rolls_back_when_the_upstream_position_is_inconsistent() {
+	set_bitcoin_height(12);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		set_argons(2, 2_000_000);
+		TreasuryPositions::set_upstream_position(
+			&2,
+			Some(UpstreamPosition { vault_id: 1, ..Default::default() }),
+		);
+		assert_ok!(BitcoinLocks::create_receive_address(
+			RuntimeOrigin::signed(2),
+			1,
+			SATOSHIS_PER_BITCOIN,
+			CompressedBitcoinPubkey([1; 33]),
+			None
+		));
+		let lock = LocksById::<Test>::get(1).unwrap();
+		// Corrupt the old reservation to exercise the failure after source mutations.
+		TreasuryPositions::set_upstream_position(
+			&2,
+			Some(UpstreamPosition { vault_id: 1, ..Default::default() }),
+		);
+		assert_ok!(BitcoinUtxos::watch_for_utxo(1, lock.utxo_script_pubkey));
+		let block = BitcoinBlock { block_height: 12, block_hash: H256Le([1; 32]) };
+		pallet_bitcoin_utxos::ConfirmedBitcoinBlockTip::<Test>::put(block.clone());
+		assert_ok!(BitcoinUtxos::sync(
+			RuntimeOrigin::none(),
+			BitcoinUtxoSyncV2 {
+				sync_to_block: block,
+				funded: vec![BitcoinUtxoFunding {
+					lock_id: 1,
+					utxo_ref: UtxoRef { txid: H256Le([1; 32]), output_index: 0 },
+					satoshis: SATOSHIS_PER_BITCOIN,
+					expected_satoshis: SATOSHIS_PER_BITCOIN,
+					bitcoin_height: 12,
+				}],
+				spent: vec![],
+			},
+		));
+		System::assert_last_event(
+			pallet_bitcoin_utxos::Event::<Test>::UtxoDetectedError {
+				lock_id: 1,
+				error: sp_runtime::ArithmeticError::Underflow.into(),
+			}
+			.into(),
+		);
+		assert_eq!(LocksById::<Test>::get(1).unwrap().funded_satoshis, lock.funded_satoshis);
+		assert!(LocksById::<Test>::get(1).unwrap().funding_utxos.is_empty());
+		assert!(pallet_bitcoin_utxos::UtxoRefsByLockId::<Test>::get(1).is_empty());
+		assert_eq!(
+			TreasuryPositions::upstream_position(&2),
+			Some(UpstreamPosition { vault_id: 1, ..Default::default() }),
+		);
+	});
 }

@@ -24,6 +24,7 @@ pub mod pallet_ticks;
 pub mod pallet_timestamp;
 pub mod pallet_transaction_payment;
 pub mod pallet_treasury;
+pub mod pallet_treasury_positions;
 pub mod pallet_tx_pause;
 pub mod pallet_utility;
 pub mod pallet_vaults;

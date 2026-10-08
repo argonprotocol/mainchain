@@ -93,6 +93,7 @@ parameter_types! {
 	pub const MaxAccessCodeAwardsPerFrame: u32 = 2;
 	pub const MinimumUniswapTransfer: Balance = 250;
 	pub const MinimumBitcoin: Balance = 2_000 * MICROGONS_PER_ARGON;
+	pub const BitcoinLiquidityTolerance: Percent = Percent::from_percent(1);
 	pub const MinimumBonds: Balance = 200;
 	pub const OperationalMinimumUniswapTransfer: Balance = 3_000;
 	pub const OperationalMinimumVaultSecuritization: Balance = 2_000 * MICROGONS_PER_ARGON;
@@ -336,7 +337,12 @@ impl TreasuryPoolProvider<TestAccountId> for MockTreasuryPoolProvider {
 	type Weights = ();
 	type Balance = Balance;
 
-	fn vault_securitization_changed(_vault_id: VaultId, _securitization: Self::Balance) {}
+	fn vault_securitization_changed(
+		_vault_id: VaultId,
+		_securitization: Self::Balance,
+	) -> DispatchResult {
+		Ok(())
+	}
 
 	fn has_vault_bond_participation(vault_id: VaultId, account_id: &TestAccountId) -> bool {
 		Self::active_vault_bond_amount(vault_id, account_id) > 0
@@ -397,6 +403,7 @@ impl UniswapTransferProvider<TestAccountId> for MockUniswapTransferProvider {
 
 pub struct MockOperationalRewardsPayer;
 impl OperationalRewardsPayer<TestAccountId, Balance> for MockOperationalRewardsPayer {
+	type Weights = ();
 	fn claim_reward(account_id: &TestAccountId, amount: Balance) -> DispatchResult {
 		let available = ClaimableTreasuryBalance::get();
 		if amount > available {
@@ -410,11 +417,13 @@ impl OperationalRewardsPayer<TestAccountId, Balance> for MockOperationalRewardsP
 }
 
 impl pallet_operational_accounts::Config for Test {
+	type PositionProvider = ();
 	type Balance = Balance;
 	type MaxAvailableAccessCodes = MaxAvailableAccessCodes;
 	type MaxAccessCodeAwardsPerFrame = MaxAccessCodeAwardsPerFrame;
 	type MinimumUniswapTransfer = MinimumUniswapTransfer;
 	type MinimumBitcoin = MinimumBitcoin;
+	type BitcoinLiquidityTolerance = BitcoinLiquidityTolerance;
 	type MinimumBonds = MinimumBonds;
 	type OperationalMinimumUniswapTransfer = OperationalMinimumUniswapTransfer;
 	type OperationalMinimumVaultSecuritization = OperationalMinimumVaultSecuritization;
