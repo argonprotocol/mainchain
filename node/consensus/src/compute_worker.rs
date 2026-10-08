@@ -6,8 +6,8 @@ use argon_primitives::{
 	block_seal::ComputePuzzle,
 	prelude::*,
 	tick::{Ticker, MAX_BLOCKS_PER_TICK},
-	BlockSealApis, BlockSealAuthorityId, BlockSealDigest, ComputeDifficulty, NotebookApis,
-	TickApis,
+	ArgonDigests, BlockSealApis, BlockSealAuthorityId, BlockSealDigest, ComputeDifficulty,
+	NotebookApis, TickApis,
 };
 use argon_randomx::{calculate_hash, calculate_mining_hash, RandomXError};
 use argon_runtime::NotebookVerifyError;
@@ -20,6 +20,7 @@ use rand::RngExt;
 use sc_client_api::AuxStore;
 use sc_service::TaskManager;
 use sc_utils::mpsc::TracingUnboundedSender;
+use schnellru::{ByLength, LruMap};
 use sp_api::ProvideRuntimeApi;
 use sp_blockchain::HeaderBackend;
 use sp_core::{traits::SpawnEssentialNamed, H256, U256};
@@ -35,6 +36,8 @@ use std::{
 use tokio::task::yield_now;
 
 pub(crate) type Version = usize;
+const VOTE_BLOCKS_BEFORE_MEMORY_EVICTION: usize = 10;
+const VOTE_BLOCK_STREAK_CACHE_CAPACITY: u32 = 100;
 
 /// Mining metadata. This is the information needed to start an actual mining loop.
 #[derive(Clone, Eq, PartialEq)]
@@ -76,6 +79,8 @@ pub(crate) struct ComputeHandle<B: BlockT> {
 	metadata: Arc<Mutex<Option<MiningMetadata<B::Hash>>>>,
 	solving_block: Arc<Mutex<Option<SolvingBlock<B>>>>,
 	block_found_tx: TracingUnboundedSender<(SolvingBlock<B>, BlockSealDigest)>,
+	vote_block_streaks: Arc<Mutex<LruMap<B::Hash, usize>>>,
+	last_memory_eviction: Arc<Mutex<Option<B::Hash>>>,
 }
 
 impl<B> ComputeHandle<B>
@@ -90,6 +95,54 @@ where
 			solving_block: Arc::new(Mutex::new(None)),
 			block_found_tx,
 			metadata: Arc::new(Mutex::new(None)),
+			vote_block_streaks: Arc::new(Mutex::new(LruMap::new(ByLength::new(
+				VOTE_BLOCK_STREAK_CACHE_CAPACITY,
+			)))),
+			last_memory_eviction: Arc::new(Mutex::new(None)),
+		}
+	}
+
+	pub fn on_block_import(&self, block_hash: B::Hash, header: &B::Header) {
+		let mut vote_block_streaks = self.vote_block_streaks.lock();
+		if vote_block_streaks.get(&block_hash).is_some() {
+			return;
+		}
+
+		let is_vote = header
+			.digest()
+			.convert_first(|item| item.as_block_seal())
+			.is_some_and(|seal| seal.is_vote());
+		let vote_streak = if is_vote {
+			// Missing parents only delay eviction; startup and cache misses need no history walk.
+			let parent_streak =
+				vote_block_streaks.get(header.parent_hash()).copied().unwrap_or_default();
+			(parent_streak + 1).min(VOTE_BLOCKS_BEFORE_MEMORY_EVICTION)
+		} else {
+			0
+		};
+		vote_block_streaks.insert(block_hash, vote_streak);
+	}
+
+	pub fn on_best_block(&self, best_hash: B::Hash) {
+		if !argon_randomx::full_vm::has_cached_data() {
+			return;
+		}
+
+		let mut last_memory_eviction = self.last_memory_eviction.lock();
+		if *last_memory_eviction == Some(best_hash) {
+			return;
+		}
+
+		let vote_streak =
+			self.vote_block_streaks.lock().get(&best_hash).copied().unwrap_or_default();
+		if vote_streak < VOTE_BLOCKS_BEFORE_MEMORY_EVICTION {
+			return;
+		}
+
+		self.stop_solving_current();
+		if argon_randomx::full_vm::evict_mining_memory() {
+			*last_memory_eviction = Some(best_hash);
+			info!("Evicted compute mining memory after {VOTE_BLOCKS_BEFORE_MEMORY_EVICTION} consecutive vote blocks");
 		}
 	}
 
@@ -269,6 +322,7 @@ impl BlockComputeNonce {
 #[derive(Clone)]
 pub(crate) struct ComputeSolver {
 	pub version: Version,
+	memory_generation: usize,
 	pub wip_nonce: BlockComputeNonce,
 	pub wip_nonce_hash: Vec<u8>,
 	pub threshold: U256,
@@ -287,6 +341,7 @@ impl ComputeSolver {
 		rng.fill(&mut bytes);
 		let mut solver = ComputeSolver {
 			version,
+			memory_generation: argon_randomx::full_vm::cache_generation(),
 			threshold: BlockComputeNonce::threshold(compute_difficulty),
 			wip_nonce_hash: vec![],
 			wip_nonce: BlockComputeNonce { nonce: U256::from_big_endian(&bytes[..]), pre_hash },
@@ -304,7 +359,11 @@ impl ComputeSolver {
 		let payload = &mut self.wip_nonce_hash;
 		payload.splice(payload.len() - nonce_bytes.len().., nonce_bytes);
 
-		let hash = calculate_mining_hash(&self.key_block_hash, payload)?;
+		let Some(hash) =
+			calculate_mining_hash(&self.key_block_hash, payload, self.memory_generation)?
+		else {
+			return Ok(None);
+		};
 		if BlockComputeNonce::meets_threshold(hash.as_fixed_bytes(), self.threshold) {
 			return Ok(Some(self.wip_nonce.clone()));
 		}
@@ -329,6 +388,7 @@ pub fn run_compute_solver_threads<B, C>(
 			let mut counter = 0;
 			let mut solver_ref = None;
 			loop {
+				argon_randomx::full_vm::release_vm_if_evicted();
 				if !worker.is_valid_solver(&solver_ref) {
 					solver_ref = worker.create_solver().map(Box::new);
 					if counter > 0 &&
@@ -541,11 +601,13 @@ where
 mod tests {
 	use super::*;
 	use crate::mock_notary::setup_logs;
-	use argon_primitives::{tick::Ticker, HashOutput};
-	use argon_runtime::Block;
+	use argon_primitives::{tick::Ticker, BlockSealAuthoritySignature, HashOutput};
+	use argon_runtime::{Block, Header as BlockHeader};
 	use codec::Encode;
 	use sc_utils::mpsc::tracing_unbounded;
-	use sp_core::{H256, U256};
+	use sp_core::{ByteArray, H256, U256};
+	use sp_runtime::Digest;
+	static MINING_MEMORY_TEST_LOCK: Mutex<()> = Mutex::new(());
 
 	struct ApiState {
 		ticker: Ticker,
@@ -605,6 +667,175 @@ mod tests {
 	}
 
 	#[test]
+	fn vote_block_recovery_evicts_memory_without_disabling_emergency_fallback() {
+		use crate::mock_importer::{Block as ImportedBlock, MemChain};
+		let _mining_memory_guard = MINING_MEMORY_TEST_LOCK.lock();
+
+		let genesis =
+			BlockHeader::new(0, H256::zero(), H256::zero(), H256::zero(), Digest::default());
+		let client = MemChain::new(genesis);
+		let (tx, _) = tracing_unbounded("node::consensus::compute_block_stream", 10);
+		let worker = ComputeHandle::<ImportedBlock>::new(tx);
+		let key = H256::repeat_byte(72);
+		let mut solver = Some(Box::new(ComputeSolver::new(worker.version(), vec![1; 32], key, 1)));
+		assert!(solver.as_mut().unwrap().check_next().unwrap().is_some());
+		assert!(worker.is_valid_solver(&solver));
+
+		let mut best_hash = client.info().best_hash;
+		for number in 1..=13 {
+			let mut seal = BlockSealDigest::Vote {
+				seal_strength: U256::one(),
+				signature: BlockSealAuthoritySignature::from_slice(&[0; 64]).unwrap(),
+				miner_nonce_score: None,
+			};
+			if number == 3 {
+				seal = BlockSealDigest::Compute { nonce: U256::one() };
+			}
+			let header = BlockHeader::new(
+				number,
+				H256::zero(),
+				H256::zero(),
+				best_hash,
+				Digest { logs: vec![seal.to_digest()] },
+			);
+			best_hash = header.hash();
+			worker.on_block_import(best_hash, &header);
+
+			if number == 13 {
+				// A competing branch with a compute block must not inherit the vote tip's streak.
+				let fork_compute = BlockHeader::new(
+					13,
+					H256::zero(),
+					H256::zero(),
+					*header.parent_hash(),
+					Digest {
+						logs: vec![BlockSealDigest::Compute { nonce: U256::one() }.to_digest()],
+					},
+				);
+				let fork_vote = BlockHeader::new(
+					14,
+					H256::zero(),
+					H256::zero(),
+					fork_compute.hash(),
+					Digest { logs: vec![seal.to_digest()] },
+				);
+				let fork_hash = fork_vote.hash();
+				for fork_header in [fork_compute, fork_vote] {
+					worker.on_block_import(fork_header.hash(), &fork_header);
+					client.insert(fork_header);
+				}
+				client.force_best(14, fork_hash);
+				worker.on_best_block(client.info().best_hash);
+				assert!(argon_randomx::full_vm::has_cached_data());
+			}
+
+			// Duplicate imports and repeated polling cannot inflate a branch's vote streak.
+			worker.on_block_import(best_hash, &header);
+			client.insert(header);
+			client.force_best(number, best_hash);
+			for _ in 0..10 {
+				worker.on_best_block(client.info().best_hash);
+			}
+			assert_eq!(argon_randomx::full_vm::has_cached_data(), number < 13);
+		}
+		assert_eq!(worker.version(), 1);
+		assert!(!worker.is_valid_solver(&solver));
+
+		// Eviction can happen after admission to the loop, before the next hash starts.
+		assert!(solver.as_mut().unwrap().check_next().unwrap().is_none());
+		assert!(!argon_randomx::full_vm::has_cached_data(), "cancelled work reallocated a dataset");
+
+		// Eligible votes on a stalled vote tip must not prevent compute from restarting.
+		worker.new_best_block(MiningMetadata {
+			best_hash,
+			activate_mining_time: u64::MAX,
+			submit_notebooks_time: u64::MAX,
+			has_eligible_votes: true,
+			is_bootstrap_mining: false,
+			emergency_tick: 20,
+			key_block_hash: key,
+			difficulty: 1,
+			solving_with_notebooks_at_tick: (18, 0),
+		});
+		assert!(!worker.ready_to_solve(20, 0));
+		assert!(worker.ready_to_solve(21, 0));
+		assert!(calculate_mining_hash(
+			&key,
+			b"next fallback block",
+			argon_randomx::full_vm::cache_generation(),
+		)
+		.unwrap()
+		.is_some());
+		worker.on_best_block(best_hash);
+		assert!(argon_randomx::full_vm::has_cached_data());
+
+		assert!(argon_randomx::full_vm::evict_mining_memory());
+		argon_randomx::full_vm::release_vm_if_evicted();
+	}
+
+	#[test]
+	fn vote_streak_cache_misses_delay_counting_and_duplicates_preserve_known_streaks() {
+		let (tx, _) = tracing_unbounded("node::consensus::compute_block_stream", 10);
+		let worker = ComputeHandle::<Block>::new(tx);
+		let vote_seal = BlockSealDigest::Vote {
+			seal_strength: U256::one(),
+			signature: BlockSealAuthoritySignature::from_slice(&[0; 64]).unwrap(),
+			miner_nonce_score: None,
+		};
+		let mut parent_hash = H256::zero();
+		for number in 1..=10 {
+			let header = BlockHeader::new(
+				number,
+				H256::zero(),
+				H256::zero(),
+				parent_hash,
+				Digest { logs: vec![vote_seal.to_digest()] },
+			);
+			parent_hash = header.hash();
+			worker.on_block_import(parent_hash, &header);
+		}
+
+		let child = BlockHeader::new(
+			11,
+			H256::zero(),
+			H256::zero(),
+			parent_hash,
+			Digest { logs: vec![vote_seal.to_digest()] },
+		);
+		let child_hash = child.hash();
+		worker.on_block_import(child_hash, &child);
+
+		// Fill the cache with sibling blocks until the parent is evicted but its child remains.
+		for nonce in 1..VOTE_BLOCK_STREAK_CACHE_CAPACITY {
+			let sibling = BlockHeader::new(
+				1,
+				H256::zero(),
+				H256::zero(),
+				H256::zero(),
+				Digest {
+					logs: vec![BlockSealDigest::Compute { nonce: U256::from(nonce) }.to_digest()],
+				},
+			);
+			worker.on_block_import(sibling.hash(), &sibling);
+		}
+		assert_eq!(worker.vote_block_streaks.lock().len(), 100);
+		assert!(worker.vote_block_streaks.lock().peek(&parent_hash).is_none());
+		worker.on_block_import(child_hash, &child);
+		assert_eq!(worker.vote_block_streaks.lock().peek(&child_hash), Some(&10));
+
+		let fork_child = BlockHeader::new(
+			11,
+			H256::repeat_byte(1),
+			H256::zero(),
+			parent_hash,
+			Digest { logs: vec![vote_seal.to_digest()] },
+		);
+		worker.on_block_import(fork_child.hash(), &fork_child);
+		assert_eq!(worker.vote_block_streaks.lock().peek(&fork_child.hash()), Some(&1));
+		assert_eq!(worker.vote_block_streaks.lock().len(), 100);
+	}
+
+	#[test]
 	fn nonce_verify_compute() {
 		let mut bytes = [0u8; 32];
 		bytes[31] = 1;
@@ -624,6 +855,7 @@ mod tests {
 	#[test]
 	fn it_can_reuse_a_nonce_algorithm_multiple_times() {
 		setup_logs();
+		let _mining_memory_guard = MINING_MEMORY_TEST_LOCK.lock();
 
 		let mut bytes = [0u8; 32];
 		bytes[31] = 2;
