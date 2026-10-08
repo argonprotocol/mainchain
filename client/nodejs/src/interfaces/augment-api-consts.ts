@@ -2,12 +2,12 @@
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
-import '@polkadot/api-base/types/consts';
+import type {} from '@polkadot/api-base/types/consts';
 
 import type { ApiTypes, AugmentedConst } from '@polkadot/api-base/types';
 import type { u128, u16, u32, u64, u8 } from '@polkadot/types-codec';
 import type { ITuple } from '@polkadot/types-codec/types';
-import type { AccountId32, Percent } from '@polkadot/types/interfaces/runtime';
+import type { AccountId32, Percent, Permill } from '@polkadot/types/interfaces/runtime';
 import type {
   FrameSupportPalletId,
   FrameSystemLimitsBlockLength,
@@ -371,6 +371,10 @@ declare module '@polkadot/api-base/types/consts' {
     };
     operationalAccounts: {
       /**
+       * Allowed Bitcoin valuation shortfall below the liquidity minimum.
+       **/
+      bitcoinLiquidityTolerance: Percent & AugmentedConst<ApiType>;
+      /**
        * Additional argon amount (base units) required per follow-on access code after an account
        * becomes operational.
        **/
@@ -384,7 +388,7 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       maxAvailableAccessCodes: u32 & AugmentedConst<ApiType>;
       /**
-       * Minimum bitcoin amount required to register.
+       * Minimum Bitcoin-backed ARGON liquidity required to register and activate.
        **/
       minimumBitcoin: u128 & AugmentedConst<ApiType>;
       /**
@@ -654,6 +658,9 @@ declare module '@polkadot/api-base/types/consts' {
        * Account that holds treasury reserves for claims and reserve-funded payouts.
        **/
       treasuryReservesAccount: AccountId32 & AugmentedConst<ApiType>;
+      upstreamBitcoinTarget: u128 & AugmentedConst<ApiType>;
+      upstreamBitcoinWeight: Permill & AugmentedConst<ApiType>;
+      upstreamBondTarget: u128 & AugmentedConst<ApiType>;
     };
     txPause: {
       /**
@@ -670,6 +677,10 @@ declare module '@polkadot/api-base/types/consts' {
       batchedCallsLimit: u32 & AugmentedConst<ApiType>;
     };
     vaults: {
+      /**
+       * Bitcoin blocks in the term of a newly created Bitcoin lock.
+       **/
+      bitcoinLockDurationBlocks: u64 & AugmentedConst<ApiType>;
       /**
        * Max concurrent cosigns pending per vault
        **/

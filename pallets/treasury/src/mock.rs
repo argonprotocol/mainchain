@@ -1,7 +1,7 @@
 use crate as pallet_treasury;
 use argon_primitives::{
 	providers::{BitcoinMintedProvider, BurnEventHandler},
-	vault::{TreasuryVaultProvider, VaultError, VaultSecuritization},
+	vault::{TreasuryVaultProvider, VaultError, VaultParticipationCapacity, VaultSecuritization},
 	ArgonCPI, OperationalAccountsHook, PriceProvider, TreasuryPoolProvider, MICROGONS_PER_ARGON,
 };
 use frame_support::traits::{Currency, StorageMapShim};
@@ -11,7 +11,7 @@ use pallet_prelude::{
 };
 use sp_core::{crypto::AccountId32, sr25519, Pair};
 use sp_runtime::{traits::IdentifyAccount, MultiSigner};
-use std::collections::HashMap;
+use std::collections::{BTreeMap, HashMap};
 
 type Block = frame_system::mocking::MockBlock<Test>;
 pub type TestAccountId = AccountId32;
@@ -19,32 +19,9 @@ pub type TestAccountId = AccountId32;
 pub struct TestOperationalAccountsHook;
 
 impl OperationalAccountsHook<TestAccountId, Balance> for TestOperationalAccountsHook {
-	fn vault_created_weight() -> Weight {
-		Weight::zero()
-	}
-
-	fn vault_bitcoin_lock_funded_weight() -> Weight {
-		Weight::zero()
-	}
-
-	fn mining_seat_won_weight() -> Weight {
-		Weight::zero()
-	}
-
-	fn account_bitcoin_amount_changed_weight() -> Weight {
-		Weight::zero()
-	}
-
-	fn account_vault_bond_total_updated_weight() -> Weight {
-		Weight::zero()
-	}
-
+	type Weights = ();
 	fn account_vault_bond_total_updated(account_id: &TestAccountId, amount: Balance) {
 		LastOperationalBondTotal::set(Some((account_id.clone(), amount)));
-	}
-
-	fn account_uniswap_argon_transfers_in_updated_weight() -> Weight {
-		Weight::zero()
 	}
 }
 
@@ -53,6 +30,7 @@ frame_support::construct_runtime!(
 	pub enum Test
 	{
 		System: frame_system,
+		TreasuryPositions: pallet_treasury_positions,
 		Treasury: pallet_treasury,
 		Balances: pallet_balances::<Instance1>,
 		Ownership: pallet_balances::<Instance2>,
@@ -213,7 +191,7 @@ pub(crate) fn insert_vault(vault_id: VaultId, vault: TestVault) {
 	VaultsById::mutate(|x| {
 		x.insert(vault_id, vault);
 	});
-	Treasury::vault_securitization_changed(vault_id, securitization);
+	Treasury::vault_securitization_changed(vault_id, securitization).unwrap();
 }
 
 pub struct StaticTreasuryVaultProvider;
@@ -222,6 +200,21 @@ impl TreasuryVaultProvider for StaticTreasuryVaultProvider {
 	type Balance = Balance;
 	type AccountId = TestAccountId;
 
+	fn get_participation_capacity(
+		vault_id: VaultId,
+	) -> Option<VaultParticipationCapacity<Self::Balance>> {
+		let vault = VaultsById::get().get(&vault_id)?.clone();
+		if vault.is_closed {
+			return None;
+		}
+		Some(VaultParticipationCapacity {
+			available_securitization_space: AvailableSecuritizationSpace::get()
+				.get(&vault_id)
+				.copied()
+				.unwrap_or(vault.securitization),
+			regular_bond_capacity: vault.securitization.saturating_sub(vault.exit_notice_amount),
+		})
+	}
 	fn get_vault_securitization(vault_id: VaultId) -> Option<Self::Balance> {
 		VaultsById::get()
 			.get(&vault_id)
@@ -389,6 +382,11 @@ impl MiningFrameTransitionProvider for StaticMiningFrameTransitionProvider {
 }
 
 impl pallet_treasury::Config for Test {
+	type PositionProvider = TreasuryPositions;
+	type OperationalAccountProvider = MockUpstreamAccounts;
+	type UpstreamBitcoinTarget = UpstreamBitcoinTarget;
+	type UpstreamBondTarget = UpstreamBondTarget;
+	type UpstreamBitcoinWeight = UpstreamBitcoinWeight;
 	type WeightInfo = ();
 	type Balance = Balance;
 	type Currency = Balances;
@@ -420,5 +418,33 @@ impl pallet_treasury::Config for Test {
 }
 
 pub(crate) fn new_test_ext() -> TestState {
+	Upstreams::set(BTreeMap::new());
+	AvailableSecuritizationSpace::set(BTreeMap::new());
 	new_test_with_genesis::<Test>(|_t| {})
+}
+
+impl pallet_treasury_positions::Config for Test {
+	type BitcoinPositionProvider = ();
+	type TreasuryPoolProvider = Treasury;
+	type OperationalAccountProvider = MockUpstreamAccounts;
+	type Balance = Balance;
+	type WeightInfo = ();
+}
+
+parameter_types! {
+	pub static Upstreams: BTreeMap<TestAccountId, (TestAccountId, VaultId)> = BTreeMap::new();
+	pub static AvailableSecuritizationSpace: BTreeMap<VaultId, Balance> = BTreeMap::new();
+	pub const UpstreamBitcoinTarget: Balance = 5_000 * MICROGONS_PER_ARGON;
+	pub const UpstreamBondTarget: Balance = 5_000 * MICROGONS_PER_ARGON;
+	pub const UpstreamBitcoinWeight: Permill = Permill::from_percent(50);
+}
+pub struct MockUpstreamAccounts;
+impl argon_primitives::OperationalAccountProvider<TestAccountId> for MockUpstreamAccounts {
+	type Weights = ();
+	fn is_eligible(_: &TestAccountId) -> bool {
+		true
+	}
+	fn upstream_vault(account: &TestAccountId) -> Option<(TestAccountId, VaultId)> {
+		Upstreams::get().get(account).cloned()
+	}
 }

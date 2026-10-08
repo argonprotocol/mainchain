@@ -1,7 +1,10 @@
 use pallet_prelude::*;
 
 use crate::{mock::*, Error, Event, FissionByOwnerAndId, FissionIdsByLockId, NextFissionIdByOwner};
-use argon_primitives::BitcoinFissionsProvider;
+use argon_primitives::{
+	treasury::{PositionQuantities, TreasuryPositionProvider},
+	BitcoinFissionsProvider,
+};
 
 fn lock(owner: u64, funded_satoshis: u64) -> MockLock {
 	MockLock { owner, funded_satoshis, fissioned_satoshis: 0, microgons_at_target_per_btc: 100 }
@@ -22,6 +25,7 @@ fn create_stores_one_lock_allocation_with_an_opaque_liquid_id() {
 		assert_eq!(fission.microgons_at_target_per_btc, 90);
 		assert_eq!(fission.last_ratchet_tick, 1);
 		assert_eq!(fission.liquidity_promised, 3_600);
+		assert_eq!(TreasuryPositions::account_quantities(&1).fission_liquidity, 3_600);
 		assert_eq!(fission.created_at_argon_block, 7);
 		assert_eq!(fission.ratchet_number, 0);
 		assert_eq!(fission.last_updated_argon_block, 7);
@@ -107,6 +111,7 @@ fn close_removes_the_fission_and_preserves_its_mint_entitlement() {
 
 		assert!(!FissionByOwnerAndId::<Test>::contains_key(1, 0));
 		assert_eq!(MockLocks::get(1).expect("lock").fissioned_satoshis, 0);
+		assert_eq!(TreasuryPositions::account_quantities(&1).fission_liquidity, 0);
 		assert!(FissionIdsByLockId::<Test>::get(1).is_empty());
 		assert_eq!(Balances::free_balance(1), 18_000);
 		assert_eq!(MockMintRequests::get(), vec![(1, 0, 1, 3_600)]);
@@ -131,6 +136,7 @@ fn close_rolls_back_when_the_owner_cannot_burn_the_redemption() {
 		);
 
 		assert!(FissionByOwnerAndId::<Test>::contains_key(1, 0));
+		assert_eq!(TreasuryPositions::account_quantities(&1).fission_liquidity, 3_600);
 		assert_eq!(MockLocks::get(1).expect("lock").fissioned_satoshis, 40);
 		assert!(FissionIdsByLockId::<Test>::get(1).contains(&0));
 		assert_eq!(MockMintRequests::get(), vec![(1, 0, 1, 3_600)]);
@@ -173,6 +179,7 @@ fn lock_cleanup_closes_only_active_fissions_and_preserves_pending_mints() {
 		assert_eq!(MockMintRequests::get(), vec![(1, 0, 1, 3_600), (1, 1, 1, 900)]);
 		assert!(!FissionByOwnerAndId::<Test>::contains_key(1, 0));
 		assert!(!FissionByOwnerAndId::<Test>::contains_key(1, 1));
+		assert_eq!(TreasuryPositions::account_quantities(&1).fission_liquidity, 0);
 		assert!(FissionIdsByLockId::<Test>::get(1).is_empty());
 		assert_eq!(
 			MockAccountBitcoinChanges::get(),
@@ -233,6 +240,7 @@ fn up_ratchet_updates_one_fission_when_threshold_and_lock_coverage_allow_it() {
 		assert_eq!(fission.microgons_at_target_per_btc, 110);
 		assert_eq!(fission.last_ratchet_tick, 2);
 		assert_eq!(fission.liquidity_promised, 4_840);
+		assert_eq!(TreasuryPositions::account_quantities(&1).fission_liquidity, 4_840);
 		assert_eq!(fission.ratchet_number, 1);
 		assert_eq!(fission.last_updated_argon_block, 12);
 		assert_eq!(MockMintRequests::get(), vec![(1, 0, 1, 3_600), (1, 0, 1, 1_240)]);
@@ -267,6 +275,7 @@ fn down_ratchet_burns_and_requeues_the_replacement_liability() {
 		assert_eq!(fission.microgons_at_target_per_btc, 80);
 		assert_eq!(fission.last_ratchet_tick, 2);
 		assert_eq!(fission.liquidity_promised, 3_200);
+		assert_eq!(TreasuryPositions::account_quantities(&1).fission_liquidity, 3_200);
 		assert_eq!(fission.ratchet_number, 1);
 		assert_eq!(fission.last_updated_argon_block, 12);
 		assert_eq!(MockMintRequests::get(), vec![(1, 0, 1, 3_600), (1, 0, 1, 3_200)]);
@@ -289,11 +298,15 @@ fn down_ratchet_burns_and_requeues_the_replacement_liability() {
 }
 
 #[test]
-fn registration_provider_sums_active_fission_liability() {
+fn registration_provider_reads_maintained_fission_liquidity() {
 	new_test_ext().execute_with(|| {
 		MockLocks::insert(1, lock(1, 100));
 		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 0, 77, 1, 40, 90));
 		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 1, 77, 1, 10, 90));
+		MockLocks::insert(2, lock(2, 100));
+		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(2), 0, 78, 2, 10, 90));
+		assert_eq!(TreasuryPositions::account_quantities(&2).fission_liquidity, 900);
+		assert_eq!(TreasuryPositions::network_totals().fission_liquidity, 5_400);
 
 		assert_eq!(
 			<BitcoinFissions as BitcoinFissionsProvider<u64, u128>>::get_account_fission_liquidity(
@@ -309,6 +322,53 @@ fn registration_provider_sums_active_fission_liability() {
 			),
 			900
 		);
+		assert_eq!(TreasuryPositions::account_quantities(&2).fission_liquidity, 900);
+		assert_eq!(TreasuryPositions::network_totals().fission_liquidity, 1_800);
+	});
+}
+
+#[test]
+fn create_rolls_back_lock_allocation_and_mint_request_when_liquidity_overflows() {
+	new_test_ext().execute_with(|| {
+		MockLocks::insert(1, lock(1, 100));
+		pallet_treasury_positions::PositionsByAccount::<Test>::insert(
+			1,
+			pallet_treasury_positions::Position {
+				quantities: PositionQuantities {
+					fission_liquidity: u128::MAX,
+					..Default::default()
+				},
+				..Default::default()
+			},
+		);
+		assert_noop!(
+			BitcoinFissions::create(RuntimeOrigin::signed(1), 0, 77, 1, 40, 90),
+			sp_runtime::ArithmeticError::Overflow
+		);
+		assert_eq!(MockLocks::get(1).unwrap().fissioned_satoshis, 0);
+		assert!(MockMintRequests::get().is_empty());
+		assert_eq!(TreasuryPositions::account_quantities(&1).fission_liquidity, u128::MAX);
+	});
+}
+
+#[test]
+fn terminal_cleanup_rolls_back_all_fissions_in_the_callers_storage_layer() {
+	new_test_ext().execute_with(|| {
+		MockLocks::insert(1, lock(1, 100));
+		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 0, 77, 1, 40, 90));
+		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 1, 77, 1, 10, 90));
+		// The first removal can succeed, but the second detects the inconsistent account total.
+		pallet_treasury_positions::PositionsByAccount::<Test>::mutate(1, |position| {
+			position.as_mut().unwrap().quantities.fission_liquidity = 3_600;
+		});
+		assert_noop!(
+			with_storage_layer(|| {
+				<BitcoinFissions as BitcoinFissionsProvider<u64, u128>>::close_for_lock(&1, 1, 0)
+			}),
+			sp_runtime::ArithmeticError::Underflow
+		);
+		assert_eq!(FissionIdsByLockId::<Test>::get(1).len(), 2);
+		assert_eq!(TreasuryPositions::account_quantities(&1).fission_liquidity, 3_600);
 	});
 }
 
@@ -356,5 +416,23 @@ fn down_ratchet_rolls_back_when_the_owner_cannot_burn_the_replacement_liability(
 		assert_eq!(FissionByOwnerAndId::<Test>::get(1, 0), Some(original));
 		assert_eq!(MockMintRequests::get(), original_mint_requests);
 		assert_eq!(Balances::free_balance(1), 100);
+	});
+}
+
+#[test]
+fn creation_rolls_back_when_the_network_fission_quantity_overflows() {
+	new_test_ext().execute_with(|| {
+		MockLocks::insert(1, lock(1, 100));
+		pallet_treasury_positions::NetworkTotals::<Test>::put(PositionQuantities {
+			fission_liquidity: u128::MAX,
+			..Default::default()
+		});
+		assert_noop!(
+			BitcoinFissions::create(RuntimeOrigin::signed(1), 0, 77, 1, 40, 90),
+			sp_runtime::ArithmeticError::Overflow
+		);
+		assert_eq!(TreasuryPositions::account_quantities(&1).fission_liquidity, 0);
+		assert_eq!(MockLocks::get(1).unwrap().fissioned_satoshis, 0);
+		assert!(MockMintRequests::get().is_empty());
 	});
 }

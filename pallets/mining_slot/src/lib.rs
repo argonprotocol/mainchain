@@ -411,8 +411,11 @@ pub mod pallet {
 					.saturating_add(T::WeightInfo::on_finalize_frame_adjustments())
 					.saturating_add(T::SlotEvents::on_frame_start_weight(frame_id))
 					.saturating_add(
-						T::OperationalAccountsHook::mining_seat_won_weight()
-							.saturating_mul(cohort_size as u64),
+						<T::OperationalAccountsHook as OperationalAccountsHook<
+							T::AccountId,
+							T::Balance,
+						>>::Weights::mining_seat_won()
+						.saturating_mul(cohort_size as u64),
 					);
 			} else if Self::should_rotate_grandpas(n) {
 				weight = weight.saturating_add(T::WeightInfo::on_finalize_grandpa_rotation());

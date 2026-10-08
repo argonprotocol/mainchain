@@ -1,6 +1,7 @@
 use super::prelude::*;
 use argon_primitives::{EthereumBlockNumber, MICROGONS_PER_ARGON};
 use pallet_transaction_payment::Multiplier;
+use polkadot_sdk::sp_runtime::Permill;
 use smallvec::smallvec;
 use sp_runtime::traits::{AccountIdConversion, One};
 
@@ -109,6 +110,14 @@ parameter_types! {
 	pub const PercentForVaultPool: Percent = Percent::from_percent(51);
 	pub const DefaultTargetBitcoinPercent: Percent = Percent::from_percent(15);
 	pub const MaxArgonotBondedPercentOfCirculation: Percent = Percent::from_percent(60);
+	/// Activated upstream Bitcoin securitization, in microgons, required for full vault earnings.
+	pub TreasuryUpstreamBitcoinForFullEarnings: Balance =
+		OperationalMinimumBitcoinLiquidity::get().saturating_mul(2);
+	/// Active upstream ARGON bond principal, in microgons, required for full vault earnings.
+	pub TreasuryUpstreamBondsForFullEarnings: Balance =
+		OperationalMinimumVaultBondPrincipal::get().saturating_mul(2);
+	/// Bitcoin's share of the upstream participation factor applied to vault earnings.
+	pub const TreasuryUpstreamBitcoinEarningsWeight: Permill = Permill::from_percent(50);
 
 	// ### pallet_mining_slot
 	pub const FramesPerMiningTerm: u32 = 10;
@@ -259,10 +268,12 @@ parameter_types! {
 	pub const OperationalMaxRewardsQueued: u32 = 1_000;
 	/// Minimum Uniswap transfer amount required to register.
 	pub const MinimumUniswapTransfer: Balance = 250 * MICROGONS_PER_ARGON;
-	/// Minimum bitcoin amount required to register.
-	pub const MinimumBitcoin: Balance = 500 * MICROGONS_PER_ARGON;
-	/// Minimum bond amount required to register.
-	pub const MinimumBonds: Balance = 200 * MICROGONS_PER_ARGON;
+	/// Minimum Bitcoin-backed ARGON liquidity, in microgons, required to register and activate.
+	pub const OperationalMinimumBitcoinLiquidity: Balance = 2_500 * MICROGONS_PER_ARGON;
+	/// Bitcoin valuation tolerance for the liquidity minimum at registration and activation.
+	pub const OperationalBitcoinLiquidityTolerance: Percent = Percent::from_percent(1);
+	/// Minimum active ARGON vault bond principal, in microgons, required to register and activate.
+	pub const OperationalMinimumVaultBondPrincipal: Balance = 2_500 * MICROGONS_PER_ARGON;
 	/// Minimum total Uniswap transfer amount required for operational certification.
 	pub const OperationalMinimumUniswapTransfer: Balance = 3_000 * MICROGONS_PER_ARGON;
 	/// Minimum vault securitization (base units) required to become operational.

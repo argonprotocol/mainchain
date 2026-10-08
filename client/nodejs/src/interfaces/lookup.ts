@@ -4101,6 +4101,7 @@ export default {
     bitcoinLockedMicrogons: 'Compact<u128>',
     argonotSecuritizationInMicrogons: 'Compact<u128>',
     activeBondMicrogons: 'Compact<u128>',
+    upstreamParticipation: 'u128',
   },
   /**
    * Lookup549: pallet_treasury::pallet::FrameArgonotBondParticipants<T>
@@ -4539,55 +4540,80 @@ export default {
     _enum: ['EncryptedPayloadTooLong', 'InvalidRecoveryProof', 'EndpointOwnedByAnotherAccount'],
   },
   /**
-   * Lookup613: frame_system::extensions::authorize_call::AuthorizeCall<T>
+   * Lookup611: pallet_treasury_positions::pallet::Position<Balance>
+   **/
+  PalletTreasuryPositionsPosition: {
+    bondPrincipal: 'Compact<u128>',
+    quantities: 'ArgonPrimitivesTreasuryPositionQuantities',
+    upstream: 'Option<ArgonPrimitivesTreasuryUpstreamPosition>',
+  },
+  /**
+   * Lookup612: argon_primitives::treasury::PositionQuantities<Balance>
+   **/
+  ArgonPrimitivesTreasuryPositionQuantities: {
+    bonds: 'Compact<u128>',
+    stakes: 'Compact<u128>',
+    fissionLiquidity: 'Compact<u128>',
+  },
+  /**
+   * Lookup614: argon_primitives::treasury::UpstreamPosition<Balance>
+   **/
+  ArgonPrimitivesTreasuryUpstreamPosition: {
+    vaultId: 'Compact<u32>',
+    bitcoinSecuritization: 'Compact<u128>',
+    bitcoinAllocatedSecuritization: 'Compact<u128>',
+    bondPrincipal: 'Compact<u128>',
+  },
+  /**
+   * Lookup617: frame_system::extensions::authorize_call::AuthorizeCall<T>
    **/
   FrameSystemExtensionsAuthorizeCall: 'Null',
   /**
-   * Lookup614: frame_system::extensions::check_non_zero_sender::CheckNonZeroSender<T>
+   * Lookup618: frame_system::extensions::check_non_zero_sender::CheckNonZeroSender<T>
    **/
   FrameSystemExtensionsCheckNonZeroSender: 'Null',
   /**
-   * Lookup615: frame_system::extensions::check_spec_version::CheckSpecVersion<T>
+   * Lookup619: frame_system::extensions::check_spec_version::CheckSpecVersion<T>
    **/
   FrameSystemExtensionsCheckSpecVersion: 'Null',
   /**
-   * Lookup616: frame_system::extensions::check_tx_version::CheckTxVersion<T>
+   * Lookup620: frame_system::extensions::check_tx_version::CheckTxVersion<T>
    **/
   FrameSystemExtensionsCheckTxVersion: 'Null',
   /**
-   * Lookup617: frame_system::extensions::check_genesis::CheckGenesis<T>
+   * Lookup621: frame_system::extensions::check_genesis::CheckGenesis<T>
    **/
   FrameSystemExtensionsCheckGenesis: 'Null',
   /**
-   * Lookup620: frame_system::extensions::check_nonce::CheckNonce<T>
+   * Lookup624: frame_system::extensions::check_nonce::CheckNonce<T>
    **/
   FrameSystemExtensionsCheckNonce: 'Compact<u32>',
   /**
-   * Lookup621: frame_system::extensions::check_weight::CheckWeight<T>
+   * Lookup625: frame_system::extensions::check_weight::CheckWeight<T>
    **/
   FrameSystemExtensionsCheckWeight: 'Null',
   /**
-   * Lookup622: pallet_transaction_payment::ChargeTransactionPayment<T>
+   * Lookup626: pallet_transaction_payment::ChargeTransactionPayment<T>
    **/
   PalletTransactionPaymentChargeTransactionPayment: 'Compact<u128>',
   /**
-   * Lookup623: frame_metadata_hash_extension::CheckMetadataHash<T>
+   * Lookup627: frame_metadata_hash_extension::CheckMetadataHash<T>
    **/
   FrameMetadataHashExtensionCheckMetadataHash: {
     mode: 'FrameMetadataHashExtensionMode',
   },
   /**
-   * Lookup624: frame_metadata_hash_extension::Mode
+   * Lookup628: frame_metadata_hash_extension::Mode
    **/
   FrameMetadataHashExtensionMode: {
     _enum: ['Disabled', 'Enabled'],
   },
   /**
-   * Lookup625: frame_system::extensions::weight_reclaim::WeightReclaim<T>
+   * Lookup629: frame_system::extensions::weight_reclaim::WeightReclaim<T>
    **/
   FrameSystemExtensionsWeightReclaim: 'Null',
   /**
-   * Lookup627: argon_runtime::Runtime
+   * Lookup631: argon_runtime::Runtime
    **/
   ArgonRuntimeRuntime: 'Null',
 };

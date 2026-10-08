@@ -132,6 +132,8 @@ mod runtime {
 	pub type CrosschainTransfer = pallet_crosschain_transfer;
 	#[runtime::pallet_index(37)]
 	pub type Bootstrap = pallet_bootstrap;
+	#[runtime::pallet_index(38)]
+	pub type TreasuryPositions = pallet_treasury_positions;
 }
 
 argon_runtime_common::inject_runtime_vars!();
@@ -306,6 +308,7 @@ impl pallet_vaults::Config for Runtime {
 	type RevenueCollectionExpirationFrames = LockReleaseCosignDeadlineFrames;
 	type OperationalMinimumVaultSecuritization = OperationalMinimumVaultSecuritization;
 	type SecuritizationExitNoticeBlocks = BitcoinLockDurationBlocks;
+	type BitcoinLockDurationBlocks = BitcoinLockDurationBlocks;
 	type OperationalAccountsHook = use_unless_benchmark!(OperationalAccounts, ());
 	type TreasuryPoolProvider = Treasury;
 	type OperationalAccountProvider = use_unless_benchmark!(
@@ -337,6 +340,7 @@ impl pallet_bitcoin_locks::Config for Runtime {
 		weights::pallet_bitcoin_locks::WeightInfo<Runtime>,
 	>;
 	type Balance = Balance;
+	type PositionProvider = use_unless_benchmark!(TreasuryPositions, ());
 	type FissionsProvider = BitcoinFissions;
 	type Currency = Balances;
 	type RuntimeHoldReason = RuntimeHoldReason;
@@ -433,6 +437,14 @@ impl pallet_treasury::Config for Runtime {
 		Vaults,
 		benchmarking::BenchmarkBitcoinVaultProvider<Balances, AccountId, Balance>
 	);
+	type PositionProvider = use_unless_benchmark!(TreasuryPositions, benchmarking::BenchmarkTreasuryPositionProvider<AccountId, Balance>);
+	type OperationalAccountProvider = use_unless_benchmark!(
+		OperationalAccounts,
+		benchmarking::BenchmarkOperationalAccountProvider<AccountId>
+	);
+	type UpstreamBitcoinTarget = TreasuryUpstreamBitcoinForFullEarnings;
+	type UpstreamBondTarget = TreasuryUpstreamBondsForFullEarnings;
+	type UpstreamBitcoinWeight = TreasuryUpstreamBitcoinEarningsWeight;
 	type BitcoinMintedProvider = Mint;
 	type PriceProvider =
 		use_unless_benchmark!(PriceIndex, benchmarking::BenchmarkPriceProvider<Balance>);
@@ -652,6 +664,7 @@ impl pallet_bitcoin_utxos::Config for Runtime {
 }
 
 impl pallet_bitcoin_fissions::Config for Runtime {
+	type PositionProvider = use_unless_benchmark!(TreasuryPositions, ());
 	type WeightInfo = pallet_bitcoin_fissions::WithProviderWeights<
 		Runtime,
 		weights::pallet_bitcoin_fissions::WeightInfo<Runtime>,
@@ -777,8 +790,9 @@ impl pallet_operational_accounts::Config for Runtime {
 	type MaxAvailableAccessCodes = MaxAvailableOperationalAccessCodes;
 	type MaxAccessCodeAwardsPerFrame = MaxOperationalAccessCodeAwardsPerFrame;
 	type MinimumUniswapTransfer = MinimumUniswapTransfer;
-	type MinimumBitcoin = MinimumBitcoin;
-	type MinimumBonds = MinimumBonds;
+	type MinimumBitcoin = OperationalMinimumBitcoinLiquidity;
+	type BitcoinLiquidityTolerance = OperationalBitcoinLiquidityTolerance;
+	type MinimumBonds = OperationalMinimumVaultBondPrincipal;
 	type OperationalMinimumUniswapTransfer = OperationalMinimumUniswapTransfer;
 	type OperationalMinimumVaultSecuritization = OperationalMinimumVaultSecuritization;
 	type BitcoinLockSizeForAccessCode = BitcoinLockSizeForAccessCode;
@@ -795,6 +809,7 @@ impl pallet_operational_accounts::Config for Runtime {
 		MiningSlot,
 		benchmarking::BenchmarkOperationalAccountsMiningSlotProvider<AccountId>
 	);
+	type PositionProvider = use_unless_benchmark!(TreasuryPositions, ());
 	type BitcoinFissionsProvider = use_unless_benchmark!(
 		BitcoinFissions,
 		benchmarking::BenchmarkOperationalAccountsBitcoinFissionsProvider<AccountId, Balance>
@@ -833,4 +848,15 @@ impl pallet_fee_control::Config for Runtime {
 	type CallTxValidityProviders = (EthereumVerifier, CrosschainTransfer);
 	type TransactionSponsorProviders = MiningBidProxyFeeSponsor<Runtime>;
 	type CallFeeRefundProviders = VaultAdminFeeRefundPolicy;
+}
+
+impl pallet_treasury_positions::Config for Runtime {
+	type BitcoinPositionProvider = use_unless_benchmark!(BitcoinLocks, ());
+	type TreasuryPoolProvider = use_unless_benchmark!(Treasury, ());
+	type OperationalAccountProvider = use_unless_benchmark!(
+		OperationalAccounts,
+		benchmarking::BenchmarkOperationalAccountProvider<AccountId>
+	);
+	type Balance = Balance;
+	type WeightInfo = weights::pallet_treasury_positions::WeightInfo<Runtime>;
 }

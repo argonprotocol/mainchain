@@ -2,7 +2,7 @@
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
-import '@polkadot/api-base/types/storage';
+import type {} from '@polkadot/api-base/types/storage';
 
 import type { ApiTypes, AugmentedQuery, QueryableStorageEntry } from '@polkadot/api-base/types';
 import type {
@@ -50,6 +50,7 @@ import type {
   ArgonPrimitivesNotaryNotaryRecord,
   ArgonPrimitivesProvidersBlockSealerInfo,
   ArgonPrimitivesTickTicker,
+  ArgonPrimitivesTreasuryPositionQuantities,
   ArgonPrimitivesVault,
   ArgonPrimitivesVaultVaultArgonotSecuritization,
   FrameSupportDispatchPerDispatchClassWeight,
@@ -112,6 +113,7 @@ import type {
   PalletTreasuryBondLotSummary,
   PalletTreasuryFrameArgonotBondParticipants,
   PalletTreasuryFrameVaultCapital,
+  PalletTreasuryPositionsPosition,
   PalletTreasuryVaultBondState,
   PalletVaultsVaultFrameRevenue,
   SpConsensusGrandpaAppPublic,
@@ -1826,9 +1828,7 @@ declare module '@polkadot/api-base/types/storage' {
         []
       >;
       /**
-       * The vault capital locked for the current frame.
-       *
-       * Payout uses this for the network bond total and participating vault positions.
+       * The network bond total and vault capital locked for the current frame's payout.
        **/
       currentFrameVaultCapital: AugmentedQuery<
         ApiType,
@@ -1877,14 +1877,32 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       targetBitcoinPercent: AugmentedQuery<ApiType, () => Observable<Percent>, []>;
       /**
-       * The total number of active Argonot bonds in the active set.
-       **/
-      totalActiveArgonotBonds: AugmentedQuery<ApiType, () => Observable<u32>, []>;
-      /**
        * Live Argon bond lots, including those awaiting release; stakes have a separate admission
        * limit.
        **/
       totalArgonBondLots: AugmentedQuery<ApiType, () => Observable<u32>, []>;
+    };
+    treasuryPositions: {
+      /**
+       * Maintained network quantities, updated together with their account contributions.
+       * Treasury reads these when freezing frame inputs. This replaces its live Argonot stake total.
+       **/
+      networkTotals: AugmentedQuery<
+        ApiType,
+        () => Observable<ArgonPrimitivesTreasuryPositionQuantities>,
+        []
+      >;
+      /**
+       * Maintained source quantities keyed by the actual position owner. Upstream quantities belong
+       * to the linked vault account; primary and mining account balances are separate owners.
+       **/
+      positionsByAccount: AugmentedQuery<
+        ApiType,
+        (
+          arg: AccountId32 | string | Uint8Array,
+        ) => Observable<Option<PalletTreasuryPositionsPosition>>,
+        [AccountId32]
+      >;
     };
     txPause: {
       /**

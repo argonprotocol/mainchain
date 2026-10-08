@@ -50,6 +50,7 @@ pub mod note;
 pub mod notebook;
 pub mod providers;
 pub mod tick;
+pub mod treasury;
 
 pub mod argon_utils;
 

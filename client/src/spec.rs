@@ -6,7 +6,7 @@ pub mod api {
 	mod root_mod {
 		pub use super::*;
 	}
-	pub static PALLETS: [&str; 34usize] = [
+	pub static PALLETS: [&str; 35usize] = [
 		"System",
 		"Digests",
 		"Timestamp",
@@ -41,6 +41,7 @@ pub mod api {
 		"EthereumVerifier",
 		"CrosschainTransfer",
 		"Bootstrap",
+		"TreasuryPositions",
 	];
 	pub static RUNTIME_APIS: [&str; 21usize] = [
 		"Core",
@@ -3387,6 +3388,9 @@ pub mod api {
 		pub fn bootstrap(&self) -> bootstrap::storage::StorageApi {
 			bootstrap::storage::StorageApi
 		}
+		pub fn treasury_positions(&self) -> treasury_positions::storage::StorageApi {
+			treasury_positions::storage::StorageApi
+		}
 	}
 	pub struct TransactionApi;
 	impl TransactionApi {
@@ -3496,9 +3500,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				153u8, 55u8, 47u8, 28u8, 194u8, 182u8, 9u8, 191u8, 110u8, 203u8, 156u8, 3u8, 168u8,
-				192u8, 106u8, 213u8, 210u8, 205u8, 231u8, 222u8, 117u8, 20u8, 111u8, 22u8, 114u8,
-				85u8, 47u8, 85u8, 192u8, 238u8, 43u8, 253u8,
+				6u8, 152u8, 208u8, 28u8, 132u8, 199u8, 108u8, 190u8, 252u8, 52u8, 187u8, 207u8,
+				51u8, 115u8, 4u8, 158u8, 102u8, 41u8, 50u8, 94u8, 199u8, 55u8, 133u8, 132u8, 208u8,
+				64u8, 54u8, 185u8, 54u8, 80u8, 86u8, 79u8,
 			]
 	}
 	pub mod system {
@@ -10905,6 +10909,23 @@ pub mod api {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"Vaults",
 						"SecuritizationExitNoticeBlocks",
+						[
+							128u8, 214u8, 205u8, 242u8, 181u8, 142u8, 124u8, 231u8, 190u8, 146u8,
+							59u8, 226u8, 157u8, 101u8, 103u8, 117u8, 249u8, 65u8, 18u8, 191u8,
+							103u8, 119u8, 53u8, 85u8, 81u8, 96u8, 220u8, 42u8, 184u8, 239u8, 42u8,
+							246u8,
+						],
+					)
+				}
+				#[doc = " Bitcoin blocks in the term of a newly created Bitcoin lock."]
+				pub fn bitcoin_lock_duration_blocks(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u64,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"Vaults",
+						"BitcoinLockDurationBlocks",
 						[
 							128u8, 214u8, 205u8, 242u8, 181u8, 142u8, 124u8, 231u8, 190u8, 146u8,
 							59u8, 226u8, 157u8, 101u8, 103u8, 117u8, 249u8, 65u8, 18u8, 191u8,
@@ -23845,16 +23866,10 @@ pub mod api {
 							runtime_types::pallet_treasury::pallet::BondLotSummary,
 						>;
 				}
-				pub mod total_active_argonot_bonds {
-					use super::runtime_types;
-					pub type TotalActiveArgonotBonds = ::core::primitive::u32;
-				}
 			}
 			pub struct StorageApi;
 			impl StorageApi {
-				#[doc = " The vault capital locked for the current frame."]
-				#[doc = ""]
-				#[doc = " Payout uses this for the network bond total and participating vault positions."]
+				#[doc = " The network bond total and vault capital locked for the current frame's payout."]
 				pub fn current_frame_vault_capital(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
@@ -23869,9 +23884,10 @@ pub mod api {
 						"CurrentFrameVaultCapital",
 						(),
 						[
-							199u8, 254u8, 168u8, 13u8, 69u8, 137u8, 254u8, 141u8, 63u8, 18u8, 10u8,
-							218u8, 183u8, 56u8, 247u8, 25u8, 114u8, 6u8, 156u8, 14u8, 206u8, 105u8,
-							121u8, 108u8, 105u8, 105u8, 237u8, 182u8, 65u8, 237u8, 179u8, 64u8,
+							142u8, 61u8, 13u8, 197u8, 149u8, 190u8, 225u8, 121u8, 255u8, 50u8,
+							30u8, 20u8, 239u8, 32u8, 173u8, 54u8, 178u8, 164u8, 136u8, 245u8,
+							191u8, 50u8, 58u8, 243u8, 169u8, 178u8, 97u8, 128u8, 24u8, 62u8, 128u8,
+							8u8,
 						],
 					)
 				}
@@ -24397,34 +24413,57 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " The total number of active Argonot bonds in the active set."]
-				pub fn total_active_argonot_bonds(
-					&self,
-				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
-					(),
-					types::total_active_argonot_bonds::TotalActiveArgonotBonds,
-					::subxt::ext::subxt_core::utils::Yes,
-					::subxt::ext::subxt_core::utils::Yes,
-					(),
-				> {
-					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"Treasury",
-						"TotalActiveArgonotBonds",
-						(),
-						[
-							225u8, 48u8, 250u8, 219u8, 126u8, 30u8, 210u8, 39u8, 169u8, 154u8,
-							121u8, 178u8, 44u8, 248u8, 205u8, 232u8, 196u8, 230u8, 165u8, 116u8,
-							115u8, 169u8, 105u8, 245u8, 140u8, 61u8, 132u8, 208u8, 116u8, 191u8,
-							198u8, 226u8,
-						],
-					)
-				}
 			}
 		}
 		pub mod constants {
 			use super::runtime_types;
 			pub struct ConstantsApi;
 			impl ConstantsApi {
+				pub fn upstream_bitcoin_target(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u128,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"Treasury",
+						"UpstreamBitcoinTarget",
+						[
+							84u8, 157u8, 140u8, 4u8, 93u8, 57u8, 29u8, 133u8, 105u8, 200u8, 214u8,
+							27u8, 144u8, 208u8, 218u8, 160u8, 130u8, 109u8, 101u8, 54u8, 210u8,
+							136u8, 71u8, 63u8, 49u8, 237u8, 234u8, 15u8, 178u8, 98u8, 148u8, 156u8,
+						],
+					)
+				}
+				pub fn upstream_bond_target(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u128,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"Treasury",
+						"UpstreamBondTarget",
+						[
+							84u8, 157u8, 140u8, 4u8, 93u8, 57u8, 29u8, 133u8, 105u8, 200u8, 214u8,
+							27u8, 144u8, 208u8, 218u8, 160u8, 130u8, 109u8, 101u8, 54u8, 210u8,
+							136u8, 71u8, 63u8, 49u8, 237u8, 234u8, 15u8, 178u8, 98u8, 148u8, 156u8,
+						],
+					)
+				}
+				pub fn upstream_bitcoin_weight(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					runtime_types::sp_arithmetic::per_things::Permill,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"Treasury",
+						"UpstreamBitcoinWeight",
+						[
+							65u8, 93u8, 120u8, 165u8, 204u8, 81u8, 159u8, 163u8, 93u8, 135u8,
+							114u8, 121u8, 147u8, 35u8, 215u8, 213u8, 4u8, 223u8, 83u8, 37u8, 225u8,
+							200u8, 189u8, 156u8, 140u8, 36u8, 58u8, 46u8, 42u8, 232u8, 155u8, 0u8,
+						],
+					)
+				}
 				#[doc = " The minimum whole-bond purchase amount."]
 				pub fn minimum_argons_per_contributor(
 					&self,
@@ -25572,7 +25611,7 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Minimum bitcoin amount required to register."]
+				#[doc = " Minimum Bitcoin-backed ARGON liquidity required to register and activate."]
 				pub fn minimum_bitcoin(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
@@ -25585,6 +25624,23 @@ pub mod api {
 							84u8, 157u8, 140u8, 4u8, 93u8, 57u8, 29u8, 133u8, 105u8, 200u8, 214u8,
 							27u8, 144u8, 208u8, 218u8, 160u8, 130u8, 109u8, 101u8, 54u8, 210u8,
 							136u8, 71u8, 63u8, 49u8, 237u8, 234u8, 15u8, 178u8, 98u8, 148u8, 156u8,
+						],
+					)
+				}
+				#[doc = " Allowed Bitcoin valuation shortfall below the liquidity minimum."]
+				pub fn bitcoin_liquidity_tolerance(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					runtime_types::sp_arithmetic::per_things::Percent,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"OperationalAccounts",
+						"BitcoinLiquidityTolerance",
+						[
+							40u8, 171u8, 69u8, 196u8, 34u8, 184u8, 50u8, 128u8, 139u8, 192u8, 63u8,
+							231u8, 249u8, 200u8, 252u8, 73u8, 244u8, 170u8, 51u8, 177u8, 106u8,
+							47u8, 114u8, 234u8, 84u8, 104u8, 62u8, 118u8, 227u8, 50u8, 225u8,
+							122u8,
 						],
 					)
 				}
@@ -29380,6 +29436,103 @@ pub mod api {
 			}
 		}
 	}
+	pub mod treasury_positions {
+		use super::{root_mod, runtime_types};
+		pub mod storage {
+			use super::runtime_types;
+			pub mod types {
+				use super::runtime_types;
+				pub mod positions_by_account {
+					use super::runtime_types;
+					pub type PositionsByAccount =
+						runtime_types::pallet_treasury_positions::pallet::Position<
+							::core::primitive::u128,
+						>;
+					pub type Param0 = crate::types::AccountId32;
+				}
+				pub mod network_totals {
+					use super::runtime_types;
+					pub type NetworkTotals =
+						runtime_types::argon_primitives::treasury::PositionQuantities<
+							::core::primitive::u128,
+						>;
+				}
+			}
+			pub struct StorageApi;
+			impl StorageApi {
+				#[doc = " Maintained source quantities keyed by the actual position owner. Upstream quantities belong"]
+				#[doc = " to the linked vault account; primary and mining account balances are separate owners."]
+				pub fn positions_by_account_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::positions_by_account::PositionsByAccount,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"TreasuryPositions",
+						"PositionsByAccount",
+						(),
+						[
+							108u8, 81u8, 66u8, 3u8, 97u8, 49u8, 19u8, 17u8, 213u8, 198u8, 226u8,
+							222u8, 79u8, 172u8, 85u8, 114u8, 156u8, 163u8, 112u8, 155u8, 156u8,
+							164u8, 73u8, 56u8, 239u8, 72u8, 205u8, 84u8, 35u8, 142u8, 173u8, 165u8,
+						],
+					)
+				}
+				#[doc = " Maintained source quantities keyed by the actual position owner. Upstream quantities belong"]
+				#[doc = " to the linked vault account; primary and mining account balances are separate owners."]
+				pub fn positions_by_account(
+					&self,
+					_0: types::positions_by_account::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::positions_by_account::Param0,
+					>,
+					types::positions_by_account::PositionsByAccount,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"TreasuryPositions",
+						"PositionsByAccount",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							108u8, 81u8, 66u8, 3u8, 97u8, 49u8, 19u8, 17u8, 213u8, 198u8, 226u8,
+							222u8, 79u8, 172u8, 85u8, 114u8, 156u8, 163u8, 112u8, 155u8, 156u8,
+							164u8, 73u8, 56u8, 239u8, 72u8, 205u8, 84u8, 35u8, 142u8, 173u8, 165u8,
+						],
+					)
+				}
+				#[doc = " Maintained network quantities, updated together with their account contributions."]
+				#[doc = " Treasury reads these when freezing frame inputs. This replaces its live Argonot stake total."]
+				pub fn network_totals(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::network_totals::NetworkTotals,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"TreasuryPositions",
+						"NetworkTotals",
+						(),
+						[
+							112u8, 176u8, 248u8, 236u8, 183u8, 99u8, 249u8, 220u8, 206u8, 230u8,
+							66u8, 146u8, 231u8, 150u8, 19u8, 65u8, 84u8, 155u8, 250u8, 248u8,
+							234u8, 234u8, 135u8, 81u8, 150u8, 215u8, 204u8, 197u8, 228u8, 182u8,
+							19u8, 117u8,
+						],
+					)
+				}
+			}
+		}
+	}
 	pub mod runtime_types {
 		use super::runtime_types;
 		pub mod argon_notary_audit {
@@ -31077,6 +31230,51 @@ pub mod api {
 					pub tick_duration_millis: ::core::primitive::u64,
 					#[codec(compact)]
 					pub channel_hold_expiration_ticks: ::core::primitive::u64,
+				}
+			}
+			pub mod treasury {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct PositionQuantities<_0> {
+					#[codec(compact)]
+					pub bonds: _0,
+					#[codec(compact)]
+					pub stakes: _0,
+					#[codec(compact)]
+					pub fission_liquidity: _0,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct UpstreamPosition<_0> {
+					#[codec(compact)]
+					pub vault_id: ::core::primitive::u32,
+					#[codec(compact)]
+					pub bitcoin_securitization: _0,
+					#[codec(compact)]
+					pub bitcoin_allocated_securitization: _0,
+					#[codec(compact)]
+					pub bond_principal: _0,
 				}
 			}
 			pub mod vault {
@@ -38604,6 +38802,35 @@ pub mod api {
 					pub argonot_securitization_in_microgons: ::core::primitive::u128,
 					#[codec(compact)]
 					pub active_bond_microgons: ::core::primitive::u128,
+					pub upstream_participation:
+						runtime_types::sp_arithmetic::fixed_point::FixedU128,
+				}
+			}
+		}
+		pub mod pallet_treasury_positions {
+			use super::runtime_types;
+			pub mod pallet {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct Position<_0> {
+					#[codec(compact)]
+					pub bond_principal: _0,
+					pub quantities:
+						runtime_types::argon_primitives::treasury::PositionQuantities<_0>,
+					pub upstream: ::core::option::Option<
+						runtime_types::argon_primitives::treasury::UpstreamPosition<_0>,
+					>,
 				}
 			}
 		}

@@ -33,6 +33,7 @@ pub trait BitcoinVaultProviderWeightInfo {
 	fn burn_encumbered_argonots() -> Weight;
 	fn account_became_operational() -> Weight;
 	fn set_bitcoin_lock_flexible() -> Weight;
+	fn reserve_securitization() -> Weight;
 	fn resecuritize() -> Weight;
 	fn burn() -> Weight;
 }
@@ -67,6 +68,10 @@ impl BitcoinVaultProviderWeightInfo for () {
 	}
 
 	fn set_bitcoin_lock_flexible() -> Weight {
+		Weight::zero()
+	}
+
+	fn reserve_securitization() -> Weight {
 		Weight::zero()
 	}
 
@@ -192,7 +197,25 @@ where
 pub type VaultSecuritizationRanking<Balance, AccountId> =
 	(Vec<VaultSecuritization<Balance, AccountId>>, Balance);
 
+/// Public participation capacity in an open vault, denominated in microgons.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct VaultParticipationCapacity<Balance> {
+	/// Additional collateral available for a new regular Bitcoin lock's term, including
+	/// replaceable flexible collateral and respecting reserved space and withdrawal deadlines.
+	pub available_securitization_space: Balance,
+	/// Total regular-bond admission capacity after withdrawal notices. Treasury subtracts
+	/// existing regular bonds and reserved space. Flexible bonds can be displaced by new
+	/// purchases.
+	pub regular_bond_capacity: Balance,
+}
+
 pub trait TreasuryVaultProviderWeightInfo {
+	fn get_vault_operator() -> Weight {
+		Weight::zero()
+	}
+	fn get_participation_capacity() -> Weight {
+		Weight::zero()
+	}
 	fn get_top_vaults_by_securitization(vaults: u32) -> Weight;
 	fn commit_securitization_for_bonds() -> Weight;
 	fn commit_securitization_for_rewards() -> Weight;
@@ -222,6 +245,12 @@ pub trait TreasuryVaultProvider {
 	type Balance: Codec;
 	type AccountId: Codec;
 
+	/// Public admission capacity for upstream participation; unavailable vaults return `None`.
+	fn get_participation_capacity(
+		_vault_id: VaultId,
+	) -> Option<VaultParticipationCapacity<Self::Balance>> {
+		None
+	}
 	/// Get raw Argon securitization for an open vault.
 	fn get_vault_securitization(vault_id: VaultId) -> Option<Self::Balance>;
 	/// Put securitization backing regular bonds into the normal withdrawal-notice flow.
@@ -1084,10 +1113,9 @@ impl<
 		lock_expiration: BitcoinHeight,
 	) -> Result<(), VaultError> {
 		let collateral_required = securitization.collateral_required();
-		ensure!(
-			collateral_required <= self.available_securitization_space(may_use_flexible_space),
-			VaultError::InsufficientVaultFunds
-		);
+		let available =
+			self.available_securitization_space(may_use_flexible_space, Some(lock_expiration));
+		ensure!(collateral_required <= available, VaultError::InsufficientVaultFunds);
 
 		let remaining = self.use_relockable_securitization(collateral_required, None);
 		self.securitization_locked.saturating_accrue(remaining);
@@ -1123,7 +1151,7 @@ impl<
 		let available_securitization = if is_flexible {
 			self.securitization_space().saturating_sub(self.flexible_securitization_locked)
 		} else {
-			self.available_securitization_space(may_use_flexible_space)
+			self.available_securitization_space(may_use_flexible_space, None)
 		};
 		ensure!(
 			collateral_required <= available_securitization,
@@ -1522,15 +1550,82 @@ impl<
 			.sum()
 	}
 
-	pub fn available_securitization_space(&self, may_use_flexible_space: bool) -> Balance {
-		let available = self
+	/// Collateral available after existing locks and reserved space. With a new lock's maturity,
+	/// also limit it to the amount that can remain committed through scheduled withdrawals.
+	/// Reservation and upstream participation use the same maturity-aware admission limit.
+	pub fn available_securitization_space(
+		&self,
+		may_use_flexible_space: bool,
+		lock_expiration: Option<BitcoinHeight>,
+	) -> Balance {
+		let mut available = self
 			.securitization
 			.saturating_sub(self.regular_securitization_locked())
 			.saturating_sub(self.reserved_securitization_space);
 		if !may_use_flexible_space {
-			return available.min(self.securitization.saturating_sub(self.securitization_locked));
+			available =
+				available.min(self.securitization.saturating_sub(self.securitization_locked));
+		}
+		let Some(lock_expiration) = lock_expiration else {
+			return available;
+		};
+
+		let expiration_day = get_rounded_up_bitcoin_day_height(lock_expiration);
+		let mut committed = Balance::zero();
+		let mut relockable = Balance::zero();
+		for entry in self.securitization_release_schedule.values() {
+			committed.saturating_accrue(entry.locked_commitments);
+			committed.saturating_accrue(entry.relockable_commitments);
+			relockable.saturating_accrue(entry.relockable_commitments);
 		}
 
+		let total_relockable = relockable;
+		let mut withdrawals = Balance::zero();
+		for (height, entry) in &self.securitization_release_schedule {
+			if *height >= expiration_day {
+				break;
+			}
+			committed.saturating_reduce(entry.locked_commitments);
+			committed.saturating_reduce(entry.relockable_commitments);
+			relockable.saturating_reduce(entry.relockable_commitments);
+			withdrawals.saturating_accrue(entry.argon_withdrawals);
+			if entry.argon_withdrawals.is_zero() {
+				continue;
+			}
+
+			let headroom =
+				self.securitization.saturating_sub(withdrawals).saturating_sub(committed);
+			let earlier_relockable = total_relockable.saturating_sub(relockable);
+			// Earlier relockable funds must be reused before later ones. If they fit, the
+			// later commitments can also be moved to this lock without increasing retention.
+			let admissible = if headroom < earlier_relockable {
+				headroom
+			} else {
+				headroom.saturating_add(relockable)
+			};
+			available = available.min(admissible);
+		}
+
+		// A full schedule must either already contain the new maturity or lose an entry
+		// when the reservation consumes relockable collateral.
+		if self.securitization_release_schedule.len() ==
+			MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES as usize &&
+			!self.securitization_release_schedule.contains_key(&expiration_day)
+		{
+			let mut remaining = available;
+			let frees_entry = self.securitization_release_schedule.values().any(|entry| {
+				let consumed = remaining.min(entry.relockable_commitments);
+				remaining.saturating_reduce(consumed);
+				!consumed.is_zero() &&
+					consumed == entry.relockable_commitments &&
+					entry.locked_commitments.is_zero() &&
+					entry.argon_withdrawals.is_zero() &&
+					entry.argonot_withdrawals.is_zero()
+			});
+			if !frees_entry {
+				return Balance::zero();
+			}
+		}
 		available
 	}
 
@@ -1778,7 +1873,7 @@ mod test {
 			.unwrap();
 		assert_eq!(vault.securitization_locked, 50);
 		assert_eq!(vault.get_relock_capacity(), 0);
-		assert_eq!(vault.available_securitization_space(false), 50);
+		assert_eq!(vault.available_securitization_space(false, None), 50);
 	}
 
 	#[test]
@@ -1827,6 +1922,58 @@ mod test {
 			successive.reserve_securitization(&securitization(1), false, 576),
 			VaultError::InsufficientVaultFunds
 		);
+	}
+
+	#[test]
+	fn new_lock_capacity_matches_admission_across_withdrawals_and_relockable_collateral() {
+		for (early_relockable, later_relockable, withdrawal, expected) in
+			[(0, 0, 100, 0), (0, 40, 60, 40), (40, 0, 60, 40), (20, 40, 40, 60)]
+		{
+			let mut vault = default_vault(100, 1.0);
+			vault.scheduled_release(144).unwrap().relockable_commitments = early_relockable;
+			vault.scheduled_release(288).unwrap().argon_withdrawals = withdrawal;
+			vault.scheduled_release(576).unwrap().relockable_commitments = later_relockable;
+			assert_eq!(vault.available_securitization_space(true, Some(432)), expected);
+			for amount in 1..=100 {
+				let admitted =
+					vault.clone().reserve_securitization(&securitization(amount), true, 432);
+				assert_eq!(admitted.is_ok(), u128::from(amount) <= expected, "collateral {amount}");
+			}
+			// A lock maturing at the withdrawal deadline releases its commitment in time.
+			assert_eq!(vault.available_securitization_space(true, Some(288)), 100);
+		}
+	}
+
+	#[test]
+	fn new_lock_capacity_requires_a_schedule_slot_or_reusable_entry() {
+		let mut vault = default_vault(1_000, 1.0);
+		for day in 1..=MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES {
+			vault.scheduled_release(u64::from(day) * 144).unwrap().argon_withdrawals = 1;
+		}
+		let expiration = u64::from(MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES + 1) * 144;
+		assert_eq!(vault.available_securitization_space(true, Some(expiration)), 0);
+		let original = vault.clone();
+		assert_err!(
+			vault.reserve_securitization(&securitization(1), true, expiration),
+			VaultError::InsufficientVaultFunds
+		);
+		assert_eq!(vault, original);
+
+		let first = vault.scheduled_release(144).unwrap();
+		first.argon_withdrawals = 0;
+		first.relockable_commitments = 10;
+		let available = vault.available_securitization_space(true, Some(expiration));
+		assert_eq!(available, 635);
+		let original = vault.clone();
+		assert_err!(
+			vault.reserve_securitization(&securitization(636), true, expiration),
+			VaultError::InsufficientVaultFunds
+		);
+		assert_eq!(vault, original);
+		assert!(vault
+			.reserve_securitization(&securitization(available as u64), true, expiration)
+			.is_ok());
+		assert!(vault.ensure_withdrawal_capacity().is_ok());
 	}
 
 	#[test]
@@ -1948,7 +2095,7 @@ mod test {
 		};
 		assert_eq!(vault.get_activated_securitization(), 0);
 		assert_eq!(vault.get_relock_capacity(), 0);
-		assert_eq!(vault.available_securitization_space(true), 100);
+		assert_eq!(vault.available_securitization_space(true, None), 100);
 		assert_eq!(vault.securitized_amount(50), 100);
 
 		assert_err!(
@@ -1959,7 +2106,7 @@ mod test {
 		vault.reserve_securitization(&requested, true, 100).unwrap();
 		assert_eq!(vault.get_activated_securitization(), 0);
 		assert_eq!(vault.get_relock_capacity(), 0);
-		assert_eq!(vault.available_securitization_space(true), 0);
+		assert_eq!(vault.available_securitization_space(true, None), 0);
 
 		vault
 			.record_bitcoin_lock_funding(BitcoinLockFundingUpdate {
@@ -1986,20 +2133,20 @@ mod test {
 		vault.securitization_locked = 100;
 		vault.flexible_securitization_locked = 100;
 
-		assert_eq!(vault.available_securitization_space(false), 0);
-		assert_eq!(vault.available_securitization_space(true), 100);
+		assert_eq!(vault.available_securitization_space(false, None), 0);
+		assert_eq!(vault.available_securitization_space(true, None), 100);
 
 		vault.securitization_locked = 120;
 		vault.securitization_pending_activation = 20;
 
-		assert_eq!(vault.available_securitization_space(true), 80);
+		assert_eq!(vault.available_securitization_space(true, None), 80);
 		vault.debug_assert_invariants();
 
 		vault.securitization_locked = 100;
 		vault.securitization_pending_activation = 20;
 		vault.flexible_securitization_locked = 80;
 
-		assert_eq!(vault.available_securitization_space(true), 80);
+		assert_eq!(vault.available_securitization_space(true, None), 80);
 	}
 
 	#[test]
@@ -2110,13 +2257,13 @@ mod test {
 		vault.set_reserved_securitization_space(100).unwrap();
 
 		assert_eq!(vault.securitization_space(), 100);
-		assert_eq!(vault.available_securitization_space(true), 0);
+		assert_eq!(vault.available_securitization_space(true, None), 0);
 		vault.set_reserved_securitization_space(50).unwrap();
 		vault.reserve_securitization(&securitization(50), true, 100).unwrap();
 
 		assert_eq!(vault.securitization_locked, 100);
 		assert_eq!(vault.securitization_space(), 50);
-		assert_eq!(vault.available_securitization_space(true), 0);
+		assert_eq!(vault.available_securitization_space(true, None), 0);
 	}
 
 	#[test]
@@ -2192,7 +2339,7 @@ mod test {
 		vault.reserve_securitization(&securitization(100), true, 365).unwrap();
 		assert_eq!(vault.securitized_amount(50), 50);
 		assert_eq!(vault.get_relock_capacity(), 0);
-		assert_eq!(vault.available_securitization_space(true), 0);
+		assert_eq!(vault.available_securitization_space(true, None), 0);
 		assert_eq!(vault.securitization_locked, 100);
 		vault.record_bitcoin_lock_funding(funding_update(100, 100, false)).unwrap();
 		vault.request_securitization_exit(80, 432).unwrap();
@@ -2210,7 +2357,7 @@ mod test {
 		assert_eq!(vault.securitization, 50);
 		assert_eq!(vault.exit_notice_amount(), 30);
 		assert_eq!(vault.securitization_target, 20);
-		assert_eq!(vault.available_securitization_space(true), 50);
+		assert_eq!(vault.available_securitization_space(true, None), 50);
 	}
 
 	#[test]
@@ -2291,18 +2438,18 @@ mod test {
 		assert_eq!(vault.securitization_release_schedule[&144].relockable_commitments, 100);
 		assert_eq!(vault.get_relock_capacity(), 100);
 		assert_eq!(vault.securitization_locked, 0);
-		assert_eq!(vault.available_securitization_space(true), 500);
+		assert_eq!(vault.available_securitization_space(true, None), 500);
 
 		let lock_extensions = &mut LockExtension::new(100);
 		vault.extend_lock(&securitization(100), lock_extensions, false, true).unwrap();
 		vault.record_bitcoin_lock_funding(funding_update(100, 0, false)).unwrap();
 		assert_eq!(vault.securitization_locked, 100);
-		assert_eq!(vault.available_securitization_space(true), 400);
+		assert_eq!(vault.available_securitization_space(true, None), 400);
 		assert_eq!(vault.get_relock_capacity(), 0);
 
 		vault.reserve_securitization(&securitization(100), true, 100).unwrap();
 		assert_eq!(vault.securitization_locked, 200);
-		assert_eq!(vault.available_securitization_space(true), 300);
+		assert_eq!(vault.available_securitization_space(true, None), 300);
 		assert_eq!(vault.get_relock_capacity(), 0);
 		vault.record_bitcoin_lock_funding(funding_update(0, 0, false)).unwrap();
 
@@ -2348,7 +2495,7 @@ mod test {
 
 		// extend the lock beyond the available unlocked securitization, using scheduled-for-release
 		// funds
-		assert_eq!(vault.available_securitization_space(true), 375);
+		assert_eq!(vault.available_securitization_space(true, None), 375);
 		assert_eq!(vault.securitization_locked, 125);
 		let lock_extensions = &mut LockExtension::new(143);
 		vault.extend_lock(&securitization(370), lock_extensions, false, true).unwrap();

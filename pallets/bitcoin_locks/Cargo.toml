@@ -24,6 +24,7 @@ pallet-prelude = { workspace = true, default-features = false }
 pallet-bitcoin-fissions = { workspace = true, default-features = false }
 
 [dev-dependencies]
+pallet-treasury-positions = { workspace = true, default-features = true }
 polkadot-sdk = { workspace = true, features = ["pallet-balances", "sp-io", "sp-arithmetic"], default-features = true }
 bitcoin = { workspace = true, features = ["rand-std"] }
 pallet-prelude = { workspace = true, features = ["test"], default-features = true }

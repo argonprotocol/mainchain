@@ -61,6 +61,8 @@ import type {
   ArgonPrimitivesProvidersBlockSealerInfo,
   ArgonPrimitivesProvidersOperationalRewardKind,
   ArgonPrimitivesTickTicker,
+  ArgonPrimitivesTreasuryPositionQuantities,
+  ArgonPrimitivesTreasuryUpstreamPosition,
   ArgonPrimitivesVault,
   ArgonPrimitivesVaultBitcoinSecuritizationBasis,
   ArgonPrimitivesVaultSecuritizationScheduleEntry,
@@ -283,6 +285,7 @@ import type {
   PalletTreasuryHoldReason,
   PalletTreasuryLockedFrameBondTerms,
   PalletTreasuryLockedFrameVaultTerms,
+  PalletTreasuryPositionsPosition,
   PalletTreasuryVaultBondState,
   PalletTreasuryVaultSecuritizationPosition,
   PalletTxPauseCall,
@@ -384,6 +387,8 @@ declare module '@polkadot/types/types/registry' {
     ArgonPrimitivesProvidersBlockSealerInfo: ArgonPrimitivesProvidersBlockSealerInfo;
     ArgonPrimitivesProvidersOperationalRewardKind: ArgonPrimitivesProvidersOperationalRewardKind;
     ArgonPrimitivesTickTicker: ArgonPrimitivesTickTicker;
+    ArgonPrimitivesTreasuryPositionQuantities: ArgonPrimitivesTreasuryPositionQuantities;
+    ArgonPrimitivesTreasuryUpstreamPosition: ArgonPrimitivesTreasuryUpstreamPosition;
     ArgonPrimitivesVault: ArgonPrimitivesVault;
     ArgonPrimitivesVaultBitcoinSecuritizationBasis: ArgonPrimitivesVaultBitcoinSecuritizationBasis;
     ArgonPrimitivesVaultSecuritizationScheduleEntry: ArgonPrimitivesVaultSecuritizationScheduleEntry;
@@ -606,6 +611,7 @@ declare module '@polkadot/types/types/registry' {
     PalletTreasuryHoldReason: PalletTreasuryHoldReason;
     PalletTreasuryLockedFrameBondTerms: PalletTreasuryLockedFrameBondTerms;
     PalletTreasuryLockedFrameVaultTerms: PalletTreasuryLockedFrameVaultTerms;
+    PalletTreasuryPositionsPosition: PalletTreasuryPositionsPosition;
     PalletTreasuryVaultBondState: PalletTreasuryVaultBondState;
     PalletTreasuryVaultSecuritizationPosition: PalletTreasuryVaultSecuritizationPosition;
     PalletTxPauseCall: PalletTxPauseCall;

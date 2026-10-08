@@ -6,7 +6,8 @@ An account may register only once all of the following are true:
 
 - The linked accounts have at least `MinimumUniswapTransfer` in cumulative qualifying Uniswap
   transfer amount.
-- The registered vault account has at least `MinimumBitcoin` in bitcoin lock value.
+- The registered vault account has at least `MinimumBitcoin` in Bitcoin-backed ARGON liquidity,
+  allowing a valuation shortfall of `BitcoinLiquidityTolerance` (1% in the runtime configuration).
 - The registered vault account has at least `MinimumBonds` in active bonds.
 
 Meeting those minimums means the account is eligible to register.
@@ -17,8 +18,8 @@ A registered account becomes operationally certified once all of the following a
 
 - The account has at least `OperationalMinimumUniswapTransfer` in cumulative qualifying Uniswap
   transfer amount.
-- The registered vault account has at least `OperationalMinimumVaultSecuritization` in
-  securitization.
+- The registered vault account has at least `OperationalMinimumVaultSecuritization` in deposited
+  ARGON collateral.
 - The account has at least `MiningSeatsForOperational` mining seats.
 
 Once eligible, any managed account may call `activate` to mark the account operationally certified

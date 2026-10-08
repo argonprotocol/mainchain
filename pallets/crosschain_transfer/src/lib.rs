@@ -46,8 +46,9 @@ pub mod pallet {
 		},
 		vault::BitcoinVaultProvider,
 		CallTxPoolKeyProvider, CallTxValidityProvider, CollectBlockerProvider,
-		EthereumVerifyProvider, OnNewSlot, OperationalAccountsHook, TickProvider,
-		TreasuryPoolProvider, UniswapTransferProvider,
+		EthereumVerifyProvider, OnNewSlot, OperationalAccountsHook,
+		OperationalAccountsHookWeightInfo, TickProvider, TreasuryPoolProvider,
+		UniswapTransferProvider,
 	};
 	use frame_support::{
 		dispatch::{Pays, PostDispatchInfo},
@@ -1467,7 +1468,7 @@ pub mod pallet {
 			});
 			prove_gateway_activity_with_providers::<T>(proof_blocks, activities)
 				.saturating_add(
-					T::OperationalAccountsHook::account_uniswap_argon_transfers_in_updated_weight()
+					<T::OperationalAccountsHook as OperationalAccountsHook<T::AccountId, T::Balance>>::Weights::account_uniswap_argon_transfers_in_updated()
 						.saturating_mul(activities as u64)
 				)
 		})]

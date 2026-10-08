@@ -19,6 +19,7 @@ members = [
     "pallets/ethereum_verifier",
     "pallets/crosschain_transfer",
     "pallets/treasury",
+    "pallets/treasury_positions",
     "pallets/mining_slot",
     "pallets/notaries",
     "pallets/notebook",
@@ -286,6 +287,7 @@ pallet-domains = { path = "pallets/domains", default-features = false }
 pallet-fee-control = { path = "pallets/fee_control", default-features = false }
 pallet-ethereum-verifier = { path = "pallets/ethereum_verifier", default-features = false }
 pallet-crosschain-transfer = { path = "pallets/crosschain_transfer", default-features = false }
+pallet-treasury-positions = { path = "pallets/treasury_positions", default-features = false }
 pallet-treasury = { path = "pallets/treasury", default-features = false }
 pallet-mining-slot = { path = "pallets/mining_slot", default-features = false }
 pallet-notebook = { path = "pallets/notebook", default-features = false }

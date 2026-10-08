@@ -153,14 +153,11 @@ fn test_register_requires_minimums() {
 }
 
 #[test]
-fn test_register_allows_one_argon_bitcoin_shortfall_but_not_more() {
+fn test_register_allows_one_percent_bitcoin_shortfall_but_not_more() {
 	new_test_ext().execute_with(|| {
 		let within_tolerance = make_account_set(201, 202, 203);
 		record_microgons_in(&within_tolerance.owner, MinimumUniswapTransfer::get());
-		record_account_bitcoin(
-			&within_tolerance.vault,
-			MinimumBitcoin::get().saturating_sub(Balance::from(MICROGONS_PER_ARGON)),
-		);
+		record_account_bitcoin(&within_tolerance.vault, 1_980 * MICROGONS_PER_ARGON);
 		record_account_vault_bond_amount(&within_tolerance.vault, MinimumBonds::get());
 
 		assert_ok!(OperationalAccountsPallet::register(
@@ -170,12 +167,7 @@ fn test_register_allows_one_argon_bitcoin_shortfall_but_not_more() {
 
 		let beyond_tolerance = make_account_set(205, 206, 207);
 		record_microgons_in(&beyond_tolerance.owner, MinimumUniswapTransfer::get());
-		record_account_bitcoin(
-			&beyond_tolerance.vault,
-			MinimumBitcoin::get()
-				.saturating_sub(Balance::from(MICROGONS_PER_ARGON))
-				.saturating_sub(1),
-		);
+		record_account_bitcoin(&beyond_tolerance.vault, 1_980 * MICROGONS_PER_ARGON - 1);
 		record_account_vault_bond_amount(&beyond_tolerance.vault, MinimumBonds::get());
 
 		assert_noop!(
@@ -857,58 +849,66 @@ fn test_activate_requires_current_minimums() {
 }
 
 #[test]
-fn test_activate_allows_one_argon_vault_shortfall_but_not_more() {
-	new_test_ext().execute_with(|| {
-		let within_tolerance = make_account_set(209, 210, 211);
-		register_account(&within_tolerance, None);
-		set_registration_lookup(
-			within_tolerance.vault.clone(),
-			within_tolerance.mining.clone(),
-			MinimumBitcoin::get(),
-			OperationalMinimumVaultSecuritization::get()
-				.saturating_sub(Balance::from(MICROGONS_PER_ARGON)),
-			MinimumBonds::get(),
-			0,
-		);
-		OperationalAccountsPallet::vault_created(&within_tolerance.vault);
-		set_linked_account_uniswap_argon_transfers_in_amount(
-			&within_tolerance.vault,
-			OperationalMinimumUniswapTransfer::get().saturating_sub(MinimumUniswapTransfer::get()),
-		);
-		OperationalAccountsPallet::mining_seat_won(&within_tolerance.mining);
-		OperationalAccountsPallet::mining_seat_won(&within_tolerance.mining);
+fn test_activate_allows_one_percent_bitcoin_shortfall_but_not_more() {
+	for (liquidity, eligible) in
+		[(1_980 * MICROGONS_PER_ARGON, true), (1_980 * MICROGONS_PER_ARGON - 1, false)]
+	{
+		new_test_ext().execute_with(|| {
+			let account_set = make_account_set(201, 202, 203);
+			register_account(&account_set, None);
+			satisfy_operational_requirements(&account_set.mining, &account_set.vault);
+			release_account_bitcoin(&account_set.vault);
+			record_account_bitcoin(&account_set.vault, liquidity);
 
-		assert_ok!(OperationalAccountsPallet::activate(RuntimeOrigin::signed(
-			within_tolerance.owner.clone(),
-		)));
+			if eligible {
+				assert_ok!(OperationalAccountsPallet::activate(RuntimeOrigin::signed(
+					account_set.owner.clone(),
+				)));
+			} else {
+				assert_noop!(
+					OperationalAccountsPallet::activate(RuntimeOrigin::signed(
+						account_set.owner.clone(),
+					)),
+					Error::<Test>::MinimumsNotMet
+				);
+			}
+		});
+	}
+}
 
-		let beyond_tolerance = make_account_set(213, 214, 215);
-		register_account(&beyond_tolerance, None);
-		set_registration_lookup(
-			beyond_tolerance.vault.clone(),
-			beyond_tolerance.mining.clone(),
-			MinimumBitcoin::get(),
-			OperationalMinimumVaultSecuritization::get()
-				.saturating_sub(Balance::from(MICROGONS_PER_ARGON))
-				.saturating_sub(1),
-			MinimumBonds::get(),
-			0,
-		);
-		OperationalAccountsPallet::vault_created(&beyond_tolerance.vault);
-		set_linked_account_uniswap_argon_transfers_in_amount(
-			&beyond_tolerance.vault,
-			OperationalMinimumUniswapTransfer::get().saturating_sub(MinimumUniswapTransfer::get()),
-		);
-		OperationalAccountsPallet::mining_seat_won(&beyond_tolerance.mining);
-		OperationalAccountsPallet::mining_seat_won(&beyond_tolerance.mining);
+#[test]
+fn test_activate_requires_the_full_vault_securitization_minimum() {
+	let minimum = OperationalMinimumVaultSecuritization::get();
+	for (securitization, eligible) in
+		[(minimum, true), (minimum - 1, false), (minimum - MICROGONS_PER_ARGON, false)]
+	{
+		new_test_ext().execute_with(|| {
+			let account_set = make_account_set(209, 210, 211);
+			register_account(&account_set, None);
+			satisfy_operational_requirements(&account_set.mining, &account_set.vault);
+			set_registration_lookup(
+				account_set.vault.clone(),
+				account_set.mining.clone(),
+				MinimumBitcoin::get(),
+				securitization,
+				MinimumBonds::get(),
+				0,
+			);
 
-		assert_noop!(
-			OperationalAccountsPallet::activate(RuntimeOrigin::signed(
-				beyond_tolerance.owner.clone(),
-			)),
-			Error::<Test>::NotEligibleForActivation
-		);
-	});
+			if eligible {
+				assert_ok!(OperationalAccountsPallet::activate(RuntimeOrigin::signed(
+					account_set.owner.clone(),
+				)));
+			} else {
+				assert_noop!(
+					OperationalAccountsPallet::activate(RuntimeOrigin::signed(
+						account_set.owner.clone(),
+					)),
+					Error::<Test>::NotEligibleForActivation
+				);
+			}
+		});
+	}
 }
 
 #[test]

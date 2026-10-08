@@ -1,7 +1,8 @@
 use argon_primitives::{
 	providers::{
 		CollectBlockerProvider, OperationalAccountProvider, OperationalAccountProviderWeightInfo,
-		TickProvider, TickProviderWeightInfo,
+		OperationalAccountsHook, OperationalAccountsHookWeightInfo, TickProvider,
+		TickProviderWeightInfo, TreasuryPoolProvider, TreasuryPoolProviderWeightInfo,
 	},
 	vault::{
 		BitcoinVaultProviderWeightInfo, TreasuryVaultProviderWeightInfo,
@@ -13,6 +14,12 @@ use pallet_prelude::*;
 
 /// Weight functions needed for pallet_vaults.
 pub trait WeightInfo {
+	fn provider_get_vault_operator() -> Weight {
+		Weight::zero()
+	}
+	fn provider_get_participation_capacity() -> Weight {
+		Weight::zero()
+	}
 	fn create() -> Weight;
 	fn modify_funding() -> Weight;
 	fn modify_terms() -> Weight;
@@ -35,7 +42,9 @@ pub trait WeightInfo {
 	fn provider_burn_encumbered_argonots() -> Weight;
 	fn provider_account_became_operational() -> Weight;
 	fn provider_set_bitcoin_lock_flexible() -> Weight;
+	fn provider_reserve_securitization(release_schedule_entries: u32) -> Weight;
 	fn provider_resecuritize(release_schedule_entries: u32) -> Weight;
+	fn provider_resecuritize_unfunded(release_schedule_entries: u32) -> Weight;
 	fn provider_burn(release_schedule_entries: u32) -> Weight;
 	fn provider_get_top_vaults_by_securitization(vaults: u32) -> Weight;
 	fn provider_commit_securitization_for_rewards() -> Weight;
@@ -51,6 +60,17 @@ type CollectBlockerProviderWeights<T> =
 	>>::Weights;
 type OperationalAccountProviderWeights<T> =
 	<<T as crate::Config>::OperationalAccountProvider as OperationalAccountProvider<
+		<T as frame_system::Config>::AccountId,
+	>>::Weights;
+
+type OperationalAccountsHookWeights<T> =
+	<<T as crate::Config>::OperationalAccountsHook as OperationalAccountsHook<
+		<T as frame_system::Config>::AccountId,
+		<T as crate::Config>::Balance,
+	>>::Weights;
+
+type TreasuryPoolWeights<T> =
+	<<T as crate::Config>::TreasuryPoolProvider as TreasuryPoolProvider<
 		<T as frame_system::Config>::AccountId,
 	>>::Weights;
 
@@ -84,6 +104,15 @@ where
 	CollectBlockerWeight: argon_primitives::CollectBlockerProviderWeightInfo,
 	OperationalAccountProviderWeight: OperationalAccountProviderWeightInfo,
 {
+	fn provider_get_participation_capacity() -> Weight {
+		Base::provider_get_participation_capacity()
+			.saturating_add(TickProviderWeight::current_tick())
+	}
+
+	fn provider_get_vault_operator() -> Weight {
+		Base::provider_get_vault_operator()
+	}
+
 	fn create() -> Weight {
 		Base::create()
 			.saturating_add(TickProviderWeight::current_tick())
@@ -92,6 +121,7 @@ where
 
 	fn modify_funding() -> Weight {
 		Base::modify_funding()
+			.saturating_add(TreasuryPoolWeights::<T>::vault_securitization_changed())
 	}
 
 	fn modify_terms() -> Weight {
@@ -99,7 +129,7 @@ where
 	}
 
 	fn close() -> Weight {
-		Base::close()
+		Base::close().saturating_add(TreasuryPoolWeights::<T>::vault_securitization_changed())
 	}
 
 	fn replace_bitcoin_xpub() -> Weight {
@@ -123,6 +153,10 @@ where
 		bitcoin_release_vault_count: u32,
 	) -> Weight {
 		Base::on_initialize_with_vault_releases(height_range, bitcoin_release_vault_count)
+			.saturating_add(
+				TreasuryPoolWeights::<T>::vault_securitization_changed()
+					.saturating_mul(bitcoin_release_vault_count.into()),
+			)
 	}
 
 	fn collect() -> Weight {
@@ -167,10 +201,23 @@ where
 
 	fn provider_resecuritize(release_schedule_entries: u32) -> Weight {
 		Base::provider_resecuritize(release_schedule_entries)
+			.saturating_add(TickProviderWeight::current_tick())
+			.saturating_add(OperationalAccountsHookWeights::<T>::vault_bitcoin_lock_funded())
+	}
+
+	fn provider_reserve_securitization(release_schedule_entries: u32) -> Weight {
+		Base::provider_reserve_securitization(release_schedule_entries)
+			.saturating_add(TickProviderWeight::current_tick())
+	}
+
+	fn provider_resecuritize_unfunded(release_schedule_entries: u32) -> Weight {
+		Base::provider_resecuritize_unfunded(release_schedule_entries)
+			.saturating_add(TickProviderWeight::current_tick())
 	}
 
 	fn provider_burn(release_schedule_entries: u32) -> Weight {
 		Base::provider_burn(release_schedule_entries)
+			.saturating_add(TreasuryPoolWeights::<T>::vault_securitization_changed())
 	}
 
 	fn provider_get_top_vaults_by_securitization(vaults: u32) -> Weight {
@@ -187,6 +234,13 @@ where
 }
 
 impl<T: crate::Config> TreasuryVaultProviderWeightInfo for ProviderWeightAdapter<T> {
+	fn get_vault_operator() -> Weight {
+		<T as crate::Config>::WeightInfo::provider_get_vault_operator()
+	}
+	fn get_participation_capacity() -> Weight {
+		<T as crate::Config>::WeightInfo::provider_get_participation_capacity()
+	}
+
 	fn get_top_vaults_by_securitization(vaults: u32) -> Weight {
 		<T as crate::Config>::WeightInfo::provider_get_top_vaults_by_securitization(vaults)
 	}
@@ -242,10 +296,19 @@ impl<T: crate::Config> BitcoinVaultProviderWeightInfo for ProviderWeightAdapter<
 		<T as crate::Config>::WeightInfo::provider_set_bitcoin_lock_flexible()
 	}
 
+	fn reserve_securitization() -> Weight {
+		<T as crate::Config>::WeightInfo::provider_reserve_securitization(
+			MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES,
+		)
+	}
+
 	fn resecuritize() -> Weight {
 		<T as crate::Config>::WeightInfo::provider_resecuritize(
 			MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES,
 		)
+		.max(<T as crate::Config>::WeightInfo::provider_resecuritize_unfunded(
+			MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES,
+		))
 	}
 
 	fn burn() -> Weight {
@@ -321,7 +384,13 @@ impl WeightInfo for () {
 	fn provider_set_bitcoin_lock_flexible() -> Weight {
 		Weight::zero()
 	}
+	fn provider_reserve_securitization(_release_schedule_entries: u32) -> Weight {
+		Weight::zero()
+	}
 	fn provider_resecuritize(_release_schedule_entries: u32) -> Weight {
+		Weight::zero()
+	}
+	fn provider_resecuritize_unfunded(_release_schedule_entries: u32) -> Weight {
 		Weight::zero()
 	}
 	fn provider_burn(_release_schedule_entries: u32) -> Weight {

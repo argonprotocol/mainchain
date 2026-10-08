@@ -151,30 +151,7 @@ impl OnNewSlot<u64> for StaticNewSlotEvent {
 
 pub struct StaticOperationalAccountsHook;
 impl OperationalAccountsHook<u64, Balance> for StaticOperationalAccountsHook {
-	fn vault_created_weight() -> Weight {
-		Weight::zero()
-	}
-
-	fn vault_bitcoin_lock_funded_weight() -> Weight {
-		Weight::zero()
-	}
-
-	fn mining_seat_won_weight() -> Weight {
-		Weight::zero()
-	}
-
-	fn account_bitcoin_amount_changed_weight() -> Weight {
-		Weight::zero()
-	}
-
-	fn account_vault_bond_total_updated_weight() -> Weight {
-		Weight::zero()
-	}
-
-	fn account_uniswap_argon_transfers_in_updated_weight() -> Weight {
-		Weight::zero()
-	}
-
+	type Weights = ();
 	fn mining_seat_won(miner_account: &u64) {
 		MiningSeatsWon::mutate(|accounts| accounts.push(*miner_account));
 	}

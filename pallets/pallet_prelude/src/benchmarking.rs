@@ -1,3 +1,8 @@
+mod treasury_positions;
+pub use treasury_positions::{
+	reset_benchmark_treasury_positions, BenchmarkTreasuryPositionProvider,
+};
+
 use crate::*;
 use alloc::{
 	collections::{BTreeMap, BTreeSet},
@@ -25,7 +30,7 @@ use argon_primitives::{
 		BitcoinLockFundingUpdate, BitcoinResecuritization, BitcoinSecuritization,
 		BitcoinVaultProvider, LockExtension, LostBitcoinCompensation, RegistrationVaultData,
 		ReserveSecuritizationRequest, TreasuryVaultProvider, Vault, VaultError,
-		VaultSecuritization, VaultTreasuryFrameEarnings,
+		VaultParticipationCapacity, VaultSecuritization, VaultTreasuryFrameEarnings,
 	},
 	ArgonCPI, NotaryId, NotebookNumber, NotebookSecret, OperationalRewardPayout, PriceProvider,
 	VaultId, VotingSchedule,
@@ -612,6 +617,8 @@ where
 	AccountId: FullCodec,
 	Balance: FullCodec,
 {
+	type Weights = ();
+
 	fn claim_reward(_account_id: &AccountId, _amount: Balance) -> DispatchResult {
 		Ok(())
 	}
@@ -1575,6 +1582,17 @@ where
 	type Weights = ();
 	type Balance = Balance;
 	type AccountId = AccountId;
+
+	fn get_participation_capacity(
+		vault_id: VaultId,
+	) -> Option<VaultParticipationCapacity<Balance>> {
+		let state = benchmark_bitcoin_vault_provider_state::<AccountId, Balance>();
+		let vault = state.vaults.get(&vault_id).filter(|vault| !vault.is_closed)?;
+		Some(VaultParticipationCapacity {
+			available_securitization_space: vault.available_securitization_space(true, None),
+			regular_bond_capacity: vault.securitization.saturating_sub(vault.exit_notice_amount()),
+		})
+	}
 
 	fn get_vault_securitization(vault_id: VaultId) -> Option<Self::Balance> {
 		benchmark_bitcoin_vault_provider_state::<AccountId, Balance>()

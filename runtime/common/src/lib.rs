@@ -10,6 +10,8 @@ mod call_filters;
 pub mod config;
 mod deal_with_fees;
 mod fee_control;
+#[cfg(test)]
+mod migrations;
 
 pub mod prelude {
 	pub use crate::config::*;
@@ -160,7 +162,7 @@ macro_rules! inject_runtime_vars {
 			pallet_vaults::migrations::IndexVaultSecuritizationAndRemoveProfitSharingMigration<
 				Runtime,
 			>,
-			pallet_treasury::migrations::SeedRewardStateMigration<Runtime>,
+			pallet_treasury::migrations::SeedTreasuryStateMigration<Runtime>,
 		);
 
 		/// Unchecked extrinsic type as expected by this runtime.

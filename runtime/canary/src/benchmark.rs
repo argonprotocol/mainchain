@@ -27,6 +27,7 @@ frame_benchmarking::define_benchmarks!(
 	[pallet_sudo, Sudo]
 	[pallet_vaults, Vaults]
 	[pallet_treasury, Treasury]
+	[pallet_treasury_positions, TreasuryPositions]
 	[pallet_operational_accounts, OperationalAccounts]
 	[pallet_bootstrap, Bootstrap]
 	[pallet_crosschain_transfer, CrosschainTransfer]

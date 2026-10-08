@@ -44,6 +44,33 @@ mod benchmarks {
 	use frame_system::RawOrigin;
 
 	#[benchmark]
+	fn provider_account_position() -> Result<(), BenchmarkError> {
+		reset_benchmark_environment::<T>();
+		let context = create_funded_lock::<T>(8)?;
+		let lock = LocksById::<T>::get(context.lock_id).unwrap();
+		// Registration-only workload, matching Treasury's 100-lot owner-query profile.
+		for id in 1_000..1_100 {
+			LocksById::<T>::insert(id, &lock);
+			LockIdsByOwnerAccount::<T>::insert(&context.owner, id, ());
+		}
+		#[block]
+		{
+			let position = <Pallet<T> as BitcoinLockPositionProvider<
+				T::AccountId,
+				<T as Config>::Balance,
+			>>::account_position(&context.owner, lock.vault_id)
+			.unwrap();
+			assert_eq!(
+				position.activated_securitization,
+				lock.upstream_collateral()
+					.activated_securitization
+					.saturating_mul(101u32.into())
+			);
+		}
+		Ok(())
+	}
+
+	#[benchmark]
 	fn create_receive_address() -> Result<(), BenchmarkError> {
 		reset_benchmark_environment::<T>();
 		let owner: T::AccountId = account("bitcoin-lock-owner", 0, 0);
