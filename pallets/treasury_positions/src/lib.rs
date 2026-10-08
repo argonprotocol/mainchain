@@ -70,7 +70,10 @@ pub mod pallet {
 		TypeInfo,
 		MaxEncodedLen,
 	)]
-	pub struct Position<Balance: codec::Codec + MaxEncodedLen> {
+	pub struct Position<Balance>
+	where
+		Balance: codec::Codec + MaxEncodedLen,
+	{
 		/// Live principal for certification/backing, including displaced flexible bonds.
 		#[codec(compact)]
 		pub bond_principal: Balance,

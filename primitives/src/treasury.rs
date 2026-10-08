@@ -35,7 +35,10 @@ pub struct BitcoinLockPosition<Balance> {
 	TypeInfo,
 	MaxEncodedLen,
 )]
-pub struct PositionQuantities<Balance: Codec + MaxEncodedLen> {
+pub struct PositionQuantities<Balance>
+where
+	Balance: Codec + MaxEncodedLen,
+{
 	/// Whole ARGON bonds: regular principal plus undisplaced operator flexible bonds.
 	#[codec(compact)]
 	pub bonds: BondTotal,
@@ -68,7 +71,10 @@ pub enum PositionQuantity {
 	TypeInfo,
 	MaxEncodedLen,
 )]
-pub struct UpstreamPosition<Balance: Codec + MaxEncodedLen> {
+pub struct UpstreamPosition<Balance>
+where
+	Balance: Codec + MaxEncodedLen,
+{
 	#[codec(compact)]
 	pub vault_id: VaultId,
 	/// Collateral used by confirmed funding.
