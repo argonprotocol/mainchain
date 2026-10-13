@@ -219,6 +219,7 @@ import type {
   PalletMiningSlotEvent,
   PalletMiningSlotHoldReason,
   PalletMiningSlotMinerNonceScoring,
+  PalletMiningSlotSeatPriceStats,
   PalletMintCall,
   PalletMintError,
   PalletMintEvent,
@@ -545,6 +546,7 @@ declare module '@polkadot/types/types/registry' {
     PalletMiningSlotEvent: PalletMiningSlotEvent;
     PalletMiningSlotHoldReason: PalletMiningSlotHoldReason;
     PalletMiningSlotMinerNonceScoring: PalletMiningSlotMinerNonceScoring;
+    PalletMiningSlotSeatPriceStats: PalletMiningSlotSeatPriceStats;
     PalletMintCall: PalletMintCall;
     PalletMintError: PalletMintError;
     PalletMintEvent: PalletMintEvent;

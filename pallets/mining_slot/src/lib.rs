@@ -58,7 +58,7 @@ pub mod pallet {
 	};
 	use pallet_prelude::argon_primitives::FRAME_INFO_DIGEST;
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(10);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(11);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -69,6 +69,24 @@ pub mod pallet {
 		<T as Config>::Balance,
 		<T as Config>::Keys,
 	>;
+
+	#[derive(
+		Clone,
+		Copy,
+		Debug,
+		Default,
+		PartialEq,
+		Eq,
+		Encode,
+		Decode,
+		DecodeWithMemTracking,
+		TypeInfo,
+		MaxEncodedLen,
+	)]
+	pub struct SeatPriceStats<Balance> {
+		pub seats: u32,
+		pub total_bids: Balance,
+	}
 
 	/// Configure the pallet by specifying the parameters and types on which it depends.
 	#[pallet::config]
@@ -234,10 +252,11 @@ pub mod pallet {
 	pub type HistoricalBidsPerSlot<T: Config> =
 		StorageValue<_, BoundedVec<MiningBidStats, ConstU32<10>>, ValueQuery>;
 
-	/// The average price per seat for the last 10 frames (newest first)
+	/// Winning bid totals and seat counts for averaging prices over the last 10 frames (newest
+	/// first).
 	#[pallet::storage]
 	pub type AveragePricePerSeat<T: Config> =
-		StorageValue<_, BoundedVec<T::Balance, ConstU32<10>>, ValueQuery>;
+		StorageValue<_, BoundedVec<SeatPriceStats<T::Balance>, ConstU32<10>>, ValueQuery>;
 
 	/// The mining slot configuration set in genesis
 	#[pallet::storage]
@@ -953,7 +972,7 @@ impl<T: Config> Pallet<T> {
 		// and then remove after if sorted differently with same account)
 		MinersByCohort::<T>::insert(frame_id, slot_cohort.clone());
 
-		let mut total_price_per_seat = T::Balance::zero();
+		let mut total_bids = T::Balance::zero();
 		let mut miner_scoring = vec![];
 		for (i, entry) in slot_cohort.iter().enumerate() {
 			AccountIndexLookup::<T>::insert(&entry.account_id, (frame_id, i as u32));
@@ -962,7 +981,7 @@ impl<T: Config> Pallet<T> {
 			T::OperationalAccountsHook::mining_seat_won(mining_account);
 			added_miners.push((entry.account_id.clone(), entry.authority_keys.clone()));
 			active_miners += 1;
-			total_price_per_seat += entry.bid;
+			total_bids = total_bids.saturating_add(entry.bid);
 			let nonce =
 				MinerNonce::<T> { account_id: entry.account_id.clone(), block_hash: parent_hash }
 					.generate();
@@ -983,14 +1002,11 @@ impl<T: Config> Pallet<T> {
 			a.try_insert(frame_id, BoundedVec::truncate_from(miner_scoring))
 				.expect("Should be valid since we removed from this map previously");
 		});
-		let average_price_per_seat = total_price_per_seat
-			.checked_div(&T::Balance::from(slot_cohort.len() as u32))
-			.unwrap_or_default();
 		AveragePricePerSeat::<T>::mutate(|a| {
 			if a.is_full() {
 				a.pop();
 			}
-			let _ = a.try_insert(0, average_price_per_seat);
+			let _ = a.try_insert(0, SeatPriceStats { seats: slot_cohort.len() as u32, total_bids });
 		});
 
 		ActiveMinersCount::<T>::put(active_miners);
@@ -1100,44 +1116,54 @@ impl<T: Config> Pallet<T> {
 		ArgonotsPerMiningSeat::<T>::put(argonots_needed.max(T::InitialArgonotsPerSeat::get()));
 	}
 
-	/// Adjust the number of seats in the next cohort based on the average price per seat vs the
-	/// target price per seat.
-	///
-	/// Swings are dampened by the `PricePerSeatAdjustmentDamper` constant and in the range of
-	/// `MinCohortSize` => value <= `MaxCohortSize`.
+	/// Forecast seats from the winning bids and seat counts of the same completed auctions.
+	/// Apply the price adjustment limit to the observed mean cohort size, then announce only a
+	/// previously unscheduled change. Existing announcements remain fixed.
 	pub(crate) fn adjust_number_of_seats() {
-		let price_target: u128 = T::TargetPricePerSeat::get().into();
-		let trailing_average_price = AveragePricePerSeat::<T>::get();
-		let prices = trailing_average_price.len() as u128;
-		let price_sum: u128 = trailing_average_price.into_iter().map(Into::into).sum();
-		let average_price = price_sum.checked_div(prices).unwrap_or_default();
-		let max_cohort_size = T::MaxCohortSize::get();
-		let min_cohort_size = T::MinCohortSize::get();
-		let damper = T::PricePerSeatAdjustmentDamper::get();
-		let one = FixedU128::one();
-		let adjustment_percent = FixedU128::from_rational(average_price, price_target)
-			.clamp(one.saturating_sub(damper), one.saturating_add(damper));
-
-		if adjustment_percent == FixedU128::one() {
+		let frames_per_term = T::FramesPerMiningTerm::get() as FrameId;
+		let next_frame_id = NextFrameId::<T>::get();
+		let scheduled_frame_id = next_frame_id + frames_per_term;
+		let mut schedule = ScheduledCohortSizeChangeByFrame::<T>::get();
+		if schedule.contains_key(&scheduled_frame_id) {
 			return;
 		}
 
-		let mut next_cohort_size =
-			adjustment_percent.saturating_mul_int(NextCohortSize::<T>::get());
-		if next_cohort_size < min_cohort_size {
-			next_cohort_size = min_cohort_size;
-		} else if next_cohort_size > max_cohort_size {
-			next_cohort_size = max_cohort_size;
+		let price_history = AveragePricePerSeat::<T>::get();
+		let observed_frames = price_history.len() as u128;
+		if observed_frames == 0 {
+			return;
 		}
 
-		let frame_id = NextFrameId::<T>::get() + 10;
-		ScheduledCohortSizeChangeByFrame::<T>::mutate(|x| {
-			if x.try_insert(frame_id, next_cohort_size).is_err() {
-				log::error!(
-					"Unable to schedule cohort size change to {next_cohort_size} at frame {frame_id}",
-				);
-			}
-		});
+		let mut total_seats = 0u128;
+		let mut total_bids = T::Balance::zero();
+		for auction in price_history {
+			total_seats += auction.seats as u128;
+			total_bids = total_bids.saturating_add(auction.total_bids);
+		}
+
+		// Mean cohort size * seat-weighted mean bid / target = mean auction bids / target.
+		// Clamp the aggregate seat estimate before averaging, preserving the existing price
+		// limit without multiplying historical prices by an unrelated future announcement.
+		let seats_at_target_price: u128 =
+			total_bids.checked_div(&T::TargetPricePerSeat::get()).unwrap_or_default().into();
+		let damper = T::PricePerSeatAdjustmentDamper::get();
+		let one = FixedU128::one();
+		let minimum_adjusted_seats = one.saturating_sub(damper).saturating_mul_int(total_seats);
+		let maximum_adjusted_seats = one.saturating_add(damper).saturating_mul_int(total_seats);
+		let mean_cohort_size = seats_at_target_price
+			.clamp(minimum_adjusted_seats, maximum_adjusted_seats) /
+			observed_frames;
+		let next_cohort_size = mean_cohort_size
+			.saturated_into::<u32>()
+			.clamp(T::MinCohortSize::get(), T::MaxCohortSize::get());
+
+		if schedule.try_insert(scheduled_frame_id, next_cohort_size).is_err() {
+			log::error!(
+				"Unable to schedule cohort size change to {next_cohort_size} at frame {scheduled_frame_id}",
+			);
+			return;
+		}
+		ScheduledCohortSizeChangeByFrame::<T>::put(schedule);
 	}
 
 	/// Check if the current block is in the closing window for the next slot

@@ -327,33 +327,55 @@ mod benchmarks {
 
 		let argonots_amount: T::Balance = 100_000u128.into();
 		ArgonotsPerMiningSeat::<T>::put(argonots_amount);
-		NextFrameId::<T>::put(2);
+		let frames_per_term = T::FramesPerMiningTerm::get() as FrameId;
+		let price_history =
+			BoundedVec::<SeatPriceStats<T::Balance>, ConstU32<10>>::truncate_from(vec![
+			SeatPriceStats {
+				seats: T::MaxCohortSize::get(),
+				total_bids: T::TargetPricePerSeat::get().saturating_mul(T::MaxCohortSize::get().into()),
+			}; 10
+		]);
+		let next_frame_id = price_history.len() as FrameId + 1;
+		AveragePricePerSeat::<T>::put(price_history);
+		NextFrameId::<T>::put(next_frame_id);
 		NextCohortSize::<T>::put(T::MinCohortSize::get());
-		ActiveMinersCount::<T>::put(10u16);
+
+		// Fill the upcoming cohort for the collateral median calculation.
+		use sp_runtime::codec::Decode;
+		let key_data = vec![0u8; T::Keys::max_encoded_len()];
+		let keys = T::Keys::decode(&mut &key_data[..])
+			.expect("Failed to create test keys for benchmarking");
 		let mut bids = BoundedVec::new();
-		for i in 0..T::MinCohortSize::get() {
-			use sp_runtime::codec::Decode;
-			let key_size = T::Keys::max_encoded_len();
-			let key_data = vec![0u8; key_size];
-			let keys = T::Keys::decode(&mut &key_data[..])
-				.expect("Failed to create test keys for benchmarking");
-			let _ = bids.try_push(Registration::<T> {
+		for i in 0..T::MaxCohortSize::get() {
+			bids.try_push(Registration::<T> {
 				account_id: account("median", i, 0),
-				external_funding_account: None,
-				bid: (5_000_000u128.saturating_sub((i as u128) * 10_000)).into(),
+				external_funding_account: Some(account("funding", i, 0)),
+				bid: T::TargetPricePerSeat::get(),
 				argonots: argonots_amount,
-				authority_keys: keys,
-				starting_frame_id: 2,
+				authority_keys: keys.clone(),
+				starting_frame_id: 1,
 				bid_at_tick: 1,
-			});
+			})
+			.expect("Maximum cohort should fit");
 		}
 		BidsForNextSlotCohort::<T>::put(bids);
+		let mut schedule: BoundedBTreeMap<FrameId, u32, ConstU32<11>> = BoundedBTreeMap::new();
+		let scheduled_frame_id = next_frame_id + frames_per_term;
+		for frame_id in next_frame_id..scheduled_frame_id {
+			schedule.try_insert(frame_id, T::MinCohortSize::get()).unwrap();
+		}
+		ScheduledCohortSizeChangeByFrame::<T>::put(schedule);
 
 		#[block]
 		{
-			Pallet::<T>::update_argonots_per_seat(2);
+			Pallet::<T>::update_argonots_per_seat(next_frame_id);
 			Pallet::<T>::adjust_number_of_seats();
 		}
+
+		assert_eq!(
+			ScheduledCohortSizeChangeByFrame::<T>::get().get(&scheduled_frame_id),
+			Some(&T::MaxCohortSize::get()),
+		);
 
 		Ok(())
 	}
