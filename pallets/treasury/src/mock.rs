@@ -156,6 +156,7 @@ parameter_types! {
 	pub const PercentForBitcoinLiquidPool: Percent = Percent::from_percent(3);
 	pub const PercentForArgonBondPool: Percent = Percent::from_percent(5);
 	pub const PercentForVaultPool: Percent = Percent::from_percent(51);
+	pub const MinimumVaultProfitPercent: Percent = Percent::from_percent(1);
 	pub const DefaultTargetBitcoinPercent: Percent = Percent::from_percent(15);
 	pub static MaxArgonotBondedPercentOfCirculation: Percent = Percent::from_percent(60);
 	pub static CurrentFrameId: FrameId = 1;
@@ -409,6 +410,7 @@ impl pallet_treasury::Config for Test {
 	type PercentForBitcoinLiquidPool = PercentForBitcoinLiquidPool;
 	type PercentForArgonBondPool = PercentForArgonBondPool;
 	type PercentForVaultPool = PercentForVaultPool;
+	type MinimumVaultProfitPercent = MinimumVaultProfitPercent;
 	type DefaultTargetBitcoinPercent = DefaultTargetBitcoinPercent;
 	type MaxVaultsPerPool = MaxVaultsPerPool;
 	type MaxPendingUnlocksPerFrame = MaxPendingUnlocksPerFrame;

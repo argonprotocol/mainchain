@@ -108,6 +108,7 @@ parameter_types! {
 	pub const PercentForBitcoinLiquidPool: Percent = Percent::from_percent(3);
 	pub const PercentForArgonBondPool: Percent = Percent::from_percent(5);
 	pub const PercentForVaultPool: Percent = Percent::from_percent(51);
+	pub const MinimumVaultProfitPercent: Percent = Percent::from_percent(1);
 	pub const DefaultTargetBitcoinPercent: Percent = Percent::from_percent(15);
 	pub const MaxArgonotBondedPercentOfCirculation: Percent = Percent::from_percent(60);
 	/// Activated upstream Bitcoin securitization, in microgons, required for full vault earnings.
@@ -277,7 +278,7 @@ parameter_types! {
 	/// Minimum total Uniswap transfer amount required for operational certification.
 	pub const OperationalMinimumUniswapTransfer: Balance = 3_000 * MICROGONS_PER_ARGON;
 	/// Minimum vault securitization (base units) required to become operational.
-	pub const OperationalMinimumVaultSecuritization: Balance = 2_000 * MICROGONS_PER_ARGON;
+	pub const OperationalMinimumVaultSecuritization: Balance = 2_500 * MICROGONS_PER_ARGON;
 	/// Additional argon amount (base units) required per follow-on access code after an account
 	/// becomes operational.
 	pub const BitcoinLockSizeForAccessCode: Balance = 5_000 * MICROGONS_PER_ARGON;
