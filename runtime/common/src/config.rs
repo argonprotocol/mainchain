@@ -277,7 +277,7 @@ parameter_types! {
 	/// Minimum total Uniswap transfer amount required for operational certification.
 	pub const OperationalMinimumUniswapTransfer: Balance = 3_000 * MICROGONS_PER_ARGON;
 	/// Minimum vault securitization (base units) required to become operational.
-	pub const OperationalMinimumVaultSecuritization: Balance = 2_000 * MICROGONS_PER_ARGON;
+	pub const OperationalMinimumVaultSecuritization: Balance = 2_500 * MICROGONS_PER_ARGON;
 	/// Additional argon amount (base units) required per follow-on access code after an account
 	/// becomes operational.
 	pub const BitcoinLockSizeForAccessCode: Balance = 5_000 * MICROGONS_PER_ARGON;
