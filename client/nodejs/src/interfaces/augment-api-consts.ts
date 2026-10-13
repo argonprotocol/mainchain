@@ -623,6 +623,10 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       minimumArgonsPerContributor: u128 & AugmentedConst<ApiType>;
       /**
+       * Minimum vault earnings rate before securitization coverage is applied.
+       **/
+      minimumVaultProfitPercent: Percent & AugmentedConst<ApiType>;
+      /**
        * Treasury pallet id retained in metadata for account derivation.
        **/
       palletId: FrameSupportPalletId & AugmentedConst<ApiType>;

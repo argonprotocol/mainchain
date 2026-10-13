@@ -199,6 +199,10 @@ pub mod pallet {
 		#[pallet::constant]
 		type PercentForVaultPool: Get<Percent>;
 
+		/// Minimum vault earnings rate before securitization coverage is applied.
+		#[pallet::constant]
+		type MinimumVaultProfitPercent: Get<Percent>;
+
 		/// Default percent of maximum Bitcoin-mintable Argons targeted by the network.
 		#[pallet::constant]
 		type DefaultTargetBitcoinPercent: Get<Percent>;
@@ -1488,14 +1492,22 @@ pub mod pallet {
 			};
 			let denominator =
 				frame_capital.target_securitization.max(frame_capital.total_securitization);
-			let minimum_profit_rate = FixedU128::from_rational(1, 100);
+			let minimum_profit_rate = FixedU128::from_rational(
+				T::MinimumVaultProfitPercent::get().deconstruct() as u128,
+				100,
+			);
 			let maximum_profit_rate =
 				FixedU128::from_rational(T::PercentForVaultPool::get().deconstruct() as u128, 100);
-			// The website curve divides its maximum by 3x capital and a 1.29x Argonot bonus.
-			// Its 57% maximum includes the 6% mining-operator allocation burned this release.
+
+			let argonot_bonus_rate = FixedU128::from_rational(29, 100);
+			let maximum_capital_multiplier =
+				FixedU128::from_u32(1 + ARGONOT_SECURITIZATION_MULTIPLIER);
+			let maximum_argonot_bonus = FixedU128::one().saturating_add(argonot_bonus_rate);
+			// Scale the core rate so maximum capital backing and bonuses reach the vault pool cap.
 			let maximum_core_profit_rate = maximum_profit_rate
-				.checked_div(&FixedU128::from_rational(387, 100))
+				.checked_div(&maximum_capital_multiplier.saturating_mul(maximum_argonot_bonus))
 				.unwrap_or_default();
+
 			let mut distributed = T::Balance::zero();
 
 			for (vault_id, position) in frame_capital.vault_securitization_positions.iter() {
@@ -1536,7 +1548,7 @@ pub mod pallet {
 					securitization,
 				);
 				let argonot_bonus = FixedU128::one().saturating_add(
-					FixedU128::from_rational(29, 100)
+					argonot_bonus_rate
 						.saturating_mul(argonot_utilization)
 						.saturating_mul(bitcoin_utilization),
 				);

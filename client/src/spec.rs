@@ -3500,9 +3500,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				6u8, 152u8, 208u8, 28u8, 132u8, 199u8, 108u8, 190u8, 252u8, 52u8, 187u8, 207u8,
-				51u8, 115u8, 4u8, 158u8, 102u8, 41u8, 50u8, 94u8, 199u8, 55u8, 133u8, 132u8, 208u8,
-				64u8, 54u8, 185u8, 54u8, 80u8, 86u8, 79u8,
+				186u8, 223u8, 245u8, 197u8, 95u8, 13u8, 138u8, 49u8, 13u8, 75u8, 116u8, 47u8,
+				144u8, 225u8, 164u8, 17u8, 81u8, 101u8, 178u8, 129u8, 224u8, 234u8, 107u8, 222u8,
+				39u8, 251u8, 61u8, 17u8, 153u8, 249u8, 8u8, 36u8,
 			]
 	}
 	pub mod system {
@@ -24658,6 +24658,23 @@ pub mod api {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"Treasury",
 						"PercentForVaultPool",
+						[
+							40u8, 171u8, 69u8, 196u8, 34u8, 184u8, 50u8, 128u8, 139u8, 192u8, 63u8,
+							231u8, 249u8, 200u8, 252u8, 73u8, 244u8, 170u8, 51u8, 177u8, 106u8,
+							47u8, 114u8, 234u8, 84u8, 104u8, 62u8, 118u8, 227u8, 50u8, 225u8,
+							122u8,
+						],
+					)
+				}
+				#[doc = " Minimum vault earnings rate before securitization coverage is applied."]
+				pub fn minimum_vault_profit_percent(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					runtime_types::sp_arithmetic::per_things::Percent,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"Treasury",
+						"MinimumVaultProfitPercent",
 						[
 							40u8, 171u8, 69u8, 196u8, 34u8, 184u8, 50u8, 128u8, 139u8, 192u8, 63u8,
 							231u8, 249u8, 200u8, 252u8, 73u8, 244u8, 170u8, 51u8, 177u8, 106u8,

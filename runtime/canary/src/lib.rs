@@ -462,6 +462,7 @@ impl pallet_treasury::Config for Runtime {
 	type PercentForBitcoinLiquidPool = PercentForBitcoinLiquidPool;
 	type PercentForArgonBondPool = PercentForArgonBondPool;
 	type PercentForVaultPool = PercentForVaultPool;
+	type MinimumVaultProfitPercent = MinimumVaultProfitPercent;
 	type DefaultTargetBitcoinPercent = DefaultTargetBitcoinPercent;
 	type MaxVaultsPerPool = MaxVaultsPerPool;
 	type MaxPendingUnlocksPerFrame = MaxPendingUnlocksPerFrame;

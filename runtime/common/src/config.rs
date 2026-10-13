@@ -108,6 +108,7 @@ parameter_types! {
 	pub const PercentForBitcoinLiquidPool: Percent = Percent::from_percent(3);
 	pub const PercentForArgonBondPool: Percent = Percent::from_percent(5);
 	pub const PercentForVaultPool: Percent = Percent::from_percent(51);
+	pub const MinimumVaultProfitPercent: Percent = Percent::from_percent(1);
 	pub const DefaultTargetBitcoinPercent: Percent = Percent::from_percent(15);
 	pub const MaxArgonotBondedPercentOfCirculation: Percent = Percent::from_percent(60);
 	/// Activated upstream Bitcoin securitization, in microgons, required for full vault earnings.
