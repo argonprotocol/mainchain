@@ -1,8 +1,48 @@
 # Changelog
 
-## [v1.4.13](https://github.com/argonprotocol/mainchain/compare/v1.4.12...34f249057e1c7da83b02c6bac7abd0ab33e5b637) (2026-09-21)
+## [v1.5.0](https://github.com/argonprotocol/mainchain/compare/v1.4.13...3727cfd52d24530169087bd44bfd2c68d2df0059) (2026-10-14)
 
 ### Features
+
+* **treasury:** expose minimum vault earnings percent
+([f7ce35a](https://github.com/argonprotocol/mainchain/commit/f7ce35a8b961bf216cd58438827b5ebb817ff06d))
+* **treasury:** factor upstream participation into vault earnings
+([2dfea9b](https://github.com/argonprotocol/mainchain/commit/2dfea9b86f156866cd0b16e1ed3f38f93628108c))
+* revise treasury rewards and securitization withdrawals
+([1fa27a1](https://github.com/argonprotocol/mainchain/commit/1fa27a1e9a3e04804f04cebd3bda84be4566bdf1))
+
+### Fixes
+
+* **mining:** align seat forecasts with completed auctions
+([b9641a5](https://github.com/argonprotocol/mainchain/commit/b9641a54f5d8916818db14f5444e63d04310fe7f))
+* **vaults:** raise certification minimum to 2,500 ARGON
+([b2d17a4](https://github.com/argonprotocol/mainchain/commit/b2d17a42485c4dede46cda72dfb97c57c5f1362b))
+* **ethereum:** update Hardhat to address security advisories
+([7e4dbe2](https://github.com/argonprotocol/mainchain/commit/7e4dbe2913e6ac386d4641ea1ca935131436bed2))
+* **treasury:** consolidate position codec bounds
+([ad8e3a0](https://github.com/argonprotocol/mainchain/commit/ad8e3a0c6a6ce76ad479cf7c6942ccb905a14613))
+* **consensus:** keep mining memory recovery safe to retry
+([4774082](https://github.com/argonprotocol/mainchain/commit/477408289545aeca8fa990e8e50aeccc901d91aa))
+* **consensus:** release compute memory after vote recovery
+([bbed111](https://github.com/argonprotocol/mainchain/commit/bbed11159eb237f0b68b76f5a012ac1ac06fe95e))
+* **ci:** reuse shared Cargo artifacts for CodeQL
+([304c7ae](https://github.com/argonprotocol/mainchain/commit/304c7ae3c61c40e411c2e2c642a414e4b1758317))
+* keep bitcoin sync results consistent across concurrent calls
+([3c3cfdb](https://github.com/argonprotocol/mainchain/commit/3c3cfdbeadf4f60413dad6b4b8f7afb7dc164822))
+* **client:** reuse supplied RPC providers
+([3177094](https://github.com/argonprotocol/mainchain/commit/317709454315857e8dc5f826e76653c1a18fed01))
+* upgrade Mainchain client to Polkadot.js 17.0.1
+([886e2b8](https://github.com/argonprotocol/mainchain/commit/886e2b8f26329fe6263a35dabf9114cf402f0cf2))
+* build Argon RPC from merged Subway commit
+([87107aa](https://github.com/argonprotocol/mainchain/commit/87107aa0b1d2d1938c19a25f0a85ee70aa345c7d))
+* **ci:** use available MinIO image for Node.js tests
+([474a9fc](https://github.com/argonprotocol/mainchain/commit/474a9fce1659b09e7a64ca203129fce1f2733ccd))
+* restore MinIO for dev Docker and tests
+([0cecf4e](https://github.com/argonprotocol/mainchain/commit/0cecf4eb86f82e62c46f2d2b272f4fbb9ab228e6))
+
+### [v1.4.13](https://github.com/argonprotocol/mainchain/compare/v1.4.12...v1.4.13) (2026-09-23)
+
+#### Features
 
 * **bitcoin:** support exact partial lock releases
 ([7ed6bbf](https://github.com/argonprotocol/mainchain/commit/7ed6bbf70100e0b85eb9065ee3a78fbca9bbbbc1))
@@ -11,8 +51,10 @@
 * add bitcoin fissions
 ([3b19218](https://github.com/argonprotocol/mainchain/commit/3b19218f71fb1a85d41ca09f8899f049fbf4b3f6))
 
-### Fixes
+#### Fixes
 
+* **bitcoin:** align lock settlement with fission liabilities
+([d8e0053](https://github.com/argonprotocol/mainchain/commit/d8e0053810485f145824213c55d77707241a31f2))
 * **treasury:** recover stranded bond releases
 ([229fa51](https://github.com/argonprotocol/mainchain/commit/229fa51493b3507b4f8aa8560de497fdedc05c3f))
 * **crosschain:** set transfer-out fee to 1.5%
