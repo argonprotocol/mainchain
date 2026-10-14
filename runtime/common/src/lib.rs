@@ -158,6 +158,7 @@ macro_rules! inject_runtime_vars {
 		///
 		/// This can be a tuple of types, each implementing `OnRuntimeUpgrade`.
 		type Migrations = (
+			pallet_mining_slot::migrations::MigrateSeatPriceHistoryMigration<Runtime>,
 			pallet_mint::migrations::RemoveMiningMintCounterMigration<Runtime>,
 			pallet_vaults::migrations::IndexVaultSecuritizationAndRemoveProfitSharingMigration<
 				Runtime,

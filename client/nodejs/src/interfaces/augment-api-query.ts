@@ -95,6 +95,7 @@ import type {
   PalletGrandpaStoredState,
   PalletLocalchainTransferQueuedTransferOut,
   PalletMiningSlotMinerNonceScoring,
+  PalletMiningSlotSeatPriceStats,
   PalletMintMintAction,
   PalletMintMintQueueCursor,
   PalletMintPendingBitcoinMint,
@@ -1088,9 +1089,14 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       argonotsPerMiningSeat: AugmentedQuery<ApiType, () => Observable<u128>, []>;
       /**
-       * The average price per seat for the last 10 frames (newest first)
+       * Winning bid totals and seat counts for averaging prices over the last 10 frames (newest
+       * first).
        **/
-      averagePricePerSeat: AugmentedQuery<ApiType, () => Observable<Vec<u128>>, []>;
+      averagePricePerSeat: AugmentedQuery<
+        ApiType,
+        () => Observable<Vec<PalletMiningSlotSeatPriceStats>>,
+        []
+      >;
       /**
        * The cohort set to go into effect in the next slot. The Vec has all
        * registrants with their bid amount

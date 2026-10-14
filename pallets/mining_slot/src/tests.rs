@@ -7,7 +7,7 @@ use crate::{
 		NextCohortSize, NextFrameId,
 	},
 	Error, Event, FrameRewardTicksRemaining, FrameStartTicks, HoldReason, MinerNonce,
-	MinerNonceScoring, Registration, ScheduledCohortSizeChangeByFrame,
+	MinerNonceScoring, Registration, ScheduledCohortSizeChangeByFrame, SeatPriceStats,
 };
 use argon_primitives::{block_seal::MiningRegistration, AuthorityProvider, MICROGONS_PER_ARGON};
 use frame_system::AccountInfo;
@@ -1845,6 +1845,213 @@ fn it_tracks_the_block_rewards() {
 }
 
 #[test]
+fn it_uses_observed_auction_sizes_for_seat_forecasts() {
+	FramesPerMiningTerm::set(10);
+	MinCohortSize::set(10);
+	MaxCohortSize::set(144);
+	TargetPricePerSeat::set(1000 * MICROGONS_PER_ARGON);
+
+	new_test_ext().execute_with(|| {
+		for frame_id in 1..=10 {
+			let (seats, bid) = if frame_id % 2 == 1 {
+				(10, 1600 * MICROGONS_PER_ARGON)
+			} else {
+				(20, 800 * MICROGONS_PER_ARGON)
+			};
+			NextCohortSize::<Test>::put(seats as u32);
+			let mut bids = BoundedVec::new();
+			for seat in 0..seats {
+				let account_id = frame_id * 100 + seat;
+				bids.try_push(Registration::<Test> {
+					account_id,
+					argonots: 0,
+					bid,
+					authority_keys: account_id.into(),
+					starting_frame_id: frame_id,
+					external_funding_account: None,
+					bid_at_tick: 1,
+				})
+				.unwrap();
+			}
+			BidsForNextSlotCohort::<Test>::put(bids);
+			MiningSlots::start_new_frame(frame_id);
+		}
+
+		// Every auction collected 16,000 Argons. Weighting each auction equally by
+		// price instead would report 1,200 Argons for the average winning seat.
+		assert_eq!(ActiveMinersCount::<Test>::get(), 150);
+		NextCohortSize::<Test>::put(57);
+		let announced: BoundedBTreeMap<FrameId, u32, ConstU32<11>> =
+			bounded_btree_map! { 11 => 49, 12 => 39, 13 => 30, 14 => 24, 15 => 19,
+				16 => 14, 17 => 12, 18 => 12, 19 => 13, 20 => 13 };
+		ScheduledCohortSizeChangeByFrame::<Test>::put(announced.clone());
+
+		MiningSlots::adjust_number_of_seats();
+
+		let schedule = ScheduledCohortSizeChangeByFrame::<Test>::get();
+		assert_eq!(schedule.get(&21), Some(&16));
+		assert_eq!(NextCohortSize::<Test>::get(), 57);
+		for (frame_id, seats) in announced {
+			assert_eq!(schedule.get(&frame_id), Some(&seats));
+		}
+
+		// A forecast made before an upgrade or an earlier invocation is also immutable.
+		ScheduledCohortSizeChangeByFrame::<Test>::mutate(|schedule| {
+			schedule.try_insert(21, 42).unwrap();
+		});
+		MiningSlots::adjust_number_of_seats();
+		assert_eq!(ScheduledCohortSizeChangeByFrame::<Test>::get().get(&21), Some(&42));
+	});
+}
+
+#[test]
+fn it_limits_seat_forecasts_relative_to_observed_auction_sizes() {
+	FramesPerMiningTerm::set(10);
+	MinCohortSize::set(10);
+	MaxCohortSize::set(144);
+	TargetPricePerSeat::set(1000 * MICROGONS_PER_ARGON);
+
+	for (seats, argons_per_seat, forecast) in [
+		(20, 1000, 20),
+		(20, 3000, 24),
+		(20, 200, 16),
+		(10, 200, 10),
+		(144, 3000, 144),
+		(0, 0, 10),
+		(21, 1050, 22),
+	] {
+		new_test_ext().execute_with(|| {
+			MiningSlots::adjust_number_of_seats();
+			assert!(ScheduledCohortSizeChangeByFrame::<Test>::get().is_empty());
+
+			NextCohortSize::<Test>::put(seats as u32);
+			let mut bids = BoundedVec::new();
+			for seat in 0..seats {
+				bids.try_push(Registration::<Test> {
+					account_id: seat,
+					argonots: 0,
+					bid: argons_per_seat * MICROGONS_PER_ARGON,
+					authority_keys: seat.into(),
+					starting_frame_id: 1,
+					external_funding_account: None,
+					bid_at_tick: 1,
+				})
+				.unwrap();
+			}
+			BidsForNextSlotCohort::<Test>::put(bids);
+			MiningSlots::start_new_frame(1);
+			NextCohortSize::<Test>::put(57);
+
+			MiningSlots::adjust_number_of_seats();
+
+			assert_eq!(ScheduledCohortSizeChangeByFrame::<Test>::get().get(&12), Some(&forecast));
+			assert_eq!(NextCohortSize::<Test>::get(), 57);
+		});
+	}
+}
+
+#[test]
+fn it_keeps_empty_and_retired_auctions_in_the_price_history() {
+	MinCohortSize::set(10);
+	MaxCohortSize::set(144);
+	TargetPricePerSeat::set(1000 * MICROGONS_PER_ARGON);
+
+	for (retained_frames, scheduled_frame) in [(10, 14), (2, 6)] {
+		FramesPerMiningTerm::set(retained_frames);
+		new_test_ext().execute_with(|| {
+			NextCohortSize::<Test>::put(20);
+			for frame_id in 1..=3 {
+				let mut bids = BoundedVec::new();
+				if frame_id < 3 {
+					for seat in 0..20 {
+						let account_id = frame_id * 100 + seat;
+						bids.try_push(Registration::<Test> {
+							account_id,
+							argonots: 0,
+							bid: 1000 * MICROGONS_PER_ARGON,
+							authority_keys: account_id.into(),
+							starting_frame_id: frame_id,
+							external_funding_account: None,
+							bid_at_tick: 1,
+						})
+						.unwrap();
+					}
+				}
+				BidsForNextSlotCohort::<Test>::put(bids);
+				MiningSlots::start_new_frame(frame_id);
+			}
+
+			MiningSlots::adjust_number_of_seats();
+
+			assert_eq!(
+				ScheduledCohortSizeChangeByFrame::<Test>::get().get(&scheduled_frame),
+				Some(&13)
+			);
+		});
+	}
+}
+
+#[test]
+fn it_migrates_winning_bid_totals_without_rounding_or_changing_announcements() {
+	#[cfg(feature = "try-runtime")]
+	use crate::migrations::MigrateSeatPriceHistory;
+	use crate::migrations::{v10, MigrateSeatPriceHistoryMigration};
+	#[cfg(feature = "try-runtime")]
+	use frame_support::traits::UncheckedOnRuntimeUpgrade;
+	use frame_support::traits::{OnRuntimeUpgrade, StorageVersion};
+
+	FramesPerMiningTerm::set(10);
+	MinCohortSize::set(10);
+	MaxCohortSize::set(144);
+	TargetPricePerSeat::set(1000 * MICROGONS_PER_ARGON);
+
+	new_test_ext().execute_with(|| {
+		let mut cohort = BoundedVec::new();
+		for seat in 0..21 {
+			cohort
+				.try_push(Registration::<Test> {
+					account_id: seat,
+					argonots: 0,
+					bid: if seat == 20 {
+						2000 * MICROGONS_PER_ARGON
+					} else {
+						1000 * MICROGONS_PER_ARGON
+					},
+					authority_keys: seat.into(),
+					starting_frame_id: 1,
+					external_funding_account: None,
+					bid_at_tick: 1,
+				})
+				.unwrap();
+		}
+		MinersByCohort::<Test>::insert(1, cohort);
+		NextFrameId::<Test>::put(2);
+		NextCohortSize::<Test>::put(57);
+		let announced = bounded_btree_map! { 2 => 49, 3 => 39 };
+		ScheduledCohortSizeChangeByFrame::<Test>::put(&announced);
+		let old_prices: BoundedVec<u128, ConstU32<10>> =
+			bounded_vec![22_000 * MICROGONS_PER_ARGON / 21];
+		v10::AveragePricePerSeat::<Test>::put(old_prices);
+		StorageVersion::new(10).put::<MiningSlots>();
+		#[cfg(feature = "try-runtime")]
+		let upgrade_state = MigrateSeatPriceHistory::<Test>::pre_upgrade().unwrap();
+
+		MigrateSeatPriceHistoryMigration::<Test>::on_runtime_upgrade();
+		#[cfg(feature = "try-runtime")]
+		MigrateSeatPriceHistory::<Test>::post_upgrade(upgrade_state).unwrap();
+
+		assert_eq!(
+			AveragePricePerSeat::<Test>::get().to_vec(),
+			vec![SeatPriceStats { seats: 21, total_bids: 22_000 * MICROGONS_PER_ARGON }]
+		);
+		assert_eq!(ScheduledCohortSizeChangeByFrame::<Test>::get(), announced);
+		assert_eq!(NextCohortSize::<Test>::get(), 57);
+		MiningSlots::adjust_number_of_seats();
+		assert_eq!(ScheduledCohortSizeChangeByFrame::<Test>::get().get(&12), Some(&22));
+	});
+}
+
+#[test]
 fn it_adjusts_mining_seats() {
 	TicksBetweenSlots::set(10);
 	FramesPerMiningTerm::set(10);
@@ -1871,7 +2078,10 @@ fn it_adjusts_mining_seats() {
 		MiningSlots::on_initialize(11);
 		MiningSlots::on_finalize(11);
 		assert_eq!(NextFrameId::<Test>::get(), 2);
-		assert_eq!(AveragePricePerSeat::<Test>::get().to_vec(), vec![110 * 1_000_000]);
+		assert_eq!(
+			AveragePricePerSeat::<Test>::get().to_vec(),
+			vec![SeatPriceStats { seats: 10, total_bids: 1100 * MICROGONS_PER_ARGON }]
+		);
 		assert_eq!(NextCohortSize::<Test>::get(), 10);
 		let expected_frame: FrameId = NextFrameId::<Test>::get() as FrameId + 10u64;
 		let expected_schedule: BoundedBTreeMap<FrameId, u32, ConstU32<11>> =
@@ -1906,7 +2116,8 @@ fn it_adjusts_mining_seats() {
 		assert_eq!(ScheduledCohortSizeChangeByFrame::<Test>::get().len(), 11);
 		assert_eq!(
 			ScheduledCohortSizeChangeByFrame::<Test>::get().into_iter().next_back(),
-			Some((23u32.into(), 12))
+			// Eleven seats were offered, but only ten won bids at 110 Argons each.
+			Some((23, 11))
 		);
 		assert_eq!(AveragePricePerSeat::<Test>::get().len(), 10);
 	});

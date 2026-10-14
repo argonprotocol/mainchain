@@ -3500,9 +3500,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				186u8, 223u8, 245u8, 197u8, 95u8, 13u8, 138u8, 49u8, 13u8, 75u8, 116u8, 47u8,
-				144u8, 225u8, 164u8, 17u8, 81u8, 101u8, 178u8, 129u8, 224u8, 234u8, 107u8, 222u8,
-				39u8, 251u8, 61u8, 17u8, 153u8, 249u8, 8u8, 36u8,
+				67u8, 8u8, 233u8, 223u8, 197u8, 229u8, 5u8, 180u8, 247u8, 210u8, 127u8, 15u8,
+				193u8, 218u8, 140u8, 204u8, 161u8, 254u8, 243u8, 218u8, 98u8, 128u8, 87u8, 9u8,
+				151u8, 118u8, 4u8, 160u8, 112u8, 140u8, 40u8, 212u8,
 			]
 	}
 	pub mod system {
@@ -7923,7 +7923,9 @@ pub mod api {
 					use super::runtime_types;
 					pub type AveragePricePerSeat =
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<
-							::core::primitive::u128,
+							runtime_types::pallet_mining_slot::pallet::SeatPriceStats<
+								::core::primitive::u128,
+							>,
 						>;
 				}
 				pub mod mining_config {
@@ -8243,7 +8245,8 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " The average price per seat for the last 10 frames (newest first)"]
+				#[doc = " Winning bid totals and seat counts for averaging prices over the last 10 frames (newest"]
+				#[doc = " first)."]
 				pub fn average_price_per_seat(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
@@ -8258,10 +8261,10 @@ pub mod api {
 						"AveragePricePerSeat",
 						(),
 						[
-							77u8, 221u8, 232u8, 161u8, 85u8, 229u8, 11u8, 172u8, 59u8, 220u8,
-							206u8, 69u8, 211u8, 116u8, 85u8, 171u8, 232u8, 20u8, 234u8, 102u8,
-							193u8, 11u8, 53u8, 56u8, 211u8, 1u8, 149u8, 243u8, 186u8, 145u8, 134u8,
-							145u8,
+							186u8, 33u8, 227u8, 72u8, 29u8, 150u8, 29u8, 15u8, 239u8, 129u8, 103u8,
+							82u8, 99u8, 113u8, 254u8, 212u8, 189u8, 82u8, 154u8, 252u8, 169u8,
+							165u8, 101u8, 177u8, 98u8, 213u8, 173u8, 189u8, 149u8, 20u8, 160u8,
+							194u8,
 						],
 					)
 				}
@@ -36297,6 +36300,22 @@ pub mod api {
 				pub enum HoldReason {
 					#[codec(index = 0)]
 					RegisterAsMiner,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct SeatPriceStats<_0> {
+					pub seats: ::core::primitive::u32,
+					pub total_bids: _0,
 				}
 			}
 			#[derive(
