@@ -20,6 +20,7 @@ scale-info = { workspace = true }
 impl-trait-for-tuples = { workspace = true }
 polkadot-sdk = { workspace = true, features = ["frame-support", "frame-system", "sp-runtime", "sp-core"] }
 pallet-prelude = { workspace = true }
+argon-notary-audit = { workspace = true, optional = true }
 
 [dev-dependencies]
 polkadot-sdk = { workspace = true, features = ["sp-io", "sp-keyring"], default-features = true }
@@ -29,12 +30,14 @@ argon-notary-audit = { workspace = true }
 [features]
 default = [ "std" ]
 std = [
+	"argon-notary-audit?/std",
 	"codec/std",
 	"pallet-prelude/std",
 	"polkadot-sdk/std",
 	"scale-info/std",
 ]
 runtime-benchmarks = [
+	"dep:argon-notary-audit",
 	"pallet-prelude/runtime-benchmarks",
 	"polkadot-sdk/frame-benchmarking",
 	"polkadot-sdk/runtime-benchmarks",

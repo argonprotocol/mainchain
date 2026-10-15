@@ -959,6 +959,8 @@ pub fn benchmark_bitcoin_utxo_tracker_state() -> BenchmarkBitcoinUtxoTrackerStat
 
 pub struct BenchmarkBitcoinUtxoTracker;
 impl BitcoinUtxoTracker for BenchmarkBitcoinUtxoTracker {
+	type Weights = ();
+
 	fn get_synched_height() -> BitcoinHeight {
 		0
 	}

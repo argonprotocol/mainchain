@@ -1,6 +1,6 @@
 use super::*;
 use argon_primitives::{PriceProvider, MICROGONS_PER_ARGON};
-use frame_support::traits::Hooks;
+use frame_support::{dispatch::CheckIfFeeless, traits::Hooks};
 use frame_system::RawOrigin;
 use pallet_prelude::benchmarking::{
 	set_benchmark_bitcoin_locks_runtime_state, BenchmarkBitcoinLocksRuntimeState,
@@ -10,6 +10,19 @@ use polkadot_sdk::frame_benchmarking::v2::*;
 #[benchmarks]
 mod benchmarks {
 	use super::*;
+
+	#[benchmark]
+	fn provider_is_feeless() {
+		let caller: T::AccountId = whitelisted_caller();
+		Operator::<T>::put(&caller);
+		let call = Call::<T>::submit { index: benchmark_price_index(1), ethereum: None };
+		let origin = RawOrigin::Signed(caller).into();
+
+		#[block]
+		{
+			assert!(core::hint::black_box(&call).is_feeless(&origin));
+		}
+	}
 
 	#[benchmark]
 	fn submit() -> Result<(), BenchmarkError> {

@@ -253,7 +253,7 @@ impl pallet_authorship::Config for Runtime {
 }
 
 impl pallet_digests::Config for Runtime {
-	type WeightInfo = ();
+	type WeightInfo = weights::pallet_digests::WeightInfo<Runtime>;
 	type NotebookVerifyError = NotebookVerifyError;
 }
 
@@ -572,7 +572,10 @@ impl pallet_notebook::Config for Runtime {
 }
 
 impl pallet_notaries::Config for Runtime {
-	type WeightInfo = ();
+	type WeightInfo = pallet_notaries::weights::WithProviderWeights<
+		Runtime,
+		weights::pallet_notaries::WeightInfo<Runtime>,
+	>;
 	type MaxActiveNotaries = MaxActiveNotaries;
 	type MaxProposalHoldBlocks = MaxProposalHoldBlocks;
 	type MaxProposalsPerBlock = MaxProposalsPerBlock;
@@ -841,6 +844,12 @@ impl pallet_ethereum_verifier::Config for Runtime {
 	type WeightInfo = weights::pallet_ethereum_verifier::WeightInfo<Runtime>;
 }
 impl pallet_fee_control::Config for Runtime {
+	type WeightInfo = weights::pallet_fee_control::WeightInfo<Runtime>;
+	type FeelessCallWeights = (
+		pallet_price_index::weights::ProviderWeightAdapter<Runtime>,
+		pallet_bitcoin_utxos::weights::ProviderWeightAdapter<Runtime>,
+		pallet_bitcoin_locks::weights::ProviderWeightAdapter<Runtime>,
+	);
 	type Balance = Balance;
 	type FeelessCallTxPoolKeyProviders = ();
 	type CallTxPoolKeyProviders = (EthereumVerifier, CrosschainTransfer);

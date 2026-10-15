@@ -22,7 +22,7 @@ use crate::mock::{
 	Test, TipAmount, TipUnbalancedAmount, ValidateCount,
 };
 use codec::Encode;
-use frame_support::dispatch::{DispatchInfo, GetDispatchInfo, Pays};
+use frame_support::dispatch::{DispatchInfo, GetDispatchInfo, Pays, PostDispatchInfo};
 use frame_system::RawOrigin;
 use pallet_prelude::{
 	argon_primitives::CurrentTransactionFeeProvider, frame_support::traits::Currency,
@@ -50,6 +50,31 @@ fn skip_feeless_payment_works() {
 			.validate_and_prepare(Some(0).into(), &call, &DispatchInfo::default(), 0, 0)
 			.unwrap();
 		assert_eq!(PrepareCount::get(), 1);
+	});
+}
+
+#[test]
+fn feeless_calls_refund_the_skipped_payment_weight() {
+	new_test_ext().execute_with(|| {
+		let call = RuntimeCall::DummyPallet(Call::<Test>::aux { is_feeless: true, key: 1 });
+		let info = call.get_dispatch_info();
+		let len = call.encoded_size();
+		let inner_weight = MockChargePaymentExtension.weight(&call);
+		let (pre, _) =
+			CheckFeeWrapper::<Test, MockChargePaymentExtension>::from(MockChargePaymentExtension)
+				.validate_and_prepare(Some(0).into(), &call, &info, len, 0)
+				.unwrap();
+
+		let refunded = CheckFeeWrapper::<Test, MockChargePaymentExtension>::post_dispatch_details(
+			pre,
+			&info,
+			&PostDispatchInfo::default(),
+			len,
+			&Ok(()),
+		)
+		.unwrap();
+
+		assert_eq!(refunded, inner_weight);
 	});
 }
 

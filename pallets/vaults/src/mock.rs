@@ -255,6 +255,8 @@ impl pallet_vaults::Config for Test {
 
 pub struct StaticBitcoinUtxoTracker;
 impl BitcoinUtxoTracker for StaticBitcoinUtxoTracker {
+	type Weights = ();
+
 	fn get_synched_height() -> BitcoinHeight {
 		0
 	}

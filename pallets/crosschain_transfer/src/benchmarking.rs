@@ -13,10 +13,16 @@ use argon_ethereum_contracts::minting_gateway::{
 };
 use argon_primitives::{
 	ethereum::{
-		EthereumCombinedReceiptProof, EthereumExecutionBlockProof, EthereumReceiptProofReceipt,
+		EthereumCombinedReceiptProof, EthereumExecutionBlockProof, EthereumExecutionHeader,
+		EthereumReceiptProofNode, EthereumReceiptProofReceipt,
+		MAX_ETHEREUM_COMBINED_RECEIPT_PROOF_NODES, MAX_ETHEREUM_EXECUTION_HEADER_RLP_BYTES,
+		MAX_ETHEREUM_HEADER_CHAIN_LEN, MAX_ETHEREUM_LOG_DATA_BYTES, MAX_ETHEREUM_LOG_TOPICS,
+		MAX_ETHEREUM_RECEIPTS_PER_PROOF, MAX_ETHEREUM_RECEIPT_PROOF_NODE_BYTES,
+		MAX_ETHEREUM_RECEIPT_PROOF_NODE_REFS,
 	},
 	vault::{Vault, VaultTerms},
-	EthereumLog, EthereumReceiptLog, UniswapTransferProvider, VaultId,
+	CallTxPoolKeyProvider, CallTxValidityProvider, EthereumLog, EthereumReceiptLog,
+	UniswapTransferProvider, VaultId,
 };
 use pallet_prelude::benchmarking::{
 	reset_benchmark_bitcoin_locks_runtime_state, reset_benchmark_bitcoin_vault_provider_state,
@@ -40,10 +46,128 @@ const BENCHMARK_DESTINATION_CHAIN: SourceChain = SourceChain::Ethereum;
 		T::AccountId: From<[u8; 32]> + Ord,
 		[u8; 32]: From<T::AccountId>,
 		T::NativeCurrency: Mutate<T::AccountId, Balance = T::Balance>
+		, T::RuntimeCall: From<Call<T>> + frame_support::traits::IsSubType<Call<T>>
 )]
 mod benchmarks {
 	use super::*;
 	use argon_primitives::CollectBlockerProvider;
+
+	#[benchmark]
+	fn provider_tx_pool_key() {
+		let node = EthereumReceiptProofNode::try_from(vec![
+			0xff;
+			MAX_ETHEREUM_RECEIPT_PROOF_NODE_BYTES
+				as usize
+		])
+		.unwrap();
+		let receipt = EthereumReceiptProofReceipt {
+			transaction_index: u64::MAX,
+			node_indexes: BoundedVec::truncate_from(vec![
+				0;
+				MAX_ETHEREUM_RECEIPT_PROOF_NODE_REFS
+					as usize
+			]),
+		};
+		let log = EthereumReceiptLog {
+			transaction_index: u64::MAX,
+			event_log: EthereumLog {
+				address: H160::repeat_byte(1),
+				topics: BoundedVec::truncate_from(vec![
+					H256::repeat_byte(2);
+					MAX_ETHEREUM_LOG_TOPICS as usize
+				]),
+				data: BoundedVec::truncate_from(vec![0xff; MAX_ETHEREUM_LOG_DATA_BYTES as usize]),
+			},
+		};
+		let block = GatewayActivityProofBlock::<T> {
+			target_block_number: u64::MAX,
+			receipt_proof: EthereumCombinedReceiptProof {
+				nodes: BoundedVec::truncate_from(vec![
+					node;
+					MAX_ETHEREUM_COMBINED_RECEIPT_PROOF_NODES
+						as usize
+				]),
+				receipts: BoundedVec::truncate_from(vec![
+					receipt;
+					MAX_ETHEREUM_RECEIPTS_PER_PROOF as usize
+				]),
+			},
+			receipt_logs: BoundedVec::truncate_from(vec![
+				log;
+				T::MaxActivitiesPerReceiptProof::get()
+					as usize
+			]),
+		};
+		let header = EthereumExecutionHeader {
+			rlp: BoundedVec::truncate_from(vec![
+				0xff;
+				MAX_ETHEREUM_EXECUTION_HEADER_RLP_BYTES as usize
+			]),
+		};
+		let proof_batch = GatewayActivityProofBatch::<T> {
+			execution_block_proof: EthereumExecutionBlockProof {
+				anchor_block_hash: H256::repeat_byte(3),
+				target_to_anchor_header_chain: BoundedVec::truncate_from(vec![
+					header;
+					MAX_ETHEREUM_HEADER_CHAIN_LEN
+						as usize
+				]),
+			},
+			blocks: BoundedVec::truncate_from(vec![
+				block;
+				T::MaxReceiptProofsPerExtrinsic::get() as usize
+			]),
+		};
+		let call = T::RuntimeCall::from(Call::<T>::prove_gateway_activity {
+			source_chain: SourceChain::Ethereum,
+			previous_gateway_activity_nonce: 0,
+			proof_batch,
+		});
+
+		#[block]
+		{
+			let key = <Pallet<T> as CallTxPoolKeyProvider<T::RuntimeCall, T::AccountId>>::key_for(
+				core::hint::black_box(&call),
+				None,
+			)
+			.expect("gateway proof has a pool key");
+			assert_eq!(key.len(), 32);
+		}
+	}
+
+	#[benchmark]
+	fn provider_validate_transaction() {
+		GatewaySyncPauseBySourceChain::<T>::remove(SourceChain::Ethereum);
+		GatewayStateBySourceChain::<T>::insert(
+			SourceChain::Ethereum,
+			GatewayState::<T> {
+				gateway_activity_nonce: 1,
+				argon_approvals_nonce: u64::MAX,
+				argon_circulation: u128::MAX.into(),
+				argonot_circulation: u128::MAX.into(),
+			},
+		);
+		let call = T::RuntimeCall::from(Call::<T>::prove_gateway_activity {
+			source_chain: SourceChain::Ethereum,
+			previous_gateway_activity_nonce: 1,
+			proof_batch: GatewayActivityProofBatch::<T> {
+				execution_block_proof: argon_primitives::ethereum::EthereumExecutionBlockProof {
+					anchor_block_hash: H256::zero(),
+					target_to_anchor_header_chain: BoundedVec::default(),
+				},
+				blocks: BoundedVec::default(),
+			},
+		});
+
+		#[block]
+		{
+			<Pallet<T> as CallTxValidityProvider<T::RuntimeCall, T::AccountId>>::validate(
+				core::hint::black_box(&call),
+				None,
+			)
+			.expect("nonce is current and gateway is not paused");
+		}
+	}
 
 	#[benchmark]
 	fn set_chain_config() -> Result<(), BenchmarkError> {

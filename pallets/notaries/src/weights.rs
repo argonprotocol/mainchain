@@ -1,4 +1,4 @@
-use argon_primitives::notary::NotaryProviderWeightInfo;
+use argon_primitives::{notary::NotaryProviderWeightInfo, TickProvider, TickProviderWeightInfo};
 use pallet_prelude::*;
 
 /// Weight functions needed for this pallet.
@@ -9,9 +9,54 @@ pub trait WeightInfo {
 	fn update() -> Weight;
 
 	// on_initialize hooks
+	fn on_initialize_without_meta_changes() -> Weight;
 	fn on_initialize_with_meta_changes(meta_count: u32) -> Weight;
-	fn on_initialize_with_expiring_proposals(expiring_count: u32) -> Weight;
+	fn on_finalize_with_expiring_proposals(expiring_count: u32) -> Weight;
 	fn provider_active_notaries() -> Weight;
+}
+
+type TickProviderWeights<T> = <<T as crate::Config>::TickProvider as TickProvider<
+	<T as frame_system::Config>::Block,
+>>::Weights;
+
+pub struct WithProviderWeights<T, Base, TickProviderWeight = TickProviderWeights<T>>(
+	PhantomData<(T, Base, TickProviderWeight)>,
+);
+impl<T, Base, TickProviderWeight> WeightInfo for WithProviderWeights<T, Base, TickProviderWeight>
+where
+	T: crate::Config,
+	Base: WeightInfo,
+	TickProviderWeight: TickProviderWeightInfo,
+{
+	fn propose() -> Weight {
+		Base::propose()
+	}
+
+	fn activate() -> Weight {
+		Base::activate().saturating_add(TickProviderWeight::current_tick())
+	}
+
+	fn update() -> Weight {
+		Base::update().saturating_add(TickProviderWeight::current_tick())
+	}
+
+	fn on_initialize_without_meta_changes() -> Weight {
+		Base::on_initialize_without_meta_changes()
+			.saturating_add(TickProviderWeight::current_tick())
+	}
+
+	fn on_initialize_with_meta_changes(meta_count: u32) -> Weight {
+		Base::on_initialize_with_meta_changes(meta_count)
+			.saturating_add(TickProviderWeight::current_tick())
+	}
+
+	fn on_finalize_with_expiring_proposals(expiring_count: u32) -> Weight {
+		Base::on_finalize_with_expiring_proposals(expiring_count)
+	}
+
+	fn provider_active_notaries() -> Weight {
+		Base::provider_active_notaries()
+	}
 }
 
 pub struct ProviderWeightAdapter<T>(PhantomData<T>);
@@ -35,11 +80,15 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 
+	fn on_initialize_without_meta_changes() -> Weight {
+		Weight::zero()
+	}
+
 	fn on_initialize_with_meta_changes(_meta_count: u32) -> Weight {
 		Weight::zero()
 	}
 
-	fn on_initialize_with_expiring_proposals(_expiring_count: u32) -> Weight {
+	fn on_finalize_with_expiring_proposals(_expiring_count: u32) -> Weight {
 		Weight::zero()
 	}
 
