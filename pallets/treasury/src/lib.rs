@@ -85,8 +85,6 @@ pub mod pallet {
 	use tracing::info;
 
 	const STORAGE_VERSION: StorageVersion = StorageVersion::new(9);
-	/// Maximum rewarded Argonot backing is worth twice the vault's Argon securitization.
-	const ARGONOT_SECURITIZATION_MULTIPLIER: u32 = 2;
 
 	pub type BondLotId = u64;
 
@@ -202,6 +200,11 @@ pub mod pallet {
 		/// Minimum vault earnings rate before securitization coverage is applied.
 		#[pallet::constant]
 		type MinimumVaultProfitPercent: Get<Percent>;
+
+		/// Maximum rewarded Argonot value as a multiple of the vault's Argon securitization.
+		/// Zero disables Argonot backing requirements and bonuses.
+		#[pallet::constant]
+		type ArgonotSecuritizationMultiplier: Get<u32>;
 
 		/// Default percent of maximum Bitcoin-mintable Argons targeted by the network.
 		#[pallet::constant]
@@ -1179,7 +1182,7 @@ pub mod pallet {
 			} in securitization_positions
 			{
 				let argonot_capacity = FixedU128::saturating_from_integer(securitization.into())
-					.saturating_mul(FixedU128::from_u32(ARGONOT_SECURITIZATION_MULTIPLIER));
+					.saturating_mul(FixedU128::from_u32(T::ArgonotSecuritizationMultiplier::get()));
 				let required_micronots = argonot_capacity
 					.checked_div(&microgons_per_micronot)
 					.unwrap_or_default()
@@ -1499,9 +1502,14 @@ pub mod pallet {
 			let maximum_profit_rate =
 				FixedU128::from_rational(T::PercentForVaultPool::get().deconstruct() as u128, 100);
 
-			let argonot_bonus_rate = FixedU128::from_rational(29, 100);
-			let maximum_capital_multiplier =
-				FixedU128::from_u32(1 + ARGONOT_SECURITIZATION_MULTIPLIER);
+			let argonot_securitization_multiplier = T::ArgonotSecuritizationMultiplier::get();
+			let argonot_bonus_rate = if argonot_securitization_multiplier == 0 {
+				FixedU128::zero()
+			} else {
+				FixedU128::from_rational(29, 100)
+			};
+			let maximum_capital_multiplier = FixedU128::one()
+				.saturating_add(FixedU128::from_u32(argonot_securitization_multiplier));
 			let maximum_argonot_bonus = FixedU128::one().saturating_add(argonot_bonus_rate);
 			// Scale the core rate so maximum capital backing and bonuses reach the vault pool cap.
 			let maximum_core_profit_rate = maximum_profit_rate
@@ -1530,10 +1538,14 @@ pub mod pallet {
 					securitization,
 				);
 				let argonot_capacity =
-					securitization.saturating_mul(ARGONOT_SECURITIZATION_MULTIPLIER.into());
+					securitization.saturating_mul(argonot_securitization_multiplier.into());
 				let argonot_value: u128 = position.argonot_securitization_in_microgons.into();
 				let argonot_value = argonot_value.min(argonot_capacity);
-				let argonot_utilization = FixedU128::from_rational(argonot_value, argonot_capacity);
+				let argonot_utilization = if argonot_capacity == 0 {
+					FixedU128::zero()
+				} else {
+					FixedU128::from_rational(argonot_value, argonot_capacity)
+				};
 				let core_utilization = bitcoin_utilization.saturating_mul(
 					FixedU128::from_rational(9, 10).saturating_add(
 						FixedU128::from_rational(1, 10).saturating_mul(bond_utilization),

@@ -595,6 +595,11 @@ declare module '@polkadot/api-base/types/consts' {
     };
     treasury: {
       /**
+       * Maximum rewarded Argonot value as a multiple of the vault's Argon securitization.
+       * Zero disables Argonot backing requirements and bonuses.
+       **/
+      argonotSecuritizationMultiplier: u32 & AugmentedConst<ApiType>;
+      /**
        * Default percent of maximum Bitcoin-mintable Argons targeted by the network.
        **/
       defaultTargetBitcoinPercent: Percent & AugmentedConst<ApiType>;

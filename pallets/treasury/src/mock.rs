@@ -157,6 +157,7 @@ parameter_types! {
 	pub const PercentForArgonBondPool: Percent = Percent::from_percent(5);
 	pub const PercentForVaultPool: Percent = Percent::from_percent(51);
 	pub const MinimumVaultProfitPercent: Percent = Percent::from_percent(1);
+	pub static ArgonotSecuritizationMultiplier: u32 = 2;
 	pub const DefaultTargetBitcoinPercent: Percent = Percent::from_percent(15);
 	pub static MaxArgonotBondedPercentOfCirculation: Percent = Percent::from_percent(60);
 	pub static CurrentFrameId: FrameId = 1;
@@ -411,6 +412,7 @@ impl pallet_treasury::Config for Test {
 	type PercentForArgonBondPool = PercentForArgonBondPool;
 	type PercentForVaultPool = PercentForVaultPool;
 	type MinimumVaultProfitPercent = MinimumVaultProfitPercent;
+	type ArgonotSecuritizationMultiplier = ArgonotSecuritizationMultiplier;
 	type DefaultTargetBitcoinPercent = DefaultTargetBitcoinPercent;
 	type MaxVaultsPerPool = MaxVaultsPerPool;
 	type MaxPendingUnlocksPerFrame = MaxPendingUnlocksPerFrame;
@@ -420,6 +422,7 @@ impl pallet_treasury::Config for Test {
 }
 
 pub(crate) fn new_test_ext() -> TestState {
+	ArgonotSecuritizationMultiplier::set(2);
 	Upstreams::set(BTreeMap::new());
 	AvailableSecuritizationSpace::set(BTreeMap::new());
 	new_test_with_genesis::<Test>(|_t| {})
