@@ -255,7 +255,7 @@ pub mod pallet {
 
 	#[pallet::type_value]
 	pub fn DefaultUpstreamParticipationFactor() -> Percent {
-		Percent::from_percent(100)
+		Percent::from_percent(5)
 	}
 
 	/// Share of reward uplift controlled by upstream participation, frozen at frame start.

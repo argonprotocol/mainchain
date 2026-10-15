@@ -62,7 +62,7 @@ mod benchmarks {
 		{
 			assert_eq!(
 				Pallet::<T>::upstream_participation(&operator),
-				FixedU128::from_rational(1, 2)
+				FixedU128::from_rational(975, 1_000)
 			);
 		}
 		Ok(())
