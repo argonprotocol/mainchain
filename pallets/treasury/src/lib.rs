@@ -250,9 +250,19 @@ pub mod pallet {
 
 	/// Configurable percent of maximum Bitcoin-mintable Argons targeted by the network.
 	#[pallet::storage]
-	#[pallet::getter(fn target_bitcoin_percent)]
 	pub type TargetBitcoinPercent<T: Config> =
 		StorageValue<_, Percent, ValueQuery, T::DefaultTargetBitcoinPercent>;
+
+	#[pallet::type_value]
+	pub fn DefaultUpstreamParticipationFactor() -> Percent {
+		Percent::from_percent(100)
+	}
+
+	/// Share of reward uplift controlled by upstream participation, frozen at frame start.
+	/// Zero disables the requirement; 100% applies the full participation score.
+	#[pallet::storage]
+	pub type UpstreamParticipationFactor<T: Config> =
+		StorageValue<_, Percent, ValueQuery, DefaultUpstreamParticipationFactor>;
 
 	/// The next bond lot id.
 	#[pallet::storage]
@@ -378,6 +388,7 @@ pub mod pallet {
 		},
 		RewardEconomicsConfigured {
 			target_bitcoin_percent: Percent,
+			upstream_participation_factor: Percent,
 		},
 		/// The current frame's vault capital was locked in.
 		FrameVaultCapitalLocked {
@@ -862,13 +873,24 @@ pub mod pallet {
 		pub fn configure_reward_economics(
 			origin: OriginFor<T>,
 			target_bitcoin_percent: Option<Percent>,
+			upstream_participation_factor: Option<Percent>,
 		) -> DispatchResult {
 			ensure_root(origin)?;
+			let current_target_bitcoin_percent = TargetBitcoinPercent::<T>::get();
 			if let Some(target_bitcoin_percent) = target_bitcoin_percent {
 				TargetBitcoinPercent::<T>::put(target_bitcoin_percent);
 			}
+
+			let current_upstream_participation_factor = UpstreamParticipationFactor::<T>::get();
+			if let Some(upstream_participation_factor) = upstream_participation_factor {
+				UpstreamParticipationFactor::<T>::put(upstream_participation_factor);
+			}
+
 			Self::deposit_event(Event::RewardEconomicsConfigured {
-				target_bitcoin_percent: TargetBitcoinPercent::<T>::get(),
+				target_bitcoin_percent: target_bitcoin_percent
+					.unwrap_or(current_target_bitcoin_percent),
+				upstream_participation_factor: upstream_participation_factor
+					.unwrap_or(current_upstream_participation_factor),
 			});
 			Ok(())
 		}
@@ -1313,7 +1335,15 @@ pub mod pallet {
 			let bitcoin_participation = bitcoin_score.saturating_mul(bitcoin_weight);
 			let bond_participation = bond_score.saturating_mul(bond_weight);
 
-			bitcoin_participation.saturating_add(bond_participation)
+			let participation = bitcoin_participation.saturating_add(bond_participation);
+			let factor = FixedU128::from_rational(
+				UpstreamParticipationFactor::<T>::get().deconstruct() as u128,
+				100,
+			);
+
+			FixedU128::one()
+				.saturating_sub(factor)
+				.saturating_add(factor.saturating_mul(participation))
 		}
 
 		/// Pay the completed frame, release matured lots, then activate next-frame positions.
