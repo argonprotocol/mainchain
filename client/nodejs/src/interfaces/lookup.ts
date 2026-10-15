@@ -1411,6 +1411,7 @@ export default {
       },
       RewardEconomicsConfigured: {
         targetBitcoinPercent: 'Percent',
+        upstreamParticipationFactor: 'Percent',
       },
       FrameVaultCapitalLocked: {
         frameId: 'u64',
@@ -2809,6 +2810,7 @@ export default {
       },
       configure_reward_economics: {
         targetBitcoinPercent: 'Option<Percent>',
+        upstreamParticipationFactor: 'Option<Percent>',
       },
       backfill_bond_lot_earnings: {
         bondLotId: 'u64',

@@ -17,7 +17,10 @@ use crate::{
 		TreasuryReservesAccountId, Upstreams, VaultArgonotMicronots, VaultBitcoinSatoshis,
 		VaultRewardCommittedMicronots, VaultsById,
 	},
-	pallet::{BondLotEarningsMetrics, Bonds, Error, FrameVaultCapital, TargetBitcoinPercent},
+	pallet::{
+		BondLotEarningsMetrics, Bonds, Error, FrameVaultCapital, TargetBitcoinPercent,
+		UpstreamParticipationFactor,
+	},
 };
 use argon_primitives::{
 	treasury::{PositionQuantities, TreasuryPositionProvider},
@@ -85,20 +88,40 @@ fn set_target_securitization(amount: Balance) {
 }
 
 #[test]
-fn root_configures_target_bitcoin_percent_without_resetting_omitted_values() {
+fn root_configures_reward_economics_without_resetting_omitted_values() {
 	new_test_ext().execute_with(|| {
-		assert_eq!(Treasury::target_bitcoin_percent(), Percent::from_percent(15));
+		System::set_block_number(1);
+		assert_eq!(TargetBitcoinPercent::<Test>::get(), Percent::from_percent(15));
+		assert_eq!(UpstreamParticipationFactor::<Test>::get(), Percent::from_percent(5));
 		assert_noop!(
-			Treasury::configure_reward_economics(origin(1), Some(Percent::from_percent(20)),),
+			Treasury::configure_reward_economics(
+				origin(1),
+				Some(Percent::from_percent(20)),
+				Some(Percent::from_percent(5)),
+			),
 			sp_runtime::DispatchError::BadOrigin,
 		);
 
 		assert_ok!(Treasury::configure_reward_economics(
 			RuntimeOrigin::root(),
 			Some(Percent::from_percent(20)),
+			None,
 		));
-		assert_ok!(Treasury::configure_reward_economics(RuntimeOrigin::root(), None));
-		assert_eq!(Treasury::target_bitcoin_percent(), Percent::from_percent(20));
+		assert_eq!(UpstreamParticipationFactor::<Test>::get(), Percent::from_percent(5));
+		assert_ok!(Treasury::configure_reward_economics(
+			RuntimeOrigin::root(),
+			None,
+			Some(Percent::from_percent(50)),
+		));
+		assert_ok!(Treasury::configure_reward_economics(RuntimeOrigin::root(), None, None));
+		assert_eq!(TargetBitcoinPercent::<Test>::get(), Percent::from_percent(20));
+		assert_eq!(UpstreamParticipationFactor::<Test>::get(), Percent::from_percent(50));
+		System::assert_last_event(RuntimeEvent::Treasury(
+			super::Event::RewardEconomicsConfigured {
+				target_bitcoin_percent: Percent::from_percent(20),
+				upstream_participation_factor: Percent::from_percent(50),
+			},
+		));
 	});
 }
 
@@ -416,6 +439,7 @@ fn buy_bonds_store_plain_and_bonus_terms_and_track_pool_participation() {
 #[test]
 fn flexible_bonds_yield_their_vault_admission_capacity() {
 	new_test_ext().execute_with(|| {
+		UpstreamParticipationFactor::<Test>::put(Percent::from_percent(100));
 		MinimumArgonsPerContributor::set(1);
 		insert_vault(1, test_vault(10, (10 * MICROGONS_PER_ARGON) as u64));
 		Upstreams::mutate(|upstreams| {
@@ -453,6 +477,7 @@ fn flexible_bonds_yield_their_vault_admission_capacity() {
 #[test]
 fn reservation_uses_capacity_yielded_by_flexible_bonds() {
 	new_test_ext().execute_with(|| {
+		UpstreamParticipationFactor::<Test>::put(Percent::from_percent(100));
 		MinimumArgonsPerContributor::set(1);
 		CurrentFrameId::set(1);
 		insert_vault(1, test_vault(10, (10 * MICROGONS_PER_ARGON) as u64));
@@ -2346,6 +2371,7 @@ fn upstream_participation_is_linear_to_five_thousand_for_each_asset() {
 		(0, 5_000, 50),
 	] {
 		new_test_ext().execute_with(|| {
+			UpstreamParticipationFactor::<Test>::put(Percent::from_percent(100));
 			MinimumArgonsPerContributor::set(1);
 			insert_vault(1, test_vault(1, (15_000 * MICROGONS_PER_ARGON) as u64));
 			Upstreams::mutate(|upstreams| {
@@ -2377,12 +2403,55 @@ fn upstream_participation_is_linear_to_five_thousand_for_each_asset() {
 }
 
 #[test]
+fn configured_upstream_factor_controls_the_share_of_reward_uplift() {
+	use crate::mock::TreasuryPositions;
+	use argon_primitives::treasury::UpstreamPosition;
+	for (factor, principal, multiplier) in [
+		(None, 0, FixedU128::from_rational(95, 100)),
+		(None, 2_500, FixedU128::from_rational(975, 1_000)),
+		(None, 5_000, FixedU128::one()),
+		(Some(0), 0, FixedU128::one()),
+		(Some(50), 0, FixedU128::from_rational(1, 2)),
+		(Some(100), 0, FixedU128::zero()),
+	] {
+		new_test_ext().execute_with(|| {
+			insert_vault(1, test_vault(1, (15_000 * MICROGONS_PER_ARGON) as u64));
+			Upstreams::mutate(|upstreams| {
+				upstreams.insert(account(2), (account(2), 1));
+			});
+			AvailableSecuritizationSpace::mutate(|space| {
+				space.insert(1, 15_000 * MICROGONS_PER_ARGON);
+			});
+			TreasuryPositions::set_upstream_position(
+				&account(2),
+				Some(UpstreamPosition {
+					vault_id: 1,
+					bitcoin_securitization: principal * MICROGONS_PER_ARGON,
+					bitcoin_allocated_securitization: principal * MICROGONS_PER_ARGON,
+					bond_principal: principal * MICROGONS_PER_ARGON,
+				}),
+			);
+			if let Some(factor) = factor {
+				assert_ok!(Treasury::configure_reward_economics(
+					RuntimeOrigin::root(),
+					None,
+					Some(Percent::from_percent(factor)),
+				));
+			}
+			assert_eq!(Treasury::upstream_participation(&account(2)), multiplier);
+			assert_eq!(Treasury::upstream_participation(&account(9)), FixedU128::one());
+		});
+	}
+}
+
+#[test]
 fn upstream_capacity_and_own_unfunded_reservations_limit_participation_requirements() {
 	use crate::mock::{AvailableSecuritizationSpace, TreasuryPositions, Upstreams};
 	use argon_primitives::treasury::{
 		BitcoinLockPosition, TreasuryPositionProvider, UpstreamPosition,
 	};
 	new_test_ext().execute_with(|| {
+		UpstreamParticipationFactor::<Test>::put(Percent::from_percent(100));
 		insert_vault(1, test_vault(1, (2_000 * MICROGONS_PER_ARGON) as u64));
 		Upstreams::mutate(|upstreams| {
 			upstreams.insert(account(2), (account(2), 1));
@@ -2441,6 +2510,7 @@ fn upstream_bond_requirements_ignore_space_below_the_purchase_minimum() {
 		(10, 50, FixedU128::from_rational(3, 4)),
 	] {
 		new_test_ext().execute_with(|| {
+			UpstreamParticipationFactor::<Test>::put(Percent::from_percent(100));
 			MinimumArgonsPerContributor::set(minimum * MICROGONS_PER_ARGON);
 			insert_vault(1, test_vault(1, (1_000 * MICROGONS_PER_ARGON) as u64));
 			insert_vault(2, test_vault(2, (1_000 * MICROGONS_PER_ARGON) as u64));
@@ -2507,6 +2577,7 @@ fn upstream_bond_principal_is_live_but_the_earnings_multiplier_is_frozen_for_the
 	use crate::mock::{AvailableSecuritizationSpace, TreasuryPositions, Upstreams};
 	use argon_primitives::treasury::{TreasuryPositionProvider, UpstreamPosition};
 	new_test_ext().execute_with(|| {
+		UpstreamParticipationFactor::<Test>::put(Percent::from_percent(100));
 		MinimumArgonsPerContributor::set(1);
 		insert_vault(1, test_vault(1, (2_000 * MICROGONS_PER_ARGON) as u64));
 		insert_vault(2, test_vault(2, (1_000 * MICROGONS_PER_ARGON) as u64));
@@ -2532,6 +2603,11 @@ fn upstream_bond_principal_is_live_but_the_earnings_multiplier_is_frozen_for_the
 		assert_ok!(Treasury::liquidate_bond_lot(origin(2), account_bond_lot_ids(2)[0]));
 		assert_eq!(TreasuryPositions::bond_principal(&account(2)), 0);
 		assert_eq!(TreasuryPositions::upstream_position(&account(2)).unwrap().bond_principal, 0);
+		assert_ok!(Treasury::configure_reward_economics(
+			RuntimeOrigin::root(),
+			None,
+			Some(Percent::from_percent(5)),
+		));
 		assert_eq!(
 			CurrentFrameVaultCapital::<Test>::get().unwrap().vault_securitization_positions[&2]
 				.upstream_participation,
@@ -2541,7 +2617,7 @@ fn upstream_bond_principal_is_live_but_the_earnings_multiplier_is_frozen_for_the
 		assert_eq!(
 			CurrentFrameVaultCapital::<Test>::get().unwrap().vault_securitization_positions[&2]
 				.upstream_participation,
-			FixedU128::from_rational(1, 2)
+			FixedU128::from_rational(975, 1_000)
 		);
 	});
 }

@@ -62,7 +62,7 @@ mod benchmarks {
 		{
 			assert_eq!(
 				Pallet::<T>::upstream_participation(&operator),
-				FixedU128::from_rational(1, 2)
+				FixedU128::from_rational(975, 1_000)
 			);
 		}
 		Ok(())
@@ -255,12 +255,16 @@ mod benchmarks {
 
 	#[benchmark]
 	fn configure_reward_economics() -> Result<(), BenchmarkError> {
+		TargetBitcoinPercent::<T>::put(Percent::from_percent(15));
+		UpstreamParticipationFactor::<T>::put(Percent::from_percent(100));
 		let target_bitcoin_percent = Percent::from_percent(20);
+		let upstream_participation_factor = Percent::from_percent(5);
 
 		#[extrinsic_call]
-		_(RawOrigin::Root, Some(target_bitcoin_percent));
+		_(RawOrigin::Root, Some(target_bitcoin_percent), Some(upstream_participation_factor));
 
 		assert_eq!(TargetBitcoinPercent::<T>::get(), target_bitcoin_percent);
+		assert_eq!(UpstreamParticipationFactor::<T>::get(), upstream_participation_factor);
 		Ok(())
 	}
 
@@ -651,7 +655,8 @@ mod benchmarks {
 		// Leave room for the 1,000 releasing lots counted by the same global limit.
 		b: Linear<0, 14_000>,
 		s: Linear<0, 1_000>,
-		r: Linear<0, 1_000>,
+		// Include the first release's aggregate bond-total update in the fixed cost.
+		r: Linear<1, 1_000>,
 	) -> Result<(), BenchmarkError> {
 		reset_benchmark_state::<T>();
 		seed_on_frame_transition_state::<T>(BENCHMARK_FRAME_ID, b, s, r)?;
