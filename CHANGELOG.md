@@ -1,6 +1,13 @@
 # Changelog
 
-## [v1.5.0](https://github.com/argonprotocol/mainchain/compare/v1.4.13...3727cfd52d24530169087bd44bfd2c68d2df0059) (2026-10-14)
+## [v1.5.1](https://github.com/argonprotocol/mainchain/compare/v1.5.0...28ea77d2fa5523fdd3ef08f3170929e5087de32b) (2026-10-15)
+
+### Features
+
+* **treasury:** make argonot backing optional for vault rewards
+([d900075](https://github.com/argonprotocol/mainchain/commit/d90007571cb2aee8f05fbfdc49fccfb30c4a3142))
+
+## [v1.5.0](https://github.com/argonprotocol/mainchain/compare/v1.4.13...v1.5.0) (2026-10-14)
 
 ### Features
 
