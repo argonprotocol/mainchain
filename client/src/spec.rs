@@ -3500,9 +3500,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				67u8, 8u8, 233u8, 223u8, 197u8, 229u8, 5u8, 180u8, 247u8, 210u8, 127u8, 15u8,
-				193u8, 218u8, 140u8, 204u8, 161u8, 254u8, 243u8, 218u8, 98u8, 128u8, 87u8, 9u8,
-				151u8, 118u8, 4u8, 160u8, 112u8, 140u8, 40u8, 212u8,
+				96u8, 124u8, 192u8, 111u8, 24u8, 59u8, 235u8, 38u8, 220u8, 66u8, 217u8, 203u8,
+				180u8, 105u8, 44u8, 77u8, 35u8, 167u8, 232u8, 126u8, 147u8, 32u8, 146u8, 210u8,
+				109u8, 63u8, 54u8, 119u8, 104u8, 51u8, 29u8, 95u8,
 			]
 	}
 	pub mod system {
@@ -24683,6 +24683,24 @@ pub mod api {
 							231u8, 249u8, 200u8, 252u8, 73u8, 244u8, 170u8, 51u8, 177u8, 106u8,
 							47u8, 114u8, 234u8, 84u8, 104u8, 62u8, 118u8, 227u8, 50u8, 225u8,
 							122u8,
+						],
+					)
+				}
+				#[doc = " Maximum rewarded Argonot value as a multiple of the vault's Argon securitization."]
+				#[doc = " Zero disables Argonot backing requirements and bonuses."]
+				pub fn argonot_securitization_multiplier(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u32,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"Treasury",
+						"ArgonotSecuritizationMultiplier",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
 						],
 					)
 				}
