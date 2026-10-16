@@ -335,6 +335,7 @@ pub(crate) fn use_mock_price_lookups(prices: PriceLookups) {
 mod tests {
 	use super::*;
 	#[tokio::test]
+	#[ignore = "requires live exchange APIs; run explicitly with --ignored"]
 	async fn test_get_price_lookups() {
 		let price_lookups = CoinUsdPriceLookup::new_with_providers(ALL_PRICE_PROVIDERS.to_vec())
 			.get_latest_prices()
@@ -347,6 +348,7 @@ mod tests {
 	}
 
 	#[tokio::test]
+	#[ignore = "requires live exchange APIs; run explicitly with --ignored"]
 	async fn test_get_kraken_price() {
 		let price_lookups =
 			CoinUsdPriceLookup::get_kraken_price_with_client(&Client::new()).await.unwrap();
@@ -369,6 +371,7 @@ mod tests {
 	}
 
 	#[tokio::test]
+	#[ignore = "requires live exchange APIs; run explicitly with --ignored"]
 	async fn test_get_gemini_price() {
 		let price_lookups =
 			CoinUsdPriceLookup::get_gemini_prices_with_client(&Client::new()).await.unwrap();
@@ -379,6 +382,7 @@ mod tests {
 	}
 
 	#[tokio::test]
+	#[ignore = "requires live exchange APIs; run explicitly with --ignored"]
 	async fn test_get_bitstamp_price() {
 		let price_lookups = CoinUsdPriceLookup::get_bitstamp_prices_with_client(&Client::new())
 			.await
@@ -390,6 +394,7 @@ mod tests {
 	}
 
 	#[tokio::test]
+	#[ignore = "requires live exchange APIs; run explicitly with --ignored"]
 	async fn test_get_coinbase_price() {
 		let price_lookups = CoinUsdPriceLookup::get_coinbase_prices_with_client(&Client::new())
 			.await
