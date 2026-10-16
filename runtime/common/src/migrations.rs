@@ -35,7 +35,7 @@ mod tests {
 	use pallet_treasury::{
 		migrations::old as old_treasury, ArgonotBondLots, BondLotById, BondLotIdsByAccount,
 		BondLotIdsByVault, BondLotSummary, BondLotsByVault, BondProgram, BondReleaseReason,
-		CurrentFrameVaultCapital,
+		CurrentFrameVaultCapital, UpstreamParticipationFactor,
 	};
 	use pallet_vaults::migrations::old as old_vaults;
 	use polkadot_sdk::{
@@ -316,11 +316,16 @@ mod tests {
 				let capital = CurrentFrameVaultCapital::<Runtime>::get().unwrap();
 				assert_eq!(capital.frame_id, 7);
 				assert_eq!(capital.total_active_bonds, 22);
+				assert!(!UpstreamParticipationFactor::<Runtime>::exists());
+				assert_eq!(UpstreamParticipationFactor::<Runtime>::get(), Percent::from_percent(5));
+				let participation = FixedU128::from_rational(100, 15 * MICROGONS_PER_ARGON)
+					.saturating_mul(FixedU128::from_rational(1, 2))
+					.saturating_add(FixedU128::from_rational(1, 2));
 				assert_eq!(
 					capital.vault_securitization_positions[&2].upstream_participation,
-					FixedU128::from_rational(100, 15 * MICROGONS_PER_ARGON)
-						.saturating_mul(FixedU128::from_rational(1, 2))
-						.saturating_add(FixedU128::from_rational(1, 2))
+					FixedU128::from_rational(95, 100).saturating_add(
+						FixedU128::from_rational(5, 100).saturating_mul(participation)
+					)
 				);
 				assert_eq!(
 					TreasuryPositions::bond_principal(&downstream_vault),
