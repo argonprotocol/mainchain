@@ -83,6 +83,7 @@ argon-bitcoin = { workspace = true }
 frame-benchmarking = { workspace = true, optional = true }
 
 [dev-dependencies]
+argon-runtime = { workspace = true, default-features = true }
 polkadot-sdk = { workspace = true, features = ["sp-io", "sp-tracing"], default-features = true }
 
 [features]
