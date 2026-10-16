@@ -3,17 +3,21 @@
 extern crate alloc;
 extern crate core;
 
+#[cfg(feature = "runtime-benchmarks")]
+mod benchmarking;
 mod check_fee_wrapper;
 #[cfg(test)]
 mod mock;
 #[cfg(test)]
 mod test;
+pub mod weights;
 
 pub use check_fee_wrapper::*;
 use core::marker::PhantomData;
 use frame_support::traits::OriginTrait;
 pub use pallet::*;
 use pallet_prelude::*;
+pub use weights::*;
 
 #[frame_support::pallet]
 pub mod pallet {
@@ -21,11 +25,16 @@ pub mod pallet {
 	use pallet_prelude::argon_primitives::{
 		CallFeeRefundProvider, CallTxPoolKeyProvider, CallTxValidityProvider,
 		CurrentTransactionFeeProvider, CurrentTransactionFeeProviderWeightInfo,
-		FeelessCallTxPoolKeyProvider, TransactionSponsorProvider,
+		FeelessCallTxPoolKeyProvider, FeelessCallWeightInfo, TransactionSponsorProvider,
 	};
 
 	#[pallet::config]
 	pub trait Config: polkadot_sdk::frame_system::Config {
+		type WeightInfo: WeightInfo;
+
+		/// Owning-pallet weights for FRAME's `feeless_if` checks.
+		type FeelessCallWeights: FeelessCallWeightInfo<Self::RuntimeCall>;
+
 		type Balance: AtLeast32BitUnsigned
 			+ codec::FullCodec
 			+ Copy

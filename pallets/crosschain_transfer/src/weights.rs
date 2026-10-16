@@ -1,11 +1,13 @@
 use argon_primitives::{
 	vault::{BitcoinVaultProvider, BitcoinVaultProviderWeightInfo},
+	CallTxPoolKeyProviderWeightInfo, CallTxValidityProviderWeightInfo,
 	CollectBlockerProviderWeightInfo, EthereumVerifyProvider, EthereumVerifyProviderWeightInfo,
 	PriceProvider, PriceProviderWeightInfo, TickProvider, TickProviderWeightInfo,
 	TreasuryPoolProvider, TreasuryPoolProviderWeightInfo, UniswapTransferProviderWeightInfo,
 };
 use core::marker::PhantomData;
 use pallet_prelude::*;
+use polkadot_sdk::frame_support::traits::IsSubType;
 
 use super::Config;
 
@@ -26,6 +28,8 @@ pub trait WeightInfo {
 	fn provider_is_crosschain_activated() -> Weight;
 	fn provider_account_uniswap_argon_transfers_in_amount() -> Weight;
 	fn provider_has_overdue_collect_blocker() -> Weight;
+	fn provider_tx_pool_key() -> Weight;
+	fn provider_validate_transaction() -> Weight;
 }
 
 type EthereumVerifyProviderWeights<T> =
@@ -159,9 +163,49 @@ where
 	fn provider_has_overdue_collect_blocker() -> Weight {
 		Base::provider_has_overdue_collect_blocker()
 	}
+
+	fn provider_tx_pool_key() -> Weight {
+		Base::provider_tx_pool_key()
+	}
+
+	fn provider_validate_transaction() -> Weight {
+		Base::provider_validate_transaction()
+	}
 }
 
 pub struct ProviderWeightAdapter<T>(PhantomData<T>);
+
+impl<T: Config> CallTxPoolKeyProviderWeightInfo<T::RuntimeCall> for ProviderWeightAdapter<T>
+where
+	T::RuntimeCall: IsSubType<crate::Call<T>>,
+{
+	fn key_for(call: &T::RuntimeCall) -> Weight {
+		if let Some(crate::Call::prove_gateway_activity { .. }) =
+			<T::RuntimeCall as IsSubType<crate::Call<T>>>::is_sub_type(call)
+		{
+			return T::WeightInfo::provider_tx_pool_key();
+		}
+
+		Weight::zero()
+	}
+}
+
+impl<T: Config> CallTxValidityProviderWeightInfo<T::RuntimeCall> for ProviderWeightAdapter<T>
+where
+	T::RuntimeCall: IsSubType<crate::Call<T>>,
+{
+	fn validate(call: &T::RuntimeCall) -> Weight {
+		if matches!(
+			<T::RuntimeCall as IsSubType<crate::Call<T>>>::is_sub_type(call),
+			Some(crate::Call::prove_gateway_activity { .. })
+		) {
+			return T::WeightInfo::provider_validate_transaction();
+		}
+
+		Weight::zero()
+	}
+}
+
 impl<T: Config> UniswapTransferProviderWeightInfo for ProviderWeightAdapter<T> {
 	fn is_crosschain_activated() -> Weight {
 		T::WeightInfo::provider_is_crosschain_activated()
@@ -179,6 +223,13 @@ impl<T: Config> CollectBlockerProviderWeightInfo for ProviderWeightAdapter<T> {
 }
 
 impl WeightInfo for () {
+	fn provider_tx_pool_key() -> Weight {
+		Weight::zero()
+	}
+
+	fn provider_validate_transaction() -> Weight {
+		Weight::zero()
+	}
 	fn set_chain_config() -> Weight {
 		Weight::zero()
 	}

@@ -1887,6 +1887,11 @@ declare module '@polkadot/api-base/types/storage' {
        * limit.
        **/
       totalArgonBondLots: AugmentedQuery<ApiType, () => Observable<u32>, []>;
+      /**
+       * Share of reward uplift controlled by upstream participation, frozen at frame start.
+       * Zero disables the requirement; 100% applies the full participation score.
+       **/
+      upstreamParticipationFactor: AugmentedQuery<ApiType, () => Observable<Percent>, []>;
     };
     treasuryPositions: {
       /**

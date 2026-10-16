@@ -6,6 +6,9 @@ pub use pallet::*;
 use pallet_prelude::*;
 pub use weights::*;
 
+#[cfg(feature = "runtime-benchmarks")]
+mod benchmarking;
+
 #[cfg(test)]
 mod mock;
 
@@ -72,14 +75,13 @@ pub mod pallet {
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_initialize(_n: BlockNumberFor<T>) -> Weight {
-			match Self::read_digest() {
-				Ok(digests) => {
-					TempDigests::<T>::put(digests);
-				},
-				Err(e) => panic!("Could not load digests: {e:?}"),
-			}
+			let digests =
+				Self::read_digest().unwrap_or_else(|e| panic!("Could not load digests: {e:?}"));
+			let notebook_count = digests.notebooks.notebooks.len() as u32;
+			TempDigests::<T>::put(digests);
 
-			T::DbWeight::get().reads_writes(1, 0)
+			T::WeightInfo::on_initialize(notebook_count)
+				.saturating_add(T::WeightInfo::on_finalize())
 		}
 
 		fn on_finalize(_n: BlockNumberFor<T>) {

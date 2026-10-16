@@ -25,6 +25,7 @@ use crate::{
 pub const MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES: u32 = 366;
 
 pub trait BitcoinVaultProviderWeightInfo {
+	fn is_owner() -> Weight;
 	fn get_registration_vault_data() -> Weight;
 	fn get_committed_securitization() -> Weight;
 	fn get_held_argonots() -> Weight;
@@ -39,6 +40,9 @@ pub trait BitcoinVaultProviderWeightInfo {
 }
 
 impl BitcoinVaultProviderWeightInfo for () {
+	fn is_owner() -> Weight {
+		Weight::zero()
+	}
 	fn get_registration_vault_data() -> Weight {
 		Weight::zero()
 	}

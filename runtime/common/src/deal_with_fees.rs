@@ -40,6 +40,41 @@ macro_rules! deal_with_fees {
 				+ pallet_mining_slot::Config<RuntimeCall = RuntimeCall>,
 			AccountIdOf<R>: From<AccountId> + Into<AccountId>,
 		{
+			#[cfg(feature = "runtime-benchmarks")]
+			fn benchmark_call(
+				signer: &R::AccountId,
+				real: &R::AccountId,
+				calls: u32,
+			) -> Option<RuntimeCall> {
+				pallet_proxy::Proxies::<R>::mutate(real, |(proxies, _)| {
+					let proxy = proxies
+						.iter_mut()
+						.find(|proxy| &proxy.delegate == signer)
+						.expect("fee-control benchmark seeds the proxy list");
+					proxy.proxy_type = ProxyType::MiningBidRealPaysFee;
+				});
+				let keys = <Runtime as pallet_mining_slot::Config>::Keys::decode(
+					&mut sp_runtime::traits::TrailingZeroInput::zeroes(),
+				)
+				.expect("session keys decode");
+				let bids = (0..calls)
+					.map(|_| {
+						RuntimeCall::MiningSlot(pallet_mining_slot::Call::bid {
+							bid: 0,
+							keys: keys.clone(),
+							mining_account_id: None,
+						})
+					})
+					.collect();
+				Some(RuntimeCall::Proxy(pallet_proxy::Call::proxy {
+					real: MultiAddress::Id(real.clone()),
+					force_proxy_type: Some(ProxyType::MiningBidRealPaysFee),
+					call: Box::new(RuntimeCall::Utility(pallet_utility::Call::batch_all {
+						calls: bids,
+					})),
+				}))
+			}
+
 			fn get_transaction_sponsor(
 				signer: &R::AccountId,
 				call: &<R as frame_system::Config>::RuntimeCall,

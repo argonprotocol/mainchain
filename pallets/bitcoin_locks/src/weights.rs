@@ -17,7 +17,8 @@ use super::Config;
 use argon_primitives::{
 	providers::{
 		BitcoinFissionLockProviderWeightInfo, BitcoinFissionsProvider,
-		BitcoinFissionsProviderWeightInfo, BitcoinUtxoEventsWeightInfo,
+		BitcoinFissionsProviderWeightInfo, BitcoinUtxoEventsWeightInfo, BitcoinUtxoTracker,
+		BitcoinUtxoTrackerWeightInfo,
 	},
 	treasury::{
 		BitcoinLockPositionProviderWeightInfo, TreasuryPositionProvider,
@@ -29,6 +30,7 @@ use pallet_prelude::*;
 
 /// Weight functions needed for pallet_bitcoin_locks.
 pub trait WeightInfo {
+	fn provider_is_feeless() -> Weight;
 	fn provider_account_position() -> Weight {
 		Weight::zero()
 	}
@@ -99,6 +101,7 @@ type PositionWeights<T> = <<T as Config>::PositionProvider as TreasuryPositionPr
 	<T as frame_system::Config>::AccountId,
 	<T as Config>::Balance,
 >>::Weights;
+type UtxoTrackerWeights<T> = <<T as Config>::BitcoinUtxoTracker as BitcoinUtxoTracker>::Weights;
 
 pub struct WithProviderWeights<
 	T,
@@ -114,22 +117,30 @@ where
 	VaultProviderWeight: BitcoinVaultProviderWeightInfo,
 	FissionsProviderWeight: BitcoinFissionsProviderWeightInfo,
 {
+	fn provider_is_feeless() -> Weight {
+		Base::provider_is_feeless().saturating_add(VaultProviderWeight::is_owner())
+	}
 	fn provider_account_position() -> Weight {
 		Base::provider_account_position()
 	}
 
 	fn create_receive_address() -> Weight {
 		Base::create_receive_address()
+			.saturating_add(UtxoTrackerWeights::<T>::watch_for_utxo())
 			.saturating_add(VaultProviderWeight::reserve_securitization())
 			.saturating_add(PositionWeights::<T>::position_updated())
 	}
 
 	fn request_release() -> Weight {
-		Base::request_release().saturating_add(PositionWeights::<T>::position_updated())
+		Base::request_release()
+			.saturating_add(UtxoTrackerWeights::<T>::unwatch())
+			.saturating_add(PositionWeights::<T>::position_updated())
 	}
 
 	fn cosign_release(input_count: u32) -> Weight {
-		Base::cosign_release(input_count).saturating_add(PositionWeights::<T>::position_updated())
+		Base::cosign_release(input_count)
+			.saturating_add(UtxoTrackerWeights::<T>::unwatch())
+			.saturating_add(PositionWeights::<T>::position_updated())
 	}
 
 	fn on_initialize_base() -> Weight {
@@ -138,6 +149,7 @@ where
 
 	fn on_initialize_expiring_locks(n: u32) -> Weight {
 		Base::on_initialize_expiring_locks(n)
+			.saturating_add(UtxoTrackerWeights::<T>::unwatch().saturating_mul(n.into()))
 			.saturating_add(PositionWeights::<T>::position_updated().saturating_mul(n.into()))
 			.saturating_add(
 				FissionsProviderWeight::get_lock_fission_redemption_bases()
@@ -148,6 +160,7 @@ where
 
 	fn on_initialize_overdue_releases(n: u32) -> Weight {
 		Base::on_initialize_overdue_releases(n)
+			.saturating_add(UtxoTrackerWeights::<T>::unwatch().saturating_mul(n.into()))
 			.saturating_add(PositionWeights::<T>::position_updated().saturating_mul(n.into()))
 			.saturating_add(FissionsProviderWeight::close_for_lock().saturating_mul(n.into()))
 	}
@@ -171,7 +184,7 @@ where
 	}
 
 	fn cosign_orphaned_utxo_release() -> Weight {
-		Base::cosign_orphaned_utxo_release()
+		Base::cosign_orphaned_utxo_release().saturating_add(UtxoTrackerWeights::<T>::unwatch_utxo())
 	}
 
 	fn resecuritize() -> Weight {
@@ -205,18 +218,20 @@ where
 
 	fn provider_utxo_detected() -> Weight {
 		let max_utxos = T::MaxUtxosPerLock::get().into();
-		// MaxEncodedLen proof charged by bitcoin_utxos::UtxoRefsByLockId.
 		Base::provider_utxo_detected()
+			.saturating_add(UtxoTrackerWeights::<T>::unwatch_utxo().saturating_mul(max_utxos))
+			.saturating_add(UtxoTrackerWeights::<T>::unwatch())
 			.saturating_add(PositionWeights::<T>::position_updated().saturating_mul(2))
 			.saturating_add(VaultProviderWeight::burn())
 			.saturating_add(FissionsProviderWeight::get_lock_fission_redemption_bases())
 			.saturating_add(FissionsProviderWeight::close_for_lock())
-			.saturating_add(T::DbWeight::get().reads_writes(max_utxos, max_utxos))
-			.saturating_add(Weight::from_parts(0, 6_093).saturating_mul(max_utxos))
 	}
 
 	fn provider_spent() -> Weight {
 		Base::provider_spent()
+			.saturating_add(
+				UtxoTrackerWeights::<T>::unwatch().max(UtxoTrackerWeights::<T>::unwatch_utxo()),
+			)
 			.saturating_add(PositionWeights::<T>::position_updated().saturating_mul(2))
 			.saturating_add(VaultProviderWeight::burn())
 			.saturating_add(FissionsProviderWeight::get_lock_fission_redemption_bases())
@@ -225,6 +240,20 @@ where
 }
 
 pub struct ProviderWeightAdapter<T>(PhantomData<T>);
+impl<T: Config> argon_primitives::FeelessCallWeightInfo<T::RuntimeCall> for ProviderWeightAdapter<T>
+where
+	T::RuntimeCall: frame_support::traits::IsSubType<crate::Call<T>>,
+{
+	fn is_feeless(call: &T::RuntimeCall) -> Weight {
+		if matches!(
+			<T::RuntimeCall as frame_support::traits::IsSubType<crate::Call<T>>>::is_sub_type(call),
+			Some(crate::Call::cosign_release { .. })
+		) {
+			return T::WeightInfo::provider_is_feeless();
+		}
+		Weight::zero()
+	}
+}
 impl<T: Config> BitcoinFissionLockProviderWeightInfo for ProviderWeightAdapter<T> {
 	fn fission_satoshis() -> Weight {
 		<T as Config>::WeightInfo::provider_fission_satoshis()
@@ -254,6 +283,9 @@ impl<T: Config> BitcoinUtxoEventsWeightInfo for ProviderWeightAdapter<T> {
 
 // For backwards compatibility and tests.
 impl WeightInfo for () {
+	fn provider_is_feeless() -> Weight {
+		Weight::zero()
+	}
 	fn create_receive_address() -> Weight {
 		Weight::zero()
 	}

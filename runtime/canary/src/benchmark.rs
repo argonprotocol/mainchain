@@ -8,6 +8,7 @@ frame_benchmarking::define_benchmarks!(
 	[pallet_timestamp, Timestamp]
 	[pallet_multisig, Multisig]
 	[pallet_proxy, Proxy]
+	[pallet_digests, Digests]
 	[pallet_ticks, Ticks]
 	[pallet_price_index, PriceIndex]
 	[pallet_bitcoin_locks, BitcoinLocks]
@@ -20,6 +21,7 @@ frame_benchmarking::define_benchmarks!(
 	[pallet_block_rewards, BlockRewards]
 	[pallet_localchain_transfer, LocalchainTransfer]
 	[pallet_notebook, Notebook]
+	[pallet_notaries, Notaries]
 	[pallet_grandpa, Grandpa]
 	[pallet_tx_pause, TxPause]
 	[pallet_transaction_payment, TransactionPayment]
@@ -32,4 +34,5 @@ frame_benchmarking::define_benchmarks!(
 	[pallet_bootstrap, Bootstrap]
 	[pallet_crosschain_transfer, CrosschainTransfer]
 	[pallet_ethereum_verifier, EthereumVerifier]
+	[pallet_fee_control, FeeControl]
 );

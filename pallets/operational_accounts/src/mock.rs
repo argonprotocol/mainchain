@@ -14,7 +14,6 @@ use pallet_prelude::*;
 use std::collections::{BTreeMap, BTreeSet};
 
 use argon_primitives::{vault::VaultError, AccountId, VaultId};
-use sp_runtime::FixedU128;
 
 pub type TestAccountId = AccountId;
 

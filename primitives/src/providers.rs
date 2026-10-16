@@ -176,6 +176,26 @@ impl OperationalRewardsProviderWeightInfo for () {
 	}
 }
 
+pub trait BitcoinUtxoTrackerWeightInfo {
+	fn watch_for_utxo() -> Weight;
+	fn unwatch_utxo() -> Weight;
+	fn unwatch() -> Weight;
+}
+
+impl BitcoinUtxoTrackerWeightInfo for () {
+	fn watch_for_utxo() -> Weight {
+		Weight::zero()
+	}
+
+	fn unwatch_utxo() -> Weight {
+		Weight::zero()
+	}
+
+	fn unwatch() -> Weight {
+		Weight::zero()
+	}
+}
+
 pub trait BitcoinUtxoEventsWeightInfo {
 	fn utxo_detected() -> Weight;
 	fn spent() -> Weight;
@@ -919,6 +939,8 @@ pub trait PriceProvider<
 }
 
 pub trait BitcoinUtxoTracker {
+	type Weights: BitcoinUtxoTrackerWeightInfo;
+
 	/// Highest Bitcoin block whose UTXO changes have been processed by the tracker.
 	fn get_synched_height() -> BitcoinHeight;
 
@@ -1418,8 +1440,21 @@ impl<AId> SlotEvents<AId> for Tuple {
 	}
 }
 
-/// Provides a mapping from a runtime call to a unique key used to safeguard the transaction pool
-/// against DoS attacks from feeless calls.
+/// Weight of FRAME feeless authorization checks owned by the participating pallets.
+pub trait FeelessCallWeightInfo<RuntimeCall> {
+	/// Weight of the call's FRAME `feeless_if` authorization check, including rejection.
+	fn is_feeless(call: &RuntimeCall) -> Weight;
+}
+
+#[impl_trait_for_tuples::impl_for_tuples(5)]
+impl<RuntimeCall> FeelessCallWeightInfo<RuntimeCall> for Tuple {
+	fn is_feeless(call: &RuntimeCall) -> Weight {
+		let weights: &[Weight] = &[for_tuples!( #( Tuple::is_feeless(call) ),* )];
+		weights.iter().fold(Weight::zero(), |weight, next| weight.saturating_add(*next))
+	}
+}
+
+/// Maps a runtime call to a unique key that safeguards the pool against repeated feeless calls.
 pub trait FeelessCallTxPoolKeyProvider<RuntimeCall> {
 	fn key_for(call: &RuntimeCall) -> Option<Vec<u8>>;
 }
@@ -1440,12 +1475,28 @@ impl<RuntimeCall> FeelessCallTxPoolKeyProvider<RuntimeCall> for Tuple {
 
 /// Provides a mapping from any runtime call to a unique key used to safeguard the transaction
 /// pool against repeated concurrent submissions of the same logical request.
+pub trait CallTxPoolKeyProviderWeightInfo<RuntimeCall> {
+	fn key_for(call: &RuntimeCall) -> Weight;
+}
+
 pub trait CallTxPoolKeyProvider<RuntimeCall, AccountId> {
+	type Weights: CallTxPoolKeyProviderWeightInfo<RuntimeCall>;
+
 	fn key_for(call: &RuntimeCall, signer: Option<&AccountId>) -> Option<Vec<u8>>;
 }
 
 #[impl_trait_for_tuples::impl_for_tuples(5)]
+impl<RuntimeCall> CallTxPoolKeyProviderWeightInfo<RuntimeCall> for Tuple {
+	fn key_for(call: &RuntimeCall) -> Weight {
+		let weights: &[Weight] = &[for_tuples!( #( Tuple::key_for(call) ),* )];
+		weights.iter().fold(Weight::zero(), |weight, next| weight.saturating_add(*next))
+	}
+}
+
+#[impl_trait_for_tuples::impl_for_tuples(5)]
 impl<RuntimeCall, AccountId> CallTxPoolKeyProvider<RuntimeCall, AccountId> for Tuple {
+	for_tuples!( type Weights = ( #( Tuple::Weights ),* ); );
+
 	fn key_for(call: &RuntimeCall, signer: Option<&AccountId>) -> Option<Vec<u8>> {
 		for_tuples!(
 			#(
@@ -1460,7 +1511,13 @@ impl<RuntimeCall, AccountId> CallTxPoolKeyProvider<RuntimeCall, AccountId> for T
 
 /// Provides transaction-validity checks for runtime calls that need best-state-aware stale
 /// rejection before they reach inclusion.
+pub trait CallTxValidityProviderWeightInfo<RuntimeCall> {
+	fn validate(call: &RuntimeCall) -> Weight;
+}
+
 pub trait CallTxValidityProvider<RuntimeCall, AccountId> {
+	type Weights: CallTxValidityProviderWeightInfo<RuntimeCall>;
+
 	fn validate(
 		call: &RuntimeCall,
 		signer: Option<&AccountId>,
@@ -1468,7 +1525,17 @@ pub trait CallTxValidityProvider<RuntimeCall, AccountId> {
 }
 
 #[impl_trait_for_tuples::impl_for_tuples(5)]
+impl<RuntimeCall> CallTxValidityProviderWeightInfo<RuntimeCall> for Tuple {
+	fn validate(call: &RuntimeCall) -> Weight {
+		let weights: &[Weight] = &[for_tuples!( #( Tuple::validate(call) ),* )];
+		weights.iter().fold(Weight::zero(), |weight, next| weight.saturating_add(*next))
+	}
+}
+
+#[impl_trait_for_tuples::impl_for_tuples(5)]
 impl<RuntimeCall, AccountId> CallTxValidityProvider<RuntimeCall, AccountId> for Tuple {
+	for_tuples!( type Weights = ( #( Tuple::Weights ),* ); );
+
 	fn validate(
 		call: &RuntimeCall,
 		signer: Option<&AccountId>,
@@ -1503,12 +1570,27 @@ pub trait TransactionSponsorProvider<AccountId, RuntimeCall, Balance> {
 		signer: &AccountId,
 		call: &RuntimeCall,
 	) -> Option<TxSponsor<AccountId, Balance>>;
+
+	#[cfg(feature = "runtime-benchmarks")]
+	fn benchmark_call(_signer: &AccountId, _real: &AccountId, _calls: u32) -> Option<RuntimeCall> {
+		None
+	}
 }
 
 #[impl_trait_for_tuples::impl_for_tuples(5)]
 impl<AccountId, RuntimeCall, Balance> TransactionSponsorProvider<AccountId, RuntimeCall, Balance>
 	for Tuple
 {
+	#[cfg(feature = "runtime-benchmarks")]
+	fn benchmark_call(signer: &AccountId, real: &AccountId, calls: u32) -> Option<RuntimeCall> {
+		for_tuples!( #(
+			if let Some(call) = Tuple::benchmark_call(signer, real, calls) {
+				return Some(call);
+			}
+		)* );
+		None
+	}
+
 	fn get_transaction_sponsor(
 		signer: &AccountId,
 		call: &RuntimeCall,
@@ -1530,12 +1612,44 @@ impl<AccountId, RuntimeCall, Balance> TransactionSponsorProvider<AccountId, Runt
 /// This is evaluated against the effective call after proxy unwrapping, allowing the runtime to
 /// keep fee-refund policy close to its own call-shape and proxy rules instead of hard-coding
 /// pallet-specific combinations inside `pallet_fee_control`.
+pub trait CallFeeRefundProviderWeightInfo<RuntimeCall> {
+	fn refund_fee_on_success(call: &RuntimeCall) -> Weight;
+}
+
 pub trait CallFeeRefundProvider<RuntimeCall> {
+	type Weights: CallFeeRefundProviderWeightInfo<RuntimeCall>;
+
 	fn refund_fee_on_success(call: &RuntimeCall) -> bool;
+
+	/// Build a full-scan policy input when the policy is owned by the runtime.
+	#[cfg(feature = "runtime-benchmarks")]
+	fn benchmark_call(_calls: u32) -> Option<RuntimeCall> {
+		None
+	}
+}
+
+#[impl_trait_for_tuples::impl_for_tuples(5)]
+impl<RuntimeCall> CallFeeRefundProviderWeightInfo<RuntimeCall> for Tuple {
+	fn refund_fee_on_success(call: &RuntimeCall) -> Weight {
+		let weights: &[Weight] = &[for_tuples!( #( Tuple::refund_fee_on_success(call) ),* )];
+		weights.iter().fold(Weight::zero(), |weight, next| weight.saturating_add(*next))
+	}
 }
 
 #[impl_trait_for_tuples::impl_for_tuples(5)]
 impl<RuntimeCall> CallFeeRefundProvider<RuntimeCall> for Tuple {
+	for_tuples!( type Weights = ( #( Tuple::Weights ),* ); );
+
+	#[cfg(feature = "runtime-benchmarks")]
+	fn benchmark_call(calls: u32) -> Option<RuntimeCall> {
+		for_tuples!( #(
+			if let Some(call) = Tuple::benchmark_call(calls) {
+				return Some(call);
+			}
+		)* );
+		None
+	}
+
 	fn refund_fee_on_success(call: &RuntimeCall) -> bool {
 		for_tuples!(
 			#(

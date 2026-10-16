@@ -1749,6 +1749,7 @@ declare module '@polkadot/types/lookup' {
     readonly isRewardEconomicsConfigured: boolean;
     readonly asRewardEconomicsConfigured: {
       readonly targetBitcoinPercent: Percent;
+      readonly upstreamParticipationFactor: Percent;
     } & Struct;
     readonly isFrameVaultCapitalLocked: boolean;
     readonly asFrameVaultCapitalLocked: {
@@ -3309,6 +3310,7 @@ declare module '@polkadot/types/lookup' {
     readonly isConfigureRewardEconomics: boolean;
     readonly asConfigureRewardEconomics: {
       readonly targetBitcoinPercent: Option<Percent>;
+      readonly upstreamParticipationFactor: Option<Percent>;
     } & Struct;
     readonly isBackfillBondLotEarnings: boolean;
     readonly asBackfillBondLotEarnings: {

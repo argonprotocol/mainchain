@@ -7,14 +7,98 @@ use argon_primitives::{
 		UtxoAddress, UtxoRef,
 	},
 	inherents::BitcoinUtxoSyncV2,
+	BitcoinUtxoTracker,
 };
 use frame_benchmarking::v2::*;
+use frame_support::dispatch::CheckIfFeeless;
 
 #[benchmarks]
 mod benchmarks {
 	use super::*;
 	use frame_system::RawOrigin;
 
+	#[benchmark]
+	fn provider_watch_for_utxo() -> Result<(), BenchmarkError> {
+		let lock_id = 1;
+		let script_pubkey = benchmark_script_pubkey(lock_id as u32);
+		let tip = BitcoinBlock { block_height: 1_000, block_hash: benchmark_block_hash(1) };
+		ConfirmedBitcoinBlockTip::<T>::put(&tip);
+
+		#[block]
+		{
+			<Pallet<T> as BitcoinUtxoTracker>::watch_for_utxo(lock_id, script_pubkey)
+				.map_err(|_| BenchmarkError::Stop("watch registration failed"))?;
+		}
+
+		assert_eq!(LockIdByScriptPubkey::<T>::get(script_pubkey), Some(lock_id));
+		assert_eq!(
+			UtxoAddressByLockId::<T>::get(lock_id),
+			Some(UtxoAddress { lock_id, script_pubkey, submitted_at_height: tip.block_height })
+		);
+		Ok(())
+	}
+
+	#[benchmark]
+	fn provider_unwatch_utxo() -> Result<(), BenchmarkError> {
+		let lock_id = 1;
+		for index in 0..T::MaxUtxosPerLock::get() {
+			UtxoRefsByLockId::<T>::try_mutate(lock_id, |refs| {
+				refs.try_insert(benchmark_utxo_ref(u32::MAX - index))
+			})
+			.map_err(|_| BenchmarkError::Stop("UTXO refs full"))?;
+		}
+		let utxo_ref = benchmark_utxo_ref(u32::MAX);
+
+		#[block]
+		{
+			<Pallet<T> as BitcoinUtxoTracker>::unwatch_utxo(lock_id, &utxo_ref);
+		}
+
+		let refs = UtxoRefsByLockId::<T>::get(lock_id);
+		assert!(!refs.contains(&utxo_ref));
+		assert_eq!(refs.len(), T::MaxUtxosPerLock::get() as usize - 1);
+		Ok(())
+	}
+
+	#[benchmark]
+	fn provider_unwatch() -> Result<(), BenchmarkError> {
+		let lock_id = 1;
+		let address = benchmark_utxo_value(lock_id, benchmark_satoshis::<T>());
+		UtxoAddressByLockId::<T>::insert(lock_id, &address);
+		LockIdByScriptPubkey::<T>::insert(address.script_pubkey, lock_id);
+		for index in 0..T::MaxUtxosPerLock::get() {
+			UtxoRefsByLockId::<T>::try_mutate(lock_id, |refs| {
+				refs.try_insert(benchmark_utxo_ref(u32::MAX - index))
+			})
+			.map_err(|_| BenchmarkError::Stop("UTXO refs full"))?;
+		}
+
+		#[block]
+		{
+			<Pallet<T> as BitcoinUtxoTracker>::unwatch(lock_id);
+		}
+
+		assert!(!UtxoAddressByLockId::<T>::contains_key(lock_id));
+		assert!(!LockIdByScriptPubkey::<T>::contains_key(address.script_pubkey));
+		assert!(!UtxoRefsByLockId::<T>::contains_key(lock_id));
+		Ok(())
+	}
+
+	#[benchmark]
+	fn provider_is_feeless() {
+		let caller: T::AccountId = whitelisted_caller();
+		OracleOperatorAccount::<T>::put(&caller);
+		let call = Call::<T>::set_confirmed_block {
+			bitcoin_height: 1,
+			bitcoin_block_hash: benchmark_block_hash(1),
+		};
+		let origin = RawOrigin::Signed(caller).into();
+
+		#[block]
+		{
+			assert!(core::hint::black_box(&call).is_feeless(&origin));
+		}
+	}
 	const MAX_SYNC_ITEMS: u32 = 20;
 
 	#[benchmark]
@@ -114,7 +198,15 @@ mod benchmarks {
 
 		for i in 0..n {
 			let lock_id = i.saturating_add(1) as BitcoinLockId;
-			assert!(UtxoRefsByLockId::<T>::get(lock_id).is_empty());
+			// The event handler owns retention cleanup and is stubbed in runtime benchmarks.
+			frame_system::Pallet::<T>::assert_has_event(
+				Event::<T>::UtxoSpent {
+					lock_id,
+					utxo_ref: benchmark_utxo_ref(10_000 + i),
+					block_height,
+				}
+				.into(),
+			);
 		}
 		Ok(())
 	}

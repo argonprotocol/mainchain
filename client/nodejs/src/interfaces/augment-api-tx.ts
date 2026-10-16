@@ -2077,8 +2077,9 @@ declare module '@polkadot/api-base/types/submittable' {
       configureRewardEconomics: AugmentedSubmittable<
         (
           targetBitcoinPercent: Option<Percent> | null | Uint8Array | Percent | AnyNumber,
+          upstreamParticipationFactor: Option<Percent> | null | Uint8Array | Percent | AnyNumber,
         ) => SubmittableExtrinsic<ApiType>,
-        [Option<Percent>]
+        [Option<Percent>, Option<Percent>]
       >;
       /**
        * Liquidate one full bond lot. It keeps the locked frame's payout terms and is

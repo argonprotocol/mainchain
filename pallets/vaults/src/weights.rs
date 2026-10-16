@@ -264,6 +264,11 @@ impl<T: crate::Config> TreasuryVaultProviderWeightInfo for ProviderWeightAdapter
 
 pub struct ProviderWeightAdapter<T>(PhantomData<T>);
 impl<T: crate::Config> BitcoinVaultProviderWeightInfo for ProviderWeightAdapter<T> {
+	fn is_owner() -> Weight {
+		// Both queries read the same bounded Vault value. This benchmark also compares
+		// the returned operator, covering the ownership equality check.
+		<T as crate::Config>::WeightInfo::provider_get_vault_operator()
+	}
 	fn get_registration_vault_data() -> Weight {
 		<T as crate::Config>::WeightInfo::provider_get_registration_vault_data()
 	}

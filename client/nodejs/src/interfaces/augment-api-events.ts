@@ -2120,8 +2120,8 @@ declare module '@polkadot/api-base/types/events' {
       >;
       RewardEconomicsConfigured: AugmentedEvent<
         ApiType,
-        [targetBitcoinPercent: Percent],
-        { targetBitcoinPercent: Percent }
+        [targetBitcoinPercent: Percent, upstreamParticipationFactor: Percent],
+        { targetBitcoinPercent: Percent; upstreamParticipationFactor: Percent }
       >;
     };
     txPause: {

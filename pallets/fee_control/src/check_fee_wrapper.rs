@@ -1,6 +1,9 @@
 // Error code for InvalidTransaction::Custom when sponsored fee is too high
 const INVALID_TX_SPONSORED_FEE_TOO_HIGH: u8 = 1;
-use crate::pallet::{Config, Event, Pallet};
+use crate::{
+	pallet::{Config, Event, Pallet},
+	WeightInfo as _,
+};
 use alloc::vec::Vec;
 use codec::EncodeLike;
 use frame_support::{
@@ -9,8 +12,9 @@ use frame_support::{
 };
 use pallet_prelude::{
 	argon_primitives::{
-		CallFeeRefundProvider, CallTxPoolKeyProvider, CallTxValidityProvider,
-		FeelessCallTxPoolKeyProvider, TransactionSponsorProvider, TxSponsor,
+		CallFeeRefundProvider, CallFeeRefundProviderWeightInfo, CallTxPoolKeyProvider,
+		CallTxPoolKeyProviderWeightInfo, CallTxValidityProvider, CallTxValidityProviderWeightInfo,
+		FeelessCallTxPoolKeyProvider, FeelessCallWeightInfo, TransactionSponsorProvider, TxSponsor,
 	},
 	sp_runtime::traits::{
 		DispatchOriginOf, Implication, PostDispatchInfoOf, StaticLookup, TransactionExtension, Zero,
@@ -64,7 +68,7 @@ pub enum Intermediate<T, O, A> {
 		refund_fee_on_success: bool,
 	},
 	/// The wrapped extension should be skipped.
-	Feeless(O),
+	Feeless { origin: O, inner_weight: Weight },
 }
 
 #[derive(Decode)]
@@ -95,7 +99,7 @@ where
 		None
 	}
 
-	fn validated_pool_key_context(
+	pub(crate) fn validated_pool_key_context(
 		call: &RuntimeCallOf<T>,
 		signer: Option<T::AccountId>,
 	) -> (&RuntimeCallOf<T>, Option<T::AccountId>) {
@@ -152,9 +156,9 @@ where
 		(call, Some(signer))
 	}
 
-	fn push_pool_key(validity: &mut ValidTransaction, key: Vec<u8>) {
-		if !validity.provides.contains(&key) {
-			validity.provides.push(key);
+	pub(crate) fn insert_pool_key(keys: &mut Vec<Vec<u8>>, key: Vec<u8>) {
+		if !keys.contains(&key) {
+			keys.push(key);
 		}
 	}
 
@@ -175,9 +179,7 @@ where
 				let mut keys = Vec::new();
 				for inner_call in calls.iter() {
 					for key in Self::collect_pool_keys(inner_call, signer.clone()) {
-						if !keys.contains(&key) {
-							keys.push(key);
-						}
+						Self::insert_pool_key(&mut keys, key);
 					}
 				}
 				if !keys.is_empty() {
@@ -291,9 +293,97 @@ where
 			_ => def.proxy_type.filter(call),
 		}
 	}
+
+	fn fee_control_weight(call: &RuntimeCallOf<T>) -> Weight {
+		let effective_call = Self::unwrap_proxy(call).unwrap_or(call);
+		let refund_weight = CallFeeRefundWeightsOf::<T>::refund_fee_on_success(effective_call);
+
+		<T as Config>::WeightInfo::regular()
+			.saturating_add(Self::call_weight(call).0)
+			.saturating_add(T::FeelessCallWeights::is_feeless(call))
+			.saturating_add(refund_weight)
+			// The origin is not available to `weight`, so reserve the post-dispatch event path.
+			.saturating_add(<T as Config>::WeightInfo::post_event())
+	}
+
+	/// Compose wrapper and provider work, returning an upper bound on the pool keys collected.
+	fn call_weight(call: &RuntimeCallOf<T>) -> (Weight, u32) {
+		// The outer extension charges regular() once; recursive costs must remain additive.
+		if let Some(
+			proxy_call @ (pallet_proxy::Call::proxy { call: inner_call, .. } |
+			pallet_proxy::Call::proxy_announced { call: inner_call, .. }),
+		) = <RuntimeCallOf<T> as IsSubType<pallet_proxy::Call<T>>>::is_sub_type(call)
+		{
+			let calls = match <RuntimeCallOf<T> as IsSubType<pallet_utility::Call<T>>>::is_sub_type(
+				inner_call,
+			) {
+				Some(
+					pallet_utility::Call::batch { calls } |
+					pallet_utility::Call::batch_all { calls } |
+					pallet_utility::Call::force_batch { calls },
+				) => calls.len() as u32,
+				_ => 1,
+			};
+			let filter_weight = <T as Config>::WeightInfo::proxy(calls.max(1));
+			let weight = if matches!(proxy_call, pallet_proxy::Call::proxy_announced { .. }) {
+				// The size benchmark uses an unrestricted proxy; also cover call-list filters.
+				<T as Config>::WeightInfo::proxy_announced(inner_call.encoded_size() as u32)
+					.saturating_add(
+						filter_weight.saturating_sub(<T as Config>::WeightInfo::proxy(1)),
+					)
+			} else {
+				filter_weight
+			};
+			let (inner_weight, keys) = Self::call_weight(inner_call);
+			return (weight.saturating_add(inner_weight), keys);
+		}
+
+		if let Some(
+			pallet_utility::Call::batch { calls } |
+			pallet_utility::Call::batch_all { calls } |
+			pallet_utility::Call::force_batch { calls },
+		) = <RuntimeCallOf<T> as IsSubType<pallet_utility::Call<T>>>::is_sub_type(call)
+		{
+			let mut weight = <T as Config>::WeightInfo::batch(calls.len() as u32);
+			let mut keys = 0u32;
+			for call in calls {
+				let (inner_weight, inner_keys) = Self::call_weight(call);
+				weight = weight.saturating_add(inner_weight);
+				keys = keys.saturating_add(inner_keys);
+			}
+			if keys == 0 {
+				return (weight, 0);
+			}
+
+			// Key-producing leaves and nonempty nested key lists can add pool keys.
+			// Charge every insertion at the full list length, covering the quadratic scans.
+			weight = weight
+				.saturating_add(
+					<T as Config>::WeightInfo::pool_key_insertion(keys).saturating_mul(keys.into()),
+				)
+				.saturating_add(<T as Config>::WeightInfo::batch_pool_key(keys));
+			return (weight, keys.saturating_add(1));
+		}
+
+		let hash_weight = CallTxPoolKeyWeightsOf::<T>::key_for(call);
+		let validity_weight = CallTxValidityWeightsOf::<T>::validate(call);
+		let keys = u32::from(!hash_weight.is_zero());
+		(hash_weight.saturating_add(validity_weight.saturating_mul(2)), keys)
+	}
 }
 
 type RuntimeCallOf<T> = <T as frame_system::Config>::RuntimeCall;
+type CallTxPoolKeyWeightsOf<T> = <<T as Config>::CallTxPoolKeyProviders as CallTxPoolKeyProvider<
+	RuntimeCallOf<T>,
+	<T as frame_system::Config>::AccountId,
+>>::Weights;
+type CallTxValidityWeightsOf<T> =
+	<<T as Config>::CallTxValidityProviders as CallTxValidityProvider<
+		RuntimeCallOf<T>,
+		<T as frame_system::Config>::AccountId,
+	>>::Weights;
+type CallFeeRefundWeightsOf<T> =
+	<<T as Config>::CallFeeRefundProviders as CallFeeRefundProvider<RuntimeCallOf<T>>>::Weights;
 
 impl<T,S> TransactionExtension<RuntimeCallOf<T>> for CheckFeeWrapper<T, S>
 where
@@ -327,7 +417,7 @@ where
     type Pre = Intermediate<S::Pre, DispatchOriginOf<RuntimeCallOf<T>>, Option<TxSponsor<<T as frame_system::Config>::AccountId, T::Balance>>>;
 
     fn weight(&self, call: &RuntimeCallOf<T>) -> Weight {
-		self.0.weight(call)
+		self.0.weight(call).saturating_add(Self::fee_control_weight(call))
     }
 
     fn validate(
@@ -359,13 +449,17 @@ where
 			};
 
 			for key in general_pool_keys.iter().cloned() {
-				Self::push_pool_key(&mut validity, key);
+				Self::insert_pool_key(&mut validity.provides, key);
 			}
 			if let Some(key) = T::FeelessCallTxPoolKeyProviders::key_for(call) {
-				Self::push_pool_key(&mut validity, key);
+				Self::insert_pool_key(&mut validity.provides, key);
 			}
 
-			Ok((validity, Feeless(origin.clone()), origin))
+			Ok((
+				validity,
+				Feeless { origin: origin.clone(), inner_weight: Weight::zero() },
+				origin,
+			))
 		} else {
 			let mut delegated_origin = origin.clone();
 			let mut tx_sponsor = None;
@@ -413,11 +507,11 @@ where
 			}
 
 			for key in general_pool_keys {
-				Self::push_pool_key(&mut validity, key);
+				Self::insert_pool_key(&mut validity.provides, key);
 			}
 			if let Some(key) = tx_sponsor.as_ref().and_then(|sponsor| sponsor.unique_tx_key.clone())
 			{
-				Self::push_pool_key(&mut validity, key);
+				Self::insert_pool_key(&mut validity.provides, key);
 			}
 
 			Ok((
@@ -461,7 +555,10 @@ where
 					refund_fee_on_success,
 				})
 			},
-			Feeless(origin) => Ok(Feeless(origin)),
+			Feeless { origin, .. } => {
+				let inner_weight = self.0.weight(call);
+				Ok(Feeless { origin, inner_weight })
+			},
 		}
     }
 
@@ -480,32 +577,38 @@ where
 				tx_sponsor,
 				refund_fee_on_success,
 			} => {
-				let adjusted_post_info;
-				let post_info = if refund_fee_on_success && result.is_ok() && post_info.pays_fee == Pays::Yes
-				{
-					adjusted_post_info = PostDispatchInfo {
-						actual_weight: post_info.actual_weight,
-						pays_fee: Pays::No,
-					};
-					&adjusted_post_info
+				let delegation = tx_sponsor.zip(transaction_origin.as_signer());
+				let event_weight_refund = if delegation.is_some() {
+					Weight::zero()
 				} else {
-					post_info
+					<T as Config>::WeightInfo::post_event()
 				};
-				let result = S::post_dispatch_details(pre, info, post_info, len, result)?;
-				if let (Some(sponsor), Some(from)) = (tx_sponsor, transaction_origin.as_signer()) {
+
+				// Payment settles fees before FRAME applies this extension's weight refund.
+				let mut adjusted_post_info = *post_info;
+				adjusted_post_info.actual_weight = Some(
+					post_info.calc_actual_weight(info).saturating_sub(event_weight_refund),
+				);
+				if refund_fee_on_success && result.is_ok() {
+					adjusted_post_info.pays_fee = Pays::No;
+				}
+				let inner_refund =
+					S::post_dispatch_details(pre, info, &adjusted_post_info, len, result)?;
+
+				if let Some((sponsor, from)) = delegation {
 					Pallet::<T>::deposit_event(Event::<T>::FeeDelegated {
 						origin: transaction_origin.clone().into_caller(),
 						from: from.clone(),
 						to: sponsor.payer,
 					});
 				}
-				Ok(result)
+				Ok(inner_refund.saturating_add(event_weight_refund))
 			},
-			Feeless(origin) => {
+			Feeless { origin, inner_weight } => {
 				Pallet::<T>::deposit_event(Event::<T>::FeeSkipped {
 					origin: origin.into_caller(),
 				});
-				Ok(Weight::zero())
+				Ok(inner_weight)
 			},
 		}
 	}
