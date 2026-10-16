@@ -1,8 +1,20 @@
 # Changelog
 
-## [v1.5.1](https://github.com/argonprotocol/mainchain/compare/v1.5.0...28ea77d2fa5523fdd3ef08f3170929e5087de32b) (2026-10-15)
+## [v1.5.2](https://github.com/argonprotocol/mainchain/compare/v1.5.1...70a57c2636a0af43e19776d6115dc6e7a2222b13) (2026-10-15)
 
 ### Features
+
+* **treasury:** make upstream reward participation configurable
+([832ea90](https://github.com/argonprotocol/mainchain/commit/832ea90c326c514d2148cec39bdcbc1f58ab454f))
+
+### Fixes
+
+* **treasury:** start upstream participation factor at five percent
+([4e76bb3](https://github.com/argonprotocol/mainchain/commit/4e76bb3a07ed6229ffffad51c8506601705482d0))
+
+### [v1.5.1](https://github.com/argonprotocol/mainchain/compare/v1.5.0...v1.5.1) (2026-10-15)
+
+#### Features
 
 * **treasury:** make argonot backing optional for vault rewards
 ([d900075](https://github.com/argonprotocol/mainchain/commit/d90007571cb2aee8f05fbfdc49fccfb30c4a3142))
