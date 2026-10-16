@@ -188,12 +188,6 @@ impl BitcoinVaultProvider for MockVaultProvider {
 		});
 	}
 
-	fn get_securitization_ratio(
-		_vault_id: VaultId,
-	) -> Result<FixedU128, argon_primitives::vault::VaultError> {
-		unimplemented!()
-	}
-
 	fn record_bitcoin_lock_funding(
 		_vault_id: VaultId,
 		_update: argon_primitives::vault::BitcoinLockFundingUpdate<Self::Balance>,

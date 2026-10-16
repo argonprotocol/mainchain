@@ -2,7 +2,6 @@
 
 use super::*;
 use argon_primitives::{
-	bitcoin::Satoshis,
 	vault::{TreasuryBonusApprovalProof, Vault, VaultTerms},
 	MiningFrameTransitionProvider, Signature, TreasuryPoolProvider, MICROGONS_PER_ARGON,
 };
@@ -1138,9 +1137,6 @@ fn benchmark_vault<T: Config>(
 	operator_account_id: T::AccountId,
 	securitized_bonds: Bonds,
 ) -> Vault<T::AccountId, T::Balance> {
-	let eligible_satoshis = ((securitized_bonds as u128).saturating_mul(MICROGONS_PER_ARGON))
-		.min(u64::MAX as u128) as Satoshis;
-
 	Vault {
 		operator_account_id,
 		delegate_account_id: Some(benchmark_bonus_approval_delegate_account()),
@@ -1152,11 +1148,8 @@ fn benchmark_vault<T: Config>(
 		securitization_pending_activation: TreasuryBalanceOf::<T>::zero(),
 		total_satoshis: 0,
 		securitized_satoshis: 0,
-		ratio_adjusted_satoshis: eligible_satoshis,
-		flexible_ratio_adjusted_satoshis: 0,
 		securitization_release_schedule: Default::default(),
 		committed_microgons: TreasuryBalanceOf::<T>::zero(),
-		securitization_ratio: FixedU128::one(),
 		is_closed: false,
 		terms: VaultTerms {
 			bitcoin_annual_percent_rate: FixedU128::one(),

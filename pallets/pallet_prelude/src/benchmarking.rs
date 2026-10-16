@@ -1253,14 +1253,6 @@ where
 		Ok(())
 	}
 
-	fn get_securitization_ratio(vault_id: VaultId) -> Result<FixedU128, VaultError> {
-		benchmark_bitcoin_vault_provider_state::<AccountId, Balance>()
-			.vaults
-			.get(&vault_id)
-			.map(|vault| vault.securitization_ratio)
-			.ok_or(VaultError::VaultNotFound)
-	}
-
 	fn record_bitcoin_lock_funding(
 		vault_id: VaultId,
 		update: BitcoinLockFundingUpdate<Self::Balance>,
@@ -1378,17 +1370,17 @@ where
 				let charge_fee = state.charge_fee;
 				let vault = state.vaults.get_mut(&vault_id).ok_or(VaultError::VaultNotFound)?;
 				let is_operator = vault.operator_account_id == *locker;
-				let additional_securitization_coverage_microgons = replacement
-					.securitization_coverage_microgons
-					.saturating_sub(current.securitization_coverage_microgons);
-				let total_fee = if additional_securitization_coverage_microgons.is_zero() {
+				let additional_securitization_microgons = replacement
+					.securitization_microgons
+					.saturating_sub(current.securitization_microgons);
+				let total_fee = if additional_securitization_microgons.is_zero() {
 					Balance::zero()
 				} else {
 					vault
 						.terms
 						.bitcoin_annual_percent_rate
 						.saturating_mul(remaining_term)
-						.saturating_mul_int(additional_securitization_coverage_microgons)
+						.saturating_mul_int(additional_securitization_microgons)
 						.saturating_add(vault.terms.bitcoin_base_fee)
 				};
 				let fee_discount =
@@ -1486,7 +1478,7 @@ where
 		is_flexible: bool,
 	) -> Result<LostBitcoinCompensation<Self::Balance>, VaultError> {
 		let compensation_amount =
-			redemption_amount.min(securitization.coverage_for_satoshis(funded_satoshis));
+			redemption_amount.min(securitization.securitization_for_satoshis(funded_satoshis));
 		let total_burned = Self::burn(
 			vault_id,
 			securitization,

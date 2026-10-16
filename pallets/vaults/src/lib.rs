@@ -49,7 +49,7 @@ pub mod pallet {
 	use frame_support::traits::Incrementable;
 	use sp_runtime::traits::SaturatedConversion;
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(19);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(20);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -239,7 +239,6 @@ pub mod pallet {
 		VaultCreated {
 			vault_id: VaultId,
 			securitization: T::Balance,
-			securitization_ratio: FixedU128,
 			operator_account_id: T::AccountId,
 			opened_tick: Tick,
 		},
@@ -249,7 +248,6 @@ pub mod pallet {
 			securitization: T::Balance,
 			/// The securitization target amount after modification (this is the long term target)
 			securitization_target: T::Balance,
-			securitization_ratio: FixedU128,
 		},
 		VaultTermsChangeScheduled {
 			vault_id: VaultId,
@@ -293,7 +291,7 @@ pub mod pallet {
 		SecuritizationReserved {
 			vault_id: VaultId,
 			locker: T::AccountId,
-			securitization_coverage_microgons: T::Balance,
+			securitization_microgons: T::Balance,
 			fee_revenue: T::Balance,
 			did_use_fee_coupon: bool,
 		},
@@ -456,9 +454,6 @@ pub mod pallet {
 		pub securitization: Balance,
 		/// Bytes for a hardened XPub. Will be used to generate child public keys
 		pub bitcoin_xpubkey: OpaqueBitcoinXpub,
-		/// The securitization percent for the vault (must be maintained going forward)
-		#[codec(compact)]
-		pub securitization_ratio: FixedU128,
 	}
 
 	#[pallet::hooks]
@@ -526,19 +521,8 @@ pub mod pallet {
 				T::OperationalAccountProvider::is_eligible(&who),
 				Error::<T>::OperationalAccountRegistrationRequired
 			);
-			let VaultConfig {
-				delegate_account_id,
-				securitization_ratio,
-				securitization,
-				terms,
-				bitcoin_xpubkey,
-			} = vault_config;
-
-			ensure!(
-				securitization_ratio >= FixedU128::one() &&
-					securitization_ratio <= FixedU128::from_u32(2),
-				Error::<T>::InvalidSecuritization
-			);
+			let VaultConfig { delegate_account_id, securitization, terms, bitcoin_xpubkey } =
+				vault_config;
 
 			let xpub: BitcoinXPub = bitcoin_xpubkey.try_into().map_err(|e| {
 				log::error!("Unable to decode xpubkey: {e:?}");
@@ -575,10 +559,7 @@ pub mod pallet {
 				flexible_securitization_locked: 0u32.into(),
 				reserved_securitization_space: 0u32.into(),
 				securitized_satoshis: 0,
-				ratio_adjusted_satoshis: 0,
-				flexible_ratio_adjusted_satoshis: 0,
 				terms,
-				securitization_ratio,
 				opened_tick,
 				securitization_release_schedule: Default::default(),
 				committed_microgons: T::Balance::zero(),
@@ -598,7 +579,6 @@ pub mod pallet {
 			Self::deposit_event(Event::VaultCreated {
 				vault_id,
 				securitization,
-				securitization_ratio,
 				operator_account_id: who,
 				opened_tick,
 			});
@@ -607,8 +587,6 @@ pub mod pallet {
 		}
 
 		/// Modify funds allocated by the vault without changing existing Bitcoin locks.
-		///
-		/// The securitization percent must be maintained or increased.
 		///
 		/// Funds not yet used in a reward snapshot may leave without notice if not needed for
 		/// Bitcoin commitments. Reward-committed funds require a one-year Bitcoin-height exit
@@ -620,7 +598,6 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			vault_id: VaultId,
 			securitization: T::Balance,
-			securitization_ratio: FixedU128,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 			let mut vault = VaultsById::<T>::get(vault_id).ok_or(Error::<T>::VaultNotFound)?;
@@ -629,13 +606,6 @@ pub mod pallet {
 			// mutable because if it increases, we need to delay it to keep bidding markets fair.
 			ensure!(vault.operator_account_id == who, Error::<T>::NoPermissions);
 
-			ensure!(
-				securitization_ratio >= FixedU128::one() &&
-					securitization_ratio <= FixedU128::from_u32(2),
-				Error::<T>::InvalidSecuritization
-			);
-
-			vault.securitization_ratio = securitization_ratio;
 			Self::change_securitization_target(vault_id, &mut vault, securitization)
 				.map_err(Error::<T>::from)?;
 
@@ -643,7 +613,6 @@ pub mod pallet {
 				vault_id,
 				securitization_target: vault.securitization_target,
 				securitization: vault.securitization,
-				securitization_ratio,
 			});
 			let next_open_securitization =
 				if vault.is_closed { T::Balance::zero() } else { vault.securitization };
@@ -1713,12 +1682,6 @@ pub mod pallet {
 			});
 		}
 
-		fn get_securitization_ratio(vault_id: VaultId) -> Result<FixedU128, VaultError> {
-			let vault =
-				VaultsById::<T>::get(vault_id).ok_or::<VaultError>(VaultError::VaultNotFound)?;
-			Ok(vault.securitization_ratio)
-		}
-
 		fn record_bitcoin_lock_funding(
 			vault_id: VaultId,
 			update: BitcoinLockFundingUpdate<Self::Balance>,
@@ -1822,14 +1785,14 @@ pub mod pallet {
 			let total_fee = vault
 				.terms
 				.bitcoin_annual_percent_rate
-				.saturating_mul_int(securitization.securitization_coverage_microgons)
+				.saturating_mul_int(securitization.securitization_microgons)
 				.saturating_add(vault.terms.bitcoin_base_fee);
 			let fee_discount = if is_operator { total_fee } else { fee_discount.min(total_fee) };
 			let fee_due = total_fee.saturating_sub(fee_discount);
 
 			log::trace!(
 				"Vault {vault_id} trying to reserve {:?} for total fee {:?} with discount {:?}",
-				securitization.collateral_required(),
+				securitization.securitization_microgons,
 				total_fee,
 				fee_discount
 			);
@@ -1839,7 +1802,7 @@ pub mod pallet {
 				locks_created: 1,
 				total_fee,
 				fee_discount,
-				securitization_locked: securitization.collateral_required(),
+				securitization_locked: securitization.securitization_microgons,
 				securitization_released: 0u32.into(),
 				total_satoshis_added: 0,
 				total_satoshis_released: 0,
@@ -1881,7 +1844,7 @@ pub mod pallet {
 			Self::deposit_event(Event::SecuritizationReserved {
 				vault_id,
 				locker: account_id.clone(),
-				securitization_coverage_microgons: securitization.securitization_coverage_microgons,
+				securitization_microgons: securitization.securitization_microgons,
 				fee_revenue: total_fee,
 				did_use_fee_coupon: fee_discount > T::Balance::zero(),
 			});
@@ -1913,8 +1876,8 @@ pub mod pallet {
 			ensure!(!vault.is_closed, VaultError::VaultClosed);
 
 			let additional_coverage_microgons = replacement
-				.securitization_coverage_microgons
-				.saturating_sub(current.securitization_coverage_microgons);
+				.securitization_microgons
+				.saturating_sub(current.securitization_microgons);
 			let total_fee = if additional_coverage_microgons.is_zero() {
 				T::Balance::zero()
 			} else {
@@ -1937,11 +1900,11 @@ pub mod pallet {
 				total_fee,
 				fee_discount,
 				securitization_locked: replacement
-					.collateral_required()
-					.saturating_sub(current.collateral_required()),
+					.securitization_microgons
+					.saturating_sub(current.securitization_microgons),
 				securitization_released: current
-					.collateral_required()
-					.saturating_sub(replacement.collateral_required()),
+					.securitization_microgons
+					.saturating_sub(replacement.securitization_microgons),
 				total_satoshis_added: 0,
 				total_satoshis_released: 0,
 			})?;
@@ -1997,7 +1960,7 @@ pub mod pallet {
 			let securitized_satoshis =
 				current_securitization.securitized_satoshis(lock_funded_satoshis);
 			let securitization_to_schedule =
-				current_securitization.collateral_for_satoshis(securitized_satoshis);
+				current_securitization.securitization_for_satoshis(securitized_satoshis);
 			// All current securitization leaves the Lock: the funded share is scheduled below,
 			// while the unactivated share is released immediately by the Vault model.
 			Self::update_vault_bitcoin_metrics(BitcoinLockUpdate {
@@ -2006,7 +1969,7 @@ pub mod pallet {
 				total_fee: 0u32.into(),
 				fee_discount: T::Balance::zero(),
 				securitization_locked: 0u32.into(),
-				securitization_released: current_securitization.collateral_required(),
+				securitization_released: current_securitization.securitization_microgons,
 				total_satoshis_added: 0,
 				total_satoshis_released: lock_funded_satoshis,
 			})?;
@@ -2040,7 +2003,7 @@ pub mod pallet {
 			is_flexible: bool,
 		) -> Result<LostBitcoinCompensation<Self::Balance>, VaultError> {
 			let compensation_amount =
-				redemption_amount.min(securitization.coverage_for_satoshis(funded_satoshis));
+				redemption_amount.min(securitization.securitization_for_satoshis(funded_satoshis));
 			let mut vault = VaultsById::<T>::get(vault_id).ok_or(VaultError::VaultNotFound)?;
 			let previous_open =
 				if vault.is_closed { T::Balance::zero() } else { vault.securitization };
@@ -2108,7 +2071,7 @@ pub mod pallet {
 				total_fee: T::Balance::zero(),
 				fee_discount: T::Balance::zero(),
 				securitization_locked: T::Balance::zero(),
-				securitization_released: securitization.collateral_required(),
+				securitization_released: securitization.securitization_microgons,
 				total_satoshis_added: 0,
 				total_satoshis_released: funded_satoshis,
 			})?;

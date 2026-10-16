@@ -118,14 +118,11 @@ fn create_receive_address_uses_the_redemption_curve_for_securitization() {
 		));
 
 		let lock = LocksById::<Test>::get(1).expect("lock");
-		assert_eq!(lock.securitization_coverage_microgons, 491_735_537_190);
-		assert_eq!(
-			DefaultVault::get().securitization_locked,
-			lock.securitization_coverage_microgons
-		);
+		assert_eq!(lock.securitization_microgons, 491_735_537_190);
+		assert_eq!(DefaultVault::get().securitization_locked, lock.securitization_microgons);
 		assert_eq!(
 			lock.security_fees,
-			FixedU128::from_float(0.1).saturating_mul_int(lock.securitization_coverage_microgons)
+			FixedU128::from_float(0.1).saturating_mul_int(lock.securitization_microgons)
 		);
 	});
 }
@@ -343,7 +340,7 @@ fn partial_release_keeps_the_lock_pending_until_the_bitcoin_transaction_is_obser
 			));
 		}
 		let lock = LocksById::<Test>::get(1).expect("lock");
-		let collateral = lock.get_securitization().collateral_required();
+		let collateral = lock.get_securitization().securitization_microgons;
 		assert_eq!(
 			TreasuryPositions::upstream_position(&2).unwrap().bitcoin_securitization,
 			collateral
@@ -435,7 +432,7 @@ fn partial_release_keeps_the_lock_pending_until_the_bitcoin_transaction_is_obser
 		assert_eq!(lock.funded_satoshis, 69_999_000);
 		assert_eq!(
 			TreasuryPositions::upstream_position(&2).unwrap().bitcoin_securitization,
-			lock.get_securitization().collateral_for_satoshis(69_999_000)
+			lock.get_securitization().securitization_for_satoshis(69_999_000)
 		);
 		assert_eq!(
 			TreasuryPositions::upstream_position(&2)
@@ -515,9 +512,6 @@ fn partial_release_preserves_the_contract_while_reclassifying_released_funding()
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		set_argons(2, 2_000_000);
-		DefaultVault::mutate(|vault| {
-			vault.securitization_ratio = FixedU128::from_rational(3, 2);
-		});
 		assert_ok!(BitcoinLocks::create_receive_address(
 			RuntimeOrigin::signed(2),
 			1,
@@ -576,19 +570,15 @@ fn partial_release_preserves_the_contract_while_reclassifying_released_funding()
 		assert_eq!(lock.funded_satoshis, fissioned_satoshis);
 		assert_eq!(lock.fissioned_satoshis, fissioned_satoshis);
 		assert_eq!(lock.securitization_basis, lock_before_release.securitization_basis);
-		assert_eq!(
-			lock.securitization_coverage_microgons,
-			lock_before_release.securitization_coverage_microgons,
-		);
-		assert_eq!(lock.securitization_ratio, lock_before_release.securitization_ratio);
+		assert_eq!(lock.securitization_microgons, lock_before_release.securitization_microgons,);
 		assert_eq!(lock.securitization_tick, lock_before_release.securitization_tick);
 		assert_eq!(lock.security_fees, lock_before_release.security_fees);
 		assert_eq!(lock.coupon_paid_fees, lock_before_release.coupon_paid_fees);
 		assert_eq!(lock.fund_hold_extensions, lock_before_release.fund_hold_extensions);
 		let vault = DefaultVault::get();
 		let securitization = lock_before_release.get_securitization();
-		let remaining_collateral = securitization.collateral_for_satoshis(fissioned_satoshis);
-		let total_collateral = securitization.collateral_required();
+		let remaining_collateral = securitization.securitization_for_satoshis(fissioned_satoshis);
+		let total_collateral = securitization.securitization_microgons;
 		assert_eq!(vault.securitization, vault_before_release.securitization);
 		assert_eq!(vault.securitization_locked, vault_before_release.securitization_locked);
 		assert_eq!(vault.total_satoshis, fissioned_satoshis);
@@ -599,10 +589,6 @@ fn partial_release_preserves_the_contract_while_reclassifying_released_funding()
 				.saturating_add(total_collateral.saturating_sub(remaining_collateral)),
 		);
 		assert_eq!(vault.securitized_satoshis, fissioned_satoshis);
-		assert_eq!(
-			vault.ratio_adjusted_satoshis,
-			securitization.eligible_satoshis(fissioned_satoshis),
-		);
 		assert_eq!(
 			vault.securitization_release_schedule,
 			vault_before_release.securitization_release_schedule,
@@ -910,10 +896,9 @@ fn securitization_hold_expiration_releases_unused_coverage_and_keeps_watching() 
 		assert_eq!(DefaultVault::get().securitization_pending_activation, 0);
 		assert_eq!(
 			DefaultVault::get().securitization_locked,
-			expired.get_securitization().collateral_required(),
+			expired.get_securitization().securitization_microgons,
 		);
 
-		let eligible_before_late_funding = DefaultVault::get().ratio_adjusted_satoshis;
 		let late_ref = UtxoRef { txid: H256Le([4; 32]), output_index: 1 };
 		assert_ok!(<BitcoinLocks as BitcoinUtxoEvents<u64>>::utxo_detected(
 			1,
@@ -925,7 +910,6 @@ fn securitization_hold_expiration_releases_unused_coverage_and_keeps_watching() 
 		assert_eq!(lock.funded_satoshis, 60_000_000);
 		assert_eq!(lock.securitization_basis.satoshis, 40_000_000);
 		assert_eq!(lock.funding_utxos.get(&late_ref), Some(&20_000_000));
-		assert_eq!(DefaultVault::get().ratio_adjusted_satoshis, eligible_before_late_funding);
 		assert!(OrphanedUtxosByAccount::<Test>::iter().next().is_none());
 	});
 }
@@ -981,7 +965,7 @@ fn fission_uses_funded_coverage_and_the_existing_redemption_formula() {
 		LocksById::<Test>::mutate(1, |lock| {
 			let lock = lock.as_mut().expect("lock");
 			lock.securitization_basis.microgons_at_target_per_btc = up_rate;
-			lock.securitization_coverage_microgons = up_liquidity;
+			lock.securitization_microgons = up_liquidity;
 		});
 		assert_eq!(
 			BitcoinLocks::validate_fission(
@@ -1170,10 +1154,9 @@ fn resecuritize_replaces_funded_vault_backing() {
 		assert_eq!(lock.securitization_basis.satoshis, securitized_satoshis);
 		assert_eq!(
 			DefaultVault::get().securitization_locked,
-			lock.get_securitization().collateral_required()
+			lock.get_securitization().securitization_microgons
 		);
 		assert_eq!(DefaultVault::get().securitized_satoshis, securitized_satoshis);
-		assert_eq!(DefaultVault::get().ratio_adjusted_satoshis, securitized_satoshis);
 	});
 }
 
@@ -1576,10 +1559,9 @@ fn resecuritize_replaces_pending_vault_backing_without_activating_bitcoin() {
 		let vault = DefaultVault::get();
 		assert!(!lock.is_funded());
 		assert_eq!(lock.securitization_basis.satoshis, securitized_satoshis);
-		assert_eq!(vault.securitization_locked, lock.get_securitization().collateral_required());
+		assert_eq!(vault.securitization_locked, lock.get_securitization().securitization_microgons);
 		assert_eq!(vault.securitization_pending_activation, vault.securitization_locked);
 		assert_eq!(vault.securitized_satoshis, 0);
-		assert_eq!(vault.ratio_adjusted_satoshis, 0);
 	});
 }
 
@@ -1642,7 +1624,6 @@ fn zero_securitization_still_tracks_funded_satoshis() {
 		assert_eq!(lock.btc_value_in_microgons(), 0);
 		assert_eq!(vault.securitization_locked, 0);
 		assert_eq!(vault.securitized_satoshis, 0);
-		assert_eq!(vault.ratio_adjusted_satoshis, 0);
 	});
 }
 
@@ -1924,7 +1905,6 @@ fn cancels_an_unfunded_lock_on_release_request() {
 		let price = StaticPriceProvider::get_btc_price_in_market_microgons(SATOSHIS_PER_BITCOIN)
 			.expect("should have price");
 		assert_eq!(DefaultVault::get().securitization_locked, price);
-		assert_eq!(DefaultVault::get().ratio_adjusted_satoshis, 0);
 
 		assert_ok!(BitcoinLocks::request_release(
 			RuntimeOrigin::signed(who),
@@ -1934,7 +1914,6 @@ fn cancels_an_unfunded_lock_on_release_request() {
 			0,
 		));
 		assert!(LocksById::<Test>::get(1).is_none());
-		assert_eq!(DefaultVault::get().ratio_adjusted_satoshis, 0);
 	});
 }
 
@@ -3276,7 +3255,6 @@ fn externally_spent_bitcoin_without_fissions_releases_the_vault_securitization()
 		assert_eq!(DefaultVault::get().securitization_locked, 0);
 		assert_eq!(DefaultVault::get().securitization, allocated);
 		assert_eq!(DefaultVault::get().get_relock_capacity(), locked_before_spend);
-		assert_eq!(DefaultVault::get().ratio_adjusted_satoshis, 0);
 		assert!(System::events().iter().any(|record| matches!(
 			record.event,
 			RuntimeEvent::BitcoinLocks(Event::<Test>::BitcoinLockTerminated {
@@ -3339,10 +3317,10 @@ fn outside_spend_and_expiry_burn_the_same_fission_redemption_value() {
 			.expect("whole-Lock redemption quote");
 			assert!(redemption < whole_lock_redemption);
 			let insured_fission_amount =
-				lock.get_securitization().coverage_for_satoshis(fission.satoshis);
+				lock.get_securitization().securitization_for_satoshis(fission.satoshis);
 			assert!(
 				insured_fission_amount <
-					lock.get_securitization().coverage_for_satoshis(lock.funded_satoshis)
+					lock.get_securitization().securitization_for_satoshis(lock.funded_satoshis)
 			);
 			let vault_before = DefaultVault::get();
 
@@ -3365,12 +3343,11 @@ fn outside_spend_and_expiry_burn_the_same_fission_redemption_value() {
 			)));
 			assert_eq!(vault_after.total_satoshis, 0);
 			assert_eq!(vault_after.securitized_satoshis, 0);
-			assert_eq!(vault_after.ratio_adjusted_satoshis, 0);
 			assert_eq!(vault_after.securitization_locked, 0);
 			assert_eq!(
 				vault_after.get_relock_capacity(),
 				vault_before.get_relock_capacity() +
-					lock.get_securitization().collateral_for_satoshis(lock.funded_satoshis) -
+					lock.get_securitization().securitization_for_satoshis(lock.funded_satoshis) -
 					burned
 			);
 			assert!(!LocksById::<Test>::contains_key(1));
@@ -3469,7 +3446,7 @@ fn external_spend_closes_the_fission_without_removing_its_pending_mint() {
 		)
 		.expect("Fission redemption amount");
 		let settlement_burned = fission_redemption
-			.min(lock.get_securitization().coverage_for_satoshis(fission.satoshis));
+			.min(lock.get_securitization().securitization_for_satoshis(fission.satoshis));
 		assert!(settlement_burned < whole_lock_redemption);
 		assert!(fission_redemption > settlement_burned);
 		pallet_mint::MintedBitcoinMicrogons::<Test>::set(settlement_burned);
@@ -3527,8 +3504,8 @@ fn external_spend_does_not_burn_beyond_insured_coverage() {
 		)
 		.expect("redemption quote");
 		let lock_collateral =
-			lock.get_securitization().collateral_for_satoshis(lock.funded_satoshis);
-		let coverage = lock.get_securitization().coverage_for_satoshis(lock.funded_satoshis);
+			lock.get_securitization().securitization_for_satoshis(lock.funded_satoshis);
+		let coverage = lock.get_securitization().securitization_for_satoshis(lock.funded_satoshis);
 		let vault_before = DefaultVault::get().securitization;
 		assert!(redemption > lock_collateral);
 		assert_eq!(coverage, lock_collateral);
@@ -3583,7 +3560,7 @@ fn expiring_fission_burns_only_its_insured_redemption_value() {
 		)
 		.expect("redemption quote");
 		let expected_burn =
-			redemption.min(lock.get_securitization().coverage_for_satoshis(fission.satoshis));
+			redemption.min(lock.get_securitization().securitization_for_satoshis(fission.satoshis));
 		let whole_lock_redemption = BitcoinLocks::calculate_redemption_amount_from_satoshis(
 			&lock.funded_satoshis,
 			Some(lock.btc_value_in_microgons()),
@@ -3655,7 +3632,7 @@ fn expiry_sums_each_fission_redemption_basis() {
 			})
 			.sum::<u128>();
 		let expected_burn = fission_redemption
-			.min(lock.get_securitization().coverage_for_satoshis(SATOSHIS_PER_BITCOIN / 2));
+			.min(lock.get_securitization().securitization_for_satoshis(SATOSHIS_PER_BITCOIN / 2));
 		let whole_lock_redemption = BitcoinLocks::calculate_redemption_amount_from_satoshis(
 			&lock.funded_satoshis,
 			Some(lock.btc_value_in_microgons()),
@@ -3683,7 +3660,6 @@ fn expiring_fission_burn_is_capped_at_insurance_coverage() {
 		System::set_block_number(1);
 		let account_id = 2;
 		set_argons(account_id, 100_000 * MICROGONS_PER_ARGON);
-		DefaultVault::mutate(|vault| vault.securitization_ratio = FixedU128::from_u32(2));
 		assert_ok!(BitcoinLocks::create_receive_address(
 			RuntimeOrigin::signed(account_id),
 			1,
@@ -3711,10 +3687,9 @@ fn expiring_fission_burn_is_capped_at_insurance_coverage() {
 			Some(lock.btc_value_in_microgons()),
 		)
 		.expect("redemption quote");
-		let coverage = lock.get_securitization().coverage_for_satoshis(lock.funded_satoshis);
+		let coverage = lock.get_securitization().securitization_for_satoshis(lock.funded_satoshis);
 		let expected_burn = coverage;
 		assert!(current_redemption > coverage);
-		assert!(lock.get_securitization().collateral_for_satoshis(lock.funded_satoshis) > coverage);
 		let vault_before = DefaultVault::get().securitization;
 
 		assert_eq!(BitcoinLocks::process_expiring_locks([1]), 1);
@@ -3758,7 +3733,6 @@ fn spent_after_release_request_schedules_securitization_release() {
 		assert_eq!(DefaultVault::get().securitization_locked, 0);
 		assert_eq!(DefaultVault::get().get_relock_capacity(), lock.btc_value_in_microgons());
 		assert_eq!(DefaultVault::get().securitization, vault.securitization);
-		assert_eq!(DefaultVault::get().ratio_adjusted_satoshis, 0);
 		System::assert_last_event(
 			Event::<Test>::BitcoinSpentAfterRelease {
 				vault_id: 1,
@@ -3798,7 +3772,7 @@ fn overdue_full_release_pays_insured_redemption() {
 		let request = LockReleaseRequestsById::<Test>::get(1).unwrap();
 		let cosign_due_frame = request.cosign_due_frame;
 		let lock = LocksById::<Test>::get(1).expect("funded lock");
-		let insurance = lock.get_securitization().coverage_for_satoshis(lock.funded_satoshis);
+		let insurance = lock.get_securitization().securitization_for_satoshis(lock.funded_satoshis);
 		let expected_compensation = insurance.min(request.securitization_at_risk);
 		let vault_before = DefaultVault::get().securitization;
 		assert!(insurance > 0);
@@ -3811,7 +3785,6 @@ fn overdue_full_release_pays_insured_redemption() {
 		assert!(!LocksById::<Test>::contains_key(1));
 		assert!(!LockReleaseRequestsById::<Test>::contains_key(1));
 		assert!(LockCosignDueByFrame::<Test>::get(cosign_due_frame).is_empty());
-		assert_eq!(DefaultVault::get().ratio_adjusted_satoshis, 0);
 		assert_eq!(DefaultVault::get().securitization, vault_before - expected_compensation);
 		System::assert_last_event(
 			Event::<Test>::BitcoinCosignPastDue {
@@ -3938,7 +3911,6 @@ fn cosigned_release_schedules_securitization_release() {
 		assert_eq!(DefaultVault::get().securitization_locked, 0);
 		assert_eq!(DefaultVault::get().get_relock_capacity(), lock.btc_value_in_microgons());
 		assert_eq!(DefaultVault::get().securitization, vault.securitization);
-		assert_eq!(DefaultVault::get().ratio_adjusted_satoshis, 0);
 		assert_eq!(
 			LockReleaseCosignHeightById::<Test>::get(1),
 			Some(LockReleaseCosignHeight {
@@ -4168,7 +4140,6 @@ fn funding_amount_does_not_rewrite_securitization() {
 		assert_eq!(lock.funded_satoshis, satoshis + 5000);
 		assert_eq!(lock.security_fees, 1000 + 1, "fees shouldn't change");
 		assert_eq!(DefaultVault::get().securitized_satoshis, satoshis);
-		assert_eq!(DefaultVault::get().ratio_adjusted_satoshis, satoshis);
 
 		// A smaller funding output is tracked independently from the existing coverage.
 		let pubkey2 = CompressedBitcoinPubkey([2; 33]);
@@ -4191,7 +4162,6 @@ fn funding_amount_does_not_rewrite_securitization() {
 		assert_eq!(lock.securitization_basis.satoshis, 100_000_000);
 		assert_eq!(lock.security_fees, 1000 + 1, "fees shouldn't change");
 		assert_eq!(DefaultVault::get().securitized_satoshis, satoshis + actual_sats);
-		assert_eq!(DefaultVault::get().ratio_adjusted_satoshis, satoshis + actual_sats);
 	});
 }
 
@@ -4215,8 +4185,6 @@ fn underfunded_lock_uses_funded_satoshis_when_set_flexible() {
 		assert_ok!(funding_received(1, funded_satoshis));
 		assert_ok!(BitcoinLocks::set_flexible(RuntimeOrigin::signed(1), 1, true));
 
-		let vault = DefaultVault::get();
-		assert_eq!(vault.flexible_ratio_adjusted_satoshis, funded_satoshis);
 		assert!(LocksById::<Test>::get(1).expect("lock").is_flexible);
 	});
 }
@@ -4243,7 +4211,6 @@ fn underfunded_lock_uses_funded_satoshis_when_spent_externally() {
 
 		let vault = DefaultVault::get();
 		assert_eq!(vault.securitized_satoshis, 0);
-		assert_eq!(vault.ratio_adjusted_satoshis, 0);
 		assert!(!LocksById::<Test>::contains_key(1));
 	});
 }
@@ -4277,7 +4244,6 @@ fn underfunded_lock_uses_funded_satoshis_when_cosign_is_overdue() {
 
 		let vault = DefaultVault::get();
 		assert_eq!(vault.securitized_satoshis, 0);
-		assert_eq!(vault.ratio_adjusted_satoshis, 0);
 		assert!(!LocksById::<Test>::contains_key(1));
 	});
 }
@@ -4448,7 +4414,7 @@ fn upstream_collateral_tracks_reservations_funding_resecuritization_and_terminat
 			None
 		));
 		let lock = LocksById::<Test>::get(1).unwrap();
-		let collateral = lock.get_securitization().collateral_required();
+		let collateral = lock.get_securitization().securitization_microgons;
 		assert_eq!(TreasuryPositions::upstream_position(&2).unwrap().bitcoin_securitization, 0);
 		assert_eq!(
 			TreasuryPositions::upstream_position(&2)

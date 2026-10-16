@@ -401,7 +401,7 @@ declare module '@polkadot/api-base/types/events' {
           lockId: u64,
           vaultId: u32,
           securitizationBasis: ArgonPrimitivesVaultBitcoinSecuritizationBasis,
-          collateralRequired: u128,
+          securitizationMicrogons: u128,
           accountId: AccountId32,
           securityFee: u128,
         ],
@@ -409,7 +409,7 @@ declare module '@polkadot/api-base/types/events' {
           lockId: u64;
           vaultId: u32;
           securitizationBasis: ArgonPrimitivesVaultBitcoinSecuritizationBasis;
-          collateralRequired: u128;
+          securitizationMicrogons: u128;
           accountId: AccountId32;
           securityFee: u128;
         }
@@ -2261,14 +2261,14 @@ declare module '@polkadot/api-base/types/events' {
         [
           vaultId: u32,
           locker: AccountId32,
-          securitizationCoverageMicrogons: u128,
+          securitizationMicrogons: u128,
           feeRevenue: u128,
           didUseFeeCoupon: bool,
         ],
         {
           vaultId: u32;
           locker: AccountId32;
-          securitizationCoverageMicrogons: u128;
+          securitizationMicrogons: u128;
           feeRevenue: u128;
           didUseFeeCoupon: bool;
         }
@@ -2299,30 +2299,13 @@ declare module '@polkadot/api-base/types/events' {
       >;
       VaultCreated: AugmentedEvent<
         ApiType,
-        [
-          vaultId: u32,
-          securitization: u128,
-          securitizationRatio: u128,
-          operatorAccountId: AccountId32,
-          openedTick: u64,
-        ],
-        {
-          vaultId: u32;
-          securitization: u128;
-          securitizationRatio: u128;
-          operatorAccountId: AccountId32;
-          openedTick: u64;
-        }
+        [vaultId: u32, securitization: u128, operatorAccountId: AccountId32, openedTick: u64],
+        { vaultId: u32; securitization: u128; operatorAccountId: AccountId32; openedTick: u64 }
       >;
       VaultModified: AugmentedEvent<
         ApiType,
-        [vaultId: u32, securitization: u128, securitizationTarget: u128, securitizationRatio: u128],
-        {
-          vaultId: u32;
-          securitization: u128;
-          securitizationTarget: u128;
-          securitizationRatio: u128;
-        }
+        [vaultId: u32, securitization: u128, securitizationTarget: u128],
+        { vaultId: u32; securitization: u128; securitizationTarget: u128 }
       >;
       /**
        * Vault revenue was not collected within the required window, so has been burned

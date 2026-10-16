@@ -1267,7 +1267,6 @@ version = "1.5.1"
 dependencies = [
  "argon-bitcoin",
  "argon-primitives",
- "argon-runtime",
  "frame-benchmarking",
  "log",
  "pallet-bitcoin-fissions",
