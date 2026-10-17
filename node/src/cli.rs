@@ -38,6 +38,7 @@ pub struct ArgonRunCmd {
 	/// Flags to control the randomx compute challenge. Can be specified multiple times.
 	/// - LargePages: use large memory pages for the randomx dataset (default inactive)
 	/// - Secure: use secure memory for the randomx dataset (default inactive)
+	/// - Light: mine without a full dataset, using less memory at a lower hash rate
 	#[arg(long, verbatim_doc_comment)]
 	pub compute_flags: Vec<RandomxFlag>,
 
@@ -61,6 +62,7 @@ pub struct ArgonRunCmd {
 pub enum RandomxFlag {
 	LargePages,
 	Secure,
+	Light,
 }
 
 #[derive(Debug, clap::Subcommand)]

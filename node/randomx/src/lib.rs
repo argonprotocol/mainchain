@@ -22,6 +22,9 @@ pub fn calculate_mining_hash(
 
 #[derive(Debug, Clone, Default)]
 pub struct Config {
+	/// Mine from the 256 MiB cache instead of allocating the full dataset. Hashes are unchanged,
+	/// but each hash takes longer. Useful for short-lived development and test nodes.
+	pub light: bool,
 	/// Recommended optimization: decreases the number of pages the system needs to manage, which
 	/// in turn reduces TLB (Translation Lookaside Buffer) misses and improves memory access speed
 	pub large_pages: bool,
@@ -130,10 +133,14 @@ pub mod full_vm {
 		}
 
 		// Caches are shared, while VMs are local to each mining thread.
+		let config = global_config();
 		let data: Arc<VMData> = if let Some(data) = shared_caches.get_mut(key_hash) {
 			data.clone()
-		} else if shared_caches.len() < shared_caches.capacity() || !global_config().large_pages {
-			let vm_data = VMData::new(&key_hash[..], &global_config(), true)?;
+		} else if shared_caches.len() < shared_caches.capacity() ||
+			!config.large_pages ||
+			config.light
+		{
+			let vm_data = VMData::new(&key_hash[..], &config)?;
 			info!(target:"argon-randomx", "Created new Randomx VMData for key: {:?}", hex::encode(key_hash));
 			Arc::new(vm_data)
 		} else {
@@ -177,7 +184,8 @@ pub mod full_vm {
 	}
 
 	impl VMData {
-		pub fn new(key: &[u8], config: &Config, use_dataset: bool) -> Result<Self, RandomXError> {
+		pub fn new(key: &[u8], config: &Config) -> Result<Self, RandomXError> {
+			let use_dataset = !config.light;
 			let mut flags = RandomXFlag::get_recommended_flags();
 
 			if use_dataset {
@@ -340,7 +348,8 @@ mod tests {
 	#[test]
 	fn should_match_randomx_tests() {
 		// test that hashes from randomx source work
-		let cache = VMData::new(&b"test key 000"[..], &Default::default(), false).unwrap();
+		let config = crate::Config { light: true, ..Default::default() };
+		let cache = VMData::new(&b"test key 000"[..], &config).unwrap();
 		let mut vm = cache.new_vm().expect("Failed to create VM");
 		{
 			// test_a
@@ -395,12 +404,11 @@ mod tests {
 	#[test]
 	fn should_work_with_vm() {
 		let _mining_memory_guard = crate::MINING_MEMORY_TEST_LOCK.lock();
-		let light_cache =
-			VMData::new(&b"RandomX example key"[..], &Default::default(), false).unwrap();
+		let config = crate::Config { light: true, ..Default::default() };
+		let light_cache = VMData::new(&b"RandomX example key"[..], &config).unwrap();
 		let light_vm = light_cache.new_vm().expect("Failed to create VM");
 		let hash = light_vm.calculate_hash(&b"RandomX example input"[..]).unwrap();
-		let full_cache =
-			VMData::new(&b"RandomX example key"[..], &Default::default(), true).unwrap();
+		let full_cache = VMData::new(&b"RandomX example key"[..], &Default::default()).unwrap();
 		let vm = full_cache.new_vm().expect("Failed to create VM");
 		let full_hash = vm.calculate_hash(&b"RandomX example input"[..]).unwrap();
 		assert_eq!(hash, full_hash);
@@ -409,7 +417,7 @@ mod tests {
 	#[test]
 	fn reinit_should_work() -> Result<(), String> {
 		let _mining_memory_guard = crate::MINING_MEMORY_TEST_LOCK.lock();
-		let cache = VMData::new(&b"RandomX example key"[..], &Default::default(), true).unwrap();
+		let cache = VMData::new(&b"RandomX example key"[..], &Default::default()).unwrap();
 		let mut vm = cache.new_vm().unwrap();
 		let hash1 = vm.calculate_hash(&b"RandomX example input"[..]).unwrap();
 

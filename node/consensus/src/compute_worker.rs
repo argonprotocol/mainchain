@@ -670,6 +670,11 @@ mod tests {
 	fn vote_block_recovery_evicts_memory_without_disabling_emergency_fallback() {
 		use crate::mock_importer::{Block as ImportedBlock, MemChain};
 		let _mining_memory_guard = MINING_MEMORY_TEST_LOCK.lock();
+		// Full dataset allocation is covered by argon-randomx; exercise solver lifecycle here.
+		let _ = argon_randomx::full_vm::set_global_config(argon_randomx::Config {
+			light: true,
+			..Default::default()
+		});
 
 		let genesis =
 			BlockHeader::new(0, H256::zero(), H256::zero(), H256::zero(), Digest::default());
@@ -856,6 +861,10 @@ mod tests {
 	fn it_can_reuse_a_nonce_algorithm_multiple_times() {
 		setup_logs();
 		let _mining_memory_guard = MINING_MEMORY_TEST_LOCK.lock();
+		let _ = argon_randomx::full_vm::set_global_config(argon_randomx::Config {
+			light: true,
+			..Default::default()
+		});
 
 		let mut bytes = [0u8; 32];
 		bytes[31] = 2;

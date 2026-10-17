@@ -129,6 +129,12 @@ impl ArgonNodeStartArgs {
 			"{overall_log},node={node_log},pallet=info,argon=trace,sc_rpc_server=info,argon_notary_apis=info",
 		);
 
+		// CI uses lower chain difficulty, so cache-only mining can avoid dataset setup.
+		let mut extra_flags = vec![];
+		if env::var("CI").is_ok() {
+			extra_flags.push("--compute-flags=light".to_string());
+		}
+
 		Ok(Self {
 			target_dir,
 			rust_log,
@@ -141,7 +147,7 @@ impl ArgonNodeStartArgs {
 			is_validator: true,
 			rpc_port: 0,
 			notebook_archive_urls: vec![],
-			extra_flags: vec![],
+			extra_flags,
 			is_archive_node: true,
 		})
 	}

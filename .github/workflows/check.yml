@@ -118,7 +118,7 @@ jobs:
         run: df -h
 
       - name: Build
-        run: cargo build --features=ci --features=try-runtime --bins
+        run: cargo build --features=ci --features=try-runtime --lib --bins --tests
         env:
           CARGO_INCREMENTAL: 0
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

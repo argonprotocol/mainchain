@@ -150,6 +150,9 @@ pub fn run() -> sc_cli::Result<()> {
 			if cli.run.compute_flags.contains(&RandomxFlag::Secure) {
 				randomx_config.secure = true;
 			}
+			if cli.run.compute_flags.contains(&RandomxFlag::Light) {
+				randomx_config.light = true;
+			}
 			let _ = argon_randomx::full_vm::set_global_config(randomx_config);
 
 			runner.run_node_until_exit(|config| async move {

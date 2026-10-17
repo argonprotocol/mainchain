@@ -24,7 +24,7 @@ async fn test_import_of_block_with_notary_down() {
 		.expect("Notary registered");
 
 	let mut blocks_before_notebooks = 0;
-	let mut block_hash = None;
+	let mut notebook_block = None;
 	{
 		let mut blocks_sub =
 			grandpa_miner.client.live.blocks().subscribe_finalized().await.unwrap();
@@ -39,7 +39,7 @@ async fn test_import_of_block_with_notary_down() {
 			{
 				if !notebooks.notebooks.is_empty() {
 					println!("Got block with notebooks - ({}) {}", block.number(), block.hash());
-					block_hash = Some(block.hash());
+					notebook_block = Some((block.number(), block.hash()));
 					break;
 				}
 			}
@@ -50,7 +50,7 @@ async fn test_import_of_block_with_notary_down() {
 		}
 	}
 
-	let block_hash = block_hash.expect("No block with notebooks found");
+	let (block_number, block_hash) = notebook_block.expect("No block with notebooks found");
 
 	test_notary.stop();
 
@@ -60,31 +60,17 @@ async fn test_import_of_block_with_notary_down() {
 	test_notary.restart().await.unwrap();
 	println!("Notary restarted");
 
-	let mut counter = 0;
-	{
-		let mut blocks_sub = miner_2.client.live.blocks().subscribe_finalized().await.unwrap();
-		while let Some(Ok(block)) = blocks_sub.next().await {
-			if let Some(notebooks) = block
-				.header()
-				.runtime_digest()
-				.logs
-				.iter()
-				.find_map(|a| a.as_notebooks::<VerifyError>())
-			{
-				if !notebooks.notebooks.is_empty() {
-					println!("Miner 2 got a block with notebooks");
-				}
-				if block.hash() == block_hash {
-					println!("Miner 2 got the block initially rejected with notebooks");
-					break;
-				}
-				counter += 1;
-				if counter > 20 {
-					panic!("Didn't get back on same chain");
-				}
-			}
-		}
-	}
+	wait_for_finalized_catchup(&grandpa_miner, &miner_2).await.unwrap();
+	assert_eq!(
+		miner_2
+			.client
+			.methods
+			.chain_get_block_hash(Some(block_number.into()))
+			.await
+			.unwrap(),
+		Some(block_hash),
+		"returning miner should finalize the block with notebooks from before the notary outage",
+	);
 }
 
 #[tokio::test(flavor = "multi_thread")]
