@@ -544,7 +544,6 @@ export class TestMintingAuthorityActor {
           treasuryProfitSharing: toFixedNumber(0, PERMILL_DECIMALS),
           treasuryBonusProfitSharing: toFixedNumber(0, PERMILL_DECIMALS),
         },
-        securitizationRatio: toFixedNumber(1, FIXED_U128_DECIMALS),
         securitization: 1_000_000_000n,
         bitcoinXpubkey: hexToU8a(args.bitcoinXpubBytesHex),
         delegateAccountId: null,

@@ -1992,66 +1992,6 @@ fn it_keeps_empty_and_retired_auctions_in_the_price_history() {
 }
 
 #[test]
-fn it_migrates_winning_bid_totals_without_rounding_or_changing_announcements() {
-	#[cfg(feature = "try-runtime")]
-	use crate::migrations::MigrateSeatPriceHistory;
-	use crate::migrations::{v10, MigrateSeatPriceHistoryMigration};
-	#[cfg(feature = "try-runtime")]
-	use frame_support::traits::UncheckedOnRuntimeUpgrade;
-	use frame_support::traits::{OnRuntimeUpgrade, StorageVersion};
-
-	FramesPerMiningTerm::set(10);
-	MinCohortSize::set(10);
-	MaxCohortSize::set(144);
-	TargetPricePerSeat::set(1000 * MICROGONS_PER_ARGON);
-
-	new_test_ext().execute_with(|| {
-		let mut cohort = BoundedVec::new();
-		for seat in 0..21 {
-			cohort
-				.try_push(Registration::<Test> {
-					account_id: seat,
-					argonots: 0,
-					bid: if seat == 20 {
-						2000 * MICROGONS_PER_ARGON
-					} else {
-						1000 * MICROGONS_PER_ARGON
-					},
-					authority_keys: seat.into(),
-					starting_frame_id: 1,
-					external_funding_account: None,
-					bid_at_tick: 1,
-				})
-				.unwrap();
-		}
-		MinersByCohort::<Test>::insert(1, cohort);
-		NextFrameId::<Test>::put(2);
-		NextCohortSize::<Test>::put(57);
-		let announced = bounded_btree_map! { 2 => 49, 3 => 39 };
-		ScheduledCohortSizeChangeByFrame::<Test>::put(&announced);
-		let old_prices: BoundedVec<u128, ConstU32<10>> =
-			bounded_vec![22_000 * MICROGONS_PER_ARGON / 21];
-		v10::AveragePricePerSeat::<Test>::put(old_prices);
-		StorageVersion::new(10).put::<MiningSlots>();
-		#[cfg(feature = "try-runtime")]
-		let upgrade_state = MigrateSeatPriceHistory::<Test>::pre_upgrade().unwrap();
-
-		MigrateSeatPriceHistoryMigration::<Test>::on_runtime_upgrade();
-		#[cfg(feature = "try-runtime")]
-		MigrateSeatPriceHistory::<Test>::post_upgrade(upgrade_state).unwrap();
-
-		assert_eq!(
-			AveragePricePerSeat::<Test>::get().to_vec(),
-			vec![SeatPriceStats { seats: 21, total_bids: 22_000 * MICROGONS_PER_ARGON }]
-		);
-		assert_eq!(ScheduledCohortSizeChangeByFrame::<Test>::get(), announced);
-		assert_eq!(NextCohortSize::<Test>::get(), 57);
-		MiningSlots::adjust_number_of_seats();
-		assert_eq!(ScheduledCohortSizeChangeByFrame::<Test>::get().get(&12), Some(&22));
-	});
-}
-
-#[test]
 fn it_adjusts_mining_seats() {
 	TicksBetweenSlots::set(10);
 	FramesPerMiningTerm::set(10);

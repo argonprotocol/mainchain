@@ -14,7 +14,6 @@ use pallet_prelude::*;
 use std::collections::{BTreeMap, BTreeSet};
 
 use argon_primitives::{vault::VaultError, AccountId, VaultId};
-use sp_runtime::FixedU128;
 
 pub type TestAccountId = AccountId;
 
@@ -186,12 +185,6 @@ impl BitcoinVaultProvider for MockVaultProvider {
 		OperationalVaultsMarkedOperational::mutate(|entries| {
 			entries.insert(vault_operator_account.clone());
 		});
-	}
-
-	fn get_securitization_ratio(
-		_vault_id: VaultId,
-	) -> Result<FixedU128, argon_primitives::vault::VaultError> {
-		unimplemented!()
 	}
 
 	fn record_bitcoin_lock_funding(

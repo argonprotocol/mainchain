@@ -1,839 +1,313 @@
-use crate::{
-	Config, HoldReason, LastProcessedSecuritizationHoldBitcoinHeight, LockCosignDueByFrame,
-	LockReleaseCosignHeight, LockReleaseCosignHeightById, LockReleaseRequest,
-	LockReleaseRequestsById, LockedBitcoin, LocksById, MicrogonsAtTargetPerBtcHistory,
-	NextBitcoinLockId, Pallet, SecuritizationHoldExpirationsByBitcoinHeight,
-};
+use crate::{Config, LocksById, Pallet};
 use argon_primitives::{
 	bitcoin::{
-		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinLockId, BitcoinScriptPubkey,
-		CompressedBitcoinPubkey, Satoshis, UtxoRef, XPubChildNumber, XPubFingerprint,
-		SATOSHIS_PER_BITCOIN,
+		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinLockId, CompressedBitcoinPubkey, Satoshis,
+		UtxoRef, XPubChildNumber, XPubFingerprint,
 	},
-	prelude::FrameId,
-	providers::{
-		BitcoinFissionMinting, BitcoinFissionMintingWeightInfo, OperationalAccountsHook,
-		OperationalAccountsHookWeightInfo,
-	},
-	vault::{BitcoinSecuritizationBasis, BitcoinVaultProvider},
+	tick::Tick,
+	vault::BitcoinSecuritizationBasis,
 	VaultId,
 };
 use codec::{Decode, Encode};
 use frame_support::{
-	storage::{migration::move_prefix, storage_prefix},
-	storage_alias,
-	traits::UncheckedOnRuntimeUpgrade,
+	migrations::VersionedMigration, storage_alias, traits::UncheckedOnRuntimeUpgrade,
 };
 use pallet_prelude::*;
+use sp_runtime::BoundedBTreeMap;
 
-#[cfg(feature = "try-runtime")]
-use alloc::vec::Vec;
-#[cfg(feature = "try-runtime")]
-use frame_support::ensure;
-#[cfg(feature = "try-runtime")]
-use sp_runtime::TryRuntimeError;
+// Mainnet's 146 Locks were all 1x at finalized block 957572 (runtime 159). At 1x the
+// stored guarantee already equals required backing, so funding, maturities, Fissions,
+// and upstream positions are unchanged. Preflight verifies this assumption again.
+/// Rename the stored guarantee and remove the unused ratio, preserving funding and maturities.
+pub struct RemoveSecuritizationRatio<T>(PhantomData<T>);
 
-#[derive(Decode, Encode)]
-struct LockedBitcoinV10<T: Config> {
-	#[codec(compact)]
-	vault_id: VaultId,
-	#[codec(compact)]
-	liquidity_promised: T::Balance,
-	#[codec(compact)]
-	locked_target_price: T::Balance,
-	owner_account: T::AccountId,
-	securitization_ratio: FixedU128,
-	#[codec(compact)]
-	security_fees: T::Balance,
-	#[codec(compact)]
-	coupon_paid_fees: T::Balance,
-	#[codec(compact)]
-	satoshis: Satoshis,
-	utxo_satoshis: Option<Satoshis>,
-	vault_pubkey: CompressedBitcoinPubkey,
-	vault_claim_pubkey: CompressedBitcoinPubkey,
-	vault_xpub_sources: (XPubFingerprint, XPubChildNumber, XPubChildNumber),
-	owner_pubkey: CompressedBitcoinPubkey,
-	#[codec(compact)]
-	vault_claim_height: BitcoinHeight,
-	#[codec(compact)]
-	open_claim_height: BitcoinHeight,
-	#[codec(compact)]
-	created_at_height: BitcoinHeight,
-	utxo_script_pubkey: BitcoinCosignScriptPubkey,
-	is_funded: bool,
-	is_flexible: bool,
-	fund_hold_extensions: BoundedBTreeMap<BitcoinHeight, T::Balance, ConstU32<366>>,
-	#[codec(compact)]
-	created_at_argon_block: BlockNumberFor<T>,
-}
-
-#[derive(Decode, Encode)]
-struct LockReleaseRequestV10<Balance: Codec> {
-	#[codec(compact)]
-	lock_id: BitcoinLockId,
-	#[codec(compact)]
-	vault_id: VaultId,
-	#[codec(compact)]
-	bitcoin_network_fee: Satoshis,
-	#[codec(compact)]
-	cosign_due_frame: FrameId,
-	to_script_pubkey: BitcoinScriptPubkey,
-	#[codec(compact)]
-	securitization_at_risk: Balance,
-}
-
-mod v10 {
-	use super::*;
-
-	#[storage_alias]
-	pub(super) type NextUtxoId<T: Config> = StorageValue<Pallet<T>, BitcoinLockId, OptionQuery>;
-
-	#[storage_alias]
-	pub(super) type LocksByUtxoId<T: Config> =
-		StorageMap<Pallet<T>, Twox64Concat, BitcoinLockId, LockedBitcoinV10<T>, OptionQuery>;
-	#[storage_alias]
-	pub(super) type UtxoIdToFundingUtxoRef<T: Config> =
-		StorageMap<Pallet<T>, Twox64Concat, BitcoinLockId, UtxoRef, OptionQuery>;
-
-	#[storage_alias]
-	pub(super) type LockReleaseRequestsByUtxoId<T: Config> = StorageMap<
-		Pallet<T>,
-		Twox64Concat,
-		BitcoinLockId,
-		LockReleaseRequestV10<<T as Config>::Balance>,
-		OptionQuery,
-	>;
-
-	#[storage_alias]
-	pub(super) type LockReleaseCosignHeightById<T: Config> =
-		StorageMap<Pallet<T>, Twox64Concat, BitcoinLockId, BlockNumberFor<T>, OptionQuery>;
-}
-
-/// Convert version 10 Locks and their existing funded positions, move funding references from the
-/// observer pallet, schedule expiration of their unused securitization, and settle pending
-/// releases.
-pub struct MigrateLockModel<T>(core::marker::PhantomData<T>);
-
-impl<T> UncheckedOnRuntimeUpgrade for MigrateLockModel<T>
-where
-	T: Config + pallet_bitcoin_fissions::Config<Balance = <T as Config>::Balance>,
-{
-	#[cfg(feature = "try-runtime")]
-	fn pre_upgrade() -> Result<Vec<u8>, TryRuntimeError> {
-		let locks = v10::LocksByUtxoId::<T>::iter()
-			.map(|(lock_id, lock)| {
-				(
-					lock_id,
-					lock.satoshis,
-					lock.locked_target_price,
-					lock.is_funded,
-					lock.utxo_satoshis,
-					lock.liquidity_promised,
-					lock.owner_account,
-					lock.created_at_argon_block,
-				)
-			})
-			.collect::<Vec<_>>();
-		let release_request_count = v10::LockReleaseRequestsByUtxoId::<T>::iter_keys()
-			.filter(|lock_id| v10::LocksByUtxoId::<T>::contains_key(lock_id))
-			.count() as u64;
-		let release_cosign_count =
-			v10::LockReleaseCosignHeightById::<T>::iter_keys().count() as u64;
-		Ok((locks, release_request_count, release_cosign_count).encode())
-	}
-
+impl<T: Config> UncheckedOnRuntimeUpgrade for RemoveSecuritizationRatio<T> {
 	fn on_runtime_upgrade() -> Weight {
-		frame_support::storage::migration::move_storage_from_pallet(
-			b"UtxoIdToFundingUtxoRef",
-			b"BitcoinUtxos",
-			b"BitcoinLocks",
-		);
-		StorageVersion::new(1).put::<pallet_bitcoin_fissions::Pallet<T>>();
-
-		let mut reads = 3u64;
-		let mut writes = 2u64;
-		let mut fission_migration_weight = Weight::zero();
-		let current_bitcoin_height = T::BitcoinBlockHeightChange::get().1;
-		LastProcessedSecuritizationHoldBitcoinHeight::<T>::put(current_bitcoin_height);
-		let current_tick = T::CurrentTick::get();
-		let microgons_at_target_per_btc_history = MicrogonsAtTargetPerBtcHistory::<T>::get();
-
-		reads = reads.saturating_add(1);
-		if let Some(next_lock_id) = v10::NextUtxoId::<T>::take() {
-			NextBitcoinLockId::<T>::put(next_lock_id);
-			writes = writes.saturating_add(2);
-		}
-
-		let pallet_prefix = b"BitcoinLocks";
-		move_prefix(
-			&storage_prefix(pallet_prefix, b"LocksByUtxoId"),
-			&storage_prefix(pallet_prefix, b"LocksById"),
-		);
-		move_prefix(
-			&storage_prefix(pallet_prefix, b"UtxoIdsByVaultId"),
-			&storage_prefix(pallet_prefix, b"LockIdsByVaultId"),
-		);
-		move_prefix(
-			&storage_prefix(pallet_prefix, b"UtxoIdsByOwnerAccount"),
-			&storage_prefix(pallet_prefix, b"LockIdsByOwnerAccount"),
-		);
-
-		let mut migrated_release_cosigns = 0u64;
-		LockReleaseCosignHeightById::<T>::translate::<BlockNumberFor<T>, _>(
-			|_lock_id, cosign_height| {
-				migrated_release_cosigns = migrated_release_cosigns.saturating_add(1);
-				Some(LockReleaseCosignHeight {
-					cosign_height,
-					previous_cosign_height: None,
-					release_number: 1,
-				})
-			},
-		);
-		reads = reads.saturating_add(migrated_release_cosigns);
-		writes = writes.saturating_add(migrated_release_cosigns);
-
-		let mut migrated_locks = 0u64;
-		LocksById::<T>::translate::<LockedBitcoinV10<T>, _>(|lock_id, lock| {
-			migrated_locks = migrated_locks.saturating_add(1);
-			let has_pending_release = v10::LockReleaseRequestsByUtxoId::<T>::contains_key(lock_id);
-			reads = reads.saturating_add(4);
-			writes = writes.saturating_add(4);
-			let funded_satoshis =
-				if lock.is_funded { lock.utxo_satoshis.unwrap_or(lock.satoshis) } else { 0 };
-			let mut funding_utxos = BoundedBTreeMap::new();
-			if let Some(utxo_ref) = v10::UtxoIdToFundingUtxoRef::<T>::take(lock_id) {
-				funding_utxos
-					.try_insert(utxo_ref, funded_satoshis)
-					.expect("MaxUtxosPerLock must permit one migrated funding UTXO");
-			}
-			let fissioned_satoshis =
-				if lock.is_funded && !has_pending_release { lock.satoshis } else { 0 };
-			let microgons_at_target_per_btc =
-				FixedU128::from_rational(SATOSHIS_PER_BITCOIN as u128, lock.satoshis as u128)
-					.saturating_mul_int(lock.locked_target_price);
-			let securitization_tick = microgons_at_target_per_btc_history
-				.iter()
-				.rev()
-				.find_map(|(tick, value)| (*value == microgons_at_target_per_btc).then_some(*tick))
-				.unwrap_or(current_tick);
-			let securitization_hold_expiration_bitcoin_height = lock
-				.created_at_height
-				.saturating_add(T::SecuritizationHoldBlocks::get())
-				.saturating_add(1);
-			let securitization_hold_expiration_bitcoin_height = if funded_satoshis >= lock.satoshis
-			{
-				securitization_hold_expiration_bitcoin_height
-			} else {
-				securitization_hold_expiration_bitcoin_height
-					.max(current_bitcoin_height.saturating_add(1))
-			};
-			let securitization_basis =
-				BitcoinSecuritizationBasis { satoshis: lock.satoshis, microgons_at_target_per_btc };
-			if lock.is_funded && !has_pending_release {
-				let fission_id = lock_id;
-				let mut fission_ids = BoundedBTreeSet::new();
-				fission_ids
-					.try_insert(fission_id)
-					.expect("MaxFissionsPerLock must permit one migrated Fission");
-				pallet_bitcoin_fissions::FissionByOwnerAndId::<T>::insert(
-					&lock.owner_account,
-					fission_id,
-					pallet_bitcoin_fissions::Fission {
-						liquid_id: lock_id,
-						lock_id,
-						satoshis: lock.satoshis,
-						microgons_at_target_per_btc,
-						last_ratchet_tick: securitization_tick,
-						liquidity_promised: lock.liquidity_promised,
-						created_at_argon_block: lock.created_at_argon_block,
-						ratchet_number: 0,
-						last_updated_argon_block: lock.created_at_argon_block,
-					},
-				);
-				pallet_bitcoin_fissions::FissionIdsByLockId::<T>::insert(lock_id, fission_ids);
-				fission_migration_weight.saturating_accrue(T::DbWeight::get().reads_writes(1, 2));
-			}
-			if lock.is_funded {
-				pallet_bitcoin_fissions::NextFissionIdByOwner::<T>::mutate(
-					&lock.owner_account,
-					|next_fission_id| {
-						*next_fission_id = (*next_fission_id).max(lock_id.saturating_add(1));
-					},
-				);
-				fission_migration_weight.saturating_accrue(T::DbWeight::get().reads_writes(1, 1));
-			}
-
-			Some(LockedBitcoin {
-				vault_id: lock.vault_id,
-				securitization_basis,
-				securitization_coverage_microgons: lock.liquidity_promised,
-				securitization_tick,
-				funded_satoshis,
-				funding_utxos,
-				fissioned_satoshis,
-				owner_account: lock.owner_account,
-				securitization_ratio: lock.securitization_ratio,
-				security_fees: lock.security_fees,
-				coupon_paid_fees: lock.coupon_paid_fees,
-				vault_pubkey: lock.vault_pubkey,
-				vault_claim_pubkey: lock.vault_claim_pubkey,
-				vault_xpub_sources: lock.vault_xpub_sources,
-				owner_pubkey: lock.owner_pubkey,
-				vault_claim_height: lock.vault_claim_height,
-				open_claim_height: lock.open_claim_height,
-				created_at_height: lock.created_at_height,
-				securitization_hold_expiration_bitcoin_height,
-				utxo_script_pubkey: lock.utxo_script_pubkey,
-				is_flexible: lock.is_flexible,
-				fund_hold_extensions: lock.fund_hold_extensions,
-				created_at_argon_block: lock.created_at_argon_block,
-			})
+		let mut count = 0u64;
+		LocksById::<T>::translate::<v11::LockedBitcoin<T>, _>(|_, lock| {
+			count += 1;
+			Some(lock.into_current())
 		});
-		// Each Lock owns one vault index and one owner index, and at most one release request.
-		reads = reads.saturating_add(migrated_locks.saturating_mul(3));
-		writes = writes.saturating_add(migrated_locks.saturating_mul(6));
-
-		let mut migrated_release_requests = 0u64;
-		let mut settled_release_holds = 0u64;
-		#[allow(deprecated)]
-		let release_hold_reason = HoldReason::ReleaseBitcoinLock.into();
-		for (lock_id, request) in v10::LockReleaseRequestsByUtxoId::<T>::drain() {
-			let Some(lock) = LocksById::<T>::get(lock_id) else {
-				// The old overdue path allowed a request to outlive its Lock. Its stored
-				// request has no owner, so there is no safe account whose hold we can settle.
-				LockCosignDueByFrame::<T>::mutate(request.cosign_due_frame, |locks| {
-					locks.remove(&lock_id);
-				});
-				if let Err(error) =
-					T::VaultProvider::update_pending_cosign_list(request.vault_id, lock_id, true)
-				{
-					log::error!("Unable to clear lockless legacy release {lock_id:?}: {error:?}");
-				}
-				reads = reads.saturating_add(3);
-				writes = writes.saturating_add(3);
-				continue;
-			};
-			let destination_satoshis = lock
-				.funded_satoshis
-				.checked_sub(request.bitcoin_network_fee)
-				.expect("a legacy release fee is lower than its funded satoshis");
-			let releaser = Pallet::<T>::create_release_releaser(
-				&lock,
-				request.to_script_pubkey.clone(),
-				destination_satoshis,
-				0,
-			)
-			.expect("a legacy release request contains a valid Bitcoin transaction");
-
-			LockReleaseRequestsById::<T>::insert(
-				lock_id,
-				LockReleaseRequest {
-					lock_id,
-					vault_id: request.vault_id,
-					release_number: 1,
-					bitcoin_network_fee: request.bitcoin_network_fee,
-					destination_satoshis,
-					change_satoshis: 0,
-					cosign_due_frame: request.cosign_due_frame,
-					to_script_pubkey: request.to_script_pubkey,
-					expected_transaction_id: releaser.psbt.unsigned_tx.compute_txid().into(),
-					securitization_at_risk: request.securitization_at_risk,
-				},
-			);
-			if !request.securitization_at_risk.is_zero() {
-				<T as Config>::Currency::burn_held(
-					&release_hold_reason,
-					&lock.owner_account,
-					request.securitization_at_risk,
-					Precision::Exact,
-					Fortitude::Force,
-				)
-				.expect("a funded legacy release has its redemption amount on hold");
-				frame_system::Pallet::<T>::dec_providers(&lock.owner_account)
-					.expect("a legacy release hold has a provider reference");
-				<T as pallet_bitcoin_fissions::Config>::Minting::record_mint_repayment(
-					request.securitization_at_risk,
-				);
-				fission_migration_weight.saturating_accrue(
-					<<T as pallet_bitcoin_fissions::Config>::Minting as BitcoinFissionMinting<
-						T::AccountId,
-						<T as Config>::Balance,
-					>>::Weights::record_mint_repayment(),
-				);
-				settled_release_holds = settled_release_holds.saturating_add(1);
-			}
-			if lock.is_funded() {
-				<T as pallet_bitcoin_fissions::Config>::OperationalAccountsHook::account_bitcoin_amount_changed(
-					&lock.owner_account,
-					lock.securitization_coverage_microgons,
-					false,
-				);
-				fission_migration_weight.saturating_accrue(
-					<<T as pallet_bitcoin_fissions::Config>::OperationalAccountsHook as OperationalAccountsHook<T::AccountId, <T as pallet_bitcoin_fissions::Config>::Balance>>::Weights::account_bitcoin_amount_changed(),
-				);
-			}
-			migrated_release_requests = migrated_release_requests.saturating_add(1);
-		}
-		reads = reads.saturating_add(migrated_release_requests.saturating_mul(2));
-		writes = writes
-			.saturating_add(migrated_release_requests.saturating_mul(2))
-			.saturating_add(settled_release_holds.saturating_mul(4));
-
-		for (lock_id, lock) in LocksById::<T>::iter() {
-			reads = reads.saturating_add(1);
-			if lock.funded_satoshis >= lock.securitization_basis.satoshis {
-				continue;
-			}
-			let inserted = SecuritizationHoldExpirationsByBitcoinHeight::<T>::try_mutate(
-				lock.securitization_hold_expiration_bitcoin_height,
-				|locks| locks.try_insert(lock_id),
-			);
-			if inserted.is_ok() {
-				writes = writes.saturating_add(1);
-			} else {
-				log::error!(
-					"Unable to schedule unused securitization expiration for bitcoin lock {lock_id:?}"
-				);
-			}
-		}
-
-		T::DbWeight::get()
-			.reads_writes(reads, writes)
-			.saturating_add(fission_migration_weight)
+		T::DbWeight::get().reads_writes(count + 1, count)
 	}
 
 	#[cfg(feature = "try-runtime")]
-	fn post_upgrade(state: Vec<u8>) -> Result<(), TryRuntimeError> {
-		type LockState<T> = (
-			BitcoinLockId,
-			Satoshis,
-			<T as Config>::Balance,
-			bool,
-			Option<Satoshis>,
-			<T as Config>::Balance,
-			<T as frame_system::Config>::AccountId,
-			BlockNumberFor<T>,
-		);
-		let (locks, release_request_count, release_cosign_count): (Vec<LockState<T>>, u64, u64) =
-			Decode::decode(&mut state.as_slice()).map_err(|_| {
-				TryRuntimeError::Other("could not decode bitcoin lock migration state")
-			})?;
-
-		ensure!(
-			LocksById::<T>::iter_keys().count() == locks.len(),
-			TryRuntimeError::Other("bitcoin lock count changed during migration"),
-		);
-		ensure!(
-			StorageVersion::get::<pallet_bitcoin_fissions::Pallet<T>>() == StorageVersion::new(1),
-			TryRuntimeError::Other("bitcoin Fission storage version was not initialized"),
-		);
-		ensure!(
-			v10::LockReleaseRequestsByUtxoId::<T>::iter_keys().next().is_none(),
-			TryRuntimeError::Other("legacy Bitcoin release requests remain after migration"),
-		);
-		ensure!(
-			LockReleaseRequestsById::<T>::iter_keys().count() == release_request_count as usize,
-			TryRuntimeError::Other("legacy Bitcoin release requests were not migrated"),
-		);
-		ensure!(
-			LockReleaseCosignHeightById::<T>::iter_keys().count() == release_cosign_count as usize &&
-				LockReleaseCosignHeightById::<T>::iter_values()
-					.all(|cosign| cosign.release_number == 1),
-			TryRuntimeError::Other("bitcoin release cosign tombstones were not migrated"),
-		);
-		log::info!("Migrated {release_request_count} legacy Bitcoin release requests");
-		for (
-			lock_id,
-			securitized_satoshis,
-			locked_target_price,
-			was_funded,
-			funding_satoshis,
-			liquidity_promised,
-			owner_account,
-			created_at_argon_block,
-		) in locks
-		{
-			let lock = LocksById::<T>::get(lock_id)
-				.ok_or(TryRuntimeError::Other("bitcoin lock was not migrated"))?;
-			let expected_rate = FixedU128::from_rational(
-				SATOSHIS_PER_BITCOIN as u128,
-				securitized_satoshis as u128,
-			)
-			.saturating_mul_int(locked_target_price);
-			let expected_funded_satoshis =
-				if was_funded { funding_satoshis.unwrap_or(securitized_satoshis) } else { 0 };
-			let release_pending = LockReleaseRequestsById::<T>::contains_key(lock_id);
-			let expected_fissioned_satoshis =
-				if was_funded && !release_pending { securitized_satoshis } else { 0 };
+	fn pre_upgrade() -> Result<Vec<u8>, sp_runtime::TryRuntimeError> {
+		let mut locks = Vec::new();
+		for (id, lock) in v11::LocksById::<T>::iter() {
 			ensure!(
-				lock.securitization_basis.satoshis == securitized_satoshis &&
-					lock.securitization_basis.microgons_at_target_per_btc == expected_rate &&
-					lock.funded_satoshis == expected_funded_satoshis &&
-					lock.fissioned_satoshis == expected_fissioned_satoshis &&
-					lock.owner_account == owner_account &&
-					lock.created_at_argon_block == created_at_argon_block,
-				TryRuntimeError::Other("bitcoin lock accounting changed during migration"),
+				lock.securitization_ratio == FixedU128::one(),
+				"non-1x Bitcoin Lock requires conversion before runtime 161"
 			);
-			if was_funded && !release_pending {
-				let fission =
-					pallet_bitcoin_fissions::FissionByOwnerAndId::<T>::get(&owner_account, lock_id)
-						.ok_or(TryRuntimeError::Other(
-							"funded bitcoin lock Fission was not migrated",
-						))?;
-				ensure!(
-					fission.liquid_id == lock_id &&
-						fission.lock_id == lock_id &&
-						fission.satoshis == securitized_satoshis &&
-						fission.microgons_at_target_per_btc == expected_rate &&
-						fission.last_ratchet_tick == lock.securitization_tick &&
-						fission.liquidity_promised == liquidity_promised &&
-						fission.created_at_argon_block == created_at_argon_block &&
-						fission.ratchet_number == 0 &&
-						fission.last_updated_argon_block == created_at_argon_block,
-					TryRuntimeError::Other("funded bitcoin lock Fission accounting changed"),
-				);
-				ensure!(
-					pallet_bitcoin_fissions::FissionIdsByLockId::<T>::get(lock_id)
-						.contains(&lock_id) &&
-						pallet_bitcoin_fissions::NextFissionIdByOwner::<T>::get(&owner_account) >
-							lock_id,
-					TryRuntimeError::Other("funded bitcoin lock Fission indexes were not migrated"),
-				);
-			} else {
-				ensure!(
-					!pallet_bitcoin_fissions::FissionByOwnerAndId::<T>::contains_key(
-						&owner_account,
-						lock_id,
-					),
-					TryRuntimeError::Other("bitcoin lock without an active Fission created one"),
-				);
-				if release_pending {
-					ensure!(
-						pallet_bitcoin_fissions::FissionIdsByLockId::<T>::get(lock_id).is_empty() &&
-							pallet_bitcoin_fissions::NextFissionIdByOwner::<T>::get(
-								&owner_account
-							) > lock_id,
-						TryRuntimeError::Other("pending release retained a Fission"),
-					);
-					continue;
-				}
-				ensure!(
-					SecuritizationHoldExpirationsByBitcoinHeight::<T>::get(
-						lock.securitization_hold_expiration_bitcoin_height,
-					)
-					.contains(&lock_id),
-					TryRuntimeError::Other(
-						"unused bitcoin lock securitization was not scheduled for expiration"
-					),
-				);
-			}
+			locks.push((id, lock.into_current().encode()));
+		}
+		Ok(locks.encode())
+	}
+
+	#[cfg(feature = "try-runtime")]
+	fn post_upgrade(state: Vec<u8>) -> Result<(), sp_runtime::TryRuntimeError> {
+		let locks = Vec::<(BitcoinLockId, Vec<u8>)>::decode(&mut state.as_slice())
+			.map_err(|_| "invalid Bitcoin Lock migration state")?;
+		ensure!(LocksById::<T>::iter_keys().count() == locks.len(), "Bitcoin Lock count changed");
+		for (id, encoded) in locks {
+			ensure!(
+				LocksById::<T>::get(id).map(|lock| lock.encode()) == Some(encoded),
+				"Bitcoin Lock migration changed stored terms or funding"
+			);
 		}
 		Ok(())
 	}
 }
 
-pub type MigrateLockModelMigration<T> = frame_support::migrations::VersionedMigration<
-	10,
+pub type RemoveSecuritizationRatioMigration<T> = VersionedMigration<
 	11,
-	MigrateLockModel<T>,
+	12,
+	RemoveSecuritizationRatio<T>,
 	Pallet<T>,
 	<T as frame_system::Config>::DbWeight,
 >;
 
+/// Runtime 160 storage; the funding-output limit is unchanged in runtime 161.
+pub mod v11 {
+	use super::*;
+
+	#[derive(Encode, Decode, CloneNoBound)]
+	pub struct LockedBitcoin<T: Config> {
+		#[codec(compact)]
+		pub vault_id: VaultId,
+		/// Bitcoin amount and valuation used to price this Lock's securitization.
+		pub securitization_basis: BitcoinSecuritizationBasis<T::Balance>,
+		/// Microgon coverage purchased after applying the redemption curve.
+		#[codec(compact)]
+		pub securitization_coverage_microgons: T::Balance,
+		/// Tick of the price-history entry used for the current securitization.
+		#[codec(compact)]
+		pub securitization_tick: Tick,
+		/// Satoshis attached to this Lock by confirmed funding outputs. Zero means unfunded.
+		#[codec(compact)]
+		pub funded_satoshis: Satoshis,
+		/// Confirmed Bitcoin outputs assigned to this Lock and their individual amounts.
+		pub funding_utxos: BoundedBTreeMap<UtxoRef, Satoshis, T::MaxUtxosPerLock>,
+		/// Funded satoshis currently split into active Fissions.
+		#[codec(compact)]
+		pub fissioned_satoshis: Satoshis,
+		/// The owner account
+		pub owner_account: T::AccountId,
+		/// The guaranteed securitization ratio for this lock
+		pub securitization_ratio: FixedU128,
+		/// Sum of all lock fees (initial plus any resecuritization)
+		#[codec(compact)]
+		pub security_fees: T::Balance,
+		/// Fees covered by the vault for this lock
+		#[codec(compact)]
+		pub coupon_paid_fees: T::Balance,
+		/// The vault pubkey used in the cosign script to lock (and unlock) the bitcoin
+		pub vault_pubkey: CompressedBitcoinPubkey,
+		/// The vault pubkey used to claim the bitcoin after the lock expiration
+		pub vault_claim_pubkey: CompressedBitcoinPubkey,
+		/// The vault xpub sources. First is the cosign number, second is the claim number
+		pub vault_xpub_sources: (XPubFingerprint, XPubChildNumber, XPubChildNumber),
+		/// The bitcoin pubkey provided by the owner of the bitcoin lock that will be needed to
+		/// spend the bitcoin (owner side of cosign)
+		pub owner_pubkey: CompressedBitcoinPubkey,
+		/// The height where the vault has exclusive rights to claim the bitcoin
+		#[codec(compact)]
+		pub vault_claim_height: BitcoinHeight,
+		/// The height where either owner or vault can claim the bitcoin
+		#[codec(compact)]
+		pub open_claim_height: BitcoinHeight,
+		/// The bitcoin height when this lock was created
+		#[codec(compact)]
+		pub created_at_height: BitcoinHeight,
+		/// The Bitcoin height through which unused securitization remains reserved.
+		#[codec(compact)]
+		pub securitization_hold_expiration_bitcoin_height: BitcoinHeight,
+		/// The script pubkey where funds are sent to fund this bitcoin lock
+		pub utxo_script_pubkey: BitcoinCosignScriptPubkey,
+		/// Whether this operator-owned lock may be displaced by outside vault capital.
+		pub is_flexible: bool,
+		/// Funds used by this bitcoin that will need to be held for extended periods when released
+		/// back to the vault
+		pub fund_hold_extensions: BoundedBTreeMap<BitcoinHeight, T::Balance, ConstU32<366>>,
+		/// The argon block when this lock was created
+		#[codec(compact)]
+		pub created_at_argon_block: BlockNumberFor<T>,
+	}
+
+	#[storage_alias]
+	pub type LocksById<T: Config> =
+		StorageMap<Pallet<T>, Twox64Concat, BitcoinLockId, LockedBitcoin<T>, OptionQuery>;
+
+	impl<T: Config> LockedBitcoin<T> {
+		pub fn into_current(self) -> crate::LockedBitcoin<T> {
+			crate::LockedBitcoin {
+				vault_id: self.vault_id,
+				securitization_basis: self.securitization_basis,
+				securitization_microgons: self.securitization_coverage_microgons,
+				securitization_tick: self.securitization_tick,
+				funded_satoshis: self.funded_satoshis,
+				funding_utxos: self.funding_utxos,
+				fissioned_satoshis: self.fissioned_satoshis,
+				owner_account: self.owner_account,
+				security_fees: self.security_fees,
+				coupon_paid_fees: self.coupon_paid_fees,
+				vault_pubkey: self.vault_pubkey,
+				vault_claim_pubkey: self.vault_claim_pubkey,
+				vault_xpub_sources: self.vault_xpub_sources,
+				owner_pubkey: self.owner_pubkey,
+				vault_claim_height: self.vault_claim_height,
+				open_claim_height: self.open_claim_height,
+				created_at_height: self.created_at_height,
+				securitization_hold_expiration_bitcoin_height: self
+					.securitization_hold_expiration_bitcoin_height,
+				utxo_script_pubkey: self.utxo_script_pubkey,
+				is_flexible: self.is_flexible,
+				fund_hold_extensions: self.fund_hold_extensions,
+				created_at_argon_block: self.created_at_argon_block,
+			}
+		}
+	}
+}
+
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use crate::{mock::*, LockCosignDueByFrame, LockReleaseRequestsById};
-	use argon_primitives::{
-		bitcoin::{BitcoinSignature, H256Le},
-		vault::BitcoinVaultProvider,
-	};
-	use frame_support::{
-		assert_ok,
-		traits::fungible::{InspectHold, MutateHold},
-	};
-	use polkadot_sdk::sp_core::H256;
+	use crate::mock::*;
+	use argon_primitives::bitcoin::H256Le;
+	#[cfg(feature = "try-runtime")]
+	use frame_support::assert_ok;
+	use frame_support::traits::OnRuntimeUpgrade;
+	use sp_runtime::bounded_btree_map;
 
-	fn old_lock(is_funded: bool) -> LockedBitcoinV10<Test> {
-		LockedBitcoinV10 {
+	fn stored_lock() -> v11::LockedBitcoin<Test> {
+		v11::LockedBitcoin {
 			vault_id: 1,
-			liquidity_promised: 25_000_000_000,
-			locked_target_price: 30_000_000_000,
+			securitization_basis: BitcoinSecuritizationBasis {
+				satoshis: 10,
+				microgons_at_target_per_btc: 123_000_000,
+			},
+			securitization_coverage_microgons: 11,
+			securitization_tick: 7,
+			funded_satoshis: 8,
+			funding_utxos: bounded_btree_map! { UtxoRef { txid: H256Le([4; 32]), output_index: 2 } => 8 },
+			fissioned_satoshis: 6,
 			owner_account: 2,
-			securitization_ratio: FixedU128::from_rational(3, 2),
+			securitization_ratio: FixedU128::one(),
 			security_fees: 17,
 			coupon_paid_fees: 5,
-			satoshis: SATOSHIS_PER_BITCOIN / 2,
-			utxo_satoshis: is_funded.then_some(52_000_000),
-			vault_pubkey: DefaultVaultBitcoinPubkey::get().into(),
-			vault_claim_pubkey: DefaultVaultReclaimBitcoinPubkey::get().into(),
-			vault_xpub_sources: ([3; 4], 4, 5),
-			owner_pubkey: DefaultVaultBitcoinPubkey::get().into(),
-			vault_claim_height: 1_000,
-			open_claim_height: 1_030,
-			created_at_height: 100,
+			vault_pubkey: CompressedBitcoinPubkey([2; 33]),
+			vault_claim_pubkey: CompressedBitcoinPubkey([3; 33]),
+			vault_xpub_sources: ([6; 4], 2, 3),
+			owner_pubkey: CompressedBitcoinPubkey([4; 33]),
+			vault_claim_height: 100,
+			open_claim_height: 1_000,
+			created_at_height: 1,
+			securitization_hold_expiration_bitcoin_height: 70,
 			utxo_script_pubkey: BitcoinCosignScriptPubkey::P2WSH {
-				wscript_hash: H256::repeat_byte(7),
+				wscript_hash: H256::repeat_byte(8),
 			},
-			is_funded,
 			is_flexible: true,
-			fund_hold_extensions: BoundedBTreeMap::new(),
+			fund_hold_extensions: bounded_btree_map! { 432 => 7, 576 => 4 },
 			created_at_argon_block: 9,
 		}
 	}
 
-	#[allow(deprecated)]
-	fn seed_v10_release(
-		lock_id: BitcoinLockId,
-		cosign_due_frame: FrameId,
-		held: Balance,
-	) -> (RuntimeHoldReason, u32) {
-		set_argons(2, 1_000_000);
-		DefaultVault::mutate(|vault| {
-			vault.securitization_locked = 37_500_000_000;
-			vault.flexible_securitization_locked = 37_500_000_000;
-			vault.total_satoshis = 52_000_000;
-			vault.securitized_satoshis = 50_000_000;
-			vault.ratio_adjusted_satoshis = 75_000_000;
-			vault.flexible_ratio_adjusted_satoshis = 75_000_000;
-		});
-		v10::LocksByUtxoId::<Test>::insert(lock_id, old_lock(true));
-		v10::UtxoIdToFundingUtxoRef::<Test>::insert(
-			lock_id,
-			UtxoRef { txid: H256Le([8; 32]), output_index: 0 },
-		);
-		let hold_reason = HoldReason::ReleaseBitcoinLock.into();
-		assert_ok!(Balances::hold(&hold_reason, &2, held));
-		System::inc_providers(&2);
-		v10::LockReleaseRequestsByUtxoId::<Test>::insert(
-			lock_id,
-			LockReleaseRequestV10 {
-				lock_id,
-				vault_id: 1,
-				bitcoin_network_fee: 1_000,
-				cosign_due_frame,
-				to_script_pubkey: BitcoinScriptPubkey(BoundedVec::truncate_from(vec![1; 32])),
-				securitization_at_risk: held,
-			},
-		);
-		LockCosignDueByFrame::<Test>::mutate(cosign_due_frame, |locks| {
-			locks.try_insert(lock_id).expect("one lock fits");
-		});
-		StaticVaultProvider::update_pending_cosign_list(1, lock_id, false).expect("pending list");
-		(hold_reason, System::providers(&2))
-	}
-
 	#[test]
-	fn v10_lock_is_decoded_before_its_securitization_hold_is_scheduled() {
+	fn migration_preserves_partial_and_overfunded_locks_and_runs_once() {
 		new_test_ext().execute_with(|| {
-			let lock_id = 7;
-			v10::LocksByUtxoId::<Test>::insert(lock_id, old_lock(false));
+			StorageVersion::new(11).put::<Pallet<Test>>();
+			let partial = stored_lock();
+			let mut overfunded = partial.clone();
+			overfunded.funded_satoshis = 15;
+			overfunded
+				.funding_utxos
+				.try_insert(UtxoRef { txid: H256Le([5; 32]), output_index: 0 }, 7)
+				.unwrap();
+			v11::LocksById::<Test>::insert(1, &partial);
+			v11::LocksById::<Test>::insert(2, &overfunded);
+			crate::LockIdsByVaultId::<Test>::insert(1, 1, ());
+			crate::LockIdsByVaultId::<Test>::insert(1, 2, ());
+			let index = crate::LockIdsByVaultId::<Test>::iter().collect::<Vec<_>>();
+			let position = pallet_treasury_positions::PositionsByAccount::<Test>::get(2).encode();
+			#[cfg(feature = "try-runtime")]
+			let state = RemoveSecuritizationRatio::<Test>::pre_upgrade().unwrap();
 
-			MigrateLockModel::<Test>::on_runtime_upgrade();
+			RemoveSecuritizationRatioMigration::<Test>::on_runtime_upgrade();
 
-			let lock = LocksById::<Test>::get(lock_id).expect("converted lock");
-			assert_eq!(lock.securitization_basis.satoshis, SATOSHIS_PER_BITCOIN / 2);
-			assert_eq!(lock.securitization_basis.microgons_at_target_per_btc, 60_000_000_000);
-			assert_eq!(lock.securitization_tick, 1);
-			assert_eq!(lock.funded_satoshis, 0);
-			assert_eq!(lock.fissioned_satoshis, 0);
-			assert_eq!(lock.owner_account, 2);
-			assert_eq!(lock.security_fees, 17);
-			assert_eq!(lock.coupon_paid_fees, 5);
-			assert_eq!(lock.created_at_argon_block, 9);
-			assert_eq!(lock.securitization_hold_expiration_bitcoin_height, 245);
-			assert!(
-				SecuritizationHoldExpirationsByBitcoinHeight::<Test>::get(245).contains(&lock_id)
-			);
-			assert_eq!(LastProcessedSecuritizationHoldBitcoinHeight::<Test>::get(), Some(0));
-			assert!(!pallet_bitcoin_fissions::FissionByOwnerAndId::<Test>::contains_key(
-				2, lock_id
-			));
-		});
-	}
-
-	#[test]
-	fn funded_v10_lock_recreates_its_existing_fission() {
-		new_test_ext().execute_with(|| {
-			let lock_id = 7;
-			v10::LocksByUtxoId::<Test>::insert(lock_id, old_lock(true));
-			MigrateLockModel::<Test>::on_runtime_upgrade();
-
-			let lock = LocksById::<Test>::get(lock_id).expect("migrated lock");
-			assert_eq!(lock.get_securitization().collateral_required(), 37_500_000_000);
-
-			let fission = pallet_bitcoin_fissions::FissionByOwnerAndId::<Test>::get(2, lock_id)
-				.expect("migrated fission");
-			assert_eq!(fission.liquid_id, lock_id);
-			assert_eq!(fission.lock_id, lock_id);
-			assert_eq!(fission.satoshis, SATOSHIS_PER_BITCOIN / 2);
-			assert_eq!(fission.microgons_at_target_per_btc, 60_000_000_000);
-			assert_eq!(fission.last_ratchet_tick, 1);
-			assert_eq!(fission.liquidity_promised, 25_000_000_000);
-			assert_eq!(fission.created_at_argon_block, 9);
-			assert_eq!(fission.last_updated_argon_block, 9);
-			assert_eq!(fission.ratchet_number, 0);
-			assert_eq!(pallet_bitcoin_fissions::NextFissionIdByOwner::<Test>::get(2), 8);
-			assert!(pallet_bitcoin_fissions::FissionIdsByLockId::<Test>::get(lock_id)
-				.contains(&lock_id));
-		});
-	}
-
-	#[test]
-	fn v10_release_cosign_height_becomes_a_legacy_recovery_tombstone() {
-		new_test_ext().execute_with(|| {
-			let lock_id = 7;
-			v10::LockReleaseCosignHeightById::<Test>::insert(lock_id, 42);
-
-			MigrateLockModel::<Test>::on_runtime_upgrade();
-
+			#[cfg(feature = "try-runtime")]
+			assert_ok!(RemoveSecuritizationRatio::<Test>::post_upgrade(state));
+			for (id, original) in [(1, partial), (2, overfunded)] {
+				let lock = LocksById::<Test>::get(id).unwrap();
+				assert_eq!(lock.securitization_microgons, 11);
+				assert_eq!(lock.securitization_basis, original.securitization_basis);
+				assert_eq!(lock.securitization_tick, 7);
+				assert_eq!(lock.funded_satoshis, original.funded_satoshis);
+				assert_eq!(lock.funding_utxos, original.funding_utxos);
+				assert_eq!(lock.fissioned_satoshis, 6);
+				assert_eq!((lock.security_fees, lock.coupon_paid_fees), (17, 5));
+				assert_eq!(
+					(lock.vault_claim_height, lock.open_claim_height, lock.created_at_height),
+					(100, 1_000, 1)
+				);
+				assert_eq!(lock.securitization_hold_expiration_bitcoin_height, 70);
+				assert_eq!(lock.fund_hold_extensions, original.fund_hold_extensions);
+				assert_eq!(lock.utxo_script_pubkey, original.utxo_script_pubkey);
+				assert_eq!(lock.vault_pubkey, original.vault_pubkey);
+				assert_eq!(lock.vault_claim_pubkey, original.vault_claim_pubkey);
+				assert_eq!(lock.owner_pubkey, original.owner_pubkey);
+			}
+			assert_eq!(crate::LockIdsByVaultId::<Test>::iter().collect::<Vec<_>>(), index);
 			assert_eq!(
-				LockReleaseCosignHeightById::<Test>::get(lock_id),
-				Some(LockReleaseCosignHeight {
-					cosign_height: 42,
-					previous_cosign_height: None,
-					release_number: 1,
-				})
+				pallet_treasury_positions::PositionsByAccount::<Test>::get(2).encode(),
+				position
+			);
+			assert_eq!(StorageVersion::get::<Pallet<Test>>(), StorageVersion::new(12));
+			let locks = LocksById::<Test>::iter()
+				.map(|(id, lock)| (id, lock.encode()))
+				.collect::<Vec<_>>();
+			RemoveSecuritizationRatioMigration::<Test>::on_runtime_upgrade();
+			assert_eq!(
+				LocksById::<Test>::iter()
+					.map(|(id, lock)| (id, lock.encode()))
+					.collect::<Vec<_>>(),
+				locks
 			);
 		});
 	}
 
+	#[cfg(feature = "try-runtime")]
 	#[test]
-	fn v10_pending_releases_settle_the_fission_and_remain_pending() {
+	fn pre_upgrade_rejects_non_one_ratios_without_writing_storage() {
 		new_test_ext().execute_with(|| {
-			let lock_id = 7;
-			let cosign_due_frame = 5;
-			let held = 200;
-			let (hold_reason, providers_before_migration) =
-				seed_v10_release(lock_id, cosign_due_frame, held);
-
-			#[cfg(feature = "try-runtime")]
-			let state = MigrateLockModel::<Test>::pre_upgrade().expect("pre-upgrade checks");
-			MigrateLockModel::<Test>::on_runtime_upgrade();
-			#[cfg(feature = "try-runtime")]
-			MigrateLockModel::<Test>::post_upgrade(state).expect("post-upgrade checks");
-
-			assert!(LocksById::<Test>::contains_key(lock_id));
-			let request = LockReleaseRequestsById::<Test>::get(lock_id).expect("migrated request");
-			assert_eq!(request.lock_id, lock_id);
-			assert_eq!(request.vault_id, 1);
-			assert_eq!(request.release_number, 1);
-			assert_eq!(request.bitcoin_network_fee, 1_000);
-			assert_eq!(request.destination_satoshis, 51_999_000);
-			assert_eq!(request.change_satoshis, 0);
-			assert_eq!(request.cosign_due_frame, cosign_due_frame);
-			assert_eq!(request.securitization_at_risk, held);
-			assert_eq!(LocksById::<Test>::get(lock_id).unwrap().fissioned_satoshis, 0);
-			assert!(!pallet_bitcoin_fissions::FissionByOwnerAndId::<Test>::contains_key(
-				2, lock_id
-			));
-			assert!(pallet_bitcoin_fissions::FissionIdsByLockId::<Test>::get(lock_id).is_empty());
-			assert!(pallet_bitcoin_fissions::NextFissionIdByOwner::<Test>::get(2) > lock_id);
-			assert!(LockCosignDueByFrame::<Test>::get(cosign_due_frame).contains(&lock_id));
-			assert!(VaultViewOfCosignPendingLocks::get().get(&1).unwrap().contains(&lock_id));
-			assert_eq!(Balances::balance_on_hold(&hold_reason, &2), 0);
-			assert_eq!(Balances::free_balance(2), 1_000_000 - held);
-			assert_eq!(System::providers(&2), providers_before_migration - 1);
-
-			assert_ok!(BitcoinLocks::cosign_release(
-				RuntimeOrigin::signed(1),
-				lock_id,
-				BoundedVec::truncate_from(vec![BitcoinSignature(BoundedVec::truncate_from(vec![
-					0;
-					73
-				]))]),
-			));
-			assert!(!LocksById::<Test>::contains_key(lock_id));
-			assert!(!LockReleaseRequestsById::<Test>::contains_key(lock_id));
-			assert!(!pallet_bitcoin_fissions::FissionByOwnerAndId::<Test>::contains_key(
-				2, lock_id
-			));
-			assert_eq!(Balances::balance_on_hold(&hold_reason, &2), 0);
-			assert_eq!(Balances::free_balance(2), 1_000_000 - held);
-			assert_eq!(System::providers(&2), providers_before_migration - 1);
+			let mut lock = stored_lock();
+			lock.securitization_ratio = FixedU128::from_rational(3, 2);
+			v11::LocksById::<Test>::insert(1, &lock);
+			assert!(RemoveSecuritizationRatio::<Test>::pre_upgrade().is_err());
+			assert_eq!(v11::LocksById::<Test>::get(1).unwrap().encode(), lock.encode());
 		});
 	}
 
+	#[cfg(feature = "try-runtime")]
 	#[test]
-	fn v10_pending_release_pays_insured_redemption_when_cosign_becomes_overdue() {
+	fn post_upgrade_detects_changed_terms_and_missing_locks() {
 		new_test_ext().execute_with(|| {
-			System::set_block_number(1);
-			let lock_id = 7;
-			let cosign_due_frame = 5;
-			let held = 200;
-			let (hold_reason, providers_before_migration) =
-				seed_v10_release(lock_id, cosign_due_frame, held);
-
-			MigrateLockModel::<Test>::on_runtime_upgrade();
-			let lock = LocksById::<Test>::get(lock_id).expect("migrated lock");
-			let insurance = lock.get_securitization().coverage_for_satoshis(lock.funded_satoshis);
-			assert!(held < insurance);
-			let expected_compensation = insurance.min(held);
-			let vault_before = DefaultVault::get().securitization;
-			assert_ok!(BitcoinLocks::cosign_bitcoin_overdue(lock_id));
-
-			assert!(!LocksById::<Test>::contains_key(lock_id));
-			assert!(!LockReleaseRequestsById::<Test>::contains_key(lock_id));
-			assert!(!pallet_bitcoin_fissions::FissionByOwnerAndId::<Test>::contains_key(
-				2, lock_id
-			));
-			assert_eq!(Balances::balance_on_hold(&hold_reason, &2), 0);
-			assert_eq!(Balances::free_balance(2), 1_000_000 - held);
-			assert_eq!(System::providers(&2), providers_before_migration - 1);
-			assert_eq!(DefaultVault::get().securitization, vault_before - expected_compensation);
-			System::assert_last_event(
-				crate::Event::<Test>::BitcoinCosignPastDue {
-					lock_id,
-					vault_id: 1,
-					release_number: 1,
-					compensation_amount: expected_compensation,
-					compensated_account_id: 2,
-				}
-				.into(),
-			);
+			v11::LocksById::<Test>::insert(1, stored_lock());
+			let state = RemoveSecuritizationRatio::<Test>::pre_upgrade().unwrap();
+			RemoveSecuritizationRatio::<Test>::on_runtime_upgrade();
+			LocksById::<Test>::mutate(1, |lock| lock.as_mut().unwrap().security_fees += 1);
+			assert!(RemoveSecuritizationRatio::<Test>::post_upgrade(state.clone()).is_err());
+			LocksById::<Test>::remove(1);
+			assert!(RemoveSecuritizationRatio::<Test>::post_upgrade(state).is_err());
 		});
 	}
 
+	#[cfg(feature = "try-runtime")]
 	#[test]
-	fn v10_pending_release_does_not_burn_redemption_twice_when_the_lock_expires() {
+	fn migration_handles_empty_storage() {
 		new_test_ext().execute_with(|| {
-			let lock_id = 7;
-			let held = 200;
-			let (hold_reason, providers_before_migration) = seed_v10_release(lock_id, 5, held);
-
-			MigrateLockModel::<Test>::on_runtime_upgrade();
-			assert_eq!(BitcoinLocks::process_expiring_locks([lock_id]), 1);
-
-			assert!(!LocksById::<Test>::contains_key(lock_id));
-			assert!(!LockReleaseRequestsById::<Test>::contains_key(lock_id));
-			assert!(!pallet_bitcoin_fissions::FissionByOwnerAndId::<Test>::contains_key(
-				2, lock_id
-			));
-			assert_eq!(Balances::balance_on_hold(&hold_reason, &2), 0);
-			assert_eq!(Balances::free_balance(2), 1_000_000 - held);
-			assert_eq!(System::providers(&2), providers_before_migration - 1);
-		});
-	}
-
-	#[test]
-	fn v10_release_without_a_lock_does_not_abort_the_upgrade() {
-		new_test_ext().execute_with(|| {
-			let lock_id = 7;
-			seed_v10_release(lock_id, 5, 200);
-			v10::LocksByUtxoId::<Test>::remove(lock_id);
-
-			#[cfg(feature = "try-runtime")]
-			let state = MigrateLockModel::<Test>::pre_upgrade().expect("pre-upgrade checks");
-			MigrateLockModel::<Test>::on_runtime_upgrade();
-			#[cfg(feature = "try-runtime")]
-			MigrateLockModel::<Test>::post_upgrade(state).expect("post-upgrade checks");
-
-			assert!(!LockReleaseRequestsById::<Test>::contains_key(lock_id));
-			assert!(!LockCosignDueByFrame::<Test>::get(5).contains(&lock_id));
-			assert!(!VaultViewOfCosignPendingLocks::get()
-				.get(&1)
-				.is_some_and(|locks| locks.contains(&lock_id)));
+			let state = RemoveSecuritizationRatio::<Test>::pre_upgrade().unwrap();
+			RemoveSecuritizationRatio::<Test>::on_runtime_upgrade();
+			assert_ok!(RemoveSecuritizationRatio::<Test>::post_upgrade(state));
 		});
 	}
 }

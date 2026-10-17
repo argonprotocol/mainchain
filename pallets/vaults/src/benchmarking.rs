@@ -58,7 +58,6 @@ fn benchmark_vault_config<T: Config>(
 		delegate_account_id: None,
 		securitization: securitization.into(),
 		bitcoin_xpubkey: benchmark_xpub::<T>(seed_hint),
-		securitization_ratio: FixedU128::one(),
 	}
 }
 
@@ -327,15 +326,13 @@ mod benchmarks {
 		)?;
 		seed_treasury_bonds_for_benchmark::<T>(vault_id)?;
 		let securitization: BalanceOf<T> = (1_000 * MICROGONS_PER_ARGON).into();
-		let ratio = FixedU128::one();
 
 		#[extrinsic_call]
-		_(RawOrigin::Signed(caller.clone()), vault_id, securitization, ratio);
+		_(RawOrigin::Signed(caller.clone()), vault_id, securitization);
 
 		let vault = VaultsById::<T>::get(vault_id)
 			.ok_or(BenchmarkError::Stop("vault missing after modify"))?;
 		assert_eq!(vault.securitization_target, securitization);
-		assert_eq!(vault.securitization_ratio, ratio);
 		let bonds = BondLotsByVault::<T>::get(vault_id);
 		assert!(bonds.locked_frame_terms.is_some());
 		assert!(bonds.displaced_flexible_bonds > 0);
@@ -675,21 +672,19 @@ mod benchmarks {
 	fn provider_set_bitcoin_lock_flexible() -> Result<(), BenchmarkError> {
 		let operator: T::AccountId = account("provider_flexible_lock", 0, 0);
 		let vault_id = create_vault::<T>(&operator, 10, 100_000)?;
-		let collateral_required: BalanceOf<T> = 10_000u128.into();
+		let securitization_microgons: BalanceOf<T> = 10_000u128.into();
 		let satoshis = 10_000;
 		VaultsById::<T>::mutate(vault_id, |vault| {
 			let vault = vault.as_mut().expect("benchmark vault should exist");
-			vault.securitization_locked = collateral_required;
+			vault.securitization_locked = securitization_microgons;
 			vault.securitized_satoshis = satoshis;
-			vault.ratio_adjusted_satoshis = satoshis;
 		});
 		let securitization = BitcoinSecuritization {
 			basis: BitcoinSecuritizationBasis {
 				satoshis,
 				microgons_at_target_per_btc: 100_000_000u128.into(),
 			},
-			securitization_coverage_microgons: collateral_required,
-			securitization_ratio: FixedU128::one(),
+			securitization_microgons,
 		};
 
 		#[block]
@@ -705,8 +700,7 @@ mod benchmarks {
 
 		let vault = VaultsById::<T>::get(vault_id)
 			.ok_or(BenchmarkError::Stop("vault missing after flexible lock update"))?;
-		assert_eq!(vault.flexible_securitization_locked, collateral_required);
-		assert_eq!(vault.flexible_ratio_adjusted_satoshis, satoshis);
+		assert_eq!(vault.flexible_securitization_locked, securitization_microgons);
 		Ok(())
 	}
 
@@ -724,8 +718,7 @@ mod benchmarks {
 				satoshis: 5_000_000,
 				microgons_at_target_per_btc: (100_000 * MICROGONS_PER_ARGON).into(),
 			},
-			securitization_coverage_microgons: (5_000 * MICROGONS_PER_ARGON).into(),
-			securitization_ratio: FixedU128::one(),
+			securitization_microgons: (5_000 * MICROGONS_PER_ARGON).into(),
 		};
 		let request = ReserveSecuritizationRequest {
 			lock_expiration: u64::from(e + 1) * 144,
@@ -745,7 +738,10 @@ mod benchmarks {
 		}
 
 		let vault = VaultsById::<T>::get(vault_id).expect("admission vault exists");
-		assert_eq!(vault.securitization_pending_activation, securitization.collateral_required());
+		assert_eq!(
+			vault.securitization_pending_activation,
+			securitization.securitization_microgons
+		);
 		assert_eq!(vault.reserved_securitization_space, BalanceOf::<T>::zero());
 		assert_eq!(vault.get_relock_capacity(), BalanceOf::<T>::zero());
 		assert!(
@@ -768,12 +764,11 @@ mod benchmarks {
 				satoshis: 2_500_000,
 				microgons_at_target_per_btc: (100_000 * MICROGONS_PER_ARGON).into(),
 			},
-			securitization_coverage_microgons: (2_500 * MICROGONS_PER_ARGON).into(),
-			securitization_ratio: FixedU128::one(),
+			securitization_microgons: (2_500 * MICROGONS_PER_ARGON).into(),
 		};
 		let replacement = BitcoinSecuritization {
 			basis: BitcoinSecuritizationBasis { satoshis: 5_000_000, ..current.basis },
-			securitization_coverage_microgons: (5_000 * MICROGONS_PER_ARGON).into(),
+			securitization_microgons: (5_000 * MICROGONS_PER_ARGON).into(),
 			..current
 		};
 		let mut extension = LockExtension::new(u64::from(e) * 144);
@@ -806,7 +801,7 @@ mod benchmarks {
 		}
 
 		let vault = VaultsById::<T>::get(vault_id).expect("unfunded vault exists");
-		assert_eq!(vault.securitization_pending_activation, replacement.collateral_required());
+		assert_eq!(vault.securitization_pending_activation, replacement.securitization_microgons);
 		assert_eq!(vault.reserved_securitization_space, BalanceOf::<T>::zero());
 		assert_eq!(vault.get_relock_capacity(), BalanceOf::<T>::zero());
 		Ok(())
@@ -824,12 +819,11 @@ mod benchmarks {
 				satoshis: 2_500_000,
 				microgons_at_target_per_btc: (100_000 * MICROGONS_PER_ARGON).into(),
 			},
-			securitization_coverage_microgons: collateral.into(),
-			securitization_ratio: FixedU128::one(),
+			securitization_microgons: collateral.into(),
 		};
 		let replacement = BitcoinSecuritization {
 			basis: BitcoinSecuritizationBasis { satoshis: 5_000_000, ..current.basis },
-			securitization_coverage_microgons: (5_000 * MICROGONS_PER_ARGON).into(),
+			securitization_microgons: (5_000 * MICROGONS_PER_ARGON).into(),
 			..current
 		};
 		let vault_id = create_vault::<T>(&operator, 11, 5_000 * MICROGONS_PER_ARGON)?;
@@ -853,9 +847,7 @@ mod benchmarks {
 			vault.record_bitcoin_lock_funding(BitcoinLockFundingUpdate {
 				funded_satoshis,
 				securitized_satoshis: current.securitized_satoshis(funded_satoshis),
-				collateral_required: current.collateral_between(0, funded_satoshis),
-				eligible_satoshis: current
-					.eligible_satoshis(current.securitized_satoshis(funded_satoshis)),
+				securitization_microgons: current.securitization_between(0, funded_satoshis),
 				is_flexible: false,
 			})?;
 
@@ -906,8 +898,7 @@ mod benchmarks {
 		let vault = VaultsById::<T>::get(vault_id)
 			.ok_or(BenchmarkError::Stop("vault missing after resecuritization"))?;
 		assert_eq!(vault.securitized_satoshis, replacement.securitized_satoshis(funded_satoshis));
-		assert_eq!(vault.ratio_adjusted_satoshis, replacement.eligible_satoshis(funded_satoshis));
-		assert_eq!(vault.securitization_locked, replacement.collateral_required());
+		assert_eq!(vault.securitization_locked, replacement.securitization_microgons);
 		assert_eq!(lock_extension.len(), e as usize);
 		assert_eq!(VaultFundsReleasingByHeight::<T>::iter().count(), e as usize);
 		assert_eq!(vault.reserved_securitization_space, BalanceOf::<T>::zero());
@@ -926,8 +917,7 @@ mod benchmarks {
 				satoshis: 100_000_000,
 				microgons_at_target_per_btc: collateral.into(),
 			},
-			securitization_coverage_microgons: collateral.into(),
-			securitization_ratio: FixedU128::one(),
+			securitization_microgons: collateral.into(),
 		};
 		let vault_id = create_vault::<T>(&operator, 13, 5_000 * MICROGONS_PER_ARGON)?;
 		let original_extension = LockExtension::new(10_000);
@@ -965,9 +955,7 @@ mod benchmarks {
 				.record_bitcoin_lock_funding(BitcoinLockFundingUpdate {
 					funded_satoshis: securitization.basis.satoshis,
 					securitized_satoshis: securitization.basis.satoshis,
-					collateral_required: securitization.collateral_required(),
-					eligible_satoshis: securitization
-						.eligible_satoshis(securitization.basis.satoshis),
+					securitization_microgons: securitization.securitization_microgons,
 					is_flexible: false,
 				})
 				.map_err(|_| BenchmarkError::Stop("failed to activate securitization"))?;
