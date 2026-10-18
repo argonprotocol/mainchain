@@ -9,6 +9,7 @@ import { result as metadataBytes } from '../../metadata.json';
 import { getOfflineRegistry } from '../index';
 
 const FIXED_U128_SCALE = 10n ** 18n;
+const PERMILL_SCALE = 1_000_000n;
 const BOND_LOTS_PER_BATCH = 25;
 const FIRST_FULL_FRAME_BY_GENESIS: Record<string, number> = {
   // The old flexible-bond snapshot format first appeared in runtime spec 158.
@@ -16,7 +17,12 @@ const FIRST_FULL_FRAME_BY_GENESIS: Record<string, number> = {
   '0x66dc4e5ff85faddb0311b768eb73a58d9a00c65f06056ffaa370a1b1354d7411': 565,
 };
 
-type HistoricalLot = { bondLotId: number; bonds: bigint };
+type HistoricalLot = {
+  bondLotId: number;
+  bonds: bigint;
+  sharingPercent: bigint;
+  bonusPercent: bigint;
+};
 
 type LotMetrics = {
   participatedFrames: number;
@@ -33,7 +39,7 @@ type LotAttribution = {
 };
 
 type Manifest = {
-  kind: 'argon-flexible-bond-metrics-v1';
+  kind: 'argon-flexible-bond-metrics-v2';
   genesisHash: string;
   anchorBlockHash: string;
   firstFrameId: number;
@@ -46,6 +52,8 @@ type Manifest = {
       vaultId: number;
       grossEarnings: bigint;
       flexibleYield: bigint;
+      bondEarnings: bigint;
+      vaultEarnings: bigint;
       eligibleFlexibleBonds: bigint;
       totalFlexibleBonds: bigint;
     }[];
@@ -54,8 +62,8 @@ type Manifest = {
   batches: { bondLotIds: number[]; sudoCallData: string }[];
 };
 
-/** Split the actual old flexible slice completely, with deterministic dust assignment. */
-function allocateFlexibleYield(
+/** Split gross flexible yield first, then retain only each lot's historical bonder share. */
+export function allocateFlexibleBondEarnings(
   grossVaultEarnings: bigint,
   flexibleProrata: bigint,
   lots: HistoricalLot[],
@@ -67,11 +75,12 @@ function allocateFlexibleYield(
   const flexibleYield = (grossVaultEarnings * flexibleProrata) / FIXED_U128_SCALE;
   const shares = lots.map(lot => ({
     bondLotId: lot.bondLotId,
-    earnings: (flexibleYield * lot.bonds) / totalBonds,
+    bonderPercent: lot.sharingPercent + lot.bonusPercent,
+    grossEarnings: (flexibleYield * lot.bonds) / totalBonds,
     remainder: (flexibleYield * lot.bonds) % totalBonds,
   }));
 
-  let dust = flexibleYield - shares.reduce((total, share) => total + share.earnings, 0n);
+  let dust = flexibleYield - shares.reduce((total, share) => total + share.grossEarnings, 0n);
   shares.sort((a, b) => {
     if (a.remainder !== b.remainder) return a.remainder > b.remainder ? -1 : 1;
     return a.bondLotId - b.bondLotId;
@@ -79,11 +88,17 @@ function allocateFlexibleYield(
 
   for (const share of shares) {
     if (dust === 0n) break;
-    share.earnings += 1n;
+    share.grossEarnings += 1n;
     dust -= 1n;
   }
 
-  return new Map(shares.map(share => [share.bondLotId, share.earnings]));
+  // The remaining yield belongs to the vault role, including profit-share rounding.
+  return new Map(
+    shares.map(share => [
+      share.bondLotId,
+      (share.grossEarnings * share.bonderPercent) / PERMILL_SCALE,
+    ]),
+  );
 }
 
 async function prepare(api: ApiPromise): Promise<Manifest> {
@@ -200,7 +215,12 @@ async function prepare(api: ApiPromise): Promise<Manifest> {
           const lot = oldLot.unwrap();
           if (!lot.isFlexible.isTrue || lot.releaseReason.isSome || !lot.program.isVault) continue;
           if (lot.program.asVault.vaultId.toNumber() !== vaultId) continue;
-          flexibleLots.push({ bondLotId, bonds: lot.bonds.toBigInt() });
+          flexibleLots.push({
+            bondLotId,
+            bonds: lot.bonds.toBigInt(),
+            sharingPercent: lot.program.asVault.sharingPercent.toBigInt(),
+            bonusPercent: lot.program.asVault.bonusPercent.toBigInt(),
+          });
         }
       }
 
@@ -220,12 +240,10 @@ async function prepare(api: ApiPromise): Promise<Manifest> {
       if (!revenue) throw new Error(`frame ${frameId} vault ${vaultId} has no recorded payout`);
 
       const gross = revenue.treasuryTotalEarnings.toBigInt();
-      const shares = allocateFlexibleYield(
-        gross,
-        capital.getT<u128>('flexibleProrata').toBigInt(),
-        flexibleLots,
-      );
-      const flexibleYield = [...shares.values()].reduce((total, share) => total + share, 0n);
+      const flexibleProrata = capital.getT<u128>('flexibleProrata').toBigInt();
+      const flexibleYield = (gross * flexibleProrata) / FIXED_U128_SCALE;
+      const shares = allocateFlexibleBondEarnings(gross, flexibleProrata, flexibleLots);
+      const bondEarnings = [...shares.values()].reduce((total, share) => total + share, 0n);
       if (flexibleYield > revenue.treasuryVaultEarnings.toBigInt()) {
         throw new Error(
           `frame ${frameId} vault ${vaultId} flexible yield exceeds recorded vault earnings`,
@@ -236,6 +254,8 @@ async function prepare(api: ApiPromise): Promise<Manifest> {
         vaultId,
         grossEarnings: gross,
         flexibleYield,
+        bondEarnings,
+        vaultEarnings: flexibleYield - bondEarnings,
         eligibleFlexibleBonds: eligibleBonds,
         totalFlexibleBonds,
       });
@@ -306,7 +326,7 @@ async function prepare(api: ApiPromise): Promise<Manifest> {
   }
 
   return {
-    kind: 'argon-flexible-bond-metrics-v1',
+    kind: 'argon-flexible-bond-metrics-v2',
     genesisHash: api.genesisHash.toHex(),
     anchorBlockHash,
     firstFrameId,

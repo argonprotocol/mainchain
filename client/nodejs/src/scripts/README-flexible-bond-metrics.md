@@ -3,6 +3,16 @@
 This attributes historical earnings already paid to vaults. It only updates metrics on bond lots
 that still exist on chain; it does not transfer Argons or adjust missed collects.
 
+Version 2 attributes only the bond-holder portion: each lot's gross flexible slice multiplied by its
+archived `sharingPercent + bonusPercent`. Gross flexible yield is split by historical principal,
+with deterministic dust assignment, before flooring each lot's bond-holder share. The operator's
+portion and profit-share rounding remain vault income. These are the historical terms, not the
+current vault settings or runtime 160's new reward-pool percentages.
+
+Version 1 attributed the entire gross flexible slice, including operator income. Do not submit its
+batches. If any version 1 batch was already applied, reconcile it before generating more updates;
+the backfill call cannot reduce previously recorded earnings.
+
 Run this using an archive-capable WS endpoint for mainnet or testnet. Calls are encoded with this
 checkout's client metadata, so a read-only dry run can happen before deployment:
 
@@ -14,8 +24,9 @@ yarn workspace @argonprotocol/mainchain backfill:flexible-bond-metrics \
 The script uses the latest finalized block as its anchor. It starts with the first complete frame
 using the old flexible-bond snapshot (mainnet 537, testnet 565, introduced in runtime spec 158) and
 finds the last old-format payout from archived frame starts. The manifest includes the frame hashes,
-vault shares, per-lot attribution, expected and updated metrics, and `sudoCallData` for each batch
-of up to 25 surviving lots.
+vault shares (gross flexible yield, bond earnings, and retained vault earnings), per-lot
+attribution, expected and updated metrics, and `sudoCallData` for each batch of up to 25 surviving
+lots.
 
 Only submit after the matching runtime containing `treasury.backfillBondLotEarnings` is deployed.
 Regenerate and review the manifest then, since live earnings may have changed since the dry run. For
