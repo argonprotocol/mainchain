@@ -1,6 +1,6 @@
-use crate::utils::{activate_vote_mining, create_active_notary_with_archive_bucket};
+use crate::utils::{activate_vote_mining, create_active_notary_with_archive_bucket, sudo};
 use argon_client::{
-	api::storage,
+	api::{runtime_types::argon_runtime::RuntimeCall, storage},
 	conversion::SubxtRuntime,
 	signer::{Signer, Sr25519Signer},
 	FetchAt,
@@ -10,13 +10,48 @@ use argon_testing::{test_miner_count, ArgonNodeStartArgs, ArgonTestNode, ArgonTe
 use polkadot_sdk::*;
 use serial_test::serial;
 use sp_core::{DeriveJunction, Pair};
+use std::{fs, process::Command, time::Duration};
 
 /// Tests default votes submitted by a notebook after nodes register as vote miners
 #[tokio::test(flavor = "multi_thread")]
 #[serial]
 async fn test_end_to_end_default_vote_mining() {
+	let is_ci = std::env::var("CI").is_ok();
 	let compute_threads = test_miner_count();
 	let mut grandpa_miner = ArgonNodeStartArgs::new("alice", compute_threads, "").unwrap();
+
+	if is_ci {
+		// Voting needs recent tick history. Leave time for cache-only compute and notebook
+		// propagation without flooding the nodes with compute blocks.
+		let node_binary = grandpa_miner.target_dir.join("argon-node");
+		let spec_output =
+			Command::new(&node_binary).args(["build-spec", "--chain=dev"]).output().unwrap();
+		assert!(
+			spec_output.status.success(),
+			"build-spec failed: {}",
+			String::from_utf8_lossy(&spec_output.stderr)
+		);
+		let mut spec: serde_json::Value = serde_json::from_slice(&spec_output.stdout).unwrap();
+		spec["genesis"]["runtimeGenesis"]["patch"]["ticks"]["ticker"]["tickDurationMillis"] =
+			6_000.into();
+
+		let spec_path = grandpa_miner.base_data_path.join("voting-chain.json");
+		fs::write(&spec_path, serde_json::to_vec(&spec).unwrap()).unwrap();
+
+		let raw_spec_output = Command::new(&node_binary)
+			.args(["build-spec", "--raw", "--chain"])
+			.arg(&spec_path)
+			.output()
+			.unwrap();
+		assert!(
+			raw_spec_output.status.success(),
+			"raw build-spec failed: {}",
+			String::from_utf8_lossy(&raw_spec_output.stderr)
+		);
+		fs::write(&spec_path, raw_spec_output.stdout).unwrap();
+		grandpa_miner.chain = spec_path.to_string_lossy().into_owned();
+	}
+
 	let archive_bucket = ArgonTestNotary::create_archive_bucket();
 	let archive_host = format!("{}/{}", ArgonTestNotary::get_minio_url(), archive_bucket.clone());
 	grandpa_miner.notebook_archive_urls.push(archive_host);
@@ -43,6 +78,23 @@ async fn test_end_to_end_default_vote_mining() {
 	let miner_2_keyring = miner_2.keyring();
 
 	activate_vote_mining(&grandpa_miner, &miner_1, &miner_2).await.unwrap();
+
+	if is_ci {
+		// Difficulty stops adapting once miners register. Use the normal CI minimum for
+		// fallback mining so a high bootstrap difficulty cannot starve voting of tick history.
+		sudo(
+			&grandpa_miner,
+			RuntimeCall::BlockSealSpec(
+				argon_client::api::runtime_types::pallet_block_seal_spec::pallet::Call::configure {
+					vote_minimum: None,
+					compute_difficulty: Some(25),
+				},
+			),
+			true,
+		)
+		.await
+		.unwrap();
+	}
 
 	// Ensure registrations are visible in finalized state before counting vote blocks.
 	let mut finalized_wait =
@@ -94,8 +146,10 @@ async fn test_end_to_end_default_vote_mining() {
 	let mut block_loops = 0;
 	let mut start_tick = None;
 	let mut last_tick = None;
-	let max_wait_ticks = if std::env::var("CI").is_ok() { 90 } else { 30 };
-	while let Some(Ok(block)) = blocks_sub.next().await {
+	// Preserve the original voting budget despite the longer ticks, including stalled finality.
+	let max_wait_seconds = if is_ci { 180 } else { 60 };
+	let deadline = tokio::time::Instant::now() + Duration::from_secs(max_wait_seconds);
+	while let Ok(Some(Ok(block))) = tokio::time::timeout_at(deadline, blocks_sub.next()).await {
 		// Ignore finalized backlog before this phase started.
 		if block.number() <= start_finalized_block {
 			continue;
@@ -120,15 +174,6 @@ async fn test_end_to_end_default_vote_mining() {
 			if start_tick.is_none() {
 				start_tick = Some(tick);
 			}
-			if let Some(start_tick) = start_tick {
-				if tick.saturating_sub(start_tick) >= max_wait_ticks {
-					println!(
-						"Stopping vote mining wait after {max_wait_ticks} ticks (start {start_tick}, current {tick}, finalized start #{start_finalized_block}, current #{})",
-						block.number(),
-					);
-					break;
-				}
-			}
 		}
 		if let (Some(author), Some(BlockSealDigest::Vote { .. })) = (author, block_seal) {
 			if author == miner_1_keyring.to_account_id() {
@@ -151,7 +196,7 @@ async fn test_end_to_end_default_vote_mining() {
 	}
 
 	println!(
-		"Vote Blocks: {}. Miner 1 ({}), Miner 1, key 2 ({}) Miner 2 ({}). Ticks: start {:?}, last {:?}. Finalized start #{}. Wait {} ticks",
+		"Vote Blocks: {}. Miner 1 ({}), Miner 1, key 2 ({}) Miner 2 ({}). Ticks: start {:?}, last {:?}. Finalized start #{}. Wait {} seconds",
 		vote_blocks,
 		miner_vote_blocks.0,
 		miner_vote_blocks.2,
@@ -159,7 +204,7 @@ async fn test_end_to_end_default_vote_mining() {
 		start_tick,
 		last_tick,
 		start_finalized_block,
-		max_wait_ticks
+		max_wait_seconds
 	);
 	assert!(vote_blocks >= 2);
 	assert!(miner_vote_blocks.0 >= 1);

@@ -1,10 +1,36 @@
 [profile.ci]
-# Print out output for failing tests as soon as they fail, and also at the end
-# of the run (for easy scrollability).
+test-threads = 4
 failure-output = "immediate-final"
-# Do not cancel the test run on the first failure.
 fail-fast = false
-retries = { backoff = "exponential", count = 2, delay = "5s", jitter = true }
+retries = 0
+
+[test-groups.bitcoin-core]
+max-threads = 1
+
+[[profile.ci.overrides]]
+# Full-dataset hashing and solving run without competing with node startup.
+filter = '''
+  package(argon-randomx)
+  | (package(argon-node-consensus) & test(=compute_worker::tests::full_dataset_solver_finds_and_verifies_nonces))
+'''
+threads-required = "num-test-threads"
+
+[[profile.ci.overrides]]
+# Reserve two slots per chain scenario so at most two run together.
+filter = '''
+  package(end-to-end)
+  | package(argon-client)
+  | (package(argon-notary) & (test(block_watch::tests::) | test(notebook_closer::tests::test_submitting_votes)))
+  | (package(argon-oracle) & (test(bitcoin_tip::tests::test_bitcoin_loop) | test(price_index::tests::can_submit_multiple_price_indices)))
+  | (package(argon-node-consensus) & test(compute_worker::tests::))
+'''
+threads-required = 2
+
+[[profile.ci.overrides]]
+# Bitcoin Core block generation also needs a concurrency limit across packages.
+filter = 'package(argon-bitcoin) | package(argon-bitcoin-utxo-tracker)'
+test-group = "bitcoin-core"
+threads-required = 2
 
 [profile.default]
 retries = { backoff = "exponential", count = 2, delay = "5s", jitter = true }

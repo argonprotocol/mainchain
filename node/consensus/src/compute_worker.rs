@@ -858,34 +858,68 @@ mod tests {
 	}
 
 	#[test]
-	fn it_can_reuse_a_nonce_algorithm_multiple_times() {
+	fn full_dataset_solver_finds_and_verifies_nonces() {
 		setup_logs();
 		let _mining_memory_guard = MINING_MEMORY_TEST_LOCK.lock();
-		let _ = argon_randomx::full_vm::set_global_config(argon_randomx::Config {
-			light: true,
-			..Default::default()
-		});
+		if argon_randomx::full_vm::global_config().light {
+			// A prior cargo test may have fixed the process-wide mode to light. Nextest
+			// already isolates tests; use a fresh process for the same guarantee here.
+			let output = std::process::Command::new(std::env::current_exe().unwrap())
+				.args([
+					"--exact",
+					"compute_worker::tests::full_dataset_solver_finds_and_verifies_nonces",
+				])
+				.output()
+				.expect("failed to start full-dataset solver test");
+			let stdout = String::from_utf8_lossy(&output.stdout);
+			assert!(
+				output.status.success(),
+				"full-dataset solver test failed:\n{stdout}\n{}",
+				String::from_utf8_lossy(&output.stderr)
+			);
+			assert!(stdout.contains("1 passed; 0 failed"), "full-dataset solver test did not run");
+			return;
+		}
 
 		let mut bytes = [0u8; 32];
 		bytes[31] = 2;
 		let key_block_hash = H256::from_slice(&[1u8; 32]);
 		let pre_hash = bytes.to_vec();
-		let mut solver = ComputeSolver::new(0, pre_hash.clone(), key_block_hash, 1);
+		let difficulty = 4;
+		let mut solver = ComputeSolver::new(0, pre_hash.clone(), key_block_hash, difficulty);
+		solver.wip_nonce.nonce = U256::zero();
+		solver.wip_nonce_hash = solver.wip_nonce.encode();
 
-		for _ in 0..2 {
-			let did_solve = solver.check_next().is_ok_and(|x| x.is_some());
+		let mut solutions = 0;
+		let mut saw_rejected_nonce = false;
+		for _ in 0..128 {
+			let nonce = solver.check_next().expect("full-dataset hashing failed");
 
 			assert_eq!(solver.wip_nonce_hash, solver.wip_nonce.encode());
 			assert_eq!(
-				did_solve,
+				nonce.is_some(),
 				BlockComputeNonce::is_valid(
 					&solver.wip_nonce.nonce,
 					pre_hash.clone(),
 					&key_block_hash,
-					1
+					difficulty
 				)
 			);
+			if let Some(nonce) = nonce {
+				assert!(nonce == solver.wip_nonce);
+				solutions += 1;
+			} else {
+				saw_rejected_nonce = true;
+			}
+			if solutions >= 2 && saw_rejected_nonce {
+				break;
+			}
 		}
+		assert!(solutions >= 2, "solver did not find two valid nonces");
+		assert!(saw_rejected_nonce, "solver did not exercise a rejected nonce");
+
+		assert!(argon_randomx::full_vm::evict_mining_memory());
+		argon_randomx::full_vm::release_vm_if_evicted();
 	}
 
 	#[test]

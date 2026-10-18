@@ -25,7 +25,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y clang libssl-dev llvm libclang-dev libudev-dev protobuf-compiler pkg-config
-          echo "LIBCLANG_PATH=$(llvm-config --libdir)" >> $GITHUB_ENV
+          echo "LIBCLANG_PATH=$(llvm-config --libdir)" >> "$GITHUB_ENV"
 
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1
@@ -69,24 +69,30 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y clang libssl-dev llvm libclang-dev libudev-dev protobuf-compiler pkg-config
-          echo "LIBCLANG_PATH=$(llvm-config --libdir)" >> $GITHUB_ENV
+          echo "LIBCLANG_PATH=$(llvm-config --libdir)" >> "$GITHUB_ENV"
 
       - name: Install mac dependencies
         if: startsWith(matrix.os, 'macos')
         run: |
           brew install protobuf llvm@18
           # need to use more modern llvm than what is on mac to build secp256k1 for wasm
-          echo "LDFLAGS=-L/opt/homebrew/opt/llvm@18/lib" >> $GITHUB_ENV
-          echo "CPPFLAGS=-I/opt/homebrew/opt/llvm@18/include" >> $GITHUB_ENV
-          echo "RUSTFLAGS=-C linker=/opt/homebrew/opt/llvm@18/bin/clang" >> $GITHUB_ENV
-          echo "CC=/opt/homebrew/opt/llvm@18/bin/clang" >> $GITHUB_ENV
-          echo "CXX=/opt/homebrew/opt/llvm@18/bin/clang++" >> $GITHUB_ENV
-          echo "LIBCLANG_PATH=/opt/homebrew/opt/llvm@18/lib" >> $GITHUB_ENV
+          {
+            echo "LDFLAGS=-L/opt/homebrew/opt/llvm@18/lib"
+            echo "CPPFLAGS=-I/opt/homebrew/opt/llvm@18/include"
+            echo "RUSTFLAGS=-C linker=/opt/homebrew/opt/llvm@18/bin/clang"
+            echo "CC=/opt/homebrew/opt/llvm@18/bin/clang"
+            echo "CXX=/opt/homebrew/opt/llvm@18/bin/clang++"
+            echo "LIBCLANG_PATH=/opt/homebrew/opt/llvm@18/lib"
+          } >> "$GITHUB_ENV"
 
       - uses: ./.github/templates/rust-cache
+        id: rust-cache
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
-          name: cargo-${{ matrix.target }}
+          name: check-native-ci-try-runtime-${{ matrix.target }}
+          key-suffix: -${{ github.sha }}
+          save: 'false'
+          clean-runtime-builds: 'false'
 
       - name: Install Rust
         uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1
@@ -96,7 +102,7 @@ jobs:
 
       - uses: taiki-e/install-action@c070f87102a1c75b3183910f391c1cb887fe13c8 # v2
         with:
-          tool: sqlx-cli@0.8.3
+          tool: sqlx-cli@0.8.3,cargo-nextest@0.9.148
 
       - name: Migrate Notary Db
         working-directory: notary
@@ -127,8 +133,23 @@ jobs:
       - name: Show space before tests
         run: df -h
 
+      - name: Prepare test genesis
+        run: |
+          test_chain_path="$RUNNER_TEMP/argon-dev-raw.json"
+          "${CARGO_TARGET_DIR:-target}/debug/argon-node" build-spec --chain=dev --raw > "$test_chain_path"
+          echo "ARGON_TEST_CHAIN=$test_chain_path" >> "$GITHUB_ENV"
+        env:
+          CI: true
+
+      - name: Save compiled tests
+        if: steps.rust-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        with:
+          path: ${{ steps.rust-cache.outputs.cache-paths }}
+          key: ${{ steps.rust-cache.outputs.cache-key }}
+
       - name: Run tests
-        run: cargo test --features=ci --features=try-runtime --no-fail-fast --lib --bins -- --nocapture
+        run: cargo nextest run --profile ci --features=ci --features=try-runtime --lib --bins
         timeout-minutes: 90
         env:
           CARGO_INCREMENTAL: 0
