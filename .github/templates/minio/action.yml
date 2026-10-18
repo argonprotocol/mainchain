@@ -5,19 +5,33 @@ description: |
 runs:
   using: "composite"
   steps:
-    - name: Install Go
-      if: ${{ runner.os == 'Linux' || runner.os == 'macOS' }}
-      uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
-      with:
-        go-version: '1.24.6'
-
     - name: Install Minio
       if: ${{ runner.os == 'Linux' || runner.os == 'macOS' }}
       shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
       run: |
-        set -eu
-        CGO_ENABLED=0 GOBIN="$RUNNER_TEMP/minio-bin" go install github.com/minio/minio@RELEASE.2025-09-07T16-13-09Z
-        sudo mv "$RUNNER_TEMP/minio-bin/minio" /usr/local/bin
+        set -euo pipefail
+        version=RELEASE.2025-09-07T16-13-09Z
+        case "$RUNNER_OS/$RUNNER_ARCH" in
+          Linux/X64)
+            asset="minio.linux-amd64.$version"
+            checksum=7c5bd8512c6e966455b1d198209358b2d191c77a83ab377c4073281065fb855f
+            ;;
+          macOS/ARM64)
+            asset="minio.darwin-arm64.$version"
+            checksum=7c3b3039b76e55a1b80935848ed83998d5e8d317374f87851f46a019ff5c0aa4
+            ;;
+          *)
+            echo "Unsupported MinIO platform: $RUNNER_OS/$RUNNER_ARCH" >&2
+            exit 1
+            ;;
+        esac
+
+        gh release download "$version" --repo minio/minio --pattern "$asset" --dir "$RUNNER_TEMP"
+        echo "$checksum  $RUNNER_TEMP/$asset" | shasum -a 256 --check
+        chmod +x "$RUNNER_TEMP/$asset"
+        sudo mv "$RUNNER_TEMP/$asset" /usr/local/bin/minio
 
     - name: Start Minio on Linux and macOS
       shell: bash

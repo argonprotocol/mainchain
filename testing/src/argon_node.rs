@@ -38,6 +38,7 @@ pub struct ArgonTestNode {
 #[derive(Clone, Debug)]
 pub struct ArgonNodeStartArgs {
 	pub target_dir: PathBuf,
+	pub chain: String,
 	pub rpc_port: u16,
 	pub bootnodes: String,
 	pub base_data_path: PathBuf,
@@ -107,7 +108,7 @@ impl ArgonNodeStartArgs {
 			.arg("--allow-private-ipv4")
 			.arg("--no-telemetry")
 			.arg("--no-prometheus")
-			.arg("--chain=dev")
+			.arg(format!("--chain={}", self.chain))
 			.arg(format!("--{}", self.authority.to_lowercase()))
 			.arg(format!("--name={}", self.authority.to_lowercase()))
 			.arg("--port=0")
@@ -121,27 +122,36 @@ impl ArgonNodeStartArgs {
 	pub fn new(authority: &str, compute_miners: u16, bootnodes: &str) -> anyhow::Result<Self> {
 		let target_dir = get_target_dir();
 
-		let overall_log = env::var("RUST_LOG").unwrap_or("info".to_string());
-
-		let node_log = "info";
-
+		let overall_log = env::var("RUST_LOG").unwrap_or_else(|_| "info".to_string());
 		let rust_log = format!(
-			"{overall_log},node={node_log},pallet=info,argon=trace,sc_rpc_server=info,argon_notary_apis=info",
+			"{overall_log},node=info,pallet=info,argon=trace,sc_rpc_server=info,argon_notary_apis=info",
 		);
+
+		// CI uses lower chain difficulty, so cache-only mining can avoid dataset setup.
+		let mut extra_flags = vec![];
+		if env::var("CI").is_ok() {
+			extra_flags.push("--compute-flags=light".to_string());
+			if cfg!(target_os = "macos") {
+				// Hosted macOS can temporarily lose its resolver configuration. Libp2p can
+				// still connect these local IP-only networks through its TCP fallback.
+				extra_flags.push("--network-backend=libp2p".to_string());
+			}
+		}
 
 		Ok(Self {
 			target_dir,
+			chain: env::var("ARGON_TEST_CHAIN").unwrap_or_else(|_| "dev".to_string()),
 			rust_log,
 			base_data_path: Self::get_temp_dir()?,
 			cleanup_base_data_path: true,
 			bootnodes: bootnodes.to_string(),
 			compute_miners,
 			bitcoin_rpc: "".to_string(),
-			authority: authority.to_lowercase().to_string(),
+			authority: authority.to_lowercase(),
 			is_validator: true,
 			rpc_port: 0,
 			notebook_archive_urls: vec![],
-			extra_flags: vec![],
+			extra_flags,
 			is_archive_node: true,
 		})
 	}

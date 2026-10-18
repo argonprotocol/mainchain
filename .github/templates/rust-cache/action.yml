@@ -13,6 +13,25 @@ inputs:
     description: 'Whether to save the cache'
     required: false
     default: "true"
+  key-suffix:
+    description: 'Optional suffix for a fresh cache entry'
+    required: false
+    default: ""
+  clean-runtime-builds:
+    description: 'Clear runtime/WASM build artifacts restored from cache'
+    required: false
+    default: "true"
+
+outputs:
+  cache-key:
+    description: 'Primary cache key'
+    value: ${{ steps.config.outputs.key }}
+  cache-paths:
+    description: 'Paths included in the cache'
+    value: ${{ steps.config.outputs.paths }}
+  cache-hit:
+    description: 'Whether the primary key was restored'
+    value: ${{ steps.cache.outputs.cache-hit || steps.restore.outputs.cache-hit }}
 
 runs:
   using: "composite"
@@ -29,50 +48,67 @@ runs:
       shell: bash
       run: |
         if [ "$RUNNER_OS" == "Linux" ]; then
-          echo "version=$(source /etc/os-release && echo $ID-$VERSION_ID)" >> $GITHUB_OUTPUT
+          # shellcheck source=/dev/null
+          source /etc/os-release
+          echo "version=$ID-$VERSION_ID" >> "$GITHUB_OUTPUT"
           sudo mkdir -p /mnt/target
-          sudo chown -R $USER:$USER /mnt/target
+          sudo chown -R "$USER:$USER" /mnt/target
           sudo rm -rf target
           sudo ln -s /mnt/target target
-          echo "CARGO_TARGET_DIR=/mnt/target" >> $GITHUB_ENV
-          echo "WASM_BUILD_WORKSPACE_HINT=${GITHUB_WORKSPACE}" >> $GITHUB_ENV
+          echo "CARGO_TARGET_DIR=/mnt/target" >> "$GITHUB_ENV"
+          echo "WASM_BUILD_WORKSPACE_HINT=${GITHUB_WORKSPACE}" >> "$GITHUB_ENV"
         elif [ "$RUNNER_OS" == "macOS" ]; then
-          echo "version=macos-$(sw_vers -productVersion)" >> $GITHUB_OUTPUT
+          echo "version=macos-$(sw_vers -productVersion)" >> "$GITHUB_OUTPUT"
         elif [ "$RUNNER_OS" == "Windows" ]; then
           ver_str=$(cmd /c ver)
-          echo "version=windows-$(echo $ver_str | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')" >> $GITHUB_OUTPUT
+          echo "version=windows-$(echo "$ver_str" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')" >> "$GITHUB_OUTPUT"
         fi
+    - name: Configure cache
+      id: config
+      shell: bash
+      env:
+        CACHE_PREFIX: ${{ inputs.name }}-${{ steps.os_version.outputs.version }}-${{ steps.rust-version.outputs.version }}-
+        LOCK_HASH: ${{ hashFiles('./Cargo.lock') }}
+        CACHE_SUFFIX: ${{ inputs.key-suffix }}
+      run: |
+        cat >> "$GITHUB_OUTPUT" <<EOF
+        key=${CACHE_PREFIX}${LOCK_HASH}${CACHE_SUFFIX}
+        lock-prefix=${CACHE_PREFIX}${LOCK_HASH}
+        restore-prefix=${CACHE_PREFIX}
+        paths<<CACHE_PATHS
+        ~/.cargo/registry/index/
+        ~/.cargo/registry/cache/
+        ~/.cargo/git/db/
+        .cargo-cache
+        ${CARGO_TARGET_DIR:-target}/
+        CACHE_PATHS
+        EOF
     - name: Cache cargo
+      id: cache
       if: inputs.save == 'true'
       uses: actions/cache@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
       with:
-        path: |
-          ~/.cargo/registry/index/
-          ~/.cargo/registry/cache/
-          ~/.cargo/git/db/
-          .cargo-cache
-          ${{ env.CARGO_TARGET_DIR || 'target' }}/
-        key: ${{ inputs.name }}-${{ steps.os_version.outputs.version }}-${{ steps.rust-version.outputs.version }}-${{ hashFiles('./Cargo.lock') }}
+        path: ${{ steps.config.outputs.paths }}
+        key: ${{ steps.config.outputs.key }}
         restore-keys: |
-          ${{ inputs.name }}-${{ steps.os_version.outputs.version }}-${{ steps.rust-version.outputs.version }}-
+          ${{ steps.config.outputs.lock-prefix }}
+          ${{ steps.config.outputs.restore-prefix }}
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
     - name: Restore cargo cache
+      id: restore
       if: inputs.save != 'true'
       uses: actions/cache/restore@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
       with:
-        path: |
-          ~/.cargo/registry/index/
-          ~/.cargo/registry/cache/
-          ~/.cargo/git/db/
-          .cargo-cache
-          ${{ env.CARGO_TARGET_DIR || 'target' }}/
-        key: ${{ inputs.name }}-${{ steps.os_version.outputs.version }}-${{ steps.rust-version.outputs.version }}-${{ hashFiles('./Cargo.lock') }}
+        path: ${{ steps.config.outputs.paths }}
+        key: ${{ steps.config.outputs.key }}
         restore-keys: |
-          ${{ inputs.name }}-${{ steps.os_version.outputs.version }}-${{ steps.rust-version.outputs.version }}-
+          ${{ steps.config.outputs.lock-prefix }}
+          ${{ steps.config.outputs.restore-prefix }}
       env:
         GITHUB_TOKEN: ${{ inputs.github-token }}
     - name: Clean runtime builds
+      if: inputs.clean-runtime-builds == 'true'
       run: |
         set -euo pipefail
 

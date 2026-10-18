@@ -406,7 +406,7 @@ mod tests {
 	};
 	use sp_keystore::{testing::MemoryKeystore, Keystore};
 	use sp_runtime::FixedU128;
-	use std::{env, str::FromStr};
+	use std::{env, str::FromStr, time::Duration};
 	use tokio::spawn;
 
 	use argon_client::{api, signer::KeystoreSigner};
@@ -475,26 +475,27 @@ mod tests {
 		use_mock_cpi_values(vec![0.2, 0.1, -0.1, 0.3]).await;
 		let signer = KeystoreSigner::new(keystore.into(), account_id, CryptoType::Sr25519);
 		spawn(price_index_loop(node.client.url.clone(), signer, vec![]));
-		let mut counter = 0;
-		let mut blocks = 0;
-		while let Some(Ok(block)) = block_sub.next().await {
-			blocks += 1;
-			let price_index = block
-				.events()
-				.await
-				.unwrap()
-				.find_first::<api::price_index::events::NewIndex>()
-				.unwrap();
-			if price_index.is_some() {
-				counter += 1;
-				if counter > 3 {
-					break;
+		// Several bootstrap blocks can arrive in one tick. Wait for updates, not a block count.
+		let counter = tokio::time::timeout(Duration::from_secs(60), async {
+			let mut counter = 0;
+			while let Some(Ok(block)) = block_sub.next().await {
+				let price_index = block
+					.events()
+					.await
+					.unwrap()
+					.find_first::<api::price_index::events::NewIndex>()
+					.unwrap();
+				if price_index.is_some() {
+					counter += 1;
+					if counter >= 3 {
+						break;
+					}
 				}
 			}
-			if blocks > 10 {
-				break;
-			}
-		}
+			counter
+		})
+		.await
+		.expect("Timed out waiting for three price index updates");
 		assert!(counter >= 3);
 	}
 
