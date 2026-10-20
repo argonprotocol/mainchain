@@ -2326,13 +2326,7 @@ declare module '@polkadot/api-base/types/submittable' {
         (
           vaultConfig:
             | PalletVaultsVaultConfig
-            | {
-                terms?: any;
-                delegateAccountId?: any;
-                securitization?: any;
-                bitcoinXpubkey?: any;
-                securitizationRatio?: any;
-              }
+            | { terms?: any; delegateAccountId?: any; securitization?: any; bitcoinXpubkey?: any }
             | string
             | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
@@ -2340,8 +2334,6 @@ declare module '@polkadot/api-base/types/submittable' {
       >;
       /**
        * Modify funds allocated by the vault without changing existing Bitcoin locks.
-       *
-       * The securitization percent must be maintained or increased.
        *
        * Funds not yet used in a reward snapshot may leave without notice if not needed for
        * Bitcoin commitments. Reward-committed funds require a one-year Bitcoin-height exit
@@ -2352,9 +2344,8 @@ declare module '@polkadot/api-base/types/submittable' {
         (
           vaultId: u32 | AnyNumber | Uint8Array,
           securitization: u128 | AnyNumber | Uint8Array,
-          securitizationRatio: u128 | AnyNumber | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
-        [u32, u128, u128]
+        [u32, u128]
       >;
       /**
        * Change the terms of this vault. The change will be applied at the next mining frame

@@ -90,7 +90,7 @@ pub mod pallet {
 	};
 	use codec::HasCompact;
 	use core::iter::Sum;
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(11);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(12);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -353,7 +353,7 @@ pub mod pallet {
 		pub securitization_basis: BitcoinSecuritizationBasis<T::Balance>,
 		/// Microgon coverage purchased after applying the redemption curve.
 		#[codec(compact)]
-		pub securitization_coverage_microgons: T::Balance,
+		pub securitization_microgons: T::Balance,
 		/// Tick of the price-history entry used for the current securitization.
 		#[codec(compact)]
 		pub securitization_tick: Tick,
@@ -367,8 +367,6 @@ pub mod pallet {
 		pub fissioned_satoshis: Satoshis,
 		/// The owner account
 		pub owner_account: T::AccountId,
-		/// The guaranteed securitization ratio for this lock
-		pub securitization_ratio: FixedU128,
 		/// Sum of all lock fees (initial plus any resecuritization)
 		#[codec(compact)]
 		pub security_fees: T::Balance,
@@ -428,16 +426,15 @@ pub mod pallet {
 			let securitization = self.get_securitization();
 			BitcoinLockPosition {
 				activated_securitization: securitization
-					.collateral_for_satoshis(self.funded_satoshis),
-				allocated_securitization: securitization.collateral_required(),
+					.securitization_for_satoshis(self.funded_satoshis),
+				allocated_securitization: securitization.securitization_microgons,
 			}
 		}
 
 		pub fn get_securitization(&self) -> BitcoinSecuritization<T::Balance> {
 			BitcoinSecuritization {
 				basis: self.securitization_basis,
-				securitization_coverage_microgons: self.securitization_coverage_microgons,
-				securitization_ratio: self.securitization_ratio,
+				securitization_microgons: self.securitization_microgons,
 			}
 		}
 	}
@@ -545,7 +542,7 @@ pub mod pallet {
 			lock_id: BitcoinLockId,
 			vault_id: VaultId,
 			securitization_basis: BitcoinSecuritizationBasis<T::Balance>,
-			collateral_required: T::Balance,
+			securitization_microgons: T::Balance,
 			account_id: T::AccountId,
 			security_fee: T::Balance,
 		},
@@ -1347,13 +1344,10 @@ pub mod pallet {
 				Error::<T>::FissionStateMismatch
 			);
 			let basis = BitcoinSecuritizationBasis { satoshis, microgons_at_target_per_btc };
-			let securitization_coverage_microgons =
+			let securitization_microgons =
 				Self::calculate_redemption_amount(basis.btc_value_in_microgons(), None)?;
-			let replacement_securitization = BitcoinSecuritization {
-				basis,
-				securitization_coverage_microgons,
-				securitization_ratio: lock.securitization_ratio,
-			};
+			let replacement_securitization =
+				BitcoinSecuritization { basis, securitization_microgons };
 			if let Some(requirements) = fission_requirements {
 				ensure!(
 					microgons_at_target_per_btc_tick >= requirements.last_ratchet_tick,
@@ -1361,7 +1355,7 @@ pub mod pallet {
 				);
 				ensure!(
 					microgons_at_target_per_btc >= requirements.microgons_at_target_per_btc &&
-						securitization_coverage_microgons >= requirements.liquidity_promised,
+						securitization_microgons >= requirements.liquidity_promised,
 					Error::<T>::InsufficientSecuritizationForFissions
 				);
 			}
@@ -1410,7 +1404,7 @@ pub mod pallet {
 			lock.coupon_paid_fees.saturating_accrue(coupon_paid_fees);
 			lock.fund_hold_extensions = lock_extension.extended_expiration_funds;
 			lock.securitization_basis = replacement_securitization.basis;
-			lock.securitization_coverage_microgons = securitization_coverage_microgons;
+			lock.securitization_microgons = securitization_microgons;
 			lock.securitization_tick = microgons_at_target_per_btc_tick;
 			let vault_id = lock.vault_id;
 			Self::report_upstream_position(&lock, previous_position)?;
@@ -1527,9 +1521,7 @@ pub mod pallet {
 					funded_satoshis: utxo_satoshis,
 					securitized_satoshis: securitized_satoshis
 						.saturating_sub(previous_securitized_satoshis),
-					collateral_required: securitization
-						.collateral_between(previous_securitized_satoshis, securitized_satoshis),
-					eligible_satoshis: securitization.eligible_satoshis_between(
+					securitization_microgons: securitization.securitization_between(
 						previous_securitized_satoshis,
 						securitized_satoshis,
 					),
@@ -1698,7 +1690,7 @@ pub mod pallet {
 				vault_claim_height.saturating_add(T::LockReclamationBlocks::get());
 
 			let (securitization, securitization_tick) =
-				Self::prepare_lock_securitization(vault_id, satoshis, options.as_ref())?;
+				Self::prepare_lock_securitization(satoshis, options.as_ref())?;
 
 			let (fee, coupon_paid_fees) = T::VaultProvider::reserve_securitization(
 				vault_id,
@@ -1751,7 +1743,7 @@ pub mod pallet {
 				vault_id,
 				BitcoinLockPosition::default(),
 				BitcoinLockPosition {
-					allocated_securitization: securitization.collateral_required(),
+					allocated_securitization: securitization.securitization_microgons,
 					..Default::default()
 				},
 			)?;
@@ -1761,14 +1753,12 @@ pub mod pallet {
 					owner_account: account_id.clone(),
 					vault_id,
 					securitization_basis: securitization.basis,
-					securitization_coverage_microgons: securitization
-						.securitization_coverage_microgons,
+					securitization_microgons: securitization.securitization_microgons,
 					securitization_tick,
 					funded_satoshis: 0,
 					funding_utxos: BoundedBTreeMap::default(),
 					fissioned_satoshis: 0,
 					security_fees: fee,
-					securitization_ratio: securitization.securitization_ratio,
 					coupon_paid_fees,
 					vault_pubkey,
 					vault_claim_pubkey,
@@ -1790,7 +1780,7 @@ pub mod pallet {
 				lock_id,
 				vault_id,
 				securitization_basis: securitization.basis,
-				collateral_required: securitization.collateral_required(),
+				securitization_microgons: securitization.securitization_microgons,
 				account_id: account_id.clone(),
 				security_fee: fee,
 			});
@@ -1799,7 +1789,6 @@ pub mod pallet {
 		}
 
 		fn prepare_lock_securitization(
-			vault_id: VaultId,
 			satoshis: Satoshis,
 			options: Option<&LockOptions<T>>,
 		) -> Result<(BitcoinSecuritization<T::Balance>, Tick), Error<T>> {
@@ -1807,20 +1796,11 @@ pub mod pallet {
 				Self::resolve_microgons_at_target_per_btc(
 					options.map(|options| options.microgons_at_target_per_btc),
 				)?;
-			let securitization_ratio =
-				T::VaultProvider::get_securitization_ratio(vault_id).map_err(Error::<T>::from)?;
 			let basis = BitcoinSecuritizationBasis { satoshis, microgons_at_target_per_btc };
-			let securitization_coverage_microgons =
+			let securitization_microgons =
 				Self::calculate_redemption_amount(basis.btc_value_in_microgons(), None)?;
 
-			Ok((
-				BitcoinSecuritization {
-					basis,
-					securitization_coverage_microgons,
-					securitization_ratio,
-				},
-				securitization_tick,
-			))
+			Ok((BitcoinSecuritization { basis, securitization_microgons }, securitization_tick))
 		}
 
 		fn resolve_microgons_at_target_per_btc(
@@ -1978,7 +1958,7 @@ pub mod pallet {
 			if !lock.is_funded() {
 				T::VaultProvider::release_unactivated_securitization(
 					lock.vault_id,
-					lock.get_securitization().collateral_required(),
+					lock.get_securitization().securitization_microgons,
 					&lock.get_lock_extension(),
 					T::Balance::zero(),
 				)
@@ -2010,7 +1990,7 @@ pub mod pallet {
 			);
 			// Fission settlement cannot consume more than the Lock insures for those sats.
 			let redemption_amount = redemption_amount
-				.min(lock.get_securitization().coverage_for_satoshis(fissioned_satoshis));
+				.min(lock.get_securitization().securitization_for_satoshis(fissioned_satoshis));
 
 			let actual_fission_burn = T::VaultProvider::burn(
 				lock.vault_id,
@@ -2059,11 +2039,7 @@ pub mod pallet {
 				BitcoinLockFundingUpdate {
 					funded_satoshis: removed_satoshis,
 					securitized_satoshis: removed_securitized_satoshis,
-					collateral_required: securitization.collateral_between(
-						remaining_securitized_satoshis,
-						previous_securitized_satoshis,
-					),
-					eligible_satoshis: securitization.eligible_satoshis_between(
+					securitization_microgons: securitization.securitization_between(
 						remaining_securitized_satoshis,
 						previous_securitized_satoshis,
 					),
@@ -2263,7 +2239,7 @@ pub mod pallet {
 			);
 			T::VaultProvider::release_unactivated_securitization(
 				lock.vault_id,
-				lock.get_securitization().collateral_required(),
+				lock.get_securitization().securitization_microgons,
 				&lock.get_lock_extension(),
 				T::Balance::zero(),
 			)
@@ -2316,20 +2292,17 @@ pub mod pallet {
 				let result = with_storage_layer(|| {
 					let previous_position = lock.upstream_collateral();
 					let securitization = lock.get_securitization();
-					let securitization_coverage_microgons =
-						securitization.coverage_for_satoshis(lock.funded_satoshis);
-					let collateral_required = lock
-						.securitization_ratio
-						.saturating_mul_int(securitization_coverage_microgons);
+					let securitization_microgons =
+						securitization.securitization_for_satoshis(lock.funded_satoshis);
 					T::VaultProvider::release_unactivated_securitization(
 						lock.vault_id,
-						securitization.collateral_required().saturating_sub(collateral_required),
+						securitization.unactivated_securitization(lock.funded_satoshis),
 						&lock.get_lock_extension(),
-						collateral_required,
+						securitization_microgons,
 					)
 					.map_err(Error::<T>::from)?;
 					lock.securitization_basis.satoshis = lock.funded_satoshis;
-					lock.securitization_coverage_microgons = securitization_coverage_microgons;
+					lock.securitization_microgons = securitization_microgons;
 					if !lock.is_funded() {
 						lock.securitization_basis.microgons_at_target_per_btc = T::Balance::zero();
 					}
@@ -2471,7 +2444,7 @@ impl<T: Config> BitcoinFissionLockProvider<T::AccountId, T::Balance> for Pallet<
 				allocated_satoshis <= lock.securitization_basis.satoshis &&
 					microgons_at_target_per_btc <=
 						lock.securitization_basis.microgons_at_target_per_btc &&
-					required_liquidity <= lock.securitization_coverage_microgons,
+					required_liquidity <= lock.securitization_microgons,
 				BitcoinFissionLockError::InsufficientSecuritization
 			);
 
@@ -2521,7 +2494,7 @@ impl<T: Config> BitcoinFissionLockProvider<T::AccountId, T::Balance> for Pallet<
 			lock.fissioned_satoshis <= lock.securitization_basis.satoshis &&
 				microgons_at_target_per_btc <=
 					lock.securitization_basis.microgons_at_target_per_btc &&
-				required_liquidity <= lock.securitization_coverage_microgons,
+				required_liquidity <= lock.securitization_microgons,
 			BitcoinFissionLockError::InsufficientSecuritization
 		);
 

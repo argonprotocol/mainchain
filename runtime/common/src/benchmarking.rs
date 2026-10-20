@@ -2,12 +2,9 @@
 #![cfg(feature = "runtime-benchmarks")]
 
 use core::marker::PhantomData;
-use polkadot_sdk::{
-	sp_arithmetic::FixedU128,
-	sp_runtime::{
-		traits::{AtLeast32BitUnsigned, Get, SaturatedConversion},
-		DispatchError,
-	},
+use polkadot_sdk::sp_runtime::{
+	traits::{AtLeast32BitUnsigned, Get, SaturatedConversion},
+	DispatchError,
 };
 
 use argon_bitcoin::CosignReleaser;
@@ -246,10 +243,6 @@ where
 		state.call_counters.account_became_operational =
 			state.call_counters.account_became_operational.saturating_add(1);
 		set_benchmark_operational_accounts_provider_state(state);
-	}
-
-	fn get_securitization_ratio(_vault_id: VaultId) -> Result<FixedU128, VaultError> {
-		Err(VaultError::VaultNotFound)
 	}
 
 	fn record_bitcoin_lock_funding(

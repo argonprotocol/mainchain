@@ -94,14 +94,11 @@ parameter_types! {
 		reserved_securitization_space: 0,
 		total_satoshis: 0,
 		securitized_satoshis: 0,
-		ratio_adjusted_satoshis: 0,
-		flexible_ratio_adjusted_satoshis: 0,
 		terms: VaultTerms {
 			bitcoin_annual_percent_rate: FixedU128::from_float(0.1),
 			bitcoin_base_fee: 0,
 		},
 		opened_tick: 1,
-		securitization_ratio: FixedU128::from_float(1.0),
 		securitization_release_schedule: BoundedBTreeMap::new(),
 		committed_microgons: 0,
 		is_closed: false,
@@ -353,7 +350,7 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 		let terms = DefaultVault::get().terms.clone();
 		let total_fee = terms
 			.bitcoin_annual_percent_rate
-			.saturating_mul_int(securitization.securitization_coverage_microgons)
+			.saturating_mul_int(securitization.securitization_microgons)
 			.saturating_add(terms.bitcoin_base_fee);
 		let fee_discount = if is_operator { total_fee } else { fee_discount.min(total_fee) };
 		if ChargeFee::get() {
@@ -386,17 +383,17 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 		} = request;
 		let vault = DefaultVault::get();
 		let is_operator = vault.operator_account_id == *locker;
-		let additional_securitization_coverage_microgons = replacement
-			.securitization_coverage_microgons
-			.saturating_sub(current.securitization_coverage_microgons);
-		let total_fee = if additional_securitization_coverage_microgons.is_zero() {
+		let additional_securitization_microgons = replacement
+			.securitization_microgons
+			.saturating_sub(current.securitization_microgons);
+		let total_fee = if additional_securitization_microgons.is_zero() {
 			Balance::zero()
 		} else {
 			vault
 				.terms
 				.bitcoin_annual_percent_rate
 				.saturating_mul(remaining_term)
-				.saturating_mul_int(additional_securitization_coverage_microgons)
+				.saturating_mul_int(additional_securitization_microgons)
 				.saturating_add(vault.terms.bitcoin_base_fee)
 		};
 		let fee_discount = if is_operator { total_fee } else { fee_discount.min(total_fee) };
@@ -454,7 +451,7 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 		is_flexible: bool,
 	) -> Result<LostBitcoinCompensation<Self::Balance>, VaultError> {
 		let compensation_amount =
-			redemption_amount.min(securitization.coverage_for_satoshis(satoshis));
+			redemption_amount.min(securitization.securitization_for_satoshis(satoshis));
 		let result = DefaultVault::mutate(|a| {
 			a.burn(securitization, satoshis, compensation_amount, lock_extension, is_flexible)
 		})?;
@@ -541,10 +538,6 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 			}
 		});
 		Ok(())
-	}
-
-	fn get_securitization_ratio(_vault_id: VaultId) -> Result<FixedU128, VaultError> {
-		Ok(DefaultVault::get().securitization_ratio)
 	}
 
 	fn record_bitcoin_lock_funding(
@@ -720,14 +713,11 @@ pub fn new_test_ext() -> TestState {
 		reserved_securitization_space: 0,
 		total_satoshis: 0,
 		securitized_satoshis: 0,
-		ratio_adjusted_satoshis: 0,
-		flexible_ratio_adjusted_satoshis: 0,
 		terms: VaultTerms {
 			bitcoin_annual_percent_rate: FixedU128::from_float(0.1),
 			bitcoin_base_fee: 0,
 		},
 		opened_tick: 1,
-		securitization_ratio: FixedU128::from_float(1.0),
 		securitization_release_schedule: BoundedBTreeMap::new(),
 		committed_microgons: 0,
 		is_closed: false,

@@ -1225,7 +1225,6 @@ async fn create_vault(
 			bitcoin_annual_percent_rate: to_api_fixed_u128(FixedU128::from_float(0.01)),
 		},
 		delegate_account_id: None,
-		securitization_ratio: to_api_fixed_u128(FixedU128::from_u32(1)),
 		securitization: 100_000_000_000,
 	};
 
