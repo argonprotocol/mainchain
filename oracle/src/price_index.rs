@@ -398,7 +398,9 @@ fn trunc_fixed_u128(value: FixedU128, decimals: u16) -> FixedU128 {
 
 #[cfg(test)]
 mod tests {
-	use alloy_primitives::Address;
+	use alloy_primitives::{Address, Bytes};
+	use alloy_sol_types::SolCall;
+	use jsonrpsee::{server::ServerBuilder, RpcModule};
 	use polkadot_sdk::*;
 	use sp_core::{
 		crypto::{key_types::ACCOUNT, AccountId32},
@@ -408,6 +410,7 @@ mod tests {
 	use sp_runtime::FixedU128;
 	use std::{env, str::FromStr, time::Duration};
 	use tokio::spawn;
+	use uniswap_lens::bindings::iuniswapv3pool::IUniswapV3Pool::{token0Call, token1Call};
 
 	use argon_client::{api, signer::KeystoreSigner};
 	use argon_primitives::CryptoType;
@@ -416,7 +419,9 @@ mod tests {
 	use crate::{
 		coin_usd_prices::{use_mock_price_lookups, PriceLookups},
 		price_index_loop,
-		uniswap_oracle::{use_mock_uniswap_prices, PriceAndLiquidity, UniswapOracleError},
+		uniswap_oracle::{
+			use_mock_uniswap_prices, PriceAndLiquidity, UniswapOracleError, USDC_ADDRESS,
+		},
 		us_cpi::use_mock_cpi_values,
 	};
 
@@ -430,10 +435,43 @@ mod tests {
 
 		const ARGON_TOKEN_ADDRESS: &str = "6b175474e89094c44da98b954eedeac495271d0f";
 		const ARGONOT_TOKEN_ADDRESS: &str = "64CBd3aa07d427E385Cb55330406508718E55f01";
+		let rpc_server = ServerBuilder::default().build("127.0.0.1:0").await.unwrap();
+		let rpc_url = format!("http://{}", rpc_server.local_addr().unwrap());
+		let argon_pool = Address::repeat_byte(1);
+		let argonot_pool = Address::repeat_byte(2);
+		let mut rpc = RpcModule::new(());
+		rpc.register_method("eth_call", move |params, _, _| {
+			let (call, _block): (serde_json::Value, serde_json::Value) = params.parse().unwrap();
+			let pool: Address = serde_json::from_value(call["to"].clone()).unwrap();
+			let token = if pool == argon_pool {
+				Address::from_str(ARGON_TOKEN_ADDRESS).unwrap()
+			} else {
+				assert_eq!(pool, argonot_pool);
+				Address::from_str(ARGONOT_TOKEN_ADDRESS).unwrap()
+			};
+			let mut tokens = [token, USDC_ADDRESS];
+			tokens.sort();
+			let input: Bytes = serde_json::from_value(
+				call.get("input").or_else(|| call.get("data")).unwrap().clone(),
+			)
+			.unwrap();
+			if input.as_ref() == token0Call::SELECTOR {
+				Bytes::from(token0Call::abi_encode_returns(&tokens[0])).to_string()
+			} else {
+				assert_eq!(input.as_ref(), token1Call::SELECTOR);
+				Bytes::from(token1Call::abi_encode_returns(&tokens[1])).to_string()
+			}
+		})
+		.unwrap();
+		rpc.register_method("eth_gasPrice", |_, _, _| "0x3b9aca00").unwrap();
+		let rpc_handle = rpc_server.start(rpc);
 		unsafe {
 			env::set_var("ARGON_TOKEN_ADDRESS", ARGON_TOKEN_ADDRESS);
 			env::set_var("ARGONOT_TOKEN_ADDRESS", ARGONOT_TOKEN_ADDRESS);
-			env::set_var("ETHEREUM_RPC_URLS", "http://localhost:8545");
+			env::set_var("ETHEREUM_RPC_URLS", rpc_url);
+			env::set_var("USE_SEPOLIA", "false");
+			env::set_var("ARGON_UNISWAP_ORACLE_ADDRESSES", argon_pool.to_string());
+			env::set_var("ARGONOT_UNISWAP_ORACLE_ADDRESSES", argonot_pool.to_string());
 		}
 
 		let mut block_sub = node.client.live.blocks().subscribe_best().await.unwrap();
@@ -474,9 +512,9 @@ mod tests {
 		});
 		use_mock_cpi_values(vec![0.2, 0.1, -0.1, 0.3]).await;
 		let signer = KeystoreSigner::new(keystore.into(), account_id, CryptoType::Sr25519);
-		spawn(price_index_loop(node.client.url.clone(), signer, vec![]));
+		let mut oracle_task = spawn(price_index_loop(node.client.url.clone(), signer, vec![]));
 		// Several bootstrap blocks can arrive in one tick. Wait for updates, not a block count.
-		let counter = tokio::time::timeout(Duration::from_secs(60), async {
+		let updates = tokio::time::timeout(Duration::from_secs(60), async {
 			let mut counter = 0;
 			while let Some(Ok(block)) = block_sub.next().await {
 				let price_index = block
@@ -493,9 +531,13 @@ mod tests {
 				}
 			}
 			counter
-		})
-		.await
-		.expect("Timed out waiting for three price index updates");
+		});
+		let counter = tokio::select! {
+			result = &mut oracle_task => panic!("Price oracle stopped before publishing updates: {result:?}"),
+			result = updates => result.expect("Timed out waiting for three price index updates"),
+		};
+		oracle_task.abort();
+		rpc_handle.stop().unwrap();
 		assert!(counter >= 3);
 	}
 

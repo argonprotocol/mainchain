@@ -326,3 +326,48 @@ Not included in this package:
 - the restoration batch generator in the standalone recovery repo
 - the temporary migration path
 - the restoration forensics work that blocks a mainnet mint run
+
+## Uniswap v4 Oracle Hook
+
+`UniswapV4OracleHook` connects one v4 pool to the existing Rust price oracle. Its history storage,
+interpolation, cumulative arithmetic and cardinality management come from the unmodified
+[Uniswap v3-core Oracle library](https://www.npmjs.com/package/@uniswap/v3-core), imported from the
+pinned `@uniswap/v3-core` version `1.0.2-solc-0.8-simulate`. The hook uses `@uniswap/v4-core`
+version `1.0.2` for callback types and pool-state access. Observations live in the hook contract's
+storage; the PoolManager retains the pool's current state. Each hook accepts observations from
+exactly one pool, including swaps and liquidity changes initiated by any user.
+
+Deploy one hook per pool using CREATE2. Constructor arguments are the PoolManager address, sorted
+currency addresses, fee, and tick spacing. Mine the salt so the deployed address's low 14 bits are
+`0x1a80`: after initialization, before liquidity addition/removal, and before swaps. The constructor
+rejects other permission bits, and callbacks reject any other manager or pool. The hook collects
+observations only; it has no fee adjustments, custody, swap deltas, or administrator.
+
+Initialize a **new** v4 pool with that exact key and hook address. Existing pools cannot acquire
+this hook or historical observations. History has a fixed capacity of 3,601 observations, enough for
+the Rust oracle's one-hour window even at one observation per second. There is no resize API or
+separate allocation transaction: swaps and liquidity changes populate slots as needed, and oldest
+observations are overwritten once the buffer fills. Reads extrapolate through quiet periods from the
+PoolManager's current tick and liquidity. History starts at initialization and must warm up before
+the full one-hour window is available.
+
+Configure both `ARGON_UNISWAP_ORACLE_ADDRESSES` and `ARGONOT_UNISWAP_ORACLE_ADDRESSES` with
+comma-separated observation contract addresses for the corresponding 18-decimal token paired with
+6-decimal USDC. Each list can include v3 pool addresses, v4 hook addresses, or both. A v3 pool
+address selects its fee tier; v4 entries must be hook addresses, not PoolManager addresses or pool
+IDs. These are explicit trusted oracle sources; token-pair validation does not authenticate
+arbitrary third-party code. Multiple sources are weighted by their historical harmonic mean
+liquidity. Both lists must contain at least one address; empty or unset variables are configuration
+errors. Read failures do not activate unlisted sources.
+
+Deploy the hook and initialize the v4 pool while the oracle continues to use its current source
+list. The hook collects history independently of the Rust oracle. After at least one hour, verify
+that `observe([3600, 0])` succeeds and the pool has sufficient active liquidity. Include the hook in
+the appropriate source list, keeping any v3 pool addresses that should still contribute, then
+restart the oracle with the updated environment (recreate containers). Argon and Argonot are
+configured independently: Argon can observe only v4 while Argonot observes both v3 and v4. To
+restore previous sources, restore their address list and restart.
+
+The preferred window is one hour, with existing fallbacks to 30, 10, 5, and 1 minute when history is
+too young or has been overwritten. Until at least one window is available, that source cannot supply
+a price.

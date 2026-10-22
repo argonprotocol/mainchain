@@ -2,7 +2,7 @@ use crate::{
 	argon_price::get_usdc_token,
 	uniswap_oracle::{ethereum_rpc_urls_from_env, UniswapOracle},
 };
-use anyhow::Result;
+use anyhow::{Context, Result};
 use polkadot_sdk::*;
 use sp_runtime::FixedU128;
 use std::env;
@@ -32,10 +32,18 @@ impl ArgonotPriceLookup {
 			env::var("ARGONOT_TOKEN_ADDRESS").expect("ARGONOT_TOKEN_ADDRESS must be set");
 		let network = if use_sepolia { ChainId::SEPOLIA } else { ChainId::MAINNET };
 		let ethereum_rpc_urls = ethereum_rpc_urls_from_env()?;
+		let oracle_addresses = env::var("ARGONOT_UNISWAP_ORACLE_ADDRESSES")
+			.context("ARGONOT_UNISWAP_ORACLE_ADDRESSES must be set")?;
 
 		let usdc_token = get_usdc_token(network);
 		let lookup_token = token!(network as u64, argonot_token_address, 18);
-		Self::new(ethereum_rpc_urls, usdc_token, lookup_token, last_price).await
+		let mut lookup = Self::new(ethereum_rpc_urls, usdc_token, lookup_token, last_price).await?;
+		lookup
+			.uniswap_oracle
+			.set_oracle_addresses(&oracle_addresses)
+			.await
+			.context("Invalid ARGONOT_UNISWAP_ORACLE_ADDRESSES")?;
+		Ok(lookup)
 	}
 
 	pub async fn get_latest_price(&mut self, usd_token_price: FixedU128) -> Result<FixedU128> {
@@ -59,20 +67,16 @@ mod test {
 
 	const MOCK_ARGONOT_TOKEN_ADDRESS: &str = "64CBd3aa07d427E385Cb55330406508718E55f01";
 
-	fn before_each() {
-		dotenv::dotenv().ok();
-		unsafe {
-			env::set_var("USE_SEPOLIA", "true");
-			env::set_var("ETHEREUM_RPC_URLS", "http://localhost:8545");
-			env::set_var("ARGONOT_TOKEN_ADDRESS", MOCK_ARGONOT_TOKEN_ADDRESS);
-		}
-	}
-
 	#[tokio::test]
 	async fn holds_last_price_without_resetting_it() {
-		before_each();
-		let mut argonot_price_lookup =
-			ArgonotPriceLookup::from_env(FixedU128::from_float(0.017)).await.unwrap();
+		let mut argonot_price_lookup = ArgonotPriceLookup::new(
+			vec!["http://localhost:8545".into()],
+			get_usdc_token(ChainId::SEPOLIA),
+			token!(ChainId::SEPOLIA as u64, MOCK_ARGONOT_TOKEN_ADDRESS, 18),
+			FixedU128::from_float(0.017),
+		)
+		.await
+		.unwrap();
 
 		let argonot_usdc_price = FixedU128::from_float(0.02);
 		let address = Address::from_str(MOCK_ARGONOT_TOKEN_ADDRESS).unwrap();
