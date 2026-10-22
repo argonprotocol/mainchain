@@ -10,9 +10,7 @@ use argon_client::{
 		runtime_types::{
 			argon_runtime::{RuntimeCall, RuntimeError},
 			pallet_bitcoin_fissions::pallet::Error as BitcoinFissionsError,
-			pallet_bitcoin_locks::pallet::{
-				Error as BitcoinLocksError, LockOptions as BitcoinLockOptions,
-			},
+			pallet_bitcoin_locks::pallet::Error as BitcoinLocksError,
 			sp_arithmetic::fixed_point::FixedU128 as FixedU128Ext,
 		},
 		storage, tx,
@@ -237,7 +235,6 @@ async fn test_bitcoin_minting_e2e() {
 		&bitcoin_owner_account_id,
 		lock_id,
 		fission_id,
-		utxo_satoshis,
 		microgons_at_target_per_btc,
 		liquidity_promised,
 		&mut last_bitcoin_price_tick,
@@ -352,7 +349,6 @@ async fn test_bitcoin_xpriv_release_e2e() {
 		.await
 		.unwrap()
 		.expect("xpriv-owned Lock");
-	let original_securitization_basis_satoshis = lock.securitization_basis.satoshis;
 	let cosign_script_pubkey: BitcoinCosignScriptPubkey = lock.utxo_script_pubkey.into();
 
 	println!("\n2. Fund the xpriv-owned Lock");
@@ -421,7 +417,7 @@ async fn test_bitcoin_xpriv_release_e2e() {
 		.unwrap()
 		.expect("partially released Lock");
 	assert_eq!(lock.funded_satoshis, change_satoshis);
-	assert_eq!(lock.securitization_basis.satoshis, original_securitization_basis_satoshis);
+	assert_eq!(lock.cosigner_guarantee.basis.satoshis, change_satoshis);
 	assert!(client
 		.fetch_storage(
 			&storage().bitcoin_locks().pending_partial_release_by_lock_id(lock_id),
@@ -510,6 +506,7 @@ async fn create_first_fission_and_check_constraints(
 			api::runtime_types::pallet_bitcoin_fissions::pallet::Call::ratchet {
 				fission_id,
 				microgons_at_target_per_btc,
+				fee_coupon: None,
 			},
 		),
 		&[RuntimeError::BitcoinFissions(BitcoinFissionsError::NoRatchetingAvailable)],
@@ -598,7 +595,6 @@ async fn ratchet_first_fission(
 	bitcoin_owner_account_id: &AccountId32,
 	lock_id: BitcoinLockId,
 	fission_id: FissionId,
-	securitized_satoshis: Satoshis,
 	microgons_at_target_per_btc: Balance,
 	initial_liquidity_promised: Balance,
 	last_submitted_tick: &mut Tick,
@@ -633,31 +629,11 @@ async fn ratchet_first_fission(
 	assert!(ratchet_tick > older_ratchet_tick);
 	assert!(ratchet_rate < older_ratchet_rate);
 
-	submit_rejected_bitcoin_call(
-		client,
-		bitcoin_owner_signer,
-		RuntimeCall::BitcoinLocks(
-			api::runtime_types::pallet_bitcoin_locks::pallet::Call::resecuritize {
-				lock_id,
-				satoshis: securitized_satoshis,
-				options: Some(BitcoinLockOptions {
-					microgons_at_target_per_btc: ratchet_rate,
-					fee_coupon: None,
-				}),
-			},
-		),
-		&[RuntimeError::BitcoinLocks(BitcoinLocksError::InsufficientSecuritizationForFissions)],
-	)
-	.await;
-	let unchanged_lock = client
+	let lock_guarantee_before_ratchet = client
 		.fetch_storage(&storage().bitcoin_locks().locks_by_id(lock_id), FetchAt::Best)
 		.await?
-		.expect("funded Lock");
-	assert_eq!(unchanged_lock.securitization_basis.satoshis, securitized_satoshis);
-	assert_eq!(
-		unchanged_lock.securitization_basis.microgons_at_target_per_btc,
-		microgons_at_target_per_btc
-	);
+		.expect("funded Lock")
+		.cosigner_guarantee;
 
 	let params = client
 		.params_with_best_nonce(&bitcoin_owner_signer.account_id())
@@ -666,7 +642,7 @@ async fn ratchet_first_fission(
 		.build();
 	let fission_ratchet_tx = client
 		.submit_tx(
-			&tx().bitcoin_fissions().ratchet(fission_id, ratchet_rate),
+			&tx().bitcoin_fissions().ratchet(fission_id, ratchet_rate, None),
 			bitcoin_owner_signer,
 			Some(params),
 			false,
@@ -682,6 +658,23 @@ async fn ratchet_first_fission(
 		.expect("fission ratcheted event");
 	assert_eq!(fission_ratcheted.fission_id, fission_id);
 	assert_eq!(fission_ratcheted.ratchet_number, 1);
+
+	let lock = client
+		.fetch_storage(&storage().bitcoin_locks().locks_by_id(lock_id), FetchAt::Best)
+		.await?
+		.expect("funded Lock");
+	let guarantee = lock.cosigner_guarantee;
+	assert_eq!(guarantee.guaranteed_microgons, lock_guarantee_before_ratchet.guaranteed_microgons);
+	assert_eq!(guarantee.basis.satoshis, lock_guarantee_before_ratchet.basis.satoshis);
+	assert_eq!(
+		guarantee.basis.microgons_at_target_per_btc,
+		lock_guarantee_before_ratchet.basis.microgons_at_target_per_btc
+	);
+	assert_eq!(guarantee.basis.tick, lock_guarantee_before_ratchet.basis.tick);
+	assert_eq!(
+		guarantee.fund_hold_extensions.0,
+		lock_guarantee_before_ratchet.fund_hold_extensions.0
+	);
 
 	let ratcheted_fission = client
 		.fetch_storage(
@@ -706,6 +699,7 @@ async fn ratchet_first_fission(
 			api::runtime_types::pallet_bitcoin_fissions::pallet::Call::ratchet {
 				fission_id,
 				microgons_at_target_per_btc: older_ratchet_rate,
+				fee_coupon: None,
 			},
 		),
 		&[
@@ -890,6 +884,7 @@ async fn create_fission(
 				lock_id,
 				satoshis,
 				microgons_at_target_per_btc,
+				None,
 			),
 			bitcoin_owner_signer,
 			Some(params),
@@ -1319,7 +1314,7 @@ async fn verify_lock(
 		.expect("should be able to retrieve");
 	assert_eq!(lock.vault_id, vault_id);
 	{
-		assert_eq!(lock.securitization_basis.satoshis, utxo_satoshis);
+		assert_eq!(lock.cosigner_guarantee.basis.satoshis, utxo_satoshis);
 		assert_eq!(lock.owner_pubkey.0, owner_compressed_pubkey.inner.serialize());
 		assert_eq!(lock.vault_xpub_sources.0, xpubkey.fingerprint().to_bytes());
 		assert_eq!(lock.vault_xpub_sources.1, Into::<u32>::into(ChildNumber::from_normal_idx(1)?));
@@ -1350,7 +1345,7 @@ async fn verify_lock(
 
 	assert_eq!(lock.funded_satoshis, 0);
 	assert_eq!(lock.fissioned_satoshis, 0);
-	Ok((lock.utxo_script_pubkey.into(), lock.securitization_basis.microgons_at_target_per_btc))
+	Ok((lock.utxo_script_pubkey.into(), lock.cosigner_guarantee.basis.microgons_at_target_per_btc))
 }
 
 async fn wait_for_lock_funding(

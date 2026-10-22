@@ -419,7 +419,7 @@ declare module '@polkadot/api-base/types/events' {
         [lockId: u64, vaultId: u32, isFlexible: bool],
         { lockId: u64; vaultId: u32; isFlexible: bool }
       >;
-      BitcoinLockResecuritized: AugmentedEvent<
+      BitcoinLockGuaranteeSet: AugmentedEvent<
         ApiType,
         [
           lockId: u64,

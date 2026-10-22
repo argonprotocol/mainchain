@@ -12760,6 +12760,7 @@ dependencies = [
  "bip32",
  "bitcoin",
  "k256",
+ "pallet-bitcoin-fissions",
  "pallet-bitcoin-locks",
  "pallet-bitcoin-utxos",
  "pallet-operational-accounts",

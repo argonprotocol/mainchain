@@ -1171,9 +1171,9 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							146u8, 247u8, 94u8, 146u8, 84u8, 90u8, 59u8, 136u8, 14u8, 144u8, 255u8,
-							145u8, 59u8, 108u8, 250u8, 251u8, 108u8, 86u8, 116u8, 177u8, 42u8,
-							33u8, 215u8, 2u8, 142u8, 254u8, 230u8, 192u8, 90u8, 95u8, 123u8, 130u8,
+							45u8, 216u8, 97u8, 56u8, 12u8, 37u8, 84u8, 15u8, 243u8, 173u8, 188u8,
+							125u8, 6u8, 202u8, 165u8, 85u8, 37u8, 58u8, 54u8, 155u8, 98u8, 7u8,
+							240u8, 197u8, 68u8, 222u8, 124u8, 153u8, 161u8, 38u8, 191u8, 174u8,
 						],
 					)
 				}
@@ -1191,9 +1191,9 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							216u8, 22u8, 196u8, 238u8, 138u8, 97u8, 20u8, 66u8, 119u8, 206u8, 74u8,
-							184u8, 162u8, 2u8, 197u8, 166u8, 243u8, 154u8, 222u8, 18u8, 45u8, 18u8,
-							100u8, 3u8, 216u8, 176u8, 227u8, 25u8, 103u8, 209u8, 13u8, 15u8,
+							163u8, 235u8, 88u8, 82u8, 64u8, 50u8, 10u8, 252u8, 71u8, 227u8, 146u8,
+							234u8, 231u8, 251u8, 50u8, 199u8, 78u8, 249u8, 129u8, 222u8, 164u8,
+							229u8, 39u8, 112u8, 27u8, 63u8, 98u8, 46u8, 63u8, 152u8, 33u8, 109u8,
 						],
 					)
 				}
@@ -3499,9 +3499,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				167u8, 184u8, 105u8, 44u8, 99u8, 151u8, 247u8, 154u8, 38u8, 92u8, 137u8, 115u8,
-				183u8, 170u8, 4u8, 48u8, 88u8, 44u8, 88u8, 133u8, 136u8, 50u8, 21u8, 16u8, 197u8,
-				28u8, 148u8, 99u8, 120u8, 198u8, 36u8, 245u8,
+				144u8, 113u8, 204u8, 185u8, 5u8, 222u8, 75u8, 182u8, 77u8, 236u8, 187u8, 228u8,
+				142u8, 78u8, 234u8, 172u8, 216u8, 239u8, 171u8, 213u8, 230u8, 34u8, 43u8, 218u8,
+				142u8, 229u8, 75u8, 188u8, 113u8, 128u8, 89u8, 194u8,
 			]
 	}
 	pub mod system {
@@ -4625,10 +4625,10 @@ pub mod api {
 						"Events",
 						(),
 						[
-							146u8, 5u8, 83u8, 35u8, 34u8, 90u8, 9u8, 118u8, 253u8, 174u8, 231u8,
-							188u8, 140u8, 223u8, 34u8, 151u8, 172u8, 81u8, 49u8, 230u8, 155u8,
-							205u8, 254u8, 234u8, 100u8, 103u8, 195u8, 120u8, 53u8, 188u8, 199u8,
-							161u8,
+							84u8, 246u8, 193u8, 254u8, 246u8, 204u8, 215u8, 245u8, 14u8, 155u8,
+							122u8, 63u8, 245u8, 186u8, 21u8, 20u8, 163u8, 212u8, 243u8, 164u8,
+							158u8, 222u8, 11u8, 111u8, 164u8, 15u8, 217u8, 134u8, 18u8, 169u8,
+							10u8, 102u8,
 						],
 					)
 				}
@@ -5536,9 +5536,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							54u8, 131u8, 40u8, 61u8, 155u8, 25u8, 217u8, 161u8, 30u8, 34u8, 171u8,
-							105u8, 87u8, 196u8, 136u8, 27u8, 34u8, 40u8, 26u8, 80u8, 179u8, 64u8,
-							142u8, 188u8, 97u8, 9u8, 98u8, 83u8, 110u8, 228u8, 131u8, 241u8,
+							57u8, 26u8, 93u8, 78u8, 35u8, 147u8, 161u8, 158u8, 2u8, 180u8, 91u8,
+							184u8, 19u8, 24u8, 124u8, 185u8, 150u8, 161u8, 50u8, 155u8, 229u8,
+							51u8, 103u8, 92u8, 121u8, 235u8, 25u8, 230u8, 17u8, 115u8, 159u8,
+							125u8,
 						],
 					)
 				}
@@ -5603,9 +5604,9 @@ pub mod api {
 							max_weight,
 						},
 						[
-							44u8, 58u8, 75u8, 197u8, 28u8, 93u8, 180u8, 196u8, 59u8, 206u8, 110u8,
-							166u8, 25u8, 5u8, 230u8, 2u8, 115u8, 26u8, 96u8, 157u8, 47u8, 194u8,
-							172u8, 90u8, 146u8, 109u8, 87u8, 82u8, 7u8, 144u8, 143u8, 18u8,
+							106u8, 10u8, 220u8, 95u8, 135u8, 65u8, 65u8, 247u8, 236u8, 105u8,
+							160u8, 126u8, 0u8, 14u8, 115u8, 255u8, 189u8, 43u8, 85u8, 89u8, 220u8,
+							65u8, 178u8, 72u8, 153u8, 76u8, 154u8, 243u8, 94u8, 69u8, 226u8, 234u8,
 						],
 					)
 				}
@@ -6510,10 +6511,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							119u8, 65u8, 192u8, 219u8, 69u8, 240u8, 170u8, 231u8, 175u8, 123u8,
-							85u8, 44u8, 88u8, 196u8, 127u8, 253u8, 80u8, 39u8, 201u8, 24u8, 203u8,
-							142u8, 60u8, 222u8, 89u8, 223u8, 111u8, 208u8, 86u8, 250u8, 248u8,
-							82u8,
+							149u8, 84u8, 36u8, 72u8, 59u8, 14u8, 197u8, 89u8, 120u8, 206u8, 129u8,
+							204u8, 236u8, 85u8, 139u8, 6u8, 202u8, 237u8, 188u8, 98u8, 173u8,
+							194u8, 14u8, 200u8, 145u8, 246u8, 228u8, 215u8, 22u8, 6u8, 166u8,
+							162u8,
 						],
 					)
 				}
@@ -6777,10 +6778,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							89u8, 128u8, 252u8, 238u8, 240u8, 228u8, 234u8, 192u8, 174u8, 33u8,
-							193u8, 56u8, 86u8, 210u8, 200u8, 187u8, 249u8, 151u8, 175u8, 146u8,
-							70u8, 26u8, 186u8, 147u8, 163u8, 40u8, 12u8, 209u8, 137u8, 58u8, 199u8,
-							198u8,
+							89u8, 35u8, 88u8, 230u8, 234u8, 58u8, 16u8, 240u8, 144u8, 184u8, 213u8,
+							239u8, 191u8, 132u8, 72u8, 252u8, 237u8, 63u8, 192u8, 135u8, 241u8,
+							74u8, 119u8, 115u8, 126u8, 102u8, 217u8, 33u8, 36u8, 182u8, 240u8,
+							235u8,
 						],
 					)
 				}
@@ -6829,9 +6830,9 @@ pub mod api {
 						],
 						check_permissions::Input { call, proxy_type },
 						[
-							21u8, 39u8, 206u8, 192u8, 154u8, 150u8, 209u8, 56u8, 5u8, 62u8, 254u8,
-							207u8, 105u8, 207u8, 4u8, 17u8, 214u8, 174u8, 38u8, 178u8, 200u8, 46u8,
-							177u8, 30u8, 28u8, 227u8, 213u8, 16u8, 152u8, 148u8, 74u8, 123u8,
+							243u8, 31u8, 28u8, 78u8, 207u8, 31u8, 103u8, 183u8, 16u8, 104u8, 209u8,
+							115u8, 228u8, 68u8, 14u8, 182u8, 104u8, 223u8, 223u8, 203u8, 16u8,
+							89u8, 223u8, 6u8, 65u8, 246u8, 27u8, 91u8, 127u8, 129u8, 137u8, 244u8,
 						],
 					)
 				}
@@ -11210,14 +11211,14 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				#[doc = "Replace this Lock's BTC coverage and target value for its remaining term."]
-				pub struct Resecuritize {
-					pub lock_id: resecuritize::LockId,
+				#[doc = "Replace the Lock's guarantee, leaving active Fission guarantees unchanged."]
+				pub struct SetGuarantee {
+					pub lock_id: set_guarantee::LockId,
 					#[codec(compact)]
-					pub satoshis: resecuritize::Satoshis,
-					pub options: resecuritize::Options,
+					pub satoshis: set_guarantee::Satoshis,
+					pub options: set_guarantee::Options,
 				}
-				pub mod resecuritize {
+				pub mod set_guarantee {
 					use super::runtime_types;
 					pub type LockId = ::core::primitive::u64;
 					pub type Satoshis = ::core::primitive::u64;
@@ -11225,9 +11226,9 @@ pub mod api {
 						runtime_types::pallet_bitcoin_locks::pallet::LockOptions,
 					>;
 				}
-				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for Resecuritize {
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for SetGuarantee {
 					const PALLET: &'static str = "BitcoinLocks";
-					const CALL: &'static str = "resecuritize";
+					const CALL: &'static str = "set_guarantee";
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -11402,22 +11403,22 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = "Replace this Lock's BTC coverage and target value for its remaining term."]
-				pub fn resecuritize(
+				#[doc = "Replace the Lock's guarantee, leaving active Fission guarantees unchanged."]
+				pub fn set_guarantee(
 					&self,
-					lock_id: types::resecuritize::LockId,
-					satoshis: types::resecuritize::Satoshis,
-					options: types::resecuritize::Options,
-				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::Resecuritize> {
+					lock_id: types::set_guarantee::LockId,
+					satoshis: types::set_guarantee::Satoshis,
+					options: types::set_guarantee::Options,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::SetGuarantee> {
 					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
 						"BitcoinLocks",
-						"resecuritize",
-						types::Resecuritize { lock_id, satoshis, options },
+						"set_guarantee",
+						types::SetGuarantee { lock_id, satoshis, options },
 						[
-							103u8, 244u8, 1u8, 50u8, 203u8, 243u8, 226u8, 23u8, 101u8, 65u8, 11u8,
-							187u8, 133u8, 197u8, 226u8, 32u8, 146u8, 178u8, 27u8, 188u8, 108u8,
-							146u8, 107u8, 197u8, 118u8, 56u8, 203u8, 160u8, 108u8, 21u8, 197u8,
-							253u8,
+							33u8, 25u8, 145u8, 99u8, 95u8, 48u8, 87u8, 127u8, 215u8, 195u8, 33u8,
+							76u8, 142u8, 68u8, 11u8, 136u8, 236u8, 182u8, 146u8, 137u8, 15u8,
+							174u8, 99u8, 162u8, 158u8, 88u8, 61u8, 205u8, 183u8, 135u8, 146u8,
+							103u8,
 						],
 					)
 				}
@@ -11779,13 +11780,13 @@ pub mod api {
 			)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			pub struct BitcoinLockResecuritized {
-				pub lock_id: bitcoin_lock_resecuritized::LockId,
-				pub vault_id: bitcoin_lock_resecuritized::VaultId,
-				pub securitization_basis: bitcoin_lock_resecuritized::SecuritizationBasis,
-				pub account_id: bitcoin_lock_resecuritized::AccountId,
+			pub struct BitcoinLockGuaranteeSet {
+				pub lock_id: bitcoin_lock_guarantee_set::LockId,
+				pub vault_id: bitcoin_lock_guarantee_set::VaultId,
+				pub securitization_basis: bitcoin_lock_guarantee_set::SecuritizationBasis,
+				pub account_id: bitcoin_lock_guarantee_set::AccountId,
 			}
-			pub mod bitcoin_lock_resecuritized {
+			pub mod bitcoin_lock_guarantee_set {
 				use super::runtime_types;
 				pub type LockId = ::core::primitive::u64;
 				pub type VaultId = ::core::primitive::u32;
@@ -11795,9 +11796,9 @@ pub mod api {
 					>;
 				pub type AccountId = crate::types::AccountId32;
 			}
-			impl ::subxt::ext::subxt_core::events::StaticEvent for BitcoinLockResecuritized {
+			impl ::subxt::ext::subxt_core::events::StaticEvent for BitcoinLockGuaranteeSet {
 				const PALLET: &'static str = "BitcoinLocks";
-				const EVENT: &'static str = "BitcoinLockResecuritized";
+				const EVENT: &'static str = "BitcoinLockGuaranteeSet";
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -11972,10 +11973,9 @@ pub mod api {
 						"LocksById",
 						(),
 						[
-							140u8, 208u8, 59u8, 236u8, 179u8, 15u8, 56u8, 217u8, 203u8, 165u8,
-							246u8, 115u8, 108u8, 108u8, 9u8, 188u8, 193u8, 131u8, 74u8, 104u8,
-							163u8, 30u8, 38u8, 196u8, 61u8, 0u8, 100u8, 236u8, 222u8, 166u8, 10u8,
-							128u8,
+							58u8, 8u8, 134u8, 51u8, 181u8, 171u8, 18u8, 86u8, 65u8, 107u8, 200u8,
+							14u8, 157u8, 121u8, 246u8, 104u8, 15u8, 219u8, 85u8, 72u8, 5u8, 50u8,
+							60u8, 1u8, 199u8, 46u8, 58u8, 6u8, 70u8, 194u8, 239u8, 162u8,
 						],
 					)
 				}
@@ -11997,10 +11997,9 @@ pub mod api {
 						"LocksById",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							140u8, 208u8, 59u8, 236u8, 179u8, 15u8, 56u8, 217u8, 203u8, 165u8,
-							246u8, 115u8, 108u8, 108u8, 9u8, 188u8, 193u8, 131u8, 74u8, 104u8,
-							163u8, 30u8, 38u8, 196u8, 61u8, 0u8, 100u8, 236u8, 222u8, 166u8, 10u8,
-							128u8,
+							58u8, 8u8, 134u8, 51u8, 181u8, 171u8, 18u8, 86u8, 65u8, 107u8, 200u8,
+							14u8, 157u8, 121u8, 246u8, 104u8, 15u8, 219u8, 85u8, 72u8, 5u8, 50u8,
+							60u8, 1u8, 199u8, 46u8, 58u8, 6u8, 70u8, 194u8, 239u8, 162u8,
 						],
 					)
 				}
@@ -12696,7 +12695,7 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Number of Bitcoin blocks to reserve securitization that has not yet been activated."]
+				#[doc = " Initial Bitcoin deposit window, measured in Bitcoin blocks."]
 				pub fn securitization_hold_blocks(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
@@ -21756,10 +21755,10 @@ pub mod api {
 						"batch",
 						types::Batch { calls },
 						[
-							123u8, 233u8, 79u8, 170u8, 148u8, 1u8, 56u8, 185u8, 163u8, 14u8, 84u8,
-							91u8, 228u8, 48u8, 106u8, 56u8, 122u8, 249u8, 182u8, 134u8, 179u8,
-							61u8, 152u8, 80u8, 40u8, 157u8, 192u8, 208u8, 163u8, 154u8, 135u8,
-							195u8,
+							143u8, 89u8, 91u8, 99u8, 78u8, 44u8, 156u8, 235u8, 130u8, 251u8, 54u8,
+							41u8, 226u8, 106u8, 213u8, 133u8, 36u8, 70u8, 100u8, 225u8, 169u8,
+							240u8, 106u8, 97u8, 102u8, 156u8, 104u8, 52u8, 198u8, 106u8, 124u8,
+							130u8,
 						],
 					)
 				}
@@ -21789,9 +21788,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							46u8, 244u8, 126u8, 177u8, 244u8, 249u8, 158u8, 160u8, 142u8, 101u8,
-							143u8, 111u8, 142u8, 22u8, 105u8, 58u8, 72u8, 28u8, 69u8, 122u8, 76u8,
-							30u8, 86u8, 88u8, 251u8, 6u8, 77u8, 168u8, 184u8, 65u8, 200u8, 85u8,
+							4u8, 107u8, 138u8, 24u8, 79u8, 220u8, 72u8, 42u8, 47u8, 185u8, 94u8,
+							113u8, 29u8, 212u8, 28u8, 186u8, 190u8, 64u8, 48u8, 136u8, 32u8, 179u8,
+							209u8, 155u8, 189u8, 187u8, 128u8, 64u8, 146u8, 34u8, 10u8, 37u8,
 						],
 					)
 				}
@@ -21817,10 +21816,9 @@ pub mod api {
 						"batch_all",
 						types::BatchAll { calls },
 						[
-							52u8, 220u8, 254u8, 30u8, 225u8, 144u8, 95u8, 117u8, 147u8, 98u8,
-							157u8, 176u8, 255u8, 81u8, 18u8, 183u8, 245u8, 212u8, 211u8, 196u8,
-							128u8, 251u8, 246u8, 165u8, 20u8, 175u8, 49u8, 43u8, 3u8, 195u8, 127u8,
-							187u8,
+							14u8, 148u8, 187u8, 71u8, 58u8, 8u8, 64u8, 102u8, 102u8, 201u8, 43u8,
+							248u8, 40u8, 10u8, 252u8, 221u8, 155u8, 167u8, 64u8, 171u8, 53u8,
+							234u8, 43u8, 26u8, 25u8, 13u8, 28u8, 88u8, 188u8, 56u8, 58u8, 88u8,
 						],
 					)
 				}
@@ -21843,9 +21841,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							230u8, 2u8, 120u8, 203u8, 96u8, 71u8, 17u8, 76u8, 150u8, 4u8, 223u8,
-							207u8, 24u8, 40u8, 163u8, 205u8, 3u8, 234u8, 143u8, 111u8, 240u8,
-							200u8, 95u8, 25u8, 93u8, 125u8, 127u8, 235u8, 210u8, 186u8, 87u8, 64u8,
+							112u8, 199u8, 252u8, 27u8, 172u8, 113u8, 33u8, 122u8, 36u8, 31u8,
+							194u8, 134u8, 185u8, 218u8, 44u8, 22u8, 159u8, 147u8, 168u8, 161u8,
+							220u8, 11u8, 85u8, 235u8, 209u8, 118u8, 53u8, 208u8, 250u8, 222u8,
+							154u8, 213u8,
 						],
 					)
 				}
@@ -21871,9 +21870,10 @@ pub mod api {
 						"force_batch",
 						types::ForceBatch { calls },
 						[
-							138u8, 171u8, 183u8, 242u8, 67u8, 88u8, 51u8, 146u8, 55u8, 10u8, 229u8,
-							94u8, 244u8, 167u8, 246u8, 106u8, 246u8, 81u8, 68u8, 191u8, 58u8,
-							126u8, 0u8, 101u8, 170u8, 104u8, 20u8, 227u8, 165u8, 28u8, 47u8, 93u8,
+							170u8, 54u8, 250u8, 131u8, 130u8, 143u8, 111u8, 126u8, 204u8, 200u8,
+							178u8, 44u8, 136u8, 158u8, 179u8, 210u8, 174u8, 187u8, 163u8, 242u8,
+							168u8, 203u8, 222u8, 9u8, 195u8, 191u8, 15u8, 162u8, 195u8, 130u8,
+							189u8, 198u8,
 						],
 					)
 				}
@@ -21896,10 +21896,10 @@ pub mod api {
 							weight,
 						},
 						[
-							40u8, 232u8, 94u8, 142u8, 206u8, 250u8, 202u8, 63u8, 78u8, 11u8, 165u8,
-							171u8, 252u8, 187u8, 150u8, 0u8, 75u8, 163u8, 131u8, 210u8, 37u8,
-							176u8, 114u8, 74u8, 149u8, 118u8, 60u8, 24u8, 224u8, 118u8, 123u8,
-							183u8,
+							240u8, 190u8, 69u8, 89u8, 134u8, 242u8, 198u8, 38u8, 138u8, 136u8,
+							199u8, 7u8, 33u8, 179u8, 250u8, 228u8, 102u8, 239u8, 128u8, 129u8,
+							193u8, 75u8, 232u8, 12u8, 176u8, 1u8, 202u8, 102u8, 241u8, 185u8, 55u8,
+							180u8,
 						],
 					)
 				}
@@ -21939,10 +21939,10 @@ pub mod api {
 							fallback: ::subxt::ext::subxt_core::alloc::boxed::Box::new(fallback),
 						},
 						[
-							48u8, 165u8, 196u8, 197u8, 209u8, 145u8, 178u8, 209u8, 27u8, 184u8,
-							86u8, 17u8, 224u8, 199u8, 175u8, 138u8, 2u8, 9u8, 99u8, 5u8, 254u8,
-							162u8, 168u8, 109u8, 155u8, 165u8, 196u8, 117u8, 106u8, 51u8, 95u8,
-							231u8,
+							138u8, 148u8, 205u8, 213u8, 49u8, 168u8, 166u8, 206u8, 190u8, 222u8,
+							61u8, 103u8, 27u8, 240u8, 51u8, 170u8, 2u8, 153u8, 27u8, 198u8, 78u8,
+							182u8, 148u8, 207u8, 108u8, 151u8, 85u8, 37u8, 195u8, 232u8, 141u8,
+							19u8,
 						],
 					)
 				}
@@ -21965,9 +21965,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							67u8, 226u8, 177u8, 35u8, 133u8, 76u8, 253u8, 93u8, 57u8, 30u8, 49u8,
-							245u8, 6u8, 224u8, 101u8, 168u8, 118u8, 159u8, 95u8, 196u8, 9u8, 11u8,
-							2u8, 222u8, 255u8, 166u8, 35u8, 143u8, 255u8, 27u8, 78u8, 34u8,
+							139u8, 51u8, 95u8, 149u8, 111u8, 224u8, 1u8, 217u8, 18u8, 227u8, 224u8,
+							194u8, 75u8, 243u8, 83u8, 23u8, 206u8, 28u8, 170u8, 64u8, 141u8, 66u8,
+							169u8, 197u8, 35u8, 146u8, 225u8, 2u8, 158u8, 240u8, 235u8, 230u8,
 						],
 					)
 				}
@@ -22303,9 +22303,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							5u8, 6u8, 110u8, 28u8, 48u8, 69u8, 120u8, 60u8, 127u8, 15u8, 212u8,
-							105u8, 78u8, 129u8, 41u8, 98u8, 70u8, 240u8, 145u8, 103u8, 195u8, 33u8,
-							162u8, 74u8, 147u8, 133u8, 233u8, 234u8, 64u8, 1u8, 161u8, 88u8,
+							47u8, 177u8, 241u8, 44u8, 58u8, 127u8, 151u8, 227u8, 255u8, 106u8,
+							75u8, 239u8, 147u8, 164u8, 137u8, 35u8, 140u8, 33u8, 196u8, 1u8, 232u8,
+							30u8, 51u8, 153u8, 162u8, 6u8, 72u8, 246u8, 5u8, 165u8, 170u8, 173u8,
 						],
 					)
 				}
@@ -22328,9 +22328,9 @@ pub mod api {
 							weight,
 						},
 						[
-							19u8, 224u8, 179u8, 26u8, 201u8, 208u8, 174u8, 80u8, 19u8, 234u8, 24u8,
-							165u8, 220u8, 254u8, 198u8, 94u8, 243u8, 41u8, 73u8, 8u8, 69u8, 0u8,
-							102u8, 141u8, 181u8, 148u8, 217u8, 133u8, 219u8, 12u8, 79u8, 230u8,
+							145u8, 79u8, 151u8, 205u8, 117u8, 39u8, 72u8, 5u8, 125u8, 173u8, 103u8,
+							242u8, 160u8, 26u8, 146u8, 175u8, 50u8, 48u8, 105u8, 84u8, 85u8, 233u8,
+							197u8, 134u8, 135u8, 236u8, 91u8, 228u8, 106u8, 22u8, 171u8, 85u8,
 						],
 					)
 				}
@@ -22368,10 +22368,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							190u8, 59u8, 93u8, 236u8, 206u8, 191u8, 69u8, 102u8, 125u8, 16u8,
-							199u8, 161u8, 247u8, 75u8, 12u8, 15u8, 203u8, 115u8, 44u8, 198u8,
-							248u8, 183u8, 77u8, 119u8, 76u8, 105u8, 187u8, 246u8, 25u8, 224u8,
-							221u8, 95u8,
+							87u8, 199u8, 165u8, 16u8, 23u8, 237u8, 228u8, 232u8, 85u8, 74u8, 191u8,
+							236u8, 195u8, 56u8, 9u8, 185u8, 12u8, 51u8, 41u8, 7u8, 162u8, 60u8,
+							173u8, 71u8, 50u8, 252u8, 6u8, 5u8, 100u8, 3u8, 176u8, 45u8,
 						],
 					)
 				}
@@ -22548,6 +22547,7 @@ pub mod api {
 					pub satoshis: create::Satoshis,
 					#[codec(compact)]
 					pub microgons_at_target_per_btc: create::MicrogonsAtTargetPerBtc,
+					pub fee_coupon: create::FeeCoupon,
 				}
 				pub mod create {
 					use super::runtime_types;
@@ -22556,6 +22556,9 @@ pub mod api {
 					pub type LockId = ::core::primitive::u64;
 					pub type Satoshis = ::core::primitive::u64;
 					pub type MicrogonsAtTargetPerBtc = ::core::primitive::u128;
+					pub type FeeCoupon = ::core::option::Option<
+						runtime_types::pallet_bitcoin_locks::pallet::FeeCoupon,
+					>;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for Create {
 					const PALLET: &'static str = "BitcoinFissions";
@@ -22579,11 +22582,15 @@ pub mod api {
 					pub fission_id: ratchet::FissionId,
 					#[codec(compact)]
 					pub microgons_at_target_per_btc: ratchet::MicrogonsAtTargetPerBtc,
+					pub fee_coupon: ratchet::FeeCoupon,
 				}
 				pub mod ratchet {
 					use super::runtime_types;
 					pub type FissionId = ::core::primitive::u64;
 					pub type MicrogonsAtTargetPerBtc = ::core::primitive::u128;
+					pub type FeeCoupon = ::core::option::Option<
+						runtime_types::pallet_bitcoin_locks::pallet::FeeCoupon,
+					>;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for Ratchet {
 					const PALLET: &'static str = "BitcoinFissions";
@@ -22625,6 +22632,7 @@ pub mod api {
 					lock_id: types::create::LockId,
 					satoshis: types::create::Satoshis,
 					microgons_at_target_per_btc: types::create::MicrogonsAtTargetPerBtc,
+					fee_coupon: types::create::FeeCoupon,
 				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::Create> {
 					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
 						"BitcoinFissions",
@@ -22635,12 +22643,12 @@ pub mod api {
 							lock_id,
 							satoshis,
 							microgons_at_target_per_btc,
+							fee_coupon,
 						},
 						[
-							205u8, 54u8, 24u8, 14u8, 110u8, 237u8, 166u8, 35u8, 100u8, 44u8, 96u8,
-							101u8, 251u8, 137u8, 149u8, 131u8, 121u8, 253u8, 62u8, 118u8, 117u8,
-							133u8, 57u8, 198u8, 11u8, 60u8, 197u8, 42u8, 252u8, 253u8, 118u8,
-							135u8,
+							251u8, 101u8, 62u8, 142u8, 14u8, 156u8, 49u8, 28u8, 128u8, 43u8, 4u8,
+							99u8, 73u8, 182u8, 244u8, 142u8, 236u8, 180u8, 71u8, 27u8, 255u8,
+							232u8, 43u8, 122u8, 244u8, 26u8, 206u8, 68u8, 29u8, 89u8, 104u8, 232u8,
 						],
 					)
 				}
@@ -22649,15 +22657,16 @@ pub mod api {
 					&self,
 					fission_id: types::ratchet::FissionId,
 					microgons_at_target_per_btc: types::ratchet::MicrogonsAtTargetPerBtc,
+					fee_coupon: types::ratchet::FeeCoupon,
 				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::Ratchet> {
 					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
 						"BitcoinFissions",
 						"ratchet",
-						types::Ratchet { fission_id, microgons_at_target_per_btc },
+						types::Ratchet { fission_id, microgons_at_target_per_btc, fee_coupon },
 						[
-							142u8, 237u8, 188u8, 243u8, 216u8, 0u8, 37u8, 198u8, 51u8, 194u8, 63u8,
-							227u8, 78u8, 100u8, 36u8, 126u8, 78u8, 181u8, 207u8, 11u8, 183u8, 24u8,
-							116u8, 26u8, 81u8, 48u8, 152u8, 236u8, 232u8, 67u8, 143u8, 98u8,
+							17u8, 122u8, 21u8, 67u8, 113u8, 41u8, 244u8, 219u8, 146u8, 193u8, 41u8,
+							93u8, 46u8, 232u8, 88u8, 15u8, 174u8, 156u8, 141u8, 7u8, 80u8, 86u8,
+							189u8, 87u8, 58u8, 49u8, 14u8, 218u8, 152u8, 86u8, 15u8, 121u8,
 						],
 					)
 				}
@@ -22885,10 +22894,10 @@ pub mod api {
 						"FissionByOwnerAndId",
 						(),
 						[
-							249u8, 163u8, 121u8, 26u8, 215u8, 151u8, 154u8, 130u8, 208u8, 212u8,
-							179u8, 217u8, 234u8, 49u8, 138u8, 59u8, 137u8, 31u8, 200u8, 109u8,
-							149u8, 74u8, 80u8, 108u8, 71u8, 166u8, 82u8, 211u8, 12u8, 215u8, 186u8,
-							202u8,
+							169u8, 135u8, 24u8, 113u8, 213u8, 246u8, 187u8, 178u8, 153u8, 35u8,
+							126u8, 158u8, 33u8, 20u8, 230u8, 53u8, 161u8, 161u8, 125u8, 78u8,
+							224u8, 136u8, 67u8, 170u8, 151u8, 93u8, 232u8, 32u8, 87u8, 186u8,
+							152u8, 142u8,
 						],
 					)
 				}
@@ -22910,10 +22919,10 @@ pub mod api {
 						"FissionByOwnerAndId",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							249u8, 163u8, 121u8, 26u8, 215u8, 151u8, 154u8, 130u8, 208u8, 212u8,
-							179u8, 217u8, 234u8, 49u8, 138u8, 59u8, 137u8, 31u8, 200u8, 109u8,
-							149u8, 74u8, 80u8, 108u8, 71u8, 166u8, 82u8, 211u8, 12u8, 215u8, 186u8,
-							202u8,
+							169u8, 135u8, 24u8, 113u8, 213u8, 246u8, 187u8, 178u8, 153u8, 35u8,
+							126u8, 158u8, 33u8, 20u8, 230u8, 53u8, 161u8, 161u8, 125u8, 78u8,
+							224u8, 136u8, 67u8, 170u8, 151u8, 93u8, 232u8, 32u8, 87u8, 186u8,
+							152u8, 142u8,
 						],
 					)
 				}
@@ -22944,10 +22953,10 @@ pub mod api {
 							::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_1),
 						),
 						[
-							249u8, 163u8, 121u8, 26u8, 215u8, 151u8, 154u8, 130u8, 208u8, 212u8,
-							179u8, 217u8, 234u8, 49u8, 138u8, 59u8, 137u8, 31u8, 200u8, 109u8,
-							149u8, 74u8, 80u8, 108u8, 71u8, 166u8, 82u8, 211u8, 12u8, 215u8, 186u8,
-							202u8,
+							169u8, 135u8, 24u8, 113u8, 213u8, 246u8, 187u8, 178u8, 153u8, 35u8,
+							126u8, 158u8, 33u8, 20u8, 230u8, 53u8, 161u8, 161u8, 125u8, 78u8,
+							224u8, 136u8, 67u8, 170u8, 151u8, 93u8, 232u8, 32u8, 87u8, 186u8,
+							152u8, 142u8,
 						],
 					)
 				}
@@ -31360,6 +31369,31 @@ pub mod api {
 					pub satoshis: ::core::primitive::u64,
 					#[codec(compact)]
 					pub microgons_at_target_per_btc: _0,
+					#[codec(compact)]
+					pub tick: ::core::primitive::u64,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct CosignerGuarantee<_0> {
+					pub basis:
+						runtime_types::argon_primitives::vault::BitcoinSecuritizationBasis<_0>,
+					#[codec(compact)]
+					pub guaranteed_microgons: _0,
+					pub fund_hold_extensions:
+						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap1<
+							::core::primitive::u64,
+							_0,
+						>,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -33192,6 +33226,9 @@ pub mod api {
 						satoshis: ::core::primitive::u64,
 						#[codec(compact)]
 						microgons_at_target_per_btc: ::core::primitive::u128,
+						fee_coupon: ::core::option::Option<
+							runtime_types::pallet_bitcoin_locks::pallet::FeeCoupon,
+						>,
 					},
 					#[codec(index = 1)]
 					#[doc = "Ratchet an active Fission to a replacement target-normalized BTC value."]
@@ -33200,6 +33237,9 @@ pub mod api {
 						fission_id: ::core::primitive::u64,
 						#[codec(compact)]
 						microgons_at_target_per_btc: ::core::primitive::u128,
+						fee_coupon: ::core::option::Option<
+							runtime_types::pallet_bitcoin_locks::pallet::FeeCoupon,
+						>,
 					},
 					#[codec(index = 2)]
 					#[doc = "Close a Fission without moving Bitcoin and remove its active record."]
@@ -33282,6 +33322,12 @@ pub mod api {
 					#[codec(index = 19)]
 					#[doc = "A Fission allocation, liability, or identifier overflowed."]
 					Overflow,
+					#[codec(index = 20)]
+					#[doc = "The Vault could not upgrade the guarantee assigned to this Fission."]
+					ResecuritizationFailed,
+					#[codec(index = 21)]
+					#[doc = "The fee coupon is invalid, expired, or already consumed."]
+					InvalidFeeCoupon,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -33357,6 +33403,10 @@ pub mod api {
 					pub microgons_at_target_per_btc: ::core::primitive::u128,
 					#[codec(compact)]
 					pub liquidity_promised: ::core::primitive::u128,
+					pub cosigner_guarantee:
+						runtime_types::argon_primitives::vault::CosignerGuarantee<
+							::core::primitive::u128,
+						>,
 					#[codec(compact)]
 					pub created_at_argon_block: ::core::primitive::u32,
 					#[codec(compact)]
@@ -33451,8 +33501,8 @@ pub mod api {
 						signature: runtime_types::argon_primitives::bitcoin::BitcoinSignature,
 					},
 					#[codec(index = 9)]
-					#[doc = "Replace this Lock's BTC coverage and target value for its remaining term."]
-					resecuritize {
+					#[doc = "Replace the Lock's guarantee, leaving active Fission guarantees unchanged."]
+					set_guarantee {
 						lock_id: ::core::primitive::u64,
 						#[codec(compact)]
 						satoshis: ::core::primitive::u64,
@@ -33548,75 +33598,72 @@ pub mod api {
 					#[doc = "The Lock records fissioned satoshis without matching active Fission requirements."]
 					FissionStateMismatch,
 					#[codec(index = 23)]
-					#[doc = "The requested Lock securitization does not cover its active Fission liabilities."]
-					InsufficientSecuritizationForFissions,
-					#[codec(index = 24)]
 					#[doc = "The expected amount of funds to return from hold was not available"]
 					HoldUnexpectedlyModified,
-					#[codec(index = 25)]
+					#[codec(index = 24)]
 					#[doc = "The hold on funds could not be recovered"]
 					UnrecoverableHold,
-					#[codec(index = 26)]
+					#[codec(index = 25)]
 					#[doc = "The vault was not found"]
 					VaultNotFound,
-					#[codec(index = 27)]
+					#[codec(index = 26)]
 					#[doc = "An error occurred in the vault module"]
 					GenericVaultError(runtime_types::argon_primitives::vault::VaultError),
-					#[codec(index = 28)]
+					#[codec(index = 27)]
 					#[doc = "The Bitcoin Lock record was not found"]
 					LockNotFound,
-					#[codec(index = 29)]
+					#[codec(index = 28)]
 					#[doc = "No Vault public keys are available"]
 					NoVaultBitcoinPubkeysAvailable,
-					#[codec(index = 30)]
+					#[codec(index = 29)]
 					#[doc = "Unable to generate a new vault public key"]
 					UnableToGenerateVaultBitcoinPubkey,
-					#[codec(index = 31)]
+					#[codec(index = 30)]
 					#[doc = "This vault is not yet active"]
 					VaultNotYetActive,
-					#[codec(index = 32)]
+					#[codec(index = 31)]
 					#[doc = "An overflow occurred recording a lock expiration"]
 					ExpirationAtBlockOverflow,
-					#[codec(index = 33)]
+					#[codec(index = 32)]
 					#[doc = "The requested securitization matches the Lock's current securitization."]
-					NoResecuritizationChange,
-					#[codec(index = 34)]
-					#[doc = "A Lock in the release process cannot be resecuritized."]
+					NoGuaranteeChange,
+					#[codec(index = 33)]
+					#[doc = "A Lock's guarantee cannot be changed while release is pending."]
 					LockInProcessOfRelease,
-					#[codec(index = 35)]
+					#[codec(index = 34)]
 					#[doc = "The lock funding has not been confirmed on bitcoin"]
 					LockNotFunded,
-					#[codec(index = 36)]
+					#[codec(index = 35)]
 					#[doc = "An overflow or underflow occurred while calculating the redemption price"]
 					OverflowError,
-					#[codec(index = 37)]
+					#[codec(index = 36)]
 					#[doc = "The requested target-normalized BTC value is not present in recent price history."]
 					IneligibleMicrogonsAtTargetPerBtcRequested,
-					#[codec(index = 38)]
+					#[codec(index = 37)]
 					#[doc = "The requested price-history entry predates the Lock's current securitization."]
 					MicrogonsAtTargetPerBtcTickOlderThanCurrent,
-					#[codec(index = 39)]
+					#[codec(index = 38)]
 					#[doc = "The fee coupon is past its expiration frame."]
 					FeeCouponExpired,
-					#[codec(index = 40)]
+					#[codec(index = 39)]
 					#[doc = "The fee coupon was not signed by the vault delegate."]
 					InvalidFeeCouponSignature,
-					#[codec(index = 41)]
+					#[codec(index = 40)]
 					#[doc = "The fee coupon nonce is not the next unconsumed nonce."]
 					FeeCouponAlreadyUsed,
-					#[codec(index = 42)]
+					#[codec(index = 41)]
 					#[doc = "Cannot fund with an orphaned utxo after lock funding is confirmed"]
 					OrphanedUtxoFundingConflict,
-					#[codec(index = 43)]
+					#[codec(index = 42)]
 					#[doc = "Cannot lock an orphaned utxo with a pending release request"]
 					OrphanedUtxoReleaseRequested,
-					#[codec(index = 44)]
+					#[codec(index = 43)]
 					#[doc = "Cannot request an orphaned release for the funding UTXO"]
 					FundingUtxoCannotBeReleased,
-					#[codec(index = 45)]
+					#[codec(index = 44)]
 					#[doc = "Too many orphaned utxo release requests for a lock"]
 					MaxOrphanedUtxoReleaseRequestsExceeded,
-					#[codec(index = 46)]
+					#[codec(index = 45)]
 					#[doc = "Too many confirmed Bitcoin outputs were assigned to one Lock."]
 					MaxUtxosPerLockExceeded,
 				}
@@ -33732,7 +33779,7 @@ pub mod api {
 						expiration_frame: ::core::primitive::u64,
 					},
 					#[codec(index = 13)]
-					BitcoinLockResecuritized {
+					BitcoinLockGuaranteeSet {
 						lock_id: ::core::primitive::u64,
 						vault_id: ::core::primitive::u32,
 						securitization_basis:
@@ -33873,14 +33920,12 @@ pub mod api {
 				pub struct LockedBitcoin {
 					#[codec(compact)]
 					pub vault_id: ::core::primitive::u32,
-					pub securitization_basis:
-						runtime_types::argon_primitives::vault::BitcoinSecuritizationBasis<
+					pub cosigner_guarantee:
+						runtime_types::argon_primitives::vault::CosignerGuarantee<
 							::core::primitive::u128,
 						>,
-					#[codec(compact)]
-					pub securitization_microgons: ::core::primitive::u128,
-					#[codec(compact)]
-					pub securitization_tick: ::core::primitive::u64,
+					pub securitization_hold_expiration_bitcoin_height:
+						::core::option::Option<::core::primitive::u64>,
 					#[codec(compact)]
 					pub funded_satoshis: ::core::primitive::u64,
 					pub funding_utxos:
@@ -33912,16 +33957,9 @@ pub mod api {
 					pub open_claim_height: ::core::primitive::u64,
 					#[codec(compact)]
 					pub created_at_height: ::core::primitive::u64,
-					#[codec(compact)]
-					pub securitization_hold_expiration_bitcoin_height: ::core::primitive::u64,
 					pub utxo_script_pubkey:
 						runtime_types::argon_primitives::bitcoin::BitcoinCosignScriptPubkey,
 					pub is_flexible: ::core::primitive::bool,
-					pub fund_hold_extensions:
-						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap1<
-							::core::primitive::u64,
-							::core::primitive::u128,
-						>,
 					#[codec(compact)]
 					pub created_at_argon_block: ::core::primitive::u32,
 				}

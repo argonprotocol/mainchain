@@ -16,7 +16,7 @@ fn create_stores_one_lock_allocation_with_an_opaque_liquid_id() {
 		System::set_block_number(7);
 		MockLocks::insert(1, lock(1, 100));
 
-		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 10, 77, 1, 40, 90));
+		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 10, 77, 1, 40, 90, None));
 
 		let fission = FissionByOwnerAndId::<Test>::get(1, 10).expect("fission");
 		assert_eq!(fission.liquid_id, 77);
@@ -55,11 +55,11 @@ fn create_allows_gaps_but_rejects_ids_below_the_owner_floor() {
 		MockLocks::insert(1, lock(1, 100));
 		MockLocks::insert(2, lock(1, 100));
 
-		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 10, 77, 1, 20, 90));
-		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 20, 77, 2, 20, 90));
+		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 10, 77, 1, 20, 90, None));
+		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 20, 77, 2, 20, 90, None));
 
 		assert_noop!(
-			BitcoinFissions::create(RuntimeOrigin::signed(1), 15, 78, 1, 20, 90),
+			BitcoinFissions::create(RuntimeOrigin::signed(1), 15, 78, 1, 20, 90, None),
 			Error::<Test>::FissionIdBelowMinimum
 		);
 		assert_eq!(NextFissionIdByOwner::<Test>::get(1), 21);
@@ -72,7 +72,7 @@ fn create_rolls_back_the_lock_index_when_allocation_fails() {
 		MockLocks::insert(1, lock(1, 10));
 
 		assert_noop!(
-			BitcoinFissions::create(RuntimeOrigin::signed(1), 0, 77, 1, 20, 90),
+			BitcoinFissions::create(RuntimeOrigin::signed(1), 0, 77, 1, 20, 90, None),
 			Error::<Test>::InsufficientFundedSatoshis
 		);
 
@@ -89,10 +89,10 @@ fn create_limits_active_fissions_per_lock() {
 	new_test_ext().execute_with(|| {
 		MockLocks::insert(1, lock(1, 100));
 
-		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 0, 1, 1, 10, 90));
-		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 1, 1, 1, 10, 90));
+		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 0, 1, 1, 10, 90, None));
+		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 1, 2, 1, 10, 90, None));
 		assert_noop!(
-			BitcoinFissions::create(RuntimeOrigin::signed(1), 2, 1, 1, 10, 90),
+			BitcoinFissions::create(RuntimeOrigin::signed(1), 2, 3, 1, 10, 90, None),
 			Error::<Test>::TooManyFissionsForLock
 		);
 	});
@@ -103,7 +103,7 @@ fn close_removes_the_fission_and_preserves_its_mint_entitlement() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(7);
 		MockLocks::insert(1, lock(1, 100));
-		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 0, 77, 1, 40, 90));
+		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 0, 77, 1, 40, 90, None));
 
 		RedemptionMicrogonsPerSatoshi::set(50);
 		System::set_block_number(12);
@@ -127,7 +127,7 @@ fn close_removes_the_fission_and_preserves_its_mint_entitlement() {
 fn close_rolls_back_when_the_owner_cannot_burn_the_redemption() {
 	new_test_ext().execute_with(|| {
 		MockLocks::insert(1, lock(1, 100));
-		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 0, 77, 1, 40, 90));
+		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 0, 77, 1, 40, 90, None));
 		assert_ok!(Balances::force_set_balance(RuntimeOrigin::root(), 1, 100));
 
 		assert_noop!(
@@ -147,7 +147,7 @@ fn close_rolls_back_when_the_owner_cannot_burn_the_redemption() {
 fn close_uses_owner_scoped_lookup_and_removes_the_closed_fission() {
 	new_test_ext().execute_with(|| {
 		MockLocks::insert(1, lock(1, 100));
-		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 0, 77, 1, 40, 90));
+		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 0, 77, 1, 40, 90, None));
 
 		assert_noop!(
 			BitcoinFissions::close(RuntimeOrigin::signed(2), 0),
@@ -167,8 +167,8 @@ fn lock_cleanup_closes_only_active_fissions_and_preserves_pending_mints() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(7);
 		MockLocks::insert(1, lock(1, 100));
-		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 0, 77, 1, 40, 90));
-		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 1, 77, 1, 10, 90));
+		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 0, 77, 1, 40, 90, None));
+		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 1, 78, 1, 10, 90, None));
 		assert_ok!(BitcoinFissions::close(RuntimeOrigin::signed(1), 0));
 
 		System::set_block_number(12);
@@ -195,7 +195,7 @@ fn lock_cleanup_closes_only_active_fissions_and_preserves_pending_mints() {
 fn terminal_redemption_records_the_full_vault_burn() {
 	new_test_ext().execute_with(|| {
 		MockLocks::insert(1, lock(1, 100));
-		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 0, 77, 1, 40, 90));
+		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 0, 77, 1, 40, 90, None));
 
 		assert_ok!(<BitcoinFissions as BitcoinFissionsProvider<u64, u128>>::close_for_lock(
 			&1, 1, 4_000,
@@ -212,15 +212,14 @@ fn terminal_redemption_records_the_full_vault_burn() {
 fn terminal_settlement_uses_each_active_fission_basis() {
 	new_test_ext().execute_with(|| {
 		MockLocks::insert(1, lock(1, 100));
-		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 0, 77, 1, 40, 90));
+		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 0, 77, 1, 40, 90, None));
 		let bases =
-			<BitcoinFissions as BitcoinFissionsProvider<u64, u128>>::get_lock_fission_redemption_bases(
+			<BitcoinFissions as BitcoinFissionsProvider<u64, u128>>::get_lock_fission_guarantees(
 				&1, 1,
-			)
-			.expect("active fission basis");
+			);
 		assert_eq!(bases.len(), 1);
-		assert_eq!(bases[0].satoshis, 40);
-		assert_eq!(bases[0].microgons_at_target_per_btc, 90);
+		assert_eq!(bases[0].0.satoshis, 40);
+		assert_eq!(bases[0].0.microgons_at_target_per_btc, 90);
 	});
 }
 
@@ -229,12 +228,12 @@ fn up_ratchet_updates_one_fission_when_threshold_and_lock_coverage_allow_it() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(7);
 		MockLocks::insert(1, MockLock { microgons_at_target_per_btc: 120, ..lock(1, 100) });
-		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 0, 77, 1, 40, 90));
+		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 0, 77, 1, 40, 90, None));
 
 		System::set_block_number(12);
 		LiquidityMultiplierPercent::set(110);
 		MockLastRatchetTick::set(2);
-		assert_ok!(BitcoinFissions::ratchet(RuntimeOrigin::signed(1), 0, 110));
+		assert_ok!(BitcoinFissions::ratchet(RuntimeOrigin::signed(1), 0, 110, None));
 
 		let fission = FissionByOwnerAndId::<Test>::get(1, 0).expect("fission");
 		assert_eq!(fission.microgons_at_target_per_btc, 110);
@@ -265,11 +264,11 @@ fn down_ratchet_burns_and_requeues_the_replacement_liability() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(7);
 		MockLocks::insert(1, lock(1, 100));
-		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 0, 77, 1, 40, 90));
+		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 0, 77, 1, 40, 90, None));
 
 		System::set_block_number(12);
 		MockLastRatchetTick::set(2);
-		assert_ok!(BitcoinFissions::ratchet(RuntimeOrigin::signed(1), 0, 80));
+		assert_ok!(BitcoinFissions::ratchet(RuntimeOrigin::signed(1), 0, 80, None));
 
 		let fission = FissionByOwnerAndId::<Test>::get(1, 0).expect("fission");
 		assert_eq!(fission.microgons_at_target_per_btc, 80);
@@ -301,10 +300,10 @@ fn down_ratchet_burns_and_requeues_the_replacement_liability() {
 fn registration_provider_reads_maintained_fission_liquidity() {
 	new_test_ext().execute_with(|| {
 		MockLocks::insert(1, lock(1, 100));
-		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 0, 77, 1, 40, 90));
-		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 1, 77, 1, 10, 90));
+		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 0, 77, 1, 40, 90, None));
+		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 1, 78, 1, 10, 90, None));
 		MockLocks::insert(2, lock(2, 100));
-		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(2), 0, 78, 2, 10, 90));
+		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(2), 0, 78, 2, 10, 90, None));
 		assert_eq!(TreasuryPositions::account_quantities(&2).fission_liquidity, 900);
 		assert_eq!(TreasuryPositions::network_totals().fission_liquidity, 5_400);
 
@@ -342,7 +341,7 @@ fn create_rolls_back_lock_allocation_and_mint_request_when_liquidity_overflows()
 			},
 		);
 		assert_noop!(
-			BitcoinFissions::create(RuntimeOrigin::signed(1), 0, 77, 1, 40, 90),
+			BitcoinFissions::create(RuntimeOrigin::signed(1), 0, 77, 1, 40, 90, None),
 			sp_runtime::ArithmeticError::Overflow
 		);
 		assert_eq!(MockLocks::get(1).unwrap().fissioned_satoshis, 0);
@@ -355,8 +354,8 @@ fn create_rolls_back_lock_allocation_and_mint_request_when_liquidity_overflows()
 fn terminal_cleanup_rolls_back_all_fissions_in_the_callers_storage_layer() {
 	new_test_ext().execute_with(|| {
 		MockLocks::insert(1, lock(1, 100));
-		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 0, 77, 1, 40, 90));
-		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 1, 77, 1, 10, 90));
+		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 0, 77, 1, 40, 90, None));
+		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 1, 78, 1, 10, 90, None));
 		// The first removal can succeed, but the second detects the inconsistent account total.
 		pallet_treasury_positions::PositionsByAccount::<Test>::mutate(1, |position| {
 			position.as_mut().unwrap().quantities.fission_liquidity = 3_600;
@@ -376,23 +375,23 @@ fn terminal_cleanup_rolls_back_all_fissions_in_the_callers_storage_layer() {
 fn ratchet_rejects_a_removed_fission_or_an_ineligible_change_without_writes() {
 	new_test_ext().execute_with(|| {
 		MockLocks::insert(1, lock(1, 100));
-		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 0, 77, 1, 40, 90));
+		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 0, 77, 1, 40, 90, None));
 		let original = FissionByOwnerAndId::<Test>::get(1, 0).expect("fission");
 
 		assert_noop!(
-			BitcoinFissions::ratchet(RuntimeOrigin::signed(1), 0, 95),
+			BitcoinFissions::ratchet(RuntimeOrigin::signed(1), 0, 95, None),
 			Error::<Test>::NoRatchetingAvailable
 		);
 		MockLastRatchetTick::set(2);
 		assert_noop!(
-			BitcoinFissions::ratchet(RuntimeOrigin::signed(1), 0, 110),
+			BitcoinFissions::ratchet(RuntimeOrigin::signed(1), 0, 110, None),
 			Error::<Test>::NoRatchetingAvailable
 		);
 		assert_eq!(FissionByOwnerAndId::<Test>::get(1, 0), Some(original));
 
 		assert_ok!(BitcoinFissions::close(RuntimeOrigin::signed(1), 0));
 		assert_noop!(
-			BitcoinFissions::ratchet(RuntimeOrigin::signed(1), 0, 80),
+			BitcoinFissions::ratchet(RuntimeOrigin::signed(1), 0, 80, None),
 			Error::<Test>::FissionNotFound
 		);
 	});
@@ -402,14 +401,14 @@ fn ratchet_rejects_a_removed_fission_or_an_ineligible_change_without_writes() {
 fn down_ratchet_rolls_back_when_the_owner_cannot_burn_the_replacement_liability() {
 	new_test_ext().execute_with(|| {
 		MockLocks::insert(1, lock(1, 100));
-		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 0, 77, 1, 40, 90));
+		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 0, 77, 1, 40, 90, None));
 		let original = FissionByOwnerAndId::<Test>::get(1, 0).expect("fission");
 		let original_mint_requests = MockMintRequests::get();
 		assert_ok!(Balances::force_set_balance(RuntimeOrigin::root(), 1, 100));
 		MockLastRatchetTick::set(2);
 
 		assert_noop!(
-			BitcoinFissions::ratchet(RuntimeOrigin::signed(1), 0, 80),
+			BitcoinFissions::ratchet(RuntimeOrigin::signed(1), 0, 80, None),
 			Error::<Test>::InsufficientFunds
 		);
 
@@ -428,7 +427,7 @@ fn creation_rolls_back_when_the_network_fission_quantity_overflows() {
 			..Default::default()
 		});
 		assert_noop!(
-			BitcoinFissions::create(RuntimeOrigin::signed(1), 0, 77, 1, 40, 90),
+			BitcoinFissions::create(RuntimeOrigin::signed(1), 0, 77, 1, 40, 90, None),
 			sp_runtime::ArithmeticError::Overflow
 		);
 		assert_eq!(TreasuryPositions::account_quantities(&1).fission_liquidity, 0);

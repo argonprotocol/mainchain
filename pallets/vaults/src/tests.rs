@@ -9,12 +9,14 @@ use crate::{
 	PendingCosignByVaultId, VaultConfig, VaultIdByOperator,
 };
 use argon_primitives::{
-	bitcoin::{CompressedBitcoinPubkey, OpaqueBitcoinXpub, SATOSHIS_PER_BITCOIN},
+	bitcoin::{CompressedBitcoinPubkey, H256Le, OpaqueBitcoinXpub, UtxoRef, SATOSHIS_PER_BITCOIN},
+	treasury::{TreasuryPositionProvider, UpstreamPosition},
 	vault::{
-		BitcoinLockFundingUpdate, BitcoinResecuritization, BitcoinSecuritization,
-		BitcoinSecuritizationBasis, BitcoinVaultProvider, ReserveSecuritizationRequest, VaultError,
-		VaultTerms, MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES,
+		BitcoinLockFunding, BitcoinSecuritizationBasis, BitcoinVaultProvider, CosignerGuarantee,
+		ReserveSecuritizationRequest, VaultError, VaultTerms,
+		MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES,
 	},
+	BitcoinUtxoEvents, MICROGONS_PER_ARGON,
 };
 use bitcoin::{
 	bip32::{ChildNumber, Xpriv, Xpub},
@@ -22,13 +24,14 @@ use bitcoin::{
 };
 use frame_support::traits::Hooks;
 use k256::elliptic_curve::rand_core::{OsRng, RngCore};
+use pallet_bitcoin_locks::{LocksById, MicrogonsAtTargetPerBtcHistory};
 use pallet_operational_accounts::{
 	OpaqueEncryptionPubkey, OperationalAccount, OperationalAccountBySubAccount,
 	OperationalAccounts as OperationalAccountsById,
 };
 use pallet_prelude::{
 	argon_primitives::{
-		vault::{LockExtension, TreasuryVaultProvider, VaultTreasuryFrameEarnings},
+		vault::{TreasuryVaultProvider, VaultTreasuryFrameEarnings},
 		OnNewSlot,
 	},
 	*,
@@ -55,30 +58,34 @@ fn default_terms(pct: FixedU128) -> VaultTerms<Balance> {
 	VaultTerms { bitcoin_annual_percent_rate: pct, bitcoin_base_fee: 0 }
 }
 
-fn securitization(amount: Balance) -> BitcoinSecuritization<Balance> {
-	BitcoinSecuritization {
+fn securitization(amount: Balance) -> CosignerGuarantee<Balance> {
+	CosignerGuarantee {
 		basis: BitcoinSecuritizationBasis {
 			satoshis: amount.saturated_into(),
 			microgons_at_target_per_btc: SATOSHIS_PER_BITCOIN.into(),
+			tick: 0,
 		},
-		securitization_microgons: amount,
+		guaranteed_microgons: amount,
+		fund_hold_extensions: Default::default(),
 	}
 }
 
 fn funding_update(
-	securitization: &BitcoinSecuritization<Balance>,
+	securitization: &CosignerGuarantee<Balance>,
 	funded_satoshis: u64,
-) -> BitcoinLockFundingUpdate<Balance> {
-	BitcoinLockFundingUpdate {
+) -> BitcoinLockFunding<Balance> {
+	BitcoinLockFunding {
 		funded_satoshis,
 		securitized_satoshis: securitization.securitized_satoshis(funded_satoshis),
-		securitization_microgons: securitization.securitization_for_satoshis(funded_satoshis),
+		activated_securitization: securitization.securitization_for_satoshis(funded_satoshis),
 		is_flexible: false,
 	}
 }
 
 fn standard_reservation_request() -> ReserveSecuritizationRequest<Balance> {
 	ReserveSecuritizationRequest {
+		remaining_term: FixedU128::from_u32(1),
+		is_flexible: false,
 		lock_expiration: 100,
 		fee_discount: 0,
 		securitization_space_to_unreserve: 0,
@@ -91,6 +98,34 @@ fn default_vault() -> VaultConfig<u64, Balance> {
 		delegate_account_id: None,
 		bitcoin_xpubkey: keys(),
 		securitization: 50_000,
+	}
+}
+
+pub(crate) fn operational_account(
+	vault_account: u64,
+	mining_account: u64,
+) -> OperationalAccount<Test> {
+	OperationalAccount {
+		vault_account,
+		mining_account,
+		encryption_pubkey: OpaqueEncryptionPubkey([0; 32]),
+		upstream_account: None,
+		name: None,
+		last_name_change_tick: None,
+		uniswap_argon_transfers_in_amount: 0,
+		account_bitcoin_amount: MinimumBitcoin::get(),
+		account_vault_bond_amount: MinimumBonds::get(),
+		vault_created: true,
+		vault_bitcoin_accrual: 0,
+		vault_bitcoin_applied_total: 0,
+		mining_seat_accrual: MiningSeatsForOperational::get(),
+		mining_seat_applied_total: 0,
+		operational_certifications_count: 0,
+		available_access_codes: 0,
+		rewards_earned_count: 0,
+		rewards_earned_amount: 0,
+		rewards_collected_amount: 0,
+		is_operationally_certified: false,
 	}
 }
 
@@ -564,6 +599,8 @@ fn participation_capacity_excludes_space_needed_before_a_new_lock_matures() {
 				&2,
 				&securitization(1),
 				ReserveSecuritizationRequest {
+					remaining_term: FixedU128::from_u32(1),
+					is_flexible: false,
 					lock_expiration: 144 + LockDurationBlocks::get(),
 					fee_discount: 0,
 					securitization_space_to_unreserve: 0,
@@ -598,6 +635,7 @@ fn participation_capacity_prunes_matured_commitments_without_mutating_storage() 
 			));
 			assert_ok!(Vaults::record_bitcoin_lock_funding(
 				1,
+				Default::default(),
 				funding_update(&collateral, collateral.basis.satoshis)
 			));
 		}
@@ -605,7 +643,7 @@ fn participation_capacity_prunes_matured_commitments_without_mutating_storage() 
 			1,
 			&securitization(10),
 			10,
-			&LockExtension::new(first_maturity),
+			first_maturity,
 			false,
 		));
 		VaultsById::<Test>::mutate(1, |vault| {
@@ -659,13 +697,17 @@ fn participation_capacity_includes_flexible_bitcoin_and_protects_reserved_space(
 			&collateral,
 			standard_reservation_request()
 		));
-		assert_ok!(Vaults::record_bitcoin_lock_funding(1, funding_update(&collateral, 100)));
+		assert_ok!(Vaults::record_bitcoin_lock_funding(
+			1,
+			Default::default(),
+			funding_update(&collateral, 100)
+		));
 		assert_eq!(
 			Vaults::get_participation_capacity(1).unwrap().available_securitization_space,
 			0
 		);
 
-		assert_ok!(Vaults::set_bitcoin_lock_flexible(1, &collateral, 100, true));
+		assert_ok!(Vaults::set_bitcoin_lock_flexible(1, 100, true));
 		assert_eq!(
 			Vaults::get_participation_capacity(1).unwrap().available_securitization_space,
 			100
@@ -711,19 +753,20 @@ fn operator_resecuritization_uses_releasing_funds_before_flexible_space() {
 
 		let current = securitization(20);
 		let replacement = securitization(60);
-		let mut lock_extension = LockExtension::new(143);
+		let lock_expiration = 143;
+		let mut replacement_guarantee = replacement.clone();
 		assert_ok!(<Vaults as BitcoinVaultProvider>::resecuritize(
 			1,
 			&1,
-			BitcoinResecuritization {
-				current: &current,
-				replacement: &replacement,
-				funded_satoshis: 20,
+			&current,
+			&mut replacement_guarantee,
+			20,
+			ReserveSecuritizationRequest {
 				remaining_term: FixedU128::one(),
-				lock_extension: &mut lock_extension,
+				lock_expiration,
 				is_flexible: false,
 				fee_discount: 0,
-				securitization_space_to_unreserve: 0,
+				securitization_space_to_unreserve: 0
 			},
 		));
 
@@ -731,7 +774,7 @@ fn operator_resecuritization_uses_releasing_funds_before_flexible_space() {
 		assert_eq!(vault.securitization_locked, 100);
 		assert_eq!(vault.flexible_securitization_locked, 40);
 		assert_eq!(vault.get_relock_capacity(), 0);
-		assert_eq!(lock_extension.get(&288), Some(&20));
+		assert_eq!(replacement_guarantee.fund_hold_extensions.get(&288), Some(&20));
 	});
 }
 
@@ -876,7 +919,11 @@ fn exit_notice_keeps_other_securitization_available() {
 			&collateral,
 			ReserveSecuritizationRequest { lock_expiration: 365, ..standard_reservation_request() },
 		));
-		assert_ok!(Vaults::record_bitcoin_lock_funding(1, funding_update(&collateral, 500)));
+		assert_ok!(Vaults::record_bitcoin_lock_funding(
+			1,
+			Default::default(),
+			funding_update(&collateral, 500)
+		));
 
 		<Vaults as TreasuryVaultProvider>::commit_securitization_for_rewards(1, 0);
 		CurrentFrameId::set(2);
@@ -902,14 +949,12 @@ fn exit_notice_keeps_other_securitization_available() {
 				..standard_reservation_request()
 			},
 		));
-		assert_ok!(Vaults::record_bitcoin_lock_funding(1, funding_update(&collateral, 500)));
-		assert_ok!(Vaults::release_bitcoin_lock_securitization(
+		assert_ok!(Vaults::record_bitcoin_lock_funding(
 			1,
-			&collateral,
-			500,
-			&LockExtension::new(365),
-			false,
+			Default::default(),
+			funding_update(&collateral, 500)
 		));
+		assert_ok!(Vaults::release_bitcoin_lock_securitization(1, &collateral, 500, 365, false,));
 		let vault = VaultsById::<Test>::get(1).unwrap();
 		assert_eq!(vault.securitization_locked, 500);
 		assert_eq!(vault.exit_notice_amount(), 500);
@@ -961,7 +1006,7 @@ fn blocked_withdrawals_remain_whole_and_retry_after_capacity_is_freed() {
 		let retry_height = exit_height + 144;
 		assert!(VaultFundsReleasingByHeight::<Test>::get(retry_height).contains(&1));
 
-		assert_ok!(Vaults::release_unactivated_securitization(1, 500, &LockExtension::new(100), 0));
+		assert_ok!(Vaults::shrink_securitization(1, &securitization(500), 100, true));
 		assert_ok!(Balances::release(&HoldReason::EnterVault.into(), &1, 600, Precision::Exact));
 		let events_before_failure = System::events().len();
 		LastBitcoinHeightChange::set((retry_height, retry_height));
@@ -1043,12 +1088,7 @@ fn uncommitted_funds_do_not_count_as_committed_by_a_cancellable_notice() {
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().exit_notice_amount(), 500);
 		assert_eq!(Vaults::get_committed_securitization(&1, 0), Some(0));
 
-		assert_ok!(Vaults::release_unactivated_securitization(
-			1,
-			1_000,
-			&LockExtension::new(100),
-			0
-		));
+		assert_ok!(Vaults::shrink_securitization(1, &securitization(1_000), 100, true));
 		assert_ok!(Vaults::modify_funding(RuntimeOrigin::signed(1), 1, 1_000));
 		assert_ok!(Vaults::modify_funding(RuntimeOrigin::signed(1), 1, 0));
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization, 0);
@@ -1072,31 +1112,7 @@ fn operational_activation_preserves_existing_commitments_and_withdrawal_notices(
 			let before = VaultsById::<Test>::get(1).unwrap();
 			assert_eq!(before.committed_microgons, committed);
 
-			OperationalAccountsById::<Test>::insert(
-				2,
-				OperationalAccount {
-					vault_account: 1,
-					mining_account: 3,
-					encryption_pubkey: OpaqueEncryptionPubkey([0; 32]),
-					upstream_account: None,
-					name: None,
-					last_name_change_tick: None,
-					uniswap_argon_transfers_in_amount: 0,
-					account_bitcoin_amount: MinimumBitcoin::get(),
-					account_vault_bond_amount: MinimumBonds::get(),
-					vault_created: true,
-					vault_bitcoin_accrual: 0,
-					vault_bitcoin_applied_total: 0,
-					mining_seat_accrual: MiningSeatsForOperational::get(),
-					mining_seat_applied_total: 0,
-					operational_certifications_count: 0,
-					available_access_codes: 0,
-					rewards_earned_count: 0,
-					rewards_earned_amount: 0,
-					rewards_collected_amount: 0,
-					is_operationally_certified: false,
-				},
-			);
+			OperationalAccountsById::<Test>::insert(2, operational_account(1, 3));
 			OperationalAccountBySubAccount::<Test>::insert(3, 2);
 
 			assert_ok!(OperationalAccounts::activate(RuntimeOrigin::signed(3)));
@@ -1284,12 +1300,7 @@ fn it_can_close_a_vault() {
 		// set to full fee block
 		CurrentTick::set(1440 * 365 + 1);
 		// now when we return the securitization, it should return the funds to the vault
-		assert_ok!(Vaults::release_unactivated_securitization(
-			1,
-			amount,
-			&LockExtension::new(100),
-			0
-		));
+		assert_ok!(Vaults::shrink_securitization(1, &securitization(amount), 100, true));
 		assert_eq!(Balances::free_balance(1), vault_owner_balance - amount);
 		let exit_height = *VaultsById::<Test>::get(1)
 			.unwrap()
@@ -1350,12 +1361,7 @@ fn it_can_lock_funds() {
 		assert_eq!(Balances::free_balance(1), 500_000);
 		assert_eq!(Balances::balance_on_hold(&HoldReason::PendingCollect.into(), &1), fee);
 		// if we return the securitization, the fee won't be returned
-		assert_ok!(Vaults::release_unactivated_securitization(
-			1,
-			500_000,
-			&LockExtension::new(100),
-			0
-		));
+		assert_ok!(Vaults::shrink_securitization(1, &securitization(500_000), 100, true));
 		assert_eq!(Balances::free_balance(1), 500_000);
 		assert_eq!(Balances::balance_on_hold(&HoldReason::PendingCollect.into(), &1), fee);
 		assert_eq!(Balances::free_balance(2), 6_000 - fee);
@@ -1592,8 +1598,12 @@ fn it_accounts_for_pending_bitcoins() {
 
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().get_activated_securitization(), 0);
 
-		Vaults::record_bitcoin_lock_funding(1, funding_update(&securitization(100_000), 0))
-			.unwrap();
+		Vaults::record_bitcoin_lock_funding(
+			1,
+			Default::default(),
+			funding_update(&securitization(100_000), 0),
+		)
+		.unwrap();
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().get_activated_securitization(), 0);
 	});
 }
@@ -1617,7 +1627,8 @@ fn it_tracks_confirmed_and_securitized_satoshis_via_provider_methods() {
 		assert_eq!(positions[0].activated_securitization, 0);
 		assert_ok!(Vaults::record_bitcoin_lock_funding(
 			1,
-			funding_update(&securitization(1_000), 1_000),
+			Default::default(),
+			funding_update(&securitization(1_000), 1_000)
 		));
 		assert_ok!(Vaults::reserve_securitization(
 			1,
@@ -1627,7 +1638,8 @@ fn it_tracks_confirmed_and_securitized_satoshis_via_provider_methods() {
 		));
 		assert_ok!(Vaults::record_bitcoin_lock_funding(
 			1,
-			funding_update(&securitization(500), 500),
+			Default::default(),
+			funding_update(&securitization(500), 500)
 		));
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitized_satoshis, 1_500);
 		let (positions, _) = Vaults::get_top_vaults_by_securitization(1);
@@ -1638,10 +1650,75 @@ fn it_tracks_confirmed_and_securitized_satoshis_via_provider_methods() {
 			1,
 			&securitization(600),
 			600,
-			&LockExtension::new(100),
+			100,
 			false,
 		));
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitized_satoshis, 900);
+	});
+}
+
+#[test]
+fn shrinking_after_withdrawal_keeps_release_maturities_and_active_accounting() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		set_argons(1, 100_010);
+		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), default_vault()));
+		OperationalAccountsById::<Test>::insert(2, operational_account(1, 3));
+		OperationalAccountBySubAccount::<Test>::insert(1, 2);
+		let collateral = securitization(100);
+		assert_ok!(Vaults::reserve_securitization(
+			1,
+			&1,
+			&collateral,
+			standard_reservation_request()
+		));
+		assert_ok!(Vaults::record_bitcoin_lock_funding(
+			1,
+			Default::default(),
+			funding_update(&collateral, 100)
+		));
+		assert_ok!(Vaults::set_bitcoin_lock_flexible(1, 100, true));
+		assert_ok!(Vaults::record_bitcoin_lock_funding(
+			1,
+			BitcoinLockFunding {
+				funded_satoshis: 60,
+				securitized_satoshis: 60,
+				activated_securitization: 60,
+				is_flexible: true,
+			},
+			BitcoinLockFunding { is_flexible: true, ..Default::default() }
+		));
+		VaultsById::<Test>::mutate(1, |vault| {
+			let vault = vault.as_mut().unwrap();
+			vault.securitization_release_schedule.get_mut(&144).unwrap().locked_commitments = 30;
+			vault.scheduled_release(432).unwrap().locked_commitments = 70;
+			vault.is_closed = true;
+		});
+		let mut revenue = RevenuePerFrameByVault::<Test>::get(1);
+		let frame = revenue.last_mut().unwrap();
+		frame.bitcoin_locks_released_securitization += 60;
+		frame.securitization_activated = 40;
+		frame.securitization_relockable = 60;
+		let guarantee = CosignerGuarantee {
+			fund_hold_extensions: sp_runtime::bounded_btree_map! { 432 => 30 },
+			..securitization(60)
+		};
+
+		assert_ok!(Vaults::shrink_securitization(1, &guarantee, 100, false));
+
+		let vault = VaultsById::<Test>::get(1).unwrap();
+		assert_eq!(vault.securitization_locked, 40);
+		assert_eq!(vault.securitization_pending_activation, 0);
+		assert_eq!(vault.flexible_securitization_locked, 40);
+		assert_eq!((vault.total_satoshis, vault.securitized_satoshis), (40, 40));
+		assert_eq!(vault.securitization_release_schedule[&144].locked_commitments, 0);
+		assert_eq!(vault.securitization_release_schedule[&144].relockable_commitments, 30);
+		assert_eq!(vault.securitization_release_schedule[&432].locked_commitments, 40);
+		assert_eq!(vault.securitization_release_schedule[&432].relockable_commitments, 30);
+		assert!(VaultFundsReleasingByHeight::<Test>::get(144).contains(&1));
+		assert!(VaultFundsReleasingByHeight::<Test>::get(432).contains(&1));
+		assert_eq!(RevenuePerFrameByVault::<Test>::get(1).encode(), revenue.encode());
+		assert_eq!(OperationalAccountsById::<Test>::get(2).unwrap().vault_bitcoin_accrual, 40);
 	});
 }
 
@@ -1651,29 +1728,36 @@ fn provider_resecuritizes_a_funded_lock_and_reuses_its_backing() {
 		System::set_block_number(1);
 		set_argons(1, 100_010);
 		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), default_vault()));
+		OperationalAccountsById::<Test>::insert(2, operational_account(1, 3));
+		OperationalAccountBySubAccount::<Test>::insert(1, 2);
 
 		let current = securitization(1_000);
 		let replacement = securitization(800);
 		assert_ok!(
 			Vaults::reserve_securitization(1, &1, &current, standard_reservation_request(),)
 		);
-		assert_ok!(Vaults::record_bitcoin_lock_funding(1, funding_update(&current, 1_000),));
+		assert_ok!(Vaults::record_bitcoin_lock_funding(
+			1,
+			Default::default(),
+			funding_update(&current, 1_000)
+		));
+		assert_eq!(OperationalAccountsById::<Test>::get(2).unwrap().vault_bitcoin_accrual, 1_000);
 		CurrentFrameId::set(2);
-
-		let mut lock_extension = LockExtension::new(100);
+		let lock_expiration = 100;
+		let mut replacement_guarantee = replacement.clone();
 		assert_eq!(
 			<Vaults as BitcoinVaultProvider>::resecuritize(
 				1,
 				&1,
-				BitcoinResecuritization {
-					current: &current,
-					replacement: &replacement,
-					funded_satoshis: 1_000,
+				&current,
+				&mut replacement_guarantee,
+				1_000,
+				ReserveSecuritizationRequest {
 					remaining_term: FixedU128::one(),
-					lock_extension: &mut lock_extension,
+					lock_expiration,
 					is_flexible: false,
 					fee_discount: 0,
-					securitization_space_to_unreserve: 0,
+					securitization_space_to_unreserve: 0
 				},
 			)
 			.unwrap(),
@@ -1685,6 +1769,7 @@ fn provider_resecuritizes_a_funded_lock_and_reuses_its_backing() {
 		assert_eq!(vault.securitization_pending_activation, 0);
 		assert_eq!(vault.securitized_satoshis, 800);
 		assert_eq!(vault.get_relock_capacity(), 200);
+		assert_eq!(OperationalAccountsById::<Test>::get(2).unwrap().vault_bitcoin_accrual, 800);
 		let revenue = RevenuePerFrameByVault::<Test>::get(1);
 		let replacement_revenue = revenue.first().unwrap();
 		assert_eq!(replacement_revenue.frame_id, 2);
@@ -1692,6 +1777,28 @@ fn provider_resecuritizes_a_funded_lock_and_reuses_its_backing() {
 		assert_eq!(replacement_revenue.bitcoin_locks_released_securitization, 200);
 		assert_eq!(replacement_revenue.bitcoin_locks_added_satoshis, 0);
 		assert_eq!(replacement_revenue.bitcoin_locks_released_satoshis, 0);
+
+		// Removing the funded guarantee must also clear the operator's accrued backing.
+		let mut empty = securitization(0);
+		assert_ok!(<Vaults as BitcoinVaultProvider>::resecuritize(
+			1,
+			&1,
+			&replacement_guarantee,
+			&mut empty,
+			1_000,
+			ReserveSecuritizationRequest {
+				remaining_term: FixedU128::one(),
+				lock_expiration,
+				is_flexible: false,
+				fee_discount: 0,
+				securitization_space_to_unreserve: 0
+			},
+		));
+		let vault = VaultsById::<Test>::get(1).unwrap();
+		assert_eq!(vault.get_activated_securitization(), 0);
+		assert_eq!(vault.total_satoshis, 1_000);
+		assert_eq!(vault.get_relock_capacity(), 1_000);
+		assert_eq!(OperationalAccountsById::<Test>::get(2).unwrap().vault_bitcoin_accrual, 0);
 	});
 }
 
@@ -1708,25 +1815,30 @@ fn resecuritization_preserves_a_whole_exit_without_earmarking_backing() {
 		assert_ok!(
 			Vaults::reserve_securitization(1, &1, &current, standard_reservation_request(),)
 		);
-		assert_ok!(Vaults::record_bitcoin_lock_funding(1, funding_update(&current, 1_000)));
+		assert_ok!(Vaults::record_bitcoin_lock_funding(
+			1,
+			Default::default(),
+			funding_update(&current, 1_000)
+		));
 		CurrentFrameId::set(2);
 		assert_ok!(Vaults::modify_funding(RuntimeOrigin::signed(1), 1, 500));
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().exit_notice_amount(), 500);
 
 		let replacement = securitization(500);
-		let mut lock_extension = LockExtension::new(100);
+		let lock_expiration = 100;
+		let mut replacement_guarantee = replacement.clone();
 		assert_ok!(<Vaults as BitcoinVaultProvider>::resecuritize(
 			1,
 			&1,
-			BitcoinResecuritization {
-				current: &current,
-				replacement: &replacement,
-				funded_satoshis: 1_000,
+			&current,
+			&mut replacement_guarantee,
+			1_000,
+			ReserveSecuritizationRequest {
 				remaining_term: FixedU128::one(),
-				lock_extension: &mut lock_extension,
+				lock_expiration,
 				is_flexible: false,
 				fee_discount: 0,
-				securitization_space_to_unreserve: 0,
+				securitization_space_to_unreserve: 0
 			},
 		));
 
@@ -1764,16 +1876,17 @@ fn provider_resecuritization_applies_coupon_terms() {
 
 		let current = securitization(0);
 		let replacement = securitization(40);
-		let mut lock_extension = LockExtension::new(100);
+		let lock_expiration = 100;
+		let mut replacement_guarantee = replacement.clone();
 		let (fee, fee_discount) = <Vaults as BitcoinVaultProvider>::resecuritize(
 			1,
 			&2,
-			BitcoinResecuritization {
-				current: &current,
-				replacement: &replacement,
-				funded_satoshis: 0,
+			&current,
+			&mut replacement_guarantee,
+			0,
+			ReserveSecuritizationRequest {
 				remaining_term: FixedU128::one(),
-				lock_extension: &mut lock_extension,
+				lock_expiration,
 				is_flexible: false,
 				fee_discount: 20,
 				securitization_space_to_unreserve: 150,
@@ -1805,13 +1918,7 @@ fn it_errors_when_releasing_more_funded_satoshis_than_the_vault_tracks() {
 		});
 
 		assert_err!(
-			Vaults::release_bitcoin_lock_securitization(
-				1,
-				&securitization(1),
-				1,
-				&LockExtension::new(100),
-				false,
-			),
+			Vaults::release_bitcoin_lock_securitization(1, &securitization(1), 1, 100, false,),
 			VaultError::InternalError
 		);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitized_satoshis, 0);
@@ -1850,18 +1957,12 @@ fn it_can_burn_funds() {
 		assert_eq!(Balances::free_balance(2), 2_000);
 		assert_ok!(Vaults::record_bitcoin_lock_funding(
 			1,
-			funding_update(&securitization(100_000), 500),
+			Default::default(),
+			funding_update(&securitization(100_000), 500)
 		));
 		CurrentFrameId::set(2);
 		assert_ok!(Vaults::modify_funding(RuntimeOrigin::signed(1), 1, 0));
-		assert_ok!(Vaults::burn(
-			1,
-			&securitization(100_000),
-			500,
-			100_000,
-			&LockExtension::new(2440),
-			false,
-		));
+		assert_ok!(Vaults::burn(1, &securitization(100_000), 500, 2440, false, 100_000,));
 
 		assert_eq!(Balances::free_balance(1), 900_000);
 		assert_eq!(Balances::total_balance(&1), 900_000, "Burned from the vault owner");
@@ -1897,14 +1998,12 @@ fn zero_burn_retires_funded_satoshis_and_schedules_funded_collateral() {
 		));
 		assert_ok!(Vaults::record_bitcoin_lock_funding(
 			1,
-			funding_update(&securitization(100_000), 500),
+			Default::default(),
+			funding_update(&securitization(100_000), 500)
 		));
 		CurrentFrameId::set(2);
 
-		assert_eq!(
-			Vaults::burn(1, &securitization(100_000), 500, 0, &LockExtension::new(2440), false),
-			Ok(0),
-		);
+		assert_eq!(Vaults::burn(1, &securitization(100_000), 500, 2440, false, 0,), Ok(0),);
 		let vault = VaultsById::<Test>::get(1).expect("vault remains");
 		assert_eq!(vault.securitization, 100_000);
 		assert_eq!(vault.securitization_locked, 0);
@@ -1956,18 +2055,19 @@ fn insured_redemption_compensation_scenario(redemption_amount: u128, expected_co
 		let vault = VaultsById::<Test>::get(1).unwrap();
 		assert_eq!(vault.securitization_locked, 0);
 		assert_eq!(vault.securitization, securitization);
-
-		let lock_extensions = LockExtension::new(1440 * 365);
+		let lock_expiration = 1440 * 365;
 		let btc_value_in_microgons = securitization_microgons / 2;
-		let bitcoin_securitization = BitcoinSecuritization {
+		let bitcoin_securitization = CosignerGuarantee {
 			basis: BitcoinSecuritizationBasis {
 				satoshis: 500,
 				microgons_at_target_per_btc: btc_value_in_microgons
 					.saturating_mul(SATOSHIS_PER_BITCOIN.into())
 					.checked_div(&500)
 					.unwrap(),
+				tick: 0,
 			},
-			securitization_microgons,
+			guaranteed_microgons: securitization_microgons,
+			fund_hold_extensions: Default::default(),
 		};
 
 		Vaults::reserve_securitization(
@@ -1977,17 +2077,21 @@ fn insured_redemption_compensation_scenario(redemption_amount: u128, expected_co
 			standard_reservation_request(),
 		)
 		.expect("bonding failed");
-		Vaults::record_bitcoin_lock_funding(1, funding_update(&bitcoin_securitization, 500))
-			.expect("activation failed");
+		Vaults::record_bitcoin_lock_funding(
+			1,
+			Default::default(),
+			funding_update(&bitcoin_securitization, 500),
+		)
+		.expect("activation failed");
 
 		let compensation = Vaults::compensate_lost_bitcoin(
 			1,
 			&bitcoin_locker,
 			&bitcoin_securitization,
 			500,
-			redemption_amount,
-			&lock_extensions,
+			lock_expiration,
 			false,
+			redemption_amount,
 		)
 		.expect("compensation failed");
 		assert_eq!(compensation.to_beneficiary, expected_compensation);
@@ -2048,6 +2152,8 @@ fn it_records_use_of_fee_coupons() {
 				lock_expiration: 100,
 				fee_discount,
 				securitization_space_to_unreserve: 0,
+				remaining_term: FixedU128::from_u32(1),
+				is_flexible: false,
 			},
 		)
 		.expect("bonding failed");
@@ -2099,18 +2205,15 @@ fn compensation_never_exceeds_the_guaranteed_securitization() {
 			&insured_lock,
 			standard_reservation_request(),
 		));
-		assert_ok!(Vaults::record_bitcoin_lock_funding(1, funding_update(&insured_lock, 100_000),));
-
-		let compensation = Vaults::compensate_lost_bitcoin(
+		assert_ok!(Vaults::record_bitcoin_lock_funding(
 			1,
-			&2,
-			&insured_lock,
-			100_000,
-			100_000,
-			&LockExtension::new(365),
-			false,
-		)
-		.expect("available collateral should still be paid");
+			Default::default(),
+			funding_update(&insured_lock, 100_000)
+		));
+
+		let compensation =
+			Vaults::compensate_lost_bitcoin(1, &2, &insured_lock, 100_000, 365, false, 100_000)
+				.expect("available collateral should still be paid");
 		assert_eq!(compensation.to_beneficiary, 50_000);
 		assert_eq!(Balances::free_balance(2), 50_000);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization, 0);
@@ -2292,7 +2395,8 @@ fn it_can_cleanup_at_bitcoin_heights() {
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().get_relock_capacity(), 0);
 		assert_ok!(Vaults::record_bitcoin_lock_funding(
 			1,
-			funding_update(&securitization(amount), 500),
+			Default::default(),
+			funding_update(&securitization(amount), 500)
 		));
 		CurrentFrameId::set(2);
 
@@ -2300,7 +2404,7 @@ fn it_can_cleanup_at_bitcoin_heights() {
 			1,
 			&securitization(amount),
 			500,
-			&LockExtension::new(365),
+			365,
 			false,
 		));
 		assert_eq!(
@@ -2369,14 +2473,15 @@ fn it_can_reuse_locked_argons() {
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().get_relock_capacity(), 0);
 		assert_ok!(Vaults::record_bitcoin_lock_funding(
 			1,
-			funding_update(&securitization(amount), 500),
+			Default::default(),
+			funding_update(&securitization(amount), 500)
 		));
 
 		assert_ok!(Vaults::release_bitcoin_lock_securitization(
 			1,
 			&securitization(amount),
 			500,
-			&LockExtension::new(365),
+			365,
 			false,
 		));
 		assert_eq!(
@@ -2400,7 +2505,8 @@ fn it_can_reuse_locked_argons() {
 		));
 		assert_ok!(Vaults::record_bitcoin_lock_funding(
 			1,
-			funding_update(&securitization(2_500_000), 2_500),
+			Default::default(),
+			funding_update(&securitization(2_500_000), 2_500)
 		));
 		assert_eq!(
 			VaultsById::<Test>::get(1).unwrap().available_securitization_space(true, None),
@@ -2413,7 +2519,7 @@ fn it_can_reuse_locked_argons() {
 			1,
 			&securitization(2_500_000),
 			2500,
-			&LockExtension::new(365),
+			365,
 			false,
 		));
 		assert_eq!(
@@ -2671,4 +2777,355 @@ fn it_tracks_pending_cosign_utxos_for_vaults() {
 		assert_ok!(Vaults::update_pending_cosign_list(2, 4, true));
 		assert_eq!(PendingCosignByVaultId::<Test>::get(2).into_iter().collect::<Vec<_>>(), vec![3]);
 	});
+}
+
+#[test]
+fn resecuritizing_an_unfunded_lock_preserves_reused_later_maturities() {
+	new_test_ext().execute_with(|| {
+		set_argons(1, 200);
+		assert_ok!(Vaults::create(
+			RuntimeOrigin::signed(1),
+			VaultConfig {
+				securitization: 200,
+				terms: default_terms(FixedU128::zero()),
+				..default_vault()
+			}
+		));
+		let mut vault = VaultsById::<Test>::get(1).unwrap();
+		let current = securitization(100);
+		vault.reserve_securitization(&current, false, 143).unwrap();
+		vault.reserve_securitization(&current, false, 145).unwrap();
+		vault
+			.record_bitcoin_lock_funding(Default::default(), funding_update(&current, 100))
+			.unwrap();
+		vault.release_bitcoin_lock_securitization(&current, 100, 145, false).unwrap();
+		VaultsById::<Test>::insert(1, vault);
+		let mut replacement = securitization(200);
+		assert_ok!(Vaults::resecuritize(
+			1,
+			&1,
+			&current,
+			&mut replacement,
+			0,
+			ReserveSecuritizationRequest { lock_expiration: 143, ..standard_reservation_request() }
+		));
+		let vault = VaultsById::<Test>::get(1).unwrap();
+		assert_eq!(vault.securitization_locked, 200);
+		assert_eq!(vault.securitization_pending_activation, 200);
+		assert_eq!(vault.total_satoshis, 0);
+		assert_eq!(vault.get_relock_capacity(), 0);
+		assert_eq!(replacement.fund_hold_extensions.get(&288), Some(&100));
+		assert_eq!(vault.securitization_release_schedule[&144].locked_commitments, 100);
+		assert_eq!(vault.securitization_release_schedule[&288].locked_commitments, 100);
+		let current = replacement.clone();
+		replacement.fund_hold_extensions.clear();
+		assert_ok!(Vaults::resecuritize(
+			1,
+			&1,
+			&current,
+			&mut replacement,
+			0,
+			ReserveSecuritizationRequest { lock_expiration: 143, ..standard_reservation_request() }
+		));
+		assert_eq!(replacement.fund_hold_extensions.get(&288), Some(&100));
+		assert_ok!(Vaults::release_bitcoin_lock_securitization(1, &replacement, 0, 143, false));
+		let vault = VaultsById::<Test>::get(1).unwrap();
+		assert_eq!(vault.securitization_pending_activation, 0);
+		assert_eq!(vault.securitization_locked, 0);
+		assert_eq!(vault.securitization_release_schedule[&288].relockable_commitments, 100);
+		assert!(VaultFundsReleasingByHeight::<Test>::get(288).contains(&1));
+	});
+}
+
+#[test]
+fn exit_notice_allows_resecuritization_within_its_deadline() {
+	new_test_ext().execute_with(|| {
+		set_argons(1, 100);
+		assert_ok!(Vaults::create(
+			RuntimeOrigin::signed(1),
+			VaultConfig {
+				securitization: 100,
+				terms: default_terms(FixedU128::zero()),
+				..default_vault()
+			}
+		));
+		let mut vault = VaultsById::<Test>::get(1).unwrap();
+		let collateral = securitization(50);
+		vault.reserve_securitization(&collateral, false, 100).unwrap();
+		vault
+			.record_bitcoin_lock_funding(Default::default(), funding_update(&collateral, 50))
+			.unwrap();
+		vault.request_securitization_exit(50, 365).unwrap();
+		VaultsById::<Test>::insert(1, vault);
+		let mut replacement = collateral.clone();
+		let funding = 50;
+		assert_ok!(Vaults::resecuritize(
+			1,
+			&1,
+			&collateral,
+			&mut replacement,
+			funding,
+			standard_reservation_request()
+		));
+		let vault = VaultsById::<Test>::get(1).unwrap();
+		assert_eq!(vault.securitization_locked, 50);
+		assert_eq!(vault.get_relock_capacity(), 0);
+		assert_eq!(vault.available_securitization_space(false, None), 50);
+	});
+}
+
+#[test]
+fn liquid_lifecycle_preserves_vault_and_treasury_accounting() {
+	new_test_ext().execute_with(|| {
+		// Fund 1 BTC with a guarantee for 0.1 BTC at the initial price.
+		System::set_block_number(1);
+		set_argons(1, 1_000_000 * MICROGONS_PER_ARGON);
+		set_argons(2, 1_000_000 * MICROGONS_PER_ARGON);
+		assert_ok!(Vaults::create(
+			RuntimeOrigin::signed(1),
+			VaultConfig {
+				securitization: 500_000 * MICROGONS_PER_ARGON,
+				terms: default_terms(FixedU128::from_rational(1, 100)),
+				..default_vault()
+			}
+		));
+		TreasuryPositions::set_upstream_position(
+			&2,
+			Some(UpstreamPosition { vault_id: 1, ..Default::default() }),
+		);
+		OperationalAccountsById::<Test>::insert(9, operational_account(1, 3));
+		OperationalAccountBySubAccount::<Test>::insert(1, 9);
+		CurrentTick::set(VaultsById::<Test>::get(1).unwrap().opened_tick);
+		BitcoinPriceInUsd::set(Some(FixedU128::from_u32(100_000)));
+		assert_ok!(BitcoinLocks::create_receive_address(
+			RuntimeOrigin::signed(2),
+			1,
+			SATOSHIS_PER_BITCOIN / 10,
+			CompressedBitcoinPubkey(
+				bitcoin::secp256k1::PublicKey::from_secret_key(
+					&Secp256k1::new(),
+					&bitcoin::secp256k1::SecretKey::from_slice(&[1; 32]).unwrap(),
+				)
+				.serialize()
+			),
+			None
+		));
+		assert_ok!(<BitcoinLocks as BitcoinUtxoEvents<u64>>::utxo_detected(
+			1,
+			UtxoRef { txid: H256Le([4; 32]), output_index: 0 },
+			SATOSHIS_PER_BITCOIN,
+			0
+		));
+		let original = LocksById::<Test>::get(1).unwrap().cosigner_guarantee.guaranteed_microgons;
+		assert_eq!(original, 10_000 * MICROGONS_PER_ARGON);
+
+		// Each Liquid buys its guarantee; the remaining Bitcoin keeps the Lock guarantee.
+		for (id, price) in [(0, 100_000), (1, 120_000)] {
+			let rate = price * MICROGONS_PER_ARGON;
+			CurrentTick::set(CurrentTick::get() + 1);
+			BitcoinPriceInUsd::set(Some(FixedU128::from_u32(price as u32)));
+			MicrogonsAtTargetPerBtcHistory::<Test>::mutate(|history| {
+				history.try_push((CurrentTick::get(), rate)).unwrap()
+			});
+			assert_ok!(BitcoinFissions::create(
+				RuntimeOrigin::signed(2),
+				id,
+				id + 77,
+				1,
+				SATOSHIS_PER_BITCOIN / 4,
+				rate,
+				None
+			));
+			assert_eq!(
+				LocksById::<Test>::get(1).unwrap().cosigner_guarantee.guaranteed_microgons,
+				original
+			);
+		}
+
+		// Ratchet the first Liquid: 10,000 on the Lock plus 35,000 and 30,000 on the Liquids.
+		let rate = 140_000 * MICROGONS_PER_ARGON;
+		CurrentTick::set(CurrentTick::get() + 1);
+		BitcoinPriceInUsd::set(Some(FixedU128::from_u32(140_000)));
+		MicrogonsAtTargetPerBtcHistory::<Test>::mutate(|history| {
+			history.try_push((CurrentTick::get(), rate)).unwrap()
+		});
+		assert_ok!(BitcoinFissions::ratchet(RuntimeOrigin::signed(2), 0, rate, None));
+		let lock = LocksById::<Test>::get(1).unwrap();
+		let paid = lock.total_securitization(1).allocated_securitization;
+		assert_eq!(paid, 75_000 * MICROGONS_PER_ARGON);
+		let vault = VaultsById::<Test>::get(1).unwrap();
+		assert_eq!(
+			(vault.securitization_locked, vault.securitization_pending_activation),
+			(paid, 0)
+		);
+		assert_eq!(TreasuryPositions::upstream_position(&2).unwrap().bitcoin_securitization, paid);
+		assert_eq!(OperationalAccountsById::<Test>::get(9).unwrap().vault_bitcoin_accrual, paid);
+		let fees = lock.security_fees;
+		assert!(fees > 0);
+		let revenue = RevenuePerFrameByVault::<Test>::get(1)[0].bitcoin_lock_fee_revenue;
+
+		// Closing returns both guarantees without new fees or a change to total securitization.
+		assert_ok!(BitcoinFissions::close(RuntimeOrigin::signed(2), 1));
+		assert_ok!(BitcoinFissions::close(RuntimeOrigin::signed(2), 0));
+		let lock = LocksById::<Test>::get(1).unwrap();
+		assert_eq!(lock.fissioned_satoshis, 0);
+		assert_eq!(lock.cosigner_guarantee.guaranteed_microgons, paid);
+		assert_eq!(lock.cosigner_guarantee.basis.microgons_at_target_per_btc, rate);
+		assert_eq!(lock.security_fees, fees);
+		assert_eq!(RevenuePerFrameByVault::<Test>::get(1)[0].bitcoin_lock_fee_revenue, revenue);
+		let vault = VaultsById::<Test>::get(1).unwrap();
+		assert_eq!(
+			(vault.securitization_locked, vault.get_activated_securitization()),
+			(paid, paid)
+		);
+		assert_eq!(vault.total_satoshis, SATOSHIS_PER_BITCOIN);
+		assert_eq!(
+			vault
+				.securitization_release_schedule
+				.values()
+				.map(|entry| entry.locked_commitments)
+				.sum::<Balance>(),
+			paid
+		);
+		let upstream = TreasuryPositions::upstream_position(&2).unwrap();
+		assert_eq!(
+			(upstream.bitcoin_allocated_securitization, upstream.bitcoin_securitization),
+			(paid, paid)
+		);
+		assert_eq!(OperationalAccountsById::<Test>::get(9).unwrap().vault_bitcoin_accrual, paid);
+	});
+}
+
+#[test]
+fn closing_displaced_flexible_liquid_preserves_securitization_and_funding_expiry() {
+	// Close with no spare capacity, including when some capacity is explicitly reserved.
+	for (capital, reserved) in [(200_000, 0), (200_001, 1)] {
+		new_test_ext().execute_with(|| {
+			System::set_block_number(1);
+			BitcoinBlockHeightChange::set((0, 0));
+			SynchedBitcoinHeight::set(0);
+			set_argons(1, 1_000_000 * MICROGONS_PER_ARGON);
+			set_argons(2, 1_000_000 * MICROGONS_PER_ARGON);
+			assert_ok!(Vaults::create(
+				RuntimeOrigin::signed(1),
+				VaultConfig {
+					securitization: capital * MICROGONS_PER_ARGON,
+					terms: default_terms(FixedU128::zero()),
+					..default_vault()
+				}
+			));
+			CurrentTick::set(VaultsById::<Test>::get(1).unwrap().opened_tick);
+			TreasuryPositions::set_upstream_position(
+				&1,
+				Some(UpstreamPosition { vault_id: 1, ..Default::default() }),
+			);
+			OperationalAccountsById::<Test>::insert(9, operational_account(1, 3));
+			OperationalAccountBySubAccount::<Test>::insert(1, 9);
+			let pubkey = CompressedBitcoinPubkey(
+				bitcoin::secp256k1::PublicKey::from_secret_key(
+					&Secp256k1::new(),
+					&bitcoin::secp256k1::SecretKey::from_slice(&[1; 32]).unwrap(),
+				)
+				.serialize(),
+			);
+
+			// Reserve 190,000 for 2 BTC, then fund only 1 BTC at a redemption multiplier of 0.95.
+			BitcoinPriceInUsd::set(Some(FixedU128::from_u32(100_000)));
+			ArgonPriceInUsd::set(Some(FixedU128::from_rational(95, 100)));
+			assert_ok!(BitcoinLocks::create_receive_address(
+				RuntimeOrigin::signed(1),
+				1,
+				2 * SATOSHIS_PER_BITCOIN,
+				pubkey,
+				None
+			));
+			assert_ok!(BitcoinLocks::utxo_detected(
+				1,
+				UtxoRef { txid: H256Le([4; 32]), output_index: 0 },
+				SATOSHIS_PER_BITCOIN,
+				0
+			));
+
+			// The Liquid buys another 5,000; the Lock retains its 95,000 unfunded reservation.
+			ArgonPriceInUsd::set(Some(FixedU128::one()));
+			let rate = 100_000 * MICROGONS_PER_ARGON;
+			MicrogonsAtTargetPerBtcHistory::<Test>::mutate(|history| {
+				history.try_push((CurrentTick::get(), rate)).unwrap()
+			});
+			assert_ok!(BitcoinFissions::create(
+				RuntimeOrigin::signed(1),
+				0,
+				77,
+				1,
+				SATOSHIS_PER_BITCOIN,
+				rate,
+				None
+			));
+			assert_ok!(BitcoinLocks::set_flexible(RuntimeOrigin::signed(1), 1, true));
+			assert_ok!(Vaults::set_reserved_securitization_space(
+				RuntimeOrigin::signed(1),
+				reserved * MICROGONS_PER_ARGON
+			));
+
+			// A customer's later reservation uses the space made available by flexible coverage.
+			BitcoinBlockHeightChange::set((0, 1));
+			assert_ok!(BitcoinLocks::create_receive_address(
+				RuntimeOrigin::signed(2),
+				1,
+				105 * SATOSHIS_PER_BITCOIN / 100,
+				pubkey,
+				None
+			));
+			let expiry = LocksById::<Test>::get(2)
+				.unwrap()
+				.securitization_hold_expiration_bitcoin_height
+				.unwrap();
+			let vault = VaultsById::<Test>::get(1).unwrap();
+			assert_eq!(vault.securitization_locked, 300_000 * MICROGONS_PER_ARGON);
+			assert_eq!(vault.flexible_securitization_locked, 100_000 * MICROGONS_PER_ARGON);
+
+			assert_eq!(vault.available_securitization_space(true, None), 0);
+			let fees = LocksById::<Test>::get(1).unwrap().security_fees;
+			assert_ok!(BitcoinFissions::close(RuntimeOrigin::signed(1), 0));
+			let combined = LocksById::<Test>::get(1).unwrap();
+			assert_eq!(
+				combined.cosigner_guarantee.guaranteed_microgons,
+				195_000 * MICROGONS_PER_ARGON
+			);
+			assert_eq!(combined.cosigner_guarantee.basis.satoshis, 195_000_000);
+			assert_eq!(combined.security_fees, fees);
+			let vault = VaultsById::<Test>::get(1).unwrap();
+			assert_eq!(vault.securitization_locked, 300_000 * MICROGONS_PER_ARGON);
+			assert_eq!(vault.flexible_securitization_locked, 100_000 * MICROGONS_PER_ARGON);
+			assert_eq!(vault.regular_securitization_locked(), 200_000 * MICROGONS_PER_ARGON);
+			assert_eq!(vault.securitization_pending_activation, 200_000 * MICROGONS_PER_ARGON);
+
+			// Both the operator's and the later customer's funding windows still expire normally.
+			BitcoinBlockHeightChange::set((1, expiry));
+			SynchedBitcoinHeight::set(expiry);
+			BitcoinLocks::on_initialize(2);
+			assert_eq!(
+				pallet_bitcoin_locks::LastProcessedSecuritizationHoldBitcoinHeight::<Test>::get(),
+				Some(expiry)
+			);
+			assert_eq!(
+				LocksById::<Test>::get(2).unwrap().cosigner_guarantee.guaranteed_microgons,
+				0
+			);
+			let expected = 100_000 * MICROGONS_PER_ARGON;
+			let vault = VaultsById::<Test>::get(1).unwrap();
+			assert_eq!(vault.securitization_locked, expected);
+			assert_eq!(vault.securitization_pending_activation, 0);
+			assert_eq!(vault.flexible_securitization_locked, expected);
+			assert_eq!(vault.total_satoshis, SATOSHIS_PER_BITCOIN);
+			assert_eq!(
+				TreasuryPositions::upstream_position(&1).unwrap().bitcoin_securitization,
+				expected
+			);
+			assert_eq!(
+				OperationalAccountsById::<Test>::get(9).unwrap().vault_bitcoin_accrual,
+				expected
+			);
+		});
+	}
 }

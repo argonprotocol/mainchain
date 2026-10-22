@@ -11,12 +11,12 @@ pub type Bonds = u32;
 /// Whole token units aggregated across account bonds or stakes.
 pub type BondTotal = u128;
 
-/// Absolute Bitcoin collateral amounts in microgons, for one lock or a sum of locks.
+/// Allocated and activated securitization in microgons, for one position or a total.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct BitcoinLockPosition<Balance> {
-	/// Collateral backing confirmed funding.
+	/// Securitization activated by confirmed Bitcoin funding.
 	pub activated_securitization: Balance,
-	/// Total collateral allocated to the lock: activated collateral plus the unfunded remainder.
+	/// Total allocated securitization: activated securitization plus the unfunded remainder.
 	pub allocated_securitization: Balance,
 }
 
@@ -77,10 +77,10 @@ where
 {
 	#[codec(compact)]
 	pub vault_id: VaultId,
-	/// Collateral used by confirmed funding.
+	/// Securitization activated by confirmed Bitcoin funding.
 	#[codec(compact)]
 	pub bitcoin_securitization: Balance,
-	/// Total collateral allocated to this owner's upstream locks: activated collateral plus
+	/// Total securitization allocated to this owner's upstream Locks and Fissions, including
 	/// the unfunded remainder. Excludes the vault's unallocated reserved securitization space.
 	#[codec(compact)]
 	pub bitcoin_allocated_securitization: Balance,
@@ -149,8 +149,9 @@ pub trait TreasuryPositionProvider<AccountId, Balance: Codec + MaxEncodedLen> {
 	fn upstream_position(account: &AccountId) -> Option<UpstreamPosition<Balance>>;
 	/// Complete upstream snapshot, installed at registration or during migration.
 	fn set_upstream_position(account: &AccountId, upstream: Option<UpstreamPosition<Balance>>);
-	/// Replace one lock's contribution; the caller supplies its absolute before/after amounts
-	/// within the same storage transaction as the canonical lock mutation.
+	/// Update the account's Bitcoin securitization totals: subtract `previous`, then add
+	/// `position`. Include only the Locks and Fissions changed by the operation.
+	/// This update and the Lock/Fission changes must succeed or roll back together.
 	fn bitcoin_position_updated(
 		account: &AccountId,
 		vault: VaultId,

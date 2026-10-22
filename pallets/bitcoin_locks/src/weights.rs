@@ -76,11 +76,11 @@ pub trait WeightInfo {
 	// Orphaned Utxo process
 	fn request_orphaned_utxo_release() -> Weight;
 	fn cosign_orphaned_utxo_release() -> Weight;
-	fn resecuritize() -> Weight;
+	fn set_guarantee() -> Weight;
 	fn set_flexible() -> Weight;
 
 	fn provider_fission_satoshis() -> Weight;
-	fn provider_validate_fission() -> Weight;
+	fn provider_update_fission_guarantee() -> Weight;
 	fn provider_calculate_liquidity_promised() -> Weight;
 	fn provider_fuse_satoshis() -> Weight;
 	// Bitcoin UTXO event handler provider weights
@@ -112,7 +112,7 @@ pub struct WithProviderWeights<
 impl<T, Base, VaultProviderWeight, FissionsProviderWeight> WeightInfo
 	for WithProviderWeights<T, Base, VaultProviderWeight, FissionsProviderWeight>
 where
-	T: Config,
+	T: Config + pallet_bitcoin_fissions::Config,
 	Base: WeightInfo,
 	VaultProviderWeight: BitcoinVaultProviderWeightInfo,
 	FissionsProviderWeight: BitcoinFissionsProviderWeightInfo,
@@ -121,7 +121,11 @@ where
 		Base::provider_is_feeless().saturating_add(VaultProviderWeight::is_owner())
 	}
 	fn provider_account_position() -> Weight {
-		Base::provider_account_position()
+		// Match the existing 101-Lock registration workload, including each Lock's Fissions.
+		// This is a benchmark profile, not a bound on the owner's Lock count.
+		Base::provider_account_position().saturating_add(
+			FissionsProviderWeight::get_lock_fission_guarantees().saturating_mul(101),
+		)
 	}
 
 	fn create_receive_address() -> Weight {
@@ -149,11 +153,13 @@ where
 
 	fn on_initialize_expiring_locks(n: u32) -> Weight {
 		Base::on_initialize_expiring_locks(n)
+			.saturating_add(VaultProviderWeight::burn().saturating_mul(
+				u64::from(n).saturating_mul(u64::from(<T as pallet_bitcoin_fissions::Config>::MaxFissionsPerLock::get()).saturating_add(1)),
+			))
 			.saturating_add(UtxoTrackerWeights::<T>::unwatch().saturating_mul(n.into()))
 			.saturating_add(PositionWeights::<T>::position_updated().saturating_mul(n.into()))
 			.saturating_add(
-				FissionsProviderWeight::get_lock_fission_redemption_bases()
-					.saturating_mul(n.into()),
+				FissionsProviderWeight::get_lock_fission_guarantees().saturating_mul(n.into()),
 			)
 			.saturating_add(FissionsProviderWeight::close_for_lock().saturating_mul(n.into()))
 	}
@@ -187,25 +193,30 @@ where
 		Base::cosign_orphaned_utxo_release().saturating_add(UtxoTrackerWeights::<T>::unwatch_utxo())
 	}
 
-	fn resecuritize() -> Weight {
-		Base::resecuritize()
+	fn set_guarantee() -> Weight {
+		Base::set_guarantee()
 			.saturating_add(PositionWeights::<T>::position_updated())
 			.saturating_add(VaultProviderWeight::resecuritize())
-			.saturating_add(FissionsProviderWeight::get_lock_fission_requirements())
 	}
 
 	fn set_flexible() -> Weight {
-		Base::set_flexible().saturating_add(VaultProviderWeights::<T>::set_bitcoin_lock_flexible())
+		Base::set_flexible()
+			.saturating_add(FissionsProviderWeight::get_lock_fission_guarantees())
+			.saturating_add(VaultProviderWeights::<T>::set_bitcoin_lock_flexible())
 	}
 
 	fn provider_fission_satoshis() -> Weight {
 		Base::provider_fission_satoshis()
-			.saturating_add(FissionsProviderWeight::get_lock_fission_requirements())
+			.saturating_add(PositionWeights::<T>::position_updated())
+			// Conservatively cover the optional guarantee purchase and funding update
+			// with the existing replacement weights.
+			.saturating_add(VaultProviderWeight::resecuritize().saturating_mul(3))
 	}
 
-	fn provider_validate_fission() -> Weight {
-		Base::provider_validate_fission()
-			.saturating_add(FissionsProviderWeight::get_lock_fission_requirements())
+	fn provider_update_fission_guarantee() -> Weight {
+		Base::provider_update_fission_guarantee()
+			.saturating_add(PositionWeights::<T>::position_updated())
+			.saturating_add(VaultProviderWeight::resecuritize())
 	}
 
 	fn provider_calculate_liquidity_promised() -> Weight {
@@ -214,6 +225,9 @@ where
 
 	fn provider_fuse_satoshis() -> Weight {
 		Base::provider_fuse_satoshis()
+			.saturating_add(PositionWeights::<T>::position_updated())
+			// Bound the Vault funding update with existing replacement weights.
+			.saturating_add(VaultProviderWeight::resecuritize().saturating_mul(2))
 	}
 
 	fn provider_utxo_detected() -> Weight {
@@ -222,8 +236,13 @@ where
 			.saturating_add(UtxoTrackerWeights::<T>::unwatch_utxo().saturating_mul(max_utxos))
 			.saturating_add(UtxoTrackerWeights::<T>::unwatch())
 			.saturating_add(PositionWeights::<T>::position_updated().saturating_mul(2))
-			.saturating_add(VaultProviderWeight::burn())
-			.saturating_add(FissionsProviderWeight::get_lock_fission_redemption_bases())
+			.saturating_add(
+				VaultProviderWeight::burn().saturating_mul(
+					u64::from(<T as pallet_bitcoin_fissions::Config>::MaxFissionsPerLock::get())
+						.saturating_add(1),
+				),
+			)
+			.saturating_add(FissionsProviderWeight::get_lock_fission_guarantees())
 			.saturating_add(FissionsProviderWeight::close_for_lock())
 	}
 
@@ -233,8 +252,13 @@ where
 				UtxoTrackerWeights::<T>::unwatch().max(UtxoTrackerWeights::<T>::unwatch_utxo()),
 			)
 			.saturating_add(PositionWeights::<T>::position_updated().saturating_mul(2))
-			.saturating_add(VaultProviderWeight::burn())
-			.saturating_add(FissionsProviderWeight::get_lock_fission_redemption_bases())
+			.saturating_add(
+				VaultProviderWeight::burn().saturating_mul(
+					u64::from(<T as pallet_bitcoin_fissions::Config>::MaxFissionsPerLock::get())
+						.saturating_add(1),
+				),
+			)
+			.saturating_add(FissionsProviderWeight::get_lock_fission_guarantees())
 			.saturating_add(FissionsProviderWeight::close_for_lock())
 	}
 }
@@ -259,8 +283,8 @@ impl<T: Config> BitcoinFissionLockProviderWeightInfo for ProviderWeightAdapter<T
 		<T as Config>::WeightInfo::provider_fission_satoshis()
 	}
 
-	fn validate_fission() -> Weight {
-		<T as Config>::WeightInfo::provider_validate_fission()
+	fn update_fission_guarantee() -> Weight {
+		<T as Config>::WeightInfo::provider_update_fission_guarantee()
 	}
 
 	fn calculate_liquidity_promised() -> Weight {
@@ -319,7 +343,7 @@ impl WeightInfo for () {
 	fn cosign_orphaned_utxo_release() -> Weight {
 		Weight::zero()
 	}
-	fn resecuritize() -> Weight {
+	fn set_guarantee() -> Weight {
 		Weight::zero()
 	}
 	fn set_flexible() -> Weight {
@@ -328,7 +352,7 @@ impl WeightInfo for () {
 	fn provider_fission_satoshis() -> Weight {
 		Weight::zero()
 	}
-	fn provider_validate_fission() -> Weight {
+	fn provider_update_fission_guarantee() -> Weight {
 		Weight::zero()
 	}
 	fn provider_calculate_liquidity_promised() -> Weight {

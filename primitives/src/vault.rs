@@ -4,10 +4,13 @@ use core::iter::Sum;
 use frame_support::{weights::Weight, PalletError};
 use polkadot_sdk::{sp_core::ConstU32, sp_runtime::BoundedBTreeMap, *};
 use scale_info::TypeInfo;
-use sp_arithmetic::{FixedPointNumber, FixedU128, Permill};
+use sp_arithmetic::{
+	helpers_128bit::multiply_by_rational_with_rounding, FixedPointNumber, FixedU128, Permill,
+	Rounding,
+};
 use sp_core::blake2_256;
 use sp_runtime::{
-	traits::{AtLeast32BitUnsigned, Saturating, Verify, Zero},
+	traits::{AtLeast32BitUnsigned, SaturatedConversion, Saturating, Verify, Zero},
 	AccountId32,
 };
 
@@ -161,7 +164,7 @@ pub struct VaultSecuritization<Balance, AccountId> {
 	pub vault_id: VaultId,
 	pub operator_account_id: AccountId,
 	pub securitization: Balance,
-	/// Collateral activated by confirmed Bitcoin funding.
+	/// Securitization activated by confirmed Bitcoin funding.
 	pub activated_securitization: Balance,
 	/// Confirmed Bitcoin locked in this vault.
 	pub bitcoin_locked_satoshis: Satoshis,
@@ -204,8 +207,8 @@ pub type VaultSecuritizationRanking<Balance, AccountId> =
 /// Public participation capacity in an open vault, denominated in microgons.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct VaultParticipationCapacity<Balance> {
-	/// Additional collateral available for a new regular Bitcoin lock's term, including
-	/// replaceable flexible collateral and respecting reserved space and withdrawal deadlines.
+	/// Securitization available for a new regular Bitcoin Lock, including replaceable flexible
+	/// securitization and respecting reserved space and withdrawal deadlines.
 	pub available_securitization_space: Balance,
 	/// Total regular-bond admission capacity after withdrawal notices. Treasury subtracts
 	/// existing regular bonds and reserved space. Flexible bonds can be displaced by new
@@ -283,57 +286,6 @@ pub trait TreasuryVaultProvider {
 	) -> sp_runtime::DispatchResult;
 }
 
-pub struct LockExtension<Balance> {
-	pub extended_expiration_funds: BoundedBTreeMap<BitcoinHeight, Balance, ConstU32<366>>,
-	pub lock_expiration: BitcoinHeight,
-}
-
-impl<Balance: Codec + MaxEncodedLen> LockExtension<Balance> {
-	pub fn new(lock_expiration: BitcoinHeight) -> Self {
-		Self { extended_expiration_funds: Default::default(), lock_expiration }
-	}
-
-	pub fn expiration_day(&self) -> BitcoinHeight {
-		get_rounded_up_bitcoin_day_height(self.lock_expiration)
-	}
-
-	/// Split collateral across inherited later maturities, then the Bitcoin Lock's own expiry.
-	pub fn collateral_expirations(
-		&self,
-		collateral: Balance,
-	) -> impl Iterator<Item = (BitcoinHeight, Balance)> + '_
-	where
-		Balance: Copy + AtLeast32BitUnsigned,
-	{
-		let mut remaining = collateral;
-		self.extended_expiration_funds
-			.iter()
-			.map(|(height, amount)| (*height, *amount))
-			.chain(core::iter::once((self.expiration_day(), collateral)))
-			.filter_map(move |(height, amount)| {
-				let amount = remaining.min(amount);
-				remaining.saturating_reduce(amount);
-				(!amount.is_zero()).then_some((height, amount))
-			})
-	}
-
-	pub fn len(&self) -> usize {
-		self.extended_expiration_funds.len()
-	}
-
-	pub fn is_empty(&self) -> bool {
-		self.extended_expiration_funds.is_empty()
-	}
-
-	pub fn contains_key(&self, key: &BitcoinHeight) -> bool {
-		self.extended_expiration_funds.contains_key(key)
-	}
-
-	pub fn get(&self, key: &BitcoinHeight) -> Option<&Balance> {
-		self.extended_expiration_funds.get(key)
-	}
-}
-
 #[derive(
 	Clone,
 	Copy,
@@ -356,6 +308,9 @@ where
 	/// Microgon value per BTC if Argon were trading at its target price.
 	#[codec(compact)]
 	pub microgons_at_target_per_btc: Balance,
+	/// Tick of the validated BTC basis in price history.
+	#[codec(compact)]
+	pub tick: Tick,
 }
 
 impl<Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned>
@@ -367,92 +322,130 @@ impl<Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned>
 	}
 }
 
-#[derive(Clone, Copy)]
-pub struct BitcoinSecuritization<Balance>
+/// Purchased cosigner coverage at a recorded Bitcoin basis, owned by one Lock or Fission.
+#[derive(
+	Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen,
+)]
+pub struct CosignerGuarantee<Balance>
 where
 	Balance: Codec + MaxEncodedLen,
 {
-	/// Bitcoin amount and valuation used to price this securitization.
 	pub basis: BitcoinSecuritizationBasis<Balance>,
-	/// Required securitization after applying the redemption curve.
-	pub securitization_microgons: Balance,
+	/// Paid coverage in microgons, preserved when guarantees are split or merged.
+	#[codec(compact)]
+	pub guaranteed_microgons: Balance,
+	/// Allocated securitization amounts and their release dates beyond the Bitcoin Lock's expiry.
+	pub fund_hold_extensions: BoundedBTreeMap<
+		BitcoinHeight,
+		Balance,
+		ConstU32<MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES>,
+	>,
 }
 
 impl<Balance: Codec + Copy + MaxEncodedLen + Default + AtLeast32BitUnsigned>
-	BitcoinSecuritization<Balance>
+	CosignerGuarantee<Balance>
 {
-	pub fn btc_value_in_microgons(&self) -> Balance {
-		self.basis.btc_value_in_microgons()
-	}
-
 	pub fn securitized_satoshis(&self, funded_satoshis: Satoshis) -> Satoshis {
 		funded_satoshis.min(self.basis.satoshis)
 	}
 
-	pub fn securitization_for_satoshis(&self, funded_satoshis: Satoshis) -> Balance {
+	/// Securitization allocated to the given satoshis, capped at the guarantee and rounded down.
+	pub fn securitization_for_satoshis(&self, satoshis: Satoshis) -> Balance {
 		if self.basis.satoshis == 0 {
 			return Balance::zero();
 		}
-		FixedU128::from_rational(
-			self.securitized_satoshis(funded_satoshis) as u128,
-			self.basis.satoshis as u128,
-		)
-		.saturating_mul_int(self.securitization_microgons)
-	}
+		if satoshis >= self.basis.satoshis {
+			return self.guaranteed_microgons;
+		}
 
-	pub fn securitization_between(
-		&self,
-		lower_funded_satoshis: Satoshis,
-		upper_funded_satoshis: Satoshis,
-	) -> Balance {
-		self.securitization_for_satoshis(upper_funded_satoshis)
-			.saturating_sub(self.securitization_for_satoshis(lower_funded_satoshis))
+		let amount = multiply_by_rational_with_rounding(
+			self.guaranteed_microgons.saturated_into::<u128>(),
+			satoshis.into(),
+			self.basis.satoshis.into(),
+			Rounding::Down,
+		)
+		.expect("a proportional portion cannot exceed its original guarantee");
+		Balance::saturated_from(amount)
 	}
 
 	pub fn unactivated_securitization(&self, funded_satoshis: Satoshis) -> Balance {
-		self.securitization_microgons
+		self.guaranteed_microgons
 			.saturating_sub(self.securitization_for_satoshis(funded_satoshis))
+	}
+
+	/// Assign securitization to its hold extensions, then the Bitcoin Lock's own expiry.
+	pub fn collateral_expirations(
+		&self,
+		lock_expiration: BitcoinHeight,
+		collateral: Balance,
+	) -> impl Iterator<Item = (BitcoinHeight, Balance)> + '_ {
+		let mut remaining = collateral;
+		self.fund_hold_extensions
+			.iter()
+			.map(|(height, amount)| (*height, *amount))
+			.chain(core::iter::once((
+				get_rounded_up_bitcoin_day_height(lock_expiration),
+				collateral,
+			)))
+			.filter_map(move |(height, amount)| {
+				let amount = remaining.min(amount);
+				remaining.saturating_reduce(amount);
+				(!amount.is_zero()).then_some((height, amount))
+			})
+	}
+
+	/// Take part of this guarantee, carrying its securitization hold extensions.
+	pub fn take_portion(
+		&mut self,
+		satoshis: Satoshis,
+		guaranteed_microgons: Balance,
+	) -> Option<Self> {
+		let remaining_satoshis = self.basis.satoshis.checked_sub(satoshis)?;
+		let remaining_microgons = self.guaranteed_microgons.checked_sub(&guaranteed_microgons)?;
+
+		let mut extensions = self.fund_hold_extensions.clone();
+		let mut to_assign = guaranteed_microgons;
+		for ((_, remaining), (_, assigned)) in
+			self.fund_hold_extensions.iter_mut().zip(extensions.iter_mut())
+		{
+			*assigned = (*remaining).min(to_assign);
+			remaining.saturating_reduce(*assigned);
+			to_assign.saturating_reduce(*assigned);
+		}
+		extensions.retain(|_, amount| !amount.is_zero());
+		self.fund_hold_extensions.retain(|_, amount| !amount.is_zero());
+		self.guaranteed_microgons = remaining_microgons;
+		self.basis.satoshis = remaining_satoshis;
+
+		Some(Self {
+			basis: BitcoinSecuritizationBasis { satoshis, ..self.basis },
+			guaranteed_microgons,
+			fund_hold_extensions: extensions,
+		})
 	}
 }
 
-pub struct BitcoinLockFundingUpdate<Balance> {
-	/// Confirmed satoshis added to or removed from the Vault's Locks.
+/// Absolute funding and activated securitization contributed to a Vault.
+/// Replacements supply both the previous and new contribution; these are not deltas.
+#[derive(Clone, Copy, Default)]
+pub struct BitcoinLockFunding<Balance> {
+	/// Confirmed Bitcoin in the affected contribution.
 	pub funded_satoshis: Satoshis,
-	/// The subset moving between pending and activated securitization.
+	/// Confirmed Bitcoin covered by the affected guarantee(s).
 	pub securitized_satoshis: Satoshis,
-	/// Securitization corresponding to the change in `securitized_satoshis`.
-	pub securitization_microgons: Balance,
-	/// Whether the Lock uses flexible vault collateral.
+	/// Activated securitization in the affected contribution.
+	pub activated_securitization: Balance,
+	/// Whether the Lock uses flexible vault securitization.
 	pub is_flexible: bool,
 }
 
 pub struct ReserveSecuritizationRequest<Balance> {
+	pub remaining_term: FixedU128,
+	pub is_flexible: bool,
 	/// Fee coupon value supplied by the Lock owner.
 	pub fee_discount: Balance,
 	/// Full Bitcoin commitment expiry for this reservation.
 	pub lock_expiration: BitcoinHeight,
-	/// Aggregate vault securitization space released for this operation.
-	pub securitization_space_to_unreserve: Balance,
-}
-
-pub struct BitcoinResecuritization<'a, Balance>
-where
-	Balance: Codec + MaxEncodedLen,
-{
-	/// Existing Lock securitization to replace.
-	pub current: &'a BitcoinSecuritization<Balance>,
-	/// New Lock securitization.
-	pub replacement: &'a BitcoinSecuritization<Balance>,
-	/// Confirmed satoshis attached to the Lock, used to derive both covered portions.
-	pub funded_satoshis: Satoshis,
-	/// Fraction of the original Lock term still remaining.
-	pub remaining_term: FixedU128,
-	/// Existing collateral extensions, updated for the replacement.
-	pub lock_extension: &'a mut LockExtension<Balance>,
-	/// Whether the Lock uses flexible vault collateral.
-	pub is_flexible: bool,
-	/// Fee coupon value supplied by the Lock owner.
-	pub fee_discount: Balance,
 	/// Aggregate vault securitization space released for this operation.
 	pub securitization_space_to_unreserve: Balance,
 }
@@ -491,83 +484,74 @@ pub trait BitcoinVaultProvider {
 	) -> Result<(), VaultError>;
 	fn account_became_operational(_vault_operator_account: &Self::AccountId) {}
 
-	/// Record a newly detected UTXO and activate the portion of this Lock's reserved
-	/// securitization covered by its cumulative funding.
+	/// Replace the affected funding and coverage contribution. Unchanged positions are omitted.
 	fn record_bitcoin_lock_funding(
 		vault_id: VaultId,
-		update: BitcoinLockFundingUpdate<Self::Balance>,
+		before: BitcoinLockFunding<Self::Balance>,
+		after: BitcoinLockFunding<Self::Balance>,
 	) -> Result<(), VaultError>;
 
-	/// Record confirmed satoshis removed from a Lock while preserving its securitization contract.
-	fn record_bitcoin_lock_funding_reduction(
-		vault_id: VaultId,
-		update: BitcoinLockFundingUpdate<Self::Balance>,
-	) -> Result<(), VaultError>;
-
-	/// Return projected `(flexible requirement, undisplaced flexible requirement)` after replacing
-	/// a funded flexible lock's released securitization with its newly added securitization.
-	fn get_projected_flexible_securitization(
-		vault_id: VaultId,
-		flexible_securitization_released: Self::Balance,
-		flexible_securitization_added: Self::Balance,
-	) -> Option<(Self::Balance, Self::Balance)>;
-
-	/// Move a funded Bitcoin lock's activated securitization into or out of the vault's flexible
-	/// totals.
+	/// Reclassify the activated securitization of a Lock and its Fissions in the Vault's flexible
+	/// total.
 	fn set_bitcoin_lock_flexible(
 		vault_id: VaultId,
-		securitization: &BitcoinSecuritization<Self::Balance>,
-		securitized_satoshis: Satoshis,
+		activated_securitization: Self::Balance,
 		is_flexible: bool,
 	) -> Result<(), VaultError>;
 
-	/// Lock vault collateral for a Bitcoin Lock and mark it pending until matching Bitcoin funding
-	/// is confirmed.
+	/// Allocate vault securitization to a Bitcoin Lock, pending confirmation of Bitcoin funding.
 	fn reserve_securitization(
 		vault_id: VaultId,
 		locker: &Self::AccountId,
-		securitization: &BitcoinSecuritization<Self::Balance>,
+		securitization: &CosignerGuarantee<Self::Balance>,
 		request: ReserveSecuritizationRequest<Self::Balance>,
 	) -> Result<(Self::Balance, Self::Balance), VaultError>;
 
-	/// Replace all securitization terms for one Lock while preserving its funded Bitcoin.
+	/// Replace the cosigner guarantee; Bitcoin stays in the Lock.
 	fn resecuritize(
 		_vault_id: VaultId,
 		_locker: &Self::AccountId,
-		_request: BitcoinResecuritization<'_, Self::Balance>,
+		_current: &CosignerGuarantee<Self::Balance>,
+		_replacement: &mut CosignerGuarantee<Self::Balance>,
+		_funded_satoshis: Satoshis,
+		_request: ReserveSecuritizationRequest<Self::Balance>,
 	) -> Result<(Self::Balance, Self::Balance), VaultError> {
 		Err(VaultError::InternalError)
 	}
 
-	/// End a funded Bitcoin Lock's current securitization. Unactivated collateral is released
-	/// immediately; collateral backing confirmed Bitcoin is released on the Lock's schedule.
+	/// Release excess securitization after its funding is reconciled. With
+	/// `release_unused_immediately`, only hold extensions remain scheduled; otherwise all release
+	/// dates are preserved.
+	fn shrink_securitization(
+		_vault_id: VaultId,
+		_released: &CosignerGuarantee<Self::Balance>,
+		_lock_expiration: BitcoinHeight,
+		_release_unused_immediately: bool,
+	) -> Result<(), VaultError> {
+		Err(VaultError::InternalError)
+	}
+
+	/// Release a Bitcoin Lock's allocated securitization, preserving its release restrictions.
+	/// Unactivated securitization without hold extensions is released immediately.
 	fn release_bitcoin_lock_securitization(
 		vault_id: VaultId,
-		current_securitization: &BitcoinSecuritization<Self::Balance>,
-		lock_funded_satoshis: Satoshis,
-		lock_extension: &LockExtension<Self::Balance>,
+		securitization: &CosignerGuarantee<Self::Balance>,
+		funded_satoshis: Satoshis,
+		lock_expiration: BitcoinHeight,
 		is_flexible: bool,
 	) -> Result<(), VaultError>;
 
-	/// Release the portion of a Lock's reservation that its confirmed funding did not activate.
-	fn release_unactivated_securitization(
-		vault_id: VaultId,
-		amount: Self::Balance,
-		lock_extension: &LockExtension<Self::Balance>,
-		retained_securitization: Self::Balance,
-	) -> Result<(), VaultError>;
-
-	/// Burn the funds from the vault. This will be called if a vault moves a bitcoin utxo outside
-	/// the system. It is assumed that the vault is in cahoots with the beneficiary.
+	/// Burn vault securitization if a vault moves a Bitcoin UTXO outside the system.
+	/// It is assumed that the vault is in cahoots with the beneficiary.
 	///
 	/// Returns the amount of argons that were burned
 	fn burn(
 		vault_id: VaultId,
-		securitization: &BitcoinSecuritization<Self::Balance>,
+		securitization: &CosignerGuarantee<Self::Balance>,
 		funded_satoshis: Satoshis,
-		market_rate: Self::Balance,
-		lock_extension: &LockExtension<Self::Balance>,
+		lock_expiration: BitcoinHeight,
 		is_flexible: bool,
+		market_rate: Self::Balance,
 	) -> Result<Self::Balance, VaultError>;
 
 	/// Pay the Bitcoin owner the lesser of the funded Lock's insurance and redemption amount
@@ -577,11 +561,11 @@ pub trait BitcoinVaultProvider {
 	fn compensate_lost_bitcoin(
 		vault_id: VaultId,
 		beneficiary: &Self::AccountId,
-		securitization: &BitcoinSecuritization<Self::Balance>,
+		securitization: &CosignerGuarantee<Self::Balance>,
 		funded_satoshis: Satoshis,
-		redemption_amount: Self::Balance,
-		lock_extension: &LockExtension<Self::Balance>,
+		lock_expiration: BitcoinHeight,
 		is_flexible: bool,
+		redemption_amount: Self::Balance,
 	) -> Result<LostBitcoinCompensation<Self::Balance>, VaultError>;
 
 	fn create_utxo_script_pubkey(
@@ -652,10 +636,10 @@ pub struct SecuritizationScheduleEntry<Balance>
 where
 	Balance: HasCompact + MaxEncodedLen,
 {
-	/// Collateral still backing Bitcoin until this entry's release height.
+	/// Securitization allocated to Bitcoin guarantees until this entry's release height.
 	#[codec(compact)]
 	pub locked_commitments: Balance,
-	/// Collateral freed from Bitcoin but held through its original commitment; it can be reused.
+	/// Securitization released from guarantees but still held until this height; it can be reused.
 	#[codec(compact)]
 	pub relockable_commitments: Balance,
 	/// Whole Argon withdrawal due at this height, denominated in microgons.
@@ -853,7 +837,7 @@ impl<
 			.sum()
 	}
 
-	/// Check each withdrawal deadline crossed by the new collateral commitment.
+	/// Check each withdrawal deadline crossed by the new securitization commitment.
 	pub fn ensure_withdrawal_capacity(&self) -> Result<(), VaultError> {
 		let mut committed = Balance::zero();
 		let mut withdrawals = Balance::zero();
@@ -881,16 +865,17 @@ impl<
 		Ok(())
 	}
 
-	/// Add or remove an interval of a Lock's collateral, preserving inherited later expirations.
+	/// Update a portion of the Lock's securitization commitments, preserving later release dates.
 	pub fn update_locked_commitments(
 		&mut self,
-		lock_extension: &LockExtension<Balance>,
+		guarantee: &CosignerGuarantee<Balance>,
+		lock_expiration: BitcoinHeight,
 		mut offset: Balance,
 		mut amount: Balance,
 		accrue: bool,
 	) -> Result<(), VaultError> {
 		for (height, extended) in
-			lock_extension.collateral_expirations(amount.saturating_add(offset))
+			guarantee.collateral_expirations(lock_expiration, amount.saturating_add(offset))
 		{
 			let skipped = offset.min(extended);
 			offset.saturating_reduce(skipped);
@@ -916,19 +901,6 @@ impl<
 		self.flexible_securitization_locked.min(self.securitization_space())
 	}
 
-	pub fn projected_flexible_securitization(
-		&self,
-		flexible_securitization_released: Balance,
-		flexible_securitization_added: Balance,
-	) -> (Balance, Balance) {
-		let flexible_securitization = self
-			.flexible_securitization_locked
-			.saturating_sub(flexible_securitization_released)
-			.saturating_add(flexible_securitization_added);
-		let undisplaced = flexible_securitization.min(self.securitization_space());
-		(flexible_securitization, undisplaced)
-	}
-
 	pub fn set_reserved_securitization_space(
 		&mut self,
 		reserved_securitization_space: Balance,
@@ -943,29 +915,26 @@ impl<
 
 	pub fn set_bitcoin_lock_flexible(
 		&mut self,
-		securitization: &BitcoinSecuritization<Balance>,
-		securitized_satoshis: Satoshis,
+		activated_securitization: Balance,
 		is_flexible: bool,
 	) -> Result<(), VaultError> {
-		let securitization_microgons =
-			securitization.securitization_for_satoshis(securitized_satoshis);
 		if is_flexible {
-			self.flexible_securitization_locked.saturating_accrue(securitization_microgons);
+			self.flexible_securitization_locked.saturating_accrue(activated_securitization);
 		} else {
 			// This reclassifies an existing flexible lock as regular, so its amounts must be
 			// present in the flexible totals before they are removed below.
 			ensure!(
-				securitization_microgons <= self.flexible_securitization_locked,
+				activated_securitization <= self.flexible_securitization_locked,
 				VaultError::InternalError
 			);
 			let regular_securitization_locked =
-				self.regular_securitization_locked().saturating_add(securitization_microgons);
+				self.regular_securitization_locked().saturating_add(activated_securitization);
 			ensure!(
 				regular_securitization_locked.saturating_add(self.reserved_securitization_space) <=
 					self.securitization,
 				VaultError::InsufficientVaultFunds
 			);
-			self.flexible_securitization_locked.saturating_reduce(securitization_microgons);
+			self.flexible_securitization_locked.saturating_reduce(activated_securitization);
 		}
 		self.debug_assert_invariants_at("set_bitcoin_lock_flexible:after");
 		Ok(())
@@ -973,10 +942,10 @@ impl<
 
 	pub fn burn(
 		&mut self,
-		securitization: &BitcoinSecuritization<Balance>,
+		securitization: &CosignerGuarantee<Balance>,
 		funded_satoshis: Satoshis,
 		market_rate: Balance,
-		lock_extension: &LockExtension<Balance>,
+		lock_expiration: BitcoinHeight,
 		is_flexible: bool,
 	) -> Result<BurnResult<Balance>, VaultError> {
 		ensure!(funded_satoshis <= self.total_satoshis, VaultError::InternalError);
@@ -985,16 +954,17 @@ impl<
 			securitization.securitization_for_satoshis(securitized_satoshis);
 		let unactivated = securitization.unactivated_securitization(securitized_satoshis);
 		self.update_locked_commitments(
-			lock_extension,
+			securitization,
+			lock_expiration,
 			Balance::zero(),
-			securitization.securitization_microgons,
+			securitization.guaranteed_microgons,
 			false,
 		)?;
 		self.release_unactivated_securitization(unactivated)?;
 
 		let burn_from_lock = securitization_microgons.min(market_rate);
-		// A terminal Bitcoin spend can owe more than this Lock's collateral. Draw unused
-		// vault securitization without taking collateral from other Locks or reservations.
+		// A terminal Bitcoin spend can owe more than this Lock's securitization. Draw unused
+		// vault securitization without taking amounts allocated to other Locks or reservations.
 		let additional_available = self
 			.securitization
 			.saturating_sub(self.securitization_locked)
@@ -1042,10 +1012,12 @@ impl<
 		}
 
 		let amount_to_future_release = securitization_microgons.saturating_sub(burn_from_lock);
+		ensure!(securitized_satoshis <= self.securitized_satoshis, VaultError::InternalError);
+		self.securitized_satoshis.saturating_reduce(securitized_satoshis);
 		let release_height = self.schedule_release(
 			amount_to_future_release,
-			securitized_satoshis,
-			lock_extension,
+			securitization,
+			lock_expiration,
 			is_flexible,
 		)?;
 		self.total_satoshis.saturating_reduce(funded_satoshis);
@@ -1059,14 +1031,14 @@ impl<
 		})
 	}
 
-	/// Reserve collateral for a full term while the underlying Bitcoin is pending.
+	/// Reserve securitization for a full term while the Bitcoin is pending.
 	pub fn reserve_securitization(
 		&mut self,
-		securitization: &BitcoinSecuritization<Balance>,
+		securitization: &CosignerGuarantee<Balance>,
 		may_use_flexible_space: bool,
 		lock_expiration: BitcoinHeight,
 	) -> Result<(), VaultError> {
-		let securitization_microgons = securitization.securitization_microgons;
+		let securitization_microgons = securitization.guaranteed_microgons;
 		let available =
 			self.available_securitization_space(may_use_flexible_space, Some(lock_expiration));
 		ensure!(securitization_microgons <= available, VaultError::InsufficientVaultFunds);
@@ -1075,12 +1047,12 @@ impl<
 		self.securitization_locked.saturating_accrue(remaining);
 		self.securitization_pending_activation
 			.saturating_accrue(securitization_microgons);
-		self.update_locked_commitments(
-			&LockExtension::new(lock_expiration),
-			Balance::zero(),
-			securitization_microgons,
-			true,
-		)?;
+		if !securitization_microgons.is_zero() {
+			self.scheduled_release(get_rounded_up_bitcoin_day_height(lock_expiration))?
+				.locked_commitments
+				.saturating_accrue(securitization_microgons);
+		}
+		self.securitization_release_schedule.retain(|_, entry| !entry.is_empty());
 		self.ensure_withdrawal_capacity()?;
 		self.debug_assert_invariants_at("reserve_securitization:after");
 
@@ -1096,12 +1068,12 @@ impl<
 	/// Modifies lock extensions for the securitization locked beyond the max expiration
 	pub fn extend_lock(
 		&mut self,
-		securitization: &BitcoinSecuritization<Balance>,
-		lock_extension: &mut LockExtension<Balance>,
+		guarantee: &mut CosignerGuarantee<Balance>,
+		lock_expiration: BitcoinHeight,
 		is_flexible: bool,
 		may_use_flexible_space: bool,
 	) -> Result<(), VaultError> {
-		let securitization_microgons = securitization.securitization_microgons;
+		let securitization_microgons = guarantee.guaranteed_microgons;
 		// Flexible extensions replace capacity that can already back reservations.
 		let available_securitization = if is_flexible {
 			self.securitization_space().saturating_sub(self.flexible_securitization_locked)
@@ -1114,10 +1086,8 @@ impl<
 		);
 
 		// 1. Use the relockable argons within the max expiration
-		let mut remaining = self.use_relockable_securitization(
-			securitization_microgons,
-			Some(lock_extension.lock_expiration),
-		);
+		let mut remaining =
+			self.use_relockable_securitization(securitization_microgons, Some(lock_expiration));
 
 		// 2. Use any available *unlocked* securitization (exclude anything still scheduled for
 		//    release).
@@ -1134,7 +1104,7 @@ impl<
 
 		// 3. Use any remaining scheduled for release beyond the max expiration
 		if !remaining.is_zero() {
-			let max_expiration = lock_extension.expiration_day();
+			let max_expiration = get_rounded_up_bitcoin_day_height(lock_expiration);
 			for (height, entry) in self.securitization_release_schedule.iter_mut() {
 				let amount_to_use = remaining.min(entry.relockable_commitments);
 				if amount_to_use.is_zero() {
@@ -1146,7 +1116,7 @@ impl<
 
 				if *height > max_expiration {
 					Self::increment_scheduled_expiration(
-						&mut lock_extension.extended_expiration_funds,
+						&mut guarantee.fund_hold_extensions,
 						amount_to_use,
 						height,
 					)?;
@@ -1165,7 +1135,8 @@ impl<
 			self.flexible_securitization_locked.saturating_accrue(securitization_microgons);
 		}
 		self.update_locked_commitments(
-			lock_extension,
+			guarantee,
+			lock_expiration,
 			Balance::zero(),
 			securitization_microgons,
 			true,
@@ -1191,105 +1162,51 @@ impl<
 
 	pub fn record_bitcoin_lock_funding(
 		&mut self,
-		update: BitcoinLockFundingUpdate<Balance>,
+		before: BitcoinLockFunding<Balance>,
+		after: BitcoinLockFunding<Balance>,
 	) -> Result<(), VaultError> {
-		let BitcoinLockFundingUpdate {
-			funded_satoshis,
-			securitized_satoshis,
-			securitization_microgons,
-			is_flexible,
-		} = update;
-		ensure!(securitized_satoshis <= funded_satoshis, VaultError::InternalError);
+		ensure!(before.funded_satoshis <= self.total_satoshis, VaultError::InternalError);
 		ensure!(
-			securitization_microgons <= self.securitization_pending_activation,
+			before.securitized_satoshis <= self.securitized_satoshis,
 			VaultError::InternalError
 		);
-		self.securitization_pending_activation
-			.saturating_reduce(securitization_microgons);
-		self.total_satoshis.saturating_accrue(funded_satoshis);
-		self.securitized_satoshis.saturating_accrue(securitized_satoshis);
-
-		if is_flexible {
-			self.flexible_securitization_locked.saturating_accrue(securitization_microgons);
-		}
-		self.debug_assert_invariants_at("record_bitcoin_lock_funding:after");
-		Ok(())
-	}
-
-	pub fn record_bitcoin_lock_funding_reduction(
-		&mut self,
-		update: BitcoinLockFundingUpdate<Balance>,
-	) -> Result<(), VaultError> {
-		let BitcoinLockFundingUpdate {
-			funded_satoshis,
-			securitized_satoshis,
-			securitization_microgons,
-			is_flexible,
-		} = update;
-		ensure!(securitized_satoshis <= funded_satoshis, VaultError::InternalError);
-		ensure!(funded_satoshis <= self.total_satoshis, VaultError::InternalError);
-		ensure!(securitized_satoshis <= self.securitized_satoshis, VaultError::InternalError);
 		ensure!(
-			self.securitization_pending_activation.saturating_add(securitization_microgons) <=
-				self.securitization_locked,
+			before.activated_securitization <= self.get_activated_securitization(),
 			VaultError::InternalError
 		);
-		if is_flexible {
+		let total_satoshis = self
+			.total_satoshis
+			.saturating_sub(before.funded_satoshis)
+			.saturating_add(after.funded_satoshis);
+		let securitized_satoshis = self
+			.securitized_satoshis
+			.saturating_sub(before.securitized_satoshis)
+			.saturating_add(after.securitized_satoshis);
+		let activated = self
+			.get_activated_securitization()
+			.saturating_sub(before.activated_securitization)
+			.saturating_add(after.activated_securitization);
+		ensure!(securitized_satoshis <= total_satoshis, VaultError::InternalError);
+		ensure!(activated <= self.securitization_locked, VaultError::InternalError);
+		if after.is_flexible {
 			ensure!(
-				securitization_microgons <= self.flexible_securitization_locked,
+				before.activated_securitization <= self.flexible_securitization_locked,
 				VaultError::InternalError
 			);
 		}
 
-		self.total_satoshis.saturating_reduce(funded_satoshis);
-		self.securitization_pending_activation
-			.saturating_accrue(securitization_microgons);
-		self.securitized_satoshis.saturating_reduce(securitized_satoshis);
-
-		if is_flexible {
-			self.flexible_securitization_locked.saturating_reduce(securitization_microgons);
+		self.total_satoshis = total_satoshis;
+		self.securitized_satoshis = securitized_satoshis;
+		self.securitization_pending_activation =
+			self.securitization_locked.saturating_sub(activated);
+		if after.is_flexible {
+			self.flexible_securitization_locked = self
+				.flexible_securitization_locked
+				.saturating_sub(before.activated_securitization)
+				.saturating_add(after.activated_securitization);
 		}
-		self.debug_assert_invariants_at("record_bitcoin_lock_funding_reduction:after");
+		self.debug_assert_invariants_at("record_bitcoin_lock_funding:after");
 		Ok(())
-	}
-
-	#[allow(clippy::too_many_arguments)]
-	pub fn replace_securitization(
-		&mut self,
-		current: &BitcoinSecuritization<Balance>,
-		replacement: &BitcoinSecuritization<Balance>,
-		funded_satoshis: Satoshis,
-		lock_extension: &mut LockExtension<Balance>,
-		is_flexible: bool,
-		may_use_flexible_space: bool,
-	) -> Result<BTreeSet<BitcoinHeight>, VaultError> {
-		let release_heights = self.unwind_bitcoin_lock_securitization(
-			current,
-			funded_satoshis,
-			lock_extension,
-			is_flexible,
-		)?;
-		let mut replacement_extension = LockExtension::new(lock_extension.lock_expiration);
-		self.extend_lock(
-			replacement,
-			&mut replacement_extension,
-			is_flexible,
-			may_use_flexible_space,
-		)?;
-		let replacement_securitized_satoshis = replacement.securitized_satoshis(funded_satoshis);
-		let replacement_unactivated_securitization =
-			replacement.unactivated_securitization(replacement_securitized_satoshis);
-		self.securitization_pending_activation
-			.saturating_accrue(replacement_unactivated_securitization);
-		if is_flexible {
-			self.flexible_securitization_locked
-				.saturating_reduce(replacement_unactivated_securitization);
-		}
-		self.securitized_satoshis.saturating_accrue(replacement_securitized_satoshis);
-		lock_extension.extended_expiration_funds = replacement_extension.extended_expiration_funds;
-		self.debug_assert_invariants_at("replace_securitization:after");
-
-		Ok(release_heights)
 	}
 
 	pub fn release_unactivated_securitization(
@@ -1305,15 +1222,19 @@ impl<
 
 	pub fn release_bitcoin_lock_securitization(
 		&mut self,
-		current_securitization: &BitcoinSecuritization<Balance>,
+		current_securitization: &CosignerGuarantee<Balance>,
 		lock_funded_satoshis: Satoshis,
-		lock_extension: &LockExtension<Balance>,
+		lock_expiration: BitcoinHeight,
 		is_flexible: bool,
 	) -> Result<BTreeSet<BitcoinHeight>, VaultError> {
+		ensure!(lock_funded_satoshis <= self.total_satoshis, VaultError::InternalError);
+		let covered_satoshis = current_securitization.securitized_satoshis(lock_funded_satoshis);
+		ensure!(covered_satoshis <= self.securitized_satoshis, VaultError::InternalError);
+		self.securitized_satoshis.saturating_reduce(covered_satoshis);
 		let release_heights = self.unwind_bitcoin_lock_securitization(
 			current_securitization,
-			lock_funded_satoshis,
-			lock_extension,
+			current_securitization.unactivated_securitization(lock_funded_satoshis),
+			lock_expiration,
 			is_flexible,
 		)?;
 		self.total_satoshis.saturating_reduce(lock_funded_satoshis);
@@ -1321,53 +1242,61 @@ impl<
 		Ok(release_heights)
 	}
 
-	fn unwind_bitcoin_lock_securitization(
+	pub fn unwind_bitcoin_lock_securitization(
 		&mut self,
-		current_securitization: &BitcoinSecuritization<Balance>,
-		lock_funded_satoshis: Satoshis,
-		lock_extension: &LockExtension<Balance>,
+		current_securitization: &CosignerGuarantee<Balance>,
+		unactivated: Balance,
+		lock_expiration: BitcoinHeight,
 		is_flexible: bool,
 	) -> Result<BTreeSet<BitcoinHeight>, VaultError> {
-		ensure!(lock_funded_satoshis <= self.total_satoshis, VaultError::InternalError);
-		let lock_securitized_satoshis =
-			current_securitization.securitized_satoshis(lock_funded_satoshis);
-		let securitization_to_schedule =
-			current_securitization.securitization_for_satoshis(lock_securitized_satoshis);
-		let unactivated_securitization_to_release =
-			current_securitization.unactivated_securitization(lock_securitized_satoshis);
+		ensure!(
+			unactivated <= current_securitization.guaranteed_microgons,
+			VaultError::InternalError
+		);
+		let activated = current_securitization.guaranteed_microgons.saturating_sub(unactivated);
 		self.update_locked_commitments(
-			lock_extension,
+			current_securitization,
+			lock_expiration,
 			Balance::zero(),
-			current_securitization.securitization_microgons,
+			current_securitization.guaranteed_microgons,
 			false,
 		)?;
-		self.release_unactivated_securitization(unactivated_securitization_to_release)?;
+		let inherited = current_securitization
+			.fund_hold_extensions
+			.values()
+			.copied()
+			.fold(Balance::zero(), |total, amount| total.saturating_add(amount));
+		let held_unactivated = inherited.saturating_sub(activated).min(unactivated);
+		self.release_unactivated_securitization(unactivated.saturating_sub(held_unactivated))?;
+		self.securitization_pending_activation.saturating_reduce(held_unactivated);
+		if is_flexible {
+			ensure!(activated <= self.flexible_securitization_locked, VaultError::InternalError);
+			self.flexible_securitization_locked.saturating_reduce(activated);
+		}
 		self.schedule_release(
-			securitization_to_schedule,
-			lock_securitized_satoshis,
-			lock_extension,
-			is_flexible,
+			activated.saturating_add(held_unactivated),
+			current_securitization,
+			lock_expiration,
+			false,
 		)
 	}
 
-	fn schedule_release(
+	pub fn schedule_release(
 		&mut self,
 		securitization_microgons: Balance,
-		securitized_satoshis: Satoshis,
-		lock_extension: &LockExtension<Balance>,
+		guarantee: &CosignerGuarantee<Balance>,
+		lock_expiration: BitcoinHeight,
 		is_flexible: bool,
 	) -> Result<BTreeSet<BitcoinHeight>, VaultError> {
 		let mut release_heights = BTreeSet::new();
 
-		// Move funded securitization out of active backing into reusable commitments, keeping
-		// inherited later maturities before assigning the rest to the Lock's own expiry.
+		// Move released securitization into reusable commitments, preserving hold extensions
+		// before assigning the rest to the Lock's own expiry.
 		ensure!(
 			securitization_microgons <= self.securitization_locked,
 			VaultError::InsufficientVaultFunds
 		);
 		self.securitization_locked.saturating_reduce(securitization_microgons);
-		ensure!(securitized_satoshis <= self.securitized_satoshis, VaultError::InternalError);
-		self.securitized_satoshis.saturating_reduce(securitized_satoshis);
 
 		if is_flexible {
 			ensure!(
@@ -1376,7 +1305,9 @@ impl<
 			);
 			self.flexible_securitization_locked.saturating_reduce(securitization_microgons);
 		}
-		for (height, amount) in lock_extension.collateral_expirations(securitization_microgons) {
+		for (height, amount) in
+			guarantee.collateral_expirations(lock_expiration, securitization_microgons)
+		{
 			release_heights.insert(height);
 			self.scheduled_release(height)?.relockable_commitments.saturating_accrue(amount);
 		}
@@ -1399,7 +1330,7 @@ impl<
 			.sum()
 	}
 
-	/// Schedule a whole withdrawal. Existing collateral keeps its Bitcoin maturity.
+	/// Schedule a whole withdrawal. Allocated securitization keeps its Bitcoin maturity.
 	pub fn request_securitization_exit(
 		&mut self,
 		amount: Balance,
@@ -1526,7 +1457,7 @@ impl<
 		}
 
 		// A full schedule must either already contain the new maturity or lose an entry
-		// when the reservation consumes relockable collateral.
+		// when the reservation consumes relockable securitization.
 		if self.securitization_release_schedule.len() ==
 			MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES as usize &&
 			!self.securitization_release_schedule.contains_key(&expiration_day)
@@ -1621,21 +1552,73 @@ impl<
 mod test {
 	use super::*;
 	use crate::Balance;
+	use alloc::collections::BTreeMap;
 	use polkadot_sdk::frame_support::assert_err;
 
 	#[test]
+	fn guarantee_portions_preserve_microgons_and_release_maturities() {
+		let mut guarantee = CosignerGuarantee {
+			basis: BitcoinSecuritizationBasis {
+				satoshis: 3,
+				microgons_at_target_per_btc: 99u128,
+				tick: 7,
+			},
+			guaranteed_microgons: 7,
+			fund_hold_extensions: BoundedBTreeMap::try_from(BTreeMap::from([(144, 5), (288, 2)]))
+				.unwrap(),
+		};
+		let original = guarantee.clone();
+		assert_eq!(guarantee.take_portion(4, 2), None);
+		assert_eq!(guarantee, original);
+		assert_eq!(guarantee.take_portion(1, 8), None);
+		assert_eq!(guarantee, original);
+
+		let portion = guarantee.take_portion(1, guarantee.securitization_for_satoshis(1)).unwrap();
+		assert_eq!((portion.basis.satoshis, portion.guaranteed_microgons), (1, 2));
+		assert_eq!((guarantee.basis.satoshis, guarantee.guaranteed_microgons), (2, 5));
+		assert_eq!(portion.basis.tick, 7);
+		assert_eq!(portion.fund_hold_extensions[&144], 2);
+		assert_eq!(guarantee.fund_hold_extensions[&144], 3);
+		assert_eq!(guarantee.fund_hold_extensions[&288], 2);
+		let rest = guarantee.take_portion(2, guarantee.securitization_for_satoshis(2)).unwrap();
+		assert_eq!(rest.guaranteed_microgons + portion.guaranteed_microgons, 7);
+		assert_eq!(guarantee.basis.satoshis, 0);
+		assert_eq!(guarantee.guaranteed_microgons, 0);
+	}
+
+	#[test]
+	fn guarantee_portions_round_once_after_multiplication() {
+		let mut guarantee = CosignerGuarantee {
+			basis: BitcoinSecuritizationBasis {
+				satoshis: 75_000_000,
+				microgons_at_target_per_btc: 62_000_000_000u128,
+				tick: 1,
+			},
+			guaranteed_microgons: 46_500_000_000,
+			fund_hold_extensions: Default::default(),
+		};
+
+		let created = guarantee
+			.take_portion(25_000_000, guarantee.securitization_for_satoshis(25_000_000))
+			.unwrap();
+		assert_eq!(created.guaranteed_microgons, 15_500_000_000);
+		assert_eq!(guarantee.guaranteed_microgons, 31_000_000_000);
+	}
+
+	#[test]
 	fn bitcoin_securitization_derives_value_and_required_backing() {
-		let securitization = BitcoinSecuritization {
+		let securitization = CosignerGuarantee {
 			basis: BitcoinSecuritizationBasis {
 				satoshis: 50_000_000,
 				microgons_at_target_per_btc: 1_000_000u128,
+				tick: 0,
 			},
-			securitization_microgons: 500_000,
+			guaranteed_microgons: 500_000,
+			fund_hold_extensions: Default::default(),
 		};
 
 		assert_eq!(securitization.basis.btc_value_in_microgons(), 500_000);
-		assert_eq!(securitization.btc_value_in_microgons(), 500_000);
-		assert_eq!(securitization.securitization_microgons, 500_000);
+		assert_eq!(securitization.guaranteed_microgons, 500_000);
 		assert_eq!(securitization.securitization_for_satoshis(25_000_000), 250_000);
 		assert_eq!(securitization.securitization_for_satoshis(75_000_000), 500_000);
 	}
@@ -1646,7 +1629,9 @@ mod test {
 		let securitization = securitization(80);
 		vault.reserve_securitization(&securitization, false, 100).unwrap();
 
-		vault.record_bitcoin_lock_funding(funding_update(80, 80, false)).unwrap();
+		vault
+			.record_bitcoin_lock_funding(Default::default(), funding_update(80, 80, false))
+			.unwrap();
 
 		assert_eq!(vault.securitization_pending_activation, 0);
 		assert_eq!(vault.total_satoshis, 80);
@@ -1654,51 +1639,49 @@ mod test {
 	}
 
 	#[test]
+	fn funding_reduction_rejects_pending_overflow_without_mutation() {
+		let mut vault = default_vault(u128::MAX);
+		vault.securitization_locked = u128::MAX;
+		vault.securitization_pending_activation = u128::MAX;
+		let before = vault.clone();
+
+		assert_err!(
+			vault.record_bitcoin_lock_funding(funding_update(0, 1, false), Default::default()),
+			VaultError::InternalError
+		);
+		assert_eq!(vault, before);
+	}
+
+	#[test]
 	fn fractional_backing_remains_exact_across_partial_and_full_release() {
 		let mut vault = default_vault(10);
-		let securitization = BitcoinSecuritization {
-			basis: BitcoinSecuritizationBasis { satoshis: 3, microgons_at_target_per_btc: 2 },
-			securitization_microgons: 2,
+		let securitization = CosignerGuarantee {
+			basis: BitcoinSecuritizationBasis {
+				satoshis: 3,
+				microgons_at_target_per_btc: 2,
+				tick: 0,
+			},
+			guaranteed_microgons: 2,
+			fund_hold_extensions: Default::default(),
 		};
-		assert_eq!(securitization.securitization_between(0, 1), 0);
-		assert_eq!(securitization.securitization_between(1, 3), 2);
+		assert_eq!(securitization.securitization_for_satoshis(1), 0);
+		assert_eq!(
+			securitization.securitization_for_satoshis(3) -
+				securitization.securitization_for_satoshis(1),
+			2
+		);
 		vault.reserve_securitization(&securitization, false, 100).unwrap();
-		vault
-			.record_bitcoin_lock_funding(BitcoinLockFundingUpdate {
-				funded_satoshis: 1,
-				securitized_satoshis: 1,
-				securitization_microgons: securitization.securitization_between(0, 1),
-				is_flexible: false,
-			})
-			.unwrap();
-		vault
-			.record_bitcoin_lock_funding(BitcoinLockFundingUpdate {
-				funded_satoshis: 2,
-				securitized_satoshis: 2,
-				securitization_microgons: securitization.securitization_between(1, 3),
-				is_flexible: false,
-			})
-			.unwrap();
-
-		vault
-			.record_bitcoin_lock_funding_reduction(BitcoinLockFundingUpdate {
-				funded_satoshis: 2,
-				securitized_satoshis: 2,
-				securitization_microgons: securitization.securitization_between(1, 3),
-				is_flexible: false,
-			})
-			.unwrap();
+		let partial = funding_update(1, securitization.securitization_for_satoshis(1), false);
+		let full = funding_update(3, securitization.securitization_for_satoshis(3), false);
+		vault.record_bitcoin_lock_funding(Default::default(), partial).unwrap();
+		vault.record_bitcoin_lock_funding(partial, full).unwrap();
+		vault.record_bitcoin_lock_funding(full, partial).unwrap();
 		assert_eq!(vault.securitization_pending_activation, 2);
 		assert_eq!(vault.total_satoshis, 1);
 		assert_eq!(vault.securitized_satoshis, 1);
 
 		vault
-			.release_bitcoin_lock_securitization(
-				&securitization,
-				1,
-				&LockExtension::new(100),
-				false,
-			)
+			.release_bitcoin_lock_securitization(&securitization, 1, 100, false)
 			.unwrap();
 
 		assert_eq!(vault.total_satoshis, 0);
@@ -1710,100 +1693,23 @@ mod test {
 		let mut vault = default_vault(100);
 		let securitization = securitization(100);
 		vault.reserve_securitization(&securitization, false, 100).unwrap();
-		vault
-			.record_bitcoin_lock_funding(BitcoinLockFundingUpdate {
-				funded_satoshis: 150,
-				securitized_satoshis: 100,
-				securitization_microgons: 100,
-				is_flexible: false,
-			})
-			.unwrap();
+		let original =
+			BitcoinLockFunding { funded_satoshis: 150, ..funding_update(100, 100, false) };
+		let excess_withdrawn = BitcoinLockFunding { funded_satoshis: 120, ..original };
+		let partially_funded = funding_update(50, 50, false);
+		vault.record_bitcoin_lock_funding(Default::default(), original).unwrap();
 
-		vault
-			.record_bitcoin_lock_funding_reduction(BitcoinLockFundingUpdate {
-				funded_satoshis: 30,
-				securitized_satoshis: 0,
-				securitization_microgons: 0,
-				is_flexible: false,
-			})
-			.unwrap();
+		vault.record_bitcoin_lock_funding(original, excess_withdrawn).unwrap();
 		assert_eq!(vault.total_satoshis, 120);
 		assert_eq!(vault.securitized_satoshis, 100);
 		assert_eq!(vault.securitization_locked, 100);
 		assert_eq!(vault.securitization_pending_activation, 0);
 
-		vault
-			.record_bitcoin_lock_funding_reduction(BitcoinLockFundingUpdate {
-				funded_satoshis: 70,
-				securitized_satoshis: 50,
-				securitization_microgons: 50,
-				is_flexible: false,
-			})
-			.unwrap();
+		vault.record_bitcoin_lock_funding(excess_withdrawn, partially_funded).unwrap();
 		assert_eq!(vault.total_satoshis, 50);
 		assert_eq!(vault.securitized_satoshis, 50);
 		assert_eq!(vault.securitization_locked, 100);
 		assert_eq!(vault.securitization_pending_activation, 50);
-	}
-
-	#[test]
-	fn resecuritizing_funded_bitcoin_preserves_funded_satoshis() {
-		let mut vault = default_vault(100);
-		let current = securitization(100);
-		let replacement = securitization(80);
-		let mut lock_extension = LockExtension::new(100);
-		vault.reserve_securitization(&current, false, 100).unwrap();
-		vault.record_bitcoin_lock_funding(funding_update(100, 100, false)).unwrap();
-
-		vault
-			.replace_securitization(&current, &replacement, 100, &mut lock_extension, false, false)
-			.unwrap();
-
-		assert_eq!(vault.securitization_locked, 80);
-		assert_eq!(vault.securitized_satoshis, 80);
-		assert_eq!(vault.get_relock_capacity(), 20);
-	}
-
-	#[test]
-	fn resecuritizing_an_unfunded_lock_preserves_reused_later_maturities() {
-		let mut vault = default_vault(200);
-		let current = securitization(100);
-		vault.reserve_securitization(&current, false, 143).unwrap();
-		vault.reserve_securitization(&current, false, 145).unwrap();
-		vault.record_bitcoin_lock_funding(funding_update(100, 100, false)).unwrap();
-		vault
-			.release_bitcoin_lock_securitization(&current, 100, &LockExtension::new(145), false)
-			.unwrap();
-
-		let mut extension = LockExtension::new(143);
-		vault
-			.replace_securitization(&current, &securitization(200), 0, &mut extension, false, false)
-			.unwrap();
-
-		assert_eq!(vault.securitization_locked, 200);
-		assert_eq!(vault.securitization_pending_activation, 200);
-		assert_eq!(vault.total_satoshis, 0);
-		assert_eq!(vault.get_relock_capacity(), 0);
-		assert_eq!(extension.get(&288), Some(&100));
-		assert_eq!(vault.securitization_release_schedule[&144].locked_commitments, 100);
-		assert_eq!(vault.securitization_release_schedule[&288].locked_commitments, 100);
-	}
-
-	#[test]
-	fn exit_notice_allows_resecuritization_within_its_deadline() {
-		let mut vault = default_vault(100);
-		let collateral = securitization(50);
-		vault.reserve_securitization(&collateral, false, 100).unwrap();
-		vault.record_bitcoin_lock_funding(funding_update(50, 50, false)).unwrap();
-		vault.request_securitization_exit(50, 365).unwrap();
-
-		let mut extension = LockExtension::new(100);
-		vault
-			.replace_securitization(&collateral, &collateral, 50, &mut extension, false, false)
-			.unwrap();
-		assert_eq!(vault.securitization_locked, 50);
-		assert_eq!(vault.get_relock_capacity(), 0);
-		assert_eq!(vault.available_securitization_space(false, None), 50);
 	}
 
 	#[test]
@@ -1911,15 +1817,12 @@ mod test {
 		let mut vault = default_vault(100);
 		vault.reserve_securitization(&securitization(25), false, 100).unwrap();
 		vault.reserve_securitization(&securitization(25), false, 100).unwrap();
-		vault.record_bitcoin_lock_funding(funding_update(50, 50, false)).unwrap();
+		vault
+			.record_bitcoin_lock_funding(Default::default(), funding_update(50, 50, false))
+			.unwrap();
 		vault.request_securitization_exit(20, 100).unwrap();
 		vault
-			.release_bitcoin_lock_securitization(
-				&securitization(25),
-				25,
-				&LockExtension::new(100),
-				false,
-			)
+			.release_bitcoin_lock_securitization(&securitization(25), 25, 100, false)
 			.unwrap();
 		assert_eq!(
 			vault.securitization_release_schedule[&144],
@@ -1938,9 +1841,7 @@ mod test {
 		);
 
 		vault.cancel_securitization_exits(10);
-		vault
-			.extend_lock(&securitization(25), &mut LockExtension::new(100), false, false)
-			.unwrap();
+		vault.extend_lock(&mut securitization(25), 100, false, false).unwrap();
 		assert_eq!(
 			vault.securitization_release_schedule[&144],
 			SecuritizationScheduleEntry {
@@ -2010,17 +1911,19 @@ mod test {
 	#[test]
 	fn calculates_securitization() {
 		let mut vault = default_vault(100);
-		let requested = BitcoinSecuritization {
+		let requested = CosignerGuarantee {
 			basis: BitcoinSecuritizationBasis {
 				satoshis: 50,
 				microgons_at_target_per_btc: SATOSHIS_PER_BITCOIN as Balance,
+				tick: 0,
 			},
-			securitization_microgons: 100,
+			guaranteed_microgons: 100,
+			fund_hold_extensions: Default::default(),
 		};
-		let excessive = BitcoinSecuritization {
+		let excessive = CosignerGuarantee {
 			basis: BitcoinSecuritizationBasis { satoshis: 60, ..requested.basis },
-			securitization_microgons: 120,
-			..requested
+			guaranteed_microgons: 120,
+			fund_hold_extensions: Default::default(),
 		};
 		assert_eq!(vault.get_activated_securitization(), 0);
 		assert_eq!(vault.get_relock_capacity(), 0);
@@ -2037,19 +1940,11 @@ mod test {
 		assert_eq!(vault.available_securitization_space(true, None), 0);
 
 		vault
-			.record_bitcoin_lock_funding(BitcoinLockFundingUpdate {
-				funded_satoshis: 50,
-				securitized_satoshis: 50,
-				securitization_microgons: 100,
-				is_flexible: false,
-			})
+			.record_bitcoin_lock_funding(Default::default(), funding_update(50, 100, false))
 			.unwrap();
 		assert_eq!(vault.get_activated_securitization(), 100);
 
-		let lock_extensions = &mut LockExtension::new(106);
-		vault
-			.release_bitcoin_lock_securitization(&requested, 50, lock_extensions, false)
-			.unwrap();
+		vault.release_bitcoin_lock_securitization(&requested, 50, 106, false).unwrap();
 		assert_eq!(vault.get_relock_capacity(), 100);
 		assert_eq!(vault.get_activated_securitization(), 0);
 	}
@@ -2089,15 +1984,6 @@ mod test {
 		vault.securitization_pending_activation = 0;
 
 		assert_eq!(vault.undisplaced_flexible_securitization(), 100);
-	}
-
-	#[test]
-	fn projects_flexible_securitization_for_a_ratchet() {
-		let mut vault = default_vault(93);
-		vault.securitization_locked = 124;
-		vault.flexible_securitization_locked = 93;
-
-		assert_eq!(vault.projected_flexible_securitization(62, 52), (83, 62));
 	}
 
 	#[test]
@@ -2152,23 +2038,18 @@ mod test {
 
 		let mut reclassified_flexible_space = vault.clone();
 		assert_err!(
-			reclassified_flexible_space.set_bitcoin_lock_flexible(&securitization(50), 50, false,),
+			reclassified_flexible_space.set_bitcoin_lock_flexible(50, false),
 			VaultError::InsufficientVaultFunds
 		);
 		let mut released_flexible_space = vault.clone();
 		released_flexible_space
-			.release_bitcoin_lock_securitization(
-				&securitization(50),
-				50,
-				&LockExtension::new(100),
-				true,
-			)
+			.release_bitcoin_lock_securitization(&securitization(50), 50, 100, true)
 			.unwrap();
 		assert_eq!(released_flexible_space.flexible_securitization_locked, 0);
 		assert_eq!(released_flexible_space.reserved_securitization_space, 100);
 
 		vault.set_reserved_securitization_space(50).unwrap();
-		vault.set_bitcoin_lock_flexible(&securitization(50), 50, false).unwrap();
+		vault.set_bitcoin_lock_flexible(50, false).unwrap();
 		assert_eq!(vault.flexible_securitization_locked, 0);
 		assert_eq!(vault.reserved_securitization_space, 50);
 		assert_eq!(vault.securitization_space(), 50);
@@ -2195,25 +2076,20 @@ mod test {
 	fn funded_flexible_lifecycle_updates_flexible_totals() {
 		let mut vault = default_vault(100);
 		vault.reserve_securitization(&securitization(100), false, 100).unwrap();
-		vault.record_bitcoin_lock_funding(funding_update(50, 50, false)).unwrap();
-		vault.set_bitcoin_lock_flexible(&securitization(100), 50, true).unwrap();
+		vault
+			.record_bitcoin_lock_funding(Default::default(), funding_update(50, 50, false))
+			.unwrap();
+		vault.set_bitcoin_lock_flexible(50, true).unwrap();
 
 		assert_eq!(vault.flexible_securitization_locked, 50);
 
 		vault
-			.release_bitcoin_lock_securitization(
-				&securitization(20),
-				10,
-				&LockExtension::new(100),
-				true,
-			)
+			.release_bitcoin_lock_securitization(&securitization(20), 10, 100, true)
 			.unwrap();
 
 		assert_eq!(vault.flexible_securitization_locked, 40);
 
-		vault
-			.extend_lock(&securitization(20), &mut LockExtension::new(200), true, true)
-			.unwrap();
+		vault.extend_lock(&mut securitization(20), 200, true, true).unwrap();
 
 		assert_eq!(vault.flexible_securitization_locked, 60);
 	}
@@ -2222,12 +2098,12 @@ mod test {
 	fn burning_funded_flexible_bitcoin_removes_flexible_totals() {
 		let mut vault = default_vault(100);
 		vault.reserve_securitization(&securitization(100), false, 100).unwrap();
-		vault.record_bitcoin_lock_funding(funding_update(50, 50, false)).unwrap();
-		vault.set_bitcoin_lock_flexible(&securitization(100), 50, true).unwrap();
-
 		vault
-			.burn(&securitization(100), 50, 50, &LockExtension::new(100), true)
+			.record_bitcoin_lock_funding(Default::default(), funding_update(50, 50, false))
 			.unwrap();
+		vault.set_bitcoin_lock_flexible(50, true).unwrap();
+
+		vault.burn(&securitization(100), 50, 50, 100, true).unwrap();
 
 		assert_eq!(vault.flexible_securitization_locked, 0);
 	}
@@ -2241,7 +2117,7 @@ mod test {
 		vault.securitized_satoshis = 75;
 		vault.set_reserved_securitization_space(50).unwrap();
 
-		vault.burn(&securitization(50), 50, 25, &LockExtension::new(100), true).unwrap();
+		vault.burn(&securitization(50), 50, 25, 100, true).unwrap();
 
 		assert_eq!(vault.securitization, 75);
 		assert_eq!(vault.securitization_locked, 50);
@@ -2257,13 +2133,13 @@ mod test {
 		assert_eq!(vault.get_relock_capacity(), 0);
 		assert_eq!(vault.available_securitization_space(true, None), 0);
 		assert_eq!(vault.securitization_locked, 100);
-		vault.record_bitcoin_lock_funding(funding_update(100, 100, false)).unwrap();
+		vault
+			.record_bitcoin_lock_funding(Default::default(), funding_update(100, 100, false))
+			.unwrap();
 		vault.request_securitization_exit(80, 432).unwrap();
 		vault.securitization_target = 20;
 
-		let lock_extensions = &mut LockExtension::new(365);
-		let burn_result =
-			vault.burn(&securitization(100), 100, 50, lock_extensions, false).unwrap();
+		let burn_result = vault.burn(&securitization(100), 100, 50, 365, false).unwrap();
 		assert_eq!(burn_result.burned_amount, 50);
 		assert_eq!(burn_result.held_for_release, 50);
 		assert_eq!(burn_result.release_heights.len(), 1);
@@ -2282,12 +2158,12 @@ mod test {
 		vault.committed_microgons = 300;
 		for _ in 0..2 {
 			vault.reserve_securitization(&securitization(100), false, 365).unwrap();
-			vault.record_bitcoin_lock_funding(funding_update(100, 100, false)).unwrap();
+			vault
+				.record_bitcoin_lock_funding(Default::default(), funding_update(100, 100, false))
+				.unwrap();
 		}
 
-		let result = vault
-			.burn(&securitization(100), 100, 150, &LockExtension::new(365), false)
-			.unwrap();
+		let result = vault.burn(&securitization(100), 100, 150, 365, false).unwrap();
 		assert_eq!(result.burned_amount, 150);
 		assert_eq!(result.held_for_release, 0);
 		assert_eq!(vault.securitization, 150);
@@ -2301,12 +2177,12 @@ mod test {
 		let mut vault = default_vault(200);
 		for _ in 0..2 {
 			vault.reserve_securitization(&securitization(100), false, 365).unwrap();
-			vault.record_bitcoin_lock_funding(funding_update(100, 100, false)).unwrap();
+			vault
+				.record_bitcoin_lock_funding(Default::default(), funding_update(100, 100, false))
+				.unwrap();
 		}
 
-		let result = vault
-			.burn(&securitization(100), 100, 150, &LockExtension::new(365), false)
-			.unwrap();
+		let result = vault.burn(&securitization(100), 100, 150, 365, false).unwrap();
 		assert_eq!(result.burned_amount, 100);
 		assert_eq!(vault.securitization, 100);
 		assert_eq!(vault.securitization_locked, 100);
@@ -2318,20 +2194,15 @@ mod test {
 		let mut vault = default_vault(300);
 		for _ in 0..2 {
 			vault.reserve_securitization(&securitization(100), false, 365).unwrap();
-			vault.record_bitcoin_lock_funding(funding_update(100, 100, false)).unwrap();
+			vault
+				.record_bitcoin_lock_funding(Default::default(), funding_update(100, 100, false))
+				.unwrap();
 		}
 		vault
-			.release_bitcoin_lock_securitization(
-				&securitization(100),
-				100,
-				&LockExtension::new(365),
-				false,
-			)
+			.release_bitcoin_lock_securitization(&securitization(100), 100, 365, false)
 			.unwrap();
 
-		let result = vault
-			.burn(&securitization(100), 100, 250, &LockExtension::new(365), false)
-			.unwrap();
+		let result = vault.burn(&securitization(100), 100, 250, 365, false).unwrap();
 
 		assert_eq!(result.burned_amount, 250);
 		assert_eq!(vault.securitization, 50);
@@ -2344,11 +2215,12 @@ mod test {
 	fn handles_schedule_for_release() {
 		let mut vault = default_vault(500);
 		vault.reserve_securitization(&securitization(100), true, 100).unwrap();
-		vault.record_bitcoin_lock_funding(funding_update(100, 100, false)).unwrap();
+		vault
+			.record_bitcoin_lock_funding(Default::default(), funding_update(100, 100, false))
+			.unwrap();
 
-		let lock_extensions = &mut LockExtension::new(100);
 		let release_heights = vault
-			.release_bitcoin_lock_securitization(&securitization(100), 100, lock_extensions, false)
+			.release_bitcoin_lock_securitization(&securitization(100), 100, 100, false)
 			.unwrap();
 		assert_eq!(release_heights.len(), 1);
 		assert_eq!(vault.securitization_release_schedule[&144].relockable_commitments, 100);
@@ -2356,9 +2228,11 @@ mod test {
 		assert_eq!(vault.securitization_locked, 0);
 		assert_eq!(vault.available_securitization_space(true, None), 500);
 
-		let lock_extensions = &mut LockExtension::new(100);
-		vault.extend_lock(&securitization(100), lock_extensions, false, true).unwrap();
-		vault.record_bitcoin_lock_funding(funding_update(100, 0, false)).unwrap();
+		let guarantee = &mut securitization(100);
+		vault.extend_lock(guarantee, 100, false, true).unwrap();
+		vault
+			.record_bitcoin_lock_funding(Default::default(), funding_update(100, 0, false))
+			.unwrap();
 		assert_eq!(vault.securitization_locked, 100);
 		assert_eq!(vault.available_securitization_space(true, None), 400);
 		assert_eq!(vault.get_relock_capacity(), 0);
@@ -2367,30 +2241,30 @@ mod test {
 		assert_eq!(vault.securitization_locked, 200);
 		assert_eq!(vault.available_securitization_space(true, None), 300);
 		assert_eq!(vault.get_relock_capacity(), 0);
-		vault.record_bitcoin_lock_funding(funding_update(0, 0, false)).unwrap();
+		vault
+			.record_bitcoin_lock_funding(Default::default(), funding_update(0, 0, false))
+			.unwrap();
 
 		// schedule multiple releases
-		let lock_extensions = &mut LockExtension::new(250);
+
 		let release_heights = vault
-			.release_bitcoin_lock_securitization(&securitization(50), 50, lock_extensions, false)
+			.release_bitcoin_lock_securitization(&securitization(50), 50, 250, false)
 			.unwrap();
 		assert_eq!(release_heights.len(), 1);
 		assert_eq!(vault.securitization_locked, 150);
 		assert_eq!(vault.securitization_release_schedule[&288].relockable_commitments, 50);
 		assert_eq!(vault.get_relock_capacity(), 50);
 
-		let lock_extensions = &mut LockExtension::new(255);
 		let release_heights = vault
-			.release_bitcoin_lock_securitization(&securitization(25), 25, lock_extensions, false)
+			.release_bitcoin_lock_securitization(&securitization(25), 25, 255, false)
 			.unwrap();
 		assert_eq!(release_heights.len(), 1);
 		assert_eq!(vault.securitization_locked, 125);
 		assert_eq!(vault.securitization_release_schedule[&288].relockable_commitments, 75);
 		assert_eq!(vault.get_relock_capacity(), 75);
 
-		let lock_extensions = &mut LockExtension::new(300);
 		let release_heights = vault
-			.release_bitcoin_lock_securitization(&securitization(25), 25, lock_extensions, false)
+			.release_bitcoin_lock_securitization(&securitization(25), 25, 300, false)
 			.unwrap();
 		assert_eq!(release_heights.len(), 1);
 		assert_eq!(vault.securitization_locked, 100);
@@ -2400,10 +2274,12 @@ mod test {
 
 		// if the expiration is within the other expirations, it will prefer the securitization
 		// already scheduled for release
-		let lock_extensions = &mut LockExtension::new(143);
-		vault.extend_lock(&securitization(25), lock_extensions, false, true).unwrap();
-		vault.record_bitcoin_lock_funding(funding_update(25, 0, false)).unwrap();
-		assert_eq!(lock_extensions.len(), 0);
+		let guarantee = &mut securitization(25);
+		vault.extend_lock(guarantee, 143, false, true).unwrap();
+		vault
+			.record_bitcoin_lock_funding(Default::default(), funding_update(25, 0, false))
+			.unwrap();
+		assert_eq!(guarantee.fund_hold_extensions.len(), 0);
 		assert_eq!(vault.securitization_locked, 125);
 		assert_eq!(vault.securitization_release_schedule[&288].relockable_commitments, 75);
 		assert_eq!(vault.securitization_release_schedule[&432].relockable_commitments, 25);
@@ -2413,20 +2289,20 @@ mod test {
 		// funds
 		assert_eq!(vault.available_securitization_space(true, None), 375);
 		assert_eq!(vault.securitization_locked, 125);
-		let lock_extensions = &mut LockExtension::new(143);
-		vault.extend_lock(&securitization(370), lock_extensions, false, true).unwrap();
-		vault.record_bitcoin_lock_funding(funding_update(370, 0, false)).unwrap();
-		assert_eq!(lock_extensions.len(), 2);
-		assert_eq!(lock_extensions.get(&288).unwrap(), &75);
-		assert_eq!(lock_extensions.get(&432).unwrap(), &20);
+		let guarantee = &mut securitization(370);
+		vault.extend_lock(guarantee, 143, false, true).unwrap();
+		vault
+			.record_bitcoin_lock_funding(Default::default(), funding_update(370, 0, false))
+			.unwrap();
+		assert_eq!(guarantee.fund_hold_extensions.len(), 2);
+		assert_eq!(guarantee.fund_hold_extensions.get(&288).unwrap(), &75);
+		assert_eq!(guarantee.fund_hold_extensions.get(&432).unwrap(), &20);
 		assert_eq!(vault.get_relock_capacity(), 5);
 		assert_eq!(vault.securitization_locked, 495);
 		assert_eq!(vault.securitization_release_schedule[&432].relockable_commitments, 5);
 
 		// now return the 370
-		let result = vault
-			.release_bitcoin_lock_securitization(&securitization(370), 370, lock_extensions, false)
-			.unwrap();
+		let result = vault.release_bitcoin_lock_securitization(guarantee, 370, 143, false).unwrap();
 		assert_eq!(result.len(), 3);
 		assert_eq!(result.iter().collect::<Vec<_>>(), vec![&144, &288, &432]);
 		assert_eq!(vault.get_relock_capacity(), 375);
@@ -2436,25 +2312,27 @@ mod test {
 		assert_eq!(vault.securitization_release_schedule[&432].relockable_commitments, 25);
 	}
 
-	fn securitization(amount: Satoshis) -> BitcoinSecuritization<Balance> {
-		BitcoinSecuritization {
+	fn securitization(amount: Satoshis) -> CosignerGuarantee<Balance> {
+		CosignerGuarantee {
 			basis: BitcoinSecuritizationBasis {
 				satoshis: amount,
 				microgons_at_target_per_btc: SATOSHIS_PER_BITCOIN as Balance,
+				tick: 0,
 			},
-			securitization_microgons: amount.into(),
+			guaranteed_microgons: amount.into(),
+			fund_hold_extensions: Default::default(),
 		}
 	}
 
 	fn funding_update(
 		securitized_satoshis: Satoshis,
-		securitization_microgons: Balance,
+		activated_securitization: Balance,
 		is_flexible: bool,
-	) -> BitcoinLockFundingUpdate<Balance> {
-		BitcoinLockFundingUpdate {
+	) -> BitcoinLockFunding<Balance> {
+		BitcoinLockFunding {
 			funded_satoshis: securitized_satoshis,
 			securitized_satoshis,
-			securitization_microgons,
+			activated_securitization,
 			is_flexible,
 		}
 	}

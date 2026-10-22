@@ -10,6 +10,7 @@ mod call_filters;
 pub mod config;
 mod deal_with_fees;
 mod fee_control;
+pub mod migrations;
 
 pub mod prelude {
 	pub use crate::config::*;
@@ -101,6 +102,8 @@ macro_rules! use_unless_benchmark {
 #[macro_export]
 macro_rules! inject_runtime_vars {
 	() => {
+		use $crate::migrations::CosignerGuaranteesMigration;
+
 		// To learn more about runtime versioning, see:
 		// https://docs.substrate.io/main-docs/build/upgrade#runtime-versioning
 		#[sp_version::runtime_version]
@@ -155,10 +158,7 @@ macro_rules! inject_runtime_vars {
 		/// All migrations of the runtime.
 		///
 		/// This can be a tuple of types, each implementing `OnRuntimeUpgrade`.
-		type Migrations = (
-			pallet_vaults::migrations::RemoveVaultSecuritizationRatioMigration<Runtime>,
-			pallet_bitcoin_locks::migrations::RemoveSecuritizationRatioMigration<Runtime>,
-		);
+		type Migrations = (CosignerGuaranteesMigration<Runtime>,);
 
 		/// Unchecked extrinsic type as expected by this runtime.
 		pub type UncheckedExtrinsic =
