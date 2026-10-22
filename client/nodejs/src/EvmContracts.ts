@@ -4,6 +4,7 @@ import {
   MINTING_GATEWAY_RUNTIME_TO_ERC20_SCALE,
   MINTING_GATEWAY_TOKEN_DECIMALS,
   argonTokenArtifact as rawArgonTokenArtifact,
+  argonBuyAndTransferArtifact as rawArgonBuyAndTransferArtifact,
   argonotTokenArtifact as rawArgonotTokenArtifact,
   mintingGatewayArtifact as rawMintingGatewayArtifact,
   proxyAdminArtifact as rawProxyAdminArtifact,
@@ -22,6 +23,7 @@ import {
   ProxyAdminEvents,
   TransparentUpgradeableProxyEvents,
   argonTokenAbi,
+  argonBuyAndTransferAbi,
   argonotTokenAbi,
   canonicalMintableBurnableErc20Abi,
   iCanonicalTokenAbi,
@@ -41,6 +43,7 @@ import {
   hashMintingGatewayActivityBlockLocator,
   hashMintingGatewayGatewayUpdateApproval,
   hashMintingGatewayGlobalIssuanceCouncilRotatedActivity,
+  hashMintingGatewayTransferToArgonFromSwapStartedActivity,
   hashMintingGatewayGlobalIssuanceCouncil,
   hashMintingGatewayMintingAuthorityActivatedActivity,
   hashMintingGatewayMintingAuthorityDeactivatedActivity,
@@ -54,6 +57,7 @@ import {
   hashMintingGatewayTransferToArgonStartedActivity,
 } from '@argonprotocol/ethereum-contracts/hashing';
 
+export type { ArgonBuyAndTransferRequest } from '@argonprotocol/ethereum-contracts';
 export type * from '@argonprotocol/ethereum-contracts/generated';
 export type * from '@argonprotocol/ethereum-contracts/hashing';
 
@@ -62,6 +66,7 @@ export type EvmContractArtifact = {
   bytecode: Hex;
 };
 
+export const argonBuyAndTransferArtifact = rawArgonBuyAndTransferArtifact as EvmContractArtifact;
 export const argonTokenArtifact = rawArgonTokenArtifact as EvmContractArtifact;
 export const argonotTokenArtifact = rawArgonotTokenArtifact as EvmContractArtifact;
 export const mintingGatewayArtifact = rawMintingGatewayArtifact as EvmContractArtifact;
@@ -106,6 +111,7 @@ export {
   TransparentUpgradeableProxyEvents,
   appendMintingGatewayActivityRoot,
   argonTokenAbi,
+  argonBuyAndTransferAbi,
   argonotTokenAbi,
   canonicalMintableBurnableErc20Abi,
   encodeMintingGatewayCouncilSnapshot,
@@ -116,6 +122,7 @@ export {
   hashMintingGatewayActivateMintingAuthorityApproval,
   hashMintingGatewayActivityBlockLocator,
   hashMintingGatewayGatewayUpdateApproval,
+  hashMintingGatewayTransferToArgonFromSwapStartedActivity,
   hashMintingGatewayGlobalIssuanceCouncil,
   hashMintingGatewayGlobalIssuanceCouncilRotatedActivity,
   hashMintingGatewayMintingAuthority,

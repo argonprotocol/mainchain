@@ -45,6 +45,8 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 		keccak256("ARGON_MINTING_AUTHORITY_DEACTIVATED_ACTIVITY");
 	bytes32 private constant _TRANSFER_TO_ARGON_STARTED_ACTIVITY_TAG =
 		keccak256("ARGON_TRANSFER_TO_ARGON_STARTED_ACTIVITY");
+	bytes32 private constant _TRANSFER_TO_ARGON_FROM_SWAP_STARTED_ACTIVITY_TAG =
+		keccak256("ARGON_TRANSFER_TO_ARGON_FROM_SWAP_STARTED_ACTIVITY");
 	bytes32 private constant _TRANSFER_OUT_OF_ARGON_CANCELED_ACTIVITY_TAG =
 		keccak256("ARGON_TRANSFER_OUT_OF_ARGON_CANCELED_ACTIVITY");
 	bytes32 private constant _TRANSFER_OUT_OF_ARGON_FINALIZED_ACTIVITY_TAG =
@@ -54,6 +56,8 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 	address public immutable argonToken;
 	/// @notice Canonical Argonot token managed by this gateway.
 	address public immutable argonotToken;
+	/// @notice Purchase contract authorized to burn its purchased ARGN.
+	address public immutable swapContract;
 	/// @notice Address that can pause the gateway without being the owner.
 	address public guardian;
 
@@ -79,6 +83,7 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 	mapping(bytes32 transferId => bool isFinalized) public finalizedTransferOutOfArgonIds;
 	/// @notice Per-block activity ranges used to locate gateway events later.
 	mapping(uint64 locatorIndex => ActivityBlockLocator locator) public activityBlockLocators;
+	uint128 private _minimumSwapMicrogons;
 
 	/// @notice Activity-number range emitted in one block on this chain.
 	struct ActivityBlockLocator {
@@ -94,6 +99,20 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 		uint64 argonApprovalsNonce;
 		uint128 argonCirculation;
 		uint128 argonotCirculation;
+	}
+
+	/// @notice Measured purchase facts supplied by the authorized purchase contract.
+	struct SwapPurchase {
+		uint64 timestamp;
+		address buyer;
+		bytes32 argonAccountId;
+		address usdcToken;
+		uint256 usdcSpent;
+		uint256 argonBought;
+		address poolManager;
+		bytes32 poolId;
+		uint160 sqrtPriceBeforeX96;
+		uint160 sqrtPriceAfterX96;
 	}
 
 	/// @notice Current council snapshot used to verify queued updates.
@@ -224,6 +243,8 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 	error TooManyGatewayActivitiesInBlock(uint256 maxAllowed, uint256 provided);
 	error TooManyMintingAuthorizations(uint256 maxAllowed, uint256 provided);
 	error UnsupportedToken(address token);
+	error UnauthorizedSwapContract();
+	error PurchaseTooSmall();
 	error RuntimeAmountOverflow(uint256 amount);
 	error ZeroAdminSafe();
 	error ZeroAmount();
@@ -339,11 +360,23 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 		GatewayActivityState gatewayState
 	);
 
+	/// @notice A purchase burned ARGN for delivery to Argon, independently of operational transfers.
+	event TransferToArgonFromSwapStarted(
+		SwapPurchase purchase,
+		address token,
+		uint128 amount,
+		GatewayActivityState gatewayState
+	);
+
+	/// @notice Owner changed the minimum purchased ARGON, measured in microgons.
+	event MinimumSwapMicrogonsUpdated(uint128 minimumMicrogons);
+
 	/// @custom:oz-upgrades-unsafe-allow constructor
 	/// @dev The implementation constructor stores immutable token addresses and disables direct initialization.
-	constructor(address argonTokenAddress, address argonotTokenAddress) {
+	constructor(address argonTokenAddress, address argonotTokenAddress, address swapContractAddress) {
 		argonToken = argonTokenAddress;
 		argonotToken = argonotTokenAddress;
+		swapContract = swapContractAddress;
 		_disableInitializers();
 	}
 
@@ -685,6 +718,36 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 		);
 	}
 
+	/// @notice Burns the whole-microgon portion of a purchase and records its delivery to Argon.
+	function burnFromSwap(SwapPurchase memory purchase)
+		external whenNotPaused returns (uint128 amount, uint64 activityNonce)
+	{
+		if (msg.sender != swapContract) revert UnauthorizedSwapContract();
+		purchase.timestamp = uint64(block.timestamp);
+		_requireCanonicalToken(argonToken);
+		amount = _toRuntimeAmount(purchase.argonBought);
+		if (amount == 0) revert ZeroAmount();
+		if (amount < minimumSwapMicrogons()) revert PurchaseTooSmall();
+		ICanonicalToken(argonToken).burnFrom(msg.sender, toTokenAmount(amount));
+
+		GatewayActivityState memory gatewayState = _gatewayActivityState(gatewayActivityNonce + 1);
+		_recordActivity(
+			gatewayState,
+			keccak256(abi.encode(
+				_TRANSFER_TO_ARGON_FROM_SWAP_STARTED_ACTIVITY_TAG,
+				ACTIVITY_HASH_VERSION,
+				block.chainid,
+				address(this),
+				purchase,
+				argonToken,
+				amount,
+				_hashGatewayActivityState(gatewayState)
+			))
+		);
+		emit TransferToArgonFromSwapStarted(purchase, argonToken, amount, gatewayState);
+		return (amount, gatewayState.gatewayActivityNonce);
+	}
+
 	/// @notice Finalizes a valid transfer out of Argon and mints to the request recipient.
 	/// @dev Anyone can call this. The signed request fixes the recipient and the required collateral.
 	/// @param request Signed transfer-out request.
@@ -842,6 +905,19 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 		}
 
 		_pause();
+	}
+
+	/// @notice Minimum purchased ARGON in microgons; unset proxy storage defaults to 100 ARGON.
+	function minimumSwapMicrogons() public view returns (uint128) {
+		if (_minimumSwapMicrogons == 0) return 100e6;
+		return _minimumSwapMicrogons;
+	}
+
+	/// @notice Changes the minimum for swap purchases without restricting ordinary transfers.
+	function setMinimumSwapMicrogons(uint128 minimumMicrogons) external onlyOwner {
+		if (minimumMicrogons == 0) revert ZeroAmount();
+		_minimumSwapMicrogons = minimumMicrogons;
+		emit MinimumSwapMicrogonsUpdated(minimumMicrogons);
 	}
 
 	/// @notice Sets the guardian.

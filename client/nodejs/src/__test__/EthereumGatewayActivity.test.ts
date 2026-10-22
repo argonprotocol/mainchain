@@ -1,6 +1,11 @@
+import v4Purchase from '../../../../chains/ethereum/fixtures/uniswap-v4-purchase.json';
+import v4Refund from '../../../../chains/ethereum/fixtures/uniswap-v4-purchase-refund.json';
+import type { EthereumEventLog } from '../EthereumProof';
 import { expect, it } from 'vitest';
 import { MintingGatewayEvents } from '../EvmContracts';
 import {
+  appendEthereumGatewayActivityRoot,
+  hashEthereumGatewayActivity,
   decodeEthereumGatewayActivityLog,
   decodeEthereumTransferToArgonStartedLog,
   findEthereumTransferToArgonStartedLogIndexes,
@@ -111,3 +116,29 @@ it('finds all TransferToArgonStarted log indexes for a gateway receipt', async (
     ),
   ).toEqual([0, 2]);
 });
+
+it.each([v4Purchase, v4Refund])(
+  'decodes native purchases and reconstructs their gateway storage commitment',
+  fixture => {
+    const eventLog = fixture.eventLog as EthereumEventLog;
+    const decoded = decodeEthereumGatewayActivityLog(eventLog);
+    expect(decoded.kind).toBe('TransferToArgonFromSwapStarted');
+    if (decoded.kind !== 'TransferToArgonFromSwapStarted') throw new Error('Expected purchase');
+    expect(decoded.amount).toBe(decoded.purchase.argonBought / 1_000_000_000_000n);
+    expect(() => decodeEthereumTransferToArgonStartedLog(eventLog)).toThrow(
+      'Expected TransferToArgonStarted',
+    );
+    expect(
+      appendEthereumGatewayActivityRoot(
+        fixture.activityRootSeed as `0x${string}`,
+        hashEthereumGatewayActivity(
+          {
+            chainId: BigInt(fixture.chainId),
+            gatewayAddress: eventLog.address,
+          },
+          decoded,
+        ),
+      ),
+    ).toBe(fixture.activityRoot);
+  },
+);

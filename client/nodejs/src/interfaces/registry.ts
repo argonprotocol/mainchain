@@ -182,6 +182,7 @@ import type {
   PalletCrosschainTransferMintingAuthorityState,
   PalletCrosschainTransferSourceChain,
   PalletCrosschainTransferSourceChainCirculation,
+  PalletCrosschainTransferSwapPurchaseEvidence,
   PalletCrosschainTransferTransferOutMintingAuthorityTransferReservation,
   PalletCrosschainTransferTransferOutPendingCollateralizationRequest,
   PalletCrosschainTransferTransferOutTransferOutOfArgon,
@@ -517,6 +518,7 @@ declare module '@polkadot/types/types/registry' {
     PalletCrosschainTransferMintingAuthorityState: PalletCrosschainTransferMintingAuthorityState;
     PalletCrosschainTransferSourceChain: PalletCrosschainTransferSourceChain;
     PalletCrosschainTransferSourceChainCirculation: PalletCrosschainTransferSourceChainCirculation;
+    PalletCrosschainTransferSwapPurchaseEvidence: PalletCrosschainTransferSwapPurchaseEvidence;
     PalletCrosschainTransferTransferOutMintingAuthorityTransferReservation: PalletCrosschainTransferTransferOutMintingAuthorityTransferReservation;
     PalletCrosschainTransferTransferOutPendingCollateralizationRequest: PalletCrosschainTransferTransferOutPendingCollateralizationRequest;
     PalletCrosschainTransferTransferOutTransferOutOfArgon: PalletCrosschainTransferTransferOutTransferOutOfArgon;

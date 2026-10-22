@@ -34,12 +34,8 @@ node_modules
 /.port-lock
 /state.raw
 /.claude/worktrees
-chains/ethereum/contracts/artifacts/*
-!chains/ethereum/contracts/artifacts/contracts/
-chains/ethereum/contracts/artifacts/contracts/*
-!chains/ethereum/contracts/artifacts/contracts/MintingGateway.sol/
-chains/ethereum/contracts/artifacts/contracts/MintingGateway.sol/*
-!chains/ethereum/contracts/artifacts/contracts/MintingGateway.sol/MintingGateway.json
+chains/ethereum/contracts/artifacts/
+chains/ethereum/contracts/generated.ts
 chains/ethereum/contracts/cache/
 chains/ethereum/contracts/deployments/default/
 /chains/ethereum/contracts/*.js

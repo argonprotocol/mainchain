@@ -43,12 +43,16 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@argonprotocol/ethereum-contracts@workspace:chains/ethereum/contracts"
   dependencies:
+    "@ethereumjs/mpt": "npm:^10.1.1"
     "@nomicfoundation/hardhat-ethers": "npm:4.0.10"
     "@openzeppelin/contracts": "npm:^5.4.0"
     "@openzeppelin/contracts-upgradeable": "npm:^5.4.0"
     "@types/node": "npm:22.17.1"
+    "@uniswap/permit2": "https://github.com/Uniswap/permit2/archive/cc56ad0f3439c502c246fc5cfcc3db92bb8b7219.tar.gz"
+    "@uniswap/universal-router": "https://github.com/Uniswap/universal-router/archive/802fe4c18f47300e0f183e2a42e9146ec2ea9fc3.tar.gz"
     "@uniswap/v3-core": "npm:1.0.2-solc-0.8-simulate"
     "@uniswap/v4-core": "npm:1.0.2"
+    "@uniswap/v4-periphery": "patch:@uniswap/v4-periphery@https%3A//github.com/Uniswap/v4-periphery/archive/545a5d2a87228167edde48f3b9eda122d1e3c4d6.tar.gz#~/.yarn/patches/@uniswap-v4-periphery-https-a69d333e68.patch"
     "@wagmi/cli": "npm:^2.10.0"
     ethers: "npm:^6.15.0"
     hardhat: "npm:^3.18.1"
@@ -2933,6 +2937,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@openzeppelin/contracts@npm:5.0.2":
+  version: 5.0.2
+  resolution: "@openzeppelin/contracts@npm:5.0.2"
+  checksum: 10c0/d042661db7bb2f3a4b9ef30bba332e86ac20907d171f2ebfccdc9255cc69b62786fead8d6904b8148a8f26946bc7c15eead91b95f75db0c193a99d52e528663e
+  languageName: node
+  linkType: hard
+
 "@openzeppelin/contracts@npm:^5.4.0":
   version: 5.6.1
   resolution: "@openzeppelin/contracts@npm:5.6.1"
@@ -4288,6 +4299,38 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@uniswap/permit2@https://github.com/Uniswap/permit2/archive/cc56ad0f3439c502c246fc5cfcc3db92bb8b7219.tar.gz":
+  version: 1.0.0
+  resolution: "@uniswap/permit2@https://github.com/Uniswap/permit2/archive/cc56ad0f3439c502c246fc5cfcc3db92bb8b7219.tar.gz"
+  checksum: 10c0/a7847349b4b33870c28dac02f55ef07098460e836b20149fa2ac82057e5dd79ee7c01d9673072263ec7f055cb583b1f16e2504f22e5ab773520dad8c86864594
+  languageName: node
+  linkType: hard
+
+"@uniswap/universal-router@https://github.com/Uniswap/universal-router/archive/802fe4c18f47300e0f183e2a42e9146ec2ea9fc3.tar.gz":
+  version: 2.1.0
+  resolution: "@uniswap/universal-router@https://github.com/Uniswap/universal-router/archive/802fe4c18f47300e0f183e2a42e9146ec2ea9fc3.tar.gz"
+  dependencies:
+    "@openzeppelin/contracts": "npm:5.0.2"
+    "@uniswap/v2-core": "npm:1.0.1"
+    "@uniswap/v3-core": "npm:1.0.0"
+  checksum: 10c0/9ecf2ec3ea3662f62dc1ab2820118a960b616e8f16204eb98c0a08ea83e354cbbcbcd52fab3676ff37ff037932108007b433bfe173a69e53cb495dc2e10f1e28
+  languageName: node
+  linkType: hard
+
+"@uniswap/v2-core@npm:1.0.1":
+  version: 1.0.1
+  resolution: "@uniswap/v2-core@npm:1.0.1"
+  checksum: 10c0/61fc8beb5f2875fc3fe6b00043c9491f0eb9839b824af44d53a303f3df1970c6c3e8a555b7a0150e0ad75b8e49ad6e3cf7d923109da31884536a7a844c24cda0
+  languageName: node
+  linkType: hard
+
+"@uniswap/v3-core@npm:1.0.0":
+  version: 1.0.0
+  resolution: "@uniswap/v3-core@npm:1.0.0"
+  checksum: 10c0/f755db40b825fac267caedce51f25f7ab268ea80f5b5131012317907754345c9f55b15a6431fe0c830fb76266bbb00c62ad3648f9f250b3e4ae6836c8bda6737
+  languageName: node
+  linkType: hard
+
 "@uniswap/v3-core@npm:1.0.2-solc-0.8-simulate":
   version: 1.0.2-solc-0.8-simulate
   resolution: "@uniswap/v3-core@npm:1.0.2-solc-0.8-simulate"
@@ -4299,6 +4342,20 @@ __metadata:
   version: 1.0.2
   resolution: "@uniswap/v4-core@npm:1.0.2"
   checksum: 10c0/a0f97e6a73e6d6395191d1f95d0e8914f338dab83144092105b12dd7bebf7cab8bd8f2ceeab048061f54c0e499e83d3dcde9443062949f6f7c227c2ee4d54f2c
+  languageName: node
+  linkType: hard
+
+"@uniswap/v4-periphery@https://github.com/Uniswap/v4-periphery/archive/545a5d2a87228167edde48f3b9eda122d1e3c4d6.tar.gz":
+  version: 1.0.4
+  resolution: "@uniswap/v4-periphery@https://github.com/Uniswap/v4-periphery/archive/545a5d2a87228167edde48f3b9eda122d1e3c4d6.tar.gz"
+  checksum: 10c0/b7f484eeb890fe8bdf1c9aa4fd47e16d7bf226ed9252097ecca2411781211a7de1ed6131c65ced6056538e8a632a538c59ac2c214532759fb967b9494b03bd1d
+  languageName: node
+  linkType: hard
+
+"@uniswap/v4-periphery@patch:@uniswap/v4-periphery@https%3A//github.com/Uniswap/v4-periphery/archive/545a5d2a87228167edde48f3b9eda122d1e3c4d6.tar.gz#~/.yarn/patches/@uniswap-v4-periphery-https-a69d333e68.patch":
+  version: 1.0.4
+  resolution: "@uniswap/v4-periphery@patch:@uniswap/v4-periphery@https%3A//github.com/Uniswap/v4-periphery/archive/545a5d2a87228167edde48f3b9eda122d1e3c4d6.tar.gz#~/.yarn/patches/@uniswap-v4-periphery-https-a69d333e68.patch::version=1.0.4&hash=ecce6b"
+  checksum: 10c0/4bdca673970c9602d083347d12a3ac2b2ada3a812ac364eb8e4b69ed246ec8b0e2e30e31d5aff1b049806b29c2b8f7d1edf39178ae879133512bca12c77415ef
   languageName: node
   linkType: hard
 
