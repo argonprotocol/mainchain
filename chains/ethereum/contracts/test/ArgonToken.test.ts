@@ -21,6 +21,7 @@ describe('ArgonToken', () => {
     const gatewayImplementation = (await gatewayImplementationFactory.deploy(
       ethers.ZeroAddress,
       ethers.ZeroAddress,
+      ethers.ZeroAddress,
     )) as any;
     await gatewayImplementation.waitForDeployment();
 

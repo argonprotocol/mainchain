@@ -1,3 +1,6 @@
+import type { ContractFunctionArgs } from 'viem';
+import type { argonBuyAndTransferAbi } from '@argonprotocol/ethereum-contracts/generated';
+import argonBuyAndTransferArtifact from './artifacts/contracts/ArgonBuyAndTransfer.sol/ArgonBuyAndTransfer.json' with { type: 'json' };
 import argonTokenArtifact from './artifacts/contracts/ArgonToken.sol/ArgonToken.json' with { type: 'json' };
 import argonotTokenArtifact from './artifacts/contracts/ArgonotToken.sol/ArgonotToken.json' with { type: 'json' };
 import mintingGatewayArtifact from './artifacts/contracts/MintingGateway.sol/MintingGateway.json' with { type: 'json' };
@@ -13,9 +16,16 @@ export * from './generated.js';
 export * from './hashing.js';
 
 export {
+  argonBuyAndTransferArtifact,
   argonTokenArtifact,
   argonotTokenArtifact,
   mintingGatewayArtifact,
   proxyAdminArtifact,
   transparentUpgradeableProxyArtifact,
 };
+
+export type ArgonBuyAndTransferRequest = ContractFunctionArgs<
+  typeof argonBuyAndTransferAbi,
+  'nonpayable',
+  'buyAndTransfer'
+>[0];

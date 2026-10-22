@@ -73,7 +73,8 @@ function abiParameterTypeToTs(
       if (/^bytes\d+$/.test(baseType)) {
         tsType = 'Hex';
       } else if (/^u?int\d*$/.test(baseType)) {
-        tsType = 'bigint';
+        const bits = Number(baseType.replace(/^u?int/, '') || '256');
+        tsType = bits <= 48 ? 'number' : 'bigint';
       } else {
         tsType = 'unknown';
       }

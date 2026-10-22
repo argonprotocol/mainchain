@@ -107,6 +107,56 @@ fn full_25_authority_finalization_fits_the_ethereum_log_bound() {
 }
 
 #[test]
+fn finalized_activity_rejects_impossible_collateral_array_before_decoding() {
+	let finalized = ethereum_contracts::TransferOutOfArgonFinalized {
+		transferId: alloy_primitives::B256::ZERO,
+		token: AlloyAddress::from_slice(h160(0x31).as_bytes()),
+		amount: 1,
+		mintingCollateral: vec![],
+		gatewayState: ethereum_contracts::GatewayActivityState {
+			gatewayActivityNonce: 1,
+			argonApprovalsNonce: 0,
+			argonCirculation: 0,
+			argonotCirculation: 0,
+		},
+	};
+	let log = EthereumLog {
+		address: h160(0x21),
+		topics: vec![H256::from(ethereum_contracts::TransferOutOfArgonFinalized::SIGNATURE_HASH.0)]
+			.try_into()
+			.unwrap(),
+		data: finalized.encode_data().try_into().unwrap(),
+	};
+
+	new_test_ext().execute_with(|| {
+		assert!(CrosschainTransfer::decode_evm_gateway_activity(&chain_config(), &log).is_ok());
+
+		let mut impossible_count = log.clone();
+		impossible_count.data[256..288]
+			.copy_from_slice(&alloy_primitives::U256::from(1_000_000u64).to_be_bytes::<32>());
+		assert_eq!(
+			CrosschainTransfer::decode_evm_gateway_activity(&chain_config(), &impossible_count)
+				.err(),
+			Some(Error::<Test>::InvalidGatewayActivity.into())
+		);
+
+		let mut wrong_offset = log.clone();
+		wrong_offset.data[96..128].fill(0);
+		assert_eq!(
+			CrosschainTransfer::decode_evm_gateway_activity(&chain_config(), &wrong_offset).err(),
+			Some(Error::<Test>::InvalidGatewayActivity.into())
+		);
+
+		let mut truncated = log;
+		truncated.data.pop();
+		assert_eq!(
+			CrosschainTransfer::decode_evm_gateway_activity(&chain_config(), &truncated).err(),
+			Some(Error::<Test>::InvalidGatewayActivity.into())
+		);
+	});
+}
+
+#[test]
 fn force_set_global_issuance_council_replaces_active_members() {
 	new_test_ext().execute_with(|| {
 		let first_account = account(30);

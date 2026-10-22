@@ -678,6 +678,7 @@ async function deployGatewayStack(council: Council) {
   const gatewayBootstrapImplementation = await gatewayFactory.deploy(
     ethers.ZeroAddress,
     ethers.ZeroAddress,
+    ethers.ZeroAddress,
   );
   const gatewayBootstrapImplementationTx = requireDeploymentTransaction(
     'MintingGateway bootstrap implementation',
@@ -738,6 +739,7 @@ async function deployGatewayStack(council: Council) {
   const gatewayFinalImplementation = await gatewayFactory.deploy(
     await argon.getAddress(),
     await argonot.getAddress(),
+    ethers.ZeroAddress,
   );
   await gatewayFinalImplementation.waitForDeployment();
 

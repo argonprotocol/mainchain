@@ -5,6 +5,8 @@ import { createMPT, createMerkleProof, verifyMPTWithMerkleProof } from '@ethereu
 import {
   bytesToHex,
   concatHex,
+  fromRlp,
+  sliceHex,
   encodeAbiParameters,
   encodeEventTopics,
   getAddress,
@@ -54,6 +56,8 @@ import {
   createTransferToArgonStartedBlockLog,
   repeatHex,
 } from './ethereumProofTestUtils';
+import v4Purchase from '../../../../chains/ethereum/fixtures/uniswap-v4-purchase.json';
+import v4Refund from '../../../../chains/ethereum/fixtures/uniswap-v4-purchase-refund.json';
 
 type EncodedReceiptInput = Parameters<typeof encodeEthereumReceiptForProof>[0];
 
@@ -859,6 +863,68 @@ it('encodes a production inbound receipt exactly as retained proof expects', asy
 
   expect(bytesToHex(recoveredReceipt!)).toBe(productionInboundReceipt.encodedReceipt);
 });
+
+it.each([v4Purchase, v4Refund])(
+  'builds the runtime-verified proof for a native purchase receipt',
+  async fixture => {
+    const [status, cumulativeGasUsed, logsBloom, logs] = fromRlp(
+      sliceHex(fixture.encodedReceipt as Hex, 1),
+    ) as [Hex, Hex, Hex, [Hex, Hex[], Hex][]];
+    expect(status).toBe('0x01');
+    expect(sliceHex(fixture.encodedReceipt as Hex, 0, 1)).toBe('0x02');
+    const txHash: Hex = `0x${'aa'.repeat(32)}`;
+    const zeroHash: Hex = `0x${'00'.repeat(32)}`;
+    const header = {
+      number: toHex(10n),
+      hash: zeroHash,
+      parentHash: zeroHash,
+      nonce: '0x0000000000000000',
+      sha3Uncles: '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347',
+      logsBloom,
+      transactionsRoot: zeroHash,
+      stateRoot: zeroHash,
+      receiptsRoot: fixture.receiptsRoot as Hex,
+      miner: `0x${'00'.repeat(20)}`,
+      difficulty: '0x0',
+      extraData: '0x',
+      size: '0x1',
+      gasLimit: toHex(30_000_000n),
+      gasUsed: cumulativeGasUsed,
+      timestamp: toHex(1n),
+      transactions: [txHash],
+      uncles: [],
+    } satisfies JSONRPCBlock;
+    header.hash = bytesToHex(createBlockHeaderFromRPC(header).hash());
+    const receipt = {
+      type: 'eip1559',
+      status: 'success',
+      cumulativeGasUsed: BigInt(cumulativeGasUsed),
+      logsBloom,
+      logs: logs.map(([address, topics, data], logIndex) => ({ address, topics, data, logIndex })),
+      transactionHash: txHash,
+      transactionIndex: fixture.transactionIndex,
+      blockHash: header.hash,
+    } as EthereumReceipt;
+    expect(bytesToHex(encodeEthereumReceiptForProof(receipt))).toBe(fixture.encodedReceipt);
+    const logIndex = receipt.logs.findIndex(log => log.topics[0] === fixture.eventLog.topics[0]);
+    expect(logIndex).toBeGreaterThanOrEqual(0);
+    const executionClient = {
+      getTransactionReceipt: async () => receipt,
+      getBlock: async () => ({ transactions: [txHash] }),
+      request: async () => header,
+    } as unknown as EthereumExecutionClient;
+    const proof = await buildEthereumEventProof(
+      { executionClient },
+      { blockHash: header.hash, blockNumber: 10n },
+      [[{ txHash, receipt, logIndexes: [logIndex] }]],
+    );
+    expect(proof.blocks[0].receiptProof.nodes).toEqual(fixture.nodes);
+    expect(proof.blocks[0].receiptLogs[0].eventLog.data).toBe(fixture.eventLog.data);
+    expect(proof.blocks[0].receiptProof.nodes.every(node => hexToBytes(node).length <= 4096)).toBe(
+      true,
+    );
+  },
+);
 
 it('builds one combined receipt proof for multiple receipts in the same execution block', async () => {
   const txHash0: Hex = `0x${'aa'.repeat(32)}`;
