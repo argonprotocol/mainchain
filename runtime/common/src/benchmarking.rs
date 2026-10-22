@@ -18,9 +18,8 @@ use argon_primitives::{
 	prelude::Tick,
 	treasury::TreasuryPositionProvider,
 	vault::{
-		BitcoinLockFundingUpdate, BitcoinSecuritization, BitcoinSecuritizationBasis,
-		BitcoinVaultProvider, LockExtension, LostBitcoinCompensation, RegistrationVaultData,
-		ReserveSecuritizationRequest, VaultError,
+		BitcoinLockFunding, BitcoinSecuritizationBasis, BitcoinVaultProvider, CosignerGuarantee,
+		LostBitcoinCompensation, RegistrationVaultData, ReserveSecuritizationRequest, VaultError,
 	},
 	Balance, BitcoinFissionLockError, BitcoinFissionLockProvider, BitcoinFissionMinting,
 	BitcoinFissionsProvider, EthereumVerifyProvider, MiningSlotProvider, Moment,
@@ -59,33 +58,48 @@ impl<T: pallet_bitcoin_locks::Config> BitcoinVerifier<T> for BenchmarkBitcoinSig
 	}
 }
 
-pub struct BenchmarkBitcoinFissionLockProvider<AccountId, Balance>(
-	PhantomData<(AccountId, Balance)>,
+pub struct BenchmarkBitcoinFissionLockProvider<AccountId, Balance, FeeCoupon>(
+	PhantomData<(AccountId, Balance, FeeCoupon)>,
 );
-impl<AccountId, Balance> BitcoinFissionLockProvider<AccountId, Balance>
-	for BenchmarkBitcoinFissionLockProvider<AccountId, Balance>
+impl<AccountId, Balance, FeeCoupon> BitcoinFissionLockProvider<AccountId, Balance>
+	for BenchmarkBitcoinFissionLockProvider<AccountId, Balance, FeeCoupon>
 where
 	Balance: codec::Codec + codec::MaxEncodedLen + Copy + Default + AtLeast32BitUnsigned,
 {
 	type Weights = ();
+	type FeeCoupon = FeeCoupon;
 
 	fn fission_satoshis(
 		_account_id: &AccountId,
 		_lock_id: BitcoinLockId,
 		satoshis: Satoshis,
 		microgons_at_target_per_btc: Balance,
-	) -> Result<(Balance, Tick), BitcoinFissionLockError> {
-		Ok((Self::calculate_liquidity_promised(satoshis, microgons_at_target_per_btc)?, 0))
+		_fee_coupon: Option<Self::FeeCoupon>,
+	) -> Result<(Balance, Tick, CosignerGuarantee<Balance>), BitcoinFissionLockError> {
+		let amount = Self::calculate_liquidity_promised(satoshis, microgons_at_target_per_btc)?;
+		Ok((
+			amount,
+			0,
+			CosignerGuarantee {
+				basis: BitcoinSecuritizationBasis {
+					satoshis,
+					microgons_at_target_per_btc,
+					tick: 0,
+				},
+				guaranteed_microgons: amount,
+				fund_hold_extensions: Default::default(),
+			},
+		))
 	}
 
-	fn validate_fission(
+	fn update_fission_guarantee(
 		_account_id: &AccountId,
 		_lock_id: BitcoinLockId,
 		_satoshis: Satoshis,
+		_guarantee: &mut CosignerGuarantee<Balance>,
 		_microgons_at_target_per_btc: Balance,
 		minimum_last_ratchet_tick: Tick,
-		_current_liquidity_promised: Balance,
-		_replacement_liquidity_promised: Balance,
+		_fee_coupon: Option<Self::FeeCoupon>,
 	) -> Result<Tick, BitcoinFissionLockError> {
 		Ok(minimum_last_ratchet_tick)
 	}
@@ -94,7 +108,7 @@ where
 		satoshis: Satoshis,
 		microgons_at_target_per_btc: Balance,
 	) -> Result<Balance, BitcoinFissionLockError> {
-		Ok(BitcoinSecuritizationBasis { satoshis, microgons_at_target_per_btc }
+		Ok(BitcoinSecuritizationBasis { satoshis, microgons_at_target_per_btc, tick: 0 }
 			.btc_value_in_microgons())
 	}
 
@@ -102,9 +116,10 @@ where
 		_account_id: &AccountId,
 		_lock_id: BitcoinLockId,
 		satoshis: Satoshis,
+		_guarantee: CosignerGuarantee<Balance>,
 		microgons_at_target_per_btc: Balance,
 	) -> Result<Balance, BitcoinFissionLockError> {
-		Ok(BitcoinSecuritizationBasis { satoshis, microgons_at_target_per_btc }
+		Ok(BitcoinSecuritizationBasis { satoshis, microgons_at_target_per_btc, tick: 0 }
 			.btc_value_in_microgons())
 	}
 }
@@ -247,30 +262,15 @@ where
 
 	fn record_bitcoin_lock_funding(
 		_vault_id: VaultId,
-		_update: BitcoinLockFundingUpdate<Self::Balance>,
+		_before: BitcoinLockFunding<Self::Balance>,
+		_after: BitcoinLockFunding<Self::Balance>,
 	) -> Result<(), VaultError> {
 		Err(VaultError::VaultNotFound)
-	}
-
-	fn record_bitcoin_lock_funding_reduction(
-		_vault_id: VaultId,
-		_update: BitcoinLockFundingUpdate<Self::Balance>,
-	) -> Result<(), VaultError> {
-		Err(VaultError::VaultNotFound)
-	}
-
-	fn get_projected_flexible_securitization(
-		_vault_id: VaultId,
-		_flexible_securitization_released: Self::Balance,
-		_flexible_securitization_added: Self::Balance,
-	) -> Option<(Self::Balance, Self::Balance)> {
-		None
 	}
 
 	fn set_bitcoin_lock_flexible(
 		_vault_id: VaultId,
-		_securitization: &BitcoinSecuritization<Self::Balance>,
-		_securitized_satoshis: argon_primitives::bitcoin::Satoshis,
+		_activated_securitization: Self::Balance,
 		_is_flexible: bool,
 	) -> Result<(), VaultError> {
 		Err(VaultError::VaultNotFound)
@@ -279,7 +279,7 @@ where
 	fn reserve_securitization(
 		_vault_id: VaultId,
 		_locker: &Self::AccountId,
-		_securitization: &BitcoinSecuritization<Self::Balance>,
+		_securitization: &CosignerGuarantee<Self::Balance>,
 		_request: ReserveSecuritizationRequest<Self::Balance>,
 	) -> Result<(Self::Balance, Self::Balance), VaultError> {
 		Err(VaultError::VaultNotFound)
@@ -287,30 +287,21 @@ where
 
 	fn release_bitcoin_lock_securitization(
 		_vault_id: VaultId,
-		_current_securitization: &BitcoinSecuritization<Self::Balance>,
-		_lock_funded_satoshis: argon_primitives::bitcoin::Satoshis,
-		_lock_extension: &LockExtension<Self::Balance>,
+		_securitization: &CosignerGuarantee<Self::Balance>,
+		_funded_satoshis: Satoshis,
+		_lock_expiration: BitcoinHeight,
 		_is_flexible: bool,
-	) -> Result<(), VaultError> {
-		Err(VaultError::VaultNotFound)
-	}
-
-	fn release_unactivated_securitization(
-		_vault_id: VaultId,
-		_amount: Self::Balance,
-		_lock_extension: &LockExtension<Self::Balance>,
-		_collateral_offset: Self::Balance,
 	) -> Result<(), VaultError> {
 		Err(VaultError::VaultNotFound)
 	}
 
 	fn burn(
 		_vault_id: VaultId,
-		_securitization: &BitcoinSecuritization<Self::Balance>,
-		_funded_satoshis: argon_primitives::bitcoin::Satoshis,
-		_market_rate: Self::Balance,
-		_lock_extension: &LockExtension<Self::Balance>,
+		_securitization: &CosignerGuarantee<Self::Balance>,
+		_funded_satoshis: Satoshis,
+		_lock_expiration: BitcoinHeight,
 		_is_flexible: bool,
+		_market_rate: Self::Balance,
 	) -> Result<Self::Balance, VaultError> {
 		Err(VaultError::VaultNotFound)
 	}
@@ -318,11 +309,11 @@ where
 	fn compensate_lost_bitcoin(
 		_vault_id: VaultId,
 		_beneficiary: &Self::AccountId,
-		_securitization: &BitcoinSecuritization<Self::Balance>,
-		_funded_satoshis: argon_primitives::bitcoin::Satoshis,
-		_market_rate: Self::Balance,
-		_lock_extension: &LockExtension<Self::Balance>,
+		_securitization: &CosignerGuarantee<Self::Balance>,
+		_funded_satoshis: Satoshis,
+		_lock_expiration: BitcoinHeight,
 		_is_flexible: bool,
+		_market_rate: Self::Balance,
 	) -> Result<LostBitcoinCompensation<Self::Balance>, VaultError> {
 		Err(VaultError::VaultNotFound)
 	}

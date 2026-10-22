@@ -4,9 +4,8 @@
 use argon_primitives::{
 	bitcoin::BitcoinLockId,
 	treasury::{PositionQuantity, TreasuryPositionProvider},
-	vault::BitcoinSecuritizationBasis,
-	BitcoinFissionMinting, BitcoinFissionRequirements, BitcoinFissionsProvider,
-	OperationalAccountsHook,
+	vault::{BitcoinSecuritizationBasis, CosignerGuarantee},
+	BitcoinFissionMinting, BitcoinFissionsProvider, OperationalAccountsHook,
 };
 use pallet_prelude::*;
 
@@ -15,6 +14,7 @@ pub use weights::{ProviderWeightAdapter, WeightInfo, WithProviderWeights};
 
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
+pub mod migrations;
 #[cfg(test)]
 mod mock;
 #[cfg(test)]
@@ -30,7 +30,7 @@ pub mod pallet {
 	};
 	use codec::HasCompact;
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(2);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -51,7 +51,12 @@ pub mod pallet {
 			+ TypeInfo
 			+ MaxEncodedLen
 			+ HasCompact;
-		type LockProvider: BitcoinFissionLockProvider<Self::AccountId, Self::Balance>;
+		type FeeCoupon: Parameter;
+		type LockProvider: BitcoinFissionLockProvider<
+			Self::AccountId,
+			Self::Balance,
+			FeeCoupon = Self::FeeCoupon,
+		>;
 		type Minting: BitcoinFissionMinting<Self::AccountId, Self::Balance>;
 		type PositionProvider: TreasuryPositionProvider<Self::AccountId, Self::Balance>;
 		type OperationalAccountsHook: OperationalAccountsHook<Self::AccountId, Self::Balance>;
@@ -122,6 +127,8 @@ pub mod pallet {
 		/// Outstanding Fission liability.
 		#[codec(compact)]
 		pub liquidity_promised: T::Balance,
+		/// Cosigner guarantee owned by this Fission.
+		pub cosigner_guarantee: CosignerGuarantee<T::Balance>,
 		/// Argon block when this Fission was created.
 		#[codec(compact)]
 		pub created_at_argon_block: BlockNumberFor<T>,
@@ -215,6 +222,10 @@ pub mod pallet {
 		InsufficientFunds,
 		/// A Fission allocation, liability, or identifier overflowed.
 		Overflow,
+		/// The Vault could not upgrade the guarantee assigned to this Fission.
+		ResecuritizationFailed,
+		/// The fee coupon is invalid, expired, or already consumed.
+		InvalidFeeCoupon,
 	}
 
 	impl<T: Config> From<BitcoinFissionLockError> for Error<T> {
@@ -236,6 +247,9 @@ pub mod pallet {
 					Self::InsufficientFissionedSatoshis,
 				BitcoinFissionLockError::NoBitcoinPricesAvailable => Self::NoBitcoinPricesAvailable,
 				BitcoinFissionLockError::Overflow => Self::Overflow,
+				BitcoinFissionLockError::InsufficientFunds => Self::InsufficientFunds,
+				BitcoinFissionLockError::ResecuritizationFailed => Self::ResecuritizationFailed,
+				BitcoinFissionLockError::InvalidFeeCoupon => Self::InvalidFeeCoupon,
 			}
 		}
 	}
@@ -252,6 +266,7 @@ pub mod pallet {
 			#[pallet::compact] lock_id: BitcoinLockId,
 			#[pallet::compact] satoshis: Satoshis,
 			#[pallet::compact] microgons_at_target_per_btc: T::Balance,
+			fee_coupon: Option<T::FeeCoupon>,
 		) -> DispatchResult {
 			let account_id = ensure_signed(origin)?;
 			let minimum_fission_id = NextFissionIdByOwner::<T>::get(&account_id);
@@ -269,13 +284,16 @@ pub mod pallet {
 					.map(|_| ())
 					.map_err(|_| Error::<T>::TooManyFissionsForLock)
 			})?;
-			let (liquidity_promised, last_ratchet_tick) = T::LockProvider::fission_satoshis(
-				&account_id,
-				lock_id,
-				satoshis,
-				microgons_at_target_per_btc,
-			)
-			.map_err(Error::<T>::from)?;
+
+			let (liquidity_promised, last_ratchet_tick, cosigner_guarantee) =
+				T::LockProvider::fission_satoshis(
+					&account_id,
+					lock_id,
+					satoshis,
+					microgons_at_target_per_btc,
+					fee_coupon,
+				)
+				.map_err(Error::<T>::from)?;
 			T::Minting::request_mint(&account_id, fission_id, lock_id, liquidity_promised)?;
 
 			let block_number = frame_system::Pallet::<T>::block_number();
@@ -289,6 +307,7 @@ pub mod pallet {
 					microgons_at_target_per_btc,
 					last_ratchet_tick,
 					liquidity_promised,
+					cosigner_guarantee,
 					created_at_argon_block: block_number,
 					ratchet_number: 0,
 					last_updated_argon_block: block_number,
@@ -326,6 +345,7 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			#[pallet::compact] fission_id: FissionId,
 			#[pallet::compact] microgons_at_target_per_btc: T::Balance,
+			fee_coupon: Option<T::FeeCoupon>,
 		) -> DispatchResult {
 			let account_id = ensure_signed(origin)?;
 			let mut fission = FissionByOwnerAndId::<T>::get(&account_id, fission_id)
@@ -334,9 +354,9 @@ pub mod pallet {
 			let ratchet_number =
 				fission.ratchet_number.checked_add(1).ok_or(Error::<T>::RatchetNumberOverflow)?;
 			let difference = if microgons_at_target_per_btc >= fission.microgons_at_target_per_btc {
-				microgons_at_target_per_btc - fission.microgons_at_target_per_btc
+				microgons_at_target_per_btc.saturating_sub(fission.microgons_at_target_per_btc)
 			} else {
-				fission.microgons_at_target_per_btc - microgons_at_target_per_btc
+				fission.microgons_at_target_per_btc.saturating_sub(microgons_at_target_per_btc)
 			};
 			let minimum_change =
 				T::MinimumRatchetPercent::get().mul_ceil(fission.microgons_at_target_per_btc);
@@ -356,14 +376,15 @@ pub mod pallet {
 			} else {
 				(liquidity_promised, liquidity_promised)
 			};
-			let last_ratchet_tick = match T::LockProvider::validate_fission(
+
+			let last_ratchet_tick = match T::LockProvider::update_fission_guarantee(
 				&account_id,
 				fission.lock_id,
 				fission.satoshis,
+				&mut fission.cosigner_guarantee,
 				microgons_at_target_per_btc,
 				fission.last_ratchet_tick,
-				fission.liquidity_promised,
-				liquidity_promised,
+				fee_coupon,
 			) {
 				Ok(tick) => tick,
 				Err(BitcoinFissionLockError::InsufficientSecuritization) =>
@@ -439,6 +460,7 @@ pub mod pallet {
 				&account_id,
 				fission.lock_id,
 				fission.satoshis,
+				fission.cosigner_guarantee.clone(),
 				fission.microgons_at_target_per_btc,
 			)
 			.map_err(Error::<T>::from)?;
@@ -491,51 +513,24 @@ impl<T: Config> BitcoinFissionsProvider<T::AccountId, T::Balance> for Pallet<T> 
 		T::PositionProvider::account_quantities(account_id).fission_liquidity
 	}
 
-	fn get_lock_fission_requirements(
+	fn get_lock_fission_guarantees(
 		account_id: &T::AccountId,
 		lock_id: BitcoinLockId,
-	) -> Option<BitcoinFissionRequirements<T::Balance>> {
-		let mut requirements: Option<BitcoinFissionRequirements<T::Balance>> = None;
-		for fission_id in FissionIdsByLockId::<T>::get(lock_id) {
-			let Some(fission) = FissionByOwnerAndId::<T>::get(account_id, fission_id) else {
-				continue
-			};
-
-			if let Some(requirements) = requirements.as_mut() {
-				requirements.microgons_at_target_per_btc = requirements
-					.microgons_at_target_per_btc
-					.max(fission.microgons_at_target_per_btc);
-				requirements.liquidity_promised.saturating_accrue(fission.liquidity_promised);
-				requirements.last_ratchet_tick =
-					requirements.last_ratchet_tick.max(fission.last_ratchet_tick);
-			} else {
-				requirements = Some(BitcoinFissionRequirements {
-					microgons_at_target_per_btc: fission.microgons_at_target_per_btc,
-					liquidity_promised: fission.liquidity_promised,
-					last_ratchet_tick: fission.last_ratchet_tick,
-				});
-			}
-		}
-		requirements
-	}
-
-	fn get_lock_fission_redemption_bases(
-		account_id: &T::AccountId,
-		lock_id: BitcoinLockId,
-	) -> Option<Vec<BitcoinSecuritizationBasis<T::Balance>>> {
-		let fission_ids = FissionIdsByLockId::<T>::get(lock_id);
-		if fission_ids.is_empty() {
-			return None;
-		}
-		let mut bases = Vec::with_capacity(fission_ids.len());
-		for fission_id in fission_ids {
-			let fission = FissionByOwnerAndId::<T>::get(account_id, fission_id)?;
-			bases.push(BitcoinSecuritizationBasis {
-				satoshis: fission.satoshis,
-				microgons_at_target_per_btc: fission.microgons_at_target_per_btc,
-			});
-		}
-		Some(bases)
+	) -> Vec<(BitcoinSecuritizationBasis<T::Balance>, CosignerGuarantee<T::Balance>)> {
+		FissionIdsByLockId::<T>::get(lock_id)
+			.into_iter()
+			.filter_map(|fission_id| {
+				let fission = FissionByOwnerAndId::<T>::get(account_id, fission_id)?;
+				Some((
+					BitcoinSecuritizationBasis {
+						satoshis: fission.satoshis,
+						microgons_at_target_per_btc: fission.microgons_at_target_per_btc,
+						tick: fission.last_ratchet_tick,
+					},
+					fission.cosigner_guarantee,
+				))
+			})
+			.collect()
 	}
 
 	fn close_for_lock(

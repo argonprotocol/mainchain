@@ -207,7 +207,7 @@ pub mod pallet {
 			});
 		}
 
-		/// Replace one canonical lock's contribution when it belongs to this owner's upstream.
+		/// Replace an affected Bitcoin securitization contribution in this owner's upstream.
 		/// Checked arithmetic prevents drift; a failed replacement leaves the aggregate unchanged.
 		fn bitcoin_position_updated(
 			account: &T::AccountId,

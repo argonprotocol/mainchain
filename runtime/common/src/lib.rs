@@ -102,6 +102,8 @@ macro_rules! use_unless_benchmark {
 #[macro_export]
 macro_rules! inject_runtime_vars {
 	() => {
+		use $crate::migrations::CosignerGuaranteesMigration;
+
 		// To learn more about runtime versioning, see:
 		// https://docs.substrate.io/main-docs/build/upgrade#runtime-versioning
 		#[sp_version::runtime_version]
@@ -157,9 +159,8 @@ macro_rules! inject_runtime_vars {
 		///
 		/// This can be a tuple of types, each implementing `OnRuntimeUpgrade`.
 		type Migrations = (
-			pallet_vaults::migrations::RemoveVaultSecuritizationRatioMigration<Runtime>,
+			CosignerGuaranteesMigration<Runtime>,
 			$crate::migrations::AddVaultSecuritizedSatoshis<Runtime>,
-			pallet_bitcoin_locks::migrations::RemoveSecuritizationRatioMigration<Runtime>,
 		);
 
 		/// Unchecked extrinsic type as expected by this runtime.

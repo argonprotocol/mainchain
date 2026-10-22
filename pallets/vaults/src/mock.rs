@@ -33,7 +33,8 @@ frame_support::construct_runtime!(
 		Balances: pallet_balances,
 		OperationalAccounts: pallet_operational_accounts,
 		Vaults: pallet_vaults,
-		BitcoinLocks: pallet_bitcoin_locks
+		BitcoinLocks: pallet_bitcoin_locks,
+		BitcoinFissions: pallet_bitcoin_fissions
 	}
 );
 
@@ -247,7 +248,7 @@ impl pallet_vaults::Config for Test {
 	type MaxPendingCosignsPerVault = ConstU32<100>;
 	type RevenueCollectionExpirationFrames = ConstU64<10>;
 	type OperationalMinimumVaultSecuritization = OperationalMinimumVaultSecuritization;
-	type OperationalAccountsHook = ();
+	type OperationalAccountsHook = OperationalAccounts;
 	type TreasuryPoolProvider = ();
 	type PositionProvider = TreasuryPositions;
 	type OperationalAccountProvider = MockOperationalAccountProvider;
@@ -259,7 +260,7 @@ impl BitcoinUtxoTracker for StaticBitcoinUtxoTracker {
 	type Weights = ();
 
 	fn get_synched_height() -> BitcoinHeight {
-		0
+		SynchedBitcoinHeight::get()
 	}
 
 	fn unwatch_utxo(_lock_id: BitcoinLockId, utxo_ref: &UtxoRef) {
@@ -293,6 +294,7 @@ parameter_types! {
 	pub static LockReclamationBlocks: BitcoinHeight = 30;
 	pub static LockDurationBlocks: BitcoinHeight = 144 * 365;
 	pub static BitcoinBlockHeightChange: (BitcoinHeight, BitcoinHeight) = (0, 0);
+	pub static SynchedBitcoinHeight: BitcoinHeight = 0;
 	pub static MinimumLockSatoshis: Satoshis = 10_000_000;
 
 	pub static NextBitcoinLockId: BitcoinLockId = 1;
@@ -354,7 +356,7 @@ impl pallet_bitcoin_locks::Config for Test {
 	type PositionProvider = TreasuryPositions;
 	type WeightInfo = ();
 	type Balance = Balance;
-	type FissionsProvider = ();
+	type FissionsProvider = BitcoinFissions;
 	type Currency = Balances;
 	type RuntimeHoldReason = RuntimeHoldReason;
 	type BitcoinUtxoTracker = StaticBitcoinUtxoTracker;
@@ -395,3 +397,27 @@ impl pallet_treasury_positions::Config for Test {
 	type Balance = Balance;
 	type WeightInfo = ();
 }
+
+// Accounting tests bypass mint issuance and repayment tracking.
+pub struct TestMinting;
+impl argon_primitives::BitcoinFissionMinting<u64, Balance> for TestMinting {
+	type Weights = ();
+	fn request_mint(_: &u64, _: u64, _: u64, _: Balance) -> DispatchResult {
+		Ok(())
+	}
+	fn record_mint_repayment(_: Balance) {}
+}
+impl pallet_bitcoin_fissions::Config for Test {
+	type WeightInfo = ();
+	type Balance = Balance;
+	type FeeCoupon = pallet_bitcoin_locks::FeeCoupon<Test>;
+	type LockProvider = BitcoinLocks;
+	type Minting = TestMinting;
+	type PositionProvider = TreasuryPositions;
+	type OperationalAccountsHook = OperationalAccounts;
+	type Currency = Balances;
+	type MaxFissionsPerLock = ConstU32<50>;
+	type MinimumRatchetPercent = MinimumRatchetPercent;
+}
+
+parameter_types! { pub MinimumRatchetPercent: Percent = Percent::from_percent(1); }

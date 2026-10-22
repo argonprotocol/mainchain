@@ -15,7 +15,7 @@ pub trait WeightInfo {
 	fn close() -> Weight;
 	fn lock_spent(fissions: u32) -> Weight;
 	fn provider_get_account_fission_liquidity() -> Weight;
-	fn provider_get_lock_fission_requirements() -> Weight;
+	fn provider_get_lock_fission_guarantees() -> Weight;
 }
 
 type FissionMintingWeights<T> = <<T as Config>::Minting as BitcoinFissionMinting<
@@ -60,7 +60,7 @@ where
 	fn ratchet() -> Weight {
 		Base::ratchet()
 			.saturating_add(PositionProviderWeights::<T>::account_quantity_updated())
-			.saturating_add(LockProviderWeight::validate_fission())
+			.saturating_add(LockProviderWeight::update_fission_guarantee())
 			.saturating_add(LockProviderWeight::calculate_liquidity_promised())
 			.saturating_add(MintingWeight::request_mint())
 			.saturating_add(MintingWeight::record_mint_repayment())
@@ -99,8 +99,8 @@ where
 			.saturating_add(PositionProviderWeights::<T>::account_quantities())
 	}
 
-	fn provider_get_lock_fission_requirements() -> Weight {
-		Base::provider_get_lock_fission_requirements()
+	fn provider_get_lock_fission_guarantees() -> Weight {
+		Base::provider_get_lock_fission_guarantees()
 	}
 }
 
@@ -110,15 +110,8 @@ impl<T: Config> BitcoinFissionsProviderWeightInfo for ProviderWeightAdapter<T> {
 		T::WeightInfo::provider_get_account_fission_liquidity()
 	}
 
-	fn get_lock_fission_requirements() -> Weight {
-		T::WeightInfo::provider_get_lock_fission_requirements()
-	}
-
-	fn get_lock_fission_redemption_bases() -> Weight {
-		T::WeightInfo::provider_get_lock_fission_requirements().saturating_add(
-			LockProviderWeights::<T>::fuse_satoshis()
-				.saturating_mul(T::MaxFissionsPerLock::get().into()),
-		)
+	fn get_lock_fission_guarantees() -> Weight {
+		T::WeightInfo::provider_get_lock_fission_guarantees()
 	}
 
 	fn close_for_lock() -> Weight {
@@ -147,7 +140,7 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 
-	fn provider_get_lock_fission_requirements() -> Weight {
+	fn provider_get_lock_fission_guarantees() -> Weight {
 		Weight::zero()
 	}
 }
