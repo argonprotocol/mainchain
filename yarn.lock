@@ -47,6 +47,8 @@ __metadata:
     "@openzeppelin/contracts": "npm:^5.4.0"
     "@openzeppelin/contracts-upgradeable": "npm:^5.4.0"
     "@types/node": "npm:22.17.1"
+    "@uniswap/v3-core": "npm:1.0.2-solc-0.8-simulate"
+    "@uniswap/v4-core": "npm:1.0.2"
     "@wagmi/cli": "npm:^2.10.0"
     ethers: "npm:^6.15.0"
     hardhat: "npm:^3.18.1"
@@ -4283,6 +4285,20 @@ __metadata:
   version: 1.3.0
   resolution: "@ungap/structured-clone@npm:1.3.0"
   checksum: 10c0/0fc3097c2540ada1fc340ee56d58d96b5b536a2a0dab6e3ec17d4bfc8c4c86db345f61a375a8185f9da96f01c69678f836a2b57eeaa9e4b8eeafd26428e57b0a
+  languageName: node
+  linkType: hard
+
+"@uniswap/v3-core@npm:1.0.2-solc-0.8-simulate":
+  version: 1.0.2-solc-0.8-simulate
+  resolution: "@uniswap/v3-core@npm:1.0.2-solc-0.8-simulate"
+  checksum: 10c0/62b1a9bb79a172be36b55c860eac7210271b6f8cfc3566c7acfec0880ea36e40e0f40343de55672e2c5ca1650969f33aecae5186f0cc26fa4fbe3aa5cc1b95be
+  languageName: node
+  linkType: hard
+
+"@uniswap/v4-core@npm:1.0.2":
+  version: 1.0.2
+  resolution: "@uniswap/v4-core@npm:1.0.2"
+  checksum: 10c0/a0f97e6a73e6d6395191d1f95d0e8914f338dab83144092105b12dd7bebf7cab8bd8f2ceeab048061f54c0e499e83d3dcde9443062949f6f7c227c2ee4d54f2c
   languageName: node
   linkType: hard
 

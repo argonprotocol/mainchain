@@ -35,6 +35,8 @@
     "@openzeppelin/contracts": "^5.4.0",
     "@openzeppelin/contracts-upgradeable": "^5.4.0",
     "@types/node": "22.17.1",
+    "@uniswap/v3-core": "1.0.2-solc-0.8-simulate",
+    "@uniswap/v4-core": "1.0.2",
     "@wagmi/cli": "^2.10.0",
     "ethers": "^6.15.0",
     "hardhat": "^3.18.1",

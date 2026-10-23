@@ -2,7 +2,7 @@ use crate::uniswap_oracle::{
 	ethereum_rpc_urls_from_env, PriceAndLiquidity, UniswapOracle, USDC_ADDRESS,
 	USDC_ADDRESS_SEPOLIA,
 };
-use anyhow::Result;
+use anyhow::{Context, Result};
 use argon_client::api::runtime_types::pallet_price_index::PriceIndex;
 use argon_primitives::{
 	tick::{Tick, Ticker},
@@ -59,11 +59,20 @@ impl ArgonPriceLookup {
 			env::var("ARGON_TOKEN_ADDRESS").expect("ARGON_TOKEN_ADDRESS must be set");
 		let network = if use_sepolia { ChainId::SEPOLIA } else { ChainId::MAINNET };
 		let ethereum_rpc_urls = ethereum_rpc_urls_from_env()?;
+		let oracle_addresses = env::var("ARGON_UNISWAP_ORACLE_ADDRESSES")
+			.context("ARGON_UNISWAP_ORACLE_ADDRESSES must be set")?;
 
 		let usdc_token = get_usdc_token(network);
 		let lookup_token =
 			token!(network as u64, argon_token_address, 18, ARGON_TOKEN_SYMBOL, "Argon");
-		Self::new(ticker, last_price, ethereum_rpc_urls, usdc_token, lookup_token).await
+		let mut lookup =
+			Self::new(ticker, last_price, ethereum_rpc_urls, usdc_token, lookup_token).await?;
+		lookup
+			.uniswap_oracle
+			.set_oracle_addresses(&oracle_addresses)
+			.await
+			.context("Invalid ARGON_UNISWAP_ORACLE_ADDRESSES")?;
+		Ok(lookup)
 	}
 
 	/// Calculates the expected cost of an Argon in USD based on the starting and current U.S. CPI.
@@ -119,41 +128,39 @@ mod test {
 	use std::{str::FromStr, time::Duration};
 
 	const MOCK_ARGON_TOKEN_ADDRESS: &str = "6b175474e89094c44da98b954eedeac495271d0f";
-	const MOCK_ARGONOT_TOKEN_ADDRESS: &str = "64CBd3aa07d427E385Cb55330406508718E55f01";
 
-	fn before_each() {
-		dotenv::dotenv().ok();
-		unsafe {
-			env::set_var("USE_SEPOLIA", "true");
-			env::set_var("ETHEREUM_RPC_URLS", "http://localhost:8545");
-			env::set_var("ARGON_TOKEN_ADDRESS", MOCK_ARGON_TOKEN_ADDRESS);
-			env::set_var("ARGONOT_TOKEN_ADDRESS", MOCK_ARGONOT_TOKEN_ADDRESS);
-		}
+	async fn price_lookup(ticker: &Ticker) -> ArgonPriceLookup {
+		ArgonPriceLookup::new(
+			ticker,
+			None,
+			vec!["http://localhost:8545".into()],
+			get_usdc_token(ChainId::SEPOLIA),
+			token!(ChainId::SEPOLIA as u64, MOCK_ARGON_TOKEN_ADDRESS, 18),
+		)
+		.await
+		.unwrap()
 	}
 
 	#[tokio::test]
 	async fn test_get_target_price() {
-		before_each();
 		let ticker = Ticker::start(Duration::from_secs(60), 2);
-		let argon_price_lookup = ArgonPriceLookup::from_env(&ticker, None).await.unwrap();
+		let argon_price_lookup = price_lookup(&ticker).await;
 		let us_cpi_ratio = FixedI128::from_float(0.00);
 		assert_eq!(argon_price_lookup.get_target_price(us_cpi_ratio), FixedU128::from_u32(1));
 	}
 
 	#[tokio::test]
 	async fn test_get_target_price_with_cpi() {
-		before_each();
 		let ticker = Ticker::start(Duration::from_secs(60), 2);
-		let argon_price_lookup = ArgonPriceLookup::from_env(&ticker, None).await.unwrap();
+		let argon_price_lookup = price_lookup(&ticker).await;
 		let us_cpi_ratio = FixedI128::from_float(0.1);
 		assert_eq!(argon_price_lookup.get_target_price(us_cpi_ratio).to_float(), 1.1);
 	}
 
 	#[tokio::test]
 	async fn adjusts_price_by_usdc_price() {
-		before_each();
 		let ticker = Ticker::start(Duration::from_secs(60), 2);
-		let mut argon_price_lookup = ArgonPriceLookup::from_env(&ticker, None).await.unwrap();
+		let mut argon_price_lookup = price_lookup(&ticker).await;
 
 		let argon_usdc_price = FixedU128::from_float(0.99);
 		let address = Address::from_str(MOCK_ARGON_TOKEN_ADDRESS).unwrap();

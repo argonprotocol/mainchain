@@ -10,8 +10,9 @@ use argon_primitives::{
 use polkadot_sdk::*;
 use sdk_core::prelude::*;
 use sp_runtime::FixedU128;
-use std::{collections::HashMap, env, fmt, sync::Arc};
-use tokio::sync::Mutex;
+#[cfg(test)]
+use std::{collections::HashMap, sync::Arc};
+use std::{env, fmt};
 use tracing::{error, trace, warn};
 use uniswap_lens::bindings::iuniswapv3pool::IUniswapV3Pool::IUniswapV3PoolInstance;
 use uniswap_v3_sdk::{entities::TickIndex, prelude::*};
@@ -32,12 +33,9 @@ pub fn ethereum_rpc_urls_from_env() -> Result<Vec<String>> {
 pub const USDC_ADDRESS: Address = address!("A0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
 pub(crate) const USDC_ADDRESS_SEPOLIA: Address =
 	address!("1c7D4B196Cb0C7B01d743Fbc6116a902379C7238");
-pub const SEPOLIA_FACTORY_ADDRESS: Address = address!("0227628f3F023bb0B980b67D528571c95c6DaC1c");
-type PoolContract = IUniswapV3PoolInstance<RootProvider<Ethereum>>;
-
-struct EthereumRpcProvider {
-	provider: Arc<RootProvider<Ethereum>>,
-	pool_cache_by_fee: Mutex<HashMap<FeeAmount, PoolContract>>,
+alloy_sol_types::sol! {
+	/// Uniswap v3-core Solidity 0.8 oracle history error.
+	error OLD();
 }
 
 #[cfg(test)]
@@ -51,11 +49,10 @@ pub(crate) fn use_mock_uniswap_prices(token_address: Address, mut prices: Vec<Pr
 }
 
 pub struct UniswapOracle {
-	providers: Vec<EthereumRpcProvider>,
-	factory_address: Address,
+	providers: Vec<RootProvider<Ethereum>>,
 	usd_token: Token,
 	lookup_token: Token,
-	fee_tiers: Vec<FeeAmount>,
+	oracle_addresses: Vec<Address>,
 }
 
 #[derive(Clone, Copy, Debug, Ord, PartialOrd, Eq, PartialEq, Default)]
@@ -73,8 +70,9 @@ pub(crate) enum UniswapOracleError {
 impl fmt::Display for UniswapOracleError {
 	fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 		match self {
-			Self::NoPoolData => write!(f, "No pool data across available fee tiers"),
-			Self::NoActiveLiquidity => write!(f, "No active liquidity across available fee tiers"),
+			Self::NoPoolData => write!(f, "No pool data across configured Uniswap sources"),
+			Self::NoActiveLiquidity =>
+				write!(f, "No active liquidity across configured Uniswap sources"),
 		}
 	}
 }
@@ -87,28 +85,66 @@ impl UniswapOracle {
 			return Err(anyhow!("At least one Ethereum RPC URL is required"));
 		}
 
-		let factory_address = if usd_token.chain_id() == ChainId::SEPOLIA as u64 {
-			SEPOLIA_FACTORY_ADDRESS
-		} else {
-			FACTORY_ADDRESS
-		};
 		let mut providers = Vec::with_capacity(rpc_urls.len());
 		for url in rpc_urls {
-			providers.push(EthereumRpcProvider {
-				provider: Arc::new(RootProvider::connect(&url).await?),
-				pool_cache_by_fee: Default::default(),
-			});
+			providers.push(RootProvider::connect(&url).await?);
 		}
 
-		Ok(Self {
-			providers,
-			factory_address,
-			usd_token,
-			lookup_token,
-			// NOTE: taking high tier out since this will be for pricing a stablecoin. High fees are
-			// usually for highly volatile assets
-			fee_tiers: vec![FeeAmount::LOW, FeeAmount::MEDIUM],
-		})
+		Ok(Self { providers, usd_token, lookup_token, oracle_addresses: vec![] })
+	}
+
+	/// Select a nonempty list of v3 pool or v4 hook addresses to observe together.
+	/// Validate every source's token pair before replacing the current selection.
+	pub async fn set_oracle_addresses(&mut self, addresses: &str) -> Result<()> {
+		let mut oracle_addresses = Vec::new();
+		for value in addresses.split(',').map(str::trim).filter(|value| !value.is_empty()) {
+			let address =
+				value.parse::<Address>().context("Invalid Uniswap oracle source address")?;
+			if address.is_zero() || oracle_addresses.contains(&address) {
+				return Err(anyhow!("Uniswap oracle source addresses must be nonzero and unique"));
+			}
+
+			let mut validated = false;
+			for (index, provider) in self.providers.iter().enumerate() {
+				let contract = IUniswapV3PoolInstance::new(address, provider.clone());
+				let tokens = async {
+					Ok::<_, ContractError>((
+						contract.token0().call().await?,
+						contract.token1().call().await?,
+					))
+				}
+				.await;
+				match tokens {
+					Ok((token0, token1)) => {
+						let mut expected = [self.usd_token.address(), self.lookup_token.address()];
+						expected.sort();
+						if [token0, token1] != expected {
+							return Err(anyhow!(
+								"Uniswap oracle source {address} has the wrong token pair"
+							));
+						}
+						validated = true;
+						break;
+					},
+					Err(error)
+						if is_internal_rpc_error(&error) && index + 1 < self.providers.len() =>
+						continue,
+					Err(error) =>
+						return Err(error).context("Validating Uniswap oracle source tokens"),
+				}
+			}
+			if !validated {
+				return Err(anyhow!(
+					"No Ethereum RPC provider available to validate Uniswap oracle source"
+				));
+			}
+			oracle_addresses.push(address);
+		}
+		if oracle_addresses.is_empty() {
+			return Err(anyhow!("At least one Uniswap oracle source address is required"));
+		}
+		self.oracle_addresses = oracle_addresses;
+		Ok(())
 	}
 
 	pub async fn get_current_price(&self) -> Result<PriceAndLiquidity> {
@@ -123,7 +159,7 @@ impl UniswapOracle {
 		let (price, liquidity) = self
 			.get_aggregated_twap()
 			.await?
-			.ok_or_else(|| anyhow!("Failed to get price, using default"))?;
+			.ok_or_else(|| anyhow!("No price from configured Uniswap sources"))?;
 		let scaled_numerator = price.adjusted_for_decimals().to_decimal() * FixedU128::accuracy();
 		let float = scaled_numerator.to_u128().map_err(|_| anyhow!("Failed to convert to u128"))?;
 
@@ -134,14 +170,14 @@ impl UniswapOracle {
 		})
 	}
 
-	/// Calculate time-weighted average price and liquidity for a given fee tier.
+	/// Calculate time-weighted average price and liquidity from a v3 pool or v4 hook.
 	async fn get_twap_and_liquidity_basis(
 		&self,
-		provider: &EthereumRpcProvider,
-		fee: FeeAmount,
+		provider: &RootProvider<Ethereum>,
+		pool_address: Address,
 	) -> Result<(Price<Token, Token>, BigInt)> {
 		let block_id = BlockId::Number(BlockNumberOrTag::Latest);
-		let pool_contract = self.get_cached_pool_contract(provider, fee).await?;
+		let pool_contract = IUniswapV3PoolInstance::new(pool_address, provider.clone());
 
 		let mut backup_second_options = vec![60 * 60, 30 * 60, 10 * 60, 5 * 60, 60];
 		let mut time_window_seconds = backup_second_options.remove(0);
@@ -154,29 +190,41 @@ impl UniswapOracle {
 					return Err(UniswapOracleError::NoPoolData.into()),
 				Err(e) => {
 					let error_msg = format!("{e:?}");
-					let is_old_observation = error_msg.contains("execution reverted: OLD");
+					let is_old_observation = e.as_decoded_error::<OLD>().is_some() ||
+						error_msg.contains("execution reverted: OLD") ||
+						e.as_decoded_error::<alloy_sol_types::Revert>()
+							.is_some_and(|revert| revert.reason == "OLD");
 					if is_old_observation && !backup_second_options.is_empty() {
 						time_window_seconds = backup_second_options.remove(0);
-						trace!(fee = ?fee, new_time_window = ?time_window_seconds, error = ?e, "Reducing time window and retrying observe");
+						trace!(pool = %pool_address, new_time_window = ?time_window_seconds, error = ?e, "Reducing time window and retrying observe");
 						continue;
 					}
 					if is_old_observation {
-						return Err(anyhow!("All time windows exhausted for fee tier {fee:?}"));
+						return Err(anyhow!("All time windows exhausted for pool {pool_address}"));
 					}
-					error!(fee = ?fee, error = ?e, "Error calling observe on fee tier, returning error");
+					error!(pool = %pool_address, error = ?e, "Error calling observe on pool, returning error");
 					return Err(e).context("Error calling observe");
 				},
 			}
 		};
 
 		// Compute tick cumulative difference
+		if result.tickCumulatives.len() != 2 || result.secondsPerLiquidityCumulativeX128s.len() != 2
+		{
+			return Err(anyhow!("Pool {pool_address} returned invalid observation lengths"));
+		}
 		let tick_cumulatives = result.tickCumulatives;
-		let tick_diff = tick_cumulatives[1] - tick_cumulatives[0];
+		let tick_diff = tick_cumulatives[1].wrapping_sub(tick_cumulatives[0]);
 
 		// Calculate time-weighted average tick (fixed-point division)
 		let tick_twap = {
 			let seconds_as_i56 = I56::try_from(time_window_seconds)?;
-			(tick_diff / seconds_as_i56).to_i24()
+			let mut mean_tick = tick_diff / seconds_as_i56;
+			// Uniswap ticks round toward negative infinity, including negative fractional ticks.
+			if tick_diff < I56::ZERO && tick_diff % seconds_as_i56 != I56::ZERO {
+				mean_tick -= I56::try_from(1)?;
+			}
+			mean_tick.to_i24()
 		};
 
 		// Convert tick to sqrtPriceX96
@@ -184,8 +232,8 @@ impl UniswapOracle {
 
 		// The same observations contain cumulative seconds per liquidity. Inverting the change
 		// across the selected window produces Uniswap's harmonic mean liquidity (TWAL).
-		let liquidity_diff = result.secondsPerLiquidityCumulativeX128s[1] -
-			result.secondsPerLiquidityCumulativeX128s[0];
+		let liquidity_diff = result.secondsPerLiquidityCumulativeX128s[1]
+			.wrapping_sub(result.secondsPerLiquidityCumulativeX128s[0]);
 		let average_liquidity = if liquidity_diff.is_zero() {
 			BigInt::zero()
 		} else {
@@ -200,71 +248,77 @@ impl UniswapOracle {
 		Ok((price, liquidity_mainchain_units))
 	}
 
-	/// Aggregate TWAPs across fee tiers, weighted by TWAL
+	/// Aggregate TWAPs across the selected v3 pools and v4 hooks, weighted by TWAL.
 	async fn get_aggregated_twap(&self) -> Result<Option<(Price<Token, Token>, BigInt)>> {
-		let mut total_numerator = BigInt::zero();
-		let mut total_denominator = BigInt::zero();
+		if self.oracle_addresses.is_empty() {
+			return Err(anyhow!("At least one Uniswap oracle source address is required"));
+		}
+
+		// Normalize every raw token price to the same denominator before weighting. SDK prices
+		// otherwise have a tick-dependent denominator when the lookup token sorts after USDC.
+		let price_scale = BigInt::from(1u128) << 128;
+		let mut weighted_price_numerator = BigInt::zero();
 		let mut total_liquidity = BigInt::zero();
-		let mut no_pool_data_fee_tiers = 0usize;
-		let mut successful_fee_tiers = 0usize;
+		let mut no_pool_data_sources = 0usize;
+		let mut successful_sources = 0usize;
 		let mut had_other_errors = false;
 		let mut last_error = None;
 
-		for &fee in &self.fee_tiers {
-			let mut fee_result = None;
-			let mut fee_error = None;
+		for &pool_address in &self.oracle_addresses {
+			let mut pool_result = None;
+			let mut pool_error = None;
 			for provider in &self.providers {
-				match self.get_twap_and_liquidity_basis(provider, fee).await {
+				match self.get_twap_and_liquidity_basis(provider, pool_address).await {
 					Ok(result) => {
-						fee_result = Some(result);
+						pool_result = Some(result);
 						break;
 					},
 					Err(e) if has_internal_rpc_error(&e) => {
-						warn!(fee = ?fee, "Ethereum RPC returned an internal error; trying fallback provider");
-						fee_error = Some(e);
+						warn!(pool = %pool_address, "Ethereum RPC returned an internal error; trying fallback provider");
+						pool_error = Some(e);
 					},
 					Err(e) => {
-						fee_error = Some(e);
+						pool_error = Some(e);
 						break;
 					},
 				}
 			}
 
-			if let Some((price, current_liquidity)) = fee_result {
-				successful_fee_tiers += 1;
+			if let Some((price, current_liquidity)) = pool_result {
+				successful_sources += 1;
 				trace!(
-					fee = ?fee,
+					pool = %pool_address,
 					price = %price.to_fixed(3, None),
 					current_liquidity = ?current_liquidity,
 					"Got TWAP and liquidity basis"
 				);
 				total_liquidity += current_liquidity;
-				total_numerator += price.numerator * current_liquidity;
-				total_denominator += price.denominator * current_liquidity;
+				let scaled_price = price.numerator * price_scale / price.denominator;
+				weighted_price_numerator += scaled_price * current_liquidity;
 				continue;
 			}
 
-			let Some(e) = fee_error else {
+			let Some(e) = pool_error else {
 				continue;
 			};
 			let oracle_error =
 				e.chain().find_map(|cause| cause.downcast_ref::<UniswapOracleError>());
 			if matches!(oracle_error, Some(UniswapOracleError::NoPoolData)) {
-				no_pool_data_fee_tiers += 1;
+				no_pool_data_sources += 1;
 				continue;
 			}
 			had_other_errors = true;
-			warn!(fee = ?fee, message = e.to_string(), "Could not get TWAP and liquidity basis for fee tier, skipping");
+			warn!(pool = %pool_address, message = e.to_string(), "Could not get TWAP and liquidity basis for pool, skipping");
 			if last_error.is_none() {
 				last_error = Some(e);
 			}
 		}
 
-		if total_denominator == BigInt::zero() {
-			if no_pool_data_fee_tiers == self.fee_tiers.len() {
+		if total_liquidity == BigInt::zero() {
+			if no_pool_data_sources == self.oracle_addresses.len() {
 				return Err(UniswapOracleError::NoPoolData.into());
 			}
-			if !had_other_errors && successful_fee_tiers > 0 && total_liquidity == BigInt::zero() {
+			if !had_other_errors && successful_sources > 0 {
 				return Err(UniswapOracleError::NoActiveLiquidity.into());
 			}
 			if let Some(error) = last_error {
@@ -278,36 +332,11 @@ impl UniswapOracle {
 			Price::new(
 				self.lookup_token.clone(),
 				self.usd_token.clone(),
-				total_denominator,
-				total_numerator,
+				total_liquidity * price_scale,
+				weighted_price_numerator,
 			),
 			total_liquidity,
 		)))
-	}
-
-	async fn get_cached_pool_contract(
-		&self,
-		provider: &EthereumRpcProvider,
-		fee: FeeAmount,
-	) -> Result<PoolContract> {
-		let mut cache = provider.pool_cache_by_fee.lock().await;
-		if let Some(pool) = cache.get(&fee) {
-			return Ok(pool.clone());
-		}
-
-		let pool_address = compute_pool_address(
-			self.factory_address,
-			self.usd_token.address(),
-			self.lookup_token.address(),
-			fee,
-			None,
-			None,
-		);
-		let pool_contract =
-			IUniswapV3PoolInstance::new(pool_address, provider.provider.as_ref().clone());
-		cache.insert(fee, pool_contract.clone());
-
-		Ok(pool_contract)
 	}
 }
 
@@ -347,16 +376,12 @@ mod test {
 	#[tokio::test]
 	async fn uses_observation_history_for_time_weighted_average_liquidity() {
 		let asserter = Asserter::new();
-		let provider = EthereumRpcProvider {
-			provider: Arc::new(ProviderBuilder::default().connect_mocked_client(asserter.clone())),
-			pool_cache_by_fee: Default::default(),
-		};
+		let provider = ProviderBuilder::default().connect_mocked_client(asserter.clone());
 		let oracle = UniswapOracle {
 			providers: vec![],
-			factory_address: FACTORY_ADDRESS,
 			usd_token: token!(ChainId::MAINNET as u64, USDC_ADDRESS, 6, "USDC"),
 			lookup_token: token!(ChainId::MAINNET as u64, ARGON_ADDRESS, 18, "ARGON"),
-			fee_tiers: vec![FeeAmount::LOW],
+			oracle_addresses: vec![],
 		};
 
 		asserter.push_success(&Bytes::from(observeCall::abi_encode_returns(&observeReturn {
@@ -364,35 +389,26 @@ mod test {
 			secondsPerLiquidityCumulativeX128s: vec![U160::ZERO, U160::from(3_600u128 << 64)],
 		})));
 
-		let (_, time_weighted_average_liquidity) =
-			oracle.get_twap_and_liquidity_basis(&provider, FeeAmount::LOW).await.unwrap();
+		let (_, time_weighted_average_liquidity) = oracle
+			.get_twap_and_liquidity_basis(&provider, Address::repeat_byte(1))
+			.await
+			.unwrap();
 
 		assert_eq!(time_weighted_average_liquidity, BigInt::from((1u128 << 64) / 1_000_000));
 	}
 
 	#[tokio::test]
-	async fn uses_fallback_provider_when_any_fee_tier_returns_internal_error() {
+	async fn retries_a_configured_source_through_another_rpc_provider() {
 		let primary = Asserter::new();
 		let fallback = Asserter::new();
 		let oracle = UniswapOracle {
 			providers: vec![
-				EthereumRpcProvider {
-					provider: Arc::new(
-						ProviderBuilder::default().connect_mocked_client(primary.clone()),
-					),
-					pool_cache_by_fee: Default::default(),
-				},
-				EthereumRpcProvider {
-					provider: Arc::new(
-						ProviderBuilder::default().connect_mocked_client(fallback.clone()),
-					),
-					pool_cache_by_fee: Default::default(),
-				},
+				ProviderBuilder::default().connect_mocked_client(primary.clone()),
+				ProviderBuilder::default().connect_mocked_client(fallback.clone()),
 			],
-			factory_address: FACTORY_ADDRESS,
 			usd_token: token!(ChainId::MAINNET as u64, USDC_ADDRESS, 6, "USDC"),
 			lookup_token: token!(ChainId::MAINNET as u64, ARGON_ADDRESS, 18, "ARGON"),
-			fee_tiers: vec![FeeAmount::LOW, FeeAmount::MEDIUM],
+			oracle_addresses: vec![Address::repeat_byte(1), Address::repeat_byte(5)],
 		};
 
 		primary.push_success(&Bytes::from(observeCall::abi_encode_returns(&observeReturn {
@@ -414,6 +430,212 @@ mod test {
 	}
 
 	#[tokio::test]
+	async fn does_not_read_unlisted_sources_when_selected_history_is_unavailable() {
+		use alloy_sol_types::SolError;
+		let asserter = Asserter::new();
+		let mut oracle = UniswapOracle::new(
+			vec!["http://localhost:8545".into()],
+			token!(ChainId::MAINNET as u64, USDC_ADDRESS, 6, "USDC"),
+			token!(ChainId::MAINNET as u64, ARGON_ADDRESS, 18, "ARGON"),
+		)
+		.await
+		.unwrap();
+		oracle.providers = vec![ProviderBuilder::default().connect_mocked_client(asserter.clone())];
+		let hook = Address::repeat_byte(5);
+		oracle.oracle_addresses = vec![hook];
+		for _ in 0..5 {
+			asserter.push_failure(
+				serde_json::from_value(serde_json::json!({
+					"code": 3, "message": "execution reverted", "data": Bytes::from(OLD {}.abi_encode()),
+				}))
+				.unwrap(),
+			);
+		}
+		// A usable response for another source must not mask failure of the selected hook.
+		asserter.push_success(&Bytes::from(observeCall::abi_encode_returns(&observeReturn {
+			tickCumulatives: vec![I56::ZERO, I56::ZERO],
+			secondsPerLiquidityCumulativeX128s: vec![U160::ZERO, U160::from(3_600u128 << 64)],
+		})));
+		let error = oracle.get_current_price().await.unwrap_err();
+		assert!(error
+			.to_string()
+			.contains(&format!("All time windows exhausted for pool {hook}")));
+		assert_eq!(asserter.read_q().len(), 1);
+	}
+
+	#[tokio::test]
+	async fn rejects_sources_for_another_pair_and_invalid_addresses() {
+		use uniswap_lens::bindings::iuniswapv3pool::IUniswapV3Pool::{token0Call, token1Call};
+		let asserter = Asserter::new();
+		let mut oracle = UniswapOracle::new(
+			vec!["http://localhost:8545".into()],
+			token!(ChainId::MAINNET as u64, USDC_ADDRESS, 6, "USDC"),
+			token!(ChainId::MAINNET as u64, ARGON_ADDRESS, 18, "ARGON"),
+		)
+		.await
+		.unwrap();
+		oracle.providers = vec![ProviderBuilder::default().connect_mocked_client(asserter.clone())];
+		let error = oracle.get_current_price().await.unwrap_err();
+		assert!(error.to_string().contains("At least one Uniswap oracle source address"));
+		for empty in ["", " ", ", ,"] {
+			assert!(oracle.set_oracle_addresses(empty).await.is_err());
+		}
+		assert!(oracle.set_oracle_addresses("not an address").await.is_err());
+		assert!(oracle.set_oracle_addresses(&Address::ZERO.to_string()).await.is_err());
+		asserter.push_success(&Bytes::from(token0Call::abi_encode_returns(&USDC_ADDRESS)));
+		asserter
+			.push_success(&Bytes::from(token1Call::abi_encode_returns(&Address::repeat_byte(7))));
+		assert!(oracle
+			.set_oracle_addresses(&Address::repeat_byte(5).to_string())
+			.await
+			.unwrap_err()
+			.to_string()
+			.contains("wrong token pair"));
+		assert!(oracle.oracle_addresses.is_empty());
+
+		let hook = Address::repeat_byte(5);
+		oracle.oracle_addresses = vec![hook];
+		asserter.push_success(&Bytes::from(token0Call::abi_encode_returns(&USDC_ADDRESS)));
+		asserter.push_success(&Bytes::from(token1Call::abi_encode_returns(
+			&oracle.lookup_token.address(),
+		)));
+		assert!(oracle.set_oracle_addresses(&format!("{hook},{hook}")).await.is_err());
+		assert_eq!(oracle.oracle_addresses, vec![hook]);
+		assert!(oracle.set_oracle_addresses("").await.is_err());
+		assert_eq!(oracle.oracle_addresses, vec![hook]);
+	}
+
+	#[tokio::test]
+	async fn reads_v4_only_history_after_old_revert_and_rounds_negative_ticks_down() {
+		use alloy_sol_types::SolError;
+		let asserter = Asserter::new();
+		let mut oracle = UniswapOracle::new(
+			vec!["http://localhost:8545".into()],
+			token!(ChainId::MAINNET as u64, USDC_ADDRESS, 6, "USDC"),
+			token!(ChainId::MAINNET as u64, ARGON_ADDRESS, 18, "ARGON"),
+		)
+		.await
+		.unwrap();
+		oracle.providers = vec![ProviderBuilder::default().connect_mocked_client(asserter.clone())];
+		oracle.oracle_addresses = vec![Address::repeat_byte(5)];
+		asserter.push_failure(
+			serde_json::from_value(serde_json::json!({
+				"code": 3, "message": "execution reverted", "data": Bytes::from(OLD {}.abi_encode()),
+			}))
+			.unwrap(),
+		);
+		asserter.push_success(&Bytes::from(observeCall::abi_encode_returns(&observeReturn {
+			tickCumulatives: vec![I56::ZERO, I56::try_from(-1_801).unwrap()],
+			secondsPerLiquidityCumulativeX128s: vec![U160::ZERO, U160::from(1_800u128 << 64)],
+		})));
+		let (price, liquidity) = oracle.get_aggregated_twap().await.unwrap().unwrap();
+		let expected =
+			tick_to_price(oracle.lookup_token.clone(), oracle.usd_token.clone(), (-2i32).to_i24())
+				.unwrap();
+		assert_eq!(price.to_fixed(12, None), expected.to_fixed(12, None));
+		assert_eq!(liquidity, BigInt::from((1u128 << 64) / 1_000_000));
+	}
+
+	#[tokio::test]
+	async fn reads_wrapped_cumulative_counters_and_rejects_malformed_history() {
+		let asserter = Asserter::new();
+		let provider = ProviderBuilder::default().connect_mocked_client(asserter.clone());
+		let oracle = UniswapOracle::new(
+			vec!["http://localhost:8545".into()],
+			token!(ChainId::MAINNET as u64, USDC_ADDRESS, 6, "USDC"),
+			token!(ChainId::MAINNET as u64, ARGON_ADDRESS, 18, "ARGON"),
+		)
+		.await
+		.unwrap();
+		let hook = Address::repeat_byte(5);
+		asserter.push_success(&Bytes::from(observeCall::abi_encode_returns(&observeReturn {
+			tickCumulatives: vec![I56::MAX, I56::MIN + I56::try_from(3_599).unwrap()],
+			secondsPerLiquidityCumulativeX128s: vec![
+				U160::ZERO.wrapping_sub(U160::from(3_600u128 << 64)),
+				U160::ZERO,
+			],
+		})));
+		let (price, liquidity) =
+			oracle.get_twap_and_liquidity_basis(&provider, hook).await.unwrap();
+		let expected =
+			tick_to_price(oracle.lookup_token.clone(), oracle.usd_token.clone(), 1i32.to_i24())
+				.unwrap();
+		assert_eq!(price.numerator * expected.denominator, expected.numerator * price.denominator);
+		assert_eq!(liquidity, BigInt::from((1u128 << 64) / 1_000_000));
+
+		asserter.push_success(&Bytes::from(observeCall::abi_encode_returns(&observeReturn {
+			tickCumulatives: vec![I56::ZERO, I56::ZERO],
+			secondsPerLiquidityCumulativeX128s: vec![],
+		})));
+		let error = oracle.get_twap_and_liquidity_basis(&provider, hook).await.unwrap_err();
+		assert!(error.to_string().contains("invalid observation lengths"));
+	}
+
+	#[tokio::test]
+	async fn combines_configured_v3_and_v4_sources_for_either_token_order() {
+		use uniswap_lens::bindings::iuniswapv3pool::IUniswapV3Pool::{token0Call, token1Call};
+		for (lookup_address, ticks) in [
+			(Address::repeat_byte(1), [-276_324i32, -262_461i32]),
+			(Address::repeat_byte(255), [276_324i32, 262_461i32]),
+		] {
+			let asserter = Asserter::new();
+			let mut oracle = UniswapOracle::new(
+				vec!["http://localhost:8545".into()],
+				token!(ChainId::MAINNET as u64, USDC_ADDRESS, 6, "USDC"),
+				token!(ChainId::MAINNET as u64, lookup_address, 18, "ARGON"),
+			)
+			.await
+			.unwrap();
+			oracle.providers =
+				vec![ProviderBuilder::default().connect_mocked_client(asserter.clone())];
+			let v3_pool = compute_pool_address(
+				FACTORY_ADDRESS,
+				USDC_ADDRESS,
+				lookup_address,
+				FeeAmount::HIGH,
+				None,
+				None,
+			);
+			let v4_hook = Address::repeat_byte(5);
+			let mut expected_tokens = [USDC_ADDRESS, lookup_address];
+			expected_tokens.sort();
+			for _ in 0..2 {
+				asserter.push_success(&Bytes::from(token0Call::abi_encode_returns(
+					&expected_tokens[0],
+				)));
+				asserter.push_success(&Bytes::from(token1Call::abi_encode_returns(
+					&expected_tokens[1],
+				)));
+			}
+			oracle.set_oracle_addresses(&format!("{v3_pool},{v4_hook}")).await.unwrap();
+			assert_eq!(oracle.oracle_addresses, vec![v3_pool, v4_hook]);
+
+			// The selected v3 1% pool and v4 hook price the token at about $1 and $4, with equal
+			// TWAL.
+			for tick in ticks {
+				asserter.push_success(&Bytes::from(observeCall::abi_encode_returns(
+					&observeReturn {
+						tickCumulatives: vec![
+							I56::ZERO,
+							I56::try_from(i64::from(tick) * 3_600).unwrap(),
+						],
+						secondsPerLiquidityCumulativeX128s: vec![
+							U160::ZERO,
+							U160::from(3_600u128 << 64),
+						],
+					},
+				)));
+			}
+			let result = oracle.get_current_price().await.unwrap();
+			// Arithmetic weighting is about $2.50. Weighting the raw fraction fields gives
+			// about $1.60 for the reversed token order instead.
+			assert!(asserter.read_q().is_empty());
+			assert!((result.price.to_float() - 2.49987927).abs() < 0.000001);
+			assert_eq!(result.liquidity, 2 * ((1u128 << 64) / 1_000_000));
+		}
+	}
+
+	#[tokio::test]
 	#[ignore]
 	async fn test_rpc_fallback_reaches_live_pool() {
 		dotenv::dotenv().ok();
@@ -428,28 +650,21 @@ mod test {
 			return;
 		};
 
+		let addresses = env::var("ARGONOT_UNISWAP_ORACLE_ADDRESSES")
+			.expect("ARGONOT_UNISWAP_ORACLE_ADDRESSES must be set for live tests");
+		let mut oracle = UniswapOracle::new(
+			vec![fallback_url],
+			token!(ChainId::MAINNET as u64, USDC_ADDRESS, 6, "USDC"),
+			token!(ChainId::MAINNET as u64, ARGONOT_ADDRESS, 18, "ARGONOT"),
+		)
+		.await
+		.unwrap();
+		oracle.set_oracle_addresses(&addresses).await.unwrap();
 		let primary = Asserter::new();
 		primary.push_failure_msg("Internal error");
-		let oracle = UniswapOracle {
-			providers: vec![
-				EthereumRpcProvider {
-					provider: Arc::new(ProviderBuilder::default().connect_mocked_client(primary)),
-					pool_cache_by_fee: Default::default(),
-				},
-				EthereumRpcProvider {
-					provider: Arc::new(
-						RootProvider::connect(&fallback_url)
-							.await
-							.expect("Failed to connect to fallback provider"),
-					),
-					pool_cache_by_fee: Default::default(),
-				},
-			],
-			factory_address: FACTORY_ADDRESS,
-			usd_token: token!(ChainId::MAINNET as u64, USDC_ADDRESS, 6, "USDC"),
-			lookup_token: token!(ChainId::MAINNET as u64, ARGONOT_ADDRESS, 18, "ARGONOT"),
-			fee_tiers: vec![FeeAmount::LOW, FeeAmount::MEDIUM],
-		};
+		oracle
+			.providers
+			.insert(0, ProviderBuilder::default().connect_mocked_client(primary));
 
 		if let Err(error) = oracle.get_current_price().await {
 			let oracle_error =
@@ -474,13 +689,16 @@ mod test {
 		};
 
 		for (address, symbol) in [(ARGON_ADDRESS, "ARGON"), (ARGONOT_ADDRESS, "ARGONOT")] {
-			let oracle = UniswapOracle::new(
+			let mut oracle = UniswapOracle::new(
 				rpc_urls.clone(),
 				token!(ChainId::MAINNET as u64, USDC_ADDRESS, 6, "USDC"),
 				token!(ChainId::MAINNET as u64, address, 18, symbol),
 			)
 			.await
 			.expect("Failed to create oracle");
+			let addresses = env::var(format!("{symbol}_UNISWAP_ORACLE_ADDRESSES"))
+				.expect("Explicit oracle addresses must be set for live tests");
+			oracle.set_oracle_addresses(&addresses).await.unwrap();
 			let price = oracle
 				.get_current_price()
 				.await
