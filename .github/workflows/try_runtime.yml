@@ -62,9 +62,7 @@ jobs:
       matrix:
         runtime:
           - artifact: argon_canary_runtime
-            rpc_secret: TRY_RUNTIME_TESTNET_URI
           - artifact: argon_runtime
-            rpc_secret: TRY_RUNTIME_MAINNET_URI
     steps:
       - name: Download try-runtime-cli
         run: |
@@ -83,13 +81,33 @@ jobs:
       - name: List runtimes
         run: ls -R runtimes
 
-      - name: Try runtime upgrade
+      - name: Try runtime upgrade (testnet)
+        if: matrix.runtime.artifact == 'argon_canary_runtime'
         env:
-          TRY_RUNTIME_URI: ${{ secrets[matrix.runtime.rpc_secret] }}
+          TRY_RUNTIME_URI: ${{ secrets.TRY_RUNTIME_TESTNET_URI }}
         run: |
           set -eu
           if [[ -z "$TRY_RUNTIME_URI" ]]; then
-            echo "::error::Missing repository secret ${{ matrix.runtime.rpc_secret }}"
+            echo "::error::Missing RPC URI for ${{ matrix.runtime.artifact }}"
+            exit 1
+          fi
+
+          ./try-runtime \
+            --runtime ./runtimes/${{ matrix.runtime.artifact }}.compact.compressed.wasm \
+            on-runtime-upgrade \
+              --print-storage-diff \
+              --blocktime 60000 \
+              --disable-mbm-checks \
+            live --uri "$TRY_RUNTIME_URI"
+
+      - name: Try runtime upgrade (mainnet)
+        if: matrix.runtime.artifact == 'argon_runtime'
+        env:
+          TRY_RUNTIME_URI: ${{ secrets.TRY_RUNTIME_MAINNET_URI }}
+        run: |
+          set -eu
+          if [[ -z "$TRY_RUNTIME_URI" ]]; then
+            echo "::error::Missing RPC URI for ${{ matrix.runtime.artifact }}"
             exit 1
           fi
 
