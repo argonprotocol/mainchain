@@ -19,6 +19,7 @@ mod mock;
 #[cfg(test)]
 mod tests;
 
+mod auction;
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 pub mod migrations;
@@ -49,7 +50,7 @@ pub mod weights;
 #[frame_support::pallet]
 pub mod pallet {
 	use codec::FullCodec;
-	use core::cmp::Ordering;
+
 	use sp_runtime::BoundedBTreeMap;
 
 	use super::*;
@@ -58,7 +59,7 @@ pub mod pallet {
 	};
 	use pallet_prelude::argon_primitives::FRAME_INFO_DIGEST;
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(11);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(12);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -107,6 +108,10 @@ pub mod pallet {
 		#[pallet::constant]
 		type MaxCohortSize: Get<u32>;
 
+		/// Maximum commitments, including public bids, admitted per block.
+		#[pallet::constant]
+		type MaxBidsPerBlock: Get<u32>;
+
 		/// The initial argonots needed per seat before a prior-day median is available.
 		#[pallet::constant]
 		type InitialArgonotsPerSeat: Get<Self::Balance>;
@@ -141,7 +146,8 @@ pub mod pallet {
 			+ Inspect<Self::AccountId, Balance = Self::Balance>;
 
 		/// The currency representing argons
-		type ArgonCurrency: Mutate<Self::AccountId, Balance = Self::Balance>;
+		type ArgonCurrency: Mutate<Self::AccountId, Balance = Self::Balance>
+			+ MutateHold<Self::AccountId, Reason = Self::RuntimeHoldReason, Balance = Self::Balance>;
 
 		/// Price source for frame-average Argonot valuations.
 		type PriceProvider: PriceProvider<Self::Balance>;
@@ -182,7 +188,39 @@ pub mod pallet {
 	pub enum HoldReason {
 		#[codec(index = 0)]
 		RegisterAsMiner,
+		#[codec(index = 1)]
+		PendingMiningBid,
 	}
+
+	/// Transient data is separate from the stable MiningRegistration encoding.
+	#[derive(Encode, Decode, DecodeWithMemTracking, CloneNoBound, TypeInfo, MaxEncodedLen)]
+	#[scale_info(skip_type_params(T))]
+	pub struct PendingBid<T: Config> {
+		pub block: BlockNumberFor<T>,
+		pub frame: FrameId,
+		pub funding: T::AccountId,
+		pub miner: T::AccountId,
+		pub commitment: Option<[u8; 32]>,
+		pub registration: Option<Registration<T>>,
+		pub low: T::Balance,
+		pub high: T::Balance,
+		pub held: T::Balance,
+		pub credit: T::Balance,
+		pub extra_argonots: T::Balance,
+	}
+
+	#[pallet::storage]
+	pub type PendingBids<T: Config> = StorageMap<_, Blake2_128Concat, T::AccountId, PendingBid<T>>;
+
+	/// Vector position is canonical commitment order, including calls inside utility batches.
+	#[pallet::storage]
+	pub type BidBatches<T: Config> = StorageMap<
+		_,
+		Twox64Concat,
+		BlockNumberFor<T>,
+		BoundedVec<T::AccountId, T::MaxBidsPerBlock>,
+		ValueQuery,
+	>;
 
 	#[pallet::storage]
 	pub type HasAddedGrandpaRotation<T: Config> = StorageValue<_, bool, ValueQuery>;
@@ -350,6 +388,19 @@ pub mod pallet {
 		MiningBidsClosed {
 			frame_id: FrameId,
 		},
+		BidCommitted {
+			account_id: T::AccountId,
+			target_frame_id: FrameId,
+		},
+		BidRevealed {
+			account_id: T::AccountId,
+		},
+		BidExpired {
+			account_id: T::AccountId,
+		},
+		BidLost {
+			account_id: T::AccountId,
+		},
 		ReleaseBidError {
 			account_id: T::AccountId,
 			error: DispatchError,
@@ -380,10 +431,29 @@ pub mod pallet {
 		OperationalAccountRegistrationRequired,
 		/// The argonots on hold cannot be released
 		UnrecoverableHold,
+		WrongBidFrame,
+		MissingBidCommitment,
+		InvalidRevealBlock,
+		BidAlreadyRevealed,
+		InvalidBidCommitment,
+		DuplicateBidCommitment,
+		TooManyBidCommitments,
+		InvalidBidRange,
 	}
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+		fn on_runtime_upgrade() -> Weight {
+			// Settled and pending legacy registrations retain their encoding and fixed prices.
+			// The new transient maps start empty; no balance or cohort transformation is needed.
+			if StorageVersion::get::<Pallet<T>>() < STORAGE_VERSION {
+				STORAGE_VERSION.put::<Pallet<T>>();
+				T::DbWeight::get().reads_writes(1, 1)
+			} else {
+				T::DbWeight::get().reads(1)
+			}
+		}
+
 		fn on_initialize(n: BlockNumberFor<T>) -> Weight {
 			// Reset this block-scoped flag before we compute transition state for the current
 			// block.
@@ -419,7 +489,11 @@ pub mod pallet {
 			let has_vote_seal = Self::has_vote_seal_digest();
 			// Worst-case bookkeeping done directly in `on_initialize` before adding delegated
 			// benchmarked path weights below.
-			let mut weight = T::DbWeight::get().reads_writes(12, 5);
+			let previous = n.saturating_sub(One::one());
+			let count = BidBatches::<T>::decode_len(previous).unwrap_or(0) as u32;
+			let mut weight = T::DbWeight::get()
+				.reads_writes(13, 5)
+				.saturating_add(T::WeightInfo::settle_bids(count, T::MaxCohortSize::get()));
 			if has_vote_seal {
 				weight = weight.saturating_add(T::WeightInfo::on_finalize_record_block_author());
 			}
@@ -450,6 +524,11 @@ pub mod pallet {
 				let author = T::SealerInfo::get_sealer_info().block_author_account_id;
 				Self::record_block_author(author);
 			}
+
+			// Settlement precedes collateral sampling, cohort activation, and treasury callbacks.
+			// Holds and bounded admission make this an invariant-preserving atomic operation.
+			Self::settle_bids(n.saturating_sub(One::one()))
+				.expect("funded mining batch settlement must succeed");
 
 			// if it's time for the cohort to start, do it
 			if let Some(activating_frame_id) = Self::get_newly_started_frame() {
@@ -498,28 +577,9 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		/// Submit a bid for a mining slot in the next cohort. Once all spots are filled in the next
-		/// cohort, a bidder can be supplanted by supplying a higher bid.
-		///
-		/// Each slot has `MaxCohortSize` spots available.
-		///
-		/// To be eligible for a slot, you must have the required ownership tokens (argonots) in
-		/// this account. The required amount is calculated as a percentage of the total ownership
-		/// tokens in the network. This percentage is adjusted before the beginning of each slot.
-		///
-		/// If your bid is no longer winning, a `SlotBidderDropped` event will be emitted. By
-		/// monitoring for this event, you will be able to ensure your bid is accepted.
-		///
-		/// NOTE: bidding for each slot will be closed at a random block within
-		/// `mining_config.ticks_before_bid_end_for_vrf_close` blocks of the slot end time.
-		///
-		/// The slot duration can be calculated as `BlocksBetweenSlots * MaxMiners / MaxCohortSize`.
-		///
-		/// Parameters:
-		/// - `bid`: The amount of argons to bid
-		/// - `keys`: The session "hot" keys for the slot (BlockSealAuthorityId and GrandpaId).
-		/// - `mining_account_id`: This account_id allows you to operate as this miner account id,
-		///   but use funding (argonots and bid) from the submitting account
+		/// Queue a public fixed-price bid for settlement at the end of the next block.
+		/// Call index and arguments are retained for existing clients. Success means queued,
+		/// not a seat allocation; `SlotBidderAdded` is emitted only after settlement.
 		#[pallet::call_index(0)]
 		#[pallet::weight(T::WeightInfo::bid())]
 		pub fn bid(
@@ -528,130 +588,64 @@ pub mod pallet {
 			keys: T::Keys,
 			mining_account_id: Option<T::AccountId>,
 		) -> DispatchResult {
-			let funding_account = ensure_signed(origin)?;
-			let miner_account_id = mining_account_id.unwrap_or(funding_account.clone());
+			let funding = ensure_signed(origin)?;
+			let miner = mining_account_id.unwrap_or_else(|| funding.clone());
+			Self::queue_bid(funding, miner, None, Some((bid, bid, keys)))
+		}
 
-			ensure!(
-				T::OperationalAccountProvider::is_eligible(&funding_account),
-				Error::<T>::OperationalAccountRegistrationRequired
-			);
-			ensure!(IsNextSlotBiddingOpen::<T>::get(), Error::<T>::SlotNotTakingBids);
-			ensure!(
-				bid % T::BidIncrements::get() == T::Balance::zero(),
-				Error::<T>::InvalidBidAmount
-			);
+		/// Commit to a salted bid range. Reveal is valid only in the following block.
+		#[pallet::call_index(2)]
+		#[pallet::weight(T::WeightInfo::commit_bid())]
+		pub fn commit_bid(
+			origin: OriginFor<T>,
+			target_frame_id: FrameId,
+			mining_account_id: Option<T::AccountId>,
+			commitment_hash: [u8; 32],
+		) -> DispatchResult {
+			let funding = ensure_signed(origin)?;
+			ensure!(target_frame_id == NextFrameId::<T>::get(), Error::<T>::WrongBidFrame);
+			let miner = mining_account_id.unwrap_or_else(|| funding.clone());
+			Self::queue_bid(funding, miner, Some(commitment_hash), None)
+		}
 
-			let existing_bid = Self::get_pending_cohort_registration(&miner_account_id);
-			if let Some(existing) = existing_bid.as_ref() {
-				let existing_funding = existing
-					.external_funding_account
-					.clone()
-					.unwrap_or_else(|| miner_account_id.clone());
+		/// Reveal and fund a commitment from the immediately preceding block.
+		#[pallet::call_index(3)]
+		#[pallet::weight(T::WeightInfo::reveal_bid())]
+		#[frame_support::transactional]
+		pub fn reveal_bid(
+			origin: OriginFor<T>,
+			mining_account_id: Option<T::AccountId>,
+			low_bid: T::Balance,
+			high_bid: T::Balance,
+			keys: T::Keys,
+			salt: [u8; 32],
+		) -> DispatchResult {
+			let funding = ensure_signed(origin)?;
+			let miner = mining_account_id.unwrap_or_else(|| funding.clone());
+			PendingBids::<T>::try_mutate(&miner, |pending| -> DispatchResult {
+				let pending = pending.as_mut().ok_or(Error::<T>::MissingBidCommitment)?;
+				ensure!(pending.funding == funding, Error::<T>::CannotChangeFundingAccount);
 				ensure!(
-					existing_funding == funding_account,
-					Error::<T>::CannotChangeFundingAccount
+					pending.block.saturating_add(One::one()) ==
+						frame_system::Pallet::<T>::block_number(),
+					Error::<T>::InvalidRevealBlock
 				);
-			}
-			let current_registration = Self::get_active_registration(&miner_account_id);
-			let next_frame_id = NextFrameId::<T>::get();
-			if let Some(ref registration) = current_registration {
-				let current_funding_account = registration
-					.external_funding_account
-					.as_ref()
-					.unwrap_or(&registration.account_id);
-				ensure!(
-					current_funding_account == &funding_account,
-					Error::<T>::CannotChangeFundingAccount
+				ensure!(pending.registration.is_none(), Error::<T>::BidAlreadyRevealed);
+				ensure!(pending.frame == NextFrameId::<T>::get(), Error::<T>::WrongBidFrame);
+				let hash = Self::bid_commitment(
+					pending.frame,
+					&funding,
+					&miner,
+					low_bid,
+					high_bid,
+					&keys,
+					salt,
 				);
-				let frames = T::FramesPerMiningTerm::get() as FrameId;
-				// ensure we are not overlapping sessions
-				ensure!(
-					registration.starting_frame_id + frames == next_frame_id,
-					Error::<T>::CannotRegisterOverlappingSessions
-				);
-			}
-			if let Some(ref existing_registration) = existing_bid {
-				let existing_funding_account = existing_registration
-					.external_funding_account
-					.as_ref()
-					.unwrap_or(&existing_registration.account_id);
-				ensure!(
-					existing_funding_account == &funding_account,
-					Error::<T>::CannotChangeFundingAccount
-				);
-			}
-
-			Self::send_argons_to_pool(&funding_account, &existing_bid, bid)?;
-			let ownership_tokens =
-				Self::hold_argonots(&funding_account, &existing_bid, &current_registration)?;
-			<BidsForNextSlotCohort<T>>::try_mutate(|cohort| -> DispatchResult {
-				if let Some(existing_position) =
-					cohort.iter().position(|x| x.account_id == miner_account_id)
-				{
-					cohort.remove(existing_position);
-				}
-
-				// sort to lowest position at bid
-				let pos = cohort
-					.binary_search_by(|x| {
-						let comp = bid.cmp(&x.bid);
-						match comp {
-							Ordering::Equal => Ordering::Less,
-							Ordering::Greater => Ordering::Greater,
-							Ordering::Less => Ordering::Less,
-						}
-					})
-					.unwrap_or_else(|pos| pos);
-
-				let next_cohort_size = NextCohortSize::<T>::get() as usize;
-				if cohort.len() >= next_cohort_size {
-					ensure!(pos < next_cohort_size, Error::<T>::BidTooLow);
-					// need to pop-off the lowest bid
-					let entry = cohort.pop().expect("should exist, just checked");
-					Self::release_failed_bid(&entry)?;
-				}
-
-				cohort
-					.try_insert(
-						pos,
-						MiningRegistration {
-							account_id: miner_account_id.clone(),
-							external_funding_account: if miner_account_id == funding_account {
-								None
-							} else {
-								Some(funding_account)
-							},
-							bid,
-							argonots: ownership_tokens,
-							authority_keys: keys,
-							starting_frame_id: next_frame_id,
-							bid_at_tick: T::TickProvider::current_tick(),
-						},
-					)
-					.map_err(|_| Error::<T>::TooManyBlockRegistrants)?;
-
-				HistoricalBidsPerSlot::<T>::mutate(|bids| {
-					if let Some(bids) = bids.get_mut(0) {
-						bids.bids_count += 1;
-						bids.bid_amount_max = bids.bid_amount_max.max(bid.into());
-						if bids.bids_count == 1 {
-							bids.bid_amount_min = bid.into();
-						}
-						bids.bid_amount_min = bids.bid_amount_min.min(bid.into());
-						bids.bid_amount_sum = bids.bid_amount_sum.saturating_add(bid.into());
-					}
-				});
-
-				Self::deposit_event(Event::<T>::SlotBidderAdded {
-					account_id: miner_account_id.clone(),
-					bid_amount: bid,
-					index: UniqueSaturatedInto::<u32>::unique_saturated_into(pos),
-				});
-
+				ensure!(pending.commitment == Some(hash), Error::<T>::InvalidBidCommitment);
+				Self::fund_bid(pending, low_bid, high_bid, keys)?;
+				Self::deposit_event(Event::BidRevealed { account_id: miner.clone() });
 				Ok(())
-			})?;
-
-			Ok(())
+			})
 		}
 
 		/// Admin function to update the mining slot delay.
@@ -693,6 +687,284 @@ pub mod pallet {
 		}
 	}
 }
+impl<T: Config> Pallet<T> {
+	/// Shared SCALE encoding; clients must use a fresh unpredictable salt for every commitment.
+	pub fn bid_commitment(
+		frame: FrameId,
+		funding: &T::AccountId,
+		miner: &T::AccountId,
+		low: T::Balance,
+		high: T::Balance,
+		keys: &T::Keys,
+		salt: [u8; 32],
+	) -> [u8; 32] {
+		argon_primitives::block_seal::mining_bid_commitment(
+			frame_system::Pallet::<T>::block_hash(BlockNumberFor::<T>::zero()),
+			frame,
+			funding,
+			miner,
+			low,
+			high,
+			keys,
+			salt,
+		)
+	}
+
+	fn check_bid_identity(funding: &T::AccountId, miner: &T::AccountId) -> DispatchResult {
+		ensure!(
+			T::OperationalAccountProvider::is_eligible(funding),
+			Error::<T>::OperationalAccountRegistrationRequired
+		);
+		for registration in
+			[Self::get_pending_cohort_registration(miner), Self::get_active_registration(miner)]
+				.into_iter()
+				.flatten()
+		{
+			ensure!(
+				registration
+					.external_funding_account
+					.as_ref()
+					.unwrap_or(&registration.account_id) ==
+					funding,
+				Error::<T>::CannotChangeFundingAccount
+			);
+		}
+		if let Some(active) = Self::get_active_registration(miner) {
+			ensure!(
+				active.starting_frame_id + T::FramesPerMiningTerm::get() as FrameId ==
+					NextFrameId::<T>::get(),
+				Error::<T>::CannotRegisterOverlappingSessions
+			);
+		}
+		Ok(())
+	}
+
+	#[frame_support::transactional]
+	fn queue_bid(
+		funding: T::AccountId,
+		miner: T::AccountId,
+		commitment: Option<[u8; 32]>,
+		public: Option<(T::Balance, T::Balance, T::Keys)>,
+	) -> DispatchResult {
+		ensure!(
+			IsNextSlotBiddingOpen::<T>::get() && NewlyStartedFrameId::<T>::get().is_none(),
+			Error::<T>::SlotNotTakingBids
+		);
+		if public.is_none() {
+			Self::check_bid_identity(&funding, &miner)?;
+		}
+		ensure!(!PendingBids::<T>::contains_key(&miner), Error::<T>::DuplicateBidCommitment);
+		let block = frame_system::Pallet::<T>::block_number();
+		let mut pending = PendingBid::<T> {
+			block,
+			frame: NextFrameId::<T>::get(),
+			funding,
+			miner: miner.clone(),
+			commitment,
+			registration: None,
+			low: Zero::zero(),
+			high: Zero::zero(),
+			held: Zero::zero(),
+			credit: Zero::zero(),
+			extra_argonots: Zero::zero(),
+		};
+		if let Some((low, high, keys)) = public {
+			Self::fund_bid(&mut pending, low, high, keys)?;
+		}
+		BidBatches::<T>::try_mutate(block, |batch| {
+			batch.try_push(miner.clone()).map_err(|_| Error::<T>::TooManyBidCommitments)
+		})?;
+		Self::deposit_event(Event::BidCommitted {
+			account_id: miner.clone(),
+			target_frame_id: pending.frame,
+		});
+		PendingBids::<T>::insert(miner, pending);
+		Ok(())
+	}
+
+	fn fund_bid(
+		pending: &mut PendingBid<T>,
+		low: T::Balance,
+		high: T::Balance,
+		keys: T::Keys,
+	) -> DispatchResult {
+		Self::check_bid_identity(&pending.funding, &pending.miner)?;
+		let increment = T::BidIncrements::get();
+		ensure!(low <= high, Error::<T>::InvalidBidRange);
+		ensure!(
+			!increment.is_zero() &&
+				low % increment == Zero::zero() &&
+				high % increment == Zero::zero(),
+			Error::<T>::InvalidBidAmount
+		);
+		let existing = Self::get_pending_cohort_registration(&pending.miner);
+		let mut floor = low;
+		if let Some(old) = &existing {
+			ensure!(high > old.bid, Error::<T>::BidCannotBeReduced);
+			floor = floor.max(old.bid.checked_add(&increment).ok_or(Error::<T>::InvalidBidAmount)?);
+		}
+		let credit = existing.as_ref().map(|x| x.bid).unwrap_or_default();
+		let held = high.saturating_sub(credit);
+		ensure!(
+			T::ArgonCurrency::reducible_balance(
+				&pending.funding,
+				Preservation::Protect,
+				Fortitude::Polite
+			) >= held,
+			Error::<T>::InsufficientFunds
+		);
+		if !held.is_zero() {
+			T::ArgonCurrency::hold(&HoldReason::PendingMiningBid.into(), &pending.funding, held)
+				.map_err(|_| Error::<T>::InsufficientFunds)?;
+		}
+		let active = Self::get_active_registration(&pending.miner);
+		let argonots = Self::hold_argonots(&pending.funding, &existing, &active)?;
+		let previous_argonots =
+			existing.as_ref().or(active.as_ref()).map(|x| x.argonots).unwrap_or_default();
+		pending.extra_argonots = argonots.saturating_sub(previous_argonots);
+		pending.credit = credit;
+		pending.held = held;
+		pending.low = floor;
+		pending.high = high;
+		pending.registration = Some(Registration::<T> {
+			account_id: pending.miner.clone(),
+			external_funding_account: if pending.miner == pending.funding {
+				None
+			} else {
+				Some(pending.funding.clone())
+			},
+			bid: high,
+			argonots,
+			authority_keys: keys,
+			starting_frame_id: pending.frame,
+			bid_at_tick: T::TickProvider::current_tick(),
+		});
+		Ok(())
+	}
+
+	/// Atomic settlement owns all cohort, payment and collateral side effects.
+	#[frame_support::transactional]
+	pub(crate) fn settle_bids(block: BlockNumberFor<T>) -> DispatchResult {
+		let batch = BidBatches::<T>::take(block);
+		if batch.is_empty() {
+			return Ok(());
+		}
+		let mut pending = Vec::new();
+		for miner in batch {
+			let entry = PendingBids::<T>::take(&miner).ok_or(Error::<T>::MissingBidCommitment)?;
+			if entry.registration.is_none() {
+				Self::deposit_event(Event::BidExpired { account_id: miner });
+			} else {
+				ensure!(entry.frame == NextFrameId::<T>::get(), Error::<T>::WrongBidFrame);
+				pending.push(entry);
+			}
+		}
+		let old = BidsForNextSlotCohort::<T>::get();
+		let incumbents: Vec<_> = old
+			.iter()
+			.filter(|x| !pending.iter().any(|p| p.miner == x.account_id))
+			.cloned()
+			.collect();
+		let mut candidates: Vec<_> = incumbents
+			.iter()
+			.map(|x| crate::auction::Candidate {
+				low: x.bid.into(),
+				high: x.bid.into(),
+				fixed: true,
+			})
+			.collect();
+		candidates.extend(pending.iter().map(|x| crate::auction::Candidate {
+			low: x.low.into(),
+			high: x.high.into(),
+			fixed: false,
+		}));
+		let allocation = crate::auction::clear(
+			&candidates,
+			NextCohortSize::<T>::get() as usize,
+			T::BidIncrements::get().into(),
+		);
+		let mut winners = Vec::new();
+		for (index, price) in allocation {
+			let mut registration = if index < incumbents.len() {
+				incumbents[index].clone()
+			} else {
+				pending[index - incumbents.len()]
+					.registration
+					.clone()
+					.expect("only revealed candidates")
+			};
+			registration.bid = price.into();
+			winners.push(registration);
+		}
+		// Release budgets first. Subsequent calls are in this storage transaction with no
+		// intervening user transactions; only winning amounts are transferred to the pool.
+		for entry in &pending {
+			if !entry.held.is_zero() {
+				T::ArgonCurrency::release(
+					&HoldReason::PendingMiningBid.into(),
+					&entry.funding,
+					entry.held,
+					Precision::Exact,
+				)?;
+			}
+			if let Some(winner) = winners.iter().find(|x| x.account_id == entry.miner) {
+				Self::send_argons_to_pool(
+					&entry.funding,
+					&old.iter().find(|x| x.account_id == entry.miner).cloned(),
+					winner.bid,
+				)?;
+				HistoricalBidsPerSlot::<T>::mutate(|history| {
+					if let Some(stats) = history.get_mut(0) {
+						stats.bids_count = stats.bids_count.saturating_add(1);
+						stats.bid_amount_max = stats.bid_amount_max.max(winner.bid.into());
+						stats.bid_amount_min = if stats.bids_count == 1 {
+							winner.bid.into()
+						} else {
+							stats.bid_amount_min.min(winner.bid.into())
+						};
+						stats.bid_amount_sum =
+							stats.bid_amount_sum.saturating_add(winner.bid.into());
+					}
+				});
+			} else {
+				Self::release_argonots_hold(&entry.funding, entry.extra_argonots)?;
+				Self::deposit_event(Event::BidLost { account_id: entry.miner.clone() });
+			}
+		}
+		for registration in &old {
+			if !winners.iter().any(|x| x.account_id == registration.account_id) {
+				Self::release_failed_bid(registration)?;
+			}
+		}
+		// Equal paid prices retain incumbent/commitment order, not ceiling order.
+		let priority = |miner: &T::AccountId| {
+			incumbents.iter().position(|x| &x.account_id == miner).unwrap_or_else(|| {
+				incumbents.len() +
+					pending.iter().position(|x| &x.miner == miner).expect("winning candidate")
+			})
+		};
+		winners.sort_by(|a, b| {
+			b.bid
+				.cmp(&a.bid)
+				.then_with(|| priority(&a.account_id).cmp(&priority(&b.account_id)))
+		});
+		for (index, winner) in winners.iter().enumerate() {
+			if pending.iter().any(|x| x.miner == winner.account_id) {
+				Self::deposit_event(Event::SlotBidderAdded {
+					account_id: winner.account_id.clone(),
+					bid_amount: winner.bid,
+					index: index as u32,
+				});
+			}
+		}
+		BidsForNextSlotCohort::<T>::put(
+			BoundedVec::<Registration<T>, T::MaxCohortSize>::try_from(winners)
+				.map_err(|_| Error::<T>::TooManyBlockRegistrants)?,
+		);
+		Ok(())
+	}
+}
+
 impl<T: Config> BlockRewardAccountsProvider<T::AccountId> for Pallet<T> {
 	type Weights = crate::weights::ProviderWeightAdapter<T>;
 
@@ -1381,6 +1653,33 @@ impl<T: Config> Pallet<T> {
 				bid_registration.bid,
 				Preservation::Expendable,
 			)?;
+		}
+
+		if let Some(mut pending) = PendingBids::<T>::get(account_id) {
+			if pending.registration.is_some() {
+				if !pending.credit.is_zero() {
+					T::ArgonCurrency::hold(
+						&HoldReason::PendingMiningBid.into(),
+						funding_account,
+						pending.credit,
+					)?;
+				}
+				pending.held = pending.held.saturating_add(pending.credit);
+				pending.credit = Zero::zero();
+				// The replacement takes over the old collateral; do not release it below.
+				pending.extra_argonots =
+					pending.registration.as_ref().expect("checked").argonots.saturating_sub(
+						Self::get_active_registration(account_id)
+							.map(|x| x.argonots)
+							.unwrap_or_default(),
+					);
+				PendingBids::<T>::insert(account_id, pending);
+				Self::deposit_event(Event::SlotBidderDropped {
+					account_id: account_id.clone(),
+					preserved_argonot_hold: true,
+				});
+				return Ok(());
+			}
 		}
 
 		let mut held_argonots = false;

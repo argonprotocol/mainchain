@@ -97,7 +97,11 @@ macro_rules! deal_with_fees {
 					fn is_mining_bid_call(call: &RuntimeCall) -> bool {
 						matches!(
 							call,
-							RuntimeCall::MiningSlot(pallet_mining_slot::Call::bid { .. })
+							RuntimeCall::MiningSlot(
+								pallet_mining_slot::Call::bid { .. } |
+									pallet_mining_slot::Call::commit_bid { .. } |
+									pallet_mining_slot::Call::reveal_bid { .. }
+							)
 						)
 					}
 

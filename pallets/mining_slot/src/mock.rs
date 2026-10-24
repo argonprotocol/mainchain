@@ -277,6 +277,7 @@ impl pallet_mining_slot::Config for Test {
 	type WeightInfo = ();
 	type MinCohortSize = MinCohortSize;
 	type MaxCohortSize = MaxCohortSize;
+	type MaxBidsPerBlock = ConstU32<32>;
 	type PricePerSeatAdjustmentDamper = PricePerSeatAdjustmentDamper;
 	type FramesPerMiningTerm = FramesPerMiningTerm;
 	type TargetPricePerSeat = TargetPricePerSeat;

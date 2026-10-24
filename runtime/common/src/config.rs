@@ -333,6 +333,38 @@ mod tests {
 	use argon_primitives::ethereum::EthereumReceiptLogProofBatch;
 	use codec::MaxEncodedLen;
 	use frame_support::dispatch::DispatchClass;
+	use pallet_mining_slot::WeightInfo as MiningWeightInfo;
+
+	#[test]
+	fn mining_batch_and_activation_fit_initialization_budget() {
+		type Runtime = argon_runtime::Runtime;
+		type MiningWeights = <Runtime as pallet_mining_slot::Config>::WeightInfo;
+		let bids = <<Runtime as pallet_mining_slot::Config>::MaxBidsPerBlock as Get<u32>>::get();
+		let seats = <Runtime as pallet_mining_slot::Config>::MaxCohortSize::get();
+		let settlement = MiningWeights::settle_bids(bids, seats);
+		assert!(settlement.ref_time() > 0, "settlement must have measured weights");
+		// Core mining work can coincide at the boundary. Other pallets' frame callbacks
+		// reserve their own weights separately in on_initialize.
+		let mining = settlement
+			.saturating_add(MiningWeights::start_new_frame(seats))
+			.saturating_add(MiningWeights::on_finalize_frame_adjustments())
+			.saturating_add(MiningWeights::on_finalize_record_block_author())
+			.saturating_add(
+				<<Runtime as pallet_mining_slot::Config>::OperationalAccountsHook as
+					argon_primitives::OperationalAccountsHook<AccountId, Balance>>::Weights::mining_seat_won()
+					.saturating_mul(seats.into()),
+			)
+			.saturating_add(
+				<<Runtime as frame_system::Config>::DbWeight as Get<
+					frame_support::weights::RuntimeDbWeight,
+				>>::get()
+					.reads_writes(13, 5),
+			);
+		assert!(
+			mining.all_lte(AVERAGE_ON_INITIALIZE_RATIO * MAXIMUM_BLOCK_WEIGHT),
+			"maximum mining batch and activation exceed the initialization allowance: {mining:?}"
+		);
+	}
 
 	#[test]
 	fn gateway_activity_proof_batch_bound_fits_normal_extrinsic_limit() {

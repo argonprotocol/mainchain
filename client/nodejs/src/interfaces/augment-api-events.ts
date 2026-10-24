@@ -1114,6 +1114,14 @@ declare module '@polkadot/api-base/types/events' {
       >;
     };
     miningSlot: {
+      BidCommitted: AugmentedEvent<
+        ApiType,
+        [accountId: AccountId32, targetFrameId: u64],
+        { accountId: AccountId32; targetFrameId: u64 }
+      >;
+      BidExpired: AugmentedEvent<ApiType, [accountId: AccountId32], { accountId: AccountId32 }>;
+      BidLost: AugmentedEvent<ApiType, [accountId: AccountId32], { accountId: AccountId32 }>;
+      BidRevealed: AugmentedEvent<ApiType, [accountId: AccountId32], { accountId: AccountId32 }>;
       /**
        * Bids are closed due to the VRF randomized function triggering
        **/

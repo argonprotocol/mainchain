@@ -14,6 +14,13 @@ use pallet_prelude::*;
 pub trait WeightInfo {
 	// Actual extrinsics
 	fn bid() -> Weight;
+	fn bid_renewal() -> Weight;
+	fn commit_bid() -> Weight;
+	fn commit_bid_renewal() -> Weight;
+	fn reveal_bid() -> Weight;
+	fn reveal_bid_renewal() -> Weight;
+	fn settle_bids(b: u32, m: u32) -> Weight;
+	fn settle_bids_with_replacements(b: u32, m: u32) -> Weight;
 	fn configure_mining_slot_delay() -> Weight;
 
 	// Hooks with variance
@@ -86,8 +93,40 @@ where
 	PriceProviderWeight: PriceProviderWeightInfo,
 	OperationalAccountProviderWeight: OperationalAccountProviderWeightInfo,
 {
+	fn commit_bid() -> Weight {
+		Base::commit_bid()
+			.max(Base::commit_bid_renewal())
+			.saturating_add(OperationalAccountProviderWeight::is_eligible())
+	}
+	fn reveal_bid() -> Weight {
+		Base::reveal_bid()
+			.max(Base::reveal_bid_renewal())
+			.saturating_add(OperationalAccountProviderWeight::is_eligible())
+			.saturating_add(TickProviderWeight::current_tick())
+	}
+	fn settle_bids(b: u32, m: u32) -> Weight {
+		Base::settle_bids(b, m).max(Base::settle_bids_with_replacements(b, m))
+	}
+
+	fn settle_bids_with_replacements(b: u32, m: u32) -> Weight {
+		Base::settle_bids_with_replacements(b, m)
+	}
+
+	fn bid_renewal() -> Weight {
+		Base::bid_renewal()
+	}
+
+	fn commit_bid_renewal() -> Weight {
+		Base::commit_bid_renewal()
+	}
+
+	fn reveal_bid_renewal() -> Weight {
+		Base::reveal_bid_renewal()
+	}
+
 	fn bid() -> Weight {
 		Base::bid()
+			.max(Base::bid_renewal())
 			.saturating_add(TickProviderWeight::current_tick())
 			.saturating_add(OperationalAccountProviderWeight::is_eligible())
 	}
@@ -149,6 +188,32 @@ impl<T: crate::Config> BlockRewardAccountsProviderWeightInfo for ProviderWeightA
 
 // For backwards compatibility and tests.
 impl WeightInfo for () {
+	fn commit_bid() -> Weight {
+		Weight::zero()
+	}
+	fn reveal_bid() -> Weight {
+		Weight::zero()
+	}
+	fn settle_bids(_: u32, _: u32) -> Weight {
+		Weight::zero()
+	}
+
+	fn settle_bids_with_replacements(_: u32, _: u32) -> Weight {
+		Weight::zero()
+	}
+
+	fn bid_renewal() -> Weight {
+		Weight::zero()
+	}
+
+	fn commit_bid_renewal() -> Weight {
+		Weight::zero()
+	}
+
+	fn reveal_bid_renewal() -> Weight {
+		Weight::zero()
+	}
+
 	fn bid() -> Weight {
 		Weight::zero()
 	}

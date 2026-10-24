@@ -270,6 +270,8 @@ pub(crate) mod utils {
 		let first_account = client.api_account(&miner_accounts[0].0);
 		let miner_count = miner_accounts.len() as u16;
 		println!("Registering {miner_count} miners");
+		// Exercise the legacy API: these public bids settle in the following block.
+		// The cohort/activation wait below observes settlement rather than just inclusion.
 		let bids = miner_accounts
 			.into_iter()
 			.map(|(a, keys)| {

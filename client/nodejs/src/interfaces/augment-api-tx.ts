@@ -832,28 +832,9 @@ declare module '@polkadot/api-base/types/submittable' {
     };
     miningSlot: {
       /**
-       * Submit a bid for a mining slot in the next cohort. Once all spots are filled in the next
-       * cohort, a bidder can be supplanted by supplying a higher bid.
-       *
-       * Each slot has `MaxCohortSize` spots available.
-       *
-       * To be eligible for a slot, you must have the required ownership tokens (argonots) in
-       * this account. The required amount is calculated as a percentage of the total ownership
-       * tokens in the network. This percentage is adjusted before the beginning of each slot.
-       *
-       * If your bid is no longer winning, a `SlotBidderDropped` event will be emitted. By
-       * monitoring for this event, you will be able to ensure your bid is accepted.
-       *
-       * NOTE: bidding for each slot will be closed at a random block within
-       * `mining_config.ticks_before_bid_end_for_vrf_close` blocks of the slot end time.
-       *
-       * The slot duration can be calculated as `BlocksBetweenSlots * MaxMiners / MaxCohortSize`.
-       *
-       * Parameters:
-       * - `bid`: The amount of argons to bid
-       * - `keys`: The session "hot" keys for the slot (BlockSealAuthorityId and GrandpaId).
-       * - `mining_account_id`: This account_id allows you to operate as this miner account id,
-       * but use funding (argonots and bid) from the submitting account
+       * Queue a public fixed-price bid for settlement at the end of the next block.
+       * Call index and arguments are retained for existing clients. Success means queued,
+       * not a seat allocation; `SlotBidderAdded` is emitted only after settlement.
        **/
       bid: AugmentedSubmittable<
         (
@@ -868,6 +849,17 @@ declare module '@polkadot/api-base/types/submittable' {
         [u128, ArgonRuntimeSessionKeys, Option<AccountId32>]
       >;
       /**
+       * Commit to a salted bid range. Reveal is valid only in the following block.
+       **/
+      commitBid: AugmentedSubmittable<
+        (
+          targetFrameId: u64 | AnyNumber | Uint8Array,
+          miningAccountId: Option<AccountId32> | null | Uint8Array | AccountId32 | string,
+          commitmentHash: U8aFixed | string | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [u64, Option<AccountId32>, U8aFixed]
+      >;
+      /**
        * Admin function to update the mining slot delay.
        **/
       configureMiningSlotDelay: AugmentedSubmittable<
@@ -876,6 +868,23 @@ declare module '@polkadot/api-base/types/submittable' {
           ticksBeforeBidEndForVrfClose: Option<u64> | null | Uint8Array | u64 | AnyNumber,
         ) => SubmittableExtrinsic<ApiType>,
         [Option<u64>, Option<u64>]
+      >;
+      /**
+       * Reveal and fund a commitment from the immediately preceding block.
+       **/
+      revealBid: AugmentedSubmittable<
+        (
+          miningAccountId: Option<AccountId32> | null | Uint8Array | AccountId32 | string,
+          lowBid: u128 | AnyNumber | Uint8Array,
+          highBid: u128 | AnyNumber | Uint8Array,
+          keys:
+            | ArgonRuntimeSessionKeys
+            | { grandpa?: any; blockSealAuthority?: any }
+            | string
+            | Uint8Array,
+          salt: U8aFixed | string | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [Option<AccountId32>, u128, u128, ArgonRuntimeSessionKeys, U8aFixed]
       >;
     };
     mint: {};
