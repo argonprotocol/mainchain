@@ -165,6 +165,8 @@ pub struct VaultSecuritization<Balance, AccountId> {
 	pub activated_securitization: Balance,
 	/// Confirmed Bitcoin locked in this vault.
 	pub bitcoin_locked_satoshis: Satoshis,
+	/// Confirmed Bitcoin backed by activated securitization.
+	pub securitized_satoshis: Satoshis,
 	/// Argonot securitization held for this vault, denominated in micronots.
 	pub securitization_micronots: Balance,
 }

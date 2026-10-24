@@ -2,7 +2,7 @@ use pallet_prelude::*;
 
 use crate::{mock::*, Error, Event, FissionByOwnerAndId, FissionIdsByLockId, NextFissionIdByOwner};
 use argon_primitives::{
-	treasury::{PositionQuantities, TreasuryPositionProvider},
+	treasury::{NetworkPositionQuantities, PositionQuantities, TreasuryPositionProvider},
 	BitcoinFissionsProvider,
 };
 
@@ -306,7 +306,7 @@ fn registration_provider_reads_maintained_fission_liquidity() {
 		MockLocks::insert(2, lock(2, 100));
 		assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(2), 0, 78, 2, 10, 90));
 		assert_eq!(TreasuryPositions::account_quantities(&2).fission_liquidity, 900);
-		assert_eq!(TreasuryPositions::network_totals().fission_liquidity, 5_400);
+		assert_eq!(TreasuryPositions::network_totals().account_quantities.fission_liquidity, 5_400);
 
 		assert_eq!(
 			<BitcoinFissions as BitcoinFissionsProvider<u64, u128>>::get_account_fission_liquidity(
@@ -323,7 +323,7 @@ fn registration_provider_reads_maintained_fission_liquidity() {
 			900
 		);
 		assert_eq!(TreasuryPositions::account_quantities(&2).fission_liquidity, 900);
-		assert_eq!(TreasuryPositions::network_totals().fission_liquidity, 1_800);
+		assert_eq!(TreasuryPositions::network_totals().account_quantities.fission_liquidity, 1_800);
 	});
 }
 
@@ -423,8 +423,11 @@ fn down_ratchet_rolls_back_when_the_owner_cannot_burn_the_replacement_liability(
 fn creation_rolls_back_when_the_network_fission_quantity_overflows() {
 	new_test_ext().execute_with(|| {
 		MockLocks::insert(1, lock(1, 100));
-		pallet_treasury_positions::NetworkTotals::<Test>::put(PositionQuantities {
-			fission_liquidity: u128::MAX,
+		pallet_treasury_positions::NetworkTotals::<Test>::put(NetworkPositionQuantities {
+			account_quantities: PositionQuantities {
+				fission_liquidity: u128::MAX,
+				..Default::default()
+			},
 			..Default::default()
 		});
 		assert_noop!(

@@ -4,6 +4,7 @@ use argon_primitives::{
 		OperationalAccountsHook, OperationalAccountsHookWeightInfo, TickProvider,
 		TickProviderWeightInfo, TreasuryPoolProvider, TreasuryPoolProviderWeightInfo,
 	},
+	treasury::{TreasuryPositionProvider, TreasuryPositionProviderWeightInfo},
 	vault::{
 		BitcoinVaultProviderWeightInfo, TreasuryVaultProviderWeightInfo,
 		MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES,
@@ -73,6 +74,10 @@ type TreasuryPoolWeights<T> =
 	<<T as crate::Config>::TreasuryPoolProvider as TreasuryPoolProvider<
 		<T as frame_system::Config>::AccountId,
 	>>::Weights;
+type PositionWeights<T> = <<T as crate::Config>::PositionProvider as TreasuryPositionProvider<
+	<T as frame_system::Config>::AccountId,
+	<T as crate::Config>::Balance,
+>>::Weights;
 
 pub struct WithProviderWeights<
 	T,
@@ -203,6 +208,7 @@ where
 		Base::provider_resecuritize(release_schedule_entries)
 			.saturating_add(TickProviderWeight::current_tick())
 			.saturating_add(OperationalAccountsHookWeights::<T>::vault_bitcoin_lock_funded())
+			.saturating_add(PositionWeights::<T>::network_securitized_satoshis_updated())
 	}
 
 	fn provider_reserve_securitization(release_schedule_entries: u32) -> Weight {
@@ -218,6 +224,7 @@ where
 	fn provider_burn(release_schedule_entries: u32) -> Weight {
 		Base::provider_burn(release_schedule_entries)
 			.saturating_add(TreasuryPoolWeights::<T>::vault_securitization_changed())
+			.saturating_add(PositionWeights::<T>::network_securitized_satoshis_updated())
 	}
 
 	fn provider_get_top_vaults_by_securitization(vaults: u32) -> Weight {

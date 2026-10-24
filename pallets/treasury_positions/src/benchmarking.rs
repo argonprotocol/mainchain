@@ -36,7 +36,10 @@ mod benchmarks {
 
 	#[benchmark]
 	fn network_totals() {
-		let quantities = certified_position::<T>().quantities;
+		let quantities = NetworkPositionQuantities {
+			account_quantities: certified_position::<T>().quantities,
+			vault_securitized_satoshis: CERTIFICATION_AMOUNT,
+		};
 		NetworkTotals::<T>::put(quantities);
 		#[block]
 		{
@@ -48,7 +51,10 @@ mod benchmarks {
 	fn account_quantity_updated() {
 		let account = account::<T::AccountId>("position", 0, 0);
 		PositionsByAccount::<T>::insert(&account, certified_position::<T>());
-		NetworkTotals::<T>::put(certified_position::<T>().quantities);
+		NetworkTotals::<T>::put(NetworkPositionQuantities {
+			account_quantities: certified_position::<T>().quantities,
+			vault_securitized_satoshis: CERTIFICATION_AMOUNT,
+		});
 		#[block]
 		{
 			Pallet::<T>::account_quantity_updated(
@@ -60,7 +66,7 @@ mod benchmarks {
 			.unwrap();
 		}
 		assert_eq!(
-			NetworkTotals::<T>::get().fission_liquidity,
+			NetworkTotals::<T>::get().account_quantities.fission_liquidity,
 			(FULL_EARNINGS_AMOUNT * MICROGONS_PER_ARGON).into()
 		);
 		assert_eq!(

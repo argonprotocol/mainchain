@@ -50,6 +50,30 @@ where
 	pub fission_liquidity: Balance,
 }
 
+/// Network sums of account positions and Bitcoin covered by Vaults.
+#[derive(
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	Clone,
+	Copy,
+	Debug,
+	Default,
+	PartialEq,
+	Eq,
+	TypeInfo,
+	MaxEncodedLen,
+)]
+pub struct NetworkPositionQuantities<Balance>
+where
+	Balance: Codec + MaxEncodedLen,
+{
+	pub account_quantities: PositionQuantities<Balance>,
+	/// Confirmed Bitcoin satoshis backed by vault securitization.
+	#[codec(compact)]
+	pub vault_securitized_satoshis: u128,
+}
+
 /// The single account and network quantity replaced by a source update.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PositionQuantity {
@@ -95,6 +119,7 @@ pub trait TreasuryPositionProviderWeightInfo {
 	fn account_quantities() -> Weight;
 	fn network_totals() -> Weight;
 	fn account_quantity_updated() -> Weight;
+	fn network_securitized_satoshis_updated() -> Weight;
 	fn upstream_position() -> Weight;
 	fn set_upstream_position() -> Weight;
 	fn position_updated() -> Weight;
@@ -113,6 +138,9 @@ impl TreasuryPositionProviderWeightInfo for () {
 		Weight::zero()
 	}
 	fn account_quantity_updated() -> Weight {
+		Weight::zero()
+	}
+	fn network_securitized_satoshis_updated() -> Weight {
 		Weight::zero()
 	}
 	fn upstream_position() -> Weight {
@@ -134,8 +162,8 @@ pub trait TreasuryPositionProvider<AccountId, Balance: Codec + MaxEncodedLen> {
 	fn bond_principal(account: &AccountId) -> Balance;
 	/// Maintained quantities across this account's live source positions.
 	fn account_quantities(account: &AccountId) -> PositionQuantities<Balance>;
-	/// Network totals maintained with the account quantities; no account or source scan.
-	fn network_totals() -> PositionQuantities<Balance>;
+	/// Network totals maintained from account and Vault updates; no source scan.
+	fn network_totals() -> NetworkPositionQuantities<Balance>;
 	/// Replace one source contribution in the selected account and network quantity atomically.
 	/// Bonds and stakes are whole units; Fission liquidity is microgons. The source
 	/// supplies its absolute before/after amounts in the same storage transaction as its canonical
@@ -146,6 +174,8 @@ pub trait TreasuryPositionProvider<AccountId, Balance: Codec + MaxEncodedLen> {
 		previous: Amount,
 		current: Amount,
 	) -> DispatchResult;
+	/// Replace a Vault's covered satoshis in the network total alongside its canonical mutation.
+	fn network_securitized_satoshis_updated(previous: u128, current: u128) -> DispatchResult;
 	fn upstream_position(account: &AccountId) -> Option<UpstreamPosition<Balance>>;
 	/// Complete upstream snapshot, installed at registration or during migration.
 	fn set_upstream_position(account: &AccountId, upstream: Option<UpstreamPosition<Balance>>);
@@ -177,8 +207,8 @@ impl<AccountId, Balance: Codec + MaxEncodedLen + Default>
 	fn account_quantities(_: &AccountId) -> PositionQuantities<Balance> {
 		PositionQuantities::default()
 	}
-	fn network_totals() -> PositionQuantities<Balance> {
-		PositionQuantities::default()
+	fn network_totals() -> NetworkPositionQuantities<Balance> {
+		NetworkPositionQuantities::default()
 	}
 	fn account_quantity_updated<Amount: Into<u128>>(
 		_: &AccountId,
@@ -186,6 +216,9 @@ impl<AccountId, Balance: Codec + MaxEncodedLen + Default>
 		_: Amount,
 		_: Amount,
 	) -> DispatchResult {
+		Ok(())
+	}
+	fn network_securitized_satoshis_updated(_: u128, _: u128) -> DispatchResult {
 		Ok(())
 	}
 	fn upstream_position(_: &AccountId) -> Option<UpstreamPosition<Balance>> {

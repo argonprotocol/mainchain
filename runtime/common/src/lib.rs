@@ -10,6 +10,7 @@ mod call_filters;
 pub mod config;
 mod deal_with_fees;
 mod fee_control;
+pub mod migrations;
 
 pub mod prelude {
 	pub use crate::config::*;
@@ -157,6 +158,7 @@ macro_rules! inject_runtime_vars {
 		/// This can be a tuple of types, each implementing `OnRuntimeUpgrade`.
 		type Migrations = (
 			pallet_vaults::migrations::RemoveVaultSecuritizationRatioMigration<Runtime>,
+			$crate::migrations::AddVaultSecuritizedSatoshis<Runtime>,
 			pallet_bitcoin_locks::migrations::RemoveSecuritizationRatioMigration<Runtime>,
 		);
 
