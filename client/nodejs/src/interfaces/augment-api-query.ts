@@ -1,8 +1,9 @@
 // Auto-generated via `yarn polkadot-types-from-chain`, do not edit
+/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
-import type {} from '@polkadot/api-base/types/storage';
+import '@polkadot/api-base/types/storage';
 
 import type { ApiTypes, AugmentedQuery, QueryableStorageEntry } from '@polkadot/api-base/types';
 import type {
@@ -95,6 +96,7 @@ import type {
   PalletGrandpaStoredState,
   PalletLocalchainTransferQueuedTransferOut,
   PalletMiningSlotMinerNonceScoring,
+  PalletMiningSlotPendingBid,
   PalletMiningSlotSeatPriceStats,
   PalletMintMintAction,
   PalletMintMintQueueCursor,
@@ -1098,6 +1100,14 @@ declare module '@polkadot/api-base/types/storage' {
         []
       >;
       /**
+       * Vector position is canonical commitment order, including calls inside utility batches.
+       **/
+      bidBatches: AugmentedQuery<
+        ApiType,
+        (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<AccountId32>>,
+        [u32]
+      >;
+      /**
        * The cohort set to go into effect in the next slot. The Vec has all
        * registrants with their bid amount
        **/
@@ -1172,6 +1182,11 @@ declare module '@polkadot/api-base/types/storage' {
        * cohorts.
        **/
       nextFrameId: AugmentedQuery<ApiType, () => Observable<u64>, []>;
+      pendingBids: AugmentedQuery<
+        ApiType,
+        (arg: AccountId32 | string | Uint8Array) => Observable<Option<PalletMiningSlotPendingBid>>,
+        [AccountId32]
+      >;
       /**
        * The miners released in the last block (only kept for a single block)
        **/

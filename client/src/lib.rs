@@ -38,6 +38,7 @@ use argon_primitives::{
 	VotingSchedule,
 };
 pub use spec::api;
+pub use argon_primitives::block_seal::mining_bid_commitment;
 
 use crate::api::{
 	block_seal_spec::storage::types::current_vote_minimum::CurrentVoteMinimum, ownership, storage,

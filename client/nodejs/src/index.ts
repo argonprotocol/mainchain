@@ -24,6 +24,7 @@ export type { SubmittableExtrinsic } from '@polkadot/api/promise/types';
 export { ApiDecoration };
 export { WageProtector } from './WageProtector';
 export * from './utils';
+export * from './miningBid';
 export * from './keyringUtils';
 export * from './header';
 export * from './convert';

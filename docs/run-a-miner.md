@@ -236,6 +236,25 @@ You can bid for a slot by using the Polkadot.js interface
 If you toggle to "Submission", you can submit your bid.
 ![Polkadot.js - Submit a bid](images/pjs-miningbid.png)
 
+The existing `miningSlot.bid(amount, keys, miningAccountId)` call queues a public fixed-price
+bid. A bid included in block N is evaluated at the end of N+1. Transaction success means the
+bid was queued; `SlotBidderAdded` confirms acceptance after settlement. Losing bids release their
+held funds and collateral. Already accepted bids retain their fixed price until displaced.
+
+For automatic bidding, use `miningSlot.commitBid(targetFrameId, miningAccountId, commitmentHash)`
+and reveal with `miningSlot.revealBid(miningAccountId, lowBid, highBid, keys, salt)` in the
+**immediately following block**. The Node.js client's `createMiningBidCommitment` helper generates
+the hash and a random salt. Keep the salt and range private until the commitment is included;
+broadcast the reveal immediately after inclusion rather than waiting for finality. Missing the
+next block expires the commitment without a penalty beyond transaction fees. Retry with a fresh
+salt and commitment.
+
+Both bounds are in microgons and must be multiples of 10,000 (0.01 ARGON). The funding account
+must cover the entire ceiling when revealing; an existing paid bid counts toward replacement
+funding. Only the final winning price is paid. Previously settled bids win ties, followed by
+commitment order. New commitments close before activation, but already accepted commitments keep
+their next-block reveal window, including when random bidding closure occurs.
+
 ### 4. Start Mining and Watch for Rewards
 
 Once you have successfully bid for a mining slot, you can start mining. You will win blocks with an

@@ -1,8 +1,9 @@
 // Auto-generated via `yarn polkadot-types-from-chain`, do not edit
+/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
-import type {} from '@polkadot/api-base/types/consts';
+import '@polkadot/api-base/types/consts';
 
 import type { ApiTypes, AugmentedConst } from '@polkadot/api-base/types';
 import type { u128, u16, u32, u64, u8 } from '@polkadot/types-codec';
@@ -279,6 +280,10 @@ declare module '@polkadot/api-base/types/consts' {
        * The initial argonots needed per seat before a prior-day median is available.
        **/
       initialArgonotsPerSeat: u128 & AugmentedConst<ApiType>;
+      /**
+       * Maximum commitments, including public bids, admitted per block.
+       **/
+      maxBidsPerBlock: u32 & AugmentedConst<ApiType>;
       /**
        * How many new miners can be in the cohort for each slot. The actual maximum will adjust
        * dynamically

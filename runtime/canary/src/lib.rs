@@ -480,6 +480,7 @@ impl pallet_mining_slot::Config for Runtime {
 	type FramesPerMiningTerm = FramesPerMiningTerm;
 	type MinCohortSize = MinCohortSize;
 	type MaxCohortSize = MaxCohortSize;
+	type MaxBidsPerBlock = ConstU32<32>;
 	type InitialArgonotsPerSeat = InitialArgonotsPerSeat;
 	type ArgonotBidCollateralMultiple = ArgonotBidCollateralMultiple;
 	type TargetPricePerSeat = TargetPricePerSeat;

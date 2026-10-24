@@ -3,7 +3,7 @@
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
-import type {} from '@polkadot/api-base/types/errors';
+import '@polkadot/api-base/types/errors';
 
 import type { ApiTypes, AugmentedError } from '@polkadot/api-base/types';
 
@@ -898,6 +898,7 @@ declare module '@polkadot/api-base/types/errors' {
       NotebookIncludesExpiredLocalchainTransfer: AugmentedError<ApiType>;
     };
     miningSlot: {
+      BidAlreadyRevealed: AugmentedError<ApiType>;
       /**
        * The mining bid cannot be reduced
        **/
@@ -914,6 +915,7 @@ declare module '@polkadot/api-base/types/errors' {
        * An account can only have one active registration
        **/
       CannotRegisterOverlappingSessions: AugmentedError<ApiType>;
+      DuplicateBidCommitment: AugmentedError<ApiType>;
       /**
        * The funding account does not have enough funds to cover the bid
        **/
@@ -926,6 +928,10 @@ declare module '@polkadot/api-base/types/errors' {
        * Bids must be in allowed increments
        **/
       InvalidBidAmount: AugmentedError<ApiType>;
+      InvalidBidCommitment: AugmentedError<ApiType>;
+      InvalidBidRange: AugmentedError<ApiType>;
+      InvalidRevealBlock: AugmentedError<ApiType>;
+      MissingBidCommitment: AugmentedError<ApiType>;
       /**
        * Mining slot bidding currently requires a prior operational-account upgrade.
        **/
@@ -934,6 +940,7 @@ declare module '@polkadot/api-base/types/errors' {
        * Bidding for the next cohort has closed
        **/
       SlotNotTakingBids: AugmentedError<ApiType>;
+      TooManyBidCommitments: AugmentedError<ApiType>;
       /**
        * The cohort registration overflowed
        **/
@@ -942,6 +949,7 @@ declare module '@polkadot/api-base/types/errors' {
        * The argonots on hold cannot be released
        **/
       UnrecoverableHold: AugmentedError<ApiType>;
+      WrongBidFrame: AugmentedError<ApiType>;
     };
     mint: {
       TooManyPendingMints: AugmentedError<ApiType>;

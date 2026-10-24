@@ -162,8 +162,8 @@ impl OperationalAccountProvider<u64> for MockOperationalAccountProvider {
 	type Weights = ();
 
 	fn is_eligible(account_id: &u64) -> bool {
-		!OperationalAccountsInviteOnly::get() ||
-			UpgradedOperationalAccounts::get().contains(account_id)
+		!OperationalAccountsInviteOnly::get()
+			|| UpgradedOperationalAccounts::get().contains(account_id)
 	}
 }
 
@@ -277,6 +277,7 @@ impl pallet_mining_slot::Config for Test {
 	type WeightInfo = ();
 	type MinCohortSize = MinCohortSize;
 	type MaxCohortSize = MaxCohortSize;
+	type MaxBidsPerBlock = ConstU32<32>;
 	type PricePerSeatAdjustmentDamper = PricePerSeatAdjustmentDamper;
 	type FramesPerMiningTerm = FramesPerMiningTerm;
 	type TargetPricePerSeat = TargetPricePerSeat;
