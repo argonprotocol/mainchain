@@ -5,17 +5,18 @@ use argon_primitives::{treasury::TreasuryPositionProvider, OperationalAccountsHo
 use codec::{Decode, Encode};
 use frame_support::traits::OnRuntimeUpgrade;
 use pallet_bitcoin_fissions::{
-	migrations::v1, Config as FissionsConfig, FissionByOwnerAndId, FissionIdsByLockId,
-	Pallet as FissionsPallet,
+	migrations::{self as fissions_migrations, v1},
+	Config as FissionsConfig, FissionByOwnerAndId, FissionIdsByLockId,
 };
 use pallet_bitcoin_locks::{
-	migrations::v11, Config as LocksConfig, LockIdsByVaultId, LockedBitcoin, LocksById,
-	Pallet as LocksPallet, SecuritizationHoldExpirationsByBitcoinHeight,
+	migrations::{self as locks_migrations, v11},
+	Config as LocksConfig, LockIdsByVaultId, LockedBitcoin, LocksById,
+	SecuritizationHoldExpirationsByBitcoinHeight,
 };
 use pallet_prelude::*;
 use pallet_vaults::{
-	migrations::v19, Config as VaultsConfig, Pallet as VaultsPallet, VaultFundsReleasingByHeight,
-	VaultsById,
+	migrations::{self as vaults_migrations, v19},
+	Config as VaultsConfig, VaultFundsReleasingByHeight, VaultsById,
 };
 
 #[cfg(feature = "try-runtime")]
@@ -41,187 +42,228 @@ where
 		+ FissionsConfig<Balance = <T as VaultsConfig>::Balance>,
 {
 	fn on_runtime_upgrade() -> Weight {
-		let vaults_version = StorageVersion::get::<VaultsPallet<T>>();
-		let locks_version = StorageVersion::get::<LocksPallet<T>>();
-		let fissions_version = StorageVersion::get::<FissionsPallet<T>>();
-		if vaults_version != 19 || locks_version != 11 || fissions_version != 1 {
-			log::info!(
-				"Skipping cosigner guarantee migration: expected Vaults/Locks/Fissions 19/11/1, found {:?}/{:?}/{:?}",
-				vaults_version, locks_version, fissions_version,
-			);
+		let vaults_pending = vaults_migrations::is_migration_pending::<T>();
+		let locks_pending = locks_migrations::is_migration_pending::<T>();
+		let fissions_pending = fissions_migrations::is_migration_pending::<T>();
+
+		if !vaults_pending || !locks_pending || !fissions_pending {
+			log::info!("Skipping cosigner guarantee migration: not all three pallets are pending");
 			return T::DbWeight::get().reads(3);
 		}
 
-		let current_height = <T as VaultsConfig>::BitcoinBlockHeightChange::get().1;
+		let current_bitcoin_height = <T as VaultsConfig>::BitcoinBlockHeightChange::get().1;
 		let mut accesses = 3u64;
-		VaultsById::<T>::translate::<v19::Vault<T>, _>(|vault_id, old_vault| {
-			let mut vault = old_vault.into_current();
-			let previous_activation = vault.get_activated_securitization();
+		VaultsById::<T>::translate::<v19::Vault<T>, _>(|vault_id, source_vault| {
+			let mut migrated_vault = source_vault.into_current();
+			let previous_vault_activation = migrated_vault.get_activated_securitization();
 			accesses.saturating_accrue(1);
 
 			for lock_id in LockIdsByVaultId::<T>::iter_key_prefix(vault_id) {
-				let Some(old) = v11::LocksById::<T>::get(lock_id) else { continue };
-				let expiration = old.securitization_hold_expiration_bitcoin_height;
-				let mut lock: LockedBitcoin<T> = old.clone().into();
-				let original = lock.cosigner_guarantee.clone();
-				let old_activation = old.securitization_for_satoshis(lock.funded_satoshis);
-				let remaining = &mut lock.cosigner_guarantee;
-				let mut assigned_satoshis = 0u64;
-				let mut assigned_microgons = <T as VaultsConfig>::Balance::zero();
+				let Some(source_lock) = v11::LocksById::<T>::get(lock_id) else { continue };
+
+				let funding_expiration_height =
+					source_lock.securitization_hold_expiration_bitcoin_height;
+				let mut migrated_lock: LockedBitcoin<T> = source_lock.clone().into();
+				let source_lock_guarantee = migrated_lock.cosigner_guarantee.clone();
+				let source_activated_securitization =
+					source_lock.securitization_for_satoshis(migrated_lock.funded_satoshis);
+				let lock_guarantee = &mut migrated_lock.cosigner_guarantee;
+				let mut assigned_fission_satoshis = 0u64;
+				let mut assigned_fission_microgons = <T as VaultsConfig>::Balance::zero();
 
 				// Split Liquid guarantees at the original price, preserving rounding and holds.
-				for id in FissionIdsByLockId::<T>::get(lock_id) {
-					let Some(fission) = v1::FissionByOwnerAndId::<T>::get(&lock.owner_account, id)
+				for fission_id in FissionIdsByLockId::<T>::get(lock_id) {
+					let Some(source_fission) =
+						v1::FissionByOwnerAndId::<T>::get(&migrated_lock.owner_account, fission_id)
 					else {
 						continue
 					};
-					assigned_satoshis.saturating_accrue(fission.satoshis);
-					let total = old.securitization_for_satoshis(assigned_satoshis);
-					let amount = total.saturating_sub(assigned_microgons);
-					assigned_microgons = total;
-					let Some(guarantee) = remaining.take_portion(fission.satoshis, amount) else {
+
+					assigned_fission_satoshis.saturating_accrue(source_fission.satoshis);
+					let cumulative_fission_microgons =
+						source_lock.securitization_for_satoshis(assigned_fission_satoshis);
+					let fission_guaranteed_microgons =
+						cumulative_fission_microgons.saturating_sub(assigned_fission_microgons);
+					assigned_fission_microgons = cumulative_fission_microgons;
+					let Some(fission_guarantee) = lock_guarantee
+						.take_portion(source_fission.satoshis, fission_guaranteed_microgons)
+					else {
 						continue
 					};
+
 					FissionByOwnerAndId::<T>::insert(
-						&lock.owner_account,
-						id,
-						fission.into_current(guarantee),
+						&migrated_lock.owner_account,
+						fission_id,
+						source_fission.into_current(fission_guarantee),
 					);
 					accesses.saturating_accrue(1);
 				}
 
 				// Keep the funding window, or shrink the remaining guarantee to confirmed Bitcoin.
-				let pending = SecuritizationHoldExpirationsByBitcoinHeight::<T>::get(expiration)
+				let funding_expiration_pending =
+					SecuritizationHoldExpirationsByBitcoinHeight::<T>::get(
+						funding_expiration_height,
+					)
 					.contains(&lock_id);
-				lock.securitization_hold_expiration_bitcoin_height = pending.then_some(expiration);
-				let mut retired = <T as VaultsConfig>::Balance::zero();
-				if !pending {
-					let retained = old_activation.saturating_sub(assigned_microgons);
-					retired = remaining.guaranteed_microgons.saturating_sub(retained);
-					remaining.guaranteed_microgons = retained;
-					remaining.basis.satoshis = remaining
-						.basis
-						.satoshis
-						.min(lock.funded_satoshis.saturating_sub(lock.fissioned_satoshis));
-					let mut to_retain = retained;
-					remaining.fund_hold_extensions.retain(|_, amount| {
-						*amount = (*amount).min(to_retain);
-						to_retain.saturating_reduce(*amount);
-						!amount.is_zero()
-					});
+				migrated_lock.securitization_hold_expiration_bitcoin_height =
+					funding_expiration_pending.then_some(funding_expiration_height);
+				let mut released_securitization = <T as VaultsConfig>::Balance::zero();
+				if !funding_expiration_pending {
+					let retained_securitization =
+						source_activated_securitization.saturating_sub(assigned_fission_microgons);
+					released_securitization =
+						lock_guarantee.guaranteed_microgons.saturating_sub(retained_securitization);
+					lock_guarantee.guaranteed_microgons = retained_securitization;
+					lock_guarantee.basis.satoshis = lock_guarantee.basis.satoshis.min(
+						migrated_lock
+							.funded_satoshis
+							.saturating_sub(migrated_lock.fissioned_satoshis),
+					);
 
+					let mut hold_microgons_to_retain = retained_securitization;
+					lock_guarantee.fund_hold_extensions.retain(|_, hold_microgons| {
+						*hold_microgons = (*hold_microgons).min(hold_microgons_to_retain);
+						hold_microgons_to_retain.saturating_reduce(*hold_microgons);
+						!hold_microgons.is_zero()
+					});
+				}
+
+				if !released_securitization.is_zero() {
 					// Release the excess at its existing maturities.
-					let mut to_skip = original.guaranteed_microgons.saturating_sub(retired);
-					for (height, amount) in original.collateral_expirations(
-						lock.vault_claim_height,
-						original.guaranteed_microgons,
-					) {
-						let released = amount.saturating_sub(to_skip);
-						to_skip.saturating_reduce(amount);
-						if released.is_zero() {
+					let mut allocated_microgons_to_skip = source_lock_guarantee
+						.guaranteed_microgons
+						.saturating_sub(released_securitization);
+					for (release_height, scheduled_microgons) in source_lock_guarantee
+						.collateral_expirations(
+							migrated_lock.vault_claim_height,
+							source_lock_guarantee.guaranteed_microgons,
+						) {
+						let released_microgons =
+							scheduled_microgons.saturating_sub(allocated_microgons_to_skip);
+						allocated_microgons_to_skip.saturating_reduce(scheduled_microgons);
+						if released_microgons.is_zero() {
 							continue
 						}
-						let Some(entry) = vault.securitization_release_schedule.get_mut(&height)
+
+						let Some(release_schedule_entry) =
+							migrated_vault.securitization_release_schedule.get_mut(&release_height)
 						else {
 							continue
 						};
-						entry.locked_commitments.saturating_reduce(released);
-						if height <= current_height {
+						release_schedule_entry
+							.locked_commitments
+							.saturating_reduce(released_microgons);
+						if release_height <= current_bitcoin_height {
 							continue
 						}
-						entry.relockable_commitments.saturating_accrue(released);
+						release_schedule_entry
+							.relockable_commitments
+							.saturating_accrue(released_microgons);
 
-						// A full bucket defers the sweep, without changing the maturity.
-						let mut sweep_height = height;
-						while VaultFundsReleasingByHeight::<T>::mutate(sweep_height, |ids| {
-							ids.try_insert(vault_id)
-						})
-						.is_err()
-						{
-							sweep_height = sweep_height.saturating_add(1);
-							accesses.saturating_accrue(1);
-						}
+						// Preflight verifies that the source Vaults fit in a release bucket.
+						VaultFundsReleasingByHeight::<T>::mutate(release_height, |ids| {
+							let _ = ids.try_insert(vault_id);
+						});
 						accesses.saturating_accrue(1);
 					}
 				}
 
 				// Update Vault and Treasury totals for the split guarantees.
-				let activation = lock
+				let migrated_activated_securitization = migrated_lock
 					.lock_held_securitization()
 					.activated_securitization
-					.saturating_add(assigned_microgons);
-				vault.securitization_locked.saturating_reduce(retired);
-				vault.securitization_pending_activation = vault
+					.saturating_add(assigned_fission_microgons);
+				migrated_vault.securitization_locked.saturating_reduce(released_securitization);
+				migrated_vault.securitization_pending_activation = migrated_vault
 					.securitization_pending_activation
-					.saturating_add(old_activation)
-					.saturating_sub(activation)
-					.saturating_sub(retired);
-				if lock.is_flexible {
-					vault.flexible_securitization_locked = vault
+					.saturating_add(source_activated_securitization)
+					.saturating_sub(migrated_activated_securitization)
+					.saturating_sub(released_securitization);
+				if migrated_lock.is_flexible {
+					migrated_vault.flexible_securitization_locked = migrated_vault
 						.flexible_securitization_locked
-						.saturating_sub(old_activation)
-						.saturating_add(activation);
+						.saturating_sub(source_activated_securitization)
+						.saturating_add(migrated_activated_securitization);
 				}
 
-				if let Some(mut upstream) =
-					<T as LocksConfig>::PositionProvider::upstream_position(&lock.owner_account)
-						.filter(|position| position.vault_id == vault_id)
+				if let Some(mut upstream_position) =
+					<T as LocksConfig>::PositionProvider::upstream_position(
+						&migrated_lock.owner_account,
+					)
+					.filter(|position| position.vault_id == vault_id)
 				{
-					upstream.bitcoin_allocated_securitization.saturating_reduce(retired);
-					upstream.bitcoin_securitization = upstream
+					upstream_position
+						.bitcoin_allocated_securitization
+						.saturating_reduce(released_securitization);
+					upstream_position.bitcoin_securitization = upstream_position
 						.bitcoin_securitization
-						.saturating_sub(old_activation)
-						.saturating_add(activation);
+						.saturating_sub(source_activated_securitization)
+						.saturating_add(migrated_activated_securitization);
 					<T as LocksConfig>::PositionProvider::set_upstream_position(
-						&lock.owner_account,
-						Some(upstream),
+						&migrated_lock.owner_account,
+						Some(upstream_position),
 					);
 				}
-				LocksById::<T>::insert(lock_id, lock);
+
+				LocksById::<T>::insert(lock_id, migrated_lock);
 				accesses.saturating_accrue(5);
 			}
 
-			vault.securitization_release_schedule.retain(|_, entry| !entry.is_empty());
-			if previous_activation != vault.get_activated_securitization() {
+			migrated_vault
+				.securitization_release_schedule
+				.retain(|_, entry| !entry.is_empty());
+			if previous_vault_activation != migrated_vault.get_activated_securitization() {
 				<T as VaultsConfig>::OperationalAccountsHook::vault_bitcoin_lock_funded(
-					&vault.operator_account_id,
-					vault.get_activated_securitization(),
+					&migrated_vault.operator_account_id,
+					migrated_vault.get_activated_securitization(),
 				);
 				accesses.saturating_accrue(3);
 			}
-			Some(vault)
+
+			Some(migrated_vault)
 		});
 
-		pallet_bitcoin_locks::migrations::complete_migration::<T>();
-		pallet_bitcoin_fissions::migrations::complete_migration::<T>();
-		pallet_vaults::migrations::complete_migration::<T>();
+		locks_migrations::complete_migration::<T>();
+		fissions_migrations::complete_migration::<T>();
+		vaults_migrations::complete_migration::<T>();
+
 		T::DbWeight::get().reads_writes(accesses.saturating_add(3), accesses.saturating_add(1))
 	}
 
 	#[cfg(feature = "try-runtime")]
 	fn pre_upgrade() -> Result<Vec<u8>, TryRuntimeError> {
-		let vaults_version = StorageVersion::get::<VaultsPallet<T>>();
-		let locks_version = StorageVersion::get::<LocksPallet<T>>();
-		let fissions_version = StorageVersion::get::<FissionsPallet<T>>();
-		if vaults_version == 20 && locks_version == 12 && fissions_version == 2 {
+		if vaults_migrations::is_migration_complete::<T>() &&
+			locks_migrations::is_migration_complete::<T>() &&
+			fissions_migrations::is_migration_complete::<T>()
+		{
 			return Ok(Vec::new());
 		}
-		ensure!(vaults_version == 19, "expected runtime-160 Vault storage");
-		ensure!(locks_version == 11, "expected runtime-160 Lock storage");
-		ensure!(fissions_version == 1, "expected runtime-160 Fission storage");
+		ensure!(vaults_migrations::is_migration_pending::<T>(), "expected source Vault storage");
+		ensure!(locks_migrations::is_migration_pending::<T>(), "expected source Lock storage");
+		ensure!(
+			fissions_migrations::is_migration_pending::<T>(),
+			"expected source Fission storage"
+		);
 		ensure!(
 			frame_system::LastRuntimeUpgrade::<T>::get().is_some_and(|v| v.spec_version.0 == 160),
 			"runtime 160 must precede this upgrade"
 		);
-		let vaults = v19::VaultsById::<T>::iter()
-			.map(|(id, vault)| (id, vault.into_current()))
+		let source_vaults = v19::VaultsById::<T>::iter()
+			.map(|(id, source_vault)| (id, source_vault.into_current()))
 			.collect::<BTreeMap<_, _>>();
-		let indexes = VaultFundsReleasingByHeight::<T>::iter().collect::<BTreeMap<_, _>>();
 		ensure!(
-			indexes.values().all(|ids| ids.iter().all(|id| vaults.contains_key(id))),
+			source_vaults.len() <= <T as VaultsConfig>::MaxVaults::get() as usize,
+			"source Vaults exceed release index capacity"
+		);
+		let source_release_index =
+			VaultFundsReleasingByHeight::<T>::iter().collect::<BTreeMap<_, _>>();
+		ensure!(
+			source_release_index
+				.values()
+				.all(|ids| ids.iter().all(|id| source_vaults.contains_key(id))),
 			"release index contains missing Vault"
 		);
-		let mut totals = BTreeMap::<
+		let mut source_vault_totals = BTreeMap::<
 			VaultId,
 			(
 				u64,
@@ -231,149 +273,204 @@ where
 				<T as VaultsConfig>::Balance,
 			),
 		>::new();
-		let mut upstream = BTreeMap::new();
-		let mut upstream_totals = BTreeMap::<
+		let mut source_upstream_positions = BTreeMap::new();
+		let mut source_upstream_totals = BTreeMap::<
 			T::AccountId,
 			(<T as VaultsConfig>::Balance, <T as VaultsConfig>::Balance),
 		>::new();
 
-		let mut pending = BTreeMap::new();
-		for (height, ids) in SecuritizationHoldExpirationsByBitcoinHeight::<T>::iter() {
-			for id in ids {
+		let mut funding_expirations = BTreeMap::new();
+		for (funding_expiration_height, lock_ids) in
+			SecuritizationHoldExpirationsByBitcoinHeight::<T>::iter()
+		{
+			for lock_id in lock_ids {
 				ensure!(
-					pending.insert(id, height).is_none(),
+					funding_expirations.insert(lock_id, funding_expiration_height).is_none(),
 					"Lock has multiple funding expiry entries"
 				);
 			}
 		}
 
-		let mut fissions_by_lock = BTreeMap::<BitcoinLockId, Vec<_>>::new();
+		let mut source_fissions_by_lock = BTreeMap::<BitcoinLockId, Vec<_>>::new();
 		let mut source_fissions = Vec::new();
-		for (owner, id, fission) in old_fissions::FissionByOwnerAndId::<T>::iter() {
-			source_fissions.push((owner.clone(), id, fission.clone()));
-			fissions_by_lock.entry(fission.lock_id).or_default().push((owner, id, fission));
+		for (owner, fission_id, source_fission) in old_fissions::FissionByOwnerAndId::<T>::iter() {
+			source_fissions.push((owner.clone(), fission_id, source_fission.clone()));
+			source_fissions_by_lock.entry(source_fission.lock_id).or_default().push((
+				owner,
+				fission_id,
+				source_fission,
+			));
 		}
 
 		let mut source_locks = Vec::new();
-		for (id, lock) in v11::LocksById::<T>::iter() {
+		for (lock_id, source_lock) in v11::LocksById::<T>::iter() {
 			ensure!(
-				lock.securitization_ratio == FixedU128::one(),
+				source_lock.securitization_ratio == FixedU128::one(),
 				"non-1x Bitcoin Lock requires conversion before runtime 161"
 			);
-			if let Some(height) = pending.get(&id) {
+			if let Some(funding_expiration_height) = funding_expirations.get(&lock_id) {
 				ensure!(
-					*height == lock.securitization_hold_expiration_bitcoin_height,
+					*funding_expiration_height ==
+						source_lock.securitization_hold_expiration_bitcoin_height,
 					"funding expiry index differs from stored Lock height"
 				);
 			}
-			let vault = vaults.get(&lock.vault_id).ok_or("Lock Vault missing")?;
+			let source_vault =
+				source_vaults.get(&source_lock.vault_id).ok_or("Lock Vault missing")?;
 			ensure!(
-				LockIdsByVaultId::<T>::contains_key(lock.vault_id, id),
+				LockIdsByVaultId::<T>::contains_key(source_lock.vault_id, lock_id),
 				"Lock missing from Vault index"
 			);
-			let guarantee = LockedBitcoin::<T>::from(lock.clone()).cosigner_guarantee;
-			for (height, amount) in guarantee
-				.collateral_expirations(lock.vault_claim_height, guarantee.guaranteed_microgons)
-			{
-				if height > <T as VaultsConfig>::BitcoinBlockHeightChange::get().1 {
+			let source_lock_guarantee =
+				LockedBitcoin::<T>::from(source_lock.clone()).cosigner_guarantee;
+			for (release_height, scheduled_microgons) in source_lock_guarantee
+				.collateral_expirations(
+					source_lock.vault_claim_height,
+					source_lock_guarantee.guaranteed_microgons,
+				) {
+				if release_height > <T as VaultsConfig>::BitcoinBlockHeightChange::get().1 {
 					ensure!(
-						vault
+						source_vault
 							.securitization_release_schedule
-							.get(&height)
-							.is_some_and(|entry| entry.locked_commitments >= amount),
+							.get(&release_height)
+							.is_some_and(|release_schedule_entry| release_schedule_entry
+								.locked_commitments >=
+								scheduled_microgons),
 						"Lock maturity missing from Vault commitments"
 					);
 				}
 			}
-			let activation = lock.securitization_for_satoshis(lock.funded_satoshis);
-			let (funded, covered, allocated, active, flexible) =
-				totals.entry(lock.vault_id).or_default();
-			funded.saturating_accrue(lock.funded_satoshis);
-			covered.saturating_accrue(guarantee.securitized_satoshis(lock.funded_satoshis));
-			allocated.saturating_accrue(guarantee.guaranteed_microgons);
-			active.saturating_accrue(activation);
-			if lock.is_flexible {
-				flexible.saturating_accrue(activation);
+			let source_activated_securitization =
+				source_lock.securitization_for_satoshis(source_lock.funded_satoshis);
+			let (
+				funded_satoshis,
+				securitized_satoshis,
+				allocated_securitization,
+				activated_securitization,
+				flexible_securitization,
+			) = source_vault_totals.entry(source_lock.vault_id).or_default();
+			funded_satoshis.saturating_accrue(source_lock.funded_satoshis);
+			securitized_satoshis.saturating_accrue(
+				source_lock_guarantee.securitized_satoshis(source_lock.funded_satoshis),
+			);
+			allocated_securitization.saturating_accrue(source_lock_guarantee.guaranteed_microgons);
+			activated_securitization.saturating_accrue(source_activated_securitization);
+			if source_lock.is_flexible {
+				flexible_securitization.saturating_accrue(source_activated_securitization);
 			}
-			let position =
-				<T as LocksConfig>::PositionProvider::upstream_position(&lock.owner_account);
-			if position.as_ref().is_some_and(|p| p.vault_id == lock.vault_id) {
-				let (allocated, active) =
-					upstream_totals.entry(lock.owner_account.clone()).or_default();
-				allocated.saturating_accrue(guarantee.guaranteed_microgons);
-				active.saturating_accrue(activation);
+			let upstream_position =
+				<T as LocksConfig>::PositionProvider::upstream_position(&source_lock.owner_account);
+			if upstream_position.as_ref().is_some_and(|p| p.vault_id == source_lock.vault_id) {
+				let (allocated_securitization, activated_securitization) =
+					source_upstream_totals.entry(source_lock.owner_account.clone()).or_default();
+				allocated_securitization
+					.saturating_accrue(source_lock_guarantee.guaranteed_microgons);
+				activated_securitization.saturating_accrue(source_activated_securitization);
 			}
-			upstream.insert(lock.owner_account.clone(), position);
-			let fissions = fissions_by_lock.remove(&id).unwrap_or_default();
-			let indexed_ids = FissionIdsByLockId::<T>::get(id);
+			source_upstream_positions.insert(source_lock.owner_account.clone(), upstream_position);
+			let lock_source_fissions = source_fissions_by_lock.remove(&lock_id).unwrap_or_default();
+			let indexed_fission_ids = FissionIdsByLockId::<T>::get(lock_id);
 			ensure!(
-				indexed_ids.len() == fissions.len(),
+				indexed_fission_ids.len() == lock_source_fissions.len(),
 				"Fission index differs from source records"
 			);
 
-			let funded = lock.funded_satoshis.min(lock.securitization_basis.satoshis);
+			let funded_satoshis =
+				source_lock.funded_satoshis.min(source_lock.securitization_basis.satoshis);
 			let mut fissioned_satoshis = 0u64;
-			for (owner, fission_id, fission) in &fissions {
-				ensure!(*owner == lock.owner_account, "Fission owner differs from source Lock");
-				ensure!(indexed_ids.contains(fission_id), "Fission missing from Lock index");
-				ensure!(fission.satoshis > 0, "Fission has no satoshis");
+			for (owner, fission_id, source_fission) in &lock_source_fissions {
+				ensure!(
+					*owner == source_lock.owner_account,
+					"Fission owner differs from source Lock"
+				);
+				ensure!(
+					indexed_fission_ids.contains(fission_id),
+					"Fission missing from Lock index"
+				);
+				ensure!(source_fission.satoshis > 0, "Fission has no satoshis");
 				fissioned_satoshis = fissioned_satoshis
-					.checked_add(fission.satoshis)
+					.checked_add(source_fission.satoshis)
 					.ok_or("Fission satoshis overflow")?;
-				ensure!(fissioned_satoshis <= funded, "Fission exceeds funded Lock guarantee");
+				ensure!(
+					fissioned_satoshis <= funded_satoshis,
+					"Fission exceeds funded Lock guarantee"
+				);
 			}
 			ensure!(
-				fissioned_satoshis == lock.fissioned_satoshis,
+				fissioned_satoshis == source_lock.fissioned_satoshis,
 				"Fission allocation differs from source Lock"
 			);
 
-			source_locks.push((id, lock));
+			source_locks.push((lock_id, source_lock));
 		}
-		ensure!(fissions_by_lock.is_empty(), "Fission source Lock missing");
+		ensure!(source_fissions_by_lock.is_empty(), "Fission source Lock missing");
 		ensure!(
 			LockIdsByVaultId::<T>::iter().count() == source_locks.len(),
 			"Vault Lock index contains extra records"
 		);
-		for (id, vault) in &vaults {
-			let (funded, covered, allocated, active, flexible) =
-				totals.get(id).copied().unwrap_or_default();
+		for (vault_id, source_vault) in &source_vaults {
+			let (
+				funded_satoshis,
+				securitized_satoshis,
+				allocated_securitization,
+				activated_securitization,
+				flexible_securitization,
+			) = source_vault_totals.get(vault_id).copied().unwrap_or_default();
 			ensure!(
 				(
-					vault.total_satoshis,
-					vault.securitized_satoshis,
-					vault.securitization_locked,
-					vault.get_activated_securitization(),
-					vault.flexible_securitization_locked
-				) == (funded, covered, allocated, active, flexible),
+					source_vault.total_satoshis,
+					source_vault.securitized_satoshis,
+					source_vault.securitization_locked,
+					source_vault.get_activated_securitization(),
+					source_vault.flexible_securitization_locked
+				) == (
+					funded_satoshis,
+					securitized_satoshis,
+					allocated_securitization,
+					activated_securitization,
+					flexible_securitization
+				),
 				"source Vault accounting differs from Locks"
 			);
 		}
-		for (owner, position) in &upstream {
-			if let Some(position) = position {
-				let (allocated, active) = upstream_totals.get(owner).copied().unwrap_or_default();
+		for (owner, upstream_position) in &source_upstream_positions {
+			if let Some(upstream_position) = upstream_position {
+				let (allocated_securitization, activated_securitization) =
+					source_upstream_totals.get(owner).copied().unwrap_or_default();
 				ensure!(
-					(position.bitcoin_allocated_securitization, position.bitcoin_securitization) ==
-						(allocated, active),
+					(
+						upstream_position.bitcoin_allocated_securitization,
+						upstream_position.bitcoin_securitization
+					) == (allocated_securitization, activated_securitization),
 					"source upstream accounting differs from Locks"
 				);
 			}
 		}
-		let vaults = vaults.into_iter().collect::<Vec<_>>();
-		let revenue = pallet_vaults::RevenuePerFrameByVault::<T>::iter()
-			.map(|(id, r)| (id, r.encode()))
+		let source_vaults = source_vaults.into_iter().collect::<Vec<_>>();
+		let source_frame_revenue = pallet_vaults::RevenuePerFrameByVault::<T>::iter()
+			.map(|(vault_id, frame_revenue)| (vault_id, frame_revenue.encode()))
 			.collect::<Vec<_>>();
-		Ok((source_locks, source_fissions, pending, vaults, upstream, indexes, revenue).encode())
+		Ok((
+			source_locks,
+			source_fissions,
+			funding_expirations,
+			source_vaults,
+			source_upstream_positions,
+			source_release_index,
+			source_frame_revenue,
+		)
+			.encode())
 	}
 
 	#[cfg(feature = "try-runtime")]
 	fn post_upgrade(state: Vec<u8>) -> Result<(), TryRuntimeError> {
 		ensure!(
-			StorageVersion::get::<VaultsPallet<T>>() == 20,
+			vaults_migrations::is_migration_complete::<T>(),
 			"Vault storage version not updated"
 		);
-		ensure!(StorageVersion::get::<LocksPallet<T>>() == 12, "Lock storage version not updated");
+		ensure!(locks_migrations::is_migration_complete::<T>(), "Lock storage version not updated");
 		ensure!(
-			StorageVersion::get::<FissionsPallet<T>>() == 2,
+			fissions_migrations::is_migration_complete::<T>(),
 			"Fission storage version not updated"
 		);
 		// An empty snapshot means all three pallets were already migrated.
@@ -381,7 +478,15 @@ where
 			return Ok(());
 		}
 
-		let (locks, fissions, pending, vaults, mut upstream, mut indexes, revenue) = <(
+		let (
+			source_locks,
+			source_fissions,
+			funding_expirations,
+			source_vaults,
+			mut expected_upstream_positions,
+			mut expected_release_index,
+			source_frame_revenue,
+		) = <(
 			Vec<(BitcoinLockId, v11::LockedBitcoin<T>)>,
 			Vec<(T::AccountId, FissionId, v1::Fission<T>)>,
 			BTreeMap<BitcoinLockId, BitcoinHeight>,
@@ -395,188 +500,231 @@ where
 			>,
 			BTreeMap<BitcoinHeight, BoundedBTreeSet<VaultId, <T as VaultsConfig>::MaxVaults>>,
 			Vec<(VaultId, Vec<u8>)>,
-		)>::decode(
-			&mut state.as_slice(),
-		)
+		)>::decode(&mut state.as_slice())
 		.map_err(|_| "invalid guarantee migration state")?;
-		ensure!(LocksById::<T>::iter_keys().count() == locks.len(), "Bitcoin Lock count changed");
 		ensure!(
-			FissionByOwnerAndId::<T>::iter_keys().count() == fissions.len(),
+			LocksById::<T>::iter_keys().count() == source_locks.len(),
+			"Bitcoin Lock count changed"
+		);
+		ensure!(
+			FissionByOwnerAndId::<T>::iter_keys().count() == source_fissions.len(),
 			"Fission count changed"
 		);
-		let mut fissions_by_lock = BTreeMap::<BitcoinLockId, Vec<_>>::new();
-		for (owner, id, fission) in fissions {
-			fissions_by_lock.entry(fission.lock_id).or_default().push((owner, id, fission));
+		let mut source_fissions_by_lock = BTreeMap::<BitcoinLockId, Vec<_>>::new();
+		for (owner, fission_id, source_fission) in source_fissions {
+			source_fissions_by_lock.entry(source_fission.lock_id).or_default().push((
+				owner,
+				fission_id,
+				source_fission,
+			));
 		}
 
-		let mut expected_vaults = vaults.into_iter().collect::<BTreeMap<_, _>>();
-		let mut locks = locks.into_iter().collect::<BTreeMap<_, _>>();
+		let mut expected_vaults = source_vaults.into_iter().collect::<BTreeMap<_, _>>();
+		let mut source_locks = source_locks.into_iter().collect::<BTreeMap<_, _>>();
 		let lock_ids =
 			VaultsById::<T>::iter_keys().flat_map(LockIdsByVaultId::<T>::iter_key_prefix);
-		for id in lock_ids {
-			let old = locks.remove(&id).ok_or("unexpected migrated Lock")?;
-			let lock = LocksById::<T>::get(id).ok_or("Bitcoin Lock missing after migration")?;
-			let mut expected_terms: LockedBitcoin<T> = old.clone().into();
-			expected_terms.cosigner_guarantee = lock.cosigner_guarantee.clone();
-			expected_terms.securitization_hold_expiration_bitcoin_height =
-				lock.securitization_hold_expiration_bitcoin_height;
+		for lock_id in lock_ids {
+			let source_lock = source_locks.remove(&lock_id).ok_or("unexpected migrated Lock")?;
+			let migrated_lock =
+				LocksById::<T>::get(lock_id).ok_or("Bitcoin Lock missing after migration")?;
+			let mut expected_lock: LockedBitcoin<T> = source_lock.clone().into();
+			expected_lock.cosigner_guarantee = migrated_lock.cosigner_guarantee.clone();
+			expected_lock.securitization_hold_expiration_bitcoin_height =
+				migrated_lock.securitization_hold_expiration_bitcoin_height;
 			ensure!(
-				lock.encode() == expected_terms.encode(),
+				migrated_lock.encode() == expected_lock.encode(),
 				"Bitcoin Lock migration changed stored terms or funding"
 			);
 
-			let basis = BitcoinSecuritizationBasis {
-				satoshis: old.securitization_basis.satoshis,
-				microgons_at_target_per_btc: old.securitization_basis.microgons_at_target_per_btc,
-				tick: old.securitization_tick,
+			let source_securitization_basis = BitcoinSecuritizationBasis {
+				satoshis: source_lock.securitization_basis.satoshis,
+				microgons_at_target_per_btc: source_lock
+					.securitization_basis
+					.microgons_at_target_per_btc,
+				tick: source_lock.securitization_tick,
 			};
-			let securitization = CosignerGuarantee {
-				basis,
-				guaranteed_microgons: old.securitization_coverage_microgons,
-				fund_hold_extensions: old.fund_hold_extensions.clone(),
+			let source_lock_guarantee = CosignerGuarantee {
+				basis: source_securitization_basis,
+				guaranteed_microgons: source_lock.securitization_coverage_microgons,
+				fund_hold_extensions: source_lock.fund_hold_extensions.clone(),
 			};
-			let mut source_fissions = fissions_by_lock.remove(&id).unwrap_or_default();
-			source_fissions.sort_by_key(|(_, fission_id, _)| *fission_id);
-			let mut guarantees = Vec::new();
-			for (owner, fission_id, source) in source_fissions {
-				let fission = FissionByOwnerAndId::<T>::get(owner, fission_id)
+			let mut lock_source_fissions =
+				source_fissions_by_lock.remove(&lock_id).unwrap_or_default();
+			lock_source_fissions.sort_by_key(|(_, fission_id, _)| *fission_id);
+			let mut migrated_guarantees = Vec::new();
+			for (owner, fission_id, source_fission) in lock_source_fissions {
+				let migrated_fission = FissionByOwnerAndId::<T>::get(owner, fission_id)
 					.ok_or("Fission missing after migration")?;
-				let satoshis = source.satoshis;
+				let guaranteed_satoshis = source_fission.satoshis;
 				ensure!(
-					source.into_current(fission.cosigner_guarantee.clone()).encode() ==
-						fission.encode(),
+					source_fission
+						.into_current(migrated_fission.cosigner_guarantee.clone())
+						.encode() == migrated_fission.encode(),
 					"Fission migration changed stored terms"
 				);
-				guarantees.push((satoshis, fission.cosigner_guarantee));
+				migrated_guarantees
+					.push((guaranteed_satoshis, migrated_fission.cosigner_guarantee));
 			}
-			let position = lock.total_securitization(id);
+			let securitization_position = migrated_lock.total_securitization(lock_id);
 			ensure!(
-				position ==
+				securitization_position ==
 					BitcoinLockPosition {
-						allocated_securitization: if pending.contains_key(&id) {
-							old.securitization_coverage_microgons
+						allocated_securitization: if funding_expirations.contains_key(&lock_id) {
+							source_lock.securitization_coverage_microgons
 						} else {
-							old.securitization_for_satoshis(old.funded_satoshis)
+							source_lock.securitization_for_satoshis(source_lock.funded_satoshis)
 						},
-						activated_securitization: lock
+						activated_securitization: migrated_lock
 							.lock_held_securitization()
 							.activated_securitization
-							.checked_add(&old.securitization_for_satoshis(old.fissioned_satoshis))
+							.checked_add(
+								&source_lock
+									.securitization_for_satoshis(source_lock.fissioned_satoshis)
+							)
 							.ok_or("migrated activated securitization overflows")?,
 					},
 				"migrated securitization does not match retained guarantees"
 			);
 
-			let capacity = if pending.contains_key(&id) {
-				basis.satoshis
+			let retained_guarantee_satoshis = if funding_expirations.contains_key(&lock_id) {
+				source_securitization_basis.satoshis
 			} else {
-				old.funded_satoshis.min(basis.satoshis)
+				source_lock.funded_satoshis.min(source_securitization_basis.satoshis)
 			};
-			let satoshis = capacity
-				.checked_sub(old.fissioned_satoshis)
+			let guaranteed_satoshis = retained_guarantee_satoshis
+				.checked_sub(source_lock.fissioned_satoshis)
 				.ok_or("Fissions exceed the Lock guarantee")?;
 			ensure!(
-				lock.cosigner_guarantee.basis.satoshis == satoshis,
+				migrated_lock.cosigner_guarantee.basis.satoshis == guaranteed_satoshis,
 				"Lock guarantee quantity changed"
 			);
 			ensure!(
-				lock.securitization_hold_expiration_bitcoin_height == pending.get(&id).copied(),
+				migrated_lock.securitization_hold_expiration_bitcoin_height ==
+					funding_expirations.get(&lock_id).copied(),
 				"initial funding deadline changed"
 			);
-			if let Some(deadline) = lock.securitization_hold_expiration_bitcoin_height {
+			if let Some(funding_expiration_height) =
+				migrated_lock.securitization_hold_expiration_bitcoin_height
+			{
 				ensure!(
-					SecuritizationHoldExpirationsByBitcoinHeight::<T>::get(deadline).contains(&id),
+					SecuritizationHoldExpirationsByBitcoinHeight::<T>::get(
+						funding_expiration_height
+					)
+					.contains(&lock_id),
 					"initial funding expiry not indexed"
 				);
 			}
-			guarantees.push((satoshis, lock.cosigner_guarantee.clone()));
+			migrated_guarantees
+				.push((guaranteed_satoshis, migrated_lock.cosigner_guarantee.clone()));
 
-			let allocated = guarantees
-				.iter()
-				.fold(<T as VaultsConfig>::Balance::zero(), |total, (_, guarantee)| {
-					total.saturating_add(guarantee.guaranteed_microgons)
-				});
-			let active = position.activated_securitization;
-			let old_active = old.securitization_for_satoshis(old.funded_satoshis);
-			let retired = old.securitization_coverage_microgons.saturating_sub(allocated);
-			let vault = expected_vaults.get_mut(&old.vault_id).ok_or("Lock Vault missing")?;
-			vault.securitization_locked.saturating_reduce(retired);
-			vault.securitization_pending_activation = vault
+			let migrated_allocated_securitization = migrated_guarantees.iter().fold(
+				<T as VaultsConfig>::Balance::zero(),
+				|total, (_, migrated_guarantee)| {
+					total.saturating_add(migrated_guarantee.guaranteed_microgons)
+				},
+			);
+			let migrated_activated_securitization =
+				securitization_position.activated_securitization;
+			let source_activated_securitization =
+				source_lock.securitization_for_satoshis(source_lock.funded_satoshis);
+			let released_securitization = source_lock
+				.securitization_coverage_microgons
+				.saturating_sub(migrated_allocated_securitization);
+			let expected_vault =
+				expected_vaults.get_mut(&source_lock.vault_id).ok_or("Lock Vault missing")?;
+			expected_vault.securitization_locked.saturating_reduce(released_securitization);
+			expected_vault.securitization_pending_activation = expected_vault
 				.securitization_pending_activation
-				.saturating_add(old_active)
-				.saturating_sub(active)
-				.saturating_sub(retired);
-			if old.is_flexible {
-				vault.flexible_securitization_locked = vault
+				.saturating_add(source_activated_securitization)
+				.saturating_sub(migrated_activated_securitization)
+				.saturating_sub(released_securitization);
+			if source_lock.is_flexible {
+				expected_vault.flexible_securitization_locked = expected_vault
 					.flexible_securitization_locked
-					.saturating_sub(old_active)
-					.saturating_add(active);
+					.saturating_sub(source_activated_securitization)
+					.saturating_add(migrated_activated_securitization);
 			}
-			if let Some(Some(position)) = upstream.get_mut(&old.owner_account) {
-				if position.vault_id == old.vault_id {
-					position.bitcoin_allocated_securitization.saturating_reduce(retired);
-					position.bitcoin_securitization = position
-						.bitcoin_securitization
-						.saturating_sub(old_active)
-						.saturating_add(active);
-				}
-			}
-			let mut owned_maturities =
-				BTreeMap::<BitcoinHeight, <T as VaultsConfig>::Balance>::new();
-			for (_, guarantee) in &guarantees {
-				for (height, amount) in guarantee
-					.collateral_expirations(old.vault_claim_height, guarantee.guaranteed_microgons)
-				{
-					owned_maturities.entry(height).or_default().saturating_accrue(amount);
-				}
-			}
-			for (height, amount) in securitization
-				.collateral_expirations(old.vault_claim_height, securitization.guaranteed_microgons)
+			if let Some(Some(expected_upstream_position)) =
+				expected_upstream_positions.get_mut(&source_lock.owner_account)
 			{
-				let released =
-					amount.saturating_sub(owned_maturities.remove(&height).unwrap_or_default());
-				if released.is_zero() {
+				if expected_upstream_position.vault_id == source_lock.vault_id {
+					expected_upstream_position
+						.bitcoin_allocated_securitization
+						.saturating_reduce(released_securitization);
+					expected_upstream_position.bitcoin_securitization = expected_upstream_position
+						.bitcoin_securitization
+						.saturating_sub(source_activated_securitization)
+						.saturating_add(migrated_activated_securitization);
+				}
+			}
+			let mut allocated_securitization_by_height =
+				BTreeMap::<BitcoinHeight, <T as VaultsConfig>::Balance>::new();
+			for (_, migrated_guarantee) in &migrated_guarantees {
+				for (release_height, scheduled_microgons) in migrated_guarantee
+					.collateral_expirations(
+						source_lock.vault_claim_height,
+						migrated_guarantee.guaranteed_microgons,
+					) {
+					allocated_securitization_by_height
+						.entry(release_height)
+						.or_default()
+						.saturating_accrue(scheduled_microgons);
+				}
+			}
+			for (release_height, scheduled_microgons) in source_lock_guarantee
+				.collateral_expirations(
+					source_lock.vault_claim_height,
+					source_lock_guarantee.guaranteed_microgons,
+				) {
+				let released_microgons = scheduled_microgons.saturating_sub(
+					allocated_securitization_by_height.remove(&release_height).unwrap_or_default(),
+				);
+				if released_microgons.is_zero() {
 					continue
 				}
-				if let Some(entry) = vault.securitization_release_schedule.get_mut(&height) {
-					entry.locked_commitments.saturating_reduce(released);
-					if height > <T as VaultsConfig>::BitcoinBlockHeightChange::get().1 {
-						entry.relockable_commitments.saturating_accrue(released);
-						let mut sweep_height = height;
-						while indexes
-							.entry(sweep_height)
+				if let Some(release_schedule_entry) =
+					expected_vault.securitization_release_schedule.get_mut(&release_height)
+				{
+					release_schedule_entry.locked_commitments.saturating_reduce(released_microgons);
+					if release_height > <T as VaultsConfig>::BitcoinBlockHeightChange::get().1 {
+						release_schedule_entry
+							.relockable_commitments
+							.saturating_accrue(released_microgons);
+						expected_release_index
+							.entry(release_height)
 							.or_default()
-							.try_insert(old.vault_id)
-							.is_err()
-						{
-							sweep_height =
-								sweep_height.checked_add(1).ok_or("release index overflows")?;
-						}
+							.try_insert(source_lock.vault_id)
+							.map_err(|_| "unreachable: preflight verified all Vaults fit")?;
 					}
 				}
 			}
 
 			// Verify each assigned guarantee amount and its hold extensions against the original
 			// guarantee.
-			let mut allocated_satoshis = 0;
-			for (satoshis, guarantee) in guarantees {
-				let allocated_microgons = old.securitization_for_satoshis(allocated_satoshis);
-				allocated_satoshis =
-					allocated_satoshis.checked_add(satoshis).ok_or("assigned satoshis overflow")?;
-				let microgons = old
-					.securitization_for_satoshis(allocated_satoshis)
-					.checked_sub(&allocated_microgons)
+			let mut assigned_satoshis = 0;
+			for (guaranteed_satoshis, migrated_guarantee) in migrated_guarantees {
+				let previously_assigned_microgons =
+					source_lock.securitization_for_satoshis(assigned_satoshis);
+				assigned_satoshis = assigned_satoshis
+					.checked_add(guaranteed_satoshis)
+					.ok_or("assigned satoshis overflow")?;
+				let expected_guaranteed_microgons = source_lock
+					.securitization_for_satoshis(assigned_satoshis)
+					.checked_sub(&previously_assigned_microgons)
 					.ok_or("assigned securitization underflows")?;
 				ensure!(
-					guarantee.basis == BitcoinSecuritizationBasis { satoshis, ..basis } &&
-						guarantee.guaranteed_microgons == microgons,
+					migrated_guarantee.basis ==
+						BitcoinSecuritizationBasis {
+							satoshis: guaranteed_satoshis,
+							..source_securitization_basis
+						} && migrated_guarantee.guaranteed_microgons == expected_guaranteed_microgons,
 					"Assigned guarantee basis or securitization changed"
 				);
 
-				let mut extensions = old.fund_hold_extensions.clone();
-				let mut microgons_to_skip = allocated_microgons;
-				let mut microgons_to_assign = microgons;
-				extensions.retain(|_, amount| {
+				let mut expected_hold_extensions = source_lock.fund_hold_extensions.clone();
+				let mut microgons_to_skip = previously_assigned_microgons;
+				let mut microgons_to_assign = expected_guaranteed_microgons;
+				expected_hold_extensions.retain(|_, amount| {
 					let assigned =
 						amount.saturating_sub(microgons_to_skip).min(microgons_to_assign);
 					microgons_to_skip = microgons_to_skip.saturating_sub(*amount);
@@ -585,7 +733,7 @@ where
 					!assigned.is_zero()
 				});
 				ensure!(
-					guarantee.fund_hold_extensions == extensions,
+					migrated_guarantee.fund_hold_extensions == expected_hold_extensions,
 					"Assigned guarantee release maturities changed"
 				);
 			}
@@ -594,28 +742,32 @@ where
 			VaultsById::<T>::iter_keys().count() == expected_vaults.len(),
 			"Vault count changed"
 		);
-		for (id, mut expected) in expected_vaults {
-			expected.securitization_release_schedule.retain(|_, entry| !entry.is_empty());
+		for (vault_id, mut expected_vault) in expected_vaults {
+			expected_vault
+				.securitization_release_schedule
+				.retain(|_, entry| !entry.is_empty());
 			ensure!(
-				VaultsById::<T>::get(id) == Some(expected),
+				VaultsById::<T>::get(vault_id) == Some(expected_vault),
 				"migrated Vault accounting or maturities differ"
 			);
 		}
-		for (owner, expected) in upstream {
+		for (owner, expected_upstream_position) in expected_upstream_positions {
 			ensure!(
-				<T as LocksConfig>::PositionProvider::upstream_position(&owner) == expected,
+				<T as LocksConfig>::PositionProvider::upstream_position(&owner) ==
+					expected_upstream_position,
 				"migrated Treasury upstream differs"
 			);
 		}
 		ensure!(
-			VaultFundsReleasingByHeight::<T>::iter().collect::<BTreeMap<_, _>>() == indexes,
+			VaultFundsReleasingByHeight::<T>::iter().collect::<BTreeMap<_, _>>() ==
+				expected_release_index,
 			"migrated Vault release index differs"
 		);
 		ensure!(
 			pallet_vaults::RevenuePerFrameByVault::<T>::iter()
-				.map(|(id, r)| (id, r.encode()))
+				.map(|(vault_id, frame_revenue)| (vault_id, frame_revenue.encode()))
 				.collect::<Vec<_>>() ==
-				revenue,
+				source_frame_revenue,
 			"migration changed frame revenue"
 		);
 		Ok(())

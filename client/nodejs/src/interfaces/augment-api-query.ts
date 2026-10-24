@@ -255,13 +255,17 @@ declare module '@polkadot/api-base/types/storage' {
         [u32, AccountId32]
       >;
       /**
-       * Highest Bitcoin UTXO sync height processed for securitization hold expirations.
+       * Highest Bitcoin UTXO sync height checked for funding expirations; failures remain pending.
        **/
       lastProcessedSecuritizationHoldBitcoinHeight: AugmentedQuery<
         ApiType,
         () => Observable<Option<u64>>,
         []
       >;
+      /**
+       * Resume retries after this Lock so a persistent failure cannot starve other expirations.
+       **/
+      lastRetriedLockExpiration: AugmentedQuery<ApiType, () => Observable<Option<u64>>, []>;
       /**
        * Utxos that have been requested to be cosigned for releasing
        **/
@@ -366,6 +370,14 @@ declare module '@polkadot/api-base/types/storage' {
             | Uint8Array,
         ) => Observable<Option<PalletBitcoinLocksOrphanedUtxo>>,
         [AccountId32, ArgonPrimitivesBitcoinUtxoRef]
+      >;
+      /**
+       * Locks whose funding-window or terminal expiration failed and must be retried.
+       **/
+      pendingLockExpirations: AugmentedQuery<
+        ApiType,
+        (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<Null>>,
+        [u64]
       >;
       /**
        * Cosigned partial releases awaiting confirmation on Bitcoin.

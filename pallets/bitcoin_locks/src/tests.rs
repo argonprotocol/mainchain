@@ -11,9 +11,9 @@ use crate::{
 	mock::*,
 	pallet::{
 		LastFeeCouponNonceByVaultAndAccount, LastProcessedSecuritizationHoldBitcoinHeight,
-		LockCosignDueByFrame, LockIdsByOwnerAccount, LockIdsByVaultId, LockReleaseCosignHeightById,
-		LockReleaseRequestsById, LocksById, PendingPartialReleaseByLockId,
-		SecuritizationHoldExpirationsByBitcoinHeight,
+		LastRetriedLockExpiration, LockCosignDueByFrame, LockIdsByOwnerAccount, LockIdsByVaultId,
+		LockReleaseCosignHeightById, LockReleaseRequestsById, LocksById, PendingLockExpirations,
+		PendingPartialReleaseByLockId, SecuritizationHoldExpirationsByBitcoinHeight,
 	},
 	Error, Event, FeeCoupon, LockExpirationsByBitcoinHeight, LockOptions, LockReleaseCosignHeight,
 	MicrogonsAtTargetPerBtcHistory, OrphanedUtxoExpirationByFrame, OrphanedUtxosByAccount,
@@ -1005,10 +1005,8 @@ fn securitization_hold_expiration_preserves_activation_and_keeps_watching() {
 			lock.cosigner_guarantee.securitization_for_satoshis(SATOSHIS_PER_BITCOIN),
 			activated,
 		);
-		assert_eq!(
-			BitcoinLocks::process_securitization_hold_expirations([1], expiration_height),
-			(1, false),
-		);
+		set_bitcoin_height(expiration_height);
+		BitcoinLocks::on_initialize(2);
 		let expired = LocksById::<Test>::get(1).unwrap();
 		assert_eq!(expired.funded_satoshis, SATOSHIS_PER_BITCOIN);
 		assert_eq!(expired.cosigner_guarantee.basis.satoshis, SATOSHIS_PER_BITCOIN);
@@ -2149,6 +2147,8 @@ fn cancels_an_unfunded_lock_on_release_request() {
 		let price = StaticPriceProvider::get_btc_price_in_market_microgons(SATOSHIS_PER_BITCOIN)
 			.expect("should have price");
 		assert_eq!(DefaultVault::get().securitization_locked, price);
+		let expiry = LocksById::<Test>::get(1).unwrap().vault_claim_height;
+		PendingLockExpirations::<Test>::insert(1, ());
 
 		assert_ok!(BitcoinLocks::request_release(
 			RuntimeOrigin::signed(who),
@@ -2158,6 +2158,12 @@ fn cancels_an_unfunded_lock_on_release_request() {
 			0,
 		));
 		assert!(LocksById::<Test>::get(1).is_none());
+		assert!(!PendingLockExpirations::<Test>::contains_key(1));
+
+		set_bitcoin_height(expiry);
+		BitcoinLocks::on_initialize(2);
+		assert!(!PendingLockExpirations::<Test>::contains_key(1));
+		assert!(LockExpirationsByBitcoinHeight::<Test>::get(expiry).is_empty());
 	});
 }
 
@@ -2220,38 +2226,47 @@ fn retries_securitization_hold_expiration_after_provider_error() {
 		System::set_block_number(1);
 		set_argons(1, 2_000_000);
 
-		assert_ok!(BitcoinLocks::create_receive_address(
-			RuntimeOrigin::signed(1),
-			1,
-			SATOSHIS_PER_BITCOIN,
-			CompressedBitcoinPubkey([1; 33]),
-			None
-		));
-		let expiration_height =
-			BitcoinBlockHeightChange::get().1 + SecuritizationHoldBlocks::get() + 1;
+		for height in [12, 13] {
+			set_bitcoin_height(height);
+			assert_ok!(BitcoinLocks::create_receive_address(
+				RuntimeOrigin::signed(1),
+				1,
+				SATOSHIS_PER_BITCOIN,
+				CompressedBitcoinPubkey([height as u8; 33]),
+				None
+			));
+		}
+		let expiration_height = LocksById::<Test>::get(2)
+			.unwrap()
+			.securitization_hold_expiration_bitcoin_height
+			.unwrap();
 
+		BitcoinLocks::on_initialize(1);
 		FailReturnSecuritization::set(true);
 		set_bitcoin_height(expiration_height);
 		BitcoinLocks::on_initialize(2);
 
-		assert!(SecuritizationHoldExpirationsByBitcoinHeight::<Test>::get(expiration_height)
-			.contains(&1));
-		assert_eq!(LastProcessedSecuritizationHoldBitcoinHeight::<Test>::get(), None);
-		assert_ne!(DefaultVault::get().securitization_locked, 0);
-		assert_ne!(DefaultVault::get().securitization_pending_activation, 0);
-
-		FailReturnSecuritization::set(false);
-		BitcoinLocks::on_initialize(3);
-
-		assert!(
-			SecuritizationHoldExpirationsByBitcoinHeight::<Test>::get(expiration_height).is_empty()
-		);
+		// Both heights advance into the shared retry set, even while cleanup fails.
+		assert!(PendingLockExpirations::<Test>::contains_key(1));
+		assert!(PendingLockExpirations::<Test>::contains_key(2));
+		assert!(SecuritizationHoldExpirationsByBitcoinHeight::<Test>::iter().next().is_none());
 		assert_eq!(
 			LastProcessedSecuritizationHoldBitcoinHeight::<Test>::get(),
 			Some(expiration_height)
 		);
+		assert_ne!(DefaultVault::get().securitization_pending_activation, 0);
+
+		FailReturnSecuritization::set(false);
+		set_bitcoin_height(expiration_height + 1);
+		BitcoinLocks::on_initialize(3);
+		assert_eq!(PendingLockExpirations::<Test>::iter_keys().count(), 1);
+		BitcoinLocks::on_initialize(4);
+
+		assert!(PendingLockExpirations::<Test>::iter_keys().next().is_none());
 		assert_eq!(DefaultVault::get().securitization_locked, 0);
 		assert_eq!(DefaultVault::get().securitization_pending_activation, 0);
+		assert!(LocksById::<Test>::contains_key(1));
+		assert!(LocksById::<Test>::contains_key(2));
 	});
 }
 
@@ -2284,6 +2299,39 @@ fn funding_remains_eligible_after_expiration_cleanup_fails() {
 		assert!(lock.is_funded());
 		assert!(lock.securitization_hold_expiration_bitcoin_height.is_none());
 		assert!(OrphanedUtxosByAccount::<Test>::iter_prefix(1).next().is_none());
+
+		BitcoinLocks::on_initialize(3);
+		assert!(!PendingLockExpirations::<Test>::contains_key(1));
+		assert_eq!(LocksById::<Test>::get(1).unwrap().encode(), lock.encode());
+	});
+}
+
+#[test]
+fn terminal_expiration_clears_a_failed_funding_expiration() {
+	set_bitcoin_height(12);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		set_argons(1, 2_000_000);
+		assert_ok!(BitcoinLocks::create_receive_address(
+			RuntimeOrigin::signed(1),
+			1,
+			SATOSHIS_PER_BITCOIN,
+			CompressedBitcoinPubkey([1; 33]),
+			None
+		));
+		let lock = LocksById::<Test>::get(1).unwrap();
+		FailReturnSecuritization::set(true);
+		set_bitcoin_height(lock.securitization_hold_expiration_bitcoin_height.unwrap());
+		BitcoinLocks::on_initialize(2);
+		assert!(PendingLockExpirations::<Test>::contains_key(1));
+		assert_eq!(LocksById::<Test>::get(1).unwrap().encode(), lock.encode());
+
+		set_bitcoin_height(lock.vault_claim_height);
+		BitcoinLocks::on_initialize(3);
+		assert!(!LocksById::<Test>::contains_key(1));
+		assert!(!PendingLockExpirations::<Test>::contains_key(1));
+		assert_eq!(DefaultVault::get().securitization_locked, 0);
+		assert!(WatchedUtxosById::get().is_empty());
 	});
 }
 
@@ -2319,8 +2367,10 @@ fn expiration_retry_does_not_depend_on_future_bucket_capacity() {
 		set_bitcoin_height(expiration_height);
 		BitcoinLocks::on_initialize(2);
 
-		assert!(SecuritizationHoldExpirationsByBitcoinHeight::<Test>::get(expiration_height)
-			.contains(&1));
+		assert!(PendingLockExpirations::<Test>::contains_key(1));
+		assert!(
+			SecuritizationHoldExpirationsByBitcoinHeight::<Test>::get(expiration_height).is_empty()
+		);
 		assert_eq!(
 			SecuritizationHoldExpirationsByBitcoinHeight::<Test>::get(retry_height).len(),
 			100
@@ -3587,11 +3637,13 @@ fn outside_spend_and_expiry_burn_the_same_fission_redemption_value() {
 			if is_externally_spent {
 				assert_ok!(spent(1));
 			} else {
-				assert_eq!(BitcoinLocks::process_expiring_locks([1]), 1);
+				set_bitcoin_height(LocksById::<Test>::get(1).unwrap().vault_claim_height);
+				BitcoinLocks::on_initialize(2);
 			}
 			let vault_after = DefaultVault::get();
 			let burned = vault_before.securitization - vault_after.securitization;
-			assert_eq!(burned, redemption.min(insured_fission_amount));
+			assert!(redemption > insured_fission_amount);
+			assert_eq!(burned, redemption);
 			assert!(System::events().iter().any(|record| matches!(
 				record.event,
 				RuntimeEvent::BitcoinLocks(Event::<Test>::BitcoinLockTerminated {
@@ -3618,6 +3670,123 @@ fn outside_spend_and_expiry_burn_the_same_fission_redemption_value() {
 }
 
 #[test]
+fn failed_expiry_retries_after_bitcoin_advances_without_blocking_other_locks() {
+	set_bitcoin_height(12);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		BitcoinPriceInUsd::set(Some(FixedU128::from_u32(62_000)));
+		ArgonPriceInUsd::set(Some(FixedU128::one()));
+		TreasuryPositions::set_upstream_position(
+			&2,
+			Some(UpstreamPosition { vault_id: 1, ..Default::default() }),
+		);
+		set_argons(2, 100_000 * MICROGONS_PER_ARGON);
+		assert_ok!(BitcoinLocks::create_receive_address(
+			RuntimeOrigin::signed(2),
+			1,
+			SATOSHIS_PER_BITCOIN,
+			CompressedBitcoinPubkey([1; 33]),
+			None,
+		));
+		assert_ok!(funding_received(1, SATOSHIS_PER_BITCOIN));
+		let microgons_at_target_per_btc = LocksById::<Test>::get(1)
+			.unwrap()
+			.cosigner_guarantee
+			.basis
+			.microgons_at_target_per_btc;
+		MicrogonsAtTargetPerBtcHistory::<Test>::mutate(|history| {
+			history.try_push((12, microgons_at_target_per_btc)).unwrap()
+		});
+		assert_ok!(BitcoinFissions::create(
+			RuntimeOrigin::signed(2),
+			0,
+			77,
+			1,
+			SATOSHIS_PER_BITCOIN / 2,
+			microgons_at_target_per_btc,
+			None
+		));
+
+		let lock = LocksById::<Test>::get(1).unwrap();
+		let liquid = FissionByOwnerAndId::<Test>::get(2, 0).unwrap();
+		let pending_mint = pallet_mint::PendingBitcoinMintsByIndex::<Test>::get(0).unwrap();
+		let expiry = lock.vault_claim_height;
+
+		// A second failed Lock must get a turn even while prices remain unavailable.
+		assert_ok!(BitcoinLocks::create_receive_address(
+			RuntimeOrigin::signed(2),
+			1,
+			SATOSHIS_PER_BITCOIN,
+			CompressedBitcoinPubkey([2; 33]),
+			None,
+		));
+		assert_ok!(funding_received(2, SATOSHIS_PER_BITCOIN));
+		assert_ok!(BitcoinFissions::create(
+			RuntimeOrigin::signed(2),
+			1,
+			78,
+			2,
+			SATOSHIS_PER_BITCOIN / 2,
+			microgons_at_target_per_btc,
+			None,
+		));
+		let upstream = TreasuryPositions::upstream_position(&2);
+
+		// A third Lock has no Liquid debt and can expire without a price quote.
+		assert_ok!(BitcoinLocks::create_receive_address(
+			RuntimeOrigin::signed(2),
+			1,
+			SATOSHIS_PER_BITCOIN,
+			CompressedBitcoinPubkey([3; 33]),
+			None,
+		));
+		assert_ok!(funding_received(3, SATOSHIS_PER_BITCOIN));
+		BitcoinPriceInUsd::set(None);
+		set_bitcoin_height(expiry);
+		BitcoinLocks::on_initialize(2);
+
+		assert_eq!(LocksById::<Test>::get(1).unwrap().encode(), lock.encode());
+		assert_eq!(FissionByOwnerAndId::<Test>::get(2, 0), Some(liquid));
+		assert_eq!(TreasuryPositions::upstream_position(&2), upstream);
+		assert!(PendingLockExpirations::<Test>::contains_key(1));
+		assert!(LockExpirationsByBitcoinHeight::<Test>::get(expiry).is_empty());
+		assert!(!LocksById::<Test>::contains_key(3));
+		assert!(!PendingLockExpirations::<Test>::contains_key(3));
+		assert!(PendingLockExpirations::<Test>::contains_key(2));
+
+		// The original expiry bucket is gone and Bitcoin has advanced; the retry remains durable.
+		set_bitcoin_height(expiry + 1);
+		BitcoinLocks::on_initialize(3);
+		let first_retried = LastRetriedLockExpiration::<Test>::get().unwrap();
+		BitcoinLocks::on_initialize(4);
+		let second_retried = LastRetriedLockExpiration::<Test>::get().unwrap();
+		assert_ne!(first_retried, second_retried);
+		assert_eq!(PendingLockExpirations::<Test>::iter_keys().count(), 2);
+		assert!(PendingLockExpirations::<Test>::contains_key(1));
+		assert!(LocksById::<Test>::contains_key(1));
+		assert_eq!(FissionIdsByLockId::<Test>::get(1).into_iter().collect::<Vec<_>>(), vec![0]);
+		assert!(LockIdsByVaultId::<Test>::contains_key(1, 1));
+
+		BitcoinPriceInUsd::set(Some(FixedU128::from_u32(62_000)));
+		set_bitcoin_height(expiry + 2);
+		BitcoinLocks::on_initialize(5);
+		assert_eq!(PendingLockExpirations::<Test>::iter_keys().count(), 1);
+		BitcoinLocks::on_initialize(6);
+
+		assert_eq!(PendingLockExpirations::<Test>::iter_keys().count(), 0);
+		assert!(!LocksById::<Test>::contains_key(2));
+		assert!(!FissionByOwnerAndId::<Test>::contains_key(2, 1));
+		assert!(!PendingLockExpirations::<Test>::contains_key(1));
+		assert!(!LocksById::<Test>::contains_key(1));
+		assert!(!FissionByOwnerAndId::<Test>::contains_key(2, 0));
+		assert!(FissionIdsByLockId::<Test>::get(1).is_empty());
+		assert!(!LockIdsByVaultId::<Test>::contains_key(1, 1));
+		assert_eq!(TreasuryPositions::upstream_position(&2).unwrap().bitcoin_securitization, 0);
+		assert_eq!(pallet_mint::PendingBitcoinMintsByIndex::<Test>::get(0), Some(pending_mint));
+	});
+}
+
+#[test]
 fn expiring_bitcoin_without_fissions_releases_the_vault_securitization() {
 	set_bitcoin_height(12);
 	new_test_ext().execute_with(|| {
@@ -3635,7 +3804,8 @@ fn expiring_bitcoin_without_fissions_releases_the_vault_securitization() {
 		let locked_before_expiry = DefaultVault::get().securitization_locked;
 		pallet_mint::MintedBitcoinMicrogons::<Test>::set(123);
 
-		assert_eq!(BitcoinLocks::process_expiring_locks([1]), 1);
+		set_bitcoin_height(LocksById::<Test>::get(1).unwrap().vault_claim_height);
+		BitcoinLocks::on_initialize(2);
 		assert!(!LocksById::<Test>::contains_key(1));
 		assert_eq!(DefaultVault::get().securitization, allocated);
 		assert_eq!(DefaultVault::get().get_relock_capacity(), locked_before_expiry);
@@ -3706,16 +3876,14 @@ fn external_spend_closes_the_fission_without_removing_its_pending_mint() {
 			Some(fission_basis.btc_value_in_microgons()),
 		)
 		.expect("Fission redemption amount");
-		let settlement_burned = fission_redemption
-			.min(lock.cosigner_guarantee.securitization_for_satoshis(fission.satoshis));
-		assert!(settlement_burned < whole_lock_redemption);
-		assert!(fission_redemption > settlement_burned);
-		pallet_mint::MintedBitcoinMicrogons::<Test>::set(settlement_burned);
+		assert!(fission_redemption < whole_lock_redemption);
+		assert!(fission_redemption > fission.cosigner_guarantee.guaranteed_microgons);
+		pallet_mint::MintedBitcoinMicrogons::<Test>::set(fission_redemption);
 
 		assert_ok!(spent(1));
 
 		assert!(!LocksById::<Test>::contains_key(1));
-		assert_eq!(DefaultVault::get().securitization, vault_securitization - settlement_burned);
+		assert_eq!(DefaultVault::get().securitization, vault_securitization - fission_redemption);
 		assert!(!FissionByOwnerAndId::<Test>::contains_key(account_id, 0));
 		assert_eq!(pallet_mint::PendingMintIndicesByLockId::<Test>::get(1), pending_indices);
 		assert!(pallet_mint::PendingBitcoinMintsByIndex::<Test>::contains_key(0));
@@ -3731,7 +3899,7 @@ fn external_spend_closes_the_fission_without_removing_its_pending_mint() {
 }
 
 #[test]
-fn external_spend_does_not_burn_beyond_insured_coverage() {
+fn external_spend_uses_uncommitted_vault_securitization_above_the_guarantee() {
 	set_bitcoin_height(12);
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
@@ -3765,25 +3933,22 @@ fn external_spend_does_not_burn_beyond_insured_coverage() {
 			Some(lock.cosigner_guarantee.basis.btc_value_in_microgons()),
 		)
 		.expect("redemption quote");
-		let lock_collateral =
-			lock.cosigner_guarantee.securitization_for_satoshis(lock.funded_satoshis);
-		let coverage = lock.cosigner_guarantee.securitization_for_satoshis(lock.funded_satoshis);
+		let coverage = lock.cosigner_guarantee.guaranteed_microgons;
 		let vault_before = DefaultVault::get().securitization;
-		assert!(redemption > lock_collateral);
-		assert_eq!(coverage, lock_collateral);
+		assert!(redemption > coverage);
 		assert!(redemption < vault_before);
-		pallet_mint::MintedBitcoinMicrogons::<Test>::set(coverage);
+		pallet_mint::MintedBitcoinMicrogons::<Test>::set(redemption);
 
 		assert_ok!(spent(1));
 
-		assert_eq!(DefaultVault::get().securitization, vault_before - coverage);
+		assert_eq!(DefaultVault::get().securitization, vault_before - redemption);
 		assert_eq!(pallet_mint::MintedBitcoinMicrogons::<Test>::get(), 0);
 		assert!(!FissionByOwnerAndId::<Test>::contains_key(account_id, 0));
 	});
 }
 
 #[test]
-fn expiring_fission_burns_only_its_insured_redemption_value() {
+fn expiring_fission_burns_its_full_redemption_without_charging_non_liquid_bitcoin() {
 	set_bitcoin_height(12);
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
@@ -3821,8 +3986,7 @@ fn expiring_fission_burns_only_its_insured_redemption_value() {
 			Some(fission_btc_value),
 		)
 		.expect("redemption quote");
-		let expected_burn =
-			redemption.min(lock.cosigner_guarantee.securitization_for_satoshis(fission.satoshis));
+		let expected_burn = redemption;
 		let whole_lock_redemption = BitcoinLocks::calculate_redemption_amount_from_satoshis(
 			&lock.funded_satoshis,
 			Some(lock.cosigner_guarantee.basis.btc_value_in_microgons()),
@@ -3831,11 +3995,12 @@ fn expiring_fission_burns_only_its_insured_redemption_value() {
 		assert!(expected_burn < whole_lock_redemption);
 		let allocated = DefaultVault::get().securitization;
 		assert!(expected_burn < allocated);
-		assert!(redemption > expected_burn);
+		assert!(expected_burn > fission.cosigner_guarantee.guaranteed_microgons);
 		assert!(fission_btc_value < lock.cosigner_guarantee.basis.btc_value_in_microgons());
 		pallet_mint::MintedBitcoinMicrogons::<Test>::set(expected_burn);
 
-		assert_eq!(BitcoinLocks::process_expiring_locks([1]), 1);
+		set_bitcoin_height(LocksById::<Test>::get(1).unwrap().vault_claim_height);
+		BitcoinLocks::on_initialize(2);
 		assert!(!LocksById::<Test>::contains_key(1));
 		assert!(!FissionByOwnerAndId::<Test>::contains_key(account_id, 0));
 		assert_eq!(DefaultVault::get().securitization, allocated - expected_burn);
@@ -3893,7 +4058,7 @@ fn expiry_sums_each_fission_redemption_basis() {
 				.expect("Fission redemption quote")
 			})
 			.sum::<u128>();
-		let expected_burn = fission_redemption.min(rate / 2);
+		let expected_burn = fission_redemption;
 		let whole_lock_redemption = BitcoinLocks::calculate_redemption_amount_from_satoshis(
 			&lock.funded_satoshis,
 			Some(lock.cosigner_guarantee.basis.btc_value_in_microgons()),
@@ -3905,7 +4070,8 @@ fn expiry_sums_each_fission_redemption_basis() {
 		assert!(expected_burn > 0);
 		pallet_mint::MintedBitcoinMicrogons::<Test>::set(expected_burn);
 
-		assert_eq!(BitcoinLocks::process_expiring_locks([1]), 1);
+		set_bitcoin_height(LocksById::<Test>::get(1).unwrap().vault_claim_height);
+		BitcoinLocks::on_initialize(2);
 
 		assert_eq!(DefaultVault::get().securitization, vault_before - expected_burn);
 		assert_eq!(pallet_mint::MintedBitcoinMicrogons::<Test>::get(), 0);
@@ -3915,7 +4081,7 @@ fn expiry_sums_each_fission_redemption_basis() {
 }
 
 #[test]
-fn expiring_fission_burn_is_capped_at_insurance_coverage() {
+fn expiring_fission_uses_uncommitted_vault_securitization_above_the_guarantee() {
 	set_bitcoin_height(12);
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
@@ -3950,12 +4116,12 @@ fn expiring_fission_burn_is_capped_at_insurance_coverage() {
 		)
 		.expect("redemption quote");
 		let coverage = lock.cosigner_guarantee.securitization_for_satoshis(lock.funded_satoshis);
-		let expected_burn = coverage;
 		assert!(current_redemption > coverage);
 		let vault_before = DefaultVault::get().securitization;
 
-		assert_eq!(BitcoinLocks::process_expiring_locks([1]), 1);
-		assert_eq!(DefaultVault::get().securitization, vault_before - expected_burn);
+		set_bitcoin_height(LocksById::<Test>::get(1).unwrap().vault_claim_height);
+		BitcoinLocks::on_initialize(2);
+		assert_eq!(DefaultVault::get().securitization, vault_before - current_redemption);
 	});
 }
 
@@ -5025,11 +5191,15 @@ fn closing_liquid_renews_the_combined_guarantee_until_funding_or_expiry() {
 			);
 			let fees = LocksById::<Test>::get(1).unwrap().security_fees;
 
-			set_bitcoin_height(old_expiry - 1);
+			set_bitcoin_height(old_expiry);
+			FailReturnSecuritization::set(true);
+			BitcoinLocks::on_initialize(2);
+			FailReturnSecuritization::set(false);
+			assert!(PendingLockExpirations::<Test>::contains_key(1));
 			assert_ok!(BitcoinFissions::close(RuntimeOrigin::signed(2), 0));
 			let combined = LocksById::<Test>::get(1).unwrap();
 			let expiry = combined.securitization_hold_expiration_bitcoin_height.unwrap();
-			assert_eq!(expiry, old_expiry + SecuritizationHoldBlocks::get());
+			assert_eq!(expiry, old_expiry + SecuritizationHoldBlocks::get() + 1);
 			assert_eq!(
 				combined.cosigner_guarantee.guaranteed_microgons,
 				97_500 * MICROGONS_PER_ARGON
@@ -5039,13 +5209,12 @@ fn closing_liquid_renews_the_combined_guarantee_until_funding_or_expiry() {
 				!SecuritizationHoldExpirationsByBitcoinHeight::<Test>::get(old_expiry).contains(&1)
 			);
 			assert!(SecuritizationHoldExpirationsByBitcoinHeight::<Test>::get(expiry).contains(&1));
-			assert_eq!(
-				BitcoinLocks::process_securitization_hold_expirations([1], old_expiry),
-				(1, false)
-			);
+			BitcoinLocks::on_initialize(3);
+			assert!(!PendingLockExpirations::<Test>::contains_key(1));
 			assert_eq!(LocksById::<Test>::get(1).unwrap().encode(), combined.encode());
 
 			if fund_remaining {
+				set_bitcoin_height(expiry - 1);
 				assert_ok!(BitcoinLocks::utxo_detected(
 					1,
 					UtxoRef { txid: H256Le([9; 32]), output_index: 0 },
@@ -5053,10 +5222,8 @@ fn closing_liquid_renews_the_combined_guarantee_until_funding_or_expiry() {
 					expiry - 1
 				));
 			}
-			assert_eq!(
-				BitcoinLocks::process_securitization_hold_expirations([1], expiry),
-				(1, false)
-			);
+			set_bitcoin_height(expiry);
+			BitcoinLocks::on_initialize(4);
 			let lock = LocksById::<Test>::get(1).unwrap();
 			let expected = if fund_remaining { 97_500 } else { 50_000 } * MICROGONS_PER_ARGON;
 			assert_eq!(lock.cosigner_guarantee.guaranteed_microgons, expected);
@@ -5151,7 +5318,8 @@ fn mixed_rate_liquid_settlement_removes_actual_bitcoin_and_covered_bitcoin() {
 			if externally_spent {
 				assert_ok!(spent(1));
 			} else {
-				assert_eq!(BitcoinLocks::process_expiring_locks([1]), 1);
+				set_bitcoin_height(LocksById::<Test>::get(1).unwrap().vault_claim_height);
+				BitcoinLocks::on_initialize(2);
 			}
 			assert!(!LocksById::<Test>::contains_key(1));
 			assert!(!FissionByOwnerAndId::<Test>::contains_key(2, 0));
@@ -5479,4 +5647,75 @@ fn differently_priced_liquids_ratchet_and_close_independently() {
 			assert_eq!(DefaultVault::get().securitized_satoshis, 62_500_000);
 		});
 	}
+}
+
+#[test]
+fn outside_spend_preserves_the_whole_locks_later_release_holds() {
+	set_bitcoin_height(12);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		BitcoinPriceInUsd::set(Some(FixedU128::from_u32(100_000)));
+		set_argons(2, 1_000_000 * MICROGONS_PER_ARGON);
+		assert_ok!(BitcoinLocks::create_receive_address(
+			RuntimeOrigin::signed(2),
+			1,
+			SATOSHIS_PER_BITCOIN,
+			CompressedBitcoinPubkey([1; 33]),
+			None
+		));
+		assert_ok!(funding_received(1, SATOSHIS_PER_BITCOIN));
+		let original = LocksById::<Test>::get(1).unwrap();
+		let lock_maturity = argon_primitives::bitcoin::get_rounded_up_bitcoin_day_height(
+			original.vault_claim_height,
+		);
+		let inherited_maturity = lock_maturity + 144;
+		let inherited = 60_000 * MICROGONS_PER_ARGON;
+		// Valid state after this Lock reuses capital committed beyond its own expiry.
+		LocksById::<Test>::mutate(1, |lock| {
+			lock.as_mut()
+				.unwrap()
+				.cosigner_guarantee
+				.fund_hold_extensions
+				.try_insert(inherited_maturity, inherited)
+				.unwrap();
+		});
+		DefaultVault::mutate(|vault| {
+			vault
+				.securitization_release_schedule
+				.get_mut(&lock_maturity)
+				.unwrap()
+				.locked_commitments = 40_000 * MICROGONS_PER_ARGON;
+			vault.scheduled_release(inherited_maturity).unwrap().locked_commitments = inherited;
+		});
+		let rate = original.cosigner_guarantee.basis.microgons_at_target_per_btc;
+		MicrogonsAtTargetPerBtcHistory::<Test>::mutate(|history| {
+			history.try_push((12, rate)).unwrap()
+		});
+		assert_ok!(BitcoinFissions::create(
+			RuntimeOrigin::signed(2),
+			0,
+			77,
+			1,
+			SATOSHIS_PER_BITCOIN / 2,
+			rate,
+			None
+		));
+		let before = DefaultVault::get();
+		assert_ok!(spent(1));
+		let after = DefaultVault::get();
+		assert_eq!(before.securitization - after.securitization, 50_000 * MICROGONS_PER_ARGON);
+		// The old whole-Lock burn retained later holds before the Lock's own maturity.
+		assert_eq!(
+			after.securitization_release_schedule[&inherited_maturity].relockable_commitments,
+			50_000 * MICROGONS_PER_ARGON
+		);
+		assert_eq!(
+			after
+				.securitization_release_schedule
+				.get(&lock_maturity)
+				.map(|entry| entry.relockable_commitments)
+				.unwrap_or_default(),
+			0
+		);
+	});
 }

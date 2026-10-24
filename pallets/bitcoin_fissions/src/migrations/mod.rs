@@ -4,6 +4,14 @@ use frame_support::storage_alias;
 use frame_system::Config as SystemConfig;
 use pallet_prelude::*;
 
+pub fn is_migration_pending<T: Config>() -> bool {
+	StorageVersion::get::<Pallet<T>>() == 1
+}
+
+pub fn is_migration_complete<T: Config>() -> bool {
+	StorageVersion::get::<Pallet<T>>() == 2
+}
+
 /// Record completion after the runtime has converted the Vault, Lock and Fission storage.
 pub fn complete_migration<T: Config>() {
 	StorageVersion::new(2).put::<Pallet<T>>();

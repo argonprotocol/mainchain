@@ -276,6 +276,7 @@ pub mod pallet {
 				!FissionByOwnerAndId::<T>::contains_key(&account_id, fission_id),
 				Error::<T>::FissionAlreadyExists
 			);
+
 			let next_fission_id = fission_id.checked_add(1).ok_or(Error::<T>::FissionIdOverflow)?;
 
 			FissionIdsByLockId::<T>::try_mutate(lock_id, |fission_ids| {
@@ -294,6 +295,7 @@ pub mod pallet {
 					fee_coupon,
 				)
 				.map_err(Error::<T>::from)?;
+
 			T::Minting::request_mint(&account_id, fission_id, lock_id, liquidity_promised)?;
 
 			let block_number = frame_system::Pallet::<T>::block_number();
@@ -314,6 +316,7 @@ pub mod pallet {
 				},
 			);
 			NextFissionIdByOwner::<T>::insert(&account_id, next_fission_id);
+
 			T::PositionProvider::account_quantity_updated(
 				&account_id,
 				PositionQuantity::FissionLiquidity,
@@ -325,6 +328,7 @@ pub mod pallet {
 				liquidity_promised,
 				true,
 			);
+
 			Self::deposit_event(Event::FissionCreated {
 				account_id,
 				fission_id,
@@ -391,6 +395,7 @@ pub mod pallet {
 					return Err(Error::<T>::NoRatchetingAvailable.into()),
 				Err(error) => return Err(Error::<T>::from(error).into()),
 			};
+
 			T::Minting::request_mint(&account_id, fission_id, fission.lock_id, amount_minted)?;
 
 			if !amount_burned.is_zero() {
@@ -412,6 +417,7 @@ pub mod pallet {
 				prior_liquidity_promised,
 				liquidity_promised,
 			)?;
+
 			let (liquidity_change, is_increase) = if liquidity_promised >= prior_liquidity_promised
 			{
 				(liquidity_promised.saturating_sub(prior_liquidity_promised), true)
@@ -432,6 +438,7 @@ pub mod pallet {
 			fission.ratchet_number = ratchet_number;
 			fission.last_updated_argon_block = frame_system::Pallet::<T>::block_number();
 			FissionByOwnerAndId::<T>::insert(&account_id, fission_id, fission);
+
 			Self::deposit_event(Event::FissionRatcheted {
 				account_id,
 				fission_id,
@@ -464,6 +471,7 @@ pub mod pallet {
 				fission.microgons_at_target_per_btc,
 			)
 			.map_err(Error::<T>::from)?;
+
 			FissionIdsByLockId::<T>::mutate_exists(fission.lock_id, |fission_ids| {
 				let is_empty = fission_ids
 					.as_mut()
@@ -498,7 +506,9 @@ pub mod pallet {
 				fission.liquidity_promised,
 				false,
 			);
+
 			FissionByOwnerAndId::<T>::remove(&account_id, fission_id);
+
 			Self::deposit_event(Event::FissionClosed { account_id, fission_id, redemption_amount });
 
 			Ok(())

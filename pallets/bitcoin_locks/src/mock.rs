@@ -446,7 +446,12 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 				false,
 			)?;
 			vault.securitization_pending_activation.saturating_reduce(held);
-			vault.schedule_release(held, released, lock_expiration, false)?;
+			vault.schedule_release(
+				held,
+				released.fund_hold_extensions.iter().map(|(height, amount)| (*height, *amount)),
+				lock_expiration,
+				false,
+			)?;
 			vault.release_unactivated_securitization(amount.saturating_sub(held))
 		})?;
 		CanceledLocks::mutate(|locks| locks.push((vault_id, amount)));
@@ -483,21 +488,20 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 		let compensation_amount =
 			redemption_amount.min(securitization.securitization_for_satoshis(satoshis));
 		let result = DefaultVault::mutate(|a| {
-			a.burn(securitization, satoshis, compensation_amount, lock_expiration, is_flexible)
+			a.burn(&[(securitization, satoshis)], compensation_amount, lock_expiration, is_flexible)
 		})?;
 		Ok(LostBitcoinCompensation { to_beneficiary: result.burned_amount, burned: 0 })
 	}
 
 	fn burn(
 		_vault_id: VaultId,
-		securitization: &CosignerGuarantee<Self::Balance>,
-		satoshis: Satoshis,
+		guarantees: &[(&CosignerGuarantee<Self::Balance>, Satoshis)],
 		lock_expiration: BitcoinHeight,
 		is_flexible: bool,
 		redemption_amount: Self::Balance,
 	) -> Result<Self::Balance, VaultError> {
 		let result = DefaultVault::mutate(|a| {
-			a.burn(securitization, satoshis, redemption_amount, lock_expiration, is_flexible)
+			a.burn(guarantees, redemption_amount, lock_expiration, is_flexible)
 		})?;
 		Ok(result.burned_amount)
 	}

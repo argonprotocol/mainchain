@@ -189,12 +189,15 @@ mod benchmarks {
 		reset_benchmark_environment::<T>();
 		let current_height: BitcoinHeight = 500;
 		seed_bitcoin_heights(current_height, current_height);
+		// Include clearing the cursor after the last pending expiration.
+		LastRetriedLockExpiration::<T>::put(1);
 
 		#[block]
 		{
 			let _ = Pallet::<T>::on_initialize(1u32.into());
 		}
 
+		assert!(!LastRetriedLockExpiration::<T>::exists());
 		Ok(())
 	}
 
@@ -207,12 +210,28 @@ mod benchmarks {
 
 		for index in 0..e {
 			let context = create_funded_lock::<T>(10u8.saturating_add(index as u8))?;
+			PendingLockExpirations::<T>::insert(context.lock_id, ());
 			expiring_lock_ids.push(context.lock_id);
 		}
 
+		let expiration_height = LocksById::<T>::get(expiring_lock_ids[0])
+			.ok_or(BenchmarkError::Stop("missing expiring Lock"))?
+			.vault_claim_height;
+		seed_bitcoin_heights(expiration_height, expiration_height);
+
 		#[block]
 		{
-			let _ = Pallet::<T>::process_expiring_locks(expiring_lock_ids);
+			let expirations = PendingLockExpirations::<T>::iter_keys().collect::<Vec<_>>();
+			let _ = Pallet::<T>::process_expiring_locks(
+				expirations,
+				expiration_height,
+				expiration_height,
+			);
+		}
+
+		for lock_id in expiring_lock_ids {
+			assert!(!LocksById::<T>::contains_key(lock_id));
+			assert!(!PendingLockExpirations::<T>::contains_key(lock_id));
 		}
 
 		Ok(())
@@ -271,15 +290,30 @@ mod benchmarks {
 
 		for index in 0..p {
 			let context = create_unfunded_lock::<T>(100u8.saturating_add(index as u8))?;
+			PendingLockExpirations::<T>::insert(context.lock_id, ());
 			expiring_lock_ids.push(context.lock_id);
 		}
 
+		let expiration_height = LocksById::<T>::get(expiring_lock_ids[0])
+			.and_then(|lock| lock.securitization_hold_expiration_bitcoin_height)
+			.ok_or(BenchmarkError::Stop("missing funding expiration"))?;
+
+		seed_bitcoin_heights(expiration_height, expiration_height);
+
 		#[block]
 		{
-			let _ = Pallet::<T>::process_securitization_hold_expirations(
-				expiring_lock_ids,
-				T::BitcoinBlockHeightChange::get().1,
+			let _ = Pallet::<T>::process_expiring_locks(
+				expiring_lock_ids.iter().copied(),
+				expiration_height,
+				expiration_height,
 			);
+		}
+
+		for lock_id in expiring_lock_ids {
+			let lock = LocksById::<T>::get(lock_id)
+				.ok_or(BenchmarkError::Stop("expired Lock must remain"))?;
+			assert!(lock.securitization_hold_expiration_bitcoin_height.is_none());
+			assert!(lock.cosigner_guarantee.guaranteed_microgons.is_zero());
 		}
 
 		Ok(())

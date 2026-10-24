@@ -2,6 +2,14 @@ use crate::{Config, LockedBitcoin as LockedBitcoinV12, Pallet};
 use argon_primitives::vault::{BitcoinSecuritizationBasis, CosignerGuarantee};
 use pallet_prelude::*;
 
+pub fn is_migration_pending<T: Config>() -> bool {
+	StorageVersion::get::<Pallet<T>>() == 11
+}
+
+pub fn is_migration_complete<T: Config>() -> bool {
+	StorageVersion::get::<Pallet<T>>() == 12
+}
+
 /// Record completion after the runtime has converted the Vault, Lock and Fission storage.
 pub fn complete_migration<T: Config>() {
 	StorageVersion::new(12).put::<Pallet<T>>();

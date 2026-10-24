@@ -177,6 +177,9 @@ where
 
 	fn on_initialize_securitization_hold_expirations(n: u32) -> Weight {
 		Base::on_initialize_securitization_hold_expirations(n)
+			// Resecuritization benchmarks conservatively cover the same Vault release-schedule
+			// work.
+			.saturating_add(VaultProviderWeight::resecuritize().saturating_mul(n.into()))
 			.saturating_add(PositionWeights::<T>::position_updated().saturating_mul(n.into()))
 			.saturating_add(T::DbWeight::get().writes(n.into()))
 	}

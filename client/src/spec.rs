@@ -3499,9 +3499,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				144u8, 113u8, 204u8, 185u8, 5u8, 222u8, 75u8, 182u8, 77u8, 236u8, 187u8, 228u8,
-				142u8, 78u8, 234u8, 172u8, 216u8, 239u8, 171u8, 213u8, 230u8, 34u8, 43u8, 218u8,
-				142u8, 229u8, 75u8, 188u8, 113u8, 128u8, 89u8, 194u8,
+				21u8, 123u8, 6u8, 237u8, 158u8, 255u8, 134u8, 119u8, 199u8, 55u8, 132u8, 79u8,
+				133u8, 177u8, 252u8, 174u8, 98u8, 110u8, 136u8, 36u8, 221u8, 13u8, 129u8, 167u8,
+				51u8, 225u8, 144u8, 77u8, 128u8, 108u8, 77u8, 111u8,
 			]
 	}
 	pub mod system {
@@ -11900,6 +11900,15 @@ pub mod api {
 						>;
 					pub type Param0 = ::core::primitive::u64;
 				}
+				pub mod pending_lock_expirations {
+					use super::runtime_types;
+					pub type PendingLockExpirations = ();
+					pub type Param0 = ::core::primitive::u64;
+				}
+				pub mod last_retried_lock_expiration {
+					use super::runtime_types;
+					pub type LastRetriedLockExpiration = ::core::primitive::u64;
+				}
 				pub mod securitization_hold_expirations_by_bitcoin_height {
 					use super::runtime_types;
 					pub type SecuritizationHoldExpirationsByBitcoinHeight =
@@ -12493,6 +12502,73 @@ pub mod api {
 						],
 					)
 				}
+				#[doc = " Locks whose funding-window or terminal expiration failed and must be retried."]
+				pub fn pending_lock_expirations_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::pending_lock_expirations::PendingLockExpirations,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"BitcoinLocks",
+						"PendingLockExpirations",
+						(),
+						[
+							160u8, 110u8, 193u8, 31u8, 16u8, 4u8, 129u8, 26u8, 93u8, 15u8, 52u8,
+							140u8, 230u8, 14u8, 71u8, 223u8, 232u8, 165u8, 103u8, 122u8, 173u8,
+							177u8, 189u8, 111u8, 108u8, 37u8, 124u8, 106u8, 15u8, 1u8, 238u8, 69u8,
+						],
+					)
+				}
+				#[doc = " Locks whose funding-window or terminal expiration failed and must be retried."]
+				pub fn pending_lock_expirations(
+					&self,
+					_0: types::pending_lock_expirations::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::pending_lock_expirations::Param0,
+					>,
+					types::pending_lock_expirations::PendingLockExpirations,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"BitcoinLocks",
+						"PendingLockExpirations",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							160u8, 110u8, 193u8, 31u8, 16u8, 4u8, 129u8, 26u8, 93u8, 15u8, 52u8,
+							140u8, 230u8, 14u8, 71u8, 223u8, 232u8, 165u8, 103u8, 122u8, 173u8,
+							177u8, 189u8, 111u8, 108u8, 37u8, 124u8, 106u8, 15u8, 1u8, 238u8, 69u8,
+						],
+					)
+				}
+				#[doc = " Resume retries after this Lock so a persistent failure cannot starve other expirations."]
+				pub fn last_retried_lock_expiration(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::last_retried_lock_expiration::LastRetriedLockExpiration,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"BitcoinLocks",
+						"LastRetriedLockExpiration",
+						(),
+						[
+							77u8, 19u8, 233u8, 139u8, 151u8, 198u8, 112u8, 171u8, 0u8, 131u8,
+							175u8, 209u8, 43u8, 141u8, 58u8, 143u8, 246u8, 170u8, 110u8, 61u8,
+							197u8, 108u8, 131u8, 207u8, 240u8, 174u8, 136u8, 122u8, 44u8, 93u8,
+							96u8, 94u8,
+						],
+					)
+				}
 				#[doc = " Lock IDs whose securitization hold expires at the indexed Bitcoin height."]
 				#[doc = " Expiry releases only the unactivated portion and leaves the lock address watched."]				pub fn securitization_hold_expirations_by_bitcoin_height_iter (& self ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < () , types :: securitization_hold_expirations_by_bitcoin_height :: SecuritizationHoldExpirationsByBitcoinHeight , () , :: subxt :: ext :: subxt_core :: utils :: Yes , :: subxt :: ext :: subxt_core :: utils :: Yes >{
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
@@ -12519,7 +12595,7 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Highest Bitcoin UTXO sync height processed for securitization hold expirations."]				pub fn last_processed_securitization_hold_bitcoin_height (& self ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < () , types :: last_processed_securitization_hold_bitcoin_height :: LastProcessedSecuritizationHoldBitcoinHeight , :: subxt :: ext :: subxt_core :: utils :: Yes , () , () >{
+				#[doc = " Highest Bitcoin UTXO sync height checked for funding expirations; failures remain pending."]				pub fn last_processed_securitization_hold_bitcoin_height (& self ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < () , types :: last_processed_securitization_hold_bitcoin_height :: LastProcessedSecuritizationHoldBitcoinHeight , :: subxt :: ext :: subxt_core :: utils :: Yes , () , () >{
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"BitcoinLocks",
 						"LastProcessedSecuritizationHoldBitcoinHeight",
