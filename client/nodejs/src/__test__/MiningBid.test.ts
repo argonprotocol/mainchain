@@ -22,9 +22,9 @@ describe('mining bid commitments', () => {
     const { salt: _salt, ...withoutSalt } = range;
     const result = createMiningBidCommitment(api, withoutSalt);
     expect(result.salt).toMatch(/^0x[0-9a-f]{64}$/);
-    expect(
-      createMiningBidCommitment(api, { ...withoutSalt, salt: hexToU8a(result.salt) }),
-    ).toEqual(result);
+    expect(createMiningBidCommitment(api, { ...withoutSalt, salt: hexToU8a(result.salt) })).toEqual(
+      result,
+    );
   });
   it('matches the Rust SCALE vector', () => {
     expect(createMiningBidCommitment(api, range).commitmentHash).toBe(

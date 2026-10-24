@@ -87,8 +87,7 @@ pub mod api {
 		runtime_apis::RuntimeApi
 	}
 	pub mod runtime_apis {
-		use super::root_mod;
-		use super::runtime_types;
+		use super::{root_mod, runtime_types};
 		use ::subxt::ext::subxt_core::ext::codec::Encode;
 		pub struct RuntimeApi;
 		impl RuntimeApi {
@@ -163,8 +162,7 @@ pub mod api {
 			}
 		}
 		pub mod core {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			#[doc = " The `Core` runtime api that every Substrate runtime needs to implement."]
 			pub struct Core;
 			impl Core {
@@ -297,8 +295,7 @@ pub mod api {
 			}
 		}
 		pub mod metadata {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			#[doc = " The `Metadata` api trait that returns metadata for the runtime."]
 			pub struct Metadata;
 			impl Metadata {
@@ -435,8 +432,7 @@ pub mod api {
 			}
 		}
 		pub mod runtime_view_function {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			#[doc = " Runtime API for executing view functions"]
 			pub struct RuntimeViewFunction;
 			impl RuntimeViewFunction {
@@ -495,8 +491,7 @@ pub mod api {
 			}
 		}
 		pub mod block_builder {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			#[doc = " The `BlockBuilder` api trait that provides the required functionality for building a block."]
 			pub struct BlockBuilder;
 			impl BlockBuilder {
@@ -680,8 +675,7 @@ pub mod api {
 			}
 		}
 		pub mod tagged_transaction_queue {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			#[doc = " The `TaggedTransactionQueue` api trait for interfering with the transaction queue."]
 			pub struct TaggedTransactionQueue;
 			impl TaggedTransactionQueue {
@@ -749,8 +743,7 @@ pub mod api {
 			}
 		}
 		pub mod offchain_worker_api {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			#[doc = " The offchain worker api."]
 			pub struct OffchainWorkerApi;
 			impl OffchainWorkerApi {
@@ -803,8 +796,7 @@ pub mod api {
 			}
 		}
 		pub mod account_nonce_api {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			#[doc = " The API to query account nonce."]
 			pub struct AccountNonceApi;
 			impl AccountNonceApi {
@@ -857,8 +849,7 @@ pub mod api {
 			}
 		}
 		pub mod session_keys {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			#[doc = " Session keys runtime api."]
 			pub struct SessionKeys;
 			impl SessionKeys {
@@ -975,8 +966,7 @@ pub mod api {
 			}
 		}
 		pub mod transaction_payment_api {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			pub struct TransactionPaymentApi;
 			impl TransactionPaymentApi {
 				pub fn query_info(
@@ -1164,8 +1154,7 @@ pub mod api {
 			}
 		}
 		pub mod transaction_payment_call_api {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			pub struct TransactionPaymentCallApi;
 			impl TransactionPaymentCallApi {
 				#[doc = " Query information of a dispatch class, weight, and fee of a given encoded `Call`."]
@@ -1356,8 +1345,7 @@ pub mod api {
 			}
 		}
 		pub mod block_import_apis {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			pub struct BlockImportApis;
 			impl BlockImportApis {
 				pub fn has_new_bitcoin_tip(
@@ -1441,8 +1429,7 @@ pub mod api {
 			}
 		}
 		pub mod mining_apis {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			pub struct MiningApis;
 			impl MiningApis {
 				pub fn get_authority_id(
@@ -1577,8 +1564,7 @@ pub mod api {
 			}
 		}
 		pub mod block_seal_apis {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			pub struct BlockSealApis;
 			impl BlockSealApis {
 				pub fn vote_minimum(
@@ -1901,8 +1887,7 @@ pub mod api {
 			}
 		}
 		pub mod block_creator_apis {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			pub struct BlockCreatorApis;
 			impl BlockCreatorApis {
 				pub fn decode_voting_author(
@@ -2008,8 +1993,7 @@ pub mod api {
 			}
 		}
 		pub mod notary_apis {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			pub struct NotaryApis;
 			impl NotaryApis {
 				pub fn notary_by_id(
@@ -2109,8 +2093,7 @@ pub mod api {
 			}
 		}
 		pub mod mining_slot_api {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			#[doc = " This runtime api allows people to query the upcoming mining_slot"]
 			pub struct MiningSlotApi;
 			impl MiningSlotApi {
@@ -2195,8 +2178,7 @@ pub mod api {
 			}
 		}
 		pub mod notebook_apis {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			pub struct NotebookApis;
 			impl NotebookApis {
 				pub fn audit_notebook_and_get_votes_v2(
@@ -2367,8 +2349,7 @@ pub mod api {
 			}
 		}
 		pub mod tick_apis {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			pub struct TickApis;
 			impl TickApis {
 				pub fn current_tick(
@@ -2494,8 +2475,7 @@ pub mod api {
 			}
 		}
 		pub mod bitcoin_apis {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			pub struct BitcoinApis;
 			impl BitcoinApis {
 				pub fn get_sync_status(
@@ -2833,8 +2813,7 @@ pub mod api {
 			}
 		}
 		pub mod grandpa_api {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			#[doc = " APIs for integrating the GRANDPA finality gadget into runtimes."]
 			#[doc = " This should be implemented on the runtime side."]
 			#[doc = ""]
@@ -3054,8 +3033,7 @@ pub mod api {
 			}
 		}
 		pub mod genesis_builder {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			#[doc = " API to interact with `RuntimeGenesisConfig` for the runtime"]
 			pub struct GenesisBuilder;
 			impl GenesisBuilder {
@@ -3508,7 +3486,11 @@ pub mod api {
 		}
 	}
 	pub struct ViewFunctionsApi;
-	impl ViewFunctionsApi {}
+	impl ViewFunctionsApi {
+		pub fn proxy(&self) -> proxy::view_functions::ViewFunctionsApi {
+			proxy::view_functions::ViewFunctionsApi
+		}
+	}
 	#[doc = r" check whether the metadata provided is aligned with this statically generated code."]
 	pub fn is_codegen_valid_for(metadata: &::subxt::ext::subxt_core::Metadata) -> bool {
 		let runtime_metadata_hash = metadata
@@ -3516,23 +3498,21 @@ pub mod api {
 			.only_these_pallets(&PALLETS)
 			.only_these_runtime_apis(&RUNTIME_APIS)
 			.hash();
-		runtime_metadata_hash
-			== [
-				140u8, 159u8, 178u8, 66u8, 48u8, 197u8, 30u8, 2u8, 44u8, 244u8, 145u8, 114u8,
-				181u8, 25u8, 234u8, 0u8, 250u8, 212u8, 162u8, 81u8, 193u8, 231u8, 18u8, 23u8,
-				116u8, 40u8, 32u8, 131u8, 179u8, 218u8, 60u8, 145u8,
+		runtime_metadata_hash ==
+			[
+				213u8, 227u8, 127u8, 74u8, 142u8, 10u8, 34u8, 50u8, 235u8, 212u8, 50u8, 44u8,
+				149u8, 143u8, 4u8, 9u8, 217u8, 19u8, 87u8, 127u8, 199u8, 41u8, 160u8, 252u8, 51u8,
+				78u8, 122u8, 146u8, 59u8, 193u8, 58u8, 188u8,
 			]
 	}
 	pub mod system {
-		use super::root_mod;
-		use super::runtime_types;
+		use super::{root_mod, runtime_types};
 		#[doc = "Error for the System pallet"]
 		pub type Error = runtime_types::frame_system::pallet::Error;
 		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 		pub type Call = runtime_types::frame_system::pallet::Call;
 		pub mod calls {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			type DispatchError = runtime_types::sp_runtime::DispatchError;
 			pub mod types {
 				use super::runtime_types;
@@ -5009,8 +4989,7 @@ pub mod api {
 		}
 	}
 	pub mod digests {
-		use super::root_mod;
-		use super::runtime_types;
+		use super::{root_mod, runtime_types};
 		#[doc = "The `Error` enum of this pallet."]
 		pub type Error = runtime_types::pallet_digests::pallet::Error;
 		#[doc = "The `Event` enum of this pallet"]
@@ -5056,13 +5035,11 @@ pub mod api {
 		}
 	}
 	pub mod timestamp {
-		use super::root_mod;
-		use super::runtime_types;
+		use super::{root_mod, runtime_types};
 		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 		pub type Call = runtime_types::pallet_timestamp::pallet::Call;
 		pub mod calls {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			type DispatchError = runtime_types::sp_runtime::DispatchError;
 			pub mod types {
 				use super::runtime_types;
@@ -5241,15 +5218,13 @@ pub mod api {
 		}
 	}
 	pub mod multisig {
-		use super::root_mod;
-		use super::runtime_types;
+		use super::{root_mod, runtime_types};
 		#[doc = "The `Error` enum of this pallet."]
 		pub type Error = runtime_types::pallet_multisig::pallet::Error;
 		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 		pub type Call = runtime_types::pallet_multisig::pallet::Call;
 		pub mod calls {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			type DispatchError = runtime_types::sp_runtime::DispatchError;
 			pub mod types {
 				use super::runtime_types;
@@ -6074,15 +6049,13 @@ pub mod api {
 		}
 	}
 	pub mod proxy {
-		use super::root_mod;
-		use super::runtime_types;
+		use super::{root_mod, runtime_types};
 		#[doc = "The `Error` enum of this pallet."]
 		pub type Error = runtime_types::pallet_proxy::pallet::Error;
 		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 		pub type Call = runtime_types::pallet_proxy::pallet::Call;
 		pub mod calls {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			type DispatchError = runtime_types::sp_runtime::DispatchError;
 			pub mod types {
 				use super::runtime_types;
@@ -6838,6 +6811,109 @@ pub mod api {
 				}
 			}
 		}
+		pub mod view_functions {
+			use super::{root_mod, runtime_types};
+			pub struct ViewFunctionsApi;
+			impl ViewFunctionsApi {
+				#[doc = " Check if a `RuntimeCall` is allowed for a given `ProxyType`."]
+				pub fn check_permissions(
+					&self,
+					call: check_permissions::Call,
+					proxy_type: check_permissions::ProxyType,
+				) -> ::subxt::ext::subxt_core::view_functions::payload::StaticPayload<
+					check_permissions::Input,
+					check_permissions::output::Output,
+				> {
+					::subxt::ext::subxt_core::view_functions::payload::StaticPayload::new_static(
+						[
+							24u8, 9u8, 215u8, 131u8, 70u8, 114u8, 122u8, 14u8, 245u8, 140u8, 15u8,
+							160u8, 59u8, 175u8, 163u8, 35u8, 203u8, 197u8, 20u8, 136u8, 217u8,
+							42u8, 26u8, 167u8, 19u8, 123u8, 3u8, 191u8, 181u8, 14u8, 252u8, 23u8,
+						],
+						check_permissions::Input { call, proxy_type },
+						[
+							72u8, 242u8, 160u8, 79u8, 54u8, 20u8, 172u8, 110u8, 145u8, 48u8, 18u8,
+							196u8, 117u8, 138u8, 246u8, 127u8, 19u8, 141u8, 57u8, 194u8, 254u8,
+							101u8, 103u8, 28u8, 75u8, 225u8, 175u8, 37u8, 109u8, 205u8, 145u8,
+							24u8,
+						],
+					)
+				}
+				#[doc = " Check if one `ProxyType` is a subset of another `ProxyType`."]
+				pub fn is_superset(
+					&self,
+					to_check: is_superset::ToCheck,
+					against: is_superset::Against,
+				) -> ::subxt::ext::subxt_core::view_functions::payload::StaticPayload<
+					is_superset::Input,
+					is_superset::output::Output,
+				> {
+					::subxt::ext::subxt_core::view_functions::payload::StaticPayload::new_static(
+						[
+							24u8, 9u8, 215u8, 131u8, 70u8, 114u8, 122u8, 14u8, 245u8, 140u8, 15u8,
+							160u8, 59u8, 175u8, 163u8, 35u8, 23u8, 20u8, 176u8, 96u8, 125u8, 98u8,
+							175u8, 10u8, 59u8, 59u8, 10u8, 210u8, 197u8, 213u8, 92u8, 88u8,
+						],
+						is_superset::Input { to_check, against },
+						[
+							47u8, 66u8, 102u8, 113u8, 156u8, 53u8, 15u8, 103u8, 91u8, 157u8, 158u8,
+							207u8, 233u8, 250u8, 154u8, 148u8, 222u8, 169u8, 58u8, 137u8, 54u8,
+							193u8, 255u8, 77u8, 228u8, 152u8, 31u8, 45u8, 227u8, 186u8, 65u8, 94u8,
+						],
+					)
+				}
+			}
+			pub mod check_permissions {
+				use super::{root_mod, runtime_types};
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct Input {
+					pub call: Call,
+					pub proxy_type: ProxyType,
+				}
+				pub type Call = runtime_types::argon_runtime::RuntimeCall;
+				pub type ProxyType = runtime_types::argon_runtime::ProxyType;
+				pub mod output {
+					use super::runtime_types;
+					pub type Output = ::core::primitive::bool;
+				}
+			}
+			pub mod is_superset {
+				use super::{root_mod, runtime_types};
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct Input {
+					pub to_check: ToCheck,
+					pub against: Against,
+				}
+				pub type ToCheck = runtime_types::argon_runtime::ProxyType;
+				pub type Against = runtime_types::argon_runtime::ProxyType;
+				pub mod output {
+					use super::runtime_types;
+					pub type Output = ::core::primitive::bool;
+				}
+			}
+		}
 		#[doc = "The `Event` enum of this pallet"]
 		pub type Event = runtime_types::pallet_proxy::pallet::Event;
 		pub mod events {
@@ -7275,15 +7351,13 @@ pub mod api {
 		}
 	}
 	pub mod ticks {
-		use super::root_mod;
-		use super::runtime_types;
+		use super::{root_mod, runtime_types};
 		#[doc = "The `Error` enum of this pallet."]
 		pub type Error = runtime_types::pallet_ticks::pallet::Error;
 		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 		pub type Call = runtime_types::pallet_ticks::pallet::Call;
 		pub mod calls {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			type DispatchError = runtime_types::sp_runtime::DispatchError;
 			pub mod types {
 				use super::runtime_types;
@@ -7454,15 +7528,13 @@ pub mod api {
 		}
 	}
 	pub mod mining_slot {
-		use super::root_mod;
-		use super::runtime_types;
+		use super::{root_mod, runtime_types};
 		#[doc = "The `Error` enum of this pallet."]
 		pub type Error = runtime_types::pallet_mining_slot::pallet::Error;
 		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 		pub type Call = runtime_types::pallet_mining_slot::pallet::Call;
 		pub mod calls {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			type DispatchError = runtime_types::sp_runtime::DispatchError;
 			pub mod types {
 				use super::runtime_types;
@@ -8817,15 +8889,13 @@ pub mod api {
 		}
 	}
 	pub mod bitcoin_utxos {
-		use super::root_mod;
-		use super::runtime_types;
+		use super::{root_mod, runtime_types};
 		#[doc = "The `Error` enum of this pallet."]
 		pub type Error = runtime_types::pallet_bitcoin_utxos::pallet::Error;
 		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 		pub type Call = runtime_types::pallet_bitcoin_utxos::pallet::Call;
 		pub mod calls {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			type DispatchError = runtime_types::sp_runtime::DispatchError;
 			pub mod types {
 				use super::runtime_types;
@@ -9460,15 +9530,13 @@ pub mod api {
 		}
 	}
 	pub mod vaults {
-		use super::root_mod;
-		use super::runtime_types;
+		use super::{root_mod, runtime_types};
 		#[doc = "The `Error` enum of this pallet."]
 		pub type Error = runtime_types::pallet_vaults::pallet::Error;
 		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 		pub type Call = runtime_types::pallet_vaults::pallet::Call;
 		pub mod calls {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			type DispatchError = runtime_types::sp_runtime::DispatchError;
 			pub mod types {
 				use super::runtime_types;
@@ -11191,15 +11259,13 @@ pub mod api {
 		}
 	}
 	pub mod bitcoin_locks {
-		use super::root_mod;
-		use super::runtime_types;
+		use super::{root_mod, runtime_types};
 		#[doc = "The `Error` enum of this pallet."]
 		pub type Error = runtime_types::pallet_bitcoin_locks::pallet::Error;
 		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 		pub type Call = runtime_types::pallet_bitcoin_locks::pallet::Call;
 		pub mod calls {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			type DispatchError = runtime_types::sp_runtime::DispatchError;
 			pub mod types {
 				use super::runtime_types;
@@ -13036,15 +13102,13 @@ pub mod api {
 		}
 	}
 	pub mod notaries {
-		use super::root_mod;
-		use super::runtime_types;
+		use super::{root_mod, runtime_types};
 		#[doc = "The `Error` enum of this pallet."]
 		pub type Error = runtime_types::pallet_notaries::pallet::Error;
 		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 		pub type Call = runtime_types::pallet_notaries::pallet::Call;
 		pub mod calls {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			type DispatchError = runtime_types::sp_runtime::DispatchError;
 			pub mod types {
 				use super::runtime_types;
@@ -13689,15 +13753,13 @@ pub mod api {
 		}
 	}
 	pub mod notebook {
-		use super::root_mod;
-		use super::runtime_types;
+		use super::{root_mod, runtime_types};
 		#[doc = "The `Error` enum of this pallet."]
 		pub type Error = runtime_types::pallet_notebook::pallet::Error;
 		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 		pub type Call = runtime_types::pallet_notebook::pallet::Call;
 		pub mod calls {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			type DispatchError = runtime_types::sp_runtime::DispatchError;
 			pub mod types {
 				use super::runtime_types;
@@ -14189,15 +14251,13 @@ pub mod api {
 		}
 	}
 	pub mod localchain_transfer {
-		use super::root_mod;
-		use super::runtime_types;
+		use super::{root_mod, runtime_types};
 		#[doc = "The `Error` enum of this pallet."]
 		pub type Error = runtime_types::pallet_localchain_transfer::pallet::Error;
 		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 		pub type Call = runtime_types::pallet_localchain_transfer::pallet::Call;
 		pub mod calls {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			type DispatchError = runtime_types::sp_runtime::DispatchError;
 			pub mod types {
 				use super::runtime_types;
@@ -14685,15 +14745,13 @@ pub mod api {
 		}
 	}
 	pub mod block_seal_spec {
-		use super::root_mod;
-		use super::runtime_types;
+		use super::{root_mod, runtime_types};
 		#[doc = "The `Error` enum of this pallet."]
 		pub type Error = runtime_types::pallet_block_seal_spec::pallet::Error;
 		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 		pub type Call = runtime_types::pallet_block_seal_spec::pallet::Call;
 		pub mod calls {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			type DispatchError = runtime_types::sp_runtime::DispatchError;
 			pub mod types {
 				use super::runtime_types;
@@ -15152,15 +15210,13 @@ pub mod api {
 		}
 	}
 	pub mod domains {
-		use super::root_mod;
-		use super::runtime_types;
+		use super::{root_mod, runtime_types};
 		#[doc = "The `Error` enum of this pallet."]
 		pub type Error = runtime_types::pallet_domains::pallet::Error;
 		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 		pub type Call = runtime_types::pallet_domains::pallet::Call;
 		pub mod calls {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			type DispatchError = runtime_types::sp_runtime::DispatchError;
 			pub mod types {
 				use super::runtime_types;
@@ -15517,15 +15573,13 @@ pub mod api {
 		}
 	}
 	pub mod price_index {
-		use super::root_mod;
-		use super::runtime_types;
+		use super::{root_mod, runtime_types};
 		#[doc = "The `Error` enum of this pallet."]
 		pub type Error = runtime_types::pallet_price_index::pallet::Error;
 		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 		pub type Call = runtime_types::pallet_price_index::pallet::Call;
 		pub mod calls {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			type DispatchError = runtime_types::sp_runtime::DispatchError;
 			pub mod types {
 				use super::runtime_types;
@@ -16049,8 +16103,7 @@ pub mod api {
 		}
 	}
 	pub mod authorship {
-		use super::root_mod;
-		use super::runtime_types;
+		use super::{root_mod, runtime_types};
 		pub mod storage {
 			use super::runtime_types;
 			pub mod types {
@@ -16088,15 +16141,13 @@ pub mod api {
 		}
 	}
 	pub mod grandpa {
-		use super::root_mod;
-		use super::runtime_types;
+		use super::{root_mod, runtime_types};
 		#[doc = "The `Error` enum of this pallet."]
 		pub type Error = runtime_types::pallet_grandpa::pallet::Error;
 		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 		pub type Call = runtime_types::pallet_grandpa::pallet::Call;
 		pub mod calls {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			type DispatchError = runtime_types::sp_runtime::DispatchError;
 			pub mod types {
 				use super::runtime_types;
@@ -16661,15 +16712,13 @@ pub mod api {
 		}
 	}
 	pub mod block_seal {
-		use super::root_mod;
-		use super::runtime_types;
+		use super::{root_mod, runtime_types};
 		#[doc = "The `Error` enum of this pallet."]
 		pub type Error = runtime_types::pallet_block_seal::pallet::Error;
 		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 		pub type Call = runtime_types::pallet_block_seal::pallet::Call;
 		pub mod calls {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			type DispatchError = runtime_types::sp_runtime::DispatchError;
 			pub mod types {
 				use super::runtime_types;
@@ -16916,15 +16965,13 @@ pub mod api {
 		}
 	}
 	pub mod block_rewards {
-		use super::root_mod;
-		use super::runtime_types;
+		use super::{root_mod, runtime_types};
 		#[doc = "The `Error` enum of this pallet."]
 		pub type Error = runtime_types::pallet_block_rewards::pallet::Error;
 		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 		pub type Call = runtime_types::pallet_block_rewards::pallet::Call;
 		pub mod calls {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			type DispatchError = runtime_types::sp_runtime::DispatchError;
 			pub mod types {
 				use super::runtime_types;
@@ -17371,15 +17418,13 @@ pub mod api {
 		}
 	}
 	pub mod mint {
-		use super::root_mod;
-		use super::runtime_types;
+		use super::{root_mod, runtime_types};
 		#[doc = "The `Error` enum of this pallet."]
 		pub type Error = runtime_types::pallet_mint::pallet::Error;
 		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 		pub type Call = runtime_types::pallet_mint::pallet::Call;
 		pub mod calls {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			type DispatchError = runtime_types::sp_runtime::DispatchError;
 			pub mod types {
 				use super::runtime_types;
@@ -17823,15 +17868,13 @@ pub mod api {
 		}
 	}
 	pub mod balances {
-		use super::root_mod;
-		use super::runtime_types;
+		use super::{root_mod, runtime_types};
 		#[doc = "The `Error` enum of this pallet."]
 		pub type Error = runtime_types::pallet_balances::pallet::Error;
 		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 		pub type Call = runtime_types::pallet_balances::pallet::Call;
 		pub mod calls {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			type DispatchError = runtime_types::sp_runtime::DispatchError;
 			pub mod types {
 				use super::runtime_types;
@@ -19510,15 +19553,13 @@ pub mod api {
 		}
 	}
 	pub mod ownership {
-		use super::root_mod;
-		use super::runtime_types;
+		use super::{root_mod, runtime_types};
 		#[doc = "The `Error` enum of this pallet."]
 		pub type Error = runtime_types::pallet_balances::pallet::Error;
 		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 		pub type Call = runtime_types::pallet_balances::pallet::Call;
 		pub mod calls {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			type DispatchError = runtime_types::sp_runtime::DispatchError;
 			pub mod types {
 				use super::runtime_types;
@@ -21197,15 +21238,13 @@ pub mod api {
 		}
 	}
 	pub mod tx_pause {
-		use super::root_mod;
-		use super::runtime_types;
+		use super::{root_mod, runtime_types};
 		#[doc = "The `Error` enum of this pallet."]
 		pub type Error = runtime_types::pallet_tx_pause::pallet::Error;
 		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 		pub type Call = runtime_types::pallet_tx_pause::pallet::Call;
 		pub mod calls {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			type DispatchError = runtime_types::sp_runtime::DispatchError;
 			pub mod types {
 				use super::runtime_types;
@@ -21473,8 +21512,7 @@ pub mod api {
 		}
 	}
 	pub mod transaction_payment {
-		use super::root_mod;
-		use super::runtime_types;
+		use super::{root_mod, runtime_types};
 		#[doc = "The `Event` enum of this pallet"]
 		pub type Event = runtime_types::pallet_transaction_payment::pallet::Event;
 		pub mod events {
@@ -21637,15 +21675,13 @@ pub mod api {
 		}
 	}
 	pub mod utility {
-		use super::root_mod;
-		use super::runtime_types;
+		use super::{root_mod, runtime_types};
 		#[doc = "The `Error` enum of this pallet."]
 		pub type Error = runtime_types::pallet_utility::pallet::Error;
 		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 		pub type Call = runtime_types::pallet_utility::pallet::Call;
 		pub mod calls {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			type DispatchError = runtime_types::sp_runtime::DispatchError;
 			pub mod types {
 				use super::runtime_types;
@@ -22365,15 +22401,13 @@ pub mod api {
 		}
 	}
 	pub mod sudo {
-		use super::root_mod;
-		use super::runtime_types;
+		use super::{root_mod, runtime_types};
 		#[doc = "Error for the Sudo pallet."]
 		pub type Error = runtime_types::pallet_sudo::pallet::Error;
 		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 		pub type Call = runtime_types::pallet_sudo::pallet::Call;
 		pub mod calls {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			type DispatchError = runtime_types::sp_runtime::DispatchError;
 			pub mod types {
 				use super::runtime_types;
@@ -22737,15 +22771,13 @@ pub mod api {
 		}
 	}
 	pub mod bitcoin_fissions {
-		use super::root_mod;
-		use super::runtime_types;
+		use super::{root_mod, runtime_types};
 		#[doc = "The `Error` enum of this pallet."]
 		pub type Error = runtime_types::pallet_bitcoin_fissions::pallet::Error;
 		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 		pub type Call = runtime_types::pallet_bitcoin_fissions::pallet::Call;
 		pub mod calls {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			type DispatchError = runtime_types::sp_runtime::DispatchError;
 			pub mod types {
 				use super::runtime_types;
@@ -23265,15 +23297,13 @@ pub mod api {
 		}
 	}
 	pub mod treasury {
-		use super::root_mod;
-		use super::runtime_types;
+		use super::{root_mod, runtime_types};
 		#[doc = "The `Error` enum of this pallet."]
 		pub type Error = runtime_types::pallet_treasury::pallet::Error;
 		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 		pub type Call = runtime_types::pallet_treasury::pallet::Call;
 		pub mod calls {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			type DispatchError = runtime_types::sp_runtime::DispatchError;
 			pub mod types {
 				use super::runtime_types;
@@ -25029,8 +25059,7 @@ pub mod api {
 		}
 	}
 	pub mod fee_control {
-		use super::root_mod;
-		use super::runtime_types;
+		use super::{root_mod, runtime_types};
 		#[doc = "The `Error` enum of this pallet."]
 		pub type Error = runtime_types::pallet_fee_control::pallet::Error;
 		#[doc = "The `Event` enum of this pallet"]
@@ -25084,15 +25113,13 @@ pub mod api {
 		}
 	}
 	pub mod operational_accounts {
-		use super::root_mod;
-		use super::runtime_types;
+		use super::{root_mod, runtime_types};
 		#[doc = "The `Error` enum of this pallet."]
 		pub type Error = runtime_types::pallet_operational_accounts::pallet::Error;
 		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 		pub type Call = runtime_types::pallet_operational_accounts::pallet::Call;
 		pub mod calls {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			type DispatchError = runtime_types::sp_runtime::DispatchError;
 			pub mod types {
 				use super::runtime_types;
@@ -26025,15 +26052,13 @@ pub mod api {
 		}
 	}
 	pub mod ethereum_verifier {
-		use super::root_mod;
-		use super::runtime_types;
+		use super::{root_mod, runtime_types};
 		#[doc = "The `Error` enum of this pallet."]
 		pub type Error = runtime_types::pallet_ethereum_verifier::pallet::Error;
 		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 		pub type Call = runtime_types::pallet_ethereum_verifier::pallet::Call;
 		pub mod calls {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			type DispatchError = runtime_types::sp_runtime::DispatchError;
 			pub mod types {
 				use super::runtime_types;
@@ -26785,10 +26810,9 @@ pub mod api {
 						"CurrentSyncCommittee",
 						(),
 						[
-							19u8, 0u8, 119u8, 186u8, 141u8, 223u8, 76u8, 165u8, 180u8, 111u8, 1u8,
-							143u8, 211u8, 197u8, 188u8, 61u8, 209u8, 62u8, 140u8, 202u8, 167u8,
-							48u8, 240u8, 111u8, 228u8, 102u8, 54u8, 49u8, 165u8, 208u8, 49u8,
-							208u8,
+							25u8, 13u8, 172u8, 72u8, 191u8, 123u8, 92u8, 195u8, 210u8, 94u8, 198u8,
+							150u8, 74u8, 62u8, 87u8, 28u8, 87u8, 249u8, 113u8, 120u8, 187u8, 237u8,
+							189u8, 154u8, 177u8, 151u8, 93u8, 40u8, 218u8, 65u8, 81u8, 185u8,
 						],
 					)
 				}
@@ -26807,9 +26831,9 @@ pub mod api {
 						"NextSyncCommittee",
 						(),
 						[
-							34u8, 47u8, 73u8, 116u8, 177u8, 12u8, 210u8, 2u8, 154u8, 193u8, 146u8,
-							255u8, 128u8, 142u8, 23u8, 190u8, 189u8, 125u8, 207u8, 95u8, 5u8, 95u8,
-							143u8, 69u8, 42u8, 94u8, 209u8, 160u8, 65u8, 237u8, 81u8, 20u8,
+							222u8, 121u8, 87u8, 239u8, 45u8, 162u8, 125u8, 171u8, 242u8, 146u8,
+							120u8, 79u8, 136u8, 90u8, 89u8, 112u8, 214u8, 64u8, 55u8, 17u8, 170u8,
+							10u8, 225u8, 35u8, 190u8, 46u8, 23u8, 117u8, 206u8, 255u8, 215u8, 48u8,
 						],
 					)
 				}
@@ -26904,15 +26928,13 @@ pub mod api {
 		}
 	}
 	pub mod crosschain_transfer {
-		use super::root_mod;
-		use super::runtime_types;
+		use super::{root_mod, runtime_types};
 		#[doc = "The `Error` enum of this pallet."]
 		pub type Error = runtime_types::pallet_crosschain_transfer::pallet::Error;
 		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 		pub type Call = runtime_types::pallet_crosschain_transfer::pallet::Call;
 		pub mod calls {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			type DispatchError = runtime_types::sp_runtime::DispatchError;
 			pub mod types {
 				use super::runtime_types;
@@ -29357,15 +29379,13 @@ pub mod api {
 		}
 	}
 	pub mod bootstrap {
-		use super::root_mod;
-		use super::runtime_types;
+		use super::{root_mod, runtime_types};
 		#[doc = "The `Error` enum of this pallet."]
 		pub type Error = runtime_types::pallet_bootstrap::pallet::Error;
 		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 		pub type Call = runtime_types::pallet_bootstrap::pallet::Call;
 		pub mod calls {
-			use super::root_mod;
-			use super::runtime_types;
+			use super::{root_mod, runtime_types};
 			type DispatchError = runtime_types::sp_runtime::DispatchError;
 			pub mod types {
 				use super::runtime_types;
@@ -29738,8 +29758,7 @@ pub mod api {
 		}
 	}
 	pub mod treasury_positions {
-		use super::root_mod;
-		use super::runtime_types;
+		use super::{root_mod, runtime_types};
 		pub mod storage {
 			use super::runtime_types;
 			pub mod types {
@@ -31817,15 +31836,6 @@ pub mod api {
 				#[codec(index = 7)]
 				VaultDelegate,
 			}
-			#[derive(
-				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-				Clone,
-				Debug,
-			)]
-			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
-			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			pub struct Runtime;
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
 				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
@@ -40009,7 +40019,7 @@ pub mod api {
 						crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 					)]
 					pub struct Big {
-						pub w: [::core::primitive::i64; 7usize],
+						pub w: [::core::primitive::i32; 14usize],
 					}
 				}
 				pub mod ecp {
@@ -41116,6 +41126,22 @@ pub mod api {
 					DecodeError,
 				}
 			}
+			pub mod traits {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct BlakeTwo256;
+			}
 			pub mod transaction_validity {
 				use super::runtime_types;
 				#[derive(
@@ -41323,6 +41349,24 @@ pub mod api {
 				Ecdsa([::core::primitive::u8; 65usize]),
 				#[codec(index = 3)]
 				Eth([::core::primitive::u8; 65usize]),
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub enum MultiSigner {
+				#[codec(index = 0)]
+				Ed25519([::core::primitive::u8; 32usize]),
+				#[codec(index = 1)]
+				Sr25519([::core::primitive::u8; 32usize]),
+				#[codec(index = 2)]
+				Ecdsa([::core::primitive::u8; 33usize]),
+				#[codec(index = 3)]
+				Eth([::core::primitive::u8; 33usize]),
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,

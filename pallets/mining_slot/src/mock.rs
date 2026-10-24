@@ -162,8 +162,8 @@ impl OperationalAccountProvider<u64> for MockOperationalAccountProvider {
 	type Weights = ();
 
 	fn is_eligible(account_id: &u64) -> bool {
-		!OperationalAccountsInviteOnly::get()
-			|| UpgradedOperationalAccounts::get().contains(account_id)
+		!OperationalAccountsInviteOnly::get() ||
+			UpgradedOperationalAccounts::get().contains(account_id)
 	}
 }
 

@@ -4374,16 +4374,16 @@ export default {
    * Lookup580: snowbridge_amcl::bls381::big::Big
    **/
   SnowbridgeAmclBls381Big: {
-    w: '[i64;7]',
+    w: '[i32;14]',
   },
   /**
-   * Lookup585: argon_primitives::ethereum::EthereumBeaconPreset
+   * Lookup584: argon_primitives::ethereum::EthereumBeaconPreset
    **/
   ArgonPrimitivesEthereumEthereumBeaconPreset: {
     _enum: ['Mainnet', 'Minimal'],
   },
   /**
-   * Lookup586: pallet_ethereum_verifier::pallet::Error<T>
+   * Lookup585: pallet_ethereum_verifier::pallet::Error<T>
    **/
   PalletEthereumVerifierError: {
     _enum: [
@@ -4414,7 +4414,7 @@ export default {
     ],
   },
   /**
-   * Lookup587: pallet_crosschain_transfer::pallet::AccountTransferTotals<T>
+   * Lookup586: pallet_crosschain_transfer::pallet::AccountTransferTotals<T>
    **/
   PalletCrosschainTransferAccountTransferTotals: {
     microgonsIn: 'u128',
@@ -4427,7 +4427,7 @@ export default {
     argonotTransfersOutCount: 'Compact<u32>',
   },
   /**
-   * Lookup589: pallet_crosschain_transfer::pallet::GlobalIssuanceCouncil<T>
+   * Lookup588: pallet_crosschain_transfer::pallet::GlobalIssuanceCouncil<T>
    **/
   PalletCrosschainTransferGlobalIssuanceCouncil: {
     epochMicrogonsPerArgonot: 'u128',
@@ -4435,7 +4435,7 @@ export default {
     totalWeight: 'u128',
   },
   /**
-   * Lookup591: pallet_crosschain_transfer::pallet::GlobalIssuanceCouncilMember<T>
+   * Lookup590: pallet_crosschain_transfer::pallet::GlobalIssuanceCouncilMember<T>
    **/
   PalletCrosschainTransferGlobalIssuanceCouncilMember: {
     accountId: 'AccountId32',
@@ -4443,7 +4443,7 @@ export default {
     weight: 'u128',
   },
   /**
-   * Lookup596: pallet_crosschain_transfer::pallet::CouncilApprovalQueueEntry<T>
+   * Lookup595: pallet_crosschain_transfer::pallet::CouncilApprovalQueueEntry<T>
    **/
   PalletCrosschainTransferCouncilApprovalQueueEntry: {
     approvingCouncilHash: 'H256',
@@ -4456,7 +4456,7 @@ export default {
     signatures: 'BTreeMap<H160, [u8;65]>',
   },
   /**
-   * Lookup601: pallet_crosschain_transfer::pallet::MintingAuthority<T>
+   * Lookup600: pallet_crosschain_transfer::pallet::MintingAuthority<T>
    **/
   PalletCrosschainTransferMintingAuthority: {
     accountId: 'AccountId32',
@@ -4474,13 +4474,13 @@ export default {
     deactivationApprovalQueueNonce: 'Option<u64>',
   },
   /**
-   * Lookup602: pallet_crosschain_transfer::pallet::MintingAuthorityState
+   * Lookup601: pallet_crosschain_transfer::pallet::MintingAuthorityState
    **/
   PalletCrosschainTransferMintingAuthorityState: {
     _enum: ['PendingActivation', 'Active', 'Deactivating'],
   },
   /**
-   * Lookup604: pallet_crosschain_transfer::transfer_out::TransferOutOfArgon<T>
+   * Lookup603: pallet_crosschain_transfer::transfer_out::TransferOutOfArgon<T>
    **/
   PalletCrosschainTransferTransferOutTransferOutOfArgon: {
     argonAccountId: 'AccountId32',
@@ -4498,7 +4498,7 @@ export default {
     state: 'PalletCrosschainTransferTransferOutTransferOutState',
   },
   /**
-   * Lookup606: pallet_crosschain_transfer::transfer_out::MintingAuthorityTransferReservation<T>
+   * Lookup605: pallet_crosschain_transfer::transfer_out::MintingAuthorityTransferReservation<T>
    **/
   PalletCrosschainTransferTransferOutMintingAuthorityTransferReservation: {
     microgonCollateral: 'u128',
@@ -4507,13 +4507,13 @@ export default {
     signature: '[u8;65]',
   },
   /**
-   * Lookup610: pallet_crosschain_transfer::transfer_out::TransferOutState
+   * Lookup609: pallet_crosschain_transfer::transfer_out::TransferOutState
    **/
   PalletCrosschainTransferTransferOutTransferOutState: {
     _enum: ['Started', 'Ready'],
   },
   /**
-   * Lookup612: pallet_crosschain_transfer::transfer_out::PendingCollateralizationRequest<T>
+   * Lookup611: pallet_crosschain_transfer::transfer_out::PendingCollateralizationRequest<T>
    **/
   PalletCrosschainTransferTransferOutPendingCollateralizationRequest: {
     transferId: 'H256',
@@ -4521,14 +4521,14 @@ export default {
     remainingMintingAuthorityTip: 'u128',
   },
   /**
-   * Lookup614: pallet_crosschain_transfer::pallet::SourceChainCirculation<T>
+   * Lookup613: pallet_crosschain_transfer::pallet::SourceChainCirculation<T>
    **/
   PalletCrosschainTransferSourceChainCirculation: {
     argonCirculation: 'u128',
     argonotCirculation: 'u128',
   },
   /**
-   * Lookup615: pallet_crosschain_transfer::pallet::Error<T>
+   * Lookup614: pallet_crosschain_transfer::pallet::Error<T>
    **/
   PalletCrosschainTransferError: {
     _enum: [
@@ -4590,13 +4590,13 @@ export default {
     ],
   },
   /**
-   * Lookup617: pallet_bootstrap::pallet::Error<T>
+   * Lookup616: pallet_bootstrap::pallet::Error<T>
    **/
   PalletBootstrapError: {
     _enum: ['EncryptedPayloadTooLong', 'InvalidRecoveryProof', 'EndpointOwnedByAnotherAccount'],
   },
   /**
-   * Lookup618: pallet_treasury_positions::pallet::Position<Balance>
+   * Lookup617: pallet_treasury_positions::pallet::Position<Balance>
    **/
   PalletTreasuryPositionsPosition: {
     bondPrincipal: 'Compact<u128>',
@@ -4604,7 +4604,7 @@ export default {
     upstream: 'Option<ArgonPrimitivesTreasuryUpstreamPosition>',
   },
   /**
-   * Lookup619: argon_primitives::treasury::PositionQuantities<Balance>
+   * Lookup618: argon_primitives::treasury::PositionQuantities<Balance>
    **/
   ArgonPrimitivesTreasuryPositionQuantities: {
     bonds: 'Compact<u128>',
@@ -4612,7 +4612,7 @@ export default {
     fissionLiquidity: 'Compact<u128>',
   },
   /**
-   * Lookup621: argon_primitives::treasury::UpstreamPosition<Balance>
+   * Lookup620: argon_primitives::treasury::UpstreamPosition<Balance>
    **/
   ArgonPrimitivesTreasuryUpstreamPosition: {
     vaultId: 'Compact<u32>',
@@ -4621,55 +4621,55 @@ export default {
     bondPrincipal: 'Compact<u128>',
   },
   /**
-   * Lookup624: frame_system::extensions::authorize_call::AuthorizeCall<T>
+   * Lookup623: frame_system::extensions::authorize_call::AuthorizeCall<T>
    **/
   FrameSystemExtensionsAuthorizeCall: 'Null',
   /**
-   * Lookup625: frame_system::extensions::check_non_zero_sender::CheckNonZeroSender<T>
+   * Lookup624: frame_system::extensions::check_non_zero_sender::CheckNonZeroSender<T>
    **/
   FrameSystemExtensionsCheckNonZeroSender: 'Null',
   /**
-   * Lookup626: frame_system::extensions::check_spec_version::CheckSpecVersion<T>
+   * Lookup625: frame_system::extensions::check_spec_version::CheckSpecVersion<T>
    **/
   FrameSystemExtensionsCheckSpecVersion: 'Null',
   /**
-   * Lookup627: frame_system::extensions::check_tx_version::CheckTxVersion<T>
+   * Lookup626: frame_system::extensions::check_tx_version::CheckTxVersion<T>
    **/
   FrameSystemExtensionsCheckTxVersion: 'Null',
   /**
-   * Lookup628: frame_system::extensions::check_genesis::CheckGenesis<T>
+   * Lookup627: frame_system::extensions::check_genesis::CheckGenesis<T>
    **/
   FrameSystemExtensionsCheckGenesis: 'Null',
   /**
-   * Lookup631: frame_system::extensions::check_nonce::CheckNonce<T>
+   * Lookup630: frame_system::extensions::check_nonce::CheckNonce<T>
    **/
   FrameSystemExtensionsCheckNonce: 'Compact<u32>',
   /**
-   * Lookup632: frame_system::extensions::check_weight::CheckWeight<T>
+   * Lookup631: frame_system::extensions::check_weight::CheckWeight<T>
    **/
   FrameSystemExtensionsCheckWeight: 'Null',
   /**
-   * Lookup633: pallet_transaction_payment::ChargeTransactionPayment<T>
+   * Lookup632: pallet_transaction_payment::ChargeTransactionPayment<T>
    **/
   PalletTransactionPaymentChargeTransactionPayment: 'Compact<u128>',
   /**
-   * Lookup634: frame_metadata_hash_extension::CheckMetadataHash<T>
+   * Lookup633: frame_metadata_hash_extension::CheckMetadataHash<T>
    **/
   FrameMetadataHashExtensionCheckMetadataHash: {
     mode: 'FrameMetadataHashExtensionMode',
   },
   /**
-   * Lookup635: frame_metadata_hash_extension::Mode
+   * Lookup634: frame_metadata_hash_extension::Mode
    **/
   FrameMetadataHashExtensionMode: {
     _enum: ['Disabled', 'Enabled'],
   },
   /**
-   * Lookup636: frame_system::extensions::weight_reclaim::WeightReclaim<T>
+   * Lookup635: frame_system::extensions::weight_reclaim::WeightReclaim<T>
    **/
   FrameSystemExtensionsWeightReclaim: 'Null',
   /**
-   * Lookup637: argon_runtime::Runtime
+   * Lookup636: argon_runtime::Runtime
    **/
   ArgonRuntimeRuntime: 'Null',
 };

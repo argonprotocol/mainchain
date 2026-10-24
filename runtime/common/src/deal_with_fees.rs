@@ -98,9 +98,9 @@ macro_rules! deal_with_fees {
 						matches!(
 							call,
 							RuntimeCall::MiningSlot(
-								pallet_mining_slot::Call::bid { .. }
-									| pallet_mining_slot::Call::commit_bid { .. }
-									| pallet_mining_slot::Call::reveal_bid { .. }
+								pallet_mining_slot::Call::bid { .. } |
+									pallet_mining_slot::Call::commit_bid { .. } |
+									pallet_mining_slot::Call::reveal_bid { .. }
 							)
 						)
 					}
@@ -112,9 +112,9 @@ macro_rules! deal_with_fees {
 						}
 						if let RuntimeCall::Utility(utility_call) = call {
 							match utility_call {
-								pallet_utility::Call::batch { calls }
-								| pallet_utility::Call::batch_all { calls }
-								| pallet_utility::Call::force_batch { calls } => {
+								pallet_utility::Call::batch { calls } |
+								pallet_utility::Call::batch_all { calls } |
+								pallet_utility::Call::force_batch { calls } => {
 									return calls.iter().all(is_mining_bid_call);
 								},
 								_ => {},

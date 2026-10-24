@@ -33,12 +33,12 @@ use tokio::{
 };
 use tracing::{info, log::debug, warn};
 
+pub use argon_primitives::block_seal::mining_bid_commitment;
 use argon_primitives::{
 	prelude::FrameId, tick::Tick, AccountId, BlockNumber, Chain, ChainIdentity, Nonce,
 	VotingSchedule,
 };
 pub use spec::api;
-pub use argon_primitives::block_seal::mining_bid_commitment;
 
 use crate::api::{
 	block_seal_spec::storage::types::current_vote_minimum::CurrentVoteMinimum, ownership, storage,

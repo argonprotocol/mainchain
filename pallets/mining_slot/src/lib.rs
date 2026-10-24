@@ -472,9 +472,9 @@ pub mod pallet {
 			}
 
 			let next_frame_id = NextFrameId::<T>::get();
-			if next_frame_id == 1
-				&& !IsNextSlotBiddingOpen::<T>::get()
-				&& Self::is_seat_bidding_started()
+			if next_frame_id == 1 &&
+				!IsNextSlotBiddingOpen::<T>::get() &&
+				Self::is_seat_bidding_started()
 			{
 				log::trace!(
 					"Opening Slot 1 bidding {}",
@@ -626,8 +626,8 @@ pub mod pallet {
 				let pending = pending.as_mut().ok_or(Error::<T>::MissingBidCommitment)?;
 				ensure!(pending.funding == funding, Error::<T>::CannotChangeFundingAccount);
 				ensure!(
-					pending.block.saturating_add(One::one())
-						== frame_system::Pallet::<T>::block_number(),
+					pending.block.saturating_add(One::one()) ==
+						frame_system::Pallet::<T>::block_number(),
 					Error::<T>::InvalidRevealBlock
 				);
 				ensure!(pending.registration.is_none(), Error::<T>::BidAlreadyRevealed);
@@ -660,15 +660,15 @@ pub mod pallet {
 
 			MiningConfig::<T>::mutate(|a| {
 				let mut has_update = false;
-				if let Some(ticks_before_bid_end_for_vrf_close) = ticks_before_bid_end_for_vrf_close
-					&& a.ticks_before_bid_end_for_vrf_close != ticks_before_bid_end_for_vrf_close
+				if let Some(ticks_before_bid_end_for_vrf_close) = ticks_before_bid_end_for_vrf_close &&
+					a.ticks_before_bid_end_for_vrf_close != ticks_before_bid_end_for_vrf_close
 				{
 					a.ticks_before_bid_end_for_vrf_close = ticks_before_bid_end_for_vrf_close;
 					has_update = true;
 				}
 
-				if let Some(mining_slot_delay) = mining_slot_delay
-					&& a.slot_bidding_start_after_ticks != mining_slot_delay
+				if let Some(mining_slot_delay) = mining_slot_delay &&
+					a.slot_bidding_start_after_ticks != mining_slot_delay
 				{
 					a.slot_bidding_start_after_ticks = mining_slot_delay;
 					has_update = true;
@@ -724,15 +724,15 @@ impl<T: Config> Pallet<T> {
 				registration
 					.external_funding_account
 					.as_ref()
-					.unwrap_or(&registration.account_id)
-					== funding,
+					.unwrap_or(&registration.account_id) ==
+					funding,
 				Error::<T>::CannotChangeFundingAccount
 			);
 		}
 		if let Some(active) = Self::get_active_registration(miner) {
 			ensure!(
-				active.starting_frame_id + T::FramesPerMiningTerm::get() as FrameId
-					== NextFrameId::<T>::get(),
+				active.starting_frame_id + T::FramesPerMiningTerm::get() as FrameId ==
+					NextFrameId::<T>::get(),
 				Error::<T>::CannotRegisterOverlappingSessions
 			);
 		}
@@ -792,9 +792,9 @@ impl<T: Config> Pallet<T> {
 		let increment = T::BidIncrements::get();
 		ensure!(low <= high, Error::<T>::InvalidBidRange);
 		ensure!(
-			!increment.is_zero()
-				&& low % increment == Zero::zero()
-				&& high % increment == Zero::zero(),
+			!increment.is_zero() &&
+				low % increment == Zero::zero() &&
+				high % increment == Zero::zero(),
 			Error::<T>::InvalidBidAmount
 		);
 		let existing = Self::get_pending_cohort_registration(&pending.miner);
@@ -939,8 +939,8 @@ impl<T: Config> Pallet<T> {
 		// Equal paid prices retain incumbent/commitment order, not ceiling order.
 		let priority = |miner: &T::AccountId| {
 			incumbents.iter().position(|x| &x.account_id == miner).unwrap_or_else(|| {
-				incumbents.len()
-					+ pending.iter().position(|x| &x.miner == miner).expect("winning candidate")
+				incumbents.len() +
+					pending.iter().position(|x| &x.miner == miner).expect("winning candidate")
 			})
 		};
 		winners.sort_by(|a, b| {
@@ -981,8 +981,8 @@ impl<T: Config> BlockRewardAccountsProvider<T::AccountId> for Pallet<T> {
 	fn get_mint_rewards_accounts() -> Vec<(T::AccountId, FrameId)> {
 		let mut result = vec![];
 		for (frame_id, cohort) in <MinersByCohort<T>>::iter() {
-			if let Some(just_activated_frame) = Self::get_newly_started_frame()
-				&& frame_id == just_activated_frame
+			if let Some(just_activated_frame) = Self::get_newly_started_frame() &&
+				frame_id == just_activated_frame
 			{
 				// skip just activated frame
 				continue;
@@ -1010,8 +1010,8 @@ impl<T: Config> MiningSlotProvider<T::AccountId> for Pallet<T> {
 	type Weights = crate::weights::ProviderWeightAdapter<T>;
 
 	fn has_active_rewards_account_seat(account_id: &T::AccountId) -> bool {
-		if T::OwnershipCurrency::balance_on_hold(&HoldReason::RegisterAsMiner.into(), account_id)
-			== 0u32.into()
+		if T::OwnershipCurrency::balance_on_hold(&HoldReason::RegisterAsMiner.into(), account_id) ==
+			0u32.into()
 		{
 			return false;
 		}
@@ -1050,8 +1050,8 @@ impl<T: Config> AuthorityProvider<T::MiningAuthorityId, T::Block, T::AccountId> 
 				scores.push(score);
 				if score < best_score {
 					let authority = Self::get_mining_authority_by_index((frame_id, i as u32))?;
-					if let Some(ref limit_to_authority) = signing_key
-						&& &authority.authority_id != limit_to_authority
+					if let Some(ref limit_to_authority) = signing_key &&
+						&authority.authority_id != limit_to_authority
 					{
 						continue;
 					}
@@ -1192,8 +1192,8 @@ impl<T: Config> Pallet<T> {
 			return;
 		};
 		MinerNonceScoringByCohort::<T>::mutate(|a| {
-			if let Some(cohort_nonces) = a.get_mut(&miner_index.0)
-				&& let Some(miner_scoring) = cohort_nonces.get_mut(miner_index.1 as usize)
+			if let Some(cohort_nonces) = a.get_mut(&miner_index.0) &&
+				let Some(miner_scoring) = cohort_nonces.get_mut(miner_index.1 as usize)
 			{
 				miner_scoring.blocks_won_in_frame.saturating_accrue(1);
 				miner_scoring.last_win_block = Some(frame_system::Pallet::<T>::block_number());
@@ -1423,8 +1423,8 @@ impl<T: Config> Pallet<T> {
 		let minimum_adjusted_seats = one.saturating_sub(damper).saturating_mul_int(total_seats);
 		let maximum_adjusted_seats = one.saturating_add(damper).saturating_mul_int(total_seats);
 		let mean_cohort_size = seats_at_target_price
-			.clamp(minimum_adjusted_seats, maximum_adjusted_seats)
-			/ observed_frames;
+			.clamp(minimum_adjusted_seats, maximum_adjusted_seats) /
+			observed_frames;
 		let next_cohort_size = mean_cohort_size
 			.saturated_into::<u32>()
 			.clamp(T::MinCohortSize::get(), T::MaxCohortSize::get());
@@ -1575,8 +1575,8 @@ impl<T: Config> Pallet<T> {
 		}
 
 		let hold_reason = HoldReason::RegisterAsMiner;
-		if T::OwnershipCurrency::balance_on_hold(&hold_reason.into(), funding_account_id)
-			== 0u32.into()
+		if T::OwnershipCurrency::balance_on_hold(&hold_reason.into(), funding_account_id) ==
+			0u32.into()
 		{
 			frame_system::Pallet::<T>::inc_providers(funding_account_id);
 		}
@@ -1809,8 +1809,8 @@ impl<T: Config> MiningFrameProvider for Pallet<T> {
 	}
 
 	fn is_seat_bidding_started() -> bool {
-		T::TickProvider::elapsed_ticks() >= MiningConfig::<T>::get().slot_bidding_start_after_ticks
-			|| IsNextSlotBiddingOpen::<T>::get()
+		T::TickProvider::elapsed_ticks() >= MiningConfig::<T>::get().slot_bidding_start_after_ticks ||
+			IsNextSlotBiddingOpen::<T>::get()
 	}
 
 	fn get_tick_range_for_frame(frame_id: FrameId) -> Option<(Tick, Tick)> {
@@ -1838,9 +1838,9 @@ impl<T: Config> BlockSealEventHandler for Pallet<T> {
 		// If bids are open, and we're in the closing-period, check if bidding should close.
 		// NOTE: This should run first to ensure bids in this block can't be manipulated once
 		// this state is known
-		if let Some(proof) = vote_seal_proof
-			&& IsNextSlotBiddingOpen::<T>::get()
-			&& Self::check_for_bidding_close(proof)
+		if let Some(proof) = vote_seal_proof &&
+			IsNextSlotBiddingOpen::<T>::get() &&
+			Self::check_for_bidding_close(proof)
 		{
 			IsNextSlotBiddingOpen::<T>::put(false);
 		}

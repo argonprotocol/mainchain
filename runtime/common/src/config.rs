@@ -377,10 +377,10 @@ mod tests {
 		const RESERVED_CALL_PREFIX_BYTES: usize = 16;
 
 		assert!(
-			MaxGatewayActivityProofBatch::max_encoded_len()
-				+ RESERVED_SIGNED_EXTRINSIC_BYTES
-				+ RESERVED_CALL_PREFIX_BYTES
-				<= *BlockLength::get().max.get(DispatchClass::Normal) as usize
+			MaxGatewayActivityProofBatch::max_encoded_len() +
+				RESERVED_SIGNED_EXTRINSIC_BYTES +
+				RESERVED_CALL_PREFIX_BYTES <=
+				*BlockLength::get().max.get(DispatchClass::Normal) as usize
 		);
 	}
 }
