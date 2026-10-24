@@ -1701,12 +1701,13 @@ pub mod pallet {
 
 		fn record_bitcoin_lock_funding(
 			vault_id: VaultId,
-			before: BitcoinLockFunding<Self::Balance>,
-			after: BitcoinLockFunding<Self::Balance>,
+			previous_funding: BitcoinLockFunding<Self::Balance>,
+			updated_funding: BitcoinLockFunding<Self::Balance>,
 		) -> Result<(), VaultError> {
-			if before.funded_satoshis == after.funded_satoshis &&
-				before.securitized_satoshis == after.securitized_satoshis &&
-				before.activated_securitization == after.activated_securitization
+			if previous_funding.funded_satoshis == updated_funding.funded_satoshis &&
+				previous_funding.securitized_satoshis == updated_funding.securitized_satoshis &&
+				previous_funding.activated_securitization ==
+					updated_funding.activated_securitization
 			{
 				return Ok(());
 			}
@@ -1717,16 +1718,18 @@ pub mod pallet {
 				fee_discount: T::Balance::zero(),
 				securitization_locked: T::Balance::zero(),
 				securitization_released: T::Balance::zero(),
-				total_satoshis_added: after.funded_satoshis.saturating_sub(before.funded_satoshis),
-				total_satoshis_released: before
+				total_satoshis_added: updated_funding
 					.funded_satoshis
-					.saturating_sub(after.funded_satoshis),
+					.saturating_sub(previous_funding.funded_satoshis),
+				total_satoshis_released: previous_funding
+					.funded_satoshis
+					.saturating_sub(updated_funding.funded_satoshis),
 			})?;
 
 			VaultsById::<T>::try_mutate(vault_id, |maybe_vault| {
 				let vault = maybe_vault.as_mut().ok_or(VaultError::VaultNotFound)?;
 				let previous_satoshis = vault.securitized_satoshis;
-				vault.record_bitcoin_lock_funding(before, after)?;
+				vault.record_bitcoin_lock_funding(previous_funding, updated_funding)?;
 				Self::update_network_securitized_satoshis(
 					previous_satoshis,
 					vault.securitized_satoshis,
@@ -1846,14 +1849,14 @@ pub mod pallet {
 		fn resecuritize(
 			vault_id: VaultId,
 			account_id: &T::AccountId,
-			current: &CosignerGuarantee<T::Balance>,
-			replacement: &mut CosignerGuarantee<T::Balance>,
+			existing_guarantee: &CosignerGuarantee<T::Balance>,
+			replacement_guarantee: &mut CosignerGuarantee<T::Balance>,
 			funded_satoshis: Satoshis,
-			request: ReserveSecuritizationRequest<T::Balance>,
+			securitization_request: ReserveSecuritizationRequest<T::Balance>,
 		) -> Result<(T::Balance, T::Balance), VaultError> {
 			let mut vault = VaultsById::<T>::get(vault_id).ok_or(VaultError::VaultNotFound)?;
 			let previous_satoshis = vault.securitized_satoshis;
-			if replacement.basis.satoshis > 0 {
+			if replacement_guarantee.basis.satoshis > 0 {
 				ensure!(
 					vault.opened_tick <= T::TickProvider::current_tick(),
 					VaultError::VaultNotYetActive
@@ -1861,23 +1864,26 @@ pub mod pallet {
 				ensure!(!vault.is_closed, VaultError::VaultClosed);
 			}
 
-			let current_microgons = current.guaranteed_microgons;
-			let replacement_microgons = replacement.guaranteed_microgons;
-			let additional_microgons = replacement_microgons.saturating_sub(current_microgons);
-			let total_fee = if additional_microgons.is_zero() {
+			// Charge only for additional securitization; the current allocation is already paid
+			// for.
+			let existing_guaranteed_microgons = existing_guarantee.guaranteed_microgons;
+			let replacement_guaranteed_microgons = replacement_guarantee.guaranteed_microgons;
+			let additional_securitization =
+				replacement_guaranteed_microgons.saturating_sub(existing_guaranteed_microgons);
+			let total_fee = if additional_securitization.is_zero() {
 				T::Balance::zero()
 			} else {
 				vault
 					.terms
 					.bitcoin_annual_percent_rate
-					.saturating_mul(request.remaining_term)
-					.saturating_mul_int(additional_microgons)
+					.saturating_mul(securitization_request.remaining_term)
+					.saturating_mul_int(additional_securitization)
 					.saturating_add(vault.terms.bitcoin_base_fee)
 			};
 			let fee_discount = if vault.operator_account_id == *account_id {
 				total_fee
 			} else {
-				request.fee_discount.min(total_fee)
+				securitization_request.fee_discount.min(total_fee)
 			};
 
 			Self::update_vault_bitcoin_metrics(BitcoinLockUpdate {
@@ -1885,45 +1891,58 @@ pub mod pallet {
 				locks_created: 0,
 				total_fee,
 				fee_discount,
-				securitization_locked: additional_microgons,
-				securitization_released: current_microgons.saturating_sub(replacement_microgons),
+				securitization_locked: additional_securitization,
+				securitization_released: existing_guaranteed_microgons
+					.saturating_sub(replacement_guaranteed_microgons),
 				total_satoshis_added: 0,
 				total_satoshis_released: 0,
 			})?;
 
 			vault
 				.reserved_securitization_space
-				.saturating_reduce(request.securitization_space_to_unreserve);
+				.saturating_reduce(securitization_request.securitization_space_to_unreserve);
+
+			// Release the current allocation so the replacement can reuse its securitization.
 			let may_use_flexible_space = vault.operator_account_id != *account_id;
 			let release_heights = vault.unwind_bitcoin_lock_securitization(
-				current,
-				current.unactivated_securitization(funded_satoshis),
-				request.lock_expiration,
-				request.is_flexible,
+				existing_guarantee,
+				existing_guarantee.unactivated_securitization(funded_satoshis),
+				securitization_request.lock_expiration,
+				securitization_request.is_flexible,
 			)?;
 
-			if replacement.basis.satoshis > 0 {
+			if replacement_guarantee.basis.satoshis > 0 {
 				vault.extend_lock(
-					replacement,
-					request.lock_expiration,
-					request.is_flexible,
+					replacement_guarantee,
+					securitization_request.lock_expiration,
+					securitization_request.is_flexible,
 					may_use_flexible_space,
 				)?;
 			}
 
-			let previous_covered = current.securitized_satoshis(funded_satoshis);
-			ensure!(previous_covered <= vault.securitized_satoshis, VaultError::InternalError);
+			let previous_securitized_satoshis =
+				existing_guarantee.securitized_satoshis(funded_satoshis);
+			ensure!(
+				previous_securitized_satoshis <= vault.securitized_satoshis,
+				VaultError::InternalError
+			);
 			vault.securitized_satoshis = vault
 				.securitized_satoshis
-				.saturating_sub(previous_covered)
-				.saturating_add(replacement.securitized_satoshis(funded_satoshis));
+				.saturating_sub(previous_securitized_satoshis)
+				.saturating_add(replacement_guarantee.securitized_satoshis(funded_satoshis));
 			ensure!(vault.securitized_satoshis <= vault.total_satoshis, VaultError::InternalError);
 
-			let unactivated = replacement.unactivated_securitization(funded_satoshis);
-			vault.securitization_pending_activation.saturating_accrue(unactivated);
-			if request.is_flexible {
-				vault.flexible_securitization_locked.saturating_reduce(unactivated);
+			let unactivated_securitization =
+				replacement_guarantee.unactivated_securitization(funded_satoshis);
+			vault
+				.securitization_pending_activation
+				.saturating_accrue(unactivated_securitization);
+			if securitization_request.is_flexible {
+				vault
+					.flexible_securitization_locked
+					.saturating_reduce(unactivated_securitization);
 			}
+
 			Self::track_vault_release_schedule(vault_id, &mut vault, release_heights)?;
 
 			let fee_due = total_fee.saturating_sub(fee_discount);
@@ -1951,6 +1970,7 @@ pub mod pallet {
 				previous_satoshis,
 				vault.securitized_satoshis,
 			)?;
+
 			VaultsById::<T>::insert(vault_id, vault);
 
 			Ok((total_fee, fee_discount))
@@ -1958,35 +1978,55 @@ pub mod pallet {
 
 		fn shrink_securitization(
 			vault_id: VaultId,
-			released: &CosignerGuarantee<T::Balance>,
+			released_guarantee: &CosignerGuarantee<T::Balance>,
 			lock_expiration: BitcoinHeight,
 			release_unused_immediately: bool,
 		) -> Result<(), VaultError> {
-			let amount = released.guaranteed_microgons;
-			let held = if release_unused_immediately {
-				released
+			let released_microgons = released_guarantee.guaranteed_microgons;
+
+			// Funding-window expiry releases unused coverage immediately, except for existing
+			// holds.
+			let held_microgons = if release_unused_immediately {
+				released_guarantee
 					.fund_hold_extensions
 					.values()
 					.copied()
-					.fold(T::Balance::zero(), |total, amount| total.saturating_add(amount))
+					.fold(T::Balance::zero(), |total, hold_microgons| {
+						total.saturating_add(hold_microgons)
+					})
 			} else {
-				amount
+				released_microgons
 			};
 
 			let mut vault = VaultsById::<T>::get(vault_id).ok_or(VaultError::VaultNotFound)?;
-			ensure!(held <= amount, VaultError::InternalError);
-			ensure!(amount <= vault.securitization_pending_activation, VaultError::InternalError);
+			ensure!(held_microgons <= released_microgons, VaultError::InternalError);
+			ensure!(
+				released_microgons <= vault.securitization_pending_activation,
+				VaultError::InternalError
+			);
+
 			vault.update_locked_commitments(
-				released,
+				released_guarantee,
 				lock_expiration,
 				T::Balance::zero(),
-				amount,
+				released_microgons,
 				false,
 			)?;
 
-			vault.securitization_pending_activation.saturating_reduce(held);
-			let release_heights = vault.schedule_release(held, released, lock_expiration, false)?;
-			vault.release_unactivated_securitization(amount.saturating_sub(held))?;
+			vault.securitization_pending_activation.saturating_reduce(held_microgons);
+			let release_heights = vault.schedule_release(
+				held_microgons,
+				released_guarantee
+					.fund_hold_extensions
+					.iter()
+					.map(|(height, amount)| (*height, *amount)),
+				lock_expiration,
+				false,
+			)?;
+			vault.release_unactivated_securitization(
+				released_microgons.saturating_sub(held_microgons),
+			)?;
+
 			Self::track_vault_release_schedule(vault_id, &mut vault, release_heights)?;
 			VaultsById::<T>::insert(vault_id, vault);
 
@@ -1996,26 +2036,31 @@ pub mod pallet {
 				total_fee: T::Balance::zero(),
 				fee_discount: T::Balance::zero(),
 				securitization_locked: T::Balance::zero(),
-				securitization_released: amount,
+				securitization_released: released_microgons,
 				total_satoshis_added: 0,
 				total_satoshis_released: 0,
 			})?;
-			Self::deposit_event(Event::SecuritizationReturned { vault_id, amount });
+
+			Self::deposit_event(Event::SecuritizationReturned {
+				vault_id,
+				amount: released_microgons,
+			});
 
 			Ok(())
 		}
 
 		fn release_bitcoin_lock_securitization(
 			vault_id: VaultId,
-			current_securitization: &CosignerGuarantee<Self::Balance>,
+			existing_guarantee: &CosignerGuarantee<Self::Balance>,
 			lock_funded_satoshis: Satoshis,
 			lock_expiration: BitcoinHeight,
 			is_flexible: bool,
 		) -> Result<(), VaultError> {
 			let securitized_satoshis =
-				current_securitization.securitized_satoshis(lock_funded_satoshis);
+				existing_guarantee.securitized_satoshis(lock_funded_satoshis);
 			let securitization_to_schedule =
-				current_securitization.securitization_for_satoshis(securitized_satoshis);
+				existing_guarantee.securitization_for_satoshis(securitized_satoshis);
+
 			// All securitization leaves the Lock. Funded amounts and hold extensions keep their
 			// release dates; unused securitization without an extension is released immediately.
 			Self::update_vault_bitcoin_metrics(BitcoinLockUpdate {
@@ -2024,7 +2069,7 @@ pub mod pallet {
 				total_fee: 0u32.into(),
 				fee_discount: T::Balance::zero(),
 				securitization_locked: 0u32.into(),
-				securitization_released: current_securitization.guaranteed_microgons,
+				securitization_released: existing_guarantee.guaranteed_microgons,
 				total_satoshis_added: 0,
 				total_satoshis_released: lock_funded_satoshis,
 			})?;
@@ -2032,17 +2077,19 @@ pub mod pallet {
 			let mut vault = VaultsById::<T>::get(vault_id).ok_or(VaultError::VaultNotFound)?;
 			let previous_satoshis = vault.securitized_satoshis;
 			let release_heights = vault.release_bitcoin_lock_securitization(
-				current_securitization,
+				existing_guarantee,
 				lock_funded_satoshis,
 				lock_expiration,
 				is_flexible,
 			)?;
+
 			Self::track_vault_release_schedule(vault_id, &mut vault, release_heights)?;
 			Self::update_network_securitized_satoshis(
 				previous_satoshis,
 				vault.securitized_satoshis,
 			)?;
 			VaultsById::<T>::insert(vault_id, vault);
+
 			Self::deposit_event(Event::FundsScheduledForRelease {
 				vault_id,
 				securitization: securitization_to_schedule,
@@ -2070,8 +2117,7 @@ pub mod pallet {
 				if vault.is_closed { T::Balance::zero() } else { vault.securitization };
 
 			let burn_result = vault.burn(
-				securitization,
-				funded_satoshis,
+				&[(securitization, funded_satoshis)],
 				compensation_amount,
 				lock_expiration,
 				is_flexible,
@@ -2113,8 +2159,7 @@ pub mod pallet {
 		/// Burn vault securitization.
 		fn burn(
 			vault_id: VaultId,
-			securitization: &CosignerGuarantee<Self::Balance>,
-			funded_satoshis: Satoshis,
+			guarantees: &[(&CosignerGuarantee<Self::Balance>, Satoshis)],
 			lock_expiration: BitcoinHeight,
 			is_flexible: bool,
 			market_rate: T::Balance,
@@ -2124,22 +2169,22 @@ pub mod pallet {
 			let previous_open =
 				if vault.is_closed { T::Balance::zero() } else { vault.securitization };
 
-			let burn_result = vault.burn(
-				securitization,
-				funded_satoshis,
-				market_rate,
-				lock_expiration,
-				is_flexible,
-			)?;
+			let burn_result = vault.burn(guarantees, market_rate, lock_expiration, is_flexible)?;
 			Self::update_vault_bitcoin_metrics(BitcoinLockUpdate {
 				vault_id,
 				locks_created: 0,
 				total_fee: T::Balance::zero(),
 				fee_discount: T::Balance::zero(),
 				securitization_locked: T::Balance::zero(),
-				securitization_released: securitization.guaranteed_microgons,
+				securitization_released: guarantees
+					.iter()
+					.fold(T::Balance::zero(), |total, (guarantee, _)| {
+						total.saturating_add(guarantee.guaranteed_microgons)
+					}),
 				total_satoshis_added: 0,
-				total_satoshis_released: funded_satoshis,
+				total_satoshis_released: guarantees
+					.iter()
+					.fold(0u64, |total, (_, funded)| total.saturating_add(*funded)),
 			})?;
 
 			let burn_amount = burn_result.burned_amount;

@@ -1994,7 +1994,7 @@ fn it_can_burn_funds() {
 		));
 		CurrentFrameId::set(2);
 		assert_ok!(Vaults::modify_funding(RuntimeOrigin::signed(1), 1, 0));
-		assert_ok!(Vaults::burn(1, &securitization(100_000), 500, 2440, false, 100_000,));
+		assert_ok!(Vaults::burn(1, &[(&securitization(100_000), 500)], 2440, false, 100_000,));
 
 		assert_eq!(Balances::free_balance(1), 900_000);
 		assert_eq!(Balances::total_balance(&1), 900_000, "Burned from the vault owner");
@@ -2036,7 +2036,7 @@ fn zero_burn_retires_funded_satoshis_and_schedules_funded_collateral() {
 		));
 		CurrentFrameId::set(2);
 
-		assert_eq!(Vaults::burn(1, &securitization(100_000), 500, 2440, false, 0,), Ok(0),);
+		assert_eq!(Vaults::burn(1, &[(&securitization(100_000), 500)], 2440, false, 0,), Ok(0),);
 		let vault = VaultsById::<Test>::get(1).expect("vault remains");
 		assert_eq!(vault.securitization, 100_000);
 		assert_eq!(vault.securitization_locked, 0);
@@ -2873,6 +2873,86 @@ fn resecuritizing_an_unfunded_lock_preserves_reused_later_maturities() {
 }
 
 #[test]
+fn terminal_settlement_preserves_reused_holds_without_reducing_the_burn() {
+	for (redemption, expected_burn, expected_hold) in
+		[(0, 0, 100), (40, 40, 60), (75, 75, 50), (150, 150, 50), (175, 175, 25), (250, 200, 0)]
+	{
+		new_test_ext().execute_with(|| {
+			set_argons(1, 200);
+			assert_ok!(Vaults::create(
+				RuntimeOrigin::signed(1),
+				VaultConfig {
+					securitization: 200,
+					terms: default_terms(FixedU128::zero()),
+					..default_vault()
+				}
+			));
+			let original = securitization(100);
+			let mut vault = VaultsById::<Test>::get(1).unwrap();
+			vault.reserve_securitization(&original, false, 143).unwrap();
+			vault.reserve_securitization(&original, false, 145).unwrap();
+			vault
+				.record_bitcoin_lock_funding(Default::default(), funding_update(&original, 100))
+				.unwrap();
+			VaultsById::<Test>::insert(1, vault);
+			assert_ok!(Vaults::release_bitcoin_lock_securitization(1, &original, 100, 145, false));
+
+			// Reuse the later commitment in an older Lock, then fund only part of it.
+			let mut replacement = securitization(200);
+			assert_ok!(Vaults::resecuritize(
+				1,
+				&1,
+				&original,
+				&mut replacement,
+				0,
+				ReserveSecuritizationRequest {
+					lock_expiration: 143,
+					..standard_reservation_request()
+				}
+			));
+			assert_eq!(replacement.fund_hold_extensions.get(&288), Some(&100));
+			assert_ok!(Vaults::record_bitcoin_lock_funding(
+				1,
+				Default::default(),
+				funding_update(&replacement, 50),
+			));
+			let issuance = Balances::total_issuance();
+			let mut before_burn = VaultsById::<Test>::get(1).unwrap();
+			let result = before_burn.burn(&[(&replacement, 50)], redemption, 143, false).unwrap();
+			assert_eq!(result.held_for_release, expected_hold, "redemption {redemption}");
+
+			assert_eq!(
+				Vaults::burn(1, &[(&replacement, 50)], 143, false, redemption),
+				Ok(expected_burn)
+			);
+			let vault = VaultsById::<Test>::get(1).unwrap();
+			assert_eq!(vault.securitization, 200 - expected_burn);
+			assert_eq!(vault.securitization_locked, 0);
+			assert_eq!(vault.securitization_pending_activation, 0);
+			assert_eq!(vault.total_satoshis, 0);
+			assert_eq!(vault.securitized_satoshis, 0);
+			assert_eq!(vault.get_relock_capacity(), expected_hold);
+			assert_eq!(
+				vault
+					.securitization_release_schedule
+					.get(&288)
+					.map(|entry| entry.relockable_commitments)
+					.unwrap_or_default(),
+				expected_hold,
+			);
+			assert_eq!(
+				Balances::balance_on_hold(&HoldReason::EnterVault.into(), &1),
+				200 - expected_burn
+			);
+			assert_eq!(Balances::total_issuance(), issuance - expected_burn);
+			if expected_hold > 0 {
+				assert!(VaultFundsReleasingByHeight::<Test>::get(288).contains(&1));
+			}
+		});
+	}
+}
+
+#[test]
 fn exit_notice_allows_resecuritization_within_its_deadline() {
 	new_test_ext().execute_with(|| {
 		set_argons(1, 100);
@@ -3163,4 +3243,369 @@ fn closing_displaced_flexible_liquid_preserves_securitization_and_funding_expiry
 			);
 		});
 	}
+}
+
+#[test]
+fn outside_spend_preserves_the_burn_rule_through_the_liquid_lifecycle() {
+	// Rebuild each checkpoint, then exercise a falling BTC price and redemption above the
+	// guarantee.
+	for checkpoint in 0..=4 {
+		for (bitcoin_price, argon_price, redemption_multiplier) in [
+			(40_000, FixedU128::one(), 10_000u128),
+			(200_000, FixedU128::from_rational(1, 2), 13_506u128),
+		] {
+			new_test_ext().execute_with(|| {
+				System::set_block_number(1);
+				set_argons(1, 1_000_000 * MICROGONS_PER_ARGON);
+				set_argons(2, 1_000_000 * MICROGONS_PER_ARGON);
+				assert_ok!(Vaults::create(
+					RuntimeOrigin::signed(1),
+					VaultConfig {
+						securitization: 500_000 * MICROGONS_PER_ARGON,
+						terms: default_terms(FixedU128::from_rational(1, 100)),
+						..default_vault()
+					}
+				));
+				CurrentTick::set(VaultsById::<Test>::get(1).unwrap().opened_tick);
+				TreasuryPositions::set_upstream_position(
+					&2,
+					Some(UpstreamPosition { vault_id: 1, ..Default::default() }),
+				);
+				BitcoinPriceInUsd::set(Some(FixedU128::from_u32(100_000)));
+				ArgonPriceInUsd::set(Some(FixedU128::one()));
+				let pubkey = CompressedBitcoinPubkey(
+					bitcoin::secp256k1::PublicKey::from_secret_key(
+						&Secp256k1::new(),
+						&bitcoin::secp256k1::SecretKey::from_slice(&[1; 32]).unwrap(),
+					)
+					.serialize(),
+				);
+				assert_ok!(BitcoinLocks::create_receive_address(
+					RuntimeOrigin::signed(2),
+					1,
+					SATOSHIS_PER_BITCOIN,
+					pubkey,
+					None
+				));
+				let funding_utxo = UtxoRef { txid: H256Le([4; 32]), output_index: 0 };
+				assert_ok!(BitcoinLocks::utxo_detected(
+					1,
+					funding_utxo.clone(),
+					SATOSHIS_PER_BITCOIN,
+					0
+				));
+				let initial_rate = 100_000 * MICROGONS_PER_ARGON;
+				MicrogonsAtTargetPerBtcHistory::<Test>::mutate(|history| {
+					history.try_push((CurrentTick::get(), initial_rate)).unwrap();
+				});
+				for id in 0..2 {
+					assert_ok!(BitcoinFissions::create(
+						RuntimeOrigin::signed(2),
+						id,
+						77 + id,
+						1,
+						SATOSHIS_PER_BITCOIN / 4,
+						initial_rate,
+						None
+					));
+				}
+
+				if checkpoint >= 1 {
+					// Increase only the available Lock guarantee, including an unfunded
+					// reservation.
+					assert_ok!(BitcoinLocks::set_guarantee(
+						RuntimeOrigin::signed(2),
+						1,
+						3 * SATOSHIS_PER_BITCOIN / 4,
+						None
+					));
+				}
+				if checkpoint >= 2 {
+					// Only Liquid 0 buys the higher price terms. Liquid 1 keeps its original
+					// guarantee.
+					CurrentTick::set(CurrentTick::get() + 1);
+					BitcoinPriceInUsd::set(Some(FixedU128::from_u32(200_000)));
+					MicrogonsAtTargetPerBtcHistory::<Test>::mutate(|history| {
+						history.try_push((CurrentTick::get(), 2 * initial_rate)).unwrap();
+					});
+					assert_ok!(BitcoinFissions::ratchet(
+						RuntimeOrigin::signed(2),
+						0,
+						2 * initial_rate,
+						None
+					));
+				}
+				if checkpoint >= 3 {
+					assert_ok!(BitcoinFissions::close(RuntimeOrigin::signed(2), 0));
+				}
+				if checkpoint >= 4 {
+					// The remaining Liquid keeps its 0.25 BTC while 0.5 non-Liquid BTC leaves.
+					let destination = argon_primitives::bitcoin::BitcoinScriptPubkey(
+						BoundedVec::try_from(vec![3u8; 32]).unwrap(),
+					);
+					assert_ok!(BitcoinLocks::request_release(
+						RuntimeOrigin::signed(2),
+						1,
+						destination,
+						SATOSHIS_PER_BITCOIN / 2 - 1_000,
+						1_000,
+					));
+					let request =
+						pallet_bitcoin_locks::LockReleaseRequestsById::<Test>::get(1).unwrap();
+					let signature = argon_primitives::bitcoin::BitcoinSignature(
+						BoundedVec::truncate_from(vec![0u8; 73]),
+					);
+					assert_ok!(BitcoinLocks::cosign_release(
+						RuntimeOrigin::signed(1),
+						1,
+						BoundedVec::truncate_from(vec![signature]),
+					));
+					let change_utxo =
+						UtxoRef { txid: request.expected_transaction_id, output_index: 1 };
+					assert_ok!(BitcoinLocks::utxo_detected(
+						1,
+						change_utxo,
+						SATOSHIS_PER_BITCOIN / 2,
+						0
+					));
+				}
+
+				BitcoinPriceInUsd::set(Some(FixedU128::from_u32(bitcoin_price)));
+				ArgonPriceInUsd::set(Some(argon_price));
+				let active_liquids = if checkpoint >= 3 { 1u128 } else { 2u128 };
+				let original_basis_value =
+					active_liquids * u128::from(bitcoin_price.min(100_000)) * MICROGONS_PER_ARGON /
+						4;
+				let redemption_value = if checkpoint == 2 {
+					u128::from(bitcoin_price.min(200_000) + bitcoin_price.min(100_000)) *
+						MICROGONS_PER_ARGON /
+						4
+				} else {
+					original_basis_value
+				};
+				let expected_burn = redemption_value * redemption_multiplier / 10_000;
+				let vault_before = VaultsById::<Test>::get(1).unwrap();
+				let balance_before = Balances::total_balance(&1);
+				let issuance_before = Balances::total_issuance();
+				let lock = LocksById::<Test>::get(1).unwrap();
+				let spent_utxo = lock.funding_utxos.keys().next().unwrap().clone();
+				assert_ok!(BitcoinLocks::spent(1, spent_utxo, 0));
+
+				let vault_after = VaultsById::<Test>::get(1).unwrap();
+				assert_eq!(
+					vault_before.securitization - vault_after.securitization,
+					expected_burn,
+					"checkpoint {checkpoint}"
+				);
+				assert_eq!(balance_before - Balances::total_balance(&1), expected_burn);
+				assert_eq!(issuance_before - Balances::total_issuance(), expected_burn);
+				assert_eq!((vault_after.total_satoshis, vault_after.securitized_satoshis), (0, 0));
+				assert_eq!(
+					(
+						vault_after.securitization_locked,
+						vault_after.securitization_pending_activation
+					),
+					(0, 0)
+				);
+				assert_eq!(
+					vault_after.get_relock_capacity(),
+					vault_before.get_relock_capacity() +
+						vault_before.get_activated_securitization().saturating_sub(expected_burn)
+				);
+				assert!(!LocksById::<Test>::contains_key(1));
+				assert!(pallet_bitcoin_fissions::FissionIdsByLockId::<Test>::get(1).is_empty());
+				let upstream = TreasuryPositions::upstream_position(&2).unwrap();
+				assert_eq!(
+					(upstream.bitcoin_securitization, upstream.bitcoin_allocated_securitization),
+					(0, 0)
+				);
+			});
+		}
+	}
+}
+
+#[test]
+fn honest_close_outside_spend_and_expiry_have_the_same_combined_argon_cost() {
+	let mut costs = Vec::new();
+	for exit in ["close", "outside_spend", "expiry"] {
+		let cost = new_test_ext().execute_with(|| {
+			System::set_block_number(1);
+			BitcoinBlockHeightChange::set((0, 0));
+			set_argons(1, 1_000_000 * MICROGONS_PER_ARGON);
+			set_argons(2, 1_000_000 * MICROGONS_PER_ARGON);
+			assert_ok!(Vaults::create(
+				RuntimeOrigin::signed(1),
+				VaultConfig {
+					securitization: 500_000 * MICROGONS_PER_ARGON,
+					terms: default_terms(FixedU128::from_rational(1, 100)),
+					..default_vault()
+				}
+			));
+			CurrentTick::set(VaultsById::<Test>::get(1).unwrap().opened_tick);
+			BitcoinPriceInUsd::set(Some(FixedU128::from_u32(100_000)));
+			ArgonPriceInUsd::set(Some(FixedU128::one()));
+			let pubkey = CompressedBitcoinPubkey(
+				bitcoin::secp256k1::PublicKey::from_secret_key(
+					&Secp256k1::new(),
+					&bitcoin::secp256k1::SecretKey::from_slice(&[1; 32]).unwrap(),
+				)
+				.serialize(),
+			);
+			assert_ok!(BitcoinLocks::create_receive_address(
+				RuntimeOrigin::signed(2),
+				1,
+				SATOSHIS_PER_BITCOIN,
+				pubkey,
+				None
+			));
+			let funding = UtxoRef { txid: H256Le([4; 32]), output_index: 0 };
+			assert_ok!(BitcoinLocks::utxo_detected(1, funding.clone(), SATOSHIS_PER_BITCOIN, 0));
+			let microgons_at_target_per_btc = 100_000 * MICROGONS_PER_ARGON;
+			MicrogonsAtTargetPerBtcHistory::<Test>::mutate(|history| {
+				history.try_push((CurrentTick::get(), microgons_at_target_per_btc)).unwrap();
+			});
+			assert_ok!(BitcoinFissions::create(
+				RuntimeOrigin::signed(2),
+				0,
+				77,
+				1,
+				SATOSHIS_PER_BITCOIN / 2,
+				microgons_at_target_per_btc,
+				None
+			));
+			let fission = pallet_bitcoin_fissions::FissionByOwnerAndId::<Test>::get(2, 0).unwrap();
+			assert_eq!(fission.liquidity_promised, 50_000 * MICROGONS_PER_ARGON);
+			assert_eq!(fission.cosigner_guarantee.guaranteed_microgons, fission.liquidity_promised);
+
+			// Same Bitcoin price and amount; only Argon's market/target ratio changes.
+			ArgonPriceInUsd::set(Some(FixedU128::from_rational(1, 2)));
+			let before = Balances::total_balance(&1) + Balances::total_balance(&2);
+			let issuance_before = Balances::total_issuance();
+			if exit == "outside_spend" {
+				assert_ok!(BitcoinLocks::spent(1, funding, 0));
+			} else if exit == "expiry" {
+				let expiration = LocksById::<Test>::get(1).unwrap().vault_claim_height;
+				BitcoinBlockHeightChange::set((expiration, expiration));
+				BitcoinLocks::on_initialize(2);
+			} else {
+				assert_ok!(BitcoinFissions::close(RuntimeOrigin::signed(2), 0));
+				assert_ok!(BitcoinLocks::request_release(
+					RuntimeOrigin::signed(2),
+					1,
+					argon_primitives::bitcoin::BitcoinScriptPubkey(
+						BoundedVec::try_from(vec![3u8; 32]).unwrap()
+					),
+					SATOSHIS_PER_BITCOIN - 1_000,
+					1_000
+				));
+				assert_ok!(BitcoinLocks::cosign_release(
+					RuntimeOrigin::signed(1),
+					1,
+					BoundedVec::truncate_from(vec![argon_primitives::bitcoin::BitcoinSignature(
+						BoundedVec::truncate_from(vec![0u8; 73])
+					)])
+				));
+			}
+			assert!(!LocksById::<Test>::contains_key(1));
+			assert!(pallet_bitcoin_fissions::FissionIdsByLockId::<Test>::get(1).is_empty());
+			let cost = before - Balances::total_balance(&1) - Balances::total_balance(&2);
+			assert_eq!(issuance_before - Balances::total_issuance(), cost);
+			cost
+		});
+		costs.push(cost);
+	}
+	assert_eq!(costs, vec![67_530 * MICROGONS_PER_ARGON; 3]);
+}
+
+#[test]
+fn due_funding_reservations_are_retired_before_terminal_liquid_settlement() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		BitcoinBlockHeightChange::set((0, 0));
+		set_argons(1, 1_000_000 * MICROGONS_PER_ARGON);
+		set_argons(2, 1_000_000 * MICROGONS_PER_ARGON);
+		assert_ok!(Vaults::create(
+			RuntimeOrigin::signed(1),
+			VaultConfig {
+				securitization: 200_000 * MICROGONS_PER_ARGON,
+				terms: default_terms(FixedU128::zero()),
+				..default_vault()
+			}
+		));
+		CurrentTick::set(VaultsById::<Test>::get(1).unwrap().opened_tick);
+		BitcoinPriceInUsd::set(Some(FixedU128::from_u32(100_000)));
+		ArgonPriceInUsd::set(Some(FixedU128::one()));
+		let pubkey = CompressedBitcoinPubkey(
+			bitcoin::secp256k1::PublicKey::from_secret_key(
+				&Secp256k1::new(),
+				&bitcoin::secp256k1::SecretKey::from_slice(&[1; 32]).unwrap(),
+			)
+			.serialize(),
+		);
+		assert_ok!(BitcoinLocks::create_receive_address(
+			RuntimeOrigin::signed(2),
+			1,
+			SATOSHIS_PER_BITCOIN,
+			pubkey,
+			None
+		));
+		assert_ok!(BitcoinLocks::utxo_detected(
+			1,
+			UtxoRef { txid: H256Le([4; 32]), output_index: 0 },
+			SATOSHIS_PER_BITCOIN,
+			0
+		));
+		let microgons_at_target_per_btc = 100_000 * MICROGONS_PER_ARGON;
+		MicrogonsAtTargetPerBtcHistory::<Test>::mutate(|history| {
+			history.try_push((CurrentTick::get(), microgons_at_target_per_btc)).unwrap();
+		});
+		assert_ok!(BitcoinFissions::create(
+			RuntimeOrigin::signed(2),
+			0,
+			77,
+			1,
+			SATOSHIS_PER_BITCOIN,
+			microgons_at_target_per_btc,
+			None
+		));
+		let expiration = LocksById::<Test>::get(1).unwrap().vault_claim_height;
+
+		// The later Lock reserves the Vault's remaining capital until this same height.
+		let reservation_height = expiration - SecuritizationHoldBlocks::get() - 1;
+		BitcoinBlockHeightChange::set((0, reservation_height));
+		assert_ok!(BitcoinLocks::create_receive_address(
+			RuntimeOrigin::signed(2),
+			1,
+			SATOSHIS_PER_BITCOIN,
+			pubkey,
+			None
+		));
+		assert_eq!(
+			VaultsById::<Test>::get(1).unwrap().securitization_locked,
+			200_000 * MICROGONS_PER_ARGON
+		);
+		ArgonPriceInUsd::set(Some(FixedU128::from_rational(1, 2)));
+		let redemption = BitcoinLocks::calculate_redemption_amount_from_satoshis(
+			&SATOSHIS_PER_BITCOIN,
+			Some(microgons_at_target_per_btc),
+		)
+		.unwrap();
+		assert!(redemption > 100_000 * MICROGONS_PER_ARGON);
+		let issuance = Balances::total_issuance();
+
+		BitcoinBlockHeightChange::set((expiration, expiration));
+		SynchedBitcoinHeight::set(expiration);
+		BitcoinLocks::on_initialize(2);
+
+		assert_eq!(issuance - Balances::total_issuance(), redemption);
+		assert_eq!(
+			VaultsById::<Test>::get(1).unwrap().securitization,
+			200_000 * MICROGONS_PER_ARGON - redemption
+		);
+		assert!(!LocksById::<Test>::contains_key(1));
+		assert!(!pallet_bitcoin_fissions::FissionByOwnerAndId::<Test>::contains_key(2, 0));
+		let remaining = LocksById::<Test>::get(2).unwrap();
+		assert!(remaining.securitization_hold_expiration_bitcoin_height.is_none());
+		assert_eq!(remaining.cosigner_guarantee.guaranteed_microgons, 0);
+	});
 }

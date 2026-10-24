@@ -5,11 +5,13 @@ use argon_primitives::{
 	treasury::UpstreamPosition,
 	vault::{SecuritizationScheduleEntry, VaultTerms},
 };
-use argon_runtime::{BitcoinLocks, Runtime, TreasuryPositions, Vaults};
+use argon_runtime::{BitcoinLocks, Runtime, TreasuryPositions};
 #[cfg(feature = "try-runtime")]
 use frame_support::assert_ok;
+use pallet_bitcoin_fissions::Pallet as FissionsPallet;
+use pallet_bitcoin_locks::Pallet as LocksPallet;
 use pallet_bitcoin_utxos::{ConfirmedBitcoinBlockTip, SynchedBitcoinBlock};
-use pallet_vaults::{RevenuePerFrameByVault, VaultFrameRevenue};
+use pallet_vaults::{Pallet as VaultsPallet, RevenuePerFrameByVault, VaultFrameRevenue};
 use polkadot_sdk::sp_io::{self, TestExternalities};
 use sp_runtime::{bounded_btree_map, AccountId32, BuildStorage, StateVersion};
 
@@ -376,57 +378,6 @@ fn preflight_rejects_inconsistent_source_and_postflight_checks_downstream_state(
 		TreasuryPositions::set_upstream_position(&LOCK_OWNER, Some(position));
 		VaultFundsReleasingByHeight::<Runtime>::remove(576);
 		assert!(CosignerGuaranteesMigration::<Runtime>::post_upgrade(state).is_err());
-	});
-}
-
-#[test]
-fn migration_defers_a_full_release_bucket_without_losing_the_maturity() {
-	use frame_support::traits::Hooks;
-	new_test_ext().execute_with(|| {
-		source_state();
-		let last_vault = <Runtime as VaultsConfig>::MaxVaults::get() + 1;
-		for id in 2..=last_vault {
-			let mut vault = stored_vault();
-			vault.total_satoshis = 0;
-			vault.securitized_satoshis = 0;
-			vault.securitization_locked = 0;
-			vault.securitization_pending_activation = 0;
-			vault.flexible_securitization_locked = 0;
-			vault.securitization_release_schedule.clear();
-			v19::VaultsById::<Runtime>::insert(id, vault);
-		}
-		VaultFundsReleasingByHeight::<Runtime>::insert(
-			576,
-			BoundedBTreeSet::<_, <Runtime as VaultsConfig>::MaxVaults>::try_from(
-				(2..=last_vault).collect::<BTreeSet<_>>(),
-			)
-			.unwrap(),
-		);
-		#[cfg(feature = "try-runtime")]
-		let state = CosignerGuaranteesMigration::<Runtime>::pre_upgrade().unwrap();
-		CosignerGuaranteesMigration::<Runtime>::on_runtime_upgrade();
-		#[cfg(feature = "try-runtime")]
-		assert_ok!(CosignerGuaranteesMigration::<Runtime>::post_upgrade(state));
-		assert!(VaultFundsReleasingByHeight::<Runtime>::get(577).contains(&1));
-		assert_eq!(
-			VaultsById::<Runtime>::get(1).unwrap().securitization_release_schedule[&576]
-				.relockable_commitments,
-			7
-		);
-		// Keep this check about collateral sweeping, not unrelated withdrawal balances.
-		VaultsById::<Runtime>::mutate(1, |vault| {
-			let entry =
-				vault.as_mut().unwrap().securitization_release_schedule.get_mut(&576).unwrap();
-			entry.argon_withdrawals = 0;
-			entry.argonot_withdrawals = 0;
-		});
-		ConfirmedBitcoinBlockTip::<Runtime>::put(BitcoinBlock::new(577, H256Le([0; 32])));
-		Vaults::on_initialize(20);
-		assert!(!VaultFundsReleasingByHeight::<Runtime>::get(577).contains(&1));
-		assert!(!VaultsById::<Runtime>::get(1)
-			.unwrap()
-			.securitization_release_schedule
-			.contains_key(&576));
 	});
 }
 

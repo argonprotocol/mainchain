@@ -927,6 +927,7 @@ mod benchmarks {
 		};
 		let vault_id = create_vault::<T>(&operator, 13, 5_000 * MICROGONS_PER_ARGON)?;
 		let original = securitization.clone();
+		let funded_satoshis = securitization.basis.satoshis / 1_000;
 		let mut remaining = collateral;
 		for index in 0..e {
 			let amount = if index == e - 1 { remaining } else { collateral / u128::from(e) };
@@ -967,26 +968,26 @@ mod benchmarks {
 				.record_bitcoin_lock_funding(
 					Default::default(),
 					BitcoinLockFunding {
-						funded_satoshis: securitization.basis.satoshis,
-						securitized_satoshis: securitization.basis.satoshis,
-						activated_securitization: securitization.guaranteed_microgons,
+						funded_satoshis,
+						securitized_satoshis: funded_satoshis,
+						activated_securitization: (collateral / 1_000).into(),
 						is_flexible: false,
 					},
 				)
 				.map_err(|_| BenchmarkError::Stop("failed to activate securitization"))?;
 			Ok::<_, BenchmarkError>(())
 		})?;
+		// Exercise inherited holds on unfunded securitization, including consuming them for debt.
 		seed_treasury_bonds_for_benchmark::<T>(vault_id)?;
 
 		#[block]
 		{
 			<Pallet<T> as BitcoinVaultProvider>::burn(
 				vault_id,
-				&securitization,
-				securitization.basis.satoshis,
+				&[(&securitization, funded_satoshis)],
 				10_000,
 				false,
-				MICROGONS_PER_ARGON.into(),
+				(4_000 * MICROGONS_PER_ARGON).into(),
 			)
 			.map_err(|_| BenchmarkError::Stop("failed to burn Bitcoin Lock securitization"))?;
 		}
@@ -995,6 +996,7 @@ mod benchmarks {
 			.ok_or(BenchmarkError::Stop("vault missing after burn"))?;
 		assert_eq!(vault.securitization_locked, BalanceOf::<T>::zero());
 		assert_eq!(vault.securitized_satoshis, 0);
+		assert_eq!(vault.get_relock_capacity(), (1_000 * MICROGONS_PER_ARGON).into());
 		let bonds = BondLotsByVault::<T>::get(vault_id);
 		assert!(bonds.locked_frame_terms.is_some());
 		assert!(bonds.displaced_flexible_bonds > 0);

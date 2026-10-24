@@ -402,8 +402,7 @@ impl BitcoinVaultProvider for MockVaultProvider {
 
 	fn burn(
 		_vault_id: VaultId,
-		_securitization: &CosignerGuarantee<Self::Balance>,
-		_funded_satoshis: Satoshis,
+		_guarantees: &[(&CosignerGuarantee<Self::Balance>, Satoshis)],
 		_lock_expiration: BitcoinHeight,
 		_is_flexible: bool,
 		_market_rate: Self::Balance,

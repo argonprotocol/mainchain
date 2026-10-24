@@ -1440,7 +1440,12 @@ where
 				false,
 			)?;
 			vault.securitization_pending_activation.saturating_reduce(held);
-			vault.schedule_release(held, released, lock_expiration, false)?;
+			vault.schedule_release(
+				held,
+				released.fund_hold_extensions.iter().map(|(height, amount)| (*height, *amount)),
+				lock_expiration,
+				false,
+			)?;
 			vault.release_unactivated_securitization(amount.saturating_sub(held))?;
 			state.canceled_locks.push((vault_id, amount));
 			Ok(())
@@ -1468,17 +1473,14 @@ where
 
 	fn burn(
 		vault_id: VaultId,
-		securitization: &CosignerGuarantee<Self::Balance>,
-		funded_satoshis: Satoshis,
+		guarantees: &[(&CosignerGuarantee<Self::Balance>, Satoshis)],
 		lock_expiration: BitcoinHeight,
 		is_flexible: bool,
 		market_rate: Self::Balance,
 	) -> Result<Self::Balance, VaultError> {
 		mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
 			let vault = state.vaults.get_mut(&vault_id).ok_or(VaultError::VaultNotFound)?;
-			Ok(vault
-				.burn(securitization, funded_satoshis, market_rate, lock_expiration, is_flexible)?
-				.burned_amount)
+			Ok(vault.burn(guarantees, market_rate, lock_expiration, is_flexible)?.burned_amount)
 		})
 	}
 
@@ -1495,8 +1497,7 @@ where
 			redemption_amount.min(securitization.securitization_for_satoshis(funded_satoshis));
 		let total_burned = Self::burn(
 			vault_id,
-			securitization,
-			funded_satoshis,
+			&[(securitization, funded_satoshis)],
 			lock_expiration,
 			is_flexible,
 			compensation_amount,
