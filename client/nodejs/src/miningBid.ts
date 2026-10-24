@@ -15,7 +15,7 @@ export interface MiningBidRange {
 
 /** Create a v1 commitment. Keep the returned salt private until the following block. */
 export function createMiningBidCommitment(api: ApiPromise, range: MiningBidRange) {
-  const salt = range.salt ?? randomAsU8a(256);
+  const salt = range.salt ?? randomAsU8a(32);
   if (salt.length !== 32) throw new Error('Mining bid salt must contain 32 bytes');
   if (range.lowBid < 0n || range.highBid < range.lowBid || range.highBid >= 1n << 128n) {
     throw new Error('Invalid mining bid range');
