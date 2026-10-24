@@ -49,6 +49,7 @@ import type {
   ArgonRuntimeProxyType,
   ArgonRuntimeSessionKeys,
   PalletBalancesAdjustmentDirection,
+  PalletBitcoinLocksFeeCoupon,
   PalletBitcoinLocksLockOptions,
   PalletBootstrapEndpointPubkey,
   PalletBootstrapRecoveryProof,
@@ -300,8 +301,28 @@ declare module '@polkadot/api-base/types/submittable' {
           lockId: Compact<u64> | AnyNumber | Uint8Array,
           satoshis: Compact<u64> | AnyNumber | Uint8Array,
           microgonsAtTargetPerBtc: Compact<u128> | AnyNumber | Uint8Array,
+          feeCoupon:
+            | Option<PalletBitcoinLocksFeeCoupon>
+            | null
+            | Uint8Array
+            | PalletBitcoinLocksFeeCoupon
+            | {
+                feeDiscount?: any;
+                securitizationSpaceToUnreserve?: any;
+                expiresAtFrame?: any;
+                nonce?: any;
+                signature?: any;
+              }
+            | string,
         ) => SubmittableExtrinsic<ApiType>,
-        [Compact<u64>, Compact<u64>, Compact<u64>, Compact<u64>, Compact<u128>]
+        [
+          Compact<u64>,
+          Compact<u64>,
+          Compact<u64>,
+          Compact<u64>,
+          Compact<u128>,
+          Option<PalletBitcoinLocksFeeCoupon>,
+        ]
       >;
       /**
        * Ratchet an active Fission to a replacement target-normalized BTC value.
@@ -310,8 +331,21 @@ declare module '@polkadot/api-base/types/submittable' {
         (
           fissionId: Compact<u64> | AnyNumber | Uint8Array,
           microgonsAtTargetPerBtc: Compact<u128> | AnyNumber | Uint8Array,
+          feeCoupon:
+            | Option<PalletBitcoinLocksFeeCoupon>
+            | null
+            | Uint8Array
+            | PalletBitcoinLocksFeeCoupon
+            | {
+                feeDiscount?: any;
+                securitizationSpaceToUnreserve?: any;
+                expiresAtFrame?: any;
+                nonce?: any;
+                signature?: any;
+              }
+            | string,
         ) => SubmittableExtrinsic<ApiType>,
-        [Compact<u64>, Compact<u128>]
+        [Compact<u64>, Compact<u128>, Option<PalletBitcoinLocksFeeCoupon>]
       >;
     };
     bitcoinLocks: {
@@ -410,10 +444,17 @@ declare module '@polkadot/api-base/types/submittable' {
         ) => SubmittableExtrinsic<ApiType>,
         [u64, Bytes, u64, u64]
       >;
+      setFlexible: AugmentedSubmittable<
+        (
+          lockId: u64 | AnyNumber | Uint8Array,
+          isFlexible: bool | boolean | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [u64, bool]
+      >;
       /**
-       * Replace this Lock's BTC coverage and target value for its remaining term.
+       * Replace the Lock's guarantee, leaving active Fission guarantees unchanged.
        **/
-      resecuritize: AugmentedSubmittable<
+      setGuarantee: AugmentedSubmittable<
         (
           lockId: u64 | AnyNumber | Uint8Array,
           satoshis: Compact<u64> | AnyNumber | Uint8Array,
@@ -426,13 +467,6 @@ declare module '@polkadot/api-base/types/submittable' {
             | string,
         ) => SubmittableExtrinsic<ApiType>,
         [u64, Compact<u64>, Option<PalletBitcoinLocksLockOptions>]
-      >;
-      setFlexible: AugmentedSubmittable<
-        (
-          lockId: u64 | AnyNumber | Uint8Array,
-          isFlexible: bool | boolean | Uint8Array,
-        ) => SubmittableExtrinsic<ApiType>,
-        [u64, bool]
       >;
     };
     bitcoinUtxos: {

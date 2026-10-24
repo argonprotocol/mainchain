@@ -27,7 +27,7 @@ use sp_runtime::{
 
 use super::{
 	ethereum::{EthereumBlockNumber, EthereumReceiptLogProofBatch, EthereumVerifyError},
-	vault::BitcoinSecuritizationBasis,
+	vault::{BitcoinSecuritizationBasis, CosignerGuarantee},
 };
 
 pub trait NotebookProviderWeightInfo {
@@ -266,10 +266,7 @@ impl<AccountId> UniswapTransferProvider<AccountId> for () {
 
 pub trait BitcoinFissionsProviderWeightInfo {
 	fn get_account_fission_liquidity() -> Weight;
-	fn get_lock_fission_requirements() -> Weight;
-	fn get_lock_fission_redemption_bases() -> Weight {
-		Self::get_lock_fission_requirements()
-	}
+	fn get_lock_fission_guarantees() -> Weight;
 	fn close_for_lock() -> Weight;
 }
 
@@ -278,7 +275,7 @@ impl BitcoinFissionsProviderWeightInfo for () {
 		Weight::zero()
 	}
 
-	fn get_lock_fission_requirements() -> Weight {
+	fn get_lock_fission_guarantees() -> Weight {
 		Weight::zero()
 	}
 
@@ -287,38 +284,20 @@ impl BitcoinFissionsProviderWeightInfo for () {
 	}
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct BitcoinFissionRequirements<Balance> {
-	/// Highest target-normalized BTC value used by an active Fission.
-	pub microgons_at_target_per_btc: Balance,
-	/// Aggregate redemption-curve liability of the active Fissions.
-	pub liquidity_promised: Balance,
-	/// Most recent price-history tick used by an active Fission.
-	pub last_ratchet_tick: Tick,
-}
-
 pub trait BitcoinFissionsProvider<AccountId, Balance> {
 	type Weights: BitcoinFissionsProviderWeightInfo;
 
 	fn get_account_fission_liquidity(_account_id: &AccountId) -> Balance;
 
-	/// Return the aggregate securitization requirements of a Lock's active Fissions.
-	fn get_lock_fission_requirements(
+	/// Return each active Fission's redemption basis and owned cosigner guarantee.
+	fn get_lock_fission_guarantees(
 		_account_id: &AccountId,
 		_lock_id: BitcoinLockId,
-	) -> Option<BitcoinFissionRequirements<Balance>> {
-		None
-	}
-
-	/// Return the active Fissions' Bitcoin amounts and target bases for terminal settlement.
-	fn get_lock_fission_redemption_bases(
-		_account_id: &AccountId,
-		_lock_id: BitcoinLockId,
-	) -> Option<Vec<BitcoinSecuritizationBasis<Balance>>>
+	) -> Vec<(BitcoinSecuritizationBasis<Balance>, CosignerGuarantee<Balance>)>
 	where
 		Balance: Codec + MaxEncodedLen,
 	{
-		None
+		Vec::new()
 	}
 
 	/// Close every active Fission sourced from a terminal Lock and record only the
@@ -356,7 +335,7 @@ pub enum BitcoinFissionLockError {
 	InsufficientSecuritization,
 	/// The requested target-normalized BTC value is not present in recent price history.
 	IneligibleMicrogonsAtTargetPerBtc,
-	/// The requested price-history entry predates the Fission or Lock coverage floor.
+	/// The requested price-history entry predates the Fission's last ratchet.
 	MicrogonsAtTargetPerBtcTickOlderThanCurrent,
 	/// The Lock has fewer active Fission satoshis than the position being settled.
 	InsufficientFissionedSatoshis,
@@ -364,11 +343,17 @@ pub enum BitcoinFissionLockError {
 	NoBitcoinPricesAvailable,
 	/// The Lock allocation or resulting liability overflowed.
 	Overflow,
+	/// The owner could not pay for a required guarantee upgrade.
+	InsufficientFunds,
+	/// The Vault could not resecuritize the assigned guarantee.
+	ResecuritizationFailed,
+	/// The fee coupon is invalid, expired, or already consumed.
+	InvalidFeeCoupon,
 }
 
 pub trait BitcoinFissionLockProviderWeightInfo {
 	fn fission_satoshis() -> Weight;
-	fn validate_fission() -> Weight;
+	fn update_fission_guarantee() -> Weight;
 	fn calculate_liquidity_promised() -> Weight;
 	fn fuse_satoshis() -> Weight;
 }
@@ -378,7 +363,7 @@ impl BitcoinFissionLockProviderWeightInfo for () {
 		Weight::zero()
 	}
 
-	fn validate_fission() -> Weight {
+	fn update_fission_guarantee() -> Weight {
 		Weight::zero()
 	}
 
@@ -392,28 +377,29 @@ impl BitcoinFissionLockProviderWeightInfo for () {
 }
 
 /// Lock-side validation and accounting required when funded satoshis are fissioned or fused.
-pub trait BitcoinFissionLockProvider<AccountId, Balance> {
+pub trait BitcoinFissionLockProvider<AccountId, Balance: Codec + MaxEncodedLen> {
 	type Weights: BitcoinFissionLockProviderWeightInfo;
+	type FeeCoupon;
 
-	/// Fission satoshis from one Lock and return their formula-derived liability and the history
-	/// tick for the submitted target-normalized BTC value.
+	/// Allocate Bitcoin from a Lock, transferring available coverage and purchasing any shortfall.
+	/// Return the Fission liability, price-history tick, and its cosigner guarantee.
 	fn fission_satoshis(
 		account_id: &AccountId,
 		lock_id: BitcoinLockId,
 		satoshis: Satoshis,
 		microgons_at_target_per_btc: Balance,
-	) -> Result<(Balance, Tick), BitcoinFissionLockError>;
+		fee_coupon: Option<Self::FeeCoupon>,
+	) -> Result<(Balance, Tick, CosignerGuarantee<Balance>), BitcoinFissionLockError>;
 
-	/// Validate that an existing Fission allocation remains covered at the submitted
-	/// target-normalized BTC value.
-	fn validate_fission(
+	/// Validate the proposed Fission basis and purchase a replacement guarantee when needed.
+	fn update_fission_guarantee(
 		account_id: &AccountId,
 		lock_id: BitcoinLockId,
 		satoshis: Satoshis,
+		guarantee: &mut CosignerGuarantee<Balance>,
 		microgons_at_target_per_btc: Balance,
 		minimum_last_ratchet_tick: Tick,
-		current_liquidity_promised: Balance,
-		replacement_liquidity_promised: Balance,
+		fee_coupon: Option<Self::FeeCoupon>,
 	) -> Result<Tick, BitcoinFissionLockError>;
 
 	/// Calculate the formula-derived liability for satoshis at a target-normalized BTC value.
@@ -422,35 +408,40 @@ pub trait BitcoinFissionLockProvider<AccountId, Balance> {
 		microgons_at_target_per_btc: Balance,
 	) -> Result<Balance, BitcoinFissionLockError>;
 
-	/// Fuse one Fission's satoshis back into its Lock and return the redemption amount.
+	/// Return a Fission's Bitcoin and guarantee to its Lock and calculate the redemption amount.
 	fn fuse_satoshis(
 		account_id: &AccountId,
 		lock_id: BitcoinLockId,
 		satoshis: Satoshis,
+		guarantee: CosignerGuarantee<Balance>,
 		microgons_at_target_per_btc: Balance,
 	) -> Result<Balance, BitcoinFissionLockError>;
 }
 
-impl<AccountId, Balance> BitcoinFissionLockProvider<AccountId, Balance> for () {
+impl<AccountId, Balance: Codec + MaxEncodedLen> BitcoinFissionLockProvider<AccountId, Balance>
+	for ()
+{
 	type Weights = ();
+	type FeeCoupon = ();
 
 	fn fission_satoshis(
 		_account_id: &AccountId,
 		_lock_id: BitcoinLockId,
 		_satoshis: Satoshis,
 		_microgons_at_target_per_btc: Balance,
-	) -> Result<(Balance, Tick), BitcoinFissionLockError> {
+		_fee_coupon: Option<Self::FeeCoupon>,
+	) -> Result<(Balance, Tick, CosignerGuarantee<Balance>), BitcoinFissionLockError> {
 		Err(BitcoinFissionLockError::LockNotFound)
 	}
 
-	fn validate_fission(
+	fn update_fission_guarantee(
 		_account_id: &AccountId,
 		_lock_id: BitcoinLockId,
 		_satoshis: Satoshis,
+		_guarantee: &mut CosignerGuarantee<Balance>,
 		_microgons_at_target_per_btc: Balance,
 		_minimum_last_ratchet_tick: Tick,
-		_current_liquidity_promised: Balance,
-		_replacement_liquidity_promised: Balance,
+		_fee_coupon: Option<Self::FeeCoupon>,
 	) -> Result<Tick, BitcoinFissionLockError> {
 		Err(BitcoinFissionLockError::LockNotFound)
 	}
@@ -466,6 +457,7 @@ impl<AccountId, Balance> BitcoinFissionLockProvider<AccountId, Balance> for () {
 		_account_id: &AccountId,
 		_lock_id: BitcoinLockId,
 		_satoshis: Satoshis,
+		_guarantee: CosignerGuarantee<Balance>,
 		_microgons_at_target_per_btc: Balance,
 	) -> Result<Balance, BitcoinFissionLockError> {
 		Err(BitcoinFissionLockError::LockNotFound)

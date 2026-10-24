@@ -367,7 +367,7 @@ async function loadCosignScriptLock(
     openClaimHeight: value.openClaimHeight.toNumber(),
     ownerPubkey: value.ownerPubkey.toHex(),
     p2wshScriptHashHex: `0x0020${wscriptHash}`,
-    securitizedSatoshis: value.securitizationBasis.satoshis.toBigInt(),
+    securitizedSatoshis: value.cosignerGuarantee.basis.satoshis.toBigInt(),
     vaultClaimHeight: value.vaultClaimHeight.toNumber(),
     vaultClaimPubkey: value.vaultClaimPubkey.toHex(),
     vaultPubkey: value.vaultPubkey.toHex(),

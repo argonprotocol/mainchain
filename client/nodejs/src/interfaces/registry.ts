@@ -65,6 +65,7 @@ import type {
   ArgonPrimitivesTreasuryUpstreamPosition,
   ArgonPrimitivesVault,
   ArgonPrimitivesVaultBitcoinSecuritizationBasis,
+  ArgonPrimitivesVaultCosignerGuarantee,
   ArgonPrimitivesVaultSecuritizationScheduleEntry,
   ArgonPrimitivesVaultTreasuryBonusApprovalProof,
   ArgonPrimitivesVaultVaultArgonotSecuritization,
@@ -392,6 +393,7 @@ declare module '@polkadot/types/types/registry' {
     ArgonPrimitivesTreasuryUpstreamPosition: ArgonPrimitivesTreasuryUpstreamPosition;
     ArgonPrimitivesVault: ArgonPrimitivesVault;
     ArgonPrimitivesVaultBitcoinSecuritizationBasis: ArgonPrimitivesVaultBitcoinSecuritizationBasis;
+    ArgonPrimitivesVaultCosignerGuarantee: ArgonPrimitivesVaultCosignerGuarantee;
     ArgonPrimitivesVaultSecuritizationScheduleEntry: ArgonPrimitivesVaultSecuritizationScheduleEntry;
     ArgonPrimitivesVaultTreasuryBonusApprovalProof: ArgonPrimitivesVaultTreasuryBonusApprovalProof;
     ArgonPrimitivesVaultVaultArgonotSecuritization: ArgonPrimitivesVaultVaultArgonotSecuritization;

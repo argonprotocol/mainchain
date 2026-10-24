@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - v[0-9]+.*
+      - pr/cosigner-guarantee-migration
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -55,11 +56,13 @@ jobs:
   try-runtime-upgrade:
     needs: build-runtimes
     runs-on: ubuntu-22.04
+    permissions:
+      actions: read
     strategy:
       matrix:
         runtime:
-          - { artifact: "argon_canary_runtime", network: "testnet" }
-          - { artifact: "argon_runtime", network: "mainnet" }
+          - artifact: argon_canary_runtime
+          - artifact: argon_runtime
     steps:
       - name: Download try-runtime-cli
         run: |
@@ -78,33 +81,36 @@ jobs:
       - name: List runtimes
         run: ls -R runtimes
 
-      - name: Configure testnet RPC
-        if: matrix.runtime.network == 'testnet'
+      - name: Try runtime upgrade (testnet)
+        if: matrix.runtime.artifact == 'argon_canary_runtime'
         env:
           TRY_RUNTIME_URI: ${{ secrets.TRY_RUNTIME_TESTNET_URI }}
         run: |
           set -eu
           if [[ -z "$TRY_RUNTIME_URI" ]]; then
-            echo "::error::Missing repository secret TRY_RUNTIME_TESTNET_URI"
+            echo "::error::Missing RPC URI for ${{ matrix.runtime.artifact }}"
             exit 1
           fi
-          printf 'TRY_RUNTIME_URI=%s\n' "$TRY_RUNTIME_URI" >> "$GITHUB_ENV"
 
-      - name: Configure mainnet RPC
-        if: matrix.runtime.network == 'mainnet'
+          ./try-runtime \
+            --runtime ./runtimes/${{ matrix.runtime.artifact }}.compact.compressed.wasm \
+            on-runtime-upgrade \
+              --print-storage-diff \
+              --blocktime 60000 \
+              --disable-mbm-checks \
+            live --uri "$TRY_RUNTIME_URI"
+
+      - name: Try runtime upgrade (mainnet)
+        if: matrix.runtime.artifact == 'argon_runtime'
         env:
           TRY_RUNTIME_URI: ${{ secrets.TRY_RUNTIME_MAINNET_URI }}
         run: |
           set -eu
           if [[ -z "$TRY_RUNTIME_URI" ]]; then
-            echo "::error::Missing repository secret TRY_RUNTIME_MAINNET_URI"
+            echo "::error::Missing RPC URI for ${{ matrix.runtime.artifact }}"
             exit 1
           fi
-          printf 'TRY_RUNTIME_URI=%s\n' "$TRY_RUNTIME_URI" >> "$GITHUB_ENV"
 
-      - name: Try runtime upgrade
-        run: |
-          set -eu
           ./try-runtime \
             --runtime ./runtimes/${{ matrix.runtime.artifact }}.compact.compressed.wasm \
             on-runtime-upgrade \

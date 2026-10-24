@@ -4,7 +4,8 @@ use super::*;
 use argon_primitives::{
 	bitcoin::{BitcoinLockId, SATOSHIS_PER_BITCOIN},
 	treasury::PositionQuantity,
-	BitcoinFissionRequirements, BitcoinFissionsProvider, MICROGONS_PER_ARGON,
+	vault::{CosignerGuarantee, MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES},
+	BitcoinFissionsProvider, MICROGONS_PER_ARGON,
 };
 use polkadot_sdk::frame_benchmarking::v2::*;
 
@@ -34,6 +35,7 @@ mod benchmarks {
 			1,
 			FISSION_SATOSHIS,
 			T::Balance::from(MICROGONS_AT_TARGET_PER_BTC),
+			None,
 		);
 
 		assert!(FissionByOwnerAndId::<T>::contains_key(&account_id, 0));
@@ -69,6 +71,16 @@ mod benchmarks {
 				created_at_argon_block: block_number,
 				ratchet_number: 0,
 				last_updated_argon_block: block_number,
+
+				cosigner_guarantee: CosignerGuarantee {
+					basis: BitcoinSecuritizationBasis {
+						satoshis: FISSION_SATOSHIS,
+						microgons_at_target_per_btc: current_rate,
+						tick: 0,
+					},
+					guaranteed_microgons: T::Balance::from(FULL_EARNINGS_LIQUIDITY),
+					fund_hold_extensions: Default::default(),
+				},
 			},
 		);
 		let owner_balance = T::Currency::minimum_balance()
@@ -77,7 +89,12 @@ mod benchmarks {
 			.map_err(|_| BenchmarkError::Stop("failed to seed Fission owner balance"))?;
 
 		#[extrinsic_call]
-		_(RawOrigin::Signed(account_id.clone()), 0, T::Balance::from(MICROGONS_AT_TARGET_PER_BTC));
+		_(
+			RawOrigin::Signed(account_id.clone()),
+			0,
+			T::Balance::from(MICROGONS_AT_TARGET_PER_BTC),
+			None,
+		);
 
 		assert_eq!(
 			FissionByOwnerAndId::<T>::get(&account_id, 0)
@@ -115,6 +132,16 @@ mod benchmarks {
 				created_at_argon_block: block_number,
 				ratchet_number: 0,
 				last_updated_argon_block: block_number,
+
+				cosigner_guarantee: CosignerGuarantee {
+					basis: BitcoinSecuritizationBasis {
+						satoshis: FISSION_SATOSHIS,
+						microgons_at_target_per_btc: T::Balance::from(MICROGONS_AT_TARGET_PER_BTC),
+						tick: 0,
+					},
+					guaranteed_microgons: T::Balance::from(CERTIFICATION_LIQUIDITY),
+					fund_hold_extensions: Default::default(),
+				},
 			},
 		);
 		FissionIdsByLockId::<T>::try_mutate(1, |fission_ids| {
@@ -167,6 +194,18 @@ mod benchmarks {
 					created_at_argon_block: block_number,
 					ratchet_number: 0,
 					last_updated_argon_block: block_number,
+
+					cosigner_guarantee: CosignerGuarantee {
+						basis: BitcoinSecuritizationBasis {
+							satoshis: FISSION_SATOSHIS,
+							microgons_at_target_per_btc: T::Balance::from(
+								MICROGONS_AT_TARGET_PER_BTC,
+							),
+							tick: 0,
+						},
+						guaranteed_microgons: T::Balance::from(CERTIFICATION_LIQUIDITY),
+						fund_hold_extensions: Default::default(),
+					},
 				},
 			);
 		}
@@ -213,10 +252,16 @@ mod benchmarks {
 	}
 
 	#[benchmark]
-	fn provider_get_lock_fission_requirements() -> Result<(), BenchmarkError> {
+	fn provider_get_lock_fission_guarantees() -> Result<(), BenchmarkError> {
 		let account_id: T::AccountId = account("fission-owner", 0, 0);
 		let block_number = frame_system::Pallet::<T>::block_number();
 		let lock_id = 1;
+		let mut release_extensions = BoundedBTreeMap::new();
+		for day in 1..=MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES {
+			release_extensions
+				.try_insert(u64::from(day) * 144, T::Balance::from(1u128))
+				.expect("bounded by the maturity limit");
+		}
 		let mut fission_ids = BoundedBTreeSet::new();
 		for fission_id in 0..T::MaxFissionsPerLock::get() as u64 {
 			fission_ids.try_insert(fission_id).expect("bounded by MaxFissionsPerLock");
@@ -237,35 +282,33 @@ mod benchmarks {
 					created_at_argon_block: block_number,
 					ratchet_number: 0,
 					last_updated_argon_block: block_number,
+
+					cosigner_guarantee: CosignerGuarantee {
+						basis: BitcoinSecuritizationBasis {
+							satoshis: FISSION_SATOSHIS,
+							microgons_at_target_per_btc: T::Balance::from(
+								MICROGONS_AT_TARGET_PER_BTC,
+							),
+							tick: 0,
+						},
+						guaranteed_microgons: T::Balance::from(CERTIFICATION_LIQUIDITY),
+						fund_hold_extensions: release_extensions.clone(),
+					},
 				},
 			);
 		}
 		FissionIdsByLockId::<T>::insert(lock_id, fission_ids);
-		let requirements;
+		let guarantees;
 
 		#[block]
 		{
-			requirements = <Pallet<T> as BitcoinFissionsProvider<
+			guarantees = <Pallet<T> as BitcoinFissionsProvider<
 				T::AccountId,
 				T::Balance,
-			>>::get_lock_fission_requirements(&account_id, lock_id);
+			>>::get_lock_fission_guarantees(&account_id, lock_id);
 		}
 
-		assert_eq!(
-			requirements,
-			Some(BitcoinFissionRequirements {
-				microgons_at_target_per_btc: T::Balance::from(
-					MICROGONS_AT_TARGET_PER_BTC + 40 * (T::MaxFissionsPerLock::get() as u128 - 1),
-				),
-				liquidity_promised: T::Balance::from(
-					CERTIFICATION_LIQUIDITY * T::MaxFissionsPerLock::get() as u128 +
-						(T::MaxFissionsPerLock::get() as u128 *
-							(T::MaxFissionsPerLock::get() as u128 - 1) /
-							2),
-				),
-				last_ratchet_tick: 0,
-			})
-		);
+		assert_eq!(guarantees.len(), T::MaxFissionsPerLock::get() as usize);
 		Ok(())
 	}
 }

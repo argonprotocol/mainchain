@@ -101,7 +101,7 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       orphanedUtxoReleaseExpiryFrames: u64 & AugmentedConst<ApiType>;
       /**
-       * Number of Bitcoin blocks to reserve securitization that has not yet been activated.
+       * Initial Bitcoin deposit window, measured in Bitcoin blocks.
        **/
       securitizationHoldBlocks: u64 & AugmentedConst<ApiType>;
       /**
