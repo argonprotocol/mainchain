@@ -1,16 +1,17 @@
 //! In-memory contributions for consumers benchmarking without Positions storage access.
 use super::*;
 use argon_primitives::treasury::{
-	BitcoinLockPosition, PositionQuantities, PositionQuantity, TreasuryPositionProvider,
-	UpstreamPosition,
+	BitcoinLockPosition, NetworkPositionQuantities, PositionQuantities, PositionQuantity,
+	TreasuryPositionProvider, UpstreamPosition,
 };
+use polkadot_sdk::sp_runtime::ArithmeticError;
 
 #[derive(Default)]
 struct State {
 	quantities: BTreeMap<Vec<u8>, PositionQuantities<u128>>,
 	principal: BTreeMap<Vec<u8>, u128>,
 	upstream: BTreeMap<Vec<u8>, Vec<u8>>,
-	totals: PositionQuantities<u128>,
+	totals: NetworkPositionQuantities<u128>,
 }
 
 pub fn reset_benchmark_treasury_positions() {
@@ -47,12 +48,15 @@ where
 		}
 	}
 
-	fn network_totals() -> PositionQuantities<Balance> {
+	fn network_totals() -> NetworkPositionQuantities<Balance> {
 		let totals = backend::with(|state| state.totals);
-		PositionQuantities {
-			bonds: totals.bonds,
-			stakes: totals.stakes,
-			fission_liquidity: totals.fission_liquidity.into(),
+		NetworkPositionQuantities {
+			account_quantities: PositionQuantities {
+				bonds: totals.account_quantities.bonds,
+				stakes: totals.account_quantities.stakes,
+				fission_liquidity: totals.account_quantities.fission_liquidity.into(),
+			},
+			vault_securitized_satoshis: totals.vault_securitized_satoshis,
 		}
 	}
 
@@ -67,10 +71,14 @@ where
 		backend::with(|state| {
 			let account = state.quantities.entry(account.encode()).or_default();
 			let (account_total, network_total) = match quantity {
-				PositionQuantity::Bonds => (&mut account.bonds, &mut state.totals.bonds),
-				PositionQuantity::Stakes => (&mut account.stakes, &mut state.totals.stakes),
-				PositionQuantity::FissionLiquidity =>
-					(&mut account.fission_liquidity, &mut state.totals.fission_liquidity),
+				PositionQuantity::Bonds =>
+					(&mut account.bonds, &mut state.totals.account_quantities.bonds),
+				PositionQuantity::Stakes =>
+					(&mut account.stakes, &mut state.totals.account_quantities.stakes),
+				PositionQuantity::FissionLiquidity => (
+					&mut account.fission_liquidity,
+					&mut state.totals.account_quantities.fission_liquidity,
+				),
 			};
 			*account_total = account_total
 				.checked_sub(previous)
@@ -84,6 +92,18 @@ where
 				.expect("benchmark quantity fits");
 		});
 		Ok(())
+	}
+
+	fn network_securitized_satoshis_updated(previous: u128, current: u128) -> DispatchResult {
+		backend::with(|state| {
+			let total = &mut state.totals.vault_securitized_satoshis;
+			*total = total
+				.checked_sub(previous)
+				.ok_or(ArithmeticError::Underflow)?
+				.checked_add(current)
+				.ok_or(ArithmeticError::Overflow)?;
+			Ok(())
+		})
 	}
 
 	fn upstream_position(account: &AccountId) -> Option<UpstreamPosition<Balance>> {

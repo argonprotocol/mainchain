@@ -1,12 +1,12 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 //! Maintained account and network quantities used by Treasury frame calculations and bond backing.
-//! Source pallets own individual locks, lots, Fissions and custody. This pallet maintains their
-//! aggregates; Treasury owns frame snapshots and payouts.
+//! Source pallets own individual vaults, locks, lots, Fissions and custody. This pallet maintains
+//! their aggregates; Treasury owns frame snapshots and payouts.
 
 use argon_primitives::{
 	treasury::{
-		BitcoinLockPosition, BitcoinLockPositionProvider, PositionQuantities, PositionQuantity,
-		TreasuryPositionProvider, UpstreamPosition,
+		BitcoinLockPosition, BitcoinLockPositionProvider, NetworkPositionQuantities,
+		PositionQuantities, PositionQuantity, TreasuryPositionProvider, UpstreamPosition,
 	},
 	OperationalAccountProvider, TreasuryPoolProvider, VaultId,
 };
@@ -23,7 +23,7 @@ pub mod weights;
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(2);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -89,10 +89,11 @@ pub mod pallet {
 	pub type PositionsByAccount<T: Config> =
 		StorageMap<_, Blake2_128Concat, T::AccountId, Position<T::Balance>, OptionQuery>;
 
-	/// Maintained network quantities, updated together with their account contributions.
-	/// Treasury reads these when freezing frame inputs. This replaces its live Argonot stake total.
+	/// Account contribution totals and Vault Bitcoin coverage, maintained as sources change.
+	/// Treasury freezes these network quantities at each frame boundary.
 	#[pallet::storage]
-	pub type NetworkTotals<T: Config> = StorageValue<_, PositionQuantities<T::Balance>, ValueQuery>;
+	pub type NetworkTotals<T: Config> =
+		StorageValue<_, NetworkPositionQuantities<T::Balance>, ValueQuery>;
 
 	impl<T: Config> TreasuryPositionProvider<T::AccountId, T::Balance> for Pallet<T> {
 		type Weights = ProviderWeightAdapter<T>;
@@ -132,7 +133,7 @@ pub mod pallet {
 			PositionsByAccount::<T>::get(account).map(|p| p.quantities).unwrap_or_default()
 		}
 
-		fn network_totals() -> PositionQuantities<T::Balance> {
+		fn network_totals() -> NetworkPositionQuantities<T::Balance> {
 			NetworkTotals::<T>::get()
 		}
 
@@ -171,7 +172,22 @@ pub mod pallet {
 					Ok(())
 				};
 				replace(&mut account_position.quantities)?;
-				NetworkTotals::<T>::try_mutate(replace)
+				NetworkTotals::<T>::try_mutate(|totals| replace(&mut totals.account_quantities))
+			})
+		}
+
+		fn network_securitized_satoshis_updated(previous: u128, current: u128) -> DispatchResult {
+			if previous == current {
+				return Ok(());
+			}
+			NetworkTotals::<T>::try_mutate(|totals| -> DispatchResult {
+				totals.vault_securitized_satoshis = totals
+					.vault_securitized_satoshis
+					.checked_sub(previous)
+					.ok_or(ArithmeticError::Underflow)?
+					.checked_add(current)
+					.ok_or(ArithmeticError::Overflow)?;
+				Ok(())
 			})
 		}
 

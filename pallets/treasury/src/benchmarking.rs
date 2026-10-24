@@ -159,7 +159,7 @@ mod benchmarks {
 			Some(BondReleaseReason::Bumped),
 		);
 		assert_eq!(
-			T::PositionProvider::network_totals().stakes,
+			T::PositionProvider::network_totals().account_quantities.stakes,
 			u128::from(
 				floor_bonds
 					.saturating_add(

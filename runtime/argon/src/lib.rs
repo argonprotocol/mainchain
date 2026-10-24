@@ -309,6 +309,7 @@ impl pallet_vaults::Config for Runtime {
 	type BitcoinLockDurationBlocks = BitcoinLockDurationBlocks;
 	type OperationalAccountsHook = use_unless_benchmark!(OperationalAccounts, ());
 	type TreasuryPoolProvider = Treasury;
+	type PositionProvider = use_unless_benchmark!(TreasuryPositions, ());
 	type OperationalAccountProvider = use_unless_benchmark!(
 		OperationalAccounts,
 		benchmarking::BenchmarkOperationalAccountProvider<AccountId>

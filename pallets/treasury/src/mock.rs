@@ -157,13 +157,14 @@ parameter_types! {
 	pub const PercentForArgonBondPool: Percent = Percent::from_percent(5);
 	pub const PercentForVaultPool: Percent = Percent::from_percent(51);
 	pub const MinimumVaultProfitPercent: Percent = Percent::from_percent(1);
-	pub static ArgonotSecuritizationMultiplier: u32 = 2;
+	pub static ArgonotSecuritizationMultiplier: u32 = 0;
 	pub const DefaultTargetBitcoinPercent: Percent = Percent::from_percent(15);
 	pub static MaxArgonotBondedPercentOfCirculation: Percent = Percent::from_percent(60);
 	pub static CurrentFrameId: FrameId = 1;
 
 	pub static VaultsById: HashMap<VaultId, TestVault> = HashMap::new();
 	pub static VaultBitcoinSatoshis: HashMap<VaultId, u64> = HashMap::new();
+	pub static VaultSecuritizedSatoshis: HashMap<VaultId, u64> = HashMap::new();
 	pub static VaultArgonotMicronots: HashMap<VaultId, Balance> = HashMap::new();
 	pub static VaultRewardCommittedMicronots: HashMap<VaultId, Balance> = HashMap::new();
 	pub static BitcoinPriceInUsd: FixedU128 = FixedU128::from_u32(10);
@@ -256,6 +257,10 @@ impl TreasuryVaultProvider for StaticTreasuryVaultProvider {
 					securitization: vault.securitization,
 					activated_securitization: vault.activated_securitization,
 					bitcoin_locked_satoshis: VaultBitcoinSatoshis::get()
+						.get(&vault_id)
+						.copied()
+						.unwrap_or_default(),
+					securitized_satoshis: VaultSecuritizedSatoshis::get()
 						.get(&vault_id)
 						.copied()
 						.unwrap_or_default(),
@@ -422,9 +427,10 @@ impl pallet_treasury::Config for Test {
 }
 
 pub(crate) fn new_test_ext() -> TestState {
-	ArgonotSecuritizationMultiplier::set(2);
+	ArgonotSecuritizationMultiplier::set(0);
 	Upstreams::set(BTreeMap::new());
 	AvailableSecuritizationSpace::set(BTreeMap::new());
+	VaultSecuritizedSatoshis::set(HashMap::new());
 	new_test_with_genesis::<Test>(|_t| {})
 }
 

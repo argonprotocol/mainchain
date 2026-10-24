@@ -9,6 +9,10 @@ use argon_primitives::{
 };
 use core::marker::PhantomData;
 use pallet_prelude::*;
+
+// The generated NetworkTotals proof estimate predates its extra compact u128.
+const BITCOIN_QUANTITY_PROOF_MARGIN: Weight = Weight::from_parts(0, 32);
+
 pub trait WeightInfo {
 	fn bond_principal() -> Weight;
 	fn account_quantities() -> Weight;
@@ -60,10 +64,14 @@ impl<T: Config> TreasuryPositionProviderWeightInfo for ProviderWeightAdapter<T> 
 		T::WeightInfo::account_quantities()
 	}
 	fn network_totals() -> Weight {
-		T::WeightInfo::network_totals()
+		T::WeightInfo::network_totals().saturating_add(BITCOIN_QUANTITY_PROOF_MARGIN)
 	}
 	fn account_quantity_updated() -> Weight {
-		T::WeightInfo::account_quantity_updated()
+		T::WeightInfo::account_quantity_updated().saturating_add(BITCOIN_QUANTITY_PROOF_MARGIN)
+	}
+	fn network_securitized_satoshis_updated() -> Weight {
+		// An account update also writes NetworkTotals, so its measured cost is conservative here.
+		Self::account_quantity_updated()
 	}
 	fn upstream_position() -> Weight {
 		T::WeightInfo::upstream_position()

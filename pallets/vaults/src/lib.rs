@@ -34,6 +34,7 @@ pub mod pallet {
 			get_rounded_up_bitcoin_day_height, BitcoinCosignScriptPubkey, BitcoinHeight,
 			BitcoinNetwork, BitcoinXPub, CompressedBitcoinPubkey, OpaqueBitcoinXpub, Satoshis,
 		},
+		treasury::TreasuryPositionProvider,
 		vault::{
 			BitcoinLockFundingUpdate, BitcoinResecuritization, BitcoinSecuritization,
 			BitcoinVaultProvider, LockExtension, LostBitcoinCompensation, RegistrationVaultData,
@@ -128,6 +129,8 @@ pub mod pallet {
 		type OperationalAccountsHook: OperationalAccountsHook<Self::AccountId, Self::Balance>;
 		/// Updates flexible-bond eligibility when open securitization changes.
 		type TreasuryPoolProvider: TreasuryPoolProvider<Self::AccountId, Balance = Self::Balance>;
+		/// Maintains network Bitcoin coverage used by Treasury.
+		type PositionProvider: TreasuryPositionProvider<Self::AccountId, Self::Balance>;
 		/// Provider for whether restricted vault creation requires an upgraded
 		/// operational account.
 		type OperationalAccountProvider: OperationalAccountProvider<Self::AccountId>;
@@ -1120,6 +1123,20 @@ pub mod pallet {
 				.map_err(|_| VaultError::InternalError)
 		}
 
+		fn update_network_securitized_satoshis(
+			previous: Satoshis,
+			current: Satoshis,
+		) -> Result<(), VaultError> {
+			if previous == current {
+				return Ok(());
+			}
+			T::PositionProvider::network_securitized_satoshis_updated(
+				previous as u128,
+				current as u128,
+			)
+			.map_err(|_| VaultError::InternalError)
+		}
+
 		fn change_securitization_target(
 			vault_id: VaultId,
 			vault: &mut Vault<T::AccountId, T::Balance>,
@@ -1422,6 +1439,7 @@ pub mod pallet {
 						)
 						.held_micronots,
 						bitcoin_locked_satoshis: vault.total_satoshis,
+						securitized_satoshis: vault.securitized_satoshis,
 						operator_account_id: vault.operator_account_id,
 						securitization: vault.securitization,
 					})
@@ -1700,7 +1718,12 @@ pub mod pallet {
 
 			VaultsById::<T>::try_mutate(vault_id, |maybe_vault| {
 				let vault = maybe_vault.as_mut().ok_or(VaultError::VaultNotFound)?;
+				let previous_satoshis = vault.securitized_satoshis;
 				vault.record_bitcoin_lock_funding(update)?;
+				Self::update_network_securitized_satoshis(
+					previous_satoshis,
+					vault.securitized_satoshis,
+				)?;
 				T::OperationalAccountsHook::vault_bitcoin_lock_funded(
 					&vault.operator_account_id,
 					vault.get_activated_securitization(),
@@ -1726,7 +1749,12 @@ pub mod pallet {
 
 			VaultsById::<T>::try_mutate(vault_id, |maybe_vault| {
 				let vault = maybe_vault.as_mut().ok_or(VaultError::VaultNotFound)?;
+				let previous_satoshis = vault.securitized_satoshis;
 				vault.record_bitcoin_lock_funding_reduction(update)?;
+				Self::update_network_securitized_satoshis(
+					previous_satoshis,
+					vault.securitized_satoshis,
+				)?;
 				T::OperationalAccountsHook::vault_bitcoin_lock_funded(
 					&vault.operator_account_id,
 					vault.get_activated_securitization(),
@@ -1869,6 +1897,7 @@ pub mod pallet {
 			} = request;
 			let mut vault =
 				VaultsById::<T>::get(vault_id).ok_or::<VaultError>(VaultError::VaultNotFound)?;
+			let previous_satoshis = vault.securitized_satoshis;
 			ensure!(
 				vault.opened_tick <= T::TickProvider::current_tick(),
 				VaultError::VaultNotYetActive
@@ -1945,6 +1974,10 @@ pub mod pallet {
 					vault.get_activated_securitization(),
 				);
 			}
+			Self::update_network_securitized_satoshis(
+				previous_satoshis,
+				vault.securitized_satoshis,
+			)?;
 			VaultsById::<T>::insert(vault_id, vault);
 
 			Ok((total_fee, fee_discount))
@@ -1975,6 +2008,7 @@ pub mod pallet {
 			})?;
 
 			let mut vault = VaultsById::<T>::get(vault_id).ok_or(VaultError::VaultNotFound)?;
+			let previous_satoshis = vault.securitized_satoshis;
 			let release_heights = vault.release_bitcoin_lock_securitization(
 				current_securitization,
 				lock_funded_satoshis,
@@ -1982,6 +2016,10 @@ pub mod pallet {
 				is_flexible,
 			)?;
 			Self::track_vault_release_schedule(vault_id, &mut vault, release_heights)?;
+			Self::update_network_securitized_satoshis(
+				previous_satoshis,
+				vault.securitized_satoshis,
+			)?;
 			VaultsById::<T>::insert(vault_id, vault);
 			Self::deposit_event(Event::FundsScheduledForRelease {
 				vault_id,
@@ -2005,6 +2043,7 @@ pub mod pallet {
 			let compensation_amount =
 				redemption_amount.min(securitization.securitization_for_satoshis(funded_satoshis));
 			let mut vault = VaultsById::<T>::get(vault_id).ok_or(VaultError::VaultNotFound)?;
+			let previous_satoshis = vault.securitized_satoshis;
 			let previous_open =
 				if vault.is_closed { T::Balance::zero() } else { vault.securitization };
 
@@ -2039,6 +2078,10 @@ pub mod pallet {
 				burned: T::Balance::zero(),
 			});
 			let next_open = if vault.is_closed { T::Balance::zero() } else { vault.securitization };
+			Self::update_network_securitized_satoshis(
+				previous_satoshis,
+				vault.securitized_satoshis,
+			)?;
 			VaultsById::<T>::insert(vault_id, vault);
 			Self::update_vault_rank(vault_id, previous_open, next_open)?;
 
@@ -2055,6 +2098,7 @@ pub mod pallet {
 			is_flexible: bool,
 		) -> Result<T::Balance, VaultError> {
 			let mut vault = VaultsById::<T>::get(vault_id).ok_or(VaultError::VaultNotFound)?;
+			let previous_satoshis = vault.securitized_satoshis;
 			let previous_open =
 				if vault.is_closed { T::Balance::zero() } else { vault.securitization };
 
@@ -2091,6 +2135,10 @@ pub mod pallet {
 			}
 
 			let next_open = if vault.is_closed { T::Balance::zero() } else { vault.securitization };
+			Self::update_network_securitized_satoshis(
+				previous_satoshis,
+				vault.securitized_satoshis,
+			)?;
 			VaultsById::<T>::insert(vault_id, vault);
 			Self::update_vault_rank(vault_id, previous_open, next_open)?;
 
