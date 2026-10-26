@@ -249,6 +249,7 @@ impl pallet_vaults::Config for Test {
 	type OperationalMinimumVaultSecuritization = OperationalMinimumVaultSecuritization;
 	type OperationalAccountsHook = ();
 	type TreasuryPoolProvider = ();
+	type PositionProvider = TreasuryPositions;
 	type OperationalAccountProvider = MockOperationalAccountProvider;
 	type CollectBlockerProvider = MockCollectBlockerProvider;
 }

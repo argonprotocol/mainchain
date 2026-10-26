@@ -10,6 +10,7 @@ use crate::{
 };
 use argon_primitives::{
 	bitcoin::{CompressedBitcoinPubkey, OpaqueBitcoinXpub, SATOSHIS_PER_BITCOIN},
+	treasury::TreasuryPositionProvider,
 	vault::{
 		BitcoinLockFundingUpdate, BitcoinResecuritization, BitcoinSecuritization,
 		BitcoinSecuritizationBasis, BitcoinVaultProvider, ReserveSecuritizationRequest, VaultError,
@@ -1630,9 +1631,12 @@ fn it_tracks_confirmed_and_securitized_satoshis_via_provider_methods() {
 			funding_update(&securitization(500), 500),
 		));
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitized_satoshis, 1_500);
+		assert_eq!(TreasuryPositions::network_totals().vault_securitized_satoshis, 1_500);
+		assert_eq!(TreasuryPositions::account_quantities(&1), Default::default());
 		let (positions, _) = Vaults::get_top_vaults_by_securitization(1);
 		assert_eq!(positions[0].activated_securitization, 1_500);
 		assert_eq!(positions[0].bitcoin_locked_satoshis, 1_500);
+		assert_eq!(positions[0].securitized_satoshis, 1_500);
 
 		assert_ok!(Vaults::release_bitcoin_lock_securitization(
 			1,
@@ -1642,6 +1646,34 @@ fn it_tracks_confirmed_and_securitized_satoshis_via_provider_methods() {
 			false,
 		));
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitized_satoshis, 900);
+		assert_eq!(TreasuryPositions::network_totals().vault_securitized_satoshis, 900);
+		assert_eq!(TreasuryPositions::account_quantities(&1), Default::default());
+	});
+}
+
+#[test]
+fn funding_reduction_updates_network_securitized_satoshis() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		set_argons(1, 100_010);
+		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), default_vault()));
+		assert_ok!(Vaults::reserve_securitization(
+			1,
+			&1,
+			&securitization(1_000),
+			standard_reservation_request(),
+		));
+		assert_ok!(Vaults::record_bitcoin_lock_funding(
+			1,
+			funding_update(&securitization(1_000), 1_000),
+		));
+		assert_eq!(TreasuryPositions::network_totals().vault_securitized_satoshis, 1_000);
+		assert_ok!(Vaults::record_bitcoin_lock_funding_reduction(
+			1,
+			funding_update(&securitization(500), 500),
+		));
+		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitized_satoshis, 500);
+		assert_eq!(TreasuryPositions::network_totals().vault_securitized_satoshis, 500);
 	});
 }
 
@@ -1684,6 +1716,7 @@ fn provider_resecuritizes_a_funded_lock_and_reuses_its_backing() {
 		assert_eq!(vault.securitization_locked, 800);
 		assert_eq!(vault.securitization_pending_activation, 0);
 		assert_eq!(vault.securitized_satoshis, 800);
+		assert_eq!(TreasuryPositions::network_totals().vault_securitized_satoshis, 800);
 		assert_eq!(vault.get_relock_capacity(), 200);
 		let revenue = RevenuePerFrameByVault::<Test>::get(1);
 		let replacement_revenue = revenue.first().unwrap();
@@ -1871,6 +1904,7 @@ fn it_can_burn_funds() {
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().exit_notice_amount(), 0);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_target, 0);
 		assert_eq!(crate::TotalVaultSecuritization::<Test>::get(), 0);
+		assert_eq!(TreasuryPositions::network_totals().vault_securitized_satoshis, 0);
 	});
 }
 
@@ -1910,6 +1944,7 @@ fn zero_burn_retires_funded_satoshis_and_schedules_funded_collateral() {
 		assert_eq!(vault.securitization_locked, 0);
 		assert_eq!(vault.total_satoshis, 0);
 		assert_eq!(vault.securitized_satoshis, 0);
+		assert_eq!(TreasuryPositions::network_totals().vault_securitized_satoshis, 0);
 		assert_eq!(
 			vault.get_relock_capacity(),
 			securitization(100_000).securitization_for_satoshis(500)
@@ -2010,6 +2045,7 @@ fn insured_redemption_compensation_scenario(redemption_amount: u128, expected_co
 		assert_eq!(vault.get_relock_capacity(), remaining_lock_collateral, "relock capacity");
 		assert_eq!(vault.securitization_locked, 0, "argons locked");
 		assert_eq!(vault.securitization, securitization - expected_compensation, "securitization");
+		assert_eq!(TreasuryPositions::network_totals().vault_securitized_satoshis, 0);
 		assert_eq!(
 			Balances::free_balance(bitcoin_locker),
 			expected_compensation,

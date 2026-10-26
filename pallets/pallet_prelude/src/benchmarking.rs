@@ -1619,6 +1619,7 @@ where
 					securitization: vault.securitization,
 					activated_securitization: vault.get_activated_securitization(),
 					bitcoin_locked_satoshis: vault.total_satoshis,
+					securitized_satoshis: vault.securitized_satoshis,
 					securitization_micronots: Balance::zero(),
 				})
 			})

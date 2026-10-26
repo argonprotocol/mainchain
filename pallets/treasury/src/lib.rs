@@ -46,8 +46,9 @@ pub use pallet::*;
 /// Once each bid pool is closed, 20% is reserved for treasury reserves, 15% is paid to Argonot
 /// Stakes, 6% reserved for future mining-operator rewards is burned, and 3% reserved for Bitcoin
 /// Liquids is burned in this release. Argon bonds may earn up to 5% and vaults may earn up to 51%
-/// based on their coverage of the configured Bitcoin target. Target shortfall and rounding are
-/// burned. Bond earnings are paid directly; vault earnings enter the vault collection flow.
+/// from independent securitization, covered Bitcoin, and bond tiers measured against the network
+/// securitization target. Target shortfall and rounding are burned. Bond earnings are paid
+/// directly; vault earnings enter the vault collection flow.
 ///
 /// The limitations on bond purchases are:
 /// - the maximum number of live Argon bond lots while frame payouts are direct
@@ -68,6 +69,7 @@ pub mod pallet {
 	use alloc::{collections::BTreeMap, vec::Vec};
 	pub use argon_primitives::treasury::Bonds;
 	use argon_primitives::{
+		bitcoin::{Satoshis, SATOSHIS_PER_BITCOIN},
 		providers::PriceProviderWeightInfo,
 		vault::{
 			TreasuryBonusApprovalProof, TreasuryVaultProvider, TreasuryVaultProviderWeightInfo,
@@ -240,6 +242,11 @@ pub mod pallet {
 	#[pallet::storage]
 	pub type CurrentFrameVaultCapital<T: Config> =
 		StorageValue<_, FrameVaultCapital<T>, OptionQuery>;
+
+	/// Covered Bitcoin locked alongside vault capital for frames using independent reward tiers.
+	#[pallet::storage]
+	pub type CurrentFrameVaultBitcoin<T: Config> =
+		StorageValue<_, FrameVaultBitcoin<T>, OptionQuery>;
 
 	/// The Argonot bond participants locked for the current frame.
 	///
@@ -678,7 +685,8 @@ pub mod pallet {
 			let who = ensure_signed(origin)?;
 			ensure!(bonds >= Self::minimum_purchase_bonds(), Error::<T>::BondPurchaseBelowMinimum);
 
-			let current_total_bonds = T::PositionProvider::network_totals().stakes;
+			let current_total_bonds =
+				T::PositionProvider::network_totals().account_quantities.stakes;
 			let max_active_bonds = Self::maximum_active_argonot_bonds();
 			let active_lots = ArgonotBondLots::<T>::get();
 			let active_lot_count = active_lots.len() as u32;
@@ -1063,6 +1071,14 @@ pub mod pallet {
 				},
 				None => None,
 			};
+			let frame_bitcoin = match CurrentFrameVaultBitcoin::<T>::take() {
+				Some(bitcoin) if bitcoin.frame_id == frame_id => Some(bitcoin),
+				Some(bitcoin) => {
+					CurrentFrameVaultBitcoin::<T>::put(bitcoin);
+					None
+				},
+				None => None,
+			};
 			let bid_pool_account = T::MiningBidPoolAccount::get();
 			Self::ensure_account_provider(&bid_pool_account);
 			let full_bid_pool_amount = T::Currency::balance(&bid_pool_account);
@@ -1109,6 +1125,7 @@ pub mod pallet {
 				&bid_pool_account,
 				full_bid_pool_amount,
 				frame_capital.as_ref(),
+				frame_bitcoin.as_ref(),
 			);
 
 			let mining_operator_pool =
@@ -1147,8 +1164,10 @@ pub mod pallet {
 		pub(crate) fn lock_in_argonot_bond_participants(frame_id: FrameId) {
 			let bond_lots = ArgonotBondLots::<T>::get();
 			// Treasury owns the admitted lot set; Positions maintains its live quantity total.
-			let total_bonds =
-				T::PositionProvider::network_totals().stakes.saturated_into::<Bonds>();
+			let total_bonds = T::PositionProvider::network_totals()
+				.account_quantities
+				.stakes
+				.saturated_into::<Bonds>();
 			if bond_lots.is_empty() || total_bonds == 0 {
 				CurrentFrameArgonotBondParticipants::<T>::kill();
 				return;
@@ -1166,7 +1185,8 @@ pub mod pallet {
 			let max_vaults = T::MaxVaultsPerPool::get() as usize;
 			// Freeze the maintained network quantity. The vault walk below clears old frame terms
 			// and releases empty records; it does not rebuild account or network quantities.
-			let total_active_bonds = T::PositionProvider::network_totals().bonds;
+			let network_totals = T::PositionProvider::network_totals();
+			let total_active_bonds = network_totals.account_quantities.bonds;
 			let mut empty_vaults = Vec::new();
 			for (vault_id, mut vault_bonds) in BondLotsByVault::<T>::iter() {
 				if vault_bonds.locked_frame_terms.take().is_some() {
@@ -1187,6 +1207,7 @@ pub mod pallet {
 				T::TreasuryVaultProvider::get_top_vaults_by_securitization(max_vaults as u32);
 
 			let mut vault_securitization_positions = BoundedBTreeMap::new();
+			let mut vault_securitized_satoshis = BoundedBTreeMap::new();
 			let previous_frame_id = frame_id.saturating_sub(1);
 			let microgons_per_micronot = FixedU128::from_rational(
 				T::PriceProvider::get_average_microgons_per_argonot(previous_frame_id)
@@ -1200,9 +1221,11 @@ pub mod pallet {
 				securitization,
 				activated_securitization,
 				bitcoin_locked_satoshis,
+				securitized_satoshis,
 				securitization_micronots,
 			} in securitization_positions
 			{
+				let _ = vault_securitized_satoshis.try_insert(vault_id, securitized_satoshis);
 				let argonot_capacity = FixedU128::saturating_from_integer(securitization.into())
 					.saturating_mul(FixedU128::from_u32(T::ArgonotSecuritizationMultiplier::get()));
 				let required_micronots = argonot_capacity
@@ -1243,12 +1266,26 @@ pub mod pallet {
 
 			let bitcoin_minted = T::BitcoinMintedProvider::minted_bitcoin_microgons();
 			let mining_minted = T::Currency::total_issuance().saturating_sub(bitcoin_minted);
+			let target_securitization =
+				TargetBitcoinPercent::<T>::get().mul_floor(mining_minted).max(bitcoin_minted);
+			let target_securitized_satoshis =
+				match T::PriceProvider::get_btc_price_in_market_microgons(SATOSHIS_PER_BITCOIN) {
+					Some(price) if !price.is_zero() => Some(
+						FixedU128::from_rational(target_securitization.into(), price.into())
+							.saturating_mul_int(SATOSHIS_PER_BITCOIN as u128),
+					),
+					_ => None,
+				};
+			CurrentFrameVaultBitcoin::<T>::put(FrameVaultBitcoin {
+				frame_id,
+				total_network_securitized_satoshis: network_totals.vault_securitized_satoshis,
+				target_securitized_satoshis,
+				vault_securitized_satoshis,
+			});
 			CurrentFrameVaultCapital::<T>::put(FrameVaultCapital {
 				frame_id,
 				total_active_bonds,
-				target_securitization: TargetBitcoinPercent::<T>::get()
-					.mul_floor(mining_minted)
-					.max(bitcoin_minted),
+				target_securitization,
 				total_securitization,
 				vault_securitization_positions,
 			});
@@ -1519,10 +1556,148 @@ pub mod pallet {
 			bid_pool_account: &T::AccountId,
 			full_bid_pool_amount: T::Balance,
 			frame_capital: Option<&FrameVaultCapital<T>>,
+			frame_bitcoin: Option<&FrameVaultBitcoin<T>>,
 		) -> (T::Balance, u32) {
 			let Some(frame_capital) = frame_capital else {
 				return (T::Balance::zero(), 0);
 			};
+			let Some(frame_bitcoin) = frame_bitcoin else {
+				return Self::distribute_vault_pool_without_bitcoin_snapshot(
+					frame_id,
+					bid_pool_account,
+					full_bid_pool_amount,
+					frame_capital,
+				);
+			};
+
+			let securitization_denominator =
+				frame_capital.target_securitization.max(frame_capital.total_securitization);
+			let bond_denominator = frame_capital
+				.target_securitization
+				.max(frame_capital.total_active_bonds.saturating_mul(MICROGONS_PER_ARGON).into());
+			let bitcoin_denominator = frame_bitcoin
+				.target_securitized_satoshis
+				.map(|target| target.max(frame_bitcoin.total_network_securitized_satoshis))
+				.filter(|denominator| *denominator > 0);
+
+			let securitization_rate = FixedU128::from_rational(
+				T::MinimumVaultProfitPercent::get().deconstruct() as u128,
+				100,
+			);
+			let vault_rate =
+				FixedU128::from_rational(T::PercentForVaultPool::get().deconstruct() as u128, 100);
+			// The minimum rate rewards securitization; Bitcoin and bonds split the rest 90/10.
+			let variable_rate = vault_rate.saturating_sub(securitization_rate);
+			let bitcoin_rate = variable_rate.saturating_mul(FixedU128::from_rational(9, 10));
+			let bond_rate = variable_rate.saturating_sub(bitcoin_rate);
+
+			let argonot_multiplier = T::ArgonotSecuritizationMultiplier::get();
+			let argonot_bonus_rate = if argonot_multiplier == 0 {
+				FixedU128::zero()
+			} else {
+				FixedU128::from_rational(29, 100)
+			};
+			// Preserve the optional Argonot uplift without letting it exceed the vault pool cap.
+			let maximum_backing_factor = FixedU128::one()
+				.saturating_add(FixedU128::from_u32(argonot_multiplier))
+				.saturating_mul(FixedU128::one().saturating_add(argonot_bonus_rate));
+			let bitcoin_rate =
+				bitcoin_rate.checked_div(&maximum_backing_factor).unwrap_or_default();
+			let bond_rate = bond_rate.checked_div(&maximum_backing_factor).unwrap_or_default();
+
+			let mut distributed = T::Balance::zero();
+			for (vault_id, position) in frame_capital.vault_securitization_positions.iter() {
+				let securitization: u128 = position.securitization.into();
+				if securitization == 0 {
+					continue;
+				}
+
+				let securitization_share =
+					FixedU128::from_rational(securitization, securitization_denominator.into());
+				let bitcoin_share = if let Some(denominator) = bitcoin_denominator {
+					let covered_satoshis = frame_bitcoin
+						.vault_securitized_satoshis
+						.get(vault_id)
+						.copied()
+						.unwrap_or_default();
+					FixedU128::from_rational(covered_satoshis as u128, denominator)
+				} else {
+					FixedU128::zero()
+				};
+				let bond_share = if bond_denominator.is_zero() {
+					FixedU128::zero()
+				} else {
+					FixedU128::from_rational(
+						position.active_bond_microgons.into(),
+						bond_denominator.into(),
+					)
+				};
+
+				let excess_bitcoin_value: u128 = position
+					.bitcoin_locked_microgons
+					.saturating_sub(position.securitization)
+					.into();
+				// The extra Bitcoin reward cut reaches 20% when BTC value reaches 2x
+				// securitization.
+				let excess_bitcoin_ratio = FixedU128::from_rational(
+					excess_bitcoin_value.min(securitization),
+					securitization,
+				);
+				let bitcoin_reward_factor = FixedU128::one().saturating_sub(
+					excess_bitcoin_ratio.saturating_mul(FixedU128::from_rational(1, 5)),
+				);
+
+				let argonot_capacity = securitization.saturating_mul(argonot_multiplier.into());
+				let argonot_value: u128 = position.argonot_securitization_in_microgons.into();
+				let argonot_value = argonot_value.min(argonot_capacity);
+				let backing_factor = FixedU128::from_rational(
+					securitization.saturating_add(argonot_value),
+					securitization,
+				);
+				let argonot_utilization = if argonot_capacity == 0 {
+					FixedU128::zero()
+				} else {
+					FixedU128::from_rational(argonot_value, argonot_capacity)
+				};
+				let argonot_bonus = FixedU128::one()
+					.saturating_add(argonot_bonus_rate.saturating_mul(argonot_utilization));
+
+				let bitcoin_earnings_rate = bitcoin_share
+					.saturating_mul(bitcoin_rate)
+					.saturating_mul(bitcoin_reward_factor);
+				let bond_earnings_rate = bond_share.saturating_mul(bond_rate);
+				let variable_earnings_rate = bitcoin_earnings_rate
+					.saturating_add(bond_earnings_rate)
+					.saturating_mul(backing_factor)
+					.saturating_mul(argonot_bonus)
+					.saturating_mul(position.upstream_participation);
+				let earnings_rate = securitization_share
+					.saturating_mul(securitization_rate)
+					.saturating_add(variable_earnings_rate);
+				let earnings = earnings_rate.saturating_mul_int(full_bid_pool_amount);
+
+				if Self::record_vault_pool_earnings(
+					frame_id,
+					bid_pool_account,
+					*vault_id,
+					position,
+					earnings,
+				)
+				.is_ok()
+				{
+					distributed.saturating_accrue(earnings);
+				}
+			}
+
+			(distributed, frame_capital.vault_securitization_positions.len() as u32)
+		}
+
+		fn distribute_vault_pool_without_bitcoin_snapshot(
+			frame_id: FrameId,
+			bid_pool_account: &T::AccountId,
+			full_bid_pool_amount: T::Balance,
+			frame_capital: &FrameVaultCapital<T>,
+		) -> (T::Balance, u32) {
 			let denominator =
 				frame_capital.target_securitization.max(frame_capital.total_securitization);
 			let minimum_profit_rate = FixedU128::from_rational(
@@ -1607,17 +1782,12 @@ pub mod pallet {
 				let earnings =
 					coverage.saturating_mul(profit_rate).saturating_mul_int(full_bid_pool_amount);
 
-				if T::TreasuryVaultProvider::record_vault_frame_earnings(
+				if Self::record_vault_pool_earnings(
+					frame_id,
 					bid_pool_account,
-					VaultTreasuryFrameEarnings {
-						vault_id: *vault_id,
-						vault_operator_account_id: position.operator_account_id.clone(),
-						frame_id,
-						earnings_for_vault: earnings,
-						earnings,
-						capital_contributed: position.active_bond_microgons,
-						capital_contributed_by_vault: T::Balance::zero(),
-					},
+					*vault_id,
+					position,
+					earnings,
 				)
 				.is_ok()
 				{
@@ -1626,6 +1796,27 @@ pub mod pallet {
 			}
 
 			(distributed, frame_capital.vault_securitization_positions.len() as u32)
+		}
+
+		fn record_vault_pool_earnings(
+			frame_id: FrameId,
+			bid_pool_account: &T::AccountId,
+			vault_id: VaultId,
+			position: &VaultSecuritizationPosition<T>,
+			earnings: T::Balance,
+		) -> DispatchResult {
+			T::TreasuryVaultProvider::record_vault_frame_earnings(
+				bid_pool_account,
+				VaultTreasuryFrameEarnings {
+					vault_id,
+					vault_operator_account_id: position.operator_account_id.clone(),
+					frame_id,
+					earnings_for_vault: earnings,
+					earnings,
+					capital_contributed: position.active_bond_microgons,
+					capital_contributed_by_vault: T::Balance::zero(),
+				},
+			)
 		}
 
 		fn burn_unearned_rewards(
@@ -2050,6 +2241,9 @@ pub mod pallet {
 			let due_frames = frame_id.saturating_sub(first_due_frame).saturating_add(1);
 			let price_weight = <T::PriceProvider as PriceProvider<T::Balance>>::Weights::
 				get_average_microgons_per_argonot();
+			// Include the network coverage read and the Bitcoin snapshot's read and write.
+			let bitcoin_snapshot_weight = T::DbWeight::get().reads_writes(4, 2);
+
 			T::WeightInfo::on_frame_transition(
 				TotalArgonBondLots::<T>::get(),
 				argonot_lots,
@@ -2061,6 +2255,7 @@ pub mod pallet {
 					.reads_writes(due_frames.saturating_sub(1), due_frames.saturating_sub(1)),
 			)
 			.saturating_add(price_weight)
+			.saturating_add(bitcoin_snapshot_weight)
 			.saturating_add(
 				<T::TreasuryVaultProvider as TreasuryVaultProvider>::Weights::
 					get_top_vaults_by_securitization(T::MaxVaultsPerPool::get()),
@@ -2511,6 +2706,21 @@ pub mod pallet {
 		/// The top raw-securitization positions eligible for vault payout.
 		pub vault_securitization_positions:
 			BoundedBTreeMap<VaultId, VaultSecuritizationPosition<T>, T::MaxVaultsPerPool>,
+	}
+
+	/// Companion to the unchanged vault capital format, so a frame frozen before an upgrade
+	/// can still settle with its original payout formula.
+	#[derive(Encode, Decode, PartialEqNoBound, DebugNoBound, TypeInfo, MaxEncodedLen)]
+	#[scale_info(skip_type_params(T))]
+	pub struct FrameVaultBitcoin<T: Config> {
+		#[codec(compact)]
+		pub frame_id: FrameId,
+		/// Covered satoshis across every vault, including those outside the payout list.
+		#[codec(compact)]
+		pub total_network_securitized_satoshis: u128,
+		/// Network securitization target converted at the frozen market price.
+		pub target_securitized_satoshis: Option<u128>,
+		pub vault_securitized_satoshis: BoundedBTreeMap<VaultId, Satoshis, T::MaxVaultsPerPool>,
 	}
 
 	/// The Argonot bond participants locked for one frame.

@@ -141,6 +141,7 @@ where
 		Base::cosign_release(input_count)
 			.saturating_add(UtxoTrackerWeights::<T>::unwatch())
 			.saturating_add(PositionWeights::<T>::position_updated())
+			.saturating_add(PositionWeights::<T>::account_quantity_updated())
 	}
 
 	fn on_initialize_base() -> Weight {
@@ -152,6 +153,9 @@ where
 			.saturating_add(UtxoTrackerWeights::<T>::unwatch().saturating_mul(n.into()))
 			.saturating_add(PositionWeights::<T>::position_updated().saturating_mul(n.into()))
 			.saturating_add(
+				PositionWeights::<T>::account_quantity_updated().saturating_mul(n.into()),
+			)
+			.saturating_add(
 				FissionsProviderWeight::get_lock_fission_redemption_bases()
 					.saturating_mul(n.into()),
 			)
@@ -162,6 +166,9 @@ where
 		Base::on_initialize_overdue_releases(n)
 			.saturating_add(UtxoTrackerWeights::<T>::unwatch().saturating_mul(n.into()))
 			.saturating_add(PositionWeights::<T>::position_updated().saturating_mul(n.into()))
+			.saturating_add(
+				PositionWeights::<T>::account_quantity_updated().saturating_mul(n.into()),
+			)
 			.saturating_add(FissionsProviderWeight::close_for_lock().saturating_mul(n.into()))
 	}
 
@@ -219,6 +226,7 @@ where
 	fn provider_utxo_detected() -> Weight {
 		let max_utxos = T::MaxUtxosPerLock::get().into();
 		Base::provider_utxo_detected()
+			.saturating_add(PositionWeights::<T>::account_quantity_updated())
 			.saturating_add(UtxoTrackerWeights::<T>::unwatch_utxo().saturating_mul(max_utxos))
 			.saturating_add(UtxoTrackerWeights::<T>::unwatch())
 			.saturating_add(PositionWeights::<T>::position_updated().saturating_mul(2))
@@ -229,6 +237,7 @@ where
 
 	fn provider_spent() -> Weight {
 		Base::provider_spent()
+			.saturating_add(PositionWeights::<T>::account_quantity_updated())
 			.saturating_add(
 				UtxoTrackerWeights::<T>::unwatch().max(UtxoTrackerWeights::<T>::unwatch_utxo()),
 			)

@@ -130,3 +130,21 @@ fn upstream_snapshot_preserves_principal_and_failed_updates_are_atomic() {
 		assert_eq!(TreasuryPositions::account_quantities(&1).fission_liquidity, 300);
 	});
 }
+
+#[test]
+fn vault_bitcoin_coverage_updates_only_the_network() {
+	polkadot_sdk::sp_io::TestExternalities::default().execute_with(|| {
+		assert_ok!(TreasuryPositions::network_securitized_satoshis_updated(0, 100));
+		assert_ok!(TreasuryPositions::network_securitized_satoshis_updated(0, 50));
+		assert_eq!(TreasuryPositions::network_totals().vault_securitized_satoshis, 150);
+		assert_eq!(PositionsByAccount::<Test>::iter().count(), 0);
+		assert_ok!(TreasuryPositions::network_securitized_satoshis_updated(100, 75));
+		assert_eq!(TreasuryPositions::network_totals().vault_securitized_satoshis, 125);
+		assert_noop!(
+			TreasuryPositions::network_securitized_satoshis_updated(150, 0),
+			ArithmeticError::Underflow
+		);
+		assert_eq!(TreasuryPositions::network_totals().vault_securitized_satoshis, 125);
+		assert_eq!(PositionsByAccount::<Test>::iter().count(), 0);
+	});
+}
