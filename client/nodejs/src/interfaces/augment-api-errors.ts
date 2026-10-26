@@ -103,6 +103,10 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       InsufficientSecuritization: AugmentedError<ApiType>;
       /**
+       * The fee coupon is invalid, expired, or already consumed.
+       **/
+      InvalidFeeCoupon: AugmentedError<ApiType>;
+      /**
        * The requested source Lock does not exist.
        **/
       LockNotFound: AugmentedError<ApiType>;
@@ -138,6 +142,10 @@ declare module '@polkadot/api-base/types/errors' {
        * The Fission's ratchet counter cannot be incremented.
        **/
       RatchetNumberOverflow: AugmentedError<ApiType>;
+      /**
+       * The Vault could not upgrade the guarantee assigned to this Fission.
+       **/
+      ResecuritizationFailed: AugmentedError<ApiType>;
       /**
        * The source Lock already has the maximum number of active Fissions.
        **/
@@ -221,10 +229,6 @@ declare module '@polkadot/api-base/types/errors' {
        * The requested Lock securitization has fewer satoshis than its active Fissions.
        **/
       InsufficientSatoshisForFissions: AugmentedError<ApiType>;
-      /**
-       * The requested Lock securitization does not cover its active Fission liabilities.
-       **/
-      InsufficientSecuritizationForFissions: AugmentedError<ApiType>;
       InsufficientVaultFunds: AugmentedError<ApiType>;
       /**
        * The external destination amount must be nonzero and fit with the network fee.
@@ -247,7 +251,7 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       LockHasActiveFissions: AugmentedError<ApiType>;
       /**
-       * A Lock in the release process cannot be resecuritized.
+       * A Lock's guarantee cannot be changed while release is pending.
        **/
       LockInProcessOfRelease: AugmentedError<ApiType>;
       /**
@@ -279,13 +283,13 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       NoBitcoinPricesAvailable: AugmentedError<ApiType>;
       /**
+       * The requested securitization matches the Lock's current securitization.
+       **/
+      NoGuaranteeChange: AugmentedError<ApiType>;
+      /**
        * The user does not have permissions to perform this action
        **/
       NoPermissions: AugmentedError<ApiType>;
-      /**
-       * The requested securitization matches the Lock's current securitization.
-       **/
-      NoResecuritizationChange: AugmentedError<ApiType>;
       /**
        * No Vault public keys are available
        **/

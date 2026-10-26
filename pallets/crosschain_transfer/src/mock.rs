@@ -1,8 +1,13 @@
 use crate as pallet_crosschain_transfer;
 use argon_primitives::{
+	bitcoin::{
+		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinLockId, BitcoinXPub,
+		CompressedBitcoinPubkey, Satoshis,
+	},
 	tick::Ticker,
 	vault::{
-		BitcoinVaultProvider, LockExtension, RegistrationVaultData, VaultArgonotSecuritization,
+		BitcoinLockFunding, BitcoinVaultProvider, CosignerGuarantee, LostBitcoinCompensation,
+		RegistrationVaultData, ReserveSecuritizationRequest, VaultArgonotSecuritization,
 		VaultError,
 	},
 	EthereumBlockNumber, EthereumReceiptLog, EthereumReceiptLogProofBatch, EthereumVerifyError,
@@ -362,120 +367,85 @@ impl BitcoinVaultProvider for MockVaultProvider {
 
 	fn record_bitcoin_lock_funding(
 		_vault_id: VaultId,
-		_update: argon_primitives::vault::BitcoinLockFundingUpdate<Self::Balance>,
-	) -> Result<(), argon_primitives::vault::VaultError> {
-		unimplemented!()
-	}
-
-	fn record_bitcoin_lock_funding_reduction(
-		_vault_id: VaultId,
-		_update: argon_primitives::vault::BitcoinLockFundingUpdate<Self::Balance>,
-	) -> Result<(), argon_primitives::vault::VaultError> {
-		unimplemented!()
-	}
-
-	fn get_projected_flexible_securitization(
-		_vault_id: VaultId,
-		_flexible_securitization_released: Self::Balance,
-		_flexible_securitization_added: Self::Balance,
-	) -> Option<(Self::Balance, Self::Balance)> {
+		_before: BitcoinLockFunding<Self::Balance>,
+		_after: BitcoinLockFunding<Self::Balance>,
+	) -> Result<(), VaultError> {
 		unimplemented!()
 	}
 
 	fn set_bitcoin_lock_flexible(
 		_vault_id: VaultId,
-		_securitization: &argon_primitives::vault::BitcoinSecuritization<Self::Balance>,
-		_funded_satoshis: argon_primitives::bitcoin::Satoshis,
+		_activated_securitization: Self::Balance,
 		_is_flexible: bool,
-	) -> Result<(), argon_primitives::vault::VaultError> {
+	) -> Result<(), VaultError> {
 		unimplemented!()
 	}
 
 	fn reserve_securitization(
 		_vault_id: VaultId,
 		_locker: &Self::AccountId,
-		_securitization: &argon_primitives::vault::BitcoinSecuritization<Self::Balance>,
-		_request: argon_primitives::vault::ReserveSecuritizationRequest<Self::Balance>,
-	) -> Result<(Self::Balance, Self::Balance), argon_primitives::vault::VaultError> {
+		_securitization: &CosignerGuarantee<Self::Balance>,
+		_request: ReserveSecuritizationRequest<Self::Balance>,
+	) -> Result<(Self::Balance, Self::Balance), VaultError> {
 		unimplemented!()
 	}
 
 	fn release_bitcoin_lock_securitization(
 		_vault_id: VaultId,
-		_current_securitization: &argon_primitives::vault::BitcoinSecuritization<Self::Balance>,
-		_lock_funded_satoshis: argon_primitives::bitcoin::Satoshis,
-		_lock_extension: &LockExtension<Self::Balance>,
+		_securitization: &CosignerGuarantee<Self::Balance>,
+		_funded_satoshis: Satoshis,
+		_lock_expiration: BitcoinHeight,
 		_is_flexible: bool,
-	) -> Result<(), argon_primitives::vault::VaultError> {
-		unimplemented!()
-	}
-
-	fn release_unactivated_securitization(
-		_vault_id: VaultId,
-		_amount: Self::Balance,
-		_lock_extension: &LockExtension<Self::Balance>,
-		_retained_securitization: Self::Balance,
-	) -> Result<(), argon_primitives::vault::VaultError> {
+	) -> Result<(), VaultError> {
 		unimplemented!()
 	}
 
 	fn burn(
 		_vault_id: VaultId,
-		_securitization: &argon_primitives::vault::BitcoinSecuritization<Self::Balance>,
-		_funded_satoshis: argon_primitives::bitcoin::Satoshis,
-		_market_rate: Self::Balance,
-		_lock_extension: &LockExtension<Self::Balance>,
+		_guarantees: &[(&CosignerGuarantee<Self::Balance>, Satoshis)],
+		_lock_expiration: BitcoinHeight,
 		_is_flexible: bool,
-	) -> Result<Self::Balance, argon_primitives::vault::VaultError> {
+		_market_rate: Self::Balance,
+	) -> Result<Self::Balance, VaultError> {
 		unimplemented!()
 	}
 
 	fn compensate_lost_bitcoin(
 		_vault_id: VaultId,
 		_beneficiary: &Self::AccountId,
-		_securitization: &argon_primitives::vault::BitcoinSecuritization<Self::Balance>,
-		_funded_satoshis: argon_primitives::bitcoin::Satoshis,
-		_market_rate: Self::Balance,
-		_lock_extension: &LockExtension<Self::Balance>,
+		_securitization: &CosignerGuarantee<Self::Balance>,
+		_funded_satoshis: Satoshis,
+		_lock_expiration: BitcoinHeight,
 		_is_flexible: bool,
-	) -> Result<
-		argon_primitives::vault::LostBitcoinCompensation<Self::Balance>,
-		argon_primitives::vault::VaultError,
-	> {
+		_market_rate: Self::Balance,
+	) -> Result<LostBitcoinCompensation<Self::Balance>, VaultError> {
 		unimplemented!()
 	}
 
 	fn create_utxo_script_pubkey(
 		_vault_id: VaultId,
-		_owner_pubkey: argon_primitives::bitcoin::CompressedBitcoinPubkey,
-		_vault_claim_height: argon_primitives::bitcoin::BitcoinHeight,
-		_open_claim_height: argon_primitives::bitcoin::BitcoinHeight,
-		_current_height: argon_primitives::bitcoin::BitcoinHeight,
-	) -> Result<
-		(
-			argon_primitives::bitcoin::BitcoinXPub,
-			argon_primitives::bitcoin::BitcoinXPub,
-			argon_primitives::bitcoin::BitcoinCosignScriptPubkey,
-		),
-		argon_primitives::vault::VaultError,
-	> {
+		_owner_pubkey: CompressedBitcoinPubkey,
+		_vault_claim_height: BitcoinHeight,
+		_open_claim_height: BitcoinHeight,
+		_current_height: BitcoinHeight,
+	) -> Result<(BitcoinXPub, BitcoinXPub, BitcoinCosignScriptPubkey), VaultError> {
 		unimplemented!()
 	}
 
 	fn update_pending_cosign_list(
 		_vault_id: VaultId,
-		_lock_id: argon_primitives::bitcoin::BitcoinLockId,
+		_lock_id: BitcoinLockId,
 		_should_remove: bool,
-	) -> Result<(), argon_primitives::vault::VaultError> {
+	) -> Result<(), VaultError> {
 		unimplemented!()
 	}
 
 	fn update_orphan_cosign_list(
 		_vault_id: VaultId,
-		_lock_id: argon_primitives::bitcoin::BitcoinLockId,
+		_lock_id: BitcoinLockId,
 		_account_id: &Self::AccountId,
 		_should_remove: bool,
-	) -> Result<(), argon_primitives::vault::VaultError> {
+	) -> Result<(), VaultError> {
 		unimplemented!()
 	}
 }

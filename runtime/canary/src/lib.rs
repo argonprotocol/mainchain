@@ -670,6 +670,7 @@ impl pallet_bitcoin_utxos::Config for Runtime {
 }
 
 impl pallet_bitcoin_fissions::Config for Runtime {
+	type FeeCoupon = pallet_bitcoin_locks::FeeCoupon<Runtime>;
 	type PositionProvider = use_unless_benchmark!(TreasuryPositions, ());
 	type WeightInfo = pallet_bitcoin_fissions::WithProviderWeights<
 		Runtime,
@@ -678,7 +679,7 @@ impl pallet_bitcoin_fissions::Config for Runtime {
 	type Balance = Balance;
 	type LockProvider = use_unless_benchmark!(
 		BitcoinLocks,
-		benchmarking::BenchmarkBitcoinFissionLockProvider<AccountId, Balance>
+		benchmarking::BenchmarkBitcoinFissionLockProvider<AccountId, Balance, pallet_bitcoin_locks::FeeCoupon<Runtime>>
 	);
 	type Minting = use_unless_benchmark!(
 		Mint,

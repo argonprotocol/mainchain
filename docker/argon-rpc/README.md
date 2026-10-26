@@ -1,7 +1,7 @@
 # Argon RPC
 
-This image builds `subway` from Argon's fork and packages it with the checked-in RPC config
-and method allowlist.
+This image builds `subway` from Argon's fork and packages it with the checked-in RPC config and
+method allowlist.
 
 ## How it works
 
@@ -45,8 +45,8 @@ the gateway.
 
 ## Versioning
 
-For published images, the immutable tag should be Argon-owned while still showing the
-Subway base version:
+For published images, the immutable tag should be Argon-owned while still showing the Subway base
+version:
 
 - `v0.1.2-argon.1`
 - `v0.1.2-argon.2`
@@ -54,8 +54,8 @@ Subway base version:
 
 That means:
 
-- bump `argon.N` when we change the pinned Subway commit, Argon packaging, config, or RPC policy
-  on top of the same Subway release
+- bump `argon.N` when we change the pinned Subway commit, Argon packaging, config, or RPC policy on
+  top of the same Subway release
 - reset to `.1` when we move to a new Subway release
 
 The current dev compose stack still builds and tags locally with `${VERSION:-dev}` because it is not

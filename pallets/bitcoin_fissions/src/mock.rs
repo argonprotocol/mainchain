@@ -8,6 +8,7 @@ use argon_primitives::{
 		BitcoinFissionLockError, BitcoinFissionLockProvider, BitcoinFissionMinting,
 		OperationalAccountsHook,
 	},
+	vault::{BitcoinSecuritizationBasis, CosignerGuarantee},
 };
 
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -49,6 +50,7 @@ impl pallet_balances::Config for Test {
 }
 
 impl pallet_bitcoin_fissions::Config for Test {
+	type FeeCoupon = ();
 	type WeightInfo = ();
 	type Balance = u128;
 	type LockProvider = MockLockProvider;
@@ -165,13 +167,15 @@ impl BitcoinFissionMinting<u64, u128> for MockFissionMinting {
 pub struct MockLockProvider;
 impl BitcoinFissionLockProvider<u64, u128> for MockLockProvider {
 	type Weights = ();
+	type FeeCoupon = ();
 
 	fn fission_satoshis(
 		account_id: &u64,
 		lock_id: BitcoinLockId,
 		satoshis: Satoshis,
 		microgons_at_target_per_btc: u128,
-	) -> Result<(u128, Tick), BitcoinFissionLockError> {
+		_fee_coupon: Option<Self::FeeCoupon>,
+	) -> Result<(u128, Tick, CosignerGuarantee<u128>), BitcoinFissionLockError> {
 		MockLocks::try_mutate(lock_id, |lock| {
 			let lock = lock.as_mut().ok_or(BitcoinFissionLockError::LockNotFound)?;
 			if lock.owner != *account_id {
@@ -191,18 +195,30 @@ impl BitcoinFissionLockProvider<u64, u128> for MockLockProvider {
 					.saturating_mul(LiquidityMultiplierPercent::get()) /
 					100,
 				MockLastRatchetTick::get(),
+				CosignerGuarantee {
+					basis: BitcoinSecuritizationBasis {
+						satoshis,
+						microgons_at_target_per_btc: lock.microgons_at_target_per_btc,
+						tick: MockLastRatchetTick::get(),
+					},
+					guaranteed_microgons: Self::calculate_liquidity_promised(
+						satoshis,
+						lock.microgons_at_target_per_btc,
+					)?,
+					fund_hold_extensions: Default::default(),
+				},
 			))
 		})
 	}
 
-	fn validate_fission(
+	fn update_fission_guarantee(
 		account_id: &u64,
 		lock_id: BitcoinLockId,
 		satoshis: Satoshis,
+		_guarantee: &mut CosignerGuarantee<u128>,
 		microgons_at_target_per_btc: u128,
 		minimum_last_ratchet_tick: Tick,
-		_current_liquidity_promised: u128,
-		_replacement_liquidity_promised: u128,
+		_fee_coupon: Option<Self::FeeCoupon>,
 	) -> Result<Tick, BitcoinFissionLockError> {
 		let lock = MockLocks::get(lock_id).ok_or(BitcoinFissionLockError::LockNotFound)?;
 		if lock.owner != *account_id {
@@ -237,6 +253,7 @@ impl BitcoinFissionLockProvider<u64, u128> for MockLockProvider {
 		account_id: &u64,
 		lock_id: BitcoinLockId,
 		satoshis: Satoshis,
+		_guarantee: CosignerGuarantee<u128>,
 		_microgons_at_target_per_btc: u128,
 	) -> Result<u128, BitcoinFissionLockError> {
 		MockLocks::try_mutate(lock_id, |lock| {

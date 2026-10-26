@@ -61,10 +61,12 @@ import type {
   ArgonPrimitivesProvidersBlockSealerInfo,
   ArgonPrimitivesProvidersOperationalRewardKind,
   ArgonPrimitivesTickTicker,
+  ArgonPrimitivesTreasuryNetworkPositionQuantities,
   ArgonPrimitivesTreasuryPositionQuantities,
   ArgonPrimitivesTreasuryUpstreamPosition,
   ArgonPrimitivesVault,
   ArgonPrimitivesVaultBitcoinSecuritizationBasis,
+  ArgonPrimitivesVaultCosignerGuarantee,
   ArgonPrimitivesVaultSecuritizationScheduleEntry,
   ArgonPrimitivesVaultTreasuryBonusApprovalProof,
   ArgonPrimitivesVaultVaultArgonotSecuritization,
@@ -282,6 +284,7 @@ import type {
   PalletTreasuryError,
   PalletTreasuryEvent,
   PalletTreasuryFrameArgonotBondParticipants,
+  PalletTreasuryFrameVaultBitcoin,
   PalletTreasuryFrameVaultCapital,
   PalletTreasuryHoldReason,
   PalletTreasuryLockedFrameBondTerms,
@@ -388,10 +391,12 @@ declare module '@polkadot/types/types/registry' {
     ArgonPrimitivesProvidersBlockSealerInfo: ArgonPrimitivesProvidersBlockSealerInfo;
     ArgonPrimitivesProvidersOperationalRewardKind: ArgonPrimitivesProvidersOperationalRewardKind;
     ArgonPrimitivesTickTicker: ArgonPrimitivesTickTicker;
+    ArgonPrimitivesTreasuryNetworkPositionQuantities: ArgonPrimitivesTreasuryNetworkPositionQuantities;
     ArgonPrimitivesTreasuryPositionQuantities: ArgonPrimitivesTreasuryPositionQuantities;
     ArgonPrimitivesTreasuryUpstreamPosition: ArgonPrimitivesTreasuryUpstreamPosition;
     ArgonPrimitivesVault: ArgonPrimitivesVault;
     ArgonPrimitivesVaultBitcoinSecuritizationBasis: ArgonPrimitivesVaultBitcoinSecuritizationBasis;
+    ArgonPrimitivesVaultCosignerGuarantee: ArgonPrimitivesVaultCosignerGuarantee;
     ArgonPrimitivesVaultSecuritizationScheduleEntry: ArgonPrimitivesVaultSecuritizationScheduleEntry;
     ArgonPrimitivesVaultTreasuryBonusApprovalProof: ArgonPrimitivesVaultTreasuryBonusApprovalProof;
     ArgonPrimitivesVaultVaultArgonotSecuritization: ArgonPrimitivesVaultVaultArgonotSecuritization;
@@ -609,6 +614,7 @@ declare module '@polkadot/types/types/registry' {
     PalletTreasuryError: PalletTreasuryError;
     PalletTreasuryEvent: PalletTreasuryEvent;
     PalletTreasuryFrameArgonotBondParticipants: PalletTreasuryFrameArgonotBondParticipants;
+    PalletTreasuryFrameVaultBitcoin: PalletTreasuryFrameVaultBitcoin;
     PalletTreasuryFrameVaultCapital: PalletTreasuryFrameVaultCapital;
     PalletTreasuryHoldReason: PalletTreasuryHoldReason;
     PalletTreasuryLockedFrameBondTerms: PalletTreasuryLockedFrameBondTerms;

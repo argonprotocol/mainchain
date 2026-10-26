@@ -52,7 +52,10 @@ mod benchmarks {
 		LocksById::<T>::mutate(context.lock_id, |lock| {
 			let lock = lock.as_mut().expect("benchmark lock exists");
 			for height in 0..argon_primitives::vault::MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES {
-				lock.fund_hold_extensions.try_insert(height.into(), u128::MAX.into()).unwrap();
+				lock.cosigner_guarantee
+					.fund_hold_extensions
+					.try_insert(height.into(), u128::MAX.into())
+					.unwrap();
 			}
 		});
 		let call = Call::<T>::cosign_release {
@@ -87,7 +90,7 @@ mod benchmarks {
 			.unwrap();
 			assert_eq!(
 				position.activated_securitization,
-				lock.upstream_collateral()
+				lock.total_securitization(context.lock_id)
 					.activated_securitization
 					.saturating_mul(101u32.into())
 			);
@@ -104,30 +107,11 @@ mod benchmarks {
 		let owner_pubkey = benchmark_pubkey::<T>(1)?;
 		seed_price_state(100_000, 1, 1);
 		let vault_id = create_vault::<T>(&operator, 1, benchmark_vault_securitization())?;
-		let delegate: T::AccountId = account("bitcoin-lock-delegate", 0, 0);
-		let mut state =
-			benchmark_bitcoin_vault_provider_state::<T::AccountId, <T as Config>::Balance>();
-		state
-			.vaults
-			.get_mut(&vault_id)
-			.ok_or(BenchmarkError::Stop("missing benchmark vault"))?
-			.delegate_account_id = Some(delegate.clone());
-		set_benchmark_bitcoin_vault_provider_state(state);
 		let microgons_at_target_per_btc = benchmark_microgons_at_target_per_btc::<T>()?;
 		seed_microgons_at_target_per_btc_history::<T>(microgons_at_target_per_btc)?;
-		let signature = T::FeeCouponSignature::decode(
-			&mut polkadot_sdk::sp_runtime::traits::TrailingZeroInput::zeroes(),
-		)
-		.map_err(|_| BenchmarkError::Stop("failed to decode benchmark fee coupon signature"))?;
 		let options = Some(LockOptions {
 			microgons_at_target_per_btc,
-			fee_coupon: Some(FeeCoupon {
-				fee_discount: <T as Config>::Balance::zero(),
-				securitization_space_to_unreserve: <T as Config>::Balance::zero(),
-				expires_at_frame: T::CurrentFrameId::get(),
-				nonce: 1,
-				signature,
-			}),
+			fee_coupon: Some(benchmark_fee_coupon::<T>(vault_id)?),
 		});
 		whitelist_account!(owner);
 
@@ -205,12 +189,15 @@ mod benchmarks {
 		reset_benchmark_environment::<T>();
 		let current_height: BitcoinHeight = 500;
 		seed_bitcoin_heights(current_height, current_height);
+		// Include clearing the cursor after the last pending expiration.
+		LastRetriedLockExpiration::<T>::put(1);
 
 		#[block]
 		{
 			let _ = Pallet::<T>::on_initialize(1u32.into());
 		}
 
+		assert!(!LastRetriedLockExpiration::<T>::exists());
 		Ok(())
 	}
 
@@ -223,12 +210,28 @@ mod benchmarks {
 
 		for index in 0..e {
 			let context = create_funded_lock::<T>(10u8.saturating_add(index as u8))?;
+			PendingLockExpirations::<T>::insert(context.lock_id, ());
 			expiring_lock_ids.push(context.lock_id);
 		}
 
+		let expiration_height = LocksById::<T>::get(expiring_lock_ids[0])
+			.ok_or(BenchmarkError::Stop("missing expiring Lock"))?
+			.vault_claim_height;
+		seed_bitcoin_heights(expiration_height, expiration_height);
+
 		#[block]
 		{
-			let _ = Pallet::<T>::process_expiring_locks(expiring_lock_ids);
+			let expirations = PendingLockExpirations::<T>::iter_keys().collect::<Vec<_>>();
+			let _ = Pallet::<T>::process_expiring_locks(
+				expirations,
+				expiration_height,
+				expiration_height,
+			);
+		}
+
+		for lock_id in expiring_lock_ids {
+			assert!(!LocksById::<T>::contains_key(lock_id));
+			assert!(!PendingLockExpirations::<T>::contains_key(lock_id));
 		}
 
 		Ok(())
@@ -287,15 +290,30 @@ mod benchmarks {
 
 		for index in 0..p {
 			let context = create_unfunded_lock::<T>(100u8.saturating_add(index as u8))?;
+			PendingLockExpirations::<T>::insert(context.lock_id, ());
 			expiring_lock_ids.push(context.lock_id);
 		}
 
+		let expiration_height = LocksById::<T>::get(expiring_lock_ids[0])
+			.and_then(|lock| lock.securitization_hold_expiration_bitcoin_height)
+			.ok_or(BenchmarkError::Stop("missing funding expiration"))?;
+
+		seed_bitcoin_heights(expiration_height, expiration_height);
+
 		#[block]
 		{
-			let _ = Pallet::<T>::process_securitization_hold_expirations(
-				expiring_lock_ids,
-				T::BitcoinBlockHeightChange::get().1,
+			let _ = Pallet::<T>::process_expiring_locks(
+				expiring_lock_ids.iter().copied(),
+				expiration_height,
+				expiration_height,
 			);
+		}
+
+		for lock_id in expiring_lock_ids {
+			let lock = LocksById::<T>::get(lock_id)
+				.ok_or(BenchmarkError::Stop("expired Lock must remain"))?;
+			assert!(lock.securitization_hold_expiration_bitcoin_height.is_none());
+			assert!(lock.cosigner_guarantee.guaranteed_microgons.is_zero());
 		}
 
 		Ok(())
@@ -373,51 +391,32 @@ mod benchmarks {
 	}
 
 	#[benchmark]
-	fn resecuritize() -> Result<(), BenchmarkError> {
+	fn set_guarantee() -> Result<(), BenchmarkError> {
 		reset_benchmark_environment::<T>();
 		let context = create_unfunded_lock::<T>(9)?;
 		let lock = LocksById::<T>::get(context.lock_id)
 			.ok_or(BenchmarkError::Stop("missing benchmark lock"))?;
 		let securitized_satoshis = context.satoshis.saturating_add(10_000);
-		let microgons_at_target_per_btc = lock.securitization_basis.microgons_at_target_per_btc;
+		let microgons_at_target_per_btc = lock.cosigner_guarantee.basis.microgons_at_target_per_btc;
 		seed_microgons_at_target_per_btc_history::<T>(microgons_at_target_per_btc)?;
 		seed_bitcoin_heights(100, 101);
-		let delegate: T::AccountId = account("bitcoin-lock-delegate", 9, 0);
-		let mut state =
-			benchmark_bitcoin_vault_provider_state::<T::AccountId, <T as Config>::Balance>();
-		state
-			.vaults
-			.get_mut(&lock.vault_id)
-			.ok_or(BenchmarkError::Stop("missing benchmark vault"))?
-			.delegate_account_id = Some(delegate);
-		set_benchmark_bitcoin_vault_provider_state(state);
-		let signature = T::FeeCouponSignature::decode(
-			&mut polkadot_sdk::sp_runtime::traits::TrailingZeroInput::zeroes(),
-		)
-		.map_err(|_| BenchmarkError::Stop("failed to decode benchmark fee coupon signature"))?;
 		let owner = context.owner.clone();
 		whitelist_account!(owner);
 
 		#[extrinsic_call]
-		_(
+		set_guarantee(
 			RawOrigin::Signed(owner),
 			context.lock_id,
 			securitized_satoshis,
 			Some(LockOptions {
 				microgons_at_target_per_btc,
-				fee_coupon: Some(FeeCoupon {
-					fee_discount: <T as Config>::Balance::zero(),
-					securitization_space_to_unreserve: <T as Config>::Balance::zero(),
-					expires_at_frame: T::CurrentFrameId::get(),
-					nonce: 1,
-					signature,
-				}),
+				fee_coupon: Some(benchmark_fee_coupon::<T>(lock.vault_id)?),
 			}),
 		);
 
 		let lock = LocksById::<T>::get(context.lock_id)
-			.ok_or(BenchmarkError::Stop("missing lock after resecuritization"))?;
-		assert_eq!(lock.securitization_basis.satoshis, securitized_satoshis);
+			.ok_or(BenchmarkError::Stop("missing lock after setting guarantee"))?;
+		assert_eq!(lock.cosigner_guarantee.basis.satoshis, securitized_satoshis);
 		Ok(())
 	}
 
@@ -452,9 +451,13 @@ mod benchmarks {
 		let lock = LocksById::<T>::get(context.lock_id)
 			.ok_or(BenchmarkError::Stop("missing benchmark lock"))?;
 		let fissioned_satoshis = context.satoshis / 2;
-		seed_microgons_at_target_per_btc_history::<T>(
-			lock.securitization_basis.microgons_at_target_per_btc,
-		)?;
+		let rate = lock
+			.cosigner_guarantee
+			.basis
+			.microgons_at_target_per_btc
+			.saturating_mul(2u32.into());
+		seed_microgons_at_target_per_btc_history::<T>(rate)?;
+		let coupon = benchmark_fee_coupon::<T>(lock.vault_id)?;
 
 		#[block]
 		{
@@ -465,7 +468,8 @@ mod benchmarks {
 				&context.owner,
 				context.lock_id,
 				fissioned_satoshis,
-				lock.securitization_basis.microgons_at_target_per_btc,
+				rate,
+				Some(coupon),
 			)
 			.map_err(|_| BenchmarkError::Stop("Fission allocation failed"))?;
 		}
@@ -480,23 +484,24 @@ mod benchmarks {
 	}
 
 	#[benchmark]
-	fn provider_validate_fission() -> Result<(), BenchmarkError> {
+	fn provider_update_fission_guarantee() -> Result<(), BenchmarkError> {
 		reset_benchmark_environment::<T>();
 		let context = create_funded_lock::<T>(19)?;
 		let lock = LocksById::<T>::get(context.lock_id)
 			.ok_or(BenchmarkError::Stop("missing benchmark lock"))?;
 		let fissioned_satoshis = context.satoshis / 2;
 		seed_microgons_at_target_per_btc_history::<T>(
-			lock.securitization_basis.microgons_at_target_per_btc,
+			lock.cosigner_guarantee.basis.microgons_at_target_per_btc,
 		)?;
-		let (liquidity_promised, last_ratchet_tick) = <Pallet<T> as BitcoinFissionLockProvider<
+		let (liquidity_promised, last_ratchet_tick, mut cosigner_guarantee) = <Pallet<T> as BitcoinFissionLockProvider<
 			T::AccountId,
 			<T as Config>::Balance,
 		>>::fission_satoshis(
 			&context.owner,
 			context.lock_id,
 			fissioned_satoshis,
-			lock.securitization_basis.microgons_at_target_per_btc,
+			lock.cosigner_guarantee.basis.microgons_at_target_per_btc,
+			None,
 		)
 		.map_err(|_| BenchmarkError::Stop("failed to seed Fission allocation"))?;
 		pallet_bitcoin_fissions::FissionByOwnerAndId::<T>::insert(
@@ -506,9 +511,13 @@ mod benchmarks {
 				liquid_id: 0,
 				lock_id: context.lock_id,
 				satoshis: fissioned_satoshis,
-				microgons_at_target_per_btc: lock.securitization_basis.microgons_at_target_per_btc,
+				microgons_at_target_per_btc: lock
+					.cosigner_guarantee
+					.basis
+					.microgons_at_target_per_btc,
 				last_ratchet_tick,
 				liquidity_promised,
+				cosigner_guarantee: cosigner_guarantee.clone(),
 				created_at_argon_block: frame_system::Pallet::<T>::block_number(),
 				ratchet_number: 0,
 				last_updated_argon_block: frame_system::Pallet::<T>::block_number(),
@@ -520,19 +529,27 @@ mod benchmarks {
 		)
 		.map_err(|_| BenchmarkError::Stop("failed to index benchmark Fission"))?;
 
+		let rate = lock
+			.cosigner_guarantee
+			.basis
+			.microgons_at_target_per_btc
+			.saturating_mul(2u32.into());
+		seed_microgons_at_target_per_btc_history::<T>(rate)?;
+		let coupon = benchmark_fee_coupon::<T>(lock.vault_id)?;
+
 		#[block]
 		{
 			<Pallet<T> as BitcoinFissionLockProvider<
 				T::AccountId,
 				<T as Config>::Balance,
-			>>::validate_fission(
+			>>::update_fission_guarantee(
 				&context.owner,
 				context.lock_id,
 				fissioned_satoshis,
-				lock.securitization_basis.microgons_at_target_per_btc,
-				lock.securitization_tick,
-				liquidity_promised,
-				liquidity_promised,
+				&mut cosigner_guarantee,
+				rate,
+				lock.cosigner_guarantee.basis.tick,
+				Some(coupon),
 			)
 			.map_err(|_| BenchmarkError::Stop("Fission validation failed"))?;
 		}
@@ -571,18 +588,43 @@ mod benchmarks {
 			.ok_or(BenchmarkError::Stop("missing benchmark lock"))?;
 		let fissioned_satoshis = context.satoshis / 2;
 		seed_microgons_at_target_per_btc_history::<T>(
-			lock.securitization_basis.microgons_at_target_per_btc,
+			lock.cosigner_guarantee.basis.microgons_at_target_per_btc,
 		)?;
-		<Pallet<T> as BitcoinFissionLockProvider<
+		let (liquidity_promised, last_ratchet_tick, guarantee) = <Pallet<T> as BitcoinFissionLockProvider<
 			T::AccountId,
 			<T as Config>::Balance,
 		>>::fission_satoshis(
 			&context.owner,
 			context.lock_id,
 			fissioned_satoshis,
-			lock.securitization_basis.microgons_at_target_per_btc,
+			lock.cosigner_guarantee.basis.microgons_at_target_per_btc,
+			None,
 		)
 		.map_err(|_| BenchmarkError::Stop("failed to seed Fission allocation"))?;
+
+		pallet_bitcoin_fissions::FissionByOwnerAndId::<T>::insert(
+			&context.owner,
+			0,
+			pallet_bitcoin_fissions::Fission {
+				liquid_id: 0,
+				lock_id: context.lock_id,
+				satoshis: fissioned_satoshis,
+				microgons_at_target_per_btc: lock
+					.cosigner_guarantee
+					.basis
+					.microgons_at_target_per_btc,
+				last_ratchet_tick,
+				liquidity_promised,
+				cosigner_guarantee: guarantee.clone(),
+				created_at_argon_block: frame_system::Pallet::<T>::block_number(),
+				ratchet_number: 0,
+				last_updated_argon_block: frame_system::Pallet::<T>::block_number(),
+			},
+		);
+		pallet_bitcoin_fissions::FissionIdsByLockId::<T>::try_mutate(context.lock_id, |ids| {
+			ids.try_insert(0)
+		})
+		.map_err(|_| BenchmarkError::Stop("failed to index benchmark Fission"))?;
 
 		#[block]
 		{
@@ -593,7 +635,8 @@ mod benchmarks {
 				&context.owner,
 				context.lock_id,
 				fissioned_satoshis,
-				lock.securitization_basis.microgons_at_target_per_btc,
+				guarantee,
+				lock.cosigner_guarantee.basis.microgons_at_target_per_btc,
 			)
 			.map_err(|_| BenchmarkError::Stop("Fission deallocation failed"))?;
 		}
@@ -702,6 +745,19 @@ mod benchmarks {
 		assert!(!LockReleaseRequestsById::<T>::contains_key(context.lock_id));
 		Ok(())
 	}
+
+	#[cfg(test)]
+	mod tests {
+		use super::*;
+
+		#[test]
+		fn closing_benchmark_includes_its_fission_in_the_position() {
+			crate::mock::new_test_ext().execute_with(|| {
+				assert!(Pallet::<crate::mock::Test>::test_bench_by_name(b"provider_fuse_satoshis")
+					.is_ok());
+			});
+		}
+	}
 }
 
 struct LockBenchmarkContext<T: Config> {
@@ -759,6 +815,28 @@ fn seed_microgons_at_target_per_btc_history<T: Config>(
 
 fn benchmark_block_hash(seed: u8) -> H256Le {
 	H256Le([seed; 32])
+}
+
+fn benchmark_fee_coupon<T: Config>(vault_id: VaultId) -> Result<FeeCoupon<T>, BenchmarkError> {
+	let mut state = benchmark_bitcoin_vault_provider_state::<T::AccountId, T::Balance>();
+	state
+		.vaults
+		.get_mut(&vault_id)
+		.ok_or(BenchmarkError::Stop("missing benchmark vault"))?
+		.delegate_account_id = Some(account("bitcoin-lock-delegate", 0, 0));
+	set_benchmark_bitcoin_vault_provider_state(state);
+
+	let signature = T::FeeCouponSignature::decode(
+		&mut polkadot_sdk::sp_runtime::traits::TrailingZeroInput::zeroes(),
+	)
+	.map_err(|_| BenchmarkError::Stop("failed to decode benchmark fee coupon signature"))?;
+	Ok(FeeCoupon {
+		fee_discount: T::Balance::zero(),
+		securitization_space_to_unreserve: T::Balance::zero(),
+		expires_at_frame: T::CurrentFrameId::get(),
+		nonce: 1,
+		signature,
+	})
 }
 
 fn benchmark_signature() -> Result<BitcoinSignature, BenchmarkError> {
