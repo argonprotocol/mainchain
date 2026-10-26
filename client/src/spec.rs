@@ -3499,9 +3499,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				21u8, 123u8, 6u8, 237u8, 158u8, 255u8, 134u8, 119u8, 199u8, 55u8, 132u8, 79u8,
-				133u8, 177u8, 252u8, 174u8, 98u8, 110u8, 136u8, 36u8, 221u8, 13u8, 129u8, 167u8,
-				51u8, 225u8, 144u8, 77u8, 128u8, 108u8, 77u8, 111u8,
+				137u8, 143u8, 241u8, 63u8, 250u8, 238u8, 163u8, 75u8, 130u8, 47u8, 228u8, 53u8,
+				149u8, 32u8, 216u8, 223u8, 18u8, 33u8, 251u8, 98u8, 189u8, 132u8, 238u8, 225u8,
+				41u8, 40u8, 8u8, 68u8, 123u8, 52u8, 99u8, 2u8,
 			]
 	}
 	pub mod system {
@@ -23881,6 +23881,11 @@ pub mod api {
 					pub type CurrentFrameVaultCapital =
 						runtime_types::pallet_treasury::pallet::FrameVaultCapital;
 				}
+				pub mod current_frame_vault_bitcoin {
+					use super::runtime_types;
+					pub type CurrentFrameVaultBitcoin =
+						runtime_types::pallet_treasury::pallet::FrameVaultBitcoin;
+				}
 				pub mod current_frame_argonot_bond_participants {
 					use super::runtime_types;
 					pub type CurrentFrameArgonotBondParticipants =
@@ -23979,6 +23984,28 @@ pub mod api {
 							30u8, 20u8, 239u8, 32u8, 173u8, 54u8, 178u8, 164u8, 136u8, 245u8,
 							191u8, 50u8, 58u8, 243u8, 169u8, 178u8, 97u8, 128u8, 24u8, 62u8, 128u8,
 							8u8,
+						],
+					)
+				}
+				#[doc = " Covered Bitcoin locked alongside vault capital for frames using independent reward tiers."]
+				pub fn current_frame_vault_bitcoin(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::current_frame_vault_bitcoin::CurrentFrameVaultBitcoin,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Treasury",
+						"CurrentFrameVaultBitcoin",
+						(),
+						[
+							98u8, 154u8, 39u8, 211u8, 61u8, 212u8, 37u8, 147u8, 124u8, 48u8, 178u8,
+							237u8, 199u8, 210u8, 29u8, 220u8, 220u8, 240u8, 173u8, 157u8, 173u8,
+							61u8, 182u8, 181u8, 219u8, 34u8, 92u8, 176u8, 134u8, 124u8, 174u8,
+							29u8,
 						],
 					)
 				}
@@ -29602,7 +29629,7 @@ pub mod api {
 				pub mod network_totals {
 					use super::runtime_types;
 					pub type NetworkTotals =
-						runtime_types::argon_primitives::treasury::PositionQuantities<
+						runtime_types::argon_primitives::treasury::NetworkPositionQuantities<
 							::core::primitive::u128,
 						>;
 				}
@@ -29656,8 +29683,8 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Maintained network quantities, updated together with their account contributions."]
-				#[doc = " Treasury reads these when freezing frame inputs. This replaces its live Argonot stake total."]
+				#[doc = " Account contribution totals and Vault Bitcoin coverage, maintained as sources change."]
+				#[doc = " Treasury freezes these network quantities at each frame boundary."]
 				pub fn network_totals(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
@@ -29672,10 +29699,10 @@ pub mod api {
 						"NetworkTotals",
 						(),
 						[
-							112u8, 176u8, 248u8, 236u8, 183u8, 99u8, 249u8, 220u8, 206u8, 230u8,
-							66u8, 146u8, 231u8, 150u8, 19u8, 65u8, 84u8, 155u8, 250u8, 248u8,
-							234u8, 234u8, 135u8, 81u8, 150u8, 215u8, 204u8, 197u8, 228u8, 182u8,
-							19u8, 117u8,
+							64u8, 227u8, 140u8, 49u8, 245u8, 247u8, 213u8, 242u8, 158u8, 84u8,
+							173u8, 21u8, 151u8, 123u8, 155u8, 132u8, 143u8, 255u8, 91u8, 23u8,
+							158u8, 197u8, 38u8, 173u8, 75u8, 216u8, 154u8, 44u8, 146u8, 166u8,
+							90u8, 206u8,
 						],
 					)
 				}
@@ -31383,6 +31410,24 @@ pub mod api {
 			}
 			pub mod treasury {
 				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct NetworkPositionQuantities<_0> {
+					pub account_quantities:
+						runtime_types::argon_primitives::treasury::PositionQuantities<_0>,
+					#[codec(compact)]
+					pub vault_securitized_satoshis: _0,
+				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
 					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
@@ -38866,6 +38911,31 @@ pub mod api {
 					pub bond_lots: runtime_types::bounded_collections::bounded_vec::BoundedVec<
 						runtime_types::pallet_treasury::pallet::BondLotSummary,
 					>,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct FrameVaultBitcoin {
+					#[codec(compact)]
+					pub frame_id: ::core::primitive::u64,
+					#[codec(compact)]
+					pub total_network_securitized_satoshis: ::core::primitive::u128,
+					pub target_securitized_satoshis:
+						::core::option::Option<::core::primitive::u128>,
+					pub vault_securitized_satoshis:
+						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap1<
+							::core::primitive::u32,
+							::core::primitive::u64,
+						>,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,

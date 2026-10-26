@@ -1676,11 +1676,13 @@ fn funding_reduction_updates_network_securitized_satoshis() {
 		));
 		assert_ok!(Vaults::record_bitcoin_lock_funding(
 			1,
+			Default::default(),
 			funding_update(&securitization(1_000), 1_000),
 		));
 		assert_eq!(TreasuryPositions::network_totals().vault_securitized_satoshis, 1_000);
-		assert_ok!(Vaults::record_bitcoin_lock_funding_reduction(
+		assert_ok!(Vaults::record_bitcoin_lock_funding(
 			1,
+			funding_update(&securitization(1_000), 1_000),
 			funding_update(&securitization(500), 500),
 		));
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitized_satoshis, 500);
@@ -2891,10 +2893,12 @@ fn terminal_settlement_preserves_reused_holds_without_reducing_the_burn() {
 			let mut vault = VaultsById::<Test>::get(1).unwrap();
 			vault.reserve_securitization(&original, false, 143).unwrap();
 			vault.reserve_securitization(&original, false, 145).unwrap();
-			vault
-				.record_bitcoin_lock_funding(Default::default(), funding_update(&original, 100))
-				.unwrap();
 			VaultsById::<Test>::insert(1, vault);
+			assert_ok!(Vaults::record_bitcoin_lock_funding(
+				1,
+				Default::default(),
+				funding_update(&original, 100),
+			));
 			assert_ok!(Vaults::release_bitcoin_lock_securitization(1, &original, 100, 145, false));
 
 			// Reuse the later commitment in an older Lock, then fund only part of it.
@@ -2931,6 +2935,7 @@ fn terminal_settlement_preserves_reused_holds_without_reducing_the_burn() {
 			assert_eq!(vault.securitization_pending_activation, 0);
 			assert_eq!(vault.total_satoshis, 0);
 			assert_eq!(vault.securitized_satoshis, 0);
+			assert_eq!(TreasuryPositions::network_totals().vault_securitized_satoshis, 0);
 			assert_eq!(vault.get_relock_capacity(), expected_hold);
 			assert_eq!(
 				vault

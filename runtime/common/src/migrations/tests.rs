@@ -2,7 +2,7 @@ use super::*;
 use alloc::collections::{BTreeMap, BTreeSet};
 use argon_primitives::{
 	bitcoin::{BitcoinBlock, BitcoinCosignScriptPubkey, CompressedBitcoinPubkey, H256Le, UtxoRef},
-	treasury::UpstreamPosition,
+	treasury::{PositionQuantities, UpstreamPosition},
 	vault::{SecuritizationScheduleEntry, VaultTerms},
 };
 use argon_runtime::{BitcoinLocks, Runtime, TreasuryPositions};
@@ -11,6 +11,7 @@ use frame_support::assert_ok;
 use pallet_bitcoin_fissions::Pallet as FissionsPallet;
 use pallet_bitcoin_locks::Pallet as LocksPallet;
 use pallet_bitcoin_utxos::{ConfirmedBitcoinBlockTip, SynchedBitcoinBlock};
+use pallet_treasury_positions::{NetworkTotals, PositionsByAccount};
 use pallet_vaults::{Pallet as VaultsPallet, RevenuePerFrameByVault, VaultFrameRevenue};
 use polkadot_sdk::sp_io::{self, TestExternalities};
 use sp_runtime::{bounded_btree_map, AccountId32, BuildStorage, StateVersion};
@@ -20,10 +21,7 @@ const LOCK_OWNER: AccountId32 = AccountId32::new([2; 32]);
 const OPERATIONAL_OWNER: AccountId32 = AccountId32::new([9; 32]);
 
 fn new_test_ext() -> TestExternalities {
-	frame_system::GenesisConfig::<Runtime>::default()
-		.build_storage()
-		.unwrap()
-		.into()
+	argon_runtime::RuntimeGenesisConfig::default().build_storage().unwrap().into()
 }
 
 fn stored_vault() -> v19::Vault<Runtime> {
@@ -170,11 +168,25 @@ fn migration_conserves_backing_and_reconciles_real_vault_and_treasury_storage() 
 	new_test_ext().execute_with(|| {
 		source_state();
 		let revenue = RevenuePerFrameByVault::<Runtime>::get(1).encode();
+
+		// Runtime 160 stored account totals without the Vault coverage field.
+		let source_totals = PositionQuantities { fission_liquidity: 6, ..Default::default() };
+		PositionsByAccount::<Runtime>::mutate(LOCK_OWNER, |position| {
+			position.as_mut().unwrap().quantities = source_totals;
+		});
+		sp_io::storage::set(&NetworkTotals::<Runtime>::hashed_key(), &source_totals.encode());
+		StorageVersion::new(1).put::<pallet_treasury_positions::Pallet<Runtime>>();
+
 		#[cfg(feature = "try-runtime")]
-		let state = CosignerGuaranteesMigration::<Runtime>::pre_upgrade().unwrap();
-		CosignerGuaranteesMigration::<Runtime>::on_runtime_upgrade();
-		#[cfg(feature = "try-runtime")]
-		assert_ok!(CosignerGuaranteesMigration::<Runtime>::post_upgrade(state));
+		assert_ok!(argon_runtime::Executive::try_runtime_upgrade(
+			polkadot_sdk::frame_try_runtime::UpgradeCheckSelect::PreAndPost,
+		));
+		#[cfg(not(feature = "try-runtime"))]
+		argon_runtime::Executive::execute_on_runtime_upgrade();
+
+		let network = NetworkTotals::<Runtime>::get();
+		assert_eq!(network.account_quantities, source_totals);
+		assert_eq!(network.vault_securitized_satoshis, 13);
 		let first = LocksById::<Runtime>::get(1).unwrap();
 		assert_eq!(
 			(
@@ -253,9 +265,11 @@ fn migration_conserves_backing_and_reconciles_real_vault_and_treasury_storage() 
 		});
 		let storage_before = sp_io::storage::root(StateVersion::V1);
 		#[cfg(feature = "try-runtime")]
-		assert_ok!(CosignerGuaranteesMigration::<Runtime>::try_on_runtime_upgrade(true));
+		assert_ok!(argon_runtime::Executive::try_runtime_upgrade(
+			polkadot_sdk::frame_try_runtime::UpgradeCheckSelect::PreAndPost,
+		));
 		#[cfg(not(feature = "try-runtime"))]
-		CosignerGuaranteesMigration::<Runtime>::on_runtime_upgrade();
+		argon_runtime::Executive::execute_on_runtime_upgrade();
 		assert_eq!(sp_io::storage::root(StateVersion::V1), storage_before);
 		assert_eq!(VaultsById::<Runtime>::get(1).unwrap(), vault);
 		assert_eq!(LocksById::<Runtime>::get(2).unwrap().encode(), second.encode());

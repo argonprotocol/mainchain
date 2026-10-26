@@ -50,7 +50,7 @@ import type {
   ArgonPrimitivesNotaryNotaryRecord,
   ArgonPrimitivesProvidersBlockSealerInfo,
   ArgonPrimitivesTickTicker,
-  ArgonPrimitivesTreasuryPositionQuantities,
+  ArgonPrimitivesTreasuryNetworkPositionQuantities,
   ArgonPrimitivesVault,
   ArgonPrimitivesVaultVaultArgonotSecuritization,
   FrameSupportDispatchPerDispatchClassWeight,
@@ -113,6 +113,7 @@ import type {
   PalletTreasuryBondLot,
   PalletTreasuryBondLotSummary,
   PalletTreasuryFrameArgonotBondParticipants,
+  PalletTreasuryFrameVaultBitcoin,
   PalletTreasuryFrameVaultCapital,
   PalletTreasuryPositionsPosition,
   PalletTreasuryVaultBondState,
@@ -1846,6 +1847,14 @@ declare module '@polkadot/api-base/types/storage' {
         []
       >;
       /**
+       * Covered Bitcoin locked alongside vault capital for frames using independent reward tiers.
+       **/
+      currentFrameVaultBitcoin: AugmentedQuery<
+        ApiType,
+        () => Observable<Option<PalletTreasuryFrameVaultBitcoin>>,
+        []
+      >;
+      /**
        * The network bond total and vault capital locked for the current frame's payout.
        **/
       currentFrameVaultCapital: AugmentedQuery<
@@ -1907,12 +1916,12 @@ declare module '@polkadot/api-base/types/storage' {
     };
     treasuryPositions: {
       /**
-       * Maintained network quantities, updated together with their account contributions.
-       * Treasury reads these when freezing frame inputs. This replaces its live Argonot stake total.
+       * Account contribution totals and Vault Bitcoin coverage, maintained as sources change.
+       * Treasury freezes these network quantities at each frame boundary.
        **/
       networkTotals: AugmentedQuery<
         ApiType,
-        () => Observable<ArgonPrimitivesTreasuryPositionQuantities>,
+        () => Observable<ArgonPrimitivesTreasuryNetworkPositionQuantities>,
         []
       >;
       /**
