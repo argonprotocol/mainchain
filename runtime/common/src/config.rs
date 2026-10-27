@@ -333,6 +333,198 @@ mod tests {
 	use argon_primitives::ethereum::EthereumReceiptLogProofBatch;
 	use codec::MaxEncodedLen;
 	use frame_support::dispatch::DispatchClass;
+	use pallet_mining_slot::WeightInfo as MiningWeightInfo;
+
+	#[test]
+	fn mining_auction_settlement_refunds_before_treasury_distribution() {
+		use argon_runtime::{
+			Balances, MiningSlot, Ownership, Runtime, RuntimeEvent, RuntimeGenesisConfig,
+			RuntimeOrigin, SessionKeys, System, Treasury,
+		};
+		use codec::Decode;
+		use frame_support::{assert_ok, traits::Hooks};
+		use polkadot_sdk::{sp_io::TestExternalities, sp_runtime::BuildStorage};
+
+		TestExternalities::new(RuntimeGenesisConfig::default().build_storage().unwrap())
+			.execute_with(|| {
+				let miners = (1..=11).map(|id| AccountId::new([id; 32])).collect::<Vec<_>>();
+				let staker = AccountId::new([20; 32]);
+				for miner in &miners {
+					assert_ok!(Balances::mint_into(miner, 1000 * ARGON));
+					assert_ok!(Ownership::mint_into(miner, ARGON));
+				}
+				assert_ok!(Balances::mint_into(&staker, ARGON));
+				assert_ok!(Ownership::mint_into(&staker, 1000 * ARGON));
+				pallet_operational_accounts::IsOperationalAccountInviteOnly::<Runtime>::put(false);
+				pallet_mining_slot::MiningConfig::<Runtime>::put(MiningSlotConfig {
+					slot_bidding_start_after_ticks: 0,
+					ticks_between_slots: 40,
+					ticks_before_bid_end_for_vrf_close: 0,
+				});
+				pallet_mining_slot::FrameRewardTicksRemaining::<Runtime>::put(40);
+				assert_ok!(Treasury::buy_argonot_bonds(RuntimeOrigin::signed(staker.clone()), 100));
+				let keys =
+					SessionKeys::decode(&mut sp_runtime::traits::TrailingZeroInput::zeroes())
+						.unwrap();
+				let pool_account = TreasuryMiningBidPoolAccount::get();
+				let reserves_account = TreasuryReservesAccount::get();
+				let initial_issuance = Balances::total_issuance();
+				let initial_staker_balance = Balances::balance(&staker);
+				let winning_price = 100 * ARGON + MiningSlotBidIncrement::get();
+				let final_pool = 10 * winning_price;
+				let stake_payout = PercentForStakePool::get().mul_floor(final_pool);
+				let reserves_payout = PercentForTreasuryReserves::get().mul_floor(final_pool);
+				let burned = final_pool - stake_payout - reserves_payout;
+
+				for block in 1..=41 {
+					pallet_ticks::CurrentTick::<Runtime>::put(39 + block as u64);
+					System::initialize(&block, &System::parent_hash(), &Digest::default());
+					MiningSlot::on_initialize(block);
+					match block {
+						2 =>
+							for (index, miner) in miners[..10].iter().enumerate() {
+								let max = if index == 9 { 100 * ARGON } else { 150 * ARGON };
+								let hash = MiningSlot::bid_commitment(
+									2,
+									miner,
+									miner,
+									90 * ARGON,
+									max,
+									&keys,
+									[index as u8; 32],
+								);
+								assert_ok!(MiningSlot::bid(
+									RuntimeOrigin::signed(miner.clone()),
+									90 * ARGON,
+									keys.clone(),
+									None,
+									Some(2),
+									Some(hash)
+								));
+							},
+						3 =>
+							for (index, miner) in miners[..10].iter().enumerate() {
+								let max = if index == 9 { 100 * ARGON } else { 150 * ARGON };
+								assert_ok!(MiningSlot::bid_max(
+									RuntimeOrigin::signed(miner.clone()),
+									max,
+									[index as u8; 32],
+									None
+								));
+							},
+						13 => {
+							let miner = &miners[10];
+							let hash = MiningSlot::bid_commitment(
+								2,
+								miner,
+								miner,
+								winning_price,
+								125 * ARGON,
+								&keys,
+								[11; 32],
+							);
+							assert_ok!(MiningSlot::bid(
+								RuntimeOrigin::signed(miner.clone()),
+								winning_price,
+								keys.clone(),
+								None,
+								Some(2),
+								Some(hash)
+							));
+						},
+						14 => {
+							assert_ok!(MiningSlot::bid_max(
+								RuntimeOrigin::signed(miners[10].clone()),
+								125 * ARGON,
+								[11; 32],
+								None
+							));
+						},
+						_ => {},
+					}
+					MiningSlot::on_finalize(block);
+					match block {
+						1 => assert_eq!(
+							pallet_treasury::CurrentFrameArgonotBondParticipants::<Runtime>::get()
+								.unwrap()
+								.frame_id,
+							1
+						),
+						12 => {
+							assert_eq!(Balances::balance(&pool_account), 900 * ARGON);
+							assert_eq!(Balances::balance(&miners[9]), 910 * ARGON);
+						},
+						23..=40 => {
+							let cohort =
+								pallet_mining_slot::BidsForNextSlotCohort::<Runtime>::get();
+							assert_eq!(cohort.len(), 10);
+							assert!(cohort.iter().all(|r| r.bid == winning_price));
+							assert!(!cohort.iter().any(|r| r.account_id == miners[9]));
+							assert_eq!(Balances::balance(&miners[9]), 1000 * ARGON);
+							assert_eq!(Balances::balance(&pool_account), final_pool);
+							assert_eq!(Balances::balance(&reserves_account), 0);
+							assert_eq!(Balances::balance(&staker), initial_staker_balance);
+						},
+						_ => {},
+					}
+				}
+				let cohort = pallet_mining_slot::MinersByCohort::<Runtime>::get(2);
+				assert_eq!(cohort.len(), 10);
+				assert!(cohort.iter().all(|r| r.bid == winning_price));
+				assert!(!cohort.iter().any(|r| r.account_id == miners[9]));
+				assert_eq!(Balances::balance(&pool_account), 0);
+				assert_eq!(Balances::balance(&reserves_account), reserves_payout);
+				assert_eq!(Balances::balance(&staker), initial_staker_balance + stake_payout);
+				assert_eq!(Balances::total_issuance(), initial_issuance - burned);
+				assert!(pallet_mining_slot::PendingBids::<Runtime>::iter().next().is_none());
+				assert!(pallet_mining_slot::BidBatches::<Runtime>::iter().next().is_none());
+				assert!(System::events().iter().any(|record| matches!(
+					&record.event,
+					RuntimeEvent::Treasury(pallet_treasury::Event::FrameEarningsDistributed {
+						frame_id: 1,
+						bid_pool_distributed,
+						stake_pool_distributed,
+						argon_bond_pool_distributed: 0,
+						vault_pool_distributed: 0,
+						burned: actual_burn,
+						treasury_reserves,
+						participating_vaults: 0,
+					}) if *bid_pool_distributed == stake_payout
+						&& *stake_pool_distributed == stake_payout
+						&& *actual_burn == burned && *treasury_reserves == reserves_payout
+				)));
+			});
+	}
+
+	#[test]
+	fn mining_batch_and_activation_fit_initialization_budget() {
+		type Runtime = argon_runtime::Runtime;
+		type MiningWeights = <Runtime as pallet_mining_slot::Config>::WeightInfo;
+		let bids = <<Runtime as pallet_mining_slot::Config>::MaxBidsPerBlock as Get<u32>>::get();
+		let seats = <Runtime as pallet_mining_slot::Config>::MaxCohortSize::get();
+		let settlement = MiningWeights::settle_bids(bids, seats);
+		assert!(settlement.ref_time() > 0, "settlement must have measured weights");
+		let nonactivating =
+			settlement.saturating_add(MiningWeights::on_finalize_grandpa_rotation());
+		// Activation waits until every submission block has settled and the buffer has
+		// passed. These paths cannot coincide; empty settlement is covered by bookkeeping.
+		assert!(MiningWeights::settle_bids(0, seats).is_zero());
+		let activation = MiningWeights::start_new_frame(seats)
+			.saturating_add(MiningWeights::on_finalize_frame_adjustments())
+			.saturating_add(
+				<<Runtime as pallet_mining_slot::Config>::OperationalAccountsHook as
+					argon_primitives::OperationalAccountsHook<AccountId, Balance>>::Weights::mining_seat_won()
+					.saturating_mul(seats.into()),
+			);
+		// Other pallets' frame callbacks reserve their own weights separately.
+		let mining = MiningWeights::auction_bookkeeping(1)
+			.saturating_add(MiningWeights::on_finalize_record_block_author())
+			.saturating_add(nonactivating.max(activation));
+		assert!(
+			mining.all_lte(AVERAGE_ON_INITIALIZE_RATIO * MAXIMUM_BLOCK_WEIGHT),
+			"maximum mining batch and activation exceed the initialization allowance: {mining:?}"
+		);
+	}
 
 	#[test]
 	fn gateway_activity_proof_batch_bound_fits_normal_extrinsic_limit() {

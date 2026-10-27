@@ -1,4 +1,5 @@
 // Auto-generated via `yarn polkadot-types-from-chain`, do not edit
+/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
@@ -95,7 +96,9 @@ import type {
   PalletGrandpaStoredState,
   PalletLocalchainTransferQueuedTransferOut,
   PalletMiningSlotMinerNonceScoring,
+  PalletMiningSlotPendingBid,
   PalletMiningSlotSeatPriceStats,
+  PalletMiningSlotStandingBid,
   PalletMintMintAction,
   PalletMintMintQueueCursor,
   PalletMintPendingBitcoinMint,
@@ -1101,6 +1104,11 @@ declare module '@polkadot/api-base/types/storage' {
        * Argonots that must be locked to take a Miner role
        **/
       argonotsPerMiningSeat: AugmentedQuery<ApiType, () => Observable<u128>, []>;
+      auctionAdmissionClosed: AugmentedQuery<ApiType, () => Observable<bool>, []>;
+      /**
+       * Zero on fresh chains. Upgrades finish the deployed fixed-price auction first.
+       **/
+      auctionRulesStartAt: AugmentedQuery<ApiType, () => Observable<u64>, []>;
       /**
        * Winning bid totals and seat counts for averaging prices over the last 10 frames (newest
        * first).
@@ -1109,6 +1117,14 @@ declare module '@polkadot/api-base/types/storage' {
         ApiType,
         () => Observable<Vec<PalletMiningSlotSeatPriceStats>>,
         []
+      >;
+      /**
+       * Vector position is canonical commitment order, including calls inside utility batches.
+       **/
+      bidBatches: AugmentedQuery<
+        ApiType,
+        (arg: u32 | AnyNumber | Uint8Array) => Observable<Vec<AccountId32>>,
+        [u32]
       >;
       /**
        * The cohort set to go into effect in the next slot. The Vec has all
@@ -1144,6 +1160,7 @@ declare module '@polkadot/api-base/types/storage' {
        * Is the next slot still open for bids
        **/
       isNextSlotBiddingOpen: AugmentedQuery<ApiType, () => Observable<bool>, []>;
+      lastBidBlock: AugmentedQuery<ApiType, () => Observable<Option<u32>>, []>;
       /**
        * This is a lookup of each miner's nonce to use when picking a best authority to submit a
        * block. It's a blake2 256 hash of the miner account id and the block hash at time of
@@ -1185,6 +1202,11 @@ declare module '@polkadot/api-base/types/storage' {
        * cohorts.
        **/
       nextFrameId: AugmentedQuery<ApiType, () => Observable<u64>, []>;
+      pendingBids: AugmentedQuery<
+        ApiType,
+        (arg: AccountId32 | string | Uint8Array) => Observable<Option<PalletMiningSlotPendingBid>>,
+        [AccountId32]
+      >;
       /**
        * The miners released in the last block (only kept for a single block)
        **/
@@ -1202,6 +1224,11 @@ declare module '@polkadot/api-base/types/storage' {
         ApiType,
         () => Observable<BTreeMap<u64, u32>>,
         []
+      >;
+      standingBids: AugmentedQuery<
+        ApiType,
+        (arg: AccountId32 | string | Uint8Array) => Observable<Option<PalletMiningSlotStandingBid>>,
+        [AccountId32]
       >;
       /**
        * Temporary store the frame info digest

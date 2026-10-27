@@ -35,7 +35,8 @@ Coverage
 - Unknowns: ...
 ```
 
-Omit empty `Blocking exceptions` and `Unresolved decisions` sections. Do not include general best practices unless they directly close a reported exception.
+Omit empty `Blocking exceptions` and `Unresolved decisions` sections. Do not include general best
+practices unless they directly close a reported exception.
 
 ## Finding Standard
 

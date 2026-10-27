@@ -17,79 +17,532 @@ use sp_core::U256;
 mod benchmarks {
 	use super::*;
 
-	/// Core extrinsic: Bid (new miner)
+	fn prepare_bid<T: Config>(caller: &T::AccountId) -> T::Keys
+	where
+		T::OwnershipCurrency:
+			frame_support::traits::fungible::Mutate<T::AccountId, Balance = T::Balance>,
+	{
+		use frame_support::traits::fungible::Mutate;
+		IsNextSlotBiddingOpen::<T>::put(true);
+		AuctionRulesStartAt::<T>::put(0);
+		NextFrameId::<T>::put(T::FramesPerMiningTerm::get() as FrameId + 1);
+		HistoricalBidsPerSlot::<T>::put(BoundedVec::truncate_from(vec![
+			MiningBidStats::default();
+			10
+		]));
+		FrameRewardTicksRemaining::<T>::put(100u64);
+		ArgonotsPerMiningSeat::<T>::put(T::Balance::from(100_000u128));
+		let _ = T::ArgonCurrency::mint_into(caller, 1_000_000_000_000u128.into());
+		let _ = T::OwnershipCurrency::mint_into(caller, 1_000_000_000u128.into());
+		T::Keys::decode(&mut &vec![0u8; T::Keys::max_encoded_len()][..]).expect("benchmark keys")
+	}
+
+	fn fill_cohort<T: Config>() {
+		let keys = T::Keys::decode(&mut &vec![0u8; T::Keys::max_encoded_len()][..])
+			.expect("benchmark keys");
+		let entries = (0..T::MaxCohortSize::get())
+			.map(|i| Registration::<T> {
+				account_id: account("fixed", i, 0),
+				external_funding_account: None,
+				bid: T::BidIncrements::get(),
+				argonots: T::Balance::from(100_000u128),
+				authority_keys: keys.clone(),
+				starting_frame_id: NextFrameId::<T>::get(),
+				bid_at_tick: 0,
+			})
+			.collect::<Vec<_>>();
+		for (position, registration) in entries.iter().enumerate() {
+			T::ArgonCurrency::mint_into(&registration.account_id, 1_000_000_000_000u128.into())
+				.expect("funded standing benchmark");
+			StandingBids::<T>::insert(
+				&registration.account_id,
+				StandingBid::<T> {
+					bid: registration.bid,
+					max: registration.bid.saturating_mul(2u32.into()),
+					fixed: false,
+					submitted_at: Zero::zero(),
+					position: position as u32,
+				},
+			);
+		}
+		BidsForNextSlotCohort::<T>::put(
+			BoundedVec::<Registration<T>, T::MaxCohortSize>::try_from(entries).ok().unwrap(),
+		);
+	}
+
+	fn fill_active_cohort<T: Config>(caller: &T::AccountId, keys: &T::Keys) {
+		let entries = (0..T::MaxCohortSize::get())
+			.map(|i| Registration::<T> {
+				account_id: if i + 1 == T::MaxCohortSize::get() {
+					caller.clone()
+				} else {
+					account("active", i, 0)
+				},
+				external_funding_account: None,
+				bid: T::BidIncrements::get(),
+				argonots: 1u128.into(),
+				authority_keys: keys.clone(),
+				starting_frame_id: 1,
+				bid_at_tick: 0,
+			})
+			.collect::<Vec<_>>();
+		MinersByCohort::<T>::insert(
+			1,
+			BoundedVec::<Registration<T>, T::MaxCohortSize>::try_from(entries).ok().unwrap(),
+		);
+		AccountIndexLookup::<T>::insert(caller, (1, T::MaxCohortSize::get() - 1));
+		frame_system::Pallet::<T>::inc_providers(caller);
+		T::OwnershipCurrency::hold(&HoldReason::RegisterAsMiner.into(), caller, 1u128.into())
+			.expect("funded benchmark collateral");
+	}
+
 	#[benchmark]
 	fn bid() -> Result<(), BenchmarkError> {
 		let caller: T::AccountId = whitelisted_caller();
-		let bid_increment: T::Balance = T::BidIncrements::get();
-
-		// Inline key creation
-		use sp_runtime::codec::Decode;
-		let key_size = T::Keys::max_encoded_len();
-		let key_data = vec![0u8; key_size];
-		let keys = T::Keys::decode(&mut &key_data[..])
-			.expect("Failed to create test keys for benchmarking");
-
-		// Inline mining environment setup
-		let mining_config = MiningSlotConfig {
-			slot_bidding_start_after_ticks: 0u64,
-			ticks_between_slots: 10u64,
-			ticks_before_bid_end_for_vrf_close: 1u64,
-		};
-		MiningConfig::<T>::put(mining_config);
-		IsNextSlotBiddingOpen::<T>::put(true);
-		let argonots_per_seat: T::Balance = 100_000u128.into();
-		ArgonotsPerMiningSeat::<T>::put(argonots_per_seat);
-		NextFrameId::<T>::put(2);
-		let next_cohort_size = T::MaxCohortSize::get().max(1);
-		NextCohortSize::<T>::put(next_cohort_size);
-		let bid_amount: T::Balance = bid_increment.saturating_mul((next_cohort_size + 1).into());
-
-		// Inline account setup
-		use frame_support::traits::fungible::Mutate;
-		let _ = T::ArgonCurrency::mint_into(&caller, 5_000_000u128.into());
-		let _ = T::OwnershipCurrency::mint_into(&caller, 5_000_000u128.into());
-
-		// Inline bid pool setup
-		let bid_pool_account = T::MiningBidPoolAccount::get();
-		let _ = T::ArgonCurrency::mint_into(&bid_pool_account, 10_000_000u128.into());
-
-		// Pre-fill the cohort so the new bid bumps the lowest bidder.
-		for i in 0..next_cohort_size {
-			let bidder: T::AccountId = account("prefill", i, 0);
-			let _ = T::ArgonCurrency::mint_into(&bidder, 5_000_000u128.into());
-			let _ = T::OwnershipCurrency::mint_into(&bidder, 5_000_000u128.into());
-			let prefill_bid: T::Balance = bid_increment.saturating_mul((i + 1).into());
-
-			use sp_runtime::codec::Decode;
-			let key_size = T::Keys::max_encoded_len();
-			let key_data = vec![0u8; key_size];
-			let keys = T::Keys::decode(&mut &key_data[..])
-				.expect("Failed to create test keys for benchmarking");
-			let _ = Pallet::<T>::bid(RawOrigin::Signed(bidder).into(), prefill_bid, keys, None);
+		let keys = prepare_bid::<T>(&caller);
+		frame_system::Pallet::<T>::set_block_number(1u32.into());
+		fill_cohort::<T>();
+		// Exercise full-size incumbent scans and a nearly full commitment vector.
+		NextCohortSize::<T>::put(T::MaxCohortSize::get());
+		for i in 0..T::MaxBidsPerBlock::get().saturating_sub(1) {
+			let other = account("queued", i, 0);
+			let other_keys = prepare_bid::<T>(&other);
+			Pallet::<T>::bid(
+				RawOrigin::Signed(other).into(),
+				T::BidIncrements::get().saturating_mul(3u32.into()),
+				other_keys,
+				None,
+				Some(NextFrameId::<T>::get()),
+				None,
+			)?;
 		}
-		let bumped = BidsForNextSlotCohort::<T>::get()
-			.iter()
-			.last()
-			.expect("Bid queue should be populated")
-			.account_id
-			.clone();
-
 		#[extrinsic_call]
-		_(RawOrigin::Signed(caller.clone()), bid_amount, keys, None);
-
-		// Verify the bid was actually placed
-		let bids = BidsForNextSlotCohort::<T>::get();
-		assert!(!bids.is_empty(), "Bid queue should contain the placed bid");
-		let bid_exists = bids.iter().any(|registration| {
-			registration.account_id == caller && registration.bid >= bid_amount
-		});
-		assert!(bid_exists, "Bid should be found in the bid queue with correct amount");
-		assert!(
-			!bids.iter().any(|registration| registration.account_id == bumped),
-			"Lowest bidder should be bumped from the queue"
+		_(
+			RawOrigin::Signed(caller.clone()),
+			T::BidIncrements::get().saturating_mul(3u32.into()),
+			keys,
+			None,
+			Some(NextFrameId::<T>::get()),
+			None,
 		);
+		assert!(PendingBids::<T>::get(caller).unwrap().max.is_none());
+		Ok(())
+	}
+	#[benchmark]
+	fn bid_renewal() -> Result<(), BenchmarkError> {
+		let caller: T::AccountId = whitelisted_caller();
+		let keys = prepare_bid::<T>(&caller);
+		fill_active_cohort::<T>(
+			&caller,
+			&T::Keys::decode(&mut &vec![0u8; T::Keys::max_encoded_len()][..]).unwrap(),
+		);
+		frame_system::Pallet::<T>::set_block_number(1u32.into());
+		fill_cohort::<T>();
+		// Exercise full-size incumbent scans and a nearly full commitment vector.
+		NextCohortSize::<T>::put(T::MaxCohortSize::get());
+		for i in 0..T::MaxBidsPerBlock::get().saturating_sub(1) {
+			let other = account("queued", i, 0);
+			let other_keys = prepare_bid::<T>(&other);
+			Pallet::<T>::bid(
+				RawOrigin::Signed(other).into(),
+				T::BidIncrements::get().saturating_mul(3u32.into()),
+				other_keys,
+				None,
+				Some(NextFrameId::<T>::get()),
+				None,
+			)?;
+		}
+		#[extrinsic_call]
+		bid(
+			RawOrigin::Signed(caller.clone()),
+			T::BidIncrements::get().saturating_mul(3u32.into()),
+			keys,
+			None,
+			Some(NextFrameId::<T>::get()),
+			None,
+		);
+		assert!(PendingBids::<T>::get(caller).unwrap().max.is_none());
+		Ok(())
+	}
 
+	#[benchmark]
+	fn bid_legacy() -> Result<(), BenchmarkError> {
+		let _ = funded_cohort::<T>(T::MaxCohortSize::get())?;
+		let who: T::AccountId = whitelisted_caller();
+		let keys = prepare_bid::<T>(&who);
+		#[block]
+		{
+			Pallet::<T>::legacy_bid(
+				who.clone(),
+				T::BidIncrements::get().saturating_mul(2u32.into()),
+				keys,
+				who,
+			)?;
+		}
+		Ok(())
+	}
+
+	#[benchmark]
+	fn auction_bookkeeping(f: Linear<0, 1>) -> Result<(), BenchmarkError> {
+		AuctionRulesStartAt::<T>::put(0);
+		NextFrameId::<T>::put(1 + f as u64);
+		FrameRewardTicksRemaining::<T>::put(0);
+		IsNextSlotBiddingOpen::<T>::put(true);
+		let block: BlockNumberFor<T> = 20u32.into();
+		LastBidBlock::<T>::put(block);
+		BidBatches::<T>::insert(
+			BlockNumberFor::<T>::from(10u32),
+			BoundedVec::<T::AccountId, T::MaxBidsPerBlock>::default(),
+		);
+		HasAddedGrandpaRotation::<T>::put(true);
+		frame_system::Pallet::<T>::set_block_number(block - One::one());
+		frame_system::Pallet::<T>::initialize(
+			&block,
+			&frame_system::Pallet::<T>::parent_hash(),
+			&sp_runtime::Digest {
+				logs: vec![sp_runtime::DigestItem::Consensus(
+					argon_primitives::FRAME_INFO_DIGEST,
+					argon_primitives::FrameInfo {
+						frame_id: f as u64,
+						frame_reward_ticks_remaining: 0,
+						is_new_frame: false,
+					}
+					.encode(),
+				)],
+			},
+		);
+		#[block]
+		{
+			let _ = Pallet::<T>::on_initialize(block);
+			Pallet::<T>::on_finalize(block);
+		}
+		Ok(())
+	}
+
+	#[benchmark]
+	fn bid_with_max() -> Result<(), BenchmarkError> {
+		let caller: T::AccountId = whitelisted_caller();
+		prepare_bid::<T>(&caller);
+		frame_system::Pallet::<T>::set_block_number(1u32.into());
+		fill_cohort::<T>();
+		for i in 0..T::MaxBidsPerBlock::get().saturating_sub(1) {
+			let other = account("queued", i, 0);
+			prepare_bid::<T>(&other);
+			Pallet::<T>::bid(
+				RawOrigin::Signed(other).into(),
+				T::BidIncrements::get().saturating_mul(3u32.into()),
+				T::Keys::decode(&mut &vec![0; T::Keys::max_encoded_len()][..]).unwrap(),
+				None,
+				Some(NextFrameId::<T>::get()),
+				Some([0; 32]),
+			)?;
+		}
+		#[extrinsic_call]
+		bid(
+			RawOrigin::Signed(caller.clone()),
+			T::BidIncrements::get().saturating_mul(3u32.into()),
+			T::Keys::decode(&mut &vec![0; T::Keys::max_encoded_len()][..]).unwrap(),
+			None,
+			Some(NextFrameId::<T>::get()),
+			Some([1; 32]),
+		);
+		assert!(PendingBids::<T>::contains_key(caller));
+		Ok(())
+	}
+	#[benchmark]
+	fn bid_with_max_renewal() -> Result<(), BenchmarkError> {
+		let caller: T::AccountId = whitelisted_caller();
+		prepare_bid::<T>(&caller);
+		fill_active_cohort::<T>(
+			&caller,
+			&T::Keys::decode(&mut &vec![0u8; T::Keys::max_encoded_len()][..]).unwrap(),
+		);
+		frame_system::Pallet::<T>::set_block_number(1u32.into());
+		fill_cohort::<T>();
+		for i in 0..T::MaxBidsPerBlock::get().saturating_sub(1) {
+			let other = account("queued", i, 0);
+			prepare_bid::<T>(&other);
+			Pallet::<T>::bid(
+				RawOrigin::Signed(other).into(),
+				T::BidIncrements::get().saturating_mul(3u32.into()),
+				T::Keys::decode(&mut &vec![0; T::Keys::max_encoded_len()][..]).unwrap(),
+				None,
+				Some(NextFrameId::<T>::get()),
+				Some([0; 32]),
+			)?;
+		}
+		#[extrinsic_call]
+		bid(
+			RawOrigin::Signed(caller.clone()),
+			T::BidIncrements::get().saturating_mul(3u32.into()),
+			T::Keys::decode(&mut &vec![0; T::Keys::max_encoded_len()][..]).unwrap(),
+			None,
+			Some(NextFrameId::<T>::get()),
+			Some([1; 32]),
+		);
+		assert!(PendingBids::<T>::contains_key(caller));
+		Ok(())
+	}
+
+	#[benchmark]
+	fn bid_max() -> Result<(), BenchmarkError> {
+		let caller: T::AccountId = whitelisted_caller();
+		let keys = prepare_bid::<T>(&caller);
+		frame_system::Pallet::<T>::set_block_number(1u32.into());
+		fill_cohort::<T>();
+		let low = T::BidIncrements::get().saturating_mul(3u32.into());
+		let high = low.saturating_mul(3u32.into());
+		let hash = Pallet::<T>::bid_commitment(
+			NextFrameId::<T>::get(),
+			&caller,
+			&caller,
+			low,
+			high,
+			&keys,
+			[1; 32],
+		);
+		Pallet::<T>::bid(
+			RawOrigin::Signed(caller.clone()).into(),
+			low,
+			T::Keys::decode(&mut &vec![0; T::Keys::max_encoded_len()][..]).unwrap(),
+			None,
+			Some(NextFrameId::<T>::get()),
+			Some(hash),
+		)?;
+		frame_system::Pallet::<T>::set_block_number(2u32.into());
+		#[extrinsic_call]
+		_(RawOrigin::Signed(caller.clone()), high, [1; 32], None);
+		assert!(PendingBids::<T>::get(caller).unwrap().max.is_some());
+		Ok(())
+	}
+	#[benchmark]
+	fn bid_max_renewal() -> Result<(), BenchmarkError> {
+		let caller: T::AccountId = whitelisted_caller();
+		let keys = prepare_bid::<T>(&caller);
+		fill_active_cohort::<T>(
+			&caller,
+			&T::Keys::decode(&mut &vec![0u8; T::Keys::max_encoded_len()][..]).unwrap(),
+		);
+		frame_system::Pallet::<T>::set_block_number(1u32.into());
+		fill_cohort::<T>();
+		// Exercise a miner that is both active and already a next-cohort winner.
+		BidsForNextSlotCohort::<T>::mutate(|cohort| {
+			cohort.last_mut().expect("nonempty benchmark cohort").account_id = caller.clone();
+		});
+		StandingBids::<T>::insert(
+			&caller,
+			StandingBid::<T> {
+				bid: T::BidIncrements::get(),
+				max: T::BidIncrements::get().saturating_mul(2u32.into()),
+				fixed: false,
+				submitted_at: Zero::zero(),
+				position: T::MaxCohortSize::get() - 1,
+			},
+		);
+		T::OwnershipCurrency::hold(
+			&HoldReason::RegisterAsMiner.into(),
+			&caller,
+			ArgonotsPerMiningSeat::<T>::get().saturating_sub(1u128.into()),
+		)?;
+		let low = T::BidIncrements::get().saturating_mul(3u32.into());
+		let high = low.saturating_mul(3u32.into());
+		let hash = Pallet::<T>::bid_commitment(
+			NextFrameId::<T>::get(),
+			&caller,
+			&caller,
+			low,
+			high,
+			&keys,
+			[1; 32],
+		);
+		Pallet::<T>::bid(
+			RawOrigin::Signed(caller.clone()).into(),
+			low,
+			T::Keys::decode(&mut &vec![0; T::Keys::max_encoded_len()][..]).unwrap(),
+			None,
+			Some(NextFrameId::<T>::get()),
+			Some(hash),
+		)?;
+		frame_system::Pallet::<T>::set_block_number(2u32.into());
+		#[extrinsic_call]
+		bid_max(RawOrigin::Signed(caller.clone()), high, [1; 32], None);
+		assert!(PendingBids::<T>::get(caller).unwrap().max.is_some());
+		Ok(())
+	}
+
+	fn funded_cohort<T: Config>(m: u32) -> Result<BlockNumberFor<T>, BenchmarkError>
+	where
+		T::OwnershipCurrency:
+			frame_support::traits::fungible::Mutate<T::AccountId, Balance = T::Balance>,
+	{
+		NextCohortSize::<T>::put(m);
+		let mut block = 1u32;
+		for start in (0..m).step_by(T::MaxBidsPerBlock::get() as usize) {
+			frame_system::Pallet::<T>::set_block_number(block.into());
+			for i in start..m.min(start + T::MaxBidsPerBlock::get()) {
+				let who = account("incumbent", i, 0);
+				let keys = prepare_bid::<T>(&who);
+				let low = T::BidIncrements::get();
+				let high = low.saturating_mul(2u32.into());
+				let hash = Pallet::<T>::bid_commitment(
+					NextFrameId::<T>::get(),
+					&who,
+					&who,
+					low,
+					high,
+					&keys,
+					[2; 32],
+				);
+				Pallet::<T>::bid(
+					RawOrigin::Signed(who.clone()).into(),
+					low,
+					T::Keys::decode(&mut &vec![0; T::Keys::max_encoded_len()][..]).unwrap(),
+					None,
+					Some(NextFrameId::<T>::get()),
+					Some(hash),
+				)?;
+			}
+			frame_system::Pallet::<T>::set_block_number((block + 1).into());
+			for i in start..(start + T::MaxBidsPerBlock::get()).min(m) {
+				let who = account("incumbent", i, 0);
+				Pallet::<T>::bid_max(
+					RawOrigin::Signed(who).into(),
+					T::BidIncrements::get().saturating_mul(2u32.into()),
+					[2; 32],
+					None,
+				)?;
+			}
+			frame_system::Pallet::<T>::set_block_number((block + T::BidRevealBlocks::get()).into());
+			Pallet::<T>::settle_bids(block.into())?;
+			block += T::BidRevealBlocks::get() + 1;
+		}
+		// Renewing incumbents also require decoding their full active cohort on eviction.
+		// Their existing collateral covers one active unit plus the renewal's remainder.
+		let next = BidsForNextSlotCohort::<T>::get();
+		let mut active = Vec::new();
+		for i in 0..T::MaxCohortSize::get() {
+			let mut registration = if i < m {
+				next[i as usize].clone()
+			} else {
+				let who = account("active-padding", i, 0);
+				let keys = prepare_bid::<T>(&who);
+				frame_system::Pallet::<T>::inc_providers(&who);
+				T::OwnershipCurrency::hold(
+					&HoldReason::RegisterAsMiner.into(),
+					&who,
+					1u128.into(),
+				)?;
+				Registration::<T> {
+					account_id: who,
+					external_funding_account: None,
+					bid: T::BidIncrements::get(),
+					argonots: 1u128.into(),
+					authority_keys: keys,
+					starting_frame_id: 1,
+					bid_at_tick: 0,
+				}
+			};
+			registration.starting_frame_id = 1;
+			registration.argonots = 1u128.into();
+			AccountIndexLookup::<T>::insert(&registration.account_id, (1, i));
+			active.push(registration);
+		}
+		MinersByCohort::<T>::insert(
+			1,
+			BoundedVec::<Registration<T>, T::MaxCohortSize>::try_from(active).ok().unwrap(),
+		);
+		Ok(block.into())
+	}
+
+	fn settlement_setup<T: Config>(
+		b: u32,
+		m: u32,
+		replacements: bool,
+	) -> Result<BlockNumberFor<T>, BenchmarkError>
+	where
+		T::OwnershipCurrency:
+			frame_support::traits::fungible::Mutate<T::AccountId, Balance = T::Balance>,
+	{
+		let block = funded_cohort::<T>(m)?;
+		frame_system::Pallet::<T>::set_block_number(block);
+		for i in 0..b {
+			let who = account("challenger", i, 0);
+			let keys = prepare_bid::<T>(&who);
+			let low = T::BidIncrements::get().saturating_mul(3u32.into());
+			let high = T::BidIncrements::get().saturating_mul((3 + i * 17 % 32).into());
+			let hash = Pallet::<T>::bid_commitment(
+				NextFrameId::<T>::get(),
+				&who,
+				&who,
+				low,
+				high,
+				&keys,
+				[1; 32],
+			);
+			Pallet::<T>::bid(
+				RawOrigin::Signed(who.clone()).into(),
+				low,
+				T::Keys::decode(&mut &vec![0; T::Keys::max_encoded_len()][..]).unwrap(),
+				None,
+				Some(NextFrameId::<T>::get()),
+				Some(hash),
+			)?;
+		}
+		frame_system::Pallet::<T>::set_block_number(block + One::one());
+		for i in 0..b {
+			let who = account("challenger", i, 0);
+			Pallet::<T>::bid_max(
+				RawOrigin::Signed(who).into(),
+				T::BidIncrements::get().saturating_mul((3 + i * 17 % 32).into()),
+				[1; 32],
+				None,
+			)?;
+		}
+		if replacements {
+			// The displaced incumbents have later, already revealed replacements.
+			for i in m.saturating_sub(b)..m {
+				let who = account("incumbent", i, 0);
+				let keys = prepare_bid::<T>(&who);
+				Pallet::<T>::bid(
+					RawOrigin::Signed(who).into(),
+					T::BidIncrements::get().saturating_mul(40u32.into()),
+					keys,
+					None,
+					Some(NextFrameId::<T>::get()),
+					None,
+				)?;
+			}
+		}
+		frame_system::Pallet::<T>::set_block_number(block + T::BidRevealBlocks::get().into());
+		Ok(block)
+	}
+
+	#[benchmark]
+	fn settle_bids(b: Linear<1, 32>, m: Linear<1, 144>) -> Result<(), BenchmarkError> {
+		let m = m.min(T::MaxCohortSize::get());
+		let block = settlement_setup::<T>(b, m, false)?;
+		#[block]
+		{
+			Pallet::<T>::settle_bids(block)?;
+		}
+		assert!(BidBatches::<T>::get(block).is_empty());
+		assert_eq!(BidsForNextSlotCohort::<T>::get().len(), m as usize);
+		Ok(())
+	}
+
+	#[benchmark]
+	fn settle_bids_with_replacements(
+		b: Linear<1, 32>,
+		m: Linear<1, 144>,
+	) -> Result<(), BenchmarkError> {
+		let m = m.min(T::MaxCohortSize::get());
+		let block = settlement_setup::<T>(b, m, true)?;
+		#[block]
+		{
+			Pallet::<T>::settle_bids(block)?;
+		}
+		assert!(BidBatches::<T>::get(block).is_empty());
+		assert_eq!(BidsForNextSlotCohort::<T>::get().len(), m as usize);
 		Ok(())
 	}
 
@@ -166,7 +619,7 @@ mod benchmarks {
 			let key_data = vec![0u8; key_size];
 			let keys = T::Keys::decode(&mut &key_data[..])
 				.expect("Failed to create test keys for benchmarking");
-			let _ = Pallet::<T>::bid(RawOrigin::Signed(bidder).into(), bid_amount, keys, None);
+			Pallet::<T>::legacy_bid(bidder.clone(), bid_amount, keys, bidder)?;
 		}
 
 		#[block]
@@ -219,7 +672,7 @@ mod benchmarks {
 
 	/// Frame transitions: start_new_frame with cross-pallet operations
 	#[benchmark]
-	fn start_new_frame(m: Linear<1, 256>) -> Result<(), BenchmarkError> {
+	fn start_new_frame(m: Linear<1, 144>) -> Result<(), BenchmarkError> {
 		let max_cohort = T::MaxCohortSize::get().max(1);
 		let m = m.min(max_cohort);
 		// Inline mining environment setup
@@ -288,7 +741,7 @@ mod benchmarks {
 			let key_data = vec![0u8; key_size];
 			let keys = T::Keys::decode(&mut &key_data[..])
 				.expect("Failed to create test keys for benchmarking");
-			let _ = Pallet::<T>::bid(RawOrigin::Signed(bidder).into(), bid_amount, keys, None);
+			Pallet::<T>::legacy_bid(bidder.clone(), bid_amount, keys, bidder)?;
 		}
 
 		let config = MiningSlotConfig {
@@ -544,4 +997,5 @@ mod benchmarks {
 			);
 		}
 	}
+	impl_benchmark_test_suite!(Pallet, crate::mock::new_test_ext(), crate::mock::Test);
 }

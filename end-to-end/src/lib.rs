@@ -270,6 +270,12 @@ pub(crate) mod utils {
 		let first_account = client.api_account(&miner_accounts[0].0);
 		let miner_count = miner_accounts.len() as u16;
 		println!("Registering {miner_count} miners");
+		// Submit fixed public bids to the explicitly selected auction frame.
+		// The cohort/activation wait below observes settlement rather than just inclusion.
+		let target_frame_id = client
+			.fetch_storage(&storage().mining_slot().next_frame_id(), FetchAt::Best)
+			.await?
+			.unwrap_or_default();
 		let bids = miner_accounts
 			.into_iter()
 			.map(|(a, keys)| {
@@ -278,6 +284,8 @@ pub(crate) mod utils {
 					mining_account_id: Some(account),
 					keys,
 					bid: 0,
+					target_frame_id: Some(target_frame_id),
+					max_hash: None,
 				})
 			})
 			.collect::<Vec<_>>();

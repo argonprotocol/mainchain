@@ -208,3 +208,53 @@ pub enum BlockRewardType {
 	Voter,
 	ProfitShare,
 }
+
+/// v1 mining bid commitment: SCALE tuple with chain, funding and frame domain separation.
+pub fn mining_bid_commitment<H: Encode, A: Encode, B: Encode, K: Encode>(
+	genesis_hash: H,
+	frame: FrameId,
+	funding: &A,
+	miner: &A,
+	bid: B,
+	max: B,
+	keys: &K,
+	salt: [u8; 32],
+) -> [u8; 32] {
+	use sp_runtime::traits::Hash;
+	sp_runtime::traits::BlakeTwo256::hash_of(&(
+		*b"argon-mining-bid-v1",
+		genesis_hash,
+		frame,
+		funding,
+		miner,
+		bid,
+		max,
+		keys,
+		salt,
+	))
+	.into()
+}
+
+#[cfg(test)]
+mod mining_commitment_tests {
+	use super::*;
+	#[test]
+	fn commitment_matches_client_scale_vector() {
+		assert_eq!(
+			mining_bid_commitment(
+				[0u8; 32],
+				2,
+				&[1u8; 32],
+				&[2u8; 32],
+				90_000_000u128,
+				150_000_000u128,
+				&[3u8; 64],
+				[4u8; 32]
+			),
+			[
+				148, 206, 129, 153, 95, 119, 96, 142, 121, 48, 223, 200, 90, 157, 19, 91, 17, 145,
+				150, 145, 42, 252, 236, 14, 91, 224, 10, 232, 208, 143, 135, 54
+			]
+		);
+	}
+}

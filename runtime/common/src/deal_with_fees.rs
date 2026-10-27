@@ -61,6 +61,8 @@ macro_rules! deal_with_fees {
 					.map(|_| {
 						RuntimeCall::MiningSlot(pallet_mining_slot::Call::bid {
 							bid: 0,
+							target_frame_id: None,
+							max_hash: None,
 							keys: keys.clone(),
 							mining_account_id: None,
 						})
@@ -97,7 +99,10 @@ macro_rules! deal_with_fees {
 					fn is_mining_bid_call(call: &RuntimeCall) -> bool {
 						matches!(
 							call,
-							RuntimeCall::MiningSlot(pallet_mining_slot::Call::bid { .. })
+							RuntimeCall::MiningSlot(
+								pallet_mining_slot::Call::bid { .. } |
+									pallet_mining_slot::Call::bid_max { .. }
+							)
 						)
 					}
 

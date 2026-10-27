@@ -1114,6 +1114,14 @@ declare module '@polkadot/api-base/types/events' {
       >;
     };
     miningSlot: {
+      BidCommitted: AugmentedEvent<
+        ApiType,
+        [accountId: AccountId32, targetFrameId: u64],
+        { accountId: AccountId32; targetFrameId: u64 }
+      >;
+      BidLost: AugmentedEvent<ApiType, [accountId: AccountId32], { accountId: AccountId32 }>;
+      BidRejected: AugmentedEvent<ApiType, [accountId: AccountId32], { accountId: AccountId32 }>;
+      BidRevealed: AugmentedEvent<ApiType, [accountId: AccountId32], { accountId: AccountId32 }>;
       /**
        * Bids are closed due to the VRF randomized function triggering
        **/
@@ -1163,6 +1171,11 @@ declare module '@polkadot/api-base/types/events' {
         ApiType,
         [accountId: AccountId32, preservedArgonotHold: bool],
         { accountId: AccountId32; preservedArgonotHold: bool }
+      >;
+      WinningBidPriceChanged: AugmentedEvent<
+        ApiType,
+        [accountId: AccountId32, bidAmount: u128],
+        { accountId: AccountId32; bidAmount: u128 }
       >;
     };
     mint: {

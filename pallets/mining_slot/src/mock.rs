@@ -277,6 +277,9 @@ impl pallet_mining_slot::Config for Test {
 	type WeightInfo = ();
 	type MinCohortSize = MinCohortSize;
 	type MaxCohortSize = MaxCohortSize;
+	type MaxBidsPerBlock = ConstU32<32>;
+	type BidRevealBlocks = ConstU32<10>;
+	type BidSettlementBuffer = ConstU32<1>;
 	type PricePerSeatAdjustmentDamper = PricePerSeatAdjustmentDamper;
 	type FramesPerMiningTerm = FramesPerMiningTerm;
 	type TargetPricePerSeat = TargetPricePerSeat;
@@ -313,5 +316,8 @@ pub fn new_test_ext() -> TestState {
 		pallet_mining_slot::GenesisConfig::<Test> { mining_config, _phantom: Default::default() }
 			.assimilate_storage(t)
 			.unwrap();
+		// Existing economics fixtures exercise the deployed fixed-price auction.
+		t.top
+			.insert(crate::AuctionRulesStartAt::<Test>::hashed_key().to_vec(), u64::MAX.encode());
 	})
 }

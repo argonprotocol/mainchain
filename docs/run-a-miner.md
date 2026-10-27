@@ -231,10 +231,48 @@ and backup your keys, you can also generate them individually as shown
 [here](https://docs.substrate.io/tutorials/build-a-blockchain/add-trusted-nodes/).
 
 You can bid for a slot by using the Polkadot.js interface
-[here](https://polkadot.js.org/apps/?rpc=wss://rpc.testnet.argonprotocol.org#/extrinsics/decode/0x06000100000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000).
+[here](https://polkadot.js.org/apps/?rpc=wss://rpc.testnet.argonprotocol.org#/extrinsics), selecting
+`miningSlot` and `bid`.
 
 If you toggle to "Submission", you can submit your bid.
 ![Polkadot.js - Submit a bid](images/pjs-miningbid.png)
+
+Use `miningSlot.bid(bid, keys, miningAccountId, targetFrameId, maxHash)` to queue a bid. Read
+`miningSlot.nextFrameId` for the target frame. A `null` target frame selects the current auction
+when the transaction executes; an explicit frame rejects the bid if the auction has changed. Pass
+`null` for `maxHash` for a fixed-price bid. Clients returned by the Node.js SDK's `getClient()` also
+support `miningSlot.bid(bid, keys, miningAccountId)`, defaulting both trailing arguments to `null`.
+Plain Polkadot.js clients must supply all five arguments.
+
+For automatic bidding, the Node.js client's `createMiningBidCommitment` helper accepts `bid`, `max`,
+the target frame, accounts and keys, and returns `maxHash` and a random salt. Keep the maximum and
+salt private until the initial bid is included. Pass that explicit frame with the commitment, so an
+auction change rejects the transaction instead of submitting a commitment for a different frame. The
+public `bid` is visible immediately.
+
+If the initial bid is included in block B, disclose its maximum with
+`miningSlot.bidMax(max, salt, miningAccountId)` in any block from **B+1 through B+10**, inclusive.
+The hash must match the original submission. All bids initially included in B settle together at the
+end of B+10, whether or not their maxima were disclosed. Without a valid, funded maximum, the public
+bid still competes at its base amount if it remains funded and eligible. Transaction success means
+the bid was queued; `SlotBidderAdded` confirms acceptance after settlement.
+
+Amounts are in microgons and must be multiples of 10,000 (0.01 ARGON). When the winning list is
+full, the public `bid` must exceed the lowest funded maximum among current winners; matching its
+paid price is insufficient. Bids initially included in the same block share the same settlement
+cutoff. Earlier submission blocks settle first and can raise the cutoff for later batches.
+
+The funding account must cover the entire maximum when disclosing it; an existing paid bid counts
+toward replacement funding. The maximum is checked again at settlement. Only the winning price is
+collected, and the full maximum is not held. Automatic bids pay the smallest winning price allowed
+by their public bid and maximum. Accepted prices cannot decrease. Fixed-price bids win maximum ties,
+followed by original submission order. Losing bids release their extra collateral. New submissions
+close before activation, but already queued bids retain their full ten-block disclosure window,
+including when random bidding closure occurs.
+
+The upgrade finishes the auction already in progress under its existing rules and enables the new
+rules for the following auction. Clients must use the updated call arguments after the upgrade;
+transactions encoded with the old `bid` arguments are incompatible.
 
 ### 4. Start Mining and Watch for Rewards
 

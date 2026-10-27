@@ -2,9 +2,12 @@ import { expect, it } from 'vitest';
 import { once } from 'node:events';
 import { WebSocketServer } from 'ws';
 import { WsProvider } from '@polkadot/rpc-provider';
-import { TypeRegistry } from '@polkadot/types';
+import { Metadata, TypeRegistry } from '@polkadot/types';
+import type { HexString } from '@polkadot/util/types';
 import { getClient } from '../index';
+import { withMiningBidDefaults } from '../miningBid';
 import Genesis from '../../genesis.json';
+import metadata from '../../metadata.json';
 import runtimeVersion from '../../runtime_version.json';
 
 it('uses one supplied connection and bundled metadata for historical reads', async () => {
@@ -95,6 +98,48 @@ it('uses one supplied connection and bundled metadata for historical reads', asy
     const historical = await client.at(header.hash);
     expect((await historical.query.system.number()).toNumber()).toBe(9);
     expect(client.registry).toBe(registry);
+    expect(connections).toBe(1);
+    expect(metadataRequests).toBe(0);
+
+    const keys = new Uint8Array(64);
+    const bid = client.tx.miningSlot.bid;
+    const explicit = bid(10_000n, keys, null, null, null);
+    const short = bid(10_000n, keys, null);
+    expect(short.method.toHex()).toBe(explicit.method.toHex());
+    expect(bid(10_000n, keys, null, undefined, undefined).method.toHex()).toBe(
+      explicit.method.toHex(),
+    );
+    expect(short.method.args[3].toJSON()).toBeNull();
+    expect(short.method.args[4].toJSON()).toBeNull();
+    expect(typeof short.signAndSend).toBe('function');
+    expect(typeof short.paymentInfo).toBe('function');
+    expect(bid.is(short.method)).toBe(true);
+    expect(bid.callIndex).toEqual(short.method.callIndex);
+    expect(bid.meta.fields).toHaveLength(5);
+    expect(client.tx.utility.batchAll([short]).method.args[0].toJSON()).toEqual([
+      short.method.toJSON(),
+    ]);
+
+    const frameOnly = bid(10_000n, keys, null, 2n);
+    expect(frameOnly.method.args[3].toJSON()).toBe(2);
+    expect(frameOnly.method.args[4].toJSON()).toBeNull();
+    const hash = '0x' + '11'.repeat(32);
+    const commitment = bid(10_000n, keys, null, 2n, hash);
+    expect(commitment.method.args[3].toJSON()).toBe(2);
+    expect(commitment.method.args[4].toHex()).toBe(hash);
+    // @ts-expect-error The SDK still requires the original three arguments.
+    expect(() => bid(10_000n, keys)).toThrow('expects 5 arguments');
+    // @ts-expect-error The SDK must not silently ignore extra arguments.
+    expect(() => bid(10_000n, keys, null, null, null, null)).toThrow('expects 5 arguments');
+    expect(withMiningBidDefaults(client)).toBe(client);
+    expect(client.tx.miningSlot.bid).toBe(bid);
+
+    // Exercise the same metadata replacement and decorated event used on runtime upgrades.
+    client.injectMetadata(new Metadata(registry, metadata.result as HexString), true, registry);
+    expect(client.tx.miningSlot.bid).not.toBe(bid);
+    expect(client.tx.miningSlot.bid(10_000n, keys, null).method.toHex()).toBe(
+      explicit.method.toHex(),
+    );
     expect(connections).toBe(1);
     expect(metadataRequests).toBe(0);
   } finally {

@@ -96,6 +96,12 @@ function benchmark_runtime() {
 
         # Run benchmark, capturing full output
         benchmark_log=$(mktemp)
+        local analysis_flags=()
+        if [ "$pallet" = "pallet_mining_slot" ]; then
+            # Keep raw measurements for conservative cap-based finalization. Sparse proof
+            # prefixes can crash the CLI's median regression, so avoid that analysis.
+            analysis_flags=(--output-analysis=min-squares --output-pov-analysis=min-squares --no-median-slopes --additional-trie-layers=2 --json-file="${benchmark_log}.json")
+        fi
         set +e
         frame-omni-bencher v1 benchmark pallet \
             --runtime="$runtime_path" \
@@ -104,6 +110,7 @@ function benchmark_runtime() {
             --genesis-builder-policy=none \
             --template="scripts/weight_template.hbs" \
             --repeat="$REPEAT_COUNT" \
+            "${analysis_flags[@]}" \
             --output="$output_dir/" 2>&1 | tee "$benchmark_log" \
             | grep -E "Starting benchmark:|Created file:|Completed|Error|error:"
         bench_ec=${PIPESTATUS[0]}
@@ -120,6 +127,10 @@ function benchmark_runtime() {
         CREATED=$(grep 'Created file:' "$benchmark_log" || true)
         if [ -n "$CREATED" ]; then
             echo "✓ Generated weight file(s)"
+            if [ "$pallet" = "pallet_mining_slot" ]; then
+                python3 scripts/finalize_mining_weights.py "$output_dir/pallet_mining_slot.rs" "${benchmark_log}.json"
+                echo "Raw mining measurements: ${benchmark_log}.json"
+            fi
             # if ismp_grandpa, we need to modify the pallet name in the generated file from pallet_ismp_grandpa::WeightInfo to ismp_grandpa::WeightInfo
             if [[ "$pallet" == "pallet_ismp_grandpa" ]]; then
                 sed -i '' 's/pallet_ismp_grandpa::WeightInfo/ismp_grandpa::WeightInfo/g' "$output_dir/$pallet.rs"

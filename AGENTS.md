@@ -2,7 +2,8 @@
 
 Read [CLAUDE.md](CLAUDE.md) and the relevant `.claude/` guidance for repository architecture and
 commands. For an independent correctness review or assessment of GitHub feedback, use
-[independent-diff-review](.agents/skills/independent-diff-review/SKILL.md). For persistent state, hooks, queues, callbacks, or migrations, also use
+[independent-diff-review](.agents/skills/independent-diff-review/SKILL.md). For persistent state,
+hooks, queues, callbacks, or migrations, also use
 [stateful-workflow-review](.agents/skills/stateful-workflow-review/SKILL.md).
 
 ## Approval Boundaries
