@@ -654,9 +654,13 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       percentForArgonBondPool: Percent & AugmentedConst<ApiType>;
       /**
-       * Percent reserved for Bitcoin Liquids and burned in this release.
+       * Percent credited to the Bitcoin Liquids reserve.
        **/
       percentForBitcoinLiquidPool: Percent & AugmentedConst<ApiType>;
+      /**
+       * Percent of the bid pool held for marketing rewards.
+       **/
+      percentForMarketing: Percent & AugmentedConst<ApiType>;
       /**
        * Percent reserved for future mining-operator rewards and burned in this release.
        **/
@@ -666,10 +670,6 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       percentForStakePool: Percent & AugmentedConst<ApiType>;
       /**
-       * Percent of the bid pool reserved for treasury reserves.
-       **/
-      percentForTreasuryReserves: Percent & AugmentedConst<ApiType>;
-      /**
        * Maximum percent paid to vaults when the network target is filled.
        **/
       percentForVaultPool: Percent & AugmentedConst<ApiType>;
@@ -677,10 +677,6 @@ declare module '@polkadot/api-base/types/consts' {
        * The number of frames a releasing bond lot remains held before release.
        **/
       treasuryExitDelayFrames: u64 & AugmentedConst<ApiType>;
-      /**
-       * Account that holds treasury reserves for claims and reserve-funded payouts.
-       **/
-      treasuryReservesAccount: AccountId32 & AugmentedConst<ApiType>;
       upstreamBitcoinTarget: u128 & AugmentedConst<ApiType>;
       upstreamBitcoinWeight: Permill & AugmentedConst<ApiType>;
       upstreamBondTarget: u128 & AugmentedConst<ApiType>;

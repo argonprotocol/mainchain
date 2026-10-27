@@ -4,6 +4,7 @@ use pallet_prelude::*;
 
 /// Weight functions needed for this pallet.
 pub trait WeightInfo {
+	fn provider_get_average_cpi_for_ticks() -> Weight;
 	fn provider_is_feeless() -> Weight;
 	fn on_initialize() -> Weight;
 	fn submit() -> Weight;
@@ -30,6 +31,10 @@ where
 	}
 }
 impl<T: crate::Config> PriceProviderWeightInfo for ProviderWeightAdapter<T> {
+	fn get_average_cpi_for_ticks() -> Weight {
+		T::WeightInfo::provider_get_average_cpi_for_ticks()
+	}
+
 	fn get_lowest_microgons_per_argonot() -> Weight {
 		<T as crate::Config>::WeightInfo::provider_get_lowest_microgons_per_argonot()
 	}
@@ -49,6 +54,10 @@ impl<T: crate::Config> PriceProviderWeightInfo for ProviderWeightAdapter<T> {
 
 // For backwards compatibility and tests.
 impl WeightInfo for () {
+	fn provider_get_average_cpi_for_ticks() -> Weight {
+		Weight::zero()
+	}
+
 	fn provider_is_feeless() -> Weight {
 		Weight::zero()
 	}

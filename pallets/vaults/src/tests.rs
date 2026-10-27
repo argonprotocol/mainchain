@@ -22,7 +22,7 @@ use bitcoin::{
 	bip32::{ChildNumber, Xpriv, Xpub},
 	key::Secp256k1,
 };
-use frame_support::traits::Hooks;
+use frame_support::traits::{fungible::Balanced, tokens::Imbalance, Hooks};
 use k256::elliptic_curve::rand_core::{OsRng, RngCore};
 use pallet_bitcoin_locks::{LocksById, MicrogonsAtTargetPerBtcHistory};
 use pallet_operational_accounts::{
@@ -2574,6 +2574,89 @@ fn it_can_reuse_locked_argons() {
 }
 
 #[test]
+fn zero_reward_records_capital_when_all_operator_funds_are_held() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		let config = default_vault();
+		let capital = config.securitization;
+		set_argons(1, capital);
+		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), config));
+		assert_eq!(Balances::balance(&1), 0);
+		let mut funding = <Balances as Balanced<_>>::issue(0);
+		let issuance_before = Balances::total_issuance();
+
+		assert_ok!(Vaults::record_vault_frame_earnings(
+			&mut funding,
+			VaultTreasuryFrameEarnings {
+				vault_id: 1,
+				vault_operator_account_id: 1,
+				frame_id: CurrentFrameId::get(),
+				earnings: 0,
+				capital_contributed: capital,
+				earnings_for_vault: 0,
+				capital_contributed_by_vault: capital,
+			},
+		));
+
+		let revenue = RevenuePerFrameByVault::<Test>::get(1);
+		assert_eq!(revenue.len(), 1);
+		assert_eq!(revenue[0].treasury_vault_capital, capital);
+		assert_eq!(revenue[0].uncollected_revenue, 0);
+		assert_eq!(Balances::total_issuance(), issuance_before);
+		assert_eq!(Balances::balance(&1), 0);
+	});
+}
+
+#[test]
+fn failed_reward_hold_preserves_funding_and_revenue_for_retry() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		set_argons(1, 1_000_000);
+		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), default_vault()));
+		assert_ok!(Vaults::close(RuntimeOrigin::signed(1), 1));
+		assert_eq!(Balances::balance_on_hold(&HoldReason::EnterVault.into(), &1), 0);
+
+		// A valid account can have all consumer slots occupied by other pallet activity.
+		while System::inc_consumers(&1).is_ok() {}
+		let mut funding = <Balances as Balanced<_>>::issue(100_000);
+		let issuance_before = Balances::total_issuance();
+		let free_before = Balances::balance(&1);
+		let profit = VaultTreasuryFrameEarnings {
+			vault_id: 1,
+			vault_operator_account_id: 1,
+			frame_id: CurrentFrameId::get(),
+			earnings: 100_000,
+			capital_contributed: 100_000,
+			earnings_for_vault: 100_000,
+			capital_contributed_by_vault: 0,
+		};
+		let mut underfunded_profit = profit.clone();
+		underfunded_profit.earnings_for_vault = 100_001;
+		assert_err!(
+			Vaults::record_vault_frame_earnings(&mut funding, underfunded_profit),
+			TokenError::FundsUnavailable
+		);
+
+		assert!(Vaults::record_vault_frame_earnings(&mut funding, profit.clone()).is_err());
+
+		assert_eq!(funding.peek(), 100_000);
+		assert_eq!(Balances::total_issuance(), issuance_before);
+		assert_eq!(Balances::balance(&1), free_before);
+		assert_eq!(Balances::balance_on_hold(&HoldReason::PendingCollect.into(), &1), 0);
+		assert!(RevenuePerFrameByVault::<Test>::get(1).is_empty());
+		assert_eq!(RevenuePerFrameByVaultCount::<Test>::get(), 0);
+
+		System::dec_consumers(&1);
+		assert_ok!(Vaults::record_vault_frame_earnings(&mut funding, profit));
+		assert_eq!(funding.peek(), 0);
+		assert_eq!(Balances::total_issuance(), issuance_before);
+		assert_eq!(Balances::balance(&1), free_before);
+		assert_eq!(Balances::balance_on_hold(&HoldReason::PendingCollect.into(), &1), 100_000);
+		assert_eq!(RevenuePerFrameByVault::<Test>::get(1)[0].uncollected_revenue, 100_000);
+	});
+}
+
+#[test]
 fn vaults_can_collect_revenue() {
 	new_test_ext().execute_with(|| {
 		// Go past genesis block so events get deposited
@@ -2627,7 +2710,14 @@ fn vaults_can_collect_revenue() {
 		let vault_lp_earnings = 40_000;
 		set_argons(100, vault_lp_earnings);
 		assert_ok!(Vaults::record_vault_frame_earnings(
-			&100,
+			&mut <Balances as Balanced<_>>::withdraw(
+				&100,
+				vault_lp_earnings,
+				Precision::Exact,
+				Preservation::Expendable,
+				Fortitude::Polite,
+			)
+			.unwrap(),
 			VaultTreasuryFrameEarnings {
 				vault_id: 1,
 				vault_operator_account_id: 1,
@@ -2704,7 +2794,14 @@ fn vaults_can_collect_revenue() {
 		set_argons(100, vault_lp_earnings);
 		assert_eq!(CurrentFrameId::get(), 3);
 		assert_ok!(Vaults::record_vault_frame_earnings(
-			&100,
+			&mut <Balances as Balanced<_>>::withdraw(
+				&100,
+				vault_lp_earnings,
+				Precision::Exact,
+				Preservation::Expendable,
+				Fortitude::Polite,
+			)
+			.unwrap(),
 			VaultTreasuryFrameEarnings {
 				vault_id: 1,
 				vault_operator_account_id: 1,
@@ -2751,7 +2848,14 @@ fn it_burns_uncollected_revenue() {
 			Vaults::on_frame_start(i);
 
 			assert_ok!(Vaults::record_vault_frame_earnings(
-				&bid_pool_account,
+				&mut <Balances as Balanced<_>>::withdraw(
+					&bid_pool_account,
+					100_000,
+					Precision::Exact,
+					Preservation::Expendable,
+					Fortitude::Polite,
+				)
+				.unwrap(),
 				VaultTreasuryFrameEarnings {
 					vault_id: 1,
 					vault_operator_account_id: 1,

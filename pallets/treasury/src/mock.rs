@@ -1,12 +1,14 @@
 use crate as pallet_treasury;
 use argon_primitives::{
-	providers::{BitcoinMintedProvider, BurnEventHandler},
+	providers::BitcoinMintedProvider,
 	vault::{TreasuryVaultProvider, VaultError, VaultParticipationCapacity, VaultSecuritization},
 	ArgonCPI, OperationalAccountsHook, PriceProvider, TreasuryPoolProvider, MICROGONS_PER_ARGON,
 };
-use frame_support::traits::{Currency, StorageMapShim};
+use frame_support::traits::{fungible::Credit, tokens::Imbalance, Currency, StorageMapShim};
 use pallet_prelude::{
-	argon_primitives::{vault::VaultTreasuryFrameEarnings, MiningFrameTransitionProvider},
+	argon_primitives::{
+		vault::VaultTreasuryFrameEarnings, MiningFrameProvider, MiningFrameTransitionProvider,
+	},
 	*,
 };
 use sp_core::{crypto::AccountId32, sr25519, Pair};
@@ -51,7 +53,6 @@ parameter_types! {
 
 	pub static ExistentialDeposit: Balance = 1;
 	pub static BidPoolAccountId: TestAccountId = AccountId32::new([250; 32]);
-	pub static TreasuryReservesAccountId: TestAccountId = AccountId32::new([251; 32]);
 }
 
 pub(crate) type ArgonToken = pallet_balances::Instance1;
@@ -150,7 +151,7 @@ parameter_types! {
 	pub static TreasuryExitDelayFrames: FrameId = 10;
 	pub const VaultPalletId: PalletId = PalletId(*b"bidPools");
 
-	pub const PercentForTreasuryReserves: Percent = Percent::from_percent(20);
+	pub const PercentForMarketing: Percent = Percent::from_percent(20);
 	pub const PercentForStakePool: Percent = Percent::from_percent(15);
 	pub const PercentForMiningOperatorPool: Percent = Percent::from_percent(6);
 	pub const PercentForBitcoinLiquidPool: Percent = Percent::from_percent(3);
@@ -168,6 +169,7 @@ parameter_types! {
 	pub static VaultArgonotMicronots: HashMap<VaultId, Balance> = HashMap::new();
 	pub static VaultRewardCommittedMicronots: HashMap<VaultId, Balance> = HashMap::new();
 	pub static BitcoinPriceInUsd: FixedU128 = FixedU128::from_u32(10);
+	pub static AverageArgonCpi: ArgonCPI = ArgonCPI::zero();
 	pub static ArgonPriceInUsd: FixedU128 = FixedU128::from_u32(1);
 	pub static ArgonotPriceInUsd: FixedU128 = FixedU128::from_u32(1);
 	pub static AverageArgonotPriceInMicrogons: Balance = MICROGONS_PER_ARGON;
@@ -199,6 +201,7 @@ pub(crate) fn insert_vault(vault_id: VaultId, vault: TestVault) {
 
 pub struct StaticTreasuryVaultProvider;
 impl TreasuryVaultProvider for StaticTreasuryVaultProvider {
+	type Currency = Balances;
 	type Weights = ();
 	type Balance = Balance;
 	type AccountId = TestAccountId;
@@ -308,16 +311,10 @@ impl TreasuryVaultProvider for StaticTreasuryVaultProvider {
 	}
 
 	fn record_vault_frame_earnings(
-		_source_account_id: &Self::AccountId,
+		funding: &mut Credit<Self::AccountId, Self::Currency>,
 		profit: VaultTreasuryFrameEarnings<Self::Balance, Self::AccountId>,
 	) -> DispatchResult {
-		let _ = Balances::burn_from(
-			&BidPoolAccountId::get(),
-			profit.earnings_for_vault,
-			Preservation::Expendable,
-			Precision::Exact,
-			Fortitude::Force,
-		);
+		drop(funding.extract(profit.earnings_for_vault));
 		LastVaultProfits::mutate(|a| a.push(profit));
 		Ok(())
 	}
@@ -360,7 +357,7 @@ impl PriceProvider<Balance> for StaticPriceProvider {
 	}
 
 	fn get_average_cpi_for_ticks(_tick_range: (Tick, Tick)) -> ArgonCPI {
-		ArgonCPI::zero()
+		AverageArgonCpi::get()
 	}
 
 	fn get_circulation() -> Balance {
@@ -372,11 +369,6 @@ impl PriceProvider<Balance> for StaticPriceProvider {
 	}
 }
 
-pub struct StaticBurnEventHandler;
-impl BurnEventHandler<Balance> for StaticBurnEventHandler {
-	fn on_argon_burn(_amount: &Balance) {}
-}
-
 pub struct StaticMiningFrameTransitionProvider;
 impl MiningFrameTransitionProvider for StaticMiningFrameTransitionProvider {
 	fn get_current_frame_id() -> FrameId {
@@ -385,6 +377,18 @@ impl MiningFrameTransitionProvider for StaticMiningFrameTransitionProvider {
 
 	fn is_new_frame_started() -> Option<FrameId> {
 		None
+	}
+}
+
+impl MiningFrameProvider for StaticMiningFrameTransitionProvider {
+	fn get_next_frame_tick() -> Tick {
+		1_440
+	}
+	fn is_seat_bidding_started() -> bool {
+		false
+	}
+	fn get_tick_range_for_frame(frame_id: FrameId) -> Option<(Tick, Tick)> {
+		Some((frame_id * 1_440, (frame_id + 1) * 1_440))
 	}
 }
 
@@ -402,15 +406,13 @@ impl pallet_treasury::Config for Test {
 	type TreasuryVaultProvider = StaticTreasuryVaultProvider;
 	type BitcoinMintedProvider = StaticBitcoinMintedProvider;
 	type PriceProvider = StaticPriceProvider;
-	type BurnEventHandler = StaticBurnEventHandler;
 	type MinimumArgonsPerContributor = MinimumArgonsPerContributor;
 	type MaxActiveArgonotBondLots = MaxActiveArgonotBondLots;
 	type MaxArgonBondLots = MaxArgonBondLots;
 	type MaxArgonotBondedPercentOfCirculation = MaxArgonotBondedPercentOfCirculation;
 	type PalletId = VaultPalletId;
 	type MiningBidPoolAccount = BidPoolAccountId;
-	type TreasuryReservesAccount = TreasuryReservesAccountId;
-	type PercentForTreasuryReserves = PercentForTreasuryReserves;
+	type PercentForMarketing = PercentForMarketing;
 	type PercentForStakePool = PercentForStakePool;
 	type PercentForMiningOperatorPool = PercentForMiningOperatorPool;
 	type PercentForBitcoinLiquidPool = PercentForBitcoinLiquidPool;
@@ -428,10 +430,26 @@ impl pallet_treasury::Config for Test {
 
 pub(crate) fn new_test_ext() -> TestState {
 	ArgonotSecuritizationMultiplier::set(0);
+	VaultsById::set(HashMap::new());
+	LastVaultProfits::set(vec![]);
+	ArgonPriceInUsd::set(FixedU128::one());
+	ArgonotPriceInUsd::set(FixedU128::one());
+	AverageArgonotPriceInMicrogons::set(MICROGONS_PER_ARGON);
+	AverageArgonCpi::set(ArgonCPI::zero());
 	Upstreams::set(BTreeMap::new());
 	AvailableSecuritizationSpace::set(BTreeMap::new());
 	VaultSecuritizedSatoshis::set(HashMap::new());
-	new_test_with_genesis::<Test>(|_t| {})
+	let mut ext = new_test_with_genesis::<Test>(|_t| {});
+	ext.execute_with(|| {
+		// Keep allocation tests untapered. Taper tests clear this override to use production
+		// defaults.
+		crate::RewardTaperingPolicy::<Test>::mutate(|policy| {
+			policy.argon_bonds.excess_reward_payout_percent = Percent::from_percent(100);
+			policy.argonot_stakes.excess_reward_payout_percent = Percent::from_percent(100);
+			policy.vault_revenue.excess_reward_payout_percent = Percent::from_percent(100);
+		});
+	});
+	ext
 }
 
 impl pallet_treasury_positions::Config for Test {

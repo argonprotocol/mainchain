@@ -1,6 +1,10 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 extern crate alloc;
 
+use frame_support::traits::{
+	fungible::{Balanced, Credit},
+	tokens::{Balance as TokenBalance, Imbalance},
+};
 pub use pallet::*;
 use pallet_prelude::*;
 pub use weights::*;
@@ -61,14 +65,16 @@ pub mod pallet {
 		type WeightInfo: WeightInfo;
 
 		type Currency: MutateHold<Self::AccountId, Reason = Self::RuntimeHoldReason, Balance = Self::Balance>
-			+ Mutate<Self::AccountId, Balance = Self::Balance>;
+			+ Mutate<Self::AccountId, Balance = Self::Balance>
+			+ Balanced<Self::AccountId, Balance = Self::Balance>;
 
 		type OwnershipCurrency: MutateHold<Self::AccountId, Reason = Self::RuntimeHoldReason, Balance = Self::Balance>
 			+ Mutate<Self::AccountId, Balance = Self::Balance>
 			+ InspectHold<Self::AccountId, Reason = Self::RuntimeHoldReason, Balance = Self::Balance>
 			+ Inspect<Self::AccountId, Balance = Self::Balance>;
 
-		type Balance: AtLeast32BitUnsigned
+		type Balance: TokenBalance
+			+ AtLeast32BitUnsigned
 			+ codec::FullCodec
 			+ Copy
 			+ MaybeSerializeDeserialize
@@ -1366,6 +1372,7 @@ pub mod pallet {
 	}
 
 	impl<T: Config> TreasuryVaultProvider for Pallet<T> {
+		type Currency = T::Currency;
 		type Weights = crate::weights::ProviderWeightAdapter<T>;
 		type Balance = T::Balance;
 		type AccountId = T::AccountId;
@@ -1480,7 +1487,7 @@ pub mod pallet {
 		}
 
 		fn record_vault_frame_earnings(
-			source_account_id: &Self::AccountId,
+			funding: &mut Credit<Self::AccountId, Self::Currency>,
 			profit: VaultTreasuryFrameEarnings<Self::Balance, Self::AccountId>,
 		) -> DispatchResult {
 			let VaultTreasuryFrameEarnings {
@@ -1492,37 +1499,52 @@ pub mod pallet {
 				capital_contributed_by_vault,
 				earnings,
 			} = profit;
+			ensure!(earnings_for_vault <= funding.peek(), TokenError::FundsUnavailable);
 
-			Self::mutate_frame_revenue(vault_id, frame_id, |revenue| {
-				revenue.treasury_total_earnings = earnings;
-				revenue.treasury_vault_earnings = earnings_for_vault;
-				revenue.treasury_external_capital =
-					capital_contributed.saturating_sub(capital_contributed_by_vault);
-				revenue.treasury_vault_capital = capital_contributed_by_vault;
-				revenue.uncollected_revenue.saturating_accrue(earnings_for_vault);
-				T::Currency::transfer_and_hold(
-					&HoldReason::PendingCollect.into(),
-					source_account_id,
+			let payment_result = with_storage_layer(|| {
+				Self::mutate_frame_revenue(vault_id, frame_id, |revenue| {
+					revenue.treasury_total_earnings = earnings;
+					revenue.treasury_vault_earnings = earnings_for_vault;
+					revenue.treasury_external_capital =
+						capital_contributed.saturating_sub(capital_contributed_by_vault);
+					revenue.treasury_vault_capital = capital_contributed_by_vault;
+					revenue.uncollected_revenue.saturating_accrue(earnings_for_vault);
+					Ok(())
+				})
+				.map_err(|error| DispatchError::from(Error::<T>::from(error)))?;
+				if earnings_for_vault.is_zero() {
+					return Ok(None);
+				}
+				let paid = T::Currency::deposit(
 					&vault_operator_account_id,
 					earnings_for_vault,
 					Precision::Exact,
-					Preservation::Expendable,
-					Fortitude::Force,
-				)
-				.map_err(|_| VaultError::UnrecoverableHold)?;
-				Ok(())
-			})
-			.map_err(|e| {
-				log::error!("Unable to record vault frame profits for vault {vault_id}: {e:?}");
-				let dispatch_error: DispatchError = Error::<T>::from(e).into();
-				Self::deposit_event(Event::TreasuryRecordingError {
-					vault_id,
-					frame_id,
-					vault_earnings: earnings_for_vault,
-					error: dispatch_error,
-				});
-				dispatch_error
-			})
+				)?;
+				T::Currency::hold(
+					&HoldReason::PendingCollect.into(),
+					&vault_operator_account_id,
+					earnings_for_vault,
+				)?;
+				Ok(Some(paid))
+			});
+			let paid = match payment_result {
+				Ok(paid) => paid,
+				Err(dispatch_error) => {
+					log::error!("Unable to record vault frame profits for vault {vault_id}: {dispatch_error:?}");
+					Self::deposit_event(Event::TreasuryRecordingError {
+						vault_id,
+						frame_id,
+						vault_earnings: earnings_for_vault,
+						error: dispatch_error,
+					});
+					return Err(dispatch_error);
+				},
+			};
+			// The transaction succeeded; consume exactly the credit backing its deposit.
+			if let Some(paid) = paid {
+				let _ = funding.extract(earnings_for_vault).offset(paid);
+			}
+			Ok(())
 		}
 	}
 

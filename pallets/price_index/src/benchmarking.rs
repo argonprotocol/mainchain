@@ -27,18 +27,39 @@ mod benchmarks {
 	#[benchmark]
 	fn submit() -> Result<(), BenchmarkError> {
 		let caller: T::AccountId = whitelisted_caller();
-		let index = benchmark_price_index(1);
+		let bucket_ticks = T::TicksPerFrame::get().div_ceil(24).max(1);
+		let mut index = benchmark_price_index(48 * bucket_ticks);
+		index.argon_usd_price = FixedU128::from_rational(9, 10);
+		let previous = PriceIndex { tick: index.tick - 1, ..index };
+		Current::<T>::put(previous);
 		let ethereum = EthereumPriceIndex {
 			ethereum_usd_price: FixedU128::from_u32(3_000),
 			ethereum_gas_price_wei: 1_000_000_000,
 			tick: index.tick,
 		};
 		Operator::<T>::put(caller.clone());
+		set_benchmark_bitcoin_locks_runtime_state(BenchmarkBitcoinLocksRuntimeState {
+			current_frame_id: 1,
+			current_tick: index.tick,
+			did_start_new_frame: false,
+		});
+		let mut history = BoundedVec::default();
+		for bucket in (0..48).rev() {
+			history
+				.try_push(CpiMeasurementBucket {
+					tick_range: (bucket * bucket_ticks, (bucket + 1) * bucket_ticks),
+					total_cpi: ArgonCPI::zero(),
+					measurements_count: 1,
+				})
+				.map_err(|_| BenchmarkError::Stop("CPI benchmark history overflow"))?;
+		}
+		HistoricArgonCPI::<T>::put(history);
 
 		#[extrinsic_call]
 		submit(RawOrigin::Signed(caller.clone()), index, Some(ethereum));
 
 		assert_eq!(Current::<T>::get(), Some(index));
+		assert_eq!(LastValid::<T>::get(), Some(previous));
 		assert_eq!(CurrentEthereumPrice::<T>::get(), Some(ethereum));
 		assert!(!HistoricEthereumPricesByFrame::<T>::get().is_empty());
 
@@ -104,23 +125,57 @@ mod benchmarks {
 	}
 
 	#[benchmark]
-	fn provider_get_average_microgons_per_argonot() -> Result<(), BenchmarkError> {
-		let frame_id: FrameId = 2;
-		let price = T::Balance::from(3 * MICROGONS_PER_ARGON);
-		HistoricArgonotAverageByFrame::<T>::mutate(|history| {
-			let _ = history.try_insert(frame_id, price);
-		});
+	fn provider_get_average_cpi_for_ticks() -> Result<(), BenchmarkError> {
+		let cpi = ArgonCPI::from_rational(1, 20);
+		let mut history = BoundedVec::default();
+		for bucket in 0..48 {
+			history
+				.try_push(CpiMeasurementBucket {
+					tick_range: (bucket * 60, (bucket + 1) * 60),
+					total_cpi: cpi,
+					measurements_count: 1,
+				})
+				.map_err(|_| BenchmarkError::Stop("CPI benchmark history overflow"))?;
+		}
+		HistoricArgonCPI::<T>::put(history);
 
 		#[block]
 		{
 			assert_eq!(
-				<Pallet<T> as PriceProvider<T::Balance>>::get_average_microgons_per_argonot(
-					frame_id
-				),
-				Some(price)
+				<Pallet<T> as PriceProvider<T::Balance>>::get_average_cpi_for_ticks((0, 48 * 60)),
+				cpi
 			);
 		}
+		Ok(())
+	}
 
+	#[benchmark]
+	fn provider_get_average_microgons_per_argonot() -> Result<(), BenchmarkError> {
+		let frame_id: FrameId = 2;
+		let price = T::Balance::from(3 * MICROGONS_PER_ARGON);
+		let mut history = BoundedBTreeMap::<_, _, T::MaxArgonotAverageHistoryFrames>::new();
+		for offset in 0..T::MaxArgonotAverageHistoryFrames::get() {
+			history
+				.try_insert(frame_id + FrameId::from(offset), price)
+				.map_err(|_| BenchmarkError::Stop("Argonot average history overflow"))?;
+		}
+		HistoricArgonotAverageByFrame::<T>::put(history);
+		let frame_id =
+			frame_id + FrameId::from(T::MaxArgonotAverageHistoryFrames::get().saturating_sub(1));
+
+		#[block]
+		{
+			// Treasury values stakes and the next vault snapshot from this same entry.
+			// Measure both lookups so the cache shares their database read and proof.
+			for _ in 0..2 {
+				assert_eq!(
+					<Pallet<T> as PriceProvider<T::Balance>>::get_average_microgons_per_argonot(
+						frame_id
+					),
+					Some(price)
+				);
+			}
+		}
 		Ok(())
 	}
 

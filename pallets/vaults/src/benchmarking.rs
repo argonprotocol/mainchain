@@ -479,9 +479,18 @@ mod benchmarks {
 		let earnings_for_vault: BalanceOf<T> = 50_000u128.into();
 		let _ = CurrencyOf::<T>::mint_into(&source, 1_000_000_000u128.into());
 
+		let mut funding = CurrencyOf::<T>::withdraw(
+			&source,
+			CurrencyOf::<T>::balance(&source),
+			Precision::Exact,
+			Preservation::Expendable,
+			Fortitude::Polite,
+		)
+		.map_err(|_| BenchmarkError::Stop("failed to withdraw reward funding"))?;
+
 		for i in 0..12u32 {
 			<Pallet<T> as TreasuryVaultProvider>::record_vault_frame_earnings(
-				&source,
+				&mut funding,
 				VaultTreasuryFrameEarnings {
 					vault_id,
 					vault_operator_account_id: caller.clone(),
@@ -646,10 +655,19 @@ mod benchmarks {
 			.map_err(|_| BenchmarkError::Stop("failed to fund reward source"))?;
 		let frame_id = T::CurrentFrameId::get();
 
+		let mut funding = CurrencyOf::<T>::withdraw(
+			&source,
+			CurrencyOf::<T>::balance(&source),
+			Precision::Exact,
+			Preservation::Expendable,
+			Fortitude::Polite,
+		)
+		.map_err(|_| BenchmarkError::Stop("failed to withdraw reward funding"))?;
+
 		#[block]
 		{
 			<Pallet<T> as TreasuryVaultProvider>::record_vault_frame_earnings(
-				&source,
+				&mut funding,
 				VaultTreasuryFrameEarnings {
 					vault_id,
 					vault_operator_account_id: operator,
@@ -1151,6 +1169,15 @@ mod benchmarks {
 		let earnings_for_vault: BalanceOf<T> = 1_000u128.into();
 		let _ = CurrencyOf::<T>::mint_into(&source, 10_000_000_000u128.into());
 
+		let mut funding = CurrencyOf::<T>::withdraw(
+			&source,
+			CurrencyOf::<T>::balance(&source),
+			Precision::Exact,
+			Preservation::Expendable,
+			Fortitude::Polite,
+		)
+		.map_err(|_| BenchmarkError::Stop("failed to withdraw reward funding"))?;
+
 		let frame_id = T::RevenueCollectionExpirationFrames::get().saturating_add(100u32.into());
 		let collect_expired_frame =
 			frame_id.saturating_sub(T::RevenueCollectionExpirationFrames::get());
@@ -1162,7 +1189,7 @@ mod benchmarks {
 			for frame_offset in 0..12u32 {
 				let expired_frame = first_expired_frame.saturating_add(frame_offset.into());
 				<Pallet<T> as TreasuryVaultProvider>::record_vault_frame_earnings(
-					&source,
+					&mut funding,
 					VaultTreasuryFrameEarnings {
 						vault_id,
 						vault_operator_account_id: operator.clone(),

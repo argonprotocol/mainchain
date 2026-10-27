@@ -1171,10 +1171,9 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							237u8, 47u8, 251u8, 58u8, 169u8, 212u8, 240u8, 227u8, 218u8, 129u8,
-							94u8, 15u8, 97u8, 193u8, 189u8, 174u8, 39u8, 27u8, 22u8, 247u8, 117u8,
-							118u8, 253u8, 140u8, 172u8, 7u8, 134u8, 111u8, 240u8, 49u8, 237u8,
-							75u8,
+							187u8, 162u8, 6u8, 80u8, 167u8, 239u8, 53u8, 216u8, 34u8, 60u8, 186u8,
+							168u8, 148u8, 107u8, 221u8, 129u8, 215u8, 162u8, 235u8, 179u8, 144u8,
+							179u8, 61u8, 50u8, 230u8, 118u8, 245u8, 59u8, 224u8, 39u8, 137u8, 37u8,
 						],
 					)
 				}
@@ -1192,10 +1191,10 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							120u8, 184u8, 100u8, 74u8, 188u8, 184u8, 212u8, 53u8, 119u8, 140u8,
-							237u8, 254u8, 13u8, 209u8, 199u8, 179u8, 116u8, 78u8, 210u8, 61u8,
-							223u8, 117u8, 38u8, 72u8, 88u8, 82u8, 44u8, 217u8, 126u8, 101u8, 188u8,
-							11u8,
+							126u8, 114u8, 228u8, 219u8, 0u8, 178u8, 188u8, 225u8, 208u8, 202u8,
+							96u8, 20u8, 208u8, 236u8, 115u8, 20u8, 182u8, 142u8, 181u8, 237u8,
+							32u8, 82u8, 253u8, 31u8, 29u8, 27u8, 174u8, 253u8, 37u8, 21u8, 62u8,
+							29u8,
 						],
 					)
 				}
@@ -3501,9 +3500,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				150u8, 149u8, 18u8, 45u8, 34u8, 225u8, 88u8, 100u8, 127u8, 129u8, 211u8, 182u8,
-				123u8, 156u8, 237u8, 233u8, 102u8, 80u8, 129u8, 210u8, 28u8, 99u8, 234u8, 68u8,
-				102u8, 177u8, 171u8, 80u8, 78u8, 235u8, 56u8, 224u8,
+				39u8, 65u8, 76u8, 34u8, 164u8, 240u8, 114u8, 169u8, 175u8, 247u8, 83u8, 65u8,
+				126u8, 150u8, 96u8, 128u8, 193u8, 92u8, 131u8, 139u8, 67u8, 139u8, 106u8, 83u8,
+				4u8, 149u8, 162u8, 4u8, 78u8, 4u8, 140u8, 75u8,
 			]
 	}
 	pub mod system {
@@ -4627,10 +4626,10 @@ pub mod api {
 						"Events",
 						(),
 						[
-							218u8, 192u8, 60u8, 4u8, 254u8, 224u8, 141u8, 179u8, 225u8, 124u8, 9u8,
-							109u8, 233u8, 93u8, 167u8, 99u8, 183u8, 237u8, 106u8, 245u8, 49u8,
-							94u8, 69u8, 159u8, 134u8, 134u8, 100u8, 82u8, 254u8, 242u8, 171u8,
-							129u8,
+							136u8, 74u8, 133u8, 208u8, 121u8, 184u8, 142u8, 163u8, 139u8, 27u8,
+							187u8, 104u8, 89u8, 19u8, 177u8, 67u8, 179u8, 58u8, 201u8, 188u8,
+							247u8, 19u8, 109u8, 138u8, 106u8, 41u8, 243u8, 44u8, 154u8, 108u8,
+							114u8, 48u8,
 						],
 					)
 				}
@@ -5538,9 +5537,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							135u8, 148u8, 75u8, 177u8, 69u8, 198u8, 100u8, 164u8, 87u8, 36u8, 58u8,
-							223u8, 227u8, 164u8, 20u8, 147u8, 15u8, 228u8, 30u8, 121u8, 41u8,
-							198u8, 58u8, 129u8, 90u8, 50u8, 212u8, 177u8, 95u8, 32u8, 200u8, 201u8,
+							11u8, 200u8, 248u8, 197u8, 112u8, 52u8, 196u8, 162u8, 58u8, 207u8,
+							224u8, 174u8, 38u8, 18u8, 33u8, 245u8, 148u8, 221u8, 229u8, 179u8,
+							54u8, 159u8, 161u8, 201u8, 153u8, 251u8, 140u8, 228u8, 225u8, 134u8,
+							111u8, 81u8,
 						],
 					)
 				}
@@ -5605,9 +5605,9 @@ pub mod api {
 							max_weight,
 						},
 						[
-							88u8, 241u8, 126u8, 138u8, 101u8, 186u8, 132u8, 3u8, 19u8, 202u8,
-							119u8, 211u8, 204u8, 177u8, 43u8, 73u8, 5u8, 102u8, 240u8, 1u8, 197u8,
-							73u8, 97u8, 90u8, 171u8, 2u8, 114u8, 21u8, 155u8, 150u8, 235u8, 201u8,
+							92u8, 18u8, 203u8, 198u8, 153u8, 240u8, 159u8, 2u8, 35u8, 122u8, 82u8,
+							35u8, 253u8, 158u8, 225u8, 154u8, 25u8, 155u8, 173u8, 200u8, 33u8,
+							72u8, 71u8, 86u8, 248u8, 248u8, 97u8, 92u8, 251u8, 141u8, 66u8, 186u8,
 						],
 					)
 				}
@@ -6512,10 +6512,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							10u8, 204u8, 190u8, 79u8, 204u8, 116u8, 209u8, 11u8, 142u8, 10u8, 23u8,
-							126u8, 70u8, 206u8, 32u8, 99u8, 80u8, 252u8, 248u8, 197u8, 135u8,
-							151u8, 127u8, 187u8, 237u8, 64u8, 134u8, 22u8, 91u8, 188u8, 147u8,
-							82u8,
+							1u8, 32u8, 172u8, 143u8, 66u8, 25u8, 196u8, 177u8, 132u8, 18u8, 17u8,
+							138u8, 66u8, 154u8, 109u8, 5u8, 193u8, 108u8, 233u8, 243u8, 160u8,
+							56u8, 174u8, 249u8, 111u8, 218u8, 62u8, 188u8, 105u8, 194u8, 54u8,
+							243u8,
 						],
 					)
 				}
@@ -6779,9 +6779,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							111u8, 162u8, 156u8, 12u8, 40u8, 14u8, 12u8, 1u8, 193u8, 66u8, 206u8,
-							3u8, 157u8, 184u8, 49u8, 254u8, 10u8, 226u8, 1u8, 94u8, 216u8, 148u8,
-							167u8, 56u8, 80u8, 116u8, 7u8, 137u8, 51u8, 124u8, 118u8, 119u8,
+							63u8, 216u8, 114u8, 73u8, 230u8, 123u8, 6u8, 92u8, 12u8, 53u8, 236u8,
+							143u8, 209u8, 100u8, 87u8, 64u8, 226u8, 28u8, 215u8, 241u8, 29u8, 49u8,
+							13u8, 33u8, 54u8, 117u8, 112u8, 123u8, 228u8, 65u8, 192u8, 42u8,
 						],
 					)
 				}
@@ -6830,9 +6830,10 @@ pub mod api {
 						],
 						check_permissions::Input { call, proxy_type },
 						[
-							60u8, 224u8, 124u8, 211u8, 17u8, 145u8, 205u8, 83u8, 91u8, 94u8, 158u8,
-							210u8, 105u8, 7u8, 111u8, 210u8, 44u8, 177u8, 67u8, 216u8, 196u8, 64u8,
-							227u8, 184u8, 181u8, 27u8, 226u8, 21u8, 240u8, 18u8, 116u8, 39u8,
+							108u8, 157u8, 109u8, 227u8, 149u8, 195u8, 151u8, 37u8, 214u8, 140u8,
+							117u8, 191u8, 107u8, 208u8, 183u8, 81u8, 234u8, 167u8, 82u8, 200u8,
+							21u8, 190u8, 137u8, 178u8, 176u8, 17u8, 97u8, 178u8, 45u8, 86u8, 41u8,
+							56u8,
 						],
 					)
 				}
@@ -16098,7 +16099,7 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Tracks the average cpi data every 60 ticks"]
+				#[doc = " CPI history in buckets of ceil(frame ticks / 24)."]
 				pub fn historic_argon_cpi(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
@@ -22252,9 +22253,9 @@ pub mod api {
 						"batch",
 						types::Batch { calls },
 						[
-							62u8, 52u8, 248u8, 9u8, 90u8, 211u8, 202u8, 193u8, 157u8, 79u8, 254u8,
-							85u8, 23u8, 191u8, 99u8, 23u8, 3u8, 121u8, 22u8, 237u8, 14u8, 108u8,
-							43u8, 36u8, 222u8, 182u8, 27u8, 183u8, 221u8, 75u8, 46u8, 169u8,
+							0u8, 135u8, 69u8, 108u8, 134u8, 46u8, 157u8, 91u8, 190u8, 234u8, 160u8,
+							249u8, 0u8, 80u8, 216u8, 86u8, 131u8, 178u8, 57u8, 27u8, 55u8, 113u8,
+							124u8, 205u8, 228u8, 245u8, 130u8, 223u8, 230u8, 81u8, 182u8, 254u8,
 						],
 					)
 				}
@@ -22284,9 +22285,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							232u8, 207u8, 139u8, 1u8, 88u8, 219u8, 119u8, 72u8, 26u8, 124u8, 224u8,
-							119u8, 70u8, 161u8, 106u8, 107u8, 12u8, 49u8, 147u8, 242u8, 199u8,
-							40u8, 233u8, 53u8, 68u8, 62u8, 240u8, 86u8, 133u8, 100u8, 50u8, 208u8,
+							8u8, 222u8, 72u8, 132u8, 54u8, 1u8, 128u8, 223u8, 43u8, 174u8, 19u8,
+							37u8, 133u8, 240u8, 214u8, 23u8, 248u8, 186u8, 129u8, 232u8, 175u8,
+							94u8, 127u8, 230u8, 120u8, 250u8, 247u8, 199u8, 229u8, 30u8, 188u8,
+							175u8,
 						],
 					)
 				}
@@ -22312,10 +22314,10 @@ pub mod api {
 						"batch_all",
 						types::BatchAll { calls },
 						[
-							127u8, 204u8, 147u8, 36u8, 42u8, 108u8, 110u8, 222u8, 44u8, 202u8,
-							195u8, 239u8, 2u8, 73u8, 27u8, 177u8, 8u8, 74u8, 90u8, 17u8, 93u8,
-							231u8, 63u8, 141u8, 51u8, 2u8, 233u8, 100u8, 244u8, 203u8, 111u8,
-							182u8,
+							158u8, 248u8, 134u8, 92u8, 89u8, 210u8, 116u8, 43u8, 40u8, 215u8, 15u8,
+							243u8, 48u8, 129u8, 116u8, 206u8, 45u8, 37u8, 163u8, 122u8, 48u8,
+							121u8, 150u8, 251u8, 247u8, 144u8, 72u8, 184u8, 36u8, 22u8, 212u8,
+							78u8,
 						],
 					)
 				}
@@ -22338,9 +22340,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							56u8, 39u8, 121u8, 58u8, 136u8, 82u8, 0u8, 247u8, 132u8, 182u8, 100u8,
-							189u8, 141u8, 31u8, 169u8, 95u8, 178u8, 124u8, 201u8, 216u8, 150u8,
-							234u8, 110u8, 43u8, 3u8, 217u8, 31u8, 166u8, 18u8, 87u8, 8u8, 222u8,
+							94u8, 32u8, 176u8, 216u8, 33u8, 238u8, 114u8, 246u8, 205u8, 67u8, 80u8,
+							203u8, 83u8, 205u8, 59u8, 130u8, 253u8, 221u8, 166u8, 61u8, 235u8,
+							222u8, 35u8, 185u8, 253u8, 16u8, 43u8, 56u8, 43u8, 27u8, 13u8, 90u8,
 						],
 					)
 				}
@@ -22366,9 +22368,10 @@ pub mod api {
 						"force_batch",
 						types::ForceBatch { calls },
 						[
-							151u8, 62u8, 131u8, 162u8, 219u8, 167u8, 116u8, 68u8, 23u8, 93u8, 21u8,
-							124u8, 192u8, 148u8, 181u8, 156u8, 205u8, 106u8, 173u8, 121u8, 82u8,
-							197u8, 68u8, 95u8, 152u8, 45u8, 71u8, 212u8, 5u8, 88u8, 4u8, 255u8,
+							73u8, 139u8, 235u8, 234u8, 174u8, 227u8, 197u8, 93u8, 228u8, 44u8,
+							169u8, 139u8, 215u8, 233u8, 52u8, 63u8, 238u8, 113u8, 135u8, 207u8,
+							63u8, 152u8, 25u8, 148u8, 28u8, 127u8, 86u8, 237u8, 194u8, 248u8,
+							250u8, 39u8,
 						],
 					)
 				}
@@ -22391,9 +22394,10 @@ pub mod api {
 							weight,
 						},
 						[
-							43u8, 183u8, 27u8, 136u8, 146u8, 148u8, 9u8, 10u8, 133u8, 90u8, 85u8,
-							220u8, 133u8, 242u8, 59u8, 174u8, 86u8, 49u8, 222u8, 149u8, 162u8,
-							19u8, 253u8, 69u8, 251u8, 28u8, 64u8, 49u8, 246u8, 219u8, 35u8, 66u8,
+							77u8, 128u8, 7u8, 218u8, 160u8, 252u8, 146u8, 217u8, 9u8, 188u8, 41u8,
+							250u8, 138u8, 149u8, 105u8, 40u8, 5u8, 100u8, 137u8, 213u8, 30u8,
+							202u8, 53u8, 129u8, 156u8, 164u8, 130u8, 224u8, 213u8, 68u8, 31u8,
+							33u8,
 						],
 					)
 				}
@@ -22433,9 +22437,10 @@ pub mod api {
 							fallback: ::subxt::ext::subxt_core::alloc::boxed::Box::new(fallback),
 						},
 						[
-							156u8, 68u8, 206u8, 29u8, 22u8, 215u8, 200u8, 49u8, 69u8, 90u8, 17u8,
-							116u8, 150u8, 77u8, 62u8, 49u8, 182u8, 184u8, 119u8, 47u8, 152u8,
-							102u8, 183u8, 17u8, 10u8, 56u8, 38u8, 46u8, 80u8, 54u8, 102u8, 107u8,
+							155u8, 102u8, 195u8, 150u8, 25u8, 210u8, 20u8, 61u8, 107u8, 140u8,
+							230u8, 8u8, 35u8, 13u8, 203u8, 70u8, 100u8, 93u8, 43u8, 98u8, 42u8,
+							132u8, 108u8, 24u8, 240u8, 170u8, 224u8, 42u8, 240u8, 150u8, 37u8,
+							43u8,
 						],
 					)
 				}
@@ -22458,10 +22463,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							114u8, 144u8, 79u8, 232u8, 115u8, 34u8, 12u8, 247u8, 81u8, 130u8,
-							131u8, 95u8, 56u8, 212u8, 106u8, 6u8, 25u8, 11u8, 46u8, 3u8, 236u8,
-							250u8, 234u8, 55u8, 182u8, 216u8, 241u8, 244u8, 73u8, 248u8, 217u8,
-							7u8,
+							243u8, 80u8, 117u8, 181u8, 199u8, 165u8, 19u8, 192u8, 59u8, 114u8,
+							64u8, 84u8, 241u8, 70u8, 207u8, 45u8, 74u8, 215u8, 215u8, 227u8, 165u8,
+							251u8, 8u8, 127u8, 73u8, 184u8, 3u8, 173u8, 92u8, 106u8, 249u8, 94u8,
 						],
 					)
 				}
@@ -22797,9 +22801,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							70u8, 191u8, 221u8, 241u8, 255u8, 6u8, 94u8, 3u8, 152u8, 158u8, 38u8,
-							122u8, 202u8, 0u8, 90u8, 206u8, 24u8, 93u8, 170u8, 120u8, 52u8, 205u8,
-							154u8, 148u8, 25u8, 112u8, 82u8, 251u8, 223u8, 155u8, 152u8, 172u8,
+							144u8, 26u8, 42u8, 27u8, 105u8, 176u8, 239u8, 175u8, 81u8, 226u8,
+							239u8, 86u8, 0u8, 47u8, 229u8, 207u8, 10u8, 32u8, 192u8, 3u8, 243u8,
+							122u8, 81u8, 222u8, 48u8, 225u8, 207u8, 152u8, 78u8, 112u8, 17u8,
+							187u8,
 						],
 					)
 				}
@@ -22822,10 +22827,10 @@ pub mod api {
 							weight,
 						},
 						[
-							243u8, 72u8, 143u8, 98u8, 239u8, 159u8, 53u8, 98u8, 210u8, 210u8,
-							183u8, 187u8, 119u8, 62u8, 247u8, 79u8, 231u8, 126u8, 240u8, 164u8,
-							132u8, 240u8, 98u8, 211u8, 236u8, 65u8, 188u8, 97u8, 231u8, 199u8,
-							73u8, 144u8,
+							129u8, 223u8, 186u8, 193u8, 183u8, 187u8, 135u8, 209u8, 59u8, 97u8,
+							210u8, 163u8, 49u8, 219u8, 164u8, 236u8, 87u8, 246u8, 195u8, 168u8,
+							199u8, 216u8, 95u8, 222u8, 28u8, 66u8, 233u8, 212u8, 134u8, 69u8, 55u8,
+							64u8,
 						],
 					)
 				}
@@ -22863,9 +22868,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							93u8, 176u8, 182u8, 55u8, 41u8, 27u8, 50u8, 70u8, 93u8, 209u8, 138u8,
-							174u8, 125u8, 53u8, 100u8, 85u8, 98u8, 21u8, 50u8, 143u8, 44u8, 159u8,
-							65u8, 188u8, 124u8, 95u8, 236u8, 227u8, 108u8, 171u8, 146u8, 114u8,
+							33u8, 86u8, 41u8, 186u8, 253u8, 55u8, 161u8, 246u8, 166u8, 210u8,
+							247u8, 191u8, 170u8, 197u8, 238u8, 162u8, 165u8, 165u8, 221u8, 210u8,
+							20u8, 1u8, 179u8, 55u8, 66u8, 158u8, 255u8, 73u8, 142u8, 205u8, 76u8,
+							128u8,
 						],
 					)
 				}
@@ -23747,6 +23753,58 @@ pub mod api {
 					const PALLET: &'static str = "Treasury";
 					const CALL: &'static str = "backfill_bond_lot_earnings";
 				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Update selected reward programs for future frames, preserving omitted programs."]
+				pub struct ConfigureRewardTaperingPolicy {
+					pub bitcoin_liquids: ::subxt::ext::subxt_core::alloc::boxed::Box<
+						configure_reward_tapering_policy::BitcoinLiquids,
+					>,
+					pub argon_bonds: ::subxt::ext::subxt_core::alloc::boxed::Box<
+						configure_reward_tapering_policy::ArgonBonds,
+					>,
+					pub argonot_stakes: ::subxt::ext::subxt_core::alloc::boxed::Box<
+						configure_reward_tapering_policy::ArgonotStakes,
+					>,
+					pub vault_revenue: ::subxt::ext::subxt_core::alloc::boxed::Box<
+						configure_reward_tapering_policy::VaultRevenue,
+					>,
+					pub stabilizer_pools: ::subxt::ext::subxt_core::alloc::boxed::Box<
+						configure_reward_tapering_policy::StabilizerPools,
+					>,
+				}
+				pub mod configure_reward_tapering_policy {
+					use super::runtime_types;
+					pub type BitcoinLiquids = ::core::option::Option<
+						runtime_types::pallet_treasury::pallet::TaperingProgram,
+					>;
+					pub type ArgonBonds = ::core::option::Option<
+						runtime_types::pallet_treasury::pallet::TaperingProgram,
+					>;
+					pub type ArgonotStakes = ::core::option::Option<
+						runtime_types::pallet_treasury::pallet::TaperingProgram,
+					>;
+					pub type VaultRevenue = ::core::option::Option<
+						runtime_types::pallet_treasury::pallet::TaperingProgram,
+					>;
+					pub type StabilizerPools = ::core::option::Option<
+						runtime_types::pallet_treasury::pallet::TaperingProgram,
+					>;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for ConfigureRewardTaperingPolicy {
+					const PALLET: &'static str = "Treasury";
+					const CALL: &'static str = "configure_reward_tapering_policy";
+				}
 			}
 			pub struct TransactionApi;
 			impl TransactionApi {
@@ -23887,6 +23945,44 @@ pub mod api {
 						],
 					)
 				}
+				#[doc = "Update selected reward programs for future frames, preserving omitted programs."]
+				pub fn configure_reward_tapering_policy(
+					&self,
+					bitcoin_liquids: types::configure_reward_tapering_policy::BitcoinLiquids,
+					argon_bonds: types::configure_reward_tapering_policy::ArgonBonds,
+					argonot_stakes: types::configure_reward_tapering_policy::ArgonotStakes,
+					vault_revenue: types::configure_reward_tapering_policy::VaultRevenue,
+					stabilizer_pools: types::configure_reward_tapering_policy::StabilizerPools,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<
+					types::ConfigureRewardTaperingPolicy,
+				> {
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"Treasury",
+						"configure_reward_tapering_policy",
+						types::ConfigureRewardTaperingPolicy {
+							bitcoin_liquids: ::subxt::ext::subxt_core::alloc::boxed::Box::new(
+								bitcoin_liquids,
+							),
+							argon_bonds: ::subxt::ext::subxt_core::alloc::boxed::Box::new(
+								argon_bonds,
+							),
+							argonot_stakes: ::subxt::ext::subxt_core::alloc::boxed::Box::new(
+								argonot_stakes,
+							),
+							vault_revenue: ::subxt::ext::subxt_core::alloc::boxed::Box::new(
+								vault_revenue,
+							),
+							stabilizer_pools: ::subxt::ext::subxt_core::alloc::boxed::Box::new(
+								stabilizer_pools,
+							),
+						},
+						[
+							6u8, 142u8, 212u8, 146u8, 90u8, 84u8, 182u8, 183u8, 176u8, 99u8, 239u8,
+							141u8, 151u8, 128u8, 96u8, 37u8, 19u8, 135u8, 218u8, 255u8, 185u8,
+							26u8, 193u8, 182u8, 105u8, 149u8, 193u8, 70u8, 12u8, 190u8, 27u8, 90u8,
+						],
+					)
+				}
 			}
 		}
 		#[doc = "The `Event` enum of this pallet"]
@@ -23960,21 +24056,21 @@ pub mod api {
 			)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			#[doc = "An error occurred while moving bid-pool funds into treasury reserves."]
-			pub struct CouldNotTransferToTreasuryReserves {
-				pub frame_id: could_not_transfer_to_treasury_reserves::FrameId,
-				pub amount: could_not_transfer_to_treasury_reserves::Amount,
-				pub dispatch_error: could_not_transfer_to_treasury_reserves::DispatchError,
+			#[doc = "A reserve top-up could not be added to the frame reward funding."]
+			pub struct CouldNotFundReserveTopup {
+				pub frame_id: could_not_fund_reserve_topup::FrameId,
+				pub amount: could_not_fund_reserve_topup::Amount,
+				pub dispatch_error: could_not_fund_reserve_topup::DispatchError,
 			}
-			pub mod could_not_transfer_to_treasury_reserves {
+			pub mod could_not_fund_reserve_topup {
 				use super::runtime_types;
 				pub type FrameId = ::core::primitive::u64;
 				pub type Amount = ::core::primitive::u128;
 				pub type DispatchError = runtime_types::sp_runtime::DispatchError;
 			}
-			impl ::subxt::ext::subxt_core::events::StaticEvent for CouldNotTransferToTreasuryReserves {
+			impl ::subxt::ext::subxt_core::events::StaticEvent for CouldNotFundReserveTopup {
 				const PALLET: &'static str = "Treasury";
-				const EVENT: &'static str = "CouldNotTransferToTreasuryReserves";
+				const EVENT: &'static str = "CouldNotFundReserveTopup";
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -23984,21 +24080,21 @@ pub mod api {
 			)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			#[doc = "A fixed or unearned reward allocation could not be burned."]
-			pub struct CouldNotBurnRewardAllocation {
-				pub frame_id: could_not_burn_reward_allocation::FrameId,
-				pub amount: could_not_burn_reward_allocation::Amount,
-				pub dispatch_error: could_not_burn_reward_allocation::DispatchError,
+			#[doc = "Bid revenue could not be withdrawn for frame distribution."]
+			pub struct CouldNotFundBidPool {
+				pub frame_id: could_not_fund_bid_pool::FrameId,
+				pub amount: could_not_fund_bid_pool::Amount,
+				pub dispatch_error: could_not_fund_bid_pool::DispatchError,
 			}
-			pub mod could_not_burn_reward_allocation {
+			pub mod could_not_fund_bid_pool {
 				use super::runtime_types;
 				pub type FrameId = ::core::primitive::u64;
 				pub type Amount = ::core::primitive::u128;
 				pub type DispatchError = runtime_types::sp_runtime::DispatchError;
 			}
-			impl ::subxt::ext::subxt_core::events::StaticEvent for CouldNotBurnRewardAllocation {
+			impl ::subxt::ext::subxt_core::events::StaticEvent for CouldNotFundBidPool {
 				const PALLET: &'static str = "Treasury";
-				const EVENT: &'static str = "CouldNotBurnRewardAllocation";
+				const EVENT: &'static str = "CouldNotFundBidPool";
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -24016,8 +24112,7 @@ pub mod api {
 				pub argon_bond_pool_distributed:
 					frame_earnings_distributed::ArgonBondPoolDistributed,
 				pub vault_pool_distributed: frame_earnings_distributed::VaultPoolDistributed,
-				pub burned: frame_earnings_distributed::Burned,
-				pub treasury_reserves: frame_earnings_distributed::TreasuryReserves,
+				pub reserved_from_circulation: frame_earnings_distributed::ReservedFromCirculation,
 				pub participating_vaults: frame_earnings_distributed::ParticipatingVaults,
 			}
 			pub mod frame_earnings_distributed {
@@ -24027,13 +24122,34 @@ pub mod api {
 				pub type StakePoolDistributed = ::core::primitive::u128;
 				pub type ArgonBondPoolDistributed = ::core::primitive::u128;
 				pub type VaultPoolDistributed = ::core::primitive::u128;
-				pub type Burned = ::core::primitive::u128;
-				pub type TreasuryReserves = ::core::primitive::u128;
+				pub type ReservedFromCirculation = ::core::primitive::u128;
 				pub type ParticipatingVaults = ::core::primitive::u32;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for FrameEarningsDistributed {
 				const PALLET: &'static str = "Treasury";
 				const EVENT: &'static str = "FrameEarningsDistributed";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "Reward reserve balances after frame settlement or a reserve-funded payment."]
+			pub struct RewardReservesUpdated {
+				pub reserves: reward_reserves_updated::Reserves,
+			}
+			pub mod reward_reserves_updated {
+				use super::runtime_types;
+				pub type Reserves = runtime_types::pallet_treasury::pallet::RewardReserveBalances<
+					::core::primitive::u128,
+				>;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for RewardReservesUpdated {
+				const PALLET: &'static str = "Treasury";
+				const EVENT: &'static str = "RewardReservesUpdated";
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -24057,6 +24173,27 @@ pub mod api {
 			impl ::subxt::ext::subxt_core::events::StaticEvent for RewardEconomicsConfigured {
 				const PALLET: &'static str = "Treasury";
 				const EVENT: &'static str = "RewardEconomicsConfigured";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub struct RewardTaperingPolicyConfigured {
+				pub policy: ::subxt::ext::subxt_core::alloc::boxed::Box<
+					reward_tapering_policy_configured::Policy,
+				>,
+			}
+			pub mod reward_tapering_policy_configured {
+				use super::runtime_types;
+				pub type Policy = runtime_types::pallet_treasury::pallet::TaperingPolicy;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for RewardTaperingPolicyConfigured {
+				const PALLET: &'static str = "Treasury";
+				const EVENT: &'static str = "RewardTaperingPolicyConfigured";
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -24310,6 +24447,23 @@ pub mod api {
 					pub type CurrentFrameArgonotBondParticipants =
 						runtime_types::pallet_treasury::pallet::FrameArgonotBondParticipants;
 				}
+				pub mod reward_tapering_policy {
+					use super::runtime_types;
+					pub type RewardTaperingPolicy =
+						runtime_types::pallet_treasury::pallet::TaperingPolicy;
+				}
+				pub mod current_frame_reward_tapering_policy {
+					use super::runtime_types;
+					pub type CurrentFrameRewardTaperingPolicy =
+						runtime_types::pallet_treasury::pallet::FrameRewardTaperingPolicy;
+				}
+				pub mod reward_reserves {
+					use super::runtime_types;
+					pub type RewardReserves =
+						runtime_types::pallet_treasury::pallet::RewardReserveBalances<
+							::core::primitive::u128,
+						>;
+				}
 				pub mod target_bitcoin_percent {
 					use super::runtime_types;
 					pub type TargetBitcoinPercent =
@@ -24439,6 +24593,71 @@ pub mod api {
 							186u8, 7u8, 171u8, 179u8, 5u8, 94u8, 194u8, 34u8, 64u8, 66u8, 218u8,
 							138u8, 187u8, 13u8, 102u8, 38u8, 144u8, 71u8, 84u8, 81u8, 139u8, 226u8,
 							119u8, 166u8, 250u8, 208u8, 197u8, 47u8, 226u8, 243u8, 254u8, 141u8,
+						],
+					)
+				}
+				#[doc = " Configured daily reward targets and the share paid above each target."]
+				pub fn reward_tapering_policy(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::reward_tapering_policy::RewardTaperingPolicy,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Treasury",
+						"RewardTaperingPolicy",
+						(),
+						[
+							13u8, 88u8, 99u8, 50u8, 199u8, 177u8, 74u8, 85u8, 66u8, 133u8, 23u8,
+							129u8, 253u8, 86u8, 49u8, 24u8, 243u8, 113u8, 155u8, 143u8, 244u8,
+							51u8, 226u8, 97u8, 98u8, 145u8, 17u8, 97u8, 42u8, 198u8, 144u8, 62u8,
+						],
+					)
+				}
+				#[doc = " Reward settings frozen before a frame starts earning. Prices are measured over that frame."]
+				pub fn current_frame_reward_tapering_policy(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::current_frame_reward_tapering_policy::CurrentFrameRewardTaperingPolicy,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Treasury",
+						"CurrentFrameRewardTaperingPolicy",
+						(),
+						[
+							197u8, 0u8, 240u8, 178u8, 216u8, 106u8, 128u8, 187u8, 94u8, 103u8,
+							64u8, 140u8, 181u8, 40u8, 115u8, 56u8, 194u8, 83u8, 30u8, 4u8, 121u8,
+							252u8, 177u8, 65u8, 142u8, 53u8, 69u8, 32u8, 203u8, 162u8, 213u8,
+							202u8,
+						],
+					)
+				}
+				#[doc = " ARGON removed from circulation and available for future issuance as rewards."]
+				pub fn reward_reserves(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::reward_reserves::RewardReserves,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Treasury",
+						"RewardReserves",
+						(),
+						[
+							137u8, 57u8, 159u8, 79u8, 140u8, 59u8, 74u8, 134u8, 28u8, 211u8, 51u8,
+							130u8, 191u8, 222u8, 32u8, 248u8, 152u8, 107u8, 50u8, 220u8, 62u8,
+							141u8, 63u8, 237u8, 117u8, 212u8, 250u8, 71u8, 163u8, 53u8, 215u8,
+							49u8,
 						],
 					)
 				}
@@ -25107,32 +25326,15 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Account that holds treasury reserves for claims and reserve-funded payouts."]
-				pub fn treasury_reserves_account(
-					&self,
-				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
-					crate::types::AccountId32,
-				> {
-					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
-						"Treasury",
-						"TreasuryReservesAccount",
-						[
-							115u8, 233u8, 13u8, 223u8, 88u8, 20u8, 202u8, 139u8, 153u8, 28u8,
-							155u8, 157u8, 224u8, 66u8, 3u8, 250u8, 23u8, 53u8, 88u8, 168u8, 211u8,
-							204u8, 122u8, 166u8, 248u8, 23u8, 174u8, 225u8, 99u8, 108u8, 89u8,
-							135u8,
-						],
-					)
-				}
-				#[doc = " Percent of the bid pool reserved for treasury reserves."]
-				pub fn percent_for_treasury_reserves(
+				#[doc = " Percent of the bid pool held for marketing rewards."]
+				pub fn percent_for_marketing(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
 					runtime_types::sp_arithmetic::per_things::Percent,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"Treasury",
-						"PercentForTreasuryReserves",
+						"PercentForMarketing",
 						[
 							40u8, 171u8, 69u8, 196u8, 34u8, 184u8, 50u8, 128u8, 139u8, 192u8, 63u8,
 							231u8, 249u8, 200u8, 252u8, 73u8, 244u8, 170u8, 51u8, 177u8, 106u8,
@@ -25175,7 +25377,7 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Percent reserved for Bitcoin Liquids and burned in this release."]
+				#[doc = " Percent credited to the Bitcoin Liquids reserve."]
 				pub fn percent_for_bitcoin_liquid_pool(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
@@ -39135,6 +39337,23 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
+				pub struct BelowTargetPriceYield {
+					pub target_daily_return: runtime_types::sp_arithmetic::fixed_point::FixedU128,
+					pub argon_price_drop_for_target:
+						runtime_types::sp_arithmetic::per_things::Percent,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
 				pub struct BondLot {
 					pub owner: crate::types::AccountId32,
 					pub program: runtime_types::pallet_treasury::pallet::BondProgram,
@@ -39325,6 +39544,35 @@ pub mod api {
 						expected: runtime_types::pallet_treasury::pallet::BondLotEarningsMetrics,
 						updated: runtime_types::pallet_treasury::pallet::BondLotEarningsMetrics,
 					},
+					#[codec(index = 11)]
+					#[doc = "Update selected reward programs for future frames, preserving omitted programs."]
+					configure_reward_tapering_policy {
+						bitcoin_liquids: ::subxt::ext::subxt_core::alloc::boxed::Box<
+							::core::option::Option<
+								runtime_types::pallet_treasury::pallet::TaperingProgram,
+							>,
+						>,
+						argon_bonds: ::subxt::ext::subxt_core::alloc::boxed::Box<
+							::core::option::Option<
+								runtime_types::pallet_treasury::pallet::TaperingProgram,
+							>,
+						>,
+						argonot_stakes: ::subxt::ext::subxt_core::alloc::boxed::Box<
+							::core::option::Option<
+								runtime_types::pallet_treasury::pallet::TaperingProgram,
+							>,
+						>,
+						vault_revenue: ::subxt::ext::subxt_core::alloc::boxed::Box<
+							::core::option::Option<
+								runtime_types::pallet_treasury::pallet::TaperingProgram,
+							>,
+						>,
+						stabilizer_pools: ::subxt::ext::subxt_core::alloc::boxed::Box<
+							::core::option::Option<
+								runtime_types::pallet_treasury::pallet::TaperingProgram,
+							>,
+						>,
+					},
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -39374,43 +39622,46 @@ pub mod api {
 					#[doc = "The proposed backfill would reduce or corrupt the lot's earnings metrics."]
 					InvalidBondLotMetrics,
 					#[codec(index = 11)]
+					#[doc = "A reward target or the price adjustment window is invalid."]
+					InvalidRewardTaperingPolicy,
+					#[codec(index = 12)]
 					#[doc = "The caller does not own the bond lot."]
 					NotBondLotOwner,
-					#[codec(index = 12)]
+					#[codec(index = 13)]
 					#[doc = "The bond lot is already scheduled for release."]
 					BondLotAlreadyReleasing,
-					#[codec(index = 13)]
+					#[codec(index = 14)]
 					#[doc = "The vault doesn't have enough raw securitization to support this bond purchase."]
 					InsufficientBondSpace,
-					#[codec(index = 14)]
+					#[codec(index = 15)]
 					#[doc = "Liquidating this bond lot would take the account below its crosschain-encumbered"]
 					#[doc = "treasury backing."]
 					ActiveBondAmountBelowEncumberedBacking,
-					#[codec(index = 15)]
+					#[codec(index = 16)]
 					#[doc = "The bonus approval was signed for a different vault."]
 					BonusApprovalWrongVault,
-					#[codec(index = 16)]
+					#[codec(index = 17)]
 					#[doc = "The bonus approval was signed for a different beneficiary."]
 					BonusApprovalWrongAccount,
-					#[codec(index = 17)]
+					#[codec(index = 18)]
 					#[doc = "The bonus approval already expired."]
 					BonusApprovalExpired,
-					#[codec(index = 18)]
+					#[codec(index = 19)]
 					#[doc = "The bonus approval nonce has already been consumed or superseded."]
 					BonusApprovalAlreadyUsed,
-					#[codec(index = 19)]
+					#[codec(index = 20)]
 					#[doc = "The bonus approval signature is invalid or unauthorized."]
 					InvalidBonusApprovalSignature,
-					#[codec(index = 20)]
+					#[codec(index = 21)]
 					#[doc = "The Argonot bond purchase did not beat the current active-set cutoff."]
 					ArgonotBondPurchaseBelowCutoff,
-					#[codec(index = 21)]
+					#[codec(index = 22)]
 					#[doc = "The Argonot bond purchase would exceed the active circulation cap."]
 					ArgonotBondPurchaseAboveCap,
-					#[codec(index = 22)]
+					#[codec(index = 23)]
 					#[doc = "Only an active vault bond owned by its operator can be used as flexible."]
 					BondLotCannotBeFlexible,
-					#[codec(index = 23)]
+					#[codec(index = 24)]
 					#[doc = "The caller does not have permission to perform this action."]
 					NoPermissions,
 				}
@@ -39448,15 +39699,15 @@ pub mod api {
 						dispatch_error: runtime_types::sp_runtime::DispatchError,
 					},
 					#[codec(index = 2)]
-					#[doc = "An error occurred while moving bid-pool funds into treasury reserves."]
-					CouldNotTransferToTreasuryReserves {
+					#[doc = "A reserve top-up could not be added to the frame reward funding."]
+					CouldNotFundReserveTopup {
 						frame_id: ::core::primitive::u64,
 						amount: ::core::primitive::u128,
 						dispatch_error: runtime_types::sp_runtime::DispatchError,
 					},
 					#[codec(index = 3)]
-					#[doc = "A fixed or unearned reward allocation could not be burned."]
-					CouldNotBurnRewardAllocation {
+					#[doc = "Bid revenue could not be withdrawn for frame distribution."]
+					CouldNotFundBidPool {
 						frame_id: ::core::primitive::u64,
 						amount: ::core::primitive::u128,
 						dispatch_error: runtime_types::sp_runtime::DispatchError,
@@ -39469,24 +39720,36 @@ pub mod api {
 						stake_pool_distributed: ::core::primitive::u128,
 						argon_bond_pool_distributed: ::core::primitive::u128,
 						vault_pool_distributed: ::core::primitive::u128,
-						burned: ::core::primitive::u128,
-						treasury_reserves: ::core::primitive::u128,
+						reserved_from_circulation: ::core::primitive::u128,
 						participating_vaults: ::core::primitive::u32,
 					},
 					#[codec(index = 5)]
+					#[doc = "Reward reserve balances after frame settlement or a reserve-funded payment."]
+					RewardReservesUpdated {
+						reserves: runtime_types::pallet_treasury::pallet::RewardReserveBalances<
+							::core::primitive::u128,
+						>,
+					},
+					#[codec(index = 6)]
 					RewardEconomicsConfigured {
 						target_bitcoin_percent: runtime_types::sp_arithmetic::per_things::Percent,
 						upstream_participation_factor:
 							runtime_types::sp_arithmetic::per_things::Percent,
 					},
-					#[codec(index = 6)]
+					#[codec(index = 7)]
+					RewardTaperingPolicyConfigured {
+						policy: ::subxt::ext::subxt_core::alloc::boxed::Box<
+							runtime_types::pallet_treasury::pallet::TaperingPolicy,
+						>,
+					},
+					#[codec(index = 8)]
 					#[doc = "The current frame's vault capital was locked in."]
 					FrameVaultCapitalLocked {
 						frame_id: ::core::primitive::u64,
 						total_active_bonds: ::core::primitive::u128,
 						participating_vaults: ::core::primitive::u32,
 					},
-					#[codec(index = 7)]
+					#[codec(index = 9)]
 					#[doc = "An error occurred while releasing a bond lot."]
 					CouldNotReleaseBondLot {
 						frame_id: ::core::primitive::u64,
@@ -39496,7 +39759,7 @@ pub mod api {
 						account_id: crate::types::AccountId32,
 						dispatch_error: runtime_types::sp_runtime::DispatchError,
 					},
-					#[codec(index = 8)]
+					#[codec(index = 10)]
 					#[doc = "A bond purchase entered its active program set."]
 					BondLotPurchased {
 						program_id: runtime_types::pallet_treasury::pallet::BondProgramId,
@@ -39504,7 +39767,7 @@ pub mod api {
 						account_id: crate::types::AccountId32,
 						bonds: ::core::primitive::u32,
 					},
-					#[codec(index = 9)]
+					#[codec(index = 11)]
 					#[doc = "A bond lot was removed from future frames and scheduled for release."]
 					BondLotReleaseScheduled {
 						program_id: runtime_types::pallet_treasury::pallet::BondProgramId,
@@ -39514,7 +39777,7 @@ pub mod api {
 						release_frame_id: ::core::primitive::u64,
 						reason: runtime_types::pallet_treasury::pallet::BondReleaseReason,
 					},
-					#[codec(index = 10)]
+					#[codec(index = 12)]
 					#[doc = "A bond lot was released."]
 					BondLotReleased {
 						frame_id: ::core::primitive::u64,
@@ -39523,18 +39786,18 @@ pub mod api {
 						account_id: crate::types::AccountId32,
 						bonds: ::core::primitive::u32,
 					},
-					#[codec(index = 11)]
+					#[codec(index = 13)]
 					BondLotFlexibilityChanged {
 						vault_id: ::core::primitive::u32,
 						bond_lot_id: ::core::primitive::u64,
 						is_flexible: ::core::primitive::bool,
 					},
-					#[codec(index = 12)]
+					#[codec(index = 14)]
 					ReservedBondSpaceChanged {
 						vault_id: ::core::primitive::u32,
 						reserved_bond_space: ::core::primitive::u32,
 					},
-					#[codec(index = 13)]
+					#[codec(index = 15)]
 					#[doc = "Encumbered treasury backing was burned and any no-longer-needed fractional hold was"]
 					#[doc = "returned."]
 					EncumberedBondMicrogonsBurned {
@@ -39542,7 +39805,7 @@ pub mod api {
 						burned_amount: ::core::primitive::u128,
 						released_amount: ::core::primitive::u128,
 					},
-					#[codec(index = 14)]
+					#[codec(index = 16)]
 					#[doc = "Historical flexible-bond earnings were attributed to a surviving vault lot. No funds"]
 					#[doc = "move."]
 					BondLotEarningsBackfilled {
@@ -39571,6 +39834,22 @@ pub mod api {
 					pub bond_lots: runtime_types::bounded_collections::bounded_vec::BoundedVec<
 						runtime_types::pallet_treasury::pallet::BondLotSummary,
 					>,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct FrameRewardTaperingPolicy {
+					pub frame_id: ::core::primitive::u64,
+					pub policy: runtime_types::pallet_treasury::pallet::TaperingPolicy,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -39674,6 +39953,65 @@ pub mod api {
 					pub flexible_bonds: ::core::primitive::u32,
 					#[codec(compact)]
 					pub displaced_flexible_bonds: ::core::primitive::u32,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct RewardReserveBalances<_0> {
+					pub marketing: _0,
+					pub bitcoin_liquids: _0,
+					pub argon_bonds: _0,
+					pub argonot_stakes: _0,
+					pub stabilizer_pools: _0,
+					pub liquidity_buys: _0,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct TaperingPolicy {
+					pub bitcoin_liquids: runtime_types::pallet_treasury::pallet::TaperingProgram,
+					pub argon_bonds: runtime_types::pallet_treasury::pallet::TaperingProgram,
+					pub argonot_stakes: runtime_types::pallet_treasury::pallet::TaperingProgram,
+					pub vault_revenue: runtime_types::pallet_treasury::pallet::TaperingProgram,
+					pub stabilizer_pools: runtime_types::pallet_treasury::pallet::TaperingProgram,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct TaperingProgram {
+					pub target_daily_return: runtime_types::sp_arithmetic::fixed_point::FixedU128,
+					pub excess_reward_payout_percent:
+						runtime_types::sp_arithmetic::per_things::Percent,
+					pub target_daily_return_with_price_below_target: ::core::option::Option<
+						runtime_types::pallet_treasury::pallet::BelowTargetPriceYield,
+					>,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,

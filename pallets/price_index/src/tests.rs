@@ -198,6 +198,7 @@ fn stores_history_grouped() {
 		CurrentTick::set(181);
 		let mut entry = create_index();
 		entry.tick = 181;
+		entry.argon_usd_price = FixedU128::from_rational(4, 5);
 		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), entry, None),);
 		assert_eq!(Current::<Test>::get(), Some(entry));
 		System::assert_last_event(Event::NewIndex.into());
@@ -207,29 +208,70 @@ fn stores_history_grouped() {
 			.any(|a| a.tick_range.0 == 180 && a.tick_range.1 == 240));
 
 		let mut entry2 = entry;
-		entry2.argon_usd_target_price = FixedU128::from_float(1.01);
-		entry2.tick = 183;
+		entry2.argon_usd_price = FixedU128::from_rational(5, 4);
+		entry2.tick = 231;
+		CurrentTick::set(entry2.tick);
 		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), entry2, None),);
+		assert_eq!(Current::<Test>::get(), Some(entry2));
 		assert_eq!(HistoricArgonCPI::<Test>::get().len(), 1);
 		assert_eq!(HistoricArgonCPI::<Test>::get()[0].measurements_count, 2);
 		assert_eq!(HistoricArgonCPI::<Test>::get()[0].tick_range.0, 180);
 
-		let mut entry_backwards = entry;
-		entry_backwards.argon_usd_target_price = FixedU128::from_float(1.02);
-		entry_backwards.tick = 241;
-		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), entry_backwards, None),);
+		let mut entry3 = entry;
+		entry3.argon_usd_price = FixedU128::one();
+		entry3.argon_usd_target_price = FixedU128::from_rational(102, 100);
+		entry3.tick = 301;
+		CurrentTick::set(entry3.tick);
+		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), entry3, None),);
+		assert_eq!(Current::<Test>::get(), Some(entry3));
 
 		assert_eq!(HistoricArgonCPI::<Test>::get().len(), 2);
 		assert_eq!(
 			HistoricArgonCPI::<Test>::get()
 				.iter()
-				.find(|a| a.tick_range.0 == 240)
+				.find(|a| a.tick_range.0 == 300)
 				.unwrap()
 				.measurements_count,
 			1
 		);
-		assert_eq!(HistoricArgonCPI::<Test>::get()[0].tick_range.0, 240, "should be newest first");
+		assert_eq!(HistoricArgonCPI::<Test>::get()[0].tick_range.0, 300, "should be newest first");
+
+		// Two readings share a bucket; all three CPIs retain equal weight: (25% - 20% + 2%) / 3.
+		assert_eq!(
+			PriceIndex::get_average_cpi_for_ticks((180, 360)),
+			ArgonCPI::from_rational(7, 300)
+		);
 	});
+}
+
+#[test]
+fn frame_cpi_includes_short_frames_and_rounds_bucket_ticks_up() {
+	for (frame_ticks, bucket_ticks) in [(10, 1), (49, 3), (1440, 60)] {
+		new_test_ext(Some(1)).execute_with(|| {
+			TicksPerFrame::set(frame_ticks);
+			// Offset by whole buckets to exercise an actual frame range away from genesis.
+			let frame_start = 3 * bucket_ticks;
+			let frame_end = frame_start + frame_ticks;
+			for tick in frame_start..frame_end {
+				CurrentTick::set(tick);
+				let mut entry = create_index();
+				entry.tick = tick;
+				entry.argon_usd_price = FixedU128::from_rational(9, 10);
+				entry.argon_usd_target_price = FixedU128::one();
+				assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), entry, None));
+			}
+
+			assert_eq!(
+				PriceIndex::get_average_cpi_for_ticks((frame_start, frame_end)),
+				ArgonCPI::from_rational(1, 9),
+			);
+			let history = HistoricArgonCPI::<Test>::get();
+			assert!(history
+				.iter()
+				.all(|bucket| bucket.tick_range.1 - bucket.tick_range.0 == bucket_ticks));
+			assert_eq!(history.len() as u64, frame_ticks.div_ceil(bucket_ticks));
+		});
+	}
 }
 
 #[test]

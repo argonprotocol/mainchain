@@ -115,9 +115,12 @@ import type {
   PalletTreasuryBondLot,
   PalletTreasuryBondLotSummary,
   PalletTreasuryFrameArgonotBondParticipants,
+  PalletTreasuryFrameRewardTaperingPolicy,
   PalletTreasuryFrameVaultBitcoin,
   PalletTreasuryFrameVaultCapital,
   PalletTreasuryPositionsPosition,
+  PalletTreasuryRewardReserveBalances,
+  PalletTreasuryTaperingPolicy,
   PalletTreasuryVaultBondState,
   PalletVaultsVaultFrameRevenue,
   SpConsensusGrandpaAppPublic,
@@ -1563,7 +1566,7 @@ declare module '@polkadot/api-base/types/storage' {
         []
       >;
       /**
-       * Tracks the average cpi data every 60 ticks
+       * CPI history in buckets of ceil(frame ticks / 24).
        **/
       historicArgonCPI: AugmentedQuery<
         ApiType,
@@ -1878,6 +1881,14 @@ declare module '@polkadot/api-base/types/storage' {
         []
       >;
       /**
+       * Reward settings frozen before a frame starts earning. Prices are measured over that frame.
+       **/
+      currentFrameRewardTaperingPolicy: AugmentedQuery<
+        ApiType,
+        () => Observable<Option<PalletTreasuryFrameRewardTaperingPolicy>>,
+        []
+      >;
+      /**
        * Covered Bitcoin locked alongside vault capital for frames using independent reward tiers.
        **/
       currentFrameVaultBitcoin: AugmentedQuery<
@@ -1929,6 +1940,22 @@ declare module '@polkadot/api-base/types/storage' {
         ApiType,
         (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<u64>>,
         [u64]
+      >;
+      /**
+       * ARGON removed from circulation and available for future issuance as rewards.
+       **/
+      rewardReserves: AugmentedQuery<
+        ApiType,
+        () => Observable<PalletTreasuryRewardReserveBalances>,
+        []
+      >;
+      /**
+       * Configured daily reward targets and the share paid above each target.
+       **/
+      rewardTaperingPolicy: AugmentedQuery<
+        ApiType,
+        () => Observable<PalletTreasuryTaperingPolicy>,
+        []
       >;
       /**
        * Configurable percent of maximum Bitcoin-mintable Argons targeted by the network.

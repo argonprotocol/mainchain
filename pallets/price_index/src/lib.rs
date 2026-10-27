@@ -219,6 +219,9 @@ pub mod pallet {
 		/// The current tick
 		type CurrentTick: Get<Tick>;
 
+		/// Configured number of reward ticks in a mining frame.
+		type TicksPerFrame: Get<Tick>;
+
 		/// Current mining frame id for trailing floor history.
 		type CurrentFrameId: Get<FrameId>;
 
@@ -289,7 +292,7 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
-	/// Tracks the average cpi data every 60 ticks
+	/// CPI history in buckets of ceil(frame ticks / 24).
 	#[pallet::storage]
 	pub type HistoricArgonCPI<T> =
 		StorageValue<_, BoundedVec<CpiMeasurementBucket, ConstU32<48>>, ValueQuery>;
@@ -413,12 +416,12 @@ pub mod pallet {
 				Self::record_argonot_floor_for_frame(frame_id, microgons_per_argonot);
 			}
 
-			// Get the current frame bucket (one per hour)
-			const BUCKET_TICKS: Tick = 60;
-			let tick_bucket_start = index.tick - (index.tick % BUCKET_TICKS);
+			let bucket_ticks = T::TicksPerFrame::get().div_ceil(24).max(1);
+			let tick_bucket_start = index.tick - (index.tick % bucket_ticks);
+			let tick_range = (tick_bucket_start, tick_bucket_start.saturating_add(bucket_ticks));
 			HistoricArgonCPI::<T>::mutate(|history| {
 				for bucket in history.iter_mut() {
-					if bucket.tick_range.0 == tick_bucket_start {
+					if bucket.tick_range == tick_range {
 						bucket.record(index.argon_cpi());
 						return;
 					}
@@ -430,7 +433,7 @@ pub mod pallet {
 					.try_insert(
 						0,
 						CpiMeasurementBucket {
-							tick_range: (tick_bucket_start, tick_bucket_start + BUCKET_TICKS),
+							tick_range,
 							total_cpi: index.argon_cpi(),
 							measurements_count: 1,
 						},
@@ -693,6 +696,8 @@ pub mod pallet {
 					measurement.accrue(bucket);
 				}
 			}
+			// CPI is target / market - 1, so below-target readings contribute more strongly.
+			// Average the reported CPIs directly to preserve the existing stabilization signal.
 			measurement.average()
 		}
 
@@ -723,11 +728,11 @@ pub mod pallet {
 	MaxEncodedLen,
 )]
 pub struct CpiMeasurementBucket {
-	/// The tick range this frame represents
+	/// Tick range covered by these price reports.
 	pub tick_range: (Tick, Tick),
-	/// The sum of all CPIs in this frame
+	/// Sum of reported CPI readings (target / market - 1).
 	pub total_cpi: ArgonCPI,
-	/// The count of measurements in this frame
+	/// Number of CPI readings included in the total.
 	pub measurements_count: u32,
 }
 

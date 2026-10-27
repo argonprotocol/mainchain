@@ -449,15 +449,13 @@ impl pallet_treasury::Config for Runtime {
 	type BitcoinMintedProvider = Mint;
 	type PriceProvider =
 		use_unless_benchmark!(PriceIndex, benchmarking::BenchmarkPriceProvider<Balance>);
-	type BurnEventHandler = use_unless_benchmark!(Mint, ());
 	type MinimumArgonsPerContributor = MinimumArgonsPerContributor;
 	type MaxActiveArgonotBondLots = MaxActiveArgonotBondLots;
 	type MaxArgonBondLots = MaxArgonBondLots;
 	type MaxArgonotBondedPercentOfCirculation = MaxArgonotBondedPercentOfCirculation;
 	type PalletId = TreasuryInternalPalletId;
 	type MiningBidPoolAccount = TreasuryMiningBidPoolAccount;
-	type TreasuryReservesAccount = TreasuryReservesAccount;
-	type PercentForTreasuryReserves = PercentForTreasuryReserves;
+	type PercentForMarketing = PercentForMarketing;
 	type PercentForStakePool = PercentForStakePool;
 	type PercentForMiningOperatorPool = PercentForMiningOperatorPool;
 	type PercentForBitcoinLiquidPool = PercentForBitcoinLiquidPool;
@@ -469,7 +467,8 @@ impl pallet_treasury::Config for Runtime {
 	type MaxVaultsPerPool = MaxVaultsPerPool;
 	type MaxPendingUnlocksPerFrame = MaxPendingUnlocksPerFrame;
 	type TreasuryExitDelayFrames = TreasuryExitDelayFrames;
-	type MiningFrameTransitionProvider = MiningSlot;
+	type MiningFrameTransitionProvider =
+		use_unless_benchmark!(MiningSlot, benchmarking::BenchmarkCurrentFrameId);
 	type OperationalAccountsHook = use_unless_benchmark!(OperationalAccounts, ());
 }
 
@@ -648,6 +647,7 @@ impl pallet_price_index::Config for Runtime {
 	type MiningFrameTransitionProvider =
 		use_unless_benchmark!(MiningSlot, benchmarking::BenchmarkCurrentFrameId);
 	type CurrentTick = use_unless_benchmark!(Ticks, benchmarking::BenchmarkCurrentTick);
+	type TicksPerFrame = GetTicksPerFrame;
 	type MaxArgonotFloorHistoryFrames = MaxArgonotFloorHistoryFrames;
 	type MaxArgonotAverageHistoryFrames = MaxArgonotAverageHistoryFrames;
 	type MaxEthereumPriceHistoryFrames = MaxEthereumPriceHistoryFrames;

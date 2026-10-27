@@ -161,6 +161,7 @@ macro_rules! inject_runtime_vars {
 		type Migrations = (
 			CosignerGuaranteesMigration<Runtime>,
 			$crate::migrations::AddVaultSecuritizedSatoshis<Runtime>,
+			pallet_treasury::migrations::VirtualizeMarketingReserveMigration<Runtime>,
 		);
 
 		/// Unchecked extrinsic type as expected by this runtime.
