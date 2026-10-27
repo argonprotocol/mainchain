@@ -81,7 +81,7 @@ describe('account-security approval signatures', () => {
     const signingBytes = encoded.length > 256 ? blake2AsU8a(encoded) : encoded;
     // Same vector as both real-runtime native signing tests, not a separately invented format.
     expect(blake2AsHex(signingBytes)).toBe(
-      '0xbf10963a6b5779a7ab2c969651abe1bd65a7122d11243fd9a47c9bad149bc934',
+      '0xa2c0f48908ec08ce38929da9765ccb1bc8db5c98f01744a9ebf918375ff6b310',
     );
   });
 

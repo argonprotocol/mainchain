@@ -31,6 +31,7 @@ pub trait WeightInfo {
 	fn set_bond_lot_flexible() -> Weight;
 	fn set_reserved_bond_space() -> Weight;
 	fn configure_reward_economics() -> Weight;
+	fn configure_reward_tapering_policy() -> Weight;
 	fn backfill_bond_lot_earnings() -> Weight;
 	fn provider_has_vault_bond_participation() -> Weight;
 	fn provider_active_vault_bond_amount() -> Weight;
@@ -161,6 +162,10 @@ where
 
 	fn configure_reward_economics() -> Weight {
 		Base::configure_reward_economics()
+	}
+
+	fn configure_reward_tapering_policy() -> Weight {
+		Base::configure_reward_tapering_policy()
 	}
 
 	fn backfill_bond_lot_earnings() -> Weight {
@@ -315,6 +320,10 @@ impl WeightInfo for () {
 	fn configure_reward_economics() -> Weight {
 		Weight::zero()
 	}
+	fn configure_reward_tapering_policy() -> Weight {
+		Weight::zero()
+	}
+
 	fn backfill_bond_lot_earnings() -> Weight {
 		Weight::zero()
 	}

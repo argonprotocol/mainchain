@@ -49,6 +49,7 @@ parameter_types! {
 	pub const MaxDowntimeBeforeReset: Tick = 60; // 1 hour
 	pub static MaxPriceAgeInTicks: Tick = 1440; // 1 day
 	pub static CurrentTick:Tick = 0;
+	pub static TicksPerFrame: Tick = 1440;
 	pub static CurrentFrameId: FrameId = 0;
 	pub static NewlyStartedFrameId: Option<FrameId> = None;
 	pub const MaxArgonotFloorHistoryFrames: u32 = 10;
@@ -97,6 +98,7 @@ impl TickProvider<Block> for CurrentTick {
 impl pallet_price_index::Config for Test {
 	type OnPriceIndexUpdated = ();
 	type TickProvider = CurrentTick;
+	type TicksPerFrame = TicksPerFrame;
 	type CurrentFrameId = CurrentFrameId;
 	type MiningFrameTransitionProvider = StaticMiningFrameTransitionProvider;
 	type WeightInfo = ();

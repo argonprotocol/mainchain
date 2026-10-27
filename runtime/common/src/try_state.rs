@@ -227,37 +227,31 @@ struct VaultBacking {
 #[cfg(all(test, not(feature = "runtime-benchmarks")))]
 mod tests {
 	use super::*;
-	use crate::migrations::tests::{new_test_ext, source_state};
-	use argon_primitives::treasury::PositionQuantities;
-	use argon_runtime::{BitcoinFissions, Runtime};
+	use argon_primitives::{
+		bitcoin::{BitcoinCosignScriptPubkey, CompressedBitcoinPubkey, H256Le, UtxoRef},
+		treasury::{PositionQuantity, TreasuryPositionProvider},
+		vault::{
+			BitcoinSecuritizationBasis, CosignerGuarantee, SecuritizationScheduleEntry, Vault,
+			VaultTerms,
+		},
+	};
+	use argon_runtime::{BitcoinFissions, Runtime, RuntimeGenesisConfig, TreasuryPositions};
 	use frame_support::{assert_ok, traits::Hooks};
-	use pallet_bitcoin_fissions::{FissionByOwnerAndId, NextFissionIdByOwner};
-	use pallet_bitcoin_locks::LocksById;
-	use pallet_treasury_positions::{NetworkTotals, PositionsByAccount};
+	use pallet_bitcoin_fissions::{
+		Fission, FissionByOwnerAndId, FissionIdsByLockId, FissionIdsByOwnerAndLiquid, LiquidTicks,
+		LiquidTicksByOwnerAndId, NextFissionIdByOwner,
+	};
+	use pallet_bitcoin_locks::{LockedBitcoin, LocksById};
+	use pallet_treasury_positions::NetworkTotals;
 	use pallet_vaults::VaultsById;
-	use polkadot_sdk::sp_io;
-	use sp_runtime::AccountId32;
+	use polkadot_sdk::sp_io::TestExternalities;
+	use sp_runtime::{bounded_btree_map, AccountId32, BuildStorage};
 
 	const LOCK_OWNER: AccountId32 = AccountId32::new([2; 32]);
 
-	fn migrate_backing() {
-		source_state();
-		let quantities = PositionQuantities { fission_liquidity: 6, ..Default::default() };
-		PositionsByAccount::<Runtime>::mutate(LOCK_OWNER, |position| {
-			position.as_mut().unwrap().quantities = quantities;
-		});
-		sp_io::storage::set(&NetworkTotals::<Runtime>::hashed_key(), &quantities.encode());
-		StorageVersion::new(1).put::<pallet_treasury_positions::Pallet<Runtime>>();
-		NextFissionIdByOwner::<Runtime>::insert(LOCK_OWNER, 3);
-		assert_ok!(argon_runtime::Executive::try_runtime_upgrade(
-			polkadot_sdk::frame_try_runtime::UpgradeCheckSelect::PreAndPost,
-		));
-	}
-
 	#[test]
-	fn reconciles_real_migrated_backing_with_promises_above_paid_guarantees() {
+	fn reconciles_backing_with_promises_above_paid_guarantees() {
 		new_test_ext().execute_with(|| {
-			migrate_backing();
 			let fission = FissionByOwnerAndId::<Runtime>::get(LOCK_OWNER, 0).unwrap();
 			assert_eq!(fission.cosigner_guarantee.guaranteed_microgons, 1);
 			assert_eq!(fission.liquidity_promised, 2);
@@ -269,7 +263,6 @@ mod tests {
 	#[test]
 	fn detects_wrong_fission_owners_and_missing_source_locks() {
 		new_test_ext().execute_with(|| {
-			migrate_backing();
 			let other_owner = AccountId32::new([8; 32]);
 			let fission = FissionByOwnerAndId::<Runtime>::take(LOCK_OWNER, 0).unwrap();
 			FissionByOwnerAndId::<Runtime>::insert(&other_owner, 0, fission.clone());
@@ -295,7 +288,6 @@ mod tests {
 	#[test]
 	fn detects_lock_allocation_drift() {
 		new_test_ext().execute_with(|| {
-			migrate_backing();
 			LocksById::<Runtime>::mutate(1, |lock| {
 				lock.as_mut().unwrap().fissioned_satoshis += 1;
 			});
@@ -310,7 +302,6 @@ mod tests {
 	fn detects_vault_backing_drift() {
 		for field in 0..5 {
 			new_test_ext().execute_with(|| {
-				migrate_backing();
 				let error = match field {
 					0 => "Vault funded satoshis disagree with its Locks",
 					1 => "Vault covered satoshis disagree with its Locks and Fissions",
@@ -336,7 +327,6 @@ mod tests {
 	#[test]
 	fn detects_network_bitcoin_coverage_drift() {
 		new_test_ext().execute_with(|| {
-			migrate_backing();
 			NetworkTotals::<Runtime>::mutate(|totals| totals.vault_securitized_satoshis += 1);
 			assert_eq!(
 				check::<Runtime>(),
@@ -348,7 +338,6 @@ mod tests {
 	#[test]
 	fn detects_guarantee_release_commitment_drift() {
 		new_test_ext().execute_with(|| {
-			migrate_backing();
 			VaultsById::<Runtime>::mutate(1, |vault| {
 				vault
 					.as_mut()
@@ -364,5 +353,113 @@ mod tests {
 					.into())
 			);
 		});
+	}
+
+	fn new_test_ext() -> TestExternalities {
+		let mut ext: TestExternalities =
+			RuntimeGenesisConfig::default().build_storage().unwrap().into();
+		ext.execute_with(|| {
+			// Seed current records directly: these checks outlive the migration that created them.
+			let guarantee = CosignerGuarantee {
+				basis: BitcoinSecuritizationBasis {
+					satoshis: 5,
+					microgons_at_target_per_btc: 123_000_000,
+					tick: 7,
+				},
+				guaranteed_microgons: 10,
+				fund_hold_extensions: bounded_btree_map! { 576 => 10 },
+			};
+			LocksById::<Runtime>::insert(
+				1,
+				LockedBitcoin::<Runtime> {
+					vault_id: 1,
+					cosigner_guarantee: guarantee.clone(),
+					securitization_hold_expiration_bitcoin_height: Some(70),
+					funded_satoshis: 5,
+					funding_utxos: bounded_btree_map! {
+						UtxoRef { txid: H256Le([4; 32]), output_index: 2 } => 5
+					},
+					fissioned_satoshis: 2,
+					owner_account: LOCK_OWNER,
+					security_fees: 0,
+					coupon_paid_fees: 0,
+					vault_pubkey: CompressedBitcoinPubkey([2; 33]),
+					vault_claim_pubkey: CompressedBitcoinPubkey([3; 33]),
+					vault_xpub_sources: ([6; 4], 2, 3),
+					owner_pubkey: CompressedBitcoinPubkey([4; 33]),
+					vault_claim_height: 100,
+					open_claim_height: 1_000,
+					created_at_height: 1,
+					utxo_script_pubkey: BitcoinCosignScriptPubkey::P2WSH {
+						wscript_hash: H256::repeat_byte(8),
+					},
+					is_flexible: true,
+					created_at_argon_block: 9,
+				},
+			);
+
+			let guarantee = CosignerGuarantee {
+				basis: BitcoinSecuritizationBasis { satoshis: 2, ..guarantee.basis },
+				guaranteed_microgons: 1,
+				fund_hold_extensions: bounded_btree_map! { 576 => 1 },
+			};
+			FissionByOwnerAndId::<Runtime>::insert(
+				LOCK_OWNER,
+				0,
+				Fission::<Runtime> {
+					liquid_id: 77,
+					lock_id: 1,
+					satoshis: 2,
+					microgons_at_target_per_btc: 90_000_000,
+					liquidity_promised: 2,
+					cosigner_guarantee: guarantee,
+					created_at_argon_block: 3,
+					ratchet_number: 1,
+					last_ratchet_price_tick: 8,
+					last_updated_argon_block: 4,
+				},
+			);
+			NextFissionIdByOwner::<Runtime>::insert(LOCK_OWNER, 1);
+			FissionIdsByLockId::<Runtime>::mutate(1, |ids| {
+				ids.try_insert(0).unwrap();
+			});
+			FissionIdsByOwnerAndLiquid::<Runtime>::insert((LOCK_OWNER, 77), 0, ());
+			LiquidTicksByOwnerAndId::<Runtime>::insert(LOCK_OWNER, 77, LiquidTicks::default());
+			assert_ok!(TreasuryPositions::account_quantity_updated(
+				&LOCK_OWNER,
+				PositionQuantity::FissionLiquidity,
+				0u128,
+				2u128,
+			));
+
+			VaultsById::<Runtime>::insert(
+				1,
+				Vault {
+					operator_account_id: AccountId32::new([1; 32]),
+					delegate_account_id: None,
+					securitization: 1_000,
+					securitization_target: 1_000,
+					securitization_locked: 11,
+					flexible_securitization_locked: 7,
+					reserved_securitization_space: 0,
+					securitization_pending_activation: 4,
+					securitized_satoshis: 5,
+					total_satoshis: 5,
+					securitization_release_schedule: bounded_btree_map! {
+						576 => SecuritizationScheduleEntry { locked_commitments: 11, ..Default::default() }
+					},
+					committed_microgons: 0,
+					is_closed: false,
+					terms: VaultTerms {
+						bitcoin_annual_percent_rate: FixedU128::zero(),
+						bitcoin_base_fee: 0,
+					},
+					pending_terms: None,
+					opened_tick: 1,
+				},
+			);
+			NetworkTotals::<Runtime>::mutate(|totals| totals.vault_securitized_satoshis = 5);
+		});
+		ext
 	}
 }
