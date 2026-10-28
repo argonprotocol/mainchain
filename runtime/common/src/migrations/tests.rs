@@ -259,10 +259,10 @@ fn migration_conserves_backing_and_reconciles_real_vault_and_treasury_storage() 
 			StorageVersion::get::<pallet_bitcoin_fissions::Pallet<Runtime>>(),
 			StorageVersion::new(2)
 		);
-		frame_system::LastRuntimeUpgrade::<Runtime>::put(frame_system::LastRuntimeUpgradeInfo {
-			spec_version: argon_runtime::VERSION.spec_version.into(),
-			spec_name: "argon".into(),
-		});
+		// Re-running the migration must not change storage once this runtime is installed.
+		frame_system::LastRuntimeUpgrade::<Runtime>::put(
+			frame_system::LastRuntimeUpgradeInfo::from(argon_runtime::VERSION),
+		);
 		let storage_before = sp_io::storage::root(StateVersion::V1);
 		#[cfg(feature = "try-runtime")]
 		assert_ok!(argon_runtime::Executive::try_runtime_upgrade(

@@ -723,11 +723,121 @@ mod test {
 		},
 		EthereumLog, EthereumReceiptLog,
 	};
-	use polkadot_sdk::sp_io::hashing::keccak_256;
+	use polkadot_sdk::{
+		frame_support::traits::{OnFinalize, OnInitialize},
+		sp_io::hashing::keccak_256,
+	};
 
 	#[test]
-	fn receipt_and_storage_proofs_share_progress_without_repaying_a_locator_prefix() {
+	fn receipt_proofs_split_one_ethereum_block_across_argon_blocks_without_replays() {
 		new_test_ext().execute_with(|| {
+			System::set_block_number(1);
+			assert_ok!(CrosschainTransfer::set_chain_config(
+				RuntimeOrigin::root(),
+				SourceChain::Ethereum,
+				chain_config()
+			));
+			let burn = CrosschainTransfer::burn_account(SourceChain::Ethereum);
+			assert_ok!(Balances::mint_into(&burn, 10_000));
+			let recipient = account(2);
+			let ethereum_block_number = 10;
+			let activity_count = u64::from(ethereum_contracts::MAX_GATEWAY_ACTIVITIES_PER_BLOCK);
+			let activities_per_receipt = MaxActivitiesPerReceiptProof::get() as usize;
+			let activities_per_submission =
+				activities_per_receipt * MaxReceiptProofsPerExtrinsic::get() as usize;
+			let logs = (1..=activity_count)
+				.map(|nonce| {
+					argon_activity_log_with_circulation(
+						recipient.clone(),
+						nonce,
+						1,
+						10_000 - u128::from(nonce),
+						0,
+					)
+				})
+				.collect::<Vec<_>>();
+			assert!(logs.len() > activities_per_submission);
+			let payloads = logs
+				.chunks(activities_per_submission)
+				.map(|logs| {
+					proof_batch_at_block(
+						ethereum_block_number,
+						logs.chunks(activities_per_receipt)
+							.map(|logs| activity_logs(logs.to_vec()))
+							.collect(),
+					)
+				})
+				.collect::<Vec<_>>();
+			assert_eq!(payloads.len(), 2);
+
+			let mut previous_nonce = 0;
+			for (index, payload) in payloads.into_iter().enumerate() {
+				assert_eq!(System::block_number(), index as u64 + 1);
+				assert!(payload
+					.blocks
+					.iter()
+					.all(|block| block.target_block_number == ethereum_block_number));
+				let submitted_activities =
+					payload.blocks.iter().map(|block| block.receipt_logs.len()).sum::<usize>();
+				let expected_nonce = previous_nonce + submitted_activities as u64;
+				assert_ok!(CrosschainTransfer::prove_gateway_activity(
+					RuntimeOrigin::signed(account(1)),
+					SourceChain::Ethereum,
+					previous_nonce,
+					payload.clone()
+				));
+				assert_eq!(
+					GatewayStateBySourceChain::<Test>::get(SourceChain::Ethereum)
+						.unwrap()
+						.gateway_activity_nonce,
+					expected_nonce
+				);
+				assert_eq!(Balances::balance(&recipient), u128::from(expected_nonce));
+				assert_eq!(Balances::balance(&burn), 10_000 - u128::from(expected_nonce));
+				let totals = TransferTotalsByAccount::<Test>::get(&recipient);
+				assert_eq!(totals.microgons_in, u128::from(expected_nonce));
+				assert_eq!(u64::from(totals.argon_transfers_in_count), expected_nonce);
+				let expected_updates = (1..=expected_nonce)
+					.map(|nonce| (recipient.clone(), u128::from(nonce)))
+					.collect::<Vec<_>>();
+				assert_eq!(ArgonFlowUpdates::get(), expected_updates);
+
+				advance_argon_block();
+				assert_noop!(
+					CrosschainTransfer::prove_gateway_activity(
+						RuntimeOrigin::signed(account(1)),
+						SourceChain::Ethereum,
+						previous_nonce,
+						payload.clone()
+					),
+					Error::<Test>::UnexpectedPreviousGatewayActivityNonce
+				);
+				// Updating the submitted cursor must not make an old chunk payable again.
+				assert_noop!(
+					CrosschainTransfer::prove_gateway_activity(
+						RuntimeOrigin::signed(account(1)),
+						SourceChain::Ethereum,
+						expected_nonce,
+						payload
+					),
+					Error::<Test>::UnexpectedGatewayActivityNonce
+				);
+				assert_eq!(Balances::balance(&recipient), u128::from(expected_nonce));
+				assert_eq!(Balances::balance(&burn), 10_000 - u128::from(expected_nonce));
+				assert_eq!(TransferTotalsByAccount::<Test>::get(&recipient), totals);
+				assert_eq!(ArgonFlowUpdates::get(), expected_updates);
+				assert!(System::events().is_empty());
+				previous_nonce = expected_nonce;
+			}
+			assert_eq!(System::block_number(), 3);
+			assert_eq!(previous_nonce, activity_count);
+		});
+	}
+
+	#[test]
+	fn receipt_then_storage_resumes_the_same_ethereum_block_in_later_argon_blocks() {
+		new_test_ext().execute_with(|| {
+			System::set_block_number(1);
 			assert_ok!(CrosschainTransfer::set_chain_config(
 				RuntimeOrigin::root(),
 				SourceChain::Ethereum,
@@ -741,7 +851,7 @@ mod test {
 			let proof = storage_proof(10, H256::repeat_byte(7), vec![first.clone(), second]);
 
 			// An upgraded chain can already be midway through a locator via receipt proofs.
-			let receipt_batch = proof_batch(vec![activity_logs(vec![first])]);
+			let receipt_batch = proof_batch_at_block(10, vec![activity_logs(vec![first])]);
 			let call = Call::<Test>::prove_gateway_activity {
 				source_chain: SourceChain::Ethereum,
 				previous_gateway_activity_nonce: 0,
@@ -758,6 +868,15 @@ mod test {
 				0,
 				receipt_batch
 			));
+			assert_eq!(Balances::balance(&recipient), 100);
+			assert_eq!(
+				GatewayStateBySourceChain::<Test>::get(SourceChain::Ethereum)
+					.unwrap()
+					.gateway_activity_nonce,
+				1
+			);
+			advance_argon_block();
+			assert_eq!(System::block_number(), 2);
 			assert_ok!(CrosschainTransfer::prove_gateway_activity_storage(
 				RuntimeOrigin::signed(account(1)),
 				SourceChain::Ethereum,
@@ -769,7 +888,13 @@ mod test {
 				TransferTotalsByAccount::<Test>::get(&recipient).argon_transfers_in_count,
 				2
 			);
+			assert_eq!(
+				ArgonFlowUpdates::get(),
+				vec![(recipient.clone(), 100), (recipient.clone(), 300)]
+			);
 
+			advance_argon_block();
+			assert_eq!(System::block_number(), 3);
 			assert_noop!(
 				CrosschainTransfer::prove_gateway_activity_storage(
 					RuntimeOrigin::signed(account(1)),
@@ -881,22 +1006,79 @@ mod test {
 	}
 
 	#[test]
-	fn storage_proofs_resume_after_a_paused_activity_without_repaying_the_prefix() {
+	fn storage_proofs_resume_a_paused_ethereum_block_in_a_later_argon_block() {
 		new_test_ext().execute_with(|| {
 			System::set_block_number(1);
-			assert_ok!(CrosschainTransfer::set_chain_config(
-				RuntimeOrigin::root(),
+			let operator = account(40);
+			let relayer = account(41);
+			let council_pair = council_signing_pair(11);
+			let authority_pair = council_signing_pair(12);
+			let signing_key = council_signer(&authority_pair);
+			configure_single_member_ethereum_council(operator.clone(), 13, 10_000, &council_pair);
+			assert_ok!(Balances::mint_into(&operator, 10_000));
+			assert_ok!(CrosschainTransfer::register_minting_authority(
+				RuntimeOrigin::signed(operator.clone()),
 				SourceChain::Ethereum,
-				chain_config()
+				signing_key,
+				minting_authority_registration_signature(&authority_pair, &operator),
+				10_000,
+				0,
 			));
+			assert_ok!(CrosschainTransfer::approve_queue_entries(
+				RuntimeOrigin::signed(operator.clone()),
+				SourceChain::Ethereum,
+				bounded_vec![minting_authority_approval_signature(&council_pair, 1)],
+			));
+			let repayment_hold = RuntimeHoldReason::CrosschainTransfer(
+				HoldReason::MintingAuthorityActivationRepayment,
+			);
+			assert_eq!(Balances::balance_on_hold(&repayment_hold, &operator), 150);
+			// Break only local reimbursement backing, not the Ethereum activity sequence.
+			assert_ok!(Balances::release(&repayment_hold, &operator, 150, Precision::Exact));
+
 			let burn = CrosschainTransfer::burn_account(SourceChain::Ethereum);
 			assert_ok!(Balances::mint_into(&burn, 10_000));
+			let activation = MintingAuthorityActivated {
+				signingKey: AlloyAddress::from_slice(signing_key.as_bytes()),
+				microgonCollateral: 10_000,
+				micronotCollateral: 0,
+				coactivationCount: 1,
+				sharedSignatureCount: 1,
+				approvalHash: approval_hash_for_queue_nonce(1).0.into(),
+				relayerArgonAccountId: destination_bytes(&relayer).into(),
+				gatewayState: ContractGatewayActivityState {
+					gatewayActivityNonce: 2,
+					argonApprovalsNonce: 1,
+					argonCirculation: 9_900,
+					argonotCirculation: 0,
+				},
+			};
 			let proof = storage_proof(
 				10,
 				H256::zero(),
 				vec![
 					argon_activity_log_with_circulation(account(2), 1, 100, 9_900, 0),
-					argon_activity_log_with_circulation(account(2), 2, 200, 8_000, 0),
+					EthereumLog {
+						address: h160(0x21),
+						topics: vec![
+							H256::from(MintingAuthorityActivated::SIGNATURE_HASH.0),
+							indexed_address_word(signing_key),
+						]
+						.try_into()
+						.unwrap(),
+						data: activation.encode_data().try_into().unwrap(),
+					},
+					transfer_to_argon_started_log(
+						h160(0x21),
+						h160(0x11),
+						h160(0x31),
+						200,
+						destination_bytes(&account(2)),
+						3,
+						1,
+						9_700,
+						0,
+					),
 				],
 			);
 			let result = CrosschainTransfer::prove_gateway_activity_storage(
@@ -921,16 +1103,34 @@ mod test {
 			let pause = GatewaySyncPauseBySourceChain::<Test>::get(SourceChain::Ethereum).unwrap();
 			assert_eq!(pause.last_good_gateway_activity_nonce, 1);
 			assert_eq!(pause.failed_gateway_activity_nonce, 2);
-			assert_eq!(pause.reason, GatewaySyncPauseReason::GatewayStateDrift);
+			assert_eq!(
+				pause.reason,
+				GatewaySyncPauseReason::MintingAuthorityActivationRepaymentMismatch
+			);
+			assert_eq!(Balances::balance(&relayer), 0);
+			assert_eq!(
+				MintingAuthoritiesBySigner::<Test>::get(signing_key).unwrap().state,
+				MintingAuthorityState::PendingActivation
+			);
 
-			// Repair the local backing mismatch, then reuse the identical full locator proof.
-			assert_ok!(Balances::burn_from(
-				&burn,
-				1_700,
-				Preservation::Expendable,
-				Precision::Exact,
-				Fortitude::Force
-			));
+			advance_argon_block();
+			assert_eq!(System::block_number(), 2);
+			assert_eq!(
+				GatewaySyncPauseBySourceChain::<Test>::get(SourceChain::Ethereum),
+				Some(pause)
+			);
+			assert_noop!(
+				CrosschainTransfer::prove_gateway_activity_storage(
+					RuntimeOrigin::signed(account(1)),
+					SourceChain::Ethereum,
+					1,
+					proof.clone()
+				),
+				Error::<Test>::GatewaySyncPaused
+			);
+
+			// Restore the local repayment hold, without changing the Ethereum events or root.
+			assert_ok!(Balances::hold(&repayment_hold, &operator, 150));
 			assert_ok!(CrosschainTransfer::unpause_gateway(
 				RuntimeOrigin::root(),
 				SourceChain::Ethereum
@@ -942,7 +1142,26 @@ mod test {
 				proof.clone()
 			));
 			assert_eq!(Balances::balance(&account(2)), 300);
-			assert_eq!(Balances::balance(&burn), 8_000);
+			assert_eq!(Balances::balance(&burn), 9_700);
+			assert_eq!(Balances::balance(&relayer), 150);
+			assert_eq!(Balances::balance_on_hold(&repayment_hold, &operator), 0);
+			assert_eq!(
+				MintingAuthoritiesBySigner::<Test>::get(signing_key).unwrap().state,
+				MintingAuthorityState::Active
+			);
+			assert_eq!(TransferTotalsByAccount::<Test>::get(account(2)).microgons_in, 300);
+			assert_eq!(ArgonFlowUpdates::get(), vec![(account(2), 100), (account(2), 300)]);
+			let settled_nonces = System::events()
+				.into_iter()
+				.filter_map(|record| match record.event {
+					RuntimeEvent::CrosschainTransfer(Event::TransferToArgonSettled {
+						transfer,
+						..
+					}) => Some(transfer.gateway_activity_nonce),
+					_ => None,
+				})
+				.collect::<Vec<_>>();
+			assert_eq!(settled_nonces, vec![3]);
 			assert_eq!(
 				TransferTotalsByAccount::<Test>::get(account(2)).argon_transfers_in_count,
 				2
@@ -951,18 +1170,38 @@ mod test {
 				GatewayStateBySourceChain::<Test>::get(SourceChain::Ethereum)
 					.unwrap()
 					.gateway_activity_nonce,
-				2
+				3
 			);
 			assert!(GatewaySyncPauseBySourceChain::<Test>::get(SourceChain::Ethereum).is_none());
+			advance_argon_block();
+			assert_eq!(System::block_number(), 3);
 			assert_noop!(
 				CrosschainTransfer::prove_gateway_activity_storage(
 					RuntimeOrigin::signed(account(1)),
 					SourceChain::Ethereum,
-					2,
+					1,
+					proof.clone()
+				),
+				Error::<Test>::UnexpectedPreviousGatewayActivityNonce
+			);
+			assert_noop!(
+				CrosschainTransfer::prove_gateway_activity_storage(
+					RuntimeOrigin::signed(account(1)),
+					SourceChain::Ethereum,
+					3,
 					proof
 				),
 				Error::<Test>::InvalidProof
 			);
+			assert_eq!(Balances::balance(&account(2)), 300);
+			assert_eq!(Balances::balance(&burn), 9_700);
+			assert_eq!(Balances::balance(&relayer), 150);
+			assert_eq!(
+				TransferTotalsByAccount::<Test>::get(account(2)).argon_transfers_in_count,
+				2
+			);
+			assert_eq!(ArgonFlowUpdates::get(), vec![(account(2), 100), (account(2), 300)]);
+			assert!(System::events().is_empty());
 		});
 	}
 
@@ -4023,6 +4262,17 @@ mod test {
 				Error::<Test>::InvalidProof,
 			);
 		});
+	}
+
+	fn advance_argon_block() {
+		let block_number = System::block_number();
+		AllPalletsWithSystem::on_finalize(block_number);
+		let parent_hash = System::finalize().hash();
+		let next_block_number = block_number + 1;
+		System::reset_events();
+		System::initialize(&next_block_number, &parent_hash, &Default::default());
+		AllPalletsWithSystem::on_initialize(next_block_number);
+		System::note_finished_initialize();
 	}
 
 	fn argon_activity_log(
