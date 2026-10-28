@@ -866,28 +866,9 @@ declare module '@polkadot/api-base/types/submittable' {
     };
     miningSlot: {
       /**
-       * Submit a bid for a mining slot in the next cohort. Once all spots are filled in the next
-       * cohort, a bidder can be supplanted by supplying a higher bid.
-       *
-       * Each slot has `MaxCohortSize` spots available.
-       *
-       * To be eligible for a slot, you must have the required ownership tokens (argonots) in
-       * this account. The required amount is calculated as a percentage of the total ownership
-       * tokens in the network. This percentage is adjusted before the beginning of each slot.
-       *
-       * If your bid is no longer winning, a `SlotBidderDropped` event will be emitted. By
-       * monitoring for this event, you will be able to ensure your bid is accepted.
-       *
-       * NOTE: bidding for each slot will be closed at a random block within
-       * `mining_config.ticks_before_bid_end_for_vrf_close` blocks of the slot end time.
-       *
-       * The slot duration can be calculated as `BlocksBetweenSlots * MaxMiners / MaxCohortSize`.
-       *
-       * Parameters:
-       * - `bid`: The amount of argons to bid
-       * - `keys`: The session "hot" keys for the slot (BlockSealAuthorityId and GrandpaId).
-       * - `mining_account_id`: This account_id allows you to operate as this miner account id,
-       * but use funding (argonots and bid) from the submitting account
+       * Submit a funded public bid, optionally committing to a hidden maximum.
+       * Every bid competes at its public amount even if no maximum is revealed.
+       * An omitted target frame selects the current auction at dispatch time.
        **/
       bid: AugmentedSubmittable<
         (
@@ -898,8 +879,23 @@ declare module '@polkadot/api-base/types/submittable' {
             | string
             | Uint8Array,
           miningAccountId: Option<AccountId32> | null | Uint8Array | AccountId32 | string,
+          targetFrameId: Option<u64> | null | Uint8Array | u64 | AnyNumber,
+          maxHash: Option<U8aFixed> | null | Uint8Array | U8aFixed | string,
         ) => SubmittableExtrinsic<ApiType>,
-        [u128, ArgonRuntimeSessionKeys, Option<AccountId32>]
+        [u128, ArgonRuntimeSessionKeys, Option<AccountId32>, Option<u64>, Option<U8aFixed>]
+      >;
+      /**
+       * Disclose a committed maximum during the five blocks following submission.
+       * The target frame must match the original bid and the current auction.
+       **/
+      bidMax: AugmentedSubmittable<
+        (
+          max: u128 | AnyNumber | Uint8Array,
+          salt: U8aFixed | string | Uint8Array,
+          miningAccountId: Option<AccountId32> | null | Uint8Array | AccountId32 | string,
+          targetFrameId: u64 | AnyNumber | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [u128, U8aFixed, Option<AccountId32>, u64]
       >;
       /**
        * Admin function to update the mining slot delay.

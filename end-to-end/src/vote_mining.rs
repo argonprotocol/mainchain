@@ -1,4 +1,7 @@
-use crate::utils::{activate_vote_mining, create_active_notary_with_archive_bucket, sudo};
+use crate::utils::{
+	activate_vote_mining, create_active_notary_with_archive_bucket, force_set_ownership_balance,
+	register_miner_keys, register_miners, sudo,
+};
 use argon_client::{
 	api::{runtime_types::argon_runtime::RuntimeCall, storage},
 	conversion::SubxtRuntime,
@@ -10,7 +13,70 @@ use argon_testing::{test_miner_count, ArgonNodeStartArgs, ArgonTestNode, ArgonTe
 use polkadot_sdk::*;
 use serial_test::serial;
 use sp_core::{DeriveJunction, Pair};
+use sp_keyring::Sr25519Keyring::Alice;
 use std::{fs, process::Command, time::Duration};
+
+#[tokio::test(flavor = "multi_thread")]
+#[serial]
+async fn test_miner_registration_after_bidding_closes() {
+	let args = ArgonNodeStartArgs::new("alice", test_miner_count(), "").unwrap();
+	let node = ArgonTestNode::start(args).await.unwrap();
+	let ownership = node
+		.client
+		.live
+		.constants()
+		.at(&argon_client::api::constants().mining_slot().initial_argonots_per_seat())
+		.unwrap();
+	force_set_ownership_balance(&node, &node.account_id, ownership.saturating_mul(2))
+		.await
+		.unwrap();
+	let keys = register_miner_keys(&node, Alice, 1).await.unwrap();
+	let closed_frame = tokio::time::timeout(Duration::from_secs(180), async {
+		let mut blocks = node.client.live.blocks().subscribe_best().await.unwrap();
+		while let Some(block) = blocks.next().await {
+			let block = block.unwrap();
+			let at = FetchAt::Block(block.hash());
+			let frame = node
+				.client
+				.fetch_storage(&storage().mining_slot().next_frame_id(), at)
+				.await
+				.unwrap()
+				.unwrap();
+			let open = node
+				.client
+				.fetch_storage(&storage().mining_slot().is_next_slot_bidding_open(), at)
+				.await
+				.unwrap()
+				.unwrap_or_default();
+			if frame > 1 && !open {
+				println!(
+					"Starting registration after auction {frame} closed at block {}",
+					block.number()
+				);
+				return frame;
+			}
+		}
+		panic!("block subscription ended before auction admission closed");
+	})
+	.await
+	.expect("auction admission should close before registration");
+	register_miners(
+		&node,
+		Sr25519Signer::new(Alice.pair()),
+		vec![(node.account_id.clone(), keys)],
+		None,
+	)
+	.await
+	.unwrap();
+	let account = node.client.api_account(&node.account_id);
+	let (winning_frame, _) = node
+		.client
+		.fetch_storage(&storage().mining_slot().account_index_lookup(account), FetchAt::Best)
+		.await
+		.unwrap()
+		.expect("miner should be active after the closed auction rolls over");
+	assert!(winning_frame > closed_frame);
+}
 
 /// Tests default votes submitted by a notebook after nodes register as vote miners
 #[tokio::test(flavor = "multi_thread")]

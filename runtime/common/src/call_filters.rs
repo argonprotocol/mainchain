@@ -100,14 +100,14 @@ macro_rules! call_filters {
 							RuntimeCall::LocalchainTransfer(..)
 					),
 					ProxyType::MiningBidRealPaysFee | ProxyType::MiningBid => match c {
-						RuntimeCall::MiningSlot(pallet_mining_slot::Call::bid { .. }) => true,
+						RuntimeCall::MiningSlot(pallet_mining_slot::Call::bid { .. } |  pallet_mining_slot::Call::bid_max { .. }) => true,
 						RuntimeCall::Utility(pallet_utility::Call::batch { calls }) |
 						RuntimeCall::Utility(pallet_utility::Call::batch_all { calls }) |
 						RuntimeCall::Utility(pallet_utility::Call::force_batch { calls }) =>
 							calls.iter().all(|sc| {
 								matches!(
 									sc,
-									RuntimeCall::MiningSlot(pallet_mining_slot::Call::bid { .. })
+									RuntimeCall::MiningSlot(pallet_mining_slot::Call::bid { .. } |  pallet_mining_slot::Call::bid_max { .. })
 								)
 							}),
 						_ => false,

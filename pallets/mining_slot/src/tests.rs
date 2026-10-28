@@ -148,14 +148,14 @@ fn extends_bidding_if_mining_slot_extends() {
 		assert!(IsNextSlotBiddingOpen::<Test>::get());
 
 		assert_eq!(MiningSlots::frame_1_begins_tick(), current_tick + 1440);
-		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(1), 0, 1.into(), None));
+		assert_ok!(settle_public_bid(RuntimeOrigin::signed(1), 0, 1.into(), None));
 		MiningConfig::<Test>::mutate(|a| {
 			a.slot_bidding_start_after_ticks = 21_000;
 		});
 		System::initialize(&3, &System::parent_hash(), &Default::default());
 		MiningSlots::on_initialize(3);
 		MiningSlots::on_finalize(3);
-		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(2), 0, 2.into(), None));
+		assert_ok!(settle_public_bid(RuntimeOrigin::signed(2), 0, 2.into(), None));
 
 		current_tick += 1440;
 		ElapsedTicks::set(current_tick - genesis);
@@ -375,7 +375,7 @@ fn it_releases_argonots_when_an_epoch_ends() {
 		FrameRewardTicksRemaining::<Test>::set(1);
 		assert_eq!(MiningSlots::get_next_mining_epoch(), (8, 8 + (2 * 3)));
 
-		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(2), 0, 1.into(), None));
+		assert_ok!(settle_public_bid(RuntimeOrigin::signed(2), 0, 1.into(), None));
 
 		CurrentTick::set(8);
 		IsBlockVoteSeal::set(true);
@@ -464,7 +464,7 @@ fn it_holds_ownership_tokens_for_a_slot() {
 		System::set_block_number(6);
 
 		assert_err!(
-			MiningSlots::bid(RuntimeOrigin::signed(2), 0, 1.into(), None),
+			settle_public_bid(RuntimeOrigin::signed(2), 0, 1.into(), None),
 			Error::<Test>::SlotNotTakingBids
 		);
 
@@ -478,13 +478,13 @@ fn it_holds_ownership_tokens_for_a_slot() {
 		ArgonotsPerMiningSeat::<Test>::set(share_amount);
 
 		assert_err!(
-			MiningSlots::bid(RuntimeOrigin::signed(1), 0, 1.into(), None),
+			settle_public_bid(RuntimeOrigin::signed(1), 0, 1.into(), None),
 			Error::<Test>::InsufficientOwnershipTokens
 		);
 
 		set_ownership(1, 1000u32.into());
 
-		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(1), 0, 1.into(), None));
+		assert_ok!(settle_public_bid(RuntimeOrigin::signed(1), 0, 1.into(), None));
 		System::assert_last_event(
 			Event::SlotBidderAdded { account_id: 1, bid_amount: 0u32.into(), index: 0 }.into(),
 		);
@@ -492,7 +492,12 @@ fn it_holds_ownership_tokens_for_a_slot() {
 
 		// should be able to re-register
 		set_argons(1, 1_100_000);
-		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(1), 1_000_000u32.into(), 1.into(), None));
+		assert_ok!(settle_public_bid(
+			RuntimeOrigin::signed(1),
+			1_000_000u32.into(),
+			1.into(),
+			None
+		));
 		assert_eq!(
 			BidsForNextSlotCohort::<Test>::get()
 				.iter()
@@ -522,14 +527,21 @@ fn it_requires_operational_account_upgrade_when_invite_only() {
 		set_ownership(1, 1);
 
 		assert_noop!(
-			MiningSlots::bid(RuntimeOrigin::signed(1), 0, 1.into(), None),
+			MiningSlots::bid(
+				RuntimeOrigin::signed(1),
+				0,
+				1.into(),
+				None,
+				Some(NextFrameId::<Test>::get()),
+				None
+			),
 			Error::<Test>::OperationalAccountRegistrationRequired
 		);
 
 		UpgradedOperationalAccounts::mutate(|accounts| {
 			accounts.insert(1);
 		});
-		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(1), 0, 1.into(), None));
+		assert_ok!(settle_public_bid(RuntimeOrigin::signed(1), 0, 1.into(), None));
 	});
 }
 
@@ -550,7 +562,7 @@ fn it_wont_accept_bids_until_bidding_starts() {
 			MiningSlots::on_initialize(i);
 			MiningSlots::on_finalize(i);
 			assert_err!(
-				MiningSlots::bid(RuntimeOrigin::signed(2), 0, 1.into(), None),
+				settle_public_bid(RuntimeOrigin::signed(2), 0, 1.into(), None),
 				Error::<Test>::SlotNotTakingBids
 			);
 		}
@@ -567,7 +579,7 @@ fn it_wont_accept_bids_until_bidding_starts() {
 		MiningSlots::on_finalize(12 + TicksBetweenSlots::get());
 
 		assert!(IsNextSlotBiddingOpen::<Test>::get(), "bidding should now be open");
-		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(2), 0, 1.into(), None));
+		assert_ok!(settle_public_bid(RuntimeOrigin::signed(2), 0, 1.into(), None));
 	});
 }
 #[test]
@@ -628,7 +640,7 @@ fn it_wont_let_you_reuse_ownership_tokens_for_two_bids() {
 
 		let ownership = (200 / 6) as u128;
 		ArgonotsPerMiningSeat::<Test>::set(ownership);
-		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(1), 0, 1.into(), None));
+		assert_ok!(settle_public_bid(RuntimeOrigin::signed(1), 0, 1.into(), None));
 		System::set_block_number(15);
 		CurrentTick::set(16);
 		IsBlockVoteSeal::set(true);
@@ -668,7 +680,7 @@ fn it_wont_let_you_reuse_ownership_tokens_for_two_bids() {
 		assert_eq!(MiningSlots::get_next_mining_epoch(), (24, 24 + (4 * 3)));
 
 		assert_err!(
-			MiningSlots::bid(RuntimeOrigin::signed(1), 0, 1.into(), None),
+			settle_public_bid(RuntimeOrigin::signed(1), 0, 1.into(), None),
 			Error::<Test>::CannotRegisterOverlappingSessions
 		);
 		assert!(System::account_exists(&1));
@@ -689,7 +701,7 @@ fn it_will_order_bids() {
 		System::set_block_number(5);
 
 		assert_err!(
-			MiningSlots::bid(RuntimeOrigin::signed(2), 0, 1.into(), None),
+			settle_public_bid(RuntimeOrigin::signed(2), 0, 1.into(), None),
 			Error::<Test>::SlotNotTakingBids
 		);
 
@@ -711,11 +723,16 @@ fn it_will_order_bids() {
 		set_argons(1, 3_100_000);
 		// Bids must be increments of 10 cents
 		assert_err!(
-			MiningSlots::bid(RuntimeOrigin::signed(1), 1_000u32.into(), 1.into(), None),
+			settle_public_bid(RuntimeOrigin::signed(1), 1_000u32.into(), 1.into(), None),
 			Error::<Test>::InvalidBidAmount
 		);
 		// 1. Account 1 bids
-		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(1), 1_000_000u32.into(), 1.into(), None));
+		assert_ok!(settle_public_bid(
+			RuntimeOrigin::signed(1),
+			1_000_000u32.into(),
+			1.into(),
+			None
+		));
 		System::assert_last_event(
 			Event::SlotBidderAdded { account_id: 1, bid_amount: 1_000_000u32.into(), index: 0 }
 				.into(),
@@ -732,7 +749,7 @@ fn it_will_order_bids() {
 		// 2. Account 2 bids highest and takes top slot
 		// should be able to re-register
 		set_argons(2, 5_000_000);
-		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(2), 2_000_000, 2.into(), None));
+		assert_ok!(settle_public_bid(RuntimeOrigin::signed(2), 2_000_000, 2.into(), None));
 		assert_eq!(Balances::free_balance(2), 3_000_000);
 		assert_eq!(Balances::free_balance(bid_pool_account_id), 3_000_000);
 		System::assert_last_event(
@@ -757,7 +774,7 @@ fn it_will_order_bids() {
 		// should be able to re-register
 		System::reset_events();
 		set_argons(3, 5_000_000);
-		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(3), 2_000_000, 3.into(), None));
+		assert_ok!(settle_public_bid(RuntimeOrigin::signed(3), 2_000_000, 3.into(), None));
 		assert_eq!(Balances::free_balance(3), 3_000_000);
 		assert_eq!(Balances::free_balance(bid_pool_account_id), 4_000_000,);
 		assert_eq!(Balances::free_balance(1), 3_100_000, "bid is returned");
@@ -784,7 +801,7 @@ fn it_will_order_bids() {
 		// 4. Account 1 increases bid and resubmits
 
 		System::reset_events();
-		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(1), 2_010_000, 1.into(), None));
+		assert_ok!(settle_public_bid(RuntimeOrigin::signed(1), 2_010_000, 1.into(), None));
 		assert_eq!(Balances::free_balance(1), 1_090_000);
 		assert_eq!(Balances::free_balance(bid_pool_account_id), 4_010_000);
 
@@ -879,7 +896,7 @@ fn it_handles_cleaning_up_miner_nonces() {
 			MiningSlots::on_initialize(i);
 			MiningSlots::on_finalize(i);
 
-			assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(i), 0, 1.into(), None));
+			assert_ok!(settle_public_bid(RuntimeOrigin::signed(i), 0, 1.into(), None));
 			System::set_block_number(i - 1);
 			System::initialize(&(i), &System::parent_hash(), &Default::default());
 			FrameRewardTicksRemaining::<Test>::set(1);
@@ -918,24 +935,21 @@ fn handles_a_max_of_bids_per_block() {
 			set_ownership(i, 1000u32.into());
 		}
 
-		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(1), 0, 1.into(), None));
+		assert_ok!(settle_public_bid(RuntimeOrigin::signed(1), 0, 1.into(), None));
 		assert_eq!(HistoricalBidsPerSlot::<Test>::get().into_inner()[0].clone().bids_count, 1);
 
 		System::assert_last_event(
 			Event::SlotBidderAdded { account_id: 1, bid_amount: 0u32.into(), index: 0 }.into(),
 		);
-		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(2), 0, 2.into(), None));
+		assert_ok!(settle_public_bid(RuntimeOrigin::signed(2), 0, 2.into(), None));
 		System::assert_last_event(
 			Event::SlotBidderAdded { account_id: 2, bid_amount: 0u32.into(), index: 1 }.into(),
 		);
 		assert_noop!(
-			MiningSlots::bid(RuntimeOrigin::signed(3), 0, 3.into(), None),
-			Error::<Test>::BidTooLow,
+			settle_public_bid(RuntimeOrigin::signed(3), 0, 3.into(), None),
+			Error::<Test>::BidTooLow
 		);
-		// should not have changed
-		System::assert_last_event(
-			Event::SlotBidderAdded { account_id: 2, bid_amount: 0u32.into(), index: 1 }.into(),
-		);
+		assert_eq!(Ownership::balance_on_hold(&HoldReason::RegisterAsMiner.into(), &3), 0);
 		assert_eq!(HistoricalBidsPerSlot::<Test>::get().into_inner()[0].clone().bids_count, 2);
 		for i in 1..5 {
 			assert!(System::account_exists(&i));
@@ -956,7 +970,7 @@ fn it_allows_bids_from_an_external_funding_account() {
 		System::set_block_number(6);
 
 		assert_err!(
-			MiningSlots::bid(RuntimeOrigin::signed(2), 0, 1.into(), None),
+			settle_public_bid(RuntimeOrigin::signed(2), 0, 1.into(), None),
 			Error::<Test>::SlotNotTakingBids
 		);
 
@@ -969,7 +983,7 @@ fn it_allows_bids_from_an_external_funding_account() {
 
 		System::set_block_number(1);
 
-		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(1), 1_000_000, 1.into(), Some(2)));
+		assert_ok!(settle_public_bid(RuntimeOrigin::signed(1), 1_000_000, 1.into(), Some(2)));
 		assert_eq!(Ownership::balance_on_hold(&HoldReason::RegisterAsMiner.into(), &1), 100_000);
 		assert_eq!(Balances::free_balance(bid_pool_account_id), 1_000_000);
 		assert_eq!(Balances::free_balance(1), 4_100_000);
@@ -992,7 +1006,7 @@ fn it_allows_bids_from_an_external_funding_account() {
 		);
 
 		// bid again as account 3
-		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(1), 2_000_000, 3.into(), Some(3)));
+		assert_ok!(settle_public_bid(RuntimeOrigin::signed(1), 2_000_000, 3.into(), Some(3)));
 		assert_eq!(Ownership::balance_on_hold(&HoldReason::RegisterAsMiner.into(), &1), 200_000);
 		assert_eq!(Balances::free_balance(bid_pool_account_id), 3_000_000);
 		assert_eq!(Balances::free_balance(1), 2_100_000);
@@ -1024,7 +1038,7 @@ fn it_allows_bids_from_an_external_funding_account() {
 		);
 
 		// overflow
-		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(1), 2_000_000, 4.into(), Some(4)));
+		assert_ok!(settle_public_bid(RuntimeOrigin::signed(1), 2_000_000, 4.into(), Some(4)));
 		assert_eq!(Ownership::balance_on_hold(&HoldReason::RegisterAsMiner.into(), &1), 200_000);
 		assert_eq!(Balances::free_balance(bid_pool_account_id), 4_000_000);
 		assert_eq!(Balances::free_balance(1), 1_100_000);
@@ -1073,7 +1087,14 @@ fn it_rejects_funding_account_changes_on_renewal() {
 		ActiveMinersCount::<Test>::put(1);
 
 		assert_noop!(
-			MiningSlots::bid(RuntimeOrigin::signed(3), 0, 3.into(), Some(2)),
+			MiningSlots::bid(
+				RuntimeOrigin::signed(3),
+				0,
+				3.into(),
+				Some(2),
+				Some(NextFrameId::<Test>::get()),
+				None
+			),
 			Error::<Test>::CannotChangeFundingAccount
 		);
 	});
@@ -1099,10 +1120,17 @@ fn it_rejects_funding_account_changes_for_pending_bid() {
 		set_ownership(3, 300_000);
 		set_argons(3, 5_100_000);
 
-		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(1), 1_000_000, 1.into(), Some(2)));
+		assert_ok!(settle_public_bid(RuntimeOrigin::signed(1), 1_000_000, 1.into(), Some(2)));
 
 		assert_noop!(
-			MiningSlots::bid(RuntimeOrigin::signed(3), 2_000_000, 3.into(), Some(2)),
+			MiningSlots::bid(
+				RuntimeOrigin::signed(3),
+				2_000_000,
+				3.into(),
+				Some(2),
+				Some(NextFrameId::<Test>::get()),
+				None
+			),
 			Error::<Test>::CannotChangeFundingAccount
 		);
 	});
@@ -1191,7 +1219,7 @@ fn it_should_allow_each_miner_to_get_full_rewards() {
 		System::initialize(&1, &System::parent_hash(), &Default::default());
 		set_argons(1, 5_000_000);
 		set_ownership(1, 100_000u32.into());
-		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(1), 1_000_000, 1.into(), None));
+		assert_ok!(settle_public_bid(RuntimeOrigin::signed(1), 1_000_000, 1.into(), None));
 		current_tick += TicksBetweenSlots::get();
 
 		CurrentTick::set(current_tick);
@@ -1258,7 +1286,7 @@ fn it_distributes_seals_evenly() {
 				let id = (10 * i) + x;
 				set_argons(id, 5_000_000);
 				set_ownership(id, 100_000u32.into());
-				assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(id), 1_000_000, 1.into(), None));
+				assert_ok!(settle_public_bid(RuntimeOrigin::signed(id), 1_000_000, 1.into(), None));
 			}
 			current_tick += TicksBetweenSlots::get();
 			IsBlockVoteSeal::set(true);
@@ -1825,7 +1853,7 @@ fn it_tracks_the_block_rewards() {
 		// submit 10 bids
 		set_ownership(1, 100_000);
 		set_argons(1, 111_000_000);
-		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(1), 110 * 1_000_000, 1.into(), None));
+		assert_ok!(settle_public_bid(RuntimeOrigin::signed(1), 110 * 1_000_000, 1.into(), None));
 
 		CurrentTick::set(20);
 		IsBlockVoteSeal::set(true);
@@ -2008,7 +2036,12 @@ fn it_adjusts_mining_seats() {
 		for i in 0..10 {
 			set_ownership(i, 100_000);
 			set_argons(i, 111_000_000);
-			assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(i), 110 * 1_000_000, 1.into(), None));
+			assert_ok!(settle_public_bid(
+				RuntimeOrigin::signed(i),
+				110 * 1_000_000,
+				1.into(),
+				None
+			));
 		}
 
 		CurrentTick::set(20);
@@ -2033,7 +2066,7 @@ fn it_adjusts_mining_seats() {
 				let account = (((frame) * 10) as u32 + i).into();
 				set_ownership(account, 100_000);
 				set_argons(account, 111_000_000);
-				assert_ok!(MiningSlots::bid(
+				assert_ok!(settle_public_bid(
 					RuntimeOrigin::signed(account),
 					110 * 1_000_000,
 					1.into(),
@@ -2092,7 +2125,7 @@ fn it_doesnt_accept_bids_until_first_slot() {
 		MiningSlots::on_finalize(12960);
 		assert_eq!(NextFrameId::<Test>::get(), 1);
 		assert!(IsNextSlotBiddingOpen::<Test>::get());
-		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(2), 0, 1.into(), None));
+		assert_ok!(settle_public_bid(RuntimeOrigin::signed(2), 0, 1.into(), None));
 		assert_eq!(ActiveMinersCount::<Test>::get(), 0);
 
 		let next_divisible_period = 12960 + 1440;
@@ -2223,7 +2256,7 @@ fn it_allows_a_bidder_to_use_their_full_balance() {
 		IsNextSlotBiddingOpen::<Test>::set(true);
 		ArgonotsPerMiningSeat::<Test>::set(10_000);
 		// ### Use most of balance
-		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(1), 900_000, 1.into(), None));
+		assert_ok!(settle_public_bid(RuntimeOrigin::signed(1), 900_000, 1.into(), None));
 
 		assert_eq!(Balances::free_balance(1), 100_000);
 		assert_eq!(System::providers(&1), 3);
@@ -2236,7 +2269,7 @@ fn it_allows_a_bidder_to_use_their_full_balance() {
 		set_ownership(2, 10_000);
 		System::inc_account_nonce(2);
 		// ### Use all of argonots and balance
-		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(2), 1_000_000, 2.into(), None));
+		assert_ok!(settle_public_bid(RuntimeOrigin::signed(2), 1_000_000, 2.into(), None));
 		assert_eq!(Balances::free_balance(2), 0);
 		assert_eq!(System::providers(&2), 1);
 		assert!(System::account_exists(&2));
@@ -2271,7 +2304,7 @@ fn bid_pool_account_survives_full_refund() {
 		set_argons(1, 1_000_000);
 		set_ownership(1, 10_000);
 
-		assert_ok!(MiningSlots::bid(RuntimeOrigin::signed(1), 1_000_000, 1.into(), None));
+		assert_ok!(settle_public_bid(RuntimeOrigin::signed(1), 1_000_000, 1.into(), None));
 		assert_eq!(Balances::free_balance(bid_pool_account_id), 1_000_000);
 		let provider_count = System::providers(&bid_pool_account_id);
 		assert!(provider_count >= 2);
@@ -2282,5 +2315,1167 @@ fn bid_pool_account_survives_full_refund() {
 		assert_eq!(Balances::free_balance(bid_pool_account_id), 0);
 		assert!(System::account_exists(&bid_pool_account_id));
 		assert!(System::providers(&bid_pool_account_id) >= 2);
+	});
+}
+
+// Range-auction fixtures explicitly enable the new rules; earlier tests cover the deployed
+// fixed-price path that remains active until the upgrade's auction boundary.
+fn settle_public_bid(
+	origin: RuntimeOrigin,
+	amount: u128,
+	keys: MockSessionKeys,
+	miner: Option<u64>,
+) -> DispatchResult {
+	MiningSlots::bid(origin, amount, keys, miner, None, None)
+}
+
+const CENT: u128 = 10_000;
+const A: u128 = MICROGONS_PER_ARGON;
+
+#[test]
+fn legacy_auction_rejects_unchanged_and_reduced_bids_after_upgrade() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		NextFrameId::<Test>::put(2);
+		NextCohortSize::<Test>::put(2);
+		IsNextSlotBiddingOpen::<Test>::put(true);
+		HistoricalBidsPerSlot::<Test>::set(bounded_vec![
+			argon_primitives::block_seal::MiningBidStats::default()
+		]);
+		for account in [1, 2] {
+			set_argons(account, 100 * A);
+			set_ownership(account, 1000);
+			assert_ok!(settle_public_bid(
+				RuntimeOrigin::signed(account),
+				10 * A,
+				account.into(),
+				None
+			));
+		}
+		StorageVersion::new(11).put::<MiningSlots>();
+		MiningSlots::on_runtime_upgrade();
+		assert!(!MiningSlots::range_auction_enabled());
+		let cohort = BidsForNextSlotCohort::<Test>::get();
+		let history = HistoricalBidsPerSlot::<Test>::get();
+		let balance = Balances::free_balance(1);
+		let pool = Balances::free_balance(BidPoolAccountId::get());
+		let held = Ownership::balance_on_hold(&HoldReason::RegisterAsMiner.into(), &1);
+		for amount in [10 * A - CENT, 10 * A] {
+			assert_noop!(
+				settle_public_bid(RuntimeOrigin::signed(1), amount, 99.into(), None),
+				Error::<Test>::BidCannotBeReduced
+			);
+			assert_eq!(BidsForNextSlotCohort::<Test>::get(), cohort);
+			assert_eq!(HistoricalBidsPerSlot::<Test>::get(), history);
+			assert_eq!(Balances::free_balance(1), balance);
+			assert_eq!(Balances::free_balance(BidPoolAccountId::get()), pool);
+			assert_eq!(Ownership::balance_on_hold(&HoldReason::RegisterAsMiner.into(), &1), held);
+		}
+		assert_ok!(settle_public_bid(RuntimeOrigin::signed(1), 10 * A + CENT, 99.into(), None));
+		assert_eq!(BidsForNextSlotCohort::<Test>::get()[0].authority_keys, 99.into());
+		assert_eq!(HistoricalBidsPerSlot::<Test>::get()[0].bids_count, 3);
+		assert_eq!(Balances::free_balance(1), balance - CENT);
+	});
+}
+
+fn auction_setup(seats: u32) {
+	System::set_block_number(1);
+	crate::AuctionRulesStartAt::<Test>::put(0);
+	NextFrameId::<Test>::put(2);
+	MaxCohortSize::set(seats.max(5));
+	NextCohortSize::<Test>::put(seats);
+	IsNextSlotBiddingOpen::<Test>::put(true);
+	FrameRewardTicksRemaining::<Test>::put(100);
+	for account in 1..=40 {
+		set_argons(account, 10_000 * A);
+		set_ownership(account, 1000);
+	}
+}
+fn commit_range(account: u64, low: u128, high: u128) {
+	let hash = MiningSlots::bid_commitment(
+		NextFrameId::<Test>::get(),
+		&account,
+		&account,
+		low,
+		high,
+		&account.into(),
+		[account as u8; 32],
+	);
+	assert_ok!(MiningSlots::bid(
+		RuntimeOrigin::signed(account),
+		low,
+		MockSessionKeys::from(account),
+		None,
+		Some(NextFrameId::<Test>::get()),
+		Some(hash)
+	));
+}
+fn reveal_range(account: u64, _bid: u128, high: u128) {
+	assert_ok!(MiningSlots::bid_max(
+		RuntimeOrigin::signed(account),
+		high,
+		[account as u8; 32],
+		None,
+		NextFrameId::<Test>::get()
+	));
+}
+fn settle_batch(block: u64) {
+	System::set_block_number(block + u64::from(BidRevealBlocks::get()));
+	assert_ok!(MiningSlots::settle_bids(block));
+}
+fn paid(account: u64) -> Option<u128> {
+	BidsForNextSlotCohort::<Test>::get()
+		.iter()
+		.find(|r| r.account_id == account)
+		.map(|r| r.bid)
+}
+fn seed_ranges(ranges: &[(u64, u128, u128)]) {
+	for &(account, low, high) in ranges {
+		commit_range(account, low, high);
+	}
+	System::set_block_number(2);
+	for &(account, low, high) in ranges {
+		reveal_range(account, low, high);
+	}
+	settle_batch(1);
+}
+
+fn auction_lifecycle_setup() {
+	auction_setup(1);
+	FramesPerMiningTerm::set(2);
+	MinCohortSize::set(1);
+	MiningConfig::<Test>::mutate(|config| {
+		config.ticks_between_slots = 40;
+		config.ticks_before_bid_end_for_vrf_close = 0;
+	});
+	FrameRewardTicksRemaining::<Test>::put(40);
+	ArgonotsPerMiningSeat::<Test>::put(100);
+	IsBlockVoteSeal::set(true);
+	System::set_block_number(0);
+}
+
+fn auction_block(block: u64, dispatch: impl FnOnce()) {
+	PreviousTick::set(block - 1);
+	CurrentTick::set(block);
+	ElapsedTicks::set(block);
+	System::initialize(&block, &System::parent_hash(), &Digest::default());
+	MiningSlots::on_initialize(block);
+	dispatch();
+	MiningSlots::on_finalize(block);
+}
+
+fn advance_auction_to(block: u64) {
+	for next in System::block_number() + 1..=block {
+		auction_block(next, || {});
+	}
+}
+
+#[test]
+fn bid_max_rejects_a_stale_reveal_after_frame_rollover() {
+	new_test_ext().execute_with(|| {
+		auction_lifecycle_setup();
+		let old_frame = NextFrameId::<Test>::get();
+		auction_block(1, || {
+			commit_range(1, 10 * A, 100 * A);
+			assert_ok!(MiningSlots::bid(
+				RuntimeOrigin::signed(2),
+				200 * A,
+				2.into(),
+				None,
+				Some(old_frame),
+				None
+			));
+		});
+		let old_hash = crate::PendingBids::<Test>::get(1).unwrap().max_hash;
+		let stale_reveal = RuntimeCall::MiningSlots(crate::Call::bid_max {
+			max: 100 * A,
+			salt: [1; 32],
+			mining_account_id: None,
+			target_frame_id: old_frame,
+		});
+		// The unrevealed bid loses, so the miner can bid again in the following auction.
+		advance_auction_to(40);
+		let current_frame = NextFrameId::<Test>::get();
+		assert_eq!(current_frame, old_frame + 1);
+		assert!(AccountIndexLookup::<Test>::get(1).is_none());
+		assert!(!crate::PendingBids::<Test>::contains_key(1));
+		auction_block(41, || commit_range(1, 10 * A, 100 * A));
+		let pending = crate::PendingBids::<Test>::get(1).unwrap();
+		assert_eq!(pending.frame, current_frame);
+		assert_ne!(pending.max_hash, old_hash);
+		auction_block(42, || {
+			// Reused maximum/salt values must not let an old-frame request reveal the new bid.
+			assert_noop!(
+				stale_reveal.dispatch(RuntimeOrigin::signed(1)),
+				Error::<Test>::WrongBidFrame
+			);
+			assert!(crate::PendingBids::<Test>::get(1).unwrap().max.is_none());
+			assert_ok!(RuntimeCall::MiningSlots(crate::Call::bid_max {
+				max: 100 * A,
+				salt: [1; 32],
+				mining_account_id: None,
+				target_frame_id: current_frame,
+			})
+			.dispatch(RuntimeOrigin::signed(1)));
+			assert_eq!(crate::PendingBids::<Test>::get(1).unwrap().max, Some(100 * A));
+		});
+		advance_auction_to(46);
+		assert_eq!(paid(1), Some(10 * A));
+		assert!(!crate::PendingBids::<Test>::contains_key(1));
+	});
+}
+
+#[test]
+fn auction_hooks_preserve_renewal_collateral_until_retirement() {
+	for renewal_collateral in [50, 150] {
+		new_test_ext().execute_with(|| {
+			auction_lifecycle_setup();
+			let initial_balance = Balances::free_balance(1);
+			let reason = HoldReason::RegisterAsMiner.into();
+			auction_block(1, || commit_range(1, 10 * A, 100 * A));
+			auction_block(2, || reveal_range(1, 10 * A, 100 * A));
+			advance_auction_to(40);
+			assert_eq!(AccountIndexLookup::<Test>::get(1), Some((2, 0)));
+			assert_eq!(Ownership::balance_on_hold(&reason, &1), 100);
+			assert_eq!(MinersByCohort::<Test>::get(2)[0].argonots, 100);
+
+			advance_auction_to(80);
+			assert_eq!(NextFrameId::<Test>::get(), 4);
+			ArgonotsPerMiningSeat::<Test>::put(renewal_collateral);
+			auction_block(81, || commit_range(1, 20 * A, 200 * A));
+			assert_eq!(Ownership::balance_on_hold(&reason, &1), 100.max(renewal_collateral));
+			auction_block(82, || reveal_range(1, 20 * A, 200 * A));
+			advance_auction_to(91);
+			assert_eq!(paid(1), Some(20 * A));
+			assert_eq!(AccountIndexLookup::<Test>::get(1), Some((2, 0)));
+			assert_eq!(Ownership::balance_on_hold(&reason, &1), 100.max(renewal_collateral));
+			assert_eq!(Balances::free_balance(1), initial_balance - 30 * A);
+			assert_eq!(Balances::free_balance(BidPoolAccountId::get()), 30 * A);
+			assert!(crate::PendingBids::<Test>::iter().next().is_none());
+			assert!(crate::BidBatches::<Test>::iter().next().is_none());
+
+			advance_auction_to(120);
+			assert!(MinersByCohort::<Test>::get(2).is_empty());
+			assert_eq!(AccountIndexLookup::<Test>::get(1), Some((4, 0)));
+			assert_eq!(MinersByCohort::<Test>::get(4)[0].argonots, renewal_collateral);
+			assert_eq!(Ownership::balance_on_hold(&reason, &1), renewal_collateral);
+			assert!(BidsForNextSlotCohort::<Test>::get().is_empty());
+			assert!(crate::StandingBids::<Test>::iter().next().is_none());
+
+			advance_auction_to(200);
+			assert!(MinersByCohort::<Test>::get(4).is_empty());
+			assert!(AccountIndexLookup::<Test>::get(1).is_none());
+			assert_eq!(ActiveMinersCount::<Test>::get(), 0);
+			assert_eq!(Ownership::balance_on_hold(&reason, &1), 0);
+			assert_eq!(Ownership::free_balance(1), 1000);
+		});
+	}
+}
+
+#[test]
+fn auction_hooks_preserve_displaced_renewal_collateral_for_pending_replacement() {
+	for replacement_wins in [false, true] {
+		new_test_ext().execute_with(|| {
+			auction_lifecycle_setup();
+			let initial_balance = Balances::free_balance(1);
+			let challenger_balance = Balances::free_balance(2);
+			let reason = HoldReason::RegisterAsMiner.into();
+			auction_block(1, || commit_range(1, 10 * A, 100 * A));
+			auction_block(2, || reveal_range(1, 10 * A, 100 * A));
+			advance_auction_to(80);
+			ArgonotsPerMiningSeat::<Test>::put(150);
+			auction_block(81, || commit_range(1, 10 * A, 100 * A));
+			auction_block(82, || reveal_range(1, 10 * A, 100 * A));
+			advance_auction_to(91);
+			assert_eq!(paid(1), Some(10 * A));
+			assert_eq!(Ownership::balance_on_hold(&reason, &1), 150);
+			auction_block(92, || {
+				assert_ok!(MiningSlots::bid(
+					RuntimeOrigin::signed(2),
+					150 * A,
+					2.into(),
+					None,
+					Some(4),
+					None
+				));
+			});
+			auction_block(93, || {
+				commit_range(1, 150 * A + CENT, 200 * A);
+				if !replacement_wins {
+					assert_ok!(MiningSlots::bid(
+						RuntimeOrigin::signed(3),
+						250 * A,
+						3.into(),
+						None,
+						Some(4),
+						None
+					));
+				}
+			});
+			auction_block(94, || reveal_range(1, 150 * A + CENT, 200 * A));
+			let challenger_settlement = 92 + u64::from(BidRevealBlocks::get());
+			advance_auction_to(challenger_settlement);
+			assert_eq!(paid(1), None);
+			assert_eq!(paid(2), Some(150 * A));
+			assert_eq!(Balances::free_balance(BidPoolAccountId::get()), 160 * A);
+			assert_eq!(Balances::free_balance(1), initial_balance - 10 * A);
+			assert_eq!(Ownership::balance_on_hold(&reason, &1), 150);
+			assert_eq!(crate::PendingBids::<Test>::get(1).unwrap().extra_argonots, 50);
+			assert_eq!(AccountIndexLookup::<Test>::get(1), Some((2, 0)));
+
+			advance_auction_to(challenger_settlement + 1);
+			let winner = if replacement_wins { 1 } else { 3 };
+			let final_bid = if replacement_wins { 150 * A + CENT } else { 250 * A };
+			assert_eq!(paid(winner), Some(final_bid));
+			assert_eq!(
+				Ownership::balance_on_hold(&reason, &1),
+				if replacement_wins { 150 } else { 100 }
+			);
+			assert_eq!(Ownership::balance_on_hold(&reason, &2), 0);
+			assert_eq!(Ownership::balance_on_hold(&reason, &winner), 150);
+			assert_eq!(Balances::free_balance(BidPoolAccountId::get()), 10 * A + final_bid);
+			assert_eq!(
+				Balances::free_balance(1),
+				initial_balance - 10 * A - if replacement_wins { final_bid } else { 0 }
+			);
+			assert_eq!(Balances::free_balance(2), challenger_balance);
+			assert!(crate::PendingBids::<Test>::iter().next().is_none());
+			assert!(crate::BidBatches::<Test>::iter().next().is_none());
+
+			advance_auction_to(120);
+			assert!(MinersByCohort::<Test>::get(2).is_empty());
+			assert_eq!(MinersByCohort::<Test>::get(4)[0].account_id, winner);
+			assert_eq!(AccountIndexLookup::<Test>::get(winner), Some((4, 0)));
+			assert_eq!(
+				Ownership::balance_on_hold(&reason, &1),
+				if replacement_wins { 150 } else { 0 }
+			);
+			assert!(crate::StandingBids::<Test>::iter().next().is_none());
+			advance_auction_to(200);
+			assert_eq!(Ownership::balance_on_hold(&reason, &1), 0);
+			assert_eq!(Ownership::balance_on_hold(&reason, &2), 0);
+			assert_eq!(Ownership::balance_on_hold(&reason, &winner), 0);
+			assert_eq!(Ownership::free_balance(1), 1000);
+			assert_eq!(Ownership::free_balance(2), 1000);
+			assert_eq!(Ownership::free_balance(winner), 1000);
+			assert_eq!(ActiveMinersCount::<Test>::get(), 0);
+		});
+	}
+}
+
+#[test]
+fn auction_same_block_competition_and_later_reactive_bids() {
+	for reverse in [false, true] {
+		new_test_ext().execute_with(|| {
+			auction_setup(10);
+			let mut ranges = (1..=9).map(|a| (a, 1000 * A, 2000 * A)).collect::<Vec<_>>();
+			ranges.push((10, 1000 * A, 1000 * A));
+			seed_ranges(&ranges);
+			System::set_block_number(12);
+			commit_range(11, 1000 * A + CENT, 1500 * A);
+			commit_range(12, 1000 * A + CENT, 1400 * A);
+			System::set_block_number(13);
+			// This later bid arrives while the earlier batch has NOT settled.
+			assert_ok!(MiningSlots::bid(
+				RuntimeOrigin::signed(13),
+				1500 * A - CENT,
+				13.into(),
+				None,
+				Some(NextFrameId::<Test>::get()),
+				None
+			));
+			if reverse {
+				reveal_range(12, 1000 * A + CENT, 1400 * A);
+				reveal_range(11, 1000 * A + CENT, 1500 * A);
+			} else {
+				reveal_range(11, 1000 * A + CENT, 1500 * A);
+				reveal_range(12, 1000 * A + CENT, 1400 * A);
+			}
+			settle_batch(12);
+			assert_eq!(paid(11), Some(1400 * A + CENT));
+			assert_eq!(paid(12), None);
+			assert!(BidsForNextSlotCohort::<Test>::get().iter().all(|r| r.bid == 1400 * A + CENT));
+			let pool_before = Balances::free_balance(BidPoolAccountId::get());
+			settle_batch(13);
+			assert_eq!(paid(13), None);
+			assert_eq!(paid(11), Some(1400 * A + CENT));
+			assert_eq!(Balances::free_balance(BidPoolAccountId::get()), pool_before);
+			assert_eq!(crate::StandingBids::<Test>::get(11).unwrap().max, 1500 * A);
+		});
+	}
+}
+
+#[test]
+fn auction_ten_tick_frames_accept_bids_after_empty_bootstrap() {
+	TicksBetweenSlots::set(10);
+	SlotBiddingStartAfterTicks::set(0);
+	new_test_ext().execute_with(|| {
+		crate::AuctionRulesStartAt::<Test>::put(0);
+		set_argons(1, 1000 * A);
+		set_ownership(1, 1000);
+		for block in 1..=10 {
+			auction_block(block, || {});
+		}
+		assert_eq!(NextFrameId::<Test>::get(), 2);
+		assert_eq!(ActiveMinersCount::<Test>::get(), 0);
+
+		auction_block(11, || commit_range(1, A, 2 * A));
+		for block in 12..=20 {
+			auction_block(block, || {
+				if block == 14 {
+					assert!(!IsNextSlotBiddingOpen::<Test>::get());
+				}
+				if block == 16 {
+					assert!(crate::PendingBids::<Test>::contains_key(1));
+					assert_eq!(paid(1), None);
+					reveal_range(1, A, 2 * A);
+				}
+			});
+			if block == 16 {
+				assert!(!crate::PendingBids::<Test>::contains_key(1));
+				assert_eq!(paid(1), Some(A));
+			}
+		}
+		assert_eq!(NextFrameId::<Test>::get(), 3);
+		assert_eq!(AccountIndexLookup::<Test>::get(1), Some((2, 0)));
+		assert_eq!(ActiveMinersCount::<Test>::get(), 1);
+		assert_eq!(Balances::free_balance(BidPoolAccountId::get()), A);
+	});
+}
+
+#[test]
+fn auction_max_window_and_unrevealed_base_bids() {
+	new_test_ext().execute_with(|| {
+		auction_setup(2);
+		let last_reveal_block = 1 + u64::from(BidRevealBlocks::get());
+		commit_range(1, 10 * CENT, 20 * CENT);
+		commit_range(2, 10 * CENT, 30 * CENT);
+		assert_noop!(
+			MiningSlots::bid_max(RuntimeOrigin::signed(1), 20 * CENT, [1; 32], None, 2),
+			Error::<Test>::InvalidRevealBlock
+		);
+		System::set_block_number(2);
+		assert_noop!(
+			MiningSlots::bid_max(RuntimeOrigin::signed(1), 20 * CENT, [8; 32], None, 2),
+			Error::<Test>::InvalidBidCommitment
+		);
+		assert_noop!(
+			MiningSlots::bid_max(RuntimeOrigin::signed(1), 21 * CENT, [1; 32], None, 2),
+			Error::<Test>::InvalidBidCommitment
+		);
+		IsNextSlotBiddingOpen::<Test>::put(false);
+		System::set_block_number(last_reveal_block - 1);
+		assert_noop!(MiningSlots::settle_bids(1), Error::<Test>::BatchNotMature);
+		System::set_block_number(last_reveal_block);
+		reveal_range(1, 10 * CENT, 20 * CENT);
+		assert_noop!(
+			MiningSlots::bid_max(RuntimeOrigin::signed(1), 20 * CENT, [1; 32], None, 2),
+			Error::<Test>::BidAlreadyRevealed
+		);
+		MiningSlots::on_finalize(last_reveal_block);
+		assert_eq!(paid(2), Some(10 * CENT));
+		assert_eq!(paid(1), Some(10 * CENT));
+		assert!(!crate::PendingBids::<Test>::contains_key(2));
+		System::set_block_number(last_reveal_block + 1);
+		assert_noop!(
+			MiningSlots::bid_max(RuntimeOrigin::signed(2), 30 * CENT, [2; 32], None, 2),
+			Error::<Test>::MissingBidCommitment
+		);
+	});
+	new_test_ext().execute_with(|| {
+		auction_setup(1);
+		commit_range(1, CENT, 2 * CENT);
+		System::set_block_number(2 + u64::from(BidRevealBlocks::get()));
+		assert_noop!(
+			MiningSlots::bid_max(RuntimeOrigin::signed(1), 2 * CENT, [1; 32], None, 2),
+			Error::<Test>::InvalidRevealBlock
+		);
+	});
+}
+
+#[test]
+fn auction_bid_stats_count_submissions_and_automatic_increases() {
+	new_test_ext().execute_with(|| {
+		auction_setup(2);
+		HistoricalBidsPerSlot::<Test>::set(bounded_vec![
+			argon_primitives::block_seal::MiningBidStats::default()
+		]);
+		commit_range(1, 90 * A, 150 * A);
+		commit_range(2, 90 * A, 100 * A);
+		commit_range(3, 10 * A, 20 * A);
+		assert_eq!(HistoricalBidsPerSlot::<Test>::get()[0].bids_count, 3);
+		System::set_block_number(2);
+		for (account, low, high) in
+			[(1, 90 * A, 150 * A), (2, 90 * A, 100 * A), (3, 10 * A, 20 * A)]
+		{
+			reveal_range(account, low, high);
+		}
+		assert_eq!(HistoricalBidsPerSlot::<Test>::get()[0].bids_count, 3);
+		settle_batch(1);
+		assert_eq!(paid(3), None);
+		let stats = HistoricalBidsPerSlot::<Test>::get()[0].clone();
+		assert_eq!(stats.bids_count, 3);
+		assert_eq!(stats.bid_amount_min, 90 * A);
+		assert_eq!(stats.bid_amount_max, 90 * A);
+		assert_eq!(stats.bid_amount_sum, 180 * A);
+
+		System::set_block_number(12);
+		commit_range(4, 100 * A + CENT, 125 * A);
+		assert_eq!(HistoricalBidsPerSlot::<Test>::get()[0].bids_count, 4);
+		System::set_block_number(13);
+		reveal_range(4, 100 * A + CENT, 125 * A);
+		settle_batch(12);
+		assert_eq!(paid(1), Some(100 * A + CENT));
+		let stats = HistoricalBidsPerSlot::<Test>::get()[0].clone();
+		assert_eq!(stats.bids_count, 5);
+		assert_eq!(stats.bid_amount_sum, 380 * A + 2 * CENT);
+
+		System::set_block_number(23);
+		commit_range(5, 125 * A + CENT, 140 * A);
+		System::set_block_number(24);
+		reveal_range(5, 125 * A + CENT, 140 * A);
+		settle_batch(23);
+		assert_eq!(paid(1), Some(125 * A + CENT));
+		let stats = HistoricalBidsPerSlot::<Test>::get()[0].clone();
+		assert_eq!(stats.bids_count, 7);
+		assert_eq!(stats.bid_amount_min, 90 * A);
+		assert_eq!(stats.bid_amount_max, 125 * A + CENT);
+		assert_eq!(stats.bid_amount_sum, 630 * A + 4 * CENT);
+
+		// This replacement queues successfully but is no longer funded at settlement.
+		System::set_block_number(34);
+		commit_range(1, 150 * A + CENT, 200 * A);
+		System::set_block_number(35);
+		reveal_range(1, 150 * A + CENT, 200 * A);
+		let spend = Balances::free_balance(1) - 1;
+		assert_ok!(Balances::transfer(&1, &20, spend, Preservation::Protect));
+		let history = HistoricalBidsPerSlot::<Test>::get();
+		assert_eq!(history[0].bids_count, 8);
+		settle_batch(34);
+		assert_eq!(paid(1), Some(125 * A + CENT));
+		assert_eq!(HistoricalBidsPerSlot::<Test>::get(), history);
+
+		set_argons(6, 1);
+		assert_noop!(
+			MiningSlots::bid(RuntimeOrigin::signed(6), 200 * A, 6.into(), None, Some(2), None),
+			Error::<Test>::InsufficientFunds
+		);
+		assert_eq!(HistoricalBidsPerSlot::<Test>::get(), history);
+	});
+}
+
+#[test]
+fn auction_bid_stats_include_bootstrap_and_preserve_a_zero_accepted_minimum() {
+	new_test_ext().execute_with(|| {
+		auction_setup(2);
+		NextFrameId::<Test>::put(1);
+		assert!(HistoricalBidsPerSlot::<Test>::get().is_empty());
+		commit_range(1, 0, 100 * A);
+		commit_range(2, 10 * A, 20 * A);
+		assert_eq!(HistoricalBidsPerSlot::<Test>::get().len(), 1);
+		assert_eq!(HistoricalBidsPerSlot::<Test>::get()[0].bids_count, 2);
+		System::set_block_number(2);
+		reveal_range(1, 0, 100 * A);
+		reveal_range(2, 10 * A, 20 * A);
+		settle_batch(1);
+		let stats = HistoricalBidsPerSlot::<Test>::get()[0].clone();
+		assert_eq!(stats.bid_amount_min, 0);
+		assert_eq!(stats.bid_amount_max, 10 * A);
+		assert_eq!(stats.bid_amount_sum, 10 * A);
+		MiningSlots::start_new_frame(1);
+		assert_eq!(HistoricalBidsPerSlot::<Test>::get()[1], stats);
+		System::set_block_number(12);
+		commit_range(3, 5 * A, 100 * A);
+		settle_batch(12);
+		assert_eq!(HistoricalBidsPerSlot::<Test>::get()[0].bid_amount_min, 5 * A);
+		assert_eq!(HistoricalBidsPerSlot::<Test>::get()[0].bids_count, 1);
+	});
+}
+
+#[test]
+fn auction_bid_stats_upgrade_preserves_legacy_price_initialization() {
+	for initial_price in [0, 5 * A] {
+		new_test_ext().execute_with(|| {
+			auction_setup(2);
+			crate::AuctionRulesStartAt::<Test>::put(3);
+			assert_ok!(settle_public_bid(RuntimeOrigin::signed(1), initial_price, 1.into(), None));
+			// The deployed runtime has the same stats layout, without this new flag.
+			crate::HasAcceptedBidPrice::<Test>::kill();
+			StorageVersion::new(11).put::<MiningSlots>();
+			let history = HistoricalBidsPerSlot::<Test>::get();
+			MiningSlots::on_runtime_upgrade();
+			assert!(crate::HasAcceptedBidPrice::<Test>::get());
+			assert_eq!(HistoricalBidsPerSlot::<Test>::get(), history);
+			assert!(!MiningSlots::range_auction_enabled());
+			assert_ok!(settle_public_bid(RuntimeOrigin::signed(2), 10 * A, 2.into(), None));
+			let stats = HistoricalBidsPerSlot::<Test>::get()[0].clone();
+			assert_eq!(stats.bids_count, 2);
+			assert_eq!(stats.bid_amount_min, initial_price);
+			assert_eq!(stats.bid_amount_sum, initial_price + 10 * A);
+		});
+	}
+}
+
+#[test]
+fn auction_standing_maximum_reprices_without_owner_and_funding_caps_it() {
+	new_test_ext().execute_with(|| {
+		auction_setup(2);
+		seed_ranges(&[(1, 90 * A, 150 * A), (2, 90 * A, 100 * A)]);
+		System::set_block_number(12);
+		commit_range(3, 100 * A + CENT, 125 * A);
+		System::set_block_number(13);
+		reveal_range(3, 100 * A + CENT, 125 * A);
+		settle_batch(12);
+		assert_eq!(paid(1), Some(100 * A + CENT));
+		assert_eq!(paid(2), None);
+		System::set_block_number(23);
+		commit_range(4, 125 * A + CENT, 140 * A);
+		System::set_block_number(24);
+		reveal_range(4, 125 * A + CENT, 140 * A);
+		settle_batch(23);
+		assert_eq!(paid(1), Some(125 * A + CENT));
+		assert_eq!(crate::StandingBids::<Test>::get(1).unwrap().max, 150 * A);
+		// Spend the remaining balance: the paid floor survives, unfunded headroom does not.
+		let spend = Balances::free_balance(1) - 1;
+		assert_ok!(Balances::transfer(&1, &20, spend, Preservation::Protect));
+		System::set_block_number(34);
+		commit_range(5, 125 * A + 2 * CENT, 130 * A);
+		System::set_block_number(35);
+		reveal_range(5, 125 * A + 2 * CENT, 130 * A);
+		settle_batch(34);
+		assert_eq!(paid(1), None);
+		assert_eq!(paid(5), Some(125 * A + 2 * CENT));
+		assert_eq!(Balances::free_balance(1), 125 * A + CENT + 1);
+	});
+}
+
+#[test]
+fn auction_shared_wallet_and_spent_reveal_cannot_set_prices() {
+	new_test_ext().execute_with(|| {
+		auction_setup(1);
+		set_argons(1, 150 * A + 1);
+		assert_ok!(MiningSlots::bid(
+			RuntimeOrigin::signed(1),
+			150 * A,
+			2.into(),
+			Some(2),
+			Some(NextFrameId::<Test>::get()),
+			None
+		));
+		assert_ok!(MiningSlots::bid(
+			RuntimeOrigin::signed(1),
+			140 * A,
+			3.into(),
+			Some(3),
+			Some(NextFrameId::<Test>::get()),
+			None
+		));
+		settle_batch(1);
+		assert_eq!(paid(2), Some(150 * A));
+		assert_eq!(paid(3), None);
+		assert_eq!(Balances::free_balance(1), 1);
+	});
+	new_test_ext().execute_with(|| {
+		auction_setup(1);
+		commit_range(1, 10 * A, 150 * A);
+		commit_range(2, 10 * A, 140 * A);
+		System::set_block_number(2);
+		reveal_range(1, 10 * A, 150 * A);
+		reveal_range(2, 10 * A, 140 * A);
+		let spend = Balances::free_balance(2) - 1;
+		assert_ok!(Balances::transfer(&2, &20, spend, Preservation::Protect));
+		settle_batch(1);
+		assert_eq!(paid(1), Some(10 * A));
+		assert_eq!(paid(2), None);
+	});
+}
+
+#[test]
+fn auction_replacement_failure_preserves_original_and_eviction_refunds_credit() {
+	new_test_ext().execute_with(|| {
+		auction_setup(1);
+		seed_ranges(&[(1, 10 * A, 100 * A)]);
+		System::set_block_number(12);
+		commit_range(1, 100 * A + CENT, 200 * A);
+		System::set_block_number(13); // The unrevealed replacement competes at its higher public amount.
+		settle_batch(12);
+		assert_eq!(paid(1), Some(100 * A + CENT));
+		assert_eq!(crate::StandingBids::<Test>::get(1).unwrap().max, 100 * A + CENT);
+		System::set_block_number(23);
+		assert_ok!(MiningSlots::bid(
+			RuntimeOrigin::signed(2),
+			150 * A,
+			2.into(),
+			None,
+			Some(NextFrameId::<Test>::get()),
+			None
+		));
+		System::set_block_number(24);
+		commit_range(1, 150 * A + CENT, 200 * A);
+		System::set_block_number(25);
+		reveal_range(1, 150 * A + CENT, 200 * A);
+		settle_batch(23);
+		assert_eq!(paid(1), None);
+		// Its existing collateral remains owned by the revealed replacement.
+		assert!(Ownership::balance_on_hold(&HoldReason::RegisterAsMiner.into(), &1) > 0);
+		settle_batch(24);
+		assert_eq!(paid(1), Some(150 * A + CENT));
+	});
+}
+
+#[test]
+fn auction_unfunded_replacement_does_not_announce_the_incumbent_as_a_new_bid() {
+	new_test_ext().execute_with(|| {
+		auction_setup(1);
+		seed_ranges(&[(1, 10 * A, 100 * A)]);
+		System::set_block_number(12);
+		commit_range(1, 100 * A + CENT, 200 * A);
+		System::set_block_number(13);
+		reveal_range(1, 100 * A + CENT, 200 * A);
+		let spend = Balances::free_balance(1) - 1;
+		assert_ok!(Balances::transfer(&1, &20, spend, Preservation::Protect));
+		let collateral = Ownership::balance_on_hold(&HoldReason::RegisterAsMiner.into(), &1);
+		System::reset_events();
+		settle_batch(12);
+		assert_eq!(paid(1), Some(10 * A));
+		assert_eq!(crate::StandingBids::<Test>::get(1).unwrap().max, 100 * A);
+		assert_eq!(Ownership::balance_on_hold(&HoldReason::RegisterAsMiner.into(), &1), collateral);
+		System::assert_has_event(Event::BidRejected { account_id: 1 }.into());
+		assert!(!System::events().iter().any(|record| matches!(
+			record.event,
+			RuntimeEvent::MiningSlots(Event::SlotBidderAdded { account_id: 1, .. })
+		)));
+	});
+}
+
+#[test]
+fn auction_public_bid_must_exceed_the_weakest_winning_maximum() {
+	for prices in [[10 * A, 10 * A], [10 * A, 20 * A]] {
+		new_test_ext().execute_with(|| {
+			auction_setup(2);
+			seed_ranges(&[(1, prices[0], 100 * A), (2, prices[1], 200 * A)]);
+			System::set_block_number(12);
+			for low in [10 * A, 20 * A, 99 * A, 100 * A] {
+				assert_noop!(
+					MiningSlots::bid(
+						RuntimeOrigin::signed(3),
+						low,
+						MockSessionKeys::from(3),
+						None,
+						Some(2),
+						Some([1; 32])
+					),
+					Error::<Test>::BidTooLow
+				);
+			}
+			assert_noop!(
+				MiningSlots::bid(
+					RuntimeOrigin::signed(3),
+					100 * A + 1,
+					MockSessionKeys::from(3),
+					None,
+					Some(2),
+					Some([1; 32])
+				),
+				Error::<Test>::InvalidBidAmount
+			);
+			commit_range(3, 100 * A + CENT, 300 * A);
+			// A valid opening bid may also exceed every current winning price.
+			commit_range(4, 300 * A, 400 * A);
+		});
+	}
+}
+
+#[test]
+fn auction_public_bid_has_no_price_floor_while_seats_are_available() {
+	for occupied in [false, true] {
+		new_test_ext().execute_with(|| {
+			auction_setup(3);
+			if occupied {
+				seed_ranges(&[(1, 10 * A, 100 * A), (2, 20 * A, 200 * A)]);
+				System::set_block_number(12);
+			}
+			commit_range(3, 0, 300 * A);
+			assert_noop!(
+				MiningSlots::bid(
+					RuntimeOrigin::signed(4),
+					1,
+					MockSessionKeys::from(4),
+					None,
+					Some(2),
+					Some([1; 32])
+				),
+				Error::<Test>::InvalidBidAmount
+			);
+		});
+	}
+}
+
+#[test]
+fn auction_commitment_capacity_and_duplicates_are_checked_before_acceptance() {
+	new_test_ext().execute_with(|| {
+		auction_setup(1);
+		seed_ranges(&[(1, 10 * A, 100 * A)]);
+		System::set_block_number(12);
+		for account in 2..=33 {
+			commit_range(account, 100 * A + CENT, 200 * A);
+		}
+		assert_noop!(
+			MiningSlots::bid(
+				RuntimeOrigin::signed(34),
+				100 * A + CENT,
+				MockSessionKeys::from(34),
+				None,
+				Some(2),
+				Some([1; 32])
+			),
+			Error::<Test>::TooManyBidCommitments
+		);
+		assert_noop!(
+			MiningSlots::bid(
+				RuntimeOrigin::signed(2),
+				100 * A + CENT,
+				MockSessionKeys::from(2),
+				None,
+				Some(2),
+				Some([1; 32])
+			),
+			Error::<Test>::DuplicateBidCommitment
+		);
+	});
+}
+
+#[test]
+fn auction_ties_use_commitment_order_and_fixed_priority() {
+	new_test_ext().execute_with(|| {
+		auction_setup(2);
+		commit_range(1, 10 * A, 100 * A);
+		commit_range(2, 10 * A, 100 * A);
+		assert_ok!(MiningSlots::bid(
+			RuntimeOrigin::signed(3),
+			100 * A,
+			3.into(),
+			None,
+			Some(NextFrameId::<Test>::get()),
+			None
+		));
+		System::set_block_number(2);
+		reveal_range(2, 10 * A, 100 * A);
+		reveal_range(1, 10 * A, 100 * A);
+		settle_batch(1);
+		assert_eq!(paid(3), Some(100 * A));
+		assert_eq!(paid(1), Some(100 * A));
+		assert_eq!(paid(2), None);
+	});
+}
+
+#[test]
+fn auction_final_reveals_and_buffer_precede_activation_even_on_tick_jump() {
+	for bootstrap in [false, true] {
+		new_test_ext().execute_with(|| {
+			auction_setup(1);
+			if bootstrap {
+				NextFrameId::<Test>::put(1);
+			}
+			let frame = NextFrameId::<Test>::get();
+			commit_range(1, 10 * A, 100 * A);
+			FrameRewardTicksRemaining::<Test>::put(0);
+			CurrentTick::set(100);
+			ElapsedTicks::set(100);
+			let last_reveal_block = 1 + u64::from(BidRevealBlocks::get());
+			let activation_block = last_reveal_block + u64::from(BidSettlementBuffer::get()) + 1;
+			for block in 2..=activation_block {
+				System::initialize(&block, &System::parent_hash(), &Digest::default());
+				MiningSlots::on_initialize(block);
+				if block == last_reveal_block {
+					reveal_range(1, 10 * A, 100 * A);
+				}
+				if block < activation_block {
+					assert!(crate::NewlyStartedFrameId::<Test>::get().is_none());
+					assert_noop!(
+						MiningSlots::bid(
+							RuntimeOrigin::signed(2),
+							200 * A,
+							2.into(),
+							None,
+							Some(NextFrameId::<Test>::get()),
+							None
+						),
+						Error::<Test>::SlotNotTakingBids
+					);
+				}
+				MiningSlots::on_finalize(block);
+			}
+			assert_eq!(NextFrameId::<Test>::get(), frame + 1);
+			assert_eq!(MinersByCohort::<Test>::get(frame)[0].bid, 10 * A);
+			assert!(!crate::StandingBids::<Test>::contains_key(1));
+			assert!(crate::PendingBids::<Test>::iter().next().is_none());
+		});
+	}
+}
+
+#[test]
+fn auction_hard_cutoff_leaves_the_full_reveal_window() {
+	new_test_ext().execute_with(|| {
+		auction_setup(1);
+		IsBlockVoteSeal::set(true);
+		let frame_ticks = u64::from(BidRevealBlocks::get() + BidSettlementBuffer::get() + 2);
+		FrameRewardTicksRemaining::<Test>::put(frame_ticks);
+		MiningSlots::on_initialize(1);
+		commit_range(1, 10 * A, 100 * A);
+		for block in 2..=frame_ticks {
+			System::initialize(&block, &System::parent_hash(), &Digest::default());
+			MiningSlots::on_initialize(block);
+			if block == 2 {
+				assert!(!IsNextSlotBiddingOpen::<Test>::get());
+			}
+			if block == 1 + u64::from(BidRevealBlocks::get()) {
+				reveal_range(1, 10 * A, 100 * A);
+			}
+			MiningSlots::on_finalize(block);
+		}
+		assert_eq!(MinersByCohort::<Test>::get(2)[0].bid, 10 * A);
+	});
+}
+
+#[test]
+fn legacy_upgrade_accepts_bids_in_activation_block() {
+	use sp_runtime::traits::Dispatchable;
+	for frame in [1, 2] {
+		new_test_ext().execute_with(|| {
+			System::set_block_number(1);
+			NextFrameId::<Test>::put(frame);
+			NextCohortSize::<Test>::put(2);
+			IsNextSlotBiddingOpen::<Test>::put(true);
+			for account in [1, 2] {
+				set_argons(account, 10_000 * A);
+				set_ownership(account, 1000);
+			}
+			assert_ok!(MiningSlots::bid(
+				RuntimeOrigin::signed(1),
+				10 * A,
+				1.into(),
+				None,
+				Some(frame),
+				None
+			));
+			StorageVersion::new(11).put::<MiningSlots>();
+			MiningSlots::on_runtime_upgrade();
+			assert!(!MiningSlots::range_auction_enabled());
+			FrameRewardTicksRemaining::<Test>::put(1);
+			let deadline = SlotBiddingStartAfterTicks::get() + TicksBetweenSlots::get();
+			CurrentTick::set(deadline);
+			ElapsedTicks::set(deadline);
+			System::initialize(&2, &System::parent_hash(), &Digest::default());
+			MiningSlots::on_initialize(2);
+			assert_eq!(crate::NewlyStartedFrameId::<Test>::get(), Some(frame));
+			let bid = RuntimeCall::MiningSlots(crate::Call::bid {
+				bid: 20 * A,
+				keys: 2.into(),
+				mining_account_id: None,
+				target_frame_id: Some(frame),
+				max_hash: None,
+			});
+			assert_ok!(bid.dispatch(RuntimeOrigin::signed(2)));
+			assert!(IsNextSlotBiddingOpen::<Test>::get());
+			assert!(!crate::AuctionAdmissionClosed::<Test>::get());
+			MiningSlots::on_finalize(2);
+			assert_eq!(NextFrameId::<Test>::get(), frame + 1);
+			assert_eq!(
+				MinersByCohort::<Test>::get(frame)
+					.iter()
+					.map(|miner| (miner.account_id, miner.bid))
+					.collect::<Vec<_>>(),
+				vec![(2, 20 * A), (1, 10 * A)]
+			);
+			assert!(MiningSlots::range_auction_enabled());
+		});
+	}
+}
+
+#[test]
+fn auction_upgrade_finishes_the_deployed_auction_before_enabling_ranges() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		NextFrameId::<Test>::put(2);
+		IsNextSlotBiddingOpen::<Test>::put(true);
+		set_argons(1, 10_000 * A);
+		set_ownership(1, 1000);
+		assert_ok!(MiningSlots::bid(
+			RuntimeOrigin::signed(1),
+			100 * A,
+			1.into(),
+			None,
+			Some(NextFrameId::<Test>::get()),
+			None
+		));
+		let before = BidsForNextSlotCohort::<Test>::get();
+		StorageVersion::new(11).put::<MiningSlots>();
+		MiningSlots::on_runtime_upgrade();
+		assert_eq!(crate::AuctionRulesStartAt::<Test>::get(), 3);
+		assert_eq!(BidsForNextSlotCohort::<Test>::get(), before);
+		assert_noop!(
+			MiningSlots::bid(
+				RuntimeOrigin::signed(1),
+				100 * A,
+				MockSessionKeys::from(1),
+				None,
+				Some(2),
+				Some([1; 32])
+			),
+			Error::<Test>::RangeAuctionNotActive
+		);
+		MiningSlots::on_runtime_upgrade();
+		assert_eq!(crate::AuctionRulesStartAt::<Test>::get(), 3);
+		MiningSlots::start_new_frame(2);
+		assert!(MiningSlots::range_auction_enabled());
+	});
+}
+
+#[test]
+fn optional_bid_frame_is_resolved_when_dispatching() {
+	use sp_runtime::traits::Dispatchable;
+	new_test_ext().execute_with(|| {
+		auction_setup(1);
+		let automatic = RuntimeCall::MiningSlots(crate::Call::bid {
+			bid: 10 * A,
+			keys: 1.into(),
+			mining_account_id: None,
+			target_frame_id: None,
+			max_hash: None,
+		});
+		let pinned = RuntimeCall::MiningSlots(crate::Call::bid {
+			bid: 10 * A,
+			keys: 2.into(),
+			mining_account_id: None,
+			target_frame_id: Some(2),
+			max_hash: None,
+		});
+		// Cross an auction boundary after constructing the calls, before dispatching them.
+		NextFrameId::<Test>::put(3);
+		assert_noop!(pinned.dispatch(RuntimeOrigin::signed(2)), Error::<Test>::WrongBidFrame);
+		assert!(!crate::PendingBids::<Test>::contains_key(2));
+		assert_ok!(automatic.dispatch(RuntimeOrigin::signed(1)));
+		let pending = crate::PendingBids::<Test>::get(1).unwrap();
+		assert_eq!(pending.frame, 3);
+		assert_eq!(pending.registration.starting_frame_id, 3);
+		settle_batch(1);
+		assert_eq!(BidsForNextSlotCohort::<Test>::get()[0].starting_frame_id, 3);
+		assert_eq!(paid(1), Some(10 * A));
+	});
+}
+
+#[test]
+fn unified_bid_targets_a_frame_and_max_disclosure_requires_a_hash() {
+	new_test_ext().execute_with(|| {
+		auction_setup(1);
+		assert_noop!(
+			MiningSlots::bid(RuntimeOrigin::signed(1), 10 * A, 1.into(), None, Some(3), None),
+			Error::<Test>::WrongBidFrame
+		);
+		assert!(!crate::PendingBids::<Test>::contains_key(1));
+		assert_ok!(MiningSlots::bid(
+			RuntimeOrigin::signed(1),
+			10 * A,
+			1.into(),
+			None,
+			Some(2),
+			None
+		));
+		System::set_block_number(2);
+		assert_noop!(
+			MiningSlots::bid_max(RuntimeOrigin::signed(1), 100 * A, [1; 32], None, 2),
+			Error::<Test>::MissingBidCommitment
+		);
+		settle_batch(1);
+		assert_eq!(paid(1), Some(10 * A));
+	});
+}
+
+#[test]
+fn unified_bid_invalid_or_missing_maximum_preserves_the_funded_base() {
+	for reveal in [false, true] {
+		new_test_ext().execute_with(|| {
+			auction_setup(1);
+			commit_range(1, 10 * A, 100 * A);
+			assert!(Ownership::balance_on_hold(&HoldReason::RegisterAsMiner.into(), &1) > 0);
+			assert_eq!(
+				crate::PendingBids::<Test>::get(1).unwrap().registration.authority_keys,
+				1.into()
+			);
+			System::set_block_number(2);
+			if reveal {
+				assert_noop!(
+					MiningSlots::bid_max(RuntimeOrigin::signed(1), 100 * A, [9; 32], None, 2),
+					Error::<Test>::InvalidBidCommitment
+				);
+				assert_noop!(
+					MiningSlots::bid_max(RuntimeOrigin::signed(1), 9 * A, [1; 32], None, 2),
+					Error::<Test>::InvalidBidRange
+				);
+				assert_noop!(
+					MiningSlots::bid_max(RuntimeOrigin::signed(1), 100 * A + 1, [1; 32], None, 2),
+					Error::<Test>::InvalidBidAmount
+				);
+			}
+			settle_batch(1);
+			assert_eq!(paid(1), Some(10 * A));
+			assert_eq!(crate::StandingBids::<Test>::get(1).unwrap().max, 10 * A);
+		});
+	}
+}
+
+#[test]
+fn unified_bid_falls_back_when_the_maximum_cannot_be_funded() {
+	for spend_before_reveal in [false, true] {
+		new_test_ext().execute_with(|| {
+			auction_setup(1);
+			set_argons(1, 200 * A + 1);
+			commit_range(1, 100 * A, 200 * A);
+			System::set_block_number(2);
+			if !spend_before_reveal {
+				reveal_range(1, 100 * A, 200 * A);
+			}
+			assert_ok!(Balances::transfer(&1, &20, 100 * A, Preservation::Protect));
+			if spend_before_reveal {
+				assert_noop!(
+					MiningSlots::bid_max(RuntimeOrigin::signed(1), 200 * A, [1; 32], None, 2),
+					Error::<Test>::InsufficientFunds
+				);
+			}
+			settle_batch(1);
+			assert_eq!(paid(1), Some(100 * A));
+			assert_eq!(crate::StandingBids::<Test>::get(1).unwrap().max, 100 * A);
+			assert_eq!(Balances::free_balance(1), 1);
+		});
+	}
+}
+
+#[test]
+fn unified_bid_public_amount_must_clear_earlier_pending_batches() {
+	new_test_ext().execute_with(|| {
+		auction_setup(1);
+		assert_ok!(MiningSlots::bid(
+			RuntimeOrigin::signed(1),
+			100 * A,
+			1.into(),
+			None,
+			Some(2),
+			None
+		));
+		settle_batch(1);
+		System::set_block_number(12);
+		commit_range(2, 101 * A, 200 * A);
+		System::set_block_number(13);
+		commit_range(3, 150 * A, 300 * A);
+		reveal_range(2, 101 * A, 200 * A);
+		System::set_block_number(14);
+		reveal_range(3, 150 * A, 300 * A);
+		settle_batch(12);
+		assert_eq!(paid(2), Some(101 * A));
+		settle_batch(13);
+		assert_eq!(paid(3), None);
+		assert_eq!(paid(2), Some(101 * A));
+		assert_eq!(crate::StandingBids::<Test>::get(2).unwrap().max, 200 * A);
 	});
 }

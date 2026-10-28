@@ -260,7 +260,7 @@ fn migration_conserves_backing_and_reconciles_real_vault_and_treasury_storage() 
 			StorageVersion::new(2)
 		);
 		frame_system::LastRuntimeUpgrade::<Runtime>::put(frame_system::LastRuntimeUpgradeInfo {
-			spec_version: 161.into(),
+			spec_version: argon_runtime::VERSION.spec_version.into(),
 			spec_name: "argon".into(),
 		});
 		let storage_before = sp_io::storage::root(StateVersion::V1);

@@ -42,6 +42,8 @@ parameter_types! {
 	pub const ArgonotBidCollateralMultiple: u128 = 2;
 
 	pub const BidIncrements: u128 = 10_000; // 1 cent
+	pub const BidRevealBlocks: u32 = 5;
+	pub const BidSettlementBuffer: u32 = 1;
 
 	pub static ExistentialDeposit: Balance = 1;
 }
@@ -277,6 +279,9 @@ impl pallet_mining_slot::Config for Test {
 	type WeightInfo = ();
 	type MinCohortSize = MinCohortSize;
 	type MaxCohortSize = MaxCohortSize;
+	type MaxBidsPerBlock = ConstU32<32>;
+	type BidRevealBlocks = BidRevealBlocks;
+	type BidSettlementBuffer = BidSettlementBuffer;
 	type PricePerSeatAdjustmentDamper = PricePerSeatAdjustmentDamper;
 	type FramesPerMiningTerm = FramesPerMiningTerm;
 	type TargetPricePerSeat = TargetPricePerSeat;
@@ -313,5 +318,8 @@ pub fn new_test_ext() -> TestState {
 		pallet_mining_slot::GenesisConfig::<Test> { mining_config, _phantom: Default::default() }
 			.assimilate_storage(t)
 			.unwrap();
+		// Existing economics fixtures exercise the deployed fixed-price auction.
+		t.top
+			.insert(crate::AuctionRulesStartAt::<Test>::hashed_key().to_vec(), u64::MAX.encode());
 	})
 }

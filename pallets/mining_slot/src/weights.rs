@@ -14,6 +14,15 @@ use pallet_prelude::*;
 pub trait WeightInfo {
 	// Actual extrinsics
 	fn bid() -> Weight;
+	fn bid_legacy() -> Weight;
+	fn auction_bookkeeping(f: u32) -> Weight;
+	fn bid_renewal() -> Weight;
+	fn bid_with_max() -> Weight;
+	fn bid_with_max_renewal() -> Weight;
+	fn bid_max() -> Weight;
+	fn bid_max_renewal() -> Weight;
+	fn settle_bids(b: u32, m: u32) -> Weight;
+	fn settle_bids_with_replacements(b: u32, m: u32) -> Weight;
 	fn configure_mining_slot_delay() -> Weight;
 
 	// Hooks with variance
@@ -86,8 +95,57 @@ where
 	PriceProviderWeight: PriceProviderWeightInfo,
 	OperationalAccountProviderWeight: OperationalAccountProviderWeightInfo,
 {
+	fn bid_with_max() -> Weight {
+		Base::bid_with_max()
+			.max(Base::bid_with_max_renewal())
+			.saturating_add(OperationalAccountProviderWeight::is_eligible())
+	}
+	fn bid_max() -> Weight {
+		Base::bid_max()
+			.max(Base::bid_max_renewal())
+			.saturating_add(OperationalAccountProviderWeight::is_eligible())
+			.saturating_add(TickProviderWeight::current_tick())
+	}
+	fn settle_bids(b: u32, m: u32) -> Weight {
+		// The bookkeeping benchmark already includes finalization of an empty batch.
+		if b == 0 {
+			return Weight::zero();
+		}
+		Base::settle_bids(b, m).max(Base::settle_bids_with_replacements(b, m))
+	}
+
+	fn settle_bids_with_replacements(b: u32, m: u32) -> Weight {
+		Base::settle_bids_with_replacements(b, m)
+	}
+
+	fn bid_legacy() -> Weight {
+		Base::bid_legacy()
+	}
+	fn auction_bookkeeping(f: u32) -> Weight {
+		Base::auction_bookkeeping(f)
+			// Bootstrap checks bidding start and derives frame one's deadline from ticks.
+			.saturating_add(TickProviderWeight::current_tick().saturating_mul(2))
+			.saturating_add(TickProviderWeight::elapsed_ticks().saturating_mul(2))
+	}
+
+	fn bid_renewal() -> Weight {
+		Base::bid_renewal()
+	}
+
+	fn bid_with_max_renewal() -> Weight {
+		Base::bid_with_max_renewal()
+	}
+
+	fn bid_max_renewal() -> Weight {
+		Base::bid_max_renewal()
+	}
+
 	fn bid() -> Weight {
 		Base::bid()
+			.max(Base::bid_legacy())
+			.max(Base::bid_renewal())
+			.max(Base::bid_with_max())
+			.max(Base::bid_with_max_renewal())
 			.saturating_add(TickProviderWeight::current_tick())
 			.saturating_add(OperationalAccountProviderWeight::is_eligible())
 	}
@@ -149,6 +207,39 @@ impl<T: crate::Config> BlockRewardAccountsProviderWeightInfo for ProviderWeightA
 
 // For backwards compatibility and tests.
 impl WeightInfo for () {
+	fn bid_with_max() -> Weight {
+		Weight::zero()
+	}
+	fn bid_max() -> Weight {
+		Weight::zero()
+	}
+	fn settle_bids(_: u32, _: u32) -> Weight {
+		Weight::zero()
+	}
+
+	fn settle_bids_with_replacements(_: u32, _: u32) -> Weight {
+		Weight::zero()
+	}
+
+	fn bid_renewal() -> Weight {
+		Weight::zero()
+	}
+
+	fn bid_with_max_renewal() -> Weight {
+		Weight::zero()
+	}
+
+	fn bid_max_renewal() -> Weight {
+		Weight::zero()
+	}
+
+	fn bid_legacy() -> Weight {
+		Weight::zero()
+	}
+	fn auction_bookkeeping(_: u32) -> Weight {
+		Weight::zero()
+	}
+
 	fn bid() -> Weight {
 		Weight::zero()
 	}

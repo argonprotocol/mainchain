@@ -903,6 +903,14 @@ declare module '@polkadot/api-base/types/errors' {
     };
     miningSlot: {
       /**
+       * The bid batch cannot settle until its reveal window has ended.
+       **/
+      BatchNotMature: AugmentedError<ApiType>;
+      /**
+       * The pending bid's maximum has already been revealed.
+       **/
+      BidAlreadyRevealed: AugmentedError<ApiType>;
+      /**
        * The mining bid cannot be reduced
        **/
       BidCannotBeReduced: AugmentedError<ApiType>;
@@ -919,6 +927,10 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       CannotRegisterOverlappingSessions: AugmentedError<ApiType>;
       /**
+       * The miner already has a pending bid awaiting settlement.
+       **/
+      DuplicateBidCommitment: AugmentedError<ApiType>;
+      /**
        * The funding account does not have enough funds to cover the bid
        **/
       InsufficientFunds: AugmentedError<ApiType>;
@@ -931,13 +943,37 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       InvalidBidAmount: AugmentedError<ApiType>;
       /**
+       * The revealed maximum and salt do not match the pending bid's hash.
+       **/
+      InvalidBidCommitment: AugmentedError<ApiType>;
+      /**
+       * The revealed maximum is lower than the public bid.
+       **/
+      InvalidBidRange: AugmentedError<ApiType>;
+      /**
+       * A maximum must be revealed in a block after submission and within the reveal window.
+       **/
+      InvalidRevealBlock: AugmentedError<ApiType>;
+      /**
+       * The miner has no pending bid with a committed maximum to reveal.
+       **/
+      MissingBidCommitment: AugmentedError<ApiType>;
+      /**
        * Mining slot bidding currently requires a prior operational-account upgrade.
        **/
       OperationalAccountRegistrationRequired: AugmentedError<ApiType>;
       /**
+       * Bidding with a committed maximum is not enabled for the current auction frame.
+       **/
+      RangeAuctionNotActive: AugmentedError<ApiType>;
+      /**
        * Bidding for the next cohort has closed
        **/
       SlotNotTakingBids: AugmentedError<ApiType>;
+      /**
+       * This block has reached the maximum number of pending bid submissions.
+       **/
+      TooManyBidCommitments: AugmentedError<ApiType>;
       /**
        * The cohort registration overflowed
        **/
@@ -946,6 +982,10 @@ declare module '@polkadot/api-base/types/errors' {
        * The argonots on hold cannot be released
        **/
       UnrecoverableHold: AugmentedError<ApiType>;
+      /**
+       * The bid targets a different auction frame than the current one.
+       **/
+      WrongBidFrame: AugmentedError<ApiType>;
     };
     mint: {
       TooManyPendingMints: AugmentedError<ApiType>;
