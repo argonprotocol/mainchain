@@ -270,40 +270,111 @@ pub(crate) mod utils {
 		let first_account = client.api_account(&miner_accounts[0].0);
 		let miner_count = miner_accounts.len() as u16;
 		println!("Registering {miner_count} miners");
-		// Submit fixed public bids to the explicitly selected auction frame.
-		// The cohort/activation wait below observes settlement rather than just inclusion.
-		let target_frame_id = client
-			.fetch_storage(&storage().mining_slot().next_frame_id(), FetchAt::Best)
-			.await?
-			.unwrap_or_default();
-		let bids = miner_accounts
-			.into_iter()
-			.map(|(a, keys)| {
-				let account = client.api_account(&a);
-				RuntimeCall::MiningSlot(api::runtime_types::pallet_mining_slot::pallet::Call::bid {
-					mining_account_id: Some(account),
-					keys,
-					bid: 0,
-					target_frame_id: Some(target_frame_id),
-					max_hash: None,
-				})
-			})
-			.collect::<Vec<_>>();
-		let params = if let Some(nonce) = nonce {
-			MainchainClient::ext_params_builder().nonce(nonce.into()).build()
-		} else {
-			client.params_with_best_nonce(&funding.account_id()).await?.build()
+		let registration = async {
+			let constants = client.live.constants();
+			let cutoff = constants.at(&api::constants().mining_slot().bid_reveal_blocks())? +
+				constants.at(&api::constants().mining_slot().bid_settlement_buffer())?;
+			let mut nonce = nonce;
+			let mut blocks = client.live.blocks().subscribe_best().await?;
+			loop {
+				let at = FetchAt::Block(client.best_block_hash().await?);
+				let target_frame_id = client
+					.fetch_storage(&storage().mining_slot().next_frame_id(), at)
+					.await?
+					.unwrap_or_default();
+				let rules_start = client
+					.fetch_storage(&storage().mining_slot().auction_rules_start_at(), at)
+					.await?
+					.unwrap_or_default();
+				let open = client
+					.fetch_storage(&storage().mining_slot().is_next_slot_bidding_open(), at)
+					.await?
+					.unwrap_or_default();
+				let closed = client
+					.fetch_storage(&storage().mining_slot().auction_admission_closed(), at)
+					.await?
+					.unwrap_or_default();
+				let remaining = client
+					.fetch_storage(&storage().mining_slot().frame_reward_ticks_remaining(), at)
+					.await?
+					.unwrap_or_default();
+				// Leave an inclusion block before the range-auction cutoff. Legacy auctions
+				// and bootstrap frame 1 do not use this reward-tick cutoff.
+				let has_time = target_frame_id < rules_start ||
+					target_frame_id == 1 ||
+					remaining > u64::from(cutoff) + 1;
+				if !open || closed || !has_time {
+					println!(
+						"Waiting for mining admission: frame={target_frame_id}, open={open}, closed={closed}, remaining={remaining}"
+					);
+					blocks
+						.next()
+						.await
+						.context("block subscription ended waiting for mining admission")??;
+					continue;
+				}
+				let bids = miner_accounts
+					.iter()
+					.map(|(account, keys)| {
+						RuntimeCall::MiningSlot(
+							api::runtime_types::pallet_mining_slot::pallet::Call::bid {
+								mining_account_id: Some(client.api_account(account)),
+								keys: keys.clone(),
+								bid: 0,
+								target_frame_id: Some(target_frame_id),
+								max_hash: None,
+							},
+						)
+					})
+					.collect::<Vec<_>>();
+				let params = if let Some(nonce) = nonce {
+					MainchainClient::ext_params_builder().nonce(nonce.into()).build()
+				} else {
+					client.params_with_best_nonce(&funding.account_id()).await?.build()
+				};
+				// Inspect dispatch only after finality: a failed batch consumes its nonce,
+				// and an unfinalized failure may still be reorged into a successful block.
+				let finalized = client
+					.live
+					.tx()
+					.sign_and_submit_then_watch(&tx().utility().batch_all(bids), &funding, params)
+					.await?
+					.wait_for_finalized()
+					.await?;
+				match finalized.wait_for_success().await {
+					Ok(events) => {
+						return Ok::<_, anyhow::Error>((
+							TxInBlockWithEvents::new(finalized, events, true),
+							target_frame_id,
+						));
+					},
+					Err(error) => {
+						if let subxt::Error::Runtime(subxt::error::DispatchError::Module(module)) =
+							&error
+						{
+							let details = module.details()?;
+							if details.pallet.name() == "MiningSlot" &&
+								matches!(
+									details.variant.name.as_str(),
+									"SlotNotTakingBids" | "WrongBidFrame"
+								) {
+								println!(
+									"Mining admission changed before inclusion: {error}; retrying"
+								);
+								nonce = None;
+								continue;
+							}
+						}
+						return Err(error.into());
+					},
+				}
+			}
 		};
-
-		let register = client
-			.submit_tx(&tx().utility().batch_all(bids), &funding, Some(params), true)
-			.await?;
+		let (register, wait_til_past_frame_id) =
+			tokio::time::timeout(Duration::from_secs(180), registration)
+				.await
+				.context("timed out waiting for mining admission and finalized registration")??;
 		println!("miner registered. {register:?}");
-
-		let wait_til_past_frame_id = client
-			.fetch_storage(&storage().mining_slot().next_frame_id(), FetchAt::Best)
-			.await?
-			.unwrap_or_default();
 		// wait for next cohort to start
 		let lookup = storage().mining_slot().account_index_lookup(first_account);
 		let mut block_sub = client.live.blocks().subscribe_best().await?;
@@ -311,6 +382,7 @@ pub(crate) mod utils {
 		let mut last_registered_miners = 0;
 		let mut last_pending_cohort = Vec::new();
 		let mut last_next_frame_id = wait_til_past_frame_id;
+		let mut block_hash = client.best_block_hash().await?;
 
 		loop {
 			let now = tokio::time::Instant::now();
@@ -321,20 +393,7 @@ pub(crate) mod utils {
 				);
 			}
 
-			let remaining = deadline.saturating_duration_since(now);
-			let block = match tokio::time::timeout(remaining, block_sub.next()).await {
-				Ok(Some(next)) => next?,
-				Ok(None) => anyhow::bail!(
-					"best block subscription ended while waiting for cohort account registration. currently registered {last_registered_miners}. pending cohort: {:?}. next_frame_id={last_next_frame_id}, expected <= {wait_til_past_frame_id}",
-					last_pending_cohort,
-				),
-				Err(_) => anyhow::bail!(
-					"timed out waiting for cohort account to be registered. currently registered {last_registered_miners}. pending cohort: {:?}. next_frame_id={last_next_frame_id}, expected <= {wait_til_past_frame_id}",
-					last_pending_cohort,
-				),
-			};
-
-			let fetch_at = FetchAt::Block(block.hash());
+			let fetch_at = FetchAt::Block(block_hash);
 			let account_index = client.fetch_storage(&lookup, fetch_at).await?;
 			if let Some((frame_id, index)) = account_index {
 				println!("Miner 1 registered at frame {frame_id}, index {index}");
@@ -374,6 +433,18 @@ pub(crate) mod utils {
 					last_pending_cohort,
 				);
 			}
+			let remaining = deadline.saturating_duration_since(tokio::time::Instant::now());
+			block_hash = match tokio::time::timeout(remaining, block_sub.next()).await {
+				Ok(Some(next)) => next?.hash(),
+				Ok(None) => anyhow::bail!(
+					"best block subscription ended while waiting for cohort account registration. currently registered {last_registered_miners}. pending cohort: {:?}. next_frame_id={last_next_frame_id}, expected <= {wait_til_past_frame_id}",
+					last_pending_cohort,
+				),
+				Err(_) => anyhow::bail!(
+					"timed out waiting for cohort account to be registered. currently registered {last_registered_miners}. pending cohort: {:?}. next_frame_id={last_next_frame_id}, expected <= {wait_til_past_frame_id}",
+					last_pending_cohort,
+				),
+			};
 		}
 		let registered_miners = client
 			.fetch_storage(&storage().mining_slot().active_miners_count(), FetchAt::Best)
