@@ -177,9 +177,13 @@ pub struct MiningAuthority<AuthorityId, AccountId> {
 	MaxEncodedLen,
 )]
 pub struct MiningBidStats {
+	/// Committed submissions plus automatic increases of standing winning bids.
 	pub bids_count: u32,
+	/// Lowest accepted bid price, including automatic increases. Zero is valid.
 	pub bid_amount_min: Balance,
+	/// Highest accepted bid price, including automatic increases.
 	pub bid_amount_max: Balance,
+	/// Sum of accepted bid prices, including automatic increases, rather than payment deltas.
 	pub bid_amount_sum: Balance,
 }
 
@@ -210,7 +214,11 @@ pub enum BlockRewardType {
 }
 
 /// v1 mining bid commitment: SCALE tuple with chain, funding and frame domain separation.
-pub fn mining_bid_commitment<H: Encode, A: Encode, B: Encode, K: Encode>(
+#[allow(
+	clippy::too_many_arguments,
+	reason = "Each argument is part of the canonical bid hash preimage."
+)]
+pub fn mining_bid_max_hash<H: Encode, A: Encode, B: Encode, K: Encode>(
 	genesis_hash: H,
 	frame: FrameId,
 	funding: &A,
@@ -241,7 +249,7 @@ mod mining_commitment_tests {
 	#[test]
 	fn commitment_matches_client_scale_vector() {
 		assert_eq!(
-			mining_bid_commitment(
+			mining_bid_max_hash(
 				[0u8; 32],
 				2,
 				&[1u8; 32],

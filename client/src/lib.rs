@@ -33,7 +33,7 @@ use tokio::{
 };
 use tracing::{info, log::debug, warn};
 
-pub use argon_primitives::block_seal::mining_bid_commitment;
+pub use argon_primitives::block_seal::mining_bid_max_hash;
 use argon_primitives::{
 	prelude::FrameId, tick::Tick, AccountId, BlockNumber, Chain, ChainIdentity, Nonce,
 	VotingSchedule,

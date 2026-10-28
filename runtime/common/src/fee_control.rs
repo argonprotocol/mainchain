@@ -84,6 +84,7 @@ mod tests {
 	use pallet_fee_control::{CheckFeeWrapper, WeightInfo};
 	use pallet_transaction_payment::ChargeTransactionPayment;
 	use polkadot_sdk::{
+		frame_support::{assert_noop, assert_ok},
 		sp_io::TestExternalities,
 		sp_runtime::{
 			traits::{DispatchTransaction, ExtensionPostDispatchWeightHandler},
@@ -143,6 +144,7 @@ mod tests {
 					max_hash: Some(hash),
 				});
 				let reveal = RuntimeCall::MiningSlot(pallet_mining_slot::Call::bid_max {
+					target_frame_id: 2,
 					mining_account_id: None,
 					max: high,
 					salt: [9; 32],
@@ -182,6 +184,10 @@ mod tests {
 						&record.event,
 						RuntimeEvent::Proxy(pallet_proxy::Event::ProxyExecuted { result: Err(_) })
 					)));
+					assert_eq!(
+						pallet_mining_slot::HistoricalBidsPerSlot::<Runtime>::get()[0].bids_count,
+						1
+					);
 				}
 				let pending = pallet_mining_slot::PendingBids::<Runtime>::get(&real).unwrap();
 				assert_eq!(pending.funding, real);
@@ -214,6 +220,61 @@ mod tests {
 	}
 
 	#[test]
+	fn mining_bid_activity_rolls_back_with_an_outer_batch() {
+		use argon_runtime::{Ownership, SessionKeys};
+		use codec::Decode;
+		TestExternalities::new(RuntimeGenesisConfig::default().build_storage().unwrap())
+			.execute_with(|| {
+				System::set_block_number(1);
+				let real = sp_runtime::AccountId32::new([1; 32]);
+				let first = sp_runtime::AccountId32::new([3; 32]);
+				let second = sp_runtime::AccountId32::new([4; 32]);
+				let tail = sp_runtime::AccountId32::new([5; 32]);
+				Balances::mint_into(&real, 100 * ARGON).unwrap();
+				Ownership::mint_into(&real, ARGON).unwrap();
+				pallet_operational_accounts::IsOperationalAccountInviteOnly::<Runtime>::put(false);
+				pallet_mining_slot::IsNextSlotBiddingOpen::<Runtime>::put(true);
+				pallet_mining_slot::NextFrameId::<Runtime>::put(2);
+				pallet_mining_slot::ArgonotsPerMiningSeat::<Runtime>::put(10_000u128);
+				let keys =
+					SessionKeys::decode(&mut sp_runtime::traits::TrailingZeroInput::zeroes())
+						.unwrap();
+				let bid = |miner, amount| {
+					RuntimeCall::MiningSlot(pallet_mining_slot::Call::bid {
+						bid: amount,
+						keys: keys.clone(),
+						mining_account_id: Some(miner),
+						target_frame_id: Some(2),
+						max_hash: None,
+					})
+				};
+				assert_ok!(bid(first.clone(), ARGON).dispatch(RuntimeOrigin::signed(real.clone())));
+				let history = pallet_mining_slot::HistoricalBidsPerSlot::<Runtime>::get();
+				assert_eq!(history[0].bids_count, 1);
+				let retry = bid(second.clone(), ARGON);
+				let batch = RuntimeCall::Utility(pallet_utility::Call::batch_all {
+					calls: vec![retry.clone(), bid(second.clone(), 1), bid(tail.clone(), ARGON)],
+				});
+				assert_noop!(
+					batch
+						.dispatch(RuntimeOrigin::signed(real.clone()))
+						.map_err(|error| error.error),
+					pallet_mining_slot::Error::<Runtime>::InvalidBidAmount
+				);
+				assert_eq!(pallet_mining_slot::HistoricalBidsPerSlot::<Runtime>::get(), history);
+				assert!(pallet_mining_slot::PendingBids::<Runtime>::contains_key(first));
+				assert!(!pallet_mining_slot::PendingBids::<Runtime>::contains_key(&second));
+				assert!(!pallet_mining_slot::PendingBids::<Runtime>::contains_key(tail));
+				assert_ok!(retry.dispatch(RuntimeOrigin::signed(real)));
+				assert_eq!(
+					pallet_mining_slot::HistoricalBidsPerSlot::<Runtime>::get()[0].bids_count,
+					2
+				);
+				assert!(pallet_mining_slot::PendingBids::<Runtime>::contains_key(second));
+			});
+	}
+
+	#[test]
 	fn mining_proxies_and_fee_sponsors_support_both_bid_steps() {
 		use argon_primitives::TransactionSponsorProvider;
 		use argon_runtime::{MiningBidProxyFeeSponsor, ProxyType, SessionKeys};
@@ -242,6 +303,7 @@ mod tests {
 						max_hash: Some([1; 32]),
 					}),
 					RuntimeCall::MiningSlot(pallet_mining_slot::Call::bid_max {
+						target_frame_id: 2,
 						mining_account_id: None,
 						max: 20_000,
 						salt: [1; 32],

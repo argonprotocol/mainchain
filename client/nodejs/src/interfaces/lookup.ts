@@ -2185,6 +2185,7 @@ export default {
         max: 'u128',
         salt: '[u8;32]',
         miningAccountId: 'Option<AccountId32>',
+        targetFrameId: 'u64',
       },
     },
   },

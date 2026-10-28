@@ -100,6 +100,7 @@ it('uses one supplied connection and bundled metadata for historical reads', asy
     expect(client.registry).toBe(registry);
     expect(connections).toBe(1);
     expect(metadataRequests).toBe(0);
+    expect(client.consts.miningSlot.bidRevealBlocks.toNumber()).toBe(5);
 
     const keys = new Uint8Array(64);
     const bid = client.tx.miningSlot.bid;
@@ -127,6 +128,15 @@ it('uses one supplied connection and bundled metadata for historical reads', asy
     const commitment = bid(10_000n, keys, null, 2n, hash);
     expect(commitment.method.args[3].toJSON()).toBe(2);
     expect(commitment.method.args[4].toHex()).toBe(hash);
+    const bidMax = client.tx.miningSlot.bidMax;
+    const reveal = bidMax(20_000n, hash, null, 2n);
+    expect(reveal.method.args[3].toU8a()).toEqual(new Uint8Array([2, 0, 0, 0, 0, 0, 0, 0]));
+    expect(bidMax.meta.fields[3].name.unwrap().toString()).toBe('target_frame_id');
+    expect(client.tx.utility.batchAll([reveal]).method.args[0].toJSON()).toEqual([
+      reveal.method.toJSON(),
+    ]);
+    // @ts-expect-error A maximum reveal must explicitly target its original auction frame.
+    expect(() => bidMax(20_000n, hash, null)).toThrow('expects 4 arguments');
     // @ts-expect-error The SDK still requires the original three arguments.
     expect(() => bid(10_000n, keys)).toThrow('expects 5 arguments');
     // @ts-expect-error The SDK must not silently ignore extra arguments.

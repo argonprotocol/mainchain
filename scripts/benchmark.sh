@@ -128,7 +128,7 @@ function benchmark_runtime() {
         if [ -n "$CREATED" ]; then
             echo "✓ Generated weight file(s)"
             if [ "$pallet" = "pallet_mining_slot" ]; then
-                python3 scripts/finalize_mining_weights.py "$output_dir/pallet_mining_slot.rs" "${benchmark_log}.json"
+                node scripts/finalize_mining_weights.mjs "$output_dir/pallet_mining_slot.rs" "${benchmark_log}.json"
                 echo "Raw mining measurements: ${benchmark_log}.json"
             fi
             # if ismp_grandpa, we need to modify the pallet name in the generated file from pallet_ismp_grandpa::WeightInfo to ismp_grandpa::WeightInfo

@@ -7,7 +7,7 @@ import { createMiningBidCommitment, miningBidRevealWindow } from '../miningBid';
 const api = {
   genesisHash: { toHex: () => '0x' + '00'.repeat(32) },
   registry: new TypeRegistry(),
-  consts: { miningSlot: { bidRevealBlocks: { toBigInt: () => 10n } } },
+  consts: { miningSlot: { bidRevealBlocks: { toBigInt: () => 5n } } },
 } as unknown as ApiPromise;
 const range = {
   targetFrameId: 2n,
@@ -21,7 +21,7 @@ const range = {
 describe('mining bid commitments', () => {
   it('returns the public minimum and inclusive runtime reveal window', () => {
     expect(createMiningBidCommitment(api, range).bid).toBe(range.bid);
-    expect(miningBidRevealWindow(api, 100n)).toEqual({ firstBlock: 101n, lastBlock: 110n });
+    expect(miningBidRevealWindow(api, 100n)).toEqual({ firstBlock: 101n, lastBlock: 105n });
   });
   it('generates a usable 32-byte salt when omitted', () => {
     const { salt: _salt, ...withoutSalt } = range;

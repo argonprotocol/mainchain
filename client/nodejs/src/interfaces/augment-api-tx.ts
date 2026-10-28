@@ -885,15 +885,17 @@ declare module '@polkadot/api-base/types/submittable' {
         [u128, ArgonRuntimeSessionKeys, Option<AccountId32>, Option<u64>, Option<U8aFixed>]
       >;
       /**
-       * Disclose a committed maximum during the ten blocks following submission.
+       * Disclose a committed maximum during the five blocks following submission.
+       * The target frame must match the original bid and the current auction.
        **/
       bidMax: AugmentedSubmittable<
         (
           max: u128 | AnyNumber | Uint8Array,
           salt: U8aFixed | string | Uint8Array,
           miningAccountId: Option<AccountId32> | null | Uint8Array | AccountId32 | string,
+          targetFrameId: u64 | AnyNumber | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
-        [u128, U8aFixed, Option<AccountId32>]
+        [u128, U8aFixed, Option<AccountId32>, u64]
       >;
       /**
        * Admin function to update the mining slot delay.

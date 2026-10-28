@@ -409,7 +409,8 @@ mod tests {
 									RuntimeOrigin::signed(miner.clone()),
 									max,
 									[index as u8; 32],
-									None
+									None,
+									2
 								));
 							},
 						13 => {
@@ -437,7 +438,8 @@ mod tests {
 								RuntimeOrigin::signed(miners[10].clone()),
 								125 * ARGON,
 								[11; 32],
-								None
+								None,
+								2
 							));
 						},
 						_ => {},

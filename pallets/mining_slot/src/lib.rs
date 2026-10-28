@@ -1,6 +1,7 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 extern crate alloc;
 extern crate core;
+use alloc::collections::{BTreeMap, BTreeSet};
 use core::cmp::Ordering;
 
 use argon_primitives::{
@@ -312,10 +313,15 @@ pub mod pallet {
 	#[pallet::storage]
 	pub type IsNextSlotBiddingOpen<T: Config> = StorageValue<_, bool, ValueQuery>;
 
-	/// The number of bids per slot for the last 10 slots (newest first)
+	/// Bid activity and accepted prices for the last 10 auctions (newest first).
+	/// Activity counts committed submissions and automatic standing-bid price increases.
 	#[pallet::storage]
 	pub type HistoricalBidsPerSlot<T: Config> =
 		StorageValue<_, BoundedVec<MiningBidStats, ConstU32<10>>, ValueQuery>;
+
+	/// Whether the current auction has an accepted price, including a valid zero price.
+	#[pallet::storage]
+	pub type HasAcceptedBidPrice<T: Config> = StorageValue<_, bool, ValueQuery>;
 
 	/// Winning bid totals and seat counts for averaging prices over the last 10 frames (newest
 	/// first).
@@ -462,15 +468,25 @@ pub mod pallet {
 		OperationalAccountRegistrationRequired,
 		/// The argonots on hold cannot be released
 		UnrecoverableHold,
+		/// The bid targets a different auction frame than the current one.
 		WrongBidFrame,
+		/// The miner has no pending bid with a committed maximum to reveal.
 		MissingBidCommitment,
+		/// A maximum must be revealed in a block after submission and within the reveal window.
 		InvalidRevealBlock,
+		/// The pending bid's maximum has already been revealed.
 		BidAlreadyRevealed,
+		/// The revealed maximum and salt do not match the pending bid's hash.
 		InvalidBidCommitment,
+		/// The miner already has a pending bid awaiting settlement.
 		DuplicateBidCommitment,
+		/// This block has reached the maximum number of pending bid submissions.
 		TooManyBidCommitments,
+		/// The revealed maximum is lower than the public bid.
 		InvalidBidRange,
+		/// Bidding with a committed maximum is not enabled for the current auction frame.
 		RangeAuctionNotActive,
+		/// The bid batch cannot settle until its reveal window has ended.
 		BatchNotMature,
 	}
 
@@ -480,8 +496,14 @@ pub mod pallet {
 			if StorageVersion::get::<Pallet<T>>() < STORAGE_VERSION {
 				// Only fixed-price bidding was deployed. Never change an auction in progress.
 				AuctionRulesStartAt::<T>::put(NextFrameId::<T>::get().saturating_add(1));
+				// Deployed counters contain only accepted bids, including zero-priced bids.
+				HasAcceptedBidPrice::<T>::put(
+					HistoricalBidsPerSlot::<T>::get()
+						.first()
+						.is_some_and(|stats| stats.bids_count > 0),
+				);
 				STORAGE_VERSION.put::<Pallet<T>>();
-				T::DbWeight::get().reads_writes(2, 2)
+				T::DbWeight::get().reads_writes(3, 3)
 			} else {
 				T::DbWeight::get().reads(1)
 			}
@@ -624,7 +646,6 @@ pub mod pallet {
 		/// An omitted target frame selects the current auction at dispatch time.
 		#[pallet::call_index(0)]
 		#[pallet::weight(T::WeightInfo::bid())]
-		#[frame_support::transactional]
 		pub fn bid(
 			origin: OriginFor<T>,
 			bid: T::Balance,
@@ -649,15 +670,16 @@ pub mod pallet {
 		}
 
 		// Index 2 belonged to the unreleased commit_bid call and must not be reused.
-		/// Disclose a committed maximum during the ten blocks following submission.
+		/// Disclose a committed maximum during the five blocks following submission.
+		/// The target frame must match the original bid and the current auction.
 		#[pallet::call_index(3)]
 		#[pallet::weight(T::WeightInfo::bid_max())]
-		#[frame_support::transactional]
 		pub fn bid_max(
 			origin: OriginFor<T>,
 			max: T::Balance,
 			salt: [u8; 32],
 			mining_account_id: Option<T::AccountId>,
+			target_frame_id: FrameId,
 		) -> DispatchResult {
 			let funding = ensure_signed(origin)?;
 			let miner = mining_account_id.unwrap_or_else(|| funding.clone());
@@ -672,7 +694,10 @@ pub mod pallet {
 							pending.block.saturating_add(T::BidRevealBlocks::get().into()),
 					Error::<T>::InvalidRevealBlock
 				);
-				ensure!(pending.frame == NextFrameId::<T>::get(), Error::<T>::WrongBidFrame);
+				ensure!(
+					pending.frame == target_frame_id && target_frame_id == NextFrameId::<T>::get(),
+					Error::<T>::WrongBidFrame
+				);
 				ensure!(pending.bid <= max, Error::<T>::InvalidBidRange);
 				ensure!(
 					max % T::BidIncrements::get() == Zero::zero(),
@@ -759,7 +784,7 @@ impl<T: Config> Pallet<T> {
 		keys: &T::Keys,
 		salt: [u8; 32],
 	) -> [u8; 32] {
-		argon_primitives::block_seal::mining_bid_commitment(
+		argon_primitives::block_seal::mining_bid_max_hash(
 			frame_system::Pallet::<T>::block_hash(BlockNumberFor::<T>::zero()),
 			frame,
 			funding,
@@ -824,7 +849,7 @@ impl<T: Config> Pallet<T> {
 	/// Allocate each wallet once, preserving each incumbent's own paid credit.
 	fn funded_standing_offers(
 		old: &[Registration<T>],
-		available: &mut alloc::collections::BTreeMap<T::AccountId, T::Balance>,
+		available: &mut BTreeMap<T::AccountId, T::Balance>,
 	) -> Vec<(Registration<T>, StandingBid<T>, T::Balance)> {
 		let mut offers = old
 			.iter()
@@ -875,7 +900,6 @@ impl<T: Config> Pallet<T> {
 		Ok(())
 	}
 
-	#[frame_support::transactional]
 	fn legacy_bid(
 		funding_account: T::AccountId,
 		bid: T::Balance,
@@ -930,7 +954,7 @@ impl<T: Config> Pallet<T> {
 		Self::send_argons_to_pool(&funding_account, &existing_bid, bid)?;
 		let ownership_tokens =
 			Self::hold_argonots(&funding_account, &existing_bid, &current_registration)?;
-		<BidsForNextSlotCohort<T>>::try_mutate(|cohort| -> DispatchResult {
+		BidsForNextSlotCohort::<T>::try_mutate(|cohort| -> DispatchResult {
 			if let Some(existing_position) =
 				cohort.iter().position(|x| x.account_id == miner_account_id)
 			{
@@ -976,17 +1000,7 @@ impl<T: Config> Pallet<T> {
 				)
 				.map_err(|_| Error::<T>::TooManyBlockRegistrants)?;
 
-			HistoricalBidsPerSlot::<T>::mutate(|bids| {
-				if let Some(bids) = bids.get_mut(0) {
-					bids.bids_count += 1;
-					bids.bid_amount_max = bids.bid_amount_max.max(bid.into());
-					if bids.bids_count == 1 {
-						bids.bid_amount_min = bid.into();
-					}
-					bids.bid_amount_min = bids.bid_amount_min.min(bid.into());
-					bids.bid_amount_sum = bids.bid_amount_sum.saturating_add(bid.into());
-				}
-			});
+			Self::record_bid_stats(1, &[bid]);
 
 			Self::deposit_event(Event::<T>::SlotBidderAdded {
 				account_id: miner_account_id.clone(),
@@ -1062,7 +1076,36 @@ impl<T: Config> Pallet<T> {
 		});
 		LastBidBlock::<T>::put(block);
 		PendingBids::<T>::insert(miner, pending);
+		Self::record_bid_stats(1, &[]);
 		Ok(())
+	}
+
+	/// Count committed activity independently of accepted-price observations.
+	fn record_bid_stats(new_bids: u32, accepted_prices: &[T::Balance]) {
+		if new_bids == 0 && accepted_prices.is_empty() {
+			return;
+		}
+		let initialize_price = !accepted_prices.is_empty() && !HasAcceptedBidPrice::<T>::get();
+		HistoricalBidsPerSlot::<T>::mutate(|history| {
+			if history.is_empty() {
+				history.try_push(MiningBidStats::default()).expect("empty history has capacity");
+			}
+			let stats = &mut history[0];
+			stats.bids_count = stats.bids_count.saturating_add(new_bids);
+			for (index, price) in accepted_prices.iter().copied().enumerate() {
+				let price = price.into();
+				stats.bid_amount_min = if initialize_price && index == 0 {
+					price
+				} else {
+					stats.bid_amount_min.min(price)
+				};
+				stats.bid_amount_max = stats.bid_amount_max.max(price);
+				stats.bid_amount_sum = stats.bid_amount_sum.saturating_add(price);
+			}
+		});
+		if initialize_price {
+			HasAcceptedBidPrice::<T>::put(true);
+		}
 	}
 
 	/// Atomic settlement owns all cohort, payment and collateral side effects.
@@ -1087,7 +1130,7 @@ impl<T: Config> Pallet<T> {
 		let funder = |r: &Registration<T>| {
 			r.external_funding_account.clone().unwrap_or_else(|| r.account_id.clone())
 		};
-		let mut available = alloc::collections::BTreeMap::<T::AccountId, T::Balance>::new();
+		let mut available = BTreeMap::<T::AccountId, T::Balance>::new();
 		let mut offers = Self::funded_standing_offers(&old, &mut available);
 		for (entry, _) in &pending {
 			available.entry(entry.funding.clone()).or_insert_with(|| {
@@ -1099,7 +1142,7 @@ impl<T: Config> Pallet<T> {
 			});
 		}
 		let increment = T::BidIncrements::get();
-		let mut accepted = alloc::collections::BTreeSet::new();
+		let mut accepted = BTreeSet::new();
 		// Freeze eligibility BEFORE considering ANY bid from this submission block.
 		let seats = NextCohortSize::<T>::get() as usize;
 		let threshold = if !offers.is_empty() && offers.len() >= seats {
@@ -1156,6 +1199,8 @@ impl<T: Config> Pallet<T> {
 			.collect::<Vec<_>>();
 		let allocation = crate::auction::clear(&candidates, seats, increment.into());
 		let mut winners = Vec::new();
+		let mut accepted_prices = Vec::new();
+		let mut automatic_bids = 0u32;
 		for (index, price) in allocation {
 			let (r, standing, _) = &offers[index];
 			let mut registration = r.clone();
@@ -1166,6 +1211,14 @@ impl<T: Config> Pallet<T> {
 				registration.bid,
 			)?;
 			StandingBids::<T>::insert(&r.account_id, standing.clone());
+			let new_submission = accepted.contains(&r.account_id);
+			let automatic_increase = !new_submission && registration.bid > r.bid;
+			if automatic_increase {
+				automatic_bids = automatic_bids.saturating_add(1);
+			}
+			if new_submission || automatic_increase {
+				accepted_prices.push(registration.bid);
+			}
 			if registration.bid != r.bid {
 				Self::deposit_event(Event::WinningBidPriceChanged {
 					account_id: r.account_id.clone(),
@@ -1178,22 +1231,7 @@ impl<T: Config> Pallet<T> {
 			// A rejected replacement does not replace a still-winning incumbent's keys/offer.
 			let accepted_winner = winners.iter().any(|r| r.account_id == entry.miner) &&
 				accepted.contains(&entry.miner);
-			if accepted_winner {
-				let winner = winners.iter().find(|r| r.account_id == entry.miner).expect("checked");
-				HistoricalBidsPerSlot::<T>::mutate(|history| {
-					if let Some(stats) = history.get_mut(0) {
-						stats.bids_count = stats.bids_count.saturating_add(1);
-						stats.bid_amount_max = stats.bid_amount_max.max(winner.bid.into());
-						stats.bid_amount_min = if stats.bids_count == 1 {
-							winner.bid.into()
-						} else {
-							stats.bid_amount_min.min(winner.bid.into())
-						};
-						stats.bid_amount_sum =
-							stats.bid_amount_sum.saturating_add(winner.bid.into());
-					}
-				});
-			} else {
+			if !accepted_winner {
 				Self::release_argonots_hold(&entry.funding, entry.extra_argonots)?;
 				Self::deposit_event(Event::BidLost { account_id: entry.miner.clone() });
 			}
@@ -1208,7 +1246,7 @@ impl<T: Config> Pallet<T> {
 		let priorities = offers
 			.iter()
 			.map(|(r, s, _)| (r.account_id.clone(), (s.submitted_at, s.position)))
-			.collect::<alloc::collections::BTreeMap<_, _>>();
+			.collect::<BTreeMap<_, _>>();
 		winners.sort_by(|a, b| {
 			b.bid
 				.cmp(&a.bid)
@@ -1230,6 +1268,7 @@ impl<T: Config> Pallet<T> {
 			BoundedVec::<Registration<T>, T::MaxCohortSize>::try_from(winners)
 				.map_err(|_| Error::<T>::TooManyBlockRegistrants)?,
 		);
+		Self::record_bid_stats(automatic_bids, &accepted_prices);
 		Ok(())
 	}
 }
@@ -1471,6 +1510,7 @@ impl<T: Config> Pallet<T> {
 	}
 
 	pub(crate) fn start_new_frame(frame_id: FrameId) {
+		HasAcceptedBidPrice::<T>::kill();
 		HistoricalBidsPerSlot::<T>::mutate(|bids| {
 			if bids.is_full() {
 				bids.pop();

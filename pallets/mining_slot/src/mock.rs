@@ -42,6 +42,8 @@ parameter_types! {
 	pub const ArgonotBidCollateralMultiple: u128 = 2;
 
 	pub const BidIncrements: u128 = 10_000; // 1 cent
+	pub const BidRevealBlocks: u32 = 5;
+	pub const BidSettlementBuffer: u32 = 1;
 
 	pub static ExistentialDeposit: Balance = 1;
 }
@@ -278,8 +280,8 @@ impl pallet_mining_slot::Config for Test {
 	type MinCohortSize = MinCohortSize;
 	type MaxCohortSize = MaxCohortSize;
 	type MaxBidsPerBlock = ConstU32<32>;
-	type BidRevealBlocks = ConstU32<10>;
-	type BidSettlementBuffer = ConstU32<1>;
+	type BidRevealBlocks = BidRevealBlocks;
+	type BidSettlementBuffer = BidSettlementBuffer;
 	type PricePerSeatAdjustmentDamper = PricePerSeatAdjustmentDamper;
 	type FramesPerMiningTerm = FramesPerMiningTerm;
 	type TargetPricePerSeat = TargetPricePerSeat;

@@ -30,6 +30,7 @@ mod benchmarks {
 			MiningBidStats::default();
 			10
 		]));
+		HasAcceptedBidPrice::<T>::kill();
 		FrameRewardTicksRemaining::<T>::put(100u64);
 		ArgonotsPerMiningSeat::<T>::put(T::Balance::from(100_000u128));
 		let _ = T::ArgonCurrency::mint_into(caller, 1_000_000_000_000u128.into());
@@ -310,8 +311,9 @@ mod benchmarks {
 			Some(hash),
 		)?;
 		frame_system::Pallet::<T>::set_block_number(2u32.into());
+		let target_frame_id = NextFrameId::<T>::get();
 		#[extrinsic_call]
-		_(RawOrigin::Signed(caller.clone()), high, [1; 32], None);
+		_(RawOrigin::Signed(caller.clone()), high, [1; 32], None, target_frame_id);
 		assert!(PendingBids::<T>::get(caller).unwrap().max.is_some());
 		Ok(())
 	}
@@ -364,8 +366,9 @@ mod benchmarks {
 			Some(hash),
 		)?;
 		frame_system::Pallet::<T>::set_block_number(2u32.into());
+		let target_frame_id = NextFrameId::<T>::get();
 		#[extrinsic_call]
-		bid_max(RawOrigin::Signed(caller.clone()), high, [1; 32], None);
+		bid_max(RawOrigin::Signed(caller.clone()), high, [1; 32], None, target_frame_id);
 		assert!(PendingBids::<T>::get(caller).unwrap().max.is_some());
 		Ok(())
 	}
@@ -410,6 +413,7 @@ mod benchmarks {
 					T::BidIncrements::get().saturating_mul(2u32.into()),
 					[2; 32],
 					None,
+					NextFrameId::<T>::get(),
 				)?;
 			}
 			frame_system::Pallet::<T>::set_block_number((block + T::BidRevealBlocks::get()).into());
@@ -496,6 +500,7 @@ mod benchmarks {
 				T::BidIncrements::get().saturating_mul((3 + i * 17 % 32).into()),
 				[1; 32],
 				None,
+				NextFrameId::<T>::get(),
 			)?;
 		}
 		if replacements {

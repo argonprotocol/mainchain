@@ -2666,6 +2666,7 @@ declare module '@polkadot/types/lookup' {
       readonly max: u128;
       readonly salt: U8aFixed;
       readonly miningAccountId: Option<AccountId32>;
+      readonly targetFrameId: u64;
     } & Struct;
     readonly type: 'Bid' | 'ConfigureMiningSlotDelay' | 'BidMax';
   }

@@ -251,11 +251,13 @@ auction change rejects the transaction instead of submitting a commitment for a 
 public `bid` is visible immediately.
 
 If the initial bid is included in block B, disclose its maximum with
-`miningSlot.bidMax(max, salt, miningAccountId)` in any block from **B+1 through B+10**, inclusive.
-The hash must match the original submission. All bids initially included in B settle together at the
-end of B+10, whether or not their maxima were disclosed. Without a valid, funded maximum, the public
-bid still competes at its base amount if it remains funded and eligible. Transaction success means
-the bid was queued; `SlotBidderAdded` confirms acceptance after settlement.
+`miningSlot.bidMax(max, salt, miningAccountId, targetFrameId)` in any block from **B+1 through
+B+5**, inclusive. Pass the same explicit frame used to create the original bid's hash; a different
+frame rejects the reveal with `WrongBidFrame`. The hash must match the original submission. All bids
+initially included in B settle together at the end of B+5, whether or not their maxima were
+disclosed. Without a valid, funded maximum, the public bid still competes at its base amount if it
+remains funded and eligible. Transaction success means the bid was queued; `SlotBidderAdded`
+confirms acceptance after settlement.
 
 Amounts are in microgons and must be multiples of 10,000 (0.01 ARGON). When the winning list is
 full, the public `bid` must exceed the lowest funded maximum among current winners; matching its
@@ -267,12 +269,19 @@ toward replacement funding. The maximum is checked again at settlement. Only the
 collected, and the full maximum is not held. Automatic bids pay the smallest winning price allowed
 by their public bid and maximum. Accepted prices cannot decrease. Fixed-price bids win maximum ties,
 followed by original submission order. Losing bids release their extra collateral. New submissions
-close before activation, but already queued bids retain their full ten-block disclosure window,
+close before activation, but already queued bids retain their full five-block disclosure window,
 including when random bidding closure occurs.
 
 The upgrade finishes the auction already in progress under its existing rules and enables the new
 rules for the following auction. Clients must use the updated call arguments after the upgrade;
 transactions encoded with the old `bid` arguments are incompatible.
+
+`historicalBidsPerSlot.bidsCount` counts each committed bid submission, including replacements and
+submissions that later lose or become unfunded at settlement. Each automatic increase of an existing
+standing winner's paid price adds one count. Reveals, unchanged prices, immediate failures, and bids
+rolled back by an enclosing batch add no count. A submission's initial settlement price is part of
+that submission and is not counted twice. The minimum, maximum, and sum describe accepted bid
+prices, including automatic increases; losing submissions do not contribute a price.
 
 ### 4. Start Mining and Watch for Rewards
 

@@ -1147,9 +1147,14 @@ declare module '@polkadot/api-base/types/storage' {
        * The previous 10 frame start ticks
        **/
       frameStartTicks: AugmentedQuery<ApiType, () => Observable<BTreeMap<u64, u64>>, []>;
+      /**
+       * Whether the current auction has an accepted price, including a valid zero price.
+       **/
+      hasAcceptedBidPrice: AugmentedQuery<ApiType, () => Observable<bool>, []>;
       hasAddedGrandpaRotation: AugmentedQuery<ApiType, () => Observable<bool>, []>;
       /**
-       * The number of bids per slot for the last 10 slots (newest first)
+       * Bid activity and accepted prices for the last 10 auctions (newest first).
+       * Activity counts committed submissions and automatic standing-bid price increases.
        **/
       historicalBidsPerSlot: AugmentedQuery<
         ApiType,

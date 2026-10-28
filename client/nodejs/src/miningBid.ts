@@ -74,7 +74,7 @@ export interface MiningBidRange {
   salt?: Uint8Array;
 }
 
-/** Create a v1 commitment. Keep the returned salt private until calling bidMax in blocks B+1 through B+10. */
+/** Create a v1 commitment. Keep the returned salt private until calling bidMax in blocks B+1 through B+5. */
 export function createMiningBidCommitment(api: ApiPromise, range: MiningBidRange) {
   const salt = range.salt ?? randomAsU8a(32);
   if (salt.length !== 32) throw new Error('Mining bid salt must contain 32 bytes');
