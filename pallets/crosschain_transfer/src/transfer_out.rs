@@ -4,11 +4,7 @@ use argon_ethereum_contracts::minting_gateway as ethereum_contracts;
 use argon_primitives::{
 	EthereumBlockNumber, EthereumVerifyProvider, TickProvider, MICROGONS_PER_ARGON,
 };
-use frame_support::{
-	ensure,
-	storage::{transactional::with_transaction_opaque_err, TransactionOutcome},
-	traits::fungible::MutateHold,
-};
+use frame_support::{ensure, storage::with_storage_layer, traits::fungible::MutateHold};
 use pallet_prelude::*;
 use polkadot_sdk::sp_core::ecdsa::KeccakSignature;
 
@@ -572,13 +568,9 @@ impl<T: Config> Pallet<T> {
 			.collect::<Vec<_>>();
 
 		for transfer_id in expired_transfer_ids {
-			with_transaction_opaque_err(|| {
-				match Self::cancel_transfer_out_from_gateway(source_chain, transfer_id) {
-					Ok(()) => TransactionOutcome::Commit(Ok(())),
-					Err(reason) => TransactionOutcome::Rollback(Err(reason)),
-				}
-			})
-			.map_err(|_| GatewaySyncPauseReason::GatewayStateDrift)??;
+			with_storage_layer(|| {
+				Self::cancel_transfer_out_from_gateway(source_chain, transfer_id)
+			})?;
 		}
 
 		Ok(())

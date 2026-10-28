@@ -1,5 +1,4 @@
 // Auto-generated via `yarn polkadot-types-from-chain`, do not edit
-/* eslint-disable */
 
 // import type lookup before we augment - in some environments
 // this is required to allow for ambient/previous definitions
@@ -56,6 +55,7 @@ import type {
   PalletBootstrapRecoveryPubkey,
   PalletCrosschainTransferAssetKind,
   PalletCrosschainTransferChainConfig,
+  PalletCrosschainTransferGatewayActivityStorageProof,
   PalletCrosschainTransferMintingAuthorityActivationRepaymentPricing,
   PalletCrosschainTransferSourceChain,
   PalletEthereumVerifierBasicOperatingMode,
@@ -618,6 +618,25 @@ declare module '@polkadot/api-base/types/submittable' {
           PalletCrosschainTransferSourceChain,
           Compact<u64>,
           ArgonPrimitivesEthereumEthereumReceiptLogProofBatch,
+        ]
+      >;
+      /**
+       * Authenticate a complete gateway locator and settle its unconsumed activities.
+       **/
+      proveGatewayActivityStorage: AugmentedSubmittable<
+        (
+          sourceChain: PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
+          previousGatewayActivityNonce: Compact<u64> | AnyNumber | Uint8Array,
+          proof:
+            | PalletCrosschainTransferGatewayActivityStorageProof
+            | { locatorIndex?: any; activityRootSeed?: any; storageProof?: any; activityLogs?: any }
+            | string
+            | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [
+          PalletCrosschainTransferSourceChain,
+          Compact<u64>,
+          PalletCrosschainTransferGatewayActivityStorageProof,
         ]
       >;
       registerCouncilSigner: AugmentedSubmittable<

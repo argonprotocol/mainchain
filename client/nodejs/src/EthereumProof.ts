@@ -12,12 +12,12 @@ import {
 
 type EthGetBlockByHashRpc = {
   Method: 'eth_getBlockByHash';
-  Parameters: [Hex, true];
+  Parameters: [Hex, false];
   ReturnType: JSONRPCBlock;
 };
 type EthGetBlockByNumberRpc = {
   Method: 'eth_getBlockByNumber';
-  Parameters: [Hex, true];
+  Parameters: [Hex, false];
   ReturnType: JSONRPCBlock;
 };
 
@@ -322,11 +322,11 @@ export async function loadExecutionHeader(
     typeof blockTag === 'string'
       ? executionClient.request<EthGetBlockByHashRpc>({
           method: 'eth_getBlockByHash',
-          params: [blockTag, true],
+          params: [blockTag, false],
         })
       : executionClient.request<EthGetBlockByNumberRpc>({
           method: 'eth_getBlockByNumber',
-          params: [toHex(blockTag), true],
+          params: [toHex(blockTag), false],
         }),
   );
   const header = createBlockHeaderFromRPC(blockData);
@@ -368,7 +368,15 @@ export async function buildExecutionHeaderChain(
   }
 
   while (header.number > targetHeader.number) {
-    header = await loadExecutionHeader(executionClient, bytesToHex(header.parentHash));
+    const parentHash = bytesToHex(header.parentHash);
+    if (
+      header.number === targetHeader.number + 1n &&
+      parentHash.toLowerCase() === targetBlockHash.toLowerCase()
+    ) {
+      header = targetHeader;
+    } else {
+      header = await loadExecutionHeader(executionClient, parentHash);
+    }
     headers.push({
       blockHash: bytesToHex(header.hash()),
       rlp: bytesToHex(header.serialize()),

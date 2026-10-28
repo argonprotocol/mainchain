@@ -1,7 +1,18 @@
 import { createBlockHeaderFromRPC, type JSONRPCBlock } from '@ethereumjs/block';
 import { createMPT } from '@ethereumjs/mpt';
-import { MintingGatewayEvents, mintingGatewayAbi } from '../EvmContracts';
-import { bytesToHex, encodeAbiParameters, encodeEventTopics, toHex, type Hex } from 'viem';
+import {
+  MintingGatewayEvents,
+  mintingGatewayAbi,
+  type MintingGatewayTransferOutOfArgonFinalized,
+} from '../EvmContracts';
+import {
+  bytesToHex,
+  encodeAbiParameters,
+  encodeEventTopics,
+  getAbiItem,
+  toHex,
+  type Hex,
+} from 'viem';
 import type { ArgonClient, IArgonQueryable } from '../index';
 import {
   encodeEthereumReceiptForProof,
@@ -22,18 +33,64 @@ export function repeatHex(byte: string, length: number): Hex {
 
 export function createGatewayProofConsts(
   args: {
+    maxActivitiesPerGatewayProof?: number;
     maxActivitiesPerReceiptProof?: number;
     maxReceiptProofsPerExtrinsic?: number;
     maxProofExecutionHeaderDepth?: number;
+    maxGatewayActivityLogDataBytes?: number;
   } = {},
 ) {
   return {
     crosschainTransfer: {
+      maxActivitiesPerGatewayProof: { toNumber: () => args.maxActivitiesPerGatewayProof ?? 4096 },
       maxActivitiesPerReceiptProof: { toNumber: () => args.maxActivitiesPerReceiptProof ?? 16 },
-      maxReceiptProofsPerExtrinsic: { toNumber: () => args.maxReceiptProofsPerExtrinsic ?? 10 },
+      maxReceiptProofsPerExtrinsic: {
+        toNumber: () => args.maxReceiptProofsPerExtrinsic ?? 6,
+      },
       maxProofExecutionHeaderDepth: { toNumber: () => args.maxProofExecutionHeaderDepth ?? 64 },
+      maxGatewayActivityLogDataBytes: {
+        toNumber: () => args.maxGatewayActivityLogDataBytes ?? 3 * 1024 * 1024 - 64 * 2048,
+      },
     },
   } as unknown as Pick<ArgonClient, 'consts'>['consts'];
+}
+
+export function createTransferOutOfArgonFinalizedBlockLog(args: {
+  gatewayAddress: Hex;
+  txHash: Hex;
+  transactionIndex: number;
+  logIndex: number;
+  nonce: bigint;
+  amount: bigint;
+  mintingCollateral: MintingGatewayTransferOutOfArgonFinalized['mintingCollateral'];
+}): ReturnType<typeof createTransferToArgonStartedBlockLog> {
+  const event = getAbiItem({ abi: mintingGatewayAbi, name: 'TransferOutOfArgonFinalized' });
+  const data = encodeAbiParameters(event.inputs, [
+    repeatHex('33', 32),
+    repeatHex('22', 20),
+    args.amount,
+    args.mintingCollateral,
+    {
+      gatewayActivityNonce: args.nonce,
+      argonApprovalsNonce: 25n,
+      argonCirculation: 1_000n + args.amount,
+      argonotCirculation: 2_000n,
+    },
+  ]);
+
+  return {
+    address: args.gatewayAddress,
+    topics: encodeEventTopics({
+      abi: mintingGatewayAbi,
+      eventName: event.name,
+    }) as Hex[],
+    data,
+    transactionHash: args.txHash,
+    transactionIndex: args.transactionIndex,
+    logIndex: args.logIndex,
+    blockHash: ZERO_HASH,
+    blockNumber: 0n,
+  };
 }
 
 export function createLegacyReceipt(args: {
@@ -58,6 +115,7 @@ export async function createExecutionBlock(args: {
   parentHash?: Hex;
   receipts?: EthereumReceipt[];
   receiptsRoot?: Hex;
+  stateRoot?: Hex;
   transactions?: Hex[];
   gasUsed?: bigint;
   timestamp?: bigint;
@@ -76,7 +134,7 @@ export async function createExecutionBlock(args: {
     sha3Uncles: EMPTY_UNCLES_HASH,
     logsBloom: ZERO_BLOOM,
     transactionsRoot: ZERO_HASH,
-    stateRoot: ZERO_HASH,
+    stateRoot: args.stateRoot ?? ZERO_HASH,
     receiptsRoot,
     miner: ZERO_ADDRESS,
     difficulty: '0x0' as Hex,
@@ -106,12 +164,30 @@ export function createExecutionClient(args: {
   blocks: JSONRPCBlock[];
   receipts?: EthereumReceipt[];
   logsByBlockNumber?: Record<string, unknown[]>;
+  activityBlockLocatorsMappingSlot?: bigint;
+  chainId?: bigint;
+  readContractRequests?: Array<{
+    functionName: string;
+    blockNumber?: bigint;
+    locatorIndex?: bigint;
+  }>;
   locators?: Array<{
     blockNumber: bigint;
     startGatewayActivityNonce: bigint;
     endGatewayActivityNonce: bigint;
     activityRoot?: Hex;
   }>;
+  proofsByBlockNumber?: Record<
+    string,
+    {
+      accountProof?: Hex[];
+      storageProof?: Array<{
+        key: Hex;
+        value: bigint;
+        proof: Hex[];
+      }>;
+    }
+  >;
 }): EthereumExecutionClient {
   const blocksByHash = Object.fromEntries(
     args.blocks.map(block => [block.hash.toLowerCase(), block]),
@@ -124,17 +200,31 @@ export function createExecutionClient(args: {
   );
   const logsByBlockNumber = args.logsByBlockNumber ?? {};
   const locators = args.locators ?? [];
+  const proofsByBlockNumber = args.proofsByBlockNumber ?? {};
 
   return {
     readContract: async ({
       functionName,
+      blockNumber,
       args: locatorArgs,
     }: {
-      functionName: 'latestActivityBlockLocatorIndex' | 'activityBlockLocators';
+      functionName:
+        | 'latestActivityBlockLocatorIndex'
+        | 'activityBlockLocators'
+        | 'activityBlockLocatorsMappingSlot';
+      blockNumber?: bigint;
       args?: [bigint];
     }) => {
+      args.readContractRequests?.push({
+        functionName,
+        blockNumber,
+        locatorIndex: locatorArgs?.[0],
+      });
       if (functionName === 'latestActivityBlockLocatorIndex') {
         return BigInt(locators.length);
+      }
+      if (functionName === 'activityBlockLocatorsMappingSlot') {
+        return args.activityBlockLocatorsMappingSlot ?? 11n;
       }
 
       const locator = locators[Number((locatorArgs?.[0] ?? 1n) - 1n)];
@@ -165,6 +255,40 @@ export function createExecutionClient(args: {
 
       throw new Error(`Unexpected receipt request for ${hash}`);
     },
+    getProof: async ({
+      blockNumber,
+      storageKeys,
+    }: {
+      blockNumber?: bigint;
+      storageKeys: Hex[];
+    }) => {
+      const proofForBlock = proofsByBlockNumber[(blockNumber ?? 0n).toString()] ?? {};
+      const storageProof = storageKeys.map(key => {
+        const proof = proofForBlock.storageProof?.find(
+          candidate => candidate.key.toLowerCase() === key.toLowerCase(),
+        ) ?? {
+          key,
+          value: 0n,
+          proof: [ZERO_HASH],
+        };
+
+        return {
+          key: proof.key,
+          value: proof.value,
+          proof: proof.proof,
+        };
+      });
+
+      return {
+        address: ZERO_ADDRESS,
+        balance: 0n,
+        codeHash: ZERO_HASH,
+        nonce: 0,
+        storageHash: ZERO_HASH,
+        accountProof: proofForBlock.accountProof ?? [ZERO_HASH],
+        storageProof,
+      };
+    },
     getBlock: async ({ blockHash, blockNumber }: { blockHash?: Hex; blockNumber?: bigint }) => {
       let block;
       if (blockHash !== undefined) {
@@ -192,7 +316,7 @@ export function createExecutionClient(args: {
       params,
     }: {
       method: 'eth_getBlockByHash' | 'eth_getBlockByNumber';
-      params: [Hex, true];
+      params: [Hex, boolean];
     }) => {
       const block =
         method === 'eth_getBlockByHash'
@@ -204,6 +328,7 @@ export function createExecutionClient(args: {
 
       throw new Error(`Unexpected header request for ${method} ${params[0]}`);
     },
+    getChainId: async () => args.chainId ?? 1n,
   } as unknown as EthereumExecutionClient;
 }
 
@@ -212,8 +337,11 @@ export function createArgonGatewayClient(
     previousGatewayActivityNonce?: bigint;
     argonFinalizedExecutionHeaders?: ArgonFinalizedExecutionHeader[];
     consts?: Pick<ArgonClient, 'consts'>['consts'];
+    runtimeSpecVersion?: number;
+    receiptProofs?: boolean;
+    storageProofs?: boolean;
   } = {},
-): IArgonQueryable & Pick<ArgonClient, 'consts'> {
+): IArgonQueryable & Pick<ArgonClient, 'consts' | 'runtimeVersion' | 'tx'> {
   const previousGatewayActivityNonce = args.previousGatewayActivityNonce ?? 0n;
   const argonFinalizedExecutionHeaders = args.argonFinalizedExecutionHeaders ?? [];
   const latestArgonFinalizedExecutionHeader = argonFinalizedExecutionHeaders.at(-1);
@@ -234,6 +362,12 @@ export function createArgonGatewayClient(
   });
 
   return {
+    tx: {
+      crosschainTransfer: {
+        ...(args.receiptProofs !== false ? { proveGatewayActivity: () => {} } : {}),
+        ...(args.storageProofs !== false ? { proveGatewayActivityStorage: () => {} } : {}),
+      },
+    },
     query: {
       crosschainTransfer: {
         gatewayStateBySourceChain: async () =>
@@ -316,7 +450,12 @@ export function createArgonGatewayClient(
       },
     },
     consts: args.consts ?? createGatewayProofConsts(),
-  } as unknown as IArgonQueryable & Pick<ArgonClient, 'consts'>;
+    runtimeVersion: {
+      specVersion: {
+        toNumber: () => args.runtimeSpecVersion ?? 161,
+      },
+    },
+  } as unknown as IArgonQueryable & Pick<ArgonClient, 'consts' | 'runtimeVersion' | 'tx'>;
 }
 
 export function createTransferToArgonStartedBlockLog(args: {

@@ -24,6 +24,8 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 	uint256 public constant MAX_GATEWAY_UPDATES_PER_BATCH = 100;
 	/// @notice Maximum minting-authority signatures accepted in one transfer finalization.
 	uint256 public constant MAX_MINTING_AUTHORIZATIONS_PER_TRANSFER = 25;
+	/// @notice Maximum activities in one locator, keeping its worst-case proof relayable to Argon.
+	uint256 public constant MAX_GATEWAY_ACTIVITIES_PER_BLOCK = 128;
 	/// @notice Version byte included in every on-chain activity hash domain.
 	uint8 public constant ACTIVITY_HASH_VERSION = 1;
 
@@ -219,6 +221,7 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 	error TransferOutOfArgonExpired(uint256 currentBlock, uint256 validUntilBlock);
 	error TransferOutOfArgonNotExpired(uint256 currentBlock, uint256 validUntilBlock);
 	error TooManyGatewayUpdates(uint256 maxAllowed, uint256 provided);
+	error TooManyGatewayActivitiesInBlock(uint256 maxAllowed, uint256 provided);
 	error TooManyMintingAuthorizations(uint256 maxAllowed, uint256 provided);
 	error UnsupportedToken(address token);
 	error RuntimeAmountOverflow(uint256 amount);
@@ -1148,6 +1151,10 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 		ActivityBlockLocator storage latestLocator =
 			activityBlockLocators[latestActivityBlockLocatorIndex];
 		if (latestLocator.blockNumber == currentBlock) {
+			uint64 activitiesInBlock = activityNonce - latestLocator.startGatewayActivityNonce + 1;
+			if (activitiesInBlock > MAX_GATEWAY_ACTIVITIES_PER_BLOCK) {
+				revert TooManyGatewayActivitiesInBlock(MAX_GATEWAY_ACTIVITIES_PER_BLOCK, activitiesInBlock);
+			}
 			// If this block already has a locator entry, just extend its end nonce.
 			latestLocator.endGatewayActivityNonce = activityNonce;
 			latestLocator.activityRoot = _appendActivityRoot(latestLocator.activityRoot, activityLeaf);

@@ -8,7 +8,6 @@ pub trait WeightInfo {
 	fn proxy_announced(bytes: u32) -> Weight;
 	fn post_event() -> Weight;
 	fn pool_key_insertion(keys: u32) -> Weight;
-	fn batch_pool_key(keys: u32) -> Weight;
 	fn inspect_refund_calls(c: u32) -> Weight;
 }
 
@@ -34,10 +33,6 @@ impl WeightInfo for () {
 	}
 
 	fn pool_key_insertion(_keys: u32) -> Weight {
-		Weight::zero()
-	}
-
-	fn batch_pool_key(_keys: u32) -> Weight {
 		Weight::zero()
 	}
 

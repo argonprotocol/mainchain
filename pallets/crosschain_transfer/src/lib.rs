@@ -5,11 +5,15 @@ extern crate alloc;
 pub use pallet::*;
 pub use weights::{prove_gateway_activity_with_providers, WeightInfo, WithProviderWeights};
 
+use argon_primitives::EthereumAccountStorageProof;
+use gateway_activity::GatewayActivityBlock;
 use pallet_prelude::*;
 
 mod approval_queue;
 mod evm;
 mod gateway_activity;
+mod gateway_activity_proof;
+pub use gateway_activity_proof::{GatewayActivityLogs, MAX_GATEWAY_ACTIVITY_LOG_DATA_BYTES};
 pub mod migrations;
 mod minting_authority;
 mod transfer_out;
@@ -33,6 +37,32 @@ pub(crate) enum CouncilMemberSource<'a, T: Config> {
 	VaultAccounts(BoundedVec<T::AccountId, T::MaxCouncilMembers>),
 }
 
+pub(crate) const GATEWAY_ACTIVITY_STORAGE_SLOT_COUNT: u32 = 2;
+type GatewayActivityStorageSlots = ConstU32<GATEWAY_ACTIVITY_STORAGE_SLOT_COUNT>;
+
+#[derive(
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	CloneNoBound,
+	PartialEqNoBound,
+	EqNoBound,
+	DebugNoBound,
+	TypeInfo,
+	MaxEncodedLen,
+)]
+#[scale_info(skip_type_params(MaxActivityLogs))]
+/// A complete locator's activity logs, authenticated by a shared account/storage proof.
+pub struct GatewayActivityStorageProof<MaxActivityLogs: Get<u32>> {
+	#[codec(compact)]
+	pub locator_index: u64,
+	/// Previous locator hash used by the contract to seed this locator's activity root.
+	/// This witness is authenticated by reconstructing the proven root, not a local cursor.
+	pub activity_root_seed: H256,
+	pub storage_proof: EthereumAccountStorageProof<GatewayActivityStorageSlots>,
+	pub activity_logs: GatewayActivityLogs<MaxActivityLogs>,
+}
+
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
@@ -51,8 +81,11 @@ pub mod pallet {
 		UniswapTransferProvider,
 	};
 	use frame_support::{
-		dispatch::{Pays, PostDispatchInfo},
-		traits::fungible::{InspectHold, Mutate, MutateHold},
+		dispatch::{DispatchClass, Pays},
+		traits::{
+			fungible::{InspectHold, Mutate, MutateHold},
+			Hooks,
+		},
 	};
 	use polkadot_sdk::{
 		frame_support::traits::IsSubType,
@@ -148,6 +181,14 @@ pub mod pallet {
 		#[pallet::constant]
 		type MaxReceiptProofsPerExtrinsic: Get<u32>;
 
+		/// Maximum activities in one complete gateway locator storage proof.
+		#[pallet::constant]
+		type MaxActivitiesPerGatewayProof: Get<u32>;
+
+		/// Runtime-reserved bytes for the signer, signature, transaction extensions,
+		/// extrinsic version, and outer length prefix, excluding the call itself.
+		type GatewayProofExtrinsicOverheadBytes: Get<u32>;
+
 		/// Maximum number of members the active Global Issuance Council may carry.
 		#[pallet::constant]
 		type MaxCouncilMembers: Get<u32>;
@@ -193,8 +234,89 @@ pub mod pallet {
 		type WeightInfo: WeightInfo;
 	}
 
+	#[pallet::hooks]
+	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+		fn integrity_test() {
+			use argon_ethereum_contracts::minting_gateway::MAX_GATEWAY_ACTIVITIES_PER_BLOCK;
+
+			assert!(
+				MAX_GATEWAY_ACTIVITIES_PER_BLOCK <= T::MaxActivitiesPerGatewayProof::get(),
+				"runtime activity capacity is below the gateway contract cap",
+			);
+			let maximum_log_data = u64::from(MAX_GATEWAY_ACTIVITIES_PER_BLOCK) *
+				u64::from(argon_primitives::MAX_ETHEREUM_LOG_DATA_BYTES);
+			assert!(
+				maximum_log_data <= u64::from(MAX_GATEWAY_ACTIVITY_LOG_DATA_BYTES),
+				"gateway contract cap exceeds the aggregate log-data capacity",
+			);
+
+			// Pallet/call indexes, source chain, and compact previous activity nonce.
+			let call_prefix_bytes =
+				<(u8, u8, SourceChain, codec::Compact<GatewayActivityNonce>)>::max_encoded_len();
+			let maximum_bytes = *T::BlockLength::get().max.get(DispatchClass::Normal) as usize;
+			let maximum_weight = T::BlockWeights::get()
+				.get(DispatchClass::Normal)
+				.max_extrinsic
+				.expect("gateway proofs require a normal-extrinsic weight limit")
+				// Keep half the available Normal extrinsic budget free for other block work.
+				.saturating_div(2);
+			let pool_weight = T::WeightInfo::provider_tx_pool_key()
+				.saturating_add(T::WeightInfo::provider_validate_transaction());
+			let receipt_blocks = T::MaxReceiptProofsPerExtrinsic::get();
+			let receipt_activities =
+				receipt_blocks.saturating_mul(T::MaxActivitiesPerReceiptProof::get());
+			let proofs = [
+				(
+					"storage",
+					GatewayActivityStorageProof::<T::MaxActivitiesPerGatewayProof>::max_encoded_len(
+					),
+					weights::prove_gateway_activity_storage_with_providers::<T>(
+						T::MaxActivitiesPerGatewayProof::get(),
+						argon_primitives::MAX_ETHEREUM_HEADER_CHAIN_LEN,
+					),
+				),
+				(
+					"receipt",
+					GatewayActivityReceiptProofBatch::<T>::max_encoded_len(),
+					weights::prove_gateway_activity_with_providers::<T>(
+						receipt_blocks,
+						receipt_activities,
+					)
+					.saturating_add(
+						<T::OperationalAccountsHook as OperationalAccountsHook<
+							T::AccountId,
+							T::Balance,
+						>>::Weights::account_uniswap_argon_transfers_in_updated()
+						.saturating_mul(receipt_activities.into()),
+					),
+				),
+			];
+
+			for (kind, proof_bytes, proof_weight) in proofs {
+				assert!(
+					proof_bytes
+						.saturating_add(call_prefix_bytes)
+						.saturating_add(T::GatewayProofExtrinsicOverheadBytes::get() as usize) <=
+						maximum_bytes,
+					"maximum gateway {kind} proof exceeds the normal-extrinsic byte limit",
+				);
+				assert!(
+					proof_weight.saturating_add(pool_weight).all_lte(maximum_weight),
+					"maximum gateway {kind} proof exceeds half the available normal-extrinsic weight: {} > {}",
+					proof_weight.saturating_add(pool_weight).ref_time(),
+					maximum_weight.ref_time(),
+				);
+			}
+		}
+	}
+
 	#[pallet::extra_constants]
 	impl<T: Config> Pallet<T> {
+		/// Maximum aggregate event data carried by one storage-proof locator.
+		pub fn max_gateway_activity_log_data_bytes() -> u32 {
+			MAX_GATEWAY_ACTIVITY_LOG_DATA_BYTES
+		}
+
 		/// Maximum execution headers carried in one receipt proof's target-to-anchor chain.
 		pub fn max_proof_execution_header_depth() -> u32 {
 			MAX_ETHEREUM_HEADER_CHAIN_LEN
@@ -352,6 +474,12 @@ pub mod pallet {
 		GlobalIssuanceCouncilNotFound,
 		/// The gateway's reported circulation or collateral no longer matched Argon's expectation.
 		GatewayStateDrift,
+	}
+
+	impl From<DispatchError> for GatewaySyncPauseReason {
+		fn from(_: DispatchError) -> Self {
+			Self::GatewayStateDrift
+		}
 	}
 
 	#[derive(
@@ -673,11 +801,11 @@ pub mod pallet {
 
 	/// One proven contiguous activity slice backed by a combined receipt proof for one execution
 	/// block.
-	pub type GatewayActivityProofBlock<T> =
+	pub type GatewayActivityReceiptProofBlock<T> =
 		BaseEthereumReceiptLogProofBlock<<T as Config>::MaxActivitiesPerReceiptProof>;
 
 	/// Ordered proof batch supplied to `prove_gateway_activity(...)`.
-	pub type GatewayActivityProofBatch<T> = BaseEthereumReceiptLogProofBatch<
+	pub type GatewayActivityReceiptProofBatch<T> = BaseEthereumReceiptLogProofBatch<
 		<T as Config>::MaxReceiptProofsPerExtrinsic,
 		<T as Config>::MaxActivitiesPerReceiptProof,
 	>;
@@ -1476,92 +1604,29 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			source_chain: SourceChain,
 			#[pallet::compact] previous_gateway_activity_nonce: GatewayActivityNonce,
-			proof_batch: GatewayActivityProofBatch<T>,
+			proof_batch: GatewayActivityReceiptProofBatch<T>,
 		) -> DispatchResultWithPostInfo {
 			let _ = ensure_signed(origin)?;
-			Self::ensure_source_chain_not_paused(source_chain)?;
+			let current_gateway_state =
+				Self::ensure_gateway_sync_ready(source_chain, previous_gateway_activity_nonce)?;
 			ensure!(!proof_batch.blocks.is_empty(), Error::<T>::NoGatewayProofBlocksProvided);
-			let current_gateway_state = GatewayStateBySourceChain::<T>::get(source_chain)
-				.unwrap_or(GatewayState::<T> {
-					gateway_activity_nonce: 0,
-					argon_approvals_nonce: 0,
-					argon_circulation: T::Balance::default(),
-					argonot_circulation: T::Balance::default(),
-				});
-
 			ensure!(
-				previous_gateway_activity_nonce == current_gateway_state.gateway_activity_nonce,
-				Error::<T>::UnexpectedPreviousGatewayActivityNonce,
-			);
-			let mut expected_gateway_activity_nonce = previous_gateway_activity_nonce;
-			let mut latest_gateway_state = None;
-			let mut did_pause_gateway_sync = false;
-			for proof_block in &proof_batch.blocks {
-				ensure!(
-					!proof_block.receipt_logs.is_empty(),
-					Error::<T>::NoGatewayActivitiesProvided
-				);
-			}
-
-			T::EthereumVerifier::verify_receipt_logs(&proof_batch)
-				.map_err(|_| Error::<T>::InvalidProof)?;
-
-			for proof_block in proof_batch.blocks.into_iter() {
-				let block_outcome = Self::apply_proved_gateway_activity_proof_block(
-					source_chain,
-					expected_gateway_activity_nonce,
-					proof_block,
-				)?;
-
-				if let Some(gateway_state) = block_outcome.latest_gateway_state {
-					expected_gateway_activity_nonce = gateway_state.gateway_activity_nonce;
-					latest_gateway_state = Some(gateway_state);
-				}
-				if let Some(pause) = block_outcome.pause {
-					Self::pause_source_chain(
-						source_chain,
-						pause.last_good_gateway_activity_nonce,
-						pause.failed_gateway_activity_nonce,
-						pause.reason,
-					);
-					did_pause_gateway_sync = true;
-					break;
-				}
-			}
-
-			let did_advance_gateway_state = latest_gateway_state.is_some();
-			if let Some(gateway_state) = latest_gateway_state {
-				if gateway_state.argon_approvals_nonce > current_gateway_state.argon_approvals_nonce
-				{
-					let last_local_queue_nonce =
-						NextCouncilApprovalQueueNonceByDestinationChain::<T>::get(source_chain);
-					let previous_retained_queue_nonce =
-						current_gateway_state.argon_approvals_nonce.min(last_local_queue_nonce);
-					let retained_queue_nonce =
-						gateway_state.argon_approvals_nonce.min(last_local_queue_nonce);
-
-					for queue_nonce in previous_retained_queue_nonce.max(1)..retained_queue_nonce {
-						CouncilApprovalQueueByDestinationChainAndNonce::<T>::remove(
-							source_chain,
-							queue_nonce,
-						);
-					}
-				}
-				GatewayStateBySourceChain::<T>::insert(source_chain, gateway_state.clone());
-				Self::refresh_destination_chain_queue_tracking(source_chain)?;
-				Self::deposit_event(Event::GatewayStateAdvanced { source_chain, gateway_state });
-			}
-
-			if did_pause_gateway_sync {
-				return Ok(Pays::No.into());
-			}
-
-			ensure!(
-				expected_gateway_activity_nonce > previous_gateway_activity_nonce,
+				proof_batch.blocks.iter().all(|block| !block.receipt_logs.is_empty()),
 				Error::<T>::NoGatewayActivitiesProvided,
 			);
-			let pays_fee = if did_advance_gateway_state { Pays::No } else { Pays::Yes };
-			Ok(PostDispatchInfo { pays_fee, ..Default::default() })
+			T::EthereumVerifier::verify_receipt_logs(&proof_batch)
+				.map_err(|_| Error::<T>::InvalidProof)?;
+			let chain_config = ChainConfigBySourceChain::<T>::get(source_chain)
+				.ok_or(Error::<T>::UnsupportedSource)?;
+			let blocks = proof_batch.blocks.into_iter().map(|block| GatewayActivityBlock {
+				block_number: block.target_block_number,
+				activities: block
+					.receipt_logs
+					.into_iter()
+					.map(|log| Self::decode_evm_gateway_activity(&chain_config, &log.event_log))
+					.collect(),
+			});
+			Self::apply_gateway_activity_blocks(source_chain, current_gateway_state, blocks)
 		}
 
 		#[pallet::call_index(9)]
@@ -1628,9 +1693,111 @@ pub mod pallet {
 			)?;
 			Ok(Pays::No.into())
 		}
+
+		/// Authenticate a complete gateway locator and settle its unconsumed activities.
+		#[pallet::call_index(13)]
+		#[pallet::weight(weights::prove_gateway_activity_storage_with_providers::<T>(
+			proof.activity_logs.len() as u32,
+			proof.storage_proof.execution_block_proof.target_to_anchor_header_chain.len() as u32,
+		))]
+		pub fn prove_gateway_activity_storage(
+			origin: OriginFor<T>,
+			source_chain: SourceChain,
+			#[pallet::compact] previous_gateway_activity_nonce: GatewayActivityNonce,
+			proof: GatewayActivityStorageProof<T::MaxActivitiesPerGatewayProof>,
+		) -> DispatchResultWithPostInfo {
+			let _ = ensure_signed(origin)?;
+			let current_gateway_state =
+				Self::ensure_gateway_sync_ready(source_chain, previous_gateway_activity_nonce)?;
+			let chain_config = ChainConfigBySourceChain::<T>::get(source_chain)
+				.ok_or(Error::<T>::InvalidChainConfig)?;
+			let ChainConfig::Evm { gateway, .. } = &chain_config;
+			T::EthereumVerifier::verify_account_storage_proof(*gateway, &proof.storage_proof)
+				.map_err(|_| Error::<T>::InvalidProof)?;
+			let activities = proof
+				.activity_logs
+				.iter()
+				.map(|log| Self::decode_evm_gateway_activity(&chain_config, log))
+				.collect();
+			let block = Self::validate_gateway_activity_locator(
+				&chain_config,
+				previous_gateway_activity_nonce,
+				&proof,
+				activities,
+			)?;
+			Self::apply_gateway_activity_blocks(source_chain, current_gateway_state, [block])
+		}
 	}
 
 	impl<T: Config> Pallet<T> {
+		fn apply_gateway_activity_blocks(
+			source_chain: SourceChain,
+			previous_gateway_state: GatewayState<T>,
+			blocks: impl IntoIterator<Item = GatewayActivityBlock<T>>,
+		) -> DispatchResultWithPostInfo {
+			let mut expected_nonce = previous_gateway_state.gateway_activity_nonce;
+			let mut latest_gateway_state = None;
+			for block in blocks {
+				let outcome =
+					Self::apply_gateway_activity_block(source_chain, expected_nonce, block)?;
+				if let Some(state) = outcome.latest_gateway_state {
+					expected_nonce = state.gateway_activity_nonce;
+					latest_gateway_state = Some(state);
+				}
+				if let Some(pause) = outcome.pause {
+					Self::pause_source_chain(
+						source_chain,
+						pause.last_good_gateway_activity_nonce,
+						pause.failed_gateway_activity_nonce,
+						pause.reason,
+					);
+					break;
+				}
+			}
+
+			if let Some(gateway_state) = latest_gateway_state {
+				if gateway_state.argon_approvals_nonce >
+					previous_gateway_state.argon_approvals_nonce
+				{
+					let last_local_queue_nonce =
+						NextCouncilApprovalQueueNonceByDestinationChain::<T>::get(source_chain);
+					let previous_retained_queue_nonce =
+						previous_gateway_state.argon_approvals_nonce.min(last_local_queue_nonce);
+					let retained_queue_nonce =
+						gateway_state.argon_approvals_nonce.min(last_local_queue_nonce);
+					for queue_nonce in previous_retained_queue_nonce.max(1)..retained_queue_nonce {
+						CouncilApprovalQueueByDestinationChainAndNonce::<T>::remove(
+							source_chain,
+							queue_nonce,
+						);
+					}
+				}
+
+				GatewayStateBySourceChain::<T>::insert(source_chain, gateway_state.clone());
+				Self::refresh_destination_chain_queue_tracking(source_chain)?;
+				Self::deposit_event(Event::GatewayStateAdvanced { source_chain, gateway_state });
+			}
+			Ok(Pays::No.into())
+		}
+
+		fn ensure_gateway_sync_ready(
+			source_chain: SourceChain,
+			previous_gateway_activity_nonce: GatewayActivityNonce,
+		) -> Result<GatewayState<T>, DispatchError> {
+			Self::ensure_source_chain_not_paused(source_chain)?;
+			let state = GatewayStateBySourceChain::<T>::get(source_chain).unwrap_or(GatewayState {
+				gateway_activity_nonce: 0,
+				argon_approvals_nonce: 0,
+				argon_circulation: T::Balance::default(),
+				argonot_circulation: T::Balance::default(),
+			});
+			ensure!(
+				previous_gateway_activity_nonce == state.gateway_activity_nonce,
+				Error::<T>::UnexpectedPreviousGatewayActivityNonce,
+			);
+			Ok(state)
+		}
+
 		pub fn burn_account(source_chain: SourceChain) -> T::AccountId {
 			match source_chain {
 				SourceChain::Ethereum => T::EthereumBurnAccount::get(),
@@ -1790,11 +1957,30 @@ pub mod pallet {
 			let call = <RuntimeCallOf<T> as IsSubType<Call<T>>>::is_sub_type(call)?;
 
 			match call {
-				Call::prove_gateway_activity { source_chain, proof_batch, .. } => Some(
+				Call::prove_gateway_activity {
+					source_chain,
+					previous_gateway_activity_nonce,
+					proof_batch,
+				} => Some(
 					(
 						b"crosschain_transfer:prove".as_slice(),
 						source_chain,
+						previous_gateway_activity_nonce,
 						proof_batch.using_encoded(blake2_256),
+					)
+						.using_encoded(blake2_256)
+						.to_vec(),
+				),
+				Call::prove_gateway_activity_storage {
+					source_chain,
+					previous_gateway_activity_nonce,
+					proof,
+				} => Some(
+					(
+						b"crosschain_transfer:prove-storage".as_slice(),
+						source_chain,
+						previous_gateway_activity_nonce,
+						proof.using_encoded(blake2_256),
 					)
 						.using_encoded(blake2_256)
 						.to_vec(),
@@ -1819,6 +2005,11 @@ pub mod pallet {
 			};
 
 			if let Call::prove_gateway_activity {
+				source_chain,
+				previous_gateway_activity_nonce,
+				..
+			} |
+			Call::prove_gateway_activity_storage {
 				source_chain,
 				previous_gateway_activity_nonce,
 				..

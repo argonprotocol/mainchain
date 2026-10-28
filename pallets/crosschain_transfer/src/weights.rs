@@ -1,9 +1,11 @@
+use argon_ethereum_contracts::minting_gateway::MAX_MINTING_AUTHORIZATIONS_PER_TRANSFER;
 use argon_primitives::{
 	vault::{BitcoinVaultProvider, BitcoinVaultProviderWeightInfo},
 	CallTxPoolKeyProviderWeightInfo, CallTxValidityProviderWeightInfo,
 	CollectBlockerProviderWeightInfo, EthereumVerifyProvider, EthereumVerifyProviderWeightInfo,
-	PriceProvider, PriceProviderWeightInfo, TickProvider, TickProviderWeightInfo,
-	TreasuryPoolProvider, TreasuryPoolProviderWeightInfo, UniswapTransferProviderWeightInfo,
+	OperationalAccountsHook, OperationalAccountsHookWeightInfo, PriceProvider,
+	PriceProviderWeightInfo, TickProvider, TickProviderWeightInfo, TreasuryPoolProvider,
+	TreasuryPoolProviderWeightInfo, UniswapTransferProviderWeightInfo,
 };
 use core::marker::PhantomData;
 use pallet_prelude::*;
@@ -21,6 +23,7 @@ pub trait WeightInfo {
 	fn deactivate_minting_authority() -> Weight;
 	fn approve_queue_entries(approvals: u32) -> Weight;
 	fn prove_gateway_activity(activities: u32) -> Weight;
+	fn prove_gateway_activity_storage(activities: u32) -> Weight;
 	fn schedule_global_issuance_council_rotation() -> Weight;
 	fn activate_global_issuance_council_signers() -> Weight;
 	fn transfer_out() -> Weight;
@@ -128,9 +131,19 @@ where
 	}
 
 	fn prove_gateway_activity(activities: u32) -> Weight {
-		Base::prove_gateway_activity(activities).saturating_add(
-			PriceProviderWeight::get_ethereum_prices().saturating_mul(activities.into()),
-		)
+		Base::prove_gateway_activity(activities)
+			.saturating_add(
+				PriceProviderWeight::get_ethereum_prices().saturating_mul(activities.into()),
+			)
+			.saturating_add(gateway_activity_vault_weight::<VaultProviderWeight>(activities))
+	}
+
+	fn prove_gateway_activity_storage(activities: u32) -> Weight {
+		Base::prove_gateway_activity_storage(activities)
+			.saturating_add(
+				PriceProviderWeight::get_ethereum_prices().saturating_mul(activities.into()),
+			)
+			.saturating_add(gateway_activity_vault_weight::<VaultProviderWeight>(activities))
 	}
 
 	fn schedule_global_issuance_council_rotation() -> Weight {
@@ -173,6 +186,16 @@ where
 	}
 }
 
+fn gateway_activity_vault_weight<V: BitcoinVaultProviderWeightInfo>(activities: u32) -> Weight {
+	let burn = V::burn_encumbered_argonots();
+	let release = V::release_encumbered_argonots();
+	// Finalization burns or releases collateral for every authorization. Deactivation can
+	// do both for one authority. Charge the larger path before execution, for every activity.
+	let finalization =
+		burn.max(release).saturating_mul(MAX_MINTING_AUTHORIZATIONS_PER_TRANSFER.into());
+	finalization.max(burn.saturating_add(release)).saturating_mul(activities.into())
+}
+
 pub struct ProviderWeightAdapter<T>(PhantomData<T>);
 
 impl<T: Config> CallTxPoolKeyProviderWeightInfo<T::RuntimeCall> for ProviderWeightAdapter<T>
@@ -180,9 +203,13 @@ where
 	T::RuntimeCall: IsSubType<crate::Call<T>>,
 {
 	fn key_for(call: &T::RuntimeCall) -> Weight {
-		if let Some(crate::Call::prove_gateway_activity { .. }) =
-			<T::RuntimeCall as IsSubType<crate::Call<T>>>::is_sub_type(call)
-		{
+		if matches!(
+			<T::RuntimeCall as IsSubType<crate::Call<T>>>::is_sub_type(call),
+			Some(
+				crate::Call::prove_gateway_activity { .. } |
+					crate::Call::prove_gateway_activity_storage { .. }
+			)
+		) {
 			return T::WeightInfo::provider_tx_pool_key();
 		}
 
@@ -197,7 +224,10 @@ where
 	fn validate(call: &T::RuntimeCall) -> Weight {
 		if matches!(
 			<T::RuntimeCall as IsSubType<crate::Call<T>>>::is_sub_type(call),
-			Some(crate::Call::prove_gateway_activity { .. })
+			Some(
+				crate::Call::prove_gateway_activity { .. } |
+					crate::Call::prove_gateway_activity_storage { .. }
+			)
 		) {
 			return T::WeightInfo::provider_validate_transaction();
 		}
@@ -266,6 +296,10 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 
+	fn prove_gateway_activity_storage(_activities: u32) -> Weight {
+		Weight::zero()
+	}
+
 	fn schedule_global_issuance_council_rotation() -> Weight {
 		Weight::zero()
 	}
@@ -319,4 +353,21 @@ pub fn prove_gateway_activity_with_providers<T: Config>(
 		.saturating_add(
 			T::WeightInfo::activate_global_issuance_council_signers(),
 		)
+}
+
+pub fn prove_gateway_activity_storage_with_providers<T: Config>(
+	activities: u32,
+	headers: u32,
+) -> Weight {
+	T::WeightInfo::prove_gateway_activity_storage(activities)
+		.saturating_add(EthereumVerifyProviderWeights::<T>::verify_account_storage_proof(
+			crate::GATEWAY_ACTIVITY_STORAGE_SLOT_COUNT,
+			headers,
+		))
+		.saturating_add(
+			<T::OperationalAccountsHook as OperationalAccountsHook<T::AccountId, T::Balance>>::Weights::account_uniswap_argon_transfers_in_updated()
+				.saturating_mul(activities.into()),
+		)
+		// A locator can activate at most one queued council, just like a receipt batch.
+		.saturating_add(T::WeightInfo::activate_global_issuance_council_signers())
 }

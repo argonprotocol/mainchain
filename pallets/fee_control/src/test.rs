@@ -319,35 +319,196 @@ fn validate_keeps_sponsor_and_general_pool_keys() {
 }
 
 #[test]
-fn validate_keeps_inner_pool_keys_for_batches() {
+fn batches_do_not_claim_standalone_pool_keys() {
 	new_test_ext().execute_with(|| {
 		set_argons(0, 1_000_000u128);
+		set_argons(7, 1_000_000u128);
+		assert_ok!(Proxy::add_proxy(Some(7).into(), 0, ProxyType::Any, 0));
 		let calls = vec![
 			RuntimeCall::DummyPallet(Call::<Test>::pooled { key: 7 }),
 			RuntimeCall::DummyPallet(Call::<Test>::stacked { key: 9 }),
 		];
-		let call = RuntimeCall::Utility(pallet_utility::Call::<Test>::batch { calls });
-		let (res, _, _) =
-			CheckFeeWrapper::<Test, MockChargePaymentExtension>::from(MockChargePaymentExtension)
+		for utility_call in [
+			pallet_utility::Call::<Test>::batch { calls: calls.clone() },
+			pallet_utility::Call::<Test>::batch_all { calls: calls.clone() },
+			pallet_utility::Call::<Test>::force_batch { calls },
+		] {
+			let batch = RuntimeCall::Utility(utility_call);
+			let proxy_batch = RuntimeCall::Proxy(pallet_proxy::Call::<Test>::proxy {
+				real: 7,
+				force_proxy_type: None,
+				call: Box::new(batch.clone()),
+			});
+			let nested_batch = RuntimeCall::Utility(pallet_utility::Call::<Test>::force_batch {
+				calls: vec![proxy_batch.clone()],
+			});
+			for call in [batch, proxy_batch, nested_batch] {
+				let (validity, _, _) = CheckFeeWrapper::<Test, MockChargePaymentExtension>::from(
+					MockChargePaymentExtension,
+				)
 				.validate_only(
 					Some(0).into(),
 					&call,
-					&DispatchInfo::default(),
-					0,
+					&call.get_dispatch_info(),
+					call.encoded_size(),
 					TransactionSource::External,
 					0,
 				)
 				.unwrap();
+				assert!(validity.provides.is_empty(), "{call:?}");
+			}
+		}
+	});
+}
 
-		let batch_key = <Test as frame_system::Config>::Hashing::hash_of(&(
-			b"batch",
-			vec![(b"general", 7u32).encode(), (b"general", 9u32).encode()],
-		))
-		.as_ref()
-		.to_vec();
-		assert!(res.provides.contains(&(b"general", 7u32).encode()));
-		assert!(res.provides.contains(&(b"general", 9u32).encode()));
-		assert!(res.provides.contains(&batch_key));
+#[test]
+fn rollback_batches_do_not_claim_standalone_keys_or_skip_fees() {
+	let honest_call = RuntimeCall::DummyPallet(Call::<Test>::pooled { key: 7 });
+	let failing_call = RuntimeCall::DummyPallet(Call::<Test>::pooled_fail { key: 8 });
+	let atomic_batch = RuntimeCall::Utility(pallet_utility::Call::<Test>::batch_all {
+		calls: vec![honest_call.clone(), failing_call.clone()],
+	});
+	let interrupted_batch = RuntimeCall::Utility(pallet_utility::Call::<Test>::batch {
+		calls: vec![failing_call, honest_call.clone()],
+	});
+	let nested_batch = RuntimeCall::Utility(pallet_utility::Call::<Test>::force_batch {
+		calls: vec![atomic_batch.clone()],
+	});
+
+	for (attack, dispatch_fails) in
+		[(interrupted_batch, false), (atomic_batch, true), (nested_batch, false)]
+	{
+		new_test_ext().execute_with(|| {
+			System::set_block_number(1);
+			FeeUnbalancedAmount::set(0);
+			TipUnbalancedAmount::set(0);
+			set_argons(0, 1_000_000_000_000);
+			set_argons(1, 1_000_000_000_000);
+			let honest_extension = (
+				frame_system::CheckNonce::<Test>::from(0),
+				CheckFeeWrapper::<Test, ChargeTransactionPayment<Test>>::from(
+					ChargeTransactionPayment::<Test>::from(0),
+				),
+			);
+			let (honest_validity, _, _) = honest_extension
+				.validate_only(
+					Some(0).into(),
+					&honest_call,
+					&honest_call.get_dispatch_info(),
+					honest_call.encoded_size(),
+					TransactionSource::External,
+					0,
+				)
+				.unwrap();
+			assert_eq!(honest_validity.provides.len(), 2); // Account nonce and standalone key.
+
+			let attack_extension = (
+				frame_system::CheckNonce::<Test>::from(0),
+				CheckFeeWrapper::<Test, ChargeTransactionPayment<Test>>::from(
+					ChargeTransactionPayment::<Test>::from(10_000),
+				),
+			);
+			let (attack_validity, _, _) = attack_extension
+				.validate_only(
+					Some(1).into(),
+					&attack,
+					&attack.get_dispatch_info(),
+					attack.encoded_size(),
+					TransactionSource::External,
+					0,
+				)
+				.unwrap();
+			assert!(attack_validity.priority > honest_validity.priority);
+			assert!(attack_validity
+				.provides
+				.iter()
+				.all(|key| !honest_validity.provides.contains(key)));
+
+			// Even if the tipped wrapper executes first, it cannot commit the keyed call.
+			let balance_before = Balances::free_balance(1);
+			let attack_result = attack_extension
+				.test_run(
+					Some(1).into(),
+					&attack,
+					&attack.get_dispatch_info(),
+					attack.encoded_size(),
+					0,
+					|origin| attack.clone().dispatch(origin),
+				)
+				.unwrap();
+			assert_eq!(attack_result.is_err(), dispatch_fails);
+			assert!(!DispatchedPoolKeys::<Test>::contains_key(7));
+			assert!(Balances::free_balance(1) < balance_before - 10_000);
+			assert_eq!(TipUnbalancedAmount::get(), 10_000);
+
+			let honest_result = honest_extension
+				.test_run(
+					Some(0).into(),
+					&honest_call,
+					&honest_call.get_dispatch_info(),
+					honest_call.encoded_size(),
+					0,
+					|origin| honest_call.clone().dispatch(origin),
+				)
+				.unwrap();
+			assert_ok!(honest_result);
+			assert!(DispatchedPoolKeys::<Test>::contains_key(7));
+		});
+	}
+}
+
+#[test]
+fn proxy_batches_keep_only_the_sponsor_specific_key_and_still_execute() {
+	new_test_ext().execute_with(|| {
+		FeeUnbalancedAmount::set(0);
+		TipUnbalancedAmount::set(0);
+		set_argons(0, 1_000_000_000_000);
+		set_argons(7, 1_000_000_000_000);
+		assert_ok!(Proxy::add_proxy(Some(7).into(), 0, ProxyType::DummyWrapper, 0));
+		let calls = vec![
+			RuntimeCall::DummyPallet(Call::<Test>::pooled { key: 7 }),
+			RuntimeCall::DummyPallet(Call::<Test>::pooled { key: 8 }),
+		];
+		let call = RuntimeCall::Proxy(pallet_proxy::Call::<Test>::proxy {
+			real: 7,
+			force_proxy_type: Some(ProxyType::DummyWrapper),
+			call: Box::new(RuntimeCall::Utility(pallet_utility::Call::<Test>::batch_all {
+				calls: calls.clone(),
+			})),
+		});
+		let wrapper = CheckFeeWrapper::<Test, ChargeTransactionPayment<Test>>::from(
+			ChargeTransactionPayment::<Test>::from(500),
+		);
+		let (validity, _, _) = wrapper
+			.validate_only(
+				Some(0).into(),
+				&call,
+				&call.get_dispatch_info(),
+				call.encoded_size(),
+				TransactionSource::External,
+				0,
+			)
+			.unwrap();
+		assert_eq!(validity.provides, vec![(b"proxy-batch", calls).encode()]);
+
+		let delegate_before = Balances::free_balance(0);
+		let sponsor_before = Balances::free_balance(7);
+		let result = wrapper
+			.test_run(
+				Some(0).into(),
+				&call,
+				&call.get_dispatch_info(),
+				call.encoded_size(),
+				0,
+				|origin| call.clone().dispatch(origin),
+			)
+			.unwrap();
+		assert_ok!(result);
+		assert!(DispatchedPoolKeys::<Test>::contains_key(7));
+		assert!(DispatchedPoolKeys::<Test>::contains_key(8));
+		assert_eq!(Balances::free_balance(0), delegate_before);
+		assert!(Balances::free_balance(7) < sponsor_before);
+		assert_eq!(TipUnbalancedAmount::get(), 500);
 	});
 }
 
@@ -360,22 +521,28 @@ fn validate_rejects_stale_batched_calls() {
 			RuntimeCall::DummyPallet(Call::<Test>::pooled { key: 7 }),
 			RuntimeCall::DummyPallet(Call::<Test>::pooled { key: 8 }),
 		];
-		let call = RuntimeCall::Utility(pallet_utility::Call::<Test>::batch { calls });
-		let result =
-			CheckFeeWrapper::<Test, MockChargePaymentExtension>::from(MockChargePaymentExtension)
-				.validate_only(
-					Some(0).into(),
-					&call,
-					&DispatchInfo::default(),
-					0,
-					TransactionSource::External,
-					0,
-				);
-
-		assert!(matches!(
-			result,
-			Err(TransactionValidityError::Invalid(InvalidTransaction::Stale))
-		));
+		for utility_call in [
+			pallet_utility::Call::<Test>::batch { calls: calls.clone() },
+			pallet_utility::Call::<Test>::batch_all { calls: calls.clone() },
+			pallet_utility::Call::<Test>::force_batch { calls },
+		] {
+			let call = RuntimeCall::Utility(utility_call);
+			let result = CheckFeeWrapper::<Test, MockChargePaymentExtension>::from(
+				MockChargePaymentExtension,
+			)
+			.validate_only(
+				Some(0).into(),
+				&call,
+				&call.get_dispatch_info(),
+				call.encoded_size(),
+				TransactionSource::External,
+				0,
+			);
+			assert!(matches!(
+				result,
+				Err(TransactionValidityError::Invalid(InvalidTransaction::Stale))
+			));
+		}
 	});
 }
 
@@ -406,7 +573,7 @@ fn post_dispatch_refunds_configured_batch_all_combinations_on_success() {
 		let dispatch_result = call.dispatch(validated_origin);
 		let dispatch_outcome = match &dispatch_result {
 			Ok(_) => Ok(()),
-			Err(err) => Err(err.error.clone()),
+			Err(err) => Err(err.error),
 		};
 		let post_info = match &dispatch_result {
 			Ok(post_info) => post_info,
@@ -453,7 +620,7 @@ fn post_dispatch_keeps_fees_for_failed_configured_batch_all_combinations() {
 		let dispatch_result = call.dispatch(validated_origin);
 		let dispatch_outcome = match &dispatch_result {
 			Ok(_) => Ok(()),
-			Err(err) => Err(err.error.clone()),
+			Err(err) => Err(err.error),
 		};
 		let post_info = match &dispatch_result {
 			Ok(post_info) => post_info,
@@ -475,41 +642,50 @@ fn post_dispatch_keeps_fees_for_failed_configured_batch_all_combinations() {
 
 #[test]
 fn prepare_rejects_calls_that_become_stale_after_validation() {
-	new_test_ext().execute_with(|| {
-		set_argons(0, 1_000_000u128);
-		PrepareCount::set(0);
-		ValidateCount::set(0);
-		LastPayer::set(None);
+	let direct_call = RuntimeCall::DummyPallet(Call::<Test>::pooled { key: 7 });
+	let calls = vec![direct_call.clone()];
+	let batch = RuntimeCall::Utility(pallet_utility::Call::<Test>::batch { calls: calls.clone() });
+	let batch_all =
+		RuntimeCall::Utility(pallet_utility::Call::<Test>::batch_all { calls: calls.clone() });
+	let force_batch = RuntimeCall::Utility(pallet_utility::Call::<Test>::force_batch { calls });
+	for call in [direct_call, batch, batch_all, force_batch] {
+		new_test_ext().execute_with(|| {
+			set_argons(0, 1_000_000u128);
+			PrepareCount::set(0);
+			ValidateCount::set(0);
+			LastPayer::set(None);
 
-		let call = RuntimeCall::DummyPallet(Call::<Test>::pooled { key: 7 });
-		let wrapper =
-			CheckFeeWrapper::<Test, MockChargePaymentExtension>::from(MockChargePaymentExtension);
-		let (_, val, validated_origin) = wrapper
-			.validate_only(
-				Some(0).into(),
-				&call,
-				&DispatchInfo::default(),
-				0,
-				TransactionSource::External,
-				0,
+			let wrapper = CheckFeeWrapper::<Test, MockChargePaymentExtension>::from(
+				MockChargePaymentExtension,
+			);
+			let (_, val, validated_origin) = wrapper
+				.validate_only(
+					Some(0).into(),
+					&call,
+					&DispatchInfo::default(),
+					0,
+					TransactionSource::External,
+					0,
+				)
+				.unwrap();
+
+			ConsumedPoolKeys::<Test>::insert(7, ());
+
+			let result = CheckFeeWrapper::<Test, MockChargePaymentExtension>::from(
+				MockChargePaymentExtension,
 			)
-			.unwrap();
+			.prepare(val, &validated_origin, &call, &DispatchInfo::default(), 0);
 
-		ConsumedPoolKeys::<Test>::insert(7, ());
-
-		let result =
-			CheckFeeWrapper::<Test, MockChargePaymentExtension>::from(MockChargePaymentExtension)
-				.prepare(val, &validated_origin, &call, &DispatchInfo::default(), 0);
-
-		assert!(matches!(
-			result,
-			Err(TransactionValidityError::Invalid(InvalidTransaction::Stale))
-		));
-		assert_eq!(ValidateCount::get(), 1);
-		assert_eq!(PrepareCount::get(), 0);
-		assert_eq!(LastPayer::get(), None);
-		assert_eq!(Balances::free_balance(0), 1_000_000u128);
-	});
+			assert!(matches!(
+				result,
+				Err(TransactionValidityError::Invalid(InvalidTransaction::Stale))
+			));
+			assert_eq!(ValidateCount::get(), 1);
+			assert_eq!(PrepareCount::get(), 0);
+			assert_eq!(LastPayer::get(), None);
+			assert_eq!(Balances::free_balance(0), 1_000_000u128);
+		});
+	}
 }
 
 #[test]
@@ -880,7 +1056,7 @@ fn proxy_specific_sponsors_charge_real_account_directly() {
 		let dispatch_result = call.dispatch(origin);
 		let outer_dispatch_outcome = match &dispatch_result {
 			Ok(_) => Ok(()),
-			Err(err) => Err(err.error.clone()),
+			Err(err) => Err(err.error),
 		};
 		let post_info = match &dispatch_result {
 			Ok(post_info) => post_info,
@@ -960,7 +1136,7 @@ fn proxy_specific_sponsors_charge_real_account_for_failed_calls() {
 		let dispatch_result = call.dispatch(origin);
 		let outer_dispatch_outcome = match &dispatch_result {
 			Ok(_) => Ok(()),
-			Err(err) => Err(err.error.clone()),
+			Err(err) => Err(err.error),
 		};
 		let post_info = match &dispatch_result {
 			Ok(post_info) => post_info,

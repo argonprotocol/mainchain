@@ -1,10 +1,13 @@
 import {
   type ArgonClient,
-  buildGatewayActivityProofPayload,
+  buildGatewayActivityStorageProofs,
+  captureGatewayActivityStorageProofs,
+  discoverMissingGatewayActivityLocators,
   decodeAddress,
   dispatchErrorToString,
   EvmContracts,
   FIXED_U128_DECIMALS,
+  getLatestArgonFinalizedExecutionHeader,
   getEthereumBeaconSyncBootstrapTx,
   hexToU8a,
   Keyring,
@@ -43,15 +46,10 @@ const MINIMAL_BOOTSTRAP_FINALIZED_SLOT = 64n;
 
 type DeployerAccount = ReturnType<typeof privateKeyToAccount>;
 type EthereumChain = ReturnType<typeof defineChain>;
-type EthereumPublicClient = {
-  getBalance: (args: { address: Hex }) => Promise<bigint>;
-  getBlock: (...args: any[]) => Promise<any>;
-  getBlockNumber: () => Promise<bigint>;
-  readContract: (...args: any[]) => Promise<unknown>;
-  waitForTransactionReceipt: (args: {
-    hash: Hex;
-  }) => Promise<{ status: string; blockNumber: bigint }>;
-};
+type EthereumPublicClient = Pick<
+  ReturnType<typeof createPublicClient>,
+  'getBalance' | 'getBlock' | 'getBlockNumber' | 'readContract' | 'estimateGas'
+>;
 type EthereumWalletClient = {
   sendTransaction: (...args: any[]) => Promise<Hex>;
   writeContract: (...args: any[]) => Promise<Hex>;
@@ -106,7 +104,6 @@ export class EthereumProofE2eHarness {
       },
     });
     this.publicClient = createPublicClient({
-      chain: this.chain,
       transport: http(endpoints.executionRpcUrl),
     });
     this.walletClient = createWalletClient({
@@ -180,26 +177,60 @@ export class EthereumProofE2eHarness {
     );
   }
 
-  async proveGatewayActivity(gatewayAddress: Hex, throughExecutionBlockNumber: bigint) {
-    const payload = await buildGatewayActivityProofPayload(this.mainchainClient, {
+  async proveGatewayActivities(gatewayAddress: Hex, throughExecutionBlockNumber: bigint) {
+    const argonFinalizedExecutionHeader = await getLatestArgonFinalizedExecutionHeader(
+      this.mainchainClient,
+    );
+    const currentGatewayState =
+      await this.mainchainClient.query.crosschainTransfer.gatewayStateBySourceChain('Ethereum');
+    const minimumGatewayActivityNonce = currentGatewayState.isSome
+      ? currentGatewayState.unwrap().gatewayActivityNonce.toBigInt() + 1n
+      : 1n;
+    const collectedLocators = await discoverMissingGatewayActivityLocators({
+      finalizedExecutionBlockNumber: argonFinalizedExecutionHeader.blockNumber,
       executionRpcUrl: this.endpoints.executionRpcUrl,
       gatewayAddress,
-      throughExecutionBlockNumber,
+      minimumGatewayActivityNonce,
     });
-    if (!payload) {
+    const locators = collectedLocators.filter(
+      locator => locator.blockNumber <= throughExecutionBlockNumber,
+    );
+    if (locators.length === 0) {
       throw new Error('Expected uncovered gateway activity to prove');
     }
 
-    const result = await this.submit(
-      this.mainchainClient.tx.crosschainTransfer.proveGatewayActivity(
-        'Ethereum',
-        payload.previousGatewayActivityNonce,
-        payload.proof,
-      ),
-      this.proofRelayer,
-    );
+    const executionBlock = await this.publicClient.getBlock({
+      blockNumber: argonFinalizedExecutionHeader.blockNumber,
+    });
+    const captures = await captureGatewayActivityStorageProofs({
+      executionRpcUrl: this.endpoints.executionRpcUrl,
+      executionBlock,
+      gatewayAddress,
+      locators,
+    });
+    const { payloads } = await buildGatewayActivityStorageProofs(this.mainchainClient, {
+      executionRpcUrl: this.endpoints.executionRpcUrl,
+      gatewayAddress,
+      locators: captures,
+    });
+    if (payloads.length === 0) {
+      throw new Error('Expected uncovered gateway activity to prove');
+    }
 
-    return { payload, result };
+    const results = [];
+    for (const payload of payloads) {
+      const result = await this.submit(
+        this.mainchainClient.tx.crosschainTransfer.proveGatewayActivityStorage(
+          'Ethereum',
+          payload.previousGatewayActivityNonce,
+          payload.proof,
+        ),
+        this.proofRelayer,
+      );
+      results.push(result);
+    }
+
+    return { payloads, results };
   }
 
   async configureEthereumRuntime(gateway: TestMintingGateway, mode: RuntimeSetupMode) {
@@ -331,12 +362,12 @@ export class TestMintingGateway {
     recipientArgonAddress: Hex;
   }) {
     const permitDeadline = (await this.harness.publicClient.getBlock()).timestamp + 3600n;
-    const permitNonce = (await this.harness.publicClient.readContract({
+    const permitNonce = await this.harness.publicClient.readContract({
       address: this.argonTokenAddress,
       abi: argonTokenAbi,
       functionName: 'nonces',
       args: [args.account.address],
-    })) as bigint;
+    });
     const permitSignature = await signGatewayPermit({
       account: args.account,
       chainId: this.harness.chain.id,
@@ -347,6 +378,24 @@ export class TestMintingGateway {
       nonce: permitNonce,
       deadline: permitDeadline,
     });
+    const data = encodeFunctionData({
+      abi: mintingGatewayAbi,
+      functionName: 'startTransferToArgon',
+      args: [
+        this.argonTokenAddress,
+        args.amountRuntimeUnits,
+        args.recipientArgonAddress,
+        permitDeadline,
+        permitSignature.v,
+        permitSignature.r,
+        permitSignature.s,
+      ],
+    });
+    const estimatedGas = await this.harness.publicClient.estimateGas({
+      account: args.account,
+      to: this.gatewayAddress,
+      data,
+    });
     const transactionHash = await createWalletClient({
       account: args.account,
       chain: this.harness.chain,
@@ -355,30 +404,25 @@ export class TestMintingGateway {
       account: args.account,
       chain: this.harness.chain,
       to: this.gatewayAddress,
-      data: encodeFunctionData({
-        abi: mintingGatewayAbi,
-        functionName: 'startTransferToArgon',
-        args: [
-          this.argonTokenAddress,
-          args.amountRuntimeUnits,
-          args.recipientArgonAddress,
-          permitDeadline,
-          permitSignature.v,
-          permitSignature.r,
-          permitSignature.s,
-        ],
-      }),
+      data,
+      // Estimation may append to this block's locator; mining in a new block creates storage slots.
+      gas: estimatedGas * 2n,
     });
 
-    return waitForExecutionReceipt(this.harness.ethereum, transactionHash);
+    const receipt = await waitForExecutionReceipt(this.harness.ethereum, transactionHash);
+    if (receipt.status !== 'success') {
+      throw new Error(`Transfer to Argon reverted: ${transactionHash}`);
+    }
+    return receipt;
   }
 
   async forceUpdateActiveCouncil(
     replacementCouncil: { signers: Hex[]; weights: bigint[] },
     nextMicrogonsPerArgonot: bigint,
   ) {
-    return this.harness.publicClient.waitForTransactionReceipt({
-      hash: await this.harness.walletClient.writeContract({
+    return waitForExecutionReceipt(
+      this.harness.ethereum,
+      await this.harness.walletClient.writeContract({
         account: this.harness.deployer,
         chain: this.harness.chain,
         address: this.gatewayAddress,
@@ -386,15 +430,16 @@ export class TestMintingGateway {
         functionName: 'forceUpdateActiveCouncil',
         args: [replacementCouncil, nextMicrogonsPerArgonot],
       }),
-    });
+    );
   }
 
   async relayReadyApprovals(
     batch: Awaited<ReturnType<typeof getReadyEthereumGatewayUpdates>>,
     operatorAddress: string,
   ) {
-    return this.harness.publicClient.waitForTransactionReceipt({
-      hash: await this.harness.walletClient.writeContract({
+    return waitForExecutionReceipt(
+      this.harness.ethereum,
+      await this.harness.walletClient.writeContract({
         account: this.harness.deployer,
         chain: this.harness.chain,
         address: this.gatewayAddress,
@@ -406,23 +451,23 @@ export class TestMintingGateway {
           toHex(decodeAddress(operatorAddress), { size: 32 }),
         ],
       }),
-    });
+    );
   }
 
   async argonApprovalsNonce(): Promise<bigint> {
-    return (await this.harness.publicClient.readContract({
+    return this.harness.publicClient.readContract({
       address: this.gatewayAddress,
       abi: mintingGatewayAbi,
       functionName: 'argonApprovalsNonce',
-    })) as bigint;
+    });
   }
 
-  async globalIssuanceCouncil(): Promise<[Hex[], bigint[], Hex]> {
-    return (await this.harness.publicClient.readContract({
+  async globalIssuanceCouncil() {
+    return this.harness.publicClient.readContract({
       address: this.gatewayAddress,
       abi: mintingGatewayAbi,
       functionName: 'globalIssuanceCouncil',
-    })) as [Hex[], bigint[], Hex];
+    });
   }
 
   async authorityCollateral(signingKey: Hex): Promise<[bigint, bigint]> {
@@ -449,8 +494,9 @@ export class TestMintingGateway {
     collateralizationSignature: Hex;
     micronotCollateral: bigint;
   }) {
-    return this.harness.publicClient.waitForTransactionReceipt({
-      hash: await this.harness.walletClient.writeContract({
+    return waitForExecutionReceipt(
+      this.harness.ethereum,
+      await this.harness.walletClient.writeContract({
         account: this.harness.deployer,
         chain: this.harness.chain,
         address: this.gatewayAddress,
@@ -469,38 +515,39 @@ export class TestMintingGateway {
           },
         ],
       }),
-    });
+    );
   }
 
   async isFinalizedTransferOut(
     transferRequest: Parameters<typeof EvmContracts.hashMintingGatewayTransferOutOfArgonRequest>[0],
   ): Promise<boolean> {
-    return (await this.harness.publicClient.readContract({
+    return this.harness.publicClient.readContract({
       address: this.gatewayAddress,
       abi: mintingGatewayAbi,
       functionName: 'finalizedTransferOutOfArgonIds',
       args: [EvmContracts.hashMintingGatewayTransferOutOfArgonRequest(transferRequest)],
-    })) as boolean;
+    });
   }
 
   async argonBalance(address: Hex): Promise<bigint> {
-    return (await this.harness.publicClient.readContract({
+    return this.harness.publicClient.readContract({
       address: this.argonTokenAddress,
       abi: argonTokenAbi,
       functionName: 'balanceOf',
       args: [address],
-    })) as bigint;
+    });
   }
 
   async fundExecutionAccount(address: Hex, value: bigint) {
-    return this.harness.publicClient.waitForTransactionReceipt({
-      hash: await this.harness.walletClient.sendTransaction({
+    return waitForExecutionReceipt(
+      this.harness.ethereum,
+      await this.harness.walletClient.sendTransaction({
         account: this.harness.deployer,
         chain: this.harness.chain,
         to: address,
         value,
       }),
-    });
+    );
   }
 }
 

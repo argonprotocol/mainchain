@@ -183,6 +183,10 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       ethereumBurnAccount: AccountId32 & AugmentedConst<ApiType>;
       /**
+       * Maximum activities in one complete gateway locator storage proof.
+       **/
+      maxActivitiesPerGatewayProof: u32 & AugmentedConst<ApiType>;
+      /**
        * Maximum number of ordered gateway activities that may share one receipt proof.
        **/
       maxActivitiesPerReceiptProof: u32 & AugmentedConst<ApiType>;
@@ -190,6 +194,10 @@ declare module '@polkadot/api-base/types/consts' {
        * Maximum number of members the active Global Issuance Council may carry.
        **/
       maxCouncilMembers: u32 & AugmentedConst<ApiType>;
+      /**
+       * Maximum aggregate event data carried by one storage-proof locator.
+       **/
+      maxGatewayActivityLogDataBytes: u32 & AugmentedConst<ApiType>;
       /**
        * Maximum number of non-terminal transfer-out requests tracked for one destination chain.
        **/

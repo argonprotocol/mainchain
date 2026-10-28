@@ -1070,6 +1070,29 @@ mod benchmarks {
 			.map_err(|_| BenchmarkError::Stop("failed to set committed argonots"))?;
 		<Pallet<T> as BitcoinVaultProvider>::encumber_argonots(&caller, amount)
 			.map_err(|_| BenchmarkError::Stop("failed to encumber argonots"))?;
+		seed_release_schedule_for_benchmark::<T>(
+			vault_id,
+			144,
+			MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES,
+			1u32.into(),
+			MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES.into(),
+			100_000u32.into(),
+		)?;
+		ArgonotSecuritizationByVaultId::<T>::mutate(vault_id, |commitment| {
+			commitment.as_mut().expect("committed argonots exist").committed_micronots = amount;
+		});
+		VaultsById::<T>::mutate(vault_id, |vault| {
+			// Cancel withdrawals across a full schedule while retaining the other commitments,
+			// so the measured write still encodes every schedule entry.
+			for (_, entry) in vault
+				.as_mut()
+				.expect("benchmark vault exists")
+				.securitization_release_schedule
+				.iter_mut()
+			{
+				entry.argonot_withdrawals = 1u32.into();
+			}
+		});
 
 		#[block]
 		{
@@ -1090,6 +1113,15 @@ mod benchmarks {
 			OwnershipCurrencyOf::<T>::balance_on_hold(&HoldReason::EnterVault.into(), &caller),
 			BalanceOf::<T>::zero(),
 		);
+		let vault = VaultsById::<T>::get(vault_id).expect("benchmark vault exists");
+		assert_eq!(
+			vault.securitization_release_schedule.len(),
+			MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES as usize
+		);
+		assert!(vault
+			.securitization_release_schedule
+			.values()
+			.all(|entry| entry.argonot_withdrawals.is_zero()));
 		Ok(())
 	}
 

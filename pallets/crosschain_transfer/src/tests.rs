@@ -4,7 +4,6 @@ pub(super) use alloy_sol_types::SolEvent;
 pub(super) use argon_ethereum_contracts::minting_gateway as ethereum_contracts;
 pub(super) use argon_primitives::{
 	Balance, CallTxPoolKeyProvider, CallTxValidityProvider, CollectBlockerProvider, EthereumLog,
-	EthereumReceiptLog,
 };
 pub(super) use frame_support::{
 	assert_noop, assert_ok,
@@ -19,6 +18,93 @@ pub(super) use sp_core::{bounded_vec, ecdsa::KeccakPair, Pair};
 pub(super) use sp_runtime::transaction_validity::{InvalidTransaction, TransactionValidityError};
 
 pub(super) use super::mock::*;
+
+#[test]
+#[should_panic(expected = "runtime activity capacity is below the gateway contract cap")]
+fn integrity_rejects_activity_capacity_below_the_contract_cap() {
+	use frame_support::traits::Hooks;
+
+	MaxActivitiesPerGatewayProof::set(ethereum_contracts::MAX_GATEWAY_ACTIVITIES_PER_BLOCK - 1);
+	CrosschainTransfer::integrity_test();
+}
+
+#[test]
+fn gateway_storage_logs_enforce_the_runtime_activity_limit_on_decode() {
+	let maximum = MaxActivitiesPerGatewayProof::get() as usize;
+	let log = EthereumLog {
+		address: h160(0x21),
+		topics: BoundedVec::default(),
+		data: vec![0; argon_primitives::MAX_ETHEREUM_LOG_DATA_BYTES as usize]
+			.try_into()
+			.unwrap(),
+	};
+	let mut logs = vec![log.clone(); maximum];
+	assert!(GatewayActivityLogs::<MaxActivitiesPerGatewayProof>::decode(
+		&mut logs.encode().as_slice()
+	)
+	.is_ok());
+	logs.push(log);
+	assert!(GatewayActivityLogs::<MaxActivitiesPerGatewayProof>::decode(
+		&mut logs.encode().as_slice()
+	)
+	.is_err());
+}
+
+#[test]
+fn full_25_authority_finalization_fits_the_ethereum_log_bound() {
+	let state = ethereum_contracts::GatewayActivityState {
+		gatewayActivityNonce: 1,
+		argonApprovalsNonce: 0,
+		argonCirculation: 0,
+		argonotCirculation: 0,
+	};
+	let finalized = ethereum_contracts::TransferOutOfArgonFinalized {
+		transferId: alloy_primitives::B256::ZERO,
+		token: AlloyAddress::from_slice(h160(0x31).as_bytes()),
+		amount: 1,
+		mintingCollateral: (0..25)
+			.map(|index| ethereum_contracts::MintingAuthorityCollateral {
+				signingKey: AlloyAddress::repeat_byte(index + 1),
+				microgonCollateral: u128::from(index) + 1,
+				micronotCollateral: u128::from(index) + 2,
+			})
+			.collect(),
+		gatewayState: state,
+	};
+	let data = finalized.encode_data();
+	assert_eq!(data.len(), 2_688);
+	let log = EthereumLog {
+		address: h160(0x21),
+		topics: vec![H256::from(ethereum_contracts::TransferOutOfArgonFinalized::SIGNATURE_HASH.0)]
+			.try_into()
+			.unwrap(),
+		data: data
+			.try_into()
+			.map_err(|data: Vec<u8>| data.len())
+			.expect("all 25 authorities must fit in a gateway activity"),
+	};
+	assert_eq!(log.data.len(), 2_688);
+	new_test_ext().execute_with(|| {
+		ChainConfigBySourceChain::<Test>::insert(SourceChain::Ethereum, chain_config());
+		let decoded = CrosschainTransfer::decode_evm_gateway_activity(&chain_config(), &log)
+			.expect("the full event must decode, not just fit the wire bound");
+		let crate::gateway_activity::DecodedGatewayActivity::TransferOutOfArgonFinalized {
+			minting_authority_collateral,
+			..
+		} = decoded
+		else {
+			panic!("expected finalization");
+		};
+		assert_eq!(minting_authority_collateral.len(), 25);
+		for (decoded, expected) in
+			minting_authority_collateral.iter().zip(&finalized.mintingCollateral)
+		{
+			assert_eq!(decoded.signing_key.as_bytes(), expected.signingKey.as_slice());
+			assert_eq!(decoded.microgon_collateral, expected.microgonCollateral);
+			assert_eq!(decoded.micronot_collateral, expected.micronotCollateral);
+		}
+	});
+}
 
 #[test]
 fn force_set_global_issuance_council_replaces_active_members() {
@@ -521,14 +607,9 @@ pub(super) fn activate_test_minting_authority(
 				.expect("minting-authority activation data stays within bounded log payload")
 		},
 	};
-	let receipt_log = EthereumReceiptLog { transaction_index: 0, event_log };
-	let decoded_activity = match CrosschainTransfer::decode_evm_gateway_activity(
-		SourceChain::Ethereum,
-		&receipt_log.event_log,
-	) {
-		Ok(decoded_activity) => decoded_activity,
-		Err(_) => panic!("activation proof should succeed"),
-	};
+	let decoded_activity =
+		CrosschainTransfer::decode_evm_gateway_activity(&chain_config(), &event_log)
+			.expect("activation log should decode");
 	let gateway_state = match CrosschainTransfer::apply_decoded_gateway_activity(
 		SourceChain::Ethereum,
 		previous_gateway_activity_nonce,

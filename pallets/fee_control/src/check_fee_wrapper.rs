@@ -162,36 +162,6 @@ where
 		}
 	}
 
-	fn collect_pool_keys(call: &RuntimeCallOf<T>, signer: Option<T::AccountId>) -> Vec<Vec<u8>> {
-		let (call, signer) = Self::validated_pool_key_context(call, signer);
-
-		if let Some(utility_call) =
-			<RuntimeCallOf<T> as IsSubType<pallet_utility::Call<T>>>::is_sub_type(call)
-		{
-			let calls = match utility_call {
-				pallet_utility::Call::batch { calls } |
-				pallet_utility::Call::batch_all { calls } |
-				pallet_utility::Call::force_batch { calls } => Some(calls),
-				_ => None,
-			};
-
-			if let Some(calls) = calls {
-				let mut keys = Vec::new();
-				for inner_call in calls.iter() {
-					for key in Self::collect_pool_keys(inner_call, signer.clone()) {
-						Self::insert_pool_key(&mut keys, key);
-					}
-				}
-				if !keys.is_empty() {
-					keys.push(T::Hashing::hash_of(&(b"batch", &keys)).as_ref().to_vec());
-				}
-				return keys;
-			}
-		}
-
-		T::CallTxPoolKeyProviders::key_for(call, signer.as_ref()).into_iter().collect()
-	}
-
 	fn validate_freshness(
 		call: &RuntimeCallOf<T>,
 		signer: Option<T::AccountId>,
@@ -299,15 +269,19 @@ where
 		let refund_weight = CallFeeRefundWeightsOf::<T>::refund_fee_on_success(effective_call);
 
 		<T as Config>::WeightInfo::regular()
-			.saturating_add(Self::call_weight(call).0)
+			.saturating_add(Self::call_weight(call))
+			.saturating_add(CallTxPoolKeyWeightsOf::<T>::key_for(effective_call))
+			// At most two tags: general plus feeless/sponsor. This benchmark measures
+			// two insertions, each into a list already containing one tag.
+			.saturating_add(<T as Config>::WeightInfo::pool_key_insertion(1))
 			.saturating_add(T::FeelessCallWeights::is_feeless(call))
 			.saturating_add(refund_weight)
 			// The origin is not available to `weight`, so reserve the post-dispatch event path.
 			.saturating_add(<T as Config>::WeightInfo::post_event())
 	}
 
-	/// Compose wrapper and provider work, returning an upper bound on the pool keys collected.
-	fn call_weight(call: &RuntimeCallOf<T>) -> (Weight, u32) {
+	/// Compose recursive proxy authorization and the two freshness checks.
+	fn call_weight(call: &RuntimeCallOf<T>) -> Weight {
 		// The outer extension charges regular() once; recursive costs must remain additive.
 		if let Some(
 			proxy_call @ (pallet_proxy::Call::proxy { call: inner_call, .. } |
@@ -334,8 +308,7 @@ where
 			} else {
 				filter_weight
 			};
-			let (inner_weight, keys) = Self::call_weight(inner_call);
-			return (weight.saturating_add(inner_weight), keys);
+			return weight.saturating_add(Self::call_weight(inner_call));
 		}
 
 		if let Some(
@@ -345,30 +318,13 @@ where
 		) = <RuntimeCallOf<T> as IsSubType<pallet_utility::Call<T>>>::is_sub_type(call)
 		{
 			let mut weight = <T as Config>::WeightInfo::batch(calls.len() as u32);
-			let mut keys = 0u32;
 			for call in calls {
-				let (inner_weight, inner_keys) = Self::call_weight(call);
-				weight = weight.saturating_add(inner_weight);
-				keys = keys.saturating_add(inner_keys);
+				weight = weight.saturating_add(Self::call_weight(call));
 			}
-			if keys == 0 {
-				return (weight, 0);
-			}
-
-			// Key-producing leaves and nonempty nested key lists can add pool keys.
-			// Charge every insertion at the full list length, covering the quadratic scans.
-			weight = weight
-				.saturating_add(
-					<T as Config>::WeightInfo::pool_key_insertion(keys).saturating_mul(keys.into()),
-				)
-				.saturating_add(<T as Config>::WeightInfo::batch_pool_key(keys));
-			return (weight, keys.saturating_add(1));
+			return weight;
 		}
 
-		let hash_weight = CallTxPoolKeyWeightsOf::<T>::key_for(call);
-		let validity_weight = CallTxValidityWeightsOf::<T>::validate(call);
-		let keys = u32::from(!hash_weight.is_zero());
-		(hash_weight.saturating_add(validity_weight.saturating_mul(2)), keys)
+		CallTxValidityWeightsOf::<T>::validate(call).saturating_mul(2)
 	}
 }
 
@@ -434,7 +390,9 @@ where
 		let inner_call = unwrapped_proxy_call.unwrap_or(call);
 		let signer = origin.as_signer().cloned();
 		Self::validate_freshness(call, signer.clone())?;
-		let general_pool_keys = Self::collect_pool_keys(call, signer);
+		// A batch can skip or roll back its children; it must not reserve their standalone tags.
+		let (pool_call, pool_signer) = Self::validated_pool_key_context(call, signer);
+		let general_pool_key = T::CallTxPoolKeyProviders::key_for(pool_call, pool_signer.as_ref());
 		if call.is_feeless(&origin) {
 			let synthetic_fee =
 				pallet_transaction_payment::Pallet::<T>::compute_fee(len as u32, info, Zero::zero());
@@ -448,7 +406,7 @@ where
 				..Default::default()
 			};
 
-			for key in general_pool_keys.iter().cloned() {
+			if let Some(key) = general_pool_key {
 				Self::insert_pool_key(&mut validity.provides, key);
 			}
 			if let Some(key) = T::FeelessCallTxPoolKeyProviders::key_for(call) {
@@ -506,7 +464,7 @@ where
 				}
 			}
 
-			for key in general_pool_keys {
+			if let Some(key) = general_pool_key {
 				Self::insert_pool_key(&mut validity.provides, key);
 			}
 			if let Some(key) = tx_sponsor.as_ref().and_then(|sponsor| sponsor.unique_tx_key.clone())

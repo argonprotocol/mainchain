@@ -10,9 +10,9 @@ use argon_primitives::{
 		RegistrationVaultData, ReserveSecuritizationRequest, VaultArgonotSecuritization,
 		VaultError,
 	},
-	EthereumBlockNumber, EthereumReceiptLog, EthereumReceiptLogProofBatch, EthereumVerifyError,
-	EthereumVerifyProvider, OperationalAccountsHook, PriceProvider, TickProvider,
-	TreasuryPoolProvider, VaultId, VotingSchedule,
+	EthereumAccountStorageProof, EthereumBlockNumber, EthereumReceiptLogProofBatch,
+	EthereumVerifyError, EthereumVerifyProvider, OperationalAccountsHook, PriceProvider,
+	TickProvider, TreasuryPoolProvider, VaultId, VotingSchedule,
 };
 use frame_support::traits::StorageMapShim;
 use pallet_prelude::*;
@@ -51,8 +51,9 @@ parameter_types! {
 	pub const CrosschainTransferPalletId: PalletId = PalletId(*b"xchaintr");
 	pub CrosschainTransferEthereumBurnAccount: TestAccountId = CrosschainTransferPalletId::get()
 		.into_sub_account_truncating((pallet_crosschain_transfer::SourceChain::Ethereum, *b"burn"));
+	pub static MaxActivitiesPerGatewayProof: u32 = 128;
 	pub const MaxActivitiesPerReceiptProof: u32 = 16;
-	pub const MaxReceiptProofsPerExtrinsic: u32 = 10;
+	pub const MaxReceiptProofsPerExtrinsic: u32 = 6;
 	pub const MaxCouncilMembers: u32 = 100;
 	pub const MaxQueueApprovalsPerCall: u32 = 32;
 	pub const TransferOutValidityEthereumBlocks: EthereumBlockNumber = 72_000;
@@ -179,8 +180,30 @@ impl EthereumVerifyProvider for MockEthereumVerifier {
 		MaxProofBlocks: Get<u32>,
 		MaxReceiptLogs: Get<u32>,
 	{
-		for proof_block in &proof_batch.blocks {
-			Self::verify_receipt_logs_internal(&proof_block.receipt_logs)?;
+		if !ProofVerificationAllowed::get() {
+			return Err(EthereumVerifyError::InvalidProof);
+		}
+		let rejected_indexes = ProofVerificationRejectedTransactionIndexes::get();
+		if proof_batch
+			.blocks
+			.iter()
+			.flat_map(|block| &block.receipt_logs)
+			.any(|log| rejected_indexes.contains(&log.transaction_index))
+		{
+			return Err(EthereumVerifyError::InvalidProof);
+		}
+		Ok(())
+	}
+
+	fn verify_account_storage_proof<MaxStorageSlots>(
+		_account_address: H160,
+		_proof: &EthereumAccountStorageProof<MaxStorageSlots>,
+	) -> Result<(), EthereumVerifyError>
+	where
+		MaxStorageSlots: Get<u32>,
+	{
+		if !ProofVerificationAllowed::get() {
+			return Err(EthereumVerifyError::InvalidProof);
 		}
 
 		Ok(())
@@ -221,26 +244,6 @@ impl TickProvider<Block> for MockTickProvider {
 
 	fn blocks_at_tick(_tick: Tick) -> Vec<<Block as sp_runtime::traits::Block>::Hash> {
 		Vec::new()
-	}
-}
-
-impl MockEthereumVerifier {
-	fn verify_receipt_logs_internal(
-		receipt_logs: &[EthereumReceiptLog],
-	) -> Result<(), EthereumVerifyError> {
-		if !ProofVerificationAllowed::get() {
-			return Err(EthereumVerifyError::InvalidProof);
-		}
-
-		let rejected_indexes = ProofVerificationRejectedTransactionIndexes::get();
-		if receipt_logs
-			.iter()
-			.any(|receipt_log| rejected_indexes.contains(&receipt_log.transaction_index))
-		{
-			return Err(EthereumVerifyError::InvalidProof);
-		}
-
-		Ok(())
 	}
 }
 
@@ -563,6 +566,8 @@ impl pallet_crosschain_transfer::Config for Test {
 	type CurrentFrameId = CurrentFrameId;
 	type CurrentTick = CurrentTick;
 	type TickProvider = MockTickProvider;
+	type MaxActivitiesPerGatewayProof = MaxActivitiesPerGatewayProof;
+	type GatewayProofExtrinsicOverheadBytes = ConstU32<512>;
 	type MaxActivitiesPerReceiptProof = MaxActivitiesPerReceiptProof;
 	type MaxReceiptProofsPerExtrinsic = MaxReceiptProofsPerExtrinsic;
 	type MaxCouncilMembers = MaxCouncilMembers;

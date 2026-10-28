@@ -1062,6 +1062,14 @@ export const mintingGatewayAbi = [
       { name: 'maxAllowed', internalType: 'uint256', type: 'uint256' },
       { name: 'provided', internalType: 'uint256', type: 'uint256' },
     ],
+    name: 'TooManyGatewayActivitiesInBlock',
+  },
+  {
+    type: 'error',
+    inputs: [
+      { name: 'maxAllowed', internalType: 'uint256', type: 'uint256' },
+      { name: 'provided', internalType: 'uint256', type: 'uint256' },
+    ],
     name: 'TooManyGatewayUpdates',
   },
   {
@@ -1323,6 +1331,13 @@ export const mintingGatewayAbi = [
     inputs: [],
     name: 'ACTIVITY_HASH_VERSION',
     outputs: [{ name: '', internalType: 'uint8', type: 'uint8' }],
+    stateMutability: 'view',
+  },
+  {
+    type: 'function',
+    inputs: [],
+    name: 'MAX_GATEWAY_ACTIVITIES_PER_BLOCK',
+    outputs: [{ name: '', internalType: 'uint256', type: 'uint256' }],
     stateMutability: 'view',
   },
   {

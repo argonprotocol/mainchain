@@ -776,6 +776,8 @@ impl pallet_crosschain_transfer::Config for Runtime {
 		use_unless_benchmark!(GetCurrentFrameId, benchmarking::BenchmarkCurrentFrameId);
 	type CurrentTick = Ticks;
 	type TickProvider = use_unless_benchmark!(Ticks, benchmarking::BenchmarkTickProvider);
+	type MaxActivitiesPerGatewayProof = MaxActivitiesPerGatewayProof;
+	type GatewayProofExtrinsicOverheadBytes = GatewayProofExtrinsicOverheadBytes;
 	type MaxActivitiesPerReceiptProof = MaxActivitiesPerReceiptProof;
 	type MaxReceiptProofsPerExtrinsic = MaxReceiptProofsPerExtrinsic;
 	type MaxCouncilMembers = MaxCouncilMembers;

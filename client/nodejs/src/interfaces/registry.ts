@@ -37,6 +37,7 @@ import type {
   ArgonPrimitivesDomainSemver,
   ArgonPrimitivesDomainVersionHost,
   ArgonPrimitivesDomainZoneRecord,
+  ArgonPrimitivesEthereumEthereumAccountStorageProof,
   ArgonPrimitivesEthereumEthereumBeaconPreset,
   ArgonPrimitivesEthereumEthereumCombinedReceiptProof,
   ArgonPrimitivesEthereumEthereumExecutionBlockProof,
@@ -46,6 +47,7 @@ import type {
   ArgonPrimitivesEthereumEthereumReceiptLogProofBatch,
   ArgonPrimitivesEthereumEthereumReceiptLogProofBlock,
   ArgonPrimitivesEthereumEthereumReceiptProofReceipt,
+  ArgonPrimitivesEthereumEthereumStorageSlotProof,
   ArgonPrimitivesForkPower,
   ArgonPrimitivesInherentsBitcoinUtxoFunding,
   ArgonPrimitivesInherentsBitcoinUtxoSpendV2,
@@ -169,6 +171,7 @@ import type {
   PalletCrosschainTransferCouncilApprovalTargetId,
   PalletCrosschainTransferError,
   PalletCrosschainTransferEvent,
+  PalletCrosschainTransferGatewayActivityStorageProof,
   PalletCrosschainTransferGatewayState,
   PalletCrosschainTransferGatewaySyncPause,
   PalletCrosschainTransferGatewaySyncPauseReason,
@@ -369,6 +372,7 @@ declare module '@polkadot/types/types/registry' {
     ArgonPrimitivesDomainSemver: ArgonPrimitivesDomainSemver;
     ArgonPrimitivesDomainVersionHost: ArgonPrimitivesDomainVersionHost;
     ArgonPrimitivesDomainZoneRecord: ArgonPrimitivesDomainZoneRecord;
+    ArgonPrimitivesEthereumEthereumAccountStorageProof: ArgonPrimitivesEthereumEthereumAccountStorageProof;
     ArgonPrimitivesEthereumEthereumBeaconPreset: ArgonPrimitivesEthereumEthereumBeaconPreset;
     ArgonPrimitivesEthereumEthereumCombinedReceiptProof: ArgonPrimitivesEthereumEthereumCombinedReceiptProof;
     ArgonPrimitivesEthereumEthereumExecutionBlockProof: ArgonPrimitivesEthereumEthereumExecutionBlockProof;
@@ -378,6 +382,7 @@ declare module '@polkadot/types/types/registry' {
     ArgonPrimitivesEthereumEthereumReceiptLogProofBatch: ArgonPrimitivesEthereumEthereumReceiptLogProofBatch;
     ArgonPrimitivesEthereumEthereumReceiptLogProofBlock: ArgonPrimitivesEthereumEthereumReceiptLogProofBlock;
     ArgonPrimitivesEthereumEthereumReceiptProofReceipt: ArgonPrimitivesEthereumEthereumReceiptProofReceipt;
+    ArgonPrimitivesEthereumEthereumStorageSlotProof: ArgonPrimitivesEthereumEthereumStorageSlotProof;
     ArgonPrimitivesForkPower: ArgonPrimitivesForkPower;
     ArgonPrimitivesInherentsBitcoinUtxoFunding: ArgonPrimitivesInherentsBitcoinUtxoFunding;
     ArgonPrimitivesInherentsBitcoinUtxoSpendV2: ArgonPrimitivesInherentsBitcoinUtxoSpendV2;
@@ -501,6 +506,7 @@ declare module '@polkadot/types/types/registry' {
     PalletCrosschainTransferCouncilApprovalTargetId: PalletCrosschainTransferCouncilApprovalTargetId;
     PalletCrosschainTransferError: PalletCrosschainTransferError;
     PalletCrosschainTransferEvent: PalletCrosschainTransferEvent;
+    PalletCrosschainTransferGatewayActivityStorageProof: PalletCrosschainTransferGatewayActivityStorageProof;
     PalletCrosschainTransferGatewayState: PalletCrosschainTransferGatewayState;
     PalletCrosschainTransferGatewaySyncPause: PalletCrosschainTransferGatewaySyncPause;
     PalletCrosschainTransferGatewaySyncPauseReason: PalletCrosschainTransferGatewaySyncPauseReason;

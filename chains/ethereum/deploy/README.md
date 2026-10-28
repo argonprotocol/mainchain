@@ -26,6 +26,12 @@ yarn workspace @argonprotocol/ethereum-deploy gas:measure
 `finalizeTransferOutOfArgon` request/proof shape, and prints the gas figures that
 `bootstrap:prepare-runtime-setup` uses for its pricing recommendation.
 
+The gateway-capacity report defaults to a 60M block gas budget. Use
+`gas:measure --json --block-gas-limit 60000000` to evaluate an explicit budget. Modeled throughput
+also respects the contract's per-block activity cap. The client capacity test checks that this
+on-chain cap fits the bundled runtime's activity and aggregate-data bounds even if every activity
+contains the maximum number of collateral rows; gas estimates are not the correctness bound.
+
 The contract source and tests remain in [`../contracts/`](../contracts/README.md).
 
 Layout:

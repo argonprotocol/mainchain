@@ -1,8 +1,11 @@
 import { writeFile } from 'node:fs/promises';
 import {
   buildGatewayExecutionHeaderBackfills,
+  discoverMissingGatewayActivityLocators,
   getClient,
+  getLatestArgonFinalizedExecutionHeader,
   type ArgonClient,
+  type MissingGatewayActivityLocator,
 } from '@argonprotocol/mainchain';
 import { getAddress, type Address } from 'viem';
 import { resolveRuntimeSetupDefaults } from './src/runtimeSetup.js';
@@ -57,11 +60,28 @@ async function main() {
   const client = await getClient(inputs.argonRpcUrl);
 
   try {
+    const argonFinalizedExecutionHeader = await getLatestArgonFinalizedExecutionHeader(client);
+    const currentGatewayState =
+      await client.query.crosschainTransfer.gatewayStateBySourceChain('Ethereum');
+    const minimumGatewayActivityNonce = currentGatewayState.isSome
+      ? currentGatewayState.unwrap().gatewayActivityNonce.toBigInt() + 1n
+      : 1n;
+    const discoveredLocators: MissingGatewayActivityLocator[] =
+      await discoverMissingGatewayActivityLocators({
+        finalizedExecutionBlockNumber: argonFinalizedExecutionHeader.blockNumber,
+        executionRpcUrl: inputs.executionRpcUrl,
+        gatewayAddress: inputs.gatewayAddress,
+        minimumGatewayActivityNonce,
+      });
+    const throughExecutionBlockNumber = inputs.throughExecutionBlockNumber;
+    const locators =
+      throughExecutionBlockNumber === undefined
+        ? discoveredLocators
+        : discoveredLocators.filter(locator => locator.blockNumber <= throughExecutionBlockNumber);
     const payloads = await buildGatewayExecutionHeaderBackfills(client, {
       beaconApiUrl: inputs.beaconApiUrl,
       executionRpcUrl: inputs.executionRpcUrl,
-      gatewayAddress: inputs.gatewayAddress,
-      throughExecutionBlockNumber: inputs.throughExecutionBlockNumber,
+      locators,
     });
 
     const calls: PreparedCalls = [];

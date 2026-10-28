@@ -10,6 +10,10 @@ import {
   transparentUpgradeableProxyArtifact as rawTransparentUpgradeableProxyArtifact,
 } from '@argonprotocol/ethereum-contracts';
 import {
+  mintingGatewayActivityHashingFixture,
+  type MintingGatewayActivityHashingFixture,
+} from '@argonprotocol/ethereum-contracts/fixtures';
+import {
   ArgonTokenEvents,
   ArgonotTokenEvents,
   CanonicalMintableBurnableERC20Events,
@@ -31,15 +35,23 @@ import {
   encodeMintingGatewayGlobalIssuanceCouncilRotateTarget,
   encodeMintingGatewayMintingAuthorityActivationTarget,
   encodeMintingGatewayMintingAuthorityDeactivateTarget,
+  appendMintingGatewayActivityRoot,
   hashMintingGatewayActivateMintingAuthority,
   hashMintingGatewayActivateMintingAuthorityApproval,
+  hashMintingGatewayActivityBlockLocator,
   hashMintingGatewayGatewayUpdateApproval,
+  hashMintingGatewayGlobalIssuanceCouncilRotatedActivity,
   hashMintingGatewayGlobalIssuanceCouncil,
+  hashMintingGatewayMintingAuthorityActivatedActivity,
+  hashMintingGatewayMintingAuthorityDeactivatedActivity,
   hashMintingGatewayMintingAuthority,
   hashMintingGatewayMintingAuthorization as rawHashMintingGatewayMintingAuthorization,
   hashMintingGatewayRotateGlobalIssuanceCouncil,
   hashMintingGatewayRotateGlobalIssuanceCouncilApproval,
+  hashMintingGatewayTransferOutOfArgonCanceledActivity,
+  hashMintingGatewayTransferOutOfArgonFinalizedActivity,
   hashMintingGatewayTransferOutOfArgonRequest as rawHashMintingGatewayTransferOutOfArgonRequest,
+  hashMintingGatewayTransferToArgonStartedActivity,
 } from '@argonprotocol/ethereum-contracts/hashing';
 
 export type * from '@argonprotocol/ethereum-contracts/generated';
@@ -88,9 +100,11 @@ export {
   MINTING_GATEWAY_RUNTIME_TO_ERC20_SCALE,
   MINTING_GATEWAY_TOKEN_DECIMALS,
   MINTING_GATEWAY_UPDATE_KINDS,
+  mintingGatewayActivityHashingFixture,
   MintingGatewayEvents,
   ProxyAdminEvents,
   TransparentUpgradeableProxyEvents,
+  appendMintingGatewayActivityRoot,
   argonTokenAbi,
   argonotTokenAbi,
   canonicalMintableBurnableErc20Abi,
@@ -100,13 +114,22 @@ export {
   encodeMintingGatewayMintingAuthorityDeactivateTarget,
   hashMintingGatewayActivateMintingAuthority,
   hashMintingGatewayActivateMintingAuthorityApproval,
+  hashMintingGatewayActivityBlockLocator,
   hashMintingGatewayGatewayUpdateApproval,
   hashMintingGatewayGlobalIssuanceCouncil,
+  hashMintingGatewayGlobalIssuanceCouncilRotatedActivity,
   hashMintingGatewayMintingAuthority,
+  hashMintingGatewayMintingAuthorityActivatedActivity,
+  hashMintingGatewayMintingAuthorityDeactivatedActivity,
   hashMintingGatewayRotateGlobalIssuanceCouncil,
   hashMintingGatewayRotateGlobalIssuanceCouncilApproval,
+  hashMintingGatewayTransferOutOfArgonCanceledActivity,
+  hashMintingGatewayTransferOutOfArgonFinalizedActivity,
+  hashMintingGatewayTransferToArgonStartedActivity,
   iCanonicalTokenAbi,
   mintingGatewayAbi,
   proxyAdminAbi,
   transparentUpgradeableProxyAbi,
 };
+
+export type { MintingGatewayActivityHashingFixture };
