@@ -3239,6 +3239,61 @@ fn auction_hard_cutoff_leaves_the_full_reveal_window() {
 }
 
 #[test]
+fn legacy_upgrade_accepts_bids_in_activation_block() {
+	use sp_runtime::traits::Dispatchable;
+	for frame in [1, 2] {
+		new_test_ext().execute_with(|| {
+			System::set_block_number(1);
+			NextFrameId::<Test>::put(frame);
+			NextCohortSize::<Test>::put(2);
+			IsNextSlotBiddingOpen::<Test>::put(true);
+			for account in [1, 2] {
+				set_argons(account, 10_000 * A);
+				set_ownership(account, 1000);
+			}
+			assert_ok!(MiningSlots::bid(
+				RuntimeOrigin::signed(1),
+				10 * A,
+				1.into(),
+				None,
+				Some(frame),
+				None
+			));
+			StorageVersion::new(11).put::<MiningSlots>();
+			MiningSlots::on_runtime_upgrade();
+			assert!(!MiningSlots::range_auction_enabled());
+			FrameRewardTicksRemaining::<Test>::put(1);
+			let deadline = SlotBiddingStartAfterTicks::get() + TicksBetweenSlots::get();
+			CurrentTick::set(deadline);
+			ElapsedTicks::set(deadline);
+			System::initialize(&2, &System::parent_hash(), &Digest::default());
+			MiningSlots::on_initialize(2);
+			assert_eq!(crate::NewlyStartedFrameId::<Test>::get(), Some(frame));
+			let bid = RuntimeCall::MiningSlots(crate::Call::bid {
+				bid: 20 * A,
+				keys: 2.into(),
+				mining_account_id: None,
+				target_frame_id: Some(frame),
+				max_hash: None,
+			});
+			assert_ok!(bid.dispatch(RuntimeOrigin::signed(2)));
+			assert!(IsNextSlotBiddingOpen::<Test>::get());
+			assert!(!crate::AuctionAdmissionClosed::<Test>::get());
+			MiningSlots::on_finalize(2);
+			assert_eq!(NextFrameId::<Test>::get(), frame + 1);
+			assert_eq!(
+				MinersByCohort::<Test>::get(frame)
+					.iter()
+					.map(|miner| (miner.account_id, miner.bid))
+					.collect::<Vec<_>>(),
+				vec![(2, 20 * A), (1, 10 * A)]
+			);
+			assert!(MiningSlots::range_auction_enabled());
+		});
+	}
+}
+
+#[test]
 fn auction_upgrade_finishes_the_deployed_auction_before_enabling_ranges() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);

@@ -837,6 +837,9 @@ impl<T: Config> Pallet<T> {
 	}
 
 	fn auction_ready_to_activate() -> bool {
+		if !Self::range_auction_enabled() {
+			return true;
+		}
 		Self::close_auction_admission();
 		LastBidBlock::<T>::get().is_none_or(|block| {
 			frame_system::Pallet::<T>::block_number() >

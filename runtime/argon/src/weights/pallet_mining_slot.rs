@@ -154,14 +154,14 @@ impl<T: frame_system::Config> pallet_mining_slot::WeightInfo for WeightInfo<T> {
 	/// Proof: `MiningSlot::FrameRewardTicksRemaining` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
 	/// Storage: `MiningSlot::ActiveMinersCount` (r:1 w:0)
 	/// Proof: `MiningSlot::ActiveMinersCount` (`max_values`: Some(1), `max_size`: Some(2), added: 497, mode: `MaxEncodedLen`)
+	/// Storage: `MiningSlot::AuctionRulesStartAt` (r:1 w:0)
+	/// Proof: `MiningSlot::AuctionRulesStartAt` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
 	/// Storage: `MiningSlot::IsNextSlotBiddingOpen` (r:1 w:1)
 	/// Proof: `MiningSlot::IsNextSlotBiddingOpen` (`max_values`: Some(1), `max_size`: Some(1), added: 496, mode: `MaxEncodedLen`)
 	/// Storage: `MiningSlot::LastBidBlock` (r:1 w:0)
 	/// Proof: `MiningSlot::LastBidBlock` (`max_values`: Some(1), `max_size`: Some(4), added: 499, mode: `MaxEncodedLen`)
 	/// Storage: `MiningSlot::HasAddedGrandpaRotation` (r:1 w:0)
 	/// Proof: `MiningSlot::HasAddedGrandpaRotation` (`max_values`: Some(1), `max_size`: Some(1), added: 496, mode: `MaxEncodedLen`)
-	/// Storage: `MiningSlot::AuctionRulesStartAt` (r:1 w:0)
-	/// Proof: `MiningSlot::AuctionRulesStartAt` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
 	/// Storage: `MiningSlot::AuctionAdmissionClosed` (r:0 w:1)
 	/// Proof: `MiningSlot::AuctionAdmissionClosed` (`max_values`: Some(1), `max_size`: Some(1), added: 496, mode: `MaxEncodedLen`)
 	/// Storage: `MiningSlot::MiningConfig` (r:1 w:0)
@@ -170,7 +170,7 @@ impl<T: frame_system::Config> pallet_mining_slot::WeightInfo for WeightInfo<T> {
 	fn auction_bookkeeping(_f: u32, ) -> Weight {
 		// Maximum observed costs across the supported benchmark range.
 		// Proof bounds include simultaneous prefixes and distinct read/write keys.
-		Weight::from_parts(664_000_000, 55_491)
+		Weight::from_parts(651_000_000, 55_491)
 			.saturating_add(T::DbWeight::get().reads(13))
 			.saturating_add(T::DbWeight::get().writes(4))
 		}
