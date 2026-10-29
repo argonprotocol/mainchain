@@ -19,7 +19,6 @@ import { result as metadataBytes } from '../metadata.json';
 import { specVersion } from '../runtime_version.json';
 import Genesis from '../genesis.json';
 import { HexString } from '@polkadot/util/types';
-import { withMiningBidDefaults, type MiningBidClient } from './miningBid';
 
 export type { SubmittableExtrinsic } from '@polkadot/api/promise/types';
 export { ApiDecoration };
@@ -155,9 +154,9 @@ export async function waitForLoad(): Promise<void> {
  * Get a client for the given host
  * @param host The host to connect to
  * @param options Additional options for the API
- * @returns The client, with omitted mining bid frame and commitment arguments defaulted to null.
+ * @returns The client.
  */
-export async function getClient(host: string, options?: ApiOptions): Promise<MiningBidClient> {
+export async function getClient(host: string, options?: ApiOptions): Promise<ArgonClient> {
   options ??= {};
   const provider: ProviderInterface =
     options.provider ?? (host.startsWith('http') ? new HttpProvider(host) : new WsProvider(host));
@@ -166,7 +165,7 @@ export async function getClient(host: string, options?: ApiOptions): Promise<Min
   for (const genesisHash of Object.values(Genesis)) {
     options.metadata[`${genesisHash}-${specVersion}`] = metadataBytes as HexString;
   }
-  return withMiningBidDefaults(await ApiPromise.create({ provider, noInitWarn: true, ...options }));
+  return await ApiPromise.create({ provider, noInitWarn: true, ...options });
 }
 
 const registry = new TypeRegistry();
