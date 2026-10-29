@@ -271,6 +271,15 @@ import type {
   PalletProxyError,
   PalletProxyEvent,
   PalletProxyProxyDefinition,
+  PalletStabilizationPoolsCall,
+  PalletStabilizationPoolsCheckpointOutcome,
+  PalletStabilizationPoolsError,
+  PalletStabilizationPoolsEvent,
+  PalletStabilizationPoolsPoolConfig,
+  PalletStabilizationPoolsPoolKey,
+  PalletStabilizationPoolsPositionCheckpoint,
+  PalletStabilizationPoolsPositionProof,
+  PalletStabilizationPoolsProofBlock,
   PalletSudoCall,
   PalletSudoError,
   PalletSudoEvent,
@@ -607,6 +616,15 @@ declare module '@polkadot/types/types/registry' {
     PalletProxyError: PalletProxyError;
     PalletProxyEvent: PalletProxyEvent;
     PalletProxyProxyDefinition: PalletProxyProxyDefinition;
+    PalletStabilizationPoolsCall: PalletStabilizationPoolsCall;
+    PalletStabilizationPoolsCheckpointOutcome: PalletStabilizationPoolsCheckpointOutcome;
+    PalletStabilizationPoolsError: PalletStabilizationPoolsError;
+    PalletStabilizationPoolsEvent: PalletStabilizationPoolsEvent;
+    PalletStabilizationPoolsPoolConfig: PalletStabilizationPoolsPoolConfig;
+    PalletStabilizationPoolsPoolKey: PalletStabilizationPoolsPoolKey;
+    PalletStabilizationPoolsPositionCheckpoint: PalletStabilizationPoolsPositionCheckpoint;
+    PalletStabilizationPoolsPositionProof: PalletStabilizationPoolsPositionProof;
+    PalletStabilizationPoolsProofBlock: PalletStabilizationPoolsProofBlock;
     PalletSudoCall: PalletSudoCall;
     PalletSudoError: PalletSudoError;
     PalletSudoEvent: PalletSudoEvent;

@@ -11,6 +11,7 @@ import type {
   Bytes,
   Null,
   Option,
+  U256,
   U8aFixed,
   Vec,
   bool,
@@ -111,6 +112,8 @@ import type {
   PalletPriceIndexPriceIndex,
   PalletProxyAnnouncement,
   PalletProxyProxyDefinition,
+  PalletStabilizationPoolsPoolConfig,
+  PalletStabilizationPoolsPositionCheckpoint,
   PalletTransactionPaymentReleases,
   PalletTreasuryBondLot,
   PalletTreasuryBondLotSummary,
@@ -1624,6 +1627,31 @@ declare module '@polkadot/api-base/types/storage' {
           arg: AccountId32 | string | Uint8Array,
         ) => Observable<ITuple<[Vec<PalletProxyProxyDefinition>, u128]>>,
         [AccountId32]
+      >;
+    };
+    stabilizationPools: {
+      /**
+       * Approved deployments on the Ethereum network authenticated by EthereumVerifier.
+       * Configuration is immutable once registered, preserving checkpoint identity and layout.
+       **/
+      pools: AugmentedQuery<
+        ApiType,
+        (
+          arg1: H160 | string | Uint8Array,
+          arg2: H256 | string | Uint8Array,
+        ) => Observable<Option<PalletStabilizationPoolsPoolConfig>>,
+        [H160, H256]
+      >;
+      /**
+       * Last accepted checkpoint for an NFT. Keep its source-block watermark across re-enrollment.
+       **/
+      positionCheckpoints: AugmentedQuery<
+        ApiType,
+        (
+          arg1: H160 | string | Uint8Array,
+          arg2: U256 | AnyNumber | Uint8Array,
+        ) => Observable<Option<PalletStabilizationPoolsPositionCheckpoint>>,
+        [H160, U256]
       >;
     };
     sudo: {

@@ -10,6 +10,7 @@ import type {
   Null,
   Option,
   Result,
+  U256,
   U8aFixed,
   Vec,
   bool,
@@ -51,6 +52,9 @@ import type {
   PalletMintMintType,
   PalletMultisigTimepoint,
   PalletProxyDepositKind,
+  PalletStabilizationPoolsCheckpointOutcome,
+  PalletStabilizationPoolsPoolConfig,
+  PalletStabilizationPoolsPositionCheckpoint,
   PalletTreasuryBondProgramId,
   PalletTreasuryBondReleaseReason,
   SpConsensusGrandpaAppPublic,
@@ -1848,6 +1852,28 @@ declare module '@polkadot/api-base/types/events' {
           spawner: AccountId32;
           proxyType: ArgonRuntimeProxyType;
           disambiguationIndex: u16;
+        }
+      >;
+    };
+    stabilizationPools: {
+      PoolRegistered: AugmentedEvent<
+        ApiType,
+        [poolManager: H160, poolId: H256, config: PalletStabilizationPoolsPoolConfig],
+        { poolManager: H160; poolId: H256; config: PalletStabilizationPoolsPoolConfig }
+      >;
+      PositionCheckpointed: AugmentedEvent<
+        ApiType,
+        [
+          positionManager: H160,
+          tokenId: U256,
+          checkpoint: PalletStabilizationPoolsPositionCheckpoint,
+          outcome: PalletStabilizationPoolsCheckpointOutcome,
+        ],
+        {
+          positionManager: H160;
+          tokenId: U256;
+          checkpoint: PalletStabilizationPoolsPositionCheckpoint;
+          outcome: PalletStabilizationPoolsCheckpointOutcome;
         }
       >;
     };
