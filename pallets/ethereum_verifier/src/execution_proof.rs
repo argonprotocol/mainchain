@@ -1,9 +1,9 @@
 //! Argon execution proof provider.
 //!
-//! This module owns the Argon event-log verification boundary:
+//! This module owns the Ethereum execution-proof verification boundary:
 //! - stored direct-finalized execution anchors imported by relayers
-//! - execution header continuity from the burn block to that anchor
-//! - receipt trie proof verification
+//! - execution header continuity from the proven block to that anchor
+//! - receipt and account/storage trie proof verification
 
 use super::{
 	receipt::verify_receipt_proof,
@@ -14,11 +14,11 @@ use alloc::{collections::BTreeMap, vec::Vec};
 use alloy_consensus::Header as AlloyHeader;
 use alloy_rlp::Decodable;
 use argon_primitives::{
-	EthereumBlockNumber, EthereumCombinedReceiptProof, EthereumExecutionBlockProof,
-	EthereumExecutionHeader, EthereumLog, EthereumReceiptLog, EthereumReceiptLogProofBatch,
-	EthereumVerifyError, EthereumVerifyProvider, Moment,
+	EthereumAccountStorageProof, EthereumBlockNumber, EthereumCombinedReceiptProof,
+	EthereumExecutionBlockProof, EthereumExecutionHeader, EthereumLog, EthereumReceiptLog,
+	EthereumReceiptLogProofBatch, EthereumVerifyError, EthereumVerifyProvider, Moment,
 };
-use polkadot_sdk::{frame_support::ensure, sp_runtime::traits::Get};
+use polkadot_sdk::{frame_support::ensure, sp_core::H160, sp_runtime::traits::Get};
 
 impl<T: Config> EthereumVerifyProvider for Pallet<T> {
 	type Weights = weights::ProviderWeightAdapter<T>;
@@ -32,13 +32,14 @@ impl<T: Config> EthereumVerifyProvider for Pallet<T> {
 	{
 		ensure!(!OperatingMode::<T>::get().is_halted(), EthereumVerifyError::VerifierUnavailable);
 
-		let receipts_roots = Self::collect_receipts_roots(&proof_batch.execution_block_proof)?;
+		let headers = Self::verify_execution_headers(&proof_batch.execution_block_proof)?;
 
 		for proof_block in &proof_batch.blocks {
-			let receipts_root = receipts_roots
+			let receipts_root = headers
 				.iter()
-				.find_map(|(block_number, receipts_root)| {
-					(*block_number == proof_block.target_block_number).then_some(*receipts_root)
+				.find_map(|header| {
+					(header.block_number == proof_block.target_block_number)
+						.then_some(header.receipts_root)
 				})
 				.ok_or(EthereumVerifyError::InvalidProof)?;
 			Self::verify_receipt_logs_against_root(
@@ -49,6 +50,24 @@ impl<T: Config> EthereumVerifyProvider for Pallet<T> {
 		}
 
 		Ok(())
+	}
+
+	fn verify_account_storage_proof<MaxStorageSlots>(
+		account_address: H160,
+		proof: &EthereumAccountStorageProof<MaxStorageSlots>,
+	) -> Result<(), EthereumVerifyError>
+	where
+		MaxStorageSlots: Get<u32>,
+	{
+		ensure!(!OperatingMode::<T>::get().is_halted(), EthereumVerifyError::VerifierUnavailable);
+
+		let headers = Self::verify_execution_headers(&proof.execution_block_proof)?;
+		let target = headers.first().ok_or(EthereumVerifyError::InvalidHeaderChain)?;
+		Self::verify_account_storage_proof_against_state_root(
+			target.state_root,
+			account_address,
+			proof,
+		)
 	}
 
 	fn latest_execution_block_number() -> Option<EthereumBlockNumber> {
@@ -116,31 +135,31 @@ impl<T: Config> Pallet<T> {
 	pub(crate) fn verify_execution_block_proof(
 		proof: &EthereumExecutionBlockProof,
 	) -> Result<ReceiptsRoot, EthereumVerifyError> {
-		let receipts_roots = Self::collect_receipts_roots(proof)?;
-		receipts_roots
+		let headers = Self::verify_execution_headers(proof)?;
+		headers
 			.first()
-			.map(|(_, receipts_root)| *receipts_root)
+			.map(|header| header.receipts_root)
 			.ok_or(EthereumVerifyError::InvalidProof)
 	}
 
-	fn collect_receipts_roots(
+	fn verify_execution_headers(
 		proof: &EthereumExecutionBlockProof,
-	) -> Result<Vec<(EthereumBlockNumber, ReceiptsRoot)>, EthereumVerifyError> {
+	) -> Result<Vec<ExecutionHeaderAnchor>, EthereumVerifyError> {
 		let anchor = ExecutionHeaderAnchors::<T>::get(proof.anchor_block_hash)
 			.ok_or(EthereumVerifyError::AnchorNotFound)?;
-		let mut receipts_roots =
+		let mut verified_headers =
 			Vec::with_capacity(proof.target_to_anchor_header_chain.len().saturating_add(1));
 
 		if proof.target_to_anchor_header_chain.is_empty() {
-			receipts_roots.push((anchor.block_number, anchor.receipts_root));
-			return Ok(receipts_roots)
+			verified_headers.push(anchor);
+			return Ok(verified_headers)
 		}
 
 		let mut headers = proof.target_to_anchor_header_chain.iter();
 		let target = Self::decode_execution_header(
 			headers.next().ok_or(EthereumVerifyError::InvalidHeaderChain)?,
 		)?;
-		receipts_roots.push((target.block_number, target.receipts_root));
+		verified_headers.push(target);
 		let mut previous = target;
 
 		for header in headers {
@@ -150,7 +169,7 @@ impl<T: Config> Pallet<T> {
 					current.block_number.checked_sub(1) == Some(previous.block_number),
 				EthereumVerifyError::InvalidHeaderChain
 			);
-			receipts_roots.push((current.block_number, current.receipts_root));
+			verified_headers.push(current);
 			previous = current;
 		}
 
@@ -159,9 +178,9 @@ impl<T: Config> Pallet<T> {
 				anchor.block_number.checked_sub(1) == Some(previous.block_number),
 			EthereumVerifyError::InvalidHeaderChain
 		);
-		receipts_roots.push((anchor.block_number, anchor.receipts_root));
+		verified_headers.push(anchor);
 
-		Ok(receipts_roots)
+		Ok(verified_headers)
 	}
 
 	fn decode_execution_header(

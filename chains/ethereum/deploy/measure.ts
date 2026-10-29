@@ -2,11 +2,13 @@ import { Wallet } from 'ethers';
 import type { Address, Hex } from 'viem';
 import { contractsRoot } from './src/hardhat.js';
 import { deriveMintingAuthorityActivationPricingRecommendation } from './src/pricing.js';
-import { parseArgs, stringifyJson } from './src/cli.js';
+import { getOptionalBigInt, parseArgs, stringifyJson } from './src/cli.js';
 import {
   encodeMintingGatewayGlobalIssuanceCouncilRotateTarget,
   encodeMintingGatewayMintingAuthorityActivationTarget,
+  encodeMintingGatewayMintingAuthorityDeactivateTarget,
   hashMintingGatewayActivateMintingAuthorityApproval,
+  hashMintingGatewayGatewayUpdateApproval,
   hashMintingGatewayGlobalIssuanceCouncil,
   hashMintingGatewayMintingAuthorization,
   hashMintingGatewayRotateGlobalIssuanceCouncilApproval,
@@ -17,6 +19,7 @@ import {
   type MintingGatewayHashContext,
   type MintingGatewayMigrationAssetDistribution,
   type MintingGatewayMintingAuthorityActivationTarget,
+  type MintingGatewayMintingAuthorityDeactivateTarget,
   type MintingGatewayMintingAuthorization,
   type MintingGatewayTransferOutOfArgonProof,
   type MintingGatewayTransferOutOfArgonRequest,
@@ -27,6 +30,7 @@ const MINTING_GATEWAY_TOKEN_DECIMALS = 18;
 const SCALE = 10n ** BigInt(MINTING_GATEWAY_TOKEN_DECIMALS - MINTING_GATEWAY_RUNTIME_DECIMALS);
 const ERC1967_ADMIN_SLOT = '0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103';
 const COUNCIL_WEIGHTS = [40n, 30n, 20n, 10n] as const;
+const DEFAULT_ETHEREUM_BLOCK_GAS_LIMIT = 60_000_000n;
 const MICROGONS_PER_ARGONOT = 1_000_000n;
 const LOCAL_GAS_CAP = 16_777_216n;
 const args = parseArgs(process.argv.slice(2));
@@ -63,6 +67,9 @@ type ContractWithDeployment = {
 
 type GatewayContract = {
   getAddress(): Promise<Address>;
+  MAX_GATEWAY_UPDATES_PER_BATCH(): Promise<bigint>;
+  MAX_GATEWAY_ACTIVITIES_PER_BLOCK(): Promise<bigint>;
+  MAX_MINTING_AUTHORIZATIONS_PER_TRANSFER(): Promise<bigint>;
   connect(signer: AccountSigner): GatewayContract;
   getFunction(name: 'argonApprovalsHash'): () => Promise<Hex>;
   globalIssuanceCouncil(): Promise<{ councilHash: Hex; epochMicrogonsPerArgonot: bigint }>;
@@ -147,10 +154,34 @@ type GasMeasurementScenario = {
   note: string;
 };
 
+type GatewayActivityCapacityScenario = {
+  scenario: string;
+  gasUsed: bigint;
+  activitiesProduced: number;
+  note: string;
+};
+
+type GatewayActivityCapacityMixEntry = {
+  scenario: string;
+  repeats: number;
+  activitiesProducedPerTx: number;
+  gasUsedPerTx: bigint;
+};
+
+type GatewayActivityCapacityReport = {
+  blockGasLimit: bigint;
+  contractActivityLimit: number;
+  mintingAuthorizationsPerTransfer: number;
+  scenarios: GatewayActivityCapacityScenario[];
+  modeledMaxActivitiesPerBlock: number;
+  optimalMix: GatewayActivityCapacityMixEntry[];
+};
+
 type GasMeasurementReport = {
   generatedAt: string;
   setupScenarios: GasMeasurementScenario[];
   userScenarios: GasMeasurementScenario[];
+  gatewayActivityCapacity: GatewayActivityCapacityReport;
   activationPricingMeasurements: {
     singleActivationGas: bigint;
     batchActivationGas: bigint;
@@ -186,6 +217,16 @@ async function main() {
     console.log('\nUser Paths');
     console.table(userRows);
 
+    console.log('\nGateway Activity Capacity');
+    console.table(
+      report.gatewayActivityCapacity.scenarios.map(scenario => ({
+        scenario: scenario.scenario,
+        gas: formatInteger(scenario.gasUsed),
+        activitiesProduced: scenario.activitiesProduced,
+        note: scenario.note,
+      })),
+    );
+
     console.log('\nNotes');
     console.log('- 100-member council scenarios use equal weights, so quorum needs 90 signatures.');
     console.log('- startTransferToArgon includes ERC-2612 permit and burn in one transaction.');
@@ -201,6 +242,9 @@ async function main() {
     );
     console.log(
       `- recommended signatureGasCost: ${formatInteger(report.activationPricingRecommendation.signatureGasCost)}`,
+    );
+    console.log(
+      `- modeled max gateway activities per Ethereum block (${formatInteger(report.gatewayActivityCapacity.blockGasLimit)} gas): ${report.gatewayActivityCapacity.modeledMaxActivitiesPerBlock}`,
     );
   } finally {
     await connection.close();
@@ -260,6 +304,8 @@ async function measureGasReport(): Promise<GasMeasurementReport> {
   const fourRotationGas = await measureCouncilRotationGas(fourSetup, 2n, createCouncil(4));
   const hundredRotationGas = await measureCouncilRotationGas(hundredSetup, 2n, createCouncil(100));
 
+  const userScenarios = await measureUserScenarios();
+
   return {
     generatedAt: new Date().toISOString(),
     setupScenarios: [
@@ -308,7 +354,8 @@ async function measureGasReport(): Promise<GasMeasurementReport> {
         hundredRotationGas.note,
       ),
     ],
-    userScenarios: await measureUserScenarios(),
+    userScenarios,
+    gatewayActivityCapacity: await measureGatewayActivityCapacity(userScenarios),
     activationPricingMeasurements: {
       singleActivationGas: hundredActivationGas,
       batchActivationGas: hundredActivationBatchGas,
@@ -432,6 +479,172 @@ async function measureUserScenarios() {
     ),
     createGasMeasurementScenario('cancelTransferOutOfArgon', cancelGas),
   ];
+}
+
+async function measureGatewayActivityCapacity(
+  userScenarios: GasMeasurementScenario[],
+): Promise<GatewayActivityCapacityReport> {
+  const singleCouncilFixture = await deployFixture(createCouncil(1));
+  const maximumUpdates = Number(await singleCouncilFixture.gateway.MAX_GATEWAY_UPDATES_PER_BATCH());
+  const contractActivityLimit = Number(
+    await singleCouncilFixture.gateway.MAX_GATEWAY_ACTIVITIES_PER_BLOCK(),
+  );
+  const mintingAuthorizationsPerTransfer = Number(
+    await singleCouncilFixture.gateway.MAX_MINTING_AUTHORIZATIONS_PER_TRANSFER(),
+  );
+  const activationBatchGas = await measureMintingAuthorityActivationBatchGas(
+    singleCouncilFixture,
+    1n,
+    maximumUpdates,
+  );
+  const deactivationFixture = await deployFixture(createCouncil(1));
+  const activatedSigningKeys = await seedMintingAuthorityActivations(
+    deactivationFixture,
+    1n,
+    maximumUpdates,
+  );
+  const deactivationBatchGas = await measureMintingAuthorityDeactivationBatchGas(
+    deactivationFixture,
+    1n + BigInt(maximumUpdates),
+    maximumUpdates,
+    activatedSigningKeys,
+  );
+  const depletedDeactivationBatchGas = await measureMintingAuthorityDeactivationBatchGas(
+    deactivationFixture,
+    1n + BigInt(2 * maximumUpdates),
+    maximumUpdates,
+    activatedSigningKeys,
+  );
+  const warmDeactivationBatchGas = await measureMintingAuthorityDeactivationBatchGas(
+    deactivationFixture,
+    1n + BigInt(3 * maximumUpdates),
+    maximumUpdates,
+    Array.from({ length: maximumUpdates }, () => activatedSigningKeys[0]),
+  );
+  const smallerBatches: GatewayActivityCapacityScenario[] = [];
+  let nextQueueNonce = 1n + BigInt(4 * maximumUpdates);
+  for (const batchSize of [1, 2, 4, 8, 16, 32, 64].filter(size => size < maximumUpdates)) {
+    const gasUsed = await measureMintingAuthorityDeactivationBatchGas(
+      deactivationFixture,
+      nextQueueNonce,
+      batchSize,
+      Array.from({ length: batchSize }, () => activatedSigningKeys[0]),
+    );
+    smallerBatches.push({
+      scenario: `warm zero-collateral deactivation batch (${batchSize} updates)`,
+      gasUsed,
+      activitiesProduced: batchSize,
+      note: 'smaller batches test the tradeoff between shared signatures and memory costs',
+    });
+    nextQueueNonce += BigInt(batchSize);
+  }
+
+  const rotationFixture = await deployFixture(createCouncil(1));
+  const rotationContext = await getGatewayHashContext(rotationFixture.gateway);
+  const rotationTarget = {
+    council: rotationFixture.council.snapshot,
+    epochMicrogonsPerArgonot: rotationFixture.council.epochMicrogonsPerArgonot,
+  };
+  const rotationUpdates: MintingGatewayGatewayUpdate[] = [];
+  let previousUpdateHash = await rotationFixture.gateway.getFunction('argonApprovalsHash')();
+  for (let index = 0; index < maximumUpdates; index += 1) {
+    const queueNonce = BigInt(index + 1);
+    const approvalHash = hashMintingGatewayRotateGlobalIssuanceCouncilApproval(rotationContext, {
+      queueNonce,
+      approvingCouncilHash: rotationFixture.council.hash,
+      previousUpdateHash,
+      target: rotationTarget,
+    });
+    rotationUpdates.push({
+      queueNonce,
+      kind: MINTING_GATEWAY_UPDATE_KINDS.globalIssuanceCouncilRotate,
+      payload: encodeMintingGatewayGlobalIssuanceCouncilRotateTarget(rotationTarget),
+      signatures: await signApprovalHash(rotationFixture.council.quorumSigners, approvalHash),
+    });
+    previousUpdateHash = approvalHash;
+  }
+  const rotationBatchGas = await getGasUsed(
+    rotationFixture.gateway.applyGatewayUpdates(
+      rotationFixture.council.snapshot,
+      rotationUpdates,
+      ethers.encodeBytes32String('relayer-rotation-batch') as Hex,
+    ),
+  );
+
+  const scenarios: GatewayActivityCapacityScenario[] = [
+    {
+      scenario: 'startTransferToArgon',
+      gasUsed: findGasMeasurement(userScenarios, 'startTransferToArgon').gasUsed,
+      activitiesProduced: 1,
+      note: 'one user transfer start emits one gateway activity',
+    },
+    {
+      scenario: 'cancelTransferOutOfArgon',
+      gasUsed: findGasMeasurement(userScenarios, 'cancelTransferOutOfArgon').gasUsed,
+      activitiesProduced: 1,
+      note: 'one expired transfer cancel emits one gateway activity',
+    },
+    ...[
+      'finalizeTransferOutOfArgon (1 authorization)',
+      'finalizeTransferOutOfArgon (3 authorizations)',
+    ].map(scenario => ({
+      scenario,
+      gasUsed: findGasMeasurement(userScenarios, scenario).gasUsed,
+      activitiesProduced: 1,
+      note: 'one finalization emits one activity regardless of its collateral-row count',
+    })),
+    {
+      scenario: `minting authority activation batch (1 member council, ${maximumUpdates} updates)`,
+      gasUsed: activationBatchGas,
+      activitiesProduced: maximumUpdates,
+      note: 'shared-signature relay batch at the contract update cap',
+    },
+    {
+      scenario: `minting authority deactivation batch (1 member council, ${maximumUpdates} updates)`,
+      gasUsed: deactivationBatchGas,
+      activitiesProduced: maximumUpdates,
+      note: 'shared-signature relay batch at the contract update cap',
+    },
+    {
+      scenario: `zero-collateral deactivation batch (1 member council, ${maximumUpdates} updates)`,
+      gasUsed: depletedDeactivationBatchGas,
+      activitiesProduced: maximumUpdates,
+      note: 'deactivations do not require a nonzero collateral balance',
+    },
+    {
+      scenario: `warm zero-collateral deactivation batch (1 member council, ${maximumUpdates} updates)`,
+      gasUsed: warmDeactivationBatchGas,
+      activitiesProduced: maximumUpdates,
+      note: 'repeated signing keys are permitted and reuse warm storage within the batch',
+    },
+    {
+      scenario: `council rotation batch (1 member council, ${maximumUpdates} updates)`,
+      gasUsed: rotationBatchGas,
+      activitiesProduced: maximumUpdates,
+      note: 'every rotation verifies the one-member council signature, including repeated councils',
+    },
+    ...smallerBatches,
+  ];
+
+  const blockGasLimit =
+    getOptionalBigInt(args, 'block-gas-limit') ?? DEFAULT_ETHEREUM_BLOCK_GAS_LIMIT;
+  if (blockGasLimit <= 0n) {
+    throw new Error('--block-gas-limit must be positive');
+  }
+  const { maxActivities, optimalMix } = deriveMaxActivitiesPerBlock(
+    blockGasLimit,
+    scenarios,
+    contractActivityLimit,
+  );
+
+  return {
+    blockGasLimit,
+    contractActivityLimit,
+    mintingAuthorizationsPerTransfer,
+    scenarios,
+    modeledMaxActivitiesPerBlock: maxActivities,
+    optimalMix,
+  };
 }
 
 async function deployFixture(council: Council) {
@@ -628,43 +841,39 @@ async function measureMintingAuthorityActivationBatchGas(
   startQueueNonce: bigint,
   activationCount: number,
 ) {
-  let previousUpdateHash = await fixture.gateway.getFunction('argonApprovalsHash')();
-  const updates: MintingGatewayGatewayUpdate[] = [];
-  const hashContext = await getGatewayHashContext(fixture.gateway);
-
-  for (let index = 0; index < activationCount; ++index) {
-    const queueNonce = startQueueNonce + BigInt(index);
-    const target = {
-      microgonCollateral: 1_000n,
-      micronotCollateral: 200n,
-      signingKey: (Wallet.createRandom() as unknown as SignerLike).address,
-    } satisfies MintingGatewayMintingAuthorityActivationTarget;
-    const approvalHash = hashMintingGatewayActivateMintingAuthorityApproval(hashContext, {
-      queueNonce,
-      approvingCouncilHash: fixture.council.hash,
-      previousUpdateHash,
-      target,
-    });
-    const signatures =
-      index + 1 === activationCount
-        ? await signApprovalHash(fixture.council.quorumSigners, approvalHash)
-        : [];
-    const payload = encodeMintingGatewayMintingAuthorityActivationTarget(target);
-
-    updates.push({
-      queueNonce,
-      kind: MINTING_GATEWAY_UPDATE_KINDS.mintingAuthorityActivate,
-      payload,
-      signatures,
-    });
-    previousUpdateHash = approvalHash;
-  }
+  const { updates } = await buildMintingAuthorityActivationBatch(
+    fixture,
+    startQueueNonce,
+    activationCount,
+  );
 
   return getGasUsed(
     fixture.gateway.applyGatewayUpdates(
       fixture.council.snapshot,
       updates,
       ethers.encodeBytes32String('relayer-activation-batch') as Hex,
+    ),
+  );
+}
+
+async function measureMintingAuthorityDeactivationBatchGas(
+  fixture: DeployStack,
+  startQueueNonce: bigint,
+  deactivationCount: number,
+  signingKeys: Address[],
+) {
+  const updates = await buildMintingAuthorityDeactivationBatch(
+    fixture,
+    startQueueNonce,
+    deactivationCount,
+    signingKeys,
+  );
+
+  return getGasUsed(
+    fixture.gateway.applyGatewayUpdates(
+      fixture.council.snapshot,
+      updates,
+      ethers.encodeBytes32String('relayer-deactivation-batch') as Hex,
     ),
   );
 }
@@ -766,6 +975,108 @@ async function buildTransferOutOfArgonRequest(
     amount,
     mintingAuthorityTip: 5n,
   };
+}
+
+async function seedMintingAuthorityActivations(
+  fixture: DeployStack,
+  startQueueNonce: bigint,
+  activationCount: number,
+) {
+  const { updates, targets } = await buildMintingAuthorityActivationBatch(
+    fixture,
+    startQueueNonce,
+    activationCount,
+  );
+
+  await fixture.gateway.applyGatewayUpdates(
+    fixture.council.snapshot,
+    updates,
+    ethers.encodeBytes32String('relayer-activation-seed') as Hex,
+  );
+
+  return targets.map(target => target.signingKey);
+}
+
+async function buildMintingAuthorityActivationBatch(
+  fixture: DeployStack,
+  startQueueNonce: bigint,
+  activationCount: number,
+) {
+  let previousUpdateHash = await fixture.gateway.getFunction('argonApprovalsHash')();
+  const updates: MintingGatewayGatewayUpdate[] = [];
+  const targets: MintingGatewayMintingAuthorityActivationTarget[] = [];
+  const hashContext = await getGatewayHashContext(fixture.gateway);
+
+  for (let index = 0; index < activationCount; ++index) {
+    const queueNonce = startQueueNonce + BigInt(index);
+    const target = {
+      microgonCollateral: 1_000n,
+      micronotCollateral: 200n,
+      signingKey: (Wallet.createRandom() as unknown as SignerLike).address,
+    } satisfies MintingGatewayMintingAuthorityActivationTarget;
+    const approvalHash = hashMintingGatewayActivateMintingAuthorityApproval(hashContext, {
+      queueNonce,
+      approvingCouncilHash: fixture.council.hash,
+      previousUpdateHash,
+      target,
+    });
+    const signatures =
+      index + 1 === activationCount
+        ? await signApprovalHash(fixture.council.quorumSigners, approvalHash)
+        : [];
+
+    updates.push({
+      queueNonce,
+      kind: MINTING_GATEWAY_UPDATE_KINDS.mintingAuthorityActivate,
+      payload: encodeMintingGatewayMintingAuthorityActivationTarget(target),
+      signatures,
+    });
+    targets.push(target);
+    previousUpdateHash = approvalHash;
+  }
+
+  return { updates, targets };
+}
+
+async function buildMintingAuthorityDeactivationBatch(
+  fixture: DeployStack,
+  startQueueNonce: bigint,
+  deactivationCount: number,
+  signingKeys: Address[],
+) {
+  let previousUpdateHash = await fixture.gateway.getFunction('argonApprovalsHash')();
+  const updates: MintingGatewayGatewayUpdate[] = [];
+  const hashContext = await getGatewayHashContext(fixture.gateway);
+
+  for (let index = 0; index < deactivationCount; ++index) {
+    const queueNonce = startQueueNonce + BigInt(index);
+    const target = {
+      signingKey: signingKeys[index],
+    } satisfies MintingGatewayMintingAuthorityDeactivateTarget;
+    const payload = encodeMintingGatewayMintingAuthorityDeactivateTarget(target);
+    const approvalHash = hashMintingGatewayGatewayUpdateApproval(hashContext, {
+      queueNonce,
+      approvingCouncilHash: fixture.council.hash,
+      kind: MINTING_GATEWAY_UPDATE_KINDS.mintingAuthorityDeactivate,
+      targetId: `0x${target.signingKey.slice(2).padStart(64, '0').toLowerCase()}`,
+      targetPayloadHash: ethers.keccak256(payload) as Hex,
+      previousUpdateHash,
+    });
+    const signatures =
+      index + 1 === deactivationCount
+        ? await signApprovalHash(fixture.council.quorumSigners, approvalHash)
+        : [];
+
+    updates.push({
+      queueNonce,
+      kind: MINTING_GATEWAY_UPDATE_KINDS.mintingAuthorityDeactivate,
+      payload,
+      signatures,
+    });
+    previousUpdateHash = approvalHash;
+  }
+
+  return updates;
 }
 
 async function buildMintingAuthorization(
@@ -908,6 +1219,111 @@ function createGasMeasurementScenario(
   note = '',
 ): GasMeasurementScenario {
   return { scenario, measurement, gasUsed, note };
+}
+
+function findGasMeasurement(
+  measurements: GasMeasurementScenario[],
+  scenario: string,
+): GasMeasurementScenario {
+  const measurement = measurements.find(entry => entry.scenario === scenario);
+  if (!measurement) {
+    throw new Error(`Missing gas measurement for scenario "${scenario}"`);
+  }
+
+  return measurement;
+}
+
+function deriveMaxActivitiesPerBlock(
+  blockGasLimit: bigint,
+  scenarios: GatewayActivityCapacityScenario[],
+  contractActivityLimit: number,
+) {
+  const maxActivitiesPerScenario = scenarios.reduce(
+    (max, scenario) => Math.max(max, scenario.activitiesProduced),
+    0,
+  );
+  const cheapestScenario = scenarios.reduce<GatewayActivityCapacityScenario | null>(
+    (best, scenario) => {
+      if (best === null) {
+        return scenario;
+      }
+
+      return scenario.gasUsed * BigInt(best.activitiesProduced) <
+        best.gasUsed * BigInt(scenario.activitiesProduced)
+        ? scenario
+        : best;
+    },
+    null,
+  );
+
+  if (cheapestScenario === null) {
+    throw new Error('No gateway activity scenarios were measured');
+  }
+
+  const maxActivitiesUpper = Math.min(
+    contractActivityLimit,
+    Number(
+      (blockGasLimit * BigInt(cheapestScenario.activitiesProduced)) / cheapestScenario.gasUsed,
+    ) + maxActivitiesPerScenario,
+  );
+  const minGasForActivities = Array<bigint | null>(maxActivitiesUpper + 1).fill(null);
+  const previousState = Array<{ previousActivities: number; scenarioIndex: number } | null>(
+    maxActivitiesUpper + 1,
+  ).fill(null);
+  minGasForActivities[0] = 0n;
+
+  for (let activities = 0; activities <= maxActivitiesUpper; ++activities) {
+    const currentGas = minGasForActivities[activities];
+    if (currentGas === null) continue;
+
+    for (const [scenarioIndex, scenario] of scenarios.entries()) {
+      const nextActivities = activities + scenario.activitiesProduced;
+      if (nextActivities > maxActivitiesUpper) continue;
+
+      const nextGas = currentGas + scenario.gasUsed;
+      if (nextGas > blockGasLimit) continue;
+
+      const bestGas = minGasForActivities[nextActivities];
+      if (bestGas === null || nextGas < bestGas) {
+        minGasForActivities[nextActivities] = nextGas;
+        previousState[nextActivities] = { previousActivities: activities, scenarioIndex };
+      }
+    }
+  }
+
+  let maxActivities = 0;
+  for (let activities = 1; activities <= maxActivitiesUpper; ++activities) {
+    if (minGasForActivities[activities] !== null) {
+      maxActivities = activities;
+    }
+  }
+
+  const repeatsByScenario = Array<number>(scenarios.length).fill(0);
+  let cursor = maxActivities;
+  while (cursor > 0) {
+    const previous = previousState[cursor];
+    if (previous === null) {
+      throw new Error(`Missing previous state while reconstructing ${cursor} activities`);
+    }
+    repeatsByScenario[previous.scenarioIndex] += 1;
+    cursor = previous.previousActivities;
+  }
+
+  return {
+    maxActivities,
+    optimalMix: repeatsByScenario
+      .map((repeats, scenarioIndex) => {
+        if (repeats === 0) return null;
+        const scenario = scenarios[scenarioIndex];
+        return {
+          scenario: scenario.scenario,
+          repeats,
+          activitiesProducedPerTx: scenario.activitiesProduced,
+          gasUsedPerTx: scenario.gasUsed,
+        } satisfies GatewayActivityCapacityMixEntry;
+      })
+      .filter((entry): entry is GatewayActivityCapacityMixEntry => entry !== null),
+  };
 }
 
 function toGasRow(measurement: GasMeasurementScenario): GasRow {

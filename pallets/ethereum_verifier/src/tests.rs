@@ -9,6 +9,7 @@ use crate::{
 		load_finalized_header_update_fixture, load_next_finalized_header_update_fixture,
 		load_next_sync_committee_update_fixture, load_sync_committee_update_fixture,
 	},
+	storage_proof_fixture::load_account_storage_proof_fixture as load_storage_proof_fixture,
 	sync_committee_sum,
 	types::{CheckpointUpdate, ExecutionHeaderProof, SyncCommittee, TypeError, Update},
 	verify_merkle_branch, BasicOperatingMode, BeaconHeader, Error, ExecutionHeaderAnchor,
@@ -18,9 +19,9 @@ use crate::{
 	LatestSyncCommitteeUpdatePeriod, NextSyncCommittee, SyncCommitteePrepared,
 };
 use alloy_consensus::{Header as AlloyHeader, Receipt, ReceiptEnvelope};
-use alloy_primitives::{Address, Bytes, Log, B256};
+use alloy_primitives::{keccak256, Address, Bytes, Log, B256, U256};
 use alloy_rlp::Encodable;
-use alloy_trie::{proof::ProofRetainer, HashBuilder, Nibbles};
+use alloy_trie::{proof::ProofRetainer, HashBuilder, Nibbles, TrieAccount};
 use argon_primitives::{
 	ethereum::{
 		EthereumReceiptLogProofBatch, EthereumReceiptLogProofBlock,
@@ -29,9 +30,10 @@ use argon_primitives::{
 		MAX_ETHEREUM_RECEIPTS_PER_PROOF, MAX_ETHEREUM_RECEIPT_PROOF_NODE_BYTES,
 		MAX_ETHEREUM_RECEIPT_PROOF_NODE_REFS,
 	},
-	CallTxPoolKeyProvider, EthereumBeaconPreset, EthereumCombinedReceiptProof,
-	EthereumExecutionBlockProof, EthereumExecutionHeader, EthereumLog, EthereumReceiptLog,
-	EthereumReceiptProofReceipt, EthereumVerifyError, EthereumVerifyProvider,
+	CallTxPoolKeyProvider, EthereumAccountStorageProof, EthereumBeaconPreset,
+	EthereumCombinedReceiptProof, EthereumExecutionBlockProof, EthereumExecutionHeader,
+	EthereumLog, EthereumReceiptLog, EthereumReceiptProofReceipt, EthereumStorageSlotProof,
+	EthereumVerifyError, EthereumVerifyProvider,
 };
 use codec::{Decode, Encode};
 use hex_literal::hex;
@@ -151,6 +153,24 @@ fn load_minimal_bootstrap_fixture(basename: &str) -> MinimalBootstrapFixture {
 	let filepath: PathBuf =
 		[env!("CARGO_MANIFEST_DIR"), "tests", "fixtures", basename].iter().collect();
 	serde_json::from_reader(File::open(filepath).unwrap()).unwrap()
+}
+
+fn load_account_storage_proof_fixture(
+) -> (H160, ExecutionHeaderAnchor, EthereumAccountStorageProof<ConstU32<2>>) {
+	let fixture = load_storage_proof_fixture();
+	let proof = EthereumAccountStorageProof::<ConstU32<2>> {
+		execution_block_proof: EthereumExecutionBlockProof {
+			anchor_block_hash: fixture.anchor.block_hash,
+			target_to_anchor_header_chain: Default::default(),
+		},
+		account_proof: fixture.account_proof,
+		storage_proof: fixture.storage_proof,
+		slots: vec![fixture.range_slot, fixture.root_slot]
+			.try_into()
+			.expect("fixture storage slots stay within bounded slot count"),
+	};
+
+	(fixture.gateway_address, fixture.anchor, proof)
 }
 
 fn compute_period(slot: u64) -> u64 {
@@ -2260,6 +2280,516 @@ fn verify_execution_block_proof_rejects_invalid_client_headers() {
 		assert_eq!(
 			EthereumBeaconClient::verify_execution_block_proof(&proof),
 			Err(EthereumVerifyError::InvalidHeaderChain)
+		);
+	});
+}
+
+#[test]
+fn verifies_gateway_maximum_sized_receipt_leaf_with_token_logs() {
+	let activity = Log::new_unchecked(
+		Address::repeat_byte(7),
+		vec![B256::repeat_byte(8)],
+		Bytes::from(vec![0xab; 2_688]),
+	);
+	let token_transfer = Log::new_unchecked(
+		Address::repeat_byte(9),
+		vec![B256::repeat_byte(10); 3],
+		Bytes::from(vec![0x11; 32]),
+	);
+	let receipt = ReceiptEnvelope::Legacy(
+		Receipt {
+			status: true.into(),
+			cumulative_gas_used: 1_000_000,
+			logs: vec![token_transfer, activity.clone()],
+		}
+		.with_bloom(),
+	);
+	let mut encoded_receipt = Vec::new();
+	receipt.encode(&mut encoded_receipt);
+	let path = Nibbles::unpack(alloy_rlp::encode(0u64));
+	let mut trie = HashBuilder::default().with_proof_retainer(ProofRetainer::new(vec![path]));
+	trie.add_leaf(path, &encoded_receipt);
+	let root = trie.root();
+	let nodes = trie.take_proof_nodes().into_nodes_sorted();
+	assert!(nodes.iter().any(|(_, node)| node.len() > 2_048));
+	let proof = EthereumCombinedReceiptProof {
+		nodes: nodes
+			.into_iter()
+			.map(|(_, node)| node.to_vec().try_into().unwrap())
+			.collect::<Vec<_>>()
+			.try_into()
+			.unwrap(),
+		receipts: vec![EthereumReceiptProofReceipt {
+			transaction_index: 0,
+			node_indexes: vec![0].try_into().unwrap(),
+		}]
+		.try_into()
+		.unwrap(),
+	};
+	let anchor = ExecutionHeaderAnchor {
+		block_number: 100,
+		timestamp_millis: 0,
+		block_hash: H256::repeat_byte(1),
+		parent_hash: H256::repeat_byte(2),
+		state_root: H256::zero(),
+		receipts_root: H256::from(root.0),
+	};
+	let event = EthereumReceiptLog {
+		transaction_index: 0,
+		event_log: EthereumLog {
+			address: H160::from_slice(activity.address.as_slice()),
+			topics: activity
+				.topics()
+				.iter()
+				.map(|topic| H256::from(topic.0))
+				.collect::<Vec<_>>()
+				.try_into()
+				.unwrap(),
+			data: activity.data.data.to_vec().try_into().unwrap(),
+		},
+	};
+	let proof_batch = single_receipt_log_proof_batch(
+		event,
+		EthereumExecutionBlockProof {
+			anchor_block_hash: anchor.block_hash,
+			target_to_anchor_header_chain: Default::default(),
+		},
+		proof,
+	);
+	// Cross the actual SCALE boundary as well as verifying the authenticated receipt bytes.
+	let mut decoded = EthereumReceiptLogProofBatch::<ConstU32<1>, ConstU32<1>>::decode(
+		&mut proof_batch.encode().as_slice(),
+	)
+	.unwrap();
+	new_tester().execute_with(|| {
+		ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
+		assert_ok!(<EthereumBeaconClient as EthereumVerifyProvider>::verify_receipt_logs(&decoded));
+		decoded.blocks[0].receipt_logs[0].event_log.data[0] ^= 1;
+		assert_eq!(
+			<EthereumBeaconClient as EthereumVerifyProvider>::verify_receipt_logs(&decoded),
+			Err(EthereumVerifyError::LogNotFound)
+		);
+	});
+}
+
+#[test]
+fn storage_node_bounds_do_not_inherit_the_larger_receipt_leaf_limit() {
+	use argon_primitives::{EthereumTrieProofNodes, MAX_ETHEREUM_TRIE_PROOF_NODE_BYTES};
+	let encoded = Encode::encode(&vec![vec![0u8; MAX_ETHEREUM_TRIE_PROOF_NODE_BYTES as usize + 1]]);
+	assert!(EthereumTrieProofNodes::decode(&mut encoded.as_slice()).is_err());
+}
+
+#[test]
+fn verify_account_storage_proof_matches_hardhat_eth_getproof_fixture() {
+	let (gateway_address, anchor, proof) = load_account_storage_proof_fixture();
+
+	new_tester().execute_with(|| {
+		ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
+		assert_ok!(EthereumBeaconClient::verify_account_storage_proof_against_state_root(
+			anchor.state_root,
+			gateway_address,
+			&proof,
+		));
+		assert_eq!(
+			EthereumBeaconClient::verify_account_storage_proof(gateway_address, &proof),
+			Ok(()),
+		);
+	});
+}
+
+#[test]
+fn verify_account_storage_proof_authenticates_ancestor_state() {
+	for header_count in [1, 2, MAX_ETHEREUM_HEADER_CHAIN_LEN] {
+		let (account_address, target, mut proof) = load_account_storage_proof_fixture();
+		let mut headers = Vec::new();
+		let mut parent_hash = target.parent_hash;
+		for offset in 0..header_count {
+			let state_root = if offset == 0 { target.state_root } else { H256::repeat_byte(0x44) };
+			let header = AlloyHeader {
+				number: target.block_number + u64::from(offset),
+				parent_hash: b256_from_h256(parent_hash),
+				state_root: b256_from_h256(state_root),
+				..Default::default()
+			};
+			parent_hash = H256::from_slice(header.hash_slow().as_slice());
+			headers.push(EthereumExecutionHeader {
+				rlp: alloy_rlp::encode(header).try_into().unwrap(),
+			});
+		}
+		let anchor = ExecutionHeaderAnchor {
+			block_number: target.block_number + u64::from(header_count),
+			block_hash: H256::repeat_byte(0x55),
+			parent_hash,
+			state_root: H256::repeat_byte(0x66),
+			..target
+		};
+		proof.execution_block_proof = EthereumExecutionBlockProof {
+			anchor_block_hash: anchor.block_hash,
+			target_to_anchor_header_chain: headers.try_into().unwrap(),
+		};
+		// Exercise the wire format as well as verification, without retaining the target header.
+		let proof =
+			EthereumAccountStorageProof::<ConstU32<2>>::decode(&mut proof.encode().as_slice())
+				.unwrap();
+
+		new_tester().execute_with(|| {
+			assert_eq!(
+				EthereumBeaconClient::verify_account_storage_proof(account_address, &proof),
+				Err(EthereumVerifyError::AnchorNotFound),
+			);
+			ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
+			assert_ok!(EthereumBeaconClient::verify_account_storage_proof(account_address, &proof));
+
+			let mut wrong_state = proof.clone();
+			wrong_state.execution_block_proof.target_to_anchor_header_chain.remove(0);
+			assert_eq!(
+				EthereumBeaconClient::verify_account_storage_proof(account_address, &wrong_state),
+				Err(EthereumVerifyError::InvalidProof),
+				"a valid ancestry path must use its first header's state root, not the anchor's",
+			);
+
+			let mut malformed = proof.clone();
+			malformed.execution_block_proof.target_to_anchor_header_chain[0]
+				.rlp
+				.try_push(0)
+				.unwrap();
+			assert_eq!(
+				EthereumBeaconClient::verify_account_storage_proof(account_address, &malformed),
+				Err(EthereumVerifyError::InvalidHeader),
+			);
+
+			let mut wrong_header = proof.clone();
+			let first = &mut wrong_header.execution_block_proof.target_to_anchor_header_chain[0];
+			let mut header: AlloyHeader = alloy_rlp::decode_exact(first.rlp.as_slice()).unwrap();
+			header.state_root = B256::repeat_byte(0x77);
+			first.rlp = alloy_rlp::encode(header).try_into().unwrap();
+			assert_eq!(
+				EthereumBeaconClient::verify_account_storage_proof(account_address, &wrong_header),
+				Err(EthereumVerifyError::InvalidHeaderChain),
+			);
+
+			let mut wrong_number = anchor;
+			wrong_number.block_number += 1;
+			ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, wrong_number);
+			assert_eq!(
+				EthereumBeaconClient::verify_account_storage_proof(account_address, &proof),
+				Err(EthereumVerifyError::InvalidHeaderChain),
+			);
+			ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
+			if header_count > 1 {
+				let mut skipped = proof.clone();
+				skipped.execution_block_proof.target_to_anchor_header_chain.remove(1);
+				assert_eq!(
+					EthereumBeaconClient::verify_account_storage_proof(account_address, &skipped),
+					Err(EthereumVerifyError::InvalidHeaderChain),
+				);
+				let mut reversed = proof.clone();
+				reversed.execution_block_proof.target_to_anchor_header_chain = proof
+					.execution_block_proof
+					.target_to_anchor_header_chain
+					.iter()
+					.rev()
+					.cloned()
+					.collect::<Vec<_>>()
+					.try_into()
+					.unwrap();
+				assert_eq!(
+					EthereumBeaconClient::verify_account_storage_proof(account_address, &reversed),
+					Err(EthereumVerifyError::InvalidHeaderChain),
+				);
+			}
+		});
+	}
+}
+
+#[test]
+fn verify_account_storage_proof_rejects_an_appended_account_value() {
+	let (account_address, anchor, mut proof) = load_account_storage_proof_fixture();
+	let last_node = proof.account_proof.last().unwrap();
+	let alloy_trie::nodes::TrieNode::Leaf(leaf) =
+		alloy_rlp::decode_exact(last_node.as_slice()).unwrap()
+	else {
+		panic!("fixture account proof ends with a leaf");
+	};
+	let mut account: TrieAccount = alloy_rlp::decode_exact(&leaf.value).unwrap();
+	account.nonce += 1;
+	proof
+		.account_proof
+		.try_push(alloy_rlp::encode(account).try_into().unwrap())
+		.unwrap();
+
+	new_tester().execute_with(|| {
+		ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
+		assert_eq!(
+			EthereumBeaconClient::verify_account_storage_proof(account_address, &proof),
+			Err(EthereumVerifyError::InvalidProof)
+		);
+	});
+}
+
+#[test]
+fn verify_account_storage_proof_fixture_rejects_false_zero_with_root_only() {
+	let (gateway_address, anchor, mut proof) = load_account_storage_proof_fixture();
+	assert_ne!(proof.slots[1].value, H256::zero());
+	assert!(proof.slots[1].node_indexes.len() > 1);
+	proof.slots[1].value = H256::zero();
+	proof.slots[1].node_indexes = vec![0].try_into().unwrap();
+
+	new_tester().execute_with(|| {
+		ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
+		assert_eq!(
+			EthereumBeaconClient::verify_account_storage_proof(gateway_address, &proof),
+			Err(EthereumVerifyError::InvalidProof),
+		);
+	});
+}
+
+#[test]
+fn verify_account_storage_proof_fixture_rejects_truncated_storage_paths() {
+	let (gateway_address, anchor, proof) = load_account_storage_proof_fixture();
+
+	new_tester().execute_with(|| {
+		ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
+		assert_ok!(EthereumBeaconClient::verify_account_storage_proof(gateway_address, &proof));
+
+		for slot_index in 0..proof.slots.len() {
+			let slot = &proof.slots[slot_index];
+			assert_ne!(slot.value, H256::zero());
+			assert!(slot.node_indexes.len() > 2);
+			for node_count in (0..slot.node_indexes.len()).rev() {
+				for value in [slot.value, H256::zero()] {
+					let mut truncated = proof.clone();
+					truncated.slots[slot_index].value = value;
+					truncated.slots[slot_index].node_indexes.truncate(node_count);
+					assert_eq!(
+						EthereumBeaconClient::verify_account_storage_proof(
+							gateway_address,
+							&truncated
+						),
+						Err(EthereumVerifyError::InvalidProof),
+						"slot {slot_index}, {node_count} nodes, claimed value {value:?}",
+					);
+				}
+			}
+		}
+	});
+}
+
+#[test]
+fn verify_account_storage_proof_accepts_proven_zero_absence() {
+	let account_address = H160::repeat_byte(0x42);
+	let account_key = Nibbles::unpack(keccak256(account_address.as_bytes()));
+	let absent_slot = H256::from_low_u64_be(32);
+	let absent_key = Nibbles::unpack(keccak256(absent_slot.as_bytes()));
+
+	for slot_count in [0, 1, 32] {
+		let mut storage_builder =
+			HashBuilder::default().with_proof_retainer(ProofRetainer::new(vec![absent_key]));
+		let mut leaves = (0..slot_count)
+			.map(|slot| {
+				let key = Nibbles::unpack(keccak256(H256::from_low_u64_be(slot).as_bytes()));
+				(key, alloy_rlp::encode(U256::from(slot + 1)))
+			})
+			.collect::<Vec<_>>();
+		leaves.sort_unstable_by_key(|(key, _)| *key);
+		for (key, value) in leaves {
+			storage_builder.add_leaf(key, &value);
+		}
+		let storage_root = storage_builder.root();
+		let storage_nodes = storage_builder.take_proof_nodes().into_nodes_sorted();
+		let node_indexes = (0..storage_nodes.len()).map(|index| index as u16).collect::<Vec<_>>();
+
+		let account = TrieAccount { storage_root, ..Default::default() };
+		let mut account_builder =
+			HashBuilder::default().with_proof_retainer(ProofRetainer::new(vec![account_key]));
+		account_builder.add_leaf(account_key, &alloy_rlp::encode(account));
+		let state_root = H256::from_slice(account_builder.root().as_slice());
+		let account_nodes = account_builder.take_proof_nodes().into_nodes_sorted();
+		let anchor = ExecutionHeaderAnchor {
+			block_number: 100,
+			timestamp_millis: 0,
+			block_hash: H256::repeat_byte(0x43),
+			parent_hash: H256::repeat_byte(0x44),
+			state_root,
+			receipts_root: H256::zero(),
+		};
+		let mut proof = EthereumAccountStorageProof::<ConstU32<1>> {
+			execution_block_proof: EthereumExecutionBlockProof {
+				anchor_block_hash: anchor.block_hash,
+				target_to_anchor_header_chain: Default::default(),
+			},
+			account_proof: account_nodes
+				.into_iter()
+				.map(|(_, node)| node.to_vec().try_into().unwrap())
+				.collect::<Vec<_>>()
+				.try_into()
+				.unwrap(),
+			storage_proof: storage_nodes
+				.into_iter()
+				.map(|(_, node)| node.to_vec().try_into().unwrap())
+				.collect::<Vec<_>>()
+				.try_into()
+				.unwrap(),
+			slots: vec![EthereumStorageSlotProof {
+				slot: absent_slot,
+				value: H256::zero(),
+				node_indexes: node_indexes.try_into().unwrap(),
+			}]
+			.try_into()
+			.unwrap(),
+		};
+
+		new_tester().execute_with(|| {
+			ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
+			assert_ok!(EthereumBeaconClient::verify_account_storage_proof(account_address, &proof));
+			proof.slots[0].value = H256::from_low_u64_be(1);
+			assert_eq!(
+				EthereumBeaconClient::verify_account_storage_proof(account_address, &proof),
+				Err(EthereumVerifyError::InvalidProof),
+			);
+		});
+	}
+}
+
+#[test]
+fn verify_account_storage_proof_fixture_rejects_wrong_state_root() {
+	let (gateway_address, mut anchor, proof) = load_account_storage_proof_fixture();
+	anchor.state_root = H256::repeat_byte(0x24);
+
+	new_tester().execute_with(|| {
+		ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
+		assert_eq!(
+			EthereumBeaconClient::verify_account_storage_proof(gateway_address, &proof),
+			Err(EthereumVerifyError::InvalidProof),
+		);
+	});
+}
+
+#[test]
+fn verify_account_storage_proof_fixture_rejects_tampered_nodes() {
+	let (gateway_address, anchor, proof) = load_account_storage_proof_fixture();
+	let mut tampered_account = proof.clone();
+	*tampered_account.account_proof[2].last_mut().unwrap() ^= 1;
+	let mut tampered_storage = proof.clone();
+	*tampered_storage.storage_proof[4].last_mut().unwrap() ^= 1;
+
+	new_tester().execute_with(|| {
+		ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
+		for tampered in [&tampered_account, &tampered_storage] {
+			assert_eq!(
+				EthereumBeaconClient::verify_account_storage_proof(gateway_address, tampered),
+				Err(EthereumVerifyError::InvalidProof),
+			);
+		}
+	});
+}
+
+#[test]
+fn verify_account_storage_proof_fixture_rejects_truncated_account_paths() {
+	let (gateway_address, anchor, proof) = load_account_storage_proof_fixture();
+
+	new_tester().execute_with(|| {
+		ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
+		for node_count in 0..proof.account_proof.len() {
+			let mut truncated = proof.clone();
+			truncated.account_proof.truncate(node_count);
+			assert_eq!(
+				EthereumBeaconClient::verify_account_storage_proof(gateway_address, &truncated),
+				Err(EthereumVerifyError::InvalidProof),
+			);
+		}
+	});
+}
+
+#[test]
+fn verify_account_storage_proof_fixture_rejects_wrong_account() {
+	let (_gateway_address, anchor, proof) = load_account_storage_proof_fixture();
+	let wrong_gateway_address = H160::repeat_byte(0x24);
+
+	new_tester().execute_with(|| {
+		ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
+		assert_eq!(
+			EthereumBeaconClient::verify_account_storage_proof_against_state_root(
+				anchor.state_root,
+				wrong_gateway_address,
+				&proof,
+			),
+			Err(EthereumVerifyError::InvalidProof)
+		);
+		assert_eq!(
+			EthereumBeaconClient::verify_account_storage_proof(wrong_gateway_address, &proof),
+			Err(EthereumVerifyError::InvalidProof),
+		);
+	});
+}
+
+#[test]
+fn verify_account_storage_proof_fixture_rejects_wrong_slot_value() {
+	let (gateway_address, anchor, mut proof) = load_account_storage_proof_fixture();
+	proof.slots[1].value = H256::repeat_byte(0x36);
+
+	new_tester().execute_with(|| {
+		ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
+		assert_eq!(
+			EthereumBeaconClient::verify_account_storage_proof_against_state_root(
+				anchor.state_root,
+				gateway_address,
+				&proof,
+			),
+			Err(EthereumVerifyError::InvalidProof)
+		);
+		assert_eq!(
+			EthereumBeaconClient::verify_account_storage_proof(gateway_address, &proof),
+			Err(EthereumVerifyError::InvalidProof),
+		);
+	});
+}
+
+#[test]
+fn verify_account_storage_proof_fixture_rejects_out_of_range_shared_node_index() {
+	let (gateway_address, anchor, mut proof) = load_account_storage_proof_fixture();
+	proof.slots[1].node_indexes = vec![999u16]
+		.try_into()
+		.expect("single out-of-range index stays within bounded node refs");
+
+	new_tester().execute_with(|| {
+		ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
+		assert_eq!(
+			EthereumBeaconClient::verify_account_storage_proof_against_state_root(
+				anchor.state_root,
+				gateway_address,
+				&proof,
+			),
+			Err(EthereumVerifyError::InvalidProof)
+		);
+		assert_eq!(
+			EthereumBeaconClient::verify_account_storage_proof(gateway_address, &proof),
+			Err(EthereumVerifyError::InvalidProof),
+		);
+	});
+}
+
+#[test]
+fn verify_account_storage_proof_fixture_rejects_duplicate_shared_node_index() {
+	let (gateway_address, anchor, mut proof) = load_account_storage_proof_fixture();
+	let duplicated_index = proof.slots[0].node_indexes[0];
+	proof.slots[0].node_indexes = vec![duplicated_index, duplicated_index]
+		.try_into()
+		.expect("duplicate indexes stay within bounded node refs");
+
+	new_tester().execute_with(|| {
+		ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
+		assert_eq!(
+			EthereumBeaconClient::verify_account_storage_proof_against_state_root(
+				anchor.state_root,
+				gateway_address,
+				&proof,
+			),
+			Err(EthereumVerifyError::InvalidProof)
+		);
+		assert_eq!(
+			EthereumBeaconClient::verify_account_storage_proof(gateway_address, &proof),
+			Err(EthereumVerifyError::InvalidProof),
 		);
 	});
 }

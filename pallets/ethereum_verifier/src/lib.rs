@@ -28,6 +28,9 @@ pub mod functions;
 pub mod migrations;
 mod receipt;
 pub mod ring_buffer;
+mod storage_proof;
+#[cfg(test)]
+mod storage_proof_fixture;
 pub mod types;
 pub mod weights;
 

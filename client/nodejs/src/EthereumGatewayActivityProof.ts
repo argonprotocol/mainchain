@@ -1,19 +1,38 @@
-import { mintingGatewayAbi } from './EvmContracts';
-import type { ArgonClient, IArgonQueryable } from './index';
-import { getAddress, type Hex, toHex } from 'viem';
 import {
+  hashMintingGatewayActivityBlockLocator,
+  mintingGatewayAbi,
+  type MintingGatewayHashContext,
+} from './EvmContracts';
+import type { ArgonClient, IArgonQueryable } from './index';
+import { createBlockHeaderFromRLP } from '@ethereumjs/block';
+import { createMerkleProof, createMPTFromProof } from '@ethereumjs/mpt';
+import {
+  bytesToHex,
+  concatHex,
+  fromRlp,
+  getAddress,
+  hexToBytes,
+  keccak256,
+  size,
+  toHex,
+  type GetProofReturnType,
+  type Hex,
+} from 'viem';
+import {
+  appendEthereumGatewayActivityRoot,
   decodeEthereumGatewayActivityLog,
+  hashEthereumGatewayActivity,
   type EthereumGatewayActivity,
 } from './EthereumGatewayActivity';
 import {
   ArgonFinalizedExecutionHeaderPathError,
   buildExecutionHeaderChain,
   buildEthereumEventProof,
-  type ArgonFinalizedExecutionHeader,
   type EthereumEventLocator,
   type EthereumEventLocatorBlock,
   type EthereumEventProof,
   getLatestArgonFinalizedExecutionHeader,
+  type ArgonFinalizedExecutionHeader,
   loadExecutionHeader,
 } from './EthereumProof';
 import {
@@ -23,9 +42,29 @@ import {
   retryWhileExecutionRpcIndexing,
 } from './EthereumExecution';
 
-export type EthereumGatewayActivityProofPayload = {
+type EthereumStorageSlotProofPayload = {
+  slot: Hex;
+  value: Hex;
+  nodeIndexes: number[];
+};
+
+type EthereumAccountStorageProofPayload = {
+  executionBlockProof: EthereumEventProof['executionBlockProof'];
+  accountProof: Hex[];
+  storageProof: Hex[];
+  slots: EthereumStorageSlotProofPayload[];
+};
+
+type GatewayActivityStorageProof = {
+  activityRootSeed: Hex;
+  locatorIndex: bigint;
+  storageProof: EthereumAccountStorageProofPayload;
+  activityLogs: GatewayActivityLog['log'][];
+};
+
+type EthereumGatewayActivityPayload<TProof> = {
   previousGatewayActivityNonce: bigint;
-  proof: EthereumEventProof;
+  proof: TProof;
   gatewayActivityNonceRange: {
     start: bigint;
     end: bigint;
@@ -37,24 +76,55 @@ export type EthereumGatewayActivityProofPayload = {
   activities: EthereumGatewayActivity[];
 };
 
-export type DiscoveredGatewayActivities = Pick<
-  EthereumGatewayActivityProofPayload,
-  'previousGatewayActivityNonce' | 'activities'
->;
+export type EthereumGatewayActivityReceiptProofPayload =
+  EthereumGatewayActivityPayload<EthereumEventProof>;
 
-type MintingGatewayActivityBlockLocator = {
+export type EthereumGatewayActivityStorageProofPayload =
+  EthereumGatewayActivityPayload<GatewayActivityStorageProof>;
+
+export type MissingGatewayActivityLocator = {
+  locatorIndex: bigint;
   blockNumber: bigint;
   startGatewayActivityNonce: bigint;
   endGatewayActivityNonce: bigint;
-  activityRoot?: Hex;
+  previousLocatorHash: Hex;
+  activityRoot: Hex;
 };
 
-type GatewayActivityProofChunk = {
+/** App-owned capture of one complete locator at a particular Ethereum execution block. */
+export type CapturedGatewayActivityStorageProof = MissingGatewayActivityLocator & {
+  executionHeaderRlp: Hex;
+  proof: GatewayActivityStorageProof;
+  activities: EthereumGatewayActivity[];
+};
+
+export type EthereumGatewayActivityProofBuildResult<
+  TPayload,
+  TLocator extends MissingGatewayActivityLocator = MissingGatewayActivityLocator,
+> = {
+  payloads: TPayload[];
+  deferredLocators: TLocator[];
+  /** Captures that cannot reach a retained anchor; capture these locators again at a newer block. */
+  recaptureLocators: TLocator[];
+};
+
+export type EthereumGatewayActivityProofPayload =
+  | EthereumGatewayActivityReceiptProofPayload
+  | EthereumGatewayActivityStorageProofPayload;
+
+type EthereumBlockLog = Awaited<ReturnType<EthereumExecutionClient['getLogs']>>[number];
+
+type GatewayActivityLog = {
+  activity: EthereumGatewayActivity;
+  log: Pick<EthereumBlockLog, 'address' | 'topics' | 'data'>;
+};
+
+type GatewayActivityReceiptProofChunk = {
   activities: EthereumGatewayActivity[];
   locatorBlock: EthereumEventLocatorBlock;
 };
 
-type GatewayProofBounds = {
+type GatewayReceiptProofBounds = {
   activitiesPerReceiptProof: number;
   receiptProofsPerExtrinsic: number;
   sharedHeaderDepth: number;
@@ -66,339 +136,643 @@ type ArgonFinalizedExecutionHeaderPlan = {
   targetToArgonFinalizedHeaderChain: Awaited<ReturnType<typeof buildExecutionHeaderChain>>;
 };
 
-type EthereumBlockLog = Awaited<ReturnType<EthereumExecutionClient['getLogs']>>[number];
+const ZERO_HASH: Hex = `0x${'00'.repeat(32)}`;
 
-const activityBlockLocatorAbi = [
-  {
-    inputs: [{ name: '', type: 'uint64' }],
-    name: 'activityBlockLocators',
-    outputs: [
-      { name: 'blockNumber', type: 'uint64' },
-      { name: 'startGatewayActivityNonce', type: 'uint64' },
-      { name: 'endGatewayActivityNonce', type: 'uint64' },
-      { name: 'activityRoot', type: 'bytes32' },
-    ],
-    stateMutability: 'view',
-    type: 'function',
-  },
-] as const;
+/**
+ * Receipt and storage proof calls may coexist; detect each capability independently.
+ */
+export function supportsGatewayActivityReceiptProofs(client: Pick<ArgonClient, 'tx'>): boolean {
+  return typeof client.tx.crosschainTransfer?.proveGatewayActivity === 'function';
+}
 
-const legacyActivityBlockLocatorAbi = [
-  {
-    inputs: [{ name: '', type: 'uint64' }],
-    name: 'activityBlockLocators',
-    outputs: [
-      { name: 'blockNumber', type: 'uint64' },
-      { name: 'startGatewayActivityNonce', type: 'uint64' },
-      { name: 'endGatewayActivityNonce', type: 'uint64' },
-    ],
-    stateMutability: 'view',
-    type: 'function',
-  },
-] as const;
+export function supportsGatewayActivityStorageProofs(client: Pick<ArgonClient, 'tx'>): boolean {
+  return typeof client.tx.crosschainTransfer?.proveGatewayActivityStorage === 'function';
+}
 
-export async function buildGatewayActivityProofPayload(
-  client: IArgonQueryable & Pick<ArgonClient, 'consts'>,
+/**
+ * Builds gateway activity proofs using the available runtime calls, preferring storage proofs.
+ *
+ * Pass discovered locators for receipts, or records returned by
+ * `captureGatewayActivityStorageProofs` for storage. This function never captures storage witnesses.
+ */
+export async function buildGatewayActivityProof<TLocator extends MissingGatewayActivityLocator>(
+  client: IArgonQueryable & Pick<ArgonClient, 'consts' | 'tx'>,
   options: EthereumExecutionSource & {
     gatewayAddress: Hex;
-    throughExecutionBlockNumber?: bigint;
+    locators: TLocator[];
   },
-): Promise<EthereumGatewayActivityProofPayload | null> {
-  const bounds = getGatewayProofBounds(client);
-  const discovered = await discoverGatewayActivities(client, options);
-  if (!discovered) {
-    return null;
+): Promise<EthereumGatewayActivityProofBuildResult<EthereumGatewayActivityProofPayload, TLocator>> {
+  if (!supportsGatewayActivityStorageProofs(client)) {
+    if (supportsGatewayActivityReceiptProofs(client)) {
+      return buildGatewayActivityReceiptProofPayloads(client, options);
+    }
+
+    throw new Error('Gateway activity proofs are not supported by this runtime');
   }
 
+  const captures = options.locators.filter(
+    (locator): locator is TLocator & CapturedGatewayActivityStorageProof => 'proof' in locator,
+  );
+  if (captures.length !== options.locators.length) {
+    throw new Error(
+      'Gateway activity storage proofs require captured locators; call captureGatewayActivityStorageProofs first',
+    );
+  }
+
+  return buildGatewayActivityStorageProofs(client, {
+    ...options,
+    locators: captures,
+  });
+}
+
+/**
+ * Builds receipt-proof payloads for the cached locators that can be relayed right now.
+ */
+export async function buildGatewayActivityReceiptProofPayloads<
+  TLocator extends MissingGatewayActivityLocator,
+>(
+  client: IArgonQueryable & Pick<ArgonClient, 'consts' | 'tx'>,
+  options: EthereumExecutionSource & {
+    gatewayAddress: Hex;
+    locators: TLocator[];
+  },
+): Promise<
+  EthereumGatewayActivityProofBuildResult<EthereumGatewayActivityReceiptProofPayload, TLocator>
+> {
+  if (!supportsGatewayActivityReceiptProofs(client)) {
+    throw new Error(
+      'Gateway activity receipt proofs are not supported by this runtime; use discoverMissingGatewayActivityLocators and buildGatewayActivityStorageProofs instead',
+    );
+  }
+
+  const bounds = getGatewayReceiptProofBounds(client);
   const executionClient = getExecutionClient(options);
-  const proofChunks = chunkGatewayActivitiesForProof(
-    discovered.activities,
+  const gatewayAddress = getAddress(options.gatewayAddress);
+  const [previousGatewayActivityNonce, chainId] = await Promise.all([
+    loadPreviousGatewayActivityNonce(client),
+    executionClient.getChainId(),
+  ]);
+  const hashContext = {
+    chainId: BigInt(chainId),
+    gatewayAddress,
+  };
+  const relayableLocators = [...options.locators]
+    .filter(locator => locator.endGatewayActivityNonce > previousGatewayActivityNonce)
+    .sort((left, right) =>
+      compareBigintsAscending(left.startGatewayActivityNonce, right.startGatewayActivityNonce),
+    );
+  const activities = await collectActivitiesFromLocators(
+    executionClient,
+    relayableLocators,
+    previousGatewayActivityNonce + 1n,
+    hashContext,
+  );
+  if (activities.length === 0) {
+    return {
+      payloads: [],
+      deferredLocators: relayableLocators,
+      recaptureLocators: [],
+    };
+  }
+
+  const proofChunks = chunkGatewayActivitiesForReceiptProof(
+    activities,
     bounds.activitiesPerReceiptProof,
   );
-  const argonFinalizedExecutionHeaderPlan = await selectArgonFinalizedExecutionHeader(
-    client,
-    executionClient,
-    proofChunks[0],
-    bounds.sharedHeaderDepth,
-  );
-  if (!argonFinalizedExecutionHeaderPlan) {
-    return null;
-  }
+  const payloads: EthereumGatewayActivityReceiptProofPayload[] = [];
+  let nextPreviousGatewayActivityNonce = previousGatewayActivityNonce;
+  let remainingProofChunks = proofChunks;
 
-  const acceptedProofChunks = await collectProofChunksForArgonFinalizedExecutionHeader(
-    executionClient,
-    proofChunks,
-    argonFinalizedExecutionHeaderPlan,
-    bounds.receiptProofsPerExtrinsic,
-  );
-  if (acceptedProofChunks.length === 0) {
-    return null;
-  }
+  while (remainingProofChunks.length > 0) {
+    let headerPlan: ArgonFinalizedExecutionHeaderPlan | null;
+    try {
+      headerPlan = await selectArgonFinalizedExecutionHeader(
+        client,
+        executionClient,
+        remainingProofChunks[0],
+        bounds.sharedHeaderDepth,
+      );
+    } catch (error) {
+      if (error instanceof ArgonFinalizedExecutionHeaderPathError && payloads.length > 0) {
+        break;
+      }
+      throw error;
+    }
+    if (!headerPlan) {
+      break;
+    }
 
-  const acceptedActivities = acceptedProofChunks.flatMap(({ activities }) => activities);
-  const proof = await buildEthereumEventProof(
-    options,
-    argonFinalizedExecutionHeaderPlan.argonFinalizedExecutionHeader,
-    acceptedProofChunks.map(({ locatorBlock }) => locatorBlock),
-  );
+    const acceptedProofChunks = await collectProofChunksForArgonFinalizedExecutionHeader(
+      executionClient,
+      remainingProofChunks,
+      headerPlan,
+      bounds.receiptProofsPerExtrinsic,
+    );
+    if (acceptedProofChunks.length === 0) {
+      break;
+    }
+
+    const acceptedActivities = acceptedProofChunks.flatMap(({ activities }) => activities);
+    const proof = await buildEthereumEventProof(
+      options,
+      headerPlan.argonFinalizedExecutionHeader,
+      acceptedProofChunks.map(({ locatorBlock }) => locatorBlock),
+    );
+
+    payloads.push({
+      previousGatewayActivityNonce: nextPreviousGatewayActivityNonce,
+      proof,
+      gatewayActivityNonceRange: {
+        start: acceptedActivities[0].gatewayState.gatewayActivityNonce,
+        end: acceptedActivities.at(-1)!.gatewayState.gatewayActivityNonce,
+      },
+      executionBlockNumberRange: {
+        start: acceptedActivities[0].blockNumber,
+        end: acceptedActivities.at(-1)!.blockNumber,
+      },
+      activities: acceptedActivities,
+    });
+    nextPreviousGatewayActivityNonce = acceptedActivities.at(-1)!.gatewayState.gatewayActivityNonce;
+    remainingProofChunks = remainingProofChunks.slice(acceptedProofChunks.length);
+  }
 
   return {
-    previousGatewayActivityNonce: discovered.previousGatewayActivityNonce,
-    proof,
-    gatewayActivityNonceRange: {
-      start: acceptedActivities[0].gatewayState.gatewayActivityNonce,
-      end: acceptedActivities.at(-1)!.gatewayState.gatewayActivityNonce,
-    },
-    executionBlockNumberRange: {
-      start: acceptedActivities[0].blockNumber,
-      end: acceptedActivities.at(-1)!.blockNumber,
-    },
-    activities: acceptedActivities,
+    payloads,
+    deferredLocators: relayableLocators.filter(
+      locator => locator.endGatewayActivityNonce > nextPreviousGatewayActivityNonce,
+    ),
+    recaptureLocators: [],
   };
 }
 
-async function loadActivityBlockLocator(
-  executionClient: EthereumExecutionClient,
-  gatewayAddress: Hex,
-  locatorIndex: bigint,
-  cache: Map<bigint, MintingGatewayActivityBlockLocator>,
-): Promise<MintingGatewayActivityBlockLocator> {
-  const cached = cache.get(locatorIndex);
-  if (cached) {
-    return cached;
+/**
+ * Captures storage witnesses while the execution RPC still has recent state, before Argon anchoring.
+ *
+ * The app chooses an observed (not pending) execution block and owns persistence and recapture.
+ * A single eth_getProof request captures all selected locator slots before loading activity logs.
+ * Witnesses are checked against the captured header so a reorg or inconsistent RPC cannot poison
+ * the cache with state from another block at the same height.
+ */
+export async function captureGatewayActivityStorageProofs(
+  options: EthereumExecutionSource & {
+    executionBlock: Pick<
+      Awaited<ReturnType<EthereumExecutionClient['getBlock']>>,
+      'hash' | 'number'
+    >;
+    gatewayAddress: Hex;
+    locators: MissingGatewayActivityLocator[];
+  },
+): Promise<CapturedGatewayActivityStorageProof[]> {
+  if (options.locators.length === 0) return [];
+  const { hash: blockHash, number: blockNumber } = options.executionBlock;
+  if (blockHash === null || blockNumber === null) {
+    throw new Error('Storage proof capture requires a mined execution block');
+  }
+  for (const locator of options.locators) {
+    if (locator.blockNumber > blockNumber) {
+      throw new Error(`Gateway block ${locator.blockNumber} is newer than the capture block`);
+    }
   }
 
-  let locator: readonly [bigint, bigint, bigint, Hex];
-
-  try {
-    locator = await executionClient.readContract({
-      abi: activityBlockLocatorAbi,
+  const executionClient = getExecutionClient(options);
+  const gatewayAddress = getAddress(options.gatewayAddress);
+  const [chainId, mappingSlot] = await Promise.all([
+    executionClient.getChainId(),
+    executionClient.readContract({
+      abi: mintingGatewayAbi,
       address: gatewayAddress,
-      functionName: 'activityBlockLocators',
-      args: [locatorIndex],
+      blockNumber,
+      functionName: 'activityBlockLocatorsMappingSlot',
+    }),
+  ]);
+  const locatorSlots = options.locators.map(locator => {
+    const base = BigInt(
+      keccak256(
+        concatHex([toHex(locator.locatorIndex, { size: 32 }), toHex(mappingSlot, { size: 32 })]),
+      ),
+    );
+    return [toHex(base, { size: 32 }), toHex(base + 1n, { size: 32 })];
+  });
+  const witness = await retryWhileExecutionRpcIndexing(() =>
+    executionClient.getProof({
+      address: gatewayAddress,
+      blockNumber,
+      storageKeys: [...new Set(locatorSlots.flat())],
+    }),
+  );
+  const captureHeader = await loadExecutionHeader(executionClient, blockHash);
+  if (captureHeader.number !== blockNumber) {
+    throw new Error('Storage proof capture block number does not match its header');
+  }
+
+  const accountTrie = await createMPTFromProof(
+    witness.accountProof.map(node => hexToBytes(node)),
+    { root: captureHeader.stateRoot, useKeyHashing: true },
+  );
+  const accountKey = hexToBytes(gatewayAddress);
+  const account = await accountTrie.get(accountKey, true);
+  const accountFields = account && fromRlp(bytesToHex(account), 'hex');
+  if (
+    !Array.isArray(accountFields) ||
+    accountFields.length !== 4 ||
+    typeof accountFields[2] !== 'string'
+  ) {
+    throw new Error('eth_getProof did not prove the gateway account at the capture block');
+  }
+  const storageRoot = hexToBytes(accountFields[2] as Hex);
+  // Rebuild the ordered paths: the runtime rejects redundant nodes accepted by the trie library.
+  const accountProof = (await createMerkleProof(accountTrie, accountKey)).map(node =>
+    bytesToHex(node),
+  );
+  const slotProofsByKey = new Map<string, GetProofReturnType['storageProof'][number]>();
+  for (const slotProof of witness.storageProof) {
+    // RPCs may return quantity-style keys without the requested 32-byte padding.
+    const key = toHex(BigInt(slotProof.key), { size: 32 }).toLowerCase();
+    if (!slotProofsByKey.has(key)) slotProofsByKey.set(key, slotProof);
+  }
+
+  const executionHeaderRlp = bytesToHex(captureHeader.serialize());
+  const hashContext = { chainId: BigInt(chainId), gatewayAddress };
+  const captures: CapturedGatewayActivityStorageProof[] = [];
+  for (const [index, locator] of options.locators.entries()) {
+    const storageProof = await verifyLocatorStorageProof(
+      locator,
+      locatorSlots[index],
+      storageRoot,
+      slotProofsByKey,
+    );
+    const activities = await readAndVerifyLocatorActivities(executionClient, locator, hashContext);
+    captures.push({
+      ...locator,
+      executionHeaderRlp,
+      activities: activities.map(({ activity }) => activity),
+      proof: {
+        locatorIndex: locator.locatorIndex,
+        activityRootSeed: locator.previousLocatorHash,
+        activityLogs: activities.map(({ log }) => log),
+        storageProof: {
+          executionBlockProof: { anchorBlockHash: blockHash, targetToAnchorHeaderChain: [] },
+          accountProof,
+          ...storageProof,
+        },
+      },
     });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    if (
-      !message.includes('out of bounds') &&
-      !message.includes('Decode') &&
-      !message.includes('decode')
-    ) {
-      throw error;
+  }
+  return captures;
+}
+
+/**
+ * Attaches retained-anchor ancestry to app-cached captures, without refetching witnesses or logs.
+ * Missing anchors/gaps are deferred; orphaned or over-distance captures must be captured again.
+ * Capacity violations are errors, not deferred work: a newer anchor cannot make them fit.
+ */
+export async function buildGatewayActivityStorageProofs<
+  TLocator extends CapturedGatewayActivityStorageProof,
+>(
+  client: IArgonQueryable & Pick<ArgonClient, 'consts' | 'tx'>,
+  options: EthereumExecutionSource & {
+    gatewayAddress: Hex;
+    locators: TLocator[];
+  },
+): Promise<
+  EthereumGatewayActivityProofBuildResult<EthereumGatewayActivityStorageProofPayload, TLocator>
+> {
+  if (!supportsGatewayActivityStorageProofs(client)) {
+    throw new Error(
+      'Gateway activity storage proofs are not supported by this runtime; use buildGatewayActivityReceiptProofPayloads instead',
+    );
+  }
+
+  const maxActivitiesPerGatewayProof =
+    client.consts.crosschainTransfer.maxActivitiesPerGatewayProof.toNumber();
+  if (maxActivitiesPerGatewayProof < 1) {
+    throw new Error('Gateway proof requires maxActivitiesPerGatewayProof to be a positive integer');
+  }
+  const maxGatewayActivityLogDataBytes =
+    client.consts.crosschainTransfer.maxGatewayActivityLogDataBytes.toNumber();
+
+  const executionClient = getExecutionClient(options);
+  const gatewayAddress = getAddress(options.gatewayAddress);
+  const previousGatewayActivityNonce = await loadPreviousGatewayActivityNonce(client);
+  const maximumDepth = BigInt(
+    client.consts.crosschainTransfer.maxProofExecutionHeaderDepth.toNumber(),
+  );
+  const pendingCaptures = [...options.locators]
+    .filter(capture => capture.endGatewayActivityNonce > previousGatewayActivityNonce)
+    .sort((left, right) =>
+      compareBigintsAscending(left.startGatewayActivityNonce, right.startGatewayActivityNonce),
+    );
+  const payloads: EthereumGatewayActivityStorageProofPayload[] = [];
+  const recaptureLocators: TLocator[] = [];
+  // Several locators captured at one block share the same retained anchor and ancestry path.
+  const ancestryByCaptureHeader = new Map<Hex, EthereumEventProof['executionBlockProof']>();
+  let expectedPreviousGatewayActivityNonce = previousGatewayActivityNonce;
+
+  for (const capture of pendingCaptures) {
+    const nextGatewayActivityNonce = expectedPreviousGatewayActivityNonce + 1n;
+    if (nextGatewayActivityNonce < capture.startGatewayActivityNonce) {
+      break;
+    }
+    if (nextGatewayActivityNonce > capture.endGatewayActivityNonce) {
+      continue;
     }
 
-    const legacyLocator = await executionClient.readContract({
-      abi: legacyActivityBlockLocatorAbi,
-      address: gatewayAddress,
-      functionName: 'activityBlockLocators',
-      args: [locatorIndex],
+    const { proof } = capture;
+    // These compatibility checks should never trigger with the capped contract and supported runtime.
+    // Fail early on mismatched limits rather than submit a proof that cannot be accepted.
+    if (proof.activityLogs.length > maxActivitiesPerGatewayProof) {
+      throw new Error(`Gateway block ${capture.blockNumber} exceeds maxActivitiesPerGatewayProof`);
+    }
+    const activityLogDataBytes = proof.activityLogs.reduce(
+      (total, log) => total + size(log.data),
+      0,
+    );
+    if (activityLogDataBytes > maxGatewayActivityLogDataBytes) {
+      throw new Error(
+        `Gateway block ${capture.blockNumber} activity log data (${activityLogDataBytes} bytes) exceeds maxGatewayActivityLogDataBytes (${maxGatewayActivityLogDataBytes} bytes)`,
+      );
+    }
+
+    if (
+      proof.activityLogs.some(log => log.address.toLowerCase() !== gatewayAddress.toLowerCase())
+    ) {
+      throw new Error('Captured storage proof belongs to a different gateway');
+    }
+    let executionBlockProof = ancestryByCaptureHeader.get(capture.executionHeaderRlp);
+    if (!executionBlockProof) {
+      const captureHeader = createBlockHeaderFromRLP(hexToBytes(capture.executionHeaderRlp));
+      const relayAnchor = await loadRetainedExecutionHeaderAnchorAtOrAfterBlock(
+        client,
+        captureHeader.number,
+      );
+      if (!relayAnchor) break;
+      if (relayAnchor.blockNumber - captureHeader.number > maximumDepth) {
+        recaptureLocators.push(capture);
+        break;
+      }
+      try {
+        const chain = await buildExecutionHeaderChain(executionClient, captureHeader, relayAnchor);
+        executionBlockProof = {
+          anchorBlockHash: relayAnchor.blockHash,
+          targetToAnchorHeaderChain: chain.map(({ rlp }) => ({ rlp })),
+        };
+      } catch (error) {
+        if (!(error instanceof ArgonFinalizedExecutionHeaderPathError)) throw error;
+        recaptureLocators.push(capture);
+        break;
+      }
+      ancestryByCaptureHeader.set(capture.executionHeaderRlp, executionBlockProof);
+    }
+
+    payloads.push({
+      previousGatewayActivityNonce: expectedPreviousGatewayActivityNonce,
+      proof: {
+        ...proof,
+        storageProof: { ...proof.storageProof, executionBlockProof },
+      },
+      gatewayActivityNonceRange: {
+        start: nextGatewayActivityNonce,
+        end: capture.endGatewayActivityNonce,
+      },
+      executionBlockNumberRange: {
+        start: capture.blockNumber,
+        end: capture.blockNumber,
+      },
+      activities: capture.activities.filter(
+        activity => activity.gatewayState.gatewayActivityNonce >= nextGatewayActivityNonce,
+      ),
     });
-    const [blockNumber, startGatewayActivityNonce, endGatewayActivityNonce] = legacyLocator;
-    const loaded: MintingGatewayActivityBlockLocator = {
+    expectedPreviousGatewayActivityNonce = capture.endGatewayActivityNonce;
+  }
+
+  return {
+    payloads,
+    deferredLocators: pendingCaptures.filter(
+      capture =>
+        capture.endGatewayActivityNonce > expectedPreviousGatewayActivityNonce &&
+        !recaptureLocators.includes(capture),
+    ),
+    recaptureLocators,
+  };
+}
+
+/**
+ * Discovers finalized locator blocks whose activity range reaches the caller's minimum gateway
+ * activity nonce.
+ *
+ * This is the intended first step for both receipt-proof and storage-proof runtimes and can be
+ * called repeatedly while a client continues collecting unproven locator blocks. When a caller is
+ * already caching finalized locators, `afterLocatorIndex` lets it fetch only the newly finalized
+ * suffix.
+ */
+export async function discoverMissingGatewayActivityLocators(
+  options: EthereumExecutionSource & {
+    afterLocatorIndex?: bigint;
+    finalizedExecutionBlockNumber: bigint;
+    gatewayAddress: Hex;
+    minimumGatewayActivityNonce: bigint;
+  },
+): Promise<MissingGatewayActivityLocator[]> {
+  const executionClient = getExecutionClient(options);
+  const gatewayAddress = getAddress(options.gatewayAddress);
+  const readLocatorRecord = async (locatorIndex: bigint) => {
+    const [blockNumber, startGatewayActivityNonce, endGatewayActivityNonce, activityRoot] =
+      await executionClient.readContract({
+        abi: mintingGatewayAbi,
+        address: gatewayAddress,
+        blockNumber: options.finalizedExecutionBlockNumber,
+        functionName: 'activityBlockLocators',
+        args: [locatorIndex],
+      });
+
+    return {
+      locatorIndex,
       blockNumber,
       startGatewayActivityNonce,
       endGatewayActivityNonce,
+      activityRoot,
     };
-    cache.set(locatorIndex, loaded);
-    return loaded;
-  }
-
-  const [blockNumber, startGatewayActivityNonce, endGatewayActivityNonce, activityRoot] = locator;
-  const loaded: MintingGatewayActivityBlockLocator = {
-    blockNumber,
-    startGatewayActivityNonce,
-    endGatewayActivityNonce,
-    activityRoot,
   };
-  cache.set(locatorIndex, loaded);
-  return loaded;
-}
-
-async function findFirstUncoveredActivityBlockLocatorIndex(
-  executionClient: EthereumExecutionClient,
-  gatewayAddress: Hex,
-  latestLocatorIndex: bigint,
-  previousGatewayActivityNonce: bigint,
-  cache: Map<bigint, MintingGatewayActivityBlockLocator>,
-): Promise<bigint | null> {
-  let low = 1n;
-  let high = latestLocatorIndex;
-  let firstUncoveredIndex: bigint | null = null;
-
-  while (low <= high) {
-    const middle = (low + high) / 2n;
-    const locator = await loadActivityBlockLocator(executionClient, gatewayAddress, middle, cache);
-
-    if (locator.endGatewayActivityNonce > previousGatewayActivityNonce) {
-      firstUncoveredIndex = middle;
-      high = middle - 1n;
-      continue;
-    }
-
-    low = middle + 1n;
-  }
-
-  return firstUncoveredIndex;
-}
-
-export async function discoverGatewayActivities(
-  client: IArgonQueryable,
-  options: EthereumExecutionSource & {
-    gatewayAddress: Hex;
-    throughExecutionBlockNumber?: bigint;
-  },
-): Promise<DiscoveredGatewayActivities | null> {
-  const executionClient = getExecutionClient(options);
-  const gatewayAddress = getAddress(options.gatewayAddress);
   const latestLocatorIndex = await executionClient.readContract({
     abi: mintingGatewayAbi,
     address: gatewayAddress,
+    blockNumber: options.finalizedExecutionBlockNumber,
     functionName: 'latestActivityBlockLocatorIndex',
   });
   if (latestLocatorIndex === 0n) {
-    return null;
+    return [];
   }
 
-  const currentGatewayState =
-    await client.query.crosschainTransfer.gatewayStateBySourceChain('Ethereum');
-  const previousGatewayActivityNonce = currentGatewayState.isSome
-    ? currentGatewayState.unwrap().gatewayActivityNonce.toBigInt()
-    : 0n;
-  const locatorCache = new Map<bigint, MintingGatewayActivityBlockLocator>();
-  const firstLocatorIndex = await findFirstUncoveredActivityBlockLocatorIndex(
-    executionClient,
-    gatewayAddress,
-    latestLocatorIndex,
-    previousGatewayActivityNonce,
-    locatorCache,
-  );
-  if (!firstLocatorIndex) {
-    return null;
-  }
+  if (options.afterLocatorIndex !== undefined) {
+    if (options.afterLocatorIndex >= latestLocatorIndex) {
+      return [];
+    }
 
-  const activities: EthereumGatewayActivity[] = [];
-  let expectedGatewayActivityNonce = previousGatewayActivityNonce + 1n;
+    const locators: MissingGatewayActivityLocator[] = [];
+    const firstUncachedLocatorIndex = options.afterLocatorIndex + 1n;
+    let previousLocator: Awaited<ReturnType<typeof readLocatorRecord>> | undefined;
 
-  for (
-    let locatorIndex = firstLocatorIndex;
-    locatorIndex <= latestLocatorIndex;
-    locatorIndex += 1n
-  ) {
-    const locator = await loadActivityBlockLocator(
-      executionClient,
-      gatewayAddress,
-      locatorIndex,
-      locatorCache,
-    );
-    if (
-      options.throughExecutionBlockNumber !== undefined &&
-      locator.blockNumber > options.throughExecutionBlockNumber
+    if (options.afterLocatorIndex > 0n) {
+      previousLocator = await readLocatorRecord(options.afterLocatorIndex);
+    }
+
+    for (
+      let locatorIndex = firstUncachedLocatorIndex;
+      locatorIndex <= latestLocatorIndex;
+      locatorIndex += 1n
     ) {
+      const locatorRecord = await readLocatorRecord(locatorIndex);
+      const locator = {
+        ...locatorRecord,
+        previousLocatorHash: previousLocator
+          ? hashMintingGatewayActivityBlockLocator(previousLocator)
+          : ZERO_HASH,
+      };
+      if (locator.endGatewayActivityNonce >= options.minimumGatewayActivityNonce) {
+        locators.push(locator);
+      }
+      previousLocator = locatorRecord;
+    }
+
+    return locators;
+  }
+
+  const locators: MissingGatewayActivityLocator[] = [];
+  let currentLocator = await readLocatorRecord(latestLocatorIndex);
+
+  for (let locatorIndex = latestLocatorIndex; locatorIndex >= 1n; locatorIndex -= 1n) {
+    if (currentLocator.endGatewayActivityNonce < options.minimumGatewayActivityNonce) {
       break;
     }
-    if (locator.endGatewayActivityNonce < expectedGatewayActivityNonce) {
+
+    let previousLocator: Awaited<ReturnType<typeof readLocatorRecord>> | undefined;
+
+    if (locatorIndex > 1n) {
+      previousLocator = await readLocatorRecord(locatorIndex - 1n);
+    }
+
+    locators.push({
+      ...currentLocator,
+      previousLocatorHash: previousLocator
+        ? hashMintingGatewayActivityBlockLocator(previousLocator)
+        : ZERO_HASH,
+    });
+
+    if (!previousLocator) {
+      break;
+    }
+    currentLocator = previousLocator;
+  }
+
+  locators.reverse();
+  return locators;
+}
+
+async function verifyLocatorStorageProof(
+  locator: MissingGatewayActivityLocator,
+  slotKeys: Hex[],
+  storageRoot: Uint8Array,
+  slotProofsByKey: ReadonlyMap<string, GetProofReturnType['storageProof'][number]>,
+): Promise<Pick<EthereumAccountStorageProofPayload, 'storageProof' | 'slots'>> {
+  const expectedRange =
+    (locator.endGatewayActivityNonce << 128n) |
+    (locator.startGatewayActivityNonce << 64n) |
+    locator.blockNumber;
+  const nodes: Hex[] = [];
+  const nodeIndexes = new Map<string, number>();
+  const slots: EthereumStorageSlotProofPayload[] = [];
+
+  for (const [index, slot] of slotKeys.entries()) {
+    const slotProof = slotProofsByKey.get(slot.toLowerCase());
+    if (!slotProof) throw new Error(`eth_getProof did not return storage slot ${slot}`);
+    const expectedValue = index === 0 ? expectedRange : BigInt(locator.activityRoot);
+    if (slotProof.value !== expectedValue) {
+      throw new Error(`eth_getProof returned an unexpected value for storage slot ${slot}`);
+    }
+
+    const slotTrie = await createMPTFromProof(
+      slotProof.proof.map(node => hexToBytes(node)),
+      { root: storageRoot, useKeyHashing: true },
+    );
+    const slotKey = hexToBytes(slot);
+    const value = await slotTrie.get(slotKey, true);
+    const encoded = value && fromRlp(bytesToHex(value), 'hex');
+    if (encoded !== null && typeof encoded !== 'string') {
+      throw new Error(`eth_getProof returned an invalid storage value for ${slot}`);
+    }
+    const actualValue = typeof encoded === 'string' && encoded !== '0x' ? BigInt(encoded) : 0n;
+    if (actualValue !== expectedValue) {
+      throw new Error(`eth_getProof did not prove the expected value for storage slot ${slot}`);
+    }
+
+    const path = await createMerkleProof(slotTrie, slotKey);
+    const indexes = path.map(bytes => {
+      const node = bytesToHex(bytes);
+      const key = node.toLowerCase();
+      let nodeIndex = nodeIndexes.get(key);
+      if (nodeIndex === undefined) {
+        nodeIndex = nodes.length;
+        nodeIndexes.set(key, nodeIndex);
+        nodes.push(node);
+      }
+      return nodeIndex;
+    });
+    slots.push({ slot, value: toHex(expectedValue, { size: 32 }), nodeIndexes: indexes });
+  }
+
+  return { storageProof: nodes, slots };
+}
+
+async function collectActivitiesFromLocators(
+  executionClient: EthereumExecutionClient,
+  locators: MissingGatewayActivityLocator[],
+  minimumGatewayActivityNonce: bigint,
+  hashContext: MintingGatewayHashContext,
+): Promise<EthereumGatewayActivity[]> {
+  const activities: EthereumGatewayActivity[] = [];
+  let expectedGatewayActivityNonce = minimumGatewayActivityNonce;
+
+  for (const locator of locators) {
+    if (expectedGatewayActivityNonce < locator.startGatewayActivityNonce) {
+      break;
+    }
+    if (expectedGatewayActivityNonce > locator.endGatewayActivityNonce) {
       continue;
     }
 
-    const blockActivities = await loadGatewayActivitiesForLocator(
+    const blockActivities = await readAndVerifyLocatorActivities(
       executionClient,
-      gatewayAddress,
       locator,
-      expectedGatewayActivityNonce,
+      hashContext,
     );
-    activities.push(...blockActivities);
+
+    activities.push(
+      ...blockActivities
+        .filter(
+          ({ activity }) =>
+            activity.gatewayState.gatewayActivityNonce >= expectedGatewayActivityNonce,
+        )
+        .map(({ activity }) => activity),
+    );
     expectedGatewayActivityNonce = locator.endGatewayActivityNonce + 1n;
   }
 
-  if (activities.length === 0) {
-    return null;
-  }
-
-  return {
-    previousGatewayActivityNonce,
-    activities,
-  };
+  return activities;
 }
 
-async function loadGatewayActivitiesForLocator(
-  executionClient: EthereumExecutionClient,
-  gatewayAddress: Hex,
-  locator: MintingGatewayActivityBlockLocator,
-  expectedGatewayActivityNonce: bigint,
-): Promise<EthereumGatewayActivity[]> {
-  const blockLogs = await retryWhileExecutionRpcIndexing(() =>
-    executionClient.getLogs({
-      address: gatewayAddress,
-      fromBlock: locator.blockNumber,
-      toBlock: locator.blockNumber,
-    }),
-  );
-  const activities = blockLogs
-    .flatMap(log => {
-      try {
-        return [toEthereumGatewayActivity(log)];
-      } catch {
-        return [];
-      }
-    })
-    .sort((left, right) =>
-      left.gatewayState.gatewayActivityNonce < right.gatewayState.gatewayActivityNonce ? -1 : 1,
-    );
-  const remainingActivities = activities.filter(
-    activity =>
-      activity.gatewayState.gatewayActivityNonce >= expectedGatewayActivityNonce &&
-      activity.gatewayState.gatewayActivityNonce <= locator.endGatewayActivityNonce,
-  );
-  if (
-    remainingActivities.length === 0 ||
-    remainingActivities[0].gatewayState.gatewayActivityNonce !== expectedGatewayActivityNonce
-  ) {
-    throw new Error(`Gateway block ${locator.blockNumber} contains uncovered gateway activity`);
+function compareBigintsAscending(left: bigint, right: bigint): number {
+  if (left === right) {
+    return 0;
   }
 
-  let previousNonce = expectedGatewayActivityNonce - 1n;
-  for (const activity of remainingActivities) {
-    if (activity.gatewayState.gatewayActivityNonce !== previousNonce + 1n) {
-      throw new Error(
-        `Gateway block ${locator.blockNumber} contains a gap in gateway activity coverage`,
-      );
-    }
-    previousNonce = activity.gatewayState.gatewayActivityNonce;
-  }
-
-  if (previousNonce !== locator.endGatewayActivityNonce) {
-    throw new Error(`Gateway block ${locator.blockNumber} contains uncovered gateway activity`);
-  }
-
-  return remainingActivities;
+  return left < right ? -1 : 1;
 }
 
-function toEthereumGatewayActivity(log: EthereumBlockLog): EthereumGatewayActivity {
-  if (
-    !log.transactionHash ||
-    log.transactionIndex == null ||
-    log.logIndex == null ||
-    !log.blockHash ||
-    log.blockNumber == null
-  ) {
-    throw new Error('Execution log is missing indexed receipt metadata');
-  }
-
-  return {
-    txHash: log.transactionHash,
-    transactionIndex: Number(log.transactionIndex),
-    logIndex: Number(log.logIndex),
-    blockHash: log.blockHash,
-    blockNumber: log.blockNumber,
-    ...decodeEthereumGatewayActivityLog(log),
-  };
-}
-
-function chunkGatewayActivitiesForProof(
+function chunkGatewayActivitiesForReceiptProof(
   activities: EthereumGatewayActivity[],
   maxActivitiesPerReceiptProof: number,
-): GatewayActivityProofChunk[] {
-  const chunks: GatewayActivityProofChunk[] = [];
+): GatewayActivityReceiptProofChunk[] {
+  const chunks: GatewayActivityReceiptProofChunk[] = [];
   let currentBlockHash: Hex | undefined;
   let currentBlockActivities: EthereumGatewayActivity[] = [];
 
@@ -452,17 +826,24 @@ function chunkGatewayActivitiesForProof(
   return chunks;
 }
 
-function getGatewayProofBounds(client: Pick<ArgonClient, 'consts'>): GatewayProofBounds {
+function getGatewayReceiptProofBounds(
+  client: Pick<ArgonClient, 'consts'>,
+): GatewayReceiptProofBounds {
+  const crosschainTransferConsts = client.consts.crosschainTransfer;
   const activitiesPerReceiptProof =
-    client.consts.crosschainTransfer.maxActivitiesPerReceiptProof.toNumber();
-  if (!Number.isInteger(activitiesPerReceiptProof) || activitiesPerReceiptProof < 1) {
-    throw new Error('Gateway proof requires maxActivitiesPerReceiptProof to be a positive integer');
+    crosschainTransferConsts.maxActivitiesPerReceiptProof?.toNumber();
+  if (!activitiesPerReceiptProof || activitiesPerReceiptProof < 1) {
+    throw new Error(
+      'Gateway receipt proof requires maxActivitiesPerReceiptProof to be a positive integer',
+    );
   }
 
   const receiptProofsPerExtrinsic =
-    client.consts.crosschainTransfer.maxReceiptProofsPerExtrinsic.toNumber();
-  if (!Number.isInteger(receiptProofsPerExtrinsic) || receiptProofsPerExtrinsic < 1) {
-    throw new Error('Gateway proof requires maxReceiptProofsPerExtrinsic to be a positive integer');
+    crosschainTransferConsts.maxReceiptProofsPerExtrinsic?.toNumber();
+  if (!receiptProofsPerExtrinsic || receiptProofsPerExtrinsic < 1) {
+    throw new Error(
+      'Gateway receipt proof requires maxReceiptProofsPerExtrinsic to be a positive integer',
+    );
   }
 
   return {
@@ -475,7 +856,7 @@ function getGatewayProofBounds(client: Pick<ArgonClient, 'consts'>): GatewayProo
 async function selectArgonFinalizedExecutionHeader(
   client: IArgonQueryable,
   executionClient: EthereumExecutionClient,
-  earliestProofChunk: GatewayActivityProofChunk,
+  earliestProofChunk: GatewayActivityReceiptProofChunk,
   sharedHeaderDepth: number,
 ): Promise<ArgonFinalizedExecutionHeaderPlan | null> {
   const earliestBlockHash = earliestProofChunk.activities[0].blockHash;
@@ -527,50 +908,16 @@ async function selectArgonFinalizedExecutionHeader(
     };
   }
 
-  throw new Error(
-    'Oldest uncovered gateway activity exceeds the Argon finalized execution-header window',
-  );
-}
-
-export async function loadRetainedExecutionHeaderAnchorAtOrAfterBlock(
-  client: IArgonQueryable,
-  earliestBlockNumber: bigint,
-): Promise<ArgonFinalizedExecutionHeader | null> {
-  // The runtime stores this index under `block_number.to_be_bytes()`, so a fixed-width hex key
-  // preserves the same big-endian ordering here. We first try the exact block number, then seek
-  // to the first later retained key when that exact anchor is not present.
-  const scanBlockNumberKey = toHex(earliestBlockNumber, { size: 8 });
-  const executionHeaderAnchorsByBlockNumber =
-    client.query.ethereumVerifier.executionHeaderAnchorsByBlockNumber;
-  const exactAnchor = await executionHeaderAnchorsByBlockNumber(scanBlockNumberKey);
-  const matchingEntry = exactAnchor.isSome
-    ? exactAnchor
-    : (
-        await executionHeaderAnchorsByBlockNumber.entriesPaged({
-          args: [],
-          pageSize: 1,
-          startKey: executionHeaderAnchorsByBlockNumber.key(scanBlockNumberKey),
-        })
-      )[0]?.[1];
-  const scannedAnchor = matchingEntry?.isSome ? matchingEntry.unwrap() : null;
-
-  if (!scannedAnchor) {
-    return null;
-  }
-
-  return {
-    blockHash: scannedAnchor.blockHash.toHex(),
-    blockNumber: scannedAnchor.blockNumber.toBigInt(),
-  };
+  return null;
 }
 
 async function collectProofChunksForArgonFinalizedExecutionHeader(
   executionClient: EthereumExecutionClient,
-  proofChunks: GatewayActivityProofChunk[],
+  proofChunks: GatewayActivityReceiptProofChunk[],
   plan: ArgonFinalizedExecutionHeaderPlan,
   receiptProofsPerExtrinsic: number,
-): Promise<GatewayActivityProofChunk[]> {
-  const acceptedProofChunks: GatewayActivityProofChunk[] = [];
+): Promise<GatewayActivityReceiptProofChunk[]> {
+  const acceptedProofChunks: GatewayActivityReceiptProofChunk[] = [];
   const loadedTargetHeaders = [
     {
       blockHash: proofChunks[0].activities[0].blockHash,
@@ -620,4 +967,137 @@ async function collectProofChunksForArgonFinalizedExecutionHeader(
   }
 
   return acceptedProofChunks;
+}
+
+async function readAndVerifyLocatorActivities(
+  executionClient: EthereumExecutionClient,
+  locator: MissingGatewayActivityLocator,
+  hashContext: MintingGatewayHashContext,
+): Promise<GatewayActivityLog[]> {
+  const blockLogs = await retryWhileExecutionRpcIndexing(() =>
+    executionClient.getLogs({
+      address: hashContext.gatewayAddress,
+      fromBlock: locator.blockNumber,
+      toBlock: locator.blockNumber,
+    }),
+  );
+  const activities = blockLogs
+    .flatMap(log => {
+      try {
+        if (
+          !log.transactionHash ||
+          log.transactionIndex == null ||
+          log.logIndex == null ||
+          !log.blockHash ||
+          log.blockNumber == null
+        ) {
+          throw new Error('Execution log is missing indexed receipt metadata');
+        }
+
+        return [
+          {
+            activity: {
+              txHash: log.transactionHash,
+              transactionIndex: Number(log.transactionIndex),
+              logIndex: Number(log.logIndex),
+              blockHash: log.blockHash,
+              blockNumber: log.blockNumber,
+              ...decodeEthereumGatewayActivityLog(log),
+            },
+            log: {
+              address: log.address,
+              topics: log.topics,
+              data: log.data,
+            },
+          },
+        ];
+      } catch {
+        return [];
+      }
+    })
+    .sort((left, right) =>
+      compareBigintsAscending(
+        left.activity.gatewayState.gatewayActivityNonce,
+        right.activity.gatewayState.gatewayActivityNonce,
+      ),
+    );
+  const locatorActivities = activities.filter(
+    ({ activity }) =>
+      activity.gatewayState.gatewayActivityNonce >= locator.startGatewayActivityNonce &&
+      activity.gatewayState.gatewayActivityNonce <= locator.endGatewayActivityNonce,
+  );
+  if (
+    locatorActivities.length === 0 ||
+    locatorActivities[0]?.activity.gatewayState.gatewayActivityNonce !==
+      locator.startGatewayActivityNonce
+  ) {
+    throw new Error(`Gateway block ${locator.blockNumber} contains uncovered gateway activity`);
+  }
+
+  let previousNonce = locator.startGatewayActivityNonce - 1n;
+  let activityRoot = locator.previousLocatorHash;
+
+  for (const { activity } of locatorActivities) {
+    if (activity.gatewayState.gatewayActivityNonce !== previousNonce + 1n) {
+      throw new Error(
+        `Gateway block ${locator.blockNumber} contains a gap in gateway activity coverage`,
+      );
+    }
+
+    previousNonce = activity.gatewayState.gatewayActivityNonce;
+    activityRoot = appendEthereumGatewayActivityRoot(
+      activityRoot,
+      hashEthereumGatewayActivity(hashContext, activity),
+    );
+  }
+
+  if (previousNonce !== locator.endGatewayActivityNonce) {
+    throw new Error(`Gateway block ${locator.blockNumber} contains uncovered gateway activity`);
+  }
+  if (activityRoot.toLowerCase() !== locator.activityRoot.toLowerCase()) {
+    throw new Error(`Gateway block ${locator.blockNumber} activity root did not match storage`);
+  }
+
+  return locatorActivities;
+}
+
+async function loadPreviousGatewayActivityNonce(client: IArgonQueryable): Promise<bigint> {
+  const currentGatewayState =
+    await client.query.crosschainTransfer.gatewayStateBySourceChain('Ethereum');
+
+  return currentGatewayState.isSome
+    ? currentGatewayState.unwrap().gatewayActivityNonce.toBigInt()
+    : 0n;
+}
+
+export async function loadRetainedExecutionHeaderAnchorAtOrAfterBlock(
+  client: IArgonQueryable,
+  earliestBlockNumber: bigint,
+): Promise<ArgonFinalizedExecutionHeader | null> {
+  // The runtime stores this index under `block_number.to_be_bytes()`, so a fixed-width hex key
+  // preserves the same big-endian ordering here. We first try the exact block number, then seek
+  // to the first later retained key when that exact anchor is not present.
+  const scanBlockNumberKey = toHex(earliestBlockNumber, { size: 8 });
+  const executionHeaderAnchorsByBlockNumber =
+    client.query.ethereumVerifier.executionHeaderAnchorsByBlockNumber;
+  const exactAnchor = await executionHeaderAnchorsByBlockNumber(scanBlockNumberKey);
+  const matchingEntry = exactAnchor.isSome
+    ? exactAnchor
+    : (
+        await executionHeaderAnchorsByBlockNumber.entriesPaged({
+          args: [],
+          pageSize: 1,
+          startKey: executionHeaderAnchorsByBlockNumber.key(scanBlockNumberKey),
+        })
+      )[0]?.[1];
+  const scannedAnchor = matchingEntry?.isSome ? matchingEntry.unwrap() : null;
+
+  if (!scannedAnchor) {
+    return null;
+  }
+
+  return {
+    blockHash: scannedAnchor.blockHash.toHex(),
+    blockNumber: scannedAnchor.blockNumber.toBigInt(),
+  };
 }

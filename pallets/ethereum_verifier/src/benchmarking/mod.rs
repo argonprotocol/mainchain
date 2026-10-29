@@ -13,13 +13,14 @@ use crate::{
 	Fork, ForkVersions, Pallet as EthereumBeaconClient,
 };
 use alloy_consensus::{Header as AlloyHeader, Receipt, ReceiptEnvelope};
-use alloy_primitives::{Address, Bytes, Log, B256};
+use alloy_primitives::{keccak256, Address, Bytes, Log, B256, U256};
 use alloy_rlp::Encodable;
-use alloy_trie::{proof::ProofRetainer, HashBuilder, Nibbles};
+use alloy_trie::{proof::ProofRetainer, HashBuilder, Nibbles, TrieAccount};
 use argon_primitives::{
 	ethereum::EthereumExecutionHeader, EthereumCombinedReceiptProof, EthereumExecutionBlockProof,
 	EthereumLog, EthereumReceiptLog, EthereumReceiptLogProofBatch, EthereumReceiptLogProofBlock,
-	EthereumReceiptProofReceipt, EthereumVerifyProvider,
+	EthereumReceiptProofReceipt, EthereumStorageSlotProof, EthereumTrieProofNodes,
+	EthereumVerifyProvider, MAX_ETHEREUM_HEADER_CHAIN_LEN,
 };
 use frame_benchmarking::v2::*;
 use frame_system::RawOrigin;
@@ -242,6 +243,89 @@ mod benchmarks {
 	}
 
 	#[benchmark]
+	fn provider_verify_account_storage_proof(
+		s: Linear<1, 10>,
+		h: Linear<0, MAX_ETHEREUM_HEADER_CHAIN_LEN>,
+	) -> Result<(), BenchmarkError> {
+		let account_address = H160::repeat_byte(0x42);
+		let slot = H256::repeat_byte(0x43);
+		let storage_key = Nibbles::unpack(keccak256(slot.as_bytes()));
+		let (storage_root, storage_proof) =
+			build_deep_trie_proof(storage_key, &alloy_rlp::encode(U256::MAX), 31);
+		assert_eq!(storage_proof.len(), 32);
+		let storage_slot = EthereumStorageSlotProof {
+			slot,
+			value: H256::repeat_byte(0xff),
+			node_indexes: (0..storage_proof.len())
+				.map(|index| index as u16)
+				.collect::<Vec<_>>()
+				.try_into()
+				.expect("benchmark storage path fills the bounded node references"),
+		};
+
+		let account =
+			TrieAccount { nonce: u64::MAX, balance: U256::MAX, storage_root, ..Default::default() };
+		let account_key = Nibbles::unpack(keccak256(account_address.as_bytes()));
+		let (state_root, account_proof) =
+			build_deep_trie_proof(account_key, &alloy_rlp::encode(account), 64);
+		assert_eq!(account_proof.len(), 65);
+		let mut parent_hash = H256::repeat_byte(0x45);
+		let mut headers = Vec::new();
+		for offset in 0..h {
+			// Fill the accepted header envelope so ancestry cost includes its worst-case hashing.
+			let mut header = AlloyHeader {
+				number: 100 + u64::from(offset),
+				parent_hash: b256_from_h256(parent_hash),
+				state_root,
+				..Default::default()
+			};
+			header.extra_data = vec![0xff; 1_024].into();
+			let remaining = argon_primitives::MAX_ETHEREUM_EXECUTION_HEADER_RLP_BYTES as usize -
+				alloy_rlp::encode(&header).len();
+			header.extra_data = vec![0xff; 1_024 + remaining].into();
+			let rlp = alloy_rlp::encode(&header);
+			assert_eq!(
+				rlp.len(),
+				argon_primitives::MAX_ETHEREUM_EXECUTION_HEADER_RLP_BYTES as usize
+			);
+			parent_hash = H256::from_slice(header.hash_slow().as_slice());
+			headers.push(EthereumExecutionHeader { rlp: rlp.try_into().unwrap() });
+		}
+		let anchor = ExecutionHeaderAnchor {
+			block_number: 100 + u64::from(h),
+			timestamp_millis: 0,
+			block_hash: H256::repeat_byte(0x44),
+			parent_hash,
+			state_root: H256::from_slice(state_root.as_slice()),
+			receipts_root: H256::zero(),
+		};
+		let proof = argon_primitives::EthereumAccountStorageProof::<ConstU32<10>> {
+			execution_block_proof: EthereumExecutionBlockProof {
+				anchor_block_hash: anchor.block_hash,
+				target_to_anchor_header_chain: headers.try_into().unwrap(),
+			},
+			account_proof,
+			storage_proof,
+			slots: vec![storage_slot; s as usize]
+				.try_into()
+				.expect("benchmark storage slots stay within bounded slot count"),
+		};
+
+		ExecutionHeaderAnchors::<T>::insert(anchor.block_hash, anchor);
+
+		#[block]
+		{
+			<EthereumBeaconClient<T> as EthereumVerifyProvider>::verify_account_storage_proof(
+				account_address,
+				&proof,
+			)
+			.map_err(|_| BenchmarkError::Stop("provider_verify_account_storage_proof failed"))?;
+		}
+
+		Ok(())
+	}
+
+	#[benchmark]
 	fn provider_latest_execution_block_number() -> Result<(), BenchmarkError> {
 		let anchor = ExecutionHeaderAnchor {
 			block_number: 100,
@@ -444,15 +528,22 @@ fn build_gateway_proof_block(
 	for log_index in 0..receipt_logs {
 		let address = Address::repeat_byte(seed.wrapping_add(log_index as u8).wrapping_add(1));
 		let topic = B256::repeat_byte(seed.wrapping_add(log_index as u8).wrapping_add(0x40));
-		let data = Bytes::from(vec![seed, log_index as u8]);
-		let receipt = ReceiptEnvelope::Legacy(
-			Receipt {
-				status: true.into(),
-				cumulative_gas_used: u64::from(log_index).saturating_add(1),
-				logs: vec![Log::new_unchecked(address, vec![topic], data.clone())],
-			}
-			.with_bloom(),
-		);
+		let data = Bytes::from(vec![seed; argon_primitives::MAX_ETHEREUM_LOG_DATA_BYTES as usize]);
+		let topics = vec![topic; argon_primitives::MAX_ETHEREUM_LOG_TOPICS as usize];
+		let mut receipt = Receipt {
+			status: true.into(),
+			cumulative_gas_used: u64::from(log_index).saturating_add(1),
+			logs: vec![
+				Log::new_unchecked(address, topics.clone(), data.clone()),
+				Log::new_unchecked(address, topics.clone(), Bytes::new()),
+			],
+		};
+		// Fill the receipt close to the node bound, reserving room for trie-leaf RLP framing.
+		let base_size = receipt.clone().with_bloom().length();
+		let padding =
+			argon_primitives::MAX_ETHEREUM_RECEIPT_PROOF_NODE_BYTES as usize - base_size - 16;
+		receipt.logs[1] = Log::new_unchecked(address, topics, Bytes::from(vec![seed; padding]));
+		let receipt = ReceiptEnvelope::Legacy(receipt.with_bloom());
 		let mut receipt_bytes = Vec::new();
 		receipt.encode(&mut receipt_bytes);
 
@@ -463,9 +554,12 @@ fn build_gateway_proof_block(
 			transaction_index: u64::from(log_index),
 			event_log: EthereumLog {
 				address: H160::from_slice(address.as_slice()),
-				topics: vec![H256::from_slice(topic.as_slice())]
-					.try_into()
-					.expect("benchmark topics stay within bounded Ethereum log topics"),
+				topics: vec![
+					H256::from_slice(topic.as_slice());
+					argon_primitives::MAX_ETHEREUM_LOG_TOPICS as usize
+				]
+				.try_into()
+				.expect("benchmark topics stay within bounded Ethereum log topics"),
 				data: data
 					.to_vec()
 					.try_into()
@@ -556,4 +650,46 @@ fn make_execution_header(
 
 fn b256_from_h256(value: H256) -> B256 {
 	B256::from_slice(value.as_bytes())
+}
+
+fn build_deep_trie_proof(
+	key: Nibbles,
+	value: &[u8],
+	branch_count: usize,
+) -> (B256, EthereumTrieProofNodes) {
+	let mut leaf_keys = Vec::with_capacity(branch_count * 15 + 1);
+	leaf_keys.push(key);
+	for depth in 0..branch_count {
+		for nibble in 0..16 {
+			if key.get(depth) == Some(nibble) {
+				continue;
+			}
+			let mut sibling = key;
+			sibling.set_at(depth, nibble);
+			leaf_keys.push(sibling);
+		}
+	}
+	leaf_keys.sort_unstable();
+
+	let mut hash_builder =
+		HashBuilder::default().with_proof_retainer(ProofRetainer::new(vec![key]));
+	for leaf_key in leaf_keys {
+		hash_builder.add_leaf(leaf_key, value);
+	}
+	let root = hash_builder.root();
+	let nodes = hash_builder.take_proof_nodes().into_nodes_sorted();
+	assert_eq!(nodes.len(), branch_count + 1);
+	// Sixteen hashed children plus the empty branch value encode to 532 bytes.
+	assert!(nodes.iter().take(branch_count).all(|(_, node)| node.len() == 532));
+	let proof = nodes
+		.into_iter()
+		.map(|(_, node)| {
+			node.to_vec()
+				.try_into()
+				.expect("benchmark trie node stays within bounded node size")
+		})
+		.collect::<Vec<_>>()
+		.try_into()
+		.expect("benchmark trie proof stays within bounded node count");
+	(root, proof)
 }

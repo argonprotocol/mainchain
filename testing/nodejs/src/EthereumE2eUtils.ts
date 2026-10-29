@@ -12,7 +12,7 @@ import {
 } from '@argonprotocol/mainchain';
 import { privateKeyToAccount } from 'viem/accounts';
 import type { Hex, RpcTransactionReceipt } from 'viem';
-import { createWalletClient, defineChain, parseSignature } from 'viem';
+import { createWalletClient, defineChain, formatTransactionReceipt, parseSignature } from 'viem';
 import TestEthereum from './TestEthereum';
 import { submitTx } from './submitTx';
 
@@ -136,7 +136,7 @@ export async function mineLaterExecutionAnchorReceipt(
 }
 
 export async function waitForExecutionReceipt(
-  ethereum: TestEthereum,
+  ethereum: Pick<TestEthereum, 'callExecution'>,
   transactionHash: Hex,
 ): Promise<EthereumReceipt> {
   const startedAt = Date.now();
@@ -149,7 +149,7 @@ export async function waitForExecutionReceipt(
       );
 
       if (receipt) {
-        return receipt as unknown as EthereumReceipt;
+        return formatTransactionReceipt(receipt);
       }
     } catch (error) {
       const errorText =

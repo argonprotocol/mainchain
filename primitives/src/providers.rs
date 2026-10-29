@@ -18,7 +18,7 @@ use polkadot_sdk::{frame_support::weights::Weight, sp_runtime::Permill};
 use scale_info::TypeInfo;
 use sp_application_crypto::RuntimeAppPublic;
 use sp_arithmetic::{traits::Zero, FixedI128, FixedPointNumber};
-use sp_core::{H256, U256};
+use sp_core::{H160, H256, U256};
 use sp_runtime::{
 	traits::{AtLeast32BitUnsigned, Block as BlockT, CheckedDiv, Get, NumberFor, OpaqueKeys},
 	transaction_validity::TransactionValidityError,
@@ -26,7 +26,10 @@ use sp_runtime::{
 };
 
 use super::{
-	ethereum::{EthereumBlockNumber, EthereumReceiptLogProofBatch, EthereumVerifyError},
+	ethereum::{
+		EthereumAccountStorageProof, EthereumBlockNumber, EthereumReceiptLogProofBatch,
+		EthereumVerifyError,
+	},
 	vault::{BitcoinSecuritizationBasis, CosignerGuarantee},
 };
 
@@ -517,12 +520,17 @@ impl<AccountId: Codec, Balance: Codec + Copy> BitcoinFissionMinting<AccountId, B
 
 pub trait EthereumVerifyProviderWeightInfo {
 	fn verify_receipt_logs(proof_blocks: u32, extra_activities: u32) -> Weight;
+	fn verify_account_storage_proof(storage_slots: u32, headers: u32) -> Weight;
 	fn latest_execution_block_number() -> Weight;
 	fn latest_execution_block_timestamp() -> Weight;
 }
 
 impl EthereumVerifyProviderWeightInfo for () {
 	fn verify_receipt_logs(_proof_blocks: u32, _extra_activities: u32) -> Weight {
+		Weight::zero()
+	}
+
+	fn verify_account_storage_proof(_storage_slots: u32, _headers: u32) -> Weight {
 		Weight::zero()
 	}
 
@@ -545,6 +553,13 @@ pub trait EthereumVerifyProvider {
 		MaxProofBlocks: Get<u32>,
 		MaxReceiptLogs: Get<u32>;
 
+	fn verify_account_storage_proof<MaxStorageSlots>(
+		account_address: H160,
+		proof: &EthereumAccountStorageProof<MaxStorageSlots>,
+	) -> Result<(), EthereumVerifyError>
+	where
+		MaxStorageSlots: Get<u32>;
+
 	fn latest_execution_block_number() -> Option<EthereumBlockNumber>;
 	fn latest_execution_block_timestamp() -> Option<Moment>;
 }
@@ -558,6 +573,16 @@ impl EthereumVerifyProvider for () {
 	where
 		MaxProofBlocks: Get<u32>,
 		MaxReceiptLogs: Get<u32>,
+	{
+		Err(EthereumVerifyError::VerifierUnavailable)
+	}
+
+	fn verify_account_storage_proof<MaxStorageSlots>(
+		_account_address: H160,
+		_proof: &EthereumAccountStorageProof<MaxStorageSlots>,
+	) -> Result<(), EthereumVerifyError>
+	where
+		MaxStorageSlots: Get<u32>,
 	{
 		Err(EthereumVerifyError::VerifierUnavailable)
 	}

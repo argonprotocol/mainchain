@@ -1106,7 +1106,7 @@ pub fn make_sync_committee_update() -> RawUpdate {
 			body_root: hex!("09be2bfe614d638717caea7224d49f9d4a5e641b0f358320f6108c19c237e6fe").into(),
 		},
 		sync_aggregate: SyncAggregate {
-			sync_committee_bits: hex!("fffffffffffffffffffffdffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").into(),
+			sync_committee_bits: hex!("fffffffffffffffffffffdffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
 			sync_committee_signature: hex!("a76363b72e33abbddeefc81b8559b39ad9160d330364134d4995a984133f44b8e8d91c08b5bb3a7f09973f9fbc7ba76b11e286567e2636d173defc7f3962a9d71075a13f6b6c979cbb44cd5f6ab99f56e2aec24ef0a36ae88e9bab64bb22e1d9").into(),
 		},
 		signature_slot: 14393413,
@@ -1668,7 +1668,7 @@ pub fn make_finalized_header_update() -> RawUpdate {
 			body_root: hex!("ce780a10b58645c5751cefed26ff72e9c7ea2d7f8d9ffc981542cc16859daece").into(),
 		},
 		sync_aggregate: SyncAggregate {
-			sync_committee_bits: hex!("fffffffffffffdffffffffffffffffffffffffffffffffffffffffffffffbfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff").into(),
+			sync_committee_bits: hex!("fffffffffffffdffffffffffffffffffffffffffffffffffffffffffffffbfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"),
 			sync_committee_signature: hex!("930a2000393037dae67ce5152ad0ce0ac93e5e1c897b5760cf45e1ae5e299182c97b943ebeb8fcfa7c824ce422773c2803ac5ce5772b9a64a8b5dbcd77c8f0d3c8e1e83a3c88b45d91c0f7863a0dc86d03312b56454f708f776b21fe821c27ea").into(),
 		},
 		signature_slot: 14408483,

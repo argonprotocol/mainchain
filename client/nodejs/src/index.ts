@@ -31,6 +31,10 @@ export * from './header';
 export * from './convert';
 export * from './PriceIndex';
 export * as EvmContracts from './EvmContracts';
+export {
+  mintingGatewayActivityHashingFixture,
+  type MintingGatewayActivityHashingFixture,
+} from './EvmContracts';
 export * from './EthereumProof';
 export type {
   EthereumBeaconBlockResponse,
@@ -49,14 +53,25 @@ export {
   type EthereumGatewayActivity,
 } from './EthereumGatewayActivity';
 export {
-  buildGatewayActivityProofPayload,
+  buildGatewayActivityProof,
+  buildGatewayActivityReceiptProofPayloads,
+  buildGatewayActivityStorageProofs,
+  captureGatewayActivityStorageProofs,
+  discoverMissingGatewayActivityLocators,
+  supportsGatewayActivityReceiptProofs,
+  supportsGatewayActivityStorageProofs,
   type EthereumGatewayActivityProofPayload,
+  type EthereumGatewayActivityReceiptProofPayload,
+  type EthereumGatewayActivityStorageProofPayload,
+  type CapturedGatewayActivityStorageProof,
+  type EthereumGatewayActivityProofBuildResult,
+  type MissingGatewayActivityLocator,
 } from './EthereumGatewayActivityProof';
 export {
   buildGatewayExecutionHeaderBackfill,
   buildGatewayExecutionHeaderBackfills,
   type EthereumExecutionHeaderBackfillPayload,
-} from './EthereumGatewayBackfill';
+} from './EthereumExecutionHeaderBackfill';
 export * from './EthereumBeaconSync';
 export type {
   EthereumExecutionClient,

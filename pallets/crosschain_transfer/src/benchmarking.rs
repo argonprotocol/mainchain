@@ -1,5 +1,3 @@
-#![cfg(feature = "runtime-benchmarks")]
-
 extern crate alloc;
 
 use super::*;
@@ -13,16 +11,14 @@ use argon_ethereum_contracts::minting_gateway::{
 };
 use argon_primitives::{
 	ethereum::{
-		EthereumCombinedReceiptProof, EthereumExecutionBlockProof, EthereumExecutionHeader,
-		EthereumReceiptProofNode, EthereumReceiptProofReceipt,
+		EthereumCombinedReceiptProof, EthereumExecutionBlockProof, EthereumReceiptProofReceipt,
 		MAX_ETHEREUM_COMBINED_RECEIPT_PROOF_NODES, MAX_ETHEREUM_EXECUTION_HEADER_RLP_BYTES,
 		MAX_ETHEREUM_HEADER_CHAIN_LEN, MAX_ETHEREUM_LOG_DATA_BYTES, MAX_ETHEREUM_LOG_TOPICS,
-		MAX_ETHEREUM_RECEIPTS_PER_PROOF, MAX_ETHEREUM_RECEIPT_PROOF_NODE_BYTES,
 		MAX_ETHEREUM_RECEIPT_PROOF_NODE_REFS,
 	},
 	vault::{Vault, VaultTerms},
-	CallTxPoolKeyProvider, CallTxValidityProvider, EthereumLog, EthereumReceiptLog,
-	UniswapTransferProvider, VaultId,
+	CallTxPoolKeyProvider, CallTxValidityProvider, EthereumAccountStorageProof, EthereumLog,
+	EthereumReceiptLog, EthereumStorageSlotProof, UniswapTransferProvider, VaultId,
 };
 use pallet_prelude::benchmarking::{
 	reset_benchmark_bitcoin_locks_runtime_state, reset_benchmark_bitcoin_vault_provider_state,
@@ -40,6 +36,7 @@ use polkadot_sdk::{
 };
 
 const BENCHMARK_DESTINATION_CHAIN: SourceChain = SourceChain::Ethereum;
+const PROVE_GATEWAY_ACTIVITY_STORAGE_BENCH_RANGE_END: u32 = 128;
 
 #[benchmarks(
 	where
@@ -54,70 +51,68 @@ mod benchmarks {
 
 	#[benchmark]
 	fn provider_tx_pool_key() {
-		let node = EthereumReceiptProofNode::try_from(vec![
-			0xff;
-			MAX_ETHEREUM_RECEIPT_PROOF_NODE_BYTES
-				as usize
-		])
-		.unwrap();
-		let receipt = EthereumReceiptProofReceipt {
-			transaction_index: u64::MAX,
-			node_indexes: BoundedVec::truncate_from(vec![
-				0;
-				MAX_ETHEREUM_RECEIPT_PROOF_NODE_REFS
-					as usize
-			]),
+		use argon_primitives::{
+			MAX_ETHEREUM_RECEIPTS_PER_PROOF, MAX_ETHEREUM_RECEIPT_PROOF_NODE_BYTES,
+		};
+
+		let header = argon_primitives::EthereumExecutionHeader {
+			rlp: vec![0xff; MAX_ETHEREUM_EXECUTION_HEADER_RLP_BYTES as usize].try_into().unwrap(),
 		};
 		let log = EthereumReceiptLog {
 			transaction_index: u64::MAX,
 			event_log: EthereumLog {
 				address: H160::repeat_byte(1),
-				topics: BoundedVec::truncate_from(vec![
-					H256::repeat_byte(2);
-					MAX_ETHEREUM_LOG_TOPICS as usize
-				]),
-				data: BoundedVec::truncate_from(vec![0xff; MAX_ETHEREUM_LOG_DATA_BYTES as usize]),
+				topics: vec![H256::repeat_byte(2); MAX_ETHEREUM_LOG_TOPICS as usize]
+					.try_into()
+					.unwrap(),
+				data: vec![0xff; MAX_ETHEREUM_LOG_DATA_BYTES as usize].try_into().unwrap(),
 			},
 		};
-		let block = GatewayActivityProofBlock::<T> {
+		let block = GatewayActivityReceiptProofBlock::<T> {
 			target_block_number: u64::MAX,
 			receipt_proof: EthereumCombinedReceiptProof {
-				nodes: BoundedVec::truncate_from(vec![
-					node;
-					MAX_ETHEREUM_COMBINED_RECEIPT_PROOF_NODES
-						as usize
-				]),
-				receipts: BoundedVec::truncate_from(vec![
-					receipt;
+				nodes: vec![
+					vec![0xff; MAX_ETHEREUM_RECEIPT_PROOF_NODE_BYTES as usize]
+						.try_into()
+						.unwrap();
+					MAX_ETHEREUM_COMBINED_RECEIPT_PROOF_NODES as usize
+				]
+				.try_into()
+				.unwrap(),
+				receipts: vec![
+					EthereumReceiptProofReceipt {
+						transaction_index: u64::MAX,
+						node_indexes: vec![u16::MAX; MAX_ETHEREUM_RECEIPT_PROOF_NODE_REFS as usize]
+							.try_into()
+							.unwrap(),
+					};
 					MAX_ETHEREUM_RECEIPTS_PER_PROOF as usize
-				]),
+				]
+				.try_into()
+				.unwrap(),
 			},
-			receipt_logs: BoundedVec::truncate_from(vec![
-				log;
-				T::MaxActivitiesPerReceiptProof::get()
-					as usize
-			]),
+			receipt_logs: vec![log; T::MaxActivitiesPerReceiptProof::get() as usize]
+				.try_into()
+				.unwrap(),
 		};
-		let header = EthereumExecutionHeader {
-			rlp: BoundedVec::truncate_from(vec![
-				0xff;
-				MAX_ETHEREUM_EXECUTION_HEADER_RLP_BYTES as usize
-			]),
-		};
-		let proof_batch = GatewayActivityProofBatch::<T> {
+		let proof_batch = GatewayActivityReceiptProofBatch::<T> {
 			execution_block_proof: EthereumExecutionBlockProof {
 				anchor_block_hash: H256::repeat_byte(3),
-				target_to_anchor_header_chain: BoundedVec::truncate_from(vec![
-					header;
-					MAX_ETHEREUM_HEADER_CHAIN_LEN
-						as usize
-				]),
+				target_to_anchor_header_chain: vec![header; MAX_ETHEREUM_HEADER_CHAIN_LEN as usize]
+					.try_into()
+					.unwrap(),
 			},
-			blocks: BoundedVec::truncate_from(vec![
-				block;
-				T::MaxReceiptProofsPerExtrinsic::get() as usize
-			]),
+			blocks: vec![block; T::MaxReceiptProofsPerExtrinsic::get() as usize]
+				.try_into()
+				.unwrap(),
 		};
+		// Both calls hash their entire payload. The maximum receipt batch is larger than
+		// a storage proof at the contract activity cap, so it bounds either pool-key path.
+		assert!(
+			proof_batch.encoded_size() >=
+				GatewayActivityStorageProof::<T::MaxActivitiesPerGatewayProof>::max_encoded_len(
+				)
+		);
 		let call = T::RuntimeCall::from(Call::<T>::prove_gateway_activity {
 			source_chain: SourceChain::Ethereum,
 			previous_gateway_activity_nonce: 0,
@@ -134,7 +129,6 @@ mod benchmarks {
 			assert_eq!(key.len(), 32);
 		}
 	}
-
 	#[benchmark]
 	fn provider_validate_transaction() {
 		GatewaySyncPauseBySourceChain::<T>::remove(SourceChain::Ethereum);
@@ -150,7 +144,7 @@ mod benchmarks {
 		let call = T::RuntimeCall::from(Call::<T>::prove_gateway_activity {
 			source_chain: SourceChain::Ethereum,
 			previous_gateway_activity_nonce: 1,
-			proof_batch: GatewayActivityProofBatch::<T> {
+			proof_batch: GatewayActivityReceiptProofBatch::<T> {
 				execution_block_proof: argon_primitives::ethereum::EthereumExecutionBlockProof {
 					anchor_block_hash: H256::zero(),
 					target_to_anchor_header_chain: BoundedVec::default(),
@@ -171,7 +165,7 @@ mod benchmarks {
 
 	#[benchmark]
 	fn set_chain_config() -> Result<(), BenchmarkError> {
-		reset_crosschain_benchmark_state::<T>();
+		reset_crosschain_benchmark_state();
 		ChainConfigBySourceChain::<T>::insert(
 			BENCHMARK_DESTINATION_CHAIN,
 			benchmark_chain_config(0x20),
@@ -193,7 +187,7 @@ mod benchmarks {
 
 	#[benchmark]
 	fn force_set_global_issuance_council() -> Result<(), BenchmarkError> {
-		reset_crosschain_benchmark_state::<T>();
+		reset_crosschain_benchmark_state();
 		let caller: T::AccountId = account("council-member", 0, 0);
 		let council_signer = benchmark_signer(1);
 		let authority_signer = benchmark_signer(2);
@@ -317,7 +311,7 @@ mod benchmarks {
 
 	#[benchmark]
 	fn pause_gateway() -> Result<(), BenchmarkError> {
-		reset_crosschain_benchmark_state::<T>();
+		reset_crosschain_benchmark_state();
 		GatewayStateBySourceChain::<T>::insert(
 			BENCHMARK_DESTINATION_CHAIN,
 			GatewayState::<T> {
@@ -337,7 +331,7 @@ mod benchmarks {
 
 	#[benchmark]
 	fn unpause_gateway() -> Result<(), BenchmarkError> {
-		reset_crosschain_benchmark_state::<T>();
+		reset_crosschain_benchmark_state();
 		GatewaySyncPauseBySourceChain::<T>::insert(
 			BENCHMARK_DESTINATION_CHAIN,
 			GatewaySyncPause {
@@ -356,7 +350,7 @@ mod benchmarks {
 
 	#[benchmark]
 	fn register_council_signer() -> Result<(), BenchmarkError> {
-		reset_crosschain_benchmark_state::<T>();
+		reset_crosschain_benchmark_state();
 		let (active_council, _) = benchmark_max_council_signer_rotation::<T>()?;
 		let active_member = active_council
 			.members
@@ -402,7 +396,7 @@ mod benchmarks {
 
 	#[benchmark]
 	fn register_minting_authority() -> Result<(), BenchmarkError> {
-		reset_crosschain_benchmark_state::<T>();
+		reset_crosschain_benchmark_state();
 		let caller: T::AccountId = whitelisted_caller();
 		let authority_signer = benchmark_signer(4);
 
@@ -432,7 +426,7 @@ mod benchmarks {
 
 	#[benchmark]
 	fn approve_queue_entries(a: Linear<1, 32>) -> Result<(), BenchmarkError> {
-		reset_crosschain_benchmark_state::<T>();
+		reset_crosschain_benchmark_state();
 		let caller: T::AccountId = whitelisted_caller();
 		let council_signer = benchmark_signer(5);
 
@@ -492,120 +486,52 @@ mod benchmarks {
 	}
 
 	#[benchmark]
-	fn prove_gateway_activity(a: Linear<1, 10>) -> Result<(), BenchmarkError> {
-		reset_crosschain_benchmark_state::<T>();
+	fn prove_gateway_activity(a: Linear<1, 96>) -> Result<(), BenchmarkError> {
+		assert_eq!(
+			T::MaxReceiptProofsPerExtrinsic::get() * T::MaxActivitiesPerReceiptProof::get(),
+			96
+		);
+		reset_crosschain_benchmark_state();
 		let caller: T::AccountId = whitelisted_caller();
-		let council_account: T::AccountId = account("prove-gateway-council", 0, 0);
-		let authority_account: T::AccountId = account("prove-gateway-authority", 0, 0);
-		let authority_signer = benchmark_signer(10);
-		let burn_account = CrosschainTransferPallet::<T>::burn_account(BENCHMARK_DESTINATION_CHAIN);
-		let incoming_amount: T::Balance = 1_000_000_000u128.into();
-		let max_transfers = T::MaxPendingTransferOutsPerDestinationChain::get();
-		let min_collateral_u128: u128 = T::MinTransferCollateralIncrement::get().into();
-		let transfer_amount_u128 = min_collateral_u128;
-		let authority_collateral: T::Balance =
-			min_collateral_u128.saturating_mul(u128::from(max_transfers)).into();
-		let transfer_amount: T::Balance = transfer_amount_u128.into();
+		let incoming_amount = 1_000_000_000u128;
+		let initial_circulation = incoming_amount * u128::from(a);
+		seed_gateway_activity_transfers::<T>(a, initial_circulation)?;
 
-		seed_chain_config::<T>(0x21);
-		seed_benchmark_vault::<T>(&council_account, 8, 50_000u128);
-		let _ = seed_active_council::<T>(&council_account, benchmark_signer(7), 50_000u128.into())?;
-		seed_active_minting_authority::<T>(
-			authority_account.clone(),
-			authority_signer,
-			1,
-			authority_collateral,
-		)?;
-		T::NativeCurrency::mint_into(&burn_account, 10_000_000_000u128.into())
-			.map_err(|_| BenchmarkError::Stop("failed to fund benchmark burn account"))?;
-
-		// Seed the full bounded queue of ready transfers, then stagger their expiry across the
-		// proof blocks so cleanup keeps scanning and canceling work throughout the batch.
-		for transfer_index in 0..max_transfers {
-			let user: T::AccountId = account("prove-gateway-expired-user", transfer_index, 0);
-			T::NativeCurrency::mint_into(
-				&user,
-				transfer_amount_u128.saturating_add(100_000).into(),
-			)
-			.map_err(|_| BenchmarkError::Stop("failed to fund benchmark expired transfer user"))?;
-			Pallet::<T>::do_transfer_out(
-				user.clone(),
-				BENCHMARK_DESTINATION_CHAIN,
-				AssetKind::Argon,
-				h160(0x45),
-				transfer_amount,
-			)
-			.map_err(|_| BenchmarkError::Stop("failed to seed benchmark expired transfer"))?;
-			let transfer_id = TransferOutById::<T>::iter()
-				.find_map(|(transfer_id, transfer)| {
-					(transfer.argon_account_id == user && transfer.argon_transfer_nonce == 1)
-						.then_some(transfer_id)
-				})
-				.ok_or(BenchmarkError::Stop("benchmark expired transfer id missing"))?;
-
-			let signature = benchmark_transfer_collateral_signature::<T>(
-				authority_signer,
-				transfer_id,
-				T::MinTransferCollateralIncrement::get(),
-				T::Balance::default(),
-			)?;
-			Pallet::<T>::do_collateralize_transfer(
-				authority_account.clone(),
-				transfer_id,
-				signature,
-				T::MinTransferCollateralIncrement::get(),
-				T::Balance::default(),
-			)
-			.map_err(|_| {
-				BenchmarkError::Stop("failed to fully collateralize benchmark transfer")
-			})?;
-			TransferOutById::<T>::mutate(transfer_id, |maybe_transfer| {
-				let transfer = maybe_transfer
-					.as_mut()
-					.expect("benchmark transfer should stay present during expiry setup");
-				transfer.valid_until_ethereum_block = u64::from(transfer_index % a);
-			});
-		}
-
-		let proof_blocks = (0..a)
+		let logs = (0..a)
 			.map(|index| {
 				let recipient: T::AccountId = account("crosschain-transfer-recipient", index, 0);
-				let argon_circulation = 10_000_000_000u128.saturating_sub(
-					incoming_amount.into().saturating_mul(u128::from(index).saturating_add(1)),
-				);
-				let receipt_logs = vec![EthereumReceiptLog {
+				EthereumReceiptLog {
 					transaction_index: 0,
 					event_log: transfer_to_argon_started_log(
 						h160(0x21),
 						h160(0x11),
 						h160(0x31),
-						incoming_amount.into(),
+						incoming_amount,
 						<[u8; 32]>::from(recipient),
-						u64::from(index).saturating_add(1),
+						u64::from(index) + 1,
 						0,
-						argon_circulation,
+						initial_circulation - incoming_amount * u128::from(index + 1),
 						0,
 					),
-				}]
-				.try_into()
-				.map_err(|_| {
-					BenchmarkError::Stop("benchmark receipt logs exceeded pallet bound")
-				})?;
-
-				Ok(GatewayActivityProofBlock::<T> {
-					target_block_number: u64::from(index).saturating_add(1),
-					receipt_proof: dummy_receipt_proof(),
-					receipt_logs,
-				})
+				}
 			})
-			.collect::<Result<Vec<_>, BenchmarkError>>()?;
-		let proof_batch = GatewayActivityProofBatch::<T> {
+			.collect::<Vec<_>>();
+		let proof_blocks = logs
+			.chunks(T::MaxActivitiesPerReceiptProof::get() as usize)
+			.enumerate()
+			.map(|(index, logs)| GatewayActivityReceiptProofBlock::<T> {
+				target_block_number: (index * T::MaxActivitiesPerReceiptProof::get() as usize +
+					logs.len()) as u64,
+				receipt_proof: dummy_receipt_proof(),
+				receipt_logs: logs.to_vec().try_into().expect("bounded chunk"),
+			})
+			.collect::<Vec<_>>();
+		let proof_batch = GatewayActivityReceiptProofBatch::<T> {
 			execution_block_proof: dummy_execution_block_proof(),
 			blocks: proof_blocks.try_into().map_err(|_| {
 				BenchmarkError::Stop("benchmark proof blocks exceeded pallet bound")
 			})?,
 		};
-
 		#[extrinsic_call]
 		prove_gateway_activity(
 			RawOrigin::Signed(caller),
@@ -625,8 +551,113 @@ mod benchmarks {
 	}
 
 	#[benchmark]
+	fn prove_gateway_activity_storage(
+		a: Linear<1, PROVE_GATEWAY_ACTIVITY_STORAGE_BENCH_RANGE_END>,
+	) -> Result<(), BenchmarkError> {
+		assert_eq!(
+			T::MaxActivitiesPerGatewayProof::get(),
+			PROVE_GATEWAY_ACTIVITY_STORAGE_BENCH_RANGE_END,
+			"storage benchmark range must cover the runtime activity bound",
+		);
+		reset_crosschain_benchmark_state();
+		let caller: T::AccountId = whitelisted_caller();
+		let incoming_amount = 1_000_000_000u128;
+		let initial_argon_circulation = incoming_amount.saturating_mul(u128::from(a));
+		seed_gateway_activity_transfers::<T>(a, initial_argon_circulation)?;
+
+		let activity_logs: BoundedVec<EthereumLog, T::MaxActivitiesPerGatewayProof> = (0..a)
+			.map(|index| {
+				let recipient: T::AccountId = account("crosschain-transfer-recipient", index, 0);
+				transfer_to_argon_started_log(
+					h160(0x21),
+					h160(0x11),
+					h160(0x31),
+					incoming_amount,
+					<[u8; 32]>::from(recipient),
+					u64::from(index).saturating_add(1),
+					0,
+					initial_argon_circulation.saturating_sub(
+						incoming_amount.saturating_mul(u128::from(index).saturating_add(1)),
+					),
+					0,
+				)
+			})
+			.collect::<Vec<_>>()
+			.try_into()
+			.map_err(|_| BenchmarkError::Stop("benchmark activities exceeded pallet bound"))?;
+		let chain_config = benchmark_chain_config(0x21);
+		let activity_root_seed = H256::repeat_byte(0x42);
+		let mut activity_root = B256::from(activity_root_seed.0);
+		for activity_log in &activity_logs {
+			let decoded_activity =
+				Pallet::<T>::decode_evm_gateway_activity(&chain_config, activity_log)
+					.map_err(|_| BenchmarkError::Stop("failed to decode benchmark activity"))?;
+			activity_root = ethereum_contracts::append_activity_root(
+				activity_root,
+				B256::from(decoded_activity.leaf_hash(&chain_config).0),
+			);
+		}
+		let locator_index = 1;
+		let (range_slot, root_slot) = Pallet::<T>::gateway_activity_locator_slots(locator_index);
+		let proof = GatewayActivityStorageProof::<T::MaxActivitiesPerGatewayProof> {
+			locator_index,
+			activity_root_seed,
+			storage_proof: EthereumAccountStorageProof {
+				execution_block_proof: argon_primitives::EthereumExecutionBlockProof {
+					anchor_block_hash: H256::repeat_byte(1),
+					target_to_anchor_header_chain: Default::default(),
+				},
+				account_proof: BoundedVec::default(),
+				storage_proof: BoundedVec::default(),
+				slots: vec![
+					EthereumStorageSlotProof {
+						slot: range_slot,
+						value: Pallet::<T>::gateway_activity_locator_range_slot_value(
+							u64::from(a),
+							1,
+							u64::from(a),
+						),
+						node_indexes: BoundedVec::default(),
+					},
+					EthereumStorageSlotProof {
+						slot: root_slot,
+						value: H256::from_slice(activity_root.as_slice()),
+						node_indexes: BoundedVec::default(),
+					},
+				]
+				.try_into()
+				.map_err(|_| BenchmarkError::Stop("benchmark slots exceeded proof bound"))?,
+			},
+			activity_logs: activity_logs
+				.try_into()
+				.map_err(|_| BenchmarkError::Stop("benchmark log data exceeded byte budget"))?,
+		};
+
+		#[extrinsic_call]
+		prove_gateway_activity_storage(
+			RawOrigin::Signed(caller),
+			BENCHMARK_DESTINATION_CHAIN,
+			0,
+			proof,
+		);
+
+		assert_eq!(
+			GatewayStateBySourceChain::<T>::get(BENCHMARK_DESTINATION_CHAIN)
+				.expect("gateway state should be written")
+				.gateway_activity_nonce,
+			u64::from(a),
+		);
+		assert_eq!(TransferOutById::<T>::iter().count(), 0);
+		assert_eq!(
+			NonTerminalTransferOutCountByDestinationChain::<T>::get(BENCHMARK_DESTINATION_CHAIN),
+			0,
+		);
+		Ok(())
+	}
+
+	#[benchmark]
 	fn schedule_global_issuance_council_rotation() -> Result<(), BenchmarkError> {
-		reset_crosschain_benchmark_state::<T>();
+		reset_crosschain_benchmark_state();
 		seed_chain_config::<T>(0x21);
 		let (active_council, _) = benchmark_max_council_signer_rotation::<T>()?;
 		let active_council_hash = Pallet::<T>::hash_global_issuance_council(
@@ -661,7 +692,7 @@ mod benchmarks {
 
 	#[benchmark]
 	fn activate_global_issuance_council_signers() -> Result<(), BenchmarkError> {
-		reset_crosschain_benchmark_state::<T>();
+		reset_crosschain_benchmark_state();
 		let (_, council) = benchmark_max_council_signer_rotation::<T>()?;
 
 		#[block]
@@ -677,7 +708,7 @@ mod benchmarks {
 
 	#[benchmark]
 	fn transfer_out() -> Result<(), BenchmarkError> {
-		reset_crosschain_benchmark_state::<T>();
+		reset_crosschain_benchmark_state();
 		let council_account: T::AccountId = account("transfer-council", 0, 0);
 		let caller: T::AccountId = whitelisted_caller();
 
@@ -705,7 +736,7 @@ mod benchmarks {
 
 	#[benchmark]
 	fn collateralize_transfer() -> Result<(), BenchmarkError> {
-		reset_crosschain_benchmark_state::<T>();
+		reset_crosschain_benchmark_state();
 		let council_account: T::AccountId = account("collateral-council", 0, 0);
 		let authority_account: T::AccountId = whitelisted_caller();
 		let user: T::AccountId = account("collateral-user", 0, 0);
@@ -760,7 +791,7 @@ mod benchmarks {
 
 	#[benchmark]
 	fn deactivate_minting_authority() -> Result<(), BenchmarkError> {
-		reset_crosschain_benchmark_state::<T>();
+		reset_crosschain_benchmark_state();
 		let caller: T::AccountId = whitelisted_caller();
 		let authority_signer = benchmark_signer(10);
 
@@ -783,7 +814,7 @@ mod benchmarks {
 
 	#[benchmark]
 	fn provider_is_crosschain_activated() -> Result<(), BenchmarkError> {
-		reset_crosschain_benchmark_state::<T>();
+		reset_crosschain_benchmark_state();
 		seed_chain_config::<T>(0x21);
 
 		#[block]
@@ -798,7 +829,7 @@ mod benchmarks {
 
 	#[benchmark]
 	fn provider_account_uniswap_argon_transfers_in_amount() -> Result<(), BenchmarkError> {
-		reset_crosschain_benchmark_state::<T>();
+		reset_crosschain_benchmark_state();
 		let account_id: T::AccountId = account("crosschain-transfer-account", 0, 0);
 		TransferTotalsByAccount::<T>::insert(
 			&account_id,
@@ -821,7 +852,7 @@ mod benchmarks {
 
 	#[benchmark]
 	fn provider_has_overdue_collect_blocker() -> Result<(), BenchmarkError> {
-		reset_crosschain_benchmark_state::<T>();
+		reset_crosschain_benchmark_state();
 		let caller: T::AccountId = account("overdue-council-member", 0, 0);
 		seed_chain_config::<T>(0x21);
 		let council_hash =
@@ -934,7 +965,82 @@ mod benchmarks {
 	);
 }
 
-fn reset_crosschain_benchmark_state<T: Config>() {
+fn seed_gateway_activity_transfers<T: Config>(
+	proof_blocks: u32,
+	initial_argon_circulation: u128,
+) -> Result<(), BenchmarkError>
+where
+	T::AccountId: From<[u8; 32]> + Ord,
+	[u8; 32]: From<T::AccountId>,
+{
+	let council_account: T::AccountId = account("prove-gateway-council", 0, 0);
+	let authority_account: T::AccountId = account("prove-gateway-authority", 0, 0);
+	let authority_signer = benchmark_signer(10);
+	let burn_account = CrosschainTransferPallet::<T>::burn_account(BENCHMARK_DESTINATION_CHAIN);
+	let max_transfers = T::MaxPendingTransferOutsPerDestinationChain::get();
+	let transfer_amount_u128: u128 = T::MinTransferCollateralIncrement::get().into();
+	let transfer_amount: T::Balance = transfer_amount_u128.into();
+	let authority_collateral: T::Balance =
+		transfer_amount_u128.saturating_mul(u128::from(max_transfers)).into();
+
+	seed_chain_config::<T>(0x21);
+	seed_benchmark_vault::<T>(&council_account, 8, 50_000u128);
+	let _ = seed_active_council::<T>(&council_account, benchmark_signer(7), 50_000u128.into())?;
+	seed_active_minting_authority::<T>(
+		authority_account.clone(),
+		authority_signer,
+		1,
+		authority_collateral,
+	)?;
+	T::NativeCurrency::mint_into(&burn_account, initial_argon_circulation.into())
+		.map_err(|_| BenchmarkError::Stop("failed to fund benchmark burn account"))?;
+
+	// Fill the ready queue. Receipt batches stagger cleanup over their proof blocks; storage
+	// proofs use the final block and expire the entire queue after settling the locator.
+	for transfer_index in 0..max_transfers {
+		let user: T::AccountId = account("prove-gateway-expired-user", transfer_index, 0);
+		T::NativeCurrency::mint_into(&user, transfer_amount_u128.saturating_add(100_000).into())
+			.map_err(|_| BenchmarkError::Stop("failed to fund benchmark expired transfer user"))?;
+		Pallet::<T>::do_transfer_out(
+			user.clone(),
+			BENCHMARK_DESTINATION_CHAIN,
+			AssetKind::Argon,
+			h160(0x45),
+			transfer_amount,
+		)
+		.map_err(|_| BenchmarkError::Stop("failed to seed benchmark expired transfer"))?;
+		let transfer_id = TransferOutById::<T>::iter()
+			.find_map(|(transfer_id, transfer)| {
+				(transfer.argon_account_id == user && transfer.argon_transfer_nonce == 1)
+					.then_some(transfer_id)
+			})
+			.ok_or(BenchmarkError::Stop("benchmark expired transfer id missing"))?;
+
+		let signature = benchmark_transfer_collateral_signature::<T>(
+			authority_signer,
+			transfer_id,
+			transfer_amount,
+			T::Balance::default(),
+		)?;
+		Pallet::<T>::do_collateralize_transfer(
+			authority_account.clone(),
+			transfer_id,
+			signature,
+			transfer_amount,
+			T::Balance::default(),
+		)
+		.map_err(|_| BenchmarkError::Stop("failed to fully collateralize benchmark transfer"))?;
+		TransferOutById::<T>::mutate(transfer_id, |maybe_transfer| {
+			let transfer = maybe_transfer
+				.as_mut()
+				.expect("benchmark transfer should stay present during expiry setup");
+			transfer.valid_until_ethereum_block = u64::from(transfer_index % proof_blocks);
+		});
+	}
+	Ok(())
+}
+
+fn reset_crosschain_benchmark_state() {
 	reset_benchmark_bitcoin_locks_runtime_state();
 	reset_benchmark_bitcoin_vault_provider_state();
 	reset_benchmark_price_provider_state();
@@ -1176,6 +1282,7 @@ fn benchmark_keccak_message_signature(signer: H160) -> KeccakSignature {
 	KeccakSignature::from_raw(bytes)
 }
 
+#[allow(clippy::too_many_arguments, reason = "Mirrors the Ethereum event ABI")]
 fn transfer_to_argon_started_log(
 	gateway: H160,
 	from: H160,

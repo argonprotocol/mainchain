@@ -70,6 +70,13 @@ The gateway is where the actual protocol behavior lives:
 - `applyGatewayUpdates(...)` rejects batches above `100` items, and
   `finalizeTransferOutOfArgon(...)` rejects proofs above `25` minting-authority authorizations, so
   the activity payloads stay within explicit relay bounds
+- each Ethereum block is capped at `128` gateway activities across all transactions. The next
+  activity reverts with `TooManyGatewayActivitiesInBlock`; the entire gateway call (including a
+  relay batch) rolls back and can be retried in the next block. The cap uses the existing locator
+  nonce range and adds no storage. Even if every activity contains 25 collateral rows, its locator
+  carries at most 344,064 bytes of event data, within Argon's storage-proof envelope. The runtime
+  also requires the maximum proof, including Vault callbacks, to fit within half the available
+  Normal extrinsic weight budget
 - `pause()` can be called by the guardian
 - `unpause()` stays on the admin Safe owner path
 

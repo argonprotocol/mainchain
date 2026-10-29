@@ -83,17 +83,14 @@ impl OnUnbalanced<fungible::Credit<<Test as frame_system::Config>::AccountId, Ba
 	Encode,
 	Decode,
 	DecodeWithMemTracking,
+	Default,
 	Debug,
 	MaxEncodedLen,
 )]
 pub enum ProxyType {
+	#[default]
 	Any,
 	DummyWrapper,
-}
-impl Default for ProxyType {
-	fn default() -> Self {
-		Self::Any
-	}
 }
 impl InstanceFilter<RuntimeCall> for ProxyType {
 	fn filter(&self, c: &RuntimeCall) -> bool {

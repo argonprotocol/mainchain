@@ -1171,10 +1171,10 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							23u8, 246u8, 211u8, 233u8, 19u8, 169u8, 243u8, 69u8, 186u8, 199u8,
-							254u8, 171u8, 118u8, 147u8, 190u8, 135u8, 78u8, 231u8, 160u8, 37u8,
-							170u8, 236u8, 45u8, 61u8, 200u8, 116u8, 21u8, 158u8, 190u8, 9u8, 157u8,
-							14u8,
+							237u8, 47u8, 251u8, 58u8, 169u8, 212u8, 240u8, 227u8, 218u8, 129u8,
+							94u8, 15u8, 97u8, 193u8, 189u8, 174u8, 39u8, 27u8, 22u8, 247u8, 117u8,
+							118u8, 253u8, 140u8, 172u8, 7u8, 134u8, 111u8, 240u8, 49u8, 237u8,
+							75u8,
 						],
 					)
 				}
@@ -1192,9 +1192,10 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							233u8, 135u8, 32u8, 179u8, 131u8, 126u8, 186u8, 151u8, 104u8, 246u8,
-							146u8, 136u8, 4u8, 84u8, 220u8, 185u8, 99u8, 221u8, 216u8, 47u8, 60u8,
-							207u8, 161u8, 168u8, 80u8, 32u8, 44u8, 140u8, 121u8, 17u8, 115u8, 65u8,
+							120u8, 184u8, 100u8, 74u8, 188u8, 184u8, 212u8, 53u8, 119u8, 140u8,
+							237u8, 254u8, 13u8, 209u8, 199u8, 179u8, 116u8, 78u8, 210u8, 61u8,
+							223u8, 117u8, 38u8, 72u8, 88u8, 82u8, 44u8, 217u8, 126u8, 101u8, 188u8,
+							11u8,
 						],
 					)
 				}
@@ -3500,9 +3501,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				234u8, 222u8, 42u8, 83u8, 21u8, 163u8, 122u8, 72u8, 60u8, 203u8, 75u8, 60u8, 54u8,
-				2u8, 251u8, 120u8, 167u8, 177u8, 139u8, 209u8, 27u8, 89u8, 30u8, 20u8, 199u8,
-				144u8, 45u8, 215u8, 69u8, 182u8, 244u8, 160u8,
+				150u8, 149u8, 18u8, 45u8, 34u8, 225u8, 88u8, 100u8, 127u8, 129u8, 211u8, 182u8,
+				123u8, 156u8, 237u8, 233u8, 102u8, 80u8, 129u8, 210u8, 28u8, 99u8, 234u8, 68u8,
+				102u8, 177u8, 171u8, 80u8, 78u8, 235u8, 56u8, 224u8,
 			]
 	}
 	pub mod system {
@@ -5537,9 +5538,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							150u8, 152u8, 207u8, 181u8, 13u8, 119u8, 67u8, 206u8, 85u8, 132u8,
-							232u8, 232u8, 166u8, 93u8, 75u8, 26u8, 81u8, 68u8, 223u8, 85u8, 124u8,
-							98u8, 185u8, 55u8, 234u8, 34u8, 50u8, 205u8, 90u8, 100u8, 150u8, 75u8,
+							135u8, 148u8, 75u8, 177u8, 69u8, 198u8, 100u8, 164u8, 87u8, 36u8, 58u8,
+							223u8, 227u8, 164u8, 20u8, 147u8, 15u8, 228u8, 30u8, 121u8, 41u8,
+							198u8, 58u8, 129u8, 90u8, 50u8, 212u8, 177u8, 95u8, 32u8, 200u8, 201u8,
 						],
 					)
 				}
@@ -5604,10 +5605,9 @@ pub mod api {
 							max_weight,
 						},
 						[
-							103u8, 50u8, 218u8, 92u8, 232u8, 85u8, 47u8, 84u8, 191u8, 131u8, 240u8,
-							173u8, 188u8, 208u8, 177u8, 44u8, 101u8, 215u8, 108u8, 181u8, 158u8,
-							123u8, 8u8, 251u8, 158u8, 135u8, 85u8, 89u8, 127u8, 157u8, 250u8,
-							215u8,
+							88u8, 241u8, 126u8, 138u8, 101u8, 186u8, 132u8, 3u8, 19u8, 202u8,
+							119u8, 211u8, 204u8, 177u8, 43u8, 73u8, 5u8, 102u8, 240u8, 1u8, 197u8,
+							73u8, 97u8, 90u8, 171u8, 2u8, 114u8, 21u8, 155u8, 150u8, 235u8, 201u8,
 						],
 					)
 				}
@@ -6512,9 +6512,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							110u8, 78u8, 244u8, 81u8, 148u8, 43u8, 109u8, 36u8, 18u8, 175u8, 31u8,
-							112u8, 56u8, 174u8, 158u8, 145u8, 196u8, 194u8, 25u8, 95u8, 68u8, 6u8,
-							2u8, 58u8, 221u8, 210u8, 36u8, 103u8, 213u8, 15u8, 185u8, 237u8,
+							10u8, 204u8, 190u8, 79u8, 204u8, 116u8, 209u8, 11u8, 142u8, 10u8, 23u8,
+							126u8, 70u8, 206u8, 32u8, 99u8, 80u8, 252u8, 248u8, 197u8, 135u8,
+							151u8, 127u8, 187u8, 237u8, 64u8, 134u8, 22u8, 91u8, 188u8, 147u8,
+							82u8,
 						],
 					)
 				}
@@ -6778,9 +6779,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							228u8, 54u8, 15u8, 125u8, 113u8, 211u8, 119u8, 104u8, 226u8, 217u8,
-							200u8, 192u8, 210u8, 97u8, 7u8, 236u8, 169u8, 213u8, 38u8, 75u8, 48u8,
-							61u8, 124u8, 78u8, 66u8, 138u8, 225u8, 157u8, 139u8, 4u8, 31u8, 29u8,
+							111u8, 162u8, 156u8, 12u8, 40u8, 14u8, 12u8, 1u8, 193u8, 66u8, 206u8,
+							3u8, 157u8, 184u8, 49u8, 254u8, 10u8, 226u8, 1u8, 94u8, 216u8, 148u8,
+							167u8, 56u8, 80u8, 116u8, 7u8, 137u8, 51u8, 124u8, 118u8, 119u8,
 						],
 					)
 				}
@@ -6829,9 +6830,9 @@ pub mod api {
 						],
 						check_permissions::Input { call, proxy_type },
 						[
-							22u8, 80u8, 241u8, 95u8, 207u8, 45u8, 202u8, 78u8, 21u8, 188u8, 22u8,
-							61u8, 27u8, 62u8, 57u8, 13u8, 255u8, 231u8, 190u8, 24u8, 112u8, 139u8,
-							79u8, 208u8, 139u8, 89u8, 44u8, 106u8, 216u8, 48u8, 164u8, 55u8,
+							60u8, 224u8, 124u8, 211u8, 17u8, 145u8, 205u8, 83u8, 91u8, 94u8, 158u8,
+							210u8, 105u8, 7u8, 111u8, 210u8, 44u8, 177u8, 67u8, 216u8, 196u8, 64u8,
+							227u8, 184u8, 181u8, 27u8, 226u8, 21u8, 240u8, 18u8, 116u8, 39u8,
 						],
 					)
 				}
@@ -22251,9 +22252,9 @@ pub mod api {
 						"batch",
 						types::Batch { calls },
 						[
-							95u8, 46u8, 0u8, 39u8, 112u8, 2u8, 1u8, 139u8, 104u8, 81u8, 110u8,
-							169u8, 34u8, 83u8, 6u8, 107u8, 226u8, 199u8, 182u8, 21u8, 200u8, 24u8,
-							72u8, 70u8, 62u8, 4u8, 17u8, 177u8, 164u8, 108u8, 244u8, 126u8,
+							62u8, 52u8, 248u8, 9u8, 90u8, 211u8, 202u8, 193u8, 157u8, 79u8, 254u8,
+							85u8, 23u8, 191u8, 99u8, 23u8, 3u8, 121u8, 22u8, 237u8, 14u8, 108u8,
+							43u8, 36u8, 222u8, 182u8, 27u8, 183u8, 221u8, 75u8, 46u8, 169u8,
 						],
 					)
 				}
@@ -22283,10 +22284,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							254u8, 66u8, 29u8, 206u8, 34u8, 218u8, 87u8, 109u8, 194u8, 47u8, 16u8,
-							68u8, 151u8, 148u8, 133u8, 177u8, 190u8, 255u8, 229u8, 147u8, 7u8,
-							59u8, 133u8, 219u8, 126u8, 29u8, 98u8, 162u8, 203u8, 56u8, 249u8,
-							228u8,
+							232u8, 207u8, 139u8, 1u8, 88u8, 219u8, 119u8, 72u8, 26u8, 124u8, 224u8,
+							119u8, 70u8, 161u8, 106u8, 107u8, 12u8, 49u8, 147u8, 242u8, 199u8,
+							40u8, 233u8, 53u8, 68u8, 62u8, 240u8, 86u8, 133u8, 100u8, 50u8, 208u8,
 						],
 					)
 				}
@@ -22312,10 +22312,10 @@ pub mod api {
 						"batch_all",
 						types::BatchAll { calls },
 						[
-							154u8, 247u8, 142u8, 72u8, 238u8, 152u8, 229u8, 150u8, 134u8, 42u8,
-							230u8, 49u8, 184u8, 121u8, 224u8, 23u8, 91u8, 76u8, 175u8, 190u8,
-							242u8, 145u8, 130u8, 244u8, 18u8, 82u8, 218u8, 80u8, 12u8, 250u8,
-							252u8, 112u8,
+							127u8, 204u8, 147u8, 36u8, 42u8, 108u8, 110u8, 222u8, 44u8, 202u8,
+							195u8, 239u8, 2u8, 73u8, 27u8, 177u8, 8u8, 74u8, 90u8, 17u8, 93u8,
+							231u8, 63u8, 141u8, 51u8, 2u8, 233u8, 100u8, 244u8, 203u8, 111u8,
+							182u8,
 						],
 					)
 				}
@@ -22338,9 +22338,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							45u8, 79u8, 67u8, 236u8, 232u8, 219u8, 17u8, 91u8, 38u8, 50u8, 245u8,
-							83u8, 73u8, 187u8, 60u8, 231u8, 20u8, 113u8, 191u8, 8u8, 0u8, 180u8,
-							161u8, 6u8, 31u8, 164u8, 71u8, 100u8, 33u8, 121u8, 42u8, 136u8,
+							56u8, 39u8, 121u8, 58u8, 136u8, 82u8, 0u8, 247u8, 132u8, 182u8, 100u8,
+							189u8, 141u8, 31u8, 169u8, 95u8, 178u8, 124u8, 201u8, 216u8, 150u8,
+							234u8, 110u8, 43u8, 3u8, 217u8, 31u8, 166u8, 18u8, 87u8, 8u8, 222u8,
 						],
 					)
 				}
@@ -22366,10 +22366,9 @@ pub mod api {
 						"force_batch",
 						types::ForceBatch { calls },
 						[
-							252u8, 102u8, 31u8, 201u8, 154u8, 52u8, 103u8, 41u8, 14u8, 238u8,
-							229u8, 253u8, 213u8, 135u8, 118u8, 53u8, 232u8, 190u8, 65u8, 193u8,
-							75u8, 176u8, 173u8, 85u8, 3u8, 167u8, 180u8, 79u8, 20u8, 255u8, 177u8,
-							108u8,
+							151u8, 62u8, 131u8, 162u8, 219u8, 167u8, 116u8, 68u8, 23u8, 93u8, 21u8,
+							124u8, 192u8, 148u8, 181u8, 156u8, 205u8, 106u8, 173u8, 121u8, 82u8,
+							197u8, 68u8, 95u8, 152u8, 45u8, 71u8, 212u8, 5u8, 88u8, 4u8, 255u8,
 						],
 					)
 				}
@@ -22392,10 +22391,9 @@ pub mod api {
 							weight,
 						},
 						[
-							252u8, 216u8, 168u8, 234u8, 201u8, 124u8, 126u8, 29u8, 125u8, 37u8,
-							91u8, 165u8, 24u8, 56u8, 51u8, 120u8, 159u8, 114u8, 226u8, 142u8,
-							135u8, 111u8, 10u8, 94u8, 26u8, 118u8, 172u8, 94u8, 177u8, 146u8,
-							237u8, 64u8,
+							43u8, 183u8, 27u8, 136u8, 146u8, 148u8, 9u8, 10u8, 133u8, 90u8, 85u8,
+							220u8, 133u8, 242u8, 59u8, 174u8, 86u8, 49u8, 222u8, 149u8, 162u8,
+							19u8, 253u8, 69u8, 251u8, 28u8, 64u8, 49u8, 246u8, 219u8, 35u8, 66u8,
 						],
 					)
 				}
@@ -22435,9 +22433,9 @@ pub mod api {
 							fallback: ::subxt::ext::subxt_core::alloc::boxed::Box::new(fallback),
 						},
 						[
-							27u8, 237u8, 75u8, 205u8, 5u8, 140u8, 12u8, 128u8, 13u8, 134u8, 0u8,
-							16u8, 35u8, 121u8, 128u8, 125u8, 177u8, 85u8, 78u8, 16u8, 84u8, 149u8,
-							218u8, 213u8, 213u8, 128u8, 213u8, 29u8, 39u8, 197u8, 35u8, 206u8,
+							156u8, 68u8, 206u8, 29u8, 22u8, 215u8, 200u8, 49u8, 69u8, 90u8, 17u8,
+							116u8, 150u8, 77u8, 62u8, 49u8, 182u8, 184u8, 119u8, 47u8, 152u8,
+							102u8, 183u8, 17u8, 10u8, 56u8, 38u8, 46u8, 80u8, 54u8, 102u8, 107u8,
 						],
 					)
 				}
@@ -22460,9 +22458,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							70u8, 7u8, 212u8, 187u8, 212u8, 31u8, 111u8, 181u8, 52u8, 72u8, 66u8,
-							102u8, 221u8, 144u8, 60u8, 247u8, 47u8, 103u8, 5u8, 105u8, 64u8, 77u8,
-							207u8, 166u8, 136u8, 165u8, 71u8, 199u8, 214u8, 231u8, 188u8, 150u8,
+							114u8, 144u8, 79u8, 232u8, 115u8, 34u8, 12u8, 247u8, 81u8, 130u8,
+							131u8, 95u8, 56u8, 212u8, 106u8, 6u8, 25u8, 11u8, 46u8, 3u8, 236u8,
+							250u8, 234u8, 55u8, 182u8, 216u8, 241u8, 244u8, 73u8, 248u8, 217u8,
+							7u8,
 						],
 					)
 				}
@@ -22798,10 +22797,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							219u8, 212u8, 222u8, 144u8, 221u8, 207u8, 102u8, 246u8, 208u8, 25u8,
-							231u8, 43u8, 89u8, 141u8, 15u8, 10u8, 232u8, 237u8, 227u8, 40u8, 68u8,
-							29u8, 182u8, 112u8, 130u8, 171u8, 125u8, 3u8, 214u8, 200u8, 101u8,
-							170u8,
+							70u8, 191u8, 221u8, 241u8, 255u8, 6u8, 94u8, 3u8, 152u8, 158u8, 38u8,
+							122u8, 202u8, 0u8, 90u8, 206u8, 24u8, 93u8, 170u8, 120u8, 52u8, 205u8,
+							154u8, 148u8, 25u8, 112u8, 82u8, 251u8, 223u8, 155u8, 152u8, 172u8,
 						],
 					)
 				}
@@ -22824,9 +22822,10 @@ pub mod api {
 							weight,
 						},
 						[
-							112u8, 195u8, 161u8, 12u8, 20u8, 177u8, 110u8, 110u8, 250u8, 191u8,
-							246u8, 21u8, 228u8, 170u8, 244u8, 97u8, 87u8, 200u8, 4u8, 172u8, 156u8,
-							249u8, 75u8, 48u8, 45u8, 35u8, 189u8, 119u8, 70u8, 157u8, 192u8, 88u8,
+							243u8, 72u8, 143u8, 98u8, 239u8, 159u8, 53u8, 98u8, 210u8, 210u8,
+							183u8, 187u8, 119u8, 62u8, 247u8, 79u8, 231u8, 126u8, 240u8, 164u8,
+							132u8, 240u8, 98u8, 211u8, 236u8, 65u8, 188u8, 97u8, 231u8, 199u8,
+							73u8, 144u8,
 						],
 					)
 				}
@@ -22864,9 +22863,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							47u8, 98u8, 22u8, 126u8, 245u8, 241u8, 146u8, 224u8, 4u8, 113u8, 44u8,
-							106u8, 30u8, 28u8, 121u8, 66u8, 111u8, 148u8, 42u8, 154u8, 36u8, 233u8,
-							56u8, 210u8, 245u8, 157u8, 164u8, 247u8, 222u8, 198u8, 72u8, 15u8,
+							93u8, 176u8, 182u8, 55u8, 41u8, 27u8, 50u8, 70u8, 93u8, 209u8, 138u8,
+							174u8, 125u8, 53u8, 100u8, 85u8, 98u8, 21u8, 50u8, 143u8, 44u8, 159u8,
+							65u8, 188u8, 124u8, 95u8, 236u8, 227u8, 108u8, 171u8, 146u8, 114u8,
 						],
 					)
 				}
@@ -27584,6 +27583,38 @@ pub mod api {
 					const PALLET: &'static str = "CrosschainTransfer";
 					const CALL: &'static str = "collateralize_transfer";
 				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Authenticate a complete gateway locator and settle its unconsumed activities."]
+				pub struct ProveGatewayActivityStorage {
+					pub source_chain: prove_gateway_activity_storage::SourceChain,
+					#[codec(compact)]
+					pub previous_gateway_activity_nonce:
+						prove_gateway_activity_storage::PreviousGatewayActivityNonce,
+					pub proof: prove_gateway_activity_storage::Proof,
+				}
+				pub mod prove_gateway_activity_storage {
+					use super::runtime_types;
+					pub type SourceChain =
+						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+					pub type PreviousGatewayActivityNonce = ::core::primitive::u64;
+					pub type Proof =
+						runtime_types::pallet_crosschain_transfer::GatewayActivityStorageProof;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for ProveGatewayActivityStorage {
+					const PALLET: &'static str = "CrosschainTransfer";
+					const CALL: &'static str = "prove_gateway_activity_storage";
+				}
 			}
 			pub struct TransactionApi;
 			impl TransactionApi {
@@ -27850,6 +27881,30 @@ pub mod api {
 							236u8, 172u8, 38u8, 130u8, 76u8, 73u8, 22u8, 148u8, 163u8, 51u8, 28u8,
 							189u8, 98u8, 138u8, 151u8, 36u8, 96u8, 222u8, 78u8, 134u8, 223u8,
 							123u8, 241u8, 77u8, 170u8, 182u8, 204u8, 32u8, 43u8, 93u8, 15u8, 12u8,
+						],
+					)
+				}
+				#[doc = "Authenticate a complete gateway locator and settle its unconsumed activities."]
+				pub fn prove_gateway_activity_storage(
+					&self,
+					source_chain: types::prove_gateway_activity_storage::SourceChain,
+					previous_gateway_activity_nonce : types :: prove_gateway_activity_storage :: PreviousGatewayActivityNonce,
+					proof: types::prove_gateway_activity_storage::Proof,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<
+					types::ProveGatewayActivityStorage,
+				> {
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"CrosschainTransfer",
+						"prove_gateway_activity_storage",
+						types::ProveGatewayActivityStorage {
+							source_chain,
+							previous_gateway_activity_nonce,
+							proof,
+						},
+						[
+							48u8, 207u8, 115u8, 9u8, 144u8, 3u8, 131u8, 203u8, 79u8, 218u8, 187u8,
+							186u8, 131u8, 103u8, 116u8, 146u8, 16u8, 254u8, 13u8, 154u8, 92u8,
+							111u8, 112u8, 246u8, 149u8, 82u8, 196u8, 93u8, 29u8, 33u8, 60u8, 217u8,
 						],
 					)
 				}
@@ -29477,6 +29532,23 @@ pub mod api {
 						],
 					)
 				}
+				#[doc = " Maximum activities in one complete gateway locator storage proof."]
+				pub fn max_activities_per_gateway_proof(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u32,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"MaxActivitiesPerGatewayProof",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
+						],
+					)
+				}
 				#[doc = " Maximum number of members the active Global Issuance Council may carry."]
 				pub fn max_council_members(
 					&self,
@@ -29630,6 +29702,23 @@ pub mod api {
 							59u8, 226u8, 157u8, 101u8, 103u8, 117u8, 249u8, 65u8, 18u8, 191u8,
 							103u8, 119u8, 53u8, 85u8, 81u8, 96u8, 220u8, 42u8, 184u8, 239u8, 42u8,
 							246u8,
+						],
+					)
+				}
+				#[doc = " Maximum aggregate event data carried by one storage-proof locator."]
+				pub fn max_gateway_activity_log_data_bytes(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u32,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"max_gateway_activity_log_data_bytes",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
 						],
 					)
 				}
@@ -31104,6 +31193,35 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
+				pub struct EthereumAccountStorageProof {
+					pub execution_block_proof:
+						runtime_types::argon_primitives::ethereum::EthereumExecutionBlockProof,
+					pub account_proof: runtime_types::bounded_collections::bounded_vec::BoundedVec<
+						runtime_types::bounded_collections::bounded_vec::BoundedVec<
+							::core::primitive::u8,
+						>,
+					>,
+					pub storage_proof: runtime_types::bounded_collections::bounded_vec::BoundedVec<
+						runtime_types::bounded_collections::bounded_vec::BoundedVec<
+							::core::primitive::u8,
+						>,
+					>,
+					pub slots: runtime_types::bounded_collections::bounded_vec::BoundedVec<
+						runtime_types::argon_primitives::ethereum::EthereumStorageSlotProof,
+					>,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
 				pub enum EthereumBeaconPreset {
 					#[codec(index = 0)]
 					Mainnet,
@@ -31261,6 +31379,25 @@ pub mod api {
 				pub struct EthereumReceiptProofReceipt {
 					#[codec(compact)]
 					pub transaction_index: ::core::primitive::u64,
+					pub node_indexes: runtime_types::bounded_collections::bounded_vec::BoundedVec<
+						::core::primitive::u16,
+					>,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct EthereumStorageSlotProof {
+					pub slot: crate::types::H256,
+					pub value: crate::types::H256,
 					pub node_indexes: runtime_types::bounded_collections::bounded_vec::BoundedVec<
 						::core::primitive::u16,
 					>,
@@ -35173,7 +35310,7 @@ pub mod api {
 				)]
 				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 				pub enum Call {
-					# [codec (index = 0)] set_chain_config { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , config : runtime_types :: pallet_crosschain_transfer :: pallet :: ChainConfig , } , # [codec (index = 1)] force_set_global_issuance_council { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , # [codec (compact)] after_nonce : :: core :: primitive :: u64 , member_account_ids : runtime_types :: bounded_collections :: bounded_vec :: BoundedVec < crate :: types :: AccountId32 > , } , # [codec (index = 2)] pause_gateway { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , } , # [codec (index = 3)] unpause_gateway { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , } , # [codec (index = 4)] set_minimum_minting_authority_value { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , # [codec (compact)] minimum_value : :: core :: primitive :: u128 , } , # [codec (index = 5)] set_minting_authority_activation_repayment_pricing { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , pricing : runtime_types :: pallet_crosschain_transfer :: pallet :: MintingAuthorityActivationRepaymentPricing , } , # [codec (index = 6)] register_council_signer { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , signature : [:: core :: primitive :: u8 ; 65usize] , } , # [codec (index = 7)] approve_queue_entries { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , signatures : runtime_types :: bounded_collections :: bounded_vec :: BoundedVec < [:: core :: primitive :: u8 ; 65usize] > , } , # [codec (index = 8)] prove_gateway_activity { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , # [codec (compact)] previous_gateway_activity_nonce : :: core :: primitive :: u64 , proof_batch : runtime_types :: argon_primitives :: ethereum :: EthereumReceiptLogProofBatch , } , # [codec (index = 9)] register_minting_authority { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , signature : [:: core :: primitive :: u8 ; 65usize] , # [codec (compact)] microgon_collateral : :: core :: primitive :: u128 , # [codec (compact)] micronot_collateral : :: core :: primitive :: u128 , } , # [codec (index = 10)] deactivate_minting_authority { destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , } , # [codec (index = 11)] transfer_out { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , asset : runtime_types :: pallet_crosschain_transfer :: pallet :: AssetKind , destination_account : :: subxt :: ext :: subxt_core :: utils :: H160 , # [codec (compact)] amount : :: core :: primitive :: u128 , } , # [codec (index = 12)] collateralize_transfer { transfer_id : crate :: types :: H256 , signature : [:: core :: primitive :: u8 ; 65usize] , # [codec (compact)] microgon_collateral : :: core :: primitive :: u128 , # [codec (compact)] micronot_collateral : :: core :: primitive :: u128 , } , }
+					# [codec (index = 0)] set_chain_config { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , config : runtime_types :: pallet_crosschain_transfer :: pallet :: ChainConfig , } , # [codec (index = 1)] force_set_global_issuance_council { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , # [codec (compact)] after_nonce : :: core :: primitive :: u64 , member_account_ids : runtime_types :: bounded_collections :: bounded_vec :: BoundedVec < crate :: types :: AccountId32 > , } , # [codec (index = 2)] pause_gateway { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , } , # [codec (index = 3)] unpause_gateway { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , } , # [codec (index = 4)] set_minimum_minting_authority_value { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , # [codec (compact)] minimum_value : :: core :: primitive :: u128 , } , # [codec (index = 5)] set_minting_authority_activation_repayment_pricing { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , pricing : runtime_types :: pallet_crosschain_transfer :: pallet :: MintingAuthorityActivationRepaymentPricing , } , # [codec (index = 6)] register_council_signer { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , signature : [:: core :: primitive :: u8 ; 65usize] , } , # [codec (index = 7)] approve_queue_entries { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , signatures : runtime_types :: bounded_collections :: bounded_vec :: BoundedVec < [:: core :: primitive :: u8 ; 65usize] > , } , # [codec (index = 8)] prove_gateway_activity { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , # [codec (compact)] previous_gateway_activity_nonce : :: core :: primitive :: u64 , proof_batch : runtime_types :: argon_primitives :: ethereum :: EthereumReceiptLogProofBatch , } , # [codec (index = 9)] register_minting_authority { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , signature : [:: core :: primitive :: u8 ; 65usize] , # [codec (compact)] microgon_collateral : :: core :: primitive :: u128 , # [codec (compact)] micronot_collateral : :: core :: primitive :: u128 , } , # [codec (index = 10)] deactivate_minting_authority { destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , } , # [codec (index = 11)] transfer_out { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , asset : runtime_types :: pallet_crosschain_transfer :: pallet :: AssetKind , destination_account : :: subxt :: ext :: subxt_core :: utils :: H160 , # [codec (compact)] amount : :: core :: primitive :: u128 , } , # [codec (index = 12)] collateralize_transfer { transfer_id : crate :: types :: H256 , signature : [:: core :: primitive :: u8 ; 65usize] , # [codec (compact)] microgon_collateral : :: core :: primitive :: u128 , # [codec (compact)] micronot_collateral : :: core :: primitive :: u128 , } , # [codec (index = 13)] # [doc = "Authenticate a complete gateway locator and settle its unconsumed activities."] prove_gateway_activity_storage { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , # [codec (compact)] previous_gateway_activity_nonce : :: core :: primitive :: u64 , proof : runtime_types :: pallet_crosschain_transfer :: GatewayActivityStorageProof , } , }
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
 					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
@@ -35769,6 +35906,24 @@ pub mod api {
 					#[codec(index = 1)]
 					Ready,
 				}
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub struct GatewayActivityStorageProof {
+				#[codec(compact)]
+				pub locator_index: ::core::primitive::u64,
+				pub activity_root_seed: crate::types::H256,
+				pub storage_proof:
+					runtime_types::argon_primitives::ethereum::EthereumAccountStorageProof,
+				pub activity_logs: runtime_types::bounded_collections::bounded_vec::BoundedVec<
+					runtime_types::argon_primitives::ethereum::EthereumLog,
+				>,
 			}
 		}
 		pub mod pallet_digests {

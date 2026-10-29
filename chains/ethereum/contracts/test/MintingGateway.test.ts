@@ -1,6 +1,7 @@
 import { network } from 'hardhat';
 import { afterAll, describe, expect, it } from 'vitest';
-import { Wallet } from 'ethers';
+import { Wallet, type Log, type TransactionResponse } from 'ethers';
+import { mintingGatewayActivityHashingFixture as gatewayHashFixture } from '../fixtures.js';
 import {
   appendMintingGatewayActivityRoot,
   encodeMintingGatewayGlobalIssuanceCouncilRotateTarget,
@@ -31,7 +32,6 @@ const SCALE = 1_000_000_000_000n;
 const MICROGONS_PER_ARGONOT = 1_000_000n;
 const ERC1967_ADMIN_SLOT = '0xb53127684a568b3173ae13b9f8a6016e243e63b6e8ee1178d6a717850b5d6103';
 const COUNCIL_WEIGHTS = [40n, 30n, 20n, 10n] as const;
-
 const connection = await network.create();
 const { ethers } = connection;
 
@@ -550,6 +550,231 @@ describe('MintingGateway', () => {
     expect(await argon.balanceOf(holder.address)).to.equal(750n * SCALE);
     expect(await argon.allowance(holder.address, await gateway.getAddress())).to.equal(0n);
     expect(await argonot.balanceOf(holder.address)).to.equal(2_000n * SCALE);
+  });
+
+  it('exposes the shared activity locator mapping slot and block cap', async () => {
+    const { gateway } = await deployFixture();
+
+    expect(await gateway.activityBlockLocatorsMappingSlot()).to.equal(
+      gatewayHashFixture.mappingSlot,
+    );
+    expect(await gateway.MAX_GATEWAY_ACTIVITIES_PER_BLOCK()).to.equal(
+      gatewayHashFixture.maxGatewayActivitiesPerBlock,
+    );
+    expect(await gateway.MAX_MINTING_AUTHORIZATIONS_PER_TRANSFER()).to.equal(
+      gatewayHashFixture.maxMintingAuthorizationsPerTransfer,
+    );
+  });
+
+  it('caps one block across transactions, rolls back overflowing calls, and resumes next block', async () => {
+    const fixture = await deployFixture();
+    const { gateway, argon, holder, recipient, outsider, council, mintingAuthoritySigner } =
+      fixture;
+    await activateMintingAuthority(fixture);
+    const context = await getGatewayHashContext(gateway);
+    const cap = Number(await gateway.MAX_GATEWAY_ACTIVITIES_PER_BLOCK());
+    const batchLimit = Number(await gateway.MAX_GATEWAY_UPDATES_PER_BATCH());
+    const startingActivityNonce = await gateway.gatewayActivityNonce();
+    const startingApprovalsNonce = await gateway.argonApprovalsNonce();
+    const previousLocator = await gateway.activityBlockLocators(
+      await gateway.latestActivityBlockLocatorIndex(),
+    );
+    const collateralBefore = await gateway.mintingAuthorityCollateralRemaining(
+      mintingAuthoritySigner.address,
+    );
+
+    const request = await createTransferOutRequest(fixture, { amount: 1n });
+    const transferId = hashMintingGatewayTransferOutOfArgonRequest(request);
+    const finalizationProof = {
+      authorizations: [
+        {
+          microgonCollateral: 1n,
+          micronotCollateral: 0n,
+          signature: await mintingAuthoritySigner.signMessage(
+            ethers.getBytes(
+              hashMintingGatewayMintingAuthorization(context, {
+                request,
+                microgonCollateral: 1n,
+                micronotCollateral: 0n,
+              }),
+            ),
+          ),
+        },
+      ],
+    };
+    const deadline = BigInt((await ethers.provider.getBlock('latest'))!.timestamp + 3600);
+    const permit = await signPermit(
+      holder,
+      argon,
+      holder.address as `0x${string}`,
+      (await gateway.getAddress()) as `0x${string}`,
+      SCALE,
+      deadline,
+      'Argon',
+    );
+    const accepted: TransactionResponse[] = [];
+    let nextQueueNonce = startingApprovalsNonce + 1n;
+    let previousUpdateHash = await gateway.getFunction('argonApprovalsHash')();
+    let overflowingBatch: TransactionResponse;
+    let overflowingFinalization: TransactionResponse;
+    let expectedApprovalHash: string;
+
+    await ethers.provider.send('evm_setAutomine', [false]);
+    try {
+      // Leave one place available, so the first item of the following two-item batch fits.
+      for (let remaining = cap - 1; remaining > 0; ) {
+        const count = Math.min(remaining, batchLimit);
+        const updates = [];
+        for (let index = 0; index < count; index += 1) {
+          const signingKey = recipient.address as `0x${string}`;
+          const payload = encodeMintingGatewayMintingAuthorityDeactivateTarget({ signingKey });
+          const approvalHash = hashMintingGatewayGatewayUpdateApproval(context, {
+            queueNonce: nextQueueNonce,
+            approvingCouncilHash: council.hash,
+            kind: MINTING_GATEWAY_UPDATE_KINDS.mintingAuthorityDeactivate,
+            targetId: ethers.zeroPadValue(signingKey, 32) as `0x${string}`,
+            targetPayloadHash: ethers.keccak256(payload) as `0x${string}`,
+            previousUpdateHash,
+          });
+          const signatures = [];
+          if (index + 1 === count) {
+            signatures.push(...(await signApprovalHash(council.quorumSigners, approvalHash)));
+          }
+          updates.push({
+            queueNonce: nextQueueNonce,
+            kind: MINTING_GATEWAY_UPDATE_KINDS.mintingAuthorityDeactivate,
+            payload,
+            signatures,
+          });
+          nextQueueNonce += 1n;
+          previousUpdateHash = approvalHash;
+        }
+        accepted.push(
+          await gateway.applyGatewayUpdates(
+            council.snapshot,
+            updates,
+            fixture.relayerArgonAccountId,
+            { gasLimit: 3_000_000 },
+          ),
+        );
+        remaining -= count;
+      }
+      expectedApprovalHash = previousUpdateHash;
+
+      // This batch writes collateral and appends one activity before its second item overflows.
+      const updates = [];
+      for (const [index, signingKey] of [holder.address, outsider.address].entries()) {
+        const target = {
+          signingKey: signingKey as `0x${string}`,
+          microgonCollateral: 1n,
+          micronotCollateral: 0n,
+        };
+        const queueNonce = nextQueueNonce + BigInt(index);
+        const approvalHash = hashMintingGatewayActivateMintingAuthorityApproval(context, {
+          queueNonce,
+          approvingCouncilHash: council.hash,
+          previousUpdateHash,
+          target,
+        });
+        const signatures = [];
+        if (index === 1) {
+          signatures.push(...(await signApprovalHash(council.quorumSigners, approvalHash)));
+        }
+        updates.push({
+          queueNonce,
+          kind: MINTING_GATEWAY_UPDATE_KINDS.mintingAuthorityActivate,
+          payload: encodeMintingGatewayMintingAuthorityActivationTarget(target),
+          signatures,
+        });
+        previousUpdateHash = approvalHash;
+      }
+      overflowingBatch = await gateway.applyGatewayUpdates(
+        council.snapshot,
+        updates,
+        fixture.relayerArgonAccountId,
+        { gasLimit: 1_000_000 },
+      );
+
+      // A different entrypoint may still take the final place after the failed batch rolls back.
+      accepted.push(
+        await gateway
+          .connect(holder)
+          .startTransferToArgon(
+            await argon.getAddress(),
+            1n,
+            ethers.encodeBytes32String('capacity'),
+            deadline,
+            permit.v,
+            permit.r,
+            permit.s,
+            { gasLimit: 500_000 },
+          ),
+      );
+      overflowingFinalization = await gateway
+        .connect(outsider)
+        .finalizeTransferOutOfArgon(request, finalizationProof, { gasLimit: 500_000 });
+      await ethers.provider.send('evm_mine', []);
+    } finally {
+      await ethers.provider.send('evm_setAutomine', [true]);
+    }
+
+    const blockNumbers = new Set<number>();
+    for (const transaction of accepted) {
+      const receipt = (await ethers.provider.getTransactionReceipt(transaction.hash))!;
+      expect(receipt.status).to.equal(1);
+      blockNumbers.add(receipt.blockNumber);
+    }
+    expect(blockNumbers.size).to.equal(1);
+    for (const transaction of [overflowingBatch!, overflowingFinalization!]) {
+      const receipt = (await ethers.provider.getTransactionReceipt(transaction.hash))!;
+      expect(receipt.status).to.equal(0);
+      expect(receipt.logs).toHaveLength(0);
+      expect(blockNumbers.has(receipt.blockNumber)).to.equal(true);
+    }
+
+    const locatorIndex = await gateway.latestActivityBlockLocatorIndex();
+    const locator = await gateway.activityBlockLocators(locatorIndex);
+    expect(locator.startGatewayActivityNonce).to.equal(startingActivityNonce + 1n);
+    expect(locator.endGatewayActivityNonce).to.equal(startingActivityNonce + BigInt(cap));
+    expect(await gateway.gatewayActivityNonce()).to.equal(locator.endGatewayActivityNonce);
+    expect(await gateway.argonApprovalsNonce()).to.equal(startingApprovalsNonce + BigInt(cap - 1));
+    expect(await gateway.argonApprovalsHash()).to.equal(expectedApprovalHash!);
+    expect(await argon.balanceOf(holder.address)).to.equal(999n * SCALE);
+    expect(await argon.totalSupply()).to.equal(999n * SCALE);
+    expect(await argon.balanceOf(recipient.address)).to.equal(0n);
+    expect(await argon.nonces(holder.address)).to.equal(1n);
+    expect(await gateway.finalizedTransferOutOfArgonIds(transferId)).to.equal(false);
+    expect(
+      await gateway.mintingAuthorityCollateralRemaining(mintingAuthoritySigner.address),
+    ).to.deep.equal(collateralBefore);
+    for (const signingKey of [holder.address, outsider.address]) {
+      expect(
+        (await gateway.mintingAuthorityCollateralRemaining(signingKey)).microgonCollateral,
+      ).to.equal(0n);
+    }
+    expect(await gateway.activityBlockLocators(locatorIndex - 1n)).to.deep.equal(previousLocator);
+    await expectCustomError(
+      gateway.connect(outsider).finalizeTransferOutOfArgon.staticCall(request, finalizationProof),
+      gateway,
+      'TooManyGatewayActivitiesInBlock',
+      [BigInt(cap), BigInt(cap + 1)],
+    );
+
+    const retry = await gateway
+      .connect(outsider)
+      .finalizeTransferOutOfArgon(request, finalizationProof, { gasLimit: 500_000 });
+    const retryReceipt = await retry.wait();
+    expect(retryReceipt.status).to.equal(1);
+    expect(BigInt(retryReceipt.blockNumber)).to.equal(locator.blockNumber + 1n);
+    const nextLocator = await gateway.activityBlockLocators(locatorIndex + 1n);
+    expect(nextLocator.startGatewayActivityNonce).to.equal(locator.endGatewayActivityNonce + 1n);
+    expect(nextLocator.endGatewayActivityNonce).to.equal(nextLocator.startGatewayActivityNonce);
+    expect(await gateway.finalizedTransferOutOfArgonIds(transferId)).to.equal(true);
+    expect(await argon.balanceOf(recipient.address)).to.equal(SCALE);
+    expect(
+      (await gateway.mintingAuthorityCollateralRemaining(mintingAuthoritySigner.address))
+        .microgonCollateral,
+    ).to.equal(collateralBefore.microgonCollateral - 1n);
   });
 
   it('rejects zero runtime-unit transfer amounts', async () => {
@@ -1345,6 +1570,110 @@ describe('MintingGateway', () => {
       gateway,
       'TransferOutOfArgonAlreadyFinalized',
       [transferId],
+    );
+  });
+
+  it('finalizes with all 25 valid signatures and records every collateral row', async () => {
+    const fixture = await deployFixture();
+    const { argon, gateway, outsider, recipient } = fixture;
+    expect(await gateway.MAX_MINTING_AUTHORIZATIONS_PER_TRANSFER()).to.equal(25n);
+    const hashContext = await getGatewayHashContext(gateway);
+    const wallets = Array.from({ length: 25 }, () => Wallet.createRandom()).sort((left, right) =>
+      left.address.toLowerCase().localeCompare(right.address.toLowerCase()),
+    );
+    const mintingCollateral = wallets.map((wallet, index) => ({
+      signingKey: wallet.address as `0x${string}`,
+      microgonCollateral: BigInt(index + 1),
+      micronotCollateral: BigInt(index + 2),
+    }));
+
+    for (const [index, row] of mintingCollateral.entries()) {
+      await activateMintingAuthority(fixture, BigInt(index + 1), { signingKey: row.signingKey });
+    }
+
+    const amount = mintingCollateral.reduce(
+      (sum, row) => sum + row.microgonCollateral + row.micronotCollateral,
+      0n,
+    );
+    const request = await createTransferOutRequest(fixture, { amount });
+    const transferId = hashMintingGatewayTransferOutOfArgonRequest(request);
+    const authorizations = await Promise.all(
+      mintingCollateral.map(async (row, index) => ({
+        microgonCollateral: row.microgonCollateral,
+        micronotCollateral: row.micronotCollateral,
+        signature: await wallets[index].signMessage(
+          ethers.getBytes(hashMintingGatewayMintingAuthorization(hashContext, { request, ...row })),
+        ),
+      })),
+    );
+    const previousLocator = await gateway.activityBlockLocators(
+      await gateway.latestActivityBlockLocatorIndex(),
+    );
+    const activityRootSeed = hashMintingGatewayActivityBlockLocator({
+      blockNumber: previousLocator.blockNumber,
+      startGatewayActivityNonce: previousLocator.startGatewayActivityNonce,
+      endGatewayActivityNonce: previousLocator.endGatewayActivityNonce,
+      activityRoot: previousLocator.activityRoot,
+    });
+
+    expect(authorizations).toHaveLength(25);
+    const tx = await gateway
+      .connect(outsider)
+      .finalizeTransferOutOfArgon(request, { authorizations });
+    const event = await parseGatewayEvent(
+      Promise.resolve(tx),
+      gateway,
+      'TransferOutOfArgonFinalized',
+    );
+    const receipt = await tx.wait();
+    const emittedLog = receipt.logs.find(
+      (log: Log) =>
+        log.address.toLowerCase() === hashContext.gatewayAddress.toLowerCase() &&
+        log.topics[0] === gateway.interface.getEvent('TransferOutOfArgonFinalized').topicHash,
+    );
+
+    expect(emittedLog).toBeDefined();
+    expect(ethers.getBytes(emittedLog.data)).toHaveLength(2688);
+    expect(event.args[0]).to.equal(transferId);
+    expect(event.args[1]).to.equal(await argon.getAddress());
+    expect(event.args[2]).to.equal(amount);
+    expect(event.args[3]).toHaveLength(25);
+    for (const [index, row] of mintingCollateral.entries()) {
+      expect(event.args[3][index].signingKey).to.equal(row.signingKey);
+      expect(event.args[3][index].microgonCollateral).to.equal(row.microgonCollateral);
+      expect(event.args[3][index].micronotCollateral).to.equal(row.micronotCollateral);
+      const remaining = await gateway.mintingAuthorityCollateralRemaining(row.signingKey);
+      expect(remaining.microgonCollateral).to.equal(1_000n - row.microgonCollateral);
+      expect(remaining.micronotCollateral).to.equal(200n - row.micronotCollateral);
+    }
+    expect(await argon.balanceOf(recipient.address)).to.equal(amount * SCALE);
+    expect(await argon.totalSupply()).to.equal((1_000n + amount) * SCALE);
+    expect(await gateway.finalizedTransferOutOfArgonIds(transferId)).to.equal(true);
+    expect(await gateway.gatewayActivityNonce()).to.equal(26n);
+    expect(asGatewayActivityState(event.args[4])).toEqual({
+      gatewayActivityNonce: 26n,
+      argonApprovalsNonce: 25n,
+      argonCirculation: 1_000n + amount,
+      argonotCirculation: 2_000n,
+    });
+
+    const locator = await gateway.activityBlockLocators(
+      await gateway.latestActivityBlockLocatorIndex(),
+    );
+    expect(locator.blockNumber).to.equal(BigInt(receipt.blockNumber));
+    expect(locator.startGatewayActivityNonce).to.equal(26n);
+    expect(locator.endGatewayActivityNonce).to.equal(26n);
+    expect(locator.activityRoot).to.equal(
+      appendMintingGatewayActivityRoot(
+        activityRootSeed,
+        hashMintingGatewayTransferOutOfArgonFinalizedActivity(hashContext, {
+          transferId,
+          token: request.token,
+          amount,
+          mintingCollateral,
+          gatewayState: asGatewayActivityState(event.args[4]),
+        }),
+      ),
     );
   });
 

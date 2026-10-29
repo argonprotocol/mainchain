@@ -31,6 +31,16 @@ replaceInFile(path, [
     ["readonly values:", 'readonly values_:'],
 ]);
 
+const interfacesDir = `${dirname}/src/interfaces`;
+for (const file of fs.readdirSync(interfacesDir)) {
+    if (!file.endsWith('.ts')) continue;
+
+    replaceInFile(`${interfacesDir}/${file}`, [
+        ['/* eslint-disable */\n', ''],
+        ['/* eslint-disable sort-keys */\n', ''],
+    ]);
+}
+
 const typeOnlyAugmentImports = [
     ['src/interfaces/augment-api-consts.ts', '@polkadot/api-base/types/consts'],
     ['src/interfaces/augment-api-errors.ts', '@polkadot/api-base/types/errors'],

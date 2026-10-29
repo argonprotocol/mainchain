@@ -130,7 +130,8 @@ macro_rules! call_filters {
 					},
 					ProxyType::VaultDelegate => match c {
 						RuntimeCall::CrosschainTransfer(
-							pallet_crosschain_transfer::Call::prove_gateway_activity { .. }
+							pallet_crosschain_transfer::Call::prove_gateway_activity { .. } |
+							pallet_crosschain_transfer::Call::prove_gateway_activity_storage { .. }
 						) => true,
 						RuntimeCall::Utility(pallet_utility::Call::batch { calls }) |
 						RuntimeCall::Utility(pallet_utility::Call::batch_all { calls }) |
@@ -139,7 +140,8 @@ macro_rules! call_filters {
 								matches!(
 									sc,
 									RuntimeCall::CrosschainTransfer(
-										pallet_crosschain_transfer::Call::prove_gateway_activity { .. }
+											pallet_crosschain_transfer::Call::prove_gateway_activity { .. } |
+											pallet_crosschain_transfer::Call::prove_gateway_activity_storage { .. }
 									)
 								)
 							}),
@@ -155,6 +157,60 @@ macro_rules! call_filters {
 					(ProxyType::NonTransfer, _) => true,
 					_ => false,
 				}
+			}
+		}
+
+		#[cfg(test)]
+		mod gateway_proof_proxy_tests {
+			use super::*;
+
+			#[test]
+			fn vault_delegate_permits_both_proof_calls_but_not_gateway_admin() {
+				use pallet_crosschain_transfer::{Call, SourceChain};
+				let receipt = RuntimeCall::CrosschainTransfer(Call::prove_gateway_activity {
+					source_chain: SourceChain::Ethereum,
+					previous_gateway_activity_nonce: 0,
+					proof_batch: argon_primitives::EthereumReceiptLogProofBatch {
+						execution_block_proof: argon_primitives::EthereumExecutionBlockProof {
+							anchor_block_hash: Default::default(),
+							target_to_anchor_header_chain: Default::default(),
+						},
+						blocks: Default::default(),
+					},
+				});
+				let storage = RuntimeCall::CrosschainTransfer(Call::prove_gateway_activity_storage {
+					source_chain: SourceChain::Ethereum,
+					previous_gateway_activity_nonce: 0,
+					proof: pallet_crosschain_transfer::GatewayActivityStorageProof {
+						locator_index: 1,
+						activity_root_seed: Default::default(),
+						storage_proof: argon_primitives::EthereumAccountStorageProof {
+							execution_block_proof: argon_primitives::EthereumExecutionBlockProof {
+								anchor_block_hash: Default::default(),
+								target_to_anchor_header_chain: Default::default(),
+							},
+							account_proof: Default::default(),
+							storage_proof: Default::default(),
+							slots: Default::default(),
+						},
+						activity_logs: Default::default(),
+					},
+				});
+				let admin = RuntimeCall::CrosschainTransfer(Call::pause_gateway { source_chain: SourceChain::Ethereum });
+				assert!(ProxyType::VaultDelegate.filter(&receipt));
+				assert!(ProxyType::VaultDelegate.filter(&storage));
+				assert!(!ProxyType::VaultDelegate.filter(&admin));
+
+				for batch in [
+					pallet_utility::Call::batch { calls: vec![receipt.clone(), storage.clone()] },
+					pallet_utility::Call::batch_all { calls: vec![receipt.clone(), storage.clone()] },
+					pallet_utility::Call::force_batch { calls: vec![receipt, storage.clone()] },
+				] {
+					assert!(ProxyType::VaultDelegate.filter(&RuntimeCall::Utility(batch)));
+				}
+				assert!(!ProxyType::VaultDelegate.filter(&RuntimeCall::Utility(pallet_utility::Call::batch {
+					calls: vec![storage, admin],
+				})));
 			}
 		}
 	};

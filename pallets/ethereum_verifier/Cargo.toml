@@ -23,8 +23,8 @@ codec = { workspace = true }
 hex-literal = { optional = true, workspace = true, default-features = true }
 polkadot-sdk = { workspace = true, features = ["frame-support", "frame-system", "sp-core", "sp-runtime"] }
 scale-info = { workspace = true }
-serde = { optional = true, workspace = true, default-features = true }
-serde_json = { optional = true, workspace = true, default-features = true }
+serde = { optional = true, workspace = true, default-features = false }
+serde_json = { optional = true, workspace = true, default-features = false }
 snowbridge-beacon-primitives = { workspace = true }
 snowbridge-pallet-ethereum-client-fixtures = { optional = true, workspace = true }
 static_assertions = { version = "1.1.0", default-features = false }
@@ -66,6 +66,8 @@ runtime-benchmarks = [
 	"polkadot-sdk/frame-benchmarking",
 	"polkadot-sdk/pallet-timestamp",
 	"polkadot-sdk/runtime-benchmarks",
+	"serde",
+	"serde_json",
 	"snowbridge-pallet-ethereum-client-fixtures/runtime-benchmarks",
 ]
 try-runtime = [ "polkadot-sdk/pallet-timestamp", "polkadot-sdk/try-runtime" ]

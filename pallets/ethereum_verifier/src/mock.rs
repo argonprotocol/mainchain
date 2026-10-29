@@ -24,17 +24,18 @@ use hex_literal::hex;
 
 pub const INBOUND_FIXTURE_RECEIPT_INDEX: u64 = 0;
 
-fn load_fixture<T>(basename: String) -> Result<T, serde_json::Error>
+pub(crate) fn load_fixture<T>(basename: impl AsRef<str>) -> Result<T, serde_json::Error>
 where
 	T: for<'de> serde::Deserialize<'de>,
 {
-	let filepath: PathBuf =
-		[env!("CARGO_MANIFEST_DIR"), "tests", "fixtures", &basename].iter().collect();
+	let filepath: PathBuf = [env!("CARGO_MANIFEST_DIR"), "tests", "fixtures", basename.as_ref()]
+		.iter()
+		.collect();
 	serde_json::from_reader(File::open(filepath).unwrap())
 }
 
 pub fn load_execution_proof_fixture() -> snowbridge::ExecutionProof {
-	load_fixture("execution-proof.json".to_string()).unwrap()
+	load_fixture("execution-proof.json").unwrap()
 }
 
 #[derive(serde::Deserialize)]
@@ -52,7 +53,7 @@ struct UpdateExecutionWitnessFixture {
 }
 
 fn load_execution_witness_fixture(basename: &str) -> snowbridge::ExecutionProof {
-	let proof: ExecutionWitnessFixture = load_fixture(basename.to_string()).unwrap();
+	let proof: ExecutionWitnessFixture = load_fixture(basename).unwrap();
 	snowbridge::ExecutionProof {
 		header: proof.header,
 		ancestry_proof: None,
@@ -62,7 +63,7 @@ fn load_execution_witness_fixture(basename: &str) -> snowbridge::ExecutionProof 
 }
 
 fn load_update_execution_witness_fixture(basename: &str) -> snowbridge::ExecutionProof {
-	let proof: UpdateExecutionWitnessFixture = load_fixture(basename.to_string()).unwrap();
+	let proof: UpdateExecutionWitnessFixture = load_fixture(basename).unwrap();
 	snowbridge::ExecutionProof {
 		header: proof.finalized_header,
 		ancestry_proof: None,
@@ -72,16 +73,14 @@ fn load_update_execution_witness_fixture(basename: &str) -> snowbridge::Executio
 }
 
 pub fn load_checkpoint_update_fixture() -> CheckpointUpdate {
-	let update: MainnetCheckpointUpdate =
-		load_fixture("initial-checkpoint.json".to_string()).unwrap();
+	let update: MainnetCheckpointUpdate = load_fixture("initial-checkpoint.json").unwrap();
 	let execution_proof = load_execution_witness_fixture("initial-checkpoint-execution-proof.json");
 	checkpoint_update_from_fixture(update, execution_proof)
 		.expect("checkpoint fixture stays within bounded branch size")
 }
 
 pub fn load_later_checkpoint_update_fixture() -> CheckpointUpdate {
-	let update: MainnetCheckpointUpdate =
-		load_fixture("initial-checkpoint-later.json".to_string()).unwrap();
+	let update: MainnetCheckpointUpdate = load_fixture("initial-checkpoint-later.json").unwrap();
 	let execution_proof =
 		load_execution_witness_fixture("initial-checkpoint-later-execution-proof.json");
 	checkpoint_update_from_fixture(update, execution_proof)
@@ -89,7 +88,7 @@ pub fn load_later_checkpoint_update_fixture() -> CheckpointUpdate {
 }
 
 pub fn load_sync_committee_update_fixture() -> Update {
-	let update: MainnetUpdate = load_fixture("sync-committee-update.json".to_string()).unwrap();
+	let update: MainnetUpdate = load_fixture("sync-committee-update.json").unwrap();
 	committee_update_from_fixture(
 		update,
 		load_update_execution_witness_fixture("sync-committee-update.json"),
@@ -98,7 +97,7 @@ pub fn load_sync_committee_update_fixture() -> Update {
 }
 
 pub fn load_finalized_header_update_fixture() -> Update {
-	let update: MainnetUpdate = load_fixture("finalized-header-update.json".to_string()).unwrap();
+	let update: MainnetUpdate = load_fixture("finalized-header-update.json").unwrap();
 	anchored_update_from_fixture(
 		update,
 		load_update_execution_witness_fixture("finalized-header-update.json"),
@@ -107,8 +106,7 @@ pub fn load_finalized_header_update_fixture() -> Update {
 }
 
 pub fn load_next_sync_committee_update_fixture() -> Update {
-	let update: MainnetUpdate =
-		load_fixture("next-sync-committee-update.json".to_string()).unwrap();
+	let update: MainnetUpdate = load_fixture("next-sync-committee-update.json").unwrap();
 	committee_update_from_fixture(
 		update,
 		load_update_execution_witness_fixture("next-sync-committee-update.json"),
@@ -117,8 +115,7 @@ pub fn load_next_sync_committee_update_fixture() -> Update {
 }
 
 pub fn load_next_finalized_header_update_fixture() -> Update {
-	let update: MainnetUpdate =
-		load_fixture("next-finalized-header-update.json".to_string()).unwrap();
+	let update: MainnetUpdate = load_fixture("next-finalized-header-update.json").unwrap();
 	anchored_update_from_fixture(
 		update,
 		load_update_execution_witness_fixture("next-finalized-header-update.json"),

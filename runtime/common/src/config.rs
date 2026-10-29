@@ -250,14 +250,21 @@ parameter_types! {
 	pub const DefaultMinimumMintingAuthorityMicrogonValue: Balance = 10_000;
 	/// Maximum number of non-terminal transfer-out requests tracked for one destination chain.
 	pub const MaxPendingTransferOutsPerDestinationChain: u32 = 100;
-	/// Maximum number of gateway activities carried by one Ethereum receipt proof.
-	pub const MaxActivitiesPerReceiptProof: u32 = 16;
-	/// Maximum number of proven Ethereum receipt proofs accepted in one extrinsic.
+	/// Maximum number of gateway activities carried by one proven gateway block.
 	///
-	/// `10` leaves comfortable headroom below the worst-case bound proven in the config test, so
-	/// any proof accepted by the runtime envelope is submittable without extra client-side byte
-	/// budgeting.
-	pub const MaxReceiptProofsPerExtrinsic: u32 = 10;
+	/// The pallet integrity checks require this envelope to cover the contract's per-block
+	/// activity cap, including maximum-size events, encoded proof bytes, and provider weights.
+	/// 128 includes 25 worst-case Vault callbacks per activity, plus proof verification,
+	/// settlement, and pool validation, below half the available Normal extrinsic weight.
+	pub const MaxActivitiesPerGatewayProof: u32 = 128;
+	/// Reserved byte budget for the signed extrinsic envelope, excluding its call.
+	/// This is runtime policy, not part of the Ethereum proof encoding.
+	pub const GatewayProofExtrinsicOverheadBytes: u32 = 512;
+	/// Maximum ordered activities sharing a receipt proof.
+	pub const MaxActivitiesPerReceiptProof: u32 = 16;
+	/// Maximum receipt proofs submitted together, bounded by the runtime's byte envelope.
+	/// Six blocks leave room for 4-KiB receipt nodes and 2,688-byte gateway logs.
+	pub const MaxReceiptProofsPerExtrinsic: u32 = 6;
 	// ## pallet_bootstrap
 	/// Maximum number of encrypted bootstrap payload bytes.
 	pub const MaxEncryptedBootstrapPayloadLen: u32 = 256;
@@ -330,9 +337,6 @@ impl WeightToFeePolynomial for ArgonWeightToFee {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use argon_primitives::ethereum::EthereumReceiptLogProofBatch;
-	use codec::MaxEncodedLen;
-	use frame_support::dispatch::DispatchClass;
 	use pallet_mining_slot::WeightInfo as MiningWeightInfo;
 
 	#[test]
@@ -525,24 +529,6 @@ mod tests {
 		assert!(
 			mining.all_lte(AVERAGE_ON_INITIALIZE_RATIO * MAXIMUM_BLOCK_WEIGHT),
 			"maximum mining batch and activation exceed the initialization allowance: {mining:?}"
-		);
-	}
-
-	#[test]
-	fn gateway_activity_proof_batch_bound_fits_normal_extrinsic_limit() {
-		type MaxGatewayActivityProofBatch = EthereumReceiptLogProofBatch<
-			MaxReceiptProofsPerExtrinsic,
-			MaxActivitiesPerReceiptProof,
-		>;
-
-		const RESERVED_SIGNED_EXTRINSIC_BYTES: usize = 512;
-		const RESERVED_CALL_PREFIX_BYTES: usize = 16;
-
-		assert!(
-			MaxGatewayActivityProofBatch::max_encoded_len() +
-				RESERVED_SIGNED_EXTRINSIC_BYTES +
-				RESERVED_CALL_PREFIX_BYTES <=
-				*BlockLength::get().max.get(DispatchClass::Normal) as usize
 		);
 	}
 }

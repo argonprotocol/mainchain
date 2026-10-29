@@ -283,18 +283,6 @@ mod benchmarks {
 	}
 
 	#[benchmark]
-	fn batch_pool_key(k: Linear<0, 10_000>) {
-		let keys = (0..k)
-			.map(|index| T::Hashing::hash_of(&index).as_ref().to_vec())
-			.collect::<Vec<_>>();
-
-		#[block]
-		{
-			core::hint::black_box(T::Hashing::hash_of(&(b"batch", core::hint::black_box(&keys))));
-		}
-	}
-
-	#[benchmark]
 	fn inspect_refund_calls(c: Linear<0, 10_000>) -> Result<(), BenchmarkError> {
 		let call = T::CallFeeRefundProviders::benchmark_call(c).ok_or(BenchmarkError::Skip)?;
 

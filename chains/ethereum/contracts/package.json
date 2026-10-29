@@ -16,6 +16,10 @@
     "./hashing": {
       "types": "./hashing.ts",
       "default": "./hashing.ts"
+    },
+    "./fixtures": {
+      "types": "./fixtures.ts",
+      "default": "./fixtures.ts"
     }
   },
   "scripts": {
