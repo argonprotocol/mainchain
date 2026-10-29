@@ -2286,33 +2286,33 @@ declare module '@polkadot/types/lookup' {
   /** @name PalletBootstrapEndpointPubkey (147) */
   interface PalletBootstrapEndpointPubkey extends U8aFixed {}
 
-  /** @name PalletStabilizationPoolsEvent (148) */
-  interface PalletStabilizationPoolsEvent extends Enum {
+  /** @name PalletStabilizerPoolsEvent (148) */
+  interface PalletStabilizerPoolsEvent extends Enum {
     readonly isPoolRegistered: boolean;
     readonly asPoolRegistered: {
       readonly poolManager: H160;
       readonly poolId: H256;
-      readonly config: PalletStabilizationPoolsPoolConfig;
+      readonly config: PalletStabilizerPoolsPoolConfig;
     } & Struct;
     readonly isPositionCheckpointed: boolean;
     readonly asPositionCheckpointed: {
       readonly positionManager: H160;
       readonly tokenId: U256;
-      readonly checkpoint: PalletStabilizationPoolsPositionCheckpoint;
-      readonly outcome: PalletStabilizationPoolsCheckpointOutcome;
+      readonly checkpoint: PalletStabilizerPoolsPositionCheckpoint;
+      readonly outcome: PalletStabilizerPoolsCheckpointOutcome;
     } & Struct;
     readonly type: 'PoolRegistered' | 'PositionCheckpointed';
   }
 
-  /** @name PalletStabilizationPoolsPoolConfig (149) */
-  interface PalletStabilizationPoolsPoolConfig extends Struct {
+  /** @name PalletStabilizerPoolsPoolConfig (149) */
+  interface PalletStabilizerPoolsPoolConfig extends Struct {
     readonly positionManager: H160;
     readonly subscriber: H160;
-    readonly key: PalletStabilizationPoolsPoolKey;
+    readonly key: PalletStabilizerPoolsPoolKey;
   }
 
-  /** @name PalletStabilizationPoolsPoolKey (150) */
-  interface PalletStabilizationPoolsPoolKey extends Struct {
+  /** @name PalletStabilizerPoolsPoolKey (150) */
+  interface PalletStabilizerPoolsPoolKey extends Struct {
     readonly currency0: H160;
     readonly currency1: H160;
     readonly fee: u32;
@@ -2320,8 +2320,8 @@ declare module '@polkadot/types/lookup' {
     readonly hooks: H160;
   }
 
-  /** @name PalletStabilizationPoolsPositionCheckpoint (152) */
-  interface PalletStabilizationPoolsPositionCheckpoint extends Struct {
+  /** @name PalletStabilizerPoolsPositionCheckpoint (152) */
+  interface PalletStabilizerPoolsPositionCheckpoint extends Struct {
     readonly beneficiary: AccountId32;
     readonly poolManager: H160;
     readonly poolId: H256;
@@ -2330,28 +2330,28 @@ declare module '@polkadot/types/lookup' {
     readonly tickLower: i32;
     readonly tickUpper: i32;
     readonly liquidity: u128;
-    readonly maintainedSince: PalletStabilizationPoolsProofBlock;
-    readonly provenThrough: PalletStabilizationPoolsProofBlock;
+    readonly maintainedSince: PalletStabilizerPoolsProofBlock;
+    readonly provenThrough: PalletStabilizerPoolsProofBlock;
   }
 
-  /** @name PalletStabilizationPoolsProofBlock (153) */
-  interface PalletStabilizationPoolsProofBlock extends Struct {
+  /** @name PalletStabilizerPoolsProofBlock (153) */
+  interface PalletStabilizerPoolsProofBlock extends Struct {
     readonly hash_: H256;
     readonly number: u64;
     readonly timestampMillis: u64;
   }
 
-  /** @name PalletStabilizationPoolsCheckpointOutcome (154) */
-  interface PalletStabilizationPoolsCheckpointOutcome extends Enum {
+  /** @name PalletStabilizerPoolsCheckpointOutcome (154) */
+  interface PalletStabilizerPoolsCheckpointOutcome extends Enum {
     readonly isRegistered: boolean;
     readonly isMaintained: boolean;
     readonly asMaintained: {
-      readonly from: PalletStabilizationPoolsProofBlock;
+      readonly from: PalletStabilizerPoolsProofBlock;
     } & Struct;
     readonly isReset: boolean;
     readonly asReset: {
       readonly previousRevision: U256;
-      readonly unprovenFrom: PalletStabilizationPoolsProofBlock;
+      readonly unprovenFrom: PalletStabilizerPoolsProofBlock;
     } & Struct;
     readonly type: 'Registered' | 'Maintained' | 'Reset';
   }
@@ -3915,25 +3915,25 @@ declare module '@polkadot/types/lookup' {
     readonly signature: U8aFixed;
   }
 
-  /** @name PalletStabilizationPoolsCall (370) */
-  interface PalletStabilizationPoolsCall extends Enum {
+  /** @name PalletStabilizerPoolsCall (370) */
+  interface PalletStabilizerPoolsCall extends Enum {
     readonly isRegisterPool: boolean;
     readonly asRegisterPool: {
       readonly poolManager: H160;
-      readonly config: PalletStabilizationPoolsPoolConfig;
+      readonly config: PalletStabilizerPoolsPoolConfig;
     } & Struct;
     readonly isCheckpointPosition: boolean;
     readonly asCheckpointPosition: {
       readonly poolManager: H160;
       readonly poolId: H256;
       readonly tokenId: U256;
-      readonly proof: PalletStabilizationPoolsPositionProof;
+      readonly proof: PalletStabilizerPoolsPositionProof;
     } & Struct;
     readonly type: 'RegisterPool' | 'CheckpointPosition';
   }
 
-  /** @name PalletStabilizationPoolsPositionProof (371) */
-  interface PalletStabilizationPoolsPositionProof extends Struct {
+  /** @name PalletStabilizerPoolsPositionProof (371) */
+  interface PalletStabilizerPoolsPositionProof extends Struct {
     readonly subscriber: ArgonPrimitivesEthereumEthereumAccountStorageProof;
     readonly positionManager: ArgonPrimitivesEthereumEthereumAccountStorageProof;
     readonly poolManager: ArgonPrimitivesEthereumEthereumAccountStorageProof;
@@ -5583,8 +5583,8 @@ declare module '@polkadot/types/lookup' {
     readonly vaultSecuritizedSatoshis: Compact<u128>;
   }
 
-  /** @name PalletStabilizationPoolsError (651) */
-  interface PalletStabilizationPoolsError extends Enum {
+  /** @name PalletStabilizerPoolsError (651) */
+  interface PalletStabilizerPoolsError extends Enum {
     readonly isInvalidPool: boolean;
     readonly isPoolAlreadyRegistered: boolean;
     readonly isPoolNotRegistered: boolean;

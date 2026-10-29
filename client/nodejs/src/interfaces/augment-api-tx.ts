@@ -69,8 +69,8 @@ import type {
   PalletOperationalAccountsRegistration,
   PalletPriceIndexEthereumPriceIndex,
   PalletPriceIndexPriceIndex,
-  PalletStabilizationPoolsPoolConfig,
-  PalletStabilizationPoolsPositionProof,
+  PalletStabilizerPoolsPoolConfig,
+  PalletStabilizerPoolsPositionProof,
   PalletTreasuryBondLotEarningsMetrics,
   PalletVaultsVaultConfig,
   SnowbridgeBeaconPrimitivesBeaconHeader,
@@ -1845,7 +1845,7 @@ declare module '@polkadot/api-base/types/submittable' {
         [MultiAddress, ArgonRuntimeProxyType, u32]
       >;
     };
-    stabilizationPools: {
+    stabilizerPools: {
       /**
        * Register a baseline, extend a maintained revision, or reset after an unproven change.
        **/
@@ -1855,12 +1855,12 @@ declare module '@polkadot/api-base/types/submittable' {
           poolId: H256 | string | Uint8Array,
           tokenId: U256 | AnyNumber | Uint8Array,
           proof:
-            | PalletStabilizationPoolsPositionProof
+            | PalletStabilizerPoolsPositionProof
             | { subscriber?: any; positionManager?: any; poolManager?: any }
             | string
             | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
-        [H160, H256, U256, PalletStabilizationPoolsPositionProof]
+        [H160, H256, U256, PalletStabilizerPoolsPositionProof]
       >;
       /**
        * Approve immutable deployment bindings and the canonical pool key.
@@ -1870,12 +1870,12 @@ declare module '@polkadot/api-base/types/submittable' {
         (
           poolManager: H160 | string | Uint8Array,
           config:
-            | PalletStabilizationPoolsPoolConfig
+            | PalletStabilizerPoolsPoolConfig
             | { positionManager?: any; subscriber?: any; key?: any }
             | string
             | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
-        [H160, PalletStabilizationPoolsPoolConfig]
+        [H160, PalletStabilizerPoolsPoolConfig]
       >;
     };
     sudo: {

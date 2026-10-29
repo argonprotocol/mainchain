@@ -135,7 +135,7 @@ mod runtime {
 	#[runtime::pallet_index(38)]
 	pub type TreasuryPositions = pallet_treasury_positions;
 	#[runtime::pallet_index(39)]
-	pub type StabilizationPools = pallet_stabilization_pools;
+	pub type StabilizerPools = pallet_stabilizer_pools;
 }
 
 argon_runtime_common::inject_runtime_vars!();
@@ -881,6 +881,6 @@ impl pallet_treasury_positions::Config for Runtime {
 	type WeightInfo = weights::pallet_treasury_positions::WeightInfo<Runtime>;
 }
 
-impl pallet_stabilization_pools::Config for Runtime {
-	type WeightInfo = weights::pallet_stabilization_pools::WeightInfo<Runtime>;
+impl pallet_stabilizer_pools::Config for Runtime {
+	type WeightInfo = weights::pallet_stabilizer_pools::WeightInfo<Runtime>;
 }

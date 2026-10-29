@@ -1337,7 +1337,7 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       Unproxyable: AugmentedError<ApiType>;
     };
-    stabilizationPools: {
+    stabilizerPools: {
       /**
        * The three account witnesses do not contain identical execution-block proofs.
        **/

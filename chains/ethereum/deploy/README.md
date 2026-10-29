@@ -128,7 +128,7 @@ yarn workspace @argonprotocol/ethereum-deploy stabilization:prepare \
 
 Review the manifest's addresses, dependency code hashes, PoolKey, initial price, constructor
 arguments, and Argon registration call. The PositionManager and PoolManager must match the storage
-layouts pinned by `pallet_stabilization_pools`; code existence and the manager binding alone do not
+layouts pinned by `pallet_stabilizer_pools`; code existence and the manager binding alone do not
 approve a different implementation. The manifest includes the full CREATE2 init code and
 initialization calldata. `--argon-rpc-url` is optional; when supplied, the deployed Argon runtime
 must expose the new pallet, and the manifest includes encoded root registration and sudo calls.
@@ -163,8 +163,8 @@ exact-input or exact-output swap and obtain its post-swap price. This quoter is 
 that PoolManager; it requires no separate Argon registration. See the
 [quoter API](../contracts/README.md#uniswap-v4-price-quoter).
 
-After publication, execute the prepared `stabilizationPools.registerPool` root call on Argon. Add
-the hook address to `ARGON_UNISWAP_ORACLE_ADDRESSES` when enabling it as a price source, and allow
-the one-hour observation window to warm up with liquidity. Initial liquidity, NFT subscription, and
+After publication, execute the prepared `stabilizerPools.registerPool` root call on Argon. Add the
+hook address to `ARGON_UNISWAP_ORACLE_ADDRESSES` when enabling it as a price source, and allow the
+one-hour observation window to warm up with liquidity. Initial liquidity, NFT subscription, and
 claimant checkpoints are separate user operations. Reward calculation and collection remain
 deferred.

@@ -898,7 +898,7 @@ dependencies = [
  "pallet-notebook",
  "pallet-operational-accounts",
  "pallet-price-index",
- "pallet-stabilization-pools",
+ "pallet-stabilizer-pools",
  "pallet-ticks",
  "pallet-treasury 1.5.2",
  "pallet-treasury-positions",
@@ -1250,7 +1250,7 @@ dependencies = [
  "pallet-operational-accounts",
  "pallet-prelude",
  "pallet-price-index",
- "pallet-stabilization-pools",
+ "pallet-stabilizer-pools",
  "pallet-ticks",
  "pallet-treasury 1.5.2",
  "pallet-treasury-positions",
@@ -12375,7 +12375,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "pallet-stabilization-pools"
+name = "pallet-stabilizer-pools"
 version = "1.5.2"
 dependencies = [
  "alloy-consensus",

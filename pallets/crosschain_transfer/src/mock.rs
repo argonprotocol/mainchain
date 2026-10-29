@@ -1,4 +1,7 @@
 use crate as pallet_crosschain_transfer;
+use crate::{ChainConfig, GatewayActivityStorageProof};
+use alloy_primitives::B256;
+use argon_ethereum_contracts::minting_gateway::append_activity_root;
 use argon_primitives::{
 	bitcoin::{
 		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinLockId, BitcoinXPub,
@@ -10,9 +13,10 @@ use argon_primitives::{
 		RegistrationVaultData, ReserveSecuritizationRequest, VaultArgonotSecuritization,
 		VaultError,
 	},
-	EthereumAccountStorageProof, EthereumBlockNumber, EthereumReceiptLogProofBatch,
-	EthereumVerifyError, EthereumVerifyProvider, OperationalAccountsHook, PriceProvider,
-	TickProvider, TreasuryPoolProvider, VaultId, VotingSchedule,
+	EthereumAccountStorageProof, EthereumBlockNumber, EthereumExecutionBlockProof, EthereumLog,
+	EthereumReceiptLogProofBatch, EthereumStorageSlotProof, EthereumVerifyError,
+	EthereumVerifyProvider, OperationalAccountsHook, PriceProvider, TickProvider,
+	TreasuryPoolProvider, VaultId, VotingSchedule,
 };
 use frame_support::traits::StorageMapShim;
 use pallet_prelude::*;
@@ -707,4 +711,63 @@ pub fn encumbered_argonot_micronots(operator_account: &TestAccountId) -> Balance
 		.get(operator_account)
 		.map(|entry| entry.encumbered_micronots)
 		.unwrap_or_default()
+}
+
+pub(super) fn chain_config() -> ChainConfig {
+	ChainConfig::Evm {
+		chain_id: 1,
+		gateway: h160(0x21),
+		argon_token: h160(0x31),
+		argonot_token: h160(0x32),
+	}
+}
+
+/// Build locator commitments from real event encodings for the external-proof mock.
+pub(super) fn storage_proof(
+	block_number: u64,
+	activity_root_seed: H256,
+	logs: Vec<EthereumLog>,
+) -> GatewayActivityStorageProof<MaxActivitiesPerGatewayProof> {
+	let config = chain_config();
+	let mut root = B256::from(activity_root_seed.0);
+	let decoded = logs
+		.iter()
+		.map(|log| CrosschainTransfer::decode_evm_gateway_activity(&config, log).unwrap())
+		.collect::<Vec<_>>();
+	for activity in &decoded {
+		root = append_activity_root(root, B256::from(activity.leaf_hash(&config).0));
+	}
+
+	let (range_slot, root_slot) = CrosschainTransfer::gateway_activity_locator_slots(1);
+	GatewayActivityStorageProof {
+		locator_index: 1,
+		activity_root_seed,
+		storage_proof: EthereumAccountStorageProof {
+			execution_block_proof: EthereumExecutionBlockProof {
+				anchor_block_hash: H256::repeat_byte(1),
+				target_to_anchor_header_chain: Default::default(),
+			},
+			account_proof: Default::default(),
+			storage_proof: Default::default(),
+			slots: vec![
+				EthereumStorageSlotProof {
+					slot: range_slot,
+					value: CrosschainTransfer::gateway_activity_locator_range_slot_value(
+						block_number,
+						decoded.first().unwrap().gateway_activity_nonce(),
+						decoded.last().unwrap().gateway_activity_nonce(),
+					),
+					node_indexes: Default::default(),
+				},
+				EthereumStorageSlotProof {
+					slot: root_slot,
+					value: H256::from_slice(root.as_slice()),
+					node_indexes: Default::default(),
+				},
+			]
+			.try_into()
+			.unwrap(),
+		},
+		activity_logs: logs.try_into().unwrap(),
+	}
 }

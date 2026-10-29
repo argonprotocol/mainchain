@@ -104,7 +104,7 @@ it.each(Object.entries(Genesis))('uses %s cached metadata', async (_network, gen
 
     // Registration must be available through the known-network metadata cache used by deployment.
     const poolManager = `0x${'33'.repeat(20)}`;
-    const registration = client.tx.stabilizationPools.registerPool(poolManager, {
+    const registration = client.tx.stabilizerPools.registerPool(poolManager, {
       positionManager: `0x${'22'.repeat(20)}`,
       subscriber: `0x${'11'.repeat(20)}`,
       key: {

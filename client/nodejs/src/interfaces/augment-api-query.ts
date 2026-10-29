@@ -112,8 +112,8 @@ import type {
   PalletPriceIndexPriceIndex,
   PalletProxyAnnouncement,
   PalletProxyProxyDefinition,
-  PalletStabilizationPoolsPoolConfig,
-  PalletStabilizationPoolsPositionCheckpoint,
+  PalletStabilizerPoolsPoolConfig,
+  PalletStabilizerPoolsPositionCheckpoint,
   PalletTransactionPaymentReleases,
   PalletTreasuryBondLot,
   PalletTreasuryBondLotSummary,
@@ -1629,7 +1629,7 @@ declare module '@polkadot/api-base/types/storage' {
         [AccountId32]
       >;
     };
-    stabilizationPools: {
+    stabilizerPools: {
       /**
        * Approved deployments on the Ethereum network authenticated by EthereumVerifier.
        * Configuration is immutable once registered, preserving checkpoint identity and layout.
@@ -1639,7 +1639,7 @@ declare module '@polkadot/api-base/types/storage' {
         (
           arg1: H160 | string | Uint8Array,
           arg2: H256 | string | Uint8Array,
-        ) => Observable<Option<PalletStabilizationPoolsPoolConfig>>,
+        ) => Observable<Option<PalletStabilizerPoolsPoolConfig>>,
         [H160, H256]
       >;
       /**
@@ -1650,7 +1650,7 @@ declare module '@polkadot/api-base/types/storage' {
         (
           arg1: H160 | string | Uint8Array,
           arg2: U256 | AnyNumber | Uint8Array,
-        ) => Observable<Option<PalletStabilizationPoolsPositionCheckpoint>>,
+        ) => Observable<Option<PalletStabilizerPoolsPositionCheckpoint>>,
         [H160, U256]
       >;
     };

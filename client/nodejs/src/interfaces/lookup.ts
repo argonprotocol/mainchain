@@ -1839,35 +1839,35 @@ export default {
    **/
   PalletBootstrapEndpointPubkey: '[u8;32]',
   /**
-   * Lookup148: pallet_stabilization_pools::pallet::Event<T>
+   * Lookup148: pallet_stabilizer_pools::pallet::Event<T>
    **/
-  PalletStabilizationPoolsEvent: {
+  PalletStabilizerPoolsEvent: {
     _enum: {
       PoolRegistered: {
         poolManager: 'H160',
         poolId: 'H256',
-        config: 'PalletStabilizationPoolsPoolConfig',
+        config: 'PalletStabilizerPoolsPoolConfig',
       },
       PositionCheckpointed: {
         positionManager: 'H160',
         tokenId: 'U256',
-        checkpoint: 'PalletStabilizationPoolsPositionCheckpoint',
-        outcome: 'PalletStabilizationPoolsCheckpointOutcome',
+        checkpoint: 'PalletStabilizerPoolsPositionCheckpoint',
+        outcome: 'PalletStabilizerPoolsCheckpointOutcome',
       },
     },
   },
   /**
-   * Lookup149: pallet_stabilization_pools::PoolConfig
+   * Lookup149: pallet_stabilizer_pools::PoolConfig
    **/
-  PalletStabilizationPoolsPoolConfig: {
+  PalletStabilizerPoolsPoolConfig: {
     positionManager: 'H160',
     subscriber: 'H160',
-    key: 'PalletStabilizationPoolsPoolKey',
+    key: 'PalletStabilizerPoolsPoolKey',
   },
   /**
-   * Lookup150: pallet_stabilization_pools::PoolKey
+   * Lookup150: pallet_stabilizer_pools::PoolKey
    **/
-  PalletStabilizationPoolsPoolKey: {
+  PalletStabilizerPoolsPoolKey: {
     currency0: 'H160',
     currency1: 'H160',
     fee: 'u32',
@@ -1875,9 +1875,9 @@ export default {
     hooks: 'H160',
   },
   /**
-   * Lookup152: pallet_stabilization_pools::PositionCheckpoint<sp_core::crypto::AccountId32>
+   * Lookup152: pallet_stabilizer_pools::PositionCheckpoint<sp_core::crypto::AccountId32>
    **/
-  PalletStabilizationPoolsPositionCheckpoint: {
+  PalletStabilizerPoolsPositionCheckpoint: {
     beneficiary: 'AccountId32',
     poolManager: 'H160',
     poolId: 'H256',
@@ -1886,13 +1886,13 @@ export default {
     tickLower: 'i32',
     tickUpper: 'i32',
     liquidity: 'u128',
-    maintainedSince: 'PalletStabilizationPoolsProofBlock',
-    provenThrough: 'PalletStabilizationPoolsProofBlock',
+    maintainedSince: 'PalletStabilizerPoolsProofBlock',
+    provenThrough: 'PalletStabilizerPoolsProofBlock',
   },
   /**
-   * Lookup153: pallet_stabilization_pools::ProofBlock
+   * Lookup153: pallet_stabilizer_pools::ProofBlock
    **/
-  PalletStabilizationPoolsProofBlock: {
+  PalletStabilizerPoolsProofBlock: {
     _alias: {
       hash_: 'hash',
     },
@@ -1901,17 +1901,17 @@ export default {
     timestampMillis: 'u64',
   },
   /**
-   * Lookup154: pallet_stabilization_pools::CheckpointOutcome
+   * Lookup154: pallet_stabilizer_pools::CheckpointOutcome
    **/
-  PalletStabilizationPoolsCheckpointOutcome: {
+  PalletStabilizerPoolsCheckpointOutcome: {
     _enum: {
       Registered: 'Null',
       Maintained: {
-        from: 'PalletStabilizationPoolsProofBlock',
+        from: 'PalletStabilizerPoolsProofBlock',
       },
       Reset: {
         previousRevision: 'U256',
-        unprovenFrom: 'PalletStabilizationPoolsProofBlock',
+        unprovenFrom: 'PalletStabilizerPoolsProofBlock',
       },
     },
   },
@@ -3395,26 +3395,26 @@ export default {
     signature: '[u8;64]',
   },
   /**
-   * Lookup370: pallet_stabilization_pools::pallet::Call<T>
+   * Lookup370: pallet_stabilizer_pools::pallet::Call<T>
    **/
-  PalletStabilizationPoolsCall: {
+  PalletStabilizerPoolsCall: {
     _enum: {
       register_pool: {
         poolManager: 'H160',
-        config: 'PalletStabilizationPoolsPoolConfig',
+        config: 'PalletStabilizerPoolsPoolConfig',
       },
       checkpoint_position: {
         poolManager: 'H160',
         poolId: 'H256',
         tokenId: 'U256',
-        proof: 'PalletStabilizationPoolsPositionProof',
+        proof: 'PalletStabilizerPoolsPositionProof',
       },
     },
   },
   /**
-   * Lookup371: pallet_stabilization_pools::PositionProof
+   * Lookup371: pallet_stabilizer_pools::PositionProof
    **/
-  PalletStabilizationPoolsPositionProof: {
+  PalletStabilizerPoolsPositionProof: {
     subscriber: 'ArgonPrimitivesEthereumEthereumAccountStorageProof',
     positionManager: 'ArgonPrimitivesEthereumEthereumAccountStorageProof',
     poolManager: 'ArgonPrimitivesEthereumEthereumAccountStorageProof',
@@ -4803,9 +4803,9 @@ export default {
     vaultSecuritizedSatoshis: 'Compact<u128>',
   },
   /**
-   * Lookup651: pallet_stabilization_pools::pallet::Error<T>
+   * Lookup651: pallet_stabilizer_pools::pallet::Error<T>
    **/
-  PalletStabilizationPoolsError: {
+  PalletStabilizerPoolsError: {
     _enum: [
       'InvalidPool',
       'PoolAlreadyRegistered',

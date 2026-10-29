@@ -271,15 +271,15 @@ import type {
   PalletProxyError,
   PalletProxyEvent,
   PalletProxyProxyDefinition,
-  PalletStabilizationPoolsCall,
-  PalletStabilizationPoolsCheckpointOutcome,
-  PalletStabilizationPoolsError,
-  PalletStabilizationPoolsEvent,
-  PalletStabilizationPoolsPoolConfig,
-  PalletStabilizationPoolsPoolKey,
-  PalletStabilizationPoolsPositionCheckpoint,
-  PalletStabilizationPoolsPositionProof,
-  PalletStabilizationPoolsProofBlock,
+  PalletStabilizerPoolsCall,
+  PalletStabilizerPoolsCheckpointOutcome,
+  PalletStabilizerPoolsError,
+  PalletStabilizerPoolsEvent,
+  PalletStabilizerPoolsPoolConfig,
+  PalletStabilizerPoolsPoolKey,
+  PalletStabilizerPoolsPositionCheckpoint,
+  PalletStabilizerPoolsPositionProof,
+  PalletStabilizerPoolsProofBlock,
   PalletSudoCall,
   PalletSudoError,
   PalletSudoEvent,
@@ -616,15 +616,15 @@ declare module '@polkadot/types/types/registry' {
     PalletProxyError: PalletProxyError;
     PalletProxyEvent: PalletProxyEvent;
     PalletProxyProxyDefinition: PalletProxyProxyDefinition;
-    PalletStabilizationPoolsCall: PalletStabilizationPoolsCall;
-    PalletStabilizationPoolsCheckpointOutcome: PalletStabilizationPoolsCheckpointOutcome;
-    PalletStabilizationPoolsError: PalletStabilizationPoolsError;
-    PalletStabilizationPoolsEvent: PalletStabilizationPoolsEvent;
-    PalletStabilizationPoolsPoolConfig: PalletStabilizationPoolsPoolConfig;
-    PalletStabilizationPoolsPoolKey: PalletStabilizationPoolsPoolKey;
-    PalletStabilizationPoolsPositionCheckpoint: PalletStabilizationPoolsPositionCheckpoint;
-    PalletStabilizationPoolsPositionProof: PalletStabilizationPoolsPositionProof;
-    PalletStabilizationPoolsProofBlock: PalletStabilizationPoolsProofBlock;
+    PalletStabilizerPoolsCall: PalletStabilizerPoolsCall;
+    PalletStabilizerPoolsCheckpointOutcome: PalletStabilizerPoolsCheckpointOutcome;
+    PalletStabilizerPoolsError: PalletStabilizerPoolsError;
+    PalletStabilizerPoolsEvent: PalletStabilizerPoolsEvent;
+    PalletStabilizerPoolsPoolConfig: PalletStabilizerPoolsPoolConfig;
+    PalletStabilizerPoolsPoolKey: PalletStabilizerPoolsPoolKey;
+    PalletStabilizerPoolsPositionCheckpoint: PalletStabilizerPoolsPositionCheckpoint;
+    PalletStabilizerPoolsPositionProof: PalletStabilizerPoolsPositionProof;
+    PalletStabilizerPoolsProofBlock: PalletStabilizerPoolsProofBlock;
     PalletSudoCall: PalletSudoCall;
     PalletSudoError: PalletSudoError;
     PalletSudoEvent: PalletSudoEvent;

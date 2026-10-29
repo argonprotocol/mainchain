@@ -80,7 +80,7 @@ fn new_beneficiary_must_authorize_reenrollment_and_keeps_global_replay_watermark
 
 		let changed = evidence(200, 2, next.clone(), 1_000, true);
 		assert_noop!(submit(changed.clone()), Error::<Test>::NotBeneficiary);
-		assert_ok!(StabilizationPools::checkpoint_position(
+		assert_ok!(StabilizerPools::checkpoint_position(
 			RuntimeOrigin::signed(next.clone()),
 			pool_manager(),
 			pool_id(),
@@ -123,7 +123,7 @@ fn rejects_forged_values_and_wrong_slots_or_token_ids() {
 		tampered.subscriber.slots[0].slot = H256::zero();
 		assert_noop!(submit(tampered), Error::<Test>::InvalidStorageSlots);
 		assert_noop!(
-			StabilizationPools::checkpoint_position(
+			StabilizerPools::checkpoint_position(
 				RuntimeOrigin::signed(beneficiary_account()),
 				pool_manager(),
 				pool_id(),
@@ -187,7 +187,7 @@ fn uses_authenticated_target_timestamp_when_proof_is_an_ancestor_of_anchor() {
 fn approvals_are_root_only_and_cannot_reconfigure_existing_pool_history() {
 	new_test_ext().execute_with(|| {
 		assert_noop!(
-			StabilizationPools::register_pool(
+			StabilizerPools::register_pool(
 				RuntimeOrigin::signed(beneficiary_account()),
 				pool_manager(),
 				config()
@@ -195,21 +195,21 @@ fn approvals_are_root_only_and_cannot_reconfigure_existing_pool_history() {
 			DispatchError::BadOrigin
 		);
 		assert_noop!(
-			StabilizationPools::register_pool(RuntimeOrigin::root(), pool_manager(), config()),
+			StabilizerPools::register_pool(RuntimeOrigin::root(), pool_manager(), config()),
 			Error::<Test>::PoolAlreadyRegistered
 		);
 
 		let mut changed = config();
 		changed.subscriber = H160::repeat_byte(0x99);
 		assert_noop!(
-			StabilizationPools::register_pool(RuntimeOrigin::root(), pool_manager(), changed),
+			StabilizerPools::register_pool(RuntimeOrigin::root(), pool_manager(), changed),
 			Error::<Test>::PoolAlreadyRegistered
 		);
 
 		let mut invalid = config();
 		invalid.key.tick_spacing = 0;
 		assert_noop!(
-			StabilizationPools::register_pool(RuntimeOrigin::root(), pool_manager(), invalid),
+			StabilizerPools::register_pool(RuntimeOrigin::root(), pool_manager(), invalid),
 			Error::<Test>::InvalidPool
 		);
 	});
@@ -236,7 +236,7 @@ fn evidence(
 }
 
 fn submit(proof: PositionProof) -> DispatchResult {
-	StabilizationPools::checkpoint_position(
+	StabilizerPools::checkpoint_position(
 		RuntimeOrigin::signed(beneficiary_account()),
 		pool_manager(),
 		pool_id(),

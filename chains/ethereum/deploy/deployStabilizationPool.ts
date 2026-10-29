@@ -50,9 +50,9 @@ async function main() {
     if (args['argon-rpc-url']) {
       const client = await getClient(args['argon-rpc-url']);
       try {
-        const registerPool = client.tx.stabilizationPools?.registerPool;
+        const registerPool = client.tx.stabilizerPools?.registerPool;
         if (!registerPool)
-          throw new Error('Argon runtime does not expose stabilizationPools.registerPool');
+          throw new Error('Argon runtime does not expose stabilizerPools.registerPool');
         const call = registerPool(plan.pool.poolManager, poolConfig);
         registrationCalls = {
           callHex: call.method.toHex(),
@@ -64,7 +64,7 @@ async function main() {
     }
 
     const runtimeRegistration = {
-      pallet: 'stabilizationPools',
+      pallet: 'stabilizerPools',
       method: 'registerPool',
       args: [plan.pool.poolManager, poolConfig],
       ...registrationCalls,
