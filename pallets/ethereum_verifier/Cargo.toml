@@ -26,7 +26,6 @@ scale-info = { workspace = true }
 serde = { optional = true, workspace = true, default-features = false }
 serde_json = { optional = true, workspace = true, default-features = false }
 snowbridge-beacon-primitives = { workspace = true }
-snowbridge-pallet-ethereum-client-fixtures = { optional = true, workspace = true }
 static_assertions = { version = "1.1.0", default-features = false }
 tracing = { workspace = true }
 
@@ -57,7 +56,6 @@ std = [
 	"scale-info/std",
 	"serde",
 	"snowbridge-beacon-primitives/std",
-	"snowbridge-pallet-ethereum-client-fixtures/std",
 	"tracing/std",
 ]
 runtime-benchmarks = [
@@ -68,6 +66,5 @@ runtime-benchmarks = [
 	"polkadot-sdk/runtime-benchmarks",
 	"serde",
 	"serde_json",
-	"snowbridge-pallet-ethereum-client-fixtures/runtime-benchmarks",
 ]
 try-runtime = [ "polkadot-sdk/pallet-timestamp", "polkadot-sdk/try-runtime" ]

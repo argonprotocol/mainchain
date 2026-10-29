@@ -7,6 +7,7 @@ import type {} from '@polkadot/api-base/types/events';
 import type { ApiTypes, AugmentedEvent } from '@polkadot/api-base/types';
 import type {
   Bytes,
+  Compact,
   Null,
   Option,
   Result,
@@ -999,6 +1000,11 @@ declare module '@polkadot/api-base/types/events' {
         ApiType,
         [blockHash: H256, blockNumber: u64],
         { blockHash: H256; blockNumber: u64 }
+      >;
+      GloasForkScheduled: AugmentedEvent<
+        ApiType,
+        [version: U8aFixed, epoch: Compact<u64>],
+        { version: U8aFixed; epoch: Compact<u64> }
       >;
       /**
        * Set OperatingMode

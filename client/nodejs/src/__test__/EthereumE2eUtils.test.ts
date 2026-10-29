@@ -1,5 +1,8 @@
 import { afterEach, expect, it, vi } from 'vitest';
-import { waitForExecutionReceipt } from '@argonprotocol/testing';
+import {
+  waitForExecutionReceipt,
+  waitForFinalizedBeaconExecutionAtOrAbove,
+} from '@argonprotocol/testing';
 import type { RpcTransactionReceipt } from 'viem';
 import { repeatHex } from './ethereumProofTestUtils';
 
@@ -45,4 +48,48 @@ it('does not hide permanent execution RPC errors as indexing delays', async () =
   await expect(waitForExecutionReceipt(ethereum, repeatHex('44', 32))).rejects.toThrow(
     'Method not found',
   );
+});
+
+it('waits for the Gloas finalized parent execution block and rejects a mismatched RPC block', async () => {
+  vi.useFakeTimers();
+  const parentHash = repeatHex('11', 32);
+  const header = { data: { root: repeatHex('22', 32), header: { message: { slot: '100' } } } };
+  const block = {
+    data: {
+      message: {
+        body: {
+          signed_execution_payload_bid: {
+            message: { parent_block_hash: parentHash, block_hash: repeatHex('33', 32) },
+          },
+        },
+      },
+    },
+  };
+  const ethereum = {
+    getBeacon: vi
+      .fn()
+      .mockResolvedValueOnce(header)
+      .mockResolvedValueOnce(header)
+      .mockResolvedValueOnce(block)
+      .mockResolvedValueOnce(header)
+      .mockResolvedValueOnce(header)
+      .mockResolvedValueOnce(block)
+      .mockResolvedValueOnce(header)
+      .mockResolvedValueOnce(header)
+      .mockResolvedValueOnce(block),
+    callExecution: vi
+      .fn()
+      .mockResolvedValueOnce({ hash: parentHash, number: '0x9' })
+      .mockResolvedValueOnce({ hash: repeatHex('ff', 32), number: '0xa' })
+      .mockResolvedValueOnce({ hash: parentHash, number: '0xa' }),
+  };
+
+  const pending = waitForFinalizedBeaconExecutionAtOrAbove(ethereum, 10n);
+  await vi.runAllTimersAsync();
+  await expect(pending).resolves.toEqual({ header, block });
+  expect(ethereum.callExecution.mock.calls).toEqual([
+    ['eth_getBlockByHash', [parentHash, false]],
+    ['eth_getBlockByHash', [parentHash, false]],
+    ['eth_getBlockByHash', [parentHash, false]],
+  ]);
 });

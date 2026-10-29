@@ -6,12 +6,13 @@ import {
   type ArgonClient,
   type EthereumBeaconBlockResponse,
   type EthereumBeaconHeaderDetailsResponse,
+  type EthereumExecutionSource,
   type EthereumReceipt,
   type KeyringPair,
   u8aToHex,
 } from '@argonprotocol/mainchain';
 import { privateKeyToAccount } from 'viem/accounts';
-import type { Hex, RpcTransactionReceipt } from 'viem';
+import type { Hex, RpcBlock, RpcTransactionReceipt } from 'viem';
 import { createWalletClient, defineChain, formatTransactionReceipt, parseSignature } from 'viem';
 import TestEthereum from './TestEthereum';
 import { submitTx } from './submitTx';
@@ -62,7 +63,7 @@ export async function signGatewayPermit(args: {
 }
 
 export async function waitForFinalizedBeaconExecutionAtOrAbove(
-  ethereum: TestEthereum,
+  ethereum: Pick<TestEthereum, 'getBeacon' | 'callExecution'>,
   minimumExecutionBlockNumber: bigint,
   options: {
     minimumFinalizedSlot?: bigint;
@@ -87,7 +88,24 @@ export async function waitForFinalizedBeaconExecutionAtOrAbove(
       const block = await ethereum.getBeacon<EthereumBeaconBlockResponse>(
         `/eth/v2/beacon/blocks/${finalizedHeader.data.root}`,
       );
-      const executionBlockNumber = BigInt(block.data.message.body.execution_payload.block_number);
+      const body = block.data.message.body;
+      let executionBlockNumber: bigint;
+      if (body.execution_payload) {
+        executionBlockNumber = BigInt(body.execution_payload.block_number);
+      } else {
+        const parentHash = body.signed_execution_payload_bid.message.parent_block_hash;
+        const executionBlock = await ethereum.callExecution<RpcBlock | null>('eth_getBlockByHash', [
+          parentHash,
+          false,
+        ]);
+        if (
+          executionBlock?.number == null ||
+          executionBlock.hash?.toLowerCase() !== parentHash.toLowerCase()
+        ) {
+          throw new Error(`Execution block not found for finalized beacon parent ${parentHash}`);
+        }
+        executionBlockNumber = BigInt(executionBlock.number);
+      }
       lastSeenExecutionBlockNumber = executionBlockNumber;
       lastError = undefined;
 
@@ -178,6 +196,7 @@ export async function syncEthereumVerifierUntilAnchorCovers(
   relayer: KeyringPair,
   beaconApiUrl: string,
   minimumExecutionBlockNumber: bigint,
+  executionSource?: EthereumExecutionSource,
 ) {
   const startedAt = Date.now();
   const timeoutMs = 5 * 60_000;
@@ -193,7 +212,7 @@ export async function syncEthereumVerifierUntilAnchorCovers(
       }
     } catch {}
 
-    const txs = await getNextEthereumBeaconSyncTxs(mainchainClient, beaconApiUrl);
+    const txs = await getNextEthereumBeaconSyncTxs(mainchainClient, beaconApiUrl, executionSource);
     if (txs.length === 0) {
       await delay(500);
       continue;

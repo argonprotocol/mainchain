@@ -1634,6 +1634,10 @@ export default {
       OperatingModeChanged: {
         mode: 'PalletEthereumVerifierBasicOperatingMode',
       },
+      GloasForkScheduled: {
+        version: '[u8;4]',
+        epoch: 'Compact<u64>',
+      },
     },
   },
   /**
@@ -3087,6 +3091,9 @@ export default {
       set_operating_mode: {
         mode: 'PalletEthereumVerifierBasicOperatingMode',
       },
+      set_gloas_fork: {
+        fork: 'PalletEthereumVerifierFork',
+      },
     },
   },
   /**
@@ -3124,16 +3131,17 @@ export default {
    * Lookup315: pallet_ethereum_verifier::types::ExecutionHeaderProof
    **/
   PalletEthereumVerifierExecutionHeaderProof: {
-    executionHeader: 'SnowbridgeBeaconPrimitivesVersionedExecutionPayloadHeader',
+    executionHeader: 'PalletEthereumVerifierVersionedExecutionPayloadHeader',
     executionBranch: 'Vec<H256>',
   },
   /**
-   * Lookup316: snowbridge_beacon_primitives::types::VersionedExecutionPayloadHeader
+   * Lookup316: pallet_ethereum_verifier::types::VersionedExecutionPayloadHeader
    **/
-  SnowbridgeBeaconPrimitivesVersionedExecutionPayloadHeader: {
+  PalletEthereumVerifierVersionedExecutionPayloadHeader: {
     _enum: {
       Capella: 'SnowbridgeBeaconPrimitivesExecutionPayloadHeader',
       Deneb: 'SnowbridgeBeaconPrimitivesDenebExecutionPayloadHeader',
+      Rlp: 'Bytes',
     },
   },
   /**
@@ -3179,7 +3187,7 @@ export default {
     excessBlobGas: 'u64',
   },
   /**
-   * Lookup319: pallet_ethereum_verifier::types::ForkVersions
+   * Lookup320: pallet_ethereum_verifier::types::ForkVersions
    **/
   PalletEthereumVerifierForkVersions: {
     genesis: 'PalletEthereumVerifierFork',
@@ -3189,16 +3197,17 @@ export default {
     deneb: 'PalletEthereumVerifierFork',
     electra: 'PalletEthereumVerifierFork',
     fulu: 'PalletEthereumVerifierFork',
+    gloas: 'PalletEthereumVerifierFork',
   },
   /**
-   * Lookup320: pallet_ethereum_verifier::types::Fork
+   * Lookup321: pallet_ethereum_verifier::types::Fork
    **/
   PalletEthereumVerifierFork: {
     version: '[u8;4]',
     epoch: 'Compact<u64>',
   },
   /**
-   * Lookup321: pallet_ethereum_verifier::types::Update
+   * Lookup322: pallet_ethereum_verifier::types::Update
    **/
   PalletEthereumVerifierUpdate: {
     attestedHeader: 'SnowbridgeBeaconPrimitivesBeaconHeader',
@@ -3210,25 +3219,25 @@ export default {
     executionHeaderProof: 'PalletEthereumVerifierExecutionHeaderProof',
   },
   /**
-   * Lookup322: pallet_ethereum_verifier::types::SyncAggregate
+   * Lookup323: pallet_ethereum_verifier::types::SyncAggregate
    **/
   PalletEthereumVerifierSyncAggregate: {
     syncCommitteeBits: 'Bytes',
     syncCommitteeSignature: 'SnowbridgeBeaconPrimitivesSignature',
   },
   /**
-   * Lookup324: snowbridge_beacon_primitives::types::Signature
+   * Lookup325: snowbridge_beacon_primitives::types::Signature
    **/
   SnowbridgeBeaconPrimitivesSignature: '[u8;96]',
   /**
-   * Lookup327: pallet_ethereum_verifier::types::NextSyncCommitteeUpdate
+   * Lookup328: pallet_ethereum_verifier::types::NextSyncCommitteeUpdate
    **/
   PalletEthereumVerifierNextSyncCommitteeUpdate: {
     nextSyncCommittee: 'PalletEthereumVerifierSyncCommittee',
     nextSyncCommitteeBranch: 'Vec<H256>',
   },
   /**
-   * Lookup328: pallet_crosschain_transfer::pallet::Call<T>
+   * Lookup329: pallet_crosschain_transfer::pallet::Call<T>
    **/
   PalletCrosschainTransferCall: {
     _enum: {
@@ -3299,7 +3308,7 @@ export default {
     },
   },
   /**
-   * Lookup329: pallet_crosschain_transfer::pallet::ChainConfig
+   * Lookup330: pallet_crosschain_transfer::pallet::ChainConfig
    **/
   PalletCrosschainTransferChainConfig: {
     _enum: {
@@ -3312,7 +3321,7 @@ export default {
     },
   },
   /**
-   * Lookup331: pallet_crosschain_transfer::pallet::MintingAuthorityActivationRepaymentPricing<T>
+   * Lookup332: pallet_crosschain_transfer::pallet::MintingAuthorityActivationRepaymentPricing<T>
    **/
   PalletCrosschainTransferMintingAuthorityActivationRepaymentPricing: {
     activationGasCost: 'Compact<u128>',
@@ -3321,21 +3330,21 @@ export default {
     estimatedMicrogonsPerEth: 'u128',
   },
   /**
-   * Lookup334: argon_primitives::ethereum::EthereumReceiptLogProofBatch<MaxProofBlocks, MaxReceiptLogs>
+   * Lookup335: argon_primitives::ethereum::EthereumReceiptLogProofBatch<MaxProofBlocks, MaxReceiptLogs>
    **/
   ArgonPrimitivesEthereumEthereumReceiptLogProofBatch: {
     executionBlockProof: 'ArgonPrimitivesEthereumEthereumExecutionBlockProof',
     blocks: 'Vec<ArgonPrimitivesEthereumEthereumReceiptLogProofBlock>',
   },
   /**
-   * Lookup335: argon_primitives::ethereum::EthereumExecutionBlockProof
+   * Lookup336: argon_primitives::ethereum::EthereumExecutionBlockProof
    **/
   ArgonPrimitivesEthereumEthereumExecutionBlockProof: {
     anchorBlockHash: 'H256',
     targetToAnchorHeaderChain: 'Vec<ArgonPrimitivesEthereumEthereumExecutionHeader>',
   },
   /**
-   * Lookup337: argon_primitives::ethereum::EthereumExecutionHeader
+   * Lookup338: argon_primitives::ethereum::EthereumExecutionHeader
    **/
   ArgonPrimitivesEthereumEthereumExecutionHeader: {
     rlp: 'Bytes',
@@ -4611,6 +4620,8 @@ export default {
       'InvalidUpdateSlot',
       'InvalidSyncCommitteeUpdate',
       'Halted',
+      'InvalidForkSchedule',
+      'GloasForkAlreadyActive',
     ],
   },
   /**

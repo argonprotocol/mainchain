@@ -6,9 +6,14 @@ export type EthereumBeaconHeader = {
   body_root: string;
 };
 
-export type EthereumBeaconBlockBody = Record<string, unknown> & {
-  execution_payload: EthereumBeaconExecutionPayload;
-};
+export type EthereumBeaconBlockBody = Record<string, unknown> &
+  (
+    | { execution_payload: EthereumBeaconExecutionPayload; signed_execution_payload_bid?: never }
+    | {
+        execution_payload?: never;
+        signed_execution_payload_bid: { message: { parent_block_hash: string } };
+      }
+  );
 
 export type EthereumBeaconExecutionPayload = {
   parent_hash: string;
@@ -30,29 +35,21 @@ export type EthereumBeaconExecutionPayload = {
   excess_blob_gas?: string;
 };
 
+export type EthereumLightClientExecutionPayloadHeader = Omit<
+  EthereumBeaconExecutionPayload,
+  'transactions' | 'withdrawals'
+> & {
+  transactions_root: string;
+  withdrawals_root: string;
+};
+
 export type EthereumLightClientHeader = {
   beacon: EthereumBeaconHeader;
-  execution: {
-    parent_hash: string;
-    fee_recipient: string;
-    state_root: string;
-    receipts_root: string;
-    logs_bloom: string;
-    prev_randao: string;
-    block_number: string;
-    gas_limit: string;
-    gas_used: string;
-    timestamp: string;
-    extra_data: string;
-    base_fee_per_gas: string;
-    block_hash: string;
-    transactions_root: string;
-    withdrawals_root: string;
-    blob_gas_used?: string;
-    excess_blob_gas?: string;
-  };
   execution_branch: string[];
-};
+} & (
+  | { execution: EthereumLightClientExecutionPayloadHeader; execution_block_hash?: never }
+  | { execution_block_hash: string; execution?: never }
+);
 
 export type EthereumLightClientBootstrapResponse = {
   data: {

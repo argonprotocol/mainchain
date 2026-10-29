@@ -1,5 +1,5 @@
 import camelcaseKeys from 'camelcase-keys';
-import { type Hex } from 'viem';
+import type { Hex } from 'viem';
 import type {
   EthereumBeaconConfigSpecResponse,
   EthereumBeaconGenesisResponse,
@@ -11,6 +11,7 @@ import {
   type MissingGatewayActivityLocator,
 } from './EthereumGatewayActivityProof';
 import { getExecutionClient, type EthereumExecutionSource } from './EthereumExecution';
+import { decodeExecutionHeaderRlp } from './EthereumProof';
 import type { ArgonClient, IArgonQueryable } from './index';
 
 export type EthereumExecutionHeaderBackfillPayload = {
@@ -23,7 +24,7 @@ export type EthereumExecutionHeaderBackfillPayload = {
     stateRoot: Hex;
     bodyRoot: Hex;
   };
-  executionHeaderProof: ReturnType<typeof buildExecutionHeaderProof>;
+  executionHeaderProof: Awaited<ReturnType<typeof buildExecutionHeaderProof>>;
   executionBlockNumber: bigint;
   executionBlockHash: Hex;
 };
@@ -153,18 +154,47 @@ export async function buildGatewayExecutionHeaderBackfill(
           options.beaconApiUrl,
           `/eth/v1/beacon/light_client/bootstrap/${checkpointHeader.root}`,
         );
-        const executionBlockNumber = BigInt(bootstrap.data.header.execution.block_number);
+        const bootstrapHeader = bootstrap.data.header;
+        if (!bootstrapHeader.execution) {
+          const bootstrapSlot = BigInt(bootstrapHeader.beacon.slot);
+          const capellaSlot = BigInt(spec.data.CAPELLA_FORK_EPOCH ?? '0') * slotsPerEpoch;
+          if (bootstrapSlot === 0n || bootstrapSlot < capellaSlot) {
+            scanSlot += 1n;
+            continue;
+          }
+        }
+
+        const executionHeaderProof = await buildExecutionHeaderProof(
+          bootstrapHeader,
+          options,
+          spec.data,
+        );
+        const proofHeader = executionHeaderProof.executionHeader;
+        let executionBlockNumber: bigint;
+        if ('Rlp' in proofHeader) {
+          executionBlockNumber = decodeExecutionHeaderRlp(proofHeader.Rlp).number;
+        } else if (proofHeader.Deneb) {
+          executionBlockNumber = BigInt(proofHeader.Deneb.blockNumber);
+        } else {
+          executionBlockNumber = BigInt(proofHeader.Capella.blockNumber);
+        }
+        let executionBlockHash: Hex;
+        if (bootstrapHeader.execution) {
+          executionBlockHash = bootstrapHeader.execution.block_hash.toLowerCase() as Hex;
+        } else {
+          executionBlockHash = bootstrapHeader.execution_block_hash.toLowerCase() as Hex;
+        }
 
         if (executionBlockNumber >= targetExecutionBlockNumber) {
           return {
             targetExecutionBlockNumber,
             expectedBeaconRoot: checkpointHeader.root.toLowerCase() as Hex,
             header: camelcaseKeys(
-              bootstrap.data.header.beacon,
+              bootstrapHeader.beacon,
             ) as EthereumExecutionHeaderBackfillPayload['header'],
-            executionHeaderProof: buildExecutionHeaderProof(bootstrap.data.header),
+            executionHeaderProof,
             executionBlockNumber,
-            executionBlockHash: bootstrap.data.header.execution.block_hash.toLowerCase() as Hex,
+            executionBlockHash,
           };
         }
       } catch (error) {
