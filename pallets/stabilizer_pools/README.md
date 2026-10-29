@@ -1,4 +1,4 @@
-# Stabilization pool checkpoints
+# Stabilizer pool checkpoints
 
 Users retain their Uniswap v4 NFTs and subscribe them to `StabilizationPoolSubscriber`, passing
 `abi.encode(argonAccountId)`. The subscriber stores only that beneficiary and a permanent revision.

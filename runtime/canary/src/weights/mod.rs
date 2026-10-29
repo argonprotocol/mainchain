@@ -23,7 +23,7 @@ pub mod pallet_operational_accounts;
 pub mod pallet_price_index;
 pub mod pallet_proxy;
 pub mod pallet_stabilizer_buys;
-pub mod pallet_stabilization_pools;
+pub mod pallet_stabilizer_pools;
 pub mod pallet_sudo;
 pub mod pallet_ticks;
 pub mod pallet_timestamp;

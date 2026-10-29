@@ -1,7 +1,7 @@
 //! Shared setup for tests and runtime benchmarks; excluded from ordinary runtime builds.
 //! Ethereum finality anchors are supplied here, while account/storage proofs use the real verifier.
 #[cfg(test)]
-use crate as pallet_stabilization_pools;
+use crate as pallet_stabilizer_pools;
 use crate::*;
 use alloy_primitives::{keccak256, B256, U256 as AlloyU256};
 use alloy_trie::{
@@ -24,7 +24,7 @@ type Block = frame_system::mocking::MockBlock<Test>;
 frame_support::construct_runtime!(pub enum Test {
 	System: frame_system,
 	EthereumVerifier: pallet_ethereum_verifier,
-	StabilizationPools: pallet_stabilization_pools,
+	StabilizerPools: pallet_stabilizer_pools,
 });
 
 #[cfg(test)]
@@ -51,11 +51,7 @@ pub fn new_test_ext() -> TestState {
 	let mut ext = new_test_with_genesis::<Test>(|_| {});
 	ext.execute_with(|| {
 		System::set_block_number(1);
-		assert_ok!(StabilizationPools::register_pool(
-			RuntimeOrigin::root(),
-			pool_manager(),
-			config()
-		));
+		assert_ok!(StabilizerPools::register_pool(RuntimeOrigin::root(), pool_manager(), config()));
 	});
 	ext
 }

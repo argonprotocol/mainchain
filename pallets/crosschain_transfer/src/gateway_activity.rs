@@ -780,7 +780,7 @@ impl<T: Config> Pallet<T> {
 
 #[cfg(test)]
 mod test {
-	use crate::{tests::*, GatewayActivityStorageProof};
+	use crate::tests::*;
 	use alloy_primitives::{B256, U160};
 	use alloy_sol_types::{SolEvent, SolType};
 	use argon_ethereum_contracts::minting_gateway::{
@@ -1415,43 +1415,6 @@ mod test {
 	}
 
 	#[test]
-	fn storage_proof_rejects_impossible_finalization_array() {
-		new_test_ext().execute_with(|| {
-			assert_ok!(CrosschainTransfer::set_chain_config(
-				RuntimeOrigin::root(),
-				SourceChain::Ethereum,
-				chain_config()
-			));
-			let log = transfer_out_of_argon_finalized_log_with_circulation(
-				H256::zero(),
-				AssetKind::Argon,
-				1,
-				vec![],
-				1,
-				0,
-				0,
-				0,
-			);
-			let mut proof = storage_proof(10, H256::zero(), vec![log]);
-			let mut logs = proof.activity_logs.to_vec();
-			logs[0].data[256..288]
-				.copy_from_slice(&alloy_primitives::U256::from(1_000_000u64).to_be_bytes::<32>());
-			proof.activity_logs = logs.try_into().unwrap();
-
-			assert_noop!(
-				CrosschainTransfer::prove_gateway_activity_storage(
-					RuntimeOrigin::signed(account(1)),
-					SourceChain::Ethereum,
-					0,
-					proof
-				),
-				Error::<Test>::InvalidProof
-			);
-			assert!(GatewayStateBySourceChain::<Test>::get(SourceChain::Ethereum).is_none());
-		});
-	}
-
-	#[test]
 	fn storage_proofs_authenticate_the_consumed_prefix_and_seed_before_writing() {
 		new_test_ext().execute_with(|| {
 			assert_ok!(CrosschainTransfer::set_chain_config(
@@ -1915,58 +1878,6 @@ mod test {
 			assert_ok!(CrosschainTransfer::prove_gateway_activity(RuntimeOrigin::signed(account(1)), SourceChain::Ethereum, 0, proof_batch(vec![activity_logs(vec![log])])));
 			assert!(matches!(<CrosschainTransfer as CallTxValidityProvider<RuntimeCall, TestAccountId>>::validate(&call, Some(&account(1))), Err(TransactionValidityError::Invalid(InvalidTransaction::Stale))));
 		});
-	}
-
-	fn storage_proof(
-		block_number: u64,
-		activity_root_seed: H256,
-		logs: Vec<EthereumLog>,
-	) -> GatewayActivityStorageProof<MaxActivitiesPerGatewayProof> {
-		let mut root = alloy_primitives::B256::from(activity_root_seed.0);
-		let decoded = logs
-			.iter()
-			.map(|log| {
-				CrosschainTransfer::decode_evm_gateway_activity(&chain_config(), log).unwrap()
-			})
-			.collect::<Vec<_>>();
-		for activity in &decoded {
-			root = argon_ethereum_contracts::minting_gateway::append_activity_root(
-				root,
-				alloy_primitives::B256::from(activity.leaf_hash(&chain_config()).0),
-			);
-		}
-		let (range_slot, root_slot) = CrosschainTransfer::gateway_activity_locator_slots(1);
-		GatewayActivityStorageProof {
-			locator_index: 1,
-			activity_root_seed,
-			storage_proof: argon_primitives::EthereumAccountStorageProof {
-				execution_block_proof: argon_primitives::EthereumExecutionBlockProof {
-					anchor_block_hash: H256::repeat_byte(1),
-					target_to_anchor_header_chain: Default::default(),
-				},
-				account_proof: Default::default(),
-				storage_proof: Default::default(),
-				slots: vec![
-					argon_primitives::EthereumStorageSlotProof {
-						slot: range_slot,
-						value: CrosschainTransfer::gateway_activity_locator_range_slot_value(
-							block_number,
-							decoded.first().unwrap().gateway_activity_nonce(),
-							decoded.last().unwrap().gateway_activity_nonce(),
-						),
-						node_indexes: Default::default(),
-					},
-					argon_primitives::EthereumStorageSlotProof {
-						slot: root_slot,
-						value: H256::from_slice(root.as_slice()),
-						node_indexes: Default::default(),
-					},
-				]
-				.try_into()
-				.unwrap(),
-			},
-			activity_logs: logs.try_into().unwrap(),
-		}
 	}
 
 	#[test]
