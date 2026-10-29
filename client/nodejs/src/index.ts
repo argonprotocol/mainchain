@@ -141,7 +141,7 @@ export type { ExtrinsicOrHash, ExtrinsicStatus } from '@polkadot/types/interface
 export { type BlockHash } from '@polkadot/types/interfaces/chain';
 export { InterfaceTypes as interfaces };
 
-export type ArgonClient = MiningBidClient;
+export type ArgonClient = ApiPromise;
 export type IArgonQueryable = ArgonClient | ApiDecoration<'promise'>;
 
 /**
@@ -157,7 +157,7 @@ export async function waitForLoad(): Promise<void> {
  * @param options Additional options for the API
  * @returns The client, with omitted mining bid frame and commitment arguments defaulted to null.
  */
-export async function getClient(host: string, options?: ApiOptions): Promise<ArgonClient> {
+export async function getClient(host: string, options?: ApiOptions): Promise<MiningBidClient> {
   options ??= {};
   const provider: ProviderInterface =
     options.provider ?? (host.startsWith('http') ? new HttpProvider(host) : new WsProvider(host));

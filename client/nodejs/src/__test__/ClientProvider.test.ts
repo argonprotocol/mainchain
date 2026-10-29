@@ -1,16 +1,19 @@
-import { expect, it } from 'vitest';
+import { expect, expectTypeOf, it } from 'vitest';
 import { once } from 'node:events';
 import { WebSocketServer } from 'ws';
 import { WsProvider } from '@polkadot/rpc-provider';
 import { Metadata, TypeRegistry } from '@polkadot/types';
 import type { HexString } from '@polkadot/util/types';
-import { getClient } from '../index';
+import { getClient, type ArgonClient } from '../index';
+import type { ApiPromise } from '@polkadot/api';
 import { withMiningBidDefaults } from '../miningBid';
 import Genesis from '../../genesis.json';
 import metadata from '../../metadata.json';
 import runtimeVersion from '../../runtime_version.json';
 
 it('uses one supplied connection and bundled metadata for historical reads', async () => {
+  expectTypeOf<ApiPromise>().toEqualTypeOf<ArgonClient>();
+
   const registry = new TypeRegistry();
   const header = registry.createType('Header', { number: 9, parentHash: Genesis.mainnet });
   const server = new WebSocketServer({ host: '127.0.0.1', port: 0 });
