@@ -1,0 +1,58 @@
+[package]
+name = "pallet-stabilization-pools"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+publish = false
+
+[dependencies]
+alloy-trie = { workspace = true, optional = true }
+alloy-rlp = { workspace = true, optional = true }
+alloy-primitives = { workspace = true }
+alloy-sol-types = { workspace = true }
+argon-primitives = { workspace = true }
+codec = { workspace = true }
+pallet-ethereum-verifier = { workspace = true }
+pallet-prelude = { workspace = true }
+polkadot-sdk = { workspace = true, features = ["frame-support", "frame-system", "sp-runtime", "sp-core"] }
+scale-info = { workspace = true }
+
+[dev-dependencies]
+alloy-consensus = { workspace = true }
+alloy-rlp = { workspace = true }
+alloy-trie = { workspace = true }
+pallet-prelude = { workspace = true, features = ["test"], default-features = true }
+polkadot-sdk = { workspace = true, features = ["sp-io", "pallet-timestamp"], default-features = true }
+
+[features]
+default = [ "std" ]
+std = [
+	"alloy-primitives/std",
+	"alloy-rlp?/std",
+	"alloy-sol-types/std",
+	"alloy-trie?/std",
+	"argon-primitives/std",
+	"codec/std",
+	"pallet-ethereum-verifier/std",
+	"pallet-prelude/std",
+	"polkadot-sdk/std",
+	"scale-info/std",
+]
+runtime-benchmarks = [
+	"alloy-rlp",
+	"alloy-trie",
+	"argon-primitives/runtime-benchmarks",
+	"pallet-ethereum-verifier/runtime-benchmarks",
+	"pallet-prelude/runtime-benchmarks",
+	"polkadot-sdk/frame-benchmarking",
+	"polkadot-sdk/runtime-benchmarks",
+]
+try-runtime = [
+	"pallet-ethereum-verifier/try-runtime",
+	"polkadot-sdk/try-runtime",
+]

@@ -4,14 +4,28 @@ import { configVariable, defineConfig } from 'hardhat/config';
 export default defineConfig({
   plugins: [hardhatEthers],
   solidity: {
-    version: '0.8.35',
-    settings: {
-      optimizer: {
-        enabled: true,
-        runs: 200,
+    npmFilesToBuild: ['@uniswap/v4-periphery/src/PositionManager.sol'],
+    compilers: [
+      {
+        version: '0.8.35',
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 200,
+          },
+          evmVersion: 'cancun',
+        },
       },
-      evmVersion: 'cancun',
-    },
+      // PositionManager pins solc 0.8.26 and uses the upstream IR compilation profile.
+      {
+        version: '0.8.26',
+        settings: {
+          optimizer: { enabled: true, runs: 500 },
+          viaIR: true,
+          evmVersion: 'cancun',
+        },
+      },
+    ],
   },
   networks: {
     hardhatMainnet: {

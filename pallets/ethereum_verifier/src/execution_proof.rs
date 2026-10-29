@@ -129,6 +129,17 @@ impl<T: Config> Pallet<T> {
 		Ok(())
 	}
 
+	/// Verify ancestry and return the exact execution header used by a storage witness.
+	pub fn verified_execution_header(
+		proof: &EthereumExecutionBlockProof,
+	) -> Result<ExecutionHeaderAnchor, EthereumVerifyError> {
+		ensure!(!OperatingMode::<T>::get().is_halted(), EthereumVerifyError::VerifierUnavailable);
+		Self::verify_execution_headers(proof)?
+			.into_iter()
+			.next()
+			.ok_or(EthereumVerifyError::InvalidHeaderChain)
+	}
+
 	#[cfg(test)]
 	pub(crate) fn verify_execution_block_proof(
 		proof: &EthereumExecutionBlockProof,
