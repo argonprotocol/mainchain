@@ -22,7 +22,7 @@ jobs:
       attestations: write
     steps:
       - name: Check out the repo
-        uses: actions/checkout@v5
+        uses: actions/checkout@v5.1.0
 
       - name: Validate release tag
         run: |
@@ -56,7 +56,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Argon Node
-        uses: ./.github/templates/docker
+        uses: $/.github/templates/docker
         with:
           image: ghcr.io/argonprotocol/argon-miner
           bin: argon-node
@@ -68,7 +68,7 @@ jobs:
             type=sha
 
       - name: Notary
-        uses: ./.github/templates/docker
+        uses: $/.github/templates/docker
         with:
           image: ghcr.io/argonprotocol/argon-notary
           bin: argon-notary
@@ -80,7 +80,7 @@ jobs:
             type=sha
 
       - name: Oracle
-        uses: ./.github/templates/docker
+        uses: $/.github/templates/docker
         with:
           image: ghcr.io/argonprotocol/argon-oracle
           bin: argon-oracle

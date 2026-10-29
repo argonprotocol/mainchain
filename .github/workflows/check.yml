@@ -16,10 +16,10 @@ jobs:
     name: Lint
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v5.1.0
 
       - name: Free Disk Space
-        uses: ./.github/templates/clear-space
+        uses: $/.github/templates/clear-space
 
       - name: Install linux dependencies
         run: |
@@ -28,11 +28,11 @@ jobs:
           echo "LIBCLANG_PATH=$(llvm-config --libdir)" >> "$GITHUB_ENV"
 
       - name: Install Rust
-        uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1.16.1
         with:
           cache: 'false'
 
-      - uses: ./.github/templates/rust-cache
+      - uses: $/.github/templates/rust-cache
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           name: check-x86_64-unknown-linux-gnu
@@ -56,13 +56,13 @@ jobs:
     name: Build
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v5.1.0
 
       - name: Free Disk Space
-        uses: ./.github/templates/clear-space
+        uses: $/.github/templates/clear-space
 
-      - uses: ikalnytskyi/action-setup-postgres@10ab8a56cc77b4823c2bfa57b1d4dd5605ef0481 # v7
-      - uses: ./.github/templates/minio
+      - uses: ikalnytskyi/action-setup-postgres@v7
+      - uses: $/.github/templates/minio
 
       - name: Install linux dependencies
         if: ${{startsWith(matrix.os, 'ubuntu')}}
@@ -85,7 +85,7 @@ jobs:
             echo "LIBCLANG_PATH=/opt/homebrew/opt/llvm@18/lib"
           } >> "$GITHUB_ENV"
 
-      - uses: ./.github/templates/rust-cache
+      - uses: $/.github/templates/rust-cache
         id: rust-cache
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -95,12 +95,12 @@ jobs:
           clean-runtime-builds: 'false'
 
       - name: Install Rust
-        uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1.16.1
         with:
           cache: 'false'
           target: ${{matrix.target}}
 
-      - uses: taiki-e/install-action@c070f87102a1c75b3183910f391c1cb887fe13c8 # v2
+      - uses: taiki-e/install-action@v2.77.6
         with:
           tool: sqlx-cli@0.8.3,cargo-nextest@0.9.148
 
@@ -143,7 +143,7 @@ jobs:
 
       - name: Save compiled tests
         if: steps.rust-cache.outputs.cache-hit != 'true'
-        uses: actions/cache/save@caa296126883cff596d87d8935842f9db880ef25 # v5.1.0
+        uses: actions/cache/save@v5.1.0
         with:
           path: ${{ steps.rust-cache.outputs.cache-paths }}
           key: ${{ steps.rust-cache.outputs.cache-key }}
