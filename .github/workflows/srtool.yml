@@ -25,7 +25,7 @@ jobs:
             package: argon-canary-runtime
     steps:
       - name: Checkout sources
-        uses: actions/checkout@v5
+        uses: actions/checkout@v5.1.0
 
       - name: Get Rust version from rust-toolchain.toml
         id: rustver
@@ -83,7 +83,7 @@ jobs:
 
       - name: Archive Runtime
         if: github.event_name != 'release'
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v6.0.0
         with:
           name: ${{ matrix.runtime }}-runtime
           path: |
@@ -116,7 +116,7 @@ jobs:
 
       - name: Archive Subwasm results
         if: github.event_name != 'release'
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v6.0.0
         with:
           name: ${{ matrix.runtime }}-results
           path: |
@@ -127,7 +127,7 @@ jobs:
 
       # Release published: add artifacts to release
       - name: Add artifacts to release
-        uses: softprops/action-gh-release@de2c0eb89ae2a093876385947365aca7b0e5f844 # v1
+        uses: softprops/action-gh-release@v0.1.15
         if: startsWith(github.ref, 'refs/tags/') || startsWith(github.ref, 'refs/heads/v')
         with:
           append_body: true

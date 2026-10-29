@@ -16,7 +16,7 @@ jobs:
       contents: write
       packages: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v5.1.0
       - name: Determine if release is marked as latest
         id: get_latest
         run: |
@@ -27,7 +27,7 @@ jobs:
 
       - name: Login to container registry
         if: ${{ github.event.release.draft == false && steps.get_latest.outputs.latest != '' }}
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        uses: docker/login-action@v3.7.0
         with:
           registry: ghcr.io
           username: ${{ github.repository_owner }}

@@ -22,16 +22,16 @@ jobs:
   build-runtimes:
     runs-on: ubuntu-22.04
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v5.1.0
         with:
           persist-credentials: false
 
       - name: Install
-        uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1.16.1
         with:
           cache: 'false'
 
-      - uses: ./.github/templates/rust-cache
+      - uses: $/.github/templates/rust-cache
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           name: try-runtime
@@ -47,7 +47,7 @@ jobs:
           cp target/release/wbuild/*/*.compact.compressed.wasm runtimes/
 
       - name: Upload Debug Assets
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v6.0.0
         with:
           name: runtimes
           path: ./runtimes
@@ -73,7 +73,7 @@ jobs:
         shell: bash
 
       - name: Download runtime artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v7.0.0
         with:
           name: runtimes
           path: ./runtimes

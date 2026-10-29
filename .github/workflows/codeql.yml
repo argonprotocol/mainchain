@@ -36,7 +36,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        uses: actions/checkout@v5.1.0
 
       - name: Install Rust analysis dependencies
         if: matrix.language == 'rust'
@@ -54,26 +54,26 @@ jobs:
 
       - name: Install Rust
         if: matrix.language == 'rust'
-        uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1.16.1
         with:
           cache: 'false'
 
       - name: Restore Cargo build cache
         if: matrix.language == 'rust'
-        uses: ./.github/templates/rust-cache
+        uses: $/.github/templates/rust-cache
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           name: check-x86_64-unknown-linux-gnu
           save: false
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4
+        uses: github/codeql-action/init@v4.37.3
         with:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
 
       - name: Perform CodeQL analysis
-        uses: github/codeql-action/analyze@e4fba868fa4b1b91e1fdab776edc8cfbe6e9fb81 # v4
+        uses: github/codeql-action/analyze@v4.37.3
         env:
           CODEQL_EXTRACTOR_RUST_OPTION_CARGO_TARGET_DIR: ${{ env.CARGO_TARGET_DIR }}
         with:

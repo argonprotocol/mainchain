@@ -33,7 +33,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v5.1.0
         with:
           persist-credentials: false
 
@@ -100,13 +100,13 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v5.1.0
         with:
           persist-credentials: false
 
       - name: Free Disk Space
         if: (matrix.os == '' || startsWith(matrix.os, 'ubuntu'))
-        uses: ./.github/templates/clear-space
+        uses: $/.github/templates/clear-space
 
       - name: Install linux dependencies
         if: (matrix.os == '' || startsWith(matrix.os, 'ubuntu'))
@@ -140,16 +140,16 @@ jobs:
           echo "OPENSSL_NO_VENDOR=1" | Out-File -FilePath $env:GITHUB_ENV -Append
 
       - name: Install
-        uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1.16.1
         with:
           cache: 'false'
           target: ${{ matrix.target }}
 
-      - uses: taiki-e/setup-cross-toolchain-action@129361238c06ff2cc1c4ca5c5d2217af441ffdf6 # v1
+      - uses: taiki-e/setup-cross-toolchain-action@v1.40.1
         with:
           target: ${{ matrix.target }}
 
-      - uses: taiki-e/upload-rust-binary-action@f0d45ae91ee7b8ee928de7a9d04d893a08bcbec6 # v1
+      - uses: taiki-e/upload-rust-binary-action@v1.30.2
         if: (matrix.os == '' || startsWith(matrix.os, 'ubuntu'))
         with:
           bin: argon-node
@@ -159,7 +159,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: refs/tags/${{ env.RELEASE_TAG }}
 
-      - uses: taiki-e/upload-rust-binary-action@f0d45ae91ee7b8ee928de7a9d04d893a08bcbec6 # v1
+      - uses: taiki-e/upload-rust-binary-action@v1.30.2
         if: (matrix.os == '' || startsWith(matrix.os, 'ubuntu'))
         with:
           bin: argon-notary
@@ -168,7 +168,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: refs/tags/${{ env.RELEASE_TAG }}
 
-      - uses: taiki-e/upload-rust-binary-action@f0d45ae91ee7b8ee928de7a9d04d893a08bcbec6 # v1
+      - uses: taiki-e/upload-rust-binary-action@v1.30.2
         with:
           bin: argon-localchain
           target: ${{ matrix.target }}
@@ -176,7 +176,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           ref: refs/tags/${{ env.RELEASE_TAG }}
 
-      - uses: taiki-e/upload-rust-binary-action@f0d45ae91ee7b8ee928de7a9d04d893a08bcbec6 # v1
+      - uses: taiki-e/upload-rust-binary-action@v1.30.2
         if: (matrix.os == '' || startsWith(matrix.os, 'ubuntu'))
         with:
           bin: argon-oracle
