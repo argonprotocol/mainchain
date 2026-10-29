@@ -157,3 +157,38 @@ jobs:
           RUST_LOG: info
           CI: true
           SQLX_OFFLINE: ${{ startsWith(matrix.os, 'macos') }}
+
+  ethereum:
+    name: Ethereum contracts
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5.1.0
+
+      - uses: actions/setup-node@v5.0.0
+        with:
+          node-version: 22
+          cache: yarn
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Build Ethereum artifacts and contract types
+        run: yarn workspace @argonprotocol/ethereum-contracts build
+
+      - name: Check contract types
+        run: yarn workspace @argonprotocol/ethereum-contracts exec tsc --noEmit
+
+      - name: Test Ethereum contracts
+        run: yarn exec vitest run --config vitest.config.ts --project ethereum-contracts
+
+      - name: Build and validate mainchain client package
+        run: yarn workspace @argonprotocol/mainchain build
+
+      - name: Upload Ethereum build artifacts
+        uses: actions/upload-artifact@v6.0.0
+        with:
+          name: ethereum-contracts
+          path: |
+            chains/ethereum/contracts/artifacts/
+            chains/ethereum/contracts/generated.ts
+          if-no-files-found: error

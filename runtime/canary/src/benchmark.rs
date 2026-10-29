@@ -33,6 +33,7 @@ frame_benchmarking::define_benchmarks!(
 	[pallet_operational_accounts, OperationalAccounts]
 	[pallet_bootstrap, Bootstrap]
 	[pallet_crosschain_transfer, CrosschainTransfer]
+	[pallet_stabilizer_pools, StabilizerPools]
 	[pallet_ethereum_verifier, EthereumVerifier]
 	[pallet_fee_control, FeeControl]
 );

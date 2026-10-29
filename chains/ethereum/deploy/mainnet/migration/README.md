@@ -1,18 +1,11 @@
-# Mainnet Migration Bundle
+# Historical Ethereum migration
 
-This directory holds the checked-in final mainnet Ethereum migration bundle used by
-`yarn workspace @argonprotocol/ethereum-deploy bootstrap:deploy`.
+The completed migration bundles, provenance, and deployment loader are preserved at
+[commit 7eb80ba8](https://github.com/argonprotocol/mainchain/tree/7eb80ba8ea114ae91b6eb987e374a5725f88d8ec/chains/ethereum/deploy/mainnet/migration).
 
-Files:
+Fresh deployments no longer load or submit those historical balances. Existing deployment manifests
+remain audit records.
 
-- `migrate-bundle.json`
-  - the current `MintingGateway.migrate(...)` input shape used by the deploy manifest
-  - copied recovery migration file hashes
-  - upstream final-balance source hashes
-- `restore-argon-batch-000.json`
-- `restore-argon-batch-001.json`
-- `restore-argonot-batch-000.json`
-- `migration-plan.json`
-- `manifestHashes.txt`
-
-The copied batch files stay here for provenance. The deploy flow uses `migrate-bundle.json`.
+The owner-only, one-time `MintingGateway.migrate` initializer and `migrationCompleted` storage
+remain because Apps development setup uses them to create initial ARGN/ARGNOT balances. Proxy
+storage layout and repeat-run behavior are unchanged.

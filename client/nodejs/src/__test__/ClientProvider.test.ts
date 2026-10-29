@@ -10,9 +10,9 @@ import Genesis from '../../genesis.json';
 import metadata from '../../metadata.json';
 import runtimeVersion from '../../runtime_version.json';
 
-it('uses one supplied connection and bundled metadata for historical reads', async () => {
+it.each(Object.entries(Genesis))('uses %s cached metadata', async (_network, genesisHash) => {
   const registry = new TypeRegistry();
-  const header = registry.createType('Header', { number: 9, parentHash: Genesis.mainnet });
+  const header = registry.createType('Header', { number: 9, parentHash: genesisHash });
   const server = new WebSocketServer({ host: '127.0.0.1', port: 0 });
   await once(server, 'listening');
   const address = server.address();
@@ -27,7 +27,7 @@ it('uses one supplied connection and bundled metadata for historical reads', asy
       let result: unknown;
       switch (method) {
         case 'chain_getBlockHash':
-          result = Number(params[0]) === 0 ? Genesis.mainnet : header.hash.toHex();
+          result = Number(params[0]) === 0 ? genesisHash : header.hash.toHex();
           break;
         case 'chain_getHeader':
           result = header.toJSON();
@@ -101,6 +101,35 @@ it('uses one supplied connection and bundled metadata for historical reads', asy
     expect(connections).toBe(1);
     expect(metadataRequests).toBe(0);
     expect(client.consts.miningSlot.bidRevealBlocks.toNumber()).toBe(5);
+
+    // Registration must be available through the known-network metadata cache used by deployment.
+    const poolManager = `0x${'33'.repeat(20)}`;
+    const registration = client.tx.stabilizerPools.registerPool(poolManager, {
+      positionManager: `0x${'22'.repeat(20)}`,
+      subscriber: `0x${'11'.repeat(20)}`,
+      key: {
+        currency0: `0x${'44'.repeat(20)}`,
+        currency1: `0x${'55'.repeat(20)}`,
+        fee: 0x800000,
+        tickSpacing: 10,
+        hooks: `0x${'66'.repeat(20)}`,
+      },
+    });
+
+    // Runtime pallet 39, call 0, followed by PoolManager and the SCALE-encoded PoolConfig.
+    const registrationCallHex = [
+      '0x2700',
+      '33'.repeat(20),
+      '22'.repeat(20),
+      '11'.repeat(20),
+      '44'.repeat(20),
+      '55'.repeat(20),
+      '00008000', // uint32 dynamic-fee flag
+      '0a000000', // int32 tick spacing
+      '66'.repeat(20),
+    ].join('');
+    expect(registration.method.toHex()).toBe(registrationCallHex);
+    expect(client.tx.sudo.sudo(registration).method.args[0].toHex()).toBe(registrationCallHex);
 
     const keys = new Uint8Array(64);
     const bid = client.tx.miningSlot.bid;

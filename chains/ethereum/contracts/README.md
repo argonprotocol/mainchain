@@ -138,18 +138,20 @@ initial migration distribution in the same place as the long-term burn behavior.
 
 The deployment order still matters:
 
-1. Deploy a bootstrap `MintingGateway` implementation with zero canonical-token immutables.
+1. Deploy a bootstrap `MintingGateway` implementation with zero canonical-token and
+   purchase-contract immutables.
 2. Deploy the gateway proxy with the admin Safe as its current `ProxyAdmin` owner and the bootstrap
    `initialize(...)` calldata already encoded into the proxy constructor. Token-bearing gateway
    entrypoints stay blocked in this bootstrap state until the final implementation is installed with
    canonical token addresses configured.
 3. Deploy `ArgonToken` and `ArgonotToken` with the proxy address in their constructors.
-4. Deploy the final `MintingGateway` implementation with the Argon and Argonot token addresses baked
-   in as immutables.
+4. Optionally deploy `ArgonBuyAndTransfer` with the native Uniswap addresses. Deploy the final
+   `MintingGateway` implementation with canonical token addresses and that purchase address (or zero
+   to disable purchases) as immutables.
 5. Have the admin Safe call `ProxyAdmin.upgradeAndCall(...)` once to move the proxy onto that final
    implementation.
-6. Have the admin Safe call `migrate(...)` once with the migrated Argon balances and migrated
-   Argonot balances.
+6. For a fresh development environment, initialize ARGN and ARGNOT balances once with
+   `migrate(...)`.
 
 The reverse direction does not exist: the token contracts do not have a mutable `setGateway(...)`
 path.
@@ -165,23 +167,29 @@ The generated bootstrap manifest records:
   addresses
 
 See [`../deploy/README.md`](../deploy/README.md) for the deploy workspace,
-[`../deploy/mainnet/migration/README.md`](../deploy/mainnet/migration/README.md) for the checked-in
-mainnet migration bundle, [`../deploy/DEPLOY_CHECKLIST.md`](../deploy/DEPLOY_CHECKLIST.md) for the
-full activation sequence, and [TODO.md](./TODO.md) for the remaining hardening work.
+[`../deploy/mainnet/migration/README.md`](../deploy/mainnet/migration/README.md) for the historical
+mainnet migration reference, [`../deploy/DEPLOY_CHECKLIST.md`](../deploy/DEPLOY_CHECKLIST.md) for
+the full activation sequence, and [TODO.md](./TODO.md) for the remaining hardening work.
 
 ## Commands
 
-Recovery research and balance-derivation tooling still live in the separate
-`argonprotocol/hyperbridge-recovery` repository. The final reviewed mainnet migration bundle used by
-`bootstrap:deploy` is checked in locally under
-[`../deploy/mainnet/migration/`](../deploy/mainnet/migration/).
+Completed migration tooling and balances are preserved in
+[Git history](../deploy/mainnet/migration/README.md). Apps development setup still uses the one-time
+`migrate` initializer for initial token balances.
 
 Contract commands stay here:
 
 ```sh
+yarn workspace @argonprotocol/ethereum-contracts build
 yarn workspace @argonprotocol/ethereum-contracts test
 yarn workspace @argonprotocol/ethereum-contracts typecheck
 ```
+
+The build compiles the Solidity sources and generates the TypeScript ABIs and event types.
+`artifacts/` and `generated.ts` are build outputs, excluded from Git and archived by the Ethereum CI
+job. The mainchain package bundles the artifacts and generated declarations for consumers. Rust
+derives its gateway types directly from `contracts/MintingGateway.sol`, so a Rust build does not
+require Node.js or generated JSON.
 
 Bootstrap deploy commands live in the sibling deploy workspace at
 [`../deploy/`](../deploy/README.md):
@@ -230,19 +238,8 @@ The remaining manual Ethereum follow-ups after that script are:
 
 - have the admin Safe execute each prepared Safe transaction from the manifest in order
 
-For mainnet, that manifest includes both the proxy upgrade and the one-time `migrate(...)` call.
-
-For mainnet, the checked-in bundle at
-[`../deploy/mainnet/migration/migrate-bundle.json`](../deploy/mainnet/migration/migrate-bundle.json)
-already carries:
-
-- the final Argon and Argonot migration recipient lists and amounts in current `migrate(...)` shape
-- the copied recovery migration file hashes
-- the upstream final-balance source hashes used to derive that bundle
-
-The Argon-side legacy gateway balance move plus the finalized refund cases are already baked into
-the runtime migration at
-[`pallets/crosschain_transfer/src/migrations.rs`](../../../pallets/crosschain_transfer/src/migrations.rs).
+The manifest no longer loads or submits historical migration balances. Initial balances for a fresh
+development environment still use the owner-only initializer.
 
 `bootstrap:prepare-runtime-setup` defaults the execution RPC, beacon API, and
 `estimatedMicrogonsPerEth` when it can:
@@ -334,21 +331,23 @@ Not included in this package:
 - the temporary migration path
 - the restoration forensics work that blocks a mainnet mint run
 
-## Uniswap v4 Oracle Hook
+## Uniswap v4 Stabilization Pool Hook
 
-`UniswapV4OracleHook` connects one v4 pool to the existing Rust price oracle. Its history storage,
-interpolation, cumulative arithmetic and cardinality management come from the unmodified
+`StabilizationPoolHook` connects one ARGN/USDC v4 pool to the existing Rust price oracle and sets
+directional LP fees. Its history storage, interpolation, cumulative arithmetic and cardinality
+management come from the unmodified
 [Uniswap v3-core Oracle library](https://www.npmjs.com/package/@uniswap/v3-core), imported from the
 pinned `@uniswap/v3-core` version `1.0.2-solc-0.8-simulate`. The hook uses `@uniswap/v4-core`
 version `1.0.2` for callback types and pool-state access. Observations live in the hook contract's
 storage; the PoolManager retains the pool's current state. Each hook accepts observations from
 exactly one pool, including swaps and liquidity changes initiated by any user.
 
-Deploy one hook per pool using CREATE2. Constructor arguments are the PoolManager address, sorted
-currency addresses, fee, and tick spacing. Mine the salt so the deployed address's low 14 bits are
-`0x1a80`: after initialization, before liquidity addition/removal, and before swaps. The constructor
-rejects other permission bits, and callbacks reject any other manager or pool. The hook collects
-observations only; it has no fee adjustments, custody, swap deltas, or administrator.
+Deploy one hook per pool using CREATE2. Constructor arguments are the PoolManager address, ARGN
+address, USDC address, and tick spacing. The contract sorts the currencies and uses a dynamic-fee
+PoolKey (`fee = 0x800000`). Mine the salt so the deployed address's low 14 bits are `0x1a80`: after
+initialization, before liquidity addition/removal, and before swaps. The constructor rejects other
+permission bits, and callbacks reject any other manager or pool. The hook has no custody, swap
+deltas, or administrator.
 
 Initialize a **new** v4 pool with that exact key and hook address. Existing pools cannot acquire
 this hook or historical observations. History has a fixed capacity of 3,601 observations, enough for
@@ -357,6 +356,16 @@ separate allocation transaction: swaps and liquidity changes populate slots as n
 observations are overwritten once the buffer fills. Reads extrapolate through quiet periods from the
 PoolManager's current tick and liquidity. History starts at initialization and must warm up before
 the full one-hour window is available.
+
+ARGN sales pay 10% and ARGN purchases pay 0.5%. Both fees go to liquidity providers. The hook
+overrides the fee on every swap, including exact-output trades and swaps through other routers.
+Direction follows the ARGN token address regardless of currency ordering. There is no treasury
+deduction. The hook exposes the v3-compatible `observe()` interface used by the Rust oracle.
+
+The [deployment workspace](../deploy/README.md#stabilization-pool) prepares and publishes the hook,
+shared position subscriber, price quoter, pool initialization, and Argon registration call. Each
+user's NFT must still subscribe to the shared subscriber; pool publication does not enroll positions
+or seed liquidity.
 
 Configure both `ARGON_UNISWAP_ORACLE_ADDRESSES` and `ARGONOT_UNISWAP_ORACLE_ADDRESSES` with
 comma-separated observation contract addresses for the corresponding 18-decimal token paired with
@@ -378,3 +387,86 @@ restore previous sources, restore their address list and restart.
 The preferred window is one hour, with existing fallbacks to 30, 10, 5, and 1 minute when history is
 too young or has been overwritten. Until at least one window is available, that source cannot supply
 a price.
+
+## Uniswap v4 Price Quoter
+
+`UniswapV4PriceQuoter` extends the pinned periphery's `BaseV4Quoter` with the simulated post-swap
+price. It calls PoolManager's actual swap implementation, including the pool's hook and dynamic LP
+fee overrides, then reads the resulting slot0 before reverting the simulated changes. All pool,
+fee-growth and hook writes are rolled back, including when someone submits a quote as a transaction.
+
+Call it using `eth_call` (`simulateContract` in viem), with the standard
+`IV4Quoter.QuoteExactSingleParams`: `poolKey`, `zeroForOne`, `exactAmount`, and `hookData`.
+
+- `quoteExactInputSingle` returns `(amountOut, gasEstimate, sqrtPriceX96After)`.
+- `quoteExactOutputSingle` returns `(amountIn, gasEstimate, sqrtPriceX96After)`.
+
+Amounts are raw token base units. `sqrtPriceX96After` is the Q64.96 square root of raw currency1
+units per raw currency0 unit; account for token ordering and decimals when displaying price. The
+first two return values retain the standard v4 quoter's ordering. Quotes require the full specified
+input/output amount to be filled; native pool or hook failures are returned as
+`UnexpectedRevertBytes`, preserving their revert data. Multi-pool paths are outside this API.
+
+The constructor takes only the PoolManager address, so one quoter serves pools on that manager. It
+is separate from the hook: v4 skips hook callbacks when a hook initiates its own swap, which would
+skip our fee overrides. The deployment manifest includes it alongside the hook and subscriber, and
+the contract package exports its ABI and deployment artifact. The pallet does not depend on the
+quoter; checkpoints still authenticate Ethereum storage directly.
+
+## Uniswap purchases
+
+`ArgonBuyAndTransfer` buys canonical ARGN with USDC from one selected v4 pool through the deployed
+Universal Router 2.1.2, then calls `MintingGateway.burnFromSwap`. Its constructor reads the
+PoolManager from the router and stores it as an immutable, so swaps and observations use the same
+manager. The app selects the pool before the user signs.
+`buyAndTransfer(request, poolKey, hookData)` takes Uniswap's native `PoolKey`.
+
+The request contains the Argon recipient, maximum USDC input, minimum whole microgons out and an
+Ethereum timestamp deadline. The wrapper constructs a single exact-input swap, measures actual
+spend/output, returns unused USDC and fractional ARGN, and clears its router spending permissions.
+Pre-existing balances cannot satisfy the output minimum. Callers cannot supply arbitrary router
+commands, split routes, intermediate tokens or a different pool to observe. Uniswap handles swap
+execution, settlement and v4 hooks; there are no custom swap callbacks.
+
+The gateway enforces a minimum delivered ARGON amount through `minimumSwapMicrogons()`, defaulting
+to 100 ARGON (`100e6` microgons), including for existing proxies with unset configuration. The owner
+can change it with `setMinimumSwapMicrogons(...)` to any positive microgon amount. `burnFromSwap`
+checks actual whole microgons before burning; a smaller fill reverts the entire swap. The adapter
+reads the live gateway minimum at entry and rejects a lower `request.minMicrogonsOut` before moving
+USDC or calling Uniswap. Native swap slippage checks still enforce that requested output against the
+actual fill. There is no USDC spending floor. Ordinary transfers are unaffected, and this minimum is
+separate from Argon's reward eligibility rules.
+
+`TransferToArgonFromSwapStarted` commits buyer, Argon recipient, actual USDC spent, actual ARGN
+bought, `poolManager`, `poolId`, `sqrtPriceBeforeX96` and `sqrtPriceAfterX96` through the existing
+activity nonce/root. Prices remain native token1/token0 square-root prices; conversion to USD per
+ARGN accounts for token ordering, decimals and the historical USDC/USD price. The event data is 512
+bytes. No liquidity traversal or compact band summary is included.
+
+The planned reward basis is the positive difference between delivered ARGON valued at its
+purchase-time target and actual USD spent. The selected matching coefficient is 100% of that
+discount, with a frame payout budget capped at 90% of the smaller of its matching basis and
+available reserve. Buyers bid for a fraction of their match; awards are paid in ascending bid order.
+The plan retains four positive bid submissions. Transferred principal is released at the end of its
+sync frame, before bidding in the next frame; only awarded rewards remain unavailable for 30 days.
+Below target, prospective vault payouts fall linearly from 100% of normal returns at target to 20%
+at 10% below target, with a 20% floor deeper below target. The unpaid difference accumulates in the
+burned/unissued purchase reserve. The LP follow-on targets usable USDC liquidity within 90%–100% of
+target; purchase matching remains eligible below that range. LP protocol rewards also mature after
+30 days. Removing liquidity stops future accrual on the removed capacity and preserves earned
+rewards on their original maturity schedules, even after a position closes. These are follow-on
+Argon features; this contract only records purchase facts. No target feed is needed on Ethereum, and
+no exact below-target fill quantity is claimed.
+
+There is no Ethereum reward-pool allowlist. Reward eligibility belongs on Argon, where the pool can
+be checked against the eligible set without preventing purchases through other canonical pools.
+Reward funding, holds and payouts remain follow-on work; recording the evidence does not grant a
+reward. Pool selection is per purchase, so deployment requires no existing pool or oracle hook.
+
+The Argon runtime emits `TransferToArgonFromSwapSettled` with the amounts, pool identity,
+before/after prices and purchase tick. The gateway sets the purchase timestamp from Ethereum's
+`block.timestamp` and commits it in the activity payload. Both receipt and storage proofs therefore
+preserve the purchase time even when later Ethereum state authenticates an older locator. Both proof
+paths share nonce tracking and retries, without updating operational transfer totals or callbacks.
+Storage proofs avoid carrying a full Uniswap receipt when its other logs exceed the receipt-proof
+node bound.

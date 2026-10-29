@@ -252,7 +252,7 @@ export default class TestEthereum implements ITeardownable {
     const bootstrapImplementationAddress = await deployContract(walletClient, publicClient, {
       abi: mintingGatewayArtifact.abi,
       bytecode: mintingGatewayArtifact.bytecode,
-      args: [zeroAddress, zeroAddress],
+      args: [zeroAddress, zeroAddress, zeroAddress],
     });
     const initializeData = encodeFunctionData({
       abi: mintingGatewayArtifact.abi,
@@ -290,7 +290,7 @@ export default class TestEthereum implements ITeardownable {
     const finalImplementationAddress = await deployContract(walletClient, publicClient, {
       abi: mintingGatewayArtifact.abi,
       bytecode: mintingGatewayArtifact.bytecode,
-      args: [argonTokenAddress, argonotTokenAddress],
+      args: [argonTokenAddress, argonotTokenAddress, zeroAddress],
     });
     const upgradeHash = await walletClient.sendTransaction({
       to: proxyAdminAddress,

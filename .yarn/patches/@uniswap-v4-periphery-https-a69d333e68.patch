@@ -1,0 +1,13 @@
+diff --git a/remappings.txt b/remappings.txt
+index 822fdd158196f14abb6c714f7a993a934a7f18ad..1613a2d5ac4c0ecc0d0c6bf7985ceed9ccf3bc68 100644
+--- a/remappings.txt
++++ b/remappings.txt
+@@ -1,5 +1,6 @@
+-@uniswap/v4-core/=lib/v4-core/
++@uniswap/v4-core/=node_modules/@uniswap/v4-core/
+ ds-test/=lib/v4-core/lib/forge-std/lib/ds-test/src/
+ forge-std/=lib/v4-core/lib/forge-std/src/
+ openzeppelin-contracts/=lib/v4-core/lib/openzeppelin-contracts/
+-solmate/=lib/v4-core/lib/solmate/
++solmate/=node_modules/@uniswap/v4-core/lib/solmate/
++permit2/=node_modules/@uniswap/permit2/

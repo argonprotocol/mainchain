@@ -898,6 +898,7 @@ dependencies = [
  "pallet-notebook",
  "pallet-operational-accounts",
  "pallet-price-index",
+ "pallet-stabilizer-pools",
  "pallet-ticks",
  "pallet-treasury 1.5.2",
  "pallet-treasury-positions",
@@ -1249,6 +1250,7 @@ dependencies = [
  "pallet-operational-accounts",
  "pallet-prelude",
  "pallet-price-index",
+ "pallet-stabilizer-pools",
  "pallet-ticks",
  "pallet-treasury 1.5.2",
  "pallet-treasury-positions",
@@ -11144,6 +11146,7 @@ dependencies = [
  "parity-scale-codec",
  "polkadot-sdk",
  "scale-info",
+ "serde_json",
 ]
 
 [[package]]
@@ -12369,6 +12372,23 @@ dependencies = [
  "sp-arithmetic",
  "sp-io",
  "sp-runtime",
+]
+
+[[package]]
+name = "pallet-stabilizer-pools"
+version = "1.5.2"
+dependencies = [
+ "alloy-consensus",
+ "alloy-primitives",
+ "alloy-rlp",
+ "alloy-sol-types",
+ "alloy-trie",
+ "argon-primitives",
+ "pallet-ethereum-verifier",
+ "pallet-prelude",
+ "parity-scale-codec",
+ "polkadot-sdk",
+ "scale-info",
 ]
 
 [[package]]

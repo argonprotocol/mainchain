@@ -66,7 +66,7 @@ pub struct GatewayActivityStorageProof<MaxActivityLogs: Get<u32>> {
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
-	use alloc::vec::Vec;
+	use alloc::{boxed::Box, vec::Vec};
 	use argon_primitives::{
 		block_seal::{BlockSealAuthorityId, FrameId},
 		ethereum::{
@@ -169,8 +169,8 @@ pub mod pallet {
 		/// Runtime tick provider used for transfer age checks.
 		type CurrentTick: Get<Tick>;
 
-		/// Runtime tick provider used to convert verified Ethereum header timestamps into local
-		/// tick age.
+		/// Runtime tick provider used to convert authenticated Ethereum purchase timestamps into
+		/// local tick age.
 		type TickProvider: TickProvider<Self::Block>;
 
 		/// Maximum number of ordered gateway activities that may share one receipt proof.
@@ -436,6 +436,21 @@ pub mod pallet {
 		/// Amount transferred for this activity.
 		#[codec(compact)]
 		pub amount: T::Balance,
+	}
+
+	#[derive(
+		Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen,
+	)]
+	pub struct SwapPurchaseEvidence {
+		pub usdc_token: H160,
+		pub usdc_spent: U256,
+		pub argon_bought: U256,
+		pub pool_manager: H160,
+		pub pool_id: H256,
+		/// Native token1/token0 square-root price before the swap, scaled by 2^96.
+		pub sqrt_price_before_x96: U256,
+		/// Native token1/token0 square-root price after the swap, scaled by 2^96.
+		pub sqrt_price_after_x96: U256,
 	}
 
 	#[derive(
@@ -1095,6 +1110,13 @@ pub mod pallet {
 		TransferOutCanceled { source_chain: SourceChain, transfer_id: H256 },
 		/// A pending collateral reservation was invalidated.
 		TransferCollateralInvalidated { transfer_id: H256, destination_signing_key: H160 },
+		/// A Uniswap purchase was credited without operational transfer credit.
+		TransferToArgonFromSwapSettled {
+			source_chain: SourceChain,
+			transfer: TransferToArgonActivity<T>,
+			purchase: Box<SwapPurchaseEvidence>,
+			purchase_tick: Tick,
+		},
 	}
 
 	#[pallet::error]
@@ -1714,16 +1736,10 @@ pub mod pallet {
 			let ChainConfig::Evm { gateway, .. } = &chain_config;
 			T::EthereumVerifier::verify_account_storage_proof(*gateway, &proof.storage_proof)
 				.map_err(|_| Error::<T>::InvalidProof)?;
-			let activities = proof
-				.activity_logs
-				.iter()
-				.map(|log| Self::decode_evm_gateway_activity(&chain_config, log))
-				.collect();
 			let block = Self::validate_gateway_activity_locator(
 				&chain_config,
 				previous_gateway_activity_nonce,
 				&proof,
-				activities,
 			)?;
 			Self::apply_gateway_activity_blocks(source_chain, current_gateway_state, [block])
 		}

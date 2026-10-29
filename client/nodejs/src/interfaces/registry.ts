@@ -182,6 +182,7 @@ import type {
   PalletCrosschainTransferMintingAuthorityState,
   PalletCrosschainTransferSourceChain,
   PalletCrosschainTransferSourceChainCirculation,
+  PalletCrosschainTransferSwapPurchaseEvidence,
   PalletCrosschainTransferTransferOutMintingAuthorityTransferReservation,
   PalletCrosschainTransferTransferOutPendingCollateralizationRequest,
   PalletCrosschainTransferTransferOutTransferOutOfArgon,
@@ -270,6 +271,15 @@ import type {
   PalletProxyError,
   PalletProxyEvent,
   PalletProxyProxyDefinition,
+  PalletStabilizerPoolsCall,
+  PalletStabilizerPoolsCheckpointOutcome,
+  PalletStabilizerPoolsError,
+  PalletStabilizerPoolsEvent,
+  PalletStabilizerPoolsPoolConfig,
+  PalletStabilizerPoolsPoolKey,
+  PalletStabilizerPoolsPositionCheckpoint,
+  PalletStabilizerPoolsPositionProof,
+  PalletStabilizerPoolsProofBlock,
   PalletSudoCall,
   PalletSudoError,
   PalletSudoEvent,
@@ -517,6 +527,7 @@ declare module '@polkadot/types/types/registry' {
     PalletCrosschainTransferMintingAuthorityState: PalletCrosschainTransferMintingAuthorityState;
     PalletCrosschainTransferSourceChain: PalletCrosschainTransferSourceChain;
     PalletCrosschainTransferSourceChainCirculation: PalletCrosschainTransferSourceChainCirculation;
+    PalletCrosschainTransferSwapPurchaseEvidence: PalletCrosschainTransferSwapPurchaseEvidence;
     PalletCrosschainTransferTransferOutMintingAuthorityTransferReservation: PalletCrosschainTransferTransferOutMintingAuthorityTransferReservation;
     PalletCrosschainTransferTransferOutPendingCollateralizationRequest: PalletCrosschainTransferTransferOutPendingCollateralizationRequest;
     PalletCrosschainTransferTransferOutTransferOutOfArgon: PalletCrosschainTransferTransferOutTransferOutOfArgon;
@@ -605,6 +616,15 @@ declare module '@polkadot/types/types/registry' {
     PalletProxyError: PalletProxyError;
     PalletProxyEvent: PalletProxyEvent;
     PalletProxyProxyDefinition: PalletProxyProxyDefinition;
+    PalletStabilizerPoolsCall: PalletStabilizerPoolsCall;
+    PalletStabilizerPoolsCheckpointOutcome: PalletStabilizerPoolsCheckpointOutcome;
+    PalletStabilizerPoolsError: PalletStabilizerPoolsError;
+    PalletStabilizerPoolsEvent: PalletStabilizerPoolsEvent;
+    PalletStabilizerPoolsPoolConfig: PalletStabilizerPoolsPoolConfig;
+    PalletStabilizerPoolsPoolKey: PalletStabilizerPoolsPoolKey;
+    PalletStabilizerPoolsPositionCheckpoint: PalletStabilizerPoolsPositionCheckpoint;
+    PalletStabilizerPoolsPositionProof: PalletStabilizerPoolsPositionProof;
+    PalletStabilizerPoolsProofBlock: PalletStabilizerPoolsProofBlock;
     PalletSudoCall: PalletSudoCall;
     PalletSudoError: PalletSudoError;
     PalletSudoEvent: PalletSudoEvent;

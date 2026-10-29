@@ -2,7 +2,8 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, relative, resolve } from 'node:path';
 
 import { Interface, getAddress } from 'ethers';
-import { getOptionalArg, parseArgs, stringifyJson } from './src/cli.js';
+import { getOptionalArg, getRequiredArg, parseArgs, stringifyJson } from './src/cli.js';
+import { deployBuyAndTransfer } from './src/purchase.js';
 import { contractsRoot, repoRoot } from './src/hardhat.js';
 
 const args = parseArgs(process.argv.slice(2));
@@ -25,8 +26,6 @@ async function main() {
   const proxyAdminAddress = getRequiredContractAddress(manifest, 'mintingGatewayProxyAdmin');
   const argonTokenAddress = getRequiredContractAddress(manifest, 'argonToken');
   const argonotTokenAddress = getRequiredContractAddress(manifest, 'argonotToken');
-  const previousImplementationAddress =
-    manifest.contracts?.mintingGatewayImplementationFinal?.address ?? null;
   const { network } = await import('hardhat');
   const connection = await network.create(networkName);
 
@@ -44,10 +43,40 @@ async function main() {
       );
     }
 
+    const implementationSlot = '0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc';
+    const previousImplementationAddress = getAddress(
+      `0x${(await ethers.provider.getStorage(gatewayProxyAddress, implementationSlot)).slice(-40)}`,
+    );
+
+    let purchase;
+    const purchaseConfigPath = getOptionalArg(args, 'purchase-config');
+    if (purchaseConfigPath) {
+      if (getOptionalArg(args, 'swap-contract'))
+        throw new Error('Choose --purchase-config or --swap-contract');
+      purchase = await deployBuyAndTransfer(
+        ethers,
+        gatewayProxyAddress,
+        argonTokenAddress,
+        resolve(repoRoot, purchaseConfigPath),
+      );
+    }
+    const swapContractAddress =
+      purchase?.address ?? getAddress(getRequiredArg(args, 'swap-contract'));
+    if (swapContractAddress !== ethers.ZeroAddress) {
+      const swap = await ethers.getContractAt('ArgonBuyAndTransfer', swapContractAddress);
+      if (
+        (await swap.getFunction('gateway')()) !== gatewayProxyAddress ||
+        (await swap.getFunction('argon')()) !== argonTokenAddress
+      ) {
+        throw new Error('Purchase contract does not match the gateway and canonical ARGN');
+      }
+    }
+
     const gatewayFactory = await ethers.getContractFactory('MintingGateway');
     const gatewayImplementation = await gatewayFactory.deploy(
       argonTokenAddress,
       argonotTokenAddress,
+      swapContractAddress,
     );
     await gatewayImplementation.waitForDeployment();
 
@@ -71,15 +100,16 @@ async function main() {
         previousImplementationAddress,
       },
       contracts: {
+        argonBuyAndTransfer: purchase,
         mintingGatewayImplementationFinal: {
           address: nextImplementationAddress,
-          constructorArgs: [argonTokenAddress, argonotTokenAddress],
+          constructorArgs: [argonTokenAddress, argonotTokenAddress, swapContractAddress],
           deploymentTxHash: gatewayImplementation.deploymentTransaction()?.hash ?? null,
         },
       },
       safeTransactions: [
         {
-          description: 'Upgrade MintingGateway proxy to the activity-root implementation',
+          description: 'Upgrade MintingGateway with the explicitly selected purchase authority',
           target: proxyAdminAddress,
           value: '0',
           data: proxyAdminInterface.encodeFunctionData('upgradeAndCall', [
