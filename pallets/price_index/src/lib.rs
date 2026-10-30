@@ -3,7 +3,8 @@
 extern crate alloc;
 use pallet_prelude::*;
 
-use argon_primitives::{block_seal::FrameId, ArgonCPI};
+pub use argon_primitives::PriceIndex;
+use argon_primitives::{block_seal::FrameId, ArgonCPI, PriceIndexUpdated};
 pub use pallet::*;
 pub use weights::WeightInfo;
 
@@ -16,63 +17,6 @@ pub mod weights;
 
 #[cfg(test)]
 mod mock;
-
-#[derive(
-	Encode,
-	Decode,
-	DecodeWithMemTracking,
-	Eq,
-	PartialEq,
-	Clone,
-	Copy,
-	Ord,
-	PartialOrd,
-	Debug,
-	TypeInfo,
-	MaxEncodedLen,
-)]
-pub struct PriceIndex {
-	/// Bitcoin to usd price in cents
-	#[codec(compact)]
-	pub btc_usd_price: FixedU128,
-	/// Price of argon ownership tokens (argonot) in usd cents
-	pub argonot_usd_price: FixedU128,
-	/// Argon to usd price in cents
-	#[codec(compact)]
-	pub argon_usd_price: FixedU128,
-	/// The target price for argon based on inflation since start
-	pub argon_usd_target_price: FixedU128,
-	/// The argon liquidity in the pool
-	pub argon_time_weighted_average_liquidity: Balance,
-	/// Tick of price index
-	#[codec(compact)]
-	pub tick: Tick,
-}
-
-impl PriceIndex {
-	pub fn argon_cpi(&self) -> ArgonCPI {
-		// if the difference is less than 0.001, treat it as normal market slippage/noise
-		let fixed_i_argon_usd_price =
-			FixedI128::from_inner(self.argon_usd_price.into_inner() as i128);
-		let fixed_i_argon_usd_target_price =
-			FixedI128::from_inner(self.argon_usd_target_price.into_inner() as i128);
-		if (fixed_i_argon_usd_price - fixed_i_argon_usd_target_price).saturating_abs() <
-			FixedI128::from_rational(1, 1000)
-		{
-			return ArgonCPI::zero();
-		}
-		let ratio = fixed_i_argon_usd_target_price
-			.checked_div(&fixed_i_argon_usd_price)
-			.unwrap_or(FixedI128::one());
-		ratio - FixedI128::one()
-	}
-
-	pub fn redemption_r_value(&self) -> FixedU128 {
-		self.argon_usd_price
-			.checked_div(&self.argon_usd_target_price)
-			.unwrap_or(FixedU128::one())
-	}
-}
 
 #[derive(
 	Encode,
@@ -180,7 +124,7 @@ pub mod pallet {
 
 	use super::*;
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(2);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -192,6 +136,9 @@ pub mod pallet {
 	pub trait Config: polkadot_sdk::frame_system::Config {
 		/// Weight information for the extrinsics in this module.
 		type WeightInfo: WeightInfo;
+
+		/// Consumers own any policy-specific price history.
+		type OnPriceIndexUpdated: PriceIndexUpdated;
 
 		type Currency: Inspect<Self::AccountId, Balance = Self::Balance>;
 
@@ -267,6 +214,8 @@ pub mod pallet {
 		MaxPriceChangePerTickExceeded,
 		/// Ethereum prices must be non-zero and correspond to the submitted price-index tick.
 		InvalidEthereumPrices,
+		/// A supplied USDC observation must be positive and no later than the current tick.
+		InvalidUsdcPrice,
 	}
 
 	/// Stores the active price index
@@ -336,6 +285,9 @@ pub mod pallet {
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+		fn on_runtime_upgrade() -> Weight {
+			migrations::add_usdc::<T>()
+		}
 		fn on_initialize(_: BlockNumberFor<T>) -> Weight {
 			let prev_tick = T::CurrentTick::get();
 			let new_frame_id = T::MiningFrameTransitionProvider::is_new_frame_started();
@@ -361,7 +313,7 @@ pub mod pallet {
 	impl<T: Config> Pallet<T> {
 		/// Submit the latest price index. Only valid for the configured operator account
 		#[pallet::call_index(0)]
-		#[pallet::weight((T::WeightInfo::submit(), DispatchClass::Operational))]
+		#[pallet::weight((T::WeightInfo::submit().saturating_add(T::OnPriceIndexUpdated::on_price_index_weight()), DispatchClass::Operational))]
 		#[pallet::feeless_if(
 			|origin: &OriginFor<T>, _index: &PriceIndex, _ethereum: &Option<EthereumPriceIndex>| -> bool {
 				let Ok(who) = ensure_signed(origin.clone()) else {
@@ -388,7 +340,12 @@ pub mod pallet {
 				Error::<T>::InvalidEthereumPrices,
 			);
 
-			let oldest_age = T::CurrentTick::get().saturating_sub(T::MaxPriceAgeInTicks::get());
+			let now = T::CurrentTick::get();
+			if let Some(usdc) = index.usdc_usd_price {
+				ensure!(!usdc.is_zero(), Error::<T>::InvalidUsdcPrice);
+				ensure!(index.tick <= now, Error::<T>::InvalidUsdcPrice);
+			}
+			let oldest_age = now.saturating_sub(T::MaxPriceAgeInTicks::get());
 
 			if index.tick < oldest_age {
 				return Ok(());
@@ -403,6 +360,7 @@ pub mod pallet {
 			}
 
 			Current::<T>::put(index);
+			T::OnPriceIndexUpdated::on_price_index(&index);
 			let frame_id = T::MiningFrameTransitionProvider::is_new_frame_started()
 				.unwrap_or_else(T::CurrentFrameId::get);
 			if let Some(ethereum) = ethereum {

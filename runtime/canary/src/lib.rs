@@ -134,6 +134,8 @@ mod runtime {
 	pub type Bootstrap = pallet_bootstrap;
 	#[runtime::pallet_index(38)]
 	pub type TreasuryPositions = pallet_treasury_positions;
+	#[runtime::pallet_index(39)]
+	pub type StabilizerBuys = pallet_stabilizer_buys;
 }
 
 argon_runtime_common::inject_runtime_vars!();
@@ -505,6 +507,7 @@ impl pallet_mining_slot::Config for Runtime {
 			GrandpaSlotRotation,
 			BlockRewards,
 			Treasury,
+			StabilizerBuys,
 			Vaults,
 			CrosschainTransfer,
 			OperationalAccounts
@@ -637,7 +640,33 @@ impl pallet_proxy::Config for Runtime {
 	type BlockNumberProvider = frame_system::Pallet<Runtime>;
 }
 
+impl pallet_stabilizer_buys::Config for Runtime {
+	type Currency = Balances;
+	type MiningFrameTransitionProvider = MiningSlot;
+	type CurrentTick = Ticks;
+	type MaxRecentPriceTicks = ConstU32<360>;
+	type PriceHistoryBucketTicks = ConstU64<60>;
+	type MaxHourlyPriceReferences = ConstU32<720>;
+	type MaxCurrentHourPriceAgeTicks = ConstU64<10>;
+	type TreasuryRewardProvider =
+		use_unless_benchmark!(Treasury, benchmarking::BenchmarkTreasuryRewardProvider);
+	type MaxPrincipalPayouts = ConstU32<16>;
+	type MaxPayoutsPerBlock = ConstU32<4>;
+	type MaxPositiveBids = ConstU8<4>;
+	type AuctionBudgetPercent = PurchaseAuctionBudgetPercent;
+	type RewardMaturityTicks = ConstU64<{ 30 * 1440 }>;
+	type WeightInfo = pallet_stabilizer_buys::weights::WithProviderWeights<
+		Runtime,
+		weights::pallet_stabilizer_buys::WeightInfo<Runtime>,
+	>;
+}
+
+parameter_types! {
+	pub const PurchaseAuctionBudgetPercent: Percent = Percent::from_percent(90);
+}
+
 impl pallet_price_index::Config for Runtime {
+	type OnPriceIndexUpdated = use_unless_benchmark!(StabilizerBuys, ());
 	type WeightInfo = weights::pallet_price_index::WeightInfo<Runtime>;
 	type Currency = Balances;
 	type Balance = Balance;
@@ -761,6 +790,7 @@ impl pallet_transaction_payment::Config for Runtime {
 }
 
 impl pallet_crosschain_transfer::Config for Runtime {
+	type UniswapPurchaseProvider = use_unless_benchmark!(StabilizerBuys, ());
 	type Balance = Balance;
 	type EthereumBurnAccount = CrosschainTransferEthereumBurnAccount;
 	type NativeCurrency = Balances;

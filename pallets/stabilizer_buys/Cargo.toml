@@ -1,0 +1,52 @@
+[package]
+name = "pallet-stabilizer-buys"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+publish = false
+
+[dependencies]
+pallet-mining-slot = { workspace = true, optional = true }
+pallet-ticks = { workspace = true, optional = true }
+codec = { workspace = true }
+scale-info = { workspace = true }
+polkadot-sdk = { workspace = true, features = ["frame-support", "frame-system", "sp-runtime", "sp-core"] }
+pallet-prelude = { workspace = true }
+argon-primitives = { workspace = true }
+
+[dev-dependencies]
+pallet-price-index = { workspace = true, default-features = true }
+polkadot-sdk = { workspace = true, features = ["sp-io", "pallet-balances"], default-features = true }
+pallet-prelude = { workspace = true, features = ["test"], default-features = true }
+
+[features]
+default = [ "std" ]
+std = [
+	"argon-primitives/std",
+	"codec/std",
+	"pallet-mining-slot?/std",
+	"pallet-prelude/std",
+	"pallet-ticks?/std",
+	"polkadot-sdk/std",
+	"scale-info/std",
+]
+runtime-benchmarks = [
+	"argon-primitives/runtime-benchmarks",
+	"dep:pallet-mining-slot",
+	"dep:pallet-ticks",
+	"pallet-mining-slot/runtime-benchmarks",
+	"pallet-prelude/runtime-benchmarks",
+	"pallet-ticks/runtime-benchmarks",
+	"polkadot-sdk/frame-benchmarking",
+	"polkadot-sdk/runtime-benchmarks",
+]
+try-runtime = [
+	"pallet-mining-slot?/try-runtime",
+	"pallet-ticks?/try-runtime",
+	"polkadot-sdk/try-runtime",
+]

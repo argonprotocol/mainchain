@@ -4,7 +4,7 @@ use clap::ValueEnum;
 use polkadot_sdk::*;
 use reqwest::Client;
 use serde::Deserialize;
-use sp_runtime::{traits::One, FixedU128};
+use sp_runtime::FixedU128;
 use std::{collections::HashMap, time::Duration};
 use tokio::{join, task::JoinSet, time::Instant};
 
@@ -57,12 +57,6 @@ impl CoinUsdPriceLookup {
 			let upper = values[middle_index].into_inner();
 			Some(FixedU128::from_inner((lower + upper) / 2))
 		}
-	}
-
-	fn default_usdc_when_missing() -> FixedU128 {
-		// USDC is expected to be near $1.00; if we can't fetch it, we assume the peg rather than
-		// dividing by zero.
-		FixedU128::one()
 	}
 
 	pub async fn get_latest_prices(&mut self) -> Result<PriceLookups> {
@@ -128,8 +122,7 @@ impl CoinUsdPriceLookup {
 		let median_btc = Self::median_fixed(&mut bitcoin_values)
 			.ok_or_else(|| anyhow!("No bitcoin prices available from any provider"))?;
 		let median_ethereum = Self::median_fixed(&mut ethereum_values);
-		let median_usdc =
-			Self::median_fixed(&mut usdc_values).unwrap_or_else(Self::default_usdc_when_missing);
+		let median_usdc = Self::median_fixed(&mut usdc_values);
 
 		let latest =
 			PriceLookups { bitcoin: median_btc, ethereum: median_ethereum, usdc: median_usdc };
@@ -270,7 +263,7 @@ impl CoinUsdPriceLookup {
 pub struct PriceLookups {
 	pub bitcoin: FixedU128,
 	pub ethereum: Option<FixedU128>,
-	pub usdc: FixedU128,
+	pub usdc: Option<FixedU128>,
 }
 
 struct PriceLookupMaybe {
@@ -343,8 +336,8 @@ mod tests {
 			.unwrap();
 		assert!(price_lookups.bitcoin > FixedU128::from_float(30_000.0));
 		assert!(price_lookups.ethereum.unwrap() > FixedU128::from_float(100.0));
-		assert!(price_lookups.usdc > FixedU128::from_float(0.9));
-		assert!(price_lookups.usdc < FixedU128::from_float(1.1));
+		assert!(price_lookups.usdc.unwrap() > FixedU128::from_float(0.9));
+		assert!(price_lookups.usdc.unwrap() < FixedU128::from_float(1.1));
 	}
 
 	#[tokio::test]

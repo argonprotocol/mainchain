@@ -47,6 +47,8 @@ alloy-provider = { workspace = true }
 alloy-sol-types = { workspace = true }
 
 [dev-dependencies]
+codec = { workspace = true }
+scale-info = { workspace = true }
 jsonrpsee = { workspace = true, features = ["server"] }
 env_logger = { workspace = true }
 polkadot-sdk = { workspace = true, features = ["sp-keyring", "sp-keystore"], default-features = true }

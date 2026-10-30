@@ -21,16 +21,20 @@ use crate::{
 use argon_client::{
 	api::{
 		constants,
-		runtime_types::pallet_price_index::{
-			EthereumPriceIndex as ApiEthereumPriceIndex, PriceIndex as ApiPriceIndex,
+		runtime_types::{
+			argon_primitives::price_index::PriceIndex as ApiPriceIndex,
+			pallet_price_index::EthereumPriceIndex as ApiEthereumPriceIndex,
 		},
-		storage, tx,
+		storage,
 	},
 	conversion::{from_api_fixed_u128, to_api_fixed_u128},
 	signer::{KeystoreSigner, Signer},
-	FetchAt, MainchainClient, ReconnectingClient,
+	MainchainClient, ReconnectingClient,
 };
-use argon_primitives::prelude::{sp_arithmetic::FixedPointNumber, Tick};
+use argon_primitives::{
+	prelude::{sp_arithmetic::FixedPointNumber, Tick},
+	PriceIndex as ChainPriceIndex,
+};
 
 fn fixed_u128_from_float<'de, D>(deserializer: D) -> Result<FixedU128, D::Error>
 where
@@ -38,6 +42,13 @@ where
 {
 	let value = f64::deserialize(deserializer)?;
 	Ok(FixedU128::from_float(value))
+}
+
+fn optional_fixed_u128_from_float<'de, D>(deserializer: D) -> Result<Option<FixedU128>, D::Error>
+where
+	D: Deserializer<'de>,
+{
+	Ok(Option::<f64>::deserialize(deserializer)?.map(FixedU128::from_float))
 }
 
 #[derive(Serialize, Deserialize, Debug, Clone)]
@@ -51,6 +62,9 @@ pub struct PriceIndex {
 	pub argonot_usd_price: FixedU128,
 	#[serde(deserialize_with = "fixed_u128_from_float")]
 	pub btc_usd_price: FixedU128,
+	/// Observed USDC/USD; missing observations must not publish an assumed peg.
+	#[serde(default, deserialize_with = "optional_fixed_u128_from_float")]
+	pub usdc_usd_price: Option<FixedU128>,
 	#[serde(default)]
 	pub ethereum: Option<EthereumPriceIndex>,
 }
@@ -87,9 +101,7 @@ pub async fn price_index_loop(
 			.map_err(|e| anyhow!("Unable to synchronize time {e:?}"))?;
 	}
 
-	let last_price = mainchain_client
-		.fetch_storage(&storage().price_index().current(), FetchAt::Best)
-		.await?;
+	let last_price = latest_price_index(&mainchain_client).await?;
 
 	let constants_client = mainchain_client.live.constants();
 
@@ -105,12 +117,10 @@ pub async fn price_index_loop(
 	let mut last_attempted_tick = last_price.as_ref().map(|a| a.tick).unwrap_or(0);
 	let mut last_target_price = last_price
 		.as_ref()
-		.map(|a| from_api_fixed_u128(a.argon_usd_target_price.clone()))
+		.map(|a| a.argon_usd_target_price)
 		.unwrap_or(FixedU128::one());
-	let last_argonot_price = last_price
-		.as_ref()
-		.map(|a| from_api_fixed_u128(a.argonot_usd_price.clone()))
-		.unwrap_or(FixedU128::zero());
+	let last_argonot_price =
+		last_price.as_ref().map(|a| a.argonot_usd_price).unwrap_or(FixedU128::zero());
 
 	let mut min_sleep_duration = Duration::from_millis(ticker.tick_duration_millis)
 		.saturating_sub(Duration::from_secs(10))
@@ -151,6 +161,8 @@ pub async fn price_index_loop(
 				continue;
 			},
 		};
+		// Preserve the existing market-price fallback, without publishing it as an observation.
+		let usdc_usd_price = usd_price_lookup.usdc.unwrap_or_else(FixedU128::one);
 		let us_cpi_ratio = us_cpi.get_us_cpi_ratio(tick);
 		let target_price = argon_price_lookup.get_target_price(us_cpi_ratio).clamp(
 			last_target_price.saturating_sub(max_argon_target_change_per_tick),
@@ -160,7 +172,7 @@ pub async fn price_index_loop(
 			argon_price_lookup.get_latest_price_and_liquidity(
 				tick,
 				max_argon_change_per_tick_away_from_target,
-				usd_price_lookup.usdc,
+				usdc_usd_price,
 			),
 			ethereum_gas_price_lookup.get_gas_price(),
 		);
@@ -190,9 +202,7 @@ pub async fn price_index_loop(
 				},
 		};
 
-		let argonot_price_lookup = match argonot_price_lookup
-			.get_latest_price(usd_price_lookup.usdc)
-			.await
+		let argonot_price_lookup = match argonot_price_lookup.get_latest_price(usdc_usd_price).await
 		{
 			Ok(x) => x,
 			Err(e) =>
@@ -254,6 +264,7 @@ pub async fn price_index_loop(
 				argon_time_weighted_average_liquidity: argon_liquidity,
 				argonot_usd_price,
 				btc_usd_price: bitcoin_usd_price,
+				usdc_usd_price: usd_price_lookup.usdc,
 				ethereum,
 			},
 		)
@@ -282,9 +293,7 @@ pub async fn price_index_loop_from_file(
 	);
 
 	let ticker = mainchain_client.lookup_ticker().await?;
-	let last_price = mainchain_client
-		.fetch_storage(&storage().price_index().current(), FetchAt::Best)
-		.await?;
+	let last_price = latest_price_index(&mainchain_client).await?;
 
 	let mut last_submitted_tick = last_price.as_ref().map(|a| a.tick).unwrap_or(0);
 
@@ -328,6 +337,15 @@ pub async fn price_index_loop_from_file(
 	}
 }
 
+// Storage changed when USDC joined the index. Read both supported native layouts during rollout.
+async fn latest_price_index(client: &MainchainClient) -> anyhow::Result<Option<ChainPriceIndex>> {
+	let at = client.live.storage().at(client.best_block_hash().await?);
+	let key = storage().price_index().current().to_root_bytes();
+	let Some(bytes) = at.fetch_raw(key).await? else { return Ok(None) };
+	let index = ChainPriceIndex::decode_compatible(&bytes)?;
+	Ok(Some(index))
+}
+
 async fn submit_price_index(
 	reconnecting_client: &mut ReconnectingClient,
 	signer: &KeystoreSigner,
@@ -353,14 +371,16 @@ async fn submit_price_index(
 		argon_time_weighted_average_liquidity: price.argon_time_weighted_average_liquidity,
 		argonot_usd_price: to_api_fixed_u128(price.argonot_usd_price),
 		btc_usd_price: to_api_fixed_u128(price.btc_usd_price),
+		usdc_usd_price: price.usdc_usd_price.map(to_api_fixed_u128),
 	};
 	let ethereum = price.ethereum.map(|ethereum| ApiEthereumPriceIndex {
 		ethereum_usd_price: to_api_fixed_u128(ethereum.ethereum_usd_price),
 		ethereum_gas_price_wei: ethereum.ethereum_gas_price_wei,
 		tick,
 	});
+	// Encode by the connected runtime's field metadata across the oracle rollout.
 	let price_index: Box<dyn subxt::tx::Payload + Send + Sync> = if supports_ethereum_prices {
-		Box::new(tx().price_index().submit(index, ethereum))
+		Box::new(subxt::tx::DefaultPayload::new("PriceIndex", "submit", (index, ethereum)))
 	} else {
 		Box::new(subxt::tx::DefaultPayload::new("PriceIndex", "submit", (index,)))
 	};
@@ -508,7 +528,7 @@ mod tests {
 		use_mock_price_lookups(PriceLookups {
 			bitcoin: FixedU128::from_float(62_000.23),
 			ethereum: None,
-			usdc: FixedU128::from_float(1.0),
+			usdc: Some(FixedU128::from_float(1.0)),
 		});
 		use_mock_cpi_values(vec![0.2, 0.1, -0.1, 0.3]).await;
 		let signer = KeystoreSigner::new(keystore.into(), account_id, CryptoType::Sr25519);
@@ -539,6 +559,8 @@ mod tests {
 		oracle_task.abort();
 		rpc_handle.stop().unwrap();
 		assert!(counter >= 3);
+		let published = super::latest_price_index(&node.client).await.unwrap().unwrap();
+		assert_eq!(published.usdc_usd_price, Some(FixedU128::from_u32(1)));
 	}
 
 	#[test]
@@ -556,18 +578,57 @@ mod tests {
 	}
 
 	#[test]
-	fn file_prices_remain_compatible_without_ethereum_fields() {
-		let price: super::PriceIndex = serde_json::from_str(
-			r#"{
-				"argon_usd_target_price": 1.0,
-				"argon_usd_price": 1.0,
-				"argon_time_weighted_average_liquidity": 100000000,
-				"argonot_usd_price": 2.0,
-				"btc_usd_price": 62000.0
-			}"#,
-		)
-		.unwrap();
+	fn submitted_indices_encode_against_both_native_storage_versions() {
+		use argon_primitives::{price_index::PriceIndexV1, PriceIndex as NativeIndex};
+		use codec::Encode;
+		use subxt::ext::scale_encode::EncodeAsType;
+		let old = PriceIndexV1 {
+			btc_usd_price: FixedU128::from_u32(60_000),
+			argonot_usd_price: FixedU128::from_u32(2),
+			argon_usd_price: FixedU128::from_rational(98, 100),
+			argon_usd_target_price: FixedU128::from_u32(1),
+			argon_time_weighted_average_liquidity: 100_000,
+			tick: 10,
+		};
+		let current =
+			NativeIndex { usdc_usd_price: Some(FixedU128::from_rational(99, 100)), ..old.into() };
+		let submitted = super::ApiPriceIndex {
+			btc_usd_price: super::to_api_fixed_u128(current.btc_usd_price),
+			argonot_usd_price: super::to_api_fixed_u128(current.argonot_usd_price),
+			argon_usd_price: super::to_api_fixed_u128(current.argon_usd_price),
+			argon_usd_target_price: super::to_api_fixed_u128(current.argon_usd_target_price),
+			argon_time_weighted_average_liquidity: current.argon_time_weighted_average_liquidity,
+			tick: current.tick,
+			usdc_usd_price: current.usdc_usd_price.map(super::to_api_fixed_u128),
+		};
+		let mut registry = scale_info::Registry::new();
+		let old_type = registry.register_type(&scale_info::meta_type::<PriceIndexV1>());
+		let current_type = registry.register_type(&scale_info::meta_type::<NativeIndex>());
+		let registry: scale_info::PortableRegistry = registry.into();
+		assert_eq!(submitted.encode_as_type(old_type.id, &registry).unwrap(), old.encode());
+		assert_eq!(submitted.encode_as_type(current_type.id, &registry).unwrap(), current.encode());
+	}
 
-		assert!(price.ethereum.is_none());
+	#[test]
+	fn file_prices_distinguish_observed_usdc_from_missing_prices() {
+		let mut json = serde_json::json!({
+			"argon_usd_target_price": 1.0,
+			"argon_usd_price": 1.0,
+			"argon_time_weighted_average_liquidity": 100000000,
+			"argonot_usd_price": 2.0,
+			"btc_usd_price": 62000.0
+		});
+		let missing: super::PriceIndex = serde_json::from_value(json.clone()).unwrap();
+		assert!(missing.ethereum.is_none());
+		assert!(missing.usdc_usd_price.is_none());
+
+		json["usdc_usd_price"] = serde_json::json!(0.98);
+		let observed: super::PriceIndex = serde_json::from_value(json.clone()).unwrap();
+		assert_eq!(observed.usdc_usd_price, Some(FixedU128::from_rational(98, 100)));
+		json["usdc_usd_price"] = serde_json::Value::Null;
+		assert!(serde_json::from_value::<super::PriceIndex>(json)
+			.unwrap()
+			.usdc_usd_price
+			.is_none());
 	}
 }

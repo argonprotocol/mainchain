@@ -41,9 +41,16 @@ export function withMiningBidDefaults(api: ApiPromise): MiningBidClient {
     const wrapped = new Proxy(bid, {
       apply(target, thisArg, args: unknown[]) {
         // Preserve the underlying argument-count errors for malformed calls.
-        if (args.length < 3 || args.length > 5) return Reflect.apply(target, thisArg, args);
+        if (args.length < 3 || args.length > 5)
+          return Reflect.apply(target, thisArg, args) as ReturnType<RuntimeMiningBid>;
         const [amount, keys, miner, frame = null, maxHash = null] = args;
-        return Reflect.apply(target, thisArg, [amount, keys, miner, frame, maxHash]);
+        return Reflect.apply(target, thisArg, [
+          amount,
+          keys,
+          miner,
+          frame,
+          maxHash,
+        ]) as ReturnType<RuntimeMiningBid>;
       },
     });
     bidsWithDefaults.add(wrapped);

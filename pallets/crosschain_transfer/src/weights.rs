@@ -5,7 +5,8 @@ use argon_primitives::{
 	CollectBlockerProviderWeightInfo, EthereumVerifyProvider, EthereumVerifyProviderWeightInfo,
 	OperationalAccountsHook, OperationalAccountsHookWeightInfo, PriceProvider,
 	PriceProviderWeightInfo, TickProvider, TickProviderWeightInfo, TreasuryPoolProvider,
-	TreasuryPoolProviderWeightInfo, UniswapTransferProviderWeightInfo,
+	TreasuryPoolProviderWeightInfo, UniswapPurchaseProvider, UniswapPurchaseProviderWeightInfo,
+	UniswapTransferProviderWeightInfo,
 };
 use core::marker::PhantomData;
 use pallet_prelude::*;
@@ -24,6 +25,8 @@ pub trait WeightInfo {
 	fn approve_queue_entries(approvals: u32) -> Weight;
 	fn prove_gateway_activity(activities: u32) -> Weight;
 	fn prove_gateway_activity_storage(activities: u32) -> Weight;
+	fn prove_gateway_purchase(activities: u32) -> Weight;
+	fn prove_gateway_purchase_storage(activities: u32) -> Weight;
 	fn schedule_global_issuance_council_rotation() -> Weight;
 	fn activate_global_issuance_council_signers() -> Weight;
 	fn transfer_out() -> Weight;
@@ -46,6 +49,10 @@ type TickProviderWeights<T> =
 type VaultProviderWeights<T> = <<T as Config>::VaultProvider as BitcoinVaultProvider>::Weights;
 type PriceProviderWeights<T> =
 	<<T as Config>::PriceProvider as PriceProvider<<T as Config>::Balance>>::Weights;
+type UniswapPurchaseWeights<T> =
+	<<T as Config>::UniswapPurchaseProvider as UniswapPurchaseProvider<
+		<T as frame_system::Config>::AccountId,
+	>>::Weights;
 
 pub struct WithProviderWeights<
 	T,
@@ -132,6 +139,7 @@ where
 
 	fn prove_gateway_activity(activities: u32) -> Weight {
 		Base::prove_gateway_activity(activities)
+			.max(Base::prove_gateway_purchase(activities))
 			.saturating_add(
 				PriceProviderWeight::get_ethereum_prices().saturating_mul(activities.into()),
 			)
@@ -140,10 +148,18 @@ where
 
 	fn prove_gateway_activity_storage(activities: u32) -> Weight {
 		Base::prove_gateway_activity_storage(activities)
+			.max(Base::prove_gateway_purchase_storage(activities))
 			.saturating_add(
 				PriceProviderWeight::get_ethereum_prices().saturating_mul(activities.into()),
 			)
 			.saturating_add(gateway_activity_vault_weight::<VaultProviderWeight>(activities))
+	}
+
+	fn prove_gateway_purchase(activities: u32) -> Weight {
+		Base::prove_gateway_purchase(activities)
+	}
+	fn prove_gateway_purchase_storage(activities: u32) -> Weight {
+		Base::prove_gateway_purchase_storage(activities)
 	}
 
 	fn schedule_global_issuance_council_rotation() -> Weight {
@@ -300,6 +316,13 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 
+	fn prove_gateway_purchase(_: u32) -> Weight {
+		Weight::zero()
+	}
+	fn prove_gateway_purchase_storage(_: u32) -> Weight {
+		Weight::zero()
+	}
+
 	fn schedule_global_issuance_council_rotation() -> Weight {
 		Weight::zero()
 	}
@@ -337,10 +360,13 @@ pub fn scheduled_council_rotation_with_price_provider<T: Config>() -> Weight {
 pub fn prove_gateway_activity_with_providers<T: Config>(
 	proof_blocks: u32,
 	activities: u32,
+	purchases: u32,
 ) -> Weight {
 	let extra_activities = activities.saturating_sub(proof_blocks);
 
 	T::WeightInfo::prove_gateway_activity(activities)
+		.saturating_add(UniswapPurchaseWeights::<T>::record_transferred_purchase().saturating_mul(purchases.into()))
+		.saturating_add(TickProviderWeights::<T>::ticker().saturating_mul(purchases.into()))
 		.saturating_add(
 			<<T::EthereumVerifier as EthereumVerifyProvider>::Weights as
 				EthereumVerifyProviderWeightInfo>::verify_receipt_logs(
@@ -358,8 +384,11 @@ pub fn prove_gateway_activity_with_providers<T: Config>(
 pub fn prove_gateway_activity_storage_with_providers<T: Config>(
 	activities: u32,
 	headers: u32,
+	purchases: u32,
 ) -> Weight {
 	T::WeightInfo::prove_gateway_activity_storage(activities)
+		.saturating_add(UniswapPurchaseWeights::<T>::record_transferred_purchase().saturating_mul(purchases.into()))
+		.saturating_add(TickProviderWeights::<T>::ticker().saturating_mul(purchases.into()))
 		.saturating_add(EthereumVerifyProviderWeights::<T>::verify_account_storage_proof(
 			crate::GATEWAY_ACTIVITY_STORAGE_SLOT_COUNT,
 			headers,
@@ -370,4 +399,16 @@ pub fn prove_gateway_activity_storage_with_providers<T: Config>(
 		)
 		// A locator can activate at most one queued council, just like a receipt batch.
 		.saturating_add(T::WeightInfo::activate_global_issuance_council_signers())
+}
+
+/// Topics are part of the proof payload; a different topic takes a different decoder branch.
+pub(crate) fn purchase_count<'a>(
+	logs: impl IntoIterator<Item = &'a argon_primitives::EthereumLog>,
+) -> u32 {
+	use alloy_sol_types::SolEvent;
+	let signature =
+		argon_ethereum_contracts::minting_gateway::TransferToArgonFromSwapStarted::SIGNATURE_HASH.0;
+	logs.into_iter()
+		.filter(|log| log.topics.first().is_some_and(|topic| topic.0 == signature))
+		.count() as u32
 }

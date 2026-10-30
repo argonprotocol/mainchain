@@ -540,6 +540,48 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       proxyDepositFactor: u128 & AugmentedConst<ApiType>;
     };
+    stabilizerBuys: {
+      /**
+       * Fraction of min(available funding, matching basis) reserved once; configure 90%.
+       **/
+      auctionBudgetPercent: Percent & AugmentedConst<ApiType>;
+      /**
+       * In the open bucket, allow USDC observations up to ten ticks before the purchase.
+       **/
+      maxCurrentHourPriceAgeTicks: u64 & AugmentedConst<ApiType>;
+      /**
+       * Maximum hourly reference buckets retained; configure 720.
+       **/
+      maxHourlyPriceReferences: u32 & AugmentedConst<ApiType>;
+      /**
+       * Maximum work in each automatic stage per block: ranked bid decisions, then account
+       * payout attempts. Failures and empty-auction completion consume work; excess stays
+       * queued.
+       **/
+      maxPayoutsPerBlock: u32 & AugmentedConst<ApiType>;
+      /**
+       * Positive submissions per account and auction; four allows an initial bid and three
+       * revisions.
+       **/
+      maxPositiveBids: u8 & AugmentedConst<ApiType>;
+      /**
+       * Maximum mature principal buckets released in one account payout visit.
+       * This bounds work, without limiting the number of purchases an account can hold.
+       **/
+      maxPrincipalPayouts: u32 & AugmentedConst<ApiType>;
+      /**
+       * Most recent tick observations retained for exact ARGON targets; configure 360.
+       **/
+      maxRecentPriceTicks: u32 & AugmentedConst<ApiType>;
+      /**
+       * Tick width of each older reference bucket; configure 60.
+       **/
+      priceHistoryBucketTicks: u64 & AugmentedConst<ApiType>;
+      /**
+       * Ticks after bidding close, configured for 30 elapsed days on the network.
+       **/
+      rewardMaturityTicks: u64 & AugmentedConst<ApiType>;
+    };
     system: {
       /**
        * Maximum number of block number to block hash mappings to keep (oldest pruned first).

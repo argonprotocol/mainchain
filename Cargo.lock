@@ -898,6 +898,7 @@ dependencies = [
  "pallet-notebook",
  "pallet-operational-accounts",
  "pallet-price-index",
+ "pallet-stabilizer-buys",
  "pallet-ticks",
  "pallet-treasury 1.5.2",
  "pallet-treasury-positions",
@@ -1154,10 +1155,12 @@ dependencies = [
  "env_logger",
  "jsonrpsee",
  "lazy_static",
+ "parity-scale-codec",
  "parking_lot 0.12.5",
  "polkadot-sdk",
  "rand 0.10.1",
  "reqwest 0.12.28",
+ "scale-info",
  "scraper",
  "serde",
  "serde_json",
@@ -1249,6 +1252,7 @@ dependencies = [
  "pallet-operational-accounts",
  "pallet-prelude",
  "pallet-price-index",
+ "pallet-stabilizer-buys",
  "pallet-ticks",
  "pallet-treasury 1.5.2",
  "pallet-treasury-positions",
@@ -11141,6 +11145,7 @@ dependencies = [
  "k256",
  "log",
  "pallet-prelude",
+ "pallet-stabilizer-buys",
  "parity-scale-codec",
  "polkadot-sdk",
  "scale-info",
@@ -12373,6 +12378,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-stabilizer-buys"
+version = "1.5.2"
+dependencies = [
+ "argon-primitives",
+ "pallet-mining-slot",
+ "pallet-prelude",
+ "pallet-price-index",
+ "pallet-ticks",
+ "parity-scale-codec",
+ "polkadot-sdk",
+ "scale-info",
+]
+
+[[package]]
 name = "pallet-staking"
 version = "46.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12669,8 +12688,10 @@ dependencies = [
  "impl-trait-for-tuples",
  "pallet-bitcoin-fissions",
  "pallet-bitcoin-locks",
+ "pallet-mint",
  "pallet-operational-accounts",
  "pallet-prelude",
+ "pallet-stabilizer-buys",
  "pallet-treasury-positions",
  "parity-scale-codec",
  "polkadot-sdk",

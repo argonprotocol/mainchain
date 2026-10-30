@@ -1,6 +1,10 @@
 mod treasury_positions;
+mod treasury_rewards;
 pub use treasury_positions::{
 	reset_benchmark_treasury_positions, BenchmarkTreasuryPositionProvider,
+};
+pub use treasury_rewards::{
+	set_benchmark_treasury_reward_payment_failure, BenchmarkTreasuryRewardProvider,
 };
 
 use crate::*;

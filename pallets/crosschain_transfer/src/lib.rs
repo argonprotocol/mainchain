@@ -5,7 +5,7 @@ extern crate alloc;
 pub use pallet::*;
 pub use weights::{prove_gateway_activity_with_providers, WeightInfo, WithProviderWeights};
 
-use argon_primitives::EthereumAccountStorageProof;
+use argon_primitives::{EthereumAccountStorageProof, UniswapPurchaseProvider};
 use gateway_activity::GatewayActivityBlock;
 use pallet_prelude::*;
 
@@ -166,6 +166,10 @@ pub mod pallet {
 		/// Runtime frame provider used for collect-due alignment on queued council work.
 		type CurrentFrameId: Get<FrameId>;
 
+		/// Records eligibility after authenticated purchase delivery, inside the activity
+		/// transaction.
+		type UniswapPurchaseProvider: UniswapPurchaseProvider<Self::AccountId>;
+
 		/// Runtime tick provider used for transfer age checks.
 		type CurrentTick: Get<Tick>;
 
@@ -273,6 +277,7 @@ pub mod pallet {
 					weights::prove_gateway_activity_storage_with_providers::<T>(
 						T::MaxActivitiesPerGatewayProof::get(),
 						argon_primitives::MAX_ETHEREUM_HEADER_CHAIN_LEN,
+						T::MaxActivitiesPerGatewayProof::get(),
 					),
 				),
 				(
@@ -280,6 +285,7 @@ pub mod pallet {
 					GatewayActivityReceiptProofBatch::<T>::max_encoded_len(),
 					weights::prove_gateway_activity_with_providers::<T>(
 						receipt_blocks,
+						receipt_activities,
 						receipt_activities,
 					)
 					.saturating_add(
@@ -1616,7 +1622,9 @@ pub mod pallet {
 			let activities = proof_batch.blocks.iter().fold(0u32, |total, block| {
 				total.saturating_add(block.receipt_logs.len() as u32)
 			});
-			prove_gateway_activity_with_providers::<T>(proof_blocks, activities)
+			let purchases = weights::purchase_count(proof_batch.blocks.iter()
+				.flat_map(|block| block.receipt_logs.iter().map(|log| &log.event_log)));
+			prove_gateway_activity_with_providers::<T>(proof_blocks, activities, purchases)
 				.saturating_add(
 					<T::OperationalAccountsHook as OperationalAccountsHook<T::AccountId, T::Balance>>::Weights::account_uniswap_argon_transfers_in_updated()
 						.saturating_mul(activities as u64)
@@ -1721,6 +1729,7 @@ pub mod pallet {
 		#[pallet::weight(weights::prove_gateway_activity_storage_with_providers::<T>(
 			proof.activity_logs.len() as u32,
 			proof.storage_proof.execution_block_proof.target_to_anchor_header_chain.len() as u32,
+			weights::purchase_count(proof.activity_logs.iter()),
 		))]
 		pub fn prove_gateway_activity_storage(
 			origin: OriginFor<T>,

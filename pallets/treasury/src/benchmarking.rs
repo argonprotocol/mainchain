@@ -44,6 +44,82 @@ mod benchmarks {
 	use super::*;
 
 	#[benchmark]
+	fn provider_available_reward_budget() {
+		let amount = T::Currency::minimum_balance().max(10_000u128.into());
+		RewardReserves::<T>::mutate(|reserves| reserves.liquidity_buys = amount);
+		#[block]
+		{
+			assert_eq!(Pallet::<T>::available_budget(), amount);
+		}
+	}
+
+	#[benchmark]
+	fn provider_reserve_reward_budget() -> Result<(), BenchmarkError> {
+		let amount = T::Currency::minimum_balance().max(10_000u128.into());
+		RewardReserves::<T>::mutate(|reserves| reserves.liquidity_buys = amount + amount);
+		#[block]
+		{
+			Pallet::<T>::reserve_budget(amount)?;
+		}
+		assert_eq!(RewardReserves::<T>::get().liquidity_buys, amount);
+		Ok(())
+	}
+
+	#[benchmark]
+	fn provider_commit_reward() -> Result<(), BenchmarkError> {
+		let amount = T::Currency::minimum_balance().max(10_000u128.into());
+		OutstandingPurchaseRewards::<T>::put(amount);
+		#[block]
+		{
+			Pallet::<T>::commit_reward(amount)?;
+		}
+		assert_eq!(OutstandingPurchaseRewards::<T>::get(), amount + amount);
+		Ok(())
+	}
+
+	#[benchmark]
+	fn provider_return_reward_budget() -> Result<(), BenchmarkError> {
+		let amount = T::Currency::minimum_balance().max(10_000u128.into());
+		RewardReserves::<T>::mutate(|reserves| reserves.liquidity_buys = amount);
+		#[block]
+		{
+			Pallet::<T>::return_budget(amount)?;
+		}
+		assert_eq!(RewardReserves::<T>::get().liquidity_buys, amount + amount);
+		Ok(())
+	}
+
+	#[benchmark]
+	fn provider_pay_reward() -> Result<(), BenchmarkError> {
+		let owner = account("purchase-reward", 0, 0);
+		let amount = T::Currency::minimum_balance().max(10_000u128.into());
+		T::Currency::mint_into(&owner, amount)?;
+		OutstandingPurchaseRewards::<T>::put(amount + amount);
+		#[block]
+		{
+			Pallet::<T>::pay_reward(&owner, amount)?;
+		}
+		assert_eq!(OutstandingPurchaseRewards::<T>::get(), amount);
+		assert_eq!(T::Currency::balance(&owner), amount + amount);
+		Ok(())
+	}
+
+	#[benchmark]
+	fn provider_pay_reward_new_account() -> Result<(), BenchmarkError> {
+		let owner = account("new-purchase-reward", 0, 0);
+		let amount = T::Currency::minimum_balance().max(10_000u128.into());
+		OutstandingPurchaseRewards::<T>::put(amount + amount);
+		assert_eq!(T::Currency::balance(&owner), T::Balance::zero());
+		#[block]
+		{
+			Pallet::<T>::pay_reward(&owner, amount)?;
+		}
+		assert_eq!(OutstandingPurchaseRewards::<T>::get(), amount);
+		assert_eq!(T::Currency::balance(&owner), amount);
+		Ok(())
+	}
+
+	#[benchmark]
 	fn upstream_participation() -> Result<(), BenchmarkError> {
 		reset_benchmark_state::<T>();
 		seed_accepted_vault_state::<T>(1, 0, minimum_purchase_bonds::<T>(), 100_000, 1)?;
@@ -625,6 +701,7 @@ mod benchmarks {
 			T::MaxVaultsPerPool::get() as usize,
 			"expected every selected vault to record frame earnings",
 		);
+		assert!(!RewardReserves::<T>::get().liquidity_buys.is_zero());
 		Ok(())
 	}
 
@@ -676,6 +753,7 @@ mod benchmarks {
 			BENCHMARK_FRAME_ID,
 			"expected next frame capital to be locked in",
 		);
+		assert!(!RewardReserves::<T>::get().liquidity_buys.is_zero());
 		if s == 0 {
 			assert!(CurrentFrameArgonotBondParticipants::<T>::get().is_none());
 		} else {

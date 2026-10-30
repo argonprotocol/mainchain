@@ -656,6 +656,176 @@ mod benchmarks {
 	}
 
 	#[benchmark]
+	fn prove_gateway_purchase(a: Linear<1, 96>) -> Result<(), BenchmarkError> {
+		assert_eq!(
+			T::MaxReceiptProofsPerExtrinsic::get() * T::MaxActivitiesPerReceiptProof::get(),
+			96
+		);
+		reset_crosschain_benchmark_state();
+		let caller: T::AccountId = whitelisted_caller();
+		let incoming_amount = 1_000_000_000u128;
+		let initial_circulation = incoming_amount * u128::from(a);
+		seed_gateway_activity_transfers::<T>(a, initial_circulation)?;
+
+		let logs = (0..a)
+			.map(|index| {
+				let recipient: T::AccountId = account("crosschain-transfer-recipient", index, 0);
+				EthereumReceiptLog {
+					transaction_index: 0,
+					event_log: purchase_activity_log(transfer_to_argon_started_log(
+						h160(0x21),
+						h160(0x11),
+						h160(0x31),
+						incoming_amount,
+						<[u8; 32]>::from(recipient),
+						u64::from(index) + 1,
+						0,
+						initial_circulation - incoming_amount * u128::from(index + 1),
+						0,
+					)),
+				}
+			})
+			.collect::<Vec<_>>();
+		let proof_blocks = logs
+			.chunks(T::MaxActivitiesPerReceiptProof::get() as usize)
+			.enumerate()
+			.map(|(index, logs)| GatewayActivityReceiptProofBlock::<T> {
+				target_block_number: (index * T::MaxActivitiesPerReceiptProof::get() as usize +
+					logs.len()) as u64,
+				receipt_proof: dummy_receipt_proof(),
+				receipt_logs: logs.to_vec().try_into().expect("bounded chunk"),
+			})
+			.collect::<Vec<_>>();
+		let proof_batch = GatewayActivityReceiptProofBatch::<T> {
+			execution_block_proof: dummy_execution_block_proof(),
+			blocks: proof_blocks.try_into().map_err(|_| {
+				BenchmarkError::Stop("benchmark proof blocks exceeded pallet bound")
+			})?,
+		};
+		#[extrinsic_call]
+		prove_gateway_activity(
+			RawOrigin::Signed(caller),
+			BENCHMARK_DESTINATION_CHAIN,
+			0,
+			proof_batch,
+		);
+
+		assert_eq!(
+			GatewayStateBySourceChain::<T>::get(BENCHMARK_DESTINATION_CHAIN)
+				.expect("gateway state should be written")
+				.gateway_activity_nonce,
+			u64::from(a)
+		);
+		assert_eq!(TransferOutById::<T>::iter().count(), 0);
+		Ok(())
+	}
+
+	#[benchmark]
+	fn prove_gateway_purchase_storage(
+		a: Linear<1, PROVE_GATEWAY_ACTIVITY_STORAGE_BENCH_RANGE_END>,
+	) -> Result<(), BenchmarkError> {
+		assert_eq!(
+			T::MaxActivitiesPerGatewayProof::get(),
+			PROVE_GATEWAY_ACTIVITY_STORAGE_BENCH_RANGE_END,
+			"storage benchmark range must cover the runtime activity bound",
+		);
+		reset_crosschain_benchmark_state();
+		let caller: T::AccountId = whitelisted_caller();
+		let incoming_amount = 1_000_000_000u128;
+		let initial_argon_circulation = incoming_amount.saturating_mul(u128::from(a));
+		seed_gateway_activity_transfers::<T>(a, initial_argon_circulation)?;
+
+		let activity_logs: BoundedVec<EthereumLog, T::MaxActivitiesPerGatewayProof> = (0..a)
+			.map(|index| {
+				let recipient: T::AccountId = account("crosschain-transfer-recipient", index, 0);
+				purchase_activity_log(transfer_to_argon_started_log(
+					h160(0x21),
+					h160(0x11),
+					h160(0x31),
+					incoming_amount,
+					<[u8; 32]>::from(recipient),
+					u64::from(index).saturating_add(1),
+					0,
+					initial_argon_circulation.saturating_sub(
+						incoming_amount.saturating_mul(u128::from(index).saturating_add(1)),
+					),
+					0,
+				))
+			})
+			.collect::<Vec<_>>()
+			.try_into()
+			.map_err(|_| BenchmarkError::Stop("benchmark activities exceeded pallet bound"))?;
+		let chain_config = benchmark_chain_config(0x21);
+		let activity_root_seed = H256::repeat_byte(0x42);
+		let mut activity_root = B256::from(activity_root_seed.0);
+		for activity_log in &activity_logs {
+			let decoded_activity =
+				Pallet::<T>::decode_evm_gateway_activity(&chain_config, activity_log)
+					.map_err(|_| BenchmarkError::Stop("failed to decode benchmark activity"))?;
+			activity_root = ethereum_contracts::append_activity_root(
+				activity_root,
+				B256::from(decoded_activity.leaf_hash(&chain_config).0),
+			);
+		}
+		let locator_index = 1;
+		let (range_slot, root_slot) = Pallet::<T>::gateway_activity_locator_slots(locator_index);
+		let proof = GatewayActivityStorageProof::<T::MaxActivitiesPerGatewayProof> {
+			locator_index,
+			activity_root_seed,
+			storage_proof: EthereumAccountStorageProof {
+				execution_block_proof: argon_primitives::EthereumExecutionBlockProof {
+					anchor_block_hash: H256::repeat_byte(1),
+					target_to_anchor_header_chain: Default::default(),
+				},
+				account_proof: BoundedVec::default(),
+				storage_proof: BoundedVec::default(),
+				slots: vec![
+					EthereumStorageSlotProof {
+						slot: range_slot,
+						value: Pallet::<T>::gateway_activity_locator_range_slot_value(
+							u64::from(a),
+							1,
+							u64::from(a),
+						),
+						node_indexes: BoundedVec::default(),
+					},
+					EthereumStorageSlotProof {
+						slot: root_slot,
+						value: H256::from_slice(activity_root.as_slice()),
+						node_indexes: BoundedVec::default(),
+					},
+				]
+				.try_into()
+				.map_err(|_| BenchmarkError::Stop("benchmark slots exceeded proof bound"))?,
+			},
+			activity_logs: activity_logs
+				.try_into()
+				.map_err(|_| BenchmarkError::Stop("benchmark log data exceeded byte budget"))?,
+		};
+
+		#[extrinsic_call]
+		prove_gateway_activity_storage(
+			RawOrigin::Signed(caller),
+			BENCHMARK_DESTINATION_CHAIN,
+			0,
+			proof,
+		);
+
+		assert_eq!(
+			GatewayStateBySourceChain::<T>::get(BENCHMARK_DESTINATION_CHAIN)
+				.expect("gateway state should be written")
+				.gateway_activity_nonce,
+			u64::from(a),
+		);
+		assert_eq!(TransferOutById::<T>::iter().count(), 0);
+		assert_eq!(
+			NonTerminalTransferOutCountByDestinationChain::<T>::get(BENCHMARK_DESTINATION_CHAIN),
+			0,
+		);
+		Ok(())
+	}
+
+	#[benchmark]
 	fn schedule_global_issuance_council_rotation() -> Result<(), BenchmarkError> {
 		reset_crosschain_benchmark_state();
 		seed_chain_config::<T>(0x21);
@@ -1312,6 +1482,38 @@ fn transfer_to_argon_started_log(
 		.try_into()
 		.expect("topics stay within Ethereum log topic bounds"),
 		data: data.try_into().expect("burn event data stays within bounded log payload"),
+	}
+}
+
+fn purchase_activity_log(log: EthereumLog) -> EthereumLog {
+	use alloy_primitives::U256;
+	use ethereum_contracts::{SwapPurchase, TransferToArgonFromSwapStarted};
+	let transfer =
+		TransferToArgonStarted::decode_raw_log_validate(log.topics.iter().map(|t| t.0), &log.data)
+			.unwrap();
+	let purchase = TransferToArgonFromSwapStarted {
+		purchase: SwapPurchase {
+			timestamp: 1,
+			buyer: transfer.from,
+			argonAccountId: transfer.argonAccountId,
+			usdcToken: [0x41; 20].into(),
+			usdcSpent: U256::from(transfer.amount * 9 / 10),
+			argonBought: U256::from(transfer.amount) * U256::from(1_000_000_000_000u64),
+			poolManager: [0x51; 20].into(),
+			poolId: [0x61; 32].into(),
+			sqrtPriceBeforeX96: alloy_primitives::U160::from(1u128 << 76),
+			sqrtPriceAfterX96: alloy_primitives::U160::from(1u128 << 77),
+		},
+		token: transfer.token,
+		amount: transfer.amount,
+		gatewayState: transfer.gatewayState,
+	};
+	EthereumLog {
+		address: log.address,
+		topics: vec![H256::from_slice(TransferToArgonFromSwapStarted::SIGNATURE_HASH.as_slice())]
+			.try_into()
+			.unwrap(),
+		data: purchase.encode_data().try_into().unwrap(),
 	}
 }
 

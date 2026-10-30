@@ -606,6 +606,7 @@ export class TestMintingAuthorityActor {
     await this.harness.submit(
       this.harness.mainchainClient.tx.priceIndex.submit(
         {
+          usdcUsdPrice: null,
           btcUsdPrice: toFixedNumber(60_000, 18),
           argonotUsdPrice: toFixedNumber(1, 18),
           argonUsdPrice: toFixedNumber(1, 18),

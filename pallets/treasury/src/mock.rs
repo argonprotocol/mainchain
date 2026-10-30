@@ -1,8 +1,9 @@
 use crate as pallet_treasury;
 use argon_primitives::{
-	providers::{BitcoinMintedProvider, BurnEventHandler},
+	providers::BitcoinMintedProvider,
 	vault::{TreasuryVaultProvider, VaultError, VaultParticipationCapacity, VaultSecuritization},
-	ArgonCPI, OperationalAccountsHook, PriceProvider, TreasuryPoolProvider, MICROGONS_PER_ARGON,
+	ArgonCPI, BlockRewardAccountsProvider, MiningFrameProvider, OperationalAccountsHook,
+	PriceProvider, TreasuryPoolProvider, MICROGONS_PER_ARGON,
 };
 use frame_support::traits::{Currency, StorageMapShim};
 use pallet_prelude::{
@@ -10,7 +11,10 @@ use pallet_prelude::{
 	*,
 };
 use sp_core::{crypto::AccountId32, sr25519, Pair};
-use sp_runtime::{traits::IdentifyAccount, MultiSigner};
+use sp_runtime::{
+	traits::{ConstU8, IdentifyAccount},
+	MultiSigner,
+};
 use std::collections::{BTreeMap, HashMap};
 
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -32,6 +36,8 @@ frame_support::construct_runtime!(
 		System: frame_system,
 		TreasuryPositions: pallet_treasury_positions,
 		Treasury: pallet_treasury,
+		StabilizerBuys: pallet_stabilizer_buys,
+		Mint: pallet_mint,
 		Balances: pallet_balances::<Instance1>,
 		Ownership: pallet_balances::<Instance2>,
 	}
@@ -372,11 +378,6 @@ impl PriceProvider<Balance> for StaticPriceProvider {
 	}
 }
 
-pub struct StaticBurnEventHandler;
-impl BurnEventHandler<Balance> for StaticBurnEventHandler {
-	fn on_argon_burn(_amount: &Balance) {}
-}
-
 pub struct StaticMiningFrameTransitionProvider;
 impl MiningFrameTransitionProvider for StaticMiningFrameTransitionProvider {
 	fn get_current_frame_id() -> FrameId {
@@ -385,6 +386,108 @@ impl MiningFrameTransitionProvider for StaticMiningFrameTransitionProvider {
 
 	fn is_new_frame_started() -> Option<FrameId> {
 		None
+	}
+}
+
+impl MiningFrameProvider for StaticMiningFrameTransitionProvider {
+	fn get_next_frame_tick() -> Tick {
+		PurchaseTick::get().saturating_add(1)
+	}
+	fn is_seat_bidding_started() -> bool {
+		false
+	}
+	fn get_tick_range_for_frame(_: FrameId) -> Option<(Tick, Tick)> {
+		None
+	}
+}
+
+impl BlockRewardAccountsProvider<TestAccountId> for StaticMiningFrameTransitionProvider {
+	type Weights = ();
+	fn get_block_rewards_account(_: &TestAccountId) -> Option<(TestAccountId, FrameId)> {
+		None
+	}
+	fn get_mint_rewards_accounts() -> Vec<(TestAccountId, FrameId)> {
+		vec![]
+	}
+	fn is_compute_block_eligible_for_rewards() -> bool {
+		false
+	}
+}
+
+impl pallet_mint::Config for Test {
+	type WeightInfo = ();
+	type Currency = Balances;
+	type PriceProvider = StaticPriceProvider;
+	type MiningFrameProvider = StaticMiningFrameTransitionProvider;
+	type Balance = Balance;
+	type MaxPendingMintsPerUtxo = ConstU32<50>;
+	type MaxPendingMintPayoutWindowSize = ConstU32<1_000>;
+	type BlockRewardAccountsProvider = StaticMiningFrameTransitionProvider;
+	type MaxMintHistoryToMaintain = ConstU32<10>;
+	type MaxPossibleMiners = ConstU32<1>;
+	type BitcoinMintPayoutPercentPerFrame = BitcoinMintPayoutPercentPerFrame;
+}
+
+parameter_types! {
+	pub static PurchaseTick: Tick = 1;
+	pub const PurchaseBudgetPercent: Percent = Percent::from_percent(90);
+	pub const BitcoinMintPayoutPercentPerFrame: Percent = Percent::from_percent(10);
+	pub PurchasePool: pallet_stabilizer_buys::PurchasePool = pallet_stabilizer_buys::PurchasePool {
+		chain_id: 1,
+		pool_manager: H160::repeat_byte(1),
+		pool_id: H256::repeat_byte(2),
+		usdc_token: H160::repeat_byte(3),
+		argon_is_token0: true,
+	};
+}
+
+impl pallet_stabilizer_buys::Config for Test {
+	type Currency = Balances;
+	type MiningFrameTransitionProvider = StaticMiningFrameTransitionProvider;
+	type CurrentTick = PurchaseTick;
+	type MaxRecentPriceTicks = ConstU32<360>;
+	type PriceHistoryBucketTicks = ConstU64<60>;
+	type MaxHourlyPriceReferences = ConstU32<720>;
+	type MaxCurrentHourPriceAgeTicks = ConstU64<10>;
+	type TreasuryRewardProvider = Treasury;
+	type MaxPrincipalPayouts = ConstU32<16>;
+	type MaxPayoutsPerBlock = ConstU32<2>;
+	type MaxPositiveBids = ConstU8<4>;
+	type AuctionBudgetPercent = PurchaseBudgetPercent;
+	type RewardMaturityTicks = ConstU64<10>;
+	type WeightInfo = Test;
+}
+
+impl pallet_stabilizer_buys::WeightInfo for Test {
+	fn record_prices() -> Weight {
+		Weight::zero()
+	}
+	fn record_purchase() -> Weight {
+		Weight::zero()
+	}
+	fn record_purchase_first_hold() -> Weight {
+		Weight::zero()
+	}
+	fn bid() -> Weight {
+		Weight::zero()
+	}
+	fn process_payouts_failed(_: u32) -> Weight {
+		Weight::zero()
+	}
+	fn process_payouts(_: u32) -> Weight {
+		Weight::zero()
+	}
+	fn process_auctions(_: u32) -> Weight {
+		Weight::zero()
+	}
+	fn set_approved_pool() -> Weight {
+		Weight::zero()
+	}
+	fn set_matching_rate() -> Weight {
+		Weight::zero()
+	}
+	fn on_frame_start() -> Weight {
+		Weight::zero()
 	}
 }
 
@@ -402,7 +505,7 @@ impl pallet_treasury::Config for Test {
 	type TreasuryVaultProvider = StaticTreasuryVaultProvider;
 	type BitcoinMintedProvider = StaticBitcoinMintedProvider;
 	type PriceProvider = StaticPriceProvider;
-	type BurnEventHandler = StaticBurnEventHandler;
+	type BurnEventHandler = Mint;
 	type MinimumArgonsPerContributor = MinimumArgonsPerContributor;
 	type MaxActiveArgonotBondLots = MaxActiveArgonotBondLots;
 	type MaxArgonBondLots = MaxArgonBondLots;

@@ -10,7 +10,7 @@ use super::{
 	inherents::BlockSealInherent,
 	tick::{Tick, Ticker},
 	BlockSealAuthorityId, ComputeDifficulty, Moment, NotaryId, NotebookHeader, NotebookNumber,
-	NotebookSecret, TransferToLocalchainId, VaultId, VoteMinimum, VotingSchedule,
+	NotebookSecret, PriceIndex, TransferToLocalchainId, VaultId, VoteMinimum, VotingSchedule,
 	MICROGONS_PER_ARGON,
 };
 use codec::{Codec, Decode, DecodeWithMemTracking, Encode, FullCodec, HasCompact, MaxEncodedLen};
@@ -28,7 +28,7 @@ use sp_runtime::{
 use super::{
 	ethereum::{
 		EthereumAccountStorageProof, EthereumBlockNumber, EthereumReceiptLogProofBatch,
-		EthereumVerifyError,
+		EthereumVerifyError, UniswapPurchase,
 	},
 	vault::{BitcoinSecuritizationBasis, CosignerGuarantee},
 };
@@ -822,6 +822,45 @@ fn btc_price_in_microgons<
 	Some(microgons.saturating_mul_int(Balance::one()))
 }
 
+/// Accepted oracle observations. Consumers own their retention and valuation policy.
+pub trait PriceIndexUpdated {
+	fn on_price_index(index: &PriceIndex);
+	fn on_price_index_weight() -> Weight;
+}
+
+impl PriceIndexUpdated for () {
+	fn on_price_index(_: &PriceIndex) {}
+	fn on_price_index_weight() -> Weight {
+		Weight::zero()
+	}
+}
+
+/// Records authenticated purchases after the gateway has delivered the principal.
+pub trait UniswapPurchaseProvider<AccountId> {
+	type Weights: UniswapPurchaseProviderWeightInfo;
+	fn record_transferred_purchase(
+		account: &AccountId,
+		purchase: &UniswapPurchase,
+	) -> DispatchResult;
+}
+
+impl<AccountId> UniswapPurchaseProvider<AccountId> for () {
+	type Weights = ();
+	fn record_transferred_purchase(_: &AccountId, _: &UniswapPurchase) -> DispatchResult {
+		Ok(())
+	}
+}
+
+pub trait UniswapPurchaseProviderWeightInfo {
+	fn record_transferred_purchase() -> Weight;
+}
+
+impl UniswapPurchaseProviderWeightInfo for () {
+	fn record_transferred_purchase() -> Weight {
+		Weight::zero()
+	}
+}
+
 pub trait PriceProviderWeightInfo {
 	fn get_lowest_microgons_per_argonot() -> Weight;
 	fn get_average_microgons_per_argonot() -> Weight;
@@ -1422,7 +1461,7 @@ pub trait SlotEvents<AccountId> {
 	}
 }
 
-#[impl_trait_for_tuples::impl_for_tuples(0, 6)]
+#[impl_trait_for_tuples::impl_for_tuples(0, 7)]
 #[tuple_types_custom_trait_bound(OnNewSlot<AId>)]
 impl<AId> SlotEvents<AId> for Tuple {
 	fn on_frame_start(frame_id: FrameId) {

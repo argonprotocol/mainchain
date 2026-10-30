@@ -17,7 +17,7 @@ mod benchmarking;
 pub mod migrations;
 pub mod weights;
 use argon_primitives::{
-	treasury::{PositionQuantity, TreasuryPositionProvider},
+	treasury::{PositionQuantity, TreasuryPositionProvider, TreasuryRewardProvider},
 	OperationalAccountProvider,
 };
 pub use pallet::*;
@@ -255,6 +255,15 @@ pub mod pallet {
 	pub type CurrentFrameArgonotBondParticipants<T: Config> =
 		StorageValue<_, FrameArgonotBondParticipants<T>, OptionQuery>;
 
+	/// ARGON removed from circulation and available for future issuance as rewards.
+	#[pallet::storage]
+	pub type RewardReserves<T: Config> =
+		StorageValue<_, RewardReserveBalances<T::Balance>, ValueQuery>;
+
+	/// Awarded purchase rewards awaiting issuance. Auctions own their unallocated reservations.
+	#[pallet::storage]
+	pub type OutstandingPurchaseRewards<T: Config> = StorageValue<_, T::Balance, ValueQuery>;
+
 	/// Configurable percent of maximum Bitcoin-mintable Argons targeted by the network.
 	#[pallet::storage]
 	pub type TargetBitcoinPercent<T: Config> =
@@ -347,6 +356,9 @@ pub mod pallet {
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
+		RewardReservesUpdated {
+			reserves: RewardReserveBalances<T::Balance>,
+		},
 		/// An error occurred while paying frame earnings for a bond lot.
 		CouldNotDistributeEarningsToBondLot {
 			frame_id: FrameId,
@@ -1145,7 +1157,15 @@ pub mod pallet {
 				.saturating_add(argon_bond_pool.saturating_sub(argon_bond_pool_distributed))
 				.saturating_add(vault_pool.saturating_sub(vault_pool_distributed))
 				.saturating_add(full_bid_pool_amount.saturating_sub(allocated));
-			let burned = Self::burn_unearned_rewards(frame_id, &bid_pool_account, burn_amount);
+			// Only the unused vault allocation funds purchase rewards. The other unused
+			// allocations keep their existing burn policy.
+			let liquidity_buy_reserve = vault_pool.saturating_sub(vault_pool_distributed);
+			let burned = Self::burn_unearned_rewards(
+				frame_id,
+				&bid_pool_account,
+				burn_amount,
+				liquidity_buy_reserve,
+			);
 
 			Self::deposit_event(Event::<T>::FrameEarningsDistributed {
 				frame_id,
@@ -1823,6 +1843,7 @@ pub mod pallet {
 			frame_id: FrameId,
 			bid_pool_account: &T::AccountId,
 			amount: T::Balance,
+			liquidity_buy_reserve: T::Balance,
 		) -> T::Balance {
 			if amount.is_zero() {
 				return T::Balance::zero();
@@ -1835,6 +1856,17 @@ pub mod pallet {
 				Fortitude::Force,
 			) {
 				Ok(burned) => {
+					// Credit only funds actually removed from issuance. A failed burn leaves
+					// both the bid-pool balance and the reserve unchanged.
+					let reserved = liquidity_buy_reserve.min(burned);
+					if !reserved.is_zero() {
+						let reserves = RewardReserves::<T>::mutate(|reserves| {
+							reserves.liquidity_buys.saturating_accrue(reserved);
+							reserves.clone()
+						});
+						Self::deposit_event(Event::<T>::RewardReservesUpdated { reserves });
+					}
+					// Report the full issuance reduction; a future reward mint is separate.
 					T::BurnEventHandler::on_argon_burn(&burned);
 					burned
 				},
@@ -2191,6 +2223,55 @@ pub mod pallet {
 		}
 	}
 
+	impl<T: Config> TreasuryRewardProvider<T::AccountId> for Pallet<T> {
+		type Balance = T::Balance;
+		type Weights = weights::ProviderWeightAdapter<T>;
+
+		fn available_budget() -> T::Balance {
+			RewardReserves::<T>::get().liquidity_buys
+		}
+
+		fn reserve_budget(amount: T::Balance) -> DispatchResult {
+			if amount.is_zero() {
+				return Ok(());
+			}
+			let mut reserves = RewardReserves::<T>::get();
+			ensure!(amount <= reserves.liquidity_buys, TokenError::FundsUnavailable);
+			reserves.liquidity_buys.saturating_reduce(amount);
+			RewardReserves::<T>::put(&reserves);
+			Self::deposit_event(Event::<T>::RewardReservesUpdated { reserves });
+			Ok(())
+		}
+
+		fn commit_reward(amount: T::Balance) -> DispatchResult {
+			OutstandingPurchaseRewards::<T>::mutate(|outstanding| {
+				outstanding.saturating_accrue(amount);
+			});
+			Ok(())
+		}
+
+		fn return_budget(amount: T::Balance) -> DispatchResult {
+			if amount.is_zero() {
+				return Ok(());
+			}
+			let mut reserves = RewardReserves::<T>::get();
+			reserves.liquidity_buys.saturating_accrue(amount);
+			RewardReserves::<T>::put(&reserves);
+			Self::deposit_event(Event::<T>::RewardReservesUpdated { reserves });
+			Ok(())
+		}
+
+		#[frame_support::transactional]
+		fn pay_reward(account: &T::AccountId, amount: T::Balance) -> DispatchResult {
+			let mut outstanding = OutstandingPurchaseRewards::<T>::get();
+			ensure!(amount <= outstanding, ArithmeticError::Underflow);
+			outstanding.saturating_reduce(amount);
+			T::Currency::mint_into(account, amount)?;
+			OutstandingPurchaseRewards::<T>::put(outstanding);
+			Ok(())
+		}
+	}
+
 	impl<T: Config> OperationalRewardsPayer<T::AccountId, T::Balance> for Pallet<T> {
 		type Weights = weights::ProviderWeightAdapter<T>;
 
@@ -2501,6 +2582,34 @@ pub mod pallet {
 			});
 			Ok(())
 		}
+	}
+
+	/// Reward budgets excluded from issuance until paid. These are amounts, not funded accounts.
+	#[derive(
+		Encode,
+		Decode,
+		DecodeWithMemTracking,
+		Clone,
+		PartialEq,
+		Eq,
+		Debug,
+		Default,
+		TypeInfo,
+		MaxEncodedLen,
+	)]
+	pub struct RewardReserveBalances<Balance> {
+		/// Budget available for marketing reward claims.
+		pub marketing: Balance,
+		/// Budget for future Bitcoin Liquids rewards.
+		pub bitcoin_liquids: Balance,
+		/// Budget for future ARGON bond rewards.
+		pub argon_bonds: Balance,
+		/// Budget for future ARGONOT stake rewards.
+		pub argonot_stakes: Balance,
+		/// Budget for future stabilizer pool rewards.
+		pub stabilizer_pools: Balance,
+		/// Unpaid vault allocations available for future liquidity-buy rewards.
+		pub liquidity_buys: Balance,
 	}
 
 	#[derive(

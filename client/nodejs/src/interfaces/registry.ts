@@ -9,6 +9,8 @@ import type {
   ArgonNotaryAuditErrorVerifyError,
   ArgonPrimitivesAccountAccountType,
   ArgonPrimitivesAmountRankAmountRankKey,
+  ArgonPrimitivesAmountRankAscendingRankKeyAccountId32,
+  ArgonPrimitivesAmountRankAscendingRankKeyU64,
   ArgonPrimitivesBalanceChangeAccountOrigin,
   ArgonPrimitivesBalanceChangeMerkleProof,
   ArgonPrimitivesBitcoinBitcoinBlock,
@@ -60,6 +62,7 @@ import type {
   ArgonPrimitivesNotebookNotebookAuditResult,
   ArgonPrimitivesNotebookNotebookHeader,
   ArgonPrimitivesNotebookSignedNotebookHeader,
+  ArgonPrimitivesPriceIndex,
   ArgonPrimitivesProvidersBlockSealerInfo,
   ArgonPrimitivesProvidersOperationalRewardKind,
   ArgonPrimitivesTickTicker,
@@ -264,13 +267,22 @@ import type {
   PalletPriceIndexEthereumPriceFrameAccumulator,
   PalletPriceIndexEthereumPriceIndex,
   PalletPriceIndexEvent,
-  PalletPriceIndexPriceIndex,
   PalletProxyAnnouncement,
   PalletProxyCall,
   PalletProxyDepositKind,
   PalletProxyError,
   PalletProxyEvent,
   PalletProxyProxyDefinition,
+  PalletStabilizerBuysAccountBuys,
+  PalletStabilizerBuysAuction,
+  PalletStabilizerBuysBuyPayout,
+  PalletStabilizerBuysCall,
+  PalletStabilizerBuysError,
+  PalletStabilizerBuysEvent,
+  PalletStabilizerBuysHoldReason,
+  PalletStabilizerBuysIneligibleReason,
+  PalletStabilizerBuysPriceHistoryHourlyPriceReference,
+  PalletStabilizerBuysUniswapPurchasePurchasePool,
   PalletSudoCall,
   PalletSudoError,
   PalletSudoEvent,
@@ -296,6 +308,7 @@ import type {
   PalletTreasuryLockedFrameBondTerms,
   PalletTreasuryLockedFrameVaultTerms,
   PalletTreasuryPositionsPosition,
+  PalletTreasuryRewardReserveBalances,
   PalletTreasuryVaultBondState,
   PalletTreasuryVaultSecuritizationPosition,
   PalletTxPauseCall,
@@ -345,6 +358,8 @@ declare module '@polkadot/types/types/registry' {
     ArgonNotaryAuditErrorVerifyError: ArgonNotaryAuditErrorVerifyError;
     ArgonPrimitivesAccountAccountType: ArgonPrimitivesAccountAccountType;
     ArgonPrimitivesAmountRankAmountRankKey: ArgonPrimitivesAmountRankAmountRankKey;
+    ArgonPrimitivesAmountRankAscendingRankKeyAccountId32: ArgonPrimitivesAmountRankAscendingRankKeyAccountId32;
+    ArgonPrimitivesAmountRankAscendingRankKeyU64: ArgonPrimitivesAmountRankAscendingRankKeyU64;
     ArgonPrimitivesBalanceChangeAccountOrigin: ArgonPrimitivesBalanceChangeAccountOrigin;
     ArgonPrimitivesBalanceChangeMerkleProof: ArgonPrimitivesBalanceChangeMerkleProof;
     ArgonPrimitivesBitcoinBitcoinBlock: ArgonPrimitivesBitcoinBitcoinBlock;
@@ -396,6 +411,7 @@ declare module '@polkadot/types/types/registry' {
     ArgonPrimitivesNotebookNotebookAuditResult: ArgonPrimitivesNotebookNotebookAuditResult;
     ArgonPrimitivesNotebookNotebookHeader: ArgonPrimitivesNotebookNotebookHeader;
     ArgonPrimitivesNotebookSignedNotebookHeader: ArgonPrimitivesNotebookSignedNotebookHeader;
+    ArgonPrimitivesPriceIndex: ArgonPrimitivesPriceIndex;
     ArgonPrimitivesProvidersBlockSealerInfo: ArgonPrimitivesProvidersBlockSealerInfo;
     ArgonPrimitivesProvidersOperationalRewardKind: ArgonPrimitivesProvidersOperationalRewardKind;
     ArgonPrimitivesTickTicker: ArgonPrimitivesTickTicker;
@@ -600,13 +616,22 @@ declare module '@polkadot/types/types/registry' {
     PalletPriceIndexEthereumPriceFrameAccumulator: PalletPriceIndexEthereumPriceFrameAccumulator;
     PalletPriceIndexEthereumPriceIndex: PalletPriceIndexEthereumPriceIndex;
     PalletPriceIndexEvent: PalletPriceIndexEvent;
-    PalletPriceIndexPriceIndex: PalletPriceIndexPriceIndex;
     PalletProxyAnnouncement: PalletProxyAnnouncement;
     PalletProxyCall: PalletProxyCall;
     PalletProxyDepositKind: PalletProxyDepositKind;
     PalletProxyError: PalletProxyError;
     PalletProxyEvent: PalletProxyEvent;
     PalletProxyProxyDefinition: PalletProxyProxyDefinition;
+    PalletStabilizerBuysAccountBuys: PalletStabilizerBuysAccountBuys;
+    PalletStabilizerBuysAuction: PalletStabilizerBuysAuction;
+    PalletStabilizerBuysBuyPayout: PalletStabilizerBuysBuyPayout;
+    PalletStabilizerBuysCall: PalletStabilizerBuysCall;
+    PalletStabilizerBuysError: PalletStabilizerBuysError;
+    PalletStabilizerBuysEvent: PalletStabilizerBuysEvent;
+    PalletStabilizerBuysHoldReason: PalletStabilizerBuysHoldReason;
+    PalletStabilizerBuysIneligibleReason: PalletStabilizerBuysIneligibleReason;
+    PalletStabilizerBuysPriceHistoryHourlyPriceReference: PalletStabilizerBuysPriceHistoryHourlyPriceReference;
+    PalletStabilizerBuysUniswapPurchasePurchasePool: PalletStabilizerBuysUniswapPurchasePurchasePool;
     PalletSudoCall: PalletSudoCall;
     PalletSudoError: PalletSudoError;
     PalletSudoEvent: PalletSudoEvent;
@@ -632,6 +657,7 @@ declare module '@polkadot/types/types/registry' {
     PalletTreasuryLockedFrameBondTerms: PalletTreasuryLockedFrameBondTerms;
     PalletTreasuryLockedFrameVaultTerms: PalletTreasuryLockedFrameVaultTerms;
     PalletTreasuryPositionsPosition: PalletTreasuryPositionsPosition;
+    PalletTreasuryRewardReserveBalances: PalletTreasuryRewardReserveBalances;
     PalletTreasuryVaultBondState: PalletTreasuryVaultBondState;
     PalletTreasuryVaultSecuritizationPosition: PalletTreasuryVaultSecuritizationPosition;
     PalletTxPauseCall: PalletTxPauseCall;

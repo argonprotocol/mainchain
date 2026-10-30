@@ -2,7 +2,8 @@ use super::{
 	ArgonotBondLots, BondLot, BondLotById, BondLotIdsByAccount, BondLotIdsByVault, BondLotSummary,
 	BondLotsByVault, BondProgram, BondProgramId, BondReleaseReason,
 	CurrentFrameArgonotBondParticipants, CurrentFrameVaultBitcoin, CurrentFrameVaultCapital,
-	HoldReason, PendingBondReleaseRetryCursor, PendingBondReleasesByFrame, TotalArgonBondLots,
+	HoldReason, PendingBondReleaseRetryCursor, PendingBondReleasesByFrame, RewardReserves,
+	TotalArgonBondLots,
 };
 use crate::{
 	mock::{
@@ -11,11 +12,12 @@ use crate::{
 		AvailableSecuritizationSpace, AverageArgonotPriceInMicrogons, Balances, BidPoolAccountId,
 		CurrentFrameId, ExistentialDeposit, LastAverageArgonotPriceFrame, LastOperationalBondTotal,
 		LastVaultProfits, MaxActiveArgonotBondLots, MaxArgonBondLots,
-		MaxArgonotBondedPercentOfCirculation, MaxVaultsPerPool, MinimumArgonsPerContributor,
-		MintedBitcoinMicrogons, Ownership, RuntimeEvent, RuntimeHoldReason, RuntimeOrigin, System,
-		Test, TestAccountId, TestVault, Treasury, TreasuryExitDelayFrames, TreasuryPositions,
-		TreasuryReservesAccountId, Upstreams, VaultArgonotMicronots, VaultBitcoinSatoshis,
-		VaultRewardCommittedMicronots, VaultSecuritizedSatoshis, VaultsById,
+		MaxArgonotBondedPercentOfCirculation, MaxVaultsPerPool, MinimumArgonsPerContributor, Mint,
+		MintedBitcoinMicrogons, Ownership, PurchasePool, PurchaseTick, RuntimeEvent,
+		RuntimeHoldReason, RuntimeOrigin, StabilizerBuys, System, Test, TestAccountId, TestVault,
+		Treasury, TreasuryExitDelayFrames, TreasuryPositions, TreasuryReservesAccountId, Upstreams,
+		VaultArgonotMicronots, VaultBitcoinSatoshis, VaultRewardCommittedMicronots,
+		VaultSecuritizedSatoshis, VaultsById,
 	},
 	pallet::{
 		BondLotEarningsMetrics, Bonds, Error, FrameVaultCapital, TargetBitcoinPercent,
@@ -23,13 +25,18 @@ use crate::{
 	},
 };
 use argon_primitives::{
-	treasury::{NetworkPositionQuantities, TreasuryPositionProvider},
+	treasury::{NetworkPositionQuantities, TreasuryPositionProvider, TreasuryRewardProvider},
 	vault::{TreasuryBonusApprovalProof, TREASURY_BONUS_APPROVAL_PROOF_MESSAGE_KEY},
-	OperationalRewardsPayer, Signature, TreasuryPoolProvider, MICROGONS_PER_ARGON,
+	BitcoinFissionMinting, OnNewSlot, OperationalRewardsPayer, PriceIndex, PriceIndexUpdated,
+	Signature, TreasuryPoolProvider, MICROGONS_PER_ARGON,
 };
 use frame_support::{
-	assert_err, assert_ok,
-	traits::fungible::{Inspect, InspectHold, Unbalanced},
+	assert_err, assert_noop, assert_ok,
+	storage::with_storage_layer,
+	traits::{
+		fungible::{Inspect, InspectHold, Unbalanced},
+		Hooks,
+	},
 };
 use pallet_prelude::*;
 use sp_core::{blake2_256, Pair};
@@ -1252,14 +1259,65 @@ fn locked_frame_terms_capture_the_first_flexibility_change_only() {
 		let lot = BondLotById::<Test>::get(lot_id).unwrap();
 		assert_eq!(lot.last_frame_earnings, Some(1_500_000));
 		assert!(lot.locked_frame_terms.is_none());
+		let vault_paid: Balance =
+			LastVaultProfits::get().iter().map(|earnings| earnings.earnings_for_vault).sum();
+		assert!(vault_paid > 0);
+		assert_eq!(Treasury::available_budget(), 51 * MICROGONS_PER_ARGON - vault_paid);
 	});
 }
 
 #[test]
-fn fixed_pools_are_reserved_and_burned_even_without_participants() {
+fn unpaid_vault_reserves_preserve_pending_bitcoin_mint_capacity() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		assert_ok!(Balances::mint_into(&BidPoolAccountId::get(), 100 * MICROGONS_PER_ARGON));
+		assert_ok!(Balances::mint_into(&account(1), 200 * MICROGONS_PER_ARGON));
+		pallet_mint::MintedBitcoinMicrogons::<Test>::put(100 * MICROGONS_PER_ARGON);
+
+		let recipient = account(2);
+		// A 500-ARGON entitlement pays a 50-ARGON chunk per frame.
+		assert_ok!(Mint::request_mint(&recipient, 0, 1, 500 * MICROGONS_PER_ARGON));
+		Treasury::distribute_bid_pool(1);
+		let burned = pallet_mint::BlockMintAction::<Test>::get().1.argon_burned;
+		assert_eq!(Balances::total_issuance(), 220 * MICROGONS_PER_ARGON);
+		assert_eq!(Treasury::available_budget(), 51 * MICROGONS_PER_ARGON);
+
+		CurrentFrameId::set(2);
+		System::set_block_number(2);
+		Mint::on_initialize(2);
+
+		// Underreporting the burn leaves only 49 ARGON of capacity and blocks this chunk.
+		assert_eq!(Balances::balance(&recipient), 50 * MICROGONS_PER_ARGON);
+		assert_eq!(
+			pallet_mint::PendingBitcoinMintsByIndex::<Test>::get(0)
+				.unwrap()
+				.remaining_amount,
+			450 * MICROGONS_PER_ARGON
+		);
+		assert_eq!(pallet_mint::MintedBitcoinMicrogons::<Test>::get(), 110 * MICROGONS_PER_ARGON);
+		assert_eq!(Balances::total_issuance(), 270 * MICROGONS_PER_ARGON);
+		assert_eq!(Treasury::available_budget(), 51 * MICROGONS_PER_ARGON);
+		assert_eq!(burned, 80 * MICROGONS_PER_ARGON);
+	});
+}
+
+#[test]
+fn bid_pool_reserves_fund_purchase_rewards_at_maturity() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		assert_ok!(Balances::mint_into(&BidPoolAccountId::get(), 100 * MICROGONS_PER_ARGON));
+
+		assert_noop!(
+			with_storage_layer(|| -> DispatchResult {
+				Treasury::distribute_bid_pool(1);
+				assert_eq!(Treasury::available_budget(), 51 * MICROGONS_PER_ARGON);
+				Err(DispatchError::Other("settlement failed"))
+			}),
+			DispatchError::Other("settlement failed")
+		);
+		assert_eq!(Treasury::available_budget(), 0);
+		assert_eq!(Balances::balance(&BidPoolAccountId::get()), 100 * MICROGONS_PER_ARGON);
+		assert_eq!(pallet_mint::BlockMintAction::<Test>::get().1.argon_burned, 0);
 
 		Treasury::distribute_bid_pool(1);
 
@@ -1280,6 +1338,123 @@ fn fixed_pools_are_reserved_and_burned_even_without_participants() {
 			})
 			.expect("distribution event");
 		assert_eq!(distribution, (0, 80 * MICROGONS_PER_ARGON, 20 * MICROGONS_PER_ARGON));
+		assert_eq!(Treasury::available_budget(), 51 * MICROGONS_PER_ARGON);
+		// Mint accounts for all 80 removed from issuance, including the reserved 51.
+		assert_eq!(
+			pallet_mint::BlockMintAction::<Test>::get().1.argon_burned,
+			80 * MICROGONS_PER_ARGON
+		);
+		let reserve_updates: Vec<_> = System::events()
+			.into_iter()
+			.filter_map(|record| match record.event {
+				RuntimeEvent::Treasury(crate::Event::RewardReservesUpdated { reserves }) =>
+					Some(reserves),
+				_ => None,
+			})
+			.collect();
+		assert_eq!(reserve_updates, vec![RewardReserves::<Test>::get()]);
+
+		// The reserve remains unissued through purchase admission and bidding.
+		ExistentialDeposit::set(1);
+		CurrentFrameId::set(1);
+		PurchaseTick::set(1);
+		StabilizerBuys::on_price_index(&PriceIndex {
+			btc_usd_price: FixedU128::from_u32(60_000),
+			argonot_usd_price: FixedU128::one(),
+			argon_usd_price: FixedU128::one(),
+			argon_usd_target_price: FixedU128::one(),
+			argon_time_weighted_average_liquidity: 1,
+			tick: 1,
+			usdc_usd_price: Some(FixedU128::one()),
+		});
+		let owner = account(1);
+		let pool = PurchasePool::get();
+		pallet_stabilizer_buys::ApprovedPool::<Test>::put(&pool);
+		assert_ok!(Balances::mint_into(&owner, 100 * MICROGONS_PER_ARGON));
+		assert_ok!(StabilizerBuys::record_transferred_purchase(
+			&owner,
+			&pallet_stabilizer_buys::UniswapPurchase {
+				chain_id: pool.chain_id,
+				pool_manager: pool.pool_manager,
+				pool_id: pool.pool_id,
+				usdc_token: pool.usdc_token,
+				usdc_spent: U256::from(90_000_000u64),
+				principal: 100 * MICROGONS_PER_ARGON,
+				sqrt_price_before_x96: U256::one() << 76,
+				sqrt_price_after_x96: U256::one() << 77,
+				tick: 1,
+			}
+		));
+		CurrentFrameId::set(2);
+		StabilizerBuys::on_frame_start(2);
+		assert_eq!(Treasury::available_budget(), 42 * MICROGONS_PER_ARGON);
+		assert_ok!(StabilizerBuys::bid(origin(1), 1, Percent::from_percent(50)));
+		CurrentFrameId::set(3);
+		StabilizerBuys::on_frame_start(3);
+		PurchaseTick::set(10);
+		StabilizerBuys::on_initialize(2);
+		assert_eq!(Balances::total_issuance(), 120 * MICROGONS_PER_ARGON);
+		assert_eq!(Balances::balance(&owner), 0);
+		assert_eq!(crate::OutstandingPurchaseRewards::<Test>::get(), 0);
+
+		// A caller failure restores allocation, unused funding, holds and issuance together.
+		PurchaseTick::set(11);
+		assert_noop!(
+			with_storage_layer(|| -> DispatchResult {
+				StabilizerBuys::on_initialize(3);
+				assert_eq!(Balances::balance(&owner), 105 * MICROGONS_PER_ARGON);
+				assert_eq!(Treasury::available_budget(), 46 * MICROGONS_PER_ARGON);
+				Err(DispatchError::Other("delivery failed"))
+			}),
+			DispatchError::Other("delivery failed")
+		);
+		assert_eq!(Treasury::available_budget(), 42 * MICROGONS_PER_ARGON);
+		assert_eq!(Balances::total_issuance(), 120 * MICROGONS_PER_ARGON);
+
+		StabilizerBuys::on_initialize(4);
+		assert_eq!(Balances::balance(&owner), 105 * MICROGONS_PER_ARGON);
+		assert_eq!(Balances::total_issuance(), 125 * MICROGONS_PER_ARGON);
+		assert_eq!(Treasury::available_budget(), 46 * MICROGONS_PER_ARGON);
+		assert_eq!(RewardReserves::<Test>::get().marketing, 0);
+		assert_eq!(RewardReserves::<Test>::get().bitcoin_liquids, 0);
+		assert_eq!(crate::OutstandingPurchaseRewards::<Test>::get(), 0);
+		assert_eq!(
+			Balances::balance_on_hold(
+				&pallet_stabilizer_buys::HoldReason::PurchasePrincipal.into(),
+				&owner
+			),
+			0
+		);
+		assert!(pallet_stabilizer_buys::PurchasesByAccount::<Test>::iter_prefix(&owner)
+			.next()
+			.is_none());
+		StabilizerBuys::on_initialize(5);
+		assert_eq!(Balances::total_issuance(), 125 * MICROGONS_PER_ARGON);
+	});
+}
+
+#[test]
+fn purchase_reward_mint_failure_preserves_the_award_for_retry() {
+	new_test_ext().execute_with(|| {
+		ExistentialDeposit::set(10);
+		RewardReserves::<Test>::mutate(|reserves| reserves.liquidity_buys = 10);
+		assert_noop!(Treasury::reserve_budget(11), TokenError::FundsUnavailable);
+		assert_ok!(Treasury::reserve_budget(10));
+		assert_ok!(Treasury::commit_reward(3));
+		assert_ok!(Treasury::return_budget(7));
+		assert_eq!(Treasury::available_budget(), 7);
+		assert_eq!(Balances::total_issuance(), 0);
+
+		let owner = account(1);
+		assert_noop!(Treasury::pay_reward(&owner, 3), TokenError::BelowMinimum);
+		assert_eq!(crate::OutstandingPurchaseRewards::<Test>::get(), 3);
+		assert_eq!(Balances::total_issuance(), 0);
+		assert_ok!(Balances::mint_into(&owner, 10));
+		assert_ok!(Treasury::pay_reward(&owner, 3));
+		assert_eq!(Balances::balance(&owner), 13);
+		assert_eq!(Balances::total_issuance(), 13);
+		assert_eq!(crate::OutstandingPurchaseRewards::<Test>::get(), 0);
+		assert_noop!(Treasury::pay_reward(&owner, 3), ArithmeticError::Underflow);
 	});
 }
 

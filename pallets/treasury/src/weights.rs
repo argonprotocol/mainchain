@@ -1,6 +1,9 @@
 use super::Config;
 use argon_primitives::{
-	treasury::{TreasuryPositionProvider, TreasuryPositionProviderWeightInfo},
+	treasury::{
+		TreasuryPositionProvider, TreasuryPositionProviderWeightInfo,
+		TreasuryRewardProviderWeightInfo,
+	},
 	vault::{TreasuryVaultProvider, TreasuryVaultProviderWeightInfo},
 	OperationalAccountProvider, OperationalAccountProviderWeightInfo, OperationalAccountsHook,
 	OperationalAccountsHookWeightInfo, OperationalRewardsPayerWeightInfo,
@@ -32,6 +35,12 @@ pub trait WeightInfo {
 	fn provider_encumber_bond_microgons() -> Weight;
 	fn provider_release_encumbered_bond_microgons() -> Weight;
 	fn provider_burn_encumbered_bond_microgons(lots: u32) -> Weight;
+	fn provider_available_reward_budget() -> Weight;
+	fn provider_reserve_reward_budget() -> Weight;
+	fn provider_commit_reward() -> Weight;
+	fn provider_return_reward_budget() -> Weight;
+	fn provider_pay_reward() -> Weight;
+	fn provider_pay_reward_new_account() -> Weight;
 }
 
 pub struct WithProviderWeights<T, Base>(core::marker::PhantomData<(T, Base)>);
@@ -176,6 +185,29 @@ where
 			.saturating_add(PositionWeights::<T>::position_updated().saturating_mul(lots.into()))
 			.saturating_add(OperationalHookWeights::<T>::account_vault_bond_total_updated())
 	}
+	fn provider_available_reward_budget() -> Weight {
+		Base::provider_available_reward_budget()
+	}
+
+	fn provider_reserve_reward_budget() -> Weight {
+		Base::provider_reserve_reward_budget()
+	}
+
+	fn provider_commit_reward() -> Weight {
+		Base::provider_commit_reward()
+	}
+
+	fn provider_return_reward_budget() -> Weight {
+		Base::provider_return_reward_budget()
+	}
+
+	fn provider_pay_reward() -> Weight {
+		Base::provider_pay_reward()
+	}
+
+	fn provider_pay_reward_new_account() -> Weight {
+		Base::provider_pay_reward_new_account()
+	}
 }
 
 pub struct ProviderWeightAdapter<T>(core::marker::PhantomData<T>);
@@ -280,10 +312,51 @@ impl WeightInfo for () {
 	fn provider_burn_encumbered_bond_microgons(_: u32) -> Weight {
 		Weight::zero()
 	}
+	fn provider_available_reward_budget() -> Weight {
+		Weight::zero()
+	}
+
+	fn provider_reserve_reward_budget() -> Weight {
+		Weight::zero()
+	}
+
+	fn provider_commit_reward() -> Weight {
+		Weight::zero()
+	}
+
+	fn provider_return_reward_budget() -> Weight {
+		Weight::zero()
+	}
+
+	fn provider_pay_reward() -> Weight {
+		Weight::zero()
+	}
+
+	fn provider_pay_reward_new_account() -> Weight {
+		Weight::zero()
+	}
 }
 
 impl<T: Config> OperationalRewardsPayerWeightInfo for ProviderWeightAdapter<T> {
 	fn claim_reward() -> Weight {
 		T::WeightInfo::claim_reward()
+	}
+}
+
+impl<T: Config> TreasuryRewardProviderWeightInfo for ProviderWeightAdapter<T> {
+	fn available_budget() -> Weight {
+		T::WeightInfo::provider_available_reward_budget()
+	}
+	fn reserve_budget() -> Weight {
+		T::WeightInfo::provider_reserve_reward_budget()
+	}
+	fn commit_reward() -> Weight {
+		T::WeightInfo::provider_commit_reward()
+	}
+	fn return_budget() -> Weight {
+		T::WeightInfo::provider_return_reward_budget()
+	}
+	fn pay_reward() -> Weight {
+		T::WeightInfo::provider_pay_reward().max(T::WeightInfo::provider_pay_reward_new_account())
 	}
 }

@@ -516,7 +516,7 @@ impl<T: Config> Pallet<T> {
 		chain_config: &ChainConfig,
 		log: &EthereumLog,
 	) -> Result<DecodedGatewayActivity<T>, DispatchError> {
-		let ChainConfig::Evm { gateway, .. } = chain_config;
+		let ChainConfig::Evm { gateway, chain_id, .. } = chain_config;
 		ensure!(log.address == *gateway, Error::<T>::UnsupportedGateway);
 		let Some(first_topic) = log.topics.first() else {
 			return Err(Error::<T>::InvalidGatewayActivity.into());
@@ -546,6 +546,7 @@ impl<T: Config> Pallet<T> {
 			)
 			.map_err(|_| Error::<T>::InvalidGatewayActivity)?;
 			return Ok(DecodedGatewayActivity::TransferToArgonFromSwap {
+				chain_id: *chain_id,
 				buyer: H160::from_slice(activity.purchase.buyer.as_slice()),
 				gateway: log.address,
 				token: H160::from_slice(activity.token.as_slice()),

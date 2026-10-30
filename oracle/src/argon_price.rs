@@ -3,10 +3,9 @@ use crate::uniswap_oracle::{
 	USDC_ADDRESS_SEPOLIA,
 };
 use anyhow::{Context, Result};
-use argon_client::api::runtime_types::pallet_price_index::PriceIndex;
 use argon_primitives::{
 	tick::{Tick, Ticker},
-	ARGON_TOKEN_SYMBOL,
+	PriceIndex, ARGON_TOKEN_SYMBOL,
 };
 use polkadot_sdk::*;
 use sp_runtime::{traits::One, FixedI128, FixedPointNumber, FixedU128, Saturating};
@@ -43,7 +42,7 @@ impl ArgonPriceLookup {
 			last_price: last_price
 				.as_ref()
 				.map(|a| PriceAndLiquidity {
-					price: FixedU128::from_inner(a.argon_usd_price.0),
+					price: a.argon_usd_price,
 					liquidity: a.argon_time_weighted_average_liquidity,
 				})
 				.unwrap_or(PriceAndLiquidity { price: FixedU128::from_u32(1), liquidity: 0 }),
