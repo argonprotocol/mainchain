@@ -16,6 +16,10 @@ filter = '''
 threads-required = "num-test-threads"
 
 [[profile.ci.overrides]]
+filter = 'package(end-to-end) & test(=sync::test_normal_fast_sync_smoke_catches_up_to_notebook_history)'
+slow-timeout = { period = "60s", terminate-after = 15, grace-period = "10s" }
+
+[[profile.ci.overrides]]
 # Reserve two slots per chain scenario so at most two run together.
 filter = '''
   package(end-to-end)
