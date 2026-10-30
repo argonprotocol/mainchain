@@ -3509,9 +3509,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				142u8, 140u8, 80u8, 52u8, 123u8, 210u8, 177u8, 89u8, 26u8, 32u8, 94u8, 155u8,
-				167u8, 145u8, 72u8, 233u8, 84u8, 82u8, 112u8, 10u8, 152u8, 5u8, 144u8, 46u8, 113u8,
-				30u8, 200u8, 128u8, 103u8, 32u8, 234u8, 85u8,
+				161u8, 229u8, 19u8, 21u8, 148u8, 218u8, 199u8, 146u8, 241u8, 25u8, 56u8, 228u8,
+				86u8, 63u8, 242u8, 50u8, 136u8, 180u8, 176u8, 188u8, 51u8, 104u8, 136u8, 197u8,
+				35u8, 81u8, 71u8, 213u8, 219u8, 78u8, 79u8, 62u8,
 			]
 	}
 	pub mod system {
@@ -25323,6 +25323,22 @@ pub mod api {
 							231u8, 249u8, 200u8, 252u8, 73u8, 244u8, 170u8, 51u8, 177u8, 106u8,
 							47u8, 114u8, 234u8, 84u8, 104u8, 62u8, 118u8, 227u8, 50u8, 225u8,
 							122u8,
+						],
+					)
+				}
+				#[doc = " Maximum share of the full bid pool paid for vault Bitcoin participation."]
+				pub fn vault_bitcoin_reward_percent(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					runtime_types::sp_arithmetic::per_things::Permill,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"Treasury",
+						"VaultBitcoinRewardPercent",
+						[
+							65u8, 93u8, 120u8, 165u8, 204u8, 81u8, 159u8, 163u8, 93u8, 135u8,
+							114u8, 121u8, 147u8, 35u8, 215u8, 213u8, 4u8, 223u8, 83u8, 37u8, 225u8,
+							200u8, 189u8, 156u8, 140u8, 36u8, 58u8, 46u8, 42u8, 232u8, 155u8, 0u8,
 						],
 					)
 				}

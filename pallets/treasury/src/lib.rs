@@ -203,6 +203,10 @@ pub mod pallet {
 		#[pallet::constant]
 		type MinimumVaultProfitPercent: Get<Percent>;
 
+		/// Maximum share of the full bid pool paid for vault Bitcoin participation.
+		#[pallet::constant]
+		type VaultBitcoinRewardPercent: Get<Permill>;
+
 		/// Maximum rewarded Argonot value as a multiple of the vault's Argon securitization.
 		/// Zero disables Argonot backing requirements and bonuses.
 		#[pallet::constant]
@@ -1582,7 +1586,7 @@ pub mod pallet {
 				return (T::Balance::zero(), 0);
 			};
 			let Some(frame_bitcoin) = frame_bitcoin else {
-				return Self::distribute_vault_pool_without_bitcoin_snapshot(
+				return Self::distribute_runtime_160_vault_pool(
 					frame_id,
 					bid_pool_account,
 					full_bid_pool_amount,
@@ -1606,9 +1610,10 @@ pub mod pallet {
 			);
 			let vault_rate =
 				FixedU128::from_rational(T::PercentForVaultPool::get().deconstruct() as u128, 100);
-			// The minimum rate rewards securitization; Bitcoin and bonds split the rest 90/10.
+			// Securitization earns 5%, Bitcoin 42.835%, and bonds the remaining 3.165%.
 			let variable_rate = vault_rate.saturating_sub(securitization_rate);
-			let bitcoin_rate = variable_rate.saturating_mul(FixedU128::from_rational(9, 10));
+			let bitcoin_rate =
+				FixedU128::from(T::VaultBitcoinRewardPercent::get()).min(variable_rate);
 			let bond_rate = variable_rate.saturating_sub(bitcoin_rate);
 
 			let argonot_multiplier = T::ArgonotSecuritizationMultiplier::get();
@@ -1712,7 +1717,7 @@ pub mod pallet {
 			(distributed, frame_capital.vault_securitization_positions.len() as u32)
 		}
 
-		fn distribute_vault_pool_without_bitcoin_snapshot(
+		fn distribute_runtime_160_vault_pool(
 			frame_id: FrameId,
 			bid_pool_account: &T::AccountId,
 			full_bid_pool_amount: T::Balance,
@@ -1720,10 +1725,8 @@ pub mod pallet {
 		) -> (T::Balance, u32) {
 			let denominator =
 				frame_capital.target_securitization.max(frame_capital.total_securitization);
-			let minimum_profit_rate = FixedU128::from_rational(
-				T::MinimumVaultProfitPercent::get().deconstruct() as u128,
-				100,
-			);
+			// Snapshots store positions, not rates; settle runtime 160 at its original 1% floor.
+			let runtime_160_profit_floor = FixedU128::from_rational(1, 100);
 			let maximum_profit_rate =
 				FixedU128::from_rational(T::PercentForVaultPool::get().deconstruct() as u128, 100);
 
@@ -1777,8 +1780,8 @@ pub mod pallet {
 					),
 				);
 				let core_profit_rate =
-					minimum_profit_rate.saturating_add(core_utilization.saturating_mul(
-						maximum_core_profit_rate.saturating_sub(minimum_profit_rate),
+					runtime_160_profit_floor.saturating_add(core_utilization.saturating_mul(
+						maximum_core_profit_rate.saturating_sub(runtime_160_profit_floor),
 					));
 				let capital_multiplier = FixedU128::from_rational(
 					securitization.saturating_add(argonot_value),
@@ -1793,10 +1796,10 @@ pub mod pallet {
 					.saturating_mul(capital_multiplier)
 					.saturating_mul(argonot_bonus)
 					.min(maximum_profit_rate);
-				let profit_rate = minimum_profit_rate.saturating_add(
+				let profit_rate = runtime_160_profit_floor.saturating_add(
 					position
 						.upstream_participation
-						.saturating_mul(profit_rate.saturating_sub(minimum_profit_rate)),
+						.saturating_mul(profit_rate.saturating_sub(runtime_160_profit_floor)),
 				);
 				let coverage = FixedU128::from_rational(securitization, denominator.into());
 				let earnings =

@@ -1522,11 +1522,11 @@ fn distribution_burns_unfilled_bond_pool_without_reducing_vault_rewards() {
 					treasury_reserves,
 					participating_vaults,
 				}) if *frame_id == 1
-					&& *bid_pool_distributed == 5 * MICROGONS_PER_ARGON
+					&& *bid_pool_distributed == 8_266_000
 					&& *stake_pool_distributed == 0
 					&& *argon_bond_pool_distributed == 2 * MICROGONS_PER_ARGON
-					&& *vault_pool_distributed == 3 * MICROGONS_PER_ARGON
-					&& *burned == 75 * MICROGONS_PER_ARGON
+					&& *vault_pool_distributed == 6_266_000
+					&& *burned == 71_734_000
 					&& *treasury_reserves == 20 * MICROGONS_PER_ARGON
 					&& *participating_vaults == 1
 			)
@@ -1542,8 +1542,8 @@ fn distribution_burns_unfilled_bond_pool_without_reducing_vault_rewards() {
 
 		assert_eq!(LastVaultProfits::get().len(), 1);
 		assert_eq!(LastVaultProfits::get()[0].vault_id, 1);
-		assert_eq!(LastVaultProfits::get()[0].earnings, 3 * MICROGONS_PER_ARGON);
-		assert_eq!(LastVaultProfits::get()[0].earnings_for_vault, 3 * MICROGONS_PER_ARGON);
+		assert_eq!(LastVaultProfits::get()[0].earnings, 6_266_000);
+		assert_eq!(LastVaultProfits::get()[0].earnings_for_vault, 6_266_000);
 		assert_eq!(LastVaultProfits::get()[0].capital_contributed, 4 * MICROGONS_PER_ARGON);
 		assert_eq!(LastVaultProfits::get()[0].capital_contributed_by_vault, 0);
 	});
@@ -1584,7 +1584,7 @@ fn vault_calculator_keeps_idle_payout_at_the_securitization_tier() {
 			assert_ok!(Balances::mint_into(&BidPoolAccountId::get(), 100 * MICROGONS_PER_ARGON));
 			Treasury::distribute_bid_pool(1);
 			let earnings = LastVaultProfits::get().last().unwrap().earnings_for_vault;
-			assert_eq!(earnings, MICROGONS_PER_ARGON);
+			assert_eq!(earnings, 5 * MICROGONS_PER_ARGON);
 		});
 	}
 }
@@ -1592,10 +1592,11 @@ fn vault_calculator_keeps_idle_payout_at_the_securitization_tier() {
 #[test]
 fn vault_reward_tiers_increase_independently() {
 	for (securitization, covered_satoshis, bonds, expected_earnings) in [
-		(10, 0, 0, 500_000),
-		(15, 0, 0, 600_000),
-		(15, 100_000_000, 0, 23_100_000),
-		(15, 100_000_000, 10, 25_600_000),
+		(10, 0, 0, 2_500_000),
+		(15, 0, 0, 3_000_000),
+		(15, 0, 10, 4_582_500),
+		(15, 100_000_000, 0, 24_417_500),
+		(15, 100_000_000, 10, 26_000_000),
 	] {
 		new_test_ext().execute_with(|| {
 			VaultsById::set(Default::default());
@@ -1657,7 +1658,7 @@ fn bounded_vault_bitcoin_share_uses_all_network_covered_satoshis() {
 		assert_ok!(Balances::mint_into(&BidPoolAccountId::get(), 100 * MICROGONS_PER_ARGON));
 		Treasury::distribute_bid_pool(1);
 		assert_eq!(LastVaultProfits::get().len(), 1);
-		assert_eq!(LastVaultProfits::get()[0].earnings_for_vault, 23 * MICROGONS_PER_ARGON);
+		assert_eq!(LastVaultProfits::get()[0].earnings_for_vault, 23_917_500);
 	});
 }
 
@@ -1674,6 +1675,13 @@ fn a_frame_frozen_before_the_bitcoin_snapshot_uses_its_original_formula() {
 		assert_ok!(Balances::mint_into(&BidPoolAccountId::get(), 100 * MICROGONS_PER_ARGON));
 		Treasury::distribute_bid_pool(1);
 		assert_eq!(LastVaultProfits::get()[0].earnings_for_vault, MICROGONS_PER_ARGON);
+
+		CurrentFrameId::set(2);
+		set_target_securitization(10 * MICROGONS_PER_ARGON);
+		Treasury::lock_in_vault_capital(2);
+		assert_ok!(Balances::mint_into(&BidPoolAccountId::get(), 100 * MICROGONS_PER_ARGON));
+		Treasury::distribute_bid_pool(2);
+		assert_eq!(LastVaultProfits::get().last().unwrap().earnings_for_vault, 8_165_000);
 	});
 }
 
@@ -1687,15 +1695,18 @@ fn zero_target_and_empty_variable_tiers_keep_the_securitization_reward() {
 		Treasury::lock_in_vault_capital(1);
 		assert_ok!(Balances::mint_into(&BidPoolAccountId::get(), 100 * MICROGONS_PER_ARGON));
 		Treasury::distribute_bid_pool(1);
-		assert_eq!(LastVaultProfits::get()[0].earnings_for_vault, MICROGONS_PER_ARGON);
+		assert_eq!(LastVaultProfits::get()[0].earnings_for_vault, 5 * MICROGONS_PER_ARGON);
 	});
 }
 
 #[test]
 fn zero_argonot_target_removes_backing_requirements_without_reducing_the_vault_pool() {
-	for (activated, satoshis, bonds, expected_earnings) in
-		[(0, 0, 0, 1), (10, 100_000_000, 0, 46), (10, 100_000_000, 10, 51)]
-	{
+	for (activated, satoshis, bonds, expected_earnings) in [
+		(0, 0, 0, 5_000_000),
+		(0, 0, 10, 8_165_000),
+		(10, 100_000_000, 0, 47_835_000),
+		(10, 100_000_000, 10, 51_000_000),
+	] {
 		for (argonot_backing, argonot_price) in
 			[(0, 0), (20 * MICROGONS_PER_ARGON, MICROGONS_PER_ARGON)]
 		{
@@ -1728,7 +1739,7 @@ fn zero_argonot_target_removes_backing_requirements_without_reducing_the_vault_p
 				Treasury::distribute_bid_pool(1);
 
 				let earnings = LastVaultProfits::get().last().unwrap().earnings_for_vault;
-				assert!(earnings.abs_diff(expected_earnings * MICROGONS_PER_ARGON) <= 1);
+				assert!(earnings.abs_diff(expected_earnings) <= 1);
 			});
 		}
 	}
@@ -1745,21 +1756,21 @@ fn vault_calculator_does_not_reward_unsecuritized_bitcoin() {
 		Treasury::lock_in_vault_capital(1);
 		assert_ok!(Balances::mint_into(&BidPoolAccountId::get(), 100 * MICROGONS_PER_ARGON));
 		Treasury::distribute_bid_pool(1);
-		assert_eq!(LastVaultProfits::get()[0].earnings_for_vault, MICROGONS_PER_ARGON);
+		assert_eq!(LastVaultProfits::get()[0].earnings_for_vault, 5 * MICROGONS_PER_ARGON);
 	});
 }
 
 #[test]
 fn vault_bitcoin_penalty_is_capped_and_does_not_reduce_bond_rewards() {
 	for (securitization, activated, satoshis, bonds, expected_earnings) in [
-		(10, 8, 50_000_000, 0, 23_500_000),
-		(10, 8, 80_000_000, 0, 37_000_000),
-		(10, 10, 100_000_000, 0, 46_000_000),
-		(10, 10, 150_000_000, 0, 41_500_000),
-		(15, 15, 150_000_000, 0, 46_000_000),
-		(10, 10, 200_000_000, 0, 37_000_000),
-		(10, 10, 300_000_000, 0, 37_000_000),
-		(10, 10, 200_000_000, 10, 42_000_000),
+		(10, 8, 50_000_000, 0, 26_417_500),
+		(10, 8, 80_000_000, 0, 39_268_000),
+		(10, 10, 100_000_000, 0, 47_835_000),
+		(10, 10, 150_000_000, 0, 43_551_500),
+		(15, 15, 150_000_000, 0, 47_835_000),
+		(10, 10, 200_000_000, 0, 39_268_000),
+		(10, 10, 300_000_000, 0, 39_268_000),
+		(10, 10, 200_000_000, 10, 42_433_000),
 	] {
 		new_test_ext().execute_with(|| {
 			LastVaultProfits::set(vec![]);
@@ -1848,7 +1859,9 @@ fn vault_calculator_reaches_full_share_with_bitcoin_bonds_and_argonots() {
 		});
 		assert_ok!(Balances::mint_into(&BidPoolAccountId::get(), 100 * MICROGONS_PER_ARGON));
 		Treasury::distribute_bid_pool(1);
-		assert!(LastVaultProfits::get()[0].earnings_for_vault >= 51 * MICROGONS_PER_ARGON - 1);
+		assert!(
+			LastVaultProfits::get()[0].earnings_for_vault.abs_diff(51 * MICROGONS_PER_ARGON) <= 1
+		);
 	});
 }
 
@@ -1882,7 +1895,7 @@ fn bounded_out_vault_share_burns_but_all_bonds_still_earn() {
 			BondLotById::<Test>::get(other_bond_lot_id).unwrap().last_frame_earnings,
 			Some(2_500_000)
 		);
-		assert_eq!(LastVaultProfits::get()[0].earnings_for_vault, 3_000_000);
+		assert_eq!(LastVaultProfits::get()[0].earnings_for_vault, 4_082_500);
 		let distribution = System::events()
 			.into_iter()
 			.find_map(|record| match record.event {
@@ -1901,7 +1914,7 @@ fn bounded_out_vault_share_burns_but_all_bonds_still_earn() {
 				_ => None,
 			})
 			.expect("distribution event");
-		assert_eq!(distribution, (5_000_000, 3_000_000, 72_000_000, 1));
+		assert_eq!(distribution, (5_000_000, 4_082_500, 70_917_500, 1));
 	});
 }
 
@@ -1952,11 +1965,11 @@ fn stake_and_argon_bond_pools_are_paid_before_the_vault_pool() {
 					treasury_reserves,
 					participating_vaults,
 				}) if *frame_id == 1
-					&& *bid_pool_distributed == 26 * MICROGONS_PER_ARGON
+					&& *bid_pool_distributed == 28_165_000
 					&& *stake_pool_distributed == 15 * MICROGONS_PER_ARGON
 					&& *argon_bond_pool_distributed == 5 * MICROGONS_PER_ARGON
-					&& *vault_pool_distributed == 6 * MICROGONS_PER_ARGON
-					&& *burned == 54 * MICROGONS_PER_ARGON
+					&& *vault_pool_distributed == 8_165_000
+					&& *burned == 51_835_000
 					&& *treasury_reserves == 20 * MICROGONS_PER_ARGON
 					&& *participating_vaults == 1
 			)
@@ -1973,8 +1986,8 @@ fn stake_and_argon_bond_pools_are_paid_before_the_vault_pool() {
 
 		assert_eq!(Balances::balance(&TreasuryReservesAccountId::get()), 20_000_000);
 		assert_eq!(LastVaultProfits::get().len(), 1);
-		assert_eq!(LastVaultProfits::get()[0].earnings, 6 * MICROGONS_PER_ARGON);
-		assert_eq!(LastVaultProfits::get()[0].earnings_for_vault, 6_000_000);
+		assert_eq!(LastVaultProfits::get()[0].earnings, 8_165_000);
+		assert_eq!(LastVaultProfits::get()[0].earnings_for_vault, 8_165_000);
 	});
 }
 
@@ -2013,7 +2026,7 @@ fn base_argon_bond_pool_ignores_future_revenue_sharing_terms() {
 		assert_eq!(plain_lot.last_frame_earnings, Some(1_000_000));
 		assert_eq!(bonus_lot.last_frame_earnings, Some(1_000_000));
 		assert_eq!(bonus_lot.cumulative_earnings, plain_lot.cumulative_earnings);
-		assert_eq!(LastVaultProfits::get()[0].earnings_for_vault, 3_000_000);
+		assert_eq!(LastVaultProfits::get()[0].earnings_for_vault, 6_266_000);
 	});
 }
 
@@ -2920,7 +2933,7 @@ fn upstream_bond_principal_is_live_but_the_earnings_multiplier_is_frozen_for_the
 #[test]
 fn upstream_reducer_preserves_the_earnings_floor_and_only_scales_the_uplift() {
 	for (participation, expected_earnings) in
-		[(FixedU128::zero(), 1), (FixedU128::from_rational(1, 2), 26), (FixedU128::one(), 51)]
+		[(FixedU128::zero(), 5), (FixedU128::from_rational(1, 2), 28), (FixedU128::one(), 51)]
 	{
 		new_test_ext().execute_with(|| {
 			MinimumArgonsPerContributor::set(1);

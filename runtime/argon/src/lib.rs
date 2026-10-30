@@ -463,6 +463,7 @@ impl pallet_treasury::Config for Runtime {
 	type PercentForArgonBondPool = PercentForArgonBondPool;
 	type PercentForVaultPool = PercentForVaultPool;
 	type MinimumVaultProfitPercent = MinimumVaultProfitPercent;
+	type VaultBitcoinRewardPercent = VaultBitcoinRewardPercent;
 	type ArgonotSecuritizationMultiplier = ArgonotSecuritizationMultiplier;
 	type DefaultTargetBitcoinPercent = DefaultTargetBitcoinPercent;
 	type MaxVaultsPerPool = MaxVaultsPerPool;
