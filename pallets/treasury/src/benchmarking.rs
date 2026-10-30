@@ -1,6 +1,7 @@
 #![cfg(feature = "runtime-benchmarks")]
 
 use super::*;
+use alloc::boxed::Box;
 use argon_primitives::{
 	vault::{TreasuryBonusApprovalProof, Vault, VaultTerms},
 	MiningFrameTransitionProvider, Signature, TreasuryPoolProvider, MICROGONS_PER_ARGON,
@@ -11,8 +12,10 @@ use pallet_prelude::{
 	argon_primitives::OperationalRewardsPayer,
 	benchmarking::{
 		benchmark_bitcoin_vault_provider_state, reset_benchmark_bitcoin_vault_provider_state,
-		reset_benchmark_operational_accounts_provider_state, reset_benchmark_treasury_positions,
-		set_benchmark_bitcoin_vault_provider_state, BenchmarkBitcoinVaultProviderState,
+		reset_benchmark_operational_accounts_provider_state, reset_benchmark_price_provider_state,
+		reset_benchmark_treasury_positions, set_benchmark_bitcoin_vault_provider_state,
+		set_benchmark_price_provider_state, BenchmarkBitcoinVaultProviderState,
+		BenchmarkPriceProviderState,
 	},
 };
 use polkadot_sdk::{
@@ -25,6 +28,7 @@ use polkadot_sdk::{
 };
 
 const BENCHMARK_FRAME_ID: FrameId = 20;
+const BENCHMARK_RESERVE_BUDGET: u128 = 1_000_000_000 * MICROGONS_PER_ARGON;
 // Benchmark workload sizes, not limits on vault bond lots.
 const BENCHMARK_VAULT_BOND_LOTS: u32 = 100;
 const BENCHMARK_FLEXIBLE_BOND_LOTS_PER_VAULT: u32 = 25;
@@ -268,6 +272,38 @@ mod benchmarks {
 	}
 
 	#[benchmark]
+	fn configure_reward_tapering_policy() -> Result<(), BenchmarkError> {
+		let mut policy = RewardTaperingPolicy::<T>::get();
+		RewardTaperingPolicy::<T>::put(&policy);
+		for program in [
+			&mut policy.bitcoin_liquids,
+			&mut policy.argon_bonds,
+			&mut policy.argonot_stakes,
+			&mut policy.vault_revenue,
+			&mut policy.stabilizer_pools,
+		] {
+			program.target_daily_return = FixedU128::from_rational(4, 1_000);
+			program.target_daily_return_with_price_below_target = Some(BelowTargetPriceYield {
+				target_daily_return: FixedU128::from_rational(1, 1_000),
+				argon_price_drop_for_target: Percent::from_percent(10),
+			});
+		}
+
+		#[extrinsic_call]
+		_(
+			RawOrigin::Root,
+			Some(Box::new(policy.bitcoin_liquids)),
+			Some(Box::new(policy.argon_bonds)),
+			Some(Box::new(policy.argonot_stakes)),
+			Some(Box::new(policy.vault_revenue)),
+			Some(Box::new(policy.stabilizer_pools)),
+		);
+
+		assert_eq!(RewardTaperingPolicy::<T>::get(), policy);
+		Ok(())
+	}
+
+	#[benchmark]
 	fn backfill_bond_lot_earnings() -> Result<(), BenchmarkError> {
 		reset_benchmark_state::<T>();
 		let bonds = minimum_purchase_bonds::<T>();
@@ -302,12 +338,7 @@ mod benchmarks {
 	fn claim_reward() -> Result<(), BenchmarkError> {
 		let payout_account: T::AccountId = account("reward-payout", 0, 0);
 		let reward_amount = balance::<T>(1_000_000_000);
-		let minimum_balance = T::Currency::minimum_balance();
-		let reserves_funding = reward_amount.saturating_add(minimum_balance);
-		let reserves_account = T::TreasuryReservesAccount::get();
-
-		T::Currency::mint_into(&reserves_account, reserves_funding)
-			.map_err(|_| BenchmarkError::Stop("failed to fund treasury reserves"))?;
+		RewardReserves::<T>::mutate(|reserves| reserves.marketing = reward_amount);
 
 		#[block]
 		{
@@ -321,7 +352,7 @@ mod benchmarks {
 		}
 
 		assert_eq!(T::Currency::balance(&payout_account), reward_amount);
-		assert_eq!(T::Currency::balance(&reserves_account), minimum_balance);
+		assert_eq!(RewardReserves::<T>::get().marketing, TreasuryBalanceOf::<T>::zero());
 		Ok(())
 	}
 
@@ -610,6 +641,10 @@ mod benchmarks {
 			Pallet::<T>::distribute_bid_pool(BENCHMARK_FRAME_ID);
 		}
 
+		let reserves = RewardReserves::<T>::get();
+		assert!(reserves.argon_bonds < balance::<T>(BENCHMARK_RESERVE_BUDGET));
+		assert!(reserves.argonot_stakes < balance::<T>(BENCHMARK_RESERVE_BUDGET));
+
 		assert!(
 			CurrentFrameVaultCapital::<T>::get().is_none(),
 			"expected current frame capital to be consumed during distribution",
@@ -665,6 +700,29 @@ mod benchmarks {
 			Pallet::<T>::run_frame_transition(BENCHMARK_FRAME_ID);
 		}
 
+		let reserves = RewardReserves::<T>::get();
+		if b == 14_000 {
+			assert!(reserves.argon_bonds < balance::<T>(BENCHMARK_RESERVE_BUDGET));
+			let owner: T::AccountId = account("frame-bond-holder", 0, 0);
+			let id = BondLotIdsByAccount::<T>::iter_key_prefix(&owner)
+				.next()
+				.ok_or(BenchmarkError::Stop("missing frame bond lot"))?;
+			let lot = BondLotById::<T>::get(id)
+				.ok_or(BenchmarkError::Stop("missing frame bond record"))?;
+			let target = DefaultRewardTaperingPolicy::get()
+				.argon_bonds
+				.target_daily_return
+				.saturating_mul_int(u128::from(lot.bonds) * MICROGONS_PER_ARGON);
+			let paid: u128 = lot.last_frame_earnings.unwrap_or_default().into();
+			assert!(
+				paid >= target.saturating_sub(2),
+				"pool and reserve must both pay the bond lot"
+			);
+		}
+		if s == 1_000 {
+			assert!(reserves.argonot_stakes < balance::<T>(BENCHMARK_RESERVE_BUDGET));
+		}
+
 		assert!(
 			PendingBondReleasesByFrame::<T>::get(BENCHMARK_FRAME_ID).is_empty(),
 			"expected benchmark frame release queue to be emptied",
@@ -695,6 +753,7 @@ fn reset_benchmark_state<T: Config>() {
 	reset_benchmark_bitcoin_vault_provider_state();
 	reset_benchmark_treasury_positions();
 	reset_benchmark_operational_accounts_provider_state();
+	reset_benchmark_price_provider_state();
 }
 
 fn seed_lock_in_vault_capital_state<T: Config>(frame_id: FrameId) -> Result<(), BenchmarkError>
@@ -737,8 +796,17 @@ where
 	)?;
 	Pallet::<T>::lock_in_argonot_bond_participants(frame_id);
 
+	set_benchmark_price_provider_state(BenchmarkPriceProviderState {
+		argon_price_in_usd: Some(FixedU128::from_rational(95, 100)),
+		..Default::default()
+	});
+	RewardReserves::<T>::put(RewardReserveBalances {
+		argon_bonds: balance::<T>(BENCHMARK_RESERVE_BUDGET),
+		argonot_stakes: balance::<T>(BENCHMARK_RESERVE_BUDGET),
+		..Default::default()
+	});
 	let bid_pool_account = T::MiningBidPoolAccount::get();
-	T::Currency::mint_into(&bid_pool_account, balance::<T>(10_000_000_000_000))
+	T::Currency::mint_into(&bid_pool_account, balance::<T>(10 * MICROGONS_PER_ARGON))
 		.map_err(|_| BenchmarkError::Stop("failed to fund bid pool"))?;
 
 	Ok(())
@@ -799,8 +867,17 @@ where
 		payout_frame,
 	)?;
 	Pallet::<T>::lock_in_argonot_bond_participants(payout_frame);
+	set_benchmark_price_provider_state(BenchmarkPriceProviderState {
+		argon_price_in_usd: Some(FixedU128::from_rational(95, 100)),
+		..Default::default()
+	});
+	RewardReserves::<T>::put(RewardReserveBalances {
+		argon_bonds: balance::<T>(BENCHMARK_RESERVE_BUDGET),
+		argonot_stakes: balance::<T>(BENCHMARK_RESERVE_BUDGET),
+		..Default::default()
+	});
 	let bid_pool_account = T::MiningBidPoolAccount::get();
-	T::Currency::mint_into(&bid_pool_account, balance::<T>(10_000_000_000_000))
+	T::Currency::mint_into(&bid_pool_account, balance::<T>(10 * MICROGONS_PER_ARGON))
 		.map_err(|_| BenchmarkError::Stop("failed to fund bid pool"))?;
 	seed_pending_bond_releases::<T>(frame_id, due_releases)?;
 
@@ -1068,6 +1145,11 @@ where
 	C: Mutate<T::AccountId, Balance = T::Balance>
 		+ MutateHold<T::AccountId, Reason = T::RuntimeHoldReason, Balance = T::Balance>,
 {
+	if T::Currency::balance(owner).is_zero() {
+		T::Currency::mint_into(owner, T::Currency::minimum_balance())
+			.map_err(|_| BenchmarkError::Stop("failed to fund reward recipient"))?;
+	}
+
 	if hold_funds {
 		let held_amount = bonds_to_balance::<T>(bonds);
 		C::mint_into(owner, held_amount)

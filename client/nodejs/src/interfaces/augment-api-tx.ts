@@ -69,6 +69,7 @@ import type {
   PalletPriceIndexEthereumPriceIndex,
   PalletPriceIndexPriceIndex,
   PalletTreasuryBondLotEarningsMetrics,
+  PalletTreasuryTaperingProgram,
   PalletVaultsVaultConfig,
   SnowbridgeBeaconPrimitivesBeaconHeader,
   SpConsensusGrandpaEquivocationProof,
@@ -2129,6 +2130,75 @@ declare module '@polkadot/api-base/types/submittable' {
           upstreamParticipationFactor: Option<Percent> | null | Uint8Array | Percent | AnyNumber,
         ) => SubmittableExtrinsic<ApiType>,
         [Option<Percent>, Option<Percent>]
+      >;
+      /**
+       * Update selected reward programs for future frames, preserving omitted programs.
+       **/
+      configureRewardTaperingPolicy: AugmentedSubmittable<
+        (
+          bitcoinLiquids:
+            | Option<PalletTreasuryTaperingProgram>
+            | null
+            | Uint8Array
+            | PalletTreasuryTaperingProgram
+            | {
+                targetDailyReturn?: any;
+                excessRewardPayoutPercent?: any;
+                targetDailyReturnWithPriceBelowTarget?: any;
+              }
+            | string,
+          argonBonds:
+            | Option<PalletTreasuryTaperingProgram>
+            | null
+            | Uint8Array
+            | PalletTreasuryTaperingProgram
+            | {
+                targetDailyReturn?: any;
+                excessRewardPayoutPercent?: any;
+                targetDailyReturnWithPriceBelowTarget?: any;
+              }
+            | string,
+          argonotStakes:
+            | Option<PalletTreasuryTaperingProgram>
+            | null
+            | Uint8Array
+            | PalletTreasuryTaperingProgram
+            | {
+                targetDailyReturn?: any;
+                excessRewardPayoutPercent?: any;
+                targetDailyReturnWithPriceBelowTarget?: any;
+              }
+            | string,
+          vaultRevenue:
+            | Option<PalletTreasuryTaperingProgram>
+            | null
+            | Uint8Array
+            | PalletTreasuryTaperingProgram
+            | {
+                targetDailyReturn?: any;
+                excessRewardPayoutPercent?: any;
+                targetDailyReturnWithPriceBelowTarget?: any;
+              }
+            | string,
+          stabilizerPools:
+            | Option<PalletTreasuryTaperingProgram>
+            | null
+            | Uint8Array
+            | PalletTreasuryTaperingProgram
+            | {
+                targetDailyReturn?: any;
+                excessRewardPayoutPercent?: any;
+                targetDailyReturnWithPriceBelowTarget?: any;
+              }
+            | string,
+        ) => SubmittableExtrinsic<ApiType>,
+        [
+          Option<PalletTreasuryTaperingProgram>,
+          Option<PalletTreasuryTaperingProgram>,
+          Option<PalletTreasuryTaperingProgram>,
+          Option<PalletTreasuryTaperingProgram>,
+          Option<PalletTreasuryTaperingProgram>,
+        ]
       >;
       /**
        * Liquidate one full bond lot. It keeps the locked frame's payout terms and is

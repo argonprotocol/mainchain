@@ -1,3 +1,7 @@
+use frame_support::traits::{
+	fungible::{Balanced, Credit},
+	tokens::{Balance as TokenBalance, Imbalance},
+};
 mod treasury_positions;
 pub use treasury_positions::{
 	reset_benchmark_treasury_positions, BenchmarkTreasuryPositionProvider,
@@ -1572,9 +1576,10 @@ where
 impl<Currency, AccountId, Balance> TreasuryVaultProvider
 	for BenchmarkBitcoinVaultProvider<Currency, AccountId, Balance>
 where
-	Currency: Mutate<AccountId, Balance = Balance>,
+	Currency: Mutate<AccountId, Balance = Balance> + Balanced<AccountId>,
 	AccountId: Codec + Clone + Ord + PartialEq,
-	Balance: Codec
+	Balance: TokenBalance
+		+ Codec
 		+ Copy
 		+ MaxEncodedLen
 		+ Default
@@ -1586,6 +1591,7 @@ where
 		+ Eq
 		+ Sum,
 {
+	type Currency = Currency;
 	type Weights = ();
 	type Balance = Balance;
 	type AccountId = AccountId;
@@ -1674,9 +1680,10 @@ where
 	}
 
 	fn record_vault_frame_earnings(
-		_source_account_id: &Self::AccountId,
+		funding: &mut Credit<Self::AccountId, Self::Currency>,
 		profit: VaultTreasuryFrameEarnings<Self::Balance, Self::AccountId>,
 	) -> DispatchResult {
+		drop(funding.extract(profit.earnings_for_vault));
 		mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
 			state.treasury_frame_earnings.push((profit.vault_id, profit.earnings_for_vault));
 		});

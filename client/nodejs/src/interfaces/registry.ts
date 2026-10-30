@@ -279,6 +279,7 @@ import type {
   PalletTransactionPaymentChargeTransactionPayment,
   PalletTransactionPaymentEvent,
   PalletTransactionPaymentReleases,
+  PalletTreasuryBelowTargetPriceYield,
   PalletTreasuryBondLot,
   PalletTreasuryBondLotEarningsMetrics,
   PalletTreasuryBondLotSummary,
@@ -289,12 +290,16 @@ import type {
   PalletTreasuryError,
   PalletTreasuryEvent,
   PalletTreasuryFrameArgonotBondParticipants,
+  PalletTreasuryFrameRewardTaperingPolicy,
   PalletTreasuryFrameVaultBitcoin,
   PalletTreasuryFrameVaultCapital,
   PalletTreasuryHoldReason,
   PalletTreasuryLockedFrameBondTerms,
   PalletTreasuryLockedFrameVaultTerms,
   PalletTreasuryPositionsPosition,
+  PalletTreasuryRewardReserveBalances,
+  PalletTreasuryTaperingPolicy,
+  PalletTreasuryTaperingProgram,
   PalletTreasuryVaultBondState,
   PalletTreasuryVaultSecuritizationPosition,
   PalletTxPauseCall,
@@ -614,6 +619,7 @@ declare module '@polkadot/types/types/registry' {
     PalletTransactionPaymentChargeTransactionPayment: PalletTransactionPaymentChargeTransactionPayment;
     PalletTransactionPaymentEvent: PalletTransactionPaymentEvent;
     PalletTransactionPaymentReleases: PalletTransactionPaymentReleases;
+    PalletTreasuryBelowTargetPriceYield: PalletTreasuryBelowTargetPriceYield;
     PalletTreasuryBondLot: PalletTreasuryBondLot;
     PalletTreasuryBondLotEarningsMetrics: PalletTreasuryBondLotEarningsMetrics;
     PalletTreasuryBondLotSummary: PalletTreasuryBondLotSummary;
@@ -624,12 +630,16 @@ declare module '@polkadot/types/types/registry' {
     PalletTreasuryError: PalletTreasuryError;
     PalletTreasuryEvent: PalletTreasuryEvent;
     PalletTreasuryFrameArgonotBondParticipants: PalletTreasuryFrameArgonotBondParticipants;
+    PalletTreasuryFrameRewardTaperingPolicy: PalletTreasuryFrameRewardTaperingPolicy;
     PalletTreasuryFrameVaultBitcoin: PalletTreasuryFrameVaultBitcoin;
     PalletTreasuryFrameVaultCapital: PalletTreasuryFrameVaultCapital;
     PalletTreasuryHoldReason: PalletTreasuryHoldReason;
     PalletTreasuryLockedFrameBondTerms: PalletTreasuryLockedFrameBondTerms;
     PalletTreasuryLockedFrameVaultTerms: PalletTreasuryLockedFrameVaultTerms;
     PalletTreasuryPositionsPosition: PalletTreasuryPositionsPosition;
+    PalletTreasuryRewardReserveBalances: PalletTreasuryRewardReserveBalances;
+    PalletTreasuryTaperingPolicy: PalletTreasuryTaperingPolicy;
+    PalletTreasuryTaperingProgram: PalletTreasuryTaperingProgram;
     PalletTreasuryVaultBondState: PalletTreasuryVaultBondState;
     PalletTreasuryVaultSecuritizationPosition: PalletTreasuryVaultSecuritizationPosition;
     PalletTxPauseCall: PalletTxPauseCall;

@@ -318,26 +318,27 @@ impl<T: frame_system::Config> pallet_vaults::WeightInfo for WeightInfo<T> {
 			.saturating_add(T::DbWeight::get().reads(2))
 			.saturating_add(T::DbWeight::get().writes(2))
 		}
+
 	/// Storage: `Vaults::RevenuePerFrameByVault` (r:1 w:1)
 	/// Proof: `Vaults::RevenuePerFrameByVault` (`max_values`: None, `max_size`: Some(2653), added: 5128, mode: `MaxEncodedLen`)
 	/// Storage: `Vaults::VaultsById` (r:1 w:0)
 	/// Proof: `Vaults::VaultsById` (`max_values`: None, `max_size`: Some(26641), added: 29116, mode: `MaxEncodedLen`)
 	/// Storage: `MiningSlot::NextFrameId` (r:1 w:0)
 	/// Proof: `MiningSlot::NextFrameId` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
-	/// Storage: `System::Account` (r:2 w:2)
+	/// Storage: `Vaults::RevenuePerFrameByVaultCount` (r:1 w:1)
+	/// Proof: `Vaults::RevenuePerFrameByVaultCount` (`max_values`: Some(1), `max_size`: Some(4), added: 499, mode: `MaxEncodedLen`)
+	/// Storage: `System::Account` (r:1 w:1)
 	/// Proof: `System::Account` (`max_values`: None, `max_size`: Some(128), added: 2603, mode: `MaxEncodedLen`)
 	/// Storage: `Balances::Holds` (r:1 w:1)
 	/// Proof: `Balances::Holds` (`max_values`: None, `max_size`: Some(211), added: 2686, mode: `MaxEncodedLen`)
-	/// Storage: `Vaults::RevenuePerFrameByVaultCount` (r:1 w:1)
-	/// Proof: `Vaults::RevenuePerFrameByVaultCount` (`max_values`: Some(1), `max_size`: Some(4), added: 499, mode: `MaxEncodedLen`)
 	fn provider_record_vault_frame_earnings() -> Weight {
 		// Proof Size summary in bytes:
-		//  Measured:  `533`
+		//  Measured:  `380`
 		//  Estimated: `30106`
-		// Minimum execution time: 45_000_000 picoseconds.
-		Weight::from_parts(49_000_000, 30106)
-			.saturating_add(T::DbWeight::get().reads(7))
-			.saturating_add(T::DbWeight::get().writes(5))
+		// Minimum execution time: 59_000_000 picoseconds.
+		Weight::from_parts(62_000_000, 30106)
+			.saturating_add(T::DbWeight::get().reads(6))
+			.saturating_add(T::DbWeight::get().writes(4))
 		}
 	/// Storage: `Vaults::VaultsById` (r:1 w:1)
 	/// Proof: `Vaults::VaultsById` (`max_values`: None, `max_size`: Some(26641), added: 29116, mode: `MaxEncodedLen`)

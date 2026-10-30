@@ -1461,6 +1461,10 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       InvalidBonusApprovalSignature: AugmentedError<ApiType>;
       /**
+       * A reward target or the price adjustment window is invalid.
+       **/
+      InvalidRewardTaperingPolicy: AugmentedError<ApiType>;
+      /**
        * The network has reached the direct-payout vault bond lot admission limit.
        **/
       MaxArgonBondLotsExceeded: AugmentedError<ApiType>;

@@ -52,6 +52,8 @@ import type {
   PalletProxyDepositKind,
   PalletTreasuryBondProgramId,
   PalletTreasuryBondReleaseReason,
+  PalletTreasuryRewardReserveBalances,
+  PalletTreasuryTaperingPolicy,
   SpConsensusGrandpaAppPublic,
   SpRuntimeDispatchError,
 } from '@polkadot/types/lookup';
@@ -2003,14 +2005,6 @@ declare module '@polkadot/api-base/types/events' {
         }
       >;
       /**
-       * A fixed or unearned reward allocation could not be burned.
-       **/
-      CouldNotBurnRewardAllocation: AugmentedEvent<
-        ApiType,
-        [frameId: u64, amount: u128, dispatchError: SpRuntimeDispatchError],
-        { frameId: u64; amount: u128; dispatchError: SpRuntimeDispatchError }
-      >;
-      /**
        * An error occurred while paying frame earnings for an Argonot bond lot.
        **/
       CouldNotDistributeEarningsToArgonotBondLot: AugmentedEvent<
@@ -2053,6 +2047,22 @@ declare module '@polkadot/api-base/types/events' {
         }
       >;
       /**
+       * Bid revenue could not be withdrawn for frame distribution.
+       **/
+      CouldNotFundBidPool: AugmentedEvent<
+        ApiType,
+        [frameId: u64, amount: u128, dispatchError: SpRuntimeDispatchError],
+        { frameId: u64; amount: u128; dispatchError: SpRuntimeDispatchError }
+      >;
+      /**
+       * A reserve top-up could not be added to the frame reward funding.
+       **/
+      CouldNotFundReserveTopup: AugmentedEvent<
+        ApiType,
+        [frameId: u64, amount: u128, dispatchError: SpRuntimeDispatchError],
+        { frameId: u64; amount: u128; dispatchError: SpRuntimeDispatchError }
+      >;
+      /**
        * An error occurred while releasing a bond lot.
        **/
       CouldNotReleaseBondLot: AugmentedEvent<
@@ -2075,14 +2085,6 @@ declare module '@polkadot/api-base/types/events' {
         }
       >;
       /**
-       * An error occurred while moving bid-pool funds into treasury reserves.
-       **/
-      CouldNotTransferToTreasuryReserves: AugmentedEvent<
-        ApiType,
-        [frameId: u64, amount: u128, dispatchError: SpRuntimeDispatchError],
-        { frameId: u64; amount: u128; dispatchError: SpRuntimeDispatchError }
-      >;
-      /**
        * Encumbered treasury backing was burned and any no-longer-needed fractional hold was
        * returned.
        **/
@@ -2102,8 +2104,7 @@ declare module '@polkadot/api-base/types/events' {
           stakePoolDistributed: u128,
           argonBondPoolDistributed: u128,
           vaultPoolDistributed: u128,
-          burned: u128,
-          treasuryReserves: u128,
+          reservedFromCirculation: u128,
           participatingVaults: u32,
         ],
         {
@@ -2112,8 +2113,7 @@ declare module '@polkadot/api-base/types/events' {
           stakePoolDistributed: u128;
           argonBondPoolDistributed: u128;
           vaultPoolDistributed: u128;
-          burned: u128;
-          treasuryReserves: u128;
+          reservedFromCirculation: u128;
           participatingVaults: u32;
         }
       >;
@@ -2134,6 +2134,19 @@ declare module '@polkadot/api-base/types/events' {
         ApiType,
         [targetBitcoinPercent: Percent, upstreamParticipationFactor: Percent],
         { targetBitcoinPercent: Percent; upstreamParticipationFactor: Percent }
+      >;
+      /**
+       * Reward reserve balances after frame settlement or a reserve-funded payment.
+       **/
+      RewardReservesUpdated: AugmentedEvent<
+        ApiType,
+        [reserves: PalletTreasuryRewardReserveBalances],
+        { reserves: PalletTreasuryRewardReserveBalances }
+      >;
+      RewardTaperingPolicyConfigured: AugmentedEvent<
+        ApiType,
+        [policy: PalletTreasuryTaperingPolicy],
+        { policy: PalletTreasuryTaperingPolicy }
       >;
     };
     txPause: {

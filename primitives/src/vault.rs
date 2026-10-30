@@ -4,7 +4,14 @@ use alloc::{
 };
 use codec::{Codec, Decode, DecodeWithMemTracking, Encode, HasCompact, MaxEncodedLen};
 use core::iter::Sum;
-use frame_support::{weights::Weight, PalletError};
+use frame_support::{
+	traits::{
+		fungible::{Balanced, Credit},
+		tokens::Balance,
+	},
+	weights::Weight,
+	PalletError,
+};
 use polkadot_sdk::{sp_core::ConstU32, sp_runtime::BoundedBTreeMap, *};
 use scale_info::TypeInfo;
 use sp_arithmetic::{
@@ -253,8 +260,9 @@ impl TreasuryVaultProviderWeightInfo for () {
 }
 
 pub trait TreasuryVaultProvider {
+	type Currency: Balanced<Self::AccountId, Balance = Self::Balance>;
 	type Weights: TreasuryVaultProviderWeightInfo;
-	type Balance: Codec;
+	type Balance: Balance;
 	type AccountId: Codec;
 
 	/// Public admission capacity for upstream participation; unavailable vaults return `None`.
@@ -284,9 +292,9 @@ pub trait TreasuryVaultProvider {
 	/// Ensure a vault is open
 	fn is_vault_open(vault_id: VaultId) -> bool;
 
-	/// Records the earnings for a vault frame
+	/// Records frame earnings and consumes their funding only after the payout is held.
 	fn record_vault_frame_earnings(
-		source_account_id: &Self::AccountId,
+		funding: &mut Credit<Self::AccountId, Self::Currency>,
 		profit: VaultTreasuryFrameEarnings<Self::Balance, Self::AccountId>,
 	) -> sp_runtime::DispatchResult;
 }

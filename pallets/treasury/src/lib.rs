@@ -3,7 +3,12 @@ extern crate alloc;
 extern crate core;
 
 pub use argon_primitives::treasury::{BondTotal, Bonds};
+use frame_support::traits::{
+	fungible::{Balanced, Credit},
+	tokens::{Balance as TokenBalance, Imbalance},
+};
 use pallet_prelude::*;
+use sp_arithmetic::Rounding;
 pub use weights::*;
 
 #[cfg(test)]
@@ -18,7 +23,7 @@ pub mod migrations;
 pub mod weights;
 use argon_primitives::{
 	treasury::{PositionQuantity, TreasuryPositionProvider},
-	OperationalAccountProvider,
+	MiningFrameProvider, OperationalAccountProvider,
 };
 pub use pallet::*;
 
@@ -43,12 +48,13 @@ pub use pallet::*;
 /// after the current frame; regular bonds continue earning even if securitization later falls.
 ///
 /// ## Profits from Bid Pool
-/// Once each bid pool is closed, 20% is reserved for treasury reserves, 15% is paid to Argonot
-/// Stakes, 6% reserved for future mining-operator rewards is burned, and 3% reserved for Bitcoin
-/// Liquids is burned in this release. Argon bonds may earn up to 5% and vaults may earn up to 51%
-/// from independent securitization, covered Bitcoin, and bond tiers measured against the network
-/// securitization target. Target shortfall and rounding are burned. Bond earnings are paid
-/// directly; vault earnings enter the vault collection flow.
+/// After each bid pool closes, configured shares fund marketing and Bitcoin Liquids. Eligible
+/// Argonot stakes, Argon bonds, and vaults receive rewards. Unallocated funds go to the liquidity
+/// buys reserve.
+///
+/// The frame's APY policy tapers excess bond and stake rewards into their own reserves. Excess
+/// vault rewards go to liquidity buys. Bond earnings pay directly; vault earnings enter the
+/// collection flow.
 ///
 /// The limitations on bond purchases are:
 /// - the maximum number of live Argon bond lots while frame payouts are direct
@@ -66,7 +72,7 @@ pub use pallet::*;
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
-	use alloc::{collections::BTreeMap, vec::Vec};
+	use alloc::{boxed::Box, collections::BTreeMap, vec::Vec};
 	pub use argon_primitives::treasury::Bonds;
 	use argon_primitives::{
 		bitcoin::{Satoshis, SATOSHIS_PER_BITCOIN},
@@ -75,7 +81,7 @@ pub mod pallet {
 			TreasuryBonusApprovalProof, TreasuryVaultProvider, TreasuryVaultProviderWeightInfo,
 			VaultSecuritization, VaultTreasuryFrameEarnings,
 		},
-		BitcoinMintedProvider, BlockSealAuthorityId, BurnEventHandler, OnNewSlot, PriceProvider,
+		BitcoinMintedProvider, BlockSealAuthorityId, OnNewSlot, PriceProvider,
 		TreasuryPoolProvider, MICROGONS_PER_ARGON,
 	};
 	use pallet_prelude::argon_primitives::{
@@ -104,7 +110,8 @@ pub mod pallet {
 		type WeightInfo: WeightInfo;
 
 		/// The balance type.
-		type Balance: AtLeast32BitUnsigned
+		type Balance: TokenBalance
+			+ AtLeast32BitUnsigned
 			+ codec::FullCodec
 			+ Copy
 			+ MaybeSerializeDeserialize
@@ -118,7 +125,8 @@ pub mod pallet {
 
 		/// The currency representing argons
 		type Currency: MutateHold<Self::AccountId, Reason = Self::RuntimeHoldReason, Balance = Self::Balance>
-			+ Mutate<Self::AccountId, Balance = Self::Balance>;
+			+ Mutate<Self::AccountId, Balance = Self::Balance>
+			+ Balanced<Self::AccountId, Balance = Self::Balance>;
 
 		/// The currency representing ownership tokens (argonots).
 		type OwnershipCurrency: MutateHold<Self::AccountId, Reason = Self::RuntimeHoldReason, Balance = Self::Balance>
@@ -129,6 +137,7 @@ pub mod pallet {
 
 		/// Provider for vault treasury settings and vault-side earnings collection.
 		type TreasuryVaultProvider: TreasuryVaultProvider<
+			Currency = Self::Currency,
 			Balance = Self::Balance,
 			AccountId = Self::AccountId,
 		>;
@@ -145,9 +154,6 @@ pub mod pallet {
 		type UpstreamBitcoinWeight: Get<Permill>;
 		/// Market prices used to value locked Bitcoin and committed Argonots at frame start.
 		type PriceProvider: PriceProvider<Self::Balance>;
-		/// Records reward allocations burned from circulation.
-		type BurnEventHandler: BurnEventHandler<Self::Balance>;
-
 		/// The minimum whole-bond purchase amount.
 		#[pallet::constant]
 		type MinimumArgonsPerContributor: Get<Self::Balance>;
@@ -171,13 +177,9 @@ pub mod pallet {
 		/// Account that receives mining bid funds before frame distribution.
 		type MiningBidPoolAccount: Get<Self::AccountId>;
 
-		/// Account that holds treasury reserves for claims and reserve-funded payouts.
+		/// Percent of the bid pool held for marketing rewards.
 		#[pallet::constant]
-		type TreasuryReservesAccount: Get<Self::AccountId>;
-
-		/// Percent of the bid pool reserved for treasury reserves.
-		#[pallet::constant]
-		type PercentForTreasuryReserves: Get<Percent>;
+		type PercentForMarketing: Get<Percent>;
 
 		/// Percent of the full bid pool paid to Argonot Stakes.
 		#[pallet::constant]
@@ -187,7 +189,7 @@ pub mod pallet {
 		#[pallet::constant]
 		type PercentForMiningOperatorPool: Get<Percent>;
 
-		/// Percent reserved for Bitcoin Liquids and burned in this release.
+		/// Percent credited to the Bitcoin Liquids reserve.
 		#[pallet::constant]
 		type PercentForBitcoinLiquidPool: Get<Percent>;
 
@@ -224,8 +226,8 @@ pub mod pallet {
 		#[pallet::constant]
 		type TreasuryExitDelayFrames: Get<FrameId>;
 
-		/// Provider for the current mining frame id.
-		type MiningFrameTransitionProvider: MiningFrameTransitionProvider;
+		/// Provider for mining frame ids and their tick ranges.
+		type MiningFrameTransitionProvider: MiningFrameTransitionProvider + MiningFrameProvider;
 
 		/// Optional hook for operational account state updates.
 		type OperationalAccountsHook: OperationalAccountsHook<Self::AccountId, Self::Balance>;
@@ -254,6 +256,62 @@ pub mod pallet {
 	#[pallet::storage]
 	pub type CurrentFrameArgonotBondParticipants<T: Config> =
 		StorageValue<_, FrameArgonotBondParticipants<T>, OptionQuery>;
+
+	#[pallet::type_value]
+	pub fn DefaultRewardTaperingPolicy() -> TaperingPolicy {
+		// Daily reinvestment rates for 50%, 100%, and 500% APY, at FixedU128 precision.
+		let daily_50 = FixedU128::from_inner(1_111_480_547_066_227);
+		let daily_100 = FixedU128::from_inner(1_900_837_677_234_846);
+		let daily_500 = FixedU128::from_inner(4_920_998_589_597_458);
+		TaperingPolicy {
+			bitcoin_liquids: TaperingProgram {
+				target_daily_return: daily_100,
+				excess_reward_payout_percent: Percent::from_percent(50),
+				target_daily_return_with_price_below_target: None,
+			},
+			argon_bonds: TaperingProgram {
+				target_daily_return: daily_100,
+				excess_reward_payout_percent: Percent::from_percent(50),
+				target_daily_return_with_price_below_target: None,
+			},
+			argonot_stakes: TaperingProgram {
+				target_daily_return: daily_50,
+				excess_reward_payout_percent: Percent::from_percent(50),
+				target_daily_return_with_price_below_target: None,
+			},
+			vault_revenue: TaperingProgram {
+				target_daily_return: daily_500,
+				excess_reward_payout_percent: Percent::from_percent(50),
+				target_daily_return_with_price_below_target: Some(BelowTargetPriceYield {
+					target_daily_return: daily_100,
+					argon_price_drop_for_target: Percent::from_percent(10),
+				}),
+			},
+			stabilizer_pools: TaperingProgram {
+				target_daily_return: daily_500,
+				excess_reward_payout_percent: Percent::from_percent(50),
+				target_daily_return_with_price_below_target: Some(BelowTargetPriceYield {
+					target_daily_return: daily_100,
+					argon_price_drop_for_target: Percent::from_percent(10),
+				}),
+			},
+		}
+	}
+
+	/// Configured daily reward targets and the share paid above each target.
+	#[pallet::storage]
+	pub type RewardTaperingPolicy<T: Config> =
+		StorageValue<_, TaperingPolicy, ValueQuery, DefaultRewardTaperingPolicy>;
+
+	/// Reward settings frozen before a frame starts earning. Prices are measured over that frame.
+	#[pallet::storage]
+	pub type CurrentFrameRewardTaperingPolicy<T: Config> =
+		StorageValue<_, FrameRewardTaperingPolicy, OptionQuery>;
+
+	/// ARGON removed from circulation and available for future issuance as rewards.
+	#[pallet::storage]
+	pub type RewardReserves<T: Config> =
+		StorageValue<_, RewardReserveBalances<T::Balance>, ValueQuery>;
 
 	/// Configurable percent of maximum Bitcoin-mintable Argons targeted by the network.
 	#[pallet::storage]
@@ -364,14 +422,14 @@ pub mod pallet {
 			amount: T::Balance,
 			dispatch_error: DispatchError,
 		},
-		/// An error occurred while moving bid-pool funds into treasury reserves.
-		CouldNotTransferToTreasuryReserves {
+		/// A reserve top-up could not be added to the frame reward funding.
+		CouldNotFundReserveTopup {
 			frame_id: FrameId,
 			amount: T::Balance,
 			dispatch_error: DispatchError,
 		},
-		/// A fixed or unearned reward allocation could not be burned.
-		CouldNotBurnRewardAllocation {
+		/// Bid revenue could not be withdrawn for frame distribution.
+		CouldNotFundBidPool {
 			frame_id: FrameId,
 			amount: T::Balance,
 			dispatch_error: DispatchError,
@@ -387,15 +445,22 @@ pub mod pallet {
 			argon_bond_pool_distributed: T::Balance,
 			/// ARGON recorded for vault collection.
 			vault_pool_distributed: T::Balance,
-			/// Fixed allocations, target shortfall, failures, and rounding burned this frame.
-			burned: T::Balance,
-			/// The amount moved into treasury reserves.
-			treasury_reserves: T::Balance,
+			/// Bid-pool funds removed from circulation and credited to reward reserves.
+			reserved_from_circulation: T::Balance,
+			/// Number of vaults included in the frame's reward allocation.
 			participating_vaults: u32,
+		},
+		/// Reward reserve balances after frame settlement or a reserve-funded payment.
+		RewardReservesUpdated {
+			/// Remaining reward budgets, excluded from circulating issuance.
+			reserves: RewardReserveBalances<T::Balance>,
 		},
 		RewardEconomicsConfigured {
 			target_bitcoin_percent: Percent,
 			upstream_participation_factor: Percent,
+		},
+		RewardTaperingPolicyConfigured {
+			policy: Box<TaperingPolicy>,
 		},
 		/// The current frame's vault capital was locked in.
 		FrameVaultCapitalLocked {
@@ -485,6 +550,8 @@ pub mod pallet {
 		BondLotMetricsChanged,
 		/// The proposed backfill would reduce or corrupt the lot's earnings metrics.
 		InvalidBondLotMetrics,
+		/// A reward target or the price adjustment window is invalid.
+		InvalidRewardTaperingPolicy,
 		/// The caller does not own the bond lot.
 		NotBondLotOwner,
 		/// The bond lot is already scheduled for release.
@@ -968,6 +1035,41 @@ pub mod pallet {
 			});
 			Ok(())
 		}
+
+		/// Update selected reward programs for future frames, preserving omitted programs.
+		#[pallet::call_index(11)]
+		#[pallet::weight(T::WeightInfo::configure_reward_tapering_policy())]
+		pub fn configure_reward_tapering_policy(
+			origin: OriginFor<T>,
+			bitcoin_liquids: Option<Box<TaperingProgram>>,
+			argon_bonds: Option<Box<TaperingProgram>>,
+			argonot_stakes: Option<Box<TaperingProgram>>,
+			vault_revenue: Option<Box<TaperingProgram>>,
+			stabilizer_pools: Option<Box<TaperingProgram>>,
+		) -> DispatchResult {
+			ensure_root(origin)?;
+			let mut policy = RewardTaperingPolicy::<T>::get();
+			for (program, update) in [
+				(&mut policy.bitcoin_liquids, bitcoin_liquids),
+				(&mut policy.argon_bonds, argon_bonds),
+				(&mut policy.argonot_stakes, argonot_stakes),
+				(&mut policy.vault_revenue, vault_revenue),
+				(&mut policy.stabilizer_pools, stabilizer_pools),
+			] {
+				let Some(update) = update else { continue };
+				if let Some(low_price) = update.target_daily_return_with_price_below_target {
+					ensure!(
+						low_price.argon_price_drop_for_target > Percent::zero() &&
+							low_price.target_daily_return <= update.target_daily_return,
+						Error::<T>::InvalidRewardTaperingPolicy
+					);
+				}
+				*program = *update;
+			}
+			RewardTaperingPolicy::<T>::put(policy.clone());
+			Self::deposit_event(Event::RewardTaperingPolicyConfigured { policy: Box::new(policy) });
+			Ok(())
+		}
 	}
 
 	impl<T: Config> Pallet<T> {
@@ -1055,6 +1157,28 @@ pub mod pallet {
 		/// Once the frame is complete, this fn distributes frame earnings to Argonot bond lots
 		/// first, then Argon bonds, and finally vaults.
 		pub(crate) fn distribute_bid_pool(frame_id: FrameId) {
+			let bid_pool_account = T::MiningBidPoolAccount::get();
+			Self::ensure_account_provider(&bid_pool_account);
+			let full_bid_pool_amount = T::Currency::balance(&bid_pool_account);
+			// Keep frame funding outside an account so dust cannot consume later payouts.
+			let mut funding = match T::Currency::withdraw(
+				&bid_pool_account,
+				full_bid_pool_amount,
+				Precision::Exact,
+				Preservation::Expendable,
+				Fortitude::Polite,
+			) {
+				Ok(funding) => funding,
+				Err(dispatch_error) => {
+					Self::deposit_event(Event::<T>::CouldNotFundBidPool {
+						frame_id,
+						amount: full_bid_pool_amount,
+						dispatch_error,
+					});
+					return;
+				},
+			};
+
 			let argonot_participants = match CurrentFrameArgonotBondParticipants::<T>::take() {
 				Some(participants) if participants.frame_id == frame_id => Some(participants),
 				Some(participants) => {
@@ -1079,84 +1203,113 @@ pub mod pallet {
 				},
 				None => None,
 			};
-			let bid_pool_account = T::MiningBidPoolAccount::get();
-			Self::ensure_account_provider(&bid_pool_account);
-			let full_bid_pool_amount = T::Currency::balance(&bid_pool_account);
-			let initial_reserves_amount =
-				T::PercentForTreasuryReserves::get().mul_floor(full_bid_pool_amount);
-			let reserves_account = T::TreasuryReservesAccount::get();
-			Self::ensure_account_provider(&reserves_account);
-
-			let mut total_treasury_reserves = T::Balance::zero();
-			if !initial_reserves_amount.is_zero() {
-				if let Err(e) = T::Currency::transfer(
-					&bid_pool_account,
-					&reserves_account,
-					initial_reserves_amount,
-					Preservation::Expendable,
-				) {
-					Self::deposit_event(Event::<T>::CouldNotTransferToTreasuryReserves {
-						frame_id,
-						amount: initial_reserves_amount,
-						dispatch_error: e,
+			let frame_tapering = match CurrentFrameRewardTaperingPolicy::<T>::take() {
+				Some(policy) if policy.frame_id == frame_id => Some(policy),
+				Some(policy) => {
+					CurrentFrameRewardTaperingPolicy::<T>::put(policy);
+					None
+				},
+				None => None,
+			};
+			let policy = frame_tapering.as_ref().map(|frame| &frame.policy);
+			let argon_price_ratio =
+				T::MiningFrameTransitionProvider::get_tick_range_for_frame(frame_id)
+					.map(T::PriceProvider::get_average_cpi_for_ticks)
+					.and_then(|cpi| {
+						// CPI is target/market - 1; convert the shared frame signal to
+						// market/target.
+						let ratio =
+							FixedI128::one().checked_div(&FixedI128::one().saturating_add(cpi))?;
+						Some(FixedU128::from_inner(ratio.into_inner().try_into().ok()?))
 					});
-				} else {
-					total_treasury_reserves = initial_reserves_amount;
-				}
-			}
+			let mut reserves = RewardReserves::<T>::get();
+			let reserves_before = reserves.clone();
+			let marketing_allocation =
+				T::PercentForMarketing::get().mul_floor(full_bid_pool_amount);
 
 			let stake_pool = T::PercentForStakePool::get().mul_floor(full_bid_pool_amount);
-			let stake_pool_distributed = Self::distribute_stake_pool(
+			let stake_payout = Self::distribute_stake_pool(
 				frame_id,
-				&bid_pool_account,
+				&mut funding,
 				stake_pool,
 				argonot_participants,
+				policy,
+				argon_price_ratio,
+				reserves.argonot_stakes,
 			);
+
 			let argon_bond_pool = T::PercentForArgonBondPool::get().mul_floor(full_bid_pool_amount);
-			let argon_bond_pool_distributed = Self::distribute_argon_bond_pool(
+			let bond_payout = Self::distribute_argon_bond_pool(
 				frame_id,
-				&bid_pool_account,
+				&mut funding,
 				argon_bond_pool,
 				frame_capital.as_ref(),
+				policy,
+				argon_price_ratio,
+				reserves.argon_bonds,
 			);
-			let vault_pool = T::PercentForVaultPool::get().mul_floor(full_bid_pool_amount);
+
 			let (vault_pool_distributed, participating_vaults) = Self::distribute_vault_pool(
 				frame_id,
-				&bid_pool_account,
+				&mut funding,
 				full_bid_pool_amount,
 				frame_capital.as_ref(),
 				frame_bitcoin.as_ref(),
+				policy,
+				argon_price_ratio,
 			);
 
-			let mining_operator_pool =
-				T::PercentForMiningOperatorPool::get().mul_floor(full_bid_pool_amount);
-			let bitcoin_liquid_pool =
+			let bitcoin_liquids_allocation =
 				T::PercentForBitcoinLiquidPool::get().mul_floor(full_bid_pool_amount);
-			let allocated = initial_reserves_amount
-				.saturating_add(stake_pool)
-				.saturating_add(mining_operator_pool)
-				.saturating_add(bitcoin_liquid_pool)
-				.saturating_add(argon_bond_pool)
-				.saturating_add(vault_pool);
-			let burn_amount = mining_operator_pool
-				.saturating_add(bitcoin_liquid_pool)
-				.saturating_add(initial_reserves_amount.saturating_sub(total_treasury_reserves))
-				.saturating_add(stake_pool.saturating_sub(stake_pool_distributed))
-				.saturating_add(argon_bond_pool.saturating_sub(argon_bond_pool_distributed))
-				.saturating_add(vault_pool.saturating_sub(vault_pool_distributed))
-				.saturating_add(full_bid_pool_amount.saturating_sub(allocated));
-			let burned = Self::burn_unearned_rewards(frame_id, &bid_pool_account, burn_amount);
+			let mining_operator_allocation =
+				T::PercentForMiningOperatorPool::get().mul_floor(full_bid_pool_amount);
+			let mut unallocated = funding.peek();
+			// Dropping unspent funding removes it from issuance exactly once.
+			drop(funding);
 
+			for (payout, budget) in [
+				(&stake_payout, &mut reserves.argonot_stakes),
+				(&bond_payout, &mut reserves.argon_bonds),
+			] {
+				let unused_topup =
+					payout.reserve_minted.saturating_sub(payout.from_reserve).min(unallocated);
+				let reserve_spent = payout.reserve_minted.saturating_sub(unused_topup);
+				budget.saturating_reduce(reserve_spent);
+				unallocated.saturating_reduce(unused_topup);
+			}
+			let reserved_from_circulation = unallocated;
+			for (allocation, budget) in [
+				(marketing_allocation, &mut reserves.marketing),
+				(bitcoin_liquids_allocation, &mut reserves.bitcoin_liquids),
+				(stake_payout.withheld, &mut reserves.argonot_stakes),
+				(bond_payout.withheld, &mut reserves.argon_bonds),
+				(mining_operator_allocation, &mut reserves.liquidity_buys),
+			] {
+				let funded = allocation.min(unallocated);
+				budget.saturating_accrue(funded);
+				unallocated.saturating_reduce(funded);
+			}
+			// Vault taper excess, unfilled allocations, and payout rounding fund liquidity buys.
+			reserves.liquidity_buys.saturating_accrue(unallocated);
+
+			if reserves != reserves_before {
+				RewardReserves::<T>::put(&reserves);
+				Self::deposit_event(Event::<T>::RewardReservesUpdated { reserves });
+			}
 			Self::deposit_event(Event::<T>::FrameEarningsDistributed {
 				frame_id,
-				bid_pool_distributed: stake_pool_distributed
-					.saturating_add(argon_bond_pool_distributed)
+				bid_pool_distributed: stake_payout
+					.from_pool
+					.saturating_add(bond_payout.from_pool)
 					.saturating_add(vault_pool_distributed),
-				stake_pool_distributed,
-				argon_bond_pool_distributed,
+				stake_pool_distributed: stake_payout
+					.from_pool
+					.saturating_add(stake_payout.from_reserve),
+				argon_bond_pool_distributed: bond_payout
+					.from_pool
+					.saturating_add(bond_payout.from_reserve),
 				vault_pool_distributed,
-				burned,
-				treasury_reserves: total_treasury_reserves,
+				reserved_from_circulation,
 				participating_vaults,
 			});
 		}
@@ -1182,6 +1335,11 @@ pub mod pallet {
 
 		/// Freeze vault inputs and completed position totals for a frame.
 		pub(crate) fn lock_in_vault_capital(frame_id: FrameId) {
+			// Config changes during this frame apply only to the next frame's rewards.
+			CurrentFrameRewardTaperingPolicy::<T>::put(FrameRewardTaperingPolicy {
+				frame_id,
+				policy: RewardTaperingPolicy::<T>::get(),
+			});
 			let max_vaults = T::MaxVaultsPerPool::get() as usize;
 			// Freeze the maintained network quantity. The vault walk below clears old frame terms
 			// and releases empty records; it does not rebuild account or network quantities.
@@ -1297,6 +1455,50 @@ pub mod pallet {
 			});
 		}
 
+		pub(crate) fn price_adjusted_daily_return(
+			program: &TaperingProgram,
+			price_ratio: Option<FixedU128>,
+		) -> FixedU128 {
+			let target = program.target_daily_return;
+			let Some(low_price) = program.target_daily_return_with_price_below_target else {
+				return target
+			};
+			let Some(price_ratio) = price_ratio else { return target };
+			let shortfall = FixedU128::one().saturating_sub(price_ratio);
+			let price_drop_for_target = FixedU128::from_rational(
+				low_price.argon_price_drop_for_target.deconstruct() as u128,
+				100,
+			);
+			if price_drop_for_target.is_zero() || shortfall.is_zero() {
+				return target;
+			}
+			if shortfall >= price_drop_for_target {
+				return low_price.target_daily_return;
+			}
+
+			let fraction = price_drop_for_target
+				.saturating_sub(shortfall)
+				.checked_div(&price_drop_for_target)
+				.unwrap_or_default();
+			low_price.target_daily_return.saturating_add(
+				target.saturating_sub(low_price.target_daily_return).saturating_mul(fraction),
+			)
+		}
+
+		pub(crate) fn tapered_payout(
+			proposed: u128,
+			capital: u128,
+			daily_return: FixedU128,
+			excess_reward_payout_percent: Percent,
+		) -> u128 {
+			if capital == 0 {
+				return 0;
+			}
+			let threshold = daily_return.saturating_mul_int(capital);
+			let excess = proposed.saturating_sub(threshold);
+			proposed - excess + excess_reward_payout_percent.mul_floor(excess)
+		}
+
 		/// Score upstream participation against fixed runtime requirements, limited by the
 		/// upstream vault's admission capacity. Temporary network-wide bond-lot limits are
 		/// excluded.
@@ -1399,17 +1601,46 @@ pub mod pallet {
 
 		fn distribute_stake_pool(
 			frame_id: FrameId,
-			bid_pool_account: &T::AccountId,
+			funding: &mut RewardFunding<T>,
 			stake_pool: T::Balance,
 			argonot_participants: Option<FrameArgonotBondParticipants<T>>,
-		) -> T::Balance {
+			policy: Option<&TaperingPolicy>,
+			argon_price_ratio: Option<FixedU128>,
+			available_reserve: T::Balance,
+		) -> PoolPayout<T::Balance> {
 			let Some(argonot_participants) = argonot_participants else {
-				return T::Balance::zero();
+				return PoolPayout::default();
 			};
 			if argonot_participants.total_bonds == 0 {
-				return T::Balance::zero();
+				return PoolPayout::default();
 			}
 
+			let mut payable_pool = stake_pool;
+			let mut reserve_topup = T::Balance::zero();
+			let average_price = T::PriceProvider::get_average_microgons_per_argonot(frame_id);
+			if let (Some(policy), Some(price)) = (policy, average_price.filter(|p| !p.is_zero())) {
+				let capital =
+					(argonot_participants.total_bonds as u128).saturating_mul(price.into());
+				let daily_return =
+					Self::price_adjusted_daily_return(&policy.argonot_stakes, argon_price_ratio);
+				payable_pool = Self::tapered_payout(
+					stake_pool.into(),
+					capital,
+					daily_return,
+					policy.argonot_stakes.excess_reward_payout_percent,
+				)
+				.into();
+				if argon_price_ratio.is_some_and(|ratio| ratio < FixedU128::one()) {
+					reserve_topup = daily_return
+						.saturating_mul_int(capital)
+						.saturating_sub(stake_pool.into())
+						.min(available_reserve.into())
+						.into();
+				}
+			}
+
+			let reserve_minted = Self::fund_reserve_topup(frame_id, funding, reserve_topup);
+			let combined_pool = payable_pool.saturating_add(reserve_minted);
 			let mut distributed = T::Balance::zero();
 			for participant in argonot_participants.bond_lots.iter() {
 				let Some(bond_lot) = BondLotById::<T>::get(participant.bond_lot_id) else {
@@ -1419,20 +1650,15 @@ pub mod pallet {
 					continue;
 				}
 
-				let gross_lot_yield = Perbill::from_rational(
+				let share = Perbill::from_rational(
 					participant.bonds as u128,
 					argonot_participants.total_bonds as u128,
-				)
-				.mul_floor(stake_pool);
-
-				let mut paid_payout = gross_lot_yield;
+				);
+				let mut paid_payout = share.mul_floor(combined_pool);
 				if !paid_payout.is_zero() &&
-					let Err(e) = T::Currency::transfer(
-						bid_pool_account,
-						&bond_lot.owner,
-						paid_payout,
-						Preservation::Expendable,
-					) {
+					let Err(e) =
+						Self::pay_from_reward_pool(funding, &bond_lot.owner, paid_payout)
+				{
 					Self::deposit_event(Event::<T>::CouldNotDistributeEarningsToArgonotBondLot {
 						frame_id,
 						bond_lot_id: participant.bond_lot_id,
@@ -1442,19 +1668,29 @@ pub mod pallet {
 					});
 					paid_payout = T::Balance::zero();
 				}
+				distributed.saturating_accrue(paid_payout);
 
 				Self::record_bond_lot_earnings(participant.bond_lot_id, frame_id, paid_payout);
-				distributed.saturating_accrue(paid_payout);
 			}
-			distributed
+			// Bid revenue pays first; reserves cover only what successful payments exceed it by.
+			let from_pool = distributed.min(payable_pool);
+			PoolPayout {
+				from_pool,
+				from_reserve: distributed.saturating_sub(from_pool),
+				reserve_minted,
+				withheld: stake_pool.saturating_sub(payable_pool),
+			}
 		}
 
 		fn distribute_argon_bond_pool(
 			frame_id: FrameId,
-			bid_pool_account: &T::AccountId,
+			funding: &mut RewardFunding<T>,
 			argon_bond_pool: T::Balance,
 			frame_capital: Option<&FrameVaultCapital<T>>,
-		) -> T::Balance {
+			policy: Option<&TaperingPolicy>,
+			argon_price_ratio: Option<FixedU128>,
+			available_reserve: T::Balance,
+		) -> PoolPayout<T::Balance> {
 			let Some(frame_capital) = frame_capital else {
 				for (_, bond_lot_id, ()) in BondLotIdsByVault::<T>::iter() {
 					let Some(bond_lot) = BondLotById::<T>::get(bond_lot_id) else { continue };
@@ -1466,12 +1702,14 @@ pub mod pallet {
 						});
 					}
 				}
-				return T::Balance::zero();
+				return PoolPayout::default();
 			};
 			let total_eligible_balance =
 				frame_capital.total_active_bonds.saturating_mul(MICROGONS_PER_ARGON).into();
 			let denominator = frame_capital.target_securitization.max(total_eligible_balance);
-			let mut distributed = T::Balance::zero();
+			let mut proposed_payouts = Vec::new();
+			let mut proposed_total = 0u128;
+			let mut eligible_capital = 0u128;
 			let mut flexible_fractions = BTreeMap::new();
 			for (vault_id, bond_lot_id, ()) in BondLotIdsByVault::<T>::iter() {
 				let Some(bond_lot) = BondLotById::<T>::get(bond_lot_id) else { continue };
@@ -1498,65 +1736,117 @@ pub mod pallet {
 							Some(terms) => (terms.flexible_bonds, terms.displaced_flexible_bonds),
 							None => (state.flexible_bonds, state.displaced_flexible_bonds),
 						};
-						FixedU128::from_rational(
+						FixedU128::from_rational_with_rounding(
 							flexible.saturating_sub(displaced) as u128,
 							flexible as u128,
+							Rounding::Down,
 						)
 					});
 					fraction.saturating_mul_int(principal_microgons)
 				} else {
 					principal_microgons
 				};
-				let payout = FixedU128::from_rational(eligible_microgons, denominator.into())
-					.saturating_mul_int(argon_bond_pool);
-				distributed.saturating_accrue(Self::pay_argon_bond_lot(
-					frame_id,
-					bid_pool_account,
-					bond_lot_id,
+				let payout = if denominator.is_zero() {
+					T::Balance::zero()
+				} else {
+					FixedU128::from_rational_with_rounding(
+						eligible_microgons,
+						denominator.into(),
+						Rounding::Down,
+					)
+					.saturating_mul_int(argon_bond_pool)
+				};
+				proposed_total = proposed_total.saturating_add(payout.into());
+				eligible_capital = eligible_capital.saturating_add(eligible_microgons);
+				proposed_payouts.push((
 					vault_id,
-					&bond_lot,
+					bond_lot_id,
+					bond_lot,
+					eligible_microgons,
 					payout,
 				));
 			}
-			distributed
-		}
 
-		fn pay_argon_bond_lot(
-			frame_id: FrameId,
-			bid_pool_account: &T::AccountId,
-			bond_lot_id: BondLotId,
-			vault_id: VaultId,
-			bond_lot: &BondLot<T>,
-			payout: T::Balance,
-		) -> T::Balance {
-			let mut paid_payout = payout;
-			if !payout.is_zero() &&
-				let Err(e) = T::Currency::transfer(
-					bid_pool_account,
-					&bond_lot.owner,
-					payout,
-					Preservation::Expendable,
-				) {
-				Self::deposit_event(Event::<T>::CouldNotDistributeEarningsToBondLot {
-					frame_id,
-					vault_id,
-					bond_lot_id,
-					account_id: bond_lot.owner.clone(),
-					amount: payout,
-					dispatch_error: e,
-				});
-				paid_payout = T::Balance::zero();
+			let mut payable_total = proposed_total;
+			let mut reserve_topup = 0u128;
+			if let Some(policy) = policy {
+				let daily_return =
+					Self::price_adjusted_daily_return(&policy.argon_bonds, argon_price_ratio);
+				payable_total = Self::tapered_payout(
+					proposed_total,
+					eligible_capital,
+					daily_return,
+					policy.argon_bonds.excess_reward_payout_percent,
+				);
+				if argon_price_ratio.is_some_and(|ratio| ratio < FixedU128::one()) {
+					reserve_topup = daily_return
+						.saturating_mul_int(eligible_capital)
+						.saturating_sub(proposed_total)
+						.min(available_reserve.into());
+				}
 			}
-			Self::record_bond_lot_earnings(bond_lot_id, frame_id, paid_payout);
-			paid_payout
+
+			let reserve_minted = Self::fund_reserve_topup(frame_id, funding, reserve_topup.into());
+			let pool_fraction = if proposed_total == 0 {
+				FixedU128::zero()
+			} else {
+				FixedU128::from_rational_with_rounding(
+					payable_total,
+					proposed_total,
+					Rounding::Down,
+				)
+			};
+			let reserve_fraction = if eligible_capital == 0 {
+				FixedU128::zero()
+			} else {
+				FixedU128::from_rational_with_rounding(
+					reserve_minted.into(),
+					eligible_capital,
+					Rounding::Down,
+				)
+			};
+			let mut distributed = T::Balance::zero();
+			for (vault_id, bond_lot_id, bond_lot, capital, proposed) in proposed_payouts {
+				let pool_payout: T::Balance =
+					pool_fraction.saturating_mul_int(proposed.into()).into();
+				let reserve_payout: T::Balance =
+					reserve_fraction.saturating_mul_int(capital).into();
+				let mut paid_payout = pool_payout.saturating_add(reserve_payout);
+				if !paid_payout.is_zero() &&
+					let Err(e) =
+						Self::pay_from_reward_pool(funding, &bond_lot.owner, paid_payout)
+				{
+					Self::deposit_event(Event::<T>::CouldNotDistributeEarningsToBondLot {
+						frame_id,
+						vault_id,
+						bond_lot_id,
+						account_id: bond_lot.owner,
+						amount: paid_payout,
+						dispatch_error: e,
+					});
+					paid_payout = T::Balance::zero();
+				}
+				Self::record_bond_lot_earnings(bond_lot_id, frame_id, paid_payout);
+				distributed.saturating_accrue(paid_payout);
+			}
+
+			let from_pool = distributed.min(payable_total.into());
+			PoolPayout {
+				from_pool,
+				from_reserve: distributed.saturating_sub(from_pool),
+				reserve_minted,
+				withheld: proposed_total.saturating_sub(payable_total).into(),
+			}
 		}
 
 		fn distribute_vault_pool(
 			frame_id: FrameId,
-			bid_pool_account: &T::AccountId,
+			funding: &mut RewardFunding<T>,
 			full_bid_pool_amount: T::Balance,
 			frame_capital: Option<&FrameVaultCapital<T>>,
 			frame_bitcoin: Option<&FrameVaultBitcoin<T>>,
+			policy: Option<&TaperingPolicy>,
+			argon_price_ratio: Option<FixedU128>,
 		) -> (T::Balance, u32) {
 			let Some(frame_capital) = frame_capital else {
 				return (T::Balance::zero(), 0);
@@ -1564,7 +1854,7 @@ pub mod pallet {
 			let Some(frame_bitcoin) = frame_bitcoin else {
 				return Self::distribute_vault_pool_without_bitcoin_snapshot(
 					frame_id,
-					bid_pool_account,
+					funding,
 					full_bid_pool_amount,
 					frame_capital,
 				);
@@ -1605,6 +1895,13 @@ pub mod pallet {
 				bitcoin_rate.checked_div(&maximum_backing_factor).unwrap_or_default();
 			let bond_rate = bond_rate.checked_div(&maximum_backing_factor).unwrap_or_default();
 
+			let tapering = policy.map(|policy| {
+				let program = &policy.vault_revenue;
+				(
+					Self::price_adjusted_daily_return(program, argon_price_ratio),
+					program.excess_reward_payout_percent,
+				)
+			});
 			let mut distributed = T::Balance::zero();
 			for (vault_id, position) in frame_capital.vault_securitization_positions.iter() {
 				let securitization: u128 = position.securitization.into();
@@ -1612,24 +1909,32 @@ pub mod pallet {
 					continue;
 				}
 
-				let securitization_share =
-					FixedU128::from_rational(securitization, securitization_denominator.into());
+				let securitization_share = FixedU128::from_rational_with_rounding(
+					securitization,
+					securitization_denominator.into(),
+					Rounding::Down,
+				);
 				let bitcoin_share = if let Some(denominator) = bitcoin_denominator {
 					let covered_satoshis = frame_bitcoin
 						.vault_securitized_satoshis
 						.get(vault_id)
 						.copied()
 						.unwrap_or_default();
-					FixedU128::from_rational(covered_satoshis as u128, denominator)
+					FixedU128::from_rational_with_rounding(
+						covered_satoshis as u128,
+						denominator,
+						Rounding::Down,
+					)
 				} else {
 					FixedU128::zero()
 				};
 				let bond_share = if bond_denominator.is_zero() {
 					FixedU128::zero()
 				} else {
-					FixedU128::from_rational(
+					FixedU128::from_rational_with_rounding(
 						position.active_bond_microgons.into(),
 						bond_denominator.into(),
+						Rounding::Down,
 					)
 				};
 
@@ -1674,14 +1979,21 @@ pub mod pallet {
 				let earnings_rate = securitization_share
 					.saturating_mul(securitization_rate)
 					.saturating_add(variable_earnings_rate);
-				let earnings = earnings_rate.saturating_mul_int(full_bid_pool_amount);
-
+				let proposed = earnings_rate.saturating_mul_int(full_bid_pool_amount);
+				let earnings = if let Some((daily_return, excess_reward_payout_percent)) = tapering
+				{
+					Self::tapered_payout(
+						proposed.into(),
+						securitization.saturating_add(argonot_value),
+						daily_return,
+						excess_reward_payout_percent,
+					)
+					.into()
+				} else {
+					proposed
+				};
 				if Self::record_vault_pool_earnings(
-					frame_id,
-					bid_pool_account,
-					*vault_id,
-					position,
-					earnings,
+					frame_id, funding, *vault_id, position, earnings,
 				)
 				.is_ok()
 				{
@@ -1694,7 +2006,7 @@ pub mod pallet {
 
 		fn distribute_vault_pool_without_bitcoin_snapshot(
 			frame_id: FrameId,
-			bid_pool_account: &T::AccountId,
+			funding: &mut RewardFunding<T>,
 			full_bid_pool_amount: T::Balance,
 			frame_capital: &FrameVaultCapital<T>,
 		) -> (T::Balance, u32) {
@@ -1778,16 +2090,16 @@ pub mod pallet {
 						.upstream_participation
 						.saturating_mul(profit_rate.saturating_sub(minimum_profit_rate)),
 				);
-				let coverage = FixedU128::from_rational(securitization, denominator.into());
+				let coverage = FixedU128::from_rational_with_rounding(
+					securitization,
+					denominator.into(),
+					Rounding::Down,
+				);
 				let earnings =
 					coverage.saturating_mul(profit_rate).saturating_mul_int(full_bid_pool_amount);
 
 				if Self::record_vault_pool_earnings(
-					frame_id,
-					bid_pool_account,
-					*vault_id,
-					position,
-					earnings,
+					frame_id, funding, *vault_id, position, earnings,
 				)
 				.is_ok()
 				{
@@ -1800,13 +2112,13 @@ pub mod pallet {
 
 		fn record_vault_pool_earnings(
 			frame_id: FrameId,
-			bid_pool_account: &T::AccountId,
+			funding: &mut RewardFunding<T>,
 			vault_id: VaultId,
 			position: &VaultSecuritizationPosition<T>,
 			earnings: T::Balance,
 		) -> DispatchResult {
 			T::TreasuryVaultProvider::record_vault_frame_earnings(
-				bid_pool_account,
+				funding,
 				VaultTreasuryFrameEarnings {
 					vault_id,
 					vault_operator_account_id: position.operator_account_id.clone(),
@@ -1819,34 +2131,36 @@ pub mod pallet {
 			)
 		}
 
-		fn burn_unearned_rewards(
+		fn fund_reserve_topup(
 			frame_id: FrameId,
-			bid_pool_account: &T::AccountId,
+			funding: &mut RewardFunding<T>,
 			amount: T::Balance,
 		) -> T::Balance {
 			if amount.is_zero() {
 				return T::Balance::zero();
 			}
-			match T::Currency::burn_from(
-				bid_pool_account,
-				amount,
-				Preservation::Expendable,
-				Precision::Exact,
-				Fortitude::Force,
-			) {
-				Ok(burned) => {
-					T::BurnEventHandler::on_argon_burn(&burned);
-					burned
-				},
-				Err(e) => {
-					Self::deposit_event(Event::<T>::CouldNotBurnRewardAllocation {
-						frame_id,
-						amount,
-						dispatch_error: e,
-					});
-					T::Balance::zero()
-				},
+			// Balanced::issue saturates, so reject overflow before changing issuance.
+			if T::Currency::total_issuance().checked_add(&amount).is_none() {
+				Self::deposit_event(Event::<T>::CouldNotFundReserveTopup {
+					frame_id,
+					amount,
+					dispatch_error: ArithmeticError::Overflow.into(),
+				});
+				return T::Balance::zero();
 			}
+			funding.subsume(T::Currency::issue(amount));
+			amount
+		}
+
+		fn pay_from_reward_pool(
+			funding: &mut RewardFunding<T>,
+			owner: &T::AccountId,
+			amount: T::Balance,
+		) -> DispatchResult {
+			ensure!(amount <= funding.peek(), TokenError::FundsUnavailable);
+			let paid = T::Currency::deposit(owner, amount, Precision::Exact)?;
+			let _ = funding.extract(amount).offset(paid);
+			Ok(())
 		}
 
 		/// Releases bond lots whose release delay has matured.
@@ -2198,21 +2512,12 @@ pub mod pallet {
 			if amount.is_zero() {
 				return Ok(());
 			}
-			let treasury_reserves_account = T::TreasuryReservesAccount::get();
-			Self::ensure_account_provider(&treasury_reserves_account);
-			let available = T::Currency::reducible_balance(
-				&treasury_reserves_account,
-				Preservation::Preserve,
-				Fortitude::Polite,
-			);
-			ensure!(amount <= available, TokenError::FundsUnavailable);
-
-			T::Currency::transfer(
-				&treasury_reserves_account,
-				account_id,
-				amount,
-				Preservation::Preserve,
-			)?;
+			let mut reserves = RewardReserves::<T>::get();
+			ensure!(amount <= reserves.marketing, TokenError::FundsUnavailable);
+			let minted = T::Currency::mint_into(account_id, amount)?;
+			reserves.marketing.saturating_reduce(minted);
+			RewardReserves::<T>::put(&reserves);
+			Self::deposit_event(Event::<T>::RewardReservesUpdated { reserves });
 			Ok(())
 		}
 	}
@@ -2249,12 +2554,14 @@ pub mod pallet {
 				argonot_lots,
 				due_releases,
 			)
-			.saturating_add(T::DbWeight::get().reads(due_frames.saturating_add(4)))
+			// MiningSlot already writes and proves FrameStartTicks before this hook; add its read.
+			.saturating_add(T::DbWeight::get().reads(due_frames.saturating_add(5)))
 			.saturating_add(
 				T::DbWeight::get()
 					.reads_writes(due_frames.saturating_sub(1), due_frames.saturating_sub(1)),
 			)
 			.saturating_add(price_weight)
+			.saturating_add(<T::PriceProvider as PriceProvider<T::Balance>>::Weights::get_average_cpi_for_ticks())
 			.saturating_add(bitcoin_snapshot_weight)
 			.saturating_add(
 				<T::TreasuryVaultProvider as TreasuryVaultProvider>::Weights::
@@ -2501,6 +2808,109 @@ pub mod pallet {
 			});
 			Ok(())
 		}
+	}
+
+	type RewardFunding<T> = Credit<<T as frame_system::Config>::AccountId, <T as Config>::Currency>;
+
+	/// Funding and completed payments for one reward pool. Unspent minted funds return to reserves.
+	#[derive(Default)]
+	struct PoolPayout<Balance> {
+		from_pool: Balance,
+		from_reserve: Balance,
+		reserve_minted: Balance,
+		withheld: Balance,
+	}
+
+	/// Daily yield target and share of excess rewards paid by one reward program.
+	#[derive(
+		Encode,
+		Decode,
+		DecodeWithMemTracking,
+		Clone,
+		Copy,
+		PartialEq,
+		Eq,
+		Debug,
+		TypeInfo,
+		MaxEncodedLen,
+	)]
+	pub struct TaperingProgram {
+		/// Daily return at which tapering starts, with one frame per financial day.
+		/// Derived from the desired APY as (1 + APY)^(1/365) - 1.
+		pub target_daily_return: FixedU128,
+		/// Share of rewards paid above the daily APY target; the rest funds reserves.
+		pub excess_reward_payout_percent: Percent,
+		/// Optional lower daily target, reached linearly as ARGON falls below its price target.
+		pub target_daily_return_with_price_below_target: Option<BelowTargetPriceYield>,
+	}
+
+	/// Lower daily return reached as ARGON falls below its price target.
+	#[derive(
+		Encode,
+		Decode,
+		DecodeWithMemTracking,
+		Clone,
+		Copy,
+		PartialEq,
+		Eq,
+		Debug,
+		TypeInfo,
+		MaxEncodedLen,
+	)]
+	pub struct BelowTargetPriceYield {
+		/// Daily reinvestment rate at or beyond the configured price drop.
+		pub target_daily_return: FixedU128,
+		/// Percent below the ARGON price target where the lower daily return applies.
+		pub argon_price_drop_for_target: Percent,
+	}
+
+	/// Independent reward settings for each program; changes apply to future frames.
+	#[derive(
+		Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen,
+	)]
+	pub struct TaperingPolicy {
+		pub bitcoin_liquids: TaperingProgram,
+		pub argon_bonds: TaperingProgram,
+		pub argonot_stakes: TaperingProgram,
+		pub vault_revenue: TaperingProgram,
+		pub stabilizer_pools: TaperingProgram,
+	}
+
+	/// Reward settings captured before a frame earns revenue, unaffected by later config changes.
+	#[derive(
+		Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen,
+	)]
+	pub struct FrameRewardTaperingPolicy {
+		pub frame_id: FrameId,
+		pub policy: TaperingPolicy,
+	}
+
+	/// Reward budgets excluded from issuance until paid. These are amounts, not funded accounts.
+	#[derive(
+		Encode,
+		Decode,
+		DecodeWithMemTracking,
+		Clone,
+		PartialEq,
+		Eq,
+		Debug,
+		Default,
+		TypeInfo,
+		MaxEncodedLen,
+	)]
+	pub struct RewardReserveBalances<Balance> {
+		/// Budget available for marketing reward claims.
+		pub marketing: Balance,
+		/// Budget for future Bitcoin Liquids rewards.
+		pub bitcoin_liquids: Balance,
+		/// Withheld bond rewards available to support bonds when ARGON is below target.
+		pub argon_bonds: Balance,
+		/// Withheld stake rewards available to support stakes when ARGON is below target.
+		pub argonot_stakes: Balance,
+		/// Budget for future stabilizer pool rewards and support below ARGON's price target.
+		pub stabilizer_pools: Balance,
+		/// Vault taper excess and other unallocated rewards available for future liquidity buys.
+		pub liquidity_buys: Balance,
 	}
 
 	#[derive(

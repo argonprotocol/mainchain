@@ -100,9 +100,7 @@ parameter_types! {
 	pub const TreasuryInternalPalletId: PalletId = PalletId(*b"lqdPools");
 	pub TreasuryMiningBidPoolAccount: AccountId =
 		TreasuryInternalPalletId::get().into_account_truncating();
-	pub TreasuryReservesAccount: AccountId =
-		TreasuryInternalPalletId::get().into_sub_account_truncating(*b"treasury-reserve");
-	pub const PercentForTreasuryReserves: Percent = Percent::from_percent(20);
+	pub const PercentForMarketing: Percent = Percent::from_percent(20);
 	pub const PercentForStakePool: Percent = Percent::from_percent(15);
 	pub const PercentForMiningOperatorPool: Percent = Percent::from_percent(6);
 	pub const PercentForBitcoinLiquidPool: Percent = Percent::from_percent(3);
@@ -371,14 +369,13 @@ mod tests {
 					SessionKeys::decode(&mut sp_runtime::traits::TrailingZeroInput::zeroes())
 						.unwrap();
 				let pool_account = TreasuryMiningBidPoolAccount::get();
-				let reserves_account = TreasuryReservesAccount::get();
 				let initial_issuance = Balances::total_issuance();
 				let initial_staker_balance = Balances::balance(&staker);
 				let winning_price = 100 * ARGON + MiningSlotBidIncrement::get();
 				let final_pool = 10 * winning_price;
 				let stake_payout = PercentForStakePool::get().mul_floor(final_pool);
-				let reserves_payout = PercentForTreasuryReserves::get().mul_floor(final_pool);
-				let burned = final_pool - stake_payout - reserves_payout;
+				let marketing_allocation = PercentForMarketing::get().mul_floor(final_pool);
+				let reserved_from_circulation = final_pool - stake_payout;
 
 				for block in 1..=41 {
 					pallet_ticks::CurrentTick::<Runtime>::put(39 + block as u64);
@@ -468,7 +465,10 @@ mod tests {
 							assert!(!cohort.iter().any(|r| r.account_id == miners[9]));
 							assert_eq!(Balances::balance(&miners[9]), 1000 * ARGON);
 							assert_eq!(Balances::balance(&pool_account), final_pool);
-							assert_eq!(Balances::balance(&reserves_account), 0);
+							assert_eq!(
+								pallet_treasury::RewardReserves::<Runtime>::get(),
+								Default::default()
+							);
 							assert_eq!(Balances::balance(&staker), initial_staker_balance);
 						},
 						_ => {},
@@ -479,9 +479,17 @@ mod tests {
 				assert!(cohort.iter().all(|r| r.bid == winning_price));
 				assert!(!cohort.iter().any(|r| r.account_id == miners[9]));
 				assert_eq!(Balances::balance(&pool_account), 0);
-				assert_eq!(Balances::balance(&reserves_account), reserves_payout);
+				let reserves = pallet_treasury::RewardReserves::<Runtime>::get();
+				assert_eq!(reserves.marketing, marketing_allocation);
+				assert_eq!(
+					reserves.marketing + reserves.bitcoin_liquids + reserves.liquidity_buys,
+					reserved_from_circulation
+				);
 				assert_eq!(Balances::balance(&staker), initial_staker_balance + stake_payout);
-				assert_eq!(Balances::total_issuance(), initial_issuance - burned);
+				assert_eq!(
+					Balances::total_issuance(),
+					initial_issuance - reserved_from_circulation
+				);
 				assert!(pallet_mining_slot::PendingBids::<Runtime>::iter().next().is_none());
 				assert!(pallet_mining_slot::BidBatches::<Runtime>::iter().next().is_none());
 				assert!(System::events().iter().any(|record| matches!(
@@ -492,12 +500,11 @@ mod tests {
 						stake_pool_distributed,
 						argon_bond_pool_distributed: 0,
 						vault_pool_distributed: 0,
-						burned: actual_burn,
-						treasury_reserves,
+						reserved_from_circulation: actual_reserved,
 						participating_vaults: 0,
 					}) if *bid_pool_distributed == stake_payout
 						&& *stake_pool_distributed == stake_payout
-						&& *actual_burn == burned && *treasury_reserves == reserves_payout
+						&& *actual_reserved == reserved_from_circulation
 				)));
 			});
 	}
