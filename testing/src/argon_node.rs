@@ -1,31 +1,32 @@
-#![allow(clippy::await_holding_lock)]
-
+use anyhow::{bail, Context};
 use bitcoin::hex::DisplayHex;
 use bitcoind::{bitcoincore_rpc::Auth, BitcoinD};
-use lazy_static::lazy_static;
 use polkadot_sdk::*;
 use sp_core::{crypto::KeyTypeId, ed25519, Pair};
 use sp_keyring::Sr25519Keyring;
 use std::{
 	env,
-	fs::{create_dir_all, remove_dir_all},
+	fs::{create_dir, create_dir_all, remove_dir_all},
 	path::PathBuf,
 	process,
 	process::Command,
 	str::FromStr,
-	thread,
-	time::{Duration, SystemTime, UNIX_EPOCH},
+	time::Duration,
 };
 use subxt::ext::subxt_rpcs::client::RpcParams;
 use url::Url;
+use uuid::Uuid;
 
 use crate::{get_target_dir, log_watcher::LogWatcher, start_bitcoind};
 use argon_client::MainchainClient;
 use argon_primitives::AccountId;
 
+const NODE_STARTUP_TIMEOUT: Duration = Duration::from_secs(120);
+static NODE_START_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
 pub struct ArgonTestNode {
 	// Keep a handle to the node; once it's dropped the node is killed.
-	proc: Option<process::Child>,
+	proc: Option<NodeProcess>,
 	pub client: MainchainClient,
 	pub bitcoind: Option<BitcoinD>,
 	pub account_id: AccountId,
@@ -59,17 +60,10 @@ impl ArgonNodeStartArgs {
 	}
 
 	pub fn get_temp_dir() -> anyhow::Result<PathBuf> {
-		let thread_id = format!("{:?}", thread::current().id())
-			.replace("ThreadId(", "")
-			.replace(")", "")
-			.replace("\"", "");
-		let unique_name = format!(
-			"test_dir_{}_{}",
-			SystemTime::now().duration_since(UNIX_EPOCH)?.as_micros(),
-			thread_id
-		);
-		let base_dir = env::temp_dir().join("argon_node").join(unique_name);
-		create_dir_all(base_dir.clone())?;
+		let test_root = env::temp_dir().join("argon_node");
+		create_dir_all(&test_root)?;
+		let base_dir = test_root.join(format!("test_dir_{}", Uuid::new_v4()));
+		create_dir(&base_dir)?;
 		Ok(base_dir)
 	}
 
@@ -174,11 +168,8 @@ impl ArgonNodeStartArgs {
 
 impl Drop for ArgonTestNode {
 	fn drop(&mut self) {
+		drop(self.proc.take());
 		self.log_watcher.close();
-		if let Some(mut proc) = self.proc.take() {
-			let _ = proc.kill();
-			let _ = proc.wait();
-		}
 		if self.start_args.cleanup_base_data_path {
 			let base_data_path = self.start_args.base_data_path.clone();
 			if let Err(error) = remove_dir_all(&base_data_path) &&
@@ -193,16 +184,12 @@ impl Drop for ArgonTestNode {
 	}
 }
 
-lazy_static! {
-	static ref CONTEXT_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
-}
 impl ArgonTestNode {
 	pub fn stop(&mut self) -> anyhow::Result<()> {
-		self.log_watcher.close();
 		if let Some(mut proc) = self.proc.take() {
-			proc.kill()?;
-			let _ = proc.wait();
+			proc.stop()?;
 		}
+		self.log_watcher.close();
 		Ok(())
 	}
 
@@ -210,20 +197,15 @@ impl ArgonTestNode {
 	pub async fn restart(&mut self, wait_duration: Duration) -> anyhow::Result<()> {
 		self.stop()?;
 		tokio::time::sleep(wait_duration).await;
-		let (proc, log_watcher) = Self::start_process(&mut self.start_args).await?;
+		let mut start_args = self.start_args.clone();
+		let (proc, log_watcher, client, boot_url) =
+			Self::start_process(&mut start_args, NODE_STARTUP_TIMEOUT).await?;
+
 		self.proc = Some(proc);
 		self.log_watcher = log_watcher;
-		self.client = MainchainClient::from_url(self.client.url.as_str()).await?;
-		let listen_urls = self
-			.client
-			.rpc
-			.request::<Vec<String>>("system_localListenAddresses", RpcParams::new())
-			.await?;
-		self.boot_url = listen_urls
-			.into_iter()
-			.find(|address| address.contains("127.0.0.1"))
-			.map(normalize_bootnode_address)
-			.expect("should have a localhost ip");
+		self.client = client;
+		self.boot_url = boot_url;
+		self.start_args = start_args;
 		Ok(())
 	}
 
@@ -247,25 +229,6 @@ impl ArgonTestNode {
 		Self::start(fork_args).await
 	}
 
-	async fn start_process(
-		args: &mut ArgonNodeStartArgs,
-	) -> anyhow::Result<(process::Child, LogWatcher)> {
-		println!("Starting argon-node with args: {args:?}");
-
-		let mut proc = args.command().spawn()?;
-
-		// Wait for RPC port to be logged (it's logged to stderr).
-		let stderr = proc.stderr.take().unwrap();
-		let log_watch = LogWatcher::new(stderr, &args.authority);
-		let port_matches = log_watch
-			.wait_for_log(r"Running JSON-RPC server: addr=127.0.0.1:(\d+)", 1)
-			.await?;
-		assert_eq!(port_matches.len(), 1);
-		println!("Started argon-node with RPC port {port_matches:?}");
-		args.rpc_port = port_matches[0].parse::<u16>().expect("Failed to parse port");
-		Ok((proc, log_watch))
-	}
-
 	pub async fn start_with_args(
 		authority: &str,
 		compute_miners: u16,
@@ -275,8 +238,7 @@ impl ArgonTestNode {
 	}
 
 	pub async fn start(mut args: ArgonNodeStartArgs) -> anyhow::Result<Self> {
-		#[allow(clippy::await_holding_lock)]
-		let _lock = CONTEXT_LOCK.lock().unwrap();
+		let _lock = NODE_START_LOCK.lock().await;
 
 		let mut bitcoind = None;
 		if args.bitcoin_rpc.is_empty() {
@@ -287,28 +249,17 @@ impl ArgonTestNode {
 			bitcoind = Some(bitcoin);
 			args.bitcoin_rpc = rpc_url.to_string();
 		}
-		let (proc, log_watch) = Self::start_process(&mut args).await?;
-		let ws_url = format!("ws://127.0.0.1:{}", args.rpc_port);
-
-		let client = MainchainClient::from_url(ws_url.as_str()).await?;
-
-		let listen_urls = client
-			.rpc
-			.request::<Vec<String>>("system_localListenAddresses", RpcParams::new())
-			.await?;
+		let (proc, log_watcher, client, boot_url) =
+			Self::start_process(&mut args, NODE_STARTUP_TIMEOUT).await?;
 		Ok(ArgonTestNode {
 			proc: Some(proc),
 			client,
 			bitcoind,
 			account_id: args.get_account_id(),
 			author_keyring_name: args.authority.to_string(),
-			boot_url: listen_urls
-				.into_iter()
-				.find(|a| a.contains("127.0.0.1"))
-				.map(normalize_bootnode_address)
-				.expect("should have a localhost ip"),
-			log_watcher: log_watch,
-			start_args: args.clone(),
+			boot_url,
+			log_watcher,
+			start_args: args,
 		})
 	}
 
@@ -355,6 +306,85 @@ impl ArgonTestNode {
 		rpc_url.set_username("").unwrap();
 		(rpc_url.to_string(), auth)
 	}
+
+	async fn start_process(
+		args: &mut ArgonNodeStartArgs,
+		startup_timeout: Duration,
+	) -> anyhow::Result<(NodeProcess, LogWatcher, MainchainClient, String)> {
+		println!("Starting argon-node with args: {args:?}");
+		let mut proc = NodeProcess { child: args.command().spawn()? };
+		let stderr = proc.child.stderr.take().context("node stderr should be piped")?;
+		let log_watcher = LogWatcher::new(stderr, &args.authority);
+		let mut phase = "RPC startup";
+
+		let ready: anyhow::Result<_> = match tokio::time::timeout(startup_timeout, async {
+			let port_matches = log_watcher
+				.wait_for_log(r"Running JSON-RPC server: addr=127.0.0.1:(\d+)", 1)
+				.await?;
+			let rpc_port = port_matches
+				.first()
+				.context("node RPC port was not logged")?
+				.parse::<u16>()
+				.context("invalid node RPC port")?;
+			let ws_url = format!("ws://127.0.0.1:{rpc_port}");
+
+			phase = "RPC connection";
+			let client = MainchainClient::from_url(&ws_url).await?;
+
+			phase = "P2P listener";
+			loop {
+				if let Some(status) = proc.child.try_wait()? {
+					bail!("node exited before startup completed: {status}");
+				}
+				let listen_urls = client
+					.rpc
+					.request::<Vec<String>>("system_localListenAddresses", RpcParams::new())
+					.await?;
+				if let Some(address) =
+					listen_urls.into_iter().find(|address| address.contains("127.0.0.1"))
+				{
+					return Ok((rpc_port, client, normalize_bootnode_address(address)));
+				}
+				tokio::time::sleep(Duration::from_millis(100)).await;
+			}
+		})
+		.await
+		{
+			Ok(result) => result,
+			Err(_) => Err(anyhow::anyhow!("timed out after {startup_timeout:?}")),
+		};
+		let (rpc_port, client, boot_url) = ready.with_context(|| {
+			format!(
+				"Node {} startup failed during {phase}. Recent logs:\n{}",
+				args.authority,
+				log_watcher.tail(40),
+			)
+		})?;
+
+		args.rpc_port = rpc_port;
+		println!("Started argon-node with RPC port {rpc_port} and bootnode {boot_url}");
+		Ok((proc, log_watcher, client, boot_url))
+	}
+}
+
+struct NodeProcess {
+	child: process::Child,
+}
+
+impl NodeProcess {
+	fn stop(&mut self) -> std::io::Result<()> {
+		if self.child.try_wait()?.is_none() {
+			self.child.kill()?;
+		}
+		self.child.wait()?;
+		Ok(())
+	}
+}
+
+impl Drop for NodeProcess {
+	fn drop(&mut self) {
+		let _ = self.stop();
+	}
 }
 
 fn normalize_bootnode_address(address: String) -> String {
@@ -369,5 +399,93 @@ fn normalize_bootnode_address(address: String) -> String {
 		format!("{base}/p2p/{peer_id}")
 	} else {
 		address
+	}
+}
+
+#[cfg(all(test, unix))]
+mod tests {
+	use super::*;
+	use std::{fs, os::unix::fs::PermissionsExt};
+
+	#[tokio::test]
+	async fn startup_error_kills_the_node_process() {
+		let (args, pid_path) = startup_stub(true);
+		let data_path = args.base_data_path.clone();
+		let error = ArgonTestNode::start(args).await.err().expect("RPC connection should fail");
+
+		let pid = fs::read_to_string(&pid_path).unwrap();
+		let alive = Command::new("/bin/kill").args(["-0", pid.trim()]).output().unwrap();
+		if alive.status.success() {
+			Command::new("/bin/kill").args(["-KILL", pid.trim()]).output().unwrap();
+		}
+		remove_dir_all(data_path).unwrap();
+		assert!(!alive.status.success(), "startup error left the node process alive");
+		assert!(error.to_string().contains("RPC connection"));
+	}
+
+	#[tokio::test]
+	async fn cancelling_startup_kills_the_node_process() {
+		let (args, pid_path) = startup_stub(false);
+		let data_path = args.base_data_path.clone();
+		{
+			let startup = ArgonTestNode::start(args);
+			tokio::pin!(startup);
+			tokio::select! {
+				_ = &mut startup => panic!("node unexpectedly finished startup"),
+				ready = tokio::time::timeout(Duration::from_secs(5), async {
+					while !pid_path.exists() {
+						tokio::time::sleep(Duration::from_millis(10)).await;
+					}
+				}) => ready.expect("node process did not start"),
+			}
+		}
+
+		let pid = fs::read_to_string(&pid_path).unwrap();
+		let alive = Command::new("/bin/kill").args(["-0", pid.trim()]).output().unwrap();
+		if alive.status.success() {
+			Command::new("/bin/kill").args(["-KILL", pid.trim()]).output().unwrap();
+		}
+		remove_dir_all(data_path).unwrap();
+		assert!(!alive.status.success(), "cancelled startup left the node process alive");
+	}
+
+	#[tokio::test]
+	async fn startup_timeout_reports_the_phase_and_recent_logs() {
+		let (mut args, pid_path) = startup_stub(false);
+		let data_path = args.base_data_path.clone();
+		let error = ArgonTestNode::start_process(&mut args, Duration::from_secs(2))
+			.await
+			.err()
+			.expect("RPC startup should time out");
+
+		let pid = fs::read_to_string(&pid_path).unwrap();
+		let alive = Command::new("/bin/kill").args(["-0", pid.trim()]).output().unwrap();
+		if alive.status.success() {
+			Command::new("/bin/kill").args(["-KILL", pid.trim()]).output().unwrap();
+		}
+		remove_dir_all(data_path).unwrap();
+		assert!(!alive.status.success(), "timed-out startup left the node process alive");
+		let message = format!("{error:#}");
+		assert!(message.contains("RPC startup"), "{message}");
+		assert!(message.contains("timed out"), "{message}");
+		assert!(message.contains("startup stub running"), "{message}");
+	}
+
+	fn startup_stub(log_rpc_port: bool) -> (ArgonNodeStartArgs, PathBuf) {
+		let mut args = ArgonNodeStartArgs::new("alice", 0, "").unwrap();
+		args.target_dir = args.base_data_path.clone();
+		args.bitcoin_rpc = "http://127.0.0.1:1".to_string();
+		let executable = args.target_dir.join("argon-node");
+		let mut script =
+			"#!/bin/sh\nprintf '%s\\n' \"$$\" > \"$0.pid\"\nprintf 'startup stub running\\n' >&2\n"
+				.to_string();
+		if log_rpc_port {
+			script.push_str("printf 'Running JSON-RPC server: addr=127.0.0.1:0\\n' >&2\n");
+		}
+		script.push_str("exec /bin/sleep 60\n");
+		fs::write(&executable, script).unwrap();
+		fs::set_permissions(&executable, fs::Permissions::from_mode(0o755)).unwrap();
+		let pid_path = args.target_dir.join("argon-node.pid");
+		(args, pid_path)
 	}
 }

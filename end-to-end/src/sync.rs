@@ -245,36 +245,50 @@ async fn wait_for_finalized_notebook_snapshot(
 	min_notebook_blocks: u32,
 	max_finalized_blocks: u32,
 ) -> FinalizedSnapshot {
-	let start_finalized = node.client.latest_finalized_block().await.unwrap();
-	let mut blocks_sub = node.client.live.blocks().subscribe_finalized().await.unwrap();
 	let mut notebook_blocks_seen = 0;
 	let mut finalized_seen = 0;
+	let mut last_finalized = 0;
+	let history_timeout = Duration::from_secs(180);
 
-	while let Some(Ok(block)) = blocks_sub.next().await {
-		if block.number() <= start_finalized {
-			continue;
-		}
-		finalized_seen += 1;
+	let snapshot = tokio::time::timeout(history_timeout, async {
+		let start_finalized = node.client.latest_finalized_block().await.unwrap();
+		last_finalized = start_finalized;
+		let mut blocks_sub = node.client.live.blocks().subscribe_finalized().await.unwrap();
 
-		let has_notebooks = block.header().runtime_digest().logs.iter().any(|digest| {
-			digest
-				.as_notebooks::<VerifyError>()
-				.is_some_and(|notebooks| !notebooks.notebooks.is_empty())
-		});
-		if has_notebooks {
-			notebook_blocks_seen += 1;
-			if notebook_blocks_seen >= min_notebook_blocks {
-				return FinalizedSnapshot { number: block.number() };
+		while let Some(next) = blocks_sub.next().await {
+			let block = next
+				.expect("finalized block subscription failed while waiting for notebook history");
+			last_finalized = block.number();
+			if block.number() <= start_finalized {
+				continue;
 			}
+			finalized_seen += 1;
+
+			let has_notebooks = block.header().runtime_digest().logs.iter().any(|digest| {
+				digest
+					.as_notebooks::<VerifyError>()
+					.is_some_and(|notebooks| !notebooks.notebooks.is_empty())
+			});
+			if has_notebooks {
+				notebook_blocks_seen += 1;
+				if notebook_blocks_seen >= min_notebook_blocks {
+					return FinalizedSnapshot { number: block.number() };
+				}
+			}
+
+			assert!(
+				finalized_seen < max_finalized_blocks,
+				"only saw {notebook_blocks_seen} notebook block(s) after {finalized_seen} finalized blocks",
+			);
 		}
 
-		assert!(
-			finalized_seen < max_finalized_blocks,
-			"only saw {notebook_blocks_seen} notebook block(s) after {finalized_seen} finalized blocks",
-		);
-	}
-
-	panic!("finalized block subscription ended before enough notebook blocks were observed");
+		panic!("finalized block subscription ended before enough notebook blocks were observed");
+	})
+	.await;
+	snapshot.unwrap_or_else(|_| panic!(
+		"timed out after {history_timeout:?} waiting for {min_notebook_blocks} notebook blocks; saw {notebook_blocks_seen} after {finalized_seen} finalized blocks, last finalized block {last_finalized}. Recent node logs:\n{}",
+		node.log_watcher.tail(40),
+	))
 }
 
 async fn header_hash_at_height(node: &ArgonTestNode, height: u32) -> Option<H256> {

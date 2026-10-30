@@ -48,9 +48,17 @@ impl LogWatcher {
 	}
 
 	pub fn close(&self) {
+		// A running blocking reader exits when its process closes the pipe.
 		if let Some(handle) = self.handle.lock().unwrap().take() {
 			handle.abort();
 		}
+	}
+
+	pub fn tail(&self, line_count: usize) -> String {
+		let log = self.log.lock().unwrap();
+		let mut lines = log.lines().rev().take(line_count).collect::<Vec<_>>();
+		lines.reverse();
+		lines.join("\n")
 	}
 
 	// Wait for a specific regex to match a number of times in the log
