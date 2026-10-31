@@ -1377,6 +1377,61 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       PayoutNotReady: AugmentedError<ApiType>;
     };
+    stabilizerPools: {
+      /**
+       * The three account witnesses do not contain identical execution-block proofs.
+       **/
+      InconsistentProofBlocks: AugmentedError<ApiType>;
+      /**
+       * A deployment address is zero or reused, or the pool key fails ordering or encoding
+       * bounds.
+       **/
+      InvalidPool: AugmentedError<ApiType>;
+      /**
+       * The packed PoolId mismatches, ticks are invalid/misaligned, or liquidity exceeds
+       * uint128.
+       **/
+      InvalidPosition: AugmentedError<ApiType>;
+      /**
+       * The Ethereum verifier is unavailable, or header ancestry/account/storage authentication
+       * fails.
+       **/
+      InvalidProof: AugmentedError<ApiType>;
+      /**
+       * A witness has the wrong slot count or slot addresses for the requested NFT position.
+       **/
+      InvalidStorageSlots: AugmentedError<ApiType>;
+      /**
+       * The NFT's subscriber or subscription flag is invalid, or its permanent revision is
+       * zero.
+       **/
+      InvalidSubscription: AugmentedError<ApiType>;
+      /**
+       * The signer does not match the beneficiary encoded in the subscription witness.
+       **/
+      NotBeneficiary: AugmentedError<ApiType>;
+      /**
+       * This PoolManager/PoolId pair already has an immutable registration.
+       **/
+      PoolAlreadyRegistered: AugmentedError<ApiType>;
+      /**
+       * No approved configuration exists for the supplied PoolManager/PoolId pair.
+       **/
+      PoolNotRegistered: AugmentedError<ApiType>;
+      /**
+       * Beneficiary, subscriber, pool, tick range, or liquidity changed without a revision
+       * increase.
+       **/
+      PositionChangedWithoutRevision: AugmentedError<ApiType>;
+      /**
+       * The subscriber revision is lower than the NFT's last accepted revision.
+       **/
+      RevisionRegressed: AugmentedError<ApiType>;
+      /**
+       * Ethereum block height or time does not strictly advance past the stored checkpoint.
+       **/
+      StaleCheckpoint: AugmentedError<ApiType>;
+    };
     sudo: {
       /**
        * Sender must be the Sudo account.

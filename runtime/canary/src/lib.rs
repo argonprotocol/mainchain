@@ -669,7 +669,7 @@ parameter_types! {
 }
 
 impl pallet_price_index::Config for Runtime {
-	type OnPriceIndexUpdated = use_unless_benchmark!(StabilizerBuys, ());
+	type OnPriceIndexUpdated = use_unless_benchmark!((StabilizerBuys, StabilizerPools), ());
 	type WeightInfo = weights::pallet_price_index::WeightInfo<Runtime>;
 	type Currency = Balances;
 	type Balance = Balance;
@@ -914,4 +914,7 @@ impl pallet_treasury_positions::Config for Runtime {
 
 impl pallet_stabilizer_pools::Config for Runtime {
 	type WeightInfo = weights::pallet_stabilizer_pools::WeightInfo<Runtime>;
+	type MiningFrameTransitionProvider = MiningSlot;
+	type CurrentTick = Ticks;
+	type MaxFramePriceHistoryFrames = ConstU32<33>;
 }

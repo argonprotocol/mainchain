@@ -17,10 +17,13 @@ alloy-primitives = { workspace = true }
 alloy-sol-types = { workspace = true }
 argon-primitives = { workspace = true }
 codec = { workspace = true }
+# The SDK's static address tables need lazy_static's runtime-compatible backend.
+lazy_static = { workspace = true, features = ["spin_no_std"] }
 pallet-ethereum-verifier = { workspace = true }
 pallet-prelude = { workspace = true }
 polkadot-sdk = { workspace = true, features = ["frame-support", "frame-system", "sp-runtime", "sp-core"] }
 scale-info = { workspace = true }
+uniswap-v3-sdk-bigint = { workspace = true }
 
 [dev-dependencies]
 alloy-consensus = { workspace = true }
@@ -42,6 +45,7 @@ std = [
 	"pallet-prelude/std",
 	"polkadot-sdk/std",
 	"scale-info/std",
+	"uniswap-v3-sdk-bigint/std",
 ]
 runtime-benchmarks = [
 	"alloy-rlp",

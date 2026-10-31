@@ -14,6 +14,7 @@ import type {
   Bytes,
   Compact,
   Option,
+  U256,
   U8aFixed,
   Vec,
   bool,
@@ -71,6 +72,8 @@ import type {
   PalletOperationalAccountsRegistration,
   PalletPriceIndexEthereumPriceIndex,
   PalletStabilizerBuysUniswapPurchasePurchasePool,
+  PalletStabilizerPoolsPoolConfig,
+  PalletStabilizerPoolsPositionProof,
   PalletTreasuryBondLotEarningsMetrics,
   PalletVaultsVaultConfig,
   SnowbridgeBeaconPrimitivesBeaconHeader,
@@ -1484,6 +1487,7 @@ declare module '@polkadot/api-base/types/submittable' {
                 argonTimeWeightedAverageLiquidity?: any;
                 tick?: any;
                 usdcUsdPrice?: any;
+                stabilizerPoolSqrtPriceX96?: any;
               }
             | string
             | Uint8Array,
@@ -1895,6 +1899,39 @@ declare module '@polkadot/api-base/types/submittable' {
       setMatchingRate: AugmentedSubmittable<
         (rate: Permill | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>,
         [Permill]
+      >;
+    };
+    stabilizerPools: {
+      /**
+       * Register a baseline, extend a maintained revision, or reset after an unproven change.
+       **/
+      checkpointPosition: AugmentedSubmittable<
+        (
+          poolManager: H160 | string | Uint8Array,
+          poolId: H256 | string | Uint8Array,
+          tokenId: U256 | AnyNumber | Uint8Array,
+          proof:
+            | PalletStabilizerPoolsPositionProof
+            | { subscriber?: any; positionManager?: any; poolManager?: any }
+            | string
+            | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [H160, H256, U256, PalletStabilizerPoolsPositionProof]
+      >;
+      /**
+       * Approve immutable deployment bindings and the canonical pool key.
+       * Root must verify the pinned implementations and their immutable bindings first.
+       **/
+      registerPool: AugmentedSubmittable<
+        (
+          poolManager: H160 | string | Uint8Array,
+          config:
+            | PalletStabilizerPoolsPoolConfig
+            | { positionManager?: any; subscriber?: any; key?: any }
+            | string
+            | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [H160, PalletStabilizerPoolsPoolConfig]
       >;
     };
     sudo: {

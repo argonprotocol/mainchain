@@ -699,8 +699,11 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 		if (amount == 0) revert ZeroAmount();
 
 		uint256 tokenAmount = toTokenAmount(amount);
-		ICanonicalToken(token).permit(msg.sender, address(this), tokenAmount, deadline, v, r, s);
-		ICanonicalToken(token).burnFrom(msg.sender, tokenAmount);
+		ICanonicalToken canonicalToken = ICanonicalToken(token);
+		// Anyone can submit the permit first; burnFrom still requires the caller's allowance.
+		try canonicalToken.permit(msg.sender, address(this), tokenAmount, deadline, v, r, s) {} catch {}
+
+		canonicalToken.burnFrom(msg.sender, tokenAmount);
 
 		GatewayActivityState memory gatewayState = _gatewayActivityState(gatewayActivityNonce + 1);
 		_recordActivity(
@@ -798,6 +801,12 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 			// Require strictly increasing signing keys so the same collateral bucket cannot appear twice (eg, user replays the same signature).
 			if (signingKey <= previousSigningKey) {
 				revert InvalidSignatureOrder();
+			}
+			if (
+				authorization.microgonCollateral == 0 &&
+				authorization.micronotCollateral == 0
+			) {
+				revert InvalidMintingAuthority(signingKey);
 			}
 
 			MintingCollateral storage collateralRemaining =

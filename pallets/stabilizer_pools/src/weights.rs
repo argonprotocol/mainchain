@@ -6,6 +6,9 @@ use pallet_prelude::*;
 pub trait WeightInfo {
 	fn register_pool() -> Weight;
 	fn checkpoint_position() -> Weight;
+	fn read_price_index_context() -> Weight;
+	fn record_frame_price() -> Weight;
+	fn record_frame_price_after_gap() -> Weight;
 }
 
 impl WeightInfo for () {
@@ -13,6 +16,15 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 	fn checkpoint_position() -> Weight {
+		Weight::zero()
+	}
+	fn read_price_index_context() -> Weight {
+		Weight::zero()
+	}
+	fn record_frame_price() -> Weight {
+		Weight::zero()
+	}
+	fn record_frame_price_after_gap() -> Weight {
 		Weight::zero()
 	}
 }

@@ -6,7 +6,7 @@ pub mod api {
 	mod root_mod {
 		pub use super::*;
 	}
-	pub static PALLETS: [&str; 36usize] = [
+	pub static PALLETS: [&str; 37usize] = [
 		"System",
 		"Digests",
 		"Timestamp",
@@ -43,6 +43,7 @@ pub mod api {
 		"Bootstrap",
 		"TreasuryPositions",
 		"StabilizerBuys",
+		"StabilizerPools",
 	];
 	pub static RUNTIME_APIS: [&str; 21usize] = [
 		"Core",
@@ -1172,9 +1173,10 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							59u8, 35u8, 176u8, 231u8, 135u8, 124u8, 131u8, 204u8, 235u8, 213u8,
-							65u8, 218u8, 160u8, 156u8, 126u8, 249u8, 152u8, 98u8, 31u8, 119u8, 8u8,
-							26u8, 249u8, 34u8, 100u8, 152u8, 70u8, 98u8, 16u8, 22u8, 215u8, 89u8,
+							37u8, 217u8, 170u8, 22u8, 23u8, 113u8, 67u8, 4u8, 10u8, 118u8, 108u8,
+							120u8, 209u8, 167u8, 125u8, 171u8, 89u8, 239u8, 231u8, 223u8, 179u8,
+							115u8, 126u8, 166u8, 50u8, 227u8, 159u8, 149u8, 198u8, 234u8, 166u8,
+							209u8,
 						],
 					)
 				}
@@ -1192,9 +1194,10 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							179u8, 69u8, 29u8, 46u8, 250u8, 157u8, 229u8, 131u8, 29u8, 55u8, 240u8,
-							78u8, 57u8, 101u8, 11u8, 193u8, 181u8, 176u8, 205u8, 229u8, 209u8,
-							175u8, 245u8, 61u8, 140u8, 223u8, 70u8, 217u8, 75u8, 252u8, 54u8, 84u8,
+							52u8, 149u8, 34u8, 213u8, 171u8, 254u8, 101u8, 78u8, 71u8, 160u8,
+							251u8, 206u8, 165u8, 100u8, 232u8, 217u8, 150u8, 237u8, 44u8, 28u8,
+							119u8, 236u8, 89u8, 64u8, 91u8, 14u8, 12u8, 22u8, 111u8, 71u8, 242u8,
+							71u8,
 						],
 					)
 				}
@@ -3292,6 +3295,9 @@ pub mod api {
 		pub fn stabilizer_buys(&self) -> stabilizer_buys::constants::ConstantsApi {
 			stabilizer_buys::constants::ConstantsApi
 		}
+		pub fn stabilizer_pools(&self) -> stabilizer_pools::constants::ConstantsApi {
+			stabilizer_pools::constants::ConstantsApi
+		}
 	}
 	pub struct StorageApi;
 	impl StorageApi {
@@ -3397,6 +3403,9 @@ pub mod api {
 		pub fn stabilizer_buys(&self) -> stabilizer_buys::storage::StorageApi {
 			stabilizer_buys::storage::StorageApi
 		}
+		pub fn stabilizer_pools(&self) -> stabilizer_pools::storage::StorageApi {
+			stabilizer_pools::storage::StorageApi
+		}
 	}
 	pub struct TransactionApi;
 	impl TransactionApi {
@@ -3493,6 +3502,9 @@ pub mod api {
 		pub fn stabilizer_buys(&self) -> stabilizer_buys::calls::TransactionApi {
 			stabilizer_buys::calls::TransactionApi
 		}
+		pub fn stabilizer_pools(&self) -> stabilizer_pools::calls::TransactionApi {
+			stabilizer_pools::calls::TransactionApi
+		}
 	}
 	pub struct ViewFunctionsApi;
 	impl ViewFunctionsApi {
@@ -3509,9 +3521,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				94u8, 189u8, 103u8, 91u8, 88u8, 172u8, 167u8, 117u8, 165u8, 247u8, 169u8, 112u8,
-				80u8, 16u8, 36u8, 145u8, 41u8, 34u8, 104u8, 214u8, 248u8, 191u8, 228u8, 205u8,
-				71u8, 4u8, 228u8, 105u8, 128u8, 68u8, 236u8, 193u8,
+				86u8, 33u8, 31u8, 233u8, 235u8, 115u8, 17u8, 135u8, 134u8, 116u8, 219u8, 184u8,
+				166u8, 78u8, 93u8, 5u8, 172u8, 62u8, 0u8, 120u8, 232u8, 10u8, 93u8, 114u8, 64u8,
+				114u8, 47u8, 108u8, 81u8, 111u8, 125u8, 255u8,
 			]
 	}
 	pub mod system {
@@ -4635,9 +4647,10 @@ pub mod api {
 						"Events",
 						(),
 						[
-							143u8, 71u8, 21u8, 200u8, 179u8, 211u8, 75u8, 188u8, 179u8, 7u8, 174u8,
-							134u8, 72u8, 170u8, 217u8, 64u8, 164u8, 125u8, 80u8, 65u8, 181u8, 33u8,
-							15u8, 36u8, 136u8, 82u8, 24u8, 3u8, 87u8, 22u8, 32u8, 146u8,
+							119u8, 187u8, 62u8, 213u8, 61u8, 230u8, 58u8, 158u8, 240u8, 217u8,
+							107u8, 229u8, 25u8, 190u8, 99u8, 246u8, 10u8, 151u8, 38u8, 218u8,
+							152u8, 78u8, 32u8, 111u8, 65u8, 31u8, 187u8, 150u8, 98u8, 153u8, 125u8,
+							233u8,
 						],
 					)
 				}
@@ -5545,9 +5558,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							53u8, 246u8, 160u8, 100u8, 193u8, 196u8, 65u8, 102u8, 82u8, 54u8,
-							192u8, 154u8, 150u8, 9u8, 90u8, 102u8, 147u8, 129u8, 44u8, 57u8, 135u8,
-							67u8, 4u8, 217u8, 150u8, 89u8, 73u8, 248u8, 142u8, 156u8, 44u8, 87u8,
+							73u8, 177u8, 234u8, 224u8, 183u8, 68u8, 106u8, 137u8, 98u8, 23u8, 84u8,
+							71u8, 179u8, 72u8, 48u8, 186u8, 30u8, 8u8, 65u8, 7u8, 118u8, 70u8,
+							187u8, 111u8, 11u8, 247u8, 39u8, 95u8, 154u8, 225u8, 167u8, 120u8,
 						],
 					)
 				}
@@ -5612,9 +5625,9 @@ pub mod api {
 							max_weight,
 						},
 						[
-							3u8, 73u8, 44u8, 149u8, 91u8, 89u8, 177u8, 15u8, 48u8, 59u8, 229u8,
-							186u8, 195u8, 101u8, 48u8, 205u8, 36u8, 170u8, 23u8, 69u8, 200u8, 89u8,
-							91u8, 227u8, 73u8, 6u8, 98u8, 48u8, 114u8, 173u8, 83u8, 255u8,
+							57u8, 252u8, 26u8, 202u8, 136u8, 152u8, 18u8, 157u8, 48u8, 125u8,
+							143u8, 221u8, 117u8, 69u8, 13u8, 176u8, 72u8, 46u8, 44u8, 7u8, 10u8,
+							150u8, 41u8, 6u8, 28u8, 215u8, 201u8, 149u8, 165u8, 219u8, 144u8, 82u8,
 						],
 					)
 				}
@@ -6519,10 +6532,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							107u8, 142u8, 53u8, 13u8, 174u8, 110u8, 226u8, 14u8, 126u8, 175u8,
-							148u8, 88u8, 32u8, 176u8, 164u8, 172u8, 209u8, 197u8, 92u8, 201u8,
-							37u8, 85u8, 109u8, 161u8, 165u8, 136u8, 220u8, 62u8, 92u8, 93u8, 185u8,
-							122u8,
+							140u8, 231u8, 87u8, 230u8, 143u8, 89u8, 66u8, 223u8, 107u8, 45u8,
+							201u8, 84u8, 0u8, 9u8, 73u8, 9u8, 29u8, 200u8, 56u8, 54u8, 77u8, 192u8,
+							16u8, 218u8, 174u8, 190u8, 24u8, 124u8, 55u8, 114u8, 173u8, 31u8,
 						],
 					)
 				}
@@ -6786,10 +6798,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							21u8, 2u8, 234u8, 186u8, 52u8, 145u8, 25u8, 140u8, 239u8, 51u8, 12u8,
-							243u8, 163u8, 166u8, 222u8, 123u8, 206u8, 29u8, 80u8, 127u8, 125u8,
-							121u8, 251u8, 195u8, 152u8, 205u8, 1u8, 143u8, 113u8, 177u8, 56u8,
-							14u8,
+							80u8, 248u8, 76u8, 9u8, 11u8, 99u8, 203u8, 70u8, 39u8, 227u8, 111u8,
+							63u8, 243u8, 93u8, 156u8, 17u8, 13u8, 207u8, 109u8, 94u8, 176u8, 137u8,
+							89u8, 67u8, 120u8, 97u8, 78u8, 11u8, 246u8, 9u8, 122u8, 155u8,
 						],
 					)
 				}
@@ -6838,10 +6849,10 @@ pub mod api {
 						],
 						check_permissions::Input { call, proxy_type },
 						[
-							242u8, 80u8, 221u8, 200u8, 39u8, 240u8, 72u8, 67u8, 174u8, 174u8,
-							171u8, 247u8, 234u8, 205u8, 228u8, 221u8, 229u8, 211u8, 39u8, 193u8,
-							7u8, 177u8, 69u8, 84u8, 15u8, 77u8, 224u8, 98u8, 9u8, 217u8, 161u8,
-							135u8,
+							169u8, 209u8, 10u8, 246u8, 250u8, 206u8, 23u8, 3u8, 69u8, 3u8, 102u8,
+							183u8, 250u8, 103u8, 21u8, 146u8, 169u8, 255u8, 153u8, 246u8, 95u8,
+							191u8, 213u8, 35u8, 202u8, 124u8, 27u8, 130u8, 165u8, 10u8, 225u8,
+							50u8,
 						],
 					)
 				}
@@ -15894,9 +15905,9 @@ pub mod api {
 						"submit",
 						types::Submit { index, ethereum },
 						[
-							81u8, 65u8, 248u8, 2u8, 207u8, 139u8, 219u8, 53u8, 188u8, 230u8, 188u8,
-							5u8, 132u8, 79u8, 226u8, 154u8, 161u8, 234u8, 196u8, 255u8, 27u8, 58u8,
-							176u8, 130u8, 139u8, 100u8, 103u8, 239u8, 200u8, 21u8, 230u8, 7u8,
+							61u8, 111u8, 46u8, 82u8, 154u8, 1u8, 38u8, 19u8, 202u8, 185u8, 25u8,
+							203u8, 20u8, 67u8, 32u8, 253u8, 18u8, 215u8, 53u8, 47u8, 19u8, 139u8,
+							97u8, 51u8, 168u8, 62u8, 111u8, 22u8, 223u8, 106u8, 108u8, 116u8,
 						],
 					)
 				}
@@ -16036,10 +16047,10 @@ pub mod api {
 						"Current",
 						(),
 						[
-							175u8, 97u8, 129u8, 150u8, 96u8, 194u8, 63u8, 210u8, 22u8, 228u8, 25u8,
-							121u8, 218u8, 208u8, 213u8, 223u8, 3u8, 161u8, 165u8, 88u8, 23u8,
-							250u8, 37u8, 174u8, 29u8, 109u8, 43u8, 146u8, 218u8, 68u8, 242u8,
-							151u8,
+							111u8, 249u8, 196u8, 167u8, 217u8, 125u8, 199u8, 115u8, 221u8, 100u8,
+							126u8, 0u8, 178u8, 84u8, 112u8, 145u8, 105u8, 45u8, 196u8, 237u8, 10u8,
+							137u8, 97u8, 223u8, 63u8, 188u8, 142u8, 194u8, 253u8, 249u8, 22u8,
+							135u8,
 						],
 					)
 				}
@@ -16058,9 +16069,9 @@ pub mod api {
 						"LastValid",
 						(),
 						[
-							194u8, 241u8, 88u8, 30u8, 116u8, 55u8, 131u8, 96u8, 121u8, 255u8,
-							195u8, 163u8, 221u8, 149u8, 80u8, 29u8, 198u8, 236u8, 81u8, 37u8, 81u8,
-							87u8, 27u8, 51u8, 224u8, 178u8, 74u8, 128u8, 254u8, 99u8, 176u8, 174u8,
+							12u8, 3u8, 3u8, 140u8, 60u8, 83u8, 16u8, 242u8, 193u8, 163u8, 16u8,
+							72u8, 11u8, 1u8, 141u8, 57u8, 19u8, 182u8, 164u8, 29u8, 7u8, 252u8,
+							76u8, 72u8, 45u8, 125u8, 15u8, 184u8, 199u8, 217u8, 107u8, 88u8,
 						],
 					)
 				}
@@ -22261,10 +22272,10 @@ pub mod api {
 						"batch",
 						types::Batch { calls },
 						[
-							128u8, 19u8, 48u8, 79u8, 53u8, 83u8, 24u8, 230u8, 186u8, 222u8, 161u8,
-							10u8, 181u8, 214u8, 251u8, 99u8, 228u8, 95u8, 148u8, 137u8, 247u8,
-							203u8, 210u8, 119u8, 165u8, 108u8, 191u8, 139u8, 114u8, 156u8, 182u8,
-							66u8,
+							230u8, 147u8, 62u8, 199u8, 107u8, 211u8, 103u8, 168u8, 216u8, 180u8,
+							223u8, 163u8, 172u8, 226u8, 40u8, 129u8, 252u8, 178u8, 186u8, 130u8,
+							0u8, 12u8, 168u8, 183u8, 103u8, 120u8, 88u8, 202u8, 68u8, 46u8, 154u8,
+							111u8,
 						],
 					)
 				}
@@ -22294,9 +22305,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							67u8, 27u8, 102u8, 166u8, 67u8, 196u8, 39u8, 114u8, 94u8, 2u8, 43u8,
-							218u8, 247u8, 255u8, 178u8, 101u8, 245u8, 255u8, 113u8, 22u8, 137u8,
-							24u8, 42u8, 6u8, 87u8, 5u8, 63u8, 189u8, 212u8, 105u8, 31u8, 227u8,
+							183u8, 31u8, 64u8, 171u8, 116u8, 100u8, 218u8, 11u8, 155u8, 25u8,
+							249u8, 59u8, 64u8, 157u8, 199u8, 142u8, 63u8, 193u8, 84u8, 168u8, 53u8,
+							140u8, 155u8, 211u8, 133u8, 147u8, 155u8, 200u8, 87u8, 62u8, 5u8,
+							119u8,
 						],
 					)
 				}
@@ -22322,9 +22334,10 @@ pub mod api {
 						"batch_all",
 						types::BatchAll { calls },
 						[
-							121u8, 61u8, 73u8, 10u8, 144u8, 235u8, 74u8, 124u8, 56u8, 80u8, 189u8,
-							129u8, 157u8, 78u8, 59u8, 5u8, 160u8, 65u8, 223u8, 45u8, 76u8, 148u8,
-							2u8, 253u8, 55u8, 56u8, 182u8, 18u8, 180u8, 57u8, 218u8, 139u8,
+							142u8, 100u8, 141u8, 192u8, 62u8, 148u8, 179u8, 109u8, 89u8, 82u8,
+							141u8, 39u8, 165u8, 127u8, 131u8, 253u8, 181u8, 197u8, 189u8, 206u8,
+							155u8, 17u8, 67u8, 18u8, 141u8, 25u8, 46u8, 84u8, 50u8, 255u8, 47u8,
+							25u8,
 						],
 					)
 				}
@@ -22347,9 +22360,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							57u8, 26u8, 73u8, 14u8, 145u8, 154u8, 90u8, 176u8, 77u8, 187u8, 106u8,
-							193u8, 50u8, 79u8, 128u8, 34u8, 254u8, 179u8, 1u8, 18u8, 47u8, 32u8,
-							145u8, 147u8, 150u8, 89u8, 195u8, 192u8, 70u8, 234u8, 136u8, 211u8,
+							119u8, 238u8, 165u8, 236u8, 243u8, 83u8, 149u8, 83u8, 25u8, 110u8,
+							53u8, 191u8, 140u8, 131u8, 2u8, 71u8, 87u8, 22u8, 25u8, 86u8, 5u8, 4u8,
+							74u8, 197u8, 48u8, 8u8, 175u8, 30u8, 92u8, 215u8, 55u8, 43u8,
 						],
 					)
 				}
@@ -22375,9 +22388,9 @@ pub mod api {
 						"force_batch",
 						types::ForceBatch { calls },
 						[
-							27u8, 85u8, 114u8, 223u8, 154u8, 43u8, 172u8, 157u8, 180u8, 127u8,
-							159u8, 32u8, 145u8, 246u8, 3u8, 17u8, 94u8, 55u8, 211u8, 98u8, 145u8,
-							28u8, 26u8, 173u8, 41u8, 141u8, 76u8, 242u8, 96u8, 36u8, 221u8, 160u8,
+							100u8, 165u8, 116u8, 230u8, 137u8, 80u8, 23u8, 228u8, 132u8, 90u8,
+							186u8, 145u8, 230u8, 21u8, 43u8, 254u8, 115u8, 8u8, 26u8, 152u8, 128u8,
+							198u8, 209u8, 200u8, 208u8, 61u8, 87u8, 89u8, 122u8, 12u8, 4u8, 169u8,
 						],
 					)
 				}
@@ -22400,9 +22413,9 @@ pub mod api {
 							weight,
 						},
 						[
-							5u8, 66u8, 49u8, 79u8, 187u8, 72u8, 108u8, 77u8, 27u8, 15u8, 4u8,
-							212u8, 150u8, 124u8, 85u8, 147u8, 134u8, 241u8, 137u8, 11u8, 15u8,
-							238u8, 2u8, 221u8, 56u8, 245u8, 94u8, 0u8, 75u8, 152u8, 16u8, 192u8,
+							168u8, 63u8, 156u8, 14u8, 139u8, 9u8, 141u8, 184u8, 10u8, 120u8, 30u8,
+							179u8, 187u8, 100u8, 166u8, 218u8, 114u8, 157u8, 65u8, 189u8, 162u8,
+							208u8, 14u8, 201u8, 224u8, 28u8, 4u8, 53u8, 27u8, 23u8, 99u8, 84u8,
 						],
 					)
 				}
@@ -22442,10 +22455,9 @@ pub mod api {
 							fallback: ::subxt::ext::subxt_core::alloc::boxed::Box::new(fallback),
 						},
 						[
-							177u8, 234u8, 43u8, 127u8, 227u8, 185u8, 208u8, 205u8, 114u8, 1u8,
-							41u8, 213u8, 201u8, 55u8, 128u8, 125u8, 23u8, 117u8, 170u8, 231u8,
-							52u8, 16u8, 32u8, 1u8, 14u8, 27u8, 126u8, 85u8, 58u8, 155u8, 119u8,
-							23u8,
+							211u8, 167u8, 155u8, 92u8, 180u8, 187u8, 151u8, 188u8, 58u8, 96u8,
+							100u8, 101u8, 51u8, 6u8, 224u8, 173u8, 11u8, 86u8, 48u8, 134u8, 61u8,
+							86u8, 52u8, 58u8, 6u8, 155u8, 218u8, 184u8, 198u8, 24u8, 129u8, 177u8,
 						],
 					)
 				}
@@ -22468,9 +22480,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							217u8, 41u8, 181u8, 180u8, 177u8, 57u8, 69u8, 216u8, 137u8, 43u8, 62u8,
-							138u8, 212u8, 58u8, 70u8, 86u8, 205u8, 8u8, 93u8, 67u8, 78u8, 22u8,
-							24u8, 156u8, 221u8, 22u8, 138u8, 121u8, 139u8, 214u8, 9u8, 198u8,
+							167u8, 91u8, 78u8, 174u8, 44u8, 240u8, 167u8, 60u8, 252u8, 89u8, 161u8,
+							118u8, 151u8, 180u8, 233u8, 51u8, 183u8, 214u8, 80u8, 197u8, 8u8,
+							119u8, 247u8, 18u8, 242u8, 242u8, 184u8, 144u8, 146u8, 80u8, 2u8,
+							226u8,
 						],
 					)
 				}
@@ -22806,9 +22819,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							212u8, 137u8, 108u8, 60u8, 76u8, 228u8, 112u8, 253u8, 133u8, 232u8,
-							140u8, 42u8, 146u8, 238u8, 0u8, 162u8, 150u8, 34u8, 154u8, 224u8, 58u8,
-							136u8, 38u8, 208u8, 206u8, 6u8, 139u8, 85u8, 220u8, 123u8, 46u8, 233u8,
+							27u8, 174u8, 148u8, 163u8, 118u8, 155u8, 103u8, 40u8, 56u8, 189u8,
+							102u8, 89u8, 241u8, 214u8, 87u8, 97u8, 55u8, 20u8, 93u8, 2u8, 192u8,
+							84u8, 150u8, 227u8, 190u8, 222u8, 162u8, 161u8, 3u8, 109u8, 36u8, 24u8,
 						],
 					)
 				}
@@ -22831,9 +22844,9 @@ pub mod api {
 							weight,
 						},
 						[
-							48u8, 126u8, 63u8, 110u8, 235u8, 77u8, 45u8, 113u8, 47u8, 42u8, 178u8,
-							229u8, 93u8, 174u8, 151u8, 22u8, 253u8, 199u8, 238u8, 78u8, 157u8,
-							24u8, 212u8, 4u8, 15u8, 200u8, 183u8, 11u8, 111u8, 223u8, 126u8, 62u8,
+							178u8, 142u8, 38u8, 150u8, 5u8, 26u8, 53u8, 79u8, 110u8, 36u8, 56u8,
+							101u8, 136u8, 251u8, 237u8, 155u8, 80u8, 199u8, 137u8, 194u8, 9u8, 2u8,
+							110u8, 16u8, 202u8, 19u8, 11u8, 76u8, 5u8, 127u8, 154u8, 33u8,
 						],
 					)
 				}
@@ -22871,10 +22884,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							23u8, 6u8, 245u8, 39u8, 188u8, 197u8, 161u8, 199u8, 138u8, 131u8,
-							103u8, 215u8, 245u8, 173u8, 116u8, 244u8, 229u8, 34u8, 80u8, 202u8,
-							127u8, 148u8, 22u8, 116u8, 136u8, 3u8, 17u8, 16u8, 212u8, 138u8, 86u8,
-							0u8,
+							233u8, 125u8, 134u8, 245u8, 255u8, 202u8, 130u8, 16u8, 128u8, 69u8,
+							52u8, 96u8, 63u8, 110u8, 34u8, 160u8, 180u8, 27u8, 98u8, 204u8, 123u8,
+							185u8, 50u8, 34u8, 148u8, 154u8, 20u8, 134u8, 128u8, 19u8, 77u8, 55u8,
 						],
 					)
 				}
@@ -31001,10 +31013,10 @@ pub mod api {
 						"RecentPriceIndices",
 						(),
 						[
-							247u8, 206u8, 54u8, 117u8, 105u8, 96u8, 128u8, 176u8, 26u8, 33u8,
-							237u8, 26u8, 139u8, 74u8, 146u8, 217u8, 222u8, 227u8, 237u8, 3u8, 99u8,
-							67u8, 247u8, 22u8, 74u8, 110u8, 11u8, 231u8, 209u8, 146u8, 138u8,
-							109u8,
+							131u8, 215u8, 136u8, 188u8, 61u8, 193u8, 64u8, 236u8, 52u8, 105u8,
+							252u8, 226u8, 9u8, 243u8, 9u8, 21u8, 194u8, 49u8, 107u8, 236u8, 196u8,
+							60u8, 147u8, 178u8, 39u8, 231u8, 255u8, 180u8, 152u8, 157u8, 144u8,
+							20u8,
 						],
 					)
 				}
@@ -31026,10 +31038,10 @@ pub mod api {
 						"RecentPriceIndices",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							247u8, 206u8, 54u8, 117u8, 105u8, 96u8, 128u8, 176u8, 26u8, 33u8,
-							237u8, 26u8, 139u8, 74u8, 146u8, 217u8, 222u8, 227u8, 237u8, 3u8, 99u8,
-							67u8, 247u8, 22u8, 74u8, 110u8, 11u8, 231u8, 209u8, 146u8, 138u8,
-							109u8,
+							131u8, 215u8, 136u8, 188u8, 61u8, 193u8, 64u8, 236u8, 52u8, 105u8,
+							252u8, 226u8, 9u8, 243u8, 9u8, 21u8, 194u8, 49u8, 107u8, 236u8, 196u8,
+							60u8, 147u8, 178u8, 39u8, 231u8, 255u8, 180u8, 152u8, 157u8, 144u8,
+							20u8,
 						],
 					)
 				}
@@ -31655,6 +31667,421 @@ pub mod api {
 							59u8, 226u8, 157u8, 101u8, 103u8, 117u8, 249u8, 65u8, 18u8, 191u8,
 							103u8, 119u8, 53u8, 85u8, 81u8, 96u8, 220u8, 42u8, 184u8, 239u8, 42u8,
 							246u8,
+						],
+					)
+				}
+			}
+		}
+	}
+	pub mod stabilizer_pools {
+		use super::{root_mod, runtime_types};
+		#[doc = "The `Error` enum of this pallet."]
+		pub type Error = runtime_types::pallet_stabilizer_pools::pallet::Error;
+		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
+		pub type Call = runtime_types::pallet_stabilizer_pools::pallet::Call;
+		pub mod calls {
+			use super::{root_mod, runtime_types};
+			type DispatchError = runtime_types::sp_runtime::DispatchError;
+			pub mod types {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Approve immutable deployment bindings and the canonical pool key."]
+				#[doc = "Root must verify the pinned implementations and their immutable bindings first."]
+				pub struct RegisterPool {
+					pub pool_manager: register_pool::PoolManager,
+					pub config: register_pool::Config,
+				}
+				pub mod register_pool {
+					use super::runtime_types;
+					pub type PoolManager = ::subxt::ext::subxt_core::utils::H160;
+					pub type Config = runtime_types::pallet_stabilizer_pools::PoolConfig;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for RegisterPool {
+					const PALLET: &'static str = "StabilizerPools";
+					const CALL: &'static str = "register_pool";
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Register a baseline, extend a maintained revision, or reset after an unproven change."]
+				pub struct CheckpointPosition {
+					pub pool_manager: checkpoint_position::PoolManager,
+					pub pool_id: checkpoint_position::PoolId,
+					pub token_id: checkpoint_position::TokenId,
+					pub proof:
+						::subxt::ext::subxt_core::alloc::boxed::Box<checkpoint_position::Proof>,
+				}
+				pub mod checkpoint_position {
+					use super::runtime_types;
+					pub type PoolManager = ::subxt::ext::subxt_core::utils::H160;
+					pub type PoolId = crate::types::H256;
+					pub type TokenId = runtime_types::primitive_types::U256;
+					pub type Proof = runtime_types::pallet_stabilizer_pools::PositionProof;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for CheckpointPosition {
+					const PALLET: &'static str = "StabilizerPools";
+					const CALL: &'static str = "checkpoint_position";
+				}
+			}
+			pub struct TransactionApi;
+			impl TransactionApi {
+				#[doc = "Approve immutable deployment bindings and the canonical pool key."]
+				#[doc = "Root must verify the pinned implementations and their immutable bindings first."]
+				pub fn register_pool(
+					&self,
+					pool_manager: types::register_pool::PoolManager,
+					config: types::register_pool::Config,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::RegisterPool> {
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"StabilizerPools",
+						"register_pool",
+						types::RegisterPool { pool_manager, config },
+						[
+							165u8, 216u8, 100u8, 47u8, 176u8, 56u8, 155u8, 85u8, 219u8, 66u8,
+							193u8, 87u8, 134u8, 18u8, 56u8, 197u8, 221u8, 231u8, 190u8, 214u8,
+							182u8, 214u8, 116u8, 197u8, 109u8, 171u8, 6u8, 133u8, 103u8, 101u8,
+							156u8, 219u8,
+						],
+					)
+				}
+				#[doc = "Register a baseline, extend a maintained revision, or reset after an unproven change."]
+				pub fn checkpoint_position(
+					&self,
+					pool_manager: types::checkpoint_position::PoolManager,
+					pool_id: types::checkpoint_position::PoolId,
+					token_id: types::checkpoint_position::TokenId,
+					proof: types::checkpoint_position::Proof,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::CheckpointPosition>
+				{
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"StabilizerPools",
+						"checkpoint_position",
+						types::CheckpointPosition {
+							pool_manager,
+							pool_id,
+							token_id,
+							proof: ::subxt::ext::subxt_core::alloc::boxed::Box::new(proof),
+						},
+						[
+							44u8, 178u8, 251u8, 197u8, 103u8, 234u8, 196u8, 253u8, 186u8, 178u8,
+							164u8, 153u8, 88u8, 107u8, 205u8, 234u8, 174u8, 75u8, 221u8, 231u8,
+							204u8, 46u8, 71u8, 255u8, 101u8, 19u8, 193u8, 147u8, 57u8, 164u8,
+							154u8, 200u8,
+						],
+					)
+				}
+			}
+		}
+		#[doc = "The `Event` enum of this pallet"]
+		pub type Event = runtime_types::pallet_stabilizer_pools::pallet::Event;
+		pub mod events {
+			use super::runtime_types;
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub struct PoolRegistered {
+				pub pool_manager: pool_registered::PoolManager,
+				pub pool_id: pool_registered::PoolId,
+				pub config: pool_registered::Config,
+			}
+			pub mod pool_registered {
+				use super::runtime_types;
+				pub type PoolManager = ::subxt::ext::subxt_core::utils::H160;
+				pub type PoolId = crate::types::H256;
+				pub type Config = runtime_types::pallet_stabilizer_pools::PoolConfig;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for PoolRegistered {
+				const PALLET: &'static str = "StabilizerPools";
+				const EVENT: &'static str = "PoolRegistered";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub struct PositionCheckpointed {
+				pub position_manager: position_checkpointed::PositionManager,
+				pub token_id: position_checkpointed::TokenId,
+				pub checkpoint:
+					::subxt::ext::subxt_core::alloc::boxed::Box<position_checkpointed::Checkpoint>,
+				pub outcome: position_checkpointed::Outcome,
+			}
+			pub mod position_checkpointed {
+				use super::runtime_types;
+				pub type PositionManager = ::subxt::ext::subxt_core::utils::H160;
+				pub type TokenId = runtime_types::primitive_types::U256;
+				pub type Checkpoint = runtime_types::pallet_stabilizer_pools::PositionCheckpoint<
+					crate::types::AccountId32,
+				>;
+				pub type Outcome = runtime_types::pallet_stabilizer_pools::CheckpointOutcome;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for PositionCheckpointed {
+				const PALLET: &'static str = "StabilizerPools";
+				const EVENT: &'static str = "PositionCheckpointed";
+			}
+		}
+		pub mod storage {
+			use super::runtime_types;
+			pub mod types {
+				use super::runtime_types;
+				pub mod pools {
+					use super::runtime_types;
+					pub type Pools = runtime_types::pallet_stabilizer_pools::PoolConfig;
+					pub type Param0 = ::subxt::ext::subxt_core::utils::H160;
+					pub type Param1 = crate::types::H256;
+				}
+				pub mod frame_start_price_indices {
+					use super::runtime_types;
+					pub type FrameStartPriceIndices =
+						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap1<
+							::core::primitive::u64,
+							runtime_types::argon_primitives::price_index::PriceIndex,
+						>;
+				}
+				pub mod position_checkpoints {
+					use super::runtime_types;
+					pub type PositionCheckpoints =
+						runtime_types::pallet_stabilizer_pools::PositionCheckpoint<
+							crate::types::AccountId32,
+						>;
+					pub type Param0 = ::subxt::ext::subxt_core::utils::H160;
+					pub type Param1 = runtime_types::primitive_types::U256;
+				}
+			}
+			pub struct StorageApi;
+			impl StorageApi {
+				#[doc = " Approved deployments on the Ethereum network authenticated by EthereumVerifier."]
+				#[doc = " Configuration is immutable once registered, preserving checkpoint identity and layout."]
+				pub fn pools_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::pools::Pools,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"StabilizerPools",
+						"Pools",
+						(),
+						[
+							193u8, 131u8, 57u8, 21u8, 48u8, 179u8, 67u8, 58u8, 85u8, 204u8, 226u8,
+							110u8, 223u8, 24u8, 36u8, 147u8, 92u8, 234u8, 154u8, 2u8, 61u8, 177u8,
+							146u8, 76u8, 81u8, 19u8, 168u8, 253u8, 85u8, 137u8, 10u8, 126u8,
+						],
+					)
+				}
+				#[doc = " Approved deployments on the Ethereum network authenticated by EthereumVerifier."]
+				#[doc = " Configuration is immutable once registered, preserving checkpoint identity and layout."]
+				pub fn pools_iter1(
+					&self,
+					_0: types::pools::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::pools::Param0,
+					>,
+					types::pools::Pools,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"StabilizerPools",
+						"Pools",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							193u8, 131u8, 57u8, 21u8, 48u8, 179u8, 67u8, 58u8, 85u8, 204u8, 226u8,
+							110u8, 223u8, 24u8, 36u8, 147u8, 92u8, 234u8, 154u8, 2u8, 61u8, 177u8,
+							146u8, 76u8, 81u8, 19u8, 168u8, 253u8, 85u8, 137u8, 10u8, 126u8,
+						],
+					)
+				}
+				#[doc = " Approved deployments on the Ethereum network authenticated by EthereumVerifier."]
+				#[doc = " Configuration is immutable once registered, preserving checkpoint identity and layout."]
+				pub fn pools(
+					&self,
+					_0: types::pools::Param0,
+					_1: types::pools::Param1,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+							types::pools::Param0,
+						>,
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+							types::pools::Param1,
+						>,
+					),
+					types::pools::Pools,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"StabilizerPools",
+						"Pools",
+						(
+							::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+							::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_1),
+						),
+						[
+							193u8, 131u8, 57u8, 21u8, 48u8, 179u8, 67u8, 58u8, 85u8, 204u8, 226u8,
+							110u8, 223u8, 24u8, 36u8, 147u8, 92u8, 234u8, 154u8, 2u8, 61u8, 177u8,
+							146u8, 76u8, 81u8, 19u8, 168u8, 253u8, 85u8, 137u8, 10u8, 126u8,
+						],
+					)
+				}
+				#[doc = " First current-tick price index accepted in each frame, including absent pool observations."]
+				#[doc = " This is an oracle opening reference, not an exact historical Ethereum boundary proof."]
+				#[doc = " Later indices cannot revalue it; frames without an observation have no entry. A new opening"]
+				#[doc = " reference prunes frames outside the configured window, including across oracle gaps."]
+				pub fn frame_start_price_indices(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::frame_start_price_indices::FrameStartPriceIndices,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"StabilizerPools",
+						"FrameStartPriceIndices",
+						(),
+						[
+							93u8, 187u8, 87u8, 65u8, 11u8, 52u8, 127u8, 9u8, 10u8, 90u8, 147u8,
+							121u8, 95u8, 37u8, 242u8, 237u8, 202u8, 226u8, 4u8, 82u8, 232u8, 117u8,
+							45u8, 144u8, 142u8, 162u8, 42u8, 82u8, 78u8, 160u8, 55u8, 134u8,
+						],
+					)
+				}
+				#[doc = " Last accepted checkpoint for an NFT. Keep its source-block watermark across re-enrollment."]
+				pub fn position_checkpoints_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::position_checkpoints::PositionCheckpoints,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"StabilizerPools",
+						"PositionCheckpoints",
+						(),
+						[
+							98u8, 85u8, 114u8, 233u8, 139u8, 46u8, 133u8, 149u8, 111u8, 239u8,
+							60u8, 50u8, 85u8, 96u8, 83u8, 100u8, 31u8, 216u8, 25u8, 148u8, 211u8,
+							181u8, 32u8, 223u8, 202u8, 140u8, 35u8, 3u8, 153u8, 142u8, 42u8, 219u8,
+						],
+					)
+				}
+				#[doc = " Last accepted checkpoint for an NFT. Keep its source-block watermark across re-enrollment."]
+				pub fn position_checkpoints_iter1(
+					&self,
+					_0: types::position_checkpoints::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::position_checkpoints::Param0,
+					>,
+					types::position_checkpoints::PositionCheckpoints,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"StabilizerPools",
+						"PositionCheckpoints",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							98u8, 85u8, 114u8, 233u8, 139u8, 46u8, 133u8, 149u8, 111u8, 239u8,
+							60u8, 50u8, 85u8, 96u8, 83u8, 100u8, 31u8, 216u8, 25u8, 148u8, 211u8,
+							181u8, 32u8, 223u8, 202u8, 140u8, 35u8, 3u8, 153u8, 142u8, 42u8, 219u8,
+						],
+					)
+				}
+				#[doc = " Last accepted checkpoint for an NFT. Keep its source-block watermark across re-enrollment."]
+				pub fn position_checkpoints(
+					&self,
+					_0: types::position_checkpoints::Param0,
+					_1: types::position_checkpoints::Param1,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+							types::position_checkpoints::Param0,
+						>,
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+							types::position_checkpoints::Param1,
+						>,
+					),
+					types::position_checkpoints::PositionCheckpoints,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"StabilizerPools",
+						"PositionCheckpoints",
+						(
+							::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+							::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_1),
+						),
+						[
+							98u8, 85u8, 114u8, 233u8, 139u8, 46u8, 133u8, 149u8, 111u8, 239u8,
+							60u8, 50u8, 85u8, 96u8, 83u8, 100u8, 31u8, 216u8, 25u8, 148u8, 211u8,
+							181u8, 32u8, 223u8, 202u8, 140u8, 35u8, 3u8, 153u8, 142u8, 42u8, 219u8,
+						],
+					)
+				}
+			}
+		}
+		pub mod constants {
+			use super::runtime_types;
+			pub struct ConstantsApi;
+			impl ConstantsApi {
+				#[doc = " Opening references retained in financial-day frames, including the checkpoint buffer."]
+				#[doc = " Zero disables history. Both production runtimes retain 30 frames plus a 3-frame buffer."]
+				pub fn max_frame_price_history_frames(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u32,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"StabilizerPools",
+						"MaxFramePriceHistoryFrames",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
 						],
 					)
 				}
@@ -33400,6 +33827,8 @@ pub mod api {
 					pub usdc_usd_price: ::core::option::Option<
 						runtime_types::sp_arithmetic::fixed_point::FixedU128,
 					>,
+					pub stabilizer_pool_sqrt_price_x96:
+						::core::option::Option<runtime_types::primitive_types::U256>,
 				}
 			}
 			pub mod providers {
@@ -33871,6 +34300,8 @@ pub mod api {
 				Bootstrap(runtime_types::pallet_bootstrap::pallet::Call),
 				#[codec(index = 39)]
 				StabilizerBuys(runtime_types::pallet_stabilizer_buys::pallet::Call),
+				#[codec(index = 40)]
+				StabilizerPools(runtime_types::pallet_stabilizer_pools::pallet::Call),
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -33945,6 +34376,8 @@ pub mod api {
 				Bootstrap(runtime_types::pallet_bootstrap::pallet::Error),
 				#[codec(index = 39)]
 				StabilizerBuys(runtime_types::pallet_stabilizer_buys::pallet::Error),
+				#[codec(index = 40)]
+				StabilizerPools(runtime_types::pallet_stabilizer_pools::pallet::Error),
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -34017,6 +34450,8 @@ pub mod api {
 				Bootstrap(runtime_types::pallet_bootstrap::pallet::Event),
 				#[codec(index = 39)]
 				StabilizerBuys(runtime_types::pallet_stabilizer_buys::pallet::Event),
+				#[codec(index = 40)]
+				StabilizerPools(runtime_types::pallet_stabilizer_pools::pallet::Event),
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -40640,6 +41075,228 @@ pub mod api {
 				InvalidEvidence,
 				#[codec(index = 4)]
 				NoDiscount,
+			}
+		}
+		pub mod pallet_stabilizer_pools {
+			use super::runtime_types;
+			pub mod pallet {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
+				pub enum Call {
+					#[codec(index = 0)]
+					#[doc = "Approve immutable deployment bindings and the canonical pool key."]
+					#[doc = "Root must verify the pinned implementations and their immutable bindings first."]
+					register_pool {
+						pool_manager: ::subxt::ext::subxt_core::utils::H160,
+						config: runtime_types::pallet_stabilizer_pools::PoolConfig,
+					},
+					#[codec(index = 1)]
+					#[doc = "Register a baseline, extend a maintained revision, or reset after an unproven change."]
+					checkpoint_position {
+						pool_manager: ::subxt::ext::subxt_core::utils::H160,
+						pool_id: crate::types::H256,
+						token_id: runtime_types::primitive_types::U256,
+						proof: ::subxt::ext::subxt_core::alloc::boxed::Box<
+							runtime_types::pallet_stabilizer_pools::PositionProof,
+						>,
+					},
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "The `Error` enum of this pallet."]
+				pub enum Error {
+					#[codec(index = 0)]
+					#[doc = "A deployment address is zero or reused, or the pool key fails ordering or encoding"]
+					#[doc = "bounds."]
+					InvalidPool,
+					#[codec(index = 1)]
+					#[doc = "This PoolManager/PoolId pair already has an immutable registration."]
+					PoolAlreadyRegistered,
+					#[codec(index = 2)]
+					#[doc = "No approved configuration exists for the supplied PoolManager/PoolId pair."]
+					PoolNotRegistered,
+					#[codec(index = 3)]
+					#[doc = "The Ethereum verifier is unavailable, or header ancestry/account/storage authentication"]
+					#[doc = "fails."]
+					InvalidProof,
+					#[codec(index = 4)]
+					#[doc = "The three account witnesses do not contain identical execution-block proofs."]
+					InconsistentProofBlocks,
+					#[codec(index = 5)]
+					#[doc = "A witness has the wrong slot count or slot addresses for the requested NFT position."]
+					InvalidStorageSlots,
+					#[codec(index = 6)]
+					#[doc = "The NFT's subscriber or subscription flag is invalid, or its permanent revision is"]
+					#[doc = "zero."]
+					InvalidSubscription,
+					#[codec(index = 7)]
+					#[doc = "The signer does not match the beneficiary encoded in the subscription witness."]
+					NotBeneficiary,
+					#[codec(index = 8)]
+					#[doc = "The packed PoolId mismatches, ticks are invalid/misaligned, or liquidity exceeds"]
+					#[doc = "uint128."]
+					InvalidPosition,
+					#[codec(index = 9)]
+					#[doc = "Ethereum block height or time does not strictly advance past the stored checkpoint."]
+					StaleCheckpoint,
+					#[codec(index = 10)]
+					#[doc = "The subscriber revision is lower than the NFT's last accepted revision."]
+					RevisionRegressed,
+					#[codec(index = 11)]
+					#[doc = "Beneficiary, subscriber, pool, tick range, or liquidity changed without a revision"]
+					#[doc = "increase."]
+					PositionChangedWithoutRevision,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "The `Event` enum of this pallet"]
+				pub enum Event {
+					#[codec(index = 0)]
+					PoolRegistered {
+						pool_manager: ::subxt::ext::subxt_core::utils::H160,
+						pool_id: crate::types::H256,
+						config: runtime_types::pallet_stabilizer_pools::PoolConfig,
+					},
+					#[codec(index = 1)]
+					PositionCheckpointed {
+						position_manager: ::subxt::ext::subxt_core::utils::H160,
+						token_id: runtime_types::primitive_types::U256,
+						checkpoint: ::subxt::ext::subxt_core::alloc::boxed::Box<
+							runtime_types::pallet_stabilizer_pools::PositionCheckpoint<
+								crate::types::AccountId32,
+							>,
+						>,
+						outcome: runtime_types::pallet_stabilizer_pools::CheckpointOutcome,
+					},
+				}
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub enum CheckpointOutcome {
+				#[codec(index = 0)]
+				Registered,
+				#[codec(index = 1)]
+				Maintained { from: runtime_types::pallet_stabilizer_pools::ProofBlock },
+				#[codec(index = 2)]
+				Reset {
+					previous_revision: runtime_types::primitive_types::U256,
+					unproven_from: runtime_types::pallet_stabilizer_pools::ProofBlock,
+				},
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub struct PoolConfig {
+				pub position_manager: ::subxt::ext::subxt_core::utils::H160,
+				pub subscriber: ::subxt::ext::subxt_core::utils::H160,
+				pub key: runtime_types::pallet_stabilizer_pools::PoolKey,
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub struct PoolKey {
+				pub currency0: ::subxt::ext::subxt_core::utils::H160,
+				pub currency1: ::subxt::ext::subxt_core::utils::H160,
+				pub fee: ::core::primitive::u32,
+				pub tick_spacing: ::core::primitive::i32,
+				pub hooks: ::subxt::ext::subxt_core::utils::H160,
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub struct PositionCheckpoint<_0> {
+				pub beneficiary: _0,
+				pub pool_manager: ::subxt::ext::subxt_core::utils::H160,
+				pub pool_id: crate::types::H256,
+				pub subscriber: ::subxt::ext::subxt_core::utils::H160,
+				pub revision: runtime_types::primitive_types::U256,
+				pub tick_lower: ::core::primitive::i32,
+				pub tick_upper: ::core::primitive::i32,
+				pub liquidity: ::core::primitive::u128,
+				pub maintained_since: runtime_types::pallet_stabilizer_pools::ProofBlock,
+				pub proven_through: runtime_types::pallet_stabilizer_pools::ProofBlock,
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub struct PositionProof {
+				pub subscriber:
+					runtime_types::argon_primitives::ethereum::EthereumAccountStorageProof,
+				pub position_manager:
+					runtime_types::argon_primitives::ethereum::EthereumAccountStorageProof,
+				pub pool_manager:
+					runtime_types::argon_primitives::ethereum::EthereumAccountStorageProof,
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub struct ProofBlock {
+				pub hash: crate::types::H256,
+				pub number: ::core::primitive::u64,
+				pub timestamp_millis: ::core::primitive::u64,
 			}
 		}
 		pub mod pallet_sudo {

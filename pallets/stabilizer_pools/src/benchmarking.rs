@@ -10,6 +10,55 @@ mod benchmarks {
 	use super::*;
 
 	#[benchmark]
+	fn read_price_index_context() -> Result<(), BenchmarkError> {
+		if T::MiningFrameTransitionProvider::is_new_frame_started().is_some() {
+			return Err(BenchmarkError::Stop("measure the fallback frame lookup"));
+		}
+
+		#[block]
+		{
+			let tick = T::CurrentTick::get();
+			let frame = T::MiningFrameTransitionProvider::is_new_frame_started()
+				.unwrap_or_else(T::MiningFrameTransitionProvider::get_current_frame_id);
+			core::hint::black_box((tick, frame));
+		}
+		Ok(())
+	}
+
+	#[benchmark]
+	fn record_frame_price() -> Result<(), BenchmarkError> {
+		let (retained_frames, index) = full_frame_history::<T>()?;
+		let frame_id = retained_frames + 1;
+
+		#[block]
+		{
+			Pallet::<T>::record_frame_price(frame_id, &index);
+		}
+
+		let history = FrameStartPriceIndices::<T>::get();
+		assert_eq!(history.len(), retained_frames as usize);
+		assert!(!history.contains_key(&1));
+		assert_eq!(history.get(&frame_id), Some(&index));
+		Ok(())
+	}
+
+	#[benchmark]
+	fn record_frame_price_after_gap() -> Result<(), BenchmarkError> {
+		let (retained_frames, index) = full_frame_history::<T>()?;
+		let frame_id = retained_frames * 2 + 1;
+
+		#[block]
+		{
+			Pallet::<T>::record_frame_price(frame_id, &index);
+		}
+
+		let history = FrameStartPriceIndices::<T>::get();
+		assert_eq!(history.len(), 1);
+		assert_eq!(history.get(&frame_id), Some(&index));
+		Ok(())
+	}
+
+	#[benchmark]
 	fn register_pool() {
 		#[extrinsic_call]
 		_(RawOrigin::Root, pool_manager(), config());
@@ -92,4 +141,33 @@ mod benchmarks {
 	}
 
 	impl_benchmark_test_suite!(Pallet, new_test_with_genesis::<Test>(|_| {}), Test);
+}
+
+fn full_frame_history<T: Config>() -> Result<(FrameId, PriceIndex), BenchmarkError> {
+	let retained_frames = u64::from(T::MaxFramePriceHistoryFrames::get());
+	if retained_frames == 0 {
+		return Err(BenchmarkError::Stop("frame history is disabled"));
+	}
+
+	let index = PriceIndex {
+		btc_usd_price: FixedU128::from_inner(u128::MAX),
+		argonot_usd_price: FixedU128::from_inner(u128::MAX),
+		argon_usd_price: FixedU128::from_inner(u128::MAX),
+		argon_usd_target_price: FixedU128::from_inner(u128::MAX),
+		argon_time_weighted_average_liquidity: u128::MAX,
+		tick: Tick::MAX,
+		usdc_usd_price: Some(FixedU128::from_inner(u128::MAX)),
+		stabilizer_pool_sqrt_price_x96: Some(U256::one() << 96),
+	};
+
+	let mut history = BoundedBTreeMap::<FrameId, PriceIndex, T::MaxFramePriceHistoryFrames>::new();
+	for frame in 1..=retained_frames {
+		let observation = PriceIndex { tick: Tick::MAX - (retained_frames - frame), ..index };
+		history
+			.try_insert(frame, observation)
+			.map_err(|_| BenchmarkError::Stop("frame history benchmark overflow"))?;
+	}
+
+	FrameStartPriceIndices::<T>::put(history);
+	Ok((retained_frames, index))
 }

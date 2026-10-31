@@ -286,7 +286,7 @@ pub mod pallet {
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_runtime_upgrade() -> Weight {
-			migrations::add_usdc::<T>()
+			migrations::add_optional_pool_prices::<T>()
 		}
 		fn on_initialize(_: BlockNumberFor<T>) -> Weight {
 			let prev_tick = T::CurrentTick::get();

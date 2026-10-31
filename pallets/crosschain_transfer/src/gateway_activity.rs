@@ -835,6 +835,7 @@ mod test {
 				argon_usd_target_price: FixedU128::one(),
 				argon_time_weighted_average_liquidity: 1,
 				usdc_usd_price: Some(FixedU128::one()),
+				stabilizer_pool_sqrt_price_x96: None,
 			});
 			let burn = CrosschainTransfer::burn_account(SourceChain::Ethereum);
 			assert_ok!(Balances::mint_into(&burn, 100_000_000));
@@ -3024,6 +3025,104 @@ mod test {
 				}) => *transfer_id == second_transfer_id && *destination_signing_key == signing_key,
 				_ => false,
 			}));
+		});
+	}
+
+	#[test]
+	fn unpause_replays_zero_collateral_unknown_signer_without_repausing() {
+		new_test_ext().execute_with(|| {
+			System::set_block_number(1);
+
+			let authority_account = account(170);
+			let authority_pair = council_signing_pair(171);
+			let signing_key = activate_test_minting_authority(
+				authority_account.clone(),
+				145,
+				20_000,
+				&council_signing_pair(172),
+				&authority_pair,
+				20_000,
+				0,
+			);
+			let user = account(173);
+
+			assert_ok!(Balances::mint_into(&user, 25_000));
+			assert_ok!(CrosschainTransfer::transfer_out(
+				RuntimeOrigin::signed(user.clone()),
+				SourceChain::Ethereum,
+				AssetKind::Argon,
+				h160(0x58),
+				20_000,
+			));
+			let transfer_id = transfer_out_id(&user, 1);
+			assert_ok!(CrosschainTransfer::collateralize_transfer(
+				RuntimeOrigin::signed(authority_account.clone()),
+				transfer_id,
+				transfer_collateral_signature(&authority_pair, transfer_id, 20_000, 0),
+				20_000,
+				0,
+			));
+
+			let previous_gateway_activity_nonce =
+				GatewayStateBySourceChain::<Test>::get(SourceChain::Ethereum)
+					.expect("activation should seed gateway state")
+					.gateway_activity_nonce;
+			let unknown_signing_key = h160(0xad);
+			let mut finalized_collateral =
+				vec![(signing_key, 20_000, 0), (unknown_signing_key, 0, 0)];
+			finalized_collateral.sort_by_key(|row| row.0);
+			let proof = storage_proof(
+				10,
+				H256::repeat_byte(0x44),
+				vec![transfer_out_of_argon_finalized_log(
+					transfer_id,
+					finalized_collateral,
+					previous_gateway_activity_nonce.saturating_add(1),
+					1,
+				)],
+			);
+			let authority_balance_before = Balances::balance(&authority_account);
+
+			GatewaySyncPauseBySourceChain::<Test>::insert(
+				SourceChain::Ethereum,
+				GatewaySyncPause {
+					last_good_gateway_activity_nonce: previous_gateway_activity_nonce,
+					failed_gateway_activity_nonce: previous_gateway_activity_nonce
+						.saturating_add(1),
+					reason: GatewaySyncPauseReason::MintingAuthorityNotFound,
+				},
+			);
+			assert_ok!(CrosschainTransfer::unpause_gateway(
+				RuntimeOrigin::root(),
+				SourceChain::Ethereum,
+			));
+			assert_ok!(CrosschainTransfer::prove_gateway_activity_storage(
+				RuntimeOrigin::signed(account(1)),
+				SourceChain::Ethereum,
+				previous_gateway_activity_nonce,
+				proof,
+			));
+
+			let authority = MintingAuthoritiesBySigner::<Test>::get(signing_key)
+				.expect("known authority should remain while deactivation is queued");
+			assert_eq!(authority.gateway_remaining_microgon_collateral, 0);
+			assert_eq!(authority.pending_reserved_microgon_collateral, 0);
+			assert_eq!(Balances::balance(&authority_account), authority_balance_before + 300);
+			assert_eq!(MintingAuthoritiesBySigner::<Test>::get(unknown_signing_key), None);
+			assert!(!TransferOutById::<Test>::contains_key(transfer_id));
+			assert!(PendingCollateralizationRequestsByChain::<Test>::get(SourceChain::Ethereum)
+				.is_empty());
+			assert_eq!(
+				NonTerminalTransferOutCountByDestinationChain::<Test>::get(SourceChain::Ethereum),
+				0,
+			);
+			assert_eq!(
+				GatewayStateBySourceChain::<Test>::get(SourceChain::Ethereum)
+					.expect("replayed finalization should advance gateway state")
+					.gateway_activity_nonce,
+				previous_gateway_activity_nonce.saturating_add(1),
+			);
+			assert_eq!(GatewaySyncPauseBySourceChain::<Test>::get(SourceChain::Ethereum), None);
 		});
 	}
 

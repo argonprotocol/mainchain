@@ -284,6 +284,15 @@ import type {
   PalletStabilizerBuysIneligibleReason,
   PalletStabilizerBuysPriceHistoryHourlyPriceReference,
   PalletStabilizerBuysUniswapPurchasePurchasePool,
+  PalletStabilizerPoolsCall,
+  PalletStabilizerPoolsCheckpointOutcome,
+  PalletStabilizerPoolsError,
+  PalletStabilizerPoolsEvent,
+  PalletStabilizerPoolsPoolConfig,
+  PalletStabilizerPoolsPoolKey,
+  PalletStabilizerPoolsPositionCheckpoint,
+  PalletStabilizerPoolsPositionProof,
+  PalletStabilizerPoolsProofBlock,
   PalletSudoCall,
   PalletSudoError,
   PalletSudoEvent,
@@ -633,6 +642,15 @@ declare module '@polkadot/types/types/registry' {
     PalletStabilizerBuysIneligibleReason: PalletStabilizerBuysIneligibleReason;
     PalletStabilizerBuysPriceHistoryHourlyPriceReference: PalletStabilizerBuysPriceHistoryHourlyPriceReference;
     PalletStabilizerBuysUniswapPurchasePurchasePool: PalletStabilizerBuysUniswapPurchasePurchasePool;
+    PalletStabilizerPoolsCall: PalletStabilizerPoolsCall;
+    PalletStabilizerPoolsCheckpointOutcome: PalletStabilizerPoolsCheckpointOutcome;
+    PalletStabilizerPoolsError: PalletStabilizerPoolsError;
+    PalletStabilizerPoolsEvent: PalletStabilizerPoolsEvent;
+    PalletStabilizerPoolsPoolConfig: PalletStabilizerPoolsPoolConfig;
+    PalletStabilizerPoolsPoolKey: PalletStabilizerPoolsPoolKey;
+    PalletStabilizerPoolsPositionCheckpoint: PalletStabilizerPoolsPositionCheckpoint;
+    PalletStabilizerPoolsPositionProof: PalletStabilizerPoolsPositionProof;
+    PalletStabilizerPoolsProofBlock: PalletStabilizerPoolsProofBlock;
     PalletSudoCall: PalletSudoCall;
     PalletSudoError: PalletSudoError;
     PalletSudoEvent: PalletSudoEvent;

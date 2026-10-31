@@ -44,6 +44,30 @@ impl pallet_ethereum_verifier::Config for Test {
 #[cfg(test)]
 impl Config for Test {
 	type WeightInfo = ();
+	type MiningFrameTransitionProvider = Frames;
+	type CurrentTick = CurrentTick;
+	type MaxFramePriceHistoryFrames = ConstU32<33>;
+}
+
+#[cfg(test)]
+frame_support::parameter_types! {
+	pub static CurrentTick: Tick = 20;
+	pub static CurrentFrame: FrameId = 1;
+	pub static NewlyStartedFrame: Option<FrameId> = None;
+}
+
+#[cfg(test)]
+pub struct Frames;
+
+#[cfg(test)]
+impl MiningFrameTransitionProvider for Frames {
+	fn is_new_frame_started() -> Option<FrameId> {
+		NewlyStartedFrame::get()
+	}
+
+	fn get_current_frame_id() -> FrameId {
+		CurrentFrame::get()
+	}
 }
 
 #[cfg(test)]
@@ -76,6 +100,28 @@ pub(crate) fn config() -> PoolConfig {
 
 pub(crate) fn pool_id() -> H256 {
 	evm::pool_id(&config().key)
+}
+
+#[cfg(test)]
+pub(crate) fn position_checkpoint(
+	liquidity: u128,
+	tick_lower: i32,
+	tick_upper: i32,
+) -> PositionCheckpoint<AccountId32> {
+	let block =
+		ProofBlock { hash: H256::from_low_u64_be(100), number: 100, timestamp_millis: 1_200_000 };
+	PositionCheckpoint {
+		beneficiary: AccountId32::new([0x42; 32]),
+		pool_manager: pool_manager(),
+		pool_id: pool_id(),
+		subscriber: config().subscriber,
+		revision: U256::one(),
+		tick_lower,
+		tick_upper,
+		liquidity,
+		maintained_since: block,
+		proven_through: block,
+	}
 }
 
 /// Synthetic Ethereum state, real account/storage tries and the real configured verifier.

@@ -1,7 +1,7 @@
 use alloy_contract::Error as ContractError;
 use alloy_eips::{BlockId, BlockNumberOrTag};
-use alloy_primitives::{address, aliases::I56};
-use alloy_provider::{network::Ethereum, RootProvider};
+use alloy_primitives::{address, aliases::I56, B256};
+use alloy_provider::{network::Ethereum, Provider, RootProvider};
 use anyhow::{anyhow, Context, Result};
 use argon_primitives::{
 	prelude::{frame_support::pallet_prelude::Zero, sp_arithmetic::FixedPointNumber},
@@ -9,6 +9,7 @@ use argon_primitives::{
 };
 use polkadot_sdk::*;
 use sdk_core::prelude::*;
+use sp_core::U256;
 use sp_runtime::FixedU128;
 #[cfg(test)]
 use std::{collections::HashMap, sync::Arc};
@@ -16,6 +17,7 @@ use std::{env, fmt};
 use tracing::{error, trace, warn};
 use uniswap_lens::bindings::iuniswapv3pool::IUniswapV3Pool::IUniswapV3PoolInstance;
 use uniswap_v3_sdk::{entities::TickIndex, prelude::*};
+use uniswap_v4_sdk::extensions::PoolManagerLens;
 
 pub fn ethereum_rpc_urls_from_env() -> Result<Vec<String>> {
 	let urls = env::var("ETHEREUM_RPC_URLS")
@@ -80,6 +82,39 @@ impl fmt::Display for UniswapOracleError {
 impl std::error::Error for UniswapOracleError {}
 
 impl UniswapOracle {
+	/// Read a single chain-selected v4 pool through the SDK's PoolManager storage lens.
+	pub async fn get_pool_sqrt_price_x96(
+		&self,
+		chain_id: u64,
+		pool_manager: Address,
+		pool_id: B256,
+	) -> Result<U256> {
+		let mut last_error = anyhow!("No Ethereum provider configured");
+		for provider in &self.providers {
+			let observation = async {
+				if provider.get_chain_id().await? != chain_id {
+					return Err(anyhow!(
+						"Ethereum provider does not match the stabilizer pool chain"
+					));
+				}
+
+				let lens = PoolManagerLens::new(pool_manager, provider);
+				let (sqrt_price_x96, ..) = lens.get_slot0(pool_id, None).await?;
+				if sqrt_price_x96.is_zero() {
+					return Err(anyhow!("Stabilizer pool is not initialized"));
+				}
+
+				Ok(U256::from_big_endian(&sqrt_price_x96.to_be_bytes::<20>()))
+			}
+			.await;
+			match observation {
+				Ok(price) => return Ok(price),
+				Err(error) => last_error = error,
+			}
+		}
+		Err(last_error)
+	}
+
 	pub async fn new(rpc_urls: Vec<String>, usd_token: Token, lookup_token: Token) -> Result<Self> {
 		if rpc_urls.is_empty() {
 			return Err(anyhow!("At least one Ethereum RPC URL is required"));
@@ -360,7 +395,7 @@ fn has_internal_rpc_error(error: &anyhow::Error) -> bool {
 mod test {
 	use super::*;
 
-	use alloy_primitives::{aliases::U160, Bytes};
+	use alloy_primitives::{aliases::U160, Bytes, U64};
 	use alloy_provider::ProviderBuilder;
 	use alloy_sol_types::SolCall;
 	use alloy_transport::mock::Asserter;
@@ -372,6 +407,43 @@ mod test {
 	const ARGON_ADDRESS: &str = "0xf3D6b714dc93bc6C44bc766cc92F4A0D99344932";
 	#[allow(dead_code)]
 	const ARGONOT_ADDRESS: &str = "0x6B93a120829558C18f8CD54a96E8024EF973cE52";
+
+	#[tokio::test]
+	async fn configured_v4_pool_price_skips_providers_on_another_chain() {
+		let wrong_chain = Asserter::new();
+		let matching_chain = Asserter::new();
+		let oracle = UniswapOracle {
+			providers: vec![
+				ProviderBuilder::default().connect_mocked_client(wrong_chain.clone()),
+				ProviderBuilder::default().connect_mocked_client(matching_chain.clone()),
+			],
+			usd_token: token!(ChainId::MAINNET as u64, USDC_ADDRESS, 6, "USDC"),
+			lookup_token: token!(ChainId::MAINNET as u64, ARGON_ADDRESS, 18, "ARGON"),
+			oracle_addresses: vec![],
+		};
+		wrong_chain.push_success(&U64::from(11155111));
+		matching_chain.push_success(&U64::from(1));
+
+		// Slot0 also contains fee/tick bits; only the low 160 bits are the sqrt price.
+		let mut slot0 = [0u8; 32];
+		slot0[0] = 0x42;
+		slot0[12..].copy_from_slice(&U160::from(1u128 << 96).to_be_bytes::<20>());
+		matching_chain.push_success(&Bytes::from(slot0.to_vec()));
+		let price = oracle
+			.get_pool_sqrt_price_x96(1, Address::repeat_byte(1), B256::repeat_byte(2))
+			.await
+			.unwrap();
+		assert_eq!(price, U256::one() << 96);
+
+		// A configured but uninitialized pool provides no usable observation.
+		wrong_chain.push_success(&U64::from(11155111));
+		matching_chain.push_success(&U64::from(1));
+		matching_chain.push_success(&Bytes::from(vec![0; 32]));
+		assert!(oracle
+			.get_pool_sqrt_price_x96(1, Address::repeat_byte(1), B256::repeat_byte(2),)
+			.await
+			.is_err());
+	}
 
 	#[tokio::test]
 	async fn uses_observation_history_for_time_weighted_average_liquidity() {
