@@ -274,6 +274,7 @@ describe('MintingGateway', () => {
     const gatewayBootstrapImplementation = await gatewayFactory.deploy(
       ethers.ZeroAddress,
       ethers.ZeroAddress,
+      ethers.ZeroAddress,
     );
     await gatewayBootstrapImplementation.waitForDeployment();
 
@@ -323,6 +324,7 @@ describe('MintingGateway', () => {
     const gatewayFinalImplementation = (await gatewayFactory.deploy(
       await argon.getAddress(),
       await argonot.getAddress(),
+      holder.address,
     )) as any;
     await gatewayFinalImplementation.waitForDeployment();
 
@@ -796,6 +798,103 @@ describe('MintingGateway', () => {
       gateway,
       'ZeroAmount',
     );
+  });
+
+  it('burns a purchase only from its authorized contract and records one distinct activity', async () => {
+    const { argon, argonot, gateway, holder, outsider, guardian, adminSafe, proxyAdmin } =
+      await deployFixture();
+    const purchase = {
+      timestamp: 0n,
+      buyer: outsider.address,
+      argonAccountId: ethers.encodeBytes32String('purchase-recipient'),
+      usdcToken: '0x1111111111111111111111111111111111111111',
+      usdcSpent: 250n,
+      argonBought: 250n * SCALE + 123n,
+      poolManager: '0x1111111111111111111111111111111111111111',
+      poolId: ethers.ZeroHash,
+      sqrtPriceBeforeX96: 100n,
+      sqrtPriceAfterX96: 101n,
+    };
+
+    expect(await gateway.minimumSwapMicrogons()).toBe(100n * 10n ** 6n);
+    await expectCustomError(
+      gateway.connect(outsider).setMinimumSwapMicrogons(250n),
+      gateway,
+      'OwnableUnauthorizedAccount',
+      [outsider.address],
+    );
+    await expectCustomError(
+      gateway.connect(adminSafe).setMinimumSwapMicrogons(0),
+      gateway,
+      'ZeroAmount',
+    );
+    await gateway.connect(adminSafe).setMinimumSwapMicrogons(250n);
+    await expectCustomError(
+      gateway.connect(holder).burnFromSwap({ ...purchase, argonBought: 250n * SCALE - 1n }),
+      gateway,
+      'PurchaseTooSmall',
+    );
+
+    await expectCustomError(
+      gateway.connect(outsider).burnFromSwap(purchase),
+      gateway,
+      'UnauthorizedSwapContract',
+    );
+    await expect(gateway.connect(holder).burnFromSwap(purchase)).rejects.toThrow();
+    expect(await gateway.gatewayActivityNonce()).to.equal(0n);
+    expect(await argon.balanceOf(holder.address)).to.equal(1_000n * SCALE);
+
+    await argon.connect(holder).approve(await gateway.getAddress(), 250n * SCALE);
+    await gateway.connect(guardian).pause();
+    await expectCustomError(
+      gateway.connect(holder).burnFromSwap(purchase),
+      gateway,
+      'EnforcedPause',
+    );
+    await gateway.connect(adminSafe).unpause();
+
+    const event = await parseGatewayEvent(
+      gateway.connect(holder).burnFromSwap(purchase),
+      gateway,
+      'TransferToArgonFromSwapStarted',
+    );
+    expect(event.args.purchase.buyer).to.equal(outsider.address);
+    expect(event.args.purchase.argonBought).to.equal(purchase.argonBought);
+    expect(event.args.token).to.equal(await argon.getAddress());
+    expect(event.args.amount).to.equal(250n);
+    expect(event.args.gatewayState.gatewayActivityNonce).to.equal(1n);
+    expect(event.args.gatewayState.argonCirculation).to.equal(750n);
+    expect(await gateway.gatewayActivityNonce()).to.equal(1n);
+    expect(await argon.balanceOf(holder.address)).to.equal(750n * SCALE);
+    expect(await argon.allowance(holder.address, await gateway.getAddress())).to.equal(0n);
+    const priorLocator = await gateway.activityBlockLocators(1);
+    const priorCouncil = await gateway.globalIssuanceCouncil();
+    const replacement = await (
+      await ethers.getContractFactory('MintingGateway')
+    ).deploy(await argon.getAddress(), await argonot.getAddress(), outsider.address);
+    await proxyAdmin
+      .connect(adminSafe)
+      .upgradeAndCall(await gateway.getAddress(), await replacement.getAddress(), '0x');
+    expect(await gateway.gatewayActivityNonce()).to.equal(1n);
+    expect(await gateway.activityBlockLocators(1)).toEqual(priorLocator);
+    expect(await gateway.globalIssuanceCouncil()).toEqual(priorCouncil);
+    expect(await gateway.migrationCompleted()).toBe(true);
+    expect(await gateway.minimumSwapMicrogons()).toBe(250n);
+    await expectCustomError(
+      gateway.connect(holder).burnFromSwap(purchase),
+      gateway,
+      'UnauthorizedSwapContract',
+    );
+    await expect(
+      gateway
+        .connect(adminSafe)
+        .migrate({ recipients: [], amounts: [] }, { recipients: [], amounts: [] }),
+    ).rejects.toThrow();
+    await argon.connect(holder).transfer(outsider.address, 250n * SCALE);
+    await argon.connect(outsider).approve(await gateway.getAddress(), 250n * SCALE);
+    await gateway.connect(outsider).burnFromSwap(purchase);
+    expect(await gateway.gatewayActivityNonce()).to.equal(2n);
+    expect(await argon.totalSupply()).to.equal(500n * SCALE);
   });
 
   it('only lets the owner force-update the active council summary', async () => {

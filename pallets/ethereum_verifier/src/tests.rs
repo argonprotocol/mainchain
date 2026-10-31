@@ -2285,7 +2285,17 @@ fn verify_execution_block_proof_rejects_invalid_client_headers() {
 }
 
 #[test]
-fn verifies_gateway_maximum_sized_receipt_leaf_with_token_logs() {
+fn verifies_large_gateway_receipts_and_rejects_altered_logs() {
+	#[derive(serde::Deserialize)]
+	#[serde(rename_all = "camelCase")]
+	struct ReceiptFixture {
+		transaction_index: u64,
+		receipts_root: H256,
+		encoded_receipt: Bytes,
+		event_log: Log,
+	}
+
+	// Preserve the maximum gateway-event case alongside real native Uniswap receipts.
 	let activity = Log::new_unchecked(
 		Address::repeat_byte(7),
 		vec![B256::repeat_byte(8)],
@@ -2306,70 +2316,89 @@ fn verifies_gateway_maximum_sized_receipt_leaf_with_token_logs() {
 	);
 	let mut encoded_receipt = Vec::new();
 	receipt.encode(&mut encoded_receipt);
-	let path = Nibbles::unpack(alloy_rlp::encode(0u64));
-	let mut trie = HashBuilder::default().with_proof_retainer(ProofRetainer::new(vec![path]));
-	trie.add_leaf(path, &encoded_receipt);
-	let root = trie.root();
-	let nodes = trie.take_proof_nodes().into_nodes_sorted();
-	assert!(nodes.iter().any(|(_, node)| node.len() > 2_048));
-	let proof = EthereumCombinedReceiptProof {
-		nodes: nodes
-			.into_iter()
-			.map(|(_, node)| node.to_vec().try_into().unwrap())
-			.collect::<Vec<_>>()
-			.try_into()
-			.unwrap(),
-		receipts: vec![EthereumReceiptProofReceipt {
-			transaction_index: 0,
-			node_indexes: vec![0].try_into().unwrap(),
-		}]
-		.try_into()
-		.unwrap(),
-	};
-	let anchor = ExecutionHeaderAnchor {
-		block_number: 100,
-		timestamp_millis: 0,
-		block_hash: H256::repeat_byte(1),
-		parent_hash: H256::repeat_byte(2),
-		state_root: H256::zero(),
-		receipts_root: H256::from(root.0),
-	};
-	let event = EthereumReceiptLog {
-		transaction_index: 0,
-		event_log: EthereumLog {
-			address: H160::from_slice(activity.address.as_slice()),
-			topics: activity
-				.topics()
-				.iter()
-				.map(|topic| H256::from(topic.0))
+	let mut cases = vec![(encoded_receipt, 0u64, activity, None)];
+	for source in [
+		include_str!("../../../chains/ethereum/fixtures/uniswap-v4-purchase.json"),
+		include_str!("../../../chains/ethereum/fixtures/uniswap-v4-purchase-refund.json"),
+	] {
+		let fixture: ReceiptFixture = serde_json::from_str(source).unwrap();
+		cases.push((
+			fixture.encoded_receipt.to_vec(),
+			fixture.transaction_index,
+			fixture.event_log,
+			Some(fixture.receipts_root),
+		));
+	}
+
+	for (encoded_receipt, transaction_index, activity, expected_root) in cases {
+		let path = Nibbles::unpack(alloy_rlp::encode(transaction_index));
+		let mut trie = HashBuilder::default().with_proof_retainer(ProofRetainer::new(vec![path]));
+		trie.add_leaf(path, &encoded_receipt);
+		let root = H256::from(trie.root().0);
+		if let Some(expected_root) = expected_root {
+			assert_eq!(root, expected_root);
+		}
+		let nodes = trie.take_proof_nodes().into_nodes_sorted();
+		assert!(nodes.iter().any(|(_, node)| node.len() > 2_048));
+		let node_indexes =
+			(0..nodes.len()).map(|i| i as u16).collect::<Vec<_>>().try_into().unwrap();
+		let proof = EthereumCombinedReceiptProof {
+			nodes: nodes
+				.into_iter()
+				.map(|(_, node)| node.to_vec().try_into().unwrap())
 				.collect::<Vec<_>>()
 				.try_into()
 				.unwrap(),
-			data: activity.data.data.to_vec().try_into().unwrap(),
-		},
-	};
-	let proof_batch = single_receipt_log_proof_batch(
-		event,
-		EthereumExecutionBlockProof {
-			anchor_block_hash: anchor.block_hash,
-			target_to_anchor_header_chain: Default::default(),
-		},
-		proof,
-	);
-	// Cross the actual SCALE boundary as well as verifying the authenticated receipt bytes.
-	let mut decoded = EthereumReceiptLogProofBatch::<ConstU32<1>, ConstU32<1>>::decode(
-		&mut proof_batch.encode().as_slice(),
-	)
-	.unwrap();
-	new_tester().execute_with(|| {
-		ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
-		assert_ok!(<EthereumBeaconClient as EthereumVerifyProvider>::verify_receipt_logs(&decoded));
-		decoded.blocks[0].receipt_logs[0].event_log.data[0] ^= 1;
-		assert_eq!(
-			<EthereumBeaconClient as EthereumVerifyProvider>::verify_receipt_logs(&decoded),
-			Err(EthereumVerifyError::LogNotFound)
+			receipts: vec![EthereumReceiptProofReceipt { transaction_index, node_indexes }]
+				.try_into()
+				.unwrap(),
+		};
+		let anchor = ExecutionHeaderAnchor {
+			block_number: 100,
+			timestamp_millis: 0,
+			block_hash: H256::repeat_byte(1),
+			parent_hash: H256::repeat_byte(2),
+			state_root: H256::zero(),
+			receipts_root: root,
+		};
+		let event = EthereumReceiptLog {
+			transaction_index,
+			event_log: EthereumLog {
+				address: H160::from_slice(activity.address.as_slice()),
+				topics: activity
+					.topics()
+					.iter()
+					.map(|topic| H256::from(topic.0))
+					.collect::<Vec<_>>()
+					.try_into()
+					.unwrap(),
+				data: activity.data.data.to_vec().try_into().unwrap(),
+			},
+		};
+		let proof_batch = single_receipt_log_proof_batch(
+			event,
+			EthereumExecutionBlockProof {
+				anchor_block_hash: anchor.block_hash,
+				target_to_anchor_header_chain: Default::default(),
+			},
+			proof,
 		);
-	});
+		let mut decoded = EthereumReceiptLogProofBatch::<ConstU32<1>, ConstU32<1>>::decode(
+			&mut proof_batch.encode().as_slice(),
+		)
+		.unwrap();
+		new_tester().execute_with(|| {
+			ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
+			assert_ok!(<EthereumBeaconClient as EthereumVerifyProvider>::verify_receipt_logs(
+				&decoded
+			));
+			decoded.blocks[0].receipt_logs[0].event_log.data[0] ^= 1;
+			assert_eq!(
+				<EthereumBeaconClient as EthereumVerifyProvider>::verify_receipt_logs(&decoded),
+				Err(EthereumVerifyError::LogNotFound)
+			);
+		});
+	}
 }
 
 #[test]

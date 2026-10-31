@@ -1,15 +1,8 @@
 use alloc::vec::Vec;
 use alloy_primitives::{keccak256, Address, B256, U256};
-use alloy_sol_types::{sol, SolValue};
+use alloy_sol_types::{sol, SolEvent, SolValue};
 
-sol!(
-	#[allow(missing_docs)]
-	MintingGateway,
-	concat!(
-		env!("CARGO_MANIFEST_DIR"),
-		"/../artifacts/contracts/MintingGateway.sol/MintingGateway.json"
-	)
-);
+sol!("../contracts/MintingGateway.sol");
 
 sol! {
 	#[allow(missing_docs)]
@@ -109,8 +102,9 @@ sol! {
 
 pub use MintingGateway::{
 	GatewayActivityState, GlobalIssuanceCouncilRotated, MintingAuthorityActivated,
-	MintingAuthorityCollateral, MintingAuthorityDeactivated, TransferOutOfArgonCanceled,
-	TransferOutOfArgonFinalized, TransferOutOfArgonRequest, TransferToArgonStarted,
+	MintingAuthorityCollateral, MintingAuthorityDeactivated, SwapPurchase,
+	TransferOutOfArgonCanceled, TransferOutOfArgonFinalized, TransferOutOfArgonRequest,
+	TransferToArgonFromSwapStarted, TransferToArgonStarted,
 };
 
 pub const ACTIVITY_HASH_VERSION: u8 = 1;
@@ -120,6 +114,42 @@ pub const MAX_GATEWAY_ACTIVITIES_PER_BLOCK: u32 = 128;
 pub const MAX_MINTING_AUTHORIZATIONS_PER_TRANSFER: u32 = 25;
 /// Storage slot seed for `MintingGateway.activityBlockLocators`.
 pub const ACTIVITY_BLOCK_LOCATORS_MAPPING_SLOT: u64 = 11;
+
+/// Decode a finalization only after its dynamic collateral array fits the gateway's ABI bounds.
+pub fn decode_transfer_out_of_argon_finalized(
+	topics: impl IntoIterator<Item = B256>,
+	data: &[u8],
+) -> alloy_sol_types::Result<TransferOutOfArgonFinalized> {
+	const ABI_WORD_BYTES: usize = 32;
+	const ARRAY_OFFSET_WORD: usize = 3;
+	const HEAD_WORDS: usize = 8;
+	const COLLATERAL_WORDS: usize = 3;
+
+	// Alloy reserves the declared array length before it checks whether the rows exist.
+	let head_bytes = HEAD_WORDS * ABI_WORD_BYTES;
+	let offset_word = data
+		.get(ARRAY_OFFSET_WORD * ABI_WORD_BYTES..(ARRAY_OFFSET_WORD + 1) * ABI_WORD_BYTES)
+		.ok_or(alloy_sol_types::Error::Overrun)?;
+	if U256::from_be_slice(offset_word) != U256::from(head_bytes as u64) {
+		return Err(alloy_sol_types::Error::Overrun);
+	}
+
+	let count_word = data
+		.get(head_bytes..head_bytes + ABI_WORD_BYTES)
+		.ok_or(alloy_sol_types::Error::Overrun)?;
+	let collateral_count = U256::from_be_slice(count_word);
+	if collateral_count > U256::from(MAX_MINTING_AUTHORIZATIONS_PER_TRANSFER) {
+		return Err(alloy_sol_types::Error::Overrun);
+	}
+	let expected_bytes = head_bytes +
+		ABI_WORD_BYTES +
+		collateral_count.to::<usize>() * COLLATERAL_WORDS * ABI_WORD_BYTES;
+	if data.len() != expected_bytes {
+		return Err(alloy_sol_types::Error::Overrun);
+	}
+
+	TransferOutOfArgonFinalized::decode_raw_log_validate(topics, data)
+}
 
 pub fn hash_global_issuance_council(
 	signers: Vec<Address>,
@@ -402,6 +432,26 @@ pub fn hash_transfer_to_argon_started_activity(
 			gatewayStateHash: hash_gateway_activity_state(gateway_state),
 		}
 		.abi_encode(),
+	)
+}
+
+pub fn hash_transfer_to_argon_from_swap_started_activity(
+	chain_id: u64,
+	gateway: Address,
+	event: &TransferToArgonFromSwapStarted,
+) -> B256 {
+	keccak256(
+		(
+			keccak256(b"ARGON_TRANSFER_TO_ARGON_FROM_SWAP_STARTED_ACTIVITY"),
+			U256::from(ACTIVITY_HASH_VERSION),
+			U256::from(chain_id),
+			gateway,
+			event.purchase.clone(),
+			event.token,
+			event.amount,
+			hash_gateway_activity_state(event.gatewayState.clone()),
+		)
+			.abi_encode_params(),
 	)
 }
 
@@ -757,5 +807,32 @@ mod tests {
 		range_slot_value[16..24].copy_from_slice(&start_gateway_activity_nonce.to_be_bytes());
 		range_slot_value[8..16].copy_from_slice(&end_gateway_activity_nonce.to_be_bytes());
 		assert_eq!(B256::from(range_slot_value), b256(json(&fixture, "rangeSlotValue")));
+	}
+	#[test]
+	fn native_purchase_receipts_match_the_gateway_storage_commitment() {
+		use alloy_sol_types::SolEvent;
+		for source in [
+			include_str!("../../../fixtures/uniswap-v4-purchase.json"),
+			include_str!("../../../fixtures/uniswap-v4-purchase-refund.json"),
+		] {
+			let fixture: Value = serde_json::from_str(source).unwrap();
+			let log: alloy_primitives::Log =
+				serde_json::from_value(fixture["eventLog"].clone()).unwrap();
+			let mut event = TransferToArgonFromSwapStarted::decode_raw_log_validate(
+				log.topics().iter().copied(),
+				&log.data.data,
+			)
+			.unwrap();
+			let chain_id = u64_value(json(&fixture, "chainId"));
+			let seed = b256(json(&fixture, "activityRootSeed"));
+			let expected = b256(json(&fixture, "activityRoot"));
+			let hash =
+				hash_transfer_to_argon_from_swap_started_activity(chain_id, log.address, &event);
+			assert_eq!(append_activity_root(seed, hash), expected);
+			event.purchase.timestamp += 1;
+			let forged_hash =
+				hash_transfer_to_argon_from_swap_started_activity(chain_id, log.address, &event);
+			assert_ne!(append_activity_root(seed, forged_hash), expected);
+		}
 	}
 }

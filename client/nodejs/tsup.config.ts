@@ -6,6 +6,7 @@ const contractArtifacts = [
   'artifacts/contracts/ArgonToken.sol/ArgonToken.json',
   'artifacts/contracts/ArgonotToken.sol/ArgonotToken.json',
   'artifacts/contracts/MintingGateway.sol/MintingGateway.json',
+  'artifacts/contracts/ArgonBuyAndTransfer.sol/ArgonBuyAndTransfer.json',
   'artifacts/contracts/ProxyArtifacts.sol/ProxyAdmin.json',
   'artifacts/contracts/ProxyArtifacts.sol/TransparentUpgradeableProxy.json',
 ] as const;

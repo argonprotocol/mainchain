@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest';
-import { encodeFunctionData } from 'viem';
+import { decodeEventLog, encodeFunctionData, type Hex } from 'viem';
+import purchaseReceipt from '../../../../chains/ethereum/fixtures/uniswap-v4-purchase.json';
 import * as mainchain from '../index';
 
 it('exports typed EVM contracts through the EvmContracts namespace', () => {
@@ -76,4 +77,44 @@ it('changes the transfer request hash when microgonsPerArgonot changes', () => {
       microgonsPerArgonot: request.microgonsPerArgonot + 1n,
     }),
   ).not.toBe(mainchain.EvmContracts.hashMintingGatewayTransferOutOfArgonRequest(request));
+});
+
+it('binds every purchase field and gateway domain to the native activity commitment', () => {
+  const context = {
+    chainId: BigInt(purchaseReceipt.chainId),
+    gatewayAddress: purchaseReceipt.eventLog.address as Hex,
+  };
+  const { args: event } = decodeEventLog({
+    abi: mainchain.EvmContracts.mintingGatewayAbi,
+    eventName: 'TransferToArgonFromSwapStarted',
+    topics: purchaseReceipt.eventLog.topics as [Hex, ...Hex[]],
+    data: purchaseReceipt.eventLog.data as Hex,
+  });
+  const hash = mainchain.EvmContracts.hashMintingGatewayTransferToArgonFromSwapStartedActivity;
+  const expected = hash(context, event);
+  expect(
+    mainchain.EvmContracts.appendMintingGatewayActivityRoot(
+      purchaseReceipt.activityRootSeed as Hex,
+      expected,
+    ),
+  ).toBe(purchaseReceipt.activityRoot);
+  expect(hash(context, event)).toBe(expected);
+
+  for (const [key, value] of Object.entries(event.purchase)) {
+    let changed: string | bigint;
+    if (typeof value === 'bigint') changed = value + 1n;
+    else changed = `${value.slice(0, -1).toLowerCase()}${value.endsWith('0') ? '1' : '0'}`;
+    expect(hash(context, { ...event, purchase: { ...event.purchase, [key]: changed } })).not.toBe(
+      expected,
+    );
+  }
+  for (const [key, value] of Object.entries(event.gatewayState)) {
+    expect(
+      hash(context, { ...event, gatewayState: { ...event.gatewayState, [key]: value + 1n } }),
+    ).not.toBe(expected);
+  }
+  expect(hash({ ...context, chainId: 1n }, event)).not.toBe(expected);
+  expect(hash({ ...context, gatewayAddress: event.token }, event)).not.toBe(expected);
+  expect(hash(context, { ...event, amount: 251n })).not.toBe(expected);
+  expect(hash(context, { ...event, token: event.purchase.usdcToken })).not.toBe(expected);
 });

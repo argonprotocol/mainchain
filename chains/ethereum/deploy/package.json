@@ -6,18 +6,18 @@
   "scripts": {
     "bootstrap:deploy": "node --import tsx index.ts",
     "bootstrap:prepare-runtime-setup": "node --import tsx prepareRuntimeSetup.ts",
-    "build": "tsc --noEmit",
+    "build": "yarn workspace @argonprotocol/ethereum-contracts build && tsc --noEmit",
     "etherscan:output-files": "node --import tsx outputEtherscanFiles.ts",
     "gas:measure": "node --import tsx measure.ts",
     "gateway-backfill:prepare": "node --import tsx prepareGatewayBackfills.ts",
     "prepare:gateway-upgrade": "node --import tsx prepareMintingGatewayUpgrade.ts",
-    "pretest": "tsc --noEmit",
-    "pretest:ci": "tsc --noEmit",
+    "pretest": "yarn build",
+    "pretest:ci": "yarn build",
     "runtime-pricing:prepare": "node --import tsx prepareRuntimePricing.ts",
     "runtime-setup:prepare": "node --import tsx prepareRuntimeSetup.ts",
-    "tsc": "tsc --noEmit",
-    "tsup": "tsc --noEmit",
-    "typecheck": "tsc --noEmit"
+    "tsc": "yarn build",
+    "tsup": "yarn build",
+    "typecheck": "yarn build"
   },
   "dependencies": {
     "@argonprotocol/ethereum-contracts": "workspace:*",

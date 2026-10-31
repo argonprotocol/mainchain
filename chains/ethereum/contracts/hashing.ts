@@ -1,7 +1,8 @@
 import type { Address, ContractFunctionArgs, Hex } from 'viem';
-import { encodeAbiParameters, keccak256, stringToHex } from 'viem';
+import { encodeAbiParameters, getAbiItem, keccak256, stringToHex } from 'viem';
 import type {
   MintingGatewayActivityState,
+  MintingGatewayTransferToArgonFromSwapStarted,
   MintingGatewayMintingAuthorityCollateral,
 } from './generated.js';
 import { mintingGatewayAbi } from './generated.js';
@@ -603,6 +604,34 @@ export function hashMintingGatewayTransferToArgonStartedActivity(
       args.argonAccountId,
       hashMintingGatewayActivityState(args.gatewayState),
     ]),
+  );
+}
+
+export function hashMintingGatewayTransferToArgonFromSwapStartedActivity(
+  context: MintingGatewayHashContext,
+  args: MintingGatewayTransferToArgonFromSwapStarted,
+): Hex {
+  const purchaseParameter = getAbiItem({ abi: mintingGatewayAbi, name: 'burnFromSwap' }).inputs[0];
+  return keccak256(
+    encodeAbiParameters(
+      [
+        ...GATEWAY_ACTIVITY_HASH_PARAMETERS,
+        purchaseParameter,
+        { type: 'address' },
+        { type: 'uint128' },
+        { type: 'bytes32' },
+      ],
+      [
+        keccak256(stringToHex('ARGON_TRANSFER_TO_ARGON_FROM_SWAP_STARTED_ACTIVITY')),
+        MINTING_GATEWAY_ACTIVITY_HASH_VERSION,
+        context.chainId,
+        context.gatewayAddress,
+        args.purchase,
+        args.token,
+        args.amount,
+        hashMintingGatewayActivityState(args.gatewayState),
+      ],
+    ),
   );
 }
 

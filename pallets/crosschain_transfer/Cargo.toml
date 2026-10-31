@@ -26,6 +26,8 @@ k256 = { workspace = true, features = ["ecdsa"] }
 log = { workspace = true }
 
 [dev-dependencies]
+alloy-primitives = { workspace = true, features = ["serde"] }
+serde_json = { workspace = true }
 polkadot-sdk = { workspace = true, features = ["sp-io", "sp-core", "pallet-balances"], default-features = true }
 pallet-prelude = { workspace = true, features = ["test"], default-features = true }
 

@@ -1,20 +1,22 @@
-use alloc::{format, vec::Vec};
-use alloy_primitives::{keccak256, Address as AlloyAddress, B256, U256};
+use alloc::{boxed::Box, format, vec::Vec};
+use alloy_primitives::{keccak256, Address as AlloyAddress, B256, U160, U256};
 use alloy_sol_types::SolEvent;
 use argon_ethereum_contracts::minting_gateway::{
-	self as ethereum_contracts, GatewayActivityState as ContractGatewayActivityState,
+	self as ethereum_contracts, hash_transfer_to_argon_from_swap_started_activity,
+	GatewayActivityState as ContractGatewayActivityState,
 	GlobalIssuanceCouncilRotated as ContractGlobalIssuanceCouncilRotated,
 	MintingAuthorityActivated as ContractMintingAuthorityActivated,
-	MintingAuthorityDeactivated as ContractMintingAuthorityDeactivated,
+	MintingAuthorityDeactivated as ContractMintingAuthorityDeactivated, SwapPurchase,
 	TransferOutOfArgonCanceled as ContractTransferOutOfArgonCanceled,
 	TransferOutOfArgonFinalized as ContractTransferOutOfArgonFinalized,
-	TransferToArgonStarted as ContractTransferToArgonStarted,
+	TransferToArgonFromSwapStarted, TransferToArgonStarted as ContractTransferToArgonStarted,
 };
 use argon_primitives::EthereumLog;
 use codec::Encode;
 use k256::{elliptic_curve::sec1::ToEncodedPoint, PublicKey as Secp256k1PublicKey};
 use polkadot_sdk::{
 	frame_support::ensure,
+	sp_core,
 	sp_core::ecdsa::{KeccakPublic, KeccakSignature},
 	sp_runtime::{BoundedBTreeMap, DispatchError},
 };
@@ -26,7 +28,7 @@ use crate::{
 	ChainConfig, ChainConfigBySourceChain, Config, CouncilApprovalQueueEntry,
 	CouncilApprovalQueueNonce, CouncilApprovalTargetId, Error, GatewayActivityNonce,
 	GatewayActivityStorageProof, GatewayState, GlobalIssuanceCouncil, GlobalIssuanceCouncilMember,
-	Pallet, SourceChain, H160, H256,
+	Pallet, SourceChain, SwapPurchaseEvidence, H160, H256,
 };
 
 impl<T: Config> DecodedGatewayActivity<T> {
@@ -51,6 +53,40 @@ impl<T: Config> DecodedGatewayActivity<T> {
 					B256::from(*to),
 					gateway_state,
 				),
+			Self::TransferToArgonFromSwap {
+				buyer,
+				token,
+				to,
+				amount,
+				purchase,
+				purchase_timestamp,
+				..
+			} => hash_transfer_to_argon_from_swap_started_activity(
+				*chain_id,
+				gateway,
+				&TransferToArgonFromSwapStarted {
+					purchase: SwapPurchase {
+						timestamp: *purchase_timestamp,
+						buyer: AlloyAddress::from_slice(buyer.as_bytes()),
+						argonAccountId: B256::from(*to),
+						usdcToken: AlloyAddress::from_slice(purchase.usdc_token.as_bytes()),
+						usdcSpent: U256::from_le_bytes(purchase.usdc_spent.to_little_endian()),
+						argonBought: U256::from_le_bytes(purchase.argon_bought.to_little_endian()),
+						poolManager: AlloyAddress::from_slice(purchase.pool_manager.as_bytes()),
+						poolId: B256::from(purchase.pool_id.0),
+						sqrtPriceBeforeX96: U160::from_le_slice(
+							&purchase.sqrt_price_before_x96.to_little_endian()[..20],
+						),
+						sqrtPriceAfterX96: U160::from_le_slice(
+							&purchase.sqrt_price_after_x96.to_little_endian()[..20],
+						),
+					},
+					token: AlloyAddress::from_slice(token.as_bytes()),
+					amount: (*amount).into(),
+					gatewayState: gateway_state,
+				},
+			),
+
 			Self::MintingAuthorityActivated {
 				destination_signing_key,
 				microgon_collateral,
@@ -374,7 +410,6 @@ impl<T: Config> Pallet<T> {
 		chain_config: &ChainConfig,
 		previous_gateway_activity_nonce: GatewayActivityNonce,
 		proof: &GatewayActivityStorageProof<T::MaxActivitiesPerGatewayProof>,
-		mut activities: Vec<Result<DecodedGatewayActivity<T>, DispatchError>>,
 	) -> Result<GatewayActivityBlock<T>, DispatchError> {
 		let [range_slot, root_slot] = proof.storage_proof.slots.as_slice() else {
 			return Err(Error::<T>::InvalidProof.into());
@@ -398,7 +433,17 @@ impl<T: Config> Pallet<T> {
 			.checked_sub(start_gateway_activity_nonce)
 			.and_then(|range| range.checked_add(1))
 			.ok_or(Error::<T>::InvalidProof)?;
-		ensure!(activities.len() as u64 == activity_count, Error::<T>::InvalidProof);
+		ensure!(
+			activity_count <= u64::from(ethereum_contracts::MAX_GATEWAY_ACTIVITIES_PER_BLOCK),
+			Error::<T>::InvalidProof
+		);
+		ensure!(proof.activity_logs.len() as u64 == activity_count, Error::<T>::InvalidProof);
+
+		let mut activities = proof
+			.activity_logs
+			.iter()
+			.map(|log| Self::decode_evm_gateway_activity(chain_config, log))
+			.collect::<Vec<_>>();
 
 		let mut activity_root = B256::from(proof.activity_root_seed.0);
 		for (index, activity) in activities.iter().enumerate() {
@@ -494,6 +539,40 @@ impl<T: Config> Pallet<T> {
 			});
 		}
 
+		if first_topic.0 == TransferToArgonFromSwapStarted::SIGNATURE_HASH.0 {
+			let activity = TransferToArgonFromSwapStarted::decode_raw_log_validate(
+				log.topics.iter().map(|topic| topic.0),
+				&log.data,
+			)
+			.map_err(|_| Error::<T>::InvalidGatewayActivity)?;
+			return Ok(DecodedGatewayActivity::TransferToArgonFromSwap {
+				buyer: H160::from_slice(activity.purchase.buyer.as_slice()),
+				gateway: log.address,
+				token: H160::from_slice(activity.token.as_slice()),
+				to: activity.purchase.argonAccountId.0,
+				amount: activity.amount.into(),
+				purchase_timestamp: activity.purchase.timestamp,
+				purchase: Box::new(SwapPurchaseEvidence {
+					usdc_token: H160::from_slice(activity.purchase.usdcToken.as_slice()),
+					usdc_spent: sp_core::U256::from_big_endian(
+						&activity.purchase.usdcSpent.to_be_bytes::<32>(),
+					),
+					argon_bought: sp_core::U256::from_big_endian(
+						&activity.purchase.argonBought.to_be_bytes::<32>(),
+					),
+					pool_manager: H160::from_slice(activity.purchase.poolManager.as_slice()),
+					pool_id: H256::from_slice(activity.purchase.poolId.as_slice()),
+					sqrt_price_before_x96: sp_core::U256::from_big_endian(
+						&activity.purchase.sqrtPriceBeforeX96.to_be_bytes::<20>(),
+					),
+					sqrt_price_after_x96: sp_core::U256::from_big_endian(
+						&activity.purchase.sqrtPriceAfterX96.to_be_bytes::<20>(),
+					),
+				}),
+				gateway_state: Self::gateway_state_from_contract(activity.gatewayState),
+			});
+		}
+
 		if first_topic.0 == ContractMintingAuthorityActivated::SIGNATURE_HASH.0 {
 			let activity = ContractMintingAuthorityActivated::decode_raw_log_validate(
 				log.topics.iter().map(|topic| topic.0),
@@ -543,8 +622,8 @@ impl<T: Config> Pallet<T> {
 		}
 
 		if first_topic.0 == ContractTransferOutOfArgonFinalized::SIGNATURE_HASH.0 {
-			let activity = ContractTransferOutOfArgonFinalized::decode_raw_log_validate(
-				log.topics.iter().map(|topic| topic.0),
+			let activity = ethereum_contracts::decode_transfer_out_of_argon_finalized(
+				log.topics.iter().map(|topic| B256::from(topic.0)),
 				&log.data,
 			)
 			.map_err(|_| Error::<T>::InvalidGatewayActivity)?;

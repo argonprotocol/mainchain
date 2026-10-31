@@ -1,10 +1,11 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 
 import { Interface, getAddress } from 'ethers';
 import { getClient } from '@argonprotocol/mainchain';
 import { contractsRoot, repoRoot } from './src/hardhat.js';
 import { parseArgs } from './src/cli.js';
+import { deployBuyAndTransfer } from './src/purchase.js';
 import {
   collectVaultOperatorsByEffectiveCouncilSigner,
   deriveRuntimeCouncilSnapshot,
@@ -17,34 +18,6 @@ const args = parseArgs(process.argv.slice(2));
 const argonRpcUrl = getRequiredArg('argon-rpc-url', 'ARGON_RPC_URL');
 const adminSafe = getRequiredAddress('admin-safe', 'ADMIN_SAFE_ADDRESS');
 const guardianSafe = getRequiredAddress('guardian-safe', 'GUARDIAN_SAFE_ADDRESS');
-
-type MigrationDistribution = {
-  sourceBatches: string[];
-  recipientCount: number;
-  totalAmountRaw: string;
-  recipients: string[];
-  amounts: string[];
-};
-
-type DeploymentMigrationBundle = {
-  copiedFrom: {
-    repo: string;
-    migrationFiles: Array<{
-      path: string;
-      sha256: string;
-    }>;
-    finalBalanceSourceHashes: Array<{
-      path: string;
-      sha256: string;
-    }>;
-    poolAllocationHash: {
-      path: string;
-      sha256: string;
-    };
-  };
-  argonMigration: MigrationDistribution;
-  argonotMigration: MigrationDistribution;
-};
 
 async function main() {
   const argonClient = await getClient(argonRpcUrl);
@@ -81,12 +54,6 @@ async function main() {
       repoRoot,
       args['output-dir'] ?? `chains/ethereum/deploy/${networkName}`,
     );
-    const migrationBundlePath = resolve(
-      repoRoot,
-      `chains/ethereum/deploy/${networkName}/migration/migrate-bundle.json`,
-    );
-    const migrationBundle = await loadMigrationBundle(migrationBundlePath);
-
     const [deployer] = await ethers.getSigners();
     const connectedNetwork = await ethers.provider.getNetwork();
     const sortedCouncilSigners = initialCouncil.members.map(({ signer }) => signer);
@@ -122,6 +89,7 @@ async function main() {
     const gatewayBootstrapImplementation = await gatewayImplementationFactory.deploy(
       ethers.ZeroAddress,
       ethers.ZeroAddress,
+      ethers.ZeroAddress,
     );
     await gatewayBootstrapImplementation.waitForDeployment();
 
@@ -153,9 +121,21 @@ async function main() {
     const argonotToken = await argonotFactory.deploy(gatewayProxyAddress);
     await argonotToken.waitForDeployment();
 
+    let purchase;
+    if (args['purchase-config']) {
+      purchase = await deployBuyAndTransfer(
+        ethers,
+        gatewayProxyAddress,
+        await argonToken.getAddress(),
+        resolve(repoRoot, args['purchase-config']),
+      );
+    }
+    const swapContractAddress = purchase?.address ?? ethers.ZeroAddress;
+
     const gatewayFinalImplementation = await gatewayImplementationFactory.deploy(
       await argonToken.getAddress(),
       await argonotToken.getAddress(),
+      swapContractAddress,
     );
     await gatewayFinalImplementation.waitForDeployment();
 
@@ -176,24 +156,6 @@ async function main() {
       },
     ];
 
-    if (migrationBundle) {
-      safeTransactions.push({
-        description: 'Run MintingGateway migrate(...) from the checked-in final mainnet bundle',
-        target: gatewayProxyAddress,
-        value: '0',
-        data: gatewayImplementationFactory.interface.encodeFunctionData('migrate', [
-          {
-            recipients: migrationBundle.argonMigration.recipients,
-            amounts: migrationBundle.argonMigration.amounts,
-          },
-          {
-            recipients: migrationBundle.argonotMigration.recipients,
-            amounts: migrationBundle.argonotMigration.amounts,
-          },
-        ]),
-      });
-    }
-
     const manifest = {
       generatedAt: new Date().toISOString(),
       deployer: deployer.address,
@@ -204,6 +166,7 @@ async function main() {
       adminSafe,
       guardianSafe,
       contracts: {
+        argonBuyAndTransfer: purchase,
         argonToken: buildContractRecord(await argonToken.getAddress(), argonToken, [
           gatewayProxyAddress,
         ]),
@@ -213,12 +176,12 @@ async function main() {
         mintingGatewayImplementationBootstrap: buildContractRecord(
           await gatewayBootstrapImplementation.getAddress(),
           gatewayBootstrapImplementation,
-          [ethers.ZeroAddress, ethers.ZeroAddress],
+          [ethers.ZeroAddress, ethers.ZeroAddress, ethers.ZeroAddress],
         ),
         mintingGatewayImplementationFinal: buildContractRecord(
           await gatewayFinalImplementation.getAddress(),
           gatewayFinalImplementation,
-          [await argonToken.getAddress(), await argonotToken.getAddress()],
+          [await argonToken.getAddress(), await argonotToken.getAddress(), swapContractAddress],
         ),
         mintingGatewayProxy: buildContractRecord(gatewayProxyAddress, gatewayProxy, [
           await gatewayBootstrapImplementation.getAddress(),
@@ -256,23 +219,6 @@ async function main() {
           buildRuntimeAssetRecord('ARGNOT', await argonotToken.getAddress(), gatewayProxyAddress),
         ],
       },
-      migration: migrationBundle && {
-        bundlePath: `chains/ethereum/deploy/${networkName}/migration/migrate-bundle.json`,
-        sourceRepo: migrationBundle.copiedFrom.repo,
-        migrationFileHashes: migrationBundle.copiedFrom.migrationFiles,
-        finalBalanceSourceHashes: migrationBundle.copiedFrom.finalBalanceSourceHashes,
-        poolAllocationHash: migrationBundle.copiedFrom.poolAllocationHash,
-        argon: {
-          sourceBatches: migrationBundle.argonMigration.sourceBatches,
-          recipientCount: migrationBundle.argonMigration.recipientCount,
-          totalAmountRaw: migrationBundle.argonMigration.totalAmountRaw,
-        },
-        argonot: {
-          sourceBatches: migrationBundle.argonotMigration.sourceBatches,
-          recipientCount: migrationBundle.argonotMigration.recipientCount,
-          totalAmountRaw: migrationBundle.argonotMigration.totalAmountRaw,
-        },
-      },
       safeTransactions,
       notes: [],
     };
@@ -285,38 +231,6 @@ async function main() {
   } finally {
     await argonClient.disconnect().catch(() => undefined);
     await connection.close();
-  }
-}
-
-async function loadMigrationBundle(path: string): Promise<DeploymentMigrationBundle | null> {
-  try {
-    const raw = await readFile(path, 'utf8');
-    const bundle = JSON.parse(raw) as DeploymentMigrationBundle;
-
-    validateMigrationDistribution('Argon', bundle.argonMigration);
-    validateMigrationDistribution('Argonot', bundle.argonotMigration);
-
-    return bundle;
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === 'ENOENT') {
-      return null;
-    }
-
-    throw error;
-  }
-}
-
-function validateMigrationDistribution(label: string, distribution: MigrationDistribution) {
-  if (distribution.recipients.length !== distribution.amounts.length) {
-    throw new Error(
-      `${label} migration bundle has ${distribution.recipients.length} recipients but ${distribution.amounts.length} amounts`,
-    );
-  }
-
-  if (distribution.recipientCount !== distribution.recipients.length) {
-    throw new Error(
-      `${label} migration bundle recipientCount ${distribution.recipientCount} does not match ${distribution.recipients.length} recipients`,
-    );
   }
 }
 

@@ -6,6 +6,7 @@ import {
   hashMintingGatewayTransferOutOfArgonCanceledActivity,
   hashMintingGatewayTransferOutOfArgonFinalizedActivity,
   hashMintingGatewayTransferToArgonStartedActivity,
+  hashMintingGatewayTransferToArgonFromSwapStartedActivity,
   mintingGatewayAbi,
   MintingGatewayEvents,
   type MintingGatewayGlobalIssuanceCouncilRotated,
@@ -15,6 +16,7 @@ import {
   type MintingGatewayTransferOutOfArgonCanceled,
   type MintingGatewayTransferOutOfArgonFinalized,
   type MintingGatewayTransferToArgonStarted,
+  type MintingGatewayTransferToArgonFromSwapStarted,
 } from './EvmContracts';
 import { decodeEventLog, getAddress, type Hex } from 'viem';
 import type { EthereumEventLog } from './EthereumProof';
@@ -37,7 +39,10 @@ type DecodedEthereumGatewayActivity =
     } & MintingGatewayTransferOutOfArgonFinalized)
   | ({
       kind: typeof MintingGatewayEvents.TransferToArgonStarted.name;
-    } & MintingGatewayTransferToArgonStarted);
+    } & MintingGatewayTransferToArgonStarted)
+  | ({
+      kind: typeof MintingGatewayEvents.TransferToArgonFromSwapStarted.name;
+    } & MintingGatewayTransferToArgonFromSwapStarted);
 
 export type EthereumGatewayActivity = DecodedEthereumGatewayActivity & {
   txHash: Hex;
@@ -54,6 +59,7 @@ const gatewayActivityEvents = [
   MintingGatewayEvents.TransferOutOfArgonCanceled,
   MintingGatewayEvents.TransferOutOfArgonFinalized,
   MintingGatewayEvents.TransferToArgonStarted,
+  MintingGatewayEvents.TransferToArgonFromSwapStarted,
 ] as const;
 
 export function findEthereumTransferToArgonStartedLogIndexes(
@@ -120,7 +126,7 @@ export function decodeEthereumGatewayActivityLog(
 
 export function hashEthereumGatewayActivity(
   context: MintingGatewayHashContext,
-  activity: EthereumGatewayActivity,
+  activity: DecodedEthereumGatewayActivity,
 ): Hex {
   switch (activity.kind) {
     case MintingGatewayEvents.TransferToArgonStarted.name:
@@ -131,6 +137,8 @@ export function hashEthereumGatewayActivity(
         argonAccountId: activity.argonAccountId,
         gatewayState: activity.gatewayState,
       });
+    case MintingGatewayEvents.TransferToArgonFromSwapStarted.name:
+      return hashMintingGatewayTransferToArgonFromSwapStartedActivity(context, activity);
     case MintingGatewayEvents.MintingAuthorityActivated.name:
       return hashMintingGatewayMintingAuthorityActivatedActivity(context, {
         signingKey: activity.signingKey,

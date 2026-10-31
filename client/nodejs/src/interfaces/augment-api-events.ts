@@ -44,6 +44,7 @@ import type {
   PalletCrosschainTransferGatewayState,
   PalletCrosschainTransferGatewaySyncPause,
   PalletCrosschainTransferSourceChain,
+  PalletCrosschainTransferSwapPurchaseEvidence,
   PalletCrosschainTransferTransferToArgonActivity,
   PalletDomainsDomainRegistration,
   PalletEthereumVerifierBasicOperatingMode,
@@ -900,6 +901,24 @@ declare module '@polkadot/api-base/types/events' {
           asset: PalletCrosschainTransferAssetKind;
           amount: u128;
           mintingAuthorityTip: u128;
+        }
+      >;
+      /**
+       * A Uniswap purchase was credited without operational transfer credit.
+       **/
+      TransferToArgonFromSwapSettled: AugmentedEvent<
+        ApiType,
+        [
+          sourceChain: PalletCrosschainTransferSourceChain,
+          transfer: PalletCrosschainTransferTransferToArgonActivity,
+          purchase: PalletCrosschainTransferSwapPurchaseEvidence,
+          purchaseTick: u64,
+        ],
+        {
+          sourceChain: PalletCrosschainTransferSourceChain;
+          transfer: PalletCrosschainTransferTransferToArgonActivity;
+          purchase: PalletCrosschainTransferSwapPurchaseEvidence;
+          purchaseTick: u64;
         }
       >;
       /**
