@@ -919,6 +919,15 @@ declare module '@polkadot/api-base/types/storage' {
         []
       >;
       /**
+       * Number of retained beacon roots sharing an execution anchor. Gloas EMPTY payloads can
+       * leave the parent execution hash unchanged across multiple finalized beacon blocks.
+       **/
+      executionHeaderAnchorReferences: AugmentedQuery<
+        ApiType,
+        (arg: H256 | string | Uint8Array) => Observable<u32>,
+        [H256]
+      >;
+      /**
        * Retained execution-layer header anchors by execution block hash.
        **/
       executionHeaderAnchors: AugmentedQuery<

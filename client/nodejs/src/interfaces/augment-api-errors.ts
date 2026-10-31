@@ -803,6 +803,7 @@ declare module '@polkadot/api-base/types/errors' {
       ExecutionHeaderAnchorNotHistorical: AugmentedError<ApiType>;
       ExpectedFinalizedHeaderNotStored: AugmentedError<ApiType>;
       ForkDataHashTreeRootFailed: AugmentedError<ApiType>;
+      GloasForkAlreadyActive: AugmentedError<ApiType>;
       Halted: AugmentedError<ApiType>;
       HeaderHashTreeRootFailed: AugmentedError<ApiType>;
       InvalidBackfillHeaderRoot: AugmentedError<ApiType>;
@@ -811,6 +812,7 @@ declare module '@polkadot/api-base/types/errors' {
        * The gap between finalized headers is larger than the retained historical window.
        **/
       InvalidFinalizedHeaderGap: AugmentedError<ApiType>;
+      InvalidForkSchedule: AugmentedError<ApiType>;
       InvalidHeaderMerkleProof: AugmentedError<ApiType>;
       InvalidSyncCommitteeMerkleProof: AugmentedError<ApiType>;
       /**

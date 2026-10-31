@@ -41,6 +41,7 @@ use polkadot_sdk::{
 
 /// Weight functions needed for ethereum_beacon_client.
 pub trait WeightInfo {
+	fn set_gloas_fork() -> Weight;
 	fn force_checkpoint() -> Weight;
 	fn import_trusted_execution_header_backfill() -> Weight;
 	fn submit() -> Weight;
@@ -55,6 +56,9 @@ pub trait WeightInfo {
 
 // For backwards compatibility and tests
 impl WeightInfo for () {
+	fn set_gloas_fork() -> Weight {
+		Weight::zero()
+	}
 	fn provider_tx_pool_key(_bytes: u32) -> Weight {
 		Weight::zero()
 	}

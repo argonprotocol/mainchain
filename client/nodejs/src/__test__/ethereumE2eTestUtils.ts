@@ -1,20 +1,9 @@
-import type { KeyringPair } from '@polkadot/keyring/types';
 import { hexToU8a, u8aToHex } from '@polkadot/util';
-import {
-  type ArgonClient,
-  type EthereumReceipt,
-  getLatestArgonFinalizedExecutionHeader,
-  getNextEthereumBeaconSyncTxs,
-  isOutdatedTransactionError,
-} from '../index';
-import type {
-  EthereumBeaconBlockResponse,
-  EthereumBeaconHeaderDetailsResponse,
-} from '../EthereumBeaconTypes';
+import type { EthereumReceipt } from '../index';
 import { privateKeyToAccount } from 'viem/accounts';
 import type { Hex, RpcTransactionReceipt } from 'viem';
 import { createPublicClient, createWalletClient, defineChain, parseSignature } from 'viem';
-import { submitTx, TestEthereum } from '@argonprotocol/testing';
+import { TestEthereum } from '@argonprotocol/testing';
 
 export async function signGatewayPermit(args: {
   account: ReturnType<typeof privateKeyToAccount>;
@@ -59,58 +48,6 @@ export async function signGatewayPermit(args: {
     r: signature.r,
     s: signature.s,
   };
-}
-
-export async function waitForFinalizedBeaconExecutionAtOrAbove(
-  ethereum: TestEthereum,
-  minimumExecutionBlockNumber: bigint,
-  options: {
-    minimumFinalizedSlot?: bigint;
-  } = {},
-) {
-  const startedAt = Date.now();
-  const minimumFinalizedSlot = options.minimumFinalizedSlot ?? 0n;
-
-  let lastSeenExecutionBlockNumber = 0n;
-  let lastSeenHeadSlot = 0n;
-  let lastSeenFinalizedSlot = 0n;
-  let lastError: Error | undefined;
-
-  while (Date.now() - startedAt < 300_000) {
-    try {
-      const [headHeader, finalizedHeader] = await Promise.all([
-        ethereum.getBeacon<EthereumBeaconHeaderDetailsResponse>('/eth/v1/beacon/headers/head'),
-        ethereum.getBeacon<EthereumBeaconHeaderDetailsResponse>('/eth/v1/beacon/headers/finalized'),
-      ]);
-      lastSeenHeadSlot = BigInt(headHeader.data.header.message.slot);
-      lastSeenFinalizedSlot = BigInt(finalizedHeader.data.header.message.slot);
-      const block = await ethereum.getBeacon<EthereumBeaconBlockResponse>(
-        `/eth/v2/beacon/blocks/${finalizedHeader.data.root}`,
-      );
-      const executionBlockNumber = BigInt(block.data.message.body.execution_payload.block_number);
-      lastSeenExecutionBlockNumber = executionBlockNumber;
-      lastError = undefined;
-
-      if (
-        executionBlockNumber >= minimumExecutionBlockNumber &&
-        lastSeenFinalizedSlot >= minimumFinalizedSlot
-      ) {
-        return { header: finalizedHeader, block };
-      }
-    } catch (error) {
-      if (!(error instanceof Error)) {
-        throw error;
-      }
-      lastError = error;
-    }
-
-    await delay(1_000);
-  }
-
-  const lastErrorSuffix = lastError ? `; last beacon error was: ${lastError.message}` : '';
-  throw new Error(
-    `Timed out waiting for finalized beacon execution block at or above ${minimumExecutionBlockNumber} and finalized slot at or above ${minimumFinalizedSlot}; last seen head slot was ${lastSeenHeadSlot}, finalized slot was ${lastSeenFinalizedSlot}, and finalized execution block was ${lastSeenExecutionBlockNumber}${lastErrorSuffix}`,
-  );
 }
 
 export async function mineLaterExecutionAnchorReceipt(
@@ -191,60 +128,6 @@ export async function waitForExecutionReceipt(
   throw new Error(`Timed out waiting for execution receipt ${transactionHash}`);
 }
 
-export async function syncEthereumVerifierUntilAnchorCovers(
-  mainchainClient: ArgonClient,
-  relayer: KeyringPair,
-  beaconApiUrl: string,
-  minimumExecutionBlockNumber: bigint,
-) {
-  const startedAt = Date.now();
-  const timeoutMs = 5 * 60_000;
-  let lastRetryableError: Error | undefined;
-  let lastAnchorBlockNumber: bigint | undefined;
-
-  while (Date.now() - startedAt < timeoutMs) {
-    try {
-      const anchor = await getLatestArgonFinalizedExecutionHeader(mainchainClient);
-      lastAnchorBlockNumber = anchor.blockNumber;
-      if (anchor.blockNumber >= minimumExecutionBlockNumber) {
-        return;
-      }
-    } catch {}
-
-    const txs = await getNextEthereumBeaconSyncTxs(mainchainClient, beaconApiUrl);
-    if (txs.length === 0) {
-      await delay(500);
-      continue;
-    }
-
-    let shouldRetry = false;
-    for (const tx of txs) {
-      try {
-        await submitTx(mainchainClient, tx, relayer);
-        lastRetryableError = undefined;
-      } catch (error) {
-        if (isRetryableEthereumVerifierSyncError(error)) {
-          lastRetryableError = error instanceof Error ? error : new Error(String(error));
-          shouldRetry = true;
-          break;
-        }
-        throw error;
-      }
-    }
-
-    if (shouldRetry) {
-      await delay(500);
-    }
-  }
-
-  throw (
-    lastRetryableError ??
-    new Error(
-      `Ethereum verifier did not retain an anchor at or above execution block ${minimumExecutionBlockNumber} within ${Math.floor(timeoutMs / 1000)}s; last seen anchor was ${lastAnchorBlockNumber ?? 'unavailable'}`,
-    )
-  );
-}
-
 export function repeatByteHex(byte: string, size: number): Hex {
   return `0x${byte.repeat(size)}`;
 }
@@ -269,15 +152,6 @@ export function toEvmRecoverableSignature(signature: Hex): Hex {
     bytes[64] += 27;
   }
   return u8aToHex(bytes);
-}
-
-function isRetryableEthereumVerifierSyncError(error: unknown) {
-  const message = error instanceof Error ? error.message : String(error);
-
-  return (
-    isOutdatedTransactionError(error) ||
-    message.includes('ethereumVerifier.InvalidHeaderMerkleProof')
-  );
 }
 
 async function delay(ms: number): Promise<void> {

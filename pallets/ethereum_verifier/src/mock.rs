@@ -172,7 +172,8 @@ parameter_types! {
 		fulu: Fork {
 			version: hex!("06000000"),
 			epoch: 411_392,
-		}
+		},
+		gloas: Fork { version: hex!("07000000"), epoch: u64::MAX },
 	};
 }
 

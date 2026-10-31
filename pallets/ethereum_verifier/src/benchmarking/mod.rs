@@ -22,6 +22,7 @@ use argon_primitives::{
 	EthereumReceiptProofReceipt, EthereumStorageSlotProof, EthereumTrieProofNodes,
 	EthereumVerifyProvider, MAX_ETHEREUM_HEADER_CHAIN_LEN,
 };
+use codec::Decode;
 use frame_benchmarking::v2::*;
 use frame_system::RawOrigin;
 use hex_literal::hex;
@@ -51,6 +52,7 @@ frame_support::parameter_types! {
 		deneb: Fork { version: hex!("04000000"), epoch: 0 },
 		electra: Fork { version: hex!("05000000"), epoch: 0 },
 		fulu: Fork { version: hex!("06000000"), epoch: 411_392 },
+		gloas: Fork { version: hex!("07000000"), epoch: u64::MAX },
 	};
 }
 
@@ -99,12 +101,13 @@ mod benchmarks {
 		update.execution_header_proof.execution_branch =
 			BoundedVec::truncate_from(vec![H256::repeat_byte(3); 32]);
 		match &mut update.execution_header_proof.execution_header {
-			snowbridge_beacon_primitives::VersionedExecutionPayloadHeader::Capella(header) => {
+			crate::types::VersionedExecutionPayloadHeader::Capella(header) => {
 				header.extra_data = vec![0xff; n as usize];
 			},
-			snowbridge_beacon_primitives::VersionedExecutionPayloadHeader::Deneb(header) => {
+			crate::types::VersionedExecutionPayloadHeader::Deneb(header) => {
 				header.extra_data = vec![0xff; n as usize];
 			},
+			crate::types::VersionedExecutionPayloadHeader::Rlp(_) => unreachable!("Deneb fixture"),
 		}
 		let call = T::RuntimeCall::from(Call::<T>::submit { update: Box::new(update) });
 
@@ -145,8 +148,31 @@ mod benchmarks {
 	}
 
 	#[benchmark]
+	fn set_gloas_fork() -> Result<(), BenchmarkError> {
+		Pallet::<T>::force_checkpoint(
+			RawOrigin::Root.into(),
+			Box::new(benchmark_checkpoint_update()?),
+			BenchmarkForkVersions::get(),
+		)?;
+		let fork = Fork { version: hex!("07000000"), epoch: u64::MAX - 1 };
+
+		#[extrinsic_call]
+		_(RawOrigin::Root, fork);
+
+		assert_eq!(ForkVersionSchedule::<T>::get().unwrap().gloas, fork);
+		Ok(())
+	}
+
+	#[benchmark]
 	fn force_checkpoint() -> Result<(), BenchmarkError> {
-		let checkpoint_update = benchmark_checkpoint_update()?;
+		EthereumBeaconClient::<T>::process_checkpoint_update(
+			&benchmark_checkpoint_update()?,
+			&BenchmarkForkVersions::get(),
+		)?;
+		let evicted_hash = LatestExecutionHeaderAnchorBlockHash::<T>::get().unwrap();
+		// The checkpoint occupies slot 1; make the measured insert replace it.
+		FinalizedBeaconStateIndex::<T>::put(0);
+		let checkpoint_update = benchmark_later_checkpoint_update()?;
 		let block_root: H256 = checkpoint_update.header.hash_tree_root().unwrap();
 
 		#[extrinsic_call]
@@ -154,6 +180,8 @@ mod benchmarks {
 
 		assert!(<LatestFinalizedBlockRoot<T>>::get() == block_root);
 		assert!(<FinalizedBeaconState<T>>::get(block_root).is_some());
+		assert!(!ExecutionHeaderAnchors::<T>::contains_key(evicted_hash));
+		assert!(!ExecutionHeaderAnchorReferences::<T>::contains_key(evicted_hash));
 
 		Ok(())
 	}
@@ -167,12 +195,16 @@ mod benchmarks {
 			&checkpoint_update,
 			&BenchmarkForkVersions::get(),
 		)?;
+		let evicted_hash = LatestExecutionHeaderAnchorBlockHash::<T>::get().unwrap();
+		FinalizedBeaconStateIndex::<T>::put(0);
 
 		#[extrinsic_call]
 		submit(RawOrigin::Signed(caller.clone()), Box::new(finalized_header_update));
 
 		let latest_block_root = <LatestFinalizedBlockRoot<T>>::get();
 		assert!(<FinalizedBeaconState<T>>::get(latest_block_root).is_some());
+		assert!(!ExecutionHeaderAnchors::<T>::contains_key(evicted_hash));
+		assert!(!ExecutionHeaderAnchorReferences::<T>::contains_key(evicted_hash));
 
 		Ok(())
 	}
@@ -184,11 +216,14 @@ mod benchmarks {
 		let historical_block_root: H256 = historical_checkpoint.header.hash_tree_root().unwrap();
 		let historical_anchor = ExecutionHeaderAnchor::from_payload_header(
 			&historical_checkpoint.execution_header_proof.execution_header,
-		);
+		)
+		.unwrap();
 		EthereumBeaconClient::<T>::process_checkpoint_update(
 			&latest_checkpoint,
 			&BenchmarkForkVersions::get(),
 		)?;
+		let evicted_hash = LatestExecutionHeaderAnchorBlockHash::<T>::get().unwrap();
+		FinalizedBeaconStateIndex::<T>::put(0);
 
 		#[extrinsic_call]
 		import_trusted_execution_header_backfill(
@@ -199,6 +234,8 @@ mod benchmarks {
 		);
 
 		assert!(<ExecutionHeaderAnchors<T>>::contains_key(historical_anchor.block_hash));
+		assert!(!ExecutionHeaderAnchors::<T>::contains_key(evicted_hash));
+		assert!(!ExecutionHeaderAnchorReferences::<T>::contains_key(evicted_hash));
 
 		Ok(())
 	}
@@ -212,11 +249,25 @@ mod benchmarks {
 			&checkpoint_update,
 			&BenchmarkForkVersions::get(),
 		)?;
+		EthereumBeaconClient::<T>::submit(
+			RawOrigin::Signed(caller.clone()).into(),
+			Box::new(sync_committee_update),
+		)?;
+		let evicted_hash = LatestExecutionHeaderAnchorBlockHash::<T>::get().unwrap();
+		FinalizedBeaconStateIndex::<T>::put(0);
+		let update = crate::types::Update::decode(
+			&mut &include_bytes!("../../tests/fixtures/next-sync-committee-update.scale")[..],
+		)
+		.map_err(|_| BenchmarkError::Stop("invalid signed rollover fixture"))?;
+		let finalized_root = update.finalized_header.hash_tree_root().unwrap();
 
 		#[extrinsic_call]
-		submit(RawOrigin::Signed(caller.clone()), Box::new(sync_committee_update));
+		submit(RawOrigin::Signed(caller.clone()), Box::new(update));
 
 		assert!(<NextSyncCommittee<T>>::exists());
+		assert_eq!(LatestFinalizedBlockRoot::<T>::get(), finalized_root);
+		assert!(!ExecutionHeaderAnchors::<T>::contains_key(evicted_hash));
+		assert!(!ExecutionHeaderAnchorReferences::<T>::contains_key(evicted_hash));
 
 		Ok(())
 	}
@@ -437,6 +488,7 @@ mod benchmarks {
 			deneb: Fork { version: hex!("04000000"), epoch: 0 },
 			electra: Fork { version: hex!("05000000"), epoch: 80000000000 },
 			fulu: Fork { version: hex!("06000000"), epoch: 80000000001 },
+			gloas: Fork { version: hex!("07000000"), epoch: u64::MAX },
 		};
 		let finalized_root_gindex = EthereumBeaconClient::<T>::finalized_root_gindex_at_slot(
 			update.attested_header.slot,

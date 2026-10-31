@@ -11,12 +11,10 @@ use super::{
 	*,
 };
 use alloc::{collections::BTreeMap, vec::Vec};
-use alloy_consensus::Header as AlloyHeader;
-use alloy_rlp::Decodable;
 use argon_primitives::{
 	EthereumAccountStorageProof, EthereumBlockNumber, EthereumCombinedReceiptProof,
-	EthereumExecutionBlockProof, EthereumExecutionHeader, EthereumLog, EthereumReceiptLog,
-	EthereumReceiptLogProofBatch, EthereumVerifyError, EthereumVerifyProvider, Moment,
+	EthereumExecutionBlockProof, EthereumLog, EthereumReceiptLog, EthereumReceiptLogProofBatch,
+	EthereumVerifyError, EthereumVerifyProvider, Moment,
 };
 use polkadot_sdk::{frame_support::ensure, sp_core::H160, sp_runtime::traits::Get};
 
@@ -156,14 +154,14 @@ impl<T: Config> Pallet<T> {
 		}
 
 		let mut headers = proof.target_to_anchor_header_chain.iter();
-		let target = Self::decode_execution_header(
-			headers.next().ok_or(EthereumVerifyError::InvalidHeaderChain)?,
+		let target = ExecutionHeaderAnchor::from_rlp(
+			&headers.next().ok_or(EthereumVerifyError::InvalidHeaderChain)?.rlp,
 		)?;
 		verified_headers.push(target);
 		let mut previous = target;
 
 		for header in headers {
-			let current = Self::decode_execution_header(header)?;
+			let current = ExecutionHeaderAnchor::from_rlp(&header.rlp)?;
 			ensure!(
 				current.parent_hash == previous.block_hash &&
 					current.block_number.checked_sub(1) == Some(previous.block_number),
@@ -182,24 +180,20 @@ impl<T: Config> Pallet<T> {
 
 		Ok(verified_headers)
 	}
+}
 
-	fn decode_execution_header(
-		header: &EthereumExecutionHeader,
-	) -> Result<ExecutionHeaderAnchor, EthereumVerifyError> {
-		let mut bytes = header.rlp.as_slice();
-		let decoded =
-			AlloyHeader::decode(&mut bytes).map_err(|_| EthereumVerifyError::InvalidHeader)?;
-		ensure!(bytes.is_empty(), EthereumVerifyError::InvalidHeader);
+impl ExecutionHeaderAnchor {
+	pub(crate) fn from_rlp(bytes: &[u8]) -> Result<Self, EthereumVerifyError> {
+		let header = alloy_rlp::decode_exact::<alloy_consensus::Header>(bytes)
+			.map_err(|_| EthereumVerifyError::InvalidHeader)?;
 
-		Ok(ExecutionHeaderAnchor {
-			block_number: decoded.number,
-			timestamp_millis: decoded.timestamp.saturating_mul(1_000),
-			// Recompute the sealed hash from the verified RLP bytes so the
-			// header chain is anchored to the actual encoded header contents.
-			block_hash: H256::from_slice(decoded.hash_slow().as_slice()),
-			parent_hash: H256::from_slice(decoded.parent_hash.as_slice()),
-			state_root: H256::from_slice(decoded.state_root.as_slice()),
-			receipts_root: H256::from_slice(decoded.receipts_root.as_slice()),
+		Ok(Self {
+			block_hash: H256::from(sp_core::hashing::keccak_256(bytes)),
+			block_number: header.number,
+			timestamp_millis: header.timestamp.saturating_mul(1_000),
+			parent_hash: H256::from_slice(header.parent_hash.as_slice()),
+			state_root: H256::from_slice(header.state_root.as_slice()),
+			receipts_root: H256::from_slice(header.receipts_root.as_slice()),
 		})
 	}
 }

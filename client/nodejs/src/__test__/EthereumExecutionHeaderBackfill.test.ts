@@ -1,4 +1,5 @@
-import { afterEach, expect, it } from 'vitest';
+import { Hardfork } from '@ethereumjs/common';
+import { afterEach, expect, it, vi } from 'vitest';
 import type { ArgonClient, IArgonQueryable } from '../index';
 import {
   buildGatewayExecutionHeaderBackfill,
@@ -8,15 +9,156 @@ import { MintingGatewayEvents, mintingGatewayAbi } from '../EvmContracts';
 import {
   createExecutionBlock,
   createExecutionClient,
+  createExecutionBlockFromRlp,
   createLegacyReceipt,
+  gloasExecutionProof,
   repeatHex,
 } from './ethereumProofTestUtils';
-import { encodeAbiParameters, encodeEventTopics, type Hex } from 'viem';
+import { encodeAbiParameters, encodeEventTopics, hexToBytes, type Hex } from 'viem';
+import historicalExecutionProofs from '../../../../pallets/ethereum_verifier/tests/fixtures/historical-execution-hash-proofs.json';
 
 const originalFetch = globalThis.fetch;
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
+});
+
+it.each([
+  ['genesis', 0n, '0', ''],
+  ['pre-Capella', 1n, '1', ''],
+  ['malformed eligible branch', 1n, '1', 'Invalid execution hash branch length'],
+  ['empty eligible hash', 1n, '1', 'Empty light-client headers cannot provide an execution anchor'],
+] as const)(
+  'scans past unanchorable bootstraps and validates the Capella candidate (%s)',
+  async (_scenario, scanSlot, capellaEpoch, expectedError) => {
+    const fixture = historicalExecutionProofs[0];
+    const block = createExecutionBlockFromRlp(
+      fixture.execution_header_rlp as Hex,
+      Hardfork.Shanghai,
+    );
+    const zero = repeatHex('00', 32);
+    const earlyRoot = repeatHex('22', 32);
+    const capellaRoot = repeatHex('33', 32);
+    const capellaSlot = scanSlot + 8n;
+    const branch = [...Array<string>(3).fill(zero), ...fixture.execution_branch];
+    if (expectedError === 'Invalid execution hash branch length') branch.pop();
+    let executionBlockHash = block.hash;
+    if (expectedError === 'Empty light-client headers cannot provide an execution anchor') {
+      executionBlockHash = zero;
+    }
+
+    globalThis.fetch = vi.fn(
+      createFetch({
+        'https://backfill.example/eth/v1/config/spec': {
+          data: {
+            SLOTS_PER_EPOCH: '8',
+            SECONDS_PER_SLOT: '1',
+            CAPELLA_FORK_EPOCH: capellaEpoch,
+            DENEB_FORK_EPOCH: '2',
+            GLOAS_FORK_EPOCH: '3',
+          },
+        },
+        'https://backfill.example/eth/v1/beacon/genesis': {
+          data: { genesis_time: String(BigInt(block.timestamp) - capellaSlot) },
+        },
+        [`https://backfill.example/eth/v1/beacon/headers?slot=${scanSlot}`]:
+          createHeaderAtSlotResponse(Number(scanSlot), earlyRoot),
+        [`https://backfill.example/eth/v1/beacon/light_client/bootstrap/${earlyRoot}`]: {
+          data: {
+            header: {
+              beacon: { ...fixture.header, slot: String(scanSlot) },
+              execution_block_hash: zero,
+              execution_branch: Array<string>(11).fill(zero),
+            },
+          },
+        },
+        [`https://backfill.example/eth/v1/beacon/headers?slot=${capellaSlot}`]:
+          createHeaderAtSlotResponse(Number(capellaSlot), capellaRoot),
+        [`https://backfill.example/eth/v1/beacon/light_client/bootstrap/${capellaRoot}`]: {
+          data: {
+            header: {
+              beacon: { ...fixture.header, slot: String(capellaSlot) },
+              execution_block_hash: executionBlockHash,
+              execution_branch: branch,
+            },
+          },
+        },
+      }),
+    );
+
+    const result = buildGatewayExecutionHeaderBackfill(
+      createBackfillClient({ latestFinalizedSlot: 24n, firstRetainedAnchorAtOrAfterBlock: null }),
+      {
+        beaconApiUrl: 'https://backfill.example',
+        targetExecutionBlockNumber: BigInt(block.number),
+        executionClient: createExecutionClient({ blocks: [block] }),
+      },
+    );
+    if (expectedError) {
+      await expect(result).rejects.toThrow(expectedError);
+    } else {
+      await expect(result).resolves.toMatchObject({
+        expectedBeaconRoot: capellaRoot,
+        header: { slot: String(capellaSlot) },
+        executionBlockNumber: BigInt(block.number),
+        executionBlockHash: block.hash,
+        executionHeaderProof: {
+          executionHeader: { Rlp: hexToBytes(fixture.execution_header_rlp as Hex) },
+          executionBranch: fixture.execution_branch,
+        },
+      });
+    }
+    expect(globalThis.fetch).toHaveBeenCalledWith(
+      new URL(`https://backfill.example/eth/v1/beacon/light_client/bootstrap/${capellaRoot}`),
+    );
+  },
+);
+
+it('backfills the parent execution block committed by a Gloas bootstrap', async () => {
+  const block = createExecutionBlockFromRlp(
+    gloasExecutionProof.execution_header_rlp as Hex,
+    Hardfork.Amsterdam,
+  );
+  const blockNumber = BigInt(block.number);
+  const slot = BigInt(gloasExecutionProof.header.slot);
+  const beaconRoot = repeatHex('33', 32);
+  const genesisTime = BigInt(block.timestamp) - (slot - 1n);
+  const scanSlot = slot - 33n;
+  globalThis.fetch = createFetch({
+    'https://gloas-backfill.example/eth/v1/config/spec': {
+      data: { SLOTS_PER_EPOCH: '32', SECONDS_PER_SLOT: '1', GLOAS_FORK_EPOCH: '1' },
+    },
+    'https://gloas-backfill.example/eth/v1/beacon/genesis': {
+      data: { genesis_time: String(genesisTime) },
+    },
+    [`https://gloas-backfill.example/eth/v1/beacon/headers?slot=${scanSlot}`]:
+      createHeaderAtSlotResponse(Number(scanSlot), beaconRoot),
+    [`https://gloas-backfill.example/eth/v1/beacon/light_client/bootstrap/${beaconRoot}`]: {
+      data: {
+        header: {
+          beacon: { ...gloasExecutionProof.header, slot: String(slot) },
+          execution_block_hash: block.hash,
+          execution_branch: gloasExecutionProof.execution_branch,
+        },
+      },
+    },
+  });
+  const payload = await buildGatewayExecutionHeaderBackfill(
+    createBackfillClient({ latestFinalizedSlot: slot, firstRetainedAnchorAtOrAfterBlock: null }),
+    {
+      beaconApiUrl: 'https://gloas-backfill.example',
+      targetExecutionBlockNumber: blockNumber,
+      executionClient: createExecutionClient({ blocks: [block] }),
+    },
+  );
+  expect(payload).toMatchObject({
+    executionBlockNumber: blockNumber,
+    executionBlockHash: block.hash,
+    executionHeaderProof: {
+      executionHeader: { Rlp: hexToBytes(gloasExecutionProof.execution_header_rlp as Hex) },
+      executionBranch: gloasExecutionProof.execution_branch,
+    },
+  });
 });
 
 it('builds a historical checkpoint backfill payload for the first uncovered gateway proof block', async () => {

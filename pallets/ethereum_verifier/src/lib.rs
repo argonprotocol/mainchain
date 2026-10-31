@@ -9,6 +9,7 @@
 //! ## Governance
 //!
 //! * [`Call::force_checkpoint`]: Set the initial trusted consensus checkpoint.
+//! * [`Call::set_gloas_fork`]: Configure Gloas activation without resetting the checkpoint.
 //! * [`Call::set_operating_mode`]: Set the operating mode of the pallet. Can be used to disable
 //!   processing of consensus updates.
 //!
@@ -87,7 +88,7 @@ pub mod pallet {
 	use frame_support::pallet_prelude::*;
 	use frame_system::pallet_prelude::*;
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(2);
 
 	#[derive(scale_info::TypeInfo, codec::Encode, codec::Decode, codec::MaxEncodedLen)]
 	#[codec(mel_bound(T: Config))]
@@ -136,6 +137,11 @@ pub mod pallet {
 		OperatingModeChanged {
 			mode: BasicOperatingMode,
 		},
+		GloasForkScheduled {
+			version: ForkVersion,
+			#[codec(compact)]
+			epoch: u64,
+		},
 	}
 
 	#[pallet::error]
@@ -168,6 +174,8 @@ pub mod pallet {
 		/// not match the next sync committee in storage.
 		InvalidSyncCommitteeUpdate,
 		Halted,
+		InvalidForkSchedule,
+		GloasForkAlreadyActive,
 	}
 
 	/// Latest imported checkpoint root
@@ -214,6 +222,12 @@ pub mod pallet {
 	#[pallet::storage]
 	pub type FinalizedExecutionHeaderAnchor<T: Config> =
 		StorageMap<_, Identity, H256, ExecutionBlockHash, OptionQuery>;
+
+	/// Number of retained beacon roots sharing an execution anchor. Gloas EMPTY payloads can
+	/// leave the parent execution hash unchanged across multiple finalized beacon blocks.
+	#[pallet::storage]
+	pub type ExecutionHeaderAnchorReferences<T: Config> =
+		StorageMap<_, Identity, ExecutionBlockHash, u32, ValueQuery>;
 
 	/// Latest retained execution-layer anchor block hash.
 	#[pallet::storage]
@@ -293,8 +307,8 @@ pub mod pallet {
 		pub fn submit(origin: OriginFor<T>, update: Box<Update>) -> DispatchResultWithPostInfo {
 			ensure_signed(origin)?;
 			ensure!(!OperatingMode::<T>::get().is_halted(), Error::<T>::Halted);
-			Self::verify_update(&update)?;
-			Self::apply_update(&update)
+			let fork_versions = Self::verify_update(&update)?;
+			Self::apply_update(&update, &fork_versions)
 		}
 
 		#[pallet::call_index(2)]
@@ -311,7 +325,13 @@ pub mod pallet {
 				header.hash_tree_root().map_err(|_| Error::<T>::HeaderHashTreeRootFailed)?;
 			ensure!(header_root == expected_beacon_root, Error::<T>::InvalidBackfillHeaderRoot);
 
-			let anchor = Self::verify_execution_proof_for_header(&header, &execution_header_proof)?;
+			let fork_versions =
+				ForkVersionSchedule::<T>::get().ok_or(Error::<T>::NotBootstrapped)?;
+			let anchor = Self::verify_execution_proof_for_header(
+				&header,
+				&execution_header_proof,
+				&fork_versions,
+			)?;
 			ensure!(
 				!ExecutionHeaderAnchors::<T>::contains_key(anchor.block_hash) &&
 					!ExecutionHeaderAnchorsByBlockNumber::<T>::contains_key(
@@ -355,6 +375,45 @@ pub mod pallet {
 			ensure_root(origin)?;
 			OperatingMode::<T>::set(mode);
 			Self::deposit_event(Event::OperatingModeChanged { mode });
+			Ok(())
+		}
+
+		/// Configure the implemented Gloas fork before the verifier finalizes its activation.
+		/// Earlier forks and retained consensus state are preserved. May only be called by root.
+		#[pallet::call_index(4)]
+		#[pallet::weight((T::WeightInfo::set_gloas_fork(), DispatchClass::Operational))]
+		pub fn set_gloas_fork(origin: OriginFor<T>, fork: Fork) -> DispatchResult {
+			ensure_root(origin)?;
+			let mut forks = ForkVersionSchedule::<T>::get().ok_or(Error::<T>::NotBootstrapped)?;
+			if forks.gloas == fork {
+				return Ok(());
+			}
+			ensure!(fork.epoch > forks.fulu.epoch, Error::<T>::InvalidForkSchedule);
+			let earlier_forks = [
+				forks.genesis,
+				forks.altair,
+				forks.bellatrix,
+				forks.capella,
+				forks.deneb,
+				forks.electra,
+				forks.fulu,
+			];
+			ensure!(
+				earlier_forks.iter().all(|earlier| earlier.version != fork.version),
+				Error::<T>::InvalidForkSchedule
+			);
+			let finalized = FinalizedBeaconState::<T>::get(LatestFinalizedBlockRoot::<T>::get())
+				.ok_or(Error::<T>::NotBootstrapped)?;
+			let finalized_epoch = compute_epoch(finalized.slot, Self::slots_per_epoch());
+			ensure!(finalized_epoch < forks.gloas.epoch, Error::<T>::GloasForkAlreadyActive);
+			ensure!(finalized_epoch < fork.epoch, Error::<T>::GloasForkAlreadyActive);
+
+			forks.gloas = fork;
+			ForkVersionSchedule::<T>::put(forks);
+			Self::deposit_event(Event::GloasForkScheduled {
+				version: fork.version,
+				epoch: fork.epoch,
+			});
 			Ok(())
 		}
 	}
@@ -411,6 +470,7 @@ pub mod pallet {
 			let anchor = Self::verify_execution_proof_for_header(
 				&update.header,
 				&update.execution_header_proof,
+				fork_versions,
 			)?;
 			ExecutionHeaderAnchors::<T>::insert(anchor.block_hash, anchor);
 			ExecutionHeaderAnchorsByBlockNumber::<T>::insert(
@@ -431,7 +491,7 @@ pub mod pallet {
 		/// Verifies that provided next sync committee is valid through a series of checks
 		/// (including checking that a sync committee period isn't skipped and that the header is
 		/// signed by the current sync committee.
-		fn verify_update(update: &Update) -> DispatchResult {
+		fn verify_update(update: &Update) -> Result<ForkVersions, DispatchError> {
 			let preset = Self::beacon_preset();
 
 			ensure!(
@@ -571,7 +631,7 @@ pub mod pallet {
 			)
 			.map_err(|_| Error::<T>::BLSVerificationFailed)?;
 
-			Ok(())
+			Ok(fork_versions)
 		}
 
 		/// Reference and strictly follows <https://github.com/ethereum/consensus-specs/blob/ec42646/specs/altair/light-client/sync-protocol.md#apply_light_client_update>
@@ -579,7 +639,10 @@ pub mod pallet {
 		/// is present in the update, verify the sync committee by converting it to a
 		/// SyncCommitteePrepared type. Stores the provided finalized header. Updates are free
 		/// if the certain conditions specified in `check_refundable` are met.
-		fn apply_update(update: &Update) -> DispatchResultWithPostInfo {
+		fn apply_update(
+			update: &Update,
+			fork_versions: &ForkVersions,
+		) -> DispatchResultWithPostInfo {
 			let preset = Self::beacon_preset();
 			let latest_finalized_state =
 				FinalizedBeaconState::<T>::get(LatestFinalizedBlockRoot::<T>::get())
@@ -626,6 +689,7 @@ pub mod pallet {
 				let anchor = Self::verify_execution_proof_for_header(
 					&update.finalized_header,
 					&update.execution_header_proof,
+					fork_versions,
 				)?;
 				ExecutionHeaderAnchors::<T>::insert(anchor.block_hash, anchor);
 				ExecutionHeaderAnchorsByBlockNumber::<T>::insert(
@@ -670,6 +734,15 @@ pub mod pallet {
 			let slot = header.slot;
 			let header_root: H256 =
 				header.hash_tree_root().map_err(|_| Error::<T>::HeaderHashTreeRootFailed)?;
+			if FinalizedBeaconState::<T>::contains_key(header_root) {
+				if update_latest_finalized_root {
+					LatestFinalizedBlockRoot::<T>::set(header_root);
+				}
+				return Ok(());
+			}
+			ExecutionHeaderAnchorReferences::<T>::mutate(execution_header_block_hash, |count| {
+				*count = count.saturating_add(1);
+			});
 			let bound = MaxFinalizedHeadersToKeep::<T>::get();
 			debug_assert!(bound > 0, "finalized header ring buffer bound must be non-zero");
 			let current_index = FinalizedBeaconStateIndex::<T>::get();
@@ -679,22 +752,8 @@ pub mod pallet {
 				current_index.saturating_add(1)
 			};
 
-			if FinalizedBeaconStateMapping::<T>::contains_key(next_index) {
-				let evicted_root = FinalizedBeaconStateMapping::<T>::get(next_index);
-				if let Some(evicted_execution_header_block_hash) =
-					FinalizedExecutionHeaderAnchor::<T>::take(evicted_root) &&
-					let Some(evicted_anchor) =
-						ExecutionHeaderAnchors::<T>::take(evicted_execution_header_block_hash)
-				{
-					ExecutionHeaderAnchorsByBlockNumber::<T>::remove(
-						Self::execution_header_anchor_scan_key(evicted_anchor.block_number),
-					);
-					if LatestExecutionHeaderAnchorBlockHash::<T>::get() ==
-						Some(evicted_execution_header_block_hash)
-					{
-						LatestExecutionHeaderAnchorBlockHash::<T>::kill();
-					}
-				}
+			if let Ok(evicted_root) = FinalizedBeaconStateMapping::<T>::try_get(next_index) {
+				Self::release_execution_header_anchor(evicted_root);
 			}
 
 			FinalizedBeaconStateBuffer::<T>::insert(
@@ -729,12 +788,49 @@ pub mod pallet {
 		pub(crate) fn verify_execution_proof_for_header(
 			finalized_header: &BeaconHeader,
 			execution_header_proof: &ExecutionHeaderProof,
+			fork_versions: &ForkVersions,
 		) -> Result<ExecutionHeaderAnchor, DispatchError> {
-			let execution_header_root: H256 = execution_header_proof
-				.execution_header
-				.hash_tree_root()
-				.map_err(|_| Error::<T>::BlockBodyHashTreeRootFailed)?;
-			let execution_header_gindex = Self::execution_header_gindex();
+			use types::VersionedExecutionPayloadHeader;
+			let epoch = compute_epoch(finalized_header.slot, Self::slots_per_epoch());
+			let is_gloas = epoch >= fork_versions.gloas.epoch;
+			let anchor = ExecutionHeaderAnchor::from_payload_header(
+				&execution_header_proof.execution_header,
+			)
+			.map_err(|_| Error::<T>::InvalidExecutionHeaderProof)?;
+			// Gloas light-client validation also defines hash proofs for historical payloads.
+			// https://ethereum.github.io/consensus-specs/specs/gloas/light-client/sync-protocol/#modified-is_valid_light_client_header
+			let (execution_header_root, execution_header_gindex) =
+				match (&execution_header_proof.execution_header, is_gloas) {
+					(VersionedExecutionPayloadHeader::Capella(header), false) => (
+						header
+							.hash_tree_root()
+							.map_err(|_| Error::<T>::BlockBodyHashTreeRootFailed)?,
+						config::altair::EXECUTION_HEADER_INDEX,
+					),
+					(VersionedExecutionPayloadHeader::Deneb(header), false) => (
+						header
+							.hash_tree_root()
+							.map_err(|_| Error::<T>::BlockBodyHashTreeRootFailed)?,
+						config::altair::EXECUTION_HEADER_INDEX,
+					),
+					(VersionedExecutionPayloadHeader::Rlp(_), _) => {
+						ensure!(
+							finalized_header.slot != 0,
+							Error::<T>::InvalidExecutionHeaderProof
+						);
+						let index = if is_gloas {
+							config::gloas::EXECUTION_BLOCK_HASH_INDEX
+						} else if epoch >= fork_versions.deneb.epoch {
+							config::gloas::DENEB_EXECUTION_BLOCK_HASH_INDEX
+						} else if epoch >= fork_versions.capella.epoch {
+							config::gloas::CAPELLA_EXECUTION_BLOCK_HASH_INDEX
+						} else {
+							return Err(Error::<T>::InvalidExecutionHeaderProof.into());
+						};
+						(anchor.block_hash, index)
+					},
+					_ => return Err(Error::<T>::InvalidExecutionHeaderProof.into()),
+				};
 			ensure!(
 				verify_merkle_branch(
 					execution_header_root,
@@ -746,7 +842,31 @@ pub mod pallet {
 				Error::<T>::InvalidExecutionHeaderProof
 			);
 
-			Ok(ExecutionHeaderAnchor::from_payload_header(&execution_header_proof.execution_header))
+			Ok(anchor)
+		}
+
+		fn release_execution_header_anchor(beacon_root: H256) {
+			let Some(block_hash) = FinalizedExecutionHeaderAnchor::<T>::take(beacon_root) else {
+				return;
+			};
+			let remaining =
+				ExecutionHeaderAnchorReferences::<T>::mutate_exists(block_hash, |count| {
+					let remaining = count.unwrap_or_default().saturating_sub(1);
+					*count = (remaining > 0).then_some(remaining);
+					remaining
+				});
+			if remaining > 0 {
+				return;
+			}
+			let Some(anchor) = ExecutionHeaderAnchors::<T>::take(block_hash) else {
+				return;
+			};
+			ExecutionHeaderAnchorsByBlockNumber::<T>::remove(
+				Self::execution_header_anchor_scan_key(anchor.block_number),
+			);
+			if LatestExecutionHeaderAnchorBlockHash::<T>::get() == Some(block_hash) {
+				LatestExecutionHeaderAnchorBlockHash::<T>::kill();
+			}
 		}
 
 		fn execution_header_anchor_scan_key(
@@ -816,6 +936,9 @@ pub mod pallet {
 
 		/// Returns the fork version based on the current epoch.
 		pub(super) fn select_fork_version(fork_versions: &ForkVersions, epoch: u64) -> ForkVersion {
+			if epoch >= fork_versions.gloas.epoch {
+				return fork_versions.gloas.version;
+			}
 			if epoch >= fork_versions.fulu.epoch {
 				return fork_versions.fulu.version;
 			}
@@ -908,6 +1031,9 @@ pub mod pallet {
 
 		pub fn finalized_root_gindex_at_slot(slot: u64, fork_versions: &ForkVersions) -> usize {
 			let epoch = compute_epoch(slot, Self::slots_per_epoch());
+			if epoch >= fork_versions.gloas.epoch {
+				return config::gloas::FINALIZED_ROOT_INDEX;
+			}
 
 			if epoch >= fork_versions.electra.epoch {
 				return config::electra::FINALIZED_ROOT_INDEX;
@@ -921,6 +1047,9 @@ pub mod pallet {
 			fork_versions: &ForkVersions,
 		) -> usize {
 			let epoch = compute_epoch(slot, Self::slots_per_epoch());
+			if epoch >= fork_versions.gloas.epoch {
+				return config::gloas::CURRENT_SYNC_COMMITTEE_INDEX;
+			}
 
 			if epoch >= fork_versions.electra.epoch {
 				return config::electra::CURRENT_SYNC_COMMITTEE_INDEX;
@@ -934,16 +1063,15 @@ pub mod pallet {
 			fork_versions: &ForkVersions,
 		) -> usize {
 			let epoch = compute_epoch(slot, Self::slots_per_epoch());
+			if epoch >= fork_versions.gloas.epoch {
+				return config::gloas::NEXT_SYNC_COMMITTEE_INDEX;
+			}
 
 			if epoch >= fork_versions.electra.epoch {
 				return config::electra::NEXT_SYNC_COMMITTEE_INDEX;
 			}
 
 			config::altair::NEXT_SYNC_COMMITTEE_INDEX
-		}
-
-		pub fn execution_header_gindex() -> usize {
-			config::altair::EXECUTION_HEADER_INDEX
 		}
 
 		pub fn beacon_preset() -> EthereumBeaconPreset {

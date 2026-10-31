@@ -874,7 +874,7 @@ it.each([v4Purchase, v4Refund])(
     expect(sliceHex(fixture.encodedReceipt as Hex, 0, 1)).toBe('0x02');
     const txHash: Hex = `0x${'aa'.repeat(32)}`;
     const zeroHash: Hex = `0x${'00'.repeat(32)}`;
-    const header = {
+    const headerTemplate = {
       number: toHex(10n),
       hash: zeroHash,
       parentHash: zeroHash,
@@ -894,7 +894,12 @@ it.each([v4Purchase, v4Refund])(
       transactions: [txHash],
       uncles: [],
     } satisfies JSONRPCBlock;
-    header.hash = bytesToHex(createBlockHeaderFromRPC(header).hash());
+    const executionHeader = createBlockHeaderFromRPC(headerTemplate);
+    const header = {
+      ...headerTemplate,
+      ...executionHeader.toJSON(),
+      hash: bytesToHex(executionHeader.hash()),
+    } satisfies JSONRPCBlock;
     const receipt = {
       type: 'eip1559',
       status: 'success',
@@ -996,6 +1001,7 @@ it('builds one combined receipt proof for multiple receipts in the same executio
   const targetBlockHash: Hex = bytesToHex(createBlockHeaderFromRPC(targetBlockTemplate).hash());
   const targetBlock = {
     ...targetBlockTemplate,
+    ...createBlockHeaderFromRPC(targetBlockTemplate).toJSON(),
     hash: targetBlockHash,
   } satisfies JSONRPCBlock;
   const anchorBlockTemplate = {
@@ -1010,6 +1016,7 @@ it('builds one combined receipt proof for multiple receipts in the same executio
   const anchorBlockHash: Hex = bytesToHex(createBlockHeaderFromRPC(anchorBlockTemplate).hash());
   const anchorBlock = {
     ...anchorBlockTemplate,
+    ...createBlockHeaderFromRPC(anchorBlockTemplate).toJSON(),
     hash: anchorBlockHash,
   } satisfies JSONRPCBlock;
   receipt0.blockHash = targetBlockHash;
@@ -1149,6 +1156,7 @@ it('resolves explicit Ethereum log indexes against receipt log metadata', async 
   const targetBlockHash: Hex = bytesToHex(createBlockHeaderFromRPC(targetBlockTemplate).hash());
   const targetBlock = {
     ...targetBlockTemplate,
+    ...createBlockHeaderFromRPC(targetBlockTemplate).toJSON(),
     hash: targetBlockHash,
   } satisfies JSONRPCBlock;
   const anchorBlockTemplate = {
@@ -1163,6 +1171,7 @@ it('resolves explicit Ethereum log indexes against receipt log metadata', async 
   const anchorBlockHash: Hex = bytesToHex(createBlockHeaderFromRPC(anchorBlockTemplate).hash());
   const anchorBlock = {
     ...anchorBlockTemplate,
+    ...createBlockHeaderFromRPC(anchorBlockTemplate).toJSON(),
     hash: anchorBlockHash,
   } satisfies JSONRPCBlock;
   receipt.blockHash = targetBlockHash;
@@ -1295,6 +1304,7 @@ it('shares one execution header chain across multiple proved execution blocks', 
   const olderBlockHash: Hex = bytesToHex(createBlockHeaderFromRPC(olderBlockTemplate).hash());
   const olderBlock = {
     ...olderBlockTemplate,
+    ...createBlockHeaderFromRPC(olderBlockTemplate).toJSON(),
     hash: olderBlockHash,
   } satisfies JSONRPCBlock;
 
@@ -1310,6 +1320,7 @@ it('shares one execution header chain across multiple proved execution blocks', 
   const newerBlockHash: Hex = bytesToHex(createBlockHeaderFromRPC(newerBlockTemplate).hash());
   const newerBlock = {
     ...newerBlockTemplate,
+    ...createBlockHeaderFromRPC(newerBlockTemplate).toJSON(),
     hash: newerBlockHash,
   } satisfies JSONRPCBlock;
   const anchorBlockTemplate = {
@@ -1324,6 +1335,7 @@ it('shares one execution header chain across multiple proved execution blocks', 
   const anchorBlockHash: Hex = bytesToHex(createBlockHeaderFromRPC(anchorBlockTemplate).hash());
   const anchorBlock = {
     ...anchorBlockTemplate,
+    ...createBlockHeaderFromRPC(anchorBlockTemplate).toJSON(),
     hash: anchorBlockHash,
   } satisfies JSONRPCBlock;
 
@@ -1431,6 +1443,7 @@ it('uses an empty shared header path when the target block is the Argon finalize
   const anchorBlockHash: Hex = bytesToHex(createBlockHeaderFromRPC(anchorBlockTemplate).hash());
   const anchorBlock = {
     ...anchorBlockTemplate,
+    ...createBlockHeaderFromRPC(anchorBlockTemplate).toJSON(),
     hash: anchorBlockHash,
   } satisfies JSONRPCBlock;
   receipt.blockHash = anchorBlockHash;

@@ -212,6 +212,7 @@ import type {
   PalletEthereumVerifierSyncCommittee,
   PalletEthereumVerifierSyncCommitteePrepared,
   PalletEthereumVerifierUpdate,
+  PalletEthereumVerifierVersionedExecutionPayloadHeader,
   PalletFeeControlError,
   PalletFeeControlEvent,
   PalletGrandpaCall,
@@ -331,7 +332,6 @@ import type {
   SnowbridgeBeaconPrimitivesExecutionPayloadHeader,
   SnowbridgeBeaconPrimitivesPublicKey,
   SnowbridgeBeaconPrimitivesSignature,
-  SnowbridgeBeaconPrimitivesVersionedExecutionPayloadHeader,
   SnowbridgeMilagroBlsKeysPublicKey,
   SpArithmeticArithmeticError,
   SpConsensusGrandpaAppPublic,
@@ -561,6 +561,7 @@ declare module '@polkadot/types/types/registry' {
     PalletEthereumVerifierSyncCommittee: PalletEthereumVerifierSyncCommittee;
     PalletEthereumVerifierSyncCommitteePrepared: PalletEthereumVerifierSyncCommitteePrepared;
     PalletEthereumVerifierUpdate: PalletEthereumVerifierUpdate;
+    PalletEthereumVerifierVersionedExecutionPayloadHeader: PalletEthereumVerifierVersionedExecutionPayloadHeader;
     PalletFeeControlError: PalletFeeControlError;
     PalletFeeControlEvent: PalletFeeControlEvent;
     PalletGrandpaCall: PalletGrandpaCall;
@@ -680,7 +681,6 @@ declare module '@polkadot/types/types/registry' {
     SnowbridgeBeaconPrimitivesExecutionPayloadHeader: SnowbridgeBeaconPrimitivesExecutionPayloadHeader;
     SnowbridgeBeaconPrimitivesPublicKey: SnowbridgeBeaconPrimitivesPublicKey;
     SnowbridgeBeaconPrimitivesSignature: SnowbridgeBeaconPrimitivesSignature;
-    SnowbridgeBeaconPrimitivesVersionedExecutionPayloadHeader: SnowbridgeBeaconPrimitivesVersionedExecutionPayloadHeader;
     SnowbridgeMilagroBlsKeysPublicKey: SnowbridgeMilagroBlsKeysPublicKey;
     SpArithmeticArithmeticError: SpArithmeticArithmeticError;
     SpConsensusGrandpaAppPublic: SpConsensusGrandpaAppPublic;

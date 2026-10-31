@@ -4,7 +4,6 @@ import {
   type MintingGatewayHashContext,
 } from './EvmContracts';
 import type { ArgonClient, IArgonQueryable } from './index';
-import { createBlockHeaderFromRLP } from '@ethereumjs/block';
 import { createMerkleProof, createMPTFromProof } from '@ethereumjs/mpt';
 import {
   bytesToHex,
@@ -28,6 +27,7 @@ import {
   ArgonFinalizedExecutionHeaderPathError,
   buildExecutionHeaderChain,
   buildEthereumEventProof,
+  decodeExecutionHeaderRlp,
   type EthereumEventLocator,
   type EthereumEventLocatorBlock,
   type EthereumEventProof,
@@ -500,7 +500,7 @@ export async function buildGatewayActivityStorageProofs<
     }
     let executionBlockProof = ancestryByCaptureHeader.get(capture.executionHeaderRlp);
     if (!executionBlockProof) {
-      const captureHeader = createBlockHeaderFromRLP(hexToBytes(capture.executionHeaderRlp));
+      const captureHeader = decodeExecutionHeaderRlp(hexToBytes(capture.executionHeaderRlp));
       const relayAnchor = await loadRetainedExecutionHeaderAnchorAtOrAfterBlock(
         client,
         captureHeader.number,

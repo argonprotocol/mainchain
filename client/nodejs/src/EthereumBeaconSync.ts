@@ -8,14 +8,19 @@ import type {
   EthereumLightClientUpdate,
   EthereumLightClientUpdatesResponse,
 } from './EthereumBeaconTypes';
-import { buildExecutionHeaderProof, getBeaconJson } from './EthereumBeaconApi';
+import {
+  buildExecutionHeaderProof,
+  getBeaconJson,
+  normalizeBeaconStateBranch,
+} from './EthereumBeaconApi';
 import type { ArgonClient } from './index';
+import type { EthereumExecutionSource } from './EthereumExecution';
 import { type Hex, hexToBytes } from 'viem';
 
 type BeaconPreset = 'mainnet' | 'minimal';
 type BeaconNetworkParams = {
+  spec: Record<string, string>;
   epochsPerSyncCommitteePeriod: bigint;
-  preset: BeaconPreset;
   slotsPerEpoch: bigint;
   slotsPerHistoricalRoot: bigint;
 };
@@ -40,11 +45,11 @@ type EthereumBeaconSyncState =
 const lightClientUpdateRetryIntervalMs = 500;
 const lightClientUpdateRetryTimeoutMs = 30_000;
 const expectedBeaconPresetPromises = new WeakMap<ArgonClient, Promise<BeaconPreset | undefined>>();
-const beaconNetworkParamsPromises = new Map<string, Promise<BeaconNetworkParams>>();
 
 export async function getEthereumBeaconSyncBootstrapTx(
   client: ArgonClient,
   beaconApiUrl: string,
+  executionSource?: EthereumExecutionSource,
 ): Promise<SubmittableExtrinsic> {
   const expectedPreset = await getExpectedBeaconPreset(client);
   const [genesis, spec] = await Promise.all([
@@ -85,13 +90,27 @@ export async function getEthereumBeaconSyncBootstrapTx(
     );
   }
 
+  let gloas = { version: '0x00000000', epoch: 18446744073709551615n };
+  if (specData.GLOAS_FORK_VERSION !== undefined || specData.GLOAS_FORK_EPOCH !== undefined) {
+    gloas = buildFork(specData, 'GLOAS');
+  }
+
   return client.tx.ethereumVerifier.forceCheckpoint(
     {
       header: camelcaseKeys(bootstrap.data.header.beacon),
       currentSyncCommittee: camelcaseKeys(bootstrap.data.current_sync_committee),
-      currentSyncCommitteeBranch: bootstrap.data.current_sync_committee_branch,
+      currentSyncCommitteeBranch: normalizeBeaconStateBranch(
+        bootstrap.data.current_sync_committee_branch,
+        bootstrap.data.header.beacon.slot,
+        specData,
+        'committee',
+      ),
       validatorsRoot: genesis.data.genesis_validators_root,
-      executionHeaderProof: buildExecutionHeaderProof(bootstrap.data.header),
+      executionHeaderProof: await buildExecutionHeaderProof(
+        bootstrap.data.header,
+        executionSource,
+        specData,
+      ),
     },
     {
       genesis: {
@@ -104,6 +123,7 @@ export async function getEthereumBeaconSyncBootstrapTx(
       deneb: buildFork(specData, 'DENEB'),
       electra: buildFork(specData, 'ELECTRA'),
       fulu: buildFork(specData, 'FULU'),
+      gloas,
     },
   );
 }
@@ -111,6 +131,7 @@ export async function getEthereumBeaconSyncBootstrapTx(
 export async function getNextEthereumBeaconSyncTxs(
   client: ArgonClient,
   beaconApiUrl: string,
+  executionSource?: EthereumExecutionSource,
 ): Promise<SubmittableExtrinsic[]> {
   const state = await getEthereumBeaconSyncState(client);
 
@@ -119,7 +140,11 @@ export async function getNextEthereumBeaconSyncTxs(
   }
 
   const expectedPreset = await getExpectedBeaconPreset(client);
-  const beaconNetworkParams = await getBeaconNetworkParams(beaconApiUrl, expectedPreset);
+  const { data: spec } = await getBeaconJson<EthereumBeaconConfigSpecResponse>(
+    beaconApiUrl,
+    '/eth/v1/config/spec',
+  );
+  const beaconNetworkParams = parseBeaconNetworkParams(spec, expectedPreset);
   const storedPeriod = computePeriod(state.latestFinalizedSlot, beaconNetworkParams);
   const maxBridgeableFinalizedSlot =
     state.latestFinalizedSlot + beaconNetworkParams.slotsPerHistoricalRoot;
@@ -251,25 +276,36 @@ export async function getNextEthereumBeaconSyncTxs(
         fillsMissingNextSyncCommittee ||
         advancesKnownSyncCommitteePeriod
       ) {
-        const nextSyncCommitteeUpdate = includesNextSyncCommittee
-          ? {
-              nextSyncCommitteeUpdate: {
-                nextSyncCommittee: camelcaseKeys(submitUpdate.next_sync_committee!),
-                nextSyncCommitteeBranch: submitUpdate.next_sync_committee_branch!,
-              },
-            }
-          : {};
-        txs.push(
-          client.tx.ethereumVerifier.submit({
-            attestedHeader: camelcaseKeys(submitUpdate.attested_header.beacon),
-            syncAggregate: camelcaseKeys(submitUpdate.sync_aggregate),
-            signatureSlot: submitUpdate.signature_slot,
-            ...nextSyncCommitteeUpdate,
-            finalizedHeader: camelcaseKeys(submitUpdate.finalized_header.beacon),
-            finalityBranch: submitUpdate.finality_branch,
-            executionHeaderProof: buildExecutionHeaderProof(submitUpdate.finalized_header),
-          }),
-        );
+        const update: Parameters<typeof client.tx.ethereumVerifier.submit>[0] = {
+          attestedHeader: camelcaseKeys(submitUpdate.attested_header.beacon),
+          syncAggregate: camelcaseKeys(submitUpdate.sync_aggregate),
+          signatureSlot: submitUpdate.signature_slot,
+          finalizedHeader: camelcaseKeys(submitUpdate.finalized_header.beacon),
+          finalityBranch: normalizeBeaconStateBranch(
+            submitUpdate.finality_branch,
+            submitUpdate.attested_header.beacon.slot,
+            beaconNetworkParams.spec,
+            'finality',
+          ),
+          executionHeaderProof: await buildExecutionHeaderProof(
+            submitUpdate.finalized_header,
+            executionSource,
+            beaconNetworkParams.spec,
+          ),
+        };
+        if (includesNextSyncCommittee) {
+          update.nextSyncCommitteeUpdate = {
+            nextSyncCommittee: camelcaseKeys(submitUpdate.next_sync_committee!),
+            nextSyncCommitteeBranch: normalizeBeaconStateBranch(
+              submitUpdate.next_sync_committee_branch!,
+              submitUpdate.attested_header.beacon.slot,
+              beaconNetworkParams.spec,
+              'committee',
+            ),
+          };
+        }
+
+        txs.push(client.tx.ethereumVerifier.submit(update));
       }
     }
 
@@ -384,31 +420,6 @@ function detectBeaconPreset(spec: Record<string, string>): BeaconPreset {
   return spec.SLOTS_PER_HISTORICAL_ROOT === '64' ? 'minimal' : 'mainnet';
 }
 
-async function getBeaconNetworkParams(
-  beaconApiUrl: string,
-  expectedPreset?: BeaconPreset,
-): Promise<BeaconNetworkParams> {
-  let paramsPromise = beaconNetworkParamsPromises.get(beaconApiUrl);
-
-  if (!paramsPromise) {
-    paramsPromise = getBeaconJson<EthereumBeaconConfigSpecResponse>(
-      beaconApiUrl,
-      '/eth/v1/config/spec',
-    ).then(({ data }) => parseBeaconNetworkParams(data));
-    beaconNetworkParamsPromises.set(beaconApiUrl, paramsPromise);
-  }
-
-  const beaconNetworkParams = await paramsPromise;
-
-  if (expectedPreset && beaconNetworkParams.preset !== expectedPreset) {
-    throw new Error(
-      `Beacon preset mismatch: chain expects ${expectedPreset}, but endpoint reports ${beaconNetworkParams.preset}`,
-    );
-  }
-
-  return beaconNetworkParams;
-}
-
 function parseBeaconNetworkParams(
   spec: Record<string, string>,
   expectedPreset?: BeaconPreset,
@@ -436,7 +447,7 @@ function parseBeaconNetworkParams(
   }
 
   return {
-    preset,
+    spec,
     slotsPerEpoch: BigInt(slotsPerEpoch),
     epochsPerSyncCommitteePeriod: BigInt(epochsPerSyncCommitteePeriod),
     slotsPerHistoricalRoot: BigInt(slotsPerHistoricalRoot),
@@ -447,21 +458,13 @@ async function getExpectedBeaconPreset(client: ArgonClient): Promise<BeaconPrese
   let presetPromise = expectedBeaconPresetPromises.get(client);
 
   if (!presetPromise) {
-    const beaconPresetQuery = (
-      client.query.ethereumVerifier as {
-        beaconPreset?: () => Promise<{
-          isMainnet: boolean;
-          isMinimal: boolean;
-          toString(): string;
-        }>;
-      }
-    ).beaconPreset;
+    const beaconPresetQuery = client.query.ethereumVerifier.beaconPreset;
 
     if (!beaconPresetQuery) {
       return;
     }
 
-    presetPromise = beaconPresetQuery.call(client.query.ethereumVerifier).then(preset => {
+    presetPromise = beaconPresetQuery().then(preset => {
       if (preset.isMainnet) {
         return 'mainnet';
       }
