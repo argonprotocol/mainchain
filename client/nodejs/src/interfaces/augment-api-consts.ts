@@ -726,6 +726,10 @@ declare module '@polkadot/api-base/types/consts' {
       upstreamBitcoinTarget: u128 & AugmentedConst<ApiType>;
       upstreamBitcoinWeight: Permill & AugmentedConst<ApiType>;
       upstreamBondTarget: u128 & AugmentedConst<ApiType>;
+      /**
+       * Maximum share of the full bid pool paid for vault Bitcoin participation.
+       **/
+      vaultBitcoinRewardPercent: Permill & AugmentedConst<ApiType>;
     };
     txPause: {
       /**
