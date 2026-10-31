@@ -118,6 +118,9 @@ where
 
 #[frame_support::pallet]
 pub mod pallet {
+	// FRAME's generated call enum carries a fixed-size price record; keep it inline.
+	#![allow(clippy::large_enum_variant)]
+
 	use sp_arithmetic::FixedPointNumber;
 
 	use argon_primitives::{MiningFrameTransitionProvider, PriceProvider};
