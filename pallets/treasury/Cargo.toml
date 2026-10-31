@@ -26,6 +26,8 @@ pallet-operational-accounts = { workspace = true }
 pallet-treasury-positions = { workspace = true }
 
 [dev-dependencies]
+pallet-mint = { workspace = true, default-features = true }
+pallet-stabilizer-buys = { path = "../stabilizer_buys", default-features = true }
 polkadot-sdk = { workspace = true, features = ["sp-io", "pallet-balances"], default-features = true }
 pallet-prelude = { workspace = true, features = ["test"], default-features = true }
 

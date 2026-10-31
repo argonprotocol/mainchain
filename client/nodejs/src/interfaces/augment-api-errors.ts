@@ -1287,6 +1287,10 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       InvalidEthereumPrices: AugmentedError<ApiType>;
       /**
+       * A supplied USDC observation must be positive and no later than the current tick.
+       **/
+      InvalidUsdcPrice: AugmentedError<ApiType>;
+      /**
        * Change in argon price is too large
        **/
       MaxPriceChangePerTickExceeded: AugmentedError<ApiType>;
@@ -1336,6 +1340,40 @@ declare module '@polkadot/api-base/types/errors' {
        * A call which is incompatible with the proxy type's filter was attempted.
        **/
       Unproxyable: AugmentedError<ApiType>;
+    };
+    stabilizerBuys: {
+      /**
+       * No auction exists for the supplied admission frame.
+       **/
+      AuctionNotFound: AugmentedError<ApiType>;
+      /**
+       * An auction scheduled for allocation lacks its reservation or maturity anchor.
+       **/
+      AuctionNotReady: AugmentedError<ApiType>;
+      /**
+       * The call is outside F+1 or the auction no longer accepts bids.
+       **/
+      BiddingClosed: AugmentedError<ApiType>;
+      /**
+       * Positive submissions are exhausted; zero may still opt out.
+       **/
+      BidLimitReached: AugmentedError<ApiType>;
+      /**
+       * A positive rate produces zero whole microgons against the matching basis.
+       **/
+      BidRoundsToZero: AugmentedError<ApiType>;
+      /**
+       * A positive bid repeats the account's current rate.
+       **/
+      BidUnchanged: AugmentedError<ApiType>;
+      /**
+       * The account has no purchase bucket for this auction.
+       **/
+      EntryNotFound: AugmentedError<ApiType>;
+      /**
+       * The scheduled account has no mature principal or committed reward to pay.
+       **/
+      PayoutNotReady: AugmentedError<ApiType>;
     };
     sudo: {
       /**

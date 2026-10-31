@@ -48,7 +48,9 @@ pub mod amount_rank;
 pub mod bitcoin;
 pub mod note;
 pub mod notebook;
+pub mod price_index;
 pub mod providers;
+pub use price_index::PriceIndex;
 pub mod tick;
 pub mod treasury;
 
@@ -78,7 +80,7 @@ pub const ADDRESS_PREFIX: u16 = Ss58AddressFormatRegistry::SubstrateAccount as u
 
 /// Balance of an account.
 pub type Balance = u128;
-pub use amount_rank::AmountRankKey;
+pub use amount_rank::{AmountRankKey, AscendingRankKey};
 
 /// Index of a transaction in the chain.
 pub type Nonce = u32;

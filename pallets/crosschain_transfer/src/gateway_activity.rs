@@ -1,6 +1,7 @@
 use alloc::{boxed::Box, vec::Vec};
 use argon_primitives::{
-	AccountId as ArgonAccountId, EthereumBlockNumber, OperationalAccountsHook, TickProvider,
+	ethereum::UniswapPurchase, AccountId as ArgonAccountId, EthereumBlockNumber,
+	OperationalAccountsHook, TickProvider, UniswapPurchaseProvider,
 };
 use frame_support::{
 	ensure,
@@ -29,6 +30,7 @@ pub(crate) enum DecodedGatewayActivity<T: Config> {
 		gateway_state: GatewayState<T>,
 	},
 	TransferToArgonFromSwap {
+		chain_id: u64,
 		buyer: H160,
 		gateway: H160,
 		token: H160,
@@ -626,6 +628,7 @@ impl<T: Config> Pallet<T> {
 				Self::apply_transfer_to_argon_activity(context, from, asset, to, amount)
 			},
 			DecodedGatewayActivity::TransferToArgonFromSwap {
+				chain_id,
 				buyer,
 				gateway,
 				token,
@@ -654,6 +657,20 @@ impl<T: Config> Pallet<T> {
 					GatewayActivityApplyError::Reject(Error::<T>::InvalidGatewayActivity.into())
 				})?;
 				let purchase_tick = T::TickProvider::ticker().tick_for_time(timestamp_millis);
+				T::UniswapPurchaseProvider::record_transferred_purchase(
+					&to,
+					&UniswapPurchase {
+						chain_id,
+						pool_manager: purchase.pool_manager,
+						pool_id: purchase.pool_id,
+						usdc_token: purchase.usdc_token,
+						usdc_spent: purchase.usdc_spent,
+						principal: amount.into(),
+						sqrt_price_before_x96: purchase.sqrt_price_before_x96,
+						sqrt_price_after_x96: purchase.sqrt_price_after_x96,
+						tick: purchase_tick,
+					},
+				)?;
 				Self::deposit_event(Event::TransferToArgonFromSwapSettled {
 					source_chain,
 					purchase,
@@ -785,6 +802,107 @@ mod test {
 		frame_support::traits::{OnFinalize, OnInitialize},
 		sp_io::hashing::keccak_256,
 	};
+
+	#[test]
+	fn proved_purchases_hold_principal_atomically_and_cannot_replay() {
+		use crate::mock::StabilizerBuys;
+		use argon_primitives::{PriceIndex, PriceIndexUpdated};
+		use frame_support::storage::with_storage_layer;
+		use pallet_stabilizer_buys::{
+			ApprovedPool, BuysByAccount, HoldReason, PurchasePool, PurchasesByAccount,
+		};
+		new_test_ext().execute_with(|| {
+			System::set_block_number(1);
+			CurrentTick::set(100);
+			CurrentFrameId::set(1);
+			assert_ok!(CrosschainTransfer::set_chain_config(
+				RuntimeOrigin::root(),
+				SourceChain::Ethereum,
+				chain_config()
+			));
+			ApprovedPool::<Test>::put(PurchasePool {
+				chain_id: 1,
+				pool_manager: h160(0x51),
+				pool_id: H256::repeat_byte(0x61),
+				usdc_token: h160(0x41),
+				argon_is_token0: true,
+			});
+			StabilizerBuys::on_price_index(&PriceIndex {
+				tick: 60,
+				btc_usd_price: FixedU128::from_u32(60_000),
+				argonot_usd_price: FixedU128::one(),
+				argon_usd_price: FixedU128::one(),
+				argon_usd_target_price: FixedU128::one(),
+				argon_time_weighted_average_liquidity: 1,
+				usdc_usd_price: Some(FixedU128::one()),
+			});
+			let burn = CrosschainTransfer::burn_account(SourceChain::Ethereum);
+			assert_ok!(Balances::mint_into(&burn, 100_000_000));
+			let owner = account(2);
+			let log = purchase_activity_log(owner.clone(), 1, 100_000_000, 0, 60);
+			let mut event = TransferToArgonFromSwapStarted::decode_raw_log_validate(
+				log.topics.iter().map(|t| t.0),
+				&log.data,
+			)
+			.unwrap();
+			event.purchase.usdcSpent = alloy_primitives::U256::from(90_000_000);
+			event.purchase.sqrtPriceBeforeX96 = U160::from(1u128 << 76);
+			event.purchase.sqrtPriceAfterX96 = U160::from(1u128 << 77);
+			let log = EthereumLog { data: event.encode_data().try_into().unwrap(), ..log };
+			let proof = proof_batch(vec![activity_logs(vec![log])]);
+			assert_noop!(
+				with_storage_layer(|| -> DispatchResult {
+					CrosschainTransfer::prove_gateway_activity(
+						RuntimeOrigin::signed(account(1)),
+						SourceChain::Ethereum,
+						0,
+						proof.clone(),
+					)
+					.map_err(|error| error.error)?;
+					assert_eq!(
+						Balances::balance_on_hold(&HoldReason::PurchasePrincipal.into(), &owner),
+						100_000_000
+					);
+					Err(DispatchError::Other("outer failure"))
+				}),
+				DispatchError::Other("outer failure")
+			);
+			assert_eq!(Balances::balance(&burn), 100_000_000);
+			assert!(!BuysByAccount::<Test>::contains_key(&owner));
+			assert!(PurchasesByAccount::<Test>::iter_prefix(&owner).next().is_none());
+			assert_ok!(CrosschainTransfer::prove_gateway_activity(
+				RuntimeOrigin::signed(account(1)),
+				SourceChain::Ethereum,
+				0,
+				proof.clone()
+			));
+			assert_eq!(
+				PurchasesByAccount::<Test>::get(&owner, 1u64.to_be_bytes())
+					.unwrap()
+					.captured_discount,
+				10_000_000
+			);
+			assert_eq!(
+				Balances::balance_on_hold(&HoldReason::PurchasePrincipal.into(), &owner),
+				100_000_000
+			);
+			assert_eq!(
+				TransferTotalsByAccount::<Test>::get(&owner),
+				AccountTransferTotals::default()
+			);
+			assert!(CrosschainTransfer::prove_gateway_activity(
+				RuntimeOrigin::signed(account(1)),
+				SourceChain::Ethereum,
+				0,
+				proof
+			)
+			.is_err());
+			assert_eq!(
+				Balances::balance_on_hold(&HoldReason::PurchasePrincipal.into(), &owner),
+				100_000_000
+			);
+		});
+	}
 
 	#[test]
 	fn purchases_keep_evidence_and_source_time_without_operational_credit() {

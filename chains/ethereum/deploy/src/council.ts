@@ -5,7 +5,7 @@ import {
   type ArgonClient,
   type ArgonPrimitivesVault,
   type FrameSupportTokensMiscIdAmountRuntimeHoldReason,
-  type PalletPriceIndexPriceIndex,
+  type ArgonPrimitivesPriceIndex,
   type u128,
   type u64,
 } from '@argonprotocol/mainchain';
@@ -222,7 +222,7 @@ function getCommittedSecuritization(args: {
 function getLowestMicrogonsPerArgonot(args: {
   councilRotationFrames: bigint;
   currentFrameId: bigint;
-  currentPriceIndex: PalletPriceIndexPriceIndex;
+  currentPriceIndex: ArgonPrimitivesPriceIndex;
   historicArgonotFloorByFrame: BTreeMap<u64, u128>;
 }) {
   const currentMicrogonsPerArgonot = getCurrentMicrogonsPerArgonot(args.currentPriceIndex);
@@ -246,7 +246,7 @@ function getLowestMicrogonsPerArgonot(args: {
   return lowest;
 }
 
-function getCurrentMicrogonsPerArgonot(priceIndex: PalletPriceIndexPriceIndex) {
+function getCurrentMicrogonsPerArgonot(priceIndex: ArgonPrimitivesPriceIndex) {
   const argonUsdPrice = priceIndex.argonUsdPrice.toBigInt();
   const argonotUsdPrice = priceIndex.argonotUsdPrice.toBigInt();
 

@@ -28,9 +28,9 @@ async function fixture() {
     deployUniswap('TestERC20', [1n << 120n]),
     deployUniswap('TestERC20', [1n << 120n]),
   ]);
-  tokens.sort((a, b) =>
-    String(a.target).toLowerCase().localeCompare(String(b.target).toLowerCase()),
-  );
+  if (BigInt(await tokens[0].getAddress()) > BigInt(await tokens[1].getAddress())) {
+    tokens.reverse();
+  }
   for (const token of tokens) {
     await (await token.approve(liquidityRouter.target, ethers.MaxUint256)).wait();
     await (await token.approve(swapRouter.target, ethers.MaxUint256)).wait();
@@ -46,7 +46,7 @@ async function fixture() {
       500,
       10,
     )
-  ).data!;
+  ).data;
   const initCodeHash = ethers.keccak256(initCode);
   let salt = 0n;
   let hookAddress: string;

@@ -50,7 +50,7 @@ pub use pallet_prelude::benchmarking::{
 	BenchmarkOperationalAccountsProviderState, BenchmarkOperationalRewardsPayer,
 	BenchmarkOperationalRewardsProvider, BenchmarkOperationalRewardsProviderState,
 	BenchmarkPriceProvider, BenchmarkPriceProviderState, BenchmarkTickProvider,
-	BenchmarkTreasuryPositionProvider,
+	BenchmarkTreasuryPositionProvider, BenchmarkTreasuryRewardProvider,
 };
 use pallet_prelude::DispatchResult;
 

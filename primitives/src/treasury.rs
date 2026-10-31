@@ -6,6 +6,52 @@ use polkadot_sdk::{
 };
 use scale_info::TypeInfo;
 
+/// Treasury-owned unissued funding. All mutations, including payout delivery, must use runtime
+/// storage so that funding, currency and auction state share the caller's transaction boundary.
+pub trait TreasuryRewardProvider<AccountId> {
+	type Balance;
+	type Weights: TreasuryRewardProviderWeightInfo;
+
+	/// Available microgons, excluding auction reservations and committed rewards.
+	fn available_budget() -> Self::Balance;
+	/// Reserve microgons for one auction without issuing currency.
+	fn reserve_budget(amount: Self::Balance) -> DispatchResult;
+	/// Move reserved microgons into Treasury's outstanding reward total.
+	fn commit_reward(amount: Self::Balance) -> DispatchResult;
+	/// Restore unused reserved microgons to available funding.
+	fn return_budget(amount: Self::Balance) -> DispatchResult;
+	/// Deliver a mature reward to its owner and debit the outstanding total exactly once.
+	/// Runtime integration chooses direct payment or an exact credit to Collect. If the owner
+	/// cannot receive a small payment yet, return an error so the exact amount remains queued.
+	fn pay_reward(account: &AccountId, amount: Self::Balance) -> DispatchResult;
+}
+
+pub trait TreasuryRewardProviderWeightInfo {
+	fn available_budget() -> Weight;
+	fn reserve_budget() -> Weight;
+	fn commit_reward() -> Weight;
+	fn return_budget() -> Weight;
+	fn pay_reward() -> Weight;
+}
+
+impl TreasuryRewardProviderWeightInfo for () {
+	fn available_budget() -> Weight {
+		Weight::zero()
+	}
+	fn reserve_budget() -> Weight {
+		Weight::zero()
+	}
+	fn commit_reward() -> Weight {
+		Weight::zero()
+	}
+	fn return_budget() -> Weight {
+		Weight::zero()
+	}
+	fn pay_reward() -> Weight {
+		Weight::zero()
+	}
+}
+
 /// Whole token units in one bond lot or vault's admission state.
 pub type Bonds = u32;
 /// Whole token units aggregated across account bonds or stakes.

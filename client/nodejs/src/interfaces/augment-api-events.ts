@@ -18,9 +18,10 @@ import type {
   u16,
   u32,
   u64,
+  u8,
 } from '@polkadot/types-codec';
 import type { ITuple } from '@polkadot/types-codec/types';
-import type { AccountId32, H160, H256, Percent } from '@polkadot/types/interfaces/runtime';
+import type { AccountId32, H160, H256, Percent, Permill } from '@polkadot/types/interfaces/runtime';
 import type {
   ArgonNotaryAuditErrorVerifyError,
   ArgonPrimitivesBitcoinUtxoRef,
@@ -51,8 +52,11 @@ import type {
   PalletMintMintType,
   PalletMultisigTimepoint,
   PalletProxyDepositKind,
+  PalletStabilizerBuysIneligibleReason,
+  PalletStabilizerBuysUniswapPurchasePurchasePool,
   PalletTreasuryBondProgramId,
   PalletTreasuryBondReleaseReason,
+  PalletTreasuryRewardReserveBalances,
   SpConsensusGrandpaAppPublic,
   SpRuntimeDispatchError,
 } from '@polkadot/types/lookup';
@@ -1851,6 +1855,64 @@ declare module '@polkadot/api-base/types/events' {
         }
       >;
     };
+    stabilizerBuys: {
+      ApprovedPoolChanged: AugmentedEvent<
+        ApiType,
+        [pool: Option<PalletStabilizerBuysUniswapPurchasePurchasePool>],
+        { pool: Option<PalletStabilizerBuysUniswapPurchasePurchasePool> }
+      >;
+      AuctionAllocationFailed: AugmentedEvent<
+        ApiType,
+        [admissionFrame: u64, error: SpRuntimeDispatchError],
+        { admissionFrame: u64; error: SpRuntimeDispatchError }
+      >;
+      AuctionFundingFailed: AugmentedEvent<
+        ApiType,
+        [admissionFrame: u64, error: SpRuntimeDispatchError],
+        { admissionFrame: u64; error: SpRuntimeDispatchError }
+      >;
+      AuctionOpened: AugmentedEvent<
+        ApiType,
+        [admissionFrame: u64, budget: u128],
+        { admissionFrame: u64; budget: u128 }
+      >;
+      AuctionSettled: AugmentedEvent<
+        ApiType,
+        [admissionFrame: u64, awarded: u128, returned: u128],
+        { admissionFrame: u64; awarded: u128; returned: u128 }
+      >;
+      BidSubmitted: AugmentedEvent<
+        ApiType,
+        [account: AccountId32, admissionFrame: u64, rewardRate: Percent, positiveBidCount: u8],
+        { account: AccountId32; admissionFrame: u64; rewardRate: Percent; positiveBidCount: u8 }
+      >;
+      MatchingRateChanged: AugmentedEvent<ApiType, [rate: Permill], { rate: Permill }>;
+      PayoutCompleted: AugmentedEvent<
+        ApiType,
+        [account: AccountId32, principal: u128, reward: u128],
+        { account: AccountId32; principal: u128; reward: u128 }
+      >;
+      PayoutFailed: AugmentedEvent<
+        ApiType,
+        [account: AccountId32, error: SpRuntimeDispatchError],
+        { account: AccountId32; error: SpRuntimeDispatchError }
+      >;
+      PurchaseIneligible: AugmentedEvent<
+        ApiType,
+        [account: AccountId32, purchaseTick: u64, reason: PalletStabilizerBuysIneligibleReason],
+        { account: AccountId32; purchaseTick: u64; reason: PalletStabilizerBuysIneligibleReason }
+      >;
+      PurchaseRecorded: AugmentedEvent<
+        ApiType,
+        [account: AccountId32, admissionFrame: u64, principal: u128, matchingBasis: u128],
+        { account: AccountId32; admissionFrame: u64; principal: u128; matchingBasis: u128 }
+      >;
+      RewardAwarded: AugmentedEvent<
+        ApiType,
+        [account: AccountId32, admissionFrame: u64, amount: u128, maturesAtTick: u64],
+        { account: AccountId32; admissionFrame: u64; amount: u128; maturesAtTick: u64 }
+      >;
+    };
     sudo: {
       /**
        * The sudo key has been updated.
@@ -2153,6 +2215,11 @@ declare module '@polkadot/api-base/types/events' {
         ApiType,
         [targetBitcoinPercent: Percent, upstreamParticipationFactor: Percent],
         { targetBitcoinPercent: Percent; upstreamParticipationFactor: Percent }
+      >;
+      RewardReservesUpdated: AugmentedEvent<
+        ApiType,
+        [reserves: PalletTreasuryRewardReserveBalances],
+        { reserves: PalletTreasuryRewardReserveBalances }
       >;
     };
     txPause: {

@@ -79,14 +79,20 @@ fn accepts_base_and_ethereum_price_submissions() {
 
 		let mut index = old_index;
 		index.tick = 1;
+		index.usdc_usd_price = Some(FixedU128::from_rational(98, 100));
+		CurrentTick::set(1);
 		let ethereum = EthereumPriceIndex {
 			ethereum_usd_price: FixedU128::from_u32(3_000),
 			ethereum_gas_price_wei: 2_000_000_000,
 			tick: index.tick,
 		};
-		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), index, Some(ethereum),));
+		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), index, Some(ethereum)));
 		assert_eq!(Current::<Test>::get(), Some(index));
 		assert_eq!(CurrentEthereumPrice::<Test>::get(), Some(ethereum));
+		assert_eq!(
+			Current::<Test>::get().unwrap().usdc_usd_price,
+			Some(FixedU128::from_rational(98, 100))
+		);
 		assert_eq!(
 			<PriceIndex as PriceProvider<u128>>::get_average_ethereum_prices(10),
 			Some((FixedU128::from_u32(3_000), 2_000_000_000)),
@@ -98,7 +104,8 @@ fn accepts_base_and_ethereum_price_submissions() {
 
 		let mut index_without_ethereum = index;
 		index_without_ethereum.tick += 1;
-		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), index_without_ethereum, None,));
+		CurrentTick::set(index_without_ethereum.tick);
+		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), index_without_ethereum, None));
 		assert_eq!(CurrentEthereumPrice::<Test>::get(), Some(ethereum));
 		assert_eq!(
 			<PriceIndex as PriceProvider<u128>>::get_average_ethereum_prices(10),
@@ -111,7 +118,7 @@ fn accepts_base_and_ethereum_price_submissions() {
 }
 
 #[test]
-fn rejects_ethereum_prices_for_a_different_tick() {
+fn rejects_invalid_price_observations() {
 	new_test_ext(Some(1)).execute_with(|| {
 		let index = create_index();
 		let ethereum = EthereumPriceIndex {
@@ -121,11 +128,30 @@ fn rejects_ethereum_prices_for_a_different_tick() {
 		};
 
 		assert_err!(
-			PriceIndex::submit(RuntimeOrigin::signed(1), index, Some(ethereum),),
+			PriceIndex::submit(RuntimeOrigin::signed(1), index, Some(ethereum)),
 			Error::InvalidEthereumPrices,
 		);
 		assert_eq!(Current::<Test>::get(), None);
 		assert_eq!(CurrentEthereumPrice::<Test>::get(), None);
+		assert_err!(
+			PriceIndex::submit(
+				RuntimeOrigin::signed(1),
+				PriceIndexEntry { usdc_usd_price: Some(FixedU128::zero()), ..index },
+				None
+			),
+			Error::InvalidUsdcPrice
+		);
+		let future = PriceIndexEntry { tick: 1, ..index };
+		assert_err!(
+			PriceIndex::submit(
+				RuntimeOrigin::signed(1),
+				PriceIndexEntry { usdc_usd_price: Some(FixedU128::one()), ..future },
+				None
+			),
+			Error::InvalidUsdcPrice
+		);
+		assert_eq!(Current::<Test>::get(), None);
+		assert!(Current::<Test>::get().is_none());
 	});
 }
 
@@ -317,7 +343,7 @@ fn buckets_transition_block_floor_samples_under_the_new_frame() {
 		let mut transition_block_index = index;
 		transition_block_index.tick = 13;
 		transition_block_index.argonot_usd_price = FixedU128::from_u32(3);
-		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), transition_block_index, None,));
+		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), transition_block_index, None));
 
 		let history = HistoricArgonotFloorByFrame::<Test>::get();
 		assert_eq!(history.get(&1), Some(&(2 * MICROGONS_PER_ARGON)));
@@ -473,6 +499,7 @@ fn can_convert_argon_prices() {
 			argon_usd_target_price: FixedU128::from_float(1.00),
 			argonot_usd_price: FixedU128::from_float(2.00),
 			argon_time_weighted_average_liquidity: 100_000_000,
+			usdc_usd_price: None,
 		};
 		Current::<Test>::put(index);
 
@@ -507,6 +534,7 @@ fn clamps_argon_price_changes_away_from_target() {
 			argon_usd_target_price: FixedU128::from_float(1.00),
 			argonot_usd_price: FixedU128::from_float(2.00),
 			argon_time_weighted_average_liquidity: 100_000_000,
+			usdc_usd_price: None,
 		};
 		Current::<Test>::put(base_entry);
 		MaxPriceAgeInTicks::set(10);
@@ -552,6 +580,7 @@ fn clamps_argon_target_price_changes() {
 			argon_usd_target_price: FixedU128::from_float(1.00),
 			argonot_usd_price: FixedU128::from_float(2.00),
 			argon_time_weighted_average_liquidity: 100_000_000,
+			usdc_usd_price: None,
 		};
 		Current::<Test>::put(base_entry);
 		MaxPriceAgeInTicks::set(10);
@@ -625,5 +654,40 @@ fn create_index() -> PriceIndexEntry {
 		argon_usd_target_price: FixedU128::from_float(1.0),
 		argonot_usd_price: FixedU128::from_float(2.00),
 		argon_time_weighted_average_liquidity: 100_000_000,
+		usdc_usd_price: None,
 	}
+}
+
+#[test]
+fn migrates_current_and_last_valid_prices_without_inventing_usdc() {
+	use argon_primitives::price_index::PriceIndexV1;
+	new_test_ext(Some(1)).execute_with(|| {
+		let old = PriceIndexV1 {
+			btc_usd_price: FixedU128::from_u32(60_000),
+			argonot_usd_price: FixedU128::from_u32(2),
+			argon_usd_price: FixedU128::from_rational(98, 100),
+			argon_usd_target_price: FixedU128::one(),
+			argon_time_weighted_average_liquidity: 50_000,
+			tick: 5,
+		};
+		assert_eq!(PriceIndexEntry::decode_compatible(&old.encode()).unwrap(), old.into());
+		frame_support::storage::unhashed::put(&Current::<Test>::hashed_key(), &old);
+		frame_support::storage::unhashed::put(&crate::LastValid::<Test>::hashed_key(), &old);
+		StorageVersion::new(1).put::<PriceIndex>();
+		crate::migrations::add_usdc::<Test>();
+		assert_eq!(Current::<Test>::get(), Some(old.into()));
+		assert_eq!(crate::LastValid::<Test>::get(), Some(old.into()));
+		assert_eq!(StorageVersion::get::<PriceIndex>(), StorageVersion::new(2));
+		CurrentTick::set(6);
+		let mut next: PriceIndexEntry = old.into();
+		next.tick = 6;
+		next.usdc_usd_price = Some(FixedU128::from_rational(99, 100));
+		assert_eq!(PriceIndexEntry::decode_compatible(&next.encode()).unwrap(), next);
+		let mut unsupported = next.encode();
+		unsupported.push(0);
+		assert!(PriceIndexEntry::decode_compatible(&unsupported).is_err());
+		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), next, None));
+		crate::migrations::add_usdc::<Test>();
+		assert_eq!(Current::<Test>::get(), Some(next));
+	});
 }

@@ -27,19 +27,42 @@ mod benchmarks {
 	#[benchmark]
 	fn submit() -> Result<(), BenchmarkError> {
 		let caller: T::AccountId = whitelisted_caller();
-		let index = benchmark_price_index(1);
+		let bucket_ticks = 60;
+		let mut index = benchmark_price_index(48 * bucket_ticks);
+		index.usdc_usd_price = Some(FixedU128::one());
+		index.argon_usd_price = FixedU128::from_rational(9, 10);
+		let previous = PriceIndex { tick: index.tick - 1, ..index };
+		Current::<T>::put(previous);
 		let ethereum = EthereumPriceIndex {
 			ethereum_usd_price: FixedU128::from_u32(3_000),
 			ethereum_gas_price_wei: 1_000_000_000,
 			tick: index.tick,
 		};
 		Operator::<T>::put(caller.clone());
+		set_benchmark_bitcoin_locks_runtime_state(BenchmarkBitcoinLocksRuntimeState {
+			current_frame_id: 1,
+			current_tick: index.tick,
+			did_start_new_frame: false,
+		});
+		let mut history = BoundedVec::default();
+		for bucket in (0..48).rev() {
+			history
+				.try_push(CpiMeasurementBucket {
+					tick_range: (bucket * bucket_ticks, (bucket + 1) * bucket_ticks),
+					total_cpi: ArgonCPI::zero(),
+					measurements_count: 1,
+				})
+				.map_err(|_| BenchmarkError::Stop("CPI benchmark history overflow"))?;
+		}
+		HistoricArgonCPI::<T>::put(history);
 
 		#[extrinsic_call]
 		submit(RawOrigin::Signed(caller.clone()), index, Some(ethereum));
 
 		assert_eq!(Current::<T>::get(), Some(index));
+		assert_eq!(LastValid::<T>::get(), Some(previous));
 		assert_eq!(CurrentEthereumPrice::<T>::get(), Some(ethereum));
+
 		assert!(!HistoricEthereumPricesByFrame::<T>::get().is_empty());
 
 		Ok(())
@@ -184,5 +207,6 @@ fn benchmark_price_index(tick: Tick) -> PriceIndex {
 		argon_usd_target_price: FixedU128::from_u32(1),
 		argonot_usd_price: FixedU128::from_u32(2),
 		argon_time_weighted_average_liquidity: 100_000_000,
+		usdc_usd_price: None,
 	}
 }

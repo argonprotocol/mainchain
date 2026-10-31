@@ -14,6 +14,7 @@ publish = false
 targets = ["x86_64-unknown-linux-gnu"]
 
 [dependencies]
+pallet-stabilizer-buys = { workspace = true }
 codec = { workspace = true }
 scale-info = { workspace = true }
 smallvec = { workspace = true }
@@ -121,6 +122,7 @@ std = [
 	"pallet-operational-accounts/std",
 	"pallet-prelude/std",
 	"pallet-price-index/std",
+	"pallet-stabilizer-buys/std",
 	"pallet-ticks/std",
 	"pallet-treasury-positions/std",
 	"pallet-treasury/std",
@@ -155,6 +157,7 @@ runtime-benchmarks = [
 	"pallet-operational-accounts/runtime-benchmarks",
 	"pallet-prelude/runtime-benchmarks",
 	"pallet-price-index/runtime-benchmarks",
+	"pallet-stabilizer-buys/runtime-benchmarks",
 	"pallet-ticks/runtime-benchmarks",
 	"pallet-treasury-positions/runtime-benchmarks",
 	"pallet-treasury/runtime-benchmarks",
@@ -183,6 +186,7 @@ try-runtime = [
 	"pallet-notebook/try-runtime",
 	"pallet-operational-accounts/try-runtime",
 	"pallet-price-index/try-runtime",
+	"pallet-stabilizer-buys/try-runtime",
 	"pallet-ticks/try-runtime",
 	"pallet-treasury-positions/try-runtime",
 	"pallet-treasury/try-runtime",

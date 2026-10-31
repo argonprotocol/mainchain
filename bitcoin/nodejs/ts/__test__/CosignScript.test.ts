@@ -101,6 +101,7 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
       vaulterClient,
       vaulterClient.tx.priceIndex.submit(
         {
+          usdcUsdPrice: null,
           btcUsdPrice: toFixedNumber(60_000.5, FIXED_U128_DECIMALS),
           argonUsdPrice: toFixedNumber(1, FIXED_U128_DECIMALS),
           argonotUsdPrice: toFixedNumber(12, FIXED_U128_DECIMALS),

@@ -1,13 +1,41 @@
+use crate::{tick::Tick, Balance};
 use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use frame_support::{CloneNoBound, DebugNoBound, EqNoBound, PartialEqNoBound};
 use polkadot_sdk::*;
 use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
-use sp_core::{H160, H256};
+use sp_core::{H160, H256, U256};
 use sp_runtime::{
 	traits::{ConstU32, Get},
 	BoundedVec,
 };
+
+/// Authenticated Uniswap v4 purchase facts. Principal is the microgons actually delivered on Argon;
+/// USDC spending includes fees and excludes refunded input. The gateway owns proof and replay
+/// checks.
+#[derive(
+	Encode, Decode, DecodeWithMemTracking, Clone, Debug, PartialEq, Eq, TypeInfo, MaxEncodedLen,
+)]
+pub struct UniswapPurchase {
+	/// Ethereum execution chain ID; scoped together with the pool manager and pool ID.
+	pub chain_id: u64,
+	/// Uniswap v4 PoolManager contract that executed the authenticated swap.
+	pub pool_manager: H160,
+	/// Pool identity within the source chain's manager, committing to tokens, fee and hook.
+	pub pool_id: H256,
+	/// Source-chain USDC contract whose actual spending is reported below.
+	pub usdc_token: H160,
+	/// Actual spending in six-decimal USDC units, including fees and excluding refunds.
+	pub usdc_spent: U256,
+	/// Whole microgons actually delivered to the Argon recipient, after Ethereum unit conversion.
+	pub principal: Balance,
+	/// sqrt(raw token1 / raw token0) immediately before execution, scaled by 2^96; uint160.
+	pub sqrt_price_before_x96: U256,
+	/// The same pool's square-root price immediately after execution, with the same scaling.
+	pub sqrt_price_after_x96: U256,
+	/// Authenticated Ethereum purchase time mapped to an Argon tick, independent of relay arrival.
+	pub tick: Tick,
+}
 
 /// Ethereum logs support up to four indexed topics.
 pub const MAX_ETHEREUM_LOG_TOPICS: u32 = 4;

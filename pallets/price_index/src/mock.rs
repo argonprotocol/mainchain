@@ -70,6 +70,7 @@ impl MiningFrameTransitionProvider for StaticMiningFrameTransitionProvider {
 }
 
 impl pallet_price_index::Config for Test {
+	type OnPriceIndexUpdated = ();
 	type CurrentTick = CurrentTick;
 	type CurrentFrameId = CurrentFrameId;
 	type MiningFrameTransitionProvider = StaticMiningFrameTransitionProvider;

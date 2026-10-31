@@ -21,10 +21,12 @@ import type {
   u8,
 } from '@polkadot/types-codec';
 import type { AnyNumber, ITuple } from '@polkadot/types-codec/types';
-import type { AccountId32, H160, H256, Percent } from '@polkadot/types/interfaces/runtime';
+import type { AccountId32, H160, H256, Percent, Permill } from '@polkadot/types/interfaces/runtime';
 import type {
   ArgonNotaryAuditErrorVerifyError,
   ArgonPrimitivesAmountRankAmountRankKey,
+  ArgonPrimitivesAmountRankAscendingRankKeyAccountId32,
+  ArgonPrimitivesAmountRankAscendingRankKeyU64,
   ArgonPrimitivesBalanceChangeAccountOrigin,
   ArgonPrimitivesBitcoinBitcoinBlock,
   ArgonPrimitivesBitcoinBitcoinCosignScriptPubkey,
@@ -48,6 +50,7 @@ import type {
   ArgonPrimitivesNotaryNotaryNotebookKeyDetails,
   ArgonPrimitivesNotaryNotaryNotebookVoteDigestDetails,
   ArgonPrimitivesNotaryNotaryRecord,
+  ArgonPrimitivesPriceIndex,
   ArgonPrimitivesProvidersBlockSealerInfo,
   ArgonPrimitivesTickTicker,
   ArgonPrimitivesTreasuryNetworkPositionQuantities,
@@ -108,9 +111,13 @@ import type {
   PalletPriceIndexCpiMeasurementBucket,
   PalletPriceIndexEthereumPriceFrameAccumulator,
   PalletPriceIndexEthereumPriceIndex,
-  PalletPriceIndexPriceIndex,
   PalletProxyAnnouncement,
   PalletProxyProxyDefinition,
+  PalletStabilizerBuysAccountBuys,
+  PalletStabilizerBuysAuction,
+  PalletStabilizerBuysBuyPayout,
+  PalletStabilizerBuysPriceHistoryHourlyPriceReference,
+  PalletStabilizerBuysUniswapPurchasePurchasePool,
   PalletTransactionPaymentReleases,
   PalletTreasuryBondLot,
   PalletTreasuryBondLotSummary,
@@ -118,6 +125,7 @@ import type {
   PalletTreasuryFrameVaultBitcoin,
   PalletTreasuryFrameVaultCapital,
   PalletTreasuryPositionsPosition,
+  PalletTreasuryRewardReserveBalances,
   PalletTreasuryVaultBondState,
   PalletVaultsVaultFrameRevenue,
   SpConsensusGrandpaAppPublic,
@@ -1545,7 +1553,7 @@ declare module '@polkadot/api-base/types/storage' {
       /**
        * Stores the active price index
        **/
-      current: AugmentedQuery<ApiType, () => Observable<Option<PalletPriceIndexPriceIndex>>, []>;
+      current: AugmentedQuery<ApiType, () => Observable<Option<ArgonPrimitivesPriceIndex>>, []>;
       /**
        * Stores the latest submitted Ethereum pricing.
        **/
@@ -1597,7 +1605,7 @@ declare module '@polkadot/api-base/types/storage' {
       /**
        * Stores the last valid price index
        **/
-      lastValid: AugmentedQuery<ApiType, () => Observable<Option<PalletPriceIndexPriceIndex>>, []>;
+      lastValid: AugmentedQuery<ApiType, () => Observable<Option<ArgonPrimitivesPriceIndex>>, []>;
       /**
        * The price index operator account
        **/
@@ -1624,6 +1632,120 @@ declare module '@polkadot/api-base/types/storage' {
           arg: AccountId32 | string | Uint8Array,
         ) => Observable<ITuple<[Vec<PalletProxyProxyDefinition>, u128]>>,
         [AccountId32]
+      >;
+    };
+    stabilizerBuys: {
+      /**
+       * Execution venue eligible for purchase rewards. Unset until governance selects a pool.
+       **/
+      approvedPool: AugmentedQuery<
+        ApiType,
+        () => Observable<Option<PalletStabilizerBuysUniswapPurchasePurchasePool>>,
+        []
+      >;
+      /**
+       * Auction policy and funding keyed by admission frame F; bidding takes place during F+1.
+       **/
+      auctions: AugmentedQuery<
+        ApiType,
+        (arg: u64 | AnyNumber | Uint8Array) => Observable<Option<PalletStabilizerBuysAuction>>,
+        [u64]
+      >;
+      /**
+       * Positive bids ordered by rate ascending, then account ascending. Values are frozen matching
+       * bases in microgons, allowing settlement after the account's principal bucket is gone.
+       **/
+      bidsByAuction: AugmentedQuery<
+        ApiType,
+        (
+          arg1: u64 | AnyNumber | Uint8Array,
+          arg2:
+            | ArgonPrimitivesAmountRankAscendingRankKeyAccountId32
+            | { ascendingRank?: any; orderedId?: any }
+            | string
+            | Uint8Array,
+        ) => Observable<Option<u128>>,
+        [u64, ArgonPrimitivesAmountRankAscendingRankKeyAccountId32]
+      >;
+      /**
+       * Scheduled rewards and the account's single payout queue entry.
+       **/
+      buysByAccount: AugmentedQuery<
+        ApiType,
+        (arg: AccountId32 | string | Uint8Array) => Observable<PalletStabilizerBuysAccountBuys>,
+        [AccountId32]
+      >;
+      /**
+       * Counter for the related counted storage map
+       **/
+      counterForHourlyPriceReferences: AugmentedQuery<ApiType, () => Observable<u32>, []>;
+      /**
+       * Counter for the related counted storage map
+       **/
+      counterForRecentPriceIndices: AugmentedQuery<ApiType, () => Observable<u32>, []>;
+      /**
+       * Hourly references keyed by the bucket-start tick in the same oldest-first order.
+       **/
+      hourlyPriceReferences: AugmentedQuery<
+        ApiType,
+        (
+          arg: U8aFixed | string | Uint8Array,
+        ) => Observable<Option<PalletStabilizerBuysPriceHistoryHourlyPriceReference>>,
+        [U8aFixed]
+      >;
+      /**
+       * Matching fraction for new auctions; existing auctions retain their captured policy.
+       **/
+      matchingRate: AugmentedQuery<ApiType, () => Observable<Permill>, []>;
+      /**
+       * Funded auctions awaiting automatic reward allocation, ordered by maturity tick and frame.
+       * A failed allocation moves only its retry tick; the auction retains its original maturity.
+       **/
+      maturingAuctions: AugmentedQuery<
+        ApiType,
+        (
+          arg:
+            | ArgonPrimitivesAmountRankAscendingRankKeyU64
+            | { ascendingRank?: any; orderedId?: any }
+            | string
+            | Uint8Array,
+        ) => Observable<Option<Null>>,
+        [ArgonPrimitivesAmountRankAscendingRankKeyU64]
+      >;
+      /**
+       * One scheduled visit per account, ordered by tick then account. Purchase buckets and the
+       * reward record retain unpaid funds while this index selects bounded work.
+       **/
+      payoutQueue: AugmentedQuery<
+        ApiType,
+        (
+          arg:
+            | ArgonPrimitivesAmountRankAscendingRankKeyAccountId32
+            | { ascendingRank?: any; orderedId?: any }
+            | string
+            | Uint8Array,
+        ) => Observable<Option<Null>>,
+        [ArgonPrimitivesAmountRankAscendingRankKeyAccountId32]
+      >;
+      /**
+       * One principal bucket per account and admission frame, retained until release succeeds.
+       * Ordered frame bytes let payout visits select the oldest buckets with bounded work.
+       **/
+      purchasesByAccount: AugmentedQuery<
+        ApiType,
+        (
+          arg1: AccountId32 | string | Uint8Array,
+          arg2: U8aFixed | string | Uint8Array,
+        ) => Observable<Option<PalletStabilizerBuysBuyPayout>>,
+        [AccountId32, U8aFixed]
+      >;
+      /**
+       * Exact observations keyed by the oracle tick in big-endian order, for oldest-first pruning.
+       **/
+      recentPriceIndices: AugmentedQuery<
+        ApiType,
+        (arg: U8aFixed | string | Uint8Array) => Observable<Option<ArgonPrimitivesPriceIndex>>,
+        [U8aFixed]
       >;
     };
     sudo: {
@@ -1919,6 +2041,10 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       nextBondLotId: AugmentedQuery<ApiType, () => Observable<u64>, []>;
       /**
+       * Awarded purchase rewards awaiting issuance. Auctions own their unallocated reservations.
+       **/
+      outstandingPurchaseRewards: AugmentedQuery<ApiType, () => Observable<u128>, []>;
+      /**
        * The oldest frame that still has bond lots to retry releasing.
        **/
       pendingBondReleaseRetryCursor: AugmentedQuery<ApiType, () => Observable<Option<u64>>, []>;
@@ -1929,6 +2055,14 @@ declare module '@polkadot/api-base/types/storage' {
         ApiType,
         (arg: u64 | AnyNumber | Uint8Array) => Observable<Vec<u64>>,
         [u64]
+      >;
+      /**
+       * ARGON removed from circulation and available for future issuance as rewards.
+       **/
+      rewardReserves: AugmentedQuery<
+        ApiType,
+        () => Observable<PalletTreasuryRewardReserveBalances>,
+        []
       >;
       /**
        * Configurable percent of maximum Bitcoin-mintable Argons targeted by the network.

@@ -30,6 +30,7 @@ import type {
   H256,
   MultiAddress,
   Percent,
+  Permill,
 } from '@polkadot/types/interfaces/runtime';
 import type {
   ArgonPrimitivesBitcoinCompressedBitcoinPubkey,
@@ -42,6 +43,7 @@ import type {
   ArgonPrimitivesInherentsBlockSealInherent,
   ArgonPrimitivesNotaryNotaryMeta,
   ArgonPrimitivesNotebookSignedNotebookHeader,
+  ArgonPrimitivesPriceIndex,
   ArgonPrimitivesVaultTreasuryBonusApprovalProof,
   ArgonPrimitivesVaultVaultTerms,
   ArgonRuntimeOriginCaller,
@@ -67,7 +69,7 @@ import type {
   PalletOperationalAccountsOperationalProgressPatch,
   PalletOperationalAccountsRegistration,
   PalletPriceIndexEthereumPriceIndex,
-  PalletPriceIndexPriceIndex,
+  PalletStabilizerBuysUniswapPurchasePurchasePool,
   PalletTreasuryBondLotEarningsMetrics,
   PalletVaultsVaultConfig,
   SnowbridgeBeaconPrimitivesBeaconHeader,
@@ -1461,7 +1463,7 @@ declare module '@polkadot/api-base/types/submittable' {
       submit: AugmentedSubmittable<
         (
           index:
-            | PalletPriceIndexPriceIndex
+            | ArgonPrimitivesPriceIndex
             | {
                 btcUsdPrice?: any;
                 argonotUsdPrice?: any;
@@ -1469,6 +1471,7 @@ declare module '@polkadot/api-base/types/submittable' {
                 argonUsdTargetPrice?: any;
                 argonTimeWeightedAverageLiquidity?: any;
                 tick?: any;
+                usdcUsdPrice?: any;
               }
             | string
             | Uint8Array,
@@ -1480,7 +1483,7 @@ declare module '@polkadot/api-base/types/submittable' {
             | { ethereumUsdPrice?: any; ethereumGasPriceWei?: any; tick?: any }
             | string,
         ) => SubmittableExtrinsic<ApiType>,
-        [PalletPriceIndexPriceIndex, Option<PalletPriceIndexEthereumPriceIndex>]
+        [ArgonPrimitivesPriceIndex, Option<PalletPriceIndexEthereumPriceIndex>]
       >;
     };
     proxy: {
@@ -1840,6 +1843,46 @@ declare module '@polkadot/api-base/types/submittable' {
           delay: u32 | AnyNumber | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
         [MultiAddress, ArgonRuntimeProxyType, u32]
+      >;
+    };
+    stabilizerBuys: {
+      /**
+       * Submit a whole-percent bid during F+1. Account ID breaks equal-rate ties.
+       **/
+      bid: AugmentedSubmittable<
+        (
+          admissionFrame: u64 | AnyNumber | Uint8Array,
+          rewardRate: Percent | AnyNumber | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [u64, Percent]
+      >;
+      /**
+       * Select the reward pool, or disable new purchase eligibility.
+       **/
+      setApprovedPool: AugmentedSubmittable<
+        (
+          pool:
+            | Option<PalletStabilizerBuysUniswapPurchasePurchasePool>
+            | null
+            | Uint8Array
+            | PalletStabilizerBuysUniswapPurchasePurchasePool
+            | {
+                chainId?: any;
+                poolManager?: any;
+                poolId?: any;
+                usdcToken?: any;
+                argonIsToken0?: any;
+              }
+            | string,
+        ) => SubmittableExtrinsic<ApiType>,
+        [Option<PalletStabilizerBuysUniswapPurchasePurchasePool>]
+      >;
+      /**
+       * Change matching for newly created auctions; existing policy remains frozen.
+       **/
+      setMatchingRate: AugmentedSubmittable<
+        (rate: Permill | AnyNumber | Uint8Array) => SubmittableExtrinsic<ApiType>,
+        [Permill]
       >;
     };
     sudo: {

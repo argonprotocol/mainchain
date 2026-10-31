@@ -33,6 +33,7 @@ frame_support::construct_runtime!(
 		Balances: pallet_balances::<Instance1>::{Pallet, Call, Storage, Config<T>, Event<T>},
 		Ownership: pallet_balances::<Instance2>::{Pallet, Call, Storage, Config<T>, Event<T>},
 		CrosschainTransfer: pallet_crosschain_transfer,
+		StabilizerBuys: pallet_stabilizer_buys,
 	}
 );
 
@@ -552,7 +553,92 @@ impl TreasuryPoolProvider<TestAccountId> for MockTreasuryPoolProvider {
 	}
 }
 
+impl argon_primitives::MiningFrameTransitionProvider for CurrentFrameId {
+	fn get_current_frame_id() -> FrameId {
+		Self::get()
+	}
+	fn is_new_frame_started() -> Option<FrameId> {
+		None
+	}
+}
+
+impl pallet_stabilizer_buys::Config for Test {
+	type Currency = Balances;
+	type MiningFrameTransitionProvider = CurrentFrameId;
+	type CurrentTick = CurrentTick;
+	type MaxRecentPriceTicks = ConstU32<360>;
+	type PriceHistoryBucketTicks = ConstU64<60>;
+	type MaxHourlyPriceReferences = ConstU32<720>;
+	type MaxCurrentHourPriceAgeTicks = ConstU64<10>;
+	type TreasuryRewardProvider = Test;
+	type MaxPrincipalPayouts = ConstU32<16>;
+	type MaxPayoutsPerBlock = ConstU32<2>;
+	type MaxPositiveBids = sp_runtime::traits::ConstU8<4>;
+	type AuctionBudgetPercent = PurchaseBudgetPercent;
+	type RewardMaturityTicks = ConstU64<43200>;
+	type WeightInfo = Test;
+}
+
+parameter_types! { pub const PurchaseBudgetPercent: Percent = Percent::from_percent(90); }
+
+// This fixture tests gateway admission; Treasury funding is exercised in its connected fixture.
+impl argon_primitives::treasury::TreasuryRewardProvider<TestAccountId> for Test {
+	type Balance = Balance;
+	type Weights = ();
+	fn available_budget() -> Balance {
+		0
+	}
+	fn reserve_budget(amount: Balance) -> DispatchResult {
+		ensure!(amount == 0, sp_runtime::TokenError::FundsUnavailable);
+		Ok(())
+	}
+	fn commit_reward(_: Balance) -> DispatchResult {
+		Err(sp_runtime::TokenError::FundsUnavailable.into())
+	}
+	fn return_budget(amount: Balance) -> DispatchResult {
+		ensure!(amount == 0, sp_runtime::TokenError::FundsUnavailable);
+		Ok(())
+	}
+	fn pay_reward(_: &TestAccountId, _: Balance) -> DispatchResult {
+		Err(sp_runtime::TokenError::FundsUnavailable.into())
+	}
+}
+
+impl pallet_stabilizer_buys::WeightInfo for Test {
+	fn record_prices() -> Weight {
+		Weight::zero()
+	}
+	fn record_purchase() -> Weight {
+		Weight::zero()
+	}
+	fn record_purchase_first_hold() -> Weight {
+		Weight::zero()
+	}
+	fn bid() -> Weight {
+		Weight::zero()
+	}
+	fn process_payouts_failed(_: u32) -> Weight {
+		Weight::zero()
+	}
+	fn process_payouts(_: u32) -> Weight {
+		Weight::zero()
+	}
+	fn process_auctions(_: u32) -> Weight {
+		Weight::zero()
+	}
+	fn set_approved_pool() -> Weight {
+		Weight::zero()
+	}
+	fn set_matching_rate() -> Weight {
+		Weight::zero()
+	}
+	fn on_frame_start() -> Weight {
+		Weight::zero()
+	}
+}
+
 impl pallet_crosschain_transfer::Config for Test {
+	type UniswapPurchaseProvider = StabilizerBuys;
 	type Balance = Balance;
 	type EthereumBurnAccount = CrosschainTransferEthereumBurnAccount;
 	type NativeCurrency = Balances;
