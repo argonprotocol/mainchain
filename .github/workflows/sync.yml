@@ -33,14 +33,14 @@ jobs:
     runs-on: ubuntu-22.04
     timeout-minutes: 180
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v5.1.0
         with:
           ref: ${{ github.event.workflow_run.head_sha || github.sha }}
 
       - name: Free Disk Space
         uses: ./.github/templates/clear-space
 
-      - uses: ikalnytskyi/action-setup-postgres@10ab8a56cc77b4823c2bfa57b1d4dd5605ef0481 # v7
+      - uses: ikalnytskyi/action-setup-postgres@v7
       - uses: ./.github/templates/minio
 
       - name: Install linux dependencies
@@ -49,18 +49,26 @@ jobs:
           sudo apt-get install -y clang libssl-dev llvm libclang-dev libudev-dev protobuf-compiler pkg-config
           echo "LIBCLANG_PATH=$(llvm-config --libdir)" >> $GITHUB_ENV
 
+      # Lock the remote dependencies while running setup from the checked-out build revision.
+      - name: Declare checked-out cache dependencies
+        if: ${{ false }}
+        uses: $/.github/templates/rust-cache
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          name: cargo-x86_64-unknown-linux-gnu
+
       - uses: ./.github/templates/rust-cache
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           name: cargo-x86_64-unknown-linux-gnu
 
       - name: Install Rust
-        uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1.16.1
         with:
           cache: 'false'
           target: x86_64-unknown-linux-gnu
 
-      - uses: taiki-e/install-action@c070f87102a1c75b3183910f391c1cb887fe13c8 # v2
+      - uses: taiki-e/install-action@v2.77.6
         with:
           tool: sqlx-cli@0.8.3
 

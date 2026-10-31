@@ -11,10 +11,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v5.1.0
 
       - name: Review dependencies
-        uses: actions/dependency-review-action@v4
+        uses: actions/dependency-review-action@v4.9.0
         with:
           fail-on-severity: high
           fail-on-scopes: runtime

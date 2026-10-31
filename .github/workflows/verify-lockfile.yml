@@ -1,0 +1,27 @@
+name: Verify Actions lockfile
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v5.1.0
+        with:
+          persist-credentials: false
+
+      - name: Install lockfile tool
+        run: gh extension install github/gh-actions-lock --pin v0.4.0
+
+      - name: Verify workflow dependencies
+        run: gh actions-lock --verify --ignore-local-actions

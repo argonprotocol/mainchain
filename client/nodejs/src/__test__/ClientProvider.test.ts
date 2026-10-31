@@ -1,16 +1,19 @@
-import { expect, it } from 'vitest';
+import { expect, expectTypeOf, it } from 'vitest';
 import { once } from 'node:events';
 import { WebSocketServer } from 'ws';
 import { WsProvider } from '@polkadot/rpc-provider';
 import { Metadata, TypeRegistry } from '@polkadot/types';
 import type { HexString } from '@polkadot/util/types';
-import { getClient } from '../index';
-import { withMiningBidDefaults } from '../miningBid';
+import { getClient, type ArgonClient } from '../index';
+import type { ApiPromise } from '@polkadot/api';
 import Genesis from '../../genesis.json';
 import metadata from '../../metadata.json';
 import runtimeVersion from '../../runtime_version.json';
 
 it('uses one supplied connection and bundled metadata for historical reads', async () => {
+  expectTypeOf<ApiPromise>().toEqualTypeOf<ArgonClient>();
+  expectTypeOf<Awaited<ReturnType<typeof getClient>>>().toEqualTypeOf<ApiPromise>();
+
   const registry = new TypeRegistry();
   const header = registry.createType('Header', { number: 9, parentHash: Genesis.mainnet });
   const server = new WebSocketServer({ host: '127.0.0.1', port: 0 });
@@ -105,23 +108,12 @@ it('uses one supplied connection and bundled metadata for historical reads', asy
     const keys = new Uint8Array(64);
     const bid = client.tx.miningSlot.bid;
     const explicit = bid(10_000n, keys, null, null, null);
-    const short = bid(10_000n, keys, null);
-    expect(short.method.toHex()).toBe(explicit.method.toHex());
-    expect(bid(10_000n, keys, null, undefined, undefined).method.toHex()).toBe(
-      explicit.method.toHex(),
-    );
-    expect(short.method.args[3].toJSON()).toBeNull();
-    expect(short.method.args[4].toJSON()).toBeNull();
-    expect(typeof short.signAndSend).toBe('function');
-    expect(typeof short.paymentInfo).toBe('function');
-    expect(bid.is(short.method)).toBe(true);
-    expect(bid.callIndex).toEqual(short.method.callIndex);
-    expect(bid.meta.fields).toHaveLength(5);
-    expect(client.tx.utility.batchAll([short]).method.args[0].toJSON()).toEqual([
-      short.method.toJSON(),
-    ]);
+    expect(explicit.method.args[3].toJSON()).toBeNull();
+    expect(explicit.method.args[4].toJSON()).toBeNull();
+    // @ts-expect-error Optional runtime fields still require explicit argument positions.
+    expect(() => bid(10_000n, keys, null)).toThrow('expects 5 arguments');
 
-    const frameOnly = bid(10_000n, keys, null, 2n);
+    const frameOnly = bid(10_000n, keys, null, 2n, null);
     expect(frameOnly.method.args[3].toJSON()).toBe(2);
     expect(frameOnly.method.args[4].toJSON()).toBeNull();
     const hash = '0x' + '11'.repeat(32);
@@ -137,19 +129,18 @@ it('uses one supplied connection and bundled metadata for historical reads', asy
     ]);
     // @ts-expect-error A maximum reveal must explicitly target its original auction frame.
     expect(() => bidMax(20_000n, hash, null)).toThrow('expects 4 arguments');
-    // @ts-expect-error The SDK still requires the original three arguments.
-    expect(() => bid(10_000n, keys)).toThrow('expects 5 arguments');
     // @ts-expect-error The SDK must not silently ignore extra arguments.
     expect(() => bid(10_000n, keys, null, null, null, null)).toThrow('expects 5 arguments');
-    expect(withMiningBidDefaults(client)).toBe(client);
-    expect(client.tx.miningSlot.bid).toBe(bid);
 
-    // Exercise the same metadata replacement and decorated event used on runtime upgrades.
+    // Native argument requirements remain intact after a runtime metadata refresh.
     client.injectMetadata(new Metadata(registry, metadata.result as HexString), true, registry);
-    expect(client.tx.miningSlot.bid).not.toBe(bid);
-    expect(client.tx.miningSlot.bid(10_000n, keys, null).method.toHex()).toBe(
+    const refreshedBid = client.tx.miningSlot.bid;
+    expect(refreshedBid).not.toBe(bid);
+    expect(refreshedBid(10_000n, keys, null, null, null).method.toHex()).toBe(
       explicit.method.toHex(),
     );
+    // @ts-expect-error Metadata refresh must not install argument defaults.
+    expect(() => refreshedBid(10_000n, keys, null)).toThrow('expects 5 arguments');
     expect(connections).toBe(1);
     expect(metadataRequests).toBe(0);
   } finally {

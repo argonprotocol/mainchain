@@ -43,10 +43,10 @@ jobs:
     name: Build All ${{ matrix.target }}
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v5.1.0
       - name: Free Disk Space
         if: ${{startsWith(matrix.os, 'ubuntu')}}
-        uses: ./.github/templates/clear-space
+        uses: $/.github/templates/clear-space
 
       - name: Install linux dependencies
         if: ${{startsWith(matrix.os, 'ubuntu')}}
@@ -59,19 +59,19 @@ jobs:
         if: startsWith(matrix.os, 'macos')
         run: brew install protobuf
 
-      - uses: ./.github/templates/rust-cache
+      - uses: $/.github/templates/rust-cache
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
           name: cargo-${{ matrix.target }}
 
       - name: Install Rust
-        uses: actions-rust-lang/setup-rust-toolchain@46268bd060767258de96ed93c1251119784f2ab6 # v1
+        uses: actions-rust-lang/setup-rust-toolchain@v1.16.1
         with:
           cache: 'false'
           target: ${{ matrix.target }}
 
       - name: Install sqlx-cli
-        uses: taiki-e/install-action@c070f87102a1c75b3183910f391c1cb887fe13c8 # v2
+        uses: taiki-e/install-action@v2.77.6
         with:
           tool: sqlx-cli@0.8.3
 
@@ -102,7 +102,7 @@ jobs:
         run: ls -lart target/
 
       - name: Upload Debug Assets
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v6.0.0
         with:
           name: bins-${{ matrix.target }}
           path: target/${{ matrix.target }}/debug/argon-*
@@ -119,17 +119,17 @@ jobs:
       attestations: write
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v5.1.0
 
       - name: Download artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v7.0.0
         with:
           name: bins-x86_64-unknown-linux-gnu
           github-token: ${{ secrets.GITHUB_TOKEN }}
           path: ./amd64
 
       - name: Download amd artifacts
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v7.0.0
         with:
           name: bins-aarch64-unknown-linux-gnu
           github-token: ${{ secrets.GITHUB_TOKEN }}
@@ -140,19 +140,19 @@ jobs:
         shell: bash
 
       - name: Argon Node
-        uses: ./.github/templates/docker
+        uses: $/.github/templates/docker
         with:
           image: ghcr.io/argonprotocol/argon-miner
           bin: argon-node
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Notary
-        uses: ./.github/templates/docker
+        uses: $/.github/templates/docker
         with:
           image: ghcr.io/argonprotocol/argon-notary
           bin: argon-notary
           github-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Oracle
-        uses: ./.github/templates/docker
+        uses: $/.github/templates/docker
         with:
           image: ghcr.io/argonprotocol/argon-oracle
           bin: argon-oracle
