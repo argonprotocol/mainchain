@@ -63,6 +63,7 @@ import type {
   PalletEthereumVerifierBasicOperatingMode,
   PalletEthereumVerifierCheckpointUpdate,
   PalletEthereumVerifierExecutionHeaderProof,
+  PalletEthereumVerifierFork,
   PalletEthereumVerifierForkVersions,
   PalletEthereumVerifierUpdate,
   PalletMultisigTimepoint,
@@ -754,6 +755,7 @@ declare module '@polkadot/api-base/types/submittable' {
                 deneb?: any;
                 electra?: any;
                 fulu?: any;
+                gloas?: any;
               }
             | string
             | Uint8Array,
@@ -775,6 +777,16 @@ declare module '@polkadot/api-base/types/submittable' {
             | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
         [H256, SnowbridgeBeaconPrimitivesBeaconHeader, PalletEthereumVerifierExecutionHeaderProof]
+      >;
+      /**
+       * Configure the implemented Gloas fork before the verifier finalizes its activation.
+       * Earlier forks and retained consensus state are preserved. May only be called by root.
+       **/
+      setGloasFork: AugmentedSubmittable<
+        (
+          fork: PalletEthereumVerifierFork | { version?: any; epoch?: any } | string | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [PalletEthereumVerifierFork]
       >;
       /**
        * Halt or resume all pallet operations. May only be called by root.

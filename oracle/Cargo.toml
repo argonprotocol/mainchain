@@ -31,7 +31,7 @@ argon-primitives = { workspace = true, features = ["default", "bitcoin"] }
 subxt = { workspace = true }
 url = { workspace = true }
 uniswap-sdk-core = { workspace = true }
-uniswap-v3-sdk = { workspace = true, features = ["extensions"] }
+uniswap-v3-sdk = { workspace = true }
 uniswap-lens = { workspace = true }
 bitcoincore-rpc = { workspace = true }
 bitcoin = { workspace = true }

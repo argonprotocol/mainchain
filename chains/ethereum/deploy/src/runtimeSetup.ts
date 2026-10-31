@@ -243,7 +243,9 @@ export async function prepareCrosschainRuntimeSetup(
     );
   }
 
-  const forceCheckpoint = await getEthereumBeaconSyncBootstrapTx(client, beaconApiUrl);
+  const forceCheckpoint = await getEthereumBeaconSyncBootstrapTx(client, beaconApiUrl, {
+    executionClient,
+  });
   innerCalls.push(forceCheckpoint);
   extrinsics.push(
     describeExtrinsic(client, forceCheckpoint, {

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: Apache-2.0
 // SPDX-FileCopyrightText: 2023 Snowfork <hello@snowfork.com>
+mod gloas;
 pub use crate::mock::*;
 use crate::{
 	fixture_conversions::execution_proof_from_fixture,
@@ -53,6 +54,7 @@ use std::{fs::File, path::PathBuf};
 const MAINNET_SLOTS_PER_EPOCH: u64 = EthereumBeaconPreset::Mainnet.slots_per_epoch() as u64;
 const MAINNET_EPOCHS_PER_SYNC_COMMITTEE_PERIOD: u64 =
 	EthereumBeaconPreset::Mainnet.epochs_per_sync_committee_period() as u64;
+
 const MAINNET_SLOTS_PER_HISTORICAL_ROOT: u64 =
 	EthereumBeaconPreset::Mainnet.slots_per_historical_root() as u64;
 const MAINNET_SYNC_COMMITTEE_SIZE: usize = EthereumBeaconPreset::Mainnet.sync_committee_size();
@@ -469,6 +471,7 @@ fn compute_fork_version() {
 		deneb: Fork { version: [0, 0, 0, 4], epoch: 40 },
 		electra: Fork { version: [0, 0, 0, 5], epoch: 50 },
 		fulu: Fork { version: [0, 0, 0, 6], epoch: 60 },
+		gloas: Fork { version: [0, 0, 0, 7], epoch: 70 },
 	};
 	new_tester().execute_with(|| {
 		assert_eq!(EthereumBeaconClient::select_fork_version(&mock_fork_versions, 0), [0, 0, 0, 0]);
@@ -650,7 +653,8 @@ fn import_trusted_execution_header_backfill_uses_finalized_header_retention() {
 	let latest_root = latest_checkpoint.header.hash_tree_root().unwrap();
 	let historical_anchor = ExecutionHeaderAnchor::from_payload_header(
 		&historical_checkpoint.execution_header_proof.execution_header,
-	);
+	)
+	.unwrap();
 
 	new_tester().execute_with(|| {
 		assert_ok!(process_checkpoint_update(&latest_checkpoint));
@@ -769,10 +773,12 @@ fn import_trusted_execution_header_backfill_rejects_non_historical_anchor() {
 	let newer_root = newer_update.finalized_header.hash_tree_root().unwrap();
 	let newer_anchor = ExecutionHeaderAnchor::from_payload_header(
 		&newer_update.execution_header_proof.execution_header,
-	);
+	)
+	.unwrap();
 	let latest_anchor = ExecutionHeaderAnchor::from_payload_header(
 		&latest_checkpoint.execution_header_proof.execution_header,
-	);
+	)
+	.unwrap();
 
 	assert!(newer_anchor.block_number >= latest_anchor.block_number);
 
@@ -872,6 +878,7 @@ fn process_minimal_bootstrap_checkpoint() {
 				deneb: Fork { version: hex!("04000000"), epoch: 0 },
 				electra: Fork { version: hex!("05000000"), epoch: 0 },
 				fulu: Fork { version: hex!("06000000"), epoch: 0 },
+				gloas: Fork { version: hex!("07000000"), epoch: u64::MAX },
 			}
 		));
 	});
@@ -917,6 +924,7 @@ fn process_later_minimal_bootstrap_checkpoint() {
 				deneb: Fork { version: hex!("04000000"), epoch: 0 },
 				electra: Fork { version: hex!("05000000"), epoch: 0 },
 				fulu: Fork { version: hex!("06000000"), epoch: 0 },
+				gloas: Fork { version: hex!("07000000"), epoch: u64::MAX },
 			}
 		));
 	});
@@ -926,7 +934,10 @@ fn process_later_minimal_bootstrap_checkpoint() {
 fn submit_update_in_current_period() {
 	let checkpoint = Box::new(load_later_checkpoint_update_fixture());
 	let update = Box::new(load_finalized_header_update_fixture());
-	let block_hash = update.execution_header_proof.execution_header.block_hash();
+	let block_hash =
+		ExecutionHeaderAnchor::from_payload_header(&update.execution_header_proof.execution_header)
+			.unwrap()
+			.block_hash;
 	let checkpoint_period = compute_period(checkpoint.header.slot);
 	let update_period = compute_period(finalized_header(&update).slot);
 	assert_eq!(checkpoint_period, update_period);
@@ -954,7 +965,10 @@ fn submit_update_in_current_period() {
 fn submit_update_with_sync_committee_in_current_period() {
 	let checkpoint = Box::new(load_later_checkpoint_update_fixture());
 	let update = Box::new(load_next_sync_committee_update_fixture());
-	let block_hash = update.execution_header_proof.execution_header.block_hash();
+	let block_hash =
+		ExecutionHeaderAnchor::from_payload_header(&update.execution_header_proof.execution_header)
+			.unwrap()
+			.block_hash;
 	let init_period = compute_period(checkpoint.header.slot);
 	let update_period = compute_period(finalized_header(&update).slot);
 	assert_eq!(init_period, update_period);
@@ -1082,9 +1096,14 @@ fn submit_update_with_sync_committee_in_next_period() {
 	let checkpoint = Box::new(load_checkpoint_update_fixture());
 	let update = Box::new(load_sync_committee_update_fixture());
 	let next_update = Box::new(load_next_sync_committee_update_fixture());
+	assert_eq!(
+		next_update.encode(),
+		include_bytes!("../tests/fixtures/next-sync-committee-update.scale")
+	);
 	let expected_anchor = ExecutionHeaderAnchor::from_payload_header(
 		&next_update.execution_header_proof.execution_header,
-	);
+	)
+	.unwrap();
 	let update_period = compute_period(finalized_header(&update).slot);
 	let next_update_period = compute_period(finalized_header(&next_update).slot);
 	assert_eq!(update_period + 1, next_update_period);
@@ -1097,6 +1116,13 @@ fn submit_update_with_sync_committee_in_next_period() {
 		assert_ok!(result);
 		assert_eq!(result.unwrap().pays_fee, Pays::No);
 		assert!(<NextSyncCommittee<Test>>::exists());
+
+		let mut invalid_update = next_update.clone();
+		invalid_update.execution_header_proof.execution_branch[0] = H256::repeat_byte(99);
+		assert_noop!(
+			EthereumBeaconClient::submit(RuntimeOrigin::signed(1), invalid_update),
+			Error::<Test>::InvalidExecutionHeaderProof
+		);
 
 		let second_result = EthereumBeaconClient::submit(RuntimeOrigin::signed(1), next_update);
 		assert_ok!(second_result);
@@ -1717,6 +1743,7 @@ fn verify_execution_proof_invalid_execution_header_proof() {
 			EthereumBeaconClient::verify_execution_proof_for_header(
 				&execution_proof.header,
 				&execution_header_proof,
+				&ChainForkVersions::get(),
 			),
 			Error::<Test>::InvalidExecutionHeaderProof
 		);
@@ -2003,7 +2030,7 @@ fn execution_block_and_anchor_proof_decode_reject_oversized_vectors() {
 	#[derive(Encode)]
 	struct UnboundedExecutionProof {
 		header: BeaconHeader,
-		execution_header: snowbridge_beacon_primitives::VersionedExecutionPayloadHeader,
+		execution_header: crate::types::VersionedExecutionPayloadHeader,
 		execution_branch: Vec<H256>,
 	}
 

@@ -3,6 +3,7 @@
 
 pub mod altair;
 pub mod electra;
+pub mod gloas;
 
 /// Sizes related to SSZ encoding.
 pub const MAX_EXTRA_DATA_BYTES: usize = 32;

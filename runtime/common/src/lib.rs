@@ -116,7 +116,7 @@ macro_rules! inject_runtime_vars {
 			// `spec_name`,   `spec_version`, and `authoring_version` are the same between Wasm and
 			// native. This value is set to 100 to notify Polkadot-JS App (https://polkadot.js.org/apps) to use
 			//   the compatible custom types.
-			spec_version: 161,
+			spec_version: 162,
 			impl_version: 10,
 			apis: RUNTIME_API_VERSIONS,
 			transaction_version: 6,
@@ -161,6 +161,7 @@ macro_rules! inject_runtime_vars {
 		type Migrations = (
 			CosignerGuaranteesMigration<Runtime>,
 			$crate::migrations::AddVaultSecuritizedSatoshis<Runtime>,
+			pallet_ethereum_verifier::migrations::AddGloasForkMigration<Runtime>,
 		);
 
 		/// Unchecked extrinsic type as expected by this runtime.

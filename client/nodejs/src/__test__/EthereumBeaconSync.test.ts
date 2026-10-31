@@ -1,3 +1,4 @@
+import { Hardfork } from '@ethereumjs/common';
 import { afterEach, expect, it } from 'vitest';
 import {
   type ArgonClient,
@@ -5,6 +6,12 @@ import {
   getEthereumBeaconSyncState,
   getNextEthereumBeaconSyncTxs,
 } from '../index';
+import { hexToBytes, type Hex } from 'viem';
+import {
+  createExecutionClient,
+  createExecutionBlockFromRlp,
+  gloasExecutionProof,
+} from './ethereumProofTestUtils';
 
 const originalFetch = globalThis.fetch;
 
@@ -123,6 +130,63 @@ it('builds a submit tx with an execution header proof once the free header inter
         }),
       }),
     },
+  ]);
+});
+
+it('refreshes a published Gloas activation and builds its hash-only sync update', async () => {
+  const block = createExecutionBlockFromRlp(
+    gloasExecutionProof.execution_header_rlp as Hex,
+    Hardfork.Amsterdam,
+  );
+  const slot = gloasExecutionProof.header.slot;
+  globalThis.fetch = createFetch({
+    'https://gloas-sync.example/eth/v1/beacon/light_client/finality_update': {
+      data: createLightClientUpdate(slot),
+    },
+    'https://gloas-sync.example/eth/v1/config/spec': {
+      data: { ...createBeaconSpec(), GLOAS_FORK_EPOCH: '18446744073709551615' },
+    },
+  });
+  const client = createMockClient({
+    hasNextSyncCommittee: true,
+    latestFinalizedSlot: slot - 32,
+    latestSyncCommitteeUpdatePeriod: Math.floor(slot / 8192),
+  });
+  await expect(
+    getNextEthereumBeaconSyncTxs(client, 'https://gloas-sync.example'),
+  ).resolves.toHaveLength(1);
+
+  globalThis.fetch = createFetch({
+    'https://gloas-sync.example/eth/v1/beacon/light_client/finality_update': {
+      version: 'gloas',
+      data: createLightClientUpdate(slot, {
+        finalized_header: {
+          beacon: { ...gloasExecutionProof.header, slot: String(slot) },
+          execution_block_hash: block.hash,
+          execution_branch: gloasExecutionProof.execution_branch,
+        },
+      }),
+    },
+    'https://gloas-sync.example/eth/v1/config/spec': {
+      data: { ...createBeaconSpec(), GLOAS_FORK_EPOCH: '1' },
+    },
+  });
+  await expect(getNextEthereumBeaconSyncTxs(client, 'https://gloas-sync.example')).rejects.toThrow(
+    'execution source',
+  );
+  const txs = await getNextEthereumBeaconSyncTxs(client, 'https://gloas-sync.example', {
+    executionClient: createExecutionClient({ blocks: [block] }),
+  });
+  expect(txs).toEqual([
+    expect.objectContaining({
+      method: 'submit',
+      update: expect.objectContaining({
+        executionHeaderProof: {
+          executionHeader: { Rlp: hexToBytes(gloasExecutionProof.execution_header_rlp as Hex) },
+          executionBranch: gloasExecutionProof.execution_branch,
+        },
+      }),
+    }),
   ]);
 });
 
@@ -715,7 +779,54 @@ it('builds a force-checkpoint tx from beacon bootstrap data without block-roots 
     }),
     forks: expect.objectContaining({
       deneb: { version: '0x04000000', epoch: 3n },
+      gloas: { version: '0x00000000', epoch: 18446744073709551615n },
     }),
+  });
+});
+
+it('bootstraps Gloas with its configured fork schedule and exact execution header bytes', async () => {
+  const block = createExecutionBlockFromRlp(
+    gloasExecutionProof.execution_header_rlp as Hex,
+    Hardfork.Amsterdam,
+  );
+  const slot = gloasExecutionProof.header.slot;
+  const forkSpec: Record<string, string> = { ...createBeaconSpec() };
+  const forkNames = ['ALTAIR', 'BELLATRIX', 'CAPELLA', 'DENEB', 'ELECTRA', 'FULU', 'GLOAS'];
+  for (const [index, fork] of forkNames.entries()) {
+    forkSpec[`${fork}_FORK_VERSION`] = `0x0${index + 1}000000`;
+    forkSpec[`${fork}_FORK_EPOCH`] = String(index);
+  }
+  globalThis.fetch = createFetch({
+    'https://gloas-bootstrap.example/eth/v1/config/spec': { data: forkSpec },
+    'https://gloas-bootstrap.example/eth/v1/beacon/genesis': {
+      data: { genesis_fork_version: '0x00000000', genesis_validators_root: '0x11' },
+    },
+    'https://gloas-bootstrap.example/eth/v1/beacon/headers/finalized': { data: { root: '0xabc' } },
+    'https://gloas-bootstrap.example/eth/v1/beacon/light_client/bootstrap/0xabc': {
+      data: {
+        ...createBootstrapResponse(slot, []).data,
+        header: {
+          beacon: { ...gloasExecutionProof.header, slot: String(slot) },
+          execution_block_hash: block.hash,
+          execution_branch: gloasExecutionProof.execution_branch,
+        },
+      },
+    },
+  });
+  const tx = await getEthereumBeaconSyncBootstrapTx(
+    createMockClient(),
+    'https://gloas-bootstrap.example',
+    { executionClient: createExecutionClient({ blocks: [block] }) },
+  );
+  expect(tx).toMatchObject({
+    method: 'forceCheckpoint',
+    checkpoint: {
+      executionHeaderProof: {
+        executionHeader: { Rlp: hexToBytes(gloasExecutionProof.execution_header_rlp as Hex) },
+        executionBranch: gloasExecutionProof.execution_branch,
+      },
+    },
+    forks: { gloas: { version: '0x07000000', epoch: 6n } },
   });
 });
 

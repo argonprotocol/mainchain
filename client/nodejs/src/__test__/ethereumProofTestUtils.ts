@@ -1,4 +1,9 @@
-import { createBlockHeaderFromRPC, type JSONRPCBlock } from '@ethereumjs/block';
+import {
+  createBlockHeaderFromRPC,
+  createBlockHeaderFromRLP,
+  type JSONRPCBlock,
+} from '@ethereumjs/block';
+import { Common, Hardfork, Mainnet } from '@ethereumjs/common';
 import { createMPT } from '@ethereumjs/mpt';
 import {
   MintingGatewayEvents,
@@ -10,9 +15,11 @@ import {
   encodeAbiParameters,
   encodeEventTopics,
   getAbiItem,
+  hexToBytes,
   toHex,
   type Hex,
 } from 'viem';
+import gloasExecutionProof from '../../../../pallets/ethereum_verifier/tests/fixtures/gloas-execution-proof.json';
 import type { ArgonClient, IArgonQueryable } from '../index';
 import {
   encodeEthereumReceiptForProof,
@@ -26,6 +33,25 @@ const ZERO_BLOOM: Hex = `0x${'00'.repeat(256)}`;
 const ZERO_ADDRESS: Hex = `0x${'00'.repeat(20)}`;
 const EMPTY_UNCLES_HASH =
   '0x1dcc4de8dec75d7aab85b567b6ccd41ad312451b948a7413f0a142fd40d49347' as Hex;
+
+export { gloasExecutionProof };
+
+export function createExecutionBlockFromRlp(rlp: Hex, hardfork: Hardfork): JSONRPCBlock {
+  const header = createBlockHeaderFromRLP(hexToBytes(rlp), {
+    common: new Common({ chain: Mainnet, hardfork }),
+  });
+  return {
+    ...header.toJSON(),
+    hash: bytesToHex(header.hash()),
+    sha3Uncles: bytesToHex(header.uncleHash),
+    miner: header.coinbase.toString(),
+    transactionsRoot: bytesToHex(header.transactionsTrie),
+    receiptsRoot: bytesToHex(header.receiptTrie),
+    transactions: [],
+    uncles: [],
+    size: '0x1',
+  } as JSONRPCBlock;
+}
 
 export function repeatHex(byte: string, length: number): Hex {
   return `0x${byte.repeat(length)}`;
@@ -146,8 +172,9 @@ export async function createExecutionBlock(args: {
     transactions,
     uncles: [],
   } satisfies JSONRPCBlock;
-  const hash: Hex = bytesToHex(createBlockHeaderFromRPC(template).hash());
-  const block = { ...template, hash } satisfies JSONRPCBlock;
+  const header = createBlockHeaderFromRPC(template);
+  const hash: Hex = bytesToHex(header.hash());
+  const block = { ...template, ...header.toJSON(), hash } satisfies JSONRPCBlock;
 
   for (const receipt of args.receipts ?? []) {
     receipt.blockHash = hash;

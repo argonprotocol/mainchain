@@ -1,7 +1,13 @@
-import { BlockHeader, createBlockHeaderFromRPC, type JSONRPCBlock } from '@ethereumjs/block';
+import {
+  createBlockHeaderFromRPC,
+  createBlockHeaderFromRLP,
+  type BlockHeader,
+  type JSONRPCBlock,
+} from '@ethereumjs/block';
+import { Common, Hardfork, Mainnet } from '@ethereumjs/common';
 import { createMerkleProof, createMPT, verifyMPTWithMerkleProof } from '@ethereumjs/mpt';
 import type { IArgonQueryable } from './index';
-import { bytesToHex, type Hex, hexToBytes, toHex, toRlp } from 'viem';
+import { bytesToHex, fromRlp, type Hex, hexToBytes, toHex, toRlp } from 'viem';
 import {
   type EthereumExecutionClient,
   type EthereumExecutionSource,
@@ -13,12 +19,12 @@ import {
 type EthGetBlockByHashRpc = {
   Method: 'eth_getBlockByHash';
   Parameters: [Hex, false];
-  ReturnType: JSONRPCBlock;
+  ReturnType: JSONRPCBlock | null;
 };
 type EthGetBlockByNumberRpc = {
   Method: 'eth_getBlockByNumber';
   Parameters: [Hex, false];
-  ReturnType: JSONRPCBlock;
+  ReturnType: JSONRPCBlock | null;
 };
 
 export type ArgonFinalizedExecutionHeader = {
@@ -317,7 +323,7 @@ async function loadEthereumEventLocators(
 export async function loadExecutionHeader(
   executionClient: EthereumExecutionClient,
   blockTag: Hex | bigint,
-) {
+): Promise<BlockHeader> {
   const blockData = await retryWhileExecutionRpcIndexing(() =>
     typeof blockTag === 'string'
       ? executionClient.request<EthGetBlockByHashRpc>({
@@ -329,16 +335,43 @@ export async function loadExecutionHeader(
           params: [toHex(blockTag), false],
         }),
   );
-  const header = createBlockHeaderFromRPC(blockData);
+  if (!blockData) {
+    throw new Error(`Execution header not found for block ${blockTag}`);
+  }
+
+  const extensionCount = [
+    blockData.baseFeePerGas,
+    blockData.withdrawalsRoot,
+    blockData.blobGasUsed,
+    blockData.excessBlobGas,
+    blockData.parentBeaconBlockRoot,
+    blockData.requestsHash,
+    blockData.blockAccessListHash,
+    blockData.slotNumber,
+  ].filter(value => value != null).length;
+  const header = createBlockHeaderFromRPC(blockData, {
+    common: executionHeaderCommon(15 + extensionCount),
+  });
+  const blockHash = bytesToHex(header.hash());
 
   if (
-    typeof blockTag === 'string' &&
-    bytesToHex(header.hash()).toLowerCase() !== blockTag.toLowerCase()
+    blockHash.toLowerCase() !== blockData.hash.toLowerCase() ||
+    (typeof blockTag === 'string' && blockHash.toLowerCase() !== blockTag.toLowerCase())
   ) {
     throw new Error(`Execution header hash mismatch for block ${blockTag}`);
   }
+  if (typeof blockTag === 'bigint' && BigInt(blockData.number) !== blockTag) {
+    throw new Error(`Execution header is not block ${blockTag}`);
+  }
 
   return header;
+}
+
+/** Select the header format from its fields so historical and devnet schedules both work. */
+export function decodeExecutionHeaderRlp(rlp: Uint8Array): BlockHeader {
+  const fields = fromRlp(bytesToHex(rlp), 'hex');
+  if (!Array.isArray(fields)) throw new Error('Invalid execution header RLP');
+  return createBlockHeaderFromRLP(rlp, { common: executionHeaderCommon(fields.length) });
 }
 
 export async function buildExecutionHeaderChain(
@@ -393,6 +426,20 @@ export async function buildExecutionHeaderChain(
   }
 
   return headers.reverse();
+}
+
+function executionHeaderCommon(fieldCount: number): Common {
+  const hardforks: Record<number, Hardfork> = {
+    15: Hardfork.Chainstart,
+    16: Hardfork.London,
+    17: Hardfork.Shanghai,
+    20: Hardfork.Cancun,
+    21: Hardfork.Prague,
+    23: Hardfork.Amsterdam,
+  };
+  const hardfork = hardforks[fieldCount];
+  if (!hardfork) throw new Error(`Unsupported execution header field count: ${fieldCount}`);
+  return new Common({ chain: Mainnet, hardfork });
 }
 
 async function buildCombinedReceiptProof(

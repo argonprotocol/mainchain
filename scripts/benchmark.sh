@@ -101,6 +101,9 @@ function benchmark_runtime() {
             # Keep raw measurements for conservative cap-based finalization. Sparse proof
             # prefixes can crash the CLI's median regression, so avoid that analysis.
             analysis_flags=(--output-analysis=min-squares --output-pov-analysis=min-squares --no-median-slopes --additional-trie-layers=2 --json-file="${benchmark_log}.json")
+        elif [ "$pallet" = "pallet_ethereum_verifier" ]; then
+            # Keep the larger fitted costs when the two regression methods disagree.
+            analysis_flags=(--output-analysis=max --json-file="${benchmark_log}.json")
         fi
         set +e
         frame-omni-bencher v1 benchmark pallet \

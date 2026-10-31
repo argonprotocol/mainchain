@@ -54,6 +54,26 @@ interface IArgonCpiSnapshot {
 }
 ```
 
+## Ethereum Beacon Sync
+
+Pass an execution source when building beacon sync or bootstrap transactions:
+
+```ts
+const transactions = await getNextEthereumBeaconSyncTxs(client, beaconApiUrl, {
+  executionRpcUrl,
+});
+```
+
+Gloas light-client headers contain an execution block hash rather than a payload header. The
+execution RPC supplies the matching header bytes, which the client checks against that hash.
+Original pre-Gloas payload-header responses can omit the execution source. Historical headers
+upgraded to the hash-only format also need it. `getEthereumBeaconSyncBootstrapTx` accepts the same
+third argument.
+
+Existing verifier state migrates with Gloas disabled. Once its version and epoch are known,
+governance can call `setGloasFork` as root without resetting the checkpoint, committees, or anchors.
+That call preserves earlier forks and rejects changes to finalized Gloas history.
+
 ## Gateway Activity Proof Flow
 
 Discovery, storage-witness capture, and relay preparation are separate operations. Apps own caching,

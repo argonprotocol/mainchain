@@ -174,6 +174,7 @@ export class EthereumProofE2eHarness {
       this.sudoSigner,
       this.endpoints.beaconApiUrl,
       minimumExecutionBlockNumber,
+      { executionRpcUrl: this.endpoints.executionRpcUrl },
     );
   }
 
@@ -276,7 +277,9 @@ export class EthereumProofE2eHarness {
     }
 
     calls.push(
-      await getEthereumBeaconSyncBootstrapTx(this.mainchainClient, this.endpoints.beaconApiUrl),
+      await getEthereumBeaconSyncBootstrapTx(this.mainchainClient, this.endpoints.beaconApiUrl, {
+        executionRpcUrl: this.endpoints.executionRpcUrl,
+      }),
     );
 
     const result = await this.sudoSubmit(this.mainchainClient.tx.utility.batchAll(calls as never));

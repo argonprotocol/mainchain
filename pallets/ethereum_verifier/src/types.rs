@@ -4,7 +4,9 @@ use crate::{
 	config::MAX_BRANCH_PROOF_SIZE_U32, ring_buffer::RingBufferMapImpl, FinalizedBeaconState,
 	FinalizedBeaconStateIndex, FinalizedBeaconStateMapping, MaxFinalizedHeadersToKeep,
 };
-use argon_primitives::{EthereumBeaconPreset, EthereumBlockNumber};
+use argon_primitives::{
+	EthereumBeaconPreset, EthereumBlockNumber, EthereumExecutionHeaderRlp, EthereumVerifyError,
+};
 use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use polkadot_sdk::{
 	frame_support::{pallet_prelude::ConstU32, storage::types::OptionQuery, BoundedVec},
@@ -14,7 +16,6 @@ use scale_info::TypeInfo;
 use snowbridge_beacon_primitives::{
 	self as snowbridge, BeaconHeader, Fork as SnowbridgeFork, ForkVersion,
 	ForkVersions as SnowbridgeForkVersions, PublicKey, PublicKeyPrepared, Signature,
-	VersionedExecutionPayloadHeader,
 };
 
 const SYNC_COMMITTEE_BOUND_SIZE: u32 = EthereumBeaconPreset::Mainnet.sync_committee_size() as u32;
@@ -252,6 +253,7 @@ pub struct ForkVersions {
 	pub deneb: Fork,
 	pub electra: Fork,
 	pub fulu: Fork,
+	pub gloas: Fork,
 }
 
 impl From<ForkVersions> for SnowbridgeForkVersions {
@@ -268,7 +270,30 @@ impl From<ForkVersions> for SnowbridgeForkVersions {
 	}
 }
 
-/// Argon-owned bootstrap checkpoint shape without ancestry or `block_roots` data.
+/// Execution witness selected by the authenticated beacon slot, not by this variant.
+///
+/// Capella and Deneb retain their original SCALE indices and layouts. RLP witnesses prove the
+/// execution hash directly: the payload block hash before Gloas, and its parent hash in Gloas.
+#[derive(Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Debug, TypeInfo)]
+pub enum VersionedExecutionPayloadHeader {
+	#[codec(index = 0)]
+	Capella(snowbridge::ExecutionPayloadHeader),
+	#[codec(index = 1)]
+	Deneb(snowbridge::types::deneb::ExecutionPayloadHeader),
+	#[codec(index = 2)]
+	Rlp(EthereumExecutionHeaderRlp),
+}
+
+impl From<snowbridge::VersionedExecutionPayloadHeader> for VersionedExecutionPayloadHeader {
+	fn from(header: snowbridge::VersionedExecutionPayloadHeader) -> Self {
+		match header {
+			snowbridge::VersionedExecutionPayloadHeader::Capella(header) => Self::Capella(header),
+			snowbridge::VersionedExecutionPayloadHeader::Deneb(header) => Self::Deneb(header),
+		}
+	}
+}
+
+/// Execution witness and its branch into a finalized beacon block's body.
 #[derive(Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Debug, TypeInfo)]
 pub struct ExecutionHeaderProof {
 	pub execution_header: VersionedExecutionPayloadHeader,
@@ -373,8 +398,10 @@ pub struct ExecutionHeaderAnchor {
 }
 
 impl ExecutionHeaderAnchor {
-	pub fn from_payload_header(header: &VersionedExecutionPayloadHeader) -> Self {
-		match header {
+	pub fn from_payload_header(
+		header: &VersionedExecutionPayloadHeader,
+	) -> Result<Self, EthereumVerifyError> {
+		Ok(match header {
 			VersionedExecutionPayloadHeader::Capella(header) => Self {
 				block_number: header.block_number,
 				timestamp_millis: header.timestamp.saturating_mul(1_000),
@@ -391,7 +418,8 @@ impl ExecutionHeaderAnchor {
 				state_root: header.state_root,
 				receipts_root: header.receipts_root,
 			},
-		}
+			VersionedExecutionPayloadHeader::Rlp(rlp) => Self::from_rlp(rlp)?,
+		})
 	}
 }
 
@@ -412,7 +440,7 @@ impl TryFrom<snowbridge::ExecutionProof> for ExecutionProof {
 	fn try_from(proof: snowbridge::ExecutionProof) -> Result<Self, Self::Error> {
 		Ok(Self {
 			header: proof.header,
-			execution_header: proof.execution_header,
+			execution_header: proof.execution_header.into(),
 			execution_branch: proof
 				.execution_branch
 				.try_into()
