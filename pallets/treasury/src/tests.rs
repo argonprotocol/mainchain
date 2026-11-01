@@ -1366,6 +1366,7 @@ fn bid_pool_reserves_fund_purchase_rewards_at_maturity() {
 			argon_time_weighted_average_liquidity: 1,
 			tick: 1,
 			usdc_usd_price: Some(FixedU128::one()),
+			stabilizer_pool_sqrt_price_x96: None,
 		});
 		let owner = account(1);
 		let pool = PurchasePool::get();

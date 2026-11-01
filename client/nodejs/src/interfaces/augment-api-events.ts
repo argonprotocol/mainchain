@@ -11,6 +11,7 @@ import type {
   Null,
   Option,
   Result,
+  U256,
   U8aFixed,
   Vec,
   bool,
@@ -55,6 +56,9 @@ import type {
   PalletProxyDepositKind,
   PalletStabilizerBuysIneligibleReason,
   PalletStabilizerBuysUniswapPurchasePurchasePool,
+  PalletStabilizerPoolsCheckpointOutcome,
+  PalletStabilizerPoolsPoolConfig,
+  PalletStabilizerPoolsPositionCheckpoint,
   PalletTreasuryBondProgramId,
   PalletTreasuryBondReleaseReason,
   PalletTreasuryRewardReserveBalances,
@@ -1917,6 +1921,28 @@ declare module '@polkadot/api-base/types/events' {
         ApiType,
         [account: AccountId32, admissionFrame: u64, amount: u128, maturesAtTick: u64],
         { account: AccountId32; admissionFrame: u64; amount: u128; maturesAtTick: u64 }
+      >;
+    };
+    stabilizerPools: {
+      PoolRegistered: AugmentedEvent<
+        ApiType,
+        [poolManager: H160, poolId: H256, config: PalletStabilizerPoolsPoolConfig],
+        { poolManager: H160; poolId: H256; config: PalletStabilizerPoolsPoolConfig }
+      >;
+      PositionCheckpointed: AugmentedEvent<
+        ApiType,
+        [
+          positionManager: H160,
+          tokenId: U256,
+          checkpoint: PalletStabilizerPoolsPositionCheckpoint,
+          outcome: PalletStabilizerPoolsCheckpointOutcome,
+        ],
+        {
+          positionManager: H160;
+          tokenId: U256;
+          checkpoint: PalletStabilizerPoolsPositionCheckpoint;
+          outcome: PalletStabilizerPoolsCheckpointOutcome;
+        }
       >;
     };
     sudo: {

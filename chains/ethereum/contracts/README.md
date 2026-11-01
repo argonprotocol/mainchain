@@ -331,21 +331,23 @@ Not included in this package:
 - the temporary migration path
 - the restoration forensics work that blocks a mainnet mint run
 
-## Uniswap v4 Oracle Hook
+## Uniswap v4 Stabilization Pool Hook
 
-`UniswapV4OracleHook` connects one v4 pool to the existing Rust price oracle. Its history storage,
-interpolation, cumulative arithmetic and cardinality management come from the unmodified
+`StabilizationPoolHook` connects one ARGN/USDC v4 pool to the existing Rust price oracle and sets
+directional LP fees. Its history storage, interpolation, cumulative arithmetic and cardinality
+management come from the unmodified
 [Uniswap v3-core Oracle library](https://www.npmjs.com/package/@uniswap/v3-core), imported from the
 pinned `@uniswap/v3-core` version `1.0.2-solc-0.8-simulate`. The hook uses `@uniswap/v4-core`
 version `1.0.2` for callback types and pool-state access. Observations live in the hook contract's
 storage; the PoolManager retains the pool's current state. Each hook accepts observations from
 exactly one pool, including swaps and liquidity changes initiated by any user.
 
-Deploy one hook per pool using CREATE2. Constructor arguments are the PoolManager address, sorted
-currency addresses, fee, and tick spacing. Mine the salt so the deployed address's low 14 bits are
-`0x1a80`: after initialization, before liquidity addition/removal, and before swaps. The constructor
-rejects other permission bits, and callbacks reject any other manager or pool. The hook collects
-observations only; it has no fee adjustments, custody, swap deltas, or administrator.
+Deploy one hook per pool using CREATE2. Constructor arguments are the PoolManager address, ARGN
+address, USDC address, and tick spacing. The contract sorts the currencies and uses a dynamic-fee
+PoolKey (`fee = 0x800000`). Mine the salt so the deployed address's low 14 bits are `0x1a80`: after
+initialization, before liquidity addition/removal, and before swaps. The constructor rejects other
+permission bits, and callbacks reject any other manager or pool. The hook has no custody, swap
+deltas, or administrator.
 
 Initialize a **new** v4 pool with that exact key and hook address. Existing pools cannot acquire
 this hook or historical observations. History has a fixed capacity of 3,601 observations, enough for
@@ -354,6 +356,16 @@ separate allocation transaction: swaps and liquidity changes populate slots as n
 observations are overwritten once the buffer fills. Reads extrapolate through quiet periods from the
 PoolManager's current tick and liquidity. History starts at initialization and must warm up before
 the full one-hour window is available.
+
+ARGN sales pay 10% and ARGN purchases pay 0.5%. Both fees go to liquidity providers. The hook
+overrides the fee on every swap, including exact-output trades and swaps through other routers.
+Direction follows the ARGN token address regardless of currency ordering. There is no treasury
+deduction. The hook exposes the v3-compatible `observe()` interface used by the Rust oracle.
+
+The [deployment workspace](../deploy/README.md#stabilization-pool) prepares and publishes the hook,
+shared position subscriber, price quoter, pool initialization, and Argon registration call. Each
+user's NFT must still subscribe to the shared subscriber; pool publication does not enroll positions
+or seed liquidity.
 
 Configure both `ARGON_UNISWAP_ORACLE_ADDRESSES` and `ARGONOT_UNISWAP_ORACLE_ADDRESSES` with
 comma-separated observation contract addresses for the corresponding 18-decimal token paired with
@@ -375,6 +387,31 @@ restore previous sources, restore their address list and restart.
 The preferred window is one hour, with existing fallbacks to 30, 10, 5, and 1 minute when history is
 too young or has been overwritten. Until at least one window is available, that source cannot supply
 a price.
+
+## Uniswap v4 Price Quoter
+
+`UniswapV4PriceQuoter` extends the pinned periphery's `BaseV4Quoter` with the simulated post-swap
+price. It calls PoolManager's actual swap implementation, including the pool's hook and dynamic LP
+fee overrides, then reads the resulting slot0 before reverting the simulated changes. All pool,
+fee-growth and hook writes are rolled back, including when someone submits a quote as a transaction.
+
+Call it using `eth_call` (`simulateContract` in viem), with the standard
+`IV4Quoter.QuoteExactSingleParams`: `poolKey`, `zeroForOne`, `exactAmount`, and `hookData`.
+
+- `quoteExactInputSingle` returns `(amountOut, gasEstimate, sqrtPriceX96After)`.
+- `quoteExactOutputSingle` returns `(amountIn, gasEstimate, sqrtPriceX96After)`.
+
+Amounts are raw token base units. `sqrtPriceX96After` is the Q64.96 square root of raw currency1
+units per raw currency0 unit; account for token ordering and decimals when displaying price. The
+first two return values retain the standard v4 quoter's ordering. Quotes require the full specified
+input/output amount to be filled; native pool or hook failures are returned as
+`UnexpectedRevertBytes`, preserving their revert data. Multi-pool paths are outside this API.
+
+The constructor takes only the PoolManager address, so one quoter serves pools on that manager. It
+is separate from the hook: v4 skips hook callbacks when a hook initiates its own swap, which would
+skip our fee overrides. The deployment manifest includes it alongside the hook and subscriber, and
+the contract package exports its ABI and deployment artifact. The pallet does not depend on the
+quoter; checkpoints still authenticate Ethereum storage directly.
 
 ## Uniswap purchases
 

@@ -134,6 +134,8 @@ mod runtime {
 	pub type TreasuryPositions = pallet_treasury_positions;
 	#[runtime::pallet_index(39)]
 	pub type StabilizerBuys = pallet_stabilizer_buys;
+	#[runtime::pallet_index(40)]
+	pub type StabilizerPools = pallet_stabilizer_pools;
 }
 
 argon_runtime_common::call_filters!();
@@ -664,7 +666,7 @@ parameter_types! {
 }
 
 impl pallet_price_index::Config for Runtime {
-	type OnPriceIndexUpdated = use_unless_benchmark!(StabilizerBuys, ());
+	type OnPriceIndexUpdated = use_unless_benchmark!((StabilizerBuys, StabilizerPools), ());
 	type WeightInfo = weights::pallet_price_index::WeightInfo<Runtime>;
 	type Currency = Balances;
 	type Balance = Balance;
@@ -905,4 +907,11 @@ impl pallet_treasury_positions::Config for Runtime {
 	);
 	type Balance = Balance;
 	type WeightInfo = weights::pallet_treasury_positions::WeightInfo<Runtime>;
+}
+
+impl pallet_stabilizer_pools::Config for Runtime {
+	type WeightInfo = weights::pallet_stabilizer_pools::WeightInfo<Runtime>;
+	type MiningFrameTransitionProvider = MiningSlot;
+	type CurrentTick = Ticks;
+	type MaxFramePriceHistoryFrames = ConstU32<33>;
 }

@@ -2,7 +2,8 @@ use crate::{Config, Current, LastValid, Pallet, PriceIndex};
 use argon_primitives::price_index::PriceIndexV1;
 use pallet_prelude::*;
 
-pub fn add_usdc<T: Config>() -> Weight {
+/// Extend the open v2 index layout with optional USDC and stabilizer-pool observations.
+pub fn add_optional_pool_prices<T: Config>() -> Weight {
 	if StorageVersion::get::<Pallet<T>>() != StorageVersion::new(1) {
 		return T::DbWeight::get().reads(1);
 	}

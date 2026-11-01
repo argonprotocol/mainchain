@@ -828,10 +828,17 @@ pub trait PriceIndexUpdated {
 	fn on_price_index_weight() -> Weight;
 }
 
-impl PriceIndexUpdated for () {
-	fn on_price_index(_: &PriceIndex) {}
+#[impl_trait_for_tuples::impl_for_tuples(0, 2)]
+impl PriceIndexUpdated for Tuple {
+	fn on_price_index(index: &PriceIndex) {
+		for_tuples!( #( Tuple::on_price_index(index); )* );
+	}
+
+	#[allow(clippy::let_and_return)]
 	fn on_price_index_weight() -> Weight {
-		Weight::zero()
+		let mut weight = Weight::zero();
+		for_tuples!( #( weight = weight.saturating_add(Tuple::on_price_index_weight()); )* );
+		weight
 	}
 }
 

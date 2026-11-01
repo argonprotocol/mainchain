@@ -1082,6 +1082,7 @@ async fn submit_price(
 						argon_usd_price: FixedU128Ext(FixedU128::from_float(1.6).into_inner()),
 						argon_time_weighted_average_liquidity: 500_000_000_000,
 						usdc_usd_price: None,
+						stabilizer_pool_sqrt_price_x96: None,
 						argonot_usd_price: FixedU128Ext(FixedU128::from_float(1.0).into_inner()),
 						tick,
 					},

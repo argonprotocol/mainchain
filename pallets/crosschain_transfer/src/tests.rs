@@ -129,6 +129,12 @@ fn finalized_activity_rejects_impossible_collateral_array_before_decoding() {
 	};
 
 	new_test_ext().execute_with(|| {
+		assert_ok!(CrosschainTransfer::set_chain_config(
+			RuntimeOrigin::root(),
+			SourceChain::Ethereum,
+			chain_config()
+		));
+
 		assert!(CrosschainTransfer::decode_evm_gateway_activity(&chain_config(), &log).is_ok());
 
 		let mut impossible_count = log.clone();
@@ -139,6 +145,20 @@ fn finalized_activity_rejects_impossible_collateral_array_before_decoding() {
 				.err(),
 			Some(Error::<Test>::InvalidGatewayActivity.into())
 		);
+
+		// Start with a valid locator, then corrupt only the event's declared array size.
+		let mut proof = storage_proof(10, H256::zero(), vec![log.clone()]);
+		proof.activity_logs = vec![impossible_count].try_into().unwrap();
+		assert_noop!(
+			CrosschainTransfer::prove_gateway_activity_storage(
+				RuntimeOrigin::signed(account(1)),
+				SourceChain::Ethereum,
+				0,
+				proof
+			),
+			Error::<Test>::InvalidProof
+		);
+		assert!(GatewayStateBySourceChain::<Test>::get(SourceChain::Ethereum).is_none());
 
 		let mut wrong_offset = log.clone();
 		wrong_offset.data[96..128].fill(0);
@@ -449,15 +469,6 @@ fn register_council_signer_validates_proof_and_applies_queued_replacement() {
 			None,
 		);
 	});
-}
-
-pub(super) fn chain_config() -> ChainConfig {
-	ChainConfig::Evm {
-		chain_id: 1,
-		gateway: h160(0x21),
-		argon_token: h160(0x31),
-		argonot_token: h160(0x32),
-	}
 }
 
 pub(super) fn council_signing_pair(seed_byte: u8) -> KeccakPair {

@@ -21,6 +21,7 @@ members = [
     "pallets/crosschain_transfer",
     "pallets/treasury",
     "pallets/treasury_positions",
+    "pallets/stabilizer_pools",
     "pallets/mining_slot",
     "pallets/notaries",
     "pallets/notebook",
@@ -244,6 +245,9 @@ dotenv = { version = "0.15" }
 ethers = { version = "2.0.14" }
 uniswap-sdk-core = { version = "5.3.0" }
 uniswap-v3-sdk = { version = "5.2.1", default-features = false }
+# The bigint release avoids fastnum's std requirement in the runtime math path.
+uniswap-v3-sdk-bigint = { package = "uniswap-v3-sdk", version = "=3.11.0", default-features = false }
+uniswap-v4-sdk = { version = "=2.0.0", default-features = false }
 uniswap-lens = { version = "=2.0.0" }
 alloy-primitives = { version = "1.3", default-features = false }
 alloy-consensus = { version = "=2.0.0", default-features = false, features = ["serde"] }
@@ -288,6 +292,7 @@ pallet-domains = { path = "pallets/domains", default-features = false }
 pallet-fee-control = { path = "pallets/fee_control", default-features = false }
 pallet-ethereum-verifier = { path = "pallets/ethereum_verifier", default-features = false }
 pallet-crosschain-transfer = { path = "pallets/crosschain_transfer", default-features = false }
+pallet-stabilizer-pools = { path = "pallets/stabilizer_pools", default-features = false }
 pallet-treasury-positions = { path = "pallets/treasury_positions", default-features = false }
 pallet-stabilizer-buys = { path = "pallets/stabilizer_buys", default-features = false }
 pallet-treasury = { path = "pallets/treasury", default-features = false }

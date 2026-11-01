@@ -67,6 +67,7 @@ pallet-bitcoin-fissions = { workspace = true }
 pallet-bootstrap = { workspace = true }
 pallet-localchain-transfer = { workspace = true }
 pallet-crosschain-transfer = { workspace = true }
+pallet-stabilizer-pools = { workspace = true }
 pallet-digests = { workspace = true }
 pallet-domains = { workspace = true }
 pallet-ethereum-verifier = { workspace = true }
@@ -116,6 +117,7 @@ std = [
 	"pallet-operational-accounts/std",
 	"pallet-price-index/std",
 	"pallet-stabilizer-buys/std",
+	"pallet-stabilizer-pools/std",
 	"pallet-ticks/std",
 	"pallet-treasury-positions/std",
 	"pallet-treasury/std",
@@ -150,6 +152,7 @@ runtime-benchmarks = [
 	"pallet-operational-accounts/runtime-benchmarks",
 	"pallet-price-index/runtime-benchmarks",
 	"pallet-stabilizer-buys/runtime-benchmarks",
+	"pallet-stabilizer-pools/runtime-benchmarks",
 	"pallet-ticks/runtime-benchmarks",
 	"pallet-treasury-positions/runtime-benchmarks",
 	"pallet-treasury/runtime-benchmarks",
@@ -179,6 +182,7 @@ try-runtime = [
 	"pallet-operational-accounts/try-runtime",
 	"pallet-price-index/try-runtime",
 	"pallet-stabilizer-buys/try-runtime",
+	"pallet-stabilizer-pools/try-runtime",
 	"pallet-ticks/try-runtime",
 	"pallet-treasury-positions/try-runtime",
 	"pallet-treasury/try-runtime",

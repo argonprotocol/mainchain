@@ -118,6 +118,9 @@ where
 
 #[frame_support::pallet]
 pub mod pallet {
+	// FRAME's generated call enum carries a fixed-size price record; keep it inline.
+	#![allow(clippy::large_enum_variant)]
+
 	use sp_arithmetic::FixedPointNumber;
 
 	use argon_primitives::{MiningFrameTransitionProvider, PriceProvider};
@@ -286,7 +289,7 @@ pub mod pallet {
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_runtime_upgrade() -> Weight {
-			migrations::add_usdc::<T>()
+			migrations::add_optional_pool_prices::<T>()
 		}
 		fn on_initialize(_: BlockNumberFor<T>) -> Weight {
 			let prev_tick = T::CurrentTick::get();

@@ -148,6 +148,7 @@ mod tests {
 				argon_time_weighted_average_liquidity: 1,
 				tick: 0,
 				usdc_usd_price: None,
+				stabilizer_pool_sqrt_price_x96: None,
 			};
 			for (tick, usdc, target) in
 				[(1, 970, 1000), (12, 1010, 1010), (20, 990, 1020), (30, 995, 1030)]
@@ -231,6 +232,7 @@ mod tests {
 					argon_time_weighted_average_liquidity: 1,
 					tick,
 					usdc_usd_price: Some(FixedU128::from_rational(98, 100)),
+					stabilizer_pool_sqrt_price_x96: None,
 				};
 				assert_ok!(mock::PriceIndex::submit(RuntimeOrigin::signed(1), index, None));
 			}

@@ -32,6 +32,7 @@ subxt = { workspace = true }
 url = { workspace = true }
 uniswap-sdk-core = { workspace = true }
 uniswap-v3-sdk = { workspace = true }
+uniswap-v4-sdk = { workspace = true, features = ["extensions"] }
 uniswap-lens = { workspace = true }
 bitcoincore-rpc = { workspace = true }
 bitcoin = { workspace = true }
