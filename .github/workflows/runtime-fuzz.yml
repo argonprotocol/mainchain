@@ -67,8 +67,8 @@ jobs:
 
       - name: Install fuzz tools
         run: |
-          cargo install cargo-fuzz --version 0.13.1 --locked
-          cargo install rustfilt --version 0.2.1
+          cargo +stable install cargo-fuzz --version 0.13.1 --locked
+          cargo +stable install rustfilt --version 0.2.1
 
       - name: Replay Bitcoin lifecycle examples
         run:
