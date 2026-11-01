@@ -13,7 +13,7 @@ cargo-fuzz = true
 argon-primitives = { workspace = true, features = ["std"], optional = true }
 argon-runtime = { workspace = true, features = ["std", "try-runtime"], optional = true }
 bitcoin = { workspace = true, features = ["std"], optional = true }
-libfuzzer-sys = { version = "=0.4.10", optional = true }
+libfuzzer-sys = { version = "=0.4.13", optional = true }
 pallet-bitcoin-fissions = { workspace = true, features = ["std", "try-runtime"], optional = true }
 pallet-bitcoin-locks = { workspace = true, features = ["std", "try-runtime"], optional = true }
 pallet-vaults = { workspace = true, features = ["std"], optional = true }

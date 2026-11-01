@@ -329,7 +329,13 @@ impl ArgonTestNode {
 			let ws_url = format!("ws://127.0.0.1:{rpc_port}");
 
 			phase = "RPC connection";
-			let client = MainchainClient::from_url(&ws_url).await?;
+			// Fast sync can expose RPC before the finalized block's state is available.
+			let client = MainchainClient::try_until_connected(
+				&ws_url,
+				100,
+				startup_timeout.as_millis() as u64,
+			)
+			.await?;
 
 			phase = "P2P listener";
 			loop {
@@ -405,13 +411,119 @@ fn normalize_bootnode_address(address: String) -> String {
 #[cfg(all(test, unix))]
 mod tests {
 	use super::*;
-	use std::{fs, os::unix::fs::PermissionsExt};
+	use bitcoin::hex::FromHex;
+	use sp_core::H256;
+	use std::{
+		fs,
+		os::unix::fs::PermissionsExt,
+		sync::{
+			atomic::{AtomicUsize, Ordering},
+			Arc,
+		},
+	};
+	use subxt::ext::{
+		codec::Encode,
+		frame_metadata::OpaqueMetadata,
+		jsonrpsee::{core::JsonValue, server::ServerBuilder, types::ErrorObjectOwned, RpcModule},
+		subxt_rpcs::methods::legacy::RuntimeVersion,
+	};
 
 	#[tokio::test]
-	async fn startup_error_kills_the_node_process() {
-		let (args, pid_path) = startup_stub(true);
+	async fn startup_recovers_when_runtime_state_becomes_available() {
+		let server = ServerBuilder::default().build("127.0.0.1:0").await.unwrap();
+		let rpc_port = server.local_addr().unwrap().port();
+		let runtime_requests = Arc::new(AtomicUsize::new(0));
+		let mut rpc = RpcModule::new(runtime_requests.clone());
+		rpc.register_method("state_getRuntimeVersion", |_, requests, _| {
+			if requests.fetch_add(1, Ordering::SeqCst) == 0 {
+				return Err(ErrorObjectOwned::owned(
+					4003,
+					"Client error: Api called for an unknown Block: State already discarded",
+					None::<()>,
+				));
+			}
+			Ok(RuntimeVersion {
+				spec_version: 160,
+				transaction_version: 1,
+				other: Default::default(),
+			})
+		})
+		.unwrap();
+		rpc.register_method("chain_getBlockHash", |_, _, _| {
+			Ok::<_, ErrorObjectOwned>(H256::repeat_byte(1))
+		})
+		.unwrap();
+		rpc.register_method("chain_getFinalizedHead", |_, _, _| {
+			Ok::<_, ErrorObjectOwned>(H256::repeat_byte(1))
+		})
+		.unwrap();
+		let metadata: JsonValue =
+			include_str!("../../client/nodejs/metadata.json").parse().unwrap();
+		let metadata = OpaqueMetadata(
+			Vec::from_hex(metadata["result"].as_str().unwrap().trim_start_matches("0x")).unwrap(),
+		)
+		.encode();
+		let metadata = format!("0x{}", metadata.as_hex());
+		rpc.register_method("state_call", move |params, _, _| {
+			let (method, _, _): (String, String, H256) = params.parse()?;
+			if method == "Metadata_metadata" {
+				Ok(metadata.clone())
+			} else if method == "Metadata_metadata_at_version" {
+				Ok("0x00".to_string())
+			} else {
+				Err(ErrorObjectOwned::owned(-32601, "Method not found", None::<()>))
+			}
+		})
+		.unwrap();
+		rpc.register_method("state_getStorage", |_, _, _| None::<String>).unwrap();
+		rpc.register_method("system_localListenAddresses", |_, _, _| {
+			vec![
+				"/ip4/127.0.0.1/tcp/30333/p2p/12D3KooWD8WrhiunjNThrRGB2VKWHd2exaeJ4Cb5vAysWfZZdMrs",
+			]
+		})
+		.unwrap();
+		rpc.register_subscription(
+			"state_subscribeRuntimeVersion",
+			"state_runtimeVersion",
+			"state_unsubscribeRuntimeVersion",
+			|_, pending, _, _| async move {
+				if let Ok(sink) = pending.accept().await {
+					sink.closed().await;
+				}
+			},
+		)
+		.unwrap();
+		let server_handle = server.start(rpc);
+
+		let (mut args, _) = startup_stub(Some(rpc_port));
 		let data_path = args.base_data_path.clone();
-		let error = ArgonTestNode::start(args).await.err().expect("RPC connection should fail");
+		let (proc, _, client, boot_url) =
+			ArgonTestNode::start_process(&mut args, Duration::from_secs(5))
+				.await
+				.expect("startup should recover after the missing-state error");
+
+		assert!(runtime_requests.load(Ordering::SeqCst) >= 2);
+		assert_eq!(client.live.runtime_version().spec_version, 160);
+		assert!(boot_url.starts_with("/ip4/127.0.0.1/tcp/30333/p2p/"));
+		assert_eq!(args.rpc_port, rpc_port);
+
+		drop(client);
+		drop(proc);
+		remove_dir_all(data_path).unwrap();
+		server_handle.stop().unwrap();
+		server_handle.stopped().await;
+	}
+
+	#[tokio::test]
+	async fn rpc_connection_retries_until_timeout_and_kills_the_node_process() {
+		let (mut args, pid_path) = startup_stub(Some(0));
+		let data_path = args.base_data_path.clone();
+		let startup_timeout = Duration::from_secs(2);
+		let started_at = std::time::Instant::now();
+		let error = ArgonTestNode::start_process(&mut args, startup_timeout)
+			.await
+			.err()
+			.expect("RPC connection should time out");
 
 		let pid = fs::read_to_string(&pid_path).unwrap();
 		let alive = Command::new("/bin/kill").args(["-0", pid.trim()]).output().unwrap();
@@ -420,12 +532,15 @@ mod tests {
 		}
 		remove_dir_all(data_path).unwrap();
 		assert!(!alive.status.success(), "startup error left the node process alive");
-		assert!(error.to_string().contains("RPC connection"));
+		assert!(started_at.elapsed() >= startup_timeout, "startup failed before retrying");
+		let message = format!("{error:#}");
+		assert!(message.contains("RPC connection"), "{message}");
+		assert!(message.contains("timed out"), "{message}");
 	}
 
 	#[tokio::test]
 	async fn cancelling_startup_kills_the_node_process() {
-		let (args, pid_path) = startup_stub(false);
+		let (args, pid_path) = startup_stub(None);
 		let data_path = args.base_data_path.clone();
 		{
 			let startup = ArgonTestNode::start(args);
@@ -451,7 +566,7 @@ mod tests {
 
 	#[tokio::test]
 	async fn startup_timeout_reports_the_phase_and_recent_logs() {
-		let (mut args, pid_path) = startup_stub(false);
+		let (mut args, pid_path) = startup_stub(None);
 		let data_path = args.base_data_path.clone();
 		let error = ArgonTestNode::start_process(&mut args, Duration::from_secs(2))
 			.await
@@ -471,7 +586,7 @@ mod tests {
 		assert!(message.contains("startup stub running"), "{message}");
 	}
 
-	fn startup_stub(log_rpc_port: bool) -> (ArgonNodeStartArgs, PathBuf) {
+	fn startup_stub(rpc_port: Option<u16>) -> (ArgonNodeStartArgs, PathBuf) {
 		let mut args = ArgonNodeStartArgs::new("alice", 0, "").unwrap();
 		args.target_dir = args.base_data_path.clone();
 		args.bitcoin_rpc = "http://127.0.0.1:1".to_string();
@@ -479,8 +594,10 @@ mod tests {
 		let mut script =
 			"#!/bin/sh\nprintf '%s\\n' \"$$\" > \"$0.pid\"\nprintf 'startup stub running\\n' >&2\n"
 				.to_string();
-		if log_rpc_port {
-			script.push_str("printf 'Running JSON-RPC server: addr=127.0.0.1:0\\n' >&2\n");
+		if let Some(rpc_port) = rpc_port {
+			script.push_str(&format!(
+				"printf 'Running JSON-RPC server: addr=127.0.0.1:{rpc_port}\\n' >&2\n"
+			));
 		}
 		script.push_str("exec /bin/sleep 60\n");
 		fs::write(&executable, script).unwrap();

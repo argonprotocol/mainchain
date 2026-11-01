@@ -10,11 +10,15 @@ pub(crate) fn check<T: Config>() -> Result<(), sp_runtime::TryRuntimeError> {
 
 	let mut total_securitization = T::Balance::zero();
 	for (vault_id, vault) in VaultsById::<T>::iter() {
+		if vault.is_closed {
+			continue;
+		}
+
 		ensure!(
 			VaultIdByOperator::<T>::get(&vault.operator_account_id) == Some(vault_id),
 			"Vault is missing its operator index"
 		);
-		if vault.is_closed || vault.securitization.is_zero() {
+		if vault.securitization.is_zero() {
 			continue;
 		}
 
@@ -109,6 +113,27 @@ mod tests {
 				Vaults::try_state(1),
 				Err(DispatchError::Other("Vault operator index references the wrong operator")),
 			);
+		});
+	}
+
+	#[test]
+	fn try_state_accepts_legacy_duplicate_operator_vaults() {
+		new_test_ext().execute_with(|| {
+			<Vaults as frame_support::traits::OnGenesis>::on_genesis();
+			set_argons(1, 100_010);
+			assert_ok!(Vaults::create(RuntimeOrigin::signed(1), default_vault()));
+
+			VaultIdByOperator::<Test>::remove(1);
+			assert_eq!(
+				Vaults::try_state(1),
+				Err(DispatchError::Other("Vault is missing its operator index")),
+			);
+
+			VaultIdByOperator::<Test>::insert(1, 1);
+			let mut legacy_vault = VaultsById::<Test>::get(1).unwrap();
+			legacy_vault.is_closed = true;
+			VaultsById::<Test>::insert(2, legacy_vault);
+			assert_ok!(Vaults::try_state(1));
 		});
 	}
 }
