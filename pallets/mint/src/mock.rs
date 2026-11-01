@@ -2,7 +2,9 @@ use pallet_balances::AccountData;
 use pallet_prelude::*;
 
 use crate as pallet_mint;
+use crate::{MintIndex, MintedBitcoinMicrogons, PendingBitcoinMint, PendingBitcoinMintsByIndex};
 use argon_primitives::{BlockRewardAccountsProvider, PriceProvider};
+use frame_support::traits::fungible::Unbalanced;
 use pallet_prelude::argon_primitives::{MiningFrameProvider, MiningFrameTransitionProvider};
 
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -144,4 +146,20 @@ impl pallet_mint::Config for Test {
 
 pub fn new_test_ext() -> TestState {
 	new_test_with_genesis::<Test>(|_t| {})
+}
+
+pub(crate) fn pending_mints() -> Vec<(MintIndex, PendingBitcoinMint<Test>)> {
+	let mut pending = PendingBitcoinMintsByIndex::<Test>::iter().collect::<Vec<_>>();
+	pending.sort_by_key(|(queue_index, _)| *queue_index);
+	pending
+}
+
+pub(crate) fn set_issuance_sources(mining: Balance, bitcoin: Balance) {
+	MintedBitcoinMicrogons::<Test>::set(bitcoin);
+	Balances::set_total_issuance(mining.saturating_add(bitcoin));
+}
+
+pub(crate) fn set_cpi(value: f64) {
+	ArgonCPI::set(Some(FixedI128::from_float(value)));
+	AverageCPI::set(FixedI128::from_float(value));
 }

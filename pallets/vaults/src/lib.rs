@@ -14,6 +14,8 @@ mod tests;
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 pub mod migrations;
+#[cfg(feature = "try-runtime")]
+mod try_state;
 pub mod weights;
 
 /// The Vaults pallet allows a user to fund BitcoinLocks for bitcoin holders. This allows them to
@@ -49,7 +51,7 @@ pub mod pallet {
 	use frame_support::traits::Incrementable;
 	use sp_runtime::traits::SaturatedConversion;
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(20);
+	pub(super) const STORAGE_VERSION: StorageVersion = StorageVersion::new(20);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -460,6 +462,11 @@ pub mod pallet {
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+		#[cfg(feature = "try-runtime")]
+		fn try_state(_: BlockNumberFor<T>) -> Result<(), sp_runtime::TryRuntimeError> {
+			crate::try_state::check::<T>()
+		}
+
 		fn on_initialize(_n: BlockNumberFor<T>) -> Weight {
 			let (start_bitcoin_height, bitcoin_block_height) = T::BitcoinBlockHeightChange::get();
 			let mut completions = 0u32;

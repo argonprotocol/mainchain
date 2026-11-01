@@ -1,0 +1,136 @@
+name: Ethereum security
+
+on:
+  pull_request:
+    paths:
+      - chains/ethereum/contracts/**
+      - yarn.lock
+      - .github/workflows/ethereum-security.yml
+  push:
+    branches: [main]
+    paths:
+      - chains/ethereum/contracts/**
+      - yarn.lock
+      - .github/workflows/ethereum-security.yml
+  workflow_dispatch:
+    inputs:
+      run_slither:
+        description: Run full Slither analysis and fail on high-impact findings
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  echidna:
+    name: Echidna invariants
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5.1.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v5.0.0
+        with:
+          node-version: 22
+          cache: yarn
+
+      - uses: actions/setup-python@v6.3.0
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: chains/ethereum/contracts/security/requirements.txt
+
+      - name: Install project dependencies
+        run: yarn install --immutable
+
+      - name: Install security tools
+        run: python -m pip install -r chains/ethereum/contracts/security/requirements.txt
+
+      - name: Test Ethereum security boundaries
+        run: |
+          yarn workspace @argonprotocol/ethereum-contracts build
+          yarn exec vitest --run --config vitest.config.ts --project ethereum-contracts \
+            chains/ethereum/contracts/test/StabilizationPoolHook.test.ts \
+            chains/ethereum/contracts/test/StabilizationPoolOracle.test.ts \
+            chains/ethereum/contracts/test/StabilizationPoolSubscriber.test.ts \
+            chains/ethereum/contracts/test/MintingGateway.test.ts
+
+      - name: Install Echidna
+        run: |
+          set -eu
+          curl --fail --location --silent --show-error \
+            https://github.com/crytic/echidna/releases/download/v2.3.3/echidna-2.3.3-x86_64-linux.tar.gz \
+            --output "$RUNNER_TEMP/echidna.tar.gz"
+          echo "436d26cb5af34c6c525812b857ac53f218c7f6ad07d69495ef88bc4cdc85c764  $RUNNER_TEMP/echidna.tar.gz" | sha256sum --check
+          mkdir -p "$RUNNER_TEMP/echidna"
+          tar -xzf "$RUNNER_TEMP/echidna.tar.gz" -C "$RUNNER_TEMP/echidna"
+          echo "$RUNNER_TEMP/echidna" >> "$GITHUB_PATH"
+
+      - name: Fuzz Ethereum invariants with Echidna
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p chains/ethereum/contracts/security/results
+          yarn workspace @argonprotocol/ethereum-contracts security:echidna 2>&1 \
+            | tee chains/ethereum/contracts/security/results/echidna.log
+
+      - name: Upload security reports and fuzz corpus
+        if: always()
+        uses: actions/upload-artifact@v6.0.0
+        with:
+          name: ethereum-security-echidna
+          path: |
+            chains/ethereum/contracts/security/results/
+            chains/ethereum/contracts/security/corpus/
+          if-no-files-found: warn
+
+  slither:
+    name: Slither analysis
+    # Run the initial static-analysis alerts explicitly while they are being reviewed.
+    if: github.event_name == 'workflow_dispatch' && inputs.run_slither
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5.1.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v5.0.0
+        with:
+          node-version: 22
+          cache: yarn
+
+      - uses: actions/setup-python@v6.3.0
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: chains/ethereum/contracts/security/requirements.txt
+
+      - name: Install project dependencies
+        run: yarn install --immutable
+
+      - name: Install security tools
+        run: python -m pip install -r chains/ethereum/contracts/security/requirements.txt
+
+      - name: Analyze contracts with Slither
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p chains/ethereum/contracts/security/results
+          yarn workspace @argonprotocol/ethereum-contracts security:slither 2>&1 \
+            | tee chains/ethereum/contracts/security/results/slither.log
+
+      - name: Upload static analysis reports
+        if: always()
+        uses: actions/upload-artifact@v6.0.0
+        with:
+          name: ethereum-security-slither
+          path: chains/ethereum/contracts/security/results/
+          if-no-files-found: warn

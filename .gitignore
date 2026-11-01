@@ -37,6 +37,9 @@ node_modules
 chains/ethereum/contracts/artifacts/
 chains/ethereum/contracts/generated.ts
 chains/ethereum/contracts/cache/
+chains/ethereum/contracts/crytic-export/
+chains/ethereum/contracts/security/results/
+chains/ethereum/contracts/security/corpus/
 chains/ethereum/contracts/deployments/default/
 /chains/ethereum/contracts/*.js
 chains/ethereum/deploy/*/*.standard-input.json

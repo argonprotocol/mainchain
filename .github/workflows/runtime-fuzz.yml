@@ -1,0 +1,128 @@
+name: Bitcoin lifecycle fuzzing
+
+on:
+  pull_request:
+    paths:
+      - 'pallets/**'
+      - 'primitives/**'
+      - 'runtime/**'
+      - 'fuzz/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - '.github/workflows/runtime-fuzz.yml'
+  schedule:
+    - cron: '41 6 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  CARGO_INCREMENTAL: 0
+  SKIP_WASM_BUILD: 1
+  SQLX_OFFLINE: true
+
+jobs:
+  bitcoin-lifecycle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5.1.0
+        with:
+          persist-credentials: false
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang llvm libclang-dev libssl-dev libudev-dev protobuf-compiler pkg-config
+          echo "LIBCLANG_PATH=$(llvm-config --libdir)" >> "$GITHUB_ENV"
+
+      - name: Install Rust
+        uses: actions-rust-lang/setup-rust-toolchain@v1.16.1
+        with:
+          toolchain: nightly-2026-05-05
+          components: llvm-tools-preview
+          cache: 'false'
+
+      - name: Restore build cache
+        uses: actions/cache@v5.1.0
+        with:
+          path: |
+            ~/.cargo/registry/
+            ~/.cargo/git/
+            target/
+            fuzz/target/
+          key: runtime-fuzz-linux-nightly-2026-05-05-${{ hashFiles('Cargo.lock') }}
+
+      - name: Restore corpus
+        uses: actions/cache/restore@v5.1.0
+        with:
+          path: fuzz/corpus/bitcoin_lifecycle/
+          key: bitcoin-corpus-${{ github.run_id }}
+          restore-keys: bitcoin-corpus-
+
+      - name: Install fuzz tools
+        run: |
+          cargo install cargo-fuzz --version 0.13.1 --locked
+          cargo install rustfilt --version 0.2.1
+
+      - name: Replay Bitcoin lifecycle examples
+        run:
+          cargo +nightly-2026-05-05 run --locked -p argon-runtime-fuzz --features fuzzing --bin
+          seed-corpus
+
+      - name: Fuzz funded Bitcoin Locks and Fissions
+        env:
+          CAMPAIGN_SECONDS: ${{ github.event_name == 'schedule' && '1800' || '120' }}
+        run: |
+          set -o pipefail
+          mkdir -p fuzz/coverage/bitcoin_lifecycle
+          cargo +nightly-2026-05-05 fuzz run bitcoin_lifecycle --features fuzzing --dev -- \
+            -max_total_time="$CAMPAIGN_SECONDS" -max_len=97 -timeout=30 -rss_limit_mb=4096 \
+            2>&1 | tee fuzz/coverage/bitcoin_lifecycle/campaign.log
+
+      - name: Report successful and rejected corpus operations
+        run: |
+          set -o pipefail
+          mkdir -p fuzz/coverage/bitcoin_lifecycle
+          cargo +nightly-2026-05-05 run --locked -p argon-runtime-fuzz --features fuzzing \
+            --bin seed-corpus -- fuzz/corpus/bitcoin_lifecycle --report \
+            | tee fuzz/coverage/bitcoin_lifecycle/operations.txt
+
+      - name: Measure Bitcoin pallet coverage
+        if: github.event_name != 'pull_request'
+        run: |
+          set -o pipefail
+          cargo +nightly-2026-05-05 fuzz coverage bitcoin_lifecycle --features fuzzing --dev \
+            --target-dir target/bitcoin-coverage
+          llvm_bin="$(rustc +nightly-2026-05-05 --print sysroot)/lib/rustlib/x86_64-unknown-linux-gnu/bin"
+          "$llvm_bin/llvm-cov" report \
+            target/bitcoin-coverage/x86_64-unknown-linux-gnu/debug/bitcoin_lifecycle \
+            -instr-profile=fuzz/coverage/bitcoin_lifecycle/coverage.profdata \
+            -Xdemangler=rustfilt \
+            -show-functions \
+            pallets/bitcoin_fissions/src/lib.rs pallets/bitcoin_locks/src/lib.rs \
+            pallets/vaults/src/lib.rs pallets/mint/src/lib.rs pallets/treasury_positions/src/lib.rs \
+            | tee fuzz/coverage/bitcoin_lifecycle/functions.txt
+
+      - name: Save corpus
+        if: always() && github.event_name != 'pull_request'
+        uses: actions/cache/save@v5.1.0
+        with:
+          path: fuzz/corpus/bitcoin_lifecycle/
+          key: bitcoin-corpus-${{ github.run_id }}
+
+      - name: Upload reproductions and corpus
+        if: always()
+        uses: actions/upload-artifact@v6.0.0
+        with:
+          name: runtime-fuzz-${{ github.run_id }}
+          path: |
+            fuzz/artifacts/
+            fuzz/corpus/
+            fuzz/coverage/
+          if-no-files-found: warn

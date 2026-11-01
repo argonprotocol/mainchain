@@ -5,19 +5,19 @@ use bitcoin::PublicKey;
 use pallet_prelude::*;
 
 use crate as pallet_bitcoin_locks;
-use crate::BitcoinVerifier;
+use crate::{BitcoinVerifier, LocksById};
 use argon_bitcoin::CosignReleaser;
 use argon_primitives::{
 	bitcoin::{
 		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinLockId, BitcoinNetwork, BitcoinSignature,
-		BitcoinXPub, CompressedBitcoinPubkey, NetworkKind, Satoshis, UtxoRef,
+		BitcoinXPub, CompressedBitcoinPubkey, H256Le, NetworkKind, Satoshis, UtxoRef,
 	},
 	vault::{
 		BitcoinLockFunding, BitcoinVaultProvider, CosignerGuarantee, LostBitcoinCompensation,
 		ReserveSecuritizationRequest, Vault, VaultError, VaultTerms,
 	},
-	ArgonCPI, BitcoinUtxoTracker, BlockRewardAccountsProvider, MiningFrameProvider,
-	MiningFrameTransitionProvider, OperationalAccountsHook, PriceProvider,
+	ArgonCPI, BitcoinUtxoEvents, BitcoinUtxoTracker, BlockRewardAccountsProvider,
+	MiningFrameProvider, MiningFrameTransitionProvider, OperationalAccountsHook, PriceProvider,
 };
 use frame_support::traits::Currency;
 
@@ -757,4 +757,19 @@ impl pallet_treasury_positions::Config for Test {
 	type OperationalAccountProvider = ();
 	type Balance = Balance;
 	type WeightInfo = ();
+}
+
+pub(crate) fn funding_received(lock_id: BitcoinLockId, satoshis: Satoshis) -> DispatchResult {
+	let lock = LocksById::<Test>::get(lock_id);
+	let utxo_ref = lock
+		.as_ref()
+		.and_then(|lock| lock.funding_utxos.keys().next().cloned())
+		.unwrap_or(UtxoRef { txid: H256Le([0; 32]), output_index: 0 });
+	let bitcoin_height = lock.map(|lock| lock.created_at_height).unwrap_or_default();
+	<BitcoinLocks as BitcoinUtxoEvents<u64>>::utxo_detected(
+		lock_id,
+		utxo_ref,
+		satoshis,
+		bitcoin_height,
+	)
 }
