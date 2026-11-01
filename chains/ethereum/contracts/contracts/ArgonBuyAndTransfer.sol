@@ -61,6 +61,8 @@ contract ArgonBuyAndTransfer is ReentrancyGuard {
 	}
 
 	/// @notice Buys from one canonical USDC/ARGN v4 pool using its native PoolKey.
+	/// @dev The reentrancy guard protects balance deltas across token and router callbacks.
+	// slither-disable-next-line reentrancy-balance
 	function buyAndTransfer(Request calldata request, PoolKey calldata key, bytes calldata hookData)
 		external nonReentrant returns (uint128 microgons, uint64 activityNonce)
 	{

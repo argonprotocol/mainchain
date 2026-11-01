@@ -13,11 +13,6 @@ on:
       - yarn.lock
       - .github/workflows/ethereum-security.yml
   workflow_dispatch:
-    inputs:
-      run_slither:
-        description: Run full Slither analysis and fail on high-impact findings
-        type: boolean
-        default: false
 
 permissions:
   contents: read
@@ -93,8 +88,6 @@ jobs:
 
   slither:
     name: Slither analysis
-    # Run the initial static-analysis alerts explicitly while they are being reviewed.
-    if: github.event_name == 'workflow_dispatch' && inputs.run_slither
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
