@@ -52,7 +52,7 @@ __metadata:
     "@uniswap/universal-router": "https://github.com/Uniswap/universal-router/archive/802fe4c18f47300e0f183e2a42e9146ec2ea9fc3.tar.gz"
     "@uniswap/v3-core": "npm:1.0.2-solc-0.8-simulate"
     "@uniswap/v4-core": "npm:1.0.2"
-    "@uniswap/v4-periphery": "patch:@uniswap/v4-periphery@https%3A//github.com/Uniswap/v4-periphery/archive/545a5d2a87228167edde48f3b9eda122d1e3c4d6.tar.gz#~/.yarn/patches/@uniswap-v4-periphery-https-a69d333e68.patch"
+    "@uniswap/v4-periphery": "https://github.com/Uniswap/v4-periphery/archive/545a5d2a87228167edde48f3b9eda122d1e3c4d6.tar.gz"
     "@wagmi/cli": "npm:^2.10.0"
     ethers: "npm:^6.15.0"
     hardhat: "npm:^3.18.1"

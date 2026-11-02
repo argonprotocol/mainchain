@@ -30,10 +30,6 @@ export * from './header';
 export * from './convert';
 export * from './PriceIndex';
 export * as EvmContracts from './EvmContracts';
-export {
-  mintingGatewayActivityHashingFixture,
-  type MintingGatewayActivityHashingFixture,
-} from './EvmContracts';
 export * from './EthereumProof';
 export type {
   EthereumBeaconBlockResponse,

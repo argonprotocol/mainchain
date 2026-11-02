@@ -11,10 +11,6 @@ import {
   transparentUpgradeableProxyArtifact as rawTransparentUpgradeableProxyArtifact,
 } from '@argonprotocol/ethereum-contracts';
 import {
-  mintingGatewayActivityHashingFixture,
-  type MintingGatewayActivityHashingFixture,
-} from '@argonprotocol/ethereum-contracts/fixtures';
-import {
   ArgonTokenEvents,
   ArgonotTokenEvents,
   CanonicalMintableBurnableERC20Events,
@@ -105,7 +101,6 @@ export {
   MINTING_GATEWAY_RUNTIME_TO_ERC20_SCALE,
   MINTING_GATEWAY_TOKEN_DECIMALS,
   MINTING_GATEWAY_UPDATE_KINDS,
-  mintingGatewayActivityHashingFixture,
   MintingGatewayEvents,
   ProxyAdminEvents,
   TransparentUpgradeableProxyEvents,
@@ -138,5 +133,3 @@ export {
   proxyAdminAbi,
   transparentUpgradeableProxyAbi,
 };
-
-export type { MintingGatewayActivityHashingFixture };
