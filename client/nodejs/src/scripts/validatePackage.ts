@@ -2,6 +2,7 @@ import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import ts from 'typescript';
+import packageJson from '../../package.json' with { type: 'json' };
 
 const packageRoot = path.resolve(import.meta.dirname, '..', '..');
 const packOutput = execSync('yarn pack --dry-run --json', {
@@ -17,6 +18,9 @@ const packedFiles = new Set(
     .map(location => location.replaceAll(path.win32.sep, path.posix.sep)),
 );
 const declarationFiles = [...packedFiles].filter(file => /\.d\.(?:c|m)?ts$/.test(file));
+const workspaceDevDependencies = Object.entries(packageJson.devDependencies)
+  .filter(([, version]) => version.startsWith('workspace:'))
+  .map(([name]) => name);
 const missingImports = new Set<string>();
 
 for (const declarationFile of declarationFiles) {
@@ -24,6 +28,13 @@ for (const declarationFile of declarationFiles) {
   const imports = ts.preProcessFile(declaration, true, true).importedFiles;
 
   for (const { fileName } of imports) {
+    if (
+      workspaceDevDependencies.some(name => fileName === name || fileName.startsWith(`${name}/`))
+    ) {
+      missingImports.add(`${declarationFile}: ${fileName}`);
+      continue;
+    }
+
     if (!fileName.startsWith('.')) continue;
 
     const resolvedImport = path.posix.normalize(
@@ -49,6 +60,6 @@ for (const declarationFile of declarationFiles) {
 
 if (missingImports.size) {
   throw new Error(
-    `Packed declarations contain unresolved relative imports:\n${[...missingImports].join('\n')}`,
+    `Packed declarations contain unresolved imports:\n${[...missingImports].join('\n')}`,
   );
 }

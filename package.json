@@ -48,6 +48,7 @@
     }
   },
   "resolutions": {
+    "@uniswap/v4-periphery": "patch:@uniswap/v4-periphery@https%3A//github.com/Uniswap/v4-periphery/archive/545a5d2a87228167edde48f3b9eda122d1e3c4d6.tar.gz#~/.yarn/patches/@uniswap-v4-periphery-https-a69d333e68.patch",
     "axios@npm:^0.26.1": "1.15.2",
     "minimatch@npm:9.0.3": "9.0.9",
     "yaml@npm:2.7.0": "2.8.3"
