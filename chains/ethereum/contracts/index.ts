@@ -1,4 +1,4 @@
-import type { ContractFunctionArgs } from 'viem';
+import type { Abi, ContractFunctionArgs, Hex } from 'viem';
 import type { argonBuyAndTransferAbi } from '@argonprotocol/ethereum-contracts/generated';
 import argonBuyAndTransferArtifact from './artifacts/contracts/ArgonBuyAndTransfer.sol/ArgonBuyAndTransfer.json' with { type: 'json' };
 import argonTokenArtifact from './artifacts/contracts/ArgonToken.sol/ArgonToken.json' with { type: 'json' };
@@ -9,6 +9,8 @@ import uniswapV4PriceQuoterArtifact from './artifacts/contracts/UniswapV4PriceQu
 import mintingGatewayArtifact from './artifacts/contracts/MintingGateway.sol/MintingGateway.json' with { type: 'json' };
 import proxyAdminArtifact from './artifacts/contracts/ProxyArtifacts.sol/ProxyAdmin.json' with { type: 'json' };
 import transparentUpgradeableProxyArtifact from './artifacts/contracts/ProxyArtifacts.sol/TransparentUpgradeableProxy.json' with { type: 'json' };
+
+export type EvmContractArtifact = { abi: Abi; bytecode: Hex };
 
 export const MINTING_GATEWAY_RUNTIME_DECIMALS = 6;
 export const MINTING_GATEWAY_TOKEN_DECIMALS = 18;

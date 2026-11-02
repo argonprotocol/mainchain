@@ -1,6 +1,9 @@
 import {
   AbiCoder,
+  Contract,
+  ContractFactory,
   Interface,
+  NonceManager,
   concat,
   getAddress,
   getCreate2Address,
@@ -8,8 +11,11 @@ import {
   toBeHex,
   ZeroAddress,
   ZeroHash,
+  type ContractRunner,
+  type InterfaceAbi,
+  type Signer,
 } from 'ethers';
-import type { HardhatEthers } from '@nomicfoundation/hardhat-ethers/types';
+import { EvmContracts } from '@argonprotocol/mainchain';
 
 // Uniswap's HookMiner uses this standard, permissionless CREATE2 deployment proxy.
 // https://github.com/Arachnid/deterministic-deployment-proxy
@@ -33,10 +39,12 @@ export interface StabilizationPoolConfig {
 
 /** Prepare deterministic deployments and pool initialization without submitting transactions. */
 export async function prepareStabilizationPool(
-  ethers: HardhatEthers,
+  runner: ContractRunner,
   config: StabilizationPoolConfig,
 ) {
-  const { chainId } = await ethers.provider.getNetwork();
+  const provider = runner.provider;
+  if (!provider) throw new Error('Stabilization preparation requires a provider');
+  const { chainId } = await provider.getNetwork();
   if (BigInt(config.chainId) !== chainId) throw new Error('Stabilization config chainId mismatch');
   if (!Number.isInteger(config.tickSpacing)) throw new Error('tickSpacing must be an integer');
   if (config.tickSpacing < 1) throw new Error('tickSpacing must be positive');
@@ -53,15 +61,16 @@ export async function prepareStabilizationPool(
   const positionManager = getAddress(config.positionManager);
   if (argonToken === usdc) throw new Error('ARGN and USDC must be distinct');
 
-  const manager = await ethers.getContractAt(
-    ['function poolManager() view returns (address)'],
+  const manager = new Contract(
     positionManager,
+    ['function poolManager() view returns (address)'],
+    runner,
   );
   const poolManager = getAddress(await manager.getFunction('poolManager')());
   const dependencyCodeHashes: Record<string, string> = {};
   for (const address of [argonToken, usdc, positionManager, poolManager]) {
     if (address === ZeroAddress) throw new Error('Pool dependencies cannot be zero');
-    const code = await ethers.provider.getCode(address);
+    const code = await provider.getCode(address);
     if (code === '0x') throw new Error(`Pool dependency ${address} has no deployed code`);
     dependencyCodeHashes[address] = keccak256(code);
   }
@@ -70,18 +79,22 @@ export async function prepareStabilizationPool(
     [argonToken, 18],
     [usdc, 6],
   ] as const) {
-    const token = await ethers.getContractAt(['function decimals() view returns (uint8)'], address);
+    const token = new Contract(address, ['function decimals() view returns (uint8)'], runner);
     if ((await token.getFunction('decimals')()) !== BigInt(decimals)) {
       throw new Error(`Token ${address} must have ${decimals} decimals`);
     }
   }
-  if ((await ethers.provider.getCode(CREATE2_DEPLOYER)) !== CREATE2_DEPLOYER_CODE) {
+  if ((await provider.getCode(CREATE2_DEPLOYER)) !== CREATE2_DEPLOYER_CODE) {
     throw new Error(
       `Standard CREATE2 deployer is missing or has unexpected code at ${CREATE2_DEPLOYER}`,
     );
   }
 
-  const hookFactory = await ethers.getContractFactory('StabilizationPoolHook');
+  const hookFactory = new ContractFactory(
+    EvmContracts.stabilizationPoolHookArtifact.abi as InterfaceAbi,
+    EvmContracts.stabilizationPoolHookArtifact.bytecode,
+    runner,
+  );
   const hookConstructorArgs = [poolManager, argonToken, usdc, config.tickSpacing];
   const hookInitCode = (await hookFactory.getDeployTransaction(...hookConstructorArgs)).data;
   const hookInitCodeHash = keccak256(hookInitCode);
@@ -94,7 +107,11 @@ export async function prepareStabilizationPool(
   }
   if ((BigInt(hookAddress) & 0x3fffn) !== 0x1a80n) throw new Error('Hook salt search exhausted');
 
-  const subscriberFactory = await ethers.getContractFactory('StabilizationPoolSubscriber');
+  const subscriberFactory = new ContractFactory(
+    EvmContracts.stabilizationPoolSubscriberArtifact.abi as InterfaceAbi,
+    EvmContracts.stabilizationPoolSubscriberArtifact.bytecode,
+    runner,
+  );
   const subscriberConstructorArgs = [positionManager];
   const subscriberInitCode = (
     await subscriberFactory.getDeployTransaction(...subscriberConstructorArgs)
@@ -105,7 +122,11 @@ export async function prepareStabilizationPool(
     keccak256(subscriberInitCode),
   );
 
-  const quoterFactory = await ethers.getContractFactory('UniswapV4PriceQuoter');
+  const quoterFactory = new ContractFactory(
+    EvmContracts.uniswapV4PriceQuoterArtifact.abi as InterfaceAbi,
+    EvmContracts.uniswapV4PriceQuoterArtifact.bytecode,
+    runner,
+  );
   const quoterConstructorArgs = [poolManager];
   const quoterInitCode = (await quoterFactory.getDeployTransaction(...quoterConstructorArgs)).data;
   const quoterAddress = getCreate2Address(CREATE2_DEPLOYER, ZeroHash, keccak256(quoterInitCode));
@@ -174,23 +195,27 @@ export type StabilizationPoolDeployment = Awaited<ReturnType<typeof prepareStabi
 
 /** Publish a prepared bundle; retries reuse the same contract addresses and initialized pool. */
 export async function publishStabilizationPool(
-  ethers: HardhatEthers,
+  deployer: Signer,
   deployment: StabilizationPoolDeployment,
   saveProgress: () => Promise<void>,
 ) {
-  const { chainId } = await ethers.provider.getNetwork();
+  const provider = deployer.provider;
+  if (!provider) throw new Error('Stabilization publication requires a provider');
+  const { chainId } = await provider.getNetwork();
   if (chainId !== BigInt(deployment.network.chainId))
     throw new Error('Deployment chainId mismatch');
-  if ((await ethers.provider.getCode(CREATE2_DEPLOYER)) !== CREATE2_DEPLOYER_CODE) {
+  if ((await provider.getCode(CREATE2_DEPLOYER)) !== CREATE2_DEPLOYER_CODE) {
     throw new Error('Unexpected CREATE2 deployer code');
   }
   for (const [address, hash] of Object.entries(deployment.dependencyCodeHashes)) {
-    if (keccak256(await ethers.provider.getCode(address)) !== hash) {
+    if (keccak256(await provider.getCode(address)) !== hash) {
       throw new Error(`Dependency code changed at ${address}; prepare a new deployment`);
     }
   }
 
-  const [deployer] = await ethers.getSigners();
+  // Instant local mining can confirm the next transaction before a provider's nonce cache expires.
+  const publisher = new NonceManager(deployer);
+
   for (const [name, contract] of Object.entries(deployment.contracts)) {
     if (
       getCreate2Address(CREATE2_DEPLOYER, contract.salt, keccak256(contract.initCode)) !==
@@ -198,9 +223,9 @@ export async function publishStabilizationPool(
     ) {
       throw new Error(`Invalid deterministic address for ${name}`);
     }
-    if ((await ethers.provider.getCode(contract.address)) !== '0x') continue;
+    if ((await provider.getCode(contract.address)) !== '0x') continue;
 
-    const transaction = await deployer.sendTransaction({
+    const transaction = await publisher.sendTransaction({
       to: CREATE2_DEPLOYER,
       data: concat([contract.salt, contract.initCode]),
     });
@@ -211,9 +236,10 @@ export async function publishStabilizationPool(
   }
 
   // PoolManager stores sqrtPriceX96 in the low 160 bits of pools[poolId].slot0.
-  const poolManager = await ethers.getContractAt(
-    ['function extsload(bytes32) view returns (bytes32)'],
+  const poolManager = new Contract(
     deployment.pool.poolManager,
+    ['function extsload(bytes32) view returns (bytes32)'],
+    provider,
   );
   const slot = keccak256(
     AbiCoder.defaultAbiCoder().encode(['bytes32', 'uint256'], [deployment.pool.poolId, 6]),
@@ -233,7 +259,7 @@ export async function publishStabilizationPool(
     return;
   }
 
-  const transaction = await deployer.sendTransaction(deployment.initialization);
+  const transaction = await publisher.sendTransaction(deployment.initialization);
   const receipt = await transaction.wait();
   if (!receipt?.status) throw new Error('Pool initialization failed');
   deployment.transactions.initialize = receipt.hash;

@@ -1,5 +1,5 @@
-import type { Abi, Hex } from 'viem';
 import {
+  type EvmContractArtifact,
   MINTING_GATEWAY_RUNTIME_DECIMALS,
   MINTING_GATEWAY_RUNTIME_TO_ERC20_SCALE,
   MINTING_GATEWAY_TOKEN_DECIMALS,
@@ -8,7 +8,10 @@ import {
   argonotTokenArtifact as rawArgonotTokenArtifact,
   mintingGatewayArtifact as rawMintingGatewayArtifact,
   proxyAdminArtifact as rawProxyAdminArtifact,
+  stabilizationPoolHookArtifact as rawStabilizationPoolHookArtifact,
+  stabilizationPoolSubscriberArtifact as rawStabilizationPoolSubscriberArtifact,
   transparentUpgradeableProxyArtifact as rawTransparentUpgradeableProxyArtifact,
+  uniswapV4PriceQuoterArtifact as rawUniswapV4PriceQuoterArtifact,
 } from '@argonprotocol/ethereum-contracts';
 import {
   ArgonTokenEvents,
@@ -25,7 +28,10 @@ import {
   iCanonicalTokenAbi,
   mintingGatewayAbi,
   proxyAdminAbi,
+  stabilizationPoolHookAbi,
+  stabilizationPoolSubscriberAbi,
   transparentUpgradeableProxyAbi,
+  uniswapV4PriceQuoterAbi,
 } from '@argonprotocol/ethereum-contracts/generated';
 import {
   MINTING_GATEWAY_UPDATE_KINDS,
@@ -53,22 +59,25 @@ import {
   hashMintingGatewayTransferToArgonStartedActivity,
 } from '@argonprotocol/ethereum-contracts/hashing';
 
-export type { ArgonBuyAndTransferRequest } from '@argonprotocol/ethereum-contracts';
+export type {
+  ArgonBuyAndTransferRequest,
+  EvmContractArtifact,
+} from '@argonprotocol/ethereum-contracts';
 export type * from '@argonprotocol/ethereum-contracts/generated';
 export type * from '@argonprotocol/ethereum-contracts/hashing';
-
-export type EvmContractArtifact = {
-  abi: Abi;
-  bytecode: Hex;
-};
 
 export const argonBuyAndTransferArtifact = rawArgonBuyAndTransferArtifact as EvmContractArtifact;
 export const argonTokenArtifact = rawArgonTokenArtifact as EvmContractArtifact;
 export const argonotTokenArtifact = rawArgonotTokenArtifact as EvmContractArtifact;
 export const mintingGatewayArtifact = rawMintingGatewayArtifact as EvmContractArtifact;
 export const proxyAdminArtifact = rawProxyAdminArtifact as EvmContractArtifact;
+export const stabilizationPoolHookArtifact =
+  rawStabilizationPoolHookArtifact as EvmContractArtifact;
+export const stabilizationPoolSubscriberArtifact =
+  rawStabilizationPoolSubscriberArtifact as EvmContractArtifact;
 export const transparentUpgradeableProxyArtifact =
   rawTransparentUpgradeableProxyArtifact as EvmContractArtifact;
+export const uniswapV4PriceQuoterArtifact = rawUniswapV4PriceQuoterArtifact as EvmContractArtifact;
 
 export type MintingGatewayTransferOutOfArgonRequest = Parameters<
   typeof rawHashMintingGatewayTransferOutOfArgonRequest
@@ -131,5 +140,8 @@ export {
   iCanonicalTokenAbi,
   mintingGatewayAbi,
   proxyAdminAbi,
+  stabilizationPoolHookAbi,
+  stabilizationPoolSubscriberAbi,
   transparentUpgradeableProxyAbi,
+  uniswapV4PriceQuoterAbi,
 };

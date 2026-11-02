@@ -15,11 +15,12 @@ import {
   prepareStabilizationPool,
   publishStabilizationPool,
   type StabilizationPoolDeployment,
-} from '../../deploy/src/stabilization.js';
+} from '../../../../testing/nodejs/lib/index.js';
 
 const require = createRequire(import.meta.url);
 const connection = await network.create();
 const { ethers } = connection;
+const [deployer] = await ethers.getSigners();
 const Q96 = 1n << 96n;
 
 afterAll(async () => connection.close());
@@ -75,7 +76,7 @@ describe('Stabilization pool publication and directional LP fees', () => {
       const nonceBefore = await ethers.provider.getTransactionCount(owner.address);
       expect(await ethers.provider.getCode(deployment.pool.oracleAddress)).toBe('0x');
 
-      await publishStabilizationPool(ethers, deployment, async () => {});
+      await publishStabilizationPool(deployer, deployment, async () => {});
       const hook = await ethers.getContractAt(
         'StabilizationPoolHook',
         deployment.pool.oracleAddress,
@@ -197,14 +198,14 @@ describe('Stabilization pool publication and directional LP fees', () => {
       const [, secondsPerLiquidity] = await hook.observe([elapsed, 0]);
       expect(secondsPerLiquidity[1] - secondsPerLiquidity[0]).toBeGreaterThan(0n);
       const nonceAfterTrading = await ethers.provider.getTransactionCount(owner.address);
-      await publishStabilizationPool(ethers, deployment, async () => {});
+      await publishStabilizationPool(deployer, deployment, async () => {});
       expect(await ethers.provider.getTransactionCount(owner.address)).toBe(nonceAfterTrading);
     });
   }
 
   it('rejects unauthenticated callbacks and propagates an unfillable quote', async () => {
     const { deployment } = await fixture();
-    await publishStabilizationPool(ethers, deployment, async () => {});
+    await publishStabilizationPool(deployer, deployment, async () => {});
     const quoter = await ethers.getContractAt(
       'UniswapV4PriceQuoter',
       deployment.contracts.uniswapV4PriceQuoter.address,
@@ -233,7 +234,7 @@ describe('Stabilization pool publication and directional LP fees', () => {
   it('recovers a confirmed deployment after losing the progress write', async () => {
     const { owner, deployment } = await fixture();
     await expect(
-      publishStabilizationPool(ethers, deployment, async () => {
+      publishStabilizationPool(deployer, deployment, async () => {
         throw new Error('progress write failed');
       }),
     ).rejects.toThrow('progress write failed');
@@ -246,7 +247,7 @@ describe('Stabilization pool publication and directional LP fees', () => {
 
     const restarted: StabilizationPoolDeployment = { ...deployment, transactions: {} };
     const nonceBefore = await ethers.provider.getTransactionCount(owner.address);
-    await publishStabilizationPool(ethers, restarted, async () => {});
+    await publishStabilizationPool(deployer, restarted, async () => {});
     expect(await ethers.provider.getTransactionCount(owner.address)).toBe(nonceBefore + 3);
     const subscriber = await ethers.getContractAt(
       'StabilizationPoolSubscriber',
@@ -265,7 +266,7 @@ describe('Stabilization pool publication and directional LP fees', () => {
     const nonceBefore = await ethers.provider.getTransactionCount(owner.address);
     await expect(
       publishStabilizationPool(
-        ethers,
+        deployer,
         {
           ...deployment,
           network: { chainId: '1' },
@@ -276,13 +277,13 @@ describe('Stabilization pool publication and directional LP fees', () => {
     expect(await ethers.provider.getTransactionCount(owner.address)).toBe(nonceBefore);
 
     await expect(
-      publishStabilizationPool(ethers, deployment, async () => {
+      publishStabilizationPool(deployer, deployment, async () => {
         if (deployment.transactions.uniswapV4PriceQuoter)
           throw new Error('stopped before initialization');
       }),
     ).rejects.toThrow('stopped before initialization');
     await (await poolManager.initialize(deployment.pool.key, Q96 * 2n)).wait();
-    await expect(publishStabilizationPool(ethers, deployment, async () => {})).rejects.toThrow(
+    await expect(publishStabilizationPool(deployer, deployment, async () => {})).rejects.toThrow(
       'different price',
     );
   });
@@ -306,7 +307,7 @@ async function fixture(argonIsToken0 = true) {
 
   // Install the standard proxy's actual runtime; deployments below execute its CREATE2 opcode.
   await ethers.provider.send('hardhat_setCode', [CREATE2_DEPLOYER, CREATE2_DEPLOYER_CODE]);
-  const plan = await prepareStabilizationPool(ethers, {
+  const plan = await prepareStabilizationPool(ethers.provider, {
     chainId: (await ethers.provider.getNetwork()).chainId.toString(),
     argonToken: await argon.getAddress(),
     usdc: await usdc.getAddress(),

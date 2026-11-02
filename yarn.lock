@@ -192,6 +192,7 @@ __metadata:
     "@types/proper-lockfile": "npm:^4.1.4"
     detect-port: "npm:^2.1.0"
     docker-compose: "npm:^1.2.0"
+    ethers: "npm:^6.15.0"
     http-proxy: "npm:^1.18.1"
     nanoid: "npm:^5.1.6"
     pg: "npm:^8.16.3"

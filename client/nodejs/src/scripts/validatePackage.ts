@@ -1,7 +1,11 @@
 import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { isDeepStrictEqual } from 'node:util';
 import ts from 'typescript';
+import type { Abi } from 'viem';
+import type { EvmContractArtifact } from '../EvmContracts.js';
 import packageJson from '../../package.json' with { type: 'json' };
 
 const packageRoot = path.resolve(import.meta.dirname, '..', '..');
@@ -62,4 +66,44 @@ if (missingImports.size) {
   throw new Error(
     `Packed declarations contain unresolved imports:\n${[...missingImports].join('\n')}`,
   );
+}
+
+const stabilizationContracts = [
+  ['StabilizationPoolHook', 'stabilizationPoolHook'],
+  ['StabilizationPoolSubscriber', 'stabilizationPoolSubscriber'],
+  ['UniswapV4PriceQuoter', 'uniswapV4PriceQuoter'],
+] as const;
+
+for (const entry of ['lib/index.js', 'lib/index.cjs', 'browser/index.js']) {
+  const { EvmContracts } = await import(pathToFileURL(path.join(packageRoot, entry)).href);
+  const outputDirectory = path.posix.dirname(entry);
+
+  for (const [contractName, exportName] of stabilizationContracts) {
+    const abi = EvmContracts[`${exportName}Abi`] as Abi | undefined;
+    const artifact = EvmContracts[`${exportName}Artifact`] as EvmContractArtifact | undefined;
+    if (!Array.isArray(abi) || !abi.length) {
+      throw new Error(`${entry} does not export EvmContracts.${exportName}Abi`);
+    }
+    if (!artifact?.bytecode || artifact.bytecode === '0x') {
+      throw new Error(`${entry} does not export deployable EvmContracts.${exportName}Artifact`);
+    }
+
+    const artifactPath = `${outputDirectory}/artifacts/contracts/${contractName}.sol/${contractName}.json`;
+    if (!packedFiles.has(artifactPath)) {
+      throw new Error(`Package does not include ${artifactPath}`);
+    }
+
+    const packedArtifact = JSON.parse(
+      readFileSync(path.join(packageRoot, artifactPath), 'utf8'),
+    ) as EvmContractArtifact;
+    if (artifact.bytecode !== packedArtifact.bytecode) {
+      throw new Error(`${entry} exports different bytecode from ${artifactPath}`);
+    }
+
+    const exportedFunctions = abi.filter(item => item.type === 'function');
+    const artifactFunctions = packedArtifact.abi.filter(item => item.type === 'function');
+    if (!isDeepStrictEqual(exportedFunctions, artifactFunctions)) {
+      throw new Error(`${entry} exports a different function ABI from ${artifactPath}`);
+    }
+  }
 }
