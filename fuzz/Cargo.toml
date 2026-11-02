@@ -1,0 +1,56 @@
+[package]
+name = "argon-runtime-fuzz"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+argon-primitives = { workspace = true, features = ["std"], optional = true }
+argon-runtime = { workspace = true, features = ["std", "try-runtime"], optional = true }
+bitcoin = { workspace = true, features = ["std"], optional = true }
+libfuzzer-sys = { version = "=0.4.13", optional = true }
+pallet-bitcoin-fissions = { workspace = true, features = ["std", "try-runtime"], optional = true }
+pallet-bitcoin-locks = { workspace = true, features = ["std", "try-runtime"], optional = true }
+pallet-vaults = { workspace = true, features = ["std"], optional = true }
+polkadot-sdk = { workspace = true, optional = true, features = [
+    "std",
+    "frame-support",
+    "frame-system",
+    "pallet-balances",
+    "sp-io",
+    "sp-runtime",
+] }
+
+[features]
+default = []
+fuzzing = [
+	"dep:argon-primitives",
+	"dep:argon-runtime",
+	"dep:bitcoin",
+	"dep:libfuzzer-sys",
+	"dep:pallet-bitcoin-fissions",
+	"dep:pallet-bitcoin-locks",
+	"dep:pallet-vaults",
+	"dep:polkadot-sdk",
+]
+
+[[bin]]
+name = "bitcoin_lifecycle"
+path = "fuzz_targets/bitcoin_lifecycle.rs"
+test = false
+doc = false
+bench = false
+required-features = ["fuzzing"]
+
+[[bin]]
+name = "seed-corpus"
+path = "src/bin/seed_corpus.rs"
+test = false
+doc = false
+bench = false
+required-features = ["fuzzing"]

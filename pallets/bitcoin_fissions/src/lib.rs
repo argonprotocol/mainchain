@@ -1,6 +1,9 @@
 #![deny(warnings)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
+#[cfg(feature = "try-runtime")]
+extern crate alloc;
+
 use argon_primitives::{
 	bitcoin::BitcoinLockId,
 	treasury::{PositionQuantity, TreasuryPositionProvider},
@@ -19,6 +22,8 @@ pub mod migrations;
 mod mock;
 #[cfg(test)]
 mod tests;
+#[cfg(feature = "try-runtime")]
+mod try_state;
 mod weights;
 
 #[frame_support::pallet]
@@ -30,7 +35,7 @@ pub mod pallet {
 	};
 	use codec::HasCompact;
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(2);
+	pub(super) const STORAGE_VERSION: StorageVersion = StorageVersion::new(2);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -251,6 +256,14 @@ pub mod pallet {
 				BitcoinFissionLockError::ResecuritizationFailed => Self::ResecuritizationFailed,
 				BitcoinFissionLockError::InvalidFeeCoupon => Self::InvalidFeeCoupon,
 			}
+		}
+	}
+
+	#[pallet::hooks]
+	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+		#[cfg(feature = "try-runtime")]
+		fn try_state(_: BlockNumberFor<T>) -> Result<(), sp_runtime::TryRuntimeError> {
+			crate::try_state::check::<T>()
 		}
 	}
 

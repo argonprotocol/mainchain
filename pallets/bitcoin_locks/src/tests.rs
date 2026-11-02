@@ -33,21 +33,6 @@ use argon_primitives::{
 
 const FEE_COUPON_TARGET_RATE: Balance = 62_000 * MICROGONS_PER_ARGON;
 
-fn funding_received(lock_id: BitcoinLockId, satoshis: Satoshis) -> DispatchResult {
-	let lock = LocksById::<Test>::get(lock_id);
-	let utxo_ref = lock
-		.as_ref()
-		.and_then(|lock| lock.funding_utxos.keys().next().cloned())
-		.unwrap_or(UtxoRef { txid: H256Le([0; 32]), output_index: 0 });
-	let bitcoin_height = lock.map(|lock| lock.created_at_height).unwrap_or_default();
-	<BitcoinLocks as BitcoinUtxoEvents<u64>>::utxo_detected(
-		lock_id,
-		utxo_ref,
-		satoshis,
-		bitcoin_height,
-	)
-}
-
 fn spent(lock_id: BitcoinLockId) -> DispatchResult {
 	let Some(lock) = LocksById::<Test>::get(lock_id) else { return Ok(()) };
 	let utxo_ref = lock.funding_utxos.keys().next().cloned().or_else(|| {
@@ -66,6 +51,8 @@ fn spent(lock_id: BitcoinLockId) -> DispatchResult {
 fn create_receive_address_stores_lock_accounting() {
 	set_bitcoin_height(12);
 	new_test_ext().execute_with(|| {
+		#[cfg(feature = "try-runtime")]
+		<BitcoinLocks as frame_support::traits::OnGenesis>::on_genesis();
 		System::set_block_number(1);
 
 		set_argons(2, 2_000_000);
@@ -92,6 +79,8 @@ fn create_receive_address_stores_lock_accounting() {
 		assert_eq!(WatchedUtxosById::get().len(), 1);
 		assert!(LockExpirationsByBitcoinHeight::<Test>::get(lock.vault_claim_height).contains(&1));
 		assert!(LockIdsByVaultId::<Test>::contains_key(1, 1));
+		#[cfg(feature = "try-runtime")]
+		assert_ok!(BitcoinLocks::try_state(1));
 	});
 }
 
@@ -160,6 +149,8 @@ fn first_output_funds_without_creating_liquidity() {
 fn multiple_outputs_fill_one_securitization_hold() {
 	set_bitcoin_height(12);
 	new_test_ext().execute_with(|| {
+		#[cfg(feature = "try-runtime")]
+		<BitcoinLocks as frame_support::traits::OnGenesis>::on_genesis();
 		System::set_block_number(1);
 		set_argons(2, 2_000_000);
 		assert_ok!(BitcoinLocks::create_receive_address(
@@ -205,6 +196,8 @@ fn multiple_outputs_fill_one_securitization_hold() {
 		let vault = DefaultVault::get();
 		assert_eq!(vault.securitized_satoshis, SATOSHIS_PER_BITCOIN);
 		assert_eq!(vault.securitization_pending_activation, 0);
+		#[cfg(feature = "try-runtime")]
+		assert_ok!(BitcoinLocks::try_state(1));
 	});
 }
 
@@ -320,6 +313,8 @@ fn release_request_freezes_funding_utxos() {
 fn partial_release_keeps_the_lock_pending_until_the_bitcoin_transaction_is_observed() {
 	set_bitcoin_height(12);
 	new_test_ext().execute_with(|| {
+		#[cfg(feature = "try-runtime")]
+		<BitcoinLocks as frame_support::traits::OnGenesis>::on_genesis();
 		System::set_block_number(1);
 		TreasuryPositions::set_upstream_position(
 			&2,
@@ -396,6 +391,8 @@ fn partial_release_keeps_the_lock_pending_until_the_bitcoin_transaction_is_obser
 		));
 
 		assert!(LocksById::<Test>::contains_key(1));
+		#[cfg(feature = "try-runtime")]
+		assert_ok!(BitcoinLocks::try_state(1));
 		assert_eq!(
 			TreasuryPositions::upstream_position(&2).unwrap().bitcoin_securitization,
 			collateral
@@ -463,6 +460,8 @@ fn partial_release_keeps_the_lock_pending_until_the_bitcoin_transaction_is_obser
 		);
 		assert_eq!(DefaultVault::get().securitized_satoshis, 69_999_000);
 		assert!(FissionByOwnerAndId::<Test>::contains_key(2, 0));
+		#[cfg(feature = "try-runtime")]
+		assert_ok!(BitcoinLocks::try_state(1));
 		System::assert_has_event(
 			Event::<Test>::BitcoinSpentAfterRelease {
 				lock_id: 1,

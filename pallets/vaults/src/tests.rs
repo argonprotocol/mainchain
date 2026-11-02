@@ -37,27 +37,6 @@ use pallet_prelude::{
 	*,
 };
 
-const TEN_PCT: FixedU128 = FixedU128::from_rational(110, 100);
-
-pub(crate) fn keys() -> OpaqueBitcoinXpub {
-	let mut seed = [0u8; 32];
-	OsRng.fill_bytes(&mut seed);
-
-	let xpriv = Xpriv::new_master(GetBitcoinNetwork::get(), &seed).unwrap();
-	let child = xpriv
-		.derive_priv(
-			&Secp256k1::new(),
-			&[ChildNumber::from_normal_idx(0).unwrap(), ChildNumber::from_hardened_idx(1).unwrap()],
-		)
-		.unwrap();
-	let xpub = Xpub::from_priv(&Secp256k1::new(), &child);
-	OpaqueBitcoinXpub(xpub.encode())
-}
-
-fn default_terms(pct: FixedU128) -> VaultTerms<Balance> {
-	VaultTerms { bitcoin_annual_percent_rate: pct, bitcoin_base_fee: 0 }
-}
-
 fn securitization(amount: Balance) -> CosignerGuarantee<Balance> {
 	CosignerGuarantee {
 		basis: BitcoinSecuritizationBasis {
@@ -89,15 +68,6 @@ fn standard_reservation_request() -> ReserveSecuritizationRequest<Balance> {
 		lock_expiration: 100,
 		fee_discount: 0,
 		securitization_space_to_unreserve: 0,
-	}
-}
-
-fn default_vault() -> VaultConfig<u64, Balance> {
-	VaultConfig {
-		terms: default_terms(TEN_PCT),
-		delegate_account_id: None,
-		bitcoin_xpubkey: keys(),
-		securitization: 50_000,
 	}
 }
 
@@ -175,6 +145,8 @@ fn it_can_create_a_vault() {
 #[test]
 fn open_vault_index_returns_the_largest_positions_and_full_total() {
 	new_test_ext().execute_with(|| {
+		#[cfg(feature = "try-runtime")]
+		<Vaults as frame_support::traits::OnGenesis>::on_genesis();
 		for (operator, securitization) in [(1, 50_000), (2, 70_000), (3, 70_000)] {
 			set_argons(operator, 200_000);
 			let mut config = default_vault();
@@ -204,6 +176,8 @@ fn open_vault_index_returns_the_largest_positions_and_full_total() {
 			vec![2, 3]
 		);
 		assert_eq!(total, 140_000);
+		#[cfg(feature = "try-runtime")]
+		assert_ok!(Vaults::try_state(1));
 	});
 }
 

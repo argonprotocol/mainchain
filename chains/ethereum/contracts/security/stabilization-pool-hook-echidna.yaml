@@ -1,0 +1,12 @@
+testMode: property
+testLimit: 10000
+seqLen: 50
+shrinkLimit: 1000
+coverage: true
+corpusDir: security/corpus/stabilization-pool-hook
+coverageFormats: [txt, html, lcov]
+allContracts: false
+maxTimeDelay: 300
+maxBlockDelay: 1
+cryticArgs:
+  - --hardhat-ignore-compile

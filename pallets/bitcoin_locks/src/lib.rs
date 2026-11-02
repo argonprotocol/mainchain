@@ -36,6 +36,8 @@ mod mock;
 pub mod migrations;
 #[cfg(test)]
 mod tests;
+#[cfg(feature = "try-runtime")]
+mod try_state;
 pub mod weights;
 
 /// The Bitcoin Locks pallet creates and manages receive addresses backed by vault securitization.
@@ -96,7 +98,7 @@ pub mod pallet {
 	};
 	use codec::HasCompact;
 	use core::iter::Sum;
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(12);
+	pub(super) const STORAGE_VERSION: StorageVersion = StorageVersion::new(12);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -785,6 +787,11 @@ pub mod pallet {
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+		#[cfg(feature = "try-runtime")]
+		fn try_state(_: BlockNumberFor<T>) -> Result<(), sp_runtime::TryRuntimeError> {
+			crate::try_state::check::<T>()
+		}
+
 		fn on_initialize(_: BlockNumberFor<T>) -> Weight {
 			let (start_bitcoin_height, bitcoin_block_height) = T::BitcoinBlockHeightChange::get();
 			let synched_bitcoin_height = T::BitcoinUtxoTracker::get_synched_height();

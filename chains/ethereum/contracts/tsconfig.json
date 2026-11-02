@@ -10,5 +10,5 @@
     "types": ["node", "vitest/globals", "hardhat"],
     "noEmit": true
   },
-  "include": ["script/**/*.ts", "test/**/*.ts", "*.ts"]
+  "include": ["script/**/*.ts", "test/**/*.ts", "security/**/*.ts", "*.ts"]
 }
