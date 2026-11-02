@@ -282,6 +282,37 @@ only v4 hooks while Argonot continues to observe selected v3 fee tiers alongside
 [hook setup](chains/ethereum/contracts/README.md#uniswap-v4-stabilization-pool-hook) for deployment
 and history requirements.
 
+For local development, `--from-file-path` (or `PRICE_INDEX_FILE_PATH`) reloads prices from JSON
+each tick. A numeric `argon_usd_price` keeps the existing file-only behavior. Set it to
+`"UNISWAP"` to observe the market through the normal ARGN Uniswap lookup while keeping target,
+BTC, ARGONOT and optional Ethereum prices controlled by the file:
+
+```json
+{
+  "argon_usd_target_price": 1.06,
+  "argon_usd_price": "UNISWAP",
+  "argonot_usd_price": 0.05,
+  "btc_usd_price": 120000.0
+}
+```
+
+Use the existing `ETHEREUM_RPC_URLS`, `ARGON_TOKEN_ADDRESS` and
+`ARGON_UNISWAP_ORACLE_ADDRESSES` settings; select the local v4 hook in the last setting. Set
+`USDC_TOKEN_ADDRESS` to the local six-decimal USDC contract, and configure the same local pool as
+Mainchain's approved stabilizer pool. No CPI, external coin-price, ARGONOT or gas-price providers
+are needed in file mode. Keep the existing keystore and signer configuration for the chain's
+oracle operator.
+
+In `"UNISWAP"` mode, optional file `usdc_usd_price` defaults to `1` and converts the observed
+ARGN/USDC TWAP to ARGN/USD. The oracle uses its production observation windows, decimal handling,
+liquidity normalization and price-change limits. It replaces file ARGN liquidity and spot sqrt
+price with observed pool values; those file fields may be omitted. The raw Q96 spot price comes
+from the approved pool's PoolManager. Allow at least one minute of usable hook history. Missing
+history, zero usable liquidity, an unavailable spot price or an invalid file preserves the last
+submitted index and logs a retry for the next tick. Editing the file can switch between numeric
+and `"UNISWAP"` prices; source addresses remain process configuration. Both modes share the real
+index encoding, signing and submission path and remain restricted to development/test chains.
+
 ### Cargo Make
 
 There's a `Makefile.toml` in the root of the project that defines some common tasks for the project.
