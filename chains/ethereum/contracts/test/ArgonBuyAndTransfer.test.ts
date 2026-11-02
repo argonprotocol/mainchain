@@ -184,6 +184,22 @@ async function fixture(
 }
 
 describe('native Uniswap v4 buyAndTransfer', () => {
+  it('rejects token callbacks that reenter a purchase', async () => {
+    const f = await fixture();
+    const callData = f.purchase.interface.encodeFunctionData('buyAndTransfer', [
+      f.request,
+      f.key,
+      '0x',
+    ]);
+    await f.usdc.getFunction('setReentrantCall')(await f.purchase.getAddress(), callData);
+
+    await (await f.buyAndTransfer(f.request, f.key, '0x')).wait();
+
+    expect(await f.usdc.getFunction('reentryError')()).toBe(
+      ethers.id('ReentrancyGuardReentrantCall()').slice(0, 10),
+    );
+  });
+
   it.each([true, false])(
     'burns only purchased whole microgons and returns dust (USDC token0: %s)',
     async zeroForOne => {

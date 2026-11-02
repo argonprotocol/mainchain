@@ -11,6 +11,8 @@ pub mod config;
 mod deal_with_fees;
 mod fee_control;
 pub mod migrations;
+#[cfg(feature = "try-runtime")]
+pub mod try_state;
 
 pub mod prelude {
 	pub use crate::config::*;

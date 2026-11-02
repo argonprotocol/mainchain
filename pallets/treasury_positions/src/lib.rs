@@ -17,13 +17,17 @@ pub use weights::{ProviderWeightAdapter, WeightInfo};
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 #[cfg(test)]
+mod mock;
+#[cfg(test)]
 mod tests;
+#[cfg(feature = "try-runtime")]
+mod try_state;
 pub mod weights;
 
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(2);
+	pub(super) const STORAGE_VERSION: StorageVersion = StorageVersion::new(2);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -94,6 +98,14 @@ pub mod pallet {
 	#[pallet::storage]
 	pub type NetworkTotals<T: Config> =
 		StorageValue<_, NetworkPositionQuantities<T::Balance>, ValueQuery>;
+
+	#[pallet::hooks]
+	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+		#[cfg(feature = "try-runtime")]
+		fn try_state(_: BlockNumberFor<T>) -> Result<(), sp_runtime::TryRuntimeError> {
+			crate::try_state::check::<T>()
+		}
+	}
 
 	impl<T: Config> TreasuryPositionProvider<T::AccountId, T::Balance> for Pallet<T> {
 		type Weights = ProviderWeightAdapter<T>;

@@ -1,0 +1,310 @@
+[
+  {
+    "id": "817dc4f2a441802caef900c9631dcb3d342a3181c75661f54bd3269a9444ced5",
+    "description": "ArgonBuyAndTransfer.buyAndTransfer(ArgonBuyAndTransfer.Request,PoolKey,bytes) (contracts/ArgonBuyAndTransfer.sol#66-116) performs a multiplication on the result of a division:\n\t- burnAmount = purchase.argonBought / _SCALE * _SCALE (contracts/ArgonBuyAndTransfer.sol#110)\n",
+    "check": "divide-before-multiply",
+    "reviewed_commit": "b4504be9cd3a3c06acf213eb6339c06d130ca507",
+    "reviewed_source": {
+      "path": "contracts/ArgonBuyAndTransfer.sol",
+      "sha256": "8c6e9b7b841500d06ddd9e8071cf3cfb6702b99902263189a65a5fe670a908ab"
+    },
+    "verdict": "not_actionable",
+    "reason": "buyAndTransfer rounds to the same 1e12 scale as the gateway and returns the remainder to the buyer.",
+    "assumptions": [
+      "Runtime units remain 6 decimals, token units 18 decimals, and the sub-microgon remainder is returned to the buyer."
+    ]
+  },
+  {
+    "id": "6189a3b6fe9f5552052b2d0db23c1147acde6ee9eff18ff9f96c0b56976a040b",
+    "description": "StabilizationPoolHook._writeObservation() (contracts/StabilizationPoolHook.sol#139-147) uses a dangerous strict equality:\n\t- observationCardinality == 0 (contracts/StabilizationPoolHook.sol#140)\n",
+    "check": "incorrect-equality",
+    "reviewed_commit": "b4504be9cd3a3c06acf213eb6339c06d130ca507",
+    "reviewed_source": {
+      "path": "contracts/StabilizationPoolHook.sol",
+      "sha256": "56c01cc4ea1eb3bb725ffd1d5ce158b47de9bd752d120ff8b51085cd9b5f843f"
+    },
+    "verdict": "not_actionable",
+    "reason": "Cardinality 0 is the exact uninitialized sentinel; Oracle.initialize returns 1 and callbacks validate the immutable manager and pool.",
+    "assumptions": [
+      "The compared value remains an initialization sentinel, a block identity, or an unsigned zero-amount rejection rather than an exact target balance."
+    ]
+  },
+  {
+    "id": "7969beef38ff4ef0a2f9977caec1b9e18f8a729ff9af4f8a97ffad532d19ba3e",
+    "description": "MintingGateway._recordActivity(MintingGateway.GatewayActivityState,bytes32) (contracts/MintingGateway.sol#1217-1257) uses a dangerous strict equality:\n\t- latestLocator.blockNumber == currentBlock (contracts/MintingGateway.sol#1238)\n",
+    "check": "incorrect-equality",
+    "reviewed_commit": "b4504be9cd3a3c06acf213eb6339c06d130ca507",
+    "reviewed_source": {
+      "path": "contracts/MintingGateway.sol",
+      "sha256": "73f2ba71e3f8e4613e1ab558d8859d0b94f879f5d6a20cb7396afba7e2f74c3e"
+    },
+    "verdict": "not_actionable",
+    "reason": "Equality intentionally extends an existing same-block locator; a later block starts a new locator.",
+    "assumptions": [
+      "The compared value remains an initialization sentinel, a block identity, or an unsigned zero-amount rejection rather than an exact target balance."
+    ]
+  },
+  {
+    "id": "7dc956fe5cd648af59663e57fe5241d7fb5cae5bf4b9fb10c03697174a7a13b5",
+    "description": "MintingGateway.burnFromSwap(MintingGateway.SwapPurchase) (contracts/MintingGateway.sol#725-752) uses a dangerous strict equality:\n\t- amount == 0 (contracts/MintingGateway.sol#732)\n",
+    "check": "incorrect-equality",
+    "reviewed_commit": "b4504be9cd3a3c06acf213eb6339c06d130ca507",
+    "reviewed_source": {
+      "path": "contracts/MintingGateway.sol",
+      "sha256": "73f2ba71e3f8e4613e1ab558d8859d0b94f879f5d6a20cb7396afba7e2f74c3e"
+    },
+    "verdict": "not_actionable",
+    "reason": "Zero equality rejects purchases below one runtime unit before mint/burn; the next guard enforces the configured minimum.",
+    "assumptions": [
+      "The compared value remains an initialization sentinel, a block identity, or an unsigned zero-amount rejection rather than an exact target balance."
+    ]
+  },
+  {
+    "id": "b11b4580d7044d6f9a0ff4445bb3af273be68928e05d9e1cd7d81dce9a652e71",
+    "description": "Reentrancy in MintingGateway.migrate(MintingGateway.MigrationAssetDistribution,MintingGateway.MigrationAssetDistribution) (contracts/MintingGateway.sol#424-443):\n\tExternal calls:\n\t- argonTotalAmount = _mintMigrationBalances(argonToken,argonMigration.recipients,argonMigration.amounts) (contracts/MintingGateway.sol#430-431)\n\t\t- ICanonicalToken(token).mint(recipient,amount) (contracts/MintingGateway.sol#1183)\n\t- argonotTotalAmount = _mintMigrationBalances(argonotToken,argonotMigration.recipients,argonotMigration.amounts) (contracts/MintingGateway.sol#432-433)\n\t\t- ICanonicalToken(token).mint(recipient,amount) (contracts/MintingGateway.sol#1183)\n\tState variables written after the call(s):\n\t- migrationCompleted = true (contracts/MintingGateway.sol#435)\n\tMintingGateway.migrationCompleted (contracts/MintingGateway.sol#73) can be used in cross function reentrancies:\n\t- MintingGateway.migrate(MintingGateway.MigrationAssetDistribution,MintingGateway.MigrationAssetDistribution) (contracts/MintingGateway.sol#424-443)\n\t- MintingGateway.migrationCompleted (contracts/MintingGateway.sol#73)\n",
+    "check": "reentrancy-no-eth",
+    "reviewed_commit": "b4504be9cd3a3c06acf213eb6339c06d130ca507",
+    "reviewed_source": {
+      "path": "contracts/MintingGateway.sol",
+      "sha256": "73f2ba71e3f8e4613e1ab558d8859d0b94f879f5d6a20cb7396afba7e2f74c3e"
+    },
+    "verdict": "not_actionable",
+    "reason": "The gateway calls only its immutable canonical ERC20 token addresses. Shipped token mint/burn/permit have no recipient or external-contract callbacks, and deployment creates direct non-proxy token instances. migrate also requires onlyOwner.",
+    "assumptions": [
+      "Canonical ARGN and ARGNOT remain direct deployments of the repository ERC20 token contracts, with no recipient hooks or external callbacks in permit, mint, or burn.",
+      "Gateway implementation upgrades preserve the canonical token wiring and callback-free token behavior."
+    ]
+  },
+  {
+    "id": "67168e72f9491377e1faa7e488e3f1988f38dea30fe8d65fe89e309ca704a45d",
+    "description": "ArgonBuyAndTransfer.buyAndTransfer(ArgonBuyAndTransfer.Request,PoolKey,bytes).purchase (contracts/ArgonBuyAndTransfer.sol#85) is a local variable never initialized\n",
+    "check": "uninitialized-local",
+    "reviewed_commit": "b4504be9cd3a3c06acf213eb6339c06d130ca507",
+    "reviewed_source": {
+      "path": "contracts/ArgonBuyAndTransfer.sol",
+      "sha256": "8c6e9b7b841500d06ddd9e8071cf3cfb6702b99902263189a65a5fe670a908ab"
+    },
+    "verdict": "not_actionable",
+    "reason": "Every consumed field is assigned before use. The gateway assigns timestamp. Solidity initializes declared variables to type defaults.",
+    "assumptions": [
+      "Every consumed purchase field remains assigned before use, including timestamp assignment by burnFromSwap."
+    ]
+  },
+  {
+    "id": "9220fccffe455907aac6c52c878693ad44252062ce8371e2ca0c58f6ed77a4b3",
+    "description": "StabilizationPoolHook.observe(uint32[]) (contracts/StabilizationPoolHook.sol#129-137) ignores return value by (None,tick,None,None) = poolManager.getSlot0(poolId) (contracts/StabilizationPoolHook.sol#132)\n",
+    "check": "unused-return",
+    "reviewed_commit": "b4504be9cd3a3c06acf213eb6339c06d130ca507",
+    "reviewed_source": {
+      "path": "contracts/StabilizationPoolHook.sol",
+      "sha256": "56c01cc4ea1eb3bb725ffd1d5ce158b47de9bd752d120ff8b51085cd9b5f843f"
+    },
+    "verdict": "not_actionable",
+    "reason": "Only tick and separately fetched liquidity are inputs to the cumulative history; price and fees are unnecessary.",
+    "assumptions": [
+      "Omitted tuple fields remain unnecessary to the operation. Quote execution still returns through a validated revert payload and rejects normal unlock success."
+    ]
+  },
+  {
+    "id": "d4f834e1cb298eb0a697f2f87fe07a22f1a13fe5d9bf097c74046d0e0f914045",
+    "description": "StabilizationPoolHook._writeObservation() (contracts/StabilizationPoolHook.sol#139-147) ignores return value by (None,tick,None,None) = poolManager.getSlot0(poolId) (contracts/StabilizationPoolHook.sol#142)\n",
+    "check": "unused-return",
+    "reviewed_commit": "b4504be9cd3a3c06acf213eb6339c06d130ca507",
+    "reviewed_source": {
+      "path": "contracts/StabilizationPoolHook.sol",
+      "sha256": "56c01cc4ea1eb3bb725ffd1d5ce158b47de9bd752d120ff8b51085cd9b5f843f"
+    },
+    "verdict": "not_actionable",
+    "reason": "Only tick and liquidity are required by Oracle.write; omitting price and fees does not discard any needed input.",
+    "assumptions": [
+      "Omitted tuple fields remain unnecessary to the operation. Quote execution still returns through a validated revert payload and rejects normal unlock success."
+    ]
+  },
+  {
+    "id": "e77f5509defef840692da2874646bd1f48203212c26f7aae5625709e4729fe0e",
+    "description": "StabilizationPoolHook.afterInitialize(address,PoolKey,uint160,int24) (contracts/StabilizationPoolHook.sol#92-98) ignores return value by (observationCardinality,None) = observations.initialize(uint32(block.timestamp)) (contracts/StabilizationPoolHook.sol#96)\n",
+    "check": "unused-return",
+    "reviewed_commit": "b4504be9cd3a3c06acf213eb6339c06d130ca507",
+    "reviewed_source": {
+      "path": "contracts/StabilizationPoolHook.sol",
+      "sha256": "56c01cc4ea1eb3bb725ffd1d5ce158b47de9bd752d120ff8b51085cd9b5f843f"
+    },
+    "verdict": "not_actionable",
+    "reason": "Oracle.initialize returns (1,1); the hook explicitly supplies OBSERVATION_CAPACITY for subsequent writes instead of tracking a separate cardinalityNext.",
+    "assumptions": [
+      "Omitted tuple fields remain unnecessary to the operation. Quote execution still returns through a validated revert payload and rejects normal unlock success."
+    ]
+  },
+  {
+    "id": "1e4c5ee4ea3c24cf4fbd44364031926705597e245ae285cd722f413007f7374c",
+    "description": "ArgonBuyAndTransfer.buyAndTransfer(ArgonBuyAndTransfer.Request,PoolKey,bytes) (contracts/ArgonBuyAndTransfer.sol#66-116) ignores return value by (purchase.sqrtPriceBeforeX96,None,None,None) = StateLibrary.getSlot0(poolManager,PoolId.wrap(purchase.poolId)) (contracts/ArgonBuyAndTransfer.sol#91)\n",
+    "check": "unused-return",
+    "reviewed_commit": "b4504be9cd3a3c06acf213eb6339c06d130ca507",
+    "reviewed_source": {
+      "path": "contracts/ArgonBuyAndTransfer.sol",
+      "sha256": "8c6e9b7b841500d06ddd9e8071cf3cfb6702b99902263189a65a5fe670a908ab"
+    },
+    "verdict": "not_actionable",
+    "reason": "The receipt requires sqrtPriceX96; the omitted tick/protocolFee/lpFee are unrelated to the recorded value.",
+    "assumptions": [
+      "Omitted tuple fields remain unnecessary to the operation. Quote execution still returns through a validated revert payload and rejects normal unlock success."
+    ]
+  },
+  {
+    "id": "6e54756bbb8b5b20e201d23e5603864fbc1ada47b8c09907262e48454102be6e",
+    "description": "ArgonBuyAndTransfer.buyAndTransfer(ArgonBuyAndTransfer.Request,PoolKey,bytes) (contracts/ArgonBuyAndTransfer.sol#66-116) ignores return value by (purchase.sqrtPriceAfterX96,None,None,None) = StateLibrary.getSlot0(poolManager,PoolId.wrap(purchase.poolId)) (contracts/ArgonBuyAndTransfer.sol#101)\n",
+    "check": "unused-return",
+    "reviewed_commit": "b4504be9cd3a3c06acf213eb6339c06d130ca507",
+    "reviewed_source": {
+      "path": "contracts/ArgonBuyAndTransfer.sol",
+      "sha256": "8c6e9b7b841500d06ddd9e8071cf3cfb6702b99902263189a65a5fe670a908ab"
+    },
+    "verdict": "not_actionable",
+    "reason": "The receipt requires sqrtPriceX96; tick and fee fields are not inputs to this operation.",
+    "assumptions": [
+      "Omitted tuple fields remain unnecessary to the operation. Quote execution still returns through a validated revert payload and rejects normal unlock success."
+    ]
+  },
+  {
+    "id": "bd73fe1728de741b9e33a88c59a8d4b639517d03d5c790b7f380cc6a53c22d96",
+    "description": "UniswapV4PriceQuoter._quote(IV4Quoter.QuoteExactSingleParams,bool) (contracts/UniswapV4PriceQuoter.sol#75-92) ignores return value by poolManager.unlock(abi.encodeCall(this._quoteSingle,(params,exactInput))) (contracts/UniswapV4PriceQuoter.sol#80-91)\n",
+    "check": "unused-return",
+    "reviewed_commit": "b4504be9cd3a3c06acf213eb6339c06d130ca507",
+    "reviewed_source": {
+      "path": "contracts/UniswapV4PriceQuoter.sol",
+      "sha256": "a1666c36f1f6e08ea9c42c1427c0371a2003496f1aa9b88878250e65a228b728"
+    },
+    "verdict": "not_actionable",
+    "reason": "Quote execution intentionally always reverts with typed result bytes and rolls back simulation. A normal unlock return triggers UnexpectedCallSuccess; catch validates and decodes the revert.",
+    "assumptions": [
+      "Omitted tuple fields remain unnecessary to the operation. Quote execution still returns through a validated revert payload and rejects normal unlock success."
+    ]
+  },
+  {
+    "id": "cefd4401766e1fba278922332e50e33f8e58f9c627820c35fc08c322e195071f",
+    "description": "UniswapV4PriceQuoter._quoteSingle(IV4Quoter.QuoteExactSingleParams,bool) (contracts/UniswapV4PriceQuoter.sol#55-73) ignores return value by (sqrtPriceX96After,None,None,None) = poolManager.getSlot0(params.poolKey.toId()) (contracts/UniswapV4PriceQuoter.sol#71)\n",
+    "check": "unused-return",
+    "reviewed_commit": "b4504be9cd3a3c06acf213eb6339c06d130ca507",
+    "reviewed_source": {
+      "path": "contracts/UniswapV4PriceQuoter.sol",
+      "sha256": "a1666c36f1f6e08ea9c42c1427c0371a2003496f1aa9b88878250e65a228b728"
+    },
+    "verdict": "not_actionable",
+    "reason": "Only sqrtPriceX96 is part of the quote result; the other Slot0 fields are not needed.",
+    "assumptions": [
+      "Omitted tuple fields remain unnecessary to the operation. Quote execution still returns through a validated revert payload and rejects normal unlock success."
+    ]
+  },
+  {
+    "id": "0a7165ce662ae8b664abe764332b57d7f4554c594ce2241d869b120751a71ed3",
+    "description": "Reentrancy in MintingGateway.startTransferToArgon(address,uint128,bytes32,uint256,uint8,bytes32,bytes32) (contracts/MintingGateway.sol#689-722):\n\tExternal calls:\n\t- canonicalToken.permit(msg.sender,address(this),tokenAmount,deadline,v,r,s) (contracts/MintingGateway.sol#704)\n\t- canonicalToken.burnFrom(msg.sender,tokenAmount) (contracts/MintingGateway.sol#706)\n\tState variables written after the call(s):\n\t- _recordActivity(gatewayState,_hashTransferToArgonStartedActivity(msg.sender,token,amount,argonAccountId,gatewayState)) (contracts/MintingGateway.sol#709-714)\n\t\t- activityBlockLocators[1] = ActivityBlockLocator({blockNumber:currentBlock,startGatewayActivityNonce:activityNonce,endGatewayActivityNonce:activityNonce,activityRoot:_appendActivityRoot(bytes32(0),activityLeaf)}) (contracts/MintingGateway.sol#1227-1232)\n\t\t- latestLocator.endGatewayActivityNonce = activityNonce (contracts/MintingGateway.sol#1244)\n\t\t- latestLocator.activityRoot = _appendActivityRoot(latestLocator.activityRoot,activityLeaf) (contracts/MintingGateway.sol#1245)\n\t\t- activityBlockLocators[nextLocatorIndex] = ActivityBlockLocator({blockNumber:currentBlock,startGatewayActivityNonce:activityNonce,endGatewayActivityNonce:activityNonce,activityRoot:_appendActivityRoot(_hashActivityBlockLocator(latestLocator),activityLeaf)}) (contracts/MintingGateway.sol#1251-1256)\n\t- _recordActivity(gatewayState,_hashTransferToArgonStartedActivity(msg.sender,token,amount,argonAccountId,gatewayState)) (contracts/MintingGateway.sol#709-714)\n\t\t- gatewayActivityNonce = activityNonce (contracts/MintingGateway.sol#1222)\n\t- _recordActivity(gatewayState,_hashTransferToArgonStartedActivity(msg.sender,token,amount,argonAccountId,gatewayState)) (contracts/MintingGateway.sol#709-714)\n\t\t- latestActivityBlockLocatorIndex = 1 (contracts/MintingGateway.sol#1226)\n\t\t- latestActivityBlockLocatorIndex = nextLocatorIndex (contracts/MintingGateway.sol#1250)\n",
+    "check": "reentrancy-benign",
+    "reviewed_commit": "b4504be9cd3a3c06acf213eb6339c06d130ca507",
+    "reviewed_source": {
+      "path": "contracts/MintingGateway.sol",
+      "sha256": "73f2ba71e3f8e4613e1ab558d8859d0b94f879f5d6a20cb7396afba7e2f74c3e"
+    },
+    "verdict": "not_actionable",
+    "reason": "The gateway calls only its immutable canonical ERC20 token addresses. Shipped token mint/burn/permit have no recipient or external-contract callbacks, and deployment creates direct non-proxy token instances.",
+    "assumptions": [
+      "Canonical ARGN and ARGNOT remain direct deployments of the repository ERC20 token contracts, with no recipient hooks or external callbacks in permit, mint, or burn.",
+      "Gateway implementation upgrades preserve the canonical token wiring and callback-free token behavior."
+    ]
+  },
+  {
+    "id": "3425f6c0c45de0f53fa67865b10ea674b2aecf28487152cf270bc9767d24e887",
+    "description": "Reentrancy in MintingGateway.finalizeTransferOutOfArgon(MintingGateway.TransferOutOfArgonRequest,MintingGateway.TransferOutOfArgonProof) (contracts/MintingGateway.sol#758-879):\n\tExternal calls:\n\t- ICanonicalToken(request.token).mint(request.recipient,toTokenAmount(request.amount)) (contracts/MintingGateway.sol#861-863)\n\tState variables written after the call(s):\n\t- _recordActivity(gatewayState,_hashTransferOutOfArgonFinalizedActivity(transferId,request.token,request.amount,mintingCollateral,gatewayState)) (contracts/MintingGateway.sol#866-871)\n\t\t- activityBlockLocators[1] = ActivityBlockLocator({blockNumber:currentBlock,startGatewayActivityNonce:activityNonce,endGatewayActivityNonce:activityNonce,activityRoot:_appendActivityRoot(bytes32(0),activityLeaf)}) (contracts/MintingGateway.sol#1227-1232)\n\t\t- latestLocator.endGatewayActivityNonce = activityNonce (contracts/MintingGateway.sol#1244)\n\t\t- latestLocator.activityRoot = _appendActivityRoot(latestLocator.activityRoot,activityLeaf) (contracts/MintingGateway.sol#1245)\n\t\t- activityBlockLocators[nextLocatorIndex] = ActivityBlockLocator({blockNumber:currentBlock,startGatewayActivityNonce:activityNonce,endGatewayActivityNonce:activityNonce,activityRoot:_appendActivityRoot(_hashActivityBlockLocator(latestLocator),activityLeaf)}) (contracts/MintingGateway.sol#1251-1256)\n\t- _recordActivity(gatewayState,_hashTransferOutOfArgonFinalizedActivity(transferId,request.token,request.amount,mintingCollateral,gatewayState)) (contracts/MintingGateway.sol#866-871)\n\t\t- gatewayActivityNonce = activityNonce (contracts/MintingGateway.sol#1222)\n\t- _recordActivity(gatewayState,_hashTransferOutOfArgonFinalizedActivity(transferId,request.token,request.amount,mintingCollateral,gatewayState)) (contracts/MintingGateway.sol#866-871)\n\t\t- latestActivityBlockLocatorIndex = 1 (contracts/MintingGateway.sol#1226)\n\t\t- latestActivityBlockLocatorIndex = nextLocatorIndex (contracts/MintingGateway.sol#1250)\n",
+    "check": "reentrancy-benign",
+    "reviewed_commit": "b4504be9cd3a3c06acf213eb6339c06d130ca507",
+    "reviewed_source": {
+      "path": "contracts/MintingGateway.sol",
+      "sha256": "73f2ba71e3f8e4613e1ab558d8859d0b94f879f5d6a20cb7396afba7e2f74c3e"
+    },
+    "verdict": "not_actionable",
+    "reason": "The gateway calls only its immutable canonical ERC20 token addresses. Shipped token mint/burn/permit have no recipient or external-contract callbacks, and deployment creates direct non-proxy token instances. Collateral and transfer replay state are written before mint.",
+    "assumptions": [
+      "Canonical ARGN and ARGNOT remain direct deployments of the repository ERC20 token contracts, with no recipient hooks or external callbacks in permit, mint, or burn.",
+      "Gateway implementation upgrades preserve the canonical token wiring and callback-free token behavior."
+    ]
+  },
+  {
+    "id": "71e40f895cbf15af4dbefdefff5525d110ae3d23e64c87d9519ddd16e11f50f6",
+    "description": "Reentrancy in MintingGateway.burnFromSwap(MintingGateway.SwapPurchase) (contracts/MintingGateway.sol#725-752):\n\tExternal calls:\n\t- ICanonicalToken(argonToken).burnFrom(msg.sender,toTokenAmount(amount)) (contracts/MintingGateway.sol#734)\n\tState variables written after the call(s):\n\t- _recordActivity(gatewayState,keccak256(bytes)(abi.encode(_TRANSFER_TO_ARGON_FROM_SWAP_STARTED_ACTIVITY_TAG,ACTIVITY_HASH_VERSION,block.chainid,address(this),purchase,argonToken,amount,_hashGatewayActivityState(gatewayState)))) (contracts/MintingGateway.sol#737-749)\n\t\t- activityBlockLocators[1] = ActivityBlockLocator({blockNumber:currentBlock,startGatewayActivityNonce:activityNonce,endGatewayActivityNonce:activityNonce,activityRoot:_appendActivityRoot(bytes32(0),activityLeaf)}) (contracts/MintingGateway.sol#1227-1232)\n\t\t- latestLocator.endGatewayActivityNonce = activityNonce (contracts/MintingGateway.sol#1244)\n\t\t- latestLocator.activityRoot = _appendActivityRoot(latestLocator.activityRoot,activityLeaf) (contracts/MintingGateway.sol#1245)\n\t\t- activityBlockLocators[nextLocatorIndex] = ActivityBlockLocator({blockNumber:currentBlock,startGatewayActivityNonce:activityNonce,endGatewayActivityNonce:activityNonce,activityRoot:_appendActivityRoot(_hashActivityBlockLocator(latestLocator),activityLeaf)}) (contracts/MintingGateway.sol#1251-1256)\n\t- _recordActivity(gatewayState,keccak256(bytes)(abi.encode(_TRANSFER_TO_ARGON_FROM_SWAP_STARTED_ACTIVITY_TAG,ACTIVITY_HASH_VERSION,block.chainid,address(this),purchase,argonToken,amount,_hashGatewayActivityState(gatewayState)))) (contracts/MintingGateway.sol#737-749)\n\t\t- gatewayActivityNonce = activityNonce (contracts/MintingGateway.sol#1222)\n\t- _recordActivity(gatewayState,keccak256(bytes)(abi.encode(_TRANSFER_TO_ARGON_FROM_SWAP_STARTED_ACTIVITY_TAG,ACTIVITY_HASH_VERSION,block.chainid,address(this),purchase,argonToken,amount,_hashGatewayActivityState(gatewayState)))) (contracts/MintingGateway.sol#737-749)\n\t\t- latestActivityBlockLocatorIndex = 1 (contracts/MintingGateway.sol#1226)\n\t\t- latestActivityBlockLocatorIndex = nextLocatorIndex (contracts/MintingGateway.sol#1250)\n",
+    "check": "reentrancy-benign",
+    "reviewed_commit": "b4504be9cd3a3c06acf213eb6339c06d130ca507",
+    "reviewed_source": {
+      "path": "contracts/MintingGateway.sol",
+      "sha256": "73f2ba71e3f8e4613e1ab558d8859d0b94f879f5d6a20cb7396afba7e2f74c3e"
+    },
+    "verdict": "not_actionable",
+    "reason": "The gateway calls only its immutable canonical ERC20 token addresses. Shipped token mint/burn/permit have no recipient or external-contract callbacks, and deployment creates direct non-proxy token instances.",
+    "assumptions": [
+      "Canonical ARGN and ARGNOT remain direct deployments of the repository ERC20 token contracts, with no recipient hooks or external callbacks in permit, mint, or burn.",
+      "Gateway implementation upgrades preserve the canonical token wiring and callback-free token behavior."
+    ]
+  },
+  {
+    "id": "5ffb7df6a547a4bebb9e4db5bf157e896fbfc01335f39fe67b4a5bca1ed38949",
+    "description": "Reentrancy in MintingGateway.finalizeTransferOutOfArgon(MintingGateway.TransferOutOfArgonRequest,MintingGateway.TransferOutOfArgonProof) (contracts/MintingGateway.sol#758-879):\n\tExternal calls:\n\t- ICanonicalToken(request.token).mint(request.recipient,toTokenAmount(request.amount)) (contracts/MintingGateway.sol#861-863)\n\tEvent emitted after the call(s):\n\t- TransferOutOfArgonFinalized(transferId,request.token,request.amount,mintingCollateral,gatewayState) (contracts/MintingGateway.sol#872-878)\n",
+    "check": "reentrancy-events",
+    "reviewed_commit": "b4504be9cd3a3c06acf213eb6339c06d130ca507",
+    "reviewed_source": {
+      "path": "contracts/MintingGateway.sol",
+      "sha256": "73f2ba71e3f8e4613e1ab558d8859d0b94f879f5d6a20cb7396afba7e2f74c3e"
+    },
+    "verdict": "not_actionable",
+    "reason": "The gateway calls only its immutable canonical ERC20 token addresses. Shipped token mint/burn/permit have no recipient or external-contract callbacks, and deployment creates direct non-proxy token instances. Collateral and transfer replay state are written before mint.",
+    "assumptions": [
+      "Canonical ARGN and ARGNOT remain direct deployments of the repository ERC20 token contracts, with no recipient hooks or external callbacks in permit, mint, or burn.",
+      "Gateway implementation upgrades preserve the canonical token wiring and callback-free token behavior."
+    ]
+  },
+  {
+    "id": "7c881b979235151d8ba4123b4cd62b539d6dd1c7dcf37ac13df6ccbd7e149c9c",
+    "description": "Reentrancy in MintingGateway.burnFromSwap(MintingGateway.SwapPurchase) (contracts/MintingGateway.sol#725-752):\n\tExternal calls:\n\t- ICanonicalToken(argonToken).burnFrom(msg.sender,toTokenAmount(amount)) (contracts/MintingGateway.sol#734)\n\tEvent emitted after the call(s):\n\t- TransferToArgonFromSwapStarted(purchase,argonToken,amount,gatewayState) (contracts/MintingGateway.sol#750)\n",
+    "check": "reentrancy-events",
+    "reviewed_commit": "b4504be9cd3a3c06acf213eb6339c06d130ca507",
+    "reviewed_source": {
+      "path": "contracts/MintingGateway.sol",
+      "sha256": "73f2ba71e3f8e4613e1ab558d8859d0b94f879f5d6a20cb7396afba7e2f74c3e"
+    },
+    "verdict": "not_actionable",
+    "reason": "The gateway calls only its immutable canonical ERC20 token addresses. Shipped token mint/burn/permit have no recipient or external-contract callbacks, and deployment creates direct non-proxy token instances.",
+    "assumptions": [
+      "Canonical ARGN and ARGNOT remain direct deployments of the repository ERC20 token contracts, with no recipient hooks or external callbacks in permit, mint, or burn.",
+      "Gateway implementation upgrades preserve the canonical token wiring and callback-free token behavior."
+    ]
+  },
+  {
+    "id": "b7749b10bb4e51c564c3c3c7c40cb1b18cc4eb5522e703ac1f3f03843aae2ead",
+    "description": "Reentrancy in MintingGateway.startTransferToArgon(address,uint128,bytes32,uint256,uint8,bytes32,bytes32) (contracts/MintingGateway.sol#689-722):\n\tExternal calls:\n\t- canonicalToken.permit(msg.sender,address(this),tokenAmount,deadline,v,r,s) (contracts/MintingGateway.sol#704)\n\t- canonicalToken.burnFrom(msg.sender,tokenAmount) (contracts/MintingGateway.sol#706)\n\tEvent emitted after the call(s):\n\t- TransferToArgonStarted(msg.sender,token,amount,argonAccountId,gatewayState) (contracts/MintingGateway.sol#715-721)\n",
+    "check": "reentrancy-events",
+    "reviewed_commit": "b4504be9cd3a3c06acf213eb6339c06d130ca507",
+    "reviewed_source": {
+      "path": "contracts/MintingGateway.sol",
+      "sha256": "73f2ba71e3f8e4613e1ab558d8859d0b94f879f5d6a20cb7396afba7e2f74c3e"
+    },
+    "verdict": "not_actionable",
+    "reason": "The gateway calls only its immutable canonical ERC20 token addresses. Shipped token mint/burn/permit have no recipient or external-contract callbacks, and deployment creates direct non-proxy token instances.",
+    "assumptions": [
+      "Canonical ARGN and ARGNOT remain direct deployments of the repository ERC20 token contracts, with no recipient hooks or external callbacks in permit, mint, or burn.",
+      "Gateway implementation upgrades preserve the canonical token wiring and callback-free token behavior."
+    ]
+  },
+  {
+    "id": "ba5ebd46511e05a8d5c7261974146554e8c5a3f221ca290b767ddc68756481b2",
+    "description": "Reentrancy in MintingGateway.migrate(MintingGateway.MigrationAssetDistribution,MintingGateway.MigrationAssetDistribution) (contracts/MintingGateway.sol#424-443):\n\tExternal calls:\n\t- argonTotalAmount = _mintMigrationBalances(argonToken,argonMigration.recipients,argonMigration.amounts) (contracts/MintingGateway.sol#430-431)\n\t\t- ICanonicalToken(token).mint(recipient,amount) (contracts/MintingGateway.sol#1183)\n\t- argonotTotalAmount = _mintMigrationBalances(argonotToken,argonotMigration.recipients,argonotMigration.amounts) (contracts/MintingGateway.sol#432-433)\n\t\t- ICanonicalToken(token).mint(recipient,amount) (contracts/MintingGateway.sol#1183)\n\tEvent emitted after the call(s):\n\t- MigrationCompleted(argonMigration.recipients.length,argonTotalAmount,argonotMigration.recipients.length,argonotTotalAmount) (contracts/MintingGateway.sol#437-442)\n",
+    "check": "reentrancy-events",
+    "reviewed_commit": "b4504be9cd3a3c06acf213eb6339c06d130ca507",
+    "reviewed_source": {
+      "path": "contracts/MintingGateway.sol",
+      "sha256": "73f2ba71e3f8e4613e1ab558d8859d0b94f879f5d6a20cb7396afba7e2f74c3e"
+    },
+    "verdict": "not_actionable",
+    "reason": "The gateway calls only its immutable canonical ERC20 token addresses. Shipped token mint/burn/permit have no recipient or external-contract callbacks, and deployment creates direct non-proxy token instances. migrate also requires onlyOwner.",
+    "assumptions": [
+      "Canonical ARGN and ARGNOT remain direct deployments of the repository ERC20 token contracts, with no recipient hooks or external callbacks in permit, mint, or burn.",
+      "Gateway implementation upgrades preserve the canonical token wiring and callback-free token behavior."
+    ]
+  }
+]

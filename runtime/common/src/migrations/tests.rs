@@ -20,7 +20,7 @@ const VAULT_OPERATOR: AccountId32 = AccountId32::new([1; 32]);
 const LOCK_OWNER: AccountId32 = AccountId32::new([2; 32]);
 const OPERATIONAL_OWNER: AccountId32 = AccountId32::new([9; 32]);
 
-fn new_test_ext() -> TestExternalities {
+pub(crate) fn new_test_ext() -> TestExternalities {
 	argon_runtime::RuntimeGenesisConfig::default().build_storage().unwrap().into()
 }
 
@@ -59,7 +59,7 @@ fn stored_vault() -> v19::Vault<Runtime> {
 }
 
 // Two historical Locks exercise retirement and partially funded rounding in one real Vault.
-fn source_state() {
+pub(crate) fn source_state() {
 	StorageVersion::new(19).put::<VaultsPallet<Runtime>>();
 	StorageVersion::new(11).put::<pallet_bitcoin_locks::Pallet<Runtime>>();
 	StorageVersion::new(1).put::<pallet_bitcoin_fissions::Pallet<Runtime>>();

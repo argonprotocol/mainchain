@@ -648,17 +648,16 @@ where
 					.saturating_add(migrated_activated_securitization);
 			}
 			if let Some(Some(expected_upstream_position)) =
-				expected_upstream_positions.get_mut(&source_lock.owner_account)
+				expected_upstream_positions.get_mut(&source_lock.owner_account) &&
+				expected_upstream_position.vault_id == source_lock.vault_id
 			{
-				if expected_upstream_position.vault_id == source_lock.vault_id {
-					expected_upstream_position
-						.bitcoin_allocated_securitization
-						.saturating_reduce(released_securitization);
-					expected_upstream_position.bitcoin_securitization = expected_upstream_position
-						.bitcoin_securitization
-						.saturating_sub(source_activated_securitization)
-						.saturating_add(migrated_activated_securitization);
-				}
+				expected_upstream_position
+					.bitcoin_allocated_securitization
+					.saturating_reduce(released_securitization);
+				expected_upstream_position.bitcoin_securitization = expected_upstream_position
+					.bitcoin_securitization
+					.saturating_sub(source_activated_securitization)
+					.saturating_add(migrated_activated_securitization);
 			}
 			let mut allocated_securitization_by_height =
 				BTreeMap::<BitcoinHeight, <T as VaultsConfig>::Balance>::new();
@@ -778,4 +777,4 @@ where
 }
 
 #[cfg(all(test, not(feature = "runtime-benchmarks")))]
-mod tests;
+pub(crate) mod tests;

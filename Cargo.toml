@@ -36,6 +36,7 @@ members = [
     "localchain",
     "localchain/uniffi-bindgen",
     "primitives",
+    "fuzz",
     "runtime/argon",
     "runtime/canary",
     'runtime/common',

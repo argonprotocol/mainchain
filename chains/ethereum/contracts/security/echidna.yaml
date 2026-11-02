@@ -1,0 +1,10 @@
+testMode: property
+testLimit: 50000
+seqLen: 100
+shrinkLimit: 5000
+coverage: true
+corpusDir: security/corpus
+coverageFormats: [txt, html, lcov]
+allContracts: false
+cryticArgs:
+  - --hardhat-ignore-compile

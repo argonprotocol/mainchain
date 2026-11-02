@@ -1,4 +1,5 @@
 use crate as pallet_vaults;
+use crate::VaultConfig;
 use argon_bitcoin::{
 	primitives::{
 		BitcoinCosignScriptPubkey, BitcoinLockId, BitcoinSignature, CompressedBitcoinPubkey,
@@ -7,12 +8,18 @@ use argon_bitcoin::{
 	CosignReleaser,
 };
 use argon_primitives::{
-	bitcoin::{BitcoinHeight, BitcoinNetwork},
+	bitcoin::{BitcoinHeight, BitcoinNetwork, OpaqueBitcoinXpub},
 	tick::Ticker,
+	vault::VaultTerms,
 	CollectBlockerProvider, MiningFrameProvider, MiningSlotProvider, OperationalAccountProvider,
 	TickProvider, VotingSchedule,
 };
+use bitcoin::{
+	bip32::{ChildNumber, Xpriv, Xpub},
+	key::Secp256k1,
+};
 use frame_support::traits::Currency;
+use k256::elliptic_curve::rand_core::{OsRng, RngCore};
 use pallet_bitcoin_locks::BitcoinVerifier;
 use pallet_prelude::{
 	argon_primitives::{
@@ -21,6 +28,8 @@ use pallet_prelude::{
 	*,
 };
 use std::collections::{BTreeMap, BTreeSet};
+
+pub(crate) const TEN_PCT: FixedU128 = FixedU128::from_rational(110, 100);
 
 type Block = frame_system::mocking::MockBlock<Test>;
 
@@ -421,3 +430,31 @@ impl pallet_bitcoin_fissions::Config for Test {
 }
 
 parameter_types! { pub MinimumRatchetPercent: Percent = Percent::from_percent(1); }
+
+pub(crate) fn keys() -> OpaqueBitcoinXpub {
+	let mut seed = [0u8; 32];
+	OsRng.fill_bytes(&mut seed);
+
+	let xpriv = Xpriv::new_master(GetBitcoinNetwork::get(), &seed).unwrap();
+	let child = xpriv
+		.derive_priv(
+			&Secp256k1::new(),
+			&[ChildNumber::from_normal_idx(0).unwrap(), ChildNumber::from_hardened_idx(1).unwrap()],
+		)
+		.unwrap();
+	let xpub = Xpub::from_priv(&Secp256k1::new(), &child);
+	OpaqueBitcoinXpub(xpub.encode())
+}
+
+pub(crate) fn default_terms(pct: FixedU128) -> VaultTerms<Balance> {
+	VaultTerms { bitcoin_annual_percent_rate: pct, bitcoin_base_fee: 0 }
+}
+
+pub(crate) fn default_vault() -> VaultConfig<u64, Balance> {
+	VaultConfig {
+		terms: default_terms(TEN_PCT),
+		delegate_account_id: None,
+		bitcoin_xpubkey: keys(),
+		securitization: 50_000,
+	}
+}

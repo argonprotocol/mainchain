@@ -78,6 +78,10 @@ pub struct MockLock {
 	pub microgons_at_target_per_btc: u128,
 }
 
+pub(crate) fn lock(owner: u64, funded_satoshis: u64) -> MockLock {
+	MockLock { owner, funded_satoshis, fissioned_satoshis: 0, microgons_at_target_per_btc: 100 }
+}
+
 parameter_types! {
 	pub static RedemptionMicrogonsPerSatoshi: u128 = 100;
 	pub static LiquidityMultiplierPercent: u128 = 100;

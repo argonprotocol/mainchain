@@ -16,6 +16,8 @@ use polkadot_sdk::*;
 #[cfg(feature = "runtime-benchmarks")]
 use argon_runtime_common::benchmarking;
 pub use argon_runtime_common::config::NotaryRecordT;
+#[cfg(feature = "try-runtime")]
+pub use argon_runtime_common::try_state;
 use argon_runtime_common::{prelude::*, use_unless_benchmark};
 
 #[cfg(feature = "std")]

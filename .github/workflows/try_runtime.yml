@@ -1,6 +1,17 @@
 name: Try runtime upgrades
 
 on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - 'pallets/**'
+      - 'runtime/**'
+      - 'primitives/**'
+      - 'bitcoin/**'
+      - 'Cargo.toml'
+      - 'Cargo.lock'
+      - 'rust-toolchain.toml'
+      - '.github/workflows/try_runtime.yml'
   push:
     branches:
       - v[0-9]+.*
@@ -55,6 +66,10 @@ jobs:
 
   try-runtime-upgrade:
     needs: build-runtimes
+    # Forked pull requests cannot access the configured RPC endpoints.
+    if:
+      github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name ==
+      github.repository
     runs-on: ubuntu-22.04
     permissions:
       actions: read
@@ -95,6 +110,7 @@ jobs:
           ./try-runtime \
             --runtime ./runtimes/${{ matrix.runtime.artifact }}.compact.compressed.wasm \
             on-runtime-upgrade \
+              --checks all \
               --print-storage-diff \
               --blocktime 60000 \
               --disable-mbm-checks \
@@ -114,6 +130,7 @@ jobs:
           ./try-runtime \
             --runtime ./runtimes/${{ matrix.runtime.artifact }}.compact.compressed.wasm \
             on-runtime-upgrade \
+              --checks all \
               --print-storage-diff \
               --blocktime 60000 \
               --disable-mbm-checks \

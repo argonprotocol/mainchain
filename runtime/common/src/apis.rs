@@ -404,6 +404,9 @@ macro_rules! inject_common_apis {
                 // have a backtrace here. If any of the pre/post migration checks fail, we shall stop
                 // right here and right now.
                 let weight = Executive::try_runtime_upgrade(checks).unwrap();
+                if checks.try_state() {
+                    $crate::try_state::check::<Runtime>().expect("Bitcoin backing checks failed");
+                }
                 (weight, BlockWeights::get().max_block)
             }
 
@@ -415,7 +418,11 @@ macro_rules! inject_common_apis {
             ) -> Weight {
                 // NOTE: intentional unwrap: we don't want to propagate the error backwards, and want to
                 // have a backtrace here.
-                Executive::try_execute_block(block, state_root_check, signature_check, select).expect("execute-block failed")
+                let weight = Executive::try_execute_block(block, state_root_check, signature_check, select.clone()).expect("execute-block failed");
+                if matches!(select, frame_try_runtime::TryStateSelect::All) {
+                    $crate::try_state::check::<Runtime>().expect("Bitcoin backing checks failed");
+                }
+                weight
             }
         }
 

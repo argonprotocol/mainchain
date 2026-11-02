@@ -1,9 +1,8 @@
 use crate::{
 	mock::*,
 	pallet::{
-		BlockMintAction, MintIndex, MintedBitcoinMicrogons, NextPendingBitcoinMintIndex,
-		PendingBitcoinMint, PendingBitcoinMintsByIndex, PendingMintIndicesByLockId,
-		PendingMintQueueState,
+		BlockMintAction, MintedBitcoinMicrogons, NextPendingBitcoinMintIndex, PendingBitcoinMint,
+		PendingBitcoinMintsByIndex, PendingMintIndicesByLockId, PendingMintQueueState,
 	},
 	Error, Event, MiningMintPerCohort, MintType,
 };
@@ -13,17 +12,6 @@ use argon_primitives::{
 };
 use frame_support::traits::fungible::Unbalanced;
 use pallet_prelude::*;
-
-fn pending_mints() -> Vec<(MintIndex, PendingBitcoinMint<Test>)> {
-	let mut pending = PendingBitcoinMintsByIndex::<Test>::iter().collect::<Vec<_>>();
-	pending.sort_by_key(|(queue_index, _)| *queue_index);
-	pending
-}
-
-fn set_issuance_sources(mining: Balance, bitcoin: Balance) {
-	MintedBitcoinMicrogons::<Test>::set(bitcoin);
-	Balances::set_total_issuance(mining.saturating_add(bitcoin));
-}
 
 fn mining_issuance() -> Balance {
 	Balances::total_issuance().saturating_sub(MintedBitcoinMicrogons::<Test>::get())
@@ -185,11 +173,6 @@ fn it_tracks_block_rewards() {
 
 		assert_eq!(BlockMintAction::<Test>::get().1.argon_minted, 106);
 	});
-}
-
-fn set_cpi(value: f64) {
-	ArgonCPI::set(Some(FixedI128::from_float(value)));
-	AverageCPI::set(FixedI128::from_float(value));
 }
 
 #[test]

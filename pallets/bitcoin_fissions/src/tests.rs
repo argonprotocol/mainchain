@@ -6,10 +6,6 @@ use argon_primitives::{
 	BitcoinFissionsProvider,
 };
 
-fn lock(owner: u64, funded_satoshis: u64) -> MockLock {
-	MockLock { owner, funded_satoshis, fissioned_satoshis: 0, microgons_at_target_per_btc: 100 }
-}
-
 #[test]
 fn create_stores_one_lock_allocation_with_an_opaque_liquid_id() {
 	new_test_ext().execute_with(|| {

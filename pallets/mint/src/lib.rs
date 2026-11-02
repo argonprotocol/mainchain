@@ -16,6 +16,8 @@ mod mock;
 mod tests;
 
 pub mod migrations;
+#[cfg(feature = "try-runtime")]
+mod try_state;
 pub mod weights;
 
 #[frame_support::pallet]
@@ -30,7 +32,7 @@ pub mod pallet {
 	use pallet_prelude::argon_primitives::{MiningFrameProvider, MiningFrameTransitionProvider};
 	use sp_runtime::FixedPointNumber;
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(4);
+	pub(super) const STORAGE_VERSION: StorageVersion = StorageVersion::new(4);
 	pub type MintIndex = u64;
 
 	#[pallet::pallet]
@@ -370,6 +372,11 @@ pub mod pallet {
 			}
 
 			BlockMintAction::<T>::put((n, block_mint_action));
+		}
+
+		#[cfg(feature = "try-runtime")]
+		fn try_state(_n: BlockNumberFor<T>) -> Result<(), sp_runtime::TryRuntimeError> {
+			crate::try_state::check::<T>()
 		}
 	}
 

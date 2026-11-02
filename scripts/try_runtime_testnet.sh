@@ -9,6 +9,7 @@ cargo build -p argon-canary-runtime --release --features=try-runtime
 try-runtime \
     --runtime ./target/release/wbuild/argon-canary-runtime/argon_canary_runtime.compact.compressed.wasm \
     on-runtime-upgrade \
+    --checks all \
     --print-storage-diff \
     --blocktime 60000 \
     --disable-mbm-checks \
