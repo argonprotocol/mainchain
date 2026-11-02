@@ -604,74 +604,202 @@ mod tests {
 	}
 
 	#[tokio::test]
-	async fn file_oracle_preserves_index_when_uniswap_is_unavailable_and_retries_file_edits() {
-		use crate::price_index::{latest_price_index, price_index_loop_from_file};
+	async fn file_oracle_submits_uniswap_observations_and_recovers_after_history_failure() {
+		use alloy_primitives::{aliases::I56, U160};
+		use alloy_sol_types::SolError;
+		use argon_client::signer::Sr25519Signer;
+		use jsonrpsee::types::ErrorObjectOwned;
+		use std::sync::{
+			atomic::{AtomicBool, AtomicUsize, Ordering},
+			Arc,
+		};
+		use uniswap_lens::bindings::iuniswapv3pool::IUniswapV3Pool::{observeCall, observeReturn};
+
+		use crate::{price_index::price_index_loop_from_file, uniswap_oracle::OLD};
+
 		let _lock = PRICE_LOOP_TEST_LOCK.lock().await;
-		let _ = tracing_subscriber::fmt().with_env_filter("argon_oracle=debug").try_init();
 		let node = start_argon_test_node().await;
+		let argon = Address::repeat_byte(1);
+		let usdc = Address::repeat_byte(3);
+		let pool_manager = Address::repeat_byte(4);
+		let hook = Address::repeat_byte(5);
+		let sqrt_price_x96 = (1u128 << 96) / 1_000_000;
+		let history_available = Arc::new(AtomicBool::new(true));
+		let failed_observations = Arc::new(AtomicUsize::new(0));
+
+		let server = ServerBuilder::default().build("127.0.0.1:0").await.unwrap();
+		let rpc_url = format!("http://{}", server.local_addr().unwrap());
+		let mut rpc = RpcModule::new(history_available.clone());
+		rpc.register_method("eth_chainId", |_, _, _| "0x7a69").unwrap();
+		let failures = failed_observations.clone();
+		rpc.register_method(
+			"eth_call",
+			move |params, history_available, _| -> Result<String, ErrorObjectOwned> {
+				let (call, _block): (serde_json::Value, serde_json::Value) =
+					params.parse().unwrap();
+				let to: Address = serde_json::from_value(call["to"].clone()).unwrap();
+				let input: Bytes = serde_json::from_value(
+					call.get("input").or_else(|| call.get("data")).unwrap().clone(),
+				)
+				.unwrap();
+				if to == pool_manager {
+					assert_eq!(&input[..4], &alloy_primitives::keccak256("extsload(bytes32)")[..4]);
+					let mut pool_slot = [0u8; 64];
+					pool_slot[..32].fill(7);
+					pool_slot[63] = 6;
+					assert_eq!(&input[4..], alloy_primitives::keccak256(pool_slot).as_slice());
+					let mut slot0 = [0u8; 32];
+					slot0[12..].copy_from_slice(&U160::from(sqrt_price_x96).to_be_bytes::<20>());
+					return Ok(Bytes::from(slot0.to_vec()).to_string());
+				}
+
+				assert_eq!(to, hook);
+				let output = match input[..4].try_into().unwrap() {
+					token0Call::SELECTOR => token0Call::abi_encode_returns(&argon),
+					token1Call::SELECTOR => token1Call::abi_encode_returns(&usdc),
+					observeCall::SELECTOR => {
+						// One usable observation, then missing history until the test restores it.
+						if !history_available.swap(false, Ordering::SeqCst) {
+							failures.fetch_add(1, Ordering::SeqCst);
+							return Err(ErrorObjectOwned::owned(
+								3,
+								"execution reverted",
+								Some(Bytes::from(OLD {}.abi_encode()).to_string()),
+							));
+						}
+						let request = observeCall::abi_decode(&input).unwrap();
+						let seconds = request.secondsAgos[0];
+						assert_eq!(request.secondsAgos[1], 0);
+						observeCall::abi_encode_returns(&observeReturn {
+							tickCumulatives: vec![
+								I56::ZERO,
+								I56::try_from(-276_324i64 * i64::from(seconds)).unwrap(),
+							],
+							secondsPerLiquidityCumulativeX128s: vec![
+								U160::ZERO,
+								U160::from(u128::from(seconds) << 64),
+							],
+						})
+					},
+					_ => panic!("Unexpected oracle call: {input}"),
+				};
+				Ok(Bytes::from(output).to_string())
+			},
+		)
+		.unwrap();
+		let rpc_handle = server.start(rpc);
+
+		let pool = super::PurchasePool {
+			chain_id: 31337,
+			pool_manager: sp_core::H160::from_slice(pool_manager.as_slice()),
+			pool_id: sp_core::H256::repeat_byte(7).into(),
+			usdc_token: sp_core::H160::from_slice(usdc.as_slice()),
+			argon_is_token0: true,
+		};
+		let approve = api::tx().sudo().sudo(api::Call::StabilizerBuys(
+			api::runtime_types::pallet_stabilizer_buys::pallet::Call::set_approved_pool {
+				pool: Some(pool),
+			},
+		));
+		node.client
+			.submit_tx(
+				&approve,
+				&Sr25519Signer::new(sr25519::Pair::from_string("//Alice", None).unwrap()),
+				None,
+				false,
+			)
+			.await
+			.unwrap();
+
+		let settings = [
+			("ARGON_TOKEN_ADDRESS", argon.to_string()),
+			("USDC_TOKEN_ADDRESS", usdc.to_string()),
+			("ETHEREUM_RPC_URLS", rpc_url),
+			("ARGON_UNISWAP_ORACLE_ADDRESSES", hook.to_string()),
+			("USE_SEPOLIA", "false".to_string()),
+		];
+		let previous_settings: Vec<_> =
+			settings.iter().map(|(name, _)| (*name, env::var_os(name))).collect();
+		for (name, value) in settings {
+			unsafe {
+				env::set_var(name, value);
+			}
+		}
 		let keystore = MemoryKeystore::new();
 		let keypair = sr25519::Pair::from_string("//Eve", None).unwrap();
 		keystore.insert(ACCOUNT, "//Eve", &keypair.public().0).unwrap();
 		let signer =
 			KeystoreSigner::new(keystore.into(), keypair.public().into(), CryptoType::Sr25519);
-
-		let file = env::temp_dir().join(format!("oracle-retry-{}.json", rand::random::<u64>()));
+		let file =
+			env::temp_dir().join(format!("oracle-observations-{}.json", rand::random::<u64>()));
 		let mut json = serde_json::json!({
-			"argon_usd_target_price": 1.0,
-			"argon_usd_price": 1.0,
-			"argon_time_weighted_average_liquidity": 123,
+			"argon_usd_target_price": 1.06,
+			"argon_usd_price": "UNISWAP",
+			"argon_time_weighted_average_liquidity": 999,
+			"stabilizer_pool_sqrt_price_x96": "0x1234",
 			"argonot_usd_price": 0.05,
 			"btc_usd_price": 60000.0
 		});
-		fs::write(&file, json.to_string()).unwrap();
-		let (numeric, _) = super::read_file_price_index(file.to_str().unwrap()).unwrap();
-		let ticker = node.client.lookup_ticker().await.unwrap();
-		let mut client = argon_client::ReconnectingClient::new(vec![node.client.url.clone()]);
-		super::submit_price_index(
-			&mut client,
-			&signer,
-			ticker.current(),
-			Duration::from_secs(30),
-			numeric,
-		)
-		.await
-		.unwrap();
-		let seed = latest_price_index(&node.client).await.unwrap().unwrap();
-
-		// An unavailable source must not publish the file's simulated market fields.
-		let argon_address = env::var_os("ARGON_TOKEN_ADDRESS");
-		unsafe {
-			env::remove_var("ARGON_TOKEN_ADDRESS");
-		}
-		json["argon_usd_price"] = serde_json::json!("UNISWAP");
-		json["argon_time_weighted_average_liquidity"] = serde_json::json!(999);
 		fs::write(&file, json.to_string()).unwrap();
 		let mut oracle = spawn(price_index_loop_from_file(
 			node.client.url.clone(),
 			signer,
 			file.to_str().unwrap().into(),
 		));
-		tokio::time::sleep(Duration::from_millis(ticker.tick_duration_millis * 2 + 100)).await;
-		assert!(!oracle.is_finished());
-		assert_eq!(latest_price_index(&node.client).await.unwrap(), Some(seed));
+		let observations = async {
+			let observed =
+				wait_for_index(&node.client, |index| index.usdc_usd_price.is_some()).await;
+			assert_eq!(observed.argon_usd_price, FixedU128::from_u32(1));
+			assert_eq!(observed.argon_time_weighted_average_liquidity, (1u128 << 64) / 1_000_000);
+			assert_eq!(observed.stabilizer_pool_sqrt_price_x96, Some(U256::from(sqrt_price_x96)));
+			assert_eq!(observed.usdc_usd_price, Some(FixedU128::from_u32(1)));
+			assert_eq!(observed.btc_usd_price, FixedU128::from_float(60000.0));
 
-		// A valid file edit recovers through the same running loop and signed submission path.
-		json["argon_usd_price"] = serde_json::json!(1.0);
-		json["btc_usd_price"] = serde_json::json!(61000.0);
-		fs::write(&file, json.to_string()).unwrap();
-		let update =
-			wait_for_index(&node.client, |index| index.btc_usd_price.to_float() == 61000.0);
-		let published = tokio::select! {
-			result = &mut oracle => panic!("File oracle stopped before recovering: {result:?}"),
-			index = update => index,
+			json["usdc_usd_price"] = serde_json::json!(0.98);
+			json["btc_usd_price"] = serde_json::json!(61000.0);
+			fs::write(&file, json.to_string()).unwrap();
+			// Two failed tick attempts exhaust all five history windows each.
+			tokio::time::timeout(Duration::from_secs(15), async {
+				while failed_observations.load(Ordering::SeqCst) < 10 {
+					tokio::time::sleep(Duration::from_millis(50)).await;
+				}
+			})
+			.await
+			.unwrap();
+			assert_eq!(super::latest_price_index(&node.client).await.unwrap(), Some(observed));
+
+			history_available.store(true, Ordering::SeqCst);
+			let recovered = wait_for_index(&node.client, |index| index.tick > observed.tick).await;
+			assert_eq!(recovered.argon_usd_price, FixedU128::from_rational(98, 100));
+			assert_eq!(recovered.usdc_usd_price, Some(FixedU128::from_rational(98, 100)));
+			assert_eq!(
+				recovered.argon_time_weighted_average_liquidity,
+				observed.argon_time_weighted_average_liquidity
+			);
+			assert_eq!(
+				recovered.stabilizer_pool_sqrt_price_x96,
+				observed.stabilizer_pool_sqrt_price_x96
+			);
+			assert_eq!(recovered.btc_usd_price, FixedU128::from_float(61000.0));
+			for index in [observed, recovered] {
+				assert_eq!(index.argon_usd_target_price, FixedU128::from_float(1.06));
+				assert_eq!(index.argonot_usd_price, FixedU128::from_float(0.05));
+			}
 		};
-		assert!(published.tick > seed.tick);
-		assert_eq!(published.argon_time_weighted_average_liquidity, 999);
+		tokio::select! {
+			result = &mut oracle => panic!("File oracle stopped before observations completed: {result:?}"),
+			() = observations => {},
+		}
 		oracle.abort();
 		let _ = oracle.await;
-		unsafe {
-			if let Some(address) = argon_address {
-				env::set_var("ARGON_TOKEN_ADDRESS", address);
+		rpc_handle.stop().unwrap();
+		for (name, value) in previous_settings {
+			unsafe {
+				if let Some(value) = value {
+					env::set_var(name, value);
+				} else {
+					env::remove_var(name);
+				}
 			}
 		}
 		fs::remove_file(file).unwrap();
