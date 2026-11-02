@@ -15,6 +15,8 @@
     "pretest:ci": "yarn build",
     "runtime-pricing:prepare": "node --import tsx prepareRuntimePricing.ts",
     "runtime-setup:prepare": "node --import tsx prepareRuntimeSetup.ts",
+    "stabilization:prepare": "node --import tsx deployStabilizationPool.ts",
+    "stabilization:publish": "node --import tsx deployStabilizationPool.ts --publish",
     "tsc": "yarn build",
     "tsup": "yarn build",
     "typecheck": "yarn build"

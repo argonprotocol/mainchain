@@ -500,6 +500,7 @@ fn can_convert_argon_prices() {
 			argonot_usd_price: FixedU128::from_float(2.00),
 			argon_time_weighted_average_liquidity: 100_000_000,
 			usdc_usd_price: None,
+			stabilizer_pool_sqrt_price_x96: None,
 		};
 		Current::<Test>::put(index);
 
@@ -535,6 +536,7 @@ fn clamps_argon_price_changes_away_from_target() {
 			argonot_usd_price: FixedU128::from_float(2.00),
 			argon_time_weighted_average_liquidity: 100_000_000,
 			usdc_usd_price: None,
+			stabilizer_pool_sqrt_price_x96: None,
 		};
 		Current::<Test>::put(base_entry);
 		MaxPriceAgeInTicks::set(10);
@@ -581,6 +583,7 @@ fn clamps_argon_target_price_changes() {
 			argonot_usd_price: FixedU128::from_float(2.00),
 			argon_time_weighted_average_liquidity: 100_000_000,
 			usdc_usd_price: None,
+			stabilizer_pool_sqrt_price_x96: None,
 		};
 		Current::<Test>::put(base_entry);
 		MaxPriceAgeInTicks::set(10);
@@ -655,11 +658,12 @@ fn create_index() -> PriceIndexEntry {
 		argonot_usd_price: FixedU128::from_float(2.00),
 		argon_time_weighted_average_liquidity: 100_000_000,
 		usdc_usd_price: None,
+		stabilizer_pool_sqrt_price_x96: None,
 	}
 }
 
 #[test]
-fn migrates_current_and_last_valid_prices_without_inventing_usdc() {
+fn migrates_current_and_last_valid_prices_without_inventing_observations() {
 	use argon_primitives::price_index::PriceIndexV1;
 	new_test_ext(Some(1)).execute_with(|| {
 		let old = PriceIndexV1 {
@@ -674,20 +678,24 @@ fn migrates_current_and_last_valid_prices_without_inventing_usdc() {
 		frame_support::storage::unhashed::put(&Current::<Test>::hashed_key(), &old);
 		frame_support::storage::unhashed::put(&crate::LastValid::<Test>::hashed_key(), &old);
 		StorageVersion::new(1).put::<PriceIndex>();
-		crate::migrations::add_usdc::<Test>();
+		crate::migrations::add_optional_pool_prices::<Test>();
 		assert_eq!(Current::<Test>::get(), Some(old.into()));
 		assert_eq!(crate::LastValid::<Test>::get(), Some(old.into()));
+		let migrated = Current::<Test>::get().unwrap();
+		assert_eq!(migrated.usdc_usd_price, None);
+		assert_eq!(migrated.stabilizer_pool_sqrt_price_x96, None);
 		assert_eq!(StorageVersion::get::<PriceIndex>(), StorageVersion::new(2));
 		CurrentTick::set(6);
 		let mut next: PriceIndexEntry = old.into();
 		next.tick = 6;
 		next.usdc_usd_price = Some(FixedU128::from_rational(99, 100));
+		next.stabilizer_pool_sqrt_price_x96 = Some(U256::one() << 96);
 		assert_eq!(PriceIndexEntry::decode_compatible(&next.encode()).unwrap(), next);
 		let mut unsupported = next.encode();
 		unsupported.push(0);
 		assert!(PriceIndexEntry::decode_compatible(&unsupported).is_err());
 		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), next, None));
-		crate::migrations::add_usdc::<Test>();
+		crate::migrations::add_optional_pool_prices::<Test>();
 		assert_eq!(Current::<Test>::get(), Some(next));
 	});
 }

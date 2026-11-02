@@ -28,7 +28,7 @@ get_pallets_for_runtime() {
     # Get all pallets with benchmarks - include frame pallets as they may need custom weights
     RUST_LOG=warn frame-omni-bencher v1 benchmark pallet \
         --runtime="$runtime_path" \
-        --genesis-builder-policy=none \
+        --genesis-builder=none \
         --list=pallets
 }
 
@@ -104,13 +104,16 @@ function benchmark_runtime() {
         elif [ "$pallet" = "pallet_ethereum_verifier" ]; then
             # Keep the larger fitted costs when the two regression methods disagree.
             analysis_flags=(--output-analysis=max --json-file="${benchmark_log}.json")
+        elif [ "$pallet" = "pallet_stabilizer_buys" ]; then
+            # Bound the short batch ranges using the larger regression coefficients.
+            analysis_flags=(--output-analysis=max)
         fi
         set +e
         frame-omni-bencher v1 benchmark pallet \
             --runtime="$runtime_path" \
             --pallet="$pallet" \
             --extrinsic="*" \
-            --genesis-builder-policy=none \
+            --genesis-builder=none \
             --template="scripts/weight_template.hbs" \
             --repeat="$REPEAT_COUNT" \
             "${analysis_flags[@]}" \

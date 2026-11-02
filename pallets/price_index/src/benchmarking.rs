@@ -208,5 +208,6 @@ fn benchmark_price_index(tick: Tick) -> PriceIndex {
 		argonot_usd_price: FixedU128::from_u32(2),
 		argon_time_weighted_average_liquidity: 100_000_000,
 		usdc_usd_price: None,
+		stabilizer_pool_sqrt_price_x96: Some(U256::one() << 96),
 	}
 }

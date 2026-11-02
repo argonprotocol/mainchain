@@ -144,6 +144,13 @@ or unresolved; keep product/support decisions and verification gaps separate fro
 
 ## Apply repository requirements
 
+For code changes, include a readability and pattern-suitability pass in the same review. Apply the
+repository's rules for reading order, logical spacing, independent guards, descriptive names,
+imports, field and error documentation, test structure, and unnecessary indirection. Check a reused
+pattern's behavior, state ownership, and layer boundaries before accepting it for consistency.
+Return an explicit `Readability: PASS` or `BLOCKED` with any concrete exceptions; formatting alone
+is not evidence of readability.
+
 Read the review and test requirements that apply in the reviewed repository and revision. Read
 `CLAUDE.md` and relevant `.claude/` guidance at that revision when present. Resolve repository-local
 procedures from the reviewed repository; do not assume skills or commands from another checkout
@@ -177,8 +184,10 @@ requires separate authorization.
 
 Lead with confirmed findings, ordered by impact. Each finding needs a concise title, precise
 file/line or symbol, trigger, causal explanation, user/domain consequence, and evidence. Cite the
-changed location plus the producer/consumer that establishes the contract when needed. Avoid style
-requests and speculative hardening without a supported failure.
+changed location plus the producer/consumer that establishes the contract when needed. Do not
+present subjective style preferences as correctness findings or prescribe speculative hardening
+without a supported failure. Report concrete violations of the repository's readability rules
+separately from correctness bugs.
 
 Close with the reviewed revision/fingerprint, meaningful coverage limits, and unresolved assumptions
 or missing checks. Preserve a concise disposition for each finding submitted by the independent

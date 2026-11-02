@@ -270,7 +270,7 @@ Configure exactly which Uniswap sources to observe for each token:
 - `ARGONOT_UNISWAP_ORACLE_ADDRESSES`: comma-separated Argonot/USDC v3 pool or v4 hook addresses.
 
 Both lists are required and may mix v3 pools and v4 hooks. A v3 pool address selects its fee tier;
-for v4, supply the `UniswapV4OracleHook` address, not the PoolManager address or pool ID. Empty or
+for v4, supply the `StabilizationPoolHook` address, not the PoolManager address or pool ID. Empty or
 unset settings are configuration errors. Sources are weighted by their historical harmonic mean
 liquidity. The oracle validates every configured source's token pair at startup and never adds
 unlisted sources if reads fail.
@@ -279,8 +279,8 @@ The v4 hook collects history independently of the price oracle. Before including
 pool for at least one hour and verify its history and liquidity. Change the lists and restart the
 oracle with the updated environment (recreate containers). Argon can switch to a list containing
 only v4 hooks while Argonot continues to observe selected v3 fee tiers alongside v4. See the
-[hook setup](chains/ethereum/contracts/README.md#uniswap-v4-oracle-hook) for deployment and history
-requirements.
+[hook setup](chains/ethereum/contracts/README.md#uniswap-v4-stabilization-pool-hook) for deployment
+and history requirements.
 
 ### Cargo Make
 

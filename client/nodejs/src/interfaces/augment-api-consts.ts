@@ -582,6 +582,13 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       rewardMaturityTicks: u64 & AugmentedConst<ApiType>;
     };
+    stabilizerPools: {
+      /**
+       * Opening references retained in financial-day frames, including the checkpoint buffer.
+       * Zero disables history. Both production runtimes retain 30 frames plus a 3-frame buffer.
+       **/
+      maxFramePriceHistoryFrames: u32 & AugmentedConst<ApiType>;
+    };
     system: {
       /**
        * Maximum number of block number to block hash mappings to keep (oldest pruned first).

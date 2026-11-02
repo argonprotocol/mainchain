@@ -1,8 +1,10 @@
 use std::{env, fs, time::Duration};
 
+use alloy_primitives::{Address, B256};
 use anyhow::{anyhow, ensure};
 use polkadot_sdk::*;
 use serde::{Deserialize, Deserializer, Serialize};
+use sp_core::U256;
 use sp_runtime::{
 	traits::{One, Zero},
 	FixedU128, Saturating,
@@ -14,7 +16,7 @@ use crate::{
 	argon_price, argonot_price, coin_usd_prices,
 	coin_usd_prices::PriceProviderKind,
 	ethereum_gas_price::EthereumGasPriceLookup,
-	uniswap_oracle::{PriceAndLiquidity, UniswapOracleError},
+	uniswap_oracle::{PriceAndLiquidity, UniswapOracle, UniswapOracleError},
 	us_cpi::UsCpiRetriever,
 	utils::MIN_TRANSACTION_WATCH_TIMEOUT,
 };
@@ -24,6 +26,8 @@ use argon_client::{
 		runtime_types::{
 			argon_primitives::price_index::PriceIndex as ApiPriceIndex,
 			pallet_price_index::EthereumPriceIndex as ApiEthereumPriceIndex,
+			pallet_stabilizer_buys::uniswap_purchase::PurchasePool,
+			primitive_types::U256 as ApiU256,
 		},
 		storage,
 	},
@@ -65,6 +69,9 @@ pub struct PriceIndex {
 	/// Observed USDC/USD; missing observations must not publish an assumed peg.
 	#[serde(default, deserialize_with = "optional_fixed_u128_from_float")]
 	pub usdc_usd_price: Option<FixedU128>,
+	/// Raw Q96 sqrt price for Mainchain's configured v4 stabilizer pool, when observed.
+	#[serde(default)]
+	pub stabilizer_pool_sqrt_price_x96: Option<U256>,
 	#[serde(default)]
 	pub ethereum: Option<EthereumPriceIndex>,
 }
@@ -142,6 +149,10 @@ pub async fn price_index_loop(
 		argonot_price::ArgonotPriceLookup::from_env(last_argonot_price).await?;
 	let ethereum_gas_price_lookup = EthereumGasPriceLookup::from_env().await?;
 
+	// Pool configuration is fixed for this oracle process; changes require a restart.
+	let at = mainchain_client.live.storage().at_latest().await?;
+	let stabilizer_pool = at.fetch(&storage().stabilizer_buys().approved_pool()).await?;
+
 	info!("Oracle Started.");
 
 	loop {
@@ -176,6 +187,19 @@ pub async fn price_index_loop(
 			),
 			ethereum_gas_price_lookup.get_gas_price(),
 		);
+		let stabilizer_pool_sqrt_price_x96 =
+			match get_v4_pool_price(&argon_price_lookup.uniswap_oracle, stabilizer_pool.as_ref())
+				.await
+			{
+				Ok(price) => price,
+				Err(error) => {
+					tracing::warn!(
+						?error,
+						"Stabilizer pool price unavailable; submitting without it"
+					);
+					None
+				},
+			};
 
 		let argon_usd_price = match price_result {
 			Ok(x) => x,
@@ -265,6 +289,7 @@ pub async fn price_index_loop(
 				argonot_usd_price,
 				btc_usd_price: bitcoin_usd_price,
 				usdc_usd_price: usd_price_lookup.usdc,
+				stabilizer_pool_sqrt_price_x96,
 				ethereum,
 			},
 		)
@@ -337,6 +362,21 @@ pub async fn price_index_loop_from_file(
 	}
 }
 
+async fn get_v4_pool_price(
+	oracle: &UniswapOracle,
+	pool: Option<&PurchasePool>,
+) -> anyhow::Result<Option<U256>> {
+	let Some(pool) = pool else { return Ok(None) };
+	let sqrt_price = oracle
+		.get_pool_sqrt_price_x96(
+			pool.chain_id,
+			Address::from_slice(pool.pool_manager.as_bytes()),
+			B256::from(pool.pool_id.0),
+		)
+		.await?;
+	Ok(Some(sqrt_price))
+}
+
 // Storage changed when USDC joined the index. Read both supported native layouts during rollout.
 async fn latest_price_index(client: &MainchainClient) -> anyhow::Result<Option<ChainPriceIndex>> {
 	let at = client.live.storage().at(client.best_block_hash().await?);
@@ -372,6 +412,9 @@ async fn submit_price_index(
 		argonot_usd_price: to_api_fixed_u128(price.argonot_usd_price),
 		btc_usd_price: to_api_fixed_u128(price.btc_usd_price),
 		usdc_usd_price: price.usdc_usd_price.map(to_api_fixed_u128),
+		stabilizer_pool_sqrt_price_x96: price
+			.stabilizer_pool_sqrt_price_x96
+			.map(|price| ApiU256(price.0)),
 	};
 	let ethereum = price.ethereum.map(|ethereum| ApiEthereumPriceIndex {
 		ethereum_usd_price: to_api_fixed_u128(ethereum.ethereum_usd_price),
@@ -424,7 +467,7 @@ mod tests {
 	use polkadot_sdk::*;
 	use sp_core::{
 		crypto::{key_types::ACCOUNT, AccountId32},
-		sr25519, Pair,
+		sr25519, Pair, U256,
 	};
 	use sp_keystore::{testing::MemoryKeystore, Keystore};
 	use sp_runtime::FixedU128;
@@ -590,8 +633,11 @@ mod tests {
 			argon_time_weighted_average_liquidity: 100_000,
 			tick: 10,
 		};
-		let current =
-			NativeIndex { usdc_usd_price: Some(FixedU128::from_rational(99, 100)), ..old.into() };
+		let current = NativeIndex {
+			usdc_usd_price: Some(FixedU128::from_rational(99, 100)),
+			stabilizer_pool_sqrt_price_x96: Some(U256::one() << 96),
+			..old.into()
+		};
 		let submitted = super::ApiPriceIndex {
 			btc_usd_price: super::to_api_fixed_u128(current.btc_usd_price),
 			argonot_usd_price: super::to_api_fixed_u128(current.argonot_usd_price),
@@ -600,6 +646,9 @@ mod tests {
 			argon_time_weighted_average_liquidity: current.argon_time_weighted_average_liquidity,
 			tick: current.tick,
 			usdc_usd_price: current.usdc_usd_price.map(super::to_api_fixed_u128),
+			stabilizer_pool_sqrt_price_x96: current
+				.stabilizer_pool_sqrt_price_x96
+				.map(|price| super::ApiU256(price.0)),
 		};
 		let mut registry = scale_info::Registry::new();
 		let old_type = registry.register_type(&scale_info::meta_type::<PriceIndexV1>());

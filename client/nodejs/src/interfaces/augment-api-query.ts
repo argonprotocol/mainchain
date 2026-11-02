@@ -11,6 +11,7 @@ import type {
   Bytes,
   Null,
   Option,
+  U256,
   U8aFixed,
   Vec,
   bool,
@@ -118,6 +119,8 @@ import type {
   PalletStabilizerBuysBuyPayout,
   PalletStabilizerBuysPriceHistoryHourlyPriceReference,
   PalletStabilizerBuysUniswapPurchasePurchasePool,
+  PalletStabilizerPoolsPoolConfig,
+  PalletStabilizerPoolsPositionCheckpoint,
   PalletTransactionPaymentReleases,
   PalletTreasuryBondLot,
   PalletTreasuryBondLotSummary,
@@ -1755,6 +1758,42 @@ declare module '@polkadot/api-base/types/storage' {
         ApiType,
         (arg: U8aFixed | string | Uint8Array) => Observable<Option<ArgonPrimitivesPriceIndex>>,
         [U8aFixed]
+      >;
+    };
+    stabilizerPools: {
+      /**
+       * First current-tick price index accepted in each frame, including absent pool observations.
+       * This is an oracle opening reference, not an exact historical Ethereum boundary proof.
+       * Later indices cannot revalue it; frames without an observation have no entry. A new opening
+       * reference prunes frames outside the configured window, including across oracle gaps.
+       **/
+      frameStartPriceIndices: AugmentedQuery<
+        ApiType,
+        () => Observable<BTreeMap<u64, ArgonPrimitivesPriceIndex>>,
+        []
+      >;
+      /**
+       * Approved deployments on the Ethereum network authenticated by EthereumVerifier.
+       * Configuration is immutable once registered, preserving checkpoint identity and layout.
+       **/
+      pools: AugmentedQuery<
+        ApiType,
+        (
+          arg1: H160 | string | Uint8Array,
+          arg2: H256 | string | Uint8Array,
+        ) => Observable<Option<PalletStabilizerPoolsPoolConfig>>,
+        [H160, H256]
+      >;
+      /**
+       * Last accepted checkpoint for an NFT. Keep its source-block watermark across re-enrollment.
+       **/
+      positionCheckpoints: AugmentedQuery<
+        ApiType,
+        (
+          arg1: H160 | string | Uint8Array,
+          arg2: U256 | AnyNumber | Uint8Array,
+        ) => Observable<Option<PalletStabilizerPoolsPositionCheckpoint>>,
+        [H160, U256]
       >;
     };
     sudo: {

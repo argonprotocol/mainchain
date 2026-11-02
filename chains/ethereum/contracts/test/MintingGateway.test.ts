@@ -554,6 +554,91 @@ describe('MintingGateway', () => {
     expect(await argonot.balanceOf(holder.address)).to.equal(2_000n * SCALE);
   });
 
+  it('starts a transfer when its permit was already submitted by another account', async () => {
+    const { argon, gateway, holder, outsider } = await deployFixture();
+    const gatewayAddress = (await gateway.getAddress()) as `0x${string}`;
+    const amount = 250n;
+    const tokenAmount = amount * SCALE;
+    const deadline = BigInt((await ethers.provider.getBlock('latest'))!.timestamp) + 3600n;
+    const permit = await signPermit(
+      holder as unknown as TypedDataSignerLike,
+      argon,
+      holder.address as `0x${string}`,
+      gatewayAddress,
+      tokenAmount,
+      deadline,
+      'Argon',
+    );
+
+    await argon
+      .connect(outsider)
+      .permit(holder.address, gatewayAddress, tokenAmount, deadline, permit.v, permit.r, permit.s);
+
+    expect(await argon.nonces(holder.address)).to.equal(1n);
+    expect(await argon.allowance(holder.address, gatewayAddress)).to.equal(tokenAmount);
+
+    const event = await parseGatewayEvent(
+      gateway
+        .connect(holder)
+        .startTransferToArgon(
+          await argon.getAddress(),
+          amount,
+          ethers.encodeBytes32String('front-run-permit'),
+          deadline,
+          permit.v,
+          permit.r,
+          permit.s,
+        ),
+      gateway,
+      'TransferToArgonStarted',
+    );
+
+    expect(event.args[0]).to.equal(holder.address);
+    expect(event.args[2]).to.equal(amount);
+    expect(await argon.nonces(holder.address)).to.equal(1n);
+    expect(await argon.allowance(holder.address, gatewayAddress)).to.equal(0n);
+    expect(await argon.balanceOf(holder.address)).to.equal(750n * SCALE);
+    expect(await gateway.gatewayActivityNonce()).to.equal(1n);
+  });
+
+  it('rejects a failed permit without sufficient allowance to burn', async () => {
+    const { argon, gateway, holder } = await deployFixture();
+    const gatewayAddress = (await gateway.getAddress()) as `0x${string}`;
+    const amount = 250n;
+    const tokenAmount = amount * SCALE;
+    const deadline = BigInt((await ethers.provider.getBlock('latest'))!.timestamp) - 1n;
+    const permit = await signPermit(
+      holder as unknown as TypedDataSignerLike,
+      argon,
+      holder.address as `0x${string}`,
+      gatewayAddress,
+      tokenAmount,
+      deadline,
+      'Argon',
+    );
+
+    await expectCustomError(
+      gateway
+        .connect(holder)
+        .startTransferToArgon(
+          await argon.getAddress(),
+          amount,
+          ethers.encodeBytes32String('expired-permit'),
+          deadline,
+          permit.v,
+          permit.r,
+          permit.s,
+        ),
+      argon,
+      'ERC20InsufficientAllowance',
+      [gatewayAddress, 0n, tokenAmount],
+    );
+
+    expect(await argon.nonces(holder.address)).to.equal(0n);
+    expect(await argon.balanceOf(holder.address)).to.equal(1_000n * SCALE);
+    expect(await gateway.gatewayActivityNonce()).to.equal(0n);
+  });
+
   it('exposes the shared activity locator mapping slot and block cap', async () => {
     const { gateway } = await deployFixture();
 
@@ -1670,6 +1755,96 @@ describe('MintingGateway', () => {
       'TransferOutOfArgonAlreadyFinalized',
       [transferId],
     );
+  });
+
+  it('rejects zero collateral rows without weakening unknown-signer capacity checks', async () => {
+    const fixture = await deployFixture();
+    const { argon, gateway, outsider, recipient } = fixture;
+    const { target } = await activateMintingAuthority(fixture);
+    const request = await createTransferOutRequest(fixture, { amount: 50n });
+    const transferId = hashMintingGatewayTransferOutOfArgonRequest(request);
+    const context = await getGatewayHashContext(gateway);
+    const validAuthorization = {
+      signingKey: fixture.mintingAuthoritySigner.address,
+      microgonCollateral: 80n,
+      micronotCollateral: 0n,
+      signature: await fixture.mintingAuthoritySigner.signMessage(
+        ethers.getBytes(
+          hashMintingGatewayMintingAuthorization(context, {
+            request,
+            microgonCollateral: 80n,
+            micronotCollateral: 0n,
+          }),
+        ),
+      ),
+    };
+    const zeroAuthorization = {
+      signingKey: outsider.address,
+      microgonCollateral: 0n,
+      micronotCollateral: 0n,
+      signature: await outsider.signMessage(
+        ethers.getBytes(
+          hashMintingGatewayMintingAuthorization(context, {
+            request,
+            microgonCollateral: 0n,
+            micronotCollateral: 0n,
+          }),
+        ),
+      ),
+    };
+    const zeroProof = [validAuthorization, zeroAuthorization]
+      .sort((left, right) =>
+        left.signingKey.toLowerCase().localeCompare(right.signingKey.toLowerCase()),
+      )
+      .map(({ signingKey: _, ...authorization }) => authorization);
+    const locatorIndex = await gateway.latestActivityBlockLocatorIndex();
+    const locatorBefore = await gateway.activityBlockLocators(locatorIndex);
+
+    await expectCustomError(
+      gateway.connect(outsider).finalizeTransferOutOfArgon(request, {
+        authorizations: zeroProof,
+      }),
+      gateway,
+      'InvalidMintingAuthority',
+      [outsider.address],
+    );
+
+    const nonzeroUnknownAuthorization = {
+      signingKey: outsider.address,
+      microgonCollateral: 1n,
+      micronotCollateral: 0n,
+      signature: await outsider.signMessage(
+        ethers.getBytes(
+          hashMintingGatewayMintingAuthorization(context, {
+            request,
+            microgonCollateral: 1n,
+            micronotCollateral: 0n,
+          }),
+        ),
+      ),
+    };
+    const nonzeroUnknownProof = [validAuthorization, nonzeroUnknownAuthorization]
+      .sort((left, right) =>
+        left.signingKey.toLowerCase().localeCompare(right.signingKey.toLowerCase()),
+      )
+      .map(({ signingKey: _, ...authorization }) => authorization);
+
+    await expectCustomError(
+      gateway.connect(outsider).finalizeTransferOutOfArgon(request, {
+        authorizations: nonzeroUnknownProof,
+      }),
+      gateway,
+      'MintingAuthorityTransferCapacityExceeded',
+      [outsider.address],
+    );
+
+    const collateral = await gateway.mintingAuthorityCollateralRemaining(target.signingKey);
+    expect(collateral.microgonCollateral).to.equal(1_000n);
+    expect(collateral.micronotCollateral).to.equal(200n);
+    expect(await argon.balanceOf(recipient.address)).to.equal(0n);
+    expect(await gateway.finalizedTransferOutOfArgonIds(transferId)).to.equal(false);
+    expect(await gateway.gatewayActivityNonce()).to.equal(1n);
+    expect(await gateway.activityBlockLocators(locatorIndex)).to.deep.equal(locatorBefore);
   });
 
   it('finalizes with all 25 valid signatures and records every collateral row', async () => {

@@ -4355,8 +4355,8 @@ __metadata:
 
 "@uniswap/v4-periphery@patch:@uniswap/v4-periphery@https%3A//github.com/Uniswap/v4-periphery/archive/545a5d2a87228167edde48f3b9eda122d1e3c4d6.tar.gz#~/.yarn/patches/@uniswap-v4-periphery-https-a69d333e68.patch":
   version: 1.0.4
-  resolution: "@uniswap/v4-periphery@patch:@uniswap/v4-periphery@https%3A//github.com/Uniswap/v4-periphery/archive/545a5d2a87228167edde48f3b9eda122d1e3c4d6.tar.gz#~/.yarn/patches/@uniswap-v4-periphery-https-a69d333e68.patch::version=1.0.4&hash=ecce6b"
-  checksum: 10c0/4bdca673970c9602d083347d12a3ac2b2ada3a812ac364eb8e4b69ed246ec8b0e2e30e31d5aff1b049806b29c2b8f7d1edf39178ae879133512bca12c77415ef
+  resolution: "@uniswap/v4-periphery@patch:@uniswap/v4-periphery@https%3A//github.com/Uniswap/v4-periphery/archive/545a5d2a87228167edde48f3b9eda122d1e3c4d6.tar.gz#~/.yarn/patches/@uniswap-v4-periphery-https-a69d333e68.patch::version=1.0.4&hash=774655"
+  checksum: 10c0/2e4e65f2fa1cef1d83761a40853d1fc3c710d9c5ea6a4eea6370b2f11a80e0e0e86b71c6fe91f2d9e22369f4830e181a1888bdc1cadaa31b545de095b513484f
   languageName: node
   linkType: hard
 

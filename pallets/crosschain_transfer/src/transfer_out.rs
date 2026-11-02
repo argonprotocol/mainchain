@@ -416,6 +416,13 @@ impl<T: Config> Pallet<T> {
 		amount: T::Balance,
 		finalized_collateral_rows: Vec<GatewayMintingAuthorityCollateral<T>>,
 	) -> Result<(), GatewaySyncPauseReason> {
+		let finalized_collateral_rows = finalized_collateral_rows
+			.into_iter()
+			.filter(|collateral_row| {
+				collateral_row.microgon_collateral != T::Balance::default() ||
+					collateral_row.micronot_collateral != T::Balance::default()
+			})
+			.collect::<Vec<_>>();
 		let local_transfer = TransferOutById::<T>::take(transfer_id);
 		let has_local_transfer = local_transfer.is_some();
 		let mut finalized_authority_collateral =

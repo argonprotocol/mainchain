@@ -2,6 +2,7 @@ use crate::{tick::Tick, ArgonCPI, Balance};
 use codec::{Decode, DecodeAll, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use polkadot_sdk::{
 	sp_arithmetic::FixedPointNumber,
+	sp_core::U256,
 	sp_runtime::{
 		traits::{CheckedDiv, One, Zero},
 		FixedI128, FixedU128,
@@ -41,6 +42,9 @@ pub struct PriceIndex {
 	pub tick: Tick,
 	/// Observed USD per USDC. None means no exchange observation was available.
 	pub usdc_usd_price: Option<FixedU128>,
+	/// Raw sqrt(token1/token0) * 2^96 for the chain-configured v4 stabilizer pool.
+	/// None means the pool is unconfigured or no current observation was available.
+	pub stabilizer_pool_sqrt_price_x96: Option<U256>,
 }
 
 impl PriceIndex {
@@ -117,6 +121,7 @@ impl From<PriceIndexV1> for PriceIndex {
 			argon_time_weighted_average_liquidity: old.argon_time_weighted_average_liquidity,
 			tick: old.tick,
 			usdc_usd_price: None,
+			stabilizer_pool_sqrt_price_x96: None,
 		}
 	}
 }

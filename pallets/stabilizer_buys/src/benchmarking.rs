@@ -25,6 +25,7 @@ fn index(tick: Tick) -> PriceIndex {
 		argon_usd_target_price: FixedU128::one(),
 		argon_time_weighted_average_liquidity: 1,
 		usdc_usd_price: Some(FixedU128::one()),
+		stabilizer_pool_sqrt_price_x96: Some(U256::one() << 96),
 	}
 }
 
