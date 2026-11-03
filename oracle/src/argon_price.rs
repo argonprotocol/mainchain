@@ -55,13 +55,19 @@ impl ArgonPriceLookup {
 	pub async fn from_env(ticker: &Ticker, last_price: Option<PriceIndex>) -> Result<Self> {
 		let use_sepolia = env::var("USE_SEPOLIA").unwrap_or_default() == "true";
 		let argon_token_address =
-			env::var("ARGON_TOKEN_ADDRESS").expect("ARGON_TOKEN_ADDRESS must be set");
+			env::var("ARGON_TOKEN_ADDRESS").context("ARGON_TOKEN_ADDRESS must be set")?;
 		let network = if use_sepolia { ChainId::SEPOLIA } else { ChainId::MAINNET };
 		let ethereum_rpc_urls = ethereum_rpc_urls_from_env()?;
 		let oracle_addresses = env::var("ARGON_UNISWAP_ORACLE_ADDRESSES")
 			.context("ARGON_UNISWAP_ORACLE_ADDRESSES must be set")?;
 
-		let usdc_token = get_usdc_token(network);
+		let usdc_token = if let Ok(value) = env::var("USDC_TOKEN_ADDRESS") {
+			let address = value.parse::<Address>().context("Invalid USDC_TOKEN_ADDRESS")?;
+			anyhow::ensure!(!address.is_zero(), "USDC_TOKEN_ADDRESS must be nonzero");
+			token!(network as u64, address, 6, "USDC", "USD Coin")
+		} else {
+			get_usdc_token(network)
+		};
 		let lookup_token =
 			token!(network as u64, argon_token_address, 18, ARGON_TOKEN_SYMBOL, "Argon");
 		let mut lookup =

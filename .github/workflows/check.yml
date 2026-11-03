@@ -172,17 +172,14 @@ jobs:
       - name: Install dependencies
         run: yarn install --immutable
 
-      - name: Build Ethereum artifacts and contract types
-        run: yarn workspace @argonprotocol/ethereum-contracts build
+      - name: Build Ethereum artifacts and public SDK packages
+        run: yarn workspace @argonprotocol/ethereum-contracts pretest:ci
 
       - name: Check contract types
         run: yarn workspace @argonprotocol/ethereum-contracts exec tsc --noEmit
 
       - name: Test Ethereum contracts
         run: yarn exec vitest run --config vitest.config.ts --project ethereum-contracts
-
-      - name: Build and validate mainchain client package
-        run: yarn workspace @argonprotocol/mainchain build
 
       - name: Upload Ethereum build artifacts
         uses: actions/upload-artifact@v6.0.0

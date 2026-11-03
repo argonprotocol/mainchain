@@ -66,7 +66,7 @@ pub struct PriceIndex {
 	pub argonot_usd_price: FixedU128,
 	#[serde(deserialize_with = "fixed_u128_from_float")]
 	pub btc_usd_price: FixedU128,
-	/// Observed USDC/USD; missing observations must not publish an assumed peg.
+	/// Observed USDC/USD, or a controlled reference (defaulting to one) in observed file mode.
 	#[serde(default, deserialize_with = "optional_fixed_u128_from_float")]
 	pub usdc_usd_price: Option<FixedU128>,
 	/// Raw Q96 sqrt price for Mainchain's configured v4 stabilizer pool, when observed.
@@ -301,8 +301,8 @@ pub async fn price_index_loop(
 	}
 }
 
-/// Development feature to load price index data from a file instead of live oracles. Many of the
-/// providers are rate limited, and this is the simplest way to simulate specific scenarios
+/// Development prices reload each tick. A numeric ARGN price uses only file data; `UNISWAP`
+/// observes the configured sources and approved pool through the production price lookups.
 pub async fn price_index_loop_from_file(
 	trusted_rpc_url: String,
 	signer: KeystoreSigner,
@@ -321,6 +321,7 @@ pub async fn price_index_loop_from_file(
 	let last_price = latest_price_index(&mainchain_client).await?;
 
 	let mut last_submitted_tick = last_price.as_ref().map(|a| a.tick).unwrap_or(0);
+	let mut argon_price_lookup = None;
 
 	let mut min_sleep_duration = Duration::from_millis(ticker.tick_duration_millis)
 		.saturating_sub(Duration::from_secs(10))
@@ -342,10 +343,57 @@ pub async fn price_index_loop_from_file(
 			continue;
 		}
 
-		let price_data_raw = fs::read_to_string(&file_path)
-			.map_err(|e| anyhow!("Failed to load price data from file: {e:?}"))?;
-		let price_data: PriceIndex = serde_json::from_str(&price_data_raw)
-			.map_err(|e| anyhow!("Failed to parse price data from file {file_path:?}: {e:?}"))?;
+		// A failed observation must not advance the submitted index or use simulated market data.
+		let price_data = async {
+			let (mut price, observe_argon) = read_file_price_index(&file_path)?;
+			if !observe_argon {
+				// A later switch back to Uniswap must start from the index actually on chain.
+				argon_price_lookup = None;
+				return Ok::<_, anyhow::Error>(price);
+			}
+
+			let usdc_usd_price =
+				price.usdc_usd_price.expect("UNISWAP file prices include USDC/USD");
+			let mainchain_client = reconnecting_client.get().await?;
+			if argon_price_lookup.is_none() {
+				argon_price_lookup = Some(
+					argon_price::ArgonPriceLookup::from_env(
+						&ticker,
+						latest_price_index(&mainchain_client).await?,
+					)
+					.await?,
+				);
+			}
+			let lookup = argon_price_lookup.as_mut().expect("Initialized above");
+
+			let at = mainchain_client.live.storage().at_latest().await?;
+			let pool = at.fetch(&storage().stabilizer_buys().approved_pool()).await?;
+			ensure!(pool.is_some(), "Configure the local stabilizer pool before observing Uniswap");
+			let sqrt_price = get_v4_pool_price(&lookup.uniswap_oracle, pool.as_ref()).await?;
+			let max_change = from_api_fixed_u128(
+				mainchain_client
+					.live
+					.constants()
+					.at(&constants().price_index().max_argon_change_per_tick_away_from_target())?,
+			);
+			let market =
+				lookup.get_latest_price_and_liquidity(tick, max_change, usdc_usd_price).await?;
+			price.argon_usd_price = trunc_fixed_u128(market.price, 3);
+			price.argon_time_weighted_average_liquidity = market.liquidity;
+			price.stabilizer_pool_sqrt_price_x96 = sqrt_price;
+			Ok(price)
+		}
+		.await;
+		let price_data = match price_data {
+			Ok(price) => price,
+			Err(error) => {
+				tracing::warn!(?error, tick,
+					"Price observation unavailable; preserving last submitted index and retrying next tick");
+				// Avoid retrying on every loop iteration while allowing file edits to recover.
+				sleep(ticker.duration_to_next_tick()).await;
+				continue;
+			},
+		};
 
 		submit_price_index(
 			&mut reconnecting_client,
@@ -360,6 +408,31 @@ pub async fn price_index_loop_from_file(
 		let sleep_time = ticker.duration_to_next_tick().min(min_sleep_duration);
 		sleep(sleep_time).await;
 	}
+}
+
+/// The file's source marker is resolved before constructing a numeric index for submission.
+/// Pool-derived fields may be omitted in this mode, and any simulated values are ignored.
+fn read_file_price_index(file_path: &str) -> anyhow::Result<(PriceIndex, bool)> {
+	let price_data_raw = fs::read_to_string(file_path)
+		.map_err(|e| anyhow!("Failed to load price data from file {file_path:?}: {e:?}"))?;
+	let mut values: serde_json::Map<String, serde_json::Value> =
+		serde_json::from_str(&price_data_raw)
+			.map_err(|e| anyhow!("Failed to parse price data from file {file_path:?}: {e:?}"))?;
+	let observe_argon =
+		values.get("argon_usd_price").and_then(serde_json::Value::as_str) == Some("UNISWAP");
+	if observe_argon {
+		values.insert("argon_usd_price".into(), serde_json::json!(0));
+		values.insert("argon_time_weighted_average_liquidity".into(), serde_json::json!(0));
+		values.remove("stabilizer_pool_sqrt_price_x96");
+	}
+	let mut price: PriceIndex = serde_json::from_value(serde_json::Value::Object(values))
+		.map_err(|e| anyhow!("Failed to parse price data from file {file_path:?}: {e:?}"))?;
+	if observe_argon {
+		let usdc_usd_price = price.usdc_usd_price.unwrap_or_else(FixedU128::one);
+		ensure!(!usdc_usd_price.is_zero(), "File USDC/USD must be positive");
+		price.usdc_usd_price = Some(usdc_usd_price);
+	}
+	Ok((price, observe_argon))
 }
 
 async fn get_v4_pool_price(
@@ -471,7 +544,7 @@ mod tests {
 	};
 	use sp_keystore::{testing::MemoryKeystore, Keystore};
 	use sp_runtime::FixedU128;
-	use std::{env, str::FromStr, time::Duration};
+	use std::{env, fs, str::FromStr, time::Duration};
 	use tokio::spawn;
 	use uniswap_lens::bindings::iuniswapv3pool::IUniswapV3Pool::{token0Call, token1Call};
 
@@ -488,8 +561,272 @@ mod tests {
 		us_cpi::use_mock_cpi_values,
 	};
 
+	static PRICE_LOOP_TEST_LOCK: tokio::sync::Mutex<()> = tokio::sync::Mutex::const_new(());
+
+	#[test]
+	fn file_price_source_marker_reloads_without_changing_numeric_scenarios() {
+		let file = env::temp_dir().join(format!("oracle-prices-{}.json", rand::random::<u64>()));
+		let mut json = serde_json::json!({
+			"argon_usd_target_price": 1.06,
+			"argon_usd_price": 1.04,
+			"argon_time_weighted_average_liquidity": 123,
+			"argonot_usd_price": 0.05,
+			"btc_usd_price": 120000.0,
+			"stabilizer_pool_sqrt_price_x96": "0x1234"
+		});
+		fs::write(&file, json.to_string()).unwrap();
+		let (numeric, observe) = super::read_file_price_index(file.to_str().unwrap()).unwrap();
+		assert!(!observe);
+		assert_eq!(numeric.argon_usd_price, FixedU128::from_rational(104, 100));
+		assert_eq!(numeric.argon_time_weighted_average_liquidity, 123);
+		assert_eq!(numeric.stabilizer_pool_sqrt_price_x96, Some(U256::from(0x1234)));
+		assert!(numeric.usdc_usd_price.is_none());
+
+		json["argon_usd_price"] = serde_json::json!("UNISWAP");
+		json.as_object_mut().unwrap().remove("argon_time_weighted_average_liquidity");
+		fs::write(&file, json.to_string()).unwrap();
+		let (observed, observe) = super::read_file_price_index(file.to_str().unwrap()).unwrap();
+		assert!(observe);
+		assert_eq!(observed.argon_usd_target_price, numeric.argon_usd_target_price);
+		assert_eq!(observed.btc_usd_price, numeric.btc_usd_price);
+		assert!(observed.stabilizer_pool_sqrt_price_x96.is_none());
+		assert_eq!(observed.usdc_usd_price, Some(FixedU128::from_u32(1)));
+
+		json["usdc_usd_price"] = serde_json::json!(0.98);
+		fs::write(&file, json.to_string()).unwrap();
+		let (override_price, _) = super::read_file_price_index(file.to_str().unwrap()).unwrap();
+		assert_eq!(override_price.usdc_usd_price, Some(FixedU128::from_rational(98, 100)));
+
+		json["argon_usd_price"] = serde_json::json!("TYPO");
+		fs::write(&file, json.to_string()).unwrap();
+		assert!(super::read_file_price_index(file.to_str().unwrap()).is_err());
+		fs::remove_file(file).unwrap();
+	}
+
+	#[tokio::test]
+	async fn file_oracle_submits_uniswap_observations_and_recovers_after_history_failure() {
+		use alloy_primitives::{aliases::I56, U160};
+		use alloy_sol_types::SolError;
+		use argon_client::signer::Sr25519Signer;
+		use jsonrpsee::types::ErrorObjectOwned;
+		use std::sync::{
+			atomic::{AtomicBool, AtomicUsize, Ordering},
+			Arc,
+		};
+		use uniswap_lens::bindings::iuniswapv3pool::IUniswapV3Pool::{observeCall, observeReturn};
+
+		use crate::{price_index::price_index_loop_from_file, uniswap_oracle::OLD};
+
+		let _lock = PRICE_LOOP_TEST_LOCK.lock().await;
+		let node = start_argon_test_node().await;
+		let argon = Address::repeat_byte(1);
+		let usdc = Address::repeat_byte(3);
+		let pool_manager = Address::repeat_byte(4);
+		let hook = Address::repeat_byte(5);
+		let sqrt_price_x96 = (1u128 << 96) / 1_000_000;
+		let history_available = Arc::new(AtomicBool::new(true));
+		let failed_observations = Arc::new(AtomicUsize::new(0));
+
+		let server = ServerBuilder::default().build("127.0.0.1:0").await.unwrap();
+		let rpc_url = format!("http://{}", server.local_addr().unwrap());
+		let mut rpc = RpcModule::new(history_available.clone());
+		rpc.register_method("eth_chainId", |_, _, _| "0x7a69").unwrap();
+		let failures = failed_observations.clone();
+		rpc.register_method(
+			"eth_call",
+			move |params, history_available, _| -> Result<String, ErrorObjectOwned> {
+				let (call, _block): (serde_json::Value, serde_json::Value) =
+					params.parse().unwrap();
+				let to: Address = serde_json::from_value(call["to"].clone()).unwrap();
+				let input: Bytes = serde_json::from_value(
+					call.get("input").or_else(|| call.get("data")).unwrap().clone(),
+				)
+				.unwrap();
+				if to == pool_manager {
+					assert_eq!(&input[..4], &alloy_primitives::keccak256("extsload(bytes32)")[..4]);
+					let mut pool_slot = [0u8; 64];
+					pool_slot[..32].fill(7);
+					pool_slot[63] = 6;
+					assert_eq!(&input[4..], alloy_primitives::keccak256(pool_slot).as_slice());
+					let mut slot0 = [0u8; 32];
+					slot0[12..].copy_from_slice(&U160::from(sqrt_price_x96).to_be_bytes::<20>());
+					return Ok(Bytes::from(slot0.to_vec()).to_string());
+				}
+
+				assert_eq!(to, hook);
+				let output = match input[..4].try_into().unwrap() {
+					token0Call::SELECTOR => token0Call::abi_encode_returns(&argon),
+					token1Call::SELECTOR => token1Call::abi_encode_returns(&usdc),
+					observeCall::SELECTOR => {
+						// One usable observation, then missing history until the test restores it.
+						if !history_available.swap(false, Ordering::SeqCst) {
+							failures.fetch_add(1, Ordering::SeqCst);
+							return Err(ErrorObjectOwned::owned(
+								3,
+								"execution reverted",
+								Some(Bytes::from(OLD {}.abi_encode()).to_string()),
+							));
+						}
+						let request = observeCall::abi_decode(&input).unwrap();
+						let seconds = request.secondsAgos[0];
+						assert_eq!(request.secondsAgos[1], 0);
+						observeCall::abi_encode_returns(&observeReturn {
+							tickCumulatives: vec![
+								I56::ZERO,
+								I56::try_from(-276_324i64 * i64::from(seconds)).unwrap(),
+							],
+							secondsPerLiquidityCumulativeX128s: vec![
+								U160::ZERO,
+								U160::from(u128::from(seconds) << 64),
+							],
+						})
+					},
+					_ => panic!("Unexpected oracle call: {input}"),
+				};
+				Ok(Bytes::from(output).to_string())
+			},
+		)
+		.unwrap();
+		let rpc_handle = server.start(rpc);
+
+		let pool = super::PurchasePool {
+			chain_id: 31337,
+			pool_manager: sp_core::H160::from_slice(pool_manager.as_slice()),
+			pool_id: sp_core::H256::repeat_byte(7).into(),
+			usdc_token: sp_core::H160::from_slice(usdc.as_slice()),
+			argon_is_token0: true,
+		};
+		let approve = api::tx().sudo().sudo(api::Call::StabilizerBuys(
+			api::runtime_types::pallet_stabilizer_buys::pallet::Call::set_approved_pool {
+				pool: Some(pool),
+			},
+		));
+		// The oracle loads its approved pool from finalized storage.
+		node.client
+			.submit_tx(
+				&approve,
+				&Sr25519Signer::new(sr25519::Pair::from_string("//Alice", None).unwrap()),
+				None,
+				true,
+			)
+			.await
+			.unwrap();
+
+		let settings = [
+			("ARGON_TOKEN_ADDRESS", argon.to_string()),
+			("USDC_TOKEN_ADDRESS", usdc.to_string()),
+			("ETHEREUM_RPC_URLS", rpc_url),
+			("ARGON_UNISWAP_ORACLE_ADDRESSES", hook.to_string()),
+			("USE_SEPOLIA", "false".to_string()),
+		];
+		let previous_settings: Vec<_> =
+			settings.iter().map(|(name, _)| (*name, env::var_os(name))).collect();
+		for (name, value) in settings {
+			unsafe {
+				env::set_var(name, value);
+			}
+		}
+		let keystore = MemoryKeystore::new();
+		let keypair = sr25519::Pair::from_string("//Eve", None).unwrap();
+		keystore.insert(ACCOUNT, "//Eve", &keypair.public().0).unwrap();
+		let signer =
+			KeystoreSigner::new(keystore.into(), keypair.public().into(), CryptoType::Sr25519);
+		let file =
+			env::temp_dir().join(format!("oracle-observations-{}.json", rand::random::<u64>()));
+		let mut json = serde_json::json!({
+			"argon_usd_target_price": 1.06,
+			"argon_usd_price": "UNISWAP",
+			"argon_time_weighted_average_liquidity": 999,
+			"stabilizer_pool_sqrt_price_x96": "0x1234",
+			"argonot_usd_price": 0.05,
+			"btc_usd_price": 60000.0
+		});
+		fs::write(&file, json.to_string()).unwrap();
+		let mut oracle = spawn(price_index_loop_from_file(
+			node.client.url.clone(),
+			signer,
+			file.to_str().unwrap().into(),
+		));
+		let observations = async {
+			let observed =
+				wait_for_index(&node.client, |index| index.usdc_usd_price.is_some()).await;
+			assert_eq!(observed.argon_usd_price, FixedU128::from_u32(1));
+			assert_eq!(observed.argon_time_weighted_average_liquidity, (1u128 << 64) / 1_000_000);
+			assert_eq!(observed.stabilizer_pool_sqrt_price_x96, Some(U256::from(sqrt_price_x96)));
+			assert_eq!(observed.usdc_usd_price, Some(FixedU128::from_u32(1)));
+			assert_eq!(observed.btc_usd_price, FixedU128::from_float(60000.0));
+
+			json["usdc_usd_price"] = serde_json::json!(0.98);
+			json["btc_usd_price"] = serde_json::json!(61000.0);
+			fs::write(&file, json.to_string()).unwrap();
+			// Two failed tick attempts exhaust all five history windows each.
+			tokio::time::timeout(Duration::from_secs(15), async {
+				while failed_observations.load(Ordering::SeqCst) < 10 {
+					tokio::time::sleep(Duration::from_millis(50)).await;
+				}
+			})
+			.await
+			.unwrap();
+			assert_eq!(super::latest_price_index(&node.client).await.unwrap(), Some(observed));
+
+			history_available.store(true, Ordering::SeqCst);
+			let recovered = wait_for_index(&node.client, |index| index.tick > observed.tick).await;
+			assert_eq!(recovered.argon_usd_price, FixedU128::from_rational(98, 100));
+			assert_eq!(recovered.usdc_usd_price, Some(FixedU128::from_rational(98, 100)));
+			assert_eq!(
+				recovered.argon_time_weighted_average_liquidity,
+				observed.argon_time_weighted_average_liquidity
+			);
+			assert_eq!(
+				recovered.stabilizer_pool_sqrt_price_x96,
+				observed.stabilizer_pool_sqrt_price_x96
+			);
+			assert_eq!(recovered.btc_usd_price, FixedU128::from_float(61000.0));
+			for index in [observed, recovered] {
+				assert_eq!(index.argon_usd_target_price, FixedU128::from_float(1.06));
+				assert_eq!(index.argonot_usd_price, FixedU128::from_float(0.05));
+			}
+		};
+		tokio::select! {
+			result = &mut oracle => panic!("File oracle stopped before observations completed: {result:?}"),
+			() = observations => {},
+		}
+		oracle.abort();
+		let _ = oracle.await;
+		rpc_handle.stop().unwrap();
+		for (name, value) in previous_settings {
+			unsafe {
+				if let Some(value) = value {
+					env::set_var(name, value);
+				} else {
+					env::remove_var(name);
+				}
+			}
+		}
+		fs::remove_file(file).unwrap();
+	}
+
+	async fn wait_for_index(
+		client: &argon_client::MainchainClient,
+		predicate: impl Fn(&argon_primitives::PriceIndex) -> bool,
+	) -> argon_primitives::PriceIndex {
+		tokio::time::timeout(Duration::from_secs(30), async {
+			loop {
+				if let Some(index) = super::latest_price_index(client).await.unwrap() &&
+					predicate(&index)
+				{
+					return index;
+				}
+				tokio::time::sleep(Duration::from_millis(50)).await;
+			}
+		})
+		.await
+		.expect("Timed out waiting for the submitted price index")
+	}
+
 	#[tokio::test]
 	async fn can_submit_multiple_price_indices() {
+		let _lock = PRICE_LOOP_TEST_LOCK.lock().await;
 		let node = start_argon_test_node().await;
 		let keystore = MemoryKeystore::new();
 		let keypair = sr25519::Pair::from_string("//Eve", None).unwrap();

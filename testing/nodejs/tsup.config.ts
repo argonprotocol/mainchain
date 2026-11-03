@@ -28,6 +28,7 @@ export default defineConfig({
   target: 'node20',
   sourcemap: true,
   skipNodeModulesBundle: true,
+  noExternal: ['@uniswap/v4-core'],
   shims: true,
   onSuccess: async () => {
     await fs.copyFile('../../dev.docker-compose.yml', 'lib/dev.docker-compose.yml');

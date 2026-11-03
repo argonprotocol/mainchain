@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 
 import { Interface, getAddress } from 'ethers';
@@ -124,10 +124,10 @@ async function main() {
     let purchase;
     if (args['purchase-config']) {
       purchase = await deployBuyAndTransfer(
-        ethers,
+        deployer,
         gatewayProxyAddress,
         await argonToken.getAddress(),
-        resolve(repoRoot, args['purchase-config']),
+        JSON.parse(await readFile(resolve(repoRoot, args['purchase-config']), 'utf8')),
       );
     }
     const swapContractAddress = purchase?.address ?? ethers.ZeroAddress;

@@ -54,10 +54,10 @@ async function main() {
       if (getOptionalArg(args, 'swap-contract'))
         throw new Error('Choose --purchase-config or --swap-contract');
       purchase = await deployBuyAndTransfer(
-        ethers,
+        deployer,
         gatewayProxyAddress,
         argonTokenAddress,
-        resolve(repoRoot, purchaseConfigPath),
+        JSON.parse(await readFile(resolve(repoRoot, purchaseConfigPath), 'utf8')),
       );
     }
     const swapContractAddress =

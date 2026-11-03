@@ -4,6 +4,13 @@ import * as Path from 'node:path';
 import { spawn, spawnSync } from 'node:child_process';
 import { detectPort } from 'detect-port';
 import { EvmContracts } from '@argonprotocol/mainchain';
+import { JsonRpcProvider, Wallet } from 'ethers';
+import { uniswapV4FixtureArtifacts } from '../../../chains/ethereum/contracts/fixtures.js';
+import {
+  deployBuyAndTransfer,
+  validatePurchaseDependencies,
+  type PurchaseDependencies,
+} from '../../../chains/ethereum/deploy/src/purchase.js';
 import { privateKeyToAccount } from 'viem/accounts';
 import {
   type Abi,
@@ -16,7 +23,7 @@ import {
   type Hex,
   zeroAddress,
 } from 'viem';
-import { addTeardown, type ITeardownable } from './support';
+import { addTeardown, type ITeardownable } from './support.js';
 
 const {
   argonTokenArtifact,
@@ -52,6 +59,8 @@ export interface EthereumMintingGatewayFixture {
   argonTokenAddress: Hex;
   argonotTokenAddress: Hex;
   gatewayAddress: Hex;
+  /** Adapter immutably authorized by this gateway; absent for transfer-only fixtures. */
+  buyAndTransferAddress?: Hex;
 }
 
 export interface EthereumPrefundedAccount {
@@ -212,6 +221,23 @@ export default class TestEthereum implements ITeardownable {
     return (await response.json()) as TResult;
   }
 
+  /** Deploy a six-decimal test USDC with its initial supply held by the deployer. */
+  public async deployUsdcFixture(deployerPrivateKey: Hex): Promise<Hex> {
+    const { executionRpcUrl, chainId } = this;
+    if (!executionRpcUrl || !chainId) throw new Error('Ethereum devnet must be launched first');
+    const chain = createExecutionChain(chainId, executionRpcUrl);
+    const publicClient = createPublicClient({ chain, transport: http(executionRpcUrl) });
+    const walletClient = createWalletClient({
+      account: privateKeyToAccount(deployerPrivateKey),
+      chain,
+      transport: http(executionRpcUrl),
+    });
+    return deployContract(walletClient, publicClient, {
+      ...uniswapV4FixtureArtifacts.usdc,
+      args: [],
+    });
+  }
+
   public async deployMintingGatewayFixture(options: {
     deployerPrivateKey: Hex;
     adminSafe?: Hex;
@@ -219,6 +245,8 @@ export default class TestEthereum implements ITeardownable {
     initialMicrogonsPerArgonot?: bigint;
     seedArgonRecipient?: Hex;
     seedArgonAmountBaseUnits?: bigint;
+    /** Already-deployed canonical purchase dependencies on this fixture's Ethereum chain. */
+    purchase?: PurchaseDependencies;
   }): Promise<EthereumMintingGatewayFixture> {
     const { executionRpcUrl, chainId } = this;
     if (!executionRpcUrl || !chainId) {
@@ -238,6 +266,16 @@ export default class TestEthereum implements ITeardownable {
       chain,
       transport: http(executionRpcUrl),
     });
+
+    let purchaseSigner: Wallet | undefined;
+    if (options.purchase) {
+      const provider = new JsonRpcProvider(executionRpcUrl, Number(BigInt(chainId)), {
+        cacheTimeout: -1,
+      });
+      purchaseSigner = new Wallet(options.deployerPrivateKey, provider);
+      await validatePurchaseDependencies(provider, options.purchase);
+    }
+
     const bootstrapCouncil = {
       signers: [adminSafe],
       weights: [1n],
@@ -287,10 +325,22 @@ export default class TestEthereum implements ITeardownable {
       bytecode: argonotTokenArtifact.bytecode,
       args: [gatewayAddress],
     });
+
+    let buyAndTransferAddress: Hex | undefined;
+    if (options.purchase) {
+      const purchase = await deployBuyAndTransfer(
+        purchaseSigner!,
+        gatewayAddress,
+        argonTokenAddress,
+        options.purchase,
+      );
+      buyAndTransferAddress = getAddress(purchase.address);
+    }
+
     const finalImplementationAddress = await deployContract(walletClient, publicClient, {
       abi: mintingGatewayArtifact.abi,
       bytecode: mintingGatewayArtifact.bytecode,
-      args: [argonTokenAddress, argonotTokenAddress, zeroAddress],
+      args: [argonTokenAddress, argonotTokenAddress, buyAndTransferAddress ?? zeroAddress],
     });
     const upgradeHash = await walletClient.sendTransaction({
       to: proxyAdminAddress,
@@ -333,6 +383,7 @@ export default class TestEthereum implements ITeardownable {
       argonTokenAddress,
       argonotTokenAddress,
       gatewayAddress,
+      ...(buyAndTransferAddress ? { buyAndTransferAddress } : {}),
     };
   }
 

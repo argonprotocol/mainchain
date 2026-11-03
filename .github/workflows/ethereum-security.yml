@@ -50,7 +50,7 @@ jobs:
 
       - name: Test Ethereum security boundaries
         run: |
-          yarn workspace @argonprotocol/ethereum-contracts build
+          yarn workspace @argonprotocol/ethereum-contracts pretest:ci
           yarn exec vitest --run --config vitest.config.ts --project ethereum-contracts \
             chains/ethereum/contracts/test/StabilizationPoolHook.test.ts \
             chains/ethereum/contracts/test/StabilizationPoolOracle.test.ts \

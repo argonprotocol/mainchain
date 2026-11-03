@@ -26,7 +26,7 @@ async function main() {
     override: publishing ? {} : { accounts: [] },
   });
   try {
-    const plan = await prepareStabilizationPool(connection.ethers, config);
+    const plan = await prepareStabilizationPool(connection.ethers.provider, config);
     const planHash = keccak256(toUtf8Bytes(stringifyJson(plan)));
     let transactions: Record<string, string> = {};
     try {
@@ -81,7 +81,8 @@ async function main() {
     // Persist the complete bundle before the first transaction; receipt writes are atomic.
     await saveProgress();
     if (publishing) {
-      await publishStabilizationPool(connection.ethers, deployment, saveProgress);
+      const [deployer] = await connection.ethers.getSigners();
+      await publishStabilizationPool(deployer, deployment, saveProgress);
       console.log(`Published stabilization pool ${plan.pool.poolId}; manifest: ${outputPath}`);
     } else {
       console.log(`Prepared stabilization pool ${plan.pool.poolId}; manifest: ${outputPath}`);

@@ -40,6 +40,20 @@ export {
   TestMintingGateway,
 } from './TestEthereumProofActors';
 export { TestNotary, TestMainchain, TestOracle, TestEthereum, startNetwork };
+export type { EthereumMintingGatewayFixture } from './TestEthereum.js';
+export { uniswapV4FixtureArtifacts } from '../../../chains/ethereum/contracts/fixtures.js';
+export {
+  deployBuyAndTransfer,
+  type PurchaseDependencies,
+} from '../../../chains/ethereum/deploy/src/purchase.js';
+export {
+  CREATE2_DEPLOYER,
+  CREATE2_DEPLOYER_CODE,
+  prepareStabilizationPool,
+  publishStabilizationPool,
+  type StabilizationPoolConfig,
+  type StabilizationPoolDeployment,
+} from '../../../chains/ethereum/deploy/src/stabilization.js';
 
 export function stringifyExt(obj: any): any {
   return JSON.stringify(
