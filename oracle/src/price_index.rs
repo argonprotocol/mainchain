@@ -701,12 +701,13 @@ mod tests {
 				pool: Some(pool),
 			},
 		));
+		// The oracle loads its approved pool from finalized storage.
 		node.client
 			.submit_tx(
 				&approve,
 				&Sr25519Signer::new(sr25519::Pair::from_string("//Alice", None).unwrap()),
 				None,
-				false,
+				true,
 			)
 			.await
 			.unwrap();
