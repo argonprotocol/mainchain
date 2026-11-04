@@ -81,9 +81,9 @@ jobs:
           ARCH: ${{ matrix.arch }}
         run: |
           docker pull --platform "linux/$ARCH" "$IMAGE"
-          docker image inspect "$IMAGE" > "$RUNNER_TEMP/image.json"
-          docker image inspect "$IMAGE" --format 'Image: {{.Id}}; platform: {{.Os}}/{{.Architecture}}; digests: {{json .RepoDigests}}' >> "$GITHUB_STEP_SUMMARY"
-          docker image save --output "$RUNNER_TEMP/image.tar" "$IMAGE"
+          docker image inspect --platform "linux/$ARCH" "$IMAGE" > "$RUNNER_TEMP/image.json"
+          docker image inspect --platform "linux/$ARCH" "$IMAGE" --format 'Image: {{.Id}}; platform: {{.Os}}/{{.Architecture}}; digests: {{json .RepoDigests}}' >> "$GITHUB_STEP_SUMMARY"
+          docker image save --platform "linux/$ARCH" --output "$RUNNER_TEMP/image.tar" "$IMAGE"
 
       - name: Scan for fixable High and Critical vulnerabilities
         run: |
