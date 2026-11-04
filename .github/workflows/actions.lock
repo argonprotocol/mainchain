@@ -22,6 +22,8 @@ workflows:
     '.github/workflows/docker-latest.yml':
         - 'actions/checkout@v5.1.0'
         - 'docker/login-action@v3.7.0'
+    '.github/workflows/docker-security.yml':
+        - 'actions/upload-artifact@v6.0.0'
     '.github/workflows/docker.yml':
         - 'actions-rust-lang/setup-rust-toolchain@v1.16.1'
         - 'actions/attest-build-provenance@v2.4.0'

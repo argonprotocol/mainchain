@@ -7,12 +7,13 @@ ARG TARGETARCH
 ENV BIN=${BIN}
 # install tools and dependencies
 RUN apt-get update && \
+	DEBIAN_FRONTEND=noninteractive apt-get upgrade -y && \
 	DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
 		ca-certificates curl jq && \
 # apt cleanup
 	apt-get autoremove -y && \
 	apt-get clean && \
-	find /var/lib/apt/lists/ -type f -not -name lock -delete; \
+	find /var/lib/apt/lists/ -type f -not -name lock -delete && \
 # add user and link ~/.local/share/argon to /data
 	useradd -m -u 1000 -U -s /bin/sh -d /argon argon && \
 	mkdir -p /data /argon/.local/share && \
