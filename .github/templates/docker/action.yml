@@ -1,6 +1,6 @@
 name: Build Docker image
 description: |
-  Build a docker image with caching layers
+  Build and attest a multi-platform image
 
 inputs:
   image:
@@ -62,6 +62,9 @@ runs:
         context: .
         file: ${{ inputs.dockerfile }}
         build-args: BIN=${{ inputs.bin }}
+        # Rerun apt for the prebuilt binaries while preserving the RPC image's build cache.
+        pull: true
+        no-cache: ${{ inputs.dockerfile == 'Containerfile' }}
         push: true
         tags: ${{ steps.meta.outputs.tags }}
         labels: ${{ steps.meta.outputs.labels }}

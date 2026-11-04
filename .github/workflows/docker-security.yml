@@ -1,0 +1,134 @@
+name: Docker Security
+
+on:
+  schedule:
+    - cron: '43 9 * * 1'
+  workflow_dispatch:
+    inputs:
+      image-tag:
+        description: 'Scan this tag for all images instead of the latest release and dev'
+        required: false
+        type: string
+  workflow_run:
+    workflows: [Build Edge Docker Images]
+    branches: [main]
+    types: [completed]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docker-security-${{ github.event_name }}-${{ github.event.workflow_run.id || inputs.image-tag || github.ref }}
+  cancel-in-progress: true
+
+env:
+  GRYPE_IMAGE: anchore/grype:v0.121.1@sha256:6b06708b036f74b2cd70e94b706b4586af96d1932e6ac46255940b2e39dd44a9
+
+jobs:
+  images:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      tags: ${{ steps.tags.outputs.tags }}
+    steps:
+      - name: Select published image tags
+        id: tags
+        env:
+          GH_TOKEN: ${{ github.token }}
+          IMAGE_TAG: ${{ inputs.image-tag }}
+          BUILD_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_run" ]]; then
+            if [[ ! "$BUILD_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+              echo "Invalid build commit: $BUILD_SHA" >&2
+              exit 1
+            fi
+
+            # Match the pinned metadata action's default type=sha tag.
+            IMAGE_TAG="sha-${BUILD_SHA:0:7}"
+          fi
+
+          if [[ -n "$IMAGE_TAG" ]]; then
+            if [[ ! "$IMAGE_TAG" =~ ^[a-zA-Z0-9_][a-zA-Z0-9_.-]{0,127}$ ]]; then
+              echo "Invalid image tag: $IMAGE_TAG" >&2
+              exit 1
+            fi
+            tags=$(jq -cn --arg tag "$IMAGE_TAG" '[$tag]')
+          else
+            # The release tag preserves both platforms; the separate latest retagger may not.
+            version=$(gh release view --repo "$GITHUB_REPOSITORY" --json tagName --jq .tagName)
+            tags=$(jq -cn --arg version "$version" '[$version, "dev"]')
+          fi
+
+          echo "tags=$tags" >> "$GITHUB_OUTPUT"
+
+  scan:
+    name: Scan ${{ matrix.image }}:${{ matrix.tag }} (${{ matrix.arch }})
+    needs: images
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        image: [argon-miner, argon-notary, argon-oracle]
+        arch: [amd64, arm64]
+        tag: ${{ fromJSON(needs.images.outputs.tags) }}
+    steps:
+      - name: Prepare published image archive
+        env:
+          IMAGE: ghcr.io/argonprotocol/${{ matrix.image }}:${{ matrix.tag }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          docker pull --platform "linux/$ARCH" "$IMAGE"
+          docker image inspect "$IMAGE" > "$RUNNER_TEMP/image.json"
+          docker image inspect "$IMAGE" --format 'Image: {{.Id}}; platform: {{.Os}}/{{.Architecture}}; digests: {{json .RepoDigests}}' >> "$GITHUB_STEP_SUMMARY"
+          docker image save --output "$RUNNER_TEMP/image.tar" "$IMAGE"
+
+      - name: Scan for fixable High and Critical vulnerabilities
+        run: |
+          status=0
+          docker run --rm \
+            --user "$(id -u):$(id -g)" \
+            --read-only \
+            --cap-drop ALL \
+            --security-opt no-new-privileges:true \
+            --tmpfs /tmp:rw,nosuid,nodev,noexec,mode=1777 \
+            --env GRYPE_DB_CACHE_DIR=/tmp/grype-db \
+            --env GRYPE_DB_REQUIRE_UPDATE_CHECK=true \
+            --env GRYPE_DB_MAX_ALLOWED_BUILT_AGE=120h \
+            --env GRYPE_CHECK_FOR_APP_UPDATE=false \
+            --mount "type=bind,source=$RUNNER_TEMP/image.tar,target=/scan/image.tar,readonly" \
+            "$GRYPE_IMAGE" docker-archive:/scan/image.tar \
+            --only-fixed --fail-on high --output json \
+            > "$RUNNER_TEMP/grype.json" 2> "$RUNNER_TEMP/grype.log" || status=$?
+
+          cat "$RUNNER_TEMP/grype.log"
+          if jq -e '.descriptor.db.status.valid == true' "$RUNNER_TEMP/grype.json" > /dev/null; then
+            jq -r '
+              "Database built: " + .descriptor.db.status.built,
+              ["| Package | Installed | Fixed in | Vulnerability | Severity |", "|---|---|---|---|---|"][],
+              (.matches[] | select(.vulnerability.severity == "High" or .vulnerability.severity == "Critical") | [
+                .artifact.name, .artifact.version,
+                (.vulnerability.fix.versions | join(", ")),
+                .vulnerability.id, .vulnerability.severity
+              ] | "| " + join(" | ") + " |")
+            ' "$RUNNER_TEMP/grype.json" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'Scanner did not produce a report with a valid database.' >> "$GITHUB_STEP_SUMMARY"
+            status=1
+          fi
+
+          exit "$status"
+
+      - name: Upload scan report
+        if: always()
+        uses: actions/upload-artifact@v6.0.0
+        with:
+          name: docker-security-${{ matrix.image }}-${{ matrix.tag }}-${{ matrix.arch }}
+          path: |
+            ${{ runner.temp }}/image.json
+            ${{ runner.temp }}/grype.json
+            ${{ runner.temp }}/grype.log
+          if-no-files-found: warn
+          retention-days: 14
