@@ -8,7 +8,8 @@ import type {
   ArgonNotaryAuditAccountHistoryLookupError,
   ArgonNotaryAuditErrorVerifyError,
   ArgonPrimitivesAccountAccountType,
-  ArgonPrimitivesAmountRankAmountRankKey,
+  ArgonPrimitivesAmountRankAmountRankKeyAccountId32,
+  ArgonPrimitivesAmountRankAmountRankKeyU32,
   ArgonPrimitivesAmountRankAscendingRankKeyAccountId32,
   ArgonPrimitivesAmountRankAscendingRankKeyU64,
   ArgonPrimitivesBalanceChangeAccountOrigin,
@@ -366,7 +367,8 @@ declare module '@polkadot/types/types/registry' {
     ArgonNotaryAuditAccountHistoryLookupError: ArgonNotaryAuditAccountHistoryLookupError;
     ArgonNotaryAuditErrorVerifyError: ArgonNotaryAuditErrorVerifyError;
     ArgonPrimitivesAccountAccountType: ArgonPrimitivesAccountAccountType;
-    ArgonPrimitivesAmountRankAmountRankKey: ArgonPrimitivesAmountRankAmountRankKey;
+    ArgonPrimitivesAmountRankAmountRankKeyAccountId32: ArgonPrimitivesAmountRankAmountRankKeyAccountId32;
+    ArgonPrimitivesAmountRankAmountRankKeyU32: ArgonPrimitivesAmountRankAmountRankKeyU32;
     ArgonPrimitivesAmountRankAscendingRankKeyAccountId32: ArgonPrimitivesAmountRankAscendingRankKeyAccountId32;
     ArgonPrimitivesAmountRankAscendingRankKeyU64: ArgonPrimitivesAmountRankAscendingRankKeyU64;
     ArgonPrimitivesBalanceChangeAccountOrigin: ArgonPrimitivesBalanceChangeAccountOrigin;

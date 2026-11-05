@@ -3521,9 +3521,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				86u8, 33u8, 31u8, 233u8, 235u8, 115u8, 17u8, 135u8, 134u8, 116u8, 219u8, 184u8,
-				166u8, 78u8, 93u8, 5u8, 172u8, 62u8, 0u8, 120u8, 232u8, 10u8, 93u8, 114u8, 64u8,
-				114u8, 47u8, 108u8, 81u8, 111u8, 125u8, 255u8,
+				66u8, 70u8, 93u8, 227u8, 229u8, 60u8, 192u8, 194u8, 86u8, 42u8, 61u8, 244u8, 38u8,
+				28u8, 149u8, 3u8, 2u8, 46u8, 196u8, 126u8, 27u8, 197u8, 57u8, 253u8, 251u8, 20u8,
+				133u8, 47u8, 121u8, 249u8, 157u8, 186u8,
 			]
 	}
 	pub mod system {
@@ -10620,7 +10620,7 @@ pub mod api {
 				pub mod vault_securitization_ranks {
 					use super::runtime_types;
 					pub type VaultSecuritizationRanks = ();
-					pub type Param0 = runtime_types::argon_primitives::amount_rank::AmountRankKey<
+					pub type Param0 = runtime_types::argon_primitives::amount_rank::AmountRankKey1<
 						::core::primitive::u32,
 					>;
 				}
@@ -30505,7 +30505,8 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				#[doc = "Submit a whole-percent bid during F+1. Account ID breaks equal-rate ties."]
+				#[doc = "Submit a whole-percent bid during F+1. Larger matching bases break equal-rate ties;"]
+				#[doc = "account ID orders bids with the same rate and matching basis."]
 				pub struct Bid {
 					pub admission_frame: bid::AdmissionFrame,
 					pub reward_rate: bid::RewardRate,
@@ -30572,7 +30573,8 @@ pub mod api {
 			}
 			pub struct TransactionApi;
 			impl TransactionApi {
-				#[doc = "Submit a whole-percent bid during F+1. Account ID breaks equal-rate ties."]
+				#[doc = "Submit a whole-percent bid during F+1. Larger matching bases break equal-rate ties;"]
+				#[doc = "account ID orders bids with the same rate and matching basis."]
 				pub fn bid(
 					&self,
 					admission_frame: types::bid::AdmissionFrame,
@@ -30951,18 +30953,20 @@ pub mod api {
 				}
 				pub mod bids_by_auction {
 					use super::runtime_types;
-					pub type BidsByAuction = ::core::primitive::u128;
+					pub type BidsByAuction = ();
 					pub type Param0 = ::core::primitive::u64;
-					pub type Param1 =
-						runtime_types::argon_primitives::amount_rank::AscendingRankKey1<
+					pub type Param1 = (
+						runtime_types::sp_arithmetic::per_things::Percent,
+						runtime_types::argon_primitives::amount_rank::AmountRankKey2<
 							crate::types::AccountId32,
-						>;
+						>,
+					);
 				}
 				pub mod maturing_auctions {
 					use super::runtime_types;
 					pub type MaturingAuctions = ();
 					pub type Param0 =
-						runtime_types::argon_primitives::amount_rank::AscendingRankKey2<
+						runtime_types::argon_primitives::amount_rank::AscendingRankKey1<
 							::core::primitive::u64,
 						>;
 				}
@@ -30970,7 +30974,7 @@ pub mod api {
 					use super::runtime_types;
 					pub type PayoutQueue = ();
 					pub type Param0 =
-						runtime_types::argon_primitives::amount_rank::AscendingRankKey1<
+						runtime_types::argon_primitives::amount_rank::AscendingRankKey2<
 							crate::types::AccountId32,
 						>;
 				}
@@ -31171,9 +31175,10 @@ pub mod api {
 						"Auctions",
 						(),
 						[
-							235u8, 239u8, 110u8, 245u8, 131u8, 45u8, 40u8, 22u8, 156u8, 153u8,
-							203u8, 39u8, 57u8, 156u8, 183u8, 206u8, 128u8, 73u8, 55u8, 174u8, 70u8,
-							103u8, 35u8, 121u8, 86u8, 94u8, 198u8, 242u8, 90u8, 57u8, 49u8, 18u8,
+							71u8, 231u8, 139u8, 180u8, 118u8, 149u8, 126u8, 48u8, 218u8, 180u8,
+							215u8, 201u8, 103u8, 215u8, 253u8, 186u8, 33u8, 98u8, 236u8, 204u8,
+							35u8, 182u8, 250u8, 10u8, 58u8, 61u8, 23u8, 206u8, 28u8, 190u8, 168u8,
+							39u8,
 						],
 					)
 				}
@@ -31195,9 +31200,10 @@ pub mod api {
 						"Auctions",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							235u8, 239u8, 110u8, 245u8, 131u8, 45u8, 40u8, 22u8, 156u8, 153u8,
-							203u8, 39u8, 57u8, 156u8, 183u8, 206u8, 128u8, 73u8, 55u8, 174u8, 70u8,
-							103u8, 35u8, 121u8, 86u8, 94u8, 198u8, 242u8, 90u8, 57u8, 49u8, 18u8,
+							71u8, 231u8, 139u8, 180u8, 118u8, 149u8, 126u8, 48u8, 218u8, 180u8,
+							215u8, 201u8, 103u8, 215u8, 253u8, 186u8, 33u8, 98u8, 236u8, 204u8,
+							35u8, 182u8, 250u8, 10u8, 58u8, 61u8, 23u8, 206u8, 28u8, 190u8, 168u8,
+							39u8,
 						],
 					)
 				}
@@ -31330,8 +31336,8 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Positive bids ordered by rate ascending, then account ascending. Values are frozen matching"]
-				#[doc = " bases in microgons, allowing settlement after the account's principal bucket is gone."]
+				#[doc = " Positive bids ordered by rate ascending, matching basis descending, then account ascending."]
+				#[doc = " Keys retain each frozen matching basis in microgons even after principal is released."]
 				pub fn bids_by_auction_iter(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
@@ -31346,14 +31352,14 @@ pub mod api {
 						"BidsByAuction",
 						(),
 						[
-							245u8, 69u8, 171u8, 176u8, 213u8, 104u8, 62u8, 207u8, 178u8, 210u8,
-							32u8, 157u8, 102u8, 251u8, 23u8, 216u8, 228u8, 96u8, 1u8, 216u8, 170u8,
-							245u8, 48u8, 37u8, 100u8, 229u8, 59u8, 229u8, 34u8, 10u8, 195u8, 174u8,
+							0u8, 220u8, 198u8, 85u8, 101u8, 55u8, 134u8, 215u8, 149u8, 10u8, 206u8,
+							82u8, 181u8, 76u8, 43u8, 135u8, 241u8, 236u8, 58u8, 215u8, 36u8, 63u8,
+							53u8, 52u8, 92u8, 33u8, 1u8, 73u8, 186u8, 236u8, 249u8, 152u8,
 						],
 					)
 				}
-				#[doc = " Positive bids ordered by rate ascending, then account ascending. Values are frozen matching"]
-				#[doc = " bases in microgons, allowing settlement after the account's principal bucket is gone."]
+				#[doc = " Positive bids ordered by rate ascending, matching basis descending, then account ascending."]
+				#[doc = " Keys retain each frozen matching basis in microgons even after principal is released."]
 				pub fn bids_by_auction_iter1(
 					&self,
 					_0: types::bids_by_auction::Param0,
@@ -31371,14 +31377,14 @@ pub mod api {
 						"BidsByAuction",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							245u8, 69u8, 171u8, 176u8, 213u8, 104u8, 62u8, 207u8, 178u8, 210u8,
-							32u8, 157u8, 102u8, 251u8, 23u8, 216u8, 228u8, 96u8, 1u8, 216u8, 170u8,
-							245u8, 48u8, 37u8, 100u8, 229u8, 59u8, 229u8, 34u8, 10u8, 195u8, 174u8,
+							0u8, 220u8, 198u8, 85u8, 101u8, 55u8, 134u8, 215u8, 149u8, 10u8, 206u8,
+							82u8, 181u8, 76u8, 43u8, 135u8, 241u8, 236u8, 58u8, 215u8, 36u8, 63u8,
+							53u8, 52u8, 92u8, 33u8, 1u8, 73u8, 186u8, 236u8, 249u8, 152u8,
 						],
 					)
 				}
-				#[doc = " Positive bids ordered by rate ascending, then account ascending. Values are frozen matching"]
-				#[doc = " bases in microgons, allowing settlement after the account's principal bucket is gone."]
+				#[doc = " Positive bids ordered by rate ascending, matching basis descending, then account ascending."]
+				#[doc = " Keys retain each frozen matching basis in microgons even after principal is released."]
 				pub fn bids_by_auction(
 					&self,
 					_0: types::bids_by_auction::Param0,
@@ -31405,9 +31411,9 @@ pub mod api {
 							::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_1),
 						),
 						[
-							245u8, 69u8, 171u8, 176u8, 213u8, 104u8, 62u8, 207u8, 178u8, 210u8,
-							32u8, 157u8, 102u8, 251u8, 23u8, 216u8, 228u8, 96u8, 1u8, 216u8, 170u8,
-							245u8, 48u8, 37u8, 100u8, 229u8, 59u8, 229u8, 34u8, 10u8, 195u8, 174u8,
+							0u8, 220u8, 198u8, 85u8, 101u8, 55u8, 134u8, 215u8, 149u8, 10u8, 206u8,
+							82u8, 181u8, 76u8, 43u8, 135u8, 241u8, 236u8, 58u8, 215u8, 36u8, 63u8,
+							53u8, 52u8, 92u8, 33u8, 1u8, 73u8, 186u8, 236u8, 249u8, 152u8,
 						],
 					)
 				}
@@ -31636,15 +31642,17 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Fraction of min(available funding, matching basis) reserved once; configure 90%."]
-				pub fn auction_budget_percent(
+				#[doc = " Fraction of total matching basis admitted to rewards, independent of bid rates."]
+				#[doc = " Configure 90%; reserve up to that amount, bounded separately by available Treasury"]
+				#[doc = " funding."]
+				pub fn auction_inclusion_percent(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
 					runtime_types::sp_arithmetic::per_things::Percent,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"StabilizerBuys",
-						"AuctionBudgetPercent",
+						"AuctionInclusionPercent",
 						[
 							40u8, 171u8, 69u8, 196u8, 34u8, 184u8, 50u8, 128u8, 139u8, 192u8, 63u8,
 							231u8, 249u8, 200u8, 252u8, 73u8, 244u8, 170u8, 51u8, 177u8, 106u8,
@@ -32342,7 +32350,7 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				pub struct AmountRankKey<_0> {
+				pub struct AmountRankKey1<_0> {
 					pub descending_amount: [::core::primitive::u8; 16usize],
 					pub ordered_id: [::core::primitive::u8; 4usize],
 					#[codec(skip)]
@@ -32360,9 +32368,27 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
+				pub struct AmountRankKey2<_0> {
+					pub descending_amount: [::core::primitive::u8; 16usize],
+					pub ordered_id: [::core::primitive::u8; 32usize],
+					#[codec(skip)]
+					pub __ignore: ::core::marker::PhantomData<_0>,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
 				pub struct AscendingRankKey1<_0> {
 					pub ascending_rank: [::core::primitive::u8; 8usize],
-					pub ordered_id: [::core::primitive::u8; 32usize],
+					pub ordered_id: [::core::primitive::u8; 8usize],
 					#[codec(skip)]
 					pub __ignore: ::core::marker::PhantomData<_0>,
 				}
@@ -32380,7 +32406,7 @@ pub mod api {
 				)]
 				pub struct AscendingRankKey2<_0> {
 					pub ascending_rank: [::core::primitive::u8; 8usize],
-					pub ordered_id: [::core::primitive::u8; 8usize],
+					pub ordered_id: [::core::primitive::u8; 32usize],
 					#[codec(skip)]
 					pub __ignore: ::core::marker::PhantomData<_0>,
 				}
@@ -40816,7 +40842,8 @@ pub mod api {
 				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 				pub enum Call {
 					#[codec(index = 0)]
-					#[doc = "Submit a whole-percent bid during F+1. Account ID breaks equal-rate ties."]
+					#[doc = "Submit a whole-percent bid during F+1. Larger matching bases break equal-rate ties;"]
+					#[doc = "account ID orders bids with the same rate and matching basis."]
 					bid {
 						admission_frame: ::core::primitive::u64,
 						reward_rate: runtime_types::sp_arithmetic::per_things::Percent,
@@ -41039,7 +41066,8 @@ pub mod api {
 				pub matching_rate: runtime_types::sp_arithmetic::per_things::Permill,
 				pub total_matching_basis: ::core::primitive::u128,
 				pub budget: ::core::option::Option<::core::primitive::u128>,
-				pub remaining: ::core::primitive::u128,
+				pub remaining_budget: ::core::primitive::u128,
+				pub remaining_matching_basis: ::core::primitive::u128,
 				pub matures_at_tick: ::core::option::Option<::core::primitive::u64>,
 			}
 			#[derive(

@@ -3779,7 +3779,7 @@ export default {
   /**
    * Lookup444: argon_primitives::amount_rank::AmountRankKey<Id>
    **/
-  ArgonPrimitivesAmountRankAmountRankKey: {
+  ArgonPrimitivesAmountRankAmountRankKeyU32: {
     descendingAmount: '[u8;16]',
     orderedId: '[u8;4]',
   },
@@ -4955,7 +4955,8 @@ export default {
     matchingRate: 'Permill',
     totalMatchingBasis: 'u128',
     budget: 'Option<u128>',
-    remaining: 'u128',
+    remainingBudget: 'u128',
+    remainingMatchingBasis: 'u128',
     maturesAtTick: 'Option<u64>',
   },
   /**
@@ -4975,21 +4976,28 @@ export default {
     positiveBidCount: 'u8',
   },
   /**
-   * Lookup665: argon_primitives::amount_rank::AscendingRankKey<sp_core::crypto::AccountId32>
+   * Lookup666: argon_primitives::amount_rank::AmountRankKey<sp_core::crypto::AccountId32>
    **/
-  ArgonPrimitivesAmountRankAscendingRankKeyAccountId32: {
-    ascendingRank: '[u8;8]',
+  ArgonPrimitivesAmountRankAmountRankKeyAccountId32: {
+    descendingAmount: '[u8;16]',
     orderedId: '[u8;32]',
   },
   /**
-   * Lookup666: argon_primitives::amount_rank::AscendingRankKey<Id>
+   * Lookup667: argon_primitives::amount_rank::AscendingRankKey<Id>
    **/
   ArgonPrimitivesAmountRankAscendingRankKeyU64: {
     ascendingRank: '[u8;8]',
     orderedId: '[u8;8]',
   },
   /**
-   * Lookup667: pallet_stabilizer_buys::pallet::Error<T>
+   * Lookup668: argon_primitives::amount_rank::AscendingRankKey<sp_core::crypto::AccountId32>
+   **/
+  ArgonPrimitivesAmountRankAscendingRankKeyAccountId32: {
+    ascendingRank: '[u8;8]',
+    orderedId: '[u8;32]',
+  },
+  /**
+   * Lookup669: pallet_stabilizer_buys::pallet::Error<T>
    **/
   PalletStabilizerBuysError: {
     _enum: [
@@ -5004,7 +5012,7 @@ export default {
     ],
   },
   /**
-   * Lookup674: pallet_stabilizer_pools::pallet::Error<T>
+   * Lookup676: pallet_stabilizer_pools::pallet::Error<T>
    **/
   PalletStabilizerPoolsError: {
     _enum: [
@@ -5023,55 +5031,55 @@ export default {
     ],
   },
   /**
-   * Lookup677: frame_system::extensions::authorize_call::AuthorizeCall<T>
+   * Lookup679: frame_system::extensions::authorize_call::AuthorizeCall<T>
    **/
   FrameSystemExtensionsAuthorizeCall: 'Null',
   /**
-   * Lookup678: frame_system::extensions::check_non_zero_sender::CheckNonZeroSender<T>
+   * Lookup680: frame_system::extensions::check_non_zero_sender::CheckNonZeroSender<T>
    **/
   FrameSystemExtensionsCheckNonZeroSender: 'Null',
   /**
-   * Lookup679: frame_system::extensions::check_spec_version::CheckSpecVersion<T>
+   * Lookup681: frame_system::extensions::check_spec_version::CheckSpecVersion<T>
    **/
   FrameSystemExtensionsCheckSpecVersion: 'Null',
   /**
-   * Lookup680: frame_system::extensions::check_tx_version::CheckTxVersion<T>
+   * Lookup682: frame_system::extensions::check_tx_version::CheckTxVersion<T>
    **/
   FrameSystemExtensionsCheckTxVersion: 'Null',
   /**
-   * Lookup681: frame_system::extensions::check_genesis::CheckGenesis<T>
+   * Lookup683: frame_system::extensions::check_genesis::CheckGenesis<T>
    **/
   FrameSystemExtensionsCheckGenesis: 'Null',
   /**
-   * Lookup684: frame_system::extensions::check_nonce::CheckNonce<T>
+   * Lookup686: frame_system::extensions::check_nonce::CheckNonce<T>
    **/
   FrameSystemExtensionsCheckNonce: 'Compact<u32>',
   /**
-   * Lookup685: frame_system::extensions::check_weight::CheckWeight<T>
+   * Lookup687: frame_system::extensions::check_weight::CheckWeight<T>
    **/
   FrameSystemExtensionsCheckWeight: 'Null',
   /**
-   * Lookup686: pallet_transaction_payment::ChargeTransactionPayment<T>
+   * Lookup688: pallet_transaction_payment::ChargeTransactionPayment<T>
    **/
   PalletTransactionPaymentChargeTransactionPayment: 'Compact<u128>',
   /**
-   * Lookup687: frame_metadata_hash_extension::CheckMetadataHash<T>
+   * Lookup689: frame_metadata_hash_extension::CheckMetadataHash<T>
    **/
   FrameMetadataHashExtensionCheckMetadataHash: {
     mode: 'FrameMetadataHashExtensionMode',
   },
   /**
-   * Lookup688: frame_metadata_hash_extension::Mode
+   * Lookup690: frame_metadata_hash_extension::Mode
    **/
   FrameMetadataHashExtensionMode: {
     _enum: ['Disabled', 'Enabled'],
   },
   /**
-   * Lookup689: frame_system::extensions::weight_reclaim::WeightReclaim<T>
+   * Lookup691: frame_system::extensions::weight_reclaim::WeightReclaim<T>
    **/
   FrameSystemExtensionsWeightReclaim: 'Null',
   /**
-   * Lookup690: argon_runtime::Runtime
+   * Lookup692: argon_runtime::Runtime
    **/
   ArgonRuntimeRuntime: 'Null',
 };

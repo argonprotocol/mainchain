@@ -1403,8 +1403,8 @@ fn bid_pool_reserves_fund_purchase_rewards_at_maturity() {
 		assert_noop!(
 			with_storage_layer(|| -> DispatchResult {
 				StabilizerBuys::on_initialize(3);
-				assert_eq!(Balances::balance(&owner), 105 * MICROGONS_PER_ARGON);
-				assert_eq!(Treasury::available_budget(), 46 * MICROGONS_PER_ARGON);
+				assert_eq!(Balances::balance(&owner), 104_500_000);
+				assert_eq!(Treasury::available_budget(), 46_500_000);
 				Err(DispatchError::Other("delivery failed"))
 			}),
 			DispatchError::Other("delivery failed")
@@ -1413,9 +1413,9 @@ fn bid_pool_reserves_fund_purchase_rewards_at_maturity() {
 		assert_eq!(Balances::total_issuance(), 120 * MICROGONS_PER_ARGON);
 
 		StabilizerBuys::on_initialize(4);
-		assert_eq!(Balances::balance(&owner), 105 * MICROGONS_PER_ARGON);
-		assert_eq!(Balances::total_issuance(), 125 * MICROGONS_PER_ARGON);
-		assert_eq!(Treasury::available_budget(), 46 * MICROGONS_PER_ARGON);
+		assert_eq!(Balances::balance(&owner), 104_500_000);
+		assert_eq!(Balances::total_issuance(), 124_500_000);
+		assert_eq!(Treasury::available_budget(), 46_500_000);
 		assert_eq!(RewardReserves::<Test>::get().marketing, 0);
 		assert_eq!(RewardReserves::<Test>::get().bitcoin_liquids, 0);
 		assert_eq!(crate::OutstandingPurchaseRewards::<Test>::get(), 0);
@@ -1430,7 +1430,7 @@ fn bid_pool_reserves_fund_purchase_rewards_at_maturity() {
 			.next()
 			.is_none());
 		StabilizerBuys::on_initialize(5);
-		assert_eq!(Balances::total_issuance(), 125 * MICROGONS_PER_ARGON);
+		assert_eq!(Balances::total_issuance(), 124_500_000);
 	});
 }
 

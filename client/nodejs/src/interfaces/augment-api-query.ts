@@ -25,7 +25,8 @@ import type { AnyNumber, ITuple } from '@polkadot/types-codec/types';
 import type { AccountId32, H160, H256, Percent, Permill } from '@polkadot/types/interfaces/runtime';
 import type {
   ArgonNotaryAuditErrorVerifyError,
-  ArgonPrimitivesAmountRankAmountRankKey,
+  ArgonPrimitivesAmountRankAmountRankKeyAccountId32,
+  ArgonPrimitivesAmountRankAmountRankKeyU32,
   ArgonPrimitivesAmountRankAscendingRankKeyAccountId32,
   ArgonPrimitivesAmountRankAscendingRankKeyU64,
   ArgonPrimitivesBalanceChangeAccountOrigin,
@@ -1664,20 +1665,26 @@ declare module '@polkadot/api-base/types/storage' {
         [u64]
       >;
       /**
-       * Positive bids ordered by rate ascending, then account ascending. Values are frozen matching
-       * bases in microgons, allowing settlement after the account's principal bucket is gone.
+       * Positive bids ordered by rate ascending, matching basis descending, then account ascending.
+       * Keys retain each frozen matching basis in microgons even after principal is released.
        **/
       bidsByAuction: AugmentedQuery<
         ApiType,
         (
           arg1: u64 | AnyNumber | Uint8Array,
           arg2:
-            | ArgonPrimitivesAmountRankAscendingRankKeyAccountId32
-            | { ascendingRank?: any; orderedId?: any }
-            | string
-            | Uint8Array,
-        ) => Observable<Option<u128>>,
-        [u64, ArgonPrimitivesAmountRankAscendingRankKeyAccountId32]
+            | ITuple<[Percent, ArgonPrimitivesAmountRankAmountRankKeyAccountId32]>
+            | [
+                Percent | AnyNumber | Uint8Array,
+                (
+                  | ArgonPrimitivesAmountRankAmountRankKeyAccountId32
+                  | { descendingAmount?: any; orderedId?: any }
+                  | string
+                  | Uint8Array
+                ),
+              ],
+        ) => Observable<Option<Null>>,
+        [u64, ITuple<[Percent, ArgonPrimitivesAmountRankAmountRankKeyAccountId32]>]
       >;
       /**
        * Scheduled rewards and the account's single payout queue entry.
@@ -2255,12 +2262,12 @@ declare module '@polkadot/api-base/types/storage' {
         ApiType,
         (
           arg:
-            | ArgonPrimitivesAmountRankAmountRankKey
+            | ArgonPrimitivesAmountRankAmountRankKeyU32
             | { descendingAmount?: any; orderedId?: any }
             | string
             | Uint8Array,
         ) => Observable<Option<Null>>,
-        [ArgonPrimitivesAmountRankAmountRankKey]
+        [ArgonPrimitivesAmountRankAmountRankKeyU32]
       >;
       /**
        * Vault Bitcoin Xpub and current child counter by VaultId

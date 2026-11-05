@@ -542,9 +542,11 @@ declare module '@polkadot/api-base/types/consts' {
     };
     stabilizerBuys: {
       /**
-       * Fraction of min(available funding, matching basis) reserved once; configure 90%.
+       * Fraction of total matching basis admitted to rewards, independent of bid rates.
+       * Configure 90%; reserve up to that amount, bounded separately by available Treasury
+       * funding.
        **/
-      auctionBudgetPercent: Percent & AugmentedConst<ApiType>;
+      auctionInclusionPercent: Percent & AugmentedConst<ApiType>;
       /**
        * In the open bucket, allow USDC observations up to ten ticks before the purchase.
        **/

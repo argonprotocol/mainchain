@@ -7,14 +7,16 @@
 //! At maturity, `on_initialize` allocates ranked bids into payable rewards, then pays due accounts.
 //! Both queues advance in bounded steps. Principal can be paid before a delayed reward allocation;
 //! that allocation schedules the account again when its reward is ready.
+//! Bids consume matching-basis inclusion capacity before their requested rate is applied. Lower
+//! rates save reward funding without admitting matching basis beyond the auction's cutoff.
 #![deny(warnings)]
 #![cfg_attr(not(feature = "std"), no_std)]
 
 extern crate alloc;
 use alloc::vec::Vec;
 use argon_primitives::{
-	amount_rank::AmountRankId, AscendingRankKey, MiningFrameTransitionProvider, OnNewSlot,
-	PriceIndex,
+	amount_rank::AmountRankId, AmountRankKey, AscendingRankKey, MiningFrameTransitionProvider,
+	OnNewSlot, PriceIndex,
 };
 use frame_support::{storage::with_storage_layer, transactional};
 use pallet_prelude::*;
@@ -83,9 +85,11 @@ pub mod pallet {
 		/// revisions.
 		#[pallet::constant]
 		type MaxPositiveBids: Get<u8>;
-		/// Fraction of min(available funding, matching basis) reserved once; configure 90%.
+		/// Fraction of total matching basis admitted to rewards, independent of bid rates.
+		/// Configure 90%; reserve up to that amount, bounded separately by available Treasury
+		/// funding.
 		#[pallet::constant]
-		type AuctionBudgetPercent: Get<Percent>;
+		type AuctionInclusionPercent: Get<Percent>;
 		/// Ticks after bidding close, configured for 30 elapsed days on the network.
 		#[pallet::constant]
 		type RewardMaturityTicks: Get<Tick>;
@@ -143,16 +147,16 @@ pub mod pallet {
 		BuyPayout,
 	>;
 
-	/// Positive bids ordered by rate ascending, then account ascending. Values are frozen matching
-	/// bases in microgons, allowing settlement after the account's principal bucket is gone.
+	/// Positive bids ordered by rate ascending, matching basis descending, then account ascending.
+	/// Keys retain each frozen matching basis in microgons even after principal is released.
 	#[pallet::storage]
 	pub type BidsByAuction<T: Config> = StorageDoubleMap<
 		_,
 		Twox64Concat,
 		FrameId,
 		Identity,
-		AscendingRankKey<T::AccountId>,
-		Balance,
+		(Percent, AmountRankKey<T::AccountId>),
+		(),
 	>;
 
 	/// Funded auctions awaiting automatic reward allocation, ordered by maturity tick and frame.
@@ -351,7 +355,8 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		/// Submit a whole-percent bid during F+1. Account ID breaks equal-rate ties.
+		/// Submit a whole-percent bid during F+1. Larger matching bases break equal-rate ties;
+		/// account ID orders bids with the same rate and matching basis.
 		#[pallet::call_index(0)]
 		#[pallet::weight(T::WeightInfo::bid())]
 		pub fn bid(
@@ -384,17 +389,14 @@ pub mod pallet {
 			if !payout.bid_rate.is_zero() {
 				BidsByAuction::<T>::remove(
 					admission_frame,
-					AscendingRankKey::new(
-						u64::from(payout.bid_rate.deconstruct()),
-						account.clone(),
-					),
+					(payout.bid_rate, AmountRankKey::new(matching_basis, account.clone())),
 				);
 			}
 			if !reward_rate.is_zero() {
 				BidsByAuction::<T>::insert(
 					admission_frame,
-					AscendingRankKey::new(u64::from(reward_rate.deconstruct()), account.clone()),
-					matching_basis,
+					(reward_rate, AmountRankKey::new(matching_basis, account.clone())),
+					(),
 				);
 			}
 			payout.bid_rate = reward_rate;
@@ -483,12 +485,14 @@ impl<T: Config> OnNewSlot<T::AccountId> for Pallet<T> {
 			};
 
 			let available = T::TreasuryRewardProvider::available_budget();
-			let budget = T::AuctionBudgetPercent::get()
-				.mul_floor(available.min(auction.total_matching_basis));
+			let inclusion_limit =
+				T::AuctionInclusionPercent::get().mul_floor(auction.total_matching_basis);
+			let budget = available.min(inclusion_limit);
 
 			T::TreasuryRewardProvider::reserve_budget(budget)?;
 			auction.budget = Some(budget);
-			auction.remaining = budget;
+			auction.remaining_budget = budget;
+			auction.remaining_matching_basis = inclusion_limit;
 			Auctions::<T>::insert(admission_frame, auction);
 			Self::deposit_event(Event::AuctionOpened { admission_frame, budget });
 			Ok(())
@@ -527,7 +531,8 @@ impl<T: Config> Pallet<T> {
 			matching_rate: MatchingRate::<T>::get(),
 			total_matching_basis: 0,
 			budget: None,
-			remaining: 0,
+			remaining_budget: 0,
+			remaining_matching_basis: 0,
 			matures_at_tick: None,
 		});
 
@@ -601,17 +606,19 @@ impl<T: Config> Pallet<T> {
 		let budget = auction.budget.ok_or(Error::<T>::AuctionNotReady)?;
 		let matures_at_tick = auction.matures_at_tick.ok_or(Error::<T>::AuctionNotReady)?;
 
-		let next_bid = BidsByAuction::<T>::iter_prefix(admission_frame).next();
-		if let Some((rank, matching_basis)) = next_bid {
+		let next_bid = BidsByAuction::<T>::iter_key_prefix(admission_frame).next();
+		if let Some((rate, rank)) = next_bid {
 			let account = rank.holder_id();
-			let rate = Percent::from_percent(rank.rank() as u8);
-			let amount = rate.mul_floor(matching_basis).min(auction.remaining);
+			let included_basis = rank.amount().min(auction.remaining_matching_basis);
+			auction.remaining_matching_basis.saturating_reduce(included_basis);
+
+			let amount = rate.mul_floor(included_basis).min(auction.remaining_budget);
 			if amount > 0 {
 				T::TreasuryRewardProvider::commit_reward(amount)?;
 				let mut buys = BuysByAccount::<T>::get(&account);
 				buys.payable_reward.saturating_accrue(amount);
 				Self::save_and_schedule_account(&account, buys);
-				auction.remaining.saturating_reduce(amount);
+				auction.remaining_budget.saturating_reduce(amount);
 				Self::deposit_event(Event::RewardAwarded {
 					account,
 					admission_frame,
@@ -619,17 +626,17 @@ impl<T: Config> Pallet<T> {
 					matures_at_tick,
 				});
 			}
-			BidsByAuction::<T>::remove(admission_frame, rank);
+			BidsByAuction::<T>::remove(admission_frame, (rate, rank));
 		}
 
 		if BidsByAuction::<T>::iter_prefix(admission_frame).next().is_none() {
-			T::TreasuryRewardProvider::return_budget(auction.remaining)?;
+			T::TreasuryRewardProvider::return_budget(auction.remaining_budget)?;
 			Self::deposit_event(Event::AuctionSettled {
 				admission_frame,
-				awarded: budget - auction.remaining,
-				returned: auction.remaining,
+				awarded: budget - auction.remaining_budget,
+				returned: auction.remaining_budget,
 			});
-			auction.remaining = 0;
+			auction.remaining_budget = 0;
 			MaturingAuctions::<T>::remove(key);
 		}
 		Auctions::<T>::insert(admission_frame, auction);
@@ -720,7 +727,10 @@ pub struct Auction {
 	/// Original reserved microgons. None means reservation has not succeeded; Some(0) is funded.
 	pub budget: Option<Balance>,
 	/// Reserved microgons still available for rewards, zero after unused funding is returned.
-	pub remaining: Balance,
+	pub remaining_budget: Balance,
+	/// Matching-basis microgons still admitted before applying bid rates. Cheap bids never restore
+	/// this capacity; the final included bid may use only part of its matching basis.
+	pub remaining_matching_basis: Balance,
 	/// Tick when principal and rewards become payable, captured once when bidding closes.
 	pub matures_at_tick: Option<Tick>,
 }
