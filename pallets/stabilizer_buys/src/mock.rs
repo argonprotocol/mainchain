@@ -186,13 +186,13 @@ impl Config for Test {
 	type MaxPrincipalPayouts = ConstU32<16>;
 	type MaxPayoutsPerBlock = ConstU32<2>;
 	type MaxPositiveBids = ConstU8<4>;
-	type AuctionBudgetPercent = BudgetPercent;
+	type AuctionInclusionPercent = InclusionPercent;
 	type RewardMaturityTicks = RewardMaturityTicks;
 	type WeightInfo = ();
 }
 
 parameter_types! {
-	pub const BudgetPercent: Percent = Percent::from_percent(90);
+	pub const InclusionPercent: Percent = Percent::from_percent(90);
 	pub const RewardMaturityTicks: Tick = 30 * 1_440;
 }
 

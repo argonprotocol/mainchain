@@ -578,12 +578,12 @@ impl pallet_stabilizer_buys::Config for Test {
 	type MaxPrincipalPayouts = ConstU32<16>;
 	type MaxPayoutsPerBlock = ConstU32<2>;
 	type MaxPositiveBids = sp_runtime::traits::ConstU8<4>;
-	type AuctionBudgetPercent = PurchaseBudgetPercent;
+	type AuctionInclusionPercent = PurchaseInclusionPercent;
 	type RewardMaturityTicks = ConstU64<43200>;
 	type WeightInfo = Test;
 }
 
-parameter_types! { pub const PurchaseBudgetPercent: Percent = Percent::from_percent(90); }
+parameter_types! { pub const PurchaseInclusionPercent: Percent = Percent::from_percent(90); }
 
 // This fixture tests gateway admission; Treasury funding is exercised in its connected fixture.
 impl argon_primitives::treasury::TreasuryRewardProvider<TestAccountId> for Test {

@@ -93,7 +93,8 @@ where
 				matching_rate: Permill::one(),
 				total_matching_basis: principal / 10,
 				budget: Some(0),
-				remaining: 0,
+				remaining_budget: 0,
+				remaining_matching_basis: 0,
 				matures_at_tick: Some(if mature { NOW } else { NOW + 1 }),
 			},
 		);
@@ -197,7 +198,14 @@ mod benchmarks {
 			payout.bid_rate = Percent::from_percent(100);
 			payout.positive_bid_count = <T as Config>::MaxPositiveBids::get() - 1;
 		});
-		BidsByAuction::<T>::insert(frame, AscendingRankKey::new(100, owner.clone()), 1_000);
+		let matching_basis = PurchasesByAccount::<T>::get(&owner, frame.to_ordered())
+			.unwrap()
+			.captured_discount;
+		BidsByAuction::<T>::insert(
+			frame,
+			(Percent::one(), AmountRankKey::new(matching_basis, owner.clone())),
+			(),
+		);
 		#[extrinsic_call]
 		_(RawOrigin::Signed(owner.clone()), frame, Percent::from_percent(50));
 		assert_eq!(
@@ -211,8 +219,8 @@ mod benchmarks {
 	fn process_auctions(b: Linear<1, 4>) -> Result<(), BenchmarkError> {
 		clock::<T>(30_000, NOW);
 		let basis = CurrencyOf::<T>::minimum_balance().max(10_000) / 10;
-		let award = Percent::from_percent(50).mul_floor(basis);
-		let budget = <T as Config>::AuctionBudgetPercent::get().mul_floor(basis);
+		let budget = <T as Config>::AuctionInclusionPercent::get().mul_floor(basis);
+		let award = Percent::from_percent(50).mul_floor(budget);
 		for i in 0..b {
 			let owner = account("award", i, 0);
 			account_buys::<T>(
@@ -227,11 +235,16 @@ mod benchmarks {
 					matching_rate: Permill::one(),
 					total_matching_basis: basis,
 					budget: Some(budget),
-					remaining: budget,
+					remaining_budget: budget,
+					remaining_matching_basis: budget,
 					matures_at_tick: Some(NOW),
 				},
 			);
-			BidsByAuction::<T>::insert(frame, AscendingRankKey::new(50, owner), basis);
+			BidsByAuction::<T>::insert(
+				frame,
+				(Percent::from_percent(50), AmountRankKey::new(basis, owner)),
+				(),
+			);
 			MaturingAuctions::<T>::insert(AscendingRankKey::new(NOW, frame), ());
 		}
 		#[block]
@@ -322,7 +335,8 @@ mod benchmarks {
 					matching_rate: Permill::one(),
 					total_matching_basis: 1_000_000,
 					budget: Some(0),
-					remaining: 0,
+					remaining_budget: 0,
+					remaining_matching_basis: 0,
 					matures_at_tick: None,
 				},
 			);

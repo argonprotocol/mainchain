@@ -1863,7 +1863,8 @@ declare module '@polkadot/api-base/types/submittable' {
     };
     stabilizerBuys: {
       /**
-       * Submit a whole-percent bid during F+1. Account ID breaks equal-rate ties.
+       * Submit a whole-percent bid during F+1. Larger matching bases break equal-rate ties;
+       * account ID orders bids with the same rate and matching basis.
        **/
       bid: AugmentedSubmittable<
         (

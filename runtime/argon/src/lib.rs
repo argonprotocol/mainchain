@@ -655,7 +655,7 @@ impl pallet_stabilizer_buys::Config for Runtime {
 	type MaxPrincipalPayouts = ConstU32<16>;
 	type MaxPayoutsPerBlock = ConstU32<4>;
 	type MaxPositiveBids = ConstU8<4>;
-	type AuctionBudgetPercent = PurchaseAuctionBudgetPercent;
+	type AuctionInclusionPercent = PurchaseAuctionInclusionPercent;
 	type RewardMaturityTicks = ConstU64<{ 30 * 1440 }>;
 	type WeightInfo = pallet_stabilizer_buys::weights::WithProviderWeights<
 		Runtime,
@@ -664,7 +664,7 @@ impl pallet_stabilizer_buys::Config for Runtime {
 }
 
 parameter_types! {
-	pub const PurchaseAuctionBudgetPercent: Percent = Percent::from_percent(90);
+	pub const PurchaseAuctionInclusionPercent: Percent = Percent::from_percent(90);
 }
 
 impl pallet_price_index::Config for Runtime {

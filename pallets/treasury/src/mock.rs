@@ -431,7 +431,7 @@ impl pallet_mint::Config for Test {
 
 parameter_types! {
 	pub static PurchaseTick: Tick = 1;
-	pub const PurchaseBudgetPercent: Percent = Percent::from_percent(90);
+	pub const PurchaseInclusionPercent: Percent = Percent::from_percent(90);
 	pub const BitcoinMintPayoutPercentPerFrame: Percent = Percent::from_percent(10);
 	pub PurchasePool: pallet_stabilizer_buys::PurchasePool = pallet_stabilizer_buys::PurchasePool {
 		chain_id: 1,
@@ -454,7 +454,7 @@ impl pallet_stabilizer_buys::Config for Test {
 	type MaxPrincipalPayouts = ConstU32<16>;
 	type MaxPayoutsPerBlock = ConstU32<2>;
 	type MaxPositiveBids = ConstU8<4>;
-	type AuctionBudgetPercent = PurchaseBudgetPercent;
+	type AuctionInclusionPercent = PurchaseInclusionPercent;
 	type RewardMaturityTicks = ConstU64<10>;
 	type WeightInfo = Test;
 }
