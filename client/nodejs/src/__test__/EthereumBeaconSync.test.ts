@@ -1,5 +1,5 @@
 import { Hardfork } from '@ethereumjs/common';
-import { afterEach, expect, it } from 'vitest';
+import { afterEach, expect, it, vi } from 'vitest';
 import {
   type ArgonClient,
   getEthereumBeaconSyncBootstrapTx,
@@ -17,6 +17,7 @@ const originalFetch = globalThis.fetch;
 
 afterEach(() => {
   globalThis.fetch = originalFetch;
+  vi.useRealTimers();
 });
 
 it('reads the verifier maintenance window from chain state', async () => {
@@ -549,6 +550,98 @@ it('falls back to a bridgeable period update when the latest finality jump is to
       }),
     },
   ]);
+});
+
+it('reports required recovery when no retained-window update can advance a minimal beacon', async () => {
+  const beaconApiUrl = 'https://minimal-beacon-unbridgeable.example';
+  globalThis.fetch = createFetch({
+    [`${beaconApiUrl}/eth/v1/config/spec`]: {
+      data: createBeaconSpec({
+        slotsPerEpoch: '8',
+        epochsPerSyncCommitteePeriod: '8',
+        slotsPerHistoricalRoot: '64',
+      }),
+    },
+    [`${beaconApiUrl}/eth/v1/beacon/light_client/finality_update`]: {
+      data: createLightClientUpdate(97160),
+    },
+    [`${beaconApiUrl}/eth/v1/beacon/light_client/updates?count=1&start_period=1518`]: [
+      createVersionedLightClientUpdate(97160, {
+        next_sync_committee: { pubkeys: ['0x1'], aggregate_pubkey: '0x2' },
+        next_sync_committee_branch: ['0x3'],
+      }),
+    ],
+  });
+
+  await expect(
+    getNextEthereumBeaconSyncTxs(
+      createMockClient({
+        beaconPreset: 'minimal',
+        hasNextSyncCommittee: true,
+        latestFinalizedSlot: 97088,
+        latestSyncCommitteeUpdatePeriod: 1517,
+      }),
+      beaconApiUrl,
+    ),
+  ).rejects.toThrow(/97088.*97152.*trusted checkpoint/);
+});
+
+it('keeps the production preset retained-header limit for catch-up', async () => {
+  const beaconApiUrl = 'https://mainnet-beacon-unbridgeable.example';
+  globalThis.fetch = createFetch({
+    [`${beaconApiUrl}/eth/v1/config/spec`]: { data: createBeaconSpec() },
+    [`${beaconApiUrl}/eth/v1/beacon/light_client/finality_update`]: {
+      data: createLightClientUpdate(9000),
+    },
+    [`${beaconApiUrl}/eth/v1/beacon/light_client/updates?count=1&start_period=1`]: [
+      createVersionedLightClientUpdate(9000, {
+        next_sync_committee: { pubkeys: ['0x1'], aggregate_pubkey: '0x2' },
+        next_sync_committee_branch: ['0x3'],
+      }),
+    ],
+  });
+
+  await expect(
+    getNextEthereumBeaconSyncTxs(
+      createMockClient({ hasNextSyncCommittee: true, latestFinalizedSlot: 800 }),
+      beaconApiUrl,
+    ),
+  ).rejects.toThrow(/800.*8992.*trusted checkpoint/);
+});
+
+it('does not require checkpoint recovery when a bridgeable update is waiting for supermajority', async () => {
+  vi.useFakeTimers();
+  const beaconApiUrl = 'https://minimal-beacon-quorum-pending.example';
+  globalThis.fetch = createFetch({
+    [`${beaconApiUrl}/eth/v1/config/spec`]: {
+      data: createBeaconSpec({
+        slotsPerEpoch: '8',
+        epochsPerSyncCommitteePeriod: '8',
+        slotsPerHistoricalRoot: '64',
+      }),
+    },
+    [`${beaconApiUrl}/eth/v1/beacon/light_client/finality_update`]: {
+      data: createLightClientUpdate(120),
+    },
+    [`${beaconApiUrl}/eth/v1/beacon/light_client/updates?count=1&start_period=1`]: [
+      createVersionedLightClientUpdate(96, {
+        next_sync_committee: { pubkeys: ['0x1'], aggregate_pubkey: '0x2' },
+        next_sync_committee_branch: ['0x3'],
+        sync_aggregate: { sync_committee_bits: '0x01000000', sync_committee_signature: '0x02' },
+      }),
+    ],
+  });
+
+  const sync = getNextEthereumBeaconSyncTxs(
+    createMockClient({
+      beaconPreset: 'minimal',
+      hasNextSyncCommittee: true,
+      latestFinalizedSlot: 40,
+      latestSyncCommitteeUpdatePeriod: 0,
+    }),
+    beaconApiUrl,
+  );
+  await Promise.all([expect(sync).resolves.toEqual([]), vi.runAllTimersAsync()]);
 });
 
 it('retries until a bridgeable period update is available when finality is not bridgeable', async () => {

@@ -232,6 +232,15 @@ export async function getNextEthereumBeaconSyncTxs(
       if (periodUpdate && hasBridgeablePeriodUpdate && periodUpdateHasRequiredCommittee) {
         submitUpdate = periodUpdate;
       }
+
+      if (!finalityIsBridgeable && periodUpdate && !hasBridgeablePeriodUpdate) {
+        throw new Error(
+          `Ethereum beacon sync cannot advance from finalized slot ${state.latestFinalizedSlot}: ` +
+            `the retained header window ends at slot ${maxBridgeableFinalizedSlot}, but the ` +
+            `period ${periodUpdateStartPeriod} update finalizes slot ${periodUpdateFinalizedSlot}. ` +
+            'Recovery requires an authenticated intermediate update or an operator-authorized trusted checkpoint.',
+        );
+      }
     }
 
     if (needsCurrentPeriodUpdate && !submitUpdate) {
