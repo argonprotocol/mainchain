@@ -20,6 +20,7 @@ use crate::{
 	LatestSyncCommitteeUpdatePeriod, NextSyncCommittee, SyncCommitteePrepared,
 };
 use alloy_consensus::{Header as AlloyHeader, Receipt, ReceiptEnvelope};
+use alloy_eips::eip2718::Encodable2718;
 use alloy_primitives::{keccak256, Address, Bytes, Log, B256, U256};
 use alloy_rlp::Encodable;
 use alloy_trie::{proof::ProofRetainer, HashBuilder, Nibbles, TrieAccount};
@@ -1368,6 +1369,82 @@ fn sync_committee_update_for_sync_committee_already_imported_are_not_free() {
 }
 
 /* IMPLS */
+
+#[test]
+fn receipt_proof_requires_exact_trie_receipt_encoding() {
+	let receipt = Receipt {
+		status: true.into(),
+		cumulative_gas_used: 21_000,
+		logs: vec![Log::new_unchecked(
+			Address::repeat_byte(1),
+			vec![B256::repeat_byte(2)],
+			Bytes::from_static(b"transfer"),
+		)],
+	}
+	.with_bloom();
+	let receipts = [
+		ReceiptEnvelope::Legacy(receipt.clone()),
+		ReceiptEnvelope::Eip2930(receipt.clone()),
+		ReceiptEnvelope::Eip1559(receipt.clone()),
+		ReceiptEnvelope::Eip4844(receipt.clone()),
+		ReceiptEnvelope::Eip7702(receipt),
+	];
+	let mut cases = receipts
+		.iter()
+		.map(|receipt| ("canonical", receipt.encoded_2718(), Some(receipt.clone())))
+		.collect::<Vec<_>>();
+
+	for receipt in receipts.iter().filter(|receipt| !matches!(receipt, ReceiptEnvelope::Legacy(_)))
+	{
+		let encoded = receipt.encoded_2718();
+		for payload_length in [0, 2, 55, 56, encoded.len() - 1, encoded.len() + 1] {
+			let mut wrapped = Vec::new();
+			alloy_rlp::Header { list: false, payload_length }.encode(&mut wrapped);
+			wrapped.extend_from_slice(&encoded);
+			if payload_length > encoded.len() {
+				wrapped.push(0x80);
+			}
+			cases.push(("mismatched wrapper length", wrapped, None));
+		}
+		cases.push(("network wrapper", alloy_rlp::encode(receipt), None));
+	}
+
+	for receipt in &receipts {
+		let mut trailing = receipt.encoded_2718();
+		trailing.push(0x80);
+		cases.push(("trailing bytes", trailing, None));
+		let mut truncated = receipt.encoded_2718();
+		truncated.pop();
+		cases.push(("truncated receipt", truncated, None));
+	}
+
+	// Commit each encoding into a synthetic trie so rejection exercises decoding after proof
+	// verification.
+	for (case, encoded, expected) in cases {
+		let path = Nibbles::unpack(alloy_rlp::encode(0u64));
+		let mut trie = HashBuilder::default().with_proof_retainer(ProofRetainer::new(vec![path]));
+		trie.add_leaf(path, &encoded);
+		let root = H256::from(trie.root().0);
+		let nodes = trie.take_proof_nodes().into_nodes_sorted();
+		let node_indexes = (0..nodes.len()).map(|i| i as u16).collect::<Vec<_>>();
+		let proof = EthereumCombinedReceiptProof {
+			nodes: nodes
+				.into_iter()
+				.map(|(_, node)| node.to_vec().try_into().unwrap())
+				.collect::<Vec<_>>()
+				.try_into()
+				.unwrap(),
+			receipts: vec![EthereumReceiptProofReceipt {
+				transaction_index: 0,
+				node_indexes: node_indexes.try_into().unwrap(),
+			}]
+			.try_into()
+			.unwrap(),
+		};
+
+		assert_eq!(crate::receipt::verify_receipt_proof(root, &proof, 0), expected, "{case}");
+	}
+}
 
 #[test]
 fn verify_message() {

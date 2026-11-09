@@ -11857,6 +11857,7 @@ name = "pallet-ethereum-verifier"
 version = "1.5.2"
 dependencies = [
  "alloy-consensus 2.0.0",
+ "alloy-eips 2.0.0",
  "alloy-primitives",
  "alloy-rlp",
  "alloy-trie",
