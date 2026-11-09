@@ -11,14 +11,15 @@ use argon_primitives::{
 	bitcoin::{BitcoinHeight, BitcoinNetwork, OpaqueBitcoinXpub},
 	tick::Ticker,
 	vault::VaultTerms,
-	CollectBlockerProvider, MiningFrameProvider, MiningSlotProvider, OperationalAccountProvider,
-	TickProvider, VotingSchedule,
+	CollectBlockerProvider, CrosschainGatewayProvider, GatewayState, MiningFrameProvider,
+	MiningSlotProvider, OperationalAccountProvider, SourceChain, TickProvider, VotingSchedule,
 };
 use bitcoin::{
 	bip32::{ChildNumber, Xpriv, Xpub},
 	key::Secp256k1,
 };
-use frame_support::traits::Currency;
+use core::time::Duration;
+use frame_support::traits::{Currency, UnixTime};
 use k256::elliptic_curve::rand_core::{OsRng, RngCore};
 use pallet_bitcoin_locks::BitcoinVerifier;
 use pallet_prelude::{
@@ -131,6 +132,8 @@ parameter_types! {
 }
 pub struct StaticMiningFrameProvider;
 impl MiningFrameTransitionProvider for StaticMiningFrameProvider {
+	type Weights = ();
+
 	fn is_new_frame_started() -> Option<FrameId> {
 		Some(CurrentFrameId::get())
 	}
@@ -425,8 +428,16 @@ impl pallet_bitcoin_fissions::Config for Test {
 	type PositionProvider = TreasuryPositions;
 	type OperationalAccountsHook = OperationalAccounts;
 	type Currency = Balances;
+	type LiquidRepaymentProvider = ();
 	type MaxFissionsPerLock = ConstU32<50>;
+	type MaxExpectedFissionsPerLiquid = ConstU32<50>;
 	type MinimumRatchetPercent = MinimumRatchetPercent;
+	type MiningFrameTransitionProvider = StaticMiningFrameProvider;
+	type TickProvider = StaticTickProvider;
+	type TimeProvider = StaticTickProvider;
+	type CrosschainGatewayProvider = Test;
+	type RValueHistoryFrames = ConstU32<30>;
+	type MaxRValueHistoryPrunesPerBlock = ConstU32<16>;
 }
 
 parameter_types! { pub MinimumRatchetPercent: Percent = Percent::from_percent(1); }
@@ -456,5 +467,22 @@ pub(crate) fn default_vault() -> VaultConfig<u64, Balance> {
 		delegate_account_id: None,
 		bitcoin_xpubkey: keys(),
 		securitization: 50_000,
+	}
+}
+
+parameter_types! { pub static LastGatewayState: Option<GatewayState<u128>> = None;
+pub HistoryTicker: Ticker = Ticker::new(1_000, 2); }
+
+impl CrosschainGatewayProvider<u128> for Test {
+	type Weights = ();
+
+	fn last_state_by_chain(_source_chain: SourceChain) -> Option<GatewayState<u128>> {
+		LastGatewayState::get()
+	}
+}
+
+impl UnixTime for StaticTickProvider {
+	fn now() -> Duration {
+		Duration::from_millis(CurrentTick::get() * HistoryTicker::get().tick_duration_millis)
 	}
 }

@@ -59,7 +59,7 @@ contract MintingGatewayInvariant {
 		MintingGateway.MigrationAssetDistribution memory distribution =
 			MintingGateway.MigrationAssetDistribution(recipients, amounts);
 		_gateway.migrate(distribution, distribution);
-		_gateway.setMinimumSwapMicrogons(1);
+		_gateway.setMinimumSwapMicrogons(_gateway.MIN_TRANSFER_AMOUNT());
 		_argon.approve(address(_gateway), type(uint256).max);
 	}
 
@@ -80,8 +80,11 @@ contract MintingGatewayInvariant {
 	function burnPurchase(uint128 microgons, uint64 dust) external {
 		uint256 tokenAmount = uint256(microgons) * _SCALE;
 		uint256 allowance = _argon.allowance(address(this), address(_gateway));
-		bool shouldSucceed = !_paused && microgons != 0 && tokenAmount <= _INITIAL_SUPPLY - _burned
-			&& allowance >= tokenAmount && !_activityBlockFull();
+		bool shouldSucceed = !_paused
+			&& microgons >= _gateway.MIN_TRANSFER_AMOUNT()
+			&& tokenAmount <= _INITIAL_SUPPLY - _burned
+			&& allowance >= tokenAmount
+			&& !_activityBlockFull();
 		MintingGateway.SwapPurchase memory purchase;
 		purchase.buyer = msg.sender;
 		purchase.argonAccountId = bytes32(uint256(1));

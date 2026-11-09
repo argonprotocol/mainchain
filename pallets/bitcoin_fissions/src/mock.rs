@@ -1,9 +1,16 @@
+use argon_primitives::{
+	bitcoin::LiquidId, tick::Ticker, CrosschainGatewayProvider, GatewayState,
+	LiquidRepaymentProvider, SourceChain, TickProvider, VotingSchedule,
+};
+use core::time::Duration;
+use frame_support::traits::UnixTime;
 use pallet_prelude::*;
 use polkadot_sdk::frame_support::traits::StorageInstance;
 
 use crate as pallet_bitcoin_fissions;
+use crate::{Error, FissionByOwnerAndId, FissionIdsByOwnerAndLiquid};
 use argon_primitives::{
-	bitcoin::{BitcoinLockId, FissionId, Satoshis},
+	bitcoin::{BitcoinHeight, BitcoinLockId, FissionId, Satoshis},
 	providers::{
 		BitcoinFissionLockError, BitcoinFissionLockProvider, BitcoinFissionMinting,
 		OperationalAccountsHook,
@@ -58,8 +65,16 @@ impl pallet_bitcoin_fissions::Config for Test {
 	type PositionProvider = TreasuryPositions;
 	type OperationalAccountsHook = MockOperationalAccounts;
 	type Currency = Balances;
+	type LiquidRepaymentProvider = Test;
 	type MaxFissionsPerLock = ConstU32<2>;
+	type MaxExpectedFissionsPerLiquid = ConstU32<2>;
 	type MinimumRatchetPercent = MinimumRatchetPercent;
+	type MiningFrameTransitionProvider = FissionFrames;
+	type TickProvider = FissionTick;
+	type TimeProvider = FissionTick;
+	type CrosschainGatewayProvider = Test;
+	type RValueHistoryFrames = ConstU32<30>;
+	type MaxRValueHistoryPrunesPerBlock = ConstU32<16>;
 }
 
 impl pallet_treasury_positions::Config for Test {
@@ -87,6 +102,21 @@ parameter_types! {
 	pub static LiquidityMultiplierPercent: u128 = 100;
 	pub static MockLastRatchetTick: Tick = 1;
 	pub static MinimumRatchetPercent: Percent = Percent::from_percent(10);
+	pub static PendingLiquidRepayment: Option<(u64, LiquidId)> = None;
+	pub static PendingPriceHistoryTick: Option<Tick> = None;
+	pub static FissionTimestamp: u64 = 0;
+	pub static RepaymentWindowUnavailableForLock: Option<BitcoinLockId> = None;
+}
+
+impl LiquidRepaymentProvider<u64> for Test {
+	type Weights = ();
+
+	fn has_pending_repayment(account: &u64, liquid_id: LiquidId) -> bool {
+		PendingLiquidRepayment::get() == Some((*account, liquid_id))
+	}
+	fn oldest_pending_purchase_tick() -> Option<Tick> {
+		PendingPriceHistoryTick::get()
+	}
 }
 
 pub struct MockLocksInstance;
@@ -221,7 +251,7 @@ impl BitcoinFissionLockProvider<u64, u128> for MockLockProvider {
 		satoshis: Satoshis,
 		_guarantee: &mut CosignerGuarantee<u128>,
 		microgons_at_target_per_btc: u128,
-		minimum_last_ratchet_tick: Tick,
+		minimum_last_ratchet_price_tick: Tick,
 		_fee_coupon: Option<Self::FeeCoupon>,
 	) -> Result<Tick, BitcoinFissionLockError> {
 		let lock = MockLocks::get(lock_id).ok_or(BitcoinFissionLockError::LockNotFound)?;
@@ -234,12 +264,12 @@ impl BitcoinFissionLockProvider<u64, u128> for MockLockProvider {
 		if microgons_at_target_per_btc > lock.microgons_at_target_per_btc {
 			return Err(BitcoinFissionLockError::InsufficientSecuritization);
 		}
-		let last_ratchet_tick = MockLastRatchetTick::get();
-		if last_ratchet_tick < minimum_last_ratchet_tick {
+		let last_ratchet_price_tick = MockLastRatchetTick::get();
+		if last_ratchet_price_tick < minimum_last_ratchet_price_tick {
 			return Err(BitcoinFissionLockError::MicrogonsAtTargetPerBtcTickOlderThanCurrent);
 		}
 
-		Ok(last_ratchet_tick)
+		Ok(last_ratchet_price_tick)
 	}
 
 	fn calculate_liquidity_promised(
@@ -253,13 +283,32 @@ impl BitcoinFissionLockProvider<u64, u128> for MockLockProvider {
 			.ok_or(BitcoinFissionLockError::Overflow)
 	}
 
+	fn can_repay_before_expiry(lock_id: BitcoinLockId, _: FrameId) -> bool {
+		RepaymentWindowUnavailableForLock::get() != Some(lock_id)
+	}
+
+	fn get_lock_expiration(
+		lock_id: BitcoinLockId,
+	) -> Result<BitcoinHeight, BitcoinFissionLockError> {
+		MockLocks::get(lock_id)
+			.map(|_| lock_id)
+			.ok_or(BitcoinFissionLockError::LockNotFound)
+	}
+	fn calculate_redemption_amount(
+		satoshis: Satoshis,
+		_: u128,
+	) -> Result<u128, BitcoinFissionLockError> {
+		(satoshis as u128)
+			.checked_mul(RedemptionMicrogonsPerSatoshi::get())
+			.ok_or(BitcoinFissionLockError::Overflow)
+	}
+
 	fn fuse_satoshis(
 		account_id: &u64,
 		lock_id: BitcoinLockId,
 		satoshis: Satoshis,
 		_guarantee: CosignerGuarantee<u128>,
-		_microgons_at_target_per_btc: u128,
-	) -> Result<u128, BitcoinFissionLockError> {
+	) -> Result<(), BitcoinFissionLockError> {
 		MockLocks::try_mutate(lock_id, |lock| {
 			let lock = lock.as_mut().ok_or(BitcoinFissionLockError::LockNotFound)?;
 			if lock.owner != *account_id {
@@ -269,17 +318,22 @@ impl BitcoinFissionLockProvider<u64, u128> for MockLockProvider {
 				.fissioned_satoshis
 				.checked_sub(satoshis)
 				.ok_or(BitcoinFissionLockError::InsufficientFissionedSatoshis)?;
-			let redemption_rate = RedemptionMicrogonsPerSatoshi::get();
-			(satoshis as u128)
-				.checked_mul(redemption_rate)
-				.ok_or(BitcoinFissionLockError::Overflow)
+			Ok(())
 		})
 	}
 }
 
 pub fn new_test_ext() -> TestState {
+	RepaymentWindowUnavailableForLock::set(None);
+	FissionTimestamp::set(0);
+	FissionFrame::set(1);
+	FissionTick::set(1);
+	FissionNewFrame::set(None);
+	LastGatewayState::set(None);
 	LiquidityMultiplierPercent::set(100);
 	MockLastRatchetTick::set(1);
+	PendingLiquidRepayment::set(None);
+	PendingPriceHistoryTick::set(None);
 	new_test_with_genesis::<Test>(|storage| {
 		pallet_balances::GenesisConfig::<Test> {
 			balances: vec![(1, 20_000), (2, 20_000)],
@@ -288,4 +342,93 @@ pub fn new_test_ext() -> TestState {
 		.assimilate_storage(storage)
 		.expect("balances genesis");
 	})
+}
+
+/// Exercise partial accounting inside the transaction supplied by a production caller.
+pub fn repay_fission(
+	account_id: &u64,
+	fission_id: FissionId,
+	satoshis: Satoshis,
+) -> Result<u128, DispatchError> {
+	with_storage_layer(|| {
+		let fission = FissionByOwnerAndId::<Test>::get(account_id, fission_id)
+			.ok_or(Error::<Test>::FissionNotFound)?;
+		let liquid_id = fission.liquid_id;
+		let closes = satoshis == fission.satoshis;
+		let amount = MockLockProvider::calculate_redemption_amount(
+			satoshis,
+			fission.microgons_at_target_per_btc,
+		)
+		.map_err(Error::<Test>::from)?;
+		let liquidity =
+			BitcoinFissions::apply_repayment(account_id, fission_id, fission, satoshis, amount)?;
+		Balances::burn_from(
+			account_id,
+			amount,
+			Preservation::Expendable,
+			Precision::Exact,
+			Fortitude::Force,
+		)
+		.map_err(|_| Error::<Test>::InsufficientFunds)?;
+		BitcoinFissions::record_repayment(account_id, amount, liquidity)?;
+		if closes {
+			FissionIdsByOwnerAndLiquid::<Test>::remove((account_id, liquid_id), fission_id);
+		}
+		Ok(amount)
+	})
+}
+
+parameter_types! {
+	pub static FissionFrame: FrameId = 1;
+	pub static FissionTick: Tick = 1;
+	pub static FissionNewFrame: Option<FrameId> = None;
+	pub static LastGatewayState: Option<GatewayState<u128>> = None;
+	pub HistoryTicker: Ticker = Ticker::new(1_000, 2);
+}
+pub struct FissionFrames;
+impl argon_primitives::MiningFrameTransitionProvider for FissionFrames {
+	type Weights = ();
+
+	fn get_current_frame_id() -> FrameId {
+		FissionFrame::get()
+	}
+	fn is_new_frame_started() -> Option<FrameId> {
+		FissionNewFrame::get()
+	}
+}
+
+impl CrosschainGatewayProvider<u128> for Test {
+	type Weights = ();
+
+	fn last_state_by_chain(_source_chain: SourceChain) -> Option<GatewayState<u128>> {
+		LastGatewayState::get()
+	}
+}
+
+impl TickProvider<Block> for FissionTick {
+	type Weights = ();
+	fn current_tick() -> Tick {
+		FissionTick::get()
+	}
+	fn previous_tick() -> Tick {
+		FissionTick::get().saturating_sub(1)
+	}
+	fn elapsed_ticks() -> Tick {
+		FissionTick::get()
+	}
+	fn voting_schedule() -> VotingSchedule {
+		VotingSchedule::from_runtime_current_tick(FissionTick::get())
+	}
+	fn ticker() -> Ticker {
+		HistoryTicker::get()
+	}
+	fn blocks_at_tick(_tick: Tick) -> Vec<H256> {
+		Vec::new()
+	}
+}
+
+impl UnixTime for FissionTick {
+	fn now() -> Duration {
+		Duration::from_millis(FissionTimestamp::get())
+	}
 }

@@ -13,6 +13,7 @@ use pallet_prelude::*;
 
 /// Weight functions needed for this pallet.
 pub trait WeightInfo {
+	fn read_bond_collateral_queue() -> Weight;
 	fn on_frame_transition(argon_lots_scanned: u32, argonot_lots: u32, due_releases: u32)
 		-> Weight;
 	fn release_pending_bond_lots() -> Weight;
@@ -25,6 +26,7 @@ pub trait WeightInfo {
 	fn buy_bonds() -> Weight;
 	fn buy_argonot_bonds() -> Weight;
 	fn liquidate_bond_lot() -> Weight;
+	fn liquidate_vault_bond_lot() -> Weight;
 	fn set_bond_lot_flexible() -> Weight;
 	fn set_reserved_bond_space() -> Weight;
 	fn configure_reward_economics() -> Weight;
@@ -34,7 +36,9 @@ pub trait WeightInfo {
 	fn provider_active_account_vault_bond_amount() -> Weight;
 	fn provider_encumber_bond_microgons() -> Weight;
 	fn provider_release_encumbered_bond_microgons() -> Weight;
-	fn provider_burn_encumbered_bond_microgons(lots: u32) -> Weight;
+	fn provider_burn_encumbered_bond_microgons() -> Weight;
+	fn settle_bond_collateral_release(lots: u32) -> Weight;
+	fn settle_bond_collateral_burn(lots: u32) -> Weight;
 	fn provider_available_reward_budget() -> Weight;
 	fn provider_reserve_reward_budget() -> Weight;
 	fn provider_commit_reward() -> Weight;
@@ -65,6 +69,10 @@ where
 	T: Config,
 	Base: WeightInfo,
 {
+	fn read_bond_collateral_queue() -> Weight {
+		Base::read_bond_collateral_queue()
+	}
+
 	fn on_frame_transition(
 		argon_lots_scanned: u32,
 		argonot_lots: u32,
@@ -129,10 +137,15 @@ where
 
 	fn liquidate_bond_lot() -> Weight {
 		Base::liquidate_bond_lot()
+			.max(Base::liquidate_vault_bond_lot())
 			.saturating_add(PositionWeights::<T>::account_quantity_updated().saturating_mul(2))
 			.saturating_add(VaultWeights::<T>::get_vault_operator())
 			.saturating_add(PositionWeights::<T>::position_updated())
 			.saturating_add(OperationalHookWeights::<T>::account_vault_bond_total_updated())
+	}
+
+	fn liquidate_vault_bond_lot() -> Weight {
+		Self::liquidate_bond_lot()
 	}
 
 	fn set_bond_lot_flexible() -> Weight {
@@ -174,15 +187,25 @@ where
 		Base::provider_release_encumbered_bond_microgons()
 	}
 
-	fn provider_burn_encumbered_bond_microgons(lots: u32) -> Weight {
-		Base::provider_burn_encumbered_bond_microgons(lots)
+	fn settle_bond_collateral_release(lots: u32) -> Weight {
+		Base::settle_bond_collateral_release(lots)
+	}
+
+	fn provider_burn_encumbered_bond_microgons() -> Weight {
+		Base::provider_burn_encumbered_bond_microgons()
+	}
+
+	fn settle_bond_collateral_burn(lots: u32) -> Weight {
+		// Each lot can touch a different Vault and displaced operator. The holder's position
+		// and quantity are shared across lots, so charge those account records once.
+		Base::settle_bond_collateral_burn(lots)
 			.saturating_add(VaultWeights::<T>::get_vault_operator().saturating_mul(lots.into()))
 			.saturating_add(
 				PositionWeights::<T>::account_quantity_updated()
-					.saturating_mul(2 * u64::from(lots)),
+					.saturating_mul(lots.saturating_add(1).into()),
 			)
 			.saturating_add(PositionWeights::<T>::bond_principal())
-			.saturating_add(PositionWeights::<T>::position_updated().saturating_mul(lots.into()))
+			.saturating_add(PositionWeights::<T>::position_updated())
 			.saturating_add(OperationalHookWeights::<T>::account_vault_bond_total_updated())
 	}
 	fn provider_available_reward_budget() -> Weight {
@@ -240,14 +263,15 @@ impl<T: Config> TreasuryPoolProviderWeightInfo for ProviderWeightAdapter<T> {
 	}
 
 	fn burn_encumbered_bond_microgons() -> Weight {
-		<T as Config>::WeightInfo::provider_burn_encumbered_bond_microgons(
-			T::MaxArgonBondLots::get(),
-		)
+		<T as Config>::WeightInfo::provider_burn_encumbered_bond_microgons()
 	}
 }
 
 // For backwards compatibility and tests.
 impl WeightInfo for () {
+	fn read_bond_collateral_queue() -> Weight {
+		Weight::zero()
+	}
 	fn on_frame_transition(
 		_argon_lots_scanned: u32,
 		_argonot_lots: u32,
@@ -277,6 +301,10 @@ impl WeightInfo for () {
 	fn liquidate_bond_lot() -> Weight {
 		Weight::zero()
 	}
+	fn liquidate_vault_bond_lot() -> Weight {
+		Weight::zero()
+	}
+
 	fn set_bond_lot_flexible() -> Weight {
 		Weight::zero()
 	}
@@ -309,7 +337,13 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 
-	fn provider_burn_encumbered_bond_microgons(_: u32) -> Weight {
+	fn settle_bond_collateral_release(_: u32) -> Weight {
+		Weight::zero()
+	}
+	fn settle_bond_collateral_burn(_: u32) -> Weight {
+		Weight::zero()
+	}
+	fn provider_burn_encumbered_bond_microgons() -> Weight {
 		Weight::zero()
 	}
 	fn provider_available_reward_budget() -> Weight {

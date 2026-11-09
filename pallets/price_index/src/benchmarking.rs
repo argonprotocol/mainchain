@@ -1,5 +1,5 @@
 use super::*;
-use argon_primitives::{PriceProvider, MICROGONS_PER_ARGON};
+use argon_primitives::{bitcoin::SATOSHIS_PER_BITCOIN, PriceProvider, MICROGONS_PER_ARGON};
 use frame_support::{dispatch::CheckIfFeeless, traits::Hooks};
 use frame_system::RawOrigin;
 use pallet_prelude::benchmarking::{
@@ -178,6 +178,21 @@ mod benchmarks {
 		}
 
 		Ok(())
+	}
+
+	#[benchmark]
+	fn provider_get_redemption_prices() {
+		let mut index = benchmark_price_index(10);
+		index.argon_usd_target_price = FixedU128::from_u32(1_000);
+		Current::<T>::put(index);
+		#[block]
+		{
+			assert!(<Pallet<T> as PriceProvider<T::Balance>>::get_btc_price_in_target_microgons(
+				SATOSHIS_PER_BITCOIN,
+			)
+			.is_some());
+			assert!(<Pallet<T> as PriceProvider<T::Balance>>::get_redemption_r_value().is_some());
+		}
 	}
 
 	#[benchmark]

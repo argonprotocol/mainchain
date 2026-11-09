@@ -434,7 +434,7 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
       expect(payload.activities[0]?.kind).toBe('TransferOutOfArgonFinalized');
       expect(payload.proof.locatorIndex).toBeGreaterThan(0n);
       expect(payload.proof.activityLogs).toHaveLength(1);
-      expect(payload.proof.storageProof.slots).toHaveLength(2);
+      expect(payload.proof.storageProof.slots).toHaveLength(3);
       expect(payload.proof.storageProof.executionBlockProof.targetToAnchorHeaderChain).toEqual([]);
       expect(
         result.events.some(event =>
@@ -695,7 +695,7 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
         expect(payload.activities[0]?.kind).toBe('TransferToArgonStarted');
         expect(payload.proof.locatorIndex).toBeGreaterThan(0n);
         expect(payload.proof.activityLogs).toHaveLength(1);
-        expect(payload.proof.storageProof.slots).toHaveLength(2);
+        expect(payload.proof.storageProof.slots).toHaveLength(3);
 
         const result = await activeHarness.submit(
           client.tx.crosschainTransfer.proveGatewayActivityStorage(
@@ -880,7 +880,7 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
       });
       expect(payload.proof.locatorIndex).toBeGreaterThan(0n);
       expect(payload.proof.activityLogs).toHaveLength(1);
-      expect(payload.proof.storageProof.slots).toHaveLength(2);
+      expect(payload.proof.storageProof.slots).toHaveLength(3);
       expect(
         result.events.some(event =>
           harness.mainchainClient.events.crosschainTransfer.TransferToArgonSettled.is(event),

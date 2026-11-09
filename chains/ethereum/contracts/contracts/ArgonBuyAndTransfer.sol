@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {IERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/IERC20Permit.sol";
 import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import {SafeCast} from "@openzeppelin/contracts/utils/math/SafeCast.sol";
 import {ReentrancyGuard} from "@openzeppelin/contracts/utils/ReentrancyGuard.sol";
@@ -35,9 +36,22 @@ contract ArgonBuyAndTransfer is ReentrancyGuard {
 
 	struct Request {
 		bytes32 argonAccountId;
+		/// @notice Recipient-local Liquid to repay; zero means an ordinary purchase.
+		uint64 repayLiquidId;
 		uint128 maxUsdcIn;
 		uint128 minMicrogonsOut;
 		uint256 deadline;
+	}
+
+	struct UsdcPermit {
+		/// @notice Permit expiry as an Ethereum timestamp in seconds, independent of the swap deadline.
+		uint256 deadline;
+		/// @notice ECDSA recovery ID for the buyer's USDC permit signature.
+		uint8 v;
+		/// @notice First 32-byte component of the buyer's USDC permit signature.
+		bytes32 r;
+		/// @notice Second 32-byte component of the buyer's USDC permit signature.
+		bytes32 s;
 	}
 
 	error InvalidRequest();
@@ -62,13 +76,35 @@ contract ArgonBuyAndTransfer is ReentrancyGuard {
 
 	/// @notice Buys from one canonical USDC/ARGN v4 pool using its native PoolKey.
 	/// @dev The reentrancy guard protects balance deltas across token and router callbacks.
-	// slither-disable-next-line reentrancy-balance
 	function buyAndTransfer(Request calldata request, PoolKey calldata key, bytes calldata hookData)
 		external nonReentrant returns (uint128 microgons, uint64 activityNonce)
 	{
-		if (request.argonAccountId == bytes32(0) || request.maxUsdcIn == 0 || request.minMicrogonsOut == 0) {
-			revert InvalidRequest();
-		}
+		return _buyAndTransfer(request, key, hookData);
+	}
+
+	/// @notice Applies the caller's pre-signed USDC approval and buys for delivery to Argon.
+	/// @dev The permit approves this contract for request.maxUsdcIn; it does not authorize a relayer.
+	function buyAndTransferWithPermit(
+		Request calldata request,
+		PoolKey calldata key,
+		bytes calldata hookData,
+		UsdcPermit calldata permit
+	) external nonReentrant returns (uint128 microgons, uint64 activityNonce) {
+		// Anyone can submit the permit first; transferFrom still requires the caller's allowance.
+		try IERC20Permit(address(usdc)).permit(
+			msg.sender, address(this), request.maxUsdcIn, permit.deadline, permit.v, permit.r, permit.s
+		) {} catch {}
+
+		return _buyAndTransfer(request, key, hookData);
+	}
+
+	// slither-disable-next-line reentrancy-balance
+	function _buyAndTransfer(Request calldata request, PoolKey calldata key, bytes calldata hookData)
+		private returns (uint128 microgons, uint64 activityNonce)
+	{
+		if (request.argonAccountId == bytes32(0)) revert InvalidRequest();
+		if (request.maxUsdcIn == 0) revert InvalidRequest();
+		if (request.minMicrogonsOut == 0) revert InvalidRequest();
 		if (request.deadline < block.timestamp) revert InvalidRequest();
 		if (request.minMicrogonsOut < gateway.minimumSwapMicrogons()) revert PurchaseTooSmall();
 
@@ -85,6 +121,7 @@ contract ArgonBuyAndTransfer is ReentrancyGuard {
 		MintingGateway.SwapPurchase memory purchase;
 		purchase.buyer = msg.sender;
 		purchase.argonAccountId = request.argonAccountId;
+		purchase.repayLiquidId = request.repayLiquidId;
 		purchase.usdcToken = address(usdc);
 		purchase.poolManager = address(poolManager);
 		purchase.poolId = PoolId.unwrap(key.toId());

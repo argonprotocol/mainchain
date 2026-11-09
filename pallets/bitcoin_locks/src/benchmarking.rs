@@ -12,7 +12,7 @@ use argon_primitives::{
 		SATOSHIS_PER_BITCOIN,
 	},
 	providers::BitcoinFissionLockProvider,
-	vault::{Vault, VaultTerms},
+	vault::{Vault, VaultTerms, MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES},
 	BitcoinUtxoEvents, PriceProvider,
 };
 use frame_benchmarking::v2::*;
@@ -43,6 +43,25 @@ mod benchmarks {
 	use super::*;
 	use frame_support::traits::Hooks;
 	use frame_system::RawOrigin;
+
+	#[benchmark]
+	fn provider_has_repayment_window() -> Result<(), BenchmarkError> {
+		reset_benchmark_environment::<T>();
+		let context = create_funded_lock::<T>(20)?;
+		LocksById::<T>::mutate(context.lock_id, |lock| {
+			fill_lock_collections::<T>(lock.as_mut().unwrap())
+		});
+		let eligible;
+		#[block]
+		{
+			eligible = <Pallet<T> as BitcoinFissionLockProvider<
+				T::AccountId,
+				<T as Config>::Balance,
+			>>::can_repay_before_expiry(context.lock_id, 30);
+		}
+		assert!(eligible);
+		Ok(())
+	}
 
 	#[benchmark]
 	fn provider_is_feeless() -> Result<(), BenchmarkError> {
@@ -493,7 +512,7 @@ mod benchmarks {
 		seed_microgons_at_target_per_btc_history::<T>(
 			lock.cosigner_guarantee.basis.microgons_at_target_per_btc,
 		)?;
-		let (liquidity_promised, last_ratchet_tick, mut cosigner_guarantee) = <Pallet<T> as BitcoinFissionLockProvider<
+		let (liquidity_promised, last_ratchet_price_tick, mut cosigner_guarantee) = <Pallet<T> as BitcoinFissionLockProvider<
 			T::AccountId,
 			<T as Config>::Balance,
 		>>::fission_satoshis(
@@ -515,7 +534,7 @@ mod benchmarks {
 					.cosigner_guarantee
 					.basis
 					.microgons_at_target_per_btc,
-				last_ratchet_tick,
+				last_ratchet_price_tick,
 				liquidity_promised,
 				cosigner_guarantee: cosigner_guarantee.clone(),
 				created_at_argon_block: frame_system::Pallet::<T>::block_number(),
@@ -581,16 +600,53 @@ mod benchmarks {
 	}
 
 	#[benchmark]
+	fn provider_get_lock_expiration() -> Result<(), BenchmarkError> {
+		reset_benchmark_environment::<T>();
+		let context = create_funded_lock::<T>(20)?;
+		LocksById::<T>::mutate(context.lock_id, |lock| {
+			fill_lock_collections::<T>(lock.as_mut().unwrap())
+		});
+		#[block]
+		{
+			<Pallet<T> as BitcoinFissionLockProvider<T::AccountId, <T as Config>::Balance>>::get_lock_expiration(context.lock_id)
+			.map_err(|_| BenchmarkError::Stop("missing Lock expiration"))?;
+		}
+		Ok(())
+	}
+
+	#[benchmark]
+	fn provider_calculate_fission_redemption() -> Result<(), BenchmarkError> {
+		reset_benchmark_environment::<T>();
+		// Exercise the below-target curve, including its fixed-point division.
+		seed_price_state(100_000, 1, 1_000);
+		let satoshis = benchmark_satoshis::<T>();
+		let cap = benchmark_microgons_at_target_per_btc::<T>()?;
+		#[block]
+		{
+			<Pallet<T> as BitcoinFissionLockProvider<T::AccountId, <T as Config>::Balance>>::calculate_redemption_amount(satoshis, cap)
+			.map_err(|_| BenchmarkError::Stop("redemption quote unavailable"))?;
+		}
+		Ok(())
+	}
+
+	// Measure the combined proof of the populated Lock and both expiration buckets.
+	#[benchmark(pov_mode = Measured)]
 	fn provider_fuse_satoshis() -> Result<(), BenchmarkError> {
 		reset_benchmark_environment::<T>();
 		let context = create_funded_lock::<T>(20)?;
+		LocksById::<T>::mutate(context.lock_id, |lock| {
+			let lock = lock.as_mut().unwrap();
+			lock.cosigner_guarantee.basis.satoshis *= 2;
+			lock.cosigner_guarantee.guaranteed_microgons *= 2u128.into();
+			fill_lock_collections::<T>(lock);
+		});
 		let lock = LocksById::<T>::get(context.lock_id)
 			.ok_or(BenchmarkError::Stop("missing benchmark lock"))?;
 		let fissioned_satoshis = context.satoshis / 2;
 		seed_microgons_at_target_per_btc_history::<T>(
 			lock.cosigner_guarantee.basis.microgons_at_target_per_btc,
 		)?;
-		let (liquidity_promised, last_ratchet_tick, guarantee) = <Pallet<T> as BitcoinFissionLockProvider<
+		let (liquidity_promised, last_ratchet_price_tick, mut guarantee) = <Pallet<T> as BitcoinFissionLockProvider<
 			T::AccountId,
 			<T as Config>::Balance,
 		>>::fission_satoshis(
@@ -601,6 +657,19 @@ mod benchmarks {
 			None,
 		)
 		.map_err(|_| BenchmarkError::Stop("failed to seed Fission allocation"))?;
+
+		LocksById::<T>::mutate(context.lock_id, |lock| {
+			fill_lock_collections::<T>(lock.as_mut().unwrap())
+		});
+		guarantee.fund_hold_extensions.clear();
+		let held: u128 = guarantee.guaranteed_microgons.into();
+		let per_hold = held / u128::from(MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES);
+		for height in 1..=MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES {
+			guarantee
+				.fund_hold_extensions
+				.try_insert(lock.vault_claim_height + u64::from(height), per_hold.into())
+				.unwrap();
+		}
 
 		pallet_bitcoin_fissions::FissionByOwnerAndId::<T>::insert(
 			&context.owner,
@@ -613,7 +682,7 @@ mod benchmarks {
 					.cosigner_guarantee
 					.basis
 					.microgons_at_target_per_btc,
-				last_ratchet_tick,
+				last_ratchet_price_tick,
 				liquidity_promised,
 				cosigner_guarantee: guarantee.clone(),
 				created_at_argon_block: frame_system::Pallet::<T>::block_number(),
@@ -626,6 +695,24 @@ mod benchmarks {
 		})
 		.map_err(|_| BenchmarkError::Stop("failed to index benchmark Fission"))?;
 
+		let new_height = T::BitcoinBlockHeightChange::get()
+			.1
+			.saturating_add(T::SecuritizationHoldBlocks::get())
+			.saturating_add(1);
+		let old_height = new_height - 1;
+		LocksById::<T>::mutate(context.lock_id, |lock| {
+			lock.as_mut().unwrap().securitization_hold_expiration_bitcoin_height = Some(old_height);
+		});
+		let mut upcoming: BoundedBTreeSet<BitcoinLockId, T::MaxConcurrentlyExpiringLocks> =
+			BoundedBTreeSet::new();
+		for n in 1..T::MaxConcurrentlyExpiringLocks::get() {
+			upcoming.try_insert(u64::MAX - u64::from(n)).unwrap();
+		}
+		let mut previous = upcoming.clone();
+		previous.try_insert(context.lock_id).unwrap();
+		SecuritizationHoldExpirationsByBitcoinHeight::<T>::insert(old_height, previous);
+		SecuritizationHoldExpirationsByBitcoinHeight::<T>::insert(new_height, upcoming);
+
 		#[block]
 		{
 			<Pallet<T> as BitcoinFissionLockProvider<
@@ -635,9 +722,7 @@ mod benchmarks {
 				&context.owner,
 				context.lock_id,
 				fissioned_satoshis,
-				guarantee,
-				lock.cosigner_guarantee.basis.microgons_at_target_per_btc,
-			)
+				guarantee,)
 			.map_err(|_| BenchmarkError::Stop("Fission deallocation failed"))?;
 		}
 
@@ -965,6 +1050,26 @@ where
 	let context = create_unfunded_lock::<T>(seed_hint)?;
 	fund_lock_with_utxos::<T>(&context, 1, 10_000u32.saturating_add(seed_hint as u32))?;
 	Ok(context)
+}
+
+/// Saturate the decoded Lock collections used by provider reads and guarantee merging.
+fn fill_lock_collections<T: Config>(lock: &mut LockedBitcoin<T>) {
+	let count = T::MaxUtxosPerLock::get();
+	lock.funding_utxos.clear();
+	let per_utxo = lock.funded_satoshis / u64::from(count);
+	for i in 0..count {
+		let amount =
+			if i + 1 == count { lock.funded_satoshis - per_utxo * u64::from(i) } else { per_utxo };
+		lock.funding_utxos.try_insert(benchmark_utxo_ref(i), amount).unwrap();
+	}
+	let held: u128 = lock.cosigner_guarantee.guaranteed_microgons.into();
+	let per_hold = held / u128::from(MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES);
+	for height in 1..=MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES {
+		lock.cosigner_guarantee
+			.fund_hold_extensions
+			.try_insert(lock.vault_claim_height + u64::from(height), per_hold.into())
+			.unwrap();
+	}
 }
 
 fn fund_lock_with_utxos<T>(

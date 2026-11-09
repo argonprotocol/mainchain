@@ -40,6 +40,7 @@ pub trait BitcoinVaultProviderWeightInfo {
 	fn burn_encumbered_argonots() -> Weight;
 	fn account_became_operational() -> Weight;
 	fn set_bitcoin_lock_flexible() -> Weight;
+	fn record_bitcoin_lock_funding() -> Weight;
 	fn reserve_securitization() -> Weight;
 	fn resecuritize() -> Weight;
 	fn burn() -> Weight;
@@ -78,6 +79,9 @@ impl BitcoinVaultProviderWeightInfo for () {
 	}
 
 	fn set_bitcoin_lock_flexible() -> Weight {
+		Weight::zero()
+	}
+	fn record_bitcoin_lock_funding() -> Weight {
 		Weight::zero()
 	}
 

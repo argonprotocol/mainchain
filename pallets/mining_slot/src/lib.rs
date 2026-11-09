@@ -2127,6 +2127,8 @@ impl<T: Config> MiningFrameProvider for Pallet<T> {
 }
 
 impl<T: Config> MiningFrameTransitionProvider for Pallet<T> {
+	type Weights = crate::weights::ProviderWeightAdapter<T>;
+
 	fn is_new_frame_started() -> Option<FrameId> {
 		Self::get_newly_started_frame()
 	}

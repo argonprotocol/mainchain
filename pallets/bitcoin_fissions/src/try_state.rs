@@ -1,9 +1,12 @@
 use crate::{
-	pallet::STORAGE_VERSION, Config, FissionByOwnerAndId, FissionIdsByLockId, NextFissionIdByOwner,
-	Pallet,
+	pallet::STORAGE_VERSION, Config, FissionByOwnerAndId, FissionIdsByLockId,
+	FissionIdsByOwnerAndLiquid, LiquidTicksByOwnerAndId, NextFissionIdByOwner, Pallet,
 };
 use alloc::collections::{BTreeMap, BTreeSet};
-use argon_primitives::{bitcoin::BitcoinLockId, treasury::TreasuryPositionProvider};
+use argon_primitives::{
+	bitcoin::{BitcoinLockId, LiquidId},
+	treasury::TreasuryPositionProvider,
+};
 use pallet_prelude::*;
 
 pub(crate) fn check<T: Config>() -> Result<(), sp_runtime::TryRuntimeError> {
@@ -12,6 +15,7 @@ pub(crate) fn check<T: Config>() -> Result<(), sp_runtime::TryRuntimeError> {
 		"Bitcoin Fissions storage must be migrated before checking its state"
 	);
 
+	let mut ids_by_liquid = BTreeMap::<(T::AccountId, LiquidId), BTreeSet<_>>::new();
 	let mut ids_by_lock = BTreeMap::<BitcoinLockId, BTreeSet<_>>::new();
 	let mut liquidity_by_owner = BTreeMap::<T::AccountId, T::Balance>::new();
 	let mut total_liquidity = T::Balance::zero();
@@ -40,6 +44,12 @@ pub(crate) fn check<T: Config>() -> Result<(), sp_runtime::TryRuntimeError> {
 			ids_by_lock.entry(fission.lock_id).or_default().insert(fission_id),
 			"Source Lock has duplicate owner-scoped Fission IDs"
 		);
+		let liquid_ids = ids_by_liquid.entry((owner.clone(), fission.liquid_id)).or_default();
+		liquid_ids.insert(fission_id);
+		ensure!(
+			liquid_ids.len() <= T::MaxExpectedFissionsPerLiquid::get() as usize,
+			"Liquid Fission count exceeds repayment benchmark coverage"
+		);
 		let liquidity = liquidity_by_owner.entry(owner).or_default();
 		*liquidity = liquidity
 			.checked_add(&fission.liquidity_promised)
@@ -58,6 +68,24 @@ pub(crate) fn check<T: Config>() -> Result<(), sp_runtime::TryRuntimeError> {
 		);
 	}
 	ensure!(ids_by_lock.is_empty(), "Active Fission is missing its Lock index");
+
+	for (owner, liquid) in ids_by_liquid.keys() {
+		ensure!(
+			LiquidTicksByOwnerAndId::<T>::contains_key(owner, liquid),
+			"Active Liquid is missing its creation and ratchet timing"
+		);
+	}
+
+	for ((owner, liquid), id, ()) in FissionIdsByOwnerAndLiquid::<T>::iter() {
+		let ids = ids_by_liquid
+			.get_mut(&(owner, liquid))
+			.ok_or("Liquid Fission index disagrees with its active records")?;
+		ensure!(ids.remove(&id), "Liquid Fission index disagrees with its active records");
+	}
+	ensure!(
+		ids_by_liquid.values().all(BTreeSet::is_empty),
+		"Active Fission is missing its Liquid index"
+	);
 
 	for (owner, liquidity) in liquidity_by_owner {
 		ensure!(
@@ -81,6 +109,27 @@ mod tests {
 	use pallet_treasury_positions::{NetworkTotals, PositionsByAccount};
 
 	#[test]
+	fn reports_liquids_above_the_benchmark_expectation_without_blocking_creation() {
+		new_test_ext().execute_with(|| {
+			STORAGE_VERSION.put::<BitcoinFissions>();
+			MockLocks::insert(1, lock(1, 100));
+			MockLocks::insert(2, lock(1, 100));
+			assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 0, 77, 1, 10, 90, None));
+			assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 1, 77, 1, 10, 90, None));
+			assert_ok!(BitcoinFissions::try_state(1));
+			assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 2, 77, 2, 10, 90, None));
+			assert_eq!(
+				BitcoinFissions::try_state(1),
+				Err(DispatchError::Other(
+					"Liquid Fission count exceeds repayment benchmark coverage"
+				))
+			);
+			assert_ok!(BitcoinFissions::close(RuntimeOrigin::signed(1), 2));
+			assert_ok!(BitcoinFissions::try_state(1));
+		});
+	}
+
+	#[test]
 	fn accepts_owner_scoped_ids_and_closed_fission_mint_entitlements() {
 		new_test_ext().execute_with(|| {
 			STORAGE_VERSION.put::<BitcoinFissions>();
@@ -102,6 +151,15 @@ mod tests {
 			STORAGE_VERSION.put::<BitcoinFissions>();
 			MockLocks::insert(1, lock(1, 100));
 			assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 0, 77, 1, 20, 90, None));
+			let ticks = LiquidTicksByOwnerAndId::<Test>::take(1, 77).unwrap();
+			assert_eq!(
+				BitcoinFissions::try_state(1),
+				Err(DispatchError::Other(
+					"Active Liquid is missing its creation and ratchet timing"
+				))
+			);
+			LiquidTicksByOwnerAndId::<Test>::insert(1, 77, ticks);
+
 			let ids = FissionIdsByLockId::<Test>::take(1);
 			assert_eq!(
 				BitcoinFissions::try_state(1),
@@ -118,6 +176,18 @@ mod tests {
 			FissionIdsByLockId::<Test>::mutate(1, |ids| {
 				ids.remove(&1);
 			});
+			FissionIdsByOwnerAndLiquid::<Test>::remove((1, 77), 0);
+			assert_eq!(
+				BitcoinFissions::try_state(1),
+				Err(DispatchError::Other("Active Fission is missing its Liquid index"))
+			);
+			FissionIdsByOwnerAndLiquid::<Test>::insert((1, 77), 0, ());
+			FissionIdsByOwnerAndLiquid::<Test>::insert((1, 77), 1, ());
+			assert_eq!(
+				BitcoinFissions::try_state(1),
+				Err(DispatchError::Other("Liquid Fission index disagrees with its active records"))
+			);
+			FissionIdsByOwnerAndLiquid::<Test>::remove((1, 77), 1);
 			NextFissionIdByOwner::<Test>::insert(1, 0);
 			assert_eq!(
 				BitcoinFissions::try_state(1),

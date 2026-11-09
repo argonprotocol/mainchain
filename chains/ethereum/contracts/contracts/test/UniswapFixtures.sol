@@ -2,6 +2,7 @@
 pragma solidity ^0.8.24;
 
 import {ERC20} from "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import {ERC20Permit} from "@openzeppelin/contracts/token/ERC20/extensions/ERC20Permit.sol";
 
 contract TestArgon is ERC20 {
 	constructor() ERC20("Test Argon", "ARGN") {
@@ -9,14 +10,14 @@ contract TestArgon is ERC20 {
 	}
 }
 
-contract TestUSDC is ERC20 {
+contract TestUSDC is ERC20Permit {
 	error ReentrySucceeded();
 
 	address public reentryTarget;
 	bytes4 public reentryError;
 	bytes private _reentryCallData;
 
-	constructor() ERC20("Test USDC", "USDC") {
+	constructor() ERC20("Test USDC", "USDC") ERC20Permit("Test USDC") {
 		_mint(msg.sender, 1_000_000e6);
 	}
 

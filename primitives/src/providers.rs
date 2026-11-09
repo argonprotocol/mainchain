@@ -3,15 +3,15 @@ use polkadot_sdk::*;
 
 use super::{
 	bitcoin::{
-		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinLockId, FissionId, Satoshis, UtxoRef,
-		SATOSHIS_PER_BITCOIN,
+		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinLockId, FissionId, LiquidId,
+		LiquidRepayPrices, Satoshis, UtxoRef, SATOSHIS_PER_BITCOIN,
 	},
 	block_seal::{BlockPayout, FrameId, MiningAuthority},
 	inherents::BlockSealInherent,
 	tick::{Tick, Ticker},
 	BlockSealAuthorityId, ComputeDifficulty, Moment, NotaryId, NotebookHeader, NotebookNumber,
-	NotebookSecret, PriceIndex, TransferToLocalchainId, VaultId, VoteMinimum, VotingSchedule,
-	MICROGONS_PER_ARGON,
+	NotebookSecret, PriceIndex, RValueHighWaterMark, TransferToLocalchainId, VaultId, VoteMinimum,
+	VotingSchedule, MICROGONS_PER_ARGON,
 };
 use codec::{Codec, Decode, DecodeWithMemTracking, Encode, FullCodec, HasCompact, MaxEncodedLen};
 use polkadot_sdk::{frame_support::weights::Weight, sp_runtime::Permill};
@@ -30,6 +30,7 @@ use super::{
 		EthereumAccountStorageProof, EthereumBlockNumber, EthereumReceiptLogProofBatch,
 		EthereumVerifyError, UniswapPurchase,
 	},
+	gateway::{GatewayState, SourceChain},
 	vault::{BitcoinSecuritizationBasis, CosignerGuarantee},
 };
 
@@ -180,12 +181,20 @@ impl OperationalRewardsProviderWeightInfo for () {
 }
 
 pub trait BitcoinUtxoTrackerWeightInfo {
+	fn get_block_height_change() -> Weight;
+	fn get_confirmed_height() -> Weight;
 	fn watch_for_utxo() -> Weight;
 	fn unwatch_utxo() -> Weight;
 	fn unwatch() -> Weight;
 }
 
 impl BitcoinUtxoTrackerWeightInfo for () {
+	fn get_block_height_change() -> Weight {
+		Weight::zero()
+	}
+	fn get_confirmed_height() -> Weight {
+		Weight::zero()
+	}
 	fn watch_for_utxo() -> Weight {
 		Weight::zero()
 	}
@@ -229,6 +238,31 @@ impl BitcoinFissionMintingWeightInfo for () {
 	}
 }
 
+pub trait CrosschainGatewayProviderWeightInfo {
+	fn last_state_by_chain() -> Weight;
+}
+
+impl CrosschainGatewayProviderWeightInfo for () {
+	fn last_state_by_chain() -> Weight {
+		Weight::zero()
+	}
+}
+
+/// The gateway owns proof progress; consumers choose how much source history they retain.
+pub trait CrosschainGatewayProvider<Balance> {
+	type Weights: CrosschainGatewayProviderWeightInfo;
+
+	fn last_state_by_chain(source_chain: SourceChain) -> Option<GatewayState<Balance>>;
+}
+
+impl<Balance> CrosschainGatewayProvider<Balance> for () {
+	type Weights = ();
+
+	fn last_state_by_chain(_source_chain: SourceChain) -> Option<GatewayState<Balance>> {
+		None
+	}
+}
+
 pub trait UniswapTransferProviderWeightInfo {
 	fn is_crosschain_activated() -> Weight;
 
@@ -267,13 +301,60 @@ impl<AccountId> UniswapTransferProvider<AccountId> for () {
 	}
 }
 
+pub trait LiquidRepaymentProviderWeightInfo {
+	fn has_pending_repayment() -> Weight;
+	fn oldest_pending_purchase_tick() -> Weight;
+}
+
+impl LiquidRepaymentProviderWeightInfo for () {
+	fn oldest_pending_purchase_tick() -> Weight {
+		Weight::zero()
+	}
+	fn has_pending_repayment() -> Weight {
+		Weight::zero()
+	}
+}
+
+/// Purchase commitments remain pending until their held principal settles successfully.
+pub trait LiquidRepaymentProvider<AccountId> {
+	type Weights: LiquidRepaymentProviderWeightInfo;
+
+	/// Whether this owner's Liquid has any unsettled repayment purchases.
+	fn has_pending_repayment(account: &AccountId, liquid_id: LiquidId) -> bool;
+
+	/// Earliest purchase tick whose recovery window still needs shared price history.
+	fn oldest_pending_purchase_tick() -> Option<Tick> {
+		None
+	}
+}
+
+impl<AccountId> LiquidRepaymentProvider<AccountId> for () {
+	type Weights = ();
+
+	fn has_pending_repayment(_account: &AccountId, _liquid_id: LiquidId) -> bool {
+		false
+	}
+}
+
 pub trait BitcoinFissionsProviderWeightInfo {
+	fn has_repayment_window() -> Weight;
+	fn next_r_value_high_water() -> Weight;
+	fn repay_liquid(_burn_callback_weight: Weight) -> Weight;
 	fn get_account_fission_liquidity() -> Weight;
 	fn get_lock_fission_guarantees() -> Weight;
 	fn close_for_lock() -> Weight;
 }
 
 impl BitcoinFissionsProviderWeightInfo for () {
+	fn has_repayment_window() -> Weight {
+		Weight::zero()
+	}
+	fn next_r_value_high_water() -> Weight {
+		Weight::zero()
+	}
+	fn repay_liquid(_burn_callback_weight: Weight) -> Weight {
+		Weight::zero()
+	}
 	fn get_account_fission_liquidity() -> Weight {
 		Weight::zero()
 	}
@@ -288,6 +369,38 @@ impl BitcoinFissionsProviderWeightInfo for () {
 }
 
 pub trait BitcoinFissionsProvider<AccountId, Balance> {
+	/// Checks that the Liquid has active Fissions, its creation and latest ratchet precede the
+	/// purchase by more than one tick, and all source Locks outlive the hold and release notice.
+	/// Creation timing is unavailable for Liquids migrated before this tracking was introduced.
+	fn is_liquid_repayment_valid(
+		_account: &AccountId,
+		_liquid_id: LiquidId,
+		_purchase_tick: Tick,
+		_hold_frames: FrameId,
+	) -> bool {
+		false
+	}
+
+	/// First retained frame at or after `from_frame`, without loading the complete history.
+	fn next_r_value_high_water(_from_frame: FrameId) -> Option<(FrameId, RValueHighWaterMark)> {
+		None
+	}
+
+	/// Select Bitcoin against the captured purchase commitment, then return the recovery-adjusted
+	/// microgons burned for that same Bitcoin. Purchase-time prices are required.
+	/// The caller owns the storage transaction and supplies funding through `burn_callback`.
+	/// Invoke `burn_callback` once for the aggregate amount. A Liquid with no remaining Fissions
+	/// returns zero. Propagate failures to that boundary so all repayment and funding effects roll
+	/// back together.
+	fn repay_liquid<BurnCallback: FnMut(Balance) -> DispatchResult>(
+		_account: &AccountId,
+		_liquid_id: LiquidId,
+		_budget: Balance,
+		_prices: LiquidRepayPrices,
+		_burn_callback: BurnCallback,
+	) -> Result<Balance, DispatchError> {
+		Err(DispatchError::Other("Liquid repayment unavailable"))
+	}
 	type Weights: BitcoinFissionsProviderWeightInfo;
 
 	fn get_account_fission_liquidity(_account_id: &AccountId) -> Balance;
@@ -355,6 +468,9 @@ pub enum BitcoinFissionLockError {
 }
 
 pub trait BitcoinFissionLockProviderWeightInfo {
+	fn has_repayment_window() -> Weight;
+	fn get_lock_expiration() -> Weight;
+	fn calculate_redemption_amount() -> Weight;
 	fn fission_satoshis() -> Weight;
 	fn update_fission_guarantee() -> Weight;
 	fn calculate_liquidity_promised() -> Weight;
@@ -362,6 +478,15 @@ pub trait BitcoinFissionLockProviderWeightInfo {
 }
 
 impl BitcoinFissionLockProviderWeightInfo for () {
+	fn has_repayment_window() -> Weight {
+		Weight::zero()
+	}
+	fn calculate_redemption_amount() -> Weight {
+		Weight::zero()
+	}
+	fn get_lock_expiration() -> Weight {
+		Weight::zero()
+	}
 	fn fission_satoshis() -> Weight {
 		Weight::zero()
 	}
@@ -401,7 +526,7 @@ pub trait BitcoinFissionLockProvider<AccountId, Balance: Codec + MaxEncodedLen> 
 		satoshis: Satoshis,
 		guarantee: &mut CosignerGuarantee<Balance>,
 		microgons_at_target_per_btc: Balance,
-		minimum_last_ratchet_tick: Tick,
+		minimum_last_ratchet_price_tick: Tick,
 		fee_coupon: Option<Self::FeeCoupon>,
 	) -> Result<Tick, BitcoinFissionLockError>;
 
@@ -411,14 +536,34 @@ pub trait BitcoinFissionLockProvider<AccountId, Balance: Codec + MaxEncodedLen> 
 		microgons_at_target_per_btc: Balance,
 	) -> Result<Balance, BitcoinFissionLockError>;
 
-	/// Return a Fission's Bitcoin and guarantee to its Lock and calculate the redemption amount.
+	/// Whether the Lock outlives the purchase hold plus its required release-notice window.
+	/// Use current confirmed Bitcoin height; an unknown/missing Lock or tip is ineligible.
+	fn can_repay_before_expiry(_lock_id: BitcoinLockId, _hold_frames: FrameId) -> bool {
+		false
+	}
+
+	/// Vault claim height determining repayment priority for an existing Lock.
+	fn get_lock_expiration(
+		_lock_id: BitcoinLockId,
+	) -> Result<BitcoinHeight, BitcoinFissionLockError> {
+		Err(BitcoinFissionLockError::LockNotFound)
+	}
+
+	/// Current redemption quote for the requested Bitcoin allocation and its original price cap.
+	fn calculate_redemption_amount(
+		_satoshis: Satoshis,
+		_microgons_at_target_per_btc: Balance,
+	) -> Result<Balance, BitcoinFissionLockError> {
+		Err(BitcoinFissionLockError::NoBitcoinPricesAvailable)
+	}
+
+	/// Return a Fission's Bitcoin and guarantee to its Lock. The caller owns pricing and burn.
 	fn fuse_satoshis(
 		account_id: &AccountId,
 		lock_id: BitcoinLockId,
 		satoshis: Satoshis,
 		guarantee: CosignerGuarantee<Balance>,
-		microgons_at_target_per_btc: Balance,
-	) -> Result<Balance, BitcoinFissionLockError>;
+	) -> Result<(), BitcoinFissionLockError>;
 }
 
 impl<AccountId, Balance: Codec + MaxEncodedLen> BitcoinFissionLockProvider<AccountId, Balance>
@@ -443,7 +588,7 @@ impl<AccountId, Balance: Codec + MaxEncodedLen> BitcoinFissionLockProvider<Accou
 		_satoshis: Satoshis,
 		_guarantee: &mut CosignerGuarantee<Balance>,
 		_microgons_at_target_per_btc: Balance,
-		_minimum_last_ratchet_tick: Tick,
+		_minimum_last_ratchet_price_tick: Tick,
 		_fee_coupon: Option<Self::FeeCoupon>,
 	) -> Result<Tick, BitcoinFissionLockError> {
 		Err(BitcoinFissionLockError::LockNotFound)
@@ -461,8 +606,7 @@ impl<AccountId, Balance: Codec + MaxEncodedLen> BitcoinFissionLockProvider<Accou
 		_lock_id: BitcoinLockId,
 		_satoshis: Satoshis,
 		_guarantee: CosignerGuarantee<Balance>,
-		_microgons_at_target_per_btc: Balance,
-	) -> Result<Balance, BitcoinFissionLockError> {
+	) -> Result<(), BitcoinFissionLockError> {
 		Err(BitcoinFissionLockError::LockNotFound)
 	}
 }
@@ -556,7 +700,7 @@ pub trait EthereumVerifyProvider {
 	fn verify_account_storage_proof<MaxStorageSlots>(
 		account_address: H160,
 		proof: &EthereumAccountStorageProof<MaxStorageSlots>,
-	) -> Result<(), EthereumVerifyError>
+	) -> Result<Moment, EthereumVerifyError>
 	where
 		MaxStorageSlots: Get<u32>;
 
@@ -580,7 +724,7 @@ impl EthereumVerifyProvider for () {
 	fn verify_account_storage_proof<MaxStorageSlots>(
 		_account_address: H160,
 		_proof: &EthereumAccountStorageProof<MaxStorageSlots>,
-	) -> Result<(), EthereumVerifyError>
+	) -> Result<Moment, EthereumVerifyError>
 	where
 		MaxStorageSlots: Get<u32>,
 	{
@@ -659,16 +803,19 @@ pub trait TreasuryPoolProvider<AccountId> {
 	fn active_vault_bond_amount(vault_id: VaultId, account_id: &AccountId) -> Self::Balance;
 	/// The account's active non-releasing vault bond amount across all vaults.
 	fn active_account_vault_bond_amount(account_id: &AccountId) -> Self::Balance;
+	/// Reserve existing held backing immediately, before it can authorize gateway issuance.
 	fn encumber_bond_microgons(
 		account_id: &AccountId,
 		microgon_amount: Self::Balance,
 	) -> DispatchResult;
+	/// Queue an encumbrance release. Success accepts the request; funds stay encumbered until
+	/// Treasury processes it under its block settlement limit.
 	fn release_encumbered_bond_microgons(
 		account_id: &AccountId,
 		microgon_amount: Self::Balance,
 	) -> DispatchResult;
-	/// Run in the caller's storage layer so currency, lot and position changes roll back together
-	/// if any part of the burn fails.
+	/// Queue a burn against reserved backing. Currency, lots and positions change atomically
+	/// when Treasury processes the request; pending bonds retain their existing payout terms.
 	fn burn_encumbered_bond_microgons(
 		account_id: &AccountId,
 		microgon_amount: Self::Balance,
@@ -828,7 +975,7 @@ pub trait PriceIndexUpdated {
 	fn on_price_index_weight() -> Weight;
 }
 
-#[impl_trait_for_tuples::impl_for_tuples(0, 2)]
+#[impl_trait_for_tuples::impl_for_tuples(0, 3)]
 impl PriceIndexUpdated for Tuple {
 	fn on_price_index(index: &PriceIndex) {
 		for_tuples!( #( Tuple::on_price_index(index); )* );
@@ -842,7 +989,8 @@ impl PriceIndexUpdated for Tuple {
 	}
 }
 
-/// Records authenticated purchases after the gateway has delivered the principal.
+/// Records authenticated purchases after gateway delivery. The caller rolls back admission on
+/// error while preserving delivery; the funds stay spendable without rewards or a repayment hold.
 pub trait UniswapPurchaseProvider<AccountId> {
 	type Weights: UniswapPurchaseProviderWeightInfo;
 	fn record_transferred_purchase(
@@ -869,6 +1017,8 @@ impl UniswapPurchaseProviderWeightInfo for () {
 }
 
 pub trait PriceProviderWeightInfo {
+	/// Current BTC, target ARGON and redemption R-value lookups used by a redemption quote.
+	fn get_redemption_prices() -> Weight;
 	fn get_lowest_microgons_per_argonot() -> Weight;
 	fn get_average_microgons_per_argonot() -> Weight;
 	fn get_ethereum_prices() -> Weight;
@@ -876,6 +1026,9 @@ pub trait PriceProviderWeightInfo {
 }
 
 impl PriceProviderWeightInfo for () {
+	fn get_redemption_prices() -> Weight {
+		Weight::zero()
+	}
 	fn get_lowest_microgons_per_argonot() -> Weight {
 		Weight::zero()
 	}
@@ -1003,6 +1156,12 @@ pub trait PriceProvider<
 
 pub trait BitcoinUtxoTracker {
 	type Weights: BitcoinUtxoTrackerWeightInfo;
+
+	/// Latest confirmed Bitcoin tip, even if its watched UTXO changes are not yet processed.
+	/// None means a claim-deadline safety check cannot establish remaining Bitcoin time.
+	fn get_confirmed_height() -> Option<BitcoinHeight> {
+		None
+	}
 
 	/// Highest Bitcoin block whose UTXO changes have been processed by the tracker.
 	fn get_synched_height() -> BitcoinHeight;
@@ -1321,7 +1480,23 @@ pub trait BlockRewardAccountsProvider<AccountId: FullCodec> {
 	fn is_compute_block_eligible_for_rewards() -> bool;
 }
 
+pub trait MiningFrameTransitionProviderWeightInfo {
+	fn is_new_frame_started() -> Weight;
+	fn get_current_frame_id() -> Weight;
+}
+
+impl MiningFrameTransitionProviderWeightInfo for () {
+	fn is_new_frame_started() -> Weight {
+		Weight::zero()
+	}
+	fn get_current_frame_id() -> Weight {
+		Weight::zero()
+	}
+}
+
 pub trait MiningFrameTransitionProvider {
+	type Weights: MiningFrameTransitionProviderWeightInfo;
+
 	fn is_new_frame_started() -> Option<FrameId>;
 	fn get_current_frame_id() -> FrameId;
 }

@@ -1,4 +1,4 @@
-use crate::{tick::Tick, Balance};
+use crate::{bitcoin::LiquidId, tick::Tick, Balance};
 use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use frame_support::{CloneNoBound, DebugNoBound, EqNoBound, PartialEqNoBound};
 use polkadot_sdk::*;
@@ -17,6 +17,10 @@ use sp_runtime::{
 	Encode, Decode, DecodeWithMemTracking, Clone, Debug, PartialEq, Eq, TypeInfo, MaxEncodedLen,
 )]
 pub struct UniswapPurchase {
+	/// Authenticated position in the Ethereum gateway activity stream.
+	pub gateway_activity_nonce: u64,
+	/// Nonzero Liquid selected at purchase time; None means an ordinary buy.
+	pub repay_liquid_id: Option<LiquidId>,
 	/// Ethereum execution chain ID; scoped together with the pool manager and pool ID.
 	pub chain_id: u64,
 	/// Uniswap v4 PoolManager contract that executed the authenticated swap.

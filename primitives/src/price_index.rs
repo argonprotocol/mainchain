@@ -47,6 +47,29 @@ pub struct PriceIndex {
 	pub stabilizer_pool_sqrt_price_x96: Option<U256>,
 }
 
+/// A frame's R-value maximum and its actual closing tick, used for sync-aligned retention.
+#[derive(
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	Clone,
+	Copy,
+	Debug,
+	PartialEq,
+	Eq,
+	TypeInfo,
+	MaxEncodedLen,
+)]
+pub struct RValueHighWaterMark {
+	/// Highest accepted ARGON market-to-target ratio observed in this frame.
+	pub r_value: FixedU128,
+	/// Earliest oracle observation tick contributing to this frame.
+	pub first_tick: Tick,
+	/// Closing tick of the frame; None while open. Sync must pass this tick before pruning,
+	/// because multiple Argon blocks and a frame transition can share one tick.
+	pub end_tick: Option<Tick>,
+}
+
 impl PriceIndex {
 	/// Read either supported wire layout during an oracle/runtime upgrade.
 	pub fn decode_compatible(bytes: &[u8]) -> Result<Self, codec::Error> {

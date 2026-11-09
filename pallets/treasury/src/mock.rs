@@ -1,9 +1,11 @@
 use crate as pallet_treasury;
 use argon_primitives::{
 	providers::BitcoinMintedProvider,
+	tick::Ticker,
 	vault::{TreasuryVaultProvider, VaultError, VaultParticipationCapacity, VaultSecuritization},
-	ArgonCPI, BlockRewardAccountsProvider, MiningFrameProvider, OperationalAccountsHook,
-	PriceProvider, TreasuryPoolProvider, MICROGONS_PER_ARGON,
+	ArgonCPI, BlockRewardAccountsProvider, CrosschainGatewayProvider, GatewayState,
+	MiningFrameProvider, OperationalAccountsHook, PriceProvider, SourceChain, TickProvider,
+	TreasuryPoolProvider, VotingSchedule, MICROGONS_PER_ARGON,
 };
 use frame_support::traits::{Currency, StorageMapShim};
 use pallet_prelude::{
@@ -53,6 +55,8 @@ impl frame_system::Config for Test {
 }
 
 parameter_types! {
+	pub static LastGatewayState: Option<GatewayState<u128>> = None;
+	pub HistoryTicker: Ticker = Ticker::new(1_000, 2);
 	pub const BidIncrements: u128 = 10_000; // 1 cent
 
 	pub static ExistentialDeposit: Balance = 1;
@@ -151,6 +155,8 @@ parameter_types! {
 	pub static MinimumArgonsPerContributor: u128 = 100_000_000;
 	pub static MaxActiveArgonotBondLots: u32 = 1_000;
 	pub static MaxArgonBondLots: u32 = 15_000;
+	pub static MaxExpectedBondLotsPerAccount: u32 = 100;
+	pub static MaxBondCollateralSettlementsPerBlock: u32 = 2;
 	pub static MaxVaultsPerPool: u32 = 100;
 	pub static MaxPendingUnlocksPerFrame: u32 = 100;
 	pub static TreasuryExitDelayFrames: FrameId = 10;
@@ -381,6 +387,8 @@ impl PriceProvider<Balance> for StaticPriceProvider {
 
 pub struct StaticMiningFrameTransitionProvider;
 impl MiningFrameTransitionProvider for StaticMiningFrameTransitionProvider {
+	type Weights = ();
+
 	fn get_current_frame_id() -> FrameId {
 		CurrentFrameId::get()
 	}
@@ -432,6 +440,7 @@ impl pallet_mint::Config for Test {
 parameter_types! {
 	pub static PurchaseTick: Tick = 1;
 	pub const PurchaseInclusionPercent: Percent = Percent::from_percent(90);
+	pub const PurchaseRepaymentRewardPercent: Percent = Percent::from_percent(5);
 	pub const BitcoinMintPayoutPercentPerFrame: Percent = Percent::from_percent(10);
 	pub PurchasePool: pallet_stabilizer_buys::PurchasePool = pallet_stabilizer_buys::PurchasePool {
 		chain_id: 1,
@@ -444,52 +453,22 @@ parameter_types! {
 
 impl pallet_stabilizer_buys::Config for Test {
 	type Currency = Balances;
+	type FissionsProvider = ();
 	type MiningFrameTransitionProvider = StaticMiningFrameTransitionProvider;
-	type CurrentTick = PurchaseTick;
-	type MaxRecentPriceTicks = ConstU32<360>;
-	type PriceHistoryBucketTicks = ConstU64<60>;
-	type MaxHourlyPriceReferences = ConstU32<720>;
-	type MaxCurrentHourPriceAgeTicks = ConstU64<10>;
+	type TickProvider = PurchaseTick;
+	type CrosschainGatewayProvider = Test;
+	type MaxPriceAgeTicks = ConstU64<10>;
+	type MaxPriceHistoryPrunesPerBlock = ConstU32<16>;
+	type MaxPriceWindowSteps = ConstU32<64>;
 	type TreasuryRewardProvider = Treasury;
-	type MaxPrincipalPayouts = ConstU32<16>;
+	type MaxFramesPerPayout = ConstU32<16>;
 	type MaxPayoutsPerBlock = ConstU32<2>;
 	type MaxPositiveBids = ConstU8<4>;
 	type AuctionInclusionPercent = PurchaseInclusionPercent;
-	type RewardMaturityTicks = ConstU64<10>;
-	type WeightInfo = Test;
-}
-
-impl pallet_stabilizer_buys::WeightInfo for Test {
-	fn record_prices() -> Weight {
-		Weight::zero()
-	}
-	fn record_purchase() -> Weight {
-		Weight::zero()
-	}
-	fn record_purchase_first_hold() -> Weight {
-		Weight::zero()
-	}
-	fn bid() -> Weight {
-		Weight::zero()
-	}
-	fn process_payouts_failed(_: u32) -> Weight {
-		Weight::zero()
-	}
-	fn process_payouts(_: u32) -> Weight {
-		Weight::zero()
-	}
-	fn process_auctions(_: u32) -> Weight {
-		Weight::zero()
-	}
-	fn set_approved_pool() -> Weight {
-		Weight::zero()
-	}
-	fn set_matching_rate() -> Weight {
-		Weight::zero()
-	}
-	fn on_frame_start() -> Weight {
-		Weight::zero()
-	}
+	type PurchaseHoldFrames = ConstU64<30>;
+	type LiquidRepaymentRewardPercent = PurchaseRepaymentRewardPercent;
+	type MaxLiquidRepaysPerBlock = ConstU32<1>;
+	type WeightInfo = ();
 }
 
 impl pallet_treasury::Config for Test {
@@ -510,6 +489,8 @@ impl pallet_treasury::Config for Test {
 	type MinimumArgonsPerContributor = MinimumArgonsPerContributor;
 	type MaxActiveArgonotBondLots = MaxActiveArgonotBondLots;
 	type MaxArgonBondLots = MaxArgonBondLots;
+	type MaxExpectedBondLotsPerAccount = MaxExpectedBondLotsPerAccount;
+	type MaxBondCollateralSettlementsPerBlock = MaxBondCollateralSettlementsPerBlock;
 	type MaxArgonotBondedPercentOfCirculation = MaxArgonotBondedPercentOfCirculation;
 	type PalletId = VaultPalletId;
 	type MiningBidPoolAccount = BidPoolAccountId;
@@ -562,5 +543,47 @@ impl argon_primitives::OperationalAccountProvider<TestAccountId> for MockUpstrea
 	}
 	fn upstream_vault(account: &TestAccountId) -> Option<(TestAccountId, VaultId)> {
 		Upstreams::get().get(account).cloned()
+	}
+}
+
+impl CrosschainGatewayProvider<u128> for Test {
+	type Weights = ();
+
+	fn last_state_by_chain(_source_chain: SourceChain) -> Option<GatewayState<u128>> {
+		LastGatewayState::get()
+	}
+}
+
+impl TickProvider<Block> for PurchaseTick {
+	type Weights = ();
+	fn current_tick() -> Tick {
+		PurchaseTick::get()
+	}
+	fn previous_tick() -> Tick {
+		PurchaseTick::get().saturating_sub(1)
+	}
+	fn elapsed_ticks() -> Tick {
+		PurchaseTick::get()
+	}
+	fn voting_schedule() -> VotingSchedule {
+		VotingSchedule::from_runtime_current_tick(PurchaseTick::get())
+	}
+	fn ticker() -> Ticker {
+		HistoryTicker::get()
+	}
+	fn blocks_at_tick(_tick: Tick) -> Vec<H256> {
+		Vec::new()
+	}
+}
+
+pub fn test_vault(account_id: u64, securitization: u64) -> TestVault {
+	TestVault {
+		account_id: account_id_from_seed(account_id),
+		securitization: securitization as Balance,
+		exit_notice_amount: 0,
+		committed_microgons: 0,
+		activated_securitization: 0,
+		delegate_account_id: None,
+		is_closed: false,
 	}
 }

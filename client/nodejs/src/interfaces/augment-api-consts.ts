@@ -52,13 +52,25 @@ declare module '@polkadot/api-base/types/consts' {
     };
     bitcoinFissions: {
       /**
+       * Fissions per Liquid covered by repayment benchmarks and checked by try-state.
+       **/
+      maxExpectedFissionsPerLiquid: u32 & AugmentedConst<ApiType>;
+      /**
        * Maximum number of active Fissions that may allocate satoshis from one Lock.
        **/
       maxFissionsPerLock: u32 & AugmentedConst<ApiType>;
       /**
+       * Maximum older frame records pruned in one block after gateway sync catches up.
+       **/
+      maxRValueHistoryPrunesPerBlock: u32 & AugmentedConst<ApiType>;
+      /**
        * Minimum percentage change required to ratchet a Fission.
        **/
       minimumRatchetPercent: Percent & AugmentedConst<ApiType>;
+      /**
+       * Number of recent frame high-water marks retained after their source interval has synced.
+       **/
+      rValueHistoryFrames: u32 & AugmentedConst<ApiType>;
     };
     bitcoinLocks: {
       /**
@@ -548,13 +560,18 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       auctionInclusionPercent: Percent & AugmentedConst<ApiType>;
       /**
-       * In the open bucket, allow USDC observations up to ten ticks before the purchase.
+       * Additional burn-funded reward before applying the purchase's auction result.
        **/
-      maxCurrentHourPriceAgeTicks: u64 & AugmentedConst<ApiType>;
+      liquidRepaymentRewardPercent: Percent & AugmentedConst<ApiType>;
       /**
-       * Maximum hourly reference buckets retained; configure 720.
+       * Maximum account/frame purchase buckets visited in one account payout.
+       * This bounds work, without limiting the number of purchases an account can hold.
        **/
-      maxHourlyPriceReferences: u32 & AugmentedConst<ApiType>;
+      maxFramesPerPayout: u32 & AugmentedConst<ApiType>;
+      /**
+       * Maximum Liquid repayments attempted across all account payouts in one block.
+       **/
+      maxLiquidRepaysPerBlock: u32 & AugmentedConst<ApiType>;
       /**
        * Maximum work in each automatic stage per block: ranked bid decisions, then account
        * payout attempts. Failures and empty-auction completion consume work; excess stays
@@ -567,22 +584,21 @@ declare module '@polkadot/api-base/types/consts' {
        **/
       maxPositiveBids: u8 & AugmentedConst<ApiType>;
       /**
-       * Maximum mature principal buckets released in one account payout visit.
-       * This bounds work, without limiting the number of purchases an account can hold.
+       * Maximum observation age at purchase time; also bounds historical lookup reads.
        **/
-      maxPrincipalPayouts: u32 & AugmentedConst<ApiType>;
+      maxPriceAgeTicks: u64 & AugmentedConst<ApiType>;
       /**
-       * Most recent tick observations retained for exact ARGON targets; configure 360.
+       * Maximum obsolete price entries removed per block after gateway sync advances.
        **/
-      maxRecentPriceTicks: u32 & AugmentedConst<ApiType>;
+      maxPriceHistoryPrunesPerBlock: u32 & AugmentedConst<ApiType>;
       /**
-       * Tick width of each older reference bucket; configure 60.
+       * Maximum frame visits per repayment attempt; a partial frame visit also reads one tick.
        **/
-      priceHistoryBucketTicks: u64 & AugmentedConst<ApiType>;
+      maxPriceWindowSteps: u32 & AugmentedConst<ApiType>;
       /**
-       * Ticks after bidding close, configured for 30 elapsed days on the network.
+       * Total mining-frame hold from admission, including the bidding window.
        **/
-      rewardMaturityTicks: u64 & AugmentedConst<ApiType>;
+      purchaseHoldFrames: u64 & AugmentedConst<ApiType>;
     };
     stabilizerPools: {
       /**
@@ -680,6 +696,16 @@ declare module '@polkadot/api-base/types/consts' {
        * The maximum percent of ownership-token circulation that can be bonded.
        **/
       maxArgonotBondedPercentOfCirculation: Percent & AugmentedConst<ApiType>;
+      /**
+       * Maximum accounts whose queued bond collateral is attempted in one block.
+       **/
+      maxBondCollateralSettlementsPerBlock: u32 & AugmentedConst<ApiType>;
+      /**
+       * Owner bond/stake lot count assumed by scan benchmarks and checked by try_state.
+       * Includes lots awaiting release. Purchases remain unrestricted and scans are not
+       * truncated.
+       **/
+      maxExpectedBondLotsPerAccount: u32 & AugmentedConst<ApiType>;
       /**
        * The maximum number of bond lots whose release delay may mature in a single frame.
        **/

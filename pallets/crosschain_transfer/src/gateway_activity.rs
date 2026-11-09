@@ -27,7 +27,7 @@ pub(crate) enum DecodedGatewayActivity<T: Config> {
 		token: H160,
 		to: [u8; 32],
 		amount: T::Balance,
-		gateway_state: GatewayState<T>,
+		gateway_state: GatewayState<T::Balance>,
 	},
 	TransferToArgonFromSwap {
 		chain_id: u64,
@@ -38,7 +38,7 @@ pub(crate) enum DecodedGatewayActivity<T: Config> {
 		amount: T::Balance,
 		purchase: Box<SwapPurchaseEvidence>,
 		purchase_timestamp: u64,
-		gateway_state: GatewayState<T>,
+		gateway_state: GatewayState<T::Balance>,
 	},
 	MintingAuthorityActivated {
 		destination_signing_key: H160,
@@ -48,13 +48,13 @@ pub(crate) enum DecodedGatewayActivity<T: Config> {
 		shared_signature_count: u32,
 		relayer_argon_account_id: [u8; 32],
 		approval_hash: H256,
-		gateway_state: GatewayState<T>,
+		gateway_state: GatewayState<T::Balance>,
 	},
 	GlobalIssuanceCouncilRotated {
 		council_hash: H256,
 		approval_hash: H256,
 		relayer_argon_account_id: [u8; 32],
-		gateway_state: GatewayState<T>,
+		gateway_state: GatewayState<T::Balance>,
 	},
 	MintingAuthorityDeactivated {
 		destination_signing_key: H160,
@@ -62,18 +62,18 @@ pub(crate) enum DecodedGatewayActivity<T: Config> {
 		micronot_collateral: T::Balance,
 		approval_hash: H256,
 		relayer_argon_account_id: [u8; 32],
-		gateway_state: GatewayState<T>,
+		gateway_state: GatewayState<T::Balance>,
 	},
 	TransferOutOfArgonFinalized {
 		transfer_id: H256,
 		asset: AssetKind,
 		amount: T::Balance,
 		minting_authority_collateral: Vec<GatewayMintingAuthorityCollateral<T>>,
-		gateway_state: GatewayState<T>,
+		gateway_state: GatewayState<T::Balance>,
 	},
 	TransferOutOfArgonCanceled {
 		transfer_id: H256,
-		gateway_state: GatewayState<T>,
+		gateway_state: GatewayState<T::Balance>,
 	},
 }
 
@@ -82,7 +82,7 @@ impl<T: Config> DecodedGatewayActivity<T> {
 		self.gateway_state().gateway_activity_nonce
 	}
 
-	pub(crate) fn gateway_state(&self) -> &GatewayState<T> {
+	pub(crate) fn gateway_state(&self) -> &GatewayState<T::Balance> {
 		match self {
 			Self::TransferToArgon { gateway_state, .. } |
 			Self::TransferToArgonFromSwap { gateway_state, .. } |
@@ -110,7 +110,8 @@ pub(crate) enum GatewayActivityApplyError {
 	Reject(DispatchError),
 }
 
-pub(crate) type GatewayActivityApplyResult<T> = Result<GatewayState<T>, GatewayActivityApplyError>;
+pub(crate) type GatewayActivityApplyResult<T> =
+	Result<GatewayState<<T as Config>::Balance>, GatewayActivityApplyError>;
 
 /// Authenticated source-block activities, independent of the proof used to establish them.
 pub(crate) struct GatewayActivityBlock<T: Config> {
@@ -119,7 +120,7 @@ pub(crate) struct GatewayActivityBlock<T: Config> {
 }
 
 pub(crate) struct GatewayActivityBlockOutcome<T: Config> {
-	pub latest_gateway_state: Option<GatewayState<T>>,
+	pub latest_gateway_state: Option<GatewayState<T::Balance>>,
 	pub pause: Option<GatewaySyncPause>,
 }
 
@@ -131,7 +132,7 @@ impl From<DispatchError> for GatewayActivityApplyError {
 
 struct GatewayActivityContext<T: Config> {
 	source_chain: SourceChain,
-	gateway_state: GatewayState<T>,
+	gateway_state: GatewayState<T::Balance>,
 }
 
 enum GatewayCirculationAdjustment<Balance> {
@@ -144,7 +145,7 @@ enum GatewayCirculationAdjustment<Balance> {
 impl<T: Config> GatewayActivityContext<T> {
 	fn new(
 		source_chain: SourceChain,
-		gateway_state: GatewayState<T>,
+		gateway_state: GatewayState<T::Balance>,
 		expected_gateway_activity_nonce: GatewayActivityNonce,
 	) -> Result<Self, DispatchError> {
 		// A relayer can submit an authentic activity out of order. Reject that input without
@@ -157,7 +158,7 @@ impl<T: Config> GatewayActivityContext<T> {
 		Ok(Self { source_chain, gateway_state })
 	}
 
-	fn applied(self) -> GatewayState<T> {
+	fn applied(self) -> GatewayState<T::Balance> {
 		self.gateway_state
 	}
 
@@ -348,37 +349,29 @@ impl<T: Config> Pallet<T> {
 
 		if transfer.amount != T::Balance::default() {
 			let mint_result = match transfer.asset {
-				AssetKind::Argon => {
-					let result = Self::mint_to::<T::NativeCurrency>(
-						context.source_chain,
-						transfer.amount,
-						&transfer.to,
-					);
-					if result.is_ok() {
-						Self::record_transfer_in(&transfer.to, transfer.asset, transfer.amount);
-						T::OperationalAccountsHook::account_uniswap_argon_transfers_in_updated(
-							&transfer.to,
-						);
-					}
-					result
-				},
-				AssetKind::Argonot => {
-					let result = Self::mint_to::<T::OwnershipCurrency>(
-						context.source_chain,
-						transfer.amount,
-						&transfer.to,
-					);
-					if result.is_ok() {
-						Self::record_transfer_in(&transfer.to, transfer.asset, transfer.amount);
-					}
-					result
-				},
+				AssetKind::Argon => Self::mint_to::<T::NativeCurrency>(
+					context.source_chain,
+					transfer.amount,
+					&transfer.to,
+				),
+				AssetKind::Argonot => Self::mint_to::<T::OwnershipCurrency>(
+					context.source_chain,
+					transfer.amount,
+					&transfer.to,
+				),
 			};
 			if let Err(error) = mint_result {
 				if error == Error::<T>::InsufficientLiquidity.into() {
 					return context.pause_result(GatewaySyncPauseReason::GatewayStateDrift);
 				}
 				return Err(error.into());
+			}
+
+			Self::record_transfer_in(&transfer.to, transfer.asset, transfer.amount);
+			if transfer.asset == AssetKind::Argon {
+				T::OperationalAccountsHook::account_uniswap_argon_transfers_in_updated(
+					&transfer.to,
+				);
 			}
 		}
 		Self::deposit_event(Event::TransferToArgonSettled {
@@ -657,20 +650,34 @@ impl<T: Config> Pallet<T> {
 					GatewayActivityApplyError::Reject(Error::<T>::InvalidGatewayActivity.into())
 				})?;
 				let purchase_tick = T::TickProvider::ticker().tick_for_time(timestamp_millis);
-				T::UniswapPurchaseProvider::record_transferred_purchase(
-					&to,
-					&UniswapPurchase {
-						chain_id,
-						pool_manager: purchase.pool_manager,
-						pool_id: purchase.pool_id,
-						usdc_token: purchase.usdc_token,
-						usdc_spent: purchase.usdc_spent,
-						principal: amount.into(),
-						sqrt_price_before_x96: purchase.sqrt_price_before_x96,
-						sqrt_price_after_x96: purchase.sqrt_price_after_x96,
-						tick: purchase_tick,
-					},
-				)?;
+				// Failed admission must undo its holds and records while preserving delivery.
+				let transferred_purchase = UniswapPurchase {
+					gateway_activity_nonce: context.gateway_state.gateway_activity_nonce,
+					repay_liquid_id: purchase.repay_liquid_id,
+					chain_id,
+					pool_manager: purchase.pool_manager,
+					pool_id: purchase.pool_id,
+					usdc_token: purchase.usdc_token,
+					usdc_spent: purchase.usdc_spent,
+					principal: amount.into(),
+					sqrt_price_before_x96: purchase.sqrt_price_before_x96,
+					sqrt_price_after_x96: purchase.sqrt_price_after_x96,
+					tick: purchase_tick,
+				};
+				let admission = with_storage_layer(|| {
+					T::UniswapPurchaseProvider::record_transferred_purchase(
+						&to,
+						&transferred_purchase,
+					)
+				});
+				if let Err(error) = admission {
+					Self::deposit_event(Event::UniswapPurchaseAdmissionFailed {
+						source_chain,
+						gateway_activity_nonce: context.gateway_state.gateway_activity_nonce,
+						account: to.clone(),
+						error,
+					});
+				}
 				Self::deposit_event(Event::TransferToArgonFromSwapSettled {
 					source_chain,
 					purchase,
@@ -780,6 +787,7 @@ impl<T: Config> Pallet<T> {
 
 #[cfg(test)]
 mod test {
+	use super::DecodedGatewayActivity;
 	use crate::tests::*;
 	use alloy_primitives::{B256, U160};
 	use alloy_sol_types::{SolEvent, SolType};
@@ -793,116 +801,268 @@ mod test {
 		TransferToArgonFromSwapStarted, TransferToArgonStarted,
 	};
 	use argon_primitives::{
+		bitcoin::LiquidId,
 		ethereum::{
 			EthereumCombinedReceiptProof, EthereumExecutionBlockProof, EthereumReceiptProofReceipt,
 		},
-		EthereumLog, EthereumReceiptLog,
+		EthereumLog, EthereumReceiptLog, UniswapPurchase,
 	};
 	use polkadot_sdk::{
 		frame_support::traits::{OnFinalize, OnInitialize},
 		sp_io::hashing::keccak_256,
 	};
 
+	const NATIVE_PURCHASE_CASES: [(&str, Option<LiquidId>); 2] = [
+		(include_str!("../../../chains/ethereum/fixtures/uniswap-v4-purchase.json"), None),
+		(
+			include_str!("../../../chains/ethereum/fixtures/uniswap-v4-purchase-refund.json"),
+			Some(1),
+		),
+	];
+
 	#[test]
-	fn proved_purchases_hold_principal_atomically_and_cannot_replay() {
-		use crate::mock::StabilizerBuys;
-		use argon_primitives::{PriceIndex, PriceIndexUpdated};
-		use frame_support::storage::with_storage_layer;
-		use pallet_stabilizer_buys::{
-			ApprovedPool, BuysByAccount, HoldReason, PurchasePool, PurchasesByAccount,
-		};
+	fn failed_purchase_admission_preserves_delivery_and_does_not_block_later_activity() {
 		new_test_ext().execute_with(|| {
 			System::set_block_number(1);
 			CurrentTick::set(100);
-			CurrentFrameId::set(1);
 			assert_ok!(CrosschainTransfer::set_chain_config(
 				RuntimeOrigin::root(),
 				SourceChain::Ethereum,
 				chain_config()
 			));
-			ApprovedPool::<Test>::put(PurchasePool {
-				chain_id: 1,
-				pool_manager: h160(0x51),
-				pool_id: H256::repeat_byte(0x61),
-				usdc_token: h160(0x41),
-				argon_is_token0: true,
-			});
-			StabilizerBuys::on_price_index(&PriceIndex {
-				tick: 60,
-				btc_usd_price: FixedU128::from_u32(60_000),
-				argonot_usd_price: FixedU128::one(),
-				argon_usd_price: FixedU128::one(),
-				argon_usd_target_price: FixedU128::one(),
-				argon_time_weighted_average_liquidity: 1,
-				usdc_usd_price: Some(FixedU128::one()),
-				stabilizer_pool_sqrt_price_x96: None,
-			});
 			let burn = CrosschainTransfer::burn_account(SourceChain::Ethereum);
-			assert_ok!(Balances::mint_into(&burn, 100_000_000));
+			assert_ok!(Balances::mint_into(&burn, 200_000_000));
 			let owner = account(2);
-			let log = purchase_activity_log(owner.clone(), 1, 100_000_000, 0, 60);
+			let log = purchase_activity_log(owner.clone(), 1, 100_000_000, 100_000_000, 60);
 			let mut event = TransferToArgonFromSwapStarted::decode_raw_log_validate(
-				log.topics.iter().map(|t| t.0),
+				log.topics.iter().map(|topic| topic.0),
 				&log.data,
 			)
 			.unwrap();
-			event.purchase.usdcSpent = alloy_primitives::U256::from(90_000_000);
-			event.purchase.sqrtPriceBeforeX96 = U160::from(1u128 << 76);
-			event.purchase.sqrtPriceAfterX96 = U160::from(1u128 << 77);
+			event.purchase.repayLiquidId = 42;
 			let log = EthereumLog { data: event.encode_data().try_into().unwrap(), ..log };
-			let proof = proof_batch(vec![activity_logs(vec![log])]);
-			assert_noop!(
-				with_storage_layer(|| -> DispatchResult {
-					CrosschainTransfer::prove_gateway_activity(
-						RuntimeOrigin::signed(account(1)),
-						SourceChain::Ethereum,
-						0,
-						proof.clone(),
-					)
-					.map_err(|error| error.error)?;
-					assert_eq!(
-						Balances::balance_on_hold(&HoldReason::PurchasePrincipal.into(), &owner),
-						100_000_000
-					);
-					Err(DispatchError::Other("outer failure"))
-				}),
-				DispatchError::Other("outer failure")
-			);
-			assert_eq!(Balances::balance(&burn), 100_000_000);
-			assert!(!BuysByAccount::<Test>::contains_key(&owner));
-			assert!(PurchasesByAccount::<Test>::iter_prefix(&owner).next().is_none());
+			let proof = proof_batch(vec![activity_logs(vec![
+				log,
+				argon_activity_log_with_circulation(account(3), 2, 100_000_000, 0, 0),
+			])]);
+
+			RejectPurchaseAdmission::set(true);
 			assert_ok!(CrosschainTransfer::prove_gateway_activity(
 				RuntimeOrigin::signed(account(1)),
 				SourceChain::Ethereum,
 				0,
 				proof.clone()
 			));
+			assert_eq!(Balances::balance(&burn), 0);
+			assert_eq!(Balances::balance(&owner), 100_000_000);
+			assert_eq!(Balances::balance(&account(3)), 100_000_000);
+			assert!(RecordedPurchases::get().is_empty());
 			assert_eq!(
-				PurchasesByAccount::<Test>::get(&owner, 1u64.to_be_bytes())
+				GatewayStateBySourceChain::<Test>::get(SourceChain::Ethereum)
 					.unwrap()
-					.captured_discount,
-				10_000_000
+					.gateway_activity_nonce,
+				2
 			);
-			assert_eq!(
-				Balances::balance_on_hold(&HoldReason::PurchasePrincipal.into(), &owner),
-				100_000_000
+			assert!(!GatewaySyncPauseBySourceChain::<Test>::contains_key(SourceChain::Ethereum));
+			System::assert_has_event(
+				Event::<Test>::UniswapPurchaseAdmissionFailed {
+					source_chain: SourceChain::Ethereum,
+					gateway_activity_nonce: 1,
+					account: owner.clone(),
+					error: TokenError::FundsUnavailable.into(),
+				}
+				.into(),
 			);
-			assert_eq!(
-				TransferTotalsByAccount::<Test>::get(&owner),
-				AccountTransferTotals::default()
+
+			// Clearing the cause does not let this purchase be admitted later or paid twice.
+			RejectPurchaseAdmission::set(false);
+			assert_noop!(
+				CrosschainTransfer::prove_gateway_activity(
+					RuntimeOrigin::signed(account(1)),
+					SourceChain::Ethereum,
+					0,
+					proof
+				),
+				Error::<Test>::UnexpectedPreviousGatewayActivityNonce
 			);
-			assert!(CrosschainTransfer::prove_gateway_activity(
+			assert!(RecordedPurchases::get().is_empty());
+			assert_eq!(Balances::balance(&owner), 100_000_000);
+		});
+	}
+
+	#[test]
+	fn minimum_inbound_transfers_fund_a_new_account_in_both_currencies() {
+		new_test_ext().execute_with(|| {
+			System::set_block_number(1);
+			ExistentialDeposit::set(10_000);
+			OwnershipExistentialDeposit::set(10_000);
+			assert_ok!(CrosschainTransfer::set_chain_config(
+				RuntimeOrigin::root(),
+				SourceChain::Ethereum,
+				chain_config()
+			));
+			let burn = CrosschainTransfer::burn_account(SourceChain::Ethereum);
+			assert_ok!(Balances::mint_into(&burn, 30_000));
+			assert_ok!(Ownership::mint_into(&burn, 30_000));
+			let issuance = (Balances::total_issuance(), Ownership::total_issuance());
+			let recipient = account(2);
+			assert_eq!(System::providers(&recipient), 0);
+			let logs = vec![
+				transfer_to_argon_started_log(
+					h160(0x21),
+					h160(0x11),
+					h160(0x31),
+					10_000,
+					recipient.clone().into(),
+					1,
+					0,
+					20_000,
+					30_000,
+				),
+				transfer_to_argon_started_log(
+					h160(0x21),
+					h160(0x11),
+					h160(0x32),
+					10_000,
+					recipient.clone().into(),
+					2,
+					0,
+					20_000,
+					20_000,
+				),
+			];
+			assert_ok!(CrosschainTransfer::prove_gateway_activity(
 				RuntimeOrigin::signed(account(1)),
 				SourceChain::Ethereum,
 				0,
-				proof
-			)
-			.is_err());
+				proof_batch(vec![activity_logs(logs)])
+			));
 			assert_eq!(
-				Balances::balance_on_hold(&HoldReason::PurchasePrincipal.into(), &owner),
-				100_000_000
+				(Balances::balance(&recipient), Ownership::balance(&recipient)),
+				(10_000, 10_000)
 			);
+			assert_eq!((Balances::balance(&burn), Ownership::balance(&burn)), (20_000, 20_000));
+			assert_eq!((Balances::total_issuance(), Ownership::total_issuance()), issuance);
+			assert_eq!(
+				GatewayStateBySourceChain::<Test>::get(SourceChain::Ethereum)
+					.unwrap()
+					.gateway_activity_nonce,
+				2
+			);
+			assert!(!GatewaySyncPauseBySourceChain::<Test>::contains_key(SourceChain::Ethereum));
 		});
+	}
+
+	#[test]
+	fn cancellation_and_expiry_refund_the_minimum_transfer_before_releasing_its_tip() {
+		for (asset, expire) in [
+			(AssetKind::Argon, false),
+			(AssetKind::Argon, true),
+			(AssetKind::Argonot, false),
+			(AssetKind::Argonot, true),
+		] {
+			let amount = 10_000;
+			new_test_ext().execute_with(|| {
+				System::set_block_number(1);
+				ExistentialDeposit::set(10_000);
+				OwnershipExistentialDeposit::set(10_000);
+				configure_single_member_ethereum_council(
+					account(10),
+					1,
+					20_000,
+					&council_signing_pair(20),
+				);
+				let burn = CrosschainTransfer::burn_account(SourceChain::Ethereum);
+				assert_ok!(Balances::mint_into(&burn, 30_000));
+				assert_ok!(Ownership::mint_into(&burn, 30_000));
+				let user = account(2);
+				assert_ok!(Balances::mint_into(&user, 30_000));
+				assert_ok!(Ownership::mint_into(&user, 30_000));
+				assert_ok!(CrosschainTransfer::transfer_out(
+					RuntimeOrigin::signed(user.clone()),
+					SourceChain::Ethereum,
+					asset,
+					h160(0x71),
+					amount
+				));
+				let transfer_id = transfer_out_id(&user, 1);
+				let request = TransferOutById::<Test>::get(transfer_id).unwrap();
+				assert_ok!(Balances::transfer(
+					&user,
+					&account(1),
+					Balances::balance(&user),
+					Preservation::Expendable
+				));
+				assert_ok!(Ownership::transfer(
+					&user,
+					&account(1),
+					Ownership::balance(&user),
+					Preservation::Expendable
+				));
+				assert_eq!(Balances::balance(&user), 0);
+				assert_eq!(Ownership::balance(&user), 0);
+				let issuance = (Balances::total_issuance(), Ownership::total_issuance());
+				let proof = if expire {
+					proof_batch_at_block(
+						request.valid_until_ethereum_block + 1,
+						vec![activity_logs(vec![argon_activity_log(account(3), 1, 0)])],
+					)
+				} else {
+					proof_batch(vec![activity_logs(vec![transfer_out_of_argon_canceled_log(
+						transfer_id,
+						1,
+						0,
+					)])])
+				};
+				assert_ok!(CrosschainTransfer::prove_gateway_activity(
+					RuntimeOrigin::signed(account(1)),
+					SourceChain::Ethereum,
+					0,
+					proof
+				));
+				assert!(!GatewaySyncPauseBySourceChain::<Test>::contains_key(
+					SourceChain::Ethereum
+				));
+				assert!(!TransferOutById::<Test>::contains_key(transfer_id));
+				assert_eq!(Balances::balance(&burn), 30_000);
+				assert_eq!(Ownership::balance(&burn), 30_000);
+				let refunded = amount + request.minting_authority_tip;
+				let expected = match asset {
+					AssetKind::Argon => (refunded, 0),
+					AssetKind::Argonot => (0, refunded),
+				};
+				assert_eq!((Balances::balance(&user), Ownership::balance(&user)), expected);
+				assert_eq!(
+					Balances::balance_on_hold(
+						&HoldReason::TransferOutMintingAuthorityTip.into(),
+						&user
+					),
+					0
+				);
+				assert_eq!(
+					Ownership::balance_on_hold(
+						&HoldReason::TransferOutMintingAuthorityTip.into(),
+						&user
+					),
+					0
+				);
+				assert_eq!((Balances::total_issuance(), Ownership::total_issuance()), issuance);
+				assert_eq!(System::providers(&user), 1);
+				assert_eq!(
+					GatewayStateBySourceChain::<Test>::get(SourceChain::Ethereum)
+						.unwrap()
+						.gateway_activity_nonce,
+					1
+				);
+				System::assert_has_event(
+					Event::<Test>::TransferOutCanceled {
+						source_chain: SourceChain::Ethereum,
+						transfer_id,
+					}
+					.into(),
+				);
+			});
+		}
 	}
 
 	#[test]
@@ -1044,12 +1204,9 @@ mod test {
 	fn native_purchase_logs_reconstruct_the_actual_gateway_storage_root() {
 		assert_eq!(
 			<<TransferToArgonFromSwapStarted as SolEvent>::DataTuple<'_> as SolType>::ENCODED_SIZE,
-			Some(512)
+			Some(544)
 		);
-		for source in [
-			include_str!("../../../chains/ethereum/fixtures/uniswap-v4-purchase.json"),
-			include_str!("../../../chains/ethereum/fixtures/uniswap-v4-purchase-refund.json"),
-		] {
+		for (source, expected_repay_liquid_id) in NATIVE_PURCHASE_CASES {
 			let fixture: serde_json::Value = serde_json::from_str(source).unwrap();
 			let native_log: alloy_primitives::Log =
 				serde_json::from_value(fixture["eventLog"].clone()).unwrap();
@@ -1088,6 +1245,10 @@ mod test {
 				Some(Error::<Test>::InvalidGatewayActivity.into())
 			);
 			let activity = CrosschainTransfer::decode_evm_gateway_activity(&config, &log).unwrap();
+			let DecodedGatewayActivity::TransferToArgonFromSwap { purchase, .. } = &activity else {
+				panic!("Expected a purchase activity");
+			};
+			assert_eq!(purchase.repay_liquid_id, expected_repay_liquid_id);
 			let seed: B256 = fixture["activityRootSeed"].as_str().unwrap().parse().unwrap();
 			let expected: B256 = fixture["activityRoot"].as_str().unwrap().parse().unwrap();
 			assert_eq!(
@@ -1101,7 +1262,7 @@ mod test {
 	}
 
 	#[test]
-	fn storage_purchase_time_is_committed_and_tampering_cannot_credit_funds() {
+	fn storage_purchase_metadata_is_committed_and_tampering_cannot_credit_funds() {
 		new_test_ext().execute_with(|| {
 			System::set_block_number(1);
 			CurrentTick::set(999);
@@ -1113,20 +1274,32 @@ mod test {
 			let recipient = account(2);
 			let burn = CrosschainTransfer::burn_account(SourceChain::Ethereum);
 			assert_ok!(Balances::mint_into(&burn, 10_000));
-			let mut logs = vec![purchase_activity_log(recipient.clone(), 1, 1_000, 9_000, 60)];
-			let proof = storage_proof(10, H256::zero(), logs.clone());
-			logs[0].data[31] ^= 1;
-			let mut forged = proof.clone();
-			forged.activity_logs = logs.try_into().unwrap();
-			assert_noop!(
-				CrosschainTransfer::prove_gateway_activity_storage(
-					RuntimeOrigin::signed(account(1)),
-					SourceChain::Ethereum,
-					0,
-					forged
-				),
-				Error::<Test>::InvalidProof
-			);
+			let log = purchase_activity_log(recipient.clone(), 1, 1_000, 9_000, 60);
+			let mut event = TransferToArgonFromSwapStarted::decode_raw_log_validate(
+				log.topics.iter().map(|t| t.0),
+				&log.data,
+			)
+			.unwrap();
+			event.purchase.repayLiquidId = 1;
+			let log = EthereumLog { data: event.encode_data().try_into().unwrap(), ..log };
+			let proof = storage_proof(10, H256::zero(), vec![log.clone()]);
+			// Both the purchase timestamp and Liquid ID are covered by the proven root.
+			for offset in [31, 127] {
+				let mut forged_log = log.clone();
+				forged_log.data[offset] ^= 1;
+				let mut forged = proof.clone();
+				forged.activity_logs = vec![forged_log].try_into().unwrap();
+				assert_noop!(
+					CrosschainTransfer::prove_gateway_activity_storage(
+						RuntimeOrigin::signed(account(1)),
+						SourceChain::Ethereum,
+						0,
+						forged
+					),
+					Error::<Test>::InvalidProof
+				);
+				assert!(RecordedPurchases::get().is_empty());
+			}
 			assert_eq!(Balances::balance(&recipient), 0);
 			assert_ok!(CrosschainTransfer::prove_gateway_activity_storage(
 				RuntimeOrigin::signed(account(1)),
@@ -1135,6 +1308,25 @@ mod test {
 				proof.clone()
 			));
 			assert_eq!(Balances::balance(&recipient), 1_000);
+			assert_eq!(
+				RecordedPurchases::get(),
+				vec![(
+					recipient.clone(),
+					UniswapPurchase {
+						gateway_activity_nonce: 1,
+						repay_liquid_id: Some(1),
+						chain_id: 1,
+						pool_manager: h160(0x51),
+						pool_id: H256::repeat_byte(0x61),
+						usdc_token: h160(0x41),
+						usdc_spent: U256::from(1_000),
+						principal: 1_000,
+						sqrt_price_before_x96: U256::from(100),
+						sqrt_price_after_x96: U256::from(101),
+						tick: 60,
+					}
+				)]
+			);
 			assert!(System::events().iter().any(|record| matches!(
 				&record.event,
 				RuntimeEvent::CrosschainTransfer(Event::TransferToArgonFromSwapSettled {
@@ -1152,6 +1344,7 @@ mod test {
 				Error::<Test>::UnexpectedPreviousGatewayActivityNonce
 			);
 			assert_eq!(Balances::balance(&recipient), 1_000);
+			assert_eq!(RecordedPurchases::get().len(), 1);
 		});
 	}
 
@@ -1166,6 +1359,7 @@ mod test {
 
 		let event = TransferToArgonFromSwapStarted {
 			purchase: SwapPurchase {
+				repayLiquidId: 0,
 				timestamp,
 				buyer: [0x11; 20].into(),
 				argonAccountId: destination_bytes(&recipient).into(),
@@ -1916,7 +2110,8 @@ mod test {
 			assert_eq!(Balances::balance(&recipient), 1_250);
 			assert_eq!(
 				GatewayStateBySourceChain::<Test>::get(SourceChain::Ethereum),
-				Some(GatewayState::<Test> {
+				Some(GatewayState::<Balance> {
+					last_synced_source_block_time: None,
 					gateway_activity_nonce: 1,
 					argon_approvals_nonce: 0,
 					argon_circulation: 8_750,
@@ -1954,7 +2149,8 @@ mod test {
 					gateway_state,
 				}) => {
 					gateway_state ==
-						&GatewayState::<Test> {
+						&GatewayState::<Balance> {
+							last_synced_source_block_time: None,
 							gateway_activity_nonce: 1,
 							argon_approvals_nonce: 0,
 							argon_circulation: 8_750,
@@ -1979,7 +2175,8 @@ mod test {
 			assert_eq!(Balances::balance(&zero_amount_recipient), 0);
 			assert_eq!(
 				GatewayStateBySourceChain::<Test>::get(SourceChain::Ethereum),
-				Some(GatewayState::<Test> {
+				Some(GatewayState::<Balance> {
+					last_synced_source_block_time: None,
 					gateway_activity_nonce: 2,
 					argon_approvals_nonce: 0,
 					argon_circulation: 8_750,
@@ -2118,7 +2315,8 @@ mod test {
 			);
 			assert_eq!(
 				GatewayStateBySourceChain::<Test>::get(SourceChain::Ethereum),
-				Some(GatewayState::<Test> {
+				Some(GatewayState::<Balance> {
+					last_synced_source_block_time: None,
 					gateway_activity_nonce: 1,
 					argon_approvals_nonce: 1,
 					argon_circulation: 0,
@@ -3247,7 +3445,8 @@ mod test {
 			assert!(matches!(result, Ok(post_info) if post_info.pays_fee == Pays::No));
 			assert_eq!(
 				GatewayStateBySourceChain::<Test>::get(SourceChain::Ethereum),
-				Some(GatewayState::<Test> {
+				Some(GatewayState::<Balance> {
+					last_synced_source_block_time: None,
 					gateway_activity_nonce: 1,
 					argon_approvals_nonce: 1,
 					argon_circulation: 0,
@@ -3353,7 +3552,8 @@ mod test {
 			assert_eq!(GatewaySyncPauseBySourceChain::<Test>::get(SourceChain::Ethereum), None);
 			assert_eq!(
 				GatewayStateBySourceChain::<Test>::get(SourceChain::Ethereum),
-				Some(GatewayState::<Test> {
+				Some(GatewayState::<Balance> {
+					last_synced_source_block_time: None,
 					gateway_activity_nonce: 2,
 					argon_approvals_nonce: 1,
 					argon_circulation: 5_000,
@@ -3436,7 +3636,8 @@ mod test {
 			assert!(matches!(result, Ok(post_info) if post_info.pays_fee == Pays::No));
 			assert_eq!(
 				GatewayStateBySourceChain::<Test>::get(SourceChain::Ethereum),
-				Some(GatewayState::<Test> {
+				Some(GatewayState::<Balance> {
+					last_synced_source_block_time: None,
 					gateway_activity_nonce: 1,
 					argon_approvals_nonce: 1,
 					argon_circulation: 0,
@@ -3623,7 +3824,8 @@ mod test {
 
 			GatewayStateBySourceChain::<Test>::insert(
 				SourceChain::Ethereum,
-				GatewayState::<Test> {
+				GatewayState::<Balance> {
+					last_synced_source_block_time: None,
 					gateway_activity_nonce: 0,
 					argon_approvals_nonce: 0,
 					argon_circulation: 10_000,
@@ -3653,7 +3855,8 @@ mod test {
 			assert_eq!(Balances::balance(&recipient), 0);
 			assert_eq!(
 				GatewayStateBySourceChain::<Test>::get(SourceChain::Ethereum),
-				Some(GatewayState::<Test> {
+				Some(GatewayState::<Balance> {
+					last_synced_source_block_time: None,
 					gateway_activity_nonce: 0,
 					argon_approvals_nonce: 0,
 					argon_circulation: 10_000,
@@ -4327,7 +4530,8 @@ mod test {
 			assert_eq!(Balances::balance(&recipient), 500);
 			assert_eq!(
 				GatewayStateBySourceChain::<Test>::get(SourceChain::Ethereum),
-				Some(GatewayState::<Test> {
+				Some(GatewayState::<Balance> {
+					last_synced_source_block_time: None,
 					gateway_activity_nonce: 1,
 					argon_approvals_nonce: 0,
 					argon_circulation: 9_500,

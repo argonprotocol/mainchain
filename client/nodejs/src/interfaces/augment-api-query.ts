@@ -47,12 +47,15 @@ import type {
   ArgonPrimitivesDomainZoneRecord,
   ArgonPrimitivesEthereumEthereumBeaconPreset,
   ArgonPrimitivesForkPower,
+  ArgonPrimitivesGatewayGatewayState,
+  ArgonPrimitivesGatewaySourceChain,
   ArgonPrimitivesInherentsBlockSealInherent,
   ArgonPrimitivesNotaryNotaryMeta,
   ArgonPrimitivesNotaryNotaryNotebookKeyDetails,
   ArgonPrimitivesNotaryNotaryNotebookVoteDigestDetails,
   ArgonPrimitivesNotaryNotaryRecord,
   ArgonPrimitivesPriceIndex,
+  ArgonPrimitivesPriceIndexRValueHighWaterMark,
   ArgonPrimitivesProvidersBlockSealerInfo,
   ArgonPrimitivesTickTicker,
   ArgonPrimitivesTreasuryNetworkPositionQuantities,
@@ -71,6 +74,7 @@ import type {
   PalletBalancesBalanceLock,
   PalletBalancesReserveData,
   PalletBitcoinFissionsFission,
+  PalletBitcoinFissionsLiquidTicks,
   PalletBitcoinLocksLockReleaseCosignHeight,
   PalletBitcoinLocksLockReleaseRequest,
   PalletBitcoinLocksLockedBitcoin,
@@ -81,12 +85,10 @@ import type {
   PalletCrosschainTransferAccountTransferTotals,
   PalletCrosschainTransferChainConfig,
   PalletCrosschainTransferCouncilApprovalQueueEntry,
-  PalletCrosschainTransferGatewayState,
   PalletCrosschainTransferGatewaySyncPause,
   PalletCrosschainTransferGlobalIssuanceCouncil,
   PalletCrosschainTransferMintingAuthority,
   PalletCrosschainTransferMintingAuthorityActivationRepaymentPricing,
-  PalletCrosschainTransferSourceChain,
   PalletCrosschainTransferSourceChainCirculation,
   PalletCrosschainTransferTransferOutPendingCollateralizationRequest,
   PalletCrosschainTransferTransferOutTransferOutOfArgon,
@@ -115,10 +117,11 @@ import type {
   PalletPriceIndexEthereumPriceIndex,
   PalletProxyAnnouncement,
   PalletProxyProxyDefinition,
-  PalletStabilizerBuysAccountBuys,
+  PalletStabilizerBuysAccountFrameBuys,
+  PalletStabilizerBuysAccountPayoutState,
   PalletStabilizerBuysAuction,
-  PalletStabilizerBuysBuyPayout,
-  PalletStabilizerBuysPriceHistoryHourlyPriceReference,
+  PalletStabilizerBuysLiquidRepay,
+  PalletStabilizerBuysPriceHistoryPriceObservation,
   PalletStabilizerBuysUniswapPurchasePurchasePool,
   PalletStabilizerPoolsPoolConfig,
   PalletStabilizerPoolsPositionCheckpoint,
@@ -128,6 +131,7 @@ import type {
   PalletTreasuryFrameArgonotBondParticipants,
   PalletTreasuryFrameVaultBitcoin,
   PalletTreasuryFrameVaultCapital,
+  PalletTreasuryPendingBondCollateral,
   PalletTreasuryPositionsPosition,
   PalletTreasuryRewardReserveBalances,
   PalletTreasuryVaultBondState,
@@ -252,12 +256,48 @@ declare module '@polkadot/api-base/types/storage' {
         [u64]
       >;
       /**
+       * Active Fission IDs grouped by their owner's Liquid. Debt remains on the Fission records.
+       **/
+      fissionIdsByOwnerAndLiquid: AugmentedQuery<
+        ApiType,
+        (
+          arg1:
+            | ITuple<[AccountId32, u64]>
+            | [AccountId32 | string | Uint8Array, u64 | AnyNumber | Uint8Array],
+          arg2: u64 | AnyNumber | Uint8Array,
+        ) => Observable<Option<Null>>,
+        [ITuple<[AccountId32, u64]>, u64]
+      >;
+      /**
+       * Creation and ratchet timing for each owner-scoped Liquid. Retained after closure so an
+       * old Liquid ID cannot reopen its creation window or discard its ratchet history.
+       **/
+      liquidTicksByOwnerAndId: AugmentedQuery<
+        ApiType,
+        (
+          arg1: AccountId32 | string | Uint8Array,
+          arg2: u64 | AnyNumber | Uint8Array,
+        ) => Observable<Option<PalletBitcoinFissionsLiquidTicks>>,
+        [AccountId32, u64]
+      >;
+      /**
        * Minimum Fission ID accepted from each owner.
        **/
       nextFissionIdByOwner: AugmentedQuery<
         ApiType,
         (arg: AccountId32 | string | Uint8Array) => Observable<u64>,
         [AccountId32]
+      >;
+      /**
+       * Highest valid market-to-target ARGON ratio in each frame. Ordered frame keys support
+       * bounded pruning without loading the complete history during an Ethereum stall.
+       **/
+      rValueHighWaterByFrame: AugmentedQuery<
+        ApiType,
+        (
+          arg: U8aFixed | string | Uint8Array,
+        ) => Observable<Option<ArgonPrimitivesPriceIndexRValueHighWaterMark>>,
+        [U8aFixed]
       >;
     };
     bitcoinLocks: {
@@ -639,9 +679,9 @@ declare module '@polkadot/api-base/types/storage' {
       activeGlobalIssuanceCouncilByDestinationChain: AugmentedQuery<
         ApiType,
         (
-          arg: PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
+          arg: ArgonPrimitivesGatewaySourceChain | 'Ethereum' | number | Uint8Array,
         ) => Observable<Option<H256>>,
-        [PalletCrosschainTransferSourceChain]
+        [ArgonPrimitivesGatewaySourceChain]
       >;
       /**
        * Config accepted for each supported source chain.
@@ -649,9 +689,9 @@ declare module '@polkadot/api-base/types/storage' {
       chainConfigBySourceChain: AugmentedQuery<
         ApiType,
         (
-          arg: PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
+          arg: ArgonPrimitivesGatewaySourceChain | 'Ethereum' | number | Uint8Array,
         ) => Observable<Option<PalletCrosschainTransferChainConfig>>,
-        [PalletCrosschainTransferSourceChain]
+        [ArgonPrimitivesGatewaySourceChain]
       >;
       /**
        * Latest council approval queue nonce signed by this account for one destination chain.
@@ -659,10 +699,10 @@ declare module '@polkadot/api-base/types/storage' {
       councilApprovalCursorByDestinationChainAndAccountId: AugmentedQuery<
         ApiType,
         (
-          arg1: PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
+          arg1: ArgonPrimitivesGatewaySourceChain | 'Ethereum' | number | Uint8Array,
           arg2: AccountId32 | string | Uint8Array,
         ) => Observable<Option<u64>>,
-        [PalletCrosschainTransferSourceChain, AccountId32]
+        [ArgonPrimitivesGatewaySourceChain, AccountId32]
       >;
       /**
        * The ordered outbound council approval queue for each destination chain.
@@ -670,10 +710,10 @@ declare module '@polkadot/api-base/types/storage' {
       councilApprovalQueueByDestinationChainAndNonce: AugmentedQuery<
         ApiType,
         (
-          arg1: PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
+          arg1: ArgonPrimitivesGatewaySourceChain | 'Ethereum' | number | Uint8Array,
           arg2: u64 | AnyNumber | Uint8Array,
         ) => Observable<Option<PalletCrosschainTransferCouncilApprovalQueueEntry>>,
-        [PalletCrosschainTransferSourceChain, u64]
+        [ArgonPrimitivesGatewaySourceChain, u64]
       >;
       /**
        * The registered council signer for each account on each destination chain.
@@ -681,10 +721,10 @@ declare module '@polkadot/api-base/types/storage' {
       councilSignerByDestinationChainAndAccountId: AugmentedQuery<
         ApiType,
         (
-          arg1: PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
+          arg1: ArgonPrimitivesGatewaySourceChain | 'Ethereum' | number | Uint8Array,
           arg2: AccountId32 | string | Uint8Array,
         ) => Observable<Option<H160>>,
-        [PalletCrosschainTransferSourceChain, AccountId32]
+        [ArgonPrimitivesGatewaySourceChain, AccountId32]
       >;
       /**
        * Conservative transfer-out conversion rate currently quoted for each destination chain.
@@ -692,9 +732,9 @@ declare module '@polkadot/api-base/types/storage' {
       currentTransferOutMicrogonsPerArgonotByDestinationChain: AugmentedQuery<
         ApiType,
         (
-          arg: PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
+          arg: ArgonPrimitivesGatewaySourceChain | 'Ethereum' | number | Uint8Array,
         ) => Observable<Option<u128>>,
-        [PalletCrosschainTransferSourceChain]
+        [ArgonPrimitivesGatewaySourceChain]
       >;
       /**
        * Latest proven gateway activity snapshot for each source chain.
@@ -702,9 +742,9 @@ declare module '@polkadot/api-base/types/storage' {
       gatewayStateBySourceChain: AugmentedQuery<
         ApiType,
         (
-          arg: PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
-        ) => Observable<Option<PalletCrosschainTransferGatewayState>>,
-        [PalletCrosschainTransferSourceChain]
+          arg: ArgonPrimitivesGatewaySourceChain | 'Ethereum' | number | Uint8Array,
+        ) => Observable<Option<ArgonPrimitivesGatewayGatewayState>>,
+        [ArgonPrimitivesGatewaySourceChain]
       >;
       /**
        * Pause state recorded when a canonical gateway activity cannot be applied safely.
@@ -712,9 +752,9 @@ declare module '@polkadot/api-base/types/storage' {
       gatewaySyncPauseBySourceChain: AugmentedQuery<
         ApiType,
         (
-          arg: PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
+          arg: ArgonPrimitivesGatewaySourceChain | 'Ethereum' | number | Uint8Array,
         ) => Observable<Option<PalletCrosschainTransferGatewaySyncPause>>,
-        [PalletCrosschainTransferSourceChain]
+        [ArgonPrimitivesGatewaySourceChain]
       >;
       /**
        * Historical Global Issuance Council snapshots keyed by their signer-ordered council hash.
@@ -733,9 +773,9 @@ declare module '@polkadot/api-base/types/storage' {
       latestQueuedCouncilHashByDestinationChain: AugmentedQuery<
         ApiType,
         (
-          arg: PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
+          arg: ArgonPrimitivesGatewaySourceChain | 'Ethereum' | number | Uint8Array,
         ) => Observable<Option<H256>>,
-        [PalletCrosschainTransferSourceChain]
+        [ArgonPrimitivesGatewaySourceChain]
       >;
       /**
        * Per-chain override for the minimum normalized microgon value required to register a
@@ -744,9 +784,9 @@ declare module '@polkadot/api-base/types/storage' {
       minimumMintingAuthorityValueByDestinationChain: AugmentedQuery<
         ApiType,
         (
-          arg: PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
+          arg: ArgonPrimitivesGatewaySourceChain | 'Ethereum' | number | Uint8Array,
         ) => Observable<u128>,
-        [PalletCrosschainTransferSourceChain]
+        [ArgonPrimitivesGatewaySourceChain]
       >;
       /**
        * Local Minting Authority records keyed by their destination signing key.
@@ -765,9 +805,9 @@ declare module '@polkadot/api-base/types/storage' {
       mintingAuthorityActivationRepaymentPricingByDestinationChain: AugmentedQuery<
         ApiType,
         (
-          arg: PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
+          arg: ArgonPrimitivesGatewaySourceChain | 'Ethereum' | number | Uint8Array,
         ) => Observable<Option<PalletCrosschainTransferMintingAuthorityActivationRepaymentPricing>>,
-        [PalletCrosschainTransferSourceChain]
+        [ArgonPrimitivesGatewaySourceChain]
       >;
       /**
        * The next outbound approval-queue nonce to assign on each destination chain.
@@ -775,9 +815,9 @@ declare module '@polkadot/api-base/types/storage' {
       nextCouncilApprovalQueueNonceByDestinationChain: AugmentedQuery<
         ApiType,
         (
-          arg: PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
+          arg: ArgonPrimitivesGatewaySourceChain | 'Ethereum' | number | Uint8Array,
         ) => Observable<u64>,
-        [PalletCrosschainTransferSourceChain]
+        [ArgonPrimitivesGatewaySourceChain]
       >;
       /**
        * First frame where a new council snapshot may be added to a chain's approval queue.
@@ -785,9 +825,9 @@ declare module '@polkadot/api-base/types/storage' {
       nextCouncilRotationFrameByDestinationChain: AugmentedQuery<
         ApiType,
         (
-          arg: PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
+          arg: ArgonPrimitivesGatewaySourceChain | 'Ethereum' | number | Uint8Array,
         ) => Observable<Option<u64>>,
-        [PalletCrosschainTransferSourceChain]
+        [ArgonPrimitivesGatewaySourceChain]
       >;
       /**
        * Next outbound transfer nonce for each sending account.
@@ -803,9 +843,9 @@ declare module '@polkadot/api-base/types/storage' {
       nonTerminalTransferOutCountByDestinationChain: AugmentedQuery<
         ApiType,
         (
-          arg: PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
+          arg: ArgonPrimitivesGatewaySourceChain | 'Ethereum' | number | Uint8Array,
         ) => Observable<u32>,
-        [PalletCrosschainTransferSourceChain]
+        [ArgonPrimitivesGatewaySourceChain]
       >;
       /**
        * Collateralization requests still open on each destination chain.
@@ -813,9 +853,9 @@ declare module '@polkadot/api-base/types/storage' {
       pendingCollateralizationRequestsByChain: AugmentedQuery<
         ApiType,
         (
-          arg: PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
+          arg: ArgonPrimitivesGatewaySourceChain | 'Ethereum' | number | Uint8Array,
         ) => Observable<Vec<PalletCrosschainTransferTransferOutPendingCollateralizationRequest>>,
-        [PalletCrosschainTransferSourceChain]
+        [ArgonPrimitivesGatewaySourceChain]
       >;
       /**
        * A staged council signer rotation for the next council activation on each destination chain.
@@ -823,10 +863,10 @@ declare module '@polkadot/api-base/types/storage' {
       pendingCouncilSignerByDestinationChainAndAccountId: AugmentedQuery<
         ApiType,
         (
-          arg1: PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
+          arg1: ArgonPrimitivesGatewaySourceChain | 'Ethereum' | number | Uint8Array,
           arg2: AccountId32 | string | Uint8Array,
         ) => Observable<Option<H160>>,
-        [PalletCrosschainTransferSourceChain, AccountId32]
+        [ArgonPrimitivesGatewaySourceChain, AccountId32]
       >;
       /**
        * Pending outbound principal by destination chain.
@@ -834,9 +874,9 @@ declare module '@polkadot/api-base/types/storage' {
       pendingTransferOutCirculationByDestinationChain: AugmentedQuery<
         ApiType,
         (
-          arg: PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
+          arg: ArgonPrimitivesGatewaySourceChain | 'Ethereum' | number | Uint8Array,
         ) => Observable<PalletCrosschainTransferSourceChainCirculation>,
-        [PalletCrosschainTransferSourceChain]
+        [ArgonPrimitivesGatewaySourceChain]
       >;
       /**
        * Immediately previous transfer-out conversion rate still accepted while the floor ratchets
@@ -845,9 +885,9 @@ declare module '@polkadot/api-base/types/storage' {
       previousTransferOutMicrogonsPerArgonotByDestinationChain: AugmentedQuery<
         ApiType,
         (
-          arg: PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
+          arg: ArgonPrimitivesGatewaySourceChain | 'Ethereum' | number | Uint8Array,
         ) => Observable<Option<u128>>,
-        [PalletCrosschainTransferSourceChain]
+        [ArgonPrimitivesGatewaySourceChain]
       >;
       /**
        * Outbound transfers by transfer id.
@@ -866,9 +906,9 @@ declare module '@polkadot/api-base/types/storage' {
       transferOutQuoteMicrogonsPerArgonotByDestinationChain: AugmentedQuery<
         ApiType,
         (
-          arg: PalletCrosschainTransferSourceChain | 'Ethereum' | number | Uint8Array,
+          arg: ArgonPrimitivesGatewaySourceChain | 'Ethereum' | number | Uint8Array,
         ) => Observable<Option<u128>>,
-        [PalletCrosschainTransferSourceChain]
+        [ArgonPrimitivesGatewaySourceChain]
       >;
       /**
        * Cumulative inbound and outbound transfer totals for each local account.
@@ -1657,6 +1697,22 @@ declare module '@polkadot/api-base/types/storage' {
         []
       >;
       /**
+       * Closed auctions awaiting reward allocation, ordered by scheduled processing frame and
+       * admission frame. A failed allocation moves only its queue entry; the auction retains its
+       * original maturity.
+       **/
+      auctionAllocationQueue: AugmentedQuery<
+        ApiType,
+        (
+          arg:
+            | ArgonPrimitivesAmountRankAscendingRankKeyU64
+            | { ascendingRank?: any; orderedId?: any }
+            | string
+            | Uint8Array,
+        ) => Observable<Option<Null>>,
+        [ArgonPrimitivesAmountRankAscendingRankKeyU64]
+      >;
+      /**
        * Auction policy and funding keyed by admission frame F; bidding takes place during F+1.
        **/
       auctions: AugmentedQuery<
@@ -1687,52 +1743,35 @@ declare module '@polkadot/api-base/types/storage' {
         [u64, ITuple<[Percent, ArgonPrimitivesAmountRankAmountRankKeyAccountId32]>]
       >;
       /**
-       * Scheduled rewards and the account's single payout queue entry.
+       * Aggregated discounts, shared bid and ordinary principal for each account/admission frame.
+       * Ordered frame bytes let payout visits select the oldest buckets with bounded work.
        **/
-      buysByAccount: AugmentedQuery<
-        ApiType,
-        (arg: AccountId32 | string | Uint8Array) => Observable<PalletStabilizerBuysAccountBuys>,
-        [AccountId32]
-      >;
-      /**
-       * Counter for the related counted storage map
-       **/
-      counterForHourlyPriceReferences: AugmentedQuery<ApiType, () => Observable<u32>, []>;
-      /**
-       * Counter for the related counted storage map
-       **/
-      counterForRecentPriceIndices: AugmentedQuery<ApiType, () => Observable<u32>, []>;
-      /**
-       * Hourly references keyed by the bucket-start tick in the same oldest-first order.
-       **/
-      hourlyPriceReferences: AugmentedQuery<
+      buysByAccountAndFrame: AugmentedQuery<
         ApiType,
         (
-          arg: U8aFixed | string | Uint8Array,
-        ) => Observable<Option<PalletStabilizerBuysPriceHistoryHourlyPriceReference>>,
-        [U8aFixed]
+          arg1: AccountId32 | string | Uint8Array,
+          arg2: U8aFixed | string | Uint8Array,
+        ) => Observable<Option<PalletStabilizerBuysAccountFrameBuys>>,
+        [AccountId32, U8aFixed]
+      >;
+      /**
+       * Pending repayment commitments, ordered by gateway nonce within each recipient.
+       * The existing account payout queue selects work; this adds no separate settlement queue.
+       **/
+      liquidRepaysByAccountAndGatewayNonce: AugmentedQuery<
+        ApiType,
+        (
+          arg1: AccountId32 | string | Uint8Array,
+          arg2: U8aFixed | string | Uint8Array,
+        ) => Observable<Option<PalletStabilizerBuysLiquidRepay>>,
+        [AccountId32, U8aFixed]
       >;
       /**
        * Matching fraction for new auctions; existing auctions retain their captured policy.
        **/
       matchingRate: AugmentedQuery<ApiType, () => Observable<Permill>, []>;
       /**
-       * Funded auctions awaiting automatic reward allocation, ordered by maturity tick and frame.
-       * A failed allocation moves only its retry tick; the auction retains its original maturity.
-       **/
-      maturingAuctions: AugmentedQuery<
-        ApiType,
-        (
-          arg:
-            | ArgonPrimitivesAmountRankAscendingRankKeyU64
-            | { ascendingRank?: any; orderedId?: any }
-            | string
-            | Uint8Array,
-        ) => Observable<Option<Null>>,
-        [ArgonPrimitivesAmountRankAscendingRankKeyU64]
-      >;
-      /**
-       * One scheduled visit per account, ordered by tick then account. Purchase buckets and the
+       * One scheduled visit per account, ordered by frame then account. Purchase buckets and the
        * reward record retain unpaid funds while this index selects bounded work.
        **/
       payoutQueue: AugmentedQuery<
@@ -1747,23 +1786,57 @@ declare module '@polkadot/api-base/types/storage' {
         [ArgonPrimitivesAmountRankAscendingRankKeyAccountId32]
       >;
       /**
-       * One principal bucket per account and admission frame, retained until release succeeds.
-       * Ordered frame bytes let payout visits select the oldest buckets with bounded work.
+       * Fixed due-frame cutoff and last visited key for a bounded pass through the payout queue.
+       * Waiting repayments keep their maturity rank without blocking accounts behind them.
        **/
-      purchasesByAccount: AugmentedQuery<
+      payoutQueueCursor: AugmentedQuery<
+        ApiType,
+        () => Observable<
+          Option<ITuple<[u64, ArgonPrimitivesAmountRankAscendingRankKeyAccountId32]>>
+        >,
+        []
+      >;
+      /**
+       * Unpaid ordinary rewards and the account's single scheduled payout visit, across frames.
+       **/
+      payoutStateByAccount: AugmentedQuery<
+        ApiType,
+        (
+          arg: AccountId32 | string | Uint8Array,
+        ) => Observable<PalletStabilizerBuysAccountPayoutState>,
+        [AccountId32]
+      >;
+      /**
+       * Unsettled purchase count for an owner's Liquid. Removed after its final settlement;
+       * lets Fissions block direct close without scanning purchases. Counts use the gateway's
+       * u64 nonce range so every authenticated purchase can be represented.
+       **/
+      pendingLiquidRepayCountByAccountAndLiquid: AugmentedQuery<
         ApiType,
         (
           arg1: AccountId32 | string | Uint8Array,
-          arg2: U8aFixed | string | Uint8Array,
-        ) => Observable<Option<PalletStabilizerBuysBuyPayout>>,
-        [AccountId32, U8aFixed]
+          arg2: u64 | AnyNumber | Uint8Array,
+        ) => Observable<u64>,
+        [AccountId32, u64]
       >;
       /**
-       * Exact observations keyed by the oracle tick in big-endian order, for oldest-first pruning.
+       * Number of incomplete windows starting at each purchase tick. Ordered keys expose the
+       * oldest history still needed without scanning purchases; counts share the u64 nonce range.
        **/
-      recentPriceIndices: AugmentedQuery<
+      pendingPriceWindowCountByTick: AugmentedQuery<
         ApiType,
-        (arg: U8aFixed | string | Uint8Array) => Observable<Option<ArgonPrimitivesPriceIndex>>,
+        (arg: U8aFixed | string | Uint8Array) => Observable<u64>,
+        [U8aFixed]
+      >;
+      /**
+       * Compact observations keyed by ordered ticks. An unavailable purchase quote stops historical
+       * lookup. Retention follows gateway sync and any incomplete repayment windows.
+       **/
+      priceHistoryByTick: AugmentedQuery<
+        ApiType,
+        (
+          arg: U8aFixed | string | Uint8Array,
+        ) => Observable<Option<PalletStabilizerBuysPriceHistoryPriceObservation>>,
         [U8aFixed]
       >;
     };
@@ -2004,6 +2077,21 @@ declare module '@polkadot/api-base/types/storage' {
         []
       >;
       /**
+       * Accounts due for collateral settlement, ordered by retry block and owner. Each pending
+       * account has one entry; failures move to the next block without blocking other owners.
+       **/
+      bondCollateralSettlementQueue: AugmentedQuery<
+        ApiType,
+        (
+          arg:
+            | ArgonPrimitivesAmountRankAscendingRankKeyAccountId32
+            | { ascendingRank?: any; orderedId?: any }
+            | string
+            | Uint8Array,
+        ) => Observable<Option<Null>>,
+        [ArgonPrimitivesAmountRankAscendingRankKeyAccountId32]
+      >;
+      /**
        * The stored state for each bond lot.
        **/
       bondLotById: AugmentedQuery<
@@ -2099,6 +2187,17 @@ declare module '@polkadot/api-base/types/storage' {
        * Awarded purchase rewards awaiting issuance. Auctions own their unallocated reservations.
        **/
       outstandingPurchaseRewards: AugmentedQuery<ApiType, () => Observable<u128>, []>;
+      /**
+       * Burn and release requests awaiting settlement, combined by owner. Both amounts remain
+       * included in the owner's encumbrance until processed; bonds retain their live payout terms.
+       **/
+      pendingBondCollateralByAccount: AugmentedQuery<
+        ApiType,
+        (
+          arg: AccountId32 | string | Uint8Array,
+        ) => Observable<Option<PalletTreasuryPendingBondCollateral>>,
+        [AccountId32]
+      >;
       /**
        * The oldest frame that still has bond lots to retry releasing.
        **/

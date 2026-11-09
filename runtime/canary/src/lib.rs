@@ -457,6 +457,8 @@ impl pallet_treasury::Config for Runtime {
 	type MinimumArgonsPerContributor = MinimumArgonsPerContributor;
 	type MaxActiveArgonotBondLots = MaxActiveArgonotBondLots;
 	type MaxArgonBondLots = MaxArgonBondLots;
+	type MaxExpectedBondLotsPerAccount = MaxExpectedBondLotsPerAccount;
+	type MaxBondCollateralSettlementsPerBlock = MaxBondCollateralSettlementsPerBlock;
 	type MaxArgonotBondedPercentOfCirculation = MaxArgonotBondedPercentOfCirculation;
 	type PalletId = TreasuryInternalPalletId;
 	type MiningBidPoolAccount = TreasuryMiningBidPoolAccount;
@@ -645,19 +647,26 @@ impl pallet_proxy::Config for Runtime {
 
 impl pallet_stabilizer_buys::Config for Runtime {
 	type Currency = Balances;
-	type MiningFrameTransitionProvider = MiningSlot;
-	type CurrentTick = Ticks;
-	type MaxRecentPriceTicks = ConstU32<360>;
-	type PriceHistoryBucketTicks = ConstU64<60>;
-	type MaxHourlyPriceReferences = ConstU32<720>;
-	type MaxCurrentHourPriceAgeTicks = ConstU64<10>;
+	type FissionsProvider = use_unless_benchmark!(BitcoinFissions, benchmarking::BenchmarkLiquidRepayment<AccountId, Balance>);
+	type MiningFrameTransitionProvider =
+		use_unless_benchmark!(MiningSlot, benchmarking::BenchmarkCurrentFrameId);
+	type TickProvider = use_unless_benchmark!(Ticks, benchmarking::BenchmarkCurrentTick);
+	type CrosschainGatewayProvider = use_unless_benchmark!(
+		CrosschainTransfer,
+		benchmarking::BenchmarkCrosschainGatewayProvider<Balance>
+	);
+	type MaxPriceAgeTicks = ConstU64<10>;
+	type MaxPriceHistoryPrunesPerBlock = ConstU32<16>;
+	type MaxPriceWindowSteps = ConstU32<64>;
 	type TreasuryRewardProvider =
 		use_unless_benchmark!(Treasury, benchmarking::BenchmarkTreasuryRewardProvider);
-	type MaxPrincipalPayouts = ConstU32<16>;
+	type MaxFramesPerPayout = ConstU32<16>;
 	type MaxPayoutsPerBlock = ConstU32<4>;
 	type MaxPositiveBids = ConstU8<4>;
 	type AuctionInclusionPercent = PurchaseAuctionInclusionPercent;
-	type RewardMaturityTicks = ConstU64<{ 30 * 1440 }>;
+	type PurchaseHoldFrames = ConstU64<30>;
+	type LiquidRepaymentRewardPercent = LiquidRepaymentRewardPercent;
+	type MaxLiquidRepaysPerBlock = ConstU32<1>;
 	type WeightInfo = pallet_stabilizer_buys::weights::WithProviderWeights<
 		Runtime,
 		weights::pallet_stabilizer_buys::WeightInfo<Runtime>,
@@ -669,7 +678,8 @@ parameter_types! {
 }
 
 impl pallet_price_index::Config for Runtime {
-	type OnPriceIndexUpdated = use_unless_benchmark!((StabilizerBuys, StabilizerPools), ());
+	type OnPriceIndexUpdated =
+		use_unless_benchmark!((StabilizerBuys, StabilizerPools, BitcoinFissions), ());
 	type WeightInfo = weights::pallet_price_index::WeightInfo<Runtime>;
 	type Currency = Balances;
 	type Balance = Balance;
@@ -679,7 +689,7 @@ impl pallet_price_index::Config for Runtime {
 		use_unless_benchmark!(GetCurrentFrameId, benchmarking::BenchmarkCurrentFrameId);
 	type MiningFrameTransitionProvider =
 		use_unless_benchmark!(MiningSlot, benchmarking::BenchmarkCurrentFrameId);
-	type CurrentTick = use_unless_benchmark!(Ticks, benchmarking::BenchmarkCurrentTick);
+	type TickProvider = use_unless_benchmark!(Ticks, benchmarking::BenchmarkCurrentTick);
 	type MaxArgonotFloorHistoryFrames = MaxArgonotFloorHistoryFrames;
 	type MaxArgonotAverageHistoryFrames = MaxArgonotAverageHistoryFrames;
 	type MaxEthereumPriceHistoryFrames = MaxEthereumPriceHistoryFrames;
@@ -722,8 +732,20 @@ impl pallet_bitcoin_fissions::Config for Runtime {
 	);
 	type OperationalAccountsHook = use_unless_benchmark!(OperationalAccounts, ());
 	type Currency = Balances;
+	type LiquidRepaymentProvider = use_unless_benchmark!(StabilizerBuys, ());
 	type MaxFissionsPerLock = MaxFissionsPerLock;
+	type MaxExpectedFissionsPerLiquid = ConstU32<10>;
+	type TimeProvider = Timestamp;
 	type MinimumRatchetPercent = MinimumFissionRatchetPercent;
+	type MiningFrameTransitionProvider =
+		use_unless_benchmark!(MiningSlot, benchmarking::BenchmarkCurrentFrameId);
+	type TickProvider = use_unless_benchmark!(Ticks, benchmarking::BenchmarkCurrentTick);
+	type CrosschainGatewayProvider = use_unless_benchmark!(
+		CrosschainTransfer,
+		benchmarking::BenchmarkCrosschainGatewayProvider<Balance>
+	);
+	type RValueHistoryFrames = ConstU32<30>;
+	type MaxRValueHistoryPrunesPerBlock = ConstU32<16>;
 }
 
 impl pallet_mint::Config for Runtime {

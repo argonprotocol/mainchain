@@ -1,6 +1,6 @@
 import { writeFile } from 'node:fs/promises';
 import { network } from 'hardhat';
-import type { TransactionReceipt } from 'ethers';
+import type { BaseContract, Signer, TransactionReceipt } from 'ethers';
 import { afterAll, describe, expect, it } from 'vitest';
 import v4ManagerArtifact from '@uniswap/v4-core/out/PoolManager.sol/PoolManager.json' with { type: 'json' };
 import v4LiquidityArtifact from '@uniswap/v4-core/out/PoolModifyLiquidityTest.sol/PoolModifyLiquidityTest.json' with { type: 'json' };
@@ -158,6 +158,7 @@ async function fixture(
   );
   const request = {
     argonAccountId: ethers.encodeBytes32String('argon-recipient'),
+    repayLiquidId: 0n,
     maxUsdcIn: (narrowLiquidity ? 1_000n : 110n) * 10n ** 6n,
     minMicrogonsOut: 100n * 10n ** 6n,
     deadline,
@@ -184,6 +185,163 @@ async function fixture(
 }
 
 describe('native Uniswap v4 buyAndTransfer', () => {
+  it.each([0n, 42n])('buys with a pre-signed USDC permit (Liquid %s)', async repayLiquidId => {
+    const f = await fixture();
+    const adapter = await f.purchase.getAddress();
+    await f.usdc.getFunction('approve')(adapter, 0);
+    const permit = await signUsdcPermit(
+      f.buyer,
+      f.usdc,
+      adapter,
+      f.request.maxUsdcIn,
+      f.request.deadline + 3600n,
+    );
+    const request = { ...f.request, repayLiquidId };
+    const buy = f.purchase.getFunction('buyAndTransferWithPermit');
+    const callData = f.purchase.interface.encodeFunctionData('buyAndTransferWithPermit', [
+      request,
+      f.key,
+      '0x',
+      permit,
+    ]);
+    await f.usdc.getFunction('setReentrantCall')(adapter, callData);
+    const before = await f.usdc.getFunction('balanceOf')(f.buyer.address);
+
+    const receipt: TransactionReceipt = (await (await buy(request, f.key, '0x', permit)).wait())!;
+    const event = receipt.logs
+      .map(log => f.gateway.interface.parseLog(log))
+      .find(log => log?.name === 'TransferToArgonFromSwapStarted')!;
+    expect(event.args.purchase.buyer).toBe(f.buyer.address);
+    expect(event.args.purchase.argonAccountId).toBe(request.argonAccountId);
+    expect(event.args.purchase.repayLiquidId).toBe(repayLiquidId);
+    expect(event.args.amount).toBeGreaterThanOrEqual(request.minMicrogonsOut);
+    expect(await f.usdc.getFunction('balanceOf')(f.buyer.address)).toBe(
+      before - event.args.purchase.usdcSpent,
+    );
+    expect(await f.usdc.getFunction('nonces')(f.buyer.address)).toBe(1n);
+    expect(await f.usdc.getFunction('allowance')(f.buyer.address, adapter)).toBe(0n);
+    expect(await f.usdc.getFunction('reentryError')()).toBe(
+      ethers.id('ReentrancyGuardReentrantCall()').slice(0, 10),
+    );
+
+    await expectCustomError(
+      buy(request, f.key, '0x', permit),
+      f.usdc,
+      'ERC20InsufficientAllowance',
+      [adapter, 0n, request.maxUsdcIn],
+    );
+    expect(await f.gateway.getFunction('gatewayActivityNonce')()).toBe(1n);
+  });
+
+  it('uses the allowance when someone submits the permit before the purchase', async () => {
+    const f = await fixture();
+    const adapter = await f.purchase.getAddress();
+    await f.usdc.getFunction('approve')(adapter, 0);
+    const permit = await signUsdcPermit(
+      f.buyer,
+      f.usdc,
+      adapter,
+      f.request.maxUsdcIn,
+      f.request.deadline,
+    );
+    await f.usdc.connect(f.guardian).getFunction('permit')(
+      f.buyer.address,
+      adapter,
+      f.request.maxUsdcIn,
+      permit.deadline,
+      permit.v,
+      permit.r,
+      permit.s,
+    );
+    const before = await f.usdc.getFunction('balanceOf')(f.buyer.address);
+
+    await (
+      await f.purchase.getFunction('buyAndTransferWithPermit')(f.request, f.key, '0x', permit)
+    ).wait();
+
+    expect(await f.usdc.getFunction('nonces')(f.buyer.address)).toBe(1n);
+    expect(await f.usdc.getFunction('balanceOf')(f.buyer.address)).toBe(
+      before - f.request.maxUsdcIn,
+    );
+    expect(await f.usdc.getFunction('allowance')(f.buyer.address, adapter)).toBe(0n);
+    expect(await f.gateway.getFunction('gatewayActivityNonce')()).toBe(1n);
+  });
+
+  it("does not let another caller spend the buyer's signed permit", async () => {
+    const f = await fixture();
+    const adapter = await f.purchase.getAddress();
+    await f.usdc.getFunction('approve')(adapter, 0);
+    const permit = await signUsdcPermit(
+      f.buyer,
+      f.usdc,
+      adapter,
+      f.request.maxUsdcIn,
+      f.request.deadline,
+    );
+    const before = await f.usdc.getFunction('balanceOf')(f.buyer.address);
+
+    await expectCustomError(
+      f.purchase.connect(f.guardian).getFunction('buyAndTransferWithPermit')(
+        f.request,
+        f.key,
+        '0x',
+        permit,
+      ),
+      f.usdc,
+      'ERC20InsufficientAllowance',
+      [adapter, 0n, f.request.maxUsdcIn],
+    );
+
+    expect(await f.usdc.getFunction('balanceOf')(f.buyer.address)).toBe(before);
+    expect(await f.usdc.getFunction('nonces')(f.buyer.address)).toBe(0n);
+    expect(await f.gateway.getFunction('gatewayActivityNonce')()).toBe(0n);
+  });
+
+  it('rejects an expired permit when the buyer has no allowance', async () => {
+    const f = await fixture();
+    const adapter = await f.purchase.getAddress();
+    await f.usdc.getFunction('approve')(adapter, 0);
+    const permit = await signUsdcPermit(f.buyer, f.usdc, adapter, f.request.maxUsdcIn, 0n);
+
+    await expectCustomError(
+      f.purchase.getFunction('buyAndTransferWithPermit')(f.request, f.key, '0x', permit),
+      f.usdc,
+      'ERC20InsufficientAllowance',
+      [adapter, 0n, f.request.maxUsdcIn],
+    );
+
+    expect(await f.usdc.getFunction('nonces')(f.buyer.address)).toBe(0n);
+    expect(await f.gateway.getFunction('gatewayActivityNonce')()).toBe(0n);
+  });
+
+  it('rolls back the permit on a failed purchase and accepts the same signature on retry', async () => {
+    const f = await fixture();
+    const adapter = await f.purchase.getAddress();
+    await f.usdc.getFunction('approve')(adapter, 0);
+    const permit = await signUsdcPermit(
+      f.buyer,
+      f.usdc,
+      adapter,
+      f.request.maxUsdcIn,
+      f.request.deadline,
+    );
+    const buy = f.purchase.getFunction('buyAndTransferWithPermit');
+    const before = await f.usdc.getFunction('balanceOf')(f.buyer.address);
+    await f.gateway.connect(f.guardian).getFunction('pause')();
+
+    await expectCustomError(buy(f.request, f.key, '0x', permit), f.gateway, 'EnforcedPause');
+
+    expect(await f.usdc.getFunction('nonces')(f.buyer.address)).toBe(0n);
+    expect(await f.usdc.getFunction('allowance')(f.buyer.address, adapter)).toBe(0n);
+    expect(await f.usdc.getFunction('balanceOf')(f.buyer.address)).toBe(before);
+    expect(await f.gateway.getFunction('gatewayActivityNonce')()).toBe(0n);
+
+    await f.gateway.getFunction('unpause')();
+    await (await buy(f.request, f.key, '0x', permit)).wait();
+    expect(await f.usdc.getFunction('nonces')(f.buyer.address)).toBe(1n);
+    expect(await f.gateway.getFunction('gatewayActivityNonce')()).toBe(1n);
+  });
+
   it('rejects token callbacks that reenter a purchase', async () => {
     const f = await fixture();
     const callData = f.purchase.interface.encodeFunctionData('buyAndTransfer', [
@@ -200,9 +358,13 @@ describe('native Uniswap v4 buyAndTransfer', () => {
     );
   });
 
-  it.each([true, false])(
-    'burns only purchased whole microgons and returns dust (USDC token0: %s)',
-    async zeroForOne => {
+  it.each([
+    { zeroForOne: true, repayLiquidId: 0n },
+    { zeroForOne: false, repayLiquidId: 1n },
+    { zeroForOne: true, repayLiquidId: 42n },
+  ])(
+    'burns purchased microgons and authenticates repayment intent ($zeroForOne, $repayLiquidId)',
+    async ({ zeroForOne, repayLiquidId }) => {
       const f = await fixture(zeroForOne);
       await f.argon.getFunction('transfer')(await f.purchase.getAddress(), 7n * SCALE);
       await f.usdc.getFunction('transfer')(await f.purchase.getAddress(), 17n);
@@ -210,12 +372,13 @@ describe('native Uniswap v4 buyAndTransfer', () => {
       const argonBefore = await f.argon.getFunction('balanceOf')(f.buyer.address);
       const usdcBefore = await f.usdc.getFunction('balanceOf')(f.buyer.address);
       const supplyBefore = await f.argon.getFunction('totalSupply')();
-      const receipt = await (await f.buyAndTransfer(f.request, f.key, '0x')).wait();
+      const request = { ...f.request, repayLiquidId };
+      const receipt = await (await f.buyAndTransfer(request, f.key, '0x')).wait();
       const log = receipt.logs
         .map((x: any) => f.gateway.interface.parseLog(x))
         .find((x: any) => x?.name === 'TransferToArgonFromSwapStarted');
       expect(log).toBeDefined();
-      await verifyReceiptProof(receipt, false, zeroForOne);
+      await verifyReceiptProof(receipt, false, zeroForOne && repayLiquidId === 0n);
 
       const { purchase, token, amount, gatewayState } = log.args;
       const swaps = receipt.logs.filter(
@@ -233,13 +396,14 @@ describe('native Uniswap v4 buyAndTransfer', () => {
         (entry: TransactionReceipt['logs'][number]) =>
           entry.topics[0] === MintingGatewayEvents.TransferToArgonFromSwapStarted.topic,
       )!;
-      expect(ethers.getBytes(purchaseLog.data)).toHaveLength(512);
+      expect(ethers.getBytes(purchaseLog.data)).toHaveLength(544);
       const purchaseBlock = await ethers.provider.getBlock(receipt.blockHash);
       expect(purchase.timestamp).toBe(BigInt(purchaseBlock!.timestamp));
       if (zeroForOne) expect(purchase.sqrtPriceAfterX96).toBeLessThan(purchase.sqrtPriceBeforeX96);
       else expect(purchase.sqrtPriceAfterX96).toBeGreaterThan(purchase.sqrtPriceBeforeX96);
       expect(purchase.buyer).toBe(f.buyer.address);
       expect(purchase.argonAccountId).toBe(f.request.argonAccountId);
+      expect(purchase.repayLiquidId).toBe(repayLiquidId);
       expect(purchase.usdcSpent).toBe(f.request.maxUsdcIn);
       expect(amount).toBe(purchase.argonBought / SCALE);
       expect(amount).toBeGreaterThanOrEqual(f.request.minMicrogonsOut);
@@ -277,6 +441,10 @@ describe('native Uniswap v4 buyAndTransfer', () => {
         ),
       ).toBe(0n);
       expect(await f.gateway.getFunction('gatewayActivityNonce')()).toBe(1n);
+      const packedGatewayState = BigInt(
+        await ethers.provider.getStorage(await f.gateway.getAddress(), 0),
+      );
+      expect((packedGatewayState >> 160n) & ((1n << 64n) - 1n)).toBe(1n);
       const activityHash = hashMintingGatewayTransferToArgonFromSwapStartedActivity(
         {
           chainId: (await ethers.provider.getNetwork()).chainId,
@@ -333,7 +501,7 @@ describe('native Uniswap v4 buyAndTransfer', () => {
     async zeroForOne => {
       const f = await fixture(zeroForOne, true);
       const usdcBefore = await f.usdc.getFunction('balanceOf')(f.buyer.address);
-      const request = f.request;
+      const request = { ...f.request, repayLiquidId: 1n };
       const receipt = await (await f.buyAndTransfer(request, f.key, '0x')).wait();
       const event = receipt.logs
         .map((log: any) => f.gateway.interface.parseLog(log))
@@ -521,6 +689,37 @@ it.each([true, false])(
     await verifyReceiptProof(receipt, false, false);
   },
 );
+
+async function signUsdcPermit(
+  signer: Signer,
+  usdc: BaseContract,
+  spender: string,
+  value: bigint,
+  deadline: bigint,
+) {
+  const owner = await signer.getAddress();
+  const signature = ethers.Signature.from(
+    await signer.signTypedData(
+      {
+        name: await usdc.getFunction('name')(),
+        version: '1',
+        chainId: (await ethers.provider.getNetwork()).chainId,
+        verifyingContract: await usdc.getAddress(),
+      },
+      {
+        Permit: [
+          { name: 'owner', type: 'address' },
+          { name: 'spender', type: 'address' },
+          { name: 'value', type: 'uint256' },
+          { name: 'nonce', type: 'uint256' },
+          { name: 'deadline', type: 'uint256' },
+        ],
+      },
+      { owner, spender, value, nonce: await usdc.getFunction('nonces')(owner), deadline },
+    ),
+  );
+  return { deadline, v: signature.v, r: signature.r, s: signature.s };
+}
 
 async function verifyReceiptProof(
   receipt: TransactionReceipt,

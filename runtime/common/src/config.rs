@@ -93,9 +93,14 @@ parameter_types! {
 	pub const PayoutHistoryBlocks: u32 = 5;
 	pub const BlockRewardsDampener: FixedU128 = FixedU128::from_rational(75, 100); // 75% dampener
 
+	// ### pallet_stabilizer_buys
+	pub const LiquidRepaymentRewardPercent: Percent = Percent::from_percent(5);
+
 	// ### pallet_treasury
 	pub const MaxActiveArgonotBondLots: u32 = 1_000;
 	pub const MaxArgonBondLots: u32 = 15_000;
+	pub const MaxExpectedBondLotsPerAccount: u32 = 100;
+	pub const MaxBondCollateralSettlementsPerBlock: u32 = 2;
 	pub const MaxVaultsPerPool: u32 = 100;
 	pub const TreasuryInternalPalletId: PalletId = PalletId(*b"lqdPools");
 	pub TreasuryMiningBidPoolAccount: AccountId =

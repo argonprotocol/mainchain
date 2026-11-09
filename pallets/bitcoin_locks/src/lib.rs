@@ -15,8 +15,8 @@ use polkadot_sdk::{
 use argon_bitcoin::CosignReleaser;
 use argon_primitives::{
 	bitcoin::{
-		BitcoinLockId, BitcoinNetwork, BitcoinSignature, CompressedBitcoinPubkey, H256Le, Satoshis,
-		SATOSHIS_PER_BITCOIN,
+		redemption_rate, BitcoinHeight, BitcoinLockId, BitcoinNetwork, BitcoinSignature,
+		CompressedBitcoinPubkey, H256Le, Satoshis, SATOSHIS_PER_BITCOIN,
 	},
 	providers::{BitcoinFissionLockError, BitcoinFissionLockProvider},
 	treasury::{BitcoinLockPosition, BitcoinLockPositionProvider, TreasuryPositionProvider},
@@ -24,6 +24,7 @@ use argon_primitives::{
 		BitcoinLockFunding, BitcoinSecuritizationBasis, BitcoinVaultProvider, CosignerGuarantee,
 		ReserveSecuritizationRequest, VaultError,
 	},
+	BitcoinUtxoTracker,
 };
 pub use pallet::*;
 pub use weights::*;
@@ -2207,45 +2208,18 @@ pub mod pallet {
 			btc_value_in_microgons: T::Balance,
 			max_btc_value_in_microgons: Option<T::Balance>,
 		) -> Result<T::Balance, Error<T>> {
-			let mut price = FixedU128::from_rational(btc_value_in_microgons.into(), 1u128);
-
-			if let Some(max_microgons) = max_btc_value_in_microgons {
-				price = price.min(FixedU128::from_rational(max_microgons.into(), 1u128));
-			}
+			// Apply the redemption cap before converting either runtime amount to fixed point.
+			let capped_value = if let Some(max_microgons) = max_btc_value_in_microgons {
+				btc_value_in_microgons.min(max_microgons)
+			} else {
+				btc_value_in_microgons
+			};
+			let price = FixedU128::checked_from_rational(capped_value.into(), 1u128)
+				.ok_or(Error::<T>::OverflowError)?;
 
 			let r = T::PriceProvider::get_redemption_r_value().unwrap_or(FixedU128::one());
 
-			// Case 1: If argon is at or above target price, no penalty — unlock cost is just b.
-			let multiplier = if r >= FixedU128::one() {
-				FixedU128::one()
-			}
-			// Case 2: Mild deviation (0.90 ≤ r < 1) — apply quadratic curve to scale unlock cost.
-			else if r >= FixedU128::from_rational(0_9, 1_0) {
-				const FX_20: FixedU128 = FixedU128::from_u32(20);
-				const FX_38: FixedU128 = FixedU128::from_u32(38);
-				const FX_19: FixedU128 = FixedU128::from_u32(19);
-
-				// Formula: b * (20r² - 38r + 19)
-				((FX_20 * r.saturating_pow(2)) + FX_19)
-					.ensure_sub(FX_38 * r)
-					.map_err(|_| Error::<T>::OverflowError)?
-			}
-			// Case 3: Moderate deviation (0.01 ≤ r < 0.90) — apply rational linear formula.
-			else if r >= FixedU128::from_rational(0_01, 1_00) {
-				const FX_0_5618: FixedU128 = FixedU128::from_rational(0_5618, 1_0000);
-				const FX_0_3944: FixedU128 = FixedU128::from_rational(0_3944, 1_0000);
-				// Formula: b * ((0.5618r + 0.3944) / r)
-				((FX_0_5618 * r) + FX_0_3944)
-					.ensure_div(r)
-					.map_err(|_| Error::<T>::OverflowError)?
-			}
-			// Case 4: Extreme deviation (r < 0.01) — maximize burn using an aggressive slope.
-			else {
-				const FX_0_576: FixedU128 = FixedU128::from_rational(0_576, 1_000);
-				const FX_0_4: FixedU128 = FixedU128::from_rational(0_4, 1_0);
-				// Formula: (b / r) * (0.576r + 0.4)
-				FixedU128::from_u32(1).div(r).saturating_mul((FX_0_576 * r) + FX_0_4)
-			};
+			let multiplier = redemption_rate(r).ok_or(Error::<T>::OverflowError)?;
 			let price = price.saturating_mul(multiplier);
 			// now scale to microgons
 			let microgons = price.saturating_mul_int(T::Balance::one());
@@ -2521,7 +2495,7 @@ impl<T: Config> BitcoinFissionLockProvider<T::AccountId, T::Balance> for Pallet<
 		satoshis: Satoshis,
 		fission_guarantee: &mut CosignerGuarantee<T::Balance>,
 		microgons_at_target_per_btc: T::Balance,
-		minimum_last_ratchet_tick: Tick,
+		minimum_last_ratchet_price_tick: Tick,
 		fee_coupon: Option<Self::FeeCoupon>,
 	) -> Result<Tick, BitcoinFissionLockError> {
 		let mut lock = LocksById::<T>::get(lock_id).ok_or(BitcoinFissionLockError::LockNotFound)?;
@@ -2531,7 +2505,7 @@ impl<T: Config> BitcoinFissionLockProvider<T::AccountId, T::Balance> for Pallet<
 		let tick = Self::latest_microgons_at_target_per_btc_tick(microgons_at_target_per_btc)
 			.ok_or(BitcoinFissionLockError::IneligibleMicrogonsAtTargetPerBtc)?;
 		ensure!(
-			tick >= minimum_last_ratchet_tick,
+			tick >= minimum_last_ratchet_price_tick,
 			BitcoinFissionLockError::MicrogonsAtTargetPerBtcTickOlderThanCurrent
 		);
 		ensure!(
@@ -2610,13 +2584,43 @@ impl<T: Config> BitcoinFissionLockProvider<T::AccountId, T::Balance> for Pallet<
 			.map_err(|_| BitcoinFissionLockError::Overflow)
 	}
 
+	fn can_repay_before_expiry(lock_id: BitcoinLockId, hold_frames: FrameId) -> bool {
+		let Some(lock) = LocksById::<T>::get(lock_id) else { return false };
+		let Some(height) = T::BitcoinUtxoTracker::get_confirmed_height() else { return false };
+		let required_ticks = hold_frames
+			.saturating_add(T::LockReleaseCosignDeadlineFrames::get())
+			.saturating_mul(T::ArgonTicksPerDay::get());
+		let remaining_ticks = lock
+			.vault_claim_height
+			.saturating_sub(height)
+			.saturating_mul(T::TicksPerBitcoinBlock::get());
+		required_ticks < remaining_ticks
+	}
+
+	fn get_lock_expiration(
+		lock_id: BitcoinLockId,
+	) -> Result<BitcoinHeight, BitcoinFissionLockError> {
+		LocksById::<T>::get(lock_id)
+			.map(|lock| lock.vault_claim_height)
+			.ok_or(BitcoinFissionLockError::LockNotFound)
+	}
+
+	fn calculate_redemption_amount(
+		satoshis: Satoshis,
+		microgons_at_target_per_btc: T::Balance,
+	) -> Result<T::Balance, BitcoinFissionLockError> {
+		let cap = BitcoinSecuritizationBasis { satoshis, microgons_at_target_per_btc, tick: 0 }
+			.btc_value_in_microgons();
+		Self::calculate_redemption_amount_from_satoshis(&satoshis, Some(cap))
+			.map_err(|_| BitcoinFissionLockError::NoBitcoinPricesAvailable)
+	}
+
 	fn fuse_satoshis(
 		account_id: &T::AccountId,
 		lock_id: BitcoinLockId,
 		satoshis: Satoshis,
 		fission_guarantee: CosignerGuarantee<T::Balance>,
-		microgons_at_target_per_btc: T::Balance,
-	) -> Result<T::Balance, BitcoinFissionLockError> {
+	) -> Result<(), BitcoinFissionLockError> {
 		let mut lock = LocksById::<T>::get(lock_id).ok_or(BitcoinFissionLockError::LockNotFound)?;
 		ensure!(lock.owner_account == *account_id, BitcoinFissionLockError::NoPermissions);
 
@@ -2643,18 +2647,6 @@ impl<T: Config> BitcoinFissionLockProvider<T::AccountId, T::Balance> for Pallet<
 		// The Bitcoin stays funded in the Lock; closing frees its Fission allocation.
 		lock.fissioned_satoshis.saturating_reduce(satoshis);
 
-		let fission_btc_value_in_microgons = BitcoinSecuritizationBasis {
-			satoshis,
-			microgons_at_target_per_btc,
-			..fission_guarantee.basis
-		}
-		.btc_value_in_microgons();
-		let redemption = Self::calculate_redemption_amount_from_satoshis(
-			&satoshis,
-			Some(fission_btc_value_in_microgons),
-		)
-		.map_err(|_| BitcoinFissionLockError::NoBitcoinPricesAvailable)?;
-
 		Self::merge_guarantees(&mut lock.cosigner_guarantee, &fission_guarantee)?;
 		let merged_funding = lock.funding_and_securitization();
 
@@ -2679,7 +2671,7 @@ impl<T: Config> BitcoinFissionLockProvider<T::AccountId, T::Balance> for Pallet<
 
 		LocksById::<T>::insert(lock_id, lock);
 
-		Ok(redemption)
+		Ok(())
 	}
 }
 

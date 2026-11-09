@@ -50,6 +50,27 @@ mod benchmarks {
 	use argon_primitives::CollectBlockerProvider;
 
 	#[benchmark]
+	fn provider_last_state_by_chain() {
+		GatewayStateBySourceChain::<T>::insert(
+			BENCHMARK_DESTINATION_CHAIN,
+			GatewayState::<T::Balance> {
+				last_synced_source_block_time: Some(u64::MAX),
+				gateway_activity_nonce: u64::MAX,
+				argon_approvals_nonce: u64::MAX,
+				argon_circulation: u128::MAX.into(),
+				argonot_circulation: u128::MAX.into(),
+			},
+		);
+		#[block]
+		{
+			assert!(Pallet::<T>::last_state_by_chain(core::hint::black_box(
+				BENCHMARK_DESTINATION_CHAIN
+			))
+			.is_some());
+		}
+	}
+
+	#[benchmark]
 	fn provider_tx_pool_key() {
 		use argon_primitives::{
 			MAX_ETHEREUM_RECEIPTS_PER_PROOF, MAX_ETHEREUM_RECEIPT_PROOF_NODE_BYTES,
@@ -134,7 +155,8 @@ mod benchmarks {
 		GatewaySyncPauseBySourceChain::<T>::remove(SourceChain::Ethereum);
 		GatewayStateBySourceChain::<T>::insert(
 			SourceChain::Ethereum,
-			GatewayState::<T> {
+			GatewayState::<T::Balance> {
+				last_synced_source_block_time: None,
 				gateway_activity_nonce: 1,
 				argon_approvals_nonce: u64::MAX,
 				argon_circulation: u128::MAX.into(),
@@ -171,6 +193,14 @@ mod benchmarks {
 			benchmark_chain_config(0x20),
 		);
 
+		GatewayStateBySourceChain::<T>::insert(
+			BENCHMARK_DESTINATION_CHAIN,
+			GatewayState::<T::Balance> {
+				last_synced_source_block_time: Some(100),
+				..Default::default()
+			},
+		);
+
 		#[extrinsic_call]
 		set_chain_config(
 			RawOrigin::Root,
@@ -181,6 +211,12 @@ mod benchmarks {
 		assert_eq!(
 			ChainConfigBySourceChain::<T>::get(BENCHMARK_DESTINATION_CHAIN),
 			Some(benchmark_chain_config(0x21)),
+		);
+		assert_eq!(
+			GatewayStateBySourceChain::<T>::get(BENCHMARK_DESTINATION_CHAIN)
+				.unwrap()
+				.last_synced_source_block_time,
+			None
 		);
 		Ok(())
 	}
@@ -314,7 +350,8 @@ mod benchmarks {
 		reset_crosschain_benchmark_state();
 		GatewayStateBySourceChain::<T>::insert(
 			BENCHMARK_DESTINATION_CHAIN,
-			GatewayState::<T> {
+			GatewayState::<T::Balance> {
+				last_synced_source_block_time: None,
 				gateway_activity_nonce: 7,
 				argon_approvals_nonce: 0,
 				argon_circulation: T::Balance::default(),
@@ -624,6 +661,13 @@ mod benchmarks {
 						value: H256::from_slice(activity_root.as_slice()),
 						node_indexes: BoundedVec::default(),
 					},
+					EthereumStorageSlotProof {
+						slot: H256::zero(),
+						value: H256::from_slice(
+							&(alloy_primitives::U256::from(a) << 160usize).to_be_bytes::<32>(),
+						),
+						node_indexes: BoundedVec::default(),
+					},
 				]
 				.try_into()
 				.map_err(|_| BenchmarkError::Stop("benchmark slots exceeded proof bound"))?,
@@ -792,6 +836,13 @@ mod benchmarks {
 					EthereumStorageSlotProof {
 						slot: root_slot,
 						value: H256::from_slice(activity_root.as_slice()),
+						node_indexes: BoundedVec::default(),
+					},
+					EthereumStorageSlotProof {
+						slot: H256::zero(),
+						value: H256::from_slice(
+							&(alloy_primitives::U256::from(a) << 160usize).to_be_bytes::<32>(),
+						),
 						node_indexes: BoundedVec::default(),
 					},
 				]
@@ -1493,6 +1544,7 @@ fn purchase_activity_log(log: EthereumLog) -> EthereumLog {
 			.unwrap();
 	let purchase = TransferToArgonFromSwapStarted {
 		purchase: SwapPurchase {
+			repayLiquidId: 0,
 			timestamp: 1,
 			buyer: transfer.from,
 			argonAccountId: transfer.argonAccountId,

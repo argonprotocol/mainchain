@@ -18,7 +18,7 @@ use argon_primitives::{
 	providers::{
 		BitcoinFissionLockProviderWeightInfo, BitcoinFissionsProvider,
 		BitcoinFissionsProviderWeightInfo, BitcoinUtxoEventsWeightInfo, BitcoinUtxoTracker,
-		BitcoinUtxoTrackerWeightInfo,
+		BitcoinUtxoTrackerWeightInfo, PriceProvider, PriceProviderWeightInfo,
 	},
 	treasury::{
 		BitcoinLockPositionProviderWeightInfo, TreasuryPositionProvider,
@@ -30,6 +30,9 @@ use pallet_prelude::*;
 
 /// Weight functions needed for pallet_bitcoin_locks.
 pub trait WeightInfo {
+	fn provider_has_repayment_window() -> Weight;
+	fn provider_get_lock_expiration() -> Weight;
+	fn provider_calculate_fission_redemption() -> Weight;
 	fn provider_is_feeless() -> Weight;
 	fn provider_account_position() -> Weight {
 		Weight::zero()
@@ -102,6 +105,8 @@ type PositionWeights<T> = <<T as Config>::PositionProvider as TreasuryPositionPr
 	<T as Config>::Balance,
 >>::Weights;
 type UtxoTrackerWeights<T> = <<T as Config>::BitcoinUtxoTracker as BitcoinUtxoTracker>::Weights;
+type PriceWeights<T> =
+	<<T as Config>::PriceProvider as PriceProvider<<T as Config>::Balance>>::Weights;
 
 pub struct WithProviderWeights<
 	T,
@@ -233,11 +238,24 @@ where
 		Base::provider_calculate_liquidity_promised()
 	}
 
+	fn provider_get_lock_expiration() -> Weight {
+		Base::provider_get_lock_expiration()
+	}
+	fn provider_calculate_fission_redemption() -> Weight {
+		Base::provider_calculate_fission_redemption()
+			.saturating_add(PriceWeights::<T>::get_redemption_prices())
+	}
+
+	fn provider_has_repayment_window() -> Weight {
+		Base::provider_has_repayment_window()
+			.saturating_add(UtxoTrackerWeights::<T>::get_confirmed_height())
+	}
+
 	fn provider_fuse_satoshis() -> Weight {
 		Base::provider_fuse_satoshis()
+			.saturating_add(UtxoTrackerWeights::<T>::get_block_height_change())
 			.saturating_add(PositionWeights::<T>::position_updated())
-			// Bound the Vault funding update with existing replacement weights.
-			.saturating_add(VaultProviderWeight::resecuritize().saturating_mul(2))
+			.saturating_add(VaultProviderWeight::record_bitcoin_lock_funding())
 	}
 
 	fn provider_utxo_detected() -> Weight {
@@ -291,6 +309,17 @@ where
 	}
 }
 impl<T: Config> BitcoinFissionLockProviderWeightInfo for ProviderWeightAdapter<T> {
+	fn has_repayment_window() -> Weight {
+		T::WeightInfo::provider_has_repayment_window()
+	}
+
+	fn get_lock_expiration() -> Weight {
+		T::WeightInfo::provider_get_lock_expiration()
+	}
+	fn calculate_redemption_amount() -> Weight {
+		T::WeightInfo::provider_calculate_fission_redemption()
+	}
+
 	fn fission_satoshis() -> Weight {
 		<T as Config>::WeightInfo::provider_fission_satoshis()
 	}
@@ -319,6 +348,16 @@ impl<T: Config> BitcoinUtxoEventsWeightInfo for ProviderWeightAdapter<T> {
 
 // For backwards compatibility and tests.
 impl WeightInfo for () {
+	fn provider_has_repayment_window() -> Weight {
+		Weight::zero()
+	}
+
+	fn provider_calculate_fission_redemption() -> Weight {
+		Weight::zero()
+	}
+	fn provider_get_lock_expiration() -> Weight {
+		Weight::zero()
+	}
 	fn provider_is_feeless() -> Weight {
 		Weight::zero()
 	}

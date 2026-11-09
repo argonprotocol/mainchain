@@ -3,7 +3,6 @@
 
 use core::marker::PhantomData;
 use polkadot_sdk::{
-	sp_arithmetic::FixedU128,
 	sp_core::H160,
 	sp_runtime::{
 		traits::{AtLeast32BitUnsigned, Get, SaturatedConversion},
@@ -15,7 +14,7 @@ use argon_bitcoin::CosignReleaser;
 use argon_primitives::{
 	bitcoin::{
 		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinLockId, BitcoinSignature, BitcoinXPub,
-		CompressedBitcoinPubkey, FissionId, Satoshis,
+		CompressedBitcoinPubkey, FissionId, LiquidId, LiquidRepayPrices, Satoshis,
 	},
 	block_seal::FrameId,
 	ethereum::{
@@ -30,7 +29,8 @@ use argon_primitives::{
 	},
 	Balance, BitcoinFissionLockError, BitcoinFissionLockProvider, BitcoinFissionMinting,
 	BitcoinFissionsProvider, EthereumVerifyProvider, MiningSlotProvider, Moment,
-	OperationalAccountProvider, TreasuryPoolProvider, UniswapTransferProvider, VaultId,
+	OperationalAccountProvider, RValueHighWaterMark, TreasuryPoolProvider, UniswapTransferProvider,
+	VaultId,
 };
 use pallet_bitcoin_locks::BitcoinVerifier;
 pub use pallet_prelude::benchmarking::{
@@ -45,12 +45,12 @@ pub use pallet_prelude::benchmarking::{
 	BenchmarkBitcoinLocksRuntimeState, BenchmarkBitcoinNetwork, BenchmarkBitcoinUtxoTracker,
 	BenchmarkBitcoinUtxoTrackerState, BenchmarkBitcoinVaultProvider,
 	BenchmarkBitcoinVaultProviderState, BenchmarkBlockRewardAccountsProvider,
-	BenchmarkBlockSealerProvider, BenchmarkCurrentFrameId, BenchmarkCurrentTick,
-	BenchmarkDidStartNewFrame, BenchmarkNotaryProvider, BenchmarkNotebookProvider,
-	BenchmarkOperationalAccountsProviderState, BenchmarkOperationalRewardsPayer,
-	BenchmarkOperationalRewardsProvider, BenchmarkOperationalRewardsProviderState,
-	BenchmarkPriceProvider, BenchmarkPriceProviderState, BenchmarkTickProvider,
-	BenchmarkTreasuryPositionProvider, BenchmarkTreasuryRewardProvider,
+	BenchmarkBlockSealerProvider, BenchmarkCrosschainGatewayProvider, BenchmarkCurrentFrameId,
+	BenchmarkCurrentTick, BenchmarkDidStartNewFrame, BenchmarkNotaryProvider,
+	BenchmarkNotebookProvider, BenchmarkOperationalAccountsProviderState,
+	BenchmarkOperationalRewardsPayer, BenchmarkOperationalRewardsProvider,
+	BenchmarkOperationalRewardsProviderState, BenchmarkPriceProvider, BenchmarkPriceProviderState,
+	BenchmarkTickProvider, BenchmarkTreasuryPositionProvider, BenchmarkTreasuryRewardProvider,
 };
 use pallet_prelude::DispatchResult;
 
@@ -105,10 +105,10 @@ where
 		_satoshis: Satoshis,
 		_guarantee: &mut CosignerGuarantee<Balance>,
 		_microgons_at_target_per_btc: Balance,
-		minimum_last_ratchet_tick: Tick,
+		minimum_last_ratchet_price_tick: Tick,
 		_fee_coupon: Option<Self::FeeCoupon>,
 	) -> Result<Tick, BitcoinFissionLockError> {
-		Ok(minimum_last_ratchet_tick)
+		Ok(minimum_last_ratchet_price_tick)
 	}
 
 	fn calculate_liquidity_promised(
@@ -119,15 +119,30 @@ where
 			.btc_value_in_microgons())
 	}
 
-	fn fuse_satoshis(
-		_account_id: &AccountId,
-		_lock_id: BitcoinLockId,
+	fn can_repay_before_expiry(_: BitcoinLockId, _: FrameId) -> bool {
+		true
+	}
+
+	fn get_lock_expiration(
+		lock_id: BitcoinLockId,
+	) -> Result<BitcoinHeight, BitcoinFissionLockError> {
+		Ok(lock_id)
+	}
+	fn calculate_redemption_amount(
 		satoshis: Satoshis,
-		_guarantee: CosignerGuarantee<Balance>,
 		microgons_at_target_per_btc: Balance,
 	) -> Result<Balance, BitcoinFissionLockError> {
 		Ok(BitcoinSecuritizationBasis { satoshis, microgons_at_target_per_btc, tick: 0 }
 			.btc_value_in_microgons())
+	}
+
+	fn fuse_satoshis(
+		_account_id: &AccountId,
+		_lock_id: BitcoinLockId,
+		_satoshis: Satoshis,
+		_guarantee: CosignerGuarantee<Balance>,
+	) -> Result<(), BitcoinFissionLockError> {
+		Ok(())
 	}
 }
 
@@ -170,11 +185,11 @@ impl EthereumVerifyProvider for BenchmarkCrosschainTransferEthereumVerifier {
 	fn verify_account_storage_proof<MaxStorageSlots>(
 		_gateway_address: H160,
 		_proof: &EthereumAccountStorageProof<MaxStorageSlots>,
-	) -> Result<(), EthereumVerifyError>
+	) -> Result<Moment, EthereumVerifyError>
 	where
 		MaxStorageSlots: Get<u32>,
 	{
-		Ok(())
+		Ok(Self::latest_execution_block_timestamp().unwrap_or_default())
 	}
 
 	fn latest_execution_block_number() -> Option<EthereumBlockNumber> {
@@ -515,5 +530,46 @@ impl<AccountId> UniswapTransferProvider<AccountId>
 		let result = state.account_uniswap_argon_transfers_in_amount;
 		set_benchmark_operational_accounts_provider_state(state);
 		result
+	}
+}
+
+/// Isolate Fission accounting while measuring the buys pallet's held burn and settlement writes.
+pub struct BenchmarkLiquidRepayment<AccountId, Balance>(PhantomData<(AccountId, Balance)>);
+impl<AccountId, Balance> BitcoinFissionsProvider<AccountId, Balance>
+	for BenchmarkLiquidRepayment<AccountId, Balance>
+where
+	Balance: From<u128> + Into<u128> + Copy,
+{
+	type Weights = ();
+	fn is_liquid_repayment_valid(_: &AccountId, _: LiquidId, _: Tick, _: FrameId) -> bool {
+		true
+	}
+
+	fn next_r_value_high_water(from_frame: FrameId) -> Option<(FrameId, RValueHighWaterMark)> {
+		if from_frame > 0 {
+			return None;
+		}
+		Some((
+			0,
+			RValueHighWaterMark {
+				r_value: polkadot_sdk::sp_runtime::FixedU128::from_u32(2),
+				first_tick: 0,
+				end_tick: Some(Tick::MAX),
+			},
+		))
+	}
+	fn get_account_fission_liquidity(_: &AccountId) -> Balance {
+		0u128.into()
+	}
+	fn repay_liquid<BurnCallback: FnMut(Balance) -> DispatchResult>(
+		_: &AccountId,
+		_: LiquidId,
+		budget: Balance,
+		_prices: LiquidRepayPrices,
+		mut burn_callback: BurnCallback,
+	) -> Result<Balance, DispatchError> {
+		let amount: Balance = (budget.into() / 2).into();
+		burn_callback(amount)?;
+		Ok(amount)
 	}
 }

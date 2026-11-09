@@ -21,6 +21,7 @@ pub use digests::{BlockSealDigest, AUTHOR_DIGEST_ID, BLOCK_SEAL_DIGEST_ID, *};
 pub use domain::*;
 pub use domain_top_level::DomainTopLevel;
 pub use ethereum::*;
+pub use gateway::*;
 #[cfg(feature = "std")]
 pub use keystore_helper::*;
 
@@ -37,6 +38,7 @@ pub mod digests;
 mod domain;
 pub mod domain_top_level;
 pub mod ethereum;
+pub mod gateway;
 pub mod host;
 pub mod inherents;
 pub mod macros;
@@ -50,7 +52,7 @@ pub mod note;
 pub mod notebook;
 pub mod price_index;
 pub mod providers;
-pub use price_index::PriceIndex;
+pub use price_index::{PriceIndex, RValueHighWaterMark};
 pub mod tick;
 pub mod treasury;
 

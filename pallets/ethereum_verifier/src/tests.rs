@@ -2448,7 +2448,7 @@ fn verify_account_storage_proof_matches_hardhat_eth_getproof_fixture() {
 		));
 		assert_eq!(
 			EthereumBeaconClient::verify_account_storage_proof(gateway_address, &proof),
-			Ok(()),
+			Ok(anchor.timestamp_millis),
 		);
 	});
 }

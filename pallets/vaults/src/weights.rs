@@ -43,6 +43,9 @@ pub trait WeightInfo {
 	fn provider_burn_encumbered_argonots() -> Weight;
 	fn provider_account_became_operational() -> Weight;
 	fn provider_set_bitcoin_lock_flexible() -> Weight;
+	fn provider_record_bitcoin_lock_funding() -> Weight;
+	fn provider_record_bitcoin_lock_funding_first() -> Weight;
+	fn provider_record_bitcoin_lock_funding_new_frame() -> Weight;
 	fn provider_reserve_securitization(release_schedule_entries: u32) -> Weight;
 	fn provider_resecuritize(release_schedule_entries: u32) -> Weight;
 	fn provider_resecuritize_unfunded(release_schedule_entries: u32) -> Weight;
@@ -203,6 +206,21 @@ where
 	fn provider_set_bitcoin_lock_flexible() -> Weight {
 		Base::provider_set_bitcoin_lock_flexible()
 	}
+	fn provider_record_bitcoin_lock_funding() -> Weight {
+		Base::provider_record_bitcoin_lock_funding()
+			.saturating_add(PositionWeights::<T>::network_securitized_satoshis_updated())
+			.saturating_add(OperationalAccountsHookWeights::<T>::vault_bitcoin_lock_funded())
+	}
+	fn provider_record_bitcoin_lock_funding_new_frame() -> Weight {
+		Base::provider_record_bitcoin_lock_funding_new_frame()
+			.saturating_add(PositionWeights::<T>::network_securitized_satoshis_updated())
+			.saturating_add(OperationalAccountsHookWeights::<T>::vault_bitcoin_lock_funded())
+	}
+	fn provider_record_bitcoin_lock_funding_first() -> Weight {
+		Base::provider_record_bitcoin_lock_funding_first()
+			.saturating_add(PositionWeights::<T>::network_securitized_satoshis_updated())
+			.saturating_add(OperationalAccountsHookWeights::<T>::vault_bitcoin_lock_funded())
+	}
 
 	fn provider_resecuritize(release_schedule_entries: u32) -> Weight {
 		Base::provider_resecuritize(release_schedule_entries)
@@ -307,6 +325,11 @@ impl<T: crate::Config> BitcoinVaultProviderWeightInfo for ProviderWeightAdapter<
 	fn set_bitcoin_lock_flexible() -> Weight {
 		<T as crate::Config>::WeightInfo::provider_set_bitcoin_lock_flexible()
 	}
+	fn record_bitcoin_lock_funding() -> Weight {
+		<T as crate::Config>::WeightInfo::provider_record_bitcoin_lock_funding()
+			.max(<T as crate::Config>::WeightInfo::provider_record_bitcoin_lock_funding_first())
+			.max(<T as crate::Config>::WeightInfo::provider_record_bitcoin_lock_funding_new_frame())
+	}
 
 	fn reserve_securitization() -> Weight {
 		<T as crate::Config>::WeightInfo::provider_reserve_securitization(
@@ -330,6 +353,16 @@ impl<T: crate::Config> BitcoinVaultProviderWeightInfo for ProviderWeightAdapter<
 
 // For backwards compatibility and tests.
 impl WeightInfo for () {
+	fn provider_record_bitcoin_lock_funding() -> Weight {
+		Weight::zero()
+	}
+	fn provider_record_bitcoin_lock_funding_first() -> Weight {
+		Weight::zero()
+	}
+	fn provider_record_bitcoin_lock_funding_new_frame() -> Weight {
+		Weight::zero()
+	}
+
 	fn create() -> Weight {
 		Weight::zero()
 	}

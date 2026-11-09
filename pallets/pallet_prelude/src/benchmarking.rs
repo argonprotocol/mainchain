@@ -35,8 +35,8 @@ use argon_primitives::{
 		RegistrationVaultData, ReserveSecuritizationRequest, TreasuryVaultProvider, Vault,
 		VaultError, VaultParticipationCapacity, VaultSecuritization, VaultTreasuryFrameEarnings,
 	},
-	ArgonCPI, NotaryId, NotebookNumber, NotebookSecret, OperationalRewardPayout, PriceProvider,
-	VaultId, VotingSchedule,
+	ArgonCPI, CrosschainGatewayProvider, GatewayState, NotaryId, NotebookNumber, NotebookSecret,
+	OperationalRewardPayout, PriceProvider, SourceChain, VaultId, VotingSchedule,
 };
 use codec::{Decode, Encode, FullCodec, HasCompact};
 use core::{iter::Sum, marker::PhantomData};
@@ -406,7 +406,18 @@ impl<T: frame_system::Config> NotebookProvider for BenchmarkNotebookProvider<T> 
 	}
 }
 
+pub struct BenchmarkCrosschainGatewayProvider<Balance>(PhantomData<Balance>);
+impl<Balance: Default> CrosschainGatewayProvider<Balance>
+	for BenchmarkCrosschainGatewayProvider<Balance>
+{
+	type Weights = ();
+	fn last_state_by_chain(_source_chain: SourceChain) -> Option<GatewayState<Balance>> {
+		Some(GatewayState { last_synced_source_block_time: Some(100_000), ..Default::default() })
+	}
+}
+
 pub struct BenchmarkTickProvider;
+
 impl<B: BlockT> argon_primitives::TickProvider<B> for BenchmarkTickProvider {
 	type Weights = ();
 
@@ -963,6 +974,9 @@ pub fn benchmark_bitcoin_utxo_tracker_state() -> BenchmarkBitcoinUtxoTrackerStat
 pub struct BenchmarkBitcoinUtxoTracker;
 impl BitcoinUtxoTracker for BenchmarkBitcoinUtxoTracker {
 	type Weights = ();
+	fn get_confirmed_height() -> Option<BitcoinHeight> {
+		Some(benchmark_bitcoin_utxo_tracker_state().bitcoin_block_height_change.1)
+	}
 
 	fn get_synched_height() -> BitcoinHeight {
 		0
@@ -1034,6 +1048,8 @@ impl Get<FrameId> for BenchmarkCurrentFrameId {
 }
 
 impl MiningFrameTransitionProvider for BenchmarkCurrentFrameId {
+	type Weights = ();
+
 	fn is_new_frame_started() -> Option<FrameId> {
 		let state = benchmark_bitcoin_locks_runtime_state();
 		state.did_start_new_frame.then_some(state.current_frame_id)
@@ -1063,6 +1079,28 @@ pub struct BenchmarkCurrentTick;
 impl Get<Tick> for BenchmarkCurrentTick {
 	fn get() -> Tick {
 		benchmark_bitcoin_locks_runtime_state().current_tick
+	}
+}
+
+impl<B: BlockT> argon_primitives::TickProvider<B> for BenchmarkCurrentTick {
+	type Weights = ();
+	fn current_tick() -> Tick {
+		<Self as Get<Tick>>::get()
+	}
+	fn previous_tick() -> Tick {
+		<Self as Get<Tick>>::get().saturating_sub(1)
+	}
+	fn elapsed_ticks() -> Tick {
+		<Self as Get<Tick>>::get()
+	}
+	fn voting_schedule() -> VotingSchedule {
+		VotingSchedule::from_runtime_current_tick(<Self as Get<Tick>>::get())
+	}
+	fn ticker() -> Ticker {
+		Ticker::new(1_000, 2)
+	}
+	fn blocks_at_tick(_tick: Tick) -> Vec<B::Hash> {
+		Vec::new()
 	}
 }
 

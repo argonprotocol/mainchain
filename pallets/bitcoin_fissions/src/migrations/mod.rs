@@ -39,7 +39,7 @@ pub mod v1 {
 		#[codec(compact)]
 		pub ratchet_number: u32,
 		#[codec(compact)]
-		pub last_ratchet_tick: Tick,
+		pub last_ratchet_price_tick: Tick,
 		#[codec(compact)]
 		pub last_updated_argon_block: BlockNumberFor<T>,
 	}
@@ -58,7 +58,7 @@ pub mod v1 {
 				cosigner_guarantee,
 				created_at_argon_block: self.created_at_argon_block,
 				ratchet_number: self.ratchet_number,
-				last_ratchet_tick: self.last_ratchet_tick,
+				last_ratchet_price_tick: self.last_ratchet_price_tick,
 				last_updated_argon_block: self.last_updated_argon_block,
 			}
 		}

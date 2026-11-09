@@ -27,10 +27,10 @@ impl<AccountId> TreasuryRewardProvider<AccountId> for BenchmarkTreasuryRewardPro
 	fn return_budget(_: u128) -> DispatchResult {
 		Ok(())
 	}
-	fn pay_reward(_: &AccountId, _: u128) -> DispatchResult {
+	fn pay_reward(_: &AccountId, amount: u128) -> Result<u128, DispatchError> {
 		if FAIL_PAYMENT.load(Ordering::Relaxed) {
 			return Err(DispatchError::Other("benchmark reward payment failed"));
 		}
-		Ok(())
+		Ok(amount)
 	}
 }
