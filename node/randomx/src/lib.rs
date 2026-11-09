@@ -1,14 +1,27 @@
+use parking_lot::Mutex;
 use polkadot_sdk::sp_core::H256;
 pub use randomx_rs::RandomXError;
 use randomx_rs::{RandomXCache, RandomXFlag, RandomXVM};
+
+// Retain only the most recently verified key (about 256 MiB), independently of mining.
+static VERIFICATION_CACHE: Mutex<Option<(H256, RandomXCache)>> = Mutex::new(None);
 
 #[cfg(test)]
 static MINING_MEMORY_TEST_LOCK: parking_lot::Mutex<()> = parking_lot::Mutex::new(());
 
 pub fn calculate_hash(key_hash: &H256, pre_hash: &[u8]) -> Result<H256, RandomXError> {
 	let flags = RandomXFlag::get_recommended_flags();
-	let cache = RandomXCache::new(flags, key_hash.as_ref())?;
-	let vm = RandomXVM::new(flags, Some(cache), None)?;
+	let mut verification_cache = VERIFICATION_CACHE.lock();
+	if verification_cache.as_ref().is_none_or(|(key, _)| key != key_hash) {
+		// Release the old cache before allocating, including when replacement fails.
+		*verification_cache = None;
+		*verification_cache = Some((*key_hash, RandomXCache::new(flags, key_hash.as_ref())?));
+	}
+
+	// Hold the lock through hashing so no active VM can retain an evicted cache.
+	let (_, cache) =
+		verification_cache.as_ref().expect("Verification cache initialized above; qed");
+	let vm = RandomXVM::new(flags, Some(cache.clone()), None)?;
 	vm.calculate_hash(pre_hash).map(|e| H256::from_slice(e.as_ref()))
 }
 
@@ -343,7 +356,57 @@ pub mod full_vm {
 
 #[cfg(test)]
 mod tests {
-	use crate::full_vm::VMData;
+	use crate::{
+		calculate_hash, full_vm::VMData, RandomXCache, RandomXError, RandomXFlag, RandomXVM, H256,
+	};
+
+	#[test]
+	fn verification_matches_cold_caches_across_keys_and_threads() {
+		let keys = [H256::repeat_byte(1), H256::repeat_byte(2)];
+		let inputs = [b"first block".as_slice(), b"second block".as_slice()];
+		let flags = RandomXFlag::get_recommended_flags();
+		let mut expected = Vec::new();
+		for key in keys {
+			let cache = RandomXCache::new(flags, key.as_ref()).unwrap();
+			let vm = RandomXVM::new(flags, Some(cache), None).unwrap();
+			expected.push(inputs.map(|input| H256::from_slice(&vm.calculate_hash(input).unwrap())));
+		}
+		assert_ne!(expected[0], expected[1]);
+
+		// Revisit the first key after eviction, and hash different inputs on every hit.
+		for key_index in [0, 1, 0] {
+			for _ in 0..2 {
+				for (input_index, input) in inputs.iter().enumerate() {
+					assert_eq!(
+						calculate_hash(&keys[key_index], input).unwrap(),
+						expected[key_index][input_index]
+					);
+				}
+			}
+		}
+
+		assert!(matches!(calculate_hash(&keys[0], &[]), Err(RandomXError::ParameterError(_))));
+		assert_eq!(calculate_hash(&keys[0], inputs[0]).unwrap(), expected[0][0]);
+
+		let start = std::sync::Barrier::new(4);
+		std::thread::scope(|scope| {
+			for worker in 0..4 {
+				let start = &start;
+				let expected = &expected;
+				scope.spawn(move || {
+					start.wait();
+					for round in 0..3 {
+						let key_index = (worker + round) % keys.len();
+						let input_index = worker % inputs.len();
+						assert_eq!(
+							calculate_hash(&keys[key_index], inputs[input_index]).unwrap(),
+							expected[key_index][input_index]
+						);
+					}
+				});
+			}
+		});
+	}
 
 	#[test]
 	fn should_match_randomx_tests() {
