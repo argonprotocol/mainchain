@@ -22,7 +22,7 @@ cleanup() {
 
 trap cleanup EXIT SIGHUP SIGINT SIGTERM
 
-"$BASEDIR/../target/debug/argon-node" --tmp --no-mdns --no-prometheus --chain=meta --rpc-port="${RPC_PORT}" --compute-miners=0 --bitcoin-rpc-url="http://127.0.0.1:18443" > "$PIPE" 2>&1 &
+"${CARGO_TARGET_DIR:-$BASEDIR/../target}/debug/argon-node" --tmp --no-mdns --no-prometheus --chain=meta --rpc-port="${RPC_PORT}" --compute-miners=0 --bitcoin-rpc-url="http://127.0.0.1:18443" > "$PIPE" 2>&1 &
 set +x
 argon_PID=$!
 

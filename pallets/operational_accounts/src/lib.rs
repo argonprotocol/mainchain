@@ -40,7 +40,8 @@ pub mod pallet {
 	};
 
 	pub const UPSTREAM_ACCESS_PROOF_MESSAGE_KEY: &[u8] = b"operational_access_proof";
-	pub const OPERATIONAL_ACCOUNT_PROOF_MESSAGE_KEY: &[u8; 27] = b"operational_primary_account";
+	pub const REGISTRATION_PROOF_DOMAIN: &[u8] = b"argon/operational-registration/v2";
+	pub const REGISTRATION_PROOF_VERSION: u8 = 2;
 	pub const VAULT_ACCOUNT_PROOF_MESSAGE_KEY: &[u8; 25] = b"operational_vault_account";
 	pub const MINING_ACCOUNT_PROOF_MESSAGE_KEY: &[u8; 26] = b"operational_mining_account";
 	const STORAGE_VERSION: StorageVersion = StorageVersion::new(4);
@@ -259,7 +260,8 @@ pub mod pallet {
 		pub operational_account: T::AccountId,
 		/// Opaque public encryption key for this operational account, currently x25519 bytes.
 		pub encryption_pubkey: OpaqueEncryptionPubkey,
-		/// Proof that the primary operational account is controlled by the registrant.
+		/// Operational-key authorization of all registration fields, bound to this chain.
+		/// Uses registration proof version 2; ownership-only signatures are not accepted.
 		pub operational_account_proof: AccountOwnershipProof,
 		/// Vault account associated with this operational account.
 		pub vault_account: T::AccountId,
@@ -271,6 +273,56 @@ pub mod pallet {
 		pub mining_account_proof: AccountOwnershipProof,
 		/// Optional upstream access proof used to link this registration to an upstream account.
 		pub access_proof: Option<UpstreamAccessProof<T::AccountId>>,
+	}
+
+	impl<T: Config> RegistrationV1<T> {
+		/// Verify that the operational key authorizes this registration on this chain.
+		pub fn verify(&self) -> bool {
+			let Ok(operational_signer) =
+				AccountId32::decode(&mut self.operational_account.encode().as_slice())
+			else {
+				return false;
+			};
+			let message = self.signing_hash();
+			let verified = self
+				.operational_account_proof
+				.signature
+				.verify(message.as_slice(), &operational_signer);
+			#[cfg(feature = "runtime-benchmarks")]
+			{
+				let _ = verified;
+				true
+			}
+			#[cfg(not(feature = "runtime-benchmarks"))]
+			{
+				verified
+			}
+		}
+
+		/// Hash signed by the operational key. The domain includes the proof version, and
+		/// the genesis hash prevents authorization from being reused on another chain.
+		/// Only the upstream identity is included: proof signatures never sign themselves.
+		pub fn signing_hash(&self) -> [u8; 32] {
+			(
+				REGISTRATION_PROOF_DOMAIN,
+				frame_system::Pallet::<T>::block_hash(BlockNumberFor::<T>::zero()),
+				&self.operational_account,
+				&self.vault_account,
+				&self.mining_account,
+				&self.encryption_pubkey,
+				self.access_proof.as_ref().map(|proof| &proof.upstream_account),
+			)
+				.using_encoded(blake2_256)
+		}
+	}
+
+	#[pallet::extra_constants]
+	impl<T: Config> Pallet<T> {
+		/// Required operational registration signing contract. Clients must require version 2
+		/// before signing; older clients must upgrade rather than reuse ownership-only proofs.
+		pub fn registration_proof_version() -> u8 {
+			REGISTRATION_PROOF_VERSION
+		}
 	}
 
 	#[derive(
@@ -549,6 +601,9 @@ pub mod pallet {
 		/// Profile names must start with an uppercase ASCII letter and otherwise be ASCII
 		/// alphanumeric.
 		InvalidName,
+		/// The operational signature does not authorize this registration on this chain.
+		/// Clients using ownership-only proofs must upgrade to registration proof version 2.
+		InvalidRegistrationProof,
 	}
 
 	#[pallet::call]
@@ -559,49 +614,55 @@ pub mod pallet {
 		#[pallet::call_index(0)]
 		#[pallet::weight(T::WeightInfo::register())]
 		pub fn register(origin: OriginFor<T>, registration: Registration<T>) -> DispatchResult {
-			let Registration::V1(RegistrationV1 {
+			let Registration::V1(registration) = registration;
+			let RegistrationV1 { operational_account, vault_account, mining_account, .. } =
+				&registration;
+			let submitter = ensure_signed(origin)?;
+			ensure!(
+				&submitter == operational_account ||
+					&submitter == vault_account ||
+					&submitter == mining_account,
+				Error::<T>::InvalidRegistrationSubmitter
+			);
+			ensure!(
+				!OperationalAccounts::<T>::contains_key(operational_account),
+				Error::<T>::AlreadyRegistered
+			);
+			ensure!(
+				!OperationalAccountBySubAccount::<T>::contains_key(operational_account),
+				Error::<T>::AccountAlreadyLinked
+			);
+			ensure!(
+				!OperationalAccountBySubAccount::<T>::contains_key(vault_account),
+				Error::<T>::AccountAlreadyLinked
+			);
+			ensure!(
+				!OperationalAccountBySubAccount::<T>::contains_key(mining_account),
+				Error::<T>::AccountAlreadyLinked
+			);
+			ensure!(registration.verify(), Error::<T>::InvalidRegistrationProof);
+
+			let RegistrationV1 {
 				operational_account,
 				encryption_pubkey,
-				operational_account_proof,
 				vault_account,
 				mining_account,
 				vault_account_proof,
 				mining_account_proof,
 				access_proof,
-			}) = registration;
-			let submitter = ensure_signed(origin)?;
+				..
+			} = registration;
+
 			ensure!(
-				submitter == operational_account ||
-					submitter == vault_account ||
-					submitter == mining_account,
-				Error::<T>::InvalidRegistrationSubmitter
-			);
-			ensure!(
-				!OperationalAccounts::<T>::contains_key(&operational_account),
-				Error::<T>::AlreadyRegistered
-			);
-			ensure!(
-				!OperationalAccountBySubAccount::<T>::contains_key(&operational_account),
-				Error::<T>::AccountAlreadyLinked
-			);
-			ensure!(
-				!OperationalAccountBySubAccount::<T>::contains_key(&vault_account),
-				Error::<T>::AccountAlreadyLinked
-			);
-			ensure!(
-				!OperationalAccountBySubAccount::<T>::contains_key(&mining_account),
-				Error::<T>::AccountAlreadyLinked
-			);
-			ensure!(
-				operational_account_proof.verify(
-					&operational_account,
-					&operational_account,
-					OPERATIONAL_ACCOUNT_PROOF_MESSAGE_KEY
-				) && vault_account_proof.verify(
+				vault_account_proof.verify(
 					&operational_account,
 					&vault_account,
 					VAULT_ACCOUNT_PROOF_MESSAGE_KEY
-				) && mining_account_proof.verify(
+				),
+				Error::<T>::InvalidAccountProof
+			);
+			ensure!(
+				mining_account_proof.verify(
 					&operational_account,
 					&mining_account,
 					MINING_ACCOUNT_PROOF_MESSAGE_KEY,

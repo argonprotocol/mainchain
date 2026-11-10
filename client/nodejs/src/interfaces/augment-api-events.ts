@@ -737,6 +737,24 @@ declare module '@polkadot/api-base/types/events' {
         }
       >;
       /**
+       * Sender authorization failed; the selection was skipped and ordinary buy rules apply.
+       **/
+      LiquidRepaymentUnauthorized: AugmentedEvent<
+        ApiType,
+        [
+          sourceChain: ArgonPrimitivesGatewaySourceChain,
+          gatewayActivityNonce: u64,
+          account: AccountId32,
+          liquidId: u64,
+        ],
+        {
+          sourceChain: ArgonPrimitivesGatewaySourceChain;
+          gatewayActivityNonce: u64;
+          account: AccountId32;
+          liquidId: u64;
+        }
+      >;
+      /**
        * Root updated the minimum normalized microgon value required to register a Minting
        * Authority on one destination chain.
        **/

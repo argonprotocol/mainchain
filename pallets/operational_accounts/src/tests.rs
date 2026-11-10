@@ -1,9 +1,8 @@
 use crate::{
-	AccessCodeReadyAccounts, AccountOwnershipProof, Error, IsOperationalAccountInviteOnly,
-	OpaqueEncryptionPubkey, OperationalAccount, OperationalAccountBySubAccount,
-	OperationalAccountName, OperationalAccounts, OperationalProgressPatch, Registration,
-	RegistrationV1, UpstreamAccessProof, MINING_ACCOUNT_PROOF_MESSAGE_KEY,
-	OPERATIONAL_ACCOUNT_PROOF_MESSAGE_KEY, UPSTREAM_ACCESS_PROOF_MESSAGE_KEY,
+	AccessCodeReadyAccounts, Error, IsOperationalAccountInviteOnly, OpaqueEncryptionPubkey,
+	OperationalAccount, OperationalAccountBySubAccount, OperationalAccountName,
+	OperationalAccounts, OperationalProgressPatch, Registration, UpstreamAccessProof,
+	MINING_ACCOUNT_PROOF_MESSAGE_KEY, UPSTREAM_ACCESS_PROOF_MESSAGE_KEY,
 	VAULT_ACCOUNT_PROOF_MESSAGE_KEY,
 };
 use argon_primitives::{
@@ -13,14 +12,14 @@ use frame_support::{assert_noop, assert_ok};
 use pallet_prelude::*;
 use sp_core::{sr25519, Pair};
 use sp_io::hashing::blake2_256;
-use sp_runtime::{traits::IdentifyAccount, AccountId32, MultiSigner};
 
 use crate::mock::{
-	fission_liquidity, has_vault_operational_mark, new_test_ext, record_active_vault_bond_amount,
-	record_fission_liquidity, record_microgons_in, record_microgons_out, set_argon_balance,
-	set_crosschain_activated, set_registration_lookup, BitcoinLockSizeForAccessCode,
-	ClaimableTreasuryBalance, ClaimedOperationalRewards, CurrentTick, MaxAvailableAccessCodes,
-	MinimumBitcoin, MinimumBonds, MinimumUniswapTransfer, MiningSeatsPerAccessCode,
+	account_id_from_seed, fission_liquidity, has_vault_operational_mark, make_account_proof,
+	make_account_set, new_test_ext, record_active_vault_bond_amount, record_fission_liquidity,
+	record_microgons_in, record_microgons_out, set_argon_balance, set_crosschain_activated,
+	set_registration_lookup, AccountSet, BitcoinLockSizeForAccessCode, ClaimableTreasuryBalance,
+	ClaimedOperationalRewards, CurrentTick, MaxAvailableAccessCodes, MinimumBitcoin, MinimumBonds,
+	MinimumUniswapTransfer, MiningSeatsPerAccessCode,
 	OperationalAccounts as OperationalAccountsPallet, OperationalCertificationReward,
 	OperationalMinimumUniswapTransfer, OperationalMinimumVaultSecuritization, RuntimeOrigin, Test,
 	TestAccountId,
@@ -249,6 +248,152 @@ fn test_invite_only_eligibility_requires_registration() {
 				&account_set.vault,
 			)
 		);
+	});
+}
+
+#[test]
+fn test_copied_operational_proof_cannot_authorize_substituted_registration() {
+	new_test_ext().execute_with(|| {
+		let accounts = make_account_set(11, 12, 13);
+		seed_registration_minimums(&accounts);
+		let Registration::V1(authentic) = accounts.registration(None);
+		let attacker = account_id_from_seed(90);
+
+		let mut mining = authentic.clone();
+		mining.mining_account = attacker.clone();
+		mining.mining_account_proof =
+			make_account_proof(&accounts.owner, &attacker, 90, MINING_ACCOUNT_PROOF_MESSAGE_KEY);
+		let mut vault = authentic.clone();
+		vault.vault_account = attacker.clone();
+		vault.vault_account_proof =
+			make_account_proof(&accounts.owner, &attacker, 90, VAULT_ACCOUNT_PROOF_MESSAGE_KEY);
+		let mut encryption = authentic.clone();
+		encryption.encryption_pubkey = OpaqueEncryptionPubkey([90; 32]);
+		let mut upstream = authentic.clone();
+		upstream.access_proof = Some(make_access_proof(&attacker, 90, &accounts.owner));
+		let mut old_proof = authentic.clone();
+		old_proof.operational_account_proof = make_account_proof(
+			&accounts.owner,
+			&accounts.owner,
+			11,
+			b"operational_primary_account",
+		);
+		old_proof.mining_account = attacker.clone();
+		old_proof.encryption_pubkey = OpaqueEncryptionPubkey([90; 32]);
+		old_proof.mining_account_proof =
+			make_account_proof(&accounts.owner, &attacker, 90, MINING_ACCOUNT_PROOF_MESSAGE_KEY);
+
+		for registration in [mining, vault, encryption, upstream, old_proof] {
+			assert_noop!(
+				OperationalAccountsPallet::register(
+					RuntimeOrigin::signed(registration.mining_account.clone()),
+					Registration::V1(registration),
+				),
+				Error::<Test>::InvalidRegistrationProof
+			);
+		}
+		assert!(!OperationalAccounts::<Test>::contains_key(&accounts.owner));
+		assert!(!OperationalAccountBySubAccount::<Test>::contains_key(&attacker));
+
+		assert_ok!(OperationalAccountsPallet::register(
+			RuntimeOrigin::signed(accounts.vault.clone()),
+			Registration::V1(authentic),
+		));
+		assert_eq!(
+			OperationalAccounts::<Test>::get(&accounts.owner).unwrap().mining_account,
+			accounts.mining
+		);
+	});
+}
+
+#[test]
+fn test_registration_proof_is_bound_to_chain_and_upstream_identity() {
+	new_test_ext().execute_with(|| {
+		let upstream = make_account_set(71, 72, 73);
+		register_account(&upstream, None);
+		OperationalAccounts::<Test>::mutate(&upstream.owner, |account| {
+			account.as_mut().unwrap().available_access_codes = 1;
+		});
+		let accounts = make_account_set(81, 82, 83);
+		seed_registration_minimums(&accounts);
+		let Registration::V1(authentic) =
+			accounts.registration(Some(make_access_proof(&upstream.owner, 71, &accounts.owner)));
+		let mut removed = authentic.clone();
+		removed.access_proof = None;
+		let mut changed = authentic.clone();
+		changed.access_proof =
+			Some(make_access_proof(&account_id_from_seed(91), 91, &accounts.owner));
+		for registration in [removed, changed] {
+			assert_noop!(
+				OperationalAccountsPallet::register(
+					RuntimeOrigin::signed(accounts.vault.clone()),
+					Registration::V1(registration),
+				),
+				Error::<Test>::InvalidRegistrationProof
+			);
+		}
+		let genesis = frame_system::Pallet::<Test>::block_hash(0);
+		frame_system::BlockHash::<Test>::insert(0, H256::repeat_byte(99));
+		assert_noop!(
+			OperationalAccountsPallet::register(
+				RuntimeOrigin::signed(accounts.vault.clone()),
+				Registration::V1(authentic.clone()),
+			),
+			Error::<Test>::InvalidRegistrationProof
+		);
+		frame_system::BlockHash::<Test>::insert(0, genesis);
+		assert_eq!(
+			OperationalAccounts::<Test>::get(&upstream.owner)
+				.unwrap()
+				.available_access_codes,
+			1
+		);
+		assert_ok!(OperationalAccountsPallet::register(
+			RuntimeOrigin::signed(accounts.vault.clone()),
+			Registration::V1(authentic),
+		));
+		assert_eq!(
+			OperationalAccounts::<Test>::get(&upstream.owner)
+				.unwrap()
+				.available_access_codes,
+			0
+		);
+	});
+}
+
+#[test]
+fn test_role_proofs_remain_bound_to_the_operational_account_and_role() {
+	new_test_ext().execute_with(|| {
+		let accounts = make_account_set(51, 52, 53);
+		seed_registration_minimums(&accounts);
+		let Registration::V1(authentic) = accounts.registration(None);
+		let mut wrong_owner = authentic.clone();
+		wrong_owner.vault_account_proof = make_account_proof(
+			&account_id_from_seed(54),
+			&accounts.vault,
+			52,
+			VAULT_ACCOUNT_PROOF_MESSAGE_KEY,
+		);
+		let mut wrong_role = authentic.clone();
+		wrong_role.mining_account_proof = make_account_proof(
+			&accounts.owner,
+			&accounts.mining,
+			53,
+			VAULT_ACCOUNT_PROOF_MESSAGE_KEY,
+		);
+		for registration in [wrong_owner, wrong_role] {
+			assert_noop!(
+				OperationalAccountsPallet::register(
+					RuntimeOrigin::signed(accounts.vault.clone()),
+					Registration::V1(registration),
+				),
+				Error::<Test>::InvalidAccountProof
+			);
+		}
+		assert_ok!(OperationalAccountsPallet::register(
+			RuntimeOrigin::signed(accounts.vault.clone()),
+			Registration::V1(authentic),
+		));
 	});
 }
 
@@ -1154,35 +1299,6 @@ fn test_frame_awards_are_bounded_and_remaining_accounts_stay_ready() {
 	});
 }
 
-#[derive(Clone)]
-struct AccountSet {
-	owner: TestAccountId,
-	vault: TestAccountId,
-	mining: TestAccountId,
-	encryption_pubkey: OpaqueEncryptionPubkey,
-	owner_proof: AccountOwnershipProof,
-	vault_proof: AccountOwnershipProof,
-	mining_proof: AccountOwnershipProof,
-}
-
-impl AccountSet {
-	fn registration(
-		&self,
-		access_proof: Option<UpstreamAccessProof<TestAccountId>>,
-	) -> Registration<Test> {
-		Registration::V1(RegistrationV1 {
-			operational_account: self.owner.clone(),
-			encryption_pubkey: self.encryption_pubkey.clone(),
-			operational_account_proof: self.owner_proof.clone(),
-			vault_account: self.vault.clone(),
-			mining_account: self.mining.clone(),
-			vault_account_proof: self.vault_proof.clone(),
-			mining_account_proof: self.mining_proof.clone(),
-			access_proof,
-		})
-	}
-}
-
 fn seed_pending_rewards(owner: &TestAccountId, amount: Balance) {
 	OperationalAccounts::<Test>::mutate(owner, |maybe| {
 		let account = maybe.as_mut().expect("operational account");
@@ -1210,48 +1326,6 @@ fn current_vault_bitcoin_amount(account: &OperationalAccount<Test>) -> Balance {
 
 fn mining_seat_count(account: &OperationalAccount<Test>) -> u32 {
 	account.mining_seat_applied_total.saturating_add(account.mining_seat_accrual)
-}
-
-fn make_linked_account(
-	owner: &TestAccountId,
-	seed: u8,
-	domain: &[u8],
-) -> (TestAccountId, AccountOwnershipProof) {
-	let pair = sr25519::Pair::from_seed(&[seed; 32]);
-	let account_id = MultiSigner::from(pair.public()).into_account();
-	let proof = make_account_proof(owner, &account_id, seed, domain);
-	(account_id, proof)
-}
-
-fn account_id_from_seed(seed: u8) -> TestAccountId {
-	let pair = sr25519::Pair::from_seed(&[seed; 32]);
-	MultiSigner::from(pair.public()).into_account()
-}
-
-fn make_account_proof(
-	owner: &TestAccountId,
-	account_id: &TestAccountId,
-	seed: u8,
-	domain: &[u8],
-) -> AccountOwnershipProof {
-	let pair = sr25519::Pair::from_seed(&[seed; 32]);
-	let account_id =
-		AccountId32::decode(&mut account_id.encode().as_slice()).expect("account id32");
-	let message = (domain, owner, &account_id).using_encoded(blake2_256);
-	let signature: Signature = pair.sign(message.as_slice()).into();
-	AccountOwnershipProof { signature }
-}
-
-fn make_account_set(owner_seed: u8, vault_seed: u8, mining_seed: u8) -> AccountSet {
-	let owner = account_id_from_seed(owner_seed);
-	let owner_proof =
-		make_account_proof(&owner, &owner, owner_seed, OPERATIONAL_ACCOUNT_PROOF_MESSAGE_KEY);
-	let encryption_pubkey = OpaqueEncryptionPubkey([owner_seed; 32]);
-	let (vault, vault_proof) =
-		make_linked_account(&owner, vault_seed, VAULT_ACCOUNT_PROOF_MESSAGE_KEY);
-	let (mining, mining_proof) =
-		make_linked_account(&owner, mining_seed, MINING_ACCOUNT_PROOF_MESSAGE_KEY);
-	AccountSet { owner, vault, mining, encryption_pubkey, owner_proof, vault_proof, mining_proof }
 }
 
 fn register_account(set: &AccountSet, access_proof: Option<UpstreamAccessProof<TestAccountId>>) {
