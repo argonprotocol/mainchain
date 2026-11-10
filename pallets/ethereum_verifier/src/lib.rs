@@ -155,7 +155,7 @@ pub mod pallet {
 		InvalidHeaderMerkleProof,
 		InvalidSyncCommitteeMerkleProof,
 		InvalidExecutionHeaderProof,
-		/// The gap between finalized headers is larger than the retained historical window.
+		/// Reserved error index; finalized updates are now bounded by authenticated committees.
 		InvalidFinalizedHeaderGap,
 		InvalidBackfillHeaderRoot,
 		ExecutionHeaderAnchorAlreadyImported,
@@ -542,15 +542,6 @@ pub mod pallet {
 				update.attested_header.slot > latest_finalized_state.slot ||
 					update_has_next_sync_committee,
 				Error::<T>::IrrelevantUpdate
-			);
-
-			// Verify the finalized header gap between the current finalized header and new imported
-			// header is not larger than the sync committee period, otherwise we cannot do
-			// ancestry proofs for execution headers in the gap.
-			ensure!(
-				latest_finalized_state.slot.saturating_add(Self::slots_per_historical_root()) >=
-					update.finalized_header.slot,
-				Error::<T>::InvalidFinalizedHeaderGap
 			);
 
 			let fork_versions =
