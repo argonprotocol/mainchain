@@ -403,6 +403,10 @@ pub mod pallet {
 	pub struct SwapPurchaseEvidence {
 		/// Nonzero recipient-local Liquid to repay; None means an ordinary purchase.
 		pub repay_liquid_id: Option<LiquidId>,
+		/// SCALE-encoded owner authorization of the Ethereum sender. Invalid signatures skip
+		/// Liquid repayment while preserving ordinary buy admission and delivery.
+		/// At most one signature-type byte plus 65 signature bytes.
+		pub repay_signature: BoundedVec<u8, ConstU32<66>>,
 		pub usdc_token: H160,
 		pub usdc_spent: U256,
 		pub argon_bought: U256,
@@ -1085,6 +1089,13 @@ pub mod pallet {
 			gateway_activity_nonce: GatewayActivityNonce,
 			account: T::AccountId,
 			error: DispatchError,
+		},
+		/// Sender authorization failed; the selection was skipped and ordinary buy rules apply.
+		LiquidRepaymentUnauthorized {
+			source_chain: SourceChain,
+			gateway_activity_nonce: GatewayActivityNonce,
+			account: T::AccountId,
+			liquid_id: LiquidId,
 		},
 	}
 

@@ -110,6 +110,8 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 		bytes32 argonAccountId;
 		/// @notice Recipient-local Liquid to repay; zero means an ordinary purchase.
 		uint64 repayLiquidId;
+		/// @notice Recipient's SCALE-encoded authorization of buyer, checked only at Argon admission.
+		bytes repaySignature;
 		address usdcToken;
 		uint256 usdcSpent;
 		uint256 argonBought;

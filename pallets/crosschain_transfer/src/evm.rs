@@ -70,6 +70,7 @@ impl<T: Config> DecodedGatewayActivity<T> {
 						buyer: AlloyAddress::from_slice(buyer.as_bytes()),
 						argonAccountId: B256::from(*to),
 						repayLiquidId: purchase.repay_liquid_id.unwrap_or_default(),
+						repaySignature: purchase.repay_signature.to_vec().into(),
 						usdcToken: AlloyAddress::from_slice(purchase.usdc_token.as_bytes()),
 						usdcSpent: U256::from_le_bytes(purchase.usdc_spent.to_little_endian()),
 						argonBought: U256::from_le_bytes(purchase.argon_bought.to_little_endian()),
@@ -560,6 +561,12 @@ impl<T: Config> Pallet<T> {
 				purchase: Box::new(SwapPurchaseEvidence {
 					repay_liquid_id: (activity.purchase.repayLiquidId != 0)
 						.then_some(activity.purchase.repayLiquidId),
+					repay_signature: activity
+						.purchase
+						.repaySignature
+						.to_vec()
+						.try_into()
+						.map_err(|_| Error::<T>::InvalidGatewayActivity)?,
 					usdc_token: H160::from_slice(activity.purchase.usdcToken.as_slice()),
 					usdc_spent: sp_core::U256::from_big_endian(
 						&activity.purchase.usdcSpent.to_be_bytes::<32>(),

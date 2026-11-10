@@ -203,7 +203,14 @@ fn proven_purchase_delivery_and_principal_hold_commit_together() {
 			Balances::balance_on_hold(&PurchaseHoldReason::PurchasePrincipal.into(), &owner),
 			principal
 		);
-		// The fixture names a Liquid that has no Fissions on this recipient's account.
+		// The TypeScript-signed authorization reaches admission; its Liquid has no Fissions.
+		System::assert_has_event(RuntimeEvent::StabilizerBuys(
+			pallet_stabilizer_buys::Event::LiquidRepaymentInvalid {
+				account: owner.clone(),
+				gateway_activity_nonce: nonce,
+				liquid_id: 1,
+			},
+		));
 		assert!(!LiquidRepaysByAccountAndGatewayNonce::<Runtime>::contains_key(
 			&owner,
 			nonce.to_ordered()

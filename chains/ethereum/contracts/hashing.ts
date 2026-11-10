@@ -1,11 +1,16 @@
 import type { Address, ContractFunctionArgs, Hex } from 'viem';
-import { encodeAbiParameters, getAbiItem, keccak256, stringToHex } from 'viem';
+import { concatHex, encodeAbiParameters, getAbiItem, keccak256, stringToHex } from 'viem';
 import type {
   MintingGatewayActivityState,
   MintingGatewayTransferToArgonFromSwapStarted,
   MintingGatewayMintingAuthorityCollateral,
 } from './generated.js';
 import { mintingGatewayAbi } from './generated.js';
+
+/** Argon-account authorization of an Ethereum wallet for Liquid repayment purchases. */
+export function liquidRepayAuthorizationMessage(ethereumSender: Address): Hex {
+  return concatHex([stringToHex('argon-liquid-repay:'), ethereumSender]);
+}
 
 export const MINTING_GATEWAY_UPDATE_KINDS = {
   globalIssuanceCouncilRotate: 0,

@@ -927,6 +927,7 @@ describe('MintingGateway', () => {
       buyer: outsider.address,
       argonAccountId: ethers.encodeBytes32String('purchase-recipient'),
       repayLiquidId: 0n,
+      repaySignature: '0x',
       usdcToken: '0x1111111111111111111111111111111111111111',
       usdcSpent: 25_000n,
       argonBought: 25_000n * SCALE + 123n,

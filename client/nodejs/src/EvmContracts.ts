@@ -35,6 +35,7 @@ import {
 } from '@argonprotocol/ethereum-contracts/generated';
 import {
   MINTING_GATEWAY_UPDATE_KINDS,
+  liquidRepayAuthorizationMessage,
   encodeMintingGatewayCouncilSnapshot,
   encodeMintingGatewayGlobalIssuanceCouncilRotateTarget,
   encodeMintingGatewayMintingAuthorityActivationTarget,
@@ -110,6 +111,7 @@ export {
   MINTING_GATEWAY_RUNTIME_TO_ERC20_SCALE,
   MINTING_GATEWAY_TOKEN_DECIMALS,
   MINTING_GATEWAY_UPDATE_KINDS,
+  liquidRepayAuthorizationMessage,
   MintingGatewayEvents,
   ProxyAdminEvents,
   TransparentUpgradeableProxyEvents,

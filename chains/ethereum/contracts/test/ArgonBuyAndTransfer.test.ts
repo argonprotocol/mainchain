@@ -1,6 +1,7 @@
 import { writeFile } from 'node:fs/promises';
 import { network } from 'hardhat';
 import type { BaseContract, Signer, TransactionReceipt } from 'ethers';
+import type { Address } from 'viem';
 import { afterAll, describe, expect, it } from 'vitest';
 import v4ManagerArtifact from '@uniswap/v4-core/out/PoolManager.sol/PoolManager.json' with { type: 'json' };
 import v4LiquidityArtifact from '@uniswap/v4-core/out/PoolModifyLiquidityTest.sol/PoolModifyLiquidityTest.json' with { type: 'json' };
@@ -9,10 +10,13 @@ import routerArtifact from './fixtures/UniversalRouter2.1.2.json' with { type: '
 import permit2Artifact from './fixtures/Permit2.json' with { type: 'json' };
 import { createMPT, createMerkleProof } from '@ethereumjs/mpt';
 import { expectCustomError } from './assertions.js';
+import { Keyring } from '@polkadot/keyring';
+import { cryptoWaitReady } from '@polkadot/util-crypto';
 import {
   appendMintingGatewayActivityRoot,
   MintingGatewayEvents,
   hashMintingGatewayTransferToArgonFromSwapStartedActivity,
+  liquidRepayAuthorizationMessage,
 } from '../index.js';
 
 const connection = await network.create();
@@ -32,6 +36,8 @@ async function fixture(
   liquidityAmount = 10n ** 17n,
 ) {
   const [buyer, guardian] = await ethers.getSigners();
+  await cryptoWaitReady();
+  const argonOwner = new Keyring({ type: 'sr25519' }).createFromUri('//Alice');
   const gatewayFactory = await ethers.getContractFactory('MintingGateway');
   const bootstrap = await gatewayFactory.deploy(
     ethers.ZeroAddress,
@@ -157,8 +163,9 @@ async function fixture(
     '0x',
   );
   const request = {
-    argonAccountId: ethers.encodeBytes32String('argon-recipient'),
+    argonAccountId: ethers.hexlify(argonOwner.publicKey),
     repayLiquidId: 0n,
+    repaySignature: '0x',
     maxUsdcIn: (narrowLiquidity ? 1_000n : 110n) * 10n ** 6n,
     minMicrogonsOut: 100n * 10n ** 6n,
     deadline,
@@ -167,6 +174,7 @@ async function fixture(
   await usdc.getFunction('approve')(await purchase.getAddress(), request.maxUsdcIn);
   return {
     buyer,
+    argonOwner,
     guardian,
     gateway,
     purchase,
@@ -373,6 +381,14 @@ describe('native Uniswap v4 buyAndTransfer', () => {
       const usdcBefore = await f.usdc.getFunction('balanceOf')(f.buyer.address);
       const supplyBefore = await f.argon.getFunction('totalSupply')();
       const request = { ...f.request, repayLiquidId };
+      if (repayLiquidId !== 0n) {
+        request.repaySignature = ethers.hexlify(
+          f.argonOwner.sign(
+            ethers.getBytes(liquidRepayAuthorizationMessage(f.buyer.address as Address)),
+            { withType: true },
+          ),
+        );
+      }
       const receipt = await (await f.buyAndTransfer(request, f.key, '0x')).wait();
       const log = receipt.logs
         .map((x: any) => f.gateway.interface.parseLog(x))
@@ -396,7 +412,7 @@ describe('native Uniswap v4 buyAndTransfer', () => {
         (entry: TransactionReceipt['logs'][number]) =>
           entry.topics[0] === MintingGatewayEvents.TransferToArgonFromSwapStarted.topic,
       )!;
-      expect(ethers.getBytes(purchaseLog.data)).toHaveLength(544);
+      expect(ethers.getBytes(purchaseLog.data)).toHaveLength(repayLiquidId === 0n ? 640 : 736);
       const purchaseBlock = await ethers.provider.getBlock(receipt.blockHash);
       expect(purchase.timestamp).toBe(BigInt(purchaseBlock!.timestamp));
       if (zeroForOne) expect(purchase.sqrtPriceAfterX96).toBeLessThan(purchase.sqrtPriceBeforeX96);
@@ -404,6 +420,7 @@ describe('native Uniswap v4 buyAndTransfer', () => {
       expect(purchase.buyer).toBe(f.buyer.address);
       expect(purchase.argonAccountId).toBe(f.request.argonAccountId);
       expect(purchase.repayLiquidId).toBe(repayLiquidId);
+      expect(purchase.repaySignature).toBe(request.repaySignature);
       expect(purchase.usdcSpent).toBe(f.request.maxUsdcIn);
       expect(amount).toBe(purchase.argonBought / SCALE);
       expect(amount).toBeGreaterThanOrEqual(f.request.minMicrogonsOut);
@@ -502,6 +519,12 @@ describe('native Uniswap v4 buyAndTransfer', () => {
       const f = await fixture(zeroForOne, true);
       const usdcBefore = await f.usdc.getFunction('balanceOf')(f.buyer.address);
       const request = { ...f.request, repayLiquidId: 1n };
+      request.repaySignature = ethers.hexlify(
+        f.argonOwner.sign(
+          ethers.getBytes(liquidRepayAuthorizationMessage(f.buyer.address as Address)),
+          { withType: true },
+        ),
+      );
       const receipt = await (await f.buyAndTransfer(request, f.key, '0x')).wait();
       const event = receipt.logs
         .map((log: any) => f.gateway.interface.parseLog(log))
@@ -561,6 +584,7 @@ describe('native Uniswap v4 buyAndTransfer', () => {
       { ...f.request, argonAccountId: ethers.ZeroHash },
       { ...f.request, minMicrogonsOut: 0 },
       { ...f.request, maxUsdcIn: 0 },
+      { ...f.request, repaySignature: `0x${'11'.repeat(67)}` },
     ])
       await expectCustomError(f.buyAndTransfer(request, f.key, '0x'), f.purchase, 'InvalidRequest');
     expect(await f.gateway.getFunction('gatewayActivityNonce')()).toBe(0n);

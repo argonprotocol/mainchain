@@ -38,6 +38,8 @@ contract ArgonBuyAndTransfer is ReentrancyGuard {
 		bytes32 argonAccountId;
 		/// @notice Recipient-local Liquid to repay; zero means an ordinary purchase.
 		uint64 repayLiquidId;
+		/// @notice Argon recipient's authorization of this Ethereum sender; empty for ordinary buys.
+		bytes repaySignature;
 		uint128 maxUsdcIn;
 		uint128 minMicrogonsOut;
 		uint256 deadline;
@@ -106,6 +108,8 @@ contract ArgonBuyAndTransfer is ReentrancyGuard {
 		if (request.maxUsdcIn == 0) revert InvalidRequest();
 		if (request.minMicrogonsOut == 0) revert InvalidRequest();
 		if (request.deadline < block.timestamp) revert InvalidRequest();
+		// SCALE MultiSignature is a type byte plus at most 65 signature bytes.
+		if (request.repaySignature.length > 66) revert InvalidRequest();
 		if (request.minMicrogonsOut < gateway.minimumSwapMicrogons()) revert PurchaseTooSmall();
 
 		{
@@ -122,6 +126,7 @@ contract ArgonBuyAndTransfer is ReentrancyGuard {
 		purchase.buyer = msg.sender;
 		purchase.argonAccountId = request.argonAccountId;
 		purchase.repayLiquidId = request.repayLiquidId;
+		purchase.repaySignature = request.repaySignature;
 		purchase.usdcToken = address(usdc);
 		purchase.poolManager = address(poolManager);
 		purchase.poolId = PoolId.unwrap(key.toId());

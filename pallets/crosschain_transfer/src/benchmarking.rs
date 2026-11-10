@@ -1538,16 +1538,48 @@ fn transfer_to_argon_started_log(
 
 fn purchase_activity_log(log: EthereumLog) -> EthereumLog {
 	use alloy_primitives::U256;
+	use argon_primitives::{ethereum::LiquidRepayAuthorization, AccountId, Signature};
 	use ethereum_contracts::{SwapPurchase, TransferToArgonFromSwapStarted};
+
 	let transfer =
 		TransferToArgonStarted::decode_raw_log_validate(log.topics.iter().map(|t| t.0), &log.data)
 			.unwrap();
+	let authorization =
+		LiquidRepayAuthorization { ethereum_sender: H160::from_slice(transfer.from.as_slice()) };
+	let message = authorization.signing_payload();
+
+	#[cfg(test)]
+	let (owner, signature) = {
+		use polkadot_sdk::sp_core::{sr25519, Pair};
+
+		let pair = sr25519::Pair::from_seed(&transfer.argonAccountId.0);
+		(pair.public(), Signature::from(pair.sign(&message)))
+	};
+	#[cfg(not(test))]
+	let (owner, signature) = {
+		use alloc::format;
+		use polkadot_sdk::sp_core::crypto::KeyTypeId;
+
+		let key_type = KeyTypeId(*b"lrpy");
+		let owner = sp_io::crypto::sr25519_generate(
+			key_type,
+			Some(format!("//liquid-repay-bench//{}", transfer.argonAccountId).into_bytes()),
+		);
+		let signature = Signature::from(
+			sp_io::crypto::sr25519_sign(key_type, &owner, &message)
+				.expect("benchmark signing key exists"),
+		);
+		(owner, signature)
+	};
+	assert!(authorization.verify(&signature, &AccountId::new(owner.0)));
+
 	let purchase = TransferToArgonFromSwapStarted {
 		purchase: SwapPurchase {
-			repayLiquidId: 0,
+			repayLiquidId: 1,
+			repaySignature: signature.encode().into(),
 			timestamp: 1,
 			buyer: transfer.from,
-			argonAccountId: transfer.argonAccountId,
+			argonAccountId: owner.0.into(),
 			usdcToken: [0x41; 20].into(),
 			usdcSpent: U256::from(transfer.amount * 9 / 10),
 			argonBought: U256::from(transfer.amount) * U256::from(1_000_000_000_000u64),

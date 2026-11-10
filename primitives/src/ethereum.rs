@@ -1,4 +1,5 @@
-use crate::{bitcoin::LiquidId, tick::Tick, Balance};
+use crate::{bitcoin::LiquidId, tick::Tick, AccountId, Balance, Signature};
+use alloc::vec::Vec;
 use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use frame_support::{CloneNoBound, DebugNoBound, EqNoBound, PartialEqNoBound};
 use polkadot_sdk::*;
@@ -6,7 +7,7 @@ use scale_info::TypeInfo;
 use serde::{Deserialize, Serialize};
 use sp_core::{H160, H256, U256};
 use sp_runtime::{
-	traits::{ConstU32, Get},
+	traits::{ConstU32, Get, Verify},
 	BoundedVec,
 };
 
@@ -39,6 +40,25 @@ pub struct UniswapPurchase {
 	pub sqrt_price_after_x96: U256,
 	/// Authenticated Ethereum purchase time mapped to an Argon tick, independent of relay arrival.
 	pub tick: Tick,
+}
+
+/// An Argon account authorizes repayment buys from one Ethereum wallet. The gateway
+/// authenticates that wallet as the sender; authorization can be reused for its later buys.
+pub struct LiquidRepayAuthorization {
+	/// Ethereum wallet allowed to select the signing Argon account's Liquids for repayment.
+	pub ethereum_sender: H160,
+}
+
+impl LiquidRepayAuthorization {
+	/// Domain-separated bytes signed by the Argon account, containing the raw 20-byte sender.
+	pub fn signing_payload(&self) -> Vec<u8> {
+		[b"argon-liquid-repay:".as_slice(), self.ethereum_sender.as_bytes()].concat()
+	}
+
+	/// Verify the canonical signing payload against the Argon account being authorized.
+	pub fn verify(&self, signature: &Signature, account: &AccountId) -> bool {
+		signature.verify(self.signing_payload().as_slice(), account)
+	}
 }
 
 /// Ethereum logs support up to four indexed topics.

@@ -47,6 +47,8 @@ __metadata:
     "@nomicfoundation/hardhat-ethers": "npm:4.0.10"
     "@openzeppelin/contracts": "npm:^5.4.0"
     "@openzeppelin/contracts-upgradeable": "npm:^5.4.0"
+    "@polkadot/keyring": "npm:^14.0.3"
+    "@polkadot/util-crypto": "npm:^14.0.3"
     "@types/node": "npm:22.17.1"
     "@uniswap/permit2": "https://github.com/Uniswap/permit2/archive/cc56ad0f3439c502c246fc5cfcc3db92bb8b7219.tar.gz"
     "@uniswap/universal-router": "https://github.com/Uniswap/universal-router/archive/802fe4c18f47300e0f183e2a42e9146ec2ea9fc3.tar.gz"

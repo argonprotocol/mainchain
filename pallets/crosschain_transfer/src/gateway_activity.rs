@@ -1,8 +1,10 @@
 use alloc::{boxed::Box, vec::Vec};
 use argon_primitives::{
-	ethereum::UniswapPurchase, AccountId as ArgonAccountId, EthereumBlockNumber,
-	OperationalAccountsHook, TickProvider, UniswapPurchaseProvider,
+	ethereum::{LiquidRepayAuthorization, UniswapPurchase},
+	AccountId as ArgonAccountId, EthereumBlockNumber, OperationalAccountsHook, Signature,
+	TickProvider, UniswapPurchaseProvider,
 };
+use codec::DecodeAll;
 use frame_support::{
 	ensure,
 	storage::with_storage_layer,
@@ -650,10 +652,30 @@ impl<T: Config> Pallet<T> {
 					GatewayActivityApplyError::Reject(Error::<T>::InvalidGatewayActivity.into())
 				})?;
 				let purchase_tick = T::TickProvider::ticker().tick_for_time(timestamp_millis);
-				// Failed admission must undo its holds and records while preserving delivery.
+				let mut repay_liquid_id = purchase.repay_liquid_id;
+				if let Some(liquid_id) = repay_liquid_id {
+					// An unauthorized sender can fund an ordinary buy, but cannot lock the
+					// recipient's Liquid against close or ratchet.
+					let authorization = LiquidRepayAuthorization { ethereum_sender: buyer };
+					let authorized =
+						match Signature::decode_all(&mut purchase.repay_signature.as_slice()) {
+							Ok(signature) => authorization.verify(&signature, &to),
+							Err(_) => false,
+						};
+					if !authorized {
+						repay_liquid_id = None;
+						Self::deposit_event(Event::LiquidRepaymentUnauthorized {
+							source_chain,
+							gateway_activity_nonce: context.gateway_state.gateway_activity_nonce,
+							account: to.clone(),
+							liquid_id,
+						});
+					}
+				}
+
 				let transferred_purchase = UniswapPurchase {
 					gateway_activity_nonce: context.gateway_state.gateway_activity_nonce,
-					repay_liquid_id: purchase.repay_liquid_id,
+					repay_liquid_id,
 					chain_id,
 					pool_manager: purchase.pool_manager,
 					pool_id: purchase.pool_id,
@@ -664,6 +686,7 @@ impl<T: Config> Pallet<T> {
 					sqrt_price_after_x96: purchase.sqrt_price_after_x96,
 					tick: purchase_tick,
 				};
+				// Failed admission must undo its holds and records while preserving delivery.
 				let admission = with_storage_layer(|| {
 					T::UniswapPurchaseProvider::record_transferred_purchase(
 						&to,
@@ -804,11 +827,13 @@ mod test {
 		bitcoin::LiquidId,
 		ethereum::{
 			EthereumCombinedReceiptProof, EthereumExecutionBlockProof, EthereumReceiptProofReceipt,
+			LiquidRepayAuthorization,
 		},
-		EthereumLog, EthereumReceiptLog, UniswapPurchase,
+		EthereumLog, EthereumReceiptLog, Signature, UniswapPurchase, MICROGONS_PER_ARGON,
 	};
 	use polkadot_sdk::{
 		frame_support::traits::{OnFinalize, OnInitialize},
+		sp_core::{sr25519, Pair},
 		sp_io::hashing::keccak_256,
 	};
 
@@ -832,7 +857,8 @@ mod test {
 			));
 			let burn = CrosschainTransfer::burn_account(SourceChain::Ethereum);
 			assert_ok!(Balances::mint_into(&burn, 200_000_000));
-			let owner = account(2);
+			let owner_pair = sr25519::Pair::from_seed(&[2; 32]);
+			let owner = TestAccountId::from(owner_pair.public());
 			let log = purchase_activity_log(owner.clone(), 1, 100_000_000, 100_000_000, 60);
 			let mut event = TransferToArgonFromSwapStarted::decode_raw_log_validate(
 				log.topics.iter().map(|topic| topic.0),
@@ -840,6 +866,12 @@ mod test {
 			)
 			.unwrap();
 			event.purchase.repayLiquidId = 42;
+			event.purchase.repaySignature =
+				Signature::from(owner_pair.sign(
+					&LiquidRepayAuthorization { ethereum_sender: h160(0x11) }.signing_payload(),
+				))
+				.encode()
+				.into();
 			let log = EthereumLog { data: event.encode_data().try_into().unwrap(), ..log };
 			let proof = proof_batch(vec![activity_logs(vec![
 				log,
@@ -1204,7 +1236,7 @@ mod test {
 	fn native_purchase_logs_reconstruct_the_actual_gateway_storage_root() {
 		assert_eq!(
 			<<TransferToArgonFromSwapStarted as SolEvent>::DataTuple<'_> as SolType>::ENCODED_SIZE,
-			Some(544)
+			None
 		);
 		for (source, expected_repay_liquid_id) in NATIVE_PURCHASE_CASES {
 			let fixture: serde_json::Value = serde_json::from_str(source).unwrap();
@@ -1233,15 +1265,16 @@ mod test {
 				argonot_token: h160(0x32),
 			};
 			let mut truncated = log.clone();
-			truncated.data.pop();
+			// Remove a whole ABI word, including signature data rather than just its padding.
+			truncated.data.truncate(log.data.len().saturating_sub(32));
 			assert_eq!(
 				CrosschainTransfer::decode_evm_gateway_activity(&config, &truncated).err(),
 				Some(Error::<Test>::InvalidGatewayActivity.into())
 			);
-			let mut invalid_timestamp = log.clone();
-			invalid_timestamp.data[0] = u8::MAX;
+			let mut invalid_offset = log.clone();
+			invalid_offset.data[0] = u8::MAX;
 			assert_eq!(
-				CrosschainTransfer::decode_evm_gateway_activity(&config, &invalid_timestamp).err(),
+				CrosschainTransfer::decode_evm_gateway_activity(&config, &invalid_offset).err(),
 				Some(Error::<Test>::InvalidGatewayActivity.into())
 			);
 			let activity = CrosschainTransfer::decode_evm_gateway_activity(&config, &log).unwrap();
@@ -1271,7 +1304,8 @@ mod test {
 				SourceChain::Ethereum,
 				chain_config()
 			));
-			let recipient = account(2);
+			let owner = sr25519::Pair::from_seed(&[2; 32]);
+			let recipient = TestAccountId::from(owner.public());
 			let burn = CrosschainTransfer::burn_account(SourceChain::Ethereum);
 			assert_ok!(Balances::mint_into(&burn, 10_000));
 			let log = purchase_activity_log(recipient.clone(), 1, 1_000, 9_000, 60);
@@ -1281,12 +1315,28 @@ mod test {
 			)
 			.unwrap();
 			event.purchase.repayLiquidId = 1;
+			event.purchase.repaySignature =
+				Signature::from(owner.sign(
+					&LiquidRepayAuthorization { ethereum_sender: h160(0x11) }.signing_payload(),
+				))
+				.encode()
+				.into();
 			let log = EthereumLog { data: event.encode_data().try_into().unwrap(), ..log };
 			let proof = storage_proof(10, H256::zero(), vec![log.clone()]);
-			// Both the purchase timestamp and Liquid ID are covered by the proven root.
-			for offset in [31, 127] {
-				let mut forged_log = log.clone();
-				forged_log.data[offset] ^= 1;
+
+			let mut changed_timestamp = event.clone();
+			changed_timestamp.purchase.timestamp += 1;
+			let mut changed_liquid = event.clone();
+			changed_liquid.purchase.repayLiquidId += 1;
+			let mut changed_authorization = event.clone();
+			changed_authorization.purchase.repaySignature = Default::default();
+
+			// The source commitment covers the repayment selection and owner authorization.
+			for forged_event in [changed_timestamp, changed_liquid, changed_authorization] {
+				let forged_log = EthereumLog {
+					data: forged_event.encode_data().try_into().unwrap(),
+					..log.clone()
+				};
 				let mut forged = proof.clone();
 				forged.activity_logs = vec![forged_log].try_into().unwrap();
 				assert_noop!(
@@ -1348,6 +1398,101 @@ mod test {
 		});
 	}
 
+	#[test]
+	fn repayment_sender_authorization_does_not_block_delivery_or_later_admission() {
+		new_test_ext().execute_with(|| {
+			System::set_block_number(1);
+			CurrentTick::set(999);
+			LatestExecutionBlockTimestamp::set(Some(60_000));
+			assert_ok!(CrosschainTransfer::set_chain_config(
+				RuntimeOrigin::root(),
+				SourceChain::Ethereum,
+				chain_config()
+			));
+
+			let owner = sr25519::Pair::from_seed(&[2; 32]);
+			let recipient = TestAccountId::from(owner.public());
+			let sender = h160(0x11);
+			let message = LiquidRepayAuthorization { ethereum_sender: sender }.signing_payload();
+			let signature = Signature::from(owner.sign(&message)).encode();
+			let other_recipient = account(99);
+			let amount = 100 * MICROGONS_PER_ARGON;
+			let burn = CrosschainTransfer::burn_account(SourceChain::Ethereum);
+			assert_ok!(Balances::mint_into(&burn, 10 * amount));
+
+			// The same authorization works for later buys by that wallet, including another Liquid.
+			let purchases = [
+				(recipient.clone(), sender, signature.clone()),
+				(recipient.clone(), sender, Vec::new()),
+				(recipient.clone(), sender, vec![0xff; 66]),
+				(recipient.clone(), h160(0x12), signature.clone()),
+				(other_recipient.clone(), sender, signature.clone()),
+				(recipient.clone(), sender, signature),
+			];
+			let logs = purchases
+				.into_iter()
+				.enumerate()
+				.map(|(index, (to, buyer, signature))| {
+					let nonce = index as u64 + 1;
+					let log = purchase_activity_log(
+						to,
+						nonce,
+						amount,
+						(10 - u128::from(nonce)) * amount,
+						60,
+					);
+					let mut event = TransferToArgonFromSwapStarted::decode_raw_log_validate(
+						log.topics.iter().map(|topic| topic.0),
+						&log.data,
+					)
+					.unwrap();
+					event.purchase.buyer = buyer.0.into();
+					event.purchase.repayLiquidId = nonce;
+					event.purchase.repaySignature = signature.into();
+					EthereumLog { data: event.encode_data().try_into().unwrap(), ..log }
+				})
+				.collect();
+
+			assert_ok!(CrosschainTransfer::prove_gateway_activity_storage(
+				RuntimeOrigin::signed(account(1)),
+				SourceChain::Ethereum,
+				0,
+				storage_proof(10, H256::zero(), logs)
+			));
+			assert_eq!(Balances::balance(&recipient), 5 * amount);
+			assert_eq!(Balances::balance(&other_recipient), amount);
+			assert_eq!(Balances::balance(&burn), 4 * amount);
+			assert_eq!(
+				GatewayStateBySourceChain::<Test>::get(SourceChain::Ethereum)
+					.unwrap()
+					.gateway_activity_nonce,
+				6
+			);
+			assert_eq!(
+				RecordedPurchases::get()
+					.iter()
+					.map(|(_, buy)| (buy.gateway_activity_nonce, buy.repay_liquid_id))
+					.collect::<Vec<_>>(),
+				vec![(1, Some(1)), (2, None), (3, None), (4, None), (5, None), (6, Some(6)),]
+			);
+			assert!(!System::events().iter().any(|record| matches!(
+				record.event,
+				RuntimeEvent::CrosschainTransfer(Event::UniswapPurchaseAdmissionFailed { .. })
+			)));
+			let unauthorized = System::events()
+				.into_iter()
+				.filter_map(|record| match record.event {
+					RuntimeEvent::CrosschainTransfer(Event::LiquidRepaymentUnauthorized {
+						gateway_activity_nonce,
+						..
+					}) => Some(gateway_activity_nonce),
+					_ => None,
+				})
+				.collect::<Vec<_>>();
+			assert_eq!(unauthorized, vec![2, 3, 4, 5]);
+		});
+	}
+
 	fn purchase_activity_log(
 		recipient: TestAccountId,
 		nonce: u64,
@@ -1360,6 +1505,7 @@ mod test {
 		let event = TransferToArgonFromSwapStarted {
 			purchase: SwapPurchase {
 				repayLiquidId: 0,
+				repaySignature: Default::default(),
 				timestamp,
 				buyer: [0x11; 20].into(),
 				argonAccountId: destination_bytes(&recipient).into(),
