@@ -1209,6 +1209,11 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       InvalidName: AugmentedError<ApiType>;
       /**
+       * The operational signature does not authorize this registration on this chain.
+       * Clients using ownership-only proofs must upgrade to registration proof version 2.
+       **/
+      InvalidRegistrationProof: AugmentedError<ApiType>;
+      /**
        * The caller is not one of the accounts included in the registration.
        **/
       InvalidRegistrationSubmitter: AugmentedError<ApiType>;

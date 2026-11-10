@@ -1,3 +1,11 @@
+use crate::{
+	AccountOwnershipProof, OpaqueEncryptionPubkey, Registration, RegistrationV1,
+	UpstreamAccessProof, MINING_ACCOUNT_PROOF_MESSAGE_KEY, VAULT_ACCOUNT_PROOF_MESSAGE_KEY,
+};
+use argon_primitives::Signature;
+use sp_core::{sr25519, Pair};
+use sp_runtime::{traits::IdentifyAccount, AccountId32, MultiSigner};
+
 use crate as pallet_operational_accounts;
 use argon_primitives::{
 	bitcoin::{
@@ -508,4 +516,80 @@ pub fn set_registration_lookup(
 
 pub fn has_vault_operational_mark(vault_account: &TestAccountId) -> bool {
 	OperationalVaultsMarkedOperational::get().contains(vault_account)
+}
+
+#[derive(Clone)]
+pub(crate) struct AccountSet {
+	pub(crate) owner: TestAccountId,
+	pub(crate) vault: TestAccountId,
+	pub(crate) mining: TestAccountId,
+	pub(crate) encryption_pubkey: OpaqueEncryptionPubkey,
+	owner_seed: u8,
+	pub(crate) vault_proof: AccountOwnershipProof,
+	pub(crate) mining_proof: AccountOwnershipProof,
+}
+
+impl AccountSet {
+	pub(crate) fn registration(
+		&self,
+		access_proof: Option<UpstreamAccessProof<TestAccountId>>,
+	) -> Registration<Test> {
+		let mut registration = RegistrationV1 {
+			operational_account: self.owner.clone(),
+			encryption_pubkey: self.encryption_pubkey.clone(),
+			operational_account_proof: AccountOwnershipProof {
+				signature: sr25519::Signature::from_raw([0; 64]).into(),
+			},
+			vault_account: self.vault.clone(),
+			mining_account: self.mining.clone(),
+			vault_account_proof: self.vault_proof.clone(),
+			mining_account_proof: self.mining_proof.clone(),
+			access_proof,
+		};
+		registration.operational_account_proof.signature =
+			sr25519::Pair::from_seed(&[self.owner_seed; 32])
+				.sign(&registration.signing_hash())
+				.into();
+		Registration::V1(registration)
+	}
+}
+
+fn make_linked_account(
+	owner: &TestAccountId,
+	seed: u8,
+	domain: &[u8],
+) -> (TestAccountId, AccountOwnershipProof) {
+	let pair = sr25519::Pair::from_seed(&[seed; 32]);
+	let account_id = MultiSigner::from(pair.public()).into_account();
+	let proof = make_account_proof(owner, &account_id, seed, domain);
+	(account_id, proof)
+}
+
+pub(crate) fn account_id_from_seed(seed: u8) -> TestAccountId {
+	let pair = sr25519::Pair::from_seed(&[seed; 32]);
+	MultiSigner::from(pair.public()).into_account()
+}
+
+pub(crate) fn make_account_proof(
+	owner: &TestAccountId,
+	account_id: &TestAccountId,
+	seed: u8,
+	domain: &[u8],
+) -> AccountOwnershipProof {
+	let pair = sr25519::Pair::from_seed(&[seed; 32]);
+	let account_id =
+		AccountId32::decode(&mut account_id.encode().as_slice()).expect("account id32");
+	let message = (domain, owner, &account_id).using_encoded(blake2_256);
+	let signature: Signature = pair.sign(message.as_slice()).into();
+	AccountOwnershipProof { signature }
+}
+
+pub(crate) fn make_account_set(owner_seed: u8, vault_seed: u8, mining_seed: u8) -> AccountSet {
+	let owner = account_id_from_seed(owner_seed);
+	let encryption_pubkey = OpaqueEncryptionPubkey([owner_seed; 32]);
+	let (vault, vault_proof) =
+		make_linked_account(&owner, vault_seed, VAULT_ACCOUNT_PROOF_MESSAGE_KEY);
+	let (mining, mining_proof) =
+		make_linked_account(&owner, mining_seed, MINING_ACCOUNT_PROOF_MESSAGE_KEY);
+	AccountSet { owner, vault, mining, encryption_pubkey, owner_seed, vault_proof, mining_proof }
 }

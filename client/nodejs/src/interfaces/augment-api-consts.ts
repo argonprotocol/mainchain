@@ -454,6 +454,11 @@ declare module '@polkadot/api-base/types/consts' {
        * Minimum vault securitization required to become operational.
        **/
       operationalMinimumVaultSecuritization: u128 & AugmentedConst<ApiType>;
+      /**
+       * Required operational registration signing contract. Clients must require version 2
+       * before signing; older clients must upgrade rather than reuse ownership-only proofs.
+       **/
+      registrationProofVersion: u8 & AugmentedConst<ApiType>;
     };
     ownership: {
       /**

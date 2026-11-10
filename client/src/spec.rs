@@ -3521,9 +3521,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				208u8, 66u8, 102u8, 95u8, 23u8, 243u8, 165u8, 122u8, 20u8, 225u8, 105u8, 236u8,
-				97u8, 72u8, 247u8, 20u8, 205u8, 209u8, 205u8, 7u8, 104u8, 172u8, 236u8, 8u8, 154u8,
-				167u8, 94u8, 174u8, 172u8, 165u8, 210u8, 189u8,
+				107u8, 119u8, 197u8, 182u8, 97u8, 241u8, 20u8, 12u8, 143u8, 176u8, 50u8, 93u8,
+				146u8, 196u8, 192u8, 97u8, 254u8, 13u8, 168u8, 94u8, 75u8, 240u8, 180u8, 155u8,
+				151u8, 119u8, 106u8, 131u8, 174u8, 17u8, 200u8, 217u8,
 			]
 	}
 	pub mod system {
@@ -4647,10 +4647,10 @@ pub mod api {
 						"Events",
 						(),
 						[
-							8u8, 246u8, 164u8, 32u8, 84u8, 157u8, 34u8, 166u8, 253u8, 212u8, 182u8,
-							68u8, 237u8, 170u8, 100u8, 165u8, 58u8, 137u8, 236u8, 161u8, 232u8,
-							23u8, 203u8, 53u8, 136u8, 239u8, 229u8, 20u8, 113u8, 74u8, 177u8,
-							127u8,
+							189u8, 147u8, 56u8, 144u8, 193u8, 163u8, 176u8, 16u8, 187u8, 177u8,
+							128u8, 195u8, 170u8, 149u8, 46u8, 57u8, 226u8, 26u8, 170u8, 49u8,
+							234u8, 251u8, 136u8, 251u8, 25u8, 89u8, 77u8, 245u8, 36u8, 123u8,
+							177u8, 68u8,
 						],
 					)
 				}
@@ -26909,6 +26909,24 @@ pub mod api {
 						],
 					)
 				}
+				#[doc = " Required operational registration signing contract. Clients must require version 2"]
+				#[doc = " before signing; older clients must upgrade rather than reuse ownership-only proofs."]
+				pub fn registration_proof_version(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u8,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"OperationalAccounts",
+						"registration_proof_version",
+						[
+							141u8, 130u8, 11u8, 35u8, 226u8, 114u8, 92u8, 179u8, 168u8, 110u8,
+							28u8, 91u8, 221u8, 64u8, 4u8, 148u8, 201u8, 193u8, 185u8, 66u8, 226u8,
+							114u8, 97u8, 79u8, 62u8, 212u8, 202u8, 114u8, 237u8, 228u8, 183u8,
+							165u8,
+						],
+					)
+				}
 			}
 		}
 	}
@@ -29226,6 +29244,32 @@ pub mod api {
 			impl ::subxt::ext::subxt_core::events::StaticEvent for UniswapPurchaseAdmissionFailed {
 				const PALLET: &'static str = "CrosschainTransfer";
 				const EVENT: &'static str = "UniswapPurchaseAdmissionFailed";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "Sender authorization failed; the selection was skipped and ordinary buy rules apply."]
+			pub struct LiquidRepaymentUnauthorized {
+				pub source_chain: liquid_repayment_unauthorized::SourceChain,
+				pub gateway_activity_nonce: liquid_repayment_unauthorized::GatewayActivityNonce,
+				pub account: liquid_repayment_unauthorized::Account,
+				pub liquid_id: liquid_repayment_unauthorized::LiquidId,
+			}
+			pub mod liquid_repayment_unauthorized {
+				use super::runtime_types;
+				pub type SourceChain = runtime_types::argon_primitives::gateway::SourceChain;
+				pub type GatewayActivityNonce = ::core::primitive::u64;
+				pub type Account = crate::types::AccountId32;
+				pub type LiquidId = ::core::primitive::u64;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for LiquidRepaymentUnauthorized {
+				const PALLET: &'static str = "CrosschainTransfer";
+				const EVENT: &'static str = "LiquidRepaymentUnauthorized";
 			}
 		}
 		pub mod storage {
@@ -38313,7 +38357,7 @@ pub mod api {
 				)]
 				#[doc = "The `Event` enum of this pallet"]
 				pub enum Event {
-					# [codec (index = 0)] # [doc = "A `TransferToArgonStarted` activity was proven and settled locally."] TransferToArgonSettled { source_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , transfer : runtime_types :: pallet_crosschain_transfer :: pallet :: TransferToArgonActivity , } , # [codec (index = 1)] # [doc = "Root force-set the active Global Issuance Council for a destination chain."] GlobalIssuanceCouncilForced { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , council_hash : crate :: types :: H256 , } , # [codec (index = 2)] # [doc = "A frame transition queued a new Global Issuance Council for destination-chain approval."] GlobalIssuanceCouncilRotationQueued { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , council_hash : crate :: types :: H256 , approval_queue_nonce : :: core :: primitive :: u64 , } , # [codec (index = 3)] # [doc = "An account registered its council signer for one destination chain."] CouncilSignerRegistered { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , account_id : crate :: types :: AccountId32 , signer : :: subxt :: ext :: subxt_core :: utils :: H160 , } , # [codec (index = 4)] # [doc = "An account queued a replacement council signer for the next council update."] CouncilSignerRotationQueued { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , account_id : crate :: types :: AccountId32 , signer : :: subxt :: ext :: subxt_core :: utils :: H160 , } , # [codec (index = 5)] # [doc = "An operator account registered a Minting Authority and queued it for council approval."] MintingAuthorityRegistered { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , account_id : crate :: types :: AccountId32 , approval_queue_nonce : :: core :: primitive :: u64 , } , # [codec (index = 6)] # [doc = "An operator queued the council-approved Ethereum deactivation for a Minting Authority."] MintingAuthorityDeactivationQueued { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , approval_queue_nonce : :: core :: primitive :: u64 , } , # [codec (index = 7)] # [doc = "Root updated the minimum normalized microgon value required to register a Minting"] # [doc = "Authority on one destination chain."] MinimumMintingAuthorityValueSet { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , minimum_value : :: core :: primitive :: u128 , } , # [codec (index = 8)] # [doc = "Root updated the pricing inputs used to repay relayers for activation batches on one"] # [doc = "destination chain."] MintingAuthorityActivationRepaymentPricingSet { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , } , # [codec (index = 9)] # [doc = "A council member recorded approval for a queued council update entry."] QueueEntryApprovalRecorded { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , target : runtime_types :: pallet_crosschain_transfer :: pallet :: CouncilApprovalTargetId , approval_queue_nonce : :: core :: primitive :: u64 , } , # [codec (index = 10)] # [doc = "The queued council update entry reached local quorum."] QueueEntryApprovalReady { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , target : runtime_types :: pallet_crosschain_transfer :: pallet :: CouncilApprovalTargetId , approval_queue_nonce : :: core :: primitive :: u64 , } , # [codec (index = 11)] # [doc = "A proven Ethereum activation filled the pending local activation fields."] MintingAuthorityActivationFinalized { source_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , } , # [codec (index = 12)] # [doc = "A proven activation paid or released the held relayer reimbursement and made the"] # [doc = "authority usable."] MintingAuthorityActivationCompleted { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , relayer_argon_account_id : crate :: types :: AccountId32 , repayment_amount : :: core :: primitive :: u128 , } , # [codec (index = 13)] # [doc = "A proven Ethereum deactivation released collateral and removed the local authority"] # [doc = "record."] MintingAuthorityDeactivationFinalized { source_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , } , # [codec (index = 14)] # [doc = "Gateway proof application paused one source chain at a specific canonical activity."] GatewaySyncPaused { source_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , pause : runtime_types :: pallet_crosschain_transfer :: pallet :: GatewaySyncPause , } , # [codec (index = 15)] # [doc = "Root manually unpaused one source chain."] GatewayUnpaused { source_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , } , # [codec (index = 16)] # [doc = "The stored gateway-state snapshot advanced after a proven contiguous batch."] GatewayStateAdvanced { source_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , gateway_state : runtime_types :: argon_primitives :: gateway :: GatewayState < :: core :: primitive :: u128 > , } , # [codec (index = 17)] # [doc = "A transfer out was opened."] TransferOutStarted { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , transfer_id : crate :: types :: H256 , account_id : crate :: types :: AccountId32 , asset : runtime_types :: pallet_crosschain_transfer :: pallet :: AssetKind , amount : :: core :: primitive :: u128 , minting_authority_tip : :: core :: primitive :: u128 , } , # [codec (index = 18)] # [doc = "A minting authority updated transfer collateral."] TransferCollateralized { transfer_id : crate :: types :: H256 , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , microgon_collateral : :: core :: primitive :: u128 , micronot_collateral : :: core :: primitive :: u128 , } , # [codec (index = 19)] # [doc = "A transfer is ready for finalization."] TransferOutReady { transfer_id : crate :: types :: H256 , } , # [codec (index = 20)] # [doc = "A transfer was finalized on the source chain."] TransferOutFinalized { source_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , transfer_id : crate :: types :: H256 , } , # [codec (index = 21)] # [doc = "A transfer was canceled on the source chain."] TransferOutCanceled { source_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , transfer_id : crate :: types :: H256 , } , # [codec (index = 22)] # [doc = "A pending collateral reservation was invalidated."] TransferCollateralInvalidated { transfer_id : crate :: types :: H256 , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , } , # [codec (index = 23)] # [doc = "A Uniswap purchase was credited without operational transfer credit."] TransferToArgonFromSwapSettled { source_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , transfer : runtime_types :: pallet_crosschain_transfer :: pallet :: TransferToArgonActivity , purchase : :: subxt :: ext :: subxt_core :: alloc :: boxed :: Box < runtime_types :: pallet_crosschain_transfer :: pallet :: SwapPurchaseEvidence > , purchase_tick : :: core :: primitive :: u64 , } , # [codec (index = 24)] # [doc = "Delivery succeeded, but purchase admission rolled back. Funds remain spendable and"] # [doc = "the gateway nonce advances without a reward or Liquid repayment commitment."] UniswapPurchaseAdmissionFailed { source_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , gateway_activity_nonce : :: core :: primitive :: u64 , account : crate :: types :: AccountId32 , error : runtime_types :: sp_runtime :: DispatchError , } , }
+					# [codec (index = 0)] # [doc = "A `TransferToArgonStarted` activity was proven and settled locally."] TransferToArgonSettled { source_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , transfer : runtime_types :: pallet_crosschain_transfer :: pallet :: TransferToArgonActivity , } , # [codec (index = 1)] # [doc = "Root force-set the active Global Issuance Council for a destination chain."] GlobalIssuanceCouncilForced { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , council_hash : crate :: types :: H256 , } , # [codec (index = 2)] # [doc = "A frame transition queued a new Global Issuance Council for destination-chain approval."] GlobalIssuanceCouncilRotationQueued { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , council_hash : crate :: types :: H256 , approval_queue_nonce : :: core :: primitive :: u64 , } , # [codec (index = 3)] # [doc = "An account registered its council signer for one destination chain."] CouncilSignerRegistered { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , account_id : crate :: types :: AccountId32 , signer : :: subxt :: ext :: subxt_core :: utils :: H160 , } , # [codec (index = 4)] # [doc = "An account queued a replacement council signer for the next council update."] CouncilSignerRotationQueued { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , account_id : crate :: types :: AccountId32 , signer : :: subxt :: ext :: subxt_core :: utils :: H160 , } , # [codec (index = 5)] # [doc = "An operator account registered a Minting Authority and queued it for council approval."] MintingAuthorityRegistered { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , account_id : crate :: types :: AccountId32 , approval_queue_nonce : :: core :: primitive :: u64 , } , # [codec (index = 6)] # [doc = "An operator queued the council-approved Ethereum deactivation for a Minting Authority."] MintingAuthorityDeactivationQueued { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , approval_queue_nonce : :: core :: primitive :: u64 , } , # [codec (index = 7)] # [doc = "Root updated the minimum normalized microgon value required to register a Minting"] # [doc = "Authority on one destination chain."] MinimumMintingAuthorityValueSet { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , minimum_value : :: core :: primitive :: u128 , } , # [codec (index = 8)] # [doc = "Root updated the pricing inputs used to repay relayers for activation batches on one"] # [doc = "destination chain."] MintingAuthorityActivationRepaymentPricingSet { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , } , # [codec (index = 9)] # [doc = "A council member recorded approval for a queued council update entry."] QueueEntryApprovalRecorded { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , target : runtime_types :: pallet_crosschain_transfer :: pallet :: CouncilApprovalTargetId , approval_queue_nonce : :: core :: primitive :: u64 , } , # [codec (index = 10)] # [doc = "The queued council update entry reached local quorum."] QueueEntryApprovalReady { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , target : runtime_types :: pallet_crosschain_transfer :: pallet :: CouncilApprovalTargetId , approval_queue_nonce : :: core :: primitive :: u64 , } , # [codec (index = 11)] # [doc = "A proven Ethereum activation filled the pending local activation fields."] MintingAuthorityActivationFinalized { source_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , } , # [codec (index = 12)] # [doc = "A proven activation paid or released the held relayer reimbursement and made the"] # [doc = "authority usable."] MintingAuthorityActivationCompleted { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , relayer_argon_account_id : crate :: types :: AccountId32 , repayment_amount : :: core :: primitive :: u128 , } , # [codec (index = 13)] # [doc = "A proven Ethereum deactivation released collateral and removed the local authority"] # [doc = "record."] MintingAuthorityDeactivationFinalized { source_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , } , # [codec (index = 14)] # [doc = "Gateway proof application paused one source chain at a specific canonical activity."] GatewaySyncPaused { source_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , pause : runtime_types :: pallet_crosschain_transfer :: pallet :: GatewaySyncPause , } , # [codec (index = 15)] # [doc = "Root manually unpaused one source chain."] GatewayUnpaused { source_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , } , # [codec (index = 16)] # [doc = "The stored gateway-state snapshot advanced after a proven contiguous batch."] GatewayStateAdvanced { source_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , gateway_state : runtime_types :: argon_primitives :: gateway :: GatewayState < :: core :: primitive :: u128 > , } , # [codec (index = 17)] # [doc = "A transfer out was opened."] TransferOutStarted { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , transfer_id : crate :: types :: H256 , account_id : crate :: types :: AccountId32 , asset : runtime_types :: pallet_crosschain_transfer :: pallet :: AssetKind , amount : :: core :: primitive :: u128 , minting_authority_tip : :: core :: primitive :: u128 , } , # [codec (index = 18)] # [doc = "A minting authority updated transfer collateral."] TransferCollateralized { transfer_id : crate :: types :: H256 , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , microgon_collateral : :: core :: primitive :: u128 , micronot_collateral : :: core :: primitive :: u128 , } , # [codec (index = 19)] # [doc = "A transfer is ready for finalization."] TransferOutReady { transfer_id : crate :: types :: H256 , } , # [codec (index = 20)] # [doc = "A transfer was finalized on the source chain."] TransferOutFinalized { source_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , transfer_id : crate :: types :: H256 , } , # [codec (index = 21)] # [doc = "A transfer was canceled on the source chain."] TransferOutCanceled { source_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , transfer_id : crate :: types :: H256 , } , # [codec (index = 22)] # [doc = "A pending collateral reservation was invalidated."] TransferCollateralInvalidated { transfer_id : crate :: types :: H256 , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , } , # [codec (index = 23)] # [doc = "A Uniswap purchase was credited without operational transfer credit."] TransferToArgonFromSwapSettled { source_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , transfer : runtime_types :: pallet_crosschain_transfer :: pallet :: TransferToArgonActivity , purchase : :: subxt :: ext :: subxt_core :: alloc :: boxed :: Box < runtime_types :: pallet_crosschain_transfer :: pallet :: SwapPurchaseEvidence > , purchase_tick : :: core :: primitive :: u64 , } , # [codec (index = 24)] # [doc = "Delivery succeeded, but purchase admission rolled back. Funds remain spendable and"] # [doc = "the gateway nonce advances without a reward or Liquid repayment commitment."] UniswapPurchaseAdmissionFailed { source_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , gateway_activity_nonce : :: core :: primitive :: u64 , account : crate :: types :: AccountId32 , error : runtime_types :: sp_runtime :: DispatchError , } , # [codec (index = 25)] # [doc = "Sender authorization failed; the selection was skipped and ordinary buy rules apply."] LiquidRepaymentUnauthorized { source_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , gateway_activity_nonce : :: core :: primitive :: u64 , account : crate :: types :: AccountId32 , liquid_id : :: core :: primitive :: u64 , } , }
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
 					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
@@ -38521,6 +38565,10 @@ pub mod api {
 				)]
 				pub struct SwapPurchaseEvidence {
 					pub repay_liquid_id: ::core::option::Option<::core::primitive::u64>,
+					pub repay_signature:
+						runtime_types::bounded_collections::bounded_vec::BoundedVec<
+							::core::primitive::u8,
+						>,
 					pub usdc_token: ::subxt::ext::subxt_core::utils::H160,
 					pub usdc_spent: runtime_types::primitive_types::U256,
 					pub argon_bought: runtime_types::primitive_types::U256,
@@ -40783,6 +40831,10 @@ pub mod api {
 					#[doc = "Profile names must start with an uppercase ASCII letter and otherwise be ASCII"]
 					#[doc = "alphanumeric."]
 					InvalidName,
+					#[codec(index = 20)]
+					#[doc = "The operational signature does not authorize this registration on this chain."]
+					#[doc = "Clients using ownership-only proofs must upgrade to registration proof version 2."]
+					InvalidRegistrationProof,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
