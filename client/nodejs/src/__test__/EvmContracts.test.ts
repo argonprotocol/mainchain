@@ -102,8 +102,14 @@ it('binds every purchase field and gateway domain to the native activity commitm
 
   for (const [key, value] of Object.entries(event.purchase)) {
     let changed: string | bigint;
-    if (typeof value === 'bigint') changed = value + 1n;
-    else changed = `${value.slice(0, -1).toLowerCase()}${value.endsWith('0') ? '1' : '0'}`;
+    if (typeof value === 'bigint') {
+      changed = value + 1n;
+    } else if (value === '0x') {
+      changed = '0x01';
+    } else {
+      changed = `${value.slice(0, -1).toLowerCase()}${value.endsWith('0') ? '1' : '0'}`;
+    }
+
     expect(hash(context, { ...event, purchase: { ...event.purchase, [key]: changed } })).not.toBe(
       expected,
     );
