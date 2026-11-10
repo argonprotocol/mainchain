@@ -64,7 +64,8 @@ The gateway is where the actual protocol behavior lives:
 - each council rotation carries the next `microgonsPerArgonot` floor value alongside the next
   council snapshot
 - transfer-out requests carry one exact `microgonsPerArgonot` quote, and Ethereum only accepts the
-  request if that quoted rate is at or below the currently active council floor
+  request if that quoted rate is at or below the council-approved maximum. Argon preserves
+  outstanding quotes in that maximum while pricing new requests from the conservative market floor.
 - queued council-approved updates chain each signed item to the previous queue item's signed hash,
   so Ethereum only needs to verify council signatures on council-segment tips: each council rotation
   item and the last relayed item in the submitted batch

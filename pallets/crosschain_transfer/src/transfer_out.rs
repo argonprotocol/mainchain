@@ -2,7 +2,7 @@ use alloc::vec::Vec;
 use alloy_primitives::{Address as AlloyAddress, B256};
 use argon_ethereum_contracts::minting_gateway as ethereum_contracts;
 use argon_primitives::{
-	EthereumBlockNumber, EthereumVerifyProvider, TickProvider, MICROGONS_PER_ARGON,
+	EthereumBlockNumber, EthereumVerifyProvider, PriceProvider, TickProvider, MICROGONS_PER_ARGON,
 };
 use frame_support::{ensure, storage::with_storage_layer, traits::fungible::MutateHold};
 use pallet_prelude::*;
@@ -16,6 +16,7 @@ use super::{
 	MintingAuthoritiesBySigner, MintingAuthorityState, NextTransferOutNonceBySendingAccountId,
 	NonTerminalTransferOutCountByDestinationChain, Pallet, PendingCollateralizationRequestsByChain,
 	PendingTransferOutCirculationByDestinationChain,
+	PendingTransferOutQuoteCountsByDestinationChain,
 	PreviousTransferOutMicrogonsPerArgonotByDestinationChain, SourceChain, TransferOutById,
 	TransferOutQuoteMicrogonsPerArgonotByDestinationChain, TransferOutRequestNonce, H160, H256,
 };
@@ -231,6 +232,7 @@ impl<T: Config> Pallet<T> {
 		NonTerminalTransferOutCountByDestinationChain::<T>::mutate(destination_chain, |count| {
 			count.saturating_accrue(1);
 		});
+		Self::track_transfer_out_quote(&transfer)?;
 		TransferOutById::<T>::insert(transfer_id, transfer.clone());
 		Self::sync_pending_collateralization_request(transfer_id, &transfer)?;
 		Self::deposit_event(Event::TransferOutStarted {
@@ -432,6 +434,7 @@ impl<T: Config> Pallet<T> {
 		let mut finalized_authority_collateral =
 			Vec::with_capacity(finalized_collateral_rows.len());
 		if let Some(transfer) = local_transfer.as_ref() {
+			Self::untrack_transfer_out_quote(transfer);
 			Self::remove_pending_collateralization_request(transfer.destination_chain, transfer_id);
 			NonTerminalTransferOutCountByDestinationChain::<T>::mutate(
 				transfer.destination_chain,
@@ -531,6 +534,7 @@ impl<T: Config> Pallet<T> {
 			Self::deposit_event(Event::TransferOutCanceled { source_chain, transfer_id });
 			return Ok(());
 		};
+		Self::untrack_transfer_out_quote(&transfer);
 		Self::remove_pending_collateralization_request(transfer.destination_chain, transfer_id);
 		NonTerminalTransferOutCountByDestinationChain::<T>::mutate(
 			transfer.destination_chain,
@@ -871,12 +875,18 @@ impl<T: Config> Pallet<T> {
 	pub(crate) fn transfer_out_quote_microgons_per_argonot(
 		destination_chain: SourceChain,
 	) -> Result<T::Balance, DispatchError> {
-		TransferOutQuoteMicrogonsPerArgonotByDestinationChain::<T>::get(destination_chain)
-			.filter(|rate| *rate != T::Balance::default())
-			.map(Ok)
-			.unwrap_or_else(|| {
-				Self::base_transfer_out_quote_microgons_per_argonot(destination_chain)
-			})
+		let gateway_ceiling =
+			TransferOutQuoteMicrogonsPerArgonotByDestinationChain::<T>::get(destination_chain)
+				.filter(|rate| *rate != T::Balance::default())
+				.map(Ok)
+				.unwrap_or_else(|| {
+					Self::base_transfer_out_quote_microgons_per_argonot(destination_chain)
+				})?;
+		let market_rate =
+			T::PriceProvider::get_lowest_microgons_per_argonot(T::CouncilRotationFrames::get())
+				.filter(|rate| *rate != T::Balance::default())
+				.ok_or(Error::<T>::InvalidMicrogonsPerArgonot)?;
+		Ok(market_rate.min(gateway_ceiling))
 	}
 
 	pub(crate) fn base_transfer_out_quote_microgons_per_argonot(
@@ -899,6 +909,34 @@ impl<T: Config> Pallet<T> {
 			quoted_microgons_per_argonot = quoted_microgons_per_argonot.min(previous_transfer_rate);
 		}
 		Ok(quoted_microgons_per_argonot)
+	}
+
+	pub(crate) fn track_transfer_out_quote(transfer: &TransferOutOfArgon<T>) -> DispatchResult {
+		PendingTransferOutQuoteCountsByDestinationChain::<T>::try_mutate(
+			transfer.destination_chain,
+			|quotes| {
+				let count =
+					quotes.get(&transfer.microgons_per_argonot).copied().unwrap_or_default();
+				quotes
+					.try_insert(transfer.microgons_per_argonot, count.saturating_add(1))
+					.map(|_| ())
+					.map_err(|_| Error::<T>::TooManyPendingTransferOuts.into())
+			},
+		)
+	}
+
+	fn untrack_transfer_out_quote(transfer: &TransferOutOfArgon<T>) {
+		PendingTransferOutQuoteCountsByDestinationChain::<T>::mutate(
+			transfer.destination_chain,
+			|quotes| {
+				if let Some(count) = quotes.get_mut(&transfer.microgons_per_argonot) {
+					count.saturating_reduce(1);
+					if *count == 0 {
+						quotes.remove(&transfer.microgons_per_argonot);
+					}
+				}
+			},
+		);
 	}
 
 	fn add_pending_transfer_out_circulation(

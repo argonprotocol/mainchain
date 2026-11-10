@@ -101,7 +101,7 @@ pub mod pallet {
 		sp_runtime::{transaction_validity::InvalidTransaction, BoundedBTreeMap},
 	};
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(4);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(5);
 
 	pub(super) const WEI_PER_ETH: u128 = 1_000_000_000_000_000_000;
 
@@ -568,7 +568,8 @@ pub mod pallet {
 	/// Frozen council snapshot used to verify queue approvals and outbound transfer collateral
 	/// math.
 	pub struct GlobalIssuanceCouncil<T: Config> {
-		/// Price floor used to translate committed Argonots into council voting weight.
+		/// Maximum accepted transfer quote, in microgons per whole Argonot. Voting weights use
+		/// the conservative market floor independently of this outstanding-transfer ceiling.
 		pub epoch_microgons_per_argonot: T::Balance,
 		/// Signer-keyed council membership at the moment this snapshot became canonical.
 		pub members: BoundedBTreeMap<H160, GlobalIssuanceCouncilMember<T>, T::MaxCouncilMembers>,
@@ -852,13 +853,12 @@ pub mod pallet {
 		StorageMap<_, Blake2_128Concat, SourceChain, H256, OptionQuery>;
 
 	#[pallet::storage]
-	/// Conservative transfer-out conversion rate currently quoted for each destination chain.
+	/// Latest proved gateway acceptance ceiling, in microgons per whole Argonot.
 	pub type CurrentTransferOutMicrogonsPerArgonotByDestinationChain<T: Config> =
 		StorageMap<_, Blake2_128Concat, SourceChain, T::Balance, OptionQuery>;
 
 	#[pallet::storage]
-	/// Immediately previous transfer-out conversion rate still accepted while the floor ratchets
-	/// upward across council transitions.
+	/// Previous proved gateway ceiling, retained to quote conservatively across proof-back delays.
 	pub type PreviousTransferOutMicrogonsPerArgonotByDestinationChain<T: Config> =
 		StorageMap<_, Blake2_128Concat, SourceChain, T::Balance, OptionQuery>;
 
@@ -874,10 +874,21 @@ pub mod pallet {
 		StorageMap<_, Blake2_128Concat, SourceChain, H256, OptionQuery>;
 
 	#[pallet::storage]
-	/// The conservative transfer-out quote floor that the next newly opened transfer should
-	/// snapshot on each destination chain.
+	/// Minimum active and queued gateway ceiling. New transfers also clamp this to the market
+	/// floor.
 	pub type TransferOutQuoteMicrogonsPerArgonotByDestinationChain<T: Config> =
 		StorageMap<_, Blake2_128Concat, SourceChain, T::Balance, OptionQuery>;
+
+	#[pallet::storage]
+	/// Active transfer counts keyed by their quote in microgons per whole Argonot. The largest
+	/// key gives the required gateway ceiling without scanning transfer records at rotation.
+	pub type PendingTransferOutQuoteCountsByDestinationChain<T: Config> = StorageMap<
+		_,
+		Blake2_128Concat,
+		SourceChain,
+		BoundedBTreeMap<T::Balance, u32, T::MaxPendingTransferOutsPerDestinationChain>,
+		ValueQuery,
+	>;
 
 	#[pallet::storage]
 	/// The next outbound approval-queue nonce to assign on each destination chain.
