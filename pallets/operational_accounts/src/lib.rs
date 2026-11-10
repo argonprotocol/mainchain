@@ -24,10 +24,10 @@ pub mod pallet {
 	use super::*;
 	use alloc::vec::Vec;
 	use argon_primitives::{
-		block_seal::BlockSealAuthorityId, vault::BitcoinVaultProvider, BitcoinFissionsProvider,
-		MiningSlotProvider, OnNewSlot, OperationalAccountProvider, OperationalAccountsHook,
-		OperationalRewardKind, OperationalRewardsPayer, Signature, TickProvider,
-		TreasuryPoolProvider, UniswapTransferProvider, MICROGONS_PER_ARGON,
+		block_seal::BlockSealAuthorityId, vault::BitcoinVaultProvider, AccountSecurityProvider,
+		BitcoinFissionsProvider, MiningSlotProvider, OnNewSlot, OperationalAccountProvider,
+		OperationalAccountsHook, OperationalRewardKind, OperationalRewardsPayer, Signature,
+		TickProvider, TreasuryPoolProvider, UniswapTransferProvider, MICROGONS_PER_ARGON,
 	};
 	use codec::{Decode, Encode, EncodeLike};
 	use core::{fmt::Debug, marker::PhantomData};
@@ -53,6 +53,8 @@ pub mod pallet {
 	#[pallet::config]
 	#[pallet::disable_frame_system_supertrait_check]
 	pub trait Config: polkadot_sdk::frame_system::Config {
+		/// Reconciles account-group security atomically when standalone accounts are linked.
+		type AccountSecurityProvider: AccountSecurityProvider<Self::AccountId>;
 		/// The balance of an account.
 		type Balance: AtLeast32BitUnsigned
 			+ Member
@@ -637,7 +639,15 @@ pub mod pallet {
 				Error::<T>::AccountAlreadyLinked
 			);
 			ensure!(
+				!OperationalAccounts::<T>::contains_key(vault_account),
+				Error::<T>::AccountAlreadyLinked
+			);
+			ensure!(
 				!OperationalAccountBySubAccount::<T>::contains_key(mining_account),
+				Error::<T>::AccountAlreadyLinked
+			);
+			ensure!(
+				!OperationalAccounts::<T>::contains_key(mining_account),
 				Error::<T>::AccountAlreadyLinked
 			);
 			ensure!(registration.verify(), Error::<T>::InvalidRegistrationProof);
@@ -744,6 +754,11 @@ pub mod pallet {
 				);
 			ensure!(Self::meets_minimums(&account), Error::<T>::MinimumsNotMet);
 			Self::emit_meets_minimums_event_if_newly_met(&operational_account, false, &account);
+
+			T::AccountSecurityProvider::on_operational_registration(
+				&vault_account,
+				&[operational_account.clone(), vault_account.clone(), mining_account.clone()],
+			)?;
 
 			OperationalAccounts::<T>::insert(&operational_account, account);
 

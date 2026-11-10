@@ -37,4 +37,6 @@ frame_benchmarking::define_benchmarks!(
 	[pallet_stabilizer_pools, StabilizerPools]
 	[pallet_ethereum_verifier, EthereumVerifier]
 	[pallet_fee_control, FeeControl]
+	[pallet_account_security, AccountSecurity]
+	[argon_runtime_common::call_authorization, argon_runtime_common::call_authorization::PolicyBenchmarks<Runtime>]
 );

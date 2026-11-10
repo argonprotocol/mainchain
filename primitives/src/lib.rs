@@ -6,10 +6,7 @@ use core::fmt::Display;
 use polkadot_sdk::*;
 use serde::{Deserialize, Serialize};
 use sp_core::{crypto::Ss58AddressFormatRegistry, H256};
-use sp_runtime::{
-	traits::{BlakeTwo256, IdentifyAccount, Verify},
-	MultiSignature,
-};
+use sp_runtime::traits::{BlakeTwo256, IdentifyAccount, Verify};
 
 pub use account::{AccountType, LocalchainAccountId};
 pub use balance_change::*;
@@ -17,6 +14,7 @@ pub use block_seal::{BlockSealAuthorityId, BlockSealAuthoritySignature, BLOCK_SE
 pub use block_vote::*;
 #[cfg(feature = "std")]
 use core::str::FromStr;
+pub use crypto::{MultiSigner, Signature};
 pub use digests::{BlockSealDigest, AUTHOR_DIGEST_ID, BLOCK_SEAL_DIGEST_ID, *};
 pub use domain::*;
 pub use domain_top_level::DomainTopLevel;
@@ -34,6 +32,7 @@ pub mod apis;
 pub mod balance_change;
 pub mod block_seal;
 pub mod block_vote;
+pub mod crypto;
 pub mod digests;
 mod domain;
 pub mod domain_top_level;
@@ -70,11 +69,7 @@ pub type BlockNumber = u32;
 
 pub use block_seal::ComputeDifficulty;
 
-/// Alias to 512-bit hash when used in the context of a transaction signature on the chain.
-pub type Signature = MultiSignature;
-
-/// Some way of identifying an account on the chain. We intentionally make it equivalent
-/// to the public key of our transaction signing scheme.
+/// A native 32-byte account identity derived by the selected transaction signing scheme.
 pub type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
 
 #[cfg_attr(feature = "napi", napi_derive::napi)]

@@ -4,8 +4,51 @@ use argon_primitives::{
 	treasury::BitcoinLockPosition,
 	Balance, VaultId,
 };
+use codec::DecodeAll;
+use frame_system::Config as SystemConfig;
 use pallet_prelude::*;
-use polkadot_sdk::frame_support::{traits::GetStorageVersion, StorageNoopGuard};
+use pallet_proxy::{
+	BlockNumberFor as ProxyBlockNumber, Config as ProxyConfig, Proxies, ProxyDefinition,
+};
+use polkadot_sdk::{
+	frame_support::{
+		storage::StoragePrefixedMap,
+		traits::{Currency, GetStorageVersion},
+		StorageNoopGuard,
+	},
+	sp_io,
+};
+use sp_runtime::TryRuntimeError;
+
+type ProxyBalance<T> =
+	<<T as ProxyConfig>::Currency as Currency<<T as SystemConfig>::AccountId>>::Balance;
+type RawProxyDefinitions<T> = (
+	BoundedVec<
+		ProxyDefinition<<T as SystemConfig>::AccountId, u8, ProxyBlockNumber<T>>,
+		<T as ProxyConfig>::MaxProxies,
+	>,
+	ProxyBalance<T>,
+);
+
+/// Check legacy enum bytes directly: typed iteration can skip rows containing removed variants.
+pub fn check_proxy_types<T: ProxyConfig>() -> Result<(), TryRuntimeError> {
+	let prefix = Proxies::<T>::final_prefix();
+	let mut previous_key = prefix.to_vec();
+	while let Some(key) = sp_io::storage::next_key(&previous_key) {
+		if !key.starts_with(&prefix) {
+			break;
+		}
+		let value = sp_io::storage::get(&key).ok_or("Proxy storage row disappeared")?;
+		let (definitions, _) = RawProxyDefinitions::<T>::decode_all(&mut value.as_ref())
+			.map_err(|_| "Stored proxy definitions cannot be decoded")?;
+		ensure!(
+			definitions.iter().all(|definition| matches!(definition.proxy_type, 0 | 4)),
+			"Stored proxy uses a removed proxy type"
+		);
+		previous_key = key;
+	}
+	Ok(())
+}
 
 /// Reconcile canonical Bitcoin records across pallets after their local state checks.
 /// Pending releases and failed expirations retain their Lock backing until settlement succeeds.

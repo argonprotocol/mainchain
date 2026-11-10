@@ -23,6 +23,7 @@
     "localchain/npm/*",
     "client/nodejs",
     "testing/nodejs",
+    "testing/signers",
     "chains/ethereum/contracts",
     "chains/ethereum/deploy"
   ],

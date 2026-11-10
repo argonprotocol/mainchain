@@ -8,7 +8,7 @@ use jsonrpsee::{
 };
 pub(crate) use polkadot_sdk::*;
 use sp_core::{crypto::AccountId32, H256};
-use sp_runtime::{MultiAddress, MultiSignature};
+use sp_runtime::MultiAddress;
 use std::{fmt::Debug, io::Write, sync::Arc, time::Duration};
 use subxt::{
 	backend::{legacy::LegacyRpcMethods, rpc::RpcClient, BackendExt, BlockRef},
@@ -35,7 +35,7 @@ use tracing::{info, log::debug, warn};
 
 pub use argon_primitives::block_seal::mining_bid_max_hash;
 use argon_primitives::{
-	prelude::FrameId, tick::Tick, AccountId, BlockNumber, Chain, ChainIdentity, Nonce,
+	prelude::FrameId, tick::Tick, AccountId, BlockNumber, Chain, ChainIdentity, Nonce, Signature,
 	VotingSchedule,
 };
 pub use spec::api;
@@ -59,7 +59,7 @@ pub type ArgonOnlineClient = OnlineClient<ArgonConfig>;
 impl Config for ArgonConfig {
 	type AccountId = AccountId;
 	type Address = MultiAddress<Self::AccountId, ()>;
-	type Signature = MultiSignature;
+	type Signature = Signature;
 	type Hasher = BlakeTwo256;
 	type Header = subxt::config::substrate::SubstrateHeader<u32, Self::Hasher>;
 	type ExtrinsicParams = ArgonExtrinsicParams<Self>;

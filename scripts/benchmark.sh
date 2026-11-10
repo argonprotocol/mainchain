@@ -107,6 +107,8 @@ function benchmark_runtime() {
         elif [ "$pallet" = "pallet_stabilizer_buys" ]; then
             # Bound the short batch ranges using the larger regression coefficients.
             analysis_flags=(--output-analysis=max)
+        elif [ "$pallet" = "pallet_account_security" ] || [ "$pallet" = "argon_runtime_common::call_authorization" ]; then
+            analysis_flags=(--output-analysis=max)
         fi
         set +e
         frame-omni-bencher v1 benchmark pallet \
@@ -172,7 +174,12 @@ if [ "$RUNTIME_TYPE" = "canary" ] || [ "$RUNTIME_TYPE" = "all" ]; then
 fi
 
 echo "Building: ${RUNTIMES}"
-cargo build --release --features=runtime-benchmarks ${RUNTIMES}
+RUNTIME_FEATURES="runtime-benchmarks"
+if [ "$SPECIFIC_PALLET" = "pallet_account_security" ] || [ "$SPECIFIC_PALLET" = "all" ]; then
+    # AccountSecurity measures both native signing modes, including metadata-bound proofs.
+    RUNTIME_FEATURES="${RUNTIME_FEATURES},metadata-hash"
+fi
+cargo build --release --features="${RUNTIME_FEATURES}" ${RUNTIMES}
 
 if [ "$RUNTIME_TYPE" = "argon" ] || [ "$RUNTIME_TYPE" = "all" ]; then
     benchmark_runtime "argon"

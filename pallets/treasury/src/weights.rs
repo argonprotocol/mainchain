@@ -9,6 +9,7 @@ use argon_primitives::{
 	OperationalAccountsHookWeightInfo, OperationalRewardsPayerWeightInfo,
 	TreasuryPoolProviderWeightInfo,
 };
+use core::marker::PhantomData;
 use pallet_prelude::*;
 
 /// Weight functions needed for this pallet.
@@ -47,7 +48,9 @@ pub trait WeightInfo {
 	fn provider_pay_reward_new_account() -> Weight;
 }
 
-pub struct WithProviderWeights<T, Base>(core::marker::PhantomData<(T, Base)>);
+pub struct WithProviderWeights<T, Base, NativeSignatureWeight = ()>(
+	PhantomData<(T, Base, NativeSignatureWeight)>,
+);
 
 type PositionWeights<T> = <<T as Config>::PositionProvider as TreasuryPositionProvider<
 	<T as frame_system::Config>::AccountId,
@@ -64,10 +67,12 @@ type OperationalHookWeights<T> =
 		<T as Config>::Balance,
 	>>::Weights;
 
-impl<T, Base> WeightInfo for WithProviderWeights<T, Base>
+impl<T, Base, NativeSignatureWeight> WeightInfo
+	for WithProviderWeights<T, Base, NativeSignatureWeight>
 where
 	T: Config,
 	Base: WeightInfo,
+	NativeSignatureWeight: Get<Weight>,
 {
 	fn read_bond_collateral_queue() -> Weight {
 		Base::read_bond_collateral_queue()
@@ -120,6 +125,8 @@ where
 
 	fn buy_bonds() -> Weight {
 		Base::buy_bonds()
+			// Bonus approval checks both the vault operator and its delegate.
+			.saturating_add(NativeSignatureWeight::get().saturating_mul(2))
 			.saturating_add(PositionWeights::<T>::account_quantity_updated().saturating_mul(2))
 			.saturating_add(VaultWeights::<T>::get_vault_operator())
 			.saturating_add(PositionWeights::<T>::bond_principal())

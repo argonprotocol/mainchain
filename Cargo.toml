@@ -8,6 +8,7 @@ members = [
 	"pallets/bitcoin_locks",
 	"pallets/bitcoin_fissions",
     "pallets/bitcoin_utxos",
+    "pallets/account_security",
     "pallets/bootstrap",
     "pallets/block_rewards",
     "pallets/block_seal",
@@ -147,6 +148,7 @@ schnellru = { version = "0.2" }
 lru-cache = { version = "0.1.2" }
 getrandom = { version = "0.3.2" }
 rand = { version = "0.10.1" }
+rand-08 = { package = "rand", version = "0.8.6" }
 lazy_static = "1.4.0"
 smallvec = { version = "1.13" }
 hex = { version = "0.4", default-features = false, features = ["alloc"] }
@@ -217,6 +219,8 @@ bip39 = { version = "2.0.0", default-features = false }
 miniscript = { version = "12.0.0", default-features = false }
 bitcoind = { version = "0.36.1", features = ["26_0"] }
 k256 = { version = "0.13.3", default-features = false }
+p256 = { version = "0.13.2", default-features = false }
+ecdsa = { version = "0.16.9", default-features = false }
 bip32 = { version = "0.5.1", default-features = false }
 base58 = { version = "0.2.0", default-features = false }
 base64 = { version = "0.22", default-features = false }
@@ -286,6 +290,7 @@ pallet-block-seal-spec = { path = "pallets/block_seal_spec", default-features = 
 pallet-bitcoin-locks = { path = "pallets/bitcoin_locks", default-features = false }
 pallet-bitcoin-fissions = { path = "pallets/bitcoin_fissions", default-features = false }
 pallet-bitcoin-utxos = { path = "pallets/bitcoin_utxos", default-features = false }
+pallet-account-security = { path = "pallets/account_security", default-features = false }
 pallet-block-rewards = { path = "pallets/block_rewards", default-features = false }
 pallet-localchain-transfer = { path = "pallets/localchain_transfer", default-features = false }
 pallet-digests = { path = "pallets/digests", default-features = false }

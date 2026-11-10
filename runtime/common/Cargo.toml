@@ -19,6 +19,7 @@ scale-info = { workspace = true }
 smallvec = { workspace = true }
 log = { workspace = true }
 serde_json = { workspace = true }
+serde = { workspace = true }
 
 polkadot-sdk.workspace = true
 
@@ -55,6 +56,11 @@ polkadot-sdk.features = [
 ]
 
 # Local Dependencies
+pallet-account-security = { workspace = true }
+pallet-bootstrap = { workspace = true }
+pallet-ethereum-verifier = { workspace = true }
+pallet-stabilizer-buys = { workspace = true }
+pallet-stabilizer-pools = { workspace = true }
 pallet-bitcoin-utxos = { workspace = true }
 pallet-block-seal = { workspace = true }
 pallet-block-seal-spec = { workspace = true }
@@ -95,15 +101,18 @@ std = [
 	"codec/std",
 	"frame-benchmarking/std",
 	"log/std",
+	"pallet-account-security/std",
 	"pallet-bitcoin-fissions/std",
 	"pallet-bitcoin-locks/std",
 	"pallet-bitcoin-utxos/std",
 	"pallet-block-rewards/std",
 	"pallet-block-seal-spec/std",
 	"pallet-block-seal/std",
+	"pallet-bootstrap/std",
 	"pallet-crosschain-transfer/std",
 	"pallet-digests/std",
 	"pallet-domains/std",
+	"pallet-ethereum-verifier/std",
 	"pallet-fee-control/std",
 	"pallet-localchain-transfer/std",
 	"pallet-mining-slot/std",
@@ -113,26 +122,32 @@ std = [
 	"pallet-operational-accounts/std",
 	"pallet-prelude/std",
 	"pallet-price-index/std",
+	"pallet-stabilizer-buys/std",
+	"pallet-stabilizer-pools/std",
 	"pallet-ticks/std",
 	"pallet-treasury-positions/std",
 	"pallet-treasury/std",
 	"pallet-vaults/std",
 	"polkadot-sdk/std",
 	"scale-info/std",
+	"serde/std",
 	"serde_json/std",
 ]
 runtime-benchmarks = [
 	"argon-primitives/runtime-benchmarks",
 	"frame-benchmarking/runtime-benchmarks",
+	"pallet-account-security/runtime-benchmarks",
 	"pallet-bitcoin-fissions/runtime-benchmarks",
 	"pallet-bitcoin-locks/runtime-benchmarks",
 	"pallet-bitcoin-utxos/runtime-benchmarks",
 	"pallet-block-rewards/runtime-benchmarks",
 	"pallet-block-seal-spec/runtime-benchmarks",
 	"pallet-block-seal/runtime-benchmarks",
+	"pallet-bootstrap/runtime-benchmarks",
 	"pallet-crosschain-transfer/runtime-benchmarks",
 	"pallet-digests/runtime-benchmarks",
 	"pallet-domains/runtime-benchmarks",
+	"pallet-ethereum-verifier/runtime-benchmarks",
 	"pallet-fee-control/runtime-benchmarks",
 	"pallet-localchain-transfer/runtime-benchmarks",
 	"pallet-mining-slot/runtime-benchmarks",
@@ -142,23 +157,29 @@ runtime-benchmarks = [
 	"pallet-operational-accounts/runtime-benchmarks",
 	"pallet-prelude/runtime-benchmarks",
 	"pallet-price-index/runtime-benchmarks",
+	"pallet-stabilizer-buys/runtime-benchmarks",
+	"pallet-stabilizer-pools/runtime-benchmarks",
 	"pallet-ticks/runtime-benchmarks",
 	"pallet-treasury-positions/runtime-benchmarks",
 	"pallet-treasury/runtime-benchmarks",
 	"pallet-vaults/runtime-benchmarks",
 	"polkadot-sdk/frame-system-benchmarking",
 	"polkadot-sdk/runtime-benchmarks",
+	"polkadot-sdk/sp-io",
 ]
 try-runtime = [
+	"pallet-account-security/try-runtime",
 	"pallet-bitcoin-fissions/try-runtime",
 	"pallet-bitcoin-locks/try-runtime",
 	"pallet-bitcoin-utxos/try-runtime",
 	"pallet-block-rewards/try-runtime",
 	"pallet-block-seal-spec/try-runtime",
 	"pallet-block-seal/try-runtime",
+	"pallet-bootstrap/try-runtime",
 	"pallet-crosschain-transfer/try-runtime",
 	"pallet-digests/try-runtime",
 	"pallet-domains/try-runtime",
+	"pallet-ethereum-verifier/try-runtime",
 	"pallet-fee-control/try-runtime",
 	"pallet-localchain-transfer/try-runtime",
 	"pallet-mining-slot/try-runtime",
@@ -167,9 +188,12 @@ try-runtime = [
 	"pallet-notebook/try-runtime",
 	"pallet-operational-accounts/try-runtime",
 	"pallet-price-index/try-runtime",
+	"pallet-stabilizer-buys/try-runtime",
+	"pallet-stabilizer-pools/try-runtime",
 	"pallet-ticks/try-runtime",
 	"pallet-treasury-positions/try-runtime",
 	"pallet-treasury/try-runtime",
 	"pallet-vaults/try-runtime",
+	"polkadot-sdk/sp-io",
 	"polkadot-sdk/try-runtime",
 ]

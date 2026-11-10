@@ -9,4 +9,5 @@
 
 ## Technical Notes:
 
+- [Account Security](../pallets/account_security/README.md)
 - [Crosschain Transfer V1: Ethereum Inbound](./technical/crosschain-transfer-v1-ethereum-inbound-design.md)

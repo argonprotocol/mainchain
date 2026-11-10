@@ -390,6 +390,7 @@ impl OperationalRewardsPayer<TestAccountId, Balance> for MockOperationalRewardsP
 }
 
 impl pallet_operational_accounts::Config for Test {
+	type AccountSecurityProvider = ();
 	type PositionProvider = ();
 	type Balance = Balance;
 	type MaxAvailableAccessCodes = MaxAvailableAccessCodes;

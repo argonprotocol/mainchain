@@ -29,6 +29,10 @@ impl<T: frame_system::Config> {{pallet}}::WeightInfo for WeightInfo<T> {
 	{{#each benchmark.comments as |comment|}}
 	/// {{comment}}
 	{{/each}}
+	{{#if (and (eq @root.pallet "pallet_account_security") (or (eq benchmark.name "authorization_leaf") (eq benchmark.name "authorization_batch")))}}
+	/// Charges one inspection; repetition counts belong only to the benchmark.
+	fn {{benchmark.name}}() -> Weight {
+	{{else}}
 	{{#each benchmark.component_ranges as |range|}}
 	/// The range of component `{{range.name}}` is `[{{range.min}}, {{range.max}}]`.
 	{{/each}}
@@ -37,6 +41,7 @@ impl<T: frame_system::Config> {{pallet}}::WeightInfo for WeightInfo<T> {
 		{{~#each benchmark.components as |c| ~}}
 		{{~#if (not c.is_used)}}_{{/if}}{{c.name}}: u32, {{/each~}}
 	) -> Weight {
+	{{/if}}
 		// Proof Size summary in bytes:
 		//  Measured:  `{{benchmark.base_recorded_proof_size}}{{#each benchmark.component_recorded_proof_size as |cp|}} + {{cp.name}} * ({{cp.slope}} +/- {{underscore cp.error}}){{/each}}`
 		//  Estimated: `{{benchmark.base_calculated_proof_size}}{{#each benchmark.component_calculated_proof_size as |cp|}} + {{cp.name}} * ({{cp.slope}} +/- {{underscore cp.error}}){{/each}}`
@@ -44,7 +49,11 @@ impl<T: frame_system::Config> {{pallet}}::WeightInfo for WeightInfo<T> {
 		Weight::from_parts({{underscore benchmark.base_weight}}, {{benchmark.base_calculated_proof_size}})
 			{{#each benchmark.component_weight as |cw|}}
 			// Standard Error: {{underscore cw.error}}
+			{{#if (and (eq @root.pallet "pallet_account_security") (or (eq benchmark.name "authorization_leaf") (eq benchmark.name "authorization_batch")))}}
+			.saturating_add(Weight::from_parts({{underscore cw.slope}}, 0))
+			{{else}}
 			.saturating_add(Weight::from_parts({{underscore cw.slope}}, 0).saturating_mul({{cw.name}}.into()))
+			{{/if}}
 			{{/each}}
 			{{#if (ne benchmark.base_reads "0")}}
 			.saturating_add(T::DbWeight::get().reads({{benchmark.base_reads}}))

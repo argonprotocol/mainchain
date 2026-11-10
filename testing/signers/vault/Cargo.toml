@@ -1,0 +1,17 @@
+[package]
+name = "argon-vault-review"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+# Keep Polkadot Vault's older SDK dependencies confined to these decoder tests.
+[workspace]
+
+[dev-dependencies]
+# Pin the decoder source used by the v7.2.0 release; library versions below match it.
+vault-parser = { package = "parser", git = "https://github.com/novasamatech/parity-signer", rev = "3c46e7dd6bd1bbbf768a6d5304e8a4711dd34760" }
+definitions = { git = "https://github.com/novasamatech/parity-signer", rev = "3c46e7dd6bd1bbbf768a6d5304e8a4711dd34760", default-features = false }
+frame-metadata = { version = "16.0.0", features = ["std", "legacy"] }
+codec = { package = "parity-scale-codec", version = "3.6.9" }
+hex = "0.4.3"
+serde_json = "1.0"

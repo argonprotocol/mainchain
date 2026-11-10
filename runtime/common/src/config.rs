@@ -1,5 +1,7 @@
 use super::prelude::*;
 use argon_primitives::{EthereumBlockNumber, MICROGONS_PER_ARGON};
+use core::marker::PhantomData;
+use pallet_account_security::WeightInfo as AccountSecurityWeightInfo;
 use pallet_transaction_payment::Multiplier;
 use polkadot_sdk::sp_runtime::Permill;
 use smallvec::smallvec;
@@ -19,6 +21,15 @@ pub const NORMAL_DISPATCH_RATIO: Perbill = Perbill::from_percent(75);
 
 pub const MAXIMUM_BLOCK_WEIGHT: Weight =
 	Weight::from_parts(WEIGHT_REF_TIME_PER_SECOND.saturating_mul(10), u64::MAX);
+
+/// One measured P256 verification for calls that carry an embedded native proof.
+pub struct P256VerificationWeight<T>(PhantomData<T>);
+
+impl<T: pallet_account_security::Config> Get<Weight> for P256VerificationWeight<T> {
+	fn get() -> Weight {
+		<T as pallet_account_security::Config>::WeightInfo::native_p256()
+	}
+}
 
 /// The existential deposit.
 pub const ARGON_EXISTENTIAL_DEPOSIT: Balance = 10_000;
@@ -190,6 +201,13 @@ parameter_types! {
 	pub const AnnouncementDepositFactor: Balance = deposit(0, 66);
 	pub const MaxProxies: u16 = 32;
 	pub const MaxPending: u16 = 32;
+	pub const MaxAccountSecurityCallDepth: u32 = 32;
+	pub const MaxAccountSecurityCalls: u32 = 1024;
+	pub const MaxAccountSecuritySigners: u32 = 16;
+	pub const MaxAccountSecurityApprovals: u32 = 50;
+	pub const AccountSecurityApprovalLifetime: BlockNumber = 14_400;
+	pub const AccountSecurityDepositBase: Balance = deposit(2, 256);
+	pub const AccountSecurityDepositPerSigner: Balance = deposit(1, 160);
 
 	// One storage item; key size is 32; value is size 4+4+16+32 bytes = 56 bytes.
 	pub const DepositBase: Balance = deposit(1, 88);
