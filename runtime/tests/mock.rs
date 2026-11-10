@@ -19,7 +19,7 @@ use pallet_account_security::{
 use pallet_operational_accounts::{
 	AccountOwnershipProof, OperationalAccount, OperationalAccountBySubAccount, OperationalAccounts,
 	Registration, RegistrationV1, MINING_ACCOUNT_PROOF_MESSAGE_KEY,
-	OPERATIONAL_ACCOUNT_PROOF_MESSAGE_KEY, VAULT_ACCOUNT_PROOF_MESSAGE_KEY,
+	VAULT_ACCOUNT_PROOF_MESSAGE_KEY,
 };
 use pallet_vaults::{VaultIdByOperator, VaultsById};
 use polkadot_sdk::*;
@@ -279,16 +279,23 @@ pub(super) fn registration(
 			signature: sr25519::Pair::from_seed(&[seed; 32]).sign(&message).into(),
 		}
 	};
-	Registration::V1(RegistrationV1 {
+	let mut registration = RegistrationV1 {
 		operational_account: operational.clone(),
 		encryption_pubkey: Default::default(),
-		operational_account_proof: proof(operational_seed, OPERATIONAL_ACCOUNT_PROOF_MESSAGE_KEY),
+		operational_account_proof: AccountOwnershipProof {
+			signature: sr25519::Signature::from_raw([0; 64]).into(),
+		},
 		vault_account: account(vault_seed),
 		mining_account: account(mining_seed),
 		vault_account_proof: proof(vault_seed, VAULT_ACCOUNT_PROOF_MESSAGE_KEY),
 		mining_account_proof: proof(mining_seed, MINING_ACCOUNT_PROOF_MESSAGE_KEY),
 		access_proof: None,
-	})
+	};
+	registration.operational_account_proof.signature =
+		sr25519::Pair::from_seed(&[operational_seed; 32])
+			.sign(&registration.signing_hash())
+			.into();
+	Registration::V1(registration)
 }
 
 pub(super) fn registration_minimums(vault: AccountId) {

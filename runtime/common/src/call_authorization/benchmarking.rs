@@ -169,7 +169,7 @@ mod benchmarks {
 		fission.cosigner_guarantee = full_guarantee();
 		fission.created_at_argon_block = BlockNumberFor::<T>::max_value();
 		fission.ratchet_number = u32::MAX;
-		fission.last_ratchet_tick = u64::MAX;
+		fission.last_ratchet_price_tick = u64::MAX;
 		fission.last_updated_argon_block = BlockNumberFor::<T>::max_value();
 		// The derived bound uses scalar widths: nine compact fields add one byte
 		// each at their maximum, in addition to the guarantee's four-byte correction.

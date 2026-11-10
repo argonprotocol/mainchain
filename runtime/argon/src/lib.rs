@@ -9,11 +9,11 @@ mod benchmark;
 #[cfg(test)]
 #[path = "../../tests/mod.rs"]
 mod tests;
-pub mod weights;
 
 #[cfg(all(test, not(feature = "runtime-benchmarks")))]
 #[path = "tests.rs"]
 mod runtime_tests;
+pub mod weights;
 
 use call_authorization::CallAuthorizationPolicy;
 use frame_support::weights::ConstantMultiplier;

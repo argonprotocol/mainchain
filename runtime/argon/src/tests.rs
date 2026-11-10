@@ -351,7 +351,7 @@ fn deferred_repayment_settles_bitcoin_principal_and_rewards_including_unreceivab
 				pallet_bitcoin_locks::LockedBitcoin::<Runtime> {
 					vault_id: 1,
 					cosigner_guarantee: CosignerGuarantee {
-						basis: BitcoinSecuritizationBasis { satoshis: 0, ..basis.clone() },
+						basis: BitcoinSecuritizationBasis { satoshis: 0, ..basis },
 						guaranteed_microgons: 0,
 						fund_hold_extensions: Default::default(),
 					},
