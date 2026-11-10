@@ -55,8 +55,6 @@ const MAINNET_SLOTS_PER_EPOCH: u64 = EthereumBeaconPreset::Mainnet.slots_per_epo
 const MAINNET_EPOCHS_PER_SYNC_COMMITTEE_PERIOD: u64 =
 	EthereumBeaconPreset::Mainnet.epochs_per_sync_committee_period() as u64;
 
-const MAINNET_SLOTS_PER_HISTORICAL_ROOT: u64 =
-	EthereumBeaconPreset::Mainnet.slots_per_historical_root() as u64;
 const MAINNET_SYNC_COMMITTEE_SIZE: usize = EthereumBeaconPreset::Mainnet.sync_committee_size();
 const MAINNET_SYNC_COMMITTEE_BITS_SIZE: usize =
 	EthereumBeaconPreset::Mainnet.sync_committee_bits_size();
@@ -1230,68 +1228,94 @@ fn submit_update_with_invalid_sync_committee_update() {
 	});
 }
 
-/// Check that a gap of more than 8192 slots between finalized headers is not allowed.
 #[test]
-fn submit_finalized_header_update_with_too_large_gap() {
-	let checkpoint = Box::new(load_checkpoint_update_fixture());
-	let update = Box::new(load_sync_committee_update_fixture());
-	let mut next_update = Box::new(load_next_sync_committee_update_fixture());
-
-	// Adds 8193 slots, so that the next update is still in the next sync committee, but the
-	// gap between the finalized headers is more than 8192 slots.
-	let slot_with_large_gap = checkpoint.header.slot + MAINNET_SLOTS_PER_HISTORICAL_ROOT + 1;
-
-	finalized_header_mut(&mut next_update).slot = slot_with_large_gap;
-	// Adding some slots to the attested header and signature slot since they need to be ahead
-	// of the finalized header.
-	attested_header_mut(&mut next_update).slot = slot_with_large_gap + 33;
-	*signature_slot_mut(&mut next_update) = slot_with_large_gap + 43;
+fn submit_signed_update_beyond_the_historical_root_window() {
+	// Synthetic Minimal-preset checkpoint and updates for periods 28, 29, and 30. The
+	// Merkle roots and BLS signatures were formed together; signed slots are not edited.
+	let (checkpoint, committee_update, update): (CheckpointUpdate, Update, Update) =
+		Decode::decode(
+			&mut include_bytes!("../tests/fixtures/minimal-signed-gap.scale").as_slice(),
+		)
+		.unwrap();
+	let preset = EthereumBeaconPreset::Minimal;
+	let gap = update.finalized_header.slot - checkpoint.header.slot;
+	assert_eq!(gap, 72);
+	assert!(gap > preset.slots_per_historical_root() as u64);
+	let authenticated_committee = next_sync_committee_update(&committee_update)
+		.next_sync_committee
+		.hash_tree_root(preset)
+		.unwrap();
+	let following_committee = next_sync_committee_update(&update)
+		.next_sync_committee
+		.hash_tree_root(preset)
+		.unwrap();
+	let expected_anchor =
+		ExecutionHeaderAnchor::from_payload_header(&update.execution_header_proof.execution_header)
+			.unwrap();
+	let finalized_root = update.finalized_header.hash_tree_root().unwrap();
 
 	new_tester().execute_with(|| {
-		assert_ok!(process_checkpoint_update(&checkpoint));
-		let result = EthereumBeaconClient::submit(RuntimeOrigin::signed(1), update);
-		assert_ok!(result);
-		assert_eq!(result.unwrap().pays_fee, Pays::No);
-		assert!(<NextSyncCommittee<Test>>::exists());
+		crate::BeaconPreset::<Test>::put(preset);
+		let mut forks = ChainForkVersions::get();
+		forks.fulu.epoch = 0;
+		assert_ok!(EthereumBeaconClient::force_checkpoint(
+			RuntimeOrigin::root(),
+			Box::new(checkpoint),
+			forks
+		));
+		assert_noop!(
+			EthereumBeaconClient::submit(RuntimeOrigin::signed(1), Box::new(update.clone())),
+			Error::<Test>::SkippedSyncCommitteePeriod
+		);
+		assert_ok!(EthereumBeaconClient::submit(
+			RuntimeOrigin::signed(1),
+			Box::new(committee_update)
+		));
+		assert_eq!(NextSyncCommittee::<Test>::get().root, authenticated_committee);
 
-		let second_result = EthereumBeaconClient::submit(RuntimeOrigin::signed(1), next_update);
-		assert_err!(second_result, Error::<Test>::InvalidFinalizedHeaderGap);
-		assert_eq!(second_result.unwrap_err().post_info.pays_fee, Pays::Yes);
-	});
-}
-
-/// Check that a gap of 8192 slots between finalized headers is allowed.
-#[test]
-fn submit_finalized_header_update_with_gap_at_limit() {
-	let checkpoint = Box::new(load_checkpoint_update_fixture());
-	let update = Box::new(load_sync_committee_update_fixture());
-	let mut next_update = Box::new(load_next_sync_committee_update_fixture());
-
-	finalized_header_mut(&mut next_update).slot =
-		checkpoint.header.slot + MAINNET_SLOTS_PER_HISTORICAL_ROOT;
-	// Adding some slots to the attested header and signature slot since they need to be ahead
-	// of the finalized header.
-	attested_header_mut(&mut next_update).slot =
-		checkpoint.header.slot + MAINNET_SLOTS_PER_HISTORICAL_ROOT + 33;
-	*signature_slot_mut(&mut next_update) =
-		checkpoint.header.slot + MAINNET_SLOTS_PER_HISTORICAL_ROOT + 43;
-
-	new_tester().execute_with(|| {
-		assert_ok!(process_checkpoint_update(&checkpoint));
-
-		let result = EthereumBeaconClient::submit(RuntimeOrigin::signed(1), update);
-		assert_ok!(result);
-		assert_eq!(result.unwrap().pays_fee, Pays::No);
-		assert!(<NextSyncCommittee<Test>>::exists());
-
-		let second_result = EthereumBeaconClient::submit(RuntimeOrigin::signed(1), next_update);
-		assert_err!(
-			second_result,
-			// The test should pass the InvalidFinalizedHeaderGap check, and will fail at the
-			// next check, the merkle proof, because we changed the next_update slots.
+		let mut invalid_signature = update.clone();
+		invalid_signature.sync_aggregate.sync_committee_signature.0[0] ^= 1;
+		assert_noop!(
+			EthereumBeaconClient::submit(RuntimeOrigin::signed(1), Box::new(invalid_signature)),
+			Error::<Test>::BLSVerificationFailed
+		);
+		let mut invalid_finality = update.clone();
+		invalid_finality.finality_branch[0] = H256::repeat_byte(99);
+		assert_noop!(
+			EthereumBeaconClient::submit(RuntimeOrigin::signed(1), Box::new(invalid_finality)),
 			Error::<Test>::InvalidHeaderMerkleProof
 		);
-		assert_eq!(second_result.unwrap_err().post_info.pays_fee, Pays::Yes);
+		let mut invalid_execution = update.clone();
+		invalid_execution.execution_header_proof.execution_branch[0] = H256::repeat_byte(99);
+		assert_noop!(
+			EthereumBeaconClient::submit(RuntimeOrigin::signed(1), Box::new(invalid_execution)),
+			Error::<Test>::InvalidExecutionHeaderProof
+		);
+
+		assert_ok!(EthereumBeaconClient::submit(RuntimeOrigin::signed(1), Box::new(update)));
+		assert_eq!(LatestFinalizedBlockRoot::<Test>::get(), finalized_root);
+		assert_eq!(FinalizedBeaconState::<Test>::get(finalized_root).unwrap().slot, 1864);
+		assert_eq!(crate::CurrentSyncCommittee::<Test>::get().root, authenticated_committee);
+		assert_eq!(NextSyncCommittee::<Test>::get().root, following_committee);
+		assert_eq!(LatestSyncCommitteeUpdatePeriod::<Test>::get(), 29);
+		assert_eq!(
+			LatestExecutionHeaderAnchorBlockHash::<Test>::get(),
+			Some(expected_anchor.block_hash)
+		);
+		assert_eq!(
+			ExecutionHeaderAnchors::<Test>::get(expected_anchor.block_hash),
+			Some(expected_anchor)
+		);
+		assert_eq!(
+			ExecutionHeaderAnchorsByBlockNumber::<Test>::get(
+				expected_anchor.block_number.to_be_bytes()
+			),
+			Some(expected_anchor)
+		);
+		assert_eq!(
+			crate::ExecutionHeaderAnchorReferences::<Test>::get(expected_anchor.block_hash),
+			1
+		);
 	});
 }
 

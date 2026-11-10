@@ -22,7 +22,6 @@ type BeaconNetworkParams = {
   spec: Record<string, string>;
   epochsPerSyncCommitteePeriod: bigint;
   slotsPerEpoch: bigint;
-  slotsPerHistoricalRoot: bigint;
 };
 type EthereumBeaconSyncState =
   | {
@@ -146,8 +145,11 @@ export async function getNextEthereumBeaconSyncTxs(
   );
   const beaconNetworkParams = parseBeaconNetworkParams(spec, expectedPreset);
   const storedPeriod = computePeriod(state.latestFinalizedSlot, beaconNetworkParams);
-  const maxBridgeableFinalizedSlot =
-    state.latestFinalizedSlot + beaconNetworkParams.slotsPerHistoricalRoot;
+  let latestTrustedSignaturePeriod = storedPeriod;
+  if (state.hasNextSyncCommittee) {
+    latestTrustedSignaturePeriod += 1n;
+  }
+
   const txs: SubmittableExtrinsic[] = [];
   const startedAt = Date.now();
 
@@ -173,30 +175,40 @@ export async function getNextEthereumBeaconSyncTxs(
     const missingNextSyncCommittee = !state.hasNextSyncCommittee;
     const finalityFinalizedSlot = BigInt(finalityUpdate.finalized_header.beacon.slot);
     const finalityFinalizedPeriod = computePeriod(finalityFinalizedSlot, beaconNetworkParams);
-    const requiredCommitteePeriod = getRequiredCommitteePeriod({
-      storedPeriod,
-      missingNextSyncCommittee,
-      latestSyncCommitteeUpdatePeriod: state.latestSyncCommitteeUpdatePeriod,
-      finalityFinalizedPeriod,
-    });
+    const finalitySignaturePeriod = computePeriod(
+      BigInt(finalityUpdate.signature_slot),
+      beaconNetworkParams,
+    );
+    const finalityUsesKnownCommittee =
+      finalitySignaturePeriod >= storedPeriod &&
+      finalitySignaturePeriod <= latestTrustedSignaturePeriod;
+
+    let requiredCommitteePeriod: bigint | undefined;
+    if (missingNextSyncCommittee) {
+      requiredCommitteePeriod = storedPeriod;
+    } else if (finalityFinalizedPeriod > storedPeriod) {
+      requiredCommitteePeriod = storedPeriod + 1n;
+    } else if (finalitySignaturePeriod > latestTrustedSignaturePeriod) {
+      requiredCommitteePeriod = storedPeriod + 1n;
+    }
+
     const needsCommitteeData = requiredCommitteePeriod !== undefined;
     const finalityCarriesRequiredCommittee = updateCarriesCommitteeForPeriod(
       finalityUpdate,
       requiredCommitteePeriod,
       beaconNetworkParams,
     );
-    const finalityIsBridgeable = finalityFinalizedSlot <= maxBridgeableFinalizedSlot;
-    const needsCurrentPeriodUpdate = needsCommitteeData && !finalityCarriesRequiredCommittee;
-    const needsPeriodUpdate = needsCurrentPeriodUpdate || !finalityIsBridgeable;
+    const needsCommitteePeriodUpdate = needsCommitteeData && !finalityCarriesRequiredCommittee;
+    const needsPeriodUpdate = needsCommitteePeriodUpdate || !finalityUsesKnownCommittee;
     let submitUpdate: EthereumLightClientUpdate | undefined;
 
-    if (finalityIsBridgeable && !needsCurrentPeriodUpdate) {
+    if (!needsPeriodUpdate) {
       submitUpdate = finalityUpdate;
     }
 
     if (needsPeriodUpdate) {
       let periodUpdates: EthereumLightClientUpdatesResponse;
-      const periodUpdateStartPeriod = requiredCommitteePeriod ?? storedPeriod;
+      const periodUpdateStartPeriod = requiredCommitteePeriod ?? latestTrustedSignaturePeriod;
 
       try {
         periodUpdates = await getBeaconJson<EthereumLightClientUpdatesResponse>(
@@ -213,37 +225,34 @@ export async function getNextEthereumBeaconSyncTxs(
       }
 
       const periodUpdate = periodUpdates[0]?.data;
-      const periodUpdateFinalizedSlot = periodUpdate
-        ? BigInt(periodUpdate.finalized_header.beacon.slot)
-        : undefined;
-      const hasBridgeablePeriodUpdate =
-        periodUpdateFinalizedSlot !== undefined &&
-        periodUpdateFinalizedSlot <= maxBridgeableFinalizedSlot;
-      let periodUpdateHasRequiredCommittee = !needsCommitteeData;
-
-      if (periodUpdate && needsCommitteeData) {
-        periodUpdateHasRequiredCommittee = updateCarriesCommitteeForPeriod(
-          periodUpdate,
-          requiredCommitteePeriod,
+      if (periodUpdate) {
+        const signaturePeriod = computePeriod(
+          BigInt(periodUpdate.signature_slot),
           beaconNetworkParams,
         );
-      }
+        if (signaturePeriod < storedPeriod || signaturePeriod > latestTrustedSignaturePeriod) {
+          throw new Error(
+            `Ethereum beacon sync cannot advance from sync committee period ${storedPeriod}: ` +
+              `the period ${periodUpdateStartPeriod} update is signed in unauthenticated period ${signaturePeriod}. ` +
+              'Recovery requires an authenticated intermediate committee update or an operator-authorized trusted checkpoint.',
+          );
+        }
 
-      if (periodUpdate && hasBridgeablePeriodUpdate && periodUpdateHasRequiredCommittee) {
-        submitUpdate = periodUpdate;
-      }
-
-      if (!finalityIsBridgeable && periodUpdate && !hasBridgeablePeriodUpdate) {
-        throw new Error(
-          `Ethereum beacon sync cannot advance from finalized slot ${state.latestFinalizedSlot}: ` +
-            `the retained header window ends at slot ${maxBridgeableFinalizedSlot}, but the ` +
-            `period ${periodUpdateStartPeriod} update finalizes slot ${periodUpdateFinalizedSlot}. ` +
-            'Recovery requires an authenticated intermediate update or an operator-authorized trusted checkpoint.',
-        );
+        if (!needsCommitteeData) {
+          submitUpdate = periodUpdate;
+        } else if (
+          updateCarriesCommitteeForPeriod(
+            periodUpdate,
+            requiredCommitteePeriod,
+            beaconNetworkParams,
+          )
+        ) {
+          submitUpdate = periodUpdate;
+        }
       }
     }
 
-    if (needsCurrentPeriodUpdate && !submitUpdate) {
+    if (needsCommitteePeriodUpdate && !submitUpdate) {
       return [];
     }
 
@@ -271,7 +280,7 @@ export async function getNextEthereumBeaconSyncTxs(
       const isNewerThanStoredFinalized = finalizedSlot > state.latestFinalizedSlot;
       const hasReachedNextFinalizedWindow = finalizedSlot >= state.nextRecommendedFinalizedSlot;
       const canAdvanceFinalized = isNewerThanStoredFinalized && hasReachedNextFinalizedWindow;
-      const advancesSyncCommitteePeriod = finalizedPeriod > state.latestSyncCommitteeUpdatePeriod;
+      const advancesSyncCommitteePeriod = finalizedPeriod > storedPeriod;
       const canUseNextSyncCommittee = missingNextSyncCommittee || advancesSyncCommitteePeriod;
       const includesNextSyncCommittee =
         hasNextSyncCommitteeUpdate(submitUpdate) && canUseNextSyncCommittee;
@@ -382,28 +391,6 @@ function hasNextSyncCommitteeUpdate(
   return !!update?.next_sync_committee && !!update?.next_sync_committee_branch;
 }
 
-function getRequiredCommitteePeriod({
-  storedPeriod,
-  missingNextSyncCommittee,
-  latestSyncCommitteeUpdatePeriod,
-  finalityFinalizedPeriod,
-}: {
-  storedPeriod: bigint;
-  missingNextSyncCommittee: boolean;
-  latestSyncCommitteeUpdatePeriod: bigint;
-  finalityFinalizedPeriod: bigint;
-}): bigint | undefined {
-  if (missingNextSyncCommittee) {
-    return storedPeriod;
-  }
-
-  if (finalityFinalizedPeriod > latestSyncCommitteeUpdatePeriod) {
-    return latestSyncCommitteeUpdatePeriod + 1n;
-  }
-
-  return undefined;
-}
-
 function updateCarriesCommitteeForPeriod(
   update: EthereumLightClientUpdate | undefined,
   requiredCommitteePeriod: bigint | undefined,
@@ -459,7 +446,6 @@ function parseBeaconNetworkParams(
     spec,
     slotsPerEpoch: BigInt(slotsPerEpoch),
     epochsPerSyncCommitteePeriod: BigInt(epochsPerSyncCommitteePeriod),
-    slotsPerHistoricalRoot: BigInt(slotsPerHistoricalRoot),
   };
 }
 
