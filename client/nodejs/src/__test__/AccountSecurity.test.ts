@@ -6,8 +6,8 @@ import { createAccountSecuritySigningPayload } from '../accountSecurity';
 import runtimeMetadata from '../../metadata.json';
 import runtimeVersion from '../../runtime_version.json';
 
-describe('native account-security signatures', () => {
-  it('uses V14 metadata to encode P256 and preserves existing signature tags', () => {
+describe('account-security approval signatures', () => {
+  it('supports P256 approvals without adding P256 transaction accounts', () => {
     const registry = new TypeRegistry();
     const metadata = new Metadata(registry, runtimeMetadata.result as `0x${string}`);
     expect(metadata.version).toBe(14);
@@ -15,11 +15,16 @@ describe('native account-security signatures', () => {
 
     const deviceSignature = new Uint8Array(65).fill(7);
     deviceSignature[64] = 1;
-    const signature = registry.createType('ExtrinsicSignature', { P256: deviceSignature });
+    const signature = registry.createType('ArgonPrimitivesAccountSecurityApprovalSignature', {
+      P256: deviceSignature,
+    });
     expect(signature.toU8a()).toEqual(new Uint8Array([4, ...deviceSignature]));
-    expect(registry.createType('ExtrinsicSignature', signature.toU8a()).toHex()).toBe(
-      signature.toHex(),
-    );
+    expect(
+      registry
+        .createType('ArgonPrimitivesAccountSecurityApprovalSignature', signature.toU8a())
+        .toHex(),
+    ).toBe(signature.toHex());
+    expect(() => registry.createType('ExtrinsicSignature', { P256: deviceSignature })).toThrow();
 
     for (const [tag, variant, length] of [
       [0, 'Ed25519', 64],
@@ -28,9 +33,11 @@ describe('native account-security signatures', () => {
       [3, 'Eth', 65],
     ] as const) {
       const bytes = new Uint8Array(length).fill(5);
-      expect(registry.createType('ExtrinsicSignature', { [variant]: bytes }).toU8a()).toEqual(
-        new Uint8Array([tag, ...bytes]),
-      );
+      expect(
+        registry
+          .createType('ArgonPrimitivesAccountSecurityApprovalSignature', { [variant]: bytes })
+          .toU8a(),
+      ).toEqual(new Uint8Array([tag, ...bytes]));
     }
   });
 

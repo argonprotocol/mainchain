@@ -429,10 +429,7 @@ fn detached_proofs_use_the_real_native_signing_payload_and_bind_the_genesis_hash
 		let payload = AccountSecurity::approval_payload(&call, false).unwrap();
 		// A fresh native account supplies the nonce-zero context used by detached proofs.
 		let tx = signed(5, call.clone());
-		let encoded = tx.encode();
-		let sdk = tx.into_inner();
-		assert_eq!(encoded, sdk.encode());
-		let sp_runtime::generic::Preamble::Signed(_, signature, extra) = sdk.preamble else {
+		let sp_runtime::generic::Preamble::Signed(_, signature, extra) = tx.preamble else {
 			unreachable!()
 		};
 		let native = SignedPayload::new(call.clone(), extra).unwrap();
@@ -477,9 +474,8 @@ fn detached_proofs_use_the_real_native_signing_payload_and_bind_the_genesis_hash
 #[test]
 #[ignore = "Requires an existing ECCP256 PIV key; run testing/signers/run.sh yubikey"]
 fn yubikey_piv_enrolls_and_authorizes_without_a_funded_signer() {
-	use argon_primitives::{crypto::P256Public, MultiSigner};
+	use argon_primitives::account_security::P256Public;
 	use p256::{pkcs8::DecodePublicKey, PublicKey};
-	use sp_runtime::traits::IdentifyAccount;
 	use std::{env, path::PathBuf, process::Command};
 
 	let slot = env::var("ARGON_YUBIKEY_SLOT").expect("explicit existing PIV slot required");
@@ -500,7 +496,7 @@ fn yubikey_piv_enrolls_and_authorizes_without_a_funded_signer() {
 	let public = PublicKey::from_public_key_pem(std::str::from_utf8(&pem.stdout).unwrap())
 		.expect("the existing slot certificate must contain a P-256 key");
 	let public = P256Public::from_sec1_bytes(&public.to_sec1_bytes()).unwrap();
-	let device = MultiSigner::P256(public).into_account();
+	let device = public.signer_id();
 
 	externalities().execute_with(|| {
 		let mut policy = enrollment(2, 3);

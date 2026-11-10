@@ -117,7 +117,7 @@ impl pallet_utility::Config for Test {
 impl Config for Test {
 	type CurrentTick = CurrentTick;
 	type CallAuthorizationPolicy = TestPolicy;
-	type Signature = Signature;
+	type Signature = ApprovalSignature;
 	type SigningPayload = SigningPayload;
 	type MaxCallDepth = ConstU32<16>;
 	type MaxCalls = ConstU32<128>;

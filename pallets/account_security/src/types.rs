@@ -112,9 +112,10 @@ pub struct Authorization<T: Config> {
 )]
 #[scale_info(skip_type_params(T))]
 pub struct Approval<T: Config> {
-	/// Account whose native signature scheme authenticates this proof.
+	/// Policy signer identity authenticated by this proof; device identities cannot submit
+	/// transactions.
 	pub signer: T::AccountId,
-	/// Native proof over the canonical security call in the selected metadata-hash mode.
+	/// Account or P256 proof over the canonical security call in the selected metadata-hash mode.
 	pub signature: T::Signature,
 	/// Include the runtime's actual metadata hash in native signing (e.g. Ledger clear signing).
 	/// The app cannot substitute a different hash; unsupported runtimes reject this mode.

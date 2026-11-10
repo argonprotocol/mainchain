@@ -13,7 +13,6 @@ pub trait WeightInfo {
 	fn verify_ecdsa(a: u32) -> Weight;
 	fn verify_eth(a: u32) -> Weight;
 	fn verify_p256(a: u32) -> Weight;
-	fn native_p256() -> Weight;
 	fn authorization_leaf() -> Weight;
 	fn authorization_protection() -> Weight;
 	fn authorization_multisig(s: u32, b: u32) -> Weight;
@@ -56,9 +55,6 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 	fn verify_p256(_a: u32) -> Weight {
-		Weight::zero()
-	}
-	fn native_p256() -> Weight {
 		Weight::zero()
 	}
 	fn authorization_leaf() -> Weight {

@@ -6,9 +6,9 @@ use crate::{
 	Runtime, RuntimeCall, RuntimeOrigin, SignedPayload, System, UncheckedExtrinsic, ARGON,
 };
 use argon_primitives::{
-	crypto::{P256Public, P256Signature},
+	account_security::{ApprovalSignature, P256Public, P256Signature},
 	vault::{Vault, VaultTerms},
-	BlockSealerInfo, MultiSigner as NativeSigner, Signature,
+	BlockSealerInfo,
 };
 use codec::Encode;
 use frame_support::assert_ok;
@@ -156,8 +156,8 @@ pub(super) fn yubikey_approval(
 		P256Signature::from_device_signature(&payload, &signature.to_bytes().into(), public)
 			.expect("PIV key must match the slot certificate and exact payload");
 	let approval = Approval {
-		signer: NativeSigner::P256(*public).into_account(),
-		signature: Signature::P256(signature),
+		signer: public.signer_id(),
+		signature: ApprovalSignature::P256(signature),
 		with_metadata_hash: false,
 	};
 

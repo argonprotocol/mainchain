@@ -443,7 +443,6 @@ impl pallet_treasury::Config for Runtime {
 	type WeightInfo = pallet_treasury::weights::WithProviderWeights<
 		Runtime,
 		weights::pallet_treasury::WeightInfo<Runtime>,
-		P256VerificationWeight<Runtime>,
 	>;
 	type Balance = Balance;
 	type Currency = Balances;
@@ -908,7 +907,6 @@ impl pallet_operational_accounts::Config for Runtime {
 	type WeightInfo = pallet_operational_accounts::WithProviderWeights<
 		Runtime,
 		weights::pallet_operational_accounts::WeightInfo<Runtime>,
-		P256VerificationWeight<Runtime>,
 	>;
 }
 
@@ -916,7 +914,7 @@ impl pallet_account_security::Config for Runtime {
 	type CurrentTick = Ticks;
 	type CallAuthorizationPolicy = CallAuthorizationPolicy;
 	type SigningPayload = AccountSecuritySigningPayload;
-	type Signature = Signature;
+	type Signature = ApprovalSignature;
 	type MaxCallDepth = MaxAccountSecurityCallDepth;
 	type MaxCalls = MaxAccountSecurityCalls;
 	type MaxSigners = MaxAccountSecuritySigners;

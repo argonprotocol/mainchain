@@ -60,7 +60,6 @@ type TickProviderWeights<T> =
 pub struct WithProviderWeights<
 	T,
 	Base,
-	NativeSignatureWeight = (),
 	VaultProviderWeight = VaultProviderWeights<T>,
 	MiningSlotProviderWeight = MiningSlotProviderWeights<T>,
 	UniswapTransferWeight = UniswapTransferProviderWeights<T>,
@@ -71,7 +70,6 @@ pub struct WithProviderWeights<
 	PhantomData<(
 		T,
 		Base,
-		NativeSignatureWeight,
 		VaultProviderWeight,
 		MiningSlotProviderWeight,
 		UniswapTransferWeight,
@@ -83,7 +81,6 @@ pub struct WithProviderWeights<
 impl<
 		T,
 		Base,
-		NativeSignatureWeight,
 		VaultProviderWeight,
 		MiningSlotProviderWeight,
 		UniswapTransferWeight,
@@ -94,7 +91,6 @@ impl<
 	for WithProviderWeights<
 		T,
 		Base,
-		NativeSignatureWeight,
 		VaultProviderWeight,
 		MiningSlotProviderWeight,
 		UniswapTransferWeight,
@@ -105,7 +101,6 @@ impl<
 where
 	T: Config,
 	Base: WeightInfo,
-	NativeSignatureWeight: Get<Weight>,
 	VaultProviderWeight: BitcoinVaultProviderWeightInfo,
 	MiningSlotProviderWeight: MiningSlotProviderWeightInfo,
 	UniswapTransferWeight: UniswapTransferProviderWeightInfo,
@@ -120,8 +115,6 @@ where
 
 	fn register() -> Weight {
 		Base::register()
-			// Three ownership proofs and the optional upstream-access proof may use P256.
-			.saturating_add(NativeSignatureWeight::get().saturating_mul(4))
 			.saturating_add(SecurityProviderWeights::<T>::on_operational_registration())
 			.saturating_add(<T::PositionProvider as TreasuryPositionProvider<
 				T::AccountId,

@@ -1,9 +1,6 @@
 use super::*;
 use alloc::format;
-use argon_primitives::{
-	crypto::{P256Public, P256Signature},
-	MultiSigner, Signature,
-};
+use argon_primitives::account_security::{ApprovalSignature, P256Public, P256Signature};
 use core::{hint::black_box, iter::once};
 use frame_benchmarking::{account as benchmark_account, v2::*};
 use frame_support::{
@@ -24,17 +21,16 @@ use sp_core::{
 };
 use sp_runtime::{
 	traits::{Hash, Zero},
-	AccountId32,
+	AccountId32, MultiSigner,
 };
 
 const BENCH_KEY_TYPE: KeyTypeId = KeyTypeId(*b"asec");
 const MAX_APPROVALS: u32 = 50;
 const MAX_CALL_BYTES: u32 = 5_242_880;
-const MAX_INSPECTION_SAMPLES: u32 = 1024;
 
 #[benchmarks(
 	where
-		T: Config<AccountId = AccountId32, Signature = Signature>
+		T: Config<AccountId = AccountId32, Signature = ApprovalSignature>
 			+ pallet_balances::Config<Instance1, Balance = u128>,
 		RuntimeCallOf<T>: From<frame_system::Call<T>>
 			+ From<BalancesCall<T, Instance1>> + From<UtilityCall<T>> + From<ProxyCall<T>>
@@ -253,27 +249,13 @@ mod benchmarks {
 	}
 
 	#[benchmark]
-	fn native_p256() {
-		// Native SignedPayload hashes messages above 256 bytes before signature verification.
-		let message = vec![0xff; 256];
-		let (signer, signature) = p256_proof(&message, 0);
-
-		#[block]
-		{
-			assert!(signature.verify(message.as_slice(), &signer));
-		}
-	}
-
-	#[benchmark]
-	fn authorization_leaf(v: Linear<1, MAX_INSPECTION_SAMPLES>) {
+	fn authorization_leaf() {
 		let account = benchmark_account::<AccountId32>("security-main", 0, 0);
 		let call = frame_system::Call::<T>::remark { remark: vec![] }.into();
 
 		#[block]
 		{
-			for _ in 0..v {
-				Pallet::<T>::ensure_authorized(&account, black_box(&call)).unwrap();
-			}
+			Pallet::<T>::ensure_authorized(&account, black_box(&call)).unwrap();
 		}
 	}
 
@@ -380,24 +362,20 @@ mod benchmarks {
 	}
 
 	#[benchmark]
-	fn authorization_batch(v: Linear<1, MAX_INSPECTION_SAMPLES>) {
+	fn authorization_batch() {
 		let account = benchmark_account::<AccountId32>("security-main", 0, 0);
 		let calls = vec![frame_system::Call::<T>::remark { remark: vec![] }.into()];
 		let call = UtilityCall::<T>::batch_all { calls }.into();
 		let context = AuthorizationContext { account, authorized_group: None, executes: true };
+		let mut inspection =
+			AuthorizationInspection { visited_calls: T::MaxCalls::get() - 1, ..Default::default() };
 
 		#[block]
 		{
-			for _ in 0..v {
-				let mut inspection = AuthorizationInspection {
-					visited_calls: T::MaxCalls::get() - 1,
-					..Default::default()
-				};
-				assert_eq!(
-					Pallet::<T>::inspect(black_box(&call), &context, &mut inspection, 0),
-					Err(Error::<T>::CallLimitExceeded)
-				);
-			}
+			assert_eq!(
+				Pallet::<T>::inspect(black_box(&call), &context, &mut inspection, 0),
+				Err(Error::<T>::CallLimitExceeded)
+			);
 		}
 	}
 
@@ -589,7 +567,7 @@ fn proof_fixture<T>(
 	count: u32,
 ) -> (RuntimeCallOf<T>, BoundedVec<Approval<T>, T::MaxApprovals>)
 where
-	T: Config<AccountId = AccountId32, Signature = Signature>,
+	T: Config<AccountId = AccountId32, Signature = ApprovalSignature>,
 	RuntimeCallOf<T>: From<frame_system::Call<T>>,
 {
 	let account = benchmark_account::<AccountId32>("security-main", 0, 0);
@@ -602,7 +580,7 @@ where
 /// Fill the proof bound without the old backup, so quorum scanning cannot short-circuit.
 fn quorum_approvals<T>(call: &RuntimeCallOf<T>) -> BoundedVec<Approval<T>, T::MaxApprovals>
 where
-	T: Config<AccountId = AccountId32, Signature = Signature>,
+	T: Config<AccountId = AccountId32, Signature = ApprovalSignature>,
 {
 	let count = T::MaxSigners::get();
 	let mut proofs = sign_approvals::<T>(call, ProofKind::Sr25519, 0, count);
@@ -621,7 +599,7 @@ fn sign_approvals<T>(
 	count: u32,
 ) -> BoundedVec<Approval<T>, T::MaxApprovals>
 where
-	T: Config<AccountId = AccountId32, Signature = Signature>,
+	T: Config<AccountId = AccountId32, Signature = ApprovalSignature>,
 {
 	let plain_payload = Pallet::<T>::approval_payload(call, false).unwrap();
 	let metadata_payload = Pallet::<T>::approval_payload(call, true)
@@ -636,19 +614,25 @@ where
 					let public = sp_io::crypto::ed25519_generate(BENCH_KEY_TYPE, seed);
 					let signature =
 						sp_io::crypto::ed25519_sign(BENCH_KEY_TYPE, &public, payload).unwrap();
-					(MultiSigner::Ed25519(public).into_account(), Signature::Ed25519(signature))
+					(
+						MultiSigner::Ed25519(public).into_account(),
+						ApprovalSignature::Ed25519(signature),
+					)
 				},
 				ProofKind::Sr25519 => {
 					let public = native_key(index);
 					let signature =
 						sp_io::crypto::sr25519_sign(BENCH_KEY_TYPE, &public, payload).unwrap();
-					(MultiSigner::Sr25519(public).into_account(), Signature::Sr25519(signature))
+					(
+						MultiSigner::Sr25519(public).into_account(),
+						ApprovalSignature::Sr25519(signature),
+					)
 				},
 				ProofKind::Ecdsa => {
 					let public = sp_io::crypto::ecdsa_generate(BENCH_KEY_TYPE, seed);
 					let signature =
 						sp_io::crypto::ecdsa_sign(BENCH_KEY_TYPE, &public, payload).unwrap();
-					(MultiSigner::Ecdsa(public).into_account(), Signature::Ecdsa(signature))
+					(MultiSigner::Ecdsa(public).into_account(), ApprovalSignature::Ecdsa(signature))
 				},
 				ProofKind::Eth => {
 					let public = sp_io::crypto::ecdsa_generate(BENCH_KEY_TYPE, seed);
@@ -660,7 +644,7 @@ where
 					.unwrap();
 					(
 						MultiSigner::Eth(ecdsa::KeccakPublic::from_raw(public.0)).into_account(),
-						Signature::Eth(ecdsa::KeccakSignature::from_raw(signature.0)),
+						ApprovalSignature::Eth(ecdsa::KeccakSignature::from_raw(signature.0)),
 					)
 				},
 				ProofKind::P256 => p256_proof(payload, index),
@@ -672,7 +656,7 @@ where
 		.unwrap()
 }
 
-fn p256_proof(payload: &[u8], index: u32) -> (AccountId32, Signature) {
+fn p256_proof(payload: &[u8], index: u32) -> (AccountId32, ApprovalSignature) {
 	let seed = (b"account-security-p256", index).using_encoded(blake2_256);
 	let key = SigningKey::from_bytes((&seed).into()).unwrap();
 	let public =
@@ -681,5 +665,5 @@ fn p256_proof(payload: &[u8], index: u32) -> (AccountId32, Signature) {
 	let signature =
 		P256Signature::from_device_signature(payload, &device_signature.to_bytes().into(), &public)
 			.unwrap();
-	(MultiSigner::P256(public).into_account(), Signature::P256(signature))
+	(public.signer_id(), ApprovalSignature::P256(signature))
 }

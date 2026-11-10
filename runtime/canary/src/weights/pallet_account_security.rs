@@ -239,22 +239,12 @@ impl<T: frame_system::Config> pallet_account_security::WeightInfo for WeightInfo
 			.saturating_add(Weight::from_parts(3_529_879_306, 0).saturating_mul(a.into()))
 			.saturating_add(T::DbWeight::get().reads(1))
 		}
-	fn native_p256() -> Weight {
-		// Proof Size summary in bytes:
-		//  Measured:  `0`
-		//  Estimated: `0`
-		// Minimum execution time: 1_648_000_000 picoseconds.
-		Weight::from_parts(1_663_000_000, 0)
-		}
-	/// Charges one inspection; repetition counts belong only to the benchmark.
 	fn authorization_leaf() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
-		// Minimum execution time: 0_000 picoseconds.
-		Weight::from_parts(325_077, 0)
-			// Standard Error: 83
-			.saturating_add(Weight::from_parts(24_935, 0))
+		// Minimum execution time: 166_000 picoseconds.
+		Weight::from_parts(250_000, 0)
 		}
 	/// Storage: `OperationalAccounts::OperationalAccounts` (r:2 w:0)
 	/// Proof: `OperationalAccounts::OperationalAccounts` (`max_values`: None, `max_size`: Some(340), added: 2815, mode: `MaxEncodedLen`)
@@ -302,15 +292,12 @@ impl<T: frame_system::Config> pallet_account_security::WeightInfo for WeightInfo
 			// Standard Error: 2_024
 			.saturating_add(Weight::from_parts(66_345, 0).saturating_mul(s.into()))
 		}
-	/// Charges one inspection; repetition counts belong only to the benchmark.
 	fn authorization_batch() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
 		//  Estimated: `0`
-		// Minimum execution time: 0_000 picoseconds.
-		Weight::from_parts(49_810, 0)
-			// Standard Error: 90
-			.saturating_add(Weight::from_parts(74_211, 0))
+		// Minimum execution time: 166_000 picoseconds.
+		Weight::from_parts(250_000, 0)
 		}
 	fn authorization_derivative() -> Weight {
 		// Proof Size summary in bytes:

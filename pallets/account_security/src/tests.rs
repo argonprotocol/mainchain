@@ -2,7 +2,7 @@ use crate::{
 	mock::{System, *},
 	*,
 };
-use argon_primitives::AccountSecurityProvider;
+use argon_primitives::{AccountSecurityProvider, Signature};
 use frame_support::{assert_noop, assert_ok};
 use sp_runtime::DispatchError;
 
@@ -45,11 +45,13 @@ fn unfunded_signers_retain_native_nonces_without_spending_them_on_approvals() {
 		let RuntimeCall::AccountSecurity(Call::execute { approvals, .. }) = &approved else {
 			unreachable!()
 		};
-		let signature = approvals[0].signature.clone();
+		let ApprovalSignature::Sr25519(signature) = approvals[0].signature.clone() else {
+			unreachable!()
+		};
 		let replay = UncheckedExtrinsic::new_signed(
 			execution_call(1, transfer()),
 			account(20),
-			signature,
+			Signature::Sr25519(signature),
 			(
 				frame_system::CheckNonce::<Test>::from(0),
 				CheckAccountSecurity::<Test>::new(),
@@ -979,20 +981,16 @@ fn metadata_bound_proofs_use_the_runtime_hash_not_an_app_supplied_substitute() {
 }
 
 #[test]
-fn a_native_p256_proof_accepts_and_executes_without_a_funded_signer() {
-	use argon_primitives::{
-		crypto::{P256Public, P256Signature},
-		MultiSigner, Signature,
-	};
+fn a_p256_approval_accepts_and_executes_without_a_funded_signer() {
+	use argon_primitives::account_security::{ApprovalSignature, P256Public, P256Signature};
 	use p256::ecdsa::{signature::Signer, SigningKey};
-	use sp_runtime::traits::IdentifyAccount;
 
 	externalities().execute_with(|| {
 		let key = SigningKey::from_bytes((&[27; 32]).into()).unwrap();
 		let public =
 			P256Public::from_sec1_bytes(key.verifying_key().to_encoded_point(true).as_bytes())
 				.unwrap();
-		let signer = MultiSigner::from(public).into_account();
+		let signer = public.signer_id();
 		let configuration = Policy {
 			signers: vec![signer.clone()].try_into().unwrap(),
 			quorum: 1,
@@ -1006,7 +1004,7 @@ fn a_native_p256_proof_accepts_and_executes_without_a_funded_signer() {
 			let proof = Approval {
 				signer: signer.clone(),
 				with_metadata_hash: false,
-				signature: Signature::P256(
+				signature: ApprovalSignature::P256(
 					P256Signature::from_device_signature(
 						&payload,
 						&signature.to_bytes().into(),

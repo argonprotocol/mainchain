@@ -3,7 +3,9 @@
 extern crate alloc;
 
 use alloc::{boxed::Box, vec, vec::Vec};
-use argon_primitives::{AccountSecurityProvider, AccountSecurityProviderWeightInfo, Signature};
+use argon_primitives::{
+	account_security::ApprovalSignature, AccountSecurityProvider, AccountSecurityProviderWeightInfo,
+};
 use core::{iter::once, marker::PhantomData};
 use frame_support::{
 	dispatch::{
@@ -95,7 +97,7 @@ pub mod pallet {
 		type Signature: Parameter
 			+ Member
 			+ MaxEncodedLen
-			+ Into<Signature>
+			+ Into<ApprovalSignature>
 			+ Verify<Signer: IdentifyAccount<AccountId = Self::AccountId>>;
 		type MaxCallDepth: Get<u32>;
 		type MaxCalls: Get<u32>;
@@ -496,8 +498,6 @@ impl<T: Config> From<Error<T>> for TransactionValidityError {
 #[derive(Encode, Decode, DecodeWithMemTracking, DefaultNoBound, Clone, Eq, PartialEq, TypeInfo)]
 #[scale_info(skip_type_params(T))]
 pub struct CheckAccountSecurity<T> {
-	#[codec(skip)]
-	native_signature_weight: Weight,
 	_marker: PhantomData<T>,
 }
 
@@ -511,12 +511,6 @@ impl<T: Config + Send + Sync> CheckAccountSecurity<T> {
 	pub fn new() -> Self {
 		Self::default()
 	}
-
-	/// Set only by the runtime's outer-extrinsic adapter, from the actual signature variant.
-	/// This field is absent from both the signed bytes and extension metadata.
-	pub fn set_native_signature_weight(&mut self, weight: Weight) {
-		self.native_signature_weight = weight;
-	}
 }
 
 impl<T: Config + Send + Sync> TransactionExtension<RuntimeCallOf<T>> for CheckAccountSecurity<T> {
@@ -526,7 +520,7 @@ impl<T: Config + Send + Sync> TransactionExtension<RuntimeCallOf<T>> for CheckAc
 	type Pre = ();
 
 	fn weight(&self, call: &RuntimeCallOf<T>) -> Weight {
-		Pallet::<T>::authorization_weight(call).saturating_add(self.native_signature_weight)
+		Pallet::<T>::authorization_weight(call)
 	}
 
 	fn validate(
@@ -588,11 +582,11 @@ impl<T: Config> Pallet<T> {
 		let mut counts = [0u32; 5];
 		for approval in approvals {
 			let index = match approval.signature.clone().into() {
-				Signature::Ed25519(_) => 0,
-				Signature::Sr25519(_) => 1,
-				Signature::Ecdsa(_) => 2,
-				Signature::Eth(_) => 3,
-				Signature::P256(_) => 4,
+				ApprovalSignature::Ed25519(_) => 0,
+				ApprovalSignature::Sr25519(_) => 1,
+				ApprovalSignature::Ecdsa(_) => 2,
+				ApprovalSignature::Eth(_) => 3,
+				ApprovalSignature::P256(_) => 4,
 			};
 			counts[index] += 1;
 		}

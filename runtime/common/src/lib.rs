@@ -10,7 +10,6 @@ pub mod call_authorization;
 mod call_filters;
 pub mod config;
 mod deal_with_fees;
-pub mod extrinsic;
 mod fee_control;
 pub mod migrations;
 #[cfg(feature = "try-runtime")]
@@ -20,6 +19,7 @@ pub mod prelude {
 	pub use crate::config::*;
 	pub use alloc::{borrow::Cow, boxed::Box, collections::BTreeMap, vec, vec::Vec};
 	pub use argon_primitives::{
+		account_security::ApprovalSignature,
 		apis::*,
 		bitcoin::*,
 		block_seal::*,
@@ -111,17 +111,11 @@ macro_rules! inject_runtime_vars {
 			AuthorizeCall, CheckGenesis, CheckMortality, CheckNonZeroSender, CheckNonce,
 			CheckSpecVersion, CheckTxVersion, CheckWeight, WeightReclaim,
 		};
-		use pallet_account_security::{
-			ApprovalPayloadProvider, CheckAccountSecurity, Config as AccountSecurityConfig,
-			WeightInfo as AccountSecurityWeightInfo,
-		};
+		use pallet_account_security::{ApprovalPayloadProvider, CheckAccountSecurity};
 		use pallet_fee_control::CheckFeeWrapper;
 		use pallet_transaction_payment::ChargeTransactionPayment;
 		use sp_runtime::transaction_validity::TransactionValidityError;
-		use $crate::{
-			extrinsic::{NativeSignatureWeight, UncheckedExtrinsic as SignatureWeightedExtrinsic},
-			migrations::CosignerGuaranteesMigration,
-		};
+		use $crate::migrations::CosignerGuaranteesMigration;
 
 		// To learn more about runtime versioning, see:
 		// https://docs.substrate.io/main-docs/build/upgrade#runtime-versioning
@@ -184,28 +178,8 @@ macro_rules! inject_runtime_vars {
 		);
 
 		/// Unchecked extrinsic type as expected by this runtime.
-		pub type UncheckedExtrinsic = SignatureWeightedExtrinsic<
-			Address,
-			RuntimeCall,
-			Signature,
-			TxExtension,
-			SignatureWeights,
-		>;
-
-		#[derive(Clone, Debug, PartialEq, Eq)]
-		pub struct SignatureWeights;
-
-		impl NativeSignatureWeight<Signature, TxExtension> for SignatureWeights {
-			fn set_weight(signature: Option<&Signature>, extension: &mut TxExtension) {
-				let weight = match signature {
-					Some(Signature::P256(_)) =>
-						<Runtime as AccountSecurityConfig>::WeightInfo::native_p256(),
-					_ => Weight::zero(),
-				};
-				let account_security = &mut extension.8;
-				account_security.set_native_signature_weight(weight);
-			}
-		}
+		pub type UncheckedExtrinsic =
+			generic::UncheckedExtrinsic<Address, RuntimeCall, Signature, TxExtension>;
 		/// The payload being signed in transactions.
 		pub type SignedPayload = generic::SignedPayload<RuntimeCall, TxExtension>;
 

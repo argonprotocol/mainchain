@@ -5,8 +5,9 @@ stay in that account. Devices sign off-chain; the submitting transaction carries
 its approvals together. There is no request, pending-call storage or on-chain approval collection.
 Only delayed policy replacements are kept on chain, at most one per account group.
 
-The runtime supports native P256 and the existing account signature schemes. Apps/device signing and
-coordination still need integration.
+Approvals support P256 device keys and the existing account signature schemes. P256 keys only
+approve AccountSecurity operations; ordinary transactions retain the SDK account signature types.
+Apps/device signing and coordination still need integration.
 
 ## What requires approval?
 

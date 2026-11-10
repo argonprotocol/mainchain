@@ -1,7 +1,5 @@
 use super::prelude::*;
 use argon_primitives::{EthereumBlockNumber, MICROGONS_PER_ARGON};
-use core::marker::PhantomData;
-use pallet_account_security::WeightInfo as AccountSecurityWeightInfo;
 use pallet_transaction_payment::Multiplier;
 use polkadot_sdk::sp_runtime::Permill;
 use smallvec::smallvec;
@@ -21,15 +19,6 @@ pub const NORMAL_DISPATCH_RATIO: Perbill = Perbill::from_percent(75);
 
 pub const MAXIMUM_BLOCK_WEIGHT: Weight =
 	Weight::from_parts(WEIGHT_REF_TIME_PER_SECOND.saturating_mul(10), u64::MAX);
-
-/// One measured P256 verification for calls that carry an embedded native proof.
-pub struct P256VerificationWeight<T>(PhantomData<T>);
-
-impl<T: pallet_account_security::Config> Get<Weight> for P256VerificationWeight<T> {
-	fn get() -> Weight {
-		<T as pallet_account_security::Config>::WeightInfo::native_p256()
-	}
-}
 
 /// The existential deposit.
 pub const ARGON_EXISTENTIAL_DEPOSIT: Balance = 10_000;
