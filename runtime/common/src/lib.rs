@@ -164,6 +164,7 @@ macro_rules! inject_runtime_vars {
 			CosignerGuaranteesMigration<Runtime>,
 			$crate::migrations::AddVaultSecuritizedSatoshis<Runtime>,
 			pallet_crosschain_transfer::migrations::AddGatewaySyncTimeMigration<Runtime>,
+			pallet_crosschain_transfer::migrations::InitializePendingQuoteCountsMigration<Runtime>,
 			pallet_ethereum_verifier::migrations::AddGloasForkMigration<Runtime>,
 		);
 

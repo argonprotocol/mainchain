@@ -849,3 +849,125 @@ fn replacing_gateway_invalidates_its_sync_time() {
 			.is_none());
 	});
 }
+
+#[test]
+fn outstanding_quotes_preserve_the_cap_without_holding_up_new_quotes() {
+	use crate::gateway_activity::GatewayMintingAuthorityCollateral;
+	use argon_primitives::{OnNewSlot, MICROGONS_PER_ARGON};
+	use frame_support::traits::OnRuntimeUpgrade;
+	new_test_ext().execute_with(|| {
+		let chain = SourceChain::Ethereum;
+		let user = account(61);
+		let authority = account(62);
+		let authority_pair = council_signing_pair(81);
+		LowestMicrogonsPerArgonot::set(Some(3 * MICROGONS_PER_ARGON));
+		let signer = activate_test_minting_authority(
+			authority.clone(),
+			40,
+			100_000,
+			&council_signing_pair(80),
+			&authority_pair,
+			100_000,
+			0,
+		);
+		assert_ok!(Balances::mint_into(&user, 100_000));
+		for _ in 0..2 {
+			assert_ok!(CrosschainTransfer::transfer_out(
+				RuntimeOrigin::signed(user.clone()),
+				chain,
+				AssetKind::Argon,
+				h160(0x44),
+				20_000,
+			));
+		}
+		let first = transfer_out_id(&user, 1);
+		let second = transfer_out_id(&user, 2);
+		assert_ok!(CrosschainTransfer::collateralize_transfer(
+			RuntimeOrigin::signed(authority),
+			second,
+			transfer_collateral_signature(&authority_pair, second, 20_000, 0),
+			20_000,
+			0,
+		));
+		assert_eq!(TransferOutById::<Test>::get(second).unwrap().state, TransferOutState::Ready);
+
+		// Existing Started and Ready requests both survive the upgrade into the quote counts.
+		PendingTransferOutQuoteCountsByDestinationChain::<Test>::remove(chain);
+		StorageVersion::new(4).put::<CrosschainTransfer>();
+		type Migration = crate::migrations::InitializePendingQuoteCountsMigration<Test>;
+		#[cfg(feature = "try-runtime")]
+		let preflight = Migration::pre_upgrade().unwrap();
+		Migration::on_runtime_upgrade();
+		#[cfg(feature = "try-runtime")]
+		Migration::post_upgrade(preflight).unwrap();
+		assert_eq!(StorageVersion::get::<CrosschainTransfer>(), StorageVersion::new(5));
+		assert_eq!(
+			PendingTransferOutQuoteCountsByDestinationChain::<Test>::get(chain)
+				.get(&(3 * MICROGONS_PER_ARGON)),
+			Some(&2)
+		);
+
+		LowestMicrogonsPerArgonot::set(Some(MICROGONS_PER_ARGON));
+		assert_ok!(set_argonot_securitization(account(62), 100));
+		let council = CrosschainTransfer::build_global_issuance_council(
+			chain,
+			crate::CouncilMemberSource::VaultAccounts(vec![account(62)].try_into().unwrap()),
+		)
+		.unwrap();
+		assert_eq!(council.epoch_microgons_per_argonot, 3 * MICROGONS_PER_ARGON);
+		assert_eq!(council.total_weight, 100_100);
+		assert_ok!(CrosschainTransfer::transfer_out(
+			RuntimeOrigin::signed(user.clone()),
+			chain,
+			AssetKind::Argon,
+			h160(0x44),
+			20_000,
+		));
+		let third = transfer_out_id(&user, 3);
+		assert_eq!(
+			TransferOutById::<Test>::get(third).unwrap().microgons_per_argonot,
+			MICROGONS_PER_ARGON
+		);
+		CurrentFrameId::set(11);
+		<CrosschainTransfer as OnNewSlot<TestAccountId>>::on_frame_start(11);
+		assert_eq!(NextCouncilApprovalQueueNonceByDestinationChain::<Test>::get(chain), 1);
+
+		assert_ok!(CrosschainTransfer::cancel_transfer_out_from_gateway(chain, first));
+		assert_eq!(
+			PendingTransferOutQuoteCountsByDestinationChain::<Test>::get(chain)
+				.last_key_value()
+				.map(|(rate, count)| (*rate, *count)),
+			Some((3 * MICROGONS_PER_ARGON, 1))
+		);
+		assert_ok!(CrosschainTransfer::finalize_transfer_out_from_gateway(
+			chain,
+			second,
+			AssetKind::Argon,
+			20_000,
+			vec![GatewayMintingAuthorityCollateral {
+				signing_key: signer,
+				microgon_collateral: 20_000,
+				micronot_collateral: 0
+			}],
+		));
+		assert_eq!(
+			PendingTransferOutQuoteCountsByDestinationChain::<Test>::get(chain)
+				.last_key_value()
+				.map(|(rate, count)| (*rate, *count)),
+			Some((MICROGONS_PER_ARGON, 1))
+		);
+
+		let council_hash =
+			ActiveGlobalIssuanceCouncilByDestinationChain::<Test>::get(chain).unwrap();
+		let council = GlobalIssuanceCouncilByHash::<Test>::get(council_hash).unwrap();
+		let next = CrosschainTransfer::build_global_issuance_council(
+			chain,
+			crate::CouncilMemberSource::ExistingCouncil(&council),
+		)
+		.unwrap();
+		assert_eq!(next.epoch_microgons_per_argonot, MICROGONS_PER_ARGON);
+		let expiry = TransferOutById::<Test>::get(third).unwrap().valid_until_ethereum_block;
+		assert_ok!(CrosschainTransfer::expire_transfer_outs_through_block(chain, expiry + 1));
+		assert!(PendingTransferOutQuoteCountsByDestinationChain::<Test>::get(chain).is_empty());
+	});
+}

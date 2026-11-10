@@ -224,6 +224,9 @@ mod benchmarks {
 	#[benchmark]
 	fn force_set_global_issuance_council() -> Result<(), BenchmarkError> {
 		reset_crosschain_benchmark_state();
+		seed_pending_transfer_quote_counts::<T>(
+			T::MaxPendingTransferOutsPerDestinationChain::get(),
+		)?;
 		let caller: T::AccountId = account("council-member", 0, 0);
 		let council_signer = benchmark_signer(1);
 		let authority_signer = benchmark_signer(2);
@@ -879,6 +882,9 @@ mod benchmarks {
 	#[benchmark]
 	fn schedule_global_issuance_council_rotation() -> Result<(), BenchmarkError> {
 		reset_crosschain_benchmark_state();
+		seed_pending_transfer_quote_counts::<T>(
+			T::MaxPendingTransferOutsPerDestinationChain::get(),
+		)?;
 		seed_chain_config::<T>(0x21);
 		let (active_council, _) = benchmark_max_council_signer_rotation::<T>()?;
 		let active_council_hash = Pallet::<T>::hash_global_issuance_council(
@@ -938,6 +944,12 @@ mod benchmarks {
 		let _ = seed_active_council::<T>(&council_account, benchmark_signer(6), 50_000u128.into())?;
 		T::NativeCurrency::mint_into(&caller, 1_000_000u128.into())
 			.map_err(|_| BenchmarkError::Stop("failed to fund benchmark transfer sender"))?;
+		let pending = T::MaxPendingTransferOutsPerDestinationChain::get().saturating_sub(1);
+		seed_pending_transfer_quote_counts::<T>(pending)?;
+		NonTerminalTransferOutCountByDestinationChain::<T>::insert(
+			BENCHMARK_DESTINATION_CHAIN,
+			pending,
+		);
 
 		#[extrinsic_call]
 		transfer_out(
@@ -950,7 +962,7 @@ mod benchmarks {
 
 		assert_eq!(
 			NonTerminalTransferOutCountByDestinationChain::<T>::get(BENCHMARK_DESTINATION_CHAIN),
-			1,
+			pending + 1,
 		);
 		Ok(())
 	}
@@ -1219,6 +1231,13 @@ where
 	// Fill the ready queue. Receipt batches stagger cleanup over their proof blocks; storage
 	// proofs use the final block and expire the entire queue after settling the locator.
 	for transfer_index in 0..max_transfers {
+		let quote: T::Balance = argon_primitives::MICROGONS_PER_ARGON
+			.saturating_sub(u128::from(transfer_index))
+			.into();
+		TransferOutQuoteMicrogonsPerArgonotByDestinationChain::<T>::insert(
+			BENCHMARK_DESTINATION_CHAIN,
+			quote,
+		);
 		let user: T::AccountId = account("prove-gateway-expired-user", transfer_index, 0);
 		T::NativeCurrency::mint_into(&user, transfer_amount_u128.saturating_add(100_000).into())
 			.map_err(|_| BenchmarkError::Stop("failed to fund benchmark expired transfer user"))?;
@@ -1267,6 +1286,20 @@ fn reset_crosschain_benchmark_state() {
 	reset_benchmark_price_provider_state();
 	set_benchmark_price_provider_state(BenchmarkPriceProviderState::default());
 	set_benchmark_bitcoin_locks_runtime_state(BenchmarkBitcoinLocksRuntimeState::default());
+}
+
+fn seed_pending_transfer_quote_counts<T: Config>(count: u32) -> Result<(), BenchmarkError> {
+	let mut quotes = BoundedBTreeMap::new();
+	for index in 0..count {
+		quotes
+			.try_insert(T::Balance::from(u128::from(index) + 1), 1)
+			.map_err(|_| BenchmarkError::Stop("benchmark quote count exceeded runtime bound"))?;
+	}
+	PendingTransferOutQuoteCountsByDestinationChain::<T>::insert(
+		BENCHMARK_DESTINATION_CHAIN,
+		quotes,
+	);
+	Ok(())
 }
 
 fn benchmark_chain_config(gateway_byte: u8) -> ChainConfig {

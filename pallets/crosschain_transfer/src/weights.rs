@@ -168,6 +168,7 @@ where
 
 	fn transfer_out() -> Weight {
 		Base::transfer_out()
+			.saturating_add(PriceProviderWeight::get_lowest_microgons_per_argonot())
 			.saturating_add(EthereumVerifyWeight::latest_execution_block_number())
 			.saturating_add(EthereumVerifyWeight::latest_execution_block_timestamp())
 			.saturating_add(TickProviderWeight::ticker())

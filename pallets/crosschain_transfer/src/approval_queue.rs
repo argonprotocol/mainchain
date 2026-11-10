@@ -18,6 +18,7 @@ use super::{
 	MintingAuthoritiesBySigner, NextCouncilApprovalQueueNonceByDestinationChain,
 	NextCouncilRotationFrameByDestinationChain, Pallet,
 	PendingCouncilSignerByDestinationChainAndAccountId,
+	PendingTransferOutQuoteCountsByDestinationChain,
 	PreviousTransferOutMicrogonsPerArgonotByDestinationChain, SourceChain,
 	TransferOutQuoteMicrogonsPerArgonotByDestinationChain, H256,
 };
@@ -119,7 +120,7 @@ impl<T: Config> Pallet<T> {
 		destination_chain: SourceChain,
 		member_source: CouncilMemberSource<'_, T>,
 	) -> Result<GlobalIssuanceCouncil<T>, DispatchError> {
-		let epoch_microgons_per_argonot =
+		let market_microgons_per_argonot =
 			T::PriceProvider::get_lowest_microgons_per_argonot(T::CouncilRotationFrames::get())
 				.filter(|price| *price != T::Balance::default())
 				.ok_or(Error::<T>::InvalidMicrogonsPerArgonot)?;
@@ -171,10 +172,10 @@ impl<T: Config> Pallet<T> {
 						.ok_or(Error::<T>::UnknownOwnerVault)?;
 					let committed_argonots = T::VaultProvider::get_held_argonots(&account_id)
 						.ok_or(Error::<T>::UnknownOwnerVault)?;
-					let epoch_rate: u128 = epoch_microgons_per_argonot.into();
+					let market_rate: u128 = market_microgons_per_argonot.into();
 					let argonot_weight = committed_argonots
 						.into()
-						.saturating_mul(epoch_rate)
+						.saturating_mul(market_rate)
 						.saturating_div(MICROGONS_PER_ARGON)
 						.into();
 					let weight = committed_microgon_collateral.saturating_add(argonot_weight);
@@ -202,6 +203,13 @@ impl<T: Config> Pallet<T> {
 			!members.is_empty() && total_weight != T::Balance::default(),
 			Error::<T>::InvalidGlobalIssuanceCouncil,
 		);
+
+		let outstanding_quotes =
+			PendingTransferOutQuoteCountsByDestinationChain::<T>::get(destination_chain);
+		let outstanding_rate = outstanding_quotes
+			.last_key_value()
+			.map_or(T::Balance::default(), |(rate, _)| *rate);
+		let epoch_microgons_per_argonot = market_microgons_per_argonot.max(outstanding_rate);
 
 		Ok(GlobalIssuanceCouncil::<T> { epoch_microgons_per_argonot, members, total_weight })
 	}

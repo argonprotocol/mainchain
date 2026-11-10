@@ -1,9 +1,9 @@
-#[cfg(feature = "try-runtime")]
-use crate::SourceChain;
 use crate::{
 	ArgonApprovalsNonce, Config, GatewayActivityNonce, GatewayState, GatewayStateBySourceChain,
-	Pallet,
+	Pallet, TransferOutById,
 };
+#[cfg(feature = "try-runtime")]
+use crate::{PendingTransferOutQuoteCountsByDestinationChain, SourceChain};
 use codec::Compact;
 #[cfg(feature = "try-runtime")]
 use codec::DecodeAll;
@@ -82,6 +82,55 @@ pub type AddGatewaySyncTimeMigration<T> = VersionedMigration<
 	3,
 	4,
 	AddGatewaySyncTime<T>,
+	Pallet<T>,
+	<T as frame_system::Config>::DbWeight,
+>;
+
+pub struct InitializePendingQuoteCounts<T>(PhantomData<T>);
+
+impl<T: Config> UncheckedOnRuntimeUpgrade for InitializePendingQuoteCounts<T> {
+	fn on_runtime_upgrade() -> Weight {
+		let mut transfers = 0u64;
+		for transfer in TransferOutById::<T>::iter_values() {
+			Pallet::<T>::track_transfer_out_quote(&transfer)
+				.expect("distinct pending quotes obey the existing transfer bound");
+			transfers.saturating_accrue(1);
+		}
+		T::DbWeight::get().reads_writes(transfers.saturating_mul(2).saturating_add(1), transfers)
+	}
+
+	#[cfg(feature = "try-runtime")]
+	fn pre_upgrade() -> Result<Vec<u8>, sp_runtime::TryRuntimeError> {
+		Ok(TransferOutById::<T>::iter_values()
+			.map(|transfer| (transfer.destination_chain, transfer.microgons_per_argonot))
+			.collect::<Vec<_>>()
+			.encode())
+	}
+
+	#[cfg(feature = "try-runtime")]
+	fn post_upgrade(state: Vec<u8>) -> Result<(), sp_runtime::TryRuntimeError> {
+		let quotes = Vec::<(SourceChain, T::Balance)>::decode_all(&mut &state[..])
+			.map_err(|_| "Invalid pending-quote preflight")?;
+		let mut indexed = 0u64;
+		for (chain, counts) in PendingTransferOutQuoteCountsByDestinationChain::<T>::iter() {
+			for (rate, count) in counts {
+				let expected = quotes
+					.iter()
+					.filter(|(source, quote)| *source == chain && *quote == rate)
+					.count() as u32;
+				ensure!(count == expected, "Incorrect migrated pending-quote count");
+				indexed.saturating_accrue(u64::from(count));
+			}
+		}
+		ensure!(indexed == quotes.len() as u64, "Pending quote missing from migration");
+		Ok(())
+	}
+}
+
+pub type InitializePendingQuoteCountsMigration<T> = VersionedMigration<
+	4,
+	5,
+	InitializePendingQuoteCounts<T>,
 	Pallet<T>,
 	<T as frame_system::Config>::DbWeight,
 >;
