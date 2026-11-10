@@ -15,6 +15,8 @@ mod tests;
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 pub mod migrations;
+#[cfg(feature = "try-runtime")]
+mod try_state;
 pub mod weights;
 use argon_primitives::{
 	treasury::{PositionQuantity, TreasuryPositionProvider, TreasuryRewardProvider},
@@ -75,8 +77,8 @@ pub mod pallet {
 			TreasuryBonusApprovalProof, TreasuryVaultProvider, TreasuryVaultProviderWeightInfo,
 			VaultSecuritization, VaultTreasuryFrameEarnings,
 		},
-		BitcoinMintedProvider, BlockSealAuthorityId, BurnEventHandler, OnNewSlot, PriceProvider,
-		TreasuryPoolProvider, MICROGONS_PER_ARGON,
+		AscendingRankKey, BitcoinMintedProvider, BlockSealAuthorityId, BurnEventHandler, OnNewSlot,
+		PriceProvider, TreasuryPoolProvider, MICROGONS_PER_ARGON,
 	};
 	use pallet_prelude::argon_primitives::{
 		MiningFrameTransitionProvider, OperationalAccountsHook, OperationalRewardsPayer,
@@ -159,6 +161,16 @@ pub mod pallet {
 		/// Maximum live Argon bond lots while direct frame payouts iterate every lot.
 		#[pallet::constant]
 		type MaxArgonBondLots: Get<u32>;
+
+		/// Owner bond/stake lot count assumed by scan benchmarks and checked by try_state.
+		/// Includes lots awaiting release. Purchases remain unrestricted and scans are not
+		/// truncated.
+		#[pallet::constant]
+		type MaxExpectedBondLotsPerAccount: Get<u32>;
+
+		/// Maximum accounts whose queued bond collateral is attempted in one block.
+		#[pallet::constant]
+		type MaxBondCollateralSettlementsPerBlock: Get<u32>;
 
 		/// The maximum percent of ownership-token circulation that can be bonded.
 		#[pallet::constant]
@@ -330,6 +342,18 @@ pub mod pallet {
 	pub type EncumberedBondMicrogonsByAccount<T: Config> =
 		StorageMap<_, Twox64Concat, T::AccountId, T::Balance, ValueQuery>;
 
+	/// Burn and release requests awaiting settlement, combined by owner. Both amounts remain
+	/// included in the owner's encumbrance until processed; bonds retain their live payout terms.
+	#[pallet::storage]
+	pub type PendingBondCollateralByAccount<T: Config> =
+		StorageMap<_, Twox64Concat, T::AccountId, PendingBondCollateral<T::Balance>, OptionQuery>;
+
+	/// Accounts due for collateral settlement, ordered by retry block and owner. Each pending
+	/// account has one entry; failures move to the next block without blocking other owners.
+	#[pallet::storage]
+	pub type BondCollateralSettlementQueue<T: Config> =
+		StorageMap<_, Identity, AscendingRankKey<T::AccountId>, (), OptionQuery>;
+
 	/// Bond lots to release at the given frame.
 	#[pallet::storage]
 	pub type PendingBondReleasesByFrame<T: Config> = StorageMap<
@@ -475,6 +499,11 @@ pub mod pallet {
 			added_frames: u32,
 			added_earnings: T::Balance,
 		},
+		/// Settlement rolled back and remains queued for a later block.
+		CouldNotSettleBondCollateral {
+			account_id: T::AccountId,
+			dispatch_error: DispatchError,
+		},
 	}
 
 	#[pallet::error]
@@ -507,8 +536,8 @@ pub mod pallet {
 		BondLotAlreadyReleasing,
 		/// The vault doesn't have enough raw securitization to support this bond purchase.
 		InsufficientBondSpace,
-		/// Liquidating this bond lot would take the account below its crosschain-encumbered
-		/// treasury backing.
+		/// A reservation or liquidation would leave Treasury backing uncovered, or queued
+		/// settlement exceeds the account's remaining encumbrance.
 		ActiveBondAmountBelowEncumberedBacking,
 		/// The bonus approval was signed for a different vault.
 		BonusApprovalWrongVault,
@@ -528,6 +557,65 @@ pub mod pallet {
 		BondLotCannotBeFlexible,
 		/// The caller does not have permission to perform this action.
 		NoPermissions,
+	}
+
+	#[pallet::hooks]
+	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+		fn on_initialize(now: BlockNumberFor<T>) -> Weight {
+			let now = now.saturated_into::<u64>();
+			let mut weight = Weight::zero();
+			let reads = T::WeightInfo::read_bond_collateral_queue();
+
+			for _ in 0..T::MaxBondCollateralSettlementsPerBlock::get() {
+				weight.saturating_accrue(reads);
+				let Some(key) = BondCollateralSettlementQueue::<T>::iter_keys().next() else {
+					break;
+				};
+				if key.rank() > now {
+					break;
+				}
+
+				let account = key.holder_id();
+				let pending =
+					PendingBondCollateralByAccount::<T>::get(&account).unwrap_or_default();
+				weight.saturating_accrue(T::DbWeight::get().writes(3));
+
+				let result = with_storage_layer(|| {
+					Self::settle_bond_collateral_burn(
+						&account,
+						pending.burn_microgons,
+						&mut weight,
+					)?;
+					Self::settle_bond_collateral_release(
+						&account,
+						pending.release_microgons,
+						&mut weight,
+					)?;
+					PendingBondCollateralByAccount::<T>::remove(&account);
+					BondCollateralSettlementQueue::<T>::remove(&key);
+					Ok(())
+				});
+
+				if let Err(dispatch_error) = result {
+					BondCollateralSettlementQueue::<T>::remove(key);
+					BondCollateralSettlementQueue::<T>::insert(
+						AscendingRankKey::new(now.saturating_add(1), account.clone()),
+						(),
+					);
+					Self::deposit_event(Event::CouldNotSettleBondCollateral {
+						account_id: account,
+						dispatch_error,
+					});
+				}
+			}
+
+			weight
+		}
+
+		#[cfg(feature = "try-runtime")]
+		fn try_state(_: BlockNumberFor<T>) -> Result<(), sp_runtime::TryRuntimeError> {
+			crate::try_state::check::<T>()
+		}
 	}
 
 	#[pallet::call]
@@ -662,7 +750,8 @@ pub mod pallet {
 
 			let remaining_vault_bonds = match bond_lot.program {
 				BondProgram::Vault { vault_id, .. } => {
-					let (active_balance, current_hold) = Self::account_vault_bond_status(&who)?;
+					let (active_balance, current_hold) =
+						Self::account_vault_bond_status(&who, &mut 0)?;
 					let remaining_non_releasing_hold =
 						current_hold.saturating_sub(Self::bonds_to_balance(bond_lot.bonds));
 					ensure!(
@@ -2054,11 +2143,13 @@ pub mod pallet {
 
 		fn account_vault_bond_status(
 			account_id: &T::AccountId,
+			scanned_lots: &mut u32,
 		) -> Result<(T::Balance, T::Balance), Error<T>> {
 			let mut active_balance = T::Balance::zero();
 			let mut releasing_balance = T::Balance::zero();
 
 			for (bond_lot_id, ()) in BondLotIdsByAccount::<T>::iter_prefix(account_id) {
+				scanned_lots.saturating_accrue(1);
 				let bond_lot =
 					BondLotById::<T>::get(bond_lot_id).ok_or(Error::<T>::BondLotNotFound)?;
 				if !matches!(bond_lot.program, BondProgram::Vault { .. }) {
@@ -2265,13 +2356,22 @@ pub mod pallet {
 		}
 
 		#[frame_support::transactional]
-		fn pay_reward(account: &T::AccountId, amount: T::Balance) -> DispatchResult {
+		fn pay_reward(
+			account: &T::AccountId,
+			amount: T::Balance,
+		) -> Result<T::Balance, DispatchError> {
 			let mut outstanding = OutstandingPurchaseRewards::<T>::get();
 			ensure!(amount <= outstanding, ArithmeticError::Underflow);
+
+			let paid = match T::Currency::mint_into(account, amount) {
+				Ok(paid) => paid,
+				Err(error) if error == TokenError::BelowMinimum.into() => T::Balance::zero(),
+				Err(error) => return Err(error),
+			};
+
 			outstanding.saturating_reduce(amount);
-			T::Currency::mint_into(account, amount)?;
 			OutstandingPurchaseRewards::<T>::put(outstanding);
-			Ok(())
+			Ok(paid)
 		}
 	}
 
@@ -2415,7 +2515,7 @@ pub mod pallet {
 			let next_encumbered = Self::encumbered_bond_microgons(account_id)
 				.checked_add(&microgon_amount)
 				.ok_or(Error::<T>::InternalError)?;
-			let (_, current_hold) = Self::account_vault_bond_status(account_id)?;
+			let (_, current_hold) = Self::account_vault_bond_status(account_id, &mut 0)?;
 			ensure!(
 				current_hold >= next_encumbered,
 				Error::<T>::ActiveBondAmountBelowEncumberedBacking,
@@ -2431,9 +2531,79 @@ pub mod pallet {
 			account_id: &T::AccountId,
 			microgon_amount: Self::Balance,
 		) -> DispatchResult {
+			Self::queue_bond_collateral(
+				account_id,
+				PendingBondCollateral {
+					burn_microgons: T::Balance::zero(),
+					release_microgons: microgon_amount,
+				},
+			)
+		}
+
+		fn burn_encumbered_bond_microgons(
+			account_id: &T::AccountId,
+			microgon_amount: Self::Balance,
+		) -> DispatchResult {
+			Self::queue_bond_collateral(
+				account_id,
+				PendingBondCollateral {
+					burn_microgons: microgon_amount,
+					release_microgons: T::Balance::zero(),
+				},
+			)
+		}
+	}
+
+	impl<T: Config> Pallet<T> {
+		fn queue_bond_collateral(
+			account_id: &T::AccountId,
+			request: PendingBondCollateral<T::Balance>,
+		) -> DispatchResult {
+			if request.burn_microgons.is_zero() && request.release_microgons.is_zero() {
+				return Ok(());
+			}
+
+			let previous = PendingBondCollateralByAccount::<T>::get(account_id);
+			let mut pending = previous.clone().unwrap_or_default();
+			let available = Self::encumbered_bond_microgons(account_id)
+				.saturating_sub(pending.burn_microgons)
+				.saturating_sub(pending.release_microgons);
+			ensure!(
+				request.burn_microgons <= available,
+				Error::<T>::ActiveBondAmountBelowEncumberedBacking,
+			);
+			ensure!(
+				request.release_microgons <= available.saturating_sub(request.burn_microgons),
+				Error::<T>::ActiveBondAmountBelowEncumberedBacking,
+			);
+			pending.burn_microgons.saturating_accrue(request.burn_microgons);
+			pending.release_microgons.saturating_accrue(request.release_microgons);
+
+			if previous.is_none() {
+				BondCollateralSettlementQueue::<T>::insert(
+					AscendingRankKey::new(
+						frame_system::Pallet::<T>::block_number()
+							.saturated_into::<u64>()
+							.saturating_add(1),
+						account_id.clone(),
+					),
+					(),
+				);
+			}
+			PendingBondCollateralByAccount::<T>::insert(account_id, pending);
+			Ok(())
+		}
+
+		pub(crate) fn settle_bond_collateral_release(
+			account_id: &T::AccountId,
+			microgon_amount: T::Balance,
+			weight: &mut Weight,
+		) -> DispatchResult {
 			if microgon_amount.is_zero() {
 				return Ok(());
 			}
+			let base_weight = T::WeightInfo::settle_bond_collateral_release(0);
+			weight.saturating_accrue(base_weight);
 
 			let current_encumbered = Self::encumbered_bond_microgons(account_id);
 			ensure!(
@@ -2442,7 +2612,13 @@ pub mod pallet {
 			);
 			let remaining_encumbered = current_encumbered.saturating_sub(microgon_amount);
 			EncumberedBondMicrogonsByAccount::<T>::insert(account_id, remaining_encumbered);
-			let (current_active, current_hold) = Self::account_vault_bond_status(account_id)?;
+			let mut scanned_lots = 0;
+			let status = Self::account_vault_bond_status(account_id, &mut scanned_lots);
+			weight.saturating_accrue(
+				T::WeightInfo::settle_bond_collateral_release(scanned_lots)
+					.saturating_sub(base_weight),
+			);
+			let (current_active, current_hold) = status?;
 			let required_hold = current_active.max(remaining_encumbered);
 			let released_amount = current_hold.saturating_sub(required_hold);
 			if !released_amount.is_zero() {
@@ -2451,13 +2627,16 @@ pub mod pallet {
 			Ok(())
 		}
 
-		fn burn_encumbered_bond_microgons(
+		pub(crate) fn settle_bond_collateral_burn(
 			account_id: &T::AccountId,
-			microgon_amount: Self::Balance,
+			microgon_amount: T::Balance,
+			weight: &mut Weight,
 		) -> DispatchResult {
 			if microgon_amount.is_zero() {
 				return Ok(());
 			}
+			let base_weight = T::WeightInfo::settle_bond_collateral_burn(0);
+			weight.saturating_accrue(base_weight);
 
 			ensure!(
 				Self::encumbered_bond_microgons(account_id) >= microgon_amount,
@@ -2480,8 +2659,13 @@ pub mod pallet {
 			}
 			EncumberedBondMicrogonsByAccount::<T>::insert(account_id, encumbered_after_burn);
 
-			let (active_balance_before_trim, held_microgons_after_burn) =
-				Self::account_vault_bond_status(account_id)?;
+			let mut scanned_lots = 0;
+			let status = Self::account_vault_bond_status(account_id, &mut scanned_lots);
+			weight.saturating_accrue(
+				T::WeightInfo::settle_bond_collateral_burn(scanned_lots)
+					.saturating_sub(base_weight),
+			);
+			let (active_balance_before_trim, held_microgons_after_burn) = status?;
 			ensure!(held_microgons_after_burn >= encumbered_after_burn, Error::<T>::InternalError,);
 
 			let active_bonds_before_trim = Self::balance_to_bonds(active_balance_before_trim);
@@ -2585,6 +2769,26 @@ pub mod pallet {
 			});
 			Ok(())
 		}
+	}
+
+	/// Owner-scoped ARGON amounts awaiting actual burn or encumbrance release, in microgons.
+	#[derive(
+		Encode,
+		Decode,
+		DecodeWithMemTracking,
+		Clone,
+		Default,
+		PartialEq,
+		Eq,
+		Debug,
+		TypeInfo,
+		MaxEncodedLen,
+	)]
+	pub struct PendingBondCollateral<Balance> {
+		/// Held ARGON to burn and reconcile against the owner's bond lots at settlement.
+		pub burn_microgons: Balance,
+		/// Encumbrance to release after settling any pending burn.
+		pub release_microgons: Balance,
 	}
 
 	/// Reward budgets excluded from issuance until paid. These are amounts, not funded accounts.

@@ -169,16 +169,21 @@ where
 
 	fn on_account_bitcoin_amount_updated() -> Weight {
 		Base::on_account_bitcoin_amount_updated()
+			.saturating_add(UniswapTransferWeight::is_crosschain_activated().saturating_mul(2))
 	}
 
 	fn on_account_vault_bond_total_updated() -> Weight {
 		Base::on_account_vault_bond_total_updated()
+			.saturating_add(UniswapTransferWeight::is_crosschain_activated().saturating_mul(2))
 	}
 
 	fn on_account_uniswap_argon_transfers_in_updated() -> Weight {
-		Base::on_account_uniswap_argon_transfers_in_updated().saturating_add(
-			UniswapTransferWeight::account_uniswap_argon_transfers_in_amount().saturating_mul(3),
-		)
+		Base::on_account_uniswap_argon_transfers_in_updated()
+			.saturating_add(UniswapTransferWeight::is_crosschain_activated().saturating_mul(2))
+			.saturating_add(
+				UniswapTransferWeight::account_uniswap_argon_transfers_in_amount()
+					.saturating_mul(3),
+			)
 	}
 }
 

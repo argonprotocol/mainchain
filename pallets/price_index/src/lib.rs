@@ -4,7 +4,7 @@ extern crate alloc;
 use pallet_prelude::*;
 
 pub use argon_primitives::PriceIndex;
-use argon_primitives::{block_seal::FrameId, ArgonCPI, PriceIndexUpdated};
+use argon_primitives::{block_seal::FrameId, ArgonCPI, PriceIndexUpdated, TickProvider};
 pub use pallet::*;
 pub use weights::WeightInfo;
 
@@ -167,7 +167,7 @@ pub mod pallet {
 		type MaxPriceAgeInTicks: Get<Tick>;
 
 		/// The current tick
-		type CurrentTick: Get<Tick>;
+		type TickProvider: TickProvider<Self::Block>;
 
 		/// Current mining frame id for trailing floor history.
 		type CurrentFrameId: Get<FrameId>;
@@ -292,7 +292,7 @@ pub mod pallet {
 			migrations::add_optional_pool_prices::<T>()
 		}
 		fn on_initialize(_: BlockNumberFor<T>) -> Weight {
-			let prev_tick = T::CurrentTick::get();
+			let prev_tick = T::TickProvider::current_tick();
 			let new_frame_id = T::MiningFrameTransitionProvider::is_new_frame_started();
 			if let Some(frame_id) = new_frame_id {
 				Self::finalize_argonot_average_for_frame(frame_id.saturating_sub(1));
@@ -343,7 +343,7 @@ pub mod pallet {
 				Error::<T>::InvalidEthereumPrices,
 			);
 
-			let now = T::CurrentTick::get();
+			let now = T::TickProvider::current_tick();
 			if let Some(usdc) = index.usdc_usd_price {
 				ensure!(!usdc.is_zero(), Error::<T>::InvalidUsdcPrice);
 				ensure!(index.tick <= now, Error::<T>::InvalidUsdcPrice);
@@ -422,7 +422,8 @@ pub mod pallet {
 		fn get_current() -> Option<PriceIndex> {
 			let price = <Current<T>>::get()?;
 			if price.tick <
-				T::CurrentTick::get().saturating_sub(T::MaxDowntimeTicksBeforeReset::get())
+				T::TickProvider::current_tick()
+					.saturating_sub(T::MaxDowntimeTicksBeforeReset::get())
 			{
 				return None;
 			}

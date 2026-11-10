@@ -98,6 +98,24 @@ mod benchmarks {
 	}
 
 	#[benchmark]
+	fn provider_get_current_frame_id() {
+		NextFrameId::<T>::put(2);
+		#[block]
+		{
+			assert_eq!(Pallet::<T>::current_frame_id(), 1);
+		}
+	}
+
+	#[benchmark]
+	fn provider_is_new_frame_started() {
+		NewlyStartedFrameId::<T>::put(1);
+		#[block]
+		{
+			assert_eq!(Pallet::<T>::get_newly_started_frame(), Some(1));
+		}
+	}
+
+	#[benchmark]
 	fn bid() -> Result<(), BenchmarkError> {
 		let caller: T::AccountId = whitelisted_caller();
 		let keys = prepare_bid::<T>(&caller);
@@ -691,7 +709,7 @@ mod benchmarks {
 		let argonots_per_seat: T::Balance = 100_000u128.into();
 		ArgonotsPerMiningSeat::<T>::put(argonots_per_seat);
 		let frames_per_term = T::FramesPerMiningTerm::get() as FrameId;
-		let target_frame = frames_per_term;
+		let target_frame = frames_per_term.max(30);
 		let retiring_frame_id = target_frame.saturating_sub(frames_per_term);
 		NextFrameId::<T>::put(target_frame);
 		NextCohortSize::<T>::put(m);
@@ -755,6 +773,13 @@ mod benchmarks {
 			ticks_before_bid_end_for_vrf_close: 1u64,
 		};
 		MiningConfig::<T>::put(config);
+
+		let mut starts = FrameStartTicks::<T>::get();
+		starts.clear();
+		for frame in target_frame - 10..target_frame {
+			starts.try_insert(frame, frame).unwrap();
+		}
+		FrameStartTicks::<T>::put(starts);
 
 		#[block]
 		{

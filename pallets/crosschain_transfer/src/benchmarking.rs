@@ -50,6 +50,27 @@ mod benchmarks {
 	use argon_primitives::CollectBlockerProvider;
 
 	#[benchmark]
+	fn provider_last_state_by_chain() {
+		GatewayStateBySourceChain::<T>::insert(
+			BENCHMARK_DESTINATION_CHAIN,
+			GatewayState::<T::Balance> {
+				last_synced_source_block_time: Some(u64::MAX),
+				gateway_activity_nonce: u64::MAX,
+				argon_approvals_nonce: u64::MAX,
+				argon_circulation: u128::MAX.into(),
+				argonot_circulation: u128::MAX.into(),
+			},
+		);
+		#[block]
+		{
+			assert!(Pallet::<T>::last_state_by_chain(core::hint::black_box(
+				BENCHMARK_DESTINATION_CHAIN
+			))
+			.is_some());
+		}
+	}
+
+	#[benchmark]
 	fn provider_tx_pool_key() {
 		use argon_primitives::{
 			MAX_ETHEREUM_RECEIPTS_PER_PROOF, MAX_ETHEREUM_RECEIPT_PROOF_NODE_BYTES,
@@ -134,7 +155,8 @@ mod benchmarks {
 		GatewaySyncPauseBySourceChain::<T>::remove(SourceChain::Ethereum);
 		GatewayStateBySourceChain::<T>::insert(
 			SourceChain::Ethereum,
-			GatewayState::<T> {
+			GatewayState::<T::Balance> {
+				last_synced_source_block_time: None,
 				gateway_activity_nonce: 1,
 				argon_approvals_nonce: u64::MAX,
 				argon_circulation: u128::MAX.into(),
@@ -171,6 +193,14 @@ mod benchmarks {
 			benchmark_chain_config(0x20),
 		);
 
+		GatewayStateBySourceChain::<T>::insert(
+			BENCHMARK_DESTINATION_CHAIN,
+			GatewayState::<T::Balance> {
+				last_synced_source_block_time: Some(100),
+				..Default::default()
+			},
+		);
+
 		#[extrinsic_call]
 		set_chain_config(
 			RawOrigin::Root,
@@ -181,6 +211,12 @@ mod benchmarks {
 		assert_eq!(
 			ChainConfigBySourceChain::<T>::get(BENCHMARK_DESTINATION_CHAIN),
 			Some(benchmark_chain_config(0x21)),
+		);
+		assert_eq!(
+			GatewayStateBySourceChain::<T>::get(BENCHMARK_DESTINATION_CHAIN)
+				.unwrap()
+				.last_synced_source_block_time,
+			None
 		);
 		Ok(())
 	}
@@ -314,7 +350,8 @@ mod benchmarks {
 		reset_crosschain_benchmark_state();
 		GatewayStateBySourceChain::<T>::insert(
 			BENCHMARK_DESTINATION_CHAIN,
-			GatewayState::<T> {
+			GatewayState::<T::Balance> {
+				last_synced_source_block_time: None,
 				gateway_activity_nonce: 7,
 				argon_approvals_nonce: 0,
 				argon_circulation: T::Balance::default(),
@@ -624,6 +661,13 @@ mod benchmarks {
 						value: H256::from_slice(activity_root.as_slice()),
 						node_indexes: BoundedVec::default(),
 					},
+					EthereumStorageSlotProof {
+						slot: H256::zero(),
+						value: H256::from_slice(
+							&(alloy_primitives::U256::from(a) << 160usize).to_be_bytes::<32>(),
+						),
+						node_indexes: BoundedVec::default(),
+					},
 				]
 				.try_into()
 				.map_err(|_| BenchmarkError::Stop("benchmark slots exceeded proof bound"))?,
@@ -792,6 +836,13 @@ mod benchmarks {
 					EthereumStorageSlotProof {
 						slot: root_slot,
 						value: H256::from_slice(activity_root.as_slice()),
+						node_indexes: BoundedVec::default(),
+					},
+					EthereumStorageSlotProof {
+						slot: H256::zero(),
+						value: H256::from_slice(
+							&(alloy_primitives::U256::from(a) << 160usize).to_be_bytes::<32>(),
+						),
 						node_indexes: BoundedVec::default(),
 					},
 				]
@@ -1487,15 +1538,48 @@ fn transfer_to_argon_started_log(
 
 fn purchase_activity_log(log: EthereumLog) -> EthereumLog {
 	use alloy_primitives::U256;
+	use argon_primitives::{ethereum::LiquidRepayAuthorization, AccountId, Signature};
 	use ethereum_contracts::{SwapPurchase, TransferToArgonFromSwapStarted};
+
 	let transfer =
 		TransferToArgonStarted::decode_raw_log_validate(log.topics.iter().map(|t| t.0), &log.data)
 			.unwrap();
+	let authorization =
+		LiquidRepayAuthorization { ethereum_sender: H160::from_slice(transfer.from.as_slice()) };
+	let message = authorization.signing_payload();
+
+	#[cfg(test)]
+	let (owner, signature) = {
+		use polkadot_sdk::sp_core::{sr25519, Pair};
+
+		let pair = sr25519::Pair::from_seed(&transfer.argonAccountId.0);
+		(pair.public(), Signature::from(pair.sign(&message)))
+	};
+	#[cfg(not(test))]
+	let (owner, signature) = {
+		use alloc::format;
+		use polkadot_sdk::sp_core::crypto::KeyTypeId;
+
+		let key_type = KeyTypeId(*b"lrpy");
+		let owner = sp_io::crypto::sr25519_generate(
+			key_type,
+			Some(format!("//liquid-repay-bench//{}", transfer.argonAccountId).into_bytes()),
+		);
+		let signature = Signature::from(
+			sp_io::crypto::sr25519_sign(key_type, &owner, &message)
+				.expect("benchmark signing key exists"),
+		);
+		(owner, signature)
+	};
+	assert!(authorization.verify(&signature, &AccountId::new(owner.0)));
+
 	let purchase = TransferToArgonFromSwapStarted {
 		purchase: SwapPurchase {
+			repayLiquidId: 1,
+			repaySignature: signature.encode().into(),
 			timestamp: 1,
 			buyer: transfer.from,
-			argonAccountId: transfer.argonAccountId,
+			argonAccountId: owner.0.into(),
 			usdcToken: [0x41; 20].into(),
 			usdcSpent: U256::from(transfer.amount * 9 / 10),
 			argonBought: U256::from(transfer.amount) * U256::from(1_000_000_000_000u64),

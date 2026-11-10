@@ -201,6 +201,62 @@ where
 	Ok(())
 }
 
+fn seed_funding_update<T: Config>(
+	revenue_entries: u32,
+	include_current: bool,
+) -> Result<
+	(VaultId, BitcoinLockFunding<BalanceOf<T>>, BitcoinLockFunding<BalanceOf<T>>),
+	BenchmarkError,
+> {
+	let operator: T::AccountId = account("funding_operator", 0, 0);
+	let vault_id = create_vault::<T>(&operator, 14, 10_000)?;
+	seed_release_schedule_for_benchmark::<T>(
+		vault_id,
+		10_000,
+		MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES,
+		1u128.into(),
+		5_000u128.into(),
+		10_000u128.into(),
+	)?;
+	VaultsById::<T>::mutate(vault_id, |vault| {
+		let vault = vault.as_mut().unwrap();
+		vault.total_satoshis = 10_000;
+		vault.securitized_satoshis = 5_000;
+		vault.securitization_pending_activation = 2_500u128.into();
+		vault.flexible_securitization_locked = 2_500u128.into();
+	});
+	<T as Config>::PositionProvider::network_securitized_satoshis_updated(0, 5_000)?;
+	let frame = T::CurrentFrameId::get();
+	RevenuePerFrameByVault::<T>::mutate(vault_id, |history| {
+		for offset in (0..revenue_entries).rev() {
+			history
+				.try_push(VaultFrameRevenue::new(
+					frame.saturating_add(u64::from(offset) + u64::from(!include_current)),
+				))
+				.unwrap();
+		}
+	});
+	RevenuePerFrameByVaultCount::<T>::put(u32::from(revenue_entries > 0));
+	// Remove the key for the first-row case so its count update is measured too.
+	if revenue_entries == 0 {
+		RevenuePerFrameByVault::<T>::remove(vault_id);
+	}
+	let previous = BitcoinLockFunding {
+		funded_satoshis: 10_000,
+		securitized_satoshis: 5_000,
+		activated_securitization: 2_500u128.into(),
+		is_flexible: true,
+	};
+	let updated = BitcoinLockFunding {
+		funded_satoshis: 10_000,
+		securitized_satoshis: 7_500,
+		activated_securitization: 4_000u128.into(),
+		is_flexible: true,
+	};
+
+	Ok((vault_id, previous, updated))
+}
+
 #[benchmarks(
 	where
 		CurrencyOf<T>: frame_support::traits::fungible::Mutate<T::AccountId, Balance = BalanceOf<T>>,
@@ -664,6 +720,63 @@ mod benchmarks {
 		}
 
 		assert_eq!(RevenuePerFrameByVault::<T>::get(vault_id).len(), 1);
+		Ok(())
+	}
+
+	#[benchmark]
+	fn provider_record_bitcoin_lock_funding() -> Result<(), BenchmarkError> {
+		let (vault_id, previous, updated) = seed_funding_update::<T>(12, true)?;
+
+		#[block]
+		{
+			<Pallet<T> as BitcoinVaultProvider>::record_bitcoin_lock_funding(
+				vault_id, previous, updated,
+			)
+			.map_err(|_| BenchmarkError::Stop("funding update failed"))?;
+		}
+
+		let vault = VaultsById::<T>::get(vault_id).unwrap();
+		assert_eq!(vault.securitized_satoshis, 7_500);
+		assert_eq!(vault.get_activated_securitization(), 4_000u128.into());
+		assert_eq!(RevenuePerFrameByVault::<T>::get(vault_id).len(), 12);
+		Ok(())
+	}
+
+	#[benchmark]
+	fn provider_record_bitcoin_lock_funding_first() -> Result<(), BenchmarkError> {
+		let (vault_id, previous, updated) = seed_funding_update::<T>(0, false)?;
+
+		#[block]
+		{
+			<Pallet<T> as BitcoinVaultProvider>::record_bitcoin_lock_funding(
+				vault_id, previous, updated,
+			)
+			.map_err(|_| BenchmarkError::Stop("funding update failed"))?;
+		}
+
+		let vault = VaultsById::<T>::get(vault_id).unwrap();
+		assert_eq!(vault.securitized_satoshis, 7_500);
+		assert_eq!(vault.get_activated_securitization(), 4_000u128.into());
+		assert_eq!(RevenuePerFrameByVault::<T>::get(vault_id).len(), 1);
+		Ok(())
+	}
+
+	#[benchmark]
+	fn provider_record_bitcoin_lock_funding_new_frame() -> Result<(), BenchmarkError> {
+		let (vault_id, previous, updated) = seed_funding_update::<T>(11, false)?;
+
+		#[block]
+		{
+			<Pallet<T> as BitcoinVaultProvider>::record_bitcoin_lock_funding(
+				vault_id, previous, updated,
+			)
+			.map_err(|_| BenchmarkError::Stop("funding update failed"))?;
+		}
+
+		let vault = VaultsById::<T>::get(vault_id).unwrap();
+		assert_eq!(vault.securitized_satoshis, 7_500);
+		assert_eq!(vault.get_activated_securitization(), 4_000u128.into());
+		assert_eq!(RevenuePerFrameByVault::<T>::get(vault_id).len(), 12);
 		Ok(())
 	}
 

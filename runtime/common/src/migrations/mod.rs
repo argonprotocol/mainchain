@@ -2,14 +2,15 @@ mod vault_securitized_satoshis;
 pub use vault_securitized_satoshis::AddVaultSecuritizedSatoshis;
 
 #[cfg(feature = "try-runtime")]
-use alloc::collections::BTreeMap;
+use alloc::collections::{BTreeMap, BTreeSet};
 use argon_primitives::{treasury::TreasuryPositionProvider, OperationalAccountsHook};
 #[cfg(feature = "try-runtime")]
 use codec::{Decode, Encode};
 use frame_support::traits::OnRuntimeUpgrade;
 use pallet_bitcoin_fissions::{
 	migrations::{self as fissions_migrations, v1},
-	Config as FissionsConfig, FissionByOwnerAndId, FissionIdsByLockId,
+	Config as FissionsConfig, FissionByOwnerAndId, FissionIdsByLockId, FissionIdsByOwnerAndLiquid,
+	LiquidTicks, LiquidTicksByOwnerAndId,
 };
 use pallet_bitcoin_locks::{
 	migrations::{self as locks_migrations, v11},
@@ -94,12 +95,24 @@ where
 						continue
 					};
 
+					FissionIdsByOwnerAndLiquid::<T>::insert(
+						(&migrated_lock.owner_account, source_fission.liquid_id),
+						fission_id,
+						(),
+					);
+					// Historical creation times are unknown; existing Liquids cannot accept
+					// additions.
+					LiquidTicksByOwnerAndId::<T>::insert(
+						&migrated_lock.owner_account,
+						source_fission.liquid_id,
+						LiquidTicks::default(),
+					);
 					FissionByOwnerAndId::<T>::insert(
 						&migrated_lock.owner_account,
 						fission_id,
 						source_fission.into_current(fission_guarantee),
 					);
-					accesses.saturating_accrue(1);
+					accesses.saturating_accrue(3);
 				}
 
 				// Keep the funding window, or shrink the remaining guarantee to confirmed Bitcoin.
@@ -514,12 +527,32 @@ where
 			"Fission count changed"
 		);
 		let mut source_fissions_by_lock = BTreeMap::<BitcoinLockId, Vec<_>>::new();
+		let mut expected_liquids = BTreeMap::<_, BTreeSet<_>>::new();
 		for (owner, fission_id, source_fission) in source_fissions {
+			expected_liquids
+				.entry((owner.clone(), source_fission.liquid_id))
+				.or_default()
+				.insert(fission_id);
 			source_fissions_by_lock.entry(source_fission.lock_id).or_default().push((
 				owner,
 				fission_id,
 				source_fission,
 			));
+		}
+		let mut indexed_liquids = BTreeMap::<_, BTreeSet<_>>::new();
+		for ((owner, liquid_id), id, ()) in FissionIdsByOwnerAndLiquid::<T>::iter() {
+			indexed_liquids.entry((owner, liquid_id)).or_default().insert(id);
+		}
+		ensure!(indexed_liquids == expected_liquids, "migrated Liquid Fission index differs");
+		ensure!(
+			LiquidTicksByOwnerAndId::<T>::iter().count() == expected_liquids.len(),
+			"migrated Liquid timing count differs"
+		);
+		for (owner, liquid_id) in expected_liquids.keys() {
+			ensure!(
+				LiquidTicksByOwnerAndId::<T>::get(owner, liquid_id) == Some(LiquidTicks::default()),
+				"migrated Liquid must have a closed creation window and no recorded ratchet"
+			);
 		}
 
 		let mut expected_vaults = source_vaults.into_iter().collect::<BTreeMap<_, _>>();

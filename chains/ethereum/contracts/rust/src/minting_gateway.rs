@@ -114,6 +114,9 @@ pub const MAX_GATEWAY_ACTIVITIES_PER_BLOCK: u32 = 128;
 pub const MAX_MINTING_AUTHORIZATIONS_PER_TRANSFER: u32 = 25;
 /// Storage slot seed for `MintingGateway.activityBlockLocators`.
 pub const ACTIVITY_BLOCK_LOCATORS_MAPPING_SLOT: u64 = 11;
+/// `gatewayActivityNonce` is packed after the 20-byte guardian in slot zero.
+pub const GATEWAY_ACTIVITY_NONCE_SLOT: B256 = B256::ZERO;
+pub const GATEWAY_ACTIVITY_NONCE_OFFSET: usize = 20;
 
 /// Decode a finalization only after its dynamic collateral array fits the gateway's ABI bounds.
 pub fn decode_transfer_out_of_argon_finalized(

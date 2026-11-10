@@ -39,10 +39,10 @@ impl PurchasePool {
 		if !self.matches_purchase(purchase) {
 			return Ok(0);
 		}
-		if prices.argon_target_usd.is_zero() {
+		if prices.argon_usd_target_price.is_zero() {
 			return Err(ArithmeticError::DivisionByZero);
 		}
-		if prices.usdc_usd.is_zero() {
+		if prices.microgons_at_target_per_usdc.is_zero() {
 			return Err(ArithmeticError::DivisionByZero);
 		}
 		if purchase.sqrt_price_before_x96.is_zero() {
@@ -67,7 +67,7 @@ impl PurchasePool {
 		}
 
 		let Some(maximum_start_price) =
-			prices.argon_target_usd.into_inner().checked_sub(FixedU128::DIV / 100)
+			prices.argon_usd_target_price.into_inner().checked_sub(FixedU128::DIV / 100)
 		else {
 			return Ok(0);
 		};
@@ -77,7 +77,12 @@ impl PurchasePool {
 			.ok_or(ArithmeticError::Overflow)?;
 		let q192 = U512::one() << 192;
 		let token_decimal_scale = U512::from(1_000_000_000_000u64);
-		let usdc_usd = U512::from(prices.usdc_usd.into_inner());
+		// The normalized rate was rounded up. Reconstructing integer USD units therefore
+		// preserves the original quote or overstates spending, never inflating the discount.
+		let usdc_usd = U512::from(prices.microgons_at_target_per_usdc.into_inner()) *
+			U512::from(prices.argon_usd_target_price.into_inner()) /
+			U512::from(MICROGONS_PER_ARGON) /
+			U512::from(FixedU128::DIV);
 		let (numerator, denominator) = if self.argon_is_token0 {
 			(
 				squared_start_price
@@ -99,7 +104,7 @@ impl PurchasePool {
 		}
 
 		let microgons_per_argon = U512::from(MICROGONS_PER_ARGON);
-		let argon_target_usd = U512::from(prices.argon_target_usd.into_inner());
+		let argon_target_usd = U512::from(prices.argon_usd_target_price.into_inner());
 		let target_usd_value = U512::from(purchase.principal)
 			.checked_mul(argon_target_usd)
 			.ok_or(ArithmeticError::Overflow)? /

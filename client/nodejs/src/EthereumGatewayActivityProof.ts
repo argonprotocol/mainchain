@@ -351,7 +351,7 @@ export async function captureGatewayActivityStorageProofs(
         concatHex([toHex(locator.locatorIndex, { size: 32 }), toHex(mappingSlot, { size: 32 })]),
       ),
     );
-    return [toHex(base, { size: 32 }), toHex(base + 1n, { size: 32 })];
+    return [toHex(base, { size: 32 }), toHex(base + 1n, { size: 32 }), toHex(0n, { size: 32 })];
   });
   const witness = await retryWhileExecutionRpcIndexing(() =>
     executionClient.getProof({
@@ -685,7 +685,9 @@ async function verifyLocatorStorageProof(
   for (const [index, slot] of slotKeys.entries()) {
     const slotProof = slotProofsByKey.get(slot.toLowerCase());
     if (!slotProof) throw new Error(`eth_getProof did not return storage slot ${slot}`);
-    const expectedValue = index === 0 ? expectedRange : BigInt(locator.activityRoot);
+    let expectedValue = slotProof.value;
+    if (index === 0) expectedValue = expectedRange;
+    else if (index === 1) expectedValue = BigInt(locator.activityRoot);
     if (slotProof.value !== expectedValue) {
       throw new Error(`eth_getProof returned an unexpected value for storage slot ${slot}`);
     }

@@ -20,10 +20,12 @@ pub trait TreasuryRewardProvider<AccountId> {
 	fn commit_reward(amount: Self::Balance) -> DispatchResult;
 	/// Restore unused reserved microgons to available funding.
 	fn return_budget(amount: Self::Balance) -> DispatchResult;
-	/// Deliver a mature reward to its owner and debit the outstanding total exactly once.
-	/// Runtime integration chooses direct payment or an exact credit to Collect. If the owner
-	/// cannot receive a small payment yet, return an error so the exact amount remains queued.
-	fn pay_reward(account: &AccountId, amount: Self::Balance) -> DispatchResult;
+	/// Retire a mature reward exactly once and return the microgons actually delivered.
+	/// Unreceivable dust below the currency minimum remains unissued and is not retried.
+	fn pay_reward(
+		account: &AccountId,
+		amount: Self::Balance,
+	) -> Result<Self::Balance, DispatchError>;
 }
 
 pub trait TreasuryRewardProviderWeightInfo {

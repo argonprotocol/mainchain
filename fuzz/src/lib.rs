@@ -121,7 +121,7 @@ pub fn run(data: &[u8]) -> LifecycleStats {
 		BitcoinFissions::create(
 			RuntimeOrigin::signed(owner.clone()),
 			0,
-			77,
+			1,
 			1,
 			SATOSHIS_PER_BITCOIN / 4,
 			100_000_000_000,
@@ -148,6 +148,10 @@ pub fn run(data: &[u8]) -> LifecycleStats {
 			let call =
 				match operation {
 					CREATE => {
+						let new_fission_id = NextFissionIdByOwner::<Runtime>::get(&signer);
+						// Actions run on later ticks. Create a new Liquid by default; the low
+						// selector bit exercises rejection of additions to the original Liquid.
+						let liquid_id = if action[1] & 1 == 0 { new_fission_id + 1 } else { 1 };
 						let lock = LocksById::<Runtime>::get(1)
 							.expect("source Lock remains until settlement");
 						let available = lock.funded_satoshis - lock.fissioned_satoshis;
@@ -160,8 +164,8 @@ pub fn run(data: &[u8]) -> LifecycleStats {
 							_ => 0,
 						};
 						RuntimeCall::BitcoinFissions(pallet_bitcoin_fissions::Call::create {
-							fission_id: NextFissionIdByOwner::<Runtime>::get(&signer),
-							liquid_id: 77,
+							fission_id: new_fission_id,
+							liquid_id,
 							lock_id: 1,
 							satoshis,
 							microgons_at_target_per_btc:

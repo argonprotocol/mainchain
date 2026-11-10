@@ -6,6 +6,8 @@ use pallet_prelude::*;
 
 /// Weight functions needed for pallet_bitcoin_utxos.
 pub trait WeightInfo {
+	fn provider_get_block_height_change() -> Weight;
+	fn provider_get_confirmed_height() -> Weight;
 	fn provider_is_feeless() -> Weight;
 	fn provider_watch_for_utxo() -> Weight;
 	fn provider_unwatch_utxo() -> Weight;
@@ -47,6 +49,14 @@ where
 	Base: WeightInfo,
 	EventHandlerWeight: BitcoinUtxoEventsWeightInfo,
 {
+	fn provider_get_block_height_change() -> Weight {
+		Base::provider_get_block_height_change()
+	}
+
+	fn provider_get_confirmed_height() -> Weight {
+		Base::provider_get_confirmed_height()
+	}
+
 	fn provider_is_feeless() -> Weight {
 		Base::provider_is_feeless()
 	}
@@ -87,6 +97,13 @@ where
 
 pub struct ProviderWeightAdapter<T>(PhantomData<T>);
 impl<T: crate::Config> BitcoinUtxoTrackerWeightInfo for ProviderWeightAdapter<T> {
+	fn get_block_height_change() -> Weight {
+		T::WeightInfo::provider_get_block_height_change()
+	}
+	fn get_confirmed_height() -> Weight {
+		T::WeightInfo::provider_get_confirmed_height()
+	}
+
 	fn watch_for_utxo() -> Weight {
 		T::WeightInfo::provider_watch_for_utxo()
 	}
@@ -117,6 +134,13 @@ where
 
 // For backwards compatibility and tests.
 impl WeightInfo for () {
+	fn provider_get_block_height_change() -> Weight {
+		Weight::zero()
+	}
+	fn provider_get_confirmed_height() -> Weight {
+		Weight::zero()
+	}
+
 	fn provider_watch_for_utxo() -> Weight {
 		Weight::zero()
 	}

@@ -51,6 +51,8 @@ import type {
   ArgonPrimitivesEthereumEthereumReceiptProofReceipt,
   ArgonPrimitivesEthereumEthereumStorageSlotProof,
   ArgonPrimitivesForkPower,
+  ArgonPrimitivesGatewayGatewayState,
+  ArgonPrimitivesGatewaySourceChain,
   ArgonPrimitivesInherentsBitcoinUtxoFunding,
   ArgonPrimitivesInherentsBitcoinUtxoSpendV2,
   ArgonPrimitivesInherentsBitcoinUtxoSyncV2,
@@ -64,6 +66,7 @@ import type {
   ArgonPrimitivesNotebookNotebookHeader,
   ArgonPrimitivesNotebookSignedNotebookHeader,
   ArgonPrimitivesPriceIndex,
+  ArgonPrimitivesPriceIndexRValueHighWaterMark,
   ArgonPrimitivesProvidersBlockSealerInfo,
   ArgonPrimitivesProvidersOperationalRewardKind,
   ArgonPrimitivesTickTicker,
@@ -135,6 +138,7 @@ import type {
   PalletBitcoinFissionsError,
   PalletBitcoinFissionsEvent,
   PalletBitcoinFissionsFission,
+  PalletBitcoinFissionsLiquidTicks,
   PalletBitcoinLocksCall,
   PalletBitcoinLocksError,
   PalletBitcoinLocksEvent,
@@ -175,7 +179,6 @@ import type {
   PalletCrosschainTransferError,
   PalletCrosschainTransferEvent,
   PalletCrosschainTransferGatewayActivityStorageProof,
-  PalletCrosschainTransferGatewayState,
   PalletCrosschainTransferGatewaySyncPause,
   PalletCrosschainTransferGatewaySyncPauseReason,
   PalletCrosschainTransferGlobalIssuanceCouncil,
@@ -184,7 +187,6 @@ import type {
   PalletCrosschainTransferMintingAuthority,
   PalletCrosschainTransferMintingAuthorityActivationRepaymentPricing,
   PalletCrosschainTransferMintingAuthorityState,
-  PalletCrosschainTransferSourceChain,
   PalletCrosschainTransferSourceChainCirculation,
   PalletCrosschainTransferSwapPurchaseEvidence,
   PalletCrosschainTransferTransferOutMintingAuthorityTransferReservation,
@@ -275,15 +277,18 @@ import type {
   PalletProxyError,
   PalletProxyEvent,
   PalletProxyProxyDefinition,
-  PalletStabilizerBuysAccountBuys,
+  PalletStabilizerBuysAccountFrameBuys,
+  PalletStabilizerBuysAccountPayoutState,
   PalletStabilizerBuysAuction,
-  PalletStabilizerBuysBuyPayout,
   PalletStabilizerBuysCall,
   PalletStabilizerBuysError,
   PalletStabilizerBuysEvent,
   PalletStabilizerBuysHoldReason,
   PalletStabilizerBuysIneligibleReason,
-  PalletStabilizerBuysPriceHistoryHourlyPriceReference,
+  PalletStabilizerBuysLiquidRepay,
+  PalletStabilizerBuysLiquidRepayPriceWindow,
+  PalletStabilizerBuysPriceHistoryPriceObservation,
+  PalletStabilizerBuysPriceHistoryPurchasePriceReference,
   PalletStabilizerBuysUniswapPurchasePurchasePool,
   PalletStabilizerPoolsCall,
   PalletStabilizerPoolsCheckpointOutcome,
@@ -318,6 +323,7 @@ import type {
   PalletTreasuryHoldReason,
   PalletTreasuryLockedFrameBondTerms,
   PalletTreasuryLockedFrameVaultTerms,
+  PalletTreasuryPendingBondCollateral,
   PalletTreasuryPositionsPosition,
   PalletTreasuryRewardReserveBalances,
   PalletTreasuryVaultBondState,
@@ -410,6 +416,8 @@ declare module '@polkadot/types/types/registry' {
     ArgonPrimitivesEthereumEthereumReceiptProofReceipt: ArgonPrimitivesEthereumEthereumReceiptProofReceipt;
     ArgonPrimitivesEthereumEthereumStorageSlotProof: ArgonPrimitivesEthereumEthereumStorageSlotProof;
     ArgonPrimitivesForkPower: ArgonPrimitivesForkPower;
+    ArgonPrimitivesGatewayGatewayState: ArgonPrimitivesGatewayGatewayState;
+    ArgonPrimitivesGatewaySourceChain: ArgonPrimitivesGatewaySourceChain;
     ArgonPrimitivesInherentsBitcoinUtxoFunding: ArgonPrimitivesInherentsBitcoinUtxoFunding;
     ArgonPrimitivesInherentsBitcoinUtxoSpendV2: ArgonPrimitivesInherentsBitcoinUtxoSpendV2;
     ArgonPrimitivesInherentsBitcoinUtxoSyncV2: ArgonPrimitivesInherentsBitcoinUtxoSyncV2;
@@ -423,6 +431,7 @@ declare module '@polkadot/types/types/registry' {
     ArgonPrimitivesNotebookNotebookHeader: ArgonPrimitivesNotebookNotebookHeader;
     ArgonPrimitivesNotebookSignedNotebookHeader: ArgonPrimitivesNotebookSignedNotebookHeader;
     ArgonPrimitivesPriceIndex: ArgonPrimitivesPriceIndex;
+    ArgonPrimitivesPriceIndexRValueHighWaterMark: ArgonPrimitivesPriceIndexRValueHighWaterMark;
     ArgonPrimitivesProvidersBlockSealerInfo: ArgonPrimitivesProvidersBlockSealerInfo;
     ArgonPrimitivesProvidersOperationalRewardKind: ArgonPrimitivesProvidersOperationalRewardKind;
     ArgonPrimitivesTickTicker: ArgonPrimitivesTickTicker;
@@ -494,6 +503,7 @@ declare module '@polkadot/types/types/registry' {
     PalletBitcoinFissionsError: PalletBitcoinFissionsError;
     PalletBitcoinFissionsEvent: PalletBitcoinFissionsEvent;
     PalletBitcoinFissionsFission: PalletBitcoinFissionsFission;
+    PalletBitcoinFissionsLiquidTicks: PalletBitcoinFissionsLiquidTicks;
     PalletBitcoinLocksCall: PalletBitcoinLocksCall;
     PalletBitcoinLocksError: PalletBitcoinLocksError;
     PalletBitcoinLocksEvent: PalletBitcoinLocksEvent;
@@ -534,7 +544,6 @@ declare module '@polkadot/types/types/registry' {
     PalletCrosschainTransferError: PalletCrosschainTransferError;
     PalletCrosschainTransferEvent: PalletCrosschainTransferEvent;
     PalletCrosschainTransferGatewayActivityStorageProof: PalletCrosschainTransferGatewayActivityStorageProof;
-    PalletCrosschainTransferGatewayState: PalletCrosschainTransferGatewayState;
     PalletCrosschainTransferGatewaySyncPause: PalletCrosschainTransferGatewaySyncPause;
     PalletCrosschainTransferGatewaySyncPauseReason: PalletCrosschainTransferGatewaySyncPauseReason;
     PalletCrosschainTransferGlobalIssuanceCouncil: PalletCrosschainTransferGlobalIssuanceCouncil;
@@ -543,7 +552,6 @@ declare module '@polkadot/types/types/registry' {
     PalletCrosschainTransferMintingAuthority: PalletCrosschainTransferMintingAuthority;
     PalletCrosschainTransferMintingAuthorityActivationRepaymentPricing: PalletCrosschainTransferMintingAuthorityActivationRepaymentPricing;
     PalletCrosschainTransferMintingAuthorityState: PalletCrosschainTransferMintingAuthorityState;
-    PalletCrosschainTransferSourceChain: PalletCrosschainTransferSourceChain;
     PalletCrosschainTransferSourceChainCirculation: PalletCrosschainTransferSourceChainCirculation;
     PalletCrosschainTransferSwapPurchaseEvidence: PalletCrosschainTransferSwapPurchaseEvidence;
     PalletCrosschainTransferTransferOutMintingAuthorityTransferReservation: PalletCrosschainTransferTransferOutMintingAuthorityTransferReservation;
@@ -634,15 +642,18 @@ declare module '@polkadot/types/types/registry' {
     PalletProxyError: PalletProxyError;
     PalletProxyEvent: PalletProxyEvent;
     PalletProxyProxyDefinition: PalletProxyProxyDefinition;
-    PalletStabilizerBuysAccountBuys: PalletStabilizerBuysAccountBuys;
+    PalletStabilizerBuysAccountFrameBuys: PalletStabilizerBuysAccountFrameBuys;
+    PalletStabilizerBuysAccountPayoutState: PalletStabilizerBuysAccountPayoutState;
     PalletStabilizerBuysAuction: PalletStabilizerBuysAuction;
-    PalletStabilizerBuysBuyPayout: PalletStabilizerBuysBuyPayout;
     PalletStabilizerBuysCall: PalletStabilizerBuysCall;
     PalletStabilizerBuysError: PalletStabilizerBuysError;
     PalletStabilizerBuysEvent: PalletStabilizerBuysEvent;
     PalletStabilizerBuysHoldReason: PalletStabilizerBuysHoldReason;
     PalletStabilizerBuysIneligibleReason: PalletStabilizerBuysIneligibleReason;
-    PalletStabilizerBuysPriceHistoryHourlyPriceReference: PalletStabilizerBuysPriceHistoryHourlyPriceReference;
+    PalletStabilizerBuysLiquidRepay: PalletStabilizerBuysLiquidRepay;
+    PalletStabilizerBuysLiquidRepayPriceWindow: PalletStabilizerBuysLiquidRepayPriceWindow;
+    PalletStabilizerBuysPriceHistoryPriceObservation: PalletStabilizerBuysPriceHistoryPriceObservation;
+    PalletStabilizerBuysPriceHistoryPurchasePriceReference: PalletStabilizerBuysPriceHistoryPurchasePriceReference;
     PalletStabilizerBuysUniswapPurchasePurchasePool: PalletStabilizerBuysUniswapPurchasePurchasePool;
     PalletStabilizerPoolsCall: PalletStabilizerPoolsCall;
     PalletStabilizerPoolsCheckpointOutcome: PalletStabilizerPoolsCheckpointOutcome;
@@ -677,6 +688,7 @@ declare module '@polkadot/types/types/registry' {
     PalletTreasuryHoldReason: PalletTreasuryHoldReason;
     PalletTreasuryLockedFrameBondTerms: PalletTreasuryLockedFrameBondTerms;
     PalletTreasuryLockedFrameVaultTerms: PalletTreasuryLockedFrameVaultTerms;
+    PalletTreasuryPendingBondCollateral: PalletTreasuryPendingBondCollateral;
     PalletTreasuryPositionsPosition: PalletTreasuryPositionsPosition;
     PalletTreasuryRewardReserveBalances: PalletTreasuryRewardReserveBalances;
     PalletTreasuryVaultBondState: PalletTreasuryVaultBondState;

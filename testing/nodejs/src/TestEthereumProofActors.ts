@@ -814,7 +814,7 @@ export class TestMintingAuthorityActor {
   private registrationMessage(prefix: string) {
     const prefixBytes = this.harness.mainchainClient.registry.createType('Bytes', prefix).toU8a();
     const destinationChainBytes = this.harness.mainchainClient.registry
-      .createType('PalletCrosschainTransferSourceChain', 'Ethereum')
+      .createType('ArgonPrimitivesGatewaySourceChain', 'Ethereum')
       .toU8a();
     const operatorAccountIdBytes = this.harness.mainchainClient.registry
       .createType('AccountId32', this.operator.address)

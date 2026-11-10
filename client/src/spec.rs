@@ -3521,9 +3521,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				66u8, 70u8, 93u8, 227u8, 229u8, 60u8, 192u8, 194u8, 86u8, 42u8, 61u8, 244u8, 38u8,
-				28u8, 149u8, 3u8, 2u8, 46u8, 196u8, 126u8, 27u8, 197u8, 57u8, 253u8, 251u8, 20u8,
-				133u8, 47u8, 121u8, 249u8, 157u8, 186u8,
+				208u8, 66u8, 102u8, 95u8, 23u8, 243u8, 165u8, 122u8, 20u8, 225u8, 105u8, 236u8,
+				97u8, 72u8, 247u8, 20u8, 205u8, 209u8, 205u8, 7u8, 104u8, 172u8, 236u8, 8u8, 154u8,
+				167u8, 94u8, 174u8, 172u8, 165u8, 210u8, 189u8,
 			]
 	}
 	pub mod system {
@@ -4647,10 +4647,10 @@ pub mod api {
 						"Events",
 						(),
 						[
-							119u8, 187u8, 62u8, 213u8, 61u8, 230u8, 58u8, 158u8, 240u8, 217u8,
-							107u8, 229u8, 25u8, 190u8, 99u8, 246u8, 10u8, 151u8, 38u8, 218u8,
-							152u8, 78u8, 32u8, 111u8, 65u8, 31u8, 187u8, 150u8, 98u8, 153u8, 125u8,
-							233u8,
+							8u8, 246u8, 164u8, 32u8, 84u8, 157u8, 34u8, 166u8, 253u8, 212u8, 182u8,
+							68u8, 237u8, 170u8, 100u8, 165u8, 58u8, 137u8, 236u8, 161u8, 232u8,
+							23u8, 203u8, 53u8, 136u8, 239u8, 229u8, 20u8, 113u8, 74u8, 177u8,
+							127u8,
 						],
 					)
 				}
@@ -23320,11 +23320,45 @@ pub mod api {
 				const PALLET: &'static str = "BitcoinFissions";
 				const EVENT: &'static str = "FissionClosedByLock";
 			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "Part of a Fission was repaid and its Bitcoin allocation returned to the source Lock."]
+			pub struct FissionRepaid {
+				pub account_id: fission_repaid::AccountId,
+				pub fission_id: fission_repaid::FissionId,
+				pub satoshis: fission_repaid::Satoshis,
+				pub liquidity_repaid: fission_repaid::LiquidityRepaid,
+				pub redemption_amount: fission_repaid::RedemptionAmount,
+			}
+			pub mod fission_repaid {
+				use super::runtime_types;
+				pub type AccountId = crate::types::AccountId32;
+				pub type FissionId = ::core::primitive::u64;
+				pub type Satoshis = ::core::primitive::u64;
+				pub type LiquidityRepaid = ::core::primitive::u128;
+				pub type RedemptionAmount = ::core::primitive::u128;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for FissionRepaid {
+				const PALLET: &'static str = "BitcoinFissions";
+				const EVENT: &'static str = "FissionRepaid";
+			}
 		}
 		pub mod storage {
 			use super::runtime_types;
 			pub mod types {
 				use super::runtime_types;
+				pub mod r_value_high_water_by_frame {
+					use super::runtime_types;
+					pub type RValueHighWaterByFrame =
+						runtime_types::argon_primitives::price_index::RValueHighWaterMark;
+					pub type Param0 = [::core::primitive::u8; 8usize];
+				}
 				pub mod next_fission_id_by_owner {
 					use super::runtime_types;
 					pub type NextFissionIdByOwner = ::core::primitive::u64;
@@ -23345,9 +23379,71 @@ pub mod api {
 						>;
 					pub type Param0 = ::core::primitive::u64;
 				}
+				pub mod fission_ids_by_owner_and_liquid {
+					use super::runtime_types;
+					pub type FissionIdsByOwnerAndLiquid = ();
+					pub type Param0 = (crate::types::AccountId32, ::core::primitive::u64);
+					pub type Param1 = ::core::primitive::u64;
+				}
+				pub mod liquid_ticks_by_owner_and_id {
+					use super::runtime_types;
+					pub type LiquidTicksByOwnerAndId =
+						runtime_types::pallet_bitcoin_fissions::pallet::LiquidTicks;
+					pub type Param0 = crate::types::AccountId32;
+					pub type Param1 = ::core::primitive::u64;
+				}
 			}
 			pub struct StorageApi;
 			impl StorageApi {
+				#[doc = " Highest valid market-to-target ARGON ratio in each frame. Ordered frame keys support"]
+				#[doc = " bounded pruning without loading the complete history during an Ethereum stall."]
+				pub fn r_value_high_water_by_frame_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::r_value_high_water_by_frame::RValueHighWaterByFrame,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"BitcoinFissions",
+						"RValueHighWaterByFrame",
+						(),
+						[
+							110u8, 244u8, 112u8, 51u8, 10u8, 211u8, 200u8, 92u8, 7u8, 222u8, 191u8,
+							205u8, 205u8, 175u8, 74u8, 201u8, 118u8, 168u8, 1u8, 169u8, 140u8,
+							151u8, 245u8, 40u8, 182u8, 44u8, 14u8, 111u8, 183u8, 162u8, 240u8,
+							149u8,
+						],
+					)
+				}
+				#[doc = " Highest valid market-to-target ARGON ratio in each frame. Ordered frame keys support"]
+				#[doc = " bounded pruning without loading the complete history during an Ethereum stall."]
+				pub fn r_value_high_water_by_frame(
+					&self,
+					_0: types::r_value_high_water_by_frame::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::r_value_high_water_by_frame::Param0,
+					>,
+					types::r_value_high_water_by_frame::RValueHighWaterByFrame,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"BitcoinFissions",
+						"RValueHighWaterByFrame",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							110u8, 244u8, 112u8, 51u8, 10u8, 211u8, 200u8, 92u8, 7u8, 222u8, 191u8,
+							205u8, 205u8, 175u8, 74u8, 201u8, 118u8, 168u8, 1u8, 169u8, 140u8,
+							151u8, 245u8, 40u8, 182u8, 44u8, 14u8, 111u8, 183u8, 162u8, 240u8,
+							149u8,
+						],
+					)
+				}
 				#[doc = " Minimum Fission ID accepted from each owner."]
 				pub fn next_fission_id_by_owner_iter(
 					&self,
@@ -23410,10 +23506,9 @@ pub mod api {
 						"FissionByOwnerAndId",
 						(),
 						[
-							169u8, 135u8, 24u8, 113u8, 213u8, 246u8, 187u8, 178u8, 153u8, 35u8,
-							126u8, 158u8, 33u8, 20u8, 230u8, 53u8, 161u8, 161u8, 125u8, 78u8,
-							224u8, 136u8, 67u8, 170u8, 151u8, 93u8, 232u8, 32u8, 87u8, 186u8,
-							152u8, 142u8,
+							198u8, 119u8, 159u8, 120u8, 152u8, 58u8, 143u8, 173u8, 7u8, 56u8,
+							158u8, 6u8, 36u8, 77u8, 18u8, 188u8, 142u8, 181u8, 115u8, 213u8, 87u8,
+							173u8, 43u8, 222u8, 212u8, 93u8, 229u8, 14u8, 77u8, 239u8, 36u8, 162u8,
 						],
 					)
 				}
@@ -23435,10 +23530,9 @@ pub mod api {
 						"FissionByOwnerAndId",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							169u8, 135u8, 24u8, 113u8, 213u8, 246u8, 187u8, 178u8, 153u8, 35u8,
-							126u8, 158u8, 33u8, 20u8, 230u8, 53u8, 161u8, 161u8, 125u8, 78u8,
-							224u8, 136u8, 67u8, 170u8, 151u8, 93u8, 232u8, 32u8, 87u8, 186u8,
-							152u8, 142u8,
+							198u8, 119u8, 159u8, 120u8, 152u8, 58u8, 143u8, 173u8, 7u8, 56u8,
+							158u8, 6u8, 36u8, 77u8, 18u8, 188u8, 142u8, 181u8, 115u8, 213u8, 87u8,
+							173u8, 43u8, 222u8, 212u8, 93u8, 229u8, 14u8, 77u8, 239u8, 36u8, 162u8,
 						],
 					)
 				}
@@ -23469,10 +23563,9 @@ pub mod api {
 							::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_1),
 						),
 						[
-							169u8, 135u8, 24u8, 113u8, 213u8, 246u8, 187u8, 178u8, 153u8, 35u8,
-							126u8, 158u8, 33u8, 20u8, 230u8, 53u8, 161u8, 161u8, 125u8, 78u8,
-							224u8, 136u8, 67u8, 170u8, 151u8, 93u8, 232u8, 32u8, 87u8, 186u8,
-							152u8, 142u8,
+							198u8, 119u8, 159u8, 120u8, 152u8, 58u8, 143u8, 173u8, 7u8, 56u8,
+							158u8, 6u8, 36u8, 77u8, 18u8, 188u8, 142u8, 181u8, 115u8, 213u8, 87u8,
+							173u8, 43u8, 222u8, 212u8, 93u8, 229u8, 14u8, 77u8, 239u8, 36u8, 162u8,
 						],
 					)
 				}
@@ -23521,6 +23614,168 @@ pub mod api {
 						],
 					)
 				}
+				#[doc = " Active Fission IDs grouped by their owner's Liquid. Debt remains on the Fission records."]
+				pub fn fission_ids_by_owner_and_liquid_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::fission_ids_by_owner_and_liquid::FissionIdsByOwnerAndLiquid,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"BitcoinFissions",
+						"FissionIdsByOwnerAndLiquid",
+						(),
+						[
+							191u8, 241u8, 238u8, 243u8, 68u8, 29u8, 176u8, 187u8, 77u8, 165u8,
+							133u8, 200u8, 54u8, 240u8, 97u8, 201u8, 94u8, 117u8, 213u8, 1u8, 87u8,
+							4u8, 156u8, 189u8, 158u8, 118u8, 157u8, 16u8, 230u8, 67u8, 221u8, 61u8,
+						],
+					)
+				}
+				#[doc = " Active Fission IDs grouped by their owner's Liquid. Debt remains on the Fission records."]
+				pub fn fission_ids_by_owner_and_liquid_iter1(
+					&self,
+					_0: types::fission_ids_by_owner_and_liquid::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::fission_ids_by_owner_and_liquid::Param0,
+					>,
+					types::fission_ids_by_owner_and_liquid::FissionIdsByOwnerAndLiquid,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"BitcoinFissions",
+						"FissionIdsByOwnerAndLiquid",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							191u8, 241u8, 238u8, 243u8, 68u8, 29u8, 176u8, 187u8, 77u8, 165u8,
+							133u8, 200u8, 54u8, 240u8, 97u8, 201u8, 94u8, 117u8, 213u8, 1u8, 87u8,
+							4u8, 156u8, 189u8, 158u8, 118u8, 157u8, 16u8, 230u8, 67u8, 221u8, 61u8,
+						],
+					)
+				}
+				#[doc = " Active Fission IDs grouped by their owner's Liquid. Debt remains on the Fission records."]
+				pub fn fission_ids_by_owner_and_liquid(
+					&self,
+					_0: types::fission_ids_by_owner_and_liquid::Param0,
+					_1: types::fission_ids_by_owner_and_liquid::Param1,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+							types::fission_ids_by_owner_and_liquid::Param0,
+						>,
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+							types::fission_ids_by_owner_and_liquid::Param1,
+						>,
+					),
+					types::fission_ids_by_owner_and_liquid::FissionIdsByOwnerAndLiquid,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"BitcoinFissions",
+						"FissionIdsByOwnerAndLiquid",
+						(
+							::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+							::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_1),
+						),
+						[
+							191u8, 241u8, 238u8, 243u8, 68u8, 29u8, 176u8, 187u8, 77u8, 165u8,
+							133u8, 200u8, 54u8, 240u8, 97u8, 201u8, 94u8, 117u8, 213u8, 1u8, 87u8,
+							4u8, 156u8, 189u8, 158u8, 118u8, 157u8, 16u8, 230u8, 67u8, 221u8, 61u8,
+						],
+					)
+				}
+				#[doc = " Creation and ratchet timing for each owner-scoped Liquid. Retained after closure so an"]
+				#[doc = " old Liquid ID cannot reopen its creation window or discard its ratchet history."]
+				pub fn liquid_ticks_by_owner_and_id_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::liquid_ticks_by_owner_and_id::LiquidTicksByOwnerAndId,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"BitcoinFissions",
+						"LiquidTicksByOwnerAndId",
+						(),
+						[
+							32u8, 233u8, 171u8, 205u8, 59u8, 113u8, 34u8, 16u8, 106u8, 197u8,
+							126u8, 116u8, 102u8, 35u8, 115u8, 183u8, 245u8, 124u8, 59u8, 123u8,
+							12u8, 107u8, 111u8, 142u8, 43u8, 45u8, 166u8, 38u8, 97u8, 5u8, 3u8,
+							89u8,
+						],
+					)
+				}
+				#[doc = " Creation and ratchet timing for each owner-scoped Liquid. Retained after closure so an"]
+				#[doc = " old Liquid ID cannot reopen its creation window or discard its ratchet history."]
+				pub fn liquid_ticks_by_owner_and_id_iter1(
+					&self,
+					_0: types::liquid_ticks_by_owner_and_id::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::liquid_ticks_by_owner_and_id::Param0,
+					>,
+					types::liquid_ticks_by_owner_and_id::LiquidTicksByOwnerAndId,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"BitcoinFissions",
+						"LiquidTicksByOwnerAndId",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							32u8, 233u8, 171u8, 205u8, 59u8, 113u8, 34u8, 16u8, 106u8, 197u8,
+							126u8, 116u8, 102u8, 35u8, 115u8, 183u8, 245u8, 124u8, 59u8, 123u8,
+							12u8, 107u8, 111u8, 142u8, 43u8, 45u8, 166u8, 38u8, 97u8, 5u8, 3u8,
+							89u8,
+						],
+					)
+				}
+				#[doc = " Creation and ratchet timing for each owner-scoped Liquid. Retained after closure so an"]
+				#[doc = " old Liquid ID cannot reopen its creation window or discard its ratchet history."]
+				pub fn liquid_ticks_by_owner_and_id(
+					&self,
+					_0: types::liquid_ticks_by_owner_and_id::Param0,
+					_1: types::liquid_ticks_by_owner_and_id::Param1,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+							types::liquid_ticks_by_owner_and_id::Param0,
+						>,
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+							types::liquid_ticks_by_owner_and_id::Param1,
+						>,
+					),
+					types::liquid_ticks_by_owner_and_id::LiquidTicksByOwnerAndId,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"BitcoinFissions",
+						"LiquidTicksByOwnerAndId",
+						(
+							::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+							::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_1),
+						),
+						[
+							32u8, 233u8, 171u8, 205u8, 59u8, 113u8, 34u8, 16u8, 106u8, 197u8,
+							126u8, 116u8, 102u8, 35u8, 115u8, 183u8, 245u8, 124u8, 59u8, 123u8,
+							12u8, 107u8, 111u8, 142u8, 43u8, 45u8, 166u8, 38u8, 97u8, 5u8, 3u8,
+							89u8,
+						],
+					)
+				}
 			}
 		}
 		pub mod constants {
@@ -23544,6 +23799,23 @@ pub mod api {
 						],
 					)
 				}
+				#[doc = " Fissions per Liquid covered by repayment benchmarks and checked by try-state."]
+				pub fn max_expected_fissions_per_liquid(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u32,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"BitcoinFissions",
+						"MaxExpectedFissionsPerLiquid",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
+						],
+					)
+				}
 				#[doc = " Minimum percentage change required to ratchet a Fission."]
 				pub fn minimum_ratchet_percent(
 					&self,
@@ -23558,6 +23830,40 @@ pub mod api {
 							231u8, 249u8, 200u8, 252u8, 73u8, 244u8, 170u8, 51u8, 177u8, 106u8,
 							47u8, 114u8, 234u8, 84u8, 104u8, 62u8, 118u8, 227u8, 50u8, 225u8,
 							122u8,
+						],
+					)
+				}
+				#[doc = " Number of recent frame high-water marks retained after their source interval has synced."]
+				pub fn r_value_history_frames(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u32,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"BitcoinFissions",
+						"RValueHistoryFrames",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
+						],
+					)
+				}
+				#[doc = " Maximum older frame records pruned in one block after gateway sync catches up."]
+				pub fn max_r_value_history_prunes_per_block(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u32,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"BitcoinFissions",
+						"MaxRValueHistoryPrunesPerBlock",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
 						],
 					)
 				}
@@ -24332,6 +24638,28 @@ pub mod api {
 				const PALLET: &'static str = "Treasury";
 				const EVENT: &'static str = "BondLotEarningsBackfilled";
 			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "Settlement rolled back and remains queued for a later block."]
+			pub struct CouldNotSettleBondCollateral {
+				pub account_id: could_not_settle_bond_collateral::AccountId,
+				pub dispatch_error: could_not_settle_bond_collateral::DispatchError,
+			}
+			pub mod could_not_settle_bond_collateral {
+				use super::runtime_types;
+				pub type AccountId = crate::types::AccountId32;
+				pub type DispatchError = runtime_types::sp_runtime::DispatchError;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for CouldNotSettleBondCollateral {
+				const PALLET: &'static str = "Treasury";
+				const EVENT: &'static str = "CouldNotSettleBondCollateral";
+			}
 		}
 		pub mod storage {
 			use super::runtime_types;
@@ -24408,6 +24736,22 @@ pub mod api {
 					use super::runtime_types;
 					pub type EncumberedBondMicrogonsByAccount = ::core::primitive::u128;
 					pub type Param0 = crate::types::AccountId32;
+				}
+				pub mod pending_bond_collateral_by_account {
+					use super::runtime_types;
+					pub type PendingBondCollateralByAccount =
+						runtime_types::pallet_treasury::pallet::PendingBondCollateral<
+							::core::primitive::u128,
+						>;
+					pub type Param0 = crate::types::AccountId32;
+				}
+				pub mod bond_collateral_settlement_queue {
+					use super::runtime_types;
+					pub type BondCollateralSettlementQueue = ();
+					pub type Param0 =
+						runtime_types::argon_primitives::amount_rank::AscendingRankKey1<
+							crate::types::AccountId32,
+						>;
 				}
 				pub mod pending_bond_releases_by_frame {
 					use super::runtime_types;
@@ -24931,6 +25275,100 @@ pub mod api {
 						],
 					)
 				}
+				#[doc = " Burn and release requests awaiting settlement, combined by owner. Both amounts remain"]
+				#[doc = " included in the owner's encumbrance until processed; bonds retain their live payout terms."]
+				pub fn pending_bond_collateral_by_account_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::pending_bond_collateral_by_account::PendingBondCollateralByAccount,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Treasury",
+						"PendingBondCollateralByAccount",
+						(),
+						[
+							200u8, 208u8, 29u8, 38u8, 181u8, 90u8, 182u8, 82u8, 45u8, 248u8, 191u8,
+							110u8, 106u8, 10u8, 169u8, 242u8, 90u8, 251u8, 234u8, 3u8, 66u8, 131u8,
+							98u8, 187u8, 71u8, 234u8, 194u8, 96u8, 37u8, 199u8, 214u8, 149u8,
+						],
+					)
+				}
+				#[doc = " Burn and release requests awaiting settlement, combined by owner. Both amounts remain"]
+				#[doc = " included in the owner's encumbrance until processed; bonds retain their live payout terms."]
+				pub fn pending_bond_collateral_by_account(
+					&self,
+					_0: types::pending_bond_collateral_by_account::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::pending_bond_collateral_by_account::Param0,
+					>,
+					types::pending_bond_collateral_by_account::PendingBondCollateralByAccount,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Treasury",
+						"PendingBondCollateralByAccount",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							200u8, 208u8, 29u8, 38u8, 181u8, 90u8, 182u8, 82u8, 45u8, 248u8, 191u8,
+							110u8, 106u8, 10u8, 169u8, 242u8, 90u8, 251u8, 234u8, 3u8, 66u8, 131u8,
+							98u8, 187u8, 71u8, 234u8, 194u8, 96u8, 37u8, 199u8, 214u8, 149u8,
+						],
+					)
+				}
+				#[doc = " Accounts due for collateral settlement, ordered by retry block and owner. Each pending"]
+				#[doc = " account has one entry; failures move to the next block without blocking other owners."]
+				pub fn bond_collateral_settlement_queue_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::bond_collateral_settlement_queue::BondCollateralSettlementQueue,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Treasury",
+						"BondCollateralSettlementQueue",
+						(),
+						[
+							2u8, 30u8, 72u8, 244u8, 59u8, 8u8, 13u8, 70u8, 108u8, 155u8, 6u8,
+							192u8, 6u8, 190u8, 3u8, 37u8, 61u8, 19u8, 26u8, 171u8, 239u8, 137u8,
+							18u8, 141u8, 221u8, 171u8, 253u8, 166u8, 133u8, 38u8, 160u8, 85u8,
+						],
+					)
+				}
+				#[doc = " Accounts due for collateral settlement, ordered by retry block and owner. Each pending"]
+				#[doc = " account has one entry; failures move to the next block without blocking other owners."]
+				pub fn bond_collateral_settlement_queue(
+					&self,
+					_0: types::bond_collateral_settlement_queue::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::bond_collateral_settlement_queue::Param0,
+					>,
+					types::bond_collateral_settlement_queue::BondCollateralSettlementQueue,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"Treasury",
+						"BondCollateralSettlementQueue",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							2u8, 30u8, 72u8, 244u8, 59u8, 8u8, 13u8, 70u8, 108u8, 155u8, 6u8,
+							192u8, 6u8, 190u8, 3u8, 37u8, 61u8, 19u8, 26u8, 171u8, 239u8, 137u8,
+							18u8, 141u8, 221u8, 171u8, 253u8, 166u8, 133u8, 38u8, 160u8, 85u8,
+						],
+					)
+				}
 				#[doc = " Bond lots to release at the given frame."]
 				pub fn pending_bond_releases_by_frame_iter(
 					&self,
@@ -25163,6 +25601,42 @@ pub mod api {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"Treasury",
 						"MaxArgonBondLots",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
+						],
+					)
+				}
+				#[doc = " Owner bond/stake lot count assumed by scan benchmarks and checked by try_state."]
+				#[doc = " Includes lots awaiting release. Purchases remain unrestricted and scans are not"]
+				#[doc = " truncated."]
+				pub fn max_expected_bond_lots_per_account(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u32,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"Treasury",
+						"MaxExpectedBondLotsPerAccount",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
+						],
+					)
+				}
+				#[doc = " Maximum accounts whose queued bond collateral is attempted in one block."]
+				pub fn max_bond_collateral_settlements_per_block(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u32,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"Treasury",
+						"MaxBondCollateralSettlementsPerBlock",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
@@ -27463,8 +27937,7 @@ pub mod api {
 				}
 				pub mod set_chain_config {
 					use super::runtime_types;
-					pub type SourceChain =
-						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+					pub type SourceChain = runtime_types::argon_primitives::gateway::SourceChain;
 					pub type Config =
 						runtime_types::pallet_crosschain_transfer::pallet::ChainConfig;
 				}
@@ -27493,7 +27966,7 @@ pub mod api {
 				pub mod force_set_global_issuance_council {
 					use super::runtime_types;
 					pub type DestinationChain =
-						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+						runtime_types::argon_primitives::gateway::SourceChain;
 					pub type AfterNonce = ::core::primitive::u64;
 					pub type MemberAccountIds =
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<
@@ -27521,8 +27994,7 @@ pub mod api {
 				}
 				pub mod pause_gateway {
 					use super::runtime_types;
-					pub type SourceChain =
-						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+					pub type SourceChain = runtime_types::argon_primitives::gateway::SourceChain;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for PauseGateway {
 					const PALLET: &'static str = "CrosschainTransfer";
@@ -27545,8 +28017,7 @@ pub mod api {
 				}
 				pub mod unpause_gateway {
 					use super::runtime_types;
-					pub type SourceChain =
-						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+					pub type SourceChain = runtime_types::argon_primitives::gateway::SourceChain;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for UnpauseGateway {
 					const PALLET: &'static str = "CrosschainTransfer";
@@ -27572,7 +28043,7 @@ pub mod api {
 				pub mod set_minimum_minting_authority_value {
 					use super::runtime_types;
 					pub type DestinationChain =
-						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+						runtime_types::argon_primitives::gateway::SourceChain;
 					pub type MinimumValue = ::core::primitive::u128;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for SetMinimumMintingAuthorityValue {
@@ -27599,7 +28070,7 @@ pub mod api {
 				pub mod set_minting_authority_activation_repayment_pricing {
 					use super::runtime_types;
 					pub type DestinationChain =
-						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+						runtime_types::argon_primitives::gateway::SourceChain;
 					pub type Pricing = runtime_types :: pallet_crosschain_transfer :: pallet :: MintingAuthorityActivationRepaymentPricing ;
 				}
 				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic
@@ -27628,7 +28099,7 @@ pub mod api {
 				pub mod register_council_signer {
 					use super::runtime_types;
 					pub type DestinationChain =
-						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+						runtime_types::argon_primitives::gateway::SourceChain;
 					pub type SigningKey = ::subxt::ext::subxt_core::utils::H160;
 					pub type Signature = [::core::primitive::u8; 65usize];
 				}
@@ -27655,7 +28126,7 @@ pub mod api {
 				pub mod approve_queue_entries {
 					use super::runtime_types;
 					pub type DestinationChain =
-						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+						runtime_types::argon_primitives::gateway::SourceChain;
 					pub type Signatures =
 						runtime_types::bounded_collections::bounded_vec::BoundedVec<
 							[::core::primitive::u8; 65usize],
@@ -27686,8 +28157,7 @@ pub mod api {
 				}
 				pub mod prove_gateway_activity {
 					use super::runtime_types;
-					pub type SourceChain =
-						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+					pub type SourceChain = runtime_types::argon_primitives::gateway::SourceChain;
 					pub type PreviousGatewayActivityNonce = ::core::primitive::u64;
 					pub type ProofBatch =
 						runtime_types::argon_primitives::ethereum::EthereumReceiptLogProofBatch;
@@ -27720,7 +28190,7 @@ pub mod api {
 				pub mod register_minting_authority {
 					use super::runtime_types;
 					pub type DestinationChain =
-						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+						runtime_types::argon_primitives::gateway::SourceChain;
 					pub type DestinationSigningKey = ::subxt::ext::subxt_core::utils::H160;
 					pub type Signature = [::core::primitive::u8; 65usize];
 					pub type MicrogonCollateral = ::core::primitive::u128;
@@ -27776,7 +28246,7 @@ pub mod api {
 				pub mod transfer_out {
 					use super::runtime_types;
 					pub type DestinationChain =
-						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+						runtime_types::argon_primitives::gateway::SourceChain;
 					pub type Asset = runtime_types::pallet_crosschain_transfer::pallet::AssetKind;
 					pub type DestinationAccount = ::subxt::ext::subxt_core::utils::H160;
 					pub type Amount = ::core::primitive::u128;
@@ -27829,6 +28299,8 @@ pub mod api {
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
 				#[doc = "Authenticate a complete gateway locator and settle its unconsumed activities."]
+				#[doc = "Including the gateway's current nonce also records the proven block time once all"]
+				#[doc = "activity through that nonce has been applied."]
 				pub struct ProveGatewayActivityStorage {
 					pub source_chain: prove_gateway_activity_storage::SourceChain,
 					#[codec(compact)]
@@ -27838,8 +28310,7 @@ pub mod api {
 				}
 				pub mod prove_gateway_activity_storage {
 					use super::runtime_types;
-					pub type SourceChain =
-						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+					pub type SourceChain = runtime_types::argon_primitives::gateway::SourceChain;
 					pub type PreviousGatewayActivityNonce = ::core::primitive::u64;
 					pub type Proof =
 						runtime_types::pallet_crosschain_transfer::GatewayActivityStorageProof;
@@ -28118,6 +28589,8 @@ pub mod api {
 					)
 				}
 				#[doc = "Authenticate a complete gateway locator and settle its unconsumed activities."]
+				#[doc = "Including the gateway's current nonce also records the proven block time once all"]
+				#[doc = "activity through that nonce has been applied."]
 				pub fn prove_gateway_activity_storage(
 					&self,
 					source_chain: types::prove_gateway_activity_storage::SourceChain,
@@ -28162,8 +28635,7 @@ pub mod api {
 			}
 			pub mod transfer_to_argon_settled {
 				use super::runtime_types;
-				pub type SourceChain =
-					runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				pub type SourceChain = runtime_types::argon_primitives::gateway::SourceChain;
 				pub type Transfer =
 					runtime_types::pallet_crosschain_transfer::pallet::TransferToArgonActivity;
 			}
@@ -28186,8 +28658,7 @@ pub mod api {
 			}
 			pub mod global_issuance_council_forced {
 				use super::runtime_types;
-				pub type DestinationChain =
-					runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				pub type DestinationChain = runtime_types::argon_primitives::gateway::SourceChain;
 				pub type CouncilHash = crate::types::H256;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for GlobalIssuanceCouncilForced {
@@ -28211,8 +28682,7 @@ pub mod api {
 			}
 			pub mod global_issuance_council_rotation_queued {
 				use super::runtime_types;
-				pub type DestinationChain =
-					runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				pub type DestinationChain = runtime_types::argon_primitives::gateway::SourceChain;
 				pub type CouncilHash = crate::types::H256;
 				pub type ApprovalQueueNonce = ::core::primitive::u64;
 			}
@@ -28236,8 +28706,7 @@ pub mod api {
 			}
 			pub mod council_signer_registered {
 				use super::runtime_types;
-				pub type DestinationChain =
-					runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				pub type DestinationChain = runtime_types::argon_primitives::gateway::SourceChain;
 				pub type AccountId = crate::types::AccountId32;
 				pub type Signer = ::subxt::ext::subxt_core::utils::H160;
 			}
@@ -28261,8 +28730,7 @@ pub mod api {
 			}
 			pub mod council_signer_rotation_queued {
 				use super::runtime_types;
-				pub type DestinationChain =
-					runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				pub type DestinationChain = runtime_types::argon_primitives::gateway::SourceChain;
 				pub type AccountId = crate::types::AccountId32;
 				pub type Signer = ::subxt::ext::subxt_core::utils::H160;
 			}
@@ -28287,8 +28755,7 @@ pub mod api {
 			}
 			pub mod minting_authority_registered {
 				use super::runtime_types;
-				pub type DestinationChain =
-					runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				pub type DestinationChain = runtime_types::argon_primitives::gateway::SourceChain;
 				pub type DestinationSigningKey = ::subxt::ext::subxt_core::utils::H160;
 				pub type AccountId = crate::types::AccountId32;
 				pub type ApprovalQueueNonce = ::core::primitive::u64;
@@ -28314,8 +28781,7 @@ pub mod api {
 			}
 			pub mod minting_authority_deactivation_queued {
 				use super::runtime_types;
-				pub type DestinationChain =
-					runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				pub type DestinationChain = runtime_types::argon_primitives::gateway::SourceChain;
 				pub type DestinationSigningKey = ::subxt::ext::subxt_core::utils::H160;
 				pub type ApprovalQueueNonce = ::core::primitive::u64;
 			}
@@ -28339,8 +28805,7 @@ pub mod api {
 			}
 			pub mod minimum_minting_authority_value_set {
 				use super::runtime_types;
-				pub type DestinationChain =
-					runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				pub type DestinationChain = runtime_types::argon_primitives::gateway::SourceChain;
 				pub type MinimumValue = ::core::primitive::u128;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for MinimumMintingAuthorityValueSet {
@@ -28363,8 +28828,7 @@ pub mod api {
 			}
 			pub mod minting_authority_activation_repayment_pricing_set {
 				use super::runtime_types;
-				pub type DestinationChain =
-					runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				pub type DestinationChain = runtime_types::argon_primitives::gateway::SourceChain;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent
 				for MintingAuthorityActivationRepaymentPricingSet
@@ -28388,8 +28852,7 @@ pub mod api {
 			}
 			pub mod queue_entry_approval_recorded {
 				use super::runtime_types;
-				pub type DestinationChain =
-					runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				pub type DestinationChain = runtime_types::argon_primitives::gateway::SourceChain;
 				pub type Target =
 					runtime_types::pallet_crosschain_transfer::pallet::CouncilApprovalTargetId;
 				pub type ApprovalQueueNonce = ::core::primitive::u64;
@@ -28414,8 +28877,7 @@ pub mod api {
 			}
 			pub mod queue_entry_approval_ready {
 				use super::runtime_types;
-				pub type DestinationChain =
-					runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				pub type DestinationChain = runtime_types::argon_primitives::gateway::SourceChain;
 				pub type Target =
 					runtime_types::pallet_crosschain_transfer::pallet::CouncilApprovalTargetId;
 				pub type ApprovalQueueNonce = ::core::primitive::u64;
@@ -28440,8 +28902,7 @@ pub mod api {
 			}
 			pub mod minting_authority_activation_finalized {
 				use super::runtime_types;
-				pub type SourceChain =
-					runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				pub type SourceChain = runtime_types::argon_primitives::gateway::SourceChain;
 				pub type DestinationSigningKey = ::subxt::ext::subxt_core::utils::H160;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for MintingAuthorityActivationFinalized {
@@ -28468,8 +28929,7 @@ pub mod api {
 			}
 			pub mod minting_authority_activation_completed {
 				use super::runtime_types;
-				pub type DestinationChain =
-					runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				pub type DestinationChain = runtime_types::argon_primitives::gateway::SourceChain;
 				pub type DestinationSigningKey = ::subxt::ext::subxt_core::utils::H160;
 				pub type RelayerArgonAccountId = crate::types::AccountId32;
 				pub type RepaymentAmount = ::core::primitive::u128;
@@ -28495,8 +28955,7 @@ pub mod api {
 			}
 			pub mod minting_authority_deactivation_finalized {
 				use super::runtime_types;
-				pub type SourceChain =
-					runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				pub type SourceChain = runtime_types::argon_primitives::gateway::SourceChain;
 				pub type DestinationSigningKey = ::subxt::ext::subxt_core::utils::H160;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for MintingAuthorityDeactivationFinalized {
@@ -28518,8 +28977,7 @@ pub mod api {
 			}
 			pub mod gateway_sync_paused {
 				use super::runtime_types;
-				pub type SourceChain =
-					runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				pub type SourceChain = runtime_types::argon_primitives::gateway::SourceChain;
 				pub type Pause =
 					runtime_types::pallet_crosschain_transfer::pallet::GatewaySyncPause;
 			}
@@ -28541,8 +28999,7 @@ pub mod api {
 			}
 			pub mod gateway_unpaused {
 				use super::runtime_types;
-				pub type SourceChain =
-					runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				pub type SourceChain = runtime_types::argon_primitives::gateway::SourceChain;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for GatewayUnpaused {
 				const PALLET: &'static str = "CrosschainTransfer";
@@ -28563,10 +29020,9 @@ pub mod api {
 			}
 			pub mod gateway_state_advanced {
 				use super::runtime_types;
-				pub type SourceChain =
-					runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				pub type SourceChain = runtime_types::argon_primitives::gateway::SourceChain;
 				pub type GatewayState =
-					runtime_types::pallet_crosschain_transfer::pallet::GatewayState;
+					runtime_types::argon_primitives::gateway::GatewayState<::core::primitive::u128>;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for GatewayStateAdvanced {
 				const PALLET: &'static str = "CrosschainTransfer";
@@ -28591,8 +29047,7 @@ pub mod api {
 			}
 			pub mod transfer_out_started {
 				use super::runtime_types;
-				pub type DestinationChain =
-					runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				pub type DestinationChain = runtime_types::argon_primitives::gateway::SourceChain;
 				pub type TransferId = crate::types::H256;
 				pub type AccountId = crate::types::AccountId32;
 				pub type Asset = runtime_types::pallet_crosschain_transfer::pallet::AssetKind;
@@ -28664,8 +29119,7 @@ pub mod api {
 			}
 			pub mod transfer_out_finalized {
 				use super::runtime_types;
-				pub type SourceChain =
-					runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				pub type SourceChain = runtime_types::argon_primitives::gateway::SourceChain;
 				pub type TransferId = crate::types::H256;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for TransferOutFinalized {
@@ -28687,8 +29141,7 @@ pub mod api {
 			}
 			pub mod transfer_out_canceled {
 				use super::runtime_types;
-				pub type SourceChain =
-					runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				pub type SourceChain = runtime_types::argon_primitives::gateway::SourceChain;
 				pub type TransferId = crate::types::H256;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for TransferOutCanceled {
@@ -28736,8 +29189,7 @@ pub mod api {
 			}
 			pub mod transfer_to_argon_from_swap_settled {
 				use super::runtime_types;
-				pub type SourceChain =
-					runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+				pub type SourceChain = runtime_types::argon_primitives::gateway::SourceChain;
 				pub type Transfer =
 					runtime_types::pallet_crosschain_transfer::pallet::TransferToArgonActivity;
 				pub type Purchase =
@@ -28748,6 +29200,33 @@ pub mod api {
 				const PALLET: &'static str = "CrosschainTransfer";
 				const EVENT: &'static str = "TransferToArgonFromSwapSettled";
 			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "Delivery succeeded, but purchase admission rolled back. Funds remain spendable and"]
+			#[doc = "the gateway nonce advances without a reward or Liquid repayment commitment."]
+			pub struct UniswapPurchaseAdmissionFailed {
+				pub source_chain: uniswap_purchase_admission_failed::SourceChain,
+				pub gateway_activity_nonce: uniswap_purchase_admission_failed::GatewayActivityNonce,
+				pub account: uniswap_purchase_admission_failed::Account,
+				pub error: uniswap_purchase_admission_failed::Error,
+			}
+			pub mod uniswap_purchase_admission_failed {
+				use super::runtime_types;
+				pub type SourceChain = runtime_types::argon_primitives::gateway::SourceChain;
+				pub type GatewayActivityNonce = ::core::primitive::u64;
+				pub type Account = crate::types::AccountId32;
+				pub type Error = runtime_types::sp_runtime::DispatchError;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for UniswapPurchaseAdmissionFailed {
+				const PALLET: &'static str = "CrosschainTransfer";
+				const EVENT: &'static str = "UniswapPurchaseAdmissionFailed";
+			}
 		}
 		pub mod storage {
 			use super::runtime_types;
@@ -28757,22 +29236,21 @@ pub mod api {
 					use super::runtime_types;
 					pub type ChainConfigBySourceChain =
 						runtime_types::pallet_crosschain_transfer::pallet::ChainConfig;
-					pub type Param0 =
-						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+					pub type Param0 = runtime_types::argon_primitives::gateway::SourceChain;
 				}
 				pub mod gateway_state_by_source_chain {
 					use super::runtime_types;
 					pub type GatewayStateBySourceChain =
-						runtime_types::pallet_crosschain_transfer::pallet::GatewayState;
-					pub type Param0 =
-						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+						runtime_types::argon_primitives::gateway::GatewayState<
+							::core::primitive::u128,
+						>;
+					pub type Param0 = runtime_types::argon_primitives::gateway::SourceChain;
 				}
 				pub mod gateway_sync_pause_by_source_chain {
 					use super::runtime_types;
 					pub type GatewaySyncPauseBySourceChain =
 						runtime_types::pallet_crosschain_transfer::pallet::GatewaySyncPause;
-					pub type Param0 =
-						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+					pub type Param0 = runtime_types::argon_primitives::gateway::SourceChain;
 				}
 				pub mod transfer_totals_by_account {
 					use super::runtime_types;
@@ -28784,45 +29262,39 @@ pub mod api {
 					use super::runtime_types;
 					pub type CouncilApprovalCursorByDestinationChainAndAccountId =
 						::core::primitive::u64;
-					pub type Param0 =
-						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+					pub type Param0 = runtime_types::argon_primitives::gateway::SourceChain;
 					pub type Param1 = crate::types::AccountId32;
 				}
 				pub mod council_signer_by_destination_chain_and_account_id {
 					use super::runtime_types;
 					pub type CouncilSignerByDestinationChainAndAccountId =
 						::subxt::ext::subxt_core::utils::H160;
-					pub type Param0 =
-						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+					pub type Param0 = runtime_types::argon_primitives::gateway::SourceChain;
 					pub type Param1 = crate::types::AccountId32;
 				}
 				pub mod pending_council_signer_by_destination_chain_and_account_id {
 					use super::runtime_types;
 					pub type PendingCouncilSignerByDestinationChainAndAccountId =
 						::subxt::ext::subxt_core::utils::H160;
-					pub type Param0 =
-						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+					pub type Param0 = runtime_types::argon_primitives::gateway::SourceChain;
 					pub type Param1 = crate::types::AccountId32;
 				}
 				pub mod active_global_issuance_council_by_destination_chain {
 					use super::runtime_types;
 					pub type ActiveGlobalIssuanceCouncilByDestinationChain = crate::types::H256;
-					pub type Param0 =
-						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+					pub type Param0 = runtime_types::argon_primitives::gateway::SourceChain;
 				}
 				pub mod current_transfer_out_microgons_per_argonot_by_destination_chain {
 					use super::runtime_types;
 					pub type CurrentTransferOutMicrogonsPerArgonotByDestinationChain =
 						::core::primitive::u128;
-					pub type Param0 =
-						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+					pub type Param0 = runtime_types::argon_primitives::gateway::SourceChain;
 				}
 				pub mod previous_transfer_out_microgons_per_argonot_by_destination_chain {
 					use super::runtime_types;
 					pub type PreviousTransferOutMicrogonsPerArgonotByDestinationChain =
 						::core::primitive::u128;
-					pub type Param0 =
-						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+					pub type Param0 = runtime_types::argon_primitives::gateway::SourceChain;
 				}
 				pub mod global_issuance_council_by_hash {
 					use super::runtime_types;
@@ -28833,34 +29305,29 @@ pub mod api {
 				pub mod latest_queued_council_hash_by_destination_chain {
 					use super::runtime_types;
 					pub type LatestQueuedCouncilHashByDestinationChain = crate::types::H256;
-					pub type Param0 =
-						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+					pub type Param0 = runtime_types::argon_primitives::gateway::SourceChain;
 				}
 				pub mod transfer_out_quote_microgons_per_argonot_by_destination_chain {
 					use super::runtime_types;
 					pub type TransferOutQuoteMicrogonsPerArgonotByDestinationChain =
 						::core::primitive::u128;
-					pub type Param0 =
-						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+					pub type Param0 = runtime_types::argon_primitives::gateway::SourceChain;
 				}
 				pub mod next_council_approval_queue_nonce_by_destination_chain {
 					use super::runtime_types;
 					pub type NextCouncilApprovalQueueNonceByDestinationChain =
 						::core::primitive::u64;
-					pub type Param0 =
-						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+					pub type Param0 = runtime_types::argon_primitives::gateway::SourceChain;
 				}
 				pub mod next_council_rotation_frame_by_destination_chain {
 					use super::runtime_types;
 					pub type NextCouncilRotationFrameByDestinationChain = ::core::primitive::u64;
-					pub type Param0 =
-						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+					pub type Param0 = runtime_types::argon_primitives::gateway::SourceChain;
 				}
 				pub mod council_approval_queue_by_destination_chain_and_nonce {
 					use super::runtime_types;
 					pub type CouncilApprovalQueueByDestinationChainAndNonce = runtime_types :: pallet_crosschain_transfer :: pallet :: CouncilApprovalQueueEntry ;
-					pub type Param0 =
-						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+					pub type Param0 = runtime_types::argon_primitives::gateway::SourceChain;
 					pub type Param1 = ::core::primitive::u64;
 				}
 				pub mod minting_authorities_by_signer {
@@ -28873,14 +29340,12 @@ pub mod api {
 					use super::runtime_types;
 					pub type MinimumMintingAuthorityValueByDestinationChain =
 						::core::primitive::u128;
-					pub type Param0 =
-						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+					pub type Param0 = runtime_types::argon_primitives::gateway::SourceChain;
 				}
 				pub mod minting_authority_activation_repayment_pricing_by_destination_chain {
 					use super::runtime_types;
 					pub type MintingAuthorityActivationRepaymentPricingByDestinationChain = runtime_types :: pallet_crosschain_transfer :: pallet :: MintingAuthorityActivationRepaymentPricing ;
-					pub type Param0 =
-						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+					pub type Param0 = runtime_types::argon_primitives::gateway::SourceChain;
 				}
 				pub mod next_transfer_out_nonce_by_sending_account_id {
 					use super::runtime_types;
@@ -28896,21 +29361,18 @@ pub mod api {
 				pub mod pending_collateralization_requests_by_chain {
 					use super::runtime_types;
 					pub type PendingCollateralizationRequestsByChain = runtime_types :: bounded_collections :: bounded_vec :: BoundedVec < runtime_types :: pallet_crosschain_transfer :: transfer_out :: PendingCollateralizationRequest > ;
-					pub type Param0 =
-						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+					pub type Param0 = runtime_types::argon_primitives::gateway::SourceChain;
 				}
 				pub mod non_terminal_transfer_out_count_by_destination_chain {
 					use super::runtime_types;
 					pub type NonTerminalTransferOutCountByDestinationChain = ::core::primitive::u32;
-					pub type Param0 =
-						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+					pub type Param0 = runtime_types::argon_primitives::gateway::SourceChain;
 				}
 				pub mod pending_transfer_out_circulation_by_destination_chain {
 					use super::runtime_types;
 					pub type PendingTransferOutCirculationByDestinationChain =
 						runtime_types::pallet_crosschain_transfer::pallet::SourceChainCirculation;
-					pub type Param0 =
-						runtime_types::pallet_crosschain_transfer::pallet::SourceChain;
+					pub type Param0 = runtime_types::argon_primitives::gateway::SourceChain;
 				}
 			}
 			pub struct StorageApi;
@@ -28975,9 +29437,10 @@ pub mod api {
 						"GatewayStateBySourceChain",
 						(),
 						[
-							54u8, 104u8, 149u8, 30u8, 46u8, 214u8, 251u8, 91u8, 50u8, 92u8, 121u8,
-							76u8, 13u8, 235u8, 8u8, 34u8, 110u8, 36u8, 60u8, 45u8, 97u8, 108u8,
-							172u8, 170u8, 17u8, 107u8, 244u8, 110u8, 100u8, 244u8, 231u8, 190u8,
+							68u8, 27u8, 170u8, 245u8, 243u8, 118u8, 73u8, 55u8, 240u8, 194u8,
+							189u8, 255u8, 1u8, 161u8, 52u8, 3u8, 16u8, 157u8, 175u8, 13u8, 129u8,
+							81u8, 199u8, 242u8, 95u8, 115u8, 135u8, 207u8, 119u8, 43u8, 112u8,
+							53u8,
 						],
 					)
 				}
@@ -28999,9 +29462,10 @@ pub mod api {
 						"GatewayStateBySourceChain",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							54u8, 104u8, 149u8, 30u8, 46u8, 214u8, 251u8, 91u8, 50u8, 92u8, 121u8,
-							76u8, 13u8, 235u8, 8u8, 34u8, 110u8, 36u8, 60u8, 45u8, 97u8, 108u8,
-							172u8, 170u8, 17u8, 107u8, 244u8, 110u8, 100u8, 244u8, 231u8, 190u8,
+							68u8, 27u8, 170u8, 245u8, 243u8, 118u8, 73u8, 55u8, 240u8, 194u8,
+							189u8, 255u8, 1u8, 161u8, 52u8, 3u8, 16u8, 157u8, 175u8, 13u8, 129u8,
+							81u8, 199u8, 242u8, 95u8, 115u8, 135u8, 207u8, 119u8, 43u8, 112u8,
+							53u8,
 						],
 					)
 				}
@@ -30825,14 +31289,14 @@ pub mod api {
 				pub account: reward_awarded::Account,
 				pub admission_frame: reward_awarded::AdmissionFrame,
 				pub amount: reward_awarded::Amount,
-				pub matures_at_tick: reward_awarded::MaturesAtTick,
+				pub matures_at_frame: reward_awarded::MaturesAtFrame,
 			}
 			pub mod reward_awarded {
 				use super::runtime_types;
 				pub type Account = crate::types::AccountId32;
 				pub type AdmissionFrame = ::core::primitive::u64;
 				pub type Amount = ::core::primitive::u128;
-				pub type MaturesAtTick = ::core::primitive::u64;
+				pub type MaturesAtFrame = ::core::primitive::u64;
 			}
 			impl ::subxt::ext::subxt_core::events::StaticEvent for RewardAwarded {
 				const PALLET: &'static str = "StabilizerBuys";
@@ -30901,6 +31365,83 @@ pub mod api {
 				const PALLET: &'static str = "StabilizerBuys";
 				const EVENT: &'static str = "MatchingRateChanged";
 			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "The purchase lacks valid BTC/R prices, or the Liquid is empty, was recently ratcheted,"]
+			#[doc = "or lacks the hold plus release window."]
+			#[doc = "Delivered ARGON is processed under the ordinary purchase rules."]
+			pub struct LiquidRepaymentInvalid {
+				pub account: liquid_repayment_invalid::Account,
+				pub gateway_activity_nonce: liquid_repayment_invalid::GatewayActivityNonce,
+				pub liquid_id: liquid_repayment_invalid::LiquidId,
+			}
+			pub mod liquid_repayment_invalid {
+				use super::runtime_types;
+				pub type Account = crate::types::AccountId32;
+				pub type GatewayActivityNonce = ::core::primitive::u64;
+				pub type LiquidId = ::core::primitive::u64;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for LiquidRepaymentInvalid {
+				const PALLET: &'static str = "StabilizerBuys";
+				const EVENT: &'static str = "LiquidRepaymentInvalid";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "Repayment and its remaining principal were settled in the account payout transaction."]
+			pub struct LiquidRepaymentCompleted {
+				pub account: liquid_repayment_completed::Account,
+				pub gateway_activity_nonce: liquid_repayment_completed::GatewayActivityNonce,
+				pub liquid_id: liquid_repayment_completed::LiquidId,
+				pub microgons_burned: liquid_repayment_completed::MicrogonsBurned,
+			}
+			pub mod liquid_repayment_completed {
+				use super::runtime_types;
+				pub type Account = crate::types::AccountId32;
+				pub type GatewayActivityNonce = ::core::primitive::u64;
+				pub type LiquidId = ::core::primitive::u64;
+				pub type MicrogonsBurned = ::core::primitive::u128;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for LiquidRepaymentCompleted {
+				const PALLET: &'static str = "StabilizerBuys";
+				const EVENT: &'static str = "LiquidRepaymentCompleted";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "Additional reward funded by completed repayment burns, using the same auction result."]
+			#[doc = "This does not consume the Treasury funding reserved for ordinary buy rewards."]
+			pub struct LiquidRepaymentRewardAwarded {
+				pub account: liquid_repayment_reward_awarded::Account,
+				pub admission_frame: liquid_repayment_reward_awarded::AdmissionFrame,
+				pub amount: liquid_repayment_reward_awarded::Amount,
+			}
+			pub mod liquid_repayment_reward_awarded {
+				use super::runtime_types;
+				pub type Account = crate::types::AccountId32;
+				pub type AdmissionFrame = ::core::primitive::u64;
+				pub type Amount = ::core::primitive::u128;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for LiquidRepaymentRewardAwarded {
+				const PALLET: &'static str = "StabilizerBuys";
+				const EVENT: &'static str = "LiquidRepaymentRewardAwarded";
+			}
 		}
 		pub mod storage {
 			use super::runtime_types;
@@ -30911,25 +31452,29 @@ pub mod api {
 					pub type ApprovedPool =
 						runtime_types::pallet_stabilizer_buys::uniswap_purchase::PurchasePool;
 				}
-				pub mod recent_price_indices {
+				pub mod liquid_repays_by_account_and_gateway_nonce {
 					use super::runtime_types;
-					pub type RecentPriceIndices =
-						runtime_types::argon_primitives::price_index::PriceIndex;
+					pub type LiquidRepaysByAccountAndGatewayNonce =
+						runtime_types::pallet_stabilizer_buys::pallet::LiquidRepay;
+					pub type Param0 = crate::types::AccountId32;
+					pub type Param1 = [::core::primitive::u8; 8usize];
+				}
+				pub mod pending_liquid_repay_count_by_account_and_liquid {
+					use super::runtime_types;
+					pub type PendingLiquidRepayCountByAccountAndLiquid = ::core::primitive::u64;
+					pub type Param0 = crate::types::AccountId32;
+					pub type Param1 = ::core::primitive::u64;
+				}
+				pub mod pending_price_window_count_by_tick {
+					use super::runtime_types;
+					pub type PendingPriceWindowCountByTick = ::core::primitive::u64;
 					pub type Param0 = [::core::primitive::u8; 8usize];
 				}
-				pub mod counter_for_recent_price_indices {
+				pub mod price_history_by_tick {
 					use super::runtime_types;
-					pub type CounterForRecentPriceIndices = ::core::primitive::u32;
-				}
-				pub mod hourly_price_references {
-					use super::runtime_types;
-					pub type HourlyPriceReferences =
-						runtime_types::pallet_stabilizer_buys::price_history::HourlyPriceReference;
+					pub type PriceHistoryByTick =
+						runtime_types::pallet_stabilizer_buys::price_history::PriceObservation;
 					pub type Param0 = [::core::primitive::u8; 8usize];
-				}
-				pub mod counter_for_hourly_price_references {
-					use super::runtime_types;
-					pub type CounterForHourlyPriceReferences = ::core::primitive::u32;
 				}
 				pub mod matching_rate {
 					use super::runtime_types;
@@ -30940,14 +31485,16 @@ pub mod api {
 					pub type Auctions = runtime_types::pallet_stabilizer_buys::Auction;
 					pub type Param0 = ::core::primitive::u64;
 				}
-				pub mod buys_by_account {
+				pub mod payout_state_by_account {
 					use super::runtime_types;
-					pub type BuysByAccount = runtime_types::pallet_stabilizer_buys::AccountBuys;
+					pub type PayoutStateByAccount =
+						runtime_types::pallet_stabilizer_buys::AccountPayoutState;
 					pub type Param0 = crate::types::AccountId32;
 				}
-				pub mod purchases_by_account {
+				pub mod buys_by_account_and_frame {
 					use super::runtime_types;
-					pub type PurchasesByAccount = runtime_types::pallet_stabilizer_buys::BuyPayout;
+					pub type BuysByAccountAndFrame =
+						runtime_types::pallet_stabilizer_buys::AccountFrameBuys;
 					pub type Param0 = crate::types::AccountId32;
 					pub type Param1 = [::core::primitive::u8; 8usize];
 				}
@@ -30962,11 +31509,11 @@ pub mod api {
 						>,
 					);
 				}
-				pub mod maturing_auctions {
+				pub mod auction_allocation_queue {
 					use super::runtime_types;
-					pub type MaturingAuctions = ();
+					pub type AuctionAllocationQueue = ();
 					pub type Param0 =
-						runtime_types::argon_primitives::amount_rank::AscendingRankKey1<
+						runtime_types::argon_primitives::amount_rank::AscendingRankKey2<
 							::core::primitive::u64,
 						>;
 				}
@@ -30974,9 +31521,18 @@ pub mod api {
 					use super::runtime_types;
 					pub type PayoutQueue = ();
 					pub type Param0 =
-						runtime_types::argon_primitives::amount_rank::AscendingRankKey2<
+						runtime_types::argon_primitives::amount_rank::AscendingRankKey1<
 							crate::types::AccountId32,
 						>;
+				}
+				pub mod payout_queue_cursor {
+					use super::runtime_types;
+					pub type PayoutQueueCursor = (
+						::core::primitive::u64,
+						runtime_types::argon_primitives::amount_rank::AscendingRankKey1<
+							crate::types::AccountId32,
+						>,
+					);
 				}
 			}
 			pub struct StorageApi;
@@ -31002,139 +31558,191 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Exact observations keyed by the oracle tick in big-endian order, for oldest-first pruning."]
-				pub fn recent_price_indices_iter(
-					&self,
-				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
-					(),
-					types::recent_price_indices::RecentPriceIndices,
-					(),
-					(),
-					::subxt::ext::subxt_core::utils::Yes,
-				> {
+				#[doc = " Pending repayment commitments, ordered by gateway nonce within each recipient."]
+				#[doc = " The existing account payout queue selects work; this adds no separate settlement queue."]				pub fn liquid_repays_by_account_and_gateway_nonce_iter (& self ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < () , types :: liquid_repays_by_account_and_gateway_nonce :: LiquidRepaysByAccountAndGatewayNonce , () , () , :: subxt :: ext :: subxt_core :: utils :: Yes >{
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"StabilizerBuys",
-						"RecentPriceIndices",
+						"LiquidRepaysByAccountAndGatewayNonce",
 						(),
 						[
-							131u8, 215u8, 136u8, 188u8, 61u8, 193u8, 64u8, 236u8, 52u8, 105u8,
-							252u8, 226u8, 9u8, 243u8, 9u8, 21u8, 194u8, 49u8, 107u8, 236u8, 196u8,
-							60u8, 147u8, 178u8, 39u8, 231u8, 255u8, 180u8, 152u8, 157u8, 144u8,
-							20u8,
+							161u8, 130u8, 125u8, 98u8, 87u8, 200u8, 140u8, 238u8, 204u8, 180u8,
+							130u8, 148u8, 130u8, 203u8, 142u8, 233u8, 164u8, 237u8, 83u8, 253u8,
+							227u8, 110u8, 100u8, 62u8, 59u8, 201u8, 27u8, 63u8, 166u8, 92u8, 180u8,
+							177u8,
 						],
 					)
 				}
-				#[doc = " Exact observations keyed by the oracle tick in big-endian order, for oldest-first pruning."]
-				pub fn recent_price_indices(
-					&self,
-					_0: types::recent_price_indices::Param0,
-				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
-					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
-						types::recent_price_indices::Param0,
-					>,
-					types::recent_price_indices::RecentPriceIndices,
-					::subxt::ext::subxt_core::utils::Yes,
-					(),
-					(),
-				> {
+				#[doc = " Pending repayment commitments, ordered by gateway nonce within each recipient."]
+				#[doc = " The existing account payout queue selects work; this adds no separate settlement queue."]				pub fn liquid_repays_by_account_and_gateway_nonce_iter1 (& self , _0 : types :: liquid_repays_by_account_and_gateway_nonce :: Param0 ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < :: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: liquid_repays_by_account_and_gateway_nonce :: Param0 > , types :: liquid_repays_by_account_and_gateway_nonce :: LiquidRepaysByAccountAndGatewayNonce , () , () , :: subxt :: ext :: subxt_core :: utils :: Yes >{
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"StabilizerBuys",
-						"RecentPriceIndices",
+						"LiquidRepaysByAccountAndGatewayNonce",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							131u8, 215u8, 136u8, 188u8, 61u8, 193u8, 64u8, 236u8, 52u8, 105u8,
-							252u8, 226u8, 9u8, 243u8, 9u8, 21u8, 194u8, 49u8, 107u8, 236u8, 196u8,
-							60u8, 147u8, 178u8, 39u8, 231u8, 255u8, 180u8, 152u8, 157u8, 144u8,
-							20u8,
+							161u8, 130u8, 125u8, 98u8, 87u8, 200u8, 140u8, 238u8, 204u8, 180u8,
+							130u8, 148u8, 130u8, 203u8, 142u8, 233u8, 164u8, 237u8, 83u8, 253u8,
+							227u8, 110u8, 100u8, 62u8, 59u8, 201u8, 27u8, 63u8, 166u8, 92u8, 180u8,
+							177u8,
 						],
 					)
 				}
-				#[doc = "Counter for the related counted storage map"]
-				pub fn counter_for_recent_price_indices(
-					&self,
-				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
-					(),
-					types::counter_for_recent_price_indices::CounterForRecentPriceIndices,
-					::subxt::ext::subxt_core::utils::Yes,
-					::subxt::ext::subxt_core::utils::Yes,
-					(),
-				> {
+				#[doc = " Pending repayment commitments, ordered by gateway nonce within each recipient."]
+				#[doc = " The existing account payout queue selects work; this adds no separate settlement queue."]				pub fn liquid_repays_by_account_and_gateway_nonce (& self , _0 : types :: liquid_repays_by_account_and_gateway_nonce :: Param0 , _1 : types :: liquid_repays_by_account_and_gateway_nonce :: Param1 ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < (:: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: liquid_repays_by_account_and_gateway_nonce :: Param0 > , :: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: liquid_repays_by_account_and_gateway_nonce :: Param1 > ,) , types :: liquid_repays_by_account_and_gateway_nonce :: LiquidRepaysByAccountAndGatewayNonce , :: subxt :: ext :: subxt_core :: utils :: Yes , () , () >{
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"StabilizerBuys",
-						"CounterForRecentPriceIndices",
+						"LiquidRepaysByAccountAndGatewayNonce",
+						(
+							::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+							::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_1),
+						),
+						[
+							161u8, 130u8, 125u8, 98u8, 87u8, 200u8, 140u8, 238u8, 204u8, 180u8,
+							130u8, 148u8, 130u8, 203u8, 142u8, 233u8, 164u8, 237u8, 83u8, 253u8,
+							227u8, 110u8, 100u8, 62u8, 59u8, 201u8, 27u8, 63u8, 166u8, 92u8, 180u8,
+							177u8,
+						],
+					)
+				}
+				#[doc = " Unsettled purchase count for an owner's Liquid. Removed after its final settlement;"]
+				#[doc = " lets Fissions block direct close without scanning purchases. Counts use the gateway's"]
+				#[doc = " u64 nonce range so every authenticated purchase can be represented."]				pub fn pending_liquid_repay_count_by_account_and_liquid_iter (& self ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < () , types :: pending_liquid_repay_count_by_account_and_liquid :: PendingLiquidRepayCountByAccountAndLiquid , () , :: subxt :: ext :: subxt_core :: utils :: Yes , :: subxt :: ext :: subxt_core :: utils :: Yes >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"StabilizerBuys",
+						"PendingLiquidRepayCountByAccountAndLiquid",
 						(),
 						[
-							134u8, 44u8, 224u8, 66u8, 225u8, 178u8, 75u8, 213u8, 223u8, 182u8,
-							74u8, 86u8, 69u8, 130u8, 184u8, 21u8, 213u8, 202u8, 164u8, 140u8,
-							162u8, 181u8, 85u8, 216u8, 186u8, 92u8, 19u8, 21u8, 70u8, 44u8, 17u8,
-							34u8,
+							187u8, 17u8, 190u8, 118u8, 25u8, 242u8, 93u8, 12u8, 124u8, 191u8, 94u8,
+							3u8, 226u8, 43u8, 125u8, 252u8, 103u8, 99u8, 213u8, 49u8, 101u8, 180u8,
+							40u8, 141u8, 33u8, 158u8, 114u8, 221u8, 220u8, 245u8, 141u8, 46u8,
 						],
 					)
 				}
-				#[doc = " Hourly references keyed by the bucket-start tick in the same oldest-first order."]
-				pub fn hourly_price_references_iter(
-					&self,
-				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
-					(),
-					types::hourly_price_references::HourlyPriceReferences,
-					(),
-					(),
-					::subxt::ext::subxt_core::utils::Yes,
-				> {
+				#[doc = " Unsettled purchase count for an owner's Liquid. Removed after its final settlement;"]
+				#[doc = " lets Fissions block direct close without scanning purchases. Counts use the gateway's"]
+				#[doc = " u64 nonce range so every authenticated purchase can be represented."]				pub fn pending_liquid_repay_count_by_account_and_liquid_iter1 (& self , _0 : types :: pending_liquid_repay_count_by_account_and_liquid :: Param0 ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < :: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: pending_liquid_repay_count_by_account_and_liquid :: Param0 > , types :: pending_liquid_repay_count_by_account_and_liquid :: PendingLiquidRepayCountByAccountAndLiquid , () , :: subxt :: ext :: subxt_core :: utils :: Yes , :: subxt :: ext :: subxt_core :: utils :: Yes >{
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"StabilizerBuys",
-						"HourlyPriceReferences",
-						(),
-						[
-							225u8, 216u8, 218u8, 132u8, 148u8, 215u8, 176u8, 167u8, 215u8, 4u8,
-							16u8, 203u8, 68u8, 34u8, 68u8, 29u8, 26u8, 175u8, 245u8, 144u8, 102u8,
-							140u8, 31u8, 161u8, 211u8, 58u8, 128u8, 96u8, 226u8, 250u8, 79u8, 71u8,
-						],
-					)
-				}
-				#[doc = " Hourly references keyed by the bucket-start tick in the same oldest-first order."]
-				pub fn hourly_price_references(
-					&self,
-					_0: types::hourly_price_references::Param0,
-				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
-					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
-						types::hourly_price_references::Param0,
-					>,
-					types::hourly_price_references::HourlyPriceReferences,
-					::subxt::ext::subxt_core::utils::Yes,
-					(),
-					(),
-				> {
-					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
-						"StabilizerBuys",
-						"HourlyPriceReferences",
+						"PendingLiquidRepayCountByAccountAndLiquid",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							225u8, 216u8, 218u8, 132u8, 148u8, 215u8, 176u8, 167u8, 215u8, 4u8,
-							16u8, 203u8, 68u8, 34u8, 68u8, 29u8, 26u8, 175u8, 245u8, 144u8, 102u8,
-							140u8, 31u8, 161u8, 211u8, 58u8, 128u8, 96u8, 226u8, 250u8, 79u8, 71u8,
+							187u8, 17u8, 190u8, 118u8, 25u8, 242u8, 93u8, 12u8, 124u8, 191u8, 94u8,
+							3u8, 226u8, 43u8, 125u8, 252u8, 103u8, 99u8, 213u8, 49u8, 101u8, 180u8,
+							40u8, 141u8, 33u8, 158u8, 114u8, 221u8, 220u8, 245u8, 141u8, 46u8,
 						],
 					)
 				}
-				#[doc = "Counter for the related counted storage map"]
-				pub fn counter_for_hourly_price_references(
+				#[doc = " Unsettled purchase count for an owner's Liquid. Removed after its final settlement;"]
+				#[doc = " lets Fissions block direct close without scanning purchases. Counts use the gateway's"]
+				#[doc = " u64 nonce range so every authenticated purchase can be represented."]				pub fn pending_liquid_repay_count_by_account_and_liquid (& self , _0 : types :: pending_liquid_repay_count_by_account_and_liquid :: Param0 , _1 : types :: pending_liquid_repay_count_by_account_and_liquid :: Param1 ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < (:: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: pending_liquid_repay_count_by_account_and_liquid :: Param0 > , :: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: pending_liquid_repay_count_by_account_and_liquid :: Param1 > ,) , types :: pending_liquid_repay_count_by_account_and_liquid :: PendingLiquidRepayCountByAccountAndLiquid , :: subxt :: ext :: subxt_core :: utils :: Yes , :: subxt :: ext :: subxt_core :: utils :: Yes , () >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"StabilizerBuys",
+						"PendingLiquidRepayCountByAccountAndLiquid",
+						(
+							::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+							::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_1),
+						),
+						[
+							187u8, 17u8, 190u8, 118u8, 25u8, 242u8, 93u8, 12u8, 124u8, 191u8, 94u8,
+							3u8, 226u8, 43u8, 125u8, 252u8, 103u8, 99u8, 213u8, 49u8, 101u8, 180u8,
+							40u8, 141u8, 33u8, 158u8, 114u8, 221u8, 220u8, 245u8, 141u8, 46u8,
+						],
+					)
+				}
+				#[doc = " Number of incomplete windows starting at each purchase tick. Ordered keys expose the"]
+				#[doc = " oldest history still needed without scanning purchases; counts share the u64 nonce range."]
+				pub fn pending_price_window_count_by_tick_iter(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
 					(),
-					types::counter_for_hourly_price_references::CounterForHourlyPriceReferences,
+					types::pending_price_window_count_by_tick::PendingPriceWindowCountByTick,
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"StabilizerBuys",
+						"PendingPriceWindowCountByTick",
+						(),
+						[
+							14u8, 207u8, 20u8, 214u8, 179u8, 51u8, 245u8, 185u8, 118u8, 150u8,
+							25u8, 208u8, 98u8, 158u8, 108u8, 253u8, 21u8, 236u8, 156u8, 41u8,
+							112u8, 235u8, 194u8, 168u8, 93u8, 182u8, 119u8, 1u8, 12u8, 48u8, 5u8,
+							82u8,
+						],
+					)
+				}
+				#[doc = " Number of incomplete windows starting at each purchase tick. Ordered keys expose the"]
+				#[doc = " oldest history still needed without scanning purchases; counts share the u64 nonce range."]
+				pub fn pending_price_window_count_by_tick(
+					&self,
+					_0: types::pending_price_window_count_by_tick::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::pending_price_window_count_by_tick::Param0,
+					>,
+					types::pending_price_window_count_by_tick::PendingPriceWindowCountByTick,
 					::subxt::ext::subxt_core::utils::Yes,
 					::subxt::ext::subxt_core::utils::Yes,
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"StabilizerBuys",
-						"CounterForHourlyPriceReferences",
+						"PendingPriceWindowCountByTick",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							14u8, 207u8, 20u8, 214u8, 179u8, 51u8, 245u8, 185u8, 118u8, 150u8,
+							25u8, 208u8, 98u8, 158u8, 108u8, 253u8, 21u8, 236u8, 156u8, 41u8,
+							112u8, 235u8, 194u8, 168u8, 93u8, 182u8, 119u8, 1u8, 12u8, 48u8, 5u8,
+							82u8,
+						],
+					)
+				}
+				#[doc = " Compact observations keyed by ordered ticks. An unavailable purchase quote stops historical"]
+				#[doc = " lookup. Retention follows gateway sync and any incomplete repayment windows."]
+				pub fn price_history_by_tick_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::price_history_by_tick::PriceHistoryByTick,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"StabilizerBuys",
+						"PriceHistoryByTick",
 						(),
 						[
-							251u8, 45u8, 147u8, 175u8, 215u8, 155u8, 32u8, 150u8, 216u8, 24u8,
-							59u8, 121u8, 213u8, 210u8, 37u8, 25u8, 70u8, 110u8, 210u8, 230u8,
-							220u8, 162u8, 246u8, 188u8, 32u8, 244u8, 76u8, 223u8, 16u8, 135u8,
-							65u8, 72u8,
+							78u8, 75u8, 178u8, 157u8, 241u8, 230u8, 143u8, 144u8, 47u8, 47u8,
+							232u8, 134u8, 11u8, 58u8, 170u8, 98u8, 146u8, 158u8, 180u8, 111u8,
+							38u8, 90u8, 71u8, 141u8, 46u8, 217u8, 134u8, 207u8, 242u8, 9u8, 117u8,
+							80u8,
+						],
+					)
+				}
+				#[doc = " Compact observations keyed by ordered ticks. An unavailable purchase quote stops historical"]
+				#[doc = " lookup. Retention follows gateway sync and any incomplete repayment windows."]
+				pub fn price_history_by_tick(
+					&self,
+					_0: types::price_history_by_tick::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::price_history_by_tick::Param0,
+					>,
+					types::price_history_by_tick::PriceHistoryByTick,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"StabilizerBuys",
+						"PriceHistoryByTick",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							78u8, 75u8, 178u8, 157u8, 241u8, 230u8, 143u8, 144u8, 47u8, 47u8,
+							232u8, 134u8, 11u8, 58u8, 170u8, 98u8, 146u8, 158u8, 180u8, 111u8,
+							38u8, 90u8, 71u8, 141u8, 46u8, 217u8, 134u8, 207u8, 242u8, 9u8, 117u8,
+							80u8,
 						],
 					)
 				}
@@ -31175,10 +31783,10 @@ pub mod api {
 						"Auctions",
 						(),
 						[
-							71u8, 231u8, 139u8, 180u8, 118u8, 149u8, 126u8, 48u8, 218u8, 180u8,
-							215u8, 201u8, 103u8, 215u8, 253u8, 186u8, 33u8, 98u8, 236u8, 204u8,
-							35u8, 182u8, 250u8, 10u8, 58u8, 61u8, 23u8, 206u8, 28u8, 190u8, 168u8,
-							39u8,
+							169u8, 244u8, 207u8, 232u8, 248u8, 125u8, 14u8, 77u8, 154u8, 126u8,
+							106u8, 120u8, 195u8, 148u8, 230u8, 90u8, 152u8, 243u8, 26u8, 130u8,
+							105u8, 213u8, 150u8, 165u8, 175u8, 152u8, 120u8, 142u8, 116u8, 64u8,
+							76u8, 135u8,
 						],
 					)
 				}
@@ -31200,139 +31808,136 @@ pub mod api {
 						"Auctions",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							71u8, 231u8, 139u8, 180u8, 118u8, 149u8, 126u8, 48u8, 218u8, 180u8,
-							215u8, 201u8, 103u8, 215u8, 253u8, 186u8, 33u8, 98u8, 236u8, 204u8,
-							35u8, 182u8, 250u8, 10u8, 58u8, 61u8, 23u8, 206u8, 28u8, 190u8, 168u8,
-							39u8,
+							169u8, 244u8, 207u8, 232u8, 248u8, 125u8, 14u8, 77u8, 154u8, 126u8,
+							106u8, 120u8, 195u8, 148u8, 230u8, 90u8, 152u8, 243u8, 26u8, 130u8,
+							105u8, 213u8, 150u8, 165u8, 175u8, 152u8, 120u8, 142u8, 116u8, 64u8,
+							76u8, 135u8,
 						],
 					)
 				}
-				#[doc = " Scheduled rewards and the account's single payout queue entry."]
-				pub fn buys_by_account_iter(
+				#[doc = " Unpaid ordinary rewards and the account's single scheduled payout visit, across frames."]
+				pub fn payout_state_by_account_iter(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
 					(),
-					types::buys_by_account::BuysByAccount,
+					types::payout_state_by_account::PayoutStateByAccount,
 					(),
 					::subxt::ext::subxt_core::utils::Yes,
 					::subxt::ext::subxt_core::utils::Yes,
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"StabilizerBuys",
-						"BuysByAccount",
+						"PayoutStateByAccount",
 						(),
 						[
-							20u8, 145u8, 163u8, 153u8, 178u8, 109u8, 18u8, 159u8, 32u8, 180u8, 6u8,
-							87u8, 39u8, 241u8, 123u8, 150u8, 221u8, 15u8, 77u8, 26u8, 71u8, 189u8,
-							196u8, 149u8, 22u8, 11u8, 27u8, 95u8, 82u8, 78u8, 118u8, 68u8,
+							147u8, 175u8, 188u8, 110u8, 91u8, 81u8, 15u8, 131u8, 101u8, 148u8,
+							89u8, 43u8, 22u8, 237u8, 202u8, 77u8, 98u8, 161u8, 63u8, 9u8, 240u8,
+							68u8, 102u8, 57u8, 59u8, 169u8, 65u8, 106u8, 134u8, 56u8, 192u8, 229u8,
 						],
 					)
 				}
-				#[doc = " Scheduled rewards and the account's single payout queue entry."]
-				pub fn buys_by_account(
+				#[doc = " Unpaid ordinary rewards and the account's single scheduled payout visit, across frames."]
+				pub fn payout_state_by_account(
 					&self,
-					_0: types::buys_by_account::Param0,
+					_0: types::payout_state_by_account::Param0,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
 					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
-						types::buys_by_account::Param0,
+						types::payout_state_by_account::Param0,
 					>,
-					types::buys_by_account::BuysByAccount,
+					types::payout_state_by_account::PayoutStateByAccount,
 					::subxt::ext::subxt_core::utils::Yes,
 					::subxt::ext::subxt_core::utils::Yes,
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"StabilizerBuys",
-						"BuysByAccount",
+						"PayoutStateByAccount",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							20u8, 145u8, 163u8, 153u8, 178u8, 109u8, 18u8, 159u8, 32u8, 180u8, 6u8,
-							87u8, 39u8, 241u8, 123u8, 150u8, 221u8, 15u8, 77u8, 26u8, 71u8, 189u8,
-							196u8, 149u8, 22u8, 11u8, 27u8, 95u8, 82u8, 78u8, 118u8, 68u8,
+							147u8, 175u8, 188u8, 110u8, 91u8, 81u8, 15u8, 131u8, 101u8, 148u8,
+							89u8, 43u8, 22u8, 237u8, 202u8, 77u8, 98u8, 161u8, 63u8, 9u8, 240u8,
+							68u8, 102u8, 57u8, 59u8, 169u8, 65u8, 106u8, 134u8, 56u8, 192u8, 229u8,
 						],
 					)
 				}
-				#[doc = " One principal bucket per account and admission frame, retained until release succeeds."]
+				#[doc = " Aggregated discounts, shared bid and ordinary principal for each account/admission frame."]
 				#[doc = " Ordered frame bytes let payout visits select the oldest buckets with bounded work."]
-				pub fn purchases_by_account_iter(
+				pub fn buys_by_account_and_frame_iter(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
 					(),
-					types::purchases_by_account::PurchasesByAccount,
+					types::buys_by_account_and_frame::BuysByAccountAndFrame,
 					(),
 					(),
 					::subxt::ext::subxt_core::utils::Yes,
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"StabilizerBuys",
-						"PurchasesByAccount",
+						"BuysByAccountAndFrame",
 						(),
 						[
-							74u8, 209u8, 138u8, 217u8, 225u8, 156u8, 64u8, 112u8, 68u8, 136u8,
-							147u8, 88u8, 254u8, 255u8, 80u8, 188u8, 62u8, 218u8, 171u8, 21u8,
-							143u8, 75u8, 190u8, 75u8, 54u8, 40u8, 126u8, 41u8, 217u8, 65u8, 43u8,
-							254u8,
+							219u8, 210u8, 8u8, 65u8, 4u8, 239u8, 183u8, 136u8, 200u8, 147u8, 14u8,
+							110u8, 25u8, 79u8, 87u8, 62u8, 254u8, 91u8, 222u8, 182u8, 138u8, 48u8,
+							135u8, 174u8, 186u8, 139u8, 175u8, 237u8, 182u8, 152u8, 82u8, 130u8,
 						],
 					)
 				}
-				#[doc = " One principal bucket per account and admission frame, retained until release succeeds."]
+				#[doc = " Aggregated discounts, shared bid and ordinary principal for each account/admission frame."]
 				#[doc = " Ordered frame bytes let payout visits select the oldest buckets with bounded work."]
-				pub fn purchases_by_account_iter1(
+				pub fn buys_by_account_and_frame_iter1(
 					&self,
-					_0: types::purchases_by_account::Param0,
+					_0: types::buys_by_account_and_frame::Param0,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
 					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
-						types::purchases_by_account::Param0,
+						types::buys_by_account_and_frame::Param0,
 					>,
-					types::purchases_by_account::PurchasesByAccount,
+					types::buys_by_account_and_frame::BuysByAccountAndFrame,
 					(),
 					(),
 					::subxt::ext::subxt_core::utils::Yes,
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"StabilizerBuys",
-						"PurchasesByAccount",
+						"BuysByAccountAndFrame",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							74u8, 209u8, 138u8, 217u8, 225u8, 156u8, 64u8, 112u8, 68u8, 136u8,
-							147u8, 88u8, 254u8, 255u8, 80u8, 188u8, 62u8, 218u8, 171u8, 21u8,
-							143u8, 75u8, 190u8, 75u8, 54u8, 40u8, 126u8, 41u8, 217u8, 65u8, 43u8,
-							254u8,
+							219u8, 210u8, 8u8, 65u8, 4u8, 239u8, 183u8, 136u8, 200u8, 147u8, 14u8,
+							110u8, 25u8, 79u8, 87u8, 62u8, 254u8, 91u8, 222u8, 182u8, 138u8, 48u8,
+							135u8, 174u8, 186u8, 139u8, 175u8, 237u8, 182u8, 152u8, 82u8, 130u8,
 						],
 					)
 				}
-				#[doc = " One principal bucket per account and admission frame, retained until release succeeds."]
+				#[doc = " Aggregated discounts, shared bid and ordinary principal for each account/admission frame."]
 				#[doc = " Ordered frame bytes let payout visits select the oldest buckets with bounded work."]
-				pub fn purchases_by_account(
+				pub fn buys_by_account_and_frame(
 					&self,
-					_0: types::purchases_by_account::Param0,
-					_1: types::purchases_by_account::Param1,
+					_0: types::buys_by_account_and_frame::Param0,
+					_1: types::buys_by_account_and_frame::Param1,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
 					(
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey<
-							types::purchases_by_account::Param0,
+							types::buys_by_account_and_frame::Param0,
 						>,
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey<
-							types::purchases_by_account::Param1,
+							types::buys_by_account_and_frame::Param1,
 						>,
 					),
-					types::purchases_by_account::PurchasesByAccount,
+					types::buys_by_account_and_frame::BuysByAccountAndFrame,
 					::subxt::ext::subxt_core::utils::Yes,
 					(),
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"StabilizerBuys",
-						"PurchasesByAccount",
+						"BuysByAccountAndFrame",
 						(
 							::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 							::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_1),
 						),
 						[
-							74u8, 209u8, 138u8, 217u8, 225u8, 156u8, 64u8, 112u8, 68u8, 136u8,
-							147u8, 88u8, 254u8, 255u8, 80u8, 188u8, 62u8, 218u8, 171u8, 21u8,
-							143u8, 75u8, 190u8, 75u8, 54u8, 40u8, 126u8, 41u8, 217u8, 65u8, 43u8,
-							254u8,
+							219u8, 210u8, 8u8, 65u8, 4u8, 239u8, 183u8, 136u8, 200u8, 147u8, 14u8,
+							110u8, 25u8, 79u8, 87u8, 62u8, 254u8, 91u8, 222u8, 182u8, 138u8, 48u8,
+							135u8, 174u8, 186u8, 139u8, 175u8, 237u8, 182u8, 152u8, 82u8, 130u8,
 						],
 					)
 				}
@@ -31417,56 +32022,58 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Funded auctions awaiting automatic reward allocation, ordered by maturity tick and frame."]
-				#[doc = " A failed allocation moves only its retry tick; the auction retains its original maturity."]
-				pub fn maturing_auctions_iter(
+				#[doc = " Closed auctions awaiting reward allocation, ordered by scheduled processing frame and"]
+				#[doc = " admission frame. A failed allocation moves only its queue entry; the auction retains its"]
+				#[doc = " original maturity."]
+				pub fn auction_allocation_queue_iter(
 					&self,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
 					(),
-					types::maturing_auctions::MaturingAuctions,
+					types::auction_allocation_queue::AuctionAllocationQueue,
 					(),
 					(),
 					::subxt::ext::subxt_core::utils::Yes,
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"StabilizerBuys",
-						"MaturingAuctions",
+						"AuctionAllocationQueue",
 						(),
 						[
-							188u8, 208u8, 135u8, 28u8, 142u8, 148u8, 188u8, 165u8, 69u8, 241u8,
-							103u8, 108u8, 13u8, 172u8, 177u8, 196u8, 136u8, 219u8, 251u8, 242u8,
-							207u8, 196u8, 48u8, 241u8, 121u8, 141u8, 21u8, 62u8, 68u8, 147u8,
-							143u8, 14u8,
+							227u8, 168u8, 127u8, 162u8, 7u8, 72u8, 119u8, 212u8, 26u8, 233u8,
+							225u8, 175u8, 149u8, 85u8, 226u8, 203u8, 79u8, 174u8, 232u8, 246u8,
+							218u8, 158u8, 185u8, 97u8, 208u8, 35u8, 109u8, 226u8, 191u8, 198u8,
+							44u8, 236u8,
 						],
 					)
 				}
-				#[doc = " Funded auctions awaiting automatic reward allocation, ordered by maturity tick and frame."]
-				#[doc = " A failed allocation moves only its retry tick; the auction retains its original maturity."]
-				pub fn maturing_auctions(
+				#[doc = " Closed auctions awaiting reward allocation, ordered by scheduled processing frame and"]
+				#[doc = " admission frame. A failed allocation moves only its queue entry; the auction retains its"]
+				#[doc = " original maturity."]
+				pub fn auction_allocation_queue(
 					&self,
-					_0: types::maturing_auctions::Param0,
+					_0: types::auction_allocation_queue::Param0,
 				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
 					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
-						types::maturing_auctions::Param0,
+						types::auction_allocation_queue::Param0,
 					>,
-					types::maturing_auctions::MaturingAuctions,
+					types::auction_allocation_queue::AuctionAllocationQueue,
 					::subxt::ext::subxt_core::utils::Yes,
 					(),
 					(),
 				> {
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"StabilizerBuys",
-						"MaturingAuctions",
+						"AuctionAllocationQueue",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							188u8, 208u8, 135u8, 28u8, 142u8, 148u8, 188u8, 165u8, 69u8, 241u8,
-							103u8, 108u8, 13u8, 172u8, 177u8, 196u8, 136u8, 219u8, 251u8, 242u8,
-							207u8, 196u8, 48u8, 241u8, 121u8, 141u8, 21u8, 62u8, 68u8, 147u8,
-							143u8, 14u8,
+							227u8, 168u8, 127u8, 162u8, 7u8, 72u8, 119u8, 212u8, 26u8, 233u8,
+							225u8, 175u8, 149u8, 85u8, 226u8, 203u8, 79u8, 174u8, 232u8, 246u8,
+							218u8, 158u8, 185u8, 97u8, 208u8, 35u8, 109u8, 226u8, 191u8, 198u8,
+							44u8, 236u8,
 						],
 					)
 				}
-				#[doc = " One scheduled visit per account, ordered by tick then account. Purchase buckets and the"]
+				#[doc = " One scheduled visit per account, ordered by frame then account. Purchase buckets and the"]
 				#[doc = " reward record retain unpaid funds while this index selects bounded work."]
 				pub fn payout_queue_iter(
 					&self,
@@ -31488,7 +32095,7 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " One scheduled visit per account, ordered by tick then account. Purchase buckets and the"]
+				#[doc = " One scheduled visit per account, ordered by frame then account. Purchase buckets and the"]
 				#[doc = " reward record retain unpaid funds while this index selects bounded work."]
 				pub fn payout_queue(
 					&self,
@@ -31513,38 +32120,43 @@ pub mod api {
 						],
 					)
 				}
+				#[doc = " Fixed due-frame cutoff and last visited key for a bounded pass through the payout queue."]
+				#[doc = " Waiting repayments keep their maturity rank without blocking accounts behind them."]
+				pub fn payout_queue_cursor(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::payout_queue_cursor::PayoutQueueCursor,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"StabilizerBuys",
+						"PayoutQueueCursor",
+						(),
+						[
+							117u8, 62u8, 118u8, 134u8, 18u8, 86u8, 128u8, 120u8, 73u8, 71u8, 176u8,
+							250u8, 52u8, 199u8, 224u8, 185u8, 49u8, 227u8, 48u8, 157u8, 195u8,
+							69u8, 89u8, 134u8, 80u8, 233u8, 56u8, 3u8, 214u8, 174u8, 245u8, 39u8,
+						],
+					)
+				}
 			}
 		}
 		pub mod constants {
 			use super::runtime_types;
 			pub struct ConstantsApi;
 			impl ConstantsApi {
-				#[doc = " Most recent tick observations retained for exact ARGON targets; configure 360."]
-				pub fn max_recent_price_ticks(
-					&self,
-				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
-					::core::primitive::u32,
-				> {
-					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
-						"StabilizerBuys",
-						"MaxRecentPriceTicks",
-						[
-							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
-							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
-							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
-							145u8,
-						],
-					)
-				}
-				#[doc = " Tick width of each older reference bucket; configure 60."]
-				pub fn price_history_bucket_ticks(
+				#[doc = " Maximum observation age at purchase time; also bounds historical lookup reads."]
+				pub fn max_price_age_ticks(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
 					::core::primitive::u64,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"StabilizerBuys",
-						"PriceHistoryBucketTicks",
+						"MaxPriceAgeTicks",
 						[
 							128u8, 214u8, 205u8, 242u8, 181u8, 142u8, 124u8, 231u8, 190u8, 146u8,
 							59u8, 226u8, 157u8, 101u8, 103u8, 117u8, 249u8, 65u8, 18u8, 191u8,
@@ -31553,15 +32165,15 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Maximum hourly reference buckets retained; configure 720."]
-				pub fn max_hourly_price_references(
+				#[doc = " Maximum obsolete price entries removed per block after gateway sync advances."]
+				pub fn max_price_history_prunes_per_block(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
 					::core::primitive::u32,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"StabilizerBuys",
-						"MaxHourlyPriceReferences",
+						"MaxPriceHistoryPrunesPerBlock",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
@@ -31570,33 +32182,33 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " In the open bucket, allow USDC observations up to ten ticks before the purchase."]
-				pub fn max_current_hour_price_age_ticks(
+				#[doc = " Maximum frame visits per repayment attempt; a partial frame visit also reads one tick."]
+				pub fn max_price_window_steps(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
-					::core::primitive::u64,
+					::core::primitive::u32,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"StabilizerBuys",
-						"MaxCurrentHourPriceAgeTicks",
+						"MaxPriceWindowSteps",
 						[
-							128u8, 214u8, 205u8, 242u8, 181u8, 142u8, 124u8, 231u8, 190u8, 146u8,
-							59u8, 226u8, 157u8, 101u8, 103u8, 117u8, 249u8, 65u8, 18u8, 191u8,
-							103u8, 119u8, 53u8, 85u8, 81u8, 96u8, 220u8, 42u8, 184u8, 239u8, 42u8,
-							246u8,
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
 						],
 					)
 				}
-				#[doc = " Maximum mature principal buckets released in one account payout visit."]
+				#[doc = " Maximum account/frame purchase buckets visited in one account payout."]
 				#[doc = " This bounds work, without limiting the number of purchases an account can hold."]
-				pub fn max_principal_payouts(
+				pub fn max_frames_per_payout(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
 					::core::primitive::u32,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"StabilizerBuys",
-						"MaxPrincipalPayouts",
+						"MaxFramesPerPayout",
 						[
 							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
 							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
@@ -31661,20 +32273,54 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Ticks after bidding close, configured for 30 elapsed days on the network."]
-				pub fn reward_maturity_ticks(
+				#[doc = " Total mining-frame hold from admission, including the bidding window."]
+				pub fn purchase_hold_frames(
 					&self,
 				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
 					::core::primitive::u64,
 				> {
 					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
 						"StabilizerBuys",
-						"RewardMaturityTicks",
+						"PurchaseHoldFrames",
 						[
 							128u8, 214u8, 205u8, 242u8, 181u8, 142u8, 124u8, 231u8, 190u8, 146u8,
 							59u8, 226u8, 157u8, 101u8, 103u8, 117u8, 249u8, 65u8, 18u8, 191u8,
 							103u8, 119u8, 53u8, 85u8, 81u8, 96u8, 220u8, 42u8, 184u8, 239u8, 42u8,
 							246u8,
+						],
+					)
+				}
+				#[doc = " Additional burn-funded reward before applying the purchase's auction result."]
+				pub fn liquid_repayment_reward_percent(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					runtime_types::sp_arithmetic::per_things::Percent,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"StabilizerBuys",
+						"LiquidRepaymentRewardPercent",
+						[
+							40u8, 171u8, 69u8, 196u8, 34u8, 184u8, 50u8, 128u8, 139u8, 192u8, 63u8,
+							231u8, 249u8, 200u8, 252u8, 73u8, 244u8, 170u8, 51u8, 177u8, 106u8,
+							47u8, 114u8, 234u8, 84u8, 104u8, 62u8, 118u8, 227u8, 50u8, 225u8,
+							122u8,
+						],
+					)
+				}
+				#[doc = " Maximum Liquid repayments attempted across all account payouts in one block."]
+				pub fn max_liquid_repays_per_block(
+					&self,
+				) -> ::subxt::ext::subxt_core::constants::address::StaticAddress<
+					::core::primitive::u32,
+				> {
+					::subxt::ext::subxt_core::constants::address::StaticAddress::new_static(
+						"StabilizerBuys",
+						"MaxLiquidRepaysPerBlock",
+						[
+							98u8, 252u8, 116u8, 72u8, 26u8, 180u8, 225u8, 83u8, 200u8, 157u8,
+							125u8, 151u8, 53u8, 76u8, 168u8, 26u8, 10u8, 9u8, 98u8, 68u8, 9u8,
+							178u8, 197u8, 113u8, 31u8, 79u8, 200u8, 90u8, 203u8, 100u8, 41u8,
+							145u8,
 						],
 					)
 				}
@@ -32388,7 +33034,7 @@ pub mod api {
 				)]
 				pub struct AscendingRankKey1<_0> {
 					pub ascending_rank: [::core::primitive::u8; 8usize],
-					pub ordered_id: [::core::primitive::u8; 8usize],
+					pub ordered_id: [::core::primitive::u8; 32usize],
 					#[codec(skip)]
 					pub __ignore: ::core::marker::PhantomData<_0>,
 				}
@@ -32406,7 +33052,7 @@ pub mod api {
 				)]
 				pub struct AscendingRankKey2<_0> {
 					pub ascending_rank: [::core::primitive::u8; 8usize],
-					pub ordered_id: [::core::primitive::u8; 32usize],
+					pub ordered_id: [::core::primitive::u8; 8usize],
 					#[codec(skip)]
 					pub __ignore: ::core::marker::PhantomData<_0>,
 				}
@@ -33362,6 +34008,47 @@ pub mod api {
 						::core::option::Option<runtime_types::primitive_types::U256>,
 				}
 			}
+			pub mod gateway {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct GatewayState<_0> {
+					pub last_synced_source_block_time:
+						::core::option::Option<::core::primitive::u64>,
+					#[codec(compact)]
+					pub gateway_activity_nonce: ::core::primitive::u64,
+					#[codec(compact)]
+					pub argon_approvals_nonce: ::core::primitive::u64,
+					pub argon_circulation: _0,
+					pub argonot_circulation: _0,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub enum SourceChain {
+					#[codec(index = 0)]
+					Ethereum,
+				}
+			}
 			pub mod host {
 				use super::runtime_types;
 				#[derive(
@@ -33855,6 +34542,23 @@ pub mod api {
 					>,
 					pub stabilizer_pool_sqrt_price_x96:
 						::core::option::Option<runtime_types::primitive_types::U256>,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct RValueHighWaterMark {
+					pub r_value: runtime_types::sp_arithmetic::fixed_point::FixedU128,
+					pub first_tick: ::core::primitive::u64,
+					pub end_tick: ::core::option::Option<::core::primitive::u64>,
 				}
 			}
 			pub mod providers {
@@ -35984,6 +36688,27 @@ pub mod api {
 					#[codec(index = 21)]
 					#[doc = "The fee coupon is invalid, expired, or already consumed."]
 					InvalidFeeCoupon,
+					#[codec(index = 22)]
+					#[doc = "Zero is reserved for the absence of a Liquid and cannot identify a new allocation."]
+					InvalidLiquidId,
+					#[codec(index = 23)]
+					#[doc = "A repayment must return at least one satoshi to its source Lock."]
+					RepaymentHasNoSatoshis,
+					#[codec(index = 24)]
+					#[doc = "The repayment requests more satoshis than the Fission currently allocates."]
+					RepaymentExceedsFission,
+					#[codec(index = 25)]
+					#[doc = "This owner has no active Fissions in the selected Liquid."]
+					LiquidNotFound,
+					#[codec(index = 26)]
+					#[doc = "The actual burn exceeds the remaining purchase budget."]
+					RepaymentBudgetExceeded,
+					#[codec(index = 27)]
+					#[doc = "This owner's Liquid has unsettled repayment purchases, so it cannot close or ratchet."]
+					LiquidRepaymentPending,
+					#[codec(index = 28)]
+					#[doc = "Fissions can join an existing Liquid only during its original creation tick."]
+					LiquidCreationWindowClosed,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -36035,6 +36760,15 @@ pub mod api {
 						fission_id: ::core::primitive::u64,
 						lock_id: ::core::primitive::u64,
 					},
+					#[codec(index = 4)]
+					#[doc = "Part of a Fission was repaid and its Bitcoin allocation returned to the source Lock."]
+					FissionRepaid {
+						account_id: crate::types::AccountId32,
+						fission_id: ::core::primitive::u64,
+						satoshis: ::core::primitive::u64,
+						liquidity_repaid: ::core::primitive::u128,
+						redemption_amount: ::core::primitive::u128,
+					},
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -36068,9 +36802,25 @@ pub mod api {
 					#[codec(compact)]
 					pub ratchet_number: ::core::primitive::u32,
 					#[codec(compact)]
-					pub last_ratchet_tick: ::core::primitive::u64,
+					pub last_ratchet_price_tick: ::core::primitive::u64,
 					#[codec(compact)]
 					pub last_updated_argon_block: ::core::primitive::u32,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct LiquidTicks {
+					pub created_at_tick: ::core::option::Option<::core::primitive::u64>,
+					pub last_ratchet_tick: ::core::option::Option<::core::primitive::u64>,
 				}
 			}
 		}
@@ -37288,7 +38038,7 @@ pub mod api {
 				)]
 				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 				pub enum Call {
-					# [codec (index = 0)] set_chain_config { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , config : runtime_types :: pallet_crosschain_transfer :: pallet :: ChainConfig , } , # [codec (index = 1)] force_set_global_issuance_council { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , # [codec (compact)] after_nonce : :: core :: primitive :: u64 , member_account_ids : runtime_types :: bounded_collections :: bounded_vec :: BoundedVec < crate :: types :: AccountId32 > , } , # [codec (index = 2)] pause_gateway { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , } , # [codec (index = 3)] unpause_gateway { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , } , # [codec (index = 4)] set_minimum_minting_authority_value { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , # [codec (compact)] minimum_value : :: core :: primitive :: u128 , } , # [codec (index = 5)] set_minting_authority_activation_repayment_pricing { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , pricing : runtime_types :: pallet_crosschain_transfer :: pallet :: MintingAuthorityActivationRepaymentPricing , } , # [codec (index = 6)] register_council_signer { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , signature : [:: core :: primitive :: u8 ; 65usize] , } , # [codec (index = 7)] approve_queue_entries { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , signatures : runtime_types :: bounded_collections :: bounded_vec :: BoundedVec < [:: core :: primitive :: u8 ; 65usize] > , } , # [codec (index = 8)] prove_gateway_activity { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , # [codec (compact)] previous_gateway_activity_nonce : :: core :: primitive :: u64 , proof_batch : runtime_types :: argon_primitives :: ethereum :: EthereumReceiptLogProofBatch , } , # [codec (index = 9)] register_minting_authority { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , signature : [:: core :: primitive :: u8 ; 65usize] , # [codec (compact)] microgon_collateral : :: core :: primitive :: u128 , # [codec (compact)] micronot_collateral : :: core :: primitive :: u128 , } , # [codec (index = 10)] deactivate_minting_authority { destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , } , # [codec (index = 11)] transfer_out { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , asset : runtime_types :: pallet_crosschain_transfer :: pallet :: AssetKind , destination_account : :: subxt :: ext :: subxt_core :: utils :: H160 , # [codec (compact)] amount : :: core :: primitive :: u128 , } , # [codec (index = 12)] collateralize_transfer { transfer_id : crate :: types :: H256 , signature : [:: core :: primitive :: u8 ; 65usize] , # [codec (compact)] microgon_collateral : :: core :: primitive :: u128 , # [codec (compact)] micronot_collateral : :: core :: primitive :: u128 , } , # [codec (index = 13)] # [doc = "Authenticate a complete gateway locator and settle its unconsumed activities."] prove_gateway_activity_storage { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , # [codec (compact)] previous_gateway_activity_nonce : :: core :: primitive :: u64 , proof : runtime_types :: pallet_crosschain_transfer :: GatewayActivityStorageProof , } , }
+					# [codec (index = 0)] set_chain_config { source_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , config : runtime_types :: pallet_crosschain_transfer :: pallet :: ChainConfig , } , # [codec (index = 1)] force_set_global_issuance_council { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , # [codec (compact)] after_nonce : :: core :: primitive :: u64 , member_account_ids : runtime_types :: bounded_collections :: bounded_vec :: BoundedVec < crate :: types :: AccountId32 > , } , # [codec (index = 2)] pause_gateway { source_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , } , # [codec (index = 3)] unpause_gateway { source_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , } , # [codec (index = 4)] set_minimum_minting_authority_value { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , # [codec (compact)] minimum_value : :: core :: primitive :: u128 , } , # [codec (index = 5)] set_minting_authority_activation_repayment_pricing { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , pricing : runtime_types :: pallet_crosschain_transfer :: pallet :: MintingAuthorityActivationRepaymentPricing , } , # [codec (index = 6)] register_council_signer { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , signature : [:: core :: primitive :: u8 ; 65usize] , } , # [codec (index = 7)] approve_queue_entries { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , signatures : runtime_types :: bounded_collections :: bounded_vec :: BoundedVec < [:: core :: primitive :: u8 ; 65usize] > , } , # [codec (index = 8)] prove_gateway_activity { source_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , # [codec (compact)] previous_gateway_activity_nonce : :: core :: primitive :: u64 , proof_batch : runtime_types :: argon_primitives :: ethereum :: EthereumReceiptLogProofBatch , } , # [codec (index = 9)] register_minting_authority { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , signature : [:: core :: primitive :: u8 ; 65usize] , # [codec (compact)] microgon_collateral : :: core :: primitive :: u128 , # [codec (compact)] micronot_collateral : :: core :: primitive :: u128 , } , # [codec (index = 10)] deactivate_minting_authority { destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , } , # [codec (index = 11)] transfer_out { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , asset : runtime_types :: pallet_crosschain_transfer :: pallet :: AssetKind , destination_account : :: subxt :: ext :: subxt_core :: utils :: H160 , # [codec (compact)] amount : :: core :: primitive :: u128 , } , # [codec (index = 12)] collateralize_transfer { transfer_id : crate :: types :: H256 , signature : [:: core :: primitive :: u8 ; 65usize] , # [codec (compact)] microgon_collateral : :: core :: primitive :: u128 , # [codec (compact)] micronot_collateral : :: core :: primitive :: u128 , } , # [codec (index = 13)] # [doc = "Authenticate a complete gateway locator and settle its unconsumed activities."] # [doc = "Including the gateway's current nonce also records the proven block time once all"] # [doc = "activity through that nonce has been applied."] prove_gateway_activity_storage { source_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , # [codec (compact)] previous_gateway_activity_nonce : :: core :: primitive :: u64 , proof : runtime_types :: pallet_crosschain_transfer :: GatewayActivityStorageProof , } , }
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
 					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
@@ -37502,7 +38252,7 @@ pub mod api {
 					#[doc = "recovery."]
 					GatewaySyncPaused,
 					#[codec(index = 41)]
-					#[doc = "The transfer-out amount must be nonzero."]
+					#[doc = "The transfer-out amount is below the selected currency's minimum account balance."]
 					InvalidTransferOutAmount,
 					#[codec(index = 42)]
 					#[doc = "The transfer-out recipient must be nonzero for the destination chain."]
@@ -37563,27 +38313,7 @@ pub mod api {
 				)]
 				#[doc = "The `Event` enum of this pallet"]
 				pub enum Event {
-					# [codec (index = 0)] # [doc = "A `TransferToArgonStarted` activity was proven and settled locally."] TransferToArgonSettled { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , transfer : runtime_types :: pallet_crosschain_transfer :: pallet :: TransferToArgonActivity , } , # [codec (index = 1)] # [doc = "Root force-set the active Global Issuance Council for a destination chain."] GlobalIssuanceCouncilForced { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , council_hash : crate :: types :: H256 , } , # [codec (index = 2)] # [doc = "A frame transition queued a new Global Issuance Council for destination-chain approval."] GlobalIssuanceCouncilRotationQueued { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , council_hash : crate :: types :: H256 , approval_queue_nonce : :: core :: primitive :: u64 , } , # [codec (index = 3)] # [doc = "An account registered its council signer for one destination chain."] CouncilSignerRegistered { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , account_id : crate :: types :: AccountId32 , signer : :: subxt :: ext :: subxt_core :: utils :: H160 , } , # [codec (index = 4)] # [doc = "An account queued a replacement council signer for the next council update."] CouncilSignerRotationQueued { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , account_id : crate :: types :: AccountId32 , signer : :: subxt :: ext :: subxt_core :: utils :: H160 , } , # [codec (index = 5)] # [doc = "An operator account registered a Minting Authority and queued it for council approval."] MintingAuthorityRegistered { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , account_id : crate :: types :: AccountId32 , approval_queue_nonce : :: core :: primitive :: u64 , } , # [codec (index = 6)] # [doc = "An operator queued the council-approved Ethereum deactivation for a Minting Authority."] MintingAuthorityDeactivationQueued { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , approval_queue_nonce : :: core :: primitive :: u64 , } , # [codec (index = 7)] # [doc = "Root updated the minimum normalized microgon value required to register a Minting"] # [doc = "Authority on one destination chain."] MinimumMintingAuthorityValueSet { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , minimum_value : :: core :: primitive :: u128 , } , # [codec (index = 8)] # [doc = "Root updated the pricing inputs used to repay relayers for activation batches on one"] # [doc = "destination chain."] MintingAuthorityActivationRepaymentPricingSet { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , } , # [codec (index = 9)] # [doc = "A council member recorded approval for a queued council update entry."] QueueEntryApprovalRecorded { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , target : runtime_types :: pallet_crosschain_transfer :: pallet :: CouncilApprovalTargetId , approval_queue_nonce : :: core :: primitive :: u64 , } , # [codec (index = 10)] # [doc = "The queued council update entry reached local quorum."] QueueEntryApprovalReady { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , target : runtime_types :: pallet_crosschain_transfer :: pallet :: CouncilApprovalTargetId , approval_queue_nonce : :: core :: primitive :: u64 , } , # [codec (index = 11)] # [doc = "A proven Ethereum activation filled the pending local activation fields."] MintingAuthorityActivationFinalized { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , } , # [codec (index = 12)] # [doc = "A proven activation paid or released the held relayer reimbursement and made the"] # [doc = "authority usable."] MintingAuthorityActivationCompleted { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , relayer_argon_account_id : crate :: types :: AccountId32 , repayment_amount : :: core :: primitive :: u128 , } , # [codec (index = 13)] # [doc = "A proven Ethereum deactivation released collateral and removed the local authority"] # [doc = "record."] MintingAuthorityDeactivationFinalized { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , } , # [codec (index = 14)] # [doc = "Gateway proof application paused one source chain at a specific canonical activity."] GatewaySyncPaused { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , pause : runtime_types :: pallet_crosschain_transfer :: pallet :: GatewaySyncPause , } , # [codec (index = 15)] # [doc = "Root manually unpaused one source chain."] GatewayUnpaused { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , } , # [codec (index = 16)] # [doc = "The stored gateway-state snapshot advanced after a proven contiguous batch."] GatewayStateAdvanced { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , gateway_state : runtime_types :: pallet_crosschain_transfer :: pallet :: GatewayState , } , # [codec (index = 17)] # [doc = "A transfer out was opened."] TransferOutStarted { destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , transfer_id : crate :: types :: H256 , account_id : crate :: types :: AccountId32 , asset : runtime_types :: pallet_crosschain_transfer :: pallet :: AssetKind , amount : :: core :: primitive :: u128 , minting_authority_tip : :: core :: primitive :: u128 , } , # [codec (index = 18)] # [doc = "A minting authority updated transfer collateral."] TransferCollateralized { transfer_id : crate :: types :: H256 , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , microgon_collateral : :: core :: primitive :: u128 , micronot_collateral : :: core :: primitive :: u128 , } , # [codec (index = 19)] # [doc = "A transfer is ready for finalization."] TransferOutReady { transfer_id : crate :: types :: H256 , } , # [codec (index = 20)] # [doc = "A transfer was finalized on the source chain."] TransferOutFinalized { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , transfer_id : crate :: types :: H256 , } , # [codec (index = 21)] # [doc = "A transfer was canceled on the source chain."] TransferOutCanceled { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , transfer_id : crate :: types :: H256 , } , # [codec (index = 22)] # [doc = "A pending collateral reservation was invalidated."] TransferCollateralInvalidated { transfer_id : crate :: types :: H256 , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , } , # [codec (index = 23)] # [doc = "A Uniswap purchase was credited without operational transfer credit."] TransferToArgonFromSwapSettled { source_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , transfer : runtime_types :: pallet_crosschain_transfer :: pallet :: TransferToArgonActivity , purchase : :: subxt :: ext :: subxt_core :: alloc :: boxed :: Box < runtime_types :: pallet_crosschain_transfer :: pallet :: SwapPurchaseEvidence > , purchase_tick : :: core :: primitive :: u64 , } , }
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
-				pub struct GatewayState {
-					#[codec(compact)]
-					pub gateway_activity_nonce: ::core::primitive::u64,
-					#[codec(compact)]
-					pub argon_approvals_nonce: ::core::primitive::u64,
-					pub argon_circulation: ::core::primitive::u128,
-					pub argonot_circulation: ::core::primitive::u128,
-				}
+					# [codec (index = 0)] # [doc = "A `TransferToArgonStarted` activity was proven and settled locally."] TransferToArgonSettled { source_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , transfer : runtime_types :: pallet_crosschain_transfer :: pallet :: TransferToArgonActivity , } , # [codec (index = 1)] # [doc = "Root force-set the active Global Issuance Council for a destination chain."] GlobalIssuanceCouncilForced { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , council_hash : crate :: types :: H256 , } , # [codec (index = 2)] # [doc = "A frame transition queued a new Global Issuance Council for destination-chain approval."] GlobalIssuanceCouncilRotationQueued { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , council_hash : crate :: types :: H256 , approval_queue_nonce : :: core :: primitive :: u64 , } , # [codec (index = 3)] # [doc = "An account registered its council signer for one destination chain."] CouncilSignerRegistered { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , account_id : crate :: types :: AccountId32 , signer : :: subxt :: ext :: subxt_core :: utils :: H160 , } , # [codec (index = 4)] # [doc = "An account queued a replacement council signer for the next council update."] CouncilSignerRotationQueued { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , account_id : crate :: types :: AccountId32 , signer : :: subxt :: ext :: subxt_core :: utils :: H160 , } , # [codec (index = 5)] # [doc = "An operator account registered a Minting Authority and queued it for council approval."] MintingAuthorityRegistered { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , account_id : crate :: types :: AccountId32 , approval_queue_nonce : :: core :: primitive :: u64 , } , # [codec (index = 6)] # [doc = "An operator queued the council-approved Ethereum deactivation for a Minting Authority."] MintingAuthorityDeactivationQueued { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , approval_queue_nonce : :: core :: primitive :: u64 , } , # [codec (index = 7)] # [doc = "Root updated the minimum normalized microgon value required to register a Minting"] # [doc = "Authority on one destination chain."] MinimumMintingAuthorityValueSet { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , minimum_value : :: core :: primitive :: u128 , } , # [codec (index = 8)] # [doc = "Root updated the pricing inputs used to repay relayers for activation batches on one"] # [doc = "destination chain."] MintingAuthorityActivationRepaymentPricingSet { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , } , # [codec (index = 9)] # [doc = "A council member recorded approval for a queued council update entry."] QueueEntryApprovalRecorded { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , target : runtime_types :: pallet_crosschain_transfer :: pallet :: CouncilApprovalTargetId , approval_queue_nonce : :: core :: primitive :: u64 , } , # [codec (index = 10)] # [doc = "The queued council update entry reached local quorum."] QueueEntryApprovalReady { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , target : runtime_types :: pallet_crosschain_transfer :: pallet :: CouncilApprovalTargetId , approval_queue_nonce : :: core :: primitive :: u64 , } , # [codec (index = 11)] # [doc = "A proven Ethereum activation filled the pending local activation fields."] MintingAuthorityActivationFinalized { source_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , } , # [codec (index = 12)] # [doc = "A proven activation paid or released the held relayer reimbursement and made the"] # [doc = "authority usable."] MintingAuthorityActivationCompleted { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , relayer_argon_account_id : crate :: types :: AccountId32 , repayment_amount : :: core :: primitive :: u128 , } , # [codec (index = 13)] # [doc = "A proven Ethereum deactivation released collateral and removed the local authority"] # [doc = "record."] MintingAuthorityDeactivationFinalized { source_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , } , # [codec (index = 14)] # [doc = "Gateway proof application paused one source chain at a specific canonical activity."] GatewaySyncPaused { source_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , pause : runtime_types :: pallet_crosschain_transfer :: pallet :: GatewaySyncPause , } , # [codec (index = 15)] # [doc = "Root manually unpaused one source chain."] GatewayUnpaused { source_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , } , # [codec (index = 16)] # [doc = "The stored gateway-state snapshot advanced after a proven contiguous batch."] GatewayStateAdvanced { source_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , gateway_state : runtime_types :: argon_primitives :: gateway :: GatewayState < :: core :: primitive :: u128 > , } , # [codec (index = 17)] # [doc = "A transfer out was opened."] TransferOutStarted { destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , transfer_id : crate :: types :: H256 , account_id : crate :: types :: AccountId32 , asset : runtime_types :: pallet_crosschain_transfer :: pallet :: AssetKind , amount : :: core :: primitive :: u128 , minting_authority_tip : :: core :: primitive :: u128 , } , # [codec (index = 18)] # [doc = "A minting authority updated transfer collateral."] TransferCollateralized { transfer_id : crate :: types :: H256 , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , microgon_collateral : :: core :: primitive :: u128 , micronot_collateral : :: core :: primitive :: u128 , } , # [codec (index = 19)] # [doc = "A transfer is ready for finalization."] TransferOutReady { transfer_id : crate :: types :: H256 , } , # [codec (index = 20)] # [doc = "A transfer was finalized on the source chain."] TransferOutFinalized { source_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , transfer_id : crate :: types :: H256 , } , # [codec (index = 21)] # [doc = "A transfer was canceled on the source chain."] TransferOutCanceled { source_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , transfer_id : crate :: types :: H256 , } , # [codec (index = 22)] # [doc = "A pending collateral reservation was invalidated."] TransferCollateralInvalidated { transfer_id : crate :: types :: H256 , destination_signing_key : :: subxt :: ext :: subxt_core :: utils :: H160 , } , # [codec (index = 23)] # [doc = "A Uniswap purchase was credited without operational transfer credit."] TransferToArgonFromSwapSettled { source_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , transfer : runtime_types :: pallet_crosschain_transfer :: pallet :: TransferToArgonActivity , purchase : :: subxt :: ext :: subxt_core :: alloc :: boxed :: Box < runtime_types :: pallet_crosschain_transfer :: pallet :: SwapPurchaseEvidence > , purchase_tick : :: core :: primitive :: u64 , } , # [codec (index = 24)] # [doc = "Delivery succeeded, but purchase admission rolled back. Funds remain spendable and"] # [doc = "the gateway nonce advances without a reward or Liquid repayment commitment."] UniswapPurchaseAdmissionFailed { source_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , gateway_activity_nonce : :: core :: primitive :: u64 , account : crate :: types :: AccountId32 , error : runtime_types :: sp_runtime :: DispatchError , } , }
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
 					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
@@ -37700,8 +38430,7 @@ pub mod api {
 				)]
 				pub struct MintingAuthority {
 					pub account_id: crate::types::AccountId32,
-					pub destination_chain:
-						runtime_types::pallet_crosschain_transfer::pallet::SourceChain,
+					pub destination_chain: runtime_types::argon_primitives::gateway::SourceChain,
 					pub destination_signing_key: ::subxt::ext::subxt_core::utils::H160,
 					pub state:
 						runtime_types::pallet_crosschain_transfer::pallet::MintingAuthorityState,
@@ -37774,22 +38503,6 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				pub enum SourceChain {
-					#[codec(index = 0)]
-					Ethereum,
-				}
-				#[derive(
-					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-					Clone,
-					Debug,
-				)]
-				#[decode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
-				)]
-				#[encode_as_type(
-					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
-				)]
 				pub struct SourceChainCirculation {
 					pub argon_circulation: ::core::primitive::u128,
 					pub argonot_circulation: ::core::primitive::u128,
@@ -37807,6 +38520,7 @@ pub mod api {
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
 				pub struct SwapPurchaseEvidence {
+					pub repay_liquid_id: ::core::option::Option<::core::primitive::u64>,
 					pub usdc_token: ::subxt::ext::subxt_core::utils::H160,
 					pub usdc_spent: runtime_types::primitive_types::U256,
 					pub argon_bought: runtime_types::primitive_types::U256,
@@ -37886,7 +38600,7 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				pub struct TransferOutOfArgon { pub argon_account_id : crate :: types :: AccountId32 , # [codec (compact)] pub argon_transfer_nonce : :: core :: primitive :: u64 , pub destination_chain : runtime_types :: pallet_crosschain_transfer :: pallet :: SourceChain , # [codec (compact)] pub microgons_per_argonot : :: core :: primitive :: u128 , pub destination_account : :: subxt :: ext :: subxt_core :: utils :: H160 , # [codec (compact)] pub valid_until_ethereum_block : :: core :: primitive :: u64 , pub asset : runtime_types :: pallet_crosschain_transfer :: pallet :: AssetKind , pub amount : :: core :: primitive :: u128 , pub minting_authority_tip : :: core :: primitive :: u128 , pub total_attached_collateral : :: core :: primitive :: u128 , pub minting_authority_collateral_by_signer : runtime_types :: bounded_collections :: bounded_btree_map :: BoundedBTreeMap1 < :: subxt :: ext :: subxt_core :: utils :: H160 , runtime_types :: pallet_crosschain_transfer :: transfer_out :: MintingAuthorityTransferReservation > , pub state : runtime_types :: pallet_crosschain_transfer :: transfer_out :: TransferOutState , }
+				pub struct TransferOutOfArgon { pub argon_account_id : crate :: types :: AccountId32 , # [codec (compact)] pub argon_transfer_nonce : :: core :: primitive :: u64 , pub destination_chain : runtime_types :: argon_primitives :: gateway :: SourceChain , # [codec (compact)] pub microgons_per_argonot : :: core :: primitive :: u128 , pub destination_account : :: subxt :: ext :: subxt_core :: utils :: H160 , # [codec (compact)] pub valid_until_ethereum_block : :: core :: primitive :: u64 , pub asset : runtime_types :: pallet_crosschain_transfer :: pallet :: AssetKind , pub amount : :: core :: primitive :: u128 , pub minting_authority_tip : :: core :: primitive :: u128 , pub total_attached_collateral : :: core :: primitive :: u128 , pub minting_authority_collateral_by_signer : runtime_types :: bounded_collections :: bounded_btree_map :: BoundedBTreeMap1 < :: subxt :: ext :: subxt_core :: utils :: H160 , runtime_types :: pallet_crosschain_transfer :: transfer_out :: MintingAuthorityTransferReservation > , pub state : runtime_types :: pallet_crosschain_transfer :: transfer_out :: TransferOutState , }
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
 					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
@@ -40883,10 +41597,11 @@ pub mod api {
 					#[doc = "The call is outside F+1 or the auction no longer accepts bids."]
 					BiddingClosed,
 					#[codec(index = 3)]
-					#[doc = "An auction scheduled for allocation lacks its reservation or maturity anchor."]
+					#[doc = "Allocation was requested before the auction's Treasury budget was finalized."]
 					AuctionNotReady,
 					#[codec(index = 4)]
-					#[doc = "The scheduled account has no mature principal or committed reward to pay."]
+					#[doc = "A repayment hold has not matured, its price window is incomplete, or its auction"]
+					#[doc = "result is not available yet."]
 					PayoutNotReady,
 					#[codec(index = 5)]
 					#[doc = "A positive bid repeats the account's current rate."]
@@ -40963,7 +41678,7 @@ pub mod api {
 						account: crate::types::AccountId32,
 						admission_frame: ::core::primitive::u64,
 						amount: ::core::primitive::u128,
-						matures_at_tick: ::core::primitive::u64,
+						matures_at_frame: ::core::primitive::u64,
 					},
 					#[codec(index = 9)]
 					AuctionSettled {
@@ -40979,6 +41694,31 @@ pub mod api {
 					},
 					#[codec(index = 11)]
 					MatchingRateChanged { rate: runtime_types::sp_arithmetic::per_things::Permill },
+					#[codec(index = 12)]
+					#[doc = "The purchase lacks valid BTC/R prices, or the Liquid is empty, was recently ratcheted,"]
+					#[doc = "or lacks the hold plus release window."]
+					#[doc = "Delivered ARGON is processed under the ordinary purchase rules."]
+					LiquidRepaymentInvalid {
+						account: crate::types::AccountId32,
+						gateway_activity_nonce: ::core::primitive::u64,
+						liquid_id: ::core::primitive::u64,
+					},
+					#[codec(index = 13)]
+					#[doc = "Repayment and its remaining principal were settled in the account payout transaction."]
+					LiquidRepaymentCompleted {
+						account: crate::types::AccountId32,
+						gateway_activity_nonce: ::core::primitive::u64,
+						liquid_id: ::core::primitive::u64,
+						microgons_burned: ::core::primitive::u128,
+					},
+					#[codec(index = 14)]
+					#[doc = "Additional reward funded by completed repayment burns, using the same auction result."]
+					#[doc = "This does not consume the Treasury funding reserved for ordinary buy rewards."]
+					LiquidRepaymentRewardAwarded {
+						account: crate::types::AccountId32,
+						admission_frame: ::core::primitive::u64,
+						amount: ::core::primitive::u128,
+					},
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -40996,6 +41736,47 @@ pub mod api {
 					#[codec(index = 0)]
 					PurchasePrincipal,
 				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct LiquidRepay {
+					pub liquid_id: ::core::primitive::u64,
+					pub admission_frame: ::core::primitive::u64,
+					pub microgons: ::core::primitive::u128,
+					pub eligible_reward_percent: runtime_types::sp_arithmetic::per_things::Percent,
+					pub purchase_tick: ::core::primitive::u64,
+					pub microgons_at_target_per_btc:
+						runtime_types::sp_arithmetic::fixed_point::FixedU128,
+					pub purchase_r_value: runtime_types::sp_arithmetic::fixed_point::FixedU128,
+					pub price_window:
+						runtime_types::pallet_stabilizer_buys::pallet::LiquidRepayPriceWindow,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct LiquidRepayPriceWindow {
+					pub next_frame: ::core::option::Option<::core::primitive::u64>,
+					pub next_tick: ::core::primitive::u64,
+					pub r_value_high_water: runtime_types::sp_arithmetic::fixed_point::FixedU128,
+				}
 			}
 			pub mod price_history {
 				use super::runtime_types;
@@ -41011,13 +41792,27 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				pub struct HourlyPriceReference {
-					pub minimum_argon_target_usd:
+				pub struct PriceObservation { pub frame : :: core :: primitive :: u64 , pub r_value : runtime_types :: sp_arithmetic :: fixed_point :: FixedU128 , pub prices : :: core :: option :: Option < runtime_types :: pallet_stabilizer_buys :: price_history :: PurchasePriceReference > , }
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct PurchasePriceReference {
+					pub r_value: runtime_types::sp_arithmetic::fixed_point::FixedU128,
+					pub argon_usd_target_price:
 						runtime_types::sp_arithmetic::fixed_point::FixedU128,
-					pub usdc: ::core::option::Option<(
-						::core::primitive::u64,
+					pub microgons_at_target_per_btc:
 						runtime_types::sp_arithmetic::fixed_point::FixedU128,
-					)>,
+					pub microgons_at_target_per_usdc:
+						runtime_types::sp_arithmetic::fixed_point::FixedU128,
 				}
 			}
 			pub mod uniswap_purchase {
@@ -41050,9 +41845,26 @@ pub mod api {
 			)]
 			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
 			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			pub struct AccountBuys {
+			pub struct AccountFrameBuys {
+				pub principal: ::core::primitive::u128,
+				pub captured_discount: ::core::primitive::u128,
+				pub bid_rate: runtime_types::sp_arithmetic::per_things::Percent,
+				pub positive_bid_count: ::core::primitive::u8,
+				pub pending_liquid_repays: ::core::primitive::u64,
+				pub liquid_repayment_reward_rate:
+					::core::option::Option<runtime_types::sp_arithmetic::fixed_point::FixedU128>,
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub struct AccountPayoutState {
 				pub payable_reward: ::core::primitive::u128,
-				pub next_payout_tick: ::core::option::Option<::core::primitive::u64>,
+				pub next_payout_frame: ::core::option::Option<::core::primitive::u64>,
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -41068,21 +41880,7 @@ pub mod api {
 				pub budget: ::core::option::Option<::core::primitive::u128>,
 				pub remaining_budget: ::core::primitive::u128,
 				pub remaining_matching_basis: ::core::primitive::u128,
-				pub matures_at_tick: ::core::option::Option<::core::primitive::u64>,
-			}
-			#[derive(
-				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
-				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
-				Clone,
-				Debug,
-			)]
-			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
-			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
-			pub struct BuyPayout {
-				pub principal: ::core::primitive::u128,
-				pub captured_discount: ::core::primitive::u128,
-				pub bid_rate: runtime_types::sp_arithmetic::per_things::Percent,
-				pub positive_bid_count: ::core::primitive::u8,
+				pub matures_at_frame: ::core::primitive::u64,
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -41899,8 +42697,8 @@ pub mod api {
 					#[doc = "The vault doesn't have enough raw securitization to support this bond purchase."]
 					InsufficientBondSpace,
 					#[codec(index = 14)]
-					#[doc = "Liquidating this bond lot would take the account below its crosschain-encumbered"]
-					#[doc = "treasury backing."]
+					#[doc = "A reservation or liquidation would leave Treasury backing uncovered, or queued"]
+					#[doc = "settlement exceeds the account's remaining encumbrance."]
 					ActiveBondAmountBelowEncumberedBacking,
 					#[codec(index = 15)]
 					#[doc = "The bonus approval was signed for a different vault."]
@@ -42072,6 +42870,12 @@ pub mod api {
 						added_frames: ::core::primitive::u32,
 						added_earnings: ::core::primitive::u128,
 					},
+					#[codec(index = 16)]
+					#[doc = "Settlement rolled back and remains queued for a later block."]
+					CouldNotSettleBondCollateral {
+						account_id: crate::types::AccountId32,
+						dispatch_error: runtime_types::sp_runtime::DispatchError,
+					},
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -42196,6 +43000,22 @@ pub mod api {
 					pub flexible_bonds: ::core::primitive::u32,
 					#[codec(compact)]
 					pub displaced_flexible_bonds: ::core::primitive::u32,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct PendingBondCollateral<_0> {
+					pub burn_microgons: _0,
+					pub release_microgons: _0,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,

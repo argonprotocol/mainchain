@@ -20,6 +20,8 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 	uint8 public constant TOKEN_DECIMALS = 18;
 	/// @notice Conversion factor from runtime units into ERC-20 base units.
 	uint256 public constant RUNTIME_TO_ERC20_SCALE = 10 ** (TOKEN_DECIMALS - RUNTIME_DECIMALS);
+	/// @notice Minimum transfer of either token: 0.01 in six-decimal runtime units.
+	uint128 public constant MIN_TRANSFER_AMOUNT = 10_000;
 	/// @notice Maximum queued Argon gateway updates accepted in one relay call.
 	uint256 public constant MAX_GATEWAY_UPDATES_PER_BATCH = 100;
 	/// @notice Maximum minting-authority signatures accepted in one transfer finalization.
@@ -106,6 +108,10 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 		uint64 timestamp;
 		address buyer;
 		bytes32 argonAccountId;
+		/// @notice Recipient-local Liquid to repay; zero means an ordinary purchase.
+		uint64 repayLiquidId;
+		/// @notice Recipient's SCALE-encoded authorization of buyer, checked only at Argon admission.
+		bytes repaySignature;
 		address usdcToken;
 		uint256 usdcSpent;
 		uint256 argonBought;
@@ -245,6 +251,7 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 	error UnsupportedToken(address token);
 	error UnauthorizedSwapContract();
 	error PurchaseTooSmall();
+	error TransferTooSmall();
 	error RuntimeAmountOverflow(uint256 amount);
 	error ZeroAdminSafe();
 	error ZeroAmount();
@@ -696,7 +703,7 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 		bytes32 s
 	) external whenNotPaused {
 		_requireCanonicalToken(token);
-		if (amount == 0) revert ZeroAmount();
+		if (amount < MIN_TRANSFER_AMOUNT) revert TransferTooSmall();
 
 		uint256 tokenAmount = toTokenAmount(amount);
 		ICanonicalToken canonicalToken = ICanonicalToken(token);
@@ -729,7 +736,6 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 		purchase.timestamp = uint64(block.timestamp);
 		_requireCanonicalToken(argonToken);
 		amount = _toRuntimeAmount(purchase.argonBought);
-		if (amount == 0) revert ZeroAmount();
 		if (amount < minimumSwapMicrogons()) revert PurchaseTooSmall();
 		ICanonicalToken(argonToken).burnFrom(msg.sender, toTokenAmount(amount));
 
@@ -924,7 +930,7 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 
 	/// @notice Changes the minimum for swap purchases without restricting ordinary transfers.
 	function setMinimumSwapMicrogons(uint128 minimumMicrogons) external onlyOwner {
-		if (minimumMicrogons == 0) revert ZeroAmount();
+		if (minimumMicrogons < MIN_TRANSFER_AMOUNT) revert TransferTooSmall();
 		_minimumSwapMicrogons = minimumMicrogons;
 		emit MinimumSwapMicrogonsUpdated(minimumMicrogons);
 	}

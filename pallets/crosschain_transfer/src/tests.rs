@@ -20,6 +20,98 @@ pub(super) use sp_runtime::transaction_validity::{InvalidTransaction, Transactio
 pub(super) use super::mock::*;
 
 #[test]
+fn gateway_sync_time_migration_preserves_snapshot_and_only_runs_once() {
+	use codec::{Compact, DecodeAll};
+	use frame_support::traits::OnRuntimeUpgrade;
+	type Migration = crate::migrations::AddGatewaySyncTimeMigration<Test>;
+
+	new_test_ext().execute_with(|| {
+		let chain = SourceChain::Ethereum;
+		let key = GatewayStateBySourceChain::<Test>::hashed_key_for(chain);
+		let old_state = (Compact(73u64), Compact(69u64), 300u128, 400u128);
+		assert!(GatewayState::<u128>::decode_all(&mut &old_state.encode()[..]).is_err());
+		frame_support::storage::unhashed::put_raw(&key, &old_state.encode());
+		StorageVersion::new(3).put::<CrosschainTransfer>();
+		#[cfg(feature = "try-runtime")]
+		let preflight = Migration::pre_upgrade().unwrap();
+
+		Migration::on_runtime_upgrade();
+		#[cfg(feature = "try-runtime")]
+		Migration::post_upgrade(preflight).unwrap();
+		assert_eq!(StorageVersion::get::<CrosschainTransfer>(), StorageVersion::new(4));
+		assert_eq!(
+			GatewayStateBySourceChain::<Test>::get(chain),
+			Some(GatewayState {
+				last_synced_source_block_time: None,
+				gateway_activity_nonce: 73,
+				argon_approvals_nonce: 69,
+				argon_circulation: 300,
+				argonot_circulation: 400,
+			})
+		);
+
+		GatewayStateBySourceChain::<Test>::mutate(chain, |state| {
+			state.as_mut().unwrap().last_synced_source_block_time = Some(10_000);
+		});
+		let synced = frame_support::storage::unhashed::get_raw(&key);
+		Migration::on_runtime_upgrade();
+		assert_eq!(frame_support::storage::unhashed::get_raw(&key), synced);
+	});
+}
+
+#[test]
+fn applying_a_locator_advances_history_only_when_its_proven_head_is_fully_consumed() {
+	new_test_ext().execute_with(|| {
+		assert_ok!(CrosschainTransfer::set_chain_config(
+			RuntimeOrigin::root(),
+			SourceChain::Ethereum,
+			chain_config()
+		));
+		CurrentTick::set(100);
+		LatestExecutionBlockTimestamp::set(Some(10_000));
+		let burn = CrosschainTransfer::burn_account(SourceChain::Ethereum);
+		assert_ok!(Balances::mint_into(&burn, 400));
+		assert_ok!(CrosschainTransfer::prove_gateway_activity_storage(
+			RuntimeOrigin::signed(account(1)),
+			SourceChain::Ethereum,
+			0,
+			storage_proof(9, H256::zero(), vec![transfer_to_argon_log(account(2), 1, 100)]),
+		));
+		LatestExecutionBlockTimestamp::set(Some(50_000));
+		let mut first =
+			storage_proof(10, H256::zero(), vec![transfer_to_argon_log(account(2), 2, 100)]);
+		first.storage_proof.slots[2].value.0[11] = 3;
+		assert_ok!(CrosschainTransfer::prove_gateway_activity_storage(
+			RuntimeOrigin::signed(account(1)),
+			SourceChain::Ethereum,
+			1,
+			first,
+		));
+		assert_eq!(Balances::balance(&account(2)), 200);
+		assert_eq!(
+			GatewayStateBySourceChain::<Test>::get(SourceChain::Ethereum)
+				.unwrap()
+				.last_synced_source_block_time,
+			Some(10_000)
+		);
+		let second =
+			storage_proof(11, H256::zero(), vec![transfer_to_argon_log(account(2), 3, 200)]);
+		assert_ok!(CrosschainTransfer::prove_gateway_activity_storage(
+			RuntimeOrigin::signed(account(1)),
+			SourceChain::Ethereum,
+			2,
+			second,
+		));
+		assert_eq!(Balances::balance(&account(2)), 400);
+		assert_eq!(
+			GatewayStateBySourceChain::<Test>::get(SourceChain::Ethereum)
+				.and_then(|state| state.last_synced_source_block_time),
+			Some(50_000)
+		);
+	});
+}
+
+#[test]
 #[should_panic(expected = "runtime activity capacity is below the gateway contract cap")]
 fn integrity_rejects_activity_capacity_below_the_contract_cap() {
 	use frame_support::traits::Hooks;
@@ -712,4 +804,48 @@ pub(super) fn u128_word(value: u128) -> [u8; 32] {
 	let mut bytes = [0u8; 32];
 	bytes[16..].copy_from_slice(&value.to_be_bytes());
 	bytes
+}
+
+#[test]
+fn replacing_gateway_invalidates_its_sync_time() {
+	new_test_ext().execute_with(|| {
+		let original = chain_config();
+		assert_ok!(CrosschainTransfer::set_chain_config(
+			RuntimeOrigin::root(),
+			SourceChain::Ethereum,
+			original.clone(),
+		));
+		GatewayStateBySourceChain::<Test>::insert(
+			SourceChain::Ethereum,
+			GatewayState::<Balance> {
+				last_synced_source_block_time: Some(100),
+				..Default::default()
+			},
+		);
+		assert_ok!(CrosschainTransfer::set_chain_config(
+			RuntimeOrigin::root(),
+			SourceChain::Ethereum,
+			original.clone(),
+		));
+		assert_eq!(
+			GatewayStateBySourceChain::<Test>::get(SourceChain::Ethereum)
+				.and_then(|state| state.last_synced_source_block_time),
+			Some(100)
+		);
+		let ChainConfig::Evm { chain_id, argon_token, argonot_token, .. } = original;
+		let replacement = ChainConfig::Evm {
+			chain_id,
+			gateway: H160::repeat_byte(0x71),
+			argon_token,
+			argonot_token,
+		};
+		assert_ok!(CrosschainTransfer::set_chain_config(
+			RuntimeOrigin::root(),
+			SourceChain::Ethereum,
+			replacement,
+		));
+		assert!(GatewayStateBySourceChain::<Test>::get(SourceChain::Ethereum)
+			.and_then(|state| state.last_synced_source_block_time)
+			.is_none());
+	});
 }

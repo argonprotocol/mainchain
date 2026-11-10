@@ -106,6 +106,22 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       InvalidFeeCoupon: AugmentedError<ApiType>;
       /**
+       * Zero is reserved for the absence of a Liquid and cannot identify a new allocation.
+       **/
+      InvalidLiquidId: AugmentedError<ApiType>;
+      /**
+       * Fissions can join an existing Liquid only during its original creation tick.
+       **/
+      LiquidCreationWindowClosed: AugmentedError<ApiType>;
+      /**
+       * This owner has no active Fissions in the selected Liquid.
+       **/
+      LiquidNotFound: AugmentedError<ApiType>;
+      /**
+       * This owner's Liquid has unsettled repayment purchases, so it cannot close or ratchet.
+       **/
+      LiquidRepaymentPending: AugmentedError<ApiType>;
+      /**
        * The requested source Lock does not exist.
        **/
       LockNotFound: AugmentedError<ApiType>;
@@ -141,6 +157,18 @@ declare module '@polkadot/api-base/types/errors' {
        * The Fission's ratchet counter cannot be incremented.
        **/
       RatchetNumberOverflow: AugmentedError<ApiType>;
+      /**
+       * The actual burn exceeds the remaining purchase budget.
+       **/
+      RepaymentBudgetExceeded: AugmentedError<ApiType>;
+      /**
+       * The repayment requests more satoshis than the Fission currently allocates.
+       **/
+      RepaymentExceedsFission: AugmentedError<ApiType>;
+      /**
+       * A repayment must return at least one satoshi to its source Lock.
+       **/
+      RepaymentHasNoSatoshis: AugmentedError<ApiType>;
       /**
        * The Vault could not upgrade the guarantee assigned to this Fission.
        **/
@@ -613,7 +641,7 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       InvalidTransferCollateralUpdate: AugmentedError<ApiType>;
       /**
-       * The transfer-out amount must be nonzero.
+       * The transfer-out amount is below the selected currency's minimum account balance.
        **/
       InvalidTransferOutAmount: AugmentedError<ApiType>;
       /**
@@ -1349,7 +1377,7 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       AuctionNotFound: AugmentedError<ApiType>;
       /**
-       * An auction scheduled for allocation lacks its reservation or maturity anchor.
+       * Allocation was requested before the auction's Treasury budget was finalized.
        **/
       AuctionNotReady: AugmentedError<ApiType>;
       /**
@@ -1373,7 +1401,8 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       EntryNotFound: AugmentedError<ApiType>;
       /**
-       * The scheduled account has no mature principal or committed reward to pay.
+       * A repayment hold has not matured, its price window is incomplete, or its auction
+       * result is not available yet.
        **/
       PayoutNotReady: AugmentedError<ApiType>;
     };
@@ -1483,8 +1512,8 @@ declare module '@polkadot/api-base/types/errors' {
     ticks: {};
     treasury: {
       /**
-       * Liquidating this bond lot would take the account below its crosschain-encumbered
-       * treasury backing.
+       * A reservation or liquidation would leave Treasury backing uncovered, or queued
+       * settlement exceeds the account's remaining encumbrance.
        **/
       ActiveBondAmountBelowEncumberedBacking: AugmentedError<ApiType>;
       /**

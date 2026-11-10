@@ -69,6 +69,8 @@ impl<T: Config> DecodedGatewayActivity<T> {
 						timestamp: *purchase_timestamp,
 						buyer: AlloyAddress::from_slice(buyer.as_bytes()),
 						argonAccountId: B256::from(*to),
+						repayLiquidId: purchase.repay_liquid_id.unwrap_or_default(),
+						repaySignature: purchase.repay_signature.to_vec().into(),
 						usdcToken: AlloyAddress::from_slice(purchase.usdc_token.as_bytes()),
 						usdcSpent: U256::from_le_bytes(purchase.usdc_spent.to_little_endian()),
 						argonBought: U256::from_le_bytes(purchase.argon_bought.to_little_endian()),
@@ -397,8 +399,11 @@ impl<T: Config> Pallet<T> {
 		Some(H160::from_slice(&hash.as_slice()[12..]))
 	}
 
-	fn gateway_state_from_contract(value: ContractGatewayActivityState) -> GatewayState<T> {
-		GatewayState {
+	fn gateway_state_from_contract(
+		value: ContractGatewayActivityState,
+	) -> GatewayState<T::Balance> {
+		GatewayState::<T::Balance> {
+			last_synced_source_block_time: None,
 			gateway_activity_nonce: value.gatewayActivityNonce,
 			argon_approvals_nonce: value.argonApprovalsNonce,
 			argon_circulation: value.argonCirculation.into(),
@@ -411,7 +416,7 @@ impl<T: Config> Pallet<T> {
 		previous_gateway_activity_nonce: GatewayActivityNonce,
 		proof: &GatewayActivityStorageProof<T::MaxActivitiesPerGatewayProof>,
 	) -> Result<GatewayActivityBlock<T>, DispatchError> {
-		let [range_slot, root_slot] = proof.storage_proof.slots.as_slice() else {
+		let [range_slot, root_slot, ..] = proof.storage_proof.slots.as_slice() else {
 			return Err(Error::<T>::InvalidProof.into());
 		};
 
@@ -554,6 +559,14 @@ impl<T: Config> Pallet<T> {
 				amount: activity.amount.into(),
 				purchase_timestamp: activity.purchase.timestamp,
 				purchase: Box::new(SwapPurchaseEvidence {
+					repay_liquid_id: (activity.purchase.repayLiquidId != 0)
+						.then_some(activity.purchase.repayLiquidId),
+					repay_signature: activity
+						.purchase
+						.repaySignature
+						.to_vec()
+						.try_into()
+						.map_err(|_| Error::<T>::InvalidGatewayActivity)?,
 					usdc_token: H160::from_slice(activity.purchase.usdcToken.as_slice()),
 					usdc_spent: sp_core::U256::from_big_endian(
 						&activity.purchase.usdcSpent.to_be_bytes::<32>(),

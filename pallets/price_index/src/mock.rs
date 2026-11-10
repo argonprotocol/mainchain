@@ -1,5 +1,5 @@
 use crate as pallet_price_index;
-use argon_primitives::MiningFrameTransitionProvider;
+use argon_primitives::{tick::Ticker, MiningFrameTransitionProvider, TickProvider, VotingSchedule};
 
 use pallet_prelude::*;
 pub(crate) type Block = frame_system::mocking::MockBlock<Test>;
@@ -60,6 +60,8 @@ parameter_types! {
 
 pub struct StaticMiningFrameTransitionProvider;
 impl MiningFrameTransitionProvider for StaticMiningFrameTransitionProvider {
+	type Weights = ();
+
 	fn is_new_frame_started() -> Option<FrameId> {
 		NewlyStartedFrameId::get()
 	}
@@ -69,9 +71,32 @@ impl MiningFrameTransitionProvider for StaticMiningFrameTransitionProvider {
 	}
 }
 
+impl TickProvider<Block> for CurrentTick {
+	type Weights = ();
+
+	fn previous_tick() -> Tick {
+		Self::get().saturating_sub(1)
+	}
+	fn current_tick() -> Tick {
+		Self::get()
+	}
+	fn elapsed_ticks() -> Tick {
+		Self::get()
+	}
+	fn voting_schedule() -> VotingSchedule {
+		VotingSchedule::from_runtime_current_tick(Self::get())
+	}
+	fn ticker() -> Ticker {
+		Ticker::new(60_000, 2)
+	}
+	fn blocks_at_tick(_tick: Tick) -> Vec<<Block as BlockT>::Hash> {
+		Vec::new()
+	}
+}
+
 impl pallet_price_index::Config for Test {
 	type OnPriceIndexUpdated = ();
-	type CurrentTick = CurrentTick;
+	type TickProvider = CurrentTick;
 	type CurrentFrameId = CurrentFrameId;
 	type MiningFrameTransitionProvider = StaticMiningFrameTransitionProvider;
 	type WeightInfo = ();

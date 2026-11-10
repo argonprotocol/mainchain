@@ -30,6 +30,8 @@ import type {
   ArgonPrimitivesBlockSealBlockPayout,
   ArgonPrimitivesBlockSealMiningRegistration,
   ArgonPrimitivesDomainZoneRecord,
+  ArgonPrimitivesGatewayGatewayState,
+  ArgonPrimitivesGatewaySourceChain,
   ArgonPrimitivesNotaryNotaryMeta,
   ArgonPrimitivesNotaryNotaryRecord,
   ArgonPrimitivesProvidersOperationalRewardKind,
@@ -44,9 +46,7 @@ import type {
   PalletBootstrapRecoveryPubkey,
   PalletCrosschainTransferAssetKind,
   PalletCrosschainTransferCouncilApprovalTargetId,
-  PalletCrosschainTransferGatewayState,
   PalletCrosschainTransferGatewaySyncPause,
-  PalletCrosschainTransferSourceChain,
   PalletCrosschainTransferSwapPurchaseEvidence,
   PalletCrosschainTransferTransferToArgonActivity,
   PalletDomainsDomainRegistration,
@@ -385,6 +385,26 @@ declare module '@polkadot/api-base/types/events' {
           amountBurned: u128;
         }
       >;
+      /**
+       * Part of a Fission was repaid and its Bitcoin allocation returned to the source Lock.
+       **/
+      FissionRepaid: AugmentedEvent<
+        ApiType,
+        [
+          accountId: AccountId32,
+          fissionId: u64,
+          satoshis: u64,
+          liquidityRepaid: u128,
+          redemptionAmount: u128,
+        ],
+        {
+          accountId: AccountId32;
+          fissionId: u64;
+          satoshis: u64;
+          liquidityRepaid: u128;
+          redemptionAmount: u128;
+        }
+      >;
     };
     bitcoinLocks: {
       BitcoinCosignPastDue: AugmentedEvent<
@@ -637,13 +657,9 @@ declare module '@polkadot/api-base/types/events' {
        **/
       CouncilSignerRegistered: AugmentedEvent<
         ApiType,
-        [
-          destinationChain: PalletCrosschainTransferSourceChain,
-          accountId: AccountId32,
-          signer: H160,
-        ],
+        [destinationChain: ArgonPrimitivesGatewaySourceChain, accountId: AccountId32, signer: H160],
         {
-          destinationChain: PalletCrosschainTransferSourceChain;
+          destinationChain: ArgonPrimitivesGatewaySourceChain;
           accountId: AccountId32;
           signer: H160;
         }
@@ -653,13 +669,9 @@ declare module '@polkadot/api-base/types/events' {
        **/
       CouncilSignerRotationQueued: AugmentedEvent<
         ApiType,
-        [
-          destinationChain: PalletCrosschainTransferSourceChain,
-          accountId: AccountId32,
-          signer: H160,
-        ],
+        [destinationChain: ArgonPrimitivesGatewaySourceChain, accountId: AccountId32, signer: H160],
         {
-          destinationChain: PalletCrosschainTransferSourceChain;
+          destinationChain: ArgonPrimitivesGatewaySourceChain;
           accountId: AccountId32;
           signer: H160;
         }
@@ -670,12 +682,12 @@ declare module '@polkadot/api-base/types/events' {
       GatewayStateAdvanced: AugmentedEvent<
         ApiType,
         [
-          sourceChain: PalletCrosschainTransferSourceChain,
-          gatewayState: PalletCrosschainTransferGatewayState,
+          sourceChain: ArgonPrimitivesGatewaySourceChain,
+          gatewayState: ArgonPrimitivesGatewayGatewayState,
         ],
         {
-          sourceChain: PalletCrosschainTransferSourceChain;
-          gatewayState: PalletCrosschainTransferGatewayState;
+          sourceChain: ArgonPrimitivesGatewaySourceChain;
+          gatewayState: ArgonPrimitivesGatewayGatewayState;
         }
       >;
       /**
@@ -684,11 +696,11 @@ declare module '@polkadot/api-base/types/events' {
       GatewaySyncPaused: AugmentedEvent<
         ApiType,
         [
-          sourceChain: PalletCrosschainTransferSourceChain,
+          sourceChain: ArgonPrimitivesGatewaySourceChain,
           pause: PalletCrosschainTransferGatewaySyncPause,
         ],
         {
-          sourceChain: PalletCrosschainTransferSourceChain;
+          sourceChain: ArgonPrimitivesGatewaySourceChain;
           pause: PalletCrosschainTransferGatewaySyncPause;
         }
       >;
@@ -697,16 +709,16 @@ declare module '@polkadot/api-base/types/events' {
        **/
       GatewayUnpaused: AugmentedEvent<
         ApiType,
-        [sourceChain: PalletCrosschainTransferSourceChain],
-        { sourceChain: PalletCrosschainTransferSourceChain }
+        [sourceChain: ArgonPrimitivesGatewaySourceChain],
+        { sourceChain: ArgonPrimitivesGatewaySourceChain }
       >;
       /**
        * Root force-set the active Global Issuance Council for a destination chain.
        **/
       GlobalIssuanceCouncilForced: AugmentedEvent<
         ApiType,
-        [destinationChain: PalletCrosschainTransferSourceChain, councilHash: H256],
-        { destinationChain: PalletCrosschainTransferSourceChain; councilHash: H256 }
+        [destinationChain: ArgonPrimitivesGatewaySourceChain, councilHash: H256],
+        { destinationChain: ArgonPrimitivesGatewaySourceChain; councilHash: H256 }
       >;
       /**
        * A frame transition queued a new Global Issuance Council for destination-chain approval.
@@ -714,12 +726,12 @@ declare module '@polkadot/api-base/types/events' {
       GlobalIssuanceCouncilRotationQueued: AugmentedEvent<
         ApiType,
         [
-          destinationChain: PalletCrosschainTransferSourceChain,
+          destinationChain: ArgonPrimitivesGatewaySourceChain,
           councilHash: H256,
           approvalQueueNonce: u64,
         ],
         {
-          destinationChain: PalletCrosschainTransferSourceChain;
+          destinationChain: ArgonPrimitivesGatewaySourceChain;
           councilHash: H256;
           approvalQueueNonce: u64;
         }
@@ -730,8 +742,8 @@ declare module '@polkadot/api-base/types/events' {
        **/
       MinimumMintingAuthorityValueSet: AugmentedEvent<
         ApiType,
-        [destinationChain: PalletCrosschainTransferSourceChain, minimumValue: u128],
-        { destinationChain: PalletCrosschainTransferSourceChain; minimumValue: u128 }
+        [destinationChain: ArgonPrimitivesGatewaySourceChain, minimumValue: u128],
+        { destinationChain: ArgonPrimitivesGatewaySourceChain; minimumValue: u128 }
       >;
       /**
        * A proven activation paid or released the held relayer reimbursement and made the
@@ -740,13 +752,13 @@ declare module '@polkadot/api-base/types/events' {
       MintingAuthorityActivationCompleted: AugmentedEvent<
         ApiType,
         [
-          destinationChain: PalletCrosschainTransferSourceChain,
+          destinationChain: ArgonPrimitivesGatewaySourceChain,
           destinationSigningKey: H160,
           relayerArgonAccountId: AccountId32,
           repaymentAmount: u128,
         ],
         {
-          destinationChain: PalletCrosschainTransferSourceChain;
+          destinationChain: ArgonPrimitivesGatewaySourceChain;
           destinationSigningKey: H160;
           relayerArgonAccountId: AccountId32;
           repaymentAmount: u128;
@@ -757,8 +769,8 @@ declare module '@polkadot/api-base/types/events' {
        **/
       MintingAuthorityActivationFinalized: AugmentedEvent<
         ApiType,
-        [sourceChain: PalletCrosschainTransferSourceChain, destinationSigningKey: H160],
-        { sourceChain: PalletCrosschainTransferSourceChain; destinationSigningKey: H160 }
+        [sourceChain: ArgonPrimitivesGatewaySourceChain, destinationSigningKey: H160],
+        { sourceChain: ArgonPrimitivesGatewaySourceChain; destinationSigningKey: H160 }
       >;
       /**
        * Root updated the pricing inputs used to repay relayers for activation batches on one
@@ -766,8 +778,8 @@ declare module '@polkadot/api-base/types/events' {
        **/
       MintingAuthorityActivationRepaymentPricingSet: AugmentedEvent<
         ApiType,
-        [destinationChain: PalletCrosschainTransferSourceChain],
-        { destinationChain: PalletCrosschainTransferSourceChain }
+        [destinationChain: ArgonPrimitivesGatewaySourceChain],
+        { destinationChain: ArgonPrimitivesGatewaySourceChain }
       >;
       /**
        * A proven Ethereum deactivation released collateral and removed the local authority
@@ -775,8 +787,8 @@ declare module '@polkadot/api-base/types/events' {
        **/
       MintingAuthorityDeactivationFinalized: AugmentedEvent<
         ApiType,
-        [sourceChain: PalletCrosschainTransferSourceChain, destinationSigningKey: H160],
-        { sourceChain: PalletCrosschainTransferSourceChain; destinationSigningKey: H160 }
+        [sourceChain: ArgonPrimitivesGatewaySourceChain, destinationSigningKey: H160],
+        { sourceChain: ArgonPrimitivesGatewaySourceChain; destinationSigningKey: H160 }
       >;
       /**
        * An operator queued the council-approved Ethereum deactivation for a Minting Authority.
@@ -784,12 +796,12 @@ declare module '@polkadot/api-base/types/events' {
       MintingAuthorityDeactivationQueued: AugmentedEvent<
         ApiType,
         [
-          destinationChain: PalletCrosschainTransferSourceChain,
+          destinationChain: ArgonPrimitivesGatewaySourceChain,
           destinationSigningKey: H160,
           approvalQueueNonce: u64,
         ],
         {
-          destinationChain: PalletCrosschainTransferSourceChain;
+          destinationChain: ArgonPrimitivesGatewaySourceChain;
           destinationSigningKey: H160;
           approvalQueueNonce: u64;
         }
@@ -800,13 +812,13 @@ declare module '@polkadot/api-base/types/events' {
       MintingAuthorityRegistered: AugmentedEvent<
         ApiType,
         [
-          destinationChain: PalletCrosschainTransferSourceChain,
+          destinationChain: ArgonPrimitivesGatewaySourceChain,
           destinationSigningKey: H160,
           accountId: AccountId32,
           approvalQueueNonce: u64,
         ],
         {
-          destinationChain: PalletCrosschainTransferSourceChain;
+          destinationChain: ArgonPrimitivesGatewaySourceChain;
           destinationSigningKey: H160;
           accountId: AccountId32;
           approvalQueueNonce: u64;
@@ -818,12 +830,12 @@ declare module '@polkadot/api-base/types/events' {
       QueueEntryApprovalReady: AugmentedEvent<
         ApiType,
         [
-          destinationChain: PalletCrosschainTransferSourceChain,
+          destinationChain: ArgonPrimitivesGatewaySourceChain,
           target: PalletCrosschainTransferCouncilApprovalTargetId,
           approvalQueueNonce: u64,
         ],
         {
-          destinationChain: PalletCrosschainTransferSourceChain;
+          destinationChain: ArgonPrimitivesGatewaySourceChain;
           target: PalletCrosschainTransferCouncilApprovalTargetId;
           approvalQueueNonce: u64;
         }
@@ -834,12 +846,12 @@ declare module '@polkadot/api-base/types/events' {
       QueueEntryApprovalRecorded: AugmentedEvent<
         ApiType,
         [
-          destinationChain: PalletCrosschainTransferSourceChain,
+          destinationChain: ArgonPrimitivesGatewaySourceChain,
           target: PalletCrosschainTransferCouncilApprovalTargetId,
           approvalQueueNonce: u64,
         ],
         {
-          destinationChain: PalletCrosschainTransferSourceChain;
+          destinationChain: ArgonPrimitivesGatewaySourceChain;
           target: PalletCrosschainTransferCouncilApprovalTargetId;
           approvalQueueNonce: u64;
         }
@@ -875,16 +887,16 @@ declare module '@polkadot/api-base/types/events' {
        **/
       TransferOutCanceled: AugmentedEvent<
         ApiType,
-        [sourceChain: PalletCrosschainTransferSourceChain, transferId: H256],
-        { sourceChain: PalletCrosschainTransferSourceChain; transferId: H256 }
+        [sourceChain: ArgonPrimitivesGatewaySourceChain, transferId: H256],
+        { sourceChain: ArgonPrimitivesGatewaySourceChain; transferId: H256 }
       >;
       /**
        * A transfer was finalized on the source chain.
        **/
       TransferOutFinalized: AugmentedEvent<
         ApiType,
-        [sourceChain: PalletCrosschainTransferSourceChain, transferId: H256],
-        { sourceChain: PalletCrosschainTransferSourceChain; transferId: H256 }
+        [sourceChain: ArgonPrimitivesGatewaySourceChain, transferId: H256],
+        { sourceChain: ArgonPrimitivesGatewaySourceChain; transferId: H256 }
       >;
       /**
        * A transfer is ready for finalization.
@@ -896,7 +908,7 @@ declare module '@polkadot/api-base/types/events' {
       TransferOutStarted: AugmentedEvent<
         ApiType,
         [
-          destinationChain: PalletCrosschainTransferSourceChain,
+          destinationChain: ArgonPrimitivesGatewaySourceChain,
           transferId: H256,
           accountId: AccountId32,
           asset: PalletCrosschainTransferAssetKind,
@@ -904,7 +916,7 @@ declare module '@polkadot/api-base/types/events' {
           mintingAuthorityTip: u128,
         ],
         {
-          destinationChain: PalletCrosschainTransferSourceChain;
+          destinationChain: ArgonPrimitivesGatewaySourceChain;
           transferId: H256;
           accountId: AccountId32;
           asset: PalletCrosschainTransferAssetKind;
@@ -918,13 +930,13 @@ declare module '@polkadot/api-base/types/events' {
       TransferToArgonFromSwapSettled: AugmentedEvent<
         ApiType,
         [
-          sourceChain: PalletCrosschainTransferSourceChain,
+          sourceChain: ArgonPrimitivesGatewaySourceChain,
           transfer: PalletCrosschainTransferTransferToArgonActivity,
           purchase: PalletCrosschainTransferSwapPurchaseEvidence,
           purchaseTick: u64,
         ],
         {
-          sourceChain: PalletCrosschainTransferSourceChain;
+          sourceChain: ArgonPrimitivesGatewaySourceChain;
           transfer: PalletCrosschainTransferTransferToArgonActivity;
           purchase: PalletCrosschainTransferSwapPurchaseEvidence;
           purchaseTick: u64;
@@ -936,12 +948,31 @@ declare module '@polkadot/api-base/types/events' {
       TransferToArgonSettled: AugmentedEvent<
         ApiType,
         [
-          sourceChain: PalletCrosschainTransferSourceChain,
+          sourceChain: ArgonPrimitivesGatewaySourceChain,
           transfer: PalletCrosschainTransferTransferToArgonActivity,
         ],
         {
-          sourceChain: PalletCrosschainTransferSourceChain;
+          sourceChain: ArgonPrimitivesGatewaySourceChain;
           transfer: PalletCrosschainTransferTransferToArgonActivity;
+        }
+      >;
+      /**
+       * Delivery succeeded, but purchase admission rolled back. Funds remain spendable and
+       * the gateway nonce advances without a reward or Liquid repayment commitment.
+       **/
+      UniswapPurchaseAdmissionFailed: AugmentedEvent<
+        ApiType,
+        [
+          sourceChain: ArgonPrimitivesGatewaySourceChain,
+          gatewayActivityNonce: u64,
+          account: AccountId32,
+          error: SpRuntimeDispatchError,
+        ],
+        {
+          sourceChain: ArgonPrimitivesGatewaySourceChain;
+          gatewayActivityNonce: u64;
+          account: AccountId32;
+          error: SpRuntimeDispatchError;
         }
       >;
     };
@@ -1896,6 +1927,33 @@ declare module '@polkadot/api-base/types/events' {
         [account: AccountId32, admissionFrame: u64, rewardRate: Percent, positiveBidCount: u8],
         { account: AccountId32; admissionFrame: u64; rewardRate: Percent; positiveBidCount: u8 }
       >;
+      /**
+       * Repayment and its remaining principal were settled in the account payout transaction.
+       **/
+      LiquidRepaymentCompleted: AugmentedEvent<
+        ApiType,
+        [account: AccountId32, gatewayActivityNonce: u64, liquidId: u64, microgonsBurned: u128],
+        { account: AccountId32; gatewayActivityNonce: u64; liquidId: u64; microgonsBurned: u128 }
+      >;
+      /**
+       * The purchase lacks valid BTC/R prices, or the Liquid is empty, was recently ratcheted,
+       * or lacks the hold plus release window.
+       * Delivered ARGON is processed under the ordinary purchase rules.
+       **/
+      LiquidRepaymentInvalid: AugmentedEvent<
+        ApiType,
+        [account: AccountId32, gatewayActivityNonce: u64, liquidId: u64],
+        { account: AccountId32; gatewayActivityNonce: u64; liquidId: u64 }
+      >;
+      /**
+       * Additional reward funded by completed repayment burns, using the same auction result.
+       * This does not consume the Treasury funding reserved for ordinary buy rewards.
+       **/
+      LiquidRepaymentRewardAwarded: AugmentedEvent<
+        ApiType,
+        [account: AccountId32, admissionFrame: u64, amount: u128],
+        { account: AccountId32; admissionFrame: u64; amount: u128 }
+      >;
       MatchingRateChanged: AugmentedEvent<ApiType, [rate: Permill], { rate: Permill }>;
       PayoutCompleted: AugmentedEvent<
         ApiType,
@@ -1919,8 +1977,8 @@ declare module '@polkadot/api-base/types/events' {
       >;
       RewardAwarded: AugmentedEvent<
         ApiType,
-        [account: AccountId32, admissionFrame: u64, amount: u128, maturesAtTick: u64],
-        { account: AccountId32; admissionFrame: u64; amount: u128; maturesAtTick: u64 }
+        [account: AccountId32, admissionFrame: u64, amount: u128, maturesAtFrame: u64],
+        { account: AccountId32; admissionFrame: u64; amount: u128; maturesAtFrame: u64 }
       >;
     };
     stabilizerPools: {
@@ -2186,6 +2244,14 @@ declare module '@polkadot/api-base/types/events' {
           accountId: AccountId32;
           dispatchError: SpRuntimeDispatchError;
         }
+      >;
+      /**
+       * Settlement rolled back and remains queued for a later block.
+       **/
+      CouldNotSettleBondCollateral: AugmentedEvent<
+        ApiType,
+        [accountId: AccountId32, dispatchError: SpRuntimeDispatchError],
+        { accountId: AccountId32; dispatchError: SpRuntimeDispatchError }
       >;
       /**
        * An error occurred while moving bid-pool funds into treasury reserves.

@@ -2,11 +2,11 @@ use argon_ethereum_contracts::minting_gateway::MAX_MINTING_AUTHORIZATIONS_PER_TR
 use argon_primitives::{
 	vault::{BitcoinVaultProvider, BitcoinVaultProviderWeightInfo},
 	CallTxPoolKeyProviderWeightInfo, CallTxValidityProviderWeightInfo,
-	CollectBlockerProviderWeightInfo, EthereumVerifyProvider, EthereumVerifyProviderWeightInfo,
-	OperationalAccountsHook, OperationalAccountsHookWeightInfo, PriceProvider,
-	PriceProviderWeightInfo, TickProvider, TickProviderWeightInfo, TreasuryPoolProvider,
-	TreasuryPoolProviderWeightInfo, UniswapPurchaseProvider, UniswapPurchaseProviderWeightInfo,
-	UniswapTransferProviderWeightInfo,
+	CollectBlockerProviderWeightInfo, CrosschainGatewayProviderWeightInfo, EthereumVerifyProvider,
+	EthereumVerifyProviderWeightInfo, OperationalAccountsHook, OperationalAccountsHookWeightInfo,
+	PriceProvider, PriceProviderWeightInfo, TickProvider, TickProviderWeightInfo,
+	TreasuryPoolProvider, TreasuryPoolProviderWeightInfo, UniswapPurchaseProvider,
+	UniswapPurchaseProviderWeightInfo, UniswapTransferProviderWeightInfo,
 };
 use core::marker::PhantomData;
 use pallet_prelude::*;
@@ -15,6 +15,7 @@ use polkadot_sdk::frame_support::traits::IsSubType;
 use super::Config;
 
 pub trait WeightInfo {
+	fn provider_last_state_by_chain() -> Weight;
 	fn set_chain_config() -> Weight;
 	fn force_set_global_issuance_council() -> Weight;
 	fn register_council_signer() -> Weight;
@@ -100,6 +101,10 @@ where
 	VaultProviderWeight: BitcoinVaultProviderWeightInfo,
 	PriceProviderWeight: PriceProviderWeightInfo,
 {
+	fn provider_last_state_by_chain() -> Weight {
+		Base::provider_last_state_by_chain()
+	}
+
 	fn set_chain_config() -> Weight {
 		Base::set_chain_config()
 	}
@@ -138,21 +143,12 @@ where
 	}
 
 	fn prove_gateway_activity(activities: u32) -> Weight {
-		Base::prove_gateway_activity(activities)
-			.max(Base::prove_gateway_purchase(activities))
-			.saturating_add(
-				PriceProviderWeight::get_ethereum_prices().saturating_mul(activities.into()),
-			)
-			.saturating_add(gateway_activity_vault_weight::<VaultProviderWeight>(activities))
+		Base::prove_gateway_activity(activities).max(Base::prove_gateway_purchase(activities))
 	}
 
 	fn prove_gateway_activity_storage(activities: u32) -> Weight {
 		Base::prove_gateway_activity_storage(activities)
 			.max(Base::prove_gateway_purchase_storage(activities))
-			.saturating_add(
-				PriceProviderWeight::get_ethereum_prices().saturating_mul(activities.into()),
-			)
-			.saturating_add(gateway_activity_vault_weight::<VaultProviderWeight>(activities))
 	}
 
 	fn prove_gateway_purchase(activities: u32) -> Weight {
@@ -202,17 +198,12 @@ where
 	}
 }
 
-fn gateway_activity_vault_weight<V: BitcoinVaultProviderWeightInfo>(activities: u32) -> Weight {
-	let burn = V::burn_encumbered_argonots();
-	let release = V::release_encumbered_argonots();
-	// Finalization burns or releases collateral for every authorization. Deactivation can
-	// do both for one authority. Charge the larger path before execution, for every activity.
-	let finalization =
-		burn.max(release).saturating_mul(MAX_MINTING_AUTHORIZATIONS_PER_TRANSFER.into());
-	finalization.max(burn.saturating_add(release)).saturating_mul(activities.into())
-}
-
 pub struct ProviderWeightAdapter<T>(PhantomData<T>);
+impl<T: Config> CrosschainGatewayProviderWeightInfo for ProviderWeightAdapter<T> {
+	fn last_state_by_chain() -> Weight {
+		T::WeightInfo::provider_last_state_by_chain()
+	}
+}
 
 impl<T: Config> CallTxPoolKeyProviderWeightInfo<T::RuntimeCall> for ProviderWeightAdapter<T>
 where
@@ -269,6 +260,9 @@ impl<T: Config> CollectBlockerProviderWeightInfo for ProviderWeightAdapter<T> {
 }
 
 impl WeightInfo for () {
+	fn provider_last_state_by_chain() -> Weight {
+		Weight::zero()
+	}
 	fn provider_tx_pool_key() -> Weight {
 		Weight::zero()
 	}
@@ -360,13 +354,12 @@ pub fn scheduled_council_rotation_with_price_provider<T: Config>() -> Weight {
 pub fn prove_gateway_activity_with_providers<T: Config>(
 	proof_blocks: u32,
 	activities: u32,
-	purchases: u32,
+	application_weight: Weight,
 ) -> Weight {
 	let extra_activities = activities.saturating_sub(proof_blocks);
 
 	T::WeightInfo::prove_gateway_activity(activities)
-		.saturating_add(UniswapPurchaseWeights::<T>::record_transferred_purchase().saturating_mul(purchases.into()))
-		.saturating_add(TickProviderWeights::<T>::ticker().saturating_mul(purchases.into()))
+		.saturating_add(application_weight)
 		.saturating_add(
 			<<T::EthereumVerifier as EthereumVerifyProvider>::Weights as
 				EthereumVerifyProviderWeightInfo>::verify_receipt_logs(
@@ -384,31 +377,87 @@ pub fn prove_gateway_activity_with_providers<T: Config>(
 pub fn prove_gateway_activity_storage_with_providers<T: Config>(
 	activities: u32,
 	headers: u32,
-	purchases: u32,
+	application_weight: Weight,
 ) -> Weight {
 	T::WeightInfo::prove_gateway_activity_storage(activities)
-		.saturating_add(UniswapPurchaseWeights::<T>::record_transferred_purchase().saturating_mul(purchases.into()))
-		.saturating_add(TickProviderWeights::<T>::ticker().saturating_mul(purchases.into()))
+		.saturating_add(application_weight)
 		.saturating_add(EthereumVerifyProviderWeights::<T>::verify_account_storage_proof(
 			crate::GATEWAY_ACTIVITY_STORAGE_SLOT_COUNT,
 			headers,
 		))
-		.saturating_add(
-			<T::OperationalAccountsHook as OperationalAccountsHook<T::AccountId, T::Balance>>::Weights::account_uniswap_argon_transfers_in_updated()
-				.saturating_mul(activities.into()),
-		)
 		// A locator can activate at most one queued council, just like a receipt batch.
 		.saturating_add(T::WeightInfo::activate_global_issuance_council_signers())
 }
 
-/// Topics are part of the proof payload; a different topic takes a different decoder branch.
-pub(crate) fn purchase_count<'a>(
+/// Provider work implied by the event payload. Incoming transfers do not settle authority
+/// collateral; finalizations visit the collateral rows actually carried by their event.
+pub(crate) fn gateway_activity_application_weight<'a, T: Config>(
 	logs: impl IntoIterator<Item = &'a argon_primitives::EthereumLog>,
-) -> u32 {
+) -> Weight {
+	use alloy_primitives::B256;
 	use alloy_sol_types::SolEvent;
-	let signature =
-		argon_ethereum_contracts::minting_gateway::TransferToArgonFromSwapStarted::SIGNATURE_HASH.0;
-	logs.into_iter()
-		.filter(|log| log.topics.first().is_some_and(|topic| topic.0 == signature))
-		.count() as u32
+	use argon_ethereum_contracts::minting_gateway::{
+		decode_transfer_out_of_argon_finalized, MintingAuthorityActivated,
+		MintingAuthorityDeactivated, TransferOutOfArgonFinalized, TransferToArgonFromSwapStarted,
+		TransferToArgonStarted,
+	};
+
+	let mut weight = Weight::zero();
+	for log in logs {
+		let Some(topic) = log.topics.first() else { continue };
+		if topic.0 == TransferToArgonFromSwapStarted::SIGNATURE_HASH.0 {
+			weight.saturating_accrue(UniswapPurchaseWeights::<T>::record_transferred_purchase());
+			weight.saturating_accrue(TickProviderWeights::<T>::ticker());
+			continue;
+		}
+
+		if topic.0 == TransferOutOfArgonFinalized::SIGNATURE_HASH.0 {
+			let rows = decode_transfer_out_of_argon_finalized(
+				log.topics.iter().map(|topic| B256::from(topic.0)),
+				&log.data,
+			)
+			.map_or(0, |event| event.mintingCollateral.len() as u64);
+			weight.saturating_accrue(gateway_collateral_weight::<T>(false).saturating_mul(rows));
+		} else if topic.0 == MintingAuthorityDeactivated::SIGNATURE_HASH.0 {
+			weight.saturating_accrue(gateway_collateral_weight::<T>(true));
+		} else if topic.0 == TransferToArgonStarted::SIGNATURE_HASH.0 {
+			weight.saturating_accrue(<T::OperationalAccountsHook as OperationalAccountsHook<
+				T::AccountId,
+				T::Balance,
+			>>::Weights::account_uniswap_argon_transfers_in_updated());
+		} else if topic.0 == MintingAuthorityActivated::SIGNATURE_HASH.0 {
+			weight.saturating_accrue(PriceProviderWeights::<T>::get_ethereum_prices());
+		}
+	}
+	weight
+}
+
+/// Conservative per-activity bound used by the runtime's existing proof-capacity check.
+pub(crate) fn maximum_gateway_activity_application_weight<T: Config>() -> Weight {
+	let purchase = UniswapPurchaseWeights::<T>::record_transferred_purchase()
+		.saturating_add(TickProviderWeights::<T>::ticker());
+	let collateral = gateway_collateral_weight::<T>(false)
+		.saturating_mul(MAX_MINTING_AUTHORIZATIONS_PER_TRANSFER.into())
+		.max(gateway_collateral_weight::<T>(true));
+	let incoming_transfer = <T::OperationalAccountsHook as OperationalAccountsHook<
+		T::AccountId,
+		T::Balance,
+	>>::Weights::account_uniswap_argon_transfers_in_updated();
+	let activation = PriceProviderWeights::<T>::get_ethereum_prices();
+
+	purchase.max(collateral).max(incoming_transfer).max(activation)
+}
+
+fn gateway_collateral_weight<T: Config>(deactivation: bool) -> Weight {
+	let burn = TreasuryPoolProviderWeights::<T>::burn_encumbered_bond_microgons()
+		.saturating_add(VaultProviderWeights::<T>::burn_encumbered_argonots());
+	let release = TreasuryPoolProviderWeights::<T>::release_encumbered_bond_microgons()
+		.saturating_add(VaultProviderWeights::<T>::release_encumbered_argonots());
+	if deactivation {
+		// Deactivation may consume some collateral and return the rest.
+		burn.saturating_add(release)
+	} else {
+		// A finalization either releases local-transfer collateral or burns external usage.
+		burn.max(release)
+	}
 }

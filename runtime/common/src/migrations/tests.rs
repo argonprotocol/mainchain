@@ -132,14 +132,14 @@ pub(crate) fn source_state() {
 			LOCK_OWNER,
 			id,
 			v1::Fission::<Runtime> {
-				liquid_id: id + 77,
+				liquid_id: if id == 1 { 78 } else { 77 },
 				lock_id,
 				satoshis,
 				microgons_at_target_per_btc: 90_000_000,
 				liquidity_promised: 2,
 				created_at_argon_block: 3,
 				ratchet_number: 1,
-				last_ratchet_tick: 8,
+				last_ratchet_price_tick: 8,
 				last_updated_argon_block: 4,
 			},
 		);
@@ -214,10 +214,43 @@ fn migration_conserves_backing_and_reconciles_real_vault_and_treasury_storage() 
 			let fission = FissionByOwnerAndId::<Runtime>::get(LOCK_OWNER, id).unwrap();
 			assert_eq!(fission.cosigner_guarantee.guaranteed_microgons, amount);
 			assert_eq!(
-				(fission.liquidity_promised, fission.last_ratchet_tick, fission.ratchet_number),
+				(
+					fission.liquidity_promised,
+					fission.last_ratchet_price_tick,
+					fission.ratchet_number
+				),
 				(2, 8, 1)
 			);
 		}
+		assert_eq!(
+			LiquidTicksByOwnerAndId::<Runtime>::get(LOCK_OWNER, 77),
+			Some(LiquidTicks::default())
+		);
+		assert_eq!(
+			FissionsPallet::<Runtime>::create(
+				frame_system::RawOrigin::Signed(LOCK_OWNER).into(),
+				3,
+				77,
+				1,
+				1,
+				2,
+				None,
+			),
+			Err(pallet_bitcoin_fissions::Error::<Runtime>::LiquidCreationWindowClosed.into())
+		);
+		assert_eq!(
+			FissionIdsByOwnerAndLiquid::<Runtime>::iter().fold(
+				BTreeMap::<_, BTreeSet<_>>::new(),
+				|mut groups, (key, id, ())| {
+					groups.entry(key).or_default().insert(id);
+					groups
+				}
+			),
+			BTreeMap::from([
+				((LOCK_OWNER, 77), BTreeSet::from([0, 2])),
+				((LOCK_OWNER, 78), BTreeSet::from([1])),
+			])
+		);
 		let vault = VaultsById::<Runtime>::get(1).unwrap();
 		assert_eq!(
 			(
@@ -363,6 +396,48 @@ fn migration_leaves_the_funding_window_for_normal_expiry() {
 
 #[cfg(feature = "try-runtime")]
 #[test]
+fn migration_preserves_liquids_larger_than_the_benchmark_expectation() {
+	for count in [10u64, 11] {
+		new_test_ext().execute_with(|| {
+			source_state();
+			let template = v1::FissionByOwnerAndId::<Runtime>::get(LOCK_OWNER, 0).unwrap();
+			for id in 0..3 {
+				v1::FissionByOwnerAndId::<Runtime>::remove(LOCK_OWNER, id);
+			}
+			FissionIdsByLockId::<Runtime>::remove(1);
+			FissionIdsByLockId::<Runtime>::remove(2);
+
+			for id in 0..count {
+				let lock_id = if id < 8 { 1 } else { 2 };
+				v1::FissionByOwnerAndId::<Runtime>::insert(
+					LOCK_OWNER,
+					id,
+					v1::Fission { liquid_id: 77, lock_id, satoshis: 1, ..template.clone() },
+				);
+				FissionIdsByLockId::<Runtime>::mutate(lock_id, |ids| {
+					ids.try_insert(id).unwrap();
+				});
+			}
+			v11::LocksById::<Runtime>::mutate(1, |lock| {
+				lock.as_mut().unwrap().fissioned_satoshis = 8;
+			});
+			v11::LocksById::<Runtime>::mutate(2, |lock| {
+				lock.as_mut().unwrap().fissioned_satoshis = count - 8;
+			});
+
+			let state = CosignerGuaranteesMigration::<Runtime>::pre_upgrade();
+			CosignerGuaranteesMigration::<Runtime>::on_runtime_upgrade();
+			assert_ok!(CosignerGuaranteesMigration::<Runtime>::post_upgrade(state.unwrap()));
+			assert_eq!(
+				FissionIdsByOwnerAndLiquid::<Runtime>::iter_key_prefix((LOCK_OWNER, 77)).count(),
+				count as usize
+			);
+		});
+	}
+}
+
+#[cfg(feature = "try-runtime")]
+#[test]
 fn preflight_rejects_inconsistent_source_and_postflight_checks_downstream_state() {
 	new_test_ext().execute_with(|| {
 		source_state();
@@ -376,6 +451,18 @@ fn preflight_rejects_inconsistent_source_and_postflight_checks_downstream_state(
 		let state = CosignerGuaranteesMigration::<Runtime>::pre_upgrade().unwrap();
 		CosignerGuaranteesMigration::<Runtime>::on_runtime_upgrade();
 		assert_ok!(CosignerGuaranteesMigration::<Runtime>::post_upgrade(state.clone()));
+		FissionIdsByOwnerAndLiquid::<Runtime>::remove((LOCK_OWNER, 77), 0);
+		assert_eq!(
+			CosignerGuaranteesMigration::<Runtime>::post_upgrade(state.clone()),
+			Err("migrated Liquid Fission index differs".into())
+		);
+		FissionIdsByOwnerAndLiquid::<Runtime>::insert((LOCK_OWNER, 77), 0, ());
+		FissionIdsByOwnerAndLiquid::<Runtime>::insert((LOCK_OWNER, 78), 99, ());
+		assert_eq!(
+			CosignerGuaranteesMigration::<Runtime>::post_upgrade(state.clone()),
+			Err("migrated Liquid Fission index differs".into())
+		);
+		FissionIdsByOwnerAndLiquid::<Runtime>::remove((LOCK_OWNER, 78), 99);
 		VaultsById::<Runtime>::mutate(1, |vault| {
 			vault.as_mut().unwrap().securitization_pending_activation += 1
 		});

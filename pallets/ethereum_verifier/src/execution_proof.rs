@@ -53,7 +53,7 @@ impl<T: Config> EthereumVerifyProvider for Pallet<T> {
 	fn verify_account_storage_proof<MaxStorageSlots>(
 		account_address: H160,
 		proof: &EthereumAccountStorageProof<MaxStorageSlots>,
-	) -> Result<(), EthereumVerifyError>
+	) -> Result<Moment, EthereumVerifyError>
 	where
 		MaxStorageSlots: Get<u32>,
 	{
@@ -65,7 +65,8 @@ impl<T: Config> EthereumVerifyProvider for Pallet<T> {
 			target.state_root,
 			account_address,
 			proof,
-		)
+		)?;
+		Ok(target.timestamp_millis)
 	}
 
 	fn latest_execution_block_number() -> Option<EthereumBlockNumber> {

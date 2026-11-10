@@ -10,8 +10,8 @@
 
 use alloc::vec::Vec;
 use alloy_consensus::ReceiptEnvelope;
+use alloy_eips::eip2718::Decodable2718;
 use alloy_primitives::{Bytes, B256};
-use alloy_rlp::Decodable;
 use alloy_trie::{
 	proof::{verify_proof, ProofVerificationError},
 	Nibbles,
@@ -37,7 +37,8 @@ pub(crate) fn verify_receipt_proof(
 		Err(_) => return None,
 	};
 
-	ReceiptEnvelope::decode(&mut value.as_slice()).ok()
+	// Trie leaves contain EIP-2718 bytes, without a network RLP wrapper or trailing data.
+	ReceiptEnvelope::decode_2718_exact(&value).ok()
 }
 
 fn find_receipt_proof(

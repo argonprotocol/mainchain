@@ -1,9 +1,9 @@
 use argon_primitives::{
 	providers::{
 		BlockRewardAccountsProviderWeightInfo, BlockSealerProvider, BlockSealerProviderWeightInfo,
-		MiningSlotProviderWeightInfo, OperationalAccountProvider,
-		OperationalAccountProviderWeightInfo, PriceProviderWeightInfo, TickProvider,
-		TickProviderWeightInfo,
+		MiningFrameTransitionProviderWeightInfo, MiningSlotProviderWeightInfo,
+		OperationalAccountProvider, OperationalAccountProviderWeightInfo, PriceProviderWeightInfo,
+		TickProvider, TickProviderWeightInfo,
 	},
 	PriceProvider,
 };
@@ -12,6 +12,8 @@ use pallet_prelude::*;
 
 /// Weight functions needed for this pallet.
 pub trait WeightInfo {
+	fn provider_get_current_frame_id() -> Weight;
+	fn provider_is_new_frame_started() -> Weight;
 	// Actual extrinsics
 	fn bid() -> Weight;
 	fn bid_legacy() -> Weight;
@@ -95,6 +97,13 @@ where
 	PriceProviderWeight: PriceProviderWeightInfo,
 	OperationalAccountProviderWeight: OperationalAccountProviderWeightInfo,
 {
+	fn provider_get_current_frame_id() -> Weight {
+		Base::provider_get_current_frame_id()
+	}
+	fn provider_is_new_frame_started() -> Weight {
+		Base::provider_is_new_frame_started()
+	}
+
 	fn bid_with_max() -> Weight {
 		Base::bid_with_max()
 			.max(Base::bid_with_max_renewal())
@@ -189,6 +198,15 @@ where
 }
 
 pub struct ProviderWeightAdapter<T>(PhantomData<T>);
+impl<T: crate::Config> MiningFrameTransitionProviderWeightInfo for ProviderWeightAdapter<T> {
+	fn get_current_frame_id() -> Weight {
+		T::WeightInfo::provider_get_current_frame_id()
+	}
+	fn is_new_frame_started() -> Weight {
+		T::WeightInfo::provider_is_new_frame_started()
+	}
+}
+
 impl<T: crate::Config> MiningSlotProviderWeightInfo for ProviderWeightAdapter<T> {
 	fn has_active_rewards_account_seat() -> Weight {
 		T::WeightInfo::provider_has_active_rewards_account_seat()
@@ -207,6 +225,12 @@ impl<T: crate::Config> BlockRewardAccountsProviderWeightInfo for ProviderWeightA
 
 // For backwards compatibility and tests.
 impl WeightInfo for () {
+	fn provider_get_current_frame_id() -> Weight {
+		Weight::zero()
+	}
+	fn provider_is_new_frame_started() -> Weight {
+		Weight::zero()
+	}
 	fn bid_with_max() -> Weight {
 		Weight::zero()
 	}

@@ -382,13 +382,14 @@ async function measureGasReport(): Promise<GasMeasurementReport> {
 async function measureUserScenarios() {
   const argonAccountId = ethers.encodeBytes32String('argon-account-1') as Hex;
   const transferFixture = await deployFixture(createCouncil(4));
+  const transferMicrogons = 10_000n;
   const permitDeadline = BigInt((await ethers.provider.getBlock('latest'))!.timestamp) + 3600n;
   const permit = await signPermit(
     transferFixture.holder,
     transferFixture.argon,
     transferFixture.holder.address,
     await transferFixture.gateway.getAddress(),
-    250n * SCALE,
+    transferMicrogons * SCALE,
     permitDeadline,
     'Argon',
   );
@@ -397,7 +398,7 @@ async function measureUserScenarios() {
       .connect(transferFixture.holder)
       .startTransferToArgon(
         await transferFixture.argon.getAddress(),
-        250n,
+        transferMicrogons,
         argonAccountId,
         permitDeadline,
         permit.v,
@@ -661,8 +662,8 @@ async function deployFixture(council: Council) {
   await stack.gateway
     .connect(stack.adminSafe)
     .migrate(
-      { recipients: [stack.holder.address], amounts: [1_000n * SCALE] },
-      { recipients: [stack.holder.address], amounts: [2_000n * SCALE] },
+      { recipients: [stack.holder.address], amounts: [100_000n * SCALE] },
+      { recipients: [stack.holder.address], amounts: [200_000n * SCALE] },
     );
 
   return stack;

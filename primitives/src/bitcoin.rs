@@ -4,8 +4,12 @@ use core::convert::{TryFrom, TryInto};
 use frame_support::pallet_prelude::TypeInfo;
 use polkadot_sdk::*;
 use serde::{Deserialize, Serialize};
+use sp_arithmetic::{helpers_128bit::multiply_by_rational_with_rounding, Rounding};
 use sp_core::{ConstU32, H256};
-use sp_runtime::BoundedVec;
+use sp_runtime::{
+	traits::{CheckedAdd, CheckedDiv, CheckedMul, CheckedSub, One, Saturating, Zero},
+	BoundedVec, FixedPointNumber, FixedU128,
+};
 
 #[derive(Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Eq, TypeInfo, Debug)]
 pub struct BitcoinSyncStatus {
@@ -152,6 +156,119 @@ pub struct UtxoRef {
 pub type BitcoinLockId = u64;
 pub type FissionId = u64;
 pub type LiquidId = u64;
+
+/// Existing redemption-curve ARGON cost per target-valued microgon of Bitcoin.
+/// `r` is ARGON's market USD price divided by its target USD price. Multiply the target-valued
+/// Bitcoin basis by this rate to obtain the ARGON burn. A zero ratio has no finite quote.
+pub fn redemption_rate(r: FixedU128) -> Option<FixedU128> {
+	// At or above target (r >= 1): no penalty; unlock cost equals the Bitcoin basis.
+	if r >= FixedU128::one() {
+		return Some(FixedU128::one());
+	}
+
+	// Mild deviation (0.90 <= r < 1): the quadratic curve provides the near-target discount.
+	// Rate: 20r² - 38r + 19.
+	if r >= FixedU128::from_rational(9, 10) {
+		const FX_20: FixedU128 = FixedU128::from_u32(20);
+		const FX_38: FixedU128 = FixedU128::from_u32(38);
+		const FX_19: FixedU128 = FixedU128::from_u32(19);
+		return ((FX_20 * r.saturating_pow(2)) + FX_19).checked_sub(&(FX_38 * r));
+	}
+
+	// Moderate deviation (0.01 <= r < 0.90): require more ARGON per unit of Bitcoin value.
+	// Rate: (0.5618r + 0.3944) / r.
+	if r >= FixedU128::from_rational(1, 100) {
+		const FX_0_5618: FixedU128 = FixedU128::from_rational(5618, 10000);
+		const FX_0_3944: FixedU128 = FixedU128::from_rational(3944, 10000);
+		return ((FX_0_5618 * r) + FX_0_3944).checked_div(&r);
+	}
+
+	// Extreme deviation (r < 0.01): use the steeper burn schedule.
+	// Rate: (1 / r) * (0.576r + 0.4). Preserve this evaluation order and its fixed-point rounding.
+	const FX_0_576: FixedU128 = FixedU128::from_rational(576, 1000);
+	const FX_0_4: FixedU128 = FixedU128::from_rational(4, 10);
+	Some(FixedU128::one().checked_div(&r)?.saturating_mul((FX_0_576 * r) + FX_0_4))
+}
+
+/// Frozen purchase valuation and curve rates for one deferred Liquid repayment.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct LiquidRepayPrices {
+	/// Target-valued microgons per whole BTC at purchase, retaining fractional microgons.
+	microgons_at_target_per_btc: FixedU128,
+	/// Purchased microgons committed per target-valued BTC microgon; selects the Bitcoin amount.
+	commitment_rate: FixedU128,
+	/// Microgons actually burned per target-valued BTC microgon after recovery; never exceeds
+	/// the commitment rate. The remainder returns to the buyer.
+	burn_rate: FixedU128,
+}
+
+impl LiquidRepayPrices {
+	pub fn new(
+		microgons_at_target_per_btc: FixedU128,
+		purchase_r_value: FixedU128,
+		r_value_high_water: FixedU128,
+	) -> Option<Self> {
+		if microgons_at_target_per_btc.is_zero() {
+			return None;
+		}
+
+		// Capture the redemption rates at purchase and at the recovery high-water mark.
+		let purchase_redemption_rate = redemption_rate(purchase_r_value)?;
+		let high_water_redemption_rate = redemption_rate(r_value_high_water.max(purchase_r_value))?;
+		let at_target_rate = FixedU128::one();
+
+		// Preserve the captured curve discount's market value, expressed in ARGON at target.
+		let discount_at_target = at_target_rate
+			.saturating_sub(purchase_redemption_rate)
+			.checked_mul(&purchase_r_value)?;
+		let nonrefundable_burn_rate = at_target_rate.checked_sub(&discount_at_target)?;
+
+		// Defer any curve cost above the at-target burn; recovery can reduce that portion.
+		let deferred_burn_rate = purchase_redemption_rate.saturating_sub(at_target_rate);
+		let remaining_deferred_rate = high_water_redemption_rate
+			.saturating_sub(at_target_rate)
+			.min(deferred_burn_rate);
+
+		// Keep the full commitment fixed while reducing the burn by the recovered premium.
+		let commitment_rate = nonrefundable_burn_rate.checked_add(&deferred_burn_rate)?;
+		let burn_rate = nonrefundable_burn_rate.checked_add(&remaining_deferred_rate)?;
+		Some(Self { microgons_at_target_per_btc, commitment_rate, burn_rate })
+	}
+
+	/// Whether recovery can still remove an above-target portion of this burn.
+	pub fn has_refundable_premium(&self) -> bool {
+		self.burn_rate > FixedU128::one()
+	}
+
+	/// Return committed and burned microgons for the same Bitcoin amount. Match ordinary
+	/// redemption's original Fission price cap and round the BTC basis before the curve rates.
+	pub fn quote(
+		&self,
+		satoshis: Satoshis,
+		original_microgons_per_btc: u128,
+	) -> Option<(u128, u128)> {
+		// Value the repaid Bitcoin at both the purchase price and the original Fission price.
+		let purchase_btc_value = multiply_by_rational_with_rounding(
+			self.microgons_at_target_per_btc.into_inner(),
+			u128::from(satoshis),
+			FixedU128::DIV.checked_mul(u128::from(SATOSHIS_PER_BITCOIN))?,
+			Rounding::Down,
+		)?;
+		let original_btc_value = multiply_by_rational_with_rounding(
+			original_microgons_per_btc,
+			u128::from(satoshis),
+			u128::from(SATOSHIS_PER_BITCOIN),
+			Rounding::Down,
+		)?;
+
+		// Apply both rates to the same capped Bitcoin value.
+		let redemption_basis = purchase_btc_value.min(original_btc_value);
+		Some((
+			self.commitment_rate.checked_mul_int(redemption_basis)?,
+			self.burn_rate.checked_mul_int(redemption_basis)?,
+		))
+	}
+}
 
 #[derive(
 	Clone, PartialEq, Eq, Encode, Decode, DecodeWithMemTracking, Debug, TypeInfo, MaxEncodedLen,
@@ -625,3 +742,79 @@ pub const SATOSHIS_PER_BITCOIN: u64 = 100_000_000;
 )]
 #[repr(transparent)]
 pub struct H256Le(pub [u8; 32]);
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crate::MICROGONS_PER_ARGON;
+
+	#[test]
+	fn repayment_refunds_curve_premium_using_recovery_without_spending_it_on_more_bitcoin() {
+		let basis = 100_000 * MICROGONS_PER_ARGON;
+		for (purchase_r, high_r, committed, burned) in [
+			(50, 50, 135_060, 135_060),
+			(50, 80, 135_060, 105_480),
+			(50, 100, 135_060, 100_000),
+			(50, 95, 135_060, 100_000),
+			(80, 85, 105_480, 102_580),
+			(80, 70, 105_480, 105_480),
+			(100, 100, 100_000, 100_000),
+		] {
+			let prices = LiquidRepayPrices::new(
+				FixedU128::saturating_from_integer(basis),
+				FixedU128::from_rational(purchase_r, 100),
+				FixedU128::from_rational(high_r, 100),
+			)
+			.unwrap();
+			assert_eq!(
+				prices.quote(SATOSHIS_PER_BITCOIN, basis),
+				Some((committed * MICROGONS_PER_ARGON, burned * MICROGONS_PER_ARGON))
+			);
+			assert_eq!(prices.has_refundable_premium(), burned > 100_000);
+		}
+	}
+
+	#[test]
+	fn captured_curve_discount_keeps_its_market_value_in_target_argons() {
+		let basis = 100_000 * MICROGONS_PER_ARGON;
+		for (purchase_r, ordinary, guaranteed) in [(95, 95_000, 95_250), (98, 96_800, 96_864)] {
+			let r = FixedU128::from_rational(purchase_r, 100);
+			assert_eq!(
+				redemption_rate(r).unwrap().checked_mul_int(basis),
+				Some(ordinary * MICROGONS_PER_ARGON)
+			);
+			for high in [r, FixedU128::one()] {
+				let prices =
+					LiquidRepayPrices::new(FixedU128::saturating_from_integer(basis), r, high)
+						.unwrap();
+				assert_eq!(
+					prices.quote(SATOSHIS_PER_BITCOIN, basis),
+					Some((guaranteed * MICROGONS_PER_ARGON, guaranteed * MICROGONS_PER_ARGON))
+				);
+			}
+		}
+	}
+
+	#[test]
+	fn repayment_quotes_use_the_captured_btc_value_and_original_fission_cap() {
+		let basis = 100_000 * MICROGONS_PER_ARGON;
+		let prices = LiquidRepayPrices::new(
+			FixedU128::saturating_from_integer(basis),
+			FixedU128::from_rational(1, 2),
+			FixedU128::one(),
+		)
+		.unwrap();
+		assert_eq!(
+			prices.quote(SATOSHIS_PER_BITCOIN, basis * 2),
+			Some((135_060 * MICROGONS_PER_ARGON, basis))
+		);
+		assert_eq!(
+			prices.quote(SATOSHIS_PER_BITCOIN, basis / 2),
+			Some((67_530 * MICROGONS_PER_ARGON, basis / 2))
+		);
+		assert_eq!(prices.quote(1, basis), Some((1_350, 1_000)));
+		assert!(
+			LiquidRepayPrices::new(FixedU128::one(), FixedU128::zero(), FixedU128::one()).is_none()
+		);
+	}
+}

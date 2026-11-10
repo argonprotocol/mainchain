@@ -8,14 +8,14 @@ use super::{
 use crate::{
 	mock::{
 		account_id_from_seed, account_pair_from_seed, insert_vault, new_test_ext, set_argons,
-		set_ownership, ArgonotPriceInUsd, ArgonotSecuritizationMultiplier,
+		set_ownership, test_vault, ArgonotPriceInUsd, ArgonotSecuritizationMultiplier,
 		AvailableSecuritizationSpace, AverageArgonotPriceInMicrogons, Balances, BidPoolAccountId,
 		CurrentFrameId, ExistentialDeposit, LastAverageArgonotPriceFrame, LastOperationalBondTotal,
 		LastVaultProfits, MaxActiveArgonotBondLots, MaxArgonBondLots,
 		MaxArgonotBondedPercentOfCirculation, MaxVaultsPerPool, MinimumArgonsPerContributor, Mint,
 		MintedBitcoinMicrogons, Ownership, PurchasePool, PurchaseTick, RuntimeEvent,
-		RuntimeHoldReason, RuntimeOrigin, StabilizerBuys, System, Test, TestAccountId, TestVault,
-		Treasury, TreasuryExitDelayFrames, TreasuryPositions, TreasuryReservesAccountId, Upstreams,
+		RuntimeHoldReason, RuntimeOrigin, StabilizerBuys, System, Test, TestAccountId, Treasury,
+		TreasuryExitDelayFrames, TreasuryPositions, TreasuryReservesAccountId, Upstreams,
 		VaultArgonotMicronots, VaultBitcoinSatoshis, VaultRewardCommittedMicronots,
 		VaultSecuritizedSatoshis, VaultsById,
 	},
@@ -23,12 +23,13 @@ use crate::{
 		BondLotEarningsMetrics, Bonds, Error, FrameVaultCapital, TargetBitcoinPercent,
 		UpstreamParticipationFactor,
 	},
+	BondCollateralSettlementQueue, PendingBondCollateralByAccount,
 };
 use argon_primitives::{
 	treasury::{NetworkPositionQuantities, TreasuryPositionProvider, TreasuryRewardProvider},
 	vault::{TreasuryBonusApprovalProof, TREASURY_BONUS_APPROVAL_PROOF_MESSAGE_KEY},
 	BitcoinFissionMinting, OnNewSlot, OperationalRewardsPayer, PriceIndex, PriceIndexUpdated,
-	Signature, TreasuryPoolProvider, MICROGONS_PER_ARGON,
+	Signature, TreasuryPoolProvider, UniswapPurchaseProvider, MICROGONS_PER_ARGON,
 };
 use frame_support::{
 	assert_err, assert_noop, assert_ok,
@@ -39,6 +40,7 @@ use frame_support::{
 	},
 };
 use pallet_prelude::*;
+use pallet_stabilizer_buys::BuysByAccountAndFrame;
 use sp_core::{blake2_256, Pair};
 use sp_runtime::{ArithmeticError, BoundedBTreeMap, FixedU128, Permill, TokenError};
 
@@ -74,18 +76,6 @@ fn flexible_bond_lots_are_not_capped_per_vault() {
 		assert_eq!(BondLotsByVault::<Test>::get(1).flexible_bonds, 26);
 		assert!(BondLotById::<Test>::get(lot_ids[25]).unwrap().is_flexible);
 	});
-}
-
-fn test_vault(account_id: u64, securitization: u64) -> TestVault {
-	TestVault {
-		account_id: account(account_id),
-		securitization: securitization as Balance,
-		exit_notice_amount: 0,
-		committed_microgons: 0,
-		activated_securitization: 0,
-		delegate_account_id: None,
-		is_closed: false,
-	}
 }
 
 fn set_target_securitization(amount: Balance) {
@@ -1372,9 +1362,11 @@ fn bid_pool_reserves_fund_purchase_rewards_at_maturity() {
 		let pool = PurchasePool::get();
 		pallet_stabilizer_buys::ApprovedPool::<Test>::put(&pool);
 		assert_ok!(Balances::mint_into(&owner, 100 * MICROGONS_PER_ARGON));
-		assert_ok!(StabilizerBuys::record_transferred_purchase(
+		assert_ok!(with_storage_layer(|| StabilizerBuys::record_transferred_purchase(
 			&owner,
 			&pallet_stabilizer_buys::UniswapPurchase {
+				gateway_activity_nonce: 1,
+				repay_liquid_id: None,
 				chain_id: pool.chain_id,
 				pool_manager: pool.pool_manager,
 				pool_id: pool.pool_id,
@@ -1385,21 +1377,21 @@ fn bid_pool_reserves_fund_purchase_rewards_at_maturity() {
 				sqrt_price_after_x96: U256::one() << 77,
 				tick: 1,
 			}
-		));
+		)));
 		CurrentFrameId::set(2);
 		StabilizerBuys::on_frame_start(2);
 		assert_eq!(Treasury::available_budget(), 42 * MICROGONS_PER_ARGON);
 		assert_ok!(StabilizerBuys::bid(origin(1), 1, Percent::from_percent(50)));
 		CurrentFrameId::set(3);
 		StabilizerBuys::on_frame_start(3);
-		PurchaseTick::set(10);
+		CurrentFrameId::set(30);
 		StabilizerBuys::on_initialize(2);
 		assert_eq!(Balances::total_issuance(), 120 * MICROGONS_PER_ARGON);
 		assert_eq!(Balances::balance(&owner), 0);
 		assert_eq!(crate::OutstandingPurchaseRewards::<Test>::get(), 0);
 
 		// A caller failure restores allocation, unused funding, holds and issuance together.
-		PurchaseTick::set(11);
+		CurrentFrameId::set(31);
 		assert_noop!(
 			with_storage_layer(|| -> DispatchResult {
 				StabilizerBuys::on_initialize(3);
@@ -1426,16 +1418,14 @@ fn bid_pool_reserves_fund_purchase_rewards_at_maturity() {
 			),
 			0
 		);
-		assert!(pallet_stabilizer_buys::PurchasesByAccount::<Test>::iter_prefix(&owner)
-			.next()
-			.is_none());
+		assert!(BuysByAccountAndFrame::<Test>::iter_prefix(&owner).next().is_none());
 		StabilizerBuys::on_initialize(5);
 		assert_eq!(Balances::total_issuance(), 124_500_000);
 	});
 }
 
 #[test]
-fn purchase_reward_mint_failure_preserves_the_award_for_retry() {
+fn purchase_rewards_retire_unreceivable_dust_and_pay_small_amounts_to_funded_accounts() {
 	new_test_ext().execute_with(|| {
 		ExistentialDeposit::set(10);
 		RewardReserves::<Test>::mutate(|reserves| reserves.liquidity_buys = 10);
@@ -1447,11 +1437,16 @@ fn purchase_reward_mint_failure_preserves_the_award_for_retry() {
 		assert_eq!(Balances::total_issuance(), 0);
 
 		let owner = account(1);
-		assert_noop!(Treasury::pay_reward(&owner, 3), TokenError::BelowMinimum);
-		assert_eq!(crate::OutstandingPurchaseRewards::<Test>::get(), 3);
+		assert_eq!(Treasury::pay_reward(&owner, 3), Ok(0));
+		assert_eq!(crate::OutstandingPurchaseRewards::<Test>::get(), 0);
 		assert_eq!(Balances::total_issuance(), 0);
+		assert_eq!(Treasury::available_budget(), 7);
+		assert_noop!(Treasury::pay_reward(&owner, 3), ArithmeticError::Underflow);
+
 		assert_ok!(Balances::mint_into(&owner, 10));
-		assert_ok!(Treasury::pay_reward(&owner, 3));
+		assert_ok!(Treasury::reserve_budget(3));
+		assert_ok!(Treasury::commit_reward(3));
+		assert_eq!(Treasury::pay_reward(&owner, 3), Ok(3));
 		assert_eq!(Balances::balance(&owner), 13);
 		assert_eq!(Balances::total_issuance(), 13);
 		assert_eq!(crate::OutstandingPurchaseRewards::<Test>::get(), 0);
@@ -2160,12 +2155,11 @@ fn locked_frame_skips_lot_after_it_is_fully_burned() {
 			&account(2),
 			4 * MICROGONS_PER_ARGON,
 		));
-		assert_ok!(
-			<Treasury as TreasuryPoolProvider<TestAccountId>>::burn_encumbered_bond_microgons(
-				&account(2),
-				4 * MICROGONS_PER_ARGON,
-			)
-		);
+		assert_ok!(Treasury::settle_bond_collateral_burn(
+			&account(2),
+			4 * MICROGONS_PER_ARGON,
+			&mut Weight::zero()
+		));
 		let vault_bonds = BondLotsByVault::<Test>::get(1);
 		assert_eq!(vault_bonds.regular_bonds, 0);
 		assert_eq!(vault_bonds.flexible_bonds, 0);
@@ -2347,12 +2341,11 @@ fn burn_encumbered_bond_microgons_releases_fractional_slack_when_whole_bonds_sti
 			&account(2),
 			5 * MICROGONS_PER_ARGON,
 		));
-		assert_ok!(
-			<Treasury as TreasuryPoolProvider<TestAccountId>>::burn_encumbered_bond_microgons(
-				&account(2),
-				(3 * MICROGONS_PER_ARGON) / 2,
-			)
-		);
+		assert_ok!(Treasury::settle_bond_collateral_burn(
+			&account(2),
+			(3 * MICROGONS_PER_ARGON) / 2,
+			&mut Weight::zero()
+		));
 
 		let bond_lot_id = account_bond_lot_ids(2)[0];
 		let bond_lot = BondLotById::<Test>::get(bond_lot_id).expect("bond lot");
@@ -2398,11 +2391,11 @@ fn burn_encumbered_flexible_bonds_preserves_reserved_bond_space() {
 			);
 		assert!(encumber_result.is_ok());
 
-		let burn_result =
-			<Treasury as TreasuryPoolProvider<TestAccountId>>::burn_encumbered_bond_microgons(
-				&account(10),
-				5 * MICROGONS_PER_ARGON,
-			);
+		let burn_result = Treasury::settle_bond_collateral_burn(
+			&account(10),
+			5 * MICROGONS_PER_ARGON,
+			&mut Weight::zero(),
+		);
 		assert!(burn_result.is_ok());
 
 		let vault_bonds = BondLotsByVault::<Test>::get(1);
@@ -2410,11 +2403,11 @@ fn burn_encumbered_flexible_bonds_preserves_reserved_bond_space() {
 		assert_eq!(vault_bonds.reserved_bond_space, 10);
 		assert_eq!(BondLotById::<Test>::get(bond_lot_id).expect("bond lot").bonds, 5);
 
-		let burn_result =
-			<Treasury as TreasuryPoolProvider<TestAccountId>>::burn_encumbered_bond_microgons(
-				&account(10),
-				5 * MICROGONS_PER_ARGON,
-			);
+		let burn_result = Treasury::settle_bond_collateral_burn(
+			&account(10),
+			5 * MICROGONS_PER_ARGON,
+			&mut Weight::zero(),
+		);
 		assert!(burn_result.is_ok());
 		let vault_bonds = BondLotsByVault::<Test>::get(1);
 		assert_eq!(vault_bonds.flexible_bonds, 0);
@@ -2447,11 +2440,11 @@ fn burn_encumbered_flexible_lots_preserves_reserved_bond_space() {
 			);
 		assert!(encumber_result.is_ok());
 
-		let burn_result =
-			<Treasury as TreasuryPoolProvider<TestAccountId>>::burn_encumbered_bond_microgons(
-				&account(10),
-				10 * MICROGONS_PER_ARGON,
-			);
+		let burn_result = Treasury::settle_bond_collateral_burn(
+			&account(10),
+			10 * MICROGONS_PER_ARGON,
+			&mut Weight::zero(),
+		);
 		assert!(burn_result.is_ok());
 
 		let vault_bonds = BondLotsByVault::<Test>::get(1);
@@ -2474,12 +2467,11 @@ fn burn_encumbered_bond_microgons_keeps_fractional_remainder_held_until_it_is_re
 			&account(2),
 			5 * MICROGONS_PER_ARGON,
 		));
-		assert_ok!(
-			<Treasury as TreasuryPoolProvider<TestAccountId>>::burn_encumbered_bond_microgons(
-				&account(2),
-				(9 * MICROGONS_PER_ARGON) / 2,
-			)
-		);
+		assert_ok!(Treasury::settle_bond_collateral_burn(
+			&account(2),
+			(9 * MICROGONS_PER_ARGON) / 2,
+			&mut Weight::zero()
+		));
 
 		let vault_bonds = BondLotsByVault::<Test>::get(1);
 		assert_eq!(vault_bonds.regular_bonds, 0);
@@ -2495,18 +2487,18 @@ fn burn_encumbered_bond_microgons_keeps_fractional_remainder_held_until_it_is_re
 		assert_eq!(Treasury::encumbered_bond_microgons(&account(2)), MICROGONS_PER_ARGON / 2);
 
 		assert_err!(
-			<Treasury as TreasuryPoolProvider<TestAccountId>>::release_encumbered_bond_microgons(
+			Treasury::settle_bond_collateral_release(
 				&account(2),
 				(MICROGONS_PER_ARGON / 2) + 1,
+				&mut Weight::zero()
 			),
 			Error::<Test>::ActiveBondAmountBelowEncumberedBacking,
 		);
-		assert_ok!(
-			<Treasury as TreasuryPoolProvider<TestAccountId>>::release_encumbered_bond_microgons(
-				&account(2),
-				MICROGONS_PER_ARGON / 2,
-			)
-		);
+		assert_ok!(Treasury::settle_bond_collateral_release(
+			&account(2),
+			MICROGONS_PER_ARGON / 2,
+			&mut Weight::zero()
+		));
 		assert_eq!(
 			Balances::balance_on_hold(
 				&RuntimeHoldReason::from(HoldReason::ContributedToTreasury),
@@ -2849,9 +2841,10 @@ fn upstream_bond_requirements_ignore_space_below_the_purchase_minimum() {
 					&account(2),
 					50 * MICROGONS_PER_ARGON
 				));
-				assert_ok!(Treasury::burn_encumbered_bond_microgons(
+				assert_ok!(Treasury::settle_bond_collateral_burn(
 					&account(2),
-					50 * MICROGONS_PER_ARGON
+					50 * MICROGONS_PER_ARGON,
+					&mut Weight::zero()
 				));
 			}
 			assert_ok!(Treasury::buy_bonds(origin(3), 1, 500, None));
@@ -3000,13 +2993,21 @@ fn upstream_principal_includes_displaced_bonds_and_tracks_partial_and_full_burns
 			1_000 * MICROGONS_PER_ARGON
 		);
 		assert_ok!(Treasury::encumber_bond_microgons(&account(2), 1_000 * MICROGONS_PER_ARGON));
-		assert_ok!(Treasury::burn_encumbered_bond_microgons(&account(2), 333_500_000));
+		assert_ok!(Treasury::settle_bond_collateral_burn(
+			&account(2),
+			333_500_000,
+			&mut Weight::zero()
+		));
 		assert_eq!(TreasuryPositions::bond_principal(&account(2)), 666 * MICROGONS_PER_ARGON);
 		assert_eq!(
 			TreasuryPositions::upstream_position(&account(2)).unwrap().bond_principal,
 			666 * MICROGONS_PER_ARGON
 		);
-		assert_ok!(Treasury::burn_encumbered_bond_microgons(&account(2), 666_500_000));
+		assert_ok!(Treasury::settle_bond_collateral_burn(
+			&account(2),
+			666_500_000,
+			&mut Weight::zero()
+		));
 		assert!(account_bond_lot_ids(2).is_empty());
 		assert_eq!(TreasuryPositions::bond_principal(&account(2)), 0);
 		assert_eq!(TreasuryPositions::upstream_position(&account(2)).unwrap().bond_principal, 0);
@@ -3054,12 +3055,139 @@ fn failed_bond_burn_rolls_back_in_the_callers_storage_layer() {
 		});
 		assert_noop!(
 			with_storage_layer(|| {
-				Treasury::burn_encumbered_bond_microgons(&account(2), MICROGONS_PER_ARGON)
+				Treasury::settle_bond_collateral_burn(
+					&account(2),
+					MICROGONS_PER_ARGON,
+					&mut Weight::zero(),
+				)
 			}),
 			ArithmeticError::Underflow
 		);
 		assert_eq!(BondLotById::<Test>::get(account_bond_lot_ids(2)[0]).unwrap().bonds, 10);
 		assert_eq!(Treasury::encumbered_bond_microgons(&account(2)), 10 * MICROGONS_PER_ARGON);
+	});
+}
+
+#[test]
+fn collateral_requests_combine_without_releasing_or_double_committing_the_hold() {
+	new_test_ext().execute_with(|| {
+		MinimumArgonsPerContributor::set(1);
+		insert_vault(1, test_vault(1, 100 * MICROGONS_PER_ARGON as u64));
+		set_argons(2, 100 * MICROGONS_PER_ARGON);
+		assert_ok!(Treasury::buy_bonds(origin(2), 1, 10, None));
+		let owner = account(2);
+		assert_ok!(Treasury::encumber_bond_microgons(&owner, 10 * MICROGONS_PER_ARGON));
+		let issuance = Balances::total_issuance();
+
+		assert_ok!(
+			<Treasury as TreasuryPoolProvider<TestAccountId>>::burn_encumbered_bond_microgons(
+				&owner,
+				3 * MICROGONS_PER_ARGON,
+			)
+		);
+		assert_ok!(
+			<Treasury as TreasuryPoolProvider<TestAccountId>>::release_encumbered_bond_microgons(
+				&owner,
+				4 * MICROGONS_PER_ARGON,
+			)
+		);
+		assert_eq!(BondCollateralSettlementQueue::<Test>::iter_keys().count(), 1);
+		assert_eq!(Treasury::encumbered_bond_microgons(&owner), 10 * MICROGONS_PER_ARGON);
+		assert_eq!(Balances::total_issuance(), issuance);
+		assert_noop!(
+			<Treasury as TreasuryPoolProvider<TestAccountId>>::release_encumbered_bond_microgons(
+				&owner,
+				4 * MICROGONS_PER_ARGON,
+			),
+			Error::<Test>::ActiveBondAmountBelowEncumberedBacking,
+		);
+		assert_noop!(
+			Treasury::liquidate_bond_lot(origin(2), account_bond_lot_ids(2)[0]),
+			Error::<Test>::ActiveBondAmountBelowEncumberedBacking,
+		);
+
+		Treasury::on_initialize(System::block_number() + 1);
+		assert!(!PendingBondCollateralByAccount::<Test>::contains_key(&owner));
+		assert_eq!(BondCollateralSettlementQueue::<Test>::iter_keys().count(), 0);
+		assert_eq!(Treasury::encumbered_bond_microgons(&owner), 3 * MICROGONS_PER_ARGON);
+		assert_eq!(TreasuryPositions::bond_principal(&owner), 7 * MICROGONS_PER_ARGON);
+		assert_eq!(Balances::total_issuance(), issuance - 3 * MICROGONS_PER_ARGON);
+	});
+}
+
+#[test]
+fn pending_burn_keeps_the_next_frames_terms_until_it_is_processed() {
+	new_test_ext().execute_with(|| {
+		MinimumArgonsPerContributor::set(1);
+		CurrentFrameId::set(1);
+		insert_vault(1, test_vault(1, 100 * MICROGONS_PER_ARGON as u64));
+		set_argons(2, 200 * MICROGONS_PER_ARGON);
+		assert_ok!(Treasury::buy_bonds(origin(2), 1, 100, None));
+		Treasury::lock_in_vault_capital(1);
+		let owner = account(2);
+		assert_ok!(Treasury::encumber_bond_microgons(&owner, 40 * MICROGONS_PER_ARGON));
+		assert_ok!(
+			<Treasury as TreasuryPoolProvider<TestAccountId>>::burn_encumbered_bond_microgons(
+				&owner,
+				40 * MICROGONS_PER_ARGON,
+			)
+		);
+
+		CurrentFrameId::set(2);
+		Treasury::run_frame_transition(2);
+		assert_eq!(CurrentFrameVaultCapital::<Test>::get().unwrap().total_active_bonds, 100);
+		Treasury::on_initialize(System::block_number() + 1);
+		let lot = BondLotById::<Test>::get(account_bond_lot_ids(2)[0]).unwrap();
+		assert_eq!(lot.bonds, 60);
+		assert_eq!(lot.locked_frame_terms.unwrap().bonds, 100);
+		assert_eq!(CurrentFrameVaultCapital::<Test>::get().unwrap().total_active_bonds, 100);
+
+		CurrentFrameId::set(3);
+		Treasury::run_frame_transition(3);
+		assert_eq!(CurrentFrameVaultCapital::<Test>::get().unwrap().total_active_bonds, 60);
+	});
+}
+
+#[test]
+fn failed_collateral_settlement_rolls_back_and_retries_without_blocking_other_owners() {
+	new_test_ext().execute_with(|| {
+		MinimumArgonsPerContributor::set(1);
+		crate::mock::MaxBondCollateralSettlementsPerBlock::set(1);
+		insert_vault(1, test_vault(1, 100 * MICROGONS_PER_ARGON as u64));
+		for id in [2, 3] {
+			set_argons(id, 100 * MICROGONS_PER_ARGON);
+			assert_ok!(Treasury::buy_bonds(origin(id), 1, 10, None));
+			assert_ok!(Treasury::encumber_bond_microgons(&account(id), 10 * MICROGONS_PER_ARGON));
+			assert_ok!(
+				<Treasury as TreasuryPoolProvider<TestAccountId>>::burn_encumbered_bond_microgons(
+					&account(id),
+					5 * MICROGONS_PER_ARGON,
+				)
+			);
+		}
+		let first = BondCollateralSettlementQueue::<Test>::iter_keys().next().unwrap().holder_id();
+		let other = if first == account(2) { account(3) } else { account(2) };
+		pallet_treasury_positions::PositionsByAccount::<Test>::mutate(&first, |position| {
+			position.as_mut().unwrap().bond_principal = 0;
+		});
+		let issuance = Balances::total_issuance();
+		let now = System::block_number() + 1;
+
+		Treasury::on_initialize(now);
+		assert_eq!(Balances::total_issuance(), issuance);
+		assert_eq!(Treasury::encumbered_bond_microgons(&first), 10 * MICROGONS_PER_ARGON);
+		assert!(PendingBondCollateralByAccount::<Test>::contains_key(&first));
+		Treasury::on_initialize(now + 1);
+		assert!(!PendingBondCollateralByAccount::<Test>::contains_key(&other));
+		assert_eq!(TreasuryPositions::bond_principal(&other), 5 * MICROGONS_PER_ARGON);
+
+		pallet_treasury_positions::PositionsByAccount::<Test>::mutate(&first, |position| {
+			position.as_mut().unwrap().bond_principal = 10 * MICROGONS_PER_ARGON;
+		});
+		Treasury::on_initialize(now + 2);
+		assert_eq!(BondCollateralSettlementQueue::<Test>::iter_keys().count(), 0);
+		assert_eq!(TreasuryPositions::bond_principal(&first), 5 * MICROGONS_PER_ARGON);
+		assert_eq!(Balances::total_issuance(), issuance - 10 * MICROGONS_PER_ARGON);
 	});
 }
 
@@ -3115,20 +3243,23 @@ fn account_quantities_track_operator_displacement_capital_releases_and_burns() {
 		assert_ok!(Treasury::liquidate_bond_lot(origin(2), account_bond_lot_ids(2)[0]));
 		assert_eq!(TreasuryPositions::network_totals().account_quantities.bonds, 120);
 		assert_ok!(Treasury::encumber_bond_microgons(&account(1), 120 * MICROGONS_PER_ARGON));
-		assert_ok!(with_storage_layer(|| Treasury::burn_encumbered_bond_microgons(
+		assert_ok!(with_storage_layer(|| Treasury::settle_bond_collateral_burn(
 			&account(1),
-			20 * MICROGONS_PER_ARGON
+			20 * MICROGONS_PER_ARGON,
+			&mut Weight::zero()
 		)));
 		assert_eq!(TreasuryPositions::network_totals().account_quantities.bonds, 100);
-		assert_ok!(with_storage_layer(|| Treasury::burn_encumbered_bond_microgons(
+		assert_ok!(with_storage_layer(|| Treasury::settle_bond_collateral_burn(
 			&account(1),
-			50 * MICROGONS_PER_ARGON
+			50 * MICROGONS_PER_ARGON,
+			&mut Weight::zero()
 		)));
 		assert_eq!(TreasuryPositions::network_totals().account_quantities.bonds, 50);
 		assert_eq!(TreasuryPositions::bond_principal(&account(1)), 50 * MICROGONS_PER_ARGON);
-		assert_ok!(with_storage_layer(|| Treasury::burn_encumbered_bond_microgons(
+		assert_ok!(with_storage_layer(|| Treasury::settle_bond_collateral_burn(
 			&account(1),
-			50 * MICROGONS_PER_ARGON
+			50 * MICROGONS_PER_ARGON,
+			&mut Weight::zero()
 		)));
 		assert_eq!(TreasuryPositions::network_totals(), NetworkPositionQuantities::default());
 	});

@@ -18,6 +18,39 @@ mod benchmarks {
 	use frame_system::RawOrigin;
 
 	#[benchmark]
+	fn provider_get_block_height_change() {
+		ConfirmedBitcoinBlockTip::<T>::put(BitcoinBlock {
+			block_height: 1_000,
+			block_hash: benchmark_block_hash(1),
+		});
+		PreviousBitcoinBlockTip::<T>::put(BitcoinBlock {
+			block_height: 999,
+			block_hash: benchmark_block_hash(2),
+		});
+
+		let heights;
+		#[block]
+		{
+			heights = <Pallet<T> as Get<(BitcoinHeight, BitcoinHeight)>>::get();
+		}
+		assert_eq!(heights, (999, 1_000));
+	}
+
+	#[benchmark]
+	fn provider_get_confirmed_height() {
+		ConfirmedBitcoinBlockTip::<T>::put(BitcoinBlock {
+			block_height: 1_000,
+			block_hash: benchmark_block_hash(1),
+		});
+		let height;
+		#[block]
+		{
+			height = <Pallet<T> as BitcoinUtxoTracker>::get_confirmed_height();
+		}
+		assert_eq!(height, Some(1_000));
+	}
+
+	#[benchmark]
 	fn provider_watch_for_utxo() -> Result<(), BenchmarkError> {
 		let lock_id = 1;
 		let script_pubkey = benchmark_script_pubkey(lock_id as u32);

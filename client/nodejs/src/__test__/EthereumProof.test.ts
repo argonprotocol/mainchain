@@ -1646,7 +1646,7 @@ it('builds a gateway payload for the next uncovered locator', async () => {
     anchorBlockHash: argonFinalizedExecutionHeader.blockHash,
     targetToAnchorHeaderChain: [],
   });
-  expect(payload?.proof.storageProof.slots).toHaveLength(2);
+  expect(payload?.proof.storageProof.slots).toHaveLength(3);
   const witness = payload.proof.storageProof;
   expect(new Set(witness.storageProof).size).toBe(witness.storageProof.length);
   expect(witness.slots[0].nodeIndexes[0]).toBe(witness.slots[1].nodeIndexes[0]);
@@ -2589,7 +2589,7 @@ it('captures before anchoring and relays cached witnesses with one shared shorte
   });
   expect(captureOrder).toEqual(['proof', 'logs', 'logs']);
   expect(proofRequests).toHaveBeenCalledTimes(1);
-  expect(proofRequests.mock.calls[0][0].storageKeys).toHaveLength(4);
+  expect(proofRequests.mock.calls[0][0].storageKeys).toHaveLength(5);
   const cached = structuredClone(captures);
 
   const child = await createExecutionBlock({ number: 11n, parentHash: captureBlock.hash });
@@ -2856,7 +2856,7 @@ it.each(['padded', 'compact'])('accepts %s RPC slot keys with leading zeroes', a
   expect(recaptureLocators).toEqual([]);
   expect(payloads).toHaveLength(1);
   expect(payloads[0].gatewayActivityNonceRange).toEqual({ start: 6n, end: 6n });
-  expect(payloads[0].proof.storageProof.slots).toHaveLength(2);
+  expect(payloads[0].proof.storageProof.slots).toHaveLength(3);
   expect(payloads[0].proof.storageProof.slots[1].value).toBe(locators[5].activityRoot);
 });
 
@@ -2991,6 +2991,9 @@ async function createGatewayProofHarness(args: {
       { key: root, value: BigInt(locator.activityRoot) },
     ];
   });
+  const gatewayActivityNonce =
+    locatorFixtures.at(-1)?.locator.endGatewayActivityNonce ?? previousGatewayActivityNonce;
+  slotValues.push({ key: toHex(0n, { size: 32 }), value: gatewayActivityNonce << 160n });
   for (const { key, value } of slotValues) {
     await storageTrie.put(hexToBytes(key), hexToBytes(toRlp(toHex(value))));
   }

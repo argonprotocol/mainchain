@@ -47,9 +47,10 @@ The gateway is where the actual protocol behavior lives:
 
 - steady-state transfer amounts are expressed in 6-decimal Argon runtime base units
 - MintingGateway runtime-unit amount and collateral fields use `uint128` balances
-- `startTransferToArgon(...)` is the primary user path: the caller supplies the runtime-unit amount
-  Argon should credit plus an ERC-2612 permit signature, and the gateway scales that amount into
-  exact token base units before it permits, burns, and emits the outbound proof event
+- `startTransferToArgon(...)` requires at least 10,000 runtime units (0.01 of either token). The
+  caller supplies the amount Argon should credit plus an ERC-2612 permit signature, and the gateway
+  scales that amount into exact token base units before it permits, burns, and emits the outbound
+  proof event
 - `initialize(...)` sets the owner, guardian, and first council summary when the proxy is created
 - `migrate(...)` is the one-time owner migration path: it loads the exact Argon and Argonot
   migration balances from the prior contracts using base-unit calldata
@@ -430,12 +431,12 @@ execution, settlement and v4 hooks; there are no custom swap callbacks.
 
 The gateway enforces a minimum delivered ARGON amount through `minimumSwapMicrogons()`, defaulting
 to 100 ARGON (`100e6` microgons), including for existing proxies with unset configuration. The owner
-can change it with `setMinimumSwapMicrogons(...)` to any positive microgon amount. `burnFromSwap`
-checks actual whole microgons before burning; a smaller fill reverts the entire swap. The adapter
-reads the live gateway minimum at entry and rejects a lower `request.minMicrogonsOut` before moving
-USDC or calling Uniswap. Native swap slippage checks still enforce that requested output against the
-actual fill. There is no USDC spending floor. Ordinary transfers are unaffected, and this minimum is
-separate from Argon's reward eligibility rules.
+can change it with `setMinimumSwapMicrogons(...)`, with a floor of 10,000 microgons (0.01 ARGON).
+`burnFromSwap` checks actual whole microgons before burning; a smaller fill reverts the entire swap.
+The adapter reads the live gateway minimum at entry and rejects a lower `request.minMicrogonsOut`
+before moving USDC or calling Uniswap. Native swap slippage checks still enforce that requested
+output against the actual fill. There is no USDC spending floor. Ordinary transfers are unaffected,
+and this minimum is separate from Argon's reward eligibility rules.
 
 `TransferToArgonFromSwapStarted` commits buyer, Argon recipient, actual USDC spent, actual ARGN
 bought, `poolManager`, `poolId`, `sqrtPriceBeforeX96` and `sqrtPriceAfterX96` through the existing

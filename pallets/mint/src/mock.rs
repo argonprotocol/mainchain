@@ -65,6 +65,8 @@ parameter_types! {
 
 pub struct StaticMiningFrameProvider;
 impl MiningFrameTransitionProvider for StaticMiningFrameProvider {
+	type Weights = ();
+
 	fn is_new_frame_started() -> Option<FrameId> {
 		IsNewFrameStart::get()
 	}

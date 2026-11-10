@@ -61,6 +61,8 @@ pub struct Frames;
 
 #[cfg(test)]
 impl MiningFrameTransitionProvider for Frames {
+	type Weights = ();
+
 	fn is_new_frame_started() -> Option<FrameId> {
 		NewlyStartedFrame::get()
 	}

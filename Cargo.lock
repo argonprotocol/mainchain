@@ -1583,7 +1583,10 @@ dependencies = [
 name = "argon-runtime"
 version = "1.5.2"
 dependencies = [
+ "alloy-primitives",
+ "alloy-sol-types",
  "argon-bitcoin",
+ "argon-ethereum-contracts",
  "argon-primitives",
  "argon-runtime-common",
  "frame-benchmarking",
@@ -11624,7 +11627,6 @@ dependencies = [
  "k256",
  "log",
  "pallet-prelude",
- "pallet-stabilizer-buys",
  "parity-scale-codec",
  "polkadot-sdk",
  "scale-info",
@@ -11855,6 +11857,7 @@ name = "pallet-ethereum-verifier"
 version = "1.5.2"
 dependencies = [
  "alloy-consensus 2.0.0",
+ "alloy-eips 2.0.0",
  "alloy-primitives",
  "alloy-rlp",
  "alloy-trie",
@@ -12861,10 +12864,8 @@ name = "pallet-stabilizer-buys"
 version = "1.5.2"
 dependencies = [
  "argon-primitives",
- "pallet-mining-slot",
  "pallet-prelude",
  "pallet-price-index",
- "pallet-ticks",
  "parity-scale-codec",
  "polkadot-sdk",
  "scale-info",

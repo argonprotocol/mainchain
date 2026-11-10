@@ -173,6 +173,8 @@ async fn test_bitcoin_minting_e2e() {
 	let fission_id: FissionId = 1;
 	let second_fission_id: FissionId = 3;
 	let liquid_id: LiquidId = 1;
+	// This allocation is created after the first mint, outside the first Liquid's creation tick.
+	let second_liquid_id: LiquidId = 2;
 	let fission_satoshis = utxo_satoshis / 2;
 	let second_fission_satoshis = utxo_satoshis - fission_satoshis;
 	println!("\n5. Create the first Fission and check its active constraints");
@@ -214,7 +216,7 @@ async fn test_bitcoin_minting_e2e() {
 		lock_id,
 		fission_id,
 		second_fission_id,
-		liquid_id,
+		second_liquid_id,
 		second_fission_satoshis,
 		microgons_at_target_per_btc,
 		utxo_satoshis,
@@ -686,7 +688,7 @@ async fn ratchet_first_fission(
 		.await?
 		.expect("active Fission");
 	assert_eq!(ratcheted_fission.ratchet_number, 1);
-	assert!(ratcheted_fission.last_ratchet_tick >= ratchet_tick);
+	assert!(ratcheted_fission.last_ratchet_price_tick >= ratchet_tick);
 	assert_eq!(ratcheted_fission.microgons_at_target_per_btc, ratchet_rate);
 	assert!(ratcheted_fission.liquidity_promised < initial_liquidity_promised);
 
@@ -720,7 +722,10 @@ async fn ratchet_first_fission(
 		.await?
 		.expect("active Fission");
 	assert_eq!(unchanged_fission.ratchet_number, 1);
-	assert_eq!(unchanged_fission.last_ratchet_tick, ratcheted_fission.last_ratchet_tick);
+	assert_eq!(
+		unchanged_fission.last_ratchet_price_tick,
+		ratcheted_fission.last_ratchet_price_tick
+	);
 	assert_eq!(unchanged_fission.microgons_at_target_per_btc, ratchet_rate);
 
 	let pending_mint_indices = client

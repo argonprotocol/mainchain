@@ -1,7 +1,11 @@
 use crate as pallet_crosschain_transfer;
-use crate::{ChainConfig, GatewayActivityStorageProof};
-use alloy_primitives::B256;
-use argon_ethereum_contracts::minting_gateway::append_activity_root;
+use crate::{ChainConfig, GatewayActivityStorageProof, SourceChain};
+use alloy_primitives::{Address as AlloyAddress, B256};
+use alloy_sol_types::SolEvent;
+use argon_ethereum_contracts::minting_gateway::{
+	append_activity_root, GatewayActivityState as ContractGatewayActivityState,
+	TransferToArgonStarted,
+};
 use argon_primitives::{
 	bitcoin::{
 		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinLockId, BitcoinXPub,
@@ -16,9 +20,9 @@ use argon_primitives::{
 	EthereumAccountStorageProof, EthereumBlockNumber, EthereumExecutionBlockProof, EthereumLog,
 	EthereumReceiptLogProofBatch, EthereumStorageSlotProof, EthereumVerifyError,
 	EthereumVerifyProvider, OperationalAccountsHook, PriceProvider, TickProvider,
-	TreasuryPoolProvider, VaultId, VotingSchedule,
+	TreasuryPoolProvider, UniswapPurchase, UniswapPurchaseProvider, VaultId, VotingSchedule,
 };
-use frame_support::traits::StorageMapShim;
+use frame_support::traits::{StorageInstance, StorageMapShim};
 use pallet_prelude::*;
 use sp_arithmetic::FixedU128;
 use sp_runtime::{traits::AccountIdConversion, AccountId32};
@@ -37,7 +41,6 @@ frame_support::construct_runtime!(
 		Balances: pallet_balances::<Instance1>::{Pallet, Call, Storage, Config<T>, Event<T>},
 		Ownership: pallet_balances::<Instance2>::{Pallet, Call, Storage, Config<T>, Event<T>},
 		CrosschainTransfer: pallet_crosschain_transfer,
-		StabilizerBuys: pallet_stabilizer_buys,
 	}
 );
 
@@ -77,6 +80,7 @@ parameter_types! {
 	pub static EthereumGasPriceInWei: Option<u128> = None;
 	pub static LowestMicrogonsPerArgonot: Option<Balance> = None;
 	pub static ProofVerificationAllowed: bool = true;
+	pub static RejectPurchaseAdmission: bool = false;
 	pub static ProofVerificationRejectedTransactionIndexes: Vec<u64> = Vec::new();
 	pub static LatestExecutionBlockNumber: Option<EthereumBlockNumber> = Some(1_000);
 	pub static LatestExecutionBlockTimestamp: Option<u64> = Some(0);
@@ -203,7 +207,7 @@ impl EthereumVerifyProvider for MockEthereumVerifier {
 	fn verify_account_storage_proof<MaxStorageSlots>(
 		_account_address: H160,
 		_proof: &EthereumAccountStorageProof<MaxStorageSlots>,
-	) -> Result<(), EthereumVerifyError>
+	) -> Result<Moment, EthereumVerifyError>
 	where
 		MaxStorageSlots: Get<u32>,
 	{
@@ -211,7 +215,7 @@ impl EthereumVerifyProvider for MockEthereumVerifier {
 			return Err(EthereumVerifyError::InvalidProof);
 		}
 
-		Ok(())
+		Ok(Self::latest_execution_block_timestamp().unwrap_or_default())
 	}
 
 	fn latest_execution_block_number() -> Option<EthereumBlockNumber> {
@@ -557,92 +561,33 @@ impl TreasuryPoolProvider<TestAccountId> for MockTreasuryPoolProvider {
 	}
 }
 
-impl argon_primitives::MiningFrameTransitionProvider for CurrentFrameId {
-	fn get_current_frame_id() -> FrameId {
-		Self::get()
+pub struct RecordedPurchasesInstance;
+impl StorageInstance for RecordedPurchasesInstance {
+	fn pallet_prefix() -> &'static str {
+		"MockPurchaseProvider"
 	}
-	fn is_new_frame_started() -> Option<FrameId> {
-		None
-	}
+	const STORAGE_PREFIX: &'static str = "Purchases";
 }
 
-impl pallet_stabilizer_buys::Config for Test {
-	type Currency = Balances;
-	type MiningFrameTransitionProvider = CurrentFrameId;
-	type CurrentTick = CurrentTick;
-	type MaxRecentPriceTicks = ConstU32<360>;
-	type PriceHistoryBucketTicks = ConstU64<60>;
-	type MaxHourlyPriceReferences = ConstU32<720>;
-	type MaxCurrentHourPriceAgeTicks = ConstU64<10>;
-	type TreasuryRewardProvider = Test;
-	type MaxPrincipalPayouts = ConstU32<16>;
-	type MaxPayoutsPerBlock = ConstU32<2>;
-	type MaxPositiveBids = sp_runtime::traits::ConstU8<4>;
-	type AuctionInclusionPercent = PurchaseInclusionPercent;
-	type RewardMaturityTicks = ConstU64<43200>;
-	type WeightInfo = Test;
-}
+pub type RecordedPurchases =
+	StorageValue<RecordedPurchasesInstance, Vec<(TestAccountId, UniswapPurchase)>, ValueQuery>;
 
-parameter_types! { pub const PurchaseInclusionPercent: Percent = Percent::from_percent(90); }
-
-// This fixture tests gateway admission; Treasury funding is exercised in its connected fixture.
-impl argon_primitives::treasury::TreasuryRewardProvider<TestAccountId> for Test {
-	type Balance = Balance;
+pub struct MockPurchaseProvider;
+impl UniswapPurchaseProvider<TestAccountId> for MockPurchaseProvider {
 	type Weights = ();
-	fn available_budget() -> Balance {
-		0
-	}
-	fn reserve_budget(amount: Balance) -> DispatchResult {
-		ensure!(amount == 0, sp_runtime::TokenError::FundsUnavailable);
-		Ok(())
-	}
-	fn commit_reward(_: Balance) -> DispatchResult {
-		Err(sp_runtime::TokenError::FundsUnavailable.into())
-	}
-	fn return_budget(amount: Balance) -> DispatchResult {
-		ensure!(amount == 0, sp_runtime::TokenError::FundsUnavailable);
-		Ok(())
-	}
-	fn pay_reward(_: &TestAccountId, _: Balance) -> DispatchResult {
-		Err(sp_runtime::TokenError::FundsUnavailable.into())
-	}
-}
 
-impl pallet_stabilizer_buys::WeightInfo for Test {
-	fn record_prices() -> Weight {
-		Weight::zero()
-	}
-	fn record_purchase() -> Weight {
-		Weight::zero()
-	}
-	fn record_purchase_first_hold() -> Weight {
-		Weight::zero()
-	}
-	fn bid() -> Weight {
-		Weight::zero()
-	}
-	fn process_payouts_failed(_: u32) -> Weight {
-		Weight::zero()
-	}
-	fn process_payouts(_: u32) -> Weight {
-		Weight::zero()
-	}
-	fn process_auctions(_: u32) -> Weight {
-		Weight::zero()
-	}
-	fn set_approved_pool() -> Weight {
-		Weight::zero()
-	}
-	fn set_matching_rate() -> Weight {
-		Weight::zero()
-	}
-	fn on_frame_start() -> Weight {
-		Weight::zero()
+	fn record_transferred_purchase(
+		account: &TestAccountId,
+		purchase: &UniswapPurchase,
+	) -> DispatchResult {
+		RecordedPurchases::append((account.clone(), purchase.clone()));
+		ensure!(!RejectPurchaseAdmission::get(), TokenError::FundsUnavailable);
+		Ok(())
 	}
 }
 
 impl pallet_crosschain_transfer::Config for Test {
-	type UniswapPurchaseProvider = StabilizerBuys;
+	type UniswapPurchaseProvider = MockPurchaseProvider;
 	type Balance = Balance;
 	type EthereumBurnAccount = CrosschainTransferEthereumBurnAccount;
 	type NativeCurrency = Balances;
@@ -673,6 +618,8 @@ impl pallet_crosschain_transfer::Config for Test {
 }
 
 pub fn new_test_ext() -> TestState {
+	ExistentialDeposit::set(1);
+	OwnershipExistentialDeposit::set(1);
 	CurrentFrameId::set(1);
 	CurrentTick::set(0);
 	CurrentTicker::set(Ticker::new(1_000, 2));
@@ -682,6 +629,7 @@ pub fn new_test_ext() -> TestState {
 	EthereumGasPriceInWei::set(None);
 	LowestMicrogonsPerArgonot::set(None);
 	ProofVerificationAllowed::set(true);
+	RejectPurchaseAdmission::set(false);
 	ProofVerificationRejectedTransactionIndexes::set(Vec::new());
 	LatestExecutionBlockNumber::set(Some(1_000));
 	LatestExecutionBlockTimestamp::set(Some(0));
@@ -824,7 +772,28 @@ pub(super) fn storage_proof(
 		root = append_activity_root(root, B256::from(activity.leaf_hash(&config).0));
 	}
 
+	let first = decoded.first().expect("a locator contains activity");
+	let last = decoded.last().unwrap();
+	let mut value = H256::zero();
+	value.0[4..12].copy_from_slice(&last.gateway_activity_nonce().to_be_bytes());
 	let (range_slot, root_slot) = CrosschainTransfer::gateway_activity_locator_slots(1);
+	let slots = vec![
+		EthereumStorageSlotProof {
+			slot: range_slot,
+			value: CrosschainTransfer::gateway_activity_locator_range_slot_value(
+				block_number,
+				first.gateway_activity_nonce(),
+				last.gateway_activity_nonce(),
+			),
+			node_indexes: Default::default(),
+		},
+		EthereumStorageSlotProof {
+			slot: root_slot,
+			value: H256::from_slice(root.as_slice()),
+			node_indexes: Default::default(),
+		},
+		EthereumStorageSlotProof { slot: H256::zero(), value, node_indexes: Default::default() },
+	];
 	GatewayActivityStorageProof {
 		locator_index: 1,
 		activity_root_seed,
@@ -835,25 +804,40 @@ pub(super) fn storage_proof(
 			},
 			account_proof: Default::default(),
 			storage_proof: Default::default(),
-			slots: vec![
-				EthereumStorageSlotProof {
-					slot: range_slot,
-					value: CrosschainTransfer::gateway_activity_locator_range_slot_value(
-						block_number,
-						decoded.first().unwrap().gateway_activity_nonce(),
-						decoded.last().unwrap().gateway_activity_nonce(),
-					),
-					node_indexes: Default::default(),
-				},
-				EthereumStorageSlotProof {
-					slot: root_slot,
-					value: H256::from_slice(root.as_slice()),
-					node_indexes: Default::default(),
-				},
-			]
-			.try_into()
-			.unwrap(),
+			slots: slots.try_into().unwrap(),
 		},
 		activity_logs: logs.try_into().unwrap(),
+	}
+}
+
+pub(super) fn transfer_to_argon_log(
+	recipient: TestAccountId,
+	nonce: u64,
+	amount: u128,
+) -> EthereumLog {
+	let circulation =
+		Balances::balance(&CrosschainTransfer::burn_account(SourceChain::Ethereum)) - amount;
+	let event = TransferToArgonStarted {
+		from: AlloyAddress::repeat_byte(0x11),
+		token: AlloyAddress::repeat_byte(0x31),
+		amount,
+		argonAccountId: B256::from(<[u8; 32]>::from(recipient)),
+		gatewayState: ContractGatewayActivityState {
+			gatewayActivityNonce: nonce,
+			argonApprovalsNonce: 0,
+			argonCirculation: circulation,
+			argonotCirculation: 0,
+		},
+	};
+	EthereumLog {
+		address: h160(0x21),
+		topics: event
+			.encode_topics()
+			.into_iter()
+			.map(|topic| H256::from_slice(topic.0.as_slice()))
+			.collect::<Vec<_>>()
+			.try_into()
+			.unwrap(),
+		data: event.encode_data().try_into().unwrap(),
 	}
 }

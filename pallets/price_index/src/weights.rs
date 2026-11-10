@@ -1,9 +1,12 @@
-use argon_primitives::providers::{FeelessCallWeightInfo, PriceProviderWeightInfo};
+use argon_primitives::providers::{
+	FeelessCallWeightInfo, PriceProviderWeightInfo, TickProvider, TickProviderWeightInfo,
+};
 use core::marker::PhantomData;
 use pallet_prelude::*;
 
 /// Weight functions needed for this pallet.
 pub trait WeightInfo {
+	fn provider_get_redemption_prices() -> Weight;
 	fn provider_is_feeless() -> Weight;
 	fn on_initialize() -> Weight;
 	fn submit() -> Weight;
@@ -13,6 +16,10 @@ pub trait WeightInfo {
 	fn provider_get_ethereum_prices() -> Weight;
 	fn provider_get_liquidity_change_needed() -> Weight;
 }
+
+type ClockWeights<T> = <<T as crate::Config>::TickProvider as TickProvider<
+	<T as frame_system::Config>::Block,
+>>::Weights;
 
 pub struct ProviderWeightAdapter<T>(PhantomData<T>);
 impl<T: crate::Config> FeelessCallWeightInfo<T::RuntimeCall> for ProviderWeightAdapter<T>
@@ -30,6 +37,10 @@ where
 	}
 }
 impl<T: crate::Config> PriceProviderWeightInfo for ProviderWeightAdapter<T> {
+	fn get_redemption_prices() -> Weight {
+		T::WeightInfo::provider_get_redemption_prices()
+			.saturating_add(ClockWeights::<T>::current_tick().saturating_mul(3))
+	}
 	fn get_lowest_microgons_per_argonot() -> Weight {
 		<T as crate::Config>::WeightInfo::provider_get_lowest_microgons_per_argonot()
 	}
@@ -49,6 +60,9 @@ impl<T: crate::Config> PriceProviderWeightInfo for ProviderWeightAdapter<T> {
 
 // For backwards compatibility and tests.
 impl WeightInfo for () {
+	fn provider_get_redemption_prices() -> Weight {
+		Weight::zero()
+	}
 	fn provider_is_feeless() -> Weight {
 		Weight::zero()
 	}

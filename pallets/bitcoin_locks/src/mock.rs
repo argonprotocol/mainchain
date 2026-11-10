@@ -1,4 +1,10 @@
 #![allow(clippy::inconsistent_digit_grouping)]
+use argon_primitives::{
+	tick::Ticker, CrosschainGatewayProvider, GatewayState, SourceChain, TickProvider,
+	VotingSchedule,
+};
+use core::time::Duration;
+use frame_support::traits::UnixTime;
 use std::collections::{BTreeMap, BTreeSet};
 
 use bitcoin::PublicKey;
@@ -136,6 +142,8 @@ parameter_types! {
 
 pub struct StaticMiningFrameProvider;
 impl MiningFrameTransitionProvider for StaticMiningFrameProvider {
+	type Weights = ();
+
 	fn is_new_frame_started() -> Option<FrameId> {
 		None
 	}
@@ -619,6 +627,9 @@ impl BitcoinVerifier<Test> for StaticBitcoinVerifier {
 pub struct StaticBitcoinUtxoTracker;
 impl BitcoinUtxoTracker for StaticBitcoinUtxoTracker {
 	type Weights = ();
+	fn get_confirmed_height() -> Option<BitcoinHeight> {
+		Some(BitcoinBlockHeightChange::get().1)
+	}
 
 	fn get_synched_height() -> BitcoinHeight {
 		pallet_bitcoin_utxos::SynchedBitcoinBlock::<Test>::get()
@@ -698,8 +709,16 @@ impl pallet_bitcoin_fissions::Config for Test {
 	type Minting = Mint;
 	type OperationalAccountsHook = MockOperationalAccounts;
 	type Currency = Balances;
+	type LiquidRepaymentProvider = ();
 	type MaxFissionsPerLock = ConstU32<10>;
+	type MaxExpectedFissionsPerLiquid = ConstU32<50>;
 	type MinimumRatchetPercent = MinimumRatchetPercent;
+	type MiningFrameTransitionProvider = StaticMiningFrameProvider;
+	type TickProvider = CurrentTick;
+	type TimeProvider = CurrentTick;
+	type CrosschainGatewayProvider = Test;
+	type RValueHistoryFrames = ConstU32<30>;
+	type MaxRValueHistoryPrunesPerBlock = ConstU32<16>;
 }
 
 impl pallet_mint::Config for Test {
@@ -772,4 +791,43 @@ pub(crate) fn funding_received(lock_id: BitcoinLockId, satoshis: Satoshis) -> Di
 		satoshis,
 		bitcoin_height,
 	)
+}
+
+parameter_types! { pub static LastGatewayState: Option<GatewayState<u128>> = None;
+pub HistoryTicker: Ticker = Ticker::new(1_000, 2); }
+
+impl CrosschainGatewayProvider<u128> for Test {
+	type Weights = ();
+
+	fn last_state_by_chain(_source_chain: SourceChain) -> Option<GatewayState<u128>> {
+		LastGatewayState::get()
+	}
+}
+
+impl TickProvider<Block> for CurrentTick {
+	type Weights = ();
+	fn current_tick() -> Tick {
+		CurrentTick::get()
+	}
+	fn previous_tick() -> Tick {
+		CurrentTick::get().saturating_sub(1)
+	}
+	fn elapsed_ticks() -> Tick {
+		CurrentTick::get()
+	}
+	fn voting_schedule() -> VotingSchedule {
+		VotingSchedule::from_runtime_current_tick(CurrentTick::get())
+	}
+	fn ticker() -> Ticker {
+		HistoryTicker::get()
+	}
+	fn blocks_at_tick(_tick: Tick) -> Vec<H256> {
+		Vec::new()
+	}
+}
+
+impl UnixTime for CurrentTick {
+	fn now() -> Duration {
+		Duration::from_millis(CurrentTick::get() * HistoryTicker::get().tick_duration_millis)
+	}
 }

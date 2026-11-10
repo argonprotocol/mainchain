@@ -304,6 +304,10 @@ pub mod pallet {
 	impl<T: Config> BitcoinUtxoTracker for Pallet<T> {
 		type Weights = weights::ProviderWeightAdapter<T>;
 
+		fn get_confirmed_height() -> Option<BitcoinHeight> {
+			ConfirmedBitcoinBlockTip::<T>::get().map(|block| block.block_height)
+		}
+
 		fn get_synched_height() -> BitcoinHeight {
 			SynchedBitcoinBlock::<T>::get()
 				.map(|block| block.block_height)

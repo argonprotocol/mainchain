@@ -9,14 +9,17 @@ use crate::{
 	PendingCosignByVaultId, VaultConfig, VaultIdByOperator,
 };
 use argon_primitives::{
-	bitcoin::{CompressedBitcoinPubkey, H256Le, OpaqueBitcoinXpub, UtxoRef, SATOSHIS_PER_BITCOIN},
+	bitcoin::{
+		CompressedBitcoinPubkey, H256Le, LiquidRepayPrices, OpaqueBitcoinXpub, UtxoRef,
+		SATOSHIS_PER_BITCOIN,
+	},
 	treasury::{TreasuryPositionProvider, UpstreamPosition},
 	vault::{
 		BitcoinLockFunding, BitcoinSecuritizationBasis, BitcoinVaultProvider, CosignerGuarantee,
 		ReserveSecuritizationRequest, VaultError, VaultTerms,
 		MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES,
 	},
-	BitcoinUtxoEvents, MICROGONS_PER_ARGON,
+	BitcoinFissionsProvider, BitcoinUtxoEvents, MICROGONS_PER_ARGON,
 };
 use bitcoin::{
 	bip32::{ChildNumber, Xpriv, Xpub},
@@ -3058,7 +3061,52 @@ fn liquid_lifecycle_preserves_vault_and_treasury_accounting() {
 		assert!(fees > 0);
 		let revenue = RevenuePerFrameByVault::<Test>::get(1)[0].bitcoin_lock_fee_revenue;
 
-		// Closing returns both guarantees without new fees or a change to total securitization.
+		// A partial repayment returns only its guarantee and burns the captured curve quote.
+		let slice = SATOSHIS_PER_BITCOIN / 8;
+		let balance = Balances::free_balance(2);
+		ArgonPriceInUsd::set(Some(FixedU128::from_rational(8, 10)));
+		let prices = LiquidRepayPrices::new(
+			FixedU128::saturating_from_integer(rate),
+			FixedU128::from_rational(8, 10),
+			FixedU128::from_rational(8, 10),
+		)
+		.unwrap();
+		assert_ok!(with_storage_layer(|| BitcoinFissions::repay_liquid(
+			&2,
+			78,
+			15_822 * MICROGONS_PER_ARGON,
+			prices,
+			|amount| {
+				Balances::burn_from(
+					&2,
+					amount,
+					Preservation::Expendable,
+					Precision::Exact,
+					Fortitude::Force,
+				)
+				.map(|_| ())
+			}
+		)));
+		assert_eq!(balance - Balances::free_balance(2), 15_822 * MICROGONS_PER_ARGON);
+		let remaining = pallet_bitcoin_fissions::FissionByOwnerAndId::<Test>::get(2, 1).unwrap();
+		assert_eq!(remaining.satoshis, slice);
+		assert_eq!(remaining.liquidity_promised, 15_000 * MICROGONS_PER_ARGON);
+		assert_eq!(remaining.cosigner_guarantee.guaranteed_microgons, 15_000 * MICROGONS_PER_ARGON);
+		let lock = LocksById::<Test>::get(1).unwrap();
+		assert_eq!(lock.fissioned_satoshis, 3 * slice);
+		assert_eq!(lock.cosigner_guarantee.guaranteed_microgons, 25_000 * MICROGONS_PER_ARGON);
+		assert_eq!(lock.total_securitization(1).allocated_securitization, paid);
+		let vault = VaultsById::<Test>::get(1).unwrap();
+		assert_eq!(
+			(vault.securitization_locked, vault.get_activated_securitization()),
+			(paid, paid)
+		);
+		assert_eq!(TreasuryPositions::upstream_position(&2).unwrap().bitcoin_securitization, paid);
+		assert_eq!(OperationalAccountsById::<Test>::get(9).unwrap().vault_bitcoin_accrual, paid);
+		ArgonPriceInUsd::set(Some(FixedU128::one()));
+
+		// Closing returns the remaining guarantees without new fees or changed total
+		// securitization.
 		assert_ok!(BitcoinFissions::close(RuntimeOrigin::signed(2), 1));
 		assert_ok!(BitcoinFissions::close(RuntimeOrigin::signed(2), 0));
 		let lock = LocksById::<Test>::get(1).unwrap();

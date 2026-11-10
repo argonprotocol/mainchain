@@ -345,7 +345,7 @@ describe('MintingGateway', () => {
     };
   }
 
-  async function deployFixture() {
+  async function deployFixture(initialArgonMicrogons = 1_000n, initialArgonotMicronots = 2_000n) {
     const stack = await deployGatewayStack();
 
     await stack.proxyAdmin
@@ -359,8 +359,8 @@ describe('MintingGateway', () => {
     await stack.gateway
       .connect(stack.adminSafe)
       .migrate(
-        { recipients: [stack.holder.address], amounts: [1_000n * SCALE] },
-        { recipients: [stack.holder.address], amounts: [2_000n * SCALE] },
+        { recipients: [stack.holder.address], amounts: [initialArgonMicrogons * SCALE] },
+        { recipients: [stack.holder.address], amounts: [initialArgonotMicronots * SCALE] },
       );
 
     return stack;
@@ -492,7 +492,7 @@ describe('MintingGateway', () => {
   });
 
   it('starts a transfer to Argon in the ordered gateway activity stream', async () => {
-    const { argon, argonot, gateway, holder } = await deployFixture();
+    const { argon, argonot, gateway, holder } = await deployFixture(100_000n);
     const argonAccountId = ethers.encodeBytes32String('argon-account-1');
     const hashContext = await getGatewayHashContext(gateway);
     const deadline = BigInt((await ethers.provider.getBlock('latest'))!.timestamp) + 3600n;
@@ -501,7 +501,7 @@ describe('MintingGateway', () => {
       argon,
       holder.address as `0x${string}`,
       (await gateway.getAddress()) as `0x${string}`,
-      250n * SCALE,
+      25_000n * SCALE,
       deadline,
       'Argon',
     );
@@ -511,7 +511,7 @@ describe('MintingGateway', () => {
         .connect(holder)
         .startTransferToArgon(
           await argon.getAddress(),
-          250n,
+          25_000n,
           argonAccountId,
           deadline,
           permit.v,
@@ -524,11 +524,11 @@ describe('MintingGateway', () => {
 
     expect(event.args[0]).to.equal(holder.address);
     expect(event.args[1]).to.equal(await argon.getAddress());
-    expect(event.args[2]).to.equal(250n);
+    expect(event.args[2]).to.equal(25_000n);
     expect(event.args[3]).to.equal(argonAccountId);
     expect(event.args[4][0]).to.equal(1n);
     expect(event.args[4][1]).to.equal(0n);
-    expect(event.args[4][2]).to.equal(750n);
+    expect(event.args[4][2]).to.equal(75_000n);
     expect(event.args[4][3]).to.equal(2_000n);
 
     const locator = await gateway.activityBlockLocators(1n);
@@ -542,22 +542,22 @@ describe('MintingGateway', () => {
         hashMintingGatewayTransferToArgonStartedActivity(hashContext, {
           from: holder.address as `0x${string}`,
           token: (await argon.getAddress()) as `0x${string}`,
-          amount: 250n,
+          amount: 25_000n,
           argonAccountId: argonAccountId as `0x${string}`,
           gatewayState: asGatewayActivityState(event.args[4]),
         }),
       ),
     );
 
-    expect(await argon.balanceOf(holder.address)).to.equal(750n * SCALE);
+    expect(await argon.balanceOf(holder.address)).to.equal(75_000n * SCALE);
     expect(await argon.allowance(holder.address, await gateway.getAddress())).to.equal(0n);
     expect(await argonot.balanceOf(holder.address)).to.equal(2_000n * SCALE);
   });
 
   it('starts a transfer when its permit was already submitted by another account', async () => {
-    const { argon, gateway, holder, outsider } = await deployFixture();
+    const { argon, gateway, holder, outsider } = await deployFixture(100_000n);
     const gatewayAddress = (await gateway.getAddress()) as `0x${string}`;
-    const amount = 250n;
+    const amount = 25_000n;
     const tokenAmount = amount * SCALE;
     const deadline = BigInt((await ethers.provider.getBlock('latest'))!.timestamp) + 3600n;
     const permit = await signPermit(
@@ -597,14 +597,14 @@ describe('MintingGateway', () => {
     expect(event.args[2]).to.equal(amount);
     expect(await argon.nonces(holder.address)).to.equal(1n);
     expect(await argon.allowance(holder.address, gatewayAddress)).to.equal(0n);
-    expect(await argon.balanceOf(holder.address)).to.equal(750n * SCALE);
+    expect(await argon.balanceOf(holder.address)).to.equal(75_000n * SCALE);
     expect(await gateway.gatewayActivityNonce()).to.equal(1n);
   });
 
   it('rejects a failed permit without sufficient allowance to burn', async () => {
-    const { argon, gateway, holder } = await deployFixture();
+    const { argon, gateway, holder } = await deployFixture(100_000n);
     const gatewayAddress = (await gateway.getAddress()) as `0x${string}`;
-    const amount = 250n;
+    const amount = 25_000n;
     const tokenAmount = amount * SCALE;
     const deadline = BigInt((await ethers.provider.getBlock('latest'))!.timestamp) - 1n;
     const permit = await signPermit(
@@ -635,7 +635,7 @@ describe('MintingGateway', () => {
     );
 
     expect(await argon.nonces(holder.address)).to.equal(0n);
-    expect(await argon.balanceOf(holder.address)).to.equal(1_000n * SCALE);
+    expect(await argon.balanceOf(holder.address)).to.equal(100_000n * SCALE);
     expect(await gateway.gatewayActivityNonce()).to.equal(0n);
   });
 
@@ -654,7 +654,7 @@ describe('MintingGateway', () => {
   });
 
   it('caps one block across transactions, rolls back overflowing calls, and resumes next block', async () => {
-    const fixture = await deployFixture();
+    const fixture = await deployFixture(100_000n);
     const { gateway, argon, holder, recipient, outsider, council, mintingAuthoritySigner } =
       fixture;
     await activateMintingAuthority(fixture);
@@ -695,7 +695,7 @@ describe('MintingGateway', () => {
       argon,
       holder.address as `0x${string}`,
       (await gateway.getAddress()) as `0x${string}`,
-      SCALE,
+      10_000n * SCALE,
       deadline,
       'Argon',
     );
@@ -788,7 +788,7 @@ describe('MintingGateway', () => {
           .connect(holder)
           .startTransferToArgon(
             await argon.getAddress(),
-            1n,
+            10_000n,
             ethers.encodeBytes32String('capacity'),
             deadline,
             permit.v,
@@ -826,8 +826,8 @@ describe('MintingGateway', () => {
     expect(await gateway.gatewayActivityNonce()).to.equal(locator.endGatewayActivityNonce);
     expect(await gateway.argonApprovalsNonce()).to.equal(startingApprovalsNonce + BigInt(cap - 1));
     expect(await gateway.argonApprovalsHash()).to.equal(expectedApprovalHash!);
-    expect(await argon.balanceOf(holder.address)).to.equal(999n * SCALE);
-    expect(await argon.totalSupply()).to.equal(999n * SCALE);
+    expect(await argon.balanceOf(holder.address)).to.equal(90_000n * SCALE);
+    expect(await argon.totalSupply()).to.equal(90_000n * SCALE);
     expect(await argon.balanceOf(recipient.address)).to.equal(0n);
     expect(await argon.nonces(holder.address)).to.equal(1n);
     expect(await gateway.finalizedTransferOutOfArgonIds(transferId)).to.equal(false);
@@ -864,37 +864,73 @@ describe('MintingGateway', () => {
     ).to.equal(collateralBefore.microgonCollateral - 1n);
   });
 
-  it('rejects zero runtime-unit transfer amounts', async () => {
-    const { gateway, holder } = await deployFixture();
-    const argonAccountId = ethers.encodeBytes32String('argon-account-1');
+  it.each(['argon', 'argonot'] as const)(
+    'rejects sub-minimum %s transfers before spending or recording activity',
+    async asset => {
+      const fixture = await deployFixture(100_000n, 100_000n);
+      const { gateway, holder } = fixture;
+      const token = fixture[asset];
+      const tokenAddress = await token.getAddress();
+      const accountId = ethers.encodeBytes32String('minimum-transfer');
+      const minimum = await gateway.MIN_TRANSFER_AMOUNT();
+      expect(minimum).toBe(10_000n);
+      await token.connect(holder).approve(await gateway.getAddress(), minimum * SCALE);
 
-    await expectCustomError(
-      gateway
+      for (const amount of [minimum - 1n, 0n]) {
+        await expectCustomError(
+          gateway
+            .connect(holder)
+            .startTransferToArgon(
+              tokenAddress,
+              amount,
+              accountId,
+              0n,
+              27,
+              ethers.ZeroHash,
+              ethers.ZeroHash,
+            ),
+          gateway,
+          'TransferTooSmall',
+        );
+      }
+      expect(await token.balanceOf(holder.address)).toBe(100_000n * SCALE);
+      expect(await token.totalSupply()).toBe(100_000n * SCALE);
+      expect(await token.allowance(holder.address, await gateway.getAddress())).toBe(
+        minimum * SCALE,
+      );
+      expect(await token.nonces(holder.address)).toBe(0n);
+      expect(await gateway.gatewayActivityNonce()).toBe(0n);
+      expect(await gateway.latestActivityBlockLocatorIndex()).toBe(0n);
+
+      await gateway
         .connect(holder)
         .startTransferToArgon(
-          await gateway.argonToken(),
-          0n,
-          argonAccountId,
+          tokenAddress,
+          minimum,
+          accountId,
           0n,
           27,
           ethers.ZeroHash,
           ethers.ZeroHash,
-        ),
-      gateway,
-      'ZeroAmount',
-    );
-  });
+        );
+      expect(await token.balanceOf(holder.address)).toBe(90_000n * SCALE);
+      expect(await token.totalSupply()).toBe(90_000n * SCALE);
+      expect(await gateway.gatewayActivityNonce()).toBe(1n);
+    },
+  );
 
   it('burns a purchase only from its authorized contract and records one distinct activity', async () => {
     const { argon, argonot, gateway, holder, outsider, guardian, adminSafe, proxyAdmin } =
-      await deployFixture();
+      await deployFixture(100_000n);
     const purchase = {
       timestamp: 0n,
       buyer: outsider.address,
       argonAccountId: ethers.encodeBytes32String('purchase-recipient'),
+      repayLiquidId: 0n,
+      repaySignature: '0x',
       usdcToken: '0x1111111111111111111111111111111111111111',
-      usdcSpent: 250n,
-      argonBought: 250n * SCALE + 123n,
+      usdcSpent: 25_000n,
+      argonBought: 25_000n * SCALE + 123n,
       poolManager: '0x1111111111111111111111111111111111111111',
       poolId: ethers.ZeroHash,
       sqrtPriceBeforeX96: 100n,
@@ -903,19 +939,23 @@ describe('MintingGateway', () => {
 
     expect(await gateway.minimumSwapMicrogons()).toBe(100n * 10n ** 6n);
     await expectCustomError(
-      gateway.connect(outsider).setMinimumSwapMicrogons(250n),
+      gateway.connect(outsider).setMinimumSwapMicrogons(25_000n),
       gateway,
       'OwnableUnauthorizedAccount',
       [outsider.address],
     );
+    for (const minimum of [0n, 9_999n]) {
+      await expectCustomError(
+        gateway.connect(adminSafe).setMinimumSwapMicrogons(minimum),
+        gateway,
+        'TransferTooSmall',
+      );
+    }
+    await gateway.connect(adminSafe).setMinimumSwapMicrogons(10_000n);
+    expect(await gateway.minimumSwapMicrogons()).toBe(10_000n);
+    await gateway.connect(adminSafe).setMinimumSwapMicrogons(25_000n);
     await expectCustomError(
-      gateway.connect(adminSafe).setMinimumSwapMicrogons(0),
-      gateway,
-      'ZeroAmount',
-    );
-    await gateway.connect(adminSafe).setMinimumSwapMicrogons(250n);
-    await expectCustomError(
-      gateway.connect(holder).burnFromSwap({ ...purchase, argonBought: 250n * SCALE - 1n }),
+      gateway.connect(holder).burnFromSwap({ ...purchase, argonBought: 25_000n * SCALE - 1n }),
       gateway,
       'PurchaseTooSmall',
     );
@@ -927,9 +967,9 @@ describe('MintingGateway', () => {
     );
     await expect(gateway.connect(holder).burnFromSwap(purchase)).rejects.toThrow();
     expect(await gateway.gatewayActivityNonce()).to.equal(0n);
-    expect(await argon.balanceOf(holder.address)).to.equal(1_000n * SCALE);
+    expect(await argon.balanceOf(holder.address)).to.equal(100_000n * SCALE);
 
-    await argon.connect(holder).approve(await gateway.getAddress(), 250n * SCALE);
+    await argon.connect(holder).approve(await gateway.getAddress(), 25_000n * SCALE);
     await gateway.connect(guardian).pause();
     await expectCustomError(
       gateway.connect(holder).burnFromSwap(purchase),
@@ -946,11 +986,11 @@ describe('MintingGateway', () => {
     expect(event.args.purchase.buyer).to.equal(outsider.address);
     expect(event.args.purchase.argonBought).to.equal(purchase.argonBought);
     expect(event.args.token).to.equal(await argon.getAddress());
-    expect(event.args.amount).to.equal(250n);
+    expect(event.args.amount).to.equal(25_000n);
     expect(event.args.gatewayState.gatewayActivityNonce).to.equal(1n);
-    expect(event.args.gatewayState.argonCirculation).to.equal(750n);
+    expect(event.args.gatewayState.argonCirculation).to.equal(75_000n);
     expect(await gateway.gatewayActivityNonce()).to.equal(1n);
-    expect(await argon.balanceOf(holder.address)).to.equal(750n * SCALE);
+    expect(await argon.balanceOf(holder.address)).to.equal(75_000n * SCALE);
     expect(await argon.allowance(holder.address, await gateway.getAddress())).to.equal(0n);
     const priorLocator = await gateway.activityBlockLocators(1);
     const priorCouncil = await gateway.globalIssuanceCouncil();
@@ -964,7 +1004,7 @@ describe('MintingGateway', () => {
     expect(await gateway.activityBlockLocators(1)).toEqual(priorLocator);
     expect(await gateway.globalIssuanceCouncil()).toEqual(priorCouncil);
     expect(await gateway.migrationCompleted()).toBe(true);
-    expect(await gateway.minimumSwapMicrogons()).toBe(250n);
+    expect(await gateway.minimumSwapMicrogons()).toBe(25_000n);
     await expectCustomError(
       gateway.connect(holder).burnFromSwap(purchase),
       gateway,
@@ -975,11 +1015,11 @@ describe('MintingGateway', () => {
         .connect(adminSafe)
         .migrate({ recipients: [], amounts: [] }, { recipients: [], amounts: [] }),
     ).rejects.toThrow();
-    await argon.connect(holder).transfer(outsider.address, 250n * SCALE);
-    await argon.connect(outsider).approve(await gateway.getAddress(), 250n * SCALE);
+    await argon.connect(holder).transfer(outsider.address, 25_000n * SCALE);
+    await argon.connect(outsider).approve(await gateway.getAddress(), 25_000n * SCALE);
     await gateway.connect(outsider).burnFromSwap(purchase);
     expect(await gateway.gatewayActivityNonce()).to.equal(2n);
-    expect(await argon.totalSupply()).to.equal(500n * SCALE);
+    expect(await argon.totalSupply()).to.equal(50_000n * SCALE);
   });
 
   it('only lets the owner force-update the active council summary', async () => {

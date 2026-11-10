@@ -144,7 +144,11 @@ impl<T: Config> Pallet<T> {
 		destination_account: H160,
 		amount: T::Balance,
 	) -> DispatchResult {
-		ensure!(amount != T::Balance::default(), Error::<T>::InvalidTransferOutAmount);
+		let minimum = match asset {
+			AssetKind::Argon => T::NativeCurrency::minimum_balance(),
+			AssetKind::Argonot => T::OwnershipCurrency::minimum_balance(),
+		};
+		ensure!(amount >= minimum, Error::<T>::InvalidTransferOutAmount);
 		ensure!(destination_account != H160::zero(), Error::<T>::InvalidTransferOutRecipient);
 
 		let microgons_per_argonot =
@@ -552,6 +556,7 @@ impl<T: Config> Pallet<T> {
 			),
 		}
 		.map_err(|_| GatewaySyncPauseReason::GatewayStateDrift)?;
+		// The principal refund funds the account before even a tiny held tip is released.
 		Self::release_transfer_out_minting_authority_tip(
 			transfer.asset,
 			&transfer.argon_account_id,
@@ -1049,15 +1054,10 @@ impl<T: Config> Pallet<T> {
 		if amount == T::Balance::default() {
 			return Ok(());
 		}
-		let _ = C::release(
-			&HoldReason::TransferOutMintingAuthorityTip.into(),
-			account_id,
-			amount,
-			Precision::Exact,
-		)?;
-		if C::balance_on_hold(&HoldReason::TransferOutMintingAuthorityTip.into(), account_id) ==
-			T::Balance::default()
-		{
+		let reason = HoldReason::TransferOutMintingAuthorityTip.into();
+		C::release(&reason, account_id, amount, Precision::Exact)?;
+
+		if C::balance_on_hold(&reason, account_id) == T::Balance::default() {
 			let _ = frame_system::Pallet::<T>::dec_providers(account_id);
 		}
 		Ok(())
@@ -1096,6 +1096,50 @@ impl<T: Config> Pallet<T> {
 mod test {
 	use super::*;
 	use crate::{gateway_activity::GatewayMintingAuthorityCollateral, tests::*};
+
+	#[test]
+	fn transfer_out_enforces_each_currency_minimum_before_creating_a_request() {
+		new_test_ext().execute_with(|| {
+			ExistentialDeposit::set(10_000);
+			OwnershipExistentialDeposit::set(10_000);
+			configure_single_member_ethereum_council(
+				account(60),
+				40,
+				20_000,
+				&council_signing_pair(80),
+			);
+			let user = account(61);
+			assert_ok!(Balances::mint_into(&user, 40_000));
+			assert_ok!(Ownership::mint_into(&user, 40_000));
+
+			for asset in [AssetKind::Argon, AssetKind::Argonot] {
+				for amount in [0, 9_999] {
+					assert_noop!(
+						CrosschainTransfer::transfer_out(
+							RuntimeOrigin::signed(user.clone()),
+							SourceChain::Ethereum,
+							asset,
+							h160(0x44),
+							amount,
+						),
+						Error::<Test>::InvalidTransferOutAmount
+					);
+				}
+
+				assert_ok!(CrosschainTransfer::transfer_out(
+					RuntimeOrigin::signed(user.clone()),
+					SourceChain::Ethereum,
+					asset,
+					h160(0x44),
+					10_000,
+				));
+				let nonce = NextTransferOutNonceBySendingAccountId::<Test>::get(&user);
+				let request = TransferOutById::<Test>::get(transfer_out_id(&user, nonce)).unwrap();
+				assert_eq!(request.asset, asset);
+				assert_eq!(request.amount, 10_000);
+			}
+		});
+	}
 
 	#[test]
 	fn transfer_out_moves_principal_to_burn_and_holds_tip() {
