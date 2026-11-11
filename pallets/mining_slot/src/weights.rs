@@ -21,10 +21,13 @@ pub trait WeightInfo {
 	fn bid_renewal() -> Weight;
 	fn bid_with_max() -> Weight;
 	fn bid_with_max_renewal() -> Weight;
+	fn bid_with_max_adjustment() -> Weight;
 	fn bid_max() -> Weight;
 	fn bid_max_renewal() -> Weight;
+	fn bid_max_update() -> Weight;
 	fn settle_bids(b: u32, m: u32) -> Weight;
 	fn settle_bids_with_replacements(b: u32, m: u32) -> Weight;
+	fn settle_bids_with_max_adjustments(b: u32, m: u32) -> Weight;
 	fn configure_mining_slot_delay() -> Weight;
 
 	// Hooks with variance
@@ -107,11 +110,13 @@ where
 	fn bid_with_max() -> Weight {
 		Base::bid_with_max()
 			.max(Base::bid_with_max_renewal())
+			.max(Base::bid_with_max_adjustment())
 			.saturating_add(OperationalAccountProviderWeight::is_eligible())
 	}
 	fn bid_max() -> Weight {
 		Base::bid_max()
 			.max(Base::bid_max_renewal())
+			.max(Base::bid_max_update())
 			.saturating_add(OperationalAccountProviderWeight::is_eligible())
 			.saturating_add(TickProviderWeight::current_tick())
 	}
@@ -120,11 +125,17 @@ where
 		if b == 0 {
 			return Weight::zero();
 		}
-		Base::settle_bids(b, m).max(Base::settle_bids_with_replacements(b, m))
+		Base::settle_bids(b, m)
+			.max(Base::settle_bids_with_replacements(b, m))
+			.max(Base::settle_bids_with_max_adjustments(b, m))
 	}
 
 	fn settle_bids_with_replacements(b: u32, m: u32) -> Weight {
 		Base::settle_bids_with_replacements(b, m)
+	}
+
+	fn settle_bids_with_max_adjustments(b: u32, m: u32) -> Weight {
+		Base::settle_bids_with_max_adjustments(b, m)
 	}
 
 	fn bid_legacy() -> Weight {
@@ -145,8 +156,16 @@ where
 		Base::bid_with_max_renewal()
 	}
 
+	fn bid_with_max_adjustment() -> Weight {
+		Base::bid_with_max_adjustment()
+	}
+
 	fn bid_max_renewal() -> Weight {
 		Base::bid_max_renewal()
+	}
+
+	fn bid_max_update() -> Weight {
+		Base::bid_max_update()
 	}
 
 	fn bid() -> Weight {
@@ -155,6 +174,7 @@ where
 			.max(Base::bid_renewal())
 			.max(Base::bid_with_max())
 			.max(Base::bid_with_max_renewal())
+			.max(Base::bid_with_max_adjustment())
 			.saturating_add(TickProviderWeight::current_tick())
 			.saturating_add(OperationalAccountProviderWeight::is_eligible())
 	}
@@ -245,6 +265,10 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 
+	fn settle_bids_with_max_adjustments(_: u32, _: u32) -> Weight {
+		Weight::zero()
+	}
+
 	fn bid_renewal() -> Weight {
 		Weight::zero()
 	}
@@ -253,7 +277,15 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 
+	fn bid_with_max_adjustment() -> Weight {
+		Weight::zero()
+	}
+
 	fn bid_max_renewal() -> Weight {
+		Weight::zero()
+	}
+
+	fn bid_max_update() -> Weight {
 		Weight::zero()
 	}
 

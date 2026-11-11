@@ -93,7 +93,7 @@ mod tests {
 	};
 
 	#[test]
-	fn proxied_commit_and_reveal_charge_real_account_without_holding_the_ceiling() {
+	fn proxied_commit_reveal_and_max_update_charge_real_account_without_holding_the_ceiling() {
 		use argon_runtime::{Ownership, ProxyType, RuntimeEvent, SessionKeys};
 		use codec::Decode;
 		TestExternalities::new(RuntimeGenesisConfig::default().build_storage().unwrap())
@@ -147,11 +147,21 @@ mod tests {
 					target_frame_id: 2,
 					mining_account_id: None,
 					max: high,
-					salt: [9; 32],
+					salt: Some([9; 32]),
+				});
+				let update = RuntimeCall::MiningSlot(pallet_mining_slot::Call::bid_max {
+					target_frame_id: 2,
+					mining_account_id: None,
+					max: 3 * ARGON,
+					salt: None,
 				});
 				let before_real = <Balances as frame_support::traits::Currency<sp_runtime::AccountId32>>::total_balance(&real);
 				let before_delegate = <Balances as frame_support::traits::Currency<sp_runtime::AccountId32>>::total_balance(&delegate);
-				for (block, inner) in [(1, commit), (2, reveal)] {
+				for (block, inner) in [(1, commit), (2, reveal), (7, update)] {
+					if block == 7 {
+						System::set_block_number(6);
+						argon_runtime::MiningSlot::on_finalize(6);
+					}
 					System::set_block_number(block);
 					let call = RuntimeCall::Proxy(pallet_proxy::Call::proxy {
 						real: sp_runtime::MultiAddress::Id(real.clone()),
@@ -189,9 +199,8 @@ mod tests {
 						1
 					);
 				}
-				let pending = pallet_mining_slot::PendingBids::<Runtime>::get(&real).unwrap();
-				assert_eq!(pending.funding, real);
-				assert_eq!(pending.max, Some(high));
+				assert!(!pallet_mining_slot::PendingBids::<Runtime>::contains_key(&real));
+				assert_eq!(pallet_mining_slot::StandingBids::<Runtime>::get(&real).unwrap().max, 3 * ARGON);
 				assert_eq!(
 					Balances::total_balance_on_hold(&real),
 					0
@@ -213,9 +222,30 @@ mod tests {
 						_ => None,
 					})
 					.collect();
-				assert_eq!(fees.len(), 2);
+				assert_eq!(fees.len(), 3);
 				assert!(fees.iter().all(|fee| *fee > 0));
-				assert_eq!(before_real - <Balances as frame_support::traits::Currency<sp_runtime::AccountId32>>::total_balance(&real), fees.iter().sum::<u128>());
+				assert_eq!(before_real - <Balances as frame_support::traits::Currency<sp_runtime::AccountId32>>::total_balance(&real), fees.iter().sum::<u128>() + low);
+
+				let failed_batch = RuntimeCall::Utility(pallet_utility::Call::batch_all {
+					calls: vec![
+						RuntimeCall::MiningSlot(pallet_mining_slot::Call::bid_max {
+							target_frame_id: 2,
+							mining_account_id: None,
+							max: 4 * ARGON,
+							salt: None,
+						}),
+						RuntimeCall::Balances(pallet_balances::Call::transfer_allow_death {
+							dest: sp_runtime::MultiAddress::Id(delegate),
+							value: u128::MAX,
+						}),
+					],
+				});
+				assert!(failed_batch.dispatch(RuntimeOrigin::signed(real.clone())).is_err());
+				assert_eq!(pallet_mining_slot::StandingBids::<Runtime>::get(&real).unwrap().max, 3 * ARGON);
+				assert!(!System::events().iter().any(|record| matches!(
+					&record.event,
+					RuntimeEvent::MiningSlot(pallet_mining_slot::Event::BidMaxUpdated { max, .. }) if *max == 4 * ARGON
+				)));
 			});
 	}
 
@@ -306,7 +336,7 @@ mod tests {
 						target_frame_id: 2,
 						mining_account_id: None,
 						max: 20_000,
-						salt: [1; 32],
+						salt: Some([1; 32]),
 					}),
 				];
 				let unrelated = RuntimeCall::System(frame_system::Call::remark { remark: vec![] });

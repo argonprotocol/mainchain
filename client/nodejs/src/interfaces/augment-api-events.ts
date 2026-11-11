@@ -1201,6 +1201,11 @@ declare module '@polkadot/api-base/types/events' {
         { accountId: AccountId32; targetFrameId: u64 }
       >;
       BidLost: AugmentedEvent<ApiType, [accountId: AccountId32], { accountId: AccountId32 }>;
+      BidMaxUpdated: AugmentedEvent<
+        ApiType,
+        [accountId: AccountId32, targetFrameId: u64, max: u128],
+        { accountId: AccountId32; targetFrameId: u64; max: u128 }
+      >;
       BidRejected: AugmentedEvent<ApiType, [accountId: AccountId32], { accountId: AccountId32 }>;
       BidRevealed: AugmentedEvent<ApiType, [accountId: AccountId32], { accountId: AccountId32 }>;
       /**

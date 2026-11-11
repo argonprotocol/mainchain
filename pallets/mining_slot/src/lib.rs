@@ -442,6 +442,14 @@ pub mod pallet {
 			account_id: T::AccountId,
 			error: DispatchError,
 		},
+		BidMaxUpdated {
+			/// Mining account whose standing maximum changed.
+			account_id: T::AccountId,
+			/// Auction frame in which the updated maximum applies.
+			target_frame_id: FrameId,
+			/// New automatic-bidding ceiling in microgons, at least the paid bid.
+			max: T::Balance,
+		},
 	}
 
 	#[pallet::error]
@@ -460,7 +468,7 @@ pub mod pallet {
 		CannotChangeFundingAccount,
 		/// The funding account does not have enough funds to cover the bid
 		InsufficientFunds,
-		/// The mining bid cannot be reduced
+		/// Paid bids cannot decrease; public-only replacements must exceed the standing maximum.
 		BidCannotBeReduced,
 		/// Bids must be in allowed increments
 		InvalidBidAmount,
@@ -488,6 +496,8 @@ pub mod pallet {
 		RangeAuctionNotActive,
 		/// The bid batch cannot settle until its reveal window has ended.
 		BatchNotMature,
+		/// The miner has no settled bid with a standing maximum in the upcoming auction.
+		MissingStandingBid,
 	}
 
 	#[pallet::hooks]
@@ -644,6 +654,7 @@ pub mod pallet {
 		/// Submit a funded public bid, optionally committing to a hidden maximum.
 		/// Every bid competes at its public amount even if no maximum is revealed.
 		/// An omitted target frame selects the current auction at dispatch time.
+		/// Standing winners can commit a new maximum without clearing the new-bid entry threshold.
 		#[pallet::call_index(0)]
 		#[pallet::weight(T::WeightInfo::bid())]
 		pub fn bid(
@@ -665,24 +676,30 @@ pub mod pallet {
 				ensure!(max_hash.is_none(), Error::<T>::RangeAuctionNotActive);
 				return Self::legacy_bid(funding, bid, keys, miner);
 			}
-			Self::check_public_bid(bid)?;
+			Self::check_public_bid(bid, &miner, max_hash.is_some())?;
 			Self::queue_bid(funding, miner, bid, keys, max_hash)
 		}
 
 		// Index 2 belonged to the unreleased commit_bid call and must not be reused.
-		/// Disclose a committed maximum during the five blocks following submission.
-		/// The target frame must match the original bid and the current auction.
+		/// With a salt, disclose a committed maximum in the five blocks following submission.
+		/// Without a salt, immediately update a settled winner's maximum while bidding is open.
+		/// Updates cannot overlap pending bids or reduce the maximum below the current paid bid.
+		/// Both modes must explicitly target the current auction frame.
 		#[pallet::call_index(3)]
 		#[pallet::weight(T::WeightInfo::bid_max())]
 		pub fn bid_max(
 			origin: OriginFor<T>,
 			max: T::Balance,
-			salt: [u8; 32],
+			salt: Option<[u8; 32]>,
 			mining_account_id: Option<T::AccountId>,
 			target_frame_id: FrameId,
 		) -> DispatchResult {
 			let funding = ensure_signed(origin)?;
 			let miner = mining_account_id.unwrap_or_else(|| funding.clone());
+			let Some(salt) = salt else {
+				return Self::update_standing_max(funding, miner, max, target_frame_id);
+			};
+
 			PendingBids::<T>::try_mutate(&miner, |pending| -> DispatchResult {
 				let pending = pending.as_mut().ok_or(Error::<T>::MissingBidCommitment)?;
 				ensure!(pending.funding == funding, Error::<T>::CannotChangeFundingAccount);
@@ -716,8 +733,7 @@ pub mod pallet {
 				Self::check_bid_identity(&funding, &miner)?;
 				let existing = Self::get_pending_cohort_registration(&miner);
 				if let Some(old) = &existing {
-					let old_max = StandingBids::<T>::get(&miner).map(|s| s.max).unwrap_or(old.bid);
-					ensure!(max > old_max, Error::<T>::BidCannotBeReduced);
+					ensure!(max >= old.bid, Error::<T>::BidCannotBeReduced);
 				}
 				let credit = existing.map(|r| r.bid).unwrap_or_default();
 				ensure!(
@@ -796,6 +812,51 @@ impl<T: Config> Pallet<T> {
 		)
 	}
 
+	fn update_standing_max(
+		funding: T::AccountId,
+		miner: T::AccountId,
+		max: T::Balance,
+		target_frame_id: FrameId,
+	) -> DispatchResult {
+		ensure!(Self::range_auction_enabled(), Error::<T>::RangeAuctionNotActive);
+		ensure!(target_frame_id == NextFrameId::<T>::get(), Error::<T>::WrongBidFrame);
+		ensure!(IsNextSlotBiddingOpen::<T>::get(), Error::<T>::SlotNotTakingBids);
+		ensure!(!AuctionAdmissionClosed::<T>::get(), Error::<T>::SlotNotTakingBids);
+		ensure!(NewlyStartedFrameId::<T>::get().is_none(), Error::<T>::SlotNotTakingBids);
+		Self::check_bid_identity(&funding, &miner)?;
+		ensure!(!PendingBids::<T>::contains_key(&miner), Error::<T>::DuplicateBidCommitment);
+
+		let registration =
+			Self::get_pending_cohort_registration(&miner).ok_or(Error::<T>::MissingStandingBid)?;
+		ensure!(max >= registration.bid, Error::<T>::BidCannotBeReduced);
+		let increment = T::BidIncrements::get();
+		ensure!(!increment.is_zero(), Error::<T>::InvalidBidAmount);
+		ensure!(max % increment == Zero::zero(), Error::<T>::InvalidBidAmount);
+
+		StandingBids::<T>::try_mutate(&miner, |standing| -> DispatchResult {
+			let standing = standing.as_mut().ok_or(Error::<T>::MissingStandingBid)?;
+			if max > standing.max {
+				ensure!(
+					T::ArgonCurrency::reducible_balance(
+						&funding,
+						Preservation::Protect,
+						Fortitude::Polite,
+					) >= max.saturating_sub(registration.bid),
+					Error::<T>::InsufficientFunds
+				);
+			}
+
+			standing.max = max;
+			standing.fixed = false;
+			Self::deposit_event(Event::BidMaxUpdated {
+				account_id: miner.clone(),
+				target_frame_id,
+				max,
+			});
+			Ok(())
+		})
+	}
+
 	fn check_bid_identity(funding: &T::AccountId, miner: &T::AccountId) -> DispatchResult {
 		ensure!(
 			T::OperationalAccountProvider::is_eligible(funding),
@@ -871,8 +932,17 @@ impl<T: Config> Pallet<T> {
 		offers.sort_by(|a, b| {
 			a.1.submitted_at.cmp(&b.1.submitted_at).then(a.1.position.cmp(&b.1.position))
 		});
+		Self::fund_offer_headroom(&mut offers, available);
+		offers
+	}
+
+	/// Allocate only unreserved headroom, leaving each offer's paid credit and budget intact.
+	fn fund_offer_headroom(
+		offers: &mut [(Registration<T>, StandingBid<T>, T::Balance)],
+		available: &mut BTreeMap<T::AccountId, T::Balance>,
+	) {
 		let increment = T::BidIncrements::get();
-		for (r, standing, budget) in &mut offers {
+		for (r, standing, budget) in offers {
 			let account = r.external_funding_account.as_ref().unwrap_or(&r.account_id);
 			let free = available.entry(account.clone()).or_insert_with(|| {
 				T::ArgonCurrency::reducible_balance(
@@ -881,20 +951,26 @@ impl<T: Config> Pallet<T> {
 					Fortitude::Polite,
 				)
 			});
-			let extra = standing.max.saturating_sub(r.bid).min(*free / increment * increment);
+			let extra = standing.max.saturating_sub(*budget).min(*free / increment * increment);
 			*free -= extra;
-			*budget = r.bid.saturating_add(extra);
+			*budget = budget.saturating_add(extra);
 		}
-		offers
 	}
 
-	fn check_public_bid(bid: T::Balance) -> DispatchResult {
+	fn check_public_bid(
+		bid: T::Balance,
+		miner: &T::AccountId,
+		has_max_commitment: bool,
+	) -> DispatchResult {
 		let increment = T::BidIncrements::get();
 		ensure!(
 			!increment.is_zero() && bid % increment == Zero::zero(),
 			Error::<T>::InvalidBidAmount
 		);
 		let winners = BidsForNextSlotCohort::<T>::get();
+		if has_max_commitment && winners.iter().any(|r| &r.account_id == miner) {
+			return Ok(());
+		}
 		if !winners.is_empty() && winners.len() >= NextCohortSize::<T>::get() as usize {
 			let offers = Self::funded_standing_offers(&winners, &mut Default::default());
 			let minimum = offers.iter().map(|(_, _, budget)| *budget).min().expect("nonempty");
@@ -1154,11 +1230,13 @@ impl<T: Config> Pallet<T> {
 			None
 		};
 		for (entry, position) in &pending {
-			if threshold.is_some_and(|cutoff| entry.bid <= cutoff) {
+			let replacement = offers.iter().position(|(r, _, _)| r.account_id == entry.miner);
+			let is_max_adjustment = replacement.is_some() && entry.max_hash.is_some();
+
+			if !is_max_adjustment && threshold.is_some_and(|cutoff| entry.bid <= cutoff) {
 				Self::deposit_event(Event::BidRejected { account_id: entry.miner.clone() });
 				continue;
 			}
-			let replacement = offers.iter().position(|(r, _, _)| r.account_id == entry.miner);
 			let allocated = replacement.map(|i| offers[i].2).unwrap_or_default();
 			let free = available.get_mut(&entry.funding).expect("funder inserted");
 			// A disclosed maximum is optional. If it cannot be fully funded, preserve the base bid.
@@ -1166,12 +1244,24 @@ impl<T: Config> Pallet<T> {
 			if *free < max.saturating_sub(allocated) {
 				max = entry.bid;
 			}
-			if *free < max.saturating_sub(allocated) ||
-				replacement.is_some_and(|i| max <= offers[i].1.max || max < offers[i].0.bid)
-			{
+
+			if *free < max.saturating_sub(allocated) {
 				Self::deposit_event(Event::BidRejected { account_id: entry.miner.clone() });
 				continue;
 			}
+			if let Some(i) = replacement {
+				if max < offers[i].0.bid {
+					Self::deposit_event(Event::BidRejected { account_id: entry.miner.clone() });
+					continue;
+				}
+				if !is_max_adjustment && max <= offers[i].1.max {
+					Self::deposit_event(Event::BidRejected { account_id: entry.miner.clone() });
+					continue;
+				}
+			}
+
+			// Lowering a ceiling releases its unused reservation, never its already-paid bid.
+			*free = free.saturating_add(allocated.saturating_sub(max));
 			*free -= max.saturating_sub(allocated);
 			let standing = StandingBid::<T> {
 				bid: entry.bid,
@@ -1192,6 +1282,8 @@ impl<T: Config> Pallet<T> {
 		offers.sort_by(|a, b| {
 			a.1.submitted_at.cmp(&b.1.submitted_at).then(a.1.position.cmp(&b.1.position))
 		});
+		// Shared-wallet incumbents may have been capped before a replacement freed headroom.
+		Self::fund_offer_headroom(&mut offers, &mut available);
 		let candidates = offers
 			.iter()
 			.map(|(r, s, budget)| crate::auction::Candidate {

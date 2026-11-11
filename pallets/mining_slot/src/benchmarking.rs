@@ -331,26 +331,25 @@ mod benchmarks {
 		frame_system::Pallet::<T>::set_block_number(2u32.into());
 		let target_frame_id = NextFrameId::<T>::get();
 		#[extrinsic_call]
-		_(RawOrigin::Signed(caller.clone()), high, [1; 32], None, target_frame_id);
+		_(RawOrigin::Signed(caller.clone()), high, Some([1; 32]), None, target_frame_id);
 		assert!(PendingBids::<T>::get(caller).unwrap().max.is_some());
 		Ok(())
 	}
-	#[benchmark]
-	fn bid_max_renewal() -> Result<(), BenchmarkError> {
-		let caller: T::AccountId = whitelisted_caller();
-		let keys = prepare_bid::<T>(&caller);
-		fill_active_cohort::<T>(
-			&caller,
-			&T::Keys::decode(&mut &vec![0u8; T::Keys::max_encoded_len()][..]).unwrap(),
-		);
+
+	fn prepare_standing_renewal<T: Config>(caller: &T::AccountId) -> Result<T::Keys, BenchmarkError>
+	where
+		T::OwnershipCurrency:
+			frame_support::traits::fungible::Mutate<T::AccountId, Balance = T::Balance>,
+	{
+		let keys = prepare_bid::<T>(caller);
+		fill_active_cohort::<T>(caller, &keys);
 		frame_system::Pallet::<T>::set_block_number(1u32.into());
 		fill_cohort::<T>();
-		// Exercise a miner that is both active and already a next-cohort winner.
 		BidsForNextSlotCohort::<T>::mutate(|cohort| {
 			cohort.last_mut().expect("nonempty benchmark cohort").account_id = caller.clone();
 		});
 		StandingBids::<T>::insert(
-			&caller,
+			caller,
 			StandingBid::<T> {
 				bid: T::BidIncrements::get(),
 				max: T::BidIncrements::get().saturating_mul(2u32.into()),
@@ -361,11 +360,48 @@ mod benchmarks {
 		);
 		T::OwnershipCurrency::hold(
 			&HoldReason::RegisterAsMiner.into(),
-			&caller,
+			caller,
 			ArgonotsPerMiningSeat::<T>::get().saturating_sub(1u128.into()),
 		)?;
-		let low = T::BidIncrements::get().saturating_mul(3u32.into());
-		let high = low.saturating_mul(3u32.into());
+		Ok(keys)
+	}
+
+	#[benchmark]
+	fn bid_with_max_adjustment() -> Result<(), BenchmarkError> {
+		let caller: T::AccountId = whitelisted_caller();
+		let keys = prepare_standing_renewal::<T>(&caller)?;
+		for i in 0..T::MaxBidsPerBlock::get().saturating_sub(1) {
+			let other = account("queued", i, 0);
+			let other_keys = prepare_bid::<T>(&other);
+			Pallet::<T>::bid(
+				RawOrigin::Signed(other).into(),
+				T::BidIncrements::get().saturating_mul(3u32.into()),
+				other_keys,
+				None,
+				Some(NextFrameId::<T>::get()),
+				Some([0; 32]),
+			)?;
+		}
+		#[extrinsic_call]
+		bid(
+			RawOrigin::Signed(caller.clone()),
+			T::BidIncrements::get(),
+			keys,
+			None,
+			Some(NextFrameId::<T>::get()),
+			Some([1; 32]),
+		);
+		assert!(PendingBids::<T>::contains_key(caller));
+		Ok(())
+	}
+
+	#[benchmark]
+	fn bid_max_renewal() -> Result<(), BenchmarkError> {
+		let caller: T::AccountId = whitelisted_caller();
+		let keys = prepare_standing_renewal::<T>(&caller)?;
+		// Lower the maximum to the paid floor while retaining the active renewal.
+		let low = T::BidIncrements::get();
+		let high = low;
 		let hash = Pallet::<T>::bid_commitment(
 			NextFrameId::<T>::get(),
 			&caller,
@@ -386,8 +422,21 @@ mod benchmarks {
 		frame_system::Pallet::<T>::set_block_number(2u32.into());
 		let target_frame_id = NextFrameId::<T>::get();
 		#[extrinsic_call]
-		bid_max(RawOrigin::Signed(caller.clone()), high, [1; 32], None, target_frame_id);
+		bid_max(RawOrigin::Signed(caller.clone()), high, Some([1; 32]), None, target_frame_id);
 		assert!(PendingBids::<T>::get(caller).unwrap().max.is_some());
+		Ok(())
+	}
+
+	#[benchmark]
+	fn bid_max_update() -> Result<(), BenchmarkError> {
+		let caller: T::AccountId = whitelisted_caller();
+		prepare_standing_renewal::<T>(&caller)?;
+		let max = T::BidIncrements::get().saturating_mul(3u32.into());
+		let target_frame_id = NextFrameId::<T>::get();
+		#[extrinsic_call]
+		bid_max(RawOrigin::Signed(caller.clone()), max, None, None, target_frame_id);
+		assert_eq!(StandingBids::<T>::get(&caller).unwrap().max, max);
+		assert!(!PendingBids::<T>::contains_key(caller));
 		Ok(())
 	}
 
@@ -429,7 +478,7 @@ mod benchmarks {
 				Pallet::<T>::bid_max(
 					RawOrigin::Signed(who).into(),
 					T::BidIncrements::get().saturating_mul(2u32.into()),
-					[2; 32],
+					Some([2; 32]),
 					None,
 					NextFrameId::<T>::get(),
 				)?;
@@ -516,7 +565,7 @@ mod benchmarks {
 			Pallet::<T>::bid_max(
 				RawOrigin::Signed(who).into(),
 				T::BidIncrements::get().saturating_mul((3 + i * 17 % 32).into()),
-				[1; 32],
+				Some([1; 32]),
 				None,
 				NextFrameId::<T>::get(),
 			)?;
@@ -566,6 +615,64 @@ mod benchmarks {
 		}
 		assert!(BidBatches::<T>::get(block).is_empty());
 		assert_eq!(BidsForNextSlotCohort::<T>::get().len(), m as usize);
+		Ok(())
+	}
+
+	#[benchmark]
+	fn settle_bids_with_max_adjustments(
+		b: Linear<1, 32>,
+		m: Linear<1, 144>,
+	) -> Result<(), BenchmarkError> {
+		let m = m.min(T::MaxCohortSize::get());
+		let block = funded_cohort::<T>(m)?;
+		let count = b.min(m);
+		frame_system::Pallet::<T>::set_block_number(block);
+		for i in 0..count {
+			let who = account("incumbent", i, 0);
+			let keys = prepare_bid::<T>(&who);
+			let low = T::BidIncrements::get();
+			let high = low.saturating_mul((1 + 2 * (i % 2)).into());
+			let hash = Pallet::<T>::bid_commitment(
+				NextFrameId::<T>::get(),
+				&who,
+				&who,
+				low,
+				high,
+				&keys,
+				[3; 32],
+			);
+			Pallet::<T>::bid(
+				RawOrigin::Signed(who).into(),
+				low,
+				keys,
+				None,
+				Some(NextFrameId::<T>::get()),
+				Some(hash),
+			)?;
+		}
+		frame_system::Pallet::<T>::set_block_number(block + One::one());
+		for i in 0..count {
+			Pallet::<T>::bid_max(
+				RawOrigin::Signed(account("incumbent", i, 0)).into(),
+				T::BidIncrements::get().saturating_mul((1 + 2 * (i % 2)).into()),
+				Some([3; 32]),
+				None,
+				NextFrameId::<T>::get(),
+			)?;
+		}
+		frame_system::Pallet::<T>::set_block_number(block + T::BidRevealBlocks::get().into());
+		#[block]
+		{
+			Pallet::<T>::settle_bids(block)?;
+		}
+		assert!(BidBatches::<T>::get(block).is_empty());
+		assert_eq!(BidsForNextSlotCohort::<T>::get().len(), m as usize);
+		for i in 0..count {
+			assert_eq!(
+				StandingBids::<T>::get(account::<T::AccountId>("incumbent", i, 0)).unwrap().max,
+				T::BidIncrements::get().saturating_mul((1 + 2 * (i % 2)).into()),
+			);
+		}
 		Ok(())
 	}
 

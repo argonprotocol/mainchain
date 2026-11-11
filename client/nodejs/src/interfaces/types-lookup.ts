@@ -485,6 +485,12 @@ declare module '@polkadot/types/lookup' {
       readonly accountId: AccountId32;
       readonly error: SpRuntimeDispatchError;
     } & Struct;
+    readonly isBidMaxUpdated: boolean;
+    readonly asBidMaxUpdated: {
+      readonly accountId: AccountId32;
+      readonly targetFrameId: u64;
+      readonly max: u128;
+    } & Struct;
     readonly type:
       | 'NewMiners'
       | 'SlotBidderAdded'
@@ -497,7 +503,8 @@ declare module '@polkadot/types/lookup' {
       | 'BidRejected'
       | 'WinningBidPriceChanged'
       | 'BidLost'
-      | 'ReleaseBidError';
+      | 'ReleaseBidError'
+      | 'BidMaxUpdated';
   }
 
   /** @name ArgonPrimitivesBlockSealMiningRegistration (43) */
@@ -2950,7 +2957,7 @@ declare module '@polkadot/types/lookup' {
     readonly isBidMax: boolean;
     readonly asBidMax: {
       readonly max: u128;
-      readonly salt: U8aFixed;
+      readonly salt: Option<U8aFixed>;
       readonly miningAccountId: Option<AccountId32>;
       readonly targetFrameId: u64;
     } & Struct;
@@ -4316,6 +4323,7 @@ declare module '@polkadot/types/lookup' {
     readonly isInvalidBidRange: boolean;
     readonly isRangeAuctionNotActive: boolean;
     readonly isBatchNotMature: boolean;
+    readonly isMissingStandingBid: boolean;
     readonly type:
       | 'SlotNotTakingBids'
       | 'TooManyBlockRegistrants'
@@ -4337,7 +4345,8 @@ declare module '@polkadot/types/lookup' {
       | 'TooManyBidCommitments'
       | 'InvalidBidRange'
       | 'RangeAuctionNotActive'
-      | 'BatchNotMature';
+      | 'BatchNotMature'
+      | 'MissingStandingBid';
   }
 
   /** @name ArgonPrimitivesBitcoinBitcoinCosignScriptPubkey (432) */
