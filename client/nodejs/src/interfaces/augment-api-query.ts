@@ -70,6 +70,8 @@ import type {
   FrameSystemEventRecord,
   FrameSystemLastRuntimeUpgradeInfo,
   FrameSystemPhase,
+  PalletAccountSecurityPendingPolicyUpdate,
+  PalletAccountSecurityRegistration,
   PalletBalancesAccountData,
   PalletBalancesBalanceLock,
   PalletBalancesReserveData,
@@ -147,6 +149,36 @@ export type __QueryableStorageEntry<ApiType extends ApiTypes> = QueryableStorage
 
 declare module '@polkadot/api-base/types/storage' {
   interface AugmentedQueries<ApiType extends ApiTypes> {
+    accountSecurity: {
+      /**
+       * Next group authorization nonce. Never removed or reset by policy changes or linking.
+       **/
+      nextNonce: AugmentedQuery<
+        ApiType,
+        (arg: AccountId32 | string | Uint8Array) => Observable<u64>,
+        [AccountId32]
+      >;
+      /**
+       * At most one delayed policy replacement per default account, separately deposit-backed.
+       **/
+      pendingPolicyUpdates: AugmentedQuery<
+        ApiType,
+        (
+          arg: AccountId32 | string | Uint8Array,
+        ) => Observable<Option<PalletAccountSecurityPendingPolicyUpdate>>,
+        [AccountId32]
+      >;
+      /**
+       * One registration at the default account; linked members never duplicate it.
+       **/
+      registrations: AugmentedQuery<
+        ApiType,
+        (
+          arg: AccountId32 | string | Uint8Array,
+        ) => Observable<Option<PalletAccountSecurityRegistration>>,
+        [AccountId32]
+      >;
+    };
     authorship: {
       /**
        * Author of current block.
@@ -727,7 +759,7 @@ declare module '@polkadot/api-base/types/storage' {
         [ArgonPrimitivesGatewaySourceChain, AccountId32]
       >;
       /**
-       * Conservative transfer-out conversion rate currently quoted for each destination chain.
+       * Latest proved gateway acceptance ceiling, in microgons per whole Argonot.
        **/
       currentTransferOutMicrogonsPerArgonotByDestinationChain: AugmentedQuery<
         ApiType,
@@ -879,8 +911,18 @@ declare module '@polkadot/api-base/types/storage' {
         [ArgonPrimitivesGatewaySourceChain]
       >;
       /**
-       * Immediately previous transfer-out conversion rate still accepted while the floor ratchets
-       * upward across council transitions.
+       * Active transfer counts keyed by their quote in microgons per whole Argonot. The largest
+       * key gives the required gateway ceiling without scanning transfer records at rotation.
+       **/
+      pendingTransferOutQuoteCountsByDestinationChain: AugmentedQuery<
+        ApiType,
+        (
+          arg: ArgonPrimitivesGatewaySourceChain | 'Ethereum' | number | Uint8Array,
+        ) => Observable<BTreeMap<u128, u32>>,
+        [ArgonPrimitivesGatewaySourceChain]
+      >;
+      /**
+       * Previous proved gateway ceiling, retained to quote conservatively across proof-back delays.
        **/
       previousTransferOutMicrogonsPerArgonotByDestinationChain: AugmentedQuery<
         ApiType,
@@ -900,8 +942,8 @@ declare module '@polkadot/api-base/types/storage' {
         [H256]
       >;
       /**
-       * The conservative transfer-out quote floor that the next newly opened transfer should
-       * snapshot on each destination chain.
+       * Minimum active and queued gateway ceiling. New transfers also clamp this to the market
+       * floor.
        **/
       transferOutQuoteMicrogonsPerArgonotByDestinationChain: AugmentedQuery<
         ApiType,

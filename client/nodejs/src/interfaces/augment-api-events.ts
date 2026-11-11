@@ -70,6 +70,33 @@ export type __AugmentedEvent<ApiType extends ApiTypes> = AugmentedEvent<ApiType>
 
 declare module '@polkadot/api-base/types/events' {
   interface AugmentedEvents<ApiType extends ApiTypes> {
+    accountSecurity: {
+      /**
+       * A failed child still consumes its nonce; inspect this result, not outer success.
+       **/
+      Executed: AugmentedEvent<
+        ApiType,
+        [account: AccountId32, nonce: u64, result: Result<Null, SpRuntimeDispatchError>],
+        { account: AccountId32; nonce: u64; result: Result<Null, SpRuntimeDispatchError> }
+      >;
+      GroupLinked: AugmentedEvent<
+        ApiType,
+        [defaultAccount: AccountId32],
+        { defaultAccount: AccountId32 }
+      >;
+      PolicyUpdateCancelled: AugmentedEvent<
+        ApiType,
+        [account: AccountId32, nonce: u64],
+        { account: AccountId32; nonce: u64 }
+      >;
+      PolicyUpdated: AugmentedEvent<ApiType, [account: AccountId32], { account: AccountId32 }>;
+      PolicyUpdateScheduled: AugmentedEvent<
+        ApiType,
+        [account: AccountId32, nonce: u64, executeAfterTick: u64],
+        { account: AccountId32; nonce: u64; executeAfterTick: u64 }
+      >;
+      Registered: AugmentedEvent<ApiType, [account: AccountId32], { account: AccountId32 }>;
+    };
     balances: {
       /**
        * A balance was set by root.

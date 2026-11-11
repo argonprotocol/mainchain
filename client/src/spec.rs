@@ -6,7 +6,7 @@ pub mod api {
 	mod root_mod {
 		pub use super::*;
 	}
-	pub static PALLETS: [&str; 37usize] = [
+	pub static PALLETS: [&str; 38usize] = [
 		"System",
 		"Digests",
 		"Timestamp",
@@ -44,6 +44,7 @@ pub mod api {
 		"TreasuryPositions",
 		"StabilizerBuys",
 		"StabilizerPools",
+		"AccountSecurity",
 	];
 	pub static RUNTIME_APIS: [&str; 21usize] = [
 		"Core",
@@ -249,7 +250,7 @@ pub mod api {
 				pub struct Version {}
 				pub mod execute_block {
 					use super::runtime_types;
-					pub type Block = runtime_types :: sp_runtime :: generic :: block :: LazyBlock < runtime_types :: sp_runtime :: generic :: header :: Header < :: core :: primitive :: u32 > , :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim ,) > > ;
+					pub type Block = runtime_types :: sp_runtime :: generic :: block :: LazyBlock < runtime_types :: sp_runtime :: generic :: header :: Header < :: core :: primitive :: u32 > , :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_account_security :: CheckAccountSecurity , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim ,) > > ;
 					pub mod output {
 						use super::runtime_types;
 						pub type Output = ();
@@ -583,7 +584,7 @@ pub mod api {
 				use super::runtime_types;
 				pub mod apply_extrinsic {
 					use super::runtime_types;
-					pub type Extrinsic = :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim ,) > ;
+					pub type Extrinsic = :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_account_security :: CheckAccountSecurity , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim ,) > ;
 					pub mod output {
 						use super::runtime_types;
 						pub type Output = :: core :: result :: Result < :: core :: result :: Result < () , runtime_types :: sp_runtime :: DispatchError > , runtime_types :: sp_runtime :: transaction_validity :: TransactionValidityError > ;
@@ -631,7 +632,7 @@ pub mod api {
 					pub type Inherent = runtime_types::sp_inherents::InherentData;
 					pub mod output {
 						use super::runtime_types;
-						pub type Output = :: subxt :: ext :: subxt_core :: alloc :: vec :: Vec < :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim ,) > > ;
+						pub type Output = :: subxt :: ext :: subxt_core :: alloc :: vec :: Vec < :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_account_security :: CheckAccountSecurity , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim ,) > > ;
 					}
 				}
 				#[derive(
@@ -651,7 +652,7 @@ pub mod api {
 				}
 				pub mod check_inherents {
 					use super::runtime_types;
-					pub type Block = runtime_types :: sp_runtime :: generic :: block :: LazyBlock < runtime_types :: sp_runtime :: generic :: header :: Header < :: core :: primitive :: u32 > , :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim ,) > > ;
+					pub type Block = runtime_types :: sp_runtime :: generic :: block :: LazyBlock < runtime_types :: sp_runtime :: generic :: header :: Header < :: core :: primitive :: u32 > , :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_account_security :: CheckAccountSecurity , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim ,) > > ;
 					pub type Data = runtime_types::sp_inherents::InherentData;
 					pub mod output {
 						use super::runtime_types;
@@ -718,7 +719,7 @@ pub mod api {
 					use super::runtime_types;
 					pub type Source =
 						runtime_types::sp_runtime::transaction_validity::TransactionSource;
-					pub type Tx = :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim ,) > ;
+					pub type Tx = :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_account_security :: CheckAccountSecurity , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim ,) > ;
 					pub type BlockHash = crate::types::H256;
 					pub mod output {
 						use super::runtime_types;
@@ -1052,7 +1053,7 @@ pub mod api {
 				use super::runtime_types;
 				pub mod query_info {
 					use super::runtime_types;
-					pub type Uxt = :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim ,) > ;
+					pub type Uxt = :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_account_security :: CheckAccountSecurity , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim ,) > ;
 					pub type Len = ::core::primitive::u32;
 					pub mod output {
 						use super::runtime_types;
@@ -1081,7 +1082,7 @@ pub mod api {
 				}
 				pub mod query_fee_details {
 					use super::runtime_types;
-					pub type Uxt = :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim ,) > ;
+					pub type Uxt = :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_account_security :: CheckAccountSecurity , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim ,) > ;
 					pub type Len = ::core::primitive::u32;
 					pub mod output {
 						use super::runtime_types;
@@ -1173,10 +1174,9 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							195u8, 179u8, 118u8, 184u8, 249u8, 230u8, 202u8, 87u8, 55u8, 134u8,
-							252u8, 20u8, 224u8, 31u8, 13u8, 98u8, 249u8, 138u8, 6u8, 187u8, 247u8,
-							233u8, 4u8, 171u8, 192u8, 188u8, 108u8, 136u8, 175u8, 76u8, 200u8,
-							150u8,
+							50u8, 226u8, 119u8, 110u8, 94u8, 32u8, 195u8, 40u8, 74u8, 191u8, 141u8,
+							14u8, 179u8, 228u8, 170u8, 223u8, 167u8, 99u8, 18u8, 39u8, 170u8,
+							186u8, 140u8, 1u8, 19u8, 57u8, 103u8, 143u8, 212u8, 112u8, 56u8, 101u8,
 						],
 					)
 				}
@@ -1194,9 +1194,10 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							203u8, 206u8, 31u8, 19u8, 36u8, 43u8, 223u8, 164u8, 89u8, 224u8, 25u8,
-							148u8, 164u8, 86u8, 196u8, 127u8, 98u8, 36u8, 213u8, 3u8, 116u8, 223u8,
-							134u8, 159u8, 106u8, 42u8, 127u8, 163u8, 184u8, 2u8, 52u8, 133u8,
+							136u8, 255u8, 26u8, 254u8, 173u8, 187u8, 111u8, 174u8, 34u8, 121u8,
+							101u8, 187u8, 209u8, 184u8, 216u8, 208u8, 239u8, 28u8, 24u8, 238u8,
+							32u8, 138u8, 124u8, 201u8, 110u8, 49u8, 96u8, 124u8, 34u8, 3u8, 97u8,
+							64u8,
 						],
 					)
 				}
@@ -1733,7 +1734,7 @@ pub mod api {
 					use super::runtime_types;
 					pub mod output {
 						use super::runtime_types;
-						pub type Output = runtime_types :: argon_primitives :: block_seal :: ComputePuzzle < runtime_types :: sp_runtime :: generic :: block :: Block < runtime_types :: sp_runtime :: generic :: header :: Header < :: core :: primitive :: u32 > , :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim ,) > > > ;
+						pub type Output = runtime_types :: argon_primitives :: block_seal :: ComputePuzzle < runtime_types :: sp_runtime :: generic :: block :: Block < runtime_types :: sp_runtime :: generic :: header :: Header < :: core :: primitive :: u32 > , :: subxt :: ext :: subxt_core :: utils :: UncheckedExtrinsic < :: subxt :: ext :: subxt_core :: utils :: MultiAddress < crate :: types :: AccountId32 , () > , runtime_types :: argon_runtime :: RuntimeCall , runtime_types :: sp_runtime :: MultiSignature , (runtime_types :: frame_system :: extensions :: authorize_call :: AuthorizeCall , runtime_types :: frame_system :: extensions :: check_non_zero_sender :: CheckNonZeroSender , runtime_types :: frame_system :: extensions :: check_spec_version :: CheckSpecVersion , runtime_types :: frame_system :: extensions :: check_tx_version :: CheckTxVersion , runtime_types :: frame_system :: extensions :: check_genesis :: CheckGenesis , runtime_types :: frame_system :: extensions :: check_mortality :: CheckMortality , runtime_types :: frame_system :: extensions :: check_nonce :: CheckNonce , runtime_types :: frame_system :: extensions :: check_weight :: CheckWeight , runtime_types :: pallet_account_security :: CheckAccountSecurity , runtime_types :: pallet_transaction_payment :: ChargeTransactionPayment , runtime_types :: frame_metadata_hash_extension :: CheckMetadataHash , runtime_types :: frame_system :: extensions :: weight_reclaim :: WeightReclaim ,) > > > ;
 					}
 				}
 				#[derive(
@@ -3405,6 +3406,9 @@ pub mod api {
 		pub fn stabilizer_pools(&self) -> stabilizer_pools::storage::StorageApi {
 			stabilizer_pools::storage::StorageApi
 		}
+		pub fn account_security(&self) -> account_security::storage::StorageApi {
+			account_security::storage::StorageApi
+		}
 	}
 	pub struct TransactionApi;
 	impl TransactionApi {
@@ -3504,6 +3508,9 @@ pub mod api {
 		pub fn stabilizer_pools(&self) -> stabilizer_pools::calls::TransactionApi {
 			stabilizer_pools::calls::TransactionApi
 		}
+		pub fn account_security(&self) -> account_security::calls::TransactionApi {
+			account_security::calls::TransactionApi
+		}
 	}
 	pub struct ViewFunctionsApi;
 	impl ViewFunctionsApi {
@@ -3520,9 +3527,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				248u8, 31u8, 135u8, 218u8, 129u8, 205u8, 250u8, 45u8, 55u8, 4u8, 82u8, 127u8,
-				149u8, 243u8, 71u8, 155u8, 23u8, 196u8, 14u8, 59u8, 243u8, 130u8, 228u8, 46u8,
-				174u8, 238u8, 174u8, 21u8, 20u8, 137u8, 187u8, 233u8,
+				53u8, 255u8, 160u8, 47u8, 235u8, 14u8, 127u8, 32u8, 144u8, 86u8, 8u8, 123u8, 102u8,
+				71u8, 184u8, 64u8, 146u8, 176u8, 13u8, 88u8, 190u8, 215u8, 86u8, 90u8, 71u8, 158u8,
+				182u8, 174u8, 194u8, 65u8, 193u8, 57u8,
 			]
 	}
 	pub mod system {
@@ -4646,9 +4653,10 @@ pub mod api {
 						"Events",
 						(),
 						[
-							230u8, 255u8, 140u8, 196u8, 249u8, 71u8, 40u8, 24u8, 69u8, 251u8, 68u8,
-							170u8, 54u8, 253u8, 236u8, 243u8, 35u8, 155u8, 59u8, 210u8, 196u8,
-							107u8, 192u8, 37u8, 236u8, 58u8, 254u8, 16u8, 110u8, 5u8, 30u8, 104u8,
+							125u8, 23u8, 211u8, 101u8, 170u8, 186u8, 147u8, 127u8, 44u8, 136u8,
+							78u8, 222u8, 86u8, 215u8, 70u8, 231u8, 187u8, 191u8, 163u8, 237u8,
+							22u8, 84u8, 21u8, 190u8, 174u8, 201u8, 142u8, 180u8, 191u8, 238u8,
+							170u8, 15u8,
 						],
 					)
 				}
@@ -5556,9 +5564,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							106u8, 240u8, 55u8, 232u8, 203u8, 11u8, 87u8, 77u8, 22u8, 246u8, 96u8,
-							40u8, 13u8, 144u8, 12u8, 4u8, 148u8, 23u8, 171u8, 186u8, 153u8, 175u8,
-							174u8, 84u8, 86u8, 73u8, 69u8, 34u8, 218u8, 137u8, 40u8, 215u8,
+							169u8, 174u8, 22u8, 3u8, 46u8, 255u8, 70u8, 17u8, 117u8, 61u8, 96u8,
+							106u8, 110u8, 203u8, 4u8, 101u8, 71u8, 202u8, 166u8, 244u8, 5u8, 127u8,
+							193u8, 155u8, 32u8, 120u8, 243u8, 54u8, 52u8, 209u8, 155u8, 21u8,
 						],
 					)
 				}
@@ -5623,9 +5631,10 @@ pub mod api {
 							max_weight,
 						},
 						[
-							125u8, 217u8, 153u8, 20u8, 113u8, 172u8, 151u8, 133u8, 31u8, 34u8,
-							34u8, 169u8, 245u8, 36u8, 255u8, 248u8, 23u8, 141u8, 26u8, 29u8, 119u8,
-							85u8, 72u8, 136u8, 117u8, 22u8, 131u8, 234u8, 169u8, 24u8, 92u8, 63u8,
+							134u8, 214u8, 22u8, 36u8, 45u8, 34u8, 235u8, 193u8, 36u8, 59u8, 93u8,
+							84u8, 95u8, 158u8, 205u8, 208u8, 47u8, 186u8, 196u8, 157u8, 210u8,
+							87u8, 197u8, 72u8, 122u8, 156u8, 247u8, 191u8, 31u8, 239u8, 248u8,
+							238u8,
 						],
 					)
 				}
@@ -6530,10 +6539,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							96u8, 195u8, 101u8, 100u8, 119u8, 172u8, 114u8, 85u8, 126u8, 153u8,
-							188u8, 198u8, 18u8, 79u8, 82u8, 228u8, 254u8, 250u8, 57u8, 223u8,
-							113u8, 180u8, 75u8, 139u8, 166u8, 40u8, 81u8, 195u8, 211u8, 75u8, 89u8,
-							248u8,
+							185u8, 138u8, 196u8, 140u8, 41u8, 31u8, 18u8, 116u8, 168u8, 61u8, 39u8,
+							86u8, 113u8, 206u8, 237u8, 17u8, 73u8, 131u8, 221u8, 60u8, 37u8, 179u8,
+							9u8, 247u8, 161u8, 119u8, 169u8, 114u8, 173u8, 142u8, 9u8, 34u8,
 						],
 					)
 				}
@@ -6557,10 +6565,9 @@ pub mod api {
 						"add_proxy",
 						types::AddProxy { delegate, proxy_type, delay },
 						[
-							254u8, 107u8, 145u8, 133u8, 158u8, 195u8, 208u8, 3u8, 50u8, 68u8,
-							162u8, 189u8, 135u8, 155u8, 63u8, 225u8, 176u8, 176u8, 11u8, 64u8,
-							103u8, 140u8, 87u8, 195u8, 78u8, 150u8, 209u8, 196u8, 60u8, 99u8, 40u8,
-							45u8,
+							20u8, 178u8, 212u8, 18u8, 75u8, 97u8, 174u8, 235u8, 39u8, 173u8, 224u8,
+							177u8, 86u8, 166u8, 167u8, 117u8, 21u8, 197u8, 5u8, 124u8, 46u8, 204u8,
+							98u8, 221u8, 209u8, 172u8, 191u8, 192u8, 71u8, 44u8, 231u8, 205u8,
 						],
 					)
 				}
@@ -6582,10 +6589,9 @@ pub mod api {
 						"remove_proxy",
 						types::RemoveProxy { delegate, proxy_type, delay },
 						[
-							152u8, 66u8, 50u8, 193u8, 94u8, 113u8, 25u8, 74u8, 208u8, 135u8, 134u8,
-							97u8, 217u8, 41u8, 250u8, 199u8, 218u8, 198u8, 85u8, 194u8, 15u8,
-							164u8, 86u8, 57u8, 199u8, 201u8, 214u8, 176u8, 54u8, 125u8, 141u8,
-							159u8,
+							119u8, 241u8, 10u8, 45u8, 136u8, 142u8, 147u8, 234u8, 203u8, 160u8,
+							19u8, 111u8, 199u8, 33u8, 130u8, 3u8, 105u8, 153u8, 189u8, 58u8, 232u8,
+							5u8, 33u8, 224u8, 86u8, 229u8, 139u8, 98u8, 210u8, 50u8, 57u8, 25u8,
 						],
 					)
 				}
@@ -6640,10 +6646,9 @@ pub mod api {
 						"create_pure",
 						types::CreatePure { proxy_type, delay, index },
 						[
-							69u8, 95u8, 41u8, 173u8, 237u8, 31u8, 243u8, 234u8, 32u8, 194u8, 136u8,
-							111u8, 211u8, 136u8, 232u8, 124u8, 237u8, 221u8, 243u8, 166u8, 30u8,
-							242u8, 201u8, 169u8, 183u8, 101u8, 210u8, 55u8, 121u8, 3u8, 161u8,
-							181u8,
+							196u8, 16u8, 71u8, 211u8, 201u8, 237u8, 113u8, 160u8, 48u8, 77u8, 16u8,
+							64u8, 235u8, 92u8, 68u8, 228u8, 49u8, 65u8, 230u8, 218u8, 24u8, 44u8,
+							249u8, 95u8, 138u8, 42u8, 137u8, 32u8, 101u8, 118u8, 125u8, 162u8,
 						],
 					)
 				}
@@ -6676,9 +6681,10 @@ pub mod api {
 						"kill_pure",
 						types::KillPure { spawner, proxy_type, index, height, ext_index },
 						[
-							82u8, 214u8, 48u8, 101u8, 192u8, 4u8, 224u8, 70u8, 130u8, 173u8, 127u8,
-							47u8, 40u8, 148u8, 190u8, 108u8, 81u8, 232u8, 22u8, 57u8, 245u8, 48u8,
-							89u8, 25u8, 163u8, 95u8, 98u8, 225u8, 172u8, 6u8, 206u8, 81u8,
+							178u8, 121u8, 141u8, 148u8, 237u8, 70u8, 182u8, 68u8, 153u8, 247u8,
+							62u8, 151u8, 108u8, 167u8, 205u8, 158u8, 224u8, 163u8, 125u8, 136u8,
+							147u8, 223u8, 191u8, 54u8, 173u8, 103u8, 77u8, 30u8, 141u8, 109u8,
+							35u8, 160u8,
 						],
 					)
 				}
@@ -6797,9 +6803,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							161u8, 128u8, 109u8, 14u8, 205u8, 250u8, 101u8, 74u8, 227u8, 225u8,
-							139u8, 146u8, 156u8, 12u8, 23u8, 111u8, 102u8, 78u8, 6u8, 150u8, 44u8,
-							254u8, 108u8, 107u8, 42u8, 18u8, 6u8, 195u8, 29u8, 14u8, 91u8, 66u8,
+							249u8, 127u8, 214u8, 171u8, 36u8, 206u8, 42u8, 60u8, 202u8, 212u8,
+							180u8, 94u8, 198u8, 138u8, 88u8, 1u8, 245u8, 103u8, 144u8, 143u8, 57u8,
+							199u8, 119u8, 34u8, 208u8, 149u8, 33u8, 99u8, 74u8, 105u8, 66u8, 49u8,
 						],
 					)
 				}
@@ -6848,10 +6854,10 @@ pub mod api {
 						],
 						check_permissions::Input { call, proxy_type },
 						[
-							179u8, 55u8, 190u8, 32u8, 128u8, 182u8, 144u8, 236u8, 41u8, 38u8,
-							210u8, 101u8, 92u8, 90u8, 121u8, 172u8, 51u8, 119u8, 40u8, 166u8,
-							183u8, 97u8, 227u8, 116u8, 227u8, 251u8, 44u8, 11u8, 221u8, 208u8,
-							131u8, 126u8,
+							229u8, 106u8, 46u8, 171u8, 144u8, 193u8, 116u8, 227u8, 29u8, 142u8,
+							205u8, 66u8, 192u8, 178u8, 124u8, 185u8, 48u8, 210u8, 4u8, 155u8,
+							182u8, 51u8, 78u8, 191u8, 81u8, 102u8, 212u8, 241u8, 56u8, 139u8,
+							218u8, 66u8,
 						],
 					)
 				}
@@ -6872,9 +6878,9 @@ pub mod api {
 						],
 						is_superset::Input { to_check, against },
 						[
-							47u8, 66u8, 102u8, 113u8, 156u8, 53u8, 15u8, 103u8, 91u8, 157u8, 158u8,
-							207u8, 233u8, 250u8, 154u8, 148u8, 222u8, 169u8, 58u8, 137u8, 54u8,
-							193u8, 255u8, 77u8, 228u8, 152u8, 31u8, 45u8, 227u8, 186u8, 65u8, 94u8,
+							57u8, 57u8, 62u8, 183u8, 104u8, 63u8, 233u8, 156u8, 189u8, 86u8, 0u8,
+							227u8, 1u8, 149u8, 221u8, 227u8, 42u8, 225u8, 206u8, 217u8, 122u8,
+							180u8, 54u8, 27u8, 200u8, 192u8, 97u8, 14u8, 79u8, 43u8, 162u8, 128u8,
 						],
 					)
 				}
@@ -7166,10 +7172,9 @@ pub mod api {
 						"Proxies",
 						(),
 						[
-							129u8, 183u8, 250u8, 251u8, 229u8, 30u8, 216u8, 45u8, 209u8, 157u8,
-							59u8, 40u8, 131u8, 1u8, 43u8, 152u8, 43u8, 12u8, 236u8, 151u8, 79u8,
-							212u8, 244u8, 186u8, 205u8, 51u8, 217u8, 199u8, 89u8, 130u8, 52u8,
-							27u8,
+							1u8, 62u8, 73u8, 238u8, 59u8, 36u8, 94u8, 5u8, 100u8, 174u8, 12u8,
+							43u8, 227u8, 75u8, 4u8, 147u8, 231u8, 171u8, 80u8, 143u8, 205u8, 242u8,
+							33u8, 155u8, 216u8, 207u8, 235u8, 233u8, 217u8, 208u8, 94u8, 169u8,
 						],
 					)
 				}
@@ -7192,10 +7197,9 @@ pub mod api {
 						"Proxies",
 						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
 						[
-							129u8, 183u8, 250u8, 251u8, 229u8, 30u8, 216u8, 45u8, 209u8, 157u8,
-							59u8, 40u8, 131u8, 1u8, 43u8, 152u8, 43u8, 12u8, 236u8, 151u8, 79u8,
-							212u8, 244u8, 186u8, 205u8, 51u8, 217u8, 199u8, 89u8, 130u8, 52u8,
-							27u8,
+							1u8, 62u8, 73u8, 238u8, 59u8, 36u8, 94u8, 5u8, 100u8, 174u8, 12u8,
+							43u8, 227u8, 75u8, 4u8, 147u8, 231u8, 171u8, 80u8, 143u8, 205u8, 242u8,
+							33u8, 155u8, 216u8, 207u8, 235u8, 233u8, 217u8, 208u8, 94u8, 169u8,
 						],
 					)
 				}
@@ -22299,9 +22303,10 @@ pub mod api {
 						"batch",
 						types::Batch { calls },
 						[
-							250u8, 41u8, 172u8, 233u8, 129u8, 217u8, 40u8, 128u8, 36u8, 4u8, 232u8,
-							30u8, 213u8, 28u8, 233u8, 134u8, 4u8, 56u8, 32u8, 12u8, 135u8, 106u8,
-							95u8, 241u8, 219u8, 147u8, 182u8, 86u8, 215u8, 35u8, 67u8, 45u8,
+							110u8, 148u8, 123u8, 44u8, 141u8, 72u8, 122u8, 230u8, 110u8, 159u8,
+							11u8, 217u8, 28u8, 125u8, 45u8, 220u8, 247u8, 217u8, 168u8, 245u8,
+							34u8, 111u8, 154u8, 189u8, 173u8, 66u8, 113u8, 208u8, 254u8, 157u8,
+							5u8, 112u8,
 						],
 					)
 				}
@@ -22331,9 +22336,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							251u8, 184u8, 231u8, 153u8, 204u8, 187u8, 141u8, 194u8, 82u8, 237u8,
-							131u8, 49u8, 37u8, 73u8, 18u8, 217u8, 39u8, 196u8, 206u8, 107u8, 19u8,
-							191u8, 208u8, 216u8, 223u8, 56u8, 182u8, 43u8, 48u8, 168u8, 18u8, 81u8,
+							25u8, 185u8, 243u8, 110u8, 245u8, 216u8, 140u8, 99u8, 172u8, 24u8,
+							97u8, 10u8, 26u8, 49u8, 19u8, 89u8, 239u8, 145u8, 132u8, 24u8, 159u8,
+							219u8, 90u8, 99u8, 212u8, 153u8, 13u8, 195u8, 167u8, 83u8, 84u8, 211u8,
 						],
 					)
 				}
@@ -22359,9 +22364,9 @@ pub mod api {
 						"batch_all",
 						types::BatchAll { calls },
 						[
-							159u8, 67u8, 3u8, 75u8, 28u8, 135u8, 138u8, 120u8, 50u8, 186u8, 2u8,
-							210u8, 66u8, 6u8, 42u8, 182u8, 34u8, 208u8, 56u8, 211u8, 154u8, 145u8,
-							104u8, 15u8, 204u8, 120u8, 179u8, 119u8, 159u8, 132u8, 16u8, 118u8,
+							117u8, 45u8, 132u8, 43u8, 239u8, 223u8, 136u8, 81u8, 9u8, 152u8, 206u8,
+							116u8, 179u8, 40u8, 227u8, 208u8, 22u8, 91u8, 153u8, 10u8, 231u8,
+							251u8, 52u8, 183u8, 250u8, 22u8, 79u8, 64u8, 66u8, 70u8, 223u8, 216u8,
 						],
 					)
 				}
@@ -22384,10 +22389,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							41u8, 156u8, 137u8, 87u8, 34u8, 50u8, 172u8, 172u8, 250u8, 248u8,
-							202u8, 121u8, 180u8, 110u8, 203u8, 66u8, 232u8, 43u8, 168u8, 158u8,
-							35u8, 177u8, 113u8, 72u8, 21u8, 175u8, 249u8, 15u8, 4u8, 147u8, 114u8,
-							232u8,
+							132u8, 162u8, 2u8, 69u8, 184u8, 2u8, 80u8, 45u8, 234u8, 204u8, 159u8,
+							49u8, 42u8, 149u8, 86u8, 76u8, 242u8, 30u8, 220u8, 211u8, 167u8, 249u8,
+							7u8, 131u8, 98u8, 97u8, 30u8, 214u8, 45u8, 240u8, 171u8, 2u8,
 						],
 					)
 				}
@@ -22413,10 +22417,9 @@ pub mod api {
 						"force_batch",
 						types::ForceBatch { calls },
 						[
-							50u8, 69u8, 226u8, 14u8, 168u8, 56u8, 229u8, 128u8, 141u8, 250u8,
-							146u8, 13u8, 175u8, 187u8, 89u8, 48u8, 97u8, 174u8, 111u8, 158u8,
-							222u8, 217u8, 167u8, 229u8, 24u8, 131u8, 68u8, 147u8, 113u8, 103u8,
-							225u8, 186u8,
+							38u8, 21u8, 66u8, 0u8, 42u8, 17u8, 204u8, 147u8, 107u8, 70u8, 79u8,
+							62u8, 55u8, 129u8, 174u8, 21u8, 91u8, 156u8, 243u8, 174u8, 180u8, 75u8,
+							20u8, 55u8, 188u8, 63u8, 106u8, 162u8, 149u8, 241u8, 237u8, 207u8,
 						],
 					)
 				}
@@ -22439,10 +22442,9 @@ pub mod api {
 							weight,
 						},
 						[
-							255u8, 77u8, 217u8, 153u8, 64u8, 179u8, 168u8, 123u8, 121u8, 254u8,
-							74u8, 195u8, 85u8, 3u8, 54u8, 239u8, 173u8, 169u8, 15u8, 86u8, 28u8,
-							153u8, 170u8, 160u8, 164u8, 78u8, 243u8, 213u8, 187u8, 122u8, 108u8,
-							209u8,
+							190u8, 21u8, 188u8, 103u8, 36u8, 100u8, 135u8, 54u8, 175u8, 245u8,
+							234u8, 146u8, 38u8, 71u8, 31u8, 135u8, 30u8, 68u8, 219u8, 99u8, 203u8,
+							65u8, 16u8, 133u8, 96u8, 241u8, 201u8, 10u8, 44u8, 157u8, 254u8, 113u8,
 						],
 					)
 				}
@@ -22482,10 +22484,10 @@ pub mod api {
 							fallback: ::subxt::ext::subxt_core::alloc::boxed::Box::new(fallback),
 						},
 						[
-							108u8, 146u8, 37u8, 107u8, 69u8, 64u8, 91u8, 179u8, 22u8, 198u8, 162u8,
-							191u8, 53u8, 144u8, 244u8, 184u8, 120u8, 117u8, 231u8, 190u8, 66u8,
-							208u8, 113u8, 244u8, 155u8, 116u8, 168u8, 254u8, 250u8, 234u8, 244u8,
-							205u8,
+							100u8, 205u8, 212u8, 17u8, 185u8, 101u8, 173u8, 250u8, 209u8, 129u8,
+							131u8, 9u8, 90u8, 91u8, 116u8, 104u8, 124u8, 29u8, 110u8, 197u8, 254u8,
+							183u8, 76u8, 51u8, 75u8, 171u8, 206u8, 234u8, 172u8, 176u8, 205u8,
+							134u8,
 						],
 					)
 				}
@@ -22508,10 +22510,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							126u8, 245u8, 111u8, 217u8, 233u8, 242u8, 223u8, 120u8, 212u8, 226u8,
-							164u8, 74u8, 252u8, 107u8, 213u8, 19u8, 215u8, 104u8, 52u8, 2u8, 53u8,
-							29u8, 213u8, 253u8, 135u8, 76u8, 184u8, 79u8, 177u8, 81u8, 225u8,
-							152u8,
+							116u8, 110u8, 70u8, 203u8, 189u8, 136u8, 98u8, 136u8, 237u8, 227u8,
+							217u8, 13u8, 236u8, 25u8, 136u8, 231u8, 140u8, 110u8, 37u8, 10u8,
+							111u8, 31u8, 170u8, 3u8, 4u8, 229u8, 130u8, 50u8, 104u8, 129u8, 174u8,
+							186u8,
 						],
 					)
 				}
@@ -22847,10 +22849,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							186u8, 89u8, 207u8, 55u8, 177u8, 43u8, 210u8, 136u8, 16u8, 223u8, 89u8,
-							254u8, 203u8, 243u8, 229u8, 171u8, 8u8, 193u8, 133u8, 185u8, 100u8,
-							144u8, 108u8, 15u8, 164u8, 12u8, 112u8, 236u8, 60u8, 168u8, 181u8,
-							159u8,
+							60u8, 99u8, 29u8, 71u8, 231u8, 19u8, 31u8, 86u8, 56u8, 96u8, 118u8,
+							247u8, 175u8, 119u8, 195u8, 193u8, 121u8, 139u8, 111u8, 190u8, 130u8,
+							140u8, 34u8, 115u8, 164u8, 103u8, 75u8, 76u8, 159u8, 186u8, 156u8,
+							55u8,
 						],
 					)
 				}
@@ -22873,10 +22875,9 @@ pub mod api {
 							weight,
 						},
 						[
-							95u8, 116u8, 243u8, 104u8, 57u8, 143u8, 49u8, 164u8, 29u8, 204u8,
-							130u8, 119u8, 50u8, 47u8, 169u8, 153u8, 35u8, 152u8, 41u8, 77u8, 25u8,
-							92u8, 100u8, 66u8, 50u8, 197u8, 189u8, 125u8, 237u8, 160u8, 241u8,
-							95u8,
+							161u8, 104u8, 102u8, 73u8, 167u8, 172u8, 113u8, 152u8, 158u8, 73u8,
+							103u8, 73u8, 153u8, 85u8, 123u8, 150u8, 16u8, 134u8, 237u8, 48u8, 5u8,
+							161u8, 23u8, 89u8, 152u8, 122u8, 42u8, 152u8, 32u8, 196u8, 10u8, 5u8,
 						],
 					)
 				}
@@ -22914,9 +22915,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							23u8, 46u8, 235u8, 15u8, 8u8, 245u8, 16u8, 235u8, 63u8, 59u8, 18u8,
-							71u8, 39u8, 194u8, 225u8, 59u8, 68u8, 225u8, 101u8, 245u8, 59u8, 5u8,
-							228u8, 2u8, 82u8, 167u8, 65u8, 222u8, 139u8, 43u8, 14u8, 240u8,
+							140u8, 26u8, 117u8, 235u8, 192u8, 94u8, 43u8, 114u8, 168u8, 134u8,
+							84u8, 167u8, 106u8, 136u8, 197u8, 173u8, 159u8, 73u8, 36u8, 184u8,
+							188u8, 67u8, 137u8, 132u8, 176u8, 255u8, 219u8, 127u8, 59u8, 33u8,
+							105u8, 169u8,
 						],
 					)
 				}
@@ -29387,6 +29389,15 @@ pub mod api {
 						::core::primitive::u128;
 					pub type Param0 = runtime_types::argon_primitives::gateway::SourceChain;
 				}
+				pub mod pending_transfer_out_quote_counts_by_destination_chain {
+					use super::runtime_types;
+					pub type PendingTransferOutQuoteCountsByDestinationChain =
+						runtime_types::bounded_collections::bounded_btree_map::BoundedBTreeMap1<
+							::core::primitive::u128,
+							::core::primitive::u32,
+						>;
+					pub type Param0 = runtime_types::argon_primitives::gateway::SourceChain;
+				}
 				pub mod next_council_approval_queue_nonce_by_destination_chain {
 					use super::runtime_types;
 					pub type NextCouncilApprovalQueueNonceByDestinationChain =
@@ -29782,7 +29793,7 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Conservative transfer-out conversion rate currently quoted for each destination chain."]				pub fn current_transfer_out_microgons_per_argonot_by_destination_chain_iter (& self ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < () , types :: current_transfer_out_microgons_per_argonot_by_destination_chain :: CurrentTransferOutMicrogonsPerArgonotByDestinationChain , () , () , :: subxt :: ext :: subxt_core :: utils :: Yes >{
+				#[doc = " Latest proved gateway acceptance ceiling, in microgons per whole Argonot."]				pub fn current_transfer_out_microgons_per_argonot_by_destination_chain_iter (& self ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < () , types :: current_transfer_out_microgons_per_argonot_by_destination_chain :: CurrentTransferOutMicrogonsPerArgonotByDestinationChain , () , () , :: subxt :: ext :: subxt_core :: utils :: Yes >{
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"CrosschainTransfer",
 						"CurrentTransferOutMicrogonsPerArgonotByDestinationChain",
@@ -29795,7 +29806,7 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Conservative transfer-out conversion rate currently quoted for each destination chain."]				pub fn current_transfer_out_microgons_per_argonot_by_destination_chain (& self , _0 : types :: current_transfer_out_microgons_per_argonot_by_destination_chain :: Param0 ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < :: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: current_transfer_out_microgons_per_argonot_by_destination_chain :: Param0 > , types :: current_transfer_out_microgons_per_argonot_by_destination_chain :: CurrentTransferOutMicrogonsPerArgonotByDestinationChain , :: subxt :: ext :: subxt_core :: utils :: Yes , () , () >{
+				#[doc = " Latest proved gateway acceptance ceiling, in microgons per whole Argonot."]				pub fn current_transfer_out_microgons_per_argonot_by_destination_chain (& self , _0 : types :: current_transfer_out_microgons_per_argonot_by_destination_chain :: Param0 ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < :: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: current_transfer_out_microgons_per_argonot_by_destination_chain :: Param0 > , types :: current_transfer_out_microgons_per_argonot_by_destination_chain :: CurrentTransferOutMicrogonsPerArgonotByDestinationChain , :: subxt :: ext :: subxt_core :: utils :: Yes , () , () >{
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"CrosschainTransfer",
 						"CurrentTransferOutMicrogonsPerArgonotByDestinationChain",
@@ -29808,8 +29819,7 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Immediately previous transfer-out conversion rate still accepted while the floor ratchets"]
-				#[doc = " upward across council transitions."]				pub fn previous_transfer_out_microgons_per_argonot_by_destination_chain_iter (& self ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < () , types :: previous_transfer_out_microgons_per_argonot_by_destination_chain :: PreviousTransferOutMicrogonsPerArgonotByDestinationChain , () , () , :: subxt :: ext :: subxt_core :: utils :: Yes >{
+				#[doc = " Previous proved gateway ceiling, retained to quote conservatively across proof-back delays."]				pub fn previous_transfer_out_microgons_per_argonot_by_destination_chain_iter (& self ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < () , types :: previous_transfer_out_microgons_per_argonot_by_destination_chain :: PreviousTransferOutMicrogonsPerArgonotByDestinationChain , () , () , :: subxt :: ext :: subxt_core :: utils :: Yes >{
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"CrosschainTransfer",
 						"PreviousTransferOutMicrogonsPerArgonotByDestinationChain",
@@ -29821,8 +29831,7 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " Immediately previous transfer-out conversion rate still accepted while the floor ratchets"]
-				#[doc = " upward across council transitions."]				pub fn previous_transfer_out_microgons_per_argonot_by_destination_chain (& self , _0 : types :: previous_transfer_out_microgons_per_argonot_by_destination_chain :: Param0 ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < :: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: previous_transfer_out_microgons_per_argonot_by_destination_chain :: Param0 > , types :: previous_transfer_out_microgons_per_argonot_by_destination_chain :: PreviousTransferOutMicrogonsPerArgonotByDestinationChain , :: subxt :: ext :: subxt_core :: utils :: Yes , () , () >{
+				#[doc = " Previous proved gateway ceiling, retained to quote conservatively across proof-back delays."]				pub fn previous_transfer_out_microgons_per_argonot_by_destination_chain (& self , _0 : types :: previous_transfer_out_microgons_per_argonot_by_destination_chain :: Param0 ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < :: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: previous_transfer_out_microgons_per_argonot_by_destination_chain :: Param0 > , types :: previous_transfer_out_microgons_per_argonot_by_destination_chain :: PreviousTransferOutMicrogonsPerArgonotByDestinationChain , :: subxt :: ext :: subxt_core :: utils :: Yes , () , () >{
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"CrosschainTransfer",
 						"PreviousTransferOutMicrogonsPerArgonotByDestinationChain",
@@ -29907,8 +29916,8 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " The conservative transfer-out quote floor that the next newly opened transfer should"]
-				#[doc = " snapshot on each destination chain."]				pub fn transfer_out_quote_microgons_per_argonot_by_destination_chain_iter (& self ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < () , types :: transfer_out_quote_microgons_per_argonot_by_destination_chain :: TransferOutQuoteMicrogonsPerArgonotByDestinationChain , () , () , :: subxt :: ext :: subxt_core :: utils :: Yes >{
+				#[doc = " Minimum active and queued gateway ceiling. New transfers also clamp this to the market"]
+				#[doc = " floor."]				pub fn transfer_out_quote_microgons_per_argonot_by_destination_chain_iter (& self ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < () , types :: transfer_out_quote_microgons_per_argonot_by_destination_chain :: TransferOutQuoteMicrogonsPerArgonotByDestinationChain , () , () , :: subxt :: ext :: subxt_core :: utils :: Yes >{
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"CrosschainTransfer",
 						"TransferOutQuoteMicrogonsPerArgonotByDestinationChain",
@@ -29921,8 +29930,8 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = " The conservative transfer-out quote floor that the next newly opened transfer should"]
-				#[doc = " snapshot on each destination chain."]				pub fn transfer_out_quote_microgons_per_argonot_by_destination_chain (& self , _0 : types :: transfer_out_quote_microgons_per_argonot_by_destination_chain :: Param0 ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < :: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: transfer_out_quote_microgons_per_argonot_by_destination_chain :: Param0 > , types :: transfer_out_quote_microgons_per_argonot_by_destination_chain :: TransferOutQuoteMicrogonsPerArgonotByDestinationChain , :: subxt :: ext :: subxt_core :: utils :: Yes , () , () >{
+				#[doc = " Minimum active and queued gateway ceiling. New transfers also clamp this to the market"]
+				#[doc = " floor."]				pub fn transfer_out_quote_microgons_per_argonot_by_destination_chain (& self , _0 : types :: transfer_out_quote_microgons_per_argonot_by_destination_chain :: Param0 ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < :: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: transfer_out_quote_microgons_per_argonot_by_destination_chain :: Param0 > , types :: transfer_out_quote_microgons_per_argonot_by_destination_chain :: TransferOutQuoteMicrogonsPerArgonotByDestinationChain , :: subxt :: ext :: subxt_core :: utils :: Yes , () , () >{
 					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
 						"CrosschainTransfer",
 						"TransferOutQuoteMicrogonsPerArgonotByDestinationChain",
@@ -29932,6 +29941,32 @@ pub mod api {
 							129u8, 179u8, 219u8, 4u8, 99u8, 145u8, 35u8, 53u8, 61u8, 201u8, 71u8,
 							114u8, 81u8, 162u8, 176u8, 48u8, 171u8, 121u8, 180u8, 161u8, 129u8,
 							145u8,
+						],
+					)
+				}
+				#[doc = " Active transfer counts keyed by their quote in microgons per whole Argonot. The largest"]
+				#[doc = " key gives the required gateway ceiling without scanning transfer records at rotation."]				pub fn pending_transfer_out_quote_counts_by_destination_chain_iter (& self ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < () , types :: pending_transfer_out_quote_counts_by_destination_chain :: PendingTransferOutQuoteCountsByDestinationChain , () , :: subxt :: ext :: subxt_core :: utils :: Yes , :: subxt :: ext :: subxt_core :: utils :: Yes >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"PendingTransferOutQuoteCountsByDestinationChain",
+						(),
+						[
+							160u8, 177u8, 104u8, 7u8, 94u8, 86u8, 199u8, 124u8, 59u8, 198u8, 235u8,
+							6u8, 173u8, 247u8, 209u8, 19u8, 249u8, 90u8, 31u8, 214u8, 105u8, 237u8,
+							118u8, 10u8, 241u8, 120u8, 160u8, 16u8, 76u8, 213u8, 69u8, 93u8,
+						],
+					)
+				}
+				#[doc = " Active transfer counts keyed by their quote in microgons per whole Argonot. The largest"]
+				#[doc = " key gives the required gateway ceiling without scanning transfer records at rotation."]				pub fn pending_transfer_out_quote_counts_by_destination_chain (& self , _0 : types :: pending_transfer_out_quote_counts_by_destination_chain :: Param0 ,) -> :: subxt :: ext :: subxt_core :: storage :: address :: StaticAddress :: < :: subxt :: ext :: subxt_core :: storage :: address :: StaticStorageKey < types :: pending_transfer_out_quote_counts_by_destination_chain :: Param0 > , types :: pending_transfer_out_quote_counts_by_destination_chain :: PendingTransferOutQuoteCountsByDestinationChain , :: subxt :: ext :: subxt_core :: utils :: Yes , :: subxt :: ext :: subxt_core :: utils :: Yes , () >{
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"CrosschainTransfer",
+						"PendingTransferOutQuoteCountsByDestinationChain",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							160u8, 177u8, 104u8, 7u8, 94u8, 86u8, 199u8, 124u8, 59u8, 198u8, 235u8,
+							6u8, 173u8, 247u8, 209u8, 19u8, 249u8, 90u8, 31u8, 214u8, 105u8, 237u8,
+							118u8, 10u8, 241u8, 120u8, 160u8, 16u8, 76u8, 213u8, 69u8, 93u8,
 						],
 					)
 				}
@@ -32816,6 +32851,640 @@ pub mod api {
 			}
 		}
 	}
+	pub mod account_security {
+		use super::{root_mod, runtime_types};
+		#[doc = "The `Error` enum of this pallet."]
+		pub type Error = runtime_types::pallet_account_security::pallet::Error;
+		#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
+		pub type Call = runtime_types::pallet_account_security::pallet::Call;
+		pub mod calls {
+			use super::{root_mod, runtime_types};
+			type DispatchError = runtime_types::sp_runtime::DispatchError;
+			pub mod types {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Enroll the approval policy and backup atomically; every initial authority must accept."]
+				#[doc = "Policy fields stay flat so hardware wallets can label the choices being approved."]
+				pub struct Register {
+					pub account: register::Account,
+					pub signers: register::Signers,
+					pub quorum: register::Quorum,
+					pub recovery_account: register::RecoveryAccount,
+					pub recovery_delay: register::RecoveryDelay,
+					pub authorization: register::Authorization,
+					pub approvals: register::Approvals,
+				}
+				pub mod register {
+					use super::runtime_types;
+					pub type Account = crate::types::AccountId32;
+					pub type Signers = runtime_types::bounded_collections::bounded_vec::BoundedVec<
+						crate::types::AccountId32,
+					>;
+					pub type Quorum = ::core::primitive::u16;
+					pub type RecoveryAccount = crate::types::AccountId32;
+					pub type RecoveryDelay = ::core::primitive::u64;
+					pub type Authorization =
+						runtime_types::pallet_account_security::types::Authorization;
+					pub type Approvals =
+						runtime_types::bounded_collections::bounded_vec::BoundedVec<
+							runtime_types::pallet_account_security::types::Approval,
+						>;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for Register {
+					const PALLET: &'static str = "AccountSecurity";
+					const CALL: &'static str = "register";
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Normal signer changes use the current quorum immediately. Recovery uses the backup"]
+				#[doc = "after the current tick delay; replacing the backup or delay uses the current quorum"]
+				#[doc = "after that same delay. Main consent and new authorities' acceptance are always required."]
+				pub struct UpdatePolicy {
+					pub account: update_policy::Account,
+					pub signers: update_policy::Signers,
+					pub quorum: update_policy::Quorum,
+					pub recovery_account: update_policy::RecoveryAccount,
+					pub recovery_delay: update_policy::RecoveryDelay,
+					pub authorization: update_policy::Authorization,
+					pub approvals: update_policy::Approvals,
+				}
+				pub mod update_policy {
+					use super::runtime_types;
+					pub type Account = crate::types::AccountId32;
+					pub type Signers = runtime_types::bounded_collections::bounded_vec::BoundedVec<
+						crate::types::AccountId32,
+					>;
+					pub type Quorum = ::core::primitive::u16;
+					pub type RecoveryAccount = crate::types::AccountId32;
+					pub type RecoveryDelay = ::core::primitive::u64;
+					pub type Authorization =
+						runtime_types::pallet_account_security::types::Authorization;
+					pub type Approvals =
+						runtime_types::bounded_collections::bounded_vec::BoundedVec<
+							runtime_types::pallet_account_security::types::Approval,
+						>;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for UpdatePolicy {
+					const PALLET: &'static str = "AccountSecurity";
+					const CALL: &'static str = "update_policy";
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Submit one full call/batch and its collected off-chain approvals. The main account"]
+				#[doc = "signs the outer transaction or supplies its own proof when a relayer submits."]
+				#[doc = "Every execution consumes the group's approval nonce and therefore requires quorum,"]
+				#[doc = "even when the child could also be submitted directly without approval."]
+				pub struct Execute {
+					pub account: execute::Account,
+					pub call: ::subxt::ext::subxt_core::alloc::boxed::Box<execute::Call>,
+					pub authorization: execute::Authorization,
+					pub approvals: execute::Approvals,
+				}
+				pub mod execute {
+					use super::runtime_types;
+					pub type Account = crate::types::AccountId32;
+					pub type Call = runtime_types::argon_runtime::RuntimeCall;
+					pub type Authorization =
+						runtime_types::pallet_account_security::types::Authorization;
+					pub type Approvals =
+						runtime_types::bounded_collections::bounded_vec::BoundedVec<
+							runtime_types::pallet_account_security::types::Approval,
+						>;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for Execute {
+					const PALLET: &'static str = "AccountSecurity";
+					const CALL: &'static str = "execute";
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Complete an accepted policy replacement after its tick window. Anyone may pay the"]
+				#[doc = "submission fee; all authority and new-key acceptance was captured at scheduling."]
+				pub struct CompletePolicyUpdate {
+					pub account: complete_policy_update::Account,
+					pub update_nonce: complete_policy_update::UpdateNonce,
+				}
+				pub mod complete_policy_update {
+					use super::runtime_types;
+					pub type Account = crate::types::AccountId32;
+					pub type UpdateNonce = ::core::primitive::u64;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for CompletePolicyUpdate {
+					const PALLET: &'static str = "AccountSecurity";
+					const CALL: &'static str = "complete_policy_update";
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Main plus either current authority can veto or withdraw the exact pending update."]
+				pub struct CancelPolicyUpdate {
+					pub account: cancel_policy_update::Account,
+					pub update_nonce: cancel_policy_update::UpdateNonce,
+					pub authorization: cancel_policy_update::Authorization,
+					pub approvals: cancel_policy_update::Approvals,
+				}
+				pub mod cancel_policy_update {
+					use super::runtime_types;
+					pub type Account = crate::types::AccountId32;
+					pub type UpdateNonce = ::core::primitive::u64;
+					pub type Authorization =
+						runtime_types::pallet_account_security::types::Authorization;
+					pub type Approvals =
+						runtime_types::bounded_collections::bounded_vec::BoundedVec<
+							runtime_types::pallet_account_security::types::Approval,
+						>;
+				}
+				impl ::subxt::ext::subxt_core::blocks::StaticExtrinsic for CancelPolicyUpdate {
+					const PALLET: &'static str = "AccountSecurity";
+					const CALL: &'static str = "cancel_policy_update";
+				}
+			}
+			pub struct TransactionApi;
+			impl TransactionApi {
+				#[doc = "Enroll the approval policy and backup atomically; every initial authority must accept."]
+				#[doc = "Policy fields stay flat so hardware wallets can label the choices being approved."]
+				pub fn register(
+					&self,
+					account: types::register::Account,
+					signers: types::register::Signers,
+					quorum: types::register::Quorum,
+					recovery_account: types::register::RecoveryAccount,
+					recovery_delay: types::register::RecoveryDelay,
+					authorization: types::register::Authorization,
+					approvals: types::register::Approvals,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::Register> {
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"AccountSecurity",
+						"register",
+						types::Register {
+							account,
+							signers,
+							quorum,
+							recovery_account,
+							recovery_delay,
+							authorization,
+							approvals,
+						},
+						[
+							113u8, 120u8, 45u8, 2u8, 141u8, 66u8, 255u8, 14u8, 38u8, 183u8, 10u8,
+							123u8, 33u8, 250u8, 121u8, 55u8, 44u8, 38u8, 204u8, 239u8, 201u8,
+							211u8, 79u8, 204u8, 99u8, 243u8, 73u8, 6u8, 172u8, 229u8, 47u8, 117u8,
+						],
+					)
+				}
+				#[doc = "Normal signer changes use the current quorum immediately. Recovery uses the backup"]
+				#[doc = "after the current tick delay; replacing the backup or delay uses the current quorum"]
+				#[doc = "after that same delay. Main consent and new authorities' acceptance are always required."]
+				pub fn update_policy(
+					&self,
+					account: types::update_policy::Account,
+					signers: types::update_policy::Signers,
+					quorum: types::update_policy::Quorum,
+					recovery_account: types::update_policy::RecoveryAccount,
+					recovery_delay: types::update_policy::RecoveryDelay,
+					authorization: types::update_policy::Authorization,
+					approvals: types::update_policy::Approvals,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::UpdatePolicy> {
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"AccountSecurity",
+						"update_policy",
+						types::UpdatePolicy {
+							account,
+							signers,
+							quorum,
+							recovery_account,
+							recovery_delay,
+							authorization,
+							approvals,
+						},
+						[
+							193u8, 17u8, 69u8, 226u8, 68u8, 235u8, 145u8, 187u8, 71u8, 185u8, 27u8,
+							161u8, 72u8, 151u8, 232u8, 49u8, 179u8, 198u8, 220u8, 2u8, 161u8,
+							241u8, 199u8, 156u8, 43u8, 99u8, 249u8, 165u8, 137u8, 63u8, 225u8,
+							179u8,
+						],
+					)
+				}
+				#[doc = "Submit one full call/batch and its collected off-chain approvals. The main account"]
+				#[doc = "signs the outer transaction or supplies its own proof when a relayer submits."]
+				#[doc = "Every execution consumes the group's approval nonce and therefore requires quorum,"]
+				#[doc = "even when the child could also be submitted directly without approval."]
+				pub fn execute(
+					&self,
+					account: types::execute::Account,
+					call: types::execute::Call,
+					authorization: types::execute::Authorization,
+					approvals: types::execute::Approvals,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::Execute> {
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"AccountSecurity",
+						"execute",
+						types::Execute {
+							account,
+							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
+							authorization,
+							approvals,
+						},
+						[
+							250u8, 226u8, 197u8, 75u8, 84u8, 145u8, 77u8, 120u8, 175u8, 56u8, 70u8,
+							210u8, 177u8, 232u8, 135u8, 196u8, 11u8, 208u8, 31u8, 175u8, 38u8,
+							220u8, 150u8, 4u8, 107u8, 221u8, 5u8, 246u8, 209u8, 210u8, 122u8, 65u8,
+						],
+					)
+				}
+				#[doc = "Complete an accepted policy replacement after its tick window. Anyone may pay the"]
+				#[doc = "submission fee; all authority and new-key acceptance was captured at scheduling."]
+				pub fn complete_policy_update(
+					&self,
+					account: types::complete_policy_update::Account,
+					update_nonce: types::complete_policy_update::UpdateNonce,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::CompletePolicyUpdate>
+				{
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"AccountSecurity",
+						"complete_policy_update",
+						types::CompletePolicyUpdate { account, update_nonce },
+						[
+							228u8, 204u8, 43u8, 244u8, 188u8, 129u8, 96u8, 227u8, 156u8, 170u8,
+							32u8, 73u8, 217u8, 68u8, 36u8, 251u8, 135u8, 56u8, 59u8, 69u8, 204u8,
+							207u8, 204u8, 20u8, 68u8, 108u8, 2u8, 195u8, 243u8, 164u8, 86u8, 253u8,
+						],
+					)
+				}
+				#[doc = "Main plus either current authority can veto or withdraw the exact pending update."]
+				pub fn cancel_policy_update(
+					&self,
+					account: types::cancel_policy_update::Account,
+					update_nonce: types::cancel_policy_update::UpdateNonce,
+					authorization: types::cancel_policy_update::Authorization,
+					approvals: types::cancel_policy_update::Approvals,
+				) -> ::subxt::ext::subxt_core::tx::payload::StaticPayload<types::CancelPolicyUpdate>
+				{
+					::subxt::ext::subxt_core::tx::payload::StaticPayload::new_static(
+						"AccountSecurity",
+						"cancel_policy_update",
+						types::CancelPolicyUpdate {
+							account,
+							update_nonce,
+							authorization,
+							approvals,
+						},
+						[
+							225u8, 85u8, 127u8, 25u8, 147u8, 140u8, 169u8, 151u8, 140u8, 85u8,
+							88u8, 238u8, 37u8, 35u8, 144u8, 79u8, 55u8, 64u8, 234u8, 159u8, 105u8,
+							149u8, 110u8, 144u8, 11u8, 239u8, 245u8, 52u8, 68u8, 199u8, 98u8,
+							196u8,
+						],
+					)
+				}
+			}
+		}
+		#[doc = "The `Event` enum of this pallet"]
+		pub type Event = runtime_types::pallet_account_security::pallet::Event;
+		pub mod events {
+			use super::runtime_types;
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub struct Registered {
+				pub account: registered::Account,
+			}
+			pub mod registered {
+				use super::runtime_types;
+				pub type Account = crate::types::AccountId32;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for Registered {
+				const PALLET: &'static str = "AccountSecurity";
+				const EVENT: &'static str = "Registered";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub struct PolicyUpdated {
+				pub account: policy_updated::Account,
+			}
+			pub mod policy_updated {
+				use super::runtime_types;
+				pub type Account = crate::types::AccountId32;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for PolicyUpdated {
+				const PALLET: &'static str = "AccountSecurity";
+				const EVENT: &'static str = "PolicyUpdated";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			#[doc = "A failed child still consumes its nonce; inspect this result, not outer success."]
+			pub struct Executed {
+				pub account: executed::Account,
+				pub nonce: executed::Nonce,
+				pub result: executed::Result,
+			}
+			pub mod executed {
+				use super::runtime_types;
+				pub type Account = crate::types::AccountId32;
+				pub type Nonce = ::core::primitive::u64;
+				pub type Result =
+					::core::result::Result<(), runtime_types::sp_runtime::DispatchError>;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for Executed {
+				const PALLET: &'static str = "AccountSecurity";
+				const EVENT: &'static str = "Executed";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub struct GroupLinked {
+				pub default_account: group_linked::DefaultAccount,
+			}
+			pub mod group_linked {
+				use super::runtime_types;
+				pub type DefaultAccount = crate::types::AccountId32;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for GroupLinked {
+				const PALLET: &'static str = "AccountSecurity";
+				const EVENT: &'static str = "GroupLinked";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub struct PolicyUpdateScheduled {
+				pub account: policy_update_scheduled::Account,
+				pub nonce: policy_update_scheduled::Nonce,
+				pub execute_after_tick: policy_update_scheduled::ExecuteAfterTick,
+			}
+			pub mod policy_update_scheduled {
+				use super::runtime_types;
+				pub type Account = crate::types::AccountId32;
+				pub type Nonce = ::core::primitive::u64;
+				pub type ExecuteAfterTick = ::core::primitive::u64;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for PolicyUpdateScheduled {
+				const PALLET: &'static str = "AccountSecurity";
+				const EVENT: &'static str = "PolicyUpdateScheduled";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub struct PolicyUpdateCancelled {
+				pub account: policy_update_cancelled::Account,
+				pub nonce: policy_update_cancelled::Nonce,
+			}
+			pub mod policy_update_cancelled {
+				use super::runtime_types;
+				pub type Account = crate::types::AccountId32;
+				pub type Nonce = ::core::primitive::u64;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for PolicyUpdateCancelled {
+				const PALLET: &'static str = "AccountSecurity";
+				const EVENT: &'static str = "PolicyUpdateCancelled";
+			}
+		}
+		pub mod storage {
+			use super::runtime_types;
+			pub mod types {
+				use super::runtime_types;
+				pub mod registrations {
+					use super::runtime_types;
+					pub type Registrations =
+						runtime_types::pallet_account_security::types::Registration;
+					pub type Param0 = crate::types::AccountId32;
+				}
+				pub mod next_nonce {
+					use super::runtime_types;
+					pub type NextNonce = ::core::primitive::u64;
+					pub type Param0 = crate::types::AccountId32;
+				}
+				pub mod pending_policy_updates {
+					use super::runtime_types;
+					pub type PendingPolicyUpdates =
+						runtime_types::pallet_account_security::types::PendingPolicyUpdate;
+					pub type Param0 = crate::types::AccountId32;
+				}
+			}
+			pub struct StorageApi;
+			impl StorageApi {
+				#[doc = " One registration at the default account; linked members never duplicate it."]
+				pub fn registrations_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::registrations::Registrations,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"AccountSecurity",
+						"Registrations",
+						(),
+						[
+							180u8, 9u8, 99u8, 210u8, 10u8, 144u8, 141u8, 186u8, 171u8, 177u8,
+							227u8, 155u8, 170u8, 54u8, 164u8, 113u8, 210u8, 52u8, 240u8, 97u8,
+							75u8, 207u8, 254u8, 67u8, 250u8, 247u8, 210u8, 15u8, 195u8, 210u8,
+							238u8, 89u8,
+						],
+					)
+				}
+				#[doc = " One registration at the default account; linked members never duplicate it."]
+				pub fn registrations(
+					&self,
+					_0: types::registrations::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::registrations::Param0,
+					>,
+					types::registrations::Registrations,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"AccountSecurity",
+						"Registrations",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							180u8, 9u8, 99u8, 210u8, 10u8, 144u8, 141u8, 186u8, 171u8, 177u8,
+							227u8, 155u8, 170u8, 54u8, 164u8, 113u8, 210u8, 52u8, 240u8, 97u8,
+							75u8, 207u8, 254u8, 67u8, 250u8, 247u8, 210u8, 15u8, 195u8, 210u8,
+							238u8, 89u8,
+						],
+					)
+				}
+				#[doc = " Next group authorization nonce. Never removed or reset by policy changes or linking."]
+				pub fn next_nonce_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::next_nonce::NextNonce,
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"AccountSecurity",
+						"NextNonce",
+						(),
+						[
+							99u8, 122u8, 120u8, 186u8, 128u8, 138u8, 252u8, 101u8, 126u8, 38u8,
+							215u8, 65u8, 248u8, 93u8, 181u8, 21u8, 205u8, 150u8, 199u8, 170u8,
+							71u8, 38u8, 202u8, 199u8, 68u8, 159u8, 86u8, 177u8, 250u8, 112u8,
+							198u8, 31u8,
+						],
+					)
+				}
+				#[doc = " Next group authorization nonce. Never removed or reset by policy changes or linking."]
+				pub fn next_nonce(
+					&self,
+					_0: types::next_nonce::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::next_nonce::Param0,
+					>,
+					types::next_nonce::NextNonce,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"AccountSecurity",
+						"NextNonce",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							99u8, 122u8, 120u8, 186u8, 128u8, 138u8, 252u8, 101u8, 126u8, 38u8,
+							215u8, 65u8, 248u8, 93u8, 181u8, 21u8, 205u8, 150u8, 199u8, 170u8,
+							71u8, 38u8, 202u8, 199u8, 68u8, 159u8, 86u8, 177u8, 250u8, 112u8,
+							198u8, 31u8,
+						],
+					)
+				}
+				#[doc = " At most one delayed policy replacement per default account, separately deposit-backed."]
+				pub fn pending_policy_updates_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::pending_policy_updates::PendingPolicyUpdates,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"AccountSecurity",
+						"PendingPolicyUpdates",
+						(),
+						[
+							150u8, 97u8, 218u8, 58u8, 98u8, 58u8, 7u8, 77u8, 46u8, 244u8, 169u8,
+							113u8, 255u8, 42u8, 147u8, 47u8, 83u8, 198u8, 140u8, 43u8, 207u8, 17u8,
+							108u8, 184u8, 41u8, 7u8, 114u8, 189u8, 68u8, 71u8, 136u8, 165u8,
+						],
+					)
+				}
+				#[doc = " At most one delayed policy replacement per default account, separately deposit-backed."]
+				pub fn pending_policy_updates(
+					&self,
+					_0: types::pending_policy_updates::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::pending_policy_updates::Param0,
+					>,
+					types::pending_policy_updates::PendingPolicyUpdates,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"AccountSecurity",
+						"PendingPolicyUpdates",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							150u8, 97u8, 218u8, 58u8, 98u8, 58u8, 7u8, 77u8, 46u8, 244u8, 169u8,
+							113u8, 255u8, 42u8, 147u8, 47u8, 83u8, 198u8, 140u8, 43u8, 207u8, 17u8,
+							108u8, 184u8, 41u8, 7u8, 114u8, 189u8, 68u8, 71u8, 136u8, 165u8,
+						],
+					)
+				}
+			}
+		}
+	}
 	pub mod runtime_types {
 		use super::runtime_types;
 		pub mod argon_notary_audit {
@@ -33055,6 +33724,46 @@ pub mod api {
 					#[codec(index = 1)]
 					Deposit,
 				}
+			}
+			pub mod account_security {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub enum ApprovalSignature {
+					#[codec(index = 0)]
+					Ed25519([::core::primitive::u8; 64usize]),
+					#[codec(index = 1)]
+					Sr25519([::core::primitive::u8; 64usize]),
+					#[codec(index = 2)]
+					Ecdsa([::core::primitive::u8; 65usize]),
+					#[codec(index = 3)]
+					Eth([::core::primitive::u8; 65usize]),
+					#[codec(index = 4)]
+					P256(runtime_types::argon_primitives::account_security::P256Signature),
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct P256Signature(pub [::core::primitive::u8; 65usize]);
 			}
 			pub mod amount_rank {
 				use super::runtime_types;
@@ -35018,20 +35727,8 @@ pub mod api {
 			pub enum ProxyType {
 				#[codec(index = 0)]
 				Any,
-				#[codec(index = 1)]
-				NonTransfer,
-				#[codec(index = 2)]
-				PriceIndex,
-				#[codec(index = 3)]
-				MiningBid,
 				#[codec(index = 4)]
 				MiningBidRealPaysFee,
-				#[codec(index = 5)]
-				Bitcoin,
-				#[codec(index = 6)]
-				VaultAdmin,
-				#[codec(index = 7)]
-				VaultDelegate,
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -35106,6 +35803,8 @@ pub mod api {
 				StabilizerBuys(runtime_types::pallet_stabilizer_buys::pallet::Call),
 				#[codec(index = 40)]
 				StabilizerPools(runtime_types::pallet_stabilizer_pools::pallet::Call),
+				#[codec(index = 41)]
+				AccountSecurity(runtime_types::pallet_account_security::pallet::Call),
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -35182,6 +35881,8 @@ pub mod api {
 				StabilizerBuys(runtime_types::pallet_stabilizer_buys::pallet::Error),
 				#[codec(index = 40)]
 				StabilizerPools(runtime_types::pallet_stabilizer_pools::pallet::Error),
+				#[codec(index = 41)]
+				AccountSecurity(runtime_types::pallet_account_security::pallet::Error),
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -35256,6 +35957,8 @@ pub mod api {
 				StabilizerBuys(runtime_types::pallet_stabilizer_buys::pallet::Event),
 				#[codec(index = 40)]
 				StabilizerPools(runtime_types::pallet_stabilizer_pools::pallet::Event),
+				#[codec(index = 41)]
+				AccountSecurity(runtime_types::pallet_account_security::pallet::Event),
 			}
 			#[derive(
 				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -36160,6 +36863,316 @@ pub mod api {
 				#[codec(index = 2)]
 				Initialization,
 			}
+		}
+		pub mod pallet_account_security {
+			use super::runtime_types;
+			pub mod pallet {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
+				pub enum Call {
+					#[codec(index = 0)]
+					#[doc = "Enroll the approval policy and backup atomically; every initial authority must accept."]
+					#[doc = "Policy fields stay flat so hardware wallets can label the choices being approved."]
+					register {
+						account: crate::types::AccountId32,
+						signers: runtime_types::bounded_collections::bounded_vec::BoundedVec<
+							crate::types::AccountId32,
+						>,
+						quorum: ::core::primitive::u16,
+						recovery_account: crate::types::AccountId32,
+						recovery_delay: ::core::primitive::u64,
+						authorization: runtime_types::pallet_account_security::types::Authorization,
+						approvals: runtime_types::bounded_collections::bounded_vec::BoundedVec<
+							runtime_types::pallet_account_security::types::Approval,
+						>,
+					},
+					#[codec(index = 1)]
+					#[doc = "Normal signer changes use the current quorum immediately. Recovery uses the backup"]
+					#[doc = "after the current tick delay; replacing the backup or delay uses the current quorum"]
+					#[doc = "after that same delay. Main consent and new authorities' acceptance are always required."]
+					update_policy {
+						account: crate::types::AccountId32,
+						signers: runtime_types::bounded_collections::bounded_vec::BoundedVec<
+							crate::types::AccountId32,
+						>,
+						quorum: ::core::primitive::u16,
+						recovery_account: crate::types::AccountId32,
+						recovery_delay: ::core::primitive::u64,
+						authorization: runtime_types::pallet_account_security::types::Authorization,
+						approvals: runtime_types::bounded_collections::bounded_vec::BoundedVec<
+							runtime_types::pallet_account_security::types::Approval,
+						>,
+					},
+					#[codec(index = 2)]
+					#[doc = "Submit one full call/batch and its collected off-chain approvals. The main account"]
+					#[doc = "signs the outer transaction or supplies its own proof when a relayer submits."]
+					#[doc = "Every execution consumes the group's approval nonce and therefore requires quorum,"]
+					#[doc = "even when the child could also be submitted directly without approval."]
+					execute {
+						account: crate::types::AccountId32,
+						call: ::subxt::ext::subxt_core::alloc::boxed::Box<
+							runtime_types::argon_runtime::RuntimeCall,
+						>,
+						authorization: runtime_types::pallet_account_security::types::Authorization,
+						approvals: runtime_types::bounded_collections::bounded_vec::BoundedVec<
+							runtime_types::pallet_account_security::types::Approval,
+						>,
+					},
+					#[codec(index = 3)]
+					#[doc = "Complete an accepted policy replacement after its tick window. Anyone may pay the"]
+					#[doc = "submission fee; all authority and new-key acceptance was captured at scheduling."]
+					complete_policy_update {
+						account: crate::types::AccountId32,
+						update_nonce: ::core::primitive::u64,
+					},
+					#[codec(index = 4)]
+					#[doc = "Main plus either current authority can veto or withdraw the exact pending update."]
+					cancel_policy_update {
+						account: crate::types::AccountId32,
+						update_nonce: ::core::primitive::u64,
+						authorization: runtime_types::pallet_account_security::types::Authorization,
+						approvals: runtime_types::bounded_collections::bounded_vec::BoundedVec<
+							runtime_types::pallet_account_security::types::Approval,
+						>,
+					},
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "The `Error` enum of this pallet."]
+				pub enum Error {
+					#[codec(index = 0)]
+					#[doc = "The main account or a required policy/recovery/acceptance signature is missing."]
+					ApprovalRequired,
+					#[codec(index = 1)]
+					#[doc = "A proxy origin or transfer destination could not be resolved to an account."]
+					InvalidProxy,
+					#[codec(index = 2)]
+					#[doc = "Pre-dispatch state cannot safely authorize the nested call combination."]
+					UnsupportedComposition,
+					#[codec(index = 3)]
+					#[doc = "Nested depth, call count, or a native multisig's signatory count exceeds its limit."]
+					CallLimitExceeded,
+					#[codec(index = 4)]
+					#[doc = "Linking would discard a participant's policy or backup authority."]
+					IncompatibleAccountProtection,
+					#[codec(index = 5)]
+					#[doc = "The default account has not enrolled protection."]
+					NotRegistered,
+					#[codec(index = 6)]
+					#[doc = "Initial enrollment cannot overwrite an existing policy."]
+					AlreadyRegistered,
+					#[codec(index = 7)]
+					#[doc = "Only a group's default account may manage its configuration."]
+					NotDefaultAccount,
+					#[codec(index = 8)]
+					#[doc = "Signing roles overlap the protected group or recovery overlaps a policy signer."]
+					KeysNotIndependent,
+					#[codec(index = 9)]
+					#[doc = "A threshold is invalid or signers are empty, duplicated or not sorted."]
+					InvalidPolicy,
+					#[codec(index = 10)]
+					#[doc = "The approval expired or exceeds the allowed future lifetime."]
+					InvalidExpiry,
+					#[codec(index = 11)]
+					#[doc = "The supplied nonce is not the group's next unused authorization nonce."]
+					InvalidNonce,
+					#[codec(index = 12)]
+					#[doc = "The account group or current policy differs from the signed authorization."]
+					StalePolicy,
+					#[codec(index = 13)]
+					#[doc = "A proof does not verify against its account and the exact canonical call payload."]
+					InvalidSignature,
+					#[codec(index = 14)]
+					#[doc = "One account supplied more than one proof."]
+					DuplicateApproval,
+					#[codec(index = 15)]
+					#[doc = "Native wallet signing context could not be constructed for this security call."]
+					InvalidSigningPayload,
+					#[codec(index = 16)]
+					#[doc = "Only recovery-origin management may be submitted through native wrappers."]
+					IndirectAuthorization,
+					#[codec(index = 17)]
+					#[doc = "Authorization nonces cannot wrap or be reused."]
+					CounterExhausted,
+					#[codec(index = 18)]
+					#[doc = "A delayed replacement is already pending; cancel it before proposing another."]
+					PolicyUpdatePending,
+					#[codec(index = 19)]
+					#[doc = "No pending replacement exists with this proposal's consumed authorization nonce."]
+					UnknownPolicyUpdate,
+					#[codec(index = 20)]
+					#[doc = "The current tick has not reached the pending replacement's execution tick."]
+					RecoveryDelayActive,
+					#[codec(index = 21)]
+					#[doc = "Adding the configured delay to the current tick would overflow."]
+					TickOverflow,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				#[doc = "The `Event` enum of this pallet"]
+				pub enum Event {
+					#[codec(index = 0)]
+					Registered { account: crate::types::AccountId32 },
+					#[codec(index = 1)]
+					PolicyUpdated { account: crate::types::AccountId32 },
+					#[codec(index = 2)]
+					#[doc = "A failed child still consumes its nonce; inspect this result, not outer success."]
+					Executed {
+						account: crate::types::AccountId32,
+						nonce: ::core::primitive::u64,
+						result:
+							::core::result::Result<(), runtime_types::sp_runtime::DispatchError>,
+					},
+					#[codec(index = 3)]
+					GroupLinked { default_account: crate::types::AccountId32 },
+					#[codec(index = 4)]
+					PolicyUpdateScheduled {
+						account: crate::types::AccountId32,
+						nonce: ::core::primitive::u64,
+						execute_after_tick: ::core::primitive::u64,
+					},
+					#[codec(index = 5)]
+					PolicyUpdateCancelled {
+						account: crate::types::AccountId32,
+						nonce: ::core::primitive::u64,
+					},
+				}
+			}
+			pub mod types {
+				use super::runtime_types;
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct Approval {
+					pub signer: crate::types::AccountId32,
+					pub signature:
+						runtime_types::argon_primitives::account_security::ApprovalSignature,
+					pub with_metadata_hash: ::core::primitive::bool,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct Authorization {
+					pub group: crate::types::AccountId32,
+					pub nonce: ::core::primitive::u64,
+					pub expires_at: ::core::primitive::u32,
+					pub policy_hash: [::core::primitive::u8; 32usize],
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct PendingPolicyUpdate {
+					pub policy: runtime_types::pallet_account_security::types::Policy,
+					pub nonce: ::core::primitive::u64,
+					pub previous_policy_hash: [::core::primitive::u8; 32usize],
+					pub execute_after_tick: ::core::primitive::u64,
+					pub deposit: ::core::primitive::u128,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct Policy {
+					pub signers: runtime_types::bounded_collections::bounded_vec::BoundedVec<
+						crate::types::AccountId32,
+					>,
+					pub quorum: ::core::primitive::u16,
+					pub recovery_account: crate::types::AccountId32,
+					pub recovery_delay: ::core::primitive::u64,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
+				pub struct Registration {
+					pub policy: runtime_types::pallet_account_security::types::Policy,
+					pub deposit: ::core::primitive::u128,
+				}
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub struct CheckAccountSecurity;
 		}
 		pub mod pallet_balances {
 			use super::runtime_types;

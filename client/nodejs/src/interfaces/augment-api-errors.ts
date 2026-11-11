@@ -10,6 +10,96 @@ export type __AugmentedError<ApiType extends ApiTypes> = AugmentedError<ApiType>
 
 declare module '@polkadot/api-base/types/errors' {
   interface AugmentedErrors<ApiType extends ApiTypes> {
+    accountSecurity: {
+      /**
+       * Initial enrollment cannot overwrite an existing policy.
+       **/
+      AlreadyRegistered: AugmentedError<ApiType>;
+      /**
+       * The main account or a required policy/recovery/acceptance signature is missing.
+       **/
+      ApprovalRequired: AugmentedError<ApiType>;
+      /**
+       * Nested depth, call count, or a native multisig's signatory count exceeds its limit.
+       **/
+      CallLimitExceeded: AugmentedError<ApiType>;
+      /**
+       * Authorization nonces cannot wrap or be reused.
+       **/
+      CounterExhausted: AugmentedError<ApiType>;
+      /**
+       * One account supplied more than one proof.
+       **/
+      DuplicateApproval: AugmentedError<ApiType>;
+      /**
+       * Linking would discard a participant's policy or backup authority.
+       **/
+      IncompatibleAccountProtection: AugmentedError<ApiType>;
+      /**
+       * Only recovery-origin management may be submitted through native wrappers.
+       **/
+      IndirectAuthorization: AugmentedError<ApiType>;
+      /**
+       * The approval expired or exceeds the allowed future lifetime.
+       **/
+      InvalidExpiry: AugmentedError<ApiType>;
+      /**
+       * The supplied nonce is not the group's next unused authorization nonce.
+       **/
+      InvalidNonce: AugmentedError<ApiType>;
+      /**
+       * A threshold is invalid or signers are empty, duplicated or not sorted.
+       **/
+      InvalidPolicy: AugmentedError<ApiType>;
+      /**
+       * A proxy origin or transfer destination could not be resolved to an account.
+       **/
+      InvalidProxy: AugmentedError<ApiType>;
+      /**
+       * A proof does not verify against its account and the exact canonical call payload.
+       **/
+      InvalidSignature: AugmentedError<ApiType>;
+      /**
+       * Native wallet signing context could not be constructed for this security call.
+       **/
+      InvalidSigningPayload: AugmentedError<ApiType>;
+      /**
+       * Signing roles overlap the protected group or recovery overlaps a policy signer.
+       **/
+      KeysNotIndependent: AugmentedError<ApiType>;
+      /**
+       * Only a group's default account may manage its configuration.
+       **/
+      NotDefaultAccount: AugmentedError<ApiType>;
+      /**
+       * The default account has not enrolled protection.
+       **/
+      NotRegistered: AugmentedError<ApiType>;
+      /**
+       * A delayed replacement is already pending; cancel it before proposing another.
+       **/
+      PolicyUpdatePending: AugmentedError<ApiType>;
+      /**
+       * The current tick has not reached the pending replacement's execution tick.
+       **/
+      RecoveryDelayActive: AugmentedError<ApiType>;
+      /**
+       * The account group or current policy differs from the signed authorization.
+       **/
+      StalePolicy: AugmentedError<ApiType>;
+      /**
+       * Adding the configured delay to the current tick would overflow.
+       **/
+      TickOverflow: AugmentedError<ApiType>;
+      /**
+       * No pending replacement exists with this proposal's consumed authorization nonce.
+       **/
+      UnknownPolicyUpdate: AugmentedError<ApiType>;
+      /**
+       * Pre-dispatch state cannot safely authorize the nested call combination.
+       **/
+      UnsupportedComposition: AugmentedError<ApiType>;
+    };
     balances: {
       /**
        * Beneficiary account must pre-exist.
