@@ -103,6 +103,7 @@ import type {
   PalletGrandpaStoredPendingChange,
   PalletGrandpaStoredState,
   PalletLocalchainTransferQueuedTransferOut,
+  PalletMiningSlotBidEligibility,
   PalletMiningSlotMinerNonceScoring,
   PalletMiningSlotPendingBid,
   PalletMiningSlotSeatPriceStats,
@@ -1237,6 +1238,13 @@ declare module '@polkadot/api-base/types/storage' {
         () => Observable<Vec<ArgonPrimitivesBlockSealMiningRegistration>>,
         []
       >;
+      eligibleBids: AugmentedQuery<
+        ApiType,
+        (
+          arg: AccountId32 | string | Uint8Array,
+        ) => Observable<Option<PalletMiningSlotBidEligibility>>,
+        [AccountId32]
+      >;
       /**
        * The number of reward ticks remaining in the frame
        **/
@@ -1268,6 +1276,10 @@ declare module '@polkadot/api-base/types/storage' {
        **/
       isNextSlotBiddingOpen: AugmentedQuery<ApiType, () => Observable<bool>, []>;
       lastBidBlock: AugmentedQuery<ApiType, () => Observable<Option<u32>>, []>;
+      /**
+       * Fresh chains use immediate clearing; upgrades finish the current auction first.
+       **/
+      liveAuctionStartAt: AugmentedQuery<ApiType, () => Observable<u64>, []>;
       /**
        * This is a lookup of each miner's nonce to use when picking a best authority to submit a
        * block. It's a blake2 256 hash of the miner account id and the block hash at time of
@@ -1322,6 +1334,10 @@ declare module '@polkadot/api-base/types/storage' {
         () => Observable<BTreeMap<AccountId32, ArgonPrimitivesBlockSealMiningRegistration>>,
         []
       >;
+      /**
+       * Valid disclosures awaiting this block's atomic maximum clearing.
+       **/
+      revealedBids: AugmentedQuery<ApiType, () => Observable<Vec<AccountId32>>, []>;
       /**
        * The upcoming changes scheduled for cohort size by frame.
        * Capacity of 11 allows for 10 frames worth of scheduled changes plus one working slot

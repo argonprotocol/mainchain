@@ -1,5 +1,4 @@
 //! Benchmarking setup for pallet-mining-slot
-#![cfg(feature = "runtime-benchmarks")]
 
 use super::*;
 use argon_primitives::{
@@ -25,6 +24,8 @@ mod benchmarks {
 		use frame_support::traits::fungible::Mutate;
 		IsNextSlotBiddingOpen::<T>::put(true);
 		AuctionRulesStartAt::<T>::put(0);
+		// The delayed benchmarks qualify the auction retained during an upgrade.
+		LiveAuctionStartAt::<T>::put(FrameId::MAX);
 		NextFrameId::<T>::put(T::FramesPerMiningTerm::get() as FrameId + 1);
 		HistoricalBidsPerSlot::<T>::put(BoundedVec::truncate_from(vec![
 			MiningBidStats::default();
@@ -419,6 +420,19 @@ mod benchmarks {
 			Some(NextFrameId::<T>::get()),
 			Some(hash),
 		)?;
+		LiveAuctionStartAt::<T>::put(0);
+		NextCohortSize::<T>::put(T::MaxCohortSize::get());
+		Pallet::<T>::finalize_live_bids(1u32.into())?;
+		// Measure appending the final disclosure of the full five-block window.
+		RevealedBids::<T>::put(
+			BoundedVec::<T::AccountId, MaxBidReveals<T>>::try_from(
+				(0..MaxBidReveals::<T>::get().saturating_sub(1))
+					.map(|index| account("revealed", index, 0))
+					.collect::<Vec<_>>(),
+			)
+			.ok()
+			.unwrap(),
+		);
 		frame_system::Pallet::<T>::set_block_number(2u32.into());
 		let target_frame_id = NextFrameId::<T>::get();
 		#[extrinsic_call]
@@ -676,6 +690,124 @@ mod benchmarks {
 		Ok(())
 	}
 
+	fn live_auction_setup<T: Config>(
+		m: u32,
+		expire: bool,
+	) -> Result<BlockNumberFor<T>, BenchmarkError>
+	where
+		T::OwnershipCurrency:
+			frame_support::traits::fungible::Mutate<T::AccountId, Balance = T::Balance>,
+	{
+		let start = funded_cohort::<T>(m)?;
+		let increment = T::BidIncrements::get();
+		let per_block = T::MaxBidsPerBlock::get();
+		let windows = T::BidRevealBlocks::get();
+		for offset in 0..windows {
+			let block = start + offset.into();
+			frame_system::Pallet::<T>::set_block_number(block);
+			for position in 0..per_block {
+				let index = offset * per_block + position;
+				let miner = account("live", index, 0);
+				let keys = prepare_bid::<T>(&miner);
+				LiveAuctionStartAt::<T>::put(0);
+				let opening = increment.saturating_mul((3 + offset).into());
+				let max = increment.saturating_mul((100 + index % 32).into());
+				let hash = Pallet::<T>::bid_commitment(
+					NextFrameId::<T>::get(),
+					&miner,
+					&miner,
+					opening,
+					max,
+					&keys,
+					[index as u8; 32],
+				);
+				Pallet::<T>::bid(
+					RawOrigin::Signed(miner).into(),
+					opening,
+					keys,
+					None,
+					Some(NextFrameId::<T>::get()),
+					Some(hash),
+				)?;
+			}
+			Pallet::<T>::finalize_live_bids(block)?;
+		}
+		// Make current incumbents renewals backed by a full active cohort. Eviction
+		// must decode that cohort and preserve its active collateral, not release the seat twice.
+		let mut active = MinersByCohort::<T>::get(1);
+		for registration in active.iter().take(m as usize) {
+			AccountIndexLookup::<T>::remove(&registration.account_id);
+			Pallet::<T>::release_argonots_hold(&registration.account_id, registration.argonots)?;
+		}
+		let next = BidsForNextSlotCohort::<T>::get();
+		for (position, registration) in next.into_iter().enumerate() {
+			let mut registration = registration;
+			registration.starting_frame_id = 1;
+			registration.argonots = 1u128.into();
+			AccountIndexLookup::<T>::insert(&registration.account_id, (1, position as u32));
+			active[position] = registration;
+		}
+		MinersByCohort::<T>::insert(1, active);
+
+		let block = start + windows.into();
+		frame_system::Pallet::<T>::set_block_number(block);
+		let first = if expire { per_block } else { 0 };
+		for index in first..per_block * windows {
+			let miner = account("live", index, 0);
+			Pallet::<T>::bid_max(
+				RawOrigin::Signed(miner).into(),
+				increment.saturating_mul((100 + index % 32).into()),
+				Some([index as u8; 32]),
+				None,
+				NextFrameId::<T>::get(),
+			)?;
+		}
+		for position in 0..per_block {
+			let miner = account("live-opening", position, 0);
+			let keys = prepare_bid::<T>(&miner);
+			LiveAuctionStartAt::<T>::put(0);
+			Pallet::<T>::bid(
+				RawOrigin::Signed(miner).into(),
+				increment.saturating_mul(300u32.into()),
+				keys,
+				None,
+				Some(NextFrameId::<T>::get()),
+				Some([0; 32]),
+			)?;
+		}
+		Ok(block)
+	}
+
+	#[benchmark]
+	fn live_auction(m: Linear<1, 144>) -> Result<(), BenchmarkError> {
+		let m = m.min(T::MaxCohortSize::get());
+		let block = live_auction_setup::<T>(m, false)?;
+		assert_eq!(RevealedBids::<T>::get().len(), MaxBidReveals::<T>::get() as usize);
+		#[block]
+		{
+			Pallet::<T>::finalize_live_bids(block)?;
+		}
+		assert!(RevealedBids::<T>::get().is_empty());
+		assert_eq!(BidsForNextSlotCohort::<T>::get().len(), m as usize);
+		Ok(())
+	}
+
+	#[benchmark]
+	fn live_auction_with_expiry(m: Linear<1, 144>) -> Result<(), BenchmarkError> {
+		let m = m.min(T::MaxCohortSize::get());
+		let block = live_auction_setup::<T>(m, true)?;
+		#[block]
+		{
+			Pallet::<T>::finalize_live_bids(block)?;
+		}
+		for position in 0..T::MaxBidsPerBlock::get() {
+			let miner: T::AccountId = account("live", position, 0);
+			assert!(!PendingBids::<T>::contains_key(miner));
+		}
+		assert_eq!(BidsForNextSlotCohort::<T>::get().len(), m as usize);
+		Ok(())
+	}
+
 	/// Core extrinsic: Configure mining slot delay
 	#[benchmark]
 	fn configure_mining_slot_delay() -> Result<(), BenchmarkError> {
@@ -754,7 +886,7 @@ mod benchmarks {
 
 		#[block]
 		{
-			let _ = Pallet::<T>::on_finalize(1u32.into());
+			Pallet::<T>::on_finalize(1u32.into());
 		}
 
 		// Verify rotation path was taken
@@ -855,7 +987,7 @@ mod benchmarks {
 				bid_at_tick: 0u64,
 			};
 			let _ = retiring_miners.try_push(registration);
-			AccountIndexLookup::<T>::insert(&account_id, (retiring_frame_id, i as u32));
+			AccountIndexLookup::<T>::insert(&account_id, (retiring_frame_id, i));
 		}
 		MinersByCohort::<T>::insert(retiring_frame_id, retiring_miners);
 

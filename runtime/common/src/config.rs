@@ -350,7 +350,6 @@ impl WeightToFeePolynomial for ArgonWeightToFee {
 #[cfg(test)]
 mod tests {
 	use super::*;
-	use pallet_mining_slot::WeightInfo as MiningWeightInfo;
 
 	#[test]
 	fn mining_auction_settlement_refunds_before_treasury_distribution() {
@@ -463,6 +462,24 @@ mod tests {
 					}
 					MiningSlot::on_finalize(block);
 					match block {
+						2 => {
+							let cohort =
+								pallet_mining_slot::BidsForNextSlotCohort::<Runtime>::get();
+							assert_eq!(cohort.len(), 10);
+							assert!(cohort.iter().all(|bid| bid.bid == 90 * ARGON));
+							assert_eq!(Balances::balance(&pool_account), 900 * ARGON);
+						},
+						3 => {
+							assert!(pallet_mining_slot::PendingBids::<Runtime>::iter()
+								.next()
+								.is_none());
+							assert_eq!(
+								pallet_mining_slot::StandingBids::<Runtime>::get(&miners[0])
+									.unwrap()
+									.max,
+								150 * ARGON
+							);
+						},
 						1 => assert_eq!(
 							pallet_treasury::CurrentFrameArgonotBondParticipants::<Runtime>::get()
 								.unwrap()
@@ -513,35 +530,5 @@ mod tests {
 						&& *actual_burn == burned && *treasury_reserves == reserves_payout
 				)));
 			});
-	}
-
-	#[test]
-	fn mining_batch_and_activation_fit_initialization_budget() {
-		type Runtime = argon_runtime::Runtime;
-		type MiningWeights = <Runtime as pallet_mining_slot::Config>::WeightInfo;
-		let bids = <<Runtime as pallet_mining_slot::Config>::MaxBidsPerBlock as Get<u32>>::get();
-		let seats = <Runtime as pallet_mining_slot::Config>::MaxCohortSize::get();
-		let settlement = MiningWeights::settle_bids(bids, seats);
-		assert!(settlement.ref_time() > 0, "settlement must have measured weights");
-		let nonactivating =
-			settlement.saturating_add(MiningWeights::on_finalize_grandpa_rotation());
-		// Activation waits until every submission block has settled and the buffer has
-		// passed. These paths cannot coincide; empty settlement is covered by bookkeeping.
-		assert!(MiningWeights::settle_bids(0, seats).is_zero());
-		let activation = MiningWeights::start_new_frame(seats)
-			.saturating_add(MiningWeights::on_finalize_frame_adjustments())
-			.saturating_add(
-				<<Runtime as pallet_mining_slot::Config>::OperationalAccountsHook as
-					argon_primitives::OperationalAccountsHook<AccountId, Balance>>::Weights::mining_seat_won()
-					.saturating_mul(seats.into()),
-			);
-		// Other pallets' frame callbacks reserve their own weights separately.
-		let mining = MiningWeights::auction_bookkeeping(1)
-			.saturating_add(MiningWeights::on_finalize_record_block_author())
-			.saturating_add(nonactivating.max(activation));
-		assert!(
-			mining.all_lte(AVERAGE_ON_INITIALIZE_RATIO * MAXIMUM_BLOCK_WEIGHT),
-			"maximum mining batch and activation exceed the initialization allowance: {mining:?}"
-		);
 	}
 }

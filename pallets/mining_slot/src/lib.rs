@@ -15,6 +15,13 @@ use pallet_prelude::*;
 use sp_runtime::{traits::OpaqueKeys, RuntimeAppPublic};
 pub use weights::*;
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum BidClearing {
+	Delayed,
+	Opening,
+	Disclosure,
+}
+
 #[cfg(test)]
 mod mock;
 
@@ -61,7 +68,7 @@ pub mod pallet {
 	};
 	use pallet_prelude::argon_primitives::FRAME_INFO_DIGEST;
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(12);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(13);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -214,6 +221,38 @@ pub mod pallet {
 
 	#[pallet::storage]
 	pub type PendingBids<T: Config> = StorageMap<_, Blake2_128Concat, T::AccountId, PendingBid<T>>;
+
+	/// Admission and tie priority retained while an opening's maximum remains undisclosed.
+	#[derive(Encode, Decode, DecodeWithMemTracking, Clone, TypeInfo, MaxEncodedLen)]
+	pub struct BidEligibility<BlockNumber> {
+		/// Original submission block, preserved for incumbent replacements.
+		pub submitted_at: BlockNumber,
+		/// Original position within that block's submission batch.
+		pub position: u32,
+		/// A below-cutoff incumbent adjustment cannot reenter after losing its seat.
+		pub incumbent_only: bool,
+	}
+
+	#[pallet::storage]
+	pub type EligibleBids<T: Config> =
+		StorageMap<_, Blake2_128Concat, T::AccountId, BidEligibility<BlockNumberFor<T>>>;
+
+	/// All five eligible submission blocks may disclose in the same block.
+	pub struct MaxBidReveals<T>(PhantomData<T>);
+	impl<T: Config> Get<u32> for MaxBidReveals<T> {
+		fn get() -> u32 {
+			T::MaxBidsPerBlock::get().saturating_mul(T::BidRevealBlocks::get())
+		}
+	}
+
+	/// Valid disclosures awaiting this block's atomic maximum clearing.
+	#[pallet::storage]
+	pub type RevealedBids<T: Config> =
+		StorageValue<_, BoundedVec<T::AccountId, MaxBidReveals<T>>, ValueQuery>;
+
+	/// Fresh chains use immediate clearing; upgrades finish the current auction first.
+	#[pallet::storage]
+	pub type LiveAuctionStartAt<T: Config> = StorageValue<_, FrameId, ValueQuery>;
 
 	/// Vector position is canonical commitment order, including calls inside utility batches.
 	#[pallet::storage]
@@ -486,7 +525,7 @@ pub mod pallet {
 		BidAlreadyRevealed,
 		/// The revealed maximum and salt do not match the pending bid's hash.
 		InvalidBidCommitment,
-		/// The miner already has a pending bid awaiting settlement.
+		/// The miner already has a submission awaiting clearing or maximum disclosure.
 		DuplicateBidCommitment,
 		/// This block has reached the maximum number of pending bid submissions.
 		TooManyBidCommitments,
@@ -498,25 +537,34 @@ pub mod pallet {
 		BatchNotMature,
 		/// The miner has no settled bid with a standing maximum in the upcoming auction.
 		MissingStandingBid,
+		/// The disclosure queue already contains every commitment allowed in the reveal window.
+		TooManyBidReveals,
 	}
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
 		fn on_runtime_upgrade() -> Weight {
-			if StorageVersion::get::<Pallet<T>>() < STORAGE_VERSION {
+			let version = StorageVersion::get::<Pallet<T>>();
+			if version >= STORAGE_VERSION {
+				return T::DbWeight::get().reads(1);
+			}
+
+			let mut weight = T::DbWeight::get().reads_writes(2, 2);
+			let activation_frame = NextFrameId::<T>::get().saturating_add(1);
+			if version < StorageVersion::new(12) {
 				// Only fixed-price bidding was deployed. Never change an auction in progress.
-				AuctionRulesStartAt::<T>::put(NextFrameId::<T>::get().saturating_add(1));
+				AuctionRulesStartAt::<T>::put(activation_frame);
 				// Deployed counters contain only accepted bids, including zero-priced bids.
 				HasAcceptedBidPrice::<T>::put(
 					HistoricalBidsPerSlot::<T>::get()
 						.first()
 						.is_some_and(|stats| stats.bids_count > 0),
 				);
-				STORAGE_VERSION.put::<Pallet<T>>();
-				T::DbWeight::get().reads_writes(3, 3)
-			} else {
-				T::DbWeight::get().reads(1)
+				weight = weight.saturating_add(T::DbWeight::get().reads_writes(1, 2));
 			}
+			LiveAuctionStartAt::<T>::put(activation_frame);
+			STORAGE_VERSION.put::<Pallet<T>>();
+			weight
 		}
 
 		fn on_initialize(n: BlockNumberFor<T>) -> Weight {
@@ -557,8 +605,14 @@ pub mod pallet {
 			// benchmarked path weights below.
 			let previous = n.saturating_sub(T::BidRevealBlocks::get().into());
 			let count = BidBatches::<T>::decode_len(previous).unwrap_or(0) as u32;
-			let mut weight = T::WeightInfo::auction_bookkeeping(1)
-				.saturating_add(T::WeightInfo::settle_bids(count, T::MaxCohortSize::get()));
+			let mut weight = T::WeightInfo::auction_bookkeeping(1).saturating_add(
+				if Self::live_auction_enabled() {
+					// Current-block disclosures and openings are unknown before dispatch.
+					T::WeightInfo::live_auction(T::MaxCohortSize::get())
+				} else {
+					T::WeightInfo::settle_bids(count, T::MaxCohortSize::get())
+				},
+			);
 			if has_vote_seal {
 				weight = weight.saturating_add(T::WeightInfo::on_finalize_record_block_author());
 			}
@@ -597,9 +651,11 @@ pub mod pallet {
 				Self::record_block_author(author);
 			}
 
-			// Settlement precedes collateral sampling, cohort activation, and treasury callbacks.
+			// Clearing precedes collateral sampling, cohort activation, and treasury callbacks.
 			// Funding is allocated from the post-extrinsic snapshot before any prices are applied.
-			if n >= T::BidRevealBlocks::get().into() {
+			if Self::live_auction_enabled() {
+				Self::finalize_live_bids(n).expect("mining auction accounting invariant");
+			} else if n >= T::BidRevealBlocks::get().into() {
 				Self::settle_bids(n - T::BidRevealBlocks::get().into())
 					.expect("mining auction accounting invariant");
 			}
@@ -653,6 +709,7 @@ pub mod pallet {
 	impl<T: Config> Pallet<T> {
 		/// Submit a funded public bid, optionally committing to a hidden maximum.
 		/// Every bid competes at its public amount even if no maximum is revealed.
+		/// Live auctions clear openings at the end of their inclusion block.
 		/// An omitted target frame selects the current auction at dispatch time.
 		/// Standing winners can commit a new maximum without clearing the new-bid entry threshold.
 		#[pallet::call_index(0)]
@@ -682,6 +739,7 @@ pub mod pallet {
 
 		// Index 2 belonged to the unreleased commit_bid call and must not be reused.
 		/// With a salt, disclose a committed maximum in the five blocks following submission.
+		/// Live auctions clear disclosures together at the end of their inclusion block.
 		/// Without a salt, immediately update a settled winner's maximum while bidding is open.
 		/// Updates cannot overlap pending bids or reduce the maximum below the current paid bid.
 		/// Both modes must explicitly target the current auction frame.
@@ -745,6 +803,11 @@ pub mod pallet {
 					Error::<T>::InsufficientFunds
 				);
 				pending.max = Some(max);
+				if Self::live_auction_enabled() {
+					RevealedBids::<T>::try_mutate(|revealed| {
+						revealed.try_push(miner.clone()).map_err(|_| Error::<T>::TooManyBidReveals)
+					})?;
+				}
 				Self::deposit_event(Event::BidRevealed { account_id: miner.clone() });
 				Ok(())
 			})
@@ -890,6 +953,10 @@ impl<T: Config> Pallet<T> {
 		NextFrameId::<T>::get() >= AuctionRulesStartAt::<T>::get()
 	}
 
+	pub fn live_auction_enabled() -> bool {
+		Self::range_auction_enabled() && NextFrameId::<T>::get() >= LiveAuctionStartAt::<T>::get()
+	}
+
 	fn close_auction_admission() {
 		AuctionAdmissionClosed::<T>::put(true);
 		if IsNextSlotBiddingOpen::<T>::take() {
@@ -967,6 +1034,10 @@ impl<T: Config> Pallet<T> {
 			!increment.is_zero() && bid % increment == Zero::zero(),
 			Error::<T>::InvalidBidAmount
 		);
+		if Self::live_auction_enabled() {
+			// This block's disclosures establish one admission cutoff for all its openings.
+			return Ok(());
+		}
 		let winners = BidsForNextSlotCohort::<T>::get();
 		if has_max_commitment && winners.iter().any(|r| &r.account_id == miner) {
 			return Ok(());
@@ -1203,7 +1274,79 @@ impl<T: Config> Pallet<T> {
 		for (position, miner) in batch.into_iter().enumerate() {
 			let entry = PendingBids::<T>::take(&miner).ok_or(Error::<T>::MissingBidCommitment)?;
 			ensure!(entry.frame == NextFrameId::<T>::get(), Error::<T>::WrongBidFrame);
-			pending.push((entry, position as u32));
+			pending.push((
+				entry,
+				BidEligibility {
+					submitted_at: block,
+					position: position as u32,
+					incumbent_only: false,
+				},
+			));
+		}
+		Self::clear_bid_entries(block, pending, BidClearing::Delayed)
+	}
+
+	/// Maximum changes clear before new openings; deadline cleanup never replays an offer.
+	#[frame_support::transactional]
+	pub(crate) fn finalize_live_bids(block: BlockNumberFor<T>) -> DispatchResult {
+		let mut disclosures = Vec::new();
+		for miner in RevealedBids::<T>::take() {
+			let pending = PendingBids::<T>::get(&miner).ok_or(Error::<T>::MissingBidCommitment)?;
+			let eligibility =
+				EligibleBids::<T>::get(&miner).ok_or(Error::<T>::MissingBidCommitment)?;
+			disclosures.push((pending, eligibility));
+		}
+		Self::clear_bid_entries(block, disclosures, BidClearing::Disclosure)?;
+
+		let mut openings = Vec::new();
+		for (position, miner) in BidBatches::<T>::get(block).into_iter().enumerate() {
+			let Some(pending) = PendingBids::<T>::get(&miner) else { continue };
+			if pending.block != block {
+				continue;
+			}
+			if EligibleBids::<T>::contains_key(&miner) {
+				continue;
+			}
+			openings.push((
+				pending,
+				BidEligibility {
+					submitted_at: block,
+					position: position as u32,
+					incumbent_only: false,
+				},
+			));
+		}
+		Self::clear_bid_entries(block, openings, BidClearing::Opening)?;
+
+		if block >= T::BidRevealBlocks::get().into() {
+			let submitted = block - T::BidRevealBlocks::get().into();
+			for miner in BidBatches::<T>::take(submitted) {
+				let Some(pending) = PendingBids::<T>::get(&miner) else { continue };
+				if pending.block != submitted {
+					continue;
+				}
+				PendingBids::<T>::remove(&miner);
+				EligibleBids::<T>::remove(&miner);
+				Self::release_argonots_hold(&pending.funding, pending.extra_argonots)?;
+				if Self::get_pending_cohort_registration(&miner).is_none() {
+					Self::deposit_event(Event::BidLost { account_id: miner });
+				}
+			}
+		}
+		Ok(())
+	}
+
+	fn clear_bid_entries(
+		block: BlockNumberFor<T>,
+		mut pending: Vec<(PendingBid<T>, BidEligibility<BlockNumberFor<T>>)>,
+		clearing: BidClearing,
+	) -> DispatchResult {
+		if pending.is_empty() {
+			return Ok(());
+		}
+		if clearing == BidClearing::Disclosure {
+			pending
+				.sort_by_key(|(_, eligibility)| (eligibility.submitted_at, eligibility.position));
 		}
 		let old = BidsForNextSlotCohort::<T>::get();
 		let funder = |r: &Registration<T>| {
@@ -1222,25 +1365,52 @@ impl<T: Config> Pallet<T> {
 		}
 		let increment = T::BidIncrements::get();
 		let mut accepted = BTreeSet::new();
-		// Freeze eligibility BEFORE considering ANY bid from this submission block.
+		// Openings share one cutoff. Disclosures retain their recorded admission.
 		let seats = NextCohortSize::<T>::get() as usize;
 		let threshold = if !offers.is_empty() && offers.len() >= seats {
 			offers.iter().map(|(_, _, budget)| *budget).min()
 		} else {
 			None
 		};
-		for (entry, position) in &pending {
+		for (entry, eligibility) in &pending {
 			let replacement = offers.iter().position(|(r, _, _)| r.account_id == entry.miner);
 			let is_max_adjustment = replacement.is_some() && entry.max_hash.is_some();
+			let below_cutoff = threshold.is_some_and(|cutoff| entry.bid <= cutoff);
+			let priority = if clearing == BidClearing::Disclosure {
+				if eligibility.incumbent_only && replacement.is_none() {
+					Self::deposit_event(Event::BidRejected { account_id: entry.miner.clone() });
+					continue;
+				}
+				(eligibility.submitted_at, eligibility.position)
+			} else {
+				if !is_max_adjustment && below_cutoff {
+					Self::deposit_event(Event::BidRejected { account_id: entry.miner.clone() });
+					continue;
+				}
+				let priority = replacement
+					.map(|i| (offers[i].1.submitted_at, offers[i].1.position))
+					.unwrap_or((block, eligibility.position));
+				if clearing == BidClearing::Opening && entry.max_hash.is_some() {
+					EligibleBids::<T>::insert(
+						&entry.miner,
+						BidEligibility {
+							submitted_at: priority.0,
+							position: priority.1,
+							incumbent_only: below_cutoff,
+						},
+					);
+				}
+				priority
+			};
 
-			if !is_max_adjustment && threshold.is_some_and(|cutoff| entry.bid <= cutoff) {
-				Self::deposit_event(Event::BidRejected { account_id: entry.miner.clone() });
-				continue;
-			}
 			let allocated = replacement.map(|i| offers[i].2).unwrap_or_default();
 			let free = available.get_mut(&entry.funding).expect("funder inserted");
 			// A disclosed maximum is optional. If it cannot be fully funded, preserve the base bid.
-			let mut max = entry.max.unwrap_or(entry.bid);
+			let mut max = if clearing == BidClearing::Opening {
+				entry.bid
+			} else {
+				entry.max.unwrap_or(entry.bid)
+			};
 			if *free < max.saturating_sub(allocated) {
 				max = entry.bid;
 			}
@@ -1267,8 +1437,8 @@ impl<T: Config> Pallet<T> {
 				bid: entry.bid,
 				max,
 				fixed: entry.max_hash.is_none(),
-				submitted_at: replacement.map(|i| offers[i].1.submitted_at).unwrap_or(block),
-				position: replacement.map(|i| offers[i].1.position).unwrap_or(*position),
+				submitted_at: priority.0,
+				position: priority.1,
 			};
 			let mut registration = entry.registration.clone();
 			registration.bid = replacement.map(|i| offers[i].0.bid).unwrap_or_default();
@@ -1300,18 +1470,26 @@ impl<T: Config> Pallet<T> {
 			let (r, standing, _) = &offers[index];
 			let mut registration = r.clone();
 			registration.bid = price.into();
-			Self::send_argons_to_pool(
-				&funder(r),
-				&old.iter().find(|x| x.account_id == r.account_id).cloned(),
-				registration.bid,
-			)?;
+			let previous = old.iter().find(|old| old.account_id == r.account_id).cloned();
+			Self::send_argons_to_pool(&funder(r), &previous, registration.bid)?;
 			StandingBids::<T>::insert(&r.account_id, standing.clone());
-			let new_submission = accepted.contains(&r.account_id);
-			let automatic_increase = !new_submission && registration.bid > r.bid;
+			let applied_offer = accepted.contains(&r.account_id);
+			let automatic_increase = if registration.bid <= r.bid {
+				false
+			} else if clearing == BidClearing::Disclosure {
+				previous.is_some()
+			} else {
+				!applied_offer
+			};
+			let initial_price = if clearing == BidClearing::Disclosure {
+				applied_offer && previous.is_none()
+			} else {
+				applied_offer
+			};
 			if automatic_increase {
 				automatic_bids = automatic_bids.saturating_add(1);
 			}
-			if new_submission || automatic_increase {
+			if initial_price || automatic_increase {
 				accepted_prices.push(registration.bid);
 			}
 			if registration.bid != r.bid {
@@ -1326,6 +1504,20 @@ impl<T: Config> Pallet<T> {
 			// A rejected replacement does not replace a still-winning incumbent's keys/offer.
 			let accepted_winner = winners.iter().any(|r| r.account_id == entry.miner) &&
 				accepted.contains(&entry.miner);
+			if clearing == BidClearing::Opening && EligibleBids::<T>::contains_key(&entry.miner) {
+				if winners.iter().any(|r| r.account_id == entry.miner) {
+					// The live registration now owns the seat's collateral. Eviction can
+					// transfer it back to the still-eligible commitment exactly once.
+					PendingBids::<T>::mutate(&entry.miner, |pending| {
+						pending.as_mut().expect("opening commitment").extra_argonots = Zero::zero();
+					});
+				}
+				continue;
+			}
+			if clearing != BidClearing::Delayed {
+				PendingBids::<T>::remove(&entry.miner);
+				EligibleBids::<T>::remove(&entry.miner);
+			}
 			if !accepted_winner {
 				Self::release_argonots_hold(&entry.funding, entry.extra_argonots)?;
 				Self::deposit_event(Event::BidLost { account_id: entry.miner.clone() });
@@ -1348,10 +1540,14 @@ impl<T: Config> Pallet<T> {
 				.then_with(|| priorities[&a.account_id].cmp(&priorities[&b.account_id]))
 		});
 		for (index, winner) in winners.iter().enumerate() {
-			if pending
+			let applied_submission = pending
 				.iter()
-				.any(|(p, _)| p.miner == winner.account_id && accepted.contains(&p.miner))
-			{
+				.any(|(p, _)| p.miner == winner.account_id && accepted.contains(&p.miner));
+			let membership_changed = old
+				.iter()
+				.find(|r| r.account_id == winner.account_id)
+				.is_none_or(|r| r.authority_keys != winner.authority_keys);
+			if applied_submission && (clearing != BidClearing::Disclosure || membership_changed) {
 				Self::deposit_event(Event::SlotBidderAdded {
 					account_id: winner.account_id.clone(),
 					bid_amount: winner.bid,

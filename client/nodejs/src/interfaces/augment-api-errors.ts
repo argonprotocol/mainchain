@@ -1046,7 +1046,7 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       CannotRegisterOverlappingSessions: AugmentedError<ApiType>;
       /**
-       * The miner already has a pending bid awaiting settlement.
+       * The miner already has a submission awaiting clearing or maximum disclosure.
        **/
       DuplicateBidCommitment: AugmentedError<ApiType>;
       /**
@@ -1097,6 +1097,10 @@ declare module '@polkadot/api-base/types/errors' {
        * This block has reached the maximum number of pending bid submissions.
        **/
       TooManyBidCommitments: AugmentedError<ApiType>;
+      /**
+       * The disclosure queue already contains every commitment allowed in the reveal window.
+       **/
+      TooManyBidReveals: AugmentedError<ApiType>;
       /**
        * The cohort registration overflowed
        **/

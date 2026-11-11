@@ -3527,9 +3527,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				53u8, 255u8, 160u8, 47u8, 235u8, 14u8, 127u8, 32u8, 144u8, 86u8, 8u8, 123u8, 102u8,
-				71u8, 184u8, 64u8, 146u8, 176u8, 13u8, 88u8, 190u8, 215u8, 86u8, 90u8, 71u8, 158u8,
-				182u8, 174u8, 194u8, 65u8, 193u8, 57u8,
+				147u8, 144u8, 12u8, 59u8, 89u8, 4u8, 153u8, 7u8, 76u8, 186u8, 88u8, 109u8, 181u8,
+				168u8, 176u8, 130u8, 114u8, 67u8, 105u8, 61u8, 42u8, 126u8, 238u8, 120u8, 237u8,
+				38u8, 46u8, 56u8, 22u8, 241u8, 210u8, 47u8,
 			]
 	}
 	pub mod system {
@@ -7572,6 +7572,7 @@ pub mod api {
 				)]
 				#[doc = "Submit a funded public bid, optionally committing to a hidden maximum."]
 				#[doc = "Every bid competes at its public amount even if no maximum is revealed."]
+				#[doc = "Live auctions clear openings at the end of their inclusion block."]
 				#[doc = "An omitted target frame selects the current auction at dispatch time."]
 				#[doc = "Standing winners can commit a new maximum without clearing the new-bid entry threshold."]
 				pub struct Bid {
@@ -7606,6 +7607,7 @@ pub mod api {
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
 				#[doc = "With a salt, disclose a committed maximum in the five blocks following submission."]
+				#[doc = "Live auctions clear disclosures together at the end of their inclusion block."]
 				#[doc = "Without a salt, immediately update a settled winner's maximum while bidding is open."]
 				#[doc = "Updates cannot overlap pending bids or reduce the maximum below the current paid bid."]
 				#[doc = "Both modes must explicitly target the current auction frame."]
@@ -7659,6 +7661,7 @@ pub mod api {
 			impl TransactionApi {
 				#[doc = "Submit a funded public bid, optionally committing to a hidden maximum."]
 				#[doc = "Every bid competes at its public amount even if no maximum is revealed."]
+				#[doc = "Live auctions clear openings at the end of their inclusion block."]
 				#[doc = "An omitted target frame selects the current auction at dispatch time."]
 				#[doc = "Standing winners can commit a new maximum without clearing the new-bid entry threshold."]
 				pub fn bid(
@@ -7681,6 +7684,7 @@ pub mod api {
 					)
 				}
 				#[doc = "With a salt, disclose a committed maximum in the five blocks following submission."]
+				#[doc = "Live auctions clear disclosures together at the end of their inclusion block."]
 				#[doc = "Without a salt, immediately update a settled winner's maximum while bidding is open."]
 				#[doc = "Updates cannot overlap pending bids or reduce the maximum below the current paid bid."]
 				#[doc = "Both modes must explicitly target the current auction frame."]
@@ -8023,6 +8027,25 @@ pub mod api {
 					pub type PendingBids = runtime_types::pallet_mining_slot::pallet::PendingBid;
 					pub type Param0 = crate::types::AccountId32;
 				}
+				pub mod eligible_bids {
+					use super::runtime_types;
+					pub type EligibleBids =
+						runtime_types::pallet_mining_slot::pallet::BidEligibility<
+							::core::primitive::u32,
+						>;
+					pub type Param0 = crate::types::AccountId32;
+				}
+				pub mod revealed_bids {
+					use super::runtime_types;
+					pub type RevealedBids =
+						runtime_types::bounded_collections::bounded_vec::BoundedVec<
+							crate::types::AccountId32,
+						>;
+				}
+				pub mod live_auction_start_at {
+					use super::runtime_types;
+					pub type LiveAuctionStartAt = ::core::primitive::u64;
+				}
 				pub mod bid_batches {
 					use super::runtime_types;
 					pub type BidBatches =
@@ -8226,6 +8249,93 @@ pub mod api {
 							46u8, 133u8, 123u8, 126u8, 172u8, 85u8, 54u8, 44u8, 78u8, 37u8, 230u8,
 							242u8, 23u8, 199u8, 62u8, 199u8, 227u8, 218u8, 121u8, 16u8, 165u8,
 							227u8, 21u8, 46u8, 166u8, 235u8, 76u8, 21u8, 132u8, 47u8, 1u8, 111u8,
+						],
+					)
+				}
+				pub fn eligible_bids_iter(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::eligible_bids::EligibleBids,
+					(),
+					(),
+					::subxt::ext::subxt_core::utils::Yes,
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"MiningSlot",
+						"EligibleBids",
+						(),
+						[
+							208u8, 224u8, 158u8, 221u8, 48u8, 244u8, 131u8, 67u8, 32u8, 224u8,
+							90u8, 97u8, 89u8, 95u8, 161u8, 82u8, 137u8, 132u8, 132u8, 207u8, 134u8,
+							232u8, 164u8, 174u8, 245u8, 210u8, 199u8, 71u8, 1u8, 187u8, 68u8, 37u8,
+						],
+					)
+				}
+				pub fn eligible_bids(
+					&self,
+					_0: types::eligible_bids::Param0,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					::subxt::ext::subxt_core::storage::address::StaticStorageKey<
+						types::eligible_bids::Param0,
+					>,
+					types::eligible_bids::EligibleBids,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"MiningSlot",
+						"EligibleBids",
+						::subxt::ext::subxt_core::storage::address::StaticStorageKey::new(_0),
+						[
+							208u8, 224u8, 158u8, 221u8, 48u8, 244u8, 131u8, 67u8, 32u8, 224u8,
+							90u8, 97u8, 89u8, 95u8, 161u8, 82u8, 137u8, 132u8, 132u8, 207u8, 134u8,
+							232u8, 164u8, 174u8, 245u8, 210u8, 199u8, 71u8, 1u8, 187u8, 68u8, 37u8,
+						],
+					)
+				}
+				#[doc = " Valid disclosures awaiting this block's atomic maximum clearing."]
+				pub fn revealed_bids(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::revealed_bids::RevealedBids,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"MiningSlot",
+						"RevealedBids",
+						(),
+						[
+							172u8, 135u8, 136u8, 208u8, 88u8, 145u8, 208u8, 211u8, 165u8, 71u8,
+							224u8, 113u8, 145u8, 179u8, 110u8, 26u8, 97u8, 228u8, 42u8, 123u8,
+							13u8, 224u8, 200u8, 44u8, 148u8, 107u8, 103u8, 85u8, 9u8, 82u8, 152u8,
+							32u8,
+						],
+					)
+				}
+				#[doc = " Fresh chains use immediate clearing; upgrades finish the current auction first."]
+				pub fn live_auction_start_at(
+					&self,
+				) -> ::subxt::ext::subxt_core::storage::address::StaticAddress<
+					(),
+					types::live_auction_start_at::LiveAuctionStartAt,
+					::subxt::ext::subxt_core::utils::Yes,
+					::subxt::ext::subxt_core::utils::Yes,
+					(),
+				> {
+					::subxt::ext::subxt_core::storage::address::StaticAddress::new_static(
+						"MiningSlot",
+						"LiveAuctionStartAt",
+						(),
+						[
+							153u8, 23u8, 202u8, 53u8, 184u8, 167u8, 96u8, 102u8, 255u8, 131u8,
+							28u8, 42u8, 7u8, 168u8, 188u8, 5u8, 95u8, 119u8, 165u8, 67u8, 144u8,
+							234u8, 166u8, 172u8, 220u8, 40u8, 64u8, 175u8, 50u8, 176u8, 255u8,
+							96u8,
 						],
 					)
 				}
@@ -40746,11 +40856,29 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
+				pub struct BidEligibility<_0> {
+					pub submitted_at: _0,
+					pub position: ::core::primitive::u32,
+					pub incumbent_only: ::core::primitive::bool,
+				}
+				#[derive(
+					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+					:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+					Clone,
+					Debug,
+				)]
+				#[decode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode"
+				)]
+				#[encode_as_type(
+					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
+				)]
 				#[doc = "Contains a variant per dispatchable extrinsic that this pallet has."]
 				pub enum Call {
 					#[codec(index = 0)]
 					#[doc = "Submit a funded public bid, optionally committing to a hidden maximum."]
 					#[doc = "Every bid competes at its public amount even if no maximum is revealed."]
+					#[doc = "Live auctions clear openings at the end of their inclusion block."]
 					#[doc = "An omitted target frame selects the current auction at dispatch time."]
 					#[doc = "Standing winners can commit a new maximum without clearing the new-bid entry threshold."]
 					bid {
@@ -40762,6 +40890,7 @@ pub mod api {
 					},
 					#[codec(index = 3)]
 					#[doc = "With a salt, disclose a committed maximum in the five blocks following submission."]
+					#[doc = "Live auctions clear disclosures together at the end of their inclusion block."]
 					#[doc = "Without a salt, immediately update a settled winner's maximum while bidding is open."]
 					#[doc = "Updates cannot overlap pending bids or reduce the maximum below the current paid bid."]
 					#[doc = "Both modes must explicitly target the current auction frame."]
@@ -40842,7 +40971,7 @@ pub mod api {
 					#[doc = "The revealed maximum and salt do not match the pending bid's hash."]
 					InvalidBidCommitment,
 					#[codec(index = 16)]
-					#[doc = "The miner already has a pending bid awaiting settlement."]
+					#[doc = "The miner already has a submission awaiting clearing or maximum disclosure."]
 					DuplicateBidCommitment,
 					#[codec(index = 17)]
 					#[doc = "This block has reached the maximum number of pending bid submissions."]
@@ -40859,6 +40988,9 @@ pub mod api {
 					#[codec(index = 21)]
 					#[doc = "The miner has no settled bid with a standing maximum in the upcoming auction."]
 					MissingStandingBid,
+					#[codec(index = 22)]
+					#[doc = "The disclosure queue already contains every commitment allowed in the reveal window."]
+					TooManyBidReveals,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
