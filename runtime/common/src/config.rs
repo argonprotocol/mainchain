@@ -418,7 +418,7 @@ mod tests {
 								assert_ok!(MiningSlot::bid_max(
 									RuntimeOrigin::signed(miner.clone()),
 									max,
-									[index as u8; 32],
+									Some([index as u8; 32]),
 									None,
 									2
 								));
@@ -447,7 +447,7 @@ mod tests {
 							assert_ok!(MiningSlot::bid_max(
 								RuntimeOrigin::signed(miners[10].clone()),
 								125 * ARGON,
-								[11; 32],
+								Some([11; 32]),
 								None,
 								2
 							));

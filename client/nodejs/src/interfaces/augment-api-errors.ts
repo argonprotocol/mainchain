@@ -837,7 +837,7 @@ declare module '@polkadot/api-base/types/errors' {
       InvalidBackfillHeaderRoot: AugmentedError<ApiType>;
       InvalidExecutionHeaderProof: AugmentedError<ApiType>;
       /**
-       * The gap between finalized headers is larger than the retained historical window.
+       * Reserved error index; finalized updates are now bounded by authenticated committees.
        **/
       InvalidFinalizedHeaderGap: AugmentedError<ApiType>;
       InvalidForkSchedule: AugmentedError<ApiType>;
@@ -940,7 +940,7 @@ declare module '@polkadot/api-base/types/errors' {
        **/
       BidAlreadyRevealed: AugmentedError<ApiType>;
       /**
-       * The mining bid cannot be reduced
+       * Paid bids cannot decrease; public-only replacements must exceed the standing maximum.
        **/
       BidCannotBeReduced: AugmentedError<ApiType>;
       /**
@@ -987,6 +987,10 @@ declare module '@polkadot/api-base/types/errors' {
        * The miner has no pending bid with a committed maximum to reveal.
        **/
       MissingBidCommitment: AugmentedError<ApiType>;
+      /**
+       * The miner has no settled bid with a standing maximum in the upcoming auction.
+       **/
+      MissingStandingBid: AugmentedError<ApiType>;
       /**
        * Mining slot bidding currently requires a prior operational-account upgrade.
        **/

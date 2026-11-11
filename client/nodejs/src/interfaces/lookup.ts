@@ -368,6 +368,11 @@ export default {
         accountId: 'AccountId32',
         error: 'SpRuntimeDispatchError',
       },
+      BidMaxUpdated: {
+        accountId: 'AccountId32',
+        targetFrameId: 'u64',
+        max: 'u128',
+      },
     },
   },
   /**
@@ -2428,7 +2433,7 @@ export default {
       __Unused2: 'Null',
       bid_max: {
         max: 'u128',
-        salt: '[u8;32]',
+        salt: 'Option<[u8;32]>',
         miningAccountId: 'Option<AccountId32>',
         targetFrameId: 'u64',
       },
@@ -3743,6 +3748,7 @@ export default {
       'InvalidBidRange',
       'RangeAuctionNotActive',
       'BatchNotMature',
+      'MissingStandingBid',
     ],
   },
   /**

@@ -1173,10 +1173,10 @@ pub mod api {
 						"query_call_info",
 						types::QueryCallInfo { call, len },
 						[
-							37u8, 217u8, 170u8, 22u8, 23u8, 113u8, 67u8, 4u8, 10u8, 118u8, 108u8,
-							120u8, 209u8, 167u8, 125u8, 171u8, 89u8, 239u8, 231u8, 223u8, 179u8,
-							115u8, 126u8, 166u8, 50u8, 227u8, 159u8, 149u8, 198u8, 234u8, 166u8,
-							209u8,
+							195u8, 179u8, 118u8, 184u8, 249u8, 230u8, 202u8, 87u8, 55u8, 134u8,
+							252u8, 20u8, 224u8, 31u8, 13u8, 98u8, 249u8, 138u8, 6u8, 187u8, 247u8,
+							233u8, 4u8, 171u8, 192u8, 188u8, 108u8, 136u8, 175u8, 76u8, 200u8,
+							150u8,
 						],
 					)
 				}
@@ -1194,10 +1194,9 @@ pub mod api {
 						"query_call_fee_details",
 						types::QueryCallFeeDetails { call, len },
 						[
-							52u8, 149u8, 34u8, 213u8, 171u8, 254u8, 101u8, 78u8, 71u8, 160u8,
-							251u8, 206u8, 165u8, 100u8, 232u8, 217u8, 150u8, 237u8, 44u8, 28u8,
-							119u8, 236u8, 89u8, 64u8, 91u8, 14u8, 12u8, 22u8, 111u8, 71u8, 242u8,
-							71u8,
+							203u8, 206u8, 31u8, 19u8, 36u8, 43u8, 223u8, 164u8, 89u8, 224u8, 25u8,
+							148u8, 164u8, 86u8, 196u8, 127u8, 98u8, 36u8, 213u8, 3u8, 116u8, 223u8,
+							134u8, 159u8, 106u8, 42u8, 127u8, 163u8, 184u8, 2u8, 52u8, 133u8,
 						],
 					)
 				}
@@ -3521,9 +3520,9 @@ pub mod api {
 			.hash();
 		runtime_metadata_hash ==
 			[
-				107u8, 119u8, 197u8, 182u8, 97u8, 241u8, 20u8, 12u8, 143u8, 176u8, 50u8, 93u8,
-				146u8, 196u8, 192u8, 97u8, 254u8, 13u8, 168u8, 94u8, 75u8, 240u8, 180u8, 155u8,
-				151u8, 119u8, 106u8, 131u8, 174u8, 17u8, 200u8, 217u8,
+				248u8, 31u8, 135u8, 218u8, 129u8, 205u8, 250u8, 45u8, 55u8, 4u8, 82u8, 127u8,
+				149u8, 243u8, 71u8, 155u8, 23u8, 196u8, 14u8, 59u8, 243u8, 130u8, 228u8, 46u8,
+				174u8, 238u8, 174u8, 21u8, 20u8, 137u8, 187u8, 233u8,
 			]
 	}
 	pub mod system {
@@ -4647,10 +4646,9 @@ pub mod api {
 						"Events",
 						(),
 						[
-							189u8, 147u8, 56u8, 144u8, 193u8, 163u8, 176u8, 16u8, 187u8, 177u8,
-							128u8, 195u8, 170u8, 149u8, 46u8, 57u8, 226u8, 26u8, 170u8, 49u8,
-							234u8, 251u8, 136u8, 251u8, 25u8, 89u8, 77u8, 245u8, 36u8, 123u8,
-							177u8, 68u8,
+							230u8, 255u8, 140u8, 196u8, 249u8, 71u8, 40u8, 24u8, 69u8, 251u8, 68u8,
+							170u8, 54u8, 253u8, 236u8, 243u8, 35u8, 155u8, 59u8, 210u8, 196u8,
+							107u8, 192u8, 37u8, 236u8, 58u8, 254u8, 16u8, 110u8, 5u8, 30u8, 104u8,
 						],
 					)
 				}
@@ -5558,9 +5556,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							73u8, 177u8, 234u8, 224u8, 183u8, 68u8, 106u8, 137u8, 98u8, 23u8, 84u8,
-							71u8, 179u8, 72u8, 48u8, 186u8, 30u8, 8u8, 65u8, 7u8, 118u8, 70u8,
-							187u8, 111u8, 11u8, 247u8, 39u8, 95u8, 154u8, 225u8, 167u8, 120u8,
+							106u8, 240u8, 55u8, 232u8, 203u8, 11u8, 87u8, 77u8, 22u8, 246u8, 96u8,
+							40u8, 13u8, 144u8, 12u8, 4u8, 148u8, 23u8, 171u8, 186u8, 153u8, 175u8,
+							174u8, 84u8, 86u8, 73u8, 69u8, 34u8, 218u8, 137u8, 40u8, 215u8,
 						],
 					)
 				}
@@ -5625,9 +5623,9 @@ pub mod api {
 							max_weight,
 						},
 						[
-							57u8, 252u8, 26u8, 202u8, 136u8, 152u8, 18u8, 157u8, 48u8, 125u8,
-							143u8, 221u8, 117u8, 69u8, 13u8, 176u8, 72u8, 46u8, 44u8, 7u8, 10u8,
-							150u8, 41u8, 6u8, 28u8, 215u8, 201u8, 149u8, 165u8, 219u8, 144u8, 82u8,
+							125u8, 217u8, 153u8, 20u8, 113u8, 172u8, 151u8, 133u8, 31u8, 34u8,
+							34u8, 169u8, 245u8, 36u8, 255u8, 248u8, 23u8, 141u8, 26u8, 29u8, 119u8,
+							85u8, 72u8, 136u8, 117u8, 22u8, 131u8, 234u8, 169u8, 24u8, 92u8, 63u8,
 						],
 					)
 				}
@@ -6532,9 +6530,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							140u8, 231u8, 87u8, 230u8, 143u8, 89u8, 66u8, 223u8, 107u8, 45u8,
-							201u8, 84u8, 0u8, 9u8, 73u8, 9u8, 29u8, 200u8, 56u8, 54u8, 77u8, 192u8,
-							16u8, 218u8, 174u8, 190u8, 24u8, 124u8, 55u8, 114u8, 173u8, 31u8,
+							96u8, 195u8, 101u8, 100u8, 119u8, 172u8, 114u8, 85u8, 126u8, 153u8,
+							188u8, 198u8, 18u8, 79u8, 82u8, 228u8, 254u8, 250u8, 57u8, 223u8,
+							113u8, 180u8, 75u8, 139u8, 166u8, 40u8, 81u8, 195u8, 211u8, 75u8, 89u8,
+							248u8,
 						],
 					)
 				}
@@ -6798,9 +6797,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							80u8, 248u8, 76u8, 9u8, 11u8, 99u8, 203u8, 70u8, 39u8, 227u8, 111u8,
-							63u8, 243u8, 93u8, 156u8, 17u8, 13u8, 207u8, 109u8, 94u8, 176u8, 137u8,
-							89u8, 67u8, 120u8, 97u8, 78u8, 11u8, 246u8, 9u8, 122u8, 155u8,
+							161u8, 128u8, 109u8, 14u8, 205u8, 250u8, 101u8, 74u8, 227u8, 225u8,
+							139u8, 146u8, 156u8, 12u8, 23u8, 111u8, 102u8, 78u8, 6u8, 150u8, 44u8,
+							254u8, 108u8, 107u8, 42u8, 18u8, 6u8, 195u8, 29u8, 14u8, 91u8, 66u8,
 						],
 					)
 				}
@@ -6849,10 +6848,10 @@ pub mod api {
 						],
 						check_permissions::Input { call, proxy_type },
 						[
-							169u8, 209u8, 10u8, 246u8, 250u8, 206u8, 23u8, 3u8, 69u8, 3u8, 102u8,
-							183u8, 250u8, 103u8, 21u8, 146u8, 169u8, 255u8, 153u8, 246u8, 95u8,
-							191u8, 213u8, 35u8, 202u8, 124u8, 27u8, 130u8, 165u8, 10u8, 225u8,
-							50u8,
+							179u8, 55u8, 190u8, 32u8, 128u8, 182u8, 144u8, 236u8, 41u8, 38u8,
+							210u8, 101u8, 92u8, 90u8, 121u8, 172u8, 51u8, 119u8, 40u8, 166u8,
+							183u8, 97u8, 227u8, 116u8, 227u8, 251u8, 44u8, 11u8, 221u8, 208u8,
+							131u8, 126u8,
 						],
 					)
 				}
@@ -7570,6 +7569,7 @@ pub mod api {
 				#[doc = "Submit a funded public bid, optionally committing to a hidden maximum."]
 				#[doc = "Every bid competes at its public amount even if no maximum is revealed."]
 				#[doc = "An omitted target frame selects the current auction at dispatch time."]
+				#[doc = "Standing winners can commit a new maximum without clearing the new-bid entry threshold."]
 				pub struct Bid {
 					pub bid: bid::Bid,
 					pub keys: bid::Keys,
@@ -7601,8 +7601,10 @@ pub mod api {
 				#[encode_as_type(
 					crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode"
 				)]
-				#[doc = "Disclose a committed maximum during the five blocks following submission."]
-				#[doc = "The target frame must match the original bid and the current auction."]
+				#[doc = "With a salt, disclose a committed maximum in the five blocks following submission."]
+				#[doc = "Without a salt, immediately update a settled winner's maximum while bidding is open."]
+				#[doc = "Updates cannot overlap pending bids or reduce the maximum below the current paid bid."]
+				#[doc = "Both modes must explicitly target the current auction frame."]
 				pub struct BidMax {
 					pub max: bid_max::Max,
 					pub salt: bid_max::Salt,
@@ -7612,7 +7614,7 @@ pub mod api {
 				pub mod bid_max {
 					use super::runtime_types;
 					pub type Max = ::core::primitive::u128;
-					pub type Salt = [::core::primitive::u8; 32usize];
+					pub type Salt = ::core::option::Option<[::core::primitive::u8; 32usize]>;
 					pub type MiningAccountId = ::core::option::Option<crate::types::AccountId32>;
 					pub type TargetFrameId = ::core::primitive::u64;
 				}
@@ -7654,6 +7656,7 @@ pub mod api {
 				#[doc = "Submit a funded public bid, optionally committing to a hidden maximum."]
 				#[doc = "Every bid competes at its public amount even if no maximum is revealed."]
 				#[doc = "An omitted target frame selects the current auction at dispatch time."]
+				#[doc = "Standing winners can commit a new maximum without clearing the new-bid entry threshold."]
 				pub fn bid(
 					&self,
 					bid: types::bid::Bid,
@@ -7673,8 +7676,10 @@ pub mod api {
 						],
 					)
 				}
-				#[doc = "Disclose a committed maximum during the five blocks following submission."]
-				#[doc = "The target frame must match the original bid and the current auction."]
+				#[doc = "With a salt, disclose a committed maximum in the five blocks following submission."]
+				#[doc = "Without a salt, immediately update a settled winner's maximum while bidding is open."]
+				#[doc = "Updates cannot overlap pending bids or reduce the maximum below the current paid bid."]
+				#[doc = "Both modes must explicitly target the current auction frame."]
 				pub fn bid_max(
 					&self,
 					max: types::bid_max::Max,
@@ -7687,10 +7692,9 @@ pub mod api {
 						"bid_max",
 						types::BidMax { max, salt, mining_account_id, target_frame_id },
 						[
-							78u8, 170u8, 52u8, 176u8, 36u8, 252u8, 130u8, 52u8, 188u8, 118u8,
-							244u8, 250u8, 119u8, 158u8, 230u8, 62u8, 227u8, 136u8, 209u8, 64u8,
-							198u8, 113u8, 140u8, 3u8, 13u8, 147u8, 40u8, 81u8, 75u8, 184u8, 71u8,
-							115u8,
+							250u8, 115u8, 64u8, 216u8, 20u8, 204u8, 140u8, 210u8, 168u8, 40u8,
+							18u8, 144u8, 120u8, 92u8, 131u8, 234u8, 184u8, 44u8, 83u8, 72u8, 110u8,
+							163u8, 193u8, 97u8, 90u8, 90u8, 150u8, 23u8, 171u8, 38u8, 53u8, 194u8,
 						],
 					)
 				}
@@ -7981,6 +7985,29 @@ pub mod api {
 			impl ::subxt::ext::subxt_core::events::StaticEvent for ReleaseBidError {
 				const PALLET: &'static str = "MiningSlot";
 				const EVENT: &'static str = "ReleaseBidError";
+			}
+			#[derive(
+				:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
+				:: subxt :: ext :: subxt_core :: ext :: scale_encode :: EncodeAsType,
+				Clone,
+				Debug,
+			)]
+			#[decode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_decode")]
+			#[encode_as_type(crate_path = ":: subxt :: ext :: subxt_core :: ext :: scale_encode")]
+			pub struct BidMaxUpdated {
+				pub account_id: bid_max_updated::AccountId,
+				pub target_frame_id: bid_max_updated::TargetFrameId,
+				pub max: bid_max_updated::Max,
+			}
+			pub mod bid_max_updated {
+				use super::runtime_types;
+				pub type AccountId = crate::types::AccountId32;
+				pub type TargetFrameId = ::core::primitive::u64;
+				pub type Max = ::core::primitive::u128;
+			}
+			impl ::subxt::ext::subxt_core::events::StaticEvent for BidMaxUpdated {
+				const PALLET: &'static str = "MiningSlot";
+				const EVENT: &'static str = "BidMaxUpdated";
 			}
 		}
 		pub mod storage {
@@ -22272,10 +22299,9 @@ pub mod api {
 						"batch",
 						types::Batch { calls },
 						[
-							230u8, 147u8, 62u8, 199u8, 107u8, 211u8, 103u8, 168u8, 216u8, 180u8,
-							223u8, 163u8, 172u8, 226u8, 40u8, 129u8, 252u8, 178u8, 186u8, 130u8,
-							0u8, 12u8, 168u8, 183u8, 103u8, 120u8, 88u8, 202u8, 68u8, 46u8, 154u8,
-							111u8,
+							250u8, 41u8, 172u8, 233u8, 129u8, 217u8, 40u8, 128u8, 36u8, 4u8, 232u8,
+							30u8, 213u8, 28u8, 233u8, 134u8, 4u8, 56u8, 32u8, 12u8, 135u8, 106u8,
+							95u8, 241u8, 219u8, 147u8, 182u8, 86u8, 215u8, 35u8, 67u8, 45u8,
 						],
 					)
 				}
@@ -22305,10 +22331,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							183u8, 31u8, 64u8, 171u8, 116u8, 100u8, 218u8, 11u8, 155u8, 25u8,
-							249u8, 59u8, 64u8, 157u8, 199u8, 142u8, 63u8, 193u8, 84u8, 168u8, 53u8,
-							140u8, 155u8, 211u8, 133u8, 147u8, 155u8, 200u8, 87u8, 62u8, 5u8,
-							119u8,
+							251u8, 184u8, 231u8, 153u8, 204u8, 187u8, 141u8, 194u8, 82u8, 237u8,
+							131u8, 49u8, 37u8, 73u8, 18u8, 217u8, 39u8, 196u8, 206u8, 107u8, 19u8,
+							191u8, 208u8, 216u8, 223u8, 56u8, 182u8, 43u8, 48u8, 168u8, 18u8, 81u8,
 						],
 					)
 				}
@@ -22334,10 +22359,9 @@ pub mod api {
 						"batch_all",
 						types::BatchAll { calls },
 						[
-							142u8, 100u8, 141u8, 192u8, 62u8, 148u8, 179u8, 109u8, 89u8, 82u8,
-							141u8, 39u8, 165u8, 127u8, 131u8, 253u8, 181u8, 197u8, 189u8, 206u8,
-							155u8, 17u8, 67u8, 18u8, 141u8, 25u8, 46u8, 84u8, 50u8, 255u8, 47u8,
-							25u8,
+							159u8, 67u8, 3u8, 75u8, 28u8, 135u8, 138u8, 120u8, 50u8, 186u8, 2u8,
+							210u8, 66u8, 6u8, 42u8, 182u8, 34u8, 208u8, 56u8, 211u8, 154u8, 145u8,
+							104u8, 15u8, 204u8, 120u8, 179u8, 119u8, 159u8, 132u8, 16u8, 118u8,
 						],
 					)
 				}
@@ -22360,9 +22384,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							119u8, 238u8, 165u8, 236u8, 243u8, 83u8, 149u8, 83u8, 25u8, 110u8,
-							53u8, 191u8, 140u8, 131u8, 2u8, 71u8, 87u8, 22u8, 25u8, 86u8, 5u8, 4u8,
-							74u8, 197u8, 48u8, 8u8, 175u8, 30u8, 92u8, 215u8, 55u8, 43u8,
+							41u8, 156u8, 137u8, 87u8, 34u8, 50u8, 172u8, 172u8, 250u8, 248u8,
+							202u8, 121u8, 180u8, 110u8, 203u8, 66u8, 232u8, 43u8, 168u8, 158u8,
+							35u8, 177u8, 113u8, 72u8, 21u8, 175u8, 249u8, 15u8, 4u8, 147u8, 114u8,
+							232u8,
 						],
 					)
 				}
@@ -22388,9 +22413,10 @@ pub mod api {
 						"force_batch",
 						types::ForceBatch { calls },
 						[
-							100u8, 165u8, 116u8, 230u8, 137u8, 80u8, 23u8, 228u8, 132u8, 90u8,
-							186u8, 145u8, 230u8, 21u8, 43u8, 254u8, 115u8, 8u8, 26u8, 152u8, 128u8,
-							198u8, 209u8, 200u8, 208u8, 61u8, 87u8, 89u8, 122u8, 12u8, 4u8, 169u8,
+							50u8, 69u8, 226u8, 14u8, 168u8, 56u8, 229u8, 128u8, 141u8, 250u8,
+							146u8, 13u8, 175u8, 187u8, 89u8, 48u8, 97u8, 174u8, 111u8, 158u8,
+							222u8, 217u8, 167u8, 229u8, 24u8, 131u8, 68u8, 147u8, 113u8, 103u8,
+							225u8, 186u8,
 						],
 					)
 				}
@@ -22413,9 +22439,10 @@ pub mod api {
 							weight,
 						},
 						[
-							168u8, 63u8, 156u8, 14u8, 139u8, 9u8, 141u8, 184u8, 10u8, 120u8, 30u8,
-							179u8, 187u8, 100u8, 166u8, 218u8, 114u8, 157u8, 65u8, 189u8, 162u8,
-							208u8, 14u8, 201u8, 224u8, 28u8, 4u8, 53u8, 27u8, 23u8, 99u8, 84u8,
+							255u8, 77u8, 217u8, 153u8, 64u8, 179u8, 168u8, 123u8, 121u8, 254u8,
+							74u8, 195u8, 85u8, 3u8, 54u8, 239u8, 173u8, 169u8, 15u8, 86u8, 28u8,
+							153u8, 170u8, 160u8, 164u8, 78u8, 243u8, 213u8, 187u8, 122u8, 108u8,
+							209u8,
 						],
 					)
 				}
@@ -22455,9 +22482,10 @@ pub mod api {
 							fallback: ::subxt::ext::subxt_core::alloc::boxed::Box::new(fallback),
 						},
 						[
-							211u8, 167u8, 155u8, 92u8, 180u8, 187u8, 151u8, 188u8, 58u8, 96u8,
-							100u8, 101u8, 51u8, 6u8, 224u8, 173u8, 11u8, 86u8, 48u8, 134u8, 61u8,
-							86u8, 52u8, 58u8, 6u8, 155u8, 218u8, 184u8, 198u8, 24u8, 129u8, 177u8,
+							108u8, 146u8, 37u8, 107u8, 69u8, 64u8, 91u8, 179u8, 22u8, 198u8, 162u8,
+							191u8, 53u8, 144u8, 244u8, 184u8, 120u8, 117u8, 231u8, 190u8, 66u8,
+							208u8, 113u8, 244u8, 155u8, 116u8, 168u8, 254u8, 250u8, 234u8, 244u8,
+							205u8,
 						],
 					)
 				}
@@ -22480,10 +22508,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							167u8, 91u8, 78u8, 174u8, 44u8, 240u8, 167u8, 60u8, 252u8, 89u8, 161u8,
-							118u8, 151u8, 180u8, 233u8, 51u8, 183u8, 214u8, 80u8, 197u8, 8u8,
-							119u8, 247u8, 18u8, 242u8, 242u8, 184u8, 144u8, 146u8, 80u8, 2u8,
-							226u8,
+							126u8, 245u8, 111u8, 217u8, 233u8, 242u8, 223u8, 120u8, 212u8, 226u8,
+							164u8, 74u8, 252u8, 107u8, 213u8, 19u8, 215u8, 104u8, 52u8, 2u8, 53u8,
+							29u8, 213u8, 253u8, 135u8, 76u8, 184u8, 79u8, 177u8, 81u8, 225u8,
+							152u8,
 						],
 					)
 				}
@@ -22819,9 +22847,10 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							27u8, 174u8, 148u8, 163u8, 118u8, 155u8, 103u8, 40u8, 56u8, 189u8,
-							102u8, 89u8, 241u8, 214u8, 87u8, 97u8, 55u8, 20u8, 93u8, 2u8, 192u8,
-							84u8, 150u8, 227u8, 190u8, 222u8, 162u8, 161u8, 3u8, 109u8, 36u8, 24u8,
+							186u8, 89u8, 207u8, 55u8, 177u8, 43u8, 210u8, 136u8, 16u8, 223u8, 89u8,
+							254u8, 203u8, 243u8, 229u8, 171u8, 8u8, 193u8, 133u8, 185u8, 100u8,
+							144u8, 108u8, 15u8, 164u8, 12u8, 112u8, 236u8, 60u8, 168u8, 181u8,
+							159u8,
 						],
 					)
 				}
@@ -22844,9 +22873,10 @@ pub mod api {
 							weight,
 						},
 						[
-							178u8, 142u8, 38u8, 150u8, 5u8, 26u8, 53u8, 79u8, 110u8, 36u8, 56u8,
-							101u8, 136u8, 251u8, 237u8, 155u8, 80u8, 199u8, 137u8, 194u8, 9u8, 2u8,
-							110u8, 16u8, 202u8, 19u8, 11u8, 76u8, 5u8, 127u8, 154u8, 33u8,
+							95u8, 116u8, 243u8, 104u8, 57u8, 143u8, 49u8, 164u8, 29u8, 204u8,
+							130u8, 119u8, 50u8, 47u8, 169u8, 153u8, 35u8, 152u8, 41u8, 77u8, 25u8,
+							92u8, 100u8, 66u8, 50u8, 197u8, 189u8, 125u8, 237u8, 160u8, 241u8,
+							95u8,
 						],
 					)
 				}
@@ -22884,9 +22914,9 @@ pub mod api {
 							call: ::subxt::ext::subxt_core::alloc::boxed::Box::new(call),
 						},
 						[
-							233u8, 125u8, 134u8, 245u8, 255u8, 202u8, 130u8, 16u8, 128u8, 69u8,
-							52u8, 96u8, 63u8, 110u8, 34u8, 160u8, 180u8, 27u8, 98u8, 204u8, 123u8,
-							185u8, 50u8, 34u8, 148u8, 154u8, 20u8, 134u8, 128u8, 19u8, 77u8, 55u8,
+							23u8, 46u8, 235u8, 15u8, 8u8, 245u8, 16u8, 235u8, 63u8, 59u8, 18u8,
+							71u8, 39u8, 194u8, 225u8, 59u8, 68u8, 225u8, 101u8, 245u8, 59u8, 5u8,
+							228u8, 2u8, 82u8, 167u8, 65u8, 222u8, 139u8, 43u8, 14u8, 240u8,
 						],
 					)
 				}
@@ -38969,7 +38999,7 @@ pub mod api {
 					#[codec(index = 7)]
 					InvalidExecutionHeaderProof,
 					#[codec(index = 8)]
-					#[doc = "The gap between finalized headers is larger than the retained historical window."]
+					#[doc = "Reserved error index; finalized updates are now bounded by authenticated committees."]
 					InvalidFinalizedHeaderGap,
 					#[codec(index = 9)]
 					InvalidBackfillHeaderRoot,
@@ -39709,6 +39739,7 @@ pub mod api {
 					#[doc = "Submit a funded public bid, optionally committing to a hidden maximum."]
 					#[doc = "Every bid competes at its public amount even if no maximum is revealed."]
 					#[doc = "An omitted target frame selects the current auction at dispatch time."]
+					#[doc = "Standing winners can commit a new maximum without clearing the new-bid entry threshold."]
 					bid {
 						bid: ::core::primitive::u128,
 						keys: runtime_types::argon_runtime::SessionKeys,
@@ -39717,11 +39748,13 @@ pub mod api {
 						max_hash: ::core::option::Option<[::core::primitive::u8; 32usize]>,
 					},
 					#[codec(index = 3)]
-					#[doc = "Disclose a committed maximum during the five blocks following submission."]
-					#[doc = "The target frame must match the original bid and the current auction."]
+					#[doc = "With a salt, disclose a committed maximum in the five blocks following submission."]
+					#[doc = "Without a salt, immediately update a settled winner's maximum while bidding is open."]
+					#[doc = "Updates cannot overlap pending bids or reduce the maximum below the current paid bid."]
+					#[doc = "Both modes must explicitly target the current auction frame."]
 					bid_max {
 						max: ::core::primitive::u128,
-						salt: [::core::primitive::u8; 32usize],
+						salt: ::core::option::Option<[::core::primitive::u8; 32usize]>,
 						mining_account_id: ::core::option::Option<crate::types::AccountId32>,
 						target_frame_id: ::core::primitive::u64,
 					},
@@ -39769,7 +39802,7 @@ pub mod api {
 					#[doc = "The funding account does not have enough funds to cover the bid"]
 					InsufficientFunds,
 					#[codec(index = 7)]
-					#[doc = "The mining bid cannot be reduced"]
+					#[doc = "Paid bids cannot decrease; public-only replacements must exceed the standing maximum."]
 					BidCannotBeReduced,
 					#[codec(index = 8)]
 					#[doc = "Bids must be in allowed increments"]
@@ -39810,6 +39843,9 @@ pub mod api {
 					#[codec(index = 20)]
 					#[doc = "The bid batch cannot settle until its reveal window has ended."]
 					BatchNotMature,
+					#[codec(index = 21)]
+					#[doc = "The miner has no settled bid with a standing maximum in the upcoming auction."]
+					MissingStandingBid,
 				}
 				#[derive(
 					:: subxt :: ext :: subxt_core :: ext :: scale_decode :: DecodeAsType,
@@ -39882,6 +39918,12 @@ pub mod api {
 					ReleaseBidError {
 						account_id: crate::types::AccountId32,
 						error: runtime_types::sp_runtime::DispatchError,
+					},
+					#[codec(index = 12)]
+					BidMaxUpdated {
+						account_id: crate::types::AccountId32,
+						target_frame_id: ::core::primitive::u64,
+						max: ::core::primitive::u128,
 					},
 				}
 				#[derive(

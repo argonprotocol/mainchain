@@ -135,6 +135,16 @@ it.each(Object.entries(Genesis))('uses %s cached metadata', async (_network, gen
     expect(client.tx.sudo.sudo(registration).method.args[0].toHex()).toBe(registrationCallHex);
 
     const keys = new Uint8Array(64);
+
+    // Sync-committee storage uses the runtime's wasm32 limb representation.
+    const limbs = Array.from({ length: 14 }, (_, index) => index + 1);
+    const encodedLimbs = new Uint8Array(56);
+    const limbView = new DataView(encodedLimbs.buffer);
+    limbs.forEach((limb, index) => limbView.setInt32(index * 4, limb, true));
+    expect(client.createType('SnowbridgeAmclBls381Big', { w: limbs }).toU8a()).toEqual(
+      encodedLimbs,
+    );
+
     const bid = client.tx.miningSlot.bid;
     const explicit = bid(10_000n, keys, null, null, null);
     expect(explicit.method.args[3].toJSON()).toBeNull();
@@ -151,6 +161,15 @@ it.each(Object.entries(Genesis))('uses %s cached metadata', async (_network, gen
     expect(commitment.method.args[4].toHex()).toBe(hash);
     const bidMax = client.tx.miningSlot.bidMax;
     const reveal = bidMax(20_000n, hash, null, 2n);
+    expect(reveal.method.args[1].toU8a()).toEqual(
+      new Uint8Array([1, ...new Uint8Array(32).fill(0x11)]),
+    );
+    const update = bidMax(30_000n, null, null, 2n);
+    expect(update.method.args[1].toJSON()).toBeNull();
+    expect(update.method.args[1].toU8a()).toEqual(new Uint8Array([0]));
+    const decodedUpdate = client.registry.createType('Call', update.method.toHex());
+    expect(decodedUpdate.args[1].toJSON()).toBeNull();
+    expect(decodedUpdate.args[3].toJSON()).toBe(2);
     expect(reveal.method.args[3].toU8a()).toEqual(new Uint8Array([2, 0, 0, 0, 0, 0, 0, 0]));
     expect(bidMax.meta.fields[3].name.unwrap().toString()).toBe('target_frame_id');
     expect(client.tx.utility.batchAll([reveal]).method.args[0].toJSON()).toEqual([

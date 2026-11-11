@@ -902,6 +902,7 @@ declare module '@polkadot/api-base/types/submittable' {
        * Submit a funded public bid, optionally committing to a hidden maximum.
        * Every bid competes at its public amount even if no maximum is revealed.
        * An omitted target frame selects the current auction at dispatch time.
+       * Standing winners can commit a new maximum without clearing the new-bid entry threshold.
        **/
       bid: AugmentedSubmittable<
         (
@@ -918,17 +919,19 @@ declare module '@polkadot/api-base/types/submittable' {
         [u128, ArgonRuntimeSessionKeys, Option<AccountId32>, Option<u64>, Option<U8aFixed>]
       >;
       /**
-       * Disclose a committed maximum during the five blocks following submission.
-       * The target frame must match the original bid and the current auction.
+       * With a salt, disclose a committed maximum in the five blocks following submission.
+       * Without a salt, immediately update a settled winner's maximum while bidding is open.
+       * Updates cannot overlap pending bids or reduce the maximum below the current paid bid.
+       * Both modes must explicitly target the current auction frame.
        **/
       bidMax: AugmentedSubmittable<
         (
           max: u128 | AnyNumber | Uint8Array,
-          salt: U8aFixed | string | Uint8Array,
+          salt: Option<U8aFixed> | null | Uint8Array | U8aFixed | string,
           miningAccountId: Option<AccountId32> | null | Uint8Array | AccountId32 | string,
           targetFrameId: u64 | AnyNumber | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
-        [u128, U8aFixed, Option<AccountId32>, u64]
+        [u128, Option<U8aFixed>, Option<AccountId32>, u64]
       >;
       /**
        * Admin function to update the mining slot delay.

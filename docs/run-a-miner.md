@@ -264,6 +264,31 @@ full, the public `bid` must exceed the lowest funded maximum among current winne
 paid price is insufficient. Bids initially included in the same block share the same settlement
 cutoff. Earlier submission blocks settle first and can raise the cutoff for later batches.
 
+To adjust a settled winner's maximum up or down, submit a single
+`miningSlot.bidMax(newMax, null, miningAccountId, targetFrameId)` transaction from its existing
+funding account. The `null` salt explicitly selects an immediate update; it does not require a new
+`bid` commitment. The new maximum must be at least the actual paid bid when the transaction
+executes, including any earlier automatic price increases, and use the same 10,000-microgon
+increments. Setting the maximum equal to the paid bid stops further automatic increases immediately.
+
+Updates preserve the paid bid, keys, collateral, and original commitment priority. Raising the
+maximum requires enough available funds to cover the additional amount above the paid bid; lowering
+it remains possible if the wallet has spent its unused headroom. No funds move during an update. The
+new ceiling is used by subsequent auction admission and settlement, including batches already
+pending for other miners. Immediate increases can therefore respond to disclosed competing maxima.
+Updating a fixed-price winner enables automatic bidding at the new ceiling.
+
+Immediate updates are rejected while that miner has any pending bid or after auction admission
+closes. A supplied salt always selects the original commit/reveal behavior and must match a pending
+commitment; an old reveal cannot update a settled maximum. Initial automatic bids still require
+`bid` followed by `bidMax` with the salt. A fresh committed `bid` also remains available for
+replacements that change the public amount or keys; those replacements settle after the usual
+disclosure window and retain the public-bid fallback.
+
+Successful immediate changes emit `BidMaxUpdated` without incrementing bid-activity or
+accepted-price statistics. Later automatic price increases are counted normally. Lowering a maximum
+does not refund paid funds; it frees unused headroom for other bids from the same funding account.
+
 The funding account must cover the entire maximum when disclosing it; an existing paid bid counts
 toward replacement funding. The maximum is checked again at settlement. Only the winning price is
 collected, and the full maximum is not held. Automatic bids pay the smallest winning price allowed
@@ -275,6 +300,10 @@ including when random bidding closure occurs.
 The upgrade finishes the auction already in progress under its existing rules and enables the new
 rules for the following auction. Clients must use the updated call arguments after the upgrade;
 transactions encoded with the old `bid` arguments are incompatible.
+
+The immediate-update API makes `bidMax`'s salt optional and changes its SCALE transaction encoding.
+Use refreshed runtime metadata/bindings and rebuild previously encoded transactions after this
+upgrade. The runtime specification and transaction versions remain 161 and 6.
 
 `historicalBidsPerSlot.bidsCount` counts each committed bid submission, including replacements and
 submissions that later lose or become unfunded at settlement. Each automatic increase of an existing
