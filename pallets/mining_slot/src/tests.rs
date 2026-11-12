@@ -4011,6 +4011,140 @@ fn live_losing_openings_disclose_and_reprice_in_the_reveal_block() {
 }
 
 #[test]
+fn live_skewed_cohort_releases_losing_collateral_on_disclosure_and_expiry() {
+	for (expire_first_batch, unfunded_openings) in
+		[(false, false), (true, false), (false, true), (true, true)]
+	{
+		new_test_ext().execute_with(|| {
+			let start = skewed_live_auction_setup();
+			for offset in 0..5 {
+				auction_block(start + offset, || {
+					for position in 0..32 {
+						let index = offset * 32 + position;
+						commit_range(
+							145 + index,
+							(3 + offset) as u128 * CENT,
+							(100 + index % 32) as u128 * CENT,
+						);
+						if unfunded_openings {
+							let miner = 145 + index;
+							let available = Balances::free_balance(miner) - 1;
+							assert_ok!(Balances::transfer(
+								&miner,
+								&337,
+								available,
+								Preservation::Protect
+							));
+						}
+					}
+				});
+				assert_eq!(
+					crate::EligibleBids::<Test>::iter().count(),
+					((offset + 1) * 32) as usize,
+				);
+				assert_eq!(BidsForNextSlotCohort::<Test>::get().len(), 144);
+			}
+			let public_winner = 145 + 4 * 32;
+			if unfunded_openings {
+				assert_eq!(paid(public_winner), None);
+				assert_eq!(paid(144), Some(CENT));
+			} else {
+				assert_eq!(paid(public_winner), Some(7 * CENT));
+			}
+			for miner in 145..=304 {
+				assert_eq!(
+					Ownership::balance_on_hold(&HoldReason::RegisterAsMiner.into(), &miner),
+					100
+				);
+			}
+
+			auction_block(start + 5, || {
+				if unfunded_openings {
+					for miner in 145..=304 {
+						assert_ok!(Balances::transfer(
+							&337,
+							&miner,
+							10_000 * A - 1,
+							Preservation::Protect
+						));
+					}
+				}
+				let first = if expire_first_batch { 32 } else { 0 };
+				for index in first..160 {
+					reveal_range(145 + index, 0, (100 + index % 32) as u128 * CENT);
+				}
+				let expected_disclosures = if expire_first_batch { 128 } else { 160 };
+				assert_eq!(crate::RevealedBids::<Test>::get().len(), expected_disclosures);
+				for miner in 305..=336 {
+					assert_ok!(MiningSlots::bid(
+						RuntimeOrigin::signed(miner),
+						300 * CENT,
+						miner.into(),
+						None,
+						Some(NextFrameId::<Test>::get()),
+						None,
+					));
+				}
+			});
+
+			for miner in 1..=143 {
+				assert_eq!(paid(miner), Some(1_000 * CENT));
+				assert_eq!(
+					Ownership::balance_on_hold(&HoldReason::RegisterAsMiner.into(), &miner),
+					100
+				);
+			}
+			assert_eq!(paid(144), None);
+			assert_eq!(Balances::free_balance(144), 10_000 * A);
+			assert_eq!(Ownership::balance_on_hold(&HoldReason::RegisterAsMiner.into(), &144), 0);
+			assert_eq!(Balances::free_balance(337), 10_000 * A);
+			for miner in 145..=304 {
+				assert_eq!(paid(miner), None);
+				assert!(!crate::PendingBids::<Test>::contains_key(miner));
+				assert!(!crate::EligibleBids::<Test>::contains_key(miner));
+				assert_eq!(
+					Ownership::balance_on_hold(&HoldReason::RegisterAsMiner.into(), &miner),
+					0
+				);
+				assert_eq!(Balances::free_balance(miner), 10_000 * A);
+			}
+			assert!(crate::RevealedBids::<Test>::get().is_empty());
+			assert_eq!(paid(305), Some(300 * CENT));
+			assert_eq!(Balances::free_balance(305), 10_000 * A - 300 * CENT);
+			let pool = Balances::free_balance(BidPoolAccountId::get());
+			assert_eq!(pool, (143 * 1_000 + 300) * CENT);
+			for miner in 305..=336 {
+				assert!(!crate::PendingBids::<Test>::contains_key(miner));
+				assert!(!crate::EligibleBids::<Test>::contains_key(miner));
+				let expected_hold = if miner == 305 { 100 } else { 0 };
+				assert_eq!(
+					Ownership::balance_on_hold(&HoldReason::RegisterAsMiner.into(), &miner),
+					expected_hold
+				);
+				if miner != 305 {
+					assert_eq!(Balances::free_balance(miner), 10_000 * A);
+				}
+			}
+
+			advance_auction_to(start + 10);
+			for miner in 305..=336 {
+				assert!(!crate::PendingBids::<Test>::contains_key(miner));
+				assert!(!crate::EligibleBids::<Test>::contains_key(miner));
+				let expected_hold = if miner == 305 { 100 } else { 0 };
+				assert_eq!(
+					Ownership::balance_on_hold(&HoldReason::RegisterAsMiner.into(), &miner),
+					expected_hold
+				);
+			}
+			MiningSlots::on_finalize(start + 10);
+			assert_eq!(Balances::free_balance(BidPoolAccountId::get()), pool);
+			assert_eq!(Balances::free_balance(305), 10_000 * A - 300 * CENT);
+			assert_eq!(paid(305), Some(300 * CENT));
+		});
+	}
+}
+
+#[test]
 fn live_disclosures_share_priority_and_establish_one_cutoff_for_new_openings() {
 	for reverse in [false, true] {
 		new_test_ext().execute_with(|| {

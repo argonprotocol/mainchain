@@ -379,3 +379,33 @@ pub fn live_auction_setup(seats: u32) {
 	MaxCohortSize::set(seats.max(5));
 	NextCohortSize::<Test>::put(seats);
 }
+
+pub fn skewed_live_auction_setup() -> u64 {
+	live_auction_setup(144);
+	for account in 1..=337 {
+		set_argons(account, 10_000 * argon_primitives::MICROGONS_PER_ARGON);
+		set_ownership(account, 1_000);
+	}
+	for first in (1..=144).step_by(32) {
+		let block = (first - 1) / 32 + 1;
+		auction_block(block, || {
+			for account in first..(first + 32).min(145) {
+				let bid = if account == 144 {
+					BidIncrements::get()
+				} else {
+					1_000 * BidIncrements::get()
+				};
+				MiningSlots::bid(
+					RuntimeOrigin::signed(account),
+					bid,
+					account.into(),
+					None,
+					Some(NextFrameId::<Test>::get()),
+					None,
+				)
+				.expect("funded fixed-price incumbent");
+			}
+		});
+	}
+	System::block_number() + 1
+}
