@@ -1,4 +1,8 @@
 use crate as pallet_mining_slot;
+use crate::{
+	ArgonotsPerMiningSeat, FrameRewardTicksRemaining, IsNextSlotBiddingOpen, MiningConfig,
+	NextCohortSize, NextFrameId,
+};
 use argon_primitives::{
 	block_seal::MiningSlotConfig, providers::OnNewSlot, tick::Ticker, ArgonCPI, BlockNumber,
 	BlockSealerInfo, BlockSealerProvider, OperationalAccountProvider, OperationalAccountsHook,
@@ -318,8 +322,90 @@ pub fn new_test_ext() -> TestState {
 		pallet_mining_slot::GenesisConfig::<Test> { mining_config, _phantom: Default::default() }
 			.assimilate_storage(t)
 			.unwrap();
-		// Existing economics fixtures exercise the deployed fixed-price auction.
+		t.top
+			.insert(crate::LiveAuctionStartAt::<Test>::hashed_key().to_vec(), u64::MAX.encode());
+		// Existing fixtures cover the two auction versions supported across upgrade.
 		t.top
 			.insert(crate::AuctionRulesStartAt::<Test>::hashed_key().to_vec(), u64::MAX.encode());
 	})
+}
+
+pub fn auction_setup(seats: u32) {
+	System::set_block_number(1);
+	crate::AuctionRulesStartAt::<Test>::put(0);
+	NextFrameId::<Test>::put(2);
+	MaxCohortSize::set(seats.max(5));
+	NextCohortSize::<Test>::put(seats);
+	IsNextSlotBiddingOpen::<Test>::put(true);
+	FrameRewardTicksRemaining::<Test>::put(100);
+	for account in 1..=40 {
+		set_argons(account, 10_000 * argon_primitives::MICROGONS_PER_ARGON);
+		set_ownership(account, 1000);
+	}
+}
+pub fn auction_lifecycle_setup() {
+	auction_setup(1);
+	FramesPerMiningTerm::set(2);
+	MinCohortSize::set(1);
+	MiningConfig::<Test>::mutate(|config| {
+		config.ticks_between_slots = 40;
+		config.ticks_before_bid_end_for_vrf_close = 0;
+	});
+	FrameRewardTicksRemaining::<Test>::put(40);
+	ArgonotsPerMiningSeat::<Test>::put(100);
+	IsBlockVoteSeal::set(true);
+	System::set_block_number(0);
+}
+
+pub fn auction_block(block: u64, dispatch: impl FnOnce()) {
+	PreviousTick::set(block - 1);
+	CurrentTick::set(block);
+	ElapsedTicks::set(block);
+	System::initialize(&block, &System::parent_hash(), &Digest::default());
+	MiningSlots::on_initialize(block);
+	dispatch();
+	MiningSlots::on_finalize(block);
+}
+
+pub fn advance_auction_to(block: u64) {
+	for next in System::block_number() + 1..=block {
+		auction_block(next, || {});
+	}
+}
+
+pub fn live_auction_setup(seats: u32) {
+	auction_lifecycle_setup();
+	crate::LiveAuctionStartAt::<Test>::put(0);
+	MaxCohortSize::set(seats.max(5));
+	NextCohortSize::<Test>::put(seats);
+}
+
+pub fn skewed_live_auction_setup() -> u64 {
+	live_auction_setup(144);
+	for account in 1..=337 {
+		set_argons(account, 10_000 * argon_primitives::MICROGONS_PER_ARGON);
+		set_ownership(account, 1_000);
+	}
+	for first in (1..=144).step_by(32) {
+		let block = (first - 1) / 32 + 1;
+		auction_block(block, || {
+			for account in first..(first + 32).min(145) {
+				let bid = if account == 144 {
+					BidIncrements::get()
+				} else {
+					1_000 * BidIncrements::get()
+				};
+				MiningSlots::bid(
+					RuntimeOrigin::signed(account),
+					bid,
+					account.into(),
+					None,
+					Some(NextFrameId::<Test>::get()),
+					None,
+				)
+				.expect("funded fixed-price incumbent");
+			}
+		});
+	}
+	System::block_number() + 1
 }

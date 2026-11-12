@@ -1036,6 +1036,7 @@ declare module '@polkadot/api-base/types/submittable' {
       /**
        * Submit a funded public bid, optionally committing to a hidden maximum.
        * Every bid competes at its public amount even if no maximum is revealed.
+       * Live auctions clear openings at the end of their inclusion block.
        * An omitted target frame selects the current auction at dispatch time.
        * Standing winners can commit a new maximum without clearing the new-bid entry threshold.
        **/
@@ -1055,6 +1056,7 @@ declare module '@polkadot/api-base/types/submittable' {
       >;
       /**
        * With a salt, disclose a committed maximum in the five blocks following submission.
+       * Live auctions clear disclosures together at the end of their inclusion block.
        * Without a salt, immediately update a settled winner's maximum while bidding is open.
        * Updates cannot overlap pending bids or reduce the maximum below the current paid bid.
        * Both modes must explicitly target the current auction frame.

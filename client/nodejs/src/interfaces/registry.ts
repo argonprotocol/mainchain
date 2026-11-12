@@ -238,6 +238,7 @@ import type {
   PalletLocalchainTransferError,
   PalletLocalchainTransferEvent,
   PalletLocalchainTransferQueuedTransferOut,
+  PalletMiningSlotBidEligibility,
   PalletMiningSlotCall,
   PalletMiningSlotError,
   PalletMiningSlotEvent,
@@ -614,6 +615,7 @@ declare module '@polkadot/types/types/registry' {
     PalletLocalchainTransferError: PalletLocalchainTransferError;
     PalletLocalchainTransferEvent: PalletLocalchainTransferEvent;
     PalletLocalchainTransferQueuedTransferOut: PalletLocalchainTransferQueuedTransferOut;
+    PalletMiningSlotBidEligibility: PalletMiningSlotBidEligibility;
     PalletMiningSlotCall: PalletMiningSlotCall;
     PalletMiningSlotError: PalletMiningSlotError;
     PalletMiningSlotEvent: PalletMiningSlotEvent;

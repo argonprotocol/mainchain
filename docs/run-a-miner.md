@@ -237,12 +237,12 @@ You can bid for a slot by using the Polkadot.js interface
 If you toggle to "Submission", you can submit your bid.
 ![Polkadot.js - Submit a bid](images/pjs-miningbid.png)
 
-Use `miningSlot.bid(bid, keys, miningAccountId, targetFrameId, maxHash)` to queue a bid. Read
-`miningSlot.nextFrameId` for the target frame. A `null` target frame selects the current auction
-when the transaction executes; an explicit frame rejects the bid if the auction has changed. Pass
-`null` for `maxHash` for a fixed-price bid. Clients returned by the Node.js SDK's `getClient()` also
-support `miningSlot.bid(bid, keys, miningAccountId)`, defaulting both trailing arguments to `null`.
-Plain Polkadot.js clients must supply all five arguments.
+Use `miningSlot.bid(bid, keys, miningAccountId, targetFrameId, maxHash)` to submit a public opening
+bid. Read `miningSlot.nextFrameId` for the target frame. A `null` target frame selects the current
+auction when the transaction executes; an explicit frame rejects the bid if the auction has changed.
+Pass `null` for `maxHash` for a fixed-price bid. Clients returned by the Node.js SDK's `getClient()`
+also support `miningSlot.bid(bid, keys, miningAccountId)`, defaulting both trailing arguments to
+`null`. Plain Polkadot.js clients must supply all five arguments.
 
 For automatic bidding, the Node.js client's `createMiningBidCommitment` helper accepts `bid`, `max`,
 the target frame, accounts and keys, and returns `maxHash` and a random salt. Keep the maximum and
@@ -253,16 +253,24 @@ public `bid` is visible immediately.
 If the initial bid is included in block B, disclose its maximum with
 `miningSlot.bidMax(max, salt, miningAccountId, targetFrameId)` in any block from **B+1 through
 B+5**, inclusive. Pass the same explicit frame used to create the original bid's hash; a different
-frame rejects the reveal with `WrongBidFrame`. The hash must match the original submission. All bids
-initially included in B settle together at the end of B+5, whether or not their maxima were
-disclosed. Without a valid, funded maximum, the public bid still competes at its base amount if it
-remains funded and eligible. Transaction success means the bid was queued; `SlotBidderAdded`
-confirms acceptance after settlement.
+frame rejects the reveal with `WrongBidFrame`. The hash must match the original submission. Public
+openings compete together at the end of their inclusion block B. A valid maximum disclosed in B+2
+competes at the end of B+2; B+5 is the disclosure deadline. No maximum disclosure is needed for a
+fixed-price bid. A missing, invalid, or unfunded maximum leaves an accepted opening valid.
+Transaction success means the bid or disclosure was queued. Canonical winners and paid prices are
+published in `bidsForNextSlotCohort` after that block; bidder and price-change events describe the
+result.
 
-Amounts are in microgons and must be multiples of 10,000 (0.01 ARGON). When the winning list is
-full, the public `bid` must exceed the lowest funded maximum among current winners; matching its
-paid price is insufficient. Bids initially included in the same block share the same settlement
-cutoff. Earlier submission blocks settle first and can raise the cutoff for later batches.
+Amounts are in microgons and must be multiples of 10,000 (0.01 ARGON). Each block clears its maximum
+disclosures before its new public openings. All openings in that block share one entry cutoff after
+those maximum changes: when seats are full, the public `bid` must exceed the lowest funded maximum
+among the winners. A queued opening can therefore be rejected even if it preceded the disclosures in
+extrinsic order. Matching the lowest paid price is insufficient.
+
+Opening eligibility is retained through the disclosure deadline even if the opening loses its seat.
+An eligible losing bidder can still disclose a maximum that wins or raises winning prices. Original
+submission block and batch position determine tie priority; disclosure order within a block does
+not. Disclosures in different blocks can affect intervening prices and admission.
 
 To adjust a settled winner's maximum up or down, submit a single
 `miningSlot.bidMax(newMax, null, miningAccountId, targetFrameId)` transaction from its existing
@@ -282,35 +290,44 @@ Immediate updates are rejected while that miner has any pending bid or after auc
 closes. A supplied salt always selects the original commit/reveal behavior and must match a pending
 commitment; an old reveal cannot update a settled maximum. Initial automatic bids still require
 `bid` followed by `bidMax` with the salt. A fresh committed `bid` also remains available for
-replacements that change the public amount or keys; those replacements settle after the usual
-disclosure window and retain the public-bid fallback.
+replacements that change the public amount or keys. An accepted public replacement changes the live
+offer in its submission block, replacing the previous ceiling with its public amount until the new
+maximum is disclosed. A public replacement below the incumbent's paid price cannot reduce that price
+or replace its current offer; a valid maximum adjustment can still apply when disclosed. An
+incumbent-only adjustment admitted below the entry cutoff cannot reenter after eviction.
 
 Successful immediate changes emit `BidMaxUpdated` without incrementing bid-activity or
 accepted-price statistics. Later automatic price increases are counted normally. Lowering a maximum
 does not refund paid funds; it frees unused headroom for other bids from the same funding account.
 
 The funding account must cover the entire maximum when disclosing it; an existing paid bid counts
-toward replacement funding. The maximum is checked again at settlement. Only the winning price is
-collected, and the full maximum is not held. Automatic bids pay the smallest winning price allowed
-by their public bid and maximum. Accepted prices cannot decrease. Fixed-price bids win maximum ties,
-followed by original submission order. Losing bids release their extra collateral. New submissions
-close before activation, but already queued bids retain their full five-block disclosure window,
-including when random bidding closure occurs.
+toward replacement funding. The maximum is checked again during that block's clearing. Only the
+winning price is collected, and the full maximum is not held. Automatic bids pay the smallest
+winning price allowed by their public bid and maximum. Accepted prices cannot decrease. Fixed-price
+bids win maximum ties, followed by original submission order. Losing commitments retain collateral
+while a maximum can still be disclosed. Once a disclosure is processed or the deadline expires,
+unused collateral is released. Fixed-price submissions resolve in their inclusion block. Resolved
+commitments allow subsequent submissions and saltless maximum updates without waiting for the
+original deadline. Expiry never replays an applied maximum or removes a winning opening. New
+submissions close before activation, but already queued bids retain their full five-block disclosure
+window, including when random bidding closure occurs.
 
-The upgrade finishes the auction already in progress under its existing rules and enables the new
-rules for the following auction. Clients must use the updated call arguments after the upgrade;
-transactions encoded with the old `bid` arguments are incompatible.
-
-The immediate-update API makes `bidMax`'s salt optional and changes its SCALE transaction encoding.
-Use refreshed runtime metadata/bindings and rebuild previously encoded transactions after this
-upgrade. The runtime specification and transaction versions remain 161 and 6.
+The upgrade finishes the auction already in progress under its existing rules, including pending
+commitments that settle at B+5, and enables immediate opening and disclosure clearing for the
+following auction. Fresh chains enable immediate clearing from genesis. The runtime specification
+version is 161; the transaction version remains 6. Immediate clearing preserves the existing call
+encoding and pending-bid storage encoding. Use refreshed runtime metadata/bindings for the added
+storage queries. Clients predating the unified `bid` arguments and optional `bidMax` salt must
+update their calls and rebuild transactions encoded with those earlier interfaces.
 
 `historicalBidsPerSlot.bidsCount` counts each committed bid submission, including replacements and
-submissions that later lose or become unfunded at settlement. Each automatic increase of an existing
-standing winner's paid price adds one count. Reveals, unchanged prices, immediate failures, and bids
-rolled back by an enclosing batch add no count. A submission's initial settlement price is part of
-that submission and is not counted twice. The minimum, maximum, and sum describe accepted bid
-prices, including automatic increases; losing submissions do not contribute a price.
+submissions that later lose or become unfunded during clearing. Each automatic increase of an
+existing standing winner's paid price adds one count. Reveals, unchanged prices, immediate failures,
+and bids rolled back by an enclosing batch add no count. A submission's initial opening price is
+part of that submission and is not counted twice. A disclosure that raises a standing winner's paid
+price counts that actual automatic increase once. Deadline cleanup adds no price observations. The
+minimum, maximum, and sum describe accepted bid prices, including automatic increases; losing
+submissions do not contribute a price.
 
 ### 4. Start Mining and Watch for Rewards
 

@@ -26,6 +26,11 @@ pub trait WeightInfo {
 	fn bid_max_renewal() -> Weight;
 	fn bid_max_update() -> Weight;
 	fn settle_bids(b: u32, m: u32) -> Weight;
+	fn live_auction(m: u32) -> Weight;
+	fn live_auction_with_expiry(m: u32) -> Weight;
+	fn live_auction_with_collateral_cleanup(m: u32) -> Weight;
+	fn live_auction_with_collateral_expiry(m: u32) -> Weight;
+	fn live_auction_with_unfunded_openings() -> Weight;
 	fn settle_bids_with_replacements(b: u32, m: u32) -> Weight;
 	fn settle_bids_with_max_adjustments(b: u32, m: u32) -> Weight;
 	fn configure_mining_slot_delay() -> Weight;
@@ -128,6 +133,25 @@ where
 		Base::settle_bids(b, m)
 			.max(Base::settle_bids_with_replacements(b, m))
 			.max(Base::settle_bids_with_max_adjustments(b, m))
+	}
+	fn live_auction(m: u32) -> Weight {
+		Base::live_auction(m)
+			.max(Base::live_auction_with_expiry(m))
+			.max(Base::live_auction_with_collateral_cleanup(m))
+			.max(Base::live_auction_with_collateral_expiry(m))
+			.max(Base::live_auction_with_unfunded_openings())
+	}
+	fn live_auction_with_expiry(m: u32) -> Weight {
+		Base::live_auction_with_expiry(m)
+	}
+	fn live_auction_with_collateral_cleanup(m: u32) -> Weight {
+		Base::live_auction_with_collateral_cleanup(m)
+	}
+	fn live_auction_with_collateral_expiry(m: u32) -> Weight {
+		Base::live_auction_with_collateral_expiry(m)
+	}
+	fn live_auction_with_unfunded_openings() -> Weight {
+		Base::live_auction_with_unfunded_openings()
 	}
 
 	fn settle_bids_with_replacements(b: u32, m: u32) -> Weight {
@@ -245,6 +269,21 @@ impl<T: crate::Config> BlockRewardAccountsProviderWeightInfo for ProviderWeightA
 
 // For backwards compatibility and tests.
 impl WeightInfo for () {
+	fn live_auction_with_unfunded_openings() -> Weight {
+		Weight::zero()
+	}
+	fn live_auction_with_collateral_cleanup(_: u32) -> Weight {
+		Weight::zero()
+	}
+	fn live_auction_with_collateral_expiry(_: u32) -> Weight {
+		Weight::zero()
+	}
+	fn live_auction(_: u32) -> Weight {
+		Weight::zero()
+	}
+	fn live_auction_with_expiry(_: u32) -> Weight {
+		Weight::zero()
+	}
 	fn provider_get_current_frame_id() -> Weight {
 		Weight::zero()
 	}

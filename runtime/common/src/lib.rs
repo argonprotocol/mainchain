@@ -219,5 +219,38 @@ macro_rules! inject_runtime_vars {
 			AllPalletsWithSystem,
 			Migrations,
 		>;
+		#[cfg(test)]
+		#[test]
+		fn mining_batch_and_activation_fit_initialization_budget() {
+			use frame_support::traits::Get;
+			use pallet_mining_slot::WeightInfo as _;
+			type MiningWeights = <Runtime as pallet_mining_slot::Config>::WeightInfo;
+			let bids = <<Runtime as pallet_mining_slot::Config>::MaxBidsPerBlock as Get<u32>>::get();
+			let seats = <Runtime as pallet_mining_slot::Config>::MaxCohortSize::get();
+			let live = MiningWeights::live_auction(seats);
+			assert!(live.ref_time() > 0, "live auction must have measured weights");
+			let settlement = MiningWeights::settle_bids(bids, seats).max(live);
+			assert!(settlement.ref_time() > 0, "settlement must have measured weights");
+			let nonactivating =
+				settlement.saturating_add(MiningWeights::on_finalize_grandpa_rotation());
+			// Delayed settlement finishes before activation. Live finalization is reserved
+			// conservatively even on activation blocks, whose queues are normally empty.
+			assert!(MiningWeights::settle_bids(0, seats).is_zero());
+			let activation = MiningWeights::start_new_frame(seats)
+				.saturating_add(MiningWeights::on_finalize_frame_adjustments())
+				.saturating_add(
+					<<Runtime as pallet_mining_slot::Config>::OperationalAccountsHook as
+						argon_primitives::OperationalAccountsHook<AccountId, Balance>>::Weights::mining_seat_won()
+						.saturating_mul(seats.into()),
+				);
+			// Other pallets' frame callbacks reserve their own weights separately.
+			let mining = MiningWeights::auction_bookkeeping(1)
+				.saturating_add(MiningWeights::on_finalize_record_block_author())
+				.saturating_add(nonactivating.max(activation.saturating_add(live)));
+			assert!(
+				mining.all_lte($crate::config::AVERAGE_ON_INITIALIZE_RATIO * $crate::config::MAXIMUM_BLOCK_WEIGHT),
+				"maximum mining batch and activation exceed the initialization allowance: {mining:?}"
+			);
+		}
 	};
 }

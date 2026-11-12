@@ -1,5 +1,4 @@
 //! Benchmarking setup for pallet-mining-slot
-#![cfg(feature = "runtime-benchmarks")]
 
 use super::*;
 use argon_primitives::{
@@ -25,6 +24,8 @@ mod benchmarks {
 		use frame_support::traits::fungible::Mutate;
 		IsNextSlotBiddingOpen::<T>::put(true);
 		AuctionRulesStartAt::<T>::put(0);
+		// The delayed benchmarks qualify the auction retained during an upgrade.
+		LiveAuctionStartAt::<T>::put(FrameId::MAX);
 		NextFrameId::<T>::put(T::FramesPerMiningTerm::get() as FrameId + 1);
 		HistoricalBidsPerSlot::<T>::put(BoundedVec::truncate_from(vec![
 			MiningBidStats::default();
@@ -419,6 +420,19 @@ mod benchmarks {
 			Some(NextFrameId::<T>::get()),
 			Some(hash),
 		)?;
+		LiveAuctionStartAt::<T>::put(0);
+		NextCohortSize::<T>::put(T::MaxCohortSize::get());
+		Pallet::<T>::finalize_live_bids(1u32.into())?;
+		// Measure appending the final disclosure of the full five-block window.
+		RevealedBids::<T>::put(
+			BoundedVec::<T::AccountId, MaxBidReveals<T>>::try_from(
+				(0..MaxBidReveals::<T>::get().saturating_sub(1))
+					.map(|index| account("revealed", index, 0))
+					.collect::<Vec<_>>(),
+			)
+			.ok()
+			.unwrap(),
+		);
 		frame_system::Pallet::<T>::set_block_number(2u32.into());
 		let target_frame_id = NextFrameId::<T>::get();
 		#[extrinsic_call]
@@ -676,6 +690,279 @@ mod benchmarks {
 		Ok(())
 	}
 
+	#[derive(PartialEq)]
+	enum LiveAuctionCohort {
+		Uniform,
+		Skewed,
+		UnfundedOpenings,
+	}
+
+	fn live_auction_setup<T: Config>(
+		m: u32,
+		expire: bool,
+		cohort: LiveAuctionCohort,
+	) -> Result<BlockNumberFor<T>, BenchmarkError>
+	where
+		T::OwnershipCurrency:
+			frame_support::traits::fungible::Mutate<T::AccountId, Balance = T::Balance>,
+	{
+		let mut start = funded_cohort::<T>(m)?;
+		let increment = T::BidIncrements::get();
+		let per_block = T::MaxBidsPerBlock::get();
+		let windows = T::BidRevealBlocks::get();
+
+		if cohort != LiveAuctionCohort::Uniform {
+			// Keep all but one seat above every disclosure and current opening. The low
+			// seat admits five full batches while retaining a full cohort during cleanup.
+			let keys = BidsForNextSlotCohort::<T>::get()[0].authority_keys.clone();
+			LiveAuctionStartAt::<T>::put(0);
+			for first in (0..m.saturating_sub(1)).step_by(per_block as usize) {
+				frame_system::Pallet::<T>::set_block_number(start);
+				for index in first..(first + per_block).min(m - 1) {
+					Pallet::<T>::bid(
+						RawOrigin::Signed(account("incumbent", index, 0)).into(),
+						increment.saturating_mul(1_000u32.into()),
+						keys.clone(),
+						None,
+						Some(NextFrameId::<T>::get()),
+						None,
+					)?;
+				}
+				Pallet::<T>::finalize_live_bids(start)?;
+				start += One::one();
+			}
+		}
+
+		for offset in 0..windows {
+			let block = start + offset.into();
+			frame_system::Pallet::<T>::set_block_number(block);
+			for position in 0..per_block {
+				let index = offset * per_block + position;
+				let miner = account("live", index, 0);
+				let keys = prepare_bid::<T>(&miner);
+				LiveAuctionStartAt::<T>::put(0);
+				let opening = increment.saturating_mul((3 + offset).into());
+				let max = increment.saturating_mul((100 + index % 32).into());
+				let hash = Pallet::<T>::bid_commitment(
+					NextFrameId::<T>::get(),
+					&miner,
+					&miner,
+					opening,
+					max,
+					&keys,
+					[index as u8; 32],
+				);
+				Pallet::<T>::bid(
+					RawOrigin::Signed(miner.clone()).into(),
+					opening,
+					keys,
+					None,
+					Some(NextFrameId::<T>::get()),
+					Some(hash),
+				)?;
+				if cohort == LiveAuctionCohort::UnfundedOpenings {
+					// A later transfer can prevent an admitted opening from winning,
+					// while its commitment remains eligible for a funded disclosure.
+					let available = T::ArgonCurrency::reducible_balance(
+						&miner,
+						Preservation::Preserve,
+						Fortitude::Polite,
+					);
+					T::ArgonCurrency::transfer(
+						&miner,
+						&account("live-funding-sink", 0, 0),
+						available,
+						Preservation::Protect,
+					)?;
+				}
+			}
+			Pallet::<T>::finalize_live_bids(block)?;
+		}
+		// Make current incumbents renewals backed by a full active cohort. Eviction
+		// must decode that cohort and preserve its active collateral, not release the seat twice.
+		let mut active = MinersByCohort::<T>::get(1);
+		let next = BidsForNextSlotCohort::<T>::get();
+		for registration in active.iter().take(m as usize) {
+			AccountIndexLookup::<T>::remove(&registration.account_id);
+			if next.iter().any(|next| next.account_id == registration.account_id) {
+				continue;
+			}
+			Pallet::<T>::release_argonots_hold(&registration.account_id, registration.argonots)?;
+		}
+		for (position, registration) in next.into_iter().enumerate() {
+			let mut registration = registration;
+			registration.starting_frame_id = 1;
+			registration.argonots = 1u128.into();
+			AccountIndexLookup::<T>::insert(&registration.account_id, (1, position as u32));
+			active[position] = registration;
+		}
+		MinersByCohort::<T>::insert(1, active);
+
+		let block = start + windows.into();
+		frame_system::Pallet::<T>::set_block_number(block);
+		if cohort == LiveAuctionCohort::UnfundedOpenings {
+			for index in 0..per_block * windows {
+				T::ArgonCurrency::mint_into(
+					&account("live", index, 0),
+					1_000_000_000_000u128.into(),
+				)?;
+			}
+			assert!(BidsForNextSlotCohort::<T>::get()
+				.iter()
+				.all(|registration| { !PendingBids::<T>::contains_key(&registration.account_id) }));
+		}
+		let first = if expire { per_block } else { 0 };
+		for index in first..per_block * windows {
+			let miner = account("live", index, 0);
+			Pallet::<T>::bid_max(
+				RawOrigin::Signed(miner).into(),
+				increment.saturating_mul((100 + index % 32).into()),
+				Some([index as u8; 32]),
+				None,
+				NextFrameId::<T>::get(),
+			)?;
+		}
+		for position in 0..per_block {
+			let miner = account("live-opening", position, 0);
+			let keys = prepare_bid::<T>(&miner);
+			LiveAuctionStartAt::<T>::put(0);
+			// Fixed-price losers release collateral immediately. The uniform cases
+			// separately retain current commitments through their disclosure deadline.
+			let max_hash = if cohort == LiveAuctionCohort::Uniform { Some([0; 32]) } else { None };
+			Pallet::<T>::bid(
+				RawOrigin::Signed(miner).into(),
+				increment.saturating_mul(300u32.into()),
+				keys,
+				None,
+				Some(NextFrameId::<T>::get()),
+				max_hash,
+			)?;
+		}
+		Ok(block)
+	}
+
+	#[benchmark]
+	fn live_auction(m: Linear<1, 144>) -> Result<(), BenchmarkError> {
+		let m = m.min(T::MaxCohortSize::get());
+		let block = live_auction_setup::<T>(m, false, LiveAuctionCohort::Uniform)?;
+		assert_eq!(RevealedBids::<T>::get().len(), MaxBidReveals::<T>::get() as usize);
+		#[block]
+		{
+			Pallet::<T>::finalize_live_bids(block)?;
+		}
+		assert!(RevealedBids::<T>::get().is_empty());
+		assert_eq!(BidsForNextSlotCohort::<T>::get().len(), m as usize);
+		Ok(())
+	}
+
+	#[benchmark]
+	fn live_auction_with_expiry(m: Linear<1, 144>) -> Result<(), BenchmarkError> {
+		let m = m.min(T::MaxCohortSize::get());
+		let block = live_auction_setup::<T>(m, true, LiveAuctionCohort::Uniform)?;
+		#[block]
+		{
+			Pallet::<T>::finalize_live_bids(block)?;
+		}
+		for position in 0..T::MaxBidsPerBlock::get() {
+			let miner: T::AccountId = account("live", position, 0);
+			assert!(!PendingBids::<T>::contains_key(miner));
+		}
+		assert_eq!(BidsForNextSlotCohort::<T>::get().len(), m as usize);
+		Ok(())
+	}
+
+	#[benchmark]
+	fn live_auction_with_collateral_cleanup(m: Linear<1, 144>) -> Result<(), BenchmarkError> {
+		let m = m.min(T::MaxCohortSize::get());
+		let block = live_auction_setup::<T>(m, false, LiveAuctionCohort::Skewed)?;
+		assert_eq!(RevealedBids::<T>::get().len(), MaxBidReveals::<T>::get() as usize);
+		#[block]
+		{
+			Pallet::<T>::finalize_live_bids(block)?;
+		}
+		verify_live_collateral_cleanup::<T>(m);
+		Ok(())
+	}
+
+	#[benchmark]
+	fn live_auction_with_collateral_expiry(m: Linear<1, 144>) -> Result<(), BenchmarkError> {
+		let m = m.min(T::MaxCohortSize::get());
+		let block = live_auction_setup::<T>(m, true, LiveAuctionCohort::Skewed)?;
+		assert_eq!(
+			RevealedBids::<T>::get().len(),
+			(T::MaxBidsPerBlock::get() * (T::BidRevealBlocks::get() - 1)) as usize,
+		);
+		#[block]
+		{
+			Pallet::<T>::finalize_live_bids(block)?;
+		}
+		verify_live_collateral_cleanup::<T>(m);
+		Ok(())
+	}
+
+	#[benchmark]
+	fn live_auction_with_unfunded_openings() -> Result<(), BenchmarkError> {
+		let m = T::MaxCohortSize::get();
+		let block = live_auction_setup::<T>(m, false, LiveAuctionCohort::UnfundedOpenings)?;
+		assert_eq!(RevealedBids::<T>::get().len(), MaxBidReveals::<T>::get() as usize);
+		#[block]
+		{
+			Pallet::<T>::finalize_live_bids(block)?;
+		}
+		verify_live_collateral_cleanup::<T>(m);
+		Ok(())
+	}
+
+	fn verify_live_collateral_cleanup<T: Config>(m: u32) {
+		assert!(RevealedBids::<T>::get().is_empty());
+		let winners = BidsForNextSlotCohort::<T>::get();
+		assert_eq!(winners.len(), m as usize);
+		for index in 0..m.saturating_sub(1) {
+			let miner = account::<T::AccountId>("incumbent", index, 0);
+			assert!(winners.iter().any(|winner| winner.account_id == miner));
+			assert_eq!(
+				T::OwnershipCurrency::balance_on_hold(&HoldReason::RegisterAsMiner.into(), &miner),
+				ArgonotsPerMiningSeat::<T>::get(),
+			);
+		}
+		for index in 0..MaxBidReveals::<T>::get() {
+			let miner = account::<T::AccountId>("live", index, 0);
+			assert!(!PendingBids::<T>::contains_key(&miner));
+			assert!(!EligibleBids::<T>::contains_key(&miner));
+			let active_collateral = Pallet::<T>::get_active_registration(&miner)
+				.map(|r| r.argonots)
+				.unwrap_or_default();
+			assert_eq!(
+				T::OwnershipCurrency::balance_on_hold(&HoldReason::RegisterAsMiner.into(), &miner),
+				active_collateral,
+			);
+		}
+		let low_incumbent = account::<T::AccountId>("incumbent", m - 1, 0);
+		let active_collateral = Pallet::<T>::get_active_registration(&low_incumbent)
+			.map(|r| r.argonots)
+			.unwrap_or_default();
+		assert_eq!(
+			T::OwnershipCurrency::balance_on_hold(
+				&HoldReason::RegisterAsMiner.into(),
+				&low_incumbent
+			),
+			active_collateral,
+		);
+		let winning_opening = account::<T::AccountId>("live-opening", 0, 0);
+		assert!(winners.iter().any(|winner| winner.account_id == winning_opening));
+		for position in 0..T::MaxBidsPerBlock::get() {
+			let miner = account::<T::AccountId>("live-opening", position, 0);
+			assert!(!PendingBids::<T>::contains_key(&miner));
+			assert!(!EligibleBids::<T>::contains_key(&miner));
+			let expected_collateral =
+				if position == 0 { ArgonotsPerMiningSeat::<T>::get() } else { Zero::zero() };
+			assert_eq!(
+				T::OwnershipCurrency::balance_on_hold(&HoldReason::RegisterAsMiner.into(), &miner),
+				expected_collateral,
+			);
+		}
+	}
+
 	/// Core extrinsic: Configure mining slot delay
 	#[benchmark]
 	fn configure_mining_slot_delay() -> Result<(), BenchmarkError> {
@@ -754,7 +1041,7 @@ mod benchmarks {
 
 		#[block]
 		{
-			let _ = Pallet::<T>::on_finalize(1u32.into());
+			Pallet::<T>::on_finalize(1u32.into());
 		}
 
 		// Verify rotation path was taken
@@ -855,7 +1142,7 @@ mod benchmarks {
 				bid_at_tick: 0u64,
 			};
 			let _ = retiring_miners.try_push(registration);
-			AccountIndexLookup::<T>::insert(&account_id, (retiring_frame_id, i as u32));
+			AccountIndexLookup::<T>::insert(&account_id, (retiring_frame_id, i));
 		}
 		MinersByCohort::<T>::insert(retiring_frame_id, retiring_miners);
 

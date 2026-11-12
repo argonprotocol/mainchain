@@ -198,6 +198,7 @@ mod tests {
 						pallet_mining_slot::HistoricalBidsPerSlot::<Runtime>::get()[0].bids_count,
 						1
 					);
+					argon_runtime::MiningSlot::on_finalize(block);
 				}
 				assert!(!pallet_mining_slot::PendingBids::<Runtime>::contains_key(&real));
 				assert_eq!(pallet_mining_slot::StandingBids::<Runtime>::get(&real).unwrap().max, 3 * ARGON);
@@ -246,6 +247,37 @@ mod tests {
 					&record.event,
 					RuntimeEvent::MiningSlot(pallet_mining_slot::Event::BidMaxUpdated { max, .. }) if *max == 4 * ARGON
 				)));
+
+				System::set_block_number(8);
+				let hash = argon_runtime::MiningSlot::bid_commitment(
+					2, &real, &real, low, 4 * ARGON, &keys, [10; 32],
+				);
+				assert_ok!(argon_runtime::MiningSlot::bid(
+					RuntimeOrigin::signed(real.clone()), low, keys, None, Some(2), Some(hash),
+				));
+				argon_runtime::MiningSlot::on_finalize(8);
+				System::set_block_number(9);
+				let failed_reveal = RuntimeCall::Utility(pallet_utility::Call::batch_all {
+					calls: vec![
+						RuntimeCall::MiningSlot(pallet_mining_slot::Call::bid_max {
+							target_frame_id: 2,
+							mining_account_id: None,
+							max: 4 * ARGON,
+							salt: Some([10; 32]),
+						}),
+						RuntimeCall::Balances(pallet_balances::Call::transfer_allow_death {
+							dest: sp_runtime::MultiAddress::Id(sp_runtime::AccountId32::new([11; 32])),
+							value: u128::MAX,
+						}),
+					],
+				});
+				assert_noop!(
+					failed_reveal.dispatch(RuntimeOrigin::signed(real.clone())).map_err(|error| error.error),
+				sp_runtime::DispatchError::Arithmetic(sp_runtime::ArithmeticError::Underflow)
+				);
+				assert!(pallet_mining_slot::RevealedBids::<Runtime>::get().is_empty());
+				assert!(pallet_mining_slot::PendingBids::<Runtime>::get(&real).unwrap().max.is_none());
+				assert_eq!(pallet_mining_slot::StandingBids::<Runtime>::get(&real).unwrap().max, low);
 			});
 	}
 
