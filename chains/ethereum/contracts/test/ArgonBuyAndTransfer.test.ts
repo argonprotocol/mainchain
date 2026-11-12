@@ -726,7 +726,7 @@ async function signUsdcPermit(
     await signer.signTypedData(
       {
         name: await usdc.getFunction('name')(),
-        version: '1',
+        version: '2',
         chainId: (await ethers.provider.getNetwork()).chainId,
         verifyingContract: await usdc.getAddress(),
       },
