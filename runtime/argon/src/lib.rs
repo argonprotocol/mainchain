@@ -6,11 +6,16 @@ extern crate alloc;
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmark;
 
-pub mod weights;
-
-#[cfg(all(test, not(feature = "runtime-benchmarks")))]
+#[cfg(test)]
+#[path = "../../tests/mod.rs"]
 mod tests;
 
+#[cfg(all(test, not(feature = "runtime-benchmarks")))]
+#[path = "tests.rs"]
+mod runtime_tests;
+pub mod weights;
+
+use call_authorization::CallAuthorizationPolicy;
 use frame_support::weights::ConstantMultiplier;
 pub use pallet_notebook::NotebookVerifyError;
 use pallet_transaction_payment::{ConstFeeMultiplier, FungibleAdapter};
@@ -29,7 +34,7 @@ include!(concat!(env!("OUT_DIR"), "/wasm_binary.rs"));
 use pallet_bitcoin_locks::MinimumSatoshis;
 #[cfg(any(feature = "std", test))]
 pub use sp_runtime::BuildStorage;
-use sp_runtime::{impl_opaque_keys, Weight};
+use sp_runtime::{impl_opaque_keys, MultiSignature, Weight};
 #[cfg(feature = "std")]
 use sp_version::NativeVersion;
 
@@ -141,9 +146,12 @@ mod runtime {
 	pub type StabilizerBuys = pallet_stabilizer_buys;
 	#[runtime::pallet_index(40)]
 	pub type StabilizerPools = pallet_stabilizer_pools;
+	#[runtime::pallet_index(41)]
+	pub type AccountSecurity = pallet_account_security;
 }
 
 argon_runtime_common::call_filters!();
+argon_runtime_common::account_security_policy!();
 argon_runtime_common::vault_admin_fee_refund_policy!();
 argon_runtime_common::deal_with_fees!();
 argon_runtime_common::inject_runtime_vars!();
@@ -360,7 +368,7 @@ impl pallet_bitcoin_locks::Config for Runtime {
 		benchmarking::BenchmarkBitcoinSignatureVerifier
 	);
 	type FeeCouponSigner = polkadot_sdk::sp_runtime::MultiSigner;
-	type FeeCouponSignature = Signature;
+	type FeeCouponSignature = MultiSignature;
 	type BitcoinBlockHeightChange =
 		use_unless_benchmark!(BitcoinUtxos, benchmarking::BenchmarkBitcoinBlockHeightChange);
 	type GetBitcoinNetwork =
@@ -855,6 +863,7 @@ impl pallet_crosschain_transfer::Config for Runtime {
 	>;
 }
 impl pallet_operational_accounts::Config for Runtime {
+	type AccountSecurityProvider = AccountSecurity;
 	type Balance = Balance;
 	type MaxAvailableAccessCodes = MaxAvailableOperationalAccessCodes;
 	type MaxAccessCodeAwardsPerFrame = MaxOperationalAccessCodeAwardsPerFrame;
@@ -899,6 +908,22 @@ impl pallet_operational_accounts::Config for Runtime {
 		Runtime,
 		weights::pallet_operational_accounts::WeightInfo<Runtime>,
 	>;
+}
+
+impl pallet_account_security::Config for Runtime {
+	type CurrentTick = Ticks;
+	type CallAuthorizationPolicy = CallAuthorizationPolicy;
+	type SigningPayload = AccountSecuritySigningPayload;
+	type Signature = ApprovalSignature;
+	type MaxCallDepth = MaxAccountSecurityCallDepth;
+	type MaxCalls = MaxAccountSecurityCalls;
+	type MaxSigners = MaxAccountSecuritySigners;
+	type MaxApprovals = MaxAccountSecurityApprovals;
+	type MaxApprovalLifetime = AccountSecurityApprovalLifetime;
+	type SecurityCurrency = Balances;
+	type DepositBase = AccountSecurityDepositBase;
+	type DepositPerSigner = AccountSecurityDepositPerSigner;
+	type WeightInfo = weights::pallet_account_security::WeightInfo<Runtime>;
 }
 
 impl pallet_bootstrap::Config for Runtime {

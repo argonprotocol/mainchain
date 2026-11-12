@@ -25,6 +25,7 @@ export { ApiDecoration };
 export { WageProtector } from './WageProtector';
 export * from './utils';
 export * from './miningBid';
+export * from './accountSecurity';
 export * from './keyringUtils';
 export * from './header';
 export * from './convert';

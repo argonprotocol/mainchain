@@ -8,6 +8,8 @@ import type {
   ArgonNotaryAuditAccountHistoryLookupError,
   ArgonNotaryAuditErrorVerifyError,
   ArgonPrimitivesAccountAccountType,
+  ArgonPrimitivesAccountSecurityApprovalSignature,
+  ArgonPrimitivesAccountSecurityP256Signature,
   ArgonPrimitivesAmountRankAmountRankKeyAccountId32,
   ArgonPrimitivesAmountRankAmountRankKeyU32,
   ArgonPrimitivesAmountRankAscendingRankKeyAccountId32,
@@ -125,6 +127,15 @@ import type {
   FrameSystemLimitsBlockWeights,
   FrameSystemLimitsWeightsPerClass,
   FrameSystemPhase,
+  PalletAccountSecurityApproval,
+  PalletAccountSecurityAuthorization,
+  PalletAccountSecurityCall,
+  PalletAccountSecurityCheckAccountSecurity,
+  PalletAccountSecurityError,
+  PalletAccountSecurityEvent,
+  PalletAccountSecurityPendingPolicyUpdate,
+  PalletAccountSecurityPolicy,
+  PalletAccountSecurityRegistration,
   PalletBalancesAccountData,
   PalletBalancesAdjustmentDirection,
   PalletBalancesBalanceLock,
@@ -373,6 +384,8 @@ declare module '@polkadot/types/types/registry' {
     ArgonNotaryAuditAccountHistoryLookupError: ArgonNotaryAuditAccountHistoryLookupError;
     ArgonNotaryAuditErrorVerifyError: ArgonNotaryAuditErrorVerifyError;
     ArgonPrimitivesAccountAccountType: ArgonPrimitivesAccountAccountType;
+    ArgonPrimitivesAccountSecurityApprovalSignature: ArgonPrimitivesAccountSecurityApprovalSignature;
+    ArgonPrimitivesAccountSecurityP256Signature: ArgonPrimitivesAccountSecurityP256Signature;
     ArgonPrimitivesAmountRankAmountRankKeyAccountId32: ArgonPrimitivesAmountRankAmountRankKeyAccountId32;
     ArgonPrimitivesAmountRankAmountRankKeyU32: ArgonPrimitivesAmountRankAmountRankKeyU32;
     ArgonPrimitivesAmountRankAscendingRankKeyAccountId32: ArgonPrimitivesAmountRankAscendingRankKeyAccountId32;
@@ -490,6 +503,15 @@ declare module '@polkadot/types/types/registry' {
     FrameSystemLimitsBlockWeights: FrameSystemLimitsBlockWeights;
     FrameSystemLimitsWeightsPerClass: FrameSystemLimitsWeightsPerClass;
     FrameSystemPhase: FrameSystemPhase;
+    PalletAccountSecurityApproval: PalletAccountSecurityApproval;
+    PalletAccountSecurityAuthorization: PalletAccountSecurityAuthorization;
+    PalletAccountSecurityCall: PalletAccountSecurityCall;
+    PalletAccountSecurityCheckAccountSecurity: PalletAccountSecurityCheckAccountSecurity;
+    PalletAccountSecurityError: PalletAccountSecurityError;
+    PalletAccountSecurityEvent: PalletAccountSecurityEvent;
+    PalletAccountSecurityPendingPolicyUpdate: PalletAccountSecurityPendingPolicyUpdate;
+    PalletAccountSecurityPolicy: PalletAccountSecurityPolicy;
+    PalletAccountSecurityRegistration: PalletAccountSecurityRegistration;
     PalletBalancesAccountData: PalletBalancesAccountData;
     PalletBalancesAdjustmentDirection: PalletBalancesAdjustmentDirection;
     PalletBalancesBalanceLock: PalletBalancesBalanceLock;

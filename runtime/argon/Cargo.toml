@@ -66,6 +66,7 @@ pallet-block-rewards = { workspace = true }
 pallet-bitcoin-locks = { workspace = true }
 pallet-bitcoin-fissions = { workspace = true }
 pallet-bootstrap = { workspace = true }
+pallet-account-security = { workspace = true }
 pallet-localchain-transfer = { workspace = true }
 pallet-crosschain-transfer = { workspace = true }
 pallet-stabilizer-pools = { workspace = true }
@@ -95,6 +96,7 @@ substrate-wasm-builder = { workspace = true, optional = true }
 alloy-primitives = { workspace = true, features = ["serde"] }
 alloy-sol-types = { workspace = true }
 argon-ethereum-contracts = { workspace = true }
+p256 = { workspace = true, features = ["ecdsa", "pem"] }
 polkadot-sdk = { workspace = true, features = ["sp-io", "sp-arithmetic", "sp-runtime-interface"], default-features = true }
 
 [features]
@@ -106,6 +108,7 @@ std = [
 	"codec/std",
 	"frame-benchmarking/std",
 	"log/std",
+	"pallet-account-security/std",
 	"pallet-bitcoin-fissions/std",
 	"pallet-bitcoin-locks/std",
 	"pallet-bitcoin-utxos/std",
@@ -142,6 +145,7 @@ runtime-benchmarks = [
 	"argon-primitives/runtime-benchmarks",
 	"argon-runtime-common/runtime-benchmarks",
 	"frame-benchmarking/runtime-benchmarks",
+	"pallet-account-security/runtime-benchmarks",
 	"pallet-bitcoin-fissions/runtime-benchmarks",
 	"pallet-bitcoin-locks/runtime-benchmarks",
 	"pallet-bitcoin-utxos/runtime-benchmarks",
@@ -173,6 +177,7 @@ runtime-benchmarks = [
 ]
 try-runtime = [
 	"argon-runtime-common/try-runtime",
+	"pallet-account-security/try-runtime",
 	"pallet-bitcoin-fissions/try-runtime",
 	"pallet-bitcoin-locks/try-runtime",
 	"pallet-bitcoin-utxos/try-runtime",

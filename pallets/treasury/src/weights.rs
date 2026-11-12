@@ -9,6 +9,7 @@ use argon_primitives::{
 	OperationalAccountsHookWeightInfo, OperationalRewardsPayerWeightInfo,
 	TreasuryPoolProviderWeightInfo,
 };
+use core::marker::PhantomData;
 use pallet_prelude::*;
 
 /// Weight functions needed for this pallet.
@@ -47,7 +48,7 @@ pub trait WeightInfo {
 	fn provider_pay_reward_new_account() -> Weight;
 }
 
-pub struct WithProviderWeights<T, Base>(core::marker::PhantomData<(T, Base)>);
+pub struct WithProviderWeights<T, Base>(PhantomData<(T, Base)>);
 
 type PositionWeights<T> = <<T as Config>::PositionProvider as TreasuryPositionProvider<
 	<T as frame_system::Config>::AccountId,

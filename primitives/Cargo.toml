@@ -15,12 +15,14 @@ targets = ["x86_64-unknown-linux-gnu"]
 [dependencies]
 async-trait = { workspace = true, optional = true }
 codec = { workspace = true }
+ecdsa = { workspace = true, features = ["verifying"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 scale-info = { workspace = true }
 thiserror = { workspace = true, default-features = false }
 sp-application-crypto = { workspace = true, default-features = false, features = ["serde"] }
 sp-runtime = { workspace = true, default-features = false, features = ["serde"] }
+p256 = { workspace = true, features = ["ecdsa"] }
 
 impl-trait-for-tuples = { workspace = true }
 napi-derive = { workspace = true, optional = true }
@@ -67,8 +69,10 @@ std = [
 	"clap",
 	"codec/derive",
 	"codec/std",
+	"ecdsa/std",
 	"hex",
 	"hex?/std",
+	"p256/std",
 	"polkadot-sdk/sc-keystore",
 	"polkadot-sdk/sp-keystore",
 	"polkadot-sdk/std",

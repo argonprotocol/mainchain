@@ -405,6 +405,7 @@ macro_rules! inject_common_apis {
                 // right here and right now.
                 let weight = Executive::try_runtime_upgrade(checks).unwrap();
                 if checks.try_state() {
+                    $crate::try_state::check_proxy_types::<Runtime>().expect("Proxy type checks failed");
                     $crate::try_state::check::<Runtime>().expect("Bitcoin backing checks failed");
                 }
                 (weight, BlockWeights::get().max_block)
@@ -420,6 +421,7 @@ macro_rules! inject_common_apis {
                 // have a backtrace here.
                 let weight = Executive::try_execute_block(block, state_root_check, signature_check, select.clone()).expect("execute-block failed");
                 if matches!(select, frame_try_runtime::TryStateSelect::All) {
+                    $crate::try_state::check_proxy_types::<Runtime>().expect("Proxy type checks failed");
                     $crate::try_state::check::<Runtime>().expect("Bitcoin backing checks failed");
                 }
                 weight

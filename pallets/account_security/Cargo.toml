@@ -1,0 +1,48 @@
+[package]
+name = "pallet-account-security"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+documentation.workspace = true
+homepage.workspace = true
+publish = false
+
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
+
+[dependencies]
+argon-primitives = { workspace = true }
+codec = { workspace = true }
+scale-info = { workspace = true }
+polkadot-sdk = { workspace = true, features = ["frame-support", "frame-system", "pallet-proxy", "pallet-multisig", "pallet-utility", "sp-runtime"] }
+pallet-prelude = { workspace = true }
+p256 = { workspace = true, features = ["ecdsa"], optional = true }
+
+[dev-dependencies]
+p256 = { workspace = true, features = ["ecdsa"] }
+pallet-prelude = { workspace = true, features = ["test"], default-features = true }
+polkadot-sdk = { workspace = true, features = ["frame-executive", "frame-metadata-hash-extension", "pallet-balances", "sp-io"], default-features = true }
+
+[features]
+default = [ "std" ]
+std = [
+	"argon-primitives/std",
+	"codec/std",
+	"p256?/std",
+	"pallet-prelude/std",
+	"polkadot-sdk/std",
+	"scale-info/std",
+]
+runtime-benchmarks = [
+	"argon-primitives/runtime-benchmarks",
+	"dep:p256",
+	"pallet-prelude/runtime-benchmarks",
+	"polkadot-sdk/frame-benchmarking",
+	"polkadot-sdk/pallet-balances",
+	"polkadot-sdk/runtime-benchmarks",
+	"polkadot-sdk/sp-io",
+]
+try-runtime = [ "polkadot-sdk/try-runtime" ]

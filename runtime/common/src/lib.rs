@@ -6,6 +6,7 @@ extern crate alloc;
 pub mod apis;
 #[cfg(feature = "runtime-benchmarks")]
 pub mod benchmarking;
+pub mod call_authorization;
 mod call_filters;
 pub mod config;
 mod deal_with_fees;
@@ -18,6 +19,7 @@ pub mod prelude {
 	pub use crate::config::*;
 	pub use alloc::{borrow::Cow, boxed::Box, collections::BTreeMap, vec, vec::Vec};
 	pub use argon_primitives::{
+		account_security::ApprovalSignature,
 		apis::*,
 		bitcoin::*,
 		block_seal::*,
@@ -104,6 +106,15 @@ macro_rules! use_unless_benchmark {
 #[macro_export]
 macro_rules! inject_runtime_vars {
 	() => {
+		use frame_metadata_hash_extension::CheckMetadataHash;
+		use frame_system::{
+			AuthorizeCall, CheckGenesis, CheckMortality, CheckNonZeroSender, CheckNonce,
+			CheckSpecVersion, CheckTxVersion, CheckWeight, WeightReclaim,
+		};
+		use pallet_account_security::{ApprovalPayloadProvider, CheckAccountSecurity};
+		use pallet_fee_control::CheckFeeWrapper;
+		use pallet_transaction_payment::ChargeTransactionPayment;
+		use sp_runtime::transaction_validity::TransactionValidityError;
 		use $crate::migrations::CosignerGuaranteesMigration;
 
 		// To learn more about runtime versioning, see:
@@ -142,20 +153,18 @@ macro_rules! inject_runtime_vars {
 		pub type Block = generic::Block<Header, UncheckedExtrinsic>;
 		/// The `TransactionExtension` to the basic transaction logic.
 		pub type TxExtension = (
-			frame_system::AuthorizeCall<Runtime>,
-			frame_system::CheckNonZeroSender<Runtime>,
-			frame_system::CheckSpecVersion<Runtime>,
-			frame_system::CheckTxVersion<Runtime>,
-			frame_system::CheckGenesis<Runtime>,
-			frame_system::CheckMortality<Runtime>,
-			frame_system::CheckNonce<Runtime>,
-			frame_system::CheckWeight<Runtime>,
-			pallet_fee_control::CheckFeeWrapper<
-				Runtime,
-				pallet_transaction_payment::ChargeTransactionPayment<Runtime>,
-			>,
-			frame_metadata_hash_extension::CheckMetadataHash<Runtime>,
-			frame_system::WeightReclaim<Runtime>,
+			AuthorizeCall<Runtime>,
+			CheckNonZeroSender<Runtime>,
+			CheckSpecVersion<Runtime>,
+			CheckTxVersion<Runtime>,
+			CheckGenesis<Runtime>,
+			CheckMortality<Runtime>,
+			CheckNonce<Runtime>,
+			CheckWeight<Runtime>,
+			CheckAccountSecurity<Runtime>,
+			CheckFeeWrapper<Runtime, ChargeTransactionPayment<Runtime>>,
+			CheckMetadataHash<Runtime>,
+			WeightReclaim<Runtime>,
 		);
 		/// All migrations of the runtime.
 		///
@@ -173,6 +182,34 @@ macro_rules! inject_runtime_vars {
 			generic::UncheckedExtrinsic<Address, RuntimeCall, Signature, TxExtension>;
 		/// The payload being signed in transactions.
 		pub type SignedPayload = generic::SignedPayload<RuntimeCall, TxExtension>;
+
+		/// Detached security proofs use the same native signing format as wallet transactions.
+		/// Their replay bounds live in the call, not the submitter's nonce, era or fee fields.
+		pub struct AccountSecuritySigningPayload;
+
+		impl ApprovalPayloadProvider<RuntimeCall> for AccountSecuritySigningPayload {
+			fn signing_payload(
+				call: RuntimeCall,
+				with_metadata_hash: bool,
+			) -> Result<Vec<u8>, TransactionValidityError> {
+				let extra: TxExtension = (
+					AuthorizeCall::<Runtime>::new(),
+					CheckNonZeroSender::<Runtime>::new(),
+					CheckSpecVersion::<Runtime>::new(),
+					CheckTxVersion::<Runtime>::new(),
+					CheckGenesis::<Runtime>::new(),
+					CheckMortality::<Runtime>::from(generic::Era::Immortal),
+					CheckNonce::<Runtime>::from(0),
+					CheckWeight::<Runtime>::new(),
+					CheckAccountSecurity::<Runtime>::new(),
+					CheckFeeWrapper::from(ChargeTransactionPayment::<Runtime>::from(0)),
+					CheckMetadataHash::<Runtime>::new(with_metadata_hash),
+					WeightReclaim::<Runtime>::new(),
+				);
+				SignedPayload::new(call, extra)
+					.map(|payload| payload.using_encoded(|bytes| bytes.to_vec()))
+			}
+		}
 		/// Executive: handles dispatch to the various modules.
 		pub type Executive = frame_executive::Executive<
 			Runtime,

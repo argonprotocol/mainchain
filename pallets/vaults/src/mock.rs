@@ -213,6 +213,7 @@ impl MiningSlotProvider<u64> for MockMiningSlotProvider {
 }
 
 impl pallet_operational_accounts::Config for Test {
+	type AccountSecurityProvider = ();
 	type PositionProvider = TreasuryPositions;
 	type Balance = Balance;
 	type BitcoinLockSizeForAccessCode = BitcoinLockSizeForAccessCode;

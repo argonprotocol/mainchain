@@ -26,6 +26,7 @@ macro_rules! deal_with_fees {
 		}
 
 		pub struct MiningBidProxyFeeSponsor<R>(PhantomData<R>);
+
 		impl<R>
 			TransactionSponsorProvider<
 				R::AccountId,
@@ -133,6 +134,9 @@ macro_rules! deal_with_fees {
 					};
 
 					if def.proxy_type != ProxyType::MiningBidRealPaysFee {
+						return None;
+					}
+					if !def.delay.is_zero() {
 						return None;
 					}
 

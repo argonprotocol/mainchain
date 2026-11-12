@@ -46,6 +46,7 @@ pub mod notary;
 pub mod vault;
 
 pub mod account;
+pub mod account_security;
 pub mod amount_rank;
 pub mod bitcoin;
 pub mod note;
@@ -70,11 +71,10 @@ pub type BlockNumber = u32;
 
 pub use block_seal::ComputeDifficulty;
 
-/// Alias to 512-bit hash when used in the context of a transaction signature on the chain.
+/// Transaction signatures retain the SDK's supported account schemes.
 pub type Signature = MultiSignature;
 
-/// Some way of identifying an account on the chain. We intentionally make it equivalent
-/// to the public key of our transaction signing scheme.
+/// A native 32-byte account identity derived by the selected transaction signing scheme.
 pub type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
 
 #[cfg_attr(feature = "napi", napi_derive::napi)]

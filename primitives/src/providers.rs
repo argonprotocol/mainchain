@@ -1232,6 +1232,33 @@ impl<AccountId> BitcoinUtxoEvents<AccountId> for Tuple {
 	}
 }
 
+/// Cost of reconciling security for the three accounts in an operational registration.
+pub trait AccountSecurityProviderWeightInfo {
+	fn on_operational_registration() -> Weight;
+}
+
+impl AccountSecurityProviderWeightInfo for () {
+	fn on_operational_registration() -> Weight {
+		Weight::zero()
+	}
+}
+
+/// Reconciles security during operational-account registration, before publishing the links.
+pub trait AccountSecurityProvider<AccountId> {
+	type Weights: AccountSecurityProviderWeightInfo;
+	fn on_operational_registration(
+		default_account: &AccountId,
+		participants: &[AccountId],
+	) -> DispatchResult;
+}
+
+impl<AccountId> AccountSecurityProvider<AccountId> for () {
+	type Weights = ();
+	fn on_operational_registration(_: &AccountId, _: &[AccountId]) -> DispatchResult {
+		Ok(())
+	}
+}
+
 pub trait OperationalAccountsHookWeightInfo {
 	fn vault_created() -> Weight;
 	fn vault_bitcoin_lock_funded() -> Weight;

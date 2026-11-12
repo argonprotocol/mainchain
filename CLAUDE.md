@@ -215,6 +215,15 @@ cargo build --release --features=runtime-benchmarks --bin argon-node
 
 ## Key Development Rules
 
+### Readable Rust
+
+- Prefer focused imports and short domain names over fully qualified paths in function bodies and
+  generic bounds. Keep qualification when it disambiguates types or a framework requires it.
+- Use blank lines as logical paragraphs: separate setup, validation, context or state changes,
+  authorization, and result handling. Comments do not replace this spacing.
+- Keep wrapper traversal separate from business policy: establish what runs and under whose
+  authority, then apply the same authorization rules to each operation.
+
 ### Pallet Modifications
 
 - **NEVER remove pallet logic**: storage, events, errors, or function implementations

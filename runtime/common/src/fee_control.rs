@@ -340,12 +340,11 @@ mod tests {
 					}),
 				];
 				let unrelated = RuntimeCall::System(frame_system::Call::remark { remark: vec![] });
-				for proxy_type in [ProxyType::MiningBid, ProxyType::MiningBidRealPaysFee] {
-					for call in &calls {
-						assert!(proxy_type.filter(call));
-					}
-					assert!(!proxy_type.filter(&unrelated));
+				for call in &calls {
+					assert!(ProxyType::MiningBidRealPaysFee.filter(call));
 				}
+				assert!(!ProxyType::MiningBidRealPaysFee.filter(&unrelated));
+
 				let proxies: frame_support::BoundedVec<
 					_,
 					<Runtime as pallet_proxy::Config>::MaxProxies,
@@ -370,6 +369,16 @@ mod tests {
 					)
 					.expect("mining call sponsored");
 					assert_eq!(sponsor.payer, real);
+					pallet_proxy::Proxies::<Runtime>::mutate(&real, |(proxies, _)| {
+						proxies[0].delay = 1;
+					});
+					assert!(MiningBidProxyFeeSponsor::<Runtime>::get_transaction_sponsor(
+						&delegate, &outer,
+					)
+					.is_none());
+					pallet_proxy::Proxies::<Runtime>::mutate(&real, |(proxies, _)| {
+						proxies[0].delay = 0;
+					});
 				}
 				let outer = RuntimeCall::Proxy(pallet_proxy::Call::proxy {
 					real: sp_runtime::MultiAddress::Id(real),

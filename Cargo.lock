@@ -1233,6 +1233,8 @@ dependencies = [
  "argon-runtime-common",
  "frame-benchmarking",
  "log",
+ "p256",
+ "pallet-account-security",
  "pallet-bitcoin-fissions",
  "pallet-bitcoin-locks",
  "pallet-bitcoin-utxos",
@@ -1541,10 +1543,12 @@ dependencies = [
  "bitcoin",
  "chrono",
  "clap",
+ "ecdsa",
  "hex",
  "impl-trait-for-tuples",
  "napi",
  "napi-derive",
+ "p256",
  "parity-scale-codec",
  "polkadot-sdk",
  "rpassword",
@@ -1591,6 +1595,8 @@ dependencies = [
  "argon-runtime-common",
  "frame-benchmarking",
  "log",
+ "p256",
+ "pallet-account-security",
  "pallet-bitcoin-fissions",
  "pallet-bitcoin-locks",
  "pallet-bitcoin-utxos",
@@ -1635,15 +1641,18 @@ dependencies = [
  "argon-runtime",
  "frame-benchmarking",
  "log",
+ "pallet-account-security",
  "pallet-bitcoin-fissions",
  "pallet-bitcoin-locks",
  "pallet-bitcoin-utxos",
  "pallet-block-rewards",
  "pallet-block-seal",
  "pallet-block-seal-spec",
+ "pallet-bootstrap",
  "pallet-crosschain-transfer",
  "pallet-digests",
  "pallet-domains",
+ "pallet-ethereum-verifier",
  "pallet-fee-control",
  "pallet-localchain-transfer",
  "pallet-mining-slot",
@@ -1653,6 +1662,8 @@ dependencies = [
  "pallet-operational-accounts",
  "pallet-prelude",
  "pallet-price-index",
+ "pallet-stabilizer-buys",
+ "pallet-stabilizer-pools",
  "pallet-ticks",
  "pallet-treasury 1.5.2",
  "pallet-treasury-positions",
@@ -1660,6 +1671,7 @@ dependencies = [
  "parity-scale-codec",
  "polkadot-sdk",
  "scale-info",
+ "serde",
  "serde_json",
  "smallvec",
 ]
@@ -6206,6 +6218,7 @@ dependencies = [
  "ff",
  "generic-array 0.14.7",
  "group",
+ "pem-rfc7468",
  "pkcs8",
  "rand_core 0.6.4",
  "sec1",
@@ -10851,6 +10864,18 @@ dependencies = [
  "elliptic-curve",
  "primeorder",
  "sha2 0.10.9",
+]
+
+[[package]]
+name = "pallet-account-security"
+version = "1.5.2"
+dependencies = [
+ "argon-primitives",
+ "p256",
+ "pallet-prelude",
+ "parity-scale-codec",
+ "polkadot-sdk",
+ "scale-info",
 ]
 
 [[package]]

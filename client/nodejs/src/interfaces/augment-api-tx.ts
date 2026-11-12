@@ -51,6 +51,8 @@ import type {
   ArgonRuntimeOriginCaller,
   ArgonRuntimeProxyType,
   ArgonRuntimeSessionKeys,
+  PalletAccountSecurityApproval,
+  PalletAccountSecurityAuthorization,
   PalletBalancesAdjustmentDirection,
   PalletBitcoinLocksFeeCoupon,
   PalletBitcoinLocksLockOptions,
@@ -89,6 +91,139 @@ export type __SubmittableExtrinsicFunction<ApiType extends ApiTypes> =
 
 declare module '@polkadot/api-base/types/submittable' {
   interface AugmentedSubmittables<ApiType extends ApiTypes> {
+    accountSecurity: {
+      /**
+       * Main plus either current authority can veto or withdraw the exact pending update.
+       **/
+      cancelPolicyUpdate: AugmentedSubmittable<
+        (
+          account: AccountId32 | string | Uint8Array,
+          updateNonce: u64 | AnyNumber | Uint8Array,
+          authorization:
+            | PalletAccountSecurityAuthorization
+            | { group?: any; nonce?: any; expiresAt?: any; policyHash?: any }
+            | string
+            | Uint8Array,
+          approvals:
+            | Vec<PalletAccountSecurityApproval>
+            | (
+                | PalletAccountSecurityApproval
+                | { signer?: any; signature?: any; withMetadataHash?: any }
+                | string
+                | Uint8Array
+              )[],
+        ) => SubmittableExtrinsic<ApiType>,
+        [AccountId32, u64, PalletAccountSecurityAuthorization, Vec<PalletAccountSecurityApproval>]
+      >;
+      /**
+       * Complete an accepted policy replacement after its tick window. Anyone may pay the
+       * submission fee; all authority and new-key acceptance was captured at scheduling.
+       **/
+      completePolicyUpdate: AugmentedSubmittable<
+        (
+          account: AccountId32 | string | Uint8Array,
+          updateNonce: u64 | AnyNumber | Uint8Array,
+        ) => SubmittableExtrinsic<ApiType>,
+        [AccountId32, u64]
+      >;
+      /**
+       * Submit one full call/batch and its collected off-chain approvals. The main account
+       * signs the outer transaction or supplies its own proof when a relayer submits.
+       * Every execution consumes the group's approval nonce and therefore requires quorum,
+       * even when the child could also be submitted directly without approval.
+       **/
+      execute: AugmentedSubmittable<
+        (
+          account: AccountId32 | string | Uint8Array,
+          call: Call | IMethod | string | Uint8Array,
+          authorization:
+            | PalletAccountSecurityAuthorization
+            | { group?: any; nonce?: any; expiresAt?: any; policyHash?: any }
+            | string
+            | Uint8Array,
+          approvals:
+            | Vec<PalletAccountSecurityApproval>
+            | (
+                | PalletAccountSecurityApproval
+                | { signer?: any; signature?: any; withMetadataHash?: any }
+                | string
+                | Uint8Array
+              )[],
+        ) => SubmittableExtrinsic<ApiType>,
+        [AccountId32, Call, PalletAccountSecurityAuthorization, Vec<PalletAccountSecurityApproval>]
+      >;
+      /**
+       * Enroll the approval policy and backup atomically; every initial authority must accept.
+       * Policy fields stay flat so hardware wallets can label the choices being approved.
+       **/
+      register: AugmentedSubmittable<
+        (
+          account: AccountId32 | string | Uint8Array,
+          signers: Vec<AccountId32> | (AccountId32 | string | Uint8Array)[],
+          quorum: u16 | AnyNumber | Uint8Array,
+          recoveryAccount: AccountId32 | string | Uint8Array,
+          recoveryDelay: u64 | AnyNumber | Uint8Array,
+          authorization:
+            | PalletAccountSecurityAuthorization
+            | { group?: any; nonce?: any; expiresAt?: any; policyHash?: any }
+            | string
+            | Uint8Array,
+          approvals:
+            | Vec<PalletAccountSecurityApproval>
+            | (
+                | PalletAccountSecurityApproval
+                | { signer?: any; signature?: any; withMetadataHash?: any }
+                | string
+                | Uint8Array
+              )[],
+        ) => SubmittableExtrinsic<ApiType>,
+        [
+          AccountId32,
+          Vec<AccountId32>,
+          u16,
+          AccountId32,
+          u64,
+          PalletAccountSecurityAuthorization,
+          Vec<PalletAccountSecurityApproval>,
+        ]
+      >;
+      /**
+       * Normal signer changes use the current quorum immediately. Recovery uses the backup
+       * after the current tick delay; replacing the backup or delay uses the current quorum
+       * after that same delay. Main consent and new authorities' acceptance are always required.
+       **/
+      updatePolicy: AugmentedSubmittable<
+        (
+          account: AccountId32 | string | Uint8Array,
+          signers: Vec<AccountId32> | (AccountId32 | string | Uint8Array)[],
+          quorum: u16 | AnyNumber | Uint8Array,
+          recoveryAccount: AccountId32 | string | Uint8Array,
+          recoveryDelay: u64 | AnyNumber | Uint8Array,
+          authorization:
+            | PalletAccountSecurityAuthorization
+            | { group?: any; nonce?: any; expiresAt?: any; policyHash?: any }
+            | string
+            | Uint8Array,
+          approvals:
+            | Vec<PalletAccountSecurityApproval>
+            | (
+                | PalletAccountSecurityApproval
+                | { signer?: any; signature?: any; withMetadataHash?: any }
+                | string
+                | Uint8Array
+              )[],
+        ) => SubmittableExtrinsic<ApiType>,
+        [
+          AccountId32,
+          Vec<AccountId32>,
+          u16,
+          AccountId32,
+          u64,
+          PalletAccountSecurityAuthorization,
+          Vec<PalletAccountSecurityApproval>,
+        ]
+      >;
+    };
     balances: {
       /**
        * Burn the specified liquid free balance from the origin account.
@@ -1525,18 +1660,7 @@ declare module '@polkadot/api-base/types/submittable' {
             | { Address20: any }
             | string
             | Uint8Array,
-          proxyType:
-            | ArgonRuntimeProxyType
-            | 'Any'
-            | 'NonTransfer'
-            | 'PriceIndex'
-            | 'MiningBid'
-            | 'MiningBidRealPaysFee'
-            | 'Bitcoin'
-            | 'VaultAdmin'
-            | 'VaultDelegate'
-            | number
-            | Uint8Array,
+          proxyType: ArgonRuntimeProxyType | 'Any' | 'MiningBidRealPaysFee' | number | Uint8Array,
           delay: u32 | AnyNumber | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
         [MultiAddress, ArgonRuntimeProxyType, u32]
@@ -1595,18 +1719,7 @@ declare module '@polkadot/api-base/types/submittable' {
        **/
       createPure: AugmentedSubmittable<
         (
-          proxyType:
-            | ArgonRuntimeProxyType
-            | 'Any'
-            | 'NonTransfer'
-            | 'PriceIndex'
-            | 'MiningBid'
-            | 'MiningBidRealPaysFee'
-            | 'Bitcoin'
-            | 'VaultAdmin'
-            | 'VaultDelegate'
-            | number
-            | Uint8Array,
+          proxyType: ArgonRuntimeProxyType | 'Any' | 'MiningBidRealPaysFee' | number | Uint8Array,
           delay: u32 | AnyNumber | Uint8Array,
           index: u16 | AnyNumber | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
@@ -1641,18 +1754,7 @@ declare module '@polkadot/api-base/types/submittable' {
             | { Address20: any }
             | string
             | Uint8Array,
-          proxyType:
-            | ArgonRuntimeProxyType
-            | 'Any'
-            | 'NonTransfer'
-            | 'PriceIndex'
-            | 'MiningBid'
-            | 'MiningBidRealPaysFee'
-            | 'Bitcoin'
-            | 'VaultAdmin'
-            | 'VaultDelegate'
-            | number
-            | Uint8Array,
+          proxyType: ArgonRuntimeProxyType | 'Any' | 'MiningBidRealPaysFee' | number | Uint8Array,
           index: u16 | AnyNumber | Uint8Array,
           height: Compact<u32> | AnyNumber | Uint8Array,
           extIndex: Compact<u32> | AnyNumber | Uint8Array,
@@ -1698,13 +1800,7 @@ declare module '@polkadot/api-base/types/submittable' {
             | Uint8Array
             | ArgonRuntimeProxyType
             | 'Any'
-            | 'NonTransfer'
-            | 'PriceIndex'
-            | 'MiningBid'
             | 'MiningBidRealPaysFee'
-            | 'Bitcoin'
-            | 'VaultAdmin'
-            | 'VaultDelegate'
             | number,
           call: Call | IMethod | string | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
@@ -1749,13 +1845,7 @@ declare module '@polkadot/api-base/types/submittable' {
             | Uint8Array
             | ArgonRuntimeProxyType
             | 'Any'
-            | 'NonTransfer'
-            | 'PriceIndex'
-            | 'MiningBid'
             | 'MiningBidRealPaysFee'
-            | 'Bitcoin'
-            | 'VaultAdmin'
-            | 'VaultDelegate'
             | number,
           call: Call | IMethod | string | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
@@ -1844,18 +1934,7 @@ declare module '@polkadot/api-base/types/submittable' {
             | { Address20: any }
             | string
             | Uint8Array,
-          proxyType:
-            | ArgonRuntimeProxyType
-            | 'Any'
-            | 'NonTransfer'
-            | 'PriceIndex'
-            | 'MiningBid'
-            | 'MiningBidRealPaysFee'
-            | 'Bitcoin'
-            | 'VaultAdmin'
-            | 'VaultDelegate'
-            | number
-            | Uint8Array,
+          proxyType: ArgonRuntimeProxyType | 'Any' | 'MiningBidRealPaysFee' | number | Uint8Array,
           delay: u32 | AnyNumber | Uint8Array,
         ) => SubmittableExtrinsic<ApiType>,
         [MultiAddress, ArgonRuntimeProxyType, u32]

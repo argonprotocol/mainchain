@@ -3,7 +3,6 @@ use polkadot_sdk::*;
 use sp_core::crypto::AccountId32;
 use sp_core::Decode;
 use sp_core::{ByteArray, H256};
-use sp_runtime::MultiSignature;
 use std::collections::HashMap;
 use std::str::FromStr;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -25,7 +24,8 @@ use argon_client::{
 use argon_primitives::host::Host;
 use argon_primitives::tick::{Tick, Ticker};
 use argon_primitives::{
-  Balance, ChainIdentity, Domain, DomainTopLevel, NotaryId, NotebookNumber, TransferToLocalchainId,
+  Balance, ChainIdentity, Domain, DomainTopLevel, NotaryId, NotebookNumber, Signature,
+  TransferToLocalchainId,
 };
 
 use crate::AccountStore;
@@ -395,7 +395,7 @@ impl MainchainClient {
 
     let signature = keystore.sign(address.clone(), payload).await?;
 
-    let multi_signature = MultiSignature::decode(&mut signature.as_ref())?;
+    let signature = Signature::decode(&mut signature.as_ref())?;
 
     // have to recreate this because the internal types are not send. inefficient, but small penalty
     let submittable = {
@@ -403,7 +403,7 @@ impl MainchainClient {
         .live
         .tx()
         .create_partial_offline(&send_tx, params())?
-        .sign_with_account_and_signature(&account_id, &multi_signature)
+        .sign_with_account_and_signature(&account_id, &signature)
     };
 
     let tx_progress = submittable.submit_and_watch().await?;

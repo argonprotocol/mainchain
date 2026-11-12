@@ -1,0 +1,8 @@
+{
+  "extends": "../../client/nodejs/tsconfig.test.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": "../.."
+  },
+  "include": ["../../client/nodejs/src", "*.ts"]
+}
