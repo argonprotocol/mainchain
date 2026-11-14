@@ -41,7 +41,9 @@ cleanup() {
 }
 trap cleanup EXIT
 
-if [[ "$selection" != vault ]]; then
+export ARGON_SIGNER_METADATA_V15="$repo_dir/client/metadata.scale"
+
+if [[ "$selection" == vault || "$selection" == all ]]; then
   runtime_target="${CARGO_TARGET_DIR:-$signer_cache/runtime-target}"
   runtime_build="${CARGO_BUILD_BUILD_DIR:-$signer_cache/runtime-build}"
   cd "$repo_dir"
@@ -51,9 +53,11 @@ if [[ "$selection" != vault ]]; then
     -L "dependency=$runtime_build/debug/deps" \
     --extern "argon_runtime=$runtime_target/debug/libargon_runtime.rlib" \
     -o "$signer_cache/export-metadata"
-  "$signer_cache/export-metadata" "$signer_cache/runtime-v15.scale"
-  export ARGON_SIGNER_METADATA_V15="$signer_cache/runtime-v15.scale"
+  "$signer_cache/export-metadata" "$signer_cache/runtime-v14.scale" 14
+  export ARGON_SIGNER_METADATA_V14="$signer_cache/runtime-v14.scale"
+fi
 
+if [[ "$selection" != vault ]]; then
   ledger_source="$signer_cache/ledger-polkadot"
   if [[ ! -d "$ledger_source/.git" ]]; then
     gh repo clone Zondax/ledger-polkadot "$ledger_source" -- \

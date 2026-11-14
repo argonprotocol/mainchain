@@ -13,22 +13,25 @@
   },
   "homepage": "https://github.com/argonprotocol/mainchain#readme",
   "scripts": {
-    "build": "yarn generate:defs && yarn generate:meta && node clean-build.js && yarn tsc",
+    "build": "yarn tsc",
+    "generate": "tsx src/scripts/generateMetadata.ts && yarn generate:defs && yarn generate:meta && node clean-build.js",
     "generate:contract-declarations": "yarn workspace @argonprotocol/ethereum-contracts build && tsc -p tsconfig.contracts.json",
     "generate:defs": "polkadot-types-from-defs --endpoint metadata.json --input ./src/interfaces --package @argonprotocol/mainchain/interfaces",
     "generate:meta": "polkadot-types-from-chain --endpoint metadata.json --output ./src/interfaces --package @argonprotocol/mainchain/interfaces --strict",
-    "test": "vitest --run --config vitest.config.ts",
-    "tsc": "yarn generate:contract-declarations && tsup && yarn validate:package",
+    "pretest": "yarn generate && yarn generate:contract-declarations",
+    "pretest:ci": "yarn pretest",
+    "test": "yarn pretest && vitest --run --config vitest.config.ts",
+    "tsc": "yarn generate && yarn generate:contract-declarations && tsup && yarn validate:package",
     "tsup": "yarn tsc",
     "validate:package": "tsx src/scripts/validatePackage.ts",
-    "backfill:flexible-bond-metrics": "tsx src/scripts/backfillFlexibleBondMetrics.ts",
-    "watch": "yarn generate:contract-declarations && tsup --watch",
-    "typecheck": "yarn workspace @argonprotocol/ethereum-contracts build && tsc --noEmit -p tsconfig.test.json"
+    "backfill:flexible-bond-metrics": "yarn pretest && tsx src/scripts/backfillFlexibleBondMetrics.ts",
+    "watch": "yarn generate && yarn generate:contract-declarations && tsup --watch",
+    "typecheck": "yarn generate && yarn workspace @argonprotocol/ethereum-contracts build && tsc --noEmit -p tsconfig.test.json"
   },
   "files": [
     "lib/",
     "browser/",
-    "src/interfaces/"
+    "src/interfaces/**"
   ],
   "type": "module",
   "module": "./lib/index.js",
@@ -47,7 +50,7 @@
       }
     },
     "./interfaces/*": {
-      "types": "./src/interfaces/*/index.ts"
+      "types": "./src/interfaces/*.ts"
     }
   },
   "dependencies": {

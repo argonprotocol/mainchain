@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,12 +14,15 @@ it(
   async () => {
     await cryptoWaitReady();
     const transfer = approvalFixture('transfer');
+    const metadataPath = process.env.ARGON_SIGNER_METADATA_V14;
+    if (!metadataPath) throw new Error('Run through testing/signers/run.sh vault for V14 metadata');
+
     const dir = mkdtempSync(join(tmpdir(), 'argon-vault-review-'));
     const fixturesPath = join(dir, 'fixtures.json');
     writeFileSync(
       fixturesPath,
       JSON.stringify({
-        metadata: Buffer.from(transfer.metadata.toU8a()).toString('hex'),
+        metadata: readFileSync(metadataPath).toString('hex'),
         payloads: {
           transfer: transfer.vault,
           batch: approvalFixture('batch').vault,

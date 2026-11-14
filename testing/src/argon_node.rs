@@ -411,7 +411,6 @@ fn normalize_bootnode_address(address: String) -> String {
 #[cfg(all(test, unix))]
 mod tests {
 	use super::*;
-	use bitcoin::hex::FromHex;
 	use sp_core::H256;
 	use std::{
 		fs,
@@ -424,7 +423,7 @@ mod tests {
 	use subxt::ext::{
 		codec::Encode,
 		frame_metadata::OpaqueMetadata,
-		jsonrpsee::{core::JsonValue, server::ServerBuilder, types::ErrorObjectOwned, RpcModule},
+		jsonrpsee::{server::ServerBuilder, types::ErrorObjectOwned, RpcModule},
 		subxt_rpcs::methods::legacy::RuntimeVersion,
 	};
 
@@ -457,12 +456,8 @@ mod tests {
 			Ok::<_, ErrorObjectOwned>(H256::repeat_byte(1))
 		})
 		.unwrap();
-		let metadata: JsonValue =
-			include_str!("../../client/nodejs/metadata.json").parse().unwrap();
-		let metadata = OpaqueMetadata(
-			Vec::from_hex(metadata["result"].as_str().unwrap().trim_start_matches("0x")).unwrap(),
-		)
-		.encode();
+		let metadata =
+			OpaqueMetadata(include_bytes!("../../client/metadata.scale").to_vec()).encode();
 		let metadata = format!("0x{}", metadata.as_hex());
 		rpc.register_method("state_call", move |params, _, _| {
 			let (method, _, _): (String, String, H256) = params.parse()?;

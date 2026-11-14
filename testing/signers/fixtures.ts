@@ -3,16 +3,18 @@ import type { Call } from '@polkadot/types/interfaces';
 import { decorateExtrinsics } from '@polkadot/types/metadata/decorate';
 import { compactAddLength, hexToU8a, u8aConcat, u8aToHex } from '@polkadot/util';
 import { blake2AsU8a } from '@polkadot/util-crypto';
+import { readFileSync } from 'node:fs';
 import { createAccountSecuritySigningPayload } from '../../client/nodejs/src/accountSecurity';
-import runtimeMetadata from '../../client/nodejs/metadata.json';
 import runtimeVersion from '../../client/nodejs/runtime_version.json';
+
+const runtimeMetadata = readFileSync(new URL('../../client/metadata.scale', import.meta.url));
 
 export function approvalFixture(
   kind: 'transfer' | 'batch' | 'register' | 'updatePolicy',
   metadataHash?: `0x${string}`,
 ) {
   const registry = new TypeRegistry();
-  const metadata = new Metadata(registry, runtimeMetadata.result as `0x${string}`);
+  const metadata = new Metadata(registry, runtimeMetadata);
   registry.setMetadata(metadata);
   registry.setChainProperties(
     registry.createType('ChainProperties', {
