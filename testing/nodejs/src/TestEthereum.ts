@@ -277,6 +277,7 @@ export default class TestEthereum implements ITeardownable {
     }
 
     const bootstrapCouncil = {
+      version: 1,
       signers: [adminSafe],
       weights: [1n],
     } as const;

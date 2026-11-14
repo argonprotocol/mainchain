@@ -26,6 +26,8 @@ export const CREATE2_DEPLOYER_CODE =
 export interface StabilizationPoolConfig {
   /** Explicit Ethereum chain ID, checked before preparing or publishing transactions. */
   chainId: string;
+  /** Gateway proxy supplying the hook's council-authenticated inflation. */
+  gateway: string;
   /** Canonical 18-decimal ARGN and 6-decimal USDC contract addresses. */
   argonToken: string;
   usdc: string;
@@ -57,6 +59,7 @@ export async function prepareStabilizationPool(
   }
 
   const argonToken = getAddress(config.argonToken);
+  const gateway = getAddress(config.gateway);
   const usdc = getAddress(config.usdc);
   const positionManager = getAddress(config.positionManager);
   if (argonToken === usdc) throw new Error('ARGN and USDC must be distinct');
@@ -68,7 +71,7 @@ export async function prepareStabilizationPool(
   );
   const poolManager = getAddress(await manager.getFunction('poolManager')());
   const dependencyCodeHashes: Record<string, string> = {};
-  for (const address of [argonToken, usdc, positionManager, poolManager]) {
+  for (const address of [gateway, argonToken, usdc, positionManager, poolManager]) {
     if (address === ZeroAddress) throw new Error('Pool dependencies cannot be zero');
     const code = await provider.getCode(address);
     if (code === '0x') throw new Error(`Pool dependency ${address} has no deployed code`);
@@ -95,7 +98,7 @@ export async function prepareStabilizationPool(
     EvmContracts.stabilizationPoolHookArtifact.bytecode,
     runner,
   );
-  const hookConstructorArgs = [poolManager, argonToken, usdc, config.tickSpacing];
+  const hookConstructorArgs = [poolManager, gateway, argonToken, usdc, config.tickSpacing];
   const hookInitCode = (await hookFactory.getDeployTransaction(...hookConstructorArgs)).data;
   const hookInitCodeHash = keccak256(hookInitCode);
   let hookSalt = ZeroHash;
@@ -178,7 +181,7 @@ export async function prepareStabilizationPool(
       key: poolKey,
       sqrtPriceX96: sqrtPriceX96.toString(),
       buyFee: 5_000,
-      sellFee: 100_000,
+      maxSellFee: 100_000,
       oracleAddress: hookAddress,
     },
     initialization: {

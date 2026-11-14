@@ -1172,10 +1172,11 @@ function createCouncil(memberCount: number): Council {
     hash: hashMintingGatewayGlobalIssuanceCouncil({
       signers,
       weights,
+      version: 1,
       epochMicrogonsPerArgonot: MICROGONS_PER_ARGONOT,
     }),
     epochMicrogonsPerArgonot: MICROGONS_PER_ARGONOT,
-    snapshot: { signers, weights },
+    snapshot: { signers, weights, version: 1 },
     quorumSigners: wallets.slice(0, quorumCount),
   };
 }

@@ -17,6 +17,7 @@ import {ModifyLiquidityParams, SwapParams} from "@uniswap/v4-core/src/types/Pool
 import {PoolModifyLiquidityTest} from "@uniswap/v4-core/src/test/PoolModifyLiquidityTest.sol";
 import {PoolSwapTest} from "@uniswap/v4-core/src/test/PoolSwapTest.sol";
 import {TestERC20} from "@uniswap/v4-core/src/test/TestERC20.sol";
+import {TestInflationGateway} from "./UniswapFixtures.sol";
 import {StabilizationPoolHook} from "../StabilizationPoolHook.sol";
 import {OracleHookTestDeployer} from "./OracleHookTestDeployer.sol";
 
@@ -279,7 +280,13 @@ contract StabilizationPoolHookInvariant {
 		OracleHookTestDeployer deployer = new OracleHookTestDeployer();
 		bytes memory initCode = abi.encodePacked(
 			type(StabilizationPoolHook).creationCode,
-			abi.encode(manager, address(argonToken), address(usdcToken), _TICK_SPACING)
+			abi.encode(
+				manager,
+				new TestInflationGateway(),
+				address(argonToken),
+				address(usdcToken),
+				_TICK_SPACING
+			)
 		);
 		bytes32 initCodeHash = keccak256(initCode);
 		uint160 flags = Hooks.AFTER_INITIALIZE_FLAG | Hooks.BEFORE_ADD_LIQUIDITY_FLAG

@@ -62,7 +62,8 @@ The gateway is where the actual protocol behavior lives:
   block seeds that root from the previous locator hash, so later proof systems can anchor on
   `stateRoot` while still reconstructing the rich activity payload from emitted logs
 - each council rotation carries the next `microgonsPerArgonot` floor value alongside the next
-  council snapshot
+  council snapshot. Existing V0 councils retain their hashes and signatures. New V1 councils commit
+  signed cumulative USD inflation, including zero
 - transfer-out requests carry one exact `microgonsPerArgonot` quote, and Ethereum only accepts the
   request if that quoted rate is at or below the council-approved maximum. Argon preserves
   outstanding quotes in that maximum while pricing new requests from the conservative market floor.
@@ -359,10 +360,13 @@ observations are overwritten once the buffer fills. Reads extrapolate through qu
 PoolManager's current tick and liquidity. History starts at initialization and must warm up before
 the full one-hour window is available.
 
-ARGN sales pay 10% and ARGN purchases pay 0.5%. Both fees go to liquidity providers. The hook
-overrides the fee on every swap, including exact-output trades and swaps through other routers.
-Direction follows the ARGN token address regardless of currency ordering. There is no treasury
-deduction. The hook exposes the v3-compatible `observe()` interface used by the Rust oracle.
+ARGN sales remove the inflation uplift using `inflation / (1 + inflation)`, rounded up to millionths
+and clamped between 0.5% and 10%; zero or negative inflation charges 0.5%. ARGN purchases pay 0.5%.
+The hook pins the gateway proxy supplied to its constructor, which publishes signed inflation
+through council updates. Both fees go to liquidity providers. The hook overrides the fee on every
+swap, including exact-output trades and swaps through other routers. Direction follows the ARGN
+token address regardless of currency ordering. There is no treasury deduction. The hook exposes the
+v3-compatible `observe()` interface used by the Rust oracle.
 
 The [deployment workspace](../deploy/README.md#stabilization-pool) prepares and publishes the hook,
 shared position subscriber, price quoter, pool initialization, and Argon registration call. Each

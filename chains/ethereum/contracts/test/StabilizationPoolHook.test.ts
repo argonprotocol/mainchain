@@ -26,6 +26,15 @@ const Q96 = 1n << 96n;
 afterAll(async () => connection.close());
 
 describe('Stabilization pool publication and directional LP fees', () => {
+  it('charges the minimum sell fee at zero inflation', async () => {
+    const { gateway, deployment } = await fixture();
+    await (await gateway.setInflation(0n)).wait();
+    expect(await gateway.inflationPercentSinceLaunch()).toBe(0n);
+    await publishStabilizationPool(deployer, deployment, async () => {});
+    const hook = await ethers.getContractAt('StabilizationPoolHook', deployment.pool.oracleAddress);
+    expect(await hook.sellFee()).toBe(5_000n);
+  });
+
   it('exports the hook, subscriber and price quoter for source verification', async () => {
     const { deployment } = await fixture();
     const outputDir = await mkdtemp(join(tmpdir(), 'stabilization-verification-'));
@@ -71,8 +80,8 @@ describe('Stabilization pool publication and directional LP fees', () => {
   });
 
   for (const argonIsToken0 of [true, false]) {
-    it(`charges 10% sells and 0.5% buys with ARGN as currency${argonIsToken0 ? 0 : 1}`, async () => {
-      const { owner, poolManager, argon, usdc, deployment } = await fixture(argonIsToken0);
+    it(`clamps inflation-derived sell fees to 0.5%–10% and charges 0.5% buys with ARGN as currency${argonIsToken0 ? 0 : 1}`, async () => {
+      const { owner, poolManager, argon, usdc, gateway, deployment } = await fixture(argonIsToken0);
       const nonceBefore = await ethers.provider.getTransactionCount(owner.address);
       expect(await ethers.provider.getCode(deployment.pool.oracleAddress)).toBe('0x');
 
@@ -83,6 +92,7 @@ describe('Stabilization pool publication and directional LP fees', () => {
       );
       expect(await hook.poolId()).toBe(deployment.pool.poolId);
       expect(await hook.argonToken()).toBe(await argon.getAddress());
+      expect(await hook.gateway()).toBe(await gateway.getAddress());
       expect(await ethers.provider.getTransactionCount(owner.address)).toBe(nonceBefore + 4);
       const quoter = await ethers.getContractAt(
         'UniswapV4PriceQuoter',
@@ -129,69 +139,94 @@ describe('Stabilization pool publication and directional LP fees', () => {
       );
       const start = (await ethers.provider.getBlock('latest'))!.timestamp;
       let elapsed = 0;
-      for (const sellingArgon of [true, false]) {
-        for (const exactInput of [true, false]) {
-          const zeroForOne = sellingArgon === argonIsToken0;
-          elapsed += 10;
-          await ethers.provider.send('evm_setNextBlockTimestamp', [start + elapsed]);
+      const inflationFees = [
+        [0n, 5_000n],
+        [-10_000_000_000_000_000n, 5_000n],
+        [1n, 5_000n],
+        [5_025_125_628_140_703n, 5_000n],
+        [5_025_125_628_140_704n, 5_001n],
+        [60_000_000_000_000_000n, 56_604n],
+        [100_000_000_000_000_000n, 90_910n],
+        [120_000_000_000_000_000n, 100_000n],
+        [(1n << 127n) - 1n, 100_000n],
+      ];
+      for (const [inflation, expectedSellFee] of inflationFees) {
+        await (await gateway.setInflation(inflation)).wait();
+        expect(await hook.sellFee()).toBe(expectedSellFee);
+        for (const sellingArgon of [true, false]) {
+          for (const exactInput of [true, false]) {
+            const zeroForOne = sellingArgon === argonIsToken0;
+            elapsed += 10;
+            await ethers.provider.send('evm_setNextBlockTimestamp', [start + elapsed]);
 
-          const stateBefore = await poolManager['extsload(bytes32)'](poolStateSlot);
-          const observationIndexBefore = await hook.observationIndex();
-          const quoteParams = { poolKey: key, zeroForOne, exactAmount: 1_000_000n, hookData: '0x' };
-          let quote;
-          if (exactInput) {
-            quote = await quoter.quoteExactInputSingle.staticCall(quoteParams);
-          } else {
-            quote = await quoter.quoteExactOutputSingle.staticCall(quoteParams);
-          }
-          expect(quote.gasEstimate).toBeGreaterThan(0n);
-          expect(await poolManager['extsload(bytes32)'](poolStateSlot)).toBe(stateBefore);
-          expect(await hook.observationIndex()).toBe(observationIndexBefore);
-
-          if (sellingArgon && exactInput) {
-            // Even a submitted quote rolls back its pool and hook writes before returning.
-            const quoteReceipt = await (await quoter.quoteExactInputSingle(quoteParams)).wait();
-            expect(quoteReceipt!.logs).toHaveLength(0);
+            const feeGrowthSlot = ethers.toBeHex(
+              BigInt(poolStateSlot) + (zeroForOne ? 1n : 2n),
+              32,
+            );
+            const feeGrowthBefore = BigInt(await poolManager['extsload(bytes32)'](feeGrowthSlot));
+            const stateBefore = await poolManager['extsload(bytes32)'](poolStateSlot);
+            const observationIndexBefore = await hook.observationIndex();
+            const quoteParams = {
+              poolKey: key,
+              zeroForOne,
+              exactAmount: 1_000_000n,
+              hookData: '0x',
+            };
+            let quote;
+            if (exactInput) {
+              quote = await quoter.quoteExactInputSingle.staticCall(quoteParams);
+            } else {
+              quote = await quoter.quoteExactOutputSingle.staticCall(quoteParams);
+            }
+            expect(quote.gasEstimate).toBeGreaterThan(0n);
             expect(await poolManager['extsload(bytes32)'](poolStateSlot)).toBe(stateBefore);
             expect(await hook.observationIndex()).toBe(observationIndexBefore);
-            expect(await quoter.msgSender()).toBe(ethers.ZeroAddress);
-          }
 
-          const transaction = await swapRouter.swap(
-            key,
-            {
-              zeroForOne,
-              amountSpecified: exactInput ? -1_000_000n : 1_000_000n,
-              sqrtPriceLimitX96: zeroForOne
-                ? 4295128740n
-                : 1461446703485210103287273052203988822378723970341n,
-            },
-            { takeClaims: false, settleUsingBurn: false },
-            '0x',
-          );
-          const receipt = await transaction.wait();
-          const swap = receipt.logs
-            .filter((log: { address: string }) => log.address === poolManager.target)
-            .map((log: { topics: string[]; data: string }) => poolManager.interface.parseLog(log))
-            .find((event: { name: string } | null) => event?.name === 'Swap');
-          expect(swap.args.fee).toBe(sellingArgon ? 100_000n : 5_000n);
-          expect(swap.args.amount0 < 0n).toBe(zeroForOne);
-          let quoteAmount;
-          if (exactInput) {
-            quoteAmount = zeroForOne ? swap.args.amount1 : swap.args.amount0;
-          } else {
-            quoteAmount = -(zeroForOne ? swap.args.amount0 : swap.args.amount1);
-          }
-          expect(quote[0]).toBe(quoteAmount);
-          expect(quote.sqrtPriceX96After).toBe(swap.args.sqrtPriceX96);
-          expect(quote.sqrtPriceX96After).not.toBe(BigInt(stateBefore) & ((1n << 160n) - 1n));
-          if (sellingArgon && !exactInput) {
-            expect(swap.args.liquidity).toBe(1_000_000_000n);
-          }
+            if (sellingArgon && exactInput) {
+              // Even a submitted quote rolls back its pool and hook writes before returning.
+              const quoteReceipt = await (await quoter.quoteExactInputSingle(quoteParams)).wait();
+              expect(quoteReceipt!.logs).toHaveLength(0);
+              expect(await poolManager['extsload(bytes32)'](poolStateSlot)).toBe(stateBefore);
+              expect(await hook.observationIndex()).toBe(observationIndexBefore);
+              expect(await quoter.msgSender()).toBe(ethers.ZeroAddress);
+            }
 
-          // Core credits the fee to LP growth in the input currency; no treasury receives it.
-          const feeGrowthSlot = ethers.toBeHex(BigInt(poolStateSlot) + (zeroForOne ? 1n : 2n), 32);
-          expect(BigInt(await poolManager['extsload(bytes32)'](feeGrowthSlot))).toBeGreaterThan(0n);
+            const transaction = await swapRouter.swap(
+              key,
+              {
+                zeroForOne,
+                amountSpecified: exactInput ? -1_000_000n : 1_000_000n,
+                sqrtPriceLimitX96: zeroForOne
+                  ? 4295128740n
+                  : 1461446703485210103287273052203988822378723970341n,
+              },
+              { takeClaims: false, settleUsingBurn: false },
+              '0x',
+            );
+            const receipt = await transaction.wait();
+            const swap = receipt.logs
+              .filter((log: { address: string }) => log.address === poolManager.target)
+              .map((log: { topics: string[]; data: string }) => poolManager.interface.parseLog(log))
+              .find((event: { name: string } | null) => event?.name === 'Swap');
+            expect(swap.args.fee).toBe(sellingArgon ? expectedSellFee : 5_000n);
+            expect(swap.args.amount0 < 0n).toBe(zeroForOne);
+            let quoteAmount;
+            if (exactInput) {
+              quoteAmount = zeroForOne ? swap.args.amount1 : swap.args.amount0;
+            } else {
+              quoteAmount = -(zeroForOne ? swap.args.amount0 : swap.args.amount1);
+            }
+            expect(quote[0]).toBe(quoteAmount);
+            expect(quote.sqrtPriceX96After).toBe(swap.args.sqrtPriceX96);
+            expect(quote.sqrtPriceX96After).not.toBe(BigInt(stateBefore) & ((1n << 160n) - 1n));
+            if (sellingArgon && !exactInput) {
+              expect(swap.args.liquidity).toBe(1_000_000_000n);
+            }
+
+            // Core credits the fee to LP growth in the input currency; no treasury receives it.
+            const feeGrowthAfter = BigInt(await poolManager['extsload(bytes32)'](feeGrowthSlot));
+            expect(feeGrowthAfter).toBeGreaterThan(feeGrowthBefore);
+          }
         }
       }
 
@@ -299,7 +334,9 @@ async function fixture(argonIsToken0 = true) {
     owner.address,
     owner.address,
   ]);
+
   const argon = await ethers.deployContract('TestArgon');
+  const gateway = await ethers.deployContract('TestInflationGateway');
   let usdc = await ethers.deployContract('TestUSDC');
   while (BigInt(await argon.getAddress()) < BigInt(await usdc.getAddress()) !== argonIsToken0) {
     usdc = await ethers.deployContract('TestUSDC');
@@ -309,6 +346,7 @@ async function fixture(argonIsToken0 = true) {
   await ethers.provider.send('hardhat_setCode', [CREATE2_DEPLOYER, CREATE2_DEPLOYER_CODE]);
   const plan = await prepareStabilizationPool(ethers.provider, {
     chainId: (await ethers.provider.getNetwork()).chainId.toString(),
+    gateway: await gateway.getAddress(),
     argonToken: await argon.getAddress(),
     usdc: await usdc.getAddress(),
     positionManager: await positionManager.getAddress(),
@@ -316,7 +354,7 @@ async function fixture(argonIsToken0 = true) {
     sqrtPriceX96: Q96.toString(),
   });
   const deployment: StabilizationPoolDeployment = { ...plan, transactions: {} };
-  return { owner, poolManager, argon, usdc, deployment };
+  return { owner, poolManager, argon, usdc, gateway, deployment };
 }
 
 async function deployCore(name: string, args: unknown[]) {

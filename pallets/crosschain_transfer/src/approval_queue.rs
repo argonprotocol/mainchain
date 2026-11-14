@@ -5,7 +5,7 @@ use argon_primitives::{
 };
 use frame_support::ensure;
 use pallet_prelude::*;
-use polkadot_sdk::sp_runtime::BoundedBTreeMap;
+use polkadot_sdk::sp_runtime::{BoundedBTreeMap, FixedPointNumber, FixedU128};
 
 use super::{
 	ActiveGlobalIssuanceCouncilByDestinationChain, Config,
@@ -55,10 +55,7 @@ impl<T: Config> Pallet<T> {
 			destination_chain,
 			CouncilMemberSource::ExistingCouncil(&active_council),
 		)?;
-		let next_council_hash = Self::hash_global_issuance_council(
-			&next_council.members,
-			next_council.epoch_microgons_per_argonot,
-		);
+		let next_council_hash = Self::hash_global_issuance_council(&next_council);
 		if next_council_hash == active_council_hash &&
 			CurrentTransferOutMicrogonsPerArgonotByDestinationChain::<T>::contains_key(
 				destination_chain,
@@ -211,7 +208,26 @@ impl<T: Config> Pallet<T> {
 			.map_or(T::Balance::default(), |(rate, _)| *rate);
 		let epoch_microgons_per_argonot = market_microgons_per_argonot.max(outstanding_rate);
 
-		Ok(GlobalIssuanceCouncil::<T> { epoch_microgons_per_argonot, members, total_weight })
+		// Initial bootstrap retains the existing gateway initializer. Every subsequent council
+		// snapshot captures inflation, independently of the format of pending approvals.
+		let mut inflation_percent_since_launch = 0;
+		if ActiveGlobalIssuanceCouncilByDestinationChain::<T>::contains_key(destination_chain) {
+			let target_price = T::PriceProvider::get_target_argon_price_in_usd()
+				.ok_or(Error::<T>::InvalidInflationPercentSinceLaunch)?;
+			let target_price: i128 = target_price
+				.into_inner()
+				.try_into()
+				.map_err(|_| Error::<T>::InvalidInflationPercentSinceLaunch)?;
+			inflation_percent_since_launch = target_price - FixedU128::DIV as i128;
+		}
+
+		Ok(GlobalIssuanceCouncil::<T> {
+			epoch_microgons_per_argonot,
+			members,
+			total_weight,
+			version: 1,
+			inflation_percent_since_launch,
+		})
 	}
 
 	pub(crate) fn activate_global_issuance_council_signers(
@@ -797,10 +813,8 @@ mod tests {
 					.expect("active council snapshot should be stored");
 			queued_rotation_council.epoch_microgons_per_argonot =
 				2 * argon_primitives::MICROGONS_PER_ARGON;
-			let queued_rotation_hash = CrosschainTransfer::hash_global_issuance_council(
-				&queued_rotation_council.members,
-				queued_rotation_council.epoch_microgons_per_argonot,
-			);
+			let queued_rotation_hash =
+				CrosschainTransfer::hash_global_issuance_council(&queued_rotation_council);
 			GlobalIssuanceCouncilByHash::<Test>::insert(
 				queued_rotation_hash,
 				queued_rotation_council,
@@ -892,10 +906,8 @@ mod tests {
 					.expect("active council snapshot should be stored");
 			queued_rotation_council.epoch_microgons_per_argonot =
 				2 * argon_primitives::MICROGONS_PER_ARGON;
-			let queued_rotation_hash = CrosschainTransfer::hash_global_issuance_council(
-				&queued_rotation_council.members,
-				queued_rotation_council.epoch_microgons_per_argonot,
-			);
+			let queued_rotation_hash =
+				CrosschainTransfer::hash_global_issuance_council(&queued_rotation_council);
 			GlobalIssuanceCouncilByHash::<Test>::insert(
 				queued_rotation_hash,
 				queued_rotation_council,

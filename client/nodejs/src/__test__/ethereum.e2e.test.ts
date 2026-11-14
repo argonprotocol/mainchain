@@ -130,6 +130,7 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
       const syncGatewayCouncilReceipt = await gateway.forceUpdateActiveCouncil(
         configuredCouncil,
         councilSetup.activeCouncil.epochMicrogonsPerArgonot.toBigInt(),
+        councilSetup.activeCouncil.inflationPercentSinceLaunch.toBigInt(),
       );
       expect(syncGatewayCouncilReceipt.status).toBe('success');
 
@@ -146,9 +147,10 @@ describe.skipIf(SKIP_E2E || !TestEthereum.isInstalled())('Ethereum proof e2e', (
 
       const contractCouncil = await gateway.globalIssuanceCouncil();
       const expectedGatewayCouncilHash = hashMintingGatewayGlobalIssuanceCouncil({
-        signers: configuredCouncil.signers,
-        weights: configuredCouncil.weights,
+        ...configuredCouncil,
         epochMicrogonsPerArgonot: councilSetup.activeCouncil.epochMicrogonsPerArgonot.toBigInt(),
+        inflationPercentSinceLaunch:
+          councilSetup.activeCouncil.inflationPercentSinceLaunch.toBigInt(),
       });
 
       expect(expectedGatewayCouncilHash).toBe(activeCouncilHash);

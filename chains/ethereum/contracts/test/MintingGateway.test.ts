@@ -1,4 +1,5 @@
 import { network } from 'hardhat';
+import gatewayV1 from './fixtures/MintingGatewayV1.json' with { type: 'json' };
 import { afterAll, describe, expect, it } from 'vitest';
 import { Wallet, type Log, type TransactionResponse } from 'ethers';
 import { mintingGatewayActivityHashingFixture as gatewayHashFixture } from '../fixtures.js';
@@ -78,6 +79,144 @@ afterAll(async () => {
 });
 
 describe('MintingGateway', () => {
+  it.each([0n, 60_000_000_000_000_000n])(
+    'preserves V0 approvals, then publishes V1 inflation %s',
+    async inflation => {
+      const fixture = await deployFixture(1_000n, 2_000n, gatewayV1.bytecode);
+      const {
+        gateway,
+        council,
+        proxyAdmin,
+        adminSafe,
+        argon,
+        argonot,
+        holder,
+        relayerArgonAccountId,
+      } = fixture;
+      await expect(gateway.inflationPercentSinceLaunch()).rejects.toThrow();
+      const hashContext = await getGatewayHashContext(gateway);
+      const legacyTarget = {
+        council: council.snapshot,
+        epochMicrogonsPerArgonot: council.epochMicrogonsPerArgonot,
+      } satisfies MintingGatewayGlobalIssuanceCouncilRotateTarget;
+      const legacyHash = hashMintingGatewayRotateGlobalIssuanceCouncilApproval(hashContext, {
+        queueNonce: 1n,
+        approvingCouncilHash: council.hash,
+        previousUpdateHash: await gateway.argonApprovalsHash(),
+        target: legacyTarget,
+      });
+      const legacyUpdate = {
+        queueNonce: 1n,
+        kind: MINTING_GATEWAY_UPDATE_KINDS.globalIssuanceCouncilRotate,
+        payload: encodeMintingGatewayGlobalIssuanceCouncilRotateTarget(legacyTarget),
+        signatures: await signApprovalHash(council.quorumSigners, legacyHash),
+      };
+
+      const replacement = await ethers.deployContract('MintingGateway', [
+        argon.target,
+        argonot.target,
+        holder.address,
+      ]);
+      await (
+        await proxyAdmin.connect(adminSafe).upgradeAndCall(gateway.target, replacement.target, '0x')
+      ).wait();
+      await expectCustomError(
+        gateway
+          .connect(adminSafe)
+          .forceUpdateActiveCouncil(
+            { ...council.snapshot, version: 2 },
+            council.epochMicrogonsPerArgonot,
+            0n,
+          ),
+        gateway,
+        'UnsupportedCouncilVersion',
+        [2n],
+      );
+      await expectCustomError(
+        gateway
+          .connect(adminSafe)
+          .forceUpdateActiveCouncil(council.snapshot, council.epochMicrogonsPerArgonot, 1n),
+        gateway,
+        'InflationNotSupportedByCouncilVersion',
+      );
+      await expect(
+        gateway.applyGatewayUpdates(
+          council.snapshot,
+          [
+            {
+              ...legacyUpdate,
+              payload: encodeMintingGatewayGlobalIssuanceCouncilRotateTarget({
+                ...legacyTarget,
+                council: { ...council.snapshot, version: 1 },
+              }),
+            },
+          ],
+          relayerArgonAccountId,
+        ),
+      ).rejects.toThrow();
+      await (
+        await gateway.applyGatewayUpdates(council.snapshot, [legacyUpdate], relayerArgonAccountId)
+      ).wait();
+      expect(await gateway.argonApprovalsHash()).toBe(legacyHash);
+      expect((await gateway.globalIssuanceCouncil()).councilHash).toBe(council.hash);
+
+      const target = {
+        ...legacyTarget,
+        council: { ...legacyTarget.council, version: 1 },
+        inflationPercentSinceLaunch: inflation,
+      } satisfies MintingGatewayGlobalIssuanceCouncilRotateTarget;
+      const approvalHash = hashMintingGatewayRotateGlobalIssuanceCouncilApproval(hashContext, {
+        queueNonce: 2n,
+        approvingCouncilHash: council.hash,
+        previousUpdateHash: legacyHash,
+        target,
+      });
+      const update = {
+        queueNonce: 2n,
+        kind: MINTING_GATEWAY_UPDATE_KINDS.globalIssuanceCouncilRotate,
+        payload: encodeMintingGatewayGlobalIssuanceCouncilRotateTarget(target),
+        signatures: await signApprovalHash(council.quorumSigners, approvalHash),
+      };
+      await expect(
+        gateway.applyGatewayUpdates(
+          council.snapshot,
+          [
+            {
+              ...update,
+              payload: encodeMintingGatewayGlobalIssuanceCouncilRotateTarget({
+                ...target,
+                inflationPercentSinceLaunch: 70_000_000_000_000_000n,
+              }),
+            },
+          ],
+          relayerArgonAccountId,
+        ),
+      ).rejects.toThrow();
+      await (
+        await gateway.applyGatewayUpdates(council.snapshot, [update], relayerArgonAccountId)
+      ).wait();
+      const inflationCouncilHash = hashMintingGatewayGlobalIssuanceCouncil({
+        ...target,
+        ...target.council,
+      });
+      expect((await gateway.globalIssuanceCouncil()).councilHash).toBe(inflationCouncilHash);
+      expect(await gateway.inflationPercentSinceLaunch()).toBe(target.inflationPercentSinceLaunch);
+
+      await (
+        await gateway
+          .connect(adminSafe)
+          .forceUpdateActiveCouncil(
+            target.council,
+            target.epochMicrogonsPerArgonot,
+            30_000_000_000_000_000n,
+          )
+      ).wait();
+      expect(await gateway.inflationPercentSinceLaunch()).toBe(30_000_000_000_000_000n);
+      expect(await gateway.argonApprovalsNonce()).toBe(2n);
+      expect(await gateway.argonApprovalsHash()).toBe(approvalHash);
+    },
+  );
+
   async function getGatewayHashContext(gateway: {
     getAddress(): Promise<string>;
   }): Promise<MintingGatewayHashContext> {
@@ -152,6 +291,7 @@ describe('MintingGateway', () => {
   function createCouncil(
     signers: SignerLike[],
     epochMicrogonsPerArgonot = MICROGONS_PER_ARGONOT,
+    version = 1,
   ): Council {
     const wallets = [...signers].sort((left, right) =>
       left.address.toLowerCase().localeCompare(right.address.toLowerCase()),
@@ -159,6 +299,7 @@ describe('MintingGateway', () => {
     const sortedSigners = wallets.map(wallet => wallet.address as `0x${string}`);
     const weights = wallets.map((_, index) => COUNCIL_WEIGHTS[index] ?? 10n);
     const snapshot = {
+      version,
       signers: sortedSigners,
       weights,
     } satisfies MintingGatewayCouncilSnapshot;
@@ -255,7 +396,7 @@ describe('MintingGateway', () => {
     };
   }
 
-  async function deployGatewayStack() {
+  async function deployGatewayStack(gatewayBytecode?: string) {
     const [
       ,
       adminSafe,
@@ -270,7 +411,14 @@ describe('MintingGateway', () => {
       mintingAuthoritySigner,
     ] = await ethers.getSigners();
 
-    const gatewayFactory = await ethers.getContractFactory('MintingGateway');
+    let gatewayFactory = await ethers.getContractFactory('MintingGateway');
+    if (gatewayBytecode) {
+      gatewayFactory = new ethers.ContractFactory(
+        gatewayFactory.interface,
+        gatewayBytecode,
+        gatewayFactory.runner,
+      );
+    }
     const gatewayBootstrapImplementation = await gatewayFactory.deploy(
       ethers.ZeroAddress,
       ethers.ZeroAddress,
@@ -278,12 +426,16 @@ describe('MintingGateway', () => {
     );
     await gatewayBootstrapImplementation.waitForDeployment();
 
-    const council = createCouncil([
-      councilA as unknown as SignerLike,
-      councilB as unknown as SignerLike,
-      councilC as unknown as SignerLike,
-      councilD as unknown as SignerLike,
-    ]);
+    const council = createCouncil(
+      [
+        councilA as unknown as SignerLike,
+        councilB as unknown as SignerLike,
+        councilC as unknown as SignerLike,
+        councilD as unknown as SignerLike,
+      ],
+      MICROGONS_PER_ARGONOT,
+      gatewayBytecode ? 0 : 1,
+    );
 
     const initializeData = gatewayFactory.interface.encodeFunctionData('initialize', [
       adminSafe.address,
@@ -345,8 +497,12 @@ describe('MintingGateway', () => {
     };
   }
 
-  async function deployFixture(initialArgonMicrogons = 1_000n, initialArgonotMicronots = 2_000n) {
-    const stack = await deployGatewayStack();
+  async function deployFixture(
+    initialArgonMicrogons = 1_000n,
+    initialArgonotMicronots = 2_000n,
+    gatewayBytecode?: string,
+  ) {
+    const stack = await deployGatewayStack(gatewayBytecode);
 
     await stack.proxyAdmin
       .connect(stack.adminSafe)
@@ -1038,7 +1194,7 @@ describe('MintingGateway', () => {
     await expectCustomError(
       fixture.gateway
         .connect(fixture.outsider)
-        .forceUpdateActiveCouncil(nextCouncil.snapshot, nextCouncil.epochMicrogonsPerArgonot),
+        .forceUpdateActiveCouncil(nextCouncil.snapshot, nextCouncil.epochMicrogonsPerArgonot, 0n),
       fixture.gateway,
       'OwnableUnauthorizedAccount',
       [fixture.outsider.address],
@@ -1047,7 +1203,7 @@ describe('MintingGateway', () => {
     const event = await parseGatewayEvent(
       fixture.gateway
         .connect(fixture.adminSafe)
-        .forceUpdateActiveCouncil(nextCouncil.snapshot, nextCouncil.epochMicrogonsPerArgonot),
+        .forceUpdateActiveCouncil(nextCouncil.snapshot, nextCouncil.epochMicrogonsPerArgonot, 0n),
       fixture.gateway,
       'GlobalIssuanceCouncilForceUpdated',
     );
@@ -1102,7 +1258,7 @@ describe('MintingGateway', () => {
 
     await fixture.gateway
       .connect(fixture.adminSafe)
-      .forceUpdateActiveCouncil(nextCouncil.snapshot, nextCouncil.epochMicrogonsPerArgonot);
+      .forceUpdateActiveCouncil(nextCouncil.snapshot, nextCouncil.epochMicrogonsPerArgonot, 0n);
 
     const approvalHash = hashMintingGatewayActivateMintingAuthorityApproval(
       await getGatewayHashContext(fixture.gateway),
@@ -1299,7 +1455,7 @@ describe('MintingGateway', () => {
     expect(deactivatedCollateral.micronotCollateral).to.equal(0n);
   });
 
-  it('carries rotation signatures forward across a deactivation until the first later activation', async () => {
+  it.each([0n, 60_000_000_000_000_000n])('carries inflation %s signatures', async inflation => {
     const fixture = await deployFixture();
     const hashContext = await getGatewayHashContext(fixture.gateway);
     const { target: activeTarget } = await activateMintingAuthority(fixture);
@@ -1317,7 +1473,12 @@ describe('MintingGateway', () => {
     const rotationTarget = {
       council: nextCouncil.snapshot,
       epochMicrogonsPerArgonot: nextCouncil.epochMicrogonsPerArgonot,
+      inflationPercentSinceLaunch: inflation,
     } satisfies MintingGatewayGlobalIssuanceCouncilRotateTarget;
+    nextCouncil.hash = hashMintingGatewayGlobalIssuanceCouncil({
+      ...rotationTarget,
+      ...nextCouncil.snapshot,
+    });
     const rotationHash = hashMintingGatewayRotateGlobalIssuanceCouncilApproval(hashContext, {
       queueNonce: 2n,
       approvingCouncilHash: fixture.council.hash,

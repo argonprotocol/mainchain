@@ -52,6 +52,7 @@ contract UniswapV4PriceQuoter is BaseV4Quoter, IMsgSender {
     }
 
     /// @notice Self-call dispatched by BaseV4Quoter during unlock; always reverts with the quote.
+    // solhint-disable-next-line private-vars-leading-underscore
     function _quoteSingle(IV4Quoter.QuoteExactSingleParams calldata params, bool exactInput)
         external selfOnly returns (bytes memory)
     {

@@ -1,25 +1,51 @@
 use crate::{
 	ArgonApprovalsNonce, Config, GatewayActivityNonce, GatewayState, GatewayStateBySourceChain,
-	Pallet, TransferOutById,
+	GlobalIssuanceCouncil, GlobalIssuanceCouncilByHash, GlobalIssuanceCouncilMember, Pallet,
+	TransferOutById,
 };
 #[cfg(feature = "try-runtime")]
 use crate::{PendingTransferOutQuoteCountsByDestinationChain, SourceChain};
-use codec::Compact;
-#[cfg(feature = "try-runtime")]
-use codec::DecodeAll;
-#[cfg(feature = "try-runtime")]
-use frame_support::storage::unhashed;
-use frame_support::{migrations::VersionedMigration, traits::UncheckedOnRuntimeUpgrade};
+use codec::{Compact, DecodeAll};
+use frame_support::{
+	migrations::VersionedMigration, storage::unhashed, traits::UncheckedOnRuntimeUpgrade,
+};
 use pallet_prelude::*;
 
 // Version 3 stored the two compact nonces followed by the two circulation amounts.
 type GatewayStateV3<Balance> =
 	(Compact<GatewayActivityNonce>, Compact<ArgonApprovalsNonce>, Balance, Balance);
 
-pub struct AddGatewaySyncTime<T>(PhantomData<T>);
+type GlobalIssuanceCouncilV3<T> = (
+	<T as Config>::Balance,
+	BoundedBTreeMap<H160, GlobalIssuanceCouncilMember<T>, <T as Config>::MaxCouncilMembers>,
+	<T as Config>::Balance,
+);
 
-impl<T: Config> UncheckedOnRuntimeUpgrade for AddGatewaySyncTime<T> {
+pub struct UpgradeCrosschainTransfer<T>(PhantomData<T>);
+
+impl<T: Config> UncheckedOnRuntimeUpgrade for UpgradeCrosschainTransfer<T> {
 	fn on_runtime_upgrade() -> Weight {
+		// Decode all old snapshots before writing the new layout.
+		let mut councils = Vec::new();
+		for hash in GlobalIssuanceCouncilByHash::<T>::iter_keys() {
+			let bytes = unhashed::get_raw(&GlobalIssuanceCouncilByHash::<T>::hashed_key_for(hash))
+				.expect("version 3 council snapshot must exist");
+			let (epoch_microgons_per_argonot, members, total_weight) =
+				GlobalIssuanceCouncilV3::<T>::decode_all(&mut &bytes[..])
+					.expect("version 3 council snapshot must decode before migration");
+			councils.push((
+				hash,
+				GlobalIssuanceCouncil::<T> {
+					epoch_microgons_per_argonot,
+					members,
+					total_weight,
+					version: 0,
+					inflation_percent_since_launch: 0,
+				},
+			));
+		}
+		let council_count = councils.len() as u64;
+
 		let mut entries = 0u64;
 		GatewayStateBySourceChain::<T>::translate_values::<GatewayStateV3<T::Balance>, _>(
 			|(gateway_nonce, approvals_nonce, argon_circulation, argonot_circulation)| {
@@ -35,7 +61,19 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for AddGatewaySyncTime<T> {
 				})
 			},
 		);
-		T::DbWeight::get().reads_writes(entries.saturating_add(1), entries)
+		for (hash, council) in councils {
+			GlobalIssuanceCouncilByHash::<T>::insert(hash, council);
+		}
+		let mut transfers = 0u64;
+		for transfer in TransferOutById::<T>::iter_values() {
+			Pallet::<T>::track_transfer_out_quote(&transfer)
+				.expect("distinct pending quotes obey the existing transfer bound");
+			transfers.saturating_accrue(1);
+		}
+		T::DbWeight::get().reads_writes(
+			entries + council_count.saturating_mul(2) + transfers.saturating_mul(2),
+			entries + council_count + transfers,
+		)
 	}
 
 	#[cfg(feature = "try-runtime")]
@@ -48,13 +86,19 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for AddGatewaySyncTime<T> {
 				.map_err(|_| "Cannot decode version 3 gateway state")?;
 			states.push((chain, state));
 		}
-		Ok(states.encode())
+		let quotes: Vec<_> = TransferOutById::<T>::iter_values()
+			.map(|transfer| (transfer.destination_chain, transfer.microgons_per_argonot))
+			.collect();
+		Ok((states, quotes).encode())
 	}
 
 	#[cfg(feature = "try-runtime")]
 	fn post_upgrade(state: Vec<u8>) -> Result<(), sp_runtime::TryRuntimeError> {
-		let states = Vec::<(SourceChain, GatewayStateV3<T::Balance>)>::decode_all(&mut &state[..])
-			.map_err(|_| "Invalid gateway migration preflight state")?;
+		let (states, quotes) = <(
+			Vec<(SourceChain, GatewayStateV3<T::Balance>)>,
+			Vec<(SourceChain, T::Balance)>,
+		)>::decode_all(&mut &state[..])
+		.map_err(|_| "Invalid gateway migration preflight state")?;
 		ensure!(
 			GatewayStateBySourceChain::<T>::iter_keys().count() == states.len(),
 			"Gateway state count changed during migration"
@@ -74,43 +118,6 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for AddGatewaySyncTime<T> {
 				"Gateway migration changed the accepted snapshot"
 			);
 		}
-		Ok(())
-	}
-}
-
-pub type AddGatewaySyncTimeMigration<T> = VersionedMigration<
-	3,
-	4,
-	AddGatewaySyncTime<T>,
-	Pallet<T>,
-	<T as frame_system::Config>::DbWeight,
->;
-
-pub struct InitializePendingQuoteCounts<T>(PhantomData<T>);
-
-impl<T: Config> UncheckedOnRuntimeUpgrade for InitializePendingQuoteCounts<T> {
-	fn on_runtime_upgrade() -> Weight {
-		let mut transfers = 0u64;
-		for transfer in TransferOutById::<T>::iter_values() {
-			Pallet::<T>::track_transfer_out_quote(&transfer)
-				.expect("distinct pending quotes obey the existing transfer bound");
-			transfers.saturating_accrue(1);
-		}
-		T::DbWeight::get().reads_writes(transfers.saturating_mul(2).saturating_add(1), transfers)
-	}
-
-	#[cfg(feature = "try-runtime")]
-	fn pre_upgrade() -> Result<Vec<u8>, sp_runtime::TryRuntimeError> {
-		Ok(TransferOutById::<T>::iter_values()
-			.map(|transfer| (transfer.destination_chain, transfer.microgons_per_argonot))
-			.collect::<Vec<_>>()
-			.encode())
-	}
-
-	#[cfg(feature = "try-runtime")]
-	fn post_upgrade(state: Vec<u8>) -> Result<(), sp_runtime::TryRuntimeError> {
-		let quotes = Vec::<(SourceChain, T::Balance)>::decode_all(&mut &state[..])
-			.map_err(|_| "Invalid pending-quote preflight")?;
 		let mut indexed = 0u64;
 		for (chain, counts) in PendingTransferOutQuoteCountsByDestinationChain::<T>::iter() {
 			for (rate, count) in counts {
@@ -123,14 +130,20 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for InitializePendingQuoteCounts<T> {
 			}
 		}
 		ensure!(indexed == quotes.len() as u64, "Pending quote missing from migration");
+		for (hash, council) in GlobalIssuanceCouncilByHash::<T>::iter() {
+			ensure!(
+				Pallet::<T>::hash_global_issuance_council(&council) == hash,
+				"Migration changed a council hash"
+			);
+		}
 		Ok(())
 	}
 }
 
-pub type InitializePendingQuoteCountsMigration<T> = VersionedMigration<
-	4,
+pub type MigrateToV5<T> = VersionedMigration<
+	3,
 	5,
-	InitializePendingQuoteCounts<T>,
+	UpgradeCrosschainTransfer<T>,
 	Pallet<T>,
 	<T as frame_system::Config>::DbWeight,
 >;

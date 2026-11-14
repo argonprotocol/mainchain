@@ -20,10 +20,78 @@ pub(super) use sp_runtime::transaction_validity::{InvalidTransaction, Transactio
 pub(super) use super::mock::*;
 
 #[test]
+fn council_refresh_captures_inflation_without_changing_while_pending() {
+	use argon_primitives::{OnNewSlot, MICROGONS_PER_ARGON};
+
+	new_test_ext().execute_with(|| {
+		let chain = SourceChain::Ethereum;
+		let operator = account(30);
+		let council_pair = council_signing_pair(1);
+		LowestMicrogonsPerArgonot::set(Some(MICROGONS_PER_ARGON));
+		configure_single_member_ethereum_council(operator.clone(), 7, 10_000, &council_pair);
+		let active_hash =
+			ActiveGlobalIssuanceCouncilByDestinationChain::<Test>::get(chain).unwrap();
+
+		ArgonPriceInUsd::set(FixedU128::from_inner(1_060_000_000_000_000_000));
+		CurrentFrameId::set(11);
+		<CrosschainTransfer as OnNewSlot<TestAccountId>>::on_frame_start(11);
+		let entry = CouncilApprovalQueueByDestinationChainAndNonce::<Test>::get(chain, 1).unwrap();
+		let CouncilApprovalTargetId::GlobalIssuanceCouncilRotation(next_hash) = entry.target else {
+			panic!("expected council rotation")
+		};
+		let council = GlobalIssuanceCouncilByHash::<Test>::get(next_hash).unwrap();
+		assert_ne!(next_hash, active_hash);
+		assert_eq!(council.version, 1);
+		assert_eq!(council.inflation_percent_since_launch, 60_000_000_000_000_000);
+		assert_eq!(
+			entry.target_payload_hash,
+			CrosschainTransfer::hash_rotate_global_issuance_council(chain, &council).unwrap()
+		);
+
+		let signature = minting_authority_approval_signature(&council_pair, 1);
+		ArgonPriceInUsd::set(FixedU128::from_inner(1_120_000_000_000_000_000));
+		<CrosschainTransfer as OnNewSlot<TestAccountId>>::on_frame_start(12);
+		assert_eq!(NextCouncilApprovalQueueNonceByDestinationChain::<Test>::get(chain), 1);
+		assert_eq!(
+			GlobalIssuanceCouncilByHash::<Test>::get(next_hash)
+				.unwrap()
+				.inflation_percent_since_launch,
+			60_000_000_000_000_000
+		);
+		let mut changed = council;
+		changed.inflation_percent_since_launch = 120_000_000_000_000_000;
+		assert_ne!(CrosschainTransfer::hash_global_issuance_council(&changed), next_hash);
+		assert_ok!(CrosschainTransfer::approve_queue_entries(
+			RuntimeOrigin::signed(operator),
+			chain,
+			bounded_vec![signature]
+		));
+	});
+}
+
+#[test]
+fn council_inflation_migration_rejects_unknown_layout_before_writing() {
+	use frame_support::{storage::unhashed, traits::OnRuntimeUpgrade};
+	type Migration = crate::migrations::MigrateToV5<Test>;
+	new_test_ext().execute_with(|| {
+		let council_key =
+			GlobalIssuanceCouncilByHash::<Test>::hashed_key_for(H256::repeat_byte(0x91));
+		unhashed::put_raw(&council_key, &[255]);
+		StorageVersion::new(3).put::<CrosschainTransfer>();
+
+		let result =
+			std::panic::catch_unwind(std::panic::AssertUnwindSafe(Migration::on_runtime_upgrade));
+		assert!(result.is_err());
+		assert_eq!(StorageVersion::get::<CrosschainTransfer>(), StorageVersion::new(3));
+		assert_eq!(unhashed::get_raw(&council_key), Some(vec![255]));
+	});
+}
+
+#[test]
 fn gateway_sync_time_migration_preserves_snapshot_and_only_runs_once() {
 	use codec::{Compact, DecodeAll};
 	use frame_support::traits::OnRuntimeUpgrade;
-	type Migration = crate::migrations::AddGatewaySyncTimeMigration<Test>;
+	type Migration = crate::migrations::MigrateToV5<Test>;
 
 	new_test_ext().execute_with(|| {
 		let chain = SourceChain::Ethereum;
@@ -31,6 +99,25 @@ fn gateway_sync_time_migration_preserves_snapshot_and_only_runs_once() {
 		let old_state = (Compact(73u64), Compact(69u64), 300u128, 400u128);
 		assert!(GatewayState::<u128>::decode_all(&mut &old_state.encode()[..]).is_err());
 		frame_support::storage::unhashed::put_raw(&key, &old_state.encode());
+		for nonce in [1, 2] {
+			TransferOutById::<Test>::insert(
+				H256::repeat_byte(nonce as u8),
+				crate::transfer_out::TransferOutOfArgon::<Test> {
+					argon_account_id: account(30),
+					argon_transfer_nonce: nonce,
+					destination_chain: chain,
+					microgons_per_argonot: 3_000_000,
+					destination_account: H160::repeat_byte(0x44),
+					valid_until_ethereum_block: 72_000,
+					asset: AssetKind::Argon,
+					amount: 20_000,
+					minting_authority_tip: 0,
+					total_attached_collateral: 0,
+					minting_authority_collateral_by_signer: Default::default(),
+					state: TransferOutState::Started,
+				},
+			);
+		}
 		StorageVersion::new(3).put::<CrosschainTransfer>();
 		#[cfg(feature = "try-runtime")]
 		let preflight = Migration::pre_upgrade().unwrap();
@@ -38,7 +125,7 @@ fn gateway_sync_time_migration_preserves_snapshot_and_only_runs_once() {
 		Migration::on_runtime_upgrade();
 		#[cfg(feature = "try-runtime")]
 		Migration::post_upgrade(preflight).unwrap();
-		assert_eq!(StorageVersion::get::<CrosschainTransfer>(), StorageVersion::new(4));
+		assert_eq!(StorageVersion::get::<CrosschainTransfer>(), StorageVersion::new(5));
 		assert_eq!(
 			GatewayStateBySourceChain::<Test>::get(chain),
 			Some(GatewayState {
@@ -50,6 +137,10 @@ fn gateway_sync_time_migration_preserves_snapshot_and_only_runs_once() {
 			})
 		);
 
+		assert_eq!(
+			PendingTransferOutQuoteCountsByDestinationChain::<Test>::get(chain).get(&3_000_000),
+			Some(&2)
+		);
 		GatewayStateBySourceChain::<Test>::mutate(chain, |state| {
 			state.as_mut().unwrap().last_synced_source_block_time = Some(10_000);
 		});
@@ -854,7 +945,6 @@ fn replacing_gateway_invalidates_its_sync_time() {
 fn outstanding_quotes_preserve_the_cap_without_holding_up_new_quotes() {
 	use crate::gateway_activity::GatewayMintingAuthorityCollateral;
 	use argon_primitives::{OnNewSlot, MICROGONS_PER_ARGON};
-	use frame_support::traits::OnRuntimeUpgrade;
 	new_test_ext().execute_with(|| {
 		let chain = SourceChain::Ethereum;
 		let user = account(61);
@@ -890,22 +980,6 @@ fn outstanding_quotes_preserve_the_cap_without_holding_up_new_quotes() {
 			0,
 		));
 		assert_eq!(TransferOutById::<Test>::get(second).unwrap().state, TransferOutState::Ready);
-
-		// Existing Started and Ready requests both survive the upgrade into the quote counts.
-		PendingTransferOutQuoteCountsByDestinationChain::<Test>::remove(chain);
-		StorageVersion::new(4).put::<CrosschainTransfer>();
-		type Migration = crate::migrations::InitializePendingQuoteCountsMigration<Test>;
-		#[cfg(feature = "try-runtime")]
-		let preflight = Migration::pre_upgrade().unwrap();
-		Migration::on_runtime_upgrade();
-		#[cfg(feature = "try-runtime")]
-		Migration::post_upgrade(preflight).unwrap();
-		assert_eq!(StorageVersion::get::<CrosschainTransfer>(), StorageVersion::new(5));
-		assert_eq!(
-			PendingTransferOutQuoteCountsByDestinationChain::<Test>::get(chain)
-				.get(&(3 * MICROGONS_PER_ARGON)),
-			Some(&2)
-		);
 
 		LowestMicrogonsPerArgonot::set(Some(MICROGONS_PER_ARGON));
 		assert_ok!(set_argonot_securitization(account(62), 100));
