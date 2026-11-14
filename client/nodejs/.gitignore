@@ -1,1 +1,4 @@
 lib
+/metadata.json
+/src/interfaces/*
+!/src/interfaces/definitions.ts

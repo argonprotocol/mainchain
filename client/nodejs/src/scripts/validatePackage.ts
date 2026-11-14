@@ -21,6 +21,29 @@ const packedFiles = new Set(
     .filter(location => location !== undefined)
     .map(location => location.replaceAll(path.win32.sep, path.posix.sep)),
 );
+
+for (const file of [
+  'src/interfaces/augment-api.ts',
+  'src/interfaces/augment-types.ts',
+  'src/interfaces/types-lookup.ts',
+]) {
+  if (!packedFiles.has(file)) {
+    throw new Error(`Package does not include ${file}`);
+  }
+}
+
+const interfaceExport = packageJson.exports['./interfaces/*'].types;
+for (const file of packedFiles) {
+  if (!file.startsWith('src/interfaces/')) continue;
+  if (!file.endsWith('.ts')) continue;
+
+  const interfaceName = path.posix.basename(file, '.ts');
+  const exportedFile = interfaceExport.replace('*', interfaceName).replace(/^\.\//, '');
+  if (!packedFiles.has(exportedFile)) {
+    throw new Error(`Interface export ${interfaceName} points to missing file ${exportedFile}`);
+  }
+}
+
 const declarationFiles = [...packedFiles].filter(file => /\.d\.(?:c|m)?ts$/.test(file));
 const workspaceDevDependencies = Object.entries(packageJson.devDependencies)
   .filter(([, version]) => version.startsWith('workspace:'))

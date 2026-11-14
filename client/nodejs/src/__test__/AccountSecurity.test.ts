@@ -10,7 +10,7 @@ describe('account-security approval signatures', () => {
   it('supports P256 approvals without adding P256 transaction accounts', () => {
     const registry = new TypeRegistry();
     const metadata = new Metadata(registry, runtimeMetadata.result as `0x${string}`);
-    expect(metadata.version).toBe(14);
+    expect(metadata.version).toBe(15);
     registry.setMetadata(metadata);
 
     const deviceSignature = new Uint8Array(65).fill(7);

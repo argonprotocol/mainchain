@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "test": "vitest run --config vitest.config.ts",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "yarn workspace @argonprotocol/mainchain pretest && tsc -p tsconfig.json"
   },
   "devDependencies": {
     "@ledgerhq/hw-transport-node-speculos": "6.34.7",

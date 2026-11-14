@@ -38,7 +38,6 @@ use argon_primitives::{
 	prelude::FrameId, tick::Tick, AccountId, BlockNumber, Chain, ChainIdentity, Nonce, Signature,
 	VotingSchedule,
 };
-pub use spec::api;
 
 use crate::api::{
 	block_seal_spec::storage::types::current_vote_minimum::CurrentVoteMinimum, ownership, storage,
@@ -47,8 +46,27 @@ use crate::api::{
 
 pub mod conversion;
 pub mod signer;
-mod spec;
 pub mod types;
+
+#[subxt::subxt(
+	runtime_metadata_path = "metadata.scale",
+	generate_docs,
+	derive_for_all_types = "Clone",
+	derive_for_type(
+		path = "bounded_collections::bounded_vec::BoundedVec",
+		derive = "serde::Serialize"
+	),
+	attributes_for_type(
+		path = "bounded_collections::bounded_vec::BoundedVec",
+		attributes = "#[serde(transparent)]"
+	),
+	substitute_type(path = "primitive_types::H256", with = "crate::types::H256"),
+	substitute_type(path = "sp_core::crypto::AccountId32", with = "crate::types::AccountId32")
+)]
+pub mod api {}
+
+// Track the metadata input so Cargo rebuilds the macro when the snapshot changes.
+const _: &[u8] = include_bytes!("../metadata.scale");
 
 pub use subxt::error as subxt_error;
 

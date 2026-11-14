@@ -41,6 +41,14 @@ for (const file of fs.readdirSync(interfacesDir)) {
     ]);
 }
 
+// Typegen omits the import for the runtime call used by V15's transaction-payment APIs.
+replaceInFile(`${dirname}/src/interfaces/augment-api-runtime.ts`, [
+    [
+        'import type { ApiTypes,',
+        "import type { RuntimeCall as ArgonRuntimeRuntimeCall } from '@polkadot/types/interfaces/runtime';\n\nimport type { ApiTypes,",
+    ],
+]);
+
 const typeOnlyAugmentImports = [
     ['src/interfaces/augment-api-consts.ts', '@polkadot/api-base/types/consts'],
     ['src/interfaces/augment-api-errors.ts', '@polkadot/api-base/types/errors'],

@@ -38,8 +38,7 @@ describe('Ledger Generic Polkadot 100.0.30', () => {
   for (const kind of ['transfer', 'batch', 'register', 'updatePolicy'] as const) {
     it(`reviews and signs the exact ${kind} approval`, async () => {
       await cryptoWaitReady();
-      // Ledger needs V15 proof metadata. Keep the client on V14 and export this separately
-      // from the actual runtime; a synthesized metadata conversion is not authoritative.
+      // Use the client's runtime-exported V15 snapshot for the proof metadata.
       const merkle = merkleizeMetadata(readFileSync(metadataPath), {
         decimals: 6,
         tokenSymbol: 'ARGN',
