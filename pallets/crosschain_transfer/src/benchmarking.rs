@@ -245,10 +245,8 @@ mod benchmarks {
 				.ok_or(BenchmarkError::Stop("active benchmark council missing"))?;
 		queued_rotation_council.epoch_microgons_per_argonot =
 			(2 * argon_primitives::MICROGONS_PER_ARGON).into();
-		let queued_rotation_hash = Pallet::<T>::hash_global_issuance_council(
-			&queued_rotation_council.members,
-			queued_rotation_council.epoch_microgons_per_argonot,
-		);
+		let queued_rotation_hash =
+			Pallet::<T>::hash_global_issuance_council(&queued_rotation_council);
 		GlobalIssuanceCouncilByHash::<T>::insert(queued_rotation_hash, queued_rotation_council);
 
 		let rotation_entry = CouncilApprovalQueueEntry::<T> {
@@ -405,10 +403,7 @@ mod benchmarks {
 			BENCHMARK_DESTINATION_CHAIN,
 			&caller,
 		);
-		let active_council_hash = Pallet::<T>::hash_global_issuance_council(
-			&active_council.members,
-			active_council.epoch_microgons_per_argonot,
-		);
+		let active_council_hash = Pallet::<T>::hash_global_issuance_council(&active_council);
 		GlobalIssuanceCouncilByHash::<T>::insert(active_council_hash, active_council);
 		ActiveGlobalIssuanceCouncilByDestinationChain::<T>::insert(
 			BENCHMARK_DESTINATION_CHAIN,
@@ -887,10 +882,7 @@ mod benchmarks {
 		)?;
 		seed_chain_config::<T>(0x21);
 		let (active_council, _) = benchmark_max_council_signer_rotation::<T>()?;
-		let active_council_hash = Pallet::<T>::hash_global_issuance_council(
-			&active_council.members,
-			active_council.epoch_microgons_per_argonot,
-		);
+		let active_council_hash = Pallet::<T>::hash_global_issuance_council(&active_council);
 		CurrentTransferOutMicrogonsPerArgonotByDestinationChain::<T>::insert(
 			BENCHMARK_DESTINATION_CHAIN,
 			active_council.epoch_microgons_per_argonot,
@@ -1179,11 +1171,15 @@ mod benchmarks {
 		let epoch_microgons_per_argonot = argon_primitives::MICROGONS_PER_ARGON.into();
 		Ok((
 			GlobalIssuanceCouncil::<T> {
+				version: 1,
+				inflation_percent_since_launch: 0,
 				epoch_microgons_per_argonot,
 				members: active_members,
 				total_weight,
 			},
 			GlobalIssuanceCouncil::<T> {
+				version: 1,
+				inflation_percent_since_launch: 0,
 				epoch_microgons_per_argonot,
 				members: next_members,
 				total_weight,
@@ -1432,12 +1428,14 @@ fn benchmark_council<T: Config>(
 			GlobalIssuanceCouncilMember::<T> { account_id: account_id.clone(), signer, weight },
 		)
 		.map_err(|_| BenchmarkError::Stop("benchmark council members exceeded runtime bound"))?;
-	let council =
-		GlobalIssuanceCouncil::<T> { epoch_microgons_per_argonot, total_weight: weight, members };
-	let council_hash = Pallet::<T>::hash_global_issuance_council(
-		&council.members,
-		council.epoch_microgons_per_argonot,
-	);
+	let council = GlobalIssuanceCouncil::<T> {
+		version: 1,
+		inflation_percent_since_launch: 0,
+		epoch_microgons_per_argonot,
+		total_weight: weight,
+		members,
+	};
+	let council_hash = Pallet::<T>::hash_global_issuance_council(&council);
 
 	Ok((council_hash, council))
 }

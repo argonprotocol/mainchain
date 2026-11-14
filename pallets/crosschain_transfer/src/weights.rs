@@ -112,6 +112,8 @@ where
 	fn force_set_global_issuance_council() -> Weight {
 		Base::force_set_global_issuance_council()
 			.saturating_add(PriceProviderWeight::get_lowest_microgons_per_argonot())
+			.saturating_add(PriceProviderWeight::get_redemption_prices())
+			.saturating_add(T::DbWeight::get().reads(1))
 	}
 
 	fn register_council_signer() -> Weight {
@@ -350,6 +352,9 @@ impl WeightInfo for () {
 pub fn scheduled_council_rotation_with_price_provider<T: Config>() -> Weight {
 	T::WeightInfo::schedule_global_issuance_council_rotation()
 		.saturating_add(PriceProviderWeights::<T>::get_lowest_microgons_per_argonot())
+		// This bound includes the canonical target-price read captured with the rotation.
+		.saturating_add(PriceProviderWeights::<T>::get_redemption_prices())
+		.saturating_add(T::DbWeight::get().reads(1))
 }
 
 pub fn prove_gateway_activity_with_providers<T: Config>(

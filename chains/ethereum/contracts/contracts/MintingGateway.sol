@@ -86,6 +86,8 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 	/// @notice Per-block activity ranges used to locate gateway events later.
 	mapping(uint64 locatorIndex => ActivityBlockLocator locator) public activityBlockLocators;
 	uint128 private _minimumSwapMicrogons;
+	/// @notice Signed cumulative USD inflation since launch, scaled by 10^18. The council version selects the commitment format.
+	int128 public inflationPercentSinceLaunch;
 
 	/// @notice Activity-number range emitted in one block on this chain.
 	struct ActivityBlockLocator {
@@ -133,12 +135,16 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 	struct CouncilSnapshot {
 		address[] signers;
 		uint256[] weights;
+		/// @notice Signed format: existing councils use 0; inflation-bearing councils use 1.
+		uint8 version;
 	}
 
 	/// @notice Decoded payload for a council rotation queue item.
 	struct GlobalIssuanceCouncilRotateTarget {
 		CouncilSnapshot council;
 		uint128 epochMicrogonsPerArgonot;
+		/// @notice Signed cumulative USD inflation since launch, scaled by 10^18.
+		int128 inflationPercentSinceLaunch;
 	}
 
 	/// @notice In-memory active council state used while applying one contiguous queue batch.
@@ -249,6 +255,8 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 	error TooManyGatewayActivitiesInBlock(uint256 maxAllowed, uint256 provided);
 	error TooManyMintingAuthorizations(uint256 maxAllowed, uint256 provided);
 	error UnsupportedToken(address token);
+	error UnsupportedCouncilVersion(uint8 version);
+	error InflationNotSupportedByCouncilVersion();
 	error UnauthorizedSwapContract();
 	error PurchaseTooSmall();
 	error TransferTooSmall();
@@ -453,19 +461,21 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 	/// @dev Leaves argonApprovalsNonce and argonApprovalsHash unchanged so later queue items still chain
 	/// from the last applied Argon update while using the replacement council for future approvals.
 	/// @param nextCouncil Replacement active council snapshot.
+	/// @param nextInflationPercentSinceLaunch Signed cumulative USD inflation, scaled by 10^18.
 	/// @param nextMicrogonsPerArgonot Replacement council-approved rate, measured in microgons per
 	/// 1 whole Argonot, for the council hash itself. This does not advance the transfer-out max
 	/// until a proved rotation is applied.
 	function forceUpdateActiveCouncil(
 		CouncilSnapshot calldata nextCouncil,
-		uint128 nextMicrogonsPerArgonot
+		uint128 nextMicrogonsPerArgonot,
+		int128 nextInflationPercentSinceLaunch
 	) external onlyOwner {
 		if (nextMicrogonsPerArgonot == 0) revert ZeroMicrogonsPerArgonot();
 		(bytes32 nextCouncilHash, uint256 nextCouncilTotalWeight, uint256 nextCouncilMemberCount) =
 			_validateCouncilSnapshot(
-				nextCouncil.signers,
-				nextCouncil.weights,
-				nextMicrogonsPerArgonot
+				nextCouncil,
+				nextMicrogonsPerArgonot,
+				nextInflationPercentSinceLaunch
 			);
 		GlobalIssuanceCouncil memory activeCouncil = globalIssuanceCouncil;
 
@@ -476,6 +486,7 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 			nextMicrogonsPerArgonot
 		);
 
+		inflationPercentSinceLaunch = nextInflationPercentSinceLaunch;
 		emit GlobalIssuanceCouncilForceUpdated(activeCouncil.councilHash, nextCouncilHash);
 	}
 
@@ -584,9 +595,9 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 			return _hashRotateGlobalIssuanceCouncilApproval(
 				update.queueNonce,
 				approvingCouncilHash,
-				target.council.signers,
-				target.council.weights,
+				target.council,
 				target.epochMicrogonsPerArgonot,
+				target.inflationPercentSinceLaunch,
 				previousUpdateHash
 			);
 		}
@@ -619,9 +630,9 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 	) private view returns (ActiveCouncilSnapshot memory activeCouncil) {
 		(bytes32 activeCouncilHash, uint256 activeCouncilTotalWeight, uint256 activeCouncilMemberCount) =
 			_validateCouncilSnapshot(
-				currentCouncil.signers,
-				currentCouncil.weights,
-				globalIssuanceCouncil.epochMicrogonsPerArgonot
+				currentCouncil,
+				globalIssuanceCouncil.epochMicrogonsPerArgonot,
+				inflationPercentSinceLaunch
 			);
 		if (activeCouncilHash != globalIssuanceCouncil.councilHash
 			|| activeCouncilTotalWeight != globalIssuanceCouncil.totalWeight
@@ -995,9 +1006,9 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 
 		(nextCouncilHash, nextCouncilTotalWeight, nextCouncilMemberCount) =
 			_validateCouncilSnapshot(
-				target.council.signers,
-				target.council.weights,
-				target.epochMicrogonsPerArgonot
+				target.council,
+				target.epochMicrogonsPerArgonot,
+				target.inflationPercentSinceLaunch
 			);
 		_storeGlobalIssuanceCouncil(
 			nextCouncilHash,
@@ -1006,6 +1017,7 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 			target.epochMicrogonsPerArgonot
 		);
 		maxTransferOutMicrogonsPerArgonot = target.epochMicrogonsPerArgonot;
+		inflationPercentSinceLaunch = target.inflationPercentSinceLaunch;
 		argonApprovalsNonce = update.queueNonce;
 		argonApprovalsHash = approvalHash;
 
@@ -1485,10 +1497,12 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 
 	/// Validates a council snapshot and returns its summary values.
 	function _validateCouncilSnapshot(
-		address[] memory signers,
-		uint256[] memory weights,
-		uint128 epochMicrogonsPerArgonot
+		CouncilSnapshot memory council,
+		uint128 epochMicrogonsPerArgonot,
+		int128 inflation
 	) private pure returns (bytes32 councilHash, uint256 totalWeight, uint256 memberCount) {
+		address[] memory signers = council.signers;
+		uint256[] memory weights = council.weights;
 		if (signers.length == 0) revert InvalidGlobalIssuanceCouncilMember(0);
 		if (signers.length != weights.length) revert ArrayLengthMismatch();
 
@@ -1507,7 +1521,7 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 		}
 
 		memberCount = signers.length;
-		councilHash = _hashGlobalIssuanceCouncil(signers, weights, epochMicrogonsPerArgonot);
+		councilHash = _hashGlobalIssuanceCouncil(council, epochMicrogonsPerArgonot, inflation);
 	}
 
 	/// Converts token base units back into runtime units.
@@ -1518,15 +1532,33 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 	}
 
 	/// @notice Returns the hash for a full council snapshot.
-	/// @param signers Sorted council signer addresses.
-	/// @param weights Signer weights aligned with signers.
+	/// @param council Sorted signers, aligned weights and the signed format version.
 	/// @return councilHash Council membership hash.
 	function _hashGlobalIssuanceCouncil(
-		address[] memory signers,
-		uint256[] memory weights,
-		uint128 epochMicrogonsPerArgonot
+		CouncilSnapshot memory council,
+		uint128 epochMicrogonsPerArgonot,
+		int128 inflation
 	) private pure returns (bytes32) {
-		return keccak256(abi.encode(signers, weights, epochMicrogonsPerArgonot));
+		if (council.version == 0) {
+			if (inflation != 0) revert InflationNotSupportedByCouncilVersion();
+			return keccak256(
+				abi.encode(
+					council.signers,
+					council.weights,
+					epochMicrogonsPerArgonot
+				)
+			);
+		}
+		if (council.version != 1) revert UnsupportedCouncilVersion(council.version);
+		return keccak256(
+			abi.encode(
+				council.signers,
+				council.weights,
+				epochMicrogonsPerArgonot,
+				council.version,
+				inflation
+			)
+		);
 	}
 
 	function _signingKeyTargetId(address signingKey) private pure returns (bytes32) {
@@ -1571,21 +1603,24 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 	}
 
 	/// @notice Returns the hash that council members sign for a council rotation.
-	/// @param nextSigners Sorted next-council signer addresses.
-	/// @param nextWeights Signer weights aligned with nextSigners.
+	/// @param nextCouncil Sorted next-council signers, weights and format version.
 	/// @param nextEpochMicrogonsPerArgonot Council-approved floor for the next epoch, measured in microgons per 1 whole Argonot.
 	/// @return rotationHash Rotation hash.
 	function _hashRotateGlobalIssuanceCouncil(
-		address[] memory nextSigners,
-		uint256[] memory nextWeights,
-		uint128 nextEpochMicrogonsPerArgonot
+		CouncilSnapshot memory nextCouncil,
+		uint128 nextEpochMicrogonsPerArgonot,
+		int128 inflation
 	) private view returns (bytes32) {
 		return keccak256(
 			abi.encode(
 				_GLOBAL_ISSUANCE_COUNCIL_ROTATION_TAG,
 				block.chainid,
 				address(this),
-				_hashGlobalIssuanceCouncil(nextSigners, nextWeights, nextEpochMicrogonsPerArgonot),
+				_hashGlobalIssuanceCouncil(
+					nextCouncil,
+					nextEpochMicrogonsPerArgonot,
+					inflation
+				),
 				nextEpochMicrogonsPerArgonot
 			)
 		);
@@ -1625,21 +1660,20 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 	/// @notice Returns the queue-signing hash for a council rotation.
 	/// @param queueNonce Contiguous queue nonce being applied.
 	/// @param approvingCouncilHash Hash of the approving council membership snapshot.
-	/// @param nextSigners Sorted next-council signer addresses.
-	/// @param nextWeights Signer weights aligned with nextSigners.
+	/// @param nextCouncil Sorted next-council signers, weights and format version.
 	/// @param nextEpochMicrogonsPerArgonot Council-approved floor for the next epoch, measured in microgons per 1 whole Argonot.
 	/// @param previousUpdateHash Chained signed hash of the immediately previous queue item.
 	/// @return approvalHash Council approval hash.
 	function _hashRotateGlobalIssuanceCouncilApproval(
 		uint64 queueNonce,
 		bytes32 approvingCouncilHash,
-		address[] memory nextSigners,
-		uint256[] memory nextWeights,
+		CouncilSnapshot memory nextCouncil,
 		uint128 nextEpochMicrogonsPerArgonot,
+		int128 inflation,
 		bytes32 previousUpdateHash
 	) private view returns (bytes32) {
 		bytes32 nextCouncilHash =
-			_hashGlobalIssuanceCouncil(nextSigners, nextWeights, nextEpochMicrogonsPerArgonot);
+			_hashGlobalIssuanceCouncil(nextCouncil, nextEpochMicrogonsPerArgonot, inflation);
 
 		return _hashGatewayUpdateApproval(
 			queueNonce,
@@ -1647,7 +1681,9 @@ contract MintingGateway is Initializable, OwnableUpgradeable, PausableUpgradeabl
 			GatewayUpdateKind.GlobalIssuanceCouncilRotate,
 			nextCouncilHash,
 			_hashRotateGlobalIssuanceCouncil(
-				nextSigners, nextWeights, nextEpochMicrogonsPerArgonot
+				nextCouncil,
+				nextEpochMicrogonsPerArgonot,
+				inflation
 			),
 			previousUpdateHash
 		);

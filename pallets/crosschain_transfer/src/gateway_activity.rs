@@ -2517,7 +2517,7 @@ mod test {
 	}
 
 	#[test]
-	fn prove_gateway_activity_rotates_council_and_prunes_the_displaced_previous_snapshot() {
+	fn prove_gateway_activity_accepts_signed_legacy_council_after_inflation_migration() {
 		new_test_ext().execute_with(|| {
 			System::set_block_number(1);
 			let council_account = account(45);
@@ -2564,49 +2564,120 @@ mod test {
 			let active_council_hash =
 				ActiveGlobalIssuanceCouncilByDestinationChain::<Test>::get(SourceChain::Ethereum)
 					.expect("second council should be active");
+			let mut active_council =
+				GlobalIssuanceCouncilByHash::<Test>::take(active_council_hash).unwrap();
+			active_council.version = 0;
+			let active_council_hash =
+				CrosschainTransfer::hash_global_issuance_council(&active_council);
+			GlobalIssuanceCouncilByHash::<Test>::insert(active_council_hash, active_council);
+			ActiveGlobalIssuanceCouncilByDestinationChain::<Test>::insert(
+				SourceChain::Ethereum,
+				active_council_hash,
+			);
+			LatestQueuedCouncilHashByDestinationChain::<Test>::insert(
+				SourceChain::Ethereum,
+				active_council_hash,
+			);
 			assert_ok!(CrosschainTransfer::register_council_signer(
 				RuntimeOrigin::signed(council_account.clone()),
 				SourceChain::Ethereum,
 				replacement_signer,
 				council_signer_registration_signature(&replacement_pair, &council_account),
 			));
-			let mut next_council = GlobalIssuanceCouncilByHash::<Test>::get(active_council_hash)
-				.expect("active council snapshot should be stored");
-			next_council.epoch_microgons_per_argonot = 6 * argon_primitives::MICROGONS_PER_ARGON;
-			let mut member = next_council
-				.members
-				.remove(&current_signer)
-				.expect("active council member should be stored");
-			member.signer = replacement_signer;
-			next_council
-				.members
-				.try_insert(replacement_signer, member)
-				.expect("replacement signer should fit in the council");
-			let next_council_hash = CrosschainTransfer::hash_global_issuance_council(
-				&next_council.members,
-				next_council.epoch_microgons_per_argonot,
-			);
-			GlobalIssuanceCouncilByHash::<Test>::insert(next_council_hash, next_council);
-			let mut queued_rotation = CouncilApprovalQueueEntry::<Test> {
-				approving_council_hash: active_council_hash,
-				target: CouncilApprovalTargetId::GlobalIssuanceCouncilRotation(next_council_hash),
-				target_payload_hash: H256::repeat_byte(0x31),
-				due_frame_id: 0,
-				previous_approval_hash: H256::zero(),
-				approval_hash: H256::zero(),
-				approved_total_weight: Default::default(),
-				signatures: Default::default(),
+			LowestMicrogonsPerArgonot::set(Some(6 * argon_primitives::MICROGONS_PER_ARGON));
+			CurrentFrameId::set(11);
+			<CrosschainTransfer as argon_primitives::OnNewSlot<TestAccountId>>::on_frame_start(11);
+			let queued_rotation = CouncilApprovalQueueByDestinationChainAndNonce::<Test>::get(
+				SourceChain::Ethereum,
+				1,
+			)
+			.unwrap();
+			let CouncilApprovalTargetId::GlobalIssuanceCouncilRotation(next_council_hash) =
+				queued_rotation.target
+			else {
+				panic!("expected council rotation")
 			};
+
+			let mut next_council =
+				GlobalIssuanceCouncilByHash::<Test>::take(next_council_hash).unwrap();
+			next_council.version = 0;
+			let next_council_hash = CrosschainTransfer::hash_global_issuance_council(&next_council);
+			GlobalIssuanceCouncilByHash::<Test>::insert(next_council_hash, &next_council);
+			let mut queued_rotation = queued_rotation;
+			queued_rotation.target =
+				CouncilApprovalTargetId::GlobalIssuanceCouncilRotation(next_council_hash);
+			queued_rotation.target_payload_hash =
+				CrosschainTransfer::hash_rotate_global_issuance_council(
+					SourceChain::Ethereum,
+					&next_council,
+				)
+				.unwrap();
 			queued_rotation.approval_hash = CrosschainTransfer::hash_council_approval_queue_entry(
 				SourceChain::Ethereum,
 				1,
 				&queued_rotation,
 			)
-			.expect("rotation queue entry should hash with the configured gateway domain");
+			.unwrap();
 			CouncilApprovalQueueByDestinationChainAndNonce::<Test>::insert(
 				SourceChain::Ethereum,
 				1,
 				queued_rotation,
+			);
+			LatestQueuedCouncilHashByDestinationChain::<Test>::insert(
+				SourceChain::Ethereum,
+				next_council_hash,
+			);
+			let signature = minting_authority_approval_signature(&council_pair, 1);
+			assert_ok!(CrosschainTransfer::approve_queue_entries(
+				RuntimeOrigin::signed(council_account.clone()),
+				SourceChain::Ethereum,
+				bounded_vec![signature]
+			));
+			let queued_bytes = CouncilApprovalQueueByDestinationChainAndNonce::<Test>::get(
+				SourceChain::Ethereum,
+				1,
+			)
+			.unwrap()
+			.encode();
+			for (hash, council) in GlobalIssuanceCouncilByHash::<Test>::iter().collect::<Vec<_>>() {
+				let old_council =
+					(council.epoch_microgons_per_argonot, council.members, council.total_weight);
+				frame_support::storage::unhashed::put_raw(
+					&GlobalIssuanceCouncilByHash::<Test>::hashed_key_for(hash),
+					&old_council.encode(),
+				);
+			}
+			StorageVersion::new(3).put::<CrosschainTransfer>();
+			type Migration = crate::migrations::MigrateToV5<Test>;
+			#[cfg(feature = "try-runtime")]
+			let preflight = <Migration as frame_support::traits::OnRuntimeUpgrade>::pre_upgrade().unwrap();
+			<Migration as frame_support::traits::OnRuntimeUpgrade>::on_runtime_upgrade();
+			#[cfg(feature = "try-runtime")]
+			<Migration as frame_support::traits::OnRuntimeUpgrade>::post_upgrade(preflight)
+				.unwrap();
+			assert_eq!(StorageVersion::get::<CrosschainTransfer>(), StorageVersion::new(5));
+			assert_eq!(
+				CouncilApprovalQueueByDestinationChainAndNonce::<Test>::get(
+					SourceChain::Ethereum,
+					1
+				)
+				.unwrap()
+				.encode(),
+				queued_bytes
+			);
+			assert_eq!(
+				ActiveGlobalIssuanceCouncilByDestinationChain::<Test>::get(SourceChain::Ethereum),
+				Some(active_council_hash)
+			);
+			assert_eq!(
+				GlobalIssuanceCouncilByHash::<Test>::get(next_council_hash)
+					.unwrap()
+					.inflation_percent_since_launch,
+				0
+			);
+			assert_eq!(
+				<Migration as frame_support::traits::OnRuntimeUpgrade>::on_runtime_upgrade(),
+				<Test as frame_system::Config>::DbWeight::get().reads(1)
 			);
 			CurrentFrameId::set(20);
 
@@ -2662,6 +2733,26 @@ mod test {
 			)
 			.is_none());
 			assert!(GlobalIssuanceCouncilByHash::<Test>::get(oldest_council_hash).is_none());
+
+			ArgonPriceInUsd::set(FixedU128::from_inner(1_060_000_000_000_000_000));
+			CurrentFrameId::set(30);
+			<CrosschainTransfer as argon_primitives::OnNewSlot<TestAccountId>>::on_frame_start(30);
+			let next_update = CouncilApprovalQueueByDestinationChainAndNonce::<Test>::get(
+				SourceChain::Ethereum,
+				2,
+			)
+			.unwrap();
+			let CouncilApprovalTargetId::GlobalIssuanceCouncilRotation(inflation_council_hash) =
+				next_update.target
+			else {
+				panic!("expected inflation council rotation")
+			};
+			assert_eq!(
+				GlobalIssuanceCouncilByHash::<Test>::get(inflation_council_hash)
+					.unwrap()
+					.inflation_percent_since_launch,
+				60_000_000_000_000_000
+			);
 		});
 	}
 

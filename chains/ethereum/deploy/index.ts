@@ -80,8 +80,8 @@ async function main() {
     const epochMicrogonsPerArgonot = initialCouncil.epochMicrogonsPerArgonot;
     const councilHash = ethers.keccak256(
       ethers.AbiCoder.defaultAbiCoder().encode(
-        ['address[]', 'uint256[]', 'uint128'],
-        [sortedCouncilSigners, sortedCouncilWeights, epochMicrogonsPerArgonot],
+        ['address[]', 'uint256[]', 'uint128', 'uint8', 'int128'],
+        [sortedCouncilSigners, sortedCouncilWeights, epochMicrogonsPerArgonot, 1, 0n],
       ),
     );
 

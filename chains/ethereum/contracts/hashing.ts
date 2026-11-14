@@ -47,13 +47,16 @@ export type MintingGatewayTransferOutOfArgonProof = FinalizeTransferOutOfArgonAr
 export type MintingGatewayMintingAuthorization =
   MintingGatewayTransferOutOfArgonProof['authorizations'][number];
 export type MintingGatewayMigrationAssetDistribution = MigrateArgs[0];
+export type MintingGatewayCouncilParameters = {
+  epochMicrogonsPerArgonot: bigint;
+  /** Signed inflation fraction, scaled by 10^18. V0 councils require zero. */
+  inflationPercentSinceLaunch?: bigint;
+};
 export type MintingGatewayGlobalIssuanceCouncilRotateTarget = {
   council: MintingGatewayCouncilSnapshot;
-  epochMicrogonsPerArgonot: bigint;
-};
-export type MintingGatewayGlobalIssuanceCouncilHashArgs = MintingGatewayCouncilSnapshot & {
-  epochMicrogonsPerArgonot: bigint;
-};
+} & MintingGatewayCouncilParameters;
+export type MintingGatewayGlobalIssuanceCouncilHashArgs = MintingGatewayCouncilSnapshot &
+  MintingGatewayCouncilParameters;
 
 export type MintingGatewayMintingAuthorityActivationTarget = {
   microgonCollateral: bigint;
@@ -139,6 +142,7 @@ type GatewayUpdateApprovalArgs = {
 const COUNCIL_SNAPSHOT_PARAMETERS = [
   { name: 'signers', type: 'address[]' },
   { name: 'weights', type: 'uint256[]' },
+  { name: 'version', type: 'uint8' },
 ] as const;
 const GATEWAY_ACTIVITY_STATE_PARAMETERS = [
   { name: 'gatewayActivityNonce', type: 'uint64' },
@@ -156,12 +160,9 @@ const GLOBAL_ISSUANCE_COUNCIL_ROTATE_TARGET_PARAMETERS = [
   {
     type: 'tuple',
     components: [
-      {
-        name: 'council',
-        type: 'tuple',
-        components: COUNCIL_SNAPSHOT_PARAMETERS,
-      },
+      { name: 'council', type: 'tuple', components: COUNCIL_SNAPSHOT_PARAMETERS },
       { name: 'epochMicrogonsPerArgonot', type: 'uint128' },
+      { name: 'inflationPercentSinceLaunch', type: 'int128' },
     ],
   },
 ] as const;
@@ -336,7 +337,12 @@ export function encodeMintingGatewayCouncilSnapshot(snapshot: MintingGatewayCoun
 export function encodeMintingGatewayGlobalIssuanceCouncilRotateTarget(
   target: MintingGatewayGlobalIssuanceCouncilRotateTarget,
 ): Hex {
-  return encodeAbiParameters(GLOBAL_ISSUANCE_COUNCIL_ROTATE_TARGET_PARAMETERS, [target]);
+  return encodeAbiParameters(GLOBAL_ISSUANCE_COUNCIL_ROTATE_TARGET_PARAMETERS, [
+    {
+      ...target,
+      inflationPercentSinceLaunch: target.inflationPercentSinceLaunch ?? 0n,
+    },
+  ]);
 }
 
 export function encodeMintingGatewayMintingAuthorityActivationTarget(
@@ -354,10 +360,28 @@ export function encodeMintingGatewayMintingAuthorityDeactivateTarget(
 export function hashMintingGatewayGlobalIssuanceCouncil(
   council: MintingGatewayGlobalIssuanceCouncilHashArgs,
 ): Hex {
+  const values = [council.signers, council.weights, council.epochMicrogonsPerArgonot] as const;
+  const inflation = council.inflationPercentSinceLaunch ?? 0n;
+  if (council.version === 0) {
+    if (inflation !== 0n) throw new Error('V0 councils cannot include inflation');
+    return keccak256(
+      encodeAbiParameters(
+        [{ type: 'address[]' }, { type: 'uint256[]' }, { type: 'uint128' }],
+        values,
+      ),
+    );
+  }
+  if (council.version !== 1) throw new Error(`Unsupported council version ${council.version}`);
   return keccak256(
     encodeAbiParameters(
-      [{ type: 'address[]' }, { type: 'uint256[]' }, { type: 'uint128' }],
-      [council.signers, council.weights, council.epochMicrogonsPerArgonot],
+      [
+        { type: 'address[]' },
+        { type: 'uint256[]' },
+        { type: 'uint128' },
+        { type: 'uint8' },
+        { type: 'int128' },
+      ],
+      [...values, council.version, inflation],
     ),
   );
 }
@@ -394,7 +418,7 @@ export function hashMintingGatewayRotateGlobalIssuanceCouncilApproval(
 ): Hex {
   const nextCouncilHash = hashMintingGatewayGlobalIssuanceCouncil({
     ...args.target.council,
-    epochMicrogonsPerArgonot: args.target.epochMicrogonsPerArgonot,
+    ...args.target,
   });
 
   return hashMintingGatewayGatewayUpdateApproval(context, {
@@ -430,10 +454,7 @@ export function hashMintingGatewayRotateGlobalIssuanceCouncil(
       GLOBAL_ISSUANCE_COUNCIL_ROTATION_TAG,
       context.chainId,
       context.gatewayAddress,
-      hashMintingGatewayGlobalIssuanceCouncil({
-        ...target.council,
-        epochMicrogonsPerArgonot: target.epochMicrogonsPerArgonot,
-      }),
+      hashMintingGatewayGlobalIssuanceCouncil({ ...target.council, ...target }),
       target.epochMicrogonsPerArgonot,
     ]),
   );

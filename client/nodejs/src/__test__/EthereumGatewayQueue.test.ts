@@ -17,7 +17,7 @@ import { keccak256, type Hex } from 'viem';
 
 const ZERO_HASH: Hex = `0x${'00'.repeat(32)}`;
 
-it('builds a rate refresh followed by the contiguous ready activation prefix', async () => {
+it.each([0n, 60_000_000_000_000_000n])('relays inflation %s', async inflation => {
   const gatewayAddress = repeatHex('11', 20);
   const councilHash = repeatHex('22', 32);
   const authoritySigningKey = repeatHex('33', 20);
@@ -25,16 +25,19 @@ it('builds a rate refresh followed by the contiguous ready activation prefix', a
   const councilSignerB = repeatHex('55', 20);
   const hashContext = { chainId: 1n, gatewayAddress };
   const council = {
+    version: 1,
     signers: [councilSignerA, councilSignerB],
     weights: [70n, 30n],
   };
+  let capturedInflation = inflation;
   const rateRefreshTarget: MintingGatewayGlobalIssuanceCouncilRotateTarget = {
     council,
     epochMicrogonsPerArgonot: 6_000_000n,
+    inflationPercentSinceLaunch: capturedInflation,
   };
   const refreshedCouncilHash = hashMintingGatewayGlobalIssuanceCouncil({
     ...council,
-    epochMicrogonsPerArgonot: rateRefreshTarget.epochMicrogonsPerArgonot,
+    ...rateRefreshTarget,
   });
   const rateRefreshPayloadHash = hashMintingGatewayRotateGlobalIssuanceCouncil(
     hashContext,
@@ -130,6 +133,10 @@ it('builds a rate refresh followed by the contiguous ready activation prefix', a
         globalIssuanceCouncilByHash: async (hash: Hex) => {
           councilLookups += 1;
           return some({
+            version: { toNumber: () => 1 },
+            inflationPercentSinceLaunch: amount(
+              hash === refreshedCouncilHash ? capturedInflation : 0n,
+            ),
             epochMicrogonsPerArgonot: amount(
               hash === refreshedCouncilHash
                 ? rateRefreshTarget.epochMicrogonsPerArgonot
@@ -187,6 +194,11 @@ it('builds a rate refresh followed by the contiguous ready activation prefix', a
       signatures: [repeatHex('77', 65), repeatHex('66', 65)],
     },
   ]);
+
+  capturedInflation += 1n;
+  await expect(getReadyEthereumGatewayUpdates(client as any, gatewayClient)).rejects.toThrow(
+    'target council hash does not match council',
+  );
 });
 
 it('returns no updates while the gateway is paused', async () => {

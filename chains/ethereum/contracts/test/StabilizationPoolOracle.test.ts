@@ -156,7 +156,6 @@ describe('StabilizationPoolHook oracle history', () => {
 async function fixture() {
   const [owner] = await ethers.getSigners();
 
-  // Use Uniswap's published PoolManager, settlement routers and ERC20 test artifacts unchanged.
   async function deployUniswap(name: string, args: unknown[]) {
     const artifact = require(`@uniswap/v4-core/out/${name}.sol/${name}.json`);
     const factory = new ethers.ContractFactory(artifact.abi, artifact.bytecode.object, owner);
@@ -182,10 +181,12 @@ async function fixture() {
   }
 
   const deployer = await ethers.deployContract('OracleHookTestDeployer');
+  const gateway = await ethers.deployContract('TestInflationGateway');
   const hookFactory = await ethers.getContractFactory('StabilizationPoolHook');
   const initCode = (
     await hookFactory.getDeployTransaction(
       poolManager.target,
+      gateway.target,
       tokens[0].target,
       tokens[1].target,
       10,

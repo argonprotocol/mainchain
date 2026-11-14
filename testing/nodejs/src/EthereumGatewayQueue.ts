@@ -51,8 +51,8 @@ export type EthereumGatewayUpdateBatch = {
   updates: MintingGatewayGatewayUpdate[];
 };
 
-type LoadedCouncil = {
-  epochMicrogonsPerArgonot: bigint;
+type LoadedCouncil = EvmContracts.MintingGatewayCouncilParameters & {
+  version: number;
   totalWeight: bigint;
   members: {
     signer: Address;
@@ -127,7 +127,6 @@ export async function getReadyEthereumGatewayUpdates(
   const argonApprovalsNonce = rawArgonApprovalsNonce as bigint;
   const argonApprovalsHash = rawArgonApprovalsHash as Hex;
   const paused = rawPaused as boolean;
-
   const candidateUpdates: MintingGatewayGatewayUpdate[] = [];
   let expectedPreviousApprovalHash = argonApprovalsHash;
   let readyQueueEntriesScanned = 0;
@@ -216,12 +215,12 @@ async function buildGatewayUpdate(
     const nextCouncilHash = toHexValue(entry.target.asGlobalIssuanceCouncilRotation);
     const nextCouncil = await loadCouncilByHash(client, nextCouncilHash, councilCache);
     const target: MintingGatewayGlobalIssuanceCouncilRotateTarget = {
+      ...nextCouncil,
       council: councilToSnapshot(nextCouncil),
-      epochMicrogonsPerArgonot: nextCouncil.epochMicrogonsPerArgonot,
     };
     const calculatedCouncilHash = hashMintingGatewayGlobalIssuanceCouncil({
       ...target.council,
-      epochMicrogonsPerArgonot: target.epochMicrogonsPerArgonot,
+      ...target,
     });
     const targetPayloadHash = hashMintingGatewayRotateGlobalIssuanceCouncil(hashContext, target);
     const approvalHash = hashMintingGatewayRotateGlobalIssuanceCouncilApproval(hashContext, {
@@ -351,6 +350,8 @@ async function loadCouncilByHash(
 
   const council = councilOption.unwrap();
   const loaded = {
+    version: council.version?.toNumber() ?? 0,
+    inflationPercentSinceLaunch: council.inflationPercentSinceLaunch?.toBigInt() ?? 0n,
     epochMicrogonsPerArgonot: council.epochMicrogonsPerArgonot.toBigInt(),
     totalWeight: council.totalWeight.toBigInt(),
     members: [...council.members.entries()]
@@ -388,6 +389,7 @@ function queueEntryHasQuorum(entry: ApprovalQueueEntry, council: LoadedCouncil):
 
 function councilToSnapshot(council: LoadedCouncil): MintingGatewayCouncilSnapshot {
   return {
+    version: council.version,
     signers: council.members.map(member => member.signer),
     weights: council.members.map(member => member.weight),
   };

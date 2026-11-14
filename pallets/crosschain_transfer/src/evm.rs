@@ -18,7 +18,7 @@ use polkadot_sdk::{
 	frame_support::ensure,
 	sp_core,
 	sp_core::ecdsa::{KeccakPublic, KeccakSignature},
-	sp_runtime::{BoundedBTreeMap, DispatchError},
+	sp_runtime::DispatchError,
 };
 
 use crate::{
@@ -27,8 +27,8 @@ use crate::{
 	},
 	ChainConfig, ChainConfigBySourceChain, Config, CouncilApprovalQueueEntry,
 	CouncilApprovalQueueNonce, CouncilApprovalTargetId, Error, GatewayActivityNonce,
-	GatewayActivityStorageProof, GatewayState, GlobalIssuanceCouncil, GlobalIssuanceCouncilMember,
-	Pallet, SourceChain, SwapPurchaseEvidence, H160, H256,
+	GatewayActivityStorageProof, GatewayState, GlobalIssuanceCouncil, Pallet, SourceChain,
+	SwapPurchaseEvidence, H160, H256,
 };
 
 impl<T: Config> DecodedGatewayActivity<T> {
@@ -183,28 +183,27 @@ impl<T: Config> DecodedGatewayActivity<T> {
 }
 
 impl<T: Config> Pallet<T> {
-	pub(crate) fn hash_global_issuance_council(
-		members: &BoundedBTreeMap<H160, GlobalIssuanceCouncilMember<T>, T::MaxCouncilMembers>,
-		epoch_microgons_per_argonot: T::Balance,
-	) -> H256 {
-		let epoch_microgons_per_argonot: u128 = epoch_microgons_per_argonot.into();
-		let signers: Vec<AlloyAddress> = members
+	pub(crate) fn hash_global_issuance_council(council: &GlobalIssuanceCouncil<T>) -> H256 {
+		let signers: Vec<AlloyAddress> = council
+			.members
 			.keys()
 			.map(|signer| AlloyAddress::from_slice(signer.as_bytes()))
 			.collect();
-		let weights: Vec<U256> = members
+		let weights: Vec<U256> = council
+			.members
 			.values()
 			.map(|member| {
 				let weight: u128 = member.weight.into();
 				U256::from(weight)
 			})
 			.collect();
-
 		H256::from_slice(
 			ethereum_contracts::hash_global_issuance_council(
 				signers,
 				weights,
-				epoch_microgons_per_argonot,
+				council.epoch_microgons_per_argonot.into(),
+				council.version,
+				council.inflation_percent_since_launch,
 			)
 			.as_slice(),
 		)
@@ -215,11 +214,7 @@ impl<T: Config> Pallet<T> {
 		council: &GlobalIssuanceCouncil<T>,
 	) -> Result<H256, DispatchError> {
 		let (chain_id, gateway) = Self::evm_gateway_signature_domain(destination_chain)?;
-		let council_hash = Self::hash_global_issuance_council(
-			&council.members,
-			council.epoch_microgons_per_argonot,
-		);
-
+		let council_hash = Self::hash_global_issuance_council(council);
 		Ok(H256::from_slice(
 			ethereum_contracts::hash_rotate_global_issuance_council(
 				chain_id,

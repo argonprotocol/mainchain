@@ -420,8 +420,9 @@ export class TestMintingGateway {
   }
 
   async forceUpdateActiveCouncil(
-    replacementCouncil: { signers: Hex[]; weights: bigint[] },
+    replacementCouncil: EvmContracts.MintingGatewayCouncilSnapshot,
     nextMicrogonsPerArgonot: bigint,
+    inflationPercentSinceLaunch: bigint,
   ) {
     return waitForExecutionReceipt(
       this.harness.ethereum,
@@ -431,7 +432,7 @@ export class TestMintingGateway {
         address: this.gatewayAddress,
         abi: mintingGatewayAbi,
         functionName: 'forceUpdateActiveCouncil',
-        args: [replacementCouncil, nextMicrogonsPerArgonot],
+        args: [replacementCouncil, nextMicrogonsPerArgonot, inflationPercentSinceLaunch],
       }),
     );
   }
@@ -680,6 +681,7 @@ export class TestMintingAuthorityActor {
       activeCouncilHash: activeCouncilHashOption.unwrap().toHex(),
       activeCouncil,
       currentCouncil: {
+        version: activeCouncil.version?.toNumber() ?? 0,
         signers: currentCouncil.map(member => member.signer),
         weights: currentCouncil.map(member => member.weight),
       },

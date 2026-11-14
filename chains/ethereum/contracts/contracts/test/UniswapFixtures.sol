@@ -7,6 +7,14 @@ import {EIP712} from "@openzeppelin/contracts/utils/cryptography/EIP712.sol";
 import {ECDSA} from "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import {Nonces} from "@openzeppelin/contracts/utils/Nonces.sol";
 
+contract TestInflationGateway {
+	int128 public inflationPercentSinceLaunch = 1e18;
+
+	function setInflation(int128 inflation) external {
+		inflationPercentSinceLaunch = inflation;
+	}
+}
+
 contract TestArgon is ERC20 {
 	constructor() ERC20("Test Argon", "ARGN") {
 		_mint(msg.sender, 1_000_000e18);

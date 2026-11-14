@@ -63,6 +63,22 @@ For an existing gateway, use `prepare:gateway-upgrade --purchase-config path.jso
 existing purchase contract, pass `--swap-contract 0x...` instead. An explicit zero disables
 purchases. Both paths prepare Safe upgrade calldata; they do not execute the upgrade.
 
+Coordinate the inflation upgrade with the council voters and relayer:
+
+1. Have voters hold off, and finish proof-back for any council transactions already submitted to
+   Ethereum.
+2. Briefly stop council relaying and upgrade the gateway proxy.
+3. Install runtime spec 161. Its crosschain migration marks existing councils V0 with zero inflation
+   and leaves pending updates and signatures unchanged. New councils use V1 and capture inflation,
+   including zero.
+4. Start the updated relayer, then have voters resume signing.
+
+The relayer sends the version stored on each council. V0 preserves the original commitment, so
+existing signatures remain valid. V1 signs both the version and inflation, including zero. No
+on-chain pause or council-version activation call is required.
+
+Relay the first inflation update before deploying the inflation-priced stabilization pool.
+
 Rehearse an upgrade against the deployed proxy on a local fork from the repository root:
 
 ```sh
@@ -93,15 +109,17 @@ manifest explicitly; export historical deployments from their original Git revis
 ## Stabilization pool
 
 The pool uses the existing Uniswap v4 PoolManager and approved PositionManager. It deploys one
-`StabilizationPoolHook`, combining oracle history with immutable 10% ARGN sell and 0.5% ARGN buy LP
-fees, one shared `StabilizationPoolSubscriber`, and a `UniswapV4PriceQuoter` bound to the same
-PoolManager. No replacement Uniswap infrastructure is deployed.
+`StabilizationPoolHook`, combining oracle history with inflation-uplift ARGN sell LP fees clamped to
+0.5%–10%, and 0.5% ARGN buy LP fees, one shared `StabilizationPoolSubscriber`, and a
+`UniswapV4PriceQuoter` bound to the same PoolManager. No replacement Uniswap infrastructure is
+deployed.
 
 Create a JSON configuration with these fields, using the chosen network's actual addresses:
 
 ```json
 {
   "chainId": "11155111",
+  "gateway": "<MintingGateway proxy address>",
   "argonToken": "<canonical ARGN address>",
   "usdc": "<USDC address>",
   "positionManager": "<approved pinned PositionManager address>",
@@ -112,9 +130,11 @@ Create a JSON configuration with these fields, using the chosen network's actual
 
 Tick spacing and the initial price are explicit deployment choices. Addresses are sorted numerically
 to form the PoolKey. Compute the price using that ordering and ARGN's 18 versus USDC's 6 decimals;
-`2^96` represents equal **raw units**, not a one-dollar ARGN price. Fees are fixed by the hook and
-are not configuration options. The standard CREATE2 proxy at `0x4e59…956C` must already be deployed;
-the tool checks its exact runtime code and mines the hook's required permission bits locally.
+`2^96` represents equal **raw units**, not a one-dollar ARGN price. The sell fee is derived from the
+gateway's council-published inflation, and the buy fee and sell-fee bounds are fixed by the hook;
+they are not configuration options. The standard CREATE2 proxy at `0x4e59…956C` must already be
+deployed; the tool checks its exact runtime code and mines the hook's required permission bits
+locally.
 
 Build and prepare the bundle without broadcasting or loading a deployer key:
 

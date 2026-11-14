@@ -158,7 +158,16 @@ pub fn hash_global_issuance_council(
 	signers: Vec<Address>,
 	weights: Vec<U256>,
 	epoch_microgons_per_argonot: u128,
+	version: u8,
+	inflation_percent_since_launch: i128,
 ) -> B256 {
+	if version != 0 {
+		let inflation = inflation_percent_since_launch;
+		return keccak256(
+			(signers, weights, epoch_microgons_per_argonot, U256::from(version), inflation)
+				.abi_encode_params(),
+		);
+	}
 	keccak256((signers, weights, epoch_microgons_per_argonot).abi_encode_params())
 }
 
@@ -563,6 +572,8 @@ mod tests {
 			vec![Address::from([0x44; 20]), Address::from([0x55; 20])],
 			vec![U256::from(60), U256::from(40)],
 			6_000_000,
+			0,
+			0,
 		);
 
 		assert_eq!(
@@ -579,6 +590,28 @@ mod tests {
 			),
 			B256::from_str("0x8157fa1ca76b0c2824c5daa0839ba2dac30886d242551736349dd9488aea34e4")
 				.unwrap(),
+		);
+		let inflation_council_hash = hash_global_issuance_council(
+			vec![Address::from([0x44; 20]), Address::from([0x55; 20])],
+			vec![U256::from(60), U256::from(40)],
+			6_000_000,
+			1,
+			60_000_000_000_000_000,
+		);
+		assert_eq!(
+			inflation_council_hash,
+			B256::from_str("0x498be932c4933742e9dc549c9d1c13da17b97204dd97862583187cdd1ebc29e8")
+				.unwrap()
+		);
+		assert_eq!(
+			hash_rotate_global_issuance_council(
+				1,
+				Address::from([0x11; 20]),
+				inflation_council_hash,
+				6_000_000,
+			),
+			B256::from_str("0x666759c0be11ebb37d6d44fc761727cb3b0076e14fc2fc8319cbce0e3f3db528")
+				.unwrap()
 		);
 	}
 

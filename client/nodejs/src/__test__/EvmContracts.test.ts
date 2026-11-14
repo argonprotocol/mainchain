@@ -10,6 +10,73 @@ it('exports typed EVM contracts through the EvmContracts namespace', () => {
   expect('argonTokenArtifact' in mainchain).toBe(false);
 });
 
+it('preserves V0 commitments and binds the V1 format including zero inflation', () => {
+  const council = {
+    version: 0,
+    signers: [`0x${'44'.repeat(20)}`, `0x${'55'.repeat(20)}`],
+    weights: [60n, 40n],
+  } as const;
+  const context = { chainId: 1n, gatewayAddress: `0x${'11'.repeat(20)}` } as const;
+  const withoutInflation = { council, epochMicrogonsPerArgonot: 6_000_000n } as const;
+  const withInflation = {
+    ...withoutInflation,
+    council: { ...council, version: 1 },
+    inflationPercentSinceLaunch: 60_000_000_000_000_000n,
+  } as const;
+
+  expect(
+    mainchain.EvmContracts.hashMintingGatewayGlobalIssuanceCouncil({
+      ...council,
+      ...withoutInflation,
+    }),
+  ).toBe('0x0df99e9f55797439ddadf1526e5d5a9fa5be256c168aed2924b5f4cfdb57f5bf');
+  expect(
+    mainchain.EvmContracts.hashMintingGatewayRotateGlobalIssuanceCouncil(context, withoutInflation),
+  ).toBe('0x8157fa1ca76b0c2824c5daa0839ba2dac30886d242551736349dd9488aea34e4');
+  expect(
+    mainchain.EvmContracts.hashMintingGatewayGlobalIssuanceCouncil({
+      ...council,
+      ...withoutInflation,
+      inflationPercentSinceLaunch: 0n,
+    }),
+  ).toBe('0x0df99e9f55797439ddadf1526e5d5a9fa5be256c168aed2924b5f4cfdb57f5bf');
+  expect(
+    mainchain.EvmContracts.hashMintingGatewayRotateGlobalIssuanceCouncil(context, {
+      ...withoutInflation,
+      inflationPercentSinceLaunch: 0n,
+    }),
+  ).toBe('0x8157fa1ca76b0c2824c5daa0839ba2dac30886d242551736349dd9488aea34e4');
+  expect(
+    mainchain.EvmContracts.hashMintingGatewayGlobalIssuanceCouncil({
+      ...council,
+      version: 1,
+      epochMicrogonsPerArgonot: 6_000_000n,
+      inflationPercentSinceLaunch: 0n,
+    }),
+  ).toBe('0x536d8ac38df8d21c6c2a21a13927ed23f9a09333a728ca443fefbc07ca394747');
+  expect(
+    mainchain.EvmContracts.hashMintingGatewayGlobalIssuanceCouncil({
+      ...withInflation.council,
+      ...withInflation,
+    }),
+  ).toBe('0x498be932c4933742e9dc549c9d1c13da17b97204dd97862583187cdd1ebc29e8');
+  expect(
+    mainchain.EvmContracts.hashMintingGatewayRotateGlobalIssuanceCouncil(context, withInflation),
+  ).toBe('0x666759c0be11ebb37d6d44fc761727cb3b0076e14fc2fc8319cbce0e3f3db528');
+  expect(
+    mainchain.EvmContracts.hashMintingGatewayGlobalIssuanceCouncil({
+      ...withInflation.council,
+      ...withInflation,
+      inflationPercentSinceLaunch: withInflation.inflationPercentSinceLaunch + 1n,
+    }),
+  ).not.toBe(
+    mainchain.EvmContracts.hashMintingGatewayGlobalIssuanceCouncil({
+      ...withInflation.council,
+      ...withInflation,
+    }),
+  );
+});
+
 it('pins transfer-out hashes and finalize calldata to a known vector', () => {
   const request = {
     argonAccountId: `0x${'22'.repeat(32)}`,

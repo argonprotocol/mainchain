@@ -12,8 +12,10 @@ import {PoolId} from "@uniswap/v4-core/src/types/PoolId.sol";
 import {Currency} from "@uniswap/v4-core/src/types/Currency.sol";
 import {ModifyLiquidityParams, SwapParams} from "@uniswap/v4-core/src/types/PoolOperation.sol";
 import {BeforeSwapDelta, BeforeSwapDeltaLibrary} from "@uniswap/v4-core/src/types/BeforeSwapDelta.sol";
+import {FullMath} from "@uniswap/v4-core/src/libraries/FullMath.sol";
+import {MintingGateway} from "./MintingGateway.sol";
 
-/// @notice Maintains oracle history and charges LP fees of 10% for ARGN sales and 0.5% for buys.
+/// @notice Maintains oracle history and removes inflation uplift from ARGN sales, within 0.5%–10%.
 /// @dev One immutable ARGN/USDC pool. Fees apply to all routers, senders and exact-input/output swaps.
 contract StabilizationPoolHook {
     using StateLibrary for IPoolManager;
@@ -26,8 +28,10 @@ contract StabilizationPoolHook {
     /// @notice Retains at least one hour of history once warm, at one observation per second.
     uint16 public constant OBSERVATION_CAPACITY = 3601;
 
-    /// @notice LP fees use millionths of the input amount: 100,000 is 10%.
-    uint24 public constant SELL_FEE = 100_000;
+    /// @notice Minimum ARGN sell LP fee, in millionths of input: 5,000 is 0.5%.
+    uint24 public constant MIN_SELL_FEE = 5_000;
+    /// @notice Maximum ARGN sell LP fee, in millionths of input: 100,000 is 10%.
+    uint24 public constant MAX_SELL_FEE = 100_000;
     /// @notice A 5,000 millionths LP fee is 0.5%.
     uint24 public constant BUY_FEE = 5_000;
 
@@ -41,6 +45,8 @@ contract StabilizationPoolHook {
     address public immutable token1;
     /// @notice Canonical ARGN token; determines the trade direction independently of token ordering.
     address public immutable argonToken;
+    /// @notice Gateway proxy supplied at deployment, providing council-authenticated USD inflation.
+    MintingGateway public immutable gateway;
 
     /// @notice Uniswap v3 Oracle ring buffer; stores tick and seconds-per-liquidity cumulatives.
     Oracle.Observation[65535] public observations;
@@ -49,7 +55,7 @@ contract StabilizationPoolHook {
     /// @notice Active ring-buffer length; can include uninitialized slots while history warms up.
     uint16 public observationCardinality;
 
-    /// @notice The manager, token pair or tick spacing cannot identify a supported pool.
+    /// @notice The manager, gateway, token pair or tick spacing cannot identify a supported pool.
     error InvalidConfiguration();
     /// @notice The deployed address does not encode exactly the required hook permissions.
     error InvalidHookAddress();
@@ -62,8 +68,15 @@ contract StabilizationPoolHook {
     /// @notice The initialization callback attempted to replace existing oracle history.
     error AlreadyInitialized();
 
-    constructor(IPoolManager manager, address argon, address usdc, int24 tickSpacing) {
+    constructor(
+        IPoolManager manager,
+        MintingGateway mintingGateway,
+        address argon,
+        address usdc,
+        int24 tickSpacing
+    ) {
         if (address(manager) == address(0)) revert InvalidConfiguration();
+        if (address(mintingGateway) == address(0)) revert InvalidConfiguration();
         if (argon == address(0)) revert InvalidConfiguration();
         if (usdc == address(0)) revert InvalidConfiguration();
         if (argon == usdc) revert InvalidConfiguration();
@@ -76,6 +89,7 @@ contract StabilizationPoolHook {
         token0 = argonIsToken0 ? argon : usdc;
         token1 = argonIsToken0 ? usdc : argon;
         argonToken = argon;
+        gateway = mintingGateway;
         poolId = PoolKey(
             Currency.wrap(token0), Currency.wrap(token1), LPFeeLibrary.DYNAMIC_FEE_FLAG,
             tickSpacing, IHooks(address(this))
@@ -104,8 +118,29 @@ contract StabilizationPoolHook {
         _writeObservation();
 
         bool sellingArgon = params.zeroForOne == (argonToken == token0);
-        uint24 fee = sellingArgon ? SELL_FEE : BUY_FEE;
+        uint24 fee = BUY_FEE;
+        if (sellingArgon) {
+            fee = sellFee();
+        }
         return (IHooks.beforeSwap.selector, BeforeSwapDeltaLibrary.ZERO_DELTA, fee | LPFeeLibrary.OVERRIDE_FEE_FLAG);
+    }
+
+    /// @notice Current sell LP fee in millionths of input, rounded up and clamped to 0.5%–10%.
+    /// @dev Inflation is a signed 18-decimal fraction. Zero inflation and deflation charge 0.5%; the 10% cap
+    /// intentionally leaves some uplift with sellers once cumulative inflation exceeds 1/9.
+    function sellFee() public view returns (uint24) {
+        int128 inflation = gateway.inflationPercentSinceLaunch();
+        if (inflation <= 0) return MIN_SELL_FEE;
+
+        uint256 inflationFraction = uint128(inflation);
+        uint256 fee = FullMath.mulDivRoundingUp(
+            inflationFraction,
+            1_000_000,
+            1e18 + inflationFraction
+        );
+        if (fee < MIN_SELL_FEE) return MIN_SELL_FEE;
+        if (fee > MAX_SELL_FEE) return MAX_SELL_FEE;
+        return uint24(fee);
     }
 
     /// @notice Records the preceding liquidity interval before an addition changes its denominator.

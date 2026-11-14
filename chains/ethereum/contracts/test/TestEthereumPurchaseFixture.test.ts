@@ -134,12 +134,21 @@ describe('TestEthereum purchase fixture', () => {
       method: 'hardhat_setCode',
       params: [CREATE2_DEPLOYER, CREATE2_DEPLOYER_CODE],
     });
+    await (
+      await gateway.forceUpdateActiveCouncil(
+        { signers: [owner.address], weights: [1n], version: 1 },
+        (await gateway.globalIssuanceCouncil()).epochMicrogonsPerArgonot,
+        60_000_000_000_000_000n,
+      )
+    ).wait();
+
     const provider = new JsonRpcProvider(executionRpcUrl);
     const wallet = new Wallet(deployerPrivateKey, provider);
     try {
       const deployment = {
         ...(await prepareStabilizationPool(provider, {
           chainId: '31337',
+          gateway: fixture.gatewayAddress,
           argonToken: fixture.argonTokenAddress,
           usdc: await usdc.getAddress(),
           positionManager: await positionManager.getAddress(),

@@ -575,6 +575,10 @@ pub mod pallet {
 		pub members: BoundedBTreeMap<H160, GlobalIssuanceCouncilMember<T>, T::MaxCouncilMembers>,
 		/// Total voting power available for quorum decisions against this snapshot.
 		pub total_weight: T::Balance,
+		/// Signed council format: 0 preserves existing commitments; new councils use 1.
+		pub version: u8,
+		/// Signed cumulative USD inflation, scaled by 10^18.
+		pub inflation_percent_since_launch: i128,
 	}
 
 	#[derive(
@@ -1130,7 +1134,8 @@ pub mod pallet {
 		UnexpectedPreviousGatewayActivityNonce,
 		/// The proven gateway activity nonce is not the next contiguous nonce.
 		UnexpectedGatewayActivityNonce,
-		/// The configured source-chain shape is incomplete or malformed.
+		/// Source-chain configuration is missing, has zero identifiers, or changes a canonical
+		/// chain/token identity.
 		InvalidChainConfig,
 		/// The burn account lacks enough balance for the payout.
 		InsufficientLiquidity,
@@ -1232,6 +1237,9 @@ pub mod pallet {
 		TooManyPendingTransferOuts,
 		/// The account already has a council signer rotation pending for this destination chain.
 		CouncilSignerRotationPending,
+		/// The canonical target is unavailable or cannot fit the gateway's signed 18-decimal
+		/// inflation value when creating a council snapshot.
+		InvalidInflationPercentSinceLaunch,
 	}
 
 	#[pallet::call]
@@ -1309,10 +1317,7 @@ pub mod pallet {
 				CouncilMemberSource::VaultAccounts(member_account_ids),
 			)?;
 			let epoch_microgons_per_argonot = council.epoch_microgons_per_argonot;
-			let council_hash = Self::hash_global_issuance_council(
-				&council.members,
-				council.epoch_microgons_per_argonot,
-			);
+			let council_hash = Self::hash_global_issuance_council(&council);
 			let previous_council =
 				ActiveGlobalIssuanceCouncilByDestinationChain::<T>::get(destination_chain)
 					.and_then(GlobalIssuanceCouncilByHash::<T>::get);
