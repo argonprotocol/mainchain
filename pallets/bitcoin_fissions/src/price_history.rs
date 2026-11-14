@@ -1,14 +1,14 @@
 use crate::{Config, Pallet, RValueHighWaterByFrame, WeightInfo};
 use argon_primitives::{
-	amount_rank::AmountRankId, CrosschainGatewayProvider, LiquidRepaymentProvider,
-	MiningFrameTransitionProvider, PriceIndex, PriceIndexUpdated, RValueHighWaterMark, SourceChain,
-	TickProvider,
+	amount_rank::AmountRankId, bitcoin::best_redemption_r_value, CrosschainGatewayProvider,
+	LiquidRepaymentProvider, MiningFrameTransitionProvider, PriceIndex, PriceIndexUpdated,
+	RValueHighWaterMark, SourceChain, TickProvider,
 };
 use pallet_prelude::*;
 
 impl<T: Config> PriceIndexUpdated for Pallet<T> {
 	fn on_price_index(index: &PriceIndex) {
-		// Only valid ARGON observations contribute to a frame's high-water mark.
+		// Only valid ARGON observations contribute to a frame's best repayment quote.
 		if index.argon_time_weighted_average_liquidity == 0 {
 			return;
 		}
@@ -31,13 +31,13 @@ impl<T: Config> PriceIndexUpdated for Pallet<T> {
 			return;
 		}
 
-		// Record the maximum R-value and earliest observation tick for the active frame.
+		// Record the R-value with the cheapest quote and the frame's earliest observation tick.
 		let active_frame = T::MiningFrameTransitionProvider::is_new_frame_started()
 			.unwrap_or_else(T::MiningFrameTransitionProvider::get_current_frame_id);
 		RValueHighWaterByFrame::<T>::mutate(active_frame.to_ordered(), |entry| {
-			if let Some(high_water_mark) = entry {
-				high_water_mark.r_value = high_water_mark.r_value.max(r_value);
-				high_water_mark.first_tick = high_water_mark.first_tick.min(index.tick);
+			if let Some(price_mark) = entry {
+				price_mark.r_value = best_redemption_r_value(price_mark.r_value, r_value);
+				price_mark.first_tick = price_mark.first_tick.min(index.tick);
 			} else {
 				*entry =
 					Some(RValueHighWaterMark { r_value, first_tick: index.tick, end_tick: None });

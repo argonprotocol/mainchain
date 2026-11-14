@@ -77,7 +77,7 @@ fn recovery_refunds_do_not_expand_the_bitcoin_repayment_and_only_actual_burn_is_
 }
 
 #[test]
-fn r_value_tracks_each_frames_high_and_rejects_invalid_observations() {
+fn r_value_tracks_each_frames_cheapest_quote_and_rejects_invalid_observations() {
 	new_test_ext().execute_with(|| {
 		FissionFrame::set(1);
 		FissionNewFrame::set(None);
@@ -92,8 +92,8 @@ fn r_value_tracks_each_frames_high_and_rejects_invalid_observations() {
 			usdc_usd_price: Some(FixedU128::one()),
 			stabilizer_pool_sqrt_price_x96: None,
 		};
-		for price in [7, 9, 8] {
-			index.argon_usd_price = FixedU128::from_rational(price, 10);
+		for price in [70, 95, 80] {
+			index.argon_usd_price = FixedU128::from_rational(price, 100);
 			BitcoinFissions::on_price_index(&index);
 		}
 		index.argon_usd_price = FixedU128::one();
@@ -107,7 +107,7 @@ fn r_value_tracks_each_frames_high_and_rejects_invalid_observations() {
 		BitcoinFissions::on_price_index(&index);
 		assert_eq!(
 			RValueHighWaterByFrame::<Test>::get(1u64.to_ordered()).unwrap().r_value,
-			FixedU128::one()
+			FixedU128::from_rational(95, 100)
 		);
 		FissionTick::set(200);
 		FissionFrame::set(2);
@@ -123,7 +123,7 @@ fn r_value_tracks_each_frames_high_and_rejects_invalid_observations() {
 		index.usdc_usd_price = None;
 		BitcoinFissions::on_price_index(&index);
 		let previous = RValueHighWaterByFrame::<Test>::get(1u64.to_ordered()).unwrap();
-		assert_eq!(previous.r_value, FixedU128::one());
+		assert_eq!(previous.r_value, FixedU128::from_rational(95, 100));
 		assert_eq!(previous.first_tick, 99);
 		assert_eq!(previous.end_tick, Some(200));
 		assert_eq!(

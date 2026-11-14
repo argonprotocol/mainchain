@@ -161,7 +161,7 @@ mod benchmarks {
 			price_window: LiquidRepayPriceWindow {
 				next_frame: Some(0),
 				next_tick: 1,
-				r_value_high_water: FixedU128::zero(),
+				r_value_high_water: FixedU128::from_rational(6, 10),
 			},
 		};
 		PendingPriceWindowCountByTick::<T>::insert(1u64.to_ordered(), 1);

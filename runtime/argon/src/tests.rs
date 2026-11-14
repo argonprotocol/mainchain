@@ -250,28 +250,40 @@ fn deferred_repayment_settles_bitcoin_principal_and_rewards_including_unreceivab
 		recovery_r,
 		committed,
 		burned,
+		paydown_percent,
 		ratchet_first,
 		reward_bid,
 		treasury_funding_percent,
 	) in [
-		(false, true, 100, 100, 100_000, 100_000, false, None, 0),
-		(true, true, 100, 100, 100_000, 100_000, false, None, 0),
-		(false, true, 50, 50, 135_060, 135_060, false, None, 0),
-		(false, true, 50, 80, 135_060, 105_480, false, None, 0),
-		(false, false, 50, 100, 135_060, 100_000, false, None, 0),
-		(false, true, 98, 100, 96_864, 96_864, false, None, 0),
-		(false, true, 50, 100, 135_060, 100_000, true, None, 0),
-		(false, true, 50, 100, 135_060, 100_000, false, Some(60), 100),
-		(false, true, 50, 100, 135_060, 100_000, false, Some(0), 0),
-		(false, true, 50, 100, 135_060, 100_000, false, Some(100), 50),
+		(false, true, 100, 100, 100_000, 100_000, 100, false, None, 0),
+		(true, true, 100, 100, 100_000, 100_000, 100, false, None, 0),
+		(false, true, 50, 50, 135_060, 135_060, 100, false, None, 0),
+		(false, true, 50, 80, 135_060, 105_480, 100, false, None, 0),
+		(false, false, 50, 100, 135_060, 100_000, 100, false, None, 0),
+		(false, true, 98, 100, 96_864, 96_800, 100, false, None, 0),
+		// R=0.95 is observed before R=1: retain its cheaper quote and repay only 10%.
+		(false, true, 90, 95, 100_000, 95_000, 10, false, None, 0),
+		(false, true, 90, 100, 100_000, 100_000, 10, false, None, 0),
+		(false, true, 50, 100, 135_060, 100_000, 100, true, None, 0),
+		(false, true, 50, 100, 135_060, 100_000, 100, false, Some(60), 100),
+		(false, true, 50, 100, 135_060, 100_000, 100, false, Some(0), 0),
+		(false, true, 50, 100, 135_060, 100_000, 100, false, Some(100), 50),
 	] {
 		let owner = AccountId::from([42; 32]);
 		let sats = SATOSHIS_PER_BITCOIN;
 		let redemption = 100_000 * MICROGONS_PER_ARGON;
 		let minimum = <Balances as InspectT<AccountId>>::minimum_balance();
-		let remainder = if dust_remainder { 1 } else { minimum };
-		let expected_burn = burned * MICROGONS_PER_ARGON;
-		let principal = committed * MICROGONS_PER_ARGON + remainder;
+		let remainder = if paydown_percent < 100 {
+			0
+		} else if dust_remainder {
+			1
+		} else {
+			minimum
+		};
+		let expected_burn = burned * MICROGONS_PER_ARGON * paydown_percent / 100;
+		let principal = committed * MICROGONS_PER_ARGON * paydown_percent / 100 + remainder;
+		let remaining_satoshis = sats - sats * paydown_percent as u64 / 100;
+		let remaining_liquidity = redemption - redemption * paydown_percent / 100;
 		let expected_refund = principal - expected_burn;
 		let treasury_budget = Percent::from_percent(treasury_funding_percent)
 			.mul_floor(Percent::from_percent(90).mul_floor(principal - principal / 2));
@@ -511,6 +523,14 @@ fn deferred_repayment_settles_bitcoin_principal_and_rewards_including_unreceivab
 			recovered.argon_usd_price = FixedU128::from_rational(recovery_r, 100);
 			pallet_ticks::CurrentTick::<Runtime>::put(1);
 			<(StabilizerBuys, BitcoinFissions) as PriceIndexUpdated>::on_price_index(&recovered);
+			if recovery_r == 95 {
+				recovered.tick = 2;
+				recovered.argon_usd_price = FixedU128::one();
+				pallet_ticks::CurrentTick::<Runtime>::put(2);
+				<(StabilizerBuys, BitcoinFissions) as PriceIndexUpdated>::on_price_index(
+					&recovered,
+				);
+			}
 			// Settlement must remain usable without a live Bitcoin or ARGON quote.
 			pallet_price_index::Current::<Runtime>::kill();
 			assert_ok!(<Balances as MutateT<AccountId>>::mint_into(&owner, redemption));
@@ -530,13 +550,19 @@ fn deferred_repayment_settles_bitcoin_principal_and_rewards_including_unreceivab
 			pallet_mining_slot::NextFrameId::<Runtime>::put(32);
 			StabilizerBuys::on_initialize(3);
 
-			assert!(!pallet_bitcoin_fissions::FissionByOwnerAndId::<Runtime>::contains_key(
-				&owner, 0
-			));
+			let remaining_fission =
+				pallet_bitcoin_fissions::FissionByOwnerAndId::<Runtime>::get(&owner, 0);
+			if remaining_satoshis > 0 {
+				let fission = remaining_fission.unwrap();
+				assert_eq!(fission.satoshis, remaining_satoshis);
+				assert_eq!(fission.liquidity_promised, remaining_liquidity);
+			} else {
+				assert!(remaining_fission.is_none());
+			}
 			assert!(!StabilizerBuys::has_pending_repayment(&owner, 1));
 			assert_eq!(
 				pallet_bitcoin_locks::LocksById::<Runtime>::get(1).unwrap().fissioned_satoshis,
-				0
+				remaining_satoshis
 			);
 			assert_eq!(
 				Balances::balance_on_hold(
@@ -570,7 +596,7 @@ fn deferred_repayment_settles_bitcoin_principal_and_rewards_including_unreceivab
 				pallet_treasury_positions::NetworkTotals::<Runtime>::get()
 					.account_quantities
 					.fission_liquidity,
-				0
+				remaining_liquidity
 			);
 			let paid_issuance = Balances::total_issuance();
 			StabilizerBuys::on_initialize(5);

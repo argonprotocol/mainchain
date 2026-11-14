@@ -284,21 +284,24 @@ fn repayment_requires_btc_and_r_capture_but_usdc_only_controls_reward_eligibilit
 			);
 			let held = if expects_repayment || expects_reward { buy.principal } else { 0 };
 			assert_eq!(Balances::balance_on_hold(&HoldReason::PurchasePrincipal.into(), &1), held);
-			assert_eq!(StabilizerBuys::oldest_pending_purchase_tick(), None);
+			assert_eq!(
+				StabilizerBuys::oldest_pending_purchase_tick(),
+				expects_repayment.then_some(buy.tick)
+			);
 		});
 	}
 }
 
 #[test]
-fn repayment_without_a_premium_skips_recovery_but_keeps_the_full_hold() {
+fn repayment_without_a_premium_still_collects_cheaper_quotes_and_keeps_the_full_hold() {
 	new_test_ext().execute_with(|| {
 		let mut buy = purchase();
 		buy.repay_liquid_id = Some(42);
 		assert_ok!(record_purchase(&1, &buy));
 		let repay =
 			LiquidRepaysByAccountAndGatewayNonce::<Test>::get(1, 1u64.to_ordered()).unwrap();
-		assert_eq!(repay.price_window.next_frame, None);
-		assert_eq!(StabilizerBuys::oldest_pending_purchase_tick(), None);
+		assert_eq!(repay.price_window.next_frame, Some(1));
+		assert_eq!(StabilizerBuys::oldest_pending_purchase_tick(), Some(buy.tick));
 		start_frame(2);
 		start_frame(3);
 
@@ -389,12 +392,13 @@ fn waiting_repayments_do_not_block_other_accounts_and_the_queue_wraps_after_remo
 
 #[test]
 fn delayed_purchase_window_excludes_earlier_spikes_and_maturity_frame_through_retries() {
-	for (recovery_price, last_price, expected_high) in [(80, 85, 85), (90, 110, 90)] {
+	for (recovery_price, last_price, expected_best) in [(80, 85, 85), (90, 110, 90), (95, 100, 95)]
+	{
 		new_test_ext().execute_with(|| {
 			MaxPriceWindowSteps::set(2);
 			let mut highs = std::collections::BTreeMap::new();
 			for (frame, tick, price) in
-				[(1, 100, 200), (1, 110, 60), (1, 120, 70), (2, 210, recovery_price), (9, 900, 80)]
+				[(1, 100, 95), (1, 110, 60), (1, 120, 70), (2, 210, recovery_price), (9, 900, 80)]
 			{
 				CurrentFrame::set(frame);
 				CurrentTick::set(tick);
@@ -407,7 +411,10 @@ fn delayed_purchase_window_excludes_earlier_spikes_and_maturity_frame_through_re
 				highs
 					.entry(frame)
 					.and_modify(|high: &mut RValueHighWaterMark| {
-						high.r_value = high.r_value.max(index.argon_usd_price);
+						high.r_value = argon_primitives::bitcoin::best_redemption_r_value(
+							high.r_value,
+							index.argon_usd_price,
+						);
 					})
 					.or_insert(RValueHighWaterMark {
 						r_value: index.argon_usd_price,
@@ -453,7 +460,7 @@ fn delayed_purchase_window_excludes_earlier_spikes_and_maturity_frame_through_re
 					.unwrap()
 					.price_window
 					.r_value_high_water,
-				FixedU128::zero()
+				FixedU128::from_rational(6, 10)
 			);
 
 			CurrentFrame::set(40);
@@ -492,7 +499,7 @@ fn delayed_purchase_window_excludes_earlier_spikes_and_maturity_frame_through_re
 			assert_eq!(fixed.price_window.next_frame, None);
 			assert_eq!(
 				fixed.price_window.r_value_high_water,
-				FixedU128::from_rational(expected_high, 100)
+				FixedU128::from_rational(expected_best, 100)
 			);
 			assert_eq!(StabilizerBuys::oldest_pending_purchase_tick(), None);
 			assert_eq!(
