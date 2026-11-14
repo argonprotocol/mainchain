@@ -1,5 +1,44 @@
 # Changelog
 
+## [v1.6.0](https://github.com/argonprotocol/mainchain/compare/v1.5.2...49eebcf05108aa63f262f219a46daf610051fb6c) (2026-11-14)
+
+### Features
+
+* **stabilizer:** remove inflation uplift from pool sales ([1ea24f0](https://github.com/argonprotocol/mainchain/commit/1ea24f04ec195684d402ea093b8e41d39457cf77))
+* **mining:** clear opening bids and maximum disclosures in their inclusion block ([1678975](https://github.com/argonprotocol/mainchain/commit/167897525ce5f127c92586f91a273f71e94bfd57))
+* **mining:** allow single-call max bid updates with the current bid as the minimum (#692) ([4f5b015](https://github.com/argonprotocol/mainchain/commit/4f5b015ccb0f763b21f870b1a396f86f0f43cb1f)), closes [#692](https://github.com/argonprotocol/mainchain/issues/692)
+* **account-security:** protect exits with independent signers ([5533e70](https://github.com/argonprotocol/mainchain/commit/5533e70042dfefbfdc511d5a3f650fcb83ad71de))
+* repay liquids through stabilizer buys ([0d3501f](https://github.com/argonprotocol/mainchain/commit/0d3501fcdd9a4309a4ec5390321d8dd402249a68))
+* support local Uniswap fixtures and file oracle prices (#680) ([b031c54](https://github.com/argonprotocol/mainchain/commit/b031c548e4c86191150ccef8fc54054e6fffc319)), closes [#680](https://github.com/argonprotocol/mainchain/issues/680)
+* **ethereum:** support Gloas light-client updates ([7015cef](https://github.com/argonprotocol/mainchain/commit/7015cef9028a31690b98ba276bbea7d650cf0fe5))
+* **stabilizer:** add frame valuation and secure gateway syncing ([26a3645](https://github.com/argonprotocol/mainchain/commit/26a364598997981fbc986a8b68f5dec9724ac36e))
+* **ethereum:** add Uniswap purchase syncing ([904e8f1](https://github.com/argonprotocol/mainchain/commit/904e8f180f3f8918fb287c243e181fcc3fa2f21a))
+* **stabilizer:** reward liquidity purchases through auctions ([0183885](https://github.com/argonprotocol/mainchain/commit/0183885e9146f892135f8abf27515f770760c91f))
+* **stabilization:** add Uniswap v4 position checkpoints ([9601a93](https://github.com/argonprotocol/mainchain/commit/9601a93c262aa5a7bd8c2596b4fad4f59dd85cfb))
+* add purchase reward auction flows ([c9e832a](https://github.com/argonprotocol/mainchain/commit/c9e832a30b068d5d35051b19193ffd1d462aaf05))
+* Preserve legacy bid rules and test auction lifecycles and treasury payouts ([a4f2287](https://github.com/argonprotocol/mainchain/commit/a4f22879354e601a0033dda2193c6ee93d57995c))
+
+### Fixes
+
+* **build:** resolve type-generation templates correctly on Windows.
+* **client:** handle empty bytes in EVM purchase hash test (#691) ([c911d61](https://github.com/argonprotocol/mainchain/commit/c911d613cca38642d0fa034b37dcbb1c88ba0dfd)), closes [#691](https://github.com/argonprotocol/mainchain/issues/691)
+* **operational-accounts:** bind proofs to complete registrations (#688) ([2effa30](https://github.com/argonprotocol/mainchain/commit/2effa30c99f14631be8a84f1e648a2325593b843)), closes [#688](https://github.com/argonprotocol/mainchain/issues/688)
+* **ethereum:** allow authenticated beacon catch-up (#687) ([247195a](https://github.com/argonprotocol/mainchain/commit/247195a55ee8a90f2d0e4ffb2cd79a80b7555e60)), closes [#687](https://github.com/argonprotocol/mainchain/issues/687)
+* **stabilizer:** authorize liquid repayment senders ([8190a3a](https://github.com/argonprotocol/mainchain/commit/8190a3a3065095521b51435a8d3d42cf16c92cc4))
+* **sdk:** report unbridgeable beacon sync gaps (#684) ([c44b750](https://github.com/argonprotocol/mainchain/commit/c44b75066fa6d64f6af0468449f6148cce4d672f)), closes [#684](https://github.com/argonprotocol/mainchain/issues/684)
+* **stabilizer:** enforce reward auction inclusion cutoff ([b3ac85c](https://github.com/argonprotocol/mainchain/commit/b3ac85c4924fe8b29854fd85363cd98b695d55bb))
+* **runtime:** restore spec version 161 and regenerate metadata ([a3d2e45](https://github.com/argonprotocol/mainchain/commit/a3d2e458a5c091b67bba6e8ec04c7ecb168c799f))
+* **npm:** restore publishing and exclude test fixtures ([546f682](https://github.com/argonprotocol/mainchain/commit/546f6824724b627799162e80f0c86408336fc1cc))
+* **treasury:** align vault reward allocations ([83203ee](https://github.com/argonprotocol/mainchain/commit/83203ee59a7bf30160be570591fcd7e84812ad7c))
+* **stabilizer:** align pool naming and CI integration ([80be216](https://github.com/argonprotocol/mainchain/commit/80be21601219e9fa8ec08ee10cd706674ed96e10))
+* **sdk:** leave bid compatibility to applications ([406455e](https://github.com/argonprotocol/mainchain/commit/406455e3e3429191cb523ca477fa04411834eaa2))
+* **sdk:** keep general clients native ([92a628a](https://github.com/argonprotocol/mainchain/commit/92a628a7031475576b6eb9c17cc388291154c453))
+* dropped runtime spec from 163 to 161 ([9affb25](https://github.com/argonprotocol/mainchain/commit/9affb2519985a16485d20df76d9740142da8cf25))
+* **mining:** bind reveals to frames, use a five-block window, correct bid statistics, refresh bindings and weights ([8f9eacc](https://github.com/argonprotocol/mainchain/commit/8f9eacc9a82bf09e02f549627a2c4e773bbad6a9))
+* **bitcoin:** finalize guarantee accounting and expiry ([4e335dd](https://github.com/argonprotocol/mainchain/commit/4e335dd50fb1ba82e36b62c361ff28d0515f08a1))
+* **bitcoin:** preserve independent liquid guarantees ([dbfe101](https://github.com/argonprotocol/mainchain/commit/dbfe10183e14f6bad367deb740b8062b087efa34))
+* **treasury:** backfill only flexible bond holder earnings ([bc95c53](https://github.com/argonprotocol/mainchain/commit/bc95c532a259ecec96decda1886f206c1cfd5635))
+
 ## [v1.5.2](https://github.com/argonprotocol/mainchain/compare/v1.5.1...70a57c2636a0af43e19776d6115dc6e7a2222b13) (2026-10-15)
 
 ### Features

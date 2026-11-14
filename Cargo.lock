@@ -1167,7 +1167,7 @@ checksum = "c3d036a3c4ab069c7b410a2ce876bd74808d2d0888a82667669f8e783a898bf1"
 
 [[package]]
 name = "argon-bitcoin"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "anyhow",
  "argon-primitives",
@@ -1193,7 +1193,7 @@ dependencies = [
 
 [[package]]
 name = "argon-bitcoin-utxo-tracker"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "anyhow",
  "argon-bitcoin",
@@ -1212,7 +1212,7 @@ dependencies = [
 
 [[package]]
 name = "argon-bitcoin-wasm"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "anyhow",
  "argon-bitcoin",
@@ -1227,7 +1227,7 @@ dependencies = [
 
 [[package]]
 name = "argon-canary-runtime"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "argon-primitives",
  "argon-runtime-common",
@@ -1257,7 +1257,7 @@ dependencies = [
  "pallet-stabilizer-buys",
  "pallet-stabilizer-pools",
  "pallet-ticks",
- "pallet-treasury 1.5.2",
+ "pallet-treasury 1.6.0",
  "pallet-treasury-positions",
  "pallet-vaults",
  "parity-scale-codec",
@@ -1271,7 +1271,7 @@ dependencies = [
 
 [[package]]
 name = "argon-client"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "anyhow",
  "argon-primitives",
@@ -1294,7 +1294,7 @@ dependencies = [
 
 [[package]]
 name = "argon-ethereum-contracts"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
@@ -1303,7 +1303,7 @@ dependencies = [
 
 [[package]]
 name = "argon-localchain"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "anyhow",
  "argon-client",
@@ -1348,7 +1348,7 @@ dependencies = [
 
 [[package]]
 name = "argon-node"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "argon-bitcoin-utxo-tracker",
  "argon-canary-runtime",
@@ -1375,7 +1375,7 @@ dependencies = [
 
 [[package]]
 name = "argon-node-consensus"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "anyhow",
  "argon-bitcoin-utxo-tracker",
@@ -1410,7 +1410,7 @@ dependencies = [
 
 [[package]]
 name = "argon-notary"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "anyhow",
  "argon-client",
@@ -1452,7 +1452,7 @@ dependencies = [
 
 [[package]]
 name = "argon-notary-apis"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "anyhow",
  "argon-notary-audit",
@@ -1474,7 +1474,7 @@ dependencies = [
 
 [[package]]
 name = "argon-notary-audit"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "anyhow",
  "argon-primitives",
@@ -1489,7 +1489,7 @@ dependencies = [
 
 [[package]]
 name = "argon-oracle"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "alloy-contract 2.0.0",
  "alloy-eips 2.0.0",
@@ -1534,7 +1534,7 @@ dependencies = [
 
 [[package]]
 name = "argon-primitives"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -1567,7 +1567,7 @@ dependencies = [
 
 [[package]]
 name = "argon-randomx"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "bindgen 0.71.1",
  "cmake",
@@ -1585,7 +1585,7 @@ dependencies = [
 
 [[package]]
 name = "argon-runtime"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
@@ -1620,7 +1620,7 @@ dependencies = [
  "pallet-stabilizer-buys",
  "pallet-stabilizer-pools",
  "pallet-ticks",
- "pallet-treasury 1.5.2",
+ "pallet-treasury 1.6.0",
  "pallet-treasury-positions",
  "pallet-vaults",
  "parity-scale-codec",
@@ -1634,7 +1634,7 @@ dependencies = [
 
 [[package]]
 name = "argon-runtime-common"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "argon-bitcoin",
  "argon-primitives",
@@ -1665,7 +1665,7 @@ dependencies = [
  "pallet-stabilizer-buys",
  "pallet-stabilizer-pools",
  "pallet-ticks",
- "pallet-treasury 1.5.2",
+ "pallet-treasury 1.6.0",
  "pallet-treasury-positions",
  "pallet-vaults",
  "parity-scale-codec",
@@ -1678,7 +1678,7 @@ dependencies = [
 
 [[package]]
 name = "argon-runtime-fuzz"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "argon-primitives",
  "argon-runtime",
@@ -1692,7 +1692,7 @@ dependencies = [
 
 [[package]]
 name = "argon-testing"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "anyhow",
  "argon-client",
@@ -1720,7 +1720,7 @@ dependencies = [
 
 [[package]]
 name = "argon-testing-bitcoin"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "bitcoind",
 ]
@@ -6256,7 +6256,7 @@ dependencies = [
 
 [[package]]
 name = "end-to-end"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "anyhow",
  "argon-bitcoin",
@@ -10868,7 +10868,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-account-security"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "argon-primitives",
  "p256",
@@ -11243,7 +11243,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-bitcoin-fissions"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "argon-primitives",
  "pallet-prelude",
@@ -11255,7 +11255,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-bitcoin-locks"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "argon-bitcoin",
  "argon-primitives",
@@ -11272,7 +11272,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-bitcoin-utxos"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "pallet-prelude",
  "parity-scale-codec",
@@ -11283,7 +11283,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-block-rewards"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "pallet-prelude",
  "parity-scale-codec",
@@ -11293,7 +11293,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-block-seal"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "argon-notary-audit",
  "futures",
@@ -11305,7 +11305,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-block-seal-spec"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "pallet-prelude",
  "parity-scale-codec",
@@ -11315,7 +11315,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-bootstrap"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "pallet-prelude",
  "parity-scale-codec",
@@ -11643,7 +11643,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-crosschain-transfer"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "alloy-primitives",
  "alloy-sol-types",
@@ -11761,7 +11761,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-digests"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "argon-notary-audit",
  "impl-trait-for-tuples",
@@ -11773,7 +11773,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-domains"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "pallet-prelude",
  "parity-scale-codec",
@@ -11879,7 +11879,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-ethereum-verifier"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "alloy-consensus 2.0.0",
  "alloy-eips 2.0.0",
@@ -11920,7 +11920,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-fee-control"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "impl-trait-for-tuples",
  "pallet-prelude",
@@ -12038,7 +12038,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-localchain-transfer"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "argon-notary-audit",
  "pallet-prelude",
@@ -12139,11 +12139,11 @@ dependencies = [
 
 [[package]]
 name = "pallet-mining-slot"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "pallet-prelude",
  "pallet-ticks",
- "pallet-treasury 1.5.2",
+ "pallet-treasury 1.6.0",
  "parity-scale-codec",
  "polkadot-sdk",
  "scale-info",
@@ -12151,7 +12151,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-mint"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "pallet-prelude",
  "parity-scale-codec",
@@ -12335,7 +12335,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-notaries"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "pallet-prelude",
  "parity-scale-codec",
@@ -12346,7 +12346,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-notebook"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "argon-notary-audit",
  "pallet-prelude",
@@ -12399,7 +12399,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-operational-accounts"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "argon-primitives",
  "pallet-prelude",
@@ -12528,7 +12528,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-prelude"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "argon-primitives",
  "env_logger",
@@ -12539,7 +12539,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-price-index"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "pallet-prelude",
  "parity-scale-codec",
@@ -12886,7 +12886,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-stabilizer-buys"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "argon-primitives",
  "pallet-prelude",
@@ -12898,7 +12898,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-stabilizer-pools"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "alloy-consensus 2.0.0",
  "alloy-primitives",
@@ -13090,7 +13090,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-ticks"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "argon-notary-audit",
  "pallet-prelude",
@@ -13207,7 +13207,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-treasury"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "impl-trait-for-tuples",
  "pallet-bitcoin-fissions",
@@ -13245,7 +13245,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-treasury-positions"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "argon-primitives",
  "pallet-prelude",
@@ -13299,7 +13299,7 @@ dependencies = [
 
 [[package]]
 name = "pallet-vaults"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "argon-bitcoin",
  "bip32",
@@ -13310,7 +13310,7 @@ dependencies = [
  "pallet-bitcoin-utxos",
  "pallet-operational-accounts",
  "pallet-prelude",
- "pallet-treasury 1.5.2",
+ "pallet-treasury 1.6.0",
  "pallet-treasury-positions",
  "parity-scale-codec",
  "polkadot-sdk",
@@ -22619,7 +22619,7 @@ dependencies = [
 
 [[package]]
 name = "uniffi-bindgen-cli"
-version = "1.5.2"
+version = "1.6.0"
 dependencies = [
  "uniffi",
 ]
