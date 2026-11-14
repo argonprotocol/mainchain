@@ -180,20 +180,20 @@ pub mod pallet {
 		/// ARGON market-to-target ratio captured at purchase; admission requires a positive quote.
 		pub purchase_r_value: FixedU128,
 		/// Bounded progress over observations before admission frame F+30. Once complete,
-		/// its high-water value remains fixed through payout delays and failures.
+		/// its observed prices remain fixed through payout delays and failures.
 		pub price_window: LiquidRepayPriceWindow,
 	}
 
 	#[derive(
 		Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen,
 	)]
-	/// Progress calculating one purchase's recovery high water through its repayment window.
+	/// Progress collecting one purchase's quotes through its repayment window.
 	pub struct LiquidRepayPriceWindow {
-		/// First unconsumed frame; None means recovery finished or no premium needed a scan.
+		/// First unconsumed frame; None means the purchase-to-maturity scan finished.
 		pub next_frame: Option<FrameId>,
 		/// First observation tick not yet consumed within the purchase's partial frame.
 		pub next_tick: Tick,
-		/// Highest valid market-to-target ratio in the purchase-to-maturity window.
+		/// R-value giving the highest repayment refund, including the purchase-time quote.
 		pub r_value_high_water: FixedU128,
 	}
 
@@ -622,7 +622,7 @@ impl<T: Config> UniswapPurchaseProvider<T::AccountId> for Pallet<T> {
 			) {
 				return None;
 			}
-			let terms = LiquidRepayPrices::new(
+			LiquidRepayPrices::new(
 				prices.microgons_at_target_per_btc,
 				prices.r_value,
 				prices.r_value,
@@ -637,9 +637,9 @@ impl<T: Config> UniswapPurchaseProvider<T::AccountId> for Pallet<T> {
 				microgons_at_target_per_btc: prices.microgons_at_target_per_btc,
 				purchase_r_value: prices.r_value,
 				price_window: LiquidRepayPriceWindow {
-					next_frame: terms.has_refundable_premium().then_some(capture_frame),
+					next_frame: Some(capture_frame),
 					next_tick: purchase.tick,
-					r_value_high_water: FixedU128::zero(),
+					r_value_high_water: prices.r_value,
 				},
 			})
 		});
@@ -698,12 +698,10 @@ impl<T: Config> UniswapPurchaseProvider<T::AccountId> for Pallet<T> {
 		frame_buys.captured_discount.saturating_accrue(captured_discount);
 
 		if let Some(repay) = liquid_repayment {
-			// Only a refundable premium needs recovery history. Every repayment keeps its hold.
-			if repay.price_window.next_frame.is_some() {
-				PendingPriceWindowCountByTick::<T>::mutate(purchase.tick.to_ordered(), |count| {
-					count.saturating_accrue(1)
-				});
-			}
+			// Retain history until this purchase's best repayment quote is fixed.
+			PendingPriceWindowCountByTick::<T>::mutate(purchase.tick.to_ordered(), |count| {
+				count.saturating_accrue(1)
+			});
 
 			frame_buys.pending_liquid_repays.saturating_accrue(1);
 

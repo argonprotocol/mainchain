@@ -1,5 +1,8 @@
 use crate::*;
-use argon_primitives::{PriceIndex, PriceIndexUpdated, SourceChain, MICROGONS_PER_ARGON};
+use argon_primitives::{
+	bitcoin::best_redemption_r_value, PriceIndex, PriceIndexUpdated, SourceChain,
+	MICROGONS_PER_ARGON,
+};
 use polkadot_sdk::sp_arithmetic::{helpers_128bit::multiply_by_rational_with_rounding, Rounding};
 
 impl<T: Config> PriceIndexUpdated for Pallet<T> {
@@ -74,7 +77,7 @@ impl<T: Config> Pallet<T> {
 		}
 	}
 
-	/// Fold immutable frame highs, reading individual ticks only where the purchase cuts a frame.
+	/// Fold immutable frame price marks, reading ticks only where the purchase cuts a frame.
 	/// This runs before the payout transaction: a failed payout keeps the completed price window.
 	pub(crate) fn advance_price_window(repay: &mut LiquidRepay, max_steps: u32) {
 		let maturity_frame = repay.admission_frame.saturating_add(T::PurchaseHoldFrames::get());
@@ -83,7 +86,7 @@ impl<T: Config> Pallet<T> {
 		// Resume the recovery scan, stopping before the maturity frame.
 		for _ in 0..max_steps {
 			let Some(next_frame) = window.next_frame else { break };
-			let Some((history_frame, frame_high_water)) =
+			let Some((history_frame, price_mark)) =
 				T::FissionsProvider::next_r_value_high_water(next_frame)
 			else {
 				window.next_frame = None;
@@ -95,11 +98,12 @@ impl<T: Config> Pallet<T> {
 			}
 			window.next_frame = Some(history_frame);
 
-			// Use the frame high when its observations start at or after the purchase.
-			if frame_high_water.first_tick >= repay.purchase_tick {
-				window.r_value_high_water = window.r_value_high_water.max(frame_high_water.r_value);
+			// Use the frame mark when its observations start at or after the purchase.
+			if price_mark.first_tick >= repay.purchase_tick {
+				window.r_value_high_water =
+					best_redemption_r_value(window.r_value_high_water, price_mark.r_value);
 				window.next_frame = history_frame.checked_add(1);
-			} else if frame_high_water.end_tick.is_some_and(|tick| tick < repay.purchase_tick) {
+			} else if price_mark.end_tick.is_some_and(|tick| tick < repay.purchase_tick) {
 				// Skip frames that ended before the purchase.
 				window.next_frame = history_frame.checked_add(1);
 			} else {
@@ -119,25 +123,14 @@ impl<T: Config> Pallet<T> {
 					continue;
 				}
 				if observation.frame == history_frame {
-					window.r_value_high_water = window.r_value_high_water.max(observation.r_value);
+					window.r_value_high_water =
+						best_redemption_r_value(window.r_value_high_water, observation.r_value);
 				}
 				if let Some(next_tick) = Tick::from_ordered(&tick_key).checked_add(1) {
 					window.next_tick = next_tick;
 				} else {
 					window.next_frame = history_frame.checked_add(1);
 				}
-			}
-
-			// Once the premium is gone, later prices cannot increase the recovery refund.
-			if LiquidRepayPrices::new(
-				repay.microgons_at_target_per_btc,
-				repay.purchase_r_value,
-				window.r_value_high_water,
-			)
-			.is_some_and(|prices| !prices.has_refundable_premium())
-			{
-				window.next_frame = None;
-				break;
 			}
 		}
 

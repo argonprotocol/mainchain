@@ -91,7 +91,7 @@ pub mod pallet {
 		type TimeProvider: UnixTime;
 		/// Latest accepted source-chain gateway state; this pallet owns its retention range.
 		type CrosschainGatewayProvider: CrosschainGatewayProvider<Self::Balance>;
-		/// Number of recent frame high-water marks retained after their source interval has synced.
+		/// Number of recent frame price marks retained after their source interval has synced.
 		#[pallet::constant]
 		type RValueHistoryFrames: Get<u32>;
 		/// Maximum older frame records pruned in one block after gateway sync catches up.
@@ -99,8 +99,8 @@ pub mod pallet {
 		type MaxRValueHistoryPrunesPerBlock: Get<u32>;
 	}
 
-	/// Highest valid market-to-target ARGON ratio in each frame. Ordered frame keys support
-	/// bounded pruning without loading the complete history during an Ethereum stall.
+	/// R-value giving the highest repayment refund in each frame. Ordered keys support bounded
+	/// pruning without loading the complete history during an Ethereum stall.
 	#[pallet::storage]
 	pub type RValueHighWaterByFrame<T: Config> =
 		StorageMap<_, Identity, <FrameId as AmountRankId>::Ordered, RValueHighWaterMark>;

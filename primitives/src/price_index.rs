@@ -47,7 +47,7 @@ pub struct PriceIndex {
 	pub stabilizer_pool_sqrt_price_x96: Option<U256>,
 }
 
-/// A frame's R-value maximum and its actual closing tick, used for sync-aligned retention.
+/// A frame's cheapest observed redemption R-value and closing tick for sync-aligned retention.
 #[derive(
 	Encode,
 	Decode,
@@ -61,7 +61,8 @@ pub struct PriceIndex {
 	MaxEncodedLen,
 )]
 pub struct RValueHighWaterMark {
-	/// Highest accepted ARGON market-to-target ratio observed in this frame.
+	/// Accepted ARGON market-to-target ratio with the cheapest redemption quote in this frame.
+	/// The curve rises again between R=0.95 and 1, so a higher R need not replace this mark.
 	pub r_value: FixedU128,
 	/// Earliest oracle observation tick contributing to this frame.
 	pub first_tick: Tick,

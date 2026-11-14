@@ -190,6 +190,18 @@ pub fn redemption_rate(r: FixedU128) -> Option<FixedU128> {
 	Some(FixedU128::one().checked_div(&r)?.saturating_mul((FX_0_576 * r) + FX_0_4))
 }
 
+/// Retain the observed R-value with the cheapest redemption quote. Zero observations are invalid;
+/// zero may also initialize an empty history. The curve is not monotonic in R near target.
+pub fn best_redemption_r_value(current: FixedU128, observed: FixedU128) -> FixedU128 {
+	let Some(observed_rate) = redemption_rate(observed) else {
+		return current;
+	};
+	if redemption_rate(current).is_none_or(|rate| observed_rate < rate) {
+		return observed;
+	}
+	current
+}
+
 /// Frozen purchase valuation and curve rates for one deferred Liquid repayment.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct LiquidRepayPrices {
@@ -212,32 +224,20 @@ impl LiquidRepayPrices {
 			return None;
 		}
 
-		// Capture the redemption rates at purchase and at the recovery high-water mark.
-		let purchase_redemption_rate = redemption_rate(purchase_r_value)?;
-		let high_water_redemption_rate = redemption_rate(r_value_high_water.max(purchase_r_value))?;
-		let at_target_rate = FixedU128::one();
+		// Preserve the purchase commitment that fixes the Bitcoin quantity, including its
+		// captured discount expressed in ARGON at target.
+		let purchase_rate = redemption_rate(purchase_r_value)?;
+		let discount_at_target =
+			FixedU128::one().saturating_sub(purchase_rate).checked_mul(&purchase_r_value)?;
+		let commitment_rate = FixedU128::one()
+			.checked_sub(&discount_at_target)?
+			.checked_add(&purchase_rate.saturating_sub(FixedU128::one()))?;
 
-		// Preserve the captured curve discount's market value, expressed in ARGON at target.
-		let discount_at_target = at_target_rate
-			.saturating_sub(purchase_redemption_rate)
-			.checked_mul(&purchase_r_value)?;
-		let nonrefundable_burn_rate = at_target_rate.checked_sub(&discount_at_target)?;
-
-		// Defer any curve cost above the at-target burn; recovery can reduce that portion.
-		let deferred_burn_rate = purchase_redemption_rate.saturating_sub(at_target_rate);
-		let remaining_deferred_rate = high_water_redemption_rate
-			.saturating_sub(at_target_rate)
-			.min(deferred_burn_rate);
-
-		// Keep the full commitment fixed while reducing the burn by the recovered premium.
-		let commitment_rate = nonrefundable_burn_rate.checked_add(&deferred_burn_rate)?;
-		let burn_rate = nonrefundable_burn_rate.checked_add(&remaining_deferred_rate)?;
+		// Price the same Bitcoin at the cheapest observed R, including purchase itself.
+		// That quote cannot exceed the purchase commitment; all remaining principal is returned.
+		let high_water_rate = redemption_rate(r_value_high_water).unwrap_or(purchase_rate);
+		let burn_rate = purchase_rate.min(high_water_rate);
 		Some(Self { microgons_at_target_per_btc, commitment_rate, burn_rate })
-	}
-
-	/// Whether recovery can still remove an above-target portion of this burn.
-	pub fn has_refundable_premium(&self) -> bool {
-		self.burn_rate > FixedU128::one()
 	}
 
 	/// Return committed and burned microgons for the same Bitcoin amount. Match ordinary
@@ -749,13 +749,57 @@ mod tests {
 	use crate::MICROGONS_PER_ARGON;
 
 	#[test]
-	fn repayment_refunds_curve_premium_using_recovery_without_spending_it_on_more_bitcoin() {
+	fn repayment_prices_the_same_ten_percent_at_the_cheapest_observed_rate() {
+		// One BTC is worth 10,000 ARGNs at target. At R=0.90 the curve costs 1.0,
+		// so a 1,000-ARGN purchase buys repayment of exactly 0.1 BTC (10%).
+		// At R=0.95 the curve costs 0.95: that same 10% costs 950, returning 50.
+		let basis = 10_000 * MICROGONS_PER_ARGON;
+		let prices = LiquidRepayPrices::new(
+			FixedU128::saturating_from_integer(basis),
+			FixedU128::from_rational(90, 100),
+			FixedU128::from_rational(95, 100),
+		)
+		.unwrap();
+		assert_eq!(
+			prices.quote(SATOSHIS_PER_BITCOIN / 10, basis),
+			Some((1_000 * MICROGONS_PER_ARGON, 950 * MICROGONS_PER_ARGON))
+		);
+	}
+
+	#[test]
+	fn repayment_preserves_native_rounding_near_the_cheapest_quote() {
+		// The numeric oracle's 1.007 / 1.06 quote yields this R. Fixed-point squaring
+		// makes its rate two 18-decimal units cheaper than exact R=0.95.
+		let observed_r = FixedU128::from_inner(949_999_999_999_999_879);
+		assert_eq!(
+			redemption_rate(observed_r),
+			Some(FixedU128::from_inner(949_999_999_999_999_998))
+		);
+		assert_eq!(
+			best_redemption_r_value(FixedU128::from_rational(95, 100), observed_r),
+			observed_r
+		);
+		let basis = 10_000 * MICROGONS_PER_ARGON;
+		let prices = LiquidRepayPrices::new(
+			FixedU128::saturating_from_integer(basis),
+			FixedU128::from_rational(9, 10),
+			observed_r,
+		)
+		.unwrap();
+		assert_eq!(
+			prices.quote(SATOSHIS_PER_BITCOIN / 10, basis),
+			Some((1_000_000_000, 949_999_999))
+		);
+	}
+
+	#[test]
+	fn repayment_refunds_quote_savings_without_spending_them_on_more_bitcoin() {
 		let basis = 100_000 * MICROGONS_PER_ARGON;
 		for (purchase_r, high_r, committed, burned) in [
 			(50, 50, 135_060, 135_060),
 			(50, 80, 135_060, 105_480),
 			(50, 100, 135_060, 100_000),
-			(50, 95, 135_060, 100_000),
+			(50, 95, 135_060, 95_000),
 			(80, 85, 105_480, 102_580),
 			(80, 70, 105_480, 105_480),
 			(100, 100, 100_000, 100_000),
@@ -770,14 +814,13 @@ mod tests {
 				prices.quote(SATOSHIS_PER_BITCOIN, basis),
 				Some((committed * MICROGONS_PER_ARGON, burned * MICROGONS_PER_ARGON))
 			);
-			assert_eq!(prices.has_refundable_premium(), burned > 100_000);
 		}
 	}
 
 	#[test]
-	fn captured_curve_discount_keeps_its_market_value_in_target_argons() {
+	fn purchase_commitment_stays_fixed_while_burn_uses_the_cheapest_purchase_quote() {
 		let basis = 100_000 * MICROGONS_PER_ARGON;
-		for (purchase_r, ordinary, guaranteed) in [(95, 95_000, 95_250), (98, 96_800, 96_864)] {
+		for (purchase_r, ordinary, committed) in [(95, 95_000, 95_250), (98, 96_800, 96_864)] {
 			let r = FixedU128::from_rational(purchase_r, 100);
 			assert_eq!(
 				redemption_rate(r).unwrap().checked_mul_int(basis),
@@ -789,7 +832,7 @@ mod tests {
 						.unwrap();
 				assert_eq!(
 					prices.quote(SATOSHIS_PER_BITCOIN, basis),
-					Some((guaranteed * MICROGONS_PER_ARGON, guaranteed * MICROGONS_PER_ARGON))
+					Some((committed * MICROGONS_PER_ARGON, ordinary * MICROGONS_PER_ARGON))
 				);
 			}
 		}
