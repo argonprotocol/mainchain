@@ -338,6 +338,8 @@ pub(super) fn council_approval(owner: AccountId) -> RuntimeCall {
 		epoch_microgons_per_argonot: ARGON,
 		members: Default::default(),
 		total_weight: ARGON,
+		version: 1,
+		inflation_percent_since_launch: 0,
 	};
 	council.members.try_insert(signer, member).unwrap();
 	GlobalIssuanceCouncilByHash::<Runtime>::insert(council_hash, council);
