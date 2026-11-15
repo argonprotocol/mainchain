@@ -1,5 +1,11 @@
 # Changelog
 
+## [v1.6.0](https://github.com/argonprotocol/mainchain/compare/v1.5.2...49eebcf05108aa63f262f219a46daf610051fb6c) (2026-11-14)
+
+### Features
+
+* **account-security:** protect exits with independent signers ([5533e70](https://github.com/argonprotocol/mainchain/commit/5533e70042dfefbfdc511d5a3f650fcb83ad71de))
+
 ## [v1.5.2](https://github.com/argonprotocol/mainchain/compare/v1.5.1...70a57c2636a0af43e19776d6115dc6e7a2222b13) (2026-10-15)
 
 ### [v1.5.1](https://github.com/argonprotocol/mainchain/compare/v1.5.0...v1.5.1) (2026-10-15)
