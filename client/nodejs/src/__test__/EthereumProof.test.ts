@@ -42,6 +42,7 @@ import {
   discoverMissingGatewayActivityLocators,
   supportsGatewayActivityReceiptProofs,
   supportsGatewayActivityStorageProofs,
+  type CapturedGatewayActivityStorageProof,
   type MissingGatewayActivityLocator,
 } from '../EthereumGatewayActivityProof';
 import productionInboundReceipt from './fixtures/productionInboundReceipt.json';
@@ -2581,12 +2582,15 @@ it('captures before anchoring and relays cached witnesses with one shared shorte
     captureOrder.push('logs');
     return getLogs(options);
   });
+  const cache = new Map<bigint, CapturedGatewayActivityStorageProof>();
   const captures = await captureGatewayActivityStorageProofs({
     executionClient,
     executionBlock: await executionClient.getBlock({ blockNumber: 10n }),
     gatewayAddress,
     locators,
+    cache,
   });
+  expect([...cache.values()]).toEqual(captures);
   expect(captureOrder).toEqual(['proof', 'logs', 'logs']);
   expect(proofRequests).toHaveBeenCalledTimes(1);
   expect(proofRequests.mock.calls[0][0].storageKeys).toHaveLength(5);
@@ -2735,19 +2739,21 @@ it.each([0, 64, 65])(
   },
 );
 
-it('reports an orphaned capture for recapture rather than deferring it forever', async () => {
+it('refreshes an orphaned capture using cached events when historical logs are unavailable', async () => {
   const gatewayAddress = repeatHex('70', 20);
-  const log = createTransferToArgonStartedBlockLog({
-    gatewayAddress,
-    txHash: repeatHex('11', 32),
-    transactionIndex: 0,
-    logIndex: 0,
-    nonce: 1n,
-    argonAccountId: repeatHex('22', 32),
-  });
+  const logs = [1n, 2n].map(nonce =>
+    createTransferToArgonStartedBlockLog({
+      gatewayAddress,
+      txHash: toHex(nonce, { size: 32 }),
+      transactionIndex: Number(nonce - 1n),
+      logIndex: 0,
+      nonce,
+      argonAccountId: repeatHex('22', 32),
+    }),
+  );
   const { executionClient, captureBlock, locators } = await createGatewayProofHarness({
     gatewayAddress,
-    locators: [{ blockNumber: 10n, logs: [log] }],
+    locators: [{ blockNumber: 10n, logs }],
   });
   const captures = await captureGatewayActivityStorageProofs({
     executionClient,
@@ -2770,6 +2776,66 @@ it('reports an orphaned capture for recapture rather than deferring it forever',
     locators: captures,
   });
   expect(result).toEqual({ payloads: [], deferredLocators: [], recaptureLocators: captures });
+
+  // Restore the app-owned cache after restart; only the raw event payloads are authoritative.
+  const restoredCache = new Map(
+    structuredClone(captures).map(capture => [capture.locatorIndex, capture]),
+  );
+  restoredCache.get(1n)!.activities[0].gatewayState.argonCirculation = 999n;
+  const refreshed = await createGatewayProofHarness({
+    gatewayAddress,
+    locators: [{ blockNumber: 10n, logs }],
+    latestArgonFinalizedHeader: { blockHash: repeatHex('ff', 32), blockNumber: 20n },
+  });
+  vi.spyOn(refreshed.executionClient, 'getLogs').mockRejectedValue(
+    new Error('old logs are unavailable'),
+  );
+  const proofRequests = vi.spyOn(refreshed.executionClient, 'getProof');
+  const headerRequests = vi.spyOn(refreshed.executionClient, 'request');
+  const recaptured = await captureGatewayActivityStorageProofs({
+    executionClient: refreshed.executionClient,
+    executionBlock: await refreshed.executionClient.getBlock({ blockNumber: 20n }),
+    gatewayAddress,
+    locators,
+    cache: restoredCache,
+  });
+  expect(proofRequests).toHaveBeenCalledTimes(1);
+  expect(proofRequests.mock.calls[0][0].blockNumber).toBe(20n);
+  expect(headerRequests).toHaveBeenCalledExactlyOnceWith({
+    method: 'eth_getBlockByHash',
+    params: [refreshed.captureBlock.hash, false],
+  });
+  expect(recaptured[0].executionHeaderRlp).not.toBe(captures[0].executionHeaderRlp);
+  expect(recaptured[0].proof.activityLogs).toEqual(captures[0].proof.activityLogs);
+  expect(recaptured[0].activities).toEqual(captures[0].activities);
+  expect([...restoredCache.values()]).toEqual(recaptured);
+  const rebuilt = await buildGatewayActivityProof(refreshed.argonClient, {
+    executionClient: refreshed.executionClient,
+    gatewayAddress,
+    locators: recaptured,
+  });
+  expect(rebuilt.recaptureLocators).toEqual([]);
+  expect(rebuilt.deferredLocators).toEqual([]);
+  expect(
+    rebuilt.payloads[0].activities.map(activity => activity.gatewayState.gatewayActivityNonce),
+  ).toEqual([1n, 2n]);
+  expect(refreshed.executionClient.getLogs).not.toHaveBeenCalled();
+
+  const corrupted = structuredClone(restoredCache);
+  const savedLog = corrupted.get(1n)!.proof.activityLogs[0];
+  savedLog.data = concatHex([toHex(251n, { size: 32 }), sliceHex(savedLog.data, 32)]);
+  const corruptedBeforeRefresh = structuredClone(corrupted);
+  await expect(
+    captureGatewayActivityStorageProofs({
+      executionClient: refreshed.executionClient,
+      executionBlock: await refreshed.executionClient.getBlock({ blockNumber: 20n }),
+      gatewayAddress,
+      locators,
+      cache: corrupted,
+    }),
+  ).rejects.toThrow('activity root did not match storage');
+  expect(corrupted).toEqual(corruptedBeforeRefresh);
+  expect(refreshed.executionClient.getLogs).not.toHaveBeenCalled();
 });
 
 it.each(['account', 'slot', 'block'])(

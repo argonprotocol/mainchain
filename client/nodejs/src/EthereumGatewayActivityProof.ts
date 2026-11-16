@@ -310,6 +310,7 @@ export async function buildGatewayActivityReceiptProofPayloads<
  *
  * The app chooses an observed (not pending) execution block and owns persistence and recapture.
  * A single eth_getProof request captures all selected locator slots before loading activity logs.
+ * Cached captures reuse their events, verified again against the refreshed storage witness.
  * Witnesses are checked against the captured header so a reorg or inconsistent RPC cannot poison
  * the cache with state from another block at the same height.
  */
@@ -321,6 +322,8 @@ export async function captureGatewayActivityStorageProofs(
     >;
     gatewayAddress: Hex;
     locators: MissingGatewayActivityLocator[];
+    /** App-owned captures by locator index, scoped to this Ethereum chain and gateway. Updated only after all captures verify. */
+    cache?: Map<bigint, CapturedGatewayActivityStorageProof>;
   },
 ): Promise<CapturedGatewayActivityStorageProof[]> {
   if (options.locators.length === 0) return [];
@@ -401,7 +404,24 @@ export async function captureGatewayActivityStorageProofs(
       storageRoot,
       slotProofsByKey,
     );
-    const activities = await readAndVerifyLocatorActivities(executionClient, locator, hashContext);
+    const cached = options.cache?.get(locator.locatorIndex);
+    let activities: GatewayActivityLog[];
+    if (cached) {
+      // Re-decode saved events and check their root against the freshly proven locator.
+      activities = verifyLocatorActivities(
+        cached.proof.activityLogs.map((log, logIndex) => ({
+          activity: {
+            ...cached.activities[logIndex],
+            ...decodeEthereumGatewayActivityLog(log),
+          },
+          log,
+        })),
+        locator,
+        hashContext,
+      );
+    } else {
+      activities = await readAndVerifyLocatorActivities(executionClient, locator, hashContext);
+    }
     captures.push({
       ...locator,
       executionHeaderRlp,
@@ -417,6 +437,10 @@ export async function captureGatewayActivityStorageProofs(
         },
       },
     });
+  }
+
+  for (const capture of captures) {
+    options.cache?.set(capture.locatorIndex, capture);
   }
   return captures;
 }
@@ -1023,6 +1047,19 @@ async function readAndVerifyLocatorActivities(
         right.activity.gatewayState.gatewayActivityNonce,
       ),
     );
+  return verifyLocatorActivities(activities, locator, hashContext);
+}
+
+function verifyLocatorActivities(
+  activities: GatewayActivityLog[],
+  locator: MissingGatewayActivityLocator,
+  hashContext: MintingGatewayHashContext,
+): GatewayActivityLog[] {
+  for (const { log } of activities) {
+    if (log.address.toLowerCase() !== hashContext.gatewayAddress.toLowerCase()) {
+      throw new Error('Gateway activity log belongs to a different gateway');
+    }
+  }
   const locatorActivities = activities.filter(
     ({ activity }) =>
       activity.gatewayState.gatewayActivityNonce >= locator.startGatewayActivityNonce &&

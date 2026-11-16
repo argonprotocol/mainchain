@@ -103,11 +103,13 @@ locators or `buildGatewayActivityStorageProofs(...)` with captured locators. Cap
 independent; a runtime may accept either format.
 
 ```ts
+const cache = new Map<bigint, CapturedGatewayActivityStorageProof>();
 const captures = await captureGatewayActivityStorageProofs({
   executionClient,
   executionBlock: await executionClient.getBlock({ blockTag: 'latest' }),
   gatewayAddress,
   locators,
+  cache,
 });
 // Persist captures in the app, then prepare relay transactions when anchors become available.
 const result = await buildGatewayActivityProof(client, {
@@ -116,6 +118,12 @@ const result = await buildGatewayActivityProof(client, {
   locators: captures,
 });
 ```
+
+The optional `cache` is scoped to one Ethereum chain and gateway and keyed by locator index. Restore
+it from persisted captures to refresh a witness without fetching historical logs again. Capture
+always fetches a new storage witness and verifies the cached raw events against its locator
+commitment; cache misses load logs normally. The map is updated only after every selected capture
+verifies. Persist the updated captures in the app.
 
 Storage proofs include the full locator's activity logs and its `activityRootSeed`, even when the
 last proven nonce falls inside that locator. Only `payload.activities` and
