@@ -96,8 +96,23 @@ mod benchmarks {
 			U256::one(),
 			Box::new(first),
 		)?;
+		// Exercise a replacement after the prior registration has become eligible.
+		let current_frame = T::MiningFrameTransitionProvider::get_current_frame_id();
+		let previous =
+			PositionCheckpoints::<T>::get(config().position_manager, U256::one()).unwrap();
+		let range = StabilizerPoolLiquidityRange::from(&previous);
+		EligibleFromFrameByPosition::<T>::insert(
+			StabilizerPoolPositionId {
+				position_manager: config().position_manager,
+				token_id: U256::one(),
+			},
+			current_frame,
+		);
+		RegisteredLiquidityByRange::<T>::mutate(range, |liquidity| {
+			liquidity.current_liquidity = liquidity.next_frame_liquidity;
+		});
 
-		let proof = Box::new(evidence::<T>(200, 1, beneficiary, u128::MAX, true));
+		let proof = Box::new(evidence::<T>(200, 2, beneficiary, u128::MAX, true));
 
 		let header = EthereumVerifier::<T>::verified_execution_header(
 			&proof.subscriber.execution_block_proof,
@@ -148,7 +163,7 @@ mod benchmarks {
 
 		let checkpoint =
 			PositionCheckpoints::<T>::get(config().position_manager, U256::one()).unwrap();
-		assert_eq!(checkpoint.maintained_since.number, 100);
+		assert_eq!(checkpoint.maintained_since.number, 200);
 		assert_eq!(checkpoint.proven_through.number, 200);
 		Ok(())
 	}

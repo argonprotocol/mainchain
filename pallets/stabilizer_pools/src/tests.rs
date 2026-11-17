@@ -745,7 +745,7 @@ fn upgrade_retires_opening_price_indices_and_preserves_checkpoints() {
 			history.try_insert(1, opening_index).unwrap()
 		});
 		let token_id = U256::one();
-		let checkpoint = position_checkpoint(1_000, -10, 10);
+		let checkpoint = position_checkpoint(1_000, -100, 100);
 		PositionCheckpoints::<Test>::insert(config().position_manager, token_id, &checkpoint);
 
 		RemoveOpeningPriceIndicesMigration::<Test>::on_runtime_upgrade();
@@ -754,9 +754,29 @@ fn upgrade_retires_opening_price_indices_and_preserves_checkpoints() {
 		assert!(StabilizerPoolPricesByFrame::<Test>::get().is_empty());
 		assert_eq!(
 			PositionCheckpoints::<Test>::get(config().position_manager, token_id),
-			Some(checkpoint)
+			Some(checkpoint.clone())
 		);
 		assert_eq!(StorageVersion::get::<StabilizerPools>(), StorageVersion::new(2));
+
+		// An existing checkpoint becomes eligible only after a fresh proof. Its earlier continuity
+		// can still be recorded without treating that time as registered participation.
+		assert_ok!(submit(evidence(200, 1, beneficiary_account(), 1_000, true)));
+		assert_eq!(
+			EligibleFromFrameByPosition::<Test>::get(StabilizerPoolPositionId {
+				position_manager: config().position_manager,
+				token_id,
+			}),
+			Some(2)
+		);
+		let range = StabilizerPoolLiquidityRange::from(&checkpoint);
+		assert_eq!(
+			RegisteredLiquidityByRange::<Test>::get(range).liquidity_for_frame(1),
+			Some(U256::zero())
+		);
+		assert_eq!(
+			RegisteredLiquidityByRange::<Test>::get(range).liquidity_for_frame(2),
+			Some(U256::from(1_000))
+		);
 	});
 }
 
@@ -796,15 +816,60 @@ fn revision_change_discards_unverified_gap_even_when_liquidity_returns_to_same_v
 	new_test_ext().execute_with(|| {
 		let first = evidence(100, 1, beneficiary_account(), 1_000, true);
 		assert_ok!(submit(first));
+		let range = StabilizerPoolLiquidityRange::from(&checkpoint());
+		CurrentFrame::set(2);
 
 		let changed = evidence(200, 3, beneficiary_account(), 1_000, true);
 		assert_ok!(submit(changed));
 		assert_eq!(checkpoint().maintained_since.number, 200);
 		assert_eq!(checkpoint().revision, U256::from(3));
+		let registered = RegisteredLiquidityByRange::<Test>::get(range);
+		assert_eq!(registered.liquidity_for_frame(2), Some(U256::zero()));
+		assert_eq!(registered.liquidity_for_frame(3), Some(U256::from(1_000)));
 
 		let later = evidence(300, 3, beneficiary_account(), 1_000, true);
 		assert_ok!(submit(later));
 		assert_eq!(checkpoint().maintained_since.number, 200);
+		assert_eq!(RegisteredLiquidityByRange::<Test>::get(range), registered);
+		assert_eq!(
+			EligibleFromFrameByPosition::<Test>::get(StabilizerPoolPositionId {
+				position_manager: config().position_manager,
+				token_id: U256::one(),
+			}),
+			Some(3)
+		);
+
+		let emptied = evidence(400, 4, beneficiary_account(), 0, true);
+		assert_ok!(submit(emptied));
+		assert!(!RegisteredLiquidityByRange::<Test>::contains_key(range));
+	});
+}
+
+#[test]
+fn independent_nfts_share_their_range_without_narrowing_its_liquidity() {
+	new_test_ext().execute_with(|| {
+		let first = evidence(100, 1, beneficiary_account(), u128::MAX, true);
+		assert_ok!(submit(first));
+
+		let second_checkpoint = checkpoint();
+		let range = StabilizerPoolLiquidityRange::from(&second_checkpoint);
+		assert_ok!(StabilizerPools::record_checkpoint(
+			config().position_manager,
+			U256::from(2),
+			second_checkpoint
+		));
+
+		let one_nft = U256::from(u128::MAX);
+		let registered = RegisteredLiquidityByRange::<Test>::get(range);
+		assert_eq!(registered.liquidity_for_frame(1), Some(U256::zero()));
+		assert_eq!(registered.liquidity_for_frame(2), Some(one_nft + one_nft));
+
+		CurrentFrame::set(5);
+		let changed = evidence(200, 2, beneficiary_account(), 100, true);
+		assert_ok!(submit(changed));
+		let registered = RegisteredLiquidityByRange::<Test>::get(range);
+		assert_eq!(registered.liquidity_for_frame(5), Some(one_nft));
+		assert_eq!(registered.liquidity_for_frame(6), Some(one_nft + U256::from(100)));
 	});
 }
 

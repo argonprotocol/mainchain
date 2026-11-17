@@ -963,6 +963,8 @@ impl pallet_treasury_positions::Config for Runtime {
 
 impl pallet_stabilizer_pools::Config for Runtime {
 	type WeightInfo = weights::pallet_stabilizer_pools::WeightInfo<Runtime>;
+	type MiningFrameTransitionProvider =
+		use_unless_benchmark!(MiningSlot, benchmarking::BenchmarkCurrentFrameId);
 	type CurrentTick = Ticks;
 	type MaxSampledPriceHistoryFrames = StabilizerPoolMaxSampledPriceHistoryFrames;
 	type TicksPerFrame = GetTicksPerFrame;

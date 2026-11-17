@@ -43,8 +43,11 @@ PoolManager bytecode.
 
 ## Scope
 
-This version tracks checkpoints and emits registered/maintained/reset outcomes. It creates no reward
-entitlements, funding obligations, maturity buckets, or collection calls. Reward calculation must
-settle the old verified interval before replacing a checkpoint when those features are added;
-`maintained_since` tracks only the current continuous revision. Future accounting must use
-historical pool prices and reward policy, and retain already-earned credits across resets.
+Each registration contributes to the total liquidity for its exact Uniswap range starting in the
+next mining frame. A proof of a new revision removes the old position from the current total and
+schedules its new liquidity for the next frame. Existing checkpoints enter the totals on their next
+accepted proof.
+
+Reward settlement will use verified intervals, saved frame prices, and the applicable reward policy.
+The `maintained_since` field tracks the current continuous revision. Published rights must survive
+later revisions and beneficiary changes.

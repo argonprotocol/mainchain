@@ -1,18 +1,19 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 //! Claimant-submitted checkpoints for maintained Uniswap v4 positions.
 //!
-//! Checkpoints establish continuity, not current live network totals. Rewards and collection are
-//! deliberately not implemented. A changed revision starts a new baseline without proving the gap.
+//! Checkpoints establish continuity and maintain registered liquidity by Uniswap range.
 
 extern crate alloc;
 
 use alloc::boxed::Box;
 use argon_primitives::{
-	block_seal::FrameId, EthereumAccountStorageProof, EthereumVerifyProvider, UniswapTick,
+	block_seal::FrameId, EthereumAccountStorageProof, EthereumVerifyProvider,
+	MiningFrameTransitionProvider, UniswapTick,
 };
 pub use pallet::*;
 use pallet_ethereum_verifier::Pallet as EthereumVerifier;
 use pallet_prelude::*;
+use sp_runtime::ArithmeticError;
 pub use weights::WeightInfo;
 
 #[cfg(feature = "runtime-benchmarks")]
@@ -47,6 +48,8 @@ pub mod pallet {
 		polkadot_sdk::frame_system::Config + pallet_ethereum_verifier::Config
 	{
 		type WeightInfo: weights::WeightInfo;
+		/// Supplies the mining frame active when a checkpoint is accepted.
+		type MiningFrameTransitionProvider: MiningFrameTransitionProvider;
 		/// Mainchain clock used to assign observations to frames and reject future prices.
 		type CurrentTick: Get<Tick>;
 		/// Closed mining frames retained in the sampled Uniswap price history.
@@ -96,6 +99,22 @@ pub mod pallet {
 		U256,
 		PositionCheckpoint<T::AccountId>,
 		OptionQuery,
+	>;
+
+	/// First eligible frame for the current revision of each PositionManager NFT. A checkpoint
+	/// from before reward registration needs a fresh proof to enter the range totals.
+	#[pallet::storage]
+	pub type EligibleFromFrameByPosition<T> =
+		StorageMap<_, Blake2_128Concat, StabilizerPoolPositionId, FrameId, OptionQuery>;
+
+	/// Sum of registered raw Uniswap liquidity at each exact pool and range.
+	#[pallet::storage]
+	pub type RegisteredLiquidityByRange<T> = StorageMap<
+		_,
+		Blake2_128Concat,
+		StabilizerPoolLiquidityRange,
+		StabilizerPoolRangeLiquidity,
+		ValueQuery,
 	>;
 
 	#[pallet::event]
@@ -265,7 +284,8 @@ pub mod pallet {
 		) -> DispatchResult {
 			let block = checkpoint.proven_through;
 			let outcome;
-			if let Some(previous) = PositionCheckpoints::<T>::get(position_manager, token_id) {
+			let previous = PositionCheckpoints::<T>::get(position_manager, token_id);
+			if let Some(previous) = previous.as_ref() {
 				ensure!(block.number > previous.proven_through.number, Error::<T>::StaleCheckpoint);
 				ensure!(
 					block.timestamp_millis > previous.proven_through.timestamp_millis,
@@ -315,7 +335,15 @@ pub mod pallet {
 				outcome = CheckpointOutcome::Registered;
 			}
 
-			// Keep the only position write after authentication and continuity checks.
+			let position_id = StabilizerPoolPositionId { position_manager, token_id };
+			let eligible_from = EligibleFromFrameByPosition::<T>::get(position_id);
+			if eligible_from.is_none() || !matches!(outcome, CheckpointOutcome::Maintained { .. }) {
+				let previous_registration = previous.as_ref().zip(eligible_from);
+				let eligible_from =
+					Self::register_position_liquidity(&checkpoint, previous_registration)?;
+				EligibleFromFrameByPosition::<T>::insert(position_id, eligible_from);
+			}
+
 			PositionCheckpoints::<T>::insert(position_manager, token_id, &checkpoint);
 			Self::deposit_event(Event::PositionCheckpointed {
 				position_manager,
@@ -324,6 +352,57 @@ pub mod pallet {
 				outcome,
 			});
 			Ok(())
+		}
+
+		fn register_position_liquidity(
+			checkpoint: &PositionCheckpoint<T::AccountId>,
+			previous_registration: Option<(&PositionCheckpoint<T::AccountId>, FrameId)>,
+		) -> Result<FrameId, ArithmeticError> {
+			// A transition block still dispatches in the closing frame. MiningSlot activates the
+			// next frame during finalization, after these extrinsics have run.
+			let frame_id = T::MiningFrameTransitionProvider::get_current_frame_id();
+			let eligible_from = frame_id.checked_add(1).ok_or(ArithmeticError::Overflow)?;
+			let range = StabilizerPoolLiquidityRange::from(checkpoint);
+			let mut liquidity = RegisteredLiquidityByRange::<T>::get(range);
+			liquidity.advance_to(frame_id);
+
+			let mut previous_range_update = None;
+			if let Some((previous, previous_eligible_from)) = previous_registration {
+				let previous_range = StabilizerPoolLiquidityRange::from(previous);
+				let was_eligible = previous_eligible_from <= frame_id;
+				if previous_range == range {
+					liquidity.remove_registration(previous.liquidity, was_eligible)?;
+				} else {
+					let mut previous_liquidity =
+						RegisteredLiquidityByRange::<T>::get(previous_range);
+					previous_liquidity.advance_to(frame_id);
+					previous_liquidity.remove_registration(previous.liquidity, was_eligible)?;
+					previous_range_update = Some((previous_range, previous_liquidity));
+				}
+			}
+
+			liquidity.next_frame_liquidity = liquidity
+				.next_frame_liquidity
+				.checked_add(U256::from(checkpoint.liquidity))
+				.ok_or(ArithmeticError::Overflow)?;
+
+			// Both ranges are ready before any write. A failed total leaves the checkpoint intact.
+			if let Some((previous_range, previous_liquidity)) = previous_range_update {
+				Self::store_registered_liquidity(previous_range, previous_liquidity);
+			}
+			Self::store_registered_liquidity(range, liquidity);
+			Ok(eligible_from)
+		}
+
+		fn store_registered_liquidity(
+			range: StabilizerPoolLiquidityRange,
+			liquidity: StabilizerPoolRangeLiquidity,
+		) {
+			if liquidity.current_liquidity.is_zero() && liquidity.next_frame_liquidity.is_zero() {
+				RegisteredLiquidityByRange::<T>::remove(range);
+			} else {
+				RegisteredLiquidityByRange::<T>::insert(range, liquidity);
+			}
 		}
 	}
 }
@@ -409,6 +488,26 @@ pub struct ProofBlock {
 	pub timestamp_millis: u64,
 }
 
+/// The NFT that owns a Uniswap position on the Ethereum chain authenticated by the pallet.
+#[derive(
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	Clone,
+	Copy,
+	Debug,
+	PartialEq,
+	Eq,
+	TypeInfo,
+	MaxEncodedLen,
+)]
+pub struct StabilizerPoolPositionId {
+	/// Address of the Uniswap PositionManager that issued the NFT.
+	pub position_manager: H160,
+	/// NFT token ID within that PositionManager.
+	pub token_id: U256,
+}
+
 #[derive(
 	Encode, Decode, DecodeWithMemTracking, Clone, Debug, PartialEq, Eq, TypeInfo, MaxEncodedLen,
 )]
@@ -451,4 +550,100 @@ pub enum CheckpointOutcome {
 		/// Last verified endpoint before the unproven gap.
 		unproven_from: ProofBlock,
 	},
+}
+
+#[derive(
+	Clone,
+	Copy,
+	Debug,
+	PartialEq,
+	Eq,
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	TypeInfo,
+	MaxEncodedLen,
+)]
+pub struct StabilizerPoolLiquidityRange {
+	/// Ethereum PoolManager authenticated by this runtime's Ethereum verifier.
+	pub pool_manager: H160,
+	/// Canonical pool ID within the manager.
+	pub pool_id: H256,
+	/// Inclusive lower Uniswap tick of the registered range.
+	pub lower_uniswap_tick: UniswapTick,
+	/// Exclusive upper Uniswap tick of the registered range.
+	pub upper_uniswap_tick: UniswapTick,
+}
+
+#[derive(
+	Clone,
+	Copy,
+	Debug,
+	Default,
+	PartialEq,
+	Eq,
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	TypeInfo,
+	MaxEncodedLen,
+)]
+pub struct StabilizerPoolRangeLiquidity {
+	/// Frame at the last update of this range.
+	pub frame_id: FrameId,
+	/// Raw liquidity eligible in `frame_id`.
+	pub current_liquidity: U256,
+	/// Raw liquidity eligible from `frame_id + 1` if the registrations stay the same.
+	pub next_frame_liquidity: U256,
+}
+
+impl<AccountId> From<&PositionCheckpoint<AccountId>> for StabilizerPoolLiquidityRange {
+	fn from(checkpoint: &PositionCheckpoint<AccountId>) -> Self {
+		Self {
+			pool_manager: checkpoint.pool_manager,
+			pool_id: checkpoint.pool_id,
+			lower_uniswap_tick: checkpoint.tick_lower,
+			upper_uniswap_tick: checkpoint.tick_upper,
+		}
+	}
+}
+
+impl StabilizerPoolRangeLiquidity {
+	/// Return the registered liquidity for this frame or a later frame with no further changes.
+	/// Earlier frames require a snapshot from before the range was updated.
+	pub fn liquidity_for_frame(&self, frame_id: FrameId) -> Option<U256> {
+		if frame_id < self.frame_id {
+			return None;
+		}
+		if frame_id == self.frame_id {
+			return Some(self.current_liquidity);
+		}
+		Some(self.next_frame_liquidity)
+	}
+
+	fn advance_to(&mut self, frame_id: FrameId) {
+		if frame_id > self.frame_id {
+			self.current_liquidity = self.next_frame_liquidity;
+			self.frame_id = frame_id;
+		}
+	}
+
+	fn remove_registration(
+		&mut self,
+		liquidity: u128,
+		was_eligible: bool,
+	) -> Result<(), ArithmeticError> {
+		let liquidity = U256::from(liquidity);
+		if was_eligible {
+			self.current_liquidity = self
+				.current_liquidity
+				.checked_sub(liquidity)
+				.ok_or(ArithmeticError::Underflow)?;
+		}
+		self.next_frame_liquidity = self
+			.next_frame_liquidity
+			.checked_sub(liquidity)
+			.ok_or(ArithmeticError::Underflow)?;
+		Ok(())
+	}
 }

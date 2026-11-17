@@ -1,5 +1,8 @@
 use crate::{Config, PositionProof};
-use argon_primitives::{EthereumVerifyProvider, EthereumVerifyProviderWeightInfo};
+use argon_primitives::{
+	EthereumVerifyProvider, EthereumVerifyProviderWeightInfo, MiningFrameTransitionProvider,
+	MiningFrameTransitionProviderWeightInfo,
+};
 use pallet_ethereum_verifier::Pallet as EthereumVerifier;
 use pallet_prelude::*;
 
@@ -31,10 +34,15 @@ impl WeightInfo for () {
 
 pub fn checkpoint_position<T: Config>(proof: &PositionProof) -> Weight {
 	type ProofWeights<T> = <EthereumVerifier<T> as EthereumVerifyProvider>::Weights;
+	type FrameWeights<T> =
+		<<T as Config>::MiningFrameTransitionProvider as MiningFrameTransitionProvider>::Weights;
 	let header_count =
 		proof.subscriber.execution_block_proof.target_to_anchor_header_chain.len() as u32;
 
 	<T as Config>::WeightInfo::checkpoint_position()
+		.saturating_add(FrameWeights::<T>::get_current_frame_id())
+		// Charge the extra storage I/O until the checkpoint benchmark supplies its proof weight.
+		.saturating_add(T::DbWeight::get().reads_writes(3, 3))
 		.saturating_add(ProofWeights::<T>::verify_account_storage_proof(2, header_count))
 		.saturating_add(ProofWeights::<T>::verify_account_storage_proof(2, header_count))
 		.saturating_add(ProofWeights::<T>::verify_account_storage_proof(1, header_count))

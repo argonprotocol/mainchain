@@ -60,6 +60,7 @@ impl pallet_ethereum_verifier::Config for Test {
 #[cfg(test)]
 impl Config for Test {
 	type WeightInfo = ();
+	type MiningFrameTransitionProvider = CurrentFrame;
 	type CurrentTick = CurrentTick;
 	type MaxSampledPriceHistoryFrames = ConstU32<13>;
 	type TicksPerFrame = ConstU64<10>;
@@ -74,6 +75,18 @@ frame_support::parameter_types! {
 	pub const MaxPriceBucketsPerFrame: u32 = 24;
 	pub const MinPriceBucketCoverage: Percent = Percent::from_percent(75);
 	pub static CurrentTick: Tick = 20;
+	pub static CurrentFrame: FrameId = 1;
+}
+
+#[cfg(test)]
+impl MiningFrameTransitionProvider for CurrentFrame {
+	type Weights = ();
+	fn get_current_frame_id() -> FrameId {
+		Self::get()
+	}
+	fn is_new_frame_started() -> Option<FrameId> {
+		None
+	}
 }
 
 #[cfg(test)]
@@ -81,6 +94,7 @@ pub fn new_test_ext() -> TestState {
 	let mut ext = new_test_with_genesis::<Test>(|_| {});
 	ext.execute_with(|| {
 		System::set_block_number(1);
+		CurrentFrame::set(1);
 		assert_ok!(StabilizerPools::register_pool(RuntimeOrigin::root(), pool_manager(), config()));
 	});
 	ext
@@ -89,6 +103,7 @@ pub fn new_test_ext() -> TestState {
 #[cfg(test)]
 pub(crate) fn start_mining_frame(frame_id: FrameId, tick: Tick) {
 	CurrentTick::set(tick);
+	CurrentFrame::set(frame_id);
 	StabilizerPools::on_frame_start(frame_id);
 }
 
