@@ -1,5 +1,5 @@
 import camelcaseKeys from 'camelcase-keys';
-import type { Hex } from 'viem';
+import { hexToBytes, type Hex } from 'viem';
 import type {
   EthereumBeaconConfigSpecResponse,
   EthereumBeaconGenesisResponse,
@@ -172,7 +172,7 @@ export async function buildGatewayExecutionHeaderBackfill(
         const proofHeader = executionHeaderProof.executionHeader;
         let executionBlockNumber: bigint;
         if ('Rlp' in proofHeader) {
-          executionBlockNumber = decodeExecutionHeaderRlp(proofHeader.Rlp).number;
+          executionBlockNumber = decodeExecutionHeaderRlp(hexToBytes(proofHeader.Rlp)).number;
         } else if (proofHeader.Deneb) {
           executionBlockNumber = BigInt(proofHeader.Deneb.blockNumber);
         } else {

@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { Metadata, TypeRegistry } from '@polkadot/types';
 import { Hardfork } from '@ethereumjs/common';
 import { expect, it, vi } from 'vitest';
 import { createBlockHeaderFromRPC } from '@ethereumjs/block';
@@ -55,11 +57,21 @@ it('fetches the exact Gloas parent execution hash and preserves the shared Rust 
   });
   expect(rlp).toHaveLength(660);
   expect(block.slotNumber).toBe(toHex(115967n));
-  expect(proof).toEqual({
-    executionHeader: { Rlp: rlp },
-    executionBranch: gloasExecutionProof.execution_branch,
-  });
-  const retained = decodeExecutionHeaderRlp(rlp);
+  expect(proof.executionBranch).toEqual(gloasExecutionProof.execution_branch);
+  const registry = new TypeRegistry();
+  registry.setMetadata(
+    new Metadata(
+      registry,
+      toHex(readFileSync(new URL('../../../metadata.scale', import.meta.url))),
+    ),
+    undefined,
+    undefined,
+    true,
+  );
+  const encodedProof = registry.createType('PalletEthereumVerifierExecutionHeaderProof', proof);
+  const retainedRlp = encodedProof.executionHeader.asRlp.toU8a(true);
+  expect(retainedRlp).toEqual(rlp);
+  const retained = decodeExecutionHeaderRlp(retainedRlp);
   expect(retained.number).toBe(113202n);
   expect(bytesToHex(retained.stateRoot)).toBe(block.stateRoot);
   expect(bytesToHex(retained.hash())).toBe(block.hash);
@@ -121,7 +133,7 @@ it.each([false, true])(
     expect(Object.keys(oldProof.executionHeader)).toEqual([isDeneb ? 'Deneb' : 'Capella']);
     expect(oldProof.executionBranch).toEqual(outer);
     expect(proof).toEqual({
-      executionHeader: { Rlp: rlp },
+      executionHeader: { Rlp: toHex(rlp) },
       executionBranch: header.execution_branch.slice(isDeneb ? 2 : 3),
     });
     const badPadding = [...header.execution_branch];

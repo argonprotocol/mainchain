@@ -14,7 +14,7 @@ import {
   gloasExecutionProof,
   repeatHex,
 } from './ethereumProofTestUtils';
-import { encodeAbiParameters, encodeEventTopics, hexToBytes, type Hex } from 'viem';
+import { encodeAbiParameters, encodeEventTopics, type Hex } from 'viem';
 import historicalExecutionProofs from '../../../../pallets/ethereum_verifier/tests/fixtures/historical-execution-hash-proofs.json';
 
 const originalFetch = globalThis.fetch;
@@ -103,7 +103,7 @@ it.each([
         executionBlockNumber: BigInt(block.number),
         executionBlockHash: block.hash,
         executionHeaderProof: {
-          executionHeader: { Rlp: hexToBytes(fixture.execution_header_rlp as Hex) },
+          executionHeader: { Rlp: fixture.execution_header_rlp },
           executionBranch: fixture.execution_branch,
         },
       });
@@ -155,7 +155,7 @@ it('backfills the parent execution block committed by a Gloas bootstrap', async 
     executionBlockNumber: blockNumber,
     executionBlockHash: block.hash,
     executionHeaderProof: {
-      executionHeader: { Rlp: hexToBytes(gloasExecutionProof.execution_header_rlp as Hex) },
+      executionHeader: { Rlp: gloasExecutionProof.execution_header_rlp },
       executionBranch: gloasExecutionProof.execution_branch,
     },
   });
