@@ -12,15 +12,20 @@ use alloy_trie::{
 };
 use argon_primitives::{EthereumExecutionBlockProof, EthereumStorageSlotProof};
 #[cfg(test)]
+use core::ops::Range;
+#[cfg(test)]
 use frame_support::{assert_ok, derive_impl};
 use pallet_ethereum_verifier::{types::ExecutionHeaderAnchor, ExecutionHeaderAnchors};
 #[cfg(test)]
 use pallet_prelude::{new_test_with_genesis, TestState};
 #[cfg(test)]
+use polkadot_sdk::sp_core::U512;
+#[cfg(test)]
 use sp_runtime::{traits::IdentityLookup, AccountId32};
 #[cfg(test)]
 use uniswap_v3_sdk_bigint::utils::{
-	get_amount_0_delta, get_amount_1_delta, get_sqrt_ratio_at_tick,
+	encode_sqrt_ratio_x96, get_amount_0_delta, get_amount_1_delta, get_sqrt_ratio_at_tick,
+	get_tick_at_sqrt_ratio, ToBig,
 };
 
 #[cfg(test)]
@@ -53,10 +58,12 @@ impl Config for Test {
 	type MiningFrameTransitionProvider = Frames;
 	type CurrentTick = CurrentTick;
 	type MaxFramePriceHistoryFrames = ConstU32<33>;
+	type RewardPriceBand = RewardPriceBand;
 }
 
 #[cfg(test)]
 frame_support::parameter_types! {
+	pub const RewardPriceBand: (Percent, Percent) = (Percent::from_percent(90), Percent::one());
 	pub static CurrentTick: Tick = 20;
 	pub static CurrentFrame: FrameId = 1;
 	pub static NewlyStartedFrame: Option<FrameId> = None;
@@ -142,24 +149,86 @@ pub(crate) fn uniswap_sqrt_price_at_tick(uniswap_tick: i32) -> U256 {
 /// Independent principal reference from the pinned Uniswap SDK, which accepts one NFT's liquidity.
 #[cfg(test)]
 pub(crate) fn uniswap_sdk_principal(
-	position: &PositionCheckpoint<AccountId32>,
+	liquidity: u128,
+	sqrt_range: Range<U256>,
 	sqrt_price_x96: U256,
 	argon_is_token0: bool,
 ) -> PositionAmounts<U256> {
-	let sqrt_lower =
-		AlloyU256::from_be_bytes(uniswap_sqrt_price_at_tick(position.tick_lower).to_big_endian());
-	let sqrt_upper =
-		AlloyU256::from_be_bytes(uniswap_sqrt_price_at_tick(position.tick_upper).to_big_endian());
+	let sqrt_lower = AlloyU256::from_be_bytes(sqrt_range.start.to_big_endian());
+	let sqrt_upper = AlloyU256::from_be_bytes(sqrt_range.end.to_big_endian());
 	let sqrt_price =
 		AlloyU256::from_be_bytes(sqrt_price_x96.to_big_endian()).clamp(sqrt_lower, sqrt_upper);
-	let token0 = get_amount_0_delta(sqrt_price, sqrt_upper, position.liquidity, false).unwrap();
-	let token1 = get_amount_1_delta(sqrt_lower, sqrt_price, position.liquidity, false).unwrap();
+	let token0 = get_amount_0_delta(sqrt_price, sqrt_upper, liquidity, false).unwrap();
+	let token1 = get_amount_1_delta(sqrt_lower, sqrt_price, liquidity, false).unwrap();
 	let (argon, usdc) = if argon_is_token0 { (token0, token1) } else { (token1, token0) };
 
 	let argon_token_units_per_microgon = U256::from(10u128.pow(12));
 	PositionAmounts {
 		argon: U256::from_big_endian(&argon.to_be_bytes::<32>()) / argon_token_units_per_microgon,
 		usdc: U256::from_big_endian(&usdc.to_be_bytes::<32>()),
+	}
+}
+
+/// Use the SDK's arbitrary-precision encoder as the reference for USD-to-pool-price conversion.
+#[cfg(test)]
+pub(crate) fn uniswap_sqrt_price_for_usd_price(
+	argon_usd_price: FixedU128,
+	usdc_usd_price: FixedU128,
+	argon_is_token0: bool,
+	round_up: bool,
+) -> U256 {
+	let argon = AlloyU256::from(argon_usd_price.into_inner());
+	let usdc = AlloyU256::from(usdc_usd_price.into_inner()) * AlloyU256::from(10u128.pow(12));
+	let (numerator, denominator) = if argon_is_token0 { (argon, usdc) } else { (usdc, argon) };
+	let sqrt_price: AlloyU256 =
+		encode_sqrt_ratio_x96(numerator.to_big_int(), denominator.to_big_int());
+	let mut sqrt_price = U256::from_big_endian(&sqrt_price.to_be_bytes::<32>());
+	if round_up {
+		let numerator = U512::from_big_endian(&numerator.to_be_bytes::<32>()) << 192;
+		let denominator = U512::from_big_endian(&denominator.to_be_bytes::<32>());
+		if U512::from(sqrt_price) * U512::from(sqrt_price) * denominator < numerator {
+			sqrt_price += U256::one();
+		}
+	}
+	sqrt_price
+}
+
+/// Round both requested USD boundaries down to usable grid ticks, as an app would when minting.
+#[cfg(test)]
+pub(crate) fn uniswap_bounds_for_usd_band(
+	lower_usd_price: FixedU128,
+	upper_usd_price: FixedU128,
+	usdc_usd_price: FixedU128,
+	argon_is_token0: bool,
+	uniswap_tick_spacing: i32,
+) -> (i32, i32) {
+	let mut ticks = [0, 0];
+	for (index, usd_price) in [lower_usd_price, upper_usd_price].into_iter().enumerate() {
+		let sqrt_price = uniswap_sqrt_price_for_usd_price(
+			usd_price,
+			usdc_usd_price,
+			argon_is_token0,
+			!argon_is_token0,
+		);
+		let raw_uniswap_tick =
+			get_tick_at_sqrt_ratio(AlloyU256::from_be_bytes(sqrt_price.to_big_endian()))
+				.unwrap()
+				.as_i32();
+		let mut aligned_tick =
+			raw_uniswap_tick.div_euclid(uniswap_tick_spacing) * uniswap_tick_spacing;
+		if !argon_is_token0 {
+			// USD rises as raw Uniswap ticks fall, so USD round-down uses the next higher grid
+			// tick.
+			if uniswap_sqrt_price_at_tick(aligned_tick) < sqrt_price {
+				aligned_tick += uniswap_tick_spacing;
+			}
+		}
+		ticks[index] = aligned_tick;
+	}
+	if argon_is_token0 {
+		(ticks[0], ticks[1])
+	} else {
+		(ticks[1], ticks[0])
 	}
 }
 

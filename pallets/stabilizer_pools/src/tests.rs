@@ -8,6 +8,7 @@ use alloy_primitives::B256;
 use argon_primitives::{EthereumExecutionBlockProof, EthereumExecutionHeader, MICROGONS_PER_ARGON};
 use frame_support::{assert_noop, assert_ok};
 use pallet_ethereum_verifier::{types::ExecutionHeaderAnchor, ExecutionHeaderAnchors};
+use rstest::rstest;
 use sp_runtime::AccountId32;
 use uniswap_v3_sdk_bigint::utils::{
 	MAX_TICK_I32 as MAX_UNISWAP_TICK, MIN_TICK_I32 as MIN_UNISWAP_TICK,
@@ -197,7 +198,10 @@ fn shared_range_principal_matches_the_uniswap_sdk() {
 	for (scenario, position, uniswap_tick) in scenarios {
 		let sqrt_price = uniswap_sqrt_price_at_tick(uniswap_tick);
 		for argon_is_token0 in [true, false] {
-			let expected = uniswap_sdk_principal(&position, sqrt_price, argon_is_token0);
+			let sqrt_range = uniswap_sqrt_price_at_tick(position.tick_lower)..
+				uniswap_sqrt_price_at_tick(position.tick_upper);
+			let expected =
+				uniswap_sdk_principal(position.liquidity, sqrt_range, sqrt_price, argon_is_token0);
 			let actual = principal_for_liquidity_range(
 				U256::from(position.liquidity),
 				position.tick_lower,
@@ -242,6 +246,243 @@ fn withdrawing_liquidity_can_remove_a_rounding_unit() {
 		assert_eq!(one_position.usdc, 0);
 		assert_eq!(all_three.usdc, U256::one());
 		assert_eq!(after_withdrawal.usdc, U256::zero());
+	}
+}
+
+#[rstest]
+#[case::argon_first_spacing_1(true, 1)]
+#[case::argon_second_spacing_1(false, 1)]
+#[case::argon_first_spacing_10(true, 10)]
+#[case::argon_second_spacing_10(false, 10)]
+#[case::argon_first_spacing_60(true, 60)]
+#[case::argon_second_spacing_60(false, 60)]
+fn reward_bands_allow_a_shared_shift_but_not_independent_boundary_changes(
+	#[case] argon_is_token0: bool,
+	#[case] spacing: i32,
+) {
+	let target = FixedU128::one();
+	let usdc = FixedU128::one();
+	let liquidity = U256::from(10u128.pow(24));
+	let band = StabilizerPoolRewardBand::new(
+		target,
+		usdc,
+		argon_is_token0,
+		spacing,
+		RewardPriceBand::get(),
+		Percent::from_percent(1),
+	)
+	.unwrap();
+	let pool_price = uniswap_sqrt_price_for_usd_price(
+		FixedU128::from_rational(95, 100),
+		usdc,
+		argon_is_token0,
+		false,
+	);
+
+	for reference in [FixedU128::from_rational(99, 100), target, FixedU128::from_rational(101, 100)]
+	{
+		let (lower, upper) = uniswap_bounds_for_usd_band(
+			FixedU128::from_rational(90, 100) * reference,
+			reference,
+			usdc,
+			argon_is_token0,
+			spacing,
+		);
+		let principal = band.principal_for_range(liquidity, lower, upper, pool_price).unwrap();
+		assert!(principal.argon > U256::zero(), "reference {reference:?}");
+		assert!(principal.usdc > U256::zero(), "reference {reference:?}");
+	}
+
+	// A standard full-range NFT has valid grid boundaries, but is too wide to earn.
+	// Looking for its next grid boundary must not turn that into a malformed-range error.
+	let lowest_usable_tick = -(-MIN_UNISWAP_TICK).div_euclid(spacing) * spacing;
+	let highest_usable_tick = MAX_UNISWAP_TICK.div_euclid(spacing) * spacing;
+	assert_eq!(
+		band.principal_for_range(liquidity, lowest_usable_tick, highest_usable_tick, pool_price),
+		Ok(PositionAmounts { argon: U256::zero(), usdc: U256::zero() }),
+		"valid full-range position"
+	);
+
+	for (invalid_band, lower_usd, upper_usd) in [
+		("shortened: 91%-99%", 9_100, 9_900),
+		("widened: 89%-101%", 8_900, 10_100),
+		("only the upper edge shifted: 90%-101%", 9_000, 10_100),
+		("whole band too far up: 92.7%-103%", 9_270, 10_300),
+		("whole band too far down: 87.3%-97%", 8_730, 9_700),
+	] {
+		let (lower, upper) = uniswap_bounds_for_usd_band(
+			FixedU128::from_rational(lower_usd, 10_000),
+			FixedU128::from_rational(upper_usd, 10_000),
+			usdc,
+			argon_is_token0,
+			spacing,
+		);
+		let principal = band.principal_for_range(liquidity, lower, upper, pool_price).unwrap();
+		assert_eq!(
+			principal,
+			PositionAmounts { argon: U256::zero(), usdc: U256::zero() },
+			"{invalid_band}"
+		);
+	}
+}
+
+#[rstest]
+#[case::argon_first(true, 100, 100, (90, 100))]
+#[case::argon_second(false, 100, 100, (90, 100))]
+#[case::argon_first_changed_quotes(true, 120, 98, (90, 100))]
+#[case::argon_second_changed_quotes(false, 120, 98, (90, 100))]
+#[case::argon_first_custom_band(true, 120, 98, (85, 98))]
+#[case::argon_second_custom_band(false, 120, 98, (85, 98))]
+fn shifted_bands_earn_only_on_their_overlap_with_the_current_reward_band(
+	#[case] argon_is_token0: bool,
+	#[case] argon_target_cents: u128,
+	#[case] usdc_price_cents: u128,
+	#[case] reward_price_band: (u8, u8),
+	#[values(99, 101)] reference_percent: u128,
+	#[values(88, 95, 102)] pool_price_percent: u128,
+) {
+	let target = FixedU128::from_rational(argon_target_cents, 100);
+	let usdc = FixedU128::from_rational(usdc_price_cents, 100);
+	let liquidity = 10u128.pow(24);
+	let (lower_percent, upper_percent) = reward_price_band;
+	let band = StabilizerPoolRewardBand::new(
+		target,
+		usdc,
+		argon_is_token0,
+		10,
+		(Percent::from_percent(lower_percent), Percent::from_percent(upper_percent)),
+		Percent::from_percent(1),
+	)
+	.unwrap();
+
+	let lower_fraction = FixedU128::from_rational(u128::from(lower_percent), 100);
+	let upper_fraction = FixedU128::from_rational(u128::from(upper_percent), 100);
+	let reference = FixedU128::from_rational(reference_percent, 100) * target;
+	let (lower, upper) = uniswap_bounds_for_usd_band(
+		lower_fraction * reference,
+		upper_fraction * reference,
+		usdc,
+		argon_is_token0,
+		10,
+	);
+
+	let lower_reward_price = uniswap_sqrt_price_for_usd_price(
+		lower_fraction * target,
+		usdc,
+		argon_is_token0,
+		argon_is_token0,
+	);
+	let upper_reward_price = uniswap_sqrt_price_for_usd_price(
+		upper_fraction * target,
+		usdc,
+		argon_is_token0,
+		!argon_is_token0,
+	);
+	let reward_sqrt_lower = lower_reward_price.min(upper_reward_price);
+	let reward_sqrt_upper = lower_reward_price.max(upper_reward_price);
+	let eligible_sqrt_range = uniswap_sqrt_price_at_tick(lower).max(reward_sqrt_lower)..
+		uniswap_sqrt_price_at_tick(upper).min(reward_sqrt_upper);
+
+	let pool_price = uniswap_sqrt_price_for_usd_price(
+		FixedU128::from_rational(pool_price_percent, 100) * target,
+		usdc,
+		argon_is_token0,
+		false,
+	);
+	let expected =
+		uniswap_sdk_principal(liquidity, eligible_sqrt_range, pool_price, argon_is_token0);
+	let actual = band
+		.principal_for_range(U256::from(liquidity), lower, upper, pool_price)
+		.unwrap();
+	assert_eq!(actual, expected);
+
+	let whole_position = position_checkpoint(liquidity, lower, upper)
+		.amounts_at_price(pool_price, argon_is_token0)
+		.unwrap();
+	assert!(actual.argon <= U256::from(whole_position.argon));
+	assert!(actual.usdc <= U256::from(whole_position.usdc));
+	assert!(
+		actual.argon < U256::from(whole_position.argon) ||
+			actual.usdc < U256::from(whole_position.usdc)
+	);
+}
+
+#[rstest]
+#[case::zero_lower(0, 100)]
+#[case::same_endpoints(90, 90)]
+#[case::reversed_endpoints(100, 90)]
+fn rejects_invalid_reward_price_bands(#[case] lower_percent: u8, #[case] upper_percent: u8) {
+	let result = StabilizerPoolRewardBand::new(
+		FixedU128::one(),
+		FixedU128::one(),
+		true,
+		10,
+		(Percent::from_percent(lower_percent), Percent::from_percent(upper_percent)),
+		Percent::from_percent(1),
+	);
+	assert_eq!(result.unwrap_err(), PositionAmountError::InvalidRewardPriceBand);
+}
+
+#[test]
+fn reward_bands_reject_unusable_quotes_and_malformed_uniswap_ranges() {
+	let one_dollar = FixedU128::one();
+	for argon_is_token0 in [true, false] {
+		for (scenario, target, usdc) in [
+			("zero ARGON target", FixedU128::zero(), one_dollar),
+			("zero USDC quote", one_dollar, FixedU128::zero()),
+			(
+				"USD ratio outside Uniswap's supported prices",
+				FixedU128::from_inner(1),
+				FixedU128::from_inner(u128::MAX),
+			),
+		] {
+			let error = StabilizerPoolRewardBand::new(
+				target,
+				usdc,
+				argon_is_token0,
+				10,
+				RewardPriceBand::get(),
+				Percent::from_percent(1),
+			)
+			.unwrap_err();
+			assert_eq!(error, PositionAmountError::InvalidPrice, "{scenario}");
+		}
+
+		let band = StabilizerPoolRewardBand::new(
+			one_dollar,
+			one_dollar,
+			argon_is_token0,
+			10,
+			RewardPriceBand::get(),
+			Percent::from_percent(1),
+		)
+		.unwrap();
+		let pool_price =
+			uniswap_sqrt_price_for_usd_price(one_dollar, one_dollar, argon_is_token0, false);
+		let (lower, upper) = uniswap_bounds_for_usd_band(
+			FixedU128::from_rational(90, 100),
+			one_dollar,
+			one_dollar,
+			argon_is_token0,
+			10,
+		);
+		for (scenario, invalid_lower, invalid_upper) in [
+			("equal boundaries", lower, lower),
+			("reversed boundaries", upper, lower),
+			("lower boundary off the grid", lower + 1, upper),
+			("upper boundary off the grid", lower, upper - 1),
+			("boundary outside Uniswap's domain", MIN_UNISWAP_TICK.div_euclid(10) * 10, upper),
+		] {
+			assert_eq!(
+				band.principal_for_range(U256::one(), invalid_lower, invalid_upper, pool_price),
+				Err(PositionAmountError::InvalidTickRange),
+				"{scenario}"
+			);
+		}
+		assert_eq!(
+			band.principal_for_range(U256::one(), lower, upper, U256::zero()),
+			Err(PositionAmountError::InvalidPrice)
+		);
 	}
 }
 

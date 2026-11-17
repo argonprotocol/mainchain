@@ -964,4 +964,5 @@ impl pallet_stabilizer_pools::Config for Runtime {
 	type MiningFrameTransitionProvider = MiningSlot;
 	type CurrentTick = Ticks;
 	type MaxFramePriceHistoryFrames = ConstU32<33>;
+	type RewardPriceBand = StabilizerPoolRewardPriceBand;
 }

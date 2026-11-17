@@ -96,6 +96,10 @@ parameter_types! {
 	// ### pallet_stabilizer_buys
 	pub const LiquidRepaymentRewardPercent: Percent = Percent::from_percent(5);
 
+	// ### pallet_stabilizer_pools
+	pub const StabilizerPoolRewardPriceBand: (Percent, Percent) =
+		(Percent::from_percent(90), Percent::one());
+
 	// ### pallet_treasury
 	pub const MaxActiveArgonotBondLots: u32 = 1_000;
 	pub const MaxArgonBondLots: u32 = 15_000;

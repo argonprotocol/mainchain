@@ -31,6 +31,7 @@ alloy-rlp = { workspace = true }
 alloy-trie = { workspace = true }
 pallet-prelude = { workspace = true, features = ["test"], default-features = true }
 polkadot-sdk = { workspace = true, features = ["sp-io", "pallet-timestamp"], default-features = true }
+rstest = { workspace = true }
 
 [features]
 default = [ "std" ]

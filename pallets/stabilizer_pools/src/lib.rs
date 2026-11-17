@@ -26,7 +26,7 @@ mod tests;
 mod uniswap;
 pub mod weights;
 
-pub use uniswap::{PositionAmountError, PositionAmounts};
+pub use uniswap::{PositionAmountError, PositionAmounts, StabilizerPoolRewardBand};
 
 #[frame_support::pallet]
 pub mod pallet {
@@ -51,6 +51,10 @@ pub mod pallet {
 		/// Zero disables history. Both production runtimes retain 30 frames plus a 3-frame buffer.
 		#[pallet::constant]
 		type MaxFramePriceHistoryFrames: Get<u32>;
+		/// Lower and upper reward price boundaries, as percentages of the ARGON USD target.
+		/// The lower boundary must be positive and strictly below the upper boundary.
+		#[pallet::constant]
+		type RewardPriceBand: Get<(Percent, Percent)>;
 	}
 
 	/// Approved deployments on the Ethereum network authenticated by EthereumVerifier.

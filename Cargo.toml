@@ -206,6 +206,7 @@ strip-ansi-escapes = { version = "0.2" }
 current_platform = { version = "0.2" }
 regex = { version = "1.11.1" }
 serial_test = { version = "3.2.0" }
+rstest = { version = "0.28", default-features = false }
 
 # node
 impl-trait-for-tuples = "0.2.2"
