@@ -105,11 +105,12 @@ parameter_types! {
 	pub const TreasuryInternalPalletId: PalletId = PalletId(*b"lqdPools");
 	pub TreasuryMiningBidPoolAccount: AccountId =
 		TreasuryInternalPalletId::get().into_account_truncating();
-	pub const PercentForMarketing: Percent = Percent::from_percent(20);
+	pub const PercentForMarketing: Percent = Percent::from_percent(10);
 	pub const PercentForStakePool: Percent = Percent::from_percent(15);
 	pub const PercentForMiningOperatorPool: Percent = Percent::from_percent(6);
 	pub const PercentForBitcoinLiquidPool: Percent = Percent::from_percent(3);
 	pub const PercentForArgonBondPool: Percent = Percent::from_percent(5);
+	pub const PercentForStabilizerPool: Percent = Percent::from_percent(10);
 	pub const PercentForVaultPool: Percent = Percent::from_percent(51);
 	pub const MinimumVaultProfitPercent: Percent = Percent::from_percent(5);
 	pub const VaultBitcoinRewardPercent: Permill = Permill::from_parts(428_350);
@@ -386,7 +387,7 @@ mod tests {
 				let winning_price = 100 * ARGON + MiningSlotBidIncrement::get();
 				let final_pool = 10 * winning_price;
 				let stake_payout = PercentForStakePool::get().mul_floor(final_pool);
-				let marketing_allocation = PercentForMarketing::get().mul_floor(final_pool);
+				let marketing_allocation = final_pool / 10;
 				let reserved_from_circulation = final_pool - stake_payout;
 
 				for block in 1..=41 {
@@ -511,8 +512,12 @@ mod tests {
 				assert_eq!(Balances::balance(&pool_account), 0);
 				let reserves = pallet_treasury::RewardReserves::<Runtime>::get();
 				assert_eq!(reserves.marketing, marketing_allocation);
+				assert_eq!(reserves.stabilizer_pools, final_pool / 10);
 				assert_eq!(
-					reserves.marketing + reserves.bitcoin_liquids + reserves.liquidity_buys,
+					reserves.marketing +
+						reserves.bitcoin_liquids +
+						reserves.stabilizer_pools +
+						reserves.liquidity_buys,
 					reserved_from_circulation
 				);
 				assert_eq!(Balances::balance(&staker), initial_staker_balance + stake_payout);

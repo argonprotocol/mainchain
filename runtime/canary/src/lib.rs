@@ -472,6 +472,7 @@ impl pallet_treasury::Config for Runtime {
 	type PercentForMiningOperatorPool = PercentForMiningOperatorPool;
 	type PercentForBitcoinLiquidPool = PercentForBitcoinLiquidPool;
 	type PercentForArgonBondPool = PercentForArgonBondPool;
+	type PercentForStabilizerPool = PercentForStabilizerPool;
 	type PercentForVaultPool = PercentForVaultPool;
 	type MinimumVaultProfitPercent = MinimumVaultProfitPercent;
 	type VaultBitcoinRewardPercent = VaultBitcoinRewardPercent;

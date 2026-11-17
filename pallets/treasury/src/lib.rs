@@ -50,9 +50,9 @@ pub use pallet::*;
 /// after the current frame; regular bonds continue earning even if securitization later falls.
 ///
 /// ## Profits from Bid Pool
-/// After each bid pool closes, configured shares fund marketing and Bitcoin Liquids. Eligible
-/// Argonot stakes, Argon bonds, and vaults receive rewards. Unallocated funds go to the liquidity
-/// buys reserve.
+/// After each bid pool closes, configured shares fund marketing, Bitcoin Liquids, and stabilizer
+/// pools. Eligible Argonot stakes, Argon bonds, and vaults receive rewards. Unallocated funds go
+/// to the liquidity buys reserve.
 ///
 /// The frame's APY policy tapers excess bond and stake rewards into their own reserves. Excess
 /// vault rewards go to liquidity buys. Bond earnings pay directly; vault earnings enter the
@@ -209,6 +209,10 @@ pub mod pallet {
 		#[pallet::constant]
 		type PercentForArgonBondPool: Get<Percent>;
 
+		/// Percent credited to the stabilizer pool rewards reserve.
+		#[pallet::constant]
+		type PercentForStabilizerPool: Get<Percent>;
+
 		/// Maximum percent paid to vaults when the network target is filled.
 		#[pallet::constant]
 		type PercentForVaultPool: Get<Percent>;
@@ -306,10 +310,7 @@ pub mod pallet {
 			stabilizer_pools: TaperingProgram {
 				target_daily_return: daily_500,
 				excess_reward_payout_percent: Percent::from_percent(50),
-				target_daily_return_with_price_below_target: Some(BelowTargetPriceYield {
-					target_daily_return: daily_100,
-					argon_price_drop_for_target: Percent::from_percent(10),
-				}),
+				target_daily_return_with_price_below_target: None,
 			},
 		}
 	}
@@ -1361,6 +1362,8 @@ pub mod pallet {
 
 			let bitcoin_liquids_allocation =
 				T::PercentForBitcoinLiquidPool::get().mul_floor(full_bid_pool_amount);
+			let stabilizer_pool_allocation =
+				T::PercentForStabilizerPool::get().mul_floor(full_bid_pool_amount);
 			let mining_operator_allocation =
 				T::PercentForMiningOperatorPool::get().mul_floor(full_bid_pool_amount);
 			let mut unallocated = funding.peek();
@@ -1381,6 +1384,7 @@ pub mod pallet {
 			for (allocation, budget) in [
 				(marketing_allocation, &mut reserves.marketing),
 				(bitcoin_liquids_allocation, &mut reserves.bitcoin_liquids),
+				(stabilizer_pool_allocation, &mut reserves.stabilizer_pools),
 				(stake_payout.withheld, &mut reserves.argonot_stakes),
 				(bond_payout.withheld, &mut reserves.argon_bonds),
 				(mining_operator_allocation, &mut reserves.liquidity_buys),

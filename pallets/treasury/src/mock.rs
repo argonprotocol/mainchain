@@ -161,11 +161,12 @@ parameter_types! {
 	pub static TreasuryExitDelayFrames: FrameId = 10;
 	pub const VaultPalletId: PalletId = PalletId(*b"bidPools");
 
-	pub const PercentForMarketing: Percent = Percent::from_percent(20);
+	pub const PercentForMarketing: Percent = Percent::from_percent(10);
 	pub const PercentForStakePool: Percent = Percent::from_percent(15);
 	pub const PercentForMiningOperatorPool: Percent = Percent::from_percent(6);
 	pub const PercentForBitcoinLiquidPool: Percent = Percent::from_percent(3);
 	pub const PercentForArgonBondPool: Percent = Percent::from_percent(5);
+	pub const PercentForStabilizerPool: Percent = Percent::from_percent(10);
 	pub const PercentForVaultPool: Percent = Percent::from_percent(51);
 	pub const MinimumVaultProfitPercent: Percent = Percent::from_percent(5);
 	pub const VaultBitcoinRewardPercent: Permill = Permill::from_parts(428_350);
@@ -493,6 +494,7 @@ impl pallet_treasury::Config for Test {
 	type PercentForMiningOperatorPool = PercentForMiningOperatorPool;
 	type PercentForBitcoinLiquidPool = PercentForBitcoinLiquidPool;
 	type PercentForArgonBondPool = PercentForArgonBondPool;
+	type PercentForStabilizerPool = PercentForStabilizerPool;
 	type PercentForVaultPool = PercentForVaultPool;
 	type MinimumVaultProfitPercent = MinimumVaultProfitPercent;
 	type VaultBitcoinRewardPercent = VaultBitcoinRewardPercent;

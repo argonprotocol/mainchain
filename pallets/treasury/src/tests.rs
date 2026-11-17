@@ -1369,9 +1369,10 @@ fn bid_pool_reserves_fund_purchase_rewards_at_maturity() {
 		Treasury::distribute_bid_pool(1);
 
 		assert_eq!(Balances::balance(&BidPoolAccountId::get()), 0);
-		assert_eq!(RewardReserves::<Test>::get().marketing, 20 * MICROGONS_PER_ARGON);
+		assert_eq!(RewardReserves::<Test>::get().marketing, 10 * MICROGONS_PER_ARGON);
 		assert_eq!(Balances::total_issuance(), 0);
 		assert_eq!(RewardReserves::<Test>::get().bitcoin_liquids, 3 * MICROGONS_PER_ARGON);
+		assert_eq!(RewardReserves::<Test>::get().stabilizer_pools, 10 * MICROGONS_PER_ARGON);
 		assert_eq!(RewardReserves::<Test>::get().liquidity_buys, 77 * MICROGONS_PER_ARGON);
 		let distribution = System::events()
 			.into_iter()
@@ -1460,8 +1461,9 @@ fn bid_pool_reserves_fund_purchase_rewards_at_maturity() {
 		assert_eq!(Balances::balance(&owner), 104_500_000);
 		assert_eq!(Balances::total_issuance(), 104_500_000);
 		assert_eq!(Treasury::available_budget(), 72_500_000);
-		assert_eq!(RewardReserves::<Test>::get().marketing, 20 * MICROGONS_PER_ARGON);
+		assert_eq!(RewardReserves::<Test>::get().marketing, 10 * MICROGONS_PER_ARGON);
 		assert_eq!(RewardReserves::<Test>::get().bitcoin_liquids, 3 * MICROGONS_PER_ARGON);
+		assert_eq!(RewardReserves::<Test>::get().stabilizer_pools, 10 * MICROGONS_PER_ARGON);
 		assert_eq!(crate::OutstandingPurchaseRewards::<Test>::get(), 0);
 		assert_eq!(
 			Balances::balance_on_hold(
@@ -1585,7 +1587,7 @@ fn distribution_burns_unfilled_bond_pool_without_reducing_vault_rewards() {
 		assert_eq!(bond_lot.last_frame_earnings, Some(2_000_000));
 		assert_eq!(bond_lot.cumulative_earnings, 2_000_000);
 		assert_eq!(Balances::balance(&account(2)), balance_before + 2_000_000);
-		assert_eq!(RewardReserves::<Test>::get().marketing, 20_000_000);
+		assert_eq!(RewardReserves::<Test>::get().marketing, 10_000_000);
 
 		assert_eq!(LastVaultProfits::get().len(), 1);
 		assert_eq!(LastVaultProfits::get()[0].vault_id, 1);
@@ -2030,7 +2032,7 @@ fn stake_and_argon_bond_pools_are_paid_before_the_vault_pool() {
 		assert_eq!(vault_bond_lot.last_frame_earnings, Some(5_000_000));
 		assert_eq!(vault_bond_lot.cumulative_earnings, 5_000_000);
 
-		assert_eq!(RewardReserves::<Test>::get().marketing, 20_000_000);
+		assert_eq!(RewardReserves::<Test>::get().marketing, 10_000_000);
 		assert_eq!(LastVaultProfits::get().len(), 1);
 		assert_eq!(LastVaultProfits::get()[0].earnings, 8_165_000);
 		assert_eq!(LastVaultProfits::get()[0].earnings_for_vault, 8_165_000);
@@ -2275,9 +2277,10 @@ fn failed_bond_lot_payout_is_not_recorded_as_earned() {
 		assert_eq!(bond_lot.last_frame_earnings, Some(0));
 		assert_eq!(bond_lot.cumulative_earnings, 0);
 		assert_eq!(Balances::balance(&account(99)), 0);
-		assert_eq!(RewardReserves::<Test>::get().marketing, 7);
+		assert_eq!(RewardReserves::<Test>::get().marketing, 3);
 		assert_eq!(RewardReserves::<Test>::get().bitcoin_liquids, 1);
-		assert_eq!(RewardReserves::<Test>::get().liquidity_buys, 31);
+		assert_eq!(RewardReserves::<Test>::get().stabilizer_pools, 3);
+		assert_eq!(RewardReserves::<Test>::get().liquidity_buys, 32);
 		assert_eq!(Balances::balance(&BidPoolAccountId::get()), 0);
 		assert!(System::events().iter().any(|record| matches!(
 			&record.event,
@@ -2423,9 +2426,12 @@ fn failed_marketing_migration_preserves_funds_for_retry() {
 #[test]
 fn fixed_daily_returns_compound_to_the_agreed_apy() {
 	let policy = crate::DefaultRewardTaperingPolicy::get();
-	for (program, apy_percent) in
-		[(policy.argonot_stakes, 50), (policy.argon_bonds, 100), (policy.vault_revenue, 500)]
-	{
+	for (program, apy_percent) in [
+		(policy.argonot_stakes, 50),
+		(policy.argon_bonds, 100),
+		(policy.vault_revenue, 500),
+		(policy.stabilizer_pools, 500),
+	] {
 		let daily_growth = FixedU128::one().saturating_add(program.target_daily_return);
 		let annual_growth =
 			(0..365).fold(FixedU128::one(), |growth, _| growth.saturating_mul(daily_growth));
@@ -2544,8 +2550,9 @@ fn vault_taper_counts_only_reward_eligible_argonot_value() {
 
 			assert_eq!(LastVaultProfits::get()[0].earnings, expected_payout);
 			let reserves = RewardReserves::<Test>::get();
-			assert_eq!(reserves.marketing, 200 * MICROGONS_PER_ARGON);
+			assert_eq!(reserves.marketing, 100 * MICROGONS_PER_ARGON);
 			assert_eq!(reserves.bitcoin_liquids, 30 * MICROGONS_PER_ARGON);
+			assert_eq!(reserves.stabilizer_pools, 100 * MICROGONS_PER_ARGON);
 			assert_eq!(reserves.liquidity_buys, 770 * MICROGONS_PER_ARGON - expected_payout);
 		});
 	}
@@ -2647,25 +2654,36 @@ fn vault_rewards_use_frame_cpi_instead_of_the_closing_price() {
 }
 
 #[test]
-fn vault_and_pool_daily_targets_decline_linearly_with_price() {
+fn vault_target_declines_below_price_target_while_stabilizer_rewards_stay_high() {
 	new_test_ext().execute_with(|| {
 		let policy = RewardTaperingPolicy::<Test>::get();
-		for program in [&policy.vault_revenue, &policy.stabilizer_pools] {
-			for (ratio, expected) in [
-				(1_100, 492_099),
-				(1_000, 492_099),
-				(975, 416_595),
-				(950, 341_091),
-				(925, 265_587),
-				(900, 190_083),
-				(800, 190_083),
-			] {
-				let daily = Treasury::price_adjusted_daily_return(
-					program,
-					Some(FixedU128::from_rational(ratio, 1_000)),
-				);
-				assert_eq!(daily.saturating_mul_int(100 * MICROGONS_PER_ARGON), expected);
-			}
+		let capital = 100 * MICROGONS_PER_ARGON;
+		for (ratio, expected_vault_threshold) in [
+			(1_100, 492_099),
+			(1_000, 492_099),
+			(975, 416_595),
+			(950, 341_091),
+			(925, 265_587),
+			(900, 190_083),
+			(800, 190_083),
+		] {
+			let price_ratio = Some(FixedU128::from_rational(ratio, 1_000));
+			let vault_daily_return =
+				Treasury::price_adjusted_daily_return(&policy.vault_revenue, price_ratio);
+			assert_eq!(vault_daily_return.saturating_mul_int(capital), expected_vault_threshold);
+
+			let stabilizer_daily_return =
+				Treasury::price_adjusted_daily_return(&policy.stabilizer_pools, price_ratio);
+			assert_eq!(stabilizer_daily_return.saturating_mul_int(capital), 492_099);
+			assert_eq!(
+				Treasury::tapered_payout(
+					1_000_000,
+					capital,
+					stabilizer_daily_return,
+					policy.stabilizer_pools.excess_reward_payout_percent,
+				),
+				746_049
+			);
 		}
 	});
 }
@@ -2693,7 +2711,7 @@ fn bond_and_stake_reserves_are_self_funded_and_draw_only_below_price_target() {
 		let funded = RewardReserves::<Test>::get();
 		assert!(funded.argon_bonds > 0);
 		assert!(funded.argonot_stakes > 0);
-		assert_eq!(funded.stabilizer_pools, 0);
+		assert_eq!(funded.stabilizer_pools, 10 * MICROGONS_PER_ARGON);
 
 		Treasury::lock_in_argonot_bond_participants(2);
 		Treasury::lock_in_vault_capital(2);
@@ -2730,6 +2748,7 @@ fn bond_and_stake_reserves_are_self_funded_and_draw_only_below_price_target() {
 			RewardReserves::<Test>::get().argonot_stakes,
 			funded.argonot_stakes - stake_paid
 		);
+		assert_eq!(RewardReserves::<Test>::get().stabilizer_pools, funded.stabilizer_pools);
 		assert_eq!(Balances::total_issuance(), issuance_before + bond_paid + stake_paid);
 	});
 }
@@ -2876,7 +2895,10 @@ fn bond_reserve_shares_floor_without_spending_other_allocations() {
 		let vault_paid: u128 = LastVaultProfits::get().iter().map(|profit| profit.earnings).sum();
 		let reserves = RewardReserves::<Test>::get();
 		assert_eq!(reserves.argon_bonds, 500);
-		let reserved = reserves.marketing + reserves.bitcoin_liquids + reserves.liquidity_buys;
+		let reserved = reserves.marketing +
+			reserves.bitcoin_liquids +
+			reserves.stabilizer_pools +
+			reserves.liquidity_buys;
 		assert_eq!(reserved + bond_paid + vault_paid, bid_revenue);
 	});
 }
@@ -3005,7 +3027,10 @@ fn vault_taper_sends_withheld_rewards_to_liquidity_buys() {
 		assert_eq!(paid, 2_524_604);
 		assert_eq!(reserves.liquidity_buys, 74_475_396);
 		assert_eq!(
-			paid + reserves.marketing + reserves.bitcoin_liquids + reserves.liquidity_buys,
+			paid + reserves.marketing +
+				reserves.bitcoin_liquids +
+				reserves.stabilizer_pools +
+				reserves.liquidity_buys,
 			100 * MICROGONS_PER_ARGON
 		);
 	});
