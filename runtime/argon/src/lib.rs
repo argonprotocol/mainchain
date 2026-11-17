@@ -969,4 +969,6 @@ impl pallet_stabilizer_pools::Config for Runtime {
 	type CurrentTick = Ticks;
 	type MaxFramePriceHistoryFrames = ConstU32<33>;
 	type RewardPriceBand = StabilizerPoolRewardPriceBand;
+	type MaxPriceBucketsPerFrame = StabilizerPoolMaxPriceBucketsPerFrame;
+	type MinPriceBucketCoverage = StabilizerPoolMinPriceBucketCoverage;
 }

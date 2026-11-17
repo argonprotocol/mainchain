@@ -21,11 +21,13 @@ mod benchmarking;
 pub mod evm;
 #[cfg(any(test, feature = "runtime-benchmarks"))]
 mod mock;
+mod price_sampling;
 #[cfg(test)]
 mod tests;
 mod uniswap;
 pub mod weights;
 
+pub use price_sampling::StabilizerPoolPriceSamples;
 pub use uniswap::{PositionAmountError, PositionAmounts, StabilizerPoolRewardBand};
 
 #[frame_support::pallet]
@@ -55,6 +57,13 @@ pub mod pallet {
 		/// The lower boundary must be positive and strictly below the upper boundary.
 		#[pallet::constant]
 		type RewardPriceBand: Get<(Percent, Percent)>;
+		/// Maximum number of time buckets used to sample one frame. Zero disables sampling.
+		#[pallet::constant]
+		type MaxPriceBucketsPerFrame: Get<u32>;
+		/// Minimum share of Mainchain ticks with a valid price in each bucket. Even at zero,
+		/// each bucket needs a sample to calculate its mean.
+		#[pallet::constant]
+		type MinPriceBucketCoverage: Get<Percent>;
 	}
 
 	/// Approved deployments on the Ethereum network authenticated by EthereumVerifier.

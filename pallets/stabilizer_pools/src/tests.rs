@@ -486,6 +486,135 @@ fn reward_bands_reject_unusable_quotes_and_malformed_uniswap_ranges() {
 	}
 }
 
+type FramePriceSamples = StabilizerPoolPriceSamples<MaxPriceBucketsPerFrame>;
+
+#[test]
+fn frame_price_is_the_median_of_bucket_means() {
+	let frame_start = 20;
+	let ticks_per_bucket = 4;
+	let frame_ticks = 24 * ticks_per_bucket;
+	let mut samples =
+		FramePriceSamples::new(frame_start, frame_ticks, MinPriceBucketCoverage::get()).unwrap();
+
+	let cheaper_pool_price = uniswap_sqrt_price_at_tick(-300);
+	let higher_pool_price = uniswap_sqrt_price_at_tick(300);
+	let price_spike = uniswap_sqrt_price_at_tick(18_000);
+	for elapsed_ticks in 0..frame_ticks {
+		let bucket = elapsed_ticks / ticks_per_bucket;
+		let tick_in_bucket = elapsed_ticks % ticks_per_bucket;
+		let price = match bucket {
+			0..=10 => cheaper_pool_price,
+			// The two middle buckets average to -100 and +200 Uniswap ticks.
+			11 if tick_in_bucket < 2 => cheaper_pool_price,
+			11 if tick_in_bucket == 2 => higher_pool_price,
+			11 => continue,
+			12 if tick_in_bucket == 0 => uniswap_sqrt_price_at_tick(-100),
+			12..=22 => higher_pool_price,
+			_ => price_spike,
+		};
+		samples.record(frame_start + elapsed_ticks, price);
+	}
+
+	assert_eq!(samples.finish(frame_start + frame_ticks), Some(uniswap_sqrt_price_at_tick(50)));
+}
+
+#[rstest]
+#[case::empty_bucket(0, false)]
+#[case::half_coverage(2, false)]
+#[case::minimum_coverage(3, true)]
+fn frame_price_requires_coverage_in_every_bucket(
+	#[case] samples_in_first_bucket: Tick,
+	#[case] has_frame_price: bool,
+) {
+	let frame_start = 20;
+	let frame_ticks = 96;
+	let pool_price = uniswap_sqrt_price_at_tick(100);
+	let price_wider_than_uniswap_slot = U256::one() << 160;
+	let mut samples =
+		FramePriceSamples::new(frame_start, frame_ticks, MinPriceBucketCoverage::get()).unwrap();
+	samples.record(frame_start - 1, pool_price);
+	for elapsed_ticks in 0..4 {
+		let tick = frame_start + elapsed_ticks;
+		if elapsed_ticks < samples_in_first_bucket {
+			samples.record(tick, pool_price);
+			samples.record(tick, pool_price);
+		} else {
+			samples.record(tick, U256::zero());
+			samples.record(tick, price_wider_than_uniswap_slot);
+		}
+	}
+	for elapsed_ticks in 4..frame_ticks {
+		samples.record(frame_start + elapsed_ticks, pool_price);
+	}
+
+	assert_eq!(samples.finish(frame_start + frame_ticks), has_frame_price.then_some(pool_price));
+}
+
+#[rstest]
+#[case::short_frame(5, 5, 5, true)]
+#[case::ten_tick_frame_missing_one_price(10, 10, 9, false)]
+#[case::delayed_frame(96, 100, 100, true)]
+#[case::delayed_frame_missing_its_last_bucket(96, 100, 96, false)]
+#[case::delayed_frame_with_two_samples_across_three_ticks(96, 99, 98, false)]
+fn frame_price_uses_the_actual_frame_end(
+	#[case] configured_frame_ticks: Tick,
+	#[case] actual_frame_ticks: Tick,
+	#[case] sampled_ticks: Tick,
+	#[case] has_frame_price: bool,
+) {
+	let frame_start = 20;
+	let pool_price = uniswap_sqrt_price_at_tick(100);
+	let mut samples =
+		FramePriceSamples::new(frame_start, configured_frame_ticks, MinPriceBucketCoverage::get())
+			.unwrap();
+	for elapsed_ticks in 0..sampled_ticks {
+		samples.record(frame_start + elapsed_ticks, pool_price);
+	}
+
+	assert_eq!(
+		samples.finish(frame_start + actual_frame_ticks),
+		has_frame_price.then_some(pool_price)
+	);
+}
+
+#[test]
+fn sparse_frame_with_a_large_tick_gap_has_no_price() {
+	let pool_price = uniswap_sqrt_price_at_tick(100);
+	let mut samples = FramePriceSamples::new(0, 24, MinPriceBucketCoverage::get()).unwrap();
+	samples.record(0, pool_price);
+	samples.record(Tick::MAX - 1, pool_price);
+
+	assert_eq!(samples.finish(Tick::MAX), None);
+}
+
+#[rstest]
+#[case::half_coverage_is_enough(Percent::from_percent(50), true)]
+#[case::needs_three_quarters(Percent::from_percent(75), false)]
+fn frame_price_uses_the_configured_bucket_count_and_coverage(
+	#[case] min_coverage: Percent,
+	#[case] has_frame_price: bool,
+) {
+	let mut samples = StabilizerPoolPriceSamples::<ConstU32<2>>::new(0, 8, min_coverage).unwrap();
+	let first_bucket_price = uniswap_sqrt_price_at_tick(100);
+	let second_bucket_price = uniswap_sqrt_price_at_tick(300);
+	samples.record(0, first_bucket_price);
+	samples.record(1, first_bucket_price);
+	samples.record(4, second_bucket_price);
+	samples.record(5, second_bucket_price);
+
+	assert_eq!(samples.finish(8), has_frame_price.then(|| uniswap_sqrt_price_at_tick(200)));
+}
+
+#[test]
+fn one_price_bucket_can_cover_the_full_tick_range() {
+	let mut samples =
+		StabilizerPoolPriceSamples::<ConstU32<1>>::new(0, 1, Percent::zero()).unwrap();
+	let pool_price = uniswap_sqrt_price_at_tick(100);
+	samples.record(0, pool_price);
+
+	assert_eq!(samples.finish(Tick::MAX), Some(pool_price));
+}
+
 #[test]
 fn opening_prices_are_fixed_and_history_expires_by_frame_age() {
 	new_test_ext().execute_with(|| {

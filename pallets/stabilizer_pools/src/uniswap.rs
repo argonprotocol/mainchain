@@ -318,7 +318,7 @@ fn principal_for_sqrt_price_range(
 	Ok(PositionAmounts { argon, usdc })
 }
 
-fn sqrt_price_at_uniswap_tick(uniswap_tick: i32) -> Result<U256, PositionAmountError> {
+pub(crate) fn sqrt_price_at_uniswap_tick(uniswap_tick: i32) -> Result<U256, PositionAmountError> {
 	if !(MIN_TICK_I32..=MAX_TICK_I32).contains(&uniswap_tick) {
 		return Err(PositionAmountError::InvalidTickRange);
 	}

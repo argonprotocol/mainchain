@@ -59,11 +59,15 @@ impl Config for Test {
 	type CurrentTick = CurrentTick;
 	type MaxFramePriceHistoryFrames = ConstU32<33>;
 	type RewardPriceBand = RewardPriceBand;
+	type MaxPriceBucketsPerFrame = MaxPriceBucketsPerFrame;
+	type MinPriceBucketCoverage = MinPriceBucketCoverage;
 }
 
 #[cfg(test)]
 frame_support::parameter_types! {
 	pub const RewardPriceBand: (Percent, Percent) = (Percent::from_percent(90), Percent::one());
+	pub const MaxPriceBucketsPerFrame: u32 = 24;
+	pub const MinPriceBucketCoverage: Percent = Percent::from_percent(75);
 	pub static CurrentTick: Tick = 20;
 	pub static CurrentFrame: FrameId = 1;
 	pub static NewlyStartedFrame: Option<FrameId> = None;
