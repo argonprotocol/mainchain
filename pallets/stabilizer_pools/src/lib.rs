@@ -7,18 +7,13 @@
 extern crate alloc;
 
 use alloc::boxed::Box;
-use alloy_primitives::{aliases::I24, U256 as AlloyU256};
 use argon_primitives::{
-	block_seal::FrameId, Balance, EthereumAccountStorageProof, EthereumVerifyProvider,
-	MiningFrameTransitionProvider, PriceIndex, PriceIndexUpdated, MICROGONS_PER_ARGON,
+	block_seal::FrameId, EthereumAccountStorageProof, EthereumVerifyProvider,
+	MiningFrameTransitionProvider, PriceIndex, PriceIndexUpdated,
 };
 pub use pallet::*;
 use pallet_ethereum_verifier::Pallet as EthereumVerifier;
 use pallet_prelude::*;
-use uniswap_v3_sdk_bigint::utils::{
-	get_amount_0_delta, get_amount_1_delta, get_sqrt_ratio_at_tick, MAX_SQRT_RATIO, MAX_TICK_I32,
-	MIN_SQRT_RATIO, MIN_TICK_I32,
-};
 pub use weights::WeightInfo;
 
 #[cfg(feature = "runtime-benchmarks")]
@@ -28,7 +23,10 @@ pub mod evm;
 mod mock;
 #[cfg(test)]
 mod tests;
+mod uniswap;
 pub mod weights;
+
+pub use uniswap::{PositionAmountError, PositionAmounts};
 
 #[frame_support::pallet]
 pub mod pallet {
@@ -449,9 +447,9 @@ pub struct PositionCheckpoint<AccountId> {
 	pub subscriber: H160,
 	/// Permanent subscriber counter; any increase starts a new continuity baseline.
 	pub revision: U256,
-	/// Inclusive lower tick boundary of the NFT's position.
+	/// Inclusive lower Uniswap price tick of the NFT's position.
 	pub tick_lower: i32,
-	/// Exclusive upper tick boundary of the NFT's position.
+	/// Exclusive upper Uniswap price tick of the NFT's position.
 	pub tick_upper: i32,
 	/// Native Uniswap liquidity L, not a token balance or reward amount.
 	pub liquidity: u128,
@@ -459,82 +457,6 @@ pub struct PositionCheckpoint<AccountId> {
 	pub maintained_since: ProofBlock,
 	/// Latest accepted Ethereum endpoint; proves nothing about later blocks.
 	pub proven_through: ProofBlock,
-}
-
-impl<AccountId> PositionCheckpoint<AccountId> {
-	/// Value this checkpoint's recorded liquidity and tick bounds at a raw Q96 pool sqrt price.
-	/// `argon_is_token0` comes from the approved pool's currency ordering. Each amount is rounded
-	/// down, as when removing liquidity. ARGON is converted to microgons before checked narrowing;
-	/// USDC already has six decimals. Valuation and reward caps belong to the caller.
-	pub fn amounts_at_price(
-		&self,
-		sqrt_price_x96: U256,
-		argon_is_token0: bool,
-	) -> Result<PositionAmounts, PositionAmountError> {
-		if self.tick_lower >= self.tick_upper {
-			return Err(PositionAmountError::InvalidTickRange);
-		}
-		// Validate before int24 conversion, which can panic on oversized i32 values.
-		if !(MIN_TICK_I32..=MAX_TICK_I32).contains(&self.tick_lower) {
-			return Err(PositionAmountError::InvalidTickRange);
-		}
-		if !(MIN_TICK_I32..=MAX_TICK_I32).contains(&self.tick_upper) {
-			return Err(PositionAmountError::InvalidTickRange);
-		}
-		let tick_lower = I24::try_from(self.tick_lower).expect("validated Uniswap tick fits int24");
-		let tick_upper = I24::try_from(self.tick_upper).expect("validated Uniswap tick fits int24");
-		let sqrt_lower = AlloyU256::from(
-			get_sqrt_ratio_at_tick(tick_lower)
-				.map_err(|_| PositionAmountError::InvalidTickRange)?,
-		);
-		let sqrt_upper = AlloyU256::from(
-			get_sqrt_ratio_at_tick(tick_upper)
-				.map_err(|_| PositionAmountError::InvalidTickRange)?,
-		);
-
-		let sqrt_price = AlloyU256::from_be_bytes(sqrt_price_x96.to_big_endian());
-		if sqrt_price < AlloyU256::from(MIN_SQRT_RATIO) {
-			return Err(PositionAmountError::InvalidPrice);
-		}
-		if sqrt_price >= AlloyU256::from(MAX_SQRT_RATIO) {
-			return Err(PositionAmountError::InvalidPrice);
-		}
-
-		// Below the range the position is entirely token0; above it, entirely token1.
-		// The v4 SDK uses these same integer delta functions for position principal.
-		let sqrt_price = sqrt_price.clamp(sqrt_lower, sqrt_upper);
-		let amount0 = get_amount_0_delta(sqrt_price, sqrt_upper, self.liquidity, false)
-			.map_err(|_| PositionAmountError::AmountOverflow)?;
-		let amount1 = get_amount_1_delta(sqrt_lower, sqrt_price, self.liquidity, false)
-			.map_err(|_| PositionAmountError::AmountOverflow)?;
-		let (argon, usdc) = if argon_is_token0 { (amount0, amount1) } else { (amount1, amount0) };
-
-		let token_units_per_microgon = AlloyU256::from(10u128.pow(18) / MICROGONS_PER_ARGON);
-		let argon = Balance::try_from(argon / token_units_per_microgon)
-			.map_err(|_| PositionAmountError::AmountOverflow)?;
-		let usdc = u128::try_from(usdc).map_err(|_| PositionAmountError::AmountOverflow)?;
-		Ok(PositionAmounts { argon, usdc })
-	}
-}
-
-/// Withdrawable principal at a pool price, excluding accrued fees and reward allocations.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct PositionAmounts {
-	/// ARGON principal in native microgons (6 decimals), rounded down from 18-decimal token units.
-	pub argon: Balance,
-	/// USDC principal in Ethereum token base units (6 decimals).
-	pub usdc: u128,
-}
-
-/// Invalid inputs or a principal amount that cannot be represented by the pallet.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum PositionAmountError {
-	/// Tick bounds are reversed, equal, or outside Uniswap's supported range.
-	InvalidTickRange,
-	/// The raw sqrt price is outside Uniswap's supported domain.
-	InvalidPrice,
-	/// Converted ARGON or raw USDC principal exceeds its 128-bit balance representation.
-	AmountOverflow,
 }
 
 #[derive(

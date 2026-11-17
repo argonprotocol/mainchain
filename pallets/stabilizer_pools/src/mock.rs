@@ -3,6 +3,8 @@
 #[cfg(test)]
 use crate as pallet_stabilizer_pools;
 use crate::*;
+#[cfg(test)]
+use alloy_primitives::aliases::I24;
 use alloy_primitives::{keccak256, B256, U256 as AlloyU256};
 use alloy_trie::{
 	proof::{ProofNodes, ProofRetainer},
@@ -16,6 +18,10 @@ use pallet_ethereum_verifier::{types::ExecutionHeaderAnchor, ExecutionHeaderAnch
 use pallet_prelude::{new_test_with_genesis, TestState};
 #[cfg(test)]
 use sp_runtime::{traits::IdentityLookup, AccountId32};
+#[cfg(test)]
+use uniswap_v3_sdk_bigint::utils::{
+	get_amount_0_delta, get_amount_1_delta, get_sqrt_ratio_at_tick,
+};
 
 #[cfg(test)]
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -123,6 +129,37 @@ pub(crate) fn position_checkpoint(
 		liquidity,
 		maintained_since: block,
 		proven_through: block,
+	}
+}
+
+/// Convert a named Uniswap price tick to the raw sqrt-price format accepted by the pallet.
+#[cfg(test)]
+pub(crate) fn uniswap_sqrt_price_at_tick(uniswap_tick: i32) -> U256 {
+	let sqrt_price = get_sqrt_ratio_at_tick(I24::try_from(uniswap_tick).unwrap()).unwrap();
+	U256::from_big_endian(&sqrt_price.to_be_bytes::<20>())
+}
+
+/// Independent principal reference from the pinned Uniswap SDK, which accepts one NFT's liquidity.
+#[cfg(test)]
+pub(crate) fn uniswap_sdk_principal(
+	position: &PositionCheckpoint<AccountId32>,
+	sqrt_price_x96: U256,
+	argon_is_token0: bool,
+) -> PositionAmounts<U256> {
+	let sqrt_lower =
+		AlloyU256::from_be_bytes(uniswap_sqrt_price_at_tick(position.tick_lower).to_big_endian());
+	let sqrt_upper =
+		AlloyU256::from_be_bytes(uniswap_sqrt_price_at_tick(position.tick_upper).to_big_endian());
+	let sqrt_price =
+		AlloyU256::from_be_bytes(sqrt_price_x96.to_big_endian()).clamp(sqrt_lower, sqrt_upper);
+	let token0 = get_amount_0_delta(sqrt_price, sqrt_upper, position.liquidity, false).unwrap();
+	let token1 = get_amount_1_delta(sqrt_lower, sqrt_price, position.liquidity, false).unwrap();
+	let (argon, usdc) = if argon_is_token0 { (token0, token1) } else { (token1, token0) };
+
+	let argon_token_units_per_microgon = U256::from(10u128.pow(12));
+	PositionAmounts {
+		argon: U256::from_big_endian(&argon.to_be_bytes::<32>()) / argon_token_units_per_microgon,
+		usdc: U256::from_big_endian(&usdc.to_be_bytes::<32>()),
 	}
 }
 

@@ -1,13 +1,17 @@
 use crate::{
 	mock::{evidence as build_evidence, *},
+	uniswap::principal_for_liquidity_range,
 	*,
 };
 use alloy_consensus::Header as EthereumHeader;
 use alloy_primitives::B256;
-use argon_primitives::{EthereumExecutionBlockProof, EthereumExecutionHeader};
+use argon_primitives::{EthereumExecutionBlockProof, EthereumExecutionHeader, MICROGONS_PER_ARGON};
 use frame_support::{assert_noop, assert_ok};
 use pallet_ethereum_verifier::{types::ExecutionHeaderAnchor, ExecutionHeaderAnchors};
 use sp_runtime::AccountId32;
+use uniswap_v3_sdk_bigint::utils::{
+	MAX_TICK_I32 as MAX_UNISWAP_TICK, MIN_TICK_I32 as MIN_UNISWAP_TICK,
+};
 
 #[test]
 fn calculates_both_principals_inside_and_outside_the_range_for_either_token_order() {
@@ -85,7 +89,7 @@ fn rejects_principal_that_exceeds_its_balance_representation() {
 }
 
 #[test]
-fn rejects_invalid_tick_ranges_and_prices_without_truncating_them() {
+fn rejects_invalid_uniswap_ranges_and_prices_without_truncating_them() {
 	for (tick_lower, tick_upper) in [
 		(100, 100),
 		(100, -100),
@@ -111,6 +115,133 @@ fn rejects_invalid_tick_ranges_and_prices_without_truncating_them() {
 		assert!(position_checkpoint(1_000, -100, 100)
 			.amounts_at_price(sqrt_price, true)
 			.is_err());
+	}
+}
+
+#[test]
+fn combined_liquidity_and_principal_can_exceed_one_nfts_limits() {
+	let largest_nft = position_checkpoint(u128::MAX, 0, 20_000);
+	let smallest_nft = position_checkpoint(1, 0, 20_000);
+	let combined_liquidity = U256::from(largest_nft.liquidity) + U256::from(smallest_nft.liquidity);
+
+	// The lower sqrt price is 1 and the current sqrt price is 2. Both are inside the range,
+	// so token1 principal equals liquidity exactly: L * (2 - 1) = L.
+	let sqrt_price = uniswap_sqrt_price_at_tick(0) * U256::from(2);
+	let largest_nft_amounts = largest_nft.amounts_at_price(sqrt_price, true).unwrap();
+	let smallest_nft_amounts = smallest_nft.amounts_at_price(sqrt_price, true).unwrap();
+	assert_eq!(largest_nft_amounts.usdc, u128::MAX);
+	assert_eq!(smallest_nft_amounts.usdc, 1);
+
+	let combined =
+		principal_for_liquidity_range(combined_liquidity, 0, 20_000, sqrt_price, true).unwrap();
+	assert_eq!(combined.usdc, U256::from(u128::MAX) + U256::one());
+
+	// Reversing token order makes the same token1 amount ARGON, converted to microgons.
+	let reversed =
+		principal_for_liquidity_range(combined_liquidity, 0, 20_000, sqrt_price, false).unwrap();
+	let argon_token_units_per_microgon = U256::from(10u128.pow(12));
+	assert_eq!(reversed.argon, combined_liquidity / argon_token_units_per_microgon);
+}
+
+#[test]
+fn rejects_combined_principal_that_exceeds_u256() {
+	let minimum_price = uniswap_sqrt_price_at_tick(MIN_UNISWAP_TICK);
+	for argon_is_token0 in [true, false] {
+		let result = principal_for_liquidity_range(
+			U256::MAX,
+			MIN_UNISWAP_TICK,
+			MAX_UNISWAP_TICK,
+			minimum_price,
+			argon_is_token0,
+		);
+		assert_eq!(result, Err(PositionAmountError::AmountOverflow));
+	}
+}
+
+#[test]
+fn shared_range_principal_matches_the_uniswap_sdk() {
+	let ordinary_liquidity = 10u128.pow(18);
+	let scenarios = [
+		("below the range", position_checkpoint(ordinary_liquidity, -100, 100), -200),
+		("at the lower boundary", position_checkpoint(ordinary_liquidity, -100, 100), -100),
+		("inside the range", position_checkpoint(ordinary_liquidity, -100, 100), 0),
+		("at the upper boundary", position_checkpoint(ordinary_liquidity, -100, 100), 100),
+		("above the range", position_checkpoint(ordinary_liquidity, -100, 100), 200),
+		(
+			"at the lowest supported price",
+			position_checkpoint(u128::MAX, MIN_UNISWAP_TICK, MIN_UNISWAP_TICK + 1),
+			MIN_UNISWAP_TICK,
+		),
+		(
+			"near the highest supported price",
+			position_checkpoint(u128::MAX, MAX_UNISWAP_TICK - 1, MAX_UNISWAP_TICK),
+			MAX_UNISWAP_TICK - 1,
+		),
+		(
+			"across the widest supported range",
+			position_checkpoint(u128::MAX, MIN_UNISWAP_TICK, MAX_UNISWAP_TICK),
+			0,
+		),
+		(
+			"with a small token-unit price ratio",
+			position_checkpoint(ordinary_liquidity, -276_400, -276_200),
+			-276_300,
+		),
+		(
+			"with a large token-unit price ratio",
+			position_checkpoint(ordinary_liquidity, 276_200, 276_400),
+			276_300,
+		),
+	];
+
+	for (scenario, position, uniswap_tick) in scenarios {
+		let sqrt_price = uniswap_sqrt_price_at_tick(uniswap_tick);
+		for argon_is_token0 in [true, false] {
+			let expected = uniswap_sdk_principal(&position, sqrt_price, argon_is_token0);
+			let actual = principal_for_liquidity_range(
+				U256::from(position.liquidity),
+				position.tick_lower,
+				position.tick_upper,
+				sqrt_price,
+				argon_is_token0,
+			)
+			.unwrap();
+			assert_eq!(actual, expected, "{scenario}; ARGON is token0: {argon_is_token0}");
+		}
+	}
+}
+
+#[test]
+fn withdrawing_liquidity_can_remove_a_rounding_unit() {
+	let liquidity_per_position = 100u128;
+	let sqrt_price = uniswap_sqrt_price_at_tick(0);
+
+	// Each NFT rounds down to zero USDC base units, but three together have one unit.
+	// After withdrawing one NFT, the remaining two round down to zero again.
+	for argon_is_token0 in [true, false] {
+		let one_position = position_checkpoint(liquidity_per_position, -100, 100)
+			.amounts_at_price(sqrt_price, argon_is_token0)
+			.unwrap();
+		let all_three = principal_for_liquidity_range(
+			U256::from(liquidity_per_position * 3),
+			-100,
+			100,
+			sqrt_price,
+			argon_is_token0,
+		)
+		.unwrap();
+		let after_withdrawal = principal_for_liquidity_range(
+			U256::from(liquidity_per_position * 2),
+			-100,
+			100,
+			sqrt_price,
+			argon_is_token0,
+		)
+		.unwrap();
+
+		assert_eq!(one_position.usdc, 0);
+		assert_eq!(all_three.usdc, U256::one());
+		assert_eq!(after_withdrawal.usdc, U256::zero());
 	}
 }
 
