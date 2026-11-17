@@ -4,6 +4,7 @@ import { keccak256, toUtf8Bytes } from 'ethers';
 import { getClient } from '@argonprotocol/mainchain';
 import { getRequiredArg, parseArgs, stringifyJson } from './src/cli.js';
 import { contractsRoot, repoRoot } from './src/hardhat.js';
+import { verifyDeploymentSources } from './src/etherscan.js';
 import {
   prepareStabilizationPool,
   publishStabilizationPool,
@@ -84,6 +85,7 @@ async function main() {
       const [deployer] = await connection.ethers.getSigners();
       await publishStabilizationPool(deployer, deployment, saveProgress);
       console.log(`Published stabilization pool ${plan.pool.poolId}; manifest: ${outputPath}`);
+      await verifyDeploymentSources(outputPath, process.env.ETHERSCAN_API_KEY);
     } else {
       console.log(`Prepared stabilization pool ${plan.pool.poolId}; manifest: ${outputPath}`);
     }

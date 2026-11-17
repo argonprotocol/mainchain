@@ -1,0 +1,53 @@
+{
+  "network": {
+    "name": "sepolia",
+    "chainId": "11155111"
+  },
+  "sourceCommit": "c91ccd954929499f640a90a5211bff554ae9e6ca",
+  "compiler": "0.8.35+commit.47b9dedd",
+  "compilerInputSha256": "72faf1513f3d506a70b89019b489f1c539cfc2be7fb7024b431d1dd6433c09e3",
+  "contracts": {
+    "argonBuyAndTransfer": {
+      "address": "0x3564EB5E11033d43FFFF8eDB58DD3D23eb932F00",
+      "deploymentTxHash": "0x1ba7ba719e8a9c4daed847147ac48aa049fd9e4a6b0f1adfb509b917903386f0",
+      "creationCodeHash": "0xcac8733b914476b8621bf03a3b9a12b94385462ff71c505c8649358bfc0e28c9"
+    },
+    "mintingGatewayImplementationFinal": {
+      "address": "0xd5B0d0e78Bd5c072c85BeC61A676152146AeC580",
+      "deploymentTxHash": "0xf4b151367072115fb668fd526d05b9d98156957e35139eafc1be42113fd05649",
+      "creationCodeHash": "0x98c92e35578fcd7050c6f04903ebc1d7476ec3ab4e3cd08accd0ddb2503ae3c8"
+    },
+    "stabilizationPoolHook": {
+      "address": "0x3ACe49912DEce1f4281bAfcde0192C89D2905A80",
+      "deploymentTxHash": "0xa003a9d4ae3554afb6c8b310c04cff5743b36628520ab2c934aff1e35fc5d14a",
+      "creationCodeHash": "0x44309f087e068d070f35ab4a93023a47fcf5f4652ef00b90d6ea4c26ebd73368"
+    },
+    "stabilizationPoolSubscriber": {
+      "address": "0xA77A621F71dBE0F147802a1b1948D1728Cc67fE7",
+      "deploymentTxHash": "0x84bd3a8925c979f8657a738dc60813f8d955f5716ba97bfd6bf2118ddba98489",
+      "creationCodeHash": "0x1238c59104b47f719b45fff327e5b948ee72f202220956fa1fc906d63b7576b6"
+    },
+    "uniswapV4PriceQuoter": {
+      "address": "0x8Ae9D93a6D9c2Dd8b4E338f4c18d26C451736f16",
+      "deploymentTxHash": "0x6ec379a9a2c3c1eaad742088236cf2cde145cbf36126a556aa559d2758c366d4",
+      "creationCodeHash": "0xd2de7bb76bae29770164a056ba5864dd1339d3097e4242d9dc284c584b155a97"
+    }
+  },
+  "pool": {
+    "poolManager": "0xE03A1074c86CFeDd5C142C4F04F1a1536e203543",
+    "positionManager": "0x429ba70129df741B2Ca2a85BC3A2a3328e5c09b4",
+    "poolId": "0x2cb478a2331e0fd5375f0718e644a576e4f77f5486a914a103ab02f2fddadc8b",
+    "key": {
+      "currency0": "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238",
+      "currency1": "0xa1a1e87614B1f447fD8E65c18DCc41bAd4A7A1E5",
+      "fee": 8388608,
+      "tickSpacing": 10,
+      "hooks": "0x3ACe49912DEce1f4281bAfcde0192C89D2905A80"
+    },
+    "buyFee": 5000,
+    "sellFee": 100000,
+    "oracleAddress": "0x3ACe49912DEce1f4281bAfcde0192C89D2905A80",
+    "initializationTxHash": "0x9cca66564dd3d43fe67a1ef65323a692cbb7d801a304669be4e82b1e75c4accd",
+    "initialSqrtPriceX96": "77355614358743034450932031185008539"
+  }
+}

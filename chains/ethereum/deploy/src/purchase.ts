@@ -2,6 +2,7 @@ import {
   Contract,
   ContractFactory,
   getAddress,
+  keccak256,
   ZeroAddress,
   type Provider,
   type Signer,
@@ -50,6 +51,7 @@ export async function deployBuyAndTransfer(
     address: await contract.getAddress(),
     constructorArgs,
     deploymentTxHash: contract.deploymentTransaction()?.hash,
+    creationCodeHash: keccak256(contract.deploymentTransaction()!.data),
   };
 }
 

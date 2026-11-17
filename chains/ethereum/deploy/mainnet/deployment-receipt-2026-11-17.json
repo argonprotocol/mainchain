@@ -1,0 +1,69 @@
+{
+  "network": {
+    "name": "mainnet",
+    "chainId": "1"
+  },
+  "sourceCommit": "49eebcf05108aa63f262f219a46daf610051fb6c",
+  "observedAtBlock": 26437468,
+  "contracts": {
+    "argonBuyAndTransfer": {
+      "address": "0x6F92932D6fb7d88876c8BdD24B9A59C86B3F7A23",
+      "deploymentTxHash": "0xa3f383151902fbeaaee87cdde82926a64ad51a2d4c86eb82fb8e0c8f8ca09714",
+      "blockNumber": 26437216,
+      "creationCodeHash": "0xe0ef5bc7e754ee9fc92fa7b50b7f0bcd3aa97ea3e5f9e731302714f084b51835",
+      "runtimeCodeHash": "0xe7d8462a14a8b118d6e4c42b1407e70a7759e66662d3a8aee07a386dd3a93d50",
+      "compilerInputSha256": "d5a021029efcadc6b64170213f5464ddb03fbabc826b8ba0c383ba0c8f9dba77",
+      "sourceVerified": true
+    },
+    "stabilizationPoolHook": {
+      "address": "0x75A9F59B46Df9f21dA2B5F42747fA3B363Da5a80",
+      "deploymentTxHash": "0x0fc2eee4da38a29654a50c32de63c97e24c8e14f7bbe6676c75292c1c8ad1e5d",
+      "blockNumber": 26437292,
+      "creationCodeHash": "0xd44530e984ccaf18c8e165494056a6c7537f6f00a98ed69adc7d1e0a20c38d69",
+      "runtimeCodeHash": "0x1b12978ce969161c05cfdee2475eaf5a147c6d43633872ff7400c2381c5b70bd",
+      "compilerInputSha256": "d5a021029efcadc6b64170213f5464ddb03fbabc826b8ba0c383ba0c8f9dba77",
+      "sourceVerified": true
+    },
+    "stabilizationPoolSubscriber": {
+      "address": "0x95Ac9f026340821B469453b60ACcC83D267E5246",
+      "deploymentTxHash": "0x9238eb0edab57d589e7ffc6c58c586ce914290fd54f17f4c89a86318ad55ed18",
+      "blockNumber": 26437293,
+      "creationCodeHash": "0xf0334665c458ac811804c0c119c3134e73cd7a3366965ce14645b1dd34f98d31",
+      "runtimeCodeHash": "0xbd3cd7ff577efe465d65d54a8cb3d5fcbff225b5674a9d01c2b4d1560affa8b7",
+      "compilerInputSha256": "72faf1513f3d506a70b89019b489f1c539cfc2be7fb7024b431d1dd6433c09e3",
+      "sourceVerified": true
+    },
+    "uniswapV4PriceQuoter": {
+      "address": "0x55eCE398dDFaeE1f288983AbDE62E41E70Cf3E8A",
+      "deploymentTxHash": "0x4237ed34196ca982bb56e4cfbf4152c064f34add335032352bedd472f30444b8",
+      "blockNumber": 26437294,
+      "creationCodeHash": "0xdcd94ef1e906bd31c0c0312e1d85aca9fc4cd4801c4680448fc997708472eee9",
+      "runtimeCodeHash": "0x852f8dc1b734377061b33b12f9bc7e640362c10441c952657ff3e3de460f42f7",
+      "compilerInputSha256": "d5a021029efcadc6b64170213f5464ddb03fbabc826b8ba0c383ba0c8f9dba77",
+      "sourceVerified": true
+    },
+    "mintingGatewayImplementationFinal": {
+      "address": "0x0E2F9d41F5C12551Eb33cB7cAe08994bc1E30a41",
+      "deploymentTxHash": "0x556d0d4763e7173169f3ed95e04b6b980af872cf779e0bda0775650796e7734f",
+      "blockNumber": 26437217,
+      "creationCodeHash": "0x2a3adc7feb87658f986eb1d27b2c312396dd6f764cac8c3b2a1adbe65803d0be",
+      "runtimeCodeHash": "0xa0c5a3594bfa0260ab9d56cc2e07371052bf288349675968a7c3e7dcbfe510e2",
+      "compilerInputSha256": "d5a021029efcadc6b64170213f5464ddb03fbabc826b8ba0c383ba0c8f9dba77",
+      "sourceVerified": true
+    }
+  },
+  "pool": {
+    "poolManager": "0x000000000004444c5dc75cB358380D2e3dE08A90",
+    "poolId": "0x2fced7804240f9ab33b86f67ee9301650fee8d547bfbf437ce01860839b9772e",
+    "key": {
+      "currency0": "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48",
+      "currency1": "0xf3D6b714dc93bc6C44bc766cc92F4A0D99344932",
+      "fee": 8388608,
+      "tickSpacing": 10,
+      "hooks": "0x75A9F59B46Df9f21dA2B5F42747fA3B363Da5a80"
+    },
+    "initializationTxHash": "0x9dfe9d54b706d4df2f82ca8975ee9a19347bff83f8fe83e6861b6f2bdf7b1f47",
+    "initializationBlockNumber": 26437295,
+    "initialSqrtPriceX96": "76664438182398068086861854548707993"
+  }
+}

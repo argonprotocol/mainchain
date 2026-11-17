@@ -19,6 +19,7 @@ yarn workspace @argonprotocol/ethereum-deploy bootstrap:prepare-runtime-setup ..
 yarn workspace @argonprotocol/ethereum-deploy runtime-pricing:prepare ...
 yarn workspace @argonprotocol/ethereum-deploy prepare:gateway-upgrade --network testnet --swap-contract 0x0000000000000000000000000000000000000000
 yarn workspace @argonprotocol/ethereum-deploy etherscan:output-files --deployment-manifest path/to/current-manifest.json
+yarn workspace @argonprotocol/ethereum-deploy etherscan:verify --deployment-manifest path/to/current-manifest.json
 yarn workspace @argonprotocol/ethereum-deploy gas:measure
 ```
 
@@ -41,9 +42,40 @@ Layout:
 - `./prepareRuntimePricing.ts`: pricing-only runtime update CLI
 - `./outputEtherscanFiles.ts`: rewrite the Etherscan standard-json files and constructor args beside
   the explicitly selected current deployment or upgrade manifest
+- `./verifyEtherscan.ts`: verify the contracts in a saved manifest using the Etherscan V2 API
 - `./src/`: shared deploy logic
 - `./<env>/deployment-manifest.json`: output from `bootstrap:deploy`
 - `./mainnet/migration/README.md`: pinned history for the completed migration
+
+## Source verification
+
+Set `ETHERSCAN_API_KEY` in the deployment terminal to verify source automatically after
+`bootstrap:deploy`, `prepare:gateway-upgrade`, or `stabilization:publish` saves its manifest.
+Verification uses the manifest's chain ID, the artifact's exact compiler build and fully qualified
+contract name, and the original compiler input restricted to that contract's transitive imports. The
+reduced input is recompiled with the original settings and must reproduce both creation and runtime
+bytecode exactly, including metadata, before it can be exported or uploaded. Source names and
+remappings are preserved. It includes the bootstrap proxy's `ProxyAdmin`. No API key is written to
+manifests or source files. Local development chains skip verification.
+
+New deployment receipts retain the creation-bytecode hash, or the deployed runtime hash for the
+internally created ProxyAdmin. Unverified source must match that fingerprint before upload;
+historical receipts without a fingerprint require recovery from their original deployment
+transaction.
+
+Without a key, deployments export the upload files and print a verification command. An API error or
+pending job does not undo a deployment or change its saved manifest. Run `etherscan:verify` against
+that manifest to retry without deploying anything; this command needs no wallet signing key. It
+skips addresses already verified and resumes pending jobs from the adjacent
+`*.etherscan-verification.json` report. The explicit command exits unsuccessfully while any contract
+is failed or pending. Historical unverified deployments require their original source revision.
+
+Keep deployment receipts with chain IDs, contract addresses, constructor arguments, transaction
+hashes, and bytecode fingerprints. Compiler upload files, verification-job reports, rehearsals, and
+temporary swap plans are local artifacts and are ignored by Git. The bootstrap manifest also retains
+the council snapshot required by runtime setup. The full stabilization plan remains useful locally
+for resuming an interrupted publication; its raw init code is not a replacement for a compact
+deployment receipt.
 
 ## Buy and transfer
 
