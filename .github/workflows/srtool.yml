@@ -5,6 +5,9 @@ env:
   SUBWASM_SHA256: 0560d1b8785be9a0d04cb0bf939feaaa621c2d0809f818225698d5c44198550c
   SRTOOL_COMMIT: 70b86b039233ba31ebe3140987e51fae913dd81e
   BUILD_OPTS: --features on-chain-release-build
+  # Encode System.authorize_upgrade(code_hash) for both solochain runtimes.
+  PARACHAIN_PALLET_ID: "0x00"
+  AUTHORIZE_UPGRADE_PREFIX: "0x09"
 
 on:
   release:
@@ -57,6 +60,8 @@ jobs:
             -e RUNTIME_DIR=runtime/${{ matrix.runtime }} \
             -e BUILD_OPTS \
             -e PROFILE=release \
+            -e PARACHAIN_PALLET_ID \
+            -e AUTHORIZE_UPGRADE_PREFIX \
             -v ${{ github.workspace }}:/build \
             srtool build --app --json -cM"
 
