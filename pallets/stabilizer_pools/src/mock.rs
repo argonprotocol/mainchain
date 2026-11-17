@@ -1,5 +1,5 @@
 //! Shared setup for tests and runtime benchmarks; excluded from ordinary runtime builds.
-//! Ethereum finality anchors are supplied here, while account/storage proofs use the real verifier.
+//! Tests supply Ethereum anchors here so that the real verifier can check the storage proofs.
 #[cfg(test)]
 use crate as pallet_stabilizer_pools;
 use crate::*;
@@ -19,7 +19,8 @@ use argon_primitives::{OnNewSlot, PriceIndex, PriceIndexUpdated, UniswapSqrtPric
 #[cfg(test)]
 use core::ops::Range;
 #[cfg(test)]
-use frame_support::{assert_ok, derive_impl};
+use frame_support::{assert_ok, derive_impl, traits::Time};
+#[cfg(test)]
 use pallet_ethereum_verifier::{types::ExecutionHeaderAnchor, ExecutionHeaderAnchors};
 #[cfg(test)]
 use pallet_prelude::{new_test_with_genesis, TestState};
@@ -59,9 +60,11 @@ impl pallet_ethereum_verifier::Config for Test {
 
 #[cfg(test)]
 impl Config for Test {
+	type EthereumVerifier = EthereumVerifier;
 	type WeightInfo = ();
 	type MiningFrameTransitionProvider = CurrentFrame;
 	type CurrentTick = CurrentTick;
+	type TimeProvider = CurrentTime;
 	type MaxSampledPriceHistoryFrames = ConstU32<13>;
 	type TicksPerFrame = ConstU64<10>;
 	type RewardPriceBand = RewardPriceBand;
@@ -75,7 +78,16 @@ frame_support::parameter_types! {
 	pub const MaxPriceBucketsPerFrame: u32 = 24;
 	pub const MinPriceBucketCoverage: Percent = Percent::from_percent(75);
 	pub static CurrentTick: Tick = 20;
+	pub static CurrentTime: u64 = 0;
 	pub static CurrentFrame: FrameId = 1;
+}
+
+#[cfg(test)]
+impl Time for CurrentTime {
+	type Moment = u64;
+	fn now() -> u64 {
+		Self::get()
+	}
 }
 
 #[cfg(test)]
@@ -103,6 +115,7 @@ pub fn new_test_ext() -> TestState {
 #[cfg(test)]
 pub(crate) fn start_mining_frame(frame_id: FrameId, tick: Tick) {
 	CurrentTick::set(tick);
+	CurrentTime::set(tick.saturating_mul(60_000));
 	CurrentFrame::set(frame_id);
 	StabilizerPools::on_frame_start(frame_id);
 }
@@ -118,6 +131,7 @@ pub(crate) fn report_stabilizer_pool_price(tick: Tick, sqrt_price_x96: UniswapSq
 pub(crate) fn stabilizer_pool_price_source() -> StabilizerPoolPriceSource {
 	StabilizerPoolPriceSource {
 		revision: 1,
+		argon_is_token0: true,
 		pool: UniswapPoolIdentity { chain_id: 1, pool_manager: pool_manager(), pool_id: pool_id() },
 	}
 }
@@ -278,12 +292,24 @@ pub(crate) fn uniswap_bounds_for_usd_band(
 
 /// Synthetic Ethereum state, real account/storage tries and the real configured verifier.
 /// Slot paths are also checked against deployed Uniswap bytecode in the Solidity package tests.
-pub(crate) fn evidence<T: Config>(
+#[cfg(test)]
+pub(crate) fn evidence(
 	block: u64,
 	revision: u64,
 	beneficiary: H256,
 	liquidity: u128,
 	subscribed: bool,
+) -> PositionProof {
+	position_evidence(block, revision, beneficiary, liquidity, subscribed, (-100, 100))
+}
+
+pub(crate) fn position_evidence(
+	block: u64,
+	revision: u64,
+	beneficiary: H256,
+	liquidity: u128,
+	subscribed: bool,
+	bounds: (UniswapTick, UniswapTick),
 ) -> PositionProof {
 	let pool_config = config();
 
@@ -292,8 +318,8 @@ pub(crate) fn evidence<T: Config>(
 
 	// Pack Uniswap's pool prefix, signed tick bounds, and subscription flag.
 	let mut position_info = pool_id().0;
-	position_info[25..28].copy_from_slice(&100i32.to_be_bytes()[1..]);
-	position_info[28..31].copy_from_slice(&(-100i32).to_be_bytes()[1..]);
+	position_info[25..28].copy_from_slice(&bounds.1.to_be_bytes()[1..]);
+	position_info[28..31].copy_from_slice(&bounds.0.to_be_bytes()[1..]);
 	position_info[31] = u8::from(subscribed);
 
 	let mut subscriber_value = [0u8; 32];
@@ -321,7 +347,13 @@ pub(crate) fn evidence<T: Config>(
 			),
 		],
 		vec![(
-			evm::liquidity_slot(pool_id(), pool_config.position_manager, token_id, -100, 100),
+			evm::liquidity_slot(
+				pool_id(),
+				pool_config.position_manager,
+				token_id,
+				bounds.0,
+				bounds.1,
+			),
 			H256::from(U256::from(liquidity).to_big_endian()),
 		)],
 	];
@@ -360,18 +392,21 @@ pub(crate) fn evidence<T: Config>(
 		})
 		.collect::<Vec<_>>();
 
-	let (state_root, account_nodes) = trie(&encoded_accounts);
+	let (_state_root, account_nodes) = trie(&encoded_accounts);
 
-	// Supply finality at the external-chain boundary; trie verification remains real.
-	let anchor = ExecutionHeaderAnchor {
-		block_hash: H256::from(U256::from(block).to_big_endian()),
-		block_number: block,
-		timestamp_millis: block * 12_000,
-		parent_hash: H256::zero(),
-		state_root: H256::from(state_root.0),
-		receipts_root: H256::zero(),
-	};
-	ExecutionHeaderAnchors::<T>::insert(anchor.block_hash, anchor);
+	#[cfg(test)]
+	{
+		// Supply finality at the external-chain boundary; trie verification remains real.
+		let anchor = ExecutionHeaderAnchor {
+			block_hash: H256::from(U256::from(block).to_big_endian()),
+			block_number: block,
+			timestamp_millis: block * 12_000,
+			parent_hash: H256::zero(),
+			state_root: H256::from(_state_root.0),
+			receipts_root: H256::zero(),
+		};
+		ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
+	}
 
 	PositionProof {
 		subscriber: account_storage_proof(
@@ -395,6 +430,30 @@ pub(crate) fn evidence<T: Config>(
 			&slots[2],
 			block,
 		),
+	}
+}
+
+pub(crate) fn position_change_evidence(
+	block: u64,
+	revision: u64,
+	liquidity: u128,
+	subscribed: bool,
+	bounds: (UniswapTick, UniswapTick),
+) -> PositionChangeProof {
+	let proof =
+		position_evidence(block, revision, H256::repeat_byte(0x42), liquidity, subscribed, bounds);
+	let (account, slot_index) =
+		if subscribed { (proof.subscriber, 1) } else { (proof.position_manager, 0) };
+	let witness = EthereumAccountStorageProof {
+		execution_block_proof: account.execution_block_proof,
+		account_proof: account.account_proof,
+		storage_proof: account.storage_proof,
+		slots: [account.slots[slot_index].clone()].to_vec().try_into().unwrap(),
+	};
+	if subscribed {
+		PositionChangeProof::Revision(witness)
+	} else {
+		PositionChangeProof::Subscription(witness)
 	}
 }
 

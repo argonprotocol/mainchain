@@ -34,8 +34,8 @@ use argon_primitives::{
 	},
 	CallTxPoolKeyProvider, EthereumAccountStorageProof, EthereumBeaconPreset,
 	EthereumCombinedReceiptProof, EthereumExecutionBlockProof, EthereumExecutionHeader,
-	EthereumLog, EthereumReceiptLog, EthereumReceiptProofReceipt, EthereumStorageSlotProof,
-	EthereumVerifyError, EthereumVerifyProvider,
+	EthereumLog, EthereumProofBlock, EthereumReceiptLog, EthereumReceiptProofReceipt,
+	EthereumStorageSlotProof, EthereumVerifyError, EthereumVerifyProvider,
 };
 use codec::{Decode, Encode};
 use hex_literal::hex;
@@ -2549,7 +2549,11 @@ fn verify_account_storage_proof_matches_hardhat_eth_getproof_fixture() {
 		));
 		assert_eq!(
 			EthereumBeaconClient::verify_account_storage_proof(gateway_address, &proof),
-			Ok(anchor.timestamp_millis),
+			Ok(EthereumProofBlock {
+				hash: anchor.block_hash,
+				number: anchor.block_number,
+				timestamp_millis: anchor.timestamp_millis,
+			}),
 		);
 	});
 }
@@ -2564,6 +2568,7 @@ fn verify_account_storage_proof_authenticates_ancestor_state() {
 			let state_root = if offset == 0 { target.state_root } else { H256::repeat_byte(0x44) };
 			let header = AlloyHeader {
 				number: target.block_number + u64::from(offset),
+				timestamp: 10 + u64::from(offset),
 				parent_hash: b256_from_h256(parent_hash),
 				state_root: b256_from_h256(state_root),
 				..Default::default()
@@ -2573,8 +2578,14 @@ fn verify_account_storage_proof_authenticates_ancestor_state() {
 				rlp: alloy_rlp::encode(header).try_into().unwrap(),
 			});
 		}
+		let target_block = EthereumProofBlock {
+			hash: H256::from_slice(keccak256(&headers[0].rlp).as_slice()),
+			number: target.block_number,
+			timestamp_millis: 10_000,
+		};
 		let anchor = ExecutionHeaderAnchor {
 			block_number: target.block_number + u64::from(header_count),
+			timestamp_millis: 10_000 + u64::from(header_count) * 1_000,
 			block_hash: H256::repeat_byte(0x55),
 			parent_hash,
 			state_root: H256::repeat_byte(0x66),
@@ -2595,7 +2606,10 @@ fn verify_account_storage_proof_authenticates_ancestor_state() {
 				Err(EthereumVerifyError::AnchorNotFound),
 			);
 			ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
-			assert_ok!(EthereumBeaconClient::verify_account_storage_proof(account_address, &proof));
+			assert_eq!(
+				EthereumBeaconClient::verify_account_storage_proof(account_address, &proof),
+				Ok(target_block),
+			);
 
 			let mut wrong_state = proof.clone();
 			wrong_state.execution_block_proof.target_to_anchor_header_chain.remove(0);

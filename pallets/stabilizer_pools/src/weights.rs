@@ -1,13 +1,14 @@
-use crate::{Config, PositionProof};
+use crate::{uniswap::MAX_REWARD_RANGES, Config, PositionChangeProof, PositionProof};
 use argon_primitives::{
 	EthereumVerifyProvider, EthereumVerifyProviderWeightInfo, MiningFrameTransitionProvider,
 	MiningFrameTransitionProviderWeightInfo,
 };
-use pallet_ethereum_verifier::Pallet as EthereumVerifier;
 use pallet_prelude::*;
 
 pub trait WeightInfo {
 	fn register_pool() -> Weight;
+	fn report_position_change() -> Weight;
+	fn advance_liquidity_snapshots() -> Weight;
 	fn checkpoint_position() -> Weight;
 	fn read_price_index_context() -> Weight;
 	fn record_stabilizer_pool_spot_price() -> Weight;
@@ -15,6 +16,12 @@ pub trait WeightInfo {
 }
 
 impl WeightInfo for () {
+	fn advance_liquidity_snapshots() -> Weight {
+		Weight::zero()
+	}
+	fn report_position_change() -> Weight {
+		Weight::zero()
+	}
 	fn register_pool() -> Weight {
 		Weight::zero()
 	}
@@ -33,7 +40,7 @@ impl WeightInfo for () {
 }
 
 pub fn checkpoint_position<T: Config>(proof: &PositionProof) -> Weight {
-	type ProofWeights<T> = <EthereumVerifier<T> as EthereumVerifyProvider>::Weights;
+	type ProofWeights<T> = <<T as Config>::EthereumVerifier as EthereumVerifyProvider>::Weights;
 	type FrameWeights<T> =
 		<<T as Config>::MiningFrameTransitionProvider as MiningFrameTransitionProvider>::Weights;
 	let header_count =
@@ -42,10 +49,28 @@ pub fn checkpoint_position<T: Config>(proof: &PositionProof) -> Weight {
 	<T as Config>::WeightInfo::checkpoint_position()
 		.saturating_add(FrameWeights::<T>::get_current_frame_id())
 		// Charge the extra storage I/O until the checkpoint benchmark supplies its proof weight.
-		.saturating_add(T::DbWeight::get().reads_writes(3, 3))
+		.saturating_add(T::DbWeight::get().reads_writes(6, 4))
 		.saturating_add(ProofWeights::<T>::verify_account_storage_proof(2, header_count))
 		.saturating_add(ProofWeights::<T>::verify_account_storage_proof(2, header_count))
 		.saturating_add(ProofWeights::<T>::verify_account_storage_proof(1, header_count))
-		// Metadata verification repeats only ancestry. Charge a full provider base conservatively.
-		.saturating_add(ProofWeights::<T>::verify_account_storage_proof(0, header_count))
+}
+
+pub(crate) fn report_position_change<T: Config>(proof: &PositionChangeProof) -> Weight {
+	type ProofWeights<T> = <<T as Config>::EthereumVerifier as EthereumVerifyProvider>::Weights;
+	type FrameWeights<T> =
+		<<T as Config>::MiningFrameTransitionProvider as MiningFrameTransitionProvider>::Weights;
+	let witness = match proof {
+		PositionChangeProof::Revision(witness) | PositionChangeProof::Subscription(witness) =>
+			witness,
+	};
+	let header_count = witness.execution_block_proof.target_to_anchor_header_chain.len() as u32;
+	<T as Config>::WeightInfo::report_position_change()
+		.saturating_add(FrameWeights::<T>::get_current_frame_id())
+		.saturating_add(T::DbWeight::get().reads_writes(6, 3))
+		.saturating_add(ProofWeights::<T>::verify_account_storage_proof(1, header_count))
+}
+
+pub(crate) fn liquidity_snapshot_weight<T: Config>() -> Weight {
+	<T as Config>::WeightInfo::advance_liquidity_snapshots()
+		.saturating_add(T::DbWeight::get().reads_writes(u64::from(MAX_REWARD_RANGES) + 7, 3))
 }

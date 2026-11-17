@@ -1,6 +1,6 @@
 use crate::{
 	mock::{evidence as build_evidence, *},
-	uniswap::principal_for_liquidity_range,
+	uniswap::{principal_for_liquidity_range, MAX_REWARD_RANGES, REWARD_BAND_TOLERANCE},
 	*,
 };
 use alloy_consensus::Header as EthereumHeader;
@@ -648,6 +648,7 @@ fn sampled_prices_follow_frame_boundaries_even_when_blocks_share_a_clock_tick() 
 				argon_usd_target_price: FixedU128::one(),
 				usdc_usd_price: FixedU128::one(),
 				pool: stabilizer_pool_price_source().pool,
+				argon_is_token0: stabilizer_pool_price_source().argon_is_token0,
 			})
 		);
 		for tick in 31..40 {
@@ -686,7 +687,20 @@ fn missing_prices_do_not_delay_the_next_frame_or_history_expiry() {
 		// A late observation delivered before activation can still complete the closing frame.
 		CurrentTick::set(40);
 		report_stabilizer_pool_price(39, price);
-		start_mining_frame(3, 40);
+		// The opening block can land partway through a Mainchain tick.
+		CurrentTime::set(2_401_234);
+		CurrentFrame::set(3);
+		StabilizerPools::on_frame_start(3);
+
+		let finalized = FinalizedStabilizerPoolPrincipalByFrame::<Test>::get();
+		assert_eq!(finalized[&1], PositionAmounts::default());
+		// The frame with a missing price still has its own opening and the next opening.
+		// Reprocessing the frame boundary cannot overwrite its recorded timestamp.
+		start_mining_frame(3, 41);
+		let starts = StabilizerPoolFrameStartMillis::<Test>::get();
+		assert_eq!(starts[&1], 1_200_000);
+		assert_eq!(starts[&2], 1_800_000);
+		assert_eq!(starts[&3], 2_401_234);
 
 		let history = StabilizerPoolPricesByFrame::<Test>::get();
 		assert!(!history.contains_key(&1));
@@ -697,6 +711,16 @@ fn missing_prices_do_not_delay_the_next_frame_or_history_expiry() {
 		assert_eq!(StabilizerPoolPricesByFrame::<Test>::get(), history);
 		start_mining_frame(16, 170);
 		assert!(StabilizerPoolPricesByFrame::<Test>::get().is_empty());
+		let starts = StabilizerPoolFrameStartMillis::<Test>::get();
+		assert_eq!(starts.keys().copied().collect::<Vec<_>>(), (3..=16).collect::<Vec<_>>());
+		assert_eq!(starts[&16], 10_200_000);
+
+		// A skipped frame has no boundary and cannot become a review frame.
+		start_mining_frame(18, 190);
+		let starts = StabilizerPoolFrameStartMillis::<Test>::get();
+		assert!(!starts.contains_key(&17));
+		assert_eq!(starts[&18], 11_400_000);
+		assert!(!StabilizerPoolReviewFrame::<Test>::exists());
 	});
 }
 
@@ -762,11 +786,11 @@ fn upgrade_retires_opening_price_indices_and_preserves_checkpoints() {
 		// can still be recorded without treating that time as registered participation.
 		assert_ok!(submit(evidence(200, 1, beneficiary_account(), 1_000, true)));
 		assert_eq!(
-			EligibleFromFrameByPosition::<Test>::get(StabilizerPoolPositionId {
+			StabilizerPoolRegistrations::<Test>::get(StabilizerPoolPositionId {
 				position_manager: config().position_manager,
 				token_id,
 			}),
-			Some(2)
+			Some(StabilizerPoolRegistration::Enrolled { eligible_from: 2 })
 		);
 		let range = StabilizerPoolLiquidityRange::from(&checkpoint);
 		assert_eq!(
@@ -832,11 +856,11 @@ fn revision_change_discards_unverified_gap_even_when_liquidity_returns_to_same_v
 		assert_eq!(checkpoint().maintained_since.number, 200);
 		assert_eq!(RegisteredLiquidityByRange::<Test>::get(range), registered);
 		assert_eq!(
-			EligibleFromFrameByPosition::<Test>::get(StabilizerPoolPositionId {
+			StabilizerPoolRegistrations::<Test>::get(StabilizerPoolPositionId {
 				position_manager: config().position_manager,
 				token_id: U256::one(),
 			}),
-			Some(3)
+			Some(StabilizerPoolRegistration::Enrolled { eligible_from: 3 })
 		);
 
 		let emptied = evidence(400, 4, beneficiary_account(), 0, true);
@@ -1042,13 +1066,7 @@ fn evidence(
 	liquidity: u128,
 	subscribed: bool,
 ) -> PositionProof {
-	build_evidence::<Test>(
-		block,
-		revision,
-		H256::from_slice(beneficiary.as_ref()),
-		liquidity,
-		subscribed,
-	)
+	build_evidence(block, revision, H256::from_slice(beneficiary.as_ref()), liquidity, subscribed)
 }
 
 fn submit(proof: PositionProof) -> DispatchResult {
@@ -1063,4 +1081,333 @@ fn submit(proof: PositionProof) -> DispatchResult {
 
 fn checkpoint() -> PositionCheckpoint<AccountId32> {
 	PositionCheckpoints::<Test>::get(config().position_manager, U256::one()).unwrap()
+}
+
+#[rstest]
+#[case(true, 1)]
+#[case(false, 1)]
+#[case(true, 10)]
+#[case(false, 60)]
+fn closed_frame_looks_up_every_eligible_range_on_the_pool_grid(
+	#[case] argon_is_token0: bool,
+	#[case] spacing: i32,
+) {
+	let target = FixedU128::from_rational(120, 100);
+	let usdc = FixedU128::from_rational(98, 100);
+	let band = StabilizerPoolRewardBand::new(
+		target,
+		usdc,
+		argon_is_token0,
+		spacing,
+		RewardPriceBand::get(),
+		REWARD_BAND_TOLERANCE,
+	)
+	.unwrap();
+	let ranges = band.reward_ranges().unwrap();
+	assert!(!ranges.is_empty());
+	assert!(ranges.len() <= MAX_REWARD_RANGES as usize);
+	let spot = uniswap_sqrt_price_for_usd_price(
+		FixedU128::from_rational(95, 100) * target,
+		usdc,
+		argon_is_token0,
+		false,
+	);
+	let liquidity = U256::from(10u128.pow(24));
+	for &(lower, upper) in &ranges {
+		let principal = band.principal_for_range(liquidity, lower, upper, spot).unwrap();
+		assert_ne!(principal, PositionAmounts::default());
+	}
+
+	let (minimum_lower, minimum_upper) = uniswap_bounds_for_usd_band(
+		FixedU128::from_rational(891, 1000) * target,
+		FixedU128::from_rational(99, 100) * target,
+		usdc,
+		argon_is_token0,
+		spacing,
+	);
+	let (maximum_lower, maximum_upper) = uniswap_bounds_for_usd_band(
+		FixedU128::from_rational(909, 1000) * target,
+		FixedU128::from_rational(101, 100) * target,
+		usdc,
+		argon_is_token0,
+		spacing,
+	);
+	// Check the full small grid rectangle against independent per-range valuation.
+	let mut eligible_ranges = 0;
+	for lower in (minimum_lower.min(maximum_lower)..=minimum_lower.max(maximum_lower))
+		.step_by(spacing as usize)
+	{
+		for upper in (minimum_upper.min(maximum_upper)..=minimum_upper.max(maximum_upper))
+			.step_by(spacing as usize)
+		{
+			if band.principal_for_range(liquidity, lower, upper, spot).unwrap() ==
+				PositionAmounts::default()
+			{
+				continue;
+			}
+			assert!(ranges.contains(&(lower, upper)), "missing ({lower}, {upper})");
+			eligible_ranges += 1;
+		}
+	}
+	assert_eq!(ranges.len(), eligible_ranges);
+}
+
+#[test]
+fn a_coarse_grid_range_entirely_below_the_reward_band_is_skipped() {
+	let target = FixedU128::one();
+	let spacing = 1101;
+	let band = StabilizerPoolRewardBand::new(
+		target,
+		target,
+		true,
+		spacing,
+		RewardPriceBand::get(),
+		REWARD_BAND_TOLERANCE,
+	)
+	.unwrap();
+	let shifted_range = uniswap_bounds_for_usd_band(
+		FixedU128::from_rational(891, 1000),
+		FixedU128::from_rational(99, 100),
+		target,
+		true,
+		spacing,
+	);
+	// The allowed shift and coarse grid can leave a valid NFT entirely below $0.90.
+	assert_eq!(shifted_range, (-278_553, -277_452));
+	assert!(!band.reward_ranges().unwrap().contains(&shifted_range));
+}
+
+enum PositionCorrection {
+	PublicUnsubscribe,
+	PublicRevisionAfterPublishedProof,
+	LatePublicUnsubscribe,
+	OwnerReplacement,
+}
+
+#[rstest]
+#[case(PositionCorrection::PublicUnsubscribe)]
+#[case(PositionCorrection::PublicRevisionAfterPublishedProof)]
+#[case(PositionCorrection::LatePublicUnsubscribe)]
+#[case(PositionCorrection::OwnerReplacement)]
+fn correcting_a_position_updates_only_unproved_liquidity_during_review(
+	#[case] correction: PositionCorrection,
+) {
+	let published = matches!(correction, PositionCorrection::PublicRevisionAfterPublishedProof);
+	let late = matches!(correction, PositionCorrection::LatePublicUnsubscribe);
+	let owner_replaces = matches!(correction, PositionCorrection::OwnerReplacement);
+	new_test_ext().execute_with(|| {
+		let owner = AccountId32::new([0x42; 32]);
+		let reporter = AccountId32::new([0x77; 32]);
+		let position = StabilizerPoolPositionId {
+			position_manager: config().position_manager,
+			token_id: U256::one(),
+		};
+		let (lower, upper) = uniswap_bounds_for_usd_band(
+			FixedU128::from_rational(90, 100),
+			FixedU128::one(),
+			FixedU128::one(),
+			true,
+			config().key.tick_spacing,
+		);
+		let liquidity = 10u128.pow(24);
+		let mut checkpoint = position_checkpoint(liquidity, lower, upper);
+		checkpoint.proven_through =
+			ProofBlock { hash: H256::from_low_u64_be(95), number: 95, timestamp_millis: 1_140_000 };
+		checkpoint.maintained_since = checkpoint.proven_through;
+		let enrollment = position_evidence(
+			95,
+			1,
+			H256::from_slice(owner.as_ref()),
+			liquidity,
+			true,
+			(lower, upper),
+		);
+		assert_ok!(StabilizerPools::checkpoint_position(
+			RuntimeOrigin::signed(owner.clone()),
+			pool_manager(),
+			pool_id(),
+			position.token_id,
+			Box::new(enrollment),
+		));
+		// Another NFT shares the same range. The correction must subtract only one contribution.
+		assert_ok!(StabilizerPools::record_checkpoint(
+			position.position_manager,
+			2.into(),
+			checkpoint.clone()
+		));
+
+		let spot = uniswap_sqrt_price_for_usd_price(
+			FixedU128::from_rational(95, 100),
+			FixedU128::one(),
+			true,
+			false,
+		);
+		start_mining_frame(2, 20);
+		for tick in 20..30 {
+			CurrentTick::set(tick);
+			report_stabilizer_pool_price(tick, spot);
+		}
+		start_mining_frame(3, 30);
+		let review = StabilizerPoolReviewFrame::<Test>::get().unwrap();
+		assert_eq!(review.frame_id, 2);
+		assert_eq!(
+			review.liquidity_by_range.get(&(lower, upper)),
+			Some(&U256::from(liquidity * 2))
+		);
+
+		if published {
+			let continuity = position_evidence(
+				151,
+				1,
+				H256::from_slice(owner.as_ref()),
+				liquidity,
+				true,
+				(lower, upper),
+			);
+			assert_ok!(StabilizerPools::checkpoint_position(
+				RuntimeOrigin::signed(owner.clone()),
+				pool_manager(),
+				pool_id(),
+				position.token_id,
+				Box::new(continuity),
+			));
+		}
+		if late {
+			start_mining_frame(4, 40);
+		}
+
+		if owner_replaces {
+			let replacement = position_evidence(
+				170,
+				2,
+				H256::from_slice(owner.as_ref()),
+				liquidity * 2,
+				true,
+				(lower, upper),
+			);
+			assert_ok!(StabilizerPools::checkpoint_position(
+				RuntimeOrigin::signed(owner.clone()),
+				pool_manager(),
+				pool_id(),
+				position.token_id,
+				Box::new(replacement),
+			));
+		} else {
+			let unchanged = position_change_evidence(160, 1, liquidity, true, (lower, upper));
+			assert_noop!(
+				StabilizerPools::report_position_change(
+					RuntimeOrigin::signed(reporter.clone()),
+					position,
+					Box::new(unchanged)
+				),
+				Error::<Test>::PositionChangeNotProven
+			);
+			let reported_liquidity = if published { liquidity * 2 } else { liquidity };
+			let changed =
+				position_change_evidence(170, 2, reported_liquidity, published, (lower, upper));
+			assert_ok!(StabilizerPools::report_position_change(
+				RuntimeOrigin::signed(reporter.clone()),
+				position,
+				Box::new(changed.clone())
+			));
+			assert_noop!(
+				StabilizerPools::report_position_change(
+					RuntimeOrigin::signed(reporter),
+					position,
+					Box::new(changed)
+				),
+				Error::<Test>::PositionNotEnrolled
+			);
+		}
+		let expected_next_liquidity = if owner_replaces { liquidity * 3 } else { liquidity };
+		assert_eq!(
+			RegisteredLiquidityByRange::<Test>::get(StabilizerPoolLiquidityRange::from(
+				&checkpoint
+			))
+			.next_frame_liquidity,
+			U256::from(expected_next_liquidity)
+		);
+
+		let pending_liquidity = if published || late { liquidity * 2 } else { liquidity };
+		if !late {
+			assert_eq!(
+				StabilizerPoolReviewFrame::<Test>::get()
+					.unwrap()
+					.liquidity_by_range
+					.get(&(lower, upper)),
+				Some(&U256::from(pending_liquidity))
+			);
+			start_mining_frame(4, 40);
+		}
+		let price = StabilizerPoolPricesByFrame::<Test>::get()[&2];
+		let band = StabilizerPoolRewardBand::new(
+			price.argon_usd_target_price,
+			price.usdc_usd_price,
+			price.argon_is_token0,
+			config().key.tick_spacing,
+			RewardPriceBand::get(),
+			REWARD_BAND_TOLERANCE,
+		)
+		.unwrap();
+		let expected = band
+			.principal_for_range(pending_liquidity.into(), lower, upper, price.sqrt_price_x96)
+			.unwrap();
+		assert_ne!(expected, PositionAmounts::default());
+		assert_eq!(FinalizedStabilizerPoolPrincipalByFrame::<Test>::get().get(&2), Some(&expected));
+
+		if owner_replaces {
+			assert_eq!(
+				StabilizerPoolRegistrations::<Test>::get(position),
+				Some(StabilizerPoolRegistration::Enrolled { eligible_from: 4 })
+			);
+			return;
+		}
+
+		assert_eq!(
+			StabilizerPoolRegistrations::<Test>::get(position),
+			Some(StabilizerPoolRegistration::Removed {
+				reported_at: ProofBlock {
+					hash: H256::from_low_u64_be(170),
+					number: 170,
+					timestamp_millis: 2_040_000,
+				},
+			}),
+		);
+
+		checkpoint.proven_through = ProofBlock {
+			hash: H256::from_low_u64_be(165),
+			number: 165,
+			timestamp_millis: 1_980_000,
+		};
+		assert_noop!(
+			StabilizerPools::record_checkpoint(
+				position.position_manager,
+				position.token_id,
+				checkpoint.clone()
+			),
+			Error::<Test>::StaleCheckpoint
+		);
+		// A revision report can be followed by the owner's proof from that same Ethereum block.
+		let (block, revision, replacement_liquidity) =
+			if published { (170, 2, liquidity * 2) } else { (180, 3, liquidity) };
+		let replacement = position_evidence(
+			block,
+			revision,
+			H256::from_slice(owner.as_ref()),
+			replacement_liquidity,
+			true,
+			(lower, upper),
+		);
+		assert_ok!(StabilizerPools::checkpoint_position(
+			RuntimeOrigin::signed(owner),
+			pool_manager(),
+			pool_id(),
+			position.token_id,
+			Box::new(replacement),
+		));
+		assert_eq!(
+			StabilizerPoolRegistrations::<Test>::get(position),
+			Some(StabilizerPoolRegistration::Enrolled { eligible_from: 5 })
+		);
+	});
 }

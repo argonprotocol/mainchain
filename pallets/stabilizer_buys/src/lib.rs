@@ -787,6 +787,7 @@ impl<T: Config> Get<Option<StabilizerPoolPriceSource>> for Pallet<T> {
 		let pool = ApprovedPool::<T>::get()?;
 		Some(StabilizerPoolPriceSource {
 			revision: ApprovedPoolRevision::<T>::get(),
+			argon_is_token0: pool.argon_is_token0,
 			pool: UniswapPoolIdentity {
 				chain_id: pool.chain_id,
 				pool_manager: pool.pool_manager,

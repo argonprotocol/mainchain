@@ -5,8 +5,8 @@ use crate::{
 };
 use alloy_primitives::{U160, U256 as AlloyU256};
 use argon_primitives::{
-	block_seal::FrameId, BlockSealAuthorityId, OnNewSlot, PriceIndex, PriceIndexUpdated,
-	StabilizerPoolPriceSource, UniswapPoolIdentity, UniswapSqrtPriceX96, UniswapTick,
+	block_seal::FrameId, PriceIndex, PriceIndexUpdated, StabilizerPoolPriceSource,
+	UniswapPoolIdentity, UniswapSqrtPriceX96, UniswapTick,
 };
 use frame_support::DefaultNoBound;
 use pallet_prelude::*;
@@ -33,6 +33,8 @@ pub struct StabilizerPoolFramePrice {
 	pub usdc_usd_price: FixedU128,
 	/// Ethereum pool sampled for this frame.
 	pub pool: UniswapPoolIdentity,
+	/// Whether the sampled pool quotes ARGON as token0.
+	pub argon_is_token0: bool,
 }
 
 #[derive(
@@ -103,18 +105,6 @@ impl<T: Config> PriceIndexUpdated for Pallet<T> {
 	}
 }
 
-impl<T: Config> OnNewSlot<T::AccountId> for Pallet<T> {
-	type Key = BlockSealAuthorityId;
-
-	fn on_frame_start(frame_id: FrameId) {
-		Self::start_stabilizer_pool_price_sampling(frame_id, T::CurrentTick::get());
-	}
-
-	fn on_frame_start_weight(_: FrameId) -> Weight {
-		<T as Config>::WeightInfo::start_stabilizer_pool_price_sampling()
-	}
-}
-
 impl<T: Config> Pallet<T> {
 	pub(crate) fn record_stabilizer_pool_spot_price(
 		tick: Tick,
@@ -140,30 +130,36 @@ impl<T: Config> Pallet<T> {
 		});
 	}
 
-	pub(crate) fn start_stabilizer_pool_price_sampling(frame_id: FrameId, start_tick: Tick) {
+	/// Open sampling and return the previous frame's representative price when available.
+	pub(crate) fn start_stabilizer_pool_price_sampling(
+		frame_id: FrameId,
+		start_tick: Tick,
+	) -> Option<StabilizerPoolFramePrice> {
 		let mut sampling = StabilizerPoolPriceSamplingState::<T>::get();
 		if sampling.active_frame.as_ref().is_some_and(|active| active.frame_id >= frame_id) {
-			return;
+			return None;
 		}
 
-		let closed_frame_price = sampling.active_frame.take().and_then(|mut closed_frame| {
-			if closed_frame.frame_id.checked_add(1) != Some(frame_id) {
-				return None;
-			}
+		let closed_frame = sampling
+			.active_frame
+			.take()
+			.filter(|frame| frame.frame_id.checked_add(1) == Some(frame_id));
+		let closed_frame_price = closed_frame.and_then(|mut frame| {
 			if let Some(spot_price) =
 				sampling.latest_spot_price.filter(|price| price.tick < start_tick)
 			{
-				closed_frame.record(spot_price);
+				frame.record(spot_price);
 			}
-			let pool = closed_frame.pool_source?.pool;
-			let quotes = closed_frame.usd_quotes?;
+			let source = frame.pool_source?;
+			let quotes = frame.usd_quotes?;
 			let price = StabilizerPoolFramePrice {
 				argon_usd_target_price: quotes.argon_usd_target_price,
 				usdc_usd_price: quotes.usdc_usd_price,
-				sqrt_price_x96: closed_frame.samples.finish(start_tick)?,
-				pool,
+				sqrt_price_x96: frame.samples.finish(start_tick)?,
+				pool: source.pool,
+				argon_is_token0: source.argon_is_token0,
 			};
-			Some((closed_frame.frame_id, price))
+			Some((frame.frame_id, price))
 		});
 
 		let oldest_retained_frame =
@@ -171,7 +167,7 @@ impl<T: Config> Pallet<T> {
 		StabilizerPoolPricesByFrame::<T>::mutate(|history| {
 			history.retain(|frame, _| *frame >= oldest_retained_frame);
 			if let Some((closed_frame, price)) =
-				closed_frame_price.filter(|(frame, _)| *frame >= oldest_retained_frame)
+				closed_frame_price.filter(|(frame, ..)| *frame >= oldest_retained_frame)
 			{
 				history
 					.try_insert(closed_frame, price)
@@ -193,6 +189,7 @@ impl<T: Config> Pallet<T> {
 		sampling.latest_spot_price =
 			sampling.latest_spot_price.filter(|price| price.tick == start_tick);
 		StabilizerPoolPriceSamplingState::<T>::put(sampling);
+		closed_frame_price.map(|(_, price)| price)
 	}
 }
 

@@ -29,6 +29,16 @@ impl<T: frame_system::Config> pallet_stabilizer_pools::WeightInfo for WeightInfo
 		// TODO: Generate weights for the frame price sampler.
 		Weight::zero()
 	}
+	fn advance_liquidity_snapshots() -> Weight {
+		// TODO: Generate liquidity snapshot weights before release.
+		Weight::zero()
+	}
+
+	fn report_position_change() -> Weight {
+		// TODO: Generate position correction weights before release.
+		Weight::zero()
+	}
+
 	/// Storage: `Ticks::CurrentTick` (r:1 w:0)
 	/// Proof: `Ticks::CurrentTick` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
 	/// Retain the prior context weight until regenerating it for the single clock read.

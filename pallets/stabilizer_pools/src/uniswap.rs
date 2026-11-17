@@ -1,12 +1,21 @@
 //! Uniswap principal valuation for individual NFTs and shared liquidity ranges.
 use crate::PositionCheckpoint;
-use alloy_primitives::aliases::I24;
+use alloy_primitives::{aliases::I24, U256 as AlloyU256};
 use argon_primitives::{Balance, UniswapSqrtPriceX96, UniswapTick, MICROGONS_PER_ARGON};
+use core::cmp::Ordering;
 use pallet_prelude::*;
 use polkadot_sdk::sp_core::U512;
 use uniswap_v3_sdk_bigint::utils::{
-	get_sqrt_ratio_at_tick, MAX_SQRT_RATIO, MAX_TICK_I32, MIN_SQRT_RATIO, MIN_TICK_I32,
+	get_sqrt_ratio_at_tick, get_tick_at_sqrt_ratio, MAX_SQRT_RATIO, MAX_TICK_I32, MIN_SQRT_RATIO,
+	MIN_TICK_I32,
 };
+
+// A position can shift its full band around a reference up to 1% from target.
+// Only principal inside the current reward band counts.
+pub(crate) const REWARD_BAND_TOLERANCE: Percent = Percent::from_percent(1);
+// At spacing one, shifting the reference across that tolerance crosses at most
+// 201 Uniswap ticks at each edge of the band.
+pub(crate) const MAX_REWARD_RANGES: u32 = 404;
 
 const PERCENT_SCALE: u8 = Percent::one().deconstruct();
 
@@ -154,9 +163,63 @@ impl StabilizerPoolRewardBand {
 		)
 	}
 
-	/// Each endpoint rounds down in USD to a usable Uniswap tick. Their reference intervals must
-	/// overlap, and that overlap must intersect the allowed target drift. Compare exact ratios:
-	/// rounding each endpoint to a USD integer could accept a shortened band.
+	/// Enumerate the exact pairs obtained as the shared reference moves through its tolerance.
+	/// At each boundary only the edge that reached its next grid price advances.
+	pub(crate) fn reward_ranges(
+		&self,
+	) -> Result<Vec<(UniswapTick, UniswapTick)>, PositionAmountError> {
+		if self.reference_tolerance > REWARD_BAND_TOLERANCE {
+			return Err(PositionAmountError::InvalidRewardPriceBand);
+		}
+
+		let references = BandReferences::new(self);
+		let last_grid_index = MAX_TICK_I32 / self.uniswap_tick_spacing;
+		let mut lower = references.grid_index_at_minimum(BandEdge::Lower)?;
+		let mut upper = references.grid_index_at_minimum(BandEdge::Upper)?;
+		let first_overlapping_upper_tick =
+			rounded_uniswap_tick(self.sqrt_lower, false)?.saturating_add(1);
+		let last_overlapping_lower_tick =
+			rounded_uniswap_tick(self.sqrt_upper, true)?.saturating_sub(1);
+		let mut ranges = Vec::new();
+
+		for _ in 0..MAX_REWARD_RANGES {
+			if lower >= -last_grid_index && upper > lower && upper <= last_grid_index {
+				let (lower_tick, upper_tick) = references.uniswap_range(lower, upper);
+				if upper_tick >= first_overlapping_upper_tick &&
+					lower_tick <= last_overlapping_lower_tick
+				{
+					ranges.push((lower_tick, upper_tick));
+				}
+			}
+
+			let next_lower =
+				references.next_grid_reference_key(lower, last_grid_index, BandEdge::Lower)?;
+			let next_upper =
+				references.next_grid_reference_key(upper, last_grid_index, BandEdge::Upper)?;
+			if references
+				.compare_reference_keys(
+					references.earlier_reference_key(next_lower, next_upper),
+					references.maximum_reference_key,
+				)
+				.is_gt()
+			{
+				return Ok(ranges);
+			}
+
+			let next_edge = references.compare_reference_keys(next_lower, next_upper);
+			if !next_edge.is_gt() {
+				lower = lower.saturating_add(1);
+			}
+			if !next_edge.is_lt() {
+				upper = upper.saturating_add(1);
+			}
+		}
+
+		Err(PositionAmountError::InvalidRewardPriceBand)
+	}
+
+	/// Each endpoint rounds down in USD to a usable Uniswap tick. Their reference intervals
+	/// must overlap each other and the allowed drift around target.
 	fn qualifying_range(
 		&self,
 		lower_uniswap_tick: UniswapTick,
@@ -173,85 +236,187 @@ impl StabilizerPoolRewardBand {
 		}
 		let sqrt_lower = sqrt_price_at_uniswap_tick(lower_uniswap_tick)?;
 		let sqrt_upper = sqrt_price_at_uniswap_tick(upper_uniswap_tick)?;
-		let toward_higher_usd_price = if self.argon_is_token0 {
-			self.uniswap_tick_spacing
+
+		let references = BandReferences::new(self);
+		let (lower_grid_index, upper_grid_index) = if self.argon_is_token0 {
+			(
+				lower_uniswap_tick / self.uniswap_tick_spacing,
+				upper_uniswap_tick / self.uniswap_tick_spacing,
+			)
 		} else {
-			-self.uniswap_tick_spacing
+			(
+				-upper_uniswap_tick / self.uniswap_tick_spacing,
+				-lower_uniswap_tick / self.uniswap_tick_spacing,
+			)
 		};
-		// The last grid interval ends at Uniswap's supported price limit. Its synthetic next
-		// boundary can fall outside that domain even when the NFT's own boundaries are valid.
-		let next_lower_uniswap_tick =
-			(lower_uniswap_tick + toward_higher_usd_price).clamp(MIN_TICK_I32, MAX_TICK_I32);
-		let next_upper_uniswap_tick =
-			(upper_uniswap_tick + toward_higher_usd_price).clamp(MIN_TICK_I32, MAX_TICK_I32);
-		let next_lower = sqrt_price_at_uniswap_tick(next_lower_uniswap_tick)?;
-		let next_upper = sqrt_price_at_uniswap_tick(next_upper_uniswap_tick)?;
-
-		let [lower_square, upper_square, next_lower_square, next_upper_square] =
-			[sqrt_lower, sqrt_upper, next_lower, next_upper].map(|sqrt_price| {
-				let sqrt_price = U512::from(sqrt_price);
-				sqrt_price * sqrt_price
-			});
-		let target_usd = U512::from(self.argon_usd_target_price.into_inner());
-		let usdc_usd_scaled =
-			U512::from(self.usdc_usd_price.into_inner()) * ARGON_USDC_DECIMAL_SCALE;
-		let tolerance = self.reference_tolerance.deconstruct();
-		let minimum_reference_usd_percent_scaled = target_usd * (PERCENT_SCALE - tolerance);
-		let maximum_reference_usd_percent_scaled = target_usd * (PERCENT_SCALE + tolerance);
-		let (lower_percent, upper_percent) = self.reward_price_band;
-		let lower_percent = lower_percent.deconstruct();
-		let upper_percent = upper_percent.deconstruct();
-		// One percentage scale recovers the reference price from an edge. The other
-		// matches the scale of the allowed reference prices above.
-		let reference_usd_scale = usdc_usd_scaled * PERCENT_SCALE * PERCENT_SCALE;
-		let q192 = U512::one() << 192;
-
-		// Squared uint160 prices, uint128 USD quotes, the 10^12 token scale, and these
-		// percentage factors need at most 508 bits. They cannot overflow U512.
-		if self.argon_is_token0 {
-			// Recover the reference by dividing each edge by its own percentage.
-			// Use a common denominator to compare without rounding either edge.
-			let reference_price_denominator = q192 * lower_percent * upper_percent;
-			let minimum_reference_numerator =
-				(lower_square * upper_percent).max(upper_square * lower_percent);
-			let exclusive_maximum_reference_numerator =
-				(next_lower_square * upper_percent).min(next_upper_square * lower_percent);
-			if minimum_reference_numerator >= exclusive_maximum_reference_numerator {
-				return Ok(None);
-			}
-			if minimum_reference_numerator * reference_usd_scale >
-				maximum_reference_usd_percent_scaled * reference_price_denominator
-			{
-				return Ok(None);
-			}
-			if exclusive_maximum_reference_numerator * reference_usd_scale <=
-				minimum_reference_usd_percent_scaled * reference_price_denominator
-			{
-				return Ok(None);
-			}
+		let (lower_price, upper_price) =
+			if self.argon_is_token0 { (sqrt_lower, sqrt_upper) } else { (sqrt_upper, sqrt_lower) };
+		let lower_start = references.edge_reference_key(lower_price, BandEdge::Lower);
+		let upper_start = references.edge_reference_key(upper_price, BandEdge::Upper);
+		let last_grid_index = MAX_TICK_I32 / self.uniswap_tick_spacing;
+		let lower_end = references.next_grid_reference_key(
+			lower_grid_index,
+			last_grid_index,
+			BandEdge::Lower,
+		)?;
+		let upper_end = references.next_grid_reference_key(
+			upper_grid_index,
+			last_grid_index,
+			BandEdge::Upper,
+		)?;
+		let start = if references.compare_reference_keys(lower_start, upper_start).is_gt() {
+			lower_start
 		} else {
-			// The lower Uniswap tick is the upper USD edge. Inverted prices share a
-			// numerator, so the larger denominator means a lower USD reference.
-			let minimum_reference_denominator =
-				(lower_square * upper_percent).min(upper_square * lower_percent);
-			let exclusive_maximum_reference_denominator =
-				(next_lower_square * upper_percent).max(next_upper_square * lower_percent);
-			if minimum_reference_denominator <= exclusive_maximum_reference_denominator {
-				return Ok(None);
-			}
-			let reference_numerator = reference_usd_scale * q192;
-			if reference_numerator >
-				maximum_reference_usd_percent_scaled * minimum_reference_denominator
-			{
-				return Ok(None);
-			}
-			if reference_numerator <=
-				minimum_reference_usd_percent_scaled * exclusive_maximum_reference_denominator
-			{
-				return Ok(None);
-			}
+			upper_start
+		};
+		let end = references.earlier_reference_key(lower_end, upper_end);
+
+		if !references.compare_reference_keys(start, end).is_lt() {
+			return Ok(None);
+		}
+		if references
+			.compare_reference_keys(start, references.maximum_reference_key)
+			.is_gt()
+		{
+			return Ok(None);
+		}
+		if !references.compare_reference_keys(end, references.minimum_reference_key).is_gt() {
+			return Ok(None);
 		}
 		Ok(Some((sqrt_lower, sqrt_upper)))
+	}
+}
+
+#[derive(Clone, Copy)]
+enum BandEdge {
+	Lower,
+	Upper,
+}
+
+// Common scaled prices for comparing the two edges' implied reference and the tolerance limits.
+// With ARGON as token1, the keys are inverse prices, so USD order is reversed.
+struct BandReferences {
+	argon_is_token0: bool,
+	spacing: i32,
+	lower_percent: u8,
+	upper_percent: u8,
+	edge_scale: U512,
+	minimum_reference_key: U512,
+	maximum_reference_key: U512,
+}
+
+impl BandReferences {
+	fn new(band: &StabilizerPoolRewardBand) -> Self {
+		let (lower, upper) = band.reward_price_band;
+		let (lower_percent, upper_percent) = (lower.deconstruct(), upper.deconstruct());
+		let usdc = U512::from(band.usdc_usd_price.into_inner()) *
+			ARGON_USDC_DECIMAL_SCALE *
+			PERCENT_SCALE *
+			PERCENT_SCALE;
+		let q192 = U512::one() << 192;
+		let target = U512::from(band.argon_usd_target_price.into_inner());
+		let tolerance = band.reference_tolerance.deconstruct();
+		let (edge_scale, reference_scale) = if band.argon_is_token0 {
+			(usdc, q192 * lower_percent * upper_percent)
+		} else {
+			(target, usdc * q192)
+		};
+		let at_drift = |percent| {
+			if band.argon_is_token0 {
+				target * percent * reference_scale
+			} else if percent == 0 {
+				U512::MAX
+			} else {
+				// An edge key is integral. Round up so an exact equality or a lower
+				// implied USD price compares at or below this reference.
+				let percent = U512::from(percent);
+				(reference_scale + percent - U512::one()) / percent
+			}
+		};
+		Self {
+			argon_is_token0: band.argon_is_token0,
+			spacing: band.uniswap_tick_spacing,
+			lower_percent,
+			upper_percent,
+			edge_scale,
+			minimum_reference_key: at_drift(PERCENT_SCALE - tolerance),
+			maximum_reference_key: at_drift(PERCENT_SCALE + tolerance),
+		}
+	}
+
+	fn compare_reference_keys(&self, left: U512, right: U512) -> Ordering {
+		if self.argon_is_token0 {
+			left.cmp(&right)
+		} else {
+			right.cmp(&left)
+		}
+	}
+
+	fn earlier_reference_key(&self, left: U512, right: U512) -> U512 {
+		if self.compare_reference_keys(left, right).is_gt() {
+			right
+		} else {
+			left
+		}
+	}
+
+	fn edge_reference_scale(&self, edge: BandEdge) -> U512 {
+		let percent = match (self.argon_is_token0, edge) {
+			(true, BandEdge::Upper) | (false, BandEdge::Lower) => self.lower_percent,
+			(true, BandEdge::Lower) | (false, BandEdge::Upper) => self.upper_percent,
+		};
+		self.edge_scale * percent
+	}
+
+	fn edge_reference_key(&self, sqrt_price: UniswapSqrtPriceX96, edge: BandEdge) -> U512 {
+		// uint160 squared, uint128 USD quote, decimal scale and percentage factors
+		// need at most 508 bits together.
+		let sqrt_price = U512::from(sqrt_price);
+		sqrt_price * sqrt_price * self.edge_reference_scale(edge)
+	}
+
+	fn grid_price(&self, grid_index: i32, edge: BandEdge) -> Result<U512, PositionAmountError> {
+		let usd_ordered_tick =
+			grid_index.saturating_mul(self.spacing).clamp(MIN_TICK_I32, MAX_TICK_I32);
+		let uniswap_tick = if self.argon_is_token0 { usd_ordered_tick } else { -usd_ordered_tick };
+		Ok(self.edge_reference_key(sqrt_price_at_uniswap_tick(uniswap_tick)?, edge))
+	}
+
+	fn next_grid_reference_key(
+		&self,
+		grid_index: i32,
+		last_grid_index: i32,
+		edge: BandEdge,
+	) -> Result<U512, PositionAmountError> {
+		if grid_index > last_grid_index {
+			return Ok(if self.argon_is_token0 { U512::MAX } else { U512::zero() });
+		}
+		self.grid_price(grid_index.saturating_add(1), edge)
+	}
+
+	/// Solve the minimum reference key for sqrt price. Inverting the token order reverses
+	/// the inequality, so USD round-down then requires rounding the Uniswap price up.
+	fn grid_index_at_minimum(&self, edge: BandEdge) -> Result<i32, PositionAmountError> {
+		let floor_sqrt_price =
+			(self.minimum_reference_key / self.edge_reference_scale(edge)).integer_sqrt();
+		let mut sqrt_price =
+			U256::try_from(floor_sqrt_price).map_err(|_| PositionAmountError::InvalidPrice)?;
+		if !self.argon_is_token0 &&
+			self.edge_reference_key(sqrt_price, edge) < self.minimum_reference_key
+		{
+			sqrt_price = sqrt_price.saturating_add(U256::one());
+		}
+		let tick = rounded_uniswap_tick(sqrt_price, !self.argon_is_token0)?;
+		let usd_ordered_tick = if self.argon_is_token0 { tick } else { -tick };
+		Ok(usd_ordered_tick.div_euclid(self.spacing))
+	}
+
+	fn uniswap_range(&self, lower: i32, upper: i32) -> (UniswapTick, UniswapTick) {
+		if self.argon_is_token0 {
+			(lower * self.spacing, upper * self.spacing)
+		} else {
+			(-upper * self.spacing, -lower * self.spacing)
+		}
 	}
 }
 
@@ -330,6 +495,34 @@ pub(crate) fn sqrt_price_at_uniswap_tick(
 	Ok(U256::from_big_endian(&sqrt_price.to_be_bytes::<20>()))
 }
 
+/// Convert a price to its enclosing Uniswap tick. A price past the supported domain uses
+/// the adjacent out-of-range tick so callers can tell it never reaches a usable boundary.
+fn rounded_uniswap_tick(
+	sqrt_price_x96: UniswapSqrtPriceX96,
+	round_up: bool,
+) -> Result<UniswapTick, PositionAmountError> {
+	let min_price = U256::from_big_endian(&MIN_SQRT_RATIO.to_be_bytes::<20>());
+	let max_price = U256::from_big_endian(&MAX_SQRT_RATIO.to_be_bytes::<20>());
+	if sqrt_price_x96 < min_price {
+		return Ok(MIN_TICK_I32.saturating_sub(1));
+	}
+	if sqrt_price_x96 > max_price {
+		return Ok(MAX_TICK_I32.saturating_add(1));
+	}
+	if sqrt_price_x96 == max_price {
+		return Ok(MAX_TICK_I32);
+	}
+
+	let price = AlloyU256::from_be_bytes(sqrt_price_x96.to_big_endian());
+	let floor_tick = get_tick_at_sqrt_ratio(price)
+		.map_err(|_| PositionAmountError::InvalidPrice)?
+		.as_i32();
+	if round_up && sqrt_price_at_uniswap_tick(floor_tick)? < sqrt_price_x96 {
+		return Ok(floor_tick.saturating_add(1));
+	}
+	Ok(floor_tick)
+}
+
 /// Encode token1/token0 as Q96. Round inward when selecting either end of a reward band.
 fn sqrt_price_from_token_ratio(
 	numerator: U256,
@@ -349,7 +542,19 @@ fn sqrt_price_from_token_ratio(
 }
 
 /// Withdrawable principal, excluding fees. NFTs use native balances; shared ranges use U256.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(
+	Clone,
+	Copy,
+	Debug,
+	Default,
+	PartialEq,
+	Eq,
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	TypeInfo,
+	MaxEncodedLen,
+)]
 pub struct PositionAmounts<Amount = Balance> {
 	/// ARGON principal in native microgons (6 decimals), rounded down from 18-decimal token units.
 	pub argon: Amount,

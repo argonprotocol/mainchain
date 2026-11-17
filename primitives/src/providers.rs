@@ -27,8 +27,9 @@ use sp_runtime::{
 
 use super::{
 	ethereum::{
-		EthereumAccountStorageProof, EthereumBlockNumber, EthereumReceiptLogProofBatch,
-		EthereumVerifyError, StabilizerPoolPriceSource, UniswapPurchase,
+		EthereumAccountStorageProof, EthereumBlockNumber, EthereumProofBlock,
+		EthereumReceiptLogProofBatch, EthereumVerifyError, StabilizerPoolPriceSource,
+		UniswapPurchase,
 	},
 	gateway::{GatewayState, SourceChain},
 	vault::{BitcoinSecuritizationBasis, CosignerGuarantee},
@@ -697,10 +698,11 @@ pub trait EthereumVerifyProvider {
 		MaxProofBlocks: Get<u32>,
 		MaxReceiptLogs: Get<u32>;
 
+	/// Authenticate the storage witness and return the execution block it proves.
 	fn verify_account_storage_proof<MaxStorageSlots>(
 		account_address: H160,
 		proof: &EthereumAccountStorageProof<MaxStorageSlots>,
-	) -> Result<Moment, EthereumVerifyError>
+	) -> Result<EthereumProofBlock, EthereumVerifyError>
 	where
 		MaxStorageSlots: Get<u32>;
 
@@ -724,7 +726,7 @@ impl EthereumVerifyProvider for () {
 	fn verify_account_storage_proof<MaxStorageSlots>(
 		_account_address: H160,
 		_proof: &EthereumAccountStorageProof<MaxStorageSlots>,
-	) -> Result<Moment, EthereumVerifyError>
+	) -> Result<EthereumProofBlock, EthereumVerifyError>
 	where
 		MaxStorageSlots: Get<u32>,
 	{

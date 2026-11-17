@@ -18,6 +18,10 @@ There is no event relay, indexer requirement, global activity cursor, or ongoing
   maintained interval; an increased revision starts a new baseline and does not verify the gap.
   Older proofs, repeated proofs, regressed revisions, and changed position fields without a revision
   increase are rejected. The position watermark survives beneficiary changes.
+- `report_position_change(position, proof)` lets anyone prove that the enrolled revision increased
+  or the NFT left its registered subscription. It removes the position from future rewards.
+  A report during the next frame also removes it from the closed frame's total if its owner
+  had yet to prove continuity through that frame.
 
 Each checkpoint contains actual account/storage witnesses for the subscriber (beneficiary and
 revision), PositionManager (subscription and packed position metadata), and PoolManager (NFT
@@ -48,6 +52,10 @@ next mining frame. A proof of a new revision removes the old position from the c
 schedules its new liquidity for the next frame. Existing checkpoints enter the totals on their next
 accepted proof.
 
-Reward settlement will use verified intervals, saved frame prices, and the applicable reward policy.
-The `maintained_since` field tracks the current continuous revision. Published rights must survive
-later revisions and beneficiary changes.
+At frame close, the pallet saves the total liquidity in each qualifying range using that frame's
+sampled price. Reports can correct those totals during the next frame. After review, the pallet
+converts the corrected totals into ARGON and USDC principal using the saved price. A frame without a
+usable price has zero eligible principal.
+
+Each frame records the Unix millisecond timestamp of its opening block. The next frame's opening
+also closes the previous frame. These timestamps are recorded even when price sampling falls short.

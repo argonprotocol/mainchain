@@ -1,4 +1,4 @@
-use crate::{bitcoin::LiquidId, tick::Tick, AccountId, Balance, Signature};
+use crate::{bitcoin::LiquidId, tick::Tick, AccountId, Balance, Moment, Signature};
 use alloc::vec::Vec;
 use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use frame_support::{CloneNoBound, DebugNoBound, EqNoBound, PartialEqNoBound};
@@ -58,6 +58,8 @@ pub struct StabilizerPoolPriceSource {
 	pub revision: u32,
 	/// Ethereum venue bound to this revision.
 	pub pool: UniswapPoolIdentity,
+	/// Whether ARGON is token0 of this pool. Fixed by the approved revision.
+	pub argon_is_token0: bool,
 }
 
 /// Authenticated Uniswap v4 purchase facts. Principal is the microgons actually delivered on Argon;
@@ -136,6 +138,29 @@ pub const MAX_ETHEREUM_HEADER_CHAIN_LEN: u32 = 64;
 /// Canonical Ethereum execution-block height used anywhere Argon stores or compares expiry and
 /// proof targets.
 pub type EthereumBlockNumber = u64;
+
+/// Block authenticated by an Ethereum storage proof.
+#[derive(
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	Clone,
+	Copy,
+	Debug,
+	PartialEq,
+	Eq,
+	TypeInfo,
+	MaxEncodedLen,
+)]
+pub struct EthereumProofBlock {
+	/// Authenticated Ethereum execution-block hash.
+	pub hash: H256,
+	/// Height of the authenticated execution block.
+	pub number: EthereumBlockNumber,
+	/// Ethereum block time in Unix milliseconds, authenticated by the execution header.
+	pub timestamp_millis: Moment,
+}
+
 pub type EthereumLogTopics = BoundedVec<H256, ConstU32<MAX_ETHEREUM_LOG_TOPICS>>;
 pub type EthereumLogData = BoundedVec<u8, ConstU32<MAX_ETHEREUM_LOG_DATA_BYTES>>;
 pub type EthereumReceiptProofNode = BoundedVec<u8, ConstU32<MAX_ETHEREUM_RECEIPT_PROOF_NODE_BYTES>>;
