@@ -44,3 +44,20 @@ chains/ethereum/contracts/deployments/default/
 /chains/ethereum/contracts/*.js
 chains/ethereum/deploy/*/*.standard-input.json
 chains/ethereum/deploy/*/*.constructor-args.txt
+chains/ethereum/deploy/*/*.etherscan-verification.json
+chains/ethereum/deploy/*/deployment-preflight.json
+chains/ethereum/deploy/*/deployment-rehearsal.json
+chains/ethereum/deploy/*/deployment-verification.json
+chains/ethereum/deploy/*/gateway-deployment-plan.json
+chains/ethereum/deploy/*/initial-liquidity-position.json
+chains/ethereum/deploy/*/v4-swap-test-plan.json
+chains/ethereum/deploy/*/stabilization-pool-plan.json
+chains/ethereum/deploy/*/*.safe.json
+chains/ethereum/deploy/*/deployment-plan-*.json
+chains/ethereum/deploy/*/*.local.md
+chains/ethereum/deploy/*/*.local.json
+# Keep operational plans local; commit compact deployment receipts instead.
+chains/ethereum/deploy/*/minting-gateway-upgrade-*.json
+chains/ethereum/deploy/*/purchase-config.json
+chains/ethereum/deploy/*/stabilization-pool-config.json
+chains/ethereum/deploy/*/stabilization-pool-manifest.json

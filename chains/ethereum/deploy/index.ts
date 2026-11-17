@@ -1,11 +1,12 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { join, resolve } from 'node:path';
 
-import { Interface, getAddress } from 'ethers';
+import { Interface, getAddress, keccak256, type BaseContract } from 'ethers';
 import { getClient } from '@argonprotocol/mainchain';
 import { contractsRoot, repoRoot } from './src/hardhat.js';
 import { parseArgs } from './src/cli.js';
 import { deployBuyAndTransfer } from './src/purchase.js';
+import { verifyDeploymentSources } from './src/etherscan.js';
 import {
   collectVaultOperatorsByEffectiveCouncilSigner,
   deriveRuntimeCouncilSnapshot,
@@ -192,6 +193,7 @@ async function main() {
           address: proxyAdminAddress,
           owner: adminSafe,
           deploymentTxHash: gatewayProxy.deploymentTransaction()?.hash ?? null,
+          runtimeCodeHash: keccak256(await ethers.provider.getCode(proxyAdminAddress)),
         },
         mintingGateway: buildContractRecord(gatewayProxyAddress, gatewayProxy, [
           await gatewayBootstrapImplementation.getAddress(),
@@ -228,6 +230,10 @@ async function main() {
       join(outputDir, 'deployment-manifest.json'),
       `${JSON.stringify(manifest, null, 2)}\n`,
     );
+    await verifyDeploymentSources(
+      join(outputDir, 'deployment-manifest.json'),
+      process.env.ETHERSCAN_API_KEY,
+    );
   } finally {
     await argonClient.disconnect().catch(() => undefined);
     await connection.close();
@@ -236,13 +242,15 @@ async function main() {
 
 function buildContractRecord(
   address: string,
-  contract: { deploymentTransaction(): { hash: string } | null },
+  contract: Pick<BaseContract, 'deploymentTransaction'>,
   constructorArgs: unknown[],
 ) {
+  const transaction = contract.deploymentTransaction()!;
   return {
     address,
     constructorArgs,
-    deploymentTxHash: contract.deploymentTransaction()?.hash ?? null,
+    deploymentTxHash: transaction.hash,
+    creationCodeHash: keccak256(transaction.data),
   };
 }
 

@@ -1,10 +1,11 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, relative, resolve } from 'node:path';
 
-import { Interface, getAddress } from 'ethers';
+import { Interface, getAddress, keccak256 } from 'ethers';
 import { getOptionalArg, getRequiredArg, parseArgs, stringifyJson } from './src/cli.js';
 import { deployBuyAndTransfer } from './src/purchase.js';
 import { contractsRoot, repoRoot } from './src/hardhat.js';
+import { verifyDeploymentSources, type DeploymentManifest } from './src/etherscan.js';
 
 const args = parseArgs(process.argv.slice(2));
 const networkName = getOptionalArg(args, 'network') ?? 'testnet';
@@ -105,6 +106,7 @@ async function main() {
           address: nextImplementationAddress,
           constructorArgs: [argonTokenAddress, argonotTokenAddress, swapContractAddress],
           deploymentTxHash: gatewayImplementation.deploymentTransaction()?.hash ?? null,
+          creationCodeHash: keccak256(gatewayImplementation.deploymentTransaction()!.data),
         },
       },
       safeTransactions: [
@@ -124,6 +126,7 @@ async function main() {
 
     await mkdir(dirname(outputPath), { recursive: true });
     await writeFile(outputPath, `${stringifyJson(upgradeManifest)}\n`);
+    await verifyDeploymentSources(outputPath, process.env.ETHERSCAN_API_KEY);
   } finally {
     await connection.close();
   }
@@ -133,19 +136,6 @@ void main().catch(error => {
   console.error(error);
   process.exitCode = 1;
 });
-
-type DeploymentManifest = {
-  network?: {
-    name?: string;
-    chainId?: string;
-  };
-  contracts?: Record<
-    string,
-    {
-      address?: string;
-    }
-  >;
-};
 
 function getRequiredContractAddress(manifest: DeploymentManifest, contractKey: string) {
   const address = manifest.contracts?.[contractKey]?.address;

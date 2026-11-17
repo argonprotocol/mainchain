@@ -8,6 +8,7 @@
     "bootstrap:prepare-runtime-setup": "node --import tsx prepareRuntimeSetup.ts",
     "build": "yarn workspace @argonprotocol/mainchain run tsc && tsc --noEmit",
     "etherscan:output-files": "node --import tsx outputEtherscanFiles.ts",
+    "etherscan:verify": "node --import tsx verifyEtherscan.ts",
     "gas:measure": "node --import tsx measure.ts",
     "gateway-backfill:prepare": "node --import tsx prepareGatewayBackfills.ts",
     "prepare:gateway-upgrade": "node --import tsx prepareMintingGatewayUpgrade.ts",
