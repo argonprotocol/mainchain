@@ -6,7 +6,7 @@ import {
   getEthereumBeaconSyncState,
   getNextEthereumBeaconSyncTxs,
 } from '../index';
-import { hexToBytes, type Hex } from 'viem';
+import { type Hex } from 'viem';
 import {
   createExecutionClient,
   createExecutionBlockFromRlp,
@@ -183,7 +183,7 @@ it('refreshes a published Gloas activation and builds its hash-only sync update'
       method: 'submit',
       update: expect.objectContaining({
         executionHeaderProof: {
-          executionHeader: { Rlp: hexToBytes(gloasExecutionProof.execution_header_rlp as Hex) },
+          executionHeader: { Rlp: gloasExecutionProof.execution_header_rlp },
           executionBranch: gloasExecutionProof.execution_branch,
         },
       }),
@@ -999,7 +999,7 @@ it('bootstraps Gloas with its configured fork schedule and exact execution heade
     method: 'forceCheckpoint',
     checkpoint: {
       executionHeaderProof: {
-        executionHeader: { Rlp: hexToBytes(gloasExecutionProof.execution_header_rlp as Hex) },
+        executionHeader: { Rlp: gloasExecutionProof.execution_header_rlp },
         executionBranch: gloasExecutionProof.execution_branch,
       },
     },

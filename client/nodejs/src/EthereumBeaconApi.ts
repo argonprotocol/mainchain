@@ -1,5 +1,5 @@
 import camelcaseKeys from 'camelcase-keys';
-import { concatHex, type Hex, sha256 } from 'viem';
+import { concatHex, type Hex, sha256, toHex } from 'viem';
 import type {
   EthereumLightClientExecutionPayloadHeader,
   EthereumLightClientHeader,
@@ -84,7 +84,7 @@ export async function buildExecutionHeaderProof(
   }
 
   return {
-    executionHeader: { Rlp: header.serialize() },
+    executionHeader: { Rlp: toHex(header.serialize()) },
     executionBranch: branch,
   };
 }
