@@ -234,6 +234,10 @@ pub mod pallet {
 		#[pallet::constant]
 		type DefaultTargetBitcoinPercent: Get<Percent>;
 
+		/// Default circulating ARGON fraction used as the stabilizer pool reward reference.
+		#[pallet::constant]
+		type DefaultTargetStabilizerPoolPercent: Get<Percent>;
+
 		/// The maximum number of vaults that can participate in one frame's locked vault capital.
 		#[pallet::constant]
 		type MaxVaultsPerPool: Get<u32>;
@@ -338,6 +342,11 @@ pub mod pallet {
 	#[pallet::storage]
 	pub type TargetBitcoinPercent<T: Config> =
 		StorageValue<_, Percent, ValueQuery, T::DefaultTargetBitcoinPercent>;
+
+	/// Circulating ARGON fraction used as the value reference for stabilizer pool rewards.
+	#[pallet::storage]
+	pub type TargetStabilizerPoolPercent<T: Config> =
+		StorageValue<_, Percent, ValueQuery, T::DefaultTargetStabilizerPoolPercent>;
 
 	#[pallet::type_value]
 	pub fn DefaultUpstreamParticipationFactor() -> Percent {
@@ -491,6 +500,8 @@ pub mod pallet {
 		RewardEconomicsConfigured {
 			target_bitcoin_percent: Percent,
 			upstream_participation_factor: Percent,
+			/// Circulating ARGON fraction used as the stabilizer pool reward reference.
+			target_stabilizer_pool_percent: Percent,
 		},
 		RewardTaperingPolicyConfigured {
 			policy: Box<TaperingPolicy>,
@@ -1047,6 +1058,7 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			target_bitcoin_percent: Option<Percent>,
 			upstream_participation_factor: Option<Percent>,
+			target_stabilizer_pool_percent: Option<Percent>,
 		) -> DispatchResult {
 			ensure_root(origin)?;
 			let current_target_bitcoin_percent = TargetBitcoinPercent::<T>::get();
@@ -1059,11 +1071,18 @@ pub mod pallet {
 				UpstreamParticipationFactor::<T>::put(upstream_participation_factor);
 			}
 
+			let current_target_stabilizer_pool_percent = TargetStabilizerPoolPercent::<T>::get();
+			if let Some(target_stabilizer_pool_percent) = target_stabilizer_pool_percent {
+				TargetStabilizerPoolPercent::<T>::put(target_stabilizer_pool_percent);
+			}
+
 			Self::deposit_event(Event::RewardEconomicsConfigured {
 				target_bitcoin_percent: target_bitcoin_percent
 					.unwrap_or(current_target_bitcoin_percent),
 				upstream_participation_factor: upstream_participation_factor
 					.unwrap_or(current_upstream_participation_factor),
+				target_stabilizer_pool_percent: target_stabilizer_pool_percent
+					.unwrap_or(current_target_stabilizer_pool_percent),
 			});
 			Ok(())
 		}

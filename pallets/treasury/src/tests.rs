@@ -1,7 +1,7 @@
 use super::{
 	ArgonotBondLots, BondLot, BondLotById, BondLotIdsByAccount, BondLotIdsByVault, BondLotSummary,
 	BondLotsByVault, BondProgram, BondProgramId, BondReleaseReason,
-	CurrentFrameArgonotBondParticipants, CurrentFrameVaultBitcoin, CurrentFrameVaultCapital,
+	CurrentFrameArgonotBondParticipants, CurrentFrameVaultBitcoin, CurrentFrameVaultCapital, Event,
 	HoldReason, PendingBondReleaseRetryCursor, PendingBondReleasesByFrame, RewardReserves,
 	RewardTaperingPolicy, TaperingPolicy, TotalArgonBondLots,
 };
@@ -22,7 +22,7 @@ use crate::{
 	},
 	pallet::{
 		BondLotEarningsMetrics, Bonds, Error, FrameVaultCapital, TargetBitcoinPercent,
-		UpstreamParticipationFactor,
+		TargetStabilizerPoolPercent, UpstreamParticipationFactor,
 	},
 	BondCollateralSettlementQueue, PendingBondCollateralByAccount,
 };
@@ -107,35 +107,57 @@ fn root_configures_reward_economics_without_resetting_omitted_values() {
 		System::set_block_number(1);
 		assert_eq!(TargetBitcoinPercent::<Test>::get(), Percent::from_percent(15));
 		assert_eq!(UpstreamParticipationFactor::<Test>::get(), Percent::from_percent(5));
+		assert_eq!(TargetStabilizerPoolPercent::<Test>::get(), Percent::from_percent(5));
 		assert_noop!(
 			Treasury::configure_reward_economics(
 				origin(1),
 				Some(Percent::from_percent(20)),
 				Some(Percent::from_percent(5)),
+				Some(Percent::from_percent(10)),
 			),
-			sp_runtime::DispatchError::BadOrigin,
+			DispatchError::BadOrigin,
 		);
 
 		assert_ok!(Treasury::configure_reward_economics(
 			RuntimeOrigin::root(),
 			Some(Percent::from_percent(20)),
 			None,
+			None,
 		));
 		assert_eq!(UpstreamParticipationFactor::<Test>::get(), Percent::from_percent(5));
+		assert_eq!(TargetStabilizerPoolPercent::<Test>::get(), Percent::from_percent(5));
 		assert_ok!(Treasury::configure_reward_economics(
 			RuntimeOrigin::root(),
 			None,
 			Some(Percent::from_percent(50)),
+			None,
 		));
-		assert_ok!(Treasury::configure_reward_economics(RuntimeOrigin::root(), None, None));
+		assert_ok!(Treasury::configure_reward_economics(
+			RuntimeOrigin::root(),
+			None,
+			None,
+			Some(Percent::from_percent(10)),
+		));
+		assert_ok!(Treasury::configure_reward_economics(RuntimeOrigin::root(), None, None, None));
 		assert_eq!(TargetBitcoinPercent::<Test>::get(), Percent::from_percent(20));
 		assert_eq!(UpstreamParticipationFactor::<Test>::get(), Percent::from_percent(50));
-		System::assert_last_event(RuntimeEvent::Treasury(
-			super::Event::RewardEconomicsConfigured {
-				target_bitcoin_percent: Percent::from_percent(20),
-				upstream_participation_factor: Percent::from_percent(50),
-			},
+		assert_eq!(TargetStabilizerPoolPercent::<Test>::get(), Percent::from_percent(10));
+		System::assert_last_event(RuntimeEvent::Treasury(Event::RewardEconomicsConfigured {
+			target_bitcoin_percent: Percent::from_percent(20),
+			upstream_participation_factor: Percent::from_percent(50),
+			target_stabilizer_pool_percent: Percent::from_percent(10),
+		}));
+
+		assert_ok!(Treasury::configure_reward_economics(
+			RuntimeOrigin::root(),
+			None,
+			None,
+			Some(Percent::zero()),
 		));
+		assert_ok!(Treasury::configure_reward_economics(RuntimeOrigin::root(), None, None, None));
+		assert_eq!(TargetStabilizerPoolPercent::<Test>::get(), Percent::zero());
+		assert_eq!(TargetBitcoinPercent::<Test>::get(), Percent::from_percent(20));
+		assert_eq!(UpstreamParticipationFactor::<Test>::get(), Percent::from_percent(50));
 	});
 }
 
@@ -3446,6 +3468,7 @@ fn configured_upstream_factor_controls_the_share_of_reward_uplift() {
 					RuntimeOrigin::root(),
 					None,
 					Some(Percent::from_percent(factor)),
+					None,
 				));
 			}
 			assert_eq!(Treasury::upstream_participation(&account(2)), multiplier);
@@ -3618,6 +3641,7 @@ fn upstream_bond_principal_is_live_but_the_earnings_multiplier_is_frozen_for_the
 			RuntimeOrigin::root(),
 			None,
 			Some(Percent::from_percent(5)),
+			None,
 		));
 		assert_eq!(
 			CurrentFrameVaultCapital::<Test>::get().unwrap().vault_securitization_positions[&2]

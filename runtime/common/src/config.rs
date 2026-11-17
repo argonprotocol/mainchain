@@ -116,6 +116,7 @@ parameter_types! {
 	pub const VaultBitcoinRewardPercent: Permill = Permill::from_parts(428_350);
 	pub const ArgonotSecuritizationMultiplier: u32 = 0;
 	pub const DefaultTargetBitcoinPercent: Percent = Percent::from_percent(15);
+	pub const DefaultTargetStabilizerPoolPercent: Percent = Percent::from_percent(5);
 	pub const MaxArgonotBondedPercentOfCirculation: Percent = Percent::from_percent(60);
 	/// Activated upstream Bitcoin securitization, in microgons, required for full vault earnings.
 	pub TreasuryUpstreamBitcoinForFullEarnings: Balance =

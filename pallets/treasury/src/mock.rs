@@ -172,6 +172,7 @@ parameter_types! {
 	pub const VaultBitcoinRewardPercent: Permill = Permill::from_parts(428_350);
 	pub static ArgonotSecuritizationMultiplier: u32 = 0;
 	pub const DefaultTargetBitcoinPercent: Percent = Percent::from_percent(15);
+	pub const DefaultTargetStabilizerPoolPercent: Percent = Percent::from_percent(5);
 	pub static MaxArgonotBondedPercentOfCirculation: Percent = Percent::from_percent(60);
 	pub static CurrentFrameId: FrameId = 1;
 
@@ -500,6 +501,7 @@ impl pallet_treasury::Config for Test {
 	type VaultBitcoinRewardPercent = VaultBitcoinRewardPercent;
 	type ArgonotSecuritizationMultiplier = ArgonotSecuritizationMultiplier;
 	type DefaultTargetBitcoinPercent = DefaultTargetBitcoinPercent;
+	type DefaultTargetStabilizerPoolPercent = DefaultTargetStabilizerPoolPercent;
 	type MaxVaultsPerPool = MaxVaultsPerPool;
 	type MaxPendingUnlocksPerFrame = MaxPendingUnlocksPerFrame;
 	type TreasuryExitDelayFrames = TreasuryExitDelayFrames;

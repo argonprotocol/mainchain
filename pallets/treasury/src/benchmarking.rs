@@ -358,14 +358,22 @@ mod benchmarks {
 	fn configure_reward_economics() -> Result<(), BenchmarkError> {
 		TargetBitcoinPercent::<T>::put(Percent::from_percent(15));
 		UpstreamParticipationFactor::<T>::put(Percent::from_percent(100));
+		TargetStabilizerPoolPercent::<T>::put(Percent::from_percent(5));
 		let target_bitcoin_percent = Percent::from_percent(20);
 		let upstream_participation_factor = Percent::from_percent(5);
+		let target_stabilizer_pool_percent = Percent::from_percent(10);
 
 		#[extrinsic_call]
-		_(RawOrigin::Root, Some(target_bitcoin_percent), Some(upstream_participation_factor));
+		_(
+			RawOrigin::Root,
+			Some(target_bitcoin_percent),
+			Some(upstream_participation_factor),
+			Some(target_stabilizer_pool_percent),
+		);
 
 		assert_eq!(TargetBitcoinPercent::<T>::get(), target_bitcoin_percent);
 		assert_eq!(UpstreamParticipationFactor::<T>::get(), upstream_participation_factor);
+		assert_eq!(TargetStabilizerPoolPercent::<T>::get(), target_stabilizer_pool_percent);
 		Ok(())
 	}
 

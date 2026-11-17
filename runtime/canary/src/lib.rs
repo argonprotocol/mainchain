@@ -478,6 +478,7 @@ impl pallet_treasury::Config for Runtime {
 	type VaultBitcoinRewardPercent = VaultBitcoinRewardPercent;
 	type ArgonotSecuritizationMultiplier = ArgonotSecuritizationMultiplier;
 	type DefaultTargetBitcoinPercent = DefaultTargetBitcoinPercent;
+	type DefaultTargetStabilizerPoolPercent = DefaultTargetStabilizerPoolPercent;
 	type MaxVaultsPerPool = MaxVaultsPerPool;
 	type MaxPendingUnlocksPerFrame = MaxPendingUnlocksPerFrame;
 	type TreasuryExitDelayFrames = TreasuryExitDelayFrames;
