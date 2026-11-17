@@ -79,7 +79,7 @@ mod benchmarks {
 		};
 		#[block]
 		{
-			Pallet::<T>::on_price_index(&index);
+			Pallet::<T>::on_price_index(&index, None);
 		}
 		assert_eq!(
 			RValueHighWaterByFrame::<T>::get(40u64.to_ordered()).unwrap().r_value,

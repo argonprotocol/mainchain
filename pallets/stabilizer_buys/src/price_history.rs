@@ -6,7 +6,7 @@ use argon_primitives::{
 use polkadot_sdk::sp_arithmetic::{helpers_128bit::multiply_by_rational_with_rounding, Rounding};
 
 impl<T: Config> PriceIndexUpdated for Pallet<T> {
-	fn on_price_index(index: &PriceIndex) {
+	fn on_price_index(index: &PriceIndex, _: Option<StabilizerPoolPriceSource>) {
 		// Keep invalid observations too, so purchase lookup cannot revive an older quote.
 		let frame = T::MiningFrameTransitionProvider::is_new_frame_started()
 			.unwrap_or_else(T::MiningFrameTransitionProvider::get_current_frame_id);

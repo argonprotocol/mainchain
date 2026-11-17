@@ -1,7 +1,11 @@
 use super::*;
 #[cfg(test)]
 use crate::mock::Test;
-use crate::mock::{config, evidence, pool_id, pool_manager};
+use crate::{
+	mock::{config, evidence, pool_id, pool_manager, stabilizer_pool_price_source},
+	price_history::StabilizerPoolUsdQuotes,
+	uniswap::sqrt_price_at_uniswap_tick,
+};
 use frame_system::RawOrigin;
 use polkadot_sdk::frame_benchmarking::v2::*;
 
@@ -10,51 +14,60 @@ mod benchmarks {
 	use super::*;
 
 	#[benchmark]
-	fn read_price_index_context() -> Result<(), BenchmarkError> {
-		if T::MiningFrameTransitionProvider::is_new_frame_started().is_some() {
-			return Err(BenchmarkError::Stop("measure the fallback frame lookup"));
+	fn read_price_index_context() {
+		#[block]
+		{
+			core::hint::black_box(T::CurrentTick::get());
 		}
+	}
+
+	#[benchmark]
+	fn record_stabilizer_pool_spot_price() -> Result<(), BenchmarkError> {
+		let frame = 1;
+		let (last_tick, price) = fill_price_buckets::<T>(frame)?;
 
 		#[block]
 		{
-			let tick = T::CurrentTick::get();
-			let frame = T::MiningFrameTransitionProvider::is_new_frame_started()
-				.unwrap_or_else(T::MiningFrameTransitionProvider::get_current_frame_id);
-			core::hint::black_box((tick, frame));
+			Pallet::<T>::record_stabilizer_pool_spot_price(
+				last_tick + 1,
+				price.sqrt_price_x96,
+				Some(StabilizerPoolUsdQuotes {
+					argon_usd_target_price: price.argon_usd_target_price,
+					usdc_usd_price: price.usdc_usd_price,
+				}),
+				stabilizer_pool_price_source(),
+			);
 		}
+
+		// Closing this delayed frame needs the observation that merged the full buckets.
+		Pallet::<T>::start_stabilizer_pool_price_sampling(frame + 1, last_tick + 2);
+		assert_eq!(StabilizerPoolPricesByFrame::<T>::get().get(&frame), Some(&price));
 		Ok(())
 	}
 
 	#[benchmark]
-	fn record_frame_price() -> Result<(), BenchmarkError> {
-		let (retained_frames, index) = full_frame_history::<T>()?;
-		let frame_id = retained_frames + 1;
+	fn start_stabilizer_pool_price_sampling() -> Result<(), BenchmarkError> {
+		let retained_frames = FrameId::from(T::MaxSampledPriceHistoryFrames::get());
+		if retained_frames == 0 {
+			return Err(BenchmarkError::Stop("sampled price history is disabled"));
+		}
+		let frame = retained_frames + 1;
+		let (last_tick, price) = fill_price_buckets::<T>(frame)?;
+		StabilizerPoolPricesByFrame::<T>::mutate(|history| {
+			for frame in 1..=retained_frames {
+				history.try_insert(frame, price).unwrap();
+			}
+		});
 
 		#[block]
 		{
-			Pallet::<T>::record_frame_price(frame_id, &index);
+			core::hint::black_box(T::CurrentTick::get());
+			Pallet::<T>::start_stabilizer_pool_price_sampling(frame + 1, last_tick + 1);
 		}
 
-		let history = FrameStartPriceIndices::<T>::get();
-		assert_eq!(history.len(), retained_frames as usize);
+		let history = StabilizerPoolPricesByFrame::<T>::get();
+		assert_eq!(history.get(&frame), Some(&price));
 		assert!(!history.contains_key(&1));
-		assert_eq!(history.get(&frame_id), Some(&index));
-		Ok(())
-	}
-
-	#[benchmark]
-	fn record_frame_price_after_gap() -> Result<(), BenchmarkError> {
-		let (retained_frames, index) = full_frame_history::<T>()?;
-		let frame_id = retained_frames * 2 + 1;
-
-		#[block]
-		{
-			Pallet::<T>::record_frame_price(frame_id, &index);
-		}
-
-		let history = FrameStartPriceIndices::<T>::get();
-		assert_eq!(history.len(), 1);
-		assert_eq!(history.get(&frame_id), Some(&index));
 		Ok(())
 	}
 
@@ -143,31 +156,35 @@ mod benchmarks {
 	impl_benchmark_test_suite!(Pallet, new_test_with_genesis::<Test>(|_| {}), Test);
 }
 
-fn full_frame_history<T: Config>() -> Result<(FrameId, PriceIndex), BenchmarkError> {
-	let retained_frames = u64::from(T::MaxFramePriceHistoryFrames::get());
-	if retained_frames == 0 {
-		return Err(BenchmarkError::Stop("frame history is disabled"));
+fn fill_price_buckets<T: Config>(
+	frame: FrameId,
+) -> Result<(Tick, StabilizerPoolFramePrice), BenchmarkError> {
+	let bucket_count = Tick::from(T::MaxPriceBucketsPerFrame::get());
+	if bucket_count == 0 {
+		return Err(BenchmarkError::Stop("price sampling is disabled"));
 	}
-
-	let index = PriceIndex {
-		btc_usd_price: FixedU128::from_inner(u128::MAX),
-		argonot_usd_price: FixedU128::from_inner(u128::MAX),
-		argon_usd_price: FixedU128::from_inner(u128::MAX),
-		argon_usd_target_price: FixedU128::from_inner(u128::MAX),
-		argon_time_weighted_average_liquidity: u128::MAX,
-		tick: Tick::MAX,
-		usdc_usd_price: Some(FixedU128::from_inner(u128::MAX)),
-		stabilizer_pool_sqrt_price_x96: Some(U256::one() << 96),
+	let bucket_ticks = T::TicksPerFrame::get().div_ceil(bucket_count).max(1);
+	let first_tick = T::CurrentTick::get();
+	let first_tick_after_full_buckets = first_tick + bucket_ticks * bucket_count;
+	let pool_source = stabilizer_pool_price_source();
+	let price = StabilizerPoolFramePrice {
+		sqrt_price_x96: sqrt_price_at_uniswap_tick(524_287).unwrap(),
+		argon_usd_target_price: FixedU128::one(),
+		usdc_usd_price: FixedU128::one(),
+		pool: pool_source.pool,
 	};
-
-	let mut history = BoundedBTreeMap::<FrameId, PriceIndex, T::MaxFramePriceHistoryFrames>::new();
-	for frame in 1..=retained_frames {
-		let observation = PriceIndex { tick: Tick::MAX - (retained_frames - frame), ..index };
-		history
-			.try_insert(frame, observation)
-			.map_err(|_| BenchmarkError::Stop("frame history benchmark overflow"))?;
+	Pallet::<T>::start_stabilizer_pool_price_sampling(frame, first_tick);
+	let usd_quotes = StabilizerPoolUsdQuotes {
+		argon_usd_target_price: price.argon_usd_target_price,
+		usdc_usd_price: price.usdc_usd_price,
+	};
+	for tick in first_tick..=first_tick_after_full_buckets {
+		Pallet::<T>::record_stabilizer_pool_spot_price(
+			tick,
+			price.sqrt_price_x96,
+			Some(usd_quotes),
+			pool_source,
+		);
 	}
-
-	FrameStartPriceIndices::<T>::put(history);
-	Ok((retained_frames, index))
+	Ok((first_tick_after_full_buckets, price))
 }

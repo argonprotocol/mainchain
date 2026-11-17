@@ -191,7 +191,7 @@ mod benchmarks {
 		clock(10, NOW);
 		#[block]
 		{
-			Pallet::<T>::on_price_index(&index(NOW));
+			Pallet::<T>::on_price_index(&index(NOW), None);
 		}
 		assert!(PriceHistoryByTick::<T>::get(NOW.to_ordered()).unwrap().prices.is_some());
 	}

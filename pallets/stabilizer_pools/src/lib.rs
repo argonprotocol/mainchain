@@ -8,8 +8,7 @@ extern crate alloc;
 
 use alloc::boxed::Box;
 use argon_primitives::{
-	block_seal::FrameId, EthereumAccountStorageProof, EthereumVerifyProvider,
-	MiningFrameTransitionProvider, PriceIndex, PriceIndexUpdated,
+	block_seal::FrameId, EthereumAccountStorageProof, EthereumVerifyProvider, UniswapTick,
 };
 pub use pallet::*;
 use pallet_ethereum_verifier::Pallet as EthereumVerifier;
@@ -19,21 +18,24 @@ pub use weights::WeightInfo;
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
 pub mod evm;
+pub mod migrations;
 #[cfg(any(test, feature = "runtime-benchmarks"))]
 mod mock;
-mod price_sampling;
+mod price_history;
 #[cfg(test)]
 mod tests;
 mod uniswap;
 pub mod weights;
 
-pub use price_sampling::StabilizerPoolPriceSamples;
+pub use price_history::{
+	StabilizerPoolFramePrice, StabilizerPoolPriceSamples, StabilizerPoolPriceSampling,
+};
 pub use uniswap::{PositionAmountError, PositionAmounts, StabilizerPoolRewardBand};
 
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(2);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -45,14 +47,13 @@ pub mod pallet {
 		polkadot_sdk::frame_system::Config + pallet_ethereum_verifier::Config
 	{
 		type WeightInfo: weights::WeightInfo;
-		/// Identifies the mining frame receiving the accepted oracle index.
-		type MiningFrameTransitionProvider: MiningFrameTransitionProvider;
-		/// Only current-tick observations can establish a frame's opening reference.
+		/// Mainchain clock used to assign observations to frames and reject future prices.
 		type CurrentTick: Get<Tick>;
-		/// Opening references retained in financial-day frames, including the checkpoint buffer.
-		/// Zero disables history. Both production runtimes retain 30 frames plus a 3-frame buffer.
+		/// Closed mining frames retained in the sampled Uniswap price history.
 		#[pallet::constant]
-		type MaxFramePriceHistoryFrames: Get<u32>;
+		type MaxSampledPriceHistoryFrames: Get<u32>;
+		/// Nominal frame duration used to size the price sampling buckets.
+		type TicksPerFrame: Get<Tick>;
 		/// Lower and upper reward price boundaries, as percentages of the ARGON USD target.
 		/// The lower boundary must be positive and strictly below the upper boundary.
 		#[pallet::constant]
@@ -72,14 +73,16 @@ pub mod pallet {
 	pub type Pools<T> =
 		StorageDoubleMap<_, Blake2_128Concat, H160, Blake2_128Concat, H256, PoolConfig>;
 
-	/// First current-tick price index accepted in each frame, including absent pool observations.
-	/// This is an oracle opening reference, not an exact historical Ethereum boundary proof.
-	/// Later indices cannot revalue it; frames without an observation have no entry. A new opening
-	/// reference prunes frames outside the configured window, including across oracle gaps.
+	/// Current sampling buckets and the latest spot observation awaiting a tick boundary.
 	#[pallet::storage]
-	pub type FrameStartPriceIndices<T: Config> = StorageValue<
+	pub type StabilizerPoolPriceSamplingState<T: Config> =
+		StorageValue<_, StabilizerPoolPriceSampling<T::MaxPriceBucketsPerFrame>, ValueQuery>;
+
+	/// Representative Uniswap price and valuation quotes for each well-sampled closed frame.
+	#[pallet::storage]
+	pub type StabilizerPoolPricesByFrame<T: Config> = StorageValue<
 		_,
-		BoundedBTreeMap<FrameId, PriceIndex, T::MaxFramePriceHistoryFrames>,
+		BoundedBTreeMap<FrameId, StabilizerPoolFramePrice, T::MaxSampledPriceHistoryFrames>,
 		ValueQuery,
 	>;
 
@@ -255,26 +258,6 @@ pub mod pallet {
 	}
 
 	impl<T: Config> Pallet<T> {
-		/// Store the first opening reference and discard frames outside the retained window.
-		pub(crate) fn record_frame_price(frame_id: FrameId, index: &PriceIndex) {
-			let retained_frames = T::MaxFramePriceHistoryFrames::get();
-			if retained_frames == 0 {
-				return;
-			}
-
-			let mut history = FrameStartPriceIndices::<T>::get();
-			if history.contains_key(&frame_id) {
-				return;
-			}
-
-			let oldest_frame = frame_id.saturating_sub(u64::from(retained_frames - 1));
-			history.retain(|stored_frame, _| *stored_frame >= oldest_frame);
-			history
-				.try_insert(frame_id, *index)
-				.expect("the retained frame range fits the nonzero history bound");
-			FrameStartPriceIndices::<T>::put(history);
-		}
-
 		pub(crate) fn record_checkpoint(
 			position_manager: H160,
 			token_id: U256,
@@ -342,26 +325,6 @@ pub mod pallet {
 			});
 			Ok(())
 		}
-	}
-}
-
-impl<T: Config> PriceIndexUpdated for Pallet<T> {
-	fn on_price_index(index: &PriceIndex) {
-		// Accepted late indices remain useful elsewhere, but cannot establish an opening price.
-		if index.tick != T::CurrentTick::get() {
-			return;
-		}
-
-		let frame_id = T::MiningFrameTransitionProvider::is_new_frame_started()
-			.unwrap_or_else(T::MiningFrameTransitionProvider::get_current_frame_id);
-		Self::record_frame_price(frame_id, index);
-	}
-
-	fn on_price_index_weight() -> Weight {
-		<T as Config>::WeightInfo::read_price_index_context().saturating_add(
-			<T as Config>::WeightInfo::record_frame_price()
-				.max(<T as Config>::WeightInfo::record_frame_price_after_gap()),
-		)
 	}
 }
 
@@ -461,9 +424,9 @@ pub struct PositionCheckpoint<AccountId> {
 	/// Permanent subscriber counter; any increase starts a new continuity baseline.
 	pub revision: U256,
 	/// Inclusive lower Uniswap price tick of the NFT's position.
-	pub tick_lower: i32,
+	pub tick_lower: UniswapTick,
 	/// Exclusive upper Uniswap price tick of the NFT's position.
-	pub tick_upper: i32,
+	pub tick_upper: UniswapTick,
 	/// Native Uniswap liquidity L, not a token balance or reward amount.
 	pub liquidity: u128,
 	/// Start of the continuously maintained revision proven by this record.

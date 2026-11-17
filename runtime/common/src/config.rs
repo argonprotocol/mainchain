@@ -99,6 +99,7 @@ parameter_types! {
 	// ### pallet_stabilizer_pools
 	pub const StabilizerPoolRewardPriceBand: (Percent, Percent) =
 		(Percent::from_percent(90), Percent::one());
+	pub const StabilizerPoolMaxSampledPriceHistoryFrames: u32 = 13;
 	pub const StabilizerPoolMaxPriceBucketsPerFrame: u32 = 24;
 	pub const StabilizerPoolMinPriceBucketCoverage: Percent = Percent::from_percent(75);
 

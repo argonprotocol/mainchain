@@ -1423,16 +1423,19 @@ fn bid_pool_reserves_fund_purchase_rewards_at_maturity() {
 		ExistentialDeposit::set(1);
 		CurrentFrameId::set(1);
 		PurchaseTick::set(1);
-		StabilizerBuys::on_price_index(&PriceIndex {
-			btc_usd_price: FixedU128::from_u32(60_000),
-			argonot_usd_price: FixedU128::one(),
-			argon_usd_price: FixedU128::one(),
-			argon_usd_target_price: FixedU128::one(),
-			argon_time_weighted_average_liquidity: 1,
-			tick: 1,
-			usdc_usd_price: Some(FixedU128::one()),
-			stabilizer_pool_sqrt_price_x96: None,
-		});
+		StabilizerBuys::on_price_index(
+			&PriceIndex {
+				btc_usd_price: FixedU128::from_u32(60_000),
+				argonot_usd_price: FixedU128::one(),
+				argon_usd_price: FixedU128::one(),
+				argon_usd_target_price: FixedU128::one(),
+				argon_time_weighted_average_liquidity: 1,
+				tick: 1,
+				usdc_usd_price: Some(FixedU128::one()),
+				stabilizer_pool_sqrt_price_x96: None,
+			},
+			None,
+		);
 		let owner = account(1);
 		let pool = PurchasePool::get();
 		pallet_stabilizer_buys::ApprovedPool::<Test>::put(&pool);

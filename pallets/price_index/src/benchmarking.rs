@@ -15,7 +15,11 @@ mod benchmarks {
 	fn provider_is_feeless() {
 		let caller: T::AccountId = whitelisted_caller();
 		Operator::<T>::put(&caller);
-		let call = Call::<T>::submit { index: benchmark_price_index(1), ethereum: None };
+		let call = Call::<T>::submit {
+			index: benchmark_price_index(1),
+			ethereum: None,
+			stabilizer_pool_revision: None,
+		};
 		let origin = RawOrigin::Signed(caller).into();
 
 		#[block]
@@ -57,7 +61,7 @@ mod benchmarks {
 		HistoricArgonCPI::<T>::put(history);
 
 		#[extrinsic_call]
-		submit(RawOrigin::Signed(caller.clone()), index, Some(ethereum));
+		submit(RawOrigin::Signed(caller.clone()), index, Some(ethereum), None);
 
 		assert_eq!(Current::<T>::get(), Some(index));
 		assert_eq!(LastValid::<T>::get(), Some(previous));

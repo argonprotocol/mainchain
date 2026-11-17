@@ -6,8 +6,15 @@ use polkadot_sdk::*;
 use serde::{Deserialize, Deserializer, Serialize};
 use sp_core::U256;
 use sp_runtime::{
+	codec::DecodeAll,
 	traits::{One, Zero},
 	FixedU128, Saturating,
+};
+use subxt::{
+	backend::{legacy::LegacyRpcMethods, BackendExt},
+	client::RuntimeVersion,
+	dynamic::storage as dynamic_storage,
+	tx::{DefaultPayload, Payload},
 };
 use tokio::{join, time::sleep};
 use tracing::info;
@@ -26,14 +33,13 @@ use argon_client::{
 		runtime_types::{
 			argon_primitives::price_index::PriceIndex as ApiPriceIndex,
 			pallet_price_index::EthereumPriceIndex as ApiEthereumPriceIndex,
-			pallet_stabilizer_buys::uniswap_purchase::PurchasePool,
 			primitive_types::U256 as ApiU256,
 		},
 		storage,
 	},
 	conversion::{from_api_fixed_u128, to_api_fixed_u128},
 	signer::{KeystoreSigner, Signer},
-	MainchainClient, ReconnectingClient,
+	ArgonConfig, MainchainClient, ReconnectingClient,
 };
 use argon_primitives::{
 	prelude::{sp_arithmetic::FixedPointNumber, Tick},
@@ -149,10 +155,6 @@ pub async fn price_index_loop(
 		argonot_price::ArgonotPriceLookup::from_env(last_argonot_price).await?;
 	let ethereum_gas_price_lookup = EthereumGasPriceLookup::from_env().await?;
 
-	// Pool configuration is fixed for this oracle process; changes require a restart.
-	let at = mainchain_client.live.storage().at_latest().await?;
-	let stabilizer_pool = at.fetch(&storage().stabilizer_buys().approved_pool()).await?;
-
 	info!("Oracle Started.");
 
 	loop {
@@ -187,19 +189,19 @@ pub async fn price_index_loop(
 			),
 			ethereum_gas_price_lookup.get_gas_price(),
 		);
-		let stabilizer_pool_sqrt_price_x96 =
-			match get_v4_pool_price(&argon_price_lookup.uniswap_oracle, stabilizer_pool.as_ref())
-				.await
-			{
-				Ok(price) => price,
-				Err(error) => {
-					tracing::warn!(
-						?error,
-						"Stabilizer pool price unavailable; submitting without it"
-					);
-					None
-				},
-			};
+		let (stabilizer_pool_sqrt_price_x96, stabilizer_pool_revision) = match async {
+			let client = reconnecting_client.get().await?;
+			get_stabilizer_pool_price(&client, &argon_price_lookup.uniswap_oracle).await
+		}
+		.await
+		{
+			Ok(Some((price, revision))) => (Some(price), revision),
+			Ok(None) => (None, None),
+			Err(error) => {
+				tracing::warn!(?error, "Stabilizer pool price unavailable; submitting without it");
+				(None, None)
+			},
+		};
 
 		let argon_usd_price = match price_result {
 			Ok(x) => x,
@@ -277,7 +279,7 @@ pub async fn price_index_loop(
 			tick
 		);
 
-		submit_price_index(
+		let submitted = submit_price_index(
 			&mut reconnecting_client,
 			&signer,
 			tick,
@@ -292,9 +294,12 @@ pub async fn price_index_loop(
 				stabilizer_pool_sqrt_price_x96,
 				ethereum,
 			},
+			stabilizer_pool_revision,
 		)
 		.await?;
-		last_target_price = target_price;
+		if submitted {
+			last_target_price = target_price;
+		}
 
 		let sleep_time = ticker.duration_to_next_tick().min(min_sleep_duration);
 		sleep(sleep_time).await;
@@ -320,7 +325,7 @@ pub async fn price_index_loop_from_file(
 	let ticker = mainchain_client.lookup_ticker().await?;
 	let last_price = latest_price_index(&mainchain_client).await?;
 
-	let mut last_submitted_tick = last_price.as_ref().map(|a| a.tick).unwrap_or(0);
+	let mut last_attempted_tick = last_price.as_ref().map(|a| a.tick).unwrap_or(0);
 	let mut argon_price_lookup = None;
 
 	let mut min_sleep_duration = Duration::from_millis(ticker.tick_duration_millis)
@@ -337,54 +342,55 @@ pub async fn price_index_loop_from_file(
 
 	loop {
 		let tick = ticker.current();
-		if tick == last_submitted_tick {
+		if tick == last_attempted_tick {
 			let sleep_time = ticker.duration_to_next_tick().min(min_sleep_duration);
 			sleep(sleep_time).await;
 			continue;
 		}
 
 		// A failed observation must not advance the submitted index or use simulated market data.
-		let price_data = async {
-			let (mut price, observe_argon) = read_file_price_index(&file_path)?;
-			if !observe_argon {
-				// A later switch back to Uniswap must start from the index actually on chain.
-				argon_price_lookup = None;
-				return Ok::<_, anyhow::Error>(price);
-			}
+		let price_data =
+			async {
+				let (mut price, observe_argon) = read_file_price_index(&file_path)?;
+				if !observe_argon {
+					// A later switch back to Uniswap must start from the index actually on chain.
+					argon_price_lookup = None;
+					return Ok::<_, anyhow::Error>((price, None));
+				}
 
-			let usdc_usd_price =
-				price.usdc_usd_price.expect("UNISWAP file prices include USDC/USD");
-			let mainchain_client = reconnecting_client.get().await?;
-			if argon_price_lookup.is_none() {
-				argon_price_lookup = Some(
-					argon_price::ArgonPriceLookup::from_env(
-						&ticker,
-						latest_price_index(&mainchain_client).await?,
-					)
-					.await?,
-				);
-			}
-			let lookup = argon_price_lookup.as_mut().expect("Initialized above");
+				let usdc_usd_price =
+					price.usdc_usd_price.expect("UNISWAP file prices include USDC/USD");
+				let mainchain_client = reconnecting_client.get().await?;
+				if argon_price_lookup.is_none() {
+					argon_price_lookup = Some(
+						argon_price::ArgonPriceLookup::from_env(
+							&ticker,
+							latest_price_index(&mainchain_client).await?,
+						)
+						.await?,
+					);
+				}
+				let lookup = argon_price_lookup.as_mut().expect("Initialized above");
 
-			let at = mainchain_client.live.storage().at_latest().await?;
-			let pool = at.fetch(&storage().stabilizer_buys().approved_pool()).await?;
-			ensure!(pool.is_some(), "Configure the local stabilizer pool before observing Uniswap");
-			let sqrt_price = get_v4_pool_price(&lookup.uniswap_oracle, pool.as_ref()).await?;
-			let max_change = from_api_fixed_u128(
-				mainchain_client
-					.live
-					.constants()
-					.at(&constants().price_index().max_argon_change_per_tick_away_from_target())?,
-			);
-			let market =
-				lookup.get_latest_price_and_liquidity(tick, max_change, usdc_usd_price).await?;
-			price.argon_usd_price = trunc_fixed_u128(market.price, 3);
-			price.argon_time_weighted_average_liquidity = market.liquidity;
-			price.stabilizer_pool_sqrt_price_x96 = sqrt_price;
-			Ok(price)
-		}
-		.await;
-		let price_data = match price_data {
+				let (sqrt_price, stabilizer_pool_revision) =
+					get_stabilizer_pool_price(&mainchain_client, &lookup.uniswap_oracle)
+						.await?
+						.ok_or_else(|| {
+							anyhow!("Configure the local stabilizer pool before observing Uniswap")
+						})?;
+				let max_change =
+					from_api_fixed_u128(mainchain_client.live.constants().at(
+						&constants().price_index().max_argon_change_per_tick_away_from_target(),
+					)?);
+				let market =
+					lookup.get_latest_price_and_liquidity(tick, max_change, usdc_usd_price).await?;
+				price.argon_usd_price = trunc_fixed_u128(market.price, 3);
+				price.argon_time_weighted_average_liquidity = market.liquidity;
+				price.stabilizer_pool_sqrt_price_x96 = Some(sqrt_price);
+				Ok((price, stabilizer_pool_revision))
+			}
+			.await;
+		let (price_data, stabilizer_pool_revision) = match price_data {
 			Ok(price) => price,
 			Err(error) => {
 				tracing::warn!(?error, tick,
@@ -401,9 +407,10 @@ pub async fn price_index_loop_from_file(
 			tick,
 			transaction_watch_timeout,
 			price_data,
+			stabilizer_pool_revision,
 		)
 		.await?;
-		last_submitted_tick = tick;
+		last_attempted_tick = tick;
 
 		let sleep_time = ticker.duration_to_next_tick().min(min_sleep_duration);
 		sleep(sleep_time).await;
@@ -435,11 +442,23 @@ fn read_file_price_index(file_path: &str) -> anyhow::Result<(PriceIndex, bool)> 
 	Ok((price, observe_argon))
 }
 
-async fn get_v4_pool_price(
+async fn get_stabilizer_pool_price(
+	client: &MainchainClient,
 	oracle: &UniswapOracle,
-	pool: Option<&PurchasePool>,
-) -> anyhow::Result<Option<U256>> {
-	let Some(pool) = pool else { return Ok(None) };
+) -> anyhow::Result<Option<(U256, Option<u32>)>> {
+	// Read both fields from one finalized block. Competing forks can assign the same revision
+	// to different pools.
+	let at = client.live.storage().at_latest().await?;
+	let Some(pool) = at.fetch(&storage().stabilizer_buys().approved_pool()).await? else {
+		return Ok(None);
+	};
+	let revision = dynamic_storage("StabilizerBuys", "ApprovedPoolRevision", ());
+	let stabilizer_pool_revision = at
+		.fetch_raw(revision.to_root_bytes())
+		.await?
+		.map(|bytes| u32::decode_all(&mut bytes.as_slice()))
+		.transpose()?;
+
 	let sqrt_price = oracle
 		.get_pool_sqrt_price_x96(
 			pool.chain_id,
@@ -447,7 +466,7 @@ async fn get_v4_pool_price(
 			B256::from(pool.pool_id.0),
 		)
 		.await?;
-	Ok(Some(sqrt_price))
+	Ok(Some((sqrt_price, stabilizer_pool_revision)))
 }
 
 // Storage changed when USDC joined the index. Read both supported native layouts during rollout.
@@ -465,18 +484,22 @@ async fn submit_price_index(
 	tick: Tick,
 	transaction_watch_timeout: Duration,
 	price: PriceIndex,
-) -> anyhow::Result<()> {
+	stabilizer_pool_revision: Option<u32>,
+) -> anyhow::Result<bool> {
 	let client = reconnecting_client.get().await?;
 	let account_id = signer.account_id();
 	let nonce = client.get_account_nonce(&account_id).await?;
 	let params = MainchainClient::ext_params_builder().nonce(nonce.into()).mortal(32).build();
 	let metadata = client.live.metadata();
-	let submit_call = metadata
+	let runtime_version = client.live.runtime_version();
+	let price_index_pallet = metadata
 		.pallet_by_name("PriceIndex")
-		.and_then(|pallet| pallet.call_variant_by_name("submit"))
+		.ok_or_else(|| anyhow!("PriceIndex is missing from the connected runtime"))?;
+	let submit_call = price_index_pallet
+		.call_variant_by_name("submit")
 		.ok_or_else(|| anyhow!("PriceIndex.submit is missing from the connected runtime"))?;
-	let supports_ethereum_prices =
-		submit_call.fields.iter().any(|field| field.name.as_deref() == Some("ethereum"));
+	let has_field =
+		|name: &str| submit_call.fields.iter().any(|field| field.name.as_deref() == Some(name));
 	let index = ApiPriceIndex {
 		argon_usd_target_price: to_api_fixed_u128(price.argon_usd_target_price),
 		tick,
@@ -495,25 +518,63 @@ async fn submit_price_index(
 		tick,
 	});
 	// Encode by the connected runtime's field metadata across the oracle rollout.
-	let price_index: Box<dyn subxt::tx::Payload + Send + Sync> = if supports_ethereum_prices {
-		Box::new(subxt::tx::DefaultPayload::new("PriceIndex", "submit", (index, ethereum)))
+	let price_index: Box<dyn Payload + Send + Sync> = if has_field("stabilizer_pool_revision") {
+		Box::new(DefaultPayload::new(
+			"PriceIndex",
+			"submit",
+			(index, ethereum, stabilizer_pool_revision),
+		))
+	} else if has_field("ethereum") {
+		Box::new(DefaultPayload::new("PriceIndex", "submit", (index, ethereum)))
 	} else {
-		Box::new(subxt::tx::DefaultPayload::new("PriceIndex", "submit", (index,)))
+		Box::new(DefaultPayload::new("PriceIndex", "submit", (index,)))
 	};
-	let progress = client
-		.live
-		.tx()
-		.sign_and_submit_then_watch(&price_index, signer, params)
-		.await?;
-
-	info!("Submitted price index with progress: {:?}", progress);
-	MainchainClient::wait_for_ext_in_block_with_timeout(progress, false, transaction_watch_timeout)
+	let submitted = async {
+		let progress = client
+			.live
+			.tx()
+			.sign_and_submit_then_watch(&price_index, signer, params)
+			.await?;
+		info!("Submitted price index with progress: {:?}", progress);
+		MainchainClient::wait_for_ext_in_block_with_timeout(
+			progress,
+			false,
+			transaction_watch_timeout,
+		)
 		.await
-		.map_err(|error| {
-			tracing::warn!("Error processing price index!! {:?}", error);
-			error
-		})?;
-	Ok(())
+	}
+	.await;
+	let Err(error) = submitted else { return Ok(true) };
+
+	// The best block may already require the new call while Subxt is waiting for it to finalize.
+	let rpc = LegacyRpcMethods::<ArgonConfig>::new(client.rpc.clone());
+	let finalized_hash = client.live.backend().latest_finalized_block_ref().await?.hash();
+	let (best_version, finalized_version) = tokio::try_join!(
+		rpc.state_get_runtime_version(None),
+		rpc.state_get_runtime_version(Some(finalized_hash)),
+	)?;
+	if best_version.spec_version != finalized_version.spec_version {
+		tracing::warn!(?error, "Price index submission interrupted by a pending runtime upgrade");
+		return Ok(false);
+	}
+
+	// A reconnect during activation can have the new runtime version with the old call metadata.
+	let finalized_metadata = client.live.backend().metadata_at_version(15, finalized_hash).await?;
+	let finalized_call_hash = finalized_metadata
+		.pallet_by_name("PriceIndex")
+		.and_then(|pallet| pallet.call_hash("submit"));
+	if runtime_version.spec_version == finalized_version.spec_version &&
+		price_index_pallet.call_hash("submit") == finalized_call_hash
+	{
+		return Err(error);
+	}
+	client.live.set_metadata(finalized_metadata);
+	client.live.set_runtime_version(RuntimeVersion {
+		spec_version: finalized_version.spec_version,
+		transaction_version: finalized_version.transaction_version,
+	});
+	tracing::warn!(?error, "Price index runtime metadata refreshed after upgrade");
+	Ok(false)
 }
 
 fn should_use_argon_pool_fallback(error: &anyhow::Error) -> bool {
@@ -548,7 +609,10 @@ mod tests {
 	use tokio::spawn;
 	use uniswap_lens::bindings::iuniswapv3pool::IUniswapV3Pool::{token0Call, token1Call};
 
-	use argon_client::{api, signer::KeystoreSigner};
+	use argon_client::{
+		api::{self, runtime_types::pallet_stabilizer_buys::uniswap_purchase::PurchasePool},
+		signer::KeystoreSigner,
+	};
 	use argon_primitives::CryptoType;
 	use argon_testing::start_argon_test_node;
 
@@ -689,18 +753,21 @@ mod tests {
 		.unwrap();
 		let rpc_handle = server.start(rpc);
 
-		let pool = super::PurchasePool {
+		let pool = PurchasePool {
 			chain_id: 31337,
 			pool_manager: sp_core::H160::from_slice(pool_manager.as_slice()),
 			pool_id: sp_core::H256::repeat_byte(7).into(),
 			usdc_token: sp_core::H160::from_slice(usdc.as_slice()),
 			argon_is_token0: true,
 		};
-		let approve = api::tx().sudo().sudo(api::Call::StabilizerBuys(
-			api::runtime_types::pallet_stabilizer_buys::pallet::Call::set_approved_pool {
-				pool: Some(pool),
-			},
-		));
+		let approve = api::tx()
+			.sudo()
+			.sudo(api::Call::StabilizerBuys(
+				api::runtime_types::pallet_stabilizer_buys::pallet::Call::set_approved_pool {
+					pool: Some(pool),
+				},
+			))
+			.unvalidated();
 		// The oracle loads its approved pool from finalized storage.
 		node.client
 			.submit_tx(

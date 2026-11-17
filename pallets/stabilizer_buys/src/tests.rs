@@ -1,10 +1,60 @@
-use crate::{mock::*, *};
+use crate::{migrations::InitializeApprovedPoolRevisionMigration, mock::*, *};
 use argon_primitives::{AscendingRankKey, GatewayState, PriceIndexUpdated, RValueHighWaterMark};
 use frame_support::{
 	assert_noop, assert_ok,
 	storage::{unhashed, with_storage_layer},
-	traits::Hooks,
+	traits::{Hooks, OnRuntimeUpgrade},
 };
+use pallet_price_index::Current;
+
+#[test]
+fn price_index_keeps_other_quotes_when_a_pool_revision_is_stale() {
+	new_test_ext().execute_with(|| {
+		let original_pool = Pool::get();
+		StorageVersion::new(1).put::<StabilizerBuys>();
+		assert!(!ApprovedPoolRevision::<Test>::exists());
+		InitializeApprovedPoolRevisionMigration::<Test>::on_runtime_upgrade();
+		assert!(ApprovedPoolRevision::<Test>::exists());
+		assert_eq!(ApprovedPool::<Test>::get(), Some(original_pool.clone()));
+
+		assert_ok!(StabilizerBuys::set_approved_pool(
+			RuntimeOrigin::root(),
+			Some(original_pool.clone())
+		));
+		assert_eq!(ApprovedPoolRevision::<Test>::get(), 0);
+
+		let mut replacement_pool = original_pool.clone();
+		replacement_pool.pool_id = H256::from_low_u64_be(123);
+		assert_ok!(StabilizerBuys::set_approved_pool(
+			RuntimeOrigin::root(),
+			Some(replacement_pool)
+		));
+		assert_eq!(ApprovedPoolRevision::<Test>::get(), 1);
+
+		CurrentTick::set(20);
+		let mut index = price_index(20);
+		let sqrt_price = U256::one() << 96;
+		index.stabilizer_pool_sqrt_price_x96 = Some(sqrt_price);
+		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), index, None, Some(0)));
+		let accepted = Current::<Test>::get().unwrap();
+		assert_eq!(accepted.tick, index.tick);
+		assert_eq!(accepted.btc_usd_price, index.btc_usd_price);
+		assert_eq!(accepted.stabilizer_pool_sqrt_price_x96, None);
+
+		CurrentTick::set(21);
+		index.tick = 21;
+		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), index, None, Some(1)));
+		assert_eq!(
+			Current::<Test>::get().unwrap().stabilizer_pool_sqrt_price_x96,
+			Some(sqrt_price)
+		);
+
+		assert_ok!(StabilizerBuys::set_approved_pool(RuntimeOrigin::root(), Some(original_pool)));
+		assert_eq!(ApprovedPoolRevision::<Test>::get(), 2);
+		assert_ok!(StabilizerBuys::set_approved_pool(RuntimeOrigin::root(), None));
+		assert_eq!(ApprovedPoolRevision::<Test>::get(), 3);
+	});
+}
 
 #[test]
 fn cheap_bids_do_not_admit_the_excluded_matching_basis() {
@@ -144,7 +194,7 @@ fn compact_quotes_preserve_target_market_and_usd_valuations() {
 fn history_lookup_requires_a_fresh_observation_before_the_purchase() {
 	new_test_ext().execute_with(|| {
 		let _ = PriceHistoryByTick::<Test>::clear(u32::MAX, None);
-		StabilizerBuys::on_price_index(&price_index(10));
+		StabilizerBuys::on_price_index(&price_index(10), None);
 		CurrentTick::set(30);
 		assert!(StabilizerBuys::price_reference(9).is_none());
 		assert!(StabilizerBuys::price_reference(20).is_some());
@@ -153,7 +203,7 @@ fn history_lookup_requires_a_fresh_observation_before_the_purchase() {
 
 		let mut unavailable = price_index(11);
 		unavailable.usdc_usd_price = None;
-		StabilizerBuys::on_price_index(&unavailable);
+		StabilizerBuys::on_price_index(&unavailable, None);
 		assert!(StabilizerBuys::price_reference(11)
 			.unwrap()
 			.1
@@ -167,12 +217,12 @@ fn history_lookup_requires_a_fresh_observation_before_the_purchase() {
 		assert!(StabilizerBuys::price_reference(10).is_some());
 		unavailable.tick = 13;
 		unavailable.argon_usd_target_price = FixedU128::zero();
-		StabilizerBuys::on_price_index(&unavailable);
+		StabilizerBuys::on_price_index(&unavailable, None);
 		assert!(StabilizerBuys::price_reference(13).is_none());
 
 		let mut future = price_index(31);
 		future.usdc_usd_price = None;
-		StabilizerBuys::on_price_index(&future);
+		StabilizerBuys::on_price_index(&future, None);
 		CurrentTick::set(31);
 		assert!(StabilizerBuys::price_reference(31).is_none());
 	});
@@ -182,7 +232,7 @@ fn history_lookup_requires_a_fresh_observation_before_the_purchase() {
 fn price_history_survives_sync_stalls_then_prunes_in_bounded_steps() {
 	new_test_ext().execute_with(|| {
 		for tick in 1..=800 {
-			StabilizerBuys::on_price_index(&price_index(tick));
+			StabilizerBuys::on_price_index(&price_index(tick), None);
 		}
 		CurrentTick::set(800);
 		StabilizerBuys::on_initialize(2);
@@ -218,7 +268,7 @@ fn repayment_keeps_history_until_its_window_is_fixed() {
 	new_test_ext().execute_with(|| {
 		let mut index = price_index(1);
 		index.argon_usd_price = FixedU128::from_rational(6, 10);
-		StabilizerBuys::on_price_index(&index);
+		StabilizerBuys::on_price_index(&index, None);
 		let mut buy = purchase();
 		buy.repay_liquid_id = Some(42);
 		assert_ok!(record_purchase(&1, &buy));
@@ -264,7 +314,7 @@ fn repayment_requires_btc_and_r_capture_but_usdc_only_controls_reward_eligibilit
 				"usdc" => index.usdc_usd_price = None,
 				_ => {},
 			}
-			StabilizerBuys::on_price_index(&index);
+			StabilizerBuys::on_price_index(&index, None);
 			if case == "missing" {
 				PriceHistoryByTick::<Test>::remove(1u64.to_ordered());
 			}
@@ -325,7 +375,7 @@ fn waiting_repayments_do_not_block_other_accounts_and_the_queue_wraps_after_remo
 	new_test_ext().execute_with(|| {
 		// Account 1 also has an earlier ordinary buy: its funds must wait with its repayment.
 		CurrentFrame::set(0);
-		StabilizerBuys::on_price_index(&price_index(0));
+		StabilizerBuys::on_price_index(&price_index(0), None);
 		assert_ok!(record_purchase(&1, &UniswapPurchase { tick: 0, ..purchase() }));
 		start_frame(1);
 
@@ -334,7 +384,7 @@ fn waiting_repayments_do_not_block_other_accounts_and_the_queue_wraps_after_remo
 			let mut index = price_index(tick);
 			index.argon_usd_price = FixedU128::from_rational(6, 10);
 			index.usdc_usd_price = None;
-			StabilizerBuys::on_price_index(&index);
+			StabilizerBuys::on_price_index(&index, None);
 		}
 		FrameHighs::mutate(|highs| {
 			highs.insert(
@@ -351,7 +401,7 @@ fn waiting_repayments_do_not_block_other_accounts_and_the_queue_wraps_after_remo
 		for account in [1, 2] {
 			assert_ok!(record_purchase(&account, &buy));
 		}
-		StabilizerBuys::on_price_index(&price_index(11));
+		StabilizerBuys::on_price_index(&price_index(11), None);
 		let ordinary = UniswapPurchase { tick: 11, ..purchase() };
 		assert_ok!(record_purchase(&3, &ordinary));
 		start_frame(2);
@@ -407,7 +457,7 @@ fn delayed_purchase_window_excludes_earlier_spikes_and_maturity_frame_through_re
 				if tick == 120 {
 					index.usdc_usd_price = None;
 				}
-				StabilizerBuys::on_price_index(&index);
+				StabilizerBuys::on_price_index(&index, None);
 				highs
 					.entry(frame)
 					.and_modify(|high: &mut RValueHighWaterMark| {
@@ -443,7 +493,7 @@ fn delayed_purchase_window_excludes_earlier_spikes_and_maturity_frame_through_re
 			CurrentTick::set(3_900);
 			let mut last = price_index(3_900);
 			last.argon_usd_price = FixedU128::from_rational(last_price, 100);
-			StabilizerBuys::on_price_index(&last);
+			StabilizerBuys::on_price_index(&last, None);
 			FrameHighs::mutate(|highs| {
 				highs.insert(
 					39,
@@ -467,7 +517,7 @@ fn delayed_purchase_window_excludes_earlier_spikes_and_maturity_frame_through_re
 			CurrentTick::set(4_000);
 			let mut excluded = price_index(4_000);
 			excluded.argon_usd_price = FixedU128::from_u32(9);
-			StabilizerBuys::on_price_index(&excluded);
+			StabilizerBuys::on_price_index(&excluded, None);
 			FrameHighs::mutate(|highs| {
 				highs.insert(
 					40,
@@ -511,7 +561,7 @@ fn delayed_purchase_window_excludes_earlier_spikes_and_maturity_frame_through_re
 			CurrentTick::set(4_500);
 			let mut late = price_index(4_500);
 			late.argon_usd_price = FixedU128::from_u32(20);
-			StabilizerBuys::on_price_index(&late);
+			StabilizerBuys::on_price_index(&late, None);
 			FrameHighs::mutate(|highs| {
 				highs.insert(
 					45,
@@ -1361,7 +1411,7 @@ fn unavailable_prices_leave_delivered_principal_unencumbered() {
 
 		let mut index = price_index(1);
 		index.usdc_usd_price = None;
-		StabilizerBuys::on_price_index(&index);
+		StabilizerBuys::on_price_index(&index, None);
 		assert_ok!(record_purchase(&1, &purchase()));
 		assert!(Auctions::<Test>::get(1).is_none());
 		assert_eq!(Balances::balance_on_hold(&HoldReason::PurchasePrincipal.into(), &1), 0);
@@ -1383,7 +1433,7 @@ fn admission_keeps_pending_guards_past_u32_counts_and_schedules_without_an_older
 		buy.repay_liquid_id = Some(42);
 		let mut index = price_index(buy.tick);
 		index.argon_usd_price = FixedU128::from_rational(1, 2);
-		<StabilizerBuys as PriceIndexUpdated>::on_price_index(&index);
+		<StabilizerBuys as PriceIndexUpdated>::on_price_index(&index, None);
 		assert_ok!(record_purchase(&1, &buy));
 
 		// Exercise the former overflow boundary while keeping an older bucket to schedule.

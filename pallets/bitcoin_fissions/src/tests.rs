@@ -94,17 +94,17 @@ fn r_value_tracks_each_frames_cheapest_quote_and_rejects_invalid_observations() 
 		};
 		for price in [70, 95, 80] {
 			index.argon_usd_price = FixedU128::from_rational(price, 100);
-			BitcoinFissions::on_price_index(&index);
+			BitcoinFissions::on_price_index(&index, None);
 		}
 		index.argon_usd_price = FixedU128::one();
 		index.argon_time_weighted_average_liquidity = 0;
-		BitcoinFissions::on_price_index(&index);
+		BitcoinFissions::on_price_index(&index, None);
 		index.argon_time_weighted_average_liquidity = 1;
 		index.argon_usd_target_price = FixedU128::zero();
-		BitcoinFissions::on_price_index(&index);
+		BitcoinFissions::on_price_index(&index, None);
 		index.argon_usd_target_price = FixedU128::one();
 		index.tick = 99;
-		BitcoinFissions::on_price_index(&index);
+		BitcoinFissions::on_price_index(&index, None);
 		assert_eq!(
 			RValueHighWaterByFrame::<Test>::get(1u64.to_ordered()).unwrap().r_value,
 			FixedU128::from_rational(95, 100)
@@ -121,7 +121,7 @@ fn r_value_tracks_each_frames_cheapest_quote_and_rejects_invalid_observations() 
 		index.tick = 199;
 		index.argon_usd_price = FixedU128::from_rational(11, 10);
 		index.usdc_usd_price = None;
-		BitcoinFissions::on_price_index(&index);
+		BitcoinFissions::on_price_index(&index, None);
 		let previous = RValueHighWaterByFrame::<Test>::get(1u64.to_ordered()).unwrap();
 		assert_eq!(previous.r_value, FixedU128::from_rational(95, 100));
 		assert_eq!(previous.first_tick, 99);
@@ -136,7 +136,7 @@ fn r_value_tracks_each_frames_cheapest_quote_and_rejects_invalid_observations() 
 		);
 		index.tick = 201;
 		index.argon_usd_price = FixedU128::from_u32(2);
-		BitcoinFissions::on_price_index(&index);
+		BitcoinFissions::on_price_index(&index, None);
 		assert_eq!(
 			RValueHighWaterByFrame::<Test>::get(2u64.to_ordered()).unwrap().r_value,
 			FixedU128::from_rational(11, 10)

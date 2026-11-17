@@ -96,6 +96,7 @@ impl TickProvider<Block> for CurrentTick {
 }
 
 impl pallet_price_index::Config for Test {
+	type StabilizerPool = ();
 	type OnPriceIndexUpdated = ();
 	type TickProvider = CurrentTick;
 	type TicksPerFrame = TicksPerFrame;

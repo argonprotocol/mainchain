@@ -5,8 +5,10 @@ use crate::{
 };
 use alloy_consensus::Header as EthereumHeader;
 use alloy_primitives::B256;
-use argon_primitives::{EthereumExecutionBlockProof, EthereumExecutionHeader, MICROGONS_PER_ARGON};
-use frame_support::{assert_noop, assert_ok};
+use argon_primitives::{
+	EthereumExecutionBlockProof, EthereumExecutionHeader, PriceIndexUpdated, MICROGONS_PER_ARGON,
+};
+use frame_support::{assert_noop, assert_ok, traits::OnRuntimeUpgrade};
 use pallet_ethereum_verifier::{types::ExecutionHeaderAnchor, ExecutionHeaderAnchors};
 use rstest::rstest;
 use sp_runtime::AccountId32;
@@ -616,95 +618,145 @@ fn one_price_bucket_can_cover_the_full_tick_range() {
 }
 
 #[test]
-fn opening_prices_are_fixed_and_history_expires_by_frame_age() {
+fn sampled_prices_follow_frame_boundaries_even_when_blocks_share_a_clock_tick() {
 	new_test_ext().execute_with(|| {
-		let mut index = PriceIndex {
-			btc_usd_price: FixedU128::from_u32(60_000),
-			argonot_usd_price: FixedU128::from_u32(2),
-			argon_usd_price: FixedU128::one(),
-			argon_usd_target_price: FixedU128::one(),
-			argon_time_weighted_average_liquidity: 1_000,
-			tick: 20,
-			usdc_usd_price: Some(FixedU128::one()),
-			stabilizer_pool_sqrt_price_x96: Some(U256::one() << 96),
-		};
-		StabilizerPools::on_price_index(&index);
-		assert_eq!(FrameStartPriceIndices::<Test>::get().get(&1), Some(&index));
-
-		// Subsequent swaps and target changes must not revalue the opening reference.
-		let opening = index;
+		let first_frame_price = uniswap_sqrt_price_at_tick(100);
+		let second_frame_price = uniswap_sqrt_price_at_tick(300);
+		start_mining_frame(1, 20);
+		let mut opening = stabilizer_pool_price_index(20, uniswap_sqrt_price_at_tick(18_000));
+		opening.usdc_usd_price = None;
+		StabilizerPools::on_price_index(&opening, Some(stabilizer_pool_price_source()));
 		CurrentTick::set(21);
-		index.tick = 21;
-		index.stabilizer_pool_sqrt_price_x96 = Some(U256::from(2) << 96);
-		index.argon_usd_target_price = FixedU128::from_rational(101, 100);
-		StabilizerPools::on_price_index(&index);
-		assert_eq!(FrameStartPriceIndices::<Test>::get().get(&1), Some(&opening));
+		report_stabilizer_pool_price(21, first_frame_price);
+		for tick in 22..30 {
+			CurrentTick::set(tick);
+			let mut index = stabilizer_pool_price_index(tick, first_frame_price);
+			index.argon_usd_target_price = FixedU128::from_rational(101, 100);
+			index.usdc_usd_price = (tick != 22).then_some(FixedU128::from_rational(99, 100));
+			StabilizerPools::on_price_index(&index, Some(stabilizer_pool_price_source()));
+		}
+		assert!(StabilizerPoolPricesByFrame::<Test>::get().is_empty());
 
-		// The transition flag selects the new frame before the ordinary frame ID advances.
-		NewlyStartedFrame::set(Some(2));
-		index.stabilizer_pool_sqrt_price_x96 = None;
-		StabilizerPools::on_price_index(&index);
-		assert_eq!(FrameStartPriceIndices::<Test>::get().get(&2), Some(&index));
-
-		CurrentFrame::set(2);
-		NewlyStartedFrame::set(None);
-		index.stabilizer_pool_sqrt_price_x96 = opening.stabilizer_pool_sqrt_price_x96;
-		StabilizerPools::on_price_index(&index);
+		// The oracle reports tick 30 in the block before frame 2 opens, at the same tick.
+		CurrentTick::set(30);
+		report_stabilizer_pool_price(30, second_frame_price);
+		start_mining_frame(2, 30);
 		assert_eq!(
-			FrameStartPriceIndices::<Test>::get()
-				.get(&2)
-				.unwrap()
-				.stabilizer_pool_sqrt_price_x96,
-			None
+			StabilizerPoolPricesByFrame::<Test>::get().get(&1),
+			Some(&StabilizerPoolFramePrice {
+				sqrt_price_x96: first_frame_price,
+				argon_usd_target_price: FixedU128::one(),
+				usdc_usd_price: FixedU128::one(),
+				pool: stabilizer_pool_price_source().pool,
+			})
 		);
+		for tick in 31..40 {
+			CurrentTick::set(tick);
+			report_stabilizer_pool_price(tick, second_frame_price);
+		}
 
-		// A missed frame remains absent. An older index cannot fill the next frame either.
-		CurrentFrame::set(4);
+		// Even without an oracle submission in the opening block, frame 2 closes normally.
+		start_mining_frame(3, 40);
+		assert_eq!(
+			StabilizerPoolPricesByFrame::<Test>::get()
+				.get(&2)
+				.map(|price| price.sqrt_price_x96),
+			Some(second_frame_price)
+		);
+	});
+}
+
+#[test]
+fn missing_prices_do_not_delay_the_next_frame_or_history_expiry() {
+	new_test_ext().execute_with(|| {
+		let price = uniswap_sqrt_price_at_tick(100);
+		start_mining_frame(1, 20);
+		for tick in 20..29 {
+			CurrentTick::set(tick);
+			report_stabilizer_pool_price(tick, price);
+		}
+
+		start_mining_frame(2, 30);
+		// This would complete frame 1, but it arrived after that frame closed.
+		report_stabilizer_pool_price(29, price);
+		for tick in 31..40 {
+			CurrentTick::set(tick);
+			report_stabilizer_pool_price(tick - 1, price);
+		}
+		// A late observation delivered before activation can still complete the closing frame.
 		CurrentTick::set(40);
-		StabilizerPools::on_price_index(&index);
-		assert!(!FrameStartPriceIndices::<Test>::get().contains_key(&3));
-		assert!(!FrameStartPriceIndices::<Test>::get().contains_key(&4));
+		report_stabilizer_pool_price(39, price);
+		start_mining_frame(3, 40);
 
-		// Retention counts financial frames, not observations or the network's wall-clock speed.
-		for frame_id in 4..=33 {
-			CurrentFrame::set(frame_id);
-			CurrentTick::set(frame_id * 10);
-			index.tick = frame_id * 10;
-			StabilizerPools::on_price_index(&index);
-		}
-		assert_eq!(FrameStartPriceIndices::<Test>::get().get(&1), Some(&opening));
-
-		// Frame 34 expires frame 1 even though the missing frame 3 leaves unused capacity.
-		CurrentFrame::set(34);
-		CurrentTick::set(340);
-		index.tick = 340;
-		StabilizerPools::on_price_index(&index);
-		let history = FrameStartPriceIndices::<Test>::get();
+		let history = StabilizerPoolPricesByFrame::<Test>::get();
 		assert!(!history.contains_key(&1));
-		assert!(history.contains_key(&2));
-		assert!(!history.contains_key(&3));
-		assert_eq!(history.get(&34), Some(&index));
-		assert!(history.len() <= 33);
-
-		for frame_id in 35..=37 {
-			CurrentFrame::set(frame_id);
-			CurrentTick::set(frame_id * 10);
-			index.tick = frame_id * 10;
-			StabilizerPools::on_price_index(&index);
+		assert_eq!(history.get(&2).map(|frame_price| frame_price.sqrt_price_x96), Some(price));
+		for frame in 4..=15 {
+			start_mining_frame(frame, 10 + frame * 10);
 		}
-		let history = FrameStartPriceIndices::<Test>::get();
-		assert_eq!(history.keys().next(), Some(&5));
-		assert_eq!(history.len(), 33);
-		assert!(history.encoded_size() < 5_000);
+		assert_eq!(StabilizerPoolPricesByFrame::<Test>::get(), history);
+		start_mining_frame(16, 170);
+		assert!(StabilizerPoolPricesByFrame::<Test>::get().is_empty());
+	});
+}
 
-		// Returning after an oracle gap removes all expired references in the same update.
-		CurrentFrame::set(100);
-		CurrentTick::set(1_000);
-		index.tick = 1_000;
-		StabilizerPools::on_price_index(&index);
-		let history = FrameStartPriceIndices::<Test>::get();
-		assert_eq!(history.keys().copied().collect::<Vec<_>>(), vec![100]);
-		assert_eq!(history.get(&100), Some(&index));
+#[test]
+fn frame_price_requires_spot_prices_from_a_single_approved_revision() {
+	new_test_ext().execute_with(|| {
+		let old_pool = stabilizer_pool_price_source();
+		let mut new_pool = old_pool;
+		new_pool.revision += 1;
+		new_pool.pool.pool_id = H256::repeat_byte(2);
+		let sqrt_price = uniswap_sqrt_price_at_tick(100);
+
+		start_mining_frame(1, 20);
+		for tick in 20..30 {
+			CurrentTick::set(tick);
+			let source = if tick < 25 { old_pool } else { new_pool };
+			StabilizerPools::on_price_index(
+				&stabilizer_pool_price_index(tick, sqrt_price),
+				Some(source),
+			);
+		}
+		start_mining_frame(2, 30);
+		assert!(StabilizerPoolPricesByFrame::<Test>::get().is_empty());
+
+		for tick in 30..40 {
+			CurrentTick::set(tick);
+			StabilizerPools::on_price_index(
+				&stabilizer_pool_price_index(tick, sqrt_price),
+				Some(new_pool),
+			);
+		}
+		start_mining_frame(3, 40);
+		let prices = StabilizerPoolPricesByFrame::<Test>::get();
+		assert_eq!(prices.get(&2).unwrap().pool, new_pool.pool);
+	});
+}
+
+#[test]
+fn upgrade_retires_opening_price_indices_and_preserves_checkpoints() {
+	use crate::migrations::{v1::FrameStartPriceIndices, RemoveOpeningPriceIndicesMigration};
+
+	new_test_ext().execute_with(|| {
+		let opening_index = stabilizer_pool_price_index(20, U256::one() << 96);
+		StorageVersion::new(1).put::<StabilizerPools>();
+		FrameStartPriceIndices::<Test>::mutate(|history| {
+			history.try_insert(1, opening_index).unwrap()
+		});
+		let token_id = U256::one();
+		let checkpoint = position_checkpoint(1_000, -10, 10);
+		PositionCheckpoints::<Test>::insert(config().position_manager, token_id, &checkpoint);
+
+		RemoveOpeningPriceIndicesMigration::<Test>::on_runtime_upgrade();
+
+		assert!(!FrameStartPriceIndices::<Test>::exists());
+		assert!(StabilizerPoolPricesByFrame::<Test>::get().is_empty());
+		assert_eq!(
+			PositionCheckpoints::<Test>::get(config().position_manager, token_id),
+			Some(checkpoint)
+		);
+		assert_eq!(StorageVersion::get::<StabilizerPools>(), StorageVersion::new(2));
 	});
 }
 

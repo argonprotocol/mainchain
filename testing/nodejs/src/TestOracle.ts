@@ -1,5 +1,5 @@
 import * as child_process from 'node:child_process';
-import { Keyring, KeyringPair } from '@argonprotocol/mainchain';
+import { type ArgonClient, Keyring, KeyringPair } from '@argonprotocol/mainchain';
 import * as fs from 'node:fs';
 import * as readline from 'node:readline';
 import { addTeardown, ITeardownable, projectRoot } from './support';
@@ -10,6 +10,17 @@ import { Readable } from 'node:stream';
 export default class TestOracle implements ITeardownable {
   public static BitcoinOperator = '//Dave';
   public static PriceIndexOperator = '//Eve';
+
+  public static submitPriceIndex(
+    client: ArgonClient,
+    index: Parameters<ArgonClient['tx']['priceIndex']['submit']>[0],
+  ) {
+    const submit = client.tx.priceIndex.submit;
+    // TODO: Call the generated three-argument submit directly after regenerating metadata.
+    const args = [index, null, null];
+    return submit(...(args as Parameters<typeof submit>));
+  }
+
   public operator?: KeyringPair;
   public port?: string;
   #childProcess?: child_process.ChildProcessByStdio<null, Readable, Readable>;

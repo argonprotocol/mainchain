@@ -4,7 +4,9 @@ extern crate alloc;
 use pallet_prelude::*;
 
 pub use argon_primitives::PriceIndex;
-use argon_primitives::{block_seal::FrameId, ArgonCPI, PriceIndexUpdated, TickProvider};
+use argon_primitives::{
+	block_seal::FrameId, ArgonCPI, PriceIndexUpdated, StabilizerPoolPriceSource, TickProvider,
+};
 pub use pallet::*;
 pub use weights::WeightInfo;
 
@@ -142,6 +144,8 @@ pub mod pallet {
 
 		/// Consumers own any policy-specific price history.
 		type OnPriceIndexUpdated: PriceIndexUpdated;
+		/// The currently approved Uniswap pool and its revision.
+		type StabilizerPool: Get<Option<StabilizerPoolPriceSource>>;
 
 		type Currency: Inspect<Self::AccountId, Balance = Self::Balance>;
 
@@ -317,11 +321,12 @@ pub mod pallet {
 
 	#[pallet::call]
 	impl<T: Config> Pallet<T> {
-		/// Submit the latest price index. Only valid for the configured operator account
+		/// Submit the latest price index as the configured oracle operator.
+		/// A superseded pool revision omits only the pool quote from the accepted index.
 		#[pallet::call_index(0)]
-		#[pallet::weight((T::WeightInfo::submit().saturating_add(T::OnPriceIndexUpdated::on_price_index_weight()), DispatchClass::Operational))]
+		#[pallet::weight((T::WeightInfo::submit().saturating_add(T::OnPriceIndexUpdated::on_price_index_weight()).saturating_add(T::DbWeight::get().reads(2)), DispatchClass::Operational))]
 		#[pallet::feeless_if(
-			|origin: &OriginFor<T>, _index: &PriceIndex, _ethereum: &Option<EthereumPriceIndex>| -> bool {
+			|origin: &OriginFor<T>, _index: &PriceIndex, _ethereum: &Option<EthereumPriceIndex>, _stabilizer_pool_revision: &Option<u32>| -> bool {
 				let Ok(who) = ensure_signed(origin.clone()) else {
 					return false;
 				};
@@ -332,6 +337,7 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			mut index: PriceIndex,
 			ethereum: Option<EthereumPriceIndex>,
+			stabilizer_pool_revision: Option<u32>,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
@@ -365,8 +371,15 @@ pub mod pallet {
 				LastValid::<T>::put(current);
 			}
 
+			let pool_source = stabilizer_pool_revision.and_then(|revision| {
+				T::StabilizerPool::get().filter(|source| source.revision == revision)
+			});
+			if stabilizer_pool_revision.is_some() && pool_source.is_none() {
+				index.stabilizer_pool_sqrt_price_x96 = None;
+			}
+
 			Current::<T>::put(index);
-			T::OnPriceIndexUpdated::on_price_index(&index);
+			T::OnPriceIndexUpdated::on_price_index(&index, pool_source);
 			let frame_id = T::MiningFrameTransitionProvider::is_new_frame_started()
 				.unwrap_or_else(T::CurrentFrameId::get);
 			if let Some(ethereum) = ethereum {

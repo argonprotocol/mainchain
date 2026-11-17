@@ -21,12 +21,17 @@ use core::marker::PhantomData;
 /// Weight functions for `pallet_stabilizer_pools`.
 pub struct WeightInfo<T>(PhantomData<T>);
 impl<T: frame_system::Config> pallet_stabilizer_pools::WeightInfo for WeightInfo<T> {
+	fn record_stabilizer_pool_spot_price() -> Weight {
+		// TODO: Generate weights for the frame price sampler.
+		Weight::zero()
+	}
+	fn start_stabilizer_pool_price_sampling() -> Weight {
+		// TODO: Generate weights for the frame price sampler.
+		Weight::zero()
+	}
 	/// Storage: `Ticks::CurrentTick` (r:1 w:0)
 	/// Proof: `Ticks::CurrentTick` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
-	/// Storage: `MiningSlot::NewlyStartedFrameId` (r:1 w:0)
-	/// Proof: `MiningSlot::NewlyStartedFrameId` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
-	/// Storage: `MiningSlot::NextFrameId` (r:1 w:0)
-	/// Proof: `MiningSlot::NextFrameId` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
+	/// Retain the prior context weight until regenerating it for the single clock read.
 	fn read_price_index_context() -> Weight {
 		// Proof Size summary in bytes:
 		//  Measured:  `0`
@@ -34,28 +39,6 @@ impl<T: frame_system::Config> pallet_stabilizer_pools::WeightInfo for WeightInfo
 		// Minimum execution time: 1_000_000 picoseconds.
 		Weight::from_parts(2_000_000, 1493)
 			.saturating_add(T::DbWeight::get().reads(3))
-		}
-	/// Storage: `StabilizerPools::FrameStartPriceIndices` (r:1 w:1)
-	/// Proof: `StabilizerPools::FrameStartPriceIndices` (`max_values`: Some(1), `max_size`: Some(4819), added: 5314, mode: `MaxEncodedLen`)
-	fn record_frame_price() -> Weight {
-		// Proof Size summary in bytes:
-		//  Measured:  `4925`
-		//  Estimated: `6304`
-		// Minimum execution time: 20_000_000 picoseconds.
-		Weight::from_parts(20_000_000, 6304)
-			.saturating_add(T::DbWeight::get().reads(1))
-			.saturating_add(T::DbWeight::get().writes(1))
-		}
-	/// Storage: `StabilizerPools::FrameStartPriceIndices` (r:1 w:1)
-	/// Proof: `StabilizerPools::FrameStartPriceIndices` (`max_values`: Some(1), `max_size`: Some(4819), added: 5314, mode: `MaxEncodedLen`)
-	fn record_frame_price_after_gap() -> Weight {
-		// Proof Size summary in bytes:
-		//  Measured:  `4925`
-		//  Estimated: `6304`
-		// Minimum execution time: 22_000_000 picoseconds.
-		Weight::from_parts(22_000_000, 6304)
-			.saturating_add(T::DbWeight::get().reads(1))
-			.saturating_add(T::DbWeight::get().writes(1))
 		}
 	/// Storage: `StabilizerPools::Pools` (r:1 w:1)
 	/// Proof: `StabilizerPools::Pools` (`max_values`: None, `max_size`: Some(192), added: 2667, mode: `MaxEncodedLen`)

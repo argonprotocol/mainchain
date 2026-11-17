@@ -132,16 +132,19 @@ fn proven_purchase_delivery_and_principal_hold_commit_together() {
 			argon_is_token0: event.token < event.purchase.usdcToken,
 		});
 		// A $2 target makes this authenticated native purchase eligible for the reward auction.
-		StabilizerBuys::on_price_index(&PriceIndex {
-			tick,
-			btc_usd_price: FixedU128::from_u32(60_000),
-			argonot_usd_price: FixedU128::one(),
-			argon_usd_price: FixedU128::one(),
-			argon_usd_target_price: FixedU128::from_u32(2),
-			argon_time_weighted_average_liquidity: 1,
-			usdc_usd_price: Some(FixedU128::one()),
-			stabilizer_pool_sqrt_price_x96: None,
-		});
+		StabilizerBuys::on_price_index(
+			&PriceIndex {
+				tick,
+				btc_usd_price: FixedU128::from_u32(60_000),
+				argonot_usd_price: FixedU128::one(),
+				argon_usd_price: FixedU128::one(),
+				argon_usd_target_price: FixedU128::from_u32(2),
+				argon_time_weighted_average_liquidity: 1,
+				usdc_usd_price: Some(FixedU128::one()),
+				stabilizer_pool_sqrt_price_x96: None,
+			},
+			None,
+		);
 
 		let mut forged = proof.clone();
 		let mut forged_event = event.clone();
@@ -422,7 +425,7 @@ fn deferred_repayment_settles_bitcoin_principal_and_rewards_including_unreceivab
 				ids.try_insert(0).unwrap();
 			});
 			let index = pallet_price_index::Current::<Runtime>::get().unwrap();
-			<(StabilizerBuys, BitcoinFissions) as PriceIndexUpdated>::on_price_index(&index);
+			<(StabilizerBuys, BitcoinFissions) as PriceIndexUpdated>::on_price_index(&index, None);
 			let mut purchase = UniswapPurchase {
 				gateway_activity_nonce: 1,
 				repay_liquid_id: Some(1),
@@ -522,13 +525,15 @@ fn deferred_repayment_settles_bitcoin_principal_and_rewards_including_unreceivab
 			recovered.tick = 1;
 			recovered.argon_usd_price = FixedU128::from_rational(recovery_r, 100);
 			pallet_ticks::CurrentTick::<Runtime>::put(1);
-			<(StabilizerBuys, BitcoinFissions) as PriceIndexUpdated>::on_price_index(&recovered);
+			<(StabilizerBuys, BitcoinFissions) as PriceIndexUpdated>::on_price_index(
+				&recovered, None,
+			);
 			if recovery_r == 95 {
 				recovered.tick = 2;
 				recovered.argon_usd_price = FixedU128::one();
 				pallet_ticks::CurrentTick::<Runtime>::put(2);
 				<(StabilizerBuys, BitcoinFissions) as PriceIndexUpdated>::on_price_index(
-					&recovered,
+					&recovered, None,
 				);
 			}
 			// Settlement must remain usable without a live Bitcoin or ARGON quote.

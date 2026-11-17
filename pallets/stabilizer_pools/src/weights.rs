@@ -7,8 +7,8 @@ pub trait WeightInfo {
 	fn register_pool() -> Weight;
 	fn checkpoint_position() -> Weight;
 	fn read_price_index_context() -> Weight;
-	fn record_frame_price() -> Weight;
-	fn record_frame_price_after_gap() -> Weight;
+	fn record_stabilizer_pool_spot_price() -> Weight;
+	fn start_stabilizer_pool_price_sampling() -> Weight;
 }
 
 impl WeightInfo for () {
@@ -21,10 +21,10 @@ impl WeightInfo for () {
 	fn read_price_index_context() -> Weight {
 		Weight::zero()
 	}
-	fn record_frame_price() -> Weight {
+	fn record_stabilizer_pool_spot_price() -> Weight {
 		Weight::zero()
 	}
-	fn record_frame_price_after_gap() -> Weight {
+	fn start_stabilizer_pool_price_sampling() -> Weight {
 		Weight::zero()
 	}
 }

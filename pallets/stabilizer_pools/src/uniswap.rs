@@ -1,7 +1,7 @@
 //! Uniswap principal valuation for individual NFTs and shared liquidity ranges.
 use crate::PositionCheckpoint;
 use alloy_primitives::aliases::I24;
-use argon_primitives::{Balance, MICROGONS_PER_ARGON};
+use argon_primitives::{Balance, UniswapSqrtPriceX96, UniswapTick, MICROGONS_PER_ARGON};
 use pallet_prelude::*;
 use polkadot_sdk::sp_core::U512;
 use uniswap_v3_sdk_bigint::utils::{
@@ -20,7 +20,7 @@ impl<AccountId> PositionCheckpoint<AccountId> {
 	/// USDC already has six decimals. Each amount rounds down, as when removing liquidity.
 	pub fn amounts_at_price(
 		&self,
-		sqrt_price_x96: U256,
+		sqrt_price_x96: UniswapSqrtPriceX96,
 		argon_is_token0: bool,
 	) -> Result<PositionAmounts, PositionAmountError> {
 		let amounts = principal_for_liquidity_range(
@@ -49,8 +49,8 @@ pub struct StabilizerPoolRewardBand {
 	uniswap_tick_spacing: i32,
 	reward_price_band: (Percent, Percent),
 	reference_tolerance: Percent,
-	sqrt_lower: U256,
-	sqrt_upper: U256,
+	sqrt_lower: UniswapSqrtPriceX96,
+	sqrt_upper: UniswapSqrtPriceX96,
 }
 
 impl StabilizerPoolRewardBand {
@@ -129,9 +129,9 @@ impl StabilizerPoolRewardBand {
 	pub fn principal_for_range(
 		&self,
 		liquidity: U256,
-		lower_uniswap_tick: i32,
-		upper_uniswap_tick: i32,
-		pool_sqrt_price_x96: U256,
+		lower_uniswap_tick: UniswapTick,
+		upper_uniswap_tick: UniswapTick,
+		pool_sqrt_price_x96: UniswapSqrtPriceX96,
 	) -> Result<PositionAmounts<U256>, PositionAmountError> {
 		let empty = PositionAmounts { argon: U256::zero(), usdc: U256::zero() };
 		let Some((position_sqrt_lower, position_sqrt_upper)) =
@@ -159,9 +159,9 @@ impl StabilizerPoolRewardBand {
 	/// rounding each endpoint to a USD integer could accept a shortened band.
 	fn qualifying_range(
 		&self,
-		lower_uniswap_tick: i32,
-		upper_uniswap_tick: i32,
-	) -> Result<Option<(U256, U256)>, PositionAmountError> {
+		lower_uniswap_tick: UniswapTick,
+		upper_uniswap_tick: UniswapTick,
+	) -> Result<Option<(UniswapSqrtPriceX96, UniswapSqrtPriceX96)>, PositionAmountError> {
 		if lower_uniswap_tick >= upper_uniswap_tick {
 			return Err(PositionAmountError::InvalidTickRange);
 		}
@@ -260,9 +260,9 @@ impl StabilizerPoolRewardBand {
 /// their sum to one NFT's uint128 capacity. Eligibility and reward policy belong to the caller.
 pub(crate) fn principal_for_liquidity_range(
 	liquidity: U256,
-	lower_uniswap_tick: i32,
-	upper_uniswap_tick: i32,
-	sqrt_price_x96: U256,
+	lower_uniswap_tick: UniswapTick,
+	upper_uniswap_tick: UniswapTick,
+	sqrt_price_x96: UniswapSqrtPriceX96,
 	argon_is_token0: bool,
 ) -> Result<PositionAmounts<U256>, PositionAmountError> {
 	if lower_uniswap_tick >= upper_uniswap_tick {
@@ -283,9 +283,9 @@ pub(crate) fn principal_for_liquidity_range(
 /// may place these boundaries between usable grid ticks; it must not expand the original range.
 fn principal_for_sqrt_price_range(
 	liquidity: U256,
-	sqrt_lower: U256,
-	sqrt_upper: U256,
-	sqrt_price_x96: U256,
+	sqrt_lower: UniswapSqrtPriceX96,
+	sqrt_upper: UniswapSqrtPriceX96,
+	sqrt_price_x96: UniswapSqrtPriceX96,
 	argon_is_token0: bool,
 ) -> Result<PositionAmounts<U256>, PositionAmountError> {
 	let minimum_sqrt_price = U256::from_big_endian(&MIN_SQRT_RATIO.to_be_bytes::<20>());
@@ -318,7 +318,9 @@ fn principal_for_sqrt_price_range(
 	Ok(PositionAmounts { argon, usdc })
 }
 
-pub(crate) fn sqrt_price_at_uniswap_tick(uniswap_tick: i32) -> Result<U256, PositionAmountError> {
+pub(crate) fn sqrt_price_at_uniswap_tick(
+	uniswap_tick: UniswapTick,
+) -> Result<UniswapSqrtPriceX96, PositionAmountError> {
 	if !(MIN_TICK_I32..=MAX_TICK_I32).contains(&uniswap_tick) {
 		return Err(PositionAmountError::InvalidTickRange);
 	}
@@ -333,7 +335,7 @@ fn sqrt_price_from_token_ratio(
 	numerator: U256,
 	denominator: U256,
 	round_up: bool,
-) -> Result<U256, PositionAmountError> {
+) -> Result<UniswapSqrtPriceX96, PositionAmountError> {
 	if denominator.is_zero() {
 		return Err(PositionAmountError::InvalidPrice);
 	}

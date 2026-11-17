@@ -21,7 +21,8 @@ use argon_primitives::{
 	bitcoin::{LiquidId, LiquidRepayPrices},
 	AmountRankKey, AscendingRankKey, BitcoinFissionsProvider, CrosschainGatewayProvider,
 	LiquidRepaymentProvider, MiningFrameTransitionProvider,
-	MiningFrameTransitionProviderWeightInfo, OnNewSlot, TickProvider,
+	MiningFrameTransitionProviderWeightInfo, OnNewSlot, StabilizerPoolPriceSource, TickProvider,
+	UniswapPoolIdentity,
 };
 use frame_support::{
 	require_transactional,
@@ -42,6 +43,7 @@ pub use uniswap_purchase::PurchasePool;
 pub use weights::WeightInfo;
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
+pub mod migrations;
 #[cfg(test)]
 mod mock;
 mod price_history;
@@ -54,7 +56,7 @@ pub mod weights;
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(1);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(2);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -132,6 +134,11 @@ pub mod pallet {
 	/// Execution venue eligible for purchase rewards. Unset until governance selects a pool.
 	#[pallet::storage]
 	pub type ApprovedPool<T> = StorageValue<_, PurchasePool>;
+
+	/// Revision of `ApprovedPool`, updated by `set_approved_pool` when approval changes.
+	/// The oracle reads this from the same finalized block as `ApprovedPool`.
+	#[pallet::storage]
+	pub type ApprovedPoolRevision<T> = StorageValue<_, u32, ValueQuery>;
 
 	/// Pending repayment commitments, ordered by gateway nonce within each recipient.
 	/// The existing account payout queue selects work; this adds no separate settlement queue.
@@ -570,13 +577,19 @@ pub mod pallet {
 
 		/// Select the reward pool, or disable new purchase eligibility.
 		#[pallet::call_index(1)]
-		#[pallet::weight(T::WeightInfo::set_approved_pool())]
+		#[pallet::weight(T::WeightInfo::set_approved_pool().saturating_add(T::DbWeight::get().reads_writes(2, 1)))]
 		pub fn set_approved_pool(
 			origin: OriginFor<T>,
 			pool: Option<PurchasePool>,
 		) -> DispatchResult {
 			ensure_root(origin)?;
-			ApprovedPool::<T>::set(pool.clone());
+			if ApprovedPool::<T>::get() != pool {
+				let revision = ApprovedPoolRevision::<T>::get()
+					.checked_add(1)
+					.ok_or(ArithmeticError::Overflow)?;
+				ApprovedPool::<T>::set(pool.clone());
+				ApprovedPoolRevision::<T>::put(revision);
+			}
 			Self::deposit_event(Event::ApprovedPoolChanged { pool });
 			Ok(())
 		}
@@ -766,6 +779,20 @@ impl<T: Config> LiquidRepaymentProvider<T::AccountId> for Pallet<T> {
 		PendingPriceWindowCountByTick::<T>::iter_keys()
 			.next()
 			.map(|key| Tick::from_ordered(&key))
+	}
+}
+
+impl<T: Config> Get<Option<StabilizerPoolPriceSource>> for Pallet<T> {
+	fn get() -> Option<StabilizerPoolPriceSource> {
+		let pool = ApprovedPool::<T>::get()?;
+		Some(StabilizerPoolPriceSource {
+			revision: ApprovedPoolRevision::<T>::get(),
+			pool: UniswapPoolIdentity {
+				chain_id: pool.chain_id,
+				pool_manager: pool.pool_manager,
+				pool_id: pool.pool_id,
+			},
+		})
 	}
 }
 

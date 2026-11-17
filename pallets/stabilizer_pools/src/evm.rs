@@ -4,6 +4,7 @@
 use crate::{Config, Error, PoolConfig, PoolKey, PositionProof};
 use alloy_primitives::{keccak256, Address, B256, I256, U256 as AlloyU256};
 use alloy_sol_types::SolValue;
+use argon_primitives::UniswapTick;
 use pallet_prelude::*;
 
 /// Subscriber's `subscriptions` mapping: beneficiary at the base slot, revision at base + 1.
@@ -24,9 +25,9 @@ pub(crate) struct DecodedPosition {
 	/// Permanent subscription revision decoded as an Ethereum uint256.
 	pub revision: U256,
 	/// Inclusive signed int24 lower tick.
-	pub tick_lower: i32,
+	pub tick_lower: UniswapTick,
 	/// Exclusive signed int24 upper tick.
-	pub tick_upper: i32,
+	pub tick_upper: UniswapTick,
 	/// Native uint128 Uniswap liquidity value.
 	pub liquidity: u128,
 }
@@ -62,8 +63,8 @@ pub fn liquidity_slot(
 	pool_id: H256,
 	position_manager: H160,
 	token_id: U256,
-	lower: i32,
-	upper: i32,
+	lower: UniswapTick,
+	upper: UniswapTick,
 ) -> H256 {
 	// PoolManager keys NFT positions by the PositionManager as owner and tokenId as salt.
 	let mut position_key = [0u8; 58];
@@ -151,7 +152,7 @@ pub(crate) fn decode_position<T: Config>(
 	})
 }
 
-fn signed_tick(bytes: &[u8]) -> i32 {
+fn signed_tick(bytes: &[u8]) -> UniswapTick {
 	let sign_extension = if bytes[0] & 0x80 != 0 { 0xff } else { 0 };
 	i32::from_be_bytes([sign_extension, bytes[0], bytes[1], bytes[2]])
 }

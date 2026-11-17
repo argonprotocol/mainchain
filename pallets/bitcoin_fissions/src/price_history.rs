@@ -2,12 +2,12 @@ use crate::{Config, Pallet, RValueHighWaterByFrame, WeightInfo};
 use argon_primitives::{
 	amount_rank::AmountRankId, bitcoin::best_redemption_r_value, CrosschainGatewayProvider,
 	LiquidRepaymentProvider, MiningFrameTransitionProvider, PriceIndex, PriceIndexUpdated,
-	RValueHighWaterMark, SourceChain, TickProvider,
+	RValueHighWaterMark, SourceChain, StabilizerPoolPriceSource, TickProvider,
 };
 use pallet_prelude::*;
 
 impl<T: Config> PriceIndexUpdated for Pallet<T> {
-	fn on_price_index(index: &PriceIndex) {
+	fn on_price_index(index: &PriceIndex, _: Option<StabilizerPoolPriceSource>) {
 		// Only valid ARGON observations contribute to a frame's best repayment quote.
 		if index.argon_time_weighted_average_liquidity == 0 {
 			return;

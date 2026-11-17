@@ -28,7 +28,7 @@ use sp_runtime::{
 use super::{
 	ethereum::{
 		EthereumAccountStorageProof, EthereumBlockNumber, EthereumReceiptLogProofBatch,
-		EthereumVerifyError, UniswapPurchase,
+		EthereumVerifyError, StabilizerPoolPriceSource, UniswapPurchase,
 	},
 	gateway::{GatewayState, SourceChain},
 	vault::{BitcoinSecuritizationBasis, CosignerGuarantee},
@@ -971,14 +971,15 @@ fn btc_price_in_microgons<
 
 /// Accepted oracle observations. Consumers own their retention and valuation policy.
 pub trait PriceIndexUpdated {
-	fn on_price_index(index: &PriceIndex);
+	/// The pool source is present only when the oracle supplied the current approved revision.
+	fn on_price_index(index: &PriceIndex, pool_source: Option<StabilizerPoolPriceSource>);
 	fn on_price_index_weight() -> Weight;
 }
 
 #[impl_trait_for_tuples::impl_for_tuples(0, 3)]
 impl PriceIndexUpdated for Tuple {
-	fn on_price_index(index: &PriceIndex) {
-		for_tuples!( #( Tuple::on_price_index(index); )* );
+	fn on_price_index(index: &PriceIndex, pool_source: Option<StabilizerPoolPriceSource>) {
+		for_tuples!( #( Tuple::on_price_index(index, pool_source); )* );
 	}
 
 	#[allow(clippy::let_and_return)]
@@ -1676,7 +1677,7 @@ pub trait SlotEvents<AccountId> {
 	}
 }
 
-#[impl_trait_for_tuples::impl_for_tuples(0, 7)]
+#[impl_trait_for_tuples::impl_for_tuples(0, 8)]
 #[tuple_types_custom_trait_bound(OnNewSlot<AId>)]
 impl<AId> SlotEvents<AId> for Tuple {
 	fn on_frame_start(frame_id: FrameId) {

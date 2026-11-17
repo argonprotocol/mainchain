@@ -141,6 +141,7 @@ parameter_types! {
 }
 
 impl pallet_price_index::Config for Test {
+	type StabilizerPool = StabilizerBuys;
 	type OnPriceIndexUpdated = StabilizerBuys;
 	type WeightInfo = ();
 	type Currency = Balances;
@@ -218,7 +219,10 @@ pub fn new_test_ext() -> TestState {
 			microgons_at_target_per_usdc: FixedU128::from_u32(1_000_000),
 		}));
 		CurrentTick::set(1);
-		<StabilizerBuys as argon_primitives::PriceIndexUpdated>::on_price_index(&price_index(1));
+		<StabilizerBuys as argon_primitives::PriceIndexUpdated>::on_price_index(
+			&price_index(1),
+			None,
+		);
 		CurrentTick::set(1_000);
 		FailReserve::set(false);
 		FailReturn::set(false);

@@ -10,7 +10,12 @@ use alloy_trie::{
 	proof::{ProofNodes, ProofRetainer},
 	HashBuilder, Nibbles, TrieAccount,
 };
-use argon_primitives::{EthereumExecutionBlockProof, EthereumStorageSlotProof};
+use argon_primitives::{
+	EthereumExecutionBlockProof, EthereumStorageSlotProof, StabilizerPoolPriceSource,
+	UniswapPoolIdentity,
+};
+#[cfg(test)]
+use argon_primitives::{OnNewSlot, PriceIndex, PriceIndexUpdated, UniswapSqrtPriceX96};
 #[cfg(test)]
 use core::ops::Range;
 #[cfg(test)]
@@ -55,9 +60,9 @@ impl pallet_ethereum_verifier::Config for Test {
 #[cfg(test)]
 impl Config for Test {
 	type WeightInfo = ();
-	type MiningFrameTransitionProvider = Frames;
 	type CurrentTick = CurrentTick;
-	type MaxFramePriceHistoryFrames = ConstU32<33>;
+	type MaxSampledPriceHistoryFrames = ConstU32<13>;
+	type TicksPerFrame = ConstU64<10>;
 	type RewardPriceBand = RewardPriceBand;
 	type MaxPriceBucketsPerFrame = MaxPriceBucketsPerFrame;
 	type MinPriceBucketCoverage = MinPriceBucketCoverage;
@@ -69,24 +74,6 @@ frame_support::parameter_types! {
 	pub const MaxPriceBucketsPerFrame: u32 = 24;
 	pub const MinPriceBucketCoverage: Percent = Percent::from_percent(75);
 	pub static CurrentTick: Tick = 20;
-	pub static CurrentFrame: FrameId = 1;
-	pub static NewlyStartedFrame: Option<FrameId> = None;
-}
-
-#[cfg(test)]
-pub struct Frames;
-
-#[cfg(test)]
-impl MiningFrameTransitionProvider for Frames {
-	type Weights = ();
-
-	fn is_new_frame_started() -> Option<FrameId> {
-		NewlyStartedFrame::get()
-	}
-
-	fn get_current_frame_id() -> FrameId {
-		CurrentFrame::get()
-	}
 }
 
 #[cfg(test)]
@@ -97,6 +84,44 @@ pub fn new_test_ext() -> TestState {
 		assert_ok!(StabilizerPools::register_pool(RuntimeOrigin::root(), pool_manager(), config()));
 	});
 	ext
+}
+
+#[cfg(test)]
+pub(crate) fn start_mining_frame(frame_id: FrameId, tick: Tick) {
+	CurrentTick::set(tick);
+	StabilizerPools::on_frame_start(frame_id);
+}
+
+#[cfg(test)]
+pub(crate) fn report_stabilizer_pool_price(tick: Tick, sqrt_price_x96: UniswapSqrtPriceX96) {
+	StabilizerPools::on_price_index(
+		&stabilizer_pool_price_index(tick, sqrt_price_x96),
+		Some(stabilizer_pool_price_source()),
+	);
+}
+
+pub(crate) fn stabilizer_pool_price_source() -> StabilizerPoolPriceSource {
+	StabilizerPoolPriceSource {
+		revision: 1,
+		pool: UniswapPoolIdentity { chain_id: 1, pool_manager: pool_manager(), pool_id: pool_id() },
+	}
+}
+
+#[cfg(test)]
+pub(crate) fn stabilizer_pool_price_index(
+	tick: Tick,
+	sqrt_price_x96: UniswapSqrtPriceX96,
+) -> PriceIndex {
+	PriceIndex {
+		tick,
+		stabilizer_pool_sqrt_price_x96: Some(sqrt_price_x96),
+		btc_usd_price: FixedU128::from_u32(60_000),
+		argonot_usd_price: FixedU128::from_u32(2),
+		argon_usd_price: FixedU128::one(),
+		argon_usd_target_price: FixedU128::one(),
+		argon_time_weighted_average_liquidity: 1_000,
+		usdc_usd_price: Some(FixedU128::one()),
+	}
 }
 
 pub(crate) fn pool_manager() -> H160 {
@@ -124,8 +149,8 @@ pub(crate) fn pool_id() -> H256 {
 #[cfg(test)]
 pub(crate) fn position_checkpoint(
 	liquidity: u128,
-	tick_lower: i32,
-	tick_upper: i32,
+	tick_lower: UniswapTick,
+	tick_upper: UniswapTick,
 ) -> PositionCheckpoint<AccountId32> {
 	let block =
 		ProofBlock { hash: H256::from_low_u64_be(100), number: 100, timestamp_millis: 1_200_000 };
@@ -145,7 +170,7 @@ pub(crate) fn position_checkpoint(
 
 /// Convert a named Uniswap price tick to the raw sqrt-price format accepted by the pallet.
 #[cfg(test)]
-pub(crate) fn uniswap_sqrt_price_at_tick(uniswap_tick: i32) -> U256 {
+pub(crate) fn uniswap_sqrt_price_at_tick(uniswap_tick: UniswapTick) -> UniswapSqrtPriceX96 {
 	let sqrt_price = get_sqrt_ratio_at_tick(I24::try_from(uniswap_tick).unwrap()).unwrap();
 	U256::from_big_endian(&sqrt_price.to_be_bytes::<20>())
 }
@@ -154,8 +179,8 @@ pub(crate) fn uniswap_sqrt_price_at_tick(uniswap_tick: i32) -> U256 {
 #[cfg(test)]
 pub(crate) fn uniswap_sdk_principal(
 	liquidity: u128,
-	sqrt_range: Range<U256>,
-	sqrt_price_x96: U256,
+	sqrt_range: Range<UniswapSqrtPriceX96>,
+	sqrt_price_x96: UniswapSqrtPriceX96,
 	argon_is_token0: bool,
 ) -> PositionAmounts<U256> {
 	let sqrt_lower = AlloyU256::from_be_bytes(sqrt_range.start.to_big_endian());
@@ -180,7 +205,7 @@ pub(crate) fn uniswap_sqrt_price_for_usd_price(
 	usdc_usd_price: FixedU128,
 	argon_is_token0: bool,
 	round_up: bool,
-) -> U256 {
+) -> UniswapSqrtPriceX96 {
 	let argon = AlloyU256::from(argon_usd_price.into_inner());
 	let usdc = AlloyU256::from(usdc_usd_price.into_inner()) * AlloyU256::from(10u128.pow(12));
 	let (numerator, denominator) = if argon_is_token0 { (argon, usdc) } else { (usdc, argon) };
@@ -205,7 +230,7 @@ pub(crate) fn uniswap_bounds_for_usd_band(
 	usdc_usd_price: FixedU128,
 	argon_is_token0: bool,
 	uniswap_tick_spacing: i32,
-) -> (i32, i32) {
+) -> (UniswapTick, UniswapTick) {
 	let mut ticks = [0, 0];
 	for (index, usd_price) in [lower_usd_price, upper_usd_price].into_iter().enumerate() {
 		let sqrt_price = uniswap_sqrt_price_for_usd_price(

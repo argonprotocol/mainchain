@@ -11,6 +11,7 @@ use argon_client::{
 			argon_runtime::{RuntimeCall, RuntimeError},
 			pallet_bitcoin_fissions::pallet::Error as BitcoinFissionsError,
 			pallet_bitcoin_locks::pallet::Error as BitcoinLocksError,
+			pallet_price_index::EthereumPriceIndex,
 			sp_arithmetic::fixed_point::FixedU128 as FixedU128Ext,
 		},
 		storage, tx,
@@ -51,7 +52,7 @@ use sp_arithmetic::FixedU128;
 use sp_core::{crypto::AccountId32, sr25519, Pair};
 use sp_keyring::Sr25519Keyring::{Alice, Bob, Eve};
 use std::{str::FromStr, sync::Arc, time::Duration};
-use subxt::ext::scale_encode::EncodeAsType;
+use subxt::{ext::scale_encode::EncodeAsType, tx::DefaultPayload};
 use tokio::time::sleep;
 use url::Url;
 
@@ -1076,22 +1077,30 @@ async fn submit_price(
 			.live
 			.tx()
 			.sign_and_submit_then_watch(
-				&tx().price_index().submit(
-					Index {
-						btc_usd_price: FixedU128Ext(
-							FixedU128::from_float(btc_usd_price).into_inner(),
-						),
-						argon_usd_target_price: FixedU128Ext(
-							FixedU128::from_float(1.0).into_inner(),
-						),
-						argon_usd_price: FixedU128Ext(FixedU128::from_float(1.6).into_inner()),
-						argon_time_weighted_average_liquidity: 500_000_000_000,
-						usdc_usd_price: None,
-						stabilizer_pool_sqrt_price_x96: None,
-						argonot_usd_price: FixedU128Ext(FixedU128::from_float(1.0).into_inner()),
-						tick,
-					},
-					None,
+				// TODO: Use the generated PriceIndex.submit call after regenerating metadata.
+				&DefaultPayload::new(
+					"PriceIndex",
+					"submit",
+					(
+						Index {
+							btc_usd_price: FixedU128Ext(
+								FixedU128::from_float(btc_usd_price).into_inner(),
+							),
+							argon_usd_target_price: FixedU128Ext(
+								FixedU128::from_float(1.0).into_inner(),
+							),
+							argon_usd_price: FixedU128Ext(FixedU128::from_float(1.6).into_inner()),
+							argon_time_weighted_average_liquidity: 500_000_000_000,
+							usdc_usd_price: None,
+							stabilizer_pool_sqrt_price_x96: None,
+							argonot_usd_price: FixedU128Ext(
+								FixedU128::from_float(1.0).into_inner(),
+							),
+							tick,
+						},
+						None::<EthereumPriceIndex>,
+						None::<u32>,
+					),
 				),
 				&signer,
 				params,
