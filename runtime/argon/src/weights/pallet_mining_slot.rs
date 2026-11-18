@@ -21,6 +21,17 @@ use core::marker::PhantomData;
 /// Weight functions for `pallet_mining_slot`.
 pub struct WeightInfo<T>(PhantomData<T>);
 impl<T: frame_system::Config> pallet_mining_slot::WeightInfo for WeightInfo<T> {
+	/// Storage: `MiningSlot::FrameStartBlockNumbers` (r:1 w:0)
+	/// Proof: `MiningSlot::FrameStartBlockNumbers` (`max_values`: Some(1), `max_size`: Some(41), added: 536, mode: `MaxEncodedLen`)
+	fn provider_is_first_block_after_frame_start() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `47`
+		//  Estimated: `1526`
+		// Minimum execution time: 2_000_000 picoseconds.
+		Weight::from_parts(2_000_000, 1526)
+			.saturating_add(T::DbWeight::get().reads(1))
+		}
+
 	/// Storage: `MiningSlot::RevealedBids` (r:1 w:1)
 	/// Proof: `MiningSlot::RevealedBids` (`max_values`: Some(1), `max_size`: Some(5122), added: 5617, mode: `MaxEncodedLen`)
 	/// Storage: `MiningSlot::PendingBids` (r:193 w:192)

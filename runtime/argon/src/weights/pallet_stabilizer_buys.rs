@@ -21,6 +21,19 @@ use core::marker::PhantomData;
 /// Weight functions for `pallet_stabilizer_buys`.
 pub struct WeightInfo<T>(PhantomData<T>);
 impl<T: frame_system::Config> pallet_stabilizer_buys::WeightInfo for WeightInfo<T> {
+	/// Storage: `StabilizerBuys::ApprovedPool` (r:1 w:0)
+	/// Proof: `StabilizerBuys::ApprovedPool` (`max_values`: Some(1), `max_size`: Some(81), added: 576, mode: `MaxEncodedLen`)
+	/// Storage: `StabilizerBuys::ApprovedPoolRevision` (r:1 w:0)
+	/// Proof: `StabilizerBuys::ApprovedPoolRevision` (`max_values`: Some(1), `max_size`: Some(4), added: 499, mode: `MaxEncodedLen`)
+	fn provider_stabilizer_pool_price_source() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `70`
+		//  Estimated: `1566`
+		// Minimum execution time: 2_000_000 picoseconds.
+		Weight::from_parts(3_000_000, 1566)
+			.saturating_add(T::DbWeight::get().reads(2))
+		}
+
 	/// Storage: `StabilizerBuys::PendingPriceWindowCountByTick` (r:1 w:0)
 	/// Proof: `StabilizerBuys::PendingPriceWindowCountByTick` (`max_values`: None, `max_size`: Some(16), added: 2491, mode: `MaxEncodedLen`)
 	fn oldest_pending_purchase_tick() -> Weight {
@@ -342,14 +355,17 @@ impl<T: frame_system::Config> pallet_stabilizer_buys::WeightInfo for WeightInfo<
 		Weight::from_parts(4_000_000, 0)
 			.saturating_add(T::DbWeight::get().writes(1))
 		}
-	/// Storage: `StabilizerBuys::ApprovedPool` (r:0 w:1)
+	/// Storage: `StabilizerBuys::ApprovedPool` (r:1 w:1)
 	/// Proof: `StabilizerBuys::ApprovedPool` (`max_values`: Some(1), `max_size`: Some(81), added: 576, mode: `MaxEncodedLen`)
+	/// Storage: `StabilizerBuys::ApprovedPoolRevision` (r:1 w:1)
+	/// Proof: `StabilizerBuys::ApprovedPoolRevision` (`max_values`: Some(1), `max_size`: Some(4), added: 499, mode: `MaxEncodedLen`)
 	fn set_approved_pool() -> Weight {
 		// Proof Size summary in bytes:
-		//  Measured:  `0`
-		//  Estimated: `0`
-		// Minimum execution time: 5_000_000 picoseconds.
-		Weight::from_parts(6_000_000, 0)
-			.saturating_add(T::DbWeight::get().writes(1))
+		//  Measured:  `70`
+		//  Estimated: `1566`
+		// Minimum execution time: 8_000_000 picoseconds.
+		Weight::from_parts(8_000_000, 1566)
+			.saturating_add(T::DbWeight::get().reads(2))
+			.saturating_add(T::DbWeight::get().writes(2))
 		}
 	}

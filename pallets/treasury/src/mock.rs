@@ -2,6 +2,9 @@ use crate as pallet_treasury;
 use argon_primitives::{
 	providers::BitcoinMintedProvider,
 	tick::Ticker,
+	treasury::{
+		StabilizerPoolFrameClaim, StabilizerPoolPositionProvider, StabilizerPoolRewardProvider,
+	},
 	vault::{TreasuryVaultProvider, VaultError, VaultParticipationCapacity, VaultSecuritization},
 	ArgonCPI, BlockRewardAccountsProvider, CrosschainGatewayProvider, GatewayState,
 	MiningFrameProvider, OperationalAccountsHook, PriceProvider, SourceChain, TickProvider,
@@ -23,6 +26,29 @@ type Block = frame_system::mocking::MockBlock<Test>;
 pub type TestAccountId = AccountId32;
 
 pub struct TestOperationalAccountsHook;
+
+parameter_types! {
+	pub static CirculatingArgon: Balance = 0;
+	pub static CollectClaimFrames: Vec<StabilizerPoolFrameClaim> = Vec::new();
+	pub storage SettledClaimFrame: u64 = 0;
+}
+
+pub struct MockStabilizerPoolSettlement;
+impl StabilizerPoolPositionProvider<TestAccountId> for MockStabilizerPoolSettlement {
+	type Weights = ();
+
+	fn settle_account(_: &TestAccountId) -> Result<Balance, DispatchError> {
+		let claims = CollectClaimFrames::get();
+		if claims.is_empty() || SettledClaimFrame::get() > 0 {
+			return Ok(0);
+		}
+		let result = Treasury::claim_rewards(&claims).map(|amount| {
+			SettledClaimFrame::set(&claims.last().unwrap().frame_id);
+			amount
+		});
+		result
+	}
+}
 
 impl OperationalAccountsHook<TestAccountId, Balance> for TestOperationalAccountsHook {
 	type Weights = ();
@@ -375,7 +401,7 @@ impl PriceProvider<Balance> for StaticPriceProvider {
 	}
 
 	fn get_circulation() -> Balance {
-		0
+		CirculatingArgon::get()
 	}
 
 	fn get_redemption_r_value() -> Option<FixedU128> {
@@ -471,6 +497,7 @@ impl pallet_stabilizer_buys::Config for Test {
 
 impl pallet_treasury::Config for Test {
 	type PositionProvider = TreasuryPositions;
+	type StabilizerPoolRewardHistoryFrames = ConstU32<13>;
 	type OperationalAccountProvider = MockUpstreamAccounts;
 	type UpstreamBitcoinTarget = UpstreamBitcoinTarget;
 	type UpstreamBondTarget = UpstreamBondTarget;
@@ -512,6 +539,7 @@ impl pallet_treasury::Config for Test {
 
 pub(crate) fn new_test_ext() -> TestState {
 	NewlyStartedFrameId::set(None);
+	CirculatingArgon::set(0);
 	ArgonotSecuritizationMultiplier::set(0);
 	VaultsById::set(HashMap::new());
 	LastVaultProfits::set(vec![]);
@@ -538,8 +566,9 @@ pub(crate) fn new_test_ext() -> TestState {
 impl pallet_treasury_positions::Config for Test {
 	type BitcoinPositionProvider = ();
 	type TreasuryPoolProvider = Treasury;
-	type MiningFrameTransitionProvider = StaticMiningFrameTransitionProvider;
-	type StabilizerPoolRewardPayer = Treasury;
+	type StabilizerPoolPositionProvider = MockStabilizerPoolSettlement;
+	type MiningFrameTransitionProvider = ();
+	type Currency = Balances;
 	type OperationalAccountProvider = MockUpstreamAccounts;
 	type Balance = Balance;
 	type WeightInfo = ();

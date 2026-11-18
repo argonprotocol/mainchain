@@ -1,7 +1,7 @@
 use crate as pallet_price_index;
 use argon_primitives::{
-	tick::Ticker, MiningFrameTransitionProvider, StabilizerPoolPriceSource, TickProvider,
-	VotingSchedule,
+	tick::Ticker, MiningFrameTransitionProvider, StabilizerPoolPriceSource,
+	StabilizerPoolPriceSourceProvider, TickProvider, VotingSchedule,
 };
 
 use pallet_prelude::*;
@@ -61,6 +61,14 @@ parameter_types! {
 	pub const MaxEthereumPriceHistoryFrames: u32 = 10;
 	pub const MaxArgonChangePerTickAwayFromTarget: FixedU128 = FixedU128::from_rational(1, 100);
 	pub const MaxArgonTargetChangePerTick: FixedU128 = FixedU128::from_rational(1, 100);
+}
+
+impl StabilizerPoolPriceSourceProvider for ApprovedStabilizerPool {
+	type Weights = ();
+
+	fn price_source() -> Option<StabilizerPoolPriceSource> {
+		Self::get()
+	}
 }
 
 pub struct StaticMiningFrameTransitionProvider;

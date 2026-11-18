@@ -29,7 +29,6 @@ import {
   toHex,
 } from 'viem';
 import { getReadyEthereumGatewayUpdates } from './EthereumGatewayQueue';
-import TestOracle from './TestOracle';
 import {
   mineLaterExecutionAnchorReceipt,
   signGatewayPermit,
@@ -609,15 +608,19 @@ export class TestMintingAuthorityActor {
 
     const currentTick = await this.harness.mainchainClient.query.ticks.currentTick();
     await this.harness.submit(
-      TestOracle.submitPriceIndex(this.harness.mainchainClient, {
-        usdcUsdPrice: null,
-        btcUsdPrice: toFixedNumber(60_000, 18),
-        argonotUsdPrice: toFixedNumber(1, 18),
-        argonUsdPrice: toFixedNumber(1, 18),
-        argonUsdTargetPrice: toFixedNumber(1, 18),
-        argonTimeWeightedAverageLiquidity: toFixedNumber(1_000_000, 18),
-        tick: currentTick.toBigInt(),
-      }),
+      this.harness.mainchainClient.tx.priceIndex.submit(
+        {
+          usdcUsdPrice: null,
+          btcUsdPrice: toFixedNumber(60_000, 18),
+          argonotUsdPrice: toFixedNumber(1, 18),
+          argonUsdPrice: toFixedNumber(1, 18),
+          argonUsdTargetPrice: toFixedNumber(1, 18),
+          argonTimeWeightedAverageLiquidity: toFixedNumber(1_000_000, 18),
+          tick: currentTick.toBigInt(),
+        },
+        null,
+        null,
+      ),
       this.operator,
     );
 

@@ -977,6 +977,23 @@ fn btc_price_in_microgons<
 	Some(microgons.saturating_mul_int(Balance::one()))
 }
 
+/// Supplies the currently approved stabilizer pool and the revision an oracle must report.
+pub trait StabilizerPoolPriceSourceProvider {
+	type Weights: StabilizerPoolPriceSourceProviderWeightInfo;
+
+	fn price_source() -> Option<StabilizerPoolPriceSource>;
+}
+
+pub trait StabilizerPoolPriceSourceProviderWeightInfo {
+	fn price_source() -> Weight;
+}
+
+impl StabilizerPoolPriceSourceProviderWeightInfo for () {
+	fn price_source() -> Weight {
+		Weight::zero()
+	}
+}
+
 /// Accepted oracle observations. Consumers own their retention and valuation policy.
 pub trait PriceIndexUpdated {
 	/// The pool source is present only when the oracle supplied the current approved revision.
@@ -1523,6 +1540,9 @@ pub trait BlockRewardAccountsProvider<AccountId: FullCodec> {
 }
 
 pub trait MiningFrameTransitionProviderWeightInfo {
+	fn is_first_block_after_frame_start() -> Weight {
+		Weight::zero()
+	}
 	fn is_new_frame_started() -> Weight;
 	fn get_current_frame_id() -> Weight;
 }
@@ -1539,6 +1559,10 @@ impl MiningFrameTransitionProviderWeightInfo for () {
 pub trait MiningFrameTransitionProvider {
 	type Weights: MiningFrameTransitionProviderWeightInfo;
 
+	/// Whether the preceding block finalized a new mining frame.
+	fn is_first_block_after_frame_start() -> bool {
+		false
+	}
 	fn is_new_frame_started() -> Option<FrameId>;
 	fn get_current_frame_id() -> FrameId;
 }

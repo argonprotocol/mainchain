@@ -53,9 +53,8 @@ struct PositionUpdates {
 struct BitcoinPositionUpdate {
 	account: u64,
 	vault_id: VaultId,
-	// Activated and allocated securitization, in that order.
-	previous: [u128; 2],
-	current: [u128; 2],
+	previous: BitcoinLockPosition<u128>,
+	current: BitcoinLockPosition<u128>,
 }
 
 const POSITION_UPDATES_KEY: &[u8] = b"test:treasury-position-updates";
@@ -80,12 +79,12 @@ impl MockTreasuryPositionProvider {
 		let mut position = BitcoinLockPosition::default();
 		for update in Self::updates().bitcoin {
 			if (update.account, update.vault_id) == (account, vault_id) {
-				let [previous_activated, previous_allocated] = update.previous;
-				let [activated, allocated] = update.current;
-				position.activated_securitization =
-					position.activated_securitization - previous_activated + activated;
-				position.allocated_securitization =
-					position.allocated_securitization - previous_allocated + allocated;
+				position.activated_securitization = position.activated_securitization -
+					update.previous.activated_securitization +
+					update.current.activated_securitization;
+				position.allocated_securitization = position.allocated_securitization -
+					update.previous.allocated_securitization +
+					update.current.allocated_securitization;
 			}
 		}
 		position
@@ -169,8 +168,8 @@ impl TreasuryPositionProvider<u64, u128> for MockTreasuryPositionProvider {
 			updates.bitcoin.push(BitcoinPositionUpdate {
 				account: *account,
 				vault_id,
-				previous: [previous.activated_securitization, previous.allocated_securitization],
-				current: [current.activated_securitization, current.allocated_securitization],
+				previous,
+				current,
 			});
 		});
 		Ok(())

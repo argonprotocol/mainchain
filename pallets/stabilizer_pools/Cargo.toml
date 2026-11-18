@@ -28,6 +28,7 @@ uniswap-v3-sdk-bigint = { workspace = true }
 alloy-consensus = { workspace = true }
 alloy-rlp = { workspace = true }
 alloy-trie = { workspace = true }
+# uses_authenticated_target_timestamp_when_proof_is_an_ancestor_of_anchor checks checkpoint time against the verified header.
 pallet-ethereum-verifier = { workspace = true, features = ["std"] }
 pallet-prelude = { workspace = true, features = ["test"], default-features = true }
 polkadot-sdk = { workspace = true, features = ["sp-io", "pallet-timestamp"], default-features = true }

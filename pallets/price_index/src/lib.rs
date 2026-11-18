@@ -5,7 +5,8 @@ use pallet_prelude::*;
 
 pub use argon_primitives::PriceIndex;
 use argon_primitives::{
-	block_seal::FrameId, ArgonCPI, PriceIndexUpdated, StabilizerPoolPriceSource, TickProvider,
+	block_seal::FrameId, ArgonCPI, PriceIndexUpdated, StabilizerPoolPriceSourceProvider,
+	StabilizerPoolPriceSourceProviderWeightInfo, TickProvider,
 };
 pub use pallet::*;
 pub use weights::WeightInfo;
@@ -145,7 +146,7 @@ pub mod pallet {
 		/// Consumers own any policy-specific price history.
 		type OnPriceIndexUpdated: PriceIndexUpdated;
 		/// The currently approved Uniswap pool and its revision.
-		type StabilizerPool: Get<Option<StabilizerPoolPriceSource>>;
+		type StabilizerPool: StabilizerPoolPriceSourceProvider;
 
 		type Currency: Inspect<Self::AccountId, Balance = Self::Balance>;
 
@@ -324,7 +325,12 @@ pub mod pallet {
 		/// Submit the latest price index as the configured oracle operator.
 		/// A superseded pool revision omits only the pool quote from the accepted index.
 		#[pallet::call_index(0)]
-		#[pallet::weight((T::WeightInfo::submit().saturating_add(T::OnPriceIndexUpdated::on_price_index_weight()).saturating_add(T::DbWeight::get().reads(2)), DispatchClass::Operational))]
+		#[pallet::weight((
+			T::WeightInfo::submit()
+				.saturating_add(T::OnPriceIndexUpdated::on_price_index_weight())
+				.saturating_add(<T::StabilizerPool as StabilizerPoolPriceSourceProvider>::Weights::price_source()),
+			DispatchClass::Operational
+		))]
 		#[pallet::feeless_if(
 			|origin: &OriginFor<T>, _index: &PriceIndex, _ethereum: &Option<EthereumPriceIndex>, _stabilizer_pool_revision: &Option<u32>| -> bool {
 				let Ok(who) = ensure_signed(origin.clone()) else {
@@ -372,7 +378,7 @@ pub mod pallet {
 			}
 
 			let pool_source = stabilizer_pool_revision.and_then(|revision| {
-				T::StabilizerPool::get().filter(|source| source.revision == revision)
+				T::StabilizerPool::price_source().filter(|source| source.revision == revision)
 			});
 			if stabilizer_pool_revision.is_some() && pool_source.is_none() {
 				index.stabilizer_pool_sqrt_price_x96 = None;

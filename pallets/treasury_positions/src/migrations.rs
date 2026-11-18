@@ -11,9 +11,9 @@ pub(crate) struct PositionV2<Balance: codec::Codec + MaxEncodedLen> {
 	pub upstream: Option<UpstreamPosition<Balance>>,
 }
 
-pub struct AddStabilizerPoolEarnings<T>(PhantomData<T>);
+pub struct AddCollectAmounts<T>(PhantomData<T>);
 
-impl<T: Config> UncheckedOnRuntimeUpgrade for AddStabilizerPoolEarnings<T> {
+impl<T: Config> UncheckedOnRuntimeUpgrade for AddCollectAmounts<T> {
 	fn on_runtime_upgrade() -> Weight {
 		let mut positions = 0u64;
 		PositionsByAccount::<T>::translate_values::<PositionV2<T::Balance>, _>(|previous| {
@@ -29,10 +29,10 @@ impl<T: Config> UncheckedOnRuntimeUpgrade for AddStabilizerPoolEarnings<T> {
 	}
 }
 
-pub type AddStabilizerPoolEarningsMigration<T> = VersionedMigration<
+pub type AddCollectAmountsMigration<T> = VersionedMigration<
 	2,
 	3,
-	AddStabilizerPoolEarnings<T>,
+	AddCollectAmounts<T>,
 	Pallet<T>,
 	<T as frame_system::Config>::DbWeight,
 >;

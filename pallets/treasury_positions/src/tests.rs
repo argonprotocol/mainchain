@@ -1,9 +1,14 @@
 use super::*;
 use crate::{
-	migrations::{AddStabilizerPoolEarningsMigration, PositionV2},
+	migrations::{AddCollectAmountsMigration, PositionV2},
 	mock::*,
 };
-use frame_support::{storage::unhashed, traits::OnRuntimeUpgrade};
+use alloc::collections::BTreeMap;
+use frame_support::{
+	assert_noop,
+	storage::unhashed,
+	traits::{Hooks, OnRuntimeUpgrade},
+};
 use polkadot_sdk::sp_io::TestExternalities;
 
 #[test]
@@ -23,7 +28,7 @@ fn migrating_positions_preserves_principal_quantities_and_upstream() {
 			&PositionV2 { bond_principal: 300u128, quantities, upstream: Some(upstream) },
 		);
 
-		AddStabilizerPoolEarningsMigration::<Test>::on_runtime_upgrade();
+		AddCollectAmountsMigration::<Test>::on_runtime_upgrade();
 		assert_eq!(StorageVersion::get::<TreasuryPositions>(), StorageVersion::new(3));
 		assert_eq!(
 			PositionsByAccount::<Test>::get(9),
@@ -36,14 +41,63 @@ fn migrating_positions_preserves_principal_quantities_and_upstream() {
 			})
 		);
 
-		assert_ok!(TreasuryPositions::credit_stabilizer_pool_rewards(&9, 7));
-		AddStabilizerPoolEarningsMigration::<Test>::on_runtime_upgrade();
+		PositionsByAccount::<Test>::mutate(9, |position| {
+			position.as_mut().unwrap().collected.stabilizer_pool_earnings = 7;
+		});
+		AddCollectAmountsMigration::<Test>::on_runtime_upgrade();
 		assert_eq!(
-			PositionsByAccount::<Test>::get(9)
-				.unwrap()
-				.collect_accrued
-				.stabilizer_pool_earnings,
+			PositionsByAccount::<Test>::get(9).unwrap().collected.stabilizer_pool_earnings,
 			7
+		);
+	});
+}
+
+#[test]
+fn collect_rolls_back_each_account_and_auto_collect_continues() {
+	TestExternalities::default().execute_with(|| {
+		System::set_block_number(1);
+		ProvedThrough::set(BTreeMap::from([(9, [12, 9]), (10, [10, 5])]));
+		CollectedThrough::set(&BTreeMap::from([(9, [11, 9]), (10, [9, 4])]));
+		TreasuryPositions::ensure_account(&9);
+		TreasuryPositions::ensure_account(&10);
+		AfterFrameStart::set(false);
+		TreasuryPositions::on_initialize(1);
+		assert_eq!(Balances::balance(&9), 0);
+		assert_eq!(Balances::balance(&10), 0);
+
+		// Account 9's seven microgons cannot establish a balance. Account 10 receives one
+		// combined payment of fourteen microgons from its two source positions.
+		AfterFrameStart::set(true);
+		TreasuryPositions::on_initialize(2);
+		assert_eq!(CollectedThrough::get()[&9], [11, 9]);
+		assert_eq!(Balances::balance(&9), 0);
+		assert_eq!(CollectedThrough::get()[&10], [10, 5]);
+		assert_eq!(Balances::balance(&10), 14);
+		assert_eq!(
+			PositionsByAccount::<Test>::get(10).unwrap().collected.stabilizer_pool_earnings,
+			14
+		);
+
+		ProvedThrough::mutate(|proofs| {
+			proofs.insert(9, [12, 10]);
+		});
+		assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(9)));
+		assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(9)));
+		assert_eq!(CollectedThrough::get()[&9], [12, 10]);
+		assert_eq!(Balances::balance(&9), 14);
+		let position = PositionsByAccount::<Test>::get(9).unwrap();
+		assert_eq!(position.collected.stabilizer_pool_earnings, 14);
+		assert_eq!(position.collect_accrued, CollectAmounts::default());
+
+		ProvedThrough::mutate(|proofs| {
+			proofs.insert(9, [13, 10]);
+		});
+		assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(9)));
+		assert_eq!(CollectedThrough::get()[&9], [13, 10]);
+		assert_eq!(Balances::balance(&9), 21);
+		assert_eq!(
+			PositionsByAccount::<Test>::get(9).unwrap().collected.stabilizer_pool_earnings,
+			21
 		);
 	});
 }

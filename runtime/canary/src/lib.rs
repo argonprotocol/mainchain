@@ -449,6 +449,7 @@ impl pallet_treasury::Config for Runtime {
 		benchmarking::BenchmarkBitcoinVaultProvider<Balances, AccountId, Balance>
 	);
 	type PositionProvider = use_unless_benchmark!(TreasuryPositions, benchmarking::BenchmarkTreasuryPositionProvider<AccountId, Balance>);
+	type StabilizerPoolRewardHistoryFrames = StabilizerPoolMaxSampledPriceHistoryFrames;
 	type OperationalAccountProvider = use_unless_benchmark!(
 		OperationalAccounts,
 		benchmarking::BenchmarkOperationalAccountProvider<AccountId>
@@ -518,9 +519,9 @@ impl pallet_mining_slot::Config for Runtime {
 		(
 			GrandpaSlotRotation,
 			BlockRewards,
+			StabilizerPools,
 			Treasury,
 			StabilizerBuys,
-			StabilizerPools,
 			Vaults,
 			CrosschainTransfer,
 			OperationalAccounts
@@ -686,7 +687,8 @@ parameter_types! {
 }
 
 impl pallet_price_index::Config for Runtime {
-	type StabilizerPool = StabilizerBuys;
+	type StabilizerPool =
+		use_unless_benchmark!(StabilizerBuys, benchmarking::BenchmarkStabilizerPoolPriceSource);
 	type OnPriceIndexUpdated =
 		use_unless_benchmark!((StabilizerBuys, StabilizerPools, BitcoinFissions), ());
 	type WeightInfo = weights::pallet_price_index::WeightInfo<Runtime>;
@@ -953,8 +955,9 @@ impl pallet_fee_control::Config for Runtime {
 impl pallet_treasury_positions::Config for Runtime {
 	type BitcoinPositionProvider = use_unless_benchmark!(BitcoinLocks, ());
 	type TreasuryPoolProvider = use_unless_benchmark!(Treasury, ());
+	type StabilizerPoolPositionProvider = use_unless_benchmark!(StabilizerPools, ());
 	type MiningFrameTransitionProvider = use_unless_benchmark!(MiningSlot, ());
-	type StabilizerPoolRewardPayer = use_unless_benchmark!(Treasury, ());
+	type Currency = Balances;
 	type OperationalAccountProvider = use_unless_benchmark!(
 		OperationalAccounts,
 		benchmarking::BenchmarkOperationalAccountProvider<AccountId>
@@ -965,7 +968,11 @@ impl pallet_treasury_positions::Config for Runtime {
 
 impl pallet_stabilizer_pools::Config for Runtime {
 	type EthereumVerifier = use_unless_benchmark!(EthereumVerifier, ());
-	type ClaimProvider = ();
+	type RewardProvider =
+		use_unless_benchmark!(Treasury, benchmarking::BenchmarkStabilizerPoolRewards);
+	type UsdcRewardShare = StabilizerPoolUsdcRewardShare;
+	type MaxPositionsPerAccount = StabilizerPoolMaxPositionsPerAccount;
+	type TreasuryPositionProvider = use_unless_benchmark!(TreasuryPositions, ());
 	type WeightInfo = weights::pallet_stabilizer_pools::WeightInfo<Runtime>;
 	type MiningFrameTransitionProvider =
 		use_unless_benchmark!(MiningSlot, benchmarking::BenchmarkCurrentFrameId);

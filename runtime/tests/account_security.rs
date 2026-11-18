@@ -452,15 +452,22 @@ fn detached_proofs_use_the_real_native_signing_payload_and_bind_the_genesis_hash
 			},
 			approvals: Default::default(),
 		});
-		let vector = AccountSecurity::approval_payload(&vector, false).unwrap();
-		// Shared with the JavaScript signing helper; commits to native SCALE and extensions.
-		assert_eq!(
-			sp_core::hashing::blake2_256(&vector),
-			[
-				162, 192, 244, 137, 8, 236, 8, 206, 56, 146, 157, 169, 118, 92, 203, 27, 200, 219,
-				92, 152, 240, 23, 68, 169, 235, 249, 24, 55, 95, 246, 179, 16,
-			]
-		);
+		// Fixed fixture versions keep the shared JavaScript vector stable across upgrades.
+		let (_, extensions, mut signing_context) = native.deconstruct();
+		let (_, _, spec_version, transaction_version, ..) = &mut signing_context;
+		*spec_version = 1;
+		*transaction_version = 1;
+		let vector = SignedPayload::from_raw(vector, extensions, signing_context);
+		vector.using_encoded(|bytes| {
+			assert_eq!(
+				blake2_256(bytes),
+				[
+					80, 54, 218, 218, 43, 143, 110, 98, 170, 158, 41, 34, 77, 91, 127, 236, 77, 45,
+					92, 65, 128, 197, 239, 153, 36, 42, 245, 184, 229, 230, 88, 85,
+				]
+			);
+		});
+
 		let nonce = NextNonce::<Runtime>::get(account(1));
 		frame_system::BlockHash::<Runtime>::insert(0, H256::repeat_byte(7));
 		assert_eq!(

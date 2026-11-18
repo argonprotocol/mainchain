@@ -1,5 +1,3 @@
-#![cfg(feature = "runtime-benchmarks")]
-
 use super::*;
 #[cfg(test)]
 use crate::mock::{new_test_ext, Test};

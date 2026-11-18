@@ -3,14 +3,16 @@ use argon_primitives::{
 	treasury::{TreasuryRewardProvider, TreasuryRewardProviderWeightInfo},
 	BitcoinFissionsProvider, BitcoinFissionsProviderWeightInfo, CrosschainGatewayProvider,
 	CrosschainGatewayProviderWeightInfo, LiquidRepaymentProviderWeightInfo,
-	MiningFrameTransitionProvider, MiningFrameTransitionProviderWeightInfo, TickProvider,
-	TickProviderWeightInfo, UniswapPurchaseProviderWeightInfo,
+	MiningFrameTransitionProvider, MiningFrameTransitionProviderWeightInfo,
+	StabilizerPoolPriceSourceProviderWeightInfo, TickProvider, TickProviderWeightInfo,
+	UniswapPurchaseProviderWeightInfo,
 };
 use core::marker::PhantomData;
 use polkadot_sdk::frame_support::weights::Weight;
 
 /// Measured execution costs for price history, purchase admission and bounded payout work.
 pub trait WeightInfo {
+	fn provider_stabilizer_pool_price_source() -> Weight;
 	fn oldest_pending_purchase_tick() -> Weight;
 	fn process_repayment_prices(reads: u32) -> Weight;
 	fn has_pending_liquid_repayment() -> Weight;
@@ -49,6 +51,10 @@ type GatewayWeights<T> =
 	<<T as Config>::CrosschainGatewayProvider as CrosschainGatewayProvider<Balance>>::Weights;
 
 impl<T: Config, Base: WeightInfo> WeightInfo for WithProviderWeights<T, Base> {
+	fn provider_stabilizer_pool_price_source() -> Weight {
+		Base::provider_stabilizer_pool_price_source()
+	}
+
 	fn oldest_pending_purchase_tick() -> Weight {
 		Base::oldest_pending_purchase_tick()
 	}
@@ -145,6 +151,12 @@ impl<T: Config, Base: WeightInfo> WeightInfo for WithProviderWeights<T, Base> {
 }
 
 pub struct ProviderWeightAdapter<T>(PhantomData<T>);
+impl<T: Config> StabilizerPoolPriceSourceProviderWeightInfo for ProviderWeightAdapter<T> {
+	fn price_source() -> Weight {
+		T::WeightInfo::provider_stabilizer_pool_price_source()
+	}
+}
+
 impl<T: Config> LiquidRepaymentProviderWeightInfo for ProviderWeightAdapter<T> {
 	fn oldest_pending_purchase_tick() -> Weight {
 		T::WeightInfo::oldest_pending_purchase_tick()
@@ -161,6 +173,10 @@ impl<T: Config> UniswapPurchaseProviderWeightInfo for ProviderWeightAdapter<T> {
 }
 
 impl WeightInfo for () {
+	fn provider_stabilizer_pool_price_source() -> Weight {
+		Weight::zero()
+	}
+
 	fn oldest_pending_purchase_tick() -> Weight {
 		Weight::zero()
 	}

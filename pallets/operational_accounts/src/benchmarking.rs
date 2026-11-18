@@ -1,5 +1,4 @@
 //! Benchmarking setup for pallet-operational-accounts
-#![cfg(feature = "runtime-benchmarks")]
 use super::*;
 
 #[cfg(test)]
@@ -200,7 +199,7 @@ mod benchmarks {
 
 		#[block]
 		{
-			let _ = OperationalAccountsPallet::<T>::vault_created(&linked.vault);
+			OperationalAccountsPallet::<T>::vault_created(&linked.vault);
 		}
 
 		assert!(
@@ -226,7 +225,7 @@ mod benchmarks {
 
 		#[block]
 		{
-			let _ = OperationalAccountsPallet::<T>::vault_bitcoin_lock_funded(
+			OperationalAccountsPallet::<T>::vault_bitcoin_lock_funded(
 				&linked.vault,
 				T::BitcoinLockSizeForAccessCode::get(),
 			);
@@ -254,7 +253,7 @@ mod benchmarks {
 
 		#[block]
 		{
-			let _ = OperationalAccountsPallet::<T>::mining_seat_won(&linked.mining);
+			OperationalAccountsPallet::<T>::mining_seat_won(&linked.mining);
 		}
 
 		assert_eq!(

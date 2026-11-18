@@ -97,10 +97,13 @@ parameter_types! {
 	pub const LiquidRepaymentRewardPercent: Percent = Percent::from_percent(5);
 
 	// ### pallet_stabilizer_pools
+	// Collection reuses these bounds. A band change must account for frames still open to claims.
 	pub const StabilizerPoolRewardPriceBand: (Percent, Percent) =
 		(Percent::from_percent(90), Percent::one());
 	pub const StabilizerPoolMaxSampledPriceHistoryFrames: u32 = 13;
 	pub const StabilizerPoolClaimWindowFrames: u32 = 10;
+	pub const StabilizerPoolUsdcRewardShare: Percent = Percent::from_percent(90);
+	pub const StabilizerPoolMaxPositionsPerAccount: u32 = 5;
 	pub const StabilizerPoolMaxPriceBucketsPerFrame: u32 = 24;
 	pub const StabilizerPoolMinPriceBucketCoverage: Percent = Percent::from_percent(75);
 

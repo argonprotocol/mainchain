@@ -1,5 +1,3 @@
-#![cfg(feature = "runtime-benchmarks")]
-
 use super::*;
 use argon_primitives::{
 	bitcoin::{
@@ -251,7 +249,7 @@ mod benchmarks {
 		for i in 0..n {
 			let lock_id = i.saturating_add(1) as BitcoinLockId;
 			let address = benchmark_utxo_value(lock_id, satoshis);
-			LockIdByScriptPubkey::<T>::insert(&address.script_pubkey, lock_id);
+			LockIdByScriptPubkey::<T>::insert(address.script_pubkey, lock_id);
 			UtxoAddressByLockId::<T>::insert(lock_id, address);
 		}
 

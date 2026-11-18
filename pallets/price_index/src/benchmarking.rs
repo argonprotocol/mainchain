@@ -2,9 +2,7 @@ use super::*;
 use argon_primitives::{bitcoin::SATOSHIS_PER_BITCOIN, PriceProvider, MICROGONS_PER_ARGON};
 use frame_support::{dispatch::CheckIfFeeless, traits::Hooks};
 use frame_system::RawOrigin;
-use pallet_prelude::benchmarking::{
-	set_benchmark_bitcoin_locks_runtime_state, BenchmarkBitcoinLocksRuntimeState,
-};
+use pallet_prelude::benchmarking::{set_benchmark_mining_clock, BenchmarkMiningClock};
 use polkadot_sdk::frame_benchmarking::v2::*;
 
 #[benchmarks]
@@ -35,6 +33,8 @@ mod benchmarks {
 		let mut index = benchmark_price_index(48 * bucket_ticks);
 		index.usdc_usd_price = Some(FixedU128::one());
 		index.argon_usd_price = FixedU128::from_rational(9, 10);
+		let pool_source = T::StabilizerPool::price_source()
+			.ok_or(BenchmarkError::Stop("submit requires an approved pool price source"))?;
 		let previous = PriceIndex { tick: index.tick - 1, ..index };
 		Current::<T>::put(previous);
 		let ethereum = EthereumPriceIndex {
@@ -43,11 +43,13 @@ mod benchmarks {
 			tick: index.tick,
 		};
 		Operator::<T>::put(caller.clone());
-		set_benchmark_bitcoin_locks_runtime_state(BenchmarkBitcoinLocksRuntimeState {
+		set_benchmark_mining_clock(BenchmarkMiningClock {
 			current_frame_id: 1,
 			current_tick: index.tick,
 			did_start_new_frame: false,
 		});
+		#[cfg(test)]
+		crate::mock::CurrentTick::set(index.tick);
 		let mut history = BoundedVec::default();
 		for bucket in (0..48).rev() {
 			history
@@ -61,7 +63,12 @@ mod benchmarks {
 		HistoricArgonCPI::<T>::put(history);
 
 		#[extrinsic_call]
-		submit(RawOrigin::Signed(caller.clone()), index, Some(ethereum), None);
+		submit(
+			RawOrigin::Signed(caller.clone()),
+			index,
+			Some(ethereum),
+			Some(pool_source.revision),
+		);
 
 		assert_eq!(Current::<T>::get(), Some(index));
 		assert_eq!(LastValid::<T>::get(), Some(previous));
@@ -93,7 +100,7 @@ mod benchmarks {
 			total_microgons_per_argonot: T::Balance::from(2 * MICROGONS_PER_ARGON),
 			sample_count: 2,
 		});
-		set_benchmark_bitcoin_locks_runtime_state(BenchmarkBitcoinLocksRuntimeState {
+		set_benchmark_mining_clock(BenchmarkMiningClock {
 			current_frame_id: 2,
 			current_tick: index.tick,
 			did_start_new_frame: true,
@@ -199,7 +206,7 @@ mod benchmarks {
 		HistoricEthereumPricesByFrame::<T>::mutate(|history| {
 			let _ = history.try_insert(1, average);
 		});
-		set_benchmark_bitcoin_locks_runtime_state(BenchmarkBitcoinLocksRuntimeState {
+		set_benchmark_mining_clock(BenchmarkMiningClock {
 			current_frame_id: 1,
 			current_tick: tick,
 			did_start_new_frame: false,
@@ -249,7 +256,26 @@ mod benchmarks {
 		Ok(())
 	}
 
-	impl_benchmark_test_suite!(Pallet, crate::mock::new_test_ext(Some(1)), crate::mock::Test);
+	impl_benchmark_test_suite!(
+		Pallet,
+		{
+			use argon_primitives::{StabilizerPoolPriceSource, UniswapPoolIdentity};
+			let mut externalities = crate::mock::new_test_ext(Some(1));
+			externalities.execute_with(|| {
+				crate::mock::ApprovedStabilizerPool::set(Some(StabilizerPoolPriceSource {
+					revision: 1,
+					pool: UniswapPoolIdentity {
+						chain_id: 1,
+						pool_manager: H160::repeat_byte(1),
+						pool_id: H256::repeat_byte(2),
+					},
+					argon_is_token0: true,
+				}));
+			});
+			externalities
+		},
+		crate::mock::Test
+	);
 }
 
 fn benchmark_price_index(tick: Tick) -> PriceIndex {

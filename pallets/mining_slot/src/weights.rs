@@ -14,6 +14,7 @@ use pallet_prelude::*;
 pub trait WeightInfo {
 	fn provider_get_current_frame_id() -> Weight;
 	fn provider_is_new_frame_started() -> Weight;
+	fn provider_is_first_block_after_frame_start() -> Weight;
 	// Actual extrinsics
 	fn bid() -> Weight;
 	fn bid_legacy() -> Weight;
@@ -110,6 +111,9 @@ where
 	}
 	fn provider_is_new_frame_started() -> Weight {
 		Base::provider_is_new_frame_started()
+	}
+	fn provider_is_first_block_after_frame_start() -> Weight {
+		Base::provider_is_first_block_after_frame_start()
 	}
 
 	fn bid_with_max() -> Weight {
@@ -243,6 +247,9 @@ where
 
 pub struct ProviderWeightAdapter<T>(PhantomData<T>);
 impl<T: crate::Config> MiningFrameTransitionProviderWeightInfo for ProviderWeightAdapter<T> {
+	fn is_first_block_after_frame_start() -> Weight {
+		T::WeightInfo::provider_is_first_block_after_frame_start()
+	}
 	fn get_current_frame_id() -> Weight {
 		T::WeightInfo::provider_get_current_frame_id()
 	}
@@ -288,6 +295,9 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 	fn provider_is_new_frame_started() -> Weight {
+		Weight::zero()
+	}
+	fn provider_is_first_block_after_frame_start() -> Weight {
 		Weight::zero()
 	}
 	fn bid_with_max() -> Weight {

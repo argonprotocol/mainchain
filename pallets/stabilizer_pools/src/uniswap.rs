@@ -32,18 +32,13 @@ impl<AccountId> PositionCheckpoint<AccountId> {
 		sqrt_price_x96: UniswapSqrtPriceX96,
 		argon_is_token0: bool,
 	) -> Result<PositionAmounts, PositionAmountError> {
-		let amounts = principal_for_liquidity_range(
+		principal_for_liquidity_range(
 			self.liquidity.into(),
 			self.tick_lower,
 			self.tick_upper,
 			sqrt_price_x96,
 			argon_is_token0,
-		)?;
-		let argon =
-			Balance::try_from(amounts.argon).map_err(|_| PositionAmountError::AmountOverflow)?;
-		let usdc =
-			Balance::try_from(amounts.usdc).map_err(|_| PositionAmountError::AmountOverflow)?;
-		Ok(PositionAmounts { argon, usdc })
+		)
 	}
 }
 
@@ -141,18 +136,17 @@ impl StabilizerPoolRewardBand {
 		lower_uniswap_tick: UniswapTick,
 		upper_uniswap_tick: UniswapTick,
 		pool_sqrt_price_x96: UniswapSqrtPriceX96,
-	) -> Result<PositionAmounts<U256>, PositionAmountError> {
-		let empty = PositionAmounts { argon: U256::zero(), usdc: U256::zero() };
+	) -> Result<PositionAmounts, PositionAmountError> {
 		let Some((position_sqrt_lower, position_sqrt_upper)) =
 			self.qualifying_range(lower_uniswap_tick, upper_uniswap_tick)?
 		else {
-			return Ok(empty);
+			return Ok(PositionAmounts::default());
 		};
 
 		let sqrt_lower = position_sqrt_lower.max(self.sqrt_lower);
 		let sqrt_upper = position_sqrt_upper.min(self.sqrt_upper);
 		if sqrt_lower >= sqrt_upper {
-			return Ok(empty);
+			return Ok(PositionAmounts::default());
 		}
 		principal_for_sqrt_price_range(
 			liquidity,
@@ -421,15 +415,14 @@ impl BandReferences {
 }
 
 /// Value summed raw liquidity with identical Uniswap bounds at one pool price.
-/// The wider liquidity/result types let frame totals cover multiple NFTs without narrowing
-/// their sum to one NFT's uint128 capacity. Eligibility and reward policy belong to the caller.
+/// The input can exceed one NFT's uint128 liquidity. Returned principal uses token balances.
 pub(crate) fn principal_for_liquidity_range(
 	liquidity: U256,
 	lower_uniswap_tick: UniswapTick,
 	upper_uniswap_tick: UniswapTick,
 	sqrt_price_x96: UniswapSqrtPriceX96,
 	argon_is_token0: bool,
-) -> Result<PositionAmounts<U256>, PositionAmountError> {
+) -> Result<PositionAmounts, PositionAmountError> {
 	if lower_uniswap_tick >= upper_uniswap_tick {
 		return Err(PositionAmountError::InvalidTickRange);
 	}
@@ -452,7 +445,7 @@ fn principal_for_sqrt_price_range(
 	sqrt_upper: UniswapSqrtPriceX96,
 	sqrt_price_x96: UniswapSqrtPriceX96,
 	argon_is_token0: bool,
-) -> Result<PositionAmounts<U256>, PositionAmountError> {
+) -> Result<PositionAmounts, PositionAmountError> {
 	let minimum_sqrt_price = U256::from_big_endian(&MIN_SQRT_RATIO.to_be_bytes::<20>());
 	let maximum_sqrt_price = U256::from_big_endian(&MAX_SQRT_RATIO.to_be_bytes::<20>());
 	if sqrt_price_x96 < minimum_sqrt_price {
@@ -470,16 +463,15 @@ fn principal_for_sqrt_price_range(
 	let q96 = U512::one() << 96;
 
 	// Uniswap's round-down delta equations, extended beyond the SDK's uint128 liquidity.
-	// uint256 liquidity * uint160 price difference * Q96 fits in 512 bits. This width is
-	// for the fixed-point intermediate, not a native account balance.
+	// uint256 liquidity * uint160 price difference * Q96 fits in 512 bits.
 	let amount0 = liquidity * (sqrt_upper - sqrt_price) * q96 / (sqrt_price * sqrt_upper);
 	let amount1 = liquidity * (sqrt_price - sqrt_lower) / q96;
 	let (argon, usdc) = if argon_is_token0 { (amount0, amount1) } else { (amount1, amount0) };
 
 	let token_units_per_microgon = 10u128.pow(ARGON_TOKEN_DECIMALS) / MICROGONS_PER_ARGON;
-	let argon = U256::try_from(argon / token_units_per_microgon)
+	let argon = Balance::try_from(argon / token_units_per_microgon)
 		.map_err(|_| PositionAmountError::AmountOverflow)?;
-	let usdc = U256::try_from(usdc).map_err(|_| PositionAmountError::AmountOverflow)?;
+	let usdc = Balance::try_from(usdc).map_err(|_| PositionAmountError::AmountOverflow)?;
 	Ok(PositionAmounts { argon, usdc })
 }
 
@@ -541,7 +533,7 @@ fn sqrt_price_from_token_ratio(
 	U256::try_from(sqrt_price).map_err(|_| PositionAmountError::AmountOverflow)
 }
 
-/// Withdrawable principal, excluding fees. NFTs use native balances; shared ranges use U256.
+/// Withdrawable ARGON and USDC principal, excluding fees.
 #[derive(
 	Clone,
 	Copy,
@@ -555,11 +547,11 @@ fn sqrt_price_from_token_ratio(
 	TypeInfo,
 	MaxEncodedLen,
 )]
-pub struct PositionAmounts<Amount = Balance> {
+pub struct PositionAmounts {
 	/// ARGON principal in native microgons (6 decimals), rounded down from 18-decimal token units.
-	pub argon: Amount,
+	pub argon: Balance,
 	/// USDC principal in Ethereum token base units (6 decimals).
-	pub usdc: Amount,
+	pub usdc: Balance,
 }
 
 /// Invalid inputs or principal that cannot be represented by the result's integer type.
@@ -570,8 +562,7 @@ pub enum PositionAmountError {
 	InvalidTickRange,
 	/// A USD quote is zero or the raw Uniswap sqrt price is outside the supported domain.
 	InvalidPrice,
-	/// Converted principal exceeds a position's 128-bit balance or a shared range's 256-bit
-	/// amount.
+	/// Converted principal exceeds the 128-bit balance representation.
 	AmountOverflow,
 	/// The reward band's lower percentage is zero or at or above its upper percentage.
 	InvalidRewardPriceBand,

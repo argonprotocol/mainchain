@@ -122,7 +122,7 @@ fn rejects_invalid_uniswap_ranges_and_prices_without_truncating_them() {
 }
 
 #[test]
-fn combined_liquidity_and_principal_can_exceed_one_nfts_limits() {
+fn raw_liquidity_can_exceed_u128_while_principal_must_fit() {
 	let largest_nft = position_checkpoint(u128::MAX, 0, 20_000);
 	let smallest_nft = position_checkpoint(1, 0, 20_000);
 	let combined_liquidity = U256::from(largest_nft.liquidity) + U256::from(smallest_nft.liquidity);
@@ -135,19 +135,22 @@ fn combined_liquidity_and_principal_can_exceed_one_nfts_limits() {
 	assert_eq!(largest_nft_amounts.usdc, u128::MAX);
 	assert_eq!(smallest_nft_amounts.usdc, 1);
 
-	let combined =
-		principal_for_liquidity_range(combined_liquidity, 0, 20_000, sqrt_price, true).unwrap();
-	assert_eq!(combined.usdc, U256::from(u128::MAX) + U256::one());
+	assert_eq!(
+		principal_for_liquidity_range(combined_liquidity, 0, 20_000, sqrt_price, true),
+		Err(PositionAmountError::AmountOverflow)
+	);
 
 	// Reversing token order makes the same token1 amount ARGON, converted to microgons.
 	let reversed =
 		principal_for_liquidity_range(combined_liquidity, 0, 20_000, sqrt_price, false).unwrap();
 	let argon_token_units_per_microgon = U256::from(10u128.pow(12));
-	assert_eq!(reversed.argon, combined_liquidity / argon_token_units_per_microgon);
+	let expected_microgons =
+		Balance::try_from(combined_liquidity / argon_token_units_per_microgon).unwrap();
+	assert_eq!(reversed.argon, expected_microgons);
 }
 
 #[test]
-fn rejects_combined_principal_that_exceeds_u256() {
+fn rejects_out_of_range_principal_from_max_raw_liquidity() {
 	let minimum_price = uniswap_sqrt_price_at_tick(MIN_UNISWAP_TICK);
 	for argon_is_token0 in [true, false] {
 		let result = principal_for_liquidity_range(
@@ -210,8 +213,7 @@ fn shared_range_principal_matches_the_uniswap_sdk() {
 				position.tick_upper,
 				sqrt_price,
 				argon_is_token0,
-			)
-			.unwrap();
+			);
 			assert_eq!(actual, expected, "{scenario}; ARGON is token0: {argon_is_token0}");
 		}
 	}
@@ -246,8 +248,8 @@ fn withdrawing_liquidity_can_remove_a_rounding_unit() {
 		.unwrap();
 
 		assert_eq!(one_position.usdc, 0);
-		assert_eq!(all_three.usdc, U256::one());
-		assert_eq!(after_withdrawal.usdc, U256::zero());
+		assert_eq!(all_three.usdc, 1);
+		assert_eq!(after_withdrawal.usdc, 0);
 	}
 }
 
@@ -291,8 +293,8 @@ fn reward_bands_allow_a_shared_shift_but_not_independent_boundary_changes(
 			spacing,
 		);
 		let principal = band.principal_for_range(liquidity, lower, upper, pool_price).unwrap();
-		assert!(principal.argon > U256::zero(), "reference {reference:?}");
-		assert!(principal.usdc > U256::zero(), "reference {reference:?}");
+		assert!(principal.argon > 0, "reference {reference:?}");
+		assert!(principal.usdc > 0, "reference {reference:?}");
 	}
 
 	// A standard full-range NFT has valid grid boundaries, but is too wide to earn.
@@ -301,7 +303,7 @@ fn reward_bands_allow_a_shared_shift_but_not_independent_boundary_changes(
 	let highest_usable_tick = MAX_UNISWAP_TICK.div_euclid(spacing) * spacing;
 	assert_eq!(
 		band.principal_for_range(liquidity, lowest_usable_tick, highest_usable_tick, pool_price),
-		Ok(PositionAmounts { argon: U256::zero(), usdc: U256::zero() }),
+		Ok(PositionAmounts::default()),
 		"valid full-range position"
 	);
 
@@ -320,11 +322,7 @@ fn reward_bands_allow_a_shared_shift_but_not_independent_boundary_changes(
 			spacing,
 		);
 		let principal = band.principal_for_range(liquidity, lower, upper, pool_price).unwrap();
-		assert_eq!(
-			principal,
-			PositionAmounts { argon: U256::zero(), usdc: U256::zero() },
-			"{invalid_band}"
-		);
+		assert_eq!(principal, PositionAmounts::default(), "{invalid_band}");
 	}
 }
 
@@ -392,7 +390,7 @@ fn shifted_bands_earn_only_on_their_overlap_with_the_current_reward_band(
 		false,
 	);
 	let expected =
-		uniswap_sdk_principal(liquidity, eligible_sqrt_range, pool_price, argon_is_token0);
+		uniswap_sdk_principal(liquidity, eligible_sqrt_range, pool_price, argon_is_token0).unwrap();
 	let actual = band
 		.principal_for_range(U256::from(liquidity), lower, upper, pool_price)
 		.unwrap();
@@ -401,12 +399,9 @@ fn shifted_bands_earn_only_on_their_overlap_with_the_current_reward_band(
 	let whole_position = position_checkpoint(liquidity, lower, upper)
 		.amounts_at_price(pool_price, argon_is_token0)
 		.unwrap();
-	assert!(actual.argon <= U256::from(whole_position.argon));
-	assert!(actual.usdc <= U256::from(whole_position.usdc));
-	assert!(
-		actual.argon < U256::from(whole_position.argon) ||
-			actual.usdc < U256::from(whole_position.usdc)
-	);
+	assert!(actual.argon <= whole_position.argon);
+	assert!(actual.usdc <= whole_position.usdc);
+	assert!(actual.argon < whole_position.argon || actual.usdc < whole_position.usdc);
 }
 
 #[rstest]
@@ -692,8 +687,9 @@ fn missing_prices_do_not_delay_the_next_frame_or_history_expiry() {
 		CurrentFrame::set(3);
 		StabilizerPools::on_frame_start(3);
 
-		let finalized = FinalizedStabilizerPoolPrincipalByFrame::<Test>::get();
-		assert_eq!(finalized[&1], PositionAmounts::default());
+		let finalized = StabilizerPoolRewardSharesByFrame::<Test>::get();
+		assert_eq!(finalized[&1], Percent::from_percent(90));
+		assert_eq!(FinalizedRewardValues::get(), vec![(1, 0)]);
 		// The frame with a missing price still has its own opening and the next opening.
 		// Reprocessing the frame boundary cannot overwrite its recorded timestamp.
 		start_mining_frame(3, 41);
@@ -900,6 +896,62 @@ fn independent_nfts_share_their_range_without_narrowing_its_liquidity() {
 		let registered = RegisteredLiquidityByRange::<Test>::get(range);
 		assert_eq!(registered.liquidity_for_frame(5), Some(one_nft));
 		assert_eq!(registered.liquidity_for_frame(6), Some(one_nft + U256::from(100)));
+	});
+}
+
+#[test]
+fn account_position_limit_allows_refreshes_and_tracks_owner_changes() {
+	new_test_ext().execute_with(|| {
+		assert_ok!(submit(evidence(100, 1, beneficiary_account(), 1_000, true)));
+		let mut record = checkpoint();
+		let manager = config().position_manager;
+		for token_id in 2..=5 {
+			assert_ok!(StabilizerPools::record_checkpoint(
+				manager,
+				token_id.into(),
+				record.clone()
+			));
+		}
+		assert_eq!(PositionIdsByAccount::<Test>::get(beneficiary_account()).len(), 5);
+		assert_noop!(
+			StabilizerPools::record_checkpoint(manager, 6.into(), record.clone()),
+			Error::<Test>::TooManyPositions
+		);
+		assert_ok!(submit(evidence(150, 1, beneficiary_account(), 1_000, true)));
+		assert_eq!(PositionIdsByAccount::<Test>::get(beneficiary_account()).len(), 5);
+
+		let next_owner = AccountId32::new([0x24; 32]);
+		let changed = evidence(200, 2, next_owner.clone(), 1_000, true);
+		assert_ok!(StabilizerPools::checkpoint_position(
+			RuntimeOrigin::signed(next_owner.clone()),
+			pool_manager(),
+			pool_id(),
+			1.into(),
+			Box::new(changed),
+		));
+		assert_eq!(PositionIdsByAccount::<Test>::get(beneficiary_account()).len(), 4);
+		assert_eq!(
+			PositionIdsByAccount::<Test>::get(&next_owner).as_slice(),
+			&[StabilizerPoolPositionId { position_manager: manager, token_id: 1.into() },]
+		);
+		assert_ok!(StabilizerPools::record_checkpoint(manager, 6.into(), record.clone()));
+		assert_eq!(PositionIdsByAccount::<Test>::get(beneficiary_account()).len(), 5);
+
+		let position = StabilizerPoolPositionId { position_manager: manager, token_id: 2.into() };
+		let Some(StabilizerPoolRegistration::Enrolled(enrollment)) =
+			StabilizerPoolRegistrations::<Test>::get(position)
+		else {
+			panic!("expected an enrolled position")
+		};
+		record.proven_through.number += 1;
+		record.proven_through.timestamp_millis += 12_000;
+		assert_ok!(StabilizerPools::remove_reported_position(
+			position,
+			&record,
+			enrollment,
+			record.proven_through,
+		));
+		assert_eq!(PositionIdsByAccount::<Test>::get(beneficiary_account()).len(), 4);
 	});
 }
 
@@ -1184,41 +1236,21 @@ fn a_coarse_grid_range_entirely_below_the_reward_band_is_skipped() {
 }
 
 enum PositionCorrection {
-	PublicUnsubscribe,
-	PublicRevisionAfterPublishedProof,
-	PublicRevisionAfterProofBeforeClose,
-	PublicUnsubscribeAfterPartialProof,
-	OwnerReplacementAfterProofBeforeClose,
-	LatePublicUnsubscribe,
-	OwnerReplacement,
+	Unsubscribe,
+	RevisionAfterCheckpoint,
+	LateUnsubscribe,
+	Replacement,
 }
 
 #[rstest]
-#[case(PositionCorrection::PublicUnsubscribe)]
-#[case(PositionCorrection::PublicRevisionAfterPublishedProof)]
-#[case(PositionCorrection::PublicRevisionAfterProofBeforeClose)]
-#[case(PositionCorrection::PublicUnsubscribeAfterPartialProof)]
-#[case(PositionCorrection::OwnerReplacementAfterProofBeforeClose)]
-#[case(PositionCorrection::LatePublicUnsubscribe)]
-#[case(PositionCorrection::OwnerReplacement)]
-fn correcting_a_position_updates_only_unproved_liquidity_during_review(
-	#[case] correction: PositionCorrection,
-) {
-	let proof_before_close = matches!(
-		correction,
-		PositionCorrection::PublicRevisionAfterProofBeforeClose |
-			PositionCorrection::OwnerReplacementAfterProofBeforeClose
-	);
-	let partial_proof =
-		matches!(correction, PositionCorrection::PublicUnsubscribeAfterPartialProof);
-	let fully_proved = proof_before_close ||
-		matches!(correction, PositionCorrection::PublicRevisionAfterPublishedProof);
-	let late = matches!(correction, PositionCorrection::LatePublicUnsubscribe);
-	let owner_replaces = matches!(
-		correction,
-		PositionCorrection::OwnerReplacement |
-			PositionCorrection::OwnerReplacementAfterProofBeforeClose
-	);
+#[case(PositionCorrection::Unsubscribe)]
+#[case(PositionCorrection::RevisionAfterCheckpoint)]
+#[case(PositionCorrection::LateUnsubscribe)]
+#[case(PositionCorrection::Replacement)]
+fn invalidating_a_position_forfeits_unclaimed_rewards(#[case] correction: PositionCorrection) {
+	let revision_report = matches!(correction, PositionCorrection::RevisionAfterCheckpoint);
+	let late = matches!(correction, PositionCorrection::LateUnsubscribe);
+	let owner_replaces = matches!(correction, PositionCorrection::Replacement);
 	new_test_ext().execute_with(|| {
 		let owner = AccountId32::new([0x42; 32]);
 		let reporter = AccountId32::new([0x77; 32]);
@@ -1235,8 +1267,7 @@ fn correcting_a_position_updates_only_unproved_liquidity_during_review(
 		);
 		let liquidity = 10u128.pow(24);
 		let mut checkpoint = position_checkpoint(liquidity, lower, upper);
-		// Block 110 is after frame 2 opens. Even a later endpoint cannot prove its beginning.
-		let enrollment_block = if partial_proof { 110 } else { 95 };
+		let enrollment_block = 95;
 		checkpoint.proven_through = ProofBlock {
 			hash: H256::from_low_u64_be(enrollment_block),
 			number: enrollment_block,
@@ -1276,7 +1307,17 @@ fn correcting_a_position_updates_only_unproved_liquidity_during_review(
 			CurrentTick::set(tick);
 			report_stabilizer_pool_price(tick, spot);
 		}
-		let prove_continuity = || {
+		start_mining_frame(3, 30);
+		let review = StabilizerPoolReviewFrame::<Test>::get().unwrap();
+		assert_eq!(review.frame_id, 2);
+		assert_eq!(
+			review.liquidity_by_range.get(&(lower, upper)),
+			Some(&U256::from(liquidity * 2))
+		);
+
+		if revision_report || late {
+			// Refreshing an unchanged revision does not claim the frame or protect it from a
+			// report.
 			let continuity = position_evidence(
 				151,
 				1,
@@ -1292,24 +1333,18 @@ fn correcting_a_position_updates_only_unproved_liquidity_during_review(
 				position.token_id,
 				Box::new(continuity),
 			));
-		};
-		if proof_before_close {
-			prove_continuity();
-			assert!(SubmittedClaims::get().is_empty());
 		}
-		start_mining_frame(3, 30);
-		let review = StabilizerPoolReviewFrame::<Test>::get().unwrap();
-		assert_eq!(review.frame_id, 2);
-		assert_eq!(
-			review.liquidity_by_range.get(&(lower, upper)),
-			Some(&U256::from(liquidity * 2))
-		);
-
-		if !proof_before_close && (fully_proved || partial_proof) {
-			prove_continuity();
-		}
+		assert_ok!(StabilizerPools::settle_account(&owner), 0);
+		assert!(PaidClaims::get().is_empty());
 		if late {
 			start_mining_frame(4, 40);
+			// A failed automatic payout leaves rewards unclaimed for the late report to forfeit.
+			RejectClaims::set(true);
+			assert_noop!(
+				with_storage_layer(|| StabilizerPools::settle_account(&owner)),
+				DispatchError::Unavailable
+			);
+			RejectClaims::set(false);
 		}
 
 		if owner_replaces {
@@ -1339,9 +1374,14 @@ fn correcting_a_position_updates_only_unproved_liquidity_during_review(
 				),
 				Error::<Test>::PositionChangeNotProven
 			);
-			let reported_liquidity = if fully_proved { liquidity * 2 } else { liquidity };
-			let changed =
-				position_change_evidence(170, 2, reported_liquidity, fully_proved, (lower, upper));
+			let reported_liquidity = if revision_report { liquidity * 2 } else { liquidity };
+			let changed = position_change_evidence(
+				170,
+				2,
+				reported_liquidity,
+				revision_report,
+				(lower, upper),
+			);
 			assert_ok!(StabilizerPools::report_position_change(
 				RuntimeOrigin::signed(reporter.clone()),
 				position,
@@ -1349,7 +1389,7 @@ fn correcting_a_position_updates_only_unproved_liquidity_during_review(
 			));
 			assert_noop!(
 				StabilizerPools::report_position_change(
-					RuntimeOrigin::signed(reporter),
+					RuntimeOrigin::signed(reporter.clone()),
 					position,
 					Box::new(changed)
 				),
@@ -1365,14 +1405,14 @@ fn correcting_a_position_updates_only_unproved_liquidity_during_review(
 			U256::from(expected_next_liquidity)
 		);
 
-		let pending_liquidity = if fully_proved || late { liquidity * 2 } else { liquidity };
+		let reviewed_liquidity = if late { liquidity * 2 } else { liquidity };
 		if !late {
 			assert_eq!(
 				StabilizerPoolReviewFrame::<Test>::get()
 					.unwrap()
 					.liquidity_by_range
 					.get(&(lower, upper)),
-				Some(&U256::from(pending_liquidity))
+				Some(&U256::from(reviewed_liquidity))
 			);
 			start_mining_frame(4, 40);
 		}
@@ -1387,31 +1427,15 @@ fn correcting_a_position_updates_only_unproved_liquidity_during_review(
 		)
 		.unwrap();
 		let expected = band
-			.principal_for_range(pending_liquidity.into(), lower, upper, price.sqrt_price_x96)
+			.principal_for_range(reviewed_liquidity.into(), lower, upper, price.sqrt_price_x96)
 			.unwrap();
 		assert_ne!(expected, PositionAmounts::default());
-		assert_eq!(FinalizedStabilizerPoolPrincipalByFrame::<Test>::get().get(&2), Some(&expected));
+		assert_eq!(
+			FinalizedRewardValues::get().into_iter().find(|(frame, _)| *frame == 2),
+			Some((2, expected.argon + expected.usdc)),
+		);
 
-		let claims = SubmittedClaims::get();
-		if fully_proved {
-			let [claim] = claims.as_slice() else {
-				panic!("expected one claim for the old revision")
-			};
-			assert_eq!(claim.beneficiary, owner);
-			let individual = band
-				.principal_for_range(liquidity.into(), lower, upper, price.sqrt_price_x96)
-				.unwrap();
-			assert_eq!(
-				claim.frames,
-				[StabilizerPoolFrameClaim {
-					frame_id: 2,
-					argon_microgons: individual.argon,
-					usdc_in_microgons: individual.usdc,
-				}],
-			);
-		} else {
-			assert!(claims.is_empty());
-		}
+		assert!(PaidClaims::get().is_empty());
 
 		if owner_replaces {
 			assert_eq!(
@@ -1424,6 +1448,7 @@ fn correcting_a_position_updates_only_unproved_liquidity_during_review(
 			return;
 		}
 
+		assert_ok!(StabilizerPools::settle_account(&owner), 0);
 		assert_eq!(
 			StabilizerPoolRegistrations::<Test>::get(position),
 			Some(StabilizerPoolRegistration::Removed {
@@ -1450,7 +1475,7 @@ fn correcting_a_position_updates_only_unproved_liquidity_during_review(
 		);
 		// A revision report can be followed by the owner's proof from that same Ethereum block.
 		let (block, revision, replacement_liquidity) =
-			if fully_proved { (170, 2, liquidity * 2) } else { (180, 3, liquidity) };
+			if revision_report { (170, 2, liquidity * 2) } else { (180, 3, liquidity) };
 		let replacement = position_evidence(
 			block,
 			revision,
@@ -1473,36 +1498,15 @@ fn correcting_a_position_updates_only_unproved_liquidity_during_review(
 				next_claim_frame: 5
 			}))
 		);
-		if fully_proved {
-			let new_owner = AccountId32::new([0x17; 32]);
-			let new_beneficiary = position_evidence(
-				180,
-				3,
-				H256::from_slice(new_owner.as_ref()),
-				replacement_liquidity,
-				true,
-				(lower, upper),
-			);
-			assert_ok!(StabilizerPools::checkpoint_position(
-				RuntimeOrigin::signed(new_owner.clone()),
-				pool_manager(),
-				pool_id(),
-				position.token_id,
-				Box::new(new_beneficiary),
-			));
-			assert_eq!(
-				PositionCheckpoints::<Test>::get(position.position_manager, position.token_id)
-					.unwrap()
-					.beneficiary,
-				new_owner
-			);
-			assert_eq!(SubmittedClaims::get().len(), 1);
-		}
+		// Re-enrollment starts a new cursor. The forfeited frame cannot be claimed again.
+		start_mining_frame(5, 50);
+		assert_ok!(StabilizerPools::settle_account(&owner), 0);
+		assert!(PaidClaims::get().is_empty());
 	});
 }
 
 #[test]
-fn a_checkpoint_submits_only_new_full_frames_and_can_retry_a_rejected_claim() {
+fn collect_pays_finalized_frames_covered_by_the_latest_checkpoint_once() {
 	new_test_ext().execute_with(|| {
 		let owner = AccountId32::new([0x42; 32]);
 		let position = StabilizerPoolPositionId {
@@ -1545,38 +1549,53 @@ fn a_checkpoint_submits_only_new_full_frames_and_can_retry_a_rejected_claim() {
 				Box::new(proof),
 			)
 		};
+		let sample_frame = |frame: FrameId| {
+			for tick in (frame * 10)..((frame + 1) * 10) {
+				CurrentTick::set(tick);
+				let mut price_index = stabilizer_pool_price_index(tick, spot);
+				price_index.usdc_usd_price = Some(usdc_quote);
+				StabilizerPools::on_price_index(&price_index, Some(stabilizer_pool_price_source()));
+			}
+		};
 
 		start_mining_frame(1, 10);
 		assert_ok!(submit_proof(build_proof(45)));
-		for frame in 1..=12 {
-			let next_frame_tick = (frame + 1) * 10;
+		for frame in 1..=11 {
 			// The oracle missed frame 5. Later frames can still have valid claims.
 			if frame != 5 {
-				for tick in (frame * 10)..next_frame_tick {
-					CurrentTick::set(tick);
-					let mut price_index = stabilizer_pool_price_index(tick, spot);
-					price_index.usdc_usd_price = Some(usdc_quote);
-					StabilizerPools::on_price_index(
-						&price_index,
-						Some(stabilizer_pool_price_source()),
-					);
-				}
+				sample_frame(frame);
 			}
-			start_mining_frame(frame + 1, next_frame_tick);
+			start_mining_frame(frame + 1, (frame + 1) * 10);
 		}
+		assert_ok!(StabilizerPools::settle_account(&owner), 0);
+		assert!(PaidClaims::get().is_empty());
+		assert_ok!(submit_proof(build_proof(600)));
+		assert!(PaidClaims::get().is_empty());
+		assert_eq!(
+			StabilizerPoolRegistrations::<Test>::get(position),
+			Some(StabilizerPoolRegistration::Enrolled(StabilizerPoolEnrollment {
+				eligible_from: 2,
+				next_claim_frame: 2,
+			})),
+		);
+		// Frame 2 has its tenth collectible frame at frame 13. Frame 12 is still under review.
+		sample_frame(12);
+		start_mining_frame(13, 130);
+		let (_, last_day_claims) =
+			StabilizerPools::value_position_claim(&checkpoint(), 2, 13).unwrap();
+		assert_eq!(
+			last_day_claims.iter().map(|claim| claim.frame_id).collect::<Vec<_>>(),
+			vec![2, 3, 4, 6, 7, 8, 9, 10, 11],
+		);
+		// The next frame expires that claim even though its valuation price is retained.
+		sample_frame(13);
+		start_mining_frame(14, 140);
 		assert!(StabilizerPoolPricesByFrame::<Test>::get().contains_key(&2));
-
-		// The proof reaches the start of frame 12 exactly. Frame 2 is already too old to claim,
-		// even though its price remains stored.
-		let proof = build_proof(600);
-		RejectClaims::set(true);
-		assert_noop!(submit_proof(proof.clone()), DispatchError::Unavailable);
-		assert!(SubmittedClaims::get().is_empty());
-		RejectClaims::set(false);
-		assert_ok!(submit_proof(proof));
-		let claims = SubmittedClaims::get();
+		// A later runtime split cannot change the weighting retained for past frames.
+		UsdcRewardShare::set(Percent::from_percent(50));
+		assert_ok!(StabilizerPools::settle_account(&owner), 1);
+		let claims = PaidClaims::get();
 		let [claim] = claims.as_slice() else { panic!("expected one accepted claim") };
-		assert_eq!(claim.beneficiary, owner);
 		assert_eq!(
 			claim.frames.iter().map(|frame| frame.frame_id).collect::<Vec<_>>(),
 			vec![3, 4, 6, 7, 8, 9, 10, 11],
@@ -1606,16 +1625,33 @@ fn a_checkpoint_submits_only_new_full_frames_and_can_retry_a_rejected_claim() {
 			claim.frames[0],
 			StabilizerPoolFrameClaim {
 				frame_id: 3,
-				argon_microgons: principal.argon,
-				usdc_in_microgons: principal.usdc * 2u32,
+				amount: Percent::from_percent(10).mul_floor(principal.argon) +
+					Percent::from_percent(90).mul_floor(principal.usdc * 2),
 			},
 		);
+		assert_eq!(
+			FinalizedRewardValues::get().into_iter().find(|(frame, _)| *frame == 3),
+			Some((3, principal.argon + principal.usdc * 2)),
+		);
 
+		assert_ok!(StabilizerPools::settle_account(&owner), 0);
+		assert_eq!(PaidClaims::get().len(), 1);
 		assert_ok!(submit_proof(build_proof(650)));
-		assert_ok!(submit_proof(build_proof(651)));
-		let claims = SubmittedClaims::get();
+		RejectClaims::set(true);
+		assert_noop!(
+			with_storage_layer(|| StabilizerPools::settle_account(&owner)),
+			DispatchError::Unavailable
+		);
+		assert_eq!(PaidClaims::get().len(), 1);
+		RejectClaims::set(false);
+		start_mining_frame(15, 150);
+		assert_ok!(StabilizerPools::settle_account(&owner), 1);
+		start_mining_frame(16, 160);
+		assert_ok!(StabilizerPools::settle_account(&owner), 0);
+		let claims = PaidClaims::get();
 		let [_, last_claim] = claims.as_slice() else { panic!("expected one additional claim") };
 		let [last_frame] = last_claim.frames.as_slice() else { panic!("expected one new frame") };
 		assert_eq!(last_frame.frame_id, 12);
+		assert_eq!(checkpoint().proven_through.number, 650);
 	});
 }

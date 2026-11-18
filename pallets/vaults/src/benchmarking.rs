@@ -1,5 +1,3 @@
-#![cfg(feature = "runtime-benchmarks")]
-
 use super::*;
 use argon_bitcoin::{derive_xpub, xpriv_from_seed};
 use argon_primitives::{
@@ -30,6 +28,7 @@ const MAX_RELEASE_COMPLETIONS: u32 = 100;
 type BalanceOf<T> = <T as Config>::Balance;
 type CurrencyOf<T> = <T as Config>::Currency;
 type OwnershipCurrencyOf<T> = <T as Config>::OwnershipCurrency;
+type FundingUpdate<Balance> = (VaultId, BitcoinLockFunding<Balance>, BitcoinLockFunding<Balance>);
 
 fn benchmark_terms<T: Config>() -> VaultTerms<BalanceOf<T>> {
 	VaultTerms {
@@ -204,10 +203,7 @@ where
 fn seed_funding_update<T: Config>(
 	revenue_entries: u32,
 	include_current: bool,
-) -> Result<
-	(VaultId, BitcoinLockFunding<BalanceOf<T>>, BitcoinLockFunding<BalanceOf<T>>),
-	BenchmarkError,
-> {
+) -> Result<FundingUpdate<BalanceOf<T>>, BenchmarkError> {
 	let operator: T::AccountId = account("funding_operator", 0, 0);
 	let vault_id = create_vault::<T>(&operator, 14, 10_000)?;
 	seed_release_schedule_for_benchmark::<T>(
@@ -1319,7 +1315,7 @@ mod benchmarks {
 
 		#[block]
 		{
-			let _ = <Pallet<T> as OnNewSlot<T::AccountId>>::on_frame_start(frame_id);
+			<Pallet<T> as OnNewSlot<T::AccountId>>::on_frame_start(frame_id);
 		}
 
 		assert!(

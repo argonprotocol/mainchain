@@ -1,5 +1,4 @@
 //! Benchmarking setup for pallet-block-seal
-#![cfg(feature = "runtime-benchmarks")]
 
 extern crate alloc;
 

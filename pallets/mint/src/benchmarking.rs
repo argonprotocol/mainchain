@@ -1,12 +1,10 @@
-#![cfg(feature = "runtime-benchmarks")]
-
 use super::*;
 use frame_support::traits::Hooks;
 use pallet_prelude::{
 	argon_primitives::{bitcoin::BitcoinLockId, BitcoinFissionMinting},
 	benchmarking::{
-		set_benchmark_bitcoin_locks_runtime_state, set_benchmark_price_provider_state,
-		BenchmarkBitcoinLocksRuntimeState, BenchmarkPriceProviderState,
+		set_benchmark_mining_clock, set_benchmark_price_provider_state, BenchmarkMiningClock,
+		BenchmarkPriceProviderState,
 	},
 };
 use polkadot_sdk::{frame_benchmarking::v2::*, sp_runtime::FixedU128};
@@ -56,13 +54,13 @@ mod benchmarks {
 
 		MintedBitcoinMicrogons::<T>::put(T::Balance::from(0u128));
 
-		set_benchmark_bitcoin_locks_runtime_state(BenchmarkBitcoinLocksRuntimeState {
+		set_benchmark_mining_clock(BenchmarkMiningClock {
 			current_frame_id: 2,
 			current_tick: 20,
 			did_start_new_frame: true,
 		});
 		set_benchmark_price_provider_state(BenchmarkPriceProviderState {
-			btc_price_in_usd: Some(FixedU128::from_rational(62_000_00u128, 100u128)),
+			btc_price_in_usd: Some(FixedU128::from_rational(6_200_000u128, 100u128)),
 			argon_price_in_usd: Some(FixedU128::one()),
 			argonot_price_in_usd: Some(FixedU128::one()),
 			argon_target_price_in_usd: Some(FixedU128::from_rational(9u128, 10u128)),

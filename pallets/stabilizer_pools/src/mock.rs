@@ -61,7 +61,10 @@ impl pallet_ethereum_verifier::Config for Test {
 #[cfg(test)]
 impl Config for Test {
 	type EthereumVerifier = EthereumVerifier;
-	type ClaimProvider = MockClaimProvider;
+	type RewardProvider = MockRewardProvider;
+	type TreasuryPositionProvider = ();
+	type MaxPositionsPerAccount = ConstU32<5>;
+	type UsdcRewardShare = UsdcRewardShare;
 	type WeightInfo = ();
 	type MiningFrameTransitionProvider = CurrentFrame;
 	type CurrentTick = CurrentTick;
@@ -80,45 +83,52 @@ frame_support::parameter_types! {
 	pub const MaxPriceBucketsPerFrame: u32 = 24;
 	pub const MinPriceBucketCoverage: Percent = Percent::from_percent(75);
 	pub static CurrentTick: Tick = 20;
-	pub static CurrentTime: u64 = 0;
+	pub static CurrentTime: Moment = 0;
 	pub static CurrentFrame: FrameId = 1;
-	pub static SubmittedClaims: Vec<SubmittedClaim> = Vec::new();
+	pub static PaidClaims: Vec<PaidClaim> = Vec::new();
 	pub static RejectClaims: bool = false;
+	pub static UsdcRewardShare: Percent = Percent::from_percent(90);
+	pub static FinalizedRewardValues: Vec<(FrameId, Balance)> = Vec::new();
 }
 
 #[cfg(test)]
 #[derive(Clone)]
-pub struct SubmittedClaim {
-	pub beneficiary: AccountId32,
+pub struct PaidClaim {
 	pub frames: Vec<StabilizerPoolFrameClaim>,
 }
 
 #[cfg(test)]
-pub struct MockClaimProvider;
+pub struct MockRewardProvider;
 
 #[cfg(test)]
-impl StabilizerPoolClaimProvider<AccountId32> for MockClaimProvider {
+impl StabilizerPoolRewardProvider for MockRewardProvider {
 	type Weights = ();
 
-	fn submit_claim(
-		beneficiary: &AccountId32,
-		frames: &[StabilizerPoolFrameClaim],
-	) -> DispatchResult {
+	fn finalize_frame_rewards(frame_id: FrameId, eligible_value: Balance) {
+		FinalizedRewardValues::mutate(|frames| frames.push((frame_id, eligible_value)));
+	}
+
+	fn frame_reward_rate(frame_id: FrameId) -> Option<FixedU128> {
+		FinalizedRewardValues::get()
+			.iter()
+			.any(|(frame, _)| *frame == frame_id)
+			.then_some(FixedU128::one())
+	}
+	fn claim_rewards(frames: &[StabilizerPoolFrameClaim]) -> Result<Balance, DispatchError> {
 		if RejectClaims::get() {
 			return Err(DispatchError::Unavailable);
 		}
-		SubmittedClaims::mutate(|claims| {
-			claims
-				.push(SubmittedClaim { beneficiary: beneficiary.clone(), frames: frames.to_vec() });
+		PaidClaims::mutate(|claims| {
+			claims.push(PaidClaim { frames: frames.to_vec() });
 		});
-		Ok(())
+		Ok(1)
 	}
 }
 
 #[cfg(test)]
 impl Time for CurrentTime {
-	type Moment = u64;
-	fn now() -> u64 {
+	type Moment = Moment;
+	fn now() -> Moment {
 		Self::get()
 	}
 }
@@ -140,8 +150,10 @@ pub fn new_test_ext() -> TestState {
 	ext.execute_with(|| {
 		System::set_block_number(1);
 		CurrentFrame::set(1);
-		SubmittedClaims::set(Vec::new());
+		PaidClaims::set(Vec::new());
 		RejectClaims::set(false);
+		UsdcRewardShare::set(Percent::from_percent(90));
+		FinalizedRewardValues::set(Vec::new());
 		assert_ok!(StabilizerPools::register_pool(RuntimeOrigin::root(), pool_manager(), config()));
 	});
 	ext
@@ -246,7 +258,7 @@ pub(crate) fn uniswap_sdk_principal(
 	sqrt_range: Range<UniswapSqrtPriceX96>,
 	sqrt_price_x96: UniswapSqrtPriceX96,
 	argon_is_token0: bool,
-) -> PositionAmounts<U256> {
+) -> Result<PositionAmounts, PositionAmountError> {
 	let sqrt_lower = AlloyU256::from_be_bytes(sqrt_range.start.to_big_endian());
 	let sqrt_upper = AlloyU256::from_be_bytes(sqrt_range.end.to_big_endian());
 	let sqrt_price =
@@ -255,11 +267,11 @@ pub(crate) fn uniswap_sdk_principal(
 	let token1 = get_amount_1_delta(sqrt_lower, sqrt_price, liquidity, false).unwrap();
 	let (argon, usdc) = if argon_is_token0 { (token0, token1) } else { (token1, token0) };
 
-	let argon_token_units_per_microgon = U256::from(10u128.pow(12));
-	PositionAmounts {
-		argon: U256::from_big_endian(&argon.to_be_bytes::<32>()) / argon_token_units_per_microgon,
-		usdc: U256::from_big_endian(&usdc.to_be_bytes::<32>()),
-	}
+	let argon_token_units_per_microgon = AlloyU256::from(10u128.pow(12));
+	let argon = Balance::try_from(argon / argon_token_units_per_microgon)
+		.map_err(|_| PositionAmountError::AmountOverflow)?;
+	let usdc = Balance::try_from(usdc).map_err(|_| PositionAmountError::AmountOverflow)?;
+	Ok(PositionAmounts { argon, usdc })
 }
 
 /// Use the SDK's arbitrary-precision encoder as the reference for USD-to-pool-price conversion.

@@ -2,8 +2,8 @@ use super::{
 	ArgonotBondLots, BondLot, BondLotById, BondLotIdsByAccount, BondLotIdsByVault, BondLotSummary,
 	BondLotsByVault, BondProgram, BondProgramId, BondReleaseReason,
 	CurrentFrameArgonotBondParticipants, CurrentFrameVaultBitcoin, CurrentFrameVaultCapital, Event,
-	HoldReason, OutstandingStabilizerPoolRewards, PendingBondReleaseRetryCursor,
-	PendingBondReleasesByFrame, RewardReserves, RewardTaperingPolicy, TaperingPolicy,
+	HoldReason, PendingBondReleaseRetryCursor, PendingBondReleasesByFrame, RewardReserves,
+	RewardTaperingPolicy, StabilizerPoolRewardFrame, StabilizerPoolRewardFrames, TaperingPolicy,
 	TotalArgonBondLots,
 };
 use crate::{
@@ -11,12 +11,12 @@ use crate::{
 		account_id_from_seed, account_pair_from_seed, insert_vault, new_test_ext, set_argons,
 		set_ownership, test_vault, ArgonPriceInUsd, ArgonotPriceInUsd,
 		ArgonotSecuritizationMultiplier, AvailableSecuritizationSpace, AverageArgonCpi,
-		AverageArgonotPriceInMicrogons, Balances, BidPoolAccountId, CurrentFrameId,
-		ExistentialDeposit, LastAverageArgonotPriceFrame, LastOperationalBondTotal,
-		LastVaultProfits, MaxActiveArgonotBondLots, MaxArgonBondLots,
+		AverageArgonotPriceInMicrogons, Balances, BidPoolAccountId, CirculatingArgon,
+		CollectClaimFrames, CurrentFrameId, ExistentialDeposit, LastAverageArgonotPriceFrame,
+		LastOperationalBondTotal, LastVaultProfits, MaxActiveArgonotBondLots, MaxArgonBondLots,
 		MaxArgonotBondedPercentOfCirculation, MaxVaultsPerPool, MinimumArgonsPerContributor, Mint,
-		MintedBitcoinMicrogons, NewlyStartedFrameId, Ownership, PurchasePool, PurchaseTick,
-		RuntimeEvent, RuntimeHoldReason, RuntimeOrigin, StabilizerBuys, System, Test,
+		MintedBitcoinMicrogons, Ownership, PurchasePool, PurchaseTick, RuntimeEvent,
+		RuntimeHoldReason, RuntimeOrigin, SettledClaimFrame, StabilizerBuys, System, Test,
 		TestAccountId, Treasury, TreasuryExitDelayFrames, TreasuryPositions, Upstreams,
 		VaultArgonotMicronots, VaultBitcoinSatoshis, VaultPalletId, VaultRewardCommittedMicronots,
 		VaultSecuritizedSatoshis, VaultsById,
@@ -28,7 +28,10 @@ use crate::{
 	BondCollateralSettlementQueue, PendingBondCollateralByAccount,
 };
 use argon_primitives::{
-	treasury::{NetworkPositionQuantities, TreasuryPositionProvider, TreasuryRewardProvider},
+	treasury::{
+		NetworkPositionQuantities, StabilizerPoolFrameClaim, StabilizerPoolRewardProvider,
+		TreasuryPositionProvider, TreasuryRewardProvider,
+	},
 	vault::{TreasuryBonusApprovalProof, TREASURY_BONUS_APPROVAL_PROOF_MESSAGE_KEY},
 	ArgonCPI, BitcoinFissionMinting, OnNewSlot, OperationalRewardsPayer, PriceIndex,
 	PriceIndexUpdated, Signature, TreasuryPoolProvider, UniswapPurchaseProvider,
@@ -44,7 +47,6 @@ use frame_support::{
 };
 use pallet_prelude::*;
 use pallet_stabilizer_buys::BuysByAccountAndFrame;
-use pallet_treasury_positions::{CollectAmounts, Position, PositionsByAccount};
 use sp_core::{blake2_256, Pair};
 use sp_runtime::{
 	traits::AccountIdConversion, ArithmeticError, BoundedBTreeMap, FixedU128, Permill, TokenError,
@@ -53,61 +55,107 @@ use sp_runtime::{
 type MarketingMigration = crate::migrations::VirtualizeMarketingReserveMigration<Test>;
 
 #[test]
-fn stabilizer_pool_auto_collect_pays_other_accounts_after_a_failure_and_retries_next_frame() {
-	new_test_ext().execute_with(|| {
-		ExistentialDeposit::set(100);
-		let mut beneficiaries = [account(95), account(96)];
-		beneficiaries.sort_by_key(|account| PositionsByAccount::<Test>::hashed_key_for(account));
-		let [beneficiary, other_beneficiary] = beneficiaries;
-		let issuance_before = Balances::total_issuance();
-		RewardReserves::<Test>::mutate(|reserves| reserves.stabilizer_pools = 320);
-		let accrued = CollectAmounts { bond_earnings: 25, ..Default::default() };
-		let collected = CollectAmounts { stake_earnings: 30, ..Default::default() };
-		PositionsByAccount::<Test>::insert(
-			&beneficiary,
-			Position { collect_accrued: accrued, collected, ..Default::default() },
-		);
+fn stabilizer_pool_collect_uses_fixed_frame_rates_and_debits_shared_reserves() {
+	for (eligible_principal, expected_rate, expected_reward) in [
+		(900u128, FixedU128::from_rational(75, 1_000), 12),
+		(1_500, FixedU128::from_rational(75, 1_500), 7),
+	] {
+		new_test_ext().execute_with(|| {
+			System::set_block_number(1);
+			let frame = 7;
+			let beneficiary = account(1);
+			CirculatingArgon::set(20_000);
+			RewardTaperingPolicy::<Test>::mutate(|policy| {
+				policy.stabilizer_pools.target_daily_return = FixedU128::from_rational(5, 100);
+			});
+			RewardReserves::<Test>::mutate(|reserves| reserves.stabilizer_pools = 123);
+			Treasury::run_frame_transition(frame);
 
-		assert_ok!(Treasury::commit_stabilizer_pool_rewards(&beneficiary, 40));
-		assert_ok!(Treasury::commit_stabilizer_pool_rewards(&other_beneficiary, 120));
-		TreasuryPositions::on_initialize(1);
-		assert_eq!(OutstandingStabilizerPoolRewards::<Test>::get(), 160);
-		assert_eq!(Balances::total_issuance(), issuance_before);
+			// These changes apply to the next frame. This frame's pool value target stays 1,000.
+			TargetStabilizerPoolPercent::<Test>::put(Percent::from_percent(10));
+			RewardTaperingPolicy::<Test>::mutate(|policy| {
+				policy.stabilizer_pools.target_daily_return = FixedU128::one();
+			});
+			assert_ok!(Balances::mint_into(&BidPoolAccountId::get(), 1_000));
+			Treasury::run_frame_transition(frame + 1);
+			assert_eq!(RewardReserves::<Test>::get().stabilizer_pools, 223);
+			assert_eq!(
+				StabilizerPoolRewardFrames::<Test>::get(frame),
+				Some(StabilizerPoolRewardFrame::Funded {
+					target_pool_value_microgons: 1_000,
+					budget: 75
+				}),
+			);
 
-		NewlyStartedFrameId::set(Some(2));
-		TreasuryPositions::on_initialize(2);
-		assert_eq!(Balances::balance(&other_beneficiary), 120);
-		assert_eq!(Balances::balance(&beneficiary), 0);
-		assert_eq!(
-			PositionsByAccount::<Test>::get(&beneficiary)
-				.unwrap()
-				.collect_accrued
-				.stabilizer_pool_earnings,
-			40
-		);
-		assert_eq!(OutstandingStabilizerPoolRewards::<Test>::get(), 40);
-		assert_eq!(RewardReserves::<Test>::get().stabilizer_pools, 160);
+			let claim = StabilizerPoolFrameClaim { frame_id: frame, amount: expected_reward };
+			assert_noop!(
+				Treasury::claim_rewards(&[claim]),
+				Error::<Test>::StabilizerPoolClaimNotReady
+			);
+			assert_eq!(Balances::balance(&beneficiary), 0);
 
-		assert_ok!(Treasury::commit_stabilizer_pool_rewards(&beneficiary, 70));
-		assert_noop!(
-			Treasury::commit_stabilizer_pool_rewards(&beneficiary, 91),
-			TokenError::FundsUnavailable
-		);
-		NewlyStartedFrameId::set(Some(3));
-		TreasuryPositions::on_initialize(3);
-		assert_ok!(TreasuryPositions::collect_stabilizer_pool_rewards(&beneficiary), 0);
+			Treasury::run_frame_transition(frame + 2);
+			// Frame passage alone does not finalize source participation.
+			assert_eq!(Treasury::frame_reward_rate(frame), None);
+			Treasury::finalize_frame_rewards(frame, eligible_principal);
+			// Repeated source notifications preserve the fixed financial terms.
+			Treasury::finalize_frame_rewards(frame, eligible_principal * 2);
+			let finalized_frame =
+				StabilizerPoolRewardFrame::Finalized { reward_rate: expected_rate };
+			assert_eq!(
+				StabilizerPoolRewardFrames::<Test>::get(frame),
+				Some(finalized_frame.clone()),
+			);
+			// An earlier finalized frame had the same rate.
+			let earlier_claim = StabilizerPoolFrameClaim { frame_id: frame - 1, ..claim };
+			StabilizerPoolRewardFrames::<Test>::insert(
+				earlier_claim.frame_id,
+				finalized_frame.clone(),
+			);
 
-		let position = PositionsByAccount::<Test>::get(&beneficiary).unwrap();
-		assert_eq!(position.collect_accrued, accrued);
-		assert_eq!(
-			position.collected,
-			CollectAmounts { stabilizer_pool_earnings: 110, ..collected }
-		);
-		assert_eq!(OutstandingStabilizerPoolRewards::<Test>::get(), 0);
-		assert_eq!(RewardReserves::<Test>::get().stabilizer_pools, 90);
-		assert_eq!(Balances::balance(&beneficiary), 110);
-		assert_eq!(Balances::total_issuance(), issuance_before + 230);
-	});
+			let oversized = StabilizerPoolFrameClaim { amount: 10_000, ..claim };
+			// A combined claim cannot exceed the shared reserve; frame terms stay intact.
+			assert_noop!(
+				Treasury::claim_rewards(&[earlier_claim, oversized]),
+				TokenError::FundsUnavailable
+			);
+			CollectClaimFrames::set(vec![earlier_claim, claim]);
+			// Real account Collect owns rollback through Treasury funding and currency delivery.
+			ExistentialDeposit::set(2 * expected_reward + 1);
+			assert_noop!(
+				TreasuryPositions::collect(RuntimeOrigin::signed(beneficiary.clone())),
+				TokenError::BelowMinimum
+			);
+			assert_eq!(SettledClaimFrame::get(), 0);
+			assert_eq!(RewardReserves::<Test>::get().stabilizer_pools, 223);
+			ExistentialDeposit::set(1);
+			let issuance_before_claim = Balances::total_issuance();
+			assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(beneficiary.clone())));
+			assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(beneficiary.clone())));
+			assert_eq!(Balances::balance(&beneficiary), 2 * expected_reward);
+			assert_eq!(Balances::total_issuance(), issuance_before_claim + 2 * expected_reward);
+			assert_eq!(SettledClaimFrame::get(), frame);
+			for claimed_frame in [frame - 1, frame] {
+				assert_eq!(
+					StabilizerPoolRewardFrames::<Test>::get(claimed_frame),
+					Some(finalized_frame.clone()),
+				);
+			}
+			assert_eq!(
+				pallet_treasury_positions::PositionsByAccount::<Test>::get(&beneficiary)
+					.unwrap()
+					.collected
+					.stabilizer_pool_earnings,
+				2 * expected_reward,
+			);
+
+			for next_frame in (frame + 3)..=(frame + 14) {
+				Treasury::run_frame_transition(next_frame);
+			}
+			assert!(!StabilizerPoolRewardFrames::<Test>::contains_key(frame));
+			assert_eq!(RewardReserves::<Test>::get().stabilizer_pools, 223 - 2 * expected_reward);
+		});
+	}
 }
 
 fn account_bond_lot_ids(account_id: u64) -> Vec<u64> {

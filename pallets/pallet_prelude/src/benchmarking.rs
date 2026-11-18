@@ -482,7 +482,7 @@ impl<AccountId: FullCodec> BlockRewardAccountsProvider<AccountId>
 	}
 
 	fn get_mint_rewards_accounts() -> Vec<(AccountId, FrameId)> {
-		let state = benchmark_bitcoin_locks_runtime_state();
+		let state = benchmark_mining_clock();
 		let starting_frame_id = state.current_frame_id.saturating_sub(1);
 		(0..benchmark_block_reward_accounts_count())
 			.map(|index| (account("mint-miner", index, 0), starting_frame_id))
@@ -1020,34 +1020,34 @@ impl Get<BitcoinNetwork> for BenchmarkBitcoinNetwork {
 }
 
 #[derive(Clone, Encode, Decode, PartialEq, Eq)]
-pub struct BenchmarkBitcoinLocksRuntimeState {
+pub struct BenchmarkMiningClock {
 	pub current_frame_id: FrameId,
 	pub current_tick: Tick,
 	pub did_start_new_frame: bool,
 }
 
-impl Default for BenchmarkBitcoinLocksRuntimeState {
+impl Default for BenchmarkMiningClock {
 	fn default() -> Self {
 		Self { current_frame_id: 1, current_tick: 1, did_start_new_frame: true }
 	}
 }
 
-pub fn set_benchmark_bitcoin_locks_runtime_state(state: BenchmarkBitcoinLocksRuntimeState) {
-	bitcoin_locks_runtime_state_backend::set(state.encode());
+pub fn set_benchmark_mining_clock(state: BenchmarkMiningClock) {
+	mining_clock_backend::set(state.encode());
 }
 
-pub fn reset_benchmark_bitcoin_locks_runtime_state() {
-	bitcoin_locks_runtime_state_backend::reset();
+pub fn reset_benchmark_mining_clock() {
+	mining_clock_backend::reset();
 }
 
-pub fn benchmark_bitcoin_locks_runtime_state() -> BenchmarkBitcoinLocksRuntimeState {
-	decode_benchmark_state(bitcoin_locks_runtime_state_backend::get())
+pub fn benchmark_mining_clock() -> BenchmarkMiningClock {
+	decode_benchmark_state(mining_clock_backend::get())
 }
 
 pub struct BenchmarkCurrentFrameId;
 impl Get<FrameId> for BenchmarkCurrentFrameId {
 	fn get() -> FrameId {
-		benchmark_bitcoin_locks_runtime_state().current_frame_id
+		benchmark_mining_clock().current_frame_id
 	}
 }
 
@@ -1055,18 +1055,18 @@ impl MiningFrameTransitionProvider for BenchmarkCurrentFrameId {
 	type Weights = ();
 
 	fn is_new_frame_started() -> Option<FrameId> {
-		let state = benchmark_bitcoin_locks_runtime_state();
+		let state = benchmark_mining_clock();
 		state.did_start_new_frame.then_some(state.current_frame_id)
 	}
 
 	fn get_current_frame_id() -> FrameId {
-		benchmark_bitcoin_locks_runtime_state().current_frame_id
+		benchmark_mining_clock().current_frame_id
 	}
 }
 
 impl MiningFrameProvider for BenchmarkCurrentFrameId {
 	fn get_next_frame_tick() -> Tick {
-		benchmark_bitcoin_locks_runtime_state().current_tick.saturating_add(1)
+		benchmark_mining_clock().current_tick.saturating_add(1)
 	}
 
 	fn is_seat_bidding_started() -> bool {
@@ -1074,7 +1074,7 @@ impl MiningFrameProvider for BenchmarkCurrentFrameId {
 	}
 
 	fn get_tick_range_for_frame(_frame_id: FrameId) -> Option<(Tick, Tick)> {
-		let state = benchmark_bitcoin_locks_runtime_state();
+		let state = benchmark_mining_clock();
 		Some((state.current_tick.saturating_sub(1), state.current_tick))
 	}
 }
@@ -1082,7 +1082,7 @@ impl MiningFrameProvider for BenchmarkCurrentFrameId {
 pub struct BenchmarkCurrentTick;
 impl Get<Tick> for BenchmarkCurrentTick {
 	fn get() -> Tick {
-		benchmark_bitcoin_locks_runtime_state().current_tick
+		benchmark_mining_clock().current_tick
 	}
 }
 
@@ -1111,7 +1111,7 @@ impl<B: BlockT> argon_primitives::TickProvider<B> for BenchmarkCurrentTick {
 pub struct BenchmarkDidStartNewFrame;
 impl Get<bool> for BenchmarkDidStartNewFrame {
 	fn get() -> bool {
-		benchmark_bitcoin_locks_runtime_state().did_start_new_frame
+		benchmark_mining_clock().did_start_new_frame
 	}
 }
 
@@ -1834,52 +1834,51 @@ mod bitcoin_utxo_tracker_state_backend {
 }
 
 #[cfg(feature = "std")]
-mod bitcoin_locks_runtime_state_backend {
+mod mining_clock_backend {
 	use super::*;
 	use frame_support::parameter_types;
 
 	parameter_types! {
-		pub static BenchmarkBitcoinLocksRuntimeStateHolder: Vec<u8> = Vec::new();
+		pub static BenchmarkMiningClockHolder: Vec<u8> = Vec::new();
 	}
 
 	pub(super) fn set(state: Vec<u8>) {
-		BenchmarkBitcoinLocksRuntimeStateHolder::set(state);
+		BenchmarkMiningClockHolder::set(state);
 	}
 
 	pub(super) fn reset() {
-		BenchmarkBitcoinLocksRuntimeStateHolder::reset();
+		BenchmarkMiningClockHolder::reset();
 	}
 
 	pub(super) fn get() -> Vec<u8> {
-		BenchmarkBitcoinLocksRuntimeStateHolder::get()
+		BenchmarkMiningClockHolder::get()
 	}
 }
 
 #[cfg(not(feature = "std"))]
-mod bitcoin_locks_runtime_state_backend {
+mod mining_clock_backend {
 	use super::*;
 	use core::cell::UnsafeCell;
 
 	struct BenchmarkStateCell(UnsafeCell<Option<Vec<u8>>>);
 	unsafe impl Sync for BenchmarkStateCell {}
 
-	static BENCHMARK_BITCOIN_LOCKS_RUNTIME_STATE: BenchmarkStateCell =
-		BenchmarkStateCell(UnsafeCell::new(None));
+	static BENCHMARK_MINING_CLOCK: BenchmarkStateCell = BenchmarkStateCell(UnsafeCell::new(None));
 
 	pub(super) fn set(state: Vec<u8>) {
 		unsafe {
-			*BENCHMARK_BITCOIN_LOCKS_RUNTIME_STATE.0.get() = Some(state);
+			*BENCHMARK_MINING_CLOCK.0.get() = Some(state);
 		}
 	}
 
 	pub(super) fn reset() {
 		unsafe {
-			*BENCHMARK_BITCOIN_LOCKS_RUNTIME_STATE.0.get() = None;
+			*BENCHMARK_MINING_CLOCK.0.get() = None;
 		}
 	}
 
 	pub(super) fn get() -> Vec<u8> {
-		unsafe { (*BENCHMARK_BITCOIN_LOCKS_RUNTIME_STATE.0.get()).clone().unwrap_or_default() }
+		unsafe { (*BENCHMARK_MINING_CLOCK.0.get()).clone().unwrap_or_default() }
 	}
 }
 

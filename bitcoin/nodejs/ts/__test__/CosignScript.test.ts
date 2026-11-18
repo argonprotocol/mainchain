@@ -99,15 +99,19 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
     const currentTick = await vaulterClient.query.ticks.currentTick();
     await submitTx(
       vaulterClient,
-      TestOracle.submitPriceIndex(vaulterClient, {
-        usdcUsdPrice: null,
-        btcUsdPrice: toFixedNumber(60_000.5, FIXED_U128_DECIMALS),
-        argonUsdPrice: toFixedNumber(1, FIXED_U128_DECIMALS),
-        argonotUsdPrice: toFixedNumber(12, FIXED_U128_DECIMALS),
-        argonUsdTargetPrice: toFixedNumber(1, FIXED_U128_DECIMALS),
-        argonTimeWeightedAverageLiquidity: toFixedNumber(1_000, FIXED_U128_DECIMALS),
-        tick: currentTick.toBigInt(),
-      }),
+      vaulterClient.tx.priceIndex.submit(
+        {
+          usdcUsdPrice: null,
+          btcUsdPrice: toFixedNumber(60_000.5, FIXED_U128_DECIMALS),
+          argonUsdPrice: toFixedNumber(1, FIXED_U128_DECIMALS),
+          argonotUsdPrice: toFixedNumber(12, FIXED_U128_DECIMALS),
+          argonUsdTargetPrice: toFixedNumber(1, FIXED_U128_DECIMALS),
+          argonTimeWeightedAverageLiquidity: toFixedNumber(1_000, FIXED_U128_DECIMALS),
+          tick: currentTick.toBigInt(),
+        },
+        null,
+        null,
+      ),
       new Keyring({ type: 'sr25519' }).addFromUri(TestOracle.PriceIndexOperator),
     );
 

@@ -21,11 +21,10 @@ use argon_primitives::{
 	EthereumReceiptLog, EthereumStorageSlotProof, UniswapTransferProvider, VaultId,
 };
 use pallet_prelude::benchmarking::{
-	reset_benchmark_bitcoin_locks_runtime_state, reset_benchmark_bitcoin_vault_provider_state,
-	reset_benchmark_price_provider_state, set_benchmark_bitcoin_locks_runtime_state,
-	set_benchmark_bitcoin_vault_provider_state, set_benchmark_price_provider_state,
-	BenchmarkBitcoinLocksRuntimeState, BenchmarkBitcoinVaultProviderState,
-	BenchmarkPriceProviderState,
+	reset_benchmark_bitcoin_vault_provider_state, reset_benchmark_mining_clock,
+	reset_benchmark_price_provider_state, set_benchmark_bitcoin_vault_provider_state,
+	set_benchmark_mining_clock, set_benchmark_price_provider_state,
+	BenchmarkBitcoinVaultProviderState, BenchmarkMiningClock, BenchmarkPriceProviderState,
 };
 use polkadot_sdk::{
 	frame_benchmarking::v2::*,
@@ -1099,7 +1098,7 @@ mod benchmarks {
 			1,
 			entry,
 		);
-		set_benchmark_bitcoin_locks_runtime_state(BenchmarkBitcoinLocksRuntimeState {
+		set_benchmark_mining_clock(BenchmarkMiningClock {
 			current_frame_id: 1,
 			current_tick: 1,
 			did_start_new_frame: true,
@@ -1277,11 +1276,11 @@ where
 }
 
 fn reset_crosschain_benchmark_state() {
-	reset_benchmark_bitcoin_locks_runtime_state();
+	reset_benchmark_mining_clock();
 	reset_benchmark_bitcoin_vault_provider_state();
 	reset_benchmark_price_provider_state();
 	set_benchmark_price_provider_state(BenchmarkPriceProviderState::default());
-	set_benchmark_bitcoin_locks_runtime_state(BenchmarkBitcoinLocksRuntimeState::default());
+	set_benchmark_mining_clock(BenchmarkMiningClock::default());
 }
 
 fn seed_pending_transfer_quote_counts<T: Config>(count: u32) -> Result<(), BenchmarkError> {

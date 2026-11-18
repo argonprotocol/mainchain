@@ -3,8 +3,7 @@ use argon_primitives::{PriceIndex, PriceIndexUpdated};
 use frame_support::traits::fungible::Mutate;
 use frame_system::RawOrigin;
 use pallet_prelude::benchmarking::{
-	set_benchmark_bitcoin_locks_runtime_state, set_benchmark_treasury_reward_payment_failure,
-	BenchmarkBitcoinLocksRuntimeState,
+	set_benchmark_mining_clock, set_benchmark_treasury_reward_payment_failure, BenchmarkMiningClock,
 };
 use polkadot_sdk::frame_benchmarking::v2::*;
 
@@ -13,7 +12,7 @@ const NOW: Tick = Tick::MAX - Tick::MAX % 60 - 120;
 type CurrencyOf<T> = <T as Config>::Currency;
 
 fn clock(frame: FrameId, tick: Tick) {
-	set_benchmark_bitcoin_locks_runtime_state(BenchmarkBitcoinLocksRuntimeState {
+	set_benchmark_mining_clock(BenchmarkMiningClock {
 		current_frame_id: frame,
 		current_tick: tick,
 		did_start_new_frame: false,
@@ -595,9 +594,41 @@ mod benchmarks {
 	}
 
 	#[benchmark]
+	fn provider_stabilizer_pool_price_source() {
+		let approved_pool = pool();
+		ApprovedPool::<T>::put(&approved_pool);
+		ApprovedPoolRevision::<T>::put(u32::MAX);
+
+		let source;
+		#[block]
+		{
+			source = <Pallet<T> as StabilizerPoolPriceSourceProvider>::price_source();
+		}
+
+		assert_eq!(
+			source,
+			Some(StabilizerPoolPriceSource {
+				revision: u32::MAX,
+				pool: UniswapPoolIdentity {
+					chain_id: approved_pool.chain_id,
+					pool_manager: approved_pool.pool_manager,
+					pool_id: approved_pool.pool_id,
+				},
+				argon_is_token0: approved_pool.argon_is_token0,
+			})
+		);
+	}
+
+	#[benchmark]
 	fn set_approved_pool() {
+		let mut previous_pool = pool();
+		previous_pool.pool_id = H256::repeat_byte(4);
+		ApprovedPool::<T>::put(previous_pool);
+		ApprovedPoolRevision::<T>::put(u32::MAX - 1);
+
 		#[extrinsic_call]
 		_(RawOrigin::Root, Some(pool()));
 		assert_eq!(ApprovedPool::<T>::get(), Some(pool()));
+		assert_eq!(ApprovedPoolRevision::<T>::get(), u32::MAX);
 	}
 }

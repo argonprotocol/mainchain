@@ -21,8 +21,8 @@ use argon_primitives::{
 	bitcoin::{LiquidId, LiquidRepayPrices},
 	AmountRankKey, AscendingRankKey, BitcoinFissionsProvider, CrosschainGatewayProvider,
 	LiquidRepaymentProvider, MiningFrameTransitionProvider,
-	MiningFrameTransitionProviderWeightInfo, OnNewSlot, StabilizerPoolPriceSource, TickProvider,
-	UniswapPoolIdentity,
+	MiningFrameTransitionProviderWeightInfo, OnNewSlot, StabilizerPoolPriceSource,
+	StabilizerPoolPriceSourceProvider, TickProvider, UniswapPoolIdentity,
 };
 use frame_support::{
 	require_transactional,
@@ -577,7 +577,7 @@ pub mod pallet {
 
 		/// Select the reward pool, or disable new purchase eligibility.
 		#[pallet::call_index(1)]
-		#[pallet::weight(T::WeightInfo::set_approved_pool().saturating_add(T::DbWeight::get().reads_writes(2, 1)))]
+		#[pallet::weight(T::WeightInfo::set_approved_pool())]
 		pub fn set_approved_pool(
 			origin: OriginFor<T>,
 			pool: Option<PurchasePool>,
@@ -782,8 +782,10 @@ impl<T: Config> LiquidRepaymentProvider<T::AccountId> for Pallet<T> {
 	}
 }
 
-impl<T: Config> Get<Option<StabilizerPoolPriceSource>> for Pallet<T> {
-	fn get() -> Option<StabilizerPoolPriceSource> {
+impl<T: Config> StabilizerPoolPriceSourceProvider for Pallet<T> {
+	type Weights = weights::ProviderWeightAdapter<T>;
+
+	fn price_source() -> Option<StabilizerPoolPriceSource> {
 		let pool = ApprovedPool::<T>::get()?;
 		Some(StabilizerPoolPriceSource {
 			revision: ApprovedPoolRevision::<T>::get(),

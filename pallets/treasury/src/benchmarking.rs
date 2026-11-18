@@ -1,10 +1,10 @@
-#![cfg(feature = "runtime-benchmarks")]
-
 use super::*;
 use alloc::boxed::Box;
 use argon_primitives::{
+	treasury::{StabilizerPoolFrameClaim, StabilizerPoolRewardProvider},
 	vault::{TreasuryBonusApprovalProof, Vault, VaultTerms},
-	MiningFrameTransitionProvider, Signature, TreasuryPoolProvider, MICROGONS_PER_ARGON,
+	MiningFrameTransitionProvider, PriceProvider, Signature, TreasuryPoolProvider,
+	MICROGONS_PER_ARGON,
 };
 use frame_benchmarking::v2::*;
 use frame_system::RawOrigin;
@@ -45,6 +45,62 @@ type TreasuryBalanceOf<T> = <T as Config>::Balance;
 )]
 mod benchmarks {
 	use super::*;
+
+	#[benchmark]
+	fn finalize_stabilizer_frame_rewards() {
+		let frame_id = BENCHMARK_FRAME_ID;
+		StabilizerPoolRewardFrames::<T>::insert(
+			frame_id,
+			StabilizerPoolRewardFrame::Funded {
+				target_pool_value_microgons: 1_000u128.into(),
+				budget: 75u128.into(),
+			},
+		);
+		#[block]
+		{
+			Pallet::<T>::finalize_frame_rewards(frame_id, 900);
+		}
+		assert_eq!(
+			Pallet::<T>::frame_reward_rate(frame_id),
+			Some(FixedU128::from_rational(75, 1_000))
+		);
+	}
+
+	#[benchmark]
+	fn read_stabilizer_frame_reward_rate() {
+		let frame_id = BENCHMARK_FRAME_ID;
+		StabilizerPoolRewardFrames::<T>::insert(
+			frame_id,
+			StabilizerPoolRewardFrame::Finalized {
+				reward_rate: FixedU128::from_rational(75, 1_000),
+			},
+		);
+		#[block]
+		{
+			core::hint::black_box(Pallet::<T>::frame_reward_rate(frame_id));
+		}
+	}
+
+	#[benchmark]
+	fn claim_stabilizer_frame_rewards(f: Linear<1, 10>) {
+		let mut claims = Vec::new();
+		for frame in 1..=f {
+			let frame_id = frame.into();
+			StabilizerPoolRewardFrames::<T>::insert(
+				frame_id,
+				StabilizerPoolRewardFrame::Finalized { reward_rate: FixedU128::one() },
+			);
+			claims.push(StabilizerPoolFrameClaim { frame_id, amount: 10 });
+		}
+		RewardReserves::<T>::mutate(|reserves| {
+			reserves.stabilizer_pools = (u128::from(f) * 100).into()
+		});
+		#[block]
+		{
+			assert_eq!(Pallet::<T>::claim_rewards(&claims).unwrap(), u128::from(f) * 10);
+		}
+		assert_eq!(RewardReserves::<T>::get().stabilizer_pools, (u128::from(f) * 90).into());
+	}
 
 	#[benchmark]
 	fn provider_available_reward_budget() {
@@ -124,7 +180,7 @@ mod benchmarks {
 
 	#[benchmark]
 	fn upstream_participation() -> Result<(), BenchmarkError> {
-		reset_benchmark_state::<T>();
+		reset_benchmark_state();
 		seed_accepted_vault_state::<T>(1, 0, minimum_purchase_bonds::<T>(), 100_000, 1)?;
 		let operator = benchmark_operator::<T>(1);
 		T::PositionProvider::set_upstream_position(
@@ -148,7 +204,7 @@ mod benchmarks {
 
 	#[benchmark]
 	fn buy_bonds() -> Result<(), BenchmarkError> {
-		reset_benchmark_state::<T>();
+		reset_benchmark_state();
 
 		let caller = account("buy-bonds-caller", 0, 0);
 		let vault_id = 1;
@@ -206,7 +262,7 @@ mod benchmarks {
 
 	#[benchmark]
 	fn buy_argonot_bonds() -> Result<(), BenchmarkError> {
-		reset_benchmark_state::<T>();
+		reset_benchmark_state();
 
 		let active_lot_count = T::MaxActiveArgonotBondLots::get();
 		let floor_bonds = minimum_purchase_bonds::<T>();
@@ -253,7 +309,7 @@ mod benchmarks {
 
 	#[benchmark]
 	fn liquidate_bond_lot() -> Result<(), BenchmarkError> {
-		reset_benchmark_state::<T>();
+		reset_benchmark_state();
 
 		let active_lot_count = T::MaxActiveArgonotBondLots::get();
 		let floor_bonds = minimum_purchase_bonds::<T>();
@@ -283,7 +339,7 @@ mod benchmarks {
 
 	#[benchmark]
 	fn liquidate_vault_bond_lot() -> Result<(), BenchmarkError> {
-		reset_benchmark_state::<T>();
+		reset_benchmark_state();
 		let caller = seed_active_held_bond_lots::<T>(T::MaxExpectedBondLotsPerAccount::get())?;
 		let total_bonds =
 			scaled_bonds(minimum_purchase_bonds::<T>(), T::MaxExpectedBondLotsPerAccount::get());
@@ -306,7 +362,7 @@ mod benchmarks {
 
 	#[benchmark]
 	fn set_bond_lot_flexible() -> Result<(), BenchmarkError> {
-		reset_benchmark_state::<T>();
+		reset_benchmark_state();
 		let bonds = minimum_purchase_bonds::<T>();
 		seed_accepted_vault_state::<T>(1, 0, bonds, bonds, BENCHMARK_FRAME_ID.saturating_sub(1))?;
 		let caller = benchmark_operator::<T>(0);
@@ -320,7 +376,6 @@ mod benchmarks {
 			},
 			bonds,
 			BENCHMARK_FRAME_ID.saturating_sub(1),
-			None,
 			None,
 			false,
 		)?;
@@ -341,7 +396,7 @@ mod benchmarks {
 
 	#[benchmark]
 	fn set_reserved_bond_space() -> Result<(), BenchmarkError> {
-		reset_benchmark_state::<T>();
+		reset_benchmark_state();
 		let bonds = minimum_purchase_bonds::<T>();
 		seed_accepted_vault_state::<T>(1, 0, bonds, bonds, BENCHMARK_FRAME_ID.saturating_sub(1))?;
 		let caller = benchmark_operator::<T>(0);
@@ -411,7 +466,7 @@ mod benchmarks {
 
 	#[benchmark]
 	fn backfill_bond_lot_earnings() -> Result<(), BenchmarkError> {
-		reset_benchmark_state::<T>();
+		reset_benchmark_state();
 		let bonds = minimum_purchase_bonds::<T>();
 		let frame_id = T::MiningFrameTransitionProvider::get_current_frame_id();
 		seed_accepted_vault_state::<T>(1, 1, bonds, bonds, frame_id.saturating_sub(1))?;
@@ -464,7 +519,7 @@ mod benchmarks {
 
 	#[benchmark]
 	fn provider_has_vault_bond_participation() -> Result<(), BenchmarkError> {
-		reset_benchmark_state::<T>();
+		reset_benchmark_state();
 
 		let account_id = seed_active_held_bond_lots::<T>(T::MaxExpectedBondLotsPerAccount::get())?;
 
@@ -483,7 +538,7 @@ mod benchmarks {
 
 	#[benchmark]
 	fn provider_active_vault_bond_amount() -> Result<(), BenchmarkError> {
-		reset_benchmark_state::<T>();
+		reset_benchmark_state();
 
 		let account_id = seed_active_held_bond_lots::<T>(T::MaxExpectedBondLotsPerAccount::get())?;
 		let expected = bonds_to_balance::<T>(scaled_bonds(
@@ -507,7 +562,7 @@ mod benchmarks {
 
 	#[benchmark]
 	fn provider_active_account_vault_bond_amount() -> Result<(), BenchmarkError> {
-		reset_benchmark_state::<T>();
+		reset_benchmark_state();
 
 		let lot_bonds = minimum_purchase_bonds::<T>();
 		let _ = seed_accepted_vault_state::<T>(
@@ -534,7 +589,7 @@ mod benchmarks {
 
 	#[benchmark]
 	fn provider_encumber_bond_microgons() -> Result<(), BenchmarkError> {
-		reset_benchmark_state::<T>();
+		reset_benchmark_state();
 
 		let account_id = seed_active_held_bond_lots::<T>(T::MaxExpectedBondLotsPerAccount::get())?;
 		let microgon_amount = bonds_to_balance::<T>(minimum_purchase_bonds::<T>());
@@ -615,7 +670,7 @@ mod benchmarks {
 	fn settle_bond_collateral_release(
 		n: Linear<1, BENCHMARK_MAX_BURN_LOTS>,
 	) -> Result<(), BenchmarkError> {
-		reset_benchmark_state::<T>();
+		reset_benchmark_state();
 
 		let account_id = seed_active_held_bond_lots::<T>(n)?;
 		let microgon_amount = bonds_to_balance::<T>(minimum_purchase_bonds::<T>());
@@ -649,7 +704,7 @@ mod benchmarks {
 	fn settle_bond_collateral_burn(
 		n: Linear<1, BENCHMARK_MAX_BURN_LOTS>,
 	) -> Result<(), BenchmarkError> {
-		reset_benchmark_state::<T>();
+		reset_benchmark_state();
 		let account_id: T::AccountId = account("encumbered-bond-holder", 0, 0);
 		let lot_bonds = minimum_purchase_bonds::<T>();
 		assert_eq!(T::MaxExpectedBondLotsPerAccount::get(), BENCHMARK_MAX_BURN_LOTS);
@@ -668,7 +723,6 @@ mod benchmarks {
 				lot_bonds,
 				BENCHMARK_FRAME_ID - 1,
 				None,
-				None,
 				false,
 			)?;
 
@@ -680,7 +734,6 @@ mod benchmarks {
 				program,
 				lot_bonds,
 				BENCHMARK_FRAME_ID - 1,
-				None,
 				None,
 				true,
 			)?;
@@ -770,7 +823,7 @@ mod benchmarks {
 
 	#[benchmark]
 	fn release_pending_bond_lots() -> Result<(), BenchmarkError> {
-		reset_benchmark_state::<T>();
+		reset_benchmark_state();
 		seed_pending_bond_releases::<T>(BENCHMARK_FRAME_ID, T::MaxPendingUnlocksPerFrame::get())?;
 
 		#[block]
@@ -800,8 +853,13 @@ mod benchmarks {
 
 	#[benchmark]
 	fn distribute_bid_pool() -> Result<(), BenchmarkError> {
-		reset_benchmark_state::<T>();
+		reset_benchmark_state();
 		seed_distribution_state::<T>(BENCHMARK_FRAME_ID)?;
+		let target_pool_value_microgons = balance::<T>(100 * MICROGONS_PER_ARGON);
+		StabilizerPoolRewardFrames::<T>::insert(
+			BENCHMARK_FRAME_ID,
+			StabilizerPoolRewardFrame::Earning { target_pool_value_microgons },
+		);
 
 		#[block]
 		{
@@ -811,6 +869,16 @@ mod benchmarks {
 		let reserves = RewardReserves::<T>::get();
 		assert!(reserves.argon_bonds < balance::<T>(BENCHMARK_RESERVE_BUDGET));
 		assert!(reserves.argonot_stakes < balance::<T>(BENCHMARK_RESERVE_BUDGET));
+		let Some(StabilizerPoolRewardFrame::Funded {
+			target_pool_value_microgons: funded_target,
+			budget,
+		}) = StabilizerPoolRewardFrames::<T>::get(BENCHMARK_FRAME_ID)
+		else {
+			return Err(BenchmarkError::Stop("stabilizer frame was not funded"));
+		};
+		assert_eq!(funded_target, target_pool_value_microgons);
+		assert!(!budget.is_zero());
+		assert!(budget <= reserves.stabilizer_pools);
 
 		assert!(
 			CurrentFrameVaultCapital::<T>::get().is_none(),
@@ -833,7 +901,7 @@ mod benchmarks {
 
 	#[benchmark]
 	fn lock_in_vault_capital() -> Result<(), BenchmarkError> {
-		reset_benchmark_state::<T>();
+		reset_benchmark_state();
 		seed_lock_in_vault_capital_state::<T>(BENCHMARK_FRAME_ID)?;
 
 		#[block]
@@ -860,8 +928,23 @@ mod benchmarks {
 		// Include the first release's aggregate bond-total update in the fixed cost.
 		r: Linear<1, 1_000>,
 	) -> Result<(), BenchmarkError> {
-		reset_benchmark_state::<T>();
+		reset_benchmark_state();
 		seed_on_frame_transition_state::<T>(BENCHMARK_FRAME_ID, b, s, r)?;
+		let payout_frame = BENCHMARK_FRAME_ID - 1;
+		let target_pool_value_microgons = balance::<T>(100 * MICROGONS_PER_ARGON);
+		StabilizerPoolRewardFrames::<T>::insert(
+			payout_frame,
+			StabilizerPoolRewardFrame::Earning { target_pool_value_microgons },
+		);
+		let expired_frame = BENCHMARK_FRAME_ID
+			.checked_sub(FrameId::from(T::StabilizerPoolRewardHistoryFrames::get()) + 1)
+			.ok_or(BenchmarkError::Stop("benchmark frame must reach reward history expiry"))?;
+		StabilizerPoolRewardFrames::<T>::insert(
+			expired_frame,
+			StabilizerPoolRewardFrame::Finalized { reward_rate: FixedU128::one() },
+		);
+		TargetStabilizerPoolPercent::<T>::put(Percent::from_percent(5));
+		StabilizerPoolRewardFrames::<T>::remove(BENCHMARK_FRAME_ID);
 
 		#[block]
 		{
@@ -869,6 +952,25 @@ mod benchmarks {
 		}
 
 		let reserves = RewardReserves::<T>::get();
+		assert!(!StabilizerPoolRewardFrames::<T>::contains_key(expired_frame));
+		let Some(StabilizerPoolRewardFrame::Funded {
+			target_pool_value_microgons: funded_target,
+			budget,
+		}) = StabilizerPoolRewardFrames::<T>::get(payout_frame)
+		else {
+			return Err(BenchmarkError::Stop("stabilizer frame was not funded"));
+		};
+		assert_eq!(funded_target, target_pool_value_microgons);
+		assert!(!budget.is_zero());
+		assert!(budget <= reserves.stabilizer_pools);
+		assert_eq!(
+			StabilizerPoolRewardFrames::<T>::get(BENCHMARK_FRAME_ID),
+			Some(StabilizerPoolRewardFrame::Earning {
+				target_pool_value_microgons: Percent::from_percent(5)
+					.mul_floor(T::PriceProvider::get_circulation()),
+			}),
+		);
+
 		if b == 14_000 {
 			assert!(reserves.argon_bonds < balance::<T>(BENCHMARK_RESERVE_BUDGET));
 			let owner: T::AccountId = account("frame-bond-holder", 0, 0);
@@ -918,7 +1020,7 @@ mod benchmarks {
 	}
 }
 
-fn reset_benchmark_state<T: Config>() {
+fn reset_benchmark_state() {
 	reset_benchmark_bitcoin_vault_provider_state();
 	reset_benchmark_treasury_positions();
 	reset_benchmark_operational_accounts_provider_state();
@@ -1019,7 +1121,6 @@ where
 			lot_bonds,
 			payout_frame,
 			None,
-			None,
 			false,
 		)?;
 		BondLotsByVault::<T>::mutate(vault_id, |vault_bonds| {
@@ -1078,8 +1179,7 @@ where
 			},
 			lot_bonds,
 			frame_id.saturating_sub(1),
-			Some(frame_id),
-			Some(BondReleaseReason::UserLiquidation),
+			Some((frame_id, BondReleaseReason::UserLiquidation)),
 			true,
 		)?;
 		pending_releases
@@ -1127,7 +1227,6 @@ where
 				},
 				lot_bonds,
 				created_frame_id,
-				None,
 				None,
 				false,
 			)?;
@@ -1194,7 +1293,6 @@ where
 			bonds,
 			BENCHMARK_FRAME_ID.saturating_sub(1),
 			None,
-			None,
 			true,
 		)?;
 	}
@@ -1236,7 +1334,6 @@ fn seed_flexible_vault_lots<T: Config>(
 			lot_bonds,
 			created_frame_id,
 			None,
-			None,
 			false,
 		)?;
 		BondLotById::<T>::mutate(next_bond_lot_id, |bond_lot| {
@@ -1276,7 +1373,6 @@ where
 			bonds,
 			created_frame_id,
 			None,
-			None,
 			true,
 		)?;
 		active_lots
@@ -1309,8 +1405,7 @@ fn insert_bond_lot<T: Config, C>(
 	program: BondProgram,
 	bonds: Bonds,
 	created_frame_id: FrameId,
-	release_frame_id: Option<FrameId>,
-	release_reason: Option<BondReleaseReason>,
+	release: Option<(FrameId, BondReleaseReason)>,
 	hold_funds: bool,
 ) -> Result<(), BenchmarkError>
 where
@@ -1329,6 +1424,8 @@ where
 		Pallet::<T>::create_hold::<C>(owner, held_amount)
 			.map_err(|_| BenchmarkError::Stop("failed to create bond lot hold"))?;
 	}
+
+	let (release_frame_id, release_reason) = release.unzip();
 
 	BondLotById::<T>::insert(
 		bond_lot_id,

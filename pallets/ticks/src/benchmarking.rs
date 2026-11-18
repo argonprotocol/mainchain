@@ -1,5 +1,3 @@
-#![cfg(feature = "runtime-benchmarks")]
-
 use super::*;
 use argon_notary_audit::VerifyError;
 use argon_primitives::{

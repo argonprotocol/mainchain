@@ -9,9 +9,7 @@ pub(crate) fn check<T: Config>() -> Result<(), sp_runtime::TryRuntimeError> {
 	let mut bonds = 0u128;
 	let mut stakes = 0u128;
 	let mut fission_liquidity = T::Balance::zero();
-	let mut account_count = 0u32;
 	for position in PositionsByAccount::<T>::iter_values() {
-		account_count.saturating_accrue(1);
 		bonds = bonds
 			.checked_add(position.quantities.bonds)
 			.ok_or("Treasury Positions account bond quantities overflow")?;
@@ -32,9 +30,6 @@ pub(crate) fn check<T: Config>() -> Result<(), sp_runtime::TryRuntimeError> {
 				"Treasury Positions activated upstream securitization exceeds its allocation"
 			);
 		}
-	}
-	if account_count > EXPECTED_AUTO_COLLECT_POSITIONS_PER_FRAME {
-		log::warn!("Temporary stabilizer auto-collect would visit {account_count} Treasury positions, above the expected {EXPECTED_AUTO_COLLECT_POSITIONS_PER_FRAME}.");
 	}
 
 	// Vault coverage is maintained separately by canonical Vault updates, not account
