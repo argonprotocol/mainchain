@@ -97,7 +97,6 @@ where
 			.saturating_add(
 				PositionWeights::<T>::upstream_position()
 					.saturating_add(OperationalAccountWeights::<T>::upstream_vault())
-					.saturating_add(VaultWeights::<T>::get_participation_capacity())
 					.saturating_mul(T::MaxVaultsPerPool::get().into()),
 			)
 	}
@@ -116,7 +115,6 @@ where
 			.saturating_add(
 				PositionWeights::<T>::upstream_position()
 					.saturating_add(OperationalAccountWeights::<T>::upstream_vault())
-					.saturating_add(VaultWeights::<T>::get_participation_capacity())
 					.saturating_mul(T::MaxVaultsPerPool::get().into()),
 			)
 	}
@@ -125,7 +123,6 @@ where
 		Base::upstream_participation()
 			.saturating_add(PositionWeights::<T>::upstream_position())
 			.saturating_add(OperationalAccountWeights::<T>::upstream_vault())
-			.saturating_add(VaultWeights::<T>::get_participation_capacity())
 	}
 
 	fn claim_reward() -> Weight {

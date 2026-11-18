@@ -125,7 +125,7 @@ parameter_types! {
 	pub const PercentForVaultPool: Percent = Percent::from_percent(51);
 	pub const MinimumVaultProfitPercent: Percent = Percent::from_percent(5);
 	pub const VaultBitcoinRewardPercent: Permill = Permill::from_parts(428_350);
-	pub const ArgonotSecuritizationMultiplier: u32 = 0;
+	pub const ArgonotSecuritizationMultiplier: u32 = 2;
 	pub const DefaultTargetBitcoinPercent: Percent = Percent::from_percent(15);
 	pub const DefaultTargetStabilizerPoolPercent: Percent = Percent::from_percent(5);
 	pub const MaxArgonotBondedPercentOfCirculation: Percent = Percent::from_percent(60);
