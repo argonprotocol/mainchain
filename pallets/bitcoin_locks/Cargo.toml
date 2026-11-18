@@ -21,10 +21,10 @@ argon-primitives = { workspace = true, features = ["bitcoin"] }
 polkadot-sdk = { workspace = true, features = ["frame-support", "frame-system", "sp-runtime", "sp-arithmetic", "sp-core", "sp-api"] }
 argon-bitcoin = { workspace = true, default-features = false }
 pallet-prelude = { workspace = true, default-features = false }
-pallet-bitcoin-fissions = { workspace = true, default-features = false }
+pallet-bitcoin-fissions = { workspace = true, optional = true }
 
 [dev-dependencies]
-pallet-treasury-positions = { workspace = true, default-features = true }
+pallet-bitcoin-fissions = { workspace = true, default-features = true }
 polkadot-sdk = { workspace = true, features = ["pallet-balances", "sp-io", "sp-arithmetic"], default-features = true }
 bitcoin = { workspace = true, features = ["rand-std"] }
 pallet-prelude = { workspace = true, features = ["test"], default-features = true }
@@ -38,7 +38,7 @@ std = [
 	"argon-primitives/bitcoin",
 	"argon-primitives/std",
 	"codec/std",
-	"pallet-bitcoin-fissions/std",
+	"pallet-bitcoin-fissions?/std",
 	"pallet-prelude/std",
 	"polkadot-sdk/std",
 	"scale-info/std",
@@ -51,6 +51,6 @@ runtime-benchmarks = [
 	"polkadot-sdk/runtime-benchmarks",
 ]
 try-runtime = [
-	"pallet-bitcoin-fissions/try-runtime",
+	"pallet-bitcoin-fissions?/try-runtime",
 	"polkadot-sdk/try-runtime",
 ]

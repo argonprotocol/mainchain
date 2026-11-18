@@ -646,6 +646,10 @@ pub mod pallet {
 impl<T: Config> BitcoinFissionsProvider<T::AccountId, T::Balance> for Pallet<T> {
 	type Weights = weights::ProviderWeightAdapter<T>;
 
+	fn max_fissions_per_lock() -> u32 {
+		T::MaxFissionsPerLock::get()
+	}
+
 	fn is_liquid_repayment_valid(
 		account_id: &T::AccountId,
 		liquid_id: LiquidId,

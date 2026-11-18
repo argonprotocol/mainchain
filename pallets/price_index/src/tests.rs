@@ -1,7 +1,8 @@
 use pallet_prelude::*;
 
 use argon_primitives::{
-	bitcoin::SATOSHIS_PER_BITCOIN, ArgonCPI, PriceProvider, MICROGONS_PER_ARGON,
+	bitcoin::SATOSHIS_PER_BITCOIN, ArgonCPI, PriceProvider, StabilizerPoolPriceSource,
+	UniswapPoolIdentity, MICROGONS_PER_ARGON,
 };
 
 use crate::{
@@ -80,19 +81,29 @@ fn accepts_base_and_ethereum_price_submissions() {
 		let mut index = old_index;
 		index.tick = 1;
 		index.usdc_usd_price = Some(FixedU128::from_rational(98, 100));
+		index.stabilizer_pool_sqrt_price_x96 = Some(U256::one() << 96);
 		CurrentTick::set(1);
 		let ethereum = EthereumPriceIndex {
 			ethereum_usd_price: FixedU128::from_u32(3_000),
 			ethereum_gas_price_wei: 2_000_000_000,
 			tick: index.tick,
 		};
-		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), index, Some(ethereum), None));
-		assert_eq!(Current::<Test>::get(), Some(index));
-		assert_eq!(CurrentEthereumPrice::<Test>::get(), Some(ethereum));
+		let approved_pool = StabilizerPoolPriceSource {
+			revision: 2,
+			pool: UniswapPoolIdentity {
+				chain_id: 1,
+				pool_manager: H160::repeat_byte(1),
+				pool_id: H256::repeat_byte(2),
+			},
+			argon_is_token0: true,
+		};
+		ApprovedStabilizerPool::set(Some(approved_pool));
+		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), index, Some(ethereum), Some(1)));
 		assert_eq!(
-			Current::<Test>::get().unwrap().usdc_usd_price,
-			Some(FixedU128::from_rational(98, 100))
+			Current::<Test>::get(),
+			Some(PriceIndexEntry { stabilizer_pool_sqrt_price_x96: None, ..index })
 		);
+		assert_eq!(CurrentEthereumPrice::<Test>::get(), Some(ethereum));
 		assert_eq!(
 			<PriceIndex as PriceProvider<u128>>::get_average_ethereum_prices(10),
 			Some((FixedU128::from_u32(3_000), 2_000_000_000)),
@@ -109,8 +120,9 @@ fn accepts_base_and_ethereum_price_submissions() {
 			RuntimeOrigin::signed(1),
 			index_without_ethereum,
 			None,
-			None
+			Some(approved_pool.revision)
 		));
+		assert_eq!(Current::<Test>::get(), Some(index_without_ethereum));
 		assert_eq!(CurrentEthereumPrice::<Test>::get(), Some(ethereum));
 		assert_eq!(
 			<PriceIndex as PriceProvider<u128>>::get_average_ethereum_prices(10),

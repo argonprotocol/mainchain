@@ -1,5 +1,6 @@
 use super::*;
 use crate::mock::*;
+use polkadot_sdk::sp_io::TestExternalities;
 
 #[test]
 fn newly_created_upstream_binds_bitcoin_only_for_the_actual_position_owner() {
@@ -106,6 +107,33 @@ fn upstream_snapshot_preserves_principal_and_failed_updates_are_atomic() {
 		TreasuryPositions::set_upstream_position(&1, None);
 		assert_eq!(TreasuryPositions::bond_principal(&1), 100);
 		assert_eq!(TreasuryPositions::account_quantities(&1).fission_liquidity, 300);
+	});
+}
+
+#[test]
+fn fission_liquidity_overflow_leaves_account_and_network_positions_unchanged() {
+	TestExternalities::default().execute_with(|| {
+		let full_account = 1;
+		assert_ok!(TreasuryPositions::account_quantity_updated(
+			&full_account,
+			PositionQuantity::FissionLiquidity,
+			0u128,
+			u128::MAX,
+		));
+
+		// The first update overflows the account. The second fits the account but overflows
+		// the network total. Both must leave storage untouched.
+		for account in [full_account, 2] {
+			assert_noop!(
+				TreasuryPositions::account_quantity_updated(
+					&account,
+					PositionQuantity::FissionLiquidity,
+					0u128,
+					1,
+				),
+				ArithmeticError::Overflow
+			);
+		}
 	});
 }
 

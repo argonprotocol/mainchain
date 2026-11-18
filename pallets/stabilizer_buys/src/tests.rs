@@ -5,10 +5,9 @@ use frame_support::{
 	storage::{unhashed, with_storage_layer},
 	traits::{Hooks, OnRuntimeUpgrade},
 };
-use pallet_price_index::Current;
 
 #[test]
-fn price_index_keeps_other_quotes_when_a_pool_revision_is_stale() {
+fn approved_pool_revision_changes_only_when_the_pool_changes() {
 	new_test_ext().execute_with(|| {
 		let original_pool = Pool::get();
 		StorageVersion::new(1).put::<StabilizerBuys>();
@@ -30,24 +29,6 @@ fn price_index_keeps_other_quotes_when_a_pool_revision_is_stale() {
 			Some(replacement_pool)
 		));
 		assert_eq!(ApprovedPoolRevision::<Test>::get(), 1);
-
-		CurrentTick::set(20);
-		let mut index = price_index(20);
-		let sqrt_price = U256::one() << 96;
-		index.stabilizer_pool_sqrt_price_x96 = Some(sqrt_price);
-		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), index, None, Some(0)));
-		let accepted = Current::<Test>::get().unwrap();
-		assert_eq!(accepted.tick, index.tick);
-		assert_eq!(accepted.btc_usd_price, index.btc_usd_price);
-		assert_eq!(accepted.stabilizer_pool_sqrt_price_x96, None);
-
-		CurrentTick::set(21);
-		index.tick = 21;
-		assert_ok!(PriceIndex::submit(RuntimeOrigin::signed(1), index, None, Some(1)));
-		assert_eq!(
-			Current::<Test>::get().unwrap().stabilizer_pool_sqrt_price_x96,
-			Some(sqrt_price)
-		);
 
 		assert_ok!(StabilizerBuys::set_approved_pool(RuntimeOrigin::root(), Some(original_pool)));
 		assert_eq!(ApprovedPoolRevision::<Test>::get(), 2);

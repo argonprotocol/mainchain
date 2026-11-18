@@ -370,6 +370,12 @@ impl BitcoinFissionsProviderWeightInfo for () {
 }
 
 pub trait BitcoinFissionsProvider<AccountId, Balance> {
+	/// Upper bound on active Fissions for one Bitcoin Lock, used to price worst-case work.
+	/// A provider that returns Fission guarantees must supply its configured bound.
+	fn max_fissions_per_lock() -> u32 {
+		0
+	}
+
 	/// Checks that the Liquid has active Fissions, its creation and latest ratchet precede the
 	/// purchase by more than one tick, and all source Locks outlive the hold and release notice.
 	/// Creation timing is unavailable for Liquids migrated before this tracking was introduced.

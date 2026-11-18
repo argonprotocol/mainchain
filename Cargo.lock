@@ -11247,7 +11247,6 @@ version = "1.6.0"
 dependencies = [
  "argon-primitives",
  "pallet-prelude",
- "pallet-treasury-positions",
  "parity-scale-codec",
  "polkadot-sdk",
  "scale-info",
@@ -11264,7 +11263,6 @@ dependencies = [
  "pallet-bitcoin-utxos",
  "pallet-mint",
  "pallet-prelude",
- "pallet-treasury-positions",
  "parity-scale-codec",
  "polkadot-sdk",
  "scale-info",
@@ -12143,7 +12141,6 @@ version = "1.6.0"
 dependencies = [
  "pallet-prelude",
  "pallet-ticks",
- "pallet-treasury 1.6.0",
  "parity-scale-codec",
  "polkadot-sdk",
  "scale-info",
@@ -12890,7 +12887,6 @@ version = "1.6.0"
 dependencies = [
  "argon-primitives",
  "pallet-prelude",
- "pallet-price-index",
  "parity-scale-codec",
  "polkadot-sdk",
  "scale-info",
@@ -13211,10 +13207,7 @@ name = "pallet-treasury"
 version = "1.6.0"
 dependencies = [
  "impl-trait-for-tuples",
- "pallet-bitcoin-fissions",
- "pallet-bitcoin-locks",
  "pallet-mint",
- "pallet-operational-accounts",
  "pallet-prelude",
  "pallet-stabilizer-buys",
  "pallet-treasury-positions",
@@ -13309,10 +13302,8 @@ dependencies = [
  "pallet-bitcoin-fissions",
  "pallet-bitcoin-locks",
  "pallet-bitcoin-utxos",
- "pallet-operational-accounts",
  "pallet-prelude",
  "pallet-treasury 1.6.0",
- "pallet-treasury-positions",
  "parity-scale-codec",
  "polkadot-sdk",
  "scale-info",
