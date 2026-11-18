@@ -1,10 +1,53 @@
-use crate::VaultId;
+use crate::{block_seal::FrameId, VaultId};
 use codec::{Codec, Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use polkadot_sdk::{
 	frame_support::weights::Weight,
+	sp_core::U256,
 	sp_runtime::{DispatchError, DispatchResult},
 };
 use scale_info::TypeInfo;
+
+/// Eligible principal established by an authenticated stabilizer pool checkpoint.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct StabilizerPoolFrameClaim {
+	/// Mining frame in which the position supplied this principal.
+	pub frame_id: FrameId,
+	/// Eligible ARGON at its native six-decimal scale.
+	pub argon_microgons: U256,
+	/// Eligible USDC valued in microgons using the frame's USD quotes.
+	pub usdc_in_microgons: U256,
+}
+
+/// Accept newly proved frames for the beneficiary of an Ethereum position revision.
+pub trait StabilizerPoolClaimProvider<AccountId> {
+	type Weights: StabilizerPoolClaimProviderWeightInfo;
+	/// Whether this runtime accepts claims. Checkpoints can still be updated before activation.
+	const ENABLED: bool = true;
+
+	/// Accept the entire claim in the caller's storage transaction. An error leaves the proof
+	/// and its claim cursor unchanged so the caller can retry.
+	fn submit_claim(beneficiary: &AccountId, frames: &[StabilizerPoolFrameClaim])
+		-> DispatchResult;
+}
+
+pub trait StabilizerPoolClaimProviderWeightInfo {
+	fn submit_claim(frame_count: u32) -> Weight;
+}
+
+impl StabilizerPoolClaimProviderWeightInfo for () {
+	fn submit_claim(_: u32) -> Weight {
+		Weight::zero()
+	}
+}
+
+impl<AccountId> StabilizerPoolClaimProvider<AccountId> for () {
+	type Weights = ();
+	const ENABLED: bool = false;
+
+	fn submit_claim(_: &AccountId, _: &[StabilizerPoolFrameClaim]) -> DispatchResult {
+		Err(DispatchError::Unavailable)
+	}
+}
 
 /// Treasury-owned unissued funding. All mutations, including payout delivery, must use runtime
 /// storage so that funding, currency and auction state share the caller's transaction boundary.

@@ -5,15 +5,18 @@
 
 extern crate alloc;
 
-use alloc::boxed::Box;
+use alloc::{boxed::Box, vec::Vec};
 pub use argon_primitives::EthereumProofBlock as ProofBlock;
 use argon_primitives::{
-	block_seal::FrameId, BlockSealAuthorityId, EthereumAccountStorageProof, EthereumVerifyProvider,
+	block_seal::FrameId,
+	treasury::{StabilizerPoolClaimProvider, StabilizerPoolFrameClaim},
+	BlockSealAuthorityId, EthereumAccountStorageProof, EthereumVerifyProvider,
 	MiningFrameTransitionProvider, OnNewSlot, UniswapTick,
 };
 use frame_support::traits::Time;
 pub use pallet::*;
 use pallet_prelude::*;
+use polkadot_sdk::sp_core::U512;
 use sp_runtime::ArithmeticError;
 use uniswap::{MAX_REWARD_RANGES, REWARD_BAND_TOLERANCE};
 use weights::liquidity_snapshot_weight;
@@ -66,6 +69,8 @@ pub mod pallet {
 		type WeightInfo: weights::WeightInfo;
 		/// Authenticates Ethereum state and identifies the block proved by each witness.
 		type EthereumVerifier: EthereumVerifyProvider;
+		/// Accepts the principal proved for newly claimed frames.
+		type ClaimProvider: StabilizerPoolClaimProvider<Self::AccountId>;
 		/// Supplies the mining frame active when a checkpoint is accepted.
 		type MiningFrameTransitionProvider: MiningFrameTransitionProvider;
 		/// Mainchain clock used to assign observations to frames and reject future prices.
@@ -75,6 +80,9 @@ pub mod pallet {
 		/// Closed mining frames retained in the sampled Uniswap price history.
 		#[pallet::constant]
 		type MaxSampledPriceHistoryFrames: Get<u32>;
+		/// Number of closed frames for which an Ethereum proof can establish a new claim.
+		#[pallet::constant]
+		type ClaimWindowFrames: Get<u32>;
 		/// Nominal frame duration used to size the price sampling buckets.
 		type TicksPerFrame: Get<Tick>;
 		/// Lower and upper reward price boundaries, as percentages of the ARGON USD target.
@@ -234,6 +242,8 @@ pub mod pallet {
 		PositionChangeNotProven,
 		/// An opening timestamp is missing for the reviewed frame or its successor.
 		FrameStartTimeUnavailable,
+		/// The verified position cannot be valued at the frame's sampled pool price.
+		ClaimValuationFailed,
 	}
 
 	#[pallet::call]
@@ -272,7 +282,8 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Register a baseline, extend a maintained revision, or reset after an unproven change.
+		/// Register a baseline, submit claims for newly proved full frames of the maintained
+		/// revision, or reset after an unproven change.
 		#[pallet::call_index(1)]
 		#[pallet::weight(weights::checkpoint_position::<T>(proof))]
 		pub fn checkpoint_position(
@@ -342,7 +353,7 @@ pub mod pallet {
 			proof: Box<PositionChangeProof>,
 		) -> DispatchResult {
 			ensure_signed(origin)?;
-			let Some(StabilizerPoolRegistration::Enrolled { eligible_from }) =
+			let Some(StabilizerPoolRegistration::Enrolled(enrollment)) =
 				StabilizerPoolRegistrations::<T>::get(position)
 			else {
 				return Err(Error::<T>::PositionNotEnrolled.into());
@@ -363,7 +374,7 @@ pub mod pallet {
 				Error::<T>::StaleCheckpoint
 			);
 
-			Self::remove_reported_position(position, &previous, eligible_from, observed_at)
+			Self::remove_reported_position(position, &previous, enrollment, observed_at)
 		}
 	}
 
@@ -427,8 +438,8 @@ pub mod pallet {
 			}
 
 			let position_id = StabilizerPoolPositionId { position_manager, token_id };
-			let eligible_from = match StabilizerPoolRegistrations::<T>::get(position_id) {
-				Some(StabilizerPoolRegistration::Enrolled { eligible_from }) => Some(eligible_from),
+			let enrollment = match StabilizerPoolRegistrations::<T>::get(position_id) {
+				Some(StabilizerPoolRegistration::Enrolled(enrollment)) => Some(enrollment),
 				Some(StabilizerPoolRegistration::Removed { reported_at }) => {
 					// A proof can re-enroll from the same authenticated post-change block.
 					ensure!(block.number >= reported_at.number, Error::<T>::StaleCheckpoint);
@@ -443,28 +454,59 @@ pub mod pallet {
 				},
 				None => None,
 			};
-			if eligible_from.is_none() || !matches!(outcome, CheckpointOutcome::Maintained { .. }) {
-				let previous_registration = previous.as_ref().zip(eligible_from);
-				let frame_id = T::MiningFrameTransitionProvider::get_current_frame_id();
-				let eligible_from = frame_id.checked_add(1).ok_or(ArithmeticError::Overflow)?;
-				let review = if let Some((previous, previous_eligible_from)) = previous_registration
-				{
-					Self::review_frame_after_position_change(
-						frame_id,
-						previous,
-						previous_eligible_from,
-					)?
-				} else {
-					None
-				};
-				Self::register_position_liquidity(frame_id, &checkpoint, previous_registration)?;
-				if let Some(review) = review {
-					StabilizerPoolReviewFrame::<T>::put(review);
-				}
-				StabilizerPoolRegistrations::<T>::insert(
-					position_id,
-					StabilizerPoolRegistration::Enrolled { eligible_from },
-				);
+			let current_frame = T::MiningFrameTransitionProvider::get_current_frame_id();
+			match (enrollment, &outcome) {
+				(Some(mut enrollment), CheckpointOutcome::Maintained { .. }) => {
+					let next_claim_frame = Self::submit_position_claim(
+						&checkpoint,
+						enrollment.next_claim_frame,
+						current_frame,
+					)?;
+					if next_claim_frame != enrollment.next_claim_frame {
+						enrollment.next_claim_frame = next_claim_frame;
+						StabilizerPoolRegistrations::<T>::insert(
+							position_id,
+							StabilizerPoolRegistration::Enrolled(enrollment),
+						);
+					}
+				},
+				_ => {
+					let previous_registration = previous.as_ref().zip(enrollment);
+					let eligible_from =
+						current_frame.checked_add(1).ok_or(ArithmeticError::Overflow)?;
+					let review = if let Some((previous, enrollment)) = previous_registration {
+						let review = Self::review_frame_after_position_change(
+							current_frame,
+							previous,
+							enrollment.eligible_from,
+						)?;
+						Self::submit_position_claim(
+							previous,
+							enrollment.next_claim_frame,
+							current_frame,
+						)?;
+						review
+					} else {
+						None
+					};
+
+					Self::register_position_liquidity(
+						current_frame,
+						&checkpoint,
+						previous_registration
+							.map(|(previous, enrollment)| (previous, enrollment.eligible_from)),
+					)?;
+					if let Some(review) = review {
+						StabilizerPoolReviewFrame::<T>::put(review);
+					}
+					StabilizerPoolRegistrations::<T>::insert(
+						position_id,
+						StabilizerPoolRegistration::Enrolled(StabilizerPoolEnrollment {
+							eligible_from,
+							next_claim_frame: eligible_from,
+						}),
+					);
+				},
 			}
 
 			PositionCheckpoints::<T>::insert(position_manager, token_id, &checkpoint);
@@ -477,19 +519,115 @@ pub mod pallet {
 			Ok(())
 		}
 
+		/// Submit the proof's eligible frames before advancing the enrollment's claim cursor.
+		fn submit_position_claim(
+			checkpoint: &PositionCheckpoint<T::AccountId>,
+			next_claim_frame: FrameId,
+			current_frame: FrameId,
+		) -> Result<FrameId, DispatchError> {
+			if !T::ClaimProvider::ENABLED {
+				return Ok(next_claim_frame);
+			}
+			let (next_claim_frame, frames) =
+				Self::value_position_claim(checkpoint, next_claim_frame, current_frame)?;
+			if !frames.is_empty() {
+				T::ClaimProvider::submit_claim(&checkpoint.beneficiary, &frames)?;
+			}
+			Ok(next_claim_frame)
+		}
+
+		/// Value the complete frames covered by an authenticated checkpoint. A proof accepted
+		/// before frame close can cover a frame that closed since.
+		pub(crate) fn value_position_claim(
+			checkpoint: &PositionCheckpoint<T::AccountId>,
+			next_claim_frame: FrameId,
+			current_frame: FrameId,
+		) -> Result<(FrameId, Vec<StabilizerPoolFrameClaim>), DispatchError> {
+			let oldest_claimable_frame =
+				current_frame.saturating_sub(T::ClaimWindowFrames::get().into());
+			let first_frame = next_claim_frame.max(oldest_claimable_frame);
+			if first_frame >= current_frame {
+				return Ok((next_claim_frame, Vec::new()));
+			}
+
+			let config = Pools::<T>::get(checkpoint.pool_manager, checkpoint.pool_id)
+				.ok_or(Error::<T>::PoolNotRegistered)?;
+			let frame_starts = StabilizerPoolFrameStartMillis::<T>::get();
+			let prices = StabilizerPoolPricesByFrame::<T>::get();
+			let mut next_unclaimed = first_frame;
+			let mut claims = Vec::new();
+
+			for frame in first_frame..current_frame {
+				let next_frame = frame.saturating_add(1);
+				let (Some(start), Some(end)) =
+					(frame_starts.get(&frame), frame_starts.get(&next_frame))
+				else {
+					// Missing boundaries cannot be recovered by a newer Ethereum proof.
+					next_unclaimed = next_frame;
+					continue;
+				};
+				if *end > checkpoint.proven_through.timestamp_millis {
+					break;
+				}
+				next_unclaimed = next_frame;
+				if *start < checkpoint.maintained_since.timestamp_millis {
+					continue;
+				}
+				let Some(price) = prices.get(&frame) else { continue };
+				if checkpoint.pool_manager != price.pool.pool_manager {
+					continue;
+				}
+				if checkpoint.pool_id != price.pool.pool_id {
+					continue;
+				}
+				let Ok(band) = Self::reward_band(price, config.key.tick_spacing) else { continue };
+				let amounts = band
+					.principal_for_range(
+						checkpoint.liquidity.into(),
+						checkpoint.tick_lower,
+						checkpoint.tick_upper,
+						price.sqrt_price_x96,
+					)
+					.map_err(|_| Error::<T>::ClaimValuationFailed)?;
+
+				// USDC base units and microgons share six decimals. A uint256 amount times
+				// the uint128 USD quote fits in 384 bits, and the band validated the divisor.
+				let usdc_in_microgons = U256::try_from(
+					U512::from(amounts.usdc) * U512::from(price.usdc_usd_price.into_inner()) /
+						U512::from(price.argon_usd_target_price.into_inner()),
+				)
+				.map_err(|_| ArithmeticError::Overflow)?;
+				if amounts.argon.is_zero() && usdc_in_microgons.is_zero() {
+					continue;
+				}
+				claims.push(StabilizerPoolFrameClaim {
+					frame_id: frame,
+					argon_microgons: amounts.argon,
+					usdc_in_microgons,
+				});
+			}
+
+			Ok((next_unclaimed, claims))
+		}
+
 		pub(crate) fn remove_reported_position(
 			position: StabilizerPoolPositionId,
 			previous: &PositionCheckpoint<T::AccountId>,
-			eligible_from: FrameId,
+			enrollment: StabilizerPoolEnrollment,
 			observed_at: ProofBlock,
 		) -> DispatchResult {
 			let frame_id = T::MiningFrameTransitionProvider::get_current_frame_id();
 			let range = StabilizerPoolLiquidityRange::from(previous);
 			let mut liquidity = RegisteredLiquidityByRange::<T>::get(range);
 			liquidity.advance_to(frame_id);
-			liquidity.remove_registration(previous.liquidity, eligible_from <= frame_id)?;
-			let review =
-				Self::review_frame_after_position_change(frame_id, previous, eligible_from)?;
+			liquidity
+				.remove_registration(previous.liquidity, enrollment.eligible_from <= frame_id)?;
+			let review = Self::review_frame_after_position_change(
+				frame_id,
+				previous,
+				enrollment.eligible_from,
+			)?;
+			Self::submit_position_claim(previous, enrollment.next_claim_frame, frame_id)?;
 
 			Self::store_registered_liquidity(range, liquidity);
 			if let Some(review) = review {
@@ -559,7 +697,7 @@ pub mod pallet {
 			if review.frame_id.checked_add(1) != Some(current_frame) {
 				return Ok(None);
 			}
-			if eligible_from > review.frame_id {
+			if review.frame_id < eligible_from {
 				return Ok(None);
 			}
 
@@ -586,7 +724,7 @@ pub mod pallet {
 			if previous.maintained_since.timestamp_millis <= *began_at &&
 				previous.proven_through.timestamp_millis >= *ended_at
 			{
-				// The owner published a continuity proof covering the entire closed frame.
+				// Only a proof spanning the whole frame protects this contribution.
 				return Ok(None);
 			}
 
@@ -603,9 +741,10 @@ pub mod pallet {
 			frame_id: FrameId,
 			price: &StabilizerPoolFramePrice,
 		) -> Result<LiquidityByUniswapRange, PositionAmountError> {
-			let Some(band) = Self::reward_band(price)? else {
-				return Ok(LiquidityByUniswapRange::new())
+			let Some(pool) = Pools::<T>::get(price.pool.pool_manager, price.pool.pool_id) else {
+				return Ok(LiquidityByUniswapRange::new());
 			};
+			let band = Self::reward_band(price, pool.key.tick_spacing)?;
 			let mut snapshot = LiquidityByUniswapRange::new();
 			for (lower_uniswap_tick, upper_uniswap_tick) in band.reward_ranges()? {
 				let range = StabilizerPoolLiquidityRange {
@@ -636,7 +775,9 @@ pub mod pallet {
 
 			let prices = StabilizerPoolPricesByFrame::<T>::get();
 			let price = prices.get(&review.frame_id).ok_or(PositionAmountError::InvalidPrice)?;
-			let band = Self::reward_band(price)?.ok_or(PositionAmountError::InvalidPrice)?;
+			let pool = Pools::<T>::get(price.pool.pool_manager, price.pool.pool_id)
+				.ok_or(PositionAmountError::InvalidPrice)?;
+			let band = Self::reward_band(price, pool.key.tick_spacing)?;
 			for (&(lower, upper), &liquidity) in &review.liquidity_by_range {
 				let principal =
 					band.principal_for_range(liquidity, lower, upper, price.sqrt_price_x96)?;
@@ -654,19 +795,16 @@ pub mod pallet {
 
 		fn reward_band(
 			price: &StabilizerPoolFramePrice,
-		) -> Result<Option<StabilizerPoolRewardBand>, PositionAmountError> {
-			let Some(pool) = Pools::<T>::get(price.pool.pool_manager, price.pool.pool_id) else {
-				return Ok(None);
-			};
+			uniswap_tick_spacing: i32,
+		) -> Result<StabilizerPoolRewardBand, PositionAmountError> {
 			StabilizerPoolRewardBand::new(
 				price.argon_usd_target_price,
 				price.usdc_usd_price,
 				price.argon_is_token0,
-				pool.key.tick_spacing,
+				uniswap_tick_spacing,
 				T::RewardPriceBand::get(),
 				REWARD_BAND_TOLERANCE,
 			)
-			.map(Some)
 		}
 
 		fn register_position_liquidity(
@@ -679,9 +817,9 @@ pub mod pallet {
 			liquidity.advance_to(frame_id);
 
 			let mut previous_range_update = None;
-			if let Some((previous, previous_eligible_from)) = previous_registration {
+			if let Some((previous, eligible_from)) = previous_registration {
 				let previous_range = StabilizerPoolLiquidityRange::from(previous);
-				let was_eligible = previous_eligible_from <= frame_id;
+				let was_eligible = eligible_from <= frame_id;
 				if previous_range == range {
 					liquidity.remove_registration(previous.liquidity, was_eligible)?;
 				} else {
@@ -745,14 +883,31 @@ pub struct StabilizerPoolFrameLiquidity {
 	MaxEncodedLen,
 )]
 pub enum StabilizerPoolRegistration {
-	Enrolled {
-		/// First frame in which this revision contributes liquidity.
-		eligible_from: FrameId,
-	},
+	Enrolled(StabilizerPoolEnrollment),
 	Removed {
 		/// Ethereum block proving the change. A replacement cannot use an earlier block.
 		reported_at: ProofBlock,
 	},
+}
+
+/// Reward timing and claim progress for the NFT's currently enrolled revision.
+#[derive(
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	Clone,
+	Copy,
+	Debug,
+	PartialEq,
+	Eq,
+	TypeInfo,
+	MaxEncodedLen,
+)]
+pub struct StabilizerPoolEnrollment {
+	/// First frame in which this revision contributes liquidity.
+	pub eligible_from: FrameId,
+	/// Earliest frame this enrollment can still submit a claim for.
+	pub next_claim_frame: FrameId,
 }
 
 /// Uniswap v4's canonical pool key. The native PoolId is its ABI-encoded keccak256 hash.

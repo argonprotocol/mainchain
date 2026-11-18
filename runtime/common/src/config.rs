@@ -100,6 +100,7 @@ parameter_types! {
 	pub const StabilizerPoolRewardPriceBand: (Percent, Percent) =
 		(Percent::from_percent(90), Percent::one());
 	pub const StabilizerPoolMaxSampledPriceHistoryFrames: u32 = 13;
+	pub const StabilizerPoolClaimWindowFrames: u32 = 10;
 	pub const StabilizerPoolMaxPriceBucketsPerFrame: u32 = 24;
 	pub const StabilizerPoolMinPriceBucketCoverage: Percent = Percent::from_percent(75);
 

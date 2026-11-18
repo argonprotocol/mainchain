@@ -29,6 +29,11 @@ impl<T: frame_system::Config> pallet_stabilizer_pools::WeightInfo for WeightInfo
 		// TODO: Generate weights for the frame price sampler.
 		Weight::zero()
 	}
+	fn value_position_claim() -> Weight {
+		// TODO: Generate claim valuation weights before release.
+		Weight::zero()
+	}
+
 	fn advance_liquidity_snapshots() -> Weight {
 		// TODO: Generate liquidity snapshot weights before release.
 		Weight::zero()

@@ -61,11 +61,13 @@ impl pallet_ethereum_verifier::Config for Test {
 #[cfg(test)]
 impl Config for Test {
 	type EthereumVerifier = EthereumVerifier;
+	type ClaimProvider = MockClaimProvider;
 	type WeightInfo = ();
 	type MiningFrameTransitionProvider = CurrentFrame;
 	type CurrentTick = CurrentTick;
 	type TimeProvider = CurrentTime;
 	type MaxSampledPriceHistoryFrames = ConstU32<13>;
+	type ClaimWindowFrames = ConstU32<10>;
 	type TicksPerFrame = ConstU64<10>;
 	type RewardPriceBand = RewardPriceBand;
 	type MaxPriceBucketsPerFrame = MaxPriceBucketsPerFrame;
@@ -80,6 +82,37 @@ frame_support::parameter_types! {
 	pub static CurrentTick: Tick = 20;
 	pub static CurrentTime: u64 = 0;
 	pub static CurrentFrame: FrameId = 1;
+	pub static SubmittedClaims: Vec<SubmittedClaim> = Vec::new();
+	pub static RejectClaims: bool = false;
+}
+
+#[cfg(test)]
+#[derive(Clone)]
+pub struct SubmittedClaim {
+	pub beneficiary: AccountId32,
+	pub frames: Vec<StabilizerPoolFrameClaim>,
+}
+
+#[cfg(test)]
+pub struct MockClaimProvider;
+
+#[cfg(test)]
+impl StabilizerPoolClaimProvider<AccountId32> for MockClaimProvider {
+	type Weights = ();
+
+	fn submit_claim(
+		beneficiary: &AccountId32,
+		frames: &[StabilizerPoolFrameClaim],
+	) -> DispatchResult {
+		if RejectClaims::get() {
+			return Err(DispatchError::Unavailable);
+		}
+		SubmittedClaims::mutate(|claims| {
+			claims
+				.push(SubmittedClaim { beneficiary: beneficiary.clone(), frames: frames.to_vec() });
+		});
+		Ok(())
+	}
 }
 
 #[cfg(test)]
@@ -107,6 +140,8 @@ pub fn new_test_ext() -> TestState {
 	ext.execute_with(|| {
 		System::set_block_number(1);
 		CurrentFrame::set(1);
+		SubmittedClaims::set(Vec::new());
+		RejectClaims::set(false);
 		assert_ok!(StabilizerPools::register_pool(RuntimeOrigin::root(), pool_manager(), config()));
 	});
 	ext

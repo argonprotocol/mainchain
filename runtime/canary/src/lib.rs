@@ -963,12 +963,14 @@ impl pallet_treasury_positions::Config for Runtime {
 
 impl pallet_stabilizer_pools::Config for Runtime {
 	type EthereumVerifier = use_unless_benchmark!(EthereumVerifier, ());
+	type ClaimProvider = ();
 	type WeightInfo = weights::pallet_stabilizer_pools::WeightInfo<Runtime>;
 	type MiningFrameTransitionProvider =
 		use_unless_benchmark!(MiningSlot, benchmarking::BenchmarkCurrentFrameId);
 	type CurrentTick = Ticks;
 	type TimeProvider = Timestamp;
 	type MaxSampledPriceHistoryFrames = StabilizerPoolMaxSampledPriceHistoryFrames;
+	type ClaimWindowFrames = StabilizerPoolClaimWindowFrames;
 	type TicksPerFrame = GetTicksPerFrame;
 	type RewardPriceBand = StabilizerPoolRewardPriceBand;
 	type MaxPriceBucketsPerFrame = StabilizerPoolMaxPriceBucketsPerFrame;

@@ -15,7 +15,8 @@ There is no event relay, indexer requirement, global activity cursor, or ongoing
   PositionManager, and subscriber. Existing configurations cannot be replaced.
 - `checkpoint_position(pool_manager, pool_id, token_id, proof)` is signed by the proven Argon
   beneficiary. Its first proof registers a baseline. An unchanged revision extends the verified
-  maintained interval; an increased revision starts a new baseline and does not verify the gap.
+  maintained interval and can submit newly proved full frames within the last ten closed frames
+  to the claim provider. An increased revision starts a new baseline and does not verify the gap.
   Older proofs, repeated proofs, regressed revisions, and changed position fields without a revision
   increase are rejected. The position watermark survives beneficiary changes.
 - `report_position_change(position, proof)` lets anyone prove that the enrolled revision increased
@@ -59,3 +60,8 @@ usable price has zero eligible principal.
 
 Each frame records the Unix millisecond timestamp of its opening block. The next frame's opening
 also closes the previous frame. These timestamps are recorded even when price sampling falls short.
+
+The claim provider receives the proven beneficiary and eligible ARGON and USDC principal
+for each newly proved frame. On a replacement or removal, any claim from the previous checkpoint
+goes to its original beneficiary. The claim cursor advances only after the provider accepts the
+eligible frames. Claim submission starts when the runtime connects the settlement provider.

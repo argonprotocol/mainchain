@@ -101,7 +101,10 @@ mod benchmarks {
 				position_manager: config().position_manager,
 				token_id: U256::one(),
 			},
-			StabilizerPoolRegistration::Enrolled { eligible_from: current_frame.saturating_sub(1) },
+			StabilizerPoolRegistration::Enrolled(StabilizerPoolEnrollment {
+				eligible_from: current_frame.saturating_sub(1),
+				next_claim_frame: current_frame.saturating_sub(1),
+			}),
 		);
 		seed_review_frame::<T>(current_frame.saturating_sub(1), &previous);
 		RegisteredLiquidityByRange::<T>::mutate(range, |liquidity| {
@@ -155,6 +158,58 @@ mod benchmarks {
 			PositionCheckpoints::<T>::get(config().position_manager, U256::one()).unwrap();
 		assert_eq!(checkpoint.maintained_since.number, 200);
 		assert_eq!(checkpoint.proven_through.number, 200);
+		Ok(())
+	}
+
+	#[benchmark]
+	fn value_position_claim() -> Result<(), BenchmarkError> {
+		let claim_window_frames = T::ClaimWindowFrames::get();
+		let first_frame = 1;
+		let current_frame = first_frame + FrameId::from(claim_window_frames);
+		let caller: T::AccountId = whitelisted_caller();
+		let mut checkpoint = benchmark_checkpoint(caller);
+		let config = config();
+		Pallet::<T>::register_pool(RawOrigin::Root.into(), pool_manager(), config)?;
+
+		let price = StabilizerPoolFramePrice {
+			pool: stabilizer_pool_price_source().pool,
+			sqrt_price_x96: sqrt_price_at_uniswap_tick(-276_800).unwrap(),
+			argon_usd_target_price: FixedU128::one(),
+			usdc_usd_price: FixedU128::one(),
+			argon_is_token0: true,
+		};
+		let band = StabilizerPoolRewardBand::new(
+			price.argon_usd_target_price,
+			price.usdc_usd_price,
+			price.argon_is_token0,
+			config.key.tick_spacing,
+			T::RewardPriceBand::get(),
+			REWARD_BAND_TOLERANCE,
+		)
+		.unwrap();
+		let ranges = band.reward_ranges().unwrap();
+		(checkpoint.tick_lower, checkpoint.tick_upper) = ranges[0];
+		checkpoint.maintained_since.timestamp_millis = 0;
+		checkpoint.proven_through.timestamp_millis = current_frame.saturating_mul(60_000);
+
+		StabilizerPoolFrameStartMillis::<T>::mutate(|starts| {
+			for frame in first_frame..=current_frame {
+				starts.try_insert(frame, frame.saturating_mul(60_000)).unwrap();
+			}
+		});
+		StabilizerPoolPricesByFrame::<T>::mutate(|prices| {
+			for frame in first_frame..current_frame {
+				prices.try_insert(frame, price).unwrap();
+			}
+		});
+		let frames;
+		#[block]
+		{
+			(_, frames) =
+				Pallet::<T>::value_position_claim(&checkpoint, first_frame, current_frame)?;
+		}
+
+		assert_eq!(frames.len() as u32, claim_window_frames);
 		Ok(())
 	}
 
@@ -243,6 +298,7 @@ mod benchmarks {
 	fn report_position_change() -> Result<(), BenchmarkError> {
 		let caller: T::AccountId = whitelisted_caller();
 		let config = config();
+		Pallet::<T>::register_pool(RawOrigin::Root.into(), pool_manager(), config)?;
 		let position = StabilizerPoolPositionId {
 			position_manager: config.position_manager,
 			token_id: U256::one(),
@@ -254,7 +310,10 @@ mod benchmarks {
 		PositionCheckpoints::<T>::insert(position.position_manager, position.token_id, &checkpoint);
 		StabilizerPoolRegistrations::<T>::insert(
 			position,
-			StabilizerPoolRegistration::Enrolled { eligible_from: reviewed_frame },
+			StabilizerPoolRegistration::Enrolled(StabilizerPoolEnrollment {
+				eligible_from: reviewed_frame,
+				next_claim_frame: reviewed_frame,
+			}),
 		);
 		RegisteredLiquidityByRange::<T>::insert(
 			StabilizerPoolLiquidityRange::from(&checkpoint),
@@ -275,7 +334,7 @@ mod benchmarks {
 		// The Ethereum verifier's own benchmarks cover ancestry and authentication.
 		#[block]
 		{
-			let Some(StabilizerPoolRegistration::Enrolled { eligible_from }) =
+			let Some(StabilizerPoolRegistration::Enrolled(enrollment)) =
 				StabilizerPoolRegistrations::<T>::get(position)
 			else {
 				return Err(BenchmarkError::Stop("fixture position must be enrolled"));
@@ -284,7 +343,7 @@ mod benchmarks {
 				PositionCheckpoints::<T>::get(position.position_manager, position.token_id)
 					.unwrap();
 			evm::decode_position_change::<T>(position, &previous, &proof)?;
-			Pallet::<T>::remove_reported_position(position, &previous, eligible_from, observed_at)?;
+			Pallet::<T>::remove_reported_position(position, &previous, enrollment, observed_at)?;
 		}
 
 		assert_eq!(
