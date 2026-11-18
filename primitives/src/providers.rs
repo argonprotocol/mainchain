@@ -1543,6 +1543,18 @@ pub trait MiningFrameTransitionProvider {
 	fn get_current_frame_id() -> FrameId;
 }
 
+impl MiningFrameTransitionProvider for () {
+	type Weights = ();
+
+	fn is_new_frame_started() -> Option<FrameId> {
+		None
+	}
+
+	fn get_current_frame_id() -> FrameId {
+		0
+	}
+}
+
 /// Provides the Bitcoin-minted Argons that have not been explicitly repaid.
 pub trait BitcoinMintedProvider<Balance> {
 	fn minted_bitcoin_microgons() -> Balance;

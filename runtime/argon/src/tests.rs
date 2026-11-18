@@ -322,6 +322,7 @@ fn deferred_repayment_settles_bitcoin_principal_and_rewards_including_unreceivab
 						..Default::default()
 					},
 					upstream: None,
+					..Default::default()
 				},
 			);
 			pallet_treasury_positions::NetworkTotals::<Runtime>::put(NetworkPositionQuantities {

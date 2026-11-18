@@ -49,6 +49,42 @@ impl<AccountId> StabilizerPoolClaimProvider<AccountId> for () {
 	}
 }
 
+/// Issue rewards already committed to a Treasury position.
+pub trait StabilizerPoolRewardPayer<AccountId, Balance> {
+	type Weights: StabilizerPoolRewardPayerWeightInfo;
+	/// Whether any funded stabilizer pool rewards await payout.
+	fn has_outstanding_stabilizer_pool_rewards() -> bool;
+	/// Issue the full amount and discharge its commitment. An error leaves both unchanged.
+	fn pay_stabilizer_pool_rewards(beneficiary: &AccountId, amount: Balance) -> DispatchResult;
+}
+
+pub trait StabilizerPoolRewardPayerWeightInfo {
+	fn has_outstanding_stabilizer_pool_rewards() -> Weight;
+	fn pay_stabilizer_pool_rewards() -> Weight;
+}
+
+impl StabilizerPoolRewardPayerWeightInfo for () {
+	fn has_outstanding_stabilizer_pool_rewards() -> Weight {
+		Weight::zero()
+	}
+
+	fn pay_stabilizer_pool_rewards() -> Weight {
+		Weight::zero()
+	}
+}
+
+impl<AccountId, Balance> StabilizerPoolRewardPayer<AccountId, Balance> for () {
+	type Weights = ();
+
+	fn has_outstanding_stabilizer_pool_rewards() -> bool {
+		false
+	}
+
+	fn pay_stabilizer_pool_rewards(_: &AccountId, _: Balance) -> DispatchResult {
+		Err(DispatchError::Unavailable)
+	}
+}
+
 /// Treasury-owned unissued funding. All mutations, including payout delivery, must use runtime
 /// storage so that funding, currency and auction state share the caller's transaction boundary.
 pub trait TreasuryRewardProvider<AccountId> {
@@ -214,6 +250,9 @@ pub trait TreasuryPositionProviderWeightInfo {
 	fn upstream_position() -> Weight;
 	fn set_upstream_position() -> Weight;
 	fn position_updated() -> Weight;
+	fn credit_stabilizer_pool_rewards() -> Weight {
+		Weight::zero()
+	}
 }
 impl TreasuryPositionProviderWeightInfo for () {
 	fn operational_account_registered() -> Weight {
@@ -285,6 +324,10 @@ pub trait TreasuryPositionProvider<AccountId, Balance: Codec + MaxEncodedLen> {
 		previous: Balance,
 		principal: Balance,
 	) -> DispatchResult;
+	/// Add finalized rewards to the existing position when Treasury commits their funding.
+	fn credit_stabilizer_pool_rewards(_: &AccountId, _: Balance) -> DispatchResult {
+		Err(DispatchError::Unavailable)
+	}
 }
 impl<AccountId, Balance: Codec + MaxEncodedLen + Default>
 	TreasuryPositionProvider<AccountId, Balance> for ()

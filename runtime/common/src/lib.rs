@@ -171,6 +171,7 @@ macro_rules! inject_runtime_vars {
 			pallet_treasury::migrations::VirtualizeMarketingReserveMigration<Runtime>,
 			pallet_stabilizer_buys::migrations::InitializeApprovedPoolRevisionMigration<Runtime>,
 			pallet_stabilizer_pools::migrations::RemoveOpeningPriceIndicesMigration<Runtime>,
+			pallet_treasury_positions::migrations::AddStabilizerPoolEarningsMigration<Runtime>,
 		);
 
 		/// Unchecked extrinsic type as expected by this runtime.

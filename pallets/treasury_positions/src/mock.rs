@@ -7,6 +7,8 @@ impl frame_system::Config for Test {
 impl Config for Test {
 	type BitcoinPositionProvider = ();
 	type TreasuryPoolProvider = ();
+	type MiningFrameTransitionProvider = ();
+	type StabilizerPoolRewardPayer = ();
 	type OperationalAccountProvider = MockOperationalAccounts;
 	type Balance = u128;
 	type WeightInfo = ();

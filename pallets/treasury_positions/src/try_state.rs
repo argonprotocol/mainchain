@@ -9,7 +9,9 @@ pub(crate) fn check<T: Config>() -> Result<(), sp_runtime::TryRuntimeError> {
 	let mut bonds = 0u128;
 	let mut stakes = 0u128;
 	let mut fission_liquidity = T::Balance::zero();
+	let mut account_count = 0u32;
 	for position in PositionsByAccount::<T>::iter_values() {
+		account_count.saturating_accrue(1);
 		bonds = bonds
 			.checked_add(position.quantities.bonds)
 			.ok_or("Treasury Positions account bond quantities overflow")?;
@@ -30,6 +32,9 @@ pub(crate) fn check<T: Config>() -> Result<(), sp_runtime::TryRuntimeError> {
 				"Treasury Positions activated upstream securitization exceeds its allocation"
 			);
 		}
+	}
+	if account_count > EXPECTED_AUTO_COLLECT_POSITIONS_PER_FRAME {
+		log::warn!("Temporary stabilizer auto-collect would visit {account_count} Treasury positions, above the expected {EXPECTED_AUTO_COLLECT_POSITIONS_PER_FRAME}.");
 	}
 
 	// Vault coverage is maintained separately by canonical Vault updates, not account
@@ -59,7 +64,7 @@ mod tests {
 	#[test]
 	fn try_state_reconciles_quantities_after_updates_and_releases() {
 		polkadot_sdk::sp_io::TestExternalities::default().execute_with(|| {
-			StorageVersion::new(2).put::<TreasuryPositions>();
+			STORAGE_VERSION.put::<TreasuryPositions>();
 			assert_ok!(TreasuryPositions::try_state(1));
 			assert_ok!(TreasuryPositions::account_quantity_updated(
 				&1,
@@ -124,7 +129,7 @@ mod tests {
 	#[test]
 	fn try_state_rejects_drift_in_each_network_quantity() {
 		polkadot_sdk::sp_io::TestExternalities::default().execute_with(|| {
-			StorageVersion::new(2).put::<TreasuryPositions>();
+			STORAGE_VERSION.put::<TreasuryPositions>();
 			assert_ok!(TreasuryPositions::account_quantity_updated(
 				&1,
 				PositionQuantity::Bonds,
@@ -171,7 +176,7 @@ mod tests {
 	#[test]
 	fn try_state_rejects_impossible_upstream_subsets() {
 		polkadot_sdk::sp_io::TestExternalities::default().execute_with(|| {
-			StorageVersion::new(2).put::<TreasuryPositions>();
+			STORAGE_VERSION.put::<TreasuryPositions>();
 			assert_ok!(TreasuryPositions::bond_position_updated(&9, 3, 0, 100));
 			PositionsByAccount::<Test>::mutate(9, |position| {
 				position.as_mut().unwrap().upstream.as_mut().unwrap().bond_principal = 101;

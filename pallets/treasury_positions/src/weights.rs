@@ -2,16 +2,24 @@ use crate::Config;
 use argon_primitives::{
 	treasury::{
 		BitcoinLockPositionProvider, BitcoinLockPositionProviderWeightInfo,
-		TreasuryPositionProviderWeightInfo,
+		StabilizerPoolRewardPayer, TreasuryPositionProviderWeightInfo,
 	},
-	OperationalAccountProvider, OperationalAccountProviderWeightInfo, TreasuryPoolProvider,
-	TreasuryPoolProviderWeightInfo,
+	MiningFrameTransitionProvider, OperationalAccountProvider,
+	OperationalAccountProviderWeightInfo, TreasuryPoolProvider, TreasuryPoolProviderWeightInfo,
 };
 use core::marker::PhantomData;
 use pallet_prelude::*;
 
 // The generated NetworkTotals proof estimate predates its extra compact u128.
 const BITCOIN_QUANTITY_PROOF_MARGIN: Weight = Weight::from_parts(0, 32);
+
+pub(crate) type MiningFrameWeights<T> =
+	<<T as Config>::MiningFrameTransitionProvider as MiningFrameTransitionProvider>::Weights;
+pub(crate) type StabilizerPoolPayoutWeights<T> =
+	<<T as Config>::StabilizerPoolRewardPayer as StabilizerPoolRewardPayer<
+		<T as frame_system::Config>::AccountId,
+		<T as Config>::Balance,
+	>>::Weights;
 
 pub trait WeightInfo {
 	fn bond_principal() -> Weight;
@@ -22,6 +30,7 @@ pub trait WeightInfo {
 	fn set_upstream_position() -> Weight;
 	fn bitcoin_position_updated() -> Weight;
 	fn bond_position_updated() -> Weight;
+	fn credit_stabilizer_pool_rewards() -> Weight;
 }
 impl WeightInfo for () {
 	fn bond_principal() -> Weight {
@@ -46,6 +55,9 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 	fn bond_position_updated() -> Weight {
+		Weight::zero()
+	}
+	fn credit_stabilizer_pool_rewards() -> Weight {
 		Weight::zero()
 	}
 }
@@ -85,5 +97,8 @@ impl<T: Config> TreasuryPositionProviderWeightInfo for ProviderWeightAdapter<T> 
 			.saturating_add(<T::OperationalAccountProvider as OperationalAccountProvider<
 				T::AccountId,
 			>>::Weights::upstream_vault())
+	}
+	fn credit_stabilizer_pool_rewards() -> Weight {
+		T::WeightInfo::credit_stabilizer_pool_rewards()
 	}
 }

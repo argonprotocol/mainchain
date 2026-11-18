@@ -2,8 +2,9 @@ use super::{
 	ArgonotBondLots, BondLot, BondLotById, BondLotIdsByAccount, BondLotIdsByVault, BondLotSummary,
 	BondLotsByVault, BondProgram, BondProgramId, BondReleaseReason,
 	CurrentFrameArgonotBondParticipants, CurrentFrameVaultBitcoin, CurrentFrameVaultCapital, Event,
-	HoldReason, PendingBondReleaseRetryCursor, PendingBondReleasesByFrame, RewardReserves,
-	RewardTaperingPolicy, TaperingPolicy, TotalArgonBondLots,
+	HoldReason, OutstandingStabilizerPoolRewards, PendingBondReleaseRetryCursor,
+	PendingBondReleasesByFrame, RewardReserves, RewardTaperingPolicy, TaperingPolicy,
+	TotalArgonBondLots,
 };
 use crate::{
 	mock::{
@@ -14,10 +15,10 @@ use crate::{
 		ExistentialDeposit, LastAverageArgonotPriceFrame, LastOperationalBondTotal,
 		LastVaultProfits, MaxActiveArgonotBondLots, MaxArgonBondLots,
 		MaxArgonotBondedPercentOfCirculation, MaxVaultsPerPool, MinimumArgonsPerContributor, Mint,
-		MintedBitcoinMicrogons, Ownership, PurchasePool, PurchaseTick, RuntimeEvent,
-		RuntimeHoldReason, RuntimeOrigin, StabilizerBuys, System, Test, TestAccountId, Treasury,
-		TreasuryExitDelayFrames, TreasuryPositions, Upstreams, VaultArgonotMicronots,
-		VaultBitcoinSatoshis, VaultPalletId, VaultRewardCommittedMicronots,
+		MintedBitcoinMicrogons, NewlyStartedFrameId, Ownership, PurchasePool, PurchaseTick,
+		RuntimeEvent, RuntimeHoldReason, RuntimeOrigin, StabilizerBuys, System, Test,
+		TestAccountId, Treasury, TreasuryExitDelayFrames, TreasuryPositions, Upstreams,
+		VaultArgonotMicronots, VaultBitcoinSatoshis, VaultPalletId, VaultRewardCommittedMicronots,
 		VaultSecuritizedSatoshis, VaultsById,
 	},
 	pallet::{
@@ -43,12 +44,71 @@ use frame_support::{
 };
 use pallet_prelude::*;
 use pallet_stabilizer_buys::BuysByAccountAndFrame;
+use pallet_treasury_positions::{CollectAmounts, Position, PositionsByAccount};
 use sp_core::{blake2_256, Pair};
 use sp_runtime::{
 	traits::AccountIdConversion, ArithmeticError, BoundedBTreeMap, FixedU128, Permill, TokenError,
 };
 
 type MarketingMigration = crate::migrations::VirtualizeMarketingReserveMigration<Test>;
+
+#[test]
+fn stabilizer_pool_auto_collect_pays_other_accounts_after_a_failure_and_retries_next_frame() {
+	new_test_ext().execute_with(|| {
+		ExistentialDeposit::set(100);
+		let mut beneficiaries = [account(95), account(96)];
+		beneficiaries.sort_by_key(|account| PositionsByAccount::<Test>::hashed_key_for(account));
+		let [beneficiary, other_beneficiary] = beneficiaries;
+		let issuance_before = Balances::total_issuance();
+		RewardReserves::<Test>::mutate(|reserves| reserves.stabilizer_pools = 320);
+		let accrued = CollectAmounts { bond_earnings: 25, ..Default::default() };
+		let collected = CollectAmounts { stake_earnings: 30, ..Default::default() };
+		PositionsByAccount::<Test>::insert(
+			&beneficiary,
+			Position { collect_accrued: accrued, collected, ..Default::default() },
+		);
+
+		assert_ok!(Treasury::commit_stabilizer_pool_rewards(&beneficiary, 40));
+		assert_ok!(Treasury::commit_stabilizer_pool_rewards(&other_beneficiary, 120));
+		TreasuryPositions::on_initialize(1);
+		assert_eq!(OutstandingStabilizerPoolRewards::<Test>::get(), 160);
+		assert_eq!(Balances::total_issuance(), issuance_before);
+
+		NewlyStartedFrameId::set(Some(2));
+		TreasuryPositions::on_initialize(2);
+		assert_eq!(Balances::balance(&other_beneficiary), 120);
+		assert_eq!(Balances::balance(&beneficiary), 0);
+		assert_eq!(
+			PositionsByAccount::<Test>::get(&beneficiary)
+				.unwrap()
+				.collect_accrued
+				.stabilizer_pool_earnings,
+			40
+		);
+		assert_eq!(OutstandingStabilizerPoolRewards::<Test>::get(), 40);
+		assert_eq!(RewardReserves::<Test>::get().stabilizer_pools, 160);
+
+		assert_ok!(Treasury::commit_stabilizer_pool_rewards(&beneficiary, 70));
+		assert_noop!(
+			Treasury::commit_stabilizer_pool_rewards(&beneficiary, 91),
+			TokenError::FundsUnavailable
+		);
+		NewlyStartedFrameId::set(Some(3));
+		TreasuryPositions::on_initialize(3);
+		assert_ok!(TreasuryPositions::collect_stabilizer_pool_rewards(&beneficiary), 0);
+
+		let position = PositionsByAccount::<Test>::get(&beneficiary).unwrap();
+		assert_eq!(position.collect_accrued, accrued);
+		assert_eq!(
+			position.collected,
+			CollectAmounts { stabilizer_pool_earnings: 110, ..collected }
+		);
+		assert_eq!(OutstandingStabilizerPoolRewards::<Test>::get(), 0);
+		assert_eq!(RewardReserves::<Test>::get().stabilizer_pools, 90);
+		assert_eq!(Balances::balance(&beneficiary), 110);
+		assert_eq!(Balances::total_issuance(), issuance_before + 230);
+	});
+}
 
 fn account_bond_lot_ids(account_id: u64) -> Vec<u64> {
 	BondLotIdsByAccount::<Test>::iter_key_prefix(account(account_id)).collect()

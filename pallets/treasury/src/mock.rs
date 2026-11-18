@@ -61,6 +61,7 @@ parameter_types! {
 
 	pub static ExistentialDeposit: Balance = 1;
 	pub static BidPoolAccountId: TestAccountId = AccountId32::new([250; 32]);
+	pub static NewlyStartedFrameId: Option<FrameId> = None;
 }
 
 pub(crate) type ArgonToken = pallet_balances::Instance1;
@@ -391,7 +392,7 @@ impl MiningFrameTransitionProvider for StaticMiningFrameTransitionProvider {
 	}
 
 	fn is_new_frame_started() -> Option<FrameId> {
-		None
+		NewlyStartedFrameId::get()
 	}
 }
 
@@ -510,6 +511,7 @@ impl pallet_treasury::Config for Test {
 }
 
 pub(crate) fn new_test_ext() -> TestState {
+	NewlyStartedFrameId::set(None);
 	ArgonotSecuritizationMultiplier::set(0);
 	VaultsById::set(HashMap::new());
 	LastVaultProfits::set(vec![]);
@@ -536,6 +538,8 @@ pub(crate) fn new_test_ext() -> TestState {
 impl pallet_treasury_positions::Config for Test {
 	type BitcoinPositionProvider = ();
 	type TreasuryPoolProvider = Treasury;
+	type MiningFrameTransitionProvider = StaticMiningFrameTransitionProvider;
+	type StabilizerPoolRewardPayer = Treasury;
 	type OperationalAccountProvider = MockUpstreamAccounts;
 	type Balance = Balance;
 	type WeightInfo = ();

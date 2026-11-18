@@ -1,8 +1,8 @@
 use super::Config;
 use argon_primitives::{
 	treasury::{
-		TreasuryPositionProvider, TreasuryPositionProviderWeightInfo,
-		TreasuryRewardProviderWeightInfo,
+		StabilizerPoolRewardPayerWeightInfo, TreasuryPositionProvider,
+		TreasuryPositionProviderWeightInfo, TreasuryRewardProviderWeightInfo,
 	},
 	vault::{TreasuryVaultProvider, TreasuryVaultProviderWeightInfo},
 	OperationalAccountProvider, OperationalAccountProviderWeightInfo, OperationalAccountsHook,
@@ -402,5 +402,16 @@ impl<T: Config> TreasuryRewardProviderWeightInfo for ProviderWeightAdapter<T> {
 	}
 	fn pay_reward() -> Weight {
 		T::WeightInfo::provider_pay_reward().max(T::WeightInfo::provider_pay_reward_new_account())
+	}
+}
+
+impl<T: Config> StabilizerPoolRewardPayerWeightInfo for ProviderWeightAdapter<T> {
+	fn has_outstanding_stabilizer_pool_rewards() -> Weight {
+		T::DbWeight::get().reads(1)
+	}
+
+	fn pay_stabilizer_pool_rewards() -> Weight {
+		// Both payouts read and update an outstanding total and mint into the beneficiary.
+		Self::pay_reward()
 	}
 }

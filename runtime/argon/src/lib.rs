@@ -957,6 +957,8 @@ impl pallet_fee_control::Config for Runtime {
 impl pallet_treasury_positions::Config for Runtime {
 	type BitcoinPositionProvider = use_unless_benchmark!(BitcoinLocks, ());
 	type TreasuryPoolProvider = use_unless_benchmark!(Treasury, ());
+	type MiningFrameTransitionProvider = use_unless_benchmark!(MiningSlot, ());
+	type StabilizerPoolRewardPayer = use_unless_benchmark!(Treasury, ());
 	type OperationalAccountProvider = use_unless_benchmark!(
 		OperationalAccounts,
 		benchmarking::BenchmarkOperationalAccountProvider<AccountId>

@@ -309,6 +309,7 @@ pub(super) fn registration_minimums(vault: AccountId) {
 				..Default::default()
 			},
 			upstream: None,
+			..Default::default()
 		},
 	);
 }

@@ -24,7 +24,10 @@ pub mod migrations;
 mod try_state;
 pub mod weights;
 use argon_primitives::{
-	treasury::{PositionQuantity, TreasuryPositionProvider, TreasuryRewardProvider},
+	treasury::{
+		PositionQuantity, StabilizerPoolRewardPayer, TreasuryPositionProvider,
+		TreasuryRewardProvider,
+	},
 	MiningFrameProvider, OperationalAccountProvider,
 };
 pub use pallet::*;
@@ -337,6 +340,10 @@ pub mod pallet {
 	/// Awarded purchase rewards awaiting issuance. Auctions own their unallocated reservations.
 	#[pallet::storage]
 	pub type OutstandingPurchaseRewards<T: Config> = StorageValue<_, T::Balance, ValueQuery>;
+
+	/// Total microgons credited to Treasury positions for stabilizer pool rewards and still owed.
+	#[pallet::storage]
+	pub type OutstandingStabilizerPoolRewards<T: Config> = StorageValue<_, T::Balance, ValueQuery>;
 
 	/// Configurable percent of maximum Bitcoin-mintable Argons targeted by the network.
 	#[pallet::storage]
@@ -2620,12 +2627,59 @@ pub mod pallet {
 			Ok(release_frame_id)
 		}
 
+		/// Commit the finalized rewards for one beneficiary from the stabilizer pool reserve.
+		/// Callers settle the frame's reward budget before passing the awarded amount here.
+		pub fn commit_stabilizer_pool_rewards(
+			account: &T::AccountId,
+			amount: T::Balance,
+		) -> DispatchResult {
+			if amount.is_zero() {
+				return Ok(());
+			}
+
+			let mut reserves = RewardReserves::<T>::get();
+			let remaining = reserves
+				.stabilizer_pools
+				.checked_sub(&amount)
+				.ok_or(TokenError::FundsUnavailable)?;
+			let outstanding = OutstandingStabilizerPoolRewards::<T>::get()
+				.checked_add(&amount)
+				.ok_or(ArithmeticError::Overflow)?;
+			T::PositionProvider::credit_stabilizer_pool_rewards(account, amount)?;
+
+			reserves.stabilizer_pools = remaining;
+			RewardReserves::<T>::put(&reserves);
+			OutstandingStabilizerPoolRewards::<T>::put(outstanding);
+			Self::deposit_event(Event::<T>::RewardReservesUpdated { reserves });
+			Ok(())
+		}
+
 		fn update_account_vault_bond_total(account_id: &T::AccountId) {
 			let active_account_vault_bond_amount = T::PositionProvider::bond_principal(account_id);
 			T::OperationalAccountsHook::account_vault_bond_total_updated(
 				account_id,
 				active_account_vault_bond_amount,
 			);
+		}
+	}
+
+	impl<T: Config> StabilizerPoolRewardPayer<T::AccountId, T::Balance> for Pallet<T> {
+		type Weights = weights::ProviderWeightAdapter<T>;
+
+		fn has_outstanding_stabilizer_pool_rewards() -> bool {
+			!OutstandingStabilizerPoolRewards::<T>::get().is_zero()
+		}
+
+		fn pay_stabilizer_pool_rewards(
+			account: &T::AccountId,
+			amount: T::Balance,
+		) -> DispatchResult {
+			let outstanding = OutstandingStabilizerPoolRewards::<T>::get()
+				.checked_sub(&amount)
+				.ok_or(ArithmeticError::Underflow)?;
+			T::Currency::mint_into(account, amount)?;
+			OutstandingStabilizerPoolRewards::<T>::put(outstanding);
+			Ok(())
 		}
 	}
 

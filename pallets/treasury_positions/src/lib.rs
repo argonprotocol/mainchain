@@ -1,21 +1,28 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 //! Maintained account and network quantities used by Treasury frame calculations and bond backing.
 //! Source pallets own individual vaults, locks, lots, Fissions and custody. This pallet maintains
-//! their aggregates; Treasury owns frame snapshots and payouts.
+//! their aggregates and account earnings. Treasury owns frame terms and reward funding.
 
+extern crate alloc;
+
+use alloc::vec::Vec;
 use argon_primitives::{
+	providers::MiningFrameTransitionProviderWeightInfo,
 	treasury::{
 		BitcoinLockPosition, BitcoinLockPositionProvider, NetworkPositionQuantities,
-		PositionQuantities, PositionQuantity, TreasuryPositionProvider, UpstreamPosition,
+		PositionQuantities, PositionQuantity, StabilizerPoolRewardPayer,
+		StabilizerPoolRewardPayerWeightInfo, TreasuryPositionProvider, UpstreamPosition,
 	},
-	OperationalAccountProvider, TreasuryPoolProvider, VaultId,
+	MiningFrameTransitionProvider, OperationalAccountProvider, TreasuryPoolProvider, VaultId,
 };
 pub use pallet::*;
 use pallet_prelude::*;
 use polkadot_sdk::sp_runtime::ArithmeticError;
+use weights::{MiningFrameWeights, StabilizerPoolPayoutWeights};
 pub use weights::{ProviderWeightAdapter, WeightInfo};
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
+pub mod migrations;
 #[cfg(test)]
 mod mock;
 #[cfg(test)]
@@ -24,10 +31,13 @@ mod tests;
 mod try_state;
 pub mod weights;
 
+#[cfg(feature = "try-runtime")]
+const EXPECTED_AUTO_COLLECT_POSITIONS_PER_FRAME: u32 = 500;
+
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
-	pub(super) const STORAGE_VERSION: StorageVersion = StorageVersion::new(2);
+	pub(super) const STORAGE_VERSION: StorageVersion = StorageVersion::new(3);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -57,11 +67,15 @@ pub mod pallet {
 		type BitcoinPositionProvider: BitcoinLockPositionProvider<Self::AccountId, Self::Balance>;
 		/// Reads canonical upstream bond principal when initializing a registration snapshot.
 		type TreasuryPoolProvider: TreasuryPoolProvider<Self::AccountId, Balance = Self::Balance>;
+		/// Reports the frame boundary after MiningSlot initializes the block.
+		type MiningFrameTransitionProvider: MiningFrameTransitionProvider;
+		/// Issues ARGON backed by rewards that Treasury has already committed.
+		type StabilizerPoolRewardPayer: StabilizerPoolRewardPayer<Self::AccountId, Self::Balance>;
 		/// Costs of reading and maintaining account aggregates.
 		type WeightInfo: WeightInfo;
 	}
 
-	/// Account-wide principal and quantities, with an optional subset in the upstream vault.
+	/// Account-wide positions and earnings, with an optional subset in the upstream vault.
 	#[derive(
 		Encode,
 		Decode,
@@ -76,7 +90,7 @@ pub mod pallet {
 	)]
 	pub struct Position<Balance>
 	where
-		Balance: codec::Codec + MaxEncodedLen,
+		Balance: Codec + MaxEncodedLen,
 	{
 		/// Live principal for certification/backing, including displaced flexible bonds.
 		#[codec(compact)]
@@ -86,9 +100,49 @@ pub mod pallet {
 		/// Participation in the single vault that onboarded this account. Absent when no upstream
 		/// vault is resolvable, including accounts whose upstream has yet to create a vault.
 		pub upstream: Option<UpstreamPosition<Balance>>,
+		/// Committed amounts available to collect, by source.
+		pub collect_accrued: CollectAmounts<Balance>,
+		/// Lifetime amounts delivered through collection, by source.
+		pub collected: CollectAmounts<Balance>,
 	}
-	/// Maintained source quantities keyed by the actual position owner. Upstream quantities belong
-	/// to the linked vault account; primary and mining account balances are separate owners.
+
+	/// Account collection amounts in ARGON microgons, by source.
+	#[derive(
+		Encode,
+		Decode,
+		DecodeWithMemTracking,
+		Clone,
+		Copy,
+		Debug,
+		Default,
+		PartialEq,
+		Eq,
+		TypeInfo,
+		MaxEncodedLen,
+	)]
+	pub struct CollectAmounts<Balance>
+	where
+		Balance: Codec + MaxEncodedLen,
+	{
+		/// Rewards earned on ARGON bonds.
+		#[codec(compact)]
+		pub bond_earnings: Balance,
+		/// Rewards earned on ARGONOT stakes.
+		#[codec(compact)]
+		pub stake_earnings: Balance,
+		/// Rewards earned on eligible Bitcoin liquidity.
+		#[codec(compact)]
+		pub bitcoin_earnings: Balance,
+		/// ARGON from Bitcoin mint grants.
+		#[codec(compact)]
+		pub bitcoin_mints: Balance,
+		/// Rewards earned for supplying eligible stabilizer pool liquidity.
+		#[codec(compact)]
+		pub stabilizer_pool_earnings: Balance,
+	}
+
+	/// Source quantities and earnings keyed by the position owner. Upstream quantities belong to
+	/// the linked vault account; primary and mining accounts have separate positions.
 	#[pallet::storage]
 	pub type PositionsByAccount<T: Config> =
 		StorageMap<_, Blake2_128Concat, T::AccountId, Position<T::Balance>, OptionQuery>;
@@ -101,6 +155,22 @@ pub mod pallet {
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+		fn on_initialize(_: BlockNumberFor<T>) -> Weight {
+			let frame_check = MiningFrameWeights::<T>::is_new_frame_started();
+			if T::MiningFrameTransitionProvider::is_new_frame_started().is_none() {
+				return frame_check;
+			}
+
+			let weight = frame_check.saturating_add(
+				StabilizerPoolPayoutWeights::<T>::has_outstanding_stabilizer_pool_rewards(),
+			);
+			if !T::StabilizerPoolRewardPayer::has_outstanding_stabilizer_pool_rewards() {
+				return weight;
+			}
+
+			weight.saturating_add(Self::auto_collect_stabilizer_pool_rewards())
+		}
+
 		#[cfg(feature = "try-runtime")]
 		fn try_state(_: BlockNumberFor<T>) -> Result<(), sp_runtime::TryRuntimeError> {
 			crate::try_state::check::<T>()
@@ -281,9 +351,83 @@ pub mod pallet {
 				Ok(())
 			})
 		}
+
+		fn credit_stabilizer_pool_rewards(
+			account: &T::AccountId,
+			amount: T::Balance,
+		) -> DispatchResult {
+			if amount.is_zero() {
+				return Ok(());
+			}
+			PositionsByAccount::<T>::try_mutate(account, |record| {
+				let position = record.get_or_insert_with(Position::default);
+				let accrued = &mut position.collect_accrued.stabilizer_pool_earnings;
+				*accrued = accrued.checked_add(&amount).ok_or(ArithmeticError::Overflow)?;
+				Ok(())
+			})
+		}
 	}
 
 	impl<T: Config> Pallet<T> {
+		/// Temporary frame payout until accounts can use manual Collect.
+		fn auto_collect_stabilizer_pool_rewards() -> Weight {
+			let db = T::DbWeight::get();
+			let read_position = T::WeightInfo::account_quantities().saturating_add(db.reads(1));
+			let pay_reward = StabilizerPoolPayoutWeights::<T>::pay_stabilizer_pool_rewards();
+			let mut weight = db.reads(1); // The final storage key lookup ends the walk.
+
+			// Finish reading the map before updating any of its records.
+			let positions_with_earnings: Vec<_> = PositionsByAccount::<T>::iter()
+				.filter(|(_, position)| {
+					weight.saturating_accrue(read_position);
+					!position.collect_accrued.stabilizer_pool_earnings.is_zero()
+				})
+				.collect();
+
+			for (account, position) in positions_with_earnings {
+				weight.saturating_accrue(pay_reward);
+				match Self::pay_stabilizer_pool_position(&account, position) {
+					Ok(_) => weight.saturating_accrue(db.writes(1)),
+					Err(error) => log::warn!(
+						"Stabilizer rewards remain uncollected for {account:?}: {error:?}"
+					),
+				}
+			}
+			weight
+		}
+
+		/// Collect the account's committed rewards. A failed payment leaves them available.
+		pub fn collect_stabilizer_pool_rewards(
+			account: &T::AccountId,
+		) -> Result<T::Balance, DispatchError> {
+			let Some(position) = PositionsByAccount::<T>::get(account) else {
+				return Ok(T::Balance::zero());
+			};
+			Self::pay_stabilizer_pool_position(account, position)
+		}
+
+		fn pay_stabilizer_pool_position(
+			account: &T::AccountId,
+			mut position: Position<T::Balance>,
+		) -> Result<T::Balance, DispatchError> {
+			let amount = position.collect_accrued.stabilizer_pool_earnings;
+			if amount.is_zero() {
+				return Ok(amount);
+			}
+
+			let collected = position
+				.collected
+				.stabilizer_pool_earnings
+				.checked_add(&amount)
+				.ok_or(ArithmeticError::Overflow)?;
+			T::StabilizerPoolRewardPayer::pay_stabilizer_pool_rewards(account, amount)?;
+
+			position.collect_accrued.stabilizer_pool_earnings = T::Balance::zero();
+			position.collected.stabilizer_pool_earnings = collected;
+			PositionsByAccount::<T>::insert(account, position);
+			Ok(amount)
+		}
+
 		/// An invite can predate its upstream's vault. Bind when that vault first gets a position.
 		/// Vault IDs are never reused, so there are no earlier contributions in this newly created
 		/// vault to scan. Only the actual linked vault account may own the upstream subset.

@@ -1,6 +1,52 @@
 use super::*;
-use crate::mock::*;
+use crate::{
+	migrations::{AddStabilizerPoolEarningsMigration, PositionV2},
+	mock::*,
+};
+use frame_support::{storage::unhashed, traits::OnRuntimeUpgrade};
 use polkadot_sdk::sp_io::TestExternalities;
+
+#[test]
+fn migrating_positions_preserves_principal_quantities_and_upstream() {
+	polkadot_sdk::sp_io::TestExternalities::default().execute_with(|| {
+		StorageVersion::new(2).put::<TreasuryPositions>();
+		let quantities = PositionQuantities { bonds: 12, stakes: 2, fission_liquidity: 50 };
+		let upstream = UpstreamPosition {
+			vault_id: 3,
+			bitcoin_securitization: 10,
+			bitcoin_allocated_securitization: 45,
+			bond_principal: 100,
+		};
+		let position_key = PositionsByAccount::<Test>::hashed_key_for(9);
+		unhashed::put(
+			&position_key,
+			&PositionV2 { bond_principal: 300u128, quantities, upstream: Some(upstream) },
+		);
+
+		AddStabilizerPoolEarningsMigration::<Test>::on_runtime_upgrade();
+		assert_eq!(StorageVersion::get::<TreasuryPositions>(), StorageVersion::new(3));
+		assert_eq!(
+			PositionsByAccount::<Test>::get(9),
+			Some(Position {
+				bond_principal: 300,
+				quantities,
+				upstream: Some(upstream),
+				collect_accrued: CollectAmounts::default(),
+				collected: CollectAmounts::default(),
+			})
+		);
+
+		assert_ok!(TreasuryPositions::credit_stabilizer_pool_rewards(&9, 7));
+		AddStabilizerPoolEarningsMigration::<Test>::on_runtime_upgrade();
+		assert_eq!(
+			PositionsByAccount::<Test>::get(9)
+				.unwrap()
+				.collect_accrued
+				.stabilizer_pool_earnings,
+			7
+		);
+	});
+}
 
 #[test]
 fn newly_created_upstream_binds_bitcoin_only_for_the_actual_position_owner() {

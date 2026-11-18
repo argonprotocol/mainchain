@@ -35,6 +35,11 @@ use core::marker::PhantomData;
 /// Weight functions for `pallet_treasury_positions`.
 pub struct WeightInfo<T>(PhantomData<T>);
 impl<T: frame_system::Config> pallet_treasury_positions::WeightInfo for WeightInfo<T> {
+	fn credit_stabilizer_pool_rewards() -> Weight {
+		// TODO: Generate stabilizer pool earnings weights before release.
+		Weight::zero()
+	}
+
 	/// Storage: `TreasuryPositions::PositionsByAccount` (r:1 w:0)
 	/// Proof: `TreasuryPositions::PositionsByAccount` (`max_values`: None, `max_size`: Some(165), added: 2640, mode: `MaxEncodedLen`)
 	fn bond_principal() -> Weight {

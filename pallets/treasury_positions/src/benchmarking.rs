@@ -148,6 +148,27 @@ mod benchmarks {
 			(FULL_EARNINGS_AMOUNT * MICROGONS_PER_ARGON).into()
 		);
 	}
+
+	#[benchmark]
+	fn credit_stabilizer_pool_rewards() {
+		let account = account::<T::AccountId>("position", 0, 0);
+		let mut position = certified_position::<T>();
+		position.collect_accrued.stabilizer_pool_earnings = MICROGONS_PER_ARGON.into();
+		PositionsByAccount::<T>::insert(&account, position);
+
+		#[block]
+		{
+			Pallet::<T>::credit_stabilizer_pool_rewards(&account, MICROGONS_PER_ARGON.into())
+				.unwrap();
+		}
+		assert_eq!(
+			PositionsByAccount::<T>::get(&account)
+				.unwrap()
+				.collect_accrued
+				.stabilizer_pool_earnings,
+			(2 * MICROGONS_PER_ARGON).into(),
+		);
+	}
 }
 
 // Seed a populated account at certification levels; proof estimates still use MaxEncodedLen.
@@ -165,5 +186,6 @@ fn certified_position<T: Config>() -> Position<T::Balance> {
 			bitcoin_allocated_securitization: (CERTIFICATION_AMOUNT * MICROGONS_PER_ARGON).into(),
 			bond_principal: (CERTIFICATION_AMOUNT * MICROGONS_PER_ARGON).into(),
 		}),
+		..Default::default()
 	}
 }
