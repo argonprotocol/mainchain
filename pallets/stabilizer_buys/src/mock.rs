@@ -148,6 +148,7 @@ impl pallet_price_index::Config for Test {
 	type MaxDowntimeTicksBeforeReset = polkadot_sdk::sp_runtime::traits::ConstU64<60>;
 	type MaxPriceAgeInTicks = polkadot_sdk::sp_runtime::traits::ConstU64<1440>;
 	type TickProvider = CurrentTick;
+	type TicksPerFrame = ConstU64<1440>;
 	type CurrentFrameId = Frame;
 	type MiningFrameTransitionProvider = Frame;
 	type MaxArgonotFloorHistoryFrames = ConstU32<10>;

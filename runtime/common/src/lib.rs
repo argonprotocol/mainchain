@@ -11,7 +11,6 @@ mod call_filters;
 pub mod config;
 mod deal_with_fees;
 mod fee_control;
-pub mod migrations;
 #[cfg(feature = "try-runtime")]
 pub mod try_state;
 
@@ -115,7 +114,6 @@ macro_rules! inject_runtime_vars {
 		use pallet_fee_control::CheckFeeWrapper;
 		use pallet_transaction_payment::ChargeTransactionPayment;
 		use sp_runtime::transaction_validity::TransactionValidityError;
-		use $crate::migrations::CosignerGuaranteesMigration;
 
 		// To learn more about runtime versioning, see:
 		// https://docs.substrate.io/main-docs/build/upgrade#runtime-versioning
@@ -129,7 +127,7 @@ macro_rules! inject_runtime_vars {
 			// `spec_name`,   `spec_version`, and `authoring_version` are the same between Wasm and
 			// native. This value is set to 100 to notify Polkadot-JS App (https://polkadot.js.org/apps) to use
 			//   the compatible custom types.
-			spec_version: 161,
+			spec_version: 162,
 			impl_version: 10,
 			apis: RUNTIME_API_VERSIONS,
 			transaction_version: 6,
@@ -170,10 +168,7 @@ macro_rules! inject_runtime_vars {
 		///
 		/// This can be a tuple of types, each implementing `OnRuntimeUpgrade`.
 		type Migrations = (
-			CosignerGuaranteesMigration<Runtime>,
-			$crate::migrations::AddVaultSecuritizedSatoshis<Runtime>,
-			pallet_crosschain_transfer::migrations::MigrateToV5<Runtime>,
-			pallet_ethereum_verifier::migrations::AddGloasForkMigration<Runtime>,
+			pallet_treasury::migrations::VirtualizeMarketingReserveMigration<Runtime>,
 		);
 
 		/// Unchecked extrinsic type as expected by this runtime.

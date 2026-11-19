@@ -1019,7 +1019,9 @@ impl UniswapPurchaseProviderWeightInfo for () {
 pub trait PriceProviderWeightInfo {
 	/// Current BTC, target ARGON and redemption R-value lookups used by a redemption quote.
 	fn get_redemption_prices() -> Weight;
+	fn get_average_cpi_for_ticks() -> Weight;
 	fn get_lowest_microgons_per_argonot() -> Weight;
+	/// Includes a repeated lookup of the same history entry during a frame transition.
 	fn get_average_microgons_per_argonot() -> Weight;
 	fn get_ethereum_prices() -> Weight;
 	fn get_liquidity_change_needed() -> Weight;
@@ -1027,6 +1029,10 @@ pub trait PriceProviderWeightInfo {
 
 impl PriceProviderWeightInfo for () {
 	fn get_redemption_prices() -> Weight {
+		Weight::zero()
+	}
+
+	fn get_average_cpi_for_ticks() -> Weight {
 		Weight::zero()
 	}
 	fn get_lowest_microgons_per_argonot() -> Weight {
@@ -1135,7 +1141,7 @@ pub trait PriceProvider<
 	/// The argon CPI is the US CPI deconstructed by the Argon market price in Dollars.
 	fn get_argon_cpi() -> Option<ArgonCPI>;
 
-	/// The average argon CPI over a tick range (NOTE: ticks are grouped in increments of 60)
+	/// Report-weighted Argon CPI over complete buckets in the requested tick range.
 	fn get_average_cpi_for_ticks(tick_range: (Tick, Tick)) -> ArgonCPI;
 
 	fn get_circulation() -> Balance;

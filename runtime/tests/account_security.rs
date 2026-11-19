@@ -457,8 +457,8 @@ fn detached_proofs_use_the_real_native_signing_payload_and_bind_the_genesis_hash
 		assert_eq!(
 			sp_core::hashing::blake2_256(&vector),
 			[
-				191, 16, 150, 58, 107, 87, 121, 167, 171, 44, 150, 150, 81, 171, 225, 189, 101,
-				167, 18, 45, 17, 36, 63, 217, 164, 124, 155, 173, 20, 155, 201, 52,
+				162, 192, 244, 137, 8, 236, 8, 206, 56, 146, 157, 169, 118, 92, 203, 27, 200, 219,
+				92, 152, 240, 23, 68, 169, 235, 249, 24, 55, 95, 246, 179, 16,
 			]
 		);
 		let nonce = NextNonce::<Runtime>::get(account(1));
