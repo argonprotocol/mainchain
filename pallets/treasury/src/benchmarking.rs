@@ -181,7 +181,7 @@ mod benchmarks {
 	#[benchmark]
 	fn upstream_participation() -> Result<(), BenchmarkError> {
 		reset_benchmark_state();
-		seed_accepted_vault_state::<T>(1, 0, minimum_purchase_bonds::<T>(), 100_000, 1)?;
+		// Nominal targets apply even without upstream admission capacity state.
 		let operator = benchmark_operator::<T>(1);
 		T::PositionProvider::set_upstream_position(
 			&operator,
@@ -411,6 +411,7 @@ mod benchmarks {
 
 	#[benchmark]
 	fn configure_reward_economics() -> Result<(), BenchmarkError> {
+		ArgonotParticipationFactor::<T>::put(Percent::zero());
 		TargetBitcoinPercent::<T>::put(Percent::from_percent(15));
 		UpstreamParticipationFactor::<T>::put(Percent::from_percent(100));
 		TargetStabilizerPoolPercent::<T>::put(Percent::from_percent(5));
@@ -424,11 +425,13 @@ mod benchmarks {
 			Some(target_bitcoin_percent),
 			Some(upstream_participation_factor),
 			Some(target_stabilizer_pool_percent),
+			Some(Percent::from_percent(20)),
 		);
 
 		assert_eq!(TargetBitcoinPercent::<T>::get(), target_bitcoin_percent);
 		assert_eq!(UpstreamParticipationFactor::<T>::get(), upstream_participation_factor);
 		assert_eq!(TargetStabilizerPoolPercent::<T>::get(), target_stabilizer_pool_percent);
+		assert_eq!(ArgonotParticipationFactor::<T>::get(), Percent::from_percent(20));
 		Ok(())
 	}
 
@@ -1032,6 +1035,7 @@ where
 	T::AccountId: Ord,
 	T::Currency: Mutate<T::AccountId, Balance = T::Balance>,
 {
+	ArgonotParticipationFactor::<T>::put(Percent::from_percent(20));
 	let lot_bonds = minimum_purchase_bonds::<T>();
 	let security_bonds = scaled_bonds(lot_bonds, BENCHMARK_VAULT_BOND_LOTS.saturating_mul(2));
 
@@ -1094,6 +1098,7 @@ where
 	T::Currency: Mutate<T::AccountId, Balance = T::Balance>,
 	T::OwnershipCurrency: Mutate<T::AccountId, Balance = T::Balance>,
 {
+	ArgonotParticipationFactor::<T>::put(Percent::from_percent(20));
 	let lot_bonds = minimum_purchase_bonds::<T>();
 	let security_bonds = scaled_bonds(lot_bonds, BENCHMARK_VAULT_BOND_LOTS.saturating_mul(2));
 	let payout_frame = frame_id.saturating_sub(1);
@@ -1246,15 +1251,10 @@ where
 		);
 	}
 
-	// Distinct upstreams exercise separate Treasury capacity reads for every operator.
-	// Their smaller securitization keeps them below the participating vaults in the ranking.
+	// Reservation-only upstream records are outside the payout set but remain in the frame scan.
 	let upstream_bonds = Pallet::<T>::balance_to_bonds(T::UpstreamBondTarget::get());
 	for vault_index in 0..vault_count {
 		let upstream_vault_id = 100_000 + vault_index;
-		benchmark_vault_state.vaults.insert(
-			upstream_vault_id,
-			benchmark_vault::<T>(account("upstream-operator", vault_index, 0), upstream_bonds),
-		);
 		BondLotsByVault::<T>::insert(
 			upstream_vault_id,
 			VaultBondState { reserved_bond_space: upstream_bonds / 2, ..Default::default() },

@@ -152,8 +152,10 @@ pub mod pallet {
 		#[pallet::constant]
 		type StabilizerPoolRewardHistoryFrames: Get<u32>;
 		type OperationalAccountProvider: OperationalAccountProvider<Self::AccountId>;
+		/// Funded upstream Bitcoin securitization, in microgons, required for full Bitcoin credit.
 		#[pallet::constant]
 		type UpstreamBitcoinTarget: Get<Self::Balance>;
+		/// Upstream bond principal, in microgons, required for full bond credit.
 		#[pallet::constant]
 		type UpstreamBondTarget: Get<Self::Balance>;
 		#[pallet::constant]
@@ -230,7 +232,7 @@ pub mod pallet {
 		type VaultBitcoinRewardPercent: Get<Permill>;
 
 		/// Maximum rewarded Argonot value as a multiple of the vault's Argon securitization.
-		/// Zero disables Argonot backing requirements and bonuses.
+		/// The reward weight is configured separately by `ArgonotParticipationFactor`.
 		#[pallet::constant]
 		type ArgonotSecuritizationMultiplier: Get<u32>;
 
@@ -277,6 +279,11 @@ pub mod pallet {
 	#[pallet::storage]
 	pub type CurrentFrameVaultBitcoin<T: Config> =
 		StorageValue<_, FrameVaultBitcoin<T>, OptionQuery>;
+
+	/// Argonot reward weight frozen with the current frame's capital.
+	#[pallet::storage]
+	pub type CurrentFrameArgonotParticipation<T: Config> =
+		StorageValue<_, FrameArgonotParticipation, OptionQuery>;
 
 	/// The Argonot bond participants locked for the current frame.
 	///
@@ -368,6 +375,11 @@ pub mod pallet {
 	#[pallet::storage]
 	pub type UpstreamParticipationFactor<T: Config> =
 		StorageValue<_, Percent, ValueQuery, DefaultUpstreamParticipationFactor>;
+
+	/// Share of variable vault earnings controlled by Argonot backing, applied next frame.
+	/// Zero disables the requirement; 100% requires full backing for variable earnings.
+	#[pallet::storage]
+	pub type ArgonotParticipationFactor<T: Config> = StorageValue<_, Percent, ValueQuery>;
 
 	/// The next bond lot id.
 	#[pallet::storage]
@@ -512,6 +524,8 @@ pub mod pallet {
 			upstream_participation_factor: Percent,
 			/// Circulating ARGON fraction used as the stabilizer pool reward reference.
 			target_stabilizer_pool_percent: Percent,
+			/// Share of variable vault earnings requiring full Argonot backing.
+			argonot_participation_factor: Percent,
 		},
 		RewardTaperingPolicyConfigured {
 			policy: Box<TaperingPolicy>,
@@ -1071,6 +1085,7 @@ pub mod pallet {
 			target_bitcoin_percent: Option<Percent>,
 			upstream_participation_factor: Option<Percent>,
 			target_stabilizer_pool_percent: Option<Percent>,
+			argonot_participation_factor: Option<Percent>,
 		) -> DispatchResult {
 			ensure_root(origin)?;
 			let current_target_bitcoin_percent = TargetBitcoinPercent::<T>::get();
@@ -1088,6 +1103,11 @@ pub mod pallet {
 				TargetStabilizerPoolPercent::<T>::put(target_stabilizer_pool_percent);
 			}
 
+			let current_argonot_participation_factor = ArgonotParticipationFactor::<T>::get();
+			if let Some(argonot_participation_factor) = argonot_participation_factor {
+				ArgonotParticipationFactor::<T>::put(argonot_participation_factor);
+			}
+
 			Self::deposit_event(Event::RewardEconomicsConfigured {
 				target_bitcoin_percent: target_bitcoin_percent
 					.unwrap_or(current_target_bitcoin_percent),
@@ -1095,6 +1115,8 @@ pub mod pallet {
 					.unwrap_or(current_upstream_participation_factor),
 				target_stabilizer_pool_percent: target_stabilizer_pool_percent
 					.unwrap_or(current_target_stabilizer_pool_percent),
+				argonot_participation_factor: argonot_participation_factor
+					.unwrap_or(current_argonot_participation_factor),
 			});
 			Ok(())
 		}
@@ -1335,6 +1357,15 @@ pub mod pallet {
 				},
 				None => None,
 			};
+			let argonot_participation = match CurrentFrameArgonotParticipation::<T>::take() {
+				Some(participation) if participation.frame_id == frame_id => participation.factor,
+				Some(participation) => {
+					CurrentFrameArgonotParticipation::<T>::put(participation);
+					Percent::zero()
+				},
+				// Frames frozen before configurable participation had no Argonot requirement.
+				None => Percent::zero(),
+			};
 			let frame_tapering = match CurrentFrameRewardTaperingPolicy::<T>::take() {
 				Some(policy) if policy.frame_id == frame_id => Some(policy),
 				Some(policy) => {
@@ -1354,6 +1385,7 @@ pub mod pallet {
 							FixedI128::one().checked_div(&FixedI128::one().saturating_add(cpi))?;
 						Some(FixedU128::from_inner(ratio.into_inner().try_into().ok()?))
 					});
+
 			let mut reserves = RewardReserves::<T>::get();
 			let reserves_before = reserves.clone();
 			let marketing_allocation =
@@ -1389,6 +1421,7 @@ pub mod pallet {
 				frame_bitcoin.as_ref(),
 				policy,
 				argon_price_ratio,
+				argonot_participation,
 			);
 
 			let bitcoin_liquids_allocation =
@@ -1482,6 +1515,7 @@ pub mod pallet {
 				frame_id,
 				policy: RewardTaperingPolicy::<T>::get(),
 			});
+			let argonot_participation_factor = ArgonotParticipationFactor::<T>::get();
 			let max_vaults = T::MaxVaultsPerPool::get() as usize;
 			// Freeze the maintained network quantity. The vault walk below clears old frame terms
 			// and releases empty records; it does not rebuild account or network quantities.
@@ -1533,7 +1567,11 @@ pub mod pallet {
 					.unwrap_or_default()
 					.ceil()
 					.saturating_mul_int(1u128);
-				let reward_micronots = securitization_micronots.min(required_micronots.into());
+				let reward_micronots = if argonot_participation_factor.is_zero() {
+					T::Balance::zero()
+				} else {
+					securitization_micronots.min(required_micronots.into())
+				};
 				T::TreasuryVaultProvider::commit_securitization_for_rewards(
 					vault_id,
 					reward_micronots,
@@ -1576,6 +1614,10 @@ pub mod pallet {
 					),
 					_ => None,
 				};
+			CurrentFrameArgonotParticipation::<T>::put(FrameArgonotParticipation {
+				frame_id,
+				factor: argonot_participation_factor,
+			});
 			CurrentFrameVaultBitcoin::<T>::put(FrameVaultBitcoin {
 				frame_id,
 				total_network_securitized_satoshis: network_totals.vault_securitized_satoshis,
@@ -1641,9 +1683,8 @@ pub mod pallet {
 			proposed - excess + excess_reward_payout_percent.mul_floor(excess)
 		}
 
-		/// Score upstream participation against fixed runtime requirements, limited by the
-		/// upstream vault's admission capacity. Temporary network-wide bond-lot limits are
-		/// excluded.
+		/// Return the reward multiplier for funded participation against nominal runtime targets.
+		/// Admission capacity and vault availability do not reduce either asset's requirement.
 		pub fn upstream_participation(operator: &T::AccountId) -> FixedU128 {
 			// Accounts without an upstream vault have no participation requirement.
 			let Some((account, upstream_vault_id)) =
@@ -1652,44 +1693,14 @@ pub mod pallet {
 				return FixedU128::one();
 			};
 
-			// Closed or inactive upstream vaults cannot accept additional participation.
-			let Some(capacity) =
-				T::TreasuryVaultProvider::get_participation_capacity(upstream_vault_id)
-			else {
-				return FixedU128::one();
-			};
-
 			let position = T::PositionProvider::upstream_position(&account)
 				.filter(|p| p.vault_id == upstream_vault_id)
 				.unwrap_or_default();
 
-			// Public Bitcoin admission includes replaceable flexible collateral. Own unfunded
-			// allocations stay in the requirement until they are funded.
-			let bitcoin_capacity = position
-				.bitcoin_allocated_securitization
-				.saturating_add(capacity.available_securitization_space);
-			let required_bitcoin_securitization =
-				T::UpstreamBitcoinTarget::get().min(bitcoin_capacity);
+			let required_bitcoin_securitization = T::UpstreamBitcoinTarget::get();
+			let required_bond_principal = T::UpstreamBondTarget::get();
 
-			// Regular bond purchases can displace flexible bonds. Use the same admission rule:
-			// subtract regular bonds and reserved space, leaving flexible space available.
-			let regular_bond_capacity = Self::balance_to_bonds(capacity.regular_bond_capacity);
-			let vault_bonds = BondLotsByVault::<T>::get(upstream_vault_id);
-			// Intentionally exclude MaxArgonBondLots: it bounds the direct frame payout walk.
-			// Hitting that temporary cap can block purchases without lowering this requirement.
-			// Indexed Collect is intended to remove the cap along with the payout walk.
-			let available_bonds = vault_bonds.available_bond_space(regular_bond_capacity);
-			// A remainder below the purchase minimum cannot be captured. Existing principal
-			// still counts, even if it is smaller than the minimum for a new purchase.
-			let available_bond_principal = if available_bonds >= Self::minimum_purchase_bonds() {
-				Self::bonds_to_balance(available_bonds)
-			} else {
-				T::Balance::zero()
-			};
-			let bond_capacity = position.bond_principal.saturating_add(available_bond_principal);
-			let required_bond_principal = T::UpstreamBondTarget::get().min(bond_capacity);
-
-			// An exhausted opportunity (or a disabled requirement) receives full credit.
+			// Only a zero target grants automatic credit; excess cannot cover the other asset.
 			let bitcoin_score = if required_bitcoin_securitization.is_zero() {
 				FixedU128::one()
 			} else {
@@ -2003,6 +2014,7 @@ pub mod pallet {
 			frame_bitcoin: Option<&FrameVaultBitcoin<T>>,
 			policy: Option<&TaperingPolicy>,
 			argon_price_ratio: Option<FixedU128>,
+			argonot_participation_factor: Percent,
 		) -> (T::Balance, u32) {
 			let Some(frame_capital) = frame_capital else {
 				return (T::Balance::zero(), 0);
@@ -2039,18 +2051,8 @@ pub mod pallet {
 			let bond_rate = variable_rate.saturating_sub(bitcoin_rate);
 
 			let argonot_multiplier = T::ArgonotSecuritizationMultiplier::get();
-			let argonot_bonus_rate = if argonot_multiplier == 0 {
-				FixedU128::zero()
-			} else {
-				FixedU128::from_rational(29, 100)
-			};
-			// Preserve the optional Argonot uplift without letting it exceed the vault pool cap.
-			let maximum_backing_factor = FixedU128::one()
-				.saturating_add(FixedU128::from_u32(argonot_multiplier))
-				.saturating_mul(FixedU128::one().saturating_add(argonot_bonus_rate));
-			let bitcoin_rate =
-				bitcoin_rate.checked_div(&maximum_backing_factor).unwrap_or_default();
-			let bond_rate = bond_rate.checked_div(&maximum_backing_factor).unwrap_or_default();
+			let argonot_weight =
+				FixedU128::from_rational(argonot_participation_factor.deconstruct() as u128, 100);
 
 			let tapering = policy.map(|policy| {
 				let program = &policy.vault_revenue;
@@ -2110,19 +2112,21 @@ pub mod pallet {
 				);
 
 				let argonot_capacity = securitization.saturating_mul(argonot_multiplier.into());
-				let argonot_value: u128 = position.argonot_securitization_in_microgons.into();
-				let argonot_value = argonot_value.min(argonot_capacity);
-				let backing_factor = FixedU128::from_rational(
-					securitization.saturating_add(argonot_value),
-					securitization,
-				);
+				// Disabled participation commits no Argonots, so they cannot raise taper capital.
+				let argonot_value = if argonot_participation_factor.is_zero() {
+					0
+				} else {
+					let value: u128 = position.argonot_securitization_in_microgons.into();
+					value.min(argonot_capacity)
+				};
 				let argonot_utilization = if argonot_capacity == 0 {
-					FixedU128::zero()
+					FixedU128::one()
 				} else {
 					FixedU128::from_rational(argonot_value, argonot_capacity)
 				};
-				let argonot_bonus = FixedU128::one()
-					.saturating_add(argonot_bonus_rate.saturating_mul(argonot_utilization));
+				let argonot_participation = FixedU128::one()
+					.saturating_sub(argonot_weight)
+					.saturating_add(argonot_weight.saturating_mul(argonot_utilization));
 
 				let bitcoin_earnings_rate = bitcoin_share
 					.saturating_mul(bitcoin_rate)
@@ -2130,8 +2134,7 @@ pub mod pallet {
 				let bond_earnings_rate = bond_share.saturating_mul(bond_rate);
 				let variable_earnings_rate = bitcoin_earnings_rate
 					.saturating_add(bond_earnings_rate)
-					.saturating_mul(backing_factor)
-					.saturating_mul(argonot_bonus)
+					.saturating_mul(argonot_participation)
 					.saturating_mul(position.upstream_participation);
 				let earnings_rate = securitization_share
 					.saturating_mul(securitization_rate)
@@ -2174,7 +2177,8 @@ pub mod pallet {
 			let maximum_profit_rate =
 				FixedU128::from_rational(T::PercentForVaultPool::get().deconstruct() as u128, 100);
 
-			let argonot_securitization_multiplier = T::ArgonotSecuritizationMultiplier::get();
+			// Runtime 160 froze these frames while Argonot backing was disabled.
+			let argonot_securitization_multiplier = 0u32;
 			let argonot_bonus_rate = if argonot_securitization_multiplier == 0 {
 				FixedU128::zero()
 			} else {
@@ -2844,8 +2848,6 @@ pub mod pallet {
 			let due_frames = frame_id.saturating_sub(first_due_frame).saturating_add(1);
 			let price_weight = <T::PriceProvider as PriceProvider<T::Balance>>::Weights::
 				get_average_microgons_per_argonot();
-			// Include the network coverage read and the Bitcoin snapshot's read and write.
-			let bitcoin_snapshot_weight = T::DbWeight::get().reads_writes(4, 2);
 
 			T::WeightInfo::on_frame_transition(
 				TotalArgonBondLots::<T>::get(),
@@ -2863,7 +2865,6 @@ pub mod pallet {
 			// the benchmark price provider supplies circulation without a storage read.
 			.saturating_add(T::DbWeight::get().reads(1))
 			.saturating_add(<T::PriceProvider as PriceProvider<T::Balance>>::Weights::get_average_cpi_for_ticks())
-			.saturating_add(bitcoin_snapshot_weight)
 			.saturating_add(
 				<T::TreasuryVaultProvider as TreasuryVaultProvider>::Weights::
 					get_top_vaults_by_securitization(T::MaxVaultsPerPool::get()),
@@ -3568,6 +3569,16 @@ pub mod pallet {
 		/// Network securitization target converted at the frozen market price.
 		pub target_securitized_satoshis: Option<u128>,
 		pub vault_securitized_satoshis: BoundedBTreeMap<VaultId, Satoshis, T::MaxVaultsPerPool>,
+	}
+
+	/// The Argonot participation weight used for commitments and payout of one frame.
+	#[derive(Encode, Decode, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
+	pub struct FrameArgonotParticipation {
+		/// The frame whose commitments and payout use this participation factor.
+		#[codec(compact)]
+		pub frame_id: FrameId,
+		/// Share of variable vault earnings requiring full Argonot backing.
+		pub factor: Percent,
 	}
 
 	/// The Argonot bond participants locked for one frame.

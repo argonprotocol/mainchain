@@ -197,7 +197,7 @@ parameter_types! {
 	pub const PercentForVaultPool: Percent = Percent::from_percent(51);
 	pub const MinimumVaultProfitPercent: Percent = Percent::from_percent(5);
 	pub const VaultBitcoinRewardPercent: Permill = Permill::from_parts(428_350);
-	pub static ArgonotSecuritizationMultiplier: u32 = 0;
+	pub static ArgonotSecuritizationMultiplier: u32 = 2;
 	pub const DefaultTargetBitcoinPercent: Percent = Percent::from_percent(15);
 	pub const DefaultTargetStabilizerPoolPercent: Percent = Percent::from_percent(5);
 	pub static MaxArgonotBondedPercentOfCirculation: Percent = Percent::from_percent(60);
@@ -540,13 +540,15 @@ impl pallet_treasury::Config for Test {
 pub(crate) fn new_test_ext() -> TestState {
 	NewlyStartedFrameId::set(None);
 	CirculatingArgon::set(0);
-	ArgonotSecuritizationMultiplier::set(0);
+	ArgonotSecuritizationMultiplier::set(2);
 	VaultsById::set(HashMap::new());
 	LastVaultProfits::set(vec![]);
 	ArgonPriceInUsd::set(FixedU128::one());
 	ArgonotPriceInUsd::set(FixedU128::one());
 	AverageArgonotPriceInMicrogons::set(MICROGONS_PER_ARGON);
 	AverageArgonCpi::set(ArgonCPI::zero());
+	UpstreamBitcoinTarget::set(5_000 * MICROGONS_PER_ARGON);
+	UpstreamBondTarget::set(5_000 * MICROGONS_PER_ARGON);
 	Upstreams::set(BTreeMap::new());
 	AvailableSecuritizationSpace::set(BTreeMap::new());
 	VaultSecuritizedSatoshis::set(HashMap::new());
@@ -577,8 +579,8 @@ impl pallet_treasury_positions::Config for Test {
 parameter_types! {
 	pub static Upstreams: BTreeMap<TestAccountId, (TestAccountId, VaultId)> = BTreeMap::new();
 	pub static AvailableSecuritizationSpace: BTreeMap<VaultId, Balance> = BTreeMap::new();
-	pub const UpstreamBitcoinTarget: Balance = 5_000 * MICROGONS_PER_ARGON;
-	pub const UpstreamBondTarget: Balance = 5_000 * MICROGONS_PER_ARGON;
+	pub static UpstreamBitcoinTarget: Balance = 5_000 * MICROGONS_PER_ARGON;
+	pub static UpstreamBondTarget: Balance = 5_000 * MICROGONS_PER_ARGON;
 	pub const UpstreamBitcoinWeight: Permill = Permill::from_percent(50);
 }
 pub struct MockUpstreamAccounts;

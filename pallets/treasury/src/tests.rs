@@ -1,8 +1,9 @@
 use super::{
 	ArgonotBondLots, BondLot, BondLotById, BondLotIdsByAccount, BondLotIdsByVault, BondLotSummary,
 	BondLotsByVault, BondProgram, BondProgramId, BondReleaseReason,
-	CurrentFrameArgonotBondParticipants, CurrentFrameVaultBitcoin, CurrentFrameVaultCapital, Event,
-	HoldReason, PendingBondReleaseRetryCursor, PendingBondReleasesByFrame, RewardReserves,
+	CurrentFrameArgonotBondParticipants, CurrentFrameArgonotParticipation,
+	CurrentFrameVaultBitcoin, CurrentFrameVaultCapital, Event, HoldReason,
+	PendingBondReleaseRetryCursor, PendingBondReleasesByFrame, RewardReserves,
 	RewardTaperingPolicy, StabilizerPoolRewardFrame, StabilizerPoolRewardFrames, TaperingPolicy,
 	TotalArgonBondLots,
 };
@@ -22,8 +23,8 @@ use crate::{
 		VaultSecuritizedSatoshis, VaultsById,
 	},
 	pallet::{
-		BondLotEarningsMetrics, Bonds, Error, FrameVaultCapital, TargetBitcoinPercent,
-		TargetStabilizerPoolPercent, UpstreamParticipationFactor,
+		ArgonotParticipationFactor, BondLotEarningsMetrics, Bonds, Error, FrameVaultCapital,
+		TargetBitcoinPercent, TargetStabilizerPoolPercent, UpstreamParticipationFactor,
 	},
 	BondCollateralSettlementQueue, PendingBondCollateralByAccount,
 };
@@ -222,13 +223,17 @@ fn root_configures_reward_economics_without_resetting_omitted_values() {
 				Some(Percent::from_percent(20)),
 				Some(Percent::from_percent(5)),
 				Some(Percent::from_percent(10)),
+				None,
 			),
 			DispatchError::BadOrigin,
 		);
 
+		assert_eq!(ArgonotParticipationFactor::<Test>::get(), Percent::zero());
+
 		assert_ok!(Treasury::configure_reward_economics(
 			RuntimeOrigin::root(),
 			Some(Percent::from_percent(20)),
+			None,
 			None,
 			None,
 		));
@@ -239,21 +244,45 @@ fn root_configures_reward_economics_without_resetting_omitted_values() {
 			None,
 			Some(Percent::from_percent(50)),
 			None,
+			None,
 		));
 		assert_ok!(Treasury::configure_reward_economics(
 			RuntimeOrigin::root(),
 			None,
 			None,
 			Some(Percent::from_percent(10)),
+			None,
 		));
-		assert_ok!(Treasury::configure_reward_economics(RuntimeOrigin::root(), None, None, None));
+		assert_ok!(Treasury::configure_reward_economics(
+			RuntimeOrigin::root(),
+			None,
+			None,
+			None,
+			None
+		));
 		assert_eq!(TargetBitcoinPercent::<Test>::get(), Percent::from_percent(20));
 		assert_eq!(UpstreamParticipationFactor::<Test>::get(), Percent::from_percent(50));
 		assert_eq!(TargetStabilizerPoolPercent::<Test>::get(), Percent::from_percent(10));
+		assert_ok!(Treasury::configure_reward_economics(
+			RuntimeOrigin::root(),
+			None,
+			None,
+			None,
+			Some(Percent::from_percent(20)),
+		));
+		assert_ok!(Treasury::configure_reward_economics(
+			RuntimeOrigin::root(),
+			None,
+			None,
+			None,
+			None,
+		));
+		assert_eq!(ArgonotParticipationFactor::<Test>::get(), Percent::from_percent(20));
 		System::assert_last_event(RuntimeEvent::Treasury(Event::RewardEconomicsConfigured {
 			target_bitcoin_percent: Percent::from_percent(20),
 			upstream_participation_factor: Percent::from_percent(50),
 			target_stabilizer_pool_percent: Percent::from_percent(10),
+			argonot_participation_factor: Percent::from_percent(20),
 		}));
 
 		assert_ok!(Treasury::configure_reward_economics(
@@ -261,11 +290,28 @@ fn root_configures_reward_economics_without_resetting_omitted_values() {
 			None,
 			None,
 			Some(Percent::zero()),
+			None,
 		));
-		assert_ok!(Treasury::configure_reward_economics(RuntimeOrigin::root(), None, None, None));
+		assert_ok!(Treasury::configure_reward_economics(
+			RuntimeOrigin::root(),
+			None,
+			None,
+			None,
+			None
+		));
 		assert_eq!(TargetStabilizerPoolPercent::<Test>::get(), Percent::zero());
 		assert_eq!(TargetBitcoinPercent::<Test>::get(), Percent::from_percent(20));
 		assert_eq!(UpstreamParticipationFactor::<Test>::get(), Percent::from_percent(50));
+		assert_eq!(ArgonotParticipationFactor::<Test>::get(), Percent::from_percent(20));
+		assert_ok!(Treasury::configure_reward_economics(
+			RuntimeOrigin::root(),
+			None,
+			None,
+			None,
+			Some(Percent::zero()),
+		));
+		assert_eq!(ArgonotParticipationFactor::<Test>::get(), Percent::zero());
+		assert_eq!(TargetStabilizerPoolPercent::<Test>::get(), Percent::zero());
 	});
 }
 
@@ -598,14 +644,16 @@ fn flexible_bonds_yield_their_vault_admission_capacity() {
 
 		assert_ok!(Treasury::buy_bonds(origin(10), 1, 10, None));
 		let operator_lot_id = account_bond_lot_ids(10)[0];
-		// Regular bonds exhaust the upstream opportunity for this account.
-		assert_eq!(Treasury::upstream_participation(&account(2)), FixedU128::one());
+		// Exhausted space and flexible displacement do not reduce the nominal targets.
+		assert_eq!(Treasury::upstream_participation(&account(2)), FixedU128::zero());
 		assert_ok!(Treasury::set_bond_lot_flexible(origin(10), operator_lot_id, true));
-		// Flexible bonds can be displaced, so participation is now possible and required.
-		assert_eq!(Treasury::upstream_participation(&account(2)), FixedU128::from_rational(1, 2));
+		assert_eq!(Treasury::upstream_participation(&account(2)), FixedU128::zero());
 		assert_ok!(Treasury::buy_bonds(origin(2), 1, 10, None));
 
-		assert_eq!(Treasury::upstream_participation(&account(2)), FixedU128::one());
+		assert_eq!(
+			Treasury::upstream_participation(&account(2)),
+			FixedU128::from_rational(1, 1_000)
+		);
 		let vault_bonds = BondLotsByVault::<Test>::get(1);
 		assert_eq!(vault_bonds.flexible_bonds, 10);
 		assert_eq!(vault_bonds.regular_bonds, 10);
@@ -636,18 +684,17 @@ fn reservation_uses_capacity_yielded_by_flexible_bonds() {
 
 		assert_ok!(Treasury::buy_bonds(origin(10), 1, 10, None));
 		let operator_lot_id = account_bond_lot_ids(10)[0];
-		// Regular bonds exhaust the upstream opportunity for this account.
-		assert_eq!(Treasury::upstream_participation(&account(2)), FixedU128::one());
+		// Admission changes do not grant participation credit.
+		assert_eq!(Treasury::upstream_participation(&account(2)), FixedU128::zero());
 		assert_ok!(Treasury::set_bond_lot_flexible(origin(10), operator_lot_id, true));
-		// Flexible bonds can be displaced, so participation is now possible and required.
-		assert_eq!(Treasury::upstream_participation(&account(2)), FixedU128::from_rational(1, 2));
+		assert_eq!(Treasury::upstream_participation(&account(2)), FixedU128::zero());
 		assert_noop!(
 			Treasury::set_reserved_bond_space(origin(10), 1, 11),
 			Error::<Test>::InsufficientBondSpace
 		);
 		assert_ok!(Treasury::set_reserved_bond_space(origin(10), 1, 10));
 		// Reserved space cannot be purchased without the upstream's approval.
-		assert_eq!(Treasury::upstream_participation(&account(2)), FixedU128::one());
+		assert_eq!(Treasury::upstream_participation(&account(2)), FixedU128::zero());
 
 		assert_ok!(Treasury::buy_bonds(
 			origin(2),
@@ -655,7 +702,10 @@ fn reservation_uses_capacity_yielded_by_flexible_bonds() {
 			10,
 			Some(bonus_approval(1, 2, Permill::zero(), 1, 10, System::block_number(),)),
 		));
-		assert_eq!(Treasury::upstream_participation(&account(2)), FixedU128::one());
+		assert_eq!(
+			Treasury::upstream_participation(&account(2)),
+			FixedU128::from_rational(1, 1_000)
+		);
 		let vault_bonds = BondLotsByVault::<Test>::get(1);
 		assert_eq!(vault_bonds.flexible_bonds, 10);
 		assert_eq!(vault_bonds.regular_bonds, 10);
@@ -1548,22 +1598,24 @@ fn bid_pool_reserves_fund_purchase_rewards_at_maturity() {
 		let pool = PurchasePool::get();
 		pallet_stabilizer_buys::ApprovedPool::<Test>::put(&pool);
 		assert_ok!(Balances::mint_into(&owner, 100 * MICROGONS_PER_ARGON));
-		assert_ok!(with_storage_layer(|| StabilizerBuys::record_transferred_purchase(
-			&owner,
-			&pallet_stabilizer_buys::UniswapPurchase {
-				gateway_activity_nonce: 1,
-				repay_liquid_id: None,
-				chain_id: pool.chain_id,
-				pool_manager: pool.pool_manager,
-				pool_id: pool.pool_id,
-				usdc_token: pool.usdc_token,
-				usdc_spent: U256::from(90_000_000u64),
-				principal: 100 * MICROGONS_PER_ARGON,
-				sqrt_price_before_x96: U256::one() << 76,
-				sqrt_price_after_x96: U256::one() << 77,
-				tick: 1,
-			}
-		)));
+		assert_ok!(with_storage_layer(|| {
+			StabilizerBuys::record_transferred_purchase(
+				&owner,
+				&pallet_stabilizer_buys::UniswapPurchase {
+					gateway_activity_nonce: 1,
+					repay_liquid_id: None,
+					chain_id: pool.chain_id,
+					pool_manager: pool.pool_manager,
+					pool_id: pool.pool_id,
+					usdc_token: pool.usdc_token,
+					usdc_spent: U256::from(90_000_000u64),
+					principal: 100 * MICROGONS_PER_ARGON,
+					sqrt_price_before_x96: U256::one() << 76,
+					sqrt_price_after_x96: U256::one() << 77,
+					tick: 1,
+				},
+			)
+		}));
 		CurrentFrameId::set(2);
 		StabilizerBuys::on_frame_start(2);
 		assert_eq!(Treasury::available_budget(), 68 * MICROGONS_PER_ARGON);
@@ -1737,7 +1789,13 @@ fn vault_calculator_keeps_idle_payout_at_the_securitization_tier() {
 		[0, 10 * MICROGONS_PER_ARGON, 20 * MICROGONS_PER_ARGON, 100 * MICROGONS_PER_ARGON]
 	{
 		new_test_ext().execute_with(|| {
-			ArgonotSecuritizationMultiplier::set(2);
+			assert_ok!(Treasury::configure_reward_economics(
+				RuntimeOrigin::root(),
+				None,
+				None,
+				None,
+				Some(Percent::from_percent(100)),
+			));
 			LastVaultProfits::set(vec![]);
 			VaultRewardCommittedMicronots::set(Default::default());
 			insert_vault(1, test_vault(10, (10 * MICROGONS_PER_ARGON) as u64));
@@ -1882,7 +1940,7 @@ fn zero_target_and_empty_variable_tiers_keep_the_securitization_reward() {
 }
 
 #[test]
-fn zero_argonot_target_removes_backing_requirements_without_reducing_the_vault_pool() {
+fn zero_argonot_weight_removes_backing_requirements_without_reducing_the_vault_pool() {
 	for (activated, satoshis, bonds, expected_earnings) in [
 		(0, 0, 0, 5_000_000),
 		(0, 0, 10, 8_165_000),
@@ -1893,7 +1951,7 @@ fn zero_argonot_target_removes_backing_requirements_without_reducing_the_vault_p
 			[(0, 0), (20 * MICROGONS_PER_ARGON, MICROGONS_PER_ARGON)]
 		{
 			new_test_ext().execute_with(|| {
-				ArgonotSecuritizationMultiplier::set(0);
+				assert_eq!(ArgonotParticipationFactor::<Test>::get(), Percent::zero());
 				MinimumArgonsPerContributor::set(1);
 				AverageArgonotPriceInMicrogons::set(argonot_price);
 				let mut vault = test_vault(10, (10 * MICROGONS_PER_ARGON) as u64);
@@ -1925,6 +1983,105 @@ fn zero_argonot_target_removes_backing_requirements_without_reducing_the_vault_p
 			});
 		}
 	}
+}
+
+#[test]
+fn argonot_weight_only_controls_its_share_of_variable_vault_earnings() {
+	for (weight, backing, expected_earnings) in [
+		(0, 0, 51_000_000),
+		(20, 0, 41_800_000),
+		(20, 10, 46_400_000),
+		(20, 20, 51_000_000),
+		(20, 30, 51_000_000),
+		(100, 0, 5_000_000),
+		(100, 10, 28_000_000),
+		(100, 20, 51_000_000),
+	] {
+		new_test_ext().execute_with(|| {
+			LastVaultProfits::set(vec![]);
+			MinimumArgonsPerContributor::set(1);
+			let mut vault = test_vault(10, 10 * MICROGONS_PER_ARGON as u64);
+			vault.activated_securitization = 10 * MICROGONS_PER_ARGON;
+			insert_vault(1, vault);
+			VaultBitcoinSatoshis::mutate(|bitcoin| {
+				bitcoin.insert(1, 100_000_000);
+			});
+			set_vault_securitized_satoshis(1, 100_000_000);
+			VaultArgonotMicronots::mutate(|argonots| {
+				argonots.insert(1, backing * MICROGONS_PER_ARGON);
+			});
+			set_argons(2, 10 * MICROGONS_PER_ARGON);
+			assert_ok!(Treasury::buy_bonds(origin(2), 1, 10, None));
+			set_target_securitization(10 * MICROGONS_PER_ARGON);
+			assert_ok!(Treasury::configure_reward_economics(
+				RuntimeOrigin::root(),
+				None,
+				None,
+				None,
+				Some(Percent::from_percent(weight)),
+			));
+			Treasury::lock_in_vault_capital(1);
+			assert_ok!(Balances::mint_into(&BidPoolAccountId::get(), 100 * MICROGONS_PER_ARGON));
+			Treasury::distribute_bid_pool(1);
+			let earnings = LastVaultProfits::get()[0].earnings_for_vault;
+			assert!(
+				earnings.abs_diff(expected_earnings) <= 1,
+				"weight {weight}, backing {backing}: {earnings} vs {expected_earnings}"
+			);
+		});
+	}
+}
+
+#[test]
+fn argonot_weight_updates_apply_to_the_next_frame_and_preserve_pre_upgrade_payouts() {
+	new_test_ext().execute_with(|| {
+		MinimumArgonsPerContributor::set(1);
+		let mut vault = test_vault(10, 10 * MICROGONS_PER_ARGON as u64);
+		vault.activated_securitization = 10 * MICROGONS_PER_ARGON;
+		insert_vault(1, vault);
+		VaultBitcoinSatoshis::mutate(|bitcoin| {
+			bitcoin.insert(1, 100_000_000);
+		});
+		set_vault_securitized_satoshis(1, 100_000_000);
+		set_argons(2, 10 * MICROGONS_PER_ARGON);
+		assert_ok!(Treasury::buy_bonds(origin(2), 1, 10, None));
+		set_target_securitization(10 * MICROGONS_PER_ARGON);
+		assert_ok!(Treasury::configure_reward_economics(
+			RuntimeOrigin::root(),
+			None,
+			None,
+			None,
+			Some(Percent::from_percent(20)),
+		));
+		Treasury::lock_in_vault_capital(1);
+		assert_ok!(Treasury::configure_reward_economics(
+			RuntimeOrigin::root(),
+			None,
+			None,
+			None,
+			Some(Percent::from_percent(100)),
+		));
+		assert_ok!(Balances::mint_into(&BidPoolAccountId::get(), 100 * MICROGONS_PER_ARGON));
+		Treasury::distribute_bid_pool(1);
+		assert!(LastVaultProfits::get()[0].earnings_for_vault.abs_diff(41_800_000) <= 1);
+		assert!(CurrentFrameArgonotParticipation::<Test>::get().is_none());
+
+		CurrentFrameId::set(2);
+		set_target_securitization(10 * MICROGONS_PER_ARGON);
+		Treasury::lock_in_vault_capital(2);
+		assert_ok!(Balances::mint_into(&BidPoolAccountId::get(), 100 * MICROGONS_PER_ARGON));
+		Treasury::distribute_bid_pool(2);
+		assert_eq!(LastVaultProfits::get()[1].earnings_for_vault, 5 * MICROGONS_PER_ARGON);
+
+		CurrentFrameId::set(3);
+		set_target_securitization(10 * MICROGONS_PER_ARGON);
+		Treasury::lock_in_vault_capital(3);
+		// An existing pre-upgrade capital snapshot has no participation companion.
+		CurrentFrameArgonotParticipation::<Test>::kill();
+		assert_ok!(Balances::mint_into(&BidPoolAccountId::get(), 100 * MICROGONS_PER_ARGON));
+		Treasury::distribute_bid_pool(3);
+		assert!(LastVaultProfits::get()[2].earnings_for_vault.abs_diff(51_000_000) <= 1);
+	});
 }
 
 #[test]
@@ -1981,7 +2138,13 @@ fn vault_bitcoin_penalty_is_capped_and_does_not_reduce_bond_rewards() {
 #[test]
 fn vault_snapshot_values_argonot_backing_at_the_previous_frame_average() {
 	new_test_ext().execute_with(|| {
-		ArgonotSecuritizationMultiplier::set(2);
+		assert_ok!(Treasury::configure_reward_economics(
+			RuntimeOrigin::root(),
+			None,
+			None,
+			None,
+			Some(Percent::from_percent(100)),
+		));
 		insert_vault(1, test_vault(10, (10 * MICROGONS_PER_ARGON) as u64));
 		VaultArgonotMicronots::mutate(|backing| {
 			backing.insert(1, 5 * MICROGONS_PER_ARGON);
@@ -2015,7 +2178,13 @@ fn vault_snapshot_values_argonot_backing_at_the_previous_frame_average() {
 #[test]
 fn vault_calculator_reaches_full_share_with_bitcoin_bonds_and_argonots() {
 	new_test_ext().execute_with(|| {
-		ArgonotSecuritizationMultiplier::set(2);
+		assert_ok!(Treasury::configure_reward_economics(
+			RuntimeOrigin::root(),
+			None,
+			None,
+			None,
+			Some(Percent::from_percent(100)),
+		));
 		MinimumArgonsPerContributor::set(1);
 		let mut vault = test_vault(10, (10 * MICROGONS_PER_ARGON) as u64);
 		vault.activated_securitization = 10 * MICROGONS_PER_ARGON;
@@ -2657,16 +2826,21 @@ fn vault_rewards_use_frame_frozen_capital() {
 
 #[test]
 fn vault_taper_counts_only_reward_eligible_argonot_value() {
-	for (multiplier, held_argonots, expected_payout) in [
-		(0, 1_000, 25_246_049),
-		(2, 0, 25_246_049),
-		(2, 50, 25_492_099),
-		(2, 100, 25_738_149),
-		(2, 1_000, 25_738_149),
+	for (participation, multiplier, held_argonots, expected_payout) in [
+		(None, 2, 1_000, 25_246_049),
+		(Some(0), 2, 1_000, 25_246_049),
+		(Some(20), 0, 1_000, 25_246_049),
+		(Some(20), 2, 0, 25_246_049),
+		(Some(20), 2, 50, 25_492_099),
+		(Some(20), 2, 100, 25_738_149),
+		(Some(20), 2, 1_000, 25_738_149),
 	] {
 		new_test_ext().execute_with(|| {
 			RewardTaperingPolicy::<Test>::kill();
 			ArgonotSecuritizationMultiplier::set(multiplier);
+			ArgonotParticipationFactor::<Test>::put(Percent::from_percent(
+				participation.unwrap_or_default(),
+			));
 			AverageArgonotPriceInMicrogons::set(2 * MICROGONS_PER_ARGON);
 			insert_vault(1, test_vault(10, (100 * MICROGONS_PER_ARGON) as u64));
 			VaultArgonotMicronots::mutate(|backing| {
@@ -2674,6 +2848,10 @@ fn vault_taper_counts_only_reward_eligible_argonot_value() {
 			});
 			set_target_securitization(100 * MICROGONS_PER_ARGON);
 			Treasury::lock_in_vault_capital(1);
+			if participation.is_none() {
+				// Frames frozen before configurable participation have no companion snapshot.
+				CurrentFrameArgonotParticipation::<Test>::kill();
+			}
 
 			// Later holdings and prices cannot change this frame's frozen capital basis.
 			VaultArgonotMicronots::set(Default::default());
@@ -3512,6 +3690,10 @@ fn upstream_participation_is_linear_to_five_thousand_for_each_asset() {
 		(7_500, 7_500, 100),
 		(5_000, 0, 50),
 		(0, 5_000, 50),
+		(10_000, 0, 50),
+		(0, 10_000, 50),
+		(10_000, 2_500, 75),
+		(2_500, 10_000, 75),
 	] {
 		new_test_ext().execute_with(|| {
 			UpstreamParticipationFactor::<Test>::put(Percent::from_percent(100));
@@ -3554,8 +3736,10 @@ fn configured_upstream_factor_controls_the_share_of_reward_uplift() {
 		(None, 2_500, FixedU128::from_rational(975, 1_000)),
 		(None, 5_000, FixedU128::one()),
 		(Some(0), 0, FixedU128::one()),
+		(Some(0), 2_500, FixedU128::one()),
 		(Some(50), 0, FixedU128::from_rational(1, 2)),
 		(Some(100), 0, FixedU128::zero()),
+		(Some(100), 2_500, FixedU128::from_rational(1, 2)),
 	] {
 		new_test_ext().execute_with(|| {
 			insert_vault(1, test_vault(1, (15_000 * MICROGONS_PER_ARGON) as u64));
@@ -3580,6 +3764,7 @@ fn configured_upstream_factor_controls_the_share_of_reward_uplift() {
 					None,
 					Some(Percent::from_percent(factor)),
 					None,
+					None,
 				));
 			}
 			assert_eq!(Treasury::upstream_participation(&account(2)), multiplier);
@@ -3589,69 +3774,133 @@ fn configured_upstream_factor_controls_the_share_of_reward_uplift() {
 }
 
 #[test]
-fn upstream_capacity_and_own_unfunded_reservations_limit_participation_requirements() {
+fn upstream_nominal_targets_ignore_capacity_and_unfunded_reservations() {
 	use crate::mock::{AvailableSecuritizationSpace, TreasuryPositions, Upstreams};
-	use argon_primitives::treasury::{
-		BitcoinLockPosition, TreasuryPositionProvider, UpstreamPosition,
-	};
+	use argon_primitives::treasury::{BitcoinLockPosition, TreasuryPositionProvider};
 	new_test_ext().execute_with(|| {
 		UpstreamParticipationFactor::<Test>::put(Percent::from_percent(100));
-		insert_vault(1, test_vault(1, (2_000 * MICROGONS_PER_ARGON) as u64));
+		MinimumArgonsPerContributor::set(1);
+		insert_vault(1, test_vault(1, (5_000 * MICROGONS_PER_ARGON) as u64));
 		Upstreams::mutate(|upstreams| {
 			upstreams.insert(account(2), (account(2), 1));
 		});
 		AvailableSecuritizationSpace::mutate(|space| {
 			space.insert(1, 0);
 		});
-		BondLotsByVault::<Test>::mutate(1, |b| b.regular_bonds = 2_000);
-		// Both opportunities are exhausted by other users: no penalty.
-		assert_eq!(Treasury::upstream_participation(&account(2)), FixedU128::one());
-		// An unfunded reservation by this user is still available to fund.
-		TreasuryPositions::set_upstream_position(
+		set_argons(2, 2_500 * MICROGONS_PER_ARGON);
+		set_argons(3, 2_500 * MICROGONS_PER_ARGON);
+		assert_ok!(Treasury::buy_bonds(origin(3), 1, 2_500, None));
+		assert_ok!(Treasury::buy_bonds(origin(2), 1, 2_500, None));
+
+		// Exhausted capacity leaves the nominal Bitcoin target unmet.
+		assert_eq!(Treasury::upstream_participation(&account(2)), FixedU128::from_rational(1, 4));
+		// Reserving the full Bitcoin target adds no funded credit.
+		assert_ok!(TreasuryPositions::bitcoin_position_updated(
 			&account(2),
-			Some(UpstreamPosition {
-				vault_id: 1,
-				bitcoin_allocated_securitization: 1_000 * MICROGONS_PER_ARGON,
+			1,
+			BitcoinLockPosition::default(),
+			BitcoinLockPosition {
+				allocated_securitization: 5_000 * MICROGONS_PER_ARGON,
 				..Default::default()
-			}),
-		);
-		assert_eq!(Treasury::upstream_participation(&account(2)), FixedU128::from_rational(1, 2));
+			},
+		));
+		assert_eq!(Treasury::upstream_participation(&account(2)), FixedU128::from_rational(1, 4));
 		assert_ok!(TreasuryPositions::bitcoin_position_updated(
 			&account(2),
 			1,
 			BitcoinLockPosition {
-				allocated_securitization: 1_000 * MICROGONS_PER_ARGON,
+				allocated_securitization: 5_000 * MICROGONS_PER_ARGON,
 				..Default::default()
 			},
 			BitcoinLockPosition {
-				activated_securitization: 500 * MICROGONS_PER_ARGON,
-				allocated_securitization: 1_000 * MICROGONS_PER_ARGON,
+				activated_securitization: 2_500 * MICROGONS_PER_ARGON,
+				allocated_securitization: 5_000 * MICROGONS_PER_ARGON,
 			},
 		));
-		assert_eq!(Treasury::upstream_participation(&account(2)), FixedU128::from_rational(3, 4));
-		// New upstream capacity restores the fixed maximum requirement.
+		assert_eq!(Treasury::upstream_participation(&account(2)), FixedU128::from_rational(1, 2));
+		// Releasing the unfunded reservation cannot change funded participation.
+		assert_ok!(TreasuryPositions::bitcoin_position_updated(
+			&account(2),
+			1,
+			BitcoinLockPosition {
+				activated_securitization: 2_500 * MICROGONS_PER_ARGON,
+				allocated_securitization: 5_000 * MICROGONS_PER_ARGON,
+			},
+			BitcoinLockPosition {
+				activated_securitization: 2_500 * MICROGONS_PER_ARGON,
+				allocated_securitization: 2_500 * MICROGONS_PER_ARGON,
+			},
+		));
+		assert_eq!(Treasury::upstream_participation(&account(2)), FixedU128::from_rational(1, 2));
+		assert_ok!(Treasury::configure_reward_economics(
+			RuntimeOrigin::root(),
+			None,
+			Some(Percent::from_percent(5)),
+			None,
+			None,
+		));
+		assert_eq!(
+			Treasury::upstream_participation(&account(2)),
+			FixedU128::from_rational(975, 1_000)
+		);
+		UpstreamParticipationFactor::<Test>::put(Percent::from_percent(100));
+
+		// Capacity and upstream lifecycle changes cannot forgive either shortfall.
 		AvailableSecuritizationSpace::mutate(|space| {
 			space.insert(1, 10_000 * MICROGONS_PER_ARGON);
 		});
-		assert_eq!(
-			Treasury::upstream_participation(&account(2)),
-			FixedU128::from_rational(55, 100)
-		);
+		assert_eq!(Treasury::upstream_participation(&account(2)), FixedU128::from_rational(1, 2));
 		VaultsById::mutate(|vaults| vaults.get_mut(&1).unwrap().is_closed = true);
-		assert_eq!(Treasury::upstream_participation(&account(2)), FixedU128::one());
+		assert_eq!(Treasury::upstream_participation(&account(2)), FixedU128::from_rational(1, 2));
+		VaultsById::mutate(|vaults| {
+			let upstream = vaults.get_mut(&1).unwrap();
+			upstream.is_closed = false;
+			upstream.activated_securitization = 0;
+		});
+		assert_eq!(Treasury::upstream_participation(&account(2)), FixedU128::from_rational(1, 2));
+		VaultsById::mutate(|vaults| vaults.remove(&1));
+		assert_eq!(Treasury::upstream_participation(&account(2)), FixedU128::from_rational(1, 2));
 		assert_eq!(Treasury::upstream_participation(&account(9)), FixedU128::one());
+
+		// A position for another vault cannot satisfy the configured relationship.
+		Upstreams::mutate(|upstreams| {
+			upstreams.insert(account(2), (account(2), 2));
+		});
+		assert_eq!(Treasury::upstream_participation(&account(2)), FixedU128::zero());
 	});
 }
 
 #[test]
-fn upstream_bond_requirements_ignore_space_below_the_purchase_minimum() {
+fn upstream_nominal_targets_preserve_individual_zero_target_credit() {
+	use crate::mock::{UpstreamBitcoinTarget, UpstreamBondTarget};
+
+	for (bitcoin_target, bond_target, expected) in [
+		(0, 5_000, FixedU128::from_rational(1, 2)),
+		(5_000, 0, FixedU128::from_rational(1, 2)),
+		(0, 0, FixedU128::one()),
+	] {
+		new_test_ext().execute_with(|| {
+			UpstreamParticipationFactor::<Test>::put(Percent::from_percent(100));
+			UpstreamBitcoinTarget::set(bitcoin_target * MICROGONS_PER_ARGON);
+			UpstreamBondTarget::set(bond_target * MICROGONS_PER_ARGON);
+			Upstreams::mutate(|upstreams| {
+				upstreams.insert(account(2), (account(2), 1));
+			});
+
+			assert_eq!(Treasury::upstream_participation(&account(2)), expected);
+		});
+	}
+}
+
+#[test]
+fn upstream_bond_requirements_keep_nominal_targets_below_the_purchase_minimum() {
 	use crate::mock::{AvailableSecuritizationSpace, TreasuryPositions, Upstreams};
 	use argon_primitives::treasury::{TreasuryPositionProvider, UpstreamPosition};
 	for (minimum, retained, expected) in [
-		(100, 0, FixedU128::one()),
-		(100, 50, FixedU128::one()),
-		(10, 0, FixedU128::from_rational(1, 2)),
-		(10, 50, FixedU128::from_rational(3, 4)),
+		(100, 0, FixedU128::from_rational(1, 10)),
+		(100, 50, FixedU128::from_rational(105, 1_000)),
+		(10, 0, FixedU128::from_rational(1, 10)),
+		(10, 50, FixedU128::from_rational(105, 1_000)),
 	] {
 		new_test_ext().execute_with(|| {
 			UpstreamParticipationFactor::<Test>::put(Percent::from_percent(100));
@@ -3679,7 +3928,7 @@ fn upstream_bond_requirements_ignore_space_below_the_purchase_minimum() {
 			if retained > 0 {
 				assert_ok!(Treasury::buy_bonds(origin(2), 1, 100, None));
 				// Burning part of a valid purchase can leave principal below the new-purchase
-				// minimum. It must retain full credit when no purchasable space remains.
+				// minimum. Only the retained principal counts toward the nominal target.
 				assert_ok!(Treasury::encumber_bond_microgons(
 					&account(2),
 					50 * MICROGONS_PER_ARGON
@@ -3706,7 +3955,10 @@ fn upstream_bond_requirements_ignore_space_below_the_purchase_minimum() {
 				);
 			} else {
 				assert_ok!(Treasury::buy_bonds(origin(2), 1, 50, None));
-				assert_eq!(Treasury::upstream_participation(&account(2)), FixedU128::one());
+				assert_eq!(
+					Treasury::upstream_participation(&account(2)),
+					expected.saturating_add(FixedU128::from_rational(5, 1_000))
+				);
 			}
 			assert_eq!(
 				CurrentFrameVaultCapital::<Test>::get().unwrap().vault_securitization_positions[&2]
@@ -3743,7 +3995,7 @@ fn upstream_bond_principal_is_live_but_the_earnings_multiplier_is_frozen_for_the
 		let frozen = CurrentFrameVaultCapital::<Test>::get().unwrap();
 		assert_eq!(
 			frozen.vault_securitization_positions[&2].upstream_participation,
-			FixedU128::from_rational(3, 4)
+			FixedU128::from_rational(1, 10)
 		);
 		assert_ok!(Treasury::liquidate_bond_lot(origin(2), account_bond_lot_ids(2)[0]));
 		assert_eq!(TreasuryPositions::bond_principal(&account(2)), 0);
@@ -3753,17 +4005,18 @@ fn upstream_bond_principal_is_live_but_the_earnings_multiplier_is_frozen_for_the
 			None,
 			Some(Percent::from_percent(5)),
 			None,
+			None,
 		));
 		assert_eq!(
 			CurrentFrameVaultCapital::<Test>::get().unwrap().vault_securitization_positions[&2]
 				.upstream_participation,
-			FixedU128::from_rational(3, 4)
+			FixedU128::from_rational(1, 10)
 		);
 		Treasury::lock_in_vault_capital(2);
 		assert_eq!(
 			CurrentFrameVaultCapital::<Test>::get().unwrap().vault_securitization_positions[&2]
 				.upstream_participation,
-			FixedU128::from_rational(975, 1_000)
+			FixedU128::from_rational(95, 100)
 		);
 	});
 }
