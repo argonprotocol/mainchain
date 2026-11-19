@@ -1,4 +1,4 @@
-FROM debian:bullseye-slim
+FROM debian:bookworm-slim
 
 ARG VERSION=28.0
 ENV VERSION=$VERSION
