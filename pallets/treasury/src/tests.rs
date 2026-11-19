@@ -2826,17 +2826,21 @@ fn vault_rewards_use_frame_frozen_capital() {
 
 #[test]
 fn vault_taper_counts_only_reward_eligible_argonot_value() {
-	for (multiplier, held_argonots, expected_payout) in [
-		(0, 1_000, 25_246_049),
-		(2, 0, 25_246_049),
-		(2, 50, 25_492_099),
-		(2, 100, 25_738_149),
-		(2, 1_000, 25_738_149),
+	for (participation, multiplier, held_argonots, expected_payout) in [
+		(None, 2, 1_000, 25_246_049),
+		(Some(0), 2, 1_000, 25_246_049),
+		(Some(20), 0, 1_000, 25_246_049),
+		(Some(20), 2, 0, 25_246_049),
+		(Some(20), 2, 50, 25_492_099),
+		(Some(20), 2, 100, 25_738_149),
+		(Some(20), 2, 1_000, 25_738_149),
 	] {
 		new_test_ext().execute_with(|| {
 			RewardTaperingPolicy::<Test>::kill();
 			ArgonotSecuritizationMultiplier::set(multiplier);
-			ArgonotParticipationFactor::<Test>::put(Percent::from_percent(20));
+			ArgonotParticipationFactor::<Test>::put(Percent::from_percent(
+				participation.unwrap_or_default(),
+			));
 			AverageArgonotPriceInMicrogons::set(2 * MICROGONS_PER_ARGON);
 			insert_vault(1, test_vault(10, (100 * MICROGONS_PER_ARGON) as u64));
 			VaultArgonotMicronots::mutate(|backing| {
@@ -2844,6 +2848,10 @@ fn vault_taper_counts_only_reward_eligible_argonot_value() {
 			});
 			set_target_securitization(100 * MICROGONS_PER_ARGON);
 			Treasury::lock_in_vault_capital(1);
+			if participation.is_none() {
+				// Frames frozen before configurable participation have no companion snapshot.
+				CurrentFrameArgonotParticipation::<Test>::kill();
+			}
 
 			// Later holdings and prices cannot change this frame's frozen capital basis.
 			VaultArgonotMicronots::set(Default::default());

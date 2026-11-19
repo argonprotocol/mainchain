@@ -1251,9 +1251,14 @@ where
 		);
 	}
 
-	// Exercise the maintained upstream position read for every operator.
+	// Reservation-only upstream records are outside the payout set but remain in the frame scan.
+	let upstream_bonds = Pallet::<T>::balance_to_bonds(T::UpstreamBondTarget::get());
 	for vault_index in 0..vault_count {
 		let upstream_vault_id = 100_000 + vault_index;
+		BondLotsByVault::<T>::insert(
+			upstream_vault_id,
+			VaultBondState { reserved_bond_space: upstream_bonds / 2, ..Default::default() },
+		);
 		T::PositionProvider::set_upstream_position(
 			&benchmark_operator::<T>(vault_index),
 			Some(argon_primitives::treasury::UpstreamPosition {

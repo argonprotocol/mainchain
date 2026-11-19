@@ -2112,8 +2112,13 @@ pub mod pallet {
 				);
 
 				let argonot_capacity = securitization.saturating_mul(argonot_multiplier.into());
-				let argonot_value: u128 = position.argonot_securitization_in_microgons.into();
-				let argonot_value = argonot_value.min(argonot_capacity);
+				// Disabled participation commits no Argonots, so they cannot raise taper capital.
+				let argonot_value = if argonot_participation_factor.is_zero() {
+					0
+				} else {
+					let value: u128 = position.argonot_securitization_in_microgons.into();
+					value.min(argonot_capacity)
+				};
 				let argonot_utilization = if argonot_capacity == 0 {
 					FixedU128::one()
 				} else {
