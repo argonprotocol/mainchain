@@ -1,4 +1,4 @@
-use crate::{bitcoin::LiquidId, tick::Tick, AccountId, Balance, Signature};
+use crate::{bitcoin::LiquidId, tick::Tick, AccountId, Balance, Moment, Signature};
 use alloc::vec::Vec;
 use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use frame_support::{CloneNoBound, DebugNoBound, EqNoBound, PartialEqNoBound};
@@ -10,6 +10,57 @@ use sp_runtime::{
 	traits::{ConstU32, Get, Verify},
 	BoundedVec,
 };
+
+/// Uniswap's square root of the raw token1/token0 ratio, scaled by 2^96.
+/// Ethereum represents it as a uint160.
+pub type UniswapSqrtPriceX96 = U256;
+
+/// Signed Uniswap price-grid index. Ethereum represents it as an int24.
+pub type UniswapTick = i32;
+
+/// The Ethereum venue of a Uniswap v4 pool.
+#[derive(
+	Clone,
+	Copy,
+	Debug,
+	PartialEq,
+	Eq,
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	TypeInfo,
+	MaxEncodedLen,
+)]
+pub struct UniswapPoolIdentity {
+	/// Ethereum execution chain ID.
+	pub chain_id: u64,
+	/// PoolManager contract on that chain.
+	pub pool_manager: H160,
+	/// Native pool ID within the manager, committing to the tokens, fee and hook.
+	pub pool_id: H256,
+}
+
+/// The approved source of a stabilizer pool price observation.
+#[derive(
+	Clone,
+	Copy,
+	Debug,
+	PartialEq,
+	Eq,
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	TypeInfo,
+	MaxEncodedLen,
+)]
+pub struct StabilizerPoolPriceSource {
+	/// Revision matched against the oracle submission when it was accepted.
+	pub revision: u32,
+	/// Ethereum venue bound to this revision.
+	pub pool: UniswapPoolIdentity,
+	/// Whether ARGON is token0 of this pool. Fixed by the approved revision.
+	pub argon_is_token0: bool,
+}
 
 /// Authenticated Uniswap v4 purchase facts. Principal is the microgons actually delivered on Argon;
 /// USDC spending includes fees and excludes refunded input. The gateway owns proof and replay
@@ -35,9 +86,9 @@ pub struct UniswapPurchase {
 	/// Whole microgons actually delivered to the Argon recipient, after Ethereum unit conversion.
 	pub principal: Balance,
 	/// sqrt(raw token1 / raw token0) immediately before execution, scaled by 2^96; uint160.
-	pub sqrt_price_before_x96: U256,
+	pub sqrt_price_before_x96: UniswapSqrtPriceX96,
 	/// The same pool's square-root price immediately after execution, with the same scaling.
-	pub sqrt_price_after_x96: U256,
+	pub sqrt_price_after_x96: UniswapSqrtPriceX96,
 	/// Authenticated Ethereum purchase time mapped to an Argon tick, independent of relay arrival.
 	pub tick: Tick,
 }
@@ -87,6 +138,29 @@ pub const MAX_ETHEREUM_HEADER_CHAIN_LEN: u32 = 64;
 /// Canonical Ethereum execution-block height used anywhere Argon stores or compares expiry and
 /// proof targets.
 pub type EthereumBlockNumber = u64;
+
+/// Block authenticated by an Ethereum storage proof.
+#[derive(
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	Clone,
+	Copy,
+	Debug,
+	PartialEq,
+	Eq,
+	TypeInfo,
+	MaxEncodedLen,
+)]
+pub struct EthereumProofBlock {
+	/// Authenticated Ethereum execution-block hash.
+	pub hash: H256,
+	/// Height of the authenticated execution block.
+	pub number: EthereumBlockNumber,
+	/// Ethereum block time in Unix milliseconds, authenticated by the execution header.
+	pub timestamp_millis: Moment,
+}
+
 pub type EthereumLogTopics = BoundedVec<H256, ConstU32<MAX_ETHEREUM_LOG_TOPICS>>;
 pub type EthereumLogData = BoundedVec<u8, ConstU32<MAX_ETHEREUM_LOG_DATA_BYTES>>;
 pub type EthereumReceiptProofNode = BoundedVec<u8, ConstU32<MAX_ETHEREUM_RECEIPT_PROOF_NODE_BYTES>>;

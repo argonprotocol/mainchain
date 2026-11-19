@@ -13,8 +13,8 @@ use super::{
 use alloc::{collections::BTreeMap, vec::Vec};
 use argon_primitives::{
 	EthereumAccountStorageProof, EthereumBlockNumber, EthereumCombinedReceiptProof,
-	EthereumExecutionBlockProof, EthereumLog, EthereumReceiptLog, EthereumReceiptLogProofBatch,
-	EthereumVerifyError, EthereumVerifyProvider, Moment,
+	EthereumExecutionBlockProof, EthereumLog, EthereumProofBlock, EthereumReceiptLog,
+	EthereumReceiptLogProofBatch, EthereumVerifyError, EthereumVerifyProvider, Moment,
 };
 use polkadot_sdk::{frame_support::ensure, sp_core::H160, sp_runtime::traits::Get};
 
@@ -53,7 +53,7 @@ impl<T: Config> EthereumVerifyProvider for Pallet<T> {
 	fn verify_account_storage_proof<MaxStorageSlots>(
 		account_address: H160,
 		proof: &EthereumAccountStorageProof<MaxStorageSlots>,
-	) -> Result<Moment, EthereumVerifyError>
+	) -> Result<EthereumProofBlock, EthereumVerifyError>
 	where
 		MaxStorageSlots: Get<u32>,
 	{
@@ -66,7 +66,11 @@ impl<T: Config> EthereumVerifyProvider for Pallet<T> {
 			account_address,
 			proof,
 		)?;
-		Ok(target.timestamp_millis)
+		Ok(EthereumProofBlock {
+			hash: target.block_hash,
+			number: target.block_number,
+			timestamp_millis: target.timestamp_millis,
+		})
 	}
 
 	fn latest_execution_block_number() -> Option<EthereumBlockNumber> {
@@ -128,17 +132,6 @@ impl<T: Config> Pallet<T> {
 		}
 
 		Ok(())
-	}
-
-	/// Verify ancestry and return the exact execution header used by a storage witness.
-	pub fn verified_execution_header(
-		proof: &EthereumExecutionBlockProof,
-	) -> Result<ExecutionHeaderAnchor, EthereumVerifyError> {
-		ensure!(!OperatingMode::<T>::get().is_halted(), EthereumVerifyError::VerifierUnavailable);
-		Self::verify_execution_headers(proof)?
-			.into_iter()
-			.next()
-			.ok_or(EthereumVerifyError::InvalidHeaderChain)
 	}
 
 	#[cfg(test)]

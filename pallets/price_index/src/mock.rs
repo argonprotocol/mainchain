@@ -1,5 +1,8 @@
 use crate as pallet_price_index;
-use argon_primitives::{tick::Ticker, MiningFrameTransitionProvider, TickProvider, VotingSchedule};
+use argon_primitives::{
+	tick::Ticker, MiningFrameTransitionProvider, StabilizerPoolPriceSource,
+	StabilizerPoolPriceSourceProvider, TickProvider, VotingSchedule,
+};
 
 use pallet_prelude::*;
 pub(crate) type Block = frame_system::mocking::MockBlock<Test>;
@@ -52,11 +55,20 @@ parameter_types! {
 	pub static TicksPerFrame: Tick = 1440;
 	pub static CurrentFrameId: FrameId = 0;
 	pub static NewlyStartedFrameId: Option<FrameId> = None;
+	pub static ApprovedStabilizerPool: Option<StabilizerPoolPriceSource> = None;
 	pub const MaxArgonotFloorHistoryFrames: u32 = 10;
 	pub const MaxArgonotAverageHistoryFrames: u32 = 10;
 	pub const MaxEthereumPriceHistoryFrames: u32 = 10;
 	pub const MaxArgonChangePerTickAwayFromTarget: FixedU128 = FixedU128::from_rational(1, 100);
 	pub const MaxArgonTargetChangePerTick: FixedU128 = FixedU128::from_rational(1, 100);
+}
+
+impl StabilizerPoolPriceSourceProvider for ApprovedStabilizerPool {
+	type Weights = ();
+
+	fn price_source() -> Option<StabilizerPoolPriceSource> {
+		Self::get()
+	}
 }
 
 pub struct StaticMiningFrameTransitionProvider;
@@ -96,6 +108,7 @@ impl TickProvider<Block> for CurrentTick {
 }
 
 impl pallet_price_index::Config for Test {
+	type StabilizerPool = ApprovedStabilizerPool;
 	type OnPriceIndexUpdated = ();
 	type TickProvider = CurrentTick;
 	type TicksPerFrame = TicksPerFrame;
@@ -117,6 +130,7 @@ pub fn new_test_ext(operator: Option<u64>) -> TestState {
 	CurrentTick::set(0);
 	CurrentFrameId::set(0);
 	NewlyStartedFrameId::set(None);
+	ApprovedStabilizerPool::set(None);
 	new_test_with_genesis::<Test>(|t: &mut Storage| {
 		pallet_price_index::GenesisConfig::<Test> { operator }
 			.assimilate_storage(t)

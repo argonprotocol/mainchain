@@ -1,12 +1,11 @@
 //! Benchmark-only runtime stubs and helpers.
-#![cfg(feature = "runtime-benchmarks")]
 
-use core::marker::PhantomData;
+use core::{hint::black_box, marker::PhantomData};
 use polkadot_sdk::{
-	sp_core::H160,
+	sp_core::{H160, H256},
 	sp_runtime::{
 		traits::{AtLeast32BitUnsigned, Get, SaturatedConversion},
-		DispatchError,
+		ArithmeticError, DispatchError, FixedU128,
 	},
 };
 
@@ -18,41 +17,79 @@ use argon_primitives::{
 	},
 	block_seal::FrameId,
 	ethereum::{
-		EthereumAccountStorageProof, EthereumBlockNumber, EthereumReceiptLogProofBatch,
-		EthereumVerifyError,
+		EthereumAccountStorageProof, EthereumBlockNumber, EthereumProofBlock,
+		EthereumReceiptLogProofBatch, EthereumVerifyError,
 	},
 	prelude::Tick,
-	treasury::TreasuryPositionProvider,
+	treasury::{StabilizerPoolFrameClaim, StabilizerPoolRewardProvider, TreasuryPositionProvider},
 	vault::{
 		BitcoinLockFunding, BitcoinSecuritizationBasis, BitcoinVaultProvider, CosignerGuarantee,
 		LostBitcoinCompensation, RegistrationVaultData, ReserveSecuritizationRequest, VaultError,
 	},
 	Balance, BitcoinFissionLockError, BitcoinFissionLockProvider, BitcoinFissionMinting,
 	BitcoinFissionsProvider, EthereumVerifyProvider, MiningSlotProvider, Moment,
-	OperationalAccountProvider, RValueHighWaterMark, TreasuryPoolProvider, UniswapTransferProvider,
-	VaultId,
+	OperationalAccountProvider, RValueHighWaterMark, StabilizerPoolPriceSource,
+	StabilizerPoolPriceSourceProvider, TreasuryPoolProvider, UniswapPoolIdentity,
+	UniswapTransferProvider, VaultId,
 };
 use pallet_bitcoin_locks::BitcoinVerifier;
 pub use pallet_prelude::benchmarking::{
 	benchmark_operational_accounts_provider_state, benchmark_operational_rewards_provider_state,
-	reset_benchmark_bitcoin_locks_runtime_state, reset_benchmark_bitcoin_utxo_tracker_state,
-	reset_benchmark_bitcoin_vault_provider_state,
-	reset_benchmark_operational_rewards_provider_state, reset_benchmark_price_provider_state,
-	set_benchmark_bitcoin_locks_runtime_state, set_benchmark_bitcoin_utxo_tracker_state,
-	set_benchmark_bitcoin_vault_provider_state, set_benchmark_operational_accounts_provider_state,
+	reset_benchmark_bitcoin_utxo_tracker_state, reset_benchmark_bitcoin_vault_provider_state,
+	reset_benchmark_mining_clock, reset_benchmark_operational_rewards_provider_state,
+	reset_benchmark_price_provider_state, set_benchmark_bitcoin_utxo_tracker_state,
+	set_benchmark_bitcoin_vault_provider_state, set_benchmark_mining_clock,
+	set_benchmark_operational_accounts_provider_state,
 	set_benchmark_operational_rewards_provider_state, set_benchmark_price_provider_state,
-	BenchmarkAuthorityProvider, BenchmarkBitcoinBlockHeightChange,
-	BenchmarkBitcoinLocksRuntimeState, BenchmarkBitcoinNetwork, BenchmarkBitcoinUtxoTracker,
-	BenchmarkBitcoinUtxoTrackerState, BenchmarkBitcoinVaultProvider,
+	BenchmarkAuthorityProvider, BenchmarkBitcoinBlockHeightChange, BenchmarkBitcoinNetwork,
+	BenchmarkBitcoinUtxoTracker, BenchmarkBitcoinUtxoTrackerState, BenchmarkBitcoinVaultProvider,
 	BenchmarkBitcoinVaultProviderState, BenchmarkBlockRewardAccountsProvider,
 	BenchmarkBlockSealerProvider, BenchmarkCrosschainGatewayProvider, BenchmarkCurrentFrameId,
-	BenchmarkCurrentTick, BenchmarkDidStartNewFrame, BenchmarkNotaryProvider,
+	BenchmarkCurrentTick, BenchmarkDidStartNewFrame, BenchmarkMiningClock, BenchmarkNotaryProvider,
 	BenchmarkNotebookProvider, BenchmarkOperationalAccountsProviderState,
 	BenchmarkOperationalRewardsPayer, BenchmarkOperationalRewardsProvider,
 	BenchmarkOperationalRewardsProviderState, BenchmarkPriceProvider, BenchmarkPriceProviderState,
 	BenchmarkTickProvider, BenchmarkTreasuryPositionProvider, BenchmarkTreasuryRewardProvider,
 };
 use pallet_prelude::DispatchResult;
+
+pub struct BenchmarkStabilizerPoolPriceSource;
+impl StabilizerPoolPriceSourceProvider for BenchmarkStabilizerPoolPriceSource {
+	type Weights = ();
+
+	fn price_source() -> Option<StabilizerPoolPriceSource> {
+		Some(StabilizerPoolPriceSource {
+			revision: 1,
+			pool: UniswapPoolIdentity {
+				chain_id: 1,
+				pool_manager: H160::repeat_byte(1),
+				pool_id: H256::repeat_byte(2),
+			},
+			argon_is_token0: true,
+		})
+	}
+}
+
+pub struct BenchmarkStabilizerPoolRewards;
+impl StabilizerPoolRewardProvider for BenchmarkStabilizerPoolRewards {
+	type Weights = ();
+
+	fn finalize_frame_rewards(_: FrameId, eligible_value: Balance) {
+		// Keep source valuation in the benchmark even though this provider has no storage.
+		black_box(eligible_value);
+	}
+
+	fn frame_reward_rate(_: FrameId) -> Option<FixedU128> {
+		Some(FixedU128::from_u32(1))
+	}
+
+	fn claim_rewards(frames: &[StabilizerPoolFrameClaim]) -> Result<Balance, DispatchError> {
+		frames.iter().try_fold(0u128, |sum, frame| {
+			sum.checked_add(frame.amount)
+				.ok_or(DispatchError::Arithmetic(ArithmeticError::Overflow))
+		})
+	}
+}
 
 pub struct BenchmarkBitcoinSignatureVerifier;
 impl<T: pallet_bitcoin_locks::Config> BitcoinVerifier<T> for BenchmarkBitcoinSignatureVerifier {
@@ -184,12 +221,16 @@ impl EthereumVerifyProvider for BenchmarkCrosschainTransferEthereumVerifier {
 
 	fn verify_account_storage_proof<MaxStorageSlots>(
 		_gateway_address: H160,
-		_proof: &EthereumAccountStorageProof<MaxStorageSlots>,
-	) -> Result<Moment, EthereumVerifyError>
+		proof: &EthereumAccountStorageProof<MaxStorageSlots>,
+	) -> Result<EthereumProofBlock, EthereumVerifyError>
 	where
 		MaxStorageSlots: Get<u32>,
 	{
-		Ok(Self::latest_execution_block_timestamp().unwrap_or_default())
+		Ok(EthereumProofBlock {
+			hash: proof.execution_block_proof.anchor_block_hash,
+			number: Self::latest_execution_block_number().unwrap_or_default(),
+			timestamp_millis: Self::latest_execution_block_timestamp().unwrap_or_default(),
+		})
 	}
 
 	fn latest_execution_block_number() -> Option<EthereumBlockNumber> {

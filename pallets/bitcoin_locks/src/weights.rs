@@ -117,7 +117,7 @@ pub struct WithProviderWeights<
 impl<T, Base, VaultProviderWeight, FissionsProviderWeight> WeightInfo
 	for WithProviderWeights<T, Base, VaultProviderWeight, FissionsProviderWeight>
 where
-	T: Config + pallet_bitcoin_fissions::Config,
+	T: Config,
 	Base: WeightInfo,
 	VaultProviderWeight: BitcoinVaultProviderWeightInfo,
 	FissionsProviderWeight: BitcoinFissionsProviderWeightInfo,
@@ -158,10 +158,13 @@ where
 	}
 
 	fn on_initialize_expiring_locks(n: u32) -> Weight {
+		let max_guarantees =
+			u64::from(T::FissionsProvider::max_fissions_per_lock()).saturating_add(1);
 		Base::on_initialize_expiring_locks(n)
-			.saturating_add(VaultProviderWeight::burn().saturating_mul(
-				u64::from(n).saturating_mul(u64::from(<T as pallet_bitcoin_fissions::Config>::MaxFissionsPerLock::get()).saturating_add(1)),
-			))
+			.saturating_add(
+				VaultProviderWeight::burn()
+					.saturating_mul(u64::from(n).saturating_mul(max_guarantees)),
+			)
 			.saturating_add(UtxoTrackerWeights::<T>::unwatch().saturating_mul(n.into()))
 			.saturating_add(PositionWeights::<T>::position_updated().saturating_mul(n.into()))
 			.saturating_add(
@@ -260,34 +263,28 @@ where
 
 	fn provider_utxo_detected() -> Weight {
 		let max_utxos = T::MaxUtxosPerLock::get().into();
+		let max_guarantees =
+			u64::from(T::FissionsProvider::max_fissions_per_lock()).saturating_add(1);
 		Base::provider_utxo_detected()
 			.saturating_add(PositionWeights::<T>::account_quantity_updated())
 			.saturating_add(UtxoTrackerWeights::<T>::unwatch_utxo().saturating_mul(max_utxos))
 			.saturating_add(UtxoTrackerWeights::<T>::unwatch())
 			.saturating_add(PositionWeights::<T>::position_updated().saturating_mul(2))
-			.saturating_add(
-				VaultProviderWeight::burn().saturating_mul(
-					u64::from(<T as pallet_bitcoin_fissions::Config>::MaxFissionsPerLock::get())
-						.saturating_add(1),
-				),
-			)
+			.saturating_add(VaultProviderWeight::burn().saturating_mul(max_guarantees))
 			.saturating_add(FissionsProviderWeight::get_lock_fission_guarantees())
 			.saturating_add(FissionsProviderWeight::close_for_lock())
 	}
 
 	fn provider_spent() -> Weight {
+		let max_guarantees =
+			u64::from(T::FissionsProvider::max_fissions_per_lock()).saturating_add(1);
 		Base::provider_spent()
 			.saturating_add(PositionWeights::<T>::account_quantity_updated())
 			.saturating_add(
 				UtxoTrackerWeights::<T>::unwatch().max(UtxoTrackerWeights::<T>::unwatch_utxo()),
 			)
 			.saturating_add(PositionWeights::<T>::position_updated().saturating_mul(2))
-			.saturating_add(
-				VaultProviderWeight::burn().saturating_mul(
-					u64::from(<T as pallet_bitcoin_fissions::Config>::MaxFissionsPerLock::get())
-						.saturating_add(1),
-				),
-			)
+			.saturating_add(VaultProviderWeight::burn().saturating_mul(max_guarantees))
 			.saturating_add(FissionsProviderWeight::get_lock_fission_guarantees())
 			.saturating_add(FissionsProviderWeight::close_for_lock())
 	}

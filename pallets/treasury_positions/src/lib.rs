@@ -1,21 +1,27 @@
 #![cfg_attr(not(feature = "std"), no_std)]
 //! Maintained account and network quantities used by Treasury frame calculations and bond backing.
 //! Source pallets own individual vaults, locks, lots, Fissions and custody. This pallet maintains
-//! their aggregates; Treasury owns frame snapshots and payouts.
+//! their aggregates and account earnings. Treasury owns frame terms and reward funding.
+
+extern crate alloc;
 
 use argon_primitives::{
 	treasury::{
 		BitcoinLockPosition, BitcoinLockPositionProvider, NetworkPositionQuantities,
-		PositionQuantities, PositionQuantity, TreasuryPositionProvider, UpstreamPosition,
+		PositionQuantities, PositionQuantity, StabilizerPoolPositionProvider,
+		TreasuryPositionProvider, UpstreamPosition,
 	},
-	OperationalAccountProvider, TreasuryPoolProvider, VaultId,
+	MiningFrameTransitionProvider, OperationalAccountProvider, TreasuryPoolProvider, VaultId,
 };
+use frame_support::traits::fungible::{Inspect, Mutate};
+use frame_system::RawOrigin;
 pub use pallet::*;
 use pallet_prelude::*;
 use polkadot_sdk::sp_runtime::ArithmeticError;
 pub use weights::{ProviderWeightAdapter, WeightInfo};
 #[cfg(feature = "runtime-benchmarks")]
 mod benchmarking;
+pub mod migrations;
 #[cfg(test)]
 mod mock;
 #[cfg(test)]
@@ -27,7 +33,7 @@ pub mod weights;
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
-	pub(super) const STORAGE_VERSION: StorageVersion = StorageVersion::new(2);
+	pub(super) const STORAGE_VERSION: StorageVersion = StorageVersion::new(3);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -57,11 +63,17 @@ pub mod pallet {
 		type BitcoinPositionProvider: BitcoinLockPositionProvider<Self::AccountId, Self::Balance>;
 		/// Reads canonical upstream bond principal when initializing a registration snapshot.
 		type TreasuryPoolProvider: TreasuryPoolProvider<Self::AccountId, Balance = Self::Balance>;
+		/// Source for registered stabilizer pool positions and their claim cursors.
+		type StabilizerPoolPositionProvider: StabilizerPoolPositionProvider<Self::AccountId>;
+		/// Reports the first block after a mining frame has finalized.
+		type MiningFrameTransitionProvider: MiningFrameTransitionProvider;
+		/// Delivers the account's combined ARGON collection.
+		type Currency: Inspect<Self::AccountId, Balance = Self::Balance> + Mutate<Self::AccountId>;
 		/// Costs of reading and maintaining account aggregates.
 		type WeightInfo: WeightInfo;
 	}
 
-	/// Account-wide principal and quantities, with an optional subset in the upstream vault.
+	/// Account-wide positions and earnings, with an optional subset in the upstream vault.
 	#[derive(
 		Encode,
 		Decode,
@@ -76,7 +88,7 @@ pub mod pallet {
 	)]
 	pub struct Position<Balance>
 	where
-		Balance: codec::Codec + MaxEncodedLen,
+		Balance: Codec + MaxEncodedLen,
 	{
 		/// Live principal for certification/backing, including displaced flexible bonds.
 		#[codec(compact)]
@@ -86,9 +98,69 @@ pub mod pallet {
 		/// Participation in the single vault that onboarded this account. Absent when no upstream
 		/// vault is resolvable, including accounts whose upstream has yet to create a vault.
 		pub upstream: Option<UpstreamPosition<Balance>>,
+		/// Committed amounts available to collect, by source.
+		pub collect_accrued: CollectAmounts<Balance>,
+		/// Lifetime amounts delivered through collection, by source. Counters saturate without
+		/// blocking payment.
+		pub collected: CollectAmounts<Balance>,
 	}
-	/// Maintained source quantities keyed by the actual position owner. Upstream quantities belong
-	/// to the linked vault account; primary and mining account balances are separate owners.
+
+	/// Account collection amounts in ARGON microgons, by source.
+	#[derive(
+		Encode,
+		Decode,
+		DecodeWithMemTracking,
+		Clone,
+		Copy,
+		Debug,
+		Default,
+		PartialEq,
+		Eq,
+		TypeInfo,
+		MaxEncodedLen,
+	)]
+	pub struct CollectAmounts<Balance>
+	where
+		Balance: Codec + MaxEncodedLen,
+	{
+		/// Rewards earned on ARGON bonds.
+		#[codec(compact)]
+		pub bond_earnings: Balance,
+		/// Rewards earned on ARGONOT stakes.
+		#[codec(compact)]
+		pub stake_earnings: Balance,
+		/// Rewards earned on eligible Bitcoin liquidity.
+		#[codec(compact)]
+		pub bitcoin_earnings: Balance,
+		/// ARGON from Bitcoin mint grants.
+		#[codec(compact)]
+		pub bitcoin_mints: Balance,
+		/// Rewards earned for supplying eligible stabilizer pool liquidity.
+		#[codec(compact)]
+		pub stabilizer_pool_earnings: Balance,
+	}
+
+	impl<Balance: AtLeast32BitUnsigned + Copy + Codec + MaxEncodedLen> CollectAmounts<Balance> {
+		pub fn total(&self) -> Result<Balance, DispatchError> {
+			self.bond_earnings
+				.checked_add(&self.stake_earnings)
+				.and_then(|sum| sum.checked_add(&self.bitcoin_earnings))
+				.and_then(|sum| sum.checked_add(&self.bitcoin_mints))
+				.and_then(|sum| sum.checked_add(&self.stabilizer_pool_earnings))
+				.ok_or(ArithmeticError::Overflow.into())
+		}
+
+		fn saturating_accrue(&mut self, other: &Self) {
+			self.bond_earnings.saturating_accrue(other.bond_earnings);
+			self.stake_earnings.saturating_accrue(other.stake_earnings);
+			self.bitcoin_earnings.saturating_accrue(other.bitcoin_earnings);
+			self.bitcoin_mints.saturating_accrue(other.bitcoin_mints);
+			self.stabilizer_pool_earnings.saturating_accrue(other.stabilizer_pool_earnings);
+		}
+	}
+
+	/// Source quantities and earnings keyed by the position owner. Upstream quantities belong to
+	/// the linked vault account; primary and mining accounts have separate positions.
 	#[pallet::storage]
 	pub type PositionsByAccount<T: Config> =
 		StorageMap<_, Blake2_128Concat, T::AccountId, Position<T::Balance>, OptionQuery>;
@@ -101,14 +173,75 @@ pub mod pallet {
 
 	#[pallet::hooks]
 	impl<T: Config> Hooks<BlockNumberFor<T>> for Pallet<T> {
+		fn on_initialize(_: BlockNumberFor<T>) -> Weight {
+			let mut weight = weights::frame_start::<T>();
+			if !T::MiningFrameTransitionProvider::is_first_block_after_frame_start() {
+				return weight;
+			}
+
+			// Temporary until Apps calls account Collect. Collection updates existing records only.
+			let account_weight =
+				weights::collect::<T>().saturating_add(T::DbWeight::get().reads(2));
+			weight.saturating_accrue(T::DbWeight::get().reads(1));
+			for account in PositionsByAccount::<T>::iter_keys() {
+				weight.saturating_accrue(account_weight);
+				if let Err(error) = Self::collect(RawOrigin::Signed(account.clone()).into()) {
+					log::warn!("Account rewards remain uncollected for {account:?}: {error:?}");
+				}
+			}
+			weight
+		}
+
 		#[cfg(feature = "try-runtime")]
 		fn try_state(_: BlockNumberFor<T>) -> Result<(), sp_runtime::TryRuntimeError> {
 			crate::try_state::check::<T>()
 		}
 	}
 
+	#[pallet::event]
+	#[pallet::generate_deposit(pub(super) fn deposit_event)]
+	pub enum Event<T: Config> {
+		/// ARGON delivered to the account, recorded by its source.
+		Collected { account: T::AccountId, amounts: CollectAmounts<T::Balance> },
+	}
+
+	#[pallet::call]
+	impl<T: Config> Pallet<T> {
+		/// Settle the signer's available source earnings and collect them in one payment.
+		#[pallet::call_index(0)]
+		#[pallet::weight(weights::collect::<T>())]
+		pub fn collect(origin: OriginFor<T>) -> DispatchResult {
+			let account = ensure_signed(origin)?;
+			let earnings = T::StabilizerPoolPositionProvider::settle_account(&account)?;
+			let mut position = PositionsByAccount::<T>::get(&account).unwrap_or_default();
+			position.collect_accrued.stabilizer_pool_earnings = position
+				.collect_accrued
+				.stabilizer_pool_earnings
+				.checked_add(&earnings.into())
+				.ok_or(ArithmeticError::Overflow)?;
+			let amounts = position.collect_accrued;
+			let amount = amounts.total()?;
+			if amount.is_zero() {
+				return Ok(())
+			}
+
+			T::Currency::mint_into(&account, amount)?;
+			position.collected.saturating_accrue(&amounts);
+			position.collect_accrued = CollectAmounts::default();
+			PositionsByAccount::<T>::insert(&account, position);
+			Self::deposit_event(Event::Collected { account, amounts });
+			Ok(())
+		}
+	}
+
 	impl<T: Config> TreasuryPositionProvider<T::AccountId, T::Balance> for Pallet<T> {
 		type Weights = ProviderWeightAdapter<T>;
+
+		fn ensure_account(account: &T::AccountId) {
+			if !PositionsByAccount::<T>::contains_key(account) {
+				PositionsByAccount::<T>::insert(account, Position::<T::Balance>::default());
+			}
+		}
 
 		/// Seed the upstream subset after registration records the relationship. Locks and bonds
 		/// can predate registration, so query their canonical owner indexes once. Preserve the

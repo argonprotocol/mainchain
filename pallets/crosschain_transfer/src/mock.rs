@@ -18,9 +18,10 @@ use argon_primitives::{
 		VaultError,
 	},
 	EthereumAccountStorageProof, EthereumBlockNumber, EthereumExecutionBlockProof, EthereumLog,
-	EthereumReceiptLogProofBatch, EthereumStorageSlotProof, EthereumVerifyError,
-	EthereumVerifyProvider, OperationalAccountsHook, PriceProvider, TickProvider,
-	TreasuryPoolProvider, UniswapPurchase, UniswapPurchaseProvider, VaultId, VotingSchedule,
+	EthereumProofBlock, EthereumReceiptLogProofBatch, EthereumStorageSlotProof,
+	EthereumVerifyError, EthereumVerifyProvider, OperationalAccountsHook, PriceProvider,
+	TickProvider, TreasuryPoolProvider, UniswapPurchase, UniswapPurchaseProvider, VaultId,
+	VotingSchedule,
 };
 use frame_support::traits::{StorageInstance, StorageMapShim};
 use pallet_prelude::*;
@@ -206,8 +207,8 @@ impl EthereumVerifyProvider for MockEthereumVerifier {
 
 	fn verify_account_storage_proof<MaxStorageSlots>(
 		_account_address: H160,
-		_proof: &EthereumAccountStorageProof<MaxStorageSlots>,
-	) -> Result<Moment, EthereumVerifyError>
+		proof: &EthereumAccountStorageProof<MaxStorageSlots>,
+	) -> Result<EthereumProofBlock, EthereumVerifyError>
 	where
 		MaxStorageSlots: Get<u32>,
 	{
@@ -215,7 +216,11 @@ impl EthereumVerifyProvider for MockEthereumVerifier {
 			return Err(EthereumVerifyError::InvalidProof);
 		}
 
-		Ok(Self::latest_execution_block_timestamp().unwrap_or_default())
+		Ok(EthereumProofBlock {
+			hash: proof.execution_block_proof.anchor_block_hash,
+			number: Self::latest_execution_block_number().unwrap_or_default(),
+			timestamp_millis: Self::latest_execution_block_timestamp().unwrap_or_default(),
+		})
 	}
 
 	fn latest_execution_block_number() -> Option<EthereumBlockNumber> {

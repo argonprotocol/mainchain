@@ -1,5 +1,4 @@
 //! Benchmarking setup for pallet-notebook
-#![cfg(feature = "runtime-benchmarks")]
 
 use super::*;
 #[allow(unused_imports)]

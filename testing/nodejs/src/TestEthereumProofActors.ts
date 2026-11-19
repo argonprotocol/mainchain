@@ -619,6 +619,7 @@ export class TestMintingAuthorityActor {
           tick: currentTick.toBigInt(),
         },
         null,
+        null,
       ),
       this.operator,
     );

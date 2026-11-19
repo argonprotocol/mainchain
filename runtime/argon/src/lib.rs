@@ -453,6 +453,7 @@ impl pallet_treasury::Config for Runtime {
 		benchmarking::BenchmarkBitcoinVaultProvider<Balances, AccountId, Balance>
 	);
 	type PositionProvider = use_unless_benchmark!(TreasuryPositions, benchmarking::BenchmarkTreasuryPositionProvider<AccountId, Balance>);
+	type StabilizerPoolRewardHistoryFrames = StabilizerPoolMaxSampledPriceHistoryFrames;
 	type OperationalAccountProvider = use_unless_benchmark!(
 		OperationalAccounts,
 		benchmarking::BenchmarkOperationalAccountProvider<AccountId>
@@ -476,11 +477,13 @@ impl pallet_treasury::Config for Runtime {
 	type PercentForMiningOperatorPool = PercentForMiningOperatorPool;
 	type PercentForBitcoinLiquidPool = PercentForBitcoinLiquidPool;
 	type PercentForArgonBondPool = PercentForArgonBondPool;
+	type PercentForStabilizerPool = PercentForStabilizerPool;
 	type PercentForVaultPool = PercentForVaultPool;
 	type MinimumVaultProfitPercent = MinimumVaultProfitPercent;
 	type VaultBitcoinRewardPercent = VaultBitcoinRewardPercent;
 	type ArgonotSecuritizationMultiplier = ArgonotSecuritizationMultiplier;
 	type DefaultTargetBitcoinPercent = DefaultTargetBitcoinPercent;
+	type DefaultTargetStabilizerPoolPercent = DefaultTargetStabilizerPoolPercent;
 	type MaxVaultsPerPool = MaxVaultsPerPool;
 	type MaxPendingUnlocksPerFrame = MaxPendingUnlocksPerFrame;
 	type TreasuryExitDelayFrames = TreasuryExitDelayFrames;
@@ -520,6 +523,7 @@ impl pallet_mining_slot::Config for Runtime {
 		(
 			GrandpaSlotRotation,
 			BlockRewards,
+			StabilizerPools,
 			Treasury,
 			StabilizerBuys,
 			Vaults,
@@ -687,6 +691,8 @@ parameter_types! {
 }
 
 impl pallet_price_index::Config for Runtime {
+	type StabilizerPool =
+		use_unless_benchmark!(StabilizerBuys, benchmarking::BenchmarkStabilizerPoolPriceSource);
 	type OnPriceIndexUpdated =
 		use_unless_benchmark!((StabilizerBuys, StabilizerPools, BitcoinFissions), ());
 	type WeightInfo = weights::pallet_price_index::WeightInfo<Runtime>;
@@ -953,6 +959,9 @@ impl pallet_fee_control::Config for Runtime {
 impl pallet_treasury_positions::Config for Runtime {
 	type BitcoinPositionProvider = use_unless_benchmark!(BitcoinLocks, ());
 	type TreasuryPoolProvider = use_unless_benchmark!(Treasury, ());
+	type StabilizerPoolPositionProvider = use_unless_benchmark!(StabilizerPools, ());
+	type MiningFrameTransitionProvider = use_unless_benchmark!(MiningSlot, ());
+	type Currency = Balances;
 	type OperationalAccountProvider = use_unless_benchmark!(
 		OperationalAccounts,
 		benchmarking::BenchmarkOperationalAccountProvider<AccountId>
@@ -962,8 +971,21 @@ impl pallet_treasury_positions::Config for Runtime {
 }
 
 impl pallet_stabilizer_pools::Config for Runtime {
+	type EthereumVerifier = use_unless_benchmark!(EthereumVerifier, ());
+	type RewardProvider =
+		use_unless_benchmark!(Treasury, benchmarking::BenchmarkStabilizerPoolRewards);
+	type UsdcRewardShare = StabilizerPoolUsdcRewardShare;
+	type MaxPositionsPerAccount = StabilizerPoolMaxPositionsPerAccount;
+	type TreasuryPositionProvider = use_unless_benchmark!(TreasuryPositions, ());
 	type WeightInfo = weights::pallet_stabilizer_pools::WeightInfo<Runtime>;
-	type MiningFrameTransitionProvider = MiningSlot;
+	type MiningFrameTransitionProvider =
+		use_unless_benchmark!(MiningSlot, benchmarking::BenchmarkCurrentFrameId);
 	type CurrentTick = Ticks;
-	type MaxFramePriceHistoryFrames = ConstU32<33>;
+	type TimeProvider = Timestamp;
+	type MaxSampledPriceHistoryFrames = StabilizerPoolMaxSampledPriceHistoryFrames;
+	type ClaimWindowFrames = StabilizerPoolClaimWindowFrames;
+	type TicksPerFrame = GetTicksPerFrame;
+	type RewardPriceBand = StabilizerPoolRewardPriceBand;
+	type MaxPriceBucketsPerFrame = StabilizerPoolMaxPriceBucketsPerFrame;
+	type MinPriceBucketCoverage = StabilizerPoolMinPriceBucketCoverage;
 }

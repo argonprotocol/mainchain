@@ -110,6 +110,7 @@ describe.skipIf(SKIP_E2E)('Bitcoin Bindings test', { retry: 0, timeout: 60e3 }, 
           tick: currentTick.toBigInt(),
         },
         null,
+        null,
       ),
       new Keyring({ type: 'sr25519' }).addFromUri(TestOracle.PriceIndexOperator),
     );

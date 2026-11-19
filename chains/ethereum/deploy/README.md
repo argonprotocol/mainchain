@@ -218,5 +218,6 @@ that PoolManager; it requires no separate Argon registration. See the
 After publication, execute the prepared `stabilizerPools.registerPool` root call on Argon. Add the
 hook address to `ARGON_UNISWAP_ORACLE_ADDRESSES` when enabling it as a price source, and allow the
 one-hour observation window to warm up with liquidity. Initial liquidity, NFT subscription, and
-claimant checkpoints are separate user operations. Reward calculation and collection remain
-deferred.
+claimant checkpoints are separate user operations. For liquidity rewards, approve the same market
+with `stabilizerBuys.setApprovedPool`. Beneficiaries checkpoint their NFTs and collect finalized
+earnings through `treasuryPositions.collect()`. See the [reward rules](../../../pallets/stabilizer_pools/README.md).

@@ -2,7 +2,6 @@
 #![allow(clippy::multiple_bound_locations)]
 #![allow(clippy::inconsistent_digit_grouping)]
 
-use argon_primitives::treasury::{TreasuryPositionProvider, UpstreamPosition};
 use codec::Encode;
 use pallet_bitcoin_fissions::{Error as FissionError, FissionByOwnerAndId, FissionIdsByLockId};
 use pallet_prelude::*;
@@ -318,10 +317,6 @@ fn partial_release_keeps_the_lock_pending_until_the_bitcoin_transaction_is_obser
 		#[cfg(feature = "try-runtime")]
 		<BitcoinLocks as frame_support::traits::OnGenesis>::on_genesis();
 		System::set_block_number(1);
-		TreasuryPositions::set_upstream_position(
-			&2,
-			Some(UpstreamPosition { vault_id: 1, ..Default::default() }),
-		);
 		set_argons(2, 2_000_000);
 		let secp = bitcoin::secp256k1::Secp256k1::new();
 		let owner_pubkey =
@@ -346,13 +341,11 @@ fn partial_release_keeps_the_lock_pending_until_the_bitcoin_transaction_is_obser
 		let lock = LocksById::<Test>::get(1).expect("lock");
 		let collateral = lock.cosigner_guarantee.guaranteed_microgons;
 		assert_eq!(
-			TreasuryPositions::upstream_position(&2).unwrap().bitcoin_securitization,
+			MockTreasuryPositionProvider::bitcoin_position(2, 1).activated_securitization,
 			collateral
 		);
 		assert_eq!(
-			TreasuryPositions::upstream_position(&2)
-				.unwrap()
-				.bitcoin_allocated_securitization,
+			MockTreasuryPositionProvider::bitcoin_position(2, 1).allocated_securitization,
 			collateral
 		);
 		let target_rate = lock.cosigner_guarantee.basis.microgons_at_target_per_btc;
@@ -396,7 +389,7 @@ fn partial_release_keeps_the_lock_pending_until_the_bitcoin_transaction_is_obser
 		#[cfg(feature = "try-runtime")]
 		assert_ok!(BitcoinLocks::try_state(1));
 		assert_eq!(
-			TreasuryPositions::upstream_position(&2).unwrap().bitcoin_securitization,
+			MockTreasuryPositionProvider::bitcoin_position(2, 1).activated_securitization,
 			collateral
 		);
 		assert!(!LockReleaseRequestsById::<Test>::contains_key(1));
@@ -438,13 +431,11 @@ fn partial_release_keeps_the_lock_pending_until_the_bitcoin_transaction_is_obser
 		let lock = LocksById::<Test>::get(1).expect("partial release keeps the Lock");
 		assert_eq!(lock.funded_satoshis, 69_999_000);
 		assert_eq!(
-			TreasuryPositions::upstream_position(&2).unwrap().bitcoin_securitization,
+			MockTreasuryPositionProvider::bitcoin_position(2, 1).activated_securitization,
 			lock.total_securitization(1).activated_securitization
 		);
 		assert_eq!(
-			TreasuryPositions::upstream_position(&2)
-				.unwrap()
-				.bitcoin_allocated_securitization,
+			MockTreasuryPositionProvider::bitcoin_position(2, 1).allocated_securitization,
 			DefaultVault::get().securitization_locked
 		);
 		assert_eq!(lock.fissioned_satoshis, 40_000_000);
@@ -640,10 +631,6 @@ fn partial_release_preserves_the_funding_window_then_expires_to_remaining_bitcoi
 	set_bitcoin_height(12);
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
-		TreasuryPositions::set_upstream_position(
-			&2,
-			Some(UpstreamPosition { vault_id: 1, ..Default::default() }),
-		);
 		set_argons(2, 2_000_000);
 		assert_ok!(BitcoinLocks::create_receive_address(
 			RuntimeOrigin::signed(2),
@@ -688,9 +675,9 @@ fn partial_release_preserves_the_funding_window_then_expires_to_remaining_bitcoi
 		assert_eq!(vault.securitized_satoshis, request.change_satoshis);
 		assert_eq!(vault.securitization_locked, before.cosigner_guarantee.guaranteed_microgons);
 		assert_eq!(vault.get_activated_securitization(), activated);
-		let position = TreasuryPositions::upstream_position(&2).unwrap();
-		assert_eq!(position.bitcoin_securitization, activated);
-		assert_eq!(position.bitcoin_allocated_securitization, vault.securitization_locked);
+		let position = MockTreasuryPositionProvider::bitcoin_position(2, 1);
+		assert_eq!(position.activated_securitization, activated);
+		assert_eq!(position.allocated_securitization, vault.securitization_locked);
 
 		BitcoinBlockHeightChange::set((deadline, deadline + 1));
 		BitcoinLocks::on_initialize(2);
@@ -702,9 +689,9 @@ fn partial_release_preserves_the_funding_window_then_expires_to_remaining_bitcoi
 		assert_eq!(expired.cosigner_guarantee.guaranteed_microgons, activated);
 		assert_eq!(DefaultVault::get().securitization_locked, activated);
 		assert_eq!(DefaultVault::get().securitization_pending_activation, 0);
-		let position = TreasuryPositions::upstream_position(&2).unwrap();
-		assert_eq!(position.bitcoin_securitization, activated);
-		assert_eq!(position.bitcoin_allocated_securitization, activated);
+		let position = MockTreasuryPositionProvider::bitcoin_position(2, 1);
+		assert_eq!(position.activated_securitization, activated);
+		assert_eq!(position.allocated_securitization, activated);
 	});
 }
 
@@ -1344,10 +1331,6 @@ fn splitting_initial_funding_keeps_vault_and_position_rounding_in_sync() {
 			System::set_block_number(1);
 			BitcoinPriceInUsd::set(Some(FixedU128::from_u32(btc_price)));
 			set_argons(2, 2_000_000);
-			TreasuryPositions::set_upstream_position(
-				&2,
-				Some(UpstreamPosition { vault_id: 1, ..Default::default() }),
-			);
 			assert_ok!(BitcoinLocks::create_receive_address(
 				RuntimeOrigin::signed(2),
 				1,
@@ -1372,7 +1355,7 @@ fn splitting_initial_funding_keeps_vault_and_position_rounding_in_sync() {
 			assert_eq!(DefaultVault::get().get_activated_securitization(), after);
 			assert_eq!(DefaultVault::get().total_satoshis, funded_satoshis);
 			assert_eq!(
-				TreasuryPositions::upstream_position(&2).unwrap().bitcoin_securitization,
+				MockTreasuryPositionProvider::bitcoin_position(2, 1).activated_securitization,
 				after
 			);
 		});
@@ -2175,10 +2158,6 @@ fn expires_the_securitization_hold_without_unwatching_the_lock() {
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		let who = 1;
-		TreasuryPositions::set_upstream_position(
-			&who,
-			Some(UpstreamPosition { vault_id: 1, ..Default::default() }),
-		);
 		set_argons(who, 2_000_000);
 
 		assert_ok!(BitcoinLocks::create_receive_address(
@@ -2189,10 +2168,7 @@ fn expires_the_securitization_hold_without_unwatching_the_lock() {
 			None
 		));
 		assert!(
-			TreasuryPositions::upstream_position(&who)
-				.unwrap()
-				.bitcoin_allocated_securitization >
-				0
+			MockTreasuryPositionProvider::bitcoin_position(who, 1).allocated_securitization > 0
 		);
 		let expiration_height =
 			BitcoinBlockHeightChange::get().1 + SecuritizationHoldBlocks::get() + 1;
@@ -2205,9 +2181,7 @@ fn expires_the_securitization_hold_without_unwatching_the_lock() {
 		let lock = LocksById::<Test>::get(1).expect("lock should remain watched");
 		assert!(lock.securitization_hold_expiration_bitcoin_height.is_none());
 		assert_eq!(
-			TreasuryPositions::upstream_position(&who)
-				.unwrap()
-				.bitcoin_allocated_securitization,
+			MockTreasuryPositionProvider::bitcoin_position(who, 1).allocated_securitization,
 			0
 		);
 		assert_eq!(DefaultVault::get().securitization_locked, 0);
@@ -3678,10 +3652,6 @@ fn failed_expiry_retries_after_bitcoin_advances_without_blocking_other_locks() {
 		System::set_block_number(1);
 		BitcoinPriceInUsd::set(Some(FixedU128::from_u32(62_000)));
 		ArgonPriceInUsd::set(Some(FixedU128::one()));
-		TreasuryPositions::set_upstream_position(
-			&2,
-			Some(UpstreamPosition { vault_id: 1, ..Default::default() }),
-		);
 		set_argons(2, 100_000 * MICROGONS_PER_ARGON);
 		assert_ok!(BitcoinLocks::create_receive_address(
 			RuntimeOrigin::signed(2),
@@ -3732,7 +3702,7 @@ fn failed_expiry_retries_after_bitcoin_advances_without_blocking_other_locks() {
 			microgons_at_target_per_btc,
 			None,
 		));
-		let upstream = TreasuryPositions::upstream_position(&2);
+		let reported_position = MockTreasuryPositionProvider::bitcoin_position(2, 1);
 
 		// A third Lock has no Liquid debt and can expire without a price quote.
 		assert_ok!(BitcoinLocks::create_receive_address(
@@ -3749,7 +3719,7 @@ fn failed_expiry_retries_after_bitcoin_advances_without_blocking_other_locks() {
 
 		assert_eq!(LocksById::<Test>::get(1).unwrap().encode(), lock.encode());
 		assert_eq!(FissionByOwnerAndId::<Test>::get(2, 0), Some(liquid));
-		assert_eq!(TreasuryPositions::upstream_position(&2), upstream);
+		assert_eq!(MockTreasuryPositionProvider::bitcoin_position(2, 1), reported_position);
 		assert!(PendingLockExpirations::<Test>::contains_key(1));
 		assert!(LockExpirationsByBitcoinHeight::<Test>::get(expiry).is_empty());
 		assert!(!LocksById::<Test>::contains_key(3));
@@ -3783,7 +3753,10 @@ fn failed_expiry_retries_after_bitcoin_advances_without_blocking_other_locks() {
 		assert!(!FissionByOwnerAndId::<Test>::contains_key(2, 0));
 		assert!(FissionIdsByLockId::<Test>::get(1).is_empty());
 		assert!(!LockIdsByVaultId::<Test>::contains_key(1, 1));
-		assert_eq!(TreasuryPositions::upstream_position(&2).unwrap().bitcoin_securitization, 0);
+		assert_eq!(
+			MockTreasuryPositionProvider::bitcoin_position(2, 1).activated_securitization,
+			0
+		);
 		assert_eq!(pallet_mint::PendingBitcoinMintsByIndex::<Test>::get(0), Some(pending_mint));
 	});
 }
@@ -4881,15 +4854,11 @@ fn make_script_pubkey(vec: &[u8]) -> BitcoinScriptPubkey {
 }
 
 #[test]
-fn upstream_collateral_tracks_reservations_funding_guarantee_changes_and_termination() {
+fn reports_collateral_changes_for_reservation_funding_and_termination() {
 	set_bitcoin_height(12);
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		set_argons(2, 2_000_000);
-		TreasuryPositions::set_upstream_position(
-			&2,
-			Some(UpstreamPosition { vault_id: 1, ..Default::default() }),
-		);
 		assert_ok!(BitcoinLocks::create_receive_address(
 			RuntimeOrigin::signed(2),
 			1,
@@ -4899,17 +4868,18 @@ fn upstream_collateral_tracks_reservations_funding_guarantee_changes_and_termina
 		));
 		let lock = LocksById::<Test>::get(1).unwrap();
 		let collateral = lock.cosigner_guarantee.guaranteed_microgons;
-		assert_eq!(TreasuryPositions::upstream_position(&2).unwrap().bitcoin_securitization, 0);
 		assert_eq!(
-			TreasuryPositions::upstream_position(&2)
-				.unwrap()
-				.bitcoin_allocated_securitization,
+			MockTreasuryPositionProvider::bitcoin_position(2, 1).activated_securitization,
+			0
+		);
+		assert_eq!(
+			MockTreasuryPositionProvider::bitcoin_position(2, 1).allocated_securitization,
 			collateral
 		);
 		assert_ok!(funding_received(1, SATOSHIS_PER_BITCOIN / 2));
-		let position = TreasuryPositions::upstream_position(&2).unwrap();
-		assert_eq!(position.bitcoin_securitization, collateral / 2);
-		assert_eq!(position.bitcoin_allocated_securitization, collateral);
+		let position = MockTreasuryPositionProvider::bitcoin_position(2, 1);
+		assert_eq!(position.activated_securitization, collateral / 2);
+		assert_eq!(position.allocated_securitization, collateral);
 		MicrogonsAtTargetPerBtcHistory::<Test>::mutate(|rates| {
 			_ = rates.try_push((12, lock.cosigner_guarantee.basis.microgons_at_target_per_btc));
 		});
@@ -4920,37 +4890,32 @@ fn upstream_collateral_tracks_reservations_funding_guarantee_changes_and_termina
 			lock_options(lock.cosigner_guarantee.basis.microgons_at_target_per_btc)
 		));
 		assert_eq!(
-			TreasuryPositions::upstream_position(&2).unwrap().bitcoin_securitization,
+			MockTreasuryPositionProvider::bitcoin_position(2, 1).activated_securitization,
 			collateral / 2
 		);
 		assert_eq!(
-			TreasuryPositions::upstream_position(&2)
-				.unwrap()
-				.bitcoin_allocated_securitization,
+			MockTreasuryPositionProvider::bitcoin_position(2, 1).allocated_securitization,
 			collateral / 2
 		);
 		assert_ok!(spent(1));
 		assert!(!LocksById::<Test>::contains_key(1));
-		assert_eq!(TreasuryPositions::upstream_position(&2).unwrap().bitcoin_securitization, 0);
 		assert_eq!(
-			TreasuryPositions::upstream_position(&2)
-				.unwrap()
-				.bitcoin_allocated_securitization,
+			MockTreasuryPositionProvider::bitcoin_position(2, 1).activated_securitization,
+			0
+		);
+		assert_eq!(
+			MockTreasuryPositionProvider::bitcoin_position(2, 1).allocated_securitization,
 			0
 		);
 	});
 }
 
 #[test]
-fn funding_rolls_back_when_the_upstream_position_is_inconsistent() {
+fn funding_rolls_back_when_positions_reject_the_update() {
 	set_bitcoin_height(12);
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
 		set_argons(2, 2_000_000);
-		TreasuryPositions::set_upstream_position(
-			&2,
-			Some(UpstreamPosition { vault_id: 1, ..Default::default() }),
-		);
 		assert_ok!(BitcoinLocks::create_receive_address(
 			RuntimeOrigin::signed(2),
 			1,
@@ -4959,11 +4924,8 @@ fn funding_rolls_back_when_the_upstream_position_is_inconsistent() {
 			None
 		));
 		let lock = LocksById::<Test>::get(1).unwrap();
-		// Corrupt the old reservation to exercise the failure after source mutations.
-		TreasuryPositions::set_upstream_position(
-			&2,
-			Some(UpstreamPosition { vault_id: 1, ..Default::default() }),
-		);
+		let position_before_funding = MockTreasuryPositionProvider::bitcoin_position(2, 1);
+		MockTreasuryPositionProvider::reject_bitcoin_updates();
 		assert_ok!(BitcoinUtxos::watch_for_utxo(1, lock.utxo_script_pubkey));
 		let block = BitcoinBlock { block_height: 12, block_hash: H256Le([1; 32]) };
 		pallet_bitcoin_utxos::ConfirmedBitcoinBlockTip::<Test>::put(block.clone());
@@ -4984,17 +4946,14 @@ fn funding_rolls_back_when_the_upstream_position_is_inconsistent() {
 		System::assert_last_event(
 			pallet_bitcoin_utxos::Event::<Test>::UtxoDetectedError {
 				lock_id: 1,
-				error: sp_runtime::ArithmeticError::Underflow.into(),
+				error: DispatchError::Unavailable,
 			}
 			.into(),
 		);
 		assert_eq!(LocksById::<Test>::get(1).unwrap().funded_satoshis, lock.funded_satoshis);
 		assert!(LocksById::<Test>::get(1).unwrap().funding_utxos.is_empty());
 		assert!(pallet_bitcoin_utxos::UtxoRefsByLockId::<Test>::get(1).is_empty());
-		assert_eq!(
-			TreasuryPositions::upstream_position(&2),
-			Some(UpstreamPosition { vault_id: 1, ..Default::default() }),
-		);
+		assert_eq!(MockTreasuryPositionProvider::bitcoin_position(2, 1), position_before_funding,);
 	});
 }
 
@@ -5008,10 +4967,6 @@ fn liquid_creation_keeps_lock_coverage_and_rents_only_the_shortfall() {
 			System::set_block_number(1);
 			BitcoinPriceInUsd::set(Some(FixedU128::from_u32(100_000)));
 			set_argons(2, 1_000_000 * MICROGONS_PER_ARGON);
-			TreasuryPositions::set_upstream_position(
-				&2,
-				Some(UpstreamPosition { vault_id: 1, ..Default::default() }),
-			);
 			assert_ok!(BitcoinLocks::create_receive_address(
 				RuntimeOrigin::signed(2),
 				1,
@@ -5095,7 +5050,7 @@ fn liquid_creation_keeps_lock_coverage_and_rents_only_the_shortfall() {
 				DefaultVault::get().get_activated_securitization()
 			);
 			assert_eq!(
-				TreasuryPositions::upstream_position(&2).unwrap().bitcoin_securitization,
+				MockTreasuryPositionProvider::bitcoin_position(2, 1).activated_securitization,
 				position.activated_securitization
 			);
 			assert_eq!(DefaultVault::get().total_satoshis, SATOSHIS_PER_BITCOIN);
@@ -5114,10 +5069,6 @@ fn liquid_close_merges_at_the_better_guarantee_rate_without_changing_securitizat
 		System::set_block_number(1);
 		BitcoinPriceInUsd::set(Some(FixedU128::from_u32(100_000)));
 		set_argons(2, 1_000_000 * MICROGONS_PER_ARGON);
-		TreasuryPositions::set_upstream_position(
-			&2,
-			Some(UpstreamPosition { vault_id: 1, ..Default::default() }),
-		);
 		assert_ok!(BitcoinLocks::create_receive_address(
 			RuntimeOrigin::signed(2),
 			1,
@@ -5163,7 +5114,10 @@ fn liquid_close_merges_at_the_better_guarantee_rate_without_changing_securitizat
 		let vault = DefaultVault::get();
 		assert_eq!(vault.securitization_locked, vault_before.securitization_locked);
 		assert_eq!(vault.securitized_satoshis, 75_000_000);
-		assert_eq!(TreasuryPositions::upstream_position(&2).unwrap().bitcoin_securitization, paid);
+		assert_eq!(
+			MockTreasuryPositionProvider::bitcoin_position(2, 1).activated_securitization,
+			paid
+		);
 	});
 }
 
@@ -5176,10 +5130,6 @@ fn closing_liquid_renews_the_combined_guarantee_until_funding_or_expiry() {
 			BitcoinPriceInUsd::set(Some(FixedU128::from_u32(100_000)));
 			ArgonPriceInUsd::set(Some(FixedU128::from_rational(95, 100)));
 			set_argons(2, 1_000_000 * MICROGONS_PER_ARGON);
-			TreasuryPositions::set_upstream_position(
-				&2,
-				Some(UpstreamPosition { vault_id: 1, ..Default::default() }),
-			);
 			assert_ok!(BitcoinLocks::create_receive_address(
 				RuntimeOrigin::signed(2),
 				1,
@@ -5254,7 +5204,7 @@ fn closing_liquid_renews_the_combined_guarantee_until_funding_or_expiry() {
 			assert_eq!(DefaultVault::get().securitization_pending_activation, 0);
 			assert_eq!(DefaultVault::get().get_activated_securitization(), expected);
 			assert_eq!(
-				TreasuryPositions::upstream_position(&2).unwrap().bitcoin_securitization,
+				MockTreasuryPositionProvider::bitcoin_position(2, 1).activated_securitization,
 				expected
 			);
 		});
@@ -5661,10 +5611,6 @@ fn differently_priced_liquids_ratchet_and_close_independently() {
 			System::set_block_number(1);
 			BitcoinPriceInUsd::set(Some(FixedU128::from_u32(100_000)));
 			set_argons(2, 1_000_000 * MICROGONS_PER_ARGON);
-			TreasuryPositions::set_upstream_position(
-				&2,
-				Some(UpstreamPosition { vault_id: 1, ..Default::default() }),
-			);
 			assert_ok!(BitcoinLocks::create_receive_address(
 				RuntimeOrigin::signed(2),
 				1,
@@ -5714,10 +5660,13 @@ fn differently_priced_liquids_ratchet_and_close_independently() {
 					DefaultVault::get().get_activated_securitization()
 				);
 				let position = lock.total_securitization(1);
-				let upstream = TreasuryPositions::upstream_position(&2).unwrap();
-				assert_eq!(upstream.bitcoin_securitization, position.activated_securitization);
+				let reported_position = MockTreasuryPositionProvider::bitcoin_position(2, 1);
 				assert_eq!(
-					upstream.bitcoin_allocated_securitization,
+					reported_position.activated_securitization,
+					position.activated_securitization
+				);
+				assert_eq!(
+					reported_position.allocated_securitization,
 					position.allocated_securitization
 				);
 				assert_eq!(DefaultVault::get().total_satoshis, SATOSHIS_PER_BITCOIN);

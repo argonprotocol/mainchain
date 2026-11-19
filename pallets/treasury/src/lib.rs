@@ -50,9 +50,9 @@ pub use pallet::*;
 /// after the current frame; regular bonds continue earning even if securitization later falls.
 ///
 /// ## Profits from Bid Pool
-/// After each bid pool closes, configured shares fund marketing and Bitcoin Liquids. Eligible
-/// Argonot stakes, Argon bonds, and vaults receive rewards. Unallocated funds go to the liquidity
-/// buys reserve.
+/// After each bid pool closes, configured shares fund marketing, Bitcoin Liquids, and stabilizer
+/// pools. Eligible Argonot stakes, Argon bonds, and vaults receive rewards. Unallocated funds go
+/// to the liquidity buys reserve.
 ///
 /// The frame's APY policy tapers excess bond and stake rewards into their own reserves. Excess
 /// vault rewards go to liquidity buys. Bond earnings pay directly; vault earnings enter the
@@ -79,12 +79,13 @@ pub mod pallet {
 	use argon_primitives::{
 		bitcoin::{Satoshis, SATOSHIS_PER_BITCOIN},
 		providers::PriceProviderWeightInfo,
+		treasury::{StabilizerPoolFrameClaim, StabilizerPoolRewardProvider},
 		vault::{
 			TreasuryBonusApprovalProof, TreasuryVaultProvider, TreasuryVaultProviderWeightInfo,
 			VaultSecuritization, VaultTreasuryFrameEarnings,
 		},
-		AscendingRankKey, BitcoinMintedProvider, BlockSealAuthorityId, OnNewSlot, PriceProvider,
-		TreasuryPoolProvider, MICROGONS_PER_ARGON,
+		AscendingRankKey, Balance, BitcoinMintedProvider, BlockSealAuthorityId, OnNewSlot,
+		PriceProvider, TreasuryPoolProvider, MICROGONS_PER_ARGON,
 	};
 	use pallet_prelude::argon_primitives::{
 		MiningFrameTransitionProvider, OperationalAccountsHook, OperationalRewardsPayer,
@@ -147,6 +148,9 @@ pub mod pallet {
 		/// Provider for Bitcoin-minted Argons that have not been explicitly repaid.
 		type BitcoinMintedProvider: BitcoinMintedProvider<Self::Balance>;
 		type PositionProvider: TreasuryPositionProvider<Self::AccountId, Self::Balance>;
+		/// Retain each frame's financial terms through its correction and collection periods.
+		#[pallet::constant]
+		type StabilizerPoolRewardHistoryFrames: Get<u32>;
 		type OperationalAccountProvider: OperationalAccountProvider<Self::AccountId>;
 		#[pallet::constant]
 		type UpstreamBitcoinTarget: Get<Self::Balance>;
@@ -209,6 +213,10 @@ pub mod pallet {
 		#[pallet::constant]
 		type PercentForArgonBondPool: Get<Percent>;
 
+		/// Percent credited to the stabilizer pool rewards reserve.
+		#[pallet::constant]
+		type PercentForStabilizerPool: Get<Percent>;
+
 		/// Maximum percent paid to vaults when the network target is filled.
 		#[pallet::constant]
 		type PercentForVaultPool: Get<Percent>;
@@ -229,6 +237,10 @@ pub mod pallet {
 		/// Default percent of maximum Bitcoin-mintable Argons targeted by the network.
 		#[pallet::constant]
 		type DefaultTargetBitcoinPercent: Get<Percent>;
+
+		/// Default circulating ARGON fraction used as the stabilizer pool reward reference.
+		#[pallet::constant]
+		type DefaultTargetStabilizerPoolPercent: Get<Percent>;
 
 		/// The maximum number of vaults that can participate in one frame's locked vault capital.
 		#[pallet::constant]
@@ -306,10 +318,7 @@ pub mod pallet {
 			stabilizer_pools: TaperingProgram {
 				target_daily_return: daily_500,
 				excess_reward_payout_percent: Percent::from_percent(50),
-				target_daily_return_with_price_below_target: Some(BelowTargetPriceYield {
-					target_daily_return: daily_100,
-					argon_price_drop_for_target: Percent::from_percent(10),
-				}),
+				target_daily_return_with_price_below_target: None,
 			},
 		}
 	}
@@ -333,10 +342,21 @@ pub mod pallet {
 	#[pallet::storage]
 	pub type OutstandingPurchaseRewards<T: Config> = StorageValue<_, T::Balance, ValueQuery>;
 
+	/// Shared funding and reward rates for each retained stabilizer pool earning frame.
+	#[pallet::storage]
+	pub type StabilizerPoolRewardFrames<T: Config> =
+		StorageMap<_, Twox64Concat, FrameId, StabilizerPoolRewardFrame<T::Balance>, OptionQuery>;
+
 	/// Configurable percent of maximum Bitcoin-mintable Argons targeted by the network.
 	#[pallet::storage]
 	pub type TargetBitcoinPercent<T: Config> =
 		StorageValue<_, Percent, ValueQuery, T::DefaultTargetBitcoinPercent>;
+
+	/// Circulating ARGON fraction used as the value reference for stabilizer pool rewards.
+	/// A zero reference leaves the frame's allocation in the stabilizer pool reserve.
+	#[pallet::storage]
+	pub type TargetStabilizerPoolPercent<T: Config> =
+		StorageValue<_, Percent, ValueQuery, T::DefaultTargetStabilizerPoolPercent>;
 
 	#[pallet::type_value]
 	pub fn DefaultUpstreamParticipationFactor() -> Percent {
@@ -490,6 +510,8 @@ pub mod pallet {
 		RewardEconomicsConfigured {
 			target_bitcoin_percent: Percent,
 			upstream_participation_factor: Percent,
+			/// Circulating ARGON fraction used as the stabilizer pool reward reference.
+			target_stabilizer_pool_percent: Percent,
 		},
 		RewardTaperingPolicyConfigured {
 			policy: Box<TaperingPolicy>,
@@ -616,6 +638,8 @@ pub mod pallet {
 		BondLotCannotBeFlexible,
 		/// The caller does not have permission to perform this action.
 		NoPermissions,
+		/// A requested reward frame has yet to finalize its rate.
+		StabilizerPoolClaimNotReady,
 	}
 
 	#[pallet::hooks]
@@ -1046,6 +1070,7 @@ pub mod pallet {
 			origin: OriginFor<T>,
 			target_bitcoin_percent: Option<Percent>,
 			upstream_participation_factor: Option<Percent>,
+			target_stabilizer_pool_percent: Option<Percent>,
 		) -> DispatchResult {
 			ensure_root(origin)?;
 			let current_target_bitcoin_percent = TargetBitcoinPercent::<T>::get();
@@ -1058,11 +1083,18 @@ pub mod pallet {
 				UpstreamParticipationFactor::<T>::put(upstream_participation_factor);
 			}
 
+			let current_target_stabilizer_pool_percent = TargetStabilizerPoolPercent::<T>::get();
+			if let Some(target_stabilizer_pool_percent) = target_stabilizer_pool_percent {
+				TargetStabilizerPoolPercent::<T>::put(target_stabilizer_pool_percent);
+			}
+
 			Self::deposit_event(Event::RewardEconomicsConfigured {
 				target_bitcoin_percent: target_bitcoin_percent
 					.unwrap_or(current_target_bitcoin_percent),
 				upstream_participation_factor: upstream_participation_factor
 					.unwrap_or(current_upstream_participation_factor),
+				target_stabilizer_pool_percent: target_stabilizer_pool_percent
+					.unwrap_or(current_target_stabilizer_pool_percent),
 			});
 			Ok(())
 		}
@@ -1361,6 +1393,8 @@ pub mod pallet {
 
 			let bitcoin_liquids_allocation =
 				T::PercentForBitcoinLiquidPool::get().mul_floor(full_bid_pool_amount);
+			let stabilizer_pool_allocation =
+				T::PercentForStabilizerPool::get().mul_floor(full_bid_pool_amount);
 			let mining_operator_allocation =
 				T::PercentForMiningOperatorPool::get().mul_floor(full_bid_pool_amount);
 			let mut unallocated = funding.peek();
@@ -1381,6 +1415,7 @@ pub mod pallet {
 			for (allocation, budget) in [
 				(marketing_allocation, &mut reserves.marketing),
 				(bitcoin_liquids_allocation, &mut reserves.bitcoin_liquids),
+				(stabilizer_pool_allocation, &mut reserves.stabilizer_pools),
 				(stake_payout.withheld, &mut reserves.argonot_stakes),
 				(bond_payout.withheld, &mut reserves.argon_bonds),
 				(mining_operator_allocation, &mut reserves.liquidity_buys),
@@ -1391,6 +1426,13 @@ pub mod pallet {
 			}
 			// Vault taper excess, unfilled allocations, and payout rounding fund liquidity buys.
 			reserves.liquidity_buys.saturating_accrue(unallocated);
+
+			Self::close_stabilizer_pool_reward_frame(
+				frame_id,
+				reserves.stabilizer_pools.saturating_sub(reserves_before.stabilizer_pools),
+				policy.map(|policy| &policy.stabilizer_pools),
+				argon_price_ratio,
+			);
 
 			if reserves != reserves_before {
 				RewardReserves::<T>::put(&reserves);
@@ -1685,7 +1727,7 @@ pub mod pallet {
 				.saturating_add(factor.saturating_mul(participation))
 		}
 
-		/// Pay the completed frame, release matured lots, then activate next-frame positions.
+		/// Fund the completed frame and fix the new frame's financial terms.
 		pub(crate) fn run_frame_transition(frame_id: FrameId) {
 			if frame_id == 0 {
 				return;
@@ -1693,10 +1735,24 @@ pub mod pallet {
 
 			let payout_frame = frame_id - 1;
 			info!("Starting treasury bond frame {frame_id}. Distributing frame {payout_frame}.");
+			let retained = FrameId::from(T::StabilizerPoolRewardHistoryFrames::get());
+			if let Some(expired) = frame_id.checked_sub(retained.saturating_add(1)) {
+				StabilizerPoolRewardFrames::<T>::remove(expired);
+			}
 			Self::distribute_bid_pool(payout_frame);
 			Self::release_pending_bond_lots(frame_id);
 			Self::lock_in_argonot_bond_participants(frame_id);
 			Self::lock_in_vault_capital(frame_id);
+
+			if !StabilizerPoolRewardFrames::<T>::contains_key(frame_id) {
+				let circulation = T::PriceProvider::get_circulation();
+				let target_pool_value_microgons =
+					TargetStabilizerPoolPercent::<T>::get().mul_floor(circulation);
+				StabilizerPoolRewardFrames::<T>::insert(
+					frame_id,
+					StabilizerPoolRewardFrame::Earning { target_pool_value_microgons },
+				);
+			}
 		}
 
 		fn distribute_stake_pool(
@@ -2597,12 +2653,95 @@ pub mod pallet {
 			Ok(release_frame_id)
 		}
 
+		fn close_stabilizer_pool_reward_frame(
+			frame_id: FrameId,
+			funded: T::Balance,
+			policy: Option<&TaperingProgram>,
+			price_ratio: Option<FixedU128>,
+		) {
+			let Some(StabilizerPoolRewardFrame::Earning { target_pool_value_microgons }) =
+				StabilizerPoolRewardFrames::<T>::get(frame_id)
+			else {
+				return;
+			};
+			let budget = policy.map_or(funded, |program| {
+				Self::tapered_payout(
+					funded.into(),
+					target_pool_value_microgons.into(),
+					Self::price_adjusted_daily_return(program, price_ratio),
+					program.excess_reward_payout_percent,
+				)
+				.into()
+			});
+			StabilizerPoolRewardFrames::<T>::insert(
+				frame_id,
+				StabilizerPoolRewardFrame::Funded { target_pool_value_microgons, budget },
+			);
+		}
+
 		fn update_account_vault_bond_total(account_id: &T::AccountId) {
 			let active_account_vault_bond_amount = T::PositionProvider::bond_principal(account_id);
 			T::OperationalAccountsHook::account_vault_bond_total_updated(
 				account_id,
 				active_account_vault_bond_amount,
 			);
+		}
+	}
+
+	impl<T: Config> StabilizerPoolRewardProvider for Pallet<T> {
+		type Weights = weights::ProviderWeightAdapter<T>;
+
+		fn finalize_frame_rewards(frame_id: FrameId, eligible_value: Balance) {
+			let Some(StabilizerPoolRewardFrame::Funded { target_pool_value_microgons, budget }) =
+				StabilizerPoolRewardFrames::<T>::get(frame_id)
+			else {
+				return;
+			};
+
+			let mut reward_rate = FixedU128::zero();
+			if !eligible_value.is_zero() && !target_pool_value_microgons.is_zero() {
+				let denominator = eligible_value.max(target_pool_value_microgons.into());
+				reward_rate = FixedU128::saturating_from_rational(budget.into(), denominator);
+			}
+			StabilizerPoolRewardFrames::<T>::insert(
+				frame_id,
+				StabilizerPoolRewardFrame::Finalized { reward_rate },
+			);
+		}
+
+		fn frame_reward_rate(frame_id: FrameId) -> Option<FixedU128> {
+			let StabilizerPoolRewardFrame::Finalized { reward_rate } =
+				StabilizerPoolRewardFrames::<T>::get(frame_id)?
+			else {
+				return None;
+			};
+			Some(reward_rate)
+		}
+
+		fn claim_rewards(claims: &[StabilizerPoolFrameClaim]) -> Result<Balance, DispatchError> {
+			let mut total = T::Balance::zero();
+			for claim in claims {
+				let amount: T::Balance = match StabilizerPoolRewardFrames::<T>::get(claim.frame_id)
+				{
+					Some(StabilizerPoolRewardFrame::Finalized { .. }) => claim.amount.into(),
+					// Frames without reward terms can predate activation.
+					None => continue,
+					_ => return Err(Error::<T>::StabilizerPoolClaimNotReady.into()),
+				};
+				total = total.checked_add(&amount).ok_or(ArithmeticError::Overflow)?;
+			}
+			if total.is_zero() {
+				return Ok(0);
+			}
+
+			let mut reserves = RewardReserves::<T>::get();
+			reserves.stabilizer_pools = reserves
+				.stabilizer_pools
+				.checked_sub(&total)
+				.ok_or(TokenError::FundsUnavailable)?;
+			RewardReserves::<T>::put(&reserves);
+			Self::deposit_event(Event::<T>::RewardReservesUpdated { reserves });
+			Ok(total.into())
 		}
 	}
 
@@ -2720,6 +2859,9 @@ pub mod pallet {
 					.reads_writes(due_frames.saturating_sub(1), due_frames.saturating_sub(1)),
 			)
 			.saturating_add(price_weight)
+			// Production circulation reads Balances::TotalIssuance, whitelisted by benchmarks;
+			// the benchmark price provider supplies circulation without a storage read.
+			.saturating_add(T::DbWeight::get().reads(1))
 			.saturating_add(<T::PriceProvider as PriceProvider<T::Balance>>::Weights::get_average_cpi_for_ticks())
 			.saturating_add(bitcoin_snapshot_weight)
 			.saturating_add(
@@ -3153,6 +3295,31 @@ pub mod pallet {
 		pub frame_id: FrameId,
 		/// Settings captured at frame start, unaffected by later configuration changes.
 		pub policy: TaperingPolicy,
+	}
+
+	/// Terms for one earning frame, from opening circulation through reward-rate finalization.
+	#[derive(
+		Encode, Decode, DecodeWithMemTracking, Clone, Debug, PartialEq, Eq, TypeInfo, MaxEncodedLen,
+	)]
+	pub enum StabilizerPoolRewardFrame<Balance> {
+		/// The frame is still earning.
+		Earning {
+			/// Desired eligible pool principal, valued in microgons, from the configured share
+			/// of circulating ARGON at frame opening.
+			target_pool_value_microgons: Balance,
+		},
+		/// Funding is fixed and awaits the source's finalized eligible value.
+		Funded {
+			/// Desired eligible pool principal captured at frame opening, in microgons.
+			target_pool_value_microgons: Balance,
+			/// Newly funded rewards after applying the frame's taper, in microgons.
+			budget: Balance,
+		},
+		/// Claims can now settle against the frozen rate.
+		Finalized {
+			/// Fixed ARGON reward per microgon of eligible value, before asset weighting.
+			reward_rate: FixedU128,
+		},
 	}
 
 	/// Reward budgets excluded from issuance until paid. These are amounts, not funded accounts.

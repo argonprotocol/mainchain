@@ -27,8 +27,9 @@ use sp_runtime::{
 
 use super::{
 	ethereum::{
-		EthereumAccountStorageProof, EthereumBlockNumber, EthereumReceiptLogProofBatch,
-		EthereumVerifyError, UniswapPurchase,
+		EthereumAccountStorageProof, EthereumBlockNumber, EthereumProofBlock,
+		EthereumReceiptLogProofBatch, EthereumVerifyError, StabilizerPoolPriceSource,
+		UniswapPurchase,
 	},
 	gateway::{GatewayState, SourceChain},
 	vault::{BitcoinSecuritizationBasis, CosignerGuarantee},
@@ -369,6 +370,12 @@ impl BitcoinFissionsProviderWeightInfo for () {
 }
 
 pub trait BitcoinFissionsProvider<AccountId, Balance> {
+	/// Upper bound on active Fissions for one Bitcoin Lock, used to price worst-case work.
+	/// A provider that returns Fission guarantees must supply its configured bound.
+	fn max_fissions_per_lock() -> u32 {
+		0
+	}
+
 	/// Checks that the Liquid has active Fissions, its creation and latest ratchet precede the
 	/// purchase by more than one tick, and all source Locks outlive the hold and release notice.
 	/// Creation timing is unavailable for Liquids migrated before this tracking was introduced.
@@ -697,10 +704,11 @@ pub trait EthereumVerifyProvider {
 		MaxProofBlocks: Get<u32>,
 		MaxReceiptLogs: Get<u32>;
 
+	/// Authenticate the storage witness and return the execution block it proves.
 	fn verify_account_storage_proof<MaxStorageSlots>(
 		account_address: H160,
 		proof: &EthereumAccountStorageProof<MaxStorageSlots>,
-	) -> Result<Moment, EthereumVerifyError>
+	) -> Result<EthereumProofBlock, EthereumVerifyError>
 	where
 		MaxStorageSlots: Get<u32>;
 
@@ -724,7 +732,7 @@ impl EthereumVerifyProvider for () {
 	fn verify_account_storage_proof<MaxStorageSlots>(
 		_account_address: H160,
 		_proof: &EthereumAccountStorageProof<MaxStorageSlots>,
-	) -> Result<Moment, EthereumVerifyError>
+	) -> Result<EthereumProofBlock, EthereumVerifyError>
 	where
 		MaxStorageSlots: Get<u32>,
 	{
@@ -969,16 +977,34 @@ fn btc_price_in_microgons<
 	Some(microgons.saturating_mul_int(Balance::one()))
 }
 
+/// Supplies the currently approved stabilizer pool and the revision an oracle must report.
+pub trait StabilizerPoolPriceSourceProvider {
+	type Weights: StabilizerPoolPriceSourceProviderWeightInfo;
+
+	fn price_source() -> Option<StabilizerPoolPriceSource>;
+}
+
+pub trait StabilizerPoolPriceSourceProviderWeightInfo {
+	fn price_source() -> Weight;
+}
+
+impl StabilizerPoolPriceSourceProviderWeightInfo for () {
+	fn price_source() -> Weight {
+		Weight::zero()
+	}
+}
+
 /// Accepted oracle observations. Consumers own their retention and valuation policy.
 pub trait PriceIndexUpdated {
-	fn on_price_index(index: &PriceIndex);
+	/// The pool source is present only when the oracle supplied the current approved revision.
+	fn on_price_index(index: &PriceIndex, pool_source: Option<StabilizerPoolPriceSource>);
 	fn on_price_index_weight() -> Weight;
 }
 
 #[impl_trait_for_tuples::impl_for_tuples(0, 3)]
 impl PriceIndexUpdated for Tuple {
-	fn on_price_index(index: &PriceIndex) {
-		for_tuples!( #( Tuple::on_price_index(index); )* );
+	fn on_price_index(index: &PriceIndex, pool_source: Option<StabilizerPoolPriceSource>) {
+		for_tuples!( #( Tuple::on_price_index(index, pool_source); )* );
 	}
 
 	#[allow(clippy::let_and_return)]
@@ -1514,6 +1540,9 @@ pub trait BlockRewardAccountsProvider<AccountId: FullCodec> {
 }
 
 pub trait MiningFrameTransitionProviderWeightInfo {
+	fn is_first_block_after_frame_start() -> Weight {
+		Weight::zero()
+	}
 	fn is_new_frame_started() -> Weight;
 	fn get_current_frame_id() -> Weight;
 }
@@ -1530,8 +1559,24 @@ impl MiningFrameTransitionProviderWeightInfo for () {
 pub trait MiningFrameTransitionProvider {
 	type Weights: MiningFrameTransitionProviderWeightInfo;
 
+	/// Whether the preceding block finalized a new mining frame.
+	fn is_first_block_after_frame_start() -> bool {
+		false
+	}
 	fn is_new_frame_started() -> Option<FrameId>;
 	fn get_current_frame_id() -> FrameId;
+}
+
+impl MiningFrameTransitionProvider for () {
+	type Weights = ();
+
+	fn is_new_frame_started() -> Option<FrameId> {
+		None
+	}
+
+	fn get_current_frame_id() -> FrameId {
+		0
+	}
 }
 
 /// Provides the Bitcoin-minted Argons that have not been explicitly repaid.
@@ -1676,7 +1721,7 @@ pub trait SlotEvents<AccountId> {
 	}
 }
 
-#[impl_trait_for_tuples::impl_for_tuples(0, 7)]
+#[impl_trait_for_tuples::impl_for_tuples(0, 8)]
 #[tuple_types_custom_trait_bound(OnNewSlot<AId>)]
 impl<AId> SlotEvents<AId> for Tuple {
 	fn on_frame_start(frame_id: FrameId) {

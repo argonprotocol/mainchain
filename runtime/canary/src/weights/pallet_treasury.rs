@@ -21,6 +21,45 @@ use core::marker::PhantomData;
 /// Weight functions for `pallet_treasury`.
 pub struct WeightInfo<T>(PhantomData<T>);
 impl<T: frame_system::Config> pallet_treasury::WeightInfo for WeightInfo<T> {
+	/// Storage: `Treasury::StabilizerPoolRewardFrames` (r:1 w:1)
+	/// Proof: `Treasury::StabilizerPoolRewardFrames` (`max_values`: None, `max_size`: Some(49), added: 2524, mode: `MaxEncodedLen`)
+	fn finalize_stabilizer_frame_rewards() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `55`
+		//  Estimated: `3514`
+		// Minimum execution time: 4_000_000 picoseconds.
+		Weight::from_parts(4_000_000, 3514)
+			.saturating_add(T::DbWeight::get().reads(1))
+			.saturating_add(T::DbWeight::get().writes(1))
+		}
+	/// Storage: `Treasury::StabilizerPoolRewardFrames` (r:1 w:0)
+	/// Proof: `Treasury::StabilizerPoolRewardFrames` (`max_values`: None, `max_size`: Some(49), added: 2524, mode: `MaxEncodedLen`)
+	fn read_stabilizer_frame_reward_rate() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `38`
+		//  Estimated: `3514`
+		// Minimum execution time: 2_000_000 picoseconds.
+		Weight::from_parts(3_000_000, 3514)
+			.saturating_add(T::DbWeight::get().reads(1))
+		}
+	/// Storage: `Treasury::StabilizerPoolRewardFrames` (r:10 w:0)
+	/// Proof: `Treasury::StabilizerPoolRewardFrames` (`max_values`: None, `max_size`: Some(49), added: 2524, mode: `MaxEncodedLen`)
+	/// Storage: `Treasury::RewardReserves` (r:1 w:1)
+	/// Proof: `Treasury::RewardReserves` (`max_values`: Some(1), `max_size`: Some(96), added: 591, mode: `MaxEncodedLen`)
+	/// The range of component `f` is `[1, 10]`.
+	fn claim_stabilizer_frame_rewards(f: u32, ) -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `124 + f * (37 +/- 0)`
+		//  Estimated: `1581 + f * (2524 +/- 0)`
+		// Minimum execution time: 6_000_000 picoseconds.
+		Weight::from_parts(4_511_111, 1581)
+			// Standard Error: 45_395
+			.saturating_add(Weight::from_parts(2_546_464, 0).saturating_mul(f.into()))
+			.saturating_add(T::DbWeight::get().reads(1))
+			.saturating_add(T::DbWeight::get().reads((1_u64).saturating_mul(f.into())))
+			.saturating_add(T::DbWeight::get().writes(1))
+				.saturating_add(Weight::from_parts(0, 2524).saturating_mul(f.into()))
+		}
 	/// Storage: `Treasury::RewardReserves` (r:1 w:0)
 	/// Proof: `Treasury::RewardReserves` (`max_values`: Some(1), `max_size`: Some(96), added: 591, mode: `MaxEncodedLen`)
 	fn provider_available_reward_budget() -> Weight {
@@ -220,14 +259,16 @@ impl<T: frame_system::Config> pallet_treasury::WeightInfo for WeightInfo<T> {
 	/// Proof: `Treasury::TargetBitcoinPercent` (`max_values`: Some(1), `max_size`: Some(1), added: 496, mode: `MaxEncodedLen`)
 	/// Storage: `Treasury::UpstreamParticipationFactor` (r:1 w:1)
 	/// Proof: `Treasury::UpstreamParticipationFactor` (`max_values`: Some(1), `max_size`: Some(1), added: 496, mode: `MaxEncodedLen`)
+	/// Storage: `Treasury::TargetStabilizerPoolPercent` (r:1 w:1)
+	/// Proof: `Treasury::TargetStabilizerPoolPercent` (`max_values`: Some(1), `max_size`: Some(1), added: 496, mode: `MaxEncodedLen`)
 	fn configure_reward_economics() -> Weight {
 		// Proof Size summary in bytes:
-		//  Measured:  `28`
+		//  Measured:  `49`
 		//  Estimated: `1486`
-		// Minimum execution time: 7_000_000 picoseconds.
-		Weight::from_parts(7_000_000, 1486)
-			.saturating_add(T::DbWeight::get().reads(2))
-			.saturating_add(T::DbWeight::get().writes(2))
+		// Minimum execution time: 9_000_000 picoseconds.
+		Weight::from_parts(12_000_000, 1486)
+			.saturating_add(T::DbWeight::get().reads(3))
+			.saturating_add(T::DbWeight::get().writes(3))
 		}
 	/// Storage: `Treasury::RewardTaperingPolicy` (r:1 w:1)
 	/// Proof: `Treasury::RewardTaperingPolicy` (`max_values`: Some(1), `max_size`: Some(175), added: 670, mode: `MaxEncodedLen`)
@@ -454,14 +495,16 @@ impl<T: frame_system::Config> pallet_treasury::WeightInfo for WeightInfo<T> {
 	/// Proof: `Treasury::BondLotIdsByVault` (`max_values`: None, `max_size`: Some(28), added: 2503, mode: `MaxEncodedLen`)
 	/// Storage: `Treasury::BondLotsByVault` (r:100 w:0)
 	/// Proof: `Treasury::BondLotsByVault` (`max_values`: None, `max_size`: Some(37), added: 2512, mode: `MaxEncodedLen`)
+	/// Storage: `Treasury::StabilizerPoolRewardFrames` (r:1 w:1)
+	/// Proof: `Treasury::StabilizerPoolRewardFrames` (`max_values`: None, `max_size`: Some(49), added: 2524, mode: `MaxEncodedLen`)
 	fn distribute_bid_pool() -> Weight {
 		// Proof Size summary in bytes:
-		//  Measured:  `2764825`
+		//  Measured:  `2764862`
 		//  Estimated: `35524190`
-		// Minimum execution time: 438_334_000_000 picoseconds.
-		Weight::from_parts(457_284_000_000, 35524190)
-			.saturating_add(T::DbWeight::get().reads(37507))
-			.saturating_add(T::DbWeight::get().writes(24806))
+		// Minimum execution time: 401_340_000_000 picoseconds.
+		Weight::from_parts(442_161_000_000, 35524190)
+			.saturating_add(T::DbWeight::get().reads(37508))
+			.saturating_add(T::DbWeight::get().writes(24807))
 		}
 	/// Storage: `Treasury::RewardTaperingPolicy` (r:1 w:0)
 	/// Proof: `Treasury::RewardTaperingPolicy` (`max_values`: Some(1), `max_size`: Some(175), added: 670, mode: `MaxEncodedLen`)
@@ -504,6 +547,8 @@ impl<T: frame_system::Config> pallet_treasury::WeightInfo for WeightInfo<T> {
 	/// Proof: `Treasury::BondLotById` (`max_values`: None, `max_size`: Some(137), added: 2612, mode: `MaxEncodedLen`)
 	/// Storage: `Treasury::BondLotIdsByVault` (r:15001 w:1000)
 	/// Proof: `Treasury::BondLotIdsByVault` (`max_values`: None, `max_size`: Some(28), added: 2503, mode: `MaxEncodedLen`)
+	/// Storage: `Treasury::StabilizerPoolRewardFrames` (r:2 w:3)
+	/// Proof: `Treasury::StabilizerPoolRewardFrames` (`max_values`: None, `max_size`: Some(49), added: 2524, mode: `MaxEncodedLen`)
 	/// Storage: `Treasury::PendingBondReleaseRetryCursor` (r:1 w:0)
 	/// Proof: `Treasury::PendingBondReleaseRetryCursor` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
 	/// Storage: `Treasury::PendingBondReleasesByFrame` (r:1 w:1)
@@ -524,6 +569,8 @@ impl<T: frame_system::Config> pallet_treasury::WeightInfo for WeightInfo<T> {
 	/// Proof: `Mint::MintedBitcoinMicrogons` (`max_values`: Some(1), `max_size`: Some(16), added: 511, mode: `MaxEncodedLen`)
 	/// Storage: `Treasury::TargetBitcoinPercent` (r:1 w:0)
 	/// Proof: `Treasury::TargetBitcoinPercent` (`max_values`: Some(1), `max_size`: Some(1), added: 496, mode: `MaxEncodedLen`)
+	/// Storage: `Treasury::TargetStabilizerPoolPercent` (r:1 w:0)
+	/// Proof: `Treasury::TargetStabilizerPoolPercent` (`max_values`: Some(1), `max_size`: Some(1), added: 496, mode: `MaxEncodedLen`)
 	/// Storage: `Treasury::BondLotIdsByAccount` (r:0 w:1000)
 	/// Proof: `Treasury::BondLotIdsByAccount` (`max_values`: None, `max_size`: Some(56), added: 2531, mode: `MaxEncodedLen`)
 	/// The range of component `b` is `[0, 14000]`.
@@ -531,21 +578,21 @@ impl<T: frame_system::Config> pallet_treasury::WeightInfo for WeightInfo<T> {
 	/// The range of component `r` is `[1, 1000]`.
 	fn on_frame_transition(b: u32, s: u32, r: u32, ) -> Weight {
 		// Proof Size summary in bytes:
-		//  Measured:  `22975 + b * (227 +/- 0) + r * (329 +/- 0) + s * (208 +/- 0)`
+		//  Measured:  `23072 + b * (227 +/- 0) + r * (329 +/- 0) + s * (208 +/- 0)`
 		//  Estimated: `510926 + b * (2612 +/- 0) + r * (2704 +/- 0) + s * (2612 +/- 0)`
-		// Minimum execution time: 109_114_000_000 picoseconds.
-		Weight::from_parts(109_603_000_000, 510926)
-			// Standard Error: 486_158
-			.saturating_add(Weight::from_parts(36_016_428, 0).saturating_mul(b.into()))
-			// Standard Error: 6_806_214
-			.saturating_add(Weight::from_parts(42_133_000, 0).saturating_mul(s.into()))
-			// Standard Error: 6_807_873
-			.saturating_add(Weight::from_parts(76_402_402, 0).saturating_mul(r.into()))
-			.saturating_add(T::DbWeight::get().reads(218))
+		// Minimum execution time: 106_816_000_000 picoseconds.
+		Weight::from_parts(11_840_566_566, 510926)
+			// Standard Error: 542_752
+			.saturating_add(Weight::from_parts(37_189_073, 0).saturating_mul(b.into()))
+			// Standard Error: 7_598_540
+			.saturating_add(Weight::from_parts(33_367_202, 0).saturating_mul(s.into()))
+			// Standard Error: 7_603_000
+			.saturating_add(Weight::from_parts(64_433_433, 0).saturating_mul(r.into()))
+			.saturating_add(T::DbWeight::get().reads(221))
 			.saturating_add(T::DbWeight::get().reads((3_u64).saturating_mul(b.into())))
 			.saturating_add(T::DbWeight::get().reads((2_u64).saturating_mul(s.into())))
 			.saturating_add(T::DbWeight::get().reads((4_u64).saturating_mul(r.into())))
-			.saturating_add(T::DbWeight::get().writes(8))
+			.saturating_add(T::DbWeight::get().writes(11))
 			.saturating_add(T::DbWeight::get().writes((2_u64).saturating_mul(b.into())))
 			.saturating_add(T::DbWeight::get().writes((2_u64).saturating_mul(s.into())))
 			.saturating_add(T::DbWeight::get().writes((5_u64).saturating_mul(r.into())))

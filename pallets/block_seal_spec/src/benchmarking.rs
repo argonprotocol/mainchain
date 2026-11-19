@@ -1,6 +1,4 @@
 //! Benchmarking setup for pallet-block-seal-spec
-#![cfg(feature = "runtime-benchmarks")]
-
 use super::*;
 use crate::Pallet as BlockSealSpecPallet;
 use argon_primitives::{

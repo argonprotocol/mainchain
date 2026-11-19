@@ -21,7 +21,6 @@ frame_support::construct_runtime!(
 		System: frame_system,
 		Balances: pallet_balances,
 		StabilizerBuys: pallet_stabilizer_buys,
-		PriceIndex: pallet_price_index,
 	}
 );
 
@@ -136,28 +135,6 @@ impl Get<FrameId> for Frame {
 	}
 }
 
-parameter_types! {
-	pub const MaxPriceChange: FixedU128 = FixedU128::from_rational(1,100);
-}
-
-impl pallet_price_index::Config for Test {
-	type OnPriceIndexUpdated = StabilizerBuys;
-	type WeightInfo = ();
-	type Currency = Balances;
-	type Balance = Balance;
-	type MaxDowntimeTicksBeforeReset = polkadot_sdk::sp_runtime::traits::ConstU64<60>;
-	type MaxPriceAgeInTicks = polkadot_sdk::sp_runtime::traits::ConstU64<1440>;
-	type TickProvider = CurrentTick;
-	type TicksPerFrame = ConstU64<1440>;
-	type CurrentFrameId = Frame;
-	type MiningFrameTransitionProvider = Frame;
-	type MaxArgonotFloorHistoryFrames = ConstU32<10>;
-	type MaxArgonotAverageHistoryFrames = ConstU32<10>;
-	type MaxEthereumPriceHistoryFrames = ConstU32<10>;
-	type MaxArgonChangePerTickAwayFromTarget = MaxPriceChange;
-	type MaxArgonTargetChangePerTick = MaxPriceChange;
-}
-
 impl Config for Test {
 	type Currency = Balances;
 	type FissionsProvider = Repayments;
@@ -208,7 +185,6 @@ pub fn new_test_ext() -> TestState {
 		System::set_block_number(1);
 		LastGatewayState::set(None);
 		ApprovedPool::<Test>::put(Pool::get());
-		pallet_price_index::Operator::<Test>::put(1);
 		CurrentFrame::set(1);
 		CurrentTick::set(1_000);
 		Prices::set(Some(PurchasePriceReference {
@@ -218,7 +194,10 @@ pub fn new_test_ext() -> TestState {
 			microgons_at_target_per_usdc: FixedU128::from_u32(1_000_000),
 		}));
 		CurrentTick::set(1);
-		<StabilizerBuys as argon_primitives::PriceIndexUpdated>::on_price_index(&price_index(1));
+		<StabilizerBuys as argon_primitives::PriceIndexUpdated>::on_price_index(
+			&price_index(1),
+			None,
+		);
 		CurrentTick::set(1_000);
 		FailReserve::set(false);
 		FailReturn::set(false);

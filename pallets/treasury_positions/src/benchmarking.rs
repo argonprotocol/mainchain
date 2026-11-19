@@ -1,6 +1,7 @@
 use super::*;
 use argon_primitives::MICROGONS_PER_ARGON;
 use frame_benchmarking::v2::*;
+use frame_system::RawOrigin;
 
 // Whole bond/stake quantities and microgon liquidity at the certification and full-earnings levels.
 const CERTIFICATION_AMOUNT: u128 = 2_500;
@@ -9,6 +10,40 @@ const FULL_EARNINGS_AMOUNT: u128 = 5_000;
 #[benchmarks]
 mod benchmarks {
 	use super::*;
+
+	#[benchmark]
+	fn ensure_account() {
+		let owner: T::AccountId = account("new-pool-beneficiary", 0, 0);
+		#[block]
+		{
+			Pallet::<T>::ensure_account(&owner);
+		}
+		assert!(PositionsByAccount::<T>::contains_key(owner));
+	}
+
+	#[benchmark]
+	fn collect() {
+		// Auto-collect has no signed extension to load the recipient's currency account.
+		let caller: T::AccountId = account("collect-recipient", 0, 0);
+		let earnings: T::Balance = (FULL_EARNINGS_AMOUNT * MICROGONS_PER_ARGON).into();
+		let mut position = certified_position::<T>();
+		position.collect_accrued = CollectAmounts {
+			bond_earnings: earnings,
+			stake_earnings: earnings,
+			bitcoin_earnings: earnings,
+			bitcoin_mints: earnings,
+			stabilizer_pool_earnings: earnings,
+		};
+		let amounts = position.collect_accrued;
+		PositionsByAccount::<T>::insert(&caller, position);
+
+		#[extrinsic_call]
+		_(RawOrigin::Signed(caller.clone()));
+
+		let position = PositionsByAccount::<T>::get(&caller).unwrap();
+		assert_eq!(position.collect_accrued, CollectAmounts::default());
+		assert_eq!(position.collected, amounts);
+	}
 
 	#[benchmark]
 	fn bond_principal() {
@@ -165,5 +200,6 @@ fn certified_position<T: Config>() -> Position<T::Balance> {
 			bitcoin_allocated_securitization: (CERTIFICATION_AMOUNT * MICROGONS_PER_ARGON).into(),
 			bond_principal: (CERTIFICATION_AMOUNT * MICROGONS_PER_ARGON).into(),
 		}),
+		..Default::default()
 	}
 }

@@ -2,6 +2,9 @@ use crate as pallet_treasury;
 use argon_primitives::{
 	providers::BitcoinMintedProvider,
 	tick::Ticker,
+	treasury::{
+		StabilizerPoolFrameClaim, StabilizerPoolPositionProvider, StabilizerPoolRewardProvider,
+	},
 	vault::{TreasuryVaultProvider, VaultError, VaultParticipationCapacity, VaultSecuritization},
 	ArgonCPI, BlockRewardAccountsProvider, CrosschainGatewayProvider, GatewayState,
 	MiningFrameProvider, OperationalAccountsHook, PriceProvider, SourceChain, TickProvider,
@@ -23,6 +26,29 @@ type Block = frame_system::mocking::MockBlock<Test>;
 pub type TestAccountId = AccountId32;
 
 pub struct TestOperationalAccountsHook;
+
+parameter_types! {
+	pub static CirculatingArgon: Balance = 0;
+	pub static CollectClaimFrames: Vec<StabilizerPoolFrameClaim> = Vec::new();
+	pub storage SettledClaimFrame: u64 = 0;
+}
+
+pub struct MockStabilizerPoolSettlement;
+impl StabilizerPoolPositionProvider<TestAccountId> for MockStabilizerPoolSettlement {
+	type Weights = ();
+
+	fn settle_account(_: &TestAccountId) -> Result<Balance, DispatchError> {
+		let claims = CollectClaimFrames::get();
+		if claims.is_empty() || SettledClaimFrame::get() > 0 {
+			return Ok(0);
+		}
+		let result = Treasury::claim_rewards(&claims).map(|amount| {
+			SettledClaimFrame::set(&claims.last().unwrap().frame_id);
+			amount
+		});
+		result
+	}
+}
 
 impl OperationalAccountsHook<TestAccountId, Balance> for TestOperationalAccountsHook {
 	type Weights = ();
@@ -61,6 +87,7 @@ parameter_types! {
 
 	pub static ExistentialDeposit: Balance = 1;
 	pub static BidPoolAccountId: TestAccountId = AccountId32::new([250; 32]);
+	pub static NewlyStartedFrameId: Option<FrameId> = None;
 }
 
 pub(crate) type ArgonToken = pallet_balances::Instance1;
@@ -161,16 +188,18 @@ parameter_types! {
 	pub static TreasuryExitDelayFrames: FrameId = 10;
 	pub const VaultPalletId: PalletId = PalletId(*b"bidPools");
 
-	pub const PercentForMarketing: Percent = Percent::from_percent(20);
+	pub const PercentForMarketing: Percent = Percent::from_percent(10);
 	pub const PercentForStakePool: Percent = Percent::from_percent(15);
 	pub const PercentForMiningOperatorPool: Percent = Percent::from_percent(6);
 	pub const PercentForBitcoinLiquidPool: Percent = Percent::from_percent(3);
 	pub const PercentForArgonBondPool: Percent = Percent::from_percent(5);
+	pub const PercentForStabilizerPool: Percent = Percent::from_percent(10);
 	pub const PercentForVaultPool: Percent = Percent::from_percent(51);
 	pub const MinimumVaultProfitPercent: Percent = Percent::from_percent(5);
 	pub const VaultBitcoinRewardPercent: Permill = Permill::from_parts(428_350);
 	pub static ArgonotSecuritizationMultiplier: u32 = 0;
 	pub const DefaultTargetBitcoinPercent: Percent = Percent::from_percent(15);
+	pub const DefaultTargetStabilizerPoolPercent: Percent = Percent::from_percent(5);
 	pub static MaxArgonotBondedPercentOfCirculation: Percent = Percent::from_percent(60);
 	pub static CurrentFrameId: FrameId = 1;
 
@@ -372,7 +401,7 @@ impl PriceProvider<Balance> for StaticPriceProvider {
 	}
 
 	fn get_circulation() -> Balance {
-		0
+		CirculatingArgon::get()
 	}
 
 	fn get_redemption_r_value() -> Option<FixedU128> {
@@ -389,7 +418,7 @@ impl MiningFrameTransitionProvider for StaticMiningFrameTransitionProvider {
 	}
 
 	fn is_new_frame_started() -> Option<FrameId> {
-		None
+		NewlyStartedFrameId::get()
 	}
 }
 
@@ -468,6 +497,7 @@ impl pallet_stabilizer_buys::Config for Test {
 
 impl pallet_treasury::Config for Test {
 	type PositionProvider = TreasuryPositions;
+	type StabilizerPoolRewardHistoryFrames = ConstU32<13>;
 	type OperationalAccountProvider = MockUpstreamAccounts;
 	type UpstreamBitcoinTarget = UpstreamBitcoinTarget;
 	type UpstreamBondTarget = UpstreamBondTarget;
@@ -493,11 +523,13 @@ impl pallet_treasury::Config for Test {
 	type PercentForMiningOperatorPool = PercentForMiningOperatorPool;
 	type PercentForBitcoinLiquidPool = PercentForBitcoinLiquidPool;
 	type PercentForArgonBondPool = PercentForArgonBondPool;
+	type PercentForStabilizerPool = PercentForStabilizerPool;
 	type PercentForVaultPool = PercentForVaultPool;
 	type MinimumVaultProfitPercent = MinimumVaultProfitPercent;
 	type VaultBitcoinRewardPercent = VaultBitcoinRewardPercent;
 	type ArgonotSecuritizationMultiplier = ArgonotSecuritizationMultiplier;
 	type DefaultTargetBitcoinPercent = DefaultTargetBitcoinPercent;
+	type DefaultTargetStabilizerPoolPercent = DefaultTargetStabilizerPoolPercent;
 	type MaxVaultsPerPool = MaxVaultsPerPool;
 	type MaxPendingUnlocksPerFrame = MaxPendingUnlocksPerFrame;
 	type TreasuryExitDelayFrames = TreasuryExitDelayFrames;
@@ -506,6 +538,8 @@ impl pallet_treasury::Config for Test {
 }
 
 pub(crate) fn new_test_ext() -> TestState {
+	NewlyStartedFrameId::set(None);
+	CirculatingArgon::set(0);
 	ArgonotSecuritizationMultiplier::set(0);
 	VaultsById::set(HashMap::new());
 	LastVaultProfits::set(vec![]);
@@ -532,6 +566,9 @@ pub(crate) fn new_test_ext() -> TestState {
 impl pallet_treasury_positions::Config for Test {
 	type BitcoinPositionProvider = ();
 	type TreasuryPoolProvider = Treasury;
+	type StabilizerPoolPositionProvider = MockStabilizerPoolSettlement;
+	type MiningFrameTransitionProvider = ();
+	type Currency = Balances;
 	type OperationalAccountProvider = MockUpstreamAccounts;
 	type Balance = Balance;
 	type WeightInfo = ();

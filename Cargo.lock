@@ -11247,7 +11247,6 @@ version = "1.6.0"
 dependencies = [
  "argon-primitives",
  "pallet-prelude",
- "pallet-treasury-positions",
  "parity-scale-codec",
  "polkadot-sdk",
  "scale-info",
@@ -11264,7 +11263,6 @@ dependencies = [
  "pallet-bitcoin-utxos",
  "pallet-mint",
  "pallet-prelude",
- "pallet-treasury-positions",
  "parity-scale-codec",
  "polkadot-sdk",
  "scale-info",
@@ -12143,7 +12141,6 @@ version = "1.6.0"
 dependencies = [
  "pallet-prelude",
  "pallet-ticks",
- "pallet-treasury 1.6.0",
  "parity-scale-codec",
  "polkadot-sdk",
  "scale-info",
@@ -12890,7 +12887,6 @@ version = "1.6.0"
 dependencies = [
  "argon-primitives",
  "pallet-prelude",
- "pallet-price-index",
  "parity-scale-codec",
  "polkadot-sdk",
  "scale-info",
@@ -12911,6 +12907,7 @@ dependencies = [
  "pallet-prelude",
  "parity-scale-codec",
  "polkadot-sdk",
+ "rstest",
  "scale-info",
  "uniswap-v3-sdk 3.11.0",
 ]
@@ -13210,10 +13207,7 @@ name = "pallet-treasury"
 version = "1.6.0"
 dependencies = [
  "impl-trait-for-tuples",
- "pallet-bitcoin-fissions",
- "pallet-bitcoin-locks",
  "pallet-mint",
- "pallet-operational-accounts",
  "pallet-prelude",
  "pallet-stabilizer-buys",
  "pallet-treasury-positions",
@@ -13308,10 +13302,8 @@ dependencies = [
  "pallet-bitcoin-fissions",
  "pallet-bitcoin-locks",
  "pallet-bitcoin-utxos",
- "pallet-operational-accounts",
  "pallet-prelude",
  "pallet-treasury 1.6.0",
- "pallet-treasury-positions",
  "parity-scale-codec",
  "polkadot-sdk",
  "scale-info",
@@ -16523,6 +16515,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a96887878f22d7bad8a3b6dc5b7440e0ada9a245242924394987b21cf2210a4c"
 
 [[package]]
+name = "relative-path"
+version = "1.9.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ba39f3699c378cd8970968dcbff9c43159ea4cfbd88d43c00b22f2ef10a435d2"
+
+[[package]]
 name = "reqwest"
 version = "0.12.28"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -17037,6 +17035,32 @@ checksum = "5c475cc467404cd97386127e5c40be936ce69cf77767306fbc5ec0dc812afd87"
 dependencies = [
  "chrono",
  "tokio",
+]
+
+[[package]]
+name = "rstest"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b376e512f30a7686a8dbc6aeaace99b3ade1c26c1c63473473a817ade226dafc"
+dependencies = [
+ "rstest_macros",
+]
+
+[[package]]
+name = "rstest_macros"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "88512dbfb5b73a0dfa38aef7bc73b5657035fce477b923faf12d332dd83051ea"
+dependencies = [
+ "cfg-if",
+ "glob",
+ "proc-macro2",
+ "quote",
+ "regex",
+ "relative-path",
+ "rustc_version 0.4.1",
+ "syn 2.0.114",
+ "unicode-ident",
 ]
 
 [[package]]

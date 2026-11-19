@@ -25,7 +25,6 @@ frame_support::construct_runtime!(
 		System: frame_system,
 		Balances: pallet_balances,
 		BitcoinFissions: pallet_bitcoin_fissions,
-		TreasuryPositions: pallet_treasury_positions,
 	}
 );
 
@@ -62,7 +61,7 @@ impl pallet_bitcoin_fissions::Config for Test {
 	type Balance = u128;
 	type LockProvider = MockLockProvider;
 	type Minting = MockFissionMinting;
-	type PositionProvider = TreasuryPositions;
+	type PositionProvider = MockTreasuryPositionProvider;
 	type OperationalAccountsHook = MockOperationalAccounts;
 	type Currency = Balances;
 	type LiquidRepaymentProvider = Test;
@@ -75,14 +74,6 @@ impl pallet_bitcoin_fissions::Config for Test {
 	type CrosschainGatewayProvider = Test;
 	type RValueHistoryFrames = ConstU32<30>;
 	type MaxRValueHistoryPrunesPerBlock = ConstU32<16>;
-}
-
-impl pallet_treasury_positions::Config for Test {
-	type Balance = u128;
-	type BitcoinPositionProvider = ();
-	type TreasuryPoolProvider = ();
-	type OperationalAccountProvider = ();
-	type WeightInfo = ();
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Encode, Decode, TypeInfo, MaxEncodedLen)]

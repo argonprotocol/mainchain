@@ -2417,6 +2417,13 @@ impl<T: Config> MiningFrameProvider for Pallet<T> {
 impl<T: Config> MiningFrameTransitionProvider for Pallet<T> {
 	type Weights = crate::weights::ProviderWeightAdapter<T>;
 
+	fn is_first_block_after_frame_start() -> bool {
+		let frame_starts = FrameStartBlockNumbers::<T>::get();
+		let Some(started_at) = frame_starts.first() else { return false };
+		let block = frame_system::Pallet::<T>::block_number();
+		block.checked_sub(&1u32.into()) == Some(*started_at)
+	}
+
 	fn is_new_frame_started() -> Option<FrameId> {
 		Self::get_newly_started_frame()
 	}

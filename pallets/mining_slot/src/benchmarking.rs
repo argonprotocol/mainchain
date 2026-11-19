@@ -108,6 +108,17 @@ mod benchmarks {
 	}
 
 	#[benchmark]
+	fn provider_is_first_block_after_frame_start() {
+		let starts = (1u32..=10).rev().map(Into::into).collect::<Vec<BlockNumberFor<T>>>();
+		FrameStartBlockNumbers::<T>::put(BoundedVec::<_, ConstU32<10>>::truncate_from(starts));
+		frame_system::Pallet::<T>::set_block_number(11u32.into());
+		#[block]
+		{
+			assert!(Pallet::<T>::is_first_block_after_frame_start());
+		}
+	}
+
+	#[benchmark]
 	fn provider_is_new_frame_started() {
 		NewlyStartedFrameId::<T>::put(1);
 		#[block]

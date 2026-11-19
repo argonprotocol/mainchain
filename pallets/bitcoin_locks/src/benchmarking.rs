@@ -1,5 +1,3 @@
-#![cfg(feature = "runtime-benchmarks")]
-
 extern crate alloc;
 
 use super::*;
@@ -19,12 +17,11 @@ use frame_benchmarking::v2::*;
 use frame_support::dispatch::CheckIfFeeless;
 use pallet_prelude::benchmarking::{
 	benchmark_bitcoin_utxo_tracker_state, benchmark_bitcoin_vault_provider_state,
-	reset_benchmark_bitcoin_locks_runtime_state, reset_benchmark_bitcoin_utxo_tracker_state,
-	reset_benchmark_bitcoin_vault_provider_state, reset_benchmark_price_provider_state,
-	set_benchmark_bitcoin_locks_runtime_state, set_benchmark_bitcoin_utxo_tracker_state,
-	set_benchmark_bitcoin_vault_provider_state, set_benchmark_price_provider_state,
-	BenchmarkBitcoinLocksRuntimeState, BenchmarkBitcoinUtxoTrackerState,
-	BenchmarkPriceProviderState,
+	reset_benchmark_bitcoin_utxo_tracker_state, reset_benchmark_bitcoin_vault_provider_state,
+	reset_benchmark_mining_clock, reset_benchmark_price_provider_state,
+	set_benchmark_bitcoin_utxo_tracker_state, set_benchmark_bitcoin_vault_provider_state,
+	set_benchmark_mining_clock, set_benchmark_price_provider_state,
+	BenchmarkBitcoinUtxoTrackerState, BenchmarkMiningClock, BenchmarkPriceProviderState,
 };
 
 // Small linear fit ranges used to generate the per-item slope for hook weight components.
@@ -122,7 +119,7 @@ mod benchmarks {
 		reset_benchmark_environment::<T>();
 		let owner: T::AccountId = account("bitcoin-lock-owner", 0, 0);
 		let operator: T::AccountId = account("vault-operator", 0, 0);
-		let satoshis = benchmark_satoshis::<T>();
+		let satoshis = benchmark_satoshis();
 		let owner_pubkey = benchmark_pubkey::<T>(1)?;
 		seed_price_state(100_000, 1, 1);
 		let vault_id = create_vault::<T>(&operator, 1, benchmark_vault_securitization())?;
@@ -341,7 +338,7 @@ mod benchmarks {
 	#[benchmark]
 	fn admin_modify_minimum_locked_sats() -> Result<(), BenchmarkError> {
 		reset_benchmark_environment::<T>();
-		let new_minimum = benchmark_satoshis::<T>().saturating_add(1_000);
+		let new_minimum = benchmark_satoshis().saturating_add(1_000);
 		LockReleaseRequestsById::<T>::insert(
 			1,
 			LockReleaseRequest {
@@ -580,7 +577,7 @@ mod benchmarks {
 	fn provider_calculate_liquidity_promised() -> Result<(), BenchmarkError> {
 		reset_benchmark_environment::<T>();
 		seed_price_state(100_000, 1, 1);
-		let fissioned_satoshis = benchmark_satoshis::<T>() / 2;
+		let fissioned_satoshis = benchmark_satoshis() / 2;
 		let microgons_at_target_per_btc = benchmark_microgons_at_target_per_btc::<T>()?;
 		let liquidity_promised;
 
@@ -619,7 +616,7 @@ mod benchmarks {
 		reset_benchmark_environment::<T>();
 		// Exercise the below-target curve, including its fixed-point division.
 		seed_price_state(100_000, 1, 1_000);
-		let satoshis = benchmark_satoshis::<T>();
+		let satoshis = benchmark_satoshis();
 		let cap = benchmark_microgons_at_target_per_btc::<T>()?;
 		#[block]
 		{
@@ -858,7 +855,7 @@ where
 {
 	reset_benchmark_price_provider_state();
 	reset_benchmark_bitcoin_utxo_tracker_state();
-	reset_benchmark_bitcoin_locks_runtime_state();
+	reset_benchmark_mining_clock();
 	reset_benchmark_bitcoin_vault_provider_state();
 	set_benchmark_price_provider_state(BenchmarkPriceProviderState::default());
 	set_benchmark_bitcoin_utxo_tracker_state(BenchmarkBitcoinUtxoTrackerState {
@@ -866,14 +863,14 @@ where
 		bitcoin_block_height_change: (100, 100),
 		..Default::default()
 	});
-	set_benchmark_bitcoin_locks_runtime_state(BenchmarkBitcoinLocksRuntimeState::default());
+	set_benchmark_mining_clock(BenchmarkMiningClock::default());
 	frame_system::Pallet::<T>::set_block_number(1u32.into());
 	NextBitcoinLockId::<T>::kill();
-	MinimumSatoshis::<T>::put(benchmark_satoshis::<T>().saturating_sub(1));
+	MinimumSatoshis::<T>::put(benchmark_satoshis().saturating_sub(1));
 	MicrogonsAtTargetPerBtcHistory::<T>::kill();
 }
 
-fn benchmark_satoshis<T: Config>() -> Satoshis {
+fn benchmark_satoshis() -> Satoshis {
 	100_000_000
 }
 
@@ -1024,7 +1021,7 @@ where
 {
 	let owner: T::AccountId = account("benchmark-lock-owner", seed_hint as u32, 0);
 	let operator: T::AccountId = account("benchmark-vault-operator", seed_hint as u32, 0);
-	let satoshis = benchmark_satoshis::<T>();
+	let satoshis = benchmark_satoshis();
 	let owner_pubkey = benchmark_pubkey::<T>(seed_hint.saturating_add(100))?;
 	seed_price_state(100_000, 1, 1);
 	seed_bitcoin_heights(100, 100);

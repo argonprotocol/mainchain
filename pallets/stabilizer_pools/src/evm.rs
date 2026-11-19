@@ -1,9 +1,13 @@
 //! Layouts pinned to subscriber v1, v4-periphery 545a5d2a87228167edde48f3b9eda122d1e3c4d6,
 //! and v4-core 1.0.2.
 //! Tests compare these paths with actual Uniswap deployment storage, not caller-supplied offsets.
-use crate::{Config, Error, PoolConfig, PoolKey, PositionProof};
+use crate::{
+	Config, Error, PoolConfig, PoolKey, PositionChangeProof, PositionCheckpoint, PositionProof,
+	StabilizerPoolPositionId,
+};
 use alloy_primitives::{keccak256, Address, B256, I256, U256 as AlloyU256};
 use alloy_sol_types::SolValue;
+use argon_primitives::{EthereumAccountStorageProof, UniswapTick};
 use pallet_prelude::*;
 
 /// Subscriber's `subscriptions` mapping: beneficiary at the base slot, revision at base + 1.
@@ -24,9 +28,9 @@ pub(crate) struct DecodedPosition {
 	/// Permanent subscription revision decoded as an Ethereum uint256.
 	pub revision: U256,
 	/// Inclusive signed int24 lower tick.
-	pub tick_lower: i32,
+	pub tick_lower: UniswapTick,
 	/// Exclusive signed int24 upper tick.
-	pub tick_upper: i32,
+	pub tick_upper: UniswapTick,
 	/// Native uint128 Uniswap liquidity value.
 	pub liquidity: u128,
 }
@@ -62,8 +66,8 @@ pub fn liquidity_slot(
 	pool_id: H256,
 	position_manager: H160,
 	token_id: U256,
-	lower: i32,
-	upper: i32,
+	lower: UniswapTick,
+	upper: UniswapTick,
 ) -> H256 {
 	// PoolManager keys NFT positions by the PositionManager as owner and tokenId as salt.
 	let mut position_key = [0u8; 58];
@@ -151,7 +155,44 @@ pub(crate) fn decode_position<T: Config>(
 	})
 }
 
-fn signed_tick(bytes: &[u8]) -> i32 {
+/// Determine the canonical account and slot for a change proof. The caller authenticates it.
+pub(crate) fn decode_position_change<'a, T: Config>(
+	position: StabilizerPoolPositionId,
+	previous: &PositionCheckpoint<T::AccountId>,
+	proof: &'a PositionChangeProof,
+) -> Result<(H160, &'a EthereumAccountStorageProof<ConstU32<1>>), DispatchError> {
+	let (account, witness, expected_slot) = match proof {
+		PositionChangeProof::Revision(witness) => (
+			previous.subscriber,
+			witness,
+			offset_slot(mapping_slot(position.token_id, SUBSCRIPTIONS_SLOT), 1),
+		),
+		PositionChangeProof::Subscription(witness) => (
+			position.position_manager,
+			witness,
+			mapping_slot(position.token_id, POSITION_MANAGER_SUBSCRIBER_SLOT),
+		),
+	};
+	let [slot] = witness.slots.as_slice() else {
+		return Err(Error::<T>::InvalidStorageSlots.into());
+	};
+	ensure!(slot.slot == expected_slot, Error::<T>::InvalidStorageSlots);
+
+	match proof {
+		PositionChangeProof::Revision(_) => {
+			let revision = U256::from_big_endian(slot.value.as_bytes());
+			ensure!(revision > previous.revision, Error::<T>::PositionChangeNotProven);
+		},
+		PositionChangeProof::Subscription(_) => {
+			let mut registered_subscriber = H256::zero();
+			registered_subscriber[12..].copy_from_slice(previous.subscriber.as_bytes());
+			ensure!(slot.value != registered_subscriber, Error::<T>::PositionChangeNotProven);
+		},
+	}
+	Ok((account, witness))
+}
+
+fn signed_tick(bytes: &[u8]) -> UniswapTick {
 	let sign_extension = if bytes[0] & 0x80 != 0 { 0xff } else { 0 };
 	i32::from_be_bytes([sign_extension, bytes[0], bytes[1], bytes[2]])
 }

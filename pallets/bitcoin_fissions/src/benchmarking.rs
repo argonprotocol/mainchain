@@ -1,5 +1,3 @@
-#![cfg(feature = "runtime-benchmarks")]
-
 use super::*;
 use argon_primitives::{
 	bitcoin::{BitcoinLockId, LiquidRepayPrices, SATOSHIS_PER_BITCOIN},
@@ -7,9 +5,7 @@ use argon_primitives::{
 	vault::{CosignerGuarantee, MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES},
 	BitcoinFissionsProvider, PriceIndex, PriceIndexUpdated, MICROGONS_PER_ARGON,
 };
-use pallet_prelude::benchmarking::{
-	set_benchmark_bitcoin_locks_runtime_state, BenchmarkBitcoinLocksRuntimeState,
-};
+use pallet_prelude::benchmarking::{set_benchmark_mining_clock, BenchmarkMiningClock};
 use polkadot_sdk::frame_benchmarking::v2::*;
 
 const MAX_FISSIONS_PER_LOCK_BENCH: u32 = 50;
@@ -62,7 +58,7 @@ mod benchmarks {
 
 	#[benchmark]
 	fn record_r_value() {
-		set_benchmark_bitcoin_locks_runtime_state(BenchmarkBitcoinLocksRuntimeState {
+		set_benchmark_mining_clock(BenchmarkMiningClock {
 			current_frame_id: 40,
 			current_tick: 100,
 			did_start_new_frame: false,
@@ -79,7 +75,7 @@ mod benchmarks {
 		};
 		#[block]
 		{
-			Pallet::<T>::on_price_index(&index);
+			Pallet::<T>::on_price_index(&index, None);
 		}
 		assert_eq!(
 			RValueHighWaterByFrame::<T>::get(40u64.to_ordered()).unwrap().r_value,
@@ -89,7 +85,7 @@ mod benchmarks {
 
 	#[benchmark]
 	fn prune_r_values(p: Linear<1, 16>) {
-		set_benchmark_bitcoin_locks_runtime_state(BenchmarkBitcoinLocksRuntimeState {
+		set_benchmark_mining_clock(BenchmarkMiningClock {
 			current_frame_id: 100,
 			current_tick: 100,
 			did_start_new_frame: true,

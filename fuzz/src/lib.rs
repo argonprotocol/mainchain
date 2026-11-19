@@ -266,6 +266,7 @@ fn set_price(bitcoin_usd: u32, operator: &AccountId) {
 			stabilizer_pool_sqrt_price_x96: None,
 		},
 		None,
+		None,
 	)
 	.expect("Bitcoin fuzz price must be accepted");
 	advance_block(operator);

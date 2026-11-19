@@ -1,8 +1,8 @@
 use super::Config;
 use argon_primitives::{
 	treasury::{
-		TreasuryPositionProvider, TreasuryPositionProviderWeightInfo,
-		TreasuryRewardProviderWeightInfo,
+		StabilizerPoolRewardProviderWeightInfo, TreasuryPositionProvider,
+		TreasuryPositionProviderWeightInfo, TreasuryRewardProviderWeightInfo,
 	},
 	vault::{TreasuryVaultProvider, TreasuryVaultProviderWeightInfo},
 	OperationalAccountProvider, OperationalAccountProviderWeightInfo, OperationalAccountsHook,
@@ -14,6 +14,9 @@ use pallet_prelude::*;
 
 /// Weight functions needed for this pallet.
 pub trait WeightInfo {
+	fn finalize_stabilizer_frame_rewards() -> Weight;
+	fn read_stabilizer_frame_reward_rate() -> Weight;
+	fn claim_stabilizer_frame_rewards(frames: u32) -> Weight;
 	fn read_bond_collateral_queue() -> Weight;
 	fn on_frame_transition(argon_lots_scanned: u32, argonot_lots: u32, due_releases: u32)
 		-> Weight;
@@ -71,6 +74,15 @@ where
 	T: Config,
 	Base: WeightInfo,
 {
+	fn finalize_stabilizer_frame_rewards() -> Weight {
+		Base::finalize_stabilizer_frame_rewards()
+	}
+	fn read_stabilizer_frame_reward_rate() -> Weight {
+		Base::read_stabilizer_frame_reward_rate()
+	}
+	fn claim_stabilizer_frame_rewards(frames: u32) -> Weight {
+		Base::claim_stabilizer_frame_rewards(frames)
+	}
 	fn read_bond_collateral_queue() -> Weight {
 		Base::read_bond_collateral_queue()
 	}
@@ -275,6 +287,15 @@ impl<T: Config> TreasuryPoolProviderWeightInfo for ProviderWeightAdapter<T> {
 
 // For backwards compatibility and tests.
 impl WeightInfo for () {
+	fn finalize_stabilizer_frame_rewards() -> Weight {
+		Weight::zero()
+	}
+	fn read_stabilizer_frame_reward_rate() -> Weight {
+		Weight::zero()
+	}
+	fn claim_stabilizer_frame_rewards(_: u32) -> Weight {
+		Weight::zero()
+	}
 	fn read_bond_collateral_queue() -> Weight {
 		Weight::zero()
 	}
@@ -402,5 +423,17 @@ impl<T: Config> TreasuryRewardProviderWeightInfo for ProviderWeightAdapter<T> {
 	}
 	fn pay_reward() -> Weight {
 		T::WeightInfo::provider_pay_reward().max(T::WeightInfo::provider_pay_reward_new_account())
+	}
+}
+
+impl<T: Config> StabilizerPoolRewardProviderWeightInfo for ProviderWeightAdapter<T> {
+	fn finalize_frame_rewards() -> Weight {
+		T::WeightInfo::finalize_stabilizer_frame_rewards()
+	}
+	fn frame_reward_rate() -> Weight {
+		T::WeightInfo::read_stabilizer_frame_reward_rate()
+	}
+	fn claim_rewards(frame_count: u32) -> Weight {
+		T::WeightInfo::claim_stabilizer_frame_rewards(frame_count)
 	}
 }

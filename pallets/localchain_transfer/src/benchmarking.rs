@@ -1,5 +1,4 @@
 //! Benchmarking setup for pallet-localchain-transfer
-#![cfg(feature = "runtime-benchmarks")]
 
 use super::*;
 #[allow(unused_imports)]

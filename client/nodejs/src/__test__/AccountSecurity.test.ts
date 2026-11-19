@@ -64,7 +64,12 @@ describe('account-security approval signatures', () => {
       registry,
       // FRAME's GenesisConfig test hash is 69 (0x45) in each byte.
       genesisHash: registry.createType('Hash', `0x${'45'.repeat(32)}`),
-      runtimeVersion: registry.createType('RuntimeVersion', runtimeVersion),
+      // The signing vector uses fixed versions in both the client and runtime tests.
+      runtimeVersion: registry.createType('RuntimeVersion', {
+        ...runtimeVersion,
+        specVersion: 1,
+        transactionVersion: 1,
+      }),
     };
     const payload = createAccountSecuritySigningPayload(api, `0x${'44'.repeat(32)}`, operation);
     const decoded = registry.createType('Call', payload.method);
@@ -79,9 +84,9 @@ describe('account-security approval signatures', () => {
       .createType('ExtrinsicPayload', payload, { version: 4 })
       .toU8a({ method: true });
     const signingBytes = encoded.length > 256 ? blake2AsU8a(encoded) : encoded;
-    // Same vector as both real-runtime native signing tests, not a separately invented format.
+    // Both runtimes verify the same native signing bytes.
     expect(blake2AsHex(signingBytes)).toBe(
-      '0xa2c0f48908ec08ce38929da9765ccb1bc8db5c98f01744a9ebf918375ff6b310',
+      '0x5036dada2b8f6e62aa9e29224d5b7fec4d2d5c4180c5ef99242af5b8e5e65855',
     );
   });
 

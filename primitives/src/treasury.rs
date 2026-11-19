@@ -1,10 +1,90 @@
-use crate::VaultId;
+use crate::{block_seal::FrameId, Balance, VaultId};
 use codec::{Codec, Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use polkadot_sdk::{
 	frame_support::weights::Weight,
-	sp_runtime::{DispatchError, DispatchResult},
+	sp_runtime::{DispatchError, DispatchResult, FixedU128},
 };
 use scale_info::TypeInfo;
+
+/// ARGON earned against one frame's financial reward terms.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct StabilizerPoolFrameClaim {
+	/// Mining frame in which the rewards were earned.
+	pub frame_id: FrameId,
+	/// Earned ARGON in microgons, calculated by the source pallet.
+	pub amount: Balance,
+}
+
+/// Financial frame terms and funding supplied by Treasury.
+pub trait StabilizerPoolRewardProvider {
+	type Weights: StabilizerPoolRewardProviderWeightInfo;
+
+	/// Fix a funded frame's rate using the source's finalized eligible value in microgons.
+	fn finalize_frame_rewards(frame_id: FrameId, eligible_value: Balance);
+
+	/// Financial rate fixed after the source finalizes participation.
+	fn frame_reward_rate(frame_id: FrameId) -> Option<FixedU128>;
+
+	/// Claim earned ARGON for finalized frames, drawing the total from the shared reward reserve.
+	/// The caller commits the funding debit, source cursors and account payment together.
+	fn claim_rewards(frames: &[StabilizerPoolFrameClaim]) -> Result<Balance, DispatchError>;
+}
+
+pub trait StabilizerPoolRewardProviderWeightInfo {
+	fn finalize_frame_rewards() -> Weight;
+	fn frame_reward_rate() -> Weight;
+	fn claim_rewards(frame_count: u32) -> Weight;
+}
+
+impl StabilizerPoolRewardProviderWeightInfo for () {
+	fn finalize_frame_rewards() -> Weight {
+		Weight::zero()
+	}
+	fn frame_reward_rate() -> Weight {
+		Weight::zero()
+	}
+	fn claim_rewards(_: u32) -> Weight {
+		Weight::zero()
+	}
+}
+
+impl StabilizerPoolRewardProvider for () {
+	type Weights = ();
+
+	fn finalize_frame_rewards(_: FrameId, _: Balance) {}
+
+	fn frame_reward_rate(_: FrameId) -> Option<FixedU128> {
+		None
+	}
+	fn claim_rewards(_: &[StabilizerPoolFrameClaim]) -> Result<Balance, DispatchError> {
+		Err(DispatchError::Unavailable)
+	}
+}
+
+/// Source positions that Treasury Positions can collect.
+pub trait StabilizerPoolPositionProvider<AccountId> {
+	type Weights: StabilizerPoolPositionProviderWeightInfo;
+	/// Settle this account's available source earnings and advance its source cursors.
+	/// The caller supplies the transaction through delivery and account bookkeeping.
+	fn settle_account(account: &AccountId) -> Result<Balance, DispatchError>;
+}
+
+impl<AccountId> StabilizerPoolPositionProvider<AccountId> for () {
+	type Weights = ();
+	fn settle_account(_: &AccountId) -> Result<Balance, DispatchError> {
+		Ok(0)
+	}
+}
+
+pub trait StabilizerPoolPositionProviderWeightInfo {
+	fn settle_account() -> Weight;
+}
+
+impl StabilizerPoolPositionProviderWeightInfo for () {
+	fn settle_account() -> Weight {
+		Weight::zero()
+	}
+}
 
 /// Treasury-owned unissued funding. All mutations, including payout delivery, must use runtime
 /// storage so that funding, currency and auction state share the caller's transaction boundary.
@@ -60,7 +140,7 @@ pub type Bonds = u32;
 pub type BondTotal = u128;
 
 /// Allocated and activated securitization in microgons, for one position or a total.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Encode, Decode)]
 pub struct BitcoinLockPosition<Balance> {
 	/// Securitization activated by confirmed Bitcoin funding.
 	pub activated_securitization: Balance,
@@ -162,6 +242,9 @@ where
 }
 
 pub trait TreasuryPositionProviderWeightInfo {
+	fn ensure_account() -> Weight {
+		Weight::zero()
+	}
 	fn operational_account_registered() -> Weight;
 	fn bond_principal() -> Weight;
 	fn account_quantities() -> Weight;
@@ -205,6 +288,8 @@ impl TreasuryPositionProviderWeightInfo for () {
 /// Source contributions are replaced atomically with their canonical mutation.
 pub trait TreasuryPositionProvider<AccountId, Balance: Codec + MaxEncodedLen> {
 	type Weights: TreasuryPositionProviderWeightInfo;
+	/// Make an account with a source position discoverable for account collection.
+	fn ensure_account(_: &AccountId) {}
 	/// Notify positions after the account and its upstream relationship are stored.
 	fn operational_account_registered(account: &AccountId) -> DispatchResult;
 	fn bond_principal(account: &AccountId) -> Balance;

@@ -9,7 +9,10 @@ use crate::{
 	Error, Event, FrameRewardTicksRemaining, FrameStartTicks, HoldReason, MinerNonce,
 	MinerNonceScoring, Registration, ScheduledCohortSizeChangeByFrame, SeatPriceStats,
 };
-use argon_primitives::{block_seal::MiningRegistration, AuthorityProvider, MICROGONS_PER_ARGON};
+use argon_primitives::{
+	block_seal::MiningRegistration, AuthorityProvider, MiningFrameTransitionProvider,
+	MICROGONS_PER_ARGON,
+};
 use frame_system::AccountInfo;
 use pallet_balances::{AccountData, Event as OwnershipEvent, ExtraFlags};
 use pallet_prelude::{
@@ -666,6 +669,12 @@ fn it_wont_let_you_reuse_ownership_tokens_for_two_bids() {
 			.into(),
 		);
 		assert_eq!(FrameStartBlockNumbers::<Test>::get().to_vec(), vec![16]);
+		assert!(!MiningSlots::is_first_block_after_frame_start());
+		System::set_block_number(17);
+		assert!(MiningSlots::is_first_block_after_frame_start());
+		System::set_block_number(18);
+		assert!(!MiningSlots::is_first_block_after_frame_start());
+		System::set_block_number(16);
 		assert_eq!(FrameStartTicks::<Test>::get().len(), 1);
 		assert_eq!(FrameStartTicks::<Test>::get().get(&4), Some(&16));
 		assert_eq!(MiningSlots::get_next_mining_epoch(), (20, 20 + (4 * 3)));

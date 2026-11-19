@@ -34,7 +34,6 @@ frame_support::construct_runtime!(
 	pub enum Test
 	{
 		System: frame_system,
-		TreasuryPositions: pallet_treasury_positions,
 		Balances: pallet_balances,
 		BitcoinUtxos: pallet_bitcoin_utxos,
 		BitcoinLocks: pallet_bitcoin_locks,
@@ -670,7 +669,7 @@ pub(crate) fn set_bitcoin_height(height: BitcoinHeight) {
 }
 
 impl pallet_bitcoin_locks::Config for Test {
-	type PositionProvider = TreasuryPositions;
+	type PositionProvider = MockTreasuryPositionProvider;
 	type WeightInfo = crate::weights::WithProviderWeights<Test, ()>;
 	type Balance = Balance;
 	type FissionsProvider = BitcoinFissions;
@@ -702,7 +701,7 @@ impl pallet_bitcoin_locks::Config for Test {
 
 impl pallet_bitcoin_fissions::Config for Test {
 	type FeeCoupon = crate::FeeCoupon<Self>;
-	type PositionProvider = TreasuryPositions;
+	type PositionProvider = MockTreasuryPositionProvider;
 	type WeightInfo = pallet_bitcoin_fissions::WithProviderWeights<Test, ()>;
 	type Balance = Balance;
 	type LockProvider = BitcoinLocks;
@@ -768,14 +767,6 @@ pub fn new_test_ext() -> TestState {
 		.assimilate_storage(t)
 		.unwrap();
 	})
-}
-
-impl pallet_treasury_positions::Config for Test {
-	type BitcoinPositionProvider = BitcoinLocks;
-	type TreasuryPoolProvider = ();
-	type OperationalAccountProvider = ();
-	type Balance = Balance;
-	type WeightInfo = ();
 }
 
 pub(crate) fn funding_received(lock_id: BitcoinLockId, satoshis: Satoshis) -> DispatchResult {

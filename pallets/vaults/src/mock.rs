@@ -12,14 +12,17 @@ use argon_primitives::{
 	tick::Ticker,
 	vault::VaultTerms,
 	CollectBlockerProvider, CrosschainGatewayProvider, GatewayState, MiningFrameProvider,
-	MiningSlotProvider, OperationalAccountProvider, SourceChain, TickProvider, VotingSchedule,
+	OperationalAccountProvider, OperationalAccountsHook, SourceChain, TickProvider, VotingSchedule,
 };
 use bitcoin::{
 	bip32::{ChildNumber, Xpriv, Xpub},
 	key::Secp256k1,
 };
 use core::time::Duration;
-use frame_support::traits::{Currency, UnixTime};
+use frame_support::{
+	storage::unhashed,
+	traits::{Currency, UnixTime},
+};
 use k256::elliptic_curve::rand_core::{OsRng, RngCore};
 use pallet_bitcoin_locks::BitcoinVerifier;
 use pallet_prelude::{
@@ -39,9 +42,7 @@ frame_support::construct_runtime!(
 	pub enum Test
 	{
 		System: frame_system,
-		TreasuryPositions: pallet_treasury_positions,
 		Balances: pallet_balances,
-		OperationalAccounts: pallet_operational_accounts,
 		Vaults: pallet_vaults,
 		BitcoinLocks: pallet_bitcoin_locks,
 		BitcoinFissions: pallet_bitcoin_fissions
@@ -112,18 +113,6 @@ parameter_types! {
 	pub static TreasuryExitDelayFrames: FrameId = 10;
 	pub static VaultPalletId: PalletId = PalletId(*b"bidPools");
 	pub const OperationalMinimumVaultSecuritization: Balance = 2_000;
-	pub const BitcoinLockSizeForAccessCode: Balance = 5_000;
-	pub const OperationalCertificationReward: Balance = 1_000;
-	pub const OperationalCertificationBonusReward: Balance = 500;
-	pub const OperationalCertificationsPerBonusReward: u32 = 5;
-	pub const MaxAvailableAccessCodes: u32 = 2;
-	pub const MinimumUniswapTransfer: Balance = 250;
-	pub const MinimumBitcoin: Balance = 500;
-	pub const BitcoinLiquidityTolerance: Percent = Percent::from_percent(1);
-	pub const MinimumBonds: Balance = 200;
-	pub const OperationalMinimumUniswapTransfer: Balance = 3_000;
-	pub const MiningSeatsForOperational: u32 = 2;
-	pub const MiningSeatsPerAccessCode: u32 = 5;
 	pub static PercentForTreasuryReserves: Percent = Percent::from_percent(20);
 	pub static OverdueCollectBlockers: BTreeSet<u64> = BTreeSet::new();
 	pub static OperationalAccountsInviteOnly: bool = false;
@@ -203,42 +192,21 @@ impl OperationalAccountProvider<u64> for MockOperationalAccountProvider {
 	}
 }
 
-pub struct MockMiningSlotProvider;
-impl MiningSlotProvider<u64> for MockMiningSlotProvider {
-	type Weights = ();
+const LAST_VAULT_FUNDING_REPORT: &[u8] = b"vaults-test:last-vault-funding-report";
 
-	fn has_active_rewards_account_seat(_: &u64) -> bool {
-		false
+pub struct MockOperationalAccountsHook;
+impl MockOperationalAccountsHook {
+	pub fn last_vault_funding_report() -> Option<(u64, Balance)> {
+		unhashed::get(LAST_VAULT_FUNDING_REPORT)
 	}
 }
 
-impl pallet_operational_accounts::Config for Test {
-	type AccountSecurityProvider = ();
-	type PositionProvider = TreasuryPositions;
-	type Balance = Balance;
-	type BitcoinLockSizeForAccessCode = BitcoinLockSizeForAccessCode;
-	type OperationalCertificationReward = OperationalCertificationReward;
-	type OperationalCertificationBonusReward = OperationalCertificationBonusReward;
-	type OperationalCertificationsPerBonusReward = OperationalCertificationsPerBonusReward;
-	type MaxAvailableAccessCodes = MaxAvailableAccessCodes;
-	type MaxAccessCodeAwardsPerFrame = ConstU32<1_000>;
-	type MinimumUniswapTransfer = MinimumUniswapTransfer;
-	type MinimumBitcoin = MinimumBitcoin;
-	type BitcoinLiquidityTolerance = BitcoinLiquidityTolerance;
-	type MinimumBonds = MinimumBonds;
-	type OperationalMinimumUniswapTransfer = OperationalMinimumUniswapTransfer;
-	type OperationalMinimumVaultSecuritization = OperationalMinimumVaultSecuritization;
-	type MiningSeatsForOperational = MiningSeatsForOperational;
-	type MiningSeatsPerAccessCode = MiningSeatsPerAccessCode;
-	type VaultProvider = Vaults;
-	type MiningSlotProvider = MockMiningSlotProvider;
-	type BitcoinFissionsProvider = ();
-	type TreasuryPoolProvider = ();
-	type UniswapTransferProvider = ();
-	type Currency = Balances;
-	type OperationalRewardsPayer = ();
-	type TickProvider = StaticTickProvider;
-	type WeightInfo = ();
+impl OperationalAccountsHook<u64, Balance> for MockOperationalAccountsHook {
+	type Weights = ();
+
+	fn vault_bitcoin_lock_funded(operator: &u64, total_locked: Balance) {
+		unhashed::put(LAST_VAULT_FUNDING_REPORT, &(*operator, total_locked));
+	}
 }
 
 impl pallet_vaults::Config for Test {
@@ -261,9 +229,9 @@ impl pallet_vaults::Config for Test {
 	type MaxPendingCosignsPerVault = ConstU32<100>;
 	type RevenueCollectionExpirationFrames = ConstU64<10>;
 	type OperationalMinimumVaultSecuritization = OperationalMinimumVaultSecuritization;
-	type OperationalAccountsHook = OperationalAccounts;
+	type OperationalAccountsHook = MockOperationalAccountsHook;
 	type TreasuryPoolProvider = ();
-	type PositionProvider = TreasuryPositions;
+	type PositionProvider = MockTreasuryPositionProvider;
 	type OperationalAccountProvider = MockOperationalAccountProvider;
 	type CollectBlockerProvider = MockCollectBlockerProvider;
 }
@@ -366,7 +334,7 @@ impl BitcoinVerifier<Test> for StaticBitcoinVerifier {
 	}
 }
 impl pallet_bitcoin_locks::Config for Test {
-	type PositionProvider = TreasuryPositions;
+	type PositionProvider = MockTreasuryPositionProvider;
 	type WeightInfo = ();
 	type Balance = Balance;
 	type FissionsProvider = BitcoinFissions;
@@ -403,14 +371,6 @@ pub fn new_test_ext() -> TestState {
 	new_test_with_genesis::<Test>(|_t| {})
 }
 
-impl pallet_treasury_positions::Config for Test {
-	type BitcoinPositionProvider = BitcoinLocks;
-	type TreasuryPoolProvider = ();
-	type OperationalAccountProvider = OperationalAccounts;
-	type Balance = Balance;
-	type WeightInfo = ();
-}
-
 // Accounting tests bypass mint issuance and repayment tracking.
 pub struct TestMinting;
 impl argon_primitives::BitcoinFissionMinting<u64, Balance> for TestMinting {
@@ -426,8 +386,8 @@ impl pallet_bitcoin_fissions::Config for Test {
 	type FeeCoupon = pallet_bitcoin_locks::FeeCoupon<Test>;
 	type LockProvider = BitcoinLocks;
 	type Minting = TestMinting;
-	type PositionProvider = TreasuryPositions;
-	type OperationalAccountsHook = OperationalAccounts;
+	type PositionProvider = MockTreasuryPositionProvider;
+	type OperationalAccountsHook = ();
 	type Currency = Balances;
 	type LiquidRepaymentProvider = ();
 	type MaxFissionsPerLock = ConstU32<50>;

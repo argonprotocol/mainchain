@@ -1092,6 +1092,7 @@ async fn submit_price(
 						tick,
 					},
 					None,
+					None,
 				),
 				&signer,
 				params,

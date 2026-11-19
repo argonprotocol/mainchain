@@ -130,7 +130,7 @@ macro_rules! inject_runtime_vars {
 			spec_version: 162,
 			impl_version: 10,
 			apis: RUNTIME_API_VERSIONS,
-			transaction_version: 6,
+			transaction_version: 7,
 			system_version: 1,
 		};
 		parameter_types! {
@@ -169,6 +169,9 @@ macro_rules! inject_runtime_vars {
 		/// This can be a tuple of types, each implementing `OnRuntimeUpgrade`.
 		type Migrations = (
 			pallet_treasury::migrations::VirtualizeMarketingReserveMigration<Runtime>,
+			pallet_stabilizer_buys::migrations::InitializeApprovedPoolRevisionMigration<Runtime>,
+			pallet_stabilizer_pools::migrations::RemoveOpeningPriceIndicesMigration<Runtime>,
+			pallet_treasury_positions::migrations::AddCollectAmountsMigration<Runtime>,
 		);
 
 		/// Unchecked extrinsic type as expected by this runtime.

@@ -1,8 +1,16 @@
 use super::*;
 #[cfg(test)]
 use crate::mock::Test;
-use crate::mock::{config, evidence, pool_id, pool_manager};
+use crate::{
+	mock::{
+		config, pool_id, pool_manager, position_change_evidence, position_evidence,
+		stabilizer_pool_price_source,
+	},
+	price_history::StabilizerPoolUsdQuotes,
+	uniswap::{sqrt_price_at_uniswap_tick, MAX_REWARD_RANGES, REWARD_BAND_TOLERANCE},
+};
 use frame_system::RawOrigin;
+use pallet_prelude::benchmarking::{benchmark_mining_clock, set_benchmark_mining_clock};
 use polkadot_sdk::frame_benchmarking::v2::*;
 
 #[benchmarks]
@@ -10,51 +18,60 @@ mod benchmarks {
 	use super::*;
 
 	#[benchmark]
-	fn read_price_index_context() -> Result<(), BenchmarkError> {
-		if T::MiningFrameTransitionProvider::is_new_frame_started().is_some() {
-			return Err(BenchmarkError::Stop("measure the fallback frame lookup"));
+	fn read_price_index_context() {
+		#[block]
+		{
+			core::hint::black_box(T::CurrentTick::get());
 		}
+	}
+
+	#[benchmark]
+	fn record_stabilizer_pool_spot_price() -> Result<(), BenchmarkError> {
+		let frame = 1;
+		let (last_tick, price) = fill_price_buckets::<T>(frame)?;
 
 		#[block]
 		{
-			let tick = T::CurrentTick::get();
-			let frame = T::MiningFrameTransitionProvider::is_new_frame_started()
-				.unwrap_or_else(T::MiningFrameTransitionProvider::get_current_frame_id);
-			core::hint::black_box((tick, frame));
+			Pallet::<T>::record_stabilizer_pool_spot_price(
+				last_tick + 1,
+				price.sqrt_price_x96,
+				Some(StabilizerPoolUsdQuotes {
+					argon_usd_target_price: price.argon_usd_target_price,
+					usdc_usd_price: price.usdc_usd_price,
+				}),
+				stabilizer_pool_price_source(),
+			);
 		}
+
+		// Closing this delayed frame needs the observation that merged the full buckets.
+		let _ = Pallet::<T>::start_stabilizer_pool_price_sampling(frame + 1, last_tick + 2);
+		assert_eq!(StabilizerPoolPricesByFrame::<T>::get().get(&frame), Some(&price));
 		Ok(())
 	}
 
 	#[benchmark]
-	fn record_frame_price() -> Result<(), BenchmarkError> {
-		let (retained_frames, index) = full_frame_history::<T>()?;
-		let frame_id = retained_frames + 1;
+	fn start_stabilizer_pool_price_sampling() -> Result<(), BenchmarkError> {
+		let retained_frames = FrameId::from(T::MaxSampledPriceHistoryFrames::get());
+		if retained_frames == 0 {
+			return Err(BenchmarkError::Stop("sampled price history is disabled"));
+		}
+		let frame = retained_frames + 1;
+		let (last_tick, price) = fill_price_buckets::<T>(frame)?;
+		StabilizerPoolPricesByFrame::<T>::mutate(|history| {
+			for frame in 1..=retained_frames {
+				history.try_insert(frame, price).unwrap();
+			}
+		});
 
 		#[block]
 		{
-			Pallet::<T>::record_frame_price(frame_id, &index);
+			core::hint::black_box(T::CurrentTick::get());
+			let _ = Pallet::<T>::start_stabilizer_pool_price_sampling(frame + 1, last_tick + 1);
 		}
 
-		let history = FrameStartPriceIndices::<T>::get();
-		assert_eq!(history.len(), retained_frames as usize);
+		let history = StabilizerPoolPricesByFrame::<T>::get();
+		assert_eq!(history.get(&frame), Some(&price));
 		assert!(!history.contains_key(&1));
-		assert_eq!(history.get(&frame_id), Some(&index));
-		Ok(())
-	}
-
-	#[benchmark]
-	fn record_frame_price_after_gap() -> Result<(), BenchmarkError> {
-		let (retained_frames, index) = full_frame_history::<T>()?;
-		let frame_id = retained_frames * 2 + 1;
-
-		#[block]
-		{
-			Pallet::<T>::record_frame_price(frame_id, &index);
-		}
-
-		let history = FrameStartPriceIndices::<T>::get();
-		assert_eq!(history.len(), 1);
-		assert_eq!(history.get(&frame_id), Some(&index));
 		Ok(())
 	}
 
@@ -65,8 +82,10 @@ mod benchmarks {
 		assert_eq!(Pools::<T>::get(pool_manager(), pool_id()), Some(config()));
 	}
 
-	#[benchmark]
+	// Include the combined proof of both owners, both ranges and the full reviewed frame.
+	#[benchmark(pov_mode = Measured)]
 	fn checkpoint_position() -> Result<(), BenchmarkError> {
+		set_current_frame(FrameId::from(T::MaxSampledPriceHistoryFrames::get()));
 		let caller: T::AccountId = whitelisted_caller();
 		let encoded = caller.encode();
 		if encoded.len() != 32 {
@@ -75,21 +94,65 @@ mod benchmarks {
 		let beneficiary = H256::from_slice(&encoded);
 
 		Pallet::<T>::register_pool(RawOrigin::Root.into(), pool_manager(), config())?;
-		let first = evidence::<T>(100, 1, beneficiary, u128::MAX, true);
-		Pallet::<T>::checkpoint_position(
-			RawOrigin::Signed(caller.clone()).into(),
-			pool_manager(),
-			pool_id(),
-			U256::one(),
-			Box::new(first),
-		)?;
+		let previous_owner: T::AccountId = account("previous-owner", 0, 0);
+		let previous = benchmark_checkpoint(previous_owner);
+		let mut empty = previous.clone();
+		empty.liquidity = 0;
+		for token_id in 2..=T::MaxPositionsPerAccount::get() {
+			Pallet::<T>::record_checkpoint(
+				config().position_manager,
+				token_id.into(),
+				empty.clone(),
+			)?;
+		}
+		Pallet::<T>::record_checkpoint(config().position_manager, U256::one(), previous.clone())?;
+		// Fill both owner lists, leaving one recipient slot for the transferred NFT.
+		empty.beneficiary = caller.clone();
+		for index in 1..T::MaxPositionsPerAccount::get() {
+			let token_id = T::MaxPositionsPerAccount::get().saturating_add(index);
+			Pallet::<T>::record_checkpoint(
+				config().position_manager,
+				token_id.into(),
+				empty.clone(),
+			)?;
+		}
+		// Exercise owner and range replacement after the prior registration became eligible.
+		let current_frame = T::MiningFrameTransitionProvider::get_current_frame_id();
+		let range = StabilizerPoolLiquidityRange::from(&previous);
+		StabilizerPoolRegistrations::<T>::insert(
+			StabilizerPoolPositionId {
+				position_manager: config().position_manager,
+				token_id: U256::one(),
+			},
+			StabilizerPoolRegistration::Enrolled(StabilizerPoolEnrollment {
+				eligible_from: current_frame.saturating_sub(1),
+				next_claim_frame: current_frame.saturating_sub(1),
+			}),
+		);
+		seed_review_frame::<T>(current_frame.saturating_sub(1), &previous);
+		RegisteredLiquidityByRange::<T>::mutate(range, |liquidity| {
+			liquidity.current_liquidity = liquidity.next_frame_liquidity;
+		});
+		let new_range = StabilizerPoolLiquidityRange {
+			lower_uniswap_tick: -110,
+			upper_uniswap_tick: 110,
+			..range
+		};
+		RegisteredLiquidityByRange::<T>::insert(
+			new_range,
+			StabilizerPoolRangeLiquidity {
+				frame_id: current_frame,
+				current_liquidity: U256::one(),
+				next_frame_liquidity: U256::one(),
+			},
+		);
 
-		let proof = Box::new(evidence::<T>(200, 1, beneficiary, u128::MAX, true));
-
-		let header = EthereumVerifier::<T>::verified_execution_header(
-			&proof.subscriber.execution_block_proof,
-		)
-		.map_err(|_| BenchmarkError::Stop("fixture execution header"))?;
+		let proof = position_evidence(200, 2, beneficiary, u128::MAX, true, (-110, 110));
+		let block = ProofBlock {
+			hash: U256::from(200).to_big_endian().into(),
+			number: 200,
+			timestamp_millis: 2_400_000,
+		};
 
 		// Proof providers have their own measured weights. Measure the local decode, authorization,
 		// storage transition and event here instead of counting those providers twice.
@@ -108,12 +171,6 @@ mod benchmarks {
 
 			let position = evm::decode_position::<T>(&config, pool_id(), U256::one(), &proof)?;
 			assert_eq!(caller.encode().as_slice(), position.argon_account_id.as_bytes());
-
-			let block = ProofBlock {
-				hash: header.block_hash,
-				number: header.block_number,
-				timestamp_millis: header.timestamp_millis,
-			};
 
 			Pallet::<T>::record_checkpoint(
 				config.position_manager,
@@ -135,39 +192,362 @@ mod benchmarks {
 
 		let checkpoint =
 			PositionCheckpoints::<T>::get(config().position_manager, U256::one()).unwrap();
-		assert_eq!(checkpoint.maintained_since.number, 100);
+		assert_eq!(checkpoint.maintained_since.number, 200);
 		assert_eq!(checkpoint.proven_through.number, 200);
+		Ok(())
+	}
+
+	#[benchmark]
+	fn settle_account(n: Linear<0, 5>) -> Result<(), BenchmarkError> {
+		let retained_frames = FrameId::from(T::MaxSampledPriceHistoryFrames::get());
+		let current_frame = retained_frames + 2;
+		let first_frame = current_frame - FrameId::from(T::ClaimWindowFrames::get()) - 1;
+		let caller: T::AccountId = whitelisted_caller();
+		let mut checkpoint = benchmark_checkpoint(caller.clone());
+		let config = config();
+		Pallet::<T>::register_pool(RawOrigin::Root.into(), pool_manager(), config)?;
+
+		let price = StabilizerPoolFramePrice {
+			pool: stabilizer_pool_price_source().pool,
+			sqrt_price_x96: sqrt_price_at_uniswap_tick(-276_800).unwrap(),
+			argon_usd_target_price: FixedU128::one(),
+			usdc_usd_price: FixedU128::one(),
+			argon_is_token0: true,
+		};
+		let band = StabilizerPoolRewardBand::new(
+			price.argon_usd_target_price,
+			price.usdc_usd_price,
+			price.argon_is_token0,
+			config.key.tick_spacing,
+			T::RewardPriceBand::get(),
+			REWARD_BAND_TOLERANCE,
+		)
+		.unwrap();
+		let ranges = band.reward_ranges().unwrap();
+		(checkpoint.tick_lower, checkpoint.tick_upper) = ranges[0];
+		checkpoint.maintained_since.timestamp_millis = 0;
+		checkpoint.proven_through.timestamp_millis = current_frame.saturating_mul(60_000);
+
+		StabilizerPoolFrameStartMillis::<T>::mutate(|starts| {
+			for frame in current_frame - retained_frames..=current_frame {
+				starts.try_insert(frame, frame.saturating_mul(60_000)).unwrap();
+			}
+		});
+		StabilizerPoolPricesByFrame::<T>::mutate(|prices| {
+			for frame in current_frame - retained_frames..current_frame {
+				prices.try_insert(frame, price).unwrap();
+			}
+		});
+		StabilizerPoolRewardSharesByFrame::<T>::mutate(|history| {
+			for frame in current_frame - retained_frames - 1..current_frame - 1 {
+				history.try_insert(frame, T::UsdcRewardShare::get()).unwrap();
+				T::RewardProvider::finalize_frame_rewards(frame, 1);
+			}
+		});
+		set_current_frame(current_frame);
+		for token_id in 1..=n {
+			Pallet::<T>::record_checkpoint(
+				config.position_manager,
+				token_id.into(),
+				checkpoint.clone(),
+			)?;
+			StabilizerPoolRegistrations::<T>::insert(
+				StabilizerPoolPositionId {
+					position_manager: config.position_manager,
+					token_id: token_id.into(),
+				},
+				StabilizerPoolRegistration::Enrolled(StabilizerPoolEnrollment {
+					eligible_from: first_frame,
+					next_claim_frame: first_frame,
+				}),
+			);
+		}
+
+		#[block]
+		{
+			Pallet::<T>::settle_account(&caller)?;
+		}
+		for token_id in 1..=n {
+			let position = StabilizerPoolPositionId {
+				position_manager: config.position_manager,
+				token_id: token_id.into(),
+			};
+			assert_eq!(
+				StabilizerPoolRegistrations::<T>::get(position),
+				Some(StabilizerPoolRegistration::Enrolled(StabilizerPoolEnrollment {
+					eligible_from: first_frame,
+					next_claim_frame: current_frame - 1,
+				}))
+			);
+		}
+		Ok(())
+	}
+
+	#[benchmark]
+	fn advance_liquidity_snapshots() -> Result<(), BenchmarkError> {
+		let mut config = config();
+		config.key.tick_spacing = 1;
+		let pool_id = evm::pool_id(&config.key);
+		Pallet::<T>::register_pool(RawOrigin::Root.into(), pool_manager(), config)?;
+		// A pool rotation can leave the reviewed and newly closed frames in different markets.
+		config.key.fee = config.key.fee.saturating_add(1);
+		let reviewed_pool_id = evm::pool_id(&config.key);
+		Pallet::<T>::register_pool(RawOrigin::Root.into(), pool_manager(), config)?;
+		let mut pool = stabilizer_pool_price_source().pool;
+		pool.pool_id = pool_id;
+		let price = StabilizerPoolFramePrice {
+			pool,
+			sqrt_price_x96: sqrt_price_at_uniswap_tick(277_000).unwrap(),
+			// Place both band edges across the maximum number of spacing-one intervals.
+			argon_usd_target_price: FixedU128::from_rational(1_000_018, 1_000_000),
+			usdc_usd_price: FixedU128::one(),
+			argon_is_token0: false,
+		};
+		let mut reviewed_price = price;
+		reviewed_price.pool.pool_id = reviewed_pool_id;
+		let retained_frames = FrameId::from(T::MaxSampledPriceHistoryFrames::get());
+		let current_frame = retained_frames.saturating_add(1);
+		let reviewed_frame = current_frame.saturating_sub(2);
+		let band = StabilizerPoolRewardBand::new(
+			price.argon_usd_target_price,
+			price.usdc_usd_price,
+			price.argon_is_token0,
+			1,
+			T::RewardPriceBand::get(),
+			REWARD_BAND_TOLERANCE,
+		)
+		.unwrap();
+		let liquidity = U256::from(10u128.pow(24));
+		let mut liquidity_by_range = BoundedBTreeMap::new();
+		let ranges = band.reward_ranges().unwrap();
+		assert_eq!(ranges.len(), 402);
+		for (lower, upper) in ranges {
+			RegisteredLiquidityByRange::<T>::insert(
+				StabilizerPoolLiquidityRange {
+					pool_manager: pool.pool_manager,
+					pool_id,
+					lower_uniswap_tick: lower,
+					upper_uniswap_tick: upper,
+				},
+				StabilizerPoolRangeLiquidity {
+					frame_id: reviewed_frame,
+					current_liquidity: liquidity,
+					next_frame_liquidity: liquidity,
+				},
+			);
+			liquidity_by_range.try_insert((lower, upper), liquidity).unwrap();
+		}
+		StabilizerPoolReviewFrame::<T>::put(StabilizerPoolFrameLiquidity {
+			frame_id: reviewed_frame,
+			liquidity_by_range,
+			usdc_reward_share: T::UsdcRewardShare::get(),
+		});
+		StabilizerPoolPricesByFrame::<T>::mutate(|history| {
+			for frame_id in 1..current_frame {
+				history.try_insert(frame_id, reviewed_price).unwrap();
+			}
+		});
+		StabilizerPoolRewardSharesByFrame::<T>::mutate(|history| {
+			for frame_id in 0..reviewed_frame {
+				history.try_insert(frame_id, T::UsdcRewardShare::get()).unwrap();
+			}
+		});
+		let started_at = T::TimeProvider::now();
+		StabilizerPoolFrameStartMillis::<T>::mutate(|starts| {
+			for frame_id in 0..current_frame {
+				let elapsed = current_frame.saturating_sub(frame_id).saturating_mul(60_000);
+				starts.try_insert(frame_id, started_at.saturating_sub(elapsed)).unwrap();
+			}
+		});
+
+		#[block]
+		{
+			Pallet::<T>::advance_liquidity_snapshots(current_frame, Some(price));
+		}
+
+		assert_eq!(
+			StabilizerPoolRewardSharesByFrame::<T>::get()[&reviewed_frame],
+			T::UsdcRewardShare::get()
+		);
+		assert!(!StabilizerPoolReviewFrame::<T>::get().unwrap().liquidity_by_range.is_empty());
+		Ok(())
+	}
+
+	// Removal also reads the full review snapshot and retained prices.
+	#[benchmark(pov_mode = Measured)]
+	fn report_position_change() -> Result<(), BenchmarkError> {
+		set_current_frame(FrameId::from(T::MaxSampledPriceHistoryFrames::get()));
+		let caller: T::AccountId = whitelisted_caller();
+		let config = config();
+		Pallet::<T>::register_pool(RawOrigin::Root.into(), pool_manager(), config)?;
+		let position = StabilizerPoolPositionId {
+			position_manager: config.position_manager,
+			token_id: U256::one(),
+		};
+		let frame_id = T::MiningFrameTransitionProvider::get_current_frame_id();
+		let reviewed_frame = frame_id.saturating_sub(1);
+		let checkpoint = benchmark_checkpoint(caller);
+		let mut empty = checkpoint.clone();
+		empty.liquidity = 0;
+		for token_id in 2..=T::MaxPositionsPerAccount::get() {
+			Pallet::<T>::record_checkpoint(
+				config.position_manager,
+				token_id.into(),
+				empty.clone(),
+			)?;
+		}
+		PositionIdsByAccount::<T>::mutate(&checkpoint.beneficiary, |positions| {
+			positions.try_push(position).unwrap();
+		});
+		let liquidity = checkpoint.liquidity;
+		PositionCheckpoints::<T>::insert(position.position_manager, position.token_id, &checkpoint);
+		StabilizerPoolRegistrations::<T>::insert(
+			position,
+			StabilizerPoolRegistration::Enrolled(StabilizerPoolEnrollment {
+				eligible_from: reviewed_frame,
+				next_claim_frame: reviewed_frame,
+			}),
+		);
+		RegisteredLiquidityByRange::<T>::insert(
+			StabilizerPoolLiquidityRange::from(&checkpoint),
+			StabilizerPoolRangeLiquidity {
+				frame_id,
+				current_liquidity: liquidity.into(),
+				next_frame_liquidity: liquidity.into(),
+			},
+		);
+		seed_review_frame::<T>(reviewed_frame, &checkpoint);
+		let proof = position_change_evidence(200, 2, liquidity, true, (-100, 100));
+		let observed_at = ProofBlock {
+			hash: U256::from(200).to_big_endian().into(),
+			number: 200,
+			timestamp_millis: 2_400_000,
+		};
+
+		// The Ethereum verifier's own benchmarks cover ancestry and authentication.
+		#[block]
+		{
+			let Some(StabilizerPoolRegistration::Enrolled(enrollment)) =
+				StabilizerPoolRegistrations::<T>::get(position)
+			else {
+				return Err(BenchmarkError::Stop("fixture position must be enrolled"));
+			};
+			let previous =
+				PositionCheckpoints::<T>::get(position.position_manager, position.token_id)
+					.unwrap();
+			evm::decode_position_change::<T>(position, &previous, &proof)?;
+			Pallet::<T>::remove_reported_position(position, &previous, enrollment, observed_at)?;
+		}
+
+		assert_eq!(
+			StabilizerPoolRegistrations::<T>::get(position),
+			Some(StabilizerPoolRegistration::Removed { reported_at: observed_at }),
+		);
+		assert!(!StabilizerPoolReviewFrame::<T>::get()
+			.unwrap()
+			.liquidity_by_range
+			.contains_key(&(-100, 100)));
 		Ok(())
 	}
 
 	impl_benchmark_test_suite!(Pallet, new_test_with_genesis::<Test>(|_| {}), Test);
 }
 
-fn full_frame_history<T: Config>() -> Result<(FrameId, PriceIndex), BenchmarkError> {
-	let retained_frames = u64::from(T::MaxFramePriceHistoryFrames::get());
-	if retained_frames == 0 {
-		return Err(BenchmarkError::Stop("frame history is disabled"));
-	}
-
-	let index = PriceIndex {
-		btc_usd_price: FixedU128::from_inner(u128::MAX),
-		argonot_usd_price: FixedU128::from_inner(u128::MAX),
-		argon_usd_price: FixedU128::from_inner(u128::MAX),
-		argon_usd_target_price: FixedU128::from_inner(u128::MAX),
-		argon_time_weighted_average_liquidity: u128::MAX,
-		tick: Tick::MAX,
-		usdc_usd_price: Some(FixedU128::from_inner(u128::MAX)),
-		stabilizer_pool_sqrt_price_x96: Some(U256::one() << 96),
+fn benchmark_checkpoint<AccountId>(beneficiary: AccountId) -> PositionCheckpoint<AccountId> {
+	let block = ProofBlock {
+		hash: U256::from(100).to_big_endian().into(),
+		number: 100,
+		timestamp_millis: 1_200_000,
 	};
-
-	let mut history = BoundedBTreeMap::<FrameId, PriceIndex, T::MaxFramePriceHistoryFrames>::new();
-	for frame in 1..=retained_frames {
-		let observation = PriceIndex { tick: Tick::MAX - (retained_frames - frame), ..index };
-		history
-			.try_insert(frame, observation)
-			.map_err(|_| BenchmarkError::Stop("frame history benchmark overflow"))?;
+	PositionCheckpoint {
+		beneficiary,
+		pool_manager: pool_manager(),
+		pool_id: pool_id(),
+		subscriber: config().subscriber,
+		revision: U256::one(),
+		tick_lower: -100,
+		tick_upper: 100,
+		liquidity: u128::MAX,
+		maintained_since: block,
+		proven_through: block,
 	}
+}
 
-	FrameStartPriceIndices::<T>::put(history);
-	Ok((retained_frames, index))
+fn set_current_frame(frame_id: FrameId) {
+	let mut frame_state = benchmark_mining_clock();
+	frame_state.current_frame_id = frame_id;
+	set_benchmark_mining_clock(frame_state);
+	#[cfg(test)]
+	crate::mock::CurrentFrame::set(frame_id);
+}
+
+// Measure correction and checkpoint with a full snapshot to account for decoding and rewriting it.
+fn seed_review_frame<T: Config>(frame_id: FrameId, checkpoint: &PositionCheckpoint<T::AccountId>) {
+	let mut liquidity_by_range = BoundedBTreeMap::new();
+	let ticks = (checkpoint.tick_lower, checkpoint.tick_upper);
+	liquidity_by_range.try_insert(ticks, checkpoint.liquidity.into()).unwrap();
+	for offset in 1..MAX_REWARD_RANGES {
+		let offset = i32::try_from(offset).unwrap();
+		liquidity_by_range
+			.try_insert((ticks.0 + offset, ticks.1 + offset), U256::one())
+			.unwrap();
+	}
+	StabilizerPoolReviewFrame::<T>::put(StabilizerPoolFrameLiquidity {
+		frame_id,
+		liquidity_by_range,
+		usdc_reward_share: T::UsdcRewardShare::get(),
+	});
+	StabilizerPoolFrameStartMillis::<T>::mutate(|starts| {
+		starts.try_insert(frame_id, 1_200_000).unwrap();
+		starts.try_insert(frame_id.saturating_add(1), 1_800_000).unwrap();
+	});
+	let pool_source = stabilizer_pool_price_source();
+	let price = StabilizerPoolFramePrice {
+		pool: pool_source.pool,
+		argon_is_token0: pool_source.argon_is_token0,
+		sqrt_price_x96: sqrt_price_at_uniswap_tick(0).unwrap(),
+		argon_usd_target_price: FixedU128::one(),
+		usdc_usd_price: FixedU128::one(),
+	};
+	StabilizerPoolPricesByFrame::<T>::mutate(|history| {
+		let retained_frames = FrameId::from(T::MaxSampledPriceHistoryFrames::get());
+		let first_frame = frame_id.saturating_add(1).saturating_sub(retained_frames);
+		for stored_frame in first_frame..=frame_id {
+			history.try_insert(stored_frame, price).unwrap();
+		}
+	});
+}
+
+fn fill_price_buckets<T: Config>(
+	frame: FrameId,
+) -> Result<(Tick, StabilizerPoolFramePrice), BenchmarkError> {
+	let bucket_count = Tick::from(T::MaxPriceBucketsPerFrame::get());
+	if bucket_count == 0 {
+		return Err(BenchmarkError::Stop("price sampling is disabled"));
+	}
+	let bucket_ticks = T::TicksPerFrame::get().div_ceil(bucket_count).max(1);
+	let first_tick = T::CurrentTick::get();
+	let first_tick_after_full_buckets = first_tick + bucket_ticks * bucket_count;
+	let pool_source = stabilizer_pool_price_source();
+	let price = StabilizerPoolFramePrice {
+		sqrt_price_x96: sqrt_price_at_uniswap_tick(524_287).unwrap(),
+		argon_usd_target_price: FixedU128::one(),
+		usdc_usd_price: FixedU128::one(),
+		pool: pool_source.pool,
+		argon_is_token0: pool_source.argon_is_token0,
+	};
+	let _ = Pallet::<T>::start_stabilizer_pool_price_sampling(frame, first_tick);
+	let usd_quotes = StabilizerPoolUsdQuotes {
+		argon_usd_target_price: price.argon_usd_target_price,
+		usdc_usd_price: price.usdc_usd_price,
+	};
+	for tick in first_tick..=first_tick_after_full_buckets {
+		Pallet::<T>::record_stabilizer_pool_spot_price(
+			tick,
+			price.sqrt_price_x96,
+			Some(usd_quotes),
+			pool_source,
+		);
+	}
+	Ok((first_tick_after_full_buckets, price))
 }

@@ -1,21 +1,38 @@
 //! Shared setup for tests and runtime benchmarks; excluded from ordinary runtime builds.
-//! Ethereum finality anchors are supplied here, while account/storage proofs use the real verifier.
+//! Tests supply Ethereum anchors here so that the real verifier can check the storage proofs.
 #[cfg(test)]
 use crate as pallet_stabilizer_pools;
 use crate::*;
+#[cfg(test)]
+use alloy_primitives::aliases::I24;
 use alloy_primitives::{keccak256, B256, U256 as AlloyU256};
 use alloy_trie::{
 	proof::{ProofNodes, ProofRetainer},
 	HashBuilder, Nibbles, TrieAccount,
 };
-use argon_primitives::{EthereumExecutionBlockProof, EthereumStorageSlotProof};
+use argon_primitives::{
+	EthereumExecutionBlockProof, EthereumStorageSlotProof, StabilizerPoolPriceSource,
+	UniswapPoolIdentity,
+};
 #[cfg(test)]
-use frame_support::{assert_ok, derive_impl};
+use argon_primitives::{OnNewSlot, PriceIndex, PriceIndexUpdated, UniswapSqrtPriceX96};
+#[cfg(test)]
+use core::ops::Range;
+#[cfg(test)]
+use frame_support::{assert_ok, derive_impl, traits::Time};
+#[cfg(test)]
 use pallet_ethereum_verifier::{types::ExecutionHeaderAnchor, ExecutionHeaderAnchors};
 #[cfg(test)]
 use pallet_prelude::{new_test_with_genesis, TestState};
 #[cfg(test)]
+use polkadot_sdk::sp_core::U512;
+#[cfg(test)]
 use sp_runtime::{traits::IdentityLookup, AccountId32};
+#[cfg(test)]
+use uniswap_v3_sdk_bigint::utils::{
+	encode_sqrt_ratio_x96, get_amount_0_delta, get_amount_1_delta, get_sqrt_ratio_at_tick,
+	get_tick_at_sqrt_ratio, ToBig,
+};
 
 #[cfg(test)]
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -43,32 +60,87 @@ impl pallet_ethereum_verifier::Config for Test {
 
 #[cfg(test)]
 impl Config for Test {
+	type EthereumVerifier = EthereumVerifier;
+	type RewardProvider = MockRewardProvider;
+	type TreasuryPositionProvider = ();
+	type MaxPositionsPerAccount = ConstU32<5>;
+	type UsdcRewardShare = UsdcRewardShare;
 	type WeightInfo = ();
-	type MiningFrameTransitionProvider = Frames;
+	type MiningFrameTransitionProvider = CurrentFrame;
 	type CurrentTick = CurrentTick;
-	type MaxFramePriceHistoryFrames = ConstU32<33>;
+	type TimeProvider = CurrentTime;
+	type MaxSampledPriceHistoryFrames = ConstU32<13>;
+	type ClaimWindowFrames = ConstU32<10>;
+	type TicksPerFrame = ConstU64<10>;
+	type RewardPriceBand = RewardPriceBand;
+	type MaxPriceBucketsPerFrame = MaxPriceBucketsPerFrame;
+	type MinPriceBucketCoverage = MinPriceBucketCoverage;
 }
 
 #[cfg(test)]
 frame_support::parameter_types! {
+	pub const RewardPriceBand: (Percent, Percent) = (Percent::from_percent(90), Percent::one());
+	pub const MaxPriceBucketsPerFrame: u32 = 24;
+	pub const MinPriceBucketCoverage: Percent = Percent::from_percent(75);
 	pub static CurrentTick: Tick = 20;
+	pub static CurrentTime: Moment = 0;
 	pub static CurrentFrame: FrameId = 1;
-	pub static NewlyStartedFrame: Option<FrameId> = None;
+	pub static PaidClaims: Vec<PaidClaim> = Vec::new();
+	pub static RejectClaims: bool = false;
+	pub static UsdcRewardShare: Percent = Percent::from_percent(90);
+	pub static FinalizedRewardValues: Vec<(FrameId, Balance)> = Vec::new();
 }
 
 #[cfg(test)]
-pub struct Frames;
+#[derive(Clone)]
+pub struct PaidClaim {
+	pub frames: Vec<StabilizerPoolFrameClaim>,
+}
 
 #[cfg(test)]
-impl MiningFrameTransitionProvider for Frames {
+pub struct MockRewardProvider;
+
+#[cfg(test)]
+impl StabilizerPoolRewardProvider for MockRewardProvider {
 	type Weights = ();
 
-	fn is_new_frame_started() -> Option<FrameId> {
-		NewlyStartedFrame::get()
+	fn finalize_frame_rewards(frame_id: FrameId, eligible_value: Balance) {
+		FinalizedRewardValues::mutate(|frames| frames.push((frame_id, eligible_value)));
 	}
 
+	fn frame_reward_rate(frame_id: FrameId) -> Option<FixedU128> {
+		FinalizedRewardValues::get()
+			.iter()
+			.any(|(frame, _)| *frame == frame_id)
+			.then_some(FixedU128::one())
+	}
+	fn claim_rewards(frames: &[StabilizerPoolFrameClaim]) -> Result<Balance, DispatchError> {
+		if RejectClaims::get() {
+			return Err(DispatchError::Unavailable);
+		}
+		PaidClaims::mutate(|claims| {
+			claims.push(PaidClaim { frames: frames.to_vec() });
+		});
+		Ok(1)
+	}
+}
+
+#[cfg(test)]
+impl Time for CurrentTime {
+	type Moment = Moment;
+	fn now() -> Moment {
+		Self::get()
+	}
+}
+
+#[cfg(test)]
+impl MiningFrameTransitionProvider for CurrentFrame {
+	type Weights = ();
 	fn get_current_frame_id() -> FrameId {
-		CurrentFrame::get()
+		Self::get()
+	}
+	fn is_new_frame_started() -> Option<FrameId> {
+		None
 	}
 }
 
@@ -77,9 +149,55 @@ pub fn new_test_ext() -> TestState {
 	let mut ext = new_test_with_genesis::<Test>(|_| {});
 	ext.execute_with(|| {
 		System::set_block_number(1);
+		CurrentFrame::set(1);
+		PaidClaims::set(Vec::new());
+		RejectClaims::set(false);
+		UsdcRewardShare::set(Percent::from_percent(90));
+		FinalizedRewardValues::set(Vec::new());
 		assert_ok!(StabilizerPools::register_pool(RuntimeOrigin::root(), pool_manager(), config()));
 	});
 	ext
+}
+
+#[cfg(test)]
+pub(crate) fn start_mining_frame(frame_id: FrameId, tick: Tick) {
+	CurrentTick::set(tick);
+	CurrentTime::set(tick.saturating_mul(60_000));
+	CurrentFrame::set(frame_id);
+	StabilizerPools::on_frame_start(frame_id);
+}
+
+#[cfg(test)]
+pub(crate) fn report_stabilizer_pool_price(tick: Tick, sqrt_price_x96: UniswapSqrtPriceX96) {
+	StabilizerPools::on_price_index(
+		&stabilizer_pool_price_index(tick, sqrt_price_x96),
+		Some(stabilizer_pool_price_source()),
+	);
+}
+
+pub(crate) fn stabilizer_pool_price_source() -> StabilizerPoolPriceSource {
+	StabilizerPoolPriceSource {
+		revision: 1,
+		argon_is_token0: true,
+		pool: UniswapPoolIdentity { chain_id: 1, pool_manager: pool_manager(), pool_id: pool_id() },
+	}
+}
+
+#[cfg(test)]
+pub(crate) fn stabilizer_pool_price_index(
+	tick: Tick,
+	sqrt_price_x96: UniswapSqrtPriceX96,
+) -> PriceIndex {
+	PriceIndex {
+		tick,
+		stabilizer_pool_sqrt_price_x96: Some(sqrt_price_x96),
+		btc_usd_price: FixedU128::from_u32(60_000),
+		argonot_usd_price: FixedU128::from_u32(2),
+		argon_usd_price: FixedU128::one(),
+		argon_usd_target_price: FixedU128::one(),
+		argon_time_weighted_average_liquidity: 1_000,
+		usdc_usd_price: Some(FixedU128::one()),
+	}
 }
 
 pub(crate) fn pool_manager() -> H160 {
@@ -107,8 +225,8 @@ pub(crate) fn pool_id() -> H256 {
 #[cfg(test)]
 pub(crate) fn position_checkpoint(
 	liquidity: u128,
-	tick_lower: i32,
-	tick_upper: i32,
+	tick_lower: UniswapTick,
+	tick_upper: UniswapTick,
 ) -> PositionCheckpoint<AccountId32> {
 	let block =
 		ProofBlock { hash: H256::from_low_u64_be(100), number: 100, timestamp_millis: 1_200_000 };
@@ -126,14 +244,119 @@ pub(crate) fn position_checkpoint(
 	}
 }
 
+/// Convert a named Uniswap price tick to the raw sqrt-price format accepted by the pallet.
+#[cfg(test)]
+pub(crate) fn uniswap_sqrt_price_at_tick(uniswap_tick: UniswapTick) -> UniswapSqrtPriceX96 {
+	let sqrt_price = get_sqrt_ratio_at_tick(I24::try_from(uniswap_tick).unwrap()).unwrap();
+	U256::from_big_endian(&sqrt_price.to_be_bytes::<20>())
+}
+
+/// Independent principal reference from the pinned Uniswap SDK, which accepts one NFT's liquidity.
+#[cfg(test)]
+pub(crate) fn uniswap_sdk_principal(
+	liquidity: u128,
+	sqrt_range: Range<UniswapSqrtPriceX96>,
+	sqrt_price_x96: UniswapSqrtPriceX96,
+	argon_is_token0: bool,
+) -> Result<PositionAmounts, PositionAmountError> {
+	let sqrt_lower = AlloyU256::from_be_bytes(sqrt_range.start.to_big_endian());
+	let sqrt_upper = AlloyU256::from_be_bytes(sqrt_range.end.to_big_endian());
+	let sqrt_price =
+		AlloyU256::from_be_bytes(sqrt_price_x96.to_big_endian()).clamp(sqrt_lower, sqrt_upper);
+	let token0 = get_amount_0_delta(sqrt_price, sqrt_upper, liquidity, false).unwrap();
+	let token1 = get_amount_1_delta(sqrt_lower, sqrt_price, liquidity, false).unwrap();
+	let (argon, usdc) = if argon_is_token0 { (token0, token1) } else { (token1, token0) };
+
+	let argon_token_units_per_microgon = AlloyU256::from(10u128.pow(12));
+	let argon = Balance::try_from(argon / argon_token_units_per_microgon)
+		.map_err(|_| PositionAmountError::AmountOverflow)?;
+	let usdc = Balance::try_from(usdc).map_err(|_| PositionAmountError::AmountOverflow)?;
+	Ok(PositionAmounts { argon, usdc })
+}
+
+/// Use the SDK's arbitrary-precision encoder as the reference for USD-to-pool-price conversion.
+#[cfg(test)]
+pub(crate) fn uniswap_sqrt_price_for_usd_price(
+	argon_usd_price: FixedU128,
+	usdc_usd_price: FixedU128,
+	argon_is_token0: bool,
+	round_up: bool,
+) -> UniswapSqrtPriceX96 {
+	let argon = AlloyU256::from(argon_usd_price.into_inner());
+	let usdc = AlloyU256::from(usdc_usd_price.into_inner()) * AlloyU256::from(10u128.pow(12));
+	let (numerator, denominator) = if argon_is_token0 { (argon, usdc) } else { (usdc, argon) };
+	let sqrt_price: AlloyU256 =
+		encode_sqrt_ratio_x96(numerator.to_big_int(), denominator.to_big_int());
+	let mut sqrt_price = U256::from_big_endian(&sqrt_price.to_be_bytes::<32>());
+	if round_up {
+		let numerator = U512::from_big_endian(&numerator.to_be_bytes::<32>()) << 192;
+		let denominator = U512::from_big_endian(&denominator.to_be_bytes::<32>());
+		if U512::from(sqrt_price) * U512::from(sqrt_price) * denominator < numerator {
+			sqrt_price += U256::one();
+		}
+	}
+	sqrt_price
+}
+
+/// Round both requested USD boundaries down to usable grid ticks, as an app would when minting.
+#[cfg(test)]
+pub(crate) fn uniswap_bounds_for_usd_band(
+	lower_usd_price: FixedU128,
+	upper_usd_price: FixedU128,
+	usdc_usd_price: FixedU128,
+	argon_is_token0: bool,
+	uniswap_tick_spacing: i32,
+) -> (UniswapTick, UniswapTick) {
+	let mut ticks = [0, 0];
+	for (index, usd_price) in [lower_usd_price, upper_usd_price].into_iter().enumerate() {
+		let sqrt_price = uniswap_sqrt_price_for_usd_price(
+			usd_price,
+			usdc_usd_price,
+			argon_is_token0,
+			!argon_is_token0,
+		);
+		let raw_uniswap_tick =
+			get_tick_at_sqrt_ratio(AlloyU256::from_be_bytes(sqrt_price.to_big_endian()))
+				.unwrap()
+				.as_i32();
+		let mut aligned_tick =
+			raw_uniswap_tick.div_euclid(uniswap_tick_spacing) * uniswap_tick_spacing;
+		if !argon_is_token0 {
+			// USD rises as raw Uniswap ticks fall, so USD round-down uses the next higher grid
+			// tick.
+			if uniswap_sqrt_price_at_tick(aligned_tick) < sqrt_price {
+				aligned_tick += uniswap_tick_spacing;
+			}
+		}
+		ticks[index] = aligned_tick;
+	}
+	if argon_is_token0 {
+		(ticks[0], ticks[1])
+	} else {
+		(ticks[1], ticks[0])
+	}
+}
+
 /// Synthetic Ethereum state, real account/storage tries and the real configured verifier.
 /// Slot paths are also checked against deployed Uniswap bytecode in the Solidity package tests.
-pub(crate) fn evidence<T: Config>(
+#[cfg(test)]
+pub(crate) fn evidence(
 	block: u64,
 	revision: u64,
 	beneficiary: H256,
 	liquidity: u128,
 	subscribed: bool,
+) -> PositionProof {
+	position_evidence(block, revision, beneficiary, liquidity, subscribed, (-100, 100))
+}
+
+pub(crate) fn position_evidence(
+	block: u64,
+	revision: u64,
+	beneficiary: H256,
+	liquidity: u128,
+	subscribed: bool,
+	bounds: (UniswapTick, UniswapTick),
 ) -> PositionProof {
 	let pool_config = config();
 
@@ -142,8 +365,8 @@ pub(crate) fn evidence<T: Config>(
 
 	// Pack Uniswap's pool prefix, signed tick bounds, and subscription flag.
 	let mut position_info = pool_id().0;
-	position_info[25..28].copy_from_slice(&100i32.to_be_bytes()[1..]);
-	position_info[28..31].copy_from_slice(&(-100i32).to_be_bytes()[1..]);
+	position_info[25..28].copy_from_slice(&bounds.1.to_be_bytes()[1..]);
+	position_info[28..31].copy_from_slice(&bounds.0.to_be_bytes()[1..]);
 	position_info[31] = u8::from(subscribed);
 
 	let mut subscriber_value = [0u8; 32];
@@ -171,7 +394,13 @@ pub(crate) fn evidence<T: Config>(
 			),
 		],
 		vec![(
-			evm::liquidity_slot(pool_id(), pool_config.position_manager, token_id, -100, 100),
+			evm::liquidity_slot(
+				pool_id(),
+				pool_config.position_manager,
+				token_id,
+				bounds.0,
+				bounds.1,
+			),
 			H256::from(U256::from(liquidity).to_big_endian()),
 		)],
 	];
@@ -210,18 +439,21 @@ pub(crate) fn evidence<T: Config>(
 		})
 		.collect::<Vec<_>>();
 
-	let (state_root, account_nodes) = trie(&encoded_accounts);
+	let (_state_root, account_nodes) = trie(&encoded_accounts);
 
-	// Supply finality at the external-chain boundary; trie verification remains real.
-	let anchor = ExecutionHeaderAnchor {
-		block_hash: H256::from(U256::from(block).to_big_endian()),
-		block_number: block,
-		timestamp_millis: block * 12_000,
-		parent_hash: H256::zero(),
-		state_root: H256::from(state_root.0),
-		receipts_root: H256::zero(),
-	};
-	ExecutionHeaderAnchors::<T>::insert(anchor.block_hash, anchor);
+	#[cfg(test)]
+	{
+		// Supply finality at the external-chain boundary; trie verification remains real.
+		let anchor = ExecutionHeaderAnchor {
+			block_hash: H256::from(U256::from(block).to_big_endian()),
+			block_number: block,
+			timestamp_millis: block * 12_000,
+			parent_hash: H256::zero(),
+			state_root: H256::from(_state_root.0),
+			receipts_root: H256::zero(),
+		};
+		ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
+	}
 
 	PositionProof {
 		subscriber: account_storage_proof(
@@ -245,6 +477,30 @@ pub(crate) fn evidence<T: Config>(
 			&slots[2],
 			block,
 		),
+	}
+}
+
+pub(crate) fn position_change_evidence(
+	block: u64,
+	revision: u64,
+	liquidity: u128,
+	subscribed: bool,
+	bounds: (UniswapTick, UniswapTick),
+) -> PositionChangeProof {
+	let proof =
+		position_evidence(block, revision, H256::repeat_byte(0x42), liquidity, subscribed, bounds);
+	let (account, slot_index) =
+		if subscribed { (proof.subscriber, 1) } else { (proof.position_manager, 0) };
+	let witness = EthereumAccountStorageProof {
+		execution_block_proof: account.execution_block_proof,
+		account_proof: account.account_proof,
+		storage_proof: account.storage_proof,
+		slots: [account.slots[slot_index].clone()].to_vec().try_into().unwrap(),
+	};
+	if subscribed {
+		PositionChangeProof::Revision(witness)
+	} else {
+		PositionChangeProof::Subscription(witness)
 	}
 }
 

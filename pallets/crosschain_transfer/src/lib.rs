@@ -1744,7 +1744,8 @@ pub mod pallet {
 			let ChainConfig::Evm { gateway, .. } = &chain_config;
 			let block_time =
 				T::EthereumVerifier::verify_account_storage_proof(*gateway, &proof.storage_proof)
-					.map_err(|_| Error::<T>::InvalidProof)?;
+					.map_err(|_| Error::<T>::InvalidProof)?
+					.timestamp_millis;
 			let proven_nonce = if let Some(slot) = proof.storage_proof.slots.get(2) {
 				ensure!(
 					slot.slot == H256::from(GATEWAY_ACTIVITY_NONCE_SLOT.0),

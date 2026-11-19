@@ -105,8 +105,8 @@ pub(crate) fn check<T: Config>() -> Result<(), sp_runtime::TryRuntimeError> {
 mod tests {
 	use super::*;
 	use crate::mock::*;
+	use argon_primitives::treasury::PositionQuantity;
 	use frame_support::traits::Hooks;
-	use pallet_treasury_positions::{NetworkTotals, PositionsByAccount};
 
 	#[test]
 	fn reports_liquids_above_the_benchmark_expectation_without_blocking_creation() {
@@ -202,21 +202,20 @@ mod tests {
 			STORAGE_VERSION.put::<BitcoinFissions>();
 			MockLocks::insert(1, lock(1, 100));
 			assert_ok!(BitcoinFissions::create(RuntimeOrigin::signed(1), 0, 77, 1, 20, 90, None));
-			NetworkTotals::<Test>::mutate(|totals| {
-				totals.account_quantities.fission_liquidity += 1
-			});
+			MockTreasuryPositionProvider::override_network_fission_liquidity(Some(1_801));
 			assert_eq!(
 				BitcoinFissions::try_state(1),
 				Err(DispatchError::Other(
 					"Network Fission liquidity disagrees with active Fissions"
 				))
 			);
-			NetworkTotals::<Test>::mutate(|totals| {
-				totals.account_quantities.fission_liquidity -= 1
-			});
-			PositionsByAccount::<Test>::mutate(1, |position| {
-				position.as_mut().unwrap().quantities.fission_liquidity += 1;
-			});
+			MockTreasuryPositionProvider::override_network_fission_liquidity(None);
+			assert_ok!(MockTreasuryPositionProvider::account_quantity_updated(
+				&1,
+				PositionQuantity::FissionLiquidity,
+				0u128,
+				1,
+			));
 			assert_eq!(
 				BitcoinFissions::try_state(1),
 				Err(DispatchError::Other(

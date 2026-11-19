@@ -13,7 +13,6 @@ use argon_primitives::{
 		CompressedBitcoinPubkey, H256Le, LiquidRepayPrices, OpaqueBitcoinXpub, UtxoRef,
 		SATOSHIS_PER_BITCOIN,
 	},
-	treasury::{TreasuryPositionProvider, UpstreamPosition},
 	vault::{
 		BitcoinLockFunding, BitcoinSecuritizationBasis, BitcoinVaultProvider, CosignerGuarantee,
 		ReserveSecuritizationRequest, VaultError, VaultTerms,
@@ -28,10 +27,6 @@ use bitcoin::{
 use frame_support::traits::{fungible::Balanced, tokens::Imbalance, Hooks};
 use k256::elliptic_curve::rand_core::{OsRng, RngCore};
 use pallet_bitcoin_locks::{LocksById, MicrogonsAtTargetPerBtcHistory};
-use pallet_operational_accounts::{
-	OpaqueEncryptionPubkey, OperationalAccount, OperationalAccountBySubAccount,
-	OperationalAccounts as OperationalAccountsById,
-};
 use pallet_prelude::{
 	argon_primitives::{
 		vault::{TreasuryVaultProvider, VaultTreasuryFrameEarnings},
@@ -71,34 +66,6 @@ fn standard_reservation_request() -> ReserveSecuritizationRequest<Balance> {
 		lock_expiration: 100,
 		fee_discount: 0,
 		securitization_space_to_unreserve: 0,
-	}
-}
-
-pub(crate) fn operational_account(
-	vault_account: u64,
-	mining_account: u64,
-) -> OperationalAccount<Test> {
-	OperationalAccount {
-		vault_account,
-		mining_account,
-		encryption_pubkey: OpaqueEncryptionPubkey([0; 32]),
-		upstream_account: None,
-		name: None,
-		last_name_change_tick: None,
-		uniswap_argon_transfers_in_amount: 0,
-		account_bitcoin_amount: MinimumBitcoin::get(),
-		account_vault_bond_amount: MinimumBonds::get(),
-		vault_created: true,
-		vault_bitcoin_accrual: 0,
-		vault_bitcoin_applied_total: 0,
-		mining_seat_accrual: MiningSeatsForOperational::get(),
-		mining_seat_applied_total: 0,
-		operational_certifications_count: 0,
-		available_access_codes: 0,
-		rewards_earned_count: 0,
-		rewards_earned_amount: 0,
-		rewards_collected_amount: 0,
-		is_operationally_certified: false,
 	}
 }
 
@@ -1074,7 +1041,7 @@ fn uncommitted_funds_do_not_count_as_committed_by_a_cancellable_notice() {
 }
 
 #[test]
-fn operational_activation_preserves_existing_commitments_and_withdrawal_notices() {
+fn operational_certification_preserves_existing_commitments_and_withdrawal_notices() {
 	for committed in [0, 4_000] {
 		new_test_ext().execute_with(|| {
 			System::set_block_number(1);
@@ -1089,14 +1056,13 @@ fn operational_activation_preserves_existing_commitments_and_withdrawal_notices(
 			let before = VaultsById::<Test>::get(1).unwrap();
 			assert_eq!(before.committed_microgons, committed);
 
-			OperationalAccountsById::<Test>::insert(2, operational_account(1, 3));
-			OperationalAccountBySubAccount::<Test>::insert(3, 2);
+			Vaults::account_became_operational(&1);
 
-			assert_ok!(OperationalAccounts::activate(RuntimeOrigin::signed(3)));
-			let account = OperationalAccountsById::<Test>::get(2).unwrap();
-			assert!(account.is_operationally_certified);
 			let vault = VaultsById::<Test>::get(1).unwrap();
-			assert_eq!(vault.committed_microgons, committed.max(2_000));
+			assert_eq!(
+				vault.committed_microgons,
+				committed.max(OperationalMinimumVaultSecuritization::get())
+			);
 			assert_eq!(vault.securitization, before.securitization);
 			assert_eq!(
 				vault.securitization_release_schedule,
@@ -1619,8 +1585,7 @@ fn it_tracks_confirmed_and_securitized_satoshis_via_provider_methods() {
 			funding_update(&securitization(500), 500)
 		));
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitized_satoshis, 1_500);
-		assert_eq!(TreasuryPositions::network_totals().vault_securitized_satoshis, 1_500);
-		assert_eq!(TreasuryPositions::account_quantities(&1), Default::default());
+		assert_eq!(MockTreasuryPositionProvider::vault_securitized_satoshis(), 1_500);
 		let (positions, _) = Vaults::get_top_vaults_by_securitization(1);
 		assert_eq!(positions[0].activated_securitization, 1_500);
 		assert_eq!(positions[0].bitcoin_locked_satoshis, 1_500);
@@ -1634,8 +1599,7 @@ fn it_tracks_confirmed_and_securitized_satoshis_via_provider_methods() {
 			false,
 		));
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitized_satoshis, 900);
-		assert_eq!(TreasuryPositions::network_totals().vault_securitized_satoshis, 900);
-		assert_eq!(TreasuryPositions::account_quantities(&1), Default::default());
+		assert_eq!(MockTreasuryPositionProvider::vault_securitized_satoshis(), 900);
 	});
 }
 
@@ -1656,14 +1620,14 @@ fn funding_reduction_updates_network_securitized_satoshis() {
 			Default::default(),
 			funding_update(&securitization(1_000), 1_000),
 		));
-		assert_eq!(TreasuryPositions::network_totals().vault_securitized_satoshis, 1_000);
+		assert_eq!(MockTreasuryPositionProvider::vault_securitized_satoshis(), 1_000);
 		assert_ok!(Vaults::record_bitcoin_lock_funding(
 			1,
 			funding_update(&securitization(1_000), 1_000),
 			funding_update(&securitization(500), 500),
 		));
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitized_satoshis, 500);
-		assert_eq!(TreasuryPositions::network_totals().vault_securitized_satoshis, 500);
+		assert_eq!(MockTreasuryPositionProvider::vault_securitized_satoshis(), 500);
 	});
 }
 
@@ -1673,8 +1637,6 @@ fn shrinking_after_withdrawal_keeps_release_maturities_and_active_accounting() {
 		System::set_block_number(1);
 		set_argons(1, 100_010);
 		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), default_vault()));
-		OperationalAccountsById::<Test>::insert(2, operational_account(1, 3));
-		OperationalAccountBySubAccount::<Test>::insert(1, 2);
 		let collateral = securitization(100);
 		assert_ok!(Vaults::reserve_securitization(
 			1,
@@ -1728,7 +1690,7 @@ fn shrinking_after_withdrawal_keeps_release_maturities_and_active_accounting() {
 		assert!(VaultFundsReleasingByHeight::<Test>::get(144).contains(&1));
 		assert!(VaultFundsReleasingByHeight::<Test>::get(432).contains(&1));
 		assert_eq!(RevenuePerFrameByVault::<Test>::get(1).encode(), revenue.encode());
-		assert_eq!(OperationalAccountsById::<Test>::get(2).unwrap().vault_bitcoin_accrual, 40);
+		assert_eq!(MockOperationalAccountsHook::last_vault_funding_report(), Some((1, 40)));
 	});
 }
 
@@ -1738,8 +1700,6 @@ fn provider_resecuritizes_a_funded_lock_and_reuses_its_backing() {
 		System::set_block_number(1);
 		set_argons(1, 100_010);
 		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), default_vault()));
-		OperationalAccountsById::<Test>::insert(2, operational_account(1, 3));
-		OperationalAccountBySubAccount::<Test>::insert(1, 2);
 
 		let current = securitization(1_000);
 		let replacement = securitization(800);
@@ -1751,7 +1711,7 @@ fn provider_resecuritizes_a_funded_lock_and_reuses_its_backing() {
 			Default::default(),
 			funding_update(&current, 1_000)
 		));
-		assert_eq!(OperationalAccountsById::<Test>::get(2).unwrap().vault_bitcoin_accrual, 1_000);
+		assert_eq!(MockOperationalAccountsHook::last_vault_funding_report(), Some((1, 1_000)));
 		CurrentFrameId::set(2);
 		let lock_expiration = 100;
 		let mut replacement_guarantee = replacement.clone();
@@ -1778,9 +1738,9 @@ fn provider_resecuritizes_a_funded_lock_and_reuses_its_backing() {
 		assert_eq!(vault.securitization_locked, 800);
 		assert_eq!(vault.securitization_pending_activation, 0);
 		assert_eq!(vault.securitized_satoshis, 800);
-		assert_eq!(TreasuryPositions::network_totals().vault_securitized_satoshis, 800);
+		assert_eq!(MockTreasuryPositionProvider::vault_securitized_satoshis(), 800);
 		assert_eq!(vault.get_relock_capacity(), 200);
-		assert_eq!(OperationalAccountsById::<Test>::get(2).unwrap().vault_bitcoin_accrual, 800);
+		assert_eq!(MockOperationalAccountsHook::last_vault_funding_report(), Some((1, 800)));
 		let revenue = RevenuePerFrameByVault::<Test>::get(1);
 		let replacement_revenue = revenue.first().unwrap();
 		assert_eq!(replacement_revenue.frame_id, 2);
@@ -1789,7 +1749,7 @@ fn provider_resecuritizes_a_funded_lock_and_reuses_its_backing() {
 		assert_eq!(replacement_revenue.bitcoin_locks_added_satoshis, 0);
 		assert_eq!(replacement_revenue.bitcoin_locks_released_satoshis, 0);
 
-		// Removing the funded guarantee must also clear the operator's accrued backing.
+		// Removing the funded guarantee must report zero activated securitization.
 		let mut empty = securitization(0);
 		assert_ok!(<Vaults as BitcoinVaultProvider>::resecuritize(
 			1,
@@ -1809,7 +1769,7 @@ fn provider_resecuritizes_a_funded_lock_and_reuses_its_backing() {
 		assert_eq!(vault.get_activated_securitization(), 0);
 		assert_eq!(vault.total_satoshis, 1_000);
 		assert_eq!(vault.get_relock_capacity(), 1_000);
-		assert_eq!(OperationalAccountsById::<Test>::get(2).unwrap().vault_bitcoin_accrual, 0);
+		assert_eq!(MockOperationalAccountsHook::last_vault_funding_report(), Some((1, 0)));
 	});
 }
 
@@ -1983,7 +1943,7 @@ fn it_can_burn_funds() {
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().exit_notice_amount(), 0);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_target, 0);
 		assert_eq!(crate::TotalVaultSecuritization::<Test>::get(), 0);
-		assert_eq!(TreasuryPositions::network_totals().vault_securitized_satoshis, 0);
+		assert_eq!(MockTreasuryPositionProvider::vault_securitized_satoshis(), 0);
 	});
 }
 
@@ -2021,7 +1981,7 @@ fn zero_burn_retires_funded_satoshis_and_schedules_funded_collateral() {
 		assert_eq!(vault.securitization_locked, 0);
 		assert_eq!(vault.total_satoshis, 0);
 		assert_eq!(vault.securitized_satoshis, 0);
-		assert_eq!(TreasuryPositions::network_totals().vault_securitized_satoshis, 0);
+		assert_eq!(MockTreasuryPositionProvider::vault_securitized_satoshis(), 0);
 		assert_eq!(
 			vault.get_relock_capacity(),
 			securitization(100_000).securitization_for_satoshis(500)
@@ -2127,7 +2087,7 @@ fn insured_redemption_compensation_scenario(redemption_amount: u128, expected_co
 		assert_eq!(vault.get_relock_capacity(), remaining_lock_collateral, "relock capacity");
 		assert_eq!(vault.securitization_locked, 0, "argons locked");
 		assert_eq!(vault.securitization, securitization - expected_compensation, "securitization");
-		assert_eq!(TreasuryPositions::network_totals().vault_securitized_satoshis, 0);
+		assert_eq!(MockTreasuryPositionProvider::vault_securitized_satoshis(), 0);
 		assert_eq!(
 			Balances::free_balance(bitcoin_locker),
 			expected_compensation,
@@ -3016,7 +2976,7 @@ fn terminal_settlement_preserves_reused_holds_without_reducing_the_burn() {
 			assert_eq!(vault.securitization_pending_activation, 0);
 			assert_eq!(vault.total_satoshis, 0);
 			assert_eq!(vault.securitized_satoshis, 0);
-			assert_eq!(TreasuryPositions::network_totals().vault_securitized_satoshis, 0);
+			assert_eq!(MockTreasuryPositionProvider::vault_securitized_satoshis(), 0);
 			assert_eq!(vault.get_relock_capacity(), expected_hold);
 			assert_eq!(
 				vault
@@ -3076,7 +3036,7 @@ fn exit_notice_allows_resecuritization_within_its_deadline() {
 }
 
 #[test]
-fn liquid_lifecycle_preserves_vault_and_treasury_accounting() {
+fn liquid_lifecycle_preserves_vault_accounting_and_reports_position_changes() {
 	new_test_ext().execute_with(|| {
 		// Fund 1 BTC with a guarantee for 0.1 BTC at the initial price.
 		System::set_block_number(1);
@@ -3090,12 +3050,6 @@ fn liquid_lifecycle_preserves_vault_and_treasury_accounting() {
 				..default_vault()
 			}
 		));
-		TreasuryPositions::set_upstream_position(
-			&2,
-			Some(UpstreamPosition { vault_id: 1, ..Default::default() }),
-		);
-		OperationalAccountsById::<Test>::insert(9, operational_account(1, 3));
-		OperationalAccountBySubAccount::<Test>::insert(1, 9);
 		CurrentTick::set(VaultsById::<Test>::get(1).unwrap().opened_tick);
 		BitcoinPriceInUsd::set(Some(FixedU128::from_u32(100_000)));
 		assert_ok!(BitcoinLocks::create_receive_address(
@@ -3159,8 +3113,11 @@ fn liquid_lifecycle_preserves_vault_and_treasury_accounting() {
 			(vault.securitization_locked, vault.securitization_pending_activation),
 			(paid, 0)
 		);
-		assert_eq!(TreasuryPositions::upstream_position(&2).unwrap().bitcoin_securitization, paid);
-		assert_eq!(OperationalAccountsById::<Test>::get(9).unwrap().vault_bitcoin_accrual, paid);
+		assert_eq!(
+			MockTreasuryPositionProvider::bitcoin_position(2, 1).activated_securitization,
+			paid
+		);
+		assert_eq!(MockOperationalAccountsHook::last_vault_funding_report(), Some((1, paid)));
 		let fees = lock.security_fees;
 		assert!(fees > 0);
 		let revenue = RevenuePerFrameByVault::<Test>::get(1)[0].bitcoin_lock_fee_revenue;
@@ -3205,8 +3162,11 @@ fn liquid_lifecycle_preserves_vault_and_treasury_accounting() {
 			(vault.securitization_locked, vault.get_activated_securitization()),
 			(paid, paid)
 		);
-		assert_eq!(TreasuryPositions::upstream_position(&2).unwrap().bitcoin_securitization, paid);
-		assert_eq!(OperationalAccountsById::<Test>::get(9).unwrap().vault_bitcoin_accrual, paid);
+		assert_eq!(
+			MockTreasuryPositionProvider::bitcoin_position(2, 1).activated_securitization,
+			paid
+		);
+		assert_eq!(MockOperationalAccountsHook::last_vault_funding_report(), Some((1, paid)));
 		ArgonPriceInUsd::set(Some(FixedU128::one()));
 
 		// Closing returns the remaining guarantees without new fees or changed total
@@ -3233,12 +3193,15 @@ fn liquid_lifecycle_preserves_vault_and_treasury_accounting() {
 				.sum::<Balance>(),
 			paid
 		);
-		let upstream = TreasuryPositions::upstream_position(&2).unwrap();
+		let reported_position = MockTreasuryPositionProvider::bitcoin_position(2, 1);
 		assert_eq!(
-			(upstream.bitcoin_allocated_securitization, upstream.bitcoin_securitization),
+			(
+				reported_position.allocated_securitization,
+				reported_position.activated_securitization
+			),
 			(paid, paid)
 		);
-		assert_eq!(OperationalAccountsById::<Test>::get(9).unwrap().vault_bitcoin_accrual, paid);
+		assert_eq!(MockOperationalAccountsHook::last_vault_funding_report(), Some((1, paid)));
 	});
 }
 
@@ -3261,12 +3224,6 @@ fn closing_displaced_flexible_liquid_preserves_securitization_and_funding_expiry
 				}
 			));
 			CurrentTick::set(VaultsById::<Test>::get(1).unwrap().opened_tick);
-			TreasuryPositions::set_upstream_position(
-				&1,
-				Some(UpstreamPosition { vault_id: 1, ..Default::default() }),
-			);
-			OperationalAccountsById::<Test>::insert(9, operational_account(1, 3));
-			OperationalAccountBySubAccount::<Test>::insert(1, 9);
 			let pubkey = CompressedBitcoinPubkey(
 				bitcoin::secp256k1::PublicKey::from_secret_key(
 					&Secp256k1::new(),
@@ -3365,12 +3322,12 @@ fn closing_displaced_flexible_liquid_preserves_securitization_and_funding_expiry
 			assert_eq!(vault.flexible_securitization_locked, expected);
 			assert_eq!(vault.total_satoshis, SATOSHIS_PER_BITCOIN);
 			assert_eq!(
-				TreasuryPositions::upstream_position(&1).unwrap().bitcoin_securitization,
+				MockTreasuryPositionProvider::bitcoin_position(1, 1).activated_securitization,
 				expected
 			);
 			assert_eq!(
-				OperationalAccountsById::<Test>::get(9).unwrap().vault_bitcoin_accrual,
-				expected
+				MockOperationalAccountsHook::last_vault_funding_report(),
+				Some((1, expected))
 			);
 		});
 	}
@@ -3398,10 +3355,6 @@ fn outside_spend_preserves_the_burn_rule_through_the_liquid_lifecycle() {
 					}
 				));
 				CurrentTick::set(VaultsById::<Test>::get(1).unwrap().opened_tick);
-				TreasuryPositions::set_upstream_position(
-					&2,
-					Some(UpstreamPosition { vault_id: 1, ..Default::default() }),
-				);
 				BitcoinPriceInUsd::set(Some(FixedU128::from_u32(100_000)));
 				ArgonPriceInUsd::set(Some(FixedU128::one()));
 				let pubkey = CompressedBitcoinPubkey(
@@ -3545,9 +3498,12 @@ fn outside_spend_preserves_the_burn_rule_through_the_liquid_lifecycle() {
 				);
 				assert!(!LocksById::<Test>::contains_key(1));
 				assert!(pallet_bitcoin_fissions::FissionIdsByLockId::<Test>::get(1).is_empty());
-				let upstream = TreasuryPositions::upstream_position(&2).unwrap();
+				let reported_position = MockTreasuryPositionProvider::bitcoin_position(2, 1);
 				assert_eq!(
-					(upstream.bitcoin_securitization, upstream.bitcoin_allocated_securitization),
+					(
+						reported_position.activated_securitization,
+						reported_position.allocated_securitization
+					),
 					(0, 0)
 				);
 			});

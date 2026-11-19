@@ -18,7 +18,8 @@ polkadot-sdk = { workspace = true, features = ["frame-support", "frame-system", 
 pallet-prelude = { workspace = true, default-features = false }
 
 [dev-dependencies]
-polkadot-sdk = { workspace = true, features = ["sp-io"], default-features = true }
+# collect_rolls_back_each_account_and_auto_collect_continues verifies currency delivery and source cursors.
+polkadot-sdk = { workspace = true, features = ["sp-io", "pallet-balances"], default-features = true }
 pallet-prelude = { workspace = true, features = ["test"], default-features = true }
 
 [features]

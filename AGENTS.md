@@ -36,6 +36,16 @@ These rules apply to implementation and regular code/PR review, including reused
   order, logical spacing, compound conditions, naming, imports, field documentation, and unnecessary
   indirection. Formatting checks alone do not establish readability.
 
+## Pallet Test Dependencies
+
+- Test behavior in the pallet that owns it. Use provider mocks for setup, return values, callback
+  assertions, and injected errors.
+- Add a concrete pallet dev dependency only for a test that can catch a specific failure the
+  individual pallet tests with provider mocks would miss. Add a short comment beside the new
+  dependency in `Cargo.toml` naming the test and the invariant it covers.
+- Apply the same bar to new uses of existing dependencies and to runtime integration tests. Cover
+  each invariant in the smallest fixture that can detect its failure.
+
 ## Approval Boundaries
 
 - Never stage changes unless the user explicitly asks. Staging is a review marker.
