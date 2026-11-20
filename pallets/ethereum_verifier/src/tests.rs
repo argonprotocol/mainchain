@@ -2545,7 +2545,7 @@ fn verify_account_storage_proof_matches_hardhat_eth_getproof_fixture() {
 		assert_ok!(EthereumBeaconClient::verify_account_storage_proof_against_state_root(
 			anchor.state_root,
 			gateway_address,
-			&proof,
+			(&proof).into(),
 		));
 		assert_eq!(
 			EthereumBeaconClient::verify_account_storage_proof(gateway_address, &proof),
@@ -2883,7 +2883,7 @@ fn verify_account_storage_proof_fixture_rejects_wrong_account() {
 			EthereumBeaconClient::verify_account_storage_proof_against_state_root(
 				anchor.state_root,
 				wrong_gateway_address,
-				&proof,
+				(&proof).into(),
 			),
 			Err(EthereumVerifyError::InvalidProof)
 		);
@@ -2905,7 +2905,7 @@ fn verify_account_storage_proof_fixture_rejects_wrong_slot_value() {
 			EthereumBeaconClient::verify_account_storage_proof_against_state_root(
 				anchor.state_root,
 				gateway_address,
-				&proof,
+				(&proof).into(),
 			),
 			Err(EthereumVerifyError::InvalidProof)
 		);
@@ -2929,7 +2929,7 @@ fn verify_account_storage_proof_fixture_rejects_out_of_range_shared_node_index()
 			EthereumBeaconClient::verify_account_storage_proof_against_state_root(
 				anchor.state_root,
 				gateway_address,
-				&proof,
+				(&proof).into(),
 			),
 			Err(EthereumVerifyError::InvalidProof)
 		);
@@ -2954,7 +2954,7 @@ fn verify_account_storage_proof_fixture_rejects_duplicate_shared_node_index() {
 			EthereumBeaconClient::verify_account_storage_proof_against_state_root(
 				anchor.state_root,
 				gateway_address,
-				&proof,
+				(&proof).into(),
 			),
 			Err(EthereumVerifyError::InvalidProof)
 		);

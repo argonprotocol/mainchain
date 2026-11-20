@@ -1,4 +1,4 @@
-use crate::{Config, PositionChangeProof, PositionProof};
+use crate::{Config, PositionChangeProof, PositionContinuationProof, PositionProof};
 use argon_primitives::{
 	treasury::{
 		StabilizerPoolPositionProviderWeightInfo, StabilizerPoolRewardProvider,
@@ -6,7 +6,7 @@ use argon_primitives::{
 		TreasuryPositionProviderWeightInfo,
 	},
 	EthereumVerifyProvider, EthereumVerifyProviderWeightInfo, MiningFrameTransitionProvider,
-	MiningFrameTransitionProviderWeightInfo,
+	MiningFrameTransitionProviderWeightInfo, PriceProvider, PriceProviderWeightInfo,
 };
 use core::marker::PhantomData;
 use pallet_prelude::*;
@@ -16,6 +16,8 @@ pub trait WeightInfo {
 	fn report_position_change() -> Weight;
 	fn advance_liquidity_snapshots() -> Weight;
 	fn checkpoint_position() -> Weight;
+	fn continue_enrollment() -> Weight;
+	fn continue_reported_enrollment() -> Weight;
 	fn settle_account(positions: u32) -> Weight;
 	fn read_price_index_context() -> Weight;
 	fn record_stabilizer_pool_spot_price() -> Weight;
@@ -23,6 +25,12 @@ pub trait WeightInfo {
 }
 
 impl WeightInfo for () {
+	fn continue_reported_enrollment() -> Weight {
+		Weight::zero()
+	}
+	fn continue_enrollment() -> Weight {
+		Weight::zero()
+	}
 	fn settle_account(_: u32) -> Weight {
 		Weight::zero()
 	}
@@ -53,19 +61,31 @@ type FrameWeights<T> =
 	<<T as Config>::MiningFrameTransitionProvider as MiningFrameTransitionProvider>::Weights;
 
 pub fn checkpoint_position<T: Config>(proof: &PositionProof) -> Weight {
-	type ProofWeights<T> = <<T as Config>::EthereumVerifier as EthereumVerifyProvider>::Weights;
-	let header_count =
-		proof.subscriber.execution_block_proof.target_to_anchor_header_chain.len() as u32;
-
 	<T as Config>::WeightInfo::checkpoint_position()
 		.saturating_add(<T::TreasuryPositionProvider as TreasuryPositionProvider<
 			T::AccountId,
 			Balance,
 		>>::Weights::ensure_account())
 		.saturating_add(FrameWeights::<T>::get_current_frame_id())
-		.saturating_add(ProofWeights::<T>::verify_account_storage_proof(2, header_count))
-		.saturating_add(ProofWeights::<T>::verify_account_storage_proof(2, header_count))
-		.saturating_add(ProofWeights::<T>::verify_account_storage_proof(1, header_count))
+		// Covers the two current-price lookups for the market and target quotes.
+		.saturating_add(
+			<T::PriceProvider as PriceProvider<Balance>>::Weights::get_redemption_prices(),
+		)
+		.saturating_add(position_proof_weight::<T>(&proof.subscriber.execution_block_proof))
+}
+
+pub(crate) fn continue_enrollment<T: Config>(proof: &PositionContinuationProof) -> Weight {
+	type ProofWeights<T> = <<T as Config>::EthereumVerifier as EthereumVerifyProvider>::Weights;
+	<T as Config>::WeightInfo::continue_enrollment()
+		.max(<T as Config>::WeightInfo::continue_reported_enrollment())
+		// Covers the two current-price lookups for the market and target quotes.
+		.saturating_add(
+			<T::PriceProvider as PriceProvider<Balance>>::Weights::get_redemption_prices(),
+		)
+		.saturating_add(FrameWeights::<T>::get_current_frame_id())
+		.saturating_add(position_proof_weight::<T>(&proof.before.execution_block_proof))
+		.saturating_add(position_proof_weight::<T>(&proof.after.execution_block_proof))
+		.saturating_add(ProofWeights::<T>::verify_account_storage_proof(1, 0))
 }
 
 pub(crate) fn report_position_change<T: Config>(proof: &PositionChangeProof) -> Weight {
@@ -100,4 +120,14 @@ impl<T: Config> StabilizerPoolPositionProviderWeightInfo for PositionProviderWei
 pub(crate) fn liquidity_snapshot_weight<T: Config>() -> Weight {
 	<T as Config>::WeightInfo::advance_liquidity_snapshots()
 		.saturating_add(RewardWeights::<T>::finalize_frame_rewards())
+}
+
+fn position_proof_weight<T: Config>(
+	block: &argon_primitives::EthereumExecutionBlockProof,
+) -> Weight {
+	type ProofWeights<T> = <<T as Config>::EthereumVerifier as EthereumVerifyProvider>::Weights;
+	let headers = block.target_to_anchor_header_chain.len() as u32;
+	ProofWeights::<T>::verify_account_storage_proof(2, headers)
+		.saturating_add(ProofWeights::<T>::verify_account_storage_proof(2, 0))
+		.saturating_add(ProofWeights::<T>::verify_account_storage_proof(1, 0))
 }

@@ -27,9 +27,9 @@ use sp_runtime::{
 
 use super::{
 	ethereum::{
-		EthereumAccountStorageProof, EthereumBlockNumber, EthereumProofBlock,
-		EthereumReceiptLogProofBatch, EthereumVerifyError, StabilizerPoolPriceSource,
-		UniswapPurchase,
+		EthereumAccountStorageProof, EthereumAccountStorageWitnessRef, EthereumBlockNumber,
+		EthereumExecutionBlockProof, EthereumProofBlock, EthereumReceiptLogProofBatch,
+		EthereumVerifyError, StabilizerPoolPriceSource, UniswapPurchase,
 	},
 	gateway::{GatewayState, SourceChain},
 	vault::{BitcoinSecuritizationBasis, CosignerGuarantee},
@@ -710,7 +710,19 @@ pub trait EthereumVerifyProvider {
 		proof: &EthereumAccountStorageProof<MaxStorageSlots>,
 	) -> Result<EthereumProofBlock, EthereumVerifyError>
 	where
-		MaxStorageSlots: Get<u32>;
+		MaxStorageSlots: Get<u32>,
+	{
+		Self::verify_storage_at_block(
+			&proof.execution_block_proof,
+			[(account_address, proof.into())],
+		)
+	}
+
+	/// Authenticate the execution header once and check every account against its state root.
+	fn verify_storage_at_block<'a>(
+		block: &EthereumExecutionBlockProof,
+		accounts: impl IntoIterator<Item = (H160, EthereumAccountStorageWitnessRef<'a>)>,
+	) -> Result<EthereumProofBlock, EthereumVerifyError>;
 
 	fn latest_execution_block_number() -> Option<EthereumBlockNumber>;
 	fn latest_execution_block_timestamp() -> Option<Moment>;
@@ -729,13 +741,10 @@ impl EthereumVerifyProvider for () {
 		Err(EthereumVerifyError::VerifierUnavailable)
 	}
 
-	fn verify_account_storage_proof<MaxStorageSlots>(
-		_account_address: H160,
-		_proof: &EthereumAccountStorageProof<MaxStorageSlots>,
-	) -> Result<EthereumProofBlock, EthereumVerifyError>
-	where
-		MaxStorageSlots: Get<u32>,
-	{
+	fn verify_storage_at_block<'a>(
+		_block: &EthereumExecutionBlockProof,
+		_accounts: impl IntoIterator<Item = (H160, EthereumAccountStorageWitnessRef<'a>)>,
+	) -> Result<EthereumProofBlock, EthereumVerifyError> {
 		Err(EthereumVerifyError::VerifierUnavailable)
 	}
 

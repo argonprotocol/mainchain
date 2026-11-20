@@ -17,11 +17,11 @@ use argon_primitives::{
 		RegistrationVaultData, ReserveSecuritizationRequest, VaultArgonotSecuritization,
 		VaultError,
 	},
-	EthereumAccountStorageProof, EthereumBlockNumber, EthereumExecutionBlockProof, EthereumLog,
-	EthereumProofBlock, EthereumReceiptLogProofBatch, EthereumStorageSlotProof,
-	EthereumVerifyError, EthereumVerifyProvider, OperationalAccountsHook, PriceProvider,
-	TickProvider, TreasuryPoolProvider, UniswapPurchase, UniswapPurchaseProvider, VaultId,
-	VotingSchedule,
+	EthereumAccountStorageProof, EthereumAccountStorageWitnessRef, EthereumBlockNumber,
+	EthereumExecutionBlockProof, EthereumLog, EthereumProofBlock, EthereumReceiptLogProofBatch,
+	EthereumStorageSlotProof, EthereumVerifyError, EthereumVerifyProvider, OperationalAccountsHook,
+	PriceProvider, TickProvider, TreasuryPoolProvider, UniswapPurchase, UniswapPurchaseProvider,
+	VaultId, VotingSchedule,
 };
 use frame_support::traits::{StorageInstance, StorageMapShim};
 use pallet_prelude::*;
@@ -205,19 +205,16 @@ impl EthereumVerifyProvider for MockEthereumVerifier {
 		Ok(())
 	}
 
-	fn verify_account_storage_proof<MaxStorageSlots>(
-		_account_address: H160,
-		proof: &EthereumAccountStorageProof<MaxStorageSlots>,
-	) -> Result<EthereumProofBlock, EthereumVerifyError>
-	where
-		MaxStorageSlots: Get<u32>,
-	{
+	fn verify_storage_at_block<'a>(
+		block: &EthereumExecutionBlockProof,
+		_accounts: impl IntoIterator<Item = (H160, EthereumAccountStorageWitnessRef<'a>)>,
+	) -> Result<EthereumProofBlock, EthereumVerifyError> {
 		if !ProofVerificationAllowed::get() {
 			return Err(EthereumVerifyError::InvalidProof);
 		}
 
 		Ok(EthereumProofBlock {
-			hash: proof.execution_block_proof.anchor_block_hash,
+			hash: block.anchor_block_hash,
 			number: Self::latest_execution_block_number().unwrap_or_default(),
 			timestamp_millis: Self::latest_execution_block_timestamp().unwrap_or_default(),
 		})

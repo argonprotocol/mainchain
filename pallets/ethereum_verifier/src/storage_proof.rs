@@ -16,25 +16,24 @@ use alloy_trie::{
 	Nibbles, TrieAccount,
 };
 use argon_primitives::{
-	EthereumAccountStorageProof, EthereumReceiptProofNodeIndexes, EthereumTrieProofNodes,
+	EthereumAccountStorageWitnessRef, EthereumReceiptProofNodeIndexes, EthereumTrieProofNodes,
 	EthereumVerifyError,
 };
 use polkadot_sdk::{frame_support::ensure, sp_core::H160};
 
 impl<T: Config> Pallet<T> {
-	pub(crate) fn verify_account_storage_proof_against_state_root<MaxStorageSlots: Get<u32>>(
+	pub(crate) fn verify_account_storage_proof_against_state_root(
 		state_root: H256,
 		account_address: H160,
-		proof: &EthereumAccountStorageProof<MaxStorageSlots>,
+		proof: EthereumAccountStorageWitnessRef<'_>,
 	) -> Result<(), EthereumVerifyError> {
-		let account =
-			extract_account_from_proof(state_root, account_address, &proof.account_proof)?;
-		for slot in &proof.slots {
+		let account = extract_account_from_proof(state_root, account_address, proof.account_proof)?;
+		for slot in proof.slots {
 			verify_storage_slot_value(
 				account.storage_root,
 				slot.slot,
 				slot.value,
-				&proof.storage_proof,
+				proof.storage_proof,
 				&slot.node_indexes,
 			)?;
 		}

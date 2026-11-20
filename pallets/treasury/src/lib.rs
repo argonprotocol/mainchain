@@ -148,7 +148,7 @@ pub mod pallet {
 		/// Provider for Bitcoin-minted Argons that have not been explicitly repaid.
 		type BitcoinMintedProvider: BitcoinMintedProvider<Self::Balance>;
 		type PositionProvider: TreasuryPositionProvider<Self::AccountId, Self::Balance>;
-		/// Retain each frame's financial terms through its correction and collection periods.
+		/// Retain each frame's financial terms through funding and the collection window.
 		#[pallet::constant]
 		type StabilizerPoolRewardHistoryFrames: Get<u32>;
 		type OperationalAccountProvider: OperationalAccountProvider<Self::AccountId>;
@@ -1414,7 +1414,6 @@ pub mod pallet {
 			);
 
 			let (vault_pool_distributed, participating_vaults) = Self::distribute_vault_pool(
-				frame_id,
 				&mut funding,
 				full_bid_pool_amount,
 				frame_capital.as_ref(),
@@ -2007,7 +2006,6 @@ pub mod pallet {
 		}
 
 		fn distribute_vault_pool(
-			frame_id: FrameId,
 			funding: &mut RewardFunding<T>,
 			full_bid_pool_amount: T::Balance,
 			frame_capital: Option<&FrameVaultCapital<T>>,
@@ -2019,6 +2017,7 @@ pub mod pallet {
 			let Some(frame_capital) = frame_capital else {
 				return (T::Balance::zero(), 0);
 			};
+			let frame_id = frame_capital.frame_id;
 			let Some(frame_bitcoin) = frame_bitcoin else {
 				return Self::distribute_runtime_160_vault_pool(
 					frame_id,
