@@ -148,7 +148,7 @@ pub mod pallet {
 		/// Provider for Bitcoin-minted Argons that have not been explicitly repaid.
 		type BitcoinMintedProvider: BitcoinMintedProvider<Self::Balance>;
 		type PositionProvider: TreasuryPositionProvider<Self::AccountId, Self::Balance>;
-		/// Retain each frame's financial terms through its correction and collection periods.
+		/// Retain each frame's financial terms through funding and the collection window.
 		#[pallet::constant]
 		type StabilizerPoolRewardHistoryFrames: Get<u32>;
 		type OperationalAccountProvider: OperationalAccountProvider<Self::AccountId>;

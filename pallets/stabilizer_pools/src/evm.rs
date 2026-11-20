@@ -2,12 +2,14 @@
 //! and v4-core 1.0.2.
 //! Tests compare these paths with actual Uniswap deployment storage, not caller-supplied offsets.
 use crate::{
-	Config, Error, PoolConfig, PoolKey, PositionChangeProof, PositionCheckpoint, PositionProof,
+	Config, Error, PoolConfig, PoolKey, PositionChangeProof, PositionCheckpoint,
 	StabilizerPoolPositionId,
 };
 use alloy_primitives::{keccak256, Address, B256, I256, U256 as AlloyU256};
 use alloy_sol_types::SolValue;
-use argon_primitives::{EthereumAccountStorageProof, UniswapTick};
+use argon_primitives::{
+	EthereumAccountStorageProof, EthereumStorageSlotProof, UniswapNftId, UniswapTick,
+};
 use pallet_prelude::*;
 
 /// Subscriber's `subscriptions` mapping: beneficiary at the base slot, revision at base + 1.
@@ -65,7 +67,7 @@ pub fn offset_slot(slot: H256, offset: u64) -> H256 {
 pub fn liquidity_slot(
 	pool_id: H256,
 	position_manager: H160,
-	token_id: U256,
+	token_id: UniswapNftId,
 	lower: UniswapTick,
 	upper: UniswapTick,
 ) -> H256 {
@@ -88,16 +90,18 @@ pub fn liquidity_slot(
 pub(crate) fn decode_position<T: Config>(
 	config: &PoolConfig,
 	pool_id: H256,
-	token_id: U256,
-	proof: &PositionProof,
+	token_id: UniswapNftId,
+	subscriber: &[EthereumStorageSlotProof],
+	position_manager: &[EthereumStorageSlotProof],
+	pool_manager: &[EthereumStorageSlotProof],
 ) -> Result<DecodedPosition, DispatchError> {
-	let [beneficiary_slot, revision_slot] = proof.subscriber.slots.as_slice() else {
+	let [beneficiary_slot, revision_slot] = subscriber else {
 		return Err(Error::<T>::InvalidStorageSlots.into());
 	};
-	let [subscriber_slot, position_info_slot] = proof.position_manager.slots.as_slice() else {
+	let [subscriber_slot, position_info_slot] = position_manager else {
 		return Err(Error::<T>::InvalidStorageSlots.into());
 	};
-	let [liquidity_proof] = proof.pool_manager.slots.as_slice() else {
+	let [liquidity_proof] = pool_manager else {
 		return Err(Error::<T>::InvalidStorageSlots.into());
 	};
 
@@ -165,12 +169,12 @@ pub(crate) fn decode_position_change<'a, T: Config>(
 		PositionChangeProof::Revision(witness) => (
 			previous.subscriber,
 			witness,
-			offset_slot(mapping_slot(position.token_id, SUBSCRIPTIONS_SLOT), 1),
+			offset_slot(mapping_slot(position.uniswap_nft_id, SUBSCRIPTIONS_SLOT), 1),
 		),
 		PositionChangeProof::Subscription(witness) => (
 			position.position_manager,
 			witness,
-			mapping_slot(position.token_id, POSITION_MANAGER_SUBSCRIBER_SLOT),
+			mapping_slot(position.uniswap_nft_id, POSITION_MANAGER_SUBSCRIBER_SLOT),
 		),
 	};
 	let [slot] = witness.slots.as_slice() else {

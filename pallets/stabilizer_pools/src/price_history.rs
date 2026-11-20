@@ -10,6 +10,8 @@ use argon_primitives::{
 };
 use frame_support::DefaultNoBound;
 use pallet_prelude::*;
+use polkadot_sdk::sp_arithmetic::{helpers_128bit::multiply_by_rational_with_rounding, Rounding};
+use sp_runtime::ArithmeticError;
 use uniswap_v3_sdk_bigint::utils::get_tick_at_sqrt_ratio;
 
 #[derive(
@@ -35,6 +37,24 @@ pub struct StabilizerPoolFramePrice {
 	pub pool: UniswapPoolIdentity,
 	/// Whether the sampled pool quotes ARGON as token0.
 	pub argon_is_token0: bool,
+}
+
+impl StabilizerPoolFramePrice {
+	/// Value six-decimal USDC in microgons at this frame's USD quotes.
+	pub(crate) fn usdc_in_microgons(&self, usdc: Balance) -> Result<Balance, ArithmeticError> {
+		let argon_usd_target = self.argon_usd_target_price.into_inner();
+		if argon_usd_target == 0 {
+			return Err(ArithmeticError::DivisionByZero);
+		}
+		// USDC and microgons both have six decimals, so only the USD price ratio is needed.
+		multiply_by_rational_with_rounding(
+			usdc,
+			self.usdc_usd_price.into_inner(),
+			argon_usd_target,
+			Rounding::Down,
+		)
+		.ok_or(ArithmeticError::Overflow)
+	}
 }
 
 #[derive(

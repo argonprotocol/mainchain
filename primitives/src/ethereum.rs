@@ -15,6 +15,9 @@ use sp_runtime::{
 /// Ethereum represents it as a uint160.
 pub type UniswapSqrtPriceX96 = U256;
 
+/// ERC-721 token ID within the Uniswap PositionManager contract that minted it.
+pub type UniswapNftId = U256;
+
 /// Signed Uniswap price-grid index. Ethereum represents it as an int24.
 pub type UniswapTick = i32;
 
@@ -325,6 +328,63 @@ pub struct EthereumAccountStorageProof<MaxStorageSlots: Get<u32>> {
 	/// Shared storage-trie proof nodes for the proven storage slots.
 	pub storage_proof: EthereumTrieProofNodes,
 	pub slots: BoundedVec<EthereumStorageSlotProof, MaxStorageSlots>,
+}
+
+/// Account and storage trie paths checked against a separately authenticated execution block.
+#[derive(
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	CloneNoBound,
+	PartialEqNoBound,
+	EqNoBound,
+	DebugNoBound,
+	TypeInfo,
+	MaxEncodedLen,
+)]
+#[scale_info(skip_type_params(MaxStorageSlots))]
+pub struct EthereumAccountStorageWitness<MaxStorageSlots: Get<u32>> {
+	/// State-trie path to the contract account and its storage root.
+	pub account_proof: EthereumTrieProofNodes,
+	/// Shared storage-trie nodes referenced by the proven slots.
+	pub storage_proof: EthereumTrieProofNodes,
+	/// Solidity slot keys, expected values and paths into the shared nodes.
+	pub slots: BoundedVec<EthereumStorageSlotProof, MaxStorageSlots>,
+}
+
+/// Borrowed trie evidence lets accounts with different slot bounds share one block verification.
+#[derive(Clone, Copy)]
+pub struct EthereumAccountStorageWitnessRef<'a> {
+	/// State-trie path authenticating the contract account.
+	pub account_proof: &'a EthereumTrieProofNodes,
+	/// Shared storage-trie nodes for this account.
+	pub storage_proof: &'a EthereumTrieProofNodes,
+	/// Slot keys, expected values and paths into the shared nodes.
+	pub slots: &'a [EthereumStorageSlotProof],
+}
+
+impl<'a, S: Get<u32>> From<&'a EthereumAccountStorageProof<S>>
+	for EthereumAccountStorageWitnessRef<'a>
+{
+	fn from(proof: &'a EthereumAccountStorageProof<S>) -> Self {
+		Self {
+			account_proof: &proof.account_proof,
+			storage_proof: &proof.storage_proof,
+			slots: &proof.slots,
+		}
+	}
+}
+
+impl<'a, S: Get<u32>> From<&'a EthereumAccountStorageWitness<S>>
+	for EthereumAccountStorageWitnessRef<'a>
+{
+	fn from(proof: &'a EthereumAccountStorageWitness<S>) -> Self {
+		Self {
+			account_proof: &proof.account_proof,
+			storage_proof: &proof.storage_proof,
+			slots: &proof.slots,
+		}
+	}
 }
 
 #[derive(

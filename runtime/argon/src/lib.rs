@@ -971,11 +971,17 @@ impl pallet_treasury_positions::Config for Runtime {
 }
 
 impl pallet_stabilizer_pools::Config for Runtime {
-	type EthereumVerifier = use_unless_benchmark!(EthereumVerifier, ());
+	type PriceProvider =
+		use_unless_benchmark!(PriceIndex, benchmarking::BenchmarkPriceProvider<Balance>);
+	type EthereumVerifier = use_unless_benchmark!(
+		EthereumVerifier,
+		pallet_stabilizer_pools::benchmarking::BenchmarkEthereumVerifier
+	);
 	type RewardProvider =
 		use_unless_benchmark!(Treasury, benchmarking::BenchmarkStabilizerPoolRewards);
 	type UsdcRewardShare = StabilizerPoolUsdcRewardShare;
 	type MaxPositionsPerAccount = StabilizerPoolMaxPositionsPerAccount;
+	type ContinuationGraceMillis = ConstU64<300_000>;
 	type TreasuryPositionProvider = use_unless_benchmark!(TreasuryPositions, ());
 	type WeightInfo = weights::pallet_stabilizer_pools::WeightInfo<Runtime>;
 	type MiningFrameTransitionProvider =

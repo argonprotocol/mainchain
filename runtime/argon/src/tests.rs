@@ -678,3 +678,45 @@ fn gateway_proof_weight_includes_each_authoritys_collateral_work() {
 	assert!(first_authority.ref_time() > 0);
 	assert_eq!(weights[2].saturating_sub(weights[1]), first_authority);
 }
+
+#[test]
+fn closed_stabilizer_value_finalizes_after_treasury_funds_the_frame() {
+	use argon_primitives::treasury::StabilizerPoolRewardProvider;
+	use pallet_stabilizer_pools::{ClosedFrameRewardValue, PendingFrameRewardValue};
+	use pallet_treasury::{StabilizerPoolRewardFrame, StabilizerPoolRewardFrames};
+
+	let mut ext =
+		sp_io::TestExternalities::new(RuntimeGenesisConfig::default().build_storage().unwrap());
+	ext.execute_with(|| {
+		System::set_block_number(1);
+		StabilizerPoolRewardFrames::<Runtime>::insert(
+			6,
+			StabilizerPoolRewardFrame::Earning { target_pool_value_microgons: 1_000 },
+		);
+		assert_ok!(<Balances as MutateT<AccountId>>::mint_into(
+			&TreasuryMiningBidPoolAccount::get(),
+			1_000 * MICROGONS_PER_ARGON,
+		));
+
+		type SlotEvents = <Runtime as pallet_mining_slot::Config>::SlotEvents;
+		SlotEvents::on_frame_start(7);
+		// Supply the frozen value independently of this fixture's absent Uniswap prices.
+		PendingFrameRewardValue::<Runtime>::put(ClosedFrameRewardValue {
+			frame_id: 6,
+			eligible_value_microgons: 900,
+		});
+		let Some(StabilizerPoolRewardFrame::Funded { budget, .. }) =
+			StabilizerPoolRewardFrames::<Runtime>::get(6)
+		else {
+			panic!("Treasury must fund the frozen frame");
+		};
+		assert!(budget > 0);
+		assert_eq!(Treasury::frame_reward_rate(6), None);
+
+		SlotEvents::on_frame_start(8);
+		let rate = Treasury::frame_reward_rate(6).expect("the real provider finalizes the frame");
+		assert_eq!(rate, FixedU128::from_rational(budget, 1_000));
+		StabilizerPools::on_frame_start(8);
+		assert_eq!(Treasury::frame_reward_rate(6), Some(rate));
+	});
+}

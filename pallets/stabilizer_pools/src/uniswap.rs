@@ -137,21 +137,16 @@ impl StabilizerPoolRewardBand {
 		upper_uniswap_tick: UniswapTick,
 		pool_sqrt_price_x96: UniswapSqrtPriceX96,
 	) -> Result<PositionAmounts, PositionAmountError> {
-		let Some((position_sqrt_lower, position_sqrt_upper)) =
+		let Some((eligible_sqrt_lower, eligible_sqrt_upper)) =
 			self.qualifying_range(lower_uniswap_tick, upper_uniswap_tick)?
 		else {
 			return Ok(PositionAmounts::default());
 		};
 
-		let sqrt_lower = position_sqrt_lower.max(self.sqrt_lower);
-		let sqrt_upper = position_sqrt_upper.min(self.sqrt_upper);
-		if sqrt_lower >= sqrt_upper {
-			return Ok(PositionAmounts::default());
-		}
 		principal_for_sqrt_price_range(
 			liquidity,
-			sqrt_lower,
-			sqrt_upper,
+			eligible_sqrt_lower,
+			eligible_sqrt_upper,
 			pool_sqrt_price_x96,
 			self.argon_is_token0,
 		)
@@ -213,8 +208,9 @@ impl StabilizerPoolRewardBand {
 	}
 
 	/// Each endpoint rounds down in USD to a usable Uniswap tick. Their reference intervals
-	/// must overlap each other and the allowed drift around target.
-	fn qualifying_range(
+	/// must overlap each other and the allowed drift around target. Return the eligible overlap
+	/// with the current reward band so a shifted band outside it cannot earn.
+	pub(crate) fn qualifying_range(
 		&self,
 		lower_uniswap_tick: UniswapTick,
 		upper_uniswap_tick: UniswapTick,
@@ -275,6 +271,11 @@ impl StabilizerPoolRewardBand {
 			return Ok(None);
 		}
 		if !references.compare_reference_keys(end, references.minimum_reference_key).is_gt() {
+			return Ok(None);
+		}
+		let sqrt_lower = sqrt_lower.max(self.sqrt_lower);
+		let sqrt_upper = sqrt_upper.min(self.sqrt_upper);
+		if sqrt_lower >= sqrt_upper {
 			return Ok(None);
 		}
 		Ok(Some((sqrt_lower, sqrt_upper)))

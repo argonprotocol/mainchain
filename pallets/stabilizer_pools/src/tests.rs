@@ -3,13 +3,8 @@ use crate::{
 	uniswap::{principal_for_liquidity_range, MAX_REWARD_RANGES, REWARD_BAND_TOLERANCE},
 	*,
 };
-use alloy_consensus::Header as EthereumHeader;
-use alloy_primitives::B256;
-use argon_primitives::{
-	EthereumExecutionBlockProof, EthereumExecutionHeader, PriceIndexUpdated, MICROGONS_PER_ARGON,
-};
+use argon_primitives::{PriceIndexUpdated, MICROGONS_PER_ARGON};
 use frame_support::{assert_noop, assert_ok, traits::OnRuntimeUpgrade};
-use pallet_ethereum_verifier::{types::ExecutionHeaderAnchor, ExecutionHeaderAnchors};
 use rstest::rstest;
 use sp_runtime::AccountId32;
 use uniswap_v3_sdk_bigint::utils::{
@@ -711,12 +706,12 @@ fn missing_prices_do_not_delay_the_next_frame_or_history_expiry() {
 		assert_eq!(starts.keys().copied().collect::<Vec<_>>(), (3..=16).collect::<Vec<_>>());
 		assert_eq!(starts[&16], 10_200_000);
 
-		// A skipped frame has no boundary and cannot become a review frame.
+		// A skipped frame has no boundary or reward value to settle.
 		start_mining_frame(18, 190);
 		let starts = StabilizerPoolFrameStartMillis::<Test>::get();
 		assert!(!starts.contains_key(&17));
 		assert_eq!(starts[&18], 11_400_000);
-		assert!(!StabilizerPoolReviewFrame::<Test>::exists());
+		assert!(!PendingFrameRewardValue::<Test>::exists());
 	});
 }
 
@@ -771,6 +766,7 @@ fn upgrade_retires_opening_price_indices_and_preserves_checkpoints() {
 		RemoveOpeningPriceIndicesMigration::<Test>::on_runtime_upgrade();
 
 		assert!(!FrameStartPriceIndices::<Test>::exists());
+		assert!(!PendingFrameRewardValue::<Test>::exists());
 		assert!(StabilizerPoolPricesByFrame::<Test>::get().is_empty());
 		assert_eq!(
 			PositionCheckpoints::<Test>::get(config().position_manager, token_id),
@@ -784,11 +780,11 @@ fn upgrade_retires_opening_price_indices_and_preserves_checkpoints() {
 		assert_eq!(
 			StabilizerPoolRegistrations::<Test>::get(StabilizerPoolPositionId {
 				position_manager: config().position_manager,
-				token_id,
+				uniswap_nft_id: token_id,
 			}),
 			Some(StabilizerPoolRegistration::Enrolled(StabilizerPoolEnrollment {
-				eligible_from: 2,
-				next_claim_frame: 2
+				first_eligible_frame_id: 2,
+				next_claim_frame_id: 2
 			}))
 		);
 		let range = StabilizerPoolLiquidityRange::from(&checkpoint);
@@ -809,13 +805,13 @@ fn registers_and_proves_maintained_intervals_without_sync_or_rewards() {
 		let proof = evidence(100, 1, beneficiary_account(), 1_000, true);
 		let proof = PositionProof::decode(&mut proof.encode().as_slice()).unwrap();
 		assert_ok!(submit(proof));
-		assert_eq!(checkpoint().maintained_since.number, 100);
+		assert_eq!(checkpoint().maintained_since_block.number, 100);
 
 		let later = evidence(200, 1, beneficiary_account(), 1_000, true);
 		assert_ok!(submit(later));
 		let record = checkpoint();
-		assert_eq!(record.proven_through.timestamp_millis, 2_400_000);
-		assert_eq!(record.maintained_since.number, 100);
+		assert_eq!(record.proven_through_block.timestamp_millis, 2_400_000);
+		assert_eq!(record.maintained_since_block.number, 100);
 		System::assert_last_event(
 			Event::PositionCheckpointed {
 				position_manager: config().position_manager,
@@ -844,7 +840,7 @@ fn revision_change_discards_unverified_gap_even_when_liquidity_returns_to_same_v
 
 		let changed = evidence(200, 3, beneficiary_account(), 1_000, true);
 		assert_ok!(submit(changed));
-		assert_eq!(checkpoint().maintained_since.number, 200);
+		assert_eq!(checkpoint().maintained_since_block.number, 200);
 		assert_eq!(checkpoint().revision, U256::from(3));
 		let registered = RegisteredLiquidityByRange::<Test>::get(range);
 		assert_eq!(registered.liquidity_for_frame(2), Some(U256::zero()));
@@ -852,16 +848,16 @@ fn revision_change_discards_unverified_gap_even_when_liquidity_returns_to_same_v
 
 		let later = evidence(300, 3, beneficiary_account(), 1_000, true);
 		assert_ok!(submit(later));
-		assert_eq!(checkpoint().maintained_since.number, 200);
+		assert_eq!(checkpoint().maintained_since_block.number, 200);
 		assert_eq!(RegisteredLiquidityByRange::<Test>::get(range), registered);
 		assert_eq!(
 			StabilizerPoolRegistrations::<Test>::get(StabilizerPoolPositionId {
 				position_manager: config().position_manager,
-				token_id: U256::one(),
+				uniswap_nft_id: U256::one(),
 			}),
 			Some(StabilizerPoolRegistration::Enrolled(StabilizerPoolEnrollment {
-				eligible_from: 3,
-				next_claim_frame: 3
+				first_eligible_frame_id: 3,
+				next_claim_frame_id: 3
 			}))
 		);
 
@@ -932,25 +928,28 @@ fn account_position_limit_allows_refreshes_and_tracks_owner_changes() {
 		assert_eq!(PositionIdsByAccount::<Test>::get(beneficiary_account()).len(), 4);
 		assert_eq!(
 			PositionIdsByAccount::<Test>::get(&next_owner).as_slice(),
-			&[StabilizerPoolPositionId { position_manager: manager, token_id: 1.into() },]
+			&[StabilizerPoolPositionId { position_manager: manager, uniswap_nft_id: 1.into() },]
 		);
 		assert_ok!(StabilizerPools::record_checkpoint(manager, 6.into(), record.clone()));
 		assert_eq!(PositionIdsByAccount::<Test>::get(beneficiary_account()).len(), 5);
 
-		let position = StabilizerPoolPositionId { position_manager: manager, token_id: 2.into() };
+		let position =
+			StabilizerPoolPositionId { position_manager: manager, uniswap_nft_id: 2.into() };
 		let Some(StabilizerPoolRegistration::Enrolled(enrollment)) =
 			StabilizerPoolRegistrations::<Test>::get(position)
 		else {
 			panic!("expected an enrolled position")
 		};
-		record.proven_through.number += 1;
-		record.proven_through.timestamp_millis += 12_000;
+		record.proven_through_block.number += 1;
+		record.proven_through_block.timestamp_millis += 12_000;
 		assert_ok!(StabilizerPools::remove_reported_position(
 			position,
 			&record,
 			enrollment,
-			record.proven_through,
+			record.proven_through_block,
 		));
+		assert_eq!(PositionIdsByAccount::<Test>::get(beneficiary_account()).len(), 5);
+		assert_ok!(StabilizerPools::settle_account(&beneficiary_account()), 0);
 		assert_eq!(PositionIdsByAccount::<Test>::get(beneficiary_account()).len(), 4);
 	});
 }
@@ -986,7 +985,7 @@ fn new_beneficiary_must_authorize_reenrollment_and_keeps_global_replay_watermark
 			Box::new(changed)
 		));
 		assert_eq!(checkpoint().beneficiary, next);
-		assert_eq!(checkpoint().maintained_since.number, 200);
+		assert_eq!(checkpoint().maintained_since_block.number, 200);
 
 		let old = evidence(100, 1, beneficiary_account(), 1_000, true);
 		assert_noop!(submit(old), Error::<Test>::StaleCheckpoint);
@@ -1049,35 +1048,13 @@ fn rejects_different_source_blocks_and_uninitialized_subscriptions() {
 fn uses_authenticated_target_timestamp_when_proof_is_an_ancestor_of_anchor() {
 	new_test_ext().execute_with(|| {
 		let mut proof = evidence(100, 1, beneficiary_account(), 1_000, true);
-		let state = ExecutionHeaderAnchors::<Test>::get(H256::from_low_u64_be(100)).unwrap();
-		let target = EthereumHeader {
-			number: 100,
-			timestamp: 123,
-			state_root: B256::from(state.state_root.0),
-			..Default::default()
-		};
-		let anchor = ExecutionHeaderAnchor {
-			block_hash: H256::repeat_byte(0xaa),
-			parent_hash: H256::from(target.hash_slow().0),
-			block_number: 101,
-			timestamp_millis: 135_000,
-			..state
-		};
-		ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
-		let execution = EthereumExecutionBlockProof {
-			anchor_block_hash: anchor.block_hash,
-			target_to_anchor_header_chain: vec![EthereumExecutionHeader {
-				rlp: alloy_rlp::encode(&target).try_into().unwrap(),
-			}]
-			.try_into()
-			.unwrap(),
-		};
+		let (execution, target_hash) = prove_from_later_anchor(100, 123, 12);
 		proof.subscriber.execution_block_proof = execution.clone();
 		proof.position_manager.execution_block_proof = execution.clone();
 		proof.pool_manager.execution_block_proof = execution;
 		assert_ok!(submit(proof));
-		assert_eq!(checkpoint().proven_through.hash, H256::from(target.hash_slow().0));
-		assert_eq!(checkpoint().proven_through.timestamp_millis, 123_000);
+		assert_eq!(checkpoint().proven_through_block.hash, target_hash);
+		assert_eq!(checkpoint().proven_through_block.timestamp_millis, 123_000);
 	});
 }
 
@@ -1247,7 +1224,9 @@ enum PositionCorrection {
 #[case(PositionCorrection::RevisionAfterCheckpoint)]
 #[case(PositionCorrection::LateUnsubscribe)]
 #[case(PositionCorrection::Replacement)]
-fn invalidating_a_position_forfeits_unclaimed_rewards(#[case] correction: PositionCorrection) {
+fn reports_preserve_proven_rewards_and_ordinary_resets_forfeit(
+	#[case] correction: PositionCorrection,
+) {
 	let revision_report = matches!(correction, PositionCorrection::RevisionAfterCheckpoint);
 	let late = matches!(correction, PositionCorrection::LateUnsubscribe);
 	let owner_replaces = matches!(correction, PositionCorrection::Replacement);
@@ -1256,7 +1235,7 @@ fn invalidating_a_position_forfeits_unclaimed_rewards(#[case] correction: Positi
 		let reporter = AccountId32::new([0x77; 32]);
 		let position = StabilizerPoolPositionId {
 			position_manager: config().position_manager,
-			token_id: U256::one(),
+			uniswap_nft_id: U256::one(),
 		};
 		let (lower, upper) = uniswap_bounds_for_usd_band(
 			FixedU128::from_rational(90, 100),
@@ -1268,12 +1247,12 @@ fn invalidating_a_position_forfeits_unclaimed_rewards(#[case] correction: Positi
 		let liquidity = 10u128.pow(24);
 		let mut checkpoint = position_checkpoint(liquidity, lower, upper);
 		let enrollment_block = 95;
-		checkpoint.proven_through = ProofBlock {
+		checkpoint.proven_through_block = ProofBlock {
 			hash: H256::from_low_u64_be(enrollment_block),
 			number: enrollment_block,
 			timestamp_millis: enrollment_block * 12_000,
 		};
-		checkpoint.maintained_since = checkpoint.proven_through;
+		checkpoint.maintained_since_block = checkpoint.proven_through_block;
 		let enrollment = position_evidence(
 			enrollment_block,
 			1,
@@ -1286,7 +1265,7 @@ fn invalidating_a_position_forfeits_unclaimed_rewards(#[case] correction: Positi
 			RuntimeOrigin::signed(owner.clone()),
 			pool_manager(),
 			pool_id(),
-			position.token_id,
+			position.uniswap_nft_id,
 			Box::new(enrollment),
 		));
 		// Another NFT shares the same range. The correction must subtract only one contribution.
@@ -1308,16 +1287,9 @@ fn invalidating_a_position_forfeits_unclaimed_rewards(#[case] correction: Positi
 			report_stabilizer_pool_price(tick, spot);
 		}
 		start_mining_frame(3, 30);
-		let review = StabilizerPoolReviewFrame::<Test>::get().unwrap();
-		assert_eq!(review.frame_id, 2);
-		assert_eq!(
-			review.liquidity_by_range.get(&(lower, upper)),
-			Some(&U256::from(liquidity * 2))
-		);
 
 		if revision_report || late {
-			// Refreshing an unchanged revision does not claim the frame or protect it from a
-			// report.
+			// Refreshing the checkpoint proves coverage through the close without collecting.
 			let continuity = position_evidence(
 				151,
 				1,
@@ -1330,7 +1302,7 @@ fn invalidating_a_position_forfeits_unclaimed_rewards(#[case] correction: Positi
 				RuntimeOrigin::signed(owner.clone()),
 				pool_manager(),
 				pool_id(),
-				position.token_id,
+				position.uniswap_nft_id,
 				Box::new(continuity),
 			));
 		}
@@ -1338,7 +1310,7 @@ fn invalidating_a_position_forfeits_unclaimed_rewards(#[case] correction: Positi
 		assert!(PaidClaims::get().is_empty());
 		if late {
 			start_mining_frame(4, 40);
-			// A failed automatic payout leaves rewards unclaimed for the late report to forfeit.
+			// A failed payout leaves the proven reward available after the report.
 			RejectClaims::set(true);
 			assert_noop!(
 				with_storage_layer(|| StabilizerPools::settle_account(&owner)),
@@ -1361,7 +1333,7 @@ fn invalidating_a_position_forfeits_unclaimed_rewards(#[case] correction: Positi
 				RuntimeOrigin::signed(replacement_owner),
 				pool_manager(),
 				pool_id(),
-				position.token_id,
+				position.uniswap_nft_id,
 				Box::new(replacement),
 			));
 		} else {
@@ -1405,15 +1377,7 @@ fn invalidating_a_position_forfeits_unclaimed_rewards(#[case] correction: Positi
 			U256::from(expected_next_liquidity)
 		);
 
-		let reviewed_liquidity = if late { liquidity * 2 } else { liquidity };
 		if !late {
-			assert_eq!(
-				StabilizerPoolReviewFrame::<Test>::get()
-					.unwrap()
-					.liquidity_by_range
-					.get(&(lower, upper)),
-				Some(&U256::from(reviewed_liquidity))
-			);
 			start_mining_frame(4, 40);
 		}
 		let price = StabilizerPoolPricesByFrame::<Test>::get()[&2];
@@ -1427,7 +1391,7 @@ fn invalidating_a_position_forfeits_unclaimed_rewards(#[case] correction: Positi
 		)
 		.unwrap();
 		let expected = band
-			.principal_for_range(reviewed_liquidity.into(), lower, upper, price.sqrt_price_x96)
+			.principal_for_range((liquidity * 2).into(), lower, upper, price.sqrt_price_x96)
 			.unwrap();
 		assert_ne!(expected, PositionAmounts::default());
 		assert_eq!(
@@ -1441,18 +1405,19 @@ fn invalidating_a_position_forfeits_unclaimed_rewards(#[case] correction: Positi
 			assert_eq!(
 				StabilizerPoolRegistrations::<Test>::get(position),
 				Some(StabilizerPoolRegistration::Enrolled(StabilizerPoolEnrollment {
-					eligible_from: 4,
-					next_claim_frame: 4
+					first_eligible_frame_id: 4,
+					next_claim_frame_id: 4
 				}))
 			);
 			return;
 		}
 
-		assert_ok!(StabilizerPools::settle_account(&owner), 0);
+		let proven_claims = u128::from(late || revision_report);
+		assert_ok!(StabilizerPools::settle_account(&owner), proven_claims);
 		assert_eq!(
 			StabilizerPoolRegistrations::<Test>::get(position),
 			Some(StabilizerPoolRegistration::Removed {
-				reported_at: ProofBlock {
+				reported_at_block: ProofBlock {
 					hash: H256::from_low_u64_be(170),
 					number: 170,
 					timestamp_millis: 2_040_000,
@@ -1460,7 +1425,7 @@ fn invalidating_a_position_forfeits_unclaimed_rewards(#[case] correction: Positi
 			}),
 		);
 
-		checkpoint.proven_through = ProofBlock {
+		checkpoint.proven_through_block = ProofBlock {
 			hash: H256::from_low_u64_be(165),
 			number: 165,
 			timestamp_millis: 1_980_000,
@@ -1468,7 +1433,7 @@ fn invalidating_a_position_forfeits_unclaimed_rewards(#[case] correction: Positi
 		assert_noop!(
 			StabilizerPools::record_checkpoint(
 				position.position_manager,
-				position.token_id,
+				position.uniswap_nft_id,
 				checkpoint.clone()
 			),
 			Error::<Test>::StaleCheckpoint
@@ -1488,20 +1453,20 @@ fn invalidating_a_position_forfeits_unclaimed_rewards(#[case] correction: Positi
 			RuntimeOrigin::signed(owner.clone()),
 			pool_manager(),
 			pool_id(),
-			position.token_id,
+			position.uniswap_nft_id,
 			Box::new(replacement),
 		));
 		assert_eq!(
 			StabilizerPoolRegistrations::<Test>::get(position),
 			Some(StabilizerPoolRegistration::Enrolled(StabilizerPoolEnrollment {
-				eligible_from: 5,
-				next_claim_frame: 5
+				first_eligible_frame_id: 5,
+				next_claim_frame_id: 5
 			}))
 		);
-		// Re-enrollment starts a new cursor. The forfeited frame cannot be claimed again.
+		// Re-enrollment starts a new cursor; previously settled or forfeited frames stay closed.
 		start_mining_frame(5, 50);
 		assert_ok!(StabilizerPools::settle_account(&owner), 0);
-		assert!(PaidClaims::get().is_empty());
+		assert_eq!(PaidClaims::get().len(), usize::from(late || revision_report));
 	});
 }
 
@@ -1511,7 +1476,7 @@ fn collect_pays_finalized_frames_covered_by_the_latest_checkpoint_once() {
 		let owner = AccountId32::new([0x42; 32]);
 		let position = StabilizerPoolPositionId {
 			position_manager: config().position_manager,
-			token_id: U256::one(),
+			uniswap_nft_id: U256::one(),
 		};
 		let argon_target = FixedU128::one();
 		let usdc_quote = FixedU128::from_u32(2);
@@ -1545,7 +1510,7 @@ fn collect_pays_finalized_frames_covered_by_the_latest_checkpoint_once() {
 				RuntimeOrigin::signed(owner.clone()),
 				pool_manager(),
 				pool_id(),
-				position.token_id,
+				position.uniswap_nft_id,
 				Box::new(proof),
 			)
 		};
@@ -1574,15 +1539,20 @@ fn collect_pays_finalized_frames_covered_by_the_latest_checkpoint_once() {
 		assert_eq!(
 			StabilizerPoolRegistrations::<Test>::get(position),
 			Some(StabilizerPoolRegistration::Enrolled(StabilizerPoolEnrollment {
-				eligible_from: 2,
-				next_claim_frame: 2,
+				first_eligible_frame_id: 2,
+				next_claim_frame_id: 2,
 			})),
 		);
-		// Frame 2 has its tenth collectible frame at frame 13. Frame 12 is still under review.
+		// At frame 13, frame 2 has its last collection day and frame 12 awaits its rate.
 		sample_frame(12);
 		start_mining_frame(13, 130);
-		let (_, last_day_claims) =
-			StabilizerPools::value_position_claim(&checkpoint(), 2, 13).unwrap();
+		let (_, last_day_claims) = StabilizerPools::calculate_position_rewards(
+			&checkpoint(),
+			&StabilizerPoolEnrollment { first_eligible_frame_id: 2, next_claim_frame_id: 2 },
+			&PositionContinuation::default(),
+			13,
+		)
+		.unwrap();
 		assert_eq!(
 			last_day_claims.iter().map(|claim| claim.frame_id).collect::<Vec<_>>(),
 			vec![2, 3, 4, 6, 7, 8, 9, 10, 11],
@@ -1603,8 +1573,8 @@ fn collect_pays_finalized_frames_covered_by_the_latest_checkpoint_once() {
 		assert_eq!(
 			StabilizerPoolRegistrations::<Test>::get(position),
 			Some(StabilizerPoolRegistration::Enrolled(StabilizerPoolEnrollment {
-				eligible_from: 2,
-				next_claim_frame: 12
+				first_eligible_frame_id: 2,
+				next_claim_frame_id: 12
 			})),
 		);
 
@@ -1652,6 +1622,384 @@ fn collect_pays_finalized_frames_covered_by_the_latest_checkpoint_once() {
 		let [_, last_claim] = claims.as_slice() else { panic!("expected one additional claim") };
 		let [last_frame] = last_claim.frames.as_slice() else { panic!("expected one new frame") };
 		assert_eq!(last_frame.frame_id, 12);
-		assert_eq!(checkpoint().proven_through.number, 650);
+		assert_eq!(checkpoint().proven_through_block.number, 650);
+	});
+}
+
+#[rstest]
+#[case::qualifying_band(None, true)]
+#[case::outside_tolerance(None, false)]
+#[case::successor_reported_in_open_frame(Some(3), true)]
+#[case::successor_reported_after_close(Some(4), true)]
+fn continuation_preserves_daily_rewards_with_the_smaller_liquidity(
+	#[case] invalidate_at: Option<FrameId>,
+	#[case] qualifying: bool,
+) {
+	let mut outcomes = Vec::new();
+	for report_first in [false, true] {
+		new_test_ext().execute_with(|| {
+			let (source, mut before) = enroll_reward_position();
+			let owner = before.beneficiary.clone();
+			let bounds = (before.tick_lower, before.tick_upper);
+			let successor = StabilizerPoolPositionId { uniswap_nft_id: U256::from(2), ..source };
+
+			start_mining_frame(2, 20);
+			sample_reward_ticks(20..30);
+			start_mining_frame(3, 30);
+			CurrentTime::set(170 * 12_000);
+			before.proven_through_block = ethereum_proof_block(149);
+			let mut after = before.clone();
+			after.proven_through_block = ethereum_proof_block(151);
+			after.liquidity /= 2;
+			(after.tick_lower, after.tick_upper) = uniswap_bounds_for_usd_band(
+				FixedU128::from_rational(9045, 10000),
+				FixedU128::from_rational(1005, 1000),
+				FixedU128::one(),
+				true,
+				10,
+			);
+			if !qualifying {
+				after.tick_upper += 500;
+			}
+			ArgonMarketPrice::set(Some(FixedU128::from_rational(95, 100)));
+			let proof = continuation_evidence(
+				source.uniswap_nft_id,
+				&before,
+				successor.uniswap_nft_id,
+				&after,
+			);
+			let changed = position_change_evidence(170, 2, before.liquidity, false, bounds);
+			if report_first {
+				assert_ok!(StabilizerPools::report_position_change(
+					RuntimeOrigin::signed(AccountId32::new([0x77; 32])),
+					source,
+					Box::new(changed.clone()),
+				));
+			}
+			assert_ok!(continue_with_proof(source, successor.uniswap_nft_id, proof));
+			assert_eq!(PositionIdsByAccount::<Test>::get(&owner).as_slice(), &[successor]);
+			assert_eq!(
+				StabilizerPoolRegistrations::<Test>::get(successor),
+				Some(StabilizerPoolRegistration::Enrolled(StabilizerPoolEnrollment {
+					first_eligible_frame_id: 4,
+					next_claim_frame_id: 2,
+				}),)
+			);
+			assert_noop!(
+				StabilizerPools::report_position_change(
+					RuntimeOrigin::signed(owner.clone()),
+					source,
+					Box::new(changed),
+				),
+				Error::<Test>::PositionNotEnrolled
+			);
+
+			sample_reward_ticks(30..40);
+			if let Some(frame) = invalidate_at {
+				if frame == 4 {
+					start_mining_frame(4, 40);
+				}
+				after.revision += U256::one();
+				after.proven_through_block = ethereum_proof_block(170);
+				let changed = position_change_proof(
+					position_evidence_for_token(successor.uniswap_nft_id, &after),
+					true,
+				);
+				assert_ok!(StabilizerPools::report_position_change(
+					RuntimeOrigin::signed(owner.clone()),
+					successor,
+					Box::new(changed)
+				));
+				if frame == 3 {
+					start_mining_frame(4, 40);
+				}
+			} else {
+				start_mining_frame(4, 40);
+				after.proven_through_block = ethereum_proof_block(201);
+				assert_ok!(checkpoint_nft(successor.uniswap_nft_id, &after));
+			}
+			start_mining_frame(5, 50);
+			assert_ok!(StabilizerPools::settle_account(&owner), 1);
+			let claims = PaidClaims::get()[0].frames.clone();
+			assert_eq!(claims[0].frame_id, 2, "a later report must preserve the proven frame");
+			assert!(claims[0].amount > 0);
+			assert_ok!(StabilizerPools::settle_account(&owner), 0);
+			let old_total = finalized_reward_value(2);
+			let capped_total = finalized_reward_value(3);
+			if qualifying && invalidate_at.is_none() {
+				assert_eq!(claims.len(), 2);
+				assert_eq!(claims[1].frame_id, 3);
+				// Each asset and its reward share round separately.
+				assert!(claims[1].amount.abs_diff(claims[0].amount / 2) <= 2);
+				assert!(old_total > 0);
+				assert!(capped_total.abs_diff(old_total / 2) <= 2);
+			} else {
+				assert_eq!(claims.len(), 1);
+				if qualifying && invalidate_at == Some(4) {
+					assert!(capped_total.abs_diff(old_total / 2) <= 2);
+				} else {
+					assert_eq!(capped_total, 0);
+				}
+			}
+			outcomes.push((claims, old_total, capped_total));
+		});
+	}
+	assert_eq!(outcomes[0], outcomes[1]);
+}
+
+#[test]
+fn late_continuation_keeps_the_slot_and_only_pays_if_counted_at_close() {
+	for (report_first, qualifying) in [(false, true), (true, true), (false, false), (true, false)] {
+		new_test_ext().execute_with(|| {
+			let (source, mut before) = enroll_reward_position();
+			let owner = before.beneficiary.clone();
+			let bounds = (before.tick_lower, before.tick_upper);
+			let replacement = StabilizerPoolPositionId { uniswap_nft_id: U256::from(2), ..source };
+
+			start_mining_frame(2, 20);
+			sample_reward_ticks(20..30);
+			CurrentTime::set(29 * 60_000);
+			before.proven_through_block = ethereum_proof_block(125);
+			let mut after = before.clone();
+			after.proven_through_block = ethereum_proof_block(126);
+			after.liquidity /= 2;
+			if !qualifying {
+				after.tick_upper += 500;
+			}
+			let proof = continuation_evidence(
+				source.uniswap_nft_id,
+				&before,
+				replacement.uniswap_nft_id,
+				&after,
+			);
+			if report_first {
+				assert_ok!(StabilizerPools::report_position_change(
+					RuntimeOrigin::signed(AccountId32::new([0x77; 32])),
+					source,
+					Box::new(position_change_evidence(130, 2, before.liquidity, false, bounds)),
+				));
+			}
+			start_mining_frame(3, 30);
+			let closed = PendingFrameRewardValue::<Test>::get().unwrap();
+			assert_eq!(closed.frame_id, 2);
+			assert!(!FinalizedRewardValues::get().iter().any(|(frame, _)| *frame == 2));
+			assert_ok!(continue_with_proof(source, replacement.uniswap_nft_id, proof));
+			assert_eq!(PositionIdsByAccount::<Test>::get(&owner).as_slice(), &[replacement]);
+			assert_ok!(StabilizerPools::settle_account(&owner), 0);
+			after.proven_through_block = ethereum_proof_block(151);
+			assert_ok!(checkpoint_nft(replacement.uniswap_nft_id, &after));
+			start_mining_frame(4, 40);
+			assert_eq!(finalized_reward_value(2), closed.eligible_value_microgons);
+			assert_eq!(closed.eligible_value_microgons > 0, !report_first);
+			if report_first || !qualifying {
+				assert_ok!(StabilizerPools::settle_account(&owner), 0);
+				return;
+			}
+			assert_ok!(StabilizerPools::settle_account(&owner), 1);
+			let claims = PaidClaims::get()[0].frames.clone();
+			assert_eq!(claims.len(), 1);
+			assert_eq!(claims[0].frame_id, 2);
+			assert!(claims[0].amount > 0);
+			assert_ok!(StabilizerPools::settle_account(&owner), 0);
+		});
+	}
+}
+
+#[test]
+fn recovery_pays_the_proven_day_and_skips_the_day_closed_without_the_position() {
+	new_test_ext().execute_with(|| {
+		let (source, mut old) = enroll_reward_position();
+		let owner = old.beneficiary.clone();
+		let bounds = (old.tick_lower, old.tick_upper);
+
+		// Keep the finalized pool funded while the reported position is absent.
+		let mut other = old.clone();
+		other.beneficiary = AccountId32::new([0x43; 32]);
+		assert_ok!(StabilizerPools::record_checkpoint(
+			source.position_manager,
+			U256::from(3),
+			other
+		));
+		for frame in [2, 3] {
+			let start = frame * 10;
+			start_mining_frame(frame, start);
+			sample_reward_ticks(start..start + 10);
+		}
+
+		CurrentTime::set(175 * 12_000);
+		assert_ok!(StabilizerPools::report_position_change(
+			RuntimeOrigin::signed(owner.clone()),
+			source,
+			Box::new(position_change_evidence(170, 2, old.liquidity, false, bounds))
+		));
+		start_mining_frame(4, 40);
+		let both_positions_value = finalized_reward_value(2);
+		assert!(both_positions_value > 0);
+
+		let successor = U256::from(2);
+		old.proven_through_block = ethereum_proof_block(160);
+		let mut new = old.clone();
+		new.proven_through_block = ethereum_proof_block(165);
+		assert_ok!(continue_with_proof(
+			source,
+			successor,
+			continuation_evidence(source.uniswap_nft_id, &old, successor, &new)
+		));
+		new.proven_through_block = ethereum_proof_block(201);
+		assert_ok!(checkpoint_nft(successor, &new));
+		start_mining_frame(5, 50);
+		let other_position_value = finalized_reward_value(3);
+		assert!(both_positions_value.abs_diff(2 * other_position_value) <= 2);
+		assert_ok!(StabilizerPools::settle_account(&owner), 1);
+		let claims = PaidClaims::get()[0].frames.clone();
+		assert_eq!(claims.len(), 1);
+		assert_eq!(claims[0].frame_id, 2);
+		assert!(claims[0].amount > 0);
+	});
+}
+
+#[test]
+fn new_enrollments_require_a_current_price_at_or_above_target() {
+	for (market, target, rejection) in [
+		(
+			Some(FixedU128::from_rational(999, 1000)),
+			Some(FixedU128::one()),
+			Some(Error::<Test>::PriceBelowTarget),
+		),
+		(Some(FixedU128::one()), Some(FixedU128::one()), None),
+		(Some(FixedU128::from_rational(101, 100)), Some(FixedU128::one()), None),
+		(None, Some(FixedU128::one()), Some(Error::<Test>::PriceUnavailable)),
+		(Some(FixedU128::one()), None, Some(Error::<Test>::PriceUnavailable)),
+		(Some(FixedU128::one()), Some(FixedU128::zero()), Some(Error::<Test>::PriceUnavailable)),
+	] {
+		new_test_ext().execute_with(|| {
+			ArgonMarketPrice::set(market);
+			ArgonTargetPrice::set(target);
+			let result = submit(build_evidence(100, 1, H256::repeat_byte(0x42), 1_000, true));
+			if let Some(error) = rejection {
+				assert_eq!(result, Err(error.into()));
+				assert!(!PositionCheckpoints::<Test>::contains_key(
+					config().position_manager,
+					U256::one()
+				));
+				assert!(PositionIdsByAccount::<Test>::get(beneficiary_account()).is_empty());
+			} else {
+				assert_ok!(result);
+			}
+		});
+	}
+}
+
+#[test]
+fn continuation_enforces_the_ethereum_grace_period_and_submission_deadline() {
+	for (source_block, replacement_block, frame, rejection) in [
+		(125, 150, 3, None),
+		(149, 150, 3, None),
+		(149, 151, 3, None),
+		(125, 151, 3, Some(Error::<Test>::ContinuationGraceExceeded)),
+		(149, 151, 4, Some(Error::<Test>::ContinuationTooLate)),
+	] {
+		new_test_ext().execute_with(|| {
+			let (source, mut before) = enroll_reward_position();
+			start_mining_frame(2, 20);
+			start_mining_frame(3, 30);
+			if frame == 4 {
+				start_mining_frame(4, 40);
+			}
+			before.proven_through_block = ethereum_proof_block(source_block);
+			let mut after = before.clone();
+			after.proven_through_block = ethereum_proof_block(replacement_block);
+
+			let mut proof =
+				continuation_evidence(source.uniswap_nft_id, &before, U256::from(2), &after);
+			// A retained anchor six minutes after the replacement is valid for a five-minute
+			// handoff.
+			proof.before.execution_block_proof =
+				prove_from_later_anchor(source_block, source_block * 12, 12).0;
+			proof.after.execution_block_proof =
+				prove_from_later_anchor(replacement_block, replacement_block * 12, 360).0;
+			let anchor_time = (replacement_block * 12 + 360) * 1_000;
+			CurrentTime::set(CurrentTime::get().max(anchor_time));
+
+			if let Some(error) = rejection {
+				assert_noop!(continue_with_proof(source, U256::from(2), proof), error);
+			} else {
+				assert_ok!(continue_with_proof(source, U256::from(2), proof));
+			}
+		});
+	}
+}
+
+#[test]
+fn continuation_requires_fresh_nfts_and_one_handoff_per_frame() {
+	new_test_ext().execute_with(|| {
+		let (source, mut before) = enroll_reward_position();
+		start_mining_frame(2, 20);
+		start_mining_frame(3, 30);
+		before.proven_through_block = ethereum_proof_block(149);
+		let mut after = before.clone();
+		after.proven_through_block = ethereum_proof_block(151);
+		CurrentTime::set(after.proven_through_block.timestamp_millis.max(CurrentTime::get()));
+		ArgonMarketPrice::set(Some(FixedU128::from_rational(99, 100)));
+		let mut increased = after.clone();
+		increased.liquidity += 1;
+		let proof =
+			continuation_evidence(source.uniswap_nft_id, &before, U256::from(2), &increased);
+		assert_noop!(
+			continue_with_proof(source, U256::from(2), proof),
+			Error::<Test>::PriceBelowTarget
+		);
+		let proof = continuation_evidence(source.uniswap_nft_id, &before, U256::from(2), &after);
+		let mut wrong_block = proof.clone();
+		wrong_block.after.retired.account_proof =
+			proof.before.position_manager.account_proof.clone();
+		assert_noop!(
+			continue_with_proof(source, U256::from(2), wrong_block),
+			Error::<Test>::InvalidProof
+		);
+		assert_ok!(continue_with_proof(source, U256::from(2), proof.clone()));
+		assert_noop!(
+			continue_with_proof(source, U256::from(2), proof),
+			Error::<Test>::PositionNotEnrolled
+		);
+		let successor = StabilizerPoolPositionId { uniswap_nft_id: U256::from(2), ..source };
+		start_mining_frame(4, 40);
+		before = after;
+		before.proven_through_block = ethereum_proof_block(199);
+		after = before.clone();
+		after.proven_through_block = ethereum_proof_block(201);
+		CurrentTime::set(after.proven_through_block.timestamp_millis);
+		let proof = continuation_evidence(successor.uniswap_nft_id, &before, U256::from(3), &after);
+		assert_noop!(
+			continue_with_proof(successor, U256::from(3), proof),
+			Error::<Test>::ContinuationAlreadyUsed
+		);
+		before.proven_through_block = ethereum_proof_block(202);
+		after.proven_through_block = ethereum_proof_block(203);
+		CurrentTime::set(after.proven_through_block.timestamp_millis);
+		let proof =
+			continuation_evidence(successor.uniswap_nft_id, &before, source.uniswap_nft_id, &after);
+		assert_noop!(
+			continue_with_proof(successor, source.uniswap_nft_id, proof),
+			Error::<Test>::PositionAlreadyCheckpointed
+		);
+		let proof = continuation_evidence(successor.uniswap_nft_id, &before, U256::from(3), &after);
+		assert_ok!(continue_with_proof(successor, U256::from(3), proof));
+		ArgonMarketPrice::set(Some(FixedU128::one()));
+		after.revision += U256::one();
+		after.proven_through_block = ethereum_proof_block(204);
+		assert_ok!(StabilizerPools::record_checkpoint(
+			source.position_manager,
+			U256::from(3),
+			after.clone()
+		));
+		let liquidity =
+			RegisteredLiquidityByRange::<Test>::get(StabilizerPoolLiquidityRange::from(&after));
+		assert_eq!(
+			liquidity.current_liquidity,
+			U256::zero(),
+			"resetting the queued successor removes the old daily contribution"
+		);
+		assert_eq!(liquidity.next_frame_liquidity, U256::from(after.liquidity));
 	});
 }

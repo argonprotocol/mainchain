@@ -4,18 +4,20 @@
 use crate as pallet_stabilizer_pools;
 use crate::*;
 #[cfg(test)]
+use alloy_consensus::Header as EthereumHeader;
+#[cfg(test)]
 use alloy_primitives::aliases::I24;
 use alloy_primitives::{keccak256, B256, U256 as AlloyU256};
 use alloy_trie::{
 	proof::{ProofNodes, ProofRetainer},
 	HashBuilder, Nibbles, TrieAccount,
 };
+#[cfg(test)]
+use argon_primitives::{ArgonCPI, OnNewSlot, PriceIndex, PriceIndexUpdated, UniswapSqrtPriceX96};
 use argon_primitives::{
 	EthereumExecutionBlockProof, EthereumStorageSlotProof, StabilizerPoolPriceSource,
 	UniswapPoolIdentity,
 };
-#[cfg(test)]
-use argon_primitives::{OnNewSlot, PriceIndex, PriceIndexUpdated, UniswapSqrtPriceX96};
 #[cfg(test)]
 use core::ops::Range;
 #[cfg(test)]
@@ -61,6 +63,7 @@ impl pallet_ethereum_verifier::Config for Test {
 #[cfg(test)]
 impl Config for Test {
 	type EthereumVerifier = EthereumVerifier;
+	type PriceProvider = MockPriceProvider;
 	type RewardProvider = MockRewardProvider;
 	type TreasuryPositionProvider = ();
 	type MaxPositionsPerAccount = ConstU32<5>;
@@ -71,6 +74,7 @@ impl Config for Test {
 	type TimeProvider = CurrentTime;
 	type MaxSampledPriceHistoryFrames = ConstU32<13>;
 	type ClaimWindowFrames = ConstU32<10>;
+	type ContinuationGraceMillis = ConstU64<300_000>;
 	type TicksPerFrame = ConstU64<10>;
 	type RewardPriceBand = RewardPriceBand;
 	type MaxPriceBucketsPerFrame = MaxPriceBucketsPerFrame;
@@ -82,6 +86,8 @@ frame_support::parameter_types! {
 	pub const RewardPriceBand: (Percent, Percent) = (Percent::from_percent(90), Percent::one());
 	pub const MaxPriceBucketsPerFrame: u32 = 24;
 	pub const MinPriceBucketCoverage: Percent = Percent::from_percent(75);
+	pub static ArgonMarketPrice: Option<FixedU128> = Some(FixedU128::one());
+	pub static ArgonTargetPrice: Option<FixedU128> = Some(FixedU128::one());
 	pub static CurrentTick: Tick = 20;
 	pub static CurrentTime: Moment = 0;
 	pub static CurrentFrame: FrameId = 1;
@@ -95,6 +101,38 @@ frame_support::parameter_types! {
 #[derive(Clone)]
 pub struct PaidClaim {
 	pub frames: Vec<StabilizerPoolFrameClaim>,
+}
+
+#[cfg(test)]
+pub struct MockPriceProvider;
+
+#[cfg(test)]
+impl PriceProvider<Balance> for MockPriceProvider {
+	type Weights = ();
+	fn get_latest_argon_price_in_usd() -> Option<FixedU128> {
+		ArgonMarketPrice::get()
+	}
+	fn get_target_argon_price_in_usd() -> Option<FixedU128> {
+		ArgonTargetPrice::get()
+	}
+	fn get_latest_btc_price_in_usd() -> Option<FixedU128> {
+		None
+	}
+	fn get_argonot_price_in_usd() -> Option<FixedU128> {
+		None
+	}
+	fn get_argon_cpi() -> Option<ArgonCPI> {
+		None
+	}
+	fn get_average_cpi_for_ticks(_: (Tick, Tick)) -> ArgonCPI {
+		ArgonCPI::zero()
+	}
+	fn get_circulation() -> Balance {
+		0
+	}
+	fn get_redemption_r_value() -> Option<FixedU128> {
+		None
+	}
 }
 
 #[cfg(test)]
@@ -149,6 +187,8 @@ pub fn new_test_ext() -> TestState {
 	let mut ext = new_test_with_genesis::<Test>(|_| {});
 	ext.execute_with(|| {
 		System::set_block_number(1);
+		ArgonMarketPrice::set(Some(FixedU128::one()));
+		ArgonTargetPrice::set(Some(FixedU128::one()));
 		CurrentFrame::set(1);
 		PaidClaims::set(Vec::new());
 		RejectClaims::set(false);
@@ -173,6 +213,78 @@ pub(crate) fn report_stabilizer_pool_price(tick: Tick, sqrt_price_x96: UniswapSq
 		&stabilizer_pool_price_index(tick, sqrt_price_x96),
 		Some(stabilizer_pool_price_source()),
 	);
+}
+
+#[cfg(test)]
+pub(crate) fn sample_reward_ticks(ticks: Range<Tick>) {
+	let spot = uniswap_sqrt_price_for_usd_price(
+		FixedU128::from_rational(95, 100),
+		FixedU128::one(),
+		true,
+		false,
+	);
+	for tick in ticks {
+		CurrentTick::set(tick);
+		report_stabilizer_pool_price(tick, spot);
+	}
+}
+
+#[cfg(test)]
+pub(crate) fn finalized_reward_value(frame_id: FrameId) -> Balance {
+	FinalizedRewardValues::get()
+		.into_iter()
+		.find(|(frame, _)| *frame == frame_id)
+		.expect("frame has finalized")
+		.1
+}
+
+#[cfg(test)]
+pub(crate) fn enroll_reward_position() -> (StabilizerPoolPositionId, PositionCheckpoint<AccountId32>)
+{
+	let (lower, upper) = uniswap_bounds_for_usd_band(
+		FixedU128::from_rational(90, 100),
+		FixedU128::one(),
+		FixedU128::one(),
+		true,
+		10,
+	);
+	let source = StabilizerPoolPositionId {
+		position_manager: config().position_manager,
+		uniswap_nft_id: U256::one(),
+	};
+	let mut checkpoint = position_checkpoint(10u128.pow(24), lower, upper);
+	checkpoint.maintained_since_block = ethereum_proof_block(95);
+	checkpoint.proven_through_block = checkpoint.maintained_since_block;
+	assert_ok!(checkpoint_nft(source.uniswap_nft_id, &checkpoint));
+	(source, checkpoint)
+}
+
+#[cfg(test)]
+pub(crate) fn checkpoint_nft(
+	token_id: UniswapNftId,
+	checkpoint: &PositionCheckpoint<AccountId32>,
+) -> DispatchResult {
+	StabilizerPools::checkpoint_position(
+		RuntimeOrigin::signed(checkpoint.beneficiary.clone()),
+		checkpoint.pool_manager,
+		checkpoint.pool_id,
+		token_id,
+		Box::new(position_evidence_for_token(token_id, checkpoint)),
+	)
+}
+
+#[cfg(test)]
+pub(crate) fn continue_with_proof(
+	source: StabilizerPoolPositionId,
+	replacement: UniswapNftId,
+	proof: PositionContinuationProof,
+) -> DispatchResult {
+	StabilizerPools::continue_enrollment(
+		RuntimeOrigin::signed(AccountId32::new([0x42; 32])),
+		source,
+		replacement,
+		Box::new(proof),
+	)
 }
 
 pub(crate) fn stabilizer_pool_price_source() -> StabilizerPoolPriceSource {
@@ -228,8 +340,7 @@ pub(crate) fn position_checkpoint(
 	tick_lower: UniswapTick,
 	tick_upper: UniswapTick,
 ) -> PositionCheckpoint<AccountId32> {
-	let block =
-		ProofBlock { hash: H256::from_low_u64_be(100), number: 100, timestamp_millis: 1_200_000 };
+	let block = ethereum_proof_block(100);
 	PositionCheckpoint {
 		beneficiary: AccountId32::new([0x42; 32]),
 		pool_manager: pool_manager(),
@@ -239,9 +350,50 @@ pub(crate) fn position_checkpoint(
 		tick_lower,
 		tick_upper,
 		liquidity,
-		maintained_since: block,
-		proven_through: block,
+		maintained_since_block: block,
+		proven_through_block: block,
 	}
+}
+
+#[cfg(test)]
+pub(crate) fn ethereum_proof_block(block: u64) -> ProofBlock {
+	ProofBlock {
+		hash: U256::from(block).to_big_endian().into(),
+		number: block,
+		timestamp_millis: block * 12_000,
+	}
+}
+
+#[cfg(test)]
+pub(crate) fn prove_from_later_anchor(
+	number: u64,
+	timestamp: u64,
+	anchor_delay_secs: u64,
+) -> (EthereumExecutionBlockProof, H256) {
+	let state = ExecutionHeaderAnchors::<Test>::get(H256::from_low_u64_be(number)).unwrap();
+	let target = EthereumHeader {
+		number,
+		timestamp,
+		state_root: B256::from(state.state_root.0),
+		..Default::default()
+	};
+	let anchor = ExecutionHeaderAnchor {
+		block_hash: H256::from_low_u64_be(10_000 + number),
+		parent_hash: H256::from(target.hash_slow().0),
+		block_number: number + 1,
+		timestamp_millis: (timestamp + anchor_delay_secs) * 1_000,
+		..state
+	};
+	ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
+	let execution = EthereumExecutionBlockProof {
+		anchor_block_hash: anchor.block_hash,
+		target_to_anchor_header_chain: vec![argon_primitives::EthereumExecutionHeader {
+			rlp: alloy_rlp::encode(&target).try_into().unwrap(),
+		}]
+		.try_into()
+		.unwrap(),
+	};
+	(execution, H256::from(target.hash_slow().0))
 }
 
 /// Convert a named Uniswap price tick to the raw sqrt-price format accepted by the pallet.
@@ -358,9 +510,85 @@ pub(crate) fn position_evidence(
 	subscribed: bool,
 	bounds: (UniswapTick, UniswapTick),
 ) -> PositionProof {
+	let block = ProofBlock {
+		hash: U256::from(block).to_big_endian().into(),
+		number: block,
+		timestamp_millis: block * 12_000,
+	};
+	let checkpoint = PositionCheckpoint {
+		beneficiary,
+		pool_manager: pool_manager(),
+		pool_id: pool_id(),
+		subscriber: config().subscriber,
+		revision: revision.into(),
+		tick_lower: bounds.0,
+		tick_upper: bounds.1,
+		liquidity,
+		maintained_since_block: block,
+		proven_through_block: block,
+	};
+	position_evidence_with_retirement(U256::one(), &checkpoint, subscribed, None).0
+}
+
+#[cfg(test)]
+pub(crate) fn position_evidence_for_token(
+	token_id: UniswapNftId,
+	checkpoint: &PositionCheckpoint<AccountId32>,
+) -> PositionProof {
+	position_evidence_with_retirement(token_id, checkpoint, true, None).0
+}
+
+/// Prove a live source at A and a burned source plus live successor in one state at B.
+pub(crate) fn continuation_evidence<AccountId: Encode>(
+	source_token_id: UniswapNftId,
+	before: &PositionCheckpoint<AccountId>,
+	successor_token_id: UniswapNftId,
+	after: &PositionCheckpoint<AccountId>,
+) -> PositionContinuationProof {
+	let before = position_evidence_with_retirement(source_token_id, before, true, None).0;
+	let (after, retirement) =
+		position_evidence_with_retirement(successor_token_id, after, true, Some(source_token_id));
+	let retired = retirement.expect("a source token requests its retirement witness");
+	fn witness<S: Get<u32>>(
+		proof: EthereumAccountStorageProof<S>,
+	) -> EthereumAccountStorageWitness<S> {
+		EthereumAccountStorageWitness {
+			account_proof: proof.account_proof,
+			storage_proof: proof.storage_proof,
+			slots: proof.slots,
+		}
+	}
+	PositionContinuationProof {
+		before: ContinuationSourceProof {
+			execution_block_proof: before.subscriber.execution_block_proof.clone(),
+			subscriber: witness(before.subscriber),
+			position_manager: witness(before.position_manager),
+			pool_manager: witness(before.pool_manager),
+		},
+		after: ContinuationReplacementProof {
+			execution_block_proof: after.subscriber.execution_block_proof.clone(),
+			subscriber: witness(after.subscriber),
+			position_manager: witness(after.position_manager),
+			pool_manager: witness(after.pool_manager),
+			retired: witness(retired),
+		},
+	}
+}
+
+fn position_evidence_with_retirement<AccountId: Encode>(
+	token_id: UniswapNftId,
+	checkpoint: &PositionCheckpoint<AccountId>,
+	subscribed: bool,
+	retired_token_id: Option<UniswapNftId>,
+) -> (PositionProof, Option<EthereumAccountStorageProof<ConstU32<1>>>) {
+	let block = checkpoint.proven_through_block.number;
+	let bounds = (checkpoint.tick_lower, checkpoint.tick_upper);
+	let beneficiary = H256::from_slice(&checkpoint.beneficiary.encode());
+	let revision = checkpoint.revision;
+	let liquidity = checkpoint.liquidity;
+
 	let pool_config = config();
 
-	let token_id = U256::one();
 	let subscription_slot = evm::mapping_slot(token_id, evm::SUBSCRIPTIONS_SLOT);
 
 	// Pack Uniswap's pool prefix, signed tick bounds, and subscription flag.
@@ -375,13 +603,10 @@ pub(crate) fn position_evidence(
 	}
 
 	// Each account contributes its own storage trie to the shared Ethereum state.
-	let slots = [
+	let mut slots = [
 		vec![
 			(subscription_slot, beneficiary),
-			(
-				evm::offset_slot(subscription_slot, 1),
-				H256::from(U256::from(revision).to_big_endian()),
-			),
+			(evm::offset_slot(subscription_slot, 1), H256::from(revision.to_big_endian())),
 		],
 		vec![
 			(
@@ -404,6 +629,12 @@ pub(crate) fn position_evidence(
 			H256::from(U256::from(liquidity).to_big_endian()),
 		)],
 	];
+	if let Some(retired_token_id) = retired_token_id {
+		slots[1].push((
+			evm::mapping_slot(retired_token_id, evm::POSITION_MANAGER_POSITION_INFO_SLOT),
+			H256::zero(),
+		));
+	}
 
 	let addresses = [pool_config.subscriber, pool_config.position_manager, pool_manager()];
 	let storage_tries = slots
@@ -455,7 +686,7 @@ pub(crate) fn position_evidence(
 		ExecutionHeaderAnchors::<Test>::insert(anchor.block_hash, anchor);
 	}
 
-	PositionProof {
+	let position = PositionProof {
 		subscriber: account_storage_proof(
 			addresses[0],
 			&account_nodes,
@@ -467,7 +698,7 @@ pub(crate) fn position_evidence(
 			addresses[1],
 			&account_nodes,
 			&storage_tries[1].1,
-			&slots[1],
+			&slots[1][..2],
 			block,
 		),
 		pool_manager: account_storage_proof(
@@ -477,7 +708,17 @@ pub(crate) fn position_evidence(
 			&slots[2],
 			block,
 		),
-	}
+	};
+	let retirement = retired_token_id.map(|_| {
+		account_storage_proof(
+			addresses[1],
+			&account_nodes,
+			&storage_tries[1].1,
+			&slots[1][2..3],
+			block,
+		)
+	});
+	(position, retirement)
 }
 
 pub(crate) fn position_change_evidence(
@@ -489,6 +730,10 @@ pub(crate) fn position_change_evidence(
 ) -> PositionChangeProof {
 	let proof =
 		position_evidence(block, revision, H256::repeat_byte(0x42), liquidity, subscribed, bounds);
+	position_change_proof(proof, subscribed)
+}
+
+pub(crate) fn position_change_proof(proof: PositionProof, subscribed: bool) -> PositionChangeProof {
 	let (account, slot_index) =
 		if subscribed { (proof.subscriber, 1) } else { (proof.position_manager, 0) };
 	let witness = EthereumAccountStorageProof {

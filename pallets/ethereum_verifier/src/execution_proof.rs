@@ -12,7 +12,7 @@ use super::{
 };
 use alloc::{collections::BTreeMap, vec::Vec};
 use argon_primitives::{
-	EthereumAccountStorageProof, EthereumBlockNumber, EthereumCombinedReceiptProof,
+	EthereumAccountStorageWitnessRef, EthereumBlockNumber, EthereumCombinedReceiptProof,
 	EthereumExecutionBlockProof, EthereumLog, EthereumProofBlock, EthereumReceiptLog,
 	EthereumReceiptLogProofBatch, EthereumVerifyError, EthereumVerifyProvider, Moment,
 };
@@ -50,22 +50,21 @@ impl<T: Config> EthereumVerifyProvider for Pallet<T> {
 		Ok(())
 	}
 
-	fn verify_account_storage_proof<MaxStorageSlots>(
-		account_address: H160,
-		proof: &EthereumAccountStorageProof<MaxStorageSlots>,
-	) -> Result<EthereumProofBlock, EthereumVerifyError>
-	where
-		MaxStorageSlots: Get<u32>,
-	{
+	fn verify_storage_at_block<'a>(
+		block: &EthereumExecutionBlockProof,
+		accounts: impl IntoIterator<Item = (H160, EthereumAccountStorageWitnessRef<'a>)>,
+	) -> Result<EthereumProofBlock, EthereumVerifyError> {
 		ensure!(!OperatingMode::<T>::get().is_halted(), EthereumVerifyError::VerifierUnavailable);
 
-		let headers = Self::verify_execution_headers(&proof.execution_block_proof)?;
+		let headers = Self::verify_execution_headers(block)?;
 		let target = headers.first().ok_or(EthereumVerifyError::InvalidHeaderChain)?;
-		Self::verify_account_storage_proof_against_state_root(
-			target.state_root,
-			account_address,
-			proof,
-		)?;
+		for (address, witness) in accounts {
+			Self::verify_account_storage_proof_against_state_root(
+				target.state_root,
+				address,
+				witness,
+			)?;
+		}
 		Ok(EthereumProofBlock {
 			hash: target.block_hash,
 			number: target.block_number,
