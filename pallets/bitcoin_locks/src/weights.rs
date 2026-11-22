@@ -142,12 +142,14 @@ where
 
 	fn request_release() -> Weight {
 		Base::request_release()
+			.saturating_add(VaultProviderWeight::update_pending_cosign())
 			.saturating_add(UtxoTrackerWeights::<T>::unwatch())
 			.saturating_add(PositionWeights::<T>::position_updated())
 	}
 
 	fn cosign_release(input_count: u32) -> Weight {
 		Base::cosign_release(input_count)
+			.saturating_add(VaultProviderWeight::update_pending_cosign())
 			.saturating_add(UtxoTrackerWeights::<T>::unwatch())
 			.saturating_add(PositionWeights::<T>::position_updated())
 			.saturating_add(PositionWeights::<T>::account_quantity_updated())
@@ -161,6 +163,7 @@ where
 		let max_guarantees =
 			u64::from(T::FissionsProvider::max_fissions_per_lock()).saturating_add(1);
 		Base::on_initialize_expiring_locks(n)
+			.saturating_add(VaultProviderWeight::update_pending_cosign().saturating_mul(n.into()))
 			.saturating_add(
 				VaultProviderWeight::burn()
 					.saturating_mul(u64::from(n).saturating_mul(max_guarantees)),
@@ -178,6 +181,7 @@ where
 
 	fn on_initialize_overdue_releases(n: u32) -> Weight {
 		Base::on_initialize_overdue_releases(n)
+			.saturating_add(VaultProviderWeight::update_pending_cosign().saturating_mul(n.into()))
 			.saturating_add(UtxoTrackerWeights::<T>::unwatch().saturating_mul(n.into()))
 			.saturating_add(PositionWeights::<T>::position_updated().saturating_mul(n.into()))
 			.saturating_add(
@@ -188,6 +192,7 @@ where
 
 	fn on_initialize_orphan_expirations(n: u32) -> Weight {
 		Base::on_initialize_orphan_expirations(n)
+			.saturating_add(VaultProviderWeight::update_pending_cosign().saturating_mul(n.into()))
 	}
 
 	fn on_initialize_securitization_hold_expirations(n: u32) -> Weight {
@@ -205,10 +210,13 @@ where
 
 	fn request_orphaned_utxo_release() -> Weight {
 		Base::request_orphaned_utxo_release()
+			.saturating_add(VaultProviderWeight::update_pending_cosign())
 	}
 
 	fn cosign_orphaned_utxo_release() -> Weight {
-		Base::cosign_orphaned_utxo_release().saturating_add(UtxoTrackerWeights::<T>::unwatch_utxo())
+		Base::cosign_orphaned_utxo_release()
+			.saturating_add(VaultProviderWeight::update_pending_cosign())
+			.saturating_add(UtxoTrackerWeights::<T>::unwatch_utxo())
 	}
 
 	fn set_guarantee() -> Weight {
@@ -266,6 +274,7 @@ where
 		let max_guarantees =
 			u64::from(T::FissionsProvider::max_fissions_per_lock()).saturating_add(1);
 		Base::provider_utxo_detected()
+			.saturating_add(VaultProviderWeight::update_pending_cosign())
 			.saturating_add(PositionWeights::<T>::account_quantity_updated())
 			.saturating_add(UtxoTrackerWeights::<T>::unwatch_utxo().saturating_mul(max_utxos))
 			.saturating_add(UtxoTrackerWeights::<T>::unwatch())
@@ -279,6 +288,8 @@ where
 		let max_guarantees =
 			u64::from(T::FissionsProvider::max_fissions_per_lock()).saturating_add(1);
 		Base::provider_spent()
+			// The measured case clears one normal release and one orphan request.
+			.saturating_add(VaultProviderWeight::update_pending_cosign().saturating_mul(2))
 			.saturating_add(PositionWeights::<T>::account_quantity_updated())
 			.saturating_add(
 				UtxoTrackerWeights::<T>::unwatch().max(UtxoTrackerWeights::<T>::unwatch_utxo()),

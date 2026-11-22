@@ -1,5 +1,13 @@
-use crate::{Config, LockedBitcoin as LockedBitcoinV12, Pallet};
-use argon_primitives::vault::{BitcoinSecuritizationBasis, CosignerGuarantee};
+use crate::{
+	Config, LockReleaseRequestsById, LockedBitcoin as LockedBitcoinV12, OrphanedUtxo,
+	OrphanedUtxoCosignRequest, OrphanedUtxosByAccount, Pallet,
+};
+use argon_primitives::{
+	bitcoin::{BitcoinLockId, BitcoinScriptPubkey, Satoshis},
+	vault::{BitcoinSecuritizationBasis, BitcoinVaultProvider, CosignRequest, CosignerGuarantee},
+	VaultId,
+};
+use frame_support::{migrations::VersionedMigration, traits::UncheckedOnRuntimeUpgrade};
 use pallet_prelude::*;
 
 pub fn is_migration_pending<T: Config>() -> bool {
@@ -13,6 +21,92 @@ pub fn is_migration_complete<T: Config>() -> bool {
 /// Record completion after the runtime has converted the Vault, Lock and Fission storage.
 pub fn complete_migration<T: Config>() {
 	StorageVersion::new(12).put::<Pallet<T>>();
+}
+
+/// Rebuild the per-vault signing list from accepted Bitcoin requests.
+pub struct InitializePendingCosigns<T>(PhantomData<T>);
+impl<T: Config> UncheckedOnRuntimeUpgrade for InitializePendingCosigns<T> {
+	fn on_runtime_upgrade() -> Weight {
+		let mut requests = 0u64;
+		let mut orphans = 0u64;
+		for request in LockReleaseRequestsById::<T>::iter_values() {
+			requests.saturating_accrue(1);
+			T::VaultProvider::update_pending_cosign(
+				request.vault_id,
+				request
+					.cosign_due_frame
+					.saturating_sub(T::LockReleaseCosignDeadlineFrames::get())
+					.saturating_add(1),
+				CosignRequest::Lock(request.lock_id),
+				false,
+			);
+		}
+		OrphanedUtxosByAccount::<T>::translate::<OrphanedUtxoV12<T>, _>(|owner, utxo_ref, old| {
+			orphans.saturating_accrue(1);
+			let cosign_request = old.cosign_request.and_then(|request| {
+				if Pallet::<T>::validate_orphan_release(
+					old.satoshis,
+					&request.to_script_pubkey,
+					request.bitcoin_network_fee,
+				)
+				.is_err()
+				{
+					return None
+				}
+				T::VaultProvider::update_pending_cosign(
+					old.vault_id,
+					0,
+					CosignRequest::Orphan { owner, utxo_ref },
+					false,
+				);
+				Some(OrphanedUtxoCosignRequest {
+					bitcoin_network_fee: request.bitcoin_network_fee,
+					to_script_pubkey: request.to_script_pubkey,
+					created_at_argon_block_number: request.created_at_argon_block_number,
+					collect_due_frame: 0,
+				})
+			});
+			Some(OrphanedUtxo {
+				lock_id: old.lock_id,
+				vault_id: old.vault_id,
+				satoshis: old.satoshis,
+				recorded_argon_block_number: old.recorded_argon_block_number,
+				cosign_request,
+			})
+		});
+		T::DbWeight::get().reads_writes(
+			requests.saturating_add(orphans).saturating_add(2),
+			requests.saturating_add(orphans.saturating_mul(2)),
+		)
+	}
+}
+
+pub type PendingCosignsMigration<T> = VersionedMigration<
+	12,
+	13,
+	InitializePendingCosigns<T>,
+	Pallet<T>,
+	<T as frame_system::Config>::DbWeight,
+>;
+
+#[derive(Encode, Decode)]
+pub(crate) struct OrphanedUtxoV12<T: Config> {
+	#[codec(compact)]
+	pub lock_id: BitcoinLockId,
+	#[codec(compact)]
+	pub vault_id: VaultId,
+	#[codec(compact)]
+	pub satoshis: Satoshis,
+	#[codec(compact)]
+	pub recorded_argon_block_number: BlockNumberFor<T>,
+	pub cosign_request: Option<OrphanedUtxoCosignRequestV12<BlockNumberFor<T>>>,
+}
+
+#[derive(Encode, Decode)]
+pub(crate) struct OrphanedUtxoCosignRequestV12<BlockNumber> {
+	pub bitcoin_network_fee: Satoshis,
+	pub to_script_pubkey: BitcoinScriptPubkey,
+	pub created_at_argon_block_number: BlockNumber,
 }
 
 /// Frozen runtime-160 Lock storage. Field order and compact encodings must remain frozen.
@@ -149,5 +243,65 @@ impl<T: Config> From<v11::LockedBitcoin<T>> for LockedBitcoinV12<T> {
 			is_flexible: old.is_flexible,
 			created_at_argon_block: old.created_at_argon_block,
 		}
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crate::mock::*;
+	use argon_primitives::bitcoin::{H256Le, UtxoRef};
+	use frame_support::traits::OnRuntimeUpgrade;
+
+	#[test]
+	fn migration_preserves_valid_orphan_requests_and_allows_invalid_ones_to_be_corrected() {
+		new_test_ext().execute_with(|| {
+			System::set_block_number(1);
+			let mut script = vec![0; 34];
+			script[0] = 0x51;
+			script[1] = 0x20;
+			let script = BitcoinScriptPubkey::try_from(script).unwrap();
+			for (output_index, fee) in [(0, 1_000), (1, 10_001)] {
+				let utxo_ref = UtxoRef { txid: H256Le([1; 32]), output_index };
+				frame_support::storage::unhashed::put(
+					&OrphanedUtxosByAccount::<Test>::hashed_key_for(2, &utxo_ref),
+					&OrphanedUtxoV12::<Test> {
+						lock_id: 1,
+						vault_id: 1,
+						satoshis: 10_000,
+						recorded_argon_block_number: 5,
+						cosign_request: Some(OrphanedUtxoCosignRequestV12 {
+							bitcoin_network_fee: fee,
+							to_script_pubkey: script.clone(),
+							created_at_argon_block_number: 7,
+						}),
+					},
+				);
+			}
+			StorageVersion::new(12).put::<BitcoinLocks>();
+			PendingCosignsMigration::<Test>::on_runtime_upgrade();
+			PendingCosignsMigration::<Test>::on_runtime_upgrade();
+			assert_eq!(StorageVersion::get::<BitcoinLocks>(), StorageVersion::new(13));
+			let valid_ref = UtxoRef { txid: H256Le([1; 32]), output_index: 0 };
+			let request = OrphanedUtxosByAccount::<Test>::get(2, valid_ref)
+				.unwrap()
+				.cosign_request
+				.unwrap();
+			assert_eq!(request.collect_due_frame, 0);
+			assert_eq!(request.created_at_argon_block_number, 7);
+			assert_eq!(VaultViewOfOrphanedUtxoCosigns::get()[&1][&2], 1);
+			let invalid_ref = UtxoRef { txid: H256Le([1; 32]), output_index: 1 };
+			assert!(OrphanedUtxosByAccount::<Test>::get(2, &invalid_ref)
+				.unwrap()
+				.cosign_request
+				.is_none());
+			assert_ok!(BitcoinLocks::request_orphaned_utxo_release(
+				RuntimeOrigin::signed(2),
+				invalid_ref,
+				script,
+				1_000
+			));
+			assert_eq!(VaultViewOfOrphanedUtxoCosigns::get()[&1][&2], 2);
+		});
 	}
 }

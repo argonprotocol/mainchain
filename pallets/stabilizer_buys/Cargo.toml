@@ -18,6 +18,9 @@ pallet-prelude = { workspace = true }
 argon-primitives = { workspace = true }
 
 [dev-dependencies]
+# repayment_remainder_stays_held_until_collect_makes_release_possible checks retained claims and
+# principal holds across the real Collect transfer and provider-reference lifecycle.
+pallet-treasury-positions = { workspace = true }
 polkadot-sdk = { workspace = true, features = ["sp-io", "pallet-balances"], default-features = true }
 pallet-prelude = { workspace = true, features = ["test"], default-features = true }
 

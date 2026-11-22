@@ -34,18 +34,21 @@ pub mod weights;
 pub mod pallet {
 	use super::*;
 	use alloc::collections::BTreeSet;
-	use argon_bitcoin::{primitives::BitcoinLockId, CosignScript, CosignScriptArgs};
+	use argon_bitcoin::{CosignScript, CosignScriptArgs};
 	use argon_primitives::{
 		bitcoin::{
 			get_rounded_up_bitcoin_day_height, BitcoinCosignScriptPubkey, BitcoinHeight,
 			BitcoinNetwork, BitcoinXPub, CompressedBitcoinPubkey, OpaqueBitcoinXpub, Satoshis,
 		},
-		treasury::TreasuryPositionProvider,
+		treasury::{
+			CollectAmounts, CollectSource, TreasuryPositionProvider, VaultEarningsProvider,
+		},
 		vault::{
-			BitcoinLockFunding, BitcoinVaultProvider, CosignerGuarantee, LostBitcoinCompensation,
-			RegistrationVaultData, ReserveSecuritizationRequest, TreasuryVaultProvider, Vault,
-			VaultArgonotSecuritization, VaultError, VaultParticipationCapacity,
-			VaultSecuritization, VaultTerms, VaultTreasuryFrameEarnings,
+			BitcoinLockFunding, BitcoinVaultProvider, CosignRequest, CosignerGuarantee,
+			LostBitcoinCompensation, RegistrationVaultData, ReserveSecuritizationRequest,
+			TreasuryVaultProvider, Vault, VaultArgonotSecuritization, VaultError,
+			VaultParticipationCapacity, VaultSecuritization, VaultTerms,
+			VaultTreasuryFrameEarnings,
 		},
 		AmountRankKey, CollectBlockerProvider, MiningFrameProvider, OnNewSlot,
 		OperationalAccountProvider, OperationalAccountsHook, OperationalAccountsHookWeightInfo,
@@ -55,7 +58,7 @@ pub mod pallet {
 	use frame_support::traits::Incrementable;
 	use sp_runtime::traits::SaturatedConversion;
 
-	pub(super) const STORAGE_VERSION: StorageVersion = StorageVersion::new(20);
+	pub(super) const STORAGE_VERSION: StorageVersion = StorageVersion::new(21);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -203,20 +206,18 @@ pub mod pallet {
 		ValueQuery,
 	>;
 
-	/// Bitcoin Locks pending cosign by vault id
+	/// Pending signing requests ordered by their Collect due frame within each vault.
+	/// Big-endian frame bytes put the earliest obligation first in storage iteration.
 	#[pallet::storage]
-	pub type PendingCosignByVaultId<T: Config> = StorageMap<
+	pub type PendingCosignsByVault<T: Config> = StorageDoubleMap<
 		_,
 		Twox64Concat,
 		VaultId,
-		BoundedBTreeSet<BitcoinLockId, T::MaxPendingCosignsPerVault>,
-		ValueQuery,
+		Identity,
+		([u8; 8], CosignRequest<T::AccountId>),
+		(),
+		OptionQuery,
 	>;
-
-	/// Orphaned Bitcoin Utxos pending cosign by vault id
-	#[pallet::storage]
-	pub type OrphanedUtxoAccountsByVaultId<T: Config> =
-		StorageDoubleMap<_, Twox64Concat, VaultId, Blake2_128Concat, T::AccountId, u32, ValueQuery>;
 
 	/// The vaults that have funds releasing at a given bitcoin height
 	#[pallet::storage]
@@ -414,6 +415,10 @@ pub mod pallet {
 		OperationalAccountRegistrationRequired,
 		/// Held Argonots cannot be reduced below the amount already crosschain-encumbered.
 		ArgonotsBelowEncumberedBacking,
+		/// The vault's frame ledger differs from its aggregate earnings in Positions.
+		VaultRevenueMismatch,
+		/// Vault revenue must be moved from legacy holds into Collect custody first.
+		CollectMigrationIncomplete,
 	}
 
 	impl<T> From<VaultError> for Error<T> {
@@ -648,8 +653,7 @@ pub mod pallet {
 			terms: VaultTerms<T::Balance>,
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
-			let mut vault =
-				VaultsById::<T>::get(vault_id).ok_or::<Error<T>>(Error::<T>::VaultNotFound)?;
+			let mut vault = VaultsById::<T>::get(vault_id).ok_or(Error::<T>::VaultNotFound)?;
 
 			ensure!(vault.operator_account_id == who, Error::<T>::NoPermissions);
 			ensure!(vault.pending_terms.is_none(), Error::<T>::TermsChangeAlreadyScheduled);
@@ -680,8 +684,7 @@ pub mod pallet {
 		pub fn close(origin: OriginFor<T>, vault_id: VaultId) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
-			let mut vault =
-				VaultsById::<T>::get(vault_id).ok_or::<Error<T>>(Error::<T>::VaultNotFound)?;
+			let mut vault = VaultsById::<T>::get(vault_id).ok_or(Error::<T>::VaultNotFound)?;
 
 			ensure!(vault.operator_account_id == who, Error::<T>::NoPermissions);
 			let previous_reward_securitization =
@@ -718,8 +721,7 @@ pub mod pallet {
 		) -> DispatchResult {
 			let who = ensure_signed(origin)?;
 
-			let vault =
-				VaultsById::<T>::get(vault_id).ok_or::<Error<T>>(Error::<T>::VaultNotFound)?;
+			let vault = VaultsById::<T>::get(vault_id).ok_or(Error::<T>::VaultNotFound)?;
 
 			ensure!(vault.operator_account_id == who, Error::<T>::NoPermissions);
 
@@ -739,48 +741,6 @@ pub mod pallet {
 			Self::deposit_event(Event::VaultBitcoinXpubChange { vault_id });
 
 			Ok(())
-		}
-
-		#[pallet::call_index(5)]
-		#[pallet::weight(T::WeightInfo::collect())]
-		pub fn collect(origin: OriginFor<T>, vault_id: VaultId) -> DispatchResult {
-			let who = ensure_signed(origin)?;
-			let vault =
-				VaultsById::<T>::get(vault_id).ok_or::<Error<T>>(Error::<T>::VaultNotFound)?;
-
-			ensure!(vault.operator_account_id == who, Error::<T>::NoPermissions);
-			let pending_cosigns = PendingCosignByVaultId::<T>::get(vault_id);
-			ensure!(pending_cosigns.is_empty(), Error::<T>::PendingCosignsBeforeCollect);
-			let has_orphan_cosigns =
-				OrphanedUtxoAccountsByVaultId::<T>::iter_prefix(vault_id).next().is_some();
-			ensure!(!has_orphan_cosigns, Error::<T>::PendingOrphanedUtxoCosignsBeforeCollect);
-			ensure!(
-				!T::CollectBlockerProvider::has_overdue_collect_blocker(&who),
-				Error::<T>::OverdueCollectBlockersBeforeCollect,
-			);
-
-			LastCollectFrameByVaultId::<T>::insert(vault_id, T::CurrentFrameId::get());
-			RevenuePerFrameByVault::<T>::try_mutate(vault_id, |a| {
-				for frame in a {
-					let _ = frame.collect();
-				}
-				// use true amount on hold
-				let amount_to_collect =
-					T::Currency::balance_on_hold(&HoldReason::PendingCollect.into(), &who);
-				if amount_to_collect > T::Balance::zero() {
-					T::Currency::release(
-						&HoldReason::PendingCollect.into(),
-						&who,
-						amount_to_collect,
-						Precision::Exact,
-					)?;
-					Self::deposit_event(Event::VaultCollected {
-						vault_id,
-						revenue: amount_to_collect,
-					});
-				}
-				Ok(())
-			})
 		}
 
 		#[pallet::call_index(6)]
@@ -1292,69 +1252,165 @@ pub mod pallet {
 		}
 	}
 
+	impl<T: Config> Pallet<T> {
+		fn ensure_collect_allowed(who: &T::AccountId, vault_id: VaultId) -> Result<(), Error<T>> {
+			let vault = VaultsById::<T>::get(vault_id).ok_or(Error::<T>::VaultNotFound)?;
+
+			ensure!(vault.operator_account_id == *who, Error::<T>::NoPermissions);
+			ensure!(
+				StorageVersion::get::<Self>() == STORAGE_VERSION,
+				Error::<T>::CollectMigrationIncomplete
+			);
+			if let Some((frame, _)) = PendingCosignsByVault::<T>::iter_key_prefix(vault_id).next() {
+				ensure!(
+					u64::from_be_bytes(frame) > T::CurrentFrameId::get(),
+					Error::<T>::PendingCosignsBeforeCollect
+				);
+			}
+			ensure!(
+				!T::CollectBlockerProvider::has_overdue_collect_blocker(who),
+				Error::<T>::OverdueCollectBlockersBeforeCollect,
+			);
+
+			Ok(())
+		}
+
+		fn fund_fee_earnings(
+			payer: &T::AccountId,
+			operator: &T::AccountId,
+			amount: T::Balance,
+		) -> DispatchResult {
+			ensure!(
+				StorageVersion::get::<Self>() == STORAGE_VERSION,
+				Error::<T>::CollectMigrationIncomplete
+			);
+			T::PositionProvider::prepare_collect()?;
+			let custody =
+				T::PositionProvider::collect_account().ok_or(DispatchError::Unavailable)?;
+			let funding = T::Currency::withdraw(
+				payer,
+				amount,
+				Precision::Exact,
+				Preservation::Expendable,
+				Fortitude::Force,
+			)?;
+			T::Currency::resolve(&custody, funding).map_err(|_| TokenError::BelowMinimum)?;
+			T::PositionProvider::record_funding(CollectAmounts::from_source(
+				CollectSource::Vaults,
+				amount,
+			));
+			T::PositionProvider::accrue(operator, CollectSource::Vaults, amount)
+		}
+	}
+
+	impl<T: Config> VaultEarningsProvider<T::AccountId, T::Balance> for Pallet<T> {
+		type Weights = weights::VaultEarningsWeights<T>;
+
+		fn collect_earnings(
+			account: &T::AccountId,
+			amount: T::Balance,
+		) -> Result<bool, DispatchError> {
+			let Some(vault_id) = VaultIdByOperator::<T>::get(account) else {
+				ensure!(amount.is_zero(), Error::<T>::VaultNotFound);
+				return Ok(false)
+			};
+			match Self::ensure_collect_allowed(account, vault_id) {
+				Ok(()) => {},
+				Err(
+					Error::<T>::PendingCosignsBeforeCollect |
+					Error::<T>::PendingOrphanedUtxoCosignsBeforeCollect |
+					Error::<T>::OverdueCollectBlockersBeforeCollect,
+				) => return Ok(false),
+				Err(error) => return Err(error.into()),
+			}
+
+			let current_frame = T::CurrentFrameId::get();
+			let expired_frame =
+				current_frame.checked_sub(T::RevenueCollectionExpirationFrames::get());
+			RevenuePerFrameByVault::<T>::try_mutate(
+				vault_id,
+				|revenue| -> Result<bool, DispatchError> {
+					if revenue.iter().any(|frame| {
+						expired_frame.is_some_and(|expired| frame.frame_id <= expired) &&
+							!frame.uncollected_revenue.is_zero()
+					}) {
+						return Ok(false)
+					}
+					let available = revenue.iter().fold(T::Balance::zero(), |sum, frame| {
+						sum.saturating_add(frame.uncollected_revenue)
+					});
+					ensure!(available == amount, Error::<T>::VaultRevenueMismatch);
+					for frame in revenue {
+						frame.collect();
+					}
+					LastCollectFrameByVaultId::<T>::insert(vault_id, current_frame);
+					if !amount.is_zero() {
+						Self::deposit_event(Event::VaultCollected { vault_id, revenue: amount });
+					}
+					Ok(true)
+				},
+			)
+		}
+	}
+
 	impl<T: Config> OnNewSlot<T::AccountId> for Pallet<T> {
 		type Key = BlockSealAuthorityId;
 		fn on_frame_start(frame_id: FrameId) {
+			if StorageVersion::get::<Self>() != STORAGE_VERSION {
+				return
+			}
 			let ended_frame_id = frame_id.saturating_sub(1);
 			let collect_expired_frame =
-				frame_id.saturating_sub(T::RevenueCollectionExpirationFrames::get());
+				frame_id.checked_sub(T::RevenueCollectionExpirationFrames::get());
 			let vaults = RevenuePerFrameByVault::<T>::iter_keys().collect::<Vec<_>>();
 			for vault_id in vaults {
-				let mut is_empty = false;
-				let _ = RevenuePerFrameByVault::<T>::try_mutate(vault_id, |frame_revenue| {
-					for revenue in frame_revenue.iter_mut() {
-						if revenue.frame_id == ended_frame_id {
-							// gather activation and securitization for the ending frame
+				let result = with_storage_layer(|| -> DispatchResult {
+					let mut is_empty = false;
+					RevenuePerFrameByVault::<T>::try_mutate(
+						vault_id,
+						|frames| -> DispatchResult {
 							let vault =
-								VaultsById::<T>::get(vault_id).ok_or(VaultError::VaultNotFound)?;
-							revenue.securitization_activated = vault.get_activated_securitization();
-							revenue.securitization_relockable = vault.get_relock_capacity();
-							revenue.securitization = vault.securitization;
-						}
-						if revenue.frame_id <= collect_expired_frame &&
-							revenue.uncollected_revenue > T::Balance::zero()
-						{
-							let vault =
-								VaultsById::<T>::get(vault_id).ok_or(VaultError::VaultNotFound)?;
-							if let Err(e) = T::Currency::burn_held(
-								&HoldReason::PendingCollect.into(),
-								&vault.operator_account_id,
-								revenue.uncollected_revenue,
-								Precision::Exact,
-								Fortitude::Force,
-							) {
-								log::error!(
-									"Error burning uncollected funds for vault {vault_id}, frame {frame_id}: {e:?}"
-								);
-								continue;
+								VaultsById::<T>::get(vault_id).ok_or(Error::<T>::VaultNotFound)?;
+							for revenue in frames.iter_mut() {
+								if revenue.frame_id == ended_frame_id {
+									revenue.securitization_activated =
+										vault.get_activated_securitization();
+									revenue.securitization_relockable = vault.get_relock_capacity();
+									revenue.securitization = vault.securitization;
+								}
+								if collect_expired_frame
+									.is_some_and(|expired| revenue.frame_id <= expired) &&
+									!revenue.uncollected_revenue.is_zero()
+								{
+									T::PositionProvider::expire_vault_earnings(
+										&vault.operator_account_id,
+										revenue.uncollected_revenue,
+									)?;
+									Self::deposit_event(Event::VaultRevenueUncollected {
+										vault_id,
+										frame_id: revenue.frame_id,
+										amount: revenue.uncollected_revenue,
+									});
+								}
 							}
-							log::info!(
-								"Burning uncollected revenue for vault {}, frame {}: {:?}",
-								vault_id,
-								frame_id,
-								revenue.uncollected_revenue
-							);
-							Self::deposit_event(Event::VaultRevenueUncollected {
-								vault_id,
-								frame_id: revenue.frame_id,
-								amount: revenue.uncollected_revenue,
+							frames.retain(|revenue| {
+								collect_expired_frame
+									.is_none_or(|expired| revenue.frame_id > expired)
 							});
-						}
-					}
-					frame_revenue.retain(|a| a.frame_id > collect_expired_frame);
-					if frame_revenue.is_empty() {
-						is_empty = true;
+							is_empty = frames.is_empty();
+							Ok(())
+						},
+					)?;
+					if is_empty {
+						RevenuePerFrameByVault::<T>::remove(vault_id);
+						RevenuePerFrameByVaultCount::<T>::mutate(|count| {
+							count.saturating_reduce(1)
+						});
 					}
 					Ok(())
-				})
-				.inspect_err(|err: &VaultError| {
-					log::error!("Error processing frame revenue for vault {vault_id}: {err:?}");
 				});
-				if is_empty {
-					RevenuePerFrameByVault::<T>::remove(vault_id);
-					RevenuePerFrameByVaultCount::<T>::mutate(|count| {
-						*count = count.saturating_sub(1);
-					});
+				if let Err(error) = result {
+					log::error!("Error processing frame revenue for vault {vault_id}: {error:?}");
 				}
 			}
 		}
@@ -1509,6 +1565,10 @@ pub mod pallet {
 			ensure!(earnings_for_vault <= funding.peek(), TokenError::FundsUnavailable);
 
 			let payment_result = with_storage_layer(|| {
+				ensure!(
+					StorageVersion::get::<Self>() == STORAGE_VERSION,
+					Error::<T>::CollectMigrationIncomplete
+				);
 				Self::mutate_frame_revenue(vault_id, frame_id, |revenue| {
 					revenue.treasury_total_earnings = earnings;
 					revenue.treasury_vault_earnings = earnings_for_vault;
@@ -1524,14 +1584,17 @@ pub mod pallet {
 					return Ok(None);
 				}
 
-				let paid = T::Currency::deposit(
-					&vault_operator_account_id,
+				T::PositionProvider::prepare_collect()?;
+				let custody =
+					T::PositionProvider::collect_account().ok_or(DispatchError::Unavailable)?;
+				let paid = T::Currency::deposit(&custody, earnings_for_vault, Precision::Exact)?;
+				T::PositionProvider::record_funding(CollectAmounts::from_source(
+					CollectSource::Vaults,
 					earnings_for_vault,
-					Precision::Exact,
-				)?;
-				T::Currency::hold(
-					&HoldReason::PendingCollect.into(),
+				));
+				T::PositionProvider::accrue(
 					&vault_operator_account_id,
+					CollectSource::Vaults,
 					earnings_for_vault,
 				)?;
 				Ok(Some(paid))
@@ -1838,19 +1901,12 @@ pub mod pallet {
 
 			// do this second so the 'provider' is already on the account
 			if fee_due > T::Balance::zero() {
-				T::Currency::transfer_and_hold(
-					&HoldReason::PendingCollect.into(),
-					account_id,
-					&vault.operator_account_id,
-					fee_due,
-					Precision::Exact,
-					Preservation::Expendable,
-					Fortitude::Force,
-				)
-				.map_err(|e| match e {
-					Token(TokenError::BelowMinimum) => VaultError::AccountWouldBeBelowMinimum,
-					_ => VaultError::InsufficientFunds,
-				})?;
+				Self::fund_fee_earnings(account_id, &vault.operator_account_id, fee_due).map_err(
+					|e| match e {
+						Token(TokenError::BelowMinimum) => VaultError::AccountWouldBeBelowMinimum,
+						_ => VaultError::InsufficientFunds,
+					},
+				)?;
 			}
 
 			vault
@@ -1981,19 +2037,12 @@ pub mod pallet {
 
 			let fee_due = total_fee.saturating_sub(fee_discount);
 			if !fee_due.is_zero() {
-				T::Currency::transfer_and_hold(
-					&HoldReason::PendingCollect.into(),
-					account_id,
-					&vault.operator_account_id,
-					fee_due,
-					Precision::Exact,
-					Preservation::Expendable,
-					Fortitude::Force,
-				)
-				.map_err(|e| match e {
-					Token(TokenError::BelowMinimum) => VaultError::AccountWouldBeBelowMinimum,
-					_ => VaultError::InsufficientFunds,
-				})?;
+				Self::fund_fee_earnings(account_id, &vault.operator_account_id, fee_due).map_err(
+					|e| match e {
+						Token(TokenError::BelowMinimum) => VaultError::AccountWouldBeBelowMinimum,
+						_ => VaultError::InsufficientFunds,
+					},
+				)?;
 			}
 
 			T::OperationalAccountsHook::vault_bitcoin_lock_funded(
@@ -2296,39 +2345,18 @@ pub mod pallet {
 			))
 		}
 
-		fn update_pending_cosign_list(
+		fn update_pending_cosign(
 			vault_id: VaultId,
-			lock_id: BitcoinLockId,
+			collect_due_frame: FrameId,
+			request: CosignRequest<T::AccountId>,
 			should_remove: bool,
-		) -> Result<(), VaultError> {
-			PendingCosignByVaultId::<T>::try_mutate(vault_id, |pending| {
-				if should_remove {
-					pending.remove(&lock_id);
-				} else {
-					pending.try_insert(lock_id).map_err(|_| VaultError::InternalError)?;
-				}
-				Ok(())
-			})
-		}
-
-		fn update_orphan_cosign_list(
-			vault_id: VaultId,
-			_lock_id: BitcoinLockId,
-			account_id: &Self::AccountId,
-			should_remove: bool,
-		) -> Result<(), VaultError> {
-			let count = OrphanedUtxoAccountsByVaultId::<T>::mutate(vault_id, account_id, |count| {
-				if should_remove {
-					count.saturating_reduce(1);
-				} else {
-					count.saturating_accrue(1);
-				}
-				*count
-			});
-			if count == 0 {
-				OrphanedUtxoAccountsByVaultId::<T>::remove(vault_id, account_id);
+		) {
+			let key = (collect_due_frame.to_be_bytes(), request);
+			if should_remove {
+				PendingCosignsByVault::<T>::remove(vault_id, key);
+			} else {
+				PendingCosignsByVault::<T>::insert(vault_id, key, ());
 			}
-			Ok(())
 		}
 	}
 

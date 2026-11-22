@@ -19,8 +19,8 @@ use argon_primitives::{
 		BitcoinXPub, CompressedBitcoinPubkey, H256Le, NetworkKind, Satoshis, UtxoRef,
 	},
 	vault::{
-		BitcoinLockFunding, BitcoinVaultProvider, CosignerGuarantee, LostBitcoinCompensation,
-		ReserveSecuritizationRequest, Vault, VaultError, VaultTerms,
+		BitcoinLockFunding, BitcoinVaultProvider, CosignRequest, CosignerGuarantee,
+		LostBitcoinCompensation, ReserveSecuritizationRequest, Vault, VaultError, VaultTerms,
 	},
 	ArgonCPI, BitcoinUtxoEvents, BitcoinUtxoTracker, BlockRewardAccountsProvider,
 	MiningFrameProvider, MiningFrameTransitionProvider, OperationalAccountsHook, PriceProvider,
@@ -541,44 +541,41 @@ impl BitcoinVaultProvider for StaticVaultProvider {
 		))
 	}
 
-	fn update_pending_cosign_list(
+	fn update_pending_cosign(
 		vault_id: VaultId,
-		lock_id: BitcoinLockId,
+		_collect_due_frame: FrameId,
+		request: CosignRequest<Self::AccountId>,
 		should_remove: bool,
-	) -> Result<(), VaultError> {
-		VaultViewOfCosignPendingLocks::mutate(|l| {
-			let list = l.entry(vault_id).or_default();
-			if should_remove {
-				list.remove(&lock_id);
-			} else {
-				list.insert(lock_id);
-			}
-		});
-		Ok(())
-	}
-
-	fn update_orphan_cosign_list(
-		vault_id: VaultId,
-		_lock_id: BitcoinLockId,
-		account_id: &Self::AccountId,
-		should_remove: bool,
-	) -> Result<(), VaultError> {
-		VaultViewOfOrphanedUtxoCosigns::mutate(|x| {
-			let vault_map = x.entry(vault_id).or_default();
-			let count = vault_map.entry(*account_id).or_default();
-			if should_remove {
-				*count = count.saturating_sub(1);
-				if *count == 0 {
-					vault_map.remove(account_id);
-				}
-			} else {
-				*count = count.saturating_add(1);
-			}
-			if vault_map.is_empty() {
-				x.remove(&vault_id);
-			}
-		});
-		Ok(())
+	) {
+		match request {
+			CosignRequest::Lock(lock_id) => {
+				VaultViewOfCosignPendingLocks::mutate(|pending| {
+					let entries = pending.entry(vault_id).or_default();
+					if should_remove {
+						entries.remove(&lock_id);
+					} else {
+						entries.insert(lock_id);
+					}
+				});
+			},
+			CosignRequest::Orphan { owner, .. } => {
+				VaultViewOfOrphanedUtxoCosigns::mutate(|pending| {
+					let entries = pending.entry(vault_id).or_default();
+					let count = entries.entry(owner).or_default();
+					if should_remove {
+						*count = count.saturating_sub(1);
+					} else {
+						*count = count.saturating_add(1);
+					}
+					if *count == 0 {
+						entries.remove(&owner);
+					}
+					if entries.is_empty() {
+						pending.remove(&vault_id);
+					}
+				});
+			},
+		}
 	}
 
 	fn record_bitcoin_lock_funding(

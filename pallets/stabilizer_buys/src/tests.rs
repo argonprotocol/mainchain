@@ -1,20 +1,17 @@
-use crate::{migrations::InitializeApprovedPoolRevisionMigration, mock::*, *};
+use crate::{mock::*, *};
 use argon_primitives::{AscendingRankKey, GatewayState, PriceIndexUpdated, RValueHighWaterMark};
 use frame_support::{
 	assert_noop, assert_ok,
 	storage::{unhashed, with_storage_layer},
-	traits::{Hooks, OnRuntimeUpgrade},
+	traits::Hooks,
 };
+use pallet_treasury_positions::PositionsByAccount;
 
 #[test]
 fn approved_pool_revision_changes_only_when_the_pool_changes() {
 	new_test_ext().execute_with(|| {
 		let original_pool = Pool::get();
-		StorageVersion::new(1).put::<StabilizerBuys>();
-		assert!(!ApprovedPoolRevision::<Test>::exists());
-		InitializeApprovedPoolRevisionMigration::<Test>::on_runtime_upgrade();
-		assert!(ApprovedPoolRevision::<Test>::exists());
-		assert_eq!(ApprovedPool::<Test>::get(), Some(original_pool.clone()));
+		ApprovedPoolRevision::<Test>::put(0);
 
 		assert_ok!(StabilizerBuys::set_approved_pool(
 			RuntimeOrigin::root(),
@@ -59,11 +56,12 @@ fn cheap_bids_do_not_admit_the_excluded_matching_basis() {
 		}
 
 		for account in 10..19 {
-			assert_eq!(Balances::free_balance(account), 105_000_000);
+			assert_eq!(Balances::free_balance(account), 100_000_000);
+			assert_eq!(collect_accrued(account).stabilizer_buy_earnings, 5_000_000);
 		}
 		assert_eq!(Balances::free_balance(19), 100_000_000);
 		assert_eq!(Budget::available_budget(), 55_000_000);
-		assert_eq!(Budget::outstanding_rewards(), 0);
+
 		assert!(AuctionAllocationQueue::<Test>::iter().next().is_none());
 		assert!(PayoutQueue::<Test>::iter().next().is_none());
 	});
@@ -83,14 +81,16 @@ fn lowering_a_bid_moves_its_matching_basis_ahead_of_the_cutoff() {
 		CurrentFrame::set(1 + PurchaseHoldFrames::get());
 		StabilizerBuys::on_initialize(2);
 
-		assert_eq!(Balances::free_balance(2), 1_004_900_000);
-		assert_eq!(Balances::free_balance(1), 1_004_000_000);
+		assert_eq!(Balances::free_balance(2), 1_000_000_000);
+		assert_eq!(collect_accrued(2).stabilizer_buy_earnings, 4_900_000);
+		assert_eq!(Balances::free_balance(1), 1_000_000_000);
+		assert_eq!(collect_accrued(1).stabilizer_buy_earnings, 4_000_000);
 		assert_eq!(Budget::available_budget(), 91_100_000);
 	});
 }
 
 #[test]
-fn a_lone_bidder_is_paid_their_rate_on_only_the_included_matching_basis() {
+fn a_lone_bidder_earns_their_rate_on_only_the_included_matching_basis() {
 	new_test_ext().execute_with(|| {
 		assert_ok!(record_purchase(&1, &purchase()));
 		start_frame(2);
@@ -99,7 +99,8 @@ fn a_lone_bidder_is_paid_their_rate_on_only_the_included_matching_basis() {
 		CurrentFrame::set(1 + PurchaseHoldFrames::get());
 		StabilizerBuys::on_initialize(2);
 
-		assert_eq!(Balances::free_balance(1), 1_004_500_000);
+		assert_eq!(Balances::free_balance(1), 1_000_000_000);
+		assert_eq!(collect_accrued(1).stabilizer_buy_earnings, 4_500_000);
 		assert_eq!(Budget::available_budget(), 95_500_000);
 		assert_eq!(Balances::balance_on_hold(&HoldReason::PurchasePrincipal.into(), &1), 0);
 	});
@@ -115,7 +116,8 @@ fn a_lone_full_rate_bid_receives_ninety_percent_of_its_matching_basis() {
 		CurrentFrame::set(1 + PurchaseHoldFrames::get());
 		StabilizerBuys::on_initialize(2);
 
-		assert_eq!(Balances::free_balance(1), 1_009_000_000);
+		assert_eq!(Balances::free_balance(1), 1_000_000_000);
+		assert_eq!(collect_accrued(1).stabilizer_buy_earnings, 9_000_000);
 		assert_eq!(Budget::available_budget(), 91_000_000);
 	});
 }
@@ -139,8 +141,10 @@ fn equal_rate_bids_prioritize_larger_matching_bases_and_partially_include_the_bo
 		CurrentFrame::set(1 + PurchaseHoldFrames::get());
 		StabilizerBuys::on_initialize(2);
 
-		assert_eq!(Balances::free_balance(2), 1_005_000_000);
-		assert_eq!(Balances::free_balance(1), 1_001_750_000);
+		assert_eq!(Balances::free_balance(2), 1_000_000_000);
+		assert_eq!(collect_accrued(2).stabilizer_buy_earnings, 5_000_000);
+		assert_eq!(Balances::free_balance(1), 1_000_000_000);
+		assert_eq!(collect_accrued(1).stabilizer_buy_earnings, 1_750_000);
 		assert_eq!(Budget::available_budget(), 93_250_000);
 	});
 }
@@ -354,7 +358,7 @@ fn repayment_without_a_premium_still_collects_cheaper_quotes_and_keeps_the_full_
 #[test]
 fn waiting_repayments_do_not_block_other_accounts_and_the_queue_wraps_after_removal() {
 	new_test_ext().execute_with(|| {
-		// Account 1 also has an earlier ordinary buy: its funds must wait with its repayment.
+		// Account 1 also has earlier ordinary-buy principal held through its repayment.
 		CurrentFrame::set(0);
 		StabilizerBuys::on_price_index(&price_index(0), None);
 		assert_ok!(record_purchase(&1, &UniswapPurchase { tick: 0, ..purchase() }));
@@ -396,7 +400,8 @@ fn waiting_repayments_do_not_block_other_accounts_and_the_queue_wraps_after_remo
 		);
 		StabilizerBuys::on_initialize(3);
 		assert_eq!(Balances::balance_on_hold(&HoldReason::PurchasePrincipal.into(), &3), 0);
-		assert_eq!(Balances::free_balance(3), 1_009_000_000);
+		assert_eq!(Balances::free_balance(3), 1_000_000_000);
+		assert_eq!(collect_accrued(3).stabilizer_buy_earnings, 9_000_000);
 		for (account, held_principal) in [(1, buy.principal * 2), (2, buy.principal)] {
 			assert!(StabilizerBuys::has_pending_repayment(&account, 42));
 			assert_eq!(
@@ -404,7 +409,7 @@ fn waiting_repayments_do_not_block_other_accounts_and_the_queue_wraps_after_remo
 				held_principal
 			);
 		}
-		assert_eq!(PayoutStateByAccount::<Test>::get(1).payable_reward, 9_000_000);
+		assert_eq!(collect_accrued(1).stabilizer_buy_earnings, 9_000_000);
 		assert_eq!(Balances::free_balance(1), 800_000_000);
 
 		MaxPriceWindowSteps::set(64);
@@ -416,6 +421,7 @@ fn waiting_repayments_do_not_block_other_accounts_and_the_queue_wraps_after_remo
 		assert!(PendingPriceWindowCountByTick::<Test>::iter().next().is_none());
 		for (account, expected_balance) in [(1, 1_009_000_000), (2, 1_000_000_000)] {
 			assert!(!StabilizerBuys::has_pending_repayment(&account, 42));
+			assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(account)));
 			assert_eq!(Balances::free_balance(account), expected_balance);
 		}
 	});
@@ -573,7 +579,7 @@ fn delayed_purchase_window_excludes_earlier_spikes_and_maturity_frame_through_re
 }
 
 #[test]
-fn outer_failure_rolls_back_completed_reward_allocation_and_payment() {
+fn outer_failure_rolls_back_awards_principal_and_collect_backing() {
 	new_test_ext().execute_with(|| {
 		assert_ok!(record_purchase(&1, &purchase()));
 		start_frame(2);
@@ -585,7 +591,8 @@ fn outer_failure_rolls_back_completed_reward_allocation_and_payment() {
 		assert_noop!(
 			with_storage_layer(|| -> DispatchResult {
 				StabilizerBuys::on_initialize(2);
-				assert_eq!(Balances::free_balance(1), 1_004_500_000);
+				assert_eq!(Balances::free_balance(1), 1_000_000_000);
+				assert_eq!(collect_accrued(1).stabilizer_buy_earnings, 4_500_000);
 				assert_eq!(Balances::total_issuance(), issuance + 4_500_000);
 				assert_eq!(Budget::available_budget(), 95_500_000);
 				assert!(BidsByAuction::<Test>::iter_prefix(1).next().is_none());
@@ -603,14 +610,15 @@ fn outer_failure_rolls_back_completed_reward_allocation_and_payment() {
 			100_000_000
 		);
 		assert_eq!(Budget::available_budget(), 91_000_000);
-		assert_eq!(Budget::outstanding_rewards(), 0);
+
 		assert_eq!(Auctions::<Test>::get(1).unwrap().remaining_budget, 9_000_000);
 		assert_eq!(BidsByAuction::<Test>::iter_prefix(1).count(), 1);
 		assert_eq!(AuctionAllocationQueue::<Test>::iter().count(), 1);
 		assert_eq!(PayoutQueue::<Test>::iter().count(), 1);
 
 		StabilizerBuys::on_initialize(3);
-		assert_eq!(Balances::free_balance(1), 1_004_500_000);
+		assert_eq!(Balances::free_balance(1), 1_000_000_000);
+		assert_eq!(collect_accrued(1).stabilizer_buy_earnings, 4_500_000);
 		assert_eq!(Balances::total_issuance(), issuance + 4_500_000);
 		assert_eq!(Budget::available_budget(), 95_500_000);
 	});
@@ -738,7 +746,6 @@ fn matching_rounds_after_account_aggregation_and_zero_rate_stays_frozen() {
 			Balances::balance_on_hold(&HoldReason::PurchasePrincipal.into(), &1),
 			purchase.principal
 		);
-		assert_eq!(Budget::outstanding_rewards(), 0);
 
 		CurrentFrame::set(3 + PurchaseHoldFrames::get());
 		StabilizerBuys::on_initialize(3);
@@ -750,7 +757,7 @@ fn matching_rounds_after_account_aggregation_and_zero_rate_stays_frozen() {
 }
 
 #[test]
-fn reward_and_principal_pay_automatically_at_maturity_and_never_before_it() {
+fn maturity_releases_principal_and_backs_rewards_until_manual_collect() {
 	new_test_ext().execute_with(|| {
 		let issuance = Balances::total_issuance();
 		assert_ok!(record_purchase(&1, &purchase()));
@@ -765,7 +772,7 @@ fn reward_and_principal_pay_automatically_at_maturity_and_never_before_it() {
 		assert!(AuctionAllocationQueue::<Test>::contains_key(AscendingRankKey::new(maturity, 1)));
 		CurrentFrame::set(maturity - 1);
 		StabilizerBuys::on_initialize(2);
-		assert_eq!(Budget::outstanding_rewards(), 0);
+
 		assert_eq!(Balances::total_issuance(), issuance);
 		assert_eq!(Balances::free_balance(1), 900_000_000);
 		assert_eq!(BidsByAuction::<Test>::iter_prefix(1).count(), 1);
@@ -774,15 +781,26 @@ fn reward_and_principal_pay_automatically_at_maturity_and_never_before_it() {
 		CurrentFrame::set(maturity);
 		StabilizerBuys::on_initialize(3);
 		assert_eq!(Balances::total_issuance(), issuance + 4_500_000);
-		assert_eq!(Balances::free_balance(1), 1_004_500_000);
+		assert_eq!(Balances::free_balance(1), 1_000_000_000);
+		assert_eq!(collect_accrued(1).stabilizer_buy_earnings, 4_500_000);
 		assert_eq!(Balances::balance_on_hold(&HoldReason::PurchasePrincipal.into(), &1), 0);
-		assert_eq!(Budget::outstanding_rewards(), 0);
+
 		assert_eq!(Budget::available_budget(), 195_500_000);
 		assert_eq!(Auctions::<Test>::get(1).unwrap().remaining_budget, 0);
 		assert!(AuctionAllocationQueue::<Test>::iter().next().is_none());
-		assert!(!PayoutStateByAccount::<Test>::contains_key(1));
+		assert!(!NextSettlementFrameByAccount::<Test>::contains_key(1));
 		StabilizerBuys::on_initialize(4);
 		assert_eq!(Balances::total_issuance(), issuance + 4_500_000);
+		CurrentFrame::set(maturity + 1_000);
+		assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(1)));
+		assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(1)));
+		assert_eq!(Balances::free_balance(1), 1_004_500_000);
+		assert_eq!(Balances::total_issuance(), issuance + 4_500_000);
+		assert_eq!(Balances::balance(&TreasuryPositions::account_id()), 10_000);
+		assert_eq!(
+			PositionsByAccount::<Test>::get(1).unwrap().collected.stabilizer_buy_earnings,
+			4_500_000
+		);
 	});
 }
 
@@ -808,18 +826,21 @@ fn bounded_allocation_ranks_bids_and_shares_the_funding_shortfall_proportionally
 		CurrentFrame::set(1 + PurchaseHoldFrames::get());
 		StabilizerBuys::on_initialize(2);
 		assert_eq!(Balances::free_balance(1), 1_000_000_000);
-		assert_eq!(Balances::free_balance(255), 101_666_666);
+		assert_eq!(Balances::free_balance(255), 100_000_000);
+		assert_eq!(collect_accrued(255).stabilizer_buy_earnings, 1_666_666);
 		assert_eq!(Balances::free_balance(256), 0);
-		assert_eq!(PayoutStateByAccount::<Test>::get(256).payable_reward, 1_666_666);
+		assert_eq!(collect_accrued(256).stabilizer_buy_earnings, 1_666_666);
 		assert_eq!(BidsByAuction::<Test>::iter_prefix(1).count(), 1);
 		assert_eq!(Budget::available_budget(), 0);
 
 		StabilizerBuys::on_initialize(3);
-		assert_eq!(Balances::free_balance(256), 101_666_666);
-		assert_eq!(Balances::free_balance(1), 1_001_400_000);
+		assert_eq!(Balances::free_balance(256), 100_000_000);
+		assert_eq!(collect_accrued(256).stabilizer_buy_earnings, 1_666_666);
+		assert_eq!(Balances::free_balance(1), 1_000_000_000);
+		assert_eq!(collect_accrued(1).stabilizer_buy_earnings, 1_400_000);
 		assert!(BidsByAuction::<Test>::iter_prefix(1).next().is_none());
 		assert!(AuctionAllocationQueue::<Test>::iter().next().is_none());
-		assert_eq!(Budget::outstanding_rewards(), 0);
+
 		assert_eq!(Budget::available_budget(), 4_266_668);
 	});
 }
@@ -838,7 +859,7 @@ fn default_full_request_earns_ordinary_rewards_and_releases_principal_at_maturit
 		let maturity = 1 + PurchaseHoldFrames::get();
 		CurrentFrame::set(PurchaseHoldFrames::get());
 		StabilizerBuys::on_initialize(2);
-		assert_eq!(PayoutStateByAccount::<Test>::get(5).next_payout_frame, Some(maturity));
+		assert_eq!(NextSettlementFrameByAccount::<Test>::get(5), Some(maturity));
 		assert!(PayoutQueue::<Test>::contains_key(AscendingRankKey::new(maturity, 5)));
 		CurrentFrame::set(maturity - 1);
 		StabilizerBuys::on_initialize(3);
@@ -850,11 +871,12 @@ fn default_full_request_earns_ordinary_rewards_and_releases_principal_at_maturit
 		CurrentFrame::set(maturity);
 		StabilizerBuys::on_initialize(4);
 		assert_eq!(Budget::available_budget(), 91_000_000);
-		assert_eq!(Budget::outstanding_rewards(), 0);
-		assert_eq!(Balances::free_balance(5), 109_000_000);
+
+		assert_eq!(Balances::free_balance(5), 100_000_000);
+		assert_eq!(collect_accrued(5).stabilizer_buy_earnings, 9_000_000);
 		assert_eq!(Balances::balance_on_hold(&HoldReason::PurchasePrincipal.into(), &5), 0);
-		assert_eq!(System::account(5).providers, providers);
-		assert!(!PayoutStateByAccount::<Test>::contains_key(5));
+		assert_eq!(System::account(5).providers, providers + 1);
+		assert!(!NextSettlementFrameByAccount::<Test>::contains_key(5));
 		assert!(PayoutQueue::<Test>::iter().next().is_none());
 		assert!(AuctionAllocationQueue::<Test>::iter().next().is_none());
 	});
@@ -876,10 +898,12 @@ fn elapsed_ticks_and_delayed_processing_do_not_extend_the_admission_frame_hold()
 		);
 		assert_eq!(AuctionAllocationQueue::<Test>::iter().count(), 1);
 		StabilizerBuys::on_initialize(2);
-		assert_eq!(Balances::free_balance(1), 1_004_500_000);
+		assert_eq!(Balances::free_balance(1), 1_000_000_000);
+		assert_eq!(collect_accrued(1).stabilizer_buy_earnings, 4_500_000);
 		CurrentFrame::set(1 + PurchaseHoldFrames::get() + 6);
 		StabilizerBuys::on_initialize(3);
-		assert_eq!(Balances::free_balance(1), 1_004_500_000);
+		assert_eq!(Balances::free_balance(1), 1_000_000_000);
+		assert_eq!(collect_accrued(1).stabilizer_buy_earnings, 4_500_000);
 		assert_eq!(Budget::available_budget(), 95_500_000);
 		assert!(AuctionAllocationQueue::<Test>::iter().next().is_none());
 	});
@@ -908,7 +932,7 @@ fn failed_last_bid_return_rolls_back_that_allocation_and_retries_without_double_
 		FailReturn::set(true);
 		StabilizerBuys::on_initialize(3);
 		assert_eq!(Budget::available_budget(), 73_000_000);
-		assert_eq!(Budget::outstanding_rewards(), 0);
+
 		assert_eq!(Balances::free_balance(3), 1_000_000_000);
 		assert_eq!(Balances::total_issuance(), issuance + 10_000_000);
 		assert_eq!(BidsByAuction::<Test>::iter_prefix(1).count(), 1);
@@ -924,85 +948,12 @@ fn failed_last_bid_return_rolls_back_that_allocation_and_retries_without_double_
 		assert_eq!(BidsByAuction::<Test>::iter_prefix(1).count(), 1);
 		CurrentFrame::set(maturity + 1);
 		StabilizerBuys::on_initialize(5);
-		assert_eq!(Balances::free_balance(3), 1_003_500_000);
+		assert_eq!(Balances::free_balance(3), 1_000_000_000);
+		assert_eq!(collect_accrued(3).stabilizer_buy_earnings, 3_500_000);
 		assert_eq!(Balances::total_issuance(), issuance + 13_500_000);
 		assert_eq!(Budget::available_budget(), 86_500_000);
-		assert_eq!(Budget::outstanding_rewards(), 0);
+
 		assert!(AuctionAllocationQueue::<Test>::iter().next().is_none());
-	});
-}
-
-#[test]
-fn failed_award_preserves_its_rank_and_funding_while_prior_awards_stay_paid() {
-	new_test_ext().execute_with(|| {
-		for account in [1, 2, 3] {
-			assert_ok!(record_purchase(&account, &purchase()));
-		}
-		start_frame(2);
-		for account in [1, 2, 3] {
-			assert_ok!(StabilizerBuys::bid(
-				RuntimeOrigin::signed(account),
-				1,
-				Percent::from_percent(50)
-			));
-		}
-		start_frame(3);
-		let maturity = 1 + PurchaseHoldFrames::get();
-		CurrentFrame::set(maturity);
-		FailCommitAt::set(Some(10_000_000));
-		StabilizerBuys::on_initialize(2);
-		assert_eq!(Balances::free_balance(1), 1_005_000_000);
-		assert_eq!(Balances::free_balance(2), 1_000_000_000);
-		assert_eq!(Budget::outstanding_rewards(), 0);
-		assert_eq!(Budget::available_budget(), 73_000_000);
-		assert_eq!(BidsByAuction::<Test>::iter_prefix(1).count(), 2);
-		assert_eq!(Auctions::<Test>::get(1).unwrap().remaining_budget, 22_000_000);
-		assert_eq!(Auctions::<Test>::get(1).unwrap().remaining_matching_basis, 17_000_000);
-		assert!(AuctionAllocationQueue::<Test>::contains_key(AscendingRankKey::new(
-			maturity + 1,
-			1
-		)));
-		StabilizerBuys::on_initialize(3);
-		assert_eq!(Balances::free_balance(3), 1_000_000_000);
-
-		FailCommitAt::set(None);
-		CurrentFrame::set(maturity + 1);
-		StabilizerBuys::on_initialize(4);
-		for account in [1, 2] {
-			assert_eq!(Balances::free_balance(account), 1_005_000_000);
-		}
-		assert_eq!(Balances::free_balance(3), 1_003_500_000);
-		assert_eq!(Budget::available_budget(), 86_500_000);
-		assert!(BidsByAuction::<Test>::iter_prefix(1).next().is_none());
-	});
-}
-
-#[test]
-fn a_failed_auction_does_not_block_another_mature_auction() {
-	new_test_ext().execute_with(|| {
-		assert_ok!(record_purchase(&1, &purchase()));
-		start_frame(2);
-		assert_ok!(StabilizerBuys::bid(RuntimeOrigin::signed(1), 1, Percent::from_percent(60)));
-		assert_ok!(record_purchase(&2, &purchase()));
-		start_frame(3);
-		assert_ok!(StabilizerBuys::bid(RuntimeOrigin::signed(2), 2, Percent::from_percent(50)));
-		start_frame(4);
-		let maturity = 2 + PurchaseHoldFrames::get();
-		CurrentFrame::set(maturity);
-		FailCommitAt::set(Some(5_400_000));
-		StabilizerBuys::on_initialize(2);
-		assert_eq!(Balances::free_balance(1), 1_000_000_000);
-		assert_eq!(Balances::free_balance(2), 1_004_500_000);
-		assert_eq!(BidsByAuction::<Test>::iter_prefix(1).count(), 1);
-		assert!(BidsByAuction::<Test>::iter_prefix(2).next().is_none());
-		assert_eq!(Budget::available_budget(), 86_500_000);
-
-		FailCommitAt::set(None);
-		CurrentFrame::set(maturity + 1);
-		StabilizerBuys::on_initialize(3);
-		assert_eq!(Balances::free_balance(1), 1_005_400_000);
-		assert_eq!(Budget::available_budget(), 90_100_000);
-		assert_eq!(Budget::outstanding_rewards(), 0);
 	});
 }
 
@@ -1041,10 +992,12 @@ fn failed_treasury_funding_still_allocates_default_burn_rewards_at_maturity() {
 		CurrentFrame::set(1 + PurchaseHoldFrames::get());
 		StabilizerBuys::on_initialize(3);
 		StabilizerBuys::on_initialize(4);
+		assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(1)));
 		assert_eq!(Balances::free_balance(1), 962_000_000);
+		assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(2)));
 		assert_eq!(Balances::free_balance(2), 961_600_000);
 		assert!(!StabilizerBuys::has_pending_repayment(&2, 42));
-		assert_eq!(Budget::outstanding_rewards(), 0);
+
 		assert!(!StabilizerBuys::has_pending_repayment(&1, 42));
 		assert!(BidsByAuction::<Test>::iter_prefix(1).next().is_none());
 	});
@@ -1078,8 +1031,10 @@ fn opting_out_preserves_principal_while_funded_bids_share_the_shortfall() {
 		CurrentFrame::set(1 + PurchaseHoldFrames::get());
 		StabilizerBuys::on_initialize(3);
 		StabilizerBuys::on_initialize(4);
-		assert_eq!(Balances::free_balance(1), 1_000_925_925);
-		assert_eq!(Balances::free_balance(2), 1_001_111_111);
+		assert_eq!(Balances::free_balance(1), 1_000_000_000);
+		assert_eq!(collect_accrued(1).stabilizer_buy_earnings, 925_925);
+		assert_eq!(Balances::free_balance(2), 1_000_000_000);
+		assert_eq!(collect_accrued(2).stabilizer_buy_earnings, 1_111_111);
 		assert_eq!(Balances::free_balance(3), 1_000_000_000);
 	});
 }
@@ -1102,7 +1057,7 @@ fn more_than_a_thousand_purchases_and_entrants_finish_with_bounded_automatic_wor
 			BuysByAccountAndFrame::<Test>::get(1, 1u64.to_ordered()).unwrap().principal,
 			10_010_000
 		);
-		assert_eq!(PayoutStateByAccount::<Test>::iter().count(), 1_002);
+		assert_eq!(NextSettlementFrameByAccount::<Test>::iter().count(), 1_002);
 		assert_eq!(Auctions::<Test>::get(1).unwrap().total_matching_basis, 2_002_000);
 		start_frame(2);
 		assert_ok!(StabilizerBuys::bid(RuntimeOrigin::signed(1), 1, Percent::from_percent(50)));
@@ -1118,26 +1073,29 @@ fn more_than_a_thousand_purchases_and_entrants_finish_with_bounded_automatic_wor
 		let issuance = Balances::total_issuance();
 		StabilizerBuys::on_initialize(2);
 		assert_eq!(BidsByAuction::<Test>::iter_prefix(1).count(), 1_000);
-		assert_eq!(PayoutStateByAccount::<Test>::iter().count(), 1_000);
+		assert_eq!(NextSettlementFrameByAccount::<Test>::iter().count(), 1_000);
 		for block in 3..=502 {
 			StabilizerBuys::on_initialize(block);
 		}
 		assert!(BidsByAuction::<Test>::iter_prefix(1).next().is_none());
-		assert!(PayoutStateByAccount::<Test>::iter().next().is_none());
+		assert!(NextSettlementFrameByAccount::<Test>::iter().next().is_none());
 		assert!(AuctionAllocationQueue::<Test>::iter().next().is_none());
-		assert_eq!(Budget::outstanding_rewards(), 0);
+
 		assert_eq!(Balances::total_issuance(), issuance + 900_900);
 		assert_eq!(Balances::free_balance(1_010), 20_000);
 	});
 }
 
 #[test]
-fn automatic_payout_preserves_future_groups_and_one_provider() {
+fn maturity_preserves_future_groups_and_collect_retains_its_provider() {
 	new_test_ext().execute_with(|| {
 		let providers = System::account(1).providers;
 		assert_ok!(record_purchase(&1, &purchase()));
 		start_frame(2);
 		assert_ok!(record_purchase(&1, &purchase()));
+		assert_eq!(NextSettlementFrameByAccount::<Test>::get(1), Some(31));
+		assert!(PayoutQueue::<Test>::contains_key(AscendingRankKey::new(31, 1)));
+		assert_eq!(PayoutQueue::<Test>::iter().count(), 1);
 		CurrentTick::set(2_000);
 		start_frame(3);
 		CurrentTick::set(3_000);
@@ -1145,21 +1103,22 @@ fn automatic_payout_preserves_future_groups_and_one_provider() {
 		assert_eq!(System::account(1).providers, providers + 1);
 		CurrentFrame::set(1 + PurchaseHoldFrames::get());
 		StabilizerBuys::on_initialize(2);
-		let payout_state = PayoutStateByAccount::<Test>::get(1);
+		let next_payout_frame = NextSettlementFrameByAccount::<Test>::get(1);
 		assert_eq!(BuysByAccountAndFrame::<Test>::iter_prefix(1).count(), 1);
 		assert!(BuysByAccountAndFrame::<Test>::contains_key(1, 2u64.to_ordered()));
 		assert_eq!(
 			Balances::balance_on_hold(&HoldReason::PurchasePrincipal.into(), &1),
 			100_000_000
 		);
-		assert_eq!(System::account(1).providers, providers + 1);
-		assert_eq!(payout_state.next_payout_frame, Some(2 + PurchaseHoldFrames::get()));
+		assert_eq!(System::account(1).providers, providers + 2);
+		assert_eq!(next_payout_frame, Some(2 + PurchaseHoldFrames::get()));
 		assert_eq!(PayoutQueue::<Test>::iter().count(), 1);
 		CurrentFrame::set(2 + PurchaseHoldFrames::get());
 		StabilizerBuys::on_initialize(3);
-		assert_eq!(System::account(1).providers, providers);
-		assert_eq!(Balances::free_balance(1), 1_018_000_000);
-		assert!(!PayoutStateByAccount::<Test>::contains_key(1));
+		assert_eq!(System::account(1).providers, providers + 1);
+		assert_eq!(Balances::free_balance(1), 1_000_000_000);
+		assert_eq!(collect_accrued(1).stabilizer_buy_earnings, 18_000_000);
+		assert!(!NextSettlementFrameByAccount::<Test>::contains_key(1));
 	});
 }
 
@@ -1198,29 +1157,20 @@ fn delayed_payouts_release_a_bounded_number_of_mature_buckets_per_visit() {
 
 		let maturity = Auctions::<Test>::get(16).unwrap().matures_at_frame;
 		CurrentFrame::set(maturity);
-		FailPaymentFor::set(Some(1));
 		StabilizerBuys::on_initialize(2);
-		assert_eq!(BuysByAccountAndFrame::<Test>::iter_prefix(1).count(), 40);
-		assert_eq!(Balances::balance_on_hold(&HoldReason::PurchasePrincipal.into(), &1), 400_000);
-		assert_eq!(PayoutStateByAccount::<Test>::get(1).payable_reward, 450);
-		assert_eq!(Budget::outstanding_rewards(), 450);
-		assert_eq!(PayoutStateByAccount::<Test>::get(1).next_payout_frame, Some(maturity + 1));
-
-		FailPaymentFor::set(None);
-		CurrentFrame::set(maturity + 1);
-		StabilizerBuys::on_initialize(3);
 		assert_eq!(BuysByAccountAndFrame::<Test>::iter_prefix(1).count(), 40 - 16);
 		assert_eq!(
 			Balances::balance_on_hold(&HoldReason::PurchasePrincipal.into(), &1),
 			400_000 - 160_000
 		);
-		assert_eq!(Balances::free_balance(1), 1_000_000_000 - 400_000 + 160_000 + 450);
-		assert_eq!(Budget::outstanding_rewards(), 0);
+		assert_eq!(Balances::free_balance(1), 1_000_000_000 - 400_000 + 160_000);
+
 		assert_eq!(
-			PayoutStateByAccount::<Test>::get(1).next_payout_frame,
+			NextSettlementFrameByAccount::<Test>::get(1),
 			Some(Auctions::<Test>::get(17).unwrap().matures_at_frame)
 		);
-		assert_eq!(System::account(1).providers, providers + 1);
+		assert_eq!(System::account(1).providers, providers + 2);
+		assert_eq!(collect_accrued(1).stabilizer_buy_earnings, 450);
 
 		CurrentFrame::set(Auctions::<Test>::get(40).unwrap().matures_at_frame);
 		StabilizerBuys::on_initialize(4);
@@ -1233,15 +1183,13 @@ fn delayed_payouts_release_a_bounded_number_of_mature_buckets_per_visit() {
 			Balances::balance_on_hold(&HoldReason::PurchasePrincipal.into(), &1),
 			400_000 - 320_000
 		);
-		assert!(
-			PayoutStateByAccount::<Test>::get(1).next_payout_frame.unwrap() <= CurrentFrame::get()
-		);
+		assert!(NextSettlementFrameByAccount::<Test>::get(1).unwrap() <= CurrentFrame::get());
 		assert_eq!(PayoutQueue::<Test>::iter().count(), 1);
 	});
 }
 
 #[test]
-fn reward_backlog_after_principal_payment_automatically_queues_the_new_reward() {
+fn delayed_auction_awards_accrue_without_rescheduling_released_principal() {
 	new_test_ext().execute_with(|| {
 		let providers = System::account(1).providers;
 		for account in [1, 2, 3] {
@@ -1259,90 +1207,32 @@ fn reward_backlog_after_principal_payment_automatically_queues_the_new_reward() 
 		CurrentFrame::set(1 + PurchaseHoldFrames::get());
 		let issuance = Balances::total_issuance();
 		StabilizerBuys::on_initialize(2);
-		assert!(!PayoutStateByAccount::<Test>::contains_key(1));
+		assert!(!NextSettlementFrameByAccount::<Test>::contains_key(1));
 		assert_eq!(Balances::free_balance(1), 1_000_000_000);
 		assert_eq!(System::account(1).providers, providers);
 		assert!(BidsByAuction::<Test>::contains_key(
 			1,
 			(Percent::from_percent(60), AmountRankKey::new(10_000_000, 1))
 		));
-		assert_eq!(Budget::outstanding_rewards(), 5_000_000);
 
 		StabilizerBuys::on_initialize(3);
-		assert_eq!(Balances::free_balance(1), 1_004_200_000);
-		assert_eq!(Balances::free_balance(2), 1_005_000_000);
-		assert_eq!(Balances::free_balance(3), 1_005_000_000);
+		assert_eq!(Balances::free_balance(1), 1_000_000_000);
+		assert_eq!(collect_accrued(1).stabilizer_buy_earnings, 4_200_000);
+		assert_eq!(Balances::free_balance(2), 1_000_000_000);
+		assert_eq!(collect_accrued(2).stabilizer_buy_earnings, 5_000_000);
+		assert_eq!(Balances::free_balance(3), 1_000_000_000);
+		assert_eq!(collect_accrued(3).stabilizer_buy_earnings, 5_000_000);
 		assert_eq!(Balances::total_issuance(), issuance + 14_200_000);
-		assert_eq!(Budget::outstanding_rewards(), 0);
-		assert!(!PayoutStateByAccount::<Test>::contains_key(1));
-		assert_eq!(System::account(1).providers, providers);
+
+		assert!(!NextSettlementFrameByAccount::<Test>::contains_key(1));
+		assert_eq!(System::account(1).providers, providers + 1);
 		StabilizerBuys::on_initialize(4);
 		assert_eq!(Balances::total_issuance(), issuance + 14_200_000);
 	});
 }
 
 #[test]
-fn failed_payment_rolls_back_its_account_without_blocking_bounded_payout_progress() {
-	new_test_ext().execute_with(|| {
-		let providers = System::account(5).providers;
-		for account in [256, 255, 5] {
-			if account != 5 {
-				assert_ok!(Balances::mint_into(&account, 100_000_000));
-			}
-			assert_ok!(record_purchase(&account, &purchase()));
-		}
-		start_frame(2);
-		for account in [256, 255, 5] {
-			assert_ok!(StabilizerBuys::bid(
-				RuntimeOrigin::signed(account),
-				1,
-				Percent::from_percent(50)
-			));
-		}
-		start_frame(3);
-		let maturity = 1 + PurchaseHoldFrames::get();
-		CurrentFrame::set(maturity);
-		let issuance = Balances::total_issuance();
-		FailPaymentFor::set(Some(5));
-		StabilizerBuys::on_initialize(2);
-		assert_eq!(Balances::total_issuance(), issuance + 5_000_000);
-		assert_eq!(Balances::free_balance(5), 0);
-		assert_eq!(
-			Balances::balance_on_hold(&HoldReason::PurchasePrincipal.into(), &5),
-			100_000_000
-		);
-		assert_eq!(Budget::outstanding_rewards(), 5_000_000);
-		assert_eq!(System::account(5).providers, providers);
-		assert_eq!(PayoutStateByAccount::<Test>::get(5).payable_reward, 5_000_000);
-		assert_eq!(PayoutStateByAccount::<Test>::get(5).next_payout_frame, Some(maturity + 1));
-		assert_eq!(Balances::free_balance(255), 105_000_000);
-		assert!(!PayoutStateByAccount::<Test>::contains_key(255));
-		assert_eq!(Balances::free_balance(256), 0);
-		assert_eq!(
-			Balances::balance_on_hold(&HoldReason::PurchasePrincipal.into(), &256),
-			100_000_000
-		);
-
-		FailPaymentFor::set(None);
-		StabilizerBuys::on_initialize(3);
-		assert_eq!(Balances::free_balance(5), 0);
-		assert_eq!(Balances::free_balance(256), 103_500_000);
-		assert!(!PayoutStateByAccount::<Test>::contains_key(256));
-		assert_eq!(Budget::outstanding_rewards(), 5_000_000);
-		CurrentFrame::set(maturity + 1);
-		StabilizerBuys::on_initialize(4);
-		assert_eq!(Balances::total_issuance(), issuance + 13_500_000);
-		assert_eq!(Balances::free_balance(5), 105_000_000);
-		assert_eq!(Budget::outstanding_rewards(), 0);
-		assert_eq!(System::account(5).providers, providers);
-		assert!(PayoutQueue::<Test>::iter().next().is_none());
-		StabilizerBuys::on_initialize(5);
-		assert_eq!(Balances::total_issuance(), issuance + 13_500_000);
-	});
-}
-
-#[test]
-fn one_automatic_payment_collects_all_mature_groups_for_an_account() {
+fn separate_mature_auctions_accrue_into_one_collect_balance() {
 	new_test_ext().execute_with(|| {
 		assert_ok!(record_purchase(&1, &purchase()));
 		start_frame(2);
@@ -1355,10 +1245,11 @@ fn one_automatic_payment_collects_all_mature_groups_for_an_account() {
 		start_frame(4);
 		CurrentFrame::set(2 + PurchaseHoldFrames::get());
 		StabilizerBuys::on_initialize(2);
-		assert_eq!(Balances::free_balance(1), 1_009_900_000);
+		assert_eq!(Balances::free_balance(1), 1_000_000_000);
+		assert_eq!(collect_accrued(1).stabilizer_buy_earnings, 9_900_000);
 		assert_eq!(Balances::balance_on_hold(&HoldReason::PurchasePrincipal.into(), &1), 0);
-		assert_eq!(Budget::outstanding_rewards(), 0);
-		assert!(!PayoutStateByAccount::<Test>::contains_key(1));
+
+		assert!(!NextSettlementFrameByAccount::<Test>::contains_key(1));
 		assert!(PayoutQueue::<Test>::iter().next().is_none());
 	});
 }
@@ -1371,7 +1262,7 @@ fn unavailable_prices_leave_delivered_principal_unencumbered() {
 		assert_eq!(Balances::free_balance(1), 1_000_000_000);
 		assert_eq!(Balances::balance_on_hold(&HoldReason::PurchasePrincipal.into(), &1), 0);
 		assert!(Auctions::<Test>::get(1).is_none());
-		assert!(!PayoutStateByAccount::<Test>::contains_key(1));
+		assert!(!NextSettlementFrameByAccount::<Test>::contains_key(1));
 		assert!(PayoutQueue::<Test>::iter().next().is_none());
 		System::assert_last_event(
 			Event::<Test>::PurchaseIneligible {
@@ -1442,7 +1333,7 @@ fn admission_keeps_pending_guards_past_u32_counts_and_schedules_without_an_older
 		buy.gateway_activity_nonce += 1;
 		assert_ok!(record_purchase(&1, &buy));
 		assert!(Auctions::<Test>::contains_key(2));
-		assert_eq!(PayoutStateByAccount::<Test>::get(1).next_payout_frame, Some(31));
+		assert_eq!(NextSettlementFrameByAccount::<Test>::get(1), Some(31));
 		assert_eq!(PayoutQueue::<Test>::iter_keys().count(), 1);
 		assert_eq!(
 			Balances::balance_on_hold(&HoldReason::PurchasePrincipal.into(), &1),
@@ -1465,7 +1356,7 @@ fn failed_hold_rolls_back_admission_queue_and_provider_reference() {
 
 		assert!(Auctions::<Test>::get(1).is_none());
 		assert!(BidsByAuction::<Test>::iter().next().is_none());
-		assert!(!PayoutStateByAccount::<Test>::contains_key(4));
+		assert!(!NextSettlementFrameByAccount::<Test>::contains_key(4));
 		assert!(PayoutQueue::<Test>::iter().next().is_none());
 		assert_eq!(System::account(4).providers, providers);
 	});
@@ -1497,10 +1388,11 @@ fn sub_minimum_purchase_remains_spendable_instead_of_creating_an_unreleasable_ho
 		start_frame(3);
 		CurrentFrame::set(1 + PurchaseHoldFrames::get());
 		StabilizerBuys::on_initialize(2);
-		assert_eq!(Balances::free_balance(4), 10_720);
+		assert_eq!(Balances::free_balance(4), 10_000);
+		assert_eq!(collect_accrued(4).stabilizer_buy_earnings, 720);
 		assert_eq!(Balances::balance_on_hold(&HoldReason::PurchasePrincipal.into(), &4), 0);
-		assert!(!PayoutStateByAccount::<Test>::contains_key(1));
-		assert!(!PayoutStateByAccount::<Test>::contains_key(4));
+		assert!(!NextSettlementFrameByAccount::<Test>::contains_key(1));
+		assert!(!NextSettlementFrameByAccount::<Test>::contains_key(4));
 	});
 }
 
@@ -1547,7 +1439,7 @@ fn four_positive_bids_allow_opt_out_but_never_restore_submission_count() {
 			Error::<Test>::BidLimitReached
 		);
 		assert_eq!(Balances::free_balance(2), 1_000_000_000);
-		assert!(!PayoutStateByAccount::<Test>::contains_key(2));
+		assert!(!NextSettlementFrameByAccount::<Test>::contains_key(2));
 	});
 }
 
@@ -1660,12 +1552,11 @@ fn zero_budget_still_drains_positive_bids_and_releases_every_principal() {
 			assert_eq!(Balances::free_balance(account), 1_000_000_000);
 		}
 		assert_eq!(Balances::total_issuance(), issuance);
-		assert_eq!(Budget::outstanding_rewards(), 0);
 	});
 }
 
 #[test]
-fn delayed_unreceivable_reward_is_retired_without_blocking_the_payout() {
+fn delayed_small_reward_remains_backed_after_the_wallet_is_emptied() {
 	new_test_ext().execute_with(|| {
 		let mut purchase = purchase();
 		purchase.principal = 10_000;
@@ -1686,31 +1577,42 @@ fn delayed_unreceivable_reward_is_retired_without_blocking_the_payout() {
 		CurrentFrame::set(maturity);
 		let issuance = Balances::total_issuance();
 		StabilizerBuys::on_initialize(2);
-		assert!(!PayoutStateByAccount::<Test>::contains_key(1));
+		assert!(!NextSettlementFrameByAccount::<Test>::contains_key(1));
 		assert_eq!(Balances::free_balance(1), 1_000_000_000);
 		assert_ok!(Balances::transfer(&1, &4, Balances::free_balance(1), Preservation::Expendable));
 		assert_eq!(System::account(1).providers, 0);
 
 		StabilizerBuys::on_initialize(3);
 		assert!(BuysByAccountAndFrame::<Test>::iter_prefix(1).next().is_none());
-		assert!(!PayoutStateByAccount::<Test>::contains_key(1));
+		assert!(!NextSettlementFrameByAccount::<Test>::contains_key(1));
 		assert_eq!(Balances::free_balance(1), 0);
-		assert_eq!(Budget::outstanding_rewards(), 0);
-		assert_eq!(Balances::total_issuance(), issuance + 1_000);
+		assert_eq!(collect_accrued(1).stabilizer_buy_earnings, 420);
+		assert_noop!(
+			TreasuryPositions::collect(RuntimeOrigin::signed(1)),
+			TokenError::BelowMinimum
+		);
+
+		assert_eq!(Balances::total_issuance(), issuance + 1_420);
 		assert!(BidsByAuction::<Test>::iter_prefix(1).next().is_none());
 		assert!(PayoutQueue::<Test>::iter_keys().next().is_none());
 		System::assert_has_event(
-			Event::<Test>::PayoutCompleted { account: 1, principal: 0, reward: 0 }.into(),
+			Event::<Test>::RewardAwarded {
+				account: 1,
+				admission_frame: 1,
+				amount: 420,
+				matures_at_frame: maturity,
+			}
+			.into(),
 		);
 
 		StabilizerBuys::on_initialize(4);
 		assert_eq!(Balances::free_balance(1), 0);
-		assert_eq!(Balances::total_issuance(), issuance + 1_000);
+		assert_eq!(Balances::total_issuance(), issuance + 1_420);
 	});
 }
 
 #[test]
-fn repayment_remainder_can_use_its_reward_while_a_later_purchase_is_still_held() {
+fn repayment_remainder_stays_held_until_collect_makes_release_possible() {
 	new_test_ext().execute_with(|| {
 		assert_ok!(Balances::force_set_balance(RuntimeOrigin::root(), 1, 200_000_000));
 		RepaymentBurn::set(99_999_999);
@@ -1721,16 +1623,113 @@ fn repayment_remainder_can_use_its_reward_while_a_later_purchase_is_still_held()
 		assert_ok!(StabilizerBuys::bid(RuntimeOrigin::signed(1), 1, Percent::from_percent(50)));
 		assert_ok!(record_purchase(&1, &purchase()));
 		start_frame(3);
-		CurrentFrame::set(1 + PurchaseHoldFrames::get());
+		start_frame(4);
+		CurrentFrame::set(31);
+		let issuance = Balances::total_issuance();
 		StabilizerBuys::on_initialize(2);
-		assert_eq!(Balances::free_balance(1), 7_000_000);
+
+		assert_eq!(Balances::free_balance(1), 0);
 		assert_eq!(
 			Balances::balance_on_hold(&HoldReason::PurchasePrincipal.into(), &1),
-			100_000_000
+			100_000_001
 		);
+		assert_eq!(BuysByAccountAndFrame::<Test>::get(1, 1u64.to_ordered()).unwrap().principal, 1);
+		assert!(!StabilizerBuys::has_pending_repayment(&1, 42));
+		assert_eq!(collect_accrued(1).stabilizer_buy_earnings, 4_500_000);
+		assert_eq!(NextSettlementFrameByAccount::<Test>::get(1), Some(32));
+		let earnings = collect_accrued(1);
+		assert_eq!(earnings.stabilizer_buy_earnings, 4_500_000);
+		assert_eq!(earnings.liquid_repayment_earnings, 2_499_999);
+		assert_eq!(Balances::total_issuance(), issuance - 99_999_999 + earnings.total());
+		StabilizerBuys::on_initialize(3);
+		assert_eq!(collect_accrued(1), earnings);
+
+		assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(1)));
+		assert_eq!(Balances::free_balance(1), 6_999_999);
+		CurrentFrame::set(32);
+		StabilizerBuys::on_initialize(4);
+		assert_eq!(Balances::free_balance(1), 107_000_000);
+		assert_eq!(Balances::balance_on_hold(&HoldReason::PurchasePrincipal.into(), &1), 0);
 		assert!(!BuysByAccountAndFrame::<Test>::contains_key(1, 1u64.to_ordered()));
-		assert!(BuysByAccountAndFrame::<Test>::contains_key(1, 2u64.to_ordered()));
-		assert_eq!(PayoutStateByAccount::<Test>::get(1).payable_reward, 0);
+		assert_eq!(collect_accrued(1).stabilizer_buy_earnings, 9_000_000);
+		assert_eq!(collect_accrued(1).liquid_repayment_earnings, 0);
+	});
+}
+
+#[test]
+fn a_small_remainder_does_not_delay_another_mature_repayment() {
+	new_test_ext().execute_with(|| {
+		assert_ok!(Balances::force_set_balance(RuntimeOrigin::root(), 1, 200_402));
+		RepaymentBurn::set(100_200);
+		let mut buy = purchase();
+		buy.repay_liquid_id = Some(42);
+		buy.principal = 100_201;
+		buy.usdc_spent = U256::from(90_180u64);
+		for nonce in [1, 2] {
+			buy.gateway_activity_nonce = nonce;
+			assert_ok!(record_purchase(&1, &buy));
+		}
+		start_frame(2);
+		assert_ok!(StabilizerBuys::bid(RuntimeOrigin::signed(1), 1, Percent::zero()));
+		start_frame(3);
+		CurrentFrame::set(31);
+		StabilizerBuys::on_initialize(2);
+		assert_eq!(LiquidRepaysByAccountAndGatewayNonce::<Test>::iter_prefix(1).count(), 1);
+		assert!(NextSettlementFrameByAccount::<Test>::get(1).unwrap() <= 31);
+
+		StabilizerBuys::on_initialize(3);
+		assert!(!StabilizerBuys::has_pending_repayment(&1, 42));
+		assert_eq!(BuysByAccountAndFrame::<Test>::get(1, 1u64.to_ordered()).unwrap().principal, 2);
+		assert_eq!(Balances::balance_on_hold(&HoldReason::PurchasePrincipal.into(), &1), 2);
+		assert_eq!(NextSettlementFrameByAccount::<Test>::get(1), Some(32));
+	});
+}
+
+#[test]
+fn mature_repayment_remainders_do_not_block_later_principal() {
+	new_test_ext().execute_with(|| {
+		// 167 sat at the captured BTC quote burns 100,200 microgons, leaving one.
+		let small_principal = 100_201;
+		let later_principal = 100_000_000;
+		assert_ok!(Balances::force_set_balance(
+			RuntimeOrigin::root(),
+			1,
+			16 * small_principal + later_principal
+		));
+		for frame in 1..=17 {
+			CurrentTick::set(1_000 + (frame - 1) * 6);
+			start_frame(frame);
+			if frame > 1 {
+				assert_ok!(StabilizerBuys::bid(
+					RuntimeOrigin::signed(1),
+					frame - 1,
+					Percent::zero()
+				));
+			}
+			let mut buy = purchase();
+			buy.gateway_activity_nonce = frame;
+			if frame <= 16 {
+				buy.repay_liquid_id = Some(42);
+				buy.principal = small_principal;
+				buy.usdc_spent = U256::from(small_principal * 9 / 10);
+			}
+			assert_ok!(record_purchase(&1, &buy));
+		}
+		start_frame(18);
+		assert_ok!(StabilizerBuys::bid(RuntimeOrigin::signed(1), 17, Percent::zero()));
+		start_frame(19);
+		assert_eq!(Balances::free_balance(1), 0);
+
+		RepaymentBurn::set(small_principal - 1);
+		for block in 2..=17 {
+			CurrentFrame::set(48 + block);
+			StabilizerBuys::on_initialize(block);
+		}
+		assert!(!StabilizerBuys::has_pending_repayment(&1, 42));
+		assert_eq!(Balances::free_balance(1), later_principal + 16);
+		assert_eq!(Balances::balance_on_hold(&HoldReason::PurchasePrincipal.into(), &1), 0);
+		assert!(BuysByAccountAndFrame::<Test>::iter_prefix(1).next().is_none());
+		assert!(PayoutQueue::<Test>::iter().next().is_none());
 	});
 }
 
@@ -1768,7 +1767,7 @@ fn repayment_holds_principal_through_maturity_and_retries_a_failed_burn_atomical
 			record.event,
 			RuntimeEvent::StabilizerBuys(Event::PayoutFailed { account: 1, .. })
 		)));
-		assert_eq!(Balances::total_issuance(), issuance);
+		assert_eq!(Balances::total_issuance(), issuance + 4_500_000);
 		assert_eq!(
 			Balances::balance_on_hold(&HoldReason::PurchasePrincipal.into(), &1),
 			100_000_000
@@ -1785,11 +1784,12 @@ fn repayment_holds_principal_through_maturity_and_retries_a_failed_burn_atomical
 		FailRepayment::set(false);
 		CurrentFrame::set(32);
 		StabilizerBuys::on_initialize(4);
+		assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(1)));
 		assert_eq!(Balances::free_balance(1), 965_500_000);
 		assert_eq!(Balances::total_issuance(), issuance - 40_000_000 + 5_500_000);
 		assert_eq!(Balances::balance_on_hold(&HoldReason::PurchasePrincipal.into(), &1), 0);
 		assert!(!LiquidRepaysByAccountAndGatewayNonce::<Test>::contains_key(1, 1u64.to_ordered()));
-		assert!(!PayoutStateByAccount::<Test>::contains_key(1));
+		assert!(!NextSettlementFrameByAccount::<Test>::contains_key(1));
 		assert!(!StabilizerBuys::has_pending_repayment(&1, 42));
 		StabilizerBuys::on_initialize(5);
 		assert_eq!(Balances::total_issuance(), issuance - 40_000_000 + 5_500_000);
@@ -1797,8 +1797,9 @@ fn repayment_holds_principal_through_maturity_and_retries_a_failed_burn_atomical
 }
 
 #[test]
-fn multiple_repayments_share_the_auction_result_and_burn_unreceivable_bonus() {
-	for (spend_free_balance, expected_bonus) in [(false, 3_000), (true, 0)] {
+fn multiple_repayments_back_small_bonuses_even_after_the_wallet_is_emptied() {
+	for spend_free_balance in [false, true] {
+		let expected_bonus = 3_000;
 		new_test_ext().execute_with(|| {
 			assert_ok!(Balances::force_set_balance(RuntimeOrigin::root(), 1, 100_100_000));
 			unhashed::put(b"test_liquidity_buy_budget", &7_500u128);
@@ -1823,6 +1824,7 @@ fn multiple_repayments_share_the_auction_result_and_burn_unreceivable_bonus() {
 
 			CurrentFrame::set(31);
 			StabilizerBuys::on_initialize(2);
+			assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(1)));
 			assert_eq!(Balances::free_balance(1), 61_204_500);
 			assert_eq!(
 				Balances::balance_on_hold(&HoldReason::PurchasePrincipal.into(), &1),
@@ -1836,7 +1838,7 @@ fn multiple_repayments_share_the_auction_result_and_burn_unreceivable_bonus() {
 					.pending_liquid_repays,
 				1
 			);
-			assert_eq!(Budget::outstanding_rewards(), 0);
+
 			assert_eq!(Budget::available_budget(), 3_000);
 
 			if spend_free_balance {
@@ -1854,7 +1856,8 @@ fn multiple_repayments_share_the_auction_result_and_burn_unreceivable_bonus() {
 			StabilizerBuys::on_initialize(3);
 
 			assert_eq!(Balances::balance_on_hold(&HoldReason::PurchasePrincipal.into(), &1), 0);
-			assert_eq!(Balances::free_balance(1), free_before_second + expected_bonus);
+			assert_eq!(Balances::free_balance(1), free_before_second);
+			assert_eq!(collect_accrued(1).liquid_repayment_earnings, expected_bonus);
 			assert_eq!(Balances::total_issuance(), issuance - 100_000 + expected_bonus);
 			let awarded: Balance = System::events()
 				.iter()
@@ -1867,7 +1870,7 @@ fn multiple_repayments_share_the_auction_result_and_burn_unreceivable_bonus() {
 				})
 				.sum();
 			assert_eq!(awarded, expected_bonus);
-			assert!(!PayoutStateByAccount::<Test>::contains_key(1));
+			assert!(!NextSettlementFrameByAccount::<Test>::contains_key(1));
 			assert!(LiquidRepaysByAccountAndGatewayNonce::<Test>::iter_prefix(1).next().is_none());
 			assert!(!StabilizerBuys::has_pending_repayment(&1, 42));
 			assert!(PayoutQueue::<Test>::iter_keys().next().is_none());
@@ -1907,6 +1910,7 @@ fn repayment_commitment_stays_held_even_when_the_purchase_is_reward_ineligible()
 		start_frame(3);
 		CurrentFrame::set(31);
 		StabilizerBuys::on_initialize(2);
+		assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(1)));
 		assert_eq!(Balances::free_balance(1), 965_400_000);
 	});
 }
@@ -1948,17 +1952,20 @@ fn repayment_package_allocation_scales_treasury_funding_proportionally_and_keeps
 			StabilizerBuys::on_initialize(2);
 			StabilizerBuys::on_initialize(3);
 
+			assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(1)));
 			assert_eq!(Balances::free_balance(1), 960_000_000 + ordinary_one + bonus_one);
+			assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(2)));
 			assert_eq!(Balances::free_balance(2), 960_000_000 + ordinary_two + bonus_two);
 			assert_eq!(
 				Balances::total_issuance(),
 				issuance - 80_000_000 + ordinary_one + ordinary_two + bonus_one + bonus_two
 			);
 			assert_eq!(Budget::available_budget(), budget - ordinary_one - ordinary_two);
-			assert_eq!(Budget::outstanding_rewards(), 0);
+
 			assert!(LiquidRepaysByAccountAndGatewayNonce::<Test>::iter().next().is_none());
 			assert!(PayoutQueue::<Test>::iter().next().is_none());
 			StabilizerBuys::on_initialize(4);
+			assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(1)));
 			assert_eq!(Balances::free_balance(1), 960_000_000 + ordinary_one + bonus_one);
 		});
 	}
@@ -1985,12 +1992,14 @@ fn lowering_a_default_request_wins_burn_allocation_without_treasury_funding() {
 		}
 
 		for account in 10..18 {
-			assert_eq!(Balances::free_balance(account), 62_000_000);
+			assert_eq!(Balances::free_balance(account), 60_000_000);
+			assert_eq!(collect_accrued(account).liquid_repayment_earnings, 2_000_000);
 		}
 		assert_eq!(Balances::free_balance(18), 60_000_000);
-		assert_eq!(Balances::free_balance(19), 61_000_000);
+		assert_eq!(Balances::free_balance(19), 60_000_000);
+		assert_eq!(collect_accrued(19).liquid_repayment_earnings, 1_000_000);
 		assert_eq!(Balances::total_issuance(), issuance + 1_000_000_000 - 400_000_000 + 17_000_000);
-		assert_eq!(Budget::outstanding_rewards(), 0);
+
 		assert!(BidsByAuction::<Test>::iter().next().is_none());
 		assert!(LiquidRepaysByAccountAndGatewayNonce::<Test>::iter().next().is_none());
 		assert!(PayoutQueue::<Test>::iter().next().is_none());
@@ -1998,7 +2007,7 @@ fn lowering_a_default_request_wins_burn_allocation_without_treasury_funding() {
 }
 
 #[test]
-fn final_liquid_payout_waits_for_allocation_and_retries_the_whole_payment_atomically() {
+fn liquid_repayment_waits_for_auction_terms_and_retries_without_blocking_buy_earnings() {
 	new_test_ext().execute_with(|| {
 		RepaymentBurn::set(40_000_000);
 		unhashed::put(b"test_liquidity_buy_budget", &7_500u128);
@@ -2026,39 +2035,42 @@ fn final_liquid_payout_waits_for_allocation_and_retries_the_whole_payment_atomic
 		);
 		assert!(StabilizerBuys::has_pending_repayment(&1, 42));
 
-		FailPaymentFor::set(Some(1));
+		FailRepayment::set(true);
 		CurrentFrame::set(32);
 		StabilizerBuys::on_initialize(3);
 		assert_eq!(Balances::free_balance(1), 800_000_000);
-		assert_eq!(Balances::total_issuance(), issuance);
+		assert_eq!(Balances::total_issuance(), issuance + 4_500);
 		assert_eq!(
 			Balances::balance_on_hold(&HoldReason::PurchasePrincipal.into(), &1),
 			200_000_000
 		);
 		assert!(StabilizerBuys::has_pending_repayment(&1, 42));
-		assert_eq!(PayoutStateByAccount::<Test>::get(1).payable_reward, 4_500);
-		assert_eq!(Budget::outstanding_rewards(), 4_500);
+		assert_eq!(collect_accrued(1).stabilizer_buy_earnings, 4_500);
+		assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(1)));
+		assert_eq!(Balances::free_balance(1), 800_004_500);
+
 		assert_eq!(Budget::available_budget(), 3_000);
 
-		FailPaymentFor::set(None);
+		FailRepayment::set(false);
 		CurrentFrame::set(33);
 		StabilizerBuys::on_initialize(4);
+		assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(1)));
 		assert_eq!(Balances::free_balance(1), 961_204_500);
 		assert_eq!(Balances::total_issuance(), issuance - 40_000_000 + 1_204_500);
-		assert_eq!(Budget::outstanding_rewards(), 0);
+
 		assert!(PayoutQueue::<Test>::iter().next().is_none());
 		StabilizerBuys::on_initialize(5);
+		assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(1)));
 		assert_eq!(Balances::free_balance(1), 961_204_500);
 	});
 }
 
 #[test]
-fn full_liquid_repayment_retries_failed_burns_and_preserves_receivable_small_rewards() {
+fn full_liquid_repayment_retries_failed_burns_and_preserves_all_small_rewards() {
 	for (principal, budget, bid, ordinary_reward, paid_ordinary_reward, paid_bonus) in [
 		(100_000_000, 100_000_000, Some(60), 5_400_000, 5_400_000, 3_000_000),
 		(100_000_000, 7_500, Some(60), 4_500, 4_500, 3_000_000),
-		// Individually unreceivable dust need not be combined to establish an empty account.
-		(150_000, 10_000, Some(60), 6_000, 0, 0),
+		(150_000, 10_000, Some(60), 6_000, 6_000, 4_500),
 		(100_000_000, 100_000_000, None, 9_000_000, 9_000_000, 5_000_000),
 		(100_000_000, 4_500_000, None, 4_500_000, 4_500_000, 5_000_000),
 		(100_000_000, 0, None, 0, 0, 5_000_000),
@@ -2086,25 +2098,29 @@ fn full_liquid_repayment_retries_failed_burns_and_preserves_receivable_small_rew
 			FailRepayment::set(true);
 			CurrentFrame::set(31);
 			StabilizerBuys::on_initialize(2);
-			assert_eq!(Balances::total_issuance(), issuance);
+			assert_eq!(Balances::total_issuance(), issuance + ordinary_reward);
 			assert_eq!(
 				Balances::balance_on_hold(&HoldReason::PurchasePrincipal.into(), &1),
 				principal
 			);
 			assert!(StabilizerBuys::has_pending_repayment(&1, 42));
-			assert_eq!(Budget::outstanding_rewards(), ordinary_reward);
 
 			FailRepayment::set(false);
 			CurrentFrame::set(32);
 			StabilizerBuys::on_initialize(3);
+			let amounts = collect_accrued(1);
+			assert_eq!(amounts.stabilizer_buy_earnings, paid_ordinary_reward);
+			assert_eq!(amounts.liquid_repayment_earnings, paid_bonus);
+			assert_eq!(Balances::free_balance(1), 0);
 			let received = paid_ordinary_reward + paid_bonus;
+			assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(1)));
 			assert_eq!(Balances::free_balance(1), received);
 			assert_eq!(Balances::total_issuance(), issuance - principal + received);
 			assert_eq!(Balances::balance_on_hold(&HoldReason::PurchasePrincipal.into(), &1), 0);
 			assert_eq!(Budget::available_budget(), budget - ordinary_reward);
-			assert_eq!(Budget::outstanding_rewards(), 0);
+
 			assert!(!StabilizerBuys::has_pending_repayment(&1, 42));
-			assert!(!PayoutStateByAccount::<Test>::contains_key(1));
+			assert!(!NextSettlementFrameByAccount::<Test>::contains_key(1));
 			StabilizerBuys::on_initialize(5);
 			assert_eq!(Balances::total_issuance(), issuance - principal + received);
 		});
@@ -2140,6 +2156,7 @@ fn insufficient_bitcoin_window_keeps_the_buy_ordinary_and_reward_eligible() {
 		CurrentFrame::set(31);
 		StabilizerBuys::on_initialize(2);
 		assert_eq!(Balances::balance_on_hold(&HoldReason::PurchasePrincipal.into(), &1), 0);
-		assert_eq!(Balances::free_balance(1), 1_004_500_000);
+		assert_eq!(Balances::free_balance(1), 1_000_000_000);
+		assert_eq!(collect_accrued(1).stabilizer_buy_earnings, 4_500_000);
 	});
 }

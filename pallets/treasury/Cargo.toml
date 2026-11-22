@@ -22,9 +22,7 @@ polkadot-sdk = { workspace = true, features = ["frame-support", "frame-system", 
 pallet-prelude = { workspace = true }
 
 [dev-dependencies]
-pallet-mint = { workspace = true, default-features = true }
-pallet-stabilizer-buys = { workspace = true, default-features = true }
-# stabilizer_pool_collect_uses_fixed_frame_rates_and_debits_shared_reserves verifies atomic funding, account accounting and mint delivery.
+# frame_funding_commits_once_and_failed_collect_preserves_each_owners_backing verifies real custody, indexes and wallet delivery.
 pallet-treasury-positions = { workspace = true, default-features = true }
 polkadot-sdk = { workspace = true, features = ["sp-io", "pallet-balances"], default-features = true }
 pallet-prelude = { workspace = true, features = ["test"], default-features = true }

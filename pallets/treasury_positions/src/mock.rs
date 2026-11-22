@@ -23,8 +23,14 @@ impl pallet_balances::Config for Test {
 impl Config for Test {
 	type BitcoinPositionProvider = ();
 	type TreasuryPoolProvider = ();
-	type StabilizerPoolPositionProvider = MockStabilizerPools;
-	type MiningFrameTransitionProvider = MockFrameProvider;
+	type EarningsSettlementProvider = MockStabilizerPools;
+	#[cfg(not(feature = "runtime-benchmarks"))]
+	type VaultEarningsProvider = ();
+	#[cfg(feature = "runtime-benchmarks")]
+	type VaultEarningsProvider = pallet_prelude::benchmarking::BenchmarkVaultEarningsProvider;
+	type PalletId = TreasuryPositionsPalletId;
+	type MiningFrameTransitionProvider = CurrentFrame;
+	type MaxEarningChangesPerCall = ConstU32<32>;
 	type Currency = Balances;
 	type OperationalAccountProvider = MockOperationalAccounts;
 	type Balance = u128;
@@ -32,30 +38,18 @@ impl Config for Test {
 }
 
 frame_support::parameter_types! {
+	pub const TreasuryPositionsPalletId: frame_support::PalletId = frame_support::PalletId(*b"arg/colt");
+	pub static CurrentFrame: FrameId = 1;
 	pub static AfterFrameStart: bool = false;
 	pub static ProvedThrough: BTreeMap<u64, [FrameId; 2]> = BTreeMap::new();
 	pub storage CollectedThrough: BTreeMap<u64, [FrameId; 2]> = BTreeMap::new();
 }
 
-pub struct MockFrameProvider;
-impl MiningFrameTransitionProvider for MockFrameProvider {
-	type Weights = ();
-	fn is_first_block_after_frame_start() -> bool {
-		AfterFrameStart::get()
-	}
-	fn get_current_frame_id() -> FrameId {
-		14
-	}
-	fn is_new_frame_started() -> Option<FrameId> {
-		None
-	}
-}
-
 pub struct MockStabilizerPools;
-impl StabilizerPoolPositionProvider<u64> for MockStabilizerPools {
+impl EarningsSettlementProvider<u64> for MockStabilizerPools {
 	type Weights = ();
 
-	fn settle_account(account: &u64) -> Result<u128, DispatchError> {
+	fn settle_account(account: &u64) -> DispatchResult {
 		let proved = ProvedThrough::get().get(account).copied().unwrap_or_default();
 		let mut cursors = CollectedThrough::get();
 		let collected = cursors.entry(*account).or_default();
@@ -65,7 +59,17 @@ impl StabilizerPoolPositionProvider<u64> for MockStabilizerPools {
 			*last = eligible;
 		}
 		CollectedThrough::set(&cursors);
-		Ok(u128::from(frames_to_pay) * 7)
+		let amount = u128::from(frames_to_pay) * 7;
+		TreasuryPositions::fund(
+			argon_primitives::treasury::CollectSource::StabilizerPools,
+			amount,
+		)?;
+		TreasuryPositions::accrue(
+			account,
+			argon_primitives::treasury::CollectSource::StabilizerPools,
+			amount,
+		)?;
+		Ok(())
 	}
 }
 
@@ -78,4 +82,31 @@ impl OperationalAccountProvider<u64> for MockOperationalAccounts {
 	fn upstream_vault(account: &u64) -> Option<(u64, VaultId)> {
 		(*account == 8 || *account == 9).then_some((9, 3))
 	}
+}
+
+pub fn new_test_ext() -> polkadot_sdk::sp_io::TestExternalities {
+	CurrentFrame::set(1);
+	ProvedThrough::set(BTreeMap::new());
+	use sp_runtime::BuildStorage;
+	RuntimeGenesisConfig::default().build_storage().unwrap().into()
+}
+
+impl argon_primitives::MiningFrameTransitionProvider for CurrentFrame {
+	type Weights = ();
+	fn get_current_frame_id() -> FrameId {
+		Self::get()
+	}
+	fn is_new_frame_started() -> Option<FrameId> {
+		None
+	}
+}
+
+pub fn index_frame(
+	frame: FrameId,
+	quantities: PositionQuantities<u128>,
+	amounts: CollectAmounts<u128>,
+) {
+	assert_ok!(TreasuryPositions::prepare_collect());
+	assert_ok!(Balances::mint_into(&TreasuryPositions::account_id(), amounts.total()));
+	assert_ok!(TreasuryPositions::allocate_frame_earnings(frame, &quantities, amounts));
 }

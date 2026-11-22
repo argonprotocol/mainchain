@@ -804,6 +804,7 @@ pub(super) fn activate_test_minting_authority(
 		minting_authority_registration_signature(authority_pair, &operator_account),
 		microgon_collateral,
 		micronot_collateral,
+		None,
 	));
 	let approval_queue_nonce = MintingAuthoritiesBySigner::<Test>::get(signing_key)
 		.expect("authority should be inserted")

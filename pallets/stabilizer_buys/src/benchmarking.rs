@@ -2,9 +2,7 @@ use super::*;
 use argon_primitives::{PriceIndex, PriceIndexUpdated};
 use frame_support::traits::fungible::Mutate;
 use frame_system::RawOrigin;
-use pallet_prelude::benchmarking::{
-	set_benchmark_mining_clock, set_benchmark_treasury_reward_payment_failure, BenchmarkMiningClock,
-};
+use pallet_prelude::benchmarking::{set_benchmark_mining_clock, BenchmarkMiningClock};
 use polkadot_sdk::frame_benchmarking::v2::*;
 
 const CURRENT_FRAME: FrameId = 30_000;
@@ -88,7 +86,6 @@ where
 		owner,
 		principal * u128::from(count),
 	)?;
-	let payout_state = AccountPayoutState::default();
 	for frame in 1..=count {
 		Auctions::<T>::insert(
 			u64::from(frame) + offset,
@@ -115,16 +112,14 @@ where
 			},
 		);
 	}
-	with_storage_layer(|| Pallet::<T>::save_and_schedule_account(owner, payout_state))?;
+	with_storage_layer(|| Pallet::<T>::schedule_account(owner))?;
 	if mature {
 		// Model an overdue visit so rescheduling must remove and insert distinct keys.
-		if let Some(frame) = PayoutStateByAccount::<T>::get(owner).next_payout_frame {
+		if let Some(frame) = NextSettlementFrameByAccount::<T>::get(owner) {
 			PayoutQueue::<T>::remove(AscendingRankKey::new(frame, owner.clone()));
 		}
 		PayoutQueue::<T>::insert(AscendingRankKey::new(CURRENT_FRAME - 1, owner.clone()), ());
-		PayoutStateByAccount::<T>::mutate(owner, |payout_state| {
-			payout_state.next_payout_frame = Some(CURRENT_FRAME - 1)
-		});
+		NextSettlementFrameByAccount::<T>::insert(owner, CURRENT_FRAME - 1);
 	}
 	Ok(())
 }
@@ -258,7 +253,7 @@ mod benchmarks {
 			CurrencyOf::<T>::balance_on_hold(&HoldReason::PurchasePrincipal.into(), &owner),
 			purchase.principal
 		);
-		assert!(PayoutStateByAccount::<T>::contains_key(&owner));
+		assert!(NextSettlementFrameByAccount::<T>::contains_key(&owner));
 		assert_eq!(PayoutQueue::<T>::iter_keys().count(), 1);
 		Ok(())
 	}
@@ -296,7 +291,6 @@ mod benchmarks {
 		clock(30_000, NOW);
 		let basis = CurrencyOf::<T>::minimum_balance().max(10_000) / 10;
 		let budget = <T as Config>::AuctionInclusionPercent::get().mul_floor(basis);
-		let award = Percent::from_percent(50).mul_floor(budget);
 		for i in 0..b {
 			let owner = account("award", i, 0);
 			let offset = u64::from(i + 1) * u64::from(<T as Config>::MaxFramesPerPayout::get() + 1);
@@ -332,12 +326,7 @@ mod benchmarks {
 			}
 		}
 		assert!(AuctionAllocationQueue::<T>::iter_keys().next().is_none());
-		assert_eq!(
-			PayoutStateByAccount::<T>::iter_values()
-				.map(|payout_state| payout_state.payable_reward)
-				.sum::<Balance>(),
-			award * u128::from(b)
-		);
+		assert_eq!(BidsByAuction::<T>::iter_keys().count(), 0);
 		Ok(())
 	}
 
@@ -392,10 +381,11 @@ mod benchmarks {
 				LiquidRepaysByAccountAndGatewayNonce::<T>::iter_prefix(&owner).next().unwrap();
 			let admission_frame = repay.admission_frame;
 			with_storage_layer(|| {
-				let (_, reward) =
+				let reward =
 					Pallet::<T>::settle_liquid_repay(&owner, u64::from_ordered(&nonce), repay)?;
 				if reward > 0 {
-					CurrencyOf::<T>::mint_into(&owner, reward)?;
+					T::PositionProvider::fund(CollectSource::LiquidRepayments, reward)?;
+					T::PositionProvider::accrue(&owner, CollectSource::LiquidRepayments, reward)?;
 					Pallet::<T>::deposit_event(Event::LiquidRepaymentRewardAwarded {
 						account: owner.clone(),
 						admission_frame,
@@ -420,7 +410,6 @@ mod benchmarks {
 
 	#[benchmark]
 	fn process_reward_payouts(a: Linear<1, 4>) -> Result<(), BenchmarkError> {
-		set_benchmark_treasury_reward_payment_failure(false);
 		clock(30_000, NOW);
 		let reward = CurrencyOf::<T>::minimum_balance().max(10_000);
 		for i in 0..a {
@@ -452,7 +441,6 @@ mod benchmarks {
 					(),
 				);
 			}
-			// The reward provider is measured separately and does not credit this fixture.
 			// Leave enough free balance for the one-microgon release to reach the minimum.
 			let free = CurrencyOf::<T>::balance(&owner);
 			let retained = CurrencyOf::<T>::minimum_balance() - 1;
@@ -463,9 +451,6 @@ mod benchmarks {
 				Precision::Exact,
 				Fortitude::Force,
 			)?;
-			PayoutStateByAccount::<T>::mutate(&owner, |payout_state| {
-				payout_state.payable_reward = reward
-			});
 		}
 		PayoutQueueCursor::<T>::put((
 			CURRENT_FRAME,
@@ -485,9 +470,7 @@ mod benchmarks {
 
 	#[benchmark]
 	fn process_payouts(a: Linear<1, 4>) -> Result<(), BenchmarkError> {
-		set_benchmark_treasury_reward_payment_failure(false);
 		clock(30_000, NOW);
-		let reward = CurrencyOf::<T>::minimum_balance().max(10_000);
 
 		for i in 0..a {
 			let owner = account("payout", i, 0);
@@ -496,9 +479,6 @@ mod benchmarks {
 				true,
 				u64::from(i) * u64::from(<T as Config>::MaxFramesPerPayout::get() + 1),
 			)?;
-			PayoutStateByAccount::<T>::mutate(&owner, |payout_state| {
-				payout_state.payable_reward = reward
-			});
 		}
 		PayoutQueueCursor::<T>::put((
 			CURRENT_FRAME,
@@ -513,49 +493,11 @@ mod benchmarks {
 				Pallet::<T>::payout_account(&key.holder_id(), None)?;
 			}
 		}
-		assert!(PayoutStateByAccount::<T>::iter_values()
-			.all(|payout_state| payout_state.payable_reward == 0));
 		assert_eq!(PayoutQueue::<T>::iter_keys().count(), a as usize);
 		for i in 0..a {
 			let owner: T::AccountId = account("payout", i, 0);
 			assert_eq!(BuysByAccountAndFrame::<T>::iter_prefix(&owner).count(), 1);
 		}
-		Ok(())
-	}
-
-	#[benchmark]
-	fn process_payouts_failed(a: Linear<1, 4>) -> Result<(), BenchmarkError> {
-		clock(30_000, NOW);
-		let reward = CurrencyOf::<T>::minimum_balance().max(10_000);
-
-		for i in 0..a {
-			let owner = account("payout", i, 0);
-			account_buys::<T>(
-				&owner,
-				true,
-				u64::from(i) * u64::from(<T as Config>::MaxFramesPerPayout::get() + 1),
-			)?;
-			PayoutStateByAccount::<T>::mutate(&owner, |payout_state| {
-				payout_state.payable_reward = reward
-			});
-		}
-		set_benchmark_treasury_reward_payment_failure(true);
-		PayoutQueueCursor::<T>::put((
-			CURRENT_FRAME,
-			AscendingRankKey::new(CURRENT_FRAME, account::<T::AccountId>("queue-cursor", 0, 0)),
-		));
-		#[block]
-		{
-			Pallet::<T>::on_initialize(1u32.into());
-		}
-		assert_eq!(
-			PayoutStateByAccount::<T>::iter_values()
-				.map(|payout_state| payout_state.payable_reward)
-				.sum::<Balance>(),
-			reward * u128::from(a)
-		);
-		set_benchmark_treasury_reward_payment_failure(false);
-		assert_eq!(PayoutQueue::<T>::iter_keys().next().unwrap().rank(), CURRENT_FRAME + 1);
 		Ok(())
 	}
 

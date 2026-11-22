@@ -27,9 +27,14 @@ use pallet_ethereum_verifier::{types::ExecutionHeaderAnchor, ExecutionHeaderAnch
 #[cfg(test)]
 use pallet_prelude::{new_test_with_genesis, TestState};
 #[cfg(test)]
+use polkadot_sdk::pallet_balances;
+#[cfg(test)]
 use polkadot_sdk::sp_core::U512;
 #[cfg(test)]
-use sp_runtime::{traits::IdentityLookup, AccountId32};
+use sp_runtime::{
+	traits::{ConstU128, IdentityLookup},
+	AccountId32,
+};
 #[cfg(test)]
 use uniswap_v3_sdk_bigint::utils::{
 	encode_sqrt_ratio_x96, get_amount_0_delta, get_amount_1_delta, get_sqrt_ratio_at_tick,
@@ -42,6 +47,8 @@ type Block = frame_system::mocking::MockBlock<Test>;
 #[cfg(test)]
 frame_support::construct_runtime!(pub enum Test {
 	System: frame_system,
+	Balances: polkadot_sdk::pallet_balances,
+	TreasuryPositions: pallet_treasury_positions,
 	EthereumVerifier: pallet_ethereum_verifier,
 	StabilizerPools: pallet_stabilizer_pools,
 });
@@ -50,8 +57,32 @@ frame_support::construct_runtime!(pub enum Test {
 #[derive_impl(frame_system::config_preludes::TestDefaultConfig)]
 impl frame_system::Config for Test {
 	type Block = Block;
+	type AccountData = polkadot_sdk::pallet_balances::AccountData<Balance>;
 	type AccountId = AccountId32;
 	type Lookup = IdentityLookup<Self::AccountId>;
+}
+
+#[cfg(test)]
+#[derive_impl(pallet_balances::config_preludes::TestDefaultConfig)]
+impl polkadot_sdk::pallet_balances::Config for Test {
+	type Balance = Balance;
+	type AccountStore = System;
+	type ExistentialDeposit = ConstU128<1>;
+}
+
+#[cfg(test)]
+impl pallet_treasury_positions::Config for Test {
+	type Balance = Balance;
+	type MiningFrameTransitionProvider = CurrentFrame;
+	type MaxEarningChangesPerCall = ConstU32<32>;
+	type Currency = Balances;
+	type PalletId = TreasuryPositionsPalletId;
+	type BitcoinPositionProvider = ();
+	type TreasuryPoolProvider = ();
+	type OperationalAccountProvider = ();
+	type EarningsSettlementProvider = StabilizerPools;
+	type VaultEarningsProvider = ();
+	type WeightInfo = ();
 }
 
 #[cfg(test)]
@@ -65,7 +96,7 @@ impl Config for Test {
 	type EthereumVerifier = EthereumVerifier;
 	type PriceProvider = MockPriceProvider;
 	type RewardProvider = MockRewardProvider;
-	type TreasuryPositionProvider = ();
+	type TreasuryPositionProvider = TreasuryPositions;
 	type MaxPositionsPerAccount = ConstU32<5>;
 	type UsdcRewardShare = UsdcRewardShare;
 	type WeightInfo = ();
@@ -83,6 +114,7 @@ impl Config for Test {
 
 #[cfg(test)]
 frame_support::parameter_types! {
+	pub const TreasuryPositionsPalletId: frame_support::PalletId = frame_support::PalletId(*b"arg/colt");
 	pub const RewardPriceBand: (Percent, Percent) = (Percent::from_percent(90), Percent::one());
 	pub const MaxPriceBucketsPerFrame: u32 = 24;
 	pub const MinPriceBucketCoverage: Percent = Percent::from_percent(75);
@@ -156,10 +188,15 @@ impl StabilizerPoolRewardProvider for MockRewardProvider {
 		if RejectClaims::get() {
 			return Err(DispatchError::Unavailable);
 		}
+		let amount = frames.iter().map(|claim| claim.amount).sum();
+		TreasuryPositions::fund(
+			argon_primitives::treasury::CollectSource::StabilizerPools,
+			amount,
+		)?;
 		PaidClaims::mutate(|claims| {
 			claims.push(PaidClaim { frames: frames.to_vec() });
 		});
-		Ok(1)
+		Ok(amount)
 	}
 }
 
@@ -186,6 +223,7 @@ impl MiningFrameTransitionProvider for CurrentFrame {
 pub fn new_test_ext() -> TestState {
 	let mut ext = new_test_with_genesis::<Test>(|_| {});
 	ext.execute_with(|| {
+		<TreasuryPositions as frame_support::traits::OnGenesis>::on_genesis();
 		System::set_block_number(1);
 		ArgonMarketPrice::set(Some(FixedU128::one()));
 		ArgonTargetPrice::set(Some(FixedU128::one()));

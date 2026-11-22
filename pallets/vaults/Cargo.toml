@@ -17,7 +17,6 @@ targets = ["x86_64-unknown-linux-gnu"]
 [dependencies]
 codec = { workspace = true }
 scale-info = { workspace = true }
-pallet-treasury = { workspace = true, optional = true }
 argon-bitcoin = { workspace = true, default-features = false }
 pallet-bitcoin-utxos = { workspace = true, optional = true }
 polkadot-sdk = { workspace = true, features = ["frame-support", "frame-system", "sp-runtime", "sp-core"] }
@@ -25,6 +24,8 @@ pallet-prelude = { workspace = true }
 tracing = { workspace = true }
 
 [dev-dependencies]
+# shared_collect_skips_blocked_vault_earnings_and_expires_only_their_backing checks both financial ledgers and currency.
+pallet-treasury-positions = { workspace = true, default-features = true }
 pallet-bitcoin-fissions = { workspace = true, default-features = true }
 pallet-bitcoin-locks = { workspace = true, default-features = true }
 polkadot-sdk = { workspace = true, features = ["sp-io", "pallet-balances"], default-features = true }
@@ -42,7 +43,6 @@ std = [
 	"k256/std",
 	"pallet-bitcoin-utxos?/std",
 	"pallet-prelude/std",
-	"pallet-treasury?/std",
 	"polkadot-sdk/std",
 	"scale-info/std",
 	"tracing/std",
@@ -50,12 +50,10 @@ std = [
 runtime-benchmarks = [
 	"pallet-bitcoin-utxos/runtime-benchmarks",
 	"pallet-prelude/runtime-benchmarks",
-	"pallet-treasury/runtime-benchmarks",
 	"polkadot-sdk/frame-benchmarking",
 	"polkadot-sdk/runtime-benchmarks",
 ]
 try-runtime = [
 	"pallet-bitcoin-utxos?/try-runtime",
-	"pallet-treasury?/try-runtime",
 	"polkadot-sdk/try-runtime",
 ]

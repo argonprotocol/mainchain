@@ -10,8 +10,8 @@ pub use argon_primitives::EthereumProofBlock as ProofBlock;
 use argon_primitives::{
 	block_seal::FrameId,
 	treasury::{
-		StabilizerPoolFrameClaim, StabilizerPoolPositionProvider, StabilizerPoolRewardProvider,
-		TreasuryPositionProvider,
+		CollectSource, EarningsSettlementProvider, StabilizerPoolFrameClaim,
+		StabilizerPoolRewardProvider, TreasuryPositionProvider,
 	},
 	Balance, BlockSealAuthorityId, EthereumAccountStorageProof, EthereumAccountStorageWitness,
 	EthereumAccountStorageWitnessRef, EthereumExecutionBlockProof, EthereumVerifyProvider,
@@ -20,7 +20,7 @@ use argon_primitives::{
 use frame_support::traits::Time;
 pub use pallet::*;
 use pallet_prelude::*;
-use polkadot_sdk::sp_core::U512;
+use sp_core::U512;
 use sp_runtime::ArithmeticError;
 use uniswap::{MAX_REWARD_RANGES, REWARD_BAND_TOLERANCE};
 use weights::liquidity_snapshot_weight;
@@ -46,7 +46,7 @@ pub use uniswap::{PositionAmountError, PositionAmounts, StabilizerPoolRewardBand
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(2);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(3);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -82,7 +82,7 @@ pub mod pallet {
 		/// Closed mining frames retained in the sampled Uniswap price history.
 		#[pallet::constant]
 		type MaxSampledPriceHistoryFrames: Get<u32>;
-		/// Frames available to collect after Treasury finalizes the reward rate.
+		/// Closed frames available to prove eligibility. Accepted earnings never expire.
 		#[pallet::constant]
 		type ClaimWindowFrames: Get<u32>;
 		/// Nominal frame duration used to size the price sampling buckets.
@@ -239,6 +239,14 @@ pub mod pallet {
 			/// First frame using the replacement's daily reward terms.
 			first_eligible_frame_id: FrameId,
 		},
+
+		/// An accepted NFT earning period was handed to the owner's backed Positions bucket.
+		PositionEarningsAccrued {
+			account: T::AccountId,
+			position: StabilizerPoolPositionId,
+			frame_id: FrameId,
+			amount: Balance,
+		},
 	}
 
 	#[pallet::error]
@@ -338,8 +346,8 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Register a position or refresh its checkpoint. A new revision forfeits the old
-		/// registration's unclaimed rewards and starts earning at the next frame.
+		/// Register or refresh eligibility. A new revision preserves accepted earnings and starts
+		/// fresh eligibility at the next frame; it cannot prove continuity for the prior revision.
 		#[pallet::call_index(1)]
 		#[pallet::weight(weights::checkpoint_position::<T>(proof))]
 		pub fn checkpoint_position(
@@ -356,8 +364,8 @@ pub mod pallet {
 		}
 
 		/// Any signed account may report a newer revision or ended subscription. Proven rewards
-		/// remain collectible until an ordinary checkpoint reset starts a fresh enrollment.
-		/// A timely continuation preserves the enrollment and its unpaid reward cursor.
+		/// remain collectable after resets or removal. A timely continuation also preserves the
+		/// enrollment and eligibility that has not yet been committed.
 		#[pallet::call_index(2)]
 		#[pallet::weight(weights::report_position_change::<T>(proof))]
 		pub fn report_position_change(
@@ -533,6 +541,7 @@ pub mod pallet {
 			continuation.reported_enrollment = None;
 			PositionContinuations::<T>::remove(position);
 			PositionContinuations::<T>::insert(replacement, continuation);
+			Self::prove_position_earnings(replacement)?;
 
 			Self::deposit_event(Event::PositionContinued {
 				position,
@@ -623,12 +632,15 @@ pub mod pallet {
 				},
 				None => None,
 			};
+
+			Self::prove_position_earnings(position_id)?;
 			let mut account_positions = PositionIdsByAccount::<T>::get(&checkpoint.beneficiary);
 			if !account_positions.contains(&position_id) {
 				account_positions
 					.try_push(position_id)
 					.map_err(|_| Error::<T>::TooManyPositions)?;
 			}
+
 			if enrollment.is_none() || !matches!(outcome, CheckpointOutcome::Maintained { .. }) {
 				Self::ensure_liquidity_increase_allowed()?;
 				let current_frame = T::MiningFrameTransitionProvider::get_current_frame_id();
@@ -667,6 +679,8 @@ pub mod pallet {
 			PositionIdsByAccount::<T>::insert(&checkpoint.beneficiary, account_positions);
 			T::TreasuryPositionProvider::ensure_account(&checkpoint.beneficiary);
 			PositionCheckpoints::<T>::insert(position_manager, token_id, &checkpoint);
+
+			Self::prove_position_earnings(position_id)?;
 			Self::deposit_event(Event::PositionCheckpointed {
 				position_manager,
 				token_id,
@@ -676,8 +690,66 @@ pub mod pallet {
 			Ok(())
 		}
 
-		/// Calculate unpaid finalized rewards using the position's retained daily terms.
-		pub(crate) fn calculate_position_rewards(
+		/// Commit finalized earnings directly to the owner's backed Positions balance.
+		pub(crate) fn prove_position_earnings(
+			position: StabilizerPoolPositionId,
+		) -> DispatchResult {
+			let mut continuation = PositionContinuations::<T>::get(position);
+			let mut enrollment = match StabilizerPoolRegistrations::<T>::get(position) {
+				Some(StabilizerPoolRegistration::Enrolled(enrollment)) => enrollment,
+				_ => match continuation.reported_enrollment {
+					Some(report) => report.enrollment,
+					None => return Ok(()),
+				},
+			};
+
+			let checkpoint =
+				PositionCheckpoints::<T>::get(position.position_manager, position.uniswap_nft_id)
+					.ok_or(Error::<T>::PositionNotEnrolled)?;
+			let current_frame = T::MiningFrameTransitionProvider::get_current_frame_id();
+			let (next_frame, claims) = Self::calculate_position_earnings(
+				&checkpoint,
+				&enrollment,
+				&continuation,
+				current_frame,
+			)?;
+
+			if !claims.is_empty() {
+				let amount = T::RewardProvider::claim_rewards(&claims)?;
+				T::TreasuryPositionProvider::accrue(
+					&checkpoint.beneficiary,
+					CollectSource::StabilizerPools,
+					amount,
+				)?;
+				for claim in claims {
+					Self::deposit_event(Event::PositionEarningsAccrued {
+						account: checkpoint.beneficiary.clone(),
+						position,
+						frame_id: claim.frame_id,
+						amount: claim.amount,
+					});
+				}
+			}
+
+			if next_frame == enrollment.next_claim_frame_id {
+				return Ok(())
+			}
+			enrollment.next_claim_frame_id = next_frame;
+			if let Some(report) = continuation.reported_enrollment.as_mut() {
+				report.enrollment = enrollment;
+				PositionContinuations::<T>::insert(position, continuation);
+			} else {
+				StabilizerPoolRegistrations::<T>::insert(
+					position,
+					StabilizerPoolRegistration::Enrolled(enrollment),
+				);
+			}
+			Ok(())
+		}
+
+		/// Value proven eligibility only while its frame is retained and its financial rate is
+		/// final.
+		pub(crate) fn calculate_position_earnings(
 			checkpoint: &PositionCheckpoint<T::AccountId>,
 			enrollment: &StabilizerPoolEnrollment,
 			continuation: &PositionContinuation<T::MaxSampledPriceHistoryFrames>,
@@ -688,10 +760,10 @@ pub mod pallet {
 
 			let retained_earning_frames =
 				FrameId::from(T::ClaimWindowFrames::get()).saturating_add(1);
-			let oldest_claimable_frame = current_frame.saturating_sub(retained_earning_frames);
-			let first_frame = next_claim_frame_id.max(oldest_claimable_frame);
-			let first_unfinalized_frame_id = current_frame.saturating_sub(1);
-			if first_frame >= first_unfinalized_frame_id {
+			let oldest_provable_frame = current_frame.saturating_sub(retained_earning_frames);
+			let first_frame = next_claim_frame_id.max(oldest_provable_frame);
+			let first_unfinalized_frame = current_frame.saturating_sub(1);
+			if first_frame >= first_unfinalized_frame {
 				return Ok((next_claim_frame_id, Vec::new()));
 			}
 
@@ -704,23 +776,24 @@ pub mod pallet {
 				.ok_or(Error::<T>::PositionNotEnrolled)?;
 				history.push((period, terms));
 			}
+
 			let config = Pools::<T>::get(checkpoint.pool_manager, checkpoint.pool_id)
 				.ok_or(Error::<T>::PoolNotRegistered)?;
 			let prices = StabilizerPoolPricesByFrame::<T>::get();
 			let frame_starts = StabilizerPoolFrameStartMillis::<T>::get();
 			let reward_shares = StabilizerPoolRewardSharesByFrame::<T>::get();
-			let mut next_unclaimed = next_claim_frame_id;
-			let mut claims = Vec::new();
+			let mut next_uncommitted_frame = next_claim_frame_id;
+			let mut earnings = Vec::new();
 
 			let closed = continuation
 				.reported_enrollment
 				.is_some_and(|report| current_frame >= report.recovery_deadline_frame_id);
-			for frame in first_frame..first_unfinalized_frame_id {
+			for frame in first_frame..first_unfinalized_frame {
 				let next_frame = frame.saturating_add(1);
 				let (Some(start), Some(end)) =
 					(frame_starts.get(&frame), frame_starts.get(&next_frame))
 				else {
-					next_unclaimed = next_frame;
+					next_uncommitted_frame = next_frame;
 					continue;
 				};
 				// Frames from the report onward closed without this position.
@@ -728,13 +801,14 @@ pub mod pallet {
 					.reported_enrollment
 					.is_some_and(|report| frame >= report.reported_frame_id)
 				{
-					next_unclaimed = next_frame;
+					next_uncommitted_frame = next_frame;
 					continue;
 				}
 				if history.iter().any(|(period, _)| period.excluded_frame_id == Some(frame)) {
-					next_unclaimed = next_frame;
+					next_uncommitted_frame = next_frame;
 					continue;
 				}
+
 				let mut terms = checkpoint;
 				let mut coverage = checkpoint.proven_through_block.timestamp_millis;
 				let mut replacement = None;
@@ -743,7 +817,7 @@ pub mod pallet {
 				{
 					let (period, previous) = &history[index];
 					if frame < period.first_eligible_frame_id {
-						next_unclaimed = next_frame;
+						next_uncommitted_frame = next_frame;
 						continue;
 					}
 					terms = previous;
@@ -758,30 +832,33 @@ pub mod pallet {
 						replacement = Some(successor);
 					}
 				} else if frame < first_eligible_frame_id {
-					next_unclaimed = next_frame;
+					next_uncommitted_frame = next_frame;
 					continue
 				}
+
 				if *end > coverage {
 					if closed {
-						next_unclaimed = next_frame;
+						next_uncommitted_frame = next_frame;
 						continue
 					}
 					break;
 				}
-				next_unclaimed = next_frame;
+
+				let Some(rate) = T::RewardProvider::frame_reward_rate(frame) else { break };
+				next_uncommitted_frame = next_frame;
 				if *start < terms.maintained_since_block.timestamp_millis {
 					continue;
 				}
 
 				let Some(price) = prices.get(&frame) else { continue };
 				let Some(&usdc_share) = reward_shares.get(&frame) else { continue };
-				let Some(rate) = T::RewardProvider::frame_reward_rate(frame) else { continue };
 				if checkpoint.pool_manager != price.pool.pool_manager {
 					continue;
 				}
 				if checkpoint.pool_id != price.pool.pool_id {
 					continue;
 				}
+
 				let Ok(band) = Self::reward_band(price, config.key.tick_spacing) else { continue };
 				let basis = FrameLiquidity::new(terms, replacement);
 				let earning_liquidity = basis
@@ -797,12 +874,16 @@ pub mod pallet {
 					)
 					.map_err(|_| Error::<T>::ClaimValuationFailed)?;
 
+				if amounts.argon.is_zero() && amounts.usdc.is_zero() {
+					continue
+				}
+
 				let usdc_in_microgons = price.usdc_in_microgons(amounts.usdc)?;
 				let rate = U512::from(rate.into_inner());
 				let argon_share = Percent::one().saturating_sub(usdc_share);
 				let scale = U512::from(FixedU128::DIV) * Percent::one().deconstruct();
-				// Two uint128 factors and a percentage can require 263 bits. Round down
-				// only after applying both the financial rate and the asset's share.
+				// Two uint128 factors and a percentage can require 263 bits. Round only
+				// after applying both the financial rate and each asset's share.
 				let argon_reward =
 					U512::from(amounts.argon) * rate * argon_share.deconstruct() / scale;
 				let usdc_reward =
@@ -812,10 +893,10 @@ pub mod pallet {
 				if amount.is_zero() {
 					continue;
 				}
-				claims.push(StabilizerPoolFrameClaim { frame_id: frame, amount });
+				earnings.push(StabilizerPoolFrameClaim { frame_id: frame, amount });
 			}
 
-			Ok((next_unclaimed, claims))
+			Ok((next_uncommitted_frame, earnings))
 		}
 
 		pub(crate) fn remove_reported_position(
@@ -849,6 +930,7 @@ pub mod pallet {
 					reported_frame_id: frame_id,
 				});
 			});
+			Self::prove_position_earnings(position)?;
 			Self::deposit_event(Event::PositionChangeReported { position, observed_at });
 			Ok(())
 		}
@@ -1316,74 +1398,48 @@ pub mod pallet {
 		}
 	}
 
-	impl<T: Config> StabilizerPoolPositionProvider<T::AccountId> for Pallet<T> {
+	impl<T: Config> EarningsSettlementProvider<T::AccountId> for Pallet<T> {
 		type Weights = weights::PositionProviderWeights<T>;
-		fn settle_account(account: &T::AccountId) -> Result<Balance, DispatchError> {
-			let current_frame = T::MiningFrameTransitionProvider::get_current_frame_id();
-			let mut claims_by_frame = BTreeMap::<FrameId, Balance>::new();
+
+		fn settle_account(account: &T::AccountId) -> DispatchResult {
 			for position in PositionIdsByAccount::<T>::get(account) {
-				let mut continuation = PositionContinuations::<T>::get(position);
-				let reported = continuation.reported_enrollment;
-				let mut enrollment = match StabilizerPoolRegistrations::<T>::get(position) {
-					Some(StabilizerPoolRegistration::Enrolled(enrollment)) => enrollment,
-					_ => {
-						let Some(report) = reported else { continue };
-						report.enrollment
-					},
-				};
 				let checkpoint = PositionCheckpoints::<T>::get(
 					position.position_manager,
 					position.uniswap_nft_id,
 				)
 				.ok_or(Error::<T>::PositionNotEnrolled)?;
 				ensure!(&checkpoint.beneficiary == account, Error::<T>::NotBeneficiary);
+				Self::prove_position_earnings(position)?;
+			}
 
-				let closed = reported
-					.is_some_and(|report| current_frame >= report.recovery_deadline_frame_id);
-				let (next_claim_frame_id, claims) = Self::calculate_position_rewards(
-					&checkpoint,
-					&enrollment,
-					&continuation,
-					current_frame,
-				)?;
-				for claim in claims {
-					let amount = claims_by_frame.entry(claim.frame_id).or_default();
-					*amount = amount.checked_add(claim.amount).ok_or(ArithmeticError::Overflow)?;
-				}
-				if next_claim_frame_id > enrollment.next_claim_frame_id {
-					enrollment.next_claim_frame_id = next_claim_frame_id;
-					if let Some(mut report) = reported {
-						report.enrollment = enrollment;
-						continuation.reported_enrollment = Some(report);
-						PositionContinuations::<T>::insert(position, continuation);
-					} else {
-						StabilizerPoolRegistrations::<T>::insert(
-							position,
-							StabilizerPoolRegistration::Enrolled(enrollment),
-						);
+			let current_frame = T::MiningFrameTransitionProvider::get_current_frame_id();
+			PositionIdsByAccount::<T>::mutate_exists(account, |stored| {
+				let Some(ids) = stored else { return };
+				ids.retain(|position| {
+					let continuation = PositionContinuations::<T>::get(position);
+					let Some(report) = continuation.reported_enrollment else { return true };
+					if current_frame < report.recovery_deadline_frame_id {
+						return true
 					}
-				}
-				if closed {
-					PositionContinuations::<T>::remove(position);
-					PositionIdsByAccount::<T>::mutate_exists(account, |stored| {
-						if let Some(ids) = stored {
-							ids.retain(|id| *id != position);
-							if ids.is_empty() {
-								*stored = None;
-							}
-						}
-					});
-				}
-			}
 
-			if claims_by_frame.is_empty() {
-				return Ok(0)
-			}
-			let claims: Vec<_> = claims_by_frame
-				.into_iter()
-				.map(|(frame_id, amount)| StabilizerPoolFrameClaim { frame_id, amount })
-				.collect();
-			T::RewardProvider::claim_rewards(&claims)
+					let oldest_provable_frame = current_frame.saturating_sub(
+						FrameId::from(T::ClaimWindowFrames::get()).saturating_add(1),
+					);
+					let has_unsettled_provable_earnings = report.reported_frame_id >
+						oldest_provable_frame &&
+						report.enrollment.next_claim_frame_id < report.reported_frame_id;
+					if has_unsettled_provable_earnings {
+						return true
+					}
+
+					PositionContinuations::<T>::remove(position);
+					false
+				});
+				if ids.is_empty() {
+					*stored = None;
+				}
+			});
+			Ok(())
 		}
 	}
 }
@@ -1523,7 +1579,7 @@ pub enum StabilizerPoolRegistration {
 pub struct StabilizerPoolEnrollment {
 	/// First frame in which this revision contributes liquidity.
 	pub first_eligible_frame_id: FrameId,
-	/// Earliest frame this enrollment can still submit a claim for.
+	/// Earliest frame whose eligible earnings have not yet been committed.
 	pub next_claim_frame_id: FrameId,
 }
 
@@ -1670,7 +1726,7 @@ pub struct PositionEarningPeriod {
 	MaxEncodedLen,
 )]
 pub struct ReportedPositionEnrollment {
-	/// Eligibility and claim cursor from before the first report.
+	/// Eligibility and commitment cursor from before the first report.
 	pub enrollment: StabilizerPoolEnrollment,
 	/// Exclusive recovery frame, derived from the first report's Ethereum observation.
 	pub recovery_deadline_frame_id: FrameId,

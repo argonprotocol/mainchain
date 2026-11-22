@@ -2,9 +2,247 @@ use crate::{block_seal::FrameId, Balance, VaultId};
 use codec::{Codec, Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use polkadot_sdk::{
 	frame_support::weights::Weight,
-	sp_runtime::{DispatchError, DispatchResult, FixedU128},
+	sp_runtime::{
+		traits::{AtLeast32BitUnsigned, Saturating},
+		DispatchError, DispatchResult, FixedPointNumber, FixedU128,
+	},
 };
 use scale_info::TypeInfo;
+
+/// Account collection amounts in ARGON microgons, by source.
+#[derive(
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	Clone,
+	Copy,
+	Debug,
+	Default,
+	PartialEq,
+	Eq,
+	TypeInfo,
+	MaxEncodedLen,
+)]
+pub struct CollectAmounts<Balance>
+where
+	Balance: Codec + MaxEncodedLen,
+{
+	/// Rewards earned on ARGON bonds.
+	#[codec(compact)]
+	pub bond_earnings: Balance,
+	/// Rewards earned on ARGONOT stakes.
+	#[codec(compact)]
+	pub stake_earnings: Balance,
+	/// Rewards earned on eligible Bitcoin liquidity.
+	#[codec(compact)]
+	pub bitcoin_earnings: Balance,
+	/// Rewards earned for supplying eligible stabilizer pool liquidity.
+	#[codec(compact)]
+	pub stabilizer_pool_earnings: Balance,
+	/// Mature Treasury-funded stabilizer buy rewards.
+	#[codec(compact)]
+	pub stabilizer_buy_earnings: Balance,
+	/// Additional rewards funded by completed Liquid repayment burns.
+	#[codec(compact)]
+	pub liquid_repayment_earnings: Balance,
+	/// Vault revenue awaiting collection, subject to the vault's blockers and expiry policy.
+	#[codec(compact)]
+	pub vault_earnings: Balance,
+}
+
+impl<Balance: AtLeast32BitUnsigned + Copy + Codec + MaxEncodedLen> CollectAmounts<Balance> {
+	pub fn total(&self) -> Balance {
+		self.bond_earnings
+			.saturating_add(self.stake_earnings)
+			.saturating_add(self.bitcoin_earnings)
+			.saturating_add(self.stabilizer_pool_earnings)
+			.saturating_add(self.stabilizer_buy_earnings)
+			.saturating_add(self.liquid_repayment_earnings)
+			.saturating_add(self.vault_earnings)
+	}
+
+	pub fn saturating_accrue(&mut self, other: &Self) {
+		self.bond_earnings.saturating_accrue(other.bond_earnings);
+		self.stake_earnings.saturating_accrue(other.stake_earnings);
+		self.bitcoin_earnings.saturating_accrue(other.bitcoin_earnings);
+		self.stabilizer_pool_earnings.saturating_accrue(other.stabilizer_pool_earnings);
+		self.stabilizer_buy_earnings.saturating_accrue(other.stabilizer_buy_earnings);
+		self.liquid_repayment_earnings
+			.saturating_accrue(other.liquid_repayment_earnings);
+		self.vault_earnings.saturating_accrue(other.vault_earnings);
+	}
+
+	pub fn saturating_reduce(&mut self, other: &Self) {
+		self.bond_earnings.saturating_reduce(other.bond_earnings);
+		self.stake_earnings.saturating_reduce(other.stake_earnings);
+		self.bitcoin_earnings.saturating_reduce(other.bitcoin_earnings);
+		self.stabilizer_pool_earnings.saturating_reduce(other.stabilizer_pool_earnings);
+		self.stabilizer_buy_earnings.saturating_reduce(other.stabilizer_buy_earnings);
+		self.liquid_repayment_earnings
+			.saturating_reduce(other.liquid_repayment_earnings);
+		self.vault_earnings.saturating_reduce(other.vault_earnings);
+	}
+}
+
+/// Issued Collect funding and wallet payments, in ARGON microgons by source.
+#[derive(
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	Clone,
+	Debug,
+	Default,
+	PartialEq,
+	Eq,
+	TypeInfo,
+	MaxEncodedLen,
+)]
+pub struct CollectTotals<Balance>
+where
+	Balance: Codec + MaxEncodedLen,
+{
+	/// Source funding issued into custody, excluding its minimum balance.
+	pub funded: CollectAmounts<Balance>,
+	/// Backed amounts delivered to wallets since activation.
+	pub collected: CollectAmounts<Balance>,
+	/// Vault revenue burned after its collection deadline. Other sources never expire.
+	pub expired_vault_earnings: Balance,
+}
+
+/// Source attribution for custody funding, account accrual and wallet collection.
+#[derive(
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	Clone,
+	Copy,
+	Debug,
+	PartialEq,
+	Eq,
+	TypeInfo,
+	MaxEncodedLen,
+)]
+pub enum CollectSource {
+	/// ARGON bond earnings.
+	Bonds,
+	/// ARGONOT stake earnings, paid in ARGON.
+	Stakes,
+	/// Earnings on active Fissions' promised ARGON liquidity.
+	BitcoinLiquidity,
+	/// Accepted stabilizer pool earnings.
+	StabilizerPools,
+	/// Mature Treasury-funded stabilizer buy rewards.
+	StabilizerBuys,
+	/// Additional rewards funded by completed Liquid repayment burns.
+	LiquidRepayments,
+	/// Conditional vault revenue, in ARGON.
+	Vaults,
+}
+
+impl<Balance: AtLeast32BitUnsigned + Copy + Default + Codec + MaxEncodedLen>
+	CollectAmounts<Balance>
+{
+	pub fn from_source(source: CollectSource, amount: Balance) -> Self {
+		let mut amounts = Self::default();
+		match source {
+			CollectSource::Bonds => amounts.bond_earnings = amount,
+			CollectSource::Stakes => amounts.stake_earnings = amount,
+			CollectSource::BitcoinLiquidity => amounts.bitcoin_earnings = amount,
+			CollectSource::StabilizerPools => amounts.stabilizer_pool_earnings = amount,
+			CollectSource::StabilizerBuys => amounts.stabilizer_buy_earnings = amount,
+			CollectSource::LiquidRepayments => amounts.liquid_repayment_earnings = amount,
+			CollectSource::Vaults => amounts.vault_earnings = amount,
+		}
+		amounts
+	}
+}
+
+/// Cumulative ARGON earnings per eligible source quantity, scaled by FixedU128.
+#[derive(
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	Clone,
+	Copy,
+	Debug,
+	Default,
+	PartialEq,
+	Eq,
+	TypeInfo,
+	MaxEncodedLen,
+)]
+pub struct EarningsIndexValues {
+	/// ARGON microgons per whole eligible ARGON bond, at FixedU128 precision.
+	pub bonds: FixedU128,
+	/// ARGON microgons per whole admitted ARGONOT stake, at FixedU128 precision.
+	pub stakes: FixedU128,
+	/// ARGON microgons per promised ARGON microgon of active Bitcoin liquidity.
+	pub bitcoin_liquidity: FixedU128,
+}
+
+/// Saved cumulative index and fractional microgon carry for one indexed position.
+#[derive(
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	Clone,
+	Copy,
+	Debug,
+	Default,
+	PartialEq,
+	Eq,
+	TypeInfo,
+	MaxEncodedLen,
+)]
+pub struct EarningsCheckpoint {
+	/// Cumulative source index already settled for this earning quantity.
+	pub index: FixedU128,
+	/// Fractional microgon numerator, always less than FixedU128::DIV.
+	pub microgon_remainder: u128,
+}
+
+impl EarningsCheckpoint {
+	pub fn settle(&mut self, quantity: u128, index: FixedU128) -> crate::Balance {
+		let earnings_rate = index.saturating_sub(self.index);
+		let amount = earnings_rate.saturating_mul_int(quantity);
+
+		// Each reduced factor is below 10^18, so the fractional product fits in u128.
+		let scale = FixedU128::DIV;
+		let remainder = (quantity % scale) * (earnings_rate.into_inner() % scale) % scale +
+			self.microgon_remainder;
+
+		self.index = index;
+		self.microgon_remainder = remainder % scale;
+		amount.saturating_add(remainder / scale)
+	}
+}
+
+/// Earning quantity and its saved financial progress; never a source lot/NFT identity.
+#[derive(
+	Encode,
+	Decode,
+	DecodeWithMemTracking,
+	Clone,
+	Copy,
+	Debug,
+	Default,
+	PartialEq,
+	Eq,
+	TypeInfo,
+	MaxEncodedLen,
+)]
+pub struct IndexedEarningsPosition {
+	/// Eligible whole bonds/stakes or promised Bitcoin liquidity in microgons for this interval.
+	pub quantity: u128,
+	/// Financial progress and fractional carry belonging to this account/source.
+	pub checkpoint: EarningsCheckpoint,
+}
+
+impl IndexedEarningsPosition {
+	pub fn settle(&mut self, index: FixedU128) -> crate::Balance {
+		self.checkpoint.settle(self.quantity, index)
+	}
+}
 
 /// ARGON earned against one frame's financial reward terms.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -25,8 +263,8 @@ pub trait StabilizerPoolRewardProvider {
 	/// Financial rate fixed after the source finalizes participation.
 	fn frame_reward_rate(frame_id: FrameId) -> Option<FixedU128>;
 
-	/// Claim earned ARGON for finalized frames, drawing the total from the shared reward reserve.
-	/// The caller commits the funding debit, source cursors and account payment together.
+	/// Fund finalized earnings in custody. The caller commits the source cursor and account
+	/// accrual in the same transaction; failure leaves the earnings available for retry.
 	fn claim_rewards(frames: &[StabilizerPoolFrameClaim]) -> Result<Balance, DispatchError>;
 }
 
@@ -62,33 +300,58 @@ impl StabilizerPoolRewardProvider for () {
 }
 
 /// Source positions that Treasury Positions can collect.
-pub trait StabilizerPoolPositionProvider<AccountId> {
-	type Weights: StabilizerPoolPositionProviderWeightInfo;
+pub trait EarningsSettlementProvider<AccountId> {
+	type Weights: EarningsSettlementProviderWeightInfo;
 	/// Settle this account's available source earnings and advance its source cursors.
 	/// The caller supplies the transaction through delivery and account bookkeeping.
-	fn settle_account(account: &AccountId) -> Result<Balance, DispatchError>;
+	fn settle_account(account: &AccountId) -> DispatchResult;
 }
 
-impl<AccountId> StabilizerPoolPositionProvider<AccountId> for () {
+impl<AccountId> EarningsSettlementProvider<AccountId> for () {
 	type Weights = ();
-	fn settle_account(_: &AccountId) -> Result<Balance, DispatchError> {
-		Ok(0)
+	fn settle_account(_: &AccountId) -> DispatchResult {
+		Ok(())
 	}
 }
 
-pub trait StabilizerPoolPositionProviderWeightInfo {
+pub trait EarningsSettlementProviderWeightInfo {
 	fn settle_account() -> Weight;
 }
 
-impl StabilizerPoolPositionProviderWeightInfo for () {
+/// Source-owned authorization and bookkeeping for the expiring vault earnings bucket.
+pub trait VaultEarningsProvider<AccountId, Balance> {
+	type Weights: VaultEarningsProviderWeightInfo;
+	/// Clear the vault's source revenue when collection is allowed. A blocked vault returns
+	/// false without changing its revenue; the caller supplies the transaction through payment.
+	fn collect_earnings(account: &AccountId, amount: Balance) -> Result<bool, DispatchError>;
+}
+
+pub trait VaultEarningsProviderWeightInfo {
+	fn collect_earnings() -> Weight;
+}
+
+impl VaultEarningsProviderWeightInfo for () {
+	fn collect_earnings() -> Weight {
+		Weight::zero()
+	}
+}
+
+impl<AccountId, Balance> VaultEarningsProvider<AccountId, Balance> for () {
+	type Weights = ();
+	fn collect_earnings(_: &AccountId, _: Balance) -> Result<bool, DispatchError> {
+		Ok(false)
+	}
+}
+
+impl EarningsSettlementProviderWeightInfo for () {
 	fn settle_account() -> Weight {
 		Weight::zero()
 	}
 }
 
-/// Treasury-owned unissued funding. All mutations, including payout delivery, must use runtime
-/// storage so that funding, currency and auction state share the caller's transaction boundary.
-pub trait TreasuryRewardProvider<AccountId> {
+/// Treasury-owned unissued auction budgets. Reservations and returns share the auction caller's
+/// transaction boundary. The auction owns reserved funding until it is earned or returned.
+pub trait TreasuryRewardProvider {
 	type Balance;
 	type Weights: TreasuryRewardProviderWeightInfo;
 
@@ -96,24 +359,14 @@ pub trait TreasuryRewardProvider<AccountId> {
 	fn available_budget() -> Self::Balance;
 	/// Reserve microgons for one auction without issuing currency.
 	fn reserve_budget(amount: Self::Balance) -> DispatchResult;
-	/// Move reserved microgons into Treasury's outstanding reward total.
-	fn commit_reward(amount: Self::Balance) -> DispatchResult;
 	/// Restore unused reserved microgons to available funding.
 	fn return_budget(amount: Self::Balance) -> DispatchResult;
-	/// Retire a mature reward exactly once and return the microgons actually delivered.
-	/// Unreceivable dust below the currency minimum remains unissued and is not retried.
-	fn pay_reward(
-		account: &AccountId,
-		amount: Self::Balance,
-	) -> Result<Self::Balance, DispatchError>;
 }
 
 pub trait TreasuryRewardProviderWeightInfo {
 	fn available_budget() -> Weight;
 	fn reserve_budget() -> Weight;
-	fn commit_reward() -> Weight;
 	fn return_budget() -> Weight;
-	fn pay_reward() -> Weight;
 }
 
 impl TreasuryRewardProviderWeightInfo for () {
@@ -123,16 +376,13 @@ impl TreasuryRewardProviderWeightInfo for () {
 	fn reserve_budget() -> Weight {
 		Weight::zero()
 	}
-	fn commit_reward() -> Weight {
-		Weight::zero()
-	}
 	fn return_budget() -> Weight {
 		Weight::zero()
 	}
-	fn pay_reward() -> Weight {
-		Weight::zero()
-	}
 }
+
+/// Canonical identifier of one Treasury bond purchase.
+pub type BondLotId = u64;
 
 /// Whole token units in one bond lot or vault's admission state.
 pub type Bonds = u32;
@@ -149,7 +399,7 @@ pub struct BitcoinLockPosition<Balance> {
 }
 
 /// Live quantities shared by account positions and network totals. Sources retain individual
-/// lots and Fissions; Treasury freezes bond/stake totals when preparing a frame.
+/// lots and Fissions; Treasury freezes earning totals when preparing a frame.
 #[derive(
 	Encode,
 	Decode,
@@ -242,7 +492,28 @@ where
 }
 
 pub trait TreasuryPositionProviderWeightInfo {
+	fn record_funding() -> Weight {
+		Weight::zero()
+	}
+	fn expire_vault_earnings() -> Weight {
+		Weight::zero()
+	}
+	fn prepare_collect() -> Weight {
+		Weight::zero()
+	}
+	fn allocate_frame_earnings() -> Weight {
+		Weight::zero()
+	}
+	fn indexed_frame() -> Weight {
+		Weight::zero()
+	}
 	fn ensure_account() -> Weight {
+		Weight::zero()
+	}
+	fn fund() -> Weight {
+		Weight::zero()
+	}
+	fn accrue() -> Weight {
 		Weight::zero()
 	}
 	fn operational_account_registered() -> Weight;
@@ -288,8 +559,48 @@ impl TreasuryPositionProviderWeightInfo for () {
 /// Source contributions are replaced atomically with their canonical mutation.
 pub trait TreasuryPositionProvider<AccountId, Balance: Codec + MaxEncodedLen> {
 	type Weights: TreasuryPositionProviderWeightInfo;
+	/// Record issued funds already deposited into Collect custody. The source owns funding
+	/// authorization and the transaction joining that deposit to this accounting.
+	fn record_funding(_amounts: CollectAmounts<Balance>) {}
+	/// Burn expired vault backing and reduce its account bucket in the source's transaction.
+	fn expire_vault_earnings(_account: &AccountId, _amount: Balance) -> DispatchResult {
+		Err(DispatchError::Unavailable)
+	}
 	/// Make an account with a source position discoverable for account collection.
 	fn ensure_account(_: &AccountId) {}
+	/// Address receiving issued backing. Funding callers use the configured native currency.
+	fn collect_account() -> Option<AccountId> {
+		None
+	}
+	/// Finish cutover backing and seed the custody minimum before a funding transfer.
+	fn prepare_collect() -> DispatchResult {
+		Ok(())
+	}
+	/// Issue authorized backing and record its source; the caller owns budget/grant authorization.
+	fn fund(_source: CollectSource, _amount: Balance) -> DispatchResult {
+		Err(DispatchError::Unavailable)
+	}
+	/// Assign already backed money to its beneficiary. Never mint or pay the wallet here.
+	fn accrue(_account: &AccountId, _source: CollectSource, _amount: Balance) -> DispatchResult {
+		Err(DispatchError::Unavailable)
+	}
+	/// Accrue pre-upgrade unpaid IOUs and their aggregate cutover backing requirement.
+	/// The account storage layout must be initialized before this migration operation.
+	fn migrate_accrued(_account: &AccountId, _amounts: CollectAmounts<Balance>) {}
+	/// Commit one retained frame's funded allocations, indexes and requested account boundaries.
+	fn allocate_frame_earnings(
+		_frame: FrameId,
+		_quantities: &PositionQuantities<Balance>,
+		_amounts: CollectAmounts<Balance>,
+	) -> DispatchResult {
+		Err(DispatchError::Unavailable)
+	}
+	fn indexed_frame() -> Option<FrameId> {
+		None
+	}
+	fn earnings_start_frame() -> FrameId {
+		1
+	}
 	/// Notify positions after the account and its upstream relationship are stored.
 	fn operational_account_registered(account: &AccountId) -> DispatchResult;
 	fn bond_principal(account: &AccountId) -> Balance;

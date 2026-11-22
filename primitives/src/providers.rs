@@ -805,6 +805,8 @@ impl<AccountId> OperationalAccountProvider<AccountId> for () {
 }
 
 pub trait TreasuryPoolProvider<AccountId> {
+	/// Maximum concrete bond lots backing one operator across its authorities.
+	type MaxBondCollateralLots: Get<u32>;
 	type Weights: TreasuryPoolProviderWeightInfo;
 	type Balance;
 
@@ -821,9 +823,11 @@ pub trait TreasuryPoolProvider<AccountId> {
 	/// The account's active non-releasing vault bond amount across all vaults.
 	fn active_account_vault_bond_amount(account_id: &AccountId) -> Self::Balance;
 	/// Reserve existing held backing immediately, before it can authorize gateway issuance.
+	/// Optional lot IDs choose the backing; otherwise Treasury selects it automatically.
 	fn encumber_bond_microgons(
 		account_id: &AccountId,
 		microgon_amount: Self::Balance,
+		bond_lot_ids: Option<&[crate::treasury::BondLotId]>,
 	) -> DispatchResult;
 	/// Queue an encumbrance release. Success accepts the request; funds stay encumbered until
 	/// Treasury processes it under its block settlement limit.
@@ -840,6 +844,7 @@ pub trait TreasuryPoolProvider<AccountId> {
 }
 
 impl<AccountId> TreasuryPoolProvider<AccountId> for () {
+	type MaxBondCollateralLots = polkadot_sdk::frame_support::traits::ConstU32<10>;
 	type Weights = ();
 	type Balance = u128;
 
@@ -865,6 +870,7 @@ impl<AccountId> TreasuryPoolProvider<AccountId> for () {
 	fn encumber_bond_microgons(
 		_account_id: &AccountId,
 		_microgon_amount: Self::Balance,
+		_bond_lot_ids: Option<&[crate::treasury::BondLotId]>,
 	) -> DispatchResult {
 		Ok(())
 	}

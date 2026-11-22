@@ -1,25 +1,31 @@
-use crate as pallet_treasury;
+use crate::{
+	self as pallet_treasury, ArgonotBondLots, BondLotIdsByAccount, BondLotSummary, Bonds,
+	TargetBitcoinPercent,
+};
 use argon_primitives::{
 	providers::BitcoinMintedProvider,
-	tick::Ticker,
 	treasury::{
-		StabilizerPoolFrameClaim, StabilizerPoolPositionProvider, StabilizerPoolRewardProvider,
+		EarningsSettlementProvider, StabilizerPoolFrameClaim, StabilizerPoolRewardProvider,
+		TreasuryPositionProvider,
 	},
-	vault::{TreasuryVaultProvider, VaultError, VaultParticipationCapacity, VaultSecuritization},
-	ArgonCPI, BlockRewardAccountsProvider, CrosschainGatewayProvider, GatewayState,
-	MiningFrameProvider, OperationalAccountsHook, PriceProvider, SourceChain, TickProvider,
-	TreasuryPoolProvider, VotingSchedule, MICROGONS_PER_ARGON,
+	vault::{
+		TreasuryBonusApprovalProof, TreasuryVaultProvider, VaultError, VaultParticipationCapacity,
+		VaultSecuritization, TREASURY_BONUS_APPROVAL_PROOF_MESSAGE_KEY,
+	},
+	ArgonCPI, MiningFrameProvider, OperationalAccountsHook, PriceProvider, Signature,
+	TreasuryPoolProvider, MICROGONS_PER_ARGON,
 };
-use frame_support::traits::{fungible::Credit, tokens::Imbalance, Currency, StorageMapShim};
+use frame_support::traits::{
+	fungible::{Credit, Unbalanced},
+	tokens::Imbalance,
+	Currency, StorageMapShim,
+};
 use pallet_prelude::{
 	argon_primitives::{vault::VaultTreasuryFrameEarnings, MiningFrameTransitionProvider},
 	*,
 };
-use sp_core::{crypto::AccountId32, sr25519, Pair};
-use sp_runtime::{
-	traits::{ConstU8, IdentifyAccount},
-	MultiSigner,
-};
+use sp_core::{blake2_256, crypto::AccountId32, sr25519, Pair};
+use sp_runtime::{traits::IdentifyAccount, MultiSigner};
 use std::collections::{BTreeMap, HashMap};
 
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -34,19 +40,22 @@ parameter_types! {
 }
 
 pub struct MockStabilizerPoolSettlement;
-impl StabilizerPoolPositionProvider<TestAccountId> for MockStabilizerPoolSettlement {
+impl EarningsSettlementProvider<TestAccountId> for MockStabilizerPoolSettlement {
 	type Weights = ();
 
-	fn settle_account(_: &TestAccountId) -> Result<Balance, DispatchError> {
+	fn settle_account(account: &TestAccountId) -> DispatchResult {
 		let claims = CollectClaimFrames::get();
 		if claims.is_empty() || SettledClaimFrame::get() > 0 {
-			return Ok(0);
+			return Ok(());
 		}
-		let result = Treasury::claim_rewards(&claims).map(|amount| {
-			SettledClaimFrame::set(&claims.last().unwrap().frame_id);
-			amount
-		});
-		result
+		let amount = Treasury::claim_rewards(&claims)?;
+		TreasuryPositions::accrue(
+			account,
+			argon_primitives::treasury::CollectSource::StabilizerPools,
+			amount,
+		)?;
+		SettledClaimFrame::set(&claims.last().unwrap().frame_id);
+		Ok(())
 	}
 }
 
@@ -64,8 +73,6 @@ frame_support::construct_runtime!(
 		System: frame_system,
 		TreasuryPositions: pallet_treasury_positions,
 		Treasury: pallet_treasury,
-		StabilizerBuys: pallet_stabilizer_buys,
-		Mint: pallet_mint,
 		Balances: pallet_balances::<Instance1>,
 		Ownership: pallet_balances::<Instance2>,
 	}
@@ -81,8 +88,6 @@ impl frame_system::Config for Test {
 }
 
 parameter_types! {
-	pub static LastGatewayState: Option<GatewayState<u128>> = None;
-	pub HistoryTicker: Ticker = Ticker::new(1_000, 2);
 	pub const BidIncrements: u128 = 10_000; // 1 cent
 
 	pub static ExistentialDeposit: Balance = 1;
@@ -180,8 +185,7 @@ parameter_types! {
 
 	pub static MinimumArgonsPerContributor: u128 = 100_000_000;
 	pub static MaxActiveArgonotBondLots: u32 = 1_000;
-	pub static MaxArgonBondLots: u32 = 15_000;
-	pub static MaxExpectedBondLotsPerAccount: u32 = 100;
+	pub static MaxBondCollateralLots: u32 = 10;
 	pub static MaxBondCollateralSettlementsPerBlock: u32 = 2;
 	pub static MaxVaultsPerPool: u32 = 100;
 	pub static MaxPendingUnlocksPerFrame: u32 = 100;
@@ -216,7 +220,7 @@ parameter_types! {
 	pub static LastAverageArgonotPriceFrame: Option<FrameId> = None;
 	pub static MintedBitcoinMicrogons: Balance = 0;
 
-	pub static LastVaultProfits: Vec<VaultTreasuryFrameEarnings<Balance, TestAccountId>> = vec![];
+	pub storage LastVaultProfits: Vec<VaultTreasuryFrameEarnings<Balance, TestAccountId>> = vec![];
 	pub static LastOperationalBondTotal: Option<(TestAccountId, Balance)> = None;
 }
 
@@ -355,7 +359,9 @@ impl TreasuryVaultProvider for StaticTreasuryVaultProvider {
 		profit: VaultTreasuryFrameEarnings<Self::Balance, Self::AccountId>,
 	) -> DispatchResult {
 		drop(funding.extract(profit.earnings_for_vault));
-		LastVaultProfits::mutate(|a| a.push(profit));
+		let mut profits = LastVaultProfits::get();
+		profits.push(profit);
+		LastVaultProfits::set(&profits);
 		Ok(())
 	}
 }
@@ -424,7 +430,7 @@ impl MiningFrameTransitionProvider for StaticMiningFrameTransitionProvider {
 
 impl MiningFrameProvider for StaticMiningFrameTransitionProvider {
 	fn get_next_frame_tick() -> Tick {
-		PurchaseTick::get().saturating_add(1)
+		CurrentFrameId::get().saturating_add(1).saturating_mul(1_440)
 	}
 	fn is_seat_bidding_started() -> bool {
 		false
@@ -432,67 +438,6 @@ impl MiningFrameProvider for StaticMiningFrameTransitionProvider {
 	fn get_tick_range_for_frame(frame_id: FrameId) -> Option<(Tick, Tick)> {
 		Some((frame_id * 1_440, (frame_id + 1) * 1_440))
 	}
-}
-
-impl BlockRewardAccountsProvider<TestAccountId> for StaticMiningFrameTransitionProvider {
-	type Weights = ();
-	fn get_block_rewards_account(_: &TestAccountId) -> Option<(TestAccountId, FrameId)> {
-		None
-	}
-	fn get_mint_rewards_accounts() -> Vec<(TestAccountId, FrameId)> {
-		vec![]
-	}
-	fn is_compute_block_eligible_for_rewards() -> bool {
-		false
-	}
-}
-
-impl pallet_mint::Config for Test {
-	type WeightInfo = ();
-	type Currency = Balances;
-	type PriceProvider = StaticPriceProvider;
-	type MiningFrameProvider = StaticMiningFrameTransitionProvider;
-	type Balance = Balance;
-	type MaxPendingMintsPerUtxo = ConstU32<50>;
-	type MaxPendingMintPayoutWindowSize = ConstU32<1_000>;
-	type BlockRewardAccountsProvider = StaticMiningFrameTransitionProvider;
-	type MaxMintHistoryToMaintain = ConstU32<10>;
-	type MaxPossibleMiners = ConstU32<1>;
-	type BitcoinMintPayoutPercentPerFrame = BitcoinMintPayoutPercentPerFrame;
-}
-
-parameter_types! {
-	pub static PurchaseTick: Tick = 1;
-	pub const PurchaseInclusionPercent: Percent = Percent::from_percent(90);
-	pub const PurchaseRepaymentRewardPercent: Percent = Percent::from_percent(5);
-	pub const BitcoinMintPayoutPercentPerFrame: Percent = Percent::from_percent(10);
-	pub PurchasePool: pallet_stabilizer_buys::PurchasePool = pallet_stabilizer_buys::PurchasePool {
-		chain_id: 1,
-		pool_manager: H160::repeat_byte(1),
-		pool_id: H256::repeat_byte(2),
-		usdc_token: H160::repeat_byte(3),
-		argon_is_token0: true,
-	};
-}
-
-impl pallet_stabilizer_buys::Config for Test {
-	type Currency = Balances;
-	type FissionsProvider = ();
-	type MiningFrameTransitionProvider = StaticMiningFrameTransitionProvider;
-	type TickProvider = PurchaseTick;
-	type CrosschainGatewayProvider = Test;
-	type MaxPriceAgeTicks = ConstU64<10>;
-	type MaxPriceHistoryPrunesPerBlock = ConstU32<16>;
-	type MaxPriceWindowSteps = ConstU32<64>;
-	type TreasuryRewardProvider = Treasury;
-	type MaxFramesPerPayout = ConstU32<16>;
-	type MaxPayoutsPerBlock = ConstU32<2>;
-	type MaxPositiveBids = ConstU8<4>;
-	type AuctionInclusionPercent = PurchaseInclusionPercent;
-	type PurchaseHoldFrames = ConstU64<30>;
-	type LiquidRepaymentRewardPercent = PurchaseRepaymentRewardPercent;
-	type MaxLiquidRepaysPerBlock = ConstU32<1>;
-	type WeightInfo = ();
 }
 
 impl pallet_treasury::Config for Test {
@@ -512,8 +457,7 @@ impl pallet_treasury::Config for Test {
 	type PriceProvider = StaticPriceProvider;
 	type MinimumArgonsPerContributor = MinimumArgonsPerContributor;
 	type MaxActiveArgonotBondLots = MaxActiveArgonotBondLots;
-	type MaxArgonBondLots = MaxArgonBondLots;
-	type MaxExpectedBondLotsPerAccount = MaxExpectedBondLotsPerAccount;
+	type MaxBondCollateralLots = MaxBondCollateralLots;
 	type MaxBondCollateralSettlementsPerBlock = MaxBondCollateralSettlementsPerBlock;
 	type MaxArgonotBondedPercentOfCirculation = MaxArgonotBondedPercentOfCirculation;
 	type PalletId = VaultPalletId;
@@ -538,11 +482,16 @@ impl pallet_treasury::Config for Test {
 }
 
 pub(crate) fn new_test_ext() -> TestState {
+	CurrentFrameId::set(1);
+	CollectClaimFrames::set(Vec::new());
+	ExistentialDeposit::set(1);
 	NewlyStartedFrameId::set(None);
 	CirculatingArgon::set(0);
 	ArgonotSecuritizationMultiplier::set(2);
 	VaultsById::set(HashMap::new());
-	LastVaultProfits::set(vec![]);
+	VaultBitcoinSatoshis::set(HashMap::new());
+	VaultArgonotMicronots::set(HashMap::new());
+	VaultRewardCommittedMicronots::set(HashMap::new());
 	ArgonPriceInUsd::set(FixedU128::one());
 	ArgonotPriceInUsd::set(FixedU128::one());
 	AverageArgonotPriceInMicrogons::set(MICROGONS_PER_ARGON);
@@ -554,6 +503,7 @@ pub(crate) fn new_test_ext() -> TestState {
 	VaultSecuritizedSatoshis::set(HashMap::new());
 	let mut ext = new_test_with_genesis::<Test>(|_t| {});
 	ext.execute_with(|| {
+		<TreasuryPositions as frame_support::traits::OnGenesis>::on_genesis();
 		// Keep allocation tests untapered. Taper tests clear this override to use production
 		// defaults.
 		crate::RewardTaperingPolicy::<Test>::mutate(|policy| {
@@ -568,15 +518,19 @@ pub(crate) fn new_test_ext() -> TestState {
 impl pallet_treasury_positions::Config for Test {
 	type BitcoinPositionProvider = ();
 	type TreasuryPoolProvider = Treasury;
-	type StabilizerPoolPositionProvider = MockStabilizerPoolSettlement;
-	type MiningFrameTransitionProvider = ();
+	type EarningsSettlementProvider = MockStabilizerPoolSettlement;
+	type VaultEarningsProvider = ();
+	type MiningFrameTransitionProvider = StaticMiningFrameTransitionProvider;
+	type MaxEarningChangesPerCall = ConstU32<32>;
 	type Currency = Balances;
+	type PalletId = TreasuryPositionsPalletId;
 	type OperationalAccountProvider = MockUpstreamAccounts;
 	type Balance = Balance;
 	type WeightInfo = ();
 }
 
 parameter_types! {
+	pub const TreasuryPositionsPalletId: frame_support::PalletId = frame_support::PalletId(*b"arg/colt");
 	pub static Upstreams: BTreeMap<TestAccountId, (TestAccountId, VaultId)> = BTreeMap::new();
 	pub static AvailableSecuritizationSpace: BTreeMap<VaultId, Balance> = BTreeMap::new();
 	pub static UpstreamBitcoinTarget: Balance = 5_000 * MICROGONS_PER_ARGON;
@@ -594,36 +548,6 @@ impl argon_primitives::OperationalAccountProvider<TestAccountId> for MockUpstrea
 	}
 }
 
-impl CrosschainGatewayProvider<u128> for Test {
-	type Weights = ();
-
-	fn last_state_by_chain(_source_chain: SourceChain) -> Option<GatewayState<u128>> {
-		LastGatewayState::get()
-	}
-}
-
-impl TickProvider<Block> for PurchaseTick {
-	type Weights = ();
-	fn current_tick() -> Tick {
-		PurchaseTick::get()
-	}
-	fn previous_tick() -> Tick {
-		PurchaseTick::get().saturating_sub(1)
-	}
-	fn elapsed_ticks() -> Tick {
-		PurchaseTick::get()
-	}
-	fn voting_schedule() -> VotingSchedule {
-		VotingSchedule::from_runtime_current_tick(PurchaseTick::get())
-	}
-	fn ticker() -> Ticker {
-		HistoryTicker::get()
-	}
-	fn blocks_at_tick(_tick: Tick) -> Vec<H256> {
-		Vec::new()
-	}
-}
-
 pub fn test_vault(account_id: u64, securitization: u64) -> TestVault {
 	TestVault {
 		account_id: account_id_from_seed(account_id),
@@ -633,5 +557,77 @@ pub fn test_vault(account_id: u64, securitization: u64) -> TestVault {
 		activated_securitization: 0,
 		delegate_account_id: None,
 		is_closed: false,
+	}
+}
+
+/// Exercise the same explicit allocation, funding and wallet collection steps as callers.
+pub fn collect_frame(frame: FrameId, owners: &[u64]) {
+	assert_ok!(Treasury::distribute_bid_pool(frame));
+	for owner in owners {
+		assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(account_id_from_seed(*owner))));
+	}
+}
+
+pub(crate) fn account_bond_lot_ids(account_id: u64) -> Vec<u64> {
+	BondLotIdsByAccount::<Test>::iter_key_prefix(account(account_id)).collect()
+}
+
+pub(crate) fn account(seed: u64) -> TestAccountId {
+	account_id_from_seed(seed)
+}
+
+pub(crate) fn origin(seed: u64) -> RuntimeOrigin {
+	RuntimeOrigin::signed(account(seed))
+}
+
+pub(crate) fn argonot_bond_lots() -> Vec<BondLotSummary> {
+	ArgonotBondLots::<Test>::get().into_inner()
+}
+
+pub(crate) fn set_target_securitization(amount: Balance) {
+	TargetBitcoinPercent::<Test>::put(Percent::from_percent(100));
+	MintedBitcoinMicrogons::set(0);
+	Balances::set_total_issuance(amount);
+}
+
+pub(crate) fn set_vault_securitized_satoshis(vault_id: VaultId, satoshis: u64) {
+	let previous = VaultSecuritizedSatoshis::get().get(&vault_id).copied().unwrap_or_default();
+	assert_ok!(TreasuryPositions::network_securitized_satoshis_updated(
+		previous as u128,
+		satoshis as u128,
+	));
+	VaultSecuritizedSatoshis::mutate(|bitcoin| {
+		bitcoin.insert(vault_id, satoshis);
+	});
+}
+
+pub(crate) fn bonus_approval(
+	vault_id: u32,
+	beneficiary: u64,
+	bonus_percent: Permill,
+	expires_at_frame: FrameId,
+	bond_space_to_unreserve: Bonds,
+	nonce: u64,
+) -> TreasuryBonusApprovalProof {
+	let beneficiary = account(beneficiary);
+	let message = (
+		TREASURY_BONUS_APPROVAL_PROOF_MESSAGE_KEY,
+		vault_id,
+		beneficiary.clone(),
+		bonus_percent,
+		expires_at_frame,
+		bond_space_to_unreserve,
+		nonce,
+	)
+		.using_encoded(blake2_256);
+	let signature: Signature = account_pair_from_seed(10).sign(message.as_slice()).into();
+	TreasuryBonusApprovalProof {
+		vault_id,
+		beneficiary,
+		bonus_percent,
+		expires_at_frame,
+		bond_space_to_unreserve,
+		nonce,
+		signature,
 	}
 }

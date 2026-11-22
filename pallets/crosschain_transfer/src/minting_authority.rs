@@ -24,6 +24,7 @@ impl<T: Config> Pallet<T> {
 		signature: KeccakSignature,
 		microgon_collateral: T::Balance,
 		micronot_collateral: T::Balance,
+		bond_lot_ids: Option<&[argon_primitives::treasury::BondLotId]>,
 	) -> DispatchResult {
 		Self::ensure_source_chain_not_paused(destination_chain)?;
 		let _ = Self::evm_gateway_signature_domain(destination_chain)?;
@@ -120,6 +121,7 @@ impl<T: Config> Pallet<T> {
 			T::TreasuryPoolProvider::encumber_bond_microgons(
 				&vault_operator_account_id,
 				microgon_collateral,
+				bond_lot_ids,
 			)
 			.map_err(|_| Error::<T>::InsufficientCommittedMicrogonCollateral)?;
 		}
@@ -545,6 +547,7 @@ mod tests {
 					minting_authority_registration_signature(&wrong_pair, &owner_vault_operator),
 					10_000,
 					300,
+					None,
 				),
 				Error::<Test>::InvalidMintingAuthoritySigningKeyProof,
 			);
@@ -560,6 +563,7 @@ mod tests {
 					),
 					10_000,
 					300,
+					None,
 				),
 				Error::<Test>::InsufficientCommittedMicrogonCollateral,
 			);
@@ -575,6 +579,7 @@ mod tests {
 				),
 				10_000,
 				300,
+				None,
 			));
 			assert_eq!(
 				MintingAuthoritiesBySigner::<Test>::get(signing_key),
@@ -648,6 +653,7 @@ mod tests {
 					),
 					2_000,
 					100,
+					None,
 				),
 				Error::<Test>::MintingAuthorityAlreadyRegistered,
 			);
@@ -683,6 +689,7 @@ mod tests {
 					),
 					8_000,
 					300,
+					None,
 				),
 				Error::<Test>::MintingAuthorityCollateralBelowMinimum,
 			);
@@ -705,6 +712,7 @@ mod tests {
 				),
 				10_000,
 				300,
+				None,
 			));
 		});
 	}
@@ -831,6 +839,7 @@ mod tests {
 				minting_authority_registration_signature(&authority_pair, &authority_account),
 				4_000,
 				0,
+				None,
 			));
 
 			let authority = MintingAuthoritiesBySigner::<Test>::get(signing_key)
@@ -949,6 +958,7 @@ mod tests {
 				),
 				10_000,
 				0,
+				None,
 			));
 
 			assert_noop!(

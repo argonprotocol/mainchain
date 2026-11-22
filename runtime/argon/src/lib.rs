@@ -325,8 +325,8 @@ impl pallet_vaults::Config for Runtime {
 	type SecuritizationExitNoticeBlocks = BitcoinLockDurationBlocks;
 	type BitcoinLockDurationBlocks = BitcoinLockDurationBlocks;
 	type OperationalAccountsHook = use_unless_benchmark!(OperationalAccounts, ());
-	type TreasuryPoolProvider = Treasury;
-	type PositionProvider = use_unless_benchmark!(TreasuryPositions, ());
+	type TreasuryPoolProvider = use_unless_benchmark!(Treasury, ());
+	type PositionProvider = use_unless_benchmark!(TreasuryPositions, benchmarking::BenchmarkTreasuryPositionProvider<AccountId, Balance>);
 	type OperationalAccountProvider = use_unless_benchmark!(
 		OperationalAccounts,
 		benchmarking::BenchmarkOperationalAccountProvider<AccountId>
@@ -466,8 +466,7 @@ impl pallet_treasury::Config for Runtime {
 		use_unless_benchmark!(PriceIndex, benchmarking::BenchmarkPriceProvider<Balance>);
 	type MinimumArgonsPerContributor = MinimumArgonsPerContributor;
 	type MaxActiveArgonotBondLots = MaxActiveArgonotBondLots;
-	type MaxArgonBondLots = MaxArgonBondLots;
-	type MaxExpectedBondLotsPerAccount = MaxExpectedBondLotsPerAccount;
+	type MaxBondCollateralLots = MaxBondCollateralLots;
 	type MaxBondCollateralSettlementsPerBlock = MaxBondCollateralSettlementsPerBlock;
 	type MaxArgonotBondedPercentOfCirculation = MaxArgonotBondedPercentOfCirculation;
 	type PalletId = TreasuryInternalPalletId;
@@ -660,6 +659,10 @@ impl pallet_proxy::Config for Runtime {
 
 impl pallet_stabilizer_buys::Config for Runtime {
 	type Currency = Balances;
+	type PositionProvider = use_unless_benchmark!(
+		TreasuryPositions,
+		benchmarking::BenchmarkTreasuryPositionProvider<AccountId, Balance>
+	);
 	type FissionsProvider = use_unless_benchmark!(BitcoinFissions, benchmarking::BenchmarkLiquidRepayment<AccountId, Balance>);
 	type MiningFrameTransitionProvider =
 		use_unless_benchmark!(MiningSlot, benchmarking::BenchmarkCurrentFrameId);
@@ -956,12 +959,21 @@ impl pallet_fee_control::Config for Runtime {
 	type CallFeeRefundProviders = VaultAdminFeeRefundPolicy;
 }
 
+parameter_types! {
+	pub const TreasuryPositionsPalletId: PalletId = PalletId(*b"arg/colt");
+}
+
 impl pallet_treasury_positions::Config for Runtime {
 	type BitcoinPositionProvider = use_unless_benchmark!(BitcoinLocks, ());
 	type TreasuryPoolProvider = use_unless_benchmark!(Treasury, ());
-	type StabilizerPoolPositionProvider = use_unless_benchmark!(StabilizerPools, ());
-	type MiningFrameTransitionProvider = use_unless_benchmark!(MiningSlot, ());
+	type EarningsSettlementProvider = use_unless_benchmark!(StabilizerPools, ());
+	type VaultEarningsProvider =
+		use_unless_benchmark!(Vaults, benchmarking::BenchmarkVaultEarningsProvider);
+	type MiningFrameTransitionProvider =
+		use_unless_benchmark!(MiningSlot, benchmarking::BenchmarkCurrentFrameId);
+	type MaxEarningChangesPerCall = ConstU32<32>;
 	type Currency = Balances;
+	type PalletId = TreasuryPositionsPalletId;
 	type OperationalAccountProvider = use_unless_benchmark!(
 		OperationalAccounts,
 		benchmarking::BenchmarkOperationalAccountProvider<AccountId>
@@ -982,7 +994,7 @@ impl pallet_stabilizer_pools::Config for Runtime {
 	type UsdcRewardShare = StabilizerPoolUsdcRewardShare;
 	type MaxPositionsPerAccount = StabilizerPoolMaxPositionsPerAccount;
 	type ContinuationGraceMillis = ConstU64<300_000>;
-	type TreasuryPositionProvider = use_unless_benchmark!(TreasuryPositions, ());
+	type TreasuryPositionProvider = use_unless_benchmark!(TreasuryPositions, benchmarking::BenchmarkTreasuryPositionProvider<AccountId, Balance>);
 	type WeightInfo = weights::pallet_stabilizer_pools::WeightInfo<Runtime>;
 	type MiningFrameTransitionProvider =
 		use_unless_benchmark!(MiningSlot, benchmarking::BenchmarkCurrentFrameId);

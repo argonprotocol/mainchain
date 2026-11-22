@@ -1,14 +1,29 @@
 use crate::{Config, Pallet};
 use argon_primitives::{
-	bitcoin::{BitcoinHeight, Satoshis},
+	bitcoin::{BitcoinHeight, BitcoinLockId, Satoshis},
 	tick::Tick,
+	treasury::{
+		CollectAmounts, CollectSource, TreasuryPositionProvider, TreasuryPositionProviderWeightInfo,
+	},
 	vault::{SecuritizationScheduleEntry, VaultTerms},
 	VaultId,
 };
 use codec::{Decode, Encode};
-use frame_support::storage_alias;
+use frame_support::{
+	storage::with_storage_layer,
+	storage_alias,
+	traits::{
+		fungible::{InspectHold, MutateHold},
+		OnRuntimeUpgrade,
+	},
+};
 use pallet_prelude::*;
 use sp_runtime::BoundedBTreeMap;
+
+type PositionWeights<T> = <<T as Config>::PositionProvider as TreasuryPositionProvider<
+	<T as frame_system::Config>::AccountId,
+	<T as Config>::Balance,
+>>::Weights;
 
 pub fn is_migration_pending<T: Config>() -> bool {
 	StorageVersion::get::<Pallet<T>>() == 19
@@ -109,5 +124,178 @@ pub mod v19 {
 				opened_tick: self.opened_tick,
 			}
 		}
+	}
+}
+
+#[storage_alias]
+pub type PendingCosignByVaultId<T: Config> = StorageMap<
+	Pallet<T>,
+	Twox64Concat,
+	VaultId,
+	BoundedBTreeSet<BitcoinLockId, <T as Config>::MaxPendingCosignsPerVault>,
+	ValueQuery,
+>;
+
+#[storage_alias]
+pub type OrphanedUtxoAccountsByVaultId<T: Config> = StorageDoubleMap<
+	Pallet<T>,
+	Twox64Concat,
+	VaultId,
+	Blake2_128Concat,
+	<T as frame_system::Config>::AccountId,
+	u32,
+	ValueQuery,
+>;
+
+/// Move issued vault revenue from operator holds to the shared Collect account.
+pub struct CollectMigration<T>(PhantomData<T>);
+impl<T: Config> OnRuntimeUpgrade for CollectMigration<T> {
+	fn on_runtime_upgrade() -> Weight {
+		if StorageVersion::get::<Pallet<T>>() != StorageVersion::new(20) {
+			return T::DbWeight::get().reads(1)
+		}
+		let mut accounts = 0u64;
+		let mut retired_entries = 0u64;
+		let result = with_storage_layer(|| -> DispatchResult {
+			T::PositionProvider::prepare_collect()?;
+			let custody =
+				T::PositionProvider::collect_account().ok_or(DispatchError::Unavailable)?;
+			for (vault_id, vault) in crate::VaultsById::<T>::iter() {
+				accounts.saturating_accrue(1);
+				let recorded = crate::RevenuePerFrameByVault::<T>::get(vault_id)
+					.iter()
+					.fold(T::Balance::zero(), |sum, frame| {
+						sum.saturating_add(frame.uncollected_revenue)
+					});
+				if recorded.is_zero() {
+					continue
+				}
+
+				let account = &vault.operator_account_id;
+				ensure!(
+					crate::VaultIdByOperator::<T>::get(account) == Some(vault_id),
+					crate::Error::<T>::VaultRevenueMismatch
+				);
+				let amount = T::Currency::balance_on_hold(
+					&crate::HoldReason::PendingCollect.into(),
+					account,
+				);
+				ensure!(amount == recorded, crate::Error::<T>::VaultRevenueMismatch);
+				T::Currency::transfer_on_hold(
+					&crate::HoldReason::PendingCollect.into(),
+					account,
+					&custody,
+					amount,
+					Precision::Exact,
+					Restriction::Free,
+					Fortitude::Force,
+				)?;
+				T::PositionProvider::record_funding(CollectAmounts::from_source(
+					CollectSource::Vaults,
+					amount,
+				));
+				T::PositionProvider::accrue(account, CollectSource::Vaults, amount)?;
+			}
+			retired_entries.saturating_accrue(
+				PendingCosignByVaultId::<T>::clear(u32::MAX, None).unique.into(),
+			);
+			retired_entries.saturating_accrue(
+				OrphanedUtxoAccountsByVaultId::<T>::clear(u32::MAX, None).unique.into(),
+			);
+			StorageVersion::new(21).put::<Pallet<T>>();
+			Ok(())
+		});
+		if let Err(error) = result {
+			log::error!("Vault Collect migration failed: {error:?}");
+		}
+		let account_weight =
+			PositionWeights::<T>::record_funding().saturating_add(PositionWeights::<T>::accrue());
+		T::DbWeight::get()
+			.reads_writes(
+				accounts.saturating_mul(8).saturating_add(retired_entries).saturating_add(5),
+				accounts.saturating_mul(6).saturating_add(retired_entries).saturating_add(1),
+			)
+			.saturating_add(PositionWeights::<T>::prepare_collect())
+			.saturating_add(account_weight.saturating_mul(accounts))
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use crate::{mock::*, HoldReason, RevenuePerFrameByVault, VaultsById};
+	use frame_support::{
+		assert_ok,
+		traits::fungible::{Inspect, MutateHold},
+	};
+
+	#[test]
+	fn held_revenue_moves_once_and_a_mismatch_preserves_all_old_balances() {
+		new_test_ext().execute_with(|| {
+			CurrentFrameId::set(2);
+			System::set_block_number(1);
+			assert_ok!(TreasuryPositions::prepare_collect());
+			for account in [1, 2] {
+				set_argons(account, 100_000);
+				assert_ok!(Vaults::create(RuntimeOrigin::signed(account), default_vault()));
+				assert_ok!(Balances::hold(&HoldReason::PendingCollect.into(), &account, 100));
+				assert_ok!(Vaults::mutate_frame_revenue(account as u32, 1, |frame| {
+					frame.uncollected_revenue = 100;
+					Ok(())
+				}));
+			}
+			let last_vault = VaultsById::<Test>::iter_keys().last().unwrap();
+			let mut closed_vault = VaultsById::<Test>::get(1).unwrap();
+			closed_vault.is_closed = true;
+			VaultsById::<Test>::insert(3, closed_vault);
+			RevenuePerFrameByVault::<Test>::mutate(last_vault, |frames| {
+				frames[0].uncollected_revenue = 101;
+			});
+			StorageVersion::new(20).put::<Vaults>();
+			PendingCosignByVaultId::<Test>::mutate(1, |ids| {
+				ids.try_insert(9).unwrap();
+			});
+			OrphanedUtxoAccountsByVaultId::<Test>::insert(1, 2, 1);
+			let issuance = Balances::total_issuance();
+
+			CollectMigration::<Test>::on_runtime_upgrade();
+			assert_eq!(StorageVersion::get::<Vaults>(), StorageVersion::new(20));
+			assert!(PendingCosignByVaultId::<Test>::contains_key(1));
+			assert!(OrphanedUtxoAccountsByVaultId::<Test>::contains_key(1, 2));
+			for account in [1, 2] {
+				assert_eq!(
+					Balances::balance_on_hold(&HoldReason::PendingCollect.into(), &account),
+					100
+				);
+				assert_eq!(vault_earnings(account), 0);
+			}
+			assert_eq!(
+				Balances::balance(&TreasuryPositions::account_id()),
+				ExistentialDeposit::get()
+			);
+
+			RevenuePerFrameByVault::<Test>::mutate(last_vault, |frames| {
+				frames[0].uncollected_revenue = 100;
+			});
+			CollectMigration::<Test>::on_runtime_upgrade();
+			CollectMigration::<Test>::on_runtime_upgrade();
+			assert_eq!(StorageVersion::get::<Vaults>(), StorageVersion::new(21));
+			assert!(!PendingCosignByVaultId::<Test>::contains_key(1));
+			assert!(!OrphanedUtxoAccountsByVaultId::<Test>::contains_key(1, 2));
+			assert_eq!(Balances::total_issuance(), issuance);
+			for account in [1, 2] {
+				assert_eq!(
+					Balances::balance_on_hold(&HoldReason::PendingCollect.into(), &account),
+					0
+				);
+				assert_eq!(vault_earnings(account), 100);
+				assert_eq!(RevenuePerFrameByVault::<Test>::get(account as u32)[0].frame_id, 1);
+				let wallet = Balances::balance(&account);
+				assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(account)));
+				assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(account)));
+				assert_eq!(Balances::balance(&account), wallet + 100);
+			}
+			assert_eq!(Balances::total_issuance(), issuance);
+		});
 	}
 }

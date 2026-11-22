@@ -21,7 +21,7 @@ use bitcoin::{
 use core::time::Duration;
 use frame_support::{
 	storage::unhashed,
-	traits::{Currency, UnixTime},
+	traits::{Currency, OnGenesis, UnixTime},
 };
 use k256::elliptic_curve::rand_core::{OsRng, RngCore};
 use pallet_bitcoin_locks::BitcoinVerifier;
@@ -45,7 +45,8 @@ frame_support::construct_runtime!(
 		Balances: pallet_balances,
 		Vaults: pallet_vaults,
 		BitcoinLocks: pallet_bitcoin_locks,
-		BitcoinFissions: pallet_bitcoin_fissions
+		BitcoinFissions: pallet_bitcoin_fissions,
+		TreasuryPositions: pallet_treasury_positions
 	}
 );
 
@@ -231,7 +232,7 @@ impl pallet_vaults::Config for Test {
 	type OperationalMinimumVaultSecuritization = OperationalMinimumVaultSecuritization;
 	type OperationalAccountsHook = MockOperationalAccountsHook;
 	type TreasuryPoolProvider = ();
-	type PositionProvider = MockTreasuryPositionProvider;
+	type PositionProvider = TreasuryPositions;
 	type OperationalAccountProvider = MockOperationalAccountProvider;
 	type CollectBlockerProvider = MockCollectBlockerProvider;
 }
@@ -368,7 +369,12 @@ pub fn new_test_ext() -> TestState {
 	OverdueCollectBlockers::set(BTreeSet::new());
 	OperationalAccountsInviteOnly::set(false);
 	UpgradedOperationalAccounts::set(BTreeSet::new());
-	new_test_with_genesis::<Test>(|_t| {})
+	let mut ext = new_test_with_genesis::<Test>(|_t| {});
+	ext.execute_with(|| {
+		Vaults::on_genesis();
+		TreasuryPositions::on_genesis();
+	});
+	ext
 }
 
 // Accounting tests bypass mint issuance and repayment tracking.
@@ -446,4 +452,45 @@ impl UnixTime for StaticTickProvider {
 	fn now() -> Duration {
 		Duration::from_millis(CurrentTick::get() * HistoryTicker::get().tick_duration_millis)
 	}
+}
+
+parameter_types! { pub const TreasuryPositionsPalletId: PalletId = PalletId(*b"arg/colt"); }
+impl pallet_treasury_positions::Config for Test {
+	type Balance = Balance;
+	type BitcoinPositionProvider = ();
+	type TreasuryPoolProvider = ();
+	type OperationalAccountProvider = ();
+	type EarningsSettlementProvider = ();
+	type VaultEarningsProvider = Vaults;
+	type PalletId = TreasuryPositionsPalletId;
+	type MaxEarningChangesPerCall = ConstU32<32>;
+	type MiningFrameTransitionProvider = StaticMiningFrameProvider;
+	type Currency = Balances;
+	type WeightInfo = ();
+}
+
+pub fn vault_earnings(account: u64) -> Balance {
+	pallet_treasury_positions::PositionsByAccount::<Test>::get(account)
+		.map(|position| position.collect_accrued.vault_earnings)
+		.unwrap_or_default()
+}
+
+pub fn record_vault_earnings(frame_id: FrameId, amount: Balance) {
+	use argon_primitives::vault::{TreasuryVaultProvider, VaultTreasuryFrameEarnings};
+	use frame_support::traits::fungible::Balanced;
+
+	CurrentFrameId::set(frame_id);
+	let mut funding = <Balances as Balanced<u64>>::issue(amount);
+	assert_ok!(Vaults::record_vault_frame_earnings(
+		&mut funding,
+		VaultTreasuryFrameEarnings {
+			vault_id: 1,
+			vault_operator_account_id: 1,
+			frame_id,
+			earnings: amount,
+			earnings_for_vault: amount,
+			capital_contributed: 50_000,
+			capital_contributed_by_vault: 50_000,
+		}
+	));
 }

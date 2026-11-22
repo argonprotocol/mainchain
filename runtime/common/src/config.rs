@@ -109,8 +109,7 @@ parameter_types! {
 
 	// ### pallet_treasury
 	pub const MaxActiveArgonotBondLots: u32 = 1_000;
-	pub const MaxArgonBondLots: u32 = 15_000;
-	pub const MaxExpectedBondLotsPerAccount: u32 = 100;
+	pub const MaxBondCollateralLots: u32 = 10;
 	pub const MaxBondCollateralSettlementsPerBlock: u32 = 2;
 	pub const MaxVaultsPerPool: u32 = 100;
 	pub const TreasuryInternalPalletId: PalletId = PalletId(*b"lqdPools");

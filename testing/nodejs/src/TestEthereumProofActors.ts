@@ -703,6 +703,7 @@ export class TestMintingAuthorityActor {
         ),
         0n,
         micronotCollateral,
+        null,
       ),
       this.operator,
     );

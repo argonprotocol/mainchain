@@ -1,6 +1,9 @@
 use crate::{Balance, Config};
 use argon_primitives::{
-	treasury::{TreasuryRewardProvider, TreasuryRewardProviderWeightInfo},
+	treasury::{
+		TreasuryPositionProvider, TreasuryPositionProviderWeightInfo, TreasuryRewardProvider,
+		TreasuryRewardProviderWeightInfo,
+	},
 	BitcoinFissionsProvider, BitcoinFissionsProviderWeightInfo, CrosschainGatewayProvider,
 	CrosschainGatewayProviderWeightInfo, LiquidRepaymentProviderWeightInfo,
 	MiningFrameTransitionProvider, MiningFrameTransitionProviderWeightInfo,
@@ -24,7 +27,6 @@ pub trait WeightInfo {
 	fn record_purchase_first_hold() -> Weight;
 	fn bid() -> Weight;
 	fn process_payouts(max_accounts: u32) -> Weight;
-	fn process_payouts_failed(max_accounts: u32) -> Weight;
 	fn process_auctions(max_bids: u32) -> Weight;
 	fn set_approved_pool() -> Weight;
 	fn set_matching_rate() -> Weight;
@@ -33,10 +35,13 @@ pub trait WeightInfo {
 
 /// Add separately measured Fission and Treasury operations to the buys pallet's own costs.
 pub struct WithProviderWeights<T, Base>(PhantomData<(T, Base)>);
-type TreasuryWeights<T> = <<T as Config>::TreasuryRewardProvider as TreasuryRewardProvider<
-	<T as polkadot_sdk::frame_system::Config>::AccountId,
->>::Weights;
+type TreasuryWeights<T> =
+	<<T as Config>::TreasuryRewardProvider as TreasuryRewardProvider>::Weights;
 
+type PositionWeights<T> = <<T as Config>::PositionProvider as TreasuryPositionProvider<
+	<T as polkadot_sdk::frame_system::Config>::AccountId,
+	Balance,
+>>::Weights;
 type FissionsWeights<T> = <<T as Config>::FissionsProvider as BitcoinFissionsProvider<
 	<T as polkadot_sdk::frame_system::Config>::AccountId,
 	Balance,
@@ -126,7 +131,8 @@ impl<T: Config, Base: WeightInfo> WeightInfo for WithProviderWeights<T, Base> {
 				FrameWeights::<T>::get_current_frame_id().saturating_mul(max_bids.into()),
 			)
 			.saturating_add(
-				TreasuryWeights::<T>::commit_reward()
+				PositionWeights::<T>::fund()
+					.saturating_add(PositionWeights::<T>::accrue())
 					.saturating_add(TreasuryWeights::<T>::return_budget())
 					.saturating_mul(max_bids.into()),
 			)
@@ -138,15 +144,11 @@ impl<T: Config, Base: WeightInfo> WeightInfo for WithProviderWeights<T, Base> {
 				FrameWeights::<T>::get_current_frame_id()
 					.saturating_mul(2 * u64::from(max_accounts)),
 			)
-			.saturating_add(TreasuryWeights::<T>::pay_reward().saturating_mul(max_accounts.into()))
-	}
-	fn process_payouts_failed(max_accounts: u32) -> Weight {
-		Base::process_payouts_failed(max_accounts)
 			.saturating_add(
-				FrameWeights::<T>::get_current_frame_id()
-					.saturating_mul(2 * u64::from(max_accounts)),
+				PositionWeights::<T>::fund()
+					.saturating_add(PositionWeights::<T>::accrue())
+					.saturating_mul(max_accounts.into()),
 			)
-			.saturating_add(TreasuryWeights::<T>::pay_reward().saturating_mul(max_accounts.into()))
 	}
 }
 
@@ -206,9 +208,6 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 	fn bid() -> Weight {
-		Weight::zero()
-	}
-	fn process_payouts_failed(_: u32) -> Weight {
 		Weight::zero()
 	}
 	fn process_payouts(_: u32) -> Weight {

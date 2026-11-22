@@ -199,103 +199,27 @@ mod benchmarks {
 	}
 
 	#[benchmark]
-	fn settle_account(n: Linear<0, 5>) -> Result<(), BenchmarkError> {
-		let retained_frames = FrameId::from(T::MaxSampledPriceHistoryFrames::get());
-		let current_frame = retained_frames + 2;
-		let first_frame = current_frame - FrameId::from(T::ClaimWindowFrames::get()) - 1;
+	fn prove_position_earnings() -> Result<(), BenchmarkError> {
 		let caller: T::AccountId = whitelisted_caller();
-		let mut checkpoint = benchmark_checkpoint(caller.clone());
-		let config = config();
-		Pallet::<T>::register_pool(RawOrigin::Root.into(), pool_manager(), config)?;
+		let position = setup_earning_position::<T>(caller, 1)?;
 
-		let price = StabilizerPoolFramePrice {
-			pool: stabilizer_pool_price_source().pool,
-			sqrt_price_x96: sqrt_price_at_uniswap_tick(-276_800).unwrap(),
-			argon_usd_target_price: FixedU128::one(),
-			usdc_usd_price: FixedU128::one(),
-			argon_is_token0: true,
-		};
-		let band = StabilizerPoolRewardBand::new(
-			price.argon_usd_target_price,
-			price.usdc_usd_price,
-			price.argon_is_token0,
-			config.key.tick_spacing,
-			T::RewardPriceBand::get(),
-			REWARD_BAND_TOLERANCE,
-		)
-		.unwrap();
-		let ranges = band.reward_ranges().unwrap();
-		(checkpoint.tick_lower, checkpoint.tick_upper) = ranges[0];
-		checkpoint.maintained_since_block.timestamp_millis = 0;
-		checkpoint.proven_through_block.timestamp_millis = current_frame.saturating_mul(60_000);
+		#[block]
+		{
+			Pallet::<T>::prove_position_earnings(position)?;
+		}
+		let report = PositionContinuations::<T>::get(position).reported_enrollment.unwrap();
+		assert_eq!(
+			report.enrollment.next_claim_frame_id,
+			FrameId::from(T::MaxSampledPriceHistoryFrames::get()) + 1
+		);
+		Ok(())
+	}
 
-		StabilizerPoolFrameStartMillis::<T>::mutate(|starts| {
-			for frame in current_frame - retained_frames..=current_frame {
-				starts.try_insert(frame, frame.saturating_mul(60_000)).unwrap();
-			}
-		});
-		StabilizerPoolPricesByFrame::<T>::mutate(|prices| {
-			for frame in current_frame - retained_frames..current_frame {
-				prices.try_insert(frame, price).unwrap();
-			}
-		});
-		StabilizerPoolRewardSharesByFrame::<T>::mutate(|history| {
-			for frame in current_frame - retained_frames - 1..current_frame - 1 {
-				history.try_insert(frame, T::UsdcRewardShare::get()).unwrap();
-				T::RewardProvider::finalize_frame_rewards(frame, 1);
-			}
-		});
-		set_current_frame(current_frame);
+	#[benchmark]
+	fn settle_account(n: Linear<0, 5>) -> Result<(), BenchmarkError> {
+		let caller: T::AccountId = whitelisted_caller();
 		for token_id in 1..=n {
-			Pallet::<T>::record_checkpoint(
-				config.position_manager,
-				token_id.into(),
-				checkpoint.clone(),
-			)?;
-			let position = StabilizerPoolPositionId {
-				position_manager: config.position_manager,
-				uniswap_nft_id: token_id.into(),
-			};
-			let mut continuation =
-				PositionContinuation::<T::MaxSampledPriceHistoryFrames>::default();
-			for index in 0..retained_frames {
-				let retired = StabilizerPoolPositionId {
-					uniswap_nft_id: (100 + u64::from(token_id) * retained_frames + index).into(),
-					..position
-				};
-				let mut old = checkpoint.clone();
-				(old.tick_lower, old.tick_upper) = ranges[1 + index as usize % (ranges.len() - 1)];
-				PositionCheckpoints::<T>::insert(
-					retired.position_manager,
-					retired.uniswap_nft_id,
-					old,
-				);
-				continuation
-					.earning_periods
-					.try_push(PositionEarningPeriod {
-						retired_position_id: retired,
-						first_eligible_frame_id: 0,
-						replacement_start_frame_id: index + 2,
-						excluded_frame_id: None,
-					})
-					.unwrap();
-			}
-			// Expired reports also exercise rewriting retained terms and releasing account slots.
-			continuation.reported_enrollment = Some(ReportedPositionEnrollment {
-				enrollment: StabilizerPoolEnrollment {
-					first_eligible_frame_id: first_frame,
-					next_claim_frame_id: first_frame,
-				},
-				recovery_deadline_frame_id: current_frame,
-				reported_frame_id: current_frame,
-			});
-			PositionContinuations::<T>::insert(position, continuation);
-			StabilizerPoolRegistrations::<T>::insert(
-				position,
-				StabilizerPoolRegistration::Removed {
-					reported_at_block: checkpoint.proven_through_block,
-				},
-			);
+			setup_earning_position::<T>(caller.clone(), token_id)?;
 		}
 
 		#[block]
@@ -303,13 +227,6 @@ mod benchmarks {
 			Pallet::<T>::settle_account(&caller)?;
 		}
 		assert!(PositionIdsByAccount::<T>::get(&caller).is_empty());
-		for token_id in 1..=n {
-			let position = StabilizerPoolPositionId {
-				position_manager: config.position_manager,
-				uniswap_nft_id: token_id.into(),
-			};
-			assert!(!PositionContinuations::<T>::contains_key(position));
-		}
 		Ok(())
 	}
 
@@ -476,7 +393,16 @@ mod benchmarks {
 		Ok(())
 	}
 
-	impl_benchmark_test_suite!(Pallet, new_test_with_genesis::<Test>(|_| {}), Test);
+	impl_benchmark_test_suite!(
+		Pallet,
+		{
+			use sp_runtime::BuildStorage;
+			polkadot_sdk::sp_io::TestExternalities::new(
+				crate::mock::RuntimeGenesisConfig::default().build_storage().unwrap(),
+			)
+		},
+		Test
+	);
 }
 
 fn benchmark_checkpoint<AccountId>(beneficiary: AccountId) -> PositionCheckpoint<AccountId> {
@@ -681,4 +607,106 @@ fn fill_price_buckets<T: Config>(
 		);
 	}
 	Ok((first_tick_after_full_buckets, price))
+}
+
+/// Seed the same worst-case finalized history for one-position proofs and account settlement.
+fn setup_earning_position<T: Config>(
+	caller: T::AccountId,
+	token_id: u32,
+) -> Result<StabilizerPoolPositionId, BenchmarkError> {
+	let retained_frames = FrameId::from(T::MaxSampledPriceHistoryFrames::get());
+	let current_frame = retained_frames + 2;
+	let first_frame = current_frame - FrameId::from(T::ClaimWindowFrames::get()) - 1;
+	let mut checkpoint = benchmark_checkpoint(caller.clone());
+	let config = config();
+	if !Pools::<T>::contains_key(pool_manager(), pool_id()) {
+		Pallet::<T>::register_pool(RawOrigin::Root.into(), pool_manager(), config)?;
+	}
+
+	let price = StabilizerPoolFramePrice {
+		pool: stabilizer_pool_price_source().pool,
+		sqrt_price_x96: sqrt_price_at_uniswap_tick(-276_800).unwrap(),
+		argon_usd_target_price: FixedU128::one(),
+		usdc_usd_price: FixedU128::one(),
+		argon_is_token0: true,
+	};
+	let band = StabilizerPoolRewardBand::new(
+		price.argon_usd_target_price,
+		price.usdc_usd_price,
+		price.argon_is_token0,
+		config.key.tick_spacing,
+		T::RewardPriceBand::get(),
+		REWARD_BAND_TOLERANCE,
+	)
+	.unwrap();
+	let ranges = band.reward_ranges().unwrap();
+	(checkpoint.tick_lower, checkpoint.tick_upper) = ranges[0];
+	checkpoint.maintained_since_block.timestamp_millis = 0;
+	checkpoint.proven_through_block.timestamp_millis = current_frame.saturating_mul(60_000);
+
+	StabilizerPoolFrameStartMillis::<T>::mutate(|starts| {
+		for frame in current_frame - retained_frames..=current_frame {
+			starts.try_insert(frame, frame.saturating_mul(60_000)).unwrap();
+		}
+	});
+	StabilizerPoolPricesByFrame::<T>::mutate(|prices| {
+		for frame in current_frame - retained_frames..current_frame {
+			prices.try_insert(frame, price).unwrap();
+		}
+	});
+	StabilizerPoolRewardSharesByFrame::<T>::mutate(|history| {
+		for frame in current_frame - retained_frames..current_frame {
+			history.try_insert(frame, T::UsdcRewardShare::get()).unwrap();
+			T::RewardProvider::finalize_frame_rewards(frame, 1);
+		}
+	});
+	set_current_frame(current_frame);
+	Pallet::<T>::record_checkpoint(config.position_manager, token_id.into(), checkpoint.clone())?;
+	let position = StabilizerPoolPositionId {
+		position_manager: config.position_manager,
+		uniswap_nft_id: token_id.into(),
+	};
+	let mut continuation = PositionContinuation::<T::MaxSampledPriceHistoryFrames>::default();
+	for index in 0..retained_frames {
+		let retired = StabilizerPoolPositionId {
+			uniswap_nft_id: (100 + u64::from(token_id) * retained_frames + index).into(),
+			..position
+		};
+		let mut old = checkpoint.clone();
+		(old.tick_lower, old.tick_upper) = ranges[1 + index as usize % (ranges.len() - 1)];
+		PositionCheckpoints::<T>::insert(retired.position_manager, retired.uniswap_nft_id, old);
+		continuation
+			.earning_periods
+			.try_push(PositionEarningPeriod {
+				retired_position_id: retired,
+				first_eligible_frame_id: 0,
+				replacement_start_frame_id: index + 2,
+				excluded_frame_id: None,
+			})
+			.unwrap();
+	}
+	continuation.reported_enrollment = Some(ReportedPositionEnrollment {
+		enrollment: StabilizerPoolEnrollment {
+			first_eligible_frame_id: first_frame,
+			next_claim_frame_id: first_frame,
+		},
+		recovery_deadline_frame_id: current_frame,
+		reported_frame_id: current_frame.saturating_sub(1),
+	});
+	PositionContinuations::<T>::insert(position, continuation);
+	StabilizerPoolRegistrations::<T>::insert(
+		position,
+		StabilizerPoolRegistration::Removed { reported_at_block: checkpoint.proven_through_block },
+	);
+
+	let continuation = PositionContinuations::<T>::get(position);
+	let enrollment = continuation.reported_enrollment.unwrap().enrollment;
+	let (_, claims) = Pallet::<T>::calculate_position_earnings(
+		&checkpoint,
+		&enrollment,
+		&continuation,
+		current_frame,
+	)?;
+	assert_eq!(claims.len(), T::ClaimWindowFrames::get() as usize);
+	Ok(position)
 }

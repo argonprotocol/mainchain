@@ -5,17 +5,18 @@ use crate::{
 		PendingTermsModificationsByTick, RevenuePerFrameByVault, RevenuePerFrameByVaultCount,
 		VaultFundsReleasingByHeight, VaultXPubById, VaultsById,
 	},
-	Error, Event, HoldReason, LastCollectFrameByVaultId, OrphanedUtxoAccountsByVaultId,
-	PendingCosignByVaultId, VaultConfig, VaultIdByOperator,
+	Error, Event, HoldReason, LastCollectFrameByVaultId, PendingCosignsByVault, VaultConfig,
+	VaultIdByOperator,
 };
 use argon_primitives::{
 	bitcoin::{
 		CompressedBitcoinPubkey, H256Le, LiquidRepayPrices, OpaqueBitcoinXpub, UtxoRef,
 		SATOSHIS_PER_BITCOIN,
 	},
+	treasury::{CollectSource, TreasuryPositionProvider},
 	vault::{
-		BitcoinLockFunding, BitcoinSecuritizationBasis, BitcoinVaultProvider, CosignerGuarantee,
-		ReserveSecuritizationRequest, VaultError, VaultTerms,
+		BitcoinLockFunding, BitcoinSecuritizationBasis, BitcoinVaultProvider, CosignRequest,
+		CosignerGuarantee, ReserveSecuritizationRequest, VaultError, VaultTerms,
 		MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES,
 	},
 	BitcoinFissionsProvider, BitcoinUtxoEvents, MICROGONS_PER_ARGON,
@@ -24,7 +25,7 @@ use bitcoin::{
 	bip32::{ChildNumber, Xpriv, Xpub},
 	key::Secp256k1,
 };
-use frame_support::traits::{fungible::Balanced, tokens::Imbalance, Hooks};
+use frame_support::traits::{fungible::Balanced, Hooks};
 use k256::elliptic_curve::rand_core::{OsRng, RngCore};
 use pallet_bitcoin_locks::{LocksById, MicrogonsAtTargetPerBtcHistory};
 use pallet_prelude::{
@@ -1237,7 +1238,7 @@ fn it_can_close_a_vault() {
 			.into(),
 		);
 		assert_eq!(Balances::free_balance(1), vault_owner_balance - 40_000);
-		assert_eq!(Balances::balance_on_hold(&HoldReason::PendingCollect.into(), &1), fee);
+		assert_eq!(vault_earnings(1), fee);
 		assert!(VaultsById::<Test>::get(1).unwrap().is_closed);
 
 		// set to full fee block
@@ -1255,7 +1256,7 @@ fn it_can_close_a_vault() {
 		LastBitcoinHeightChange::set((exit_height, exit_height));
 		Vaults::on_initialize(2);
 		assert_eq!(Balances::free_balance(1), vault_owner_balance);
-		assert_eq!(Balances::balance_on_hold(&HoldReason::PendingCollect.into(), &1), fee);
+		assert_eq!(vault_earnings(1), fee);
 		assert_eq!(Balances::free_balance(2), 100_000 - fee);
 		assert_err!(
 			Vaults::reserve_securitization(
@@ -1302,11 +1303,11 @@ fn it_can_lock_funds() {
 		assert_eq!(fee, apr_fee + 1000);
 		assert_eq!(Balances::free_balance(2), 6_000 - fee);
 		assert_eq!(Balances::free_balance(1), 500_000);
-		assert_eq!(Balances::balance_on_hold(&HoldReason::PendingCollect.into(), &1), fee);
+		assert_eq!(vault_earnings(1), fee);
 		// if we return the securitization, the fee won't be returned
 		assert_ok!(Vaults::shrink_securitization(1, &securitization(500_000), 100, true));
 		assert_eq!(Balances::free_balance(1), 500_000);
-		assert_eq!(Balances::balance_on_hold(&HoldReason::PendingCollect.into(), &1), fee);
+		assert_eq!(vault_earnings(1), fee);
 		assert_eq!(Balances::free_balance(2), 6_000 - fee);
 
 		let current_frame_id = CurrentFrameId::get();
@@ -1446,9 +1447,8 @@ fn it_handles_overflowing_metrics() {
 			};
 			set_argons(account_id, 100_000_000);
 			assert_ok!(Vaults::create(RuntimeOrigin::signed(account_id), vault.clone()));
-			Balances::set_on_hold(&HoldReason::PendingCollect.into(), &account_id, 10_000_000)
-				.map_err(|_| VaultError::UnrecoverableHold)
-				.unwrap();
+			TreasuryPositions::fund(CollectSource::Vaults, 10_000_000).unwrap();
+			TreasuryPositions::accrue(&account_id, CollectSource::Vaults, 10_000_000).unwrap();
 		}
 		for frame_id in 1..50 {
 			CurrentFrameId::set(frame_id);
@@ -1585,7 +1585,7 @@ fn it_tracks_confirmed_and_securitized_satoshis_via_provider_methods() {
 			funding_update(&securitization(500), 500)
 		));
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitized_satoshis, 1_500);
-		assert_eq!(MockTreasuryPositionProvider::vault_securitized_satoshis(), 1_500);
+		assert_eq!(TreasuryPositions::network_totals().vault_securitized_satoshis, 1_500);
 		let (positions, _) = Vaults::get_top_vaults_by_securitization(1);
 		assert_eq!(positions[0].activated_securitization, 1_500);
 		assert_eq!(positions[0].bitcoin_locked_satoshis, 1_500);
@@ -1599,7 +1599,7 @@ fn it_tracks_confirmed_and_securitized_satoshis_via_provider_methods() {
 			false,
 		));
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitized_satoshis, 900);
-		assert_eq!(MockTreasuryPositionProvider::vault_securitized_satoshis(), 900);
+		assert_eq!(TreasuryPositions::network_totals().vault_securitized_satoshis, 900);
 	});
 }
 
@@ -1620,14 +1620,14 @@ fn funding_reduction_updates_network_securitized_satoshis() {
 			Default::default(),
 			funding_update(&securitization(1_000), 1_000),
 		));
-		assert_eq!(MockTreasuryPositionProvider::vault_securitized_satoshis(), 1_000);
+		assert_eq!(TreasuryPositions::network_totals().vault_securitized_satoshis, 1_000);
 		assert_ok!(Vaults::record_bitcoin_lock_funding(
 			1,
 			funding_update(&securitization(1_000), 1_000),
 			funding_update(&securitization(500), 500),
 		));
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitized_satoshis, 500);
-		assert_eq!(MockTreasuryPositionProvider::vault_securitized_satoshis(), 500);
+		assert_eq!(TreasuryPositions::network_totals().vault_securitized_satoshis, 500);
 	});
 }
 
@@ -1738,7 +1738,7 @@ fn provider_resecuritizes_a_funded_lock_and_reuses_its_backing() {
 		assert_eq!(vault.securitization_locked, 800);
 		assert_eq!(vault.securitization_pending_activation, 0);
 		assert_eq!(vault.securitized_satoshis, 800);
-		assert_eq!(MockTreasuryPositionProvider::vault_securitized_satoshis(), 800);
+		assert_eq!(TreasuryPositions::network_totals().vault_securitized_satoshis, 800);
 		assert_eq!(vault.get_relock_capacity(), 200);
 		assert_eq!(MockOperationalAccountsHook::last_vault_funding_report(), Some((1, 800)));
 		let revenue = RevenuePerFrameByVault::<Test>::get(1);
@@ -1943,7 +1943,7 @@ fn it_can_burn_funds() {
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().exit_notice_amount(), 0);
 		assert_eq!(VaultsById::<Test>::get(1).unwrap().securitization_target, 0);
 		assert_eq!(crate::TotalVaultSecuritization::<Test>::get(), 0);
-		assert_eq!(MockTreasuryPositionProvider::vault_securitized_satoshis(), 0);
+		assert_eq!(TreasuryPositions::network_totals().vault_securitized_satoshis, 0);
 	});
 }
 
@@ -1981,7 +1981,7 @@ fn zero_burn_retires_funded_satoshis_and_schedules_funded_collateral() {
 		assert_eq!(vault.securitization_locked, 0);
 		assert_eq!(vault.total_satoshis, 0);
 		assert_eq!(vault.securitized_satoshis, 0);
-		assert_eq!(MockTreasuryPositionProvider::vault_securitized_satoshis(), 0);
+		assert_eq!(TreasuryPositions::network_totals().vault_securitized_satoshis, 0);
 		assert_eq!(
 			vault.get_relock_capacity(),
 			securitization(100_000).securitization_for_satoshis(500)
@@ -2087,7 +2087,7 @@ fn insured_redemption_compensation_scenario(redemption_amount: u128, expected_co
 		assert_eq!(vault.get_relock_capacity(), remaining_lock_collateral, "relock capacity");
 		assert_eq!(vault.securitization_locked, 0, "argons locked");
 		assert_eq!(vault.securitization, securitization - expected_compensation, "securitization");
-		assert_eq!(MockTreasuryPositionProvider::vault_securitized_satoshis(), 0);
+		assert_eq!(TreasuryPositions::network_totals().vault_securitized_satoshis, 0);
 		assert_eq!(
 			Balances::free_balance(bitcoin_locker),
 			expected_compensation,
@@ -2545,319 +2545,6 @@ fn zero_reward_records_capital_when_all_operator_funds_are_held() {
 }
 
 #[test]
-fn failed_reward_hold_preserves_funding_and_revenue_for_retry() {
-	new_test_ext().execute_with(|| {
-		System::set_block_number(1);
-		set_argons(1, 1_000_000);
-		assert_ok!(Vaults::create(RuntimeOrigin::signed(1), default_vault()));
-		assert_ok!(Vaults::close(RuntimeOrigin::signed(1), 1));
-		assert_eq!(Balances::balance_on_hold(&HoldReason::EnterVault.into(), &1), 0);
-
-		// A valid account can have all consumer slots occupied by other pallet activity.
-		while System::inc_consumers(&1).is_ok() {}
-		let mut funding = <Balances as Balanced<_>>::issue(100_000);
-		let issuance_before = Balances::total_issuance();
-		let free_before = Balances::balance(&1);
-		let profit = VaultTreasuryFrameEarnings {
-			vault_id: 1,
-			vault_operator_account_id: 1,
-			frame_id: CurrentFrameId::get(),
-			earnings: 100_000,
-			capital_contributed: 100_000,
-			earnings_for_vault: 100_000,
-			capital_contributed_by_vault: 0,
-		};
-		let mut underfunded_profit = profit.clone();
-		underfunded_profit.earnings_for_vault = 100_001;
-		assert_err!(
-			Vaults::record_vault_frame_earnings(&mut funding, underfunded_profit),
-			TokenError::FundsUnavailable
-		);
-
-		assert!(Vaults::record_vault_frame_earnings(&mut funding, profit.clone()).is_err());
-
-		assert_eq!(funding.peek(), 100_000);
-		assert_eq!(Balances::total_issuance(), issuance_before);
-		assert_eq!(Balances::balance(&1), free_before);
-		assert_eq!(Balances::balance_on_hold(&HoldReason::PendingCollect.into(), &1), 0);
-		assert!(RevenuePerFrameByVault::<Test>::get(1).is_empty());
-		assert_eq!(RevenuePerFrameByVaultCount::<Test>::get(), 0);
-
-		System::dec_consumers(&1);
-		assert_ok!(Vaults::record_vault_frame_earnings(&mut funding, profit));
-		assert_eq!(funding.peek(), 0);
-		assert_eq!(Balances::total_issuance(), issuance_before);
-		assert_eq!(Balances::balance(&1), free_before);
-		assert_eq!(Balances::balance_on_hold(&HoldReason::PendingCollect.into(), &1), 100_000);
-		assert_eq!(RevenuePerFrameByVault::<Test>::get(1)[0].uncollected_revenue, 100_000);
-	});
-}
-
-#[test]
-fn vaults_can_collect_revenue() {
-	new_test_ext().execute_with(|| {
-		// Go past genesis block so events get deposited
-		System::set_block_number(5);
-
-		CurrentFrameId::set(1);
-
-		set_argons(1, 1_000_000);
-		let mut terms = default_terms(FixedU128::from_float(0.01));
-		terms.bitcoin_base_fee = 1000;
-		assert_ok!(Vaults::create(
-			RuntimeOrigin::signed(1),
-			VaultConfig {
-				terms,
-				delegate_account_id: None,
-				bitcoin_xpubkey: keys(),
-				securitization: 500_000,
-			}
-		));
-		assert_eq!(Balances::free_balance(1), 500_000);
-
-		CurrentFrameId::set(2);
-		Vaults::on_frame_start(2);
-		RevenuePerFrameByVault::<Test>::get(1);
-		assert_eq!(RevenuePerFrameByVault::<Test>::get(1).len(), 0);
-		assert_eq!(RevenuePerFrameByVaultCount::<Test>::get(), 0);
-
-		set_argons(2, 6_000);
-		let (fee, _) = Vaults::reserve_securitization(
-			1,
-			&2,
-			&securitization(500_000),
-			standard_reservation_request(),
-		)
-		.expect("bonding failed");
-
-		let current_frame_id = CurrentFrameId::get();
-		let vault_revenue = RevenuePerFrameByVault::<Test>::get(1).to_vec();
-		assert_eq!(vault_revenue.len(), 1);
-		assert_eq!(vault_revenue[0].frame_id, current_frame_id);
-		assert_eq!(vault_revenue[0].bitcoin_lock_fee_revenue, fee);
-		assert_eq!(vault_revenue[0].bitcoin_locks_new_securitization, 500_000);
-		assert_eq!(vault_revenue[0].bitcoin_locks_added_satoshis, 0);
-		assert_eq!(vault_revenue[0].bitcoin_locks_created, 1);
-		assert_eq!(vault_revenue[0].uncollected_revenue, fee);
-		assert_eq!(vault_revenue[0].securitization, 500_000);
-		assert_eq!(vault_revenue[0].securitization_activated, 0); // funds are still pending
-		assert_eq!(Balances::balance_on_hold(&HoldReason::PendingCollect.into(), &1), fee);
-
-		// set up a mining bid pallet account. 10k is "already distributed"
-		let vault_lp_earnings = 40_000;
-		set_argons(100, vault_lp_earnings);
-		assert_ok!(Vaults::record_vault_frame_earnings(
-			&mut <Balances as Balanced<_>>::withdraw(
-				&100,
-				vault_lp_earnings,
-				Precision::Exact,
-				Preservation::Expendable,
-				Fortitude::Polite,
-			)
-			.unwrap(),
-			VaultTreasuryFrameEarnings {
-				vault_id: 1,
-				vault_operator_account_id: 1,
-				frame_id: current_frame_id,
-				earnings: 50_000,
-				capital_contributed: 100_000,
-				earnings_for_vault: vault_lp_earnings,
-				capital_contributed_by_vault: 10_000,
-			},
-		));
-		assert_eq!(Balances::free_balance(100), 0);
-		assert_eq!(
-			Balances::balance_on_hold(&HoldReason::PendingCollect.into(), &1),
-			fee + vault_lp_earnings
-		);
-		let vault_revenue = RevenuePerFrameByVault::<Test>::get(1).to_vec();
-		assert_eq!(vault_revenue.len(), 1);
-		assert_eq!(vault_revenue[0].frame_id, current_frame_id);
-		assert_eq!(vault_revenue[0].treasury_vault_earnings, vault_lp_earnings);
-		assert_eq!(vault_revenue[0].treasury_total_earnings, 50_000);
-		assert_eq!(vault_revenue[0].treasury_vault_capital, 10_000);
-		assert_eq!(vault_revenue[0].treasury_external_capital, 90_000);
-		assert_eq!(vault_revenue[0].uncollected_revenue, fee + vault_lp_earnings);
-
-		assert!(LastCollectFrameByVaultId::<Test>::get(1).is_none());
-		assert_err!(Vaults::collect(RuntimeOrigin::signed(2), 1), Error::<Test>::NoPermissions);
-		// test that you can only collect if you have no pending cosigns
-		PendingCosignByVaultId::<Test>::mutate(1, |a| a.try_insert(1).unwrap());
-		assert_err!(
-			Vaults::collect(RuntimeOrigin::signed(1), 1),
-			Error::<Test>::PendingCosignsBeforeCollect
-		);
-		PendingCosignByVaultId::<Test>::mutate(1, |a| a.remove(&1));
-		OrphanedUtxoAccountsByVaultId::<Test>::insert(1, 1, 1);
-		assert_err!(
-			Vaults::collect(RuntimeOrigin::signed(1), 1),
-			Error::<Test>::PendingOrphanedUtxoCosignsBeforeCollect
-		);
-		OrphanedUtxoAccountsByVaultId::<Test>::remove(1, 1);
-		OverdueCollectBlockers::mutate(|entries| {
-			entries.insert(1);
-		});
-		assert_err!(
-			Vaults::collect(RuntimeOrigin::signed(1), 1),
-			Error::<Test>::OverdueCollectBlockersBeforeCollect
-		);
-		OverdueCollectBlockers::mutate(|entries| {
-			entries.remove(&1);
-		});
-
-		let providers_before_collect = System::providers(&1);
-		assert_ok!(Vaults::collect(RuntimeOrigin::signed(1), 1));
-		assert_eq!(System::providers(&1), providers_before_collect);
-		assert_eq!(Balances::free_balance(1), 1_000_000 - 500_000 + fee + vault_lp_earnings);
-		assert_eq!(Balances::free_balance(100), 0);
-		assert_eq!(LastCollectFrameByVaultId::<Test>::get(1), Some(CurrentFrameId::get()));
-
-		VaultsById::<Test>::mutate(1, |v| {
-			if let Some(v) = v {
-				v.securitization_pending_activation = 0;
-			}
-		});
-		CurrentFrameId::set(3);
-		Vaults::on_frame_start(3);
-		let vault_revenue = RevenuePerFrameByVault::<Test>::get(1).to_vec();
-		assert_eq!(vault_revenue.len(), 1);
-		assert_eq!(vault_revenue[0].frame_id, 2);
-		assert_eq!(vault_revenue[0].uncollected_revenue, 0);
-		assert_eq!(vault_revenue[0].securitization_activated, 500_000);
-
-		// make sure order is correct if we get another entry
-
-		let vault_lp_earnings = 20_000;
-		set_argons(100, vault_lp_earnings);
-		assert_eq!(CurrentFrameId::get(), 3);
-		assert_ok!(Vaults::record_vault_frame_earnings(
-			&mut <Balances as Balanced<_>>::withdraw(
-				&100,
-				vault_lp_earnings,
-				Precision::Exact,
-				Preservation::Expendable,
-				Fortitude::Polite,
-			)
-			.unwrap(),
-			VaultTreasuryFrameEarnings {
-				vault_id: 1,
-				vault_operator_account_id: 1,
-				frame_id: CurrentFrameId::get(),
-				earnings: 50_000,
-				capital_contributed: 100_000,
-				earnings_for_vault: vault_lp_earnings,
-				capital_contributed_by_vault: 10_000,
-			},
-		));
-		let vault_revenue = RevenuePerFrameByVault::<Test>::get(1).to_vec();
-		assert_eq!(vault_revenue.len(), 2);
-		assert_eq!(vault_revenue[0].frame_id, 3);
-		assert_eq!(vault_revenue[0].uncollected_revenue, vault_lp_earnings);
-		assert_eq!(vault_revenue[1].frame_id, 2);
-		assert_eq!(vault_revenue[1].uncollected_revenue, 0);
-	});
-}
-
-#[test]
-fn it_burns_uncollected_revenue() {
-	new_test_ext().execute_with(|| {
-		// Go past genesis block so events get deposited
-		System::set_block_number(5);
-
-		set_argons(1, 1_000_000);
-		let terms = default_terms(FixedU128::from_float(0.01));
-		assert_ok!(Vaults::create(
-			RuntimeOrigin::signed(1),
-			VaultConfig {
-				terms,
-				delegate_account_id: None,
-				bitcoin_xpubkey: keys(),
-				securitization: 500_000,
-			}
-		));
-		let bid_pool_account = 100;
-		set_argons(bid_pool_account, 1_100_000);
-		for i in 1..=10 {
-			// Go past genesis block so events get deposited
-			System::set_block_number(5 + i);
-			CurrentFrameId::set(i);
-			// Go past the frame start so revenue gets recorded
-			Vaults::on_frame_start(i);
-
-			assert_ok!(Vaults::record_vault_frame_earnings(
-				&mut <Balances as Balanced<_>>::withdraw(
-					&bid_pool_account,
-					100_000,
-					Precision::Exact,
-					Preservation::Expendable,
-					Fortitude::Polite,
-				)
-				.unwrap(),
-				VaultTreasuryFrameEarnings {
-					vault_id: 1,
-					vault_operator_account_id: 1,
-					frame_id: i,
-					earnings: 100_000,
-					capital_contributed: 100_000,
-					earnings_for_vault: 100_000,
-					capital_contributed_by_vault: 100_000,
-				},
-			));
-		}
-		let pending_revenue = RevenuePerFrameByVault::<Test>::get(1);
-		assert_eq!(pending_revenue.len(), 10);
-		assert_eq!(RevenuePerFrameByVaultCount::<Test>::get(), 1);
-		assert_eq!(Balances::balance_on_hold(&HoldReason::PendingCollect.into(), &1), 1_000_000);
-		assert_eq!(pending_revenue[0].uncollected_revenue, 100_000);
-		assert_eq!(pending_revenue[0].frame_id, 10);
-		assert_eq!(pending_revenue[9].frame_id, 1);
-		System::reset_events();
-		CurrentFrameId::set(11);
-		Vaults::on_frame_start(11);
-		assert_eq!(
-			Balances::balance_on_hold(&HoldReason::PendingCollect.into(), &1),
-			900_000,
-			"should burn 100k"
-		);
-		System::assert_has_event(
-			Event::<Test>::VaultRevenueUncollected { vault_id: 1, amount: 100_000, frame_id: 1 }
-				.into(),
-		);
-		let pending_revenue = RevenuePerFrameByVault::<Test>::get(1);
-		assert_eq!(pending_revenue.len(), 9);
-		assert_eq!(RevenuePerFrameByVaultCount::<Test>::get(), 1);
-		assert!(!pending_revenue.iter().any(|a| a.frame_id == 1));
-	})
-}
-
-#[test]
-fn it_tracks_pending_cosign_utxos_for_vaults() {
-	new_test_ext().execute_with(|| {
-		// Go past genesis block so events get deposited
-		System::set_block_number(5);
-
-		assert_ok!(Vaults::update_pending_cosign_list(1, 1, false));
-		assert_ok!(Vaults::update_pending_cosign_list(1, 2, false));
-		assert_ok!(Vaults::update_pending_cosign_list(2, 3, false));
-		assert_ok!(Vaults::update_pending_cosign_list(2, 4, false));
-		assert_eq!(
-			PendingCosignByVaultId::<Test>::get(1).into_iter().collect::<Vec<_>>(),
-			vec![1, 2]
-		);
-		assert_eq!(
-			PendingCosignByVaultId::<Test>::get(2).into_iter().collect::<Vec<_>>(),
-			vec![3, 4]
-		);
-
-		assert_ok!(Vaults::update_pending_cosign_list(1, 1, true));
-		assert_eq!(PendingCosignByVaultId::<Test>::get(1).into_iter().collect::<Vec<_>>(), vec![2]);
-
-		assert_ok!(Vaults::update_pending_cosign_list(2, 4, true));
-		assert_eq!(PendingCosignByVaultId::<Test>::get(2).into_iter().collect::<Vec<_>>(), vec![3]);
-	});
-}
-
-#[test]
 fn resecuritizing_an_unfunded_lock_preserves_reused_later_maturities() {
 	new_test_ext().execute_with(|| {
 		set_argons(1, 200);
@@ -2976,7 +2663,7 @@ fn terminal_settlement_preserves_reused_holds_without_reducing_the_burn() {
 			assert_eq!(vault.securitization_pending_activation, 0);
 			assert_eq!(vault.total_satoshis, 0);
 			assert_eq!(vault.securitized_satoshis, 0);
-			assert_eq!(MockTreasuryPositionProvider::vault_securitized_satoshis(), 0);
+			assert_eq!(TreasuryPositions::network_totals().vault_securitized_satoshis, 0);
 			assert_eq!(vault.get_relock_capacity(), expected_hold);
 			assert_eq!(
 				vault
@@ -3696,3 +3383,5 @@ fn due_funding_reservations_are_retired_before_terminal_liquid_settlement() {
 		assert_eq!(remaining.cosigner_guarantee.guaranteed_microgons, 0);
 	});
 }
+
+mod collect;

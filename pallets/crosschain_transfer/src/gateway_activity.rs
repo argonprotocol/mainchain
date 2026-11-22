@@ -1836,6 +1836,7 @@ mod test {
 				minting_authority_registration_signature(&authority_pair, &operator),
 				10_000,
 				0,
+				None,
 			));
 			assert_ok!(CrosschainTransfer::approve_queue_entries(
 				RuntimeOrigin::signed(operator.clone()),
@@ -2407,6 +2408,7 @@ mod test {
 				),
 				10_000,
 				0,
+				None,
 			));
 			let approval_signature = minting_authority_approval_signature(&council_pair, 1);
 			assert_ok!(CrosschainTransfer::approve_queue_entries(
@@ -2783,6 +2785,7 @@ mod test {
 				),
 				10_000,
 				0,
+				None,
 			));
 			assert_ok!(CrosschainTransfer::approve_queue_entries(
 				RuntimeOrigin::signed(owner_vault_operator.clone()),
@@ -2880,6 +2883,7 @@ mod test {
 				),
 				10_000,
 				0,
+				None,
 			));
 			assert_ok!(CrosschainTransfer::approve_queue_entries(
 				RuntimeOrigin::signed(owner_vault_operator.clone()),
@@ -2977,6 +2981,7 @@ mod test {
 				),
 				10_000,
 				0,
+				None,
 			));
 			assert_ok!(CrosschainTransfer::approve_queue_entries(
 				RuntimeOrigin::signed(owner_vault_operator.clone()),
@@ -3057,6 +3062,7 @@ mod test {
 				),
 				10_000,
 				0,
+				None,
 			));
 			assert_ok!(CrosschainTransfer::register_minting_authority(
 				RuntimeOrigin::signed(second_authority_account.clone()),
@@ -3068,6 +3074,7 @@ mod test {
 				),
 				10_000,
 				0,
+				None,
 			));
 			assert_ok!(CrosschainTransfer::approve_queue_entries(
 				RuntimeOrigin::signed(council_account),
@@ -3169,6 +3176,7 @@ mod test {
 				),
 				10_000,
 				0,
+				None,
 			));
 			assert_ok!(CrosschainTransfer::approve_queue_entries(
 				RuntimeOrigin::signed(owner_vault_operator.clone()),
@@ -3253,6 +3261,7 @@ mod test {
 				),
 				4_000,
 				250,
+				None,
 			));
 			MintingAuthoritiesBySigner::<Test>::insert(
 				signing_key,
@@ -3309,6 +3318,7 @@ mod test {
 				),
 				3_000,
 				200,
+				None,
 			));
 			assert_eq!(
 				MintingAuthoritiesBySigner::<Test>::get(signing_key),

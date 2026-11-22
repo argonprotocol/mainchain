@@ -21,8 +21,8 @@ use argon_primitives::{
 	providers::{BitcoinFissionLockError, BitcoinFissionLockProvider},
 	treasury::{BitcoinLockPosition, BitcoinLockPositionProvider, TreasuryPositionProvider},
 	vault::{
-		BitcoinLockFunding, BitcoinSecuritizationBasis, BitcoinVaultProvider, CosignerGuarantee,
-		ReserveSecuritizationRequest, VaultError,
+		BitcoinLockFunding, BitcoinSecuritizationBasis, BitcoinVaultProvider, CosignRequest,
+		CosignerGuarantee, ReserveSecuritizationRequest, VaultError,
 	},
 	BitcoinUtxoTracker,
 };
@@ -99,7 +99,7 @@ pub mod pallet {
 	};
 	use codec::HasCompact;
 	use core::iter::Sum;
-	pub(super) const STORAGE_VERSION: StorageVersion = StorageVersion::new(12);
+	pub(super) const STORAGE_VERSION: StorageVersion = StorageVersion::new(13);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -556,6 +556,8 @@ pub mod pallet {
 		pub to_script_pubkey: BitcoinScriptPubkey,
 		/// When this was requested to be released
 		pub created_at_argon_block_number: BlockNumber,
+		/// First frame when this unresolved request blocks vault earnings.
+		pub collect_due_frame: FrameId,
 	}
 
 	#[pallet::event]
@@ -1130,8 +1132,12 @@ pub mod pallet {
 
 			LockCosignDueByFrame::<T>::try_mutate(cosign_due_frame, |a| a.try_insert(lock_id))
 				.map_err(|_| Error::<T>::ExpirationAtBlockOverflow)?;
-			T::VaultProvider::update_pending_cosign_list(vault_id, lock_id, false)
-				.map_err(Error::<T>::from)?;
+			T::VaultProvider::update_pending_cosign(
+				vault_id,
+				T::CurrentFrameId::get().saturating_add(1),
+				CosignRequest::Lock(lock_id),
+				false,
+			);
 			Self::deposit_event(Event::<T>::BitcoinUtxoCosignRequested {
 				lock_id,
 				vault_id,
@@ -1276,19 +1282,25 @@ pub mod pallet {
 				);
 				ensure!(entry.cosign_request.is_none(), Error::<T>::OrphanedUtxoReleaseRequested);
 
+				Self::validate_orphan_release(
+					entry.satoshis,
+					&to_script_pubkey,
+					bitcoin_network_fee,
+				)?;
+				let collect_due_frame = T::CurrentFrameId::get().saturating_add(1);
+
 				entry.cosign_request = Some(OrphanedUtxoCosignRequest {
 					bitcoin_network_fee,
 					to_script_pubkey: to_script_pubkey.clone(),
 					created_at_argon_block_number: <frame_system::Pallet<T>>::block_number(),
+					collect_due_frame,
 				});
-				// send to a queue for vault to know about it
-				T::VaultProvider::update_orphan_cosign_list(
+				T::VaultProvider::update_pending_cosign(
 					entry.vault_id,
-					entry.lock_id,
-					&who,
+					collect_due_frame,
+					CosignRequest::Orphan { owner: who.clone(), utxo_ref: utxo_ref.clone() },
 					false,
-				)
-				.map_err(Error::<T>::from)?;
+				);
 
 				Self::deposit_event(Event::OrphanedUtxoReleaseRequested {
 					lock_id: entry.lock_id,
@@ -1324,8 +1336,17 @@ pub mod pallet {
 			let lock_id = orphan.lock_id;
 			// if not owner, "take" of ref will rollback
 			ensure!(T::VaultProvider::is_owner(vault_id, &who), Error::<T>::NoPermissions);
-			T::VaultProvider::update_orphan_cosign_list(vault_id, lock_id, &orphan_owner, true)
-				.map_err(Error::<T>::from)?;
+			if let Some(request) = orphan.cosign_request {
+				T::VaultProvider::update_pending_cosign(
+					vault_id,
+					request.collect_due_frame,
+					CosignRequest::Orphan {
+						owner: orphan_owner.clone(),
+						utxo_ref: utxo_ref.clone(),
+					},
+					true,
+				);
+			}
 			T::BitcoinUtxoTracker::unwatch_utxo(lock_id, &utxo_ref);
 			Self::deposit_event(Event::OrphanedUtxoCosigned {
 				lock_id,
@@ -1553,15 +1574,17 @@ pub mod pallet {
 			if !lock.funding_utxos.contains_key(&utxo_ref) {
 				if let Some(orphan) =
 					OrphanedUtxosByAccount::<T>::take(&lock.owner_account, &utxo_ref) &&
-					orphan.cosign_request.is_some()
+					let Some(request) = orphan.cosign_request
 				{
-					T::VaultProvider::update_orphan_cosign_list(
+					T::VaultProvider::update_pending_cosign(
 						orphan.vault_id,
-						orphan.lock_id,
-						&lock.owner_account,
+						request.collect_due_frame,
+						CosignRequest::Orphan {
+							owner: lock.owner_account.clone(),
+							utxo_ref: utxo_ref.clone(),
+						},
 						true,
-					)
-					.map_err(Error::<T>::from)?;
+					);
 				}
 				T::BitcoinUtxoTracker::unwatch_utxo(lock_id, &utxo_ref);
 				return Ok(());
@@ -1620,6 +1643,19 @@ pub mod pallet {
 					satoshis,
 				});
 			}
+			Ok(())
+		}
+		pub(crate) fn validate_orphan_release(
+			satoshis: Satoshis,
+			to_script_pubkey: &BitcoinScriptPubkey,
+			fee: Satoshis,
+		) -> Result<(), Error<T>> {
+			ensure!(fee < satoshis, Error::<T>::BitcoinFeeTooHigh);
+			let destination_script: ScriptBuf = to_script_pubkey.clone().into();
+			ensure!(
+				satoshis - fee >= destination_script.minimal_non_dust().to_sat(),
+				Error::<T>::InvalidBitcoinReleaseAmount
+			);
 			Ok(())
 		}
 	}
@@ -1938,27 +1974,15 @@ pub mod pallet {
 			let mut orphan_expiring_count: u64 = 0;
 			for (account_id, utxo_ref) in expiring {
 				orphan_expiring_count = orphan_expiring_count.saturating_add(1);
-				let res: Result<(), DispatchError> = with_storage_layer(|| {
-					if let Some(request) = OrphanedUtxosByAccount::<T>::take(&account_id, &utxo_ref) &&
-						request.cosign_request.is_some()
-					{
-						T::VaultProvider::update_orphan_cosign_list(
-							request.vault_id,
-							request.lock_id,
-							&account_id,
-							true,
-						)
-						.map_err(Error::<T>::from)?;
-					}
-					Ok::<(), DispatchError>(())
-				});
-				if let Err(e) = res {
-					log::error!("Orphaned bitcoin utxo {utxo_ref:?} failed expiry cleanup {e:?}");
-					Self::deposit_event(Event::OrphanedUtxoExpirationError {
-						account_id,
-						utxo_ref,
-						error: e,
-					});
+				if let Some(orphan) = OrphanedUtxosByAccount::<T>::take(&account_id, &utxo_ref) &&
+					let Some(request) = orphan.cosign_request
+				{
+					T::VaultProvider::update_pending_cosign(
+						orphan.vault_id,
+						request.collect_due_frame,
+						CosignRequest::Orphan { owner: account_id, utxo_ref },
+						true,
+					);
 				}
 			}
 			orphan_expiring_count
@@ -1970,7 +1994,7 @@ pub mod pallet {
 			let lock = Self::take_lock(lock_id)?;
 
 			if is_externally_spent {
-				Self::clear_orphans_for_lock(lock_id, &lock)?;
+				Self::clear_orphans_for_lock(lock_id, &lock);
 			} else {
 				Self::schedule_orphans_for_cleanup(lock_id, &lock);
 			}
@@ -2116,7 +2140,15 @@ pub mod pallet {
 		) -> Result<LockReleaseRequest<T::Balance>, Error<T>> {
 			let request = LockReleaseRequestsById::<T>::get(lock_id)
 				.ok_or(Error::<T>::RedemptionNotLocked)?;
-			T::VaultProvider::update_pending_cosign_list(request.vault_id, lock_id, true)?;
+			T::VaultProvider::update_pending_cosign(
+				request.vault_id,
+				request
+					.cosign_due_frame
+					.saturating_sub(T::LockReleaseCosignDeadlineFrames::get())
+					.saturating_add(1),
+				CosignRequest::Lock(lock_id),
+				true,
+			);
 			LockCosignDueByFrame::<T>::mutate(request.cosign_due_frame, |locks| {
 				locks.remove(&lock_id);
 			});
@@ -2326,33 +2358,30 @@ pub mod pallet {
 			}
 		}
 
-		fn clear_orphans_for_lock(
-			lock_id: BitcoinLockId,
-			lock: &LockedBitcoin<T>,
-		) -> DispatchResult {
+		fn clear_orphans_for_lock(lock_id: BitcoinLockId, lock: &LockedBitcoin<T>) {
 			let mut to_remove = Vec::new();
 			for (utxo_ref, orphan) in OrphanedUtxosByAccount::<T>::iter_prefix(&lock.owner_account)
 			{
 				if orphan.lock_id != lock_id {
 					continue;
 				}
-				to_remove.push((utxo_ref, orphan.cosign_request.is_some()));
+				to_remove.push((utxo_ref, orphan.cosign_request));
 			}
 
-			for (utxo_ref, had_cosign) in to_remove {
+			for (utxo_ref, request) in to_remove {
 				OrphanedUtxosByAccount::<T>::remove(&lock.owner_account, &utxo_ref);
-				if had_cosign {
-					T::VaultProvider::update_orphan_cosign_list(
+				if let Some(request) = request {
+					T::VaultProvider::update_pending_cosign(
 						lock.vault_id,
-						lock_id,
-						&lock.owner_account,
+						request.collect_due_frame,
+						CosignRequest::Orphan {
+							owner: lock.owner_account.clone(),
+							utxo_ref: utxo_ref.clone(),
+						},
 						true,
-					)
-					.map_err(Error::<T>::from)?;
+					);
 				}
 			}
-
-			Ok(())
 		}
 	}
 }

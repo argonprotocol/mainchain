@@ -3,7 +3,8 @@
 use crate::{
 	AccountId, Balances, CallAuthorizationPolicy, MinimumUniswapTransfer,
 	OperationalMinimumBitcoinLiquidity, OperationalMinimumVaultBondPrincipal, Proxy, ProxyType,
-	Runtime, RuntimeCall, RuntimeOrigin, SignedPayload, System, UncheckedExtrinsic, ARGON,
+	Runtime, RuntimeCall, RuntimeOrigin, SignedPayload, System, TreasuryPositions,
+	UncheckedExtrinsic, Vaults, ARGON,
 };
 use argon_primitives::{
 	account_security::{ApprovalSignature, P256Public, P256Signature},
@@ -11,7 +12,7 @@ use argon_primitives::{
 	BlockSealerInfo,
 };
 use codec::Encode;
-use frame_support::assert_ok;
+use frame_support::{assert_ok, traits::OnGenesis};
 use p256::ecdsa::Signature as DeviceSignature;
 use pallet_account_security::{
 	AccountSecurityPolicy, Approval, Authorization, NextNonce, Policy, Registrations,
@@ -194,6 +195,8 @@ pub(super) fn externalities() -> sp_io::TestExternalities {
 	let storage = frame_system::GenesisConfig::<Runtime>::default().build_storage().unwrap();
 	let mut externalities = sp_io::TestExternalities::new(storage);
 	externalities.execute_with(|| {
+		Vaults::on_genesis();
+		TreasuryPositions::on_genesis();
 		System::set_block_number(1);
 		pallet_block_seal::LastBlockSealerInfo::<Runtime>::put(BlockSealerInfo {
 			block_author_account_id: account(9),

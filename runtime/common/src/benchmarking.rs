@@ -21,10 +21,13 @@ use argon_primitives::{
 		EthereumProofBlock, EthereumReceiptLogProofBatch, EthereumVerifyError,
 	},
 	prelude::Tick,
-	treasury::{StabilizerPoolFrameClaim, StabilizerPoolRewardProvider, TreasuryPositionProvider},
+	treasury::{
+		BondLotId, StabilizerPoolFrameClaim, StabilizerPoolRewardProvider, TreasuryPositionProvider,
+	},
 	vault::{
-		BitcoinLockFunding, BitcoinSecuritizationBasis, BitcoinVaultProvider, CosignerGuarantee,
-		LostBitcoinCompensation, RegistrationVaultData, ReserveSecuritizationRequest, VaultError,
+		BitcoinLockFunding, BitcoinSecuritizationBasis, BitcoinVaultProvider, CosignRequest,
+		CosignerGuarantee, LostBitcoinCompensation, RegistrationVaultData,
+		ReserveSecuritizationRequest, VaultError,
 	},
 	Balance, BitcoinFissionLockError, BitcoinFissionLockProvider, BitcoinFissionMinting,
 	BitcoinFissionsProvider, EthereumVerifyProvider, MiningSlotProvider, Moment,
@@ -50,6 +53,7 @@ pub use pallet_prelude::benchmarking::{
 	BenchmarkOperationalRewardsPayer, BenchmarkOperationalRewardsProvider,
 	BenchmarkOperationalRewardsProviderState, BenchmarkPriceProvider, BenchmarkPriceProviderState,
 	BenchmarkTickProvider, BenchmarkTreasuryPositionProvider, BenchmarkTreasuryRewardProvider,
+	BenchmarkVaultEarningsProvider,
 };
 use pallet_prelude::DispatchResult;
 
@@ -397,21 +401,12 @@ where
 		Err(VaultError::VaultNotFound)
 	}
 
-	fn update_pending_cosign_list(
+	fn update_pending_cosign(
 		_vault_id: VaultId,
-		_lock_id: BitcoinLockId,
+		_collect_due_frame: FrameId,
+		_request: CosignRequest<Self::AccountId>,
 		_should_remove: bool,
-	) -> Result<(), VaultError> {
-		Err(VaultError::VaultNotFound)
-	}
-
-	fn update_orphan_cosign_list(
-		_vault_id: VaultId,
-		_lock_id: BitcoinLockId,
-		_account_id: &Self::AccountId,
-		_should_remove: bool,
-	) -> Result<(), VaultError> {
-		Err(VaultError::VaultNotFound)
+	) {
 	}
 }
 
@@ -485,6 +480,7 @@ impl<AccountId, Balance> TreasuryPoolProvider<AccountId>
 where
 	Balance: From<u128>,
 {
+	type MaxBondCollateralLots = crate::config::MaxBondCollateralLots;
 	type Weights = ();
 	type Balance = Balance;
 
@@ -525,6 +521,7 @@ where
 	fn encumber_bond_microgons(
 		_account_id: &AccountId,
 		_microgon_amount: Self::Balance,
+		_bond_lot_ids: Option<&[BondLotId]>,
 	) -> DispatchResult {
 		Ok(())
 	}
