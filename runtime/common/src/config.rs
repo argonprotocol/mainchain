@@ -362,10 +362,11 @@ mod tests {
 	use super::*;
 
 	#[test]
-	fn mining_auction_settlement_refunds_before_treasury_distribution() {
+	fn mining_auction_settlement_refunds_before_treasury_allocation() {
+		use argon_primitives::treasury::TreasuryPositionProvider;
 		use argon_runtime::{
 			Balances, MiningSlot, Ownership, Runtime, RuntimeEvent, RuntimeGenesisConfig,
-			RuntimeOrigin, SessionKeys, System, Treasury,
+			RuntimeOrigin, SessionKeys, System, Treasury, TreasuryPositions,
 		};
 		use codec::Decode;
 		use frame_support::{assert_ok, traits::Hooks};
@@ -393,11 +394,13 @@ mod tests {
 					SessionKeys::decode(&mut sp_runtime::traits::TrailingZeroInput::zeroes())
 						.unwrap();
 				let pool_account = TreasuryMiningBidPoolAccount::get();
+				assert_ok!(TreasuryPositions::prepare_collect());
 				let initial_issuance = Balances::total_issuance();
 				let initial_staker_balance = Balances::balance(&staker);
 				let winning_price = 100 * ARGON + MiningSlotBidIncrement::get();
 				let final_pool = 10 * winning_price;
 				let stake_payout = PercentForStakePool::get().mul_floor(final_pool);
+				let bitcoin_burn = PercentForBitcoinLiquidPool::get().mul_floor(final_pool);
 				let marketing_allocation = final_pool / 10;
 				let reserved_from_circulation = final_pool - stake_payout;
 
@@ -490,7 +493,7 @@ mod tests {
 							);
 						},
 						1 => assert_eq!(
-							pallet_treasury::CurrentFrameArgonotBondParticipants::<Runtime>::get()
+							pallet_treasury::CurrentFrameArgonotParticipation::<Runtime>::get()
 								.unwrap()
 								.frame_id,
 							1
@@ -529,8 +532,10 @@ mod tests {
 						reserves.bitcoin_liquids +
 						reserves.stabilizer_pools +
 						reserves.liquidity_buys,
-					reserved_from_circulation
+					reserved_from_circulation - bitcoin_burn
 				);
+				assert_eq!(Balances::balance(&staker), initial_staker_balance);
+				assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(staker.clone())));
 				assert_eq!(Balances::balance(&staker), initial_staker_balance + stake_payout);
 				assert_eq!(
 					Balances::total_issuance(),
@@ -540,16 +545,17 @@ mod tests {
 				assert!(pallet_mining_slot::BidBatches::<Runtime>::iter().next().is_none());
 				assert!(System::events().iter().any(|record| matches!(
 					&record.event,
-					RuntimeEvent::Treasury(pallet_treasury::Event::FrameEarningsDistributed {
+					RuntimeEvent::Treasury(pallet_treasury::Event::FrameEarningsAllocated {
 						frame_id: 1,
-						bid_pool_distributed,
-						stake_pool_distributed,
-						argon_bond_pool_distributed: 0,
-						vault_pool_distributed: 0,
+						bid_pool_allocated,
+						stake_earnings,
+						bond_earnings: 0,
+						bitcoin_earnings: 0,
+						vault_earnings: 0,
 						reserved_from_circulation: actual_reserved,
 						participating_vaults: 0,
-					}) if *bid_pool_distributed == stake_payout
-						&& *stake_pool_distributed == stake_payout
+					}) if *bid_pool_allocated == stake_payout
+						&& *stake_earnings == stake_payout
 						&& *actual_reserved == reserved_from_circulation
 				)));
 			});
