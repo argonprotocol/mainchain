@@ -14,12 +14,12 @@ use pallet_prelude::*;
 
 /// Weight functions needed for this pallet.
 pub trait WeightInfo {
+	fn provider_vault_securitization_changed() -> Weight;
 	fn finalize_stabilizer_frame_rewards() -> Weight;
 	fn read_stabilizer_frame_reward_rate() -> Weight;
 	fn claim_stabilizer_frame_rewards(frames: u32) -> Weight;
 	fn read_bond_collateral_queue() -> Weight;
-	fn on_frame_transition(argon_lots_scanned: u32, argonot_lots: u32, due_releases: u32)
-		-> Weight;
+	fn on_frame_transition(due_releases: u32) -> Weight;
 	fn release_pending_bond_lots() -> Weight;
 	fn distribute_bid_pool() -> Weight;
 	fn lock_in_vault_capital() -> Weight;
@@ -40,16 +40,14 @@ pub trait WeightInfo {
 	fn provider_active_vault_bond_amount() -> Weight;
 	fn provider_active_account_vault_bond_amount() -> Weight;
 	fn provider_encumber_bond_microgons() -> Weight;
+	fn provider_encumber_selected_bond_microgons() -> Weight;
 	fn provider_release_encumbered_bond_microgons() -> Weight;
 	fn provider_burn_encumbered_bond_microgons() -> Weight;
 	fn settle_bond_collateral_release(lots: u32) -> Weight;
 	fn settle_bond_collateral_burn(lots: u32) -> Weight;
 	fn provider_available_reward_budget() -> Weight;
 	fn provider_reserve_reward_budget() -> Weight;
-	fn provider_commit_reward() -> Weight;
 	fn provider_return_reward_budget() -> Weight;
-	fn provider_pay_reward() -> Weight;
-	fn provider_pay_reward_new_account() -> Weight;
 }
 
 pub struct WithProviderWeights<T, Base>(PhantomData<(T, Base)>);
@@ -74,6 +72,11 @@ where
 	T: Config,
 	Base: WeightInfo,
 {
+	fn provider_vault_securitization_changed() -> Weight {
+		Base::provider_vault_securitization_changed()
+			.saturating_add(PositionWeights::<T>::account_quantity_updated())
+			.saturating_add(VaultWeights::<T>::get_vault_operator())
+	}
 	fn finalize_stabilizer_frame_rewards() -> Weight {
 		Base::finalize_stabilizer_frame_rewards()
 	}
@@ -81,18 +84,18 @@ where
 		Base::read_stabilizer_frame_reward_rate()
 	}
 	fn claim_stabilizer_frame_rewards(frames: u32) -> Weight {
-		Base::claim_stabilizer_frame_rewards(frames)
+		Base::claim_stabilizer_frame_rewards(frames).saturating_add(PositionWeights::<T>::fund())
 	}
+
 	fn read_bond_collateral_queue() -> Weight {
 		Base::read_bond_collateral_queue()
 	}
 
-	fn on_frame_transition(
-		argon_lots_scanned: u32,
-		argonot_lots: u32,
-		due_releases: u32,
-	) -> Weight {
-		Base::on_frame_transition(argon_lots_scanned, argonot_lots, due_releases)
+	fn on_frame_transition(due_releases: u32) -> Weight {
+		Base::on_frame_transition(due_releases)
+			.saturating_add(PositionWeights::<T>::prepare_collect())
+			.saturating_add(PositionWeights::<T>::allocate_frame_earnings())
+			.saturating_add(PositionWeights::<T>::indexed_frame().saturating_mul(2))
 			.saturating_add(PositionWeights::<T>::network_totals().saturating_mul(2))
 			.saturating_add(
 				PositionWeights::<T>::upstream_position()
@@ -107,6 +110,7 @@ where
 
 	fn distribute_bid_pool() -> Weight {
 		Base::distribute_bid_pool()
+			.saturating_add(PositionWeights::<T>::indexed_frame().saturating_mul(2))
 	}
 
 	fn lock_in_vault_capital() -> Weight {
@@ -151,6 +155,7 @@ where
 			.max(Base::liquidate_vault_bond_lot())
 			.saturating_add(PositionWeights::<T>::account_quantity_updated().saturating_mul(2))
 			.saturating_add(VaultWeights::<T>::get_vault_operator())
+			.saturating_add(PositionWeights::<T>::bond_principal())
 			.saturating_add(PositionWeights::<T>::position_updated())
 			.saturating_add(OperationalHookWeights::<T>::account_vault_bond_total_updated())
 	}
@@ -196,6 +201,11 @@ where
 
 	fn provider_encumber_bond_microgons() -> Weight {
 		Base::provider_encumber_bond_microgons()
+			.max(Base::provider_encumber_selected_bond_microgons())
+	}
+
+	fn provider_encumber_selected_bond_microgons() -> Weight {
+		Self::provider_encumber_bond_microgons()
 	}
 
 	fn provider_release_encumbered_bond_microgons() -> Weight {
@@ -211,16 +221,14 @@ where
 	}
 
 	fn settle_bond_collateral_burn(lots: u32) -> Weight {
-		// Each lot can touch a different Vault and displaced operator. The holder's position
-		// and quantity are shared across lots, so charge those account records once.
+		// A regular lot updates its holder and may restore a displaced flexible operator.
+		// Repeated holder calls can settle different batches of retained index changes.
+		let per_lot = VaultWeights::<T>::get_vault_operator()
+			.saturating_add(PositionWeights::<T>::account_quantity_updated().saturating_mul(2))
+			.saturating_add(PositionWeights::<T>::position_updated());
 		Base::settle_bond_collateral_burn(lots)
-			.saturating_add(VaultWeights::<T>::get_vault_operator().saturating_mul(lots.into()))
-			.saturating_add(
-				PositionWeights::<T>::account_quantity_updated()
-					.saturating_mul(lots.saturating_add(1).into()),
-			)
+			.saturating_add(per_lot.saturating_mul(lots.into()))
 			.saturating_add(PositionWeights::<T>::bond_principal())
-			.saturating_add(PositionWeights::<T>::position_updated())
 			.saturating_add(OperationalHookWeights::<T>::account_vault_bond_total_updated())
 	}
 	fn provider_available_reward_budget() -> Weight {
@@ -231,30 +239,15 @@ where
 		Base::provider_reserve_reward_budget()
 	}
 
-	fn provider_commit_reward() -> Weight {
-		Base::provider_commit_reward()
-	}
-
 	fn provider_return_reward_budget() -> Weight {
 		Base::provider_return_reward_budget()
-	}
-
-	fn provider_pay_reward() -> Weight {
-		Base::provider_pay_reward()
-	}
-
-	fn provider_pay_reward_new_account() -> Weight {
-		Base::provider_pay_reward_new_account()
 	}
 }
 
 pub struct ProviderWeightAdapter<T>(core::marker::PhantomData<T>);
 impl<T: Config> TreasuryPoolProviderWeightInfo for ProviderWeightAdapter<T> {
 	fn vault_securitization_changed() -> Weight {
-		// Vault benchmarks measure Treasury storage inline. Positions and the Vault operator
-		// query use benchmark providers, so their storage costs are composed separately.
-		PositionWeights::<T>::account_quantity_updated()
-			.saturating_add(VaultWeights::<T>::get_vault_operator())
+		T::WeightInfo::provider_vault_securitization_changed()
 	}
 
 	fn has_vault_bond_participation() -> Weight {
@@ -284,6 +277,9 @@ impl<T: Config> TreasuryPoolProviderWeightInfo for ProviderWeightAdapter<T> {
 
 // For backwards compatibility and tests.
 impl WeightInfo for () {
+	fn provider_vault_securitization_changed() -> Weight {
+		Weight::zero()
+	}
 	fn finalize_stabilizer_frame_rewards() -> Weight {
 		Weight::zero()
 	}
@@ -296,11 +292,7 @@ impl WeightInfo for () {
 	fn read_bond_collateral_queue() -> Weight {
 		Weight::zero()
 	}
-	fn on_frame_transition(
-		_argon_lots_scanned: u32,
-		_argonot_lots: u32,
-		_due_releases: u32,
-	) -> Weight {
+	fn on_frame_transition(_due_releases: u32) -> Weight {
 		Weight::zero()
 	}
 	fn release_pending_bond_lots() -> Weight {
@@ -361,6 +353,10 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 
+	fn provider_encumber_selected_bond_microgons() -> Weight {
+		Weight::zero()
+	}
+
 	fn provider_release_encumbered_bond_microgons() -> Weight {
 		Weight::zero()
 	}
@@ -382,19 +378,7 @@ impl WeightInfo for () {
 		Weight::zero()
 	}
 
-	fn provider_commit_reward() -> Weight {
-		Weight::zero()
-	}
-
 	fn provider_return_reward_budget() -> Weight {
-		Weight::zero()
-	}
-
-	fn provider_pay_reward() -> Weight {
-		Weight::zero()
-	}
-
-	fn provider_pay_reward_new_account() -> Weight {
 		Weight::zero()
 	}
 }
@@ -412,14 +396,8 @@ impl<T: Config> TreasuryRewardProviderWeightInfo for ProviderWeightAdapter<T> {
 	fn reserve_budget() -> Weight {
 		T::WeightInfo::provider_reserve_reward_budget()
 	}
-	fn commit_reward() -> Weight {
-		T::WeightInfo::provider_commit_reward()
-	}
 	fn return_budget() -> Weight {
 		T::WeightInfo::provider_return_reward_budget()
-	}
-	fn pay_reward() -> Weight {
-		T::WeightInfo::provider_pay_reward().max(T::WeightInfo::provider_pay_reward_new_account())
 	}
 }
 

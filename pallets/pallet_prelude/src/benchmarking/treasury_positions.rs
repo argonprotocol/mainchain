@@ -1,10 +1,14 @@
 //! In-memory contributions for consumers benchmarking without Positions storage access.
 use super::*;
-use argon_primitives::treasury::{
-	BitcoinLockPosition, NetworkPositionQuantities, PositionQuantities, PositionQuantity,
-	TreasuryPositionProvider, UpstreamPosition,
+use argon_primitives::{
+	block_seal::FrameId,
+	treasury::{
+		BitcoinLockPosition, CollectAmounts, CollectSource, NetworkPositionQuantities,
+		PositionQuantities, PositionQuantity, TreasuryPositionProvider, UpstreamPosition,
+		VaultEarningsProvider,
+	},
 };
-use polkadot_sdk::sp_runtime::ArithmeticError;
+use polkadot_sdk::{frame_benchmarking, sp_runtime::ArithmeticError};
 
 #[derive(Default)]
 struct State {
@@ -26,6 +30,27 @@ where
 	Balance: Codec + MaxEncodedLen + HasCompact + Copy + Default + From<u128> + Into<u128>,
 {
 	type Weights = ();
+	fn collect_account() -> Option<AccountId> {
+		Some(frame_benchmarking::account("collect-custody", 0, 0))
+	}
+
+	fn expire_vault_earnings(_: &AccountId, _: Balance) -> DispatchResult {
+		Ok(())
+	}
+
+	fn fund(_: CollectSource, _: Balance) -> DispatchResult {
+		Ok(())
+	}
+	fn accrue(_: &AccountId, _: CollectSource, _: Balance) -> DispatchResult {
+		Ok(())
+	}
+	fn allocate_frame_earnings(
+		_: FrameId,
+		_: &PositionQuantities<Balance>,
+		_: CollectAmounts<Balance>,
+	) -> DispatchResult {
+		Ok(())
+	}
 
 	fn operational_account_registered(_: &AccountId) -> DispatchResult {
 		Ok(())
@@ -172,5 +197,15 @@ mod backend {
 	static STATE: StateCell = StateCell(UnsafeCell::new(None));
 	pub(super) fn with<R>(f: impl FnOnce(&mut State) -> R) -> R {
 		unsafe { f((*STATE.0.get()).get_or_insert_with(State::default)) }
+	}
+}
+
+pub struct BenchmarkVaultEarningsProvider;
+impl<AccountId, Balance> VaultEarningsProvider<AccountId, Balance>
+	for BenchmarkVaultEarningsProvider
+{
+	type Weights = ();
+	fn collect_earnings(_: &AccountId, _: Balance) -> Result<bool, DispatchError> {
+		Ok(true)
 	}
 }

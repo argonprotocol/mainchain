@@ -24,57 +24,62 @@ pub mod migrations;
 mod try_state;
 pub mod weights;
 use argon_primitives::{
-	treasury::{PositionQuantity, TreasuryPositionProvider, TreasuryRewardProvider},
+	treasury::{
+		CollectAmounts, CollectSource, PositionQuantities, PositionQuantity,
+		TreasuryPositionProvider, TreasuryRewardProvider,
+	},
 	MiningFrameProvider, OperationalAccountProvider,
 };
 pub use pallet::*;
 
-/// This pallet allows users to buy whole `1 ARGON` bonds into a Vault's Treasury Pool. Treasury
-/// pools serve as instant liquidity for LockedBitcoins. Each purchase becomes a purchase-level
-/// bond lot that participates in frame payouts until it is liquidated and later released, and
-/// earnings are paid directly instead of compounding back into principal.
+/// This pallet lets users buy whole `1 ARGON` bonds into a Vault's Treasury Pool. Treasury pools
+/// provide instant liquidity for LockedBitcoins. Each purchase creates a separate bond lot whose
+/// principal stays held until release. Earnings are collected separately and do not compound into
+/// principal. ARGONOT stakes also earn a share of mining bid revenue.
 ///
-/// The current treasury pallet used to model a vault contribution as one aggregated held balance
-/// per `(vault_id, account_id)`. That worked for a "single rolling funder" model, but it breaks
-/// down for a real bond model where:
-///
-/// - bonds are bought in whole `1 ARGON` units
-/// - one account may have multiple separate purchases
-/// - earnings should pay out directly instead of compounding
-/// - a purchase needs its own start date, frame count, and cumulative earnings
-/// - frame earnings belong to each purchased bond lot, not an aggregated account balance
+/// Bond lots retain purchase dates, principal and release terms. An account can own multiple lots;
+/// Treasury Positions maintains its combined earning quantities and bond/stake checkpoints.
 ///
 /// ## Treasury Pool Allocation
 /// A vault can accept whole regular bonds up to its raw Argon securitization. Flexible operator
-/// bonds yield their admission capacity to regular bonds. Displaced flexible bonds do not earn
-/// after the current frame; regular bonds continue earning even if securitization later falls.
+/// bonds yield their admission capacity to regular bonds. Displaced flexible bonds stop earning
+/// from the next frame; regular bonds continue earning even if securitization later falls.
 ///
-/// ## Profits from Bid Pool
-/// After each bid pool closes, configured shares fund marketing, Bitcoin Liquids, and stabilizer
-/// pools. Eligible Argonot stakes, Argon bonds, and vaults receive rewards. Unallocated funds go
-/// to the liquidity buys reserve.
+/// Treasury freezes earning quantities and vault capital at frame start. Purchases and eligibility
+/// changes during that frame affect the next frame's earnings.
 ///
-/// The frame's APY policy tapers excess bond and stake rewards into their own reserves. Excess
-/// vault rewards go to liquidity buys. Bond earnings pay directly; vault earnings enter the
-/// collection flow.
+/// ## Mining Bid Revenue and Collection
+/// After each bid pool closes, configured shares fund marketing, Bitcoin Liquids and stabilizer
+/// pools. Eligible ARGONOT stakes, ARGON bonds and vaults earn rewards. Unallocated funds go to the
+/// liquidity buys reserve.
 ///
-/// The limitations on bond purchases are:
-/// - the maximum number of live Argon bond lots while frame payouts are direct
-/// - the maximum number of active Argonot bond lots (`MaxActiveArgonotBondLots`)
-/// - the maximum active Argonot bonds as a percent of ownership circulation
+/// Bond and stake earnings are backed in the Treasury Positions custody account and added to global
+/// cumulative indexes. Each account settles its share when its position changes or it calls
+/// Collect. Frame payouts do not walk bond lots or stake holders. Collect transfers backed earnings
+/// to the owner's wallet; it does not add them to principal. Vault earnings retain their bounded
+/// vault calculation and separate collection flow.
+///
+/// The frame's APY policy tapers excess bond and stake rewards into their respective reserves.
+/// Excess vault rewards go to liquidity buys. Reserve support is issued into custody when funding
+/// committed earnings; auction revenue already in circulation transfers into custody.
+///
+/// Bond purchases remain subject to:
+/// - the maximum number of active ARGONOT bond lots (`MaxActiveArgonotBondLots`)
+/// - the maximum active ARGONOT bonds as a percent of ownership circulation
 ///   (`MaxArgonotBondedPercentOfCirculation`)
 /// - the minimum whole-bond purchase amount (`MinimumArgonsPerContributor`)
 ///
-/// Terminology note:
-/// - a `frame` is the Argon time duration itself
+/// Terminology:
+/// - a `frame` is one Argon financial day
 /// - a `bond` is one `1 ARGON` unit
-/// - a `bond lot` is one purchase record that contains `N` bonds
-/// - a `frame snapshot` is the locked treasury capital snapshot created for a frame by
-///   `lock_in_vault_capital(frame_id)`
+/// - a `bond lot` is one purchase record containing `N` bonds
+/// - a `frame snapshot` holds the capital and earning quantities frozen for that frame
+/// - an `earnings index` is the cumulative earnings per eligible bond or stake
+/// - an account's `checkpoint` records how far it has settled against that index
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
-	use alloc::{boxed::Box, collections::BTreeMap, vec::Vec};
+	use alloc::{boxed::Box, vec::Vec};
 	pub use argon_primitives::treasury::Bonds;
 	use argon_primitives::{
 		bitcoin::{Satoshis, SATOSHIS_PER_BITCOIN},
@@ -95,9 +100,9 @@ pub mod pallet {
 	};
 	use tracing::info;
 
-	const STORAGE_VERSION: StorageVersion = StorageVersion::new(9);
+	const STORAGE_VERSION: StorageVersion = StorageVersion::new(10);
 
-	pub type BondLotId = u64;
+	pub use argon_primitives::treasury::BondLotId;
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -170,15 +175,9 @@ pub mod pallet {
 		#[pallet::constant]
 		type MaxActiveArgonotBondLots: Get<u32>;
 
-		/// Maximum live Argon bond lots while direct frame payouts iterate every lot.
+		/// Maximum concrete lots backing one operator across all of its authorities.
 		#[pallet::constant]
-		type MaxArgonBondLots: Get<u32>;
-
-		/// Owner bond/stake lot count assumed by scan benchmarks and checked by try_state.
-		/// Includes lots awaiting release. Purchases remain unrestricted and scans are not
-		/// truncated.
-		#[pallet::constant]
-		type MaxExpectedBondLotsPerAccount: Get<u32>;
+		type MaxBondCollateralLots: Get<u32>;
 
 		/// Maximum accounts whose queued bond collateral is attempted in one block.
 		#[pallet::constant]
@@ -285,13 +284,6 @@ pub mod pallet {
 	pub type CurrentFrameArgonotParticipation<T: Config> =
 		StorageValue<_, FrameArgonotParticipation, OptionQuery>;
 
-	/// The Argonot bond participants locked for the current frame.
-	///
-	/// Payout uses this to see which Argonot bond lots are participating in the frame.
-	#[pallet::storage]
-	pub type CurrentFrameArgonotBondParticipants<T: Config> =
-		StorageValue<_, FrameArgonotBondParticipants<T>, OptionQuery>;
-
 	#[pallet::type_value]
 	pub fn DefaultRewardTaperingPolicy() -> TaperingPolicy {
 		// Daily reinvestment rates for 50%, 100%, and 500% APY, at FixedU128 precision.
@@ -345,10 +337,6 @@ pub mod pallet {
 	pub type RewardReserves<T: Config> =
 		StorageValue<_, RewardReserveBalances<T::Balance>, ValueQuery>;
 
-	/// Awarded purchase rewards awaiting issuance. Auctions own their unallocated reservations.
-	#[pallet::storage]
-	pub type OutstandingPurchaseRewards<T: Config> = StorageValue<_, T::Balance, ValueQuery>;
-
 	/// Shared funding and reward rates for each retained stabilizer pool earning frame.
 	#[pallet::storage]
 	pub type StabilizerPoolRewardFrames<T: Config> =
@@ -395,8 +383,8 @@ pub mod pallet {
 	pub type BondLotIdsByAccount<T: Config> =
 		StorageDoubleMap<_, Twox64Concat, T::AccountId, Twox64Concat, BondLotId, (), OptionQuery>;
 
-	/// Live Argon bond lot ids associated with a vault, including lots awaiting release. Direct
-	/// frame payouts iterate this admission-bounded index.
+	/// Live Argon bond lot ids associated with a vault, including lots awaiting release. Principal
+	/// operations use this index.
 	#[pallet::storage]
 	pub type BondLotIdsByVault<T: Config> =
 		StorageDoubleMap<_, Twox64Concat, VaultId, Twox64Concat, BondLotId, (), OptionQuery>;
@@ -426,6 +414,48 @@ pub mod pallet {
 	#[pallet::storage]
 	pub type EncumberedBondMicrogonsByAccount<T: Config> =
 		StorageMap<_, Twox64Concat, T::AccountId, T::Balance, ValueQuery>;
+
+	/// Whole non-releasing ARGON bonds by owner and vault, including displaced flexible bonds.
+	#[pallet::storage]
+	pub type ActiveBondsByAccountAndVault<T: Config> = StorageDoubleMap<
+		_,
+		Twox64Concat,
+		T::AccountId,
+		Twox64Concat,
+		VaultId,
+		BondTotal,
+		ValueQuery,
+	>;
+
+	/// Active lots with unreserved principal. Reservation visits at most the configured lot limit.
+	#[pallet::storage]
+	pub type AvailableBondCollateralLots<T: Config> =
+		StorageDoubleMap<_, Twox64Concat, T::AccountId, Twox64Concat, BondLotId, (), OptionQuery>;
+
+	/// Concrete backing shared by the operator's minting authorities. The list remains bounded
+	/// across registrations; each entry records exact reserved ARGON microgons.
+	#[pallet::storage]
+	pub type EncumberedBondLotsByAccount<T: Config> = StorageMap<
+		_,
+		Twox64Concat,
+		T::AccountId,
+		BoundedVec<BondCollateralLot<T::Balance>, T::MaxBondCollateralLots>,
+		ValueQuery,
+	>;
+
+	#[derive(
+		Encode, Decode, DecodeWithMemTracking, Clone, Debug, PartialEq, Eq, TypeInfo, MaxEncodedLen,
+	)]
+	pub struct BondCollateralLot<Balance>
+	where
+		Balance: Codec + MaxEncodedLen,
+	{
+		/// Source lot; None retains fractional backing without a surviving lot at cutover.
+		pub bond_lot_id: Option<BondLotId>,
+		/// Exact held ARGON microgons committed from this lot, including fractional remnants.
+		#[codec(compact)]
+		pub reserved_microgons: Balance,
+	}
 
 	/// Burn and release requests awaiting settlement, combined by owner. Both amounts remain
 	/// included in the owner's encumbrance until processed; bonds retain their live payout terms.
@@ -511,9 +541,11 @@ pub mod pallet {
 			stake_pool_distributed: T::Balance,
 			/// ARGON paid directly to vault Argon bond lots.
 			argon_bond_pool_distributed: T::Balance,
+			/// ARGON allocated to active Fissions' promised liquidity.
+			bitcoin_earnings: T::Balance,
 			/// ARGON recorded for vault collection.
 			vault_pool_distributed: T::Balance,
-			/// Bid-pool funds removed from circulation and credited to reward reserves.
+			/// Bid-pool funds removed from circulation, including the unfilled Bitcoin share.
 			reserved_from_circulation: T::Balance,
 			/// Number of vaults included in the frame's reward allocation.
 			participating_vaults: u32,
@@ -597,6 +629,24 @@ pub mod pallet {
 			account_id: T::AccountId,
 			dispatch_error: DispatchError,
 		},
+		/// Earnings reserved for the frame; wallet delivery is recorded by Collect.
+		FrameEarningsAllocated {
+			frame_id: FrameId,
+			/// The total gross bid-pool allocation made to non-reserve recipients this frame.
+			bid_pool_allocated: T::Balance,
+			/// ARGON allocated to admitted stakes.
+			stake_earnings: T::Balance,
+			/// ARGON allocated to eligible bonds.
+			bond_earnings: T::Balance,
+			/// ARGON allocated to active Fissions' promised liquidity.
+			bitcoin_earnings: T::Balance,
+			/// ARGON recorded for vault collection.
+			vault_earnings: T::Balance,
+			/// Bid-pool funds removed from circulation, including the unfilled Bitcoin share.
+			reserved_from_circulation: T::Balance,
+			/// Number of vaults included in the frame's reward allocation.
+			participating_vaults: u32,
+		},
 	}
 
 	#[pallet::error]
@@ -609,8 +659,6 @@ pub mod pallet {
 		BondPurchaseBelowMinimum,
 		/// An internal error occurred.
 		InternalError,
-		/// The network has reached the direct-payout vault bond lot admission limit.
-		MaxArgonBondLotsExceeded,
 		/// The vault already has the maximum number of flexible bond lots.
 		MaxFlexibleBondLotsExceeded,
 		/// Too many bond lot releases are scheduled for the same frame.
@@ -652,6 +700,15 @@ pub mod pallet {
 		BondLotCannotBeFlexible,
 		/// The caller does not have permission to perform this action.
 		NoPermissions,
+		/// The supplied list or the operator's resulting backing set exceeds the lot limit.
+		TooManyBondCollateralLots,
+		/// A caller-supplied collateral selection repeats a lot ID.
+		DuplicateBondCollateralLot,
+		/// Only active ARGON vault bonds can back a gateway authority.
+		InvalidBondCollateralLot,
+		/// Pre-upgrade collateral exceeds its selected backing; supply a complete lot selection
+		/// with registration before withdrawing principal or processing collateral.
+		BondCollateralSelectionRequired,
 		/// A requested reward frame has yet to finalize its rate.
 		StabilizerPoolClaimNotReady,
 	}
@@ -688,8 +745,8 @@ pub mod pallet {
 						pending.release_microgons,
 						&mut weight,
 					)?;
-					PendingBondCollateralByAccount::<T>::remove(&account);
 					BondCollateralSettlementQueue::<T>::remove(&key);
+					PendingBondCollateralByAccount::<T>::remove(&account);
 					Ok(())
 				});
 
@@ -734,10 +791,6 @@ pub mod pallet {
 				Error::<T>::VaultNotAcceptingBondPurchases
 			);
 			ensure!(bonds >= Self::minimum_purchase_bonds(), Error::<T>::BondPurchaseBelowMinimum);
-			ensure!(
-				TotalArgonBondLots::<T>::get() < T::MaxArgonBondLots::get(),
-				Error::<T>::MaxArgonBondLotsExceeded
-			);
 
 			let bond_capacity = Self::balance_to_bonds(Self::get_vault_bond_capacity(vault_id));
 
@@ -767,7 +820,6 @@ pub mod pallet {
 				bonds <= vault_bonds.available_bond_space(bond_capacity),
 				Error::<T>::InsufficientBondSpace
 			);
-			Self::lock_vault_frame_terms(&mut vault_bonds);
 
 			let bond_lot_id = Self::next_bond_lot_id()?;
 			let purchase_amount = Self::bonds_to_balance(bonds);
@@ -789,8 +841,6 @@ pub mod pallet {
 					program,
 					bonds,
 					is_flexible: false,
-					locked_frame_terms: Self::has_current_bond_payout_frame()
-						.then_some(LockedFrameBondTerms { bonds: 0, is_flexible: false }),
 					created_frame_id: current_frame_id,
 					participated_frames: 0,
 					last_frame_earnings_frame_id: None,
@@ -801,12 +851,8 @@ pub mod pallet {
 				},
 			);
 			BondLotIdsByAccount::<T>::insert(&who, bond_lot_id, ());
-			T::PositionProvider::bond_position_updated(
-				&who,
-				vault_id,
-				T::Balance::zero(),
-				purchase_amount,
-			)?;
+			AvailableBondCollateralLots::<T>::insert(&who, bond_lot_id, ());
+			Self::update_bond_principal(&who, vault_id, T::Balance::zero(), purchase_amount)?;
 			T::PositionProvider::account_quantity_updated(&who, PositionQuantity::Bonds, 0, bonds)?;
 			Self::update_vault_displacement(
 				vault_id,
@@ -847,17 +893,33 @@ pub mod pallet {
 
 			let remaining_vault_bonds = match bond_lot.program {
 				BondProgram::Vault { vault_id, .. } => {
-					let (active_balance, current_hold) =
-						Self::account_vault_bond_status(&who, &mut 0)?;
-					let remaining_non_releasing_hold =
-						current_hold.saturating_sub(Self::bonds_to_balance(bond_lot.bonds));
-					ensure!(
-						remaining_non_releasing_hold >= Self::encumbered_bond_microgons(&who),
-						Error::<T>::ActiveBondAmountBelowEncumberedBacking,
-					);
+					let active_balance = T::PositionProvider::bond_principal(&who);
+					Self::ensure_collateral_selected(
+						&EncumberedBondLotsByAccount::<T>::get(&who),
+						Self::encumbered_bond_microgons(&who),
+					)?;
+					AvailableBondCollateralLots::<T>::remove(&who, bond_lot_id);
+					EncumberedBondLotsByAccount::<T>::try_mutate(
+						&who,
+						|backing| -> DispatchResult {
+							let Some(index) = backing
+								.iter()
+								.position(|entry| entry.bond_lot_id == Some(bond_lot_id))
+							else {
+								return Ok(())
+							};
+							let reserved = backing.remove(index).reserved_microgons;
+							Self::reserve_bond_collateral(&who, reserved, None, backing)?;
+							let excess =
+								reserved.saturating_sub(Self::bonds_to_balance(bond_lot.bonds));
+							if !excess.is_zero() {
+								Self::release_hold::<T::Currency>(&who, excess)?;
+							}
+							Ok(())
+						},
+					)?;
 
 					Self::remove_bond_lot_from_vault(vault_id, &bond_lot)?;
-					Self::lock_bond_frame_terms(bond_lot_id, &bond_lot);
 					Some(active_balance.saturating_sub(Self::bonds_to_balance(bond_lot.bonds)))
 				},
 				BondProgram::Argonot => {
@@ -924,7 +986,6 @@ pub mod pallet {
 					program,
 					bonds,
 					is_flexible: false,
-					locked_frame_terms: None,
 					created_frame_id: current_frame_id,
 					participated_frames: 0,
 					last_frame_earnings_frame_id: None,
@@ -999,7 +1060,6 @@ pub mod pallet {
 
 			let bond_capacity = Self::balance_to_bonds(Self::get_vault_bond_capacity(vault_id));
 			BondLotsByVault::<T>::try_mutate(vault_id, |vault_bonds| -> DispatchResult {
-				Self::lock_vault_frame_terms(vault_bonds);
 				let previous_flexible = vault_bonds.eligible_flexible_bonds();
 				if is_flexible {
 					ensure!(
@@ -1037,12 +1097,6 @@ pub mod pallet {
 				)?;
 				Ok(())
 			})?;
-			if Self::has_current_bond_payout_frame() {
-				bond_lot.locked_frame_terms.get_or_insert(LockedFrameBondTerms {
-					bonds: bond_lot.bonds,
-					is_flexible: bond_lot.is_flexible,
-				});
-			}
 			bond_lot.is_flexible = is_flexible;
 			BondLotById::<T>::insert(bond_lot_id, bond_lot);
 			Self::deposit_event(Event::BondLotFlexibilityChanged {
@@ -1253,7 +1307,7 @@ pub mod pallet {
 			Ok(())
 		}
 
-		fn release_hold<C>(who: &T::AccountId, amount: T::Balance) -> DispatchResult
+		pub(crate) fn release_hold<C>(who: &T::AccountId, amount: T::Balance) -> DispatchResult
 		where
 			C: MutateHold<T::AccountId, Reason = T::RuntimeHoldReason, Balance = T::Balance>,
 		{
@@ -1308,39 +1362,19 @@ pub mod pallet {
 			Ok(bonus_approval.bonus_percent)
 		}
 
-		/// Once the frame is complete, this fn distributes frame earnings to Argonot bond lots
-		/// first, then Argon bonds, and finally vaults.
-		pub(crate) fn distribute_bid_pool(frame_id: FrameId) {
+		/// Allocate the completed frame's revenue, fund bond/stake indexes and record vault
+		/// earnings. Custody, reserve budgets and indexes commit together because this runs from
+		/// a frame hook.
+		#[frame_support::transactional]
+		pub(crate) fn distribute_bid_pool(frame_id: FrameId) -> DispatchResult {
+			if T::PositionProvider::indexed_frame().is_some_and(|done| frame_id <= done) {
+				return Ok(())
+			}
+
 			let bid_pool_account = T::MiningBidPoolAccount::get();
 			Self::ensure_account_provider(&bid_pool_account);
 			let full_bid_pool_amount = T::Currency::balance(&bid_pool_account);
-			// Keep frame funding outside an account so dust cannot consume later payouts.
-			let mut funding = match T::Currency::withdraw(
-				&bid_pool_account,
-				full_bid_pool_amount,
-				Precision::Exact,
-				Preservation::Expendable,
-				Fortitude::Polite,
-			) {
-				Ok(funding) => funding,
-				Err(dispatch_error) => {
-					Self::deposit_event(Event::<T>::CouldNotFundBidPool {
-						frame_id,
-						amount: full_bid_pool_amount,
-						dispatch_error,
-					});
-					return;
-				},
-			};
 
-			let argonot_participants = match CurrentFrameArgonotBondParticipants::<T>::take() {
-				Some(participants) if participants.frame_id == frame_id => Some(participants),
-				Some(participants) => {
-					CurrentFrameArgonotBondParticipants::<T>::put(participants);
-					None
-				},
-				None => None,
-			};
 			let frame_capital = match CurrentFrameVaultCapital::<T>::take() {
 				Some(frame_capital) if frame_capital.frame_id == frame_id => Some(frame_capital),
 				Some(frame_capital) => {
@@ -1391,29 +1425,84 @@ pub mod pallet {
 			let marketing_allocation =
 				T::PercentForMarketing::get().mul_floor(full_bid_pool_amount);
 
+			let indexed_earnings_active = frame_id >= T::PositionProvider::earnings_start_frame();
+			let quantities = if indexed_earnings_active {
+				frame_capital.as_ref().map(|capital| capital.quantities).unwrap_or_default()
+			} else {
+				PositionQuantities::default()
+			};
 			let stake_pool = T::PercentForStakePool::get().mul_floor(full_bid_pool_amount);
-			let stake_payout = Self::distribute_stake_pool(
-				frame_id,
-				&mut funding,
-				stake_pool,
-				argonot_participants,
-				policy,
-				argon_price_ratio,
-				reserves.argonot_stakes,
-			);
+			let average_price = T::PriceProvider::get_average_microgons_per_argonot(frame_id);
+			let stake_capital =
+				average_price.map(|price| quantities.stakes.saturating_mul(price.into()));
+			let stake_payout = if quantities.stakes > 0 {
+				Self::calculate_pool_allocation(
+					stake_pool,
+					stake_capital,
+					policy.map(|policy| &policy.argonot_stakes),
+					argon_price_ratio,
+					reserves.argonot_stakes,
+				)
+			} else {
+				PoolAllocation::default()
+			};
 
-			let argon_bond_pool = T::PercentForArgonBondPool::get().mul_floor(full_bid_pool_amount);
-			let bond_payout = Self::distribute_argon_bond_pool(
-				frame_id,
-				&mut funding,
-				argon_bond_pool,
-				frame_capital.as_ref(),
-				policy,
+			let bitcoin_target = frame_capital
+				.as_ref()
+				.map(|capital| capital.target_securitization.into())
+				.unwrap_or_default();
+			let bond_capital = quantities.bonds.saturating_mul(MICROGONS_PER_ARGON);
+			let bond_pool = T::PercentForArgonBondPool::get().mul_floor(full_bid_pool_amount);
+			let bond_allocation = Self::earned_pool_share(bond_pool, bond_capital, bitcoin_target);
+
+			let bond_payout = Self::calculate_pool_allocation(
+				bond_allocation,
+				Some(bond_capital),
+				policy.map(|policy| &policy.argon_bonds),
 				argon_price_ratio,
 				reserves.argon_bonds,
 			);
 
-			let (vault_pool_distributed, participating_vaults) = Self::distribute_vault_pool(
+			let bitcoin_pool =
+				T::PercentForBitcoinLiquidPool::get().mul_floor(full_bid_pool_amount);
+			let promised_liquidity = quantities.fission_liquidity.into();
+			let bitcoin_allocation =
+				Self::earned_pool_share(bitcoin_pool, promised_liquidity, bitcoin_target);
+
+			let bitcoin_payout = Self::calculate_pool_allocation(
+				bitcoin_allocation,
+				Some(promised_liquidity),
+				policy.map(|policy| &policy.bitcoin_liquids),
+				argon_price_ratio,
+				reserves.bitcoin_liquids,
+			);
+
+			let from_pool = CollectAmounts {
+				bond_earnings: bond_payout.from_pool,
+				bitcoin_earnings: bitcoin_payout.from_pool,
+				stake_earnings: stake_payout.from_pool,
+				..Default::default()
+			};
+			let from_reserve = CollectAmounts {
+				bond_earnings: bond_payout.from_reserve,
+				stake_earnings: stake_payout.from_reserve,
+				bitcoin_earnings: bitcoin_payout.from_reserve,
+				..Default::default()
+			};
+			reserves.bitcoin_liquids.saturating_reduce(from_reserve.bitcoin_earnings);
+			reserves.argon_bonds.saturating_reduce(from_reserve.bond_earnings);
+			reserves.argonot_stakes.saturating_reduce(from_reserve.stake_earnings);
+
+			let mut funding = T::Currency::withdraw(
+				&bid_pool_account,
+				full_bid_pool_amount,
+				Precision::Exact,
+				Preservation::Expendable,
+				Fortitude::Force,
+			)?;
+			let auction_earnings = funding.extract(from_pool.total());
+
+			let (vault_earnings, participating_vaults) = Self::distribute_vault_pool(
 				&mut funding,
 				full_bid_pool_amount,
 				frame_capital.as_ref(),
@@ -1423,30 +1512,21 @@ pub mod pallet {
 				argonot_participation,
 			);
 
-			let bitcoin_liquids_allocation =
-				T::PercentForBitcoinLiquidPool::get().mul_floor(full_bid_pool_amount);
 			let stabilizer_pool_allocation =
 				T::PercentForStabilizerPool::get().mul_floor(full_bid_pool_amount);
 			let mining_operator_allocation =
 				T::PercentForMiningOperatorPool::get().mul_floor(full_bid_pool_amount);
-			let mut unallocated = funding.peek();
+			let mut unallocated =
+				funding.peek().saturating_sub(bitcoin_pool.saturating_sub(bitcoin_allocation));
 			// Dropping unspent funding removes it from issuance exactly once.
 			drop(funding);
 
-			for (payout, budget) in [
-				(&stake_payout, &mut reserves.argonot_stakes),
-				(&bond_payout, &mut reserves.argon_bonds),
-			] {
-				let unused_topup =
-					payout.reserve_minted.saturating_sub(payout.from_reserve).min(unallocated);
-				let reserve_spent = payout.reserve_minted.saturating_sub(unused_topup);
-				budget.saturating_reduce(reserve_spent);
-				unallocated.saturating_reduce(unused_topup);
-			}
-			let reserved_from_circulation = unallocated;
+			let reserved_from_circulation = full_bid_pool_amount
+				.saturating_sub(from_pool.total())
+				.saturating_sub(vault_earnings);
 			for (allocation, budget) in [
 				(marketing_allocation, &mut reserves.marketing),
-				(bitcoin_liquids_allocation, &mut reserves.bitcoin_liquids),
+				(bitcoin_payout.withheld, &mut reserves.bitcoin_liquids),
 				(stabilizer_pool_allocation, &mut reserves.stabilizer_pools),
 				(stake_payout.withheld, &mut reserves.argonot_stakes),
 				(bond_payout.withheld, &mut reserves.argon_bonds),
@@ -1470,41 +1550,32 @@ pub mod pallet {
 				RewardReserves::<T>::put(&reserves);
 				Self::deposit_event(Event::<T>::RewardReservesUpdated { reserves });
 			}
-			Self::deposit_event(Event::<T>::FrameEarningsDistributed {
+
+			let mut earnings = from_pool;
+			earnings.saturating_accrue(&from_reserve);
+			if !earnings.total().is_zero() {
+				T::PositionProvider::prepare_collect()?;
+				let collect_account =
+					T::PositionProvider::collect_account().ok_or(DispatchError::Unavailable)?;
+				T::Currency::resolve(&collect_account, auction_earnings)
+					.map_err(|_| Error::<T>::InternalError)?;
+				T::Currency::mint_into(&collect_account, from_reserve.total())?;
+			}
+			if indexed_earnings_active {
+				T::PositionProvider::allocate_frame_earnings(frame_id, &quantities, earnings)?;
+			}
+
+			Self::deposit_event(Event::<T>::FrameEarningsAllocated {
 				frame_id,
-				bid_pool_distributed: stake_payout
-					.from_pool
-					.saturating_add(bond_payout.from_pool)
-					.saturating_add(vault_pool_distributed),
-				stake_pool_distributed: stake_payout
-					.from_pool
-					.saturating_add(stake_payout.from_reserve),
-				argon_bond_pool_distributed: bond_payout
-					.from_pool
-					.saturating_add(bond_payout.from_reserve),
-				vault_pool_distributed,
+				bid_pool_allocated: from_pool.total().saturating_add(vault_earnings),
+				stake_earnings: earnings.stake_earnings,
+				bond_earnings: earnings.bond_earnings,
+				bitcoin_earnings: earnings.bitcoin_earnings,
+				vault_earnings,
 				reserved_from_circulation,
 				participating_vaults,
 			});
-		}
-
-		pub(crate) fn lock_in_argonot_bond_participants(frame_id: FrameId) {
-			let bond_lots = ArgonotBondLots::<T>::get();
-			// Treasury owns the admitted lot set; Positions maintains its live quantity total.
-			let total_bonds = T::PositionProvider::network_totals()
-				.account_quantities
-				.stakes
-				.saturated_into::<Bonds>();
-			if bond_lots.is_empty() || total_bonds == 0 {
-				CurrentFrameArgonotBondParticipants::<T>::kill();
-				return;
-			}
-
-			CurrentFrameArgonotBondParticipants::<T>::put(FrameArgonotBondParticipants {
-				frame_id,
-				total_bonds,
-				bond_lots,
-			});
+			Ok(())
 		}
 
 		/// Freeze vault inputs and completed position totals for a frame.
@@ -1516,26 +1587,9 @@ pub mod pallet {
 			});
 			let argonot_participation_factor = ArgonotParticipationFactor::<T>::get();
 			let max_vaults = T::MaxVaultsPerPool::get() as usize;
-			// Freeze the maintained network quantity. The vault walk below clears old frame terms
-			// and releases empty records; it does not rebuild account or network quantities.
 			let network_totals = T::PositionProvider::network_totals();
 			let total_active_bonds = network_totals.account_quantities.bonds;
-			let mut empty_vaults = Vec::new();
-			for (vault_id, mut vault_bonds) in BondLotsByVault::<T>::iter() {
-				if vault_bonds.locked_frame_terms.take().is_some() {
-					if vault_bonds.regular_bonds == 0 &&
-						vault_bonds.flexible_bonds == 0 &&
-						vault_bonds.reserved_bond_space == 0
-					{
-						empty_vaults.push(vault_id);
-					} else {
-						BondLotsByVault::<T>::insert(vault_id, vault_bonds);
-					}
-				}
-			}
-			for vault_id in empty_vaults {
-				BondLotsByVault::<T>::remove(vault_id);
-			}
+
 			let (securitization_positions, total_securitization) =
 				T::TreasuryVaultProvider::get_top_vaults_by_securitization(max_vaults as u32);
 
@@ -1626,6 +1680,7 @@ pub mod pallet {
 			CurrentFrameVaultCapital::<T>::put(FrameVaultCapital {
 				frame_id,
 				total_active_bonds,
+				quantities: network_totals.account_quantities,
 				target_securitization,
 				total_securitization,
 				vault_securitization_positions,
@@ -1745,13 +1800,15 @@ pub mod pallet {
 
 			let payout_frame = frame_id - 1;
 			info!("Starting treasury bond frame {frame_id}. Distributing frame {payout_frame}.");
+			if let Err(error) = Self::distribute_bid_pool(payout_frame) {
+				log::error!("Could not allocate treasury frame {payout_frame}: {error:?}");
+			}
+
 			let retained = FrameId::from(T::StabilizerPoolRewardHistoryFrames::get());
 			if let Some(expired) = frame_id.checked_sub(retained.saturating_add(1)) {
 				StabilizerPoolRewardFrames::<T>::remove(expired);
 			}
-			Self::distribute_bid_pool(payout_frame);
 			Self::release_pending_bond_lots(frame_id);
-			Self::lock_in_argonot_bond_participants(frame_id);
 			Self::lock_in_vault_capital(frame_id);
 
 			if !StabilizerPoolRewardFrames::<T>::contains_key(frame_id) {
@@ -1765,243 +1822,46 @@ pub mod pallet {
 			}
 		}
 
-		fn distribute_stake_pool(
-			frame_id: FrameId,
-			funding: &mut RewardFunding<T>,
-			stake_pool: T::Balance,
-			argonot_participants: Option<FrameArgonotBondParticipants<T>>,
-			policy: Option<&TaperingPolicy>,
-			argon_price_ratio: Option<FixedU128>,
-			available_reserve: T::Balance,
-		) -> PoolPayout<T::Balance> {
-			let Some(argonot_participants) = argonot_participants else {
-				return PoolPayout::default();
-			};
-			if argonot_participants.total_bonds == 0 {
-				return PoolPayout::default();
+		fn earned_pool_share(pool: T::Balance, earning_quantity: u128, target: u128) -> T::Balance {
+			let denominator = target.max(earning_quantity);
+			if denominator == 0 {
+				return T::Balance::zero()
 			}
 
-			let mut payable_pool = stake_pool;
-			let mut reserve_topup = T::Balance::zero();
-			let average_price = T::PriceProvider::get_average_microgons_per_argonot(frame_id);
-			if let (Some(policy), Some(price)) = (policy, average_price.filter(|p| !p.is_zero())) {
-				let capital =
-					(argonot_participants.total_bonds as u128).saturating_mul(price.into());
-				let daily_return =
-					Self::price_adjusted_daily_return(&policy.argonot_stakes, argon_price_ratio);
-				payable_pool = Self::tapered_payout(
-					stake_pool.into(),
+			FixedU128::from_rational_with_rounding(earning_quantity, denominator, Rounding::Down)
+				.saturating_mul_int(pool)
+		}
+
+		fn calculate_pool_allocation(
+			pool: T::Balance,
+			capital: Option<u128>,
+			policy: Option<&TaperingProgram>,
+			price_ratio: Option<FixedU128>,
+			reserve: T::Balance,
+		) -> PoolAllocation<T::Balance> {
+			let mut allocated = pool;
+			let mut topup = T::Balance::zero();
+			if let (Some(program), Some(capital)) = (policy, capital) {
+				let daily_return = Self::price_adjusted_daily_return(program, price_ratio);
+				allocated = Self::tapered_payout(
+					pool.into(),
 					capital,
 					daily_return,
-					policy.argonot_stakes.excess_reward_payout_percent,
+					program.excess_reward_payout_percent,
 				)
 				.into();
-				if argon_price_ratio.is_some_and(|ratio| ratio < FixedU128::one()) {
-					reserve_topup = daily_return
+				if price_ratio.is_some_and(|ratio| ratio < FixedU128::one()) {
+					topup = daily_return
 						.saturating_mul_int(capital)
-						.saturating_sub(stake_pool.into())
-						.min(available_reserve.into())
+						.saturating_sub(pool.into())
+						.min(reserve.into())
 						.into();
 				}
 			}
-
-			let reserve_minted = Self::fund_reserve_topup(frame_id, funding, reserve_topup);
-			let combined_pool = payable_pool.saturating_add(reserve_minted);
-			let mut distributed = T::Balance::zero();
-			for participant in argonot_participants.bond_lots.iter() {
-				let Some(bond_lot) = BondLotById::<T>::get(participant.bond_lot_id) else {
-					continue;
-				};
-				if !matches!(bond_lot.program, BondProgram::Argonot) {
-					continue;
-				}
-
-				let share = Perbill::from_rational(
-					participant.bonds as u128,
-					argonot_participants.total_bonds as u128,
-				);
-				let mut paid_payout = share.mul_floor(combined_pool);
-				if !paid_payout.is_zero() &&
-					let Err(e) =
-						Self::pay_from_reward_pool(funding, &bond_lot.owner, paid_payout)
-				{
-					Self::deposit_event(Event::<T>::CouldNotDistributeEarningsToArgonotBondLot {
-						frame_id,
-						bond_lot_id: participant.bond_lot_id,
-						account_id: bond_lot.owner,
-						amount: paid_payout,
-						dispatch_error: e,
-					});
-					paid_payout = T::Balance::zero();
-				}
-				distributed.saturating_accrue(paid_payout);
-
-				Self::record_bond_lot_earnings(participant.bond_lot_id, frame_id, paid_payout);
-			}
-			// Bid revenue pays first; reserves cover only what successful payments exceed it by.
-			let from_pool = distributed.min(payable_pool);
-			PoolPayout {
-				from_pool,
-				from_reserve: distributed.saturating_sub(from_pool),
-				reserve_minted,
-				withheld: stake_pool.saturating_sub(payable_pool),
-			}
-		}
-
-		fn distribute_argon_bond_pool(
-			frame_id: FrameId,
-			funding: &mut RewardFunding<T>,
-			argon_bond_pool: T::Balance,
-			frame_capital: Option<&FrameVaultCapital<T>>,
-			policy: Option<&TaperingPolicy>,
-			argon_price_ratio: Option<FixedU128>,
-			available_reserve: T::Balance,
-		) -> PoolPayout<T::Balance> {
-			let Some(frame_capital) = frame_capital else {
-				for (_, bond_lot_id, ()) in BondLotIdsByVault::<T>::iter() {
-					let Some(bond_lot) = BondLotById::<T>::get(bond_lot_id) else { continue };
-					if bond_lot.locked_frame_terms.is_some() {
-						BondLotById::<T>::mutate(bond_lot_id, |lot| {
-							if let Some(lot) = lot {
-								lot.locked_frame_terms = None;
-							}
-						});
-					}
-				}
-				return PoolPayout::default();
-			};
-			let total_eligible_balance =
-				frame_capital.total_active_bonds.saturating_mul(MICROGONS_PER_ARGON).into();
-			let denominator = frame_capital.target_securitization.max(total_eligible_balance);
-			let mut proposed_payouts = Vec::new();
-			let mut proposed_total = 0u128;
-			let mut eligible_capital = 0u128;
-			let mut flexible_fractions = BTreeMap::new();
-			for (vault_id, bond_lot_id, ()) in BondLotIdsByVault::<T>::iter() {
-				let Some(bond_lot) = BondLotById::<T>::get(bond_lot_id) else { continue };
-				let (bonds, is_flexible) = match bond_lot.locked_frame_terms.as_ref() {
-					Some(terms) => (terms.bonds, terms.is_flexible),
-					None if bond_lot.release_reason.is_some() => continue,
-					None => (bond_lot.bonds, bond_lot.is_flexible),
-				};
-				if bond_lot.locked_frame_terms.is_some() {
-					BondLotById::<T>::mutate(bond_lot_id, |lot| {
-						if let Some(lot) = lot {
-							lot.locked_frame_terms = None;
-						}
-					});
-				}
-				if bonds == 0 {
-					continue;
-				}
-				let principal_microgons = (bonds as u128).saturating_mul(MICROGONS_PER_ARGON);
-				let eligible_microgons = if is_flexible {
-					let fraction = flexible_fractions.entry(vault_id).or_insert_with(|| {
-						let state = BondLotsByVault::<T>::get(vault_id);
-						let (flexible, displaced) = match state.locked_frame_terms {
-							Some(terms) => (terms.flexible_bonds, terms.displaced_flexible_bonds),
-							None => (state.flexible_bonds, state.displaced_flexible_bonds),
-						};
-						FixedU128::from_rational_with_rounding(
-							flexible.saturating_sub(displaced) as u128,
-							flexible as u128,
-							Rounding::Down,
-						)
-					});
-					fraction.saturating_mul_int(principal_microgons)
-				} else {
-					principal_microgons
-				};
-				let payout = if denominator.is_zero() {
-					T::Balance::zero()
-				} else {
-					FixedU128::from_rational_with_rounding(
-						eligible_microgons,
-						denominator.into(),
-						Rounding::Down,
-					)
-					.saturating_mul_int(argon_bond_pool)
-				};
-				proposed_total = proposed_total.saturating_add(payout.into());
-				eligible_capital = eligible_capital.saturating_add(eligible_microgons);
-				proposed_payouts.push((
-					vault_id,
-					bond_lot_id,
-					bond_lot,
-					eligible_microgons,
-					payout,
-				));
-			}
-
-			let mut payable_total = proposed_total;
-			let mut reserve_topup = 0u128;
-			if let Some(policy) = policy {
-				let daily_return =
-					Self::price_adjusted_daily_return(&policy.argon_bonds, argon_price_ratio);
-				payable_total = Self::tapered_payout(
-					proposed_total,
-					eligible_capital,
-					daily_return,
-					policy.argon_bonds.excess_reward_payout_percent,
-				);
-				if argon_price_ratio.is_some_and(|ratio| ratio < FixedU128::one()) {
-					reserve_topup = daily_return
-						.saturating_mul_int(eligible_capital)
-						.saturating_sub(proposed_total)
-						.min(available_reserve.into());
-				}
-			}
-
-			let reserve_minted = Self::fund_reserve_topup(frame_id, funding, reserve_topup.into());
-			let pool_fraction = if proposed_total == 0 {
-				FixedU128::zero()
-			} else {
-				FixedU128::from_rational_with_rounding(
-					payable_total,
-					proposed_total,
-					Rounding::Down,
-				)
-			};
-			let reserve_fraction = if eligible_capital == 0 {
-				FixedU128::zero()
-			} else {
-				FixedU128::from_rational_with_rounding(
-					reserve_minted.into(),
-					eligible_capital,
-					Rounding::Down,
-				)
-			};
-			let mut distributed = T::Balance::zero();
-			for (vault_id, bond_lot_id, bond_lot, capital, proposed) in proposed_payouts {
-				let pool_payout: T::Balance =
-					pool_fraction.saturating_mul_int(proposed.into()).into();
-				let reserve_payout: T::Balance =
-					reserve_fraction.saturating_mul_int(capital).into();
-				let mut paid_payout = pool_payout.saturating_add(reserve_payout);
-				if !paid_payout.is_zero() &&
-					let Err(e) =
-						Self::pay_from_reward_pool(funding, &bond_lot.owner, paid_payout)
-				{
-					Self::deposit_event(Event::<T>::CouldNotDistributeEarningsToBondLot {
-						frame_id,
-						vault_id,
-						bond_lot_id,
-						account_id: bond_lot.owner,
-						amount: paid_payout,
-						dispatch_error: e,
-					});
-					paid_payout = T::Balance::zero();
-				}
-				Self::record_bond_lot_earnings(bond_lot_id, frame_id, paid_payout);
-				distributed.saturating_accrue(paid_payout);
-			}
-
-			let from_pool = distributed.min(payable_total.into());
-			PoolPayout {
-				from_pool,
-				from_reserve: distributed.saturating_sub(from_pool),
-				reserve_minted,
-				withheld: proposed_total.saturating_sub(payable_total).into(),
+			PoolAllocation {
+				from_pool: allocated,
+				from_reserve: topup,
+				withheld: pool.saturating_sub(allocated),
 			}
 		}
 
@@ -2268,60 +2128,6 @@ pub mod pallet {
 			(distributed, frame_capital.vault_securitization_positions.len() as u32)
 		}
 
-		fn record_vault_pool_earnings(
-			frame_id: FrameId,
-			funding: &mut RewardFunding<T>,
-			vault_id: VaultId,
-			position: &VaultSecuritizationPosition<T>,
-			earnings: T::Balance,
-		) -> DispatchResult {
-			T::TreasuryVaultProvider::record_vault_frame_earnings(
-				funding,
-				VaultTreasuryFrameEarnings {
-					vault_id,
-					vault_operator_account_id: position.operator_account_id.clone(),
-					frame_id,
-					earnings_for_vault: earnings,
-					earnings,
-					capital_contributed: position.active_bond_microgons,
-					capital_contributed_by_vault: T::Balance::zero(),
-				},
-			)
-		}
-
-		fn fund_reserve_topup(
-			frame_id: FrameId,
-			funding: &mut RewardFunding<T>,
-			amount: T::Balance,
-		) -> T::Balance {
-			if amount.is_zero() {
-				return T::Balance::zero();
-			}
-			// Balanced::issue saturates, so reject overflow before changing issuance.
-			if T::Currency::total_issuance().checked_add(&amount).is_none() {
-				Self::deposit_event(Event::<T>::CouldNotFundReserveTopup {
-					frame_id,
-					amount,
-					dispatch_error: ArithmeticError::Overflow.into(),
-				});
-				return T::Balance::zero();
-			}
-			funding.subsume(T::Currency::issue(amount));
-			amount
-		}
-
-		fn pay_from_reward_pool(
-			funding: &mut RewardFunding<T>,
-			owner: &T::AccountId,
-			amount: T::Balance,
-		) -> DispatchResult {
-			ensure!(amount <= funding.peek(), TokenError::FundsUnavailable);
-			let paid = T::Currency::deposit(owner, amount, Precision::Exact)?;
-			let _ = funding.extract(amount).offset(paid);
-			Ok(())
-		}
-
-		/// Releases bond lots whose release delay has matured.
 		pub(crate) fn release_pending_bond_lots(frame_id: FrameId) {
 			let start_frame =
 				PendingBondReleaseRetryCursor::<T>::take().unwrap_or(frame_id).min(frame_id);
@@ -2393,6 +2199,27 @@ pub mod pallet {
 			}
 		}
 
+		fn record_vault_pool_earnings(
+			frame_id: FrameId,
+			funding: &mut RewardFunding<T>,
+			vault_id: VaultId,
+			position: &VaultSecuritizationPosition<T>,
+			earnings: T::Balance,
+		) -> DispatchResult {
+			T::TreasuryVaultProvider::record_vault_frame_earnings(
+				funding,
+				VaultTreasuryFrameEarnings {
+					vault_id,
+					vault_operator_account_id: position.operator_account_id.clone(),
+					frame_id,
+					earnings_for_vault: earnings,
+					earnings,
+					capital_contributed: position.active_bond_microgons,
+					capital_contributed_by_vault: T::Balance::zero(),
+				},
+			)
+		}
+
 		fn next_bond_lot_id() -> Result<BondLotId, Error<T>> {
 			let next = NextBondLotId::<T>::get();
 			let updated = next.checked_add(1).ok_or(Error::<T>::InternalError)?;
@@ -2444,109 +2271,20 @@ pub mod pallet {
 			Ok(())
 		}
 
-		fn has_current_bond_payout_frame() -> bool {
-			CurrentFrameVaultCapital::<T>::get().is_some_and(|capital| {
-				capital.frame_id == T::MiningFrameTransitionProvider::get_current_frame_id()
-			})
-		}
-
-		fn lock_bond_frame_terms(bond_lot_id: BondLotId, bond_lot: &BondLot<T>) {
-			if !Self::has_current_bond_payout_frame() {
-				return;
-			}
-			BondLotById::<T>::mutate(bond_lot_id, |stored| {
-				if let Some(stored) = stored {
-					stored.locked_frame_terms.get_or_insert(LockedFrameBondTerms {
-						bonds: bond_lot.bonds,
-						is_flexible: bond_lot.is_flexible,
-					});
-				}
+		pub(crate) fn update_bond_principal(
+			account: &T::AccountId,
+			vault: VaultId,
+			previous: T::Balance,
+			current: T::Balance,
+		) -> DispatchResult {
+			ActiveBondsByAccountAndVault::<T>::mutate_exists(account, vault, |total| {
+				let updated = total
+					.unwrap_or_default()
+					.saturating_sub(previous.into() / MICROGONS_PER_ARGON)
+					.saturating_add(current.into() / MICROGONS_PER_ARGON);
+				*total = if updated == 0 { None } else { Some(updated) };
 			});
-		}
-
-		fn lock_vault_frame_terms(vault_bonds: &mut VaultBondState) {
-			if Self::has_current_bond_payout_frame() {
-				vault_bonds.locked_frame_terms.get_or_insert(LockedFrameVaultTerms {
-					flexible_bonds: vault_bonds.flexible_bonds,
-					displaced_flexible_bonds: vault_bonds.displaced_flexible_bonds,
-				});
-			}
-		}
-
-		fn record_bond_lot_earnings(
-			bond_lot_id: BondLotId,
-			frame_id: FrameId,
-			paid_payout: T::Balance,
-		) {
-			BondLotById::<T>::mutate_exists(bond_lot_id, |maybe_bond_lot| {
-				let Some(bond_lot) = maybe_bond_lot.as_mut() else {
-					return;
-				};
-				bond_lot.participated_frames = bond_lot.participated_frames.saturating_add(1);
-				bond_lot.last_frame_earnings_frame_id = Some(frame_id);
-				bond_lot.last_frame_earnings = Some(paid_payout);
-				bond_lot.cumulative_earnings.saturating_accrue(paid_payout);
-			});
-		}
-
-		fn account_vault_bond_status(
-			account_id: &T::AccountId,
-			scanned_lots: &mut u32,
-		) -> Result<(T::Balance, T::Balance), Error<T>> {
-			let mut active_balance = T::Balance::zero();
-			let mut releasing_balance = T::Balance::zero();
-
-			for (bond_lot_id, ()) in BondLotIdsByAccount::<T>::iter_prefix(account_id) {
-				scanned_lots.saturating_accrue(1);
-				let bond_lot =
-					BondLotById::<T>::get(bond_lot_id).ok_or(Error::<T>::BondLotNotFound)?;
-				if !matches!(bond_lot.program, BondProgram::Vault { .. }) {
-					continue;
-				}
-
-				let bond_balance = Self::bonds_to_balance(bond_lot.bonds);
-				if bond_lot.release_reason.is_some() {
-					releasing_balance.saturating_accrue(bond_balance);
-				} else {
-					active_balance.saturating_accrue(bond_balance);
-				}
-			}
-
-			let held_balance =
-				T::Currency::balance_on_hold(&HoldReason::ContributedToTreasury.into(), account_id)
-					.saturating_sub(releasing_balance);
-
-			Ok((active_balance, held_balance))
-		}
-
-		fn active_non_releasing_vault_bond_amount(
-			account_id: &T::AccountId,
-			program_id: Option<BondProgramId>,
-		) -> Result<T::Balance, Error<T>> {
-			let mut active_balance = T::Balance::zero();
-
-			for (bond_lot_id, ()) in BondLotIdsByAccount::<T>::iter_prefix(account_id) {
-				let bond_lot =
-					BondLotById::<T>::get(bond_lot_id).ok_or(Error::<T>::BondLotNotFound)?;
-				if bond_lot.release_reason.is_some() {
-					continue;
-				}
-
-				let bond_program_id = match bond_lot.program {
-					BondProgram::Vault { .. } => bond_lot.program.id(),
-					BondProgram::Argonot => continue,
-				};
-
-				if let Some(expected_program_id) = program_id &&
-					bond_program_id != expected_program_id
-				{
-					continue;
-				}
-
-				active_balance.saturating_accrue(Self::bonds_to_balance(bond_lot.bonds));
-			}
-
-			Ok(active_balance)
+			T::PositionProvider::bond_position_updated(account, vault, previous, current)
 		}
 
 		pub(crate) fn encumbered_bond_microgons(account_id: &T::AccountId) -> T::Balance {
@@ -2567,7 +2305,6 @@ pub mod pallet {
 						return Ok(());
 					};
 					let previous_flexible = vault_bonds.eligible_flexible_bonds();
-					Self::lock_vault_frame_terms(vault_bonds);
 					if bond_lot.is_flexible {
 						vault_bonds.flexible_bonds.saturating_reduce(bond_lot.bonds);
 					} else {
@@ -2587,7 +2324,6 @@ pub mod pallet {
 					)?;
 					if vault_bonds.regular_bonds.is_zero() &&
 						vault_bonds.flexible_bonds.is_zero() &&
-						vault_bonds.locked_frame_terms.is_none() &&
 						vault_bonds.reserved_bond_space.is_zero()
 					{
 						*maybe_vault_bonds = None;
@@ -2629,7 +2365,7 @@ pub mod pallet {
 					)?;
 				}
 				if let BondProgram::Vault { vault_id, .. } = bond_lot.program {
-					T::PositionProvider::bond_position_updated(
+					Self::update_bond_principal(
 						&bond_lot.owner,
 						vault_id,
 						Self::bonds_to_balance(bond_lot.bonds),
@@ -2678,7 +2414,7 @@ pub mod pallet {
 			});
 			StabilizerPoolRewardFrames::<T>::insert(
 				frame_id,
-				StabilizerPoolRewardFrame::Funded { target_pool_value_microgons, budget },
+				StabilizerPoolRewardFrame::Allocated { target_pool_value_microgons, budget },
 			);
 		}
 
@@ -2695,16 +2431,20 @@ pub mod pallet {
 		type Weights = weights::ProviderWeightAdapter<T>;
 
 		fn finalize_frame_rewards(frame_id: FrameId, eligible_value: Balance) {
-			let Some(StabilizerPoolRewardFrame::Funded { target_pool_value_microgons, budget }) =
-				StabilizerPoolRewardFrames::<T>::get(frame_id)
-			else {
-				return;
-			};
-
 			let mut reward_rate = FixedU128::zero();
-			if !eligible_value.is_zero() && !target_pool_value_microgons.is_zero() {
-				let denominator = eligible_value.max(target_pool_value_microgons.into());
-				reward_rate = FixedU128::saturating_from_rational(budget.into(), denominator);
+			match StabilizerPoolRewardFrames::<T>::get(frame_id) {
+				Some(StabilizerPoolRewardFrame::Allocated {
+					target_pool_value_microgons,
+					budget,
+				}) =>
+					if !eligible_value.is_zero() && !target_pool_value_microgons.is_zero() {
+						let denominator = eligible_value.max(target_pool_value_microgons.into());
+						reward_rate =
+							FixedU128::saturating_from_rational(budget.into(), denominator);
+					},
+				// A closed frame with no auction funding has no earnings.
+				Some(StabilizerPoolRewardFrame::Earning { .. }) => {},
+				_ => return,
 			}
 			StabilizerPoolRewardFrames::<T>::insert(
 				frame_id,
@@ -2722,33 +2462,36 @@ pub mod pallet {
 		}
 
 		fn claim_rewards(claims: &[StabilizerPoolFrameClaim]) -> Result<Balance, DispatchError> {
-			let mut total = T::Balance::zero();
+			let mut total = 0u128;
 			for claim in claims {
-				let amount: T::Balance = match StabilizerPoolRewardFrames::<T>::get(claim.frame_id)
-				{
-					Some(StabilizerPoolRewardFrame::Finalized { .. }) => claim.amount.into(),
-					// Frames without reward terms can predate activation.
-					None => continue,
-					_ => return Err(Error::<T>::StabilizerPoolClaimNotReady.into()),
-				};
-				total = total.checked_add(&amount).ok_or(ArithmeticError::Overflow)?;
+				ensure!(
+					Self::frame_reward_rate(claim.frame_id).is_some(),
+					Error::<T>::StabilizerPoolClaimNotReady
+				);
+				total = total.saturating_add(claim.amount);
 			}
 			if total.is_zero() {
-				return Ok(0);
+				return Ok(0)
 			}
 
-			let mut reserves = RewardReserves::<T>::get();
-			reserves.stabilizer_pools = reserves
-				.stabilizer_pools
-				.checked_sub(&total)
-				.ok_or(TokenError::FundsUnavailable)?;
-			RewardReserves::<T>::put(&reserves);
-			Self::deposit_event(Event::<T>::RewardReservesUpdated { reserves });
-			Ok(total.into())
+			let amount = total.into();
+			ensure!(
+				amount <= RewardReserves::<T>::get().stabilizer_pools,
+				TokenError::FundsUnavailable
+			);
+			T::PositionProvider::fund(CollectSource::StabilizerPools, amount)?;
+
+			RewardReserves::<T>::mutate(|reserves| {
+				reserves.stabilizer_pools = reserves.stabilizer_pools.saturating_sub(amount);
+				Self::deposit_event(Event::<T>::RewardReservesUpdated {
+					reserves: reserves.clone(),
+				});
+			});
+			Ok(total)
 		}
 	}
 
-	impl<T: Config> TreasuryRewardProvider<T::AccountId> for Pallet<T> {
+	impl<T: Config> TreasuryRewardProvider for Pallet<T> {
 		type Balance = T::Balance;
 		type Weights = weights::ProviderWeightAdapter<T>;
 
@@ -2768,13 +2511,6 @@ pub mod pallet {
 			Ok(())
 		}
 
-		fn commit_reward(amount: T::Balance) -> DispatchResult {
-			OutstandingPurchaseRewards::<T>::mutate(|outstanding| {
-				outstanding.saturating_accrue(amount);
-			});
-			Ok(())
-		}
-
 		fn return_budget(amount: T::Balance) -> DispatchResult {
 			if amount.is_zero() {
 				return Ok(());
@@ -2784,25 +2520,6 @@ pub mod pallet {
 			RewardReserves::<T>::put(&reserves);
 			Self::deposit_event(Event::<T>::RewardReservesUpdated { reserves });
 			Ok(())
-		}
-
-		#[frame_support::transactional]
-		fn pay_reward(
-			account: &T::AccountId,
-			amount: T::Balance,
-		) -> Result<T::Balance, DispatchError> {
-			let mut outstanding = OutstandingPurchaseRewards::<T>::get();
-			ensure!(amount <= outstanding, ArithmeticError::Underflow);
-
-			let paid = match T::Currency::mint_into(account, amount) {
-				Ok(paid) => paid,
-				Err(error) if error == TokenError::BelowMinimum.into() => T::Balance::zero(),
-				Err(error) => return Err(error),
-			};
-
-			outstanding.saturating_reduce(amount);
-			OutstandingPurchaseRewards::<T>::put(outstanding);
-			Ok(paid)
 		}
 	}
 
@@ -2831,12 +2548,6 @@ pub mod pallet {
 		}
 
 		fn on_frame_start_weight(frame_id: FrameId) -> Weight {
-			let payout_argonot_participants = CurrentFrameArgonotBondParticipants::<T>::get()
-				.map(|participants| participants.bond_lots.len() as u32)
-				.unwrap_or_default();
-			// The transition pays the frozen list and locks the live list for the next frame.
-			let argonot_lots =
-				payout_argonot_participants.max(ArgonotBondLots::<T>::get().len() as u32);
 			let first_due_frame =
 				PendingBondReleaseRetryCursor::<T>::get().unwrap_or(frame_id).min(frame_id);
 			let mut due_releases = 0u32;
@@ -2848,13 +2559,9 @@ pub mod pallet {
 			let price_weight = <T::PriceProvider as PriceProvider<T::Balance>>::Weights::
 				get_average_microgons_per_argonot();
 
-			T::WeightInfo::on_frame_transition(
-				TotalArgonBondLots::<T>::get(),
-				argonot_lots,
-				due_releases,
-			)
+			T::WeightInfo::on_frame_transition(due_releases)
 			// MiningSlot already writes and proves FrameStartTicks before this hook; add its read.
-			.saturating_add(T::DbWeight::get().reads(due_frames.saturating_add(5)))
+			.saturating_add(T::DbWeight::get().reads(due_frames.saturating_add(2)))
 			.saturating_add(
 				T::DbWeight::get()
 					.reads_writes(due_frames.saturating_sub(1), due_frames.saturating_sub(1)),
@@ -2882,6 +2589,7 @@ pub mod pallet {
 	}
 
 	impl<T: Config> TreasuryPoolProvider<T::AccountId> for Pallet<T> {
+		type MaxBondCollateralLots = T::MaxBondCollateralLots;
 		type Weights = ProviderWeightAdapter<T>;
 		type Balance = T::Balance;
 
@@ -2894,7 +2602,6 @@ pub mod pallet {
 				|maybe_vault_bonds| -> DispatchResult {
 					if let Some(vault_bonds) = maybe_vault_bonds {
 						let previous_flexible = vault_bonds.eligible_flexible_bonds();
-						Self::lock_vault_frame_terms(vault_bonds);
 						Self::update_vault_displacement(
 							vault_id,
 							vault_bonds,
@@ -2908,20 +2615,13 @@ pub mod pallet {
 		}
 
 		fn has_vault_bond_participation(vault_id: VaultId, account_id: &T::AccountId) -> bool {
-			let active_balance = Self::active_non_releasing_vault_bond_amount(
-				account_id,
-				Some(BondProgramId::Vault { vault_id }),
-			)
-			.unwrap_or_default();
-			!active_balance.is_zero()
+			ActiveBondsByAccountAndVault::<T>::get(account_id, vault_id) > 0
 		}
 
 		fn active_vault_bond_amount(vault_id: VaultId, account_id: &T::AccountId) -> Self::Balance {
-			Self::active_non_releasing_vault_bond_amount(
-				account_id,
-				Some(BondProgramId::Vault { vault_id }),
-			)
-			.unwrap_or_default()
+			ActiveBondsByAccountAndVault::<T>::get(account_id, vault_id)
+				.saturating_mul(MICROGONS_PER_ARGON)
+				.into()
 		}
 
 		fn active_account_vault_bond_amount(account_id: &T::AccountId) -> Self::Balance {
@@ -2931,20 +2631,28 @@ pub mod pallet {
 		fn encumber_bond_microgons(
 			account_id: &T::AccountId,
 			microgon_amount: Self::Balance,
+			bond_lot_ids: Option<&[BondLotId]>,
 		) -> DispatchResult {
 			if microgon_amount.is_zero() {
-				return Ok(());
+				return Ok(())
 			}
 
-			let next_encumbered = Self::encumbered_bond_microgons(account_id)
-				.checked_add(&microgon_amount)
-				.ok_or(Error::<T>::InternalError)?;
-			let (_, current_hold) = Self::account_vault_bond_status(account_id, &mut 0)?;
-			ensure!(
-				current_hold >= next_encumbered,
-				Error::<T>::ActiveBondAmountBelowEncumberedBacking,
-			);
-
+			EncumberedBondLotsByAccount::<T>::try_mutate(
+				account_id,
+				|backing| -> DispatchResult {
+					let selected = backing.iter().fold(T::Balance::zero(), |sum, entry| {
+						sum.saturating_add(entry.reserved_microgons)
+					});
+					let unassigned =
+						Self::encumbered_bond_microgons(account_id).saturating_sub(selected);
+					Self::reserve_bond_collateral(
+						account_id,
+						unassigned.saturating_add(microgon_amount),
+						bond_lot_ids,
+						backing,
+					)
+				},
+			)?;
 			EncumberedBondMicrogonsByAccount::<T>::mutate(account_id, |encumbered| {
 				encumbered.saturating_accrue(microgon_amount);
 			});
@@ -2987,9 +2695,12 @@ pub mod pallet {
 				return Ok(());
 			}
 
+			let lots = EncumberedBondLotsByAccount::<T>::get(account_id);
+			let encumbered = Self::encumbered_bond_microgons(account_id);
+			Self::ensure_collateral_selected(&lots, encumbered)?;
 			let previous = PendingBondCollateralByAccount::<T>::get(account_id);
 			let mut pending = previous.clone().unwrap_or_default();
-			let available = Self::encumbered_bond_microgons(account_id)
+			let available = encumbered
 				.saturating_sub(pending.burn_microgons)
 				.saturating_sub(pending.release_microgons);
 			ensure!(
@@ -3018,179 +2729,274 @@ pub mod pallet {
 			Ok(())
 		}
 
-		pub(crate) fn settle_bond_collateral_release(
-			account_id: &T::AccountId,
-			microgon_amount: T::Balance,
-			weight: &mut Weight,
+		/// Select backing in full before publishing its availability or account record.
+		fn reserve_bond_collateral(
+			account: &T::AccountId,
+			amount: T::Balance,
+			bond_lot_ids: Option<&[BondLotId]>,
+			backing: &mut BoundedVec<BondCollateralLot<T::Balance>, T::MaxBondCollateralLots>,
 		) -> DispatchResult {
-			if microgon_amount.is_zero() {
-				return Ok(());
+			if amount.is_zero() {
+				return Ok(())
 			}
-			let base_weight = T::WeightInfo::settle_bond_collateral_release(0);
-			weight.saturating_accrue(base_weight);
+			let ids = if let Some(ids) = bond_lot_ids {
+				ensure!(
+					ids.len() <= T::MaxBondCollateralLots::get() as usize,
+					Error::<T>::TooManyBondCollateralLots
+				);
+				ensure!(
+					ids.iter().enumerate().all(|(index, id)| !ids[..index].contains(id)),
+					Error::<T>::DuplicateBondCollateralLot
+				);
+				ids.to_vec()
+			} else {
+				let mut ids = backing
+					.iter()
+					.filter_map(|entry| entry.bond_lot_id)
+					.filter(|id| AvailableBondCollateralLots::<T>::contains_key(account, id))
+					.collect::<Vec<_>>();
+				let mut remaining_slots =
+					(T::MaxBondCollateralLots::get() as usize).saturating_sub(backing.len());
+				if remaining_slots > 0 {
+					for id in AvailableBondCollateralLots::<T>::iter_key_prefix(account)
+						.take(T::MaxBondCollateralLots::get() as usize)
+					{
+						if remaining_slots == 0 {
+							break
+						}
+						if backing.iter().any(|entry| entry.bond_lot_id == Some(id)) {
+							continue
+						}
+						ids.push(id);
+						remaining_slots -= 1;
+					}
+				}
+				ids
+			};
 
-			let current_encumbered = Self::encumbered_bond_microgons(account_id);
-			ensure!(
-				current_encumbered >= microgon_amount,
-				Error::<T>::ActiveBondAmountBelowEncumberedBacking,
-			);
-			let remaining_encumbered = current_encumbered.saturating_sub(microgon_amount);
-			EncumberedBondMicrogonsByAccount::<T>::insert(account_id, remaining_encumbered);
-			let mut scanned_lots = 0;
-			let status = Self::account_vault_bond_status(account_id, &mut scanned_lots);
-			weight.saturating_accrue(
-				T::WeightInfo::settle_bond_collateral_release(scanned_lots)
-					.saturating_sub(base_weight),
-			);
-			let (current_active, current_hold) = status?;
-			let required_hold = current_active.max(remaining_encumbered);
-			let released_amount = current_hold.saturating_sub(required_hold);
-			if !released_amount.is_zero() {
-				Self::release_hold::<T::Currency>(account_id, released_amount)?;
+			let mut remaining = amount;
+			let mut fully_reserved = Vec::new();
+			for id in ids {
+				if remaining.is_zero() {
+					break
+				}
+				let lot = BondLotById::<T>::get(id).ok_or(Error::<T>::BondLotNotFound)?;
+				ensure!(lot.owner == *account, Error::<T>::NotBondLotOwner);
+				ensure!(lot.release_reason.is_none(), Error::<T>::BondLotAlreadyReleasing);
+				ensure!(
+					matches!(lot.program, BondProgram::Vault { .. }),
+					Error::<T>::InvalidBondCollateralLot
+				);
+				let principal = Self::bonds_to_balance(lot.bonds);
+				let existing = backing.iter().position(|entry| entry.bond_lot_id == Some(id));
+				let reserved =
+					existing.map(|index| backing[index].reserved_microgons).unwrap_or_default();
+				let added = remaining.min(principal.saturating_sub(reserved));
+				if added.is_zero() {
+					continue
+				}
+				let next_reserved = reserved.saturating_add(added);
+				if let Some(index) = existing {
+					backing[index].reserved_microgons = next_reserved;
+				} else {
+					backing
+						.try_push(BondCollateralLot {
+							bond_lot_id: Some(id),
+							reserved_microgons: next_reserved,
+						})
+						.map_err(|_| Error::<T>::TooManyBondCollateralLots)?;
+				}
+				if next_reserved >= principal {
+					fully_reserved.push(id);
+				}
+				remaining.saturating_reduce(added);
+			}
+			ensure!(remaining.is_zero(), Error::<T>::ActiveBondAmountBelowEncumberedBacking);
+
+			for id in fully_reserved {
+				AvailableBondCollateralLots::<T>::remove(account, id);
 			}
 			Ok(())
 		}
 
-		pub(crate) fn settle_bond_collateral_burn(
-			account_id: &T::AccountId,
-			microgon_amount: T::Balance,
+		/// Pre-upgrade backing must have concrete lots selected before principal can leave.
+		fn ensure_collateral_selected(
+			lots: &[BondCollateralLot<T::Balance>],
+			encumbered: T::Balance,
+		) -> DispatchResult {
+			let selected = lots.iter().fold(T::Balance::zero(), |sum, entry| {
+				sum.saturating_add(entry.reserved_microgons)
+			});
+			ensure!(selected == encumbered, Error::<T>::BondCollateralSelectionRequired);
+			Ok(())
+		}
+
+		pub(crate) fn settle_bond_collateral_release(
+			account: &T::AccountId,
+			amount: T::Balance,
 			weight: &mut Weight,
 		) -> DispatchResult {
-			if microgon_amount.is_zero() {
-				return Ok(());
+			Self::settle_bond_collateral(account, amount, false, weight)
+		}
+
+		pub(crate) fn settle_bond_collateral_burn(
+			account: &T::AccountId,
+			amount: T::Balance,
+			weight: &mut Weight,
+		) -> DispatchResult {
+			Self::settle_bond_collateral(account, amount, true, weight)
+		}
+
+		/// Settle the complete request against the account's bounded backing list.
+		fn settle_bond_collateral(
+			account: &T::AccountId,
+			amount: T::Balance,
+			burn: bool,
+			weight: &mut Weight,
+		) -> DispatchResult {
+			if amount.is_zero() {
+				return Ok(())
 			}
-			let base_weight = T::WeightInfo::settle_bond_collateral_burn(0);
-			weight.saturating_accrue(base_weight);
+			let mut lots = EncumberedBondLotsByAccount::<T>::get(account);
 
-			ensure!(
-				Self::encumbered_bond_microgons(account_id) >= microgon_amount,
-				Error::<T>::ActiveBondAmountBelowEncumberedBacking,
-			);
-			let encumbered_after_burn =
-				Self::encumbered_bond_microgons(account_id).saturating_sub(microgon_amount);
-			T::Currency::burn_held(
-				&HoldReason::ContributedToTreasury.into(),
-				account_id,
-				microgon_amount,
-				Precision::Exact,
-				Fortitude::Force,
-			)
-			.map_err(|_| Error::<T>::InternalError)?;
-			if T::Currency::balance_on_hold(&HoldReason::ContributedToTreasury.into(), account_id)
-				.is_zero()
-			{
-				let _ = frame_system::Pallet::<T>::dec_providers(account_id);
+			let visits = lots.len() as u32;
+			if burn {
+				weight.saturating_accrue(T::WeightInfo::settle_bond_collateral_burn(visits));
+			} else {
+				weight.saturating_accrue(T::WeightInfo::settle_bond_collateral_release(visits));
 			}
-			EncumberedBondMicrogonsByAccount::<T>::insert(account_id, encumbered_after_burn);
 
-			let mut scanned_lots = 0;
-			let status = Self::account_vault_bond_status(account_id, &mut scanned_lots);
-			weight.saturating_accrue(
-				T::WeightInfo::settle_bond_collateral_burn(scanned_lots)
-					.saturating_sub(base_weight),
-			);
-			let (active_balance_before_trim, held_microgons_after_burn) = status?;
-			ensure!(held_microgons_after_burn >= encumbered_after_burn, Error::<T>::InternalError,);
+			let encumbered = Self::encumbered_bond_microgons(account);
+			ensure!(encumbered >= amount, Error::<T>::ActiveBondAmountBelowEncumberedBacking);
 
-			let active_bonds_before_trim = Self::balance_to_bonds(active_balance_before_trim);
-			let target_active_bonds = Self::balance_to_bonds(held_microgons_after_burn);
-			let mut remaining_bonds_to_trim =
-				active_bonds_before_trim.saturating_sub(target_active_bonds);
+			Self::ensure_collateral_selected(&lots, encumbered)?;
 
-			if remaining_bonds_to_trim != 0 {
-				let mut bond_lot_ids = BondLotIdsByAccount::<T>::iter_prefix(account_id)
-					.map(|(bond_lot_id, ())| bond_lot_id)
-					.collect::<Vec<_>>();
-				bond_lot_ids.sort_unstable_by(|left, right| right.cmp(left));
-				for bond_lot_id in bond_lot_ids {
-					if remaining_bonds_to_trim == 0 {
-						break;
-					}
-
-					let Some(bond_lot) = BondLotById::<T>::get(bond_lot_id) else {
-						continue;
-					};
-					if bond_lot.release_reason.is_some() || bond_lot.bonds == 0 {
-						continue;
-					}
-					let BondProgram::Vault { vault_id, .. } = bond_lot.program else {
-						continue;
-					};
-					let removed_bonds = bond_lot.bonds.min(remaining_bonds_to_trim);
-					let remaining_bonds = bond_lot.bonds.saturating_sub(removed_bonds);
-					remaining_bonds_to_trim = remaining_bonds_to_trim.saturating_sub(removed_bonds);
-
-					T::PositionProvider::bond_position_updated(
-						account_id,
-						vault_id,
-						Self::bonds_to_balance(bond_lot.bonds),
-						Self::bonds_to_balance(remaining_bonds),
+			let mut remaining = amount;
+			let mut released = T::Balance::zero();
+			for entry in lots.iter_mut() {
+				let id = entry.bond_lot_id;
+				let reserved = entry.reserved_microgons;
+				if remaining.is_zero() {
+					break
+				}
+				let settled = remaining.min(reserved);
+				let next_reserved = reserved.saturating_sub(settled);
+				let lot = id.and_then(BondLotById::<T>::get);
+				let principal =
+					lot.as_ref().map(|lot| Self::bonds_to_balance(lot.bonds)).unwrap_or_default();
+				let mut next_principal = principal;
+				let held = principal.max(reserved);
+				let next_held = if burn { held.saturating_sub(settled) } else { held };
+				if burn {
+					T::Currency::burn_held(
+						&HoldReason::ContributedToTreasury.into(),
+						account,
+						settled,
+						Precision::Exact,
+						Fortitude::Force,
 					)?;
-					if remaining_bonds == 0 {
-						BondLotById::<T>::remove(bond_lot_id);
-						BondLotIdsByAccount::<T>::remove(account_id, bond_lot_id);
-						BondLotIdsByVault::<T>::remove(vault_id, bond_lot_id);
-						TotalArgonBondLots::<T>::mutate(|count| count.saturating_reduce(1));
-						Self::remove_bond_lot_from_vault(vault_id, &bond_lot)?;
-					} else {
-						BondLotById::<T>::mutate_exists(bond_lot_id, |maybe_bond_lot| {
-							let Some(bond_lot) = maybe_bond_lot.as_mut() else {
-								return;
-							};
-							if Self::has_current_bond_payout_frame() {
-								bond_lot.locked_frame_terms.get_or_insert(LockedFrameBondTerms {
-									bonds: bond_lot.bonds,
-									is_flexible: bond_lot.is_flexible,
-								});
-							}
-							bond_lot.bonds = remaining_bonds;
-						});
-						BondLotsByVault::<T>::try_mutate_exists(
-							vault_id,
-							|maybe_vault_bonds| -> DispatchResult {
-								let Some(vault_bonds) = maybe_vault_bonds.as_mut() else {
-									return Ok(());
-								};
-								let previous_flexible = vault_bonds.eligible_flexible_bonds();
-								Self::lock_vault_frame_terms(vault_bonds);
-
-								if bond_lot.is_flexible {
-									vault_bonds.flexible_bonds.saturating_reduce(removed_bonds);
-								} else {
-									vault_bonds.regular_bonds.saturating_reduce(removed_bonds);
-									T::PositionProvider::account_quantity_updated(
-										account_id,
-										PositionQuantity::Bonds,
-										removed_bonds,
-										0,
-									)?;
-								}
-								Self::update_vault_displacement(
-									vault_id,
-									vault_bonds,
-									Self::balance_to_bonds(Self::get_vault_bond_capacity(vault_id)),
-									previous_flexible,
-								)
-							},
-						)?;
+					if T::Currency::balance_on_hold(
+						&HoldReason::ContributedToTreasury.into(),
+						account,
+					)
+					.is_zero()
+					{
+						let _ = frame_system::Pallet::<T>::dec_providers(account);
+					}
+					if let (Some(id), Some(lot)) = (id, lot) {
+						let remaining_bonds = Self::balance_to_bonds(next_held).min(lot.bonds);
+						next_principal = Self::bonds_to_balance(remaining_bonds);
+						Self::trim_collateral_lot(id, &lot, remaining_bonds)?;
 					}
 				}
-			}
 
-			ensure!(remaining_bonds_to_trim == 0, Error::<T>::InternalError);
-
-			let target_active_hold = Self::bonds_to_balance(target_active_bonds);
-			let required_hold = target_active_hold.max(encumbered_after_burn);
-			let released_amount = held_microgons_after_burn.saturating_sub(required_hold);
-			if !released_amount.is_zero() {
-				Self::release_hold::<T::Currency>(account_id, released_amount)?;
+				let slack = next_held.saturating_sub(next_principal.max(next_reserved));
+				if !slack.is_zero() {
+					Self::release_hold::<T::Currency>(account, slack)?;
+					released.saturating_accrue(slack);
+				}
+				entry.reserved_microgons = next_reserved;
+				if let Some(id) = id {
+					if next_principal > next_reserved {
+						AvailableBondCollateralLots::<T>::insert(account, id, ());
+					} else {
+						AvailableBondCollateralLots::<T>::remove(account, id);
+					}
+				}
+				remaining.saturating_reduce(settled);
 			}
-			Self::update_account_vault_bond_total(account_id);
-			Self::deposit_event(Event::<T>::EncumberedBondMicrogonsBurned {
-				account_id: account_id.clone(),
-				burned_amount: microgon_amount,
-				released_amount,
+			ensure!(remaining.is_zero(), Error::<T>::InternalError);
+			lots.retain(|entry| !entry.reserved_microgons.is_zero());
+			if lots.is_empty() {
+				EncumberedBondLotsByAccount::<T>::remove(account);
+			} else {
+				EncumberedBondLotsByAccount::<T>::insert(account, lots);
+			}
+			EncumberedBondMicrogonsByAccount::<T>::mutate(account, |total| {
+				total.saturating_reduce(amount)
 			});
+			if burn {
+				Self::update_account_vault_bond_total(account);
+				Self::deposit_event(Event::EncumberedBondMicrogonsBurned {
+					account_id: account.clone(),
+					burned_amount: amount,
+					released_amount: released,
+				});
+			}
+			Ok(())
+		}
+
+		fn trim_collateral_lot(
+			id: BondLotId,
+			lot: &BondLot<T>,
+			remaining_bonds: Bonds,
+		) -> DispatchResult {
+			let removed_bonds = lot.bonds.saturating_sub(remaining_bonds);
+			if removed_bonds == 0 {
+				return Ok(())
+			}
+			let BondProgram::Vault { vault_id, .. } = lot.program else {
+				return Err(Error::<T>::InternalError.into())
+			};
+			Self::update_bond_principal(
+				&lot.owner,
+				vault_id,
+				Self::bonds_to_balance(lot.bonds),
+				Self::bonds_to_balance(remaining_bonds),
+			)?;
+			if remaining_bonds == 0 {
+				BondLotById::<T>::remove(id);
+				BondLotIdsByAccount::<T>::remove(&lot.owner, id);
+				BondLotIdsByVault::<T>::remove(vault_id, id);
+				TotalArgonBondLots::<T>::mutate(|count| count.saturating_reduce(1));
+				Self::remove_bond_lot_from_vault(vault_id, lot)?;
+			} else {
+				BondLotById::<T>::mutate(id, |record| {
+					if let Some(lot) = record {
+						lot.bonds = remaining_bonds;
+					}
+				});
+				BondLotsByVault::<T>::try_mutate(vault_id, |vault| -> DispatchResult {
+					let previous_flexible = vault.eligible_flexible_bonds();
+					if lot.is_flexible {
+						vault.flexible_bonds.saturating_reduce(removed_bonds);
+					} else {
+						vault.regular_bonds.saturating_reduce(removed_bonds);
+						T::PositionProvider::account_quantity_updated(
+							&lot.owner,
+							PositionQuantity::Bonds,
+							removed_bonds,
+							0,
+						)?;
+					}
+					Self::update_vault_displacement(
+						vault_id,
+						vault,
+						Self::balance_to_bonds(Self::get_vault_bond_capacity(vault_id)),
+						previous_flexible,
+					)
+				})?;
+			}
 			Ok(())
 		}
 	}
@@ -3219,10 +3025,9 @@ pub mod pallet {
 
 	/// Funding and completed payments for one reward pool. Unspent minted funds return to reserves.
 	#[derive(Default)]
-	struct PoolPayout<Balance> {
+	struct PoolAllocation<Balance> {
 		from_pool: Balance,
 		from_reserve: Balance,
-		reserve_minted: Balance,
 		withheld: Balance,
 	}
 
@@ -3274,7 +3079,7 @@ pub mod pallet {
 		Encode, Decode, DecodeWithMemTracking, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen,
 	)]
 	pub struct TaperingPolicy {
-		/// Daily yield and excess payout settings for future Bitcoin Liquids rewards.
+		/// Daily yield and excess payout settings for Bitcoin liquidity earnings.
 		pub bitcoin_liquids: TaperingProgram,
 		/// Daily yield and excess payout settings for ARGON bonds.
 		pub argon_bonds: TaperingProgram,
@@ -3309,7 +3114,7 @@ pub mod pallet {
 			target_pool_value_microgons: Balance,
 		},
 		/// Funding is fixed and awaits the source's finalized eligible value.
-		Funded {
+		Allocated {
 			/// Desired eligible pool principal captured at frame opening, in microgons.
 			target_pool_value_microgons: Balance,
 			/// Newly funded rewards after applying the frame's taper, in microgons.
@@ -3431,8 +3236,6 @@ pub mod pallet {
 		pub bonds: Bonds,
 		/// Whether this operator-owned lot yields its admission capacity to regular bonds.
 		pub is_flexible: bool,
-		/// Terms used for this frame's payout when the live lot changes mid-frame.
-		pub locked_frame_terms: Option<LockedFrameBondTerms>,
 		/// The frame when this lot was purchased.
 		#[codec(compact)]
 		pub created_frame_id: FrameId,
@@ -3473,13 +3276,6 @@ pub mod pallet {
 		pub last_frame_earnings: Option<T::Balance>,
 		#[codec(compact)]
 		pub cumulative_earnings: T::Balance,
-	}
-
-	#[derive(Encode, Decode, Clone, PartialEq, Eq, Debug, TypeInfo, MaxEncodedLen)]
-	pub struct LockedFrameBondTerms {
-		#[codec(compact)]
-		pub bonds: Bonds,
-		pub is_flexible: bool,
 	}
 
 	/// The hot-path accepted-lot entry stored on a vault.
@@ -3544,6 +3340,8 @@ pub mod pallet {
 		/// Active regular and undisplaced flexible bonds across all vaults.
 		#[codec(compact)]
 		pub total_active_bonds: BondTotal,
+		/// Frame-effective earning quantities, independent of later source mutations.
+		pub quantities: PositionQuantities<T::Balance>,
 		/// Effective network target used for both bond and vault rewards.
 		#[codec(compact)]
 		pub target_securitization: T::Balance,
@@ -3578,20 +3376,6 @@ pub mod pallet {
 		pub frame_id: FrameId,
 		/// Share of variable vault earnings requiring full Argonot backing.
 		pub factor: Percent,
-	}
-
-	/// The Argonot bond participants locked for one frame.
-	#[derive(Encode, Decode, PartialEqNoBound, DebugNoBound, TypeInfo, MaxEncodedLen)]
-	#[scale_info(skip_type_params(T))]
-	pub struct FrameArgonotBondParticipants<T: Config> {
-		/// The frame this participant set belongs to.
-		#[codec(compact)]
-		pub frame_id: FrameId,
-		/// The total active bonds sharing the Argonot bond pool for the frame.
-		#[codec(compact)]
-		pub total_bonds: Bonds,
-		/// The Argonot bond lots participating in this frame.
-		pub bond_lots: BoundedVec<BondLotSummary, T::MaxActiveArgonotBondLots>,
 	}
 
 	#[derive(Encode, Decode, PartialEqNoBound, DebugNoBound, TypeInfo, MaxEncodedLen)]

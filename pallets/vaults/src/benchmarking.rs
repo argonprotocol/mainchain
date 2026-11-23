@@ -1,25 +1,18 @@
 use super::*;
+use crate::pallet::STORAGE_VERSION;
 use argon_bitcoin::{derive_xpub, xpriv_from_seed};
 use argon_primitives::{
-	bitcoin::{get_rounded_up_bitcoin_day_height, BitcoinHeight, OpaqueBitcoinXpub},
-	treasury::{PositionQuantity, TreasuryPositionProvider},
+	bitcoin::{get_rounded_up_bitcoin_day_height, BitcoinHeight, OpaqueBitcoinXpub, UtxoRef},
+	treasury::{TreasuryPositionProvider, VaultEarningsProvider},
 	vault::{
-		BitcoinLockFunding, BitcoinSecuritizationBasis, CosignerGuarantee,
+		BitcoinLockFunding, BitcoinSecuritizationBasis, CosignRequest, CosignerGuarantee,
 		ReserveSecuritizationRequest, SecuritizationScheduleEntry, VaultArgonotSecuritization,
 		VaultError, VaultTerms, MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES,
 	},
-	MiningFrameTransitionProvider, MICROGONS_PER_ARGON,
+	MICROGONS_PER_ARGON,
 };
 use frame_benchmarking::v2::*;
 use frame_system::RawOrigin;
-use pallet_prelude::benchmarking::{
-	benchmark_bitcoin_vault_provider_state, reset_benchmark_bitcoin_vault_provider_state,
-	reset_benchmark_treasury_positions, set_benchmark_bitcoin_vault_provider_state,
-};
-use pallet_treasury::{
-	BondLotsByVault, CurrentFrameVaultCapital, FrameVaultCapital, VaultBondState,
-	VaultSecuritizationPosition,
-};
 
 // Frame revenue and release completion costs are linear in the number of vaults.
 // Measure up to 100 vaults to fit the slope; hooks charge the actual storage count.
@@ -67,6 +60,7 @@ fn create_vault<T: Config>(
 where
 	CurrencyOf<T>: frame_support::traits::fungible::Mutate<T::AccountId, Balance = BalanceOf<T>>,
 {
+	STORAGE_VERSION.put::<Pallet<T>>();
 	let funding = securitization.saturating_add(1_000_000);
 	let _ = CurrencyOf::<T>::mint_into(operator, funding.into());
 	Pallet::<T>::create(
@@ -74,6 +68,11 @@ where
 		benchmark_vault_config::<T>(seed_hint, securitization),
 	)
 	.map_err(|_| BenchmarkError::Stop("vault create failed"))?;
+	if let Some(custody) = T::PositionProvider::collect_account() {
+		let missing =
+			CurrencyOf::<T>::minimum_balance().saturating_sub(CurrencyOf::<T>::balance(&custody));
+		CurrencyOf::<T>::mint_into(&custody, missing)?;
+	}
 	VaultIdByOperator::<T>::get(operator).ok_or(BenchmarkError::Stop("vault id missing"))
 }
 
@@ -136,70 +135,6 @@ fn seed_relockable_admission<T: Config>(
 	})
 }
 
-/// Exercise Treasury's populated callback and the complete bounded frame snapshot. The
-/// position provider is isolated during measurement; its cost is added by the weight adapter.
-fn seed_treasury_bonds_for_benchmark<T>(vault_id: VaultId) -> Result<(), BenchmarkError>
-where
-	T: Config + pallet_treasury::Config<Balance = BalanceOf<T>>,
-	BalanceOf<T>: Into<u128>,
-{
-	let mut vault =
-		VaultsById::<T>::get(vault_id).ok_or(BenchmarkError::Stop("callback vault missing"))?;
-	if !CurrentFrameVaultCapital::<T>::exists() {
-		reset_benchmark_treasury_positions();
-		reset_benchmark_bitcoin_vault_provider_state();
-	}
-	let flexible_bonds = (vault.securitization.into() / MICROGONS_PER_ARGON)
-		.min(pallet_treasury::Bonds::MAX.into()) as pallet_treasury::Bonds;
-	BondLotsByVault::<T>::insert(vault_id, VaultBondState { flexible_bonds, ..Default::default() });
-	<T as pallet_treasury::Config>::PositionProvider::account_quantity_updated(
-		&vault.operator_account_id,
-		PositionQuantity::Bonds,
-		0u32,
-		flexible_bonds,
-	)
-	.map_err(|_| BenchmarkError::Stop("callback position setup failed"))?;
-	let mut benchmark_vaults =
-		benchmark_bitcoin_vault_provider_state::<T::AccountId, BalanceOf<T>>();
-	// This stub only supplies the operator. The real query's full schedule is measured
-	// separately, so avoid decoding it repeatedly inside the callback benchmark.
-	vault.securitization_release_schedule.clear();
-	benchmark_vaults.vaults.insert(vault_id, vault);
-	set_benchmark_bitcoin_vault_provider_state(benchmark_vaults);
-
-	if CurrentFrameVaultCapital::<T>::exists() {
-		return Ok(());
-	}
-	let amount: BalanceOf<T> = (5_000 * MICROGONS_PER_ARGON).into();
-	let mut positions = BoundedBTreeMap::new();
-	for index in 0..<T as pallet_treasury::Config>::MaxVaultsPerPool::get() {
-		positions
-			.try_insert(
-				index + 1,
-				VaultSecuritizationPosition::<T> {
-					operator_account_id: account("callback-frame-operator", index, 0),
-					securitization: amount,
-					activated_securitization: amount,
-					bitcoin_locked_microgons: amount,
-					argonot_securitization_in_microgons: amount,
-					active_bond_microgons: amount,
-					upstream_participation: FixedU128::one(),
-				},
-			)
-			.map_err(|_| BenchmarkError::Stop("callback frame snapshot overflow"))?;
-	}
-	CurrentFrameVaultCapital::<T>::put(FrameVaultCapital::<T> {
-		frame_id:
-			<T as pallet_treasury::Config>::MiningFrameTransitionProvider::get_current_frame_id(),
-		total_active_bonds: 5_000 *
-			u128::from(<T as pallet_treasury::Config>::MaxVaultsPerPool::get()),
-		target_securitization: amount,
-		total_securitization: amount,
-		vault_securitization_positions: positions,
-	});
-	Ok(())
-}
-
 fn seed_funding_update<T: Config>(
 	revenue_entries: u32,
 	include_current: bool,
@@ -256,7 +191,7 @@ fn seed_funding_update<T: Config>(
 #[benchmarks(
 	where
 		CurrencyOf<T>: frame_support::traits::fungible::Mutate<T::AccountId, Balance = BalanceOf<T>>,
-		T: pallet_bitcoin_utxos::Config + pallet_treasury::Config<Balance = BalanceOf<T>>,
+		T: pallet_bitcoin_utxos::Config,
 		BalanceOf<T>: Into<u128>,
 )]
 mod benchmarks {
@@ -375,7 +310,7 @@ mod benchmarks {
 			(2_000 * MICROGONS_PER_ARGON).into(),
 			capital.into(),
 		)?;
-		seed_treasury_bonds_for_benchmark::<T>(vault_id)?;
+
 		let securitization: BalanceOf<T> = (1_000 * MICROGONS_PER_ARGON).into();
 
 		#[extrinsic_call]
@@ -384,9 +319,6 @@ mod benchmarks {
 		let vault = VaultsById::<T>::get(vault_id)
 			.ok_or(BenchmarkError::Stop("vault missing after modify"))?;
 		assert_eq!(vault.securitization_target, securitization);
-		let bonds = BondLotsByVault::<T>::get(vault_id);
-		assert!(bonds.locked_frame_terms.is_some());
-		assert!(bonds.displaced_flexible_bonds > 0);
 		Ok(())
 	}
 
@@ -439,7 +371,6 @@ mod benchmarks {
 			(2_000 * MICROGONS_PER_ARGON).into(),
 			capital.into(),
 		)?;
-		seed_treasury_bonds_for_benchmark::<T>(vault_id)?;
 
 		#[extrinsic_call]
 		_(RawOrigin::Signed(caller.clone()), vault_id);
@@ -448,9 +379,6 @@ mod benchmarks {
 			.ok_or(BenchmarkError::Stop("vault missing after close"))?;
 		assert!(vault.is_closed);
 		assert_eq!(vault.securitization_target, BalanceOf::<T>::zero());
-		let bonds = BondLotsByVault::<T>::get(vault_id);
-		assert!(bonds.locked_frame_terms.is_some());
-		assert_eq!(bonds.displaced_flexible_bonds, bonds.flexible_bonds);
 		Ok(())
 	}
 
@@ -524,58 +452,78 @@ mod benchmarks {
 	}
 
 	#[benchmark]
-	fn collect() -> Result<(), BenchmarkError> {
+	fn provider_update_pending_cosign() {
+		let owner: T::AccountId = account("cosign_owner", 0, 0);
+		let request = CosignRequest::Orphan {
+			owner,
+			utxo_ref: UtxoRef { txid: H256Le([1; 32]), output_index: 0 },
+		};
+		#[block]
+		{
+			<Pallet<T> as BitcoinVaultProvider>::update_pending_cosign(
+				1,
+				1,
+				request.clone(),
+				false,
+			);
+		}
+		assert!(PendingCosignsByVault::<T>::contains_key(1, (1u64.to_be_bytes(), request)));
+	}
+
+	#[benchmark]
+	fn provider_remove_pending_cosign() {
+		let owner: T::AccountId = account("cosign_owner", 0, 0);
+		let request = CosignRequest::Orphan {
+			owner,
+			utxo_ref: UtxoRef { txid: H256Le([1; 32]), output_index: 0 },
+		};
+		<Pallet<T> as BitcoinVaultProvider>::update_pending_cosign(1, 1, request.clone(), false);
+		#[block]
+		{
+			<Pallet<T> as BitcoinVaultProvider>::update_pending_cosign(1, 1, request.clone(), true);
+		}
+		assert!(!PendingCosignsByVault::<T>::contains_key(1, (1u64.to_be_bytes(), request)));
+	}
+
+	#[benchmark]
+	fn provider_collect_earnings() -> Result<(), BenchmarkError> {
 		let caller: T::AccountId = account("collect_caller", 0, 0);
 		let vault_id = create_vault::<T>(&caller, 8, 100_000)?;
-		let source: T::AccountId = account("source", 0, 0);
-		let earnings_for_vault: BalanceOf<T> = 50_000u128.into();
-		let _ = CurrencyOf::<T>::mint_into(&source, 1_000_000_000u128.into());
+		let amount: BalanceOf<T> = 50_000u128.into();
 
-		let mut funding = CurrencyOf::<T>::withdraw(
-			&source,
-			CurrencyOf::<T>::balance(&source),
-			Precision::Exact,
-			Preservation::Expendable,
-			Fortitude::Polite,
-		)
-		.map_err(|_| BenchmarkError::Stop("failed to withdraw reward funding"))?;
-
-		for i in 0..12u32 {
-			<Pallet<T> as TreasuryVaultProvider>::record_vault_frame_earnings(
-				&mut funding,
-				VaultTreasuryFrameEarnings {
-					vault_id,
-					vault_operator_account_id: caller.clone(),
-					frame_id: T::CurrentFrameId::get().saturating_add(i.into()),
-					earnings: earnings_for_vault,
-					capital_contributed: earnings_for_vault,
-					earnings_for_vault,
-					capital_contributed_by_vault: earnings_for_vault,
+		<Pallet<T> as BitcoinVaultProvider>::update_pending_cosign(
+			vault_id,
+			T::CurrentFrameId::get().saturating_add(1),
+			CosignRequest::Orphan {
+				owner: caller.clone(),
+				utxo_ref: UtxoRef { txid: H256Le([1; 32]), output_index: 0 },
+			},
+			false,
+		);
+		for frame in 1..=12 {
+			Pallet::<T>::mutate_frame_revenue(
+				vault_id,
+				T::CurrentFrameId::get().saturating_add(frame),
+				|revenue| {
+					revenue.uncollected_revenue = amount;
+					Ok(())
 				},
-			)?;
+			)
+			.map_err(|_| BenchmarkError::Stop("frame revenue fixture failed"))?;
 		}
-		assert_eq!(RevenuePerFrameByVault::<T>::get(vault_id).len(), 12);
-		assert!(
-			RevenuePerFrameByVault::<T>::get(vault_id)
-				.iter()
-				.any(|entry| entry.uncollected_revenue > BalanceOf::<T>::zero()),
-			"expected uncollected revenue before collect"
-		);
-
-		#[extrinsic_call]
-		_(RawOrigin::Signed(caller.clone()), vault_id);
-
+		#[block]
+		{
+			assert!(
+				<Pallet<T> as VaultEarningsProvider<T::AccountId, BalanceOf<T>>>::collect_earnings(
+					&caller,
+					amount.saturating_mul(12u128.into())
+				)?
+			);
+		}
 		assert_eq!(LastCollectFrameByVaultId::<T>::get(vault_id), Some(T::CurrentFrameId::get()));
-		assert_eq!(
-			CurrencyOf::<T>::balance_on_hold(&HoldReason::PendingCollect.into(), &caller),
-			BalanceOf::<T>::zero()
-		);
-		assert!(
-			RevenuePerFrameByVault::<T>::get(vault_id)
-				.iter()
-				.all(|entry| entry.uncollected_revenue == BalanceOf::<T>::zero()),
-			"expected all frame revenue to be collected"
-		);
+		assert!(RevenuePerFrameByVault::<T>::get(vault_id)
+			.iter()
+			.all(|frame| frame.uncollected_revenue.is_zero()));
 		Ok(())
 	}
 
@@ -863,10 +811,9 @@ mod benchmarks {
 		assert_eq!(vault.securitization_pending_activation, securitization.guaranteed_microgons);
 		assert_eq!(vault.reserved_securitization_space, BalanceOf::<T>::zero());
 		assert_eq!(vault.get_relock_capacity(), BalanceOf::<T>::zero());
-		assert!(
-			CurrencyOf::<T>::balance_on_hold(&HoldReason::PendingCollect.into(), &operator) >
-				BalanceOf::<T>::zero()
-		);
+		assert!(RevenuePerFrameByVault::<T>::get(vault_id)
+			.iter()
+			.any(|frame| !frame.uncollected_revenue.is_zero()));
 		Ok(())
 	}
 
@@ -1004,6 +951,10 @@ mod benchmarks {
 			Ok::<_, VaultError>(())
 		})
 		.map_err(|_| BenchmarkError::Stop("funded replacement setup failed"))?;
+		T::PositionProvider::network_securitized_satoshis_updated(
+			0,
+			current.securitized_satoshis(funded_satoshis).into(),
+		)?;
 
 		let mut replacement_guarantee = replacement.clone();
 
@@ -1104,8 +1055,7 @@ mod benchmarks {
 				.map_err(|_| BenchmarkError::Stop("failed to activate securitization"))?;
 			Ok::<_, BenchmarkError>(())
 		})?;
-		// Exercise inherited holds on unfunded securitization, including consuming them for debt.
-		seed_treasury_bonds_for_benchmark::<T>(vault_id)?;
+		T::PositionProvider::network_securitized_satoshis_updated(0, funded_satoshis.into())?;
 
 		#[block]
 		{
@@ -1124,9 +1074,6 @@ mod benchmarks {
 		assert_eq!(vault.securitization_locked, BalanceOf::<T>::zero());
 		assert_eq!(vault.securitized_satoshis, 0);
 		assert_eq!(vault.get_relock_capacity(), (1_000 * MICROGONS_PER_ARGON).into());
-		let bonds = BondLotsByVault::<T>::get(vault_id);
-		assert!(bonds.locked_frame_terms.is_some());
-		assert!(bonds.displaced_flexible_bonds > 0);
 		Ok(())
 	}
 
@@ -1371,7 +1318,7 @@ mod benchmarks {
 					.expect("one due exit fits")
 					.argon_withdrawals = release_amount;
 			});
-			seed_treasury_bonds_for_benchmark::<T>(vault_id)?;
+
 			VaultFundsReleasingByHeight::<T>::mutate(release_height, |vaults| {
 				vaults
 					.try_insert(vault_id)
@@ -1396,9 +1343,6 @@ mod benchmarks {
 			vault.securitization < capital.into(),
 			"vault securitization should shrink after releases"
 		);
-		let bonds = BondLotsByVault::<T>::get(first);
-		assert!(bonds.locked_frame_terms.is_some());
-		assert!(bonds.displaced_flexible_bonds > 0);
 		Ok(())
 	}
 }

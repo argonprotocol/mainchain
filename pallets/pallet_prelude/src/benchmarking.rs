@@ -6,10 +6,9 @@ mod treasury_positions;
 mod treasury_rewards;
 pub use treasury_positions::{
 	reset_benchmark_treasury_positions, BenchmarkTreasuryPositionProvider,
+	BenchmarkVaultEarningsProvider,
 };
-pub use treasury_rewards::{
-	set_benchmark_treasury_reward_payment_failure, BenchmarkTreasuryRewardProvider,
-};
+pub use treasury_rewards::BenchmarkTreasuryRewardProvider;
 
 use crate::*;
 use alloc::{
@@ -35,9 +34,10 @@ use argon_primitives::{
 	},
 	tick::{Tick, TickDigest, Ticker},
 	vault::{
-		BitcoinLockFunding, BitcoinVaultProvider, CosignerGuarantee, LostBitcoinCompensation,
-		RegistrationVaultData, ReserveSecuritizationRequest, TreasuryVaultProvider, Vault,
-		VaultError, VaultParticipationCapacity, VaultSecuritization, VaultTreasuryFrameEarnings,
+		BitcoinLockFunding, BitcoinVaultProvider, CosignRequest, CosignerGuarantee,
+		LostBitcoinCompensation, RegistrationVaultData, ReserveSecuritizationRequest,
+		TreasuryVaultProvider, Vault, VaultError, VaultParticipationCapacity, VaultSecuritization,
+		VaultTreasuryFrameEarnings,
 	},
 	ArgonCPI, CrosschainGatewayProvider, GatewayState, NotaryId, NotebookNumber, NotebookSecret,
 	OperationalRewardPayout, PriceProvider, SourceChain, VaultId, VotingSchedule,
@@ -1571,47 +1571,44 @@ where
 		))
 	}
 
-	fn update_pending_cosign_list(
+	fn update_pending_cosign(
 		vault_id: VaultId,
-		lock_id: BitcoinLockId,
+		_collect_due_frame: FrameId,
+		request: CosignRequest<Self::AccountId>,
 		should_remove: bool,
-	) -> Result<(), VaultError> {
-		mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
-			let entries = state.pending_cosigns.entry(vault_id).or_default();
-			if should_remove {
-				entries.remove(&lock_id);
-				if entries.is_empty() {
-					state.pending_cosigns.remove(&vault_id);
-				}
-			} else {
-				entries.insert(lock_id);
-			}
-			Ok(())
-		})
-	}
-
-	fn update_orphan_cosign_list(
-		vault_id: VaultId,
-		_lock_id: BitcoinLockId,
-		account_id: &Self::AccountId,
-		should_remove: bool,
-	) -> Result<(), VaultError> {
-		mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
-			let vault_entries = state.orphaned_utxo_cosigns.entry(vault_id).or_default();
-			let count = vault_entries.entry(account_id.clone()).or_default();
-			if should_remove {
-				*count = count.saturating_sub(1);
-				if *count == 0 {
-					vault_entries.remove(account_id);
-				}
-			} else {
-				*count = count.saturating_add(1);
-			}
-			if vault_entries.is_empty() {
-				state.orphaned_utxo_cosigns.remove(&vault_id);
-			}
-			Ok(())
-		})
+	) {
+		match request {
+			CosignRequest::Lock(lock_id) => {
+				mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
+					let entries = state.pending_cosigns.entry(vault_id).or_default();
+					if should_remove {
+						entries.remove(&lock_id);
+					} else {
+						entries.insert(lock_id);
+					}
+					if entries.is_empty() {
+						state.pending_cosigns.remove(&vault_id);
+					}
+				});
+			},
+			CosignRequest::Orphan { owner, .. } => {
+				mutate_benchmark_bitcoin_vault_provider_state::<AccountId, Balance, _>(|state| {
+					let entries = state.orphaned_utxo_cosigns.entry(vault_id).or_default();
+					let count = entries.entry(owner.clone()).or_default();
+					if should_remove {
+						*count = count.saturating_sub(1);
+					} else {
+						*count = count.saturating_add(1);
+					}
+					if *count == 0 {
+						entries.remove(&owner);
+					}
+					if entries.is_empty() {
+						state.orphaned_utxo_cosigns.remove(&vault_id);
+					}
+				});
+			},
+		}
 	}
 }
 

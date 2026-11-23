@@ -4,8 +4,9 @@ use super::mock::{
 	set_vault_delegate, sign_call, signed, yubikey_approval,
 };
 use crate::*;
+use argon_primitives::vault::{TreasuryVaultProvider, VaultTreasuryFrameEarnings};
 use codec::Encode;
-use frame_support::{assert_noop, assert_ok, traits::fungible::MutateHold};
+use frame_support::{assert_noop, assert_ok, traits::fungible::Balanced};
 use pallet_account_security::{
 	Authorization, Error as SecurityError, Event as SecurityEvent, NextNonce, Registrations,
 };
@@ -312,16 +313,25 @@ fn routine_crosschain_collect_requires_no_exit_approval_and_keeps_fee_refund() {
 		set_vault_delegate(1, account(1), account(5));
 		enroll(1, 2, 3);
 		let approval = council_approval(account(1));
-		assert_ok!(Balances::hold(
-			&pallet_vaults::HoldReason::PendingCollect.into(),
-			&account(1),
-			5 * ARGON
+		let amount = 5 * ARGON;
+		let mut funding = <Balances as Balanced<AccountId>>::issue(amount);
+		assert_ok!(Vaults::record_vault_frame_earnings(
+			&mut funding,
+			VaultTreasuryFrameEarnings {
+				vault_id: 1,
+				vault_operator_account_id: account(1),
+				frame_id: MiningSlot::current_frame_id(),
+				earnings: amount,
+				earnings_for_vault: amount,
+				capital_contributed: 0,
+				capital_contributed_by_vault: 0,
+			}
 		));
 		let before = Balances::free_balance(account(1));
 		let batch = RuntimeCall::Utility(pallet_utility::Call::batch_all {
 			calls: vec![
 				approval,
-				RuntimeCall::Vaults(pallet_vaults::Call::collect { vault_id: 1 }),
+				RuntimeCall::TreasuryPositions(pallet_treasury_positions::Call::collect {}),
 			],
 		});
 		assert_ok!(Executive::apply_extrinsic(signed(1, batch)).unwrap());

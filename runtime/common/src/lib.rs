@@ -168,10 +168,13 @@ macro_rules! inject_runtime_vars {
 		///
 		/// This can be a tuple of types, each implementing `OnRuntimeUpgrade`.
 		type Migrations = (
-			pallet_treasury::migrations::VirtualizeMarketingReserveMigration<Runtime>,
-			pallet_stabilizer_buys::migrations::InitializeApprovedPoolRevisionMigration<Runtime>,
-			pallet_stabilizer_pools::migrations::RemoveOpeningPriceIndicesMigration<Runtime>,
-			pallet_treasury_positions::migrations::AddCollectAmountsMigration<Runtime>,
+			pallet_treasury::migrations::CollectMigration<Runtime>,
+			// Source earnings migrations require the Positions account layout.
+			pallet_treasury_positions::migrations::BackCollectMigration<Runtime>,
+			pallet_vaults::migrations::CollectMigration<Runtime>,
+			pallet_bitcoin_locks::migrations::PendingCosignsMigration<Runtime>,
+			pallet_stabilizer_buys::migrations::CollectMigration<Runtime>,
+			pallet_stabilizer_pools::migrations::CollectMigration<Runtime>,
 		);
 
 		/// Unchecked extrinsic type as expected by this runtime.

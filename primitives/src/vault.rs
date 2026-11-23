@@ -27,7 +27,7 @@ use sp_runtime::{
 use crate::{
 	bitcoin::{
 		get_rounded_up_bitcoin_day_height, BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinLockId,
-		BitcoinXPub, CompressedBitcoinPubkey, Satoshis, SATOSHIS_PER_BITCOIN,
+		BitcoinXPub, CompressedBitcoinPubkey, Satoshis, UtxoRef, SATOSHIS_PER_BITCOIN,
 	},
 	ensure,
 	prelude::FrameId,
@@ -51,6 +51,9 @@ pub trait BitcoinVaultProviderWeightInfo {
 	fn reserve_securitization() -> Weight;
 	fn resecuritize() -> Weight;
 	fn burn() -> Weight;
+	fn update_pending_cosign() -> Weight {
+		Weight::zero()
+	}
 }
 
 impl BitcoinVaultProviderWeightInfo for () {
@@ -158,7 +161,7 @@ pub struct RegistrationVaultData<Balance> {
 	pub securitization: Balance,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Encode, Decode)]
 pub struct VaultTreasuryFrameEarnings<Balance, AccountId> {
 	pub vault_id: VaultId,
 	pub vault_operator_account_id: AccountId,
@@ -470,6 +473,17 @@ pub struct ReserveSecuritizationRequest<Balance> {
 	pub securitization_space_to_unreserve: Balance,
 }
 
+/// Identifies one pending Bitcoin signing request within a vault.
+#[derive(
+	Encode, Decode, DecodeWithMemTracking, Clone, Debug, PartialEq, Eq, TypeInfo, MaxEncodedLen,
+)]
+pub enum CosignRequest<AccountId> {
+	/// Full or partial release of a Bitcoin Lock.
+	Lock(BitcoinLockId),
+	/// Release of an orphaned output belonging to its Lock's owner.
+	Orphan { owner: AccountId, utxo_ref: UtxoRef },
+}
+
 pub trait BitcoinVaultProvider {
 	type Weights: BitcoinVaultProviderWeightInfo;
 	type Balance: Codec + Copy + TypeInfo + MaxEncodedLen + Default + AtLeast32BitUnsigned;
@@ -597,20 +611,14 @@ pub trait BitcoinVaultProvider {
 		current_height: BitcoinHeight,
 	) -> Result<(BitcoinXPub, BitcoinXPub, BitcoinCosignScriptPubkey), VaultError>;
 
-	/// Track a pending cosign for a UTXO.
-	fn update_pending_cosign_list(
+	/// Maintain the vault's signing list. `collect_due_frame` is when an unresolved request
+	/// starts blocking vault earnings; it does not change the Bitcoin signing deadline.
+	fn update_pending_cosign(
 		vault_id: VaultId,
-		lock_id: BitcoinLockId,
+		collect_due_frame: FrameId,
+		request: CosignRequest<Self::AccountId>,
 		should_remove: bool,
-	) -> Result<(), VaultError>;
-
-	/// Track an orphaned cosign request for a UTXO.
-	fn update_orphan_cosign_list(
-		vault_id: VaultId,
-		lock_id: BitcoinLockId,
-		account_id: &Self::AccountId,
-		should_remove: bool,
-	) -> Result<(), VaultError>;
+	);
 }
 
 #[derive(

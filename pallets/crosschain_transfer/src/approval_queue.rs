@@ -946,6 +946,7 @@ mod tests {
 				minting_authority_registration_signature(&authority_pair, &authority_account),
 				4_000,
 				0,
+				None,
 			));
 
 			let authority = MintingAuthoritiesBySigner::<Test>::get(authority_signing_key)
@@ -1089,6 +1090,7 @@ mod tests {
 				),
 				4_000,
 				100,
+				None,
 			));
 			assert_ok!(CrosschainTransfer::register_minting_authority(
 				RuntimeOrigin::signed(original_council_account.clone()),
@@ -1100,6 +1102,7 @@ mod tests {
 				),
 				3_000,
 				50,
+				None,
 			));
 			assert_ok!(CrosschainTransfer::approve_queue_entries(
 				RuntimeOrigin::signed(original_council_account.clone()),
@@ -1220,6 +1223,7 @@ mod tests {
 				),
 				10_000,
 				300,
+				None,
 			));
 			assert_noop!(
 				CrosschainTransfer::approve_queue_entries(
@@ -1334,6 +1338,7 @@ mod tests {
 				),
 				10_000,
 				300,
+				None,
 			));
 
 			let queue_entry = CouncilApprovalQueueByDestinationChainAndNonce::<Test>::get(
@@ -1456,6 +1461,7 @@ mod tests {
 				),
 				10_000,
 				200,
+				None,
 			));
 			assert_ok!(CrosschainTransfer::register_minting_authority(
 				RuntimeOrigin::signed(owner_vault_operator.clone()),
@@ -1467,6 +1473,7 @@ mod tests {
 				),
 				10_000,
 				100,
+				None,
 			));
 
 			let result = CrosschainTransfer::approve_queue_entries(
@@ -1576,6 +1583,7 @@ mod tests {
 				),
 				4_000,
 				100,
+				None,
 			));
 
 			let queued_approving_council_hash = CouncilApprovalQueueByDestinationChainAndNonce::<
@@ -1688,6 +1696,7 @@ mod tests {
 				),
 				4_000,
 				100,
+				None,
 			));
 			assert_ok!(CrosschainTransfer::register_minting_authority(
 				RuntimeOrigin::signed(original_council_account.clone()),
@@ -1699,6 +1708,7 @@ mod tests {
 				),
 				3_000,
 				50,
+				None,
 			));
 			assert_ok!(CrosschainTransfer::approve_queue_entries(
 				RuntimeOrigin::signed(original_council_account.clone()),

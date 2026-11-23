@@ -20,6 +20,7 @@ frame_support::construct_runtime!(
 	pub enum Test {
 		System: frame_system,
 		Balances: pallet_balances,
+		TreasuryPositions: pallet_treasury_positions,
 		StabilizerBuys: pallet_stabilizer_buys,
 	}
 );
@@ -53,8 +54,6 @@ parameter_types! {
 	});
 	pub static FailReserve: bool = false;
 	pub static FailReturn: bool = false;
-	pub static FailCommitAt: Option<Balance> = None;
-	pub static FailPaymentFor: Option<u64> = None;
 	pub Pool: PurchasePool = PurchasePool {
 		chain_id: 1,
 		pool_manager: H160::repeat_byte(1),
@@ -77,13 +76,7 @@ impl MiningFrameTransitionProvider for Frame {
 }
 
 pub struct Budget;
-impl Budget {
-	pub fn outstanding_rewards() -> Balance {
-		unhashed::get(b"test_treasury_outstanding_rewards").unwrap_or(0)
-	}
-}
-
-impl TreasuryRewardProvider<u64> for Budget {
+impl TreasuryRewardProvider for Budget {
 	type Balance = Balance;
 	type Weights = ();
 
@@ -97,35 +90,12 @@ impl TreasuryRewardProvider<u64> for Budget {
 		ensure!(!FailReserve::get(), DispatchError::Other("reserve failed"));
 		Ok(())
 	}
-	fn commit_reward(amount: Balance) -> DispatchResult {
-		let outstanding = Self::outstanding_rewards()
-			.checked_add(amount)
-			.ok_or(ArithmeticError::Overflow)?;
-		unhashed::put(b"test_treasury_outstanding_rewards", &outstanding);
-		if let Some(limit) = FailCommitAt::get() {
-			ensure!(outstanding < limit, DispatchError::Other("commit failed"));
-		}
-		Ok(())
-	}
 	fn return_budget(amount: Balance) -> DispatchResult {
 		let available =
 			Self::available_budget().checked_add(amount).ok_or(ArithmeticError::Overflow)?;
 		unhashed::put(b"test_liquidity_buy_budget", &available);
 		ensure!(!FailReturn::get(), DispatchError::Other("return failed"));
 		Ok(())
-	}
-	fn pay_reward(account: &u64, amount: Balance) -> Result<Balance, DispatchError> {
-		let outstanding = Self::outstanding_rewards()
-			.checked_sub(amount)
-			.ok_or(ArithmeticError::Underflow)?;
-		unhashed::put(b"test_treasury_outstanding_rewards", &outstanding);
-		let paid = match Balances::mint_into(account, amount) {
-			Ok(paid) => paid,
-			Err(error) if error == TokenError::BelowMinimum.into() => 0,
-			Err(error) => return Err(error),
-		};
-		ensure!(FailPaymentFor::get() != Some(*account), DispatchError::Other("payment failed"));
-		Ok(paid)
 	}
 }
 
@@ -137,6 +107,7 @@ impl Get<FrameId> for Frame {
 
 impl Config for Test {
 	type Currency = Balances;
+	type PositionProvider = TreasuryPositions;
 	type FissionsProvider = Repayments;
 	type MiningFrameTransitionProvider = Frame;
 	type TickProvider = CurrentTick;
@@ -155,10 +126,31 @@ impl Config for Test {
 	type WeightInfo = ();
 }
 
+impl pallet_treasury_positions::Config for Test {
+	type Balance = Balance;
+	type Currency = Balances;
+	type OperationalAccountProvider = ();
+	type BitcoinPositionProvider = ();
+	type TreasuryPoolProvider = ();
+	type EarningsSettlementProvider = ();
+	type VaultEarningsProvider = ();
+	type PalletId = TreasuryPositionsPalletId;
+	type MiningFrameTransitionProvider = Frame;
+	type MaxEarningChangesPerCall = ConstU32<16>;
+	type WeightInfo = ();
+}
+
 parameter_types! {
+	pub const TreasuryPositionsPalletId: PalletId = PalletId(*b"arg/colt");
 	pub const InclusionPercent: Percent = Percent::from_percent(90);
 	pub const PurchaseHoldFrames: FrameId = 30;
 	pub const RepaymentRewardPercent: Percent = Percent::from_percent(5);
+}
+
+pub fn collect_accrued(account: u64) -> argon_primitives::treasury::CollectAmounts<Balance> {
+	pallet_treasury_positions::PositionsByAccount::<Test>::get(account)
+		.unwrap_or_default()
+		.collect_accrued
 }
 
 pub fn new_test_ext() -> TestState {
@@ -183,6 +175,8 @@ pub fn new_test_ext() -> TestState {
 	});
 	ext.execute_with(|| {
 		System::set_block_number(1);
+		StorageVersion::new(4).put::<TreasuryPositions>();
+		assert_ok!(TreasuryPositions::prepare_collect());
 		LastGatewayState::set(None);
 		ApprovedPool::<Test>::put(Pool::get());
 		CurrentFrame::set(1);
@@ -201,8 +195,6 @@ pub fn new_test_ext() -> TestState {
 		CurrentTick::set(1_000);
 		FailReserve::set(false);
 		FailReturn::set(false);
-		FailCommitAt::set(None);
-		FailPaymentFor::set(None);
 		unhashed::put(b"test_liquidity_buy_budget", &100_000_000u128);
 	});
 	ext

@@ -1,10 +1,14 @@
 use argon_primitives::{
 	providers::{
-		CollectBlockerProvider, OperationalAccountProvider, OperationalAccountProviderWeightInfo,
-		OperationalAccountsHook, OperationalAccountsHookWeightInfo, TickProvider,
-		TickProviderWeightInfo, TreasuryPoolProvider, TreasuryPoolProviderWeightInfo,
+		CollectBlockerProvider, CollectBlockerProviderWeightInfo, OperationalAccountProvider,
+		OperationalAccountProviderWeightInfo, OperationalAccountsHook,
+		OperationalAccountsHookWeightInfo, TickProvider, TickProviderWeightInfo,
+		TreasuryPoolProvider, TreasuryPoolProviderWeightInfo,
 	},
-	treasury::{TreasuryPositionProvider, TreasuryPositionProviderWeightInfo},
+	treasury::{
+		TreasuryPositionProvider, TreasuryPositionProviderWeightInfo,
+		VaultEarningsProviderWeightInfo,
+	},
 	vault::{
 		BitcoinVaultProviderWeightInfo, TreasuryVaultProviderWeightInfo,
 		MAX_SECURITIZATION_RELEASE_SCHEDULE_ENTRIES,
@@ -15,6 +19,13 @@ use pallet_prelude::*;
 
 /// Weight functions needed for pallet_vaults.
 pub trait WeightInfo {
+	fn provider_update_pending_cosign() -> Weight {
+		Weight::zero()
+	}
+	fn provider_remove_pending_cosign() -> Weight {
+		Weight::zero()
+	}
+	fn provider_collect_earnings() -> Weight;
 	fn provider_get_vault_operator() -> Weight {
 		Weight::zero()
 	}
@@ -33,7 +44,6 @@ pub trait WeightInfo {
 		height_range: u32,
 		bitcoin_release_vault_count: u32,
 	) -> Weight;
-	fn collect() -> Weight;
 	fn on_frame_start(vault_count: u32) -> Weight;
 	fn provider_get_registration_vault_data() -> Weight;
 	fn provider_get_committed_securitization() -> Weight;
@@ -109,9 +119,20 @@ where
 	T: crate::Config,
 	Base: WeightInfo,
 	TickProviderWeight: TickProviderWeightInfo,
-	CollectBlockerWeight: argon_primitives::CollectBlockerProviderWeightInfo,
+	CollectBlockerWeight: CollectBlockerProviderWeightInfo,
 	OperationalAccountProviderWeight: OperationalAccountProviderWeightInfo,
 {
+	fn provider_update_pending_cosign() -> Weight {
+		Base::provider_update_pending_cosign()
+	}
+	fn provider_remove_pending_cosign() -> Weight {
+		Base::provider_remove_pending_cosign()
+	}
+
+	fn provider_collect_earnings() -> Weight {
+		Base::provider_collect_earnings()
+			.saturating_add(CollectBlockerWeight::has_overdue_collect_blocker())
+	}
 	fn provider_get_participation_capacity() -> Weight {
 		Base::provider_get_participation_capacity()
 			.saturating_add(TickProviderWeight::current_tick())
@@ -167,12 +188,13 @@ where
 			)
 	}
 
-	fn collect() -> Weight {
-		Base::collect().saturating_add(CollectBlockerWeight::has_overdue_collect_blocker())
-	}
-
 	fn on_frame_start(vault_count: u32) -> Weight {
-		Base::on_frame_start(vault_count).saturating_add(TickProviderWeight::current_tick())
+		Base::on_frame_start(vault_count)
+			.saturating_add(TickProviderWeight::current_tick())
+			.saturating_add(
+				PositionWeights::<T>::expire_vault_earnings()
+					.saturating_mul(u64::from(vault_count).saturating_mul(12)),
+			)
 	}
 
 	fn provider_get_registration_vault_data() -> Weight {
@@ -227,11 +249,17 @@ where
 			.saturating_add(TickProviderWeight::current_tick())
 			.saturating_add(OperationalAccountsHookWeights::<T>::vault_bitcoin_lock_funded())
 			.saturating_add(PositionWeights::<T>::network_securitized_satoshis_updated())
+			.saturating_add(PositionWeights::<T>::prepare_collect())
+			.saturating_add(PositionWeights::<T>::record_funding())
+			.saturating_add(PositionWeights::<T>::accrue())
 	}
 
 	fn provider_reserve_securitization(release_schedule_entries: u32) -> Weight {
 		Base::provider_reserve_securitization(release_schedule_entries)
 			.saturating_add(TickProviderWeight::current_tick())
+			.saturating_add(PositionWeights::<T>::prepare_collect())
+			.saturating_add(PositionWeights::<T>::record_funding())
+			.saturating_add(PositionWeights::<T>::accrue())
 	}
 
 	fn provider_resecuritize_unfunded(release_schedule_entries: u32) -> Weight {
@@ -255,6 +283,9 @@ where
 
 	fn provider_record_vault_frame_earnings() -> Weight {
 		Base::provider_record_vault_frame_earnings()
+			.saturating_add(PositionWeights::<T>::prepare_collect())
+			.saturating_add(PositionWeights::<T>::record_funding())
+			.saturating_add(PositionWeights::<T>::accrue())
 	}
 }
 
@@ -289,6 +320,10 @@ impl<T: crate::Config> TreasuryVaultProviderWeightInfo for ProviderWeightAdapter
 
 pub struct ProviderWeightAdapter<T>(PhantomData<T>);
 impl<T: crate::Config> BitcoinVaultProviderWeightInfo for ProviderWeightAdapter<T> {
+	fn update_pending_cosign() -> Weight {
+		<T as crate::Config>::WeightInfo::provider_update_pending_cosign()
+			.max(<T as crate::Config>::WeightInfo::provider_remove_pending_cosign())
+	}
 	fn is_owner() -> Weight {
 		// Both queries read the same bounded Vault value. This benchmark also compares
 		// the returned operator, covering the ownership equality check.
@@ -353,6 +388,9 @@ impl<T: crate::Config> BitcoinVaultProviderWeightInfo for ProviderWeightAdapter<
 
 // For backwards compatibility and tests.
 impl WeightInfo for () {
+	fn provider_collect_earnings() -> Weight {
+		Weight::zero()
+	}
 	fn provider_record_bitcoin_lock_funding() -> Weight {
 		Weight::zero()
 	}
@@ -391,9 +429,6 @@ impl WeightInfo for () {
 		_height_range: u32,
 		_bitcoin_release_vault_count: u32,
 	) -> Weight {
-		Weight::zero()
-	}
-	fn collect() -> Weight {
 		Weight::zero()
 	}
 	fn on_frame_start(_vault_count: u32) -> Weight {
@@ -449,5 +484,13 @@ impl WeightInfo for () {
 	}
 	fn provider_record_vault_frame_earnings() -> Weight {
 		Weight::zero()
+	}
+}
+
+/// Vault source bookkeeping and authorization, excluding Positions payment.
+pub struct VaultEarningsWeights<T>(PhantomData<T>);
+impl<T: crate::Config> VaultEarningsProviderWeightInfo for VaultEarningsWeights<T> {
+	fn collect_earnings() -> Weight {
+		T::WeightInfo::provider_collect_earnings()
 	}
 }

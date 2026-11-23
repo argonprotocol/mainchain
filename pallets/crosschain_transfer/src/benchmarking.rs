@@ -18,7 +18,8 @@ use argon_primitives::{
 	},
 	vault::{Vault, VaultTerms},
 	CallTxPoolKeyProvider, CallTxValidityProvider, EthereumAccountStorageProof, EthereumLog,
-	EthereumReceiptLog, EthereumStorageSlotProof, UniswapTransferProvider, VaultId,
+	EthereumReceiptLog, EthereumStorageSlotProof, TreasuryPoolProvider, UniswapTransferProvider,
+	VaultId,
 };
 use pallet_prelude::benchmarking::{
 	reset_benchmark_bitcoin_vault_provider_state, reset_benchmark_mining_clock,
@@ -452,6 +453,7 @@ mod benchmarks {
 			signature,
 			20_000u128.into(),
 			T::Balance::default(),
+			Some((0..u64::from(<T::TreasuryPoolProvider as TreasuryPoolProvider<T::AccountId>>::MaxBondCollateralLots::get())).collect::<Vec<_>>().try_into().unwrap()),
 		);
 
 		assert!(MintingAuthoritiesBySigner::<T>::contains_key(authority_signer));

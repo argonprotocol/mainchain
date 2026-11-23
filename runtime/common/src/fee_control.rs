@@ -20,7 +20,10 @@ macro_rules! vault_admin_fee_refund_policy {
 
 		impl VaultAdminFeeRefundPolicy {
 			fn is_collect_call(call: &RuntimeCall) -> bool {
-				matches!(call, RuntimeCall::Vaults(pallet_vaults::Call::collect { .. }))
+				matches!(
+					call,
+					RuntimeCall::TreasuryPositions(pallet_treasury_positions::Call::collect {})
+				)
 			}
 
 			fn is_collect_prerequisite_call(call: &RuntimeCall) -> bool {
@@ -43,7 +46,9 @@ macro_rules! vault_admin_fee_refund_policy {
 			#[cfg(feature = "runtime-benchmarks")]
 			fn benchmark_call(count: u32) -> Option<RuntimeCall> {
 				let calls = (0..count)
-					.map(|_| RuntimeCall::Vaults(pallet_vaults::Call::collect { vault_id: 1 }))
+					.map(|_| {
+						RuntimeCall::TreasuryPositions(pallet_treasury_positions::Call::collect {})
+					})
 					.collect();
 				Some(RuntimeCall::Utility(pallet_utility::Call::batch_all { calls }))
 			}

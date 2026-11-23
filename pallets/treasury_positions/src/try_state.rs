@@ -6,10 +6,25 @@ pub(crate) fn check<T: Config>() -> Result<(), sp_runtime::TryRuntimeError> {
 		"Treasury Positions storage version must match the runtime before checking state"
 	);
 
+	let checked_total = |amounts: CollectAmounts<T::Balance>| {
+		amounts
+			.bond_earnings
+			.checked_add(&amounts.stake_earnings)
+			.and_then(|total| total.checked_add(&amounts.bitcoin_earnings))
+			.and_then(|total| total.checked_add(&amounts.stabilizer_pool_earnings))
+			.and_then(|total| total.checked_add(&amounts.stabilizer_buy_earnings))
+			.and_then(|total| total.checked_add(&amounts.liquid_repayment_earnings))
+			.and_then(|total| total.checked_add(&amounts.vault_earnings))
+			.ok_or("Collect amount totals overflow")
+	};
+	let mut accrued = T::Balance::zero();
 	let mut bonds = 0u128;
 	let mut stakes = 0u128;
 	let mut fission_liquidity = T::Balance::zero();
 	for position in PositionsByAccount::<T>::iter_values() {
+		accrued = accrued
+			.checked_add(&checked_total(position.collect_accrued)?)
+			.ok_or("Collect account accrual overflows")?;
 		bonds = bonds
 			.checked_add(position.quantities.bonds)
 			.ok_or("Treasury Positions account bond quantities overflow")?;
@@ -30,6 +45,25 @@ pub(crate) fn check<T: Config>() -> Result<(), sp_runtime::TryRuntimeError> {
 				"Treasury Positions activated upstream securitization exceeds its allocation"
 			);
 		}
+	}
+
+	let funding = CollectTotals::<T>::get();
+	let outstanding = checked_total(funding.funded)?
+		.checked_sub(&checked_total(funding.collected)?)
+		.and_then(|total| total.checked_sub(&funding.expired_vault_earnings))
+		.ok_or("Collected amounts exceed Collect funding")?;
+	let pending = checked_total(PendingCollectBacking::<T>::get().unwrap_or_default())?;
+	let liabilities = outstanding.checked_add(&pending).ok_or("Collect obligations overflow")?;
+	ensure!(accrued <= liabilities, "Account accrual exceeds Collect backing");
+
+	if !outstanding.is_zero() {
+		let required = outstanding
+			.checked_add(&T::Currency::minimum_balance())
+			.ok_or("Collect backing overflows")?;
+		ensure!(
+			T::Currency::balance(&Pallet::<T>::account_id()) >= required,
+			"Collect custody is underfunded"
+		);
 	}
 
 	// Vault coverage is maintained separately by canonical Vault updates, not account
@@ -58,7 +92,7 @@ mod tests {
 
 	#[test]
 	fn try_state_reconciles_quantities_after_updates_and_releases() {
-		polkadot_sdk::sp_io::TestExternalities::default().execute_with(|| {
+		new_test_ext().execute_with(|| {
 			STORAGE_VERSION.put::<TreasuryPositions>();
 			assert_ok!(TreasuryPositions::try_state(1));
 			assert_ok!(TreasuryPositions::account_quantity_updated(
@@ -123,7 +157,7 @@ mod tests {
 
 	#[test]
 	fn try_state_rejects_drift_in_each_network_quantity() {
-		polkadot_sdk::sp_io::TestExternalities::default().execute_with(|| {
+		new_test_ext().execute_with(|| {
 			STORAGE_VERSION.put::<TreasuryPositions>();
 			assert_ok!(TreasuryPositions::account_quantity_updated(
 				&1,
@@ -170,7 +204,7 @@ mod tests {
 
 	#[test]
 	fn try_state_rejects_impossible_upstream_subsets() {
-		polkadot_sdk::sp_io::TestExternalities::default().execute_with(|| {
+		new_test_ext().execute_with(|| {
 			STORAGE_VERSION.put::<TreasuryPositions>();
 			assert_ok!(TreasuryPositions::bond_position_updated(&9, 3, 0, 100));
 			PositionsByAccount::<Test>::mutate(9, |position| {
@@ -194,8 +228,48 @@ mod tests {
 	}
 
 	#[test]
+	fn try_state_checks_implicit_index_backing_and_counter_overflow() {
+		new_test_ext().execute_with(|| {
+			CurrentFrame::set(0);
+			assert_ok!(TreasuryPositions::account_quantity_updated(
+				&9,
+				PositionQuantity::Bonds,
+				0u128,
+				1u128
+			));
+			index_frame(
+				1,
+				PositionQuantities { bonds: 1, ..Default::default() },
+				CollectAmounts { bond_earnings: 10, ..Default::default() },
+			);
+			assert_eq!(PositionsByAccount::<Test>::get(9).unwrap().collect_accrued.total(), 0);
+			assert_ok!(TreasuryPositions::try_state(1));
+
+			assert_ok!(Balances::transfer(
+				&TreasuryPositions::account_id(),
+				&1,
+				10,
+				Preservation::Preserve
+			));
+			assert_eq!(
+				TreasuryPositions::try_state(1),
+				Err("Collect custody is underfunded".into())
+			);
+
+			CollectTotals::<Test>::mutate(|totals| {
+				totals.funded.bond_earnings = u128::MAX;
+				totals.funded.stake_earnings = 1;
+			});
+			assert_eq!(
+				TreasuryPositions::try_state(1),
+				Err("Collect amount totals overflow".into())
+			);
+		});
+	}
+
+	#[test]
 	fn try_state_rejects_old_storage_before_decoding_current_records() {
-		polkadot_sdk::sp_io::TestExternalities::default().execute_with(|| {
+		new_test_ext().execute_with(|| {
 			StorageVersion::new(1).put::<TreasuryPositions>();
 			frame_support::storage::unhashed::put_raw(
 				&NetworkTotals::<Test>::hashed_key(),

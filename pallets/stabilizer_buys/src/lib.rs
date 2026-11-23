@@ -1,12 +1,12 @@
-//! Purchase reward auctions with account-owned principal holds and scheduled payouts.
+//! Purchase reward auctions with account-owned principal holds and backed Collect earnings.
 //! Treasury funds ordinary rewards; Liquid repayment bonuses are funded independently by burns.
 //!
 //! Purchases accumulate in frame F. The frame hook reserves funding for bidding in F+1, then
 //! closes bidding when F+2 starts. Principal matures at admission frame F+30.
 //!
-//! At maturity, `on_initialize` allocates ranked bids into payable rewards, then pays due accounts.
-//! Both queues advance in bounded steps. Principal can be paid before a delayed reward allocation;
-//! that allocation schedules the account again when its reward is ready.
+//! At maturity, `on_initialize` allocates ranked bids, backs rewards in Collect and releases
+//! principal. Auction allocation and principal/repayment processing each have a per-block work
+//! limit. Awards remain in the shared Collect record until their owners collect them.
 //! Bids consume matching-basis inclusion capacity before their requested rate is applied. Lower
 //! rates save reward funding without admitting matching basis beyond the auction's cutoff.
 //! Purchases enter at 100% without a submitted bid. Burn bonuses follow the share of each buyer's
@@ -19,16 +19,13 @@ use alloc::vec::Vec;
 use argon_primitives::{
 	amount_rank::AmountRankId,
 	bitcoin::{LiquidId, LiquidRepayPrices},
+	treasury::{CollectSource, TreasuryPositionProvider},
 	AmountRankKey, AscendingRankKey, BitcoinFissionsProvider, CrosschainGatewayProvider,
 	LiquidRepaymentProvider, MiningFrameTransitionProvider,
 	MiningFrameTransitionProviderWeightInfo, OnNewSlot, StabilizerPoolPriceSource,
 	StabilizerPoolPriceSourceProvider, TickProvider, UniswapPoolIdentity,
 };
-use frame_support::{
-	require_transactional,
-	traits::tokens::{DepositConsequence, Provenance},
-	transactional,
-};
+use frame_support::{require_transactional, transactional};
 use pallet_prelude::*;
 use polkadot_sdk::{
 	sp_arithmetic::{helpers_128bit::multiply_by_rational_with_rounding, Rounding},
@@ -70,6 +67,8 @@ pub mod pallet {
 		type Currency: Inspect<Self::AccountId, Balance = Balance>
 			+ Mutate<Self::AccountId>
 			+ MutateHold<Self::AccountId, Reason: From<HoldReason>>;
+		/// Backs and accrues earned buy rewards and repayment bonuses in the shared Collect record.
+		type PositionProvider: TreasuryPositionProvider<Self::AccountId, Balance>;
 		/// Frame transitions must invoke this pallet's OnNewSlot exactly once for every frame.
 		type MiningFrameTransitionProvider: MiningFrameTransitionProvider;
 		/// Network clock used for purchase pricing and source-time history retention.
@@ -85,17 +84,17 @@ pub mod pallet {
 		/// Maximum frame visits per repayment attempt; a partial frame visit also reads one tick.
 		#[pallet::constant]
 		type MaxPriceWindowSteps: Get<u32>;
-		/// Treasury owns available funding, outstanding rewards and payout delivery.
-		type TreasuryRewardProvider: TreasuryRewardProvider<Self::AccountId, Balance = Balance>;
+		/// Treasury reserves auction budgets and receives unused funding back.
+		type TreasuryRewardProvider: TreasuryRewardProvider<Balance = Balance>;
 		/// Fissions owns position selection, repayment pricing and actual burns.
 		type FissionsProvider: BitcoinFissionsProvider<Self::AccountId, Balance>;
 		/// Maximum account/frame purchase buckets visited in one account payout.
 		/// This bounds work, without limiting the number of purchases an account can hold.
 		#[pallet::constant]
 		type MaxFramesPerPayout: Get<u32>;
-		/// Maximum work in each automatic stage per block: ranked bid decisions, then account
-		/// payout attempts. Failures and empty-auction completion consume work; excess stays
-		/// queued.
+		/// Maximum work in each automatic stage per block: ranked bid decisions, then principal
+		/// release and repayment attempts. Failures and empty-auction completion consume work;
+		/// excess stays queued.
 		#[pallet::constant]
 		type MaxPayoutsPerBlock: Get<u32>;
 		/// Positive submissions per account and auction; four allows an initial bid and three
@@ -224,10 +223,11 @@ pub mod pallet {
 	#[pallet::storage]
 	pub type Auctions<T> = StorageMap<_, Twox64Concat, FrameId, Auction>;
 
-	/// Unpaid ordinary rewards and the account's single scheduled payout visit, across frames.
+	/// Frame of the account's next principal release or Liquid repayment attempt, including
+	/// retries. Each entry owns one System provider reference.
 	#[pallet::storage]
-	pub type PayoutStateByAccount<T: Config> =
-		StorageMap<_, Blake2_128Concat, T::AccountId, AccountPayoutState, ValueQuery>;
+	pub type NextSettlementFrameByAccount<T: Config> =
+		StorageMap<_, Blake2_128Concat, T::AccountId, FrameId, OptionQuery>;
 
 	/// Aggregated discounts, shared bid and ordinary principal for each account/admission frame.
 	/// Ordered frame bytes let payout visits select the oldest buckets with bounded work.
@@ -260,8 +260,8 @@ pub mod pallet {
 	pub type AuctionAllocationQueue<T> =
 		StorageMap<_, Identity, AscendingRankKey<FrameId>, (), OptionQuery>;
 
-	/// One scheduled visit per account, ordered by frame then account. Purchase buckets and the
-	/// reward record retain unpaid funds while this index selects bounded work.
+	/// One principal/repayment visit per account, ordered by frame then account. Purchase holds
+	/// and repayment records retain funds while this index selects bounded work.
 	#[pallet::storage]
 	pub type PayoutQueue<T: Config> =
 		StorageMap<_, Identity, AscendingRankKey<T::AccountId>, (), OptionQuery>;
@@ -294,11 +294,11 @@ pub mod pallet {
 			reason: IneligibleReason,
 		},
 		PayoutCompleted {
-			/// Owner receiving the mature funds.
+			/// Owner whose mature principal and rewards were settled.
 			account: T::AccountId,
 			/// Microgons released from the principal hold.
 			principal: Balance,
-			/// Total microgons paid from ordinary buy rewards and the Liquid repayment bonus.
+			/// Repayment bonus microgons backed in Collect during this visit.
 			reward: Balance,
 		},
 		PayoutFailed {
@@ -340,7 +340,7 @@ pub mod pallet {
 			account: T::AccountId,
 			/// Admission frame identifying the auction.
 			admission_frame: FrameId,
-			/// Exact microgons committed to the reward, still unissued.
+			/// Exact microgons funded and accrued for Collect.
 			amount: Balance,
 			/// Original maturity frame shared with principal.
 			matures_at_frame: FrameId,
@@ -390,7 +390,7 @@ pub mod pallet {
 			account: T::AccountId,
 			/// Purchase cohort whose auction determines the awarded fraction.
 			admission_frame: FrameId,
-			/// Additional microgons paid in this settlement, independently of Treasury funding.
+			/// Additional microgons backed in Collect, independently of Treasury funding.
 			amount: Balance,
 		},
 	}
@@ -469,16 +469,13 @@ pub mod pallet {
 				}
 
 				if let Err(error) = Self::payout_account(&account, liquid_repay) {
-					let mut payout_state = PayoutStateByAccount::<T>::get(&account);
-
 					let retry_frame = now.saturating_add(1);
 					PayoutQueue::<T>::remove(rank);
 					PayoutQueue::<T>::insert(
 						AscendingRankKey::new(retry_frame, account.clone()),
 						(),
 					);
-					payout_state.next_payout_frame = Some(retry_frame);
-					PayoutStateByAccount::<T>::insert(&account, payout_state);
+					NextSettlementFrameByAccount::<T>::insert(&account, retry_frame);
 					Self::deposit_event(Event::PayoutFailed { account, error });
 				}
 			}
@@ -494,10 +491,7 @@ pub mod pallet {
 						.saturating_mul(repayments.into()),
 				)
 				.saturating_add(T::WeightInfo::process_auctions(T::MaxPayoutsPerBlock::get()))
-				.saturating_add(
-					T::WeightInfo::process_payouts(T::MaxPayoutsPerBlock::get())
-						.max(T::WeightInfo::process_payouts_failed(T::MaxPayoutsPerBlock::get())),
-				)
+				.saturating_add(T::WeightInfo::process_payouts(T::MaxPayoutsPerBlock::get()))
 		}
 
 		fn integrity_test() {
@@ -682,8 +676,12 @@ impl<T: Config> UniswapPurchaseProvider<T::AccountId> for Pallet<T> {
 			},
 		};
 
-		if !PayoutStateByAccount::<T>::contains_key(account) {
-			Self::save_account_payout_state(account, Some(AccountPayoutState::default()))?;
+		if !NextSettlementFrameByAccount::<T>::contains_key(account) {
+			frame_system::Pallet::<T>::inc_providers(account);
+			NextSettlementFrameByAccount::<T>::insert(
+				account,
+				admission_frame.saturating_add(T::PurchaseHoldFrames::get()),
+			);
 		}
 
 		let mut auction = Auctions::<T>::get(admission_frame).unwrap_or(Auction {
@@ -756,7 +754,7 @@ impl<T: Config> UniswapPurchaseProvider<T::AccountId> for Pallet<T> {
 
 		Auctions::<T>::insert(admission_frame, auction);
 		BuysByAccountAndFrame::<T>::insert(account, frame_key, frame_buys);
-		Self::save_and_schedule_account(account, PayoutStateByAccount::<T>::get(account))?;
+		Self::schedule_account(account)?;
 
 		Self::deposit_event(Event::PurchaseRecorded {
 			account: account.clone(),
@@ -891,14 +889,14 @@ impl<T: Config> Pallet<T> {
 		due
 	}
 
-	/// Burn one held purchase's repayment and return its unused principal and burn-funded bonus.
-	/// The caller releases principal and pays any receivable bonus in the same payout transaction.
+	/// Burn one held purchase's repayment, retain unused principal and return its bonus.
+	/// The caller releases principal and backs the bonus in Collect in the same transaction.
 	#[require_transactional]
 	fn settle_liquid_repay(
 		account: &T::AccountId,
 		gateway_activity_nonce: u64,
 		repay: LiquidRepay,
-	) -> Result<(Balance, Balance), DispatchError> {
+	) -> Result<Balance, DispatchError> {
 		let frame = T::MiningFrameTransitionProvider::get_current_frame_id();
 		ensure!(
 			frame >= repay.admission_frame.saturating_add(T::PurchaseHoldFrames::get()),
@@ -941,6 +939,7 @@ impl<T: Config> Pallet<T> {
 		let liquid_reward = awarded_reward_fraction
 			.saturating_mul_int(repay.eligible_reward_percent.mul_floor(burned_microgons));
 
+		frame_buys.principal.saturating_accrue(unused_principal);
 		frame_buys.pending_liquid_repays.saturating_reduce(1);
 		BuysByAccountAndFrame::<T>::insert(account, frame_key, frame_buys);
 		LiquidRepaysByAccountAndGatewayNonce::<T>::remove(
@@ -961,7 +960,7 @@ impl<T: Config> Pallet<T> {
 			liquid_id: repay.liquid_id,
 			microgons_burned: burned_microgons,
 		});
-		Ok((unused_principal, liquid_reward))
+		Ok(liquid_reward)
 	}
 
 	fn eligible_discount(
@@ -1046,10 +1045,12 @@ impl<T: Config> Pallet<T> {
 			}
 
 			if ordinary_reward > 0 {
-				T::TreasuryRewardProvider::commit_reward(ordinary_reward)?;
-				let mut payout_state = PayoutStateByAccount::<T>::get(&account);
-				payout_state.payable_reward.saturating_accrue(ordinary_reward);
-				Self::save_and_schedule_account(&account, payout_state)?;
+				T::PositionProvider::fund(CollectSource::StabilizerBuys, ordinary_reward)?;
+				T::PositionProvider::accrue(
+					&account,
+					CollectSource::StabilizerBuys,
+					ordinary_reward,
+				)?;
 				auction.remaining_budget.saturating_reduce(ordinary_reward);
 				Self::deposit_event(Event::RewardAwarded {
 					account: account.clone(),
@@ -1075,7 +1076,7 @@ impl<T: Config> Pallet<T> {
 		Ok(())
 	}
 
-	/// Pay an account after the hook has excluded any due repayment still waiting for its window
+	/// Settle an account after the hook has excluded any due repayment still waiting for its window
 	/// or this block's work allowance. All financial effects share this transaction.
 	/// `None` means the account has no due repayment.
 	#[transactional]
@@ -1094,16 +1095,17 @@ impl<T: Config> Pallet<T> {
 		}
 
 		// Settle one Liquid repayment, then collect the account's mature ordinary-buy principal.
-		let (mut principal, liquid_reward) = if let Some((nonce, repay)) = liquid_repay {
+		let liquid_reward = if let Some((nonce, repay)) = liquid_repay {
 			let admission_frame = repay.admission_frame;
-			let (principal, liquid_reward) = Self::settle_liquid_repay(account, nonce, repay)?;
-			(principal, Some((admission_frame, liquid_reward)))
+			let reward = Self::settle_liquid_repay(account, nonce, repay)?;
+			Some((admission_frame, reward))
 		} else {
-			(0, None)
+			None
 		};
 
+		let mut principal = 0u128;
 		let mut mature_frame_buys = Vec::new();
-		for (frame_key, frame_buys) in BuysByAccountAndFrame::<T>::iter_prefix(account)
+		for (frame_key, mut frame_buys) in BuysByAccountAndFrame::<T>::iter_prefix(account)
 			.take(T::MaxFramesPerPayout::get() as usize)
 		{
 			let auction = Auctions::<T>::get(FrameId::from_ordered(&frame_key))
@@ -1113,184 +1115,99 @@ impl<T: Config> Pallet<T> {
 			}
 			principal.saturating_accrue(frame_buys.principal);
 
-			let awaiting_reward = frame_buys.principal == 0 &&
-				!frame_buys.bid_rate.is_zero() &&
-				auction.remaining_budget > 0 &&
-				BidsByAuction::<T>::contains_key(
-					FrameId::from_ordered(&frame_key),
-					(
-						frame_buys.bid_rate,
-						AmountRankKey::new(
-							auction.matching_rate.mul_floor(frame_buys.captured_discount),
-							account.clone(),
-						),
-					),
-				);
-			mature_frame_buys.push((frame_key, frame_buys, awaiting_reward));
+			frame_buys.principal = 0;
+			mature_frame_buys.push((frame_key, frame_buys));
 		}
 
-		let mut payout_state = PayoutStateByAccount::<T>::get(account);
-		let treasury_reward = payout_state.payable_reward;
-		let payout_attempted = principal > 0 ||
-			treasury_reward > 0 ||
-			liquid_reward.is_some_and(|(_, amount)| amount > 0);
-		if !payout_attempted && mature_frame_buys.is_empty() {
-			return Self::save_and_schedule_account(account, payout_state);
+		let repayment_bonus = liquid_reward.map_or(0, |(_, amount)| amount);
+		if mature_frame_buys.is_empty() && repayment_bonus == 0 {
+			return Self::schedule_account(account);
 		}
 
-		// Deliver principal and both reward sources, accounting for unreceivable dust.
-		let (principal, total_reward) =
-			Self::pay_principal_and_rewards(account, principal, treasury_reward, liquid_reward)?;
+		if let Some((admission_frame, amount)) = liquid_reward &&
+			amount > 0
+		{
+			T::PositionProvider::fund(CollectSource::LiquidRepayments, amount)?;
+			T::PositionProvider::accrue(account, CollectSource::LiquidRepayments, amount)?;
+			Self::deposit_event(Event::LiquidRepaymentRewardAwarded {
+				account: account.clone(),
+				admission_frame,
+				amount,
+			});
+		}
 
-		// Clear settled principal, retaining records needed by repayments or reward allocation.
-		for (frame_key, mut frame_buys, awaiting_reward) in mature_frame_buys {
-			if awaiting_reward || frame_buys.pending_liquid_repays > 0 {
-				frame_buys.principal = 0;
+		let can_release_principal = T::Currency::balance(account).saturating_add(principal) >=
+			T::Currency::minimum_balance();
+		if principal > 0 && can_release_principal {
+			T::Currency::release(
+				&HoldReason::PurchasePrincipal.into(),
+				account,
+				principal,
+				Precision::Exact,
+			)?;
+		} else {
+			// Combine mature remainders in the newest visited bucket so old dust cannot
+			// permanently fill the bounded scan ahead of later releasable principal.
+			if let Some((_, frame_buys)) = mature_frame_buys.last_mut() {
+				frame_buys.principal = principal;
+			}
+			principal = 0;
+		}
+
+		for (frame_key, frame_buys) in mature_frame_buys {
+			if frame_buys.principal > 0 || frame_buys.pending_liquid_repays > 0 {
 				BuysByAccountAndFrame::<T>::insert(account, frame_key, frame_buys);
 			} else {
 				BuysByAccountAndFrame::<T>::remove(account, frame_key);
 			}
 		}
 
-		payout_state.payable_reward = 0;
-		Self::save_and_schedule_account(account, payout_state)?;
-		if payout_attempted {
+		Self::schedule_account(account)?;
+		if principal > 0 || repayment_bonus > 0 {
 			Self::deposit_event(Event::PayoutCompleted {
 				account: account.clone(),
 				principal,
-				reward: total_reward,
+				reward: repayment_bonus,
 			});
 		}
 		Ok(())
 	}
 
-	/// Order payments so one can make another receivable; burn a principal remainder only if
-	/// it still cannot be released after rewards. Return amounts actually delivered.
+	/// Schedule the owner's next principal release or repayment inside the caller's transaction.
 	#[require_transactional]
-	fn pay_principal_and_rewards(
-		account: &T::AccountId,
-		mut principal: Balance,
-		treasury_reward: Balance,
-		liquid_reward: Option<(FrameId, Balance)>,
-	) -> Result<(Balance, Balance), DispatchError> {
-		let (liquid_admission_frame, liquid_reward) = match liquid_reward {
-			Some((frame, amount)) => (Some(frame), amount),
-			None => (None, 0),
+	fn schedule_account(account: &T::AccountId) -> DispatchResult {
+		let previous = NextSettlementFrameByAccount::<T>::get(account);
+		let Some((frame_key, frame_buys)) = BuysByAccountAndFrame::<T>::iter_prefix(account).next()
+		else {
+			if let Some(frame) = previous {
+				PayoutQueue::<T>::remove(AscendingRankKey::new(frame, account.clone()));
+				NextSettlementFrameByAccount::<T>::remove(account);
+				frame_system::Pallet::<T>::dec_providers(account)?;
+			}
+			return Ok(())
 		};
-		let mut total_reward = treasury_reward.saturating_add(liquid_reward);
-		let free_after_release = T::Currency::balance(account).saturating_add(principal);
-		let release_principal_last =
-			principal > 0 && free_after_release < T::Currency::minimum_balance();
-		let reason = HoldReason::PurchasePrincipal.into();
-
-		// A small remainder may need its rewards credited before it can be released.
-		if principal > 0 && !release_principal_last {
-			T::Currency::release(&reason, account, principal, Precision::Exact)?;
-		}
-
-		// Credit the larger reward first so it can make the smaller one receivable.
-		let pay_treasury_first = treasury_reward >= liquid_reward;
-		if treasury_reward > 0 && pay_treasury_first {
-			let paid = T::TreasuryRewardProvider::pay_reward(account, treasury_reward)?;
-			total_reward.saturating_reduce(treasury_reward.saturating_sub(paid));
-		}
-		if let Some(admission_frame) = liquid_admission_frame &&
-			liquid_reward > 0
-		{
-			match T::Currency::mint_into(account, liquid_reward) {
-				Ok(_) => Self::deposit_event(Event::LiquidRepaymentRewardAwarded {
-					account: account.clone(),
-					admission_frame,
-					amount: liquid_reward,
-				}),
-				Err(error) if error == TokenError::BelowMinimum.into() => {
-					// The repayment already burned these funds; leave unreceivable dust unissued.
-					total_reward.saturating_reduce(liquid_reward);
-				},
-				Err(error) => return Err(error),
-			}
-		}
-		if treasury_reward > 0 && !pay_treasury_first {
-			let paid = T::TreasuryRewardProvider::pay_reward(account, treasury_reward)?;
-			total_reward.saturating_reduce(treasury_reward.saturating_sub(paid));
-		}
-
-		if release_principal_last {
-			if T::Currency::can_deposit(account, principal, Provenance::Extant) ==
-				DepositConsequence::BelowMinimum
-			{
-				T::Currency::burn_held(
-					&reason,
-					account,
-					principal,
-					Precision::Exact,
-					Fortitude::Force,
-				)?;
-				principal = 0;
-			} else {
-				T::Currency::release(&reason, account, principal, Precision::Exact)?;
-			}
-		}
-
-		Ok((principal, total_reward))
-	}
-
-	/// Persist the account and its single frame-scheduled payout entry inside its caller's
-	/// transaction.
-	#[require_transactional]
-	fn save_and_schedule_account(
-		account: &T::AccountId,
-		mut payout_state: AccountPayoutState,
-	) -> DispatchResult {
-		if let Some(frame) = payout_state.next_payout_frame.take() {
-			PayoutQueue::<T>::remove(AscendingRankKey::new(frame, account.clone()));
-		}
 
 		let now = T::MiningFrameTransitionProvider::get_current_frame_id();
-		let mut next_frame;
-		if payout_state.payable_reward > 0 {
-			next_frame = now;
-		} else if let Some((frame_key, frame_buys)) =
-			BuysByAccountAndFrame::<T>::iter_prefix(account).next()
+		let mut next_frame =
+			FrameId::from_ordered(&frame_key).saturating_add(T::PurchaseHoldFrames::get());
+		// A tiny principal remainder needs sufficient wallet funds. Pending repayments can
+		// progress in successive blocks under the per-block allowance.
+		let principal_release_due = frame_buys.pending_liquid_repays == 0 && next_frame <= now;
+		if principal_release_due &&
+			T::Currency::balance(account).saturating_add(frame_buys.principal) <
+				T::Currency::minimum_balance()
 		{
-			// Maturity follows the admission frame, independently of auction bookkeeping.
-			next_frame =
-				FrameId::from_ordered(&frame_key).saturating_add(T::PurchaseHoldFrames::get());
-			if frame_buys.principal == 0 &&
-				frame_buys.pending_liquid_repays == 0 &&
-				next_frame <= now
-			{
-				next_frame = now.saturating_add(1);
-			}
-		} else {
-			return Self::save_account_payout_state(account, None);
+			next_frame = now.saturating_add(1);
 		}
 
-		payout_state.next_payout_frame = Some(next_frame);
+		if let Some(frame) = previous {
+			PayoutQueue::<T>::remove(AscendingRankKey::new(frame, account.clone()));
+		} else {
+			frame_system::Pallet::<T>::inc_providers(account);
+		}
+		NextSettlementFrameByAccount::<T>::insert(account, next_frame);
 		PayoutQueue::<T>::insert(AscendingRankKey::new(next_frame, account.clone()), ());
-		Self::save_account_payout_state(account, Some(payout_state))
-	}
-
-	/// Each pending buy account owns one provider reference until its principal and rewards
-	/// are settled. Acquire it before holding funds, and release it with the final account row.
-	fn save_account_payout_state(
-		account: &T::AccountId,
-		payout_state: Option<AccountPayoutState>,
-	) -> DispatchResult {
-		PayoutStateByAccount::<T>::try_mutate_exists(account, |stored| {
-			match (&*stored, &payout_state) {
-				(None, Some(_)) => {
-					frame_system::Pallet::<T>::inc_providers(account);
-				},
-				(Some(_), None) => {
-					frame_system::Pallet::<T>::dec_providers(account)?;
-				},
-				_ => {},
-			}
-
-			*stored = payout_state;
-			Ok(())
-		})
+		Ok(())
 	}
 }
 
@@ -1320,8 +1237,9 @@ pub struct Auction {
 )]
 /// All purchases admitted for one account in one frame, sharing the same auction bid.
 pub struct AccountFrameBuys {
-	/// Ordinary purchase microgons still held for this account and auction; repayment funds
-	/// remain on their individual LiquidRepay records until settlement.
+	/// Unreleased principal microgons, including completed repayment remainders. Subminimum
+	/// mature remainders may be combined into the newest mature bucket visited for this owner.
+	/// Unsettled repayment funds remain on their individual LiquidRepay records.
 	pub principal: Balance,
 	/// Whole-purchase net discount in target-valued microgons, aggregated before matching.
 	pub captured_discount: Balance,
@@ -1336,26 +1254,6 @@ pub struct AccountFrameBuys {
 	/// cap, independent of Treasury funding. None while the request awaits allocation; reused by
 	/// each Liquid repayment in this admission frame. A zero basis has no reward entitlement.
 	pub liquid_repayment_reward_rate: Option<FixedU128>,
-}
-
-#[derive(
-	Encode,
-	Decode,
-	DecodeWithMemTracking,
-	Clone,
-	Debug,
-	Default,
-	PartialEq,
-	Eq,
-	TypeInfo,
-	MaxEncodedLen,
-)]
-/// Unpaid ordinary rewards and payout scheduling for one account across all admission frames.
-pub struct AccountPayoutState {
-	/// Mature funded microgons awaiting delivery through Treasury's payout adapter.
-	pub payable_reward: Balance,
-	/// Frame of this account's single queue entry, including retries after a failed payout.
-	pub next_payout_frame: Option<FrameId>,
 }
 
 #[derive(

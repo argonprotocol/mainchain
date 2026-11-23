@@ -1592,26 +1592,34 @@ async fn vault_cosigns_release(
 	vault_xpriv: &bitcoin::bip32::Xpriv,
 	uploaded_xpub_hd_path: &str,
 ) -> anyhow::Result<()> {
-	let pending_cosigns = client
-		.fetch_storage(
-			&storage().vaults().pending_cosign_by_vault_id(*vault_id),
-			FetchAt::Finalized,
-		)
-		.await?
-		.ok_or_else(|| anyhow!("No pending cosign requests found for vault {vault_id}"))?;
-	assert!(
-		pending_cosigns.0.contains(lock_id),
-		"Missing utxo {lock_id} from pending cosign requests for vault {vault_id}: {:?}",
-		pending_cosigns.0
-	);
-
 	let pending_request = client
 		.fetch_storage(
 			&storage().bitcoin_locks().lock_release_requests_by_id(*lock_id),
 			FetchAt::Finalized,
 		)
+		.await?
+		.ok_or_else(|| anyhow!("Missing finalized release request for lock {lock_id}"))?;
+	let signing_deadline = client
+		.live
+		.constants()
+		.at(&api::constants().bitcoin_locks().lock_release_cosign_deadline_frames())?;
+	let collect_due_frame = pending_request
+		.cosign_due_frame
+		.saturating_sub(signing_deadline)
+		.saturating_add(1);
+	let request = api::runtime_types::argon_primitives::vault::CosignRequest::Lock(*lock_id);
+	let pending_cosign = client
+		.fetch_storage(
+			&storage()
+				.vaults()
+				.pending_cosigns_by_vault(*vault_id, (collect_due_frame.to_be_bytes(), request)),
+			FetchAt::Finalized,
+		)
 		.await?;
-	assert!(pending_request.is_some(), "Missing finalized release request for utxo {lock_id}");
+	assert!(
+		pending_cosign.is_some(),
+		"Missing lock {lock_id} from vault {vault_id}'s signing list"
+	);
 
 	let lock = client
 		.fetch_storage(&storage().bitcoin_locks().locks_by_id(*lock_id), FetchAt::Finalized)

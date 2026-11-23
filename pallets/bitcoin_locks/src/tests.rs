@@ -2865,6 +2865,26 @@ fn allows_users_to_reclaim_orphaned_utxos() {
 		assert!(OrphanedUtxosByAccount::<Test>::contains_key(who, &utxo_ref));
 
 		let release_script_pubkey = make_script_pubkey(&[0; 32]);
+		for (fee, error) in [
+			(10_001, Error::<Test>::BitcoinFeeTooHigh),
+			(9_999, Error::<Test>::InvalidBitcoinReleaseAmount),
+		] {
+			assert_noop!(
+				BitcoinLocks::request_orphaned_utxo_release(
+					RuntimeOrigin::signed(who),
+					utxo_ref.clone(),
+					release_script_pubkey.clone(),
+					fee,
+				),
+				error
+			);
+			assert!(OrphanedUtxosByAccount::<Test>::get(who, &utxo_ref)
+				.unwrap()
+				.cosign_request
+				.is_none());
+			assert!(!VaultViewOfOrphanedUtxoCosigns::get().contains_key(&vault_id));
+		}
+
 		assert_ok!(BitcoinLocks::request_orphaned_utxo_release(
 			RuntimeOrigin::signed(who),
 			utxo_ref.clone(),

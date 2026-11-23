@@ -10,10 +10,19 @@ use argon_ethereum_contracts::minting_gateway::{
 	GATEWAY_ACTIVITY_NONCE_OFFSET, GATEWAY_ACTIVITY_NONCE_SLOT,
 };
 use argon_primitives::{
-	CrosschainGatewayProvider, EthereumAccountStorageProof, Moment, UniswapPurchaseProvider,
+	treasury::BondLotId, CrosschainGatewayProvider, EthereumAccountStorageProof, Moment,
+	TreasuryPoolProvider, UniswapPurchaseProvider,
 };
 use gateway_activity::GatewayActivityBlock;
 use pallet_prelude::*;
+
+/// Optional backing selection bounded by the Treasury provider's stored collateral limit.
+pub type BondCollateralIds<T> = BoundedVec<
+	BondLotId,
+	<<T as Config>::TreasuryPoolProvider as TreasuryPoolProvider<
+		<T as frame_system::Config>::AccountId,
+	>>::MaxBondCollateralLots,
+>;
 
 mod approval_queue;
 mod evm;
@@ -1655,6 +1664,8 @@ pub mod pallet {
 			Self::apply_gateway_activity_blocks(source_chain, current_gateway_state, blocks, None)
 		}
 
+		/// Register a gateway signer. Optional ARGON lot IDs select the operator's preferred
+		/// backing; otherwise Treasury chooses it. All authorities share the operator's lot limit.
 		#[pallet::call_index(9)]
 		#[pallet::weight(T::WeightInfo::register_minting_authority())]
 		pub fn register_minting_authority(
@@ -1664,6 +1675,7 @@ pub mod pallet {
 			signature: KeccakSignature,
 			#[pallet::compact] microgon_collateral: T::Balance,
 			#[pallet::compact] micronot_collateral: T::Balance,
+			bond_lot_ids: Option<BondCollateralIds<T>>,
 		) -> DispatchResult {
 			let vault_operator_account_id = ensure_signed(origin)?;
 			Self::do_register_minting_authority(
@@ -1673,6 +1685,7 @@ pub mod pallet {
 				signature,
 				microgon_collateral,
 				micronot_collateral,
+				bond_lot_ids.as_ref().map(|ids| ids.as_slice()),
 			)
 		}
 

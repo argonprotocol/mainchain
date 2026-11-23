@@ -8,14 +8,14 @@ use argon_ethereum_contracts::minting_gateway::{
 };
 use argon_primitives::{
 	bitcoin::{
-		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinLockId, BitcoinXPub,
-		CompressedBitcoinPubkey, Satoshis,
+		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinXPub, CompressedBitcoinPubkey, Satoshis,
 	},
 	tick::Ticker,
+	treasury::BondLotId,
 	vault::{
-		BitcoinLockFunding, BitcoinVaultProvider, CosignerGuarantee, LostBitcoinCompensation,
-		RegistrationVaultData, ReserveSecuritizationRequest, VaultArgonotSecuritization,
-		VaultError,
+		BitcoinLockFunding, BitcoinVaultProvider, CosignRequest, CosignerGuarantee,
+		LostBitcoinCompensation, RegistrationVaultData, ReserveSecuritizationRequest,
+		VaultArgonotSecuritization, VaultError,
 	},
 	EthereumAccountStorageProof, EthereumAccountStorageWitnessRef, EthereumBlockNumber,
 	EthereumExecutionBlockProof, EthereumLog, EthereumProofBlock, EthereumReceiptLogProofBatch,
@@ -446,26 +446,18 @@ impl BitcoinVaultProvider for MockVaultProvider {
 		unimplemented!()
 	}
 
-	fn update_pending_cosign_list(
+	fn update_pending_cosign(
 		_vault_id: VaultId,
-		_lock_id: BitcoinLockId,
+		_collect_due_frame: FrameId,
+		_request: CosignRequest<Self::AccountId>,
 		_should_remove: bool,
-	) -> Result<(), VaultError> {
-		unimplemented!()
-	}
-
-	fn update_orphan_cosign_list(
-		_vault_id: VaultId,
-		_lock_id: BitcoinLockId,
-		_account_id: &Self::AccountId,
-		_should_remove: bool,
-	) -> Result<(), VaultError> {
-		unimplemented!()
+	) {
 	}
 }
 
 pub struct MockTreasuryPoolProvider;
 impl TreasuryPoolProvider<TestAccountId> for MockTreasuryPoolProvider {
+	type MaxBondCollateralLots = ConstU32<10>;
 	type Weights = ();
 	type Balance = Balance;
 
@@ -497,6 +489,7 @@ impl TreasuryPoolProvider<TestAccountId> for MockTreasuryPoolProvider {
 	fn encumber_bond_microgons(
 		account_id: &TestAccountId,
 		microgon_amount: Self::Balance,
+		_bond_lot_ids: Option<&[BondLotId]>,
 	) -> DispatchResult {
 		if microgon_amount.is_zero() {
 			return Ok(());

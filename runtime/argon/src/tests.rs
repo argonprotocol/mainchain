@@ -3,7 +3,7 @@ use alloy_sol_types::SolEvent;
 use argon_ethereum_contracts::minting_gateway::TransferToArgonFromSwapStarted;
 use argon_primitives::{
 	amount_rank::AmountRankId,
-	treasury::{NetworkPositionQuantities, PositionQuantities},
+	treasury::{NetworkPositionQuantities, PositionQuantities, TreasuryPositionProvider},
 	vault::{BitcoinSecuritizationBasis, CosignerGuarantee, Vault, VaultTerms},
 	EthereumCombinedReceiptProof, EthereumExecutionBlockProof, EthereumLog, EthereumReceiptLog,
 	EthereumReceiptLogProofBlock, EthereumReceiptProofReceipt, LiquidRepaymentProvider, PriceIndex,
@@ -18,9 +18,9 @@ use pallet_crosschain_transfer::{
 use pallet_ethereum_verifier::{types::ExecutionHeaderAnchor, ExecutionHeaderAnchors};
 use pallet_stabilizer_buys::{
 	ApprovedPool, BuysByAccountAndFrame, HoldReason as PurchaseHoldReason,
-	LiquidRepaysByAccountAndGatewayNonce, PayoutStateByAccount, PurchasePool,
+	LiquidRepaysByAccountAndGatewayNonce, NextSettlementFrameByAccount, PurchasePool,
 };
-use pallet_treasury::{OutstandingPurchaseRewards, RewardReserves};
+use pallet_treasury::RewardReserves;
 use sp_core::H160;
 use sp_runtime::BuildStorage;
 
@@ -182,7 +182,7 @@ fn proven_purchase_delivery_and_principal_hold_commit_together() {
 		);
 		assert_eq!(Balances::free_balance(&burn), backing);
 		assert_eq!(Balances::free_balance(&owner), 0);
-		assert!(!PayoutStateByAccount::<Runtime>::contains_key(&owner));
+		assert!(!NextSettlementFrameByAccount::<Runtime>::contains_key(&owner));
 		assert!(!LiquidRepaysByAccountAndGatewayNonce::<Runtime>::contains_key(
 			&owner,
 			nonce.to_ordered()
@@ -244,7 +244,7 @@ fn proven_purchase_delivery_and_principal_hold_commit_together() {
 }
 
 #[test]
-fn deferred_repayment_settles_bitcoin_principal_and_rewards_including_unreceivable_dust() {
+fn deferred_repayment_preserves_principal_and_backs_bonuses_for_collect() {
 	// Some(0) enables reward eligibility without a bid; None leaves the pool unapproved.
 	for (
 		dust_remainder,
@@ -294,6 +294,9 @@ fn deferred_repayment_settles_bitcoin_principal_and_rewards_including_unreceivab
 			frame_system::GenesisConfig::<Runtime>::default().build_storage().unwrap(),
 		);
 		ext.execute_with(|| {
+			<TreasuryPositions as frame_support::traits::OnGenesis>::on_genesis();
+			assert_ok!(TreasuryPositions::prepare_collect());
+			TreasuryPositions::ensure_account(&owner);
 			pallet_bitcoin_utxos::ConfirmedBitcoinBlockTip::<Runtime>::put(
 				argon_primitives::bitcoin::BitcoinBlock {
 					block_height: 100,
@@ -570,17 +573,24 @@ fn deferred_repayment_settles_bitcoin_principal_and_rewards_including_unreceivab
 				pallet_bitcoin_locks::LocksById::<Runtime>::get(1).unwrap().fissioned_satoshis,
 				remaining_satoshis
 			);
+			let held_refund = if expected_refund < minimum { expected_refund } else { 0 };
 			assert_eq!(
 				Balances::balance_on_hold(
 					&pallet_stabilizer_buys::HoldReason::PurchasePrincipal.into(),
-					&owner
+					&owner,
 				),
-				0
+				held_refund
 			);
+			assert_eq!(Balances::free_balance(&owner), expected_refund - held_refund);
+			let accrued = pallet_treasury_positions::PositionsByAccount::<Runtime>::get(&owner)
+				.unwrap()
+				.collect_accrued;
+			assert_eq!(accrued.stabilizer_buy_earnings, ordinary_reward);
+			assert_eq!(accrued.liquid_repayment_earnings, repayment_reward);
+			assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(owner.clone())));
 			assert_eq!(
 				Balances::free_balance(&owner),
-				expected_refund + ordinary_reward + repayment_reward -
-					if dust_remainder { 1 } else { 0 }
+				expected_refund - held_refund + ordinary_reward + repayment_reward
 			);
 			assert_eq!(
 				pallet_mint::MintedBitcoinMicrogons::<Runtime>::get(),
@@ -588,15 +598,13 @@ fn deferred_repayment_settles_bitcoin_principal_and_rewards_including_unreceivab
 			);
 			assert_eq!(
 				Balances::total_issuance(),
-				issuance - expected_burn + ordinary_reward + repayment_reward -
-					if dust_remainder { 1 } else { 0 }
+				issuance - expected_burn + ordinary_reward + repayment_reward
 			);
 			if reward_bid.is_some() {
 				assert_eq!(
 					RewardReserves::<Runtime>::get().liquidity_buys,
 					treasury_budget - ordinary_reward
 				);
-				assert_eq!(OutstandingPurchaseRewards::<Runtime>::get(), 0);
 			}
 			assert_eq!(
 				pallet_treasury_positions::NetworkTotals::<Runtime>::get()
@@ -705,7 +713,7 @@ fn closed_stabilizer_value_finalizes_after_treasury_funds_the_frame() {
 			frame_id: 6,
 			eligible_value_microgons: 900,
 		});
-		let Some(StabilizerPoolRewardFrame::Funded { budget, .. }) =
+		let Some(StabilizerPoolRewardFrame::Allocated { budget, .. }) =
 			StabilizerPoolRewardFrames::<Runtime>::get(6)
 		else {
 			panic!("Treasury must fund the frozen frame");

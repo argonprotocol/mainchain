@@ -9,13 +9,13 @@ use sp_runtime::{traits::IdentifyAccount, AccountId32, MultiSigner};
 use crate as pallet_operational_accounts;
 use argon_primitives::{
 	bitcoin::{
-		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinLockId, BitcoinXPub,
-		CompressedBitcoinPubkey, Satoshis,
+		BitcoinCosignScriptPubkey, BitcoinHeight, BitcoinXPub, CompressedBitcoinPubkey, Satoshis,
 	},
 	tick::Ticker,
+	treasury::BondLotId,
 	vault::{
-		BitcoinLockFunding, BitcoinVaultProvider, CosignerGuarantee, LostBitcoinCompensation,
-		RegistrationVaultData, ReserveSecuritizationRequest,
+		BitcoinLockFunding, BitcoinVaultProvider, CosignRequest, CosignerGuarantee,
+		LostBitcoinCompensation, RegistrationVaultData, ReserveSecuritizationRequest,
 	},
 	BitcoinFissionsProvider, MiningSlotProvider, OperationalRewardsPayer, TickProvider,
 	TreasuryPoolProvider, UniswapTransferProvider, VotingSchedule, MICROGONS_PER_ARGON,
@@ -269,21 +269,12 @@ impl BitcoinVaultProvider for MockVaultProvider {
 		unimplemented!()
 	}
 
-	fn update_pending_cosign_list(
+	fn update_pending_cosign(
 		_vault_id: VaultId,
-		_lock_id: BitcoinLockId,
+		_collect_due_frame: FrameId,
+		_request: CosignRequest<Self::AccountId>,
 		_should_remove: bool,
-	) -> Result<(), VaultError> {
-		unimplemented!()
-	}
-
-	fn update_orphan_cosign_list(
-		_vault_id: VaultId,
-		_lock_id: BitcoinLockId,
-		_account_id: &Self::AccountId,
-		_should_remove: bool,
-	) -> Result<(), VaultError> {
-		unimplemented!()
+	) {
 	}
 }
 
@@ -307,6 +298,7 @@ impl BitcoinFissionsProvider<TestAccountId, Balance> for MockBitcoinFissionsProv
 
 pub struct MockTreasuryPoolProvider;
 impl TreasuryPoolProvider<TestAccountId> for MockTreasuryPoolProvider {
+	type MaxBondCollateralLots = ConstU32<10>;
 	type Weights = ();
 	type Balance = Balance;
 
@@ -341,6 +333,7 @@ impl TreasuryPoolProvider<TestAccountId> for MockTreasuryPoolProvider {
 	fn encumber_bond_microgons(
 		_account_id: &TestAccountId,
 		_microgon_amount: Self::Balance,
+		_bond_lot_ids: Option<&[BondLotId]>,
 	) -> DispatchResult {
 		Ok(())
 	}
