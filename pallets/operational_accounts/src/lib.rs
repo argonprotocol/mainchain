@@ -949,6 +949,11 @@ pub mod pallet {
 							upstream_account_data.available_access_codes.saturating_accrue(1);
 						}
 						upstream_account_data.operational_certifications_count.saturating_accrue(1);
+
+						if !Self::meets_minimums(upstream_account_data) {
+							return;
+						}
+
 						Self::record_reward(
 							upstream_account_data,
 							upstream_account,

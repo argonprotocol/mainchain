@@ -388,6 +388,10 @@ mod benchmarks {
 		let upstream_account = linked_accounts_with_seed::<T>(1);
 		let mut upstream_account_data = default_operational_account::<T>(&upstream_account);
 		upstream_account_data.is_operationally_certified = true;
+		upstream_account_data.account_bitcoin_amount = T::MinimumBitcoin::get();
+		upstream_account_data.account_vault_bond_amount = T::MinimumBonds::get();
+		upstream_account_data.uniswap_argon_transfers_in_amount =
+			T::OperationalMinimumUniswapTransfer::get();
 		upstream_account_data.operational_certifications_count =
 			T::OperationalCertificationsPerBonusReward::get().saturating_sub(1);
 		insert_operational_account::<T>(&upstream_account, upstream_account_data);

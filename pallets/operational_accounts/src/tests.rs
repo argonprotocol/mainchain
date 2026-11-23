@@ -17,12 +17,12 @@ use crate::mock::{
 	account_id_from_seed, fission_liquidity, has_vault_operational_mark, make_account_proof,
 	make_account_set, new_test_ext, record_active_vault_bond_amount, record_fission_liquidity,
 	record_microgons_in, record_microgons_out, set_argon_balance, set_crosschain_activated,
-	set_registration_lookup, AccountSet, BitcoinLockSizeForAccessCode, ClaimableTreasuryBalance,
-	ClaimedOperationalRewards, CurrentTick, MaxAvailableAccessCodes, MinimumBitcoin, MinimumBonds,
-	MinimumUniswapTransfer, MiningSeatsPerAccessCode,
+	set_registration_lookup, AccountSet, BitcoinLiquidityTolerance, BitcoinLockSizeForAccessCode,
+	ClaimableTreasuryBalance, ClaimedOperationalRewards, CurrentTick, MaxAvailableAccessCodes,
+	MinimumBitcoin, MinimumBonds, MinimumUniswapTransfer, MiningSeatsPerAccessCode,
 	OperationalAccounts as OperationalAccountsPallet, OperationalCertificationReward,
-	OperationalMinimumUniswapTransfer, OperationalMinimumVaultSecuritization, RuntimeOrigin, Test,
-	TestAccountId,
+	OperationalCertificationsPerBonusReward, OperationalMinimumUniswapTransfer,
+	OperationalMinimumVaultSecuritization, RuntimeOrigin, Test, TestAccountId,
 };
 
 #[test]
@@ -1122,6 +1122,83 @@ fn test_claim_rewards_rejects_invalid_claims() {
 			Error::<Test>::RewardClaimExceedsPending
 		);
 	});
+}
+
+#[test]
+fn test_activation_skips_only_upstream_rewards_when_minimums_are_not_met() {
+	for withdraw_bitcoin in [true, false] {
+		new_test_ext().execute_with(|| {
+			assert_ok!(OperationalAccountsPallet::set_reward_config(
+				RuntimeOrigin::root(),
+				MICROGONS_PER_ARGON,
+				2 * MICROGONS_PER_ARGON,
+			));
+			let upstream = make_account_set(181, 182, 183);
+			register_account(&upstream, None);
+			satisfy_and_activate(&upstream);
+			OperationalAccounts::<Test>::mutate(&upstream.owner, |maybe_account| {
+				let account = maybe_account.as_mut().expect("account");
+				account.operational_certifications_count =
+					OperationalCertificationsPerBonusReward::get() - 1;
+			});
+
+			let downstream = make_account_set(191, 192, 193);
+			let access_proof = make_access_proof(&upstream.owner, 181, &downstream.owner);
+			register_account(&downstream, Some(access_proof));
+			if withdraw_bitcoin {
+				release_account_bitcoin(&upstream.vault);
+				let tolerance = BitcoinLiquidityTolerance::get().mul_floor(MinimumBitcoin::get());
+				record_account_bitcoin(&upstream.vault, MinimumBitcoin::get() - tolerance - 1);
+			} else {
+				record_account_vault_bond_amount(&upstream.vault, MinimumBonds::get() - 1);
+			}
+			satisfy_and_activate(&downstream);
+
+			let account = OperationalAccounts::<Test>::get(&upstream.owner).expect("account");
+			assert!(account.is_operationally_certified);
+			assert_eq!(account.available_access_codes, 1);
+			assert_eq!(
+				account.operational_certifications_count,
+				OperationalCertificationsPerBonusReward::get()
+			);
+			assert_eq!(account.rewards_earned_count, 1);
+			assert_eq!(pending_rewards_amount(&account), MICROGONS_PER_ARGON);
+
+			let downstream_account =
+				OperationalAccounts::<Test>::get(&downstream.owner).expect("account");
+			assert!(downstream_account.is_operationally_certified);
+			assert_eq!(pending_rewards_amount(&downstream_account), MICROGONS_PER_ARGON);
+			ClaimableTreasuryBalance::set(2 * MICROGONS_PER_ARGON);
+			for claimant in [&downstream.mining, &upstream.mining] {
+				assert_ok!(OperationalAccountsPallet::claim_rewards(
+					RuntimeOrigin::signed(claimant.clone()),
+					MICROGONS_PER_ARGON,
+				));
+			}
+			assert_eq!(
+				ClaimedOperationalRewards::get(),
+				vec![
+					(downstream.mining, MICROGONS_PER_ARGON),
+					(upstream.mining.clone(), MICROGONS_PER_ARGON),
+				]
+			);
+
+			if withdraw_bitcoin {
+				record_account_bitcoin(&upstream.vault, 1);
+			} else {
+				record_account_vault_bond_amount(&upstream.vault, MinimumBonds::get());
+			}
+			let next_downstream = make_account_set(201, 202, 203);
+			let access_proof = make_access_proof(&upstream.owner, 181, &next_downstream.owner);
+			register_account(&next_downstream, Some(access_proof));
+			satisfy_and_activate(&next_downstream);
+
+			let account = OperationalAccounts::<Test>::get(&upstream.owner).expect("account");
+			assert_eq!(account.rewards_earned_count, 2);
+			assert_eq!(pending_rewards_amount(&account), MICROGONS_PER_ARGON);
+			assert_eq!(account.rewards_collected_amount, MICROGONS_PER_ARGON);
+		});
+	}
 }
 
 #[test]
