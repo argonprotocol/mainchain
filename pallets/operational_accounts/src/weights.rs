@@ -147,6 +147,7 @@ where
 		Base::activate()
 			.saturating_add(VaultProviderWeight::get_registration_vault_data())
 			.saturating_add(VaultProviderWeight::account_became_operational())
+			.saturating_add(UniswapTransferWeight::is_crosschain_activated().saturating_mul(3))
 	}
 
 	fn claim_rewards() -> Weight {
