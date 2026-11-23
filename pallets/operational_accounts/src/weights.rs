@@ -196,6 +196,9 @@ where
 
 pub struct ProviderWeightAdapter<T>(PhantomData<T>);
 impl<T: Config> OperationalAccountProviderWeightInfo for ProviderWeightAdapter<T> {
+	fn operational_account() -> Weight {
+		T::WeightInfo::provider_upstream_vault()
+	}
 	fn upstream_vault() -> Weight {
 		T::WeightInfo::provider_upstream_vault()
 	}

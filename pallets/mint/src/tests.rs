@@ -8,10 +8,12 @@ use crate::{
 };
 use argon_primitives::{
 	block_seal::{BlockPayout, BlockRewardType},
+	treasury::TreasuryPositionProvider,
 	BitcoinFissionMinting, BlockRewardsEventHandler,
 };
 use frame_support::traits::fungible::Unbalanced;
 use pallet_prelude::*;
+use pallet_treasury_positions::{CollectTotals, MiningMintIndex, PositionsByAccount};
 
 fn mining_issuance() -> Balance {
 	Balances::total_issuance().saturating_sub(MintedBitcoinMicrogons::<Test>::get())
@@ -204,13 +206,14 @@ fn it_calculates_per_miner_mint() {
 }
 
 #[test]
-fn it_can_mint() {
+fn expansion_mints_are_backed_before_collection() {
 	set_cpi(-1.0);
 
 	MinerRewardsAccounts::set(vec![(1, 1)]);
 
 	new_test_ext().execute_with(|| {
 		System::set_block_number(1);
+		assert_ok!(TreasuryPositions::prepare_collect());
 		Balances::set_total_issuance(25_000);
 		ArgonCirculation::set(25_000);
 
@@ -233,13 +236,16 @@ fn it_can_mint() {
 		assert_eq!(mining_issuance(), 25_000 + mint_amount);
 		assert_eq!(MiningMintPerCohort::<Test>::get().get(&1), Some(&mint_amount));
 		assert_eq!(Balances::total_issuance(), 25_000 + mint_amount);
+		assert_eq!(Balances::free_balance(1), 0);
+		assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(1)));
 		assert_eq!(Balances::free_balance(1), mint_amount);
+		assert_eq!(Balances::total_issuance(), 25_000 + mint_amount);
 		assert_eq!(BlockMintAction::<Test>::get().1.argon_minted, mint_amount);
 	});
 }
 
 #[test]
-fn it_records_failed_mints() {
+fn small_mining_rewards_accrue_while_failed_bitcoin_mints_remain_pending() {
 	set_cpi(-1.0);
 
 	MinerRewardsAccounts::set(vec![(1, 1)]);
@@ -253,20 +259,13 @@ fn it_records_failed_mints() {
 
 		Mint::on_initialize(1);
 		Mint::on_finalize(1);
-		System::assert_last_event(
-			Event::MintError {
-				mint_type: MintType::Mining,
-				account_id: 1,
-				fission_id: None,
-				lock_id: None,
-				error: DispatchError::Token(TokenError::BelowMinimum),
-				amount,
-			}
-			.into(),
+		assert_eq!(MiningMintPerCohort::<Test>::get().get(&1), Some(&amount));
+		assert_eq!(Balances::free_balance(1), 0);
+		assert_noop!(
+			TreasuryPositions::collect(RuntimeOrigin::signed(1)),
+			TokenError::BelowMinimum
 		);
-
-		assert_eq!(MiningMintPerCohort::<Test>::get().get(&1), None);
-		assert_eq!(Balances::total_issuance(), amount);
+		assert_eq!(MiningMintIndex::<Test>::get().microgons_per_seat, amount);
 
 		System::reset_events();
 		assert_ok!(Mint::request_mint(&1, 10, 9, 1));
@@ -302,6 +301,7 @@ fn it_cleans_old_cohorts() {
 			}
 		});
 		System::set_block_number(1);
+		assert_ok!(TreasuryPositions::prepare_collect());
 		Balances::set_total_issuance(60_000);
 		ArgonCirculation::set(60_000);
 
@@ -329,6 +329,7 @@ fn it_cleans_old_cohorts() {
 		assert_eq!(MiningMintPerCohort::<Test>::get().keys().len(), 10);
 
 		MinerRewardsAccounts::set(vec![(2, 2), (3, 3), (4, 3), (5, 11)]);
+		IsNewFrameStart::set(Some(3));
 		Mint::on_initialize(2);
 		Mint::on_finalize(2);
 		assert_eq!(MiningMintPerCohort::<Test>::get().keys().len(), 10);
@@ -558,14 +559,18 @@ fn it_pays_bitcoin_mints() {
 		assert_eq!(Balances::total_issuance(), amount + 6_200_050);
 
 		ArgonCirculation::set(100);
+		assert_ok!(TreasuryPositions::prepare_collect());
 		set_issuance_sources(amount, MintedBitcoinMicrogons::<Test>::get());
 		IsNewFrameStart::set(Some(2));
 		CurrentFrameId::set(2);
 		MinerRewardsAccounts::set(vec![(10, 1)]);
+		assert_ok!(TreasuryPositions::mining_seats_changed(&10, 0, 1));
 		BlockMintAction::<Test>::kill();
 		Mint::on_finalize(3);
 		let miner_amount = 10;
 		assert_eq!(mining_issuance(), amount + miner_amount);
+		assert_eq!(Balances::free_balance(10), 0);
+		assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(10)));
 		assert_eq!(Balances::free_balance(10), miner_amount);
 		assert_eq!(BlockMintAction::<Test>::get().1.argon_minted, miner_amount);
 		assert_eq!(BlockMintAction::<Test>::get().1.bitcoin_minted, 0);
@@ -826,5 +831,85 @@ fn it_ignores_zero_amount_pending_mints() {
 		assert!(pending_mints().is_empty());
 		assert!(PendingMintIndicesByLockId::<Test>::get(1).is_empty());
 		assert_eq!(NextPendingBitcoinMintIndex::<Test>::get(), 0);
+	});
+}
+
+#[test]
+fn frame_mint_settles_retiring_seats_before_new_seats_and_runs_once() {
+	set_cpi(-1.0);
+	ArgonCirculation::set(20);
+	MinerRewardsAccounts::set(vec![(1, 1), (1, 1)]);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		IsNewFrameStart::set(Some(2));
+		RetiredMiningAccounts::set(vec![1]);
+		ActivatedMiningAccounts::set(vec![2]);
+		Mint::on_finalize(1);
+		let owner = PositionsByAccount::<Test>::get(1).unwrap();
+		assert_eq!(owner.mining_seats, 1);
+		assert_eq!(owner.collect_accrued.mining_mints, 20);
+		assert_eq!(PositionsByAccount::<Test>::get(2).unwrap().mining_mint_checkpoint, 10);
+		let issuance = Balances::total_issuance();
+		Mint::on_finalize(1);
+		assert_eq!(Balances::total_issuance(), issuance);
+		assert_eq!(PositionsByAccount::<Test>::get(2).unwrap().mining_seats, 1);
+
+		IsNewFrameStart::set(Some(3));
+		MinerRewardsAccounts::set(vec![(1, 1), (2, 2)]);
+		RetiredMiningAccounts::set(vec![]);
+		ActivatedMiningAccounts::set(vec![]);
+		Mint::on_finalize(2);
+		assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(1)));
+		assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(2)));
+		assert_eq!(Balances::balance(&1), 30);
+		assert_eq!(Balances::balance(&2), 10);
+
+		set_cpi(0.0);
+		IsNewFrameStart::set(Some(4));
+		RetiredMiningAccounts::set(vec![1]);
+		ActivatedMiningAccounts::set(vec![3]);
+		let issuance = Balances::total_issuance();
+		Mint::on_finalize(3);
+		assert_eq!(Balances::total_issuance(), issuance);
+		assert_eq!(MiningMintIndex::<Test>::get().last_processed_frame, Some(3));
+		assert_eq!(PositionsByAccount::<Test>::get(1).unwrap().mining_seats, 0);
+		assert_eq!(PositionsByAccount::<Test>::get(3).unwrap().mining_seats, 1);
+	});
+}
+
+#[test]
+fn failed_mining_funding_does_not_block_finalization_or_reward_replacement_seats() {
+	set_cpi(-1.0);
+	ArgonCirculation::set(20);
+	MinerRewardsAccounts::set(vec![(1, 1)]);
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		assert_ok!(TreasuryPositions::prepare_collect());
+		Balances::mint_into(&99, u128::MAX - Balances::total_issuance()).unwrap();
+		IsNewFrameStart::set(Some(2));
+		RetiredMiningAccounts::set(vec![1]);
+		ActivatedMiningAccounts::set(vec![2]);
+
+		Mint::on_finalize(1);
+		let index = MiningMintIndex::<Test>::get();
+		assert_eq!(index.last_processed_frame, Some(1));
+		assert_eq!(index.microgons_per_seat, 0);
+		assert_eq!(CollectTotals::<Test>::get().funded.mining_mints, 0);
+		assert_eq!(PositionsByAccount::<Test>::get(1).unwrap().mining_seats, 0);
+		assert_eq!(PositionsByAccount::<Test>::get(2).unwrap().mining_seats, 1);
+		assert!(MiningMintPerCohort::<Test>::get().is_empty());
+		Mint::on_finalize(1);
+		assert_eq!(PositionsByAccount::<Test>::get(2).unwrap().mining_seats, 1);
+
+		Balances::burn_from(&99, 100, Preservation::Expendable, Precision::Exact, Fortitude::Force)
+			.unwrap();
+		IsNewFrameStart::set(Some(3));
+		MinerRewardsAccounts::set(vec![(2, 2)]);
+		RetiredMiningAccounts::set(vec![]);
+		ActivatedMiningAccounts::set(vec![]);
+		Mint::on_finalize(2);
+		assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(2)));
+		assert_eq!(Balances::balance(&2), 20);
+		assert_eq!(Balances::balance(&1), 0);
 	});
 }

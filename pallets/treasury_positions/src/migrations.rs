@@ -1,150 +1,224 @@
+#[cfg(feature = "try-runtime")]
+use crate::{pallet::STORAGE_VERSION, PendingCollectBacking};
 use crate::{
-	CollectAmounts, CollectTotals, Config, EarningPositions, EarningsIndexState, EarningsIndexes,
-	Pallet, PendingCollectBacking, Position, PositionsByAccount,
+	CollectTotals, Config, EarningPositions, EarningsIndexState, EarningsIndexes, MiningMintIndex,
+	MiningMintIndexState, Pallet, Position, PositionsByAccount,
 };
+#[cfg(feature = "try-runtime")]
+use alloc::collections::BTreeMap;
 use argon_primitives::{
 	treasury::{
-		PositionQuantities, TreasuryPositionProvider, TreasuryPositionProviderWeightInfo,
+		CollectTotals as CollectTotalsData, IndexedEarningsPosition, PositionQuantities,
 		UpstreamPosition,
 	},
-	MiningFrameTransitionProvider,
+	BlockRewardAccountsProvider, MiningFrameTransitionProvider,
 };
-use frame_support::{storage::with_storage_layer, traits::OnRuntimeUpgrade};
+#[cfg(any(test, feature = "try-runtime"))]
+use frame_support::storage::unhashed;
+use frame_support::{migrations::VersionedMigration, traits::UncheckedOnRuntimeUpgrade};
 use pallet_prelude::*;
+#[cfg(feature = "try-runtime")]
+use sp_runtime::TryRuntimeError;
 
-#[derive(Encode, Decode)]
-pub(crate) struct PositionV2<Balance: codec::Codec + MaxEncodedLen> {
+/// Positions layout in the released v1.6.0 runtime (storage version 2).
+#[derive(Encode, Decode, Default)]
+pub(crate) struct PositionV2<Balance: Codec + MaxEncodedLen> {
 	#[codec(compact)]
 	pub bond_principal: Balance,
 	pub quantities: PositionQuantities<Balance>,
 	pub upstream: Option<UpstreamPosition<Balance>>,
 }
 
-#[derive(Encode, Decode)]
-pub(crate) struct CollectAmountsV3<Balance: codec::Codec + MaxEncodedLen> {
-	#[codec(compact)]
-	pub bond_earnings: Balance,
-	#[codec(compact)]
-	pub stake_earnings: Balance,
-	#[codec(compact)]
-	pub bitcoin_earnings: Balance,
-	#[codec(compact)]
-	pub bitcoin_mints: Balance,
-	#[codec(compact)]
-	pub stabilizer_pool_earnings: Balance,
-}
+#[cfg(feature = "try-runtime")]
+type CollectUpgradeSnapshot<T> = (
+	BTreeMap<
+		<T as frame_system::Config>::AccountId,
+		(Option<PositionV2<<T as Config>::Balance>>, u32),
+	>,
+	BTreeMap<<T as frame_system::Config>::AccountId, u32>,
+	FrameId,
+	<T as Config>::Balance,
+	<T as Config>::Balance,
+);
 
-impl<Balance: codec::Codec + MaxEncodedLen + Default> From<CollectAmountsV3<Balance>>
-	for CollectAmounts<Balance>
-{
-	fn from(previous: CollectAmountsV3<Balance>) -> Self {
-		Self {
-			bond_earnings: previous.bond_earnings,
-			stake_earnings: previous.stake_earnings,
-			bitcoin_earnings: previous.bitcoin_earnings,
-			stabilizer_pool_earnings: previous.stabilizer_pool_earnings,
-			..Default::default()
-		}
-	}
-}
+pub type BackCollectMigration<T> = VersionedMigration<
+	2,
+	3,
+	InitializeCollect<T>,
+	Pallet<T>,
+	<T as frame_system::Config>::DbWeight,
+>;
 
-#[derive(Encode, Decode)]
-pub(crate) struct PositionV3<Balance: codec::Codec + MaxEncodedLen> {
-	#[codec(compact)]
-	pub bond_principal: Balance,
-	pub quantities: PositionQuantities<Balance>,
-	pub upstream: Option<UpstreamPosition<Balance>>,
-	pub collect_accrued: CollectAmountsV3<Balance>,
-	pub collected: CollectAmountsV3<Balance>,
-}
+/// Preserve released positions and initialize their Collect and mining checkpoints.
+pub struct InitializeCollect<T>(PhantomData<T>);
 
-/// Preserve supported account layouts and back only their unpaid amounts at cutover.
-pub struct BackCollectMigration<T>(PhantomData<T>);
-
-impl<T: Config> OnRuntimeUpgrade for BackCollectMigration<T> {
+impl<T: Config> UncheckedOnRuntimeUpgrade for InitializeCollect<T> {
 	fn on_runtime_upgrade() -> Weight {
-		let version = StorageVersion::get::<Pallet<T>>();
-		if version != StorageVersion::new(2) && version != StorageVersion::new(3) {
-			return T::DbWeight::get().reads(1);
-		}
-
-		let mut count = 0u64;
-		let result: DispatchResult = with_storage_layer(|| {
-			if version == StorageVersion::new(2) {
-				PositionsByAccount::<T>::translate_values::<PositionV2<T::Balance>, _>(
-					|previous| {
-						Some(Position {
-							bond_principal: previous.bond_principal,
-							quantities: previous.quantities,
-							upstream: previous.upstream,
-							..Default::default()
-						})
-					},
-				);
-			} else {
-				let mut has_mint_claim = false;
-				PositionsByAccount::<T>::translate_values::<PositionV3<T::Balance>, _>(
-					|previous| {
-						has_mint_claim |= !previous.collect_accrued.bitcoin_mints.is_zero() ||
-							!previous.collected.bitcoin_mints.is_zero();
-						Some(Position {
-							bond_principal: previous.bond_principal,
-							quantities: previous.quantities,
-							upstream: previous.upstream,
-							collect_accrued: previous.collect_accrued.into(),
-							collected: previous.collected.into(),
-							..Default::default()
-						})
-					},
-				);
-				ensure!(
-					!has_mint_claim,
-					"Unsupported Bitcoin mint claim; preserve the account layout for recovery"
-				);
-			}
-
-			EarningsIndexes::<T>::put(EarningsIndexState {
-				start_frame: T::MiningFrameTransitionProvider::get_current_frame_id().max(1),
-				..Default::default()
-			});
-
-			let mut unpaid = CollectAmounts::<T::Balance>::default();
-			for (account, mut position) in PositionsByAccount::<T>::iter() {
-				count.saturating_accrue(1);
-				frame_system::Pallet::<T>::inc_providers(&account);
-				unpaid.saturating_accrue(&position.collect_accrued);
-				position.earning_positions = EarningPositions::default();
-				position.earning_positions.bonds.quantity = position.quantities.bonds;
-				position.earning_positions.stakes.quantity = position.quantities.stakes;
-				position.earning_positions.bitcoin_liquidity.quantity =
-					position.quantities.fission_liquidity.into();
-				PositionsByAccount::<T>::insert(account, position);
-			}
-
-			if !unpaid.total().is_zero() {
-				PendingCollectBacking::<T>::put(unpaid);
-			}
-			CollectTotals::<T>::put(
-				argon_primitives::treasury::CollectTotals::<T::Balance>::default(),
-			);
-			StorageVersion::new(4).put::<Pallet<T>>();
-			Ok(())
+		let current_frame = T::MiningFrameTransitionProvider::get_current_frame_id();
+		EarningsIndexes::<T>::put(EarningsIndexState {
+			start_frame: current_frame.max(1),
+			..Default::default()
+		});
+		MiningMintIndex::<T>::put(MiningMintIndexState {
+			microgons_per_seat: T::Balance::zero(),
+			last_processed_frame: current_frame.checked_sub(1),
 		});
 
-		match result {
-			Ok(()) =>
-				if let Err(error) = with_storage_layer(Pallet::<T>::prepare_collect) {
-					log::warn!("Collect custody initialization failed: {error:?}");
+		let mut accounts = 0u64;
+		PositionsByAccount::<T>::translate::<PositionV2<T::Balance>, _>(|account, previous| {
+			accounts.saturating_accrue(1);
+			frame_system::Pallet::<T>::inc_providers(&account);
+			Some(Position {
+				bond_principal: previous.bond_principal,
+				quantities: previous.quantities,
+				upstream: previous.upstream,
+				earning_positions: EarningPositions {
+					bonds: IndexedEarningsPosition {
+						quantity: previous.quantities.bonds,
+						..Default::default()
+					},
+					stakes: IndexedEarningsPosition {
+						quantity: previous.quantities.stakes,
+						..Default::default()
+					},
+					bitcoin_liquidity: IndexedEarningsPosition {
+						quantity: previous.quantities.fission_liquidity.into(),
+						..Default::default()
+					},
+					..Default::default()
 				},
-			Err(error) => log::error!("Collect backing migration failed: {error:?}"),
+				..Default::default()
+			})
+		});
+		for account in T::BlockRewardAccountsProvider::get_active_mining_rewards_accounts() {
+			PositionsByAccount::<T>::mutate(&account, |record| {
+				let position = record.get_or_insert_with(|| {
+					frame_system::Pallet::<T>::inc_providers(&account);
+					Position::default()
+				});
+				position.mining_seats.saturating_accrue(1);
+			});
+			accounts.saturating_accrue(1);
 		}
+		CollectTotals::<T>::put(CollectTotalsData::<T::Balance>::default());
 
-		T::DbWeight::get()
-			.reads_writes(
-				count.saturating_mul(3).saturating_add(5),
-				count.saturating_mul(3).saturating_add(5),
+		T::DbWeight::get().reads_writes(
+			accounts.saturating_mul(3).saturating_add(1),
+			accounts.saturating_mul(3).saturating_add(3),
+		)
+	}
+
+	#[cfg(feature = "try-runtime")]
+	fn pre_upgrade() -> Result<Vec<u8>, TryRuntimeError> {
+		let mut positions = BTreeMap::<T::AccountId, (Option<PositionV2<T::Balance>>, u32)>::new();
+		for account in PositionsByAccount::<T>::iter_keys() {
+			let previous = unhashed::get::<PositionV2<T::Balance>>(
+				&PositionsByAccount::<T>::hashed_key_for(&account),
 			)
-			.saturating_add(crate::ProviderWeightAdapter::<T>::fund())
+			.ok_or("Cannot decode a released V2 position")?;
+			let providers = frame_system::Pallet::<T>::providers(&account);
+			positions.insert(account, (Some(previous), providers));
+		}
+		let mut mining_seats = BTreeMap::<T::AccountId, u32>::new();
+		for account in T::BlockRewardAccountsProvider::get_active_mining_rewards_accounts() {
+			mining_seats.entry(account.clone()).or_default().saturating_accrue(1);
+			let providers = frame_system::Pallet::<T>::providers(&account);
+			positions.entry(account).or_insert((None, providers));
+		}
+		let snapshot: CollectUpgradeSnapshot<T> = (
+			positions,
+			mining_seats,
+			T::MiningFrameTransitionProvider::get_current_frame_id(),
+			T::Currency::total_issuance(),
+			T::OwnershipCurrency::total_issuance(),
+		);
+		Ok(snapshot.encode())
+	}
+
+	#[cfg(feature = "try-runtime")]
+	fn post_upgrade(state: Vec<u8>) -> Result<(), TryRuntimeError> {
+		let (positions, mining_seats, frame, argons, micronots) =
+			CollectUpgradeSnapshot::<T>::decode(&mut &state[..])
+				.map_err(|_| "Cannot decode Collect upgrade snapshot")?;
+		ensure!(
+			StorageVersion::get::<Pallet<T>>() == STORAGE_VERSION,
+			"Collect version wrapper did not complete"
+		);
+		ensure!(
+			PositionsByAccount::<T>::iter_keys().count() == positions.len(),
+			"Collect account set changed"
+		);
+		for (account, (previous, providers)) in positions {
+			let previous = previous.unwrap_or_default();
+			let position =
+				PositionsByAccount::<T>::get(&account).ok_or("Migrated position is missing")?;
+			ensure!(
+				position.bond_principal == previous.bond_principal,
+				"Position principal changed"
+			);
+			ensure!(position.quantities == previous.quantities, "Position quantities changed");
+			ensure!(position.upstream == previous.upstream, "Position upstream changed");
+			ensure!(
+				position.mining_seats == mining_seats.get(&account).copied().unwrap_or_default(),
+				"Mining seat count is incorrect"
+			);
+			ensure!(
+				position.mining_mint_checkpoint.is_zero(),
+				"Mining checkpoint includes old rewards"
+			);
+			ensure!(position.collect_accrued.is_zero(), "Migration credited historical rewards");
+			ensure!(position.collected.is_zero(), "Migration credited historical collections");
+			ensure!(
+				position.earning_positions ==
+					EarningPositions {
+						bonds: IndexedEarningsPosition {
+							quantity: previous.quantities.bonds,
+							..Default::default()
+						},
+						stakes: IndexedEarningsPosition {
+							quantity: previous.quantities.stakes,
+							..Default::default()
+						},
+						bitcoin_liquidity: IndexedEarningsPosition {
+							quantity: previous.quantities.fission_liquidity.into(),
+							..Default::default()
+						},
+						..Default::default()
+					},
+				"Earning quantities or checkpoints were not initialized"
+			);
+			ensure!(
+				frame_system::Pallet::<T>::providers(&account) == providers.saturating_add(1),
+				"Position provider reference is incorrect"
+			);
+		}
+		ensure!(
+			EarningsIndexes::<T>::get() ==
+				EarningsIndexState { start_frame: frame.max(1), ..Default::default() },
+			"Earnings index is incorrect"
+		);
+		ensure!(
+			MiningMintIndex::<T>::get() ==
+				MiningMintIndexState {
+					microgons_per_seat: T::Balance::zero(),
+					last_processed_frame: frame.checked_sub(1)
+				},
+			"Mining index is incorrect"
+		);
+		ensure!(
+			CollectTotals::<T>::get() == CollectTotalsData::default(),
+			"Migration changed Collect totals"
+		);
+		ensure!(
+			!PendingCollectBacking::<T>::exists(),
+			"Released V2 positions have no unpaid backing"
+		);
+		ensure!(T::Currency::total_issuance() == argons, "Migration changed ARGON issuance");
+		ensure!(
+			T::OwnershipCurrency::total_issuance() == micronots,
+			"Migration changed ARGNOT issuance"
+		);
+		Ok(())
 	}
 }
 
@@ -152,7 +226,28 @@ impl<T: Config> OnRuntimeUpgrade for BackCollectMigration<T> {
 mod tests {
 	use super::*;
 	use crate::{mock::*, *};
-	use frame_support::{assert_ok, storage::unhashed};
+	use frame_support::{assert_ok, traits::OnRuntimeUpgrade};
+	#[test]
+	fn collect_cutover_seeds_active_seats_without_crediting_past_mining_rewards() {
+		new_test_ext().execute_with(|| {
+			StorageVersion::new(2).put::<TreasuryPositions>();
+			CurrentFrame::set(8);
+			ActiveMiningAccounts::set(vec![9, 9, 10]);
+			BackCollectMigration::<Test>::on_runtime_upgrade();
+			let position = PositionsByAccount::<Test>::get(9).unwrap();
+			assert_eq!(position.mining_seats, 2);
+			assert_eq!(position.mining_mint_checkpoint, 0);
+			assert_eq!(position.collect_accrued, CollectAmounts::default());
+			assert_eq!(MiningMintIndex::<Test>::get().last_processed_frame, Some(7));
+			assert_eq!(Pallet::<Test>::allocate_mining_mint(7, 100, 3), Ok(false));
+			assert_eq!(Pallet::<Test>::allocate_mining_mint(8, 10, 3), Ok(true));
+			BackCollectMigration::<Test>::on_runtime_upgrade();
+			assert_eq!(PositionsByAccount::<Test>::get(9).unwrap().mining_seats, 2);
+			assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(9)));
+			assert_eq!(Balances::balance(&9), 20);
+		});
+	}
+
 	#[test]
 	fn migrating_positions_preserves_principal_quantities_and_upstream() {
 		new_test_ext().execute_with(|| {
@@ -171,12 +266,9 @@ mod tests {
 			);
 
 			BackCollectMigration::<Test>::on_runtime_upgrade();
-			assert_eq!(StorageVersion::get::<TreasuryPositions>(), StorageVersion::new(4));
-			assert_eq!(Balances::balance(&TreasuryPositions::account_id()), 10);
-			assert_eq!(
-				CollectTotals::<Test>::get(),
-				argon_primitives::treasury::CollectTotals::default()
-			);
+			assert_eq!(StorageVersion::get::<TreasuryPositions>(), StorageVersion::new(3));
+			assert_eq!(Balances::balance(&TreasuryPositions::account_id()), 0);
+			assert_eq!(CollectTotals::<Test>::get(), CollectTotalsData::default());
 			assert_eq!(
 				PositionsByAccount::<Test>::get(9),
 				Some(Position {
@@ -194,6 +286,7 @@ mod tests {
 						},
 						..Default::default()
 					},
+					..Default::default()
 				})
 			);
 
@@ -201,7 +294,7 @@ mod tests {
 				position.as_mut().unwrap().collected.stabilizer_pool_earnings = 7;
 			});
 			BackCollectMigration::<Test>::on_runtime_upgrade();
-			assert_eq!(Balances::total_issuance(), 10);
+			assert_eq!(Balances::total_issuance(), 0);
 			assert_eq!(
 				PositionsByAccount::<Test>::get(9).unwrap().collected.stabilizer_pool_earnings,
 				7
@@ -209,64 +302,26 @@ mod tests {
 		});
 	}
 
+	#[cfg(feature = "try-runtime")]
 	#[test]
-	fn migration_backs_unpaid_v3_amounts_without_reminting_paid_history() {
+	fn upgrade_checks_preserve_released_positions_and_detect_mining_seat_drift() {
 		new_test_ext().execute_with(|| {
-			System::set_block_number(1);
-			StorageVersion::new(3).put::<TreasuryPositions>();
-			let mut position = Position::<u128>::default();
-			position.collect_accrued.stabilizer_pool_earnings = 20;
-			position.collected.stabilizer_pool_earnings = 1_000;
+			StorageVersion::new(2).put::<TreasuryPositions>();
+			ActiveMiningAccounts::set(vec![9, 9, 10]);
 			unhashed::put(
 				&PositionsByAccount::<Test>::hashed_key_for(9),
-				&PositionV3 {
-					bond_principal: position.bond_principal,
-					quantities: position.quantities,
-					upstream: position.upstream,
-					collect_accrued: CollectAmountsV3 {
-						bond_earnings: 0,
-						stake_earnings: 0,
-						bitcoin_earnings: 0,
-						bitcoin_mints: 0,
-						stabilizer_pool_earnings: 20,
-					},
-					collected: CollectAmountsV3 {
-						bond_earnings: 0,
-						stake_earnings: 0,
-						bitcoin_earnings: 0,
-						bitcoin_mints: 0,
-						stabilizer_pool_earnings: 1_000,
-					},
+				&PositionV2 {
+					bond_principal: 300u128,
+					quantities: PositionQuantities { bonds: 12, stakes: 2, fission_liquidity: 50 },
+					upstream: None,
 				},
 			);
-			BackCollectMigration::<Test>::on_runtime_upgrade();
-			assert_eq!(StorageVersion::get::<TreasuryPositions>(), StorageVersion::new(4));
-			assert_eq!(Balances::total_issuance(), 30);
-			assert_eq!(PositionsByAccount::<Test>::get(9), Some(position));
-			assert_eq!(System::providers(&9), 1);
-			BackCollectMigration::<Test>::on_runtime_upgrade();
-			assert_eq!(System::providers(&9), 1);
-			assert_eq!(Balances::total_issuance(), 30);
-			TreasuryPositions::migrate_accrued(
-				&11,
-				CollectAmounts { stabilizer_buy_earnings: 17, ..Default::default() },
-			);
-			assert_eq!(PendingCollectBacking::<Test>::get().unwrap().stabilizer_buy_earnings, 17);
-			assert_ok!(TreasuryPositions::fund(CollectSource::StabilizerPools, 100));
-			assert_ok!(TreasuryPositions::accrue(&10, CollectSource::StabilizerPools, 100));
-			assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(10)));
-			assert_eq!(Balances::balance(&10), 100);
-			assert_eq!(Balances::balance(&TreasuryPositions::account_id()), 47);
-			assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(9)));
-			assert_eq!(Balances::balance(&9), 20);
-			assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(11)));
-			assert_eq!(Balances::balance(&11), 17);
-			assert_eq!(Balances::balance(&TreasuryPositions::account_id()), 10);
-			assert_eq!(Balances::total_issuance(), 147);
-			assert_eq!(
-				PositionsByAccount::<Test>::get(9).unwrap().collected.stabilizer_pool_earnings,
-				1_020
-			);
+			let snapshot = BackCollectMigration::<Test>::pre_upgrade().unwrap();
+			assert_ok!(BackCollectMigration::<Test>::try_on_runtime_upgrade(true));
+			PositionsByAccount::<Test>::mutate(9, |position| {
+				position.as_mut().unwrap().mining_seats = 0
+			});
+			assert!(BackCollectMigration::<Test>::post_upgrade(snapshot).is_err());
 		});
 	}
 }

@@ -20,6 +20,8 @@ polkadot-sdk = { workspace = true, features = ["frame-support", "frame-system", 
 pallet-prelude = { workspace = true, default-features = false }
 
 [dev-dependencies]
+# mining_rewards_are_backed_and_collected_in_both_currencies verifies real issuance, custody and collection across pallets.
+pallet-treasury-positions = { workspace = true }
 polkadot-sdk = { workspace = true, features = ["pallet-balances"], default-features = true }
 pallet-prelude = { workspace = true, features = ["test"], default-features = true }
 

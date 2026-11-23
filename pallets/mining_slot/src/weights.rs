@@ -12,6 +12,12 @@ use pallet_prelude::*;
 
 /// Weight functions needed for this pallet.
 pub trait WeightInfo {
+	fn provider_get_mint_rewards_cohorts() -> Weight {
+		Weight::zero()
+	}
+	fn provider_get_mining_seat_changes() -> Weight {
+		Weight::zero()
+	}
 	fn provider_get_current_frame_id() -> Weight;
 	fn provider_is_new_frame_started() -> Weight;
 	fn provider_is_first_block_after_frame_start() -> Weight;
@@ -106,6 +112,12 @@ where
 	PriceProviderWeight: PriceProviderWeightInfo,
 	OperationalAccountProviderWeight: OperationalAccountProviderWeightInfo,
 {
+	fn provider_get_mint_rewards_cohorts() -> Weight {
+		Base::provider_get_mint_rewards_cohorts()
+	}
+	fn provider_get_mining_seat_changes() -> Weight {
+		Base::provider_get_mining_seat_changes()
+	}
 	fn provider_get_current_frame_id() -> Weight {
 		Base::provider_get_current_frame_id()
 	}
@@ -265,6 +277,12 @@ impl<T: crate::Config> MiningSlotProviderWeightInfo for ProviderWeightAdapter<T>
 }
 
 impl<T: crate::Config> BlockRewardAccountsProviderWeightInfo for ProviderWeightAdapter<T> {
+	fn get_mint_rewards_cohorts() -> Weight {
+		T::WeightInfo::provider_get_mint_rewards_cohorts()
+	}
+	fn get_mining_seat_changes() -> Weight {
+		T::WeightInfo::provider_get_mining_seat_changes()
+	}
 	fn get_block_rewards_account() -> Weight {
 		T::WeightInfo::provider_get_block_rewards_account()
 	}

@@ -4,7 +4,7 @@ use argon_primitives::{
 	tick::Ticker, CrosschainGatewayProvider, GatewayState, MiningFrameTransitionProvider,
 	RValueHighWaterMark, SourceChain, TickProvider, VotingSchedule,
 };
-use frame_support::{derive_impl, storage::unhashed};
+use frame_support::{derive_impl, storage::unhashed, traits::GetStorageVersion};
 use pallet_prelude::{new_test_with_genesis, TestState};
 use polkadot_sdk::{
 	pallet_balances,
@@ -127,6 +127,8 @@ impl Config for Test {
 }
 
 impl pallet_treasury_positions::Config for Test {
+	type OwnershipCurrency = Balances;
+	type BlockRewardAccountsProvider = ();
 	type Balance = Balance;
 	type Currency = Balances;
 	type OperationalAccountProvider = ();
@@ -175,7 +177,7 @@ pub fn new_test_ext() -> TestState {
 	});
 	ext.execute_with(|| {
 		System::set_block_number(1);
-		StorageVersion::new(4).put::<TreasuryPositions>();
+		TreasuryPositions::in_code_storage_version().put::<TreasuryPositions>();
 		assert_ok!(TreasuryPositions::prepare_collect());
 		LastGatewayState::set(None);
 		ApprovedPool::<Test>::put(Pool::get());

@@ -1202,22 +1202,32 @@ async fn create_vault(
 	vault_signer: &impl Signer<ArgonConfig>,
 ) -> anyhow::Result<VaultId> {
 	let client = test_node.client.clone();
-	// wait for alice to have enough argons
-	let mut finalized_sub = client.live.blocks().subscribe_finalized().await?;
+	// Mining rewards must be collected before they can fund the vault.
 	let vault_account = client.api_account(vault_owner_account_id32);
 	let lookup = storage().system().account(vault_account);
-	while let Some(block) = finalized_sub.next().await {
-		println!("Waiting for Alice to have enough argons");
-		if let Some(alice_balance) =
-			client.fetch_storage(&lookup, FetchAt::Block(block.unwrap().hash())).await?
-		{
-			println!("Alice argon balance {:#?}", alice_balance.data.free);
-			if alice_balance.data.free > 100_001_000_000 {
-				println!("Alice can start a vault now!");
-				break;
+	let funding = async {
+		let mut finalized_sub = client.live.blocks().subscribe_finalized().await?;
+		while let Some(block) = finalized_sub.next().await {
+			block?;
+			println!("Waiting for Alice to have enough argons");
+			if let Some(alice_balance) = client.fetch_storage(&lookup, FetchAt::Finalized).await? {
+				println!("Alice argon balance {:#?}", alice_balance.data.free);
+				if alice_balance.data.free > 100_001_000_000 {
+					println!("Alice can start a vault now!");
+					return Ok(());
+				}
 			}
+
+			let params = client.params_with_best_nonce(vault_owner_account_id32).await?.build();
+			client
+				.submit_tx(&tx().treasury_positions().collect(), vault_signer, Some(params), true)
+				.await?;
 		}
-	}
+		Err(anyhow!("Finalized block stream ended before vault funding"))
+	};
+	tokio::time::timeout(Duration::from_secs(120), funding)
+		.await
+		.map_err(|_| anyhow!("Timed out waiting for vault funding"))??;
 
 	println!("creating a vault");
 	let params = client.params_with_best_nonce(&vault_owner_account_id32.clone()).await?.build();

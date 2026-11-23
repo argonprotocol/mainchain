@@ -1,4 +1,4 @@
-use frame_support::traits::StorageMapShim;
+use frame_support::traits::{GetStorageVersion, StorageMapShim};
 use pallet_prelude::*;
 
 use crate as pallet_block_rewards;
@@ -8,7 +8,8 @@ use argon_primitives::{
 	notary::{NotaryProvider, NotarySignature},
 	tick::Ticker,
 	BlockRewardAccountsProvider, BlockRewardsEventHandler, BlockSealerInfo, BlockSealerProvider,
-	NotebookProvider, NotebookSecret, PriceProvider, TickProvider, VotingSchedule,
+	MiningFrameTransitionProvider, NotebookProvider, NotebookSecret, PriceProvider, TickProvider,
+	VotingSchedule,
 };
 
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -19,6 +20,7 @@ frame_support::construct_runtime!(
 	pub enum Test
 	{
 		System: frame_system,
+		TreasuryPositions: pallet_treasury_positions,
 		BlockRewards: pallet_block_rewards,
 		Balances: pallet_balances::<Instance1>::{Pallet, Call, Storage, Config<T>, Event<T>},
 		Ownership: pallet_balances::<Instance2>::{Pallet, Call, Storage, Config<T>, Event<T>},
@@ -239,6 +241,7 @@ impl PriceProvider<Balance> for StaticPriceProvider {
 }
 
 impl pallet_block_rewards::Config for Test {
+	type PositionProvider = TreasuryPositions;
 	type WeightInfo = ();
 	type ArgonCurrency = Balances;
 	type OwnershipCurrency = Ownership;
@@ -264,5 +267,37 @@ impl pallet_block_rewards::Config for Test {
 }
 
 pub fn new_test_ext() -> TestState {
-	new_test_with_genesis::<Test>(|_t| {})
+	{
+		let mut ext = new_test_with_genesis::<Test>(|_t| {});
+		ext.execute_with(|| {
+			TreasuryPositions::in_code_storage_version().put::<TreasuryPositions>()
+		});
+		ext
+	}
+}
+
+parameter_types! { pub const CollectPalletId: PalletId = PalletId(*b"arg/colt"); }
+impl MiningFrameTransitionProvider for TestProvider {
+	type Weights = ();
+	fn get_current_frame_id() -> FrameId {
+		1
+	}
+	fn is_new_frame_started() -> Option<FrameId> {
+		None
+	}
+}
+impl pallet_treasury_positions::Config for Test {
+	type Balance = Balance;
+	type Currency = Balances;
+	type OwnershipCurrency = Ownership;
+	type PalletId = CollectPalletId;
+	type MaxEarningChangesPerCall = ConstU32<32>;
+	type MiningFrameTransitionProvider = TestProvider;
+	type BlockRewardAccountsProvider = ();
+	type BitcoinPositionProvider = ();
+	type TreasuryPoolProvider = ();
+	type EarningsSettlementProvider = ();
+	type VaultEarningsProvider = ();
+	type OperationalAccountProvider = ();
+	type WeightInfo = ();
 }

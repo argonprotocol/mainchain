@@ -26,6 +26,7 @@ pub mod pallet {
 	use argon_primitives::{
 		bitcoin::{BitcoinLockId, FissionId},
 		block_seal::{BlockPayout, FrameId},
+		treasury::TreasuryPositionProvider,
 		ArgonCPI, BitcoinFissionMinting, BitcoinMintedProvider, BlockRewardAccountsProvider,
 		BlockRewardsEventHandler, BurnEventHandler, PriceProvider,
 	};
@@ -70,6 +71,8 @@ pub mod pallet {
 
 		/// The provider of reward account ids
 		type BlockRewardAccountsProvider: BlockRewardAccountsProvider<Self::AccountId>;
+		/// Funds and indexes mining rewards in shared Collect custody.
+		type PositionProvider: TreasuryPositionProvider<Self::AccountId, Self::Balance>;
 
 		/// The maximum number of mint histories to keep
 		#[pallet::constant]
@@ -136,8 +139,7 @@ pub mod pallet {
 			lock_id: Option<BitcoinLockId>,
 			amount: T::Balance,
 		},
-		/// The amount of microgons minted for mining. NOTE: accounts below Existential Deposit
-		/// will not be able to mint
+		/// ARGON expansion minted into custody and indexed for eligible mining seats.
 		MiningMint {
 			amount: T::Balance,
 			per_miner: T::Balance,
@@ -168,6 +170,8 @@ pub mod pallet {
 		<T as Config>::Balance: From<u128>,
 	{
 		fn on_initialize(n: BlockNumberFor<T>) -> Weight {
+			let frame_weight = weights::mining_frame::<T>();
+
 			let mut block_mint_action = <BlockMintAction<T>>::mutate(|(b, data)| {
 				// if this is for a different block, clear it first (this can be set from other
 				// pallets via event handlers)
@@ -181,7 +185,7 @@ pub mod pallet {
 			// only mint when cpi is negative or 0
 			if argon_cpi.is_positive() {
 				log::trace!("Argon cpi is positive. Nothing to mint.");
-				return T::DbWeight::get().reads(2);
+				return T::DbWeight::get().reads(2).saturating_add(frame_weight);
 			}
 
 			let mut bitcoin_mint = MintedBitcoinMicrogons::<T>::get();
@@ -284,94 +288,73 @@ pub mod pallet {
 			}
 			MintedBitcoinMicrogons::<T>::put(bitcoin_mint);
 			BlockMintAction::<T>::put((n, block_mint_action));
-			T::WeightInfo::on_initialize(payout_window_utxo_count)
+			T::WeightInfo::on_initialize(payout_window_utxo_count).saturating_add(frame_weight)
 		}
 
-		fn on_finalize(n: BlockNumberFor<T>) {
-			let Some(frame_id) = T::MiningFrameProvider::is_new_frame_started() else {
-				return;
-			};
-
-			let last_frame = frame_id.saturating_sub(1);
-			let Some(tick_range) = T::MiningFrameProvider::get_tick_range_for_frame(last_frame)
-			else {
-				return;
-			};
-			// if there are no miners registered, we can't mint
-			let reward_accounts = T::BlockRewardAccountsProvider::get_mint_rewards_accounts();
-			let mut argon_cpi = T::PriceProvider::get_average_cpi_for_ticks(tick_range);
-			let current_cpi = T::PriceProvider::get_argon_cpi().unwrap_or_default();
-
-			// if cpi is coming back to zero (from average), take the current cpi instead
-			if argon_cpi.is_negative() {
-				argon_cpi = argon_cpi.max(current_cpi);
-			}
-
-			// only mint when cpi is negative or 0
-			if !argon_cpi.is_negative() {
-				log::trace!("Argon cpi is non-negative. Nothing to mint.");
-				return;
-			}
-
+		fn on_finalize(_n: BlockNumberFor<T>) {
+			let Some(frame) = T::MiningFrameProvider::is_new_frame_started() else { return };
+			let completed_frame = frame.saturating_sub(1);
+			let cohorts = T::BlockRewardAccountsProvider::get_mint_rewards_cohorts();
+			let seats: u32 = cohorts.iter().map(|(_, count)| *count).sum();
 			let starting_liquidity = T::Currency::total_issuance();
-			let microgons_to_print_per_miner =
-				Self::get_microgons_to_print_per_miner(reward_accounts.len() as u128);
+			let mut argon_cpi = T::PriceProvider::get_argon_cpi().unwrap_or_default();
+			let mut per_seat = T::Balance::zero();
 
-			let mut block_mint_action = BlockMintAction::<T>::get().1;
-			if microgons_to_print_per_miner > T::Balance::zero() {
-				let mut mining_mint_history = MiningMintPerCohort::<T>::get().into_inner();
-				let mut amount_minted = T::Balance::zero();
-				for (miner, starting_frame_id) in reward_accounts {
-					let amount = microgons_to_print_per_miner;
-					match T::Currency::mint_into(&miner, amount) {
-						Ok(_) => {
-							amount_minted.saturating_accrue(amount);
-							block_mint_action.argon_minted.saturating_accrue(amount);
-							if !mining_mint_history.contains_key(&starting_frame_id) &&
-								mining_mint_history.len() >=
-									T::MaxMintHistoryToMaintain::get() as usize
-							{
-								mining_mint_history.pop_first();
-							}
-							mining_mint_history
-								.entry(starting_frame_id)
-								.or_default()
-								.saturating_accrue(amount);
-						},
-						Err(e) => {
-							log::warn!(
-								"Failed to mint {:?} microgons for miner {:?}: {:?}",
-								amount,
-								&miner,
-								e
-							);
-							Self::deposit_event(Event::<T>::MintError {
-								mint_type: MintType::Mining,
-								account_id: miner.clone(),
-								fission_id: None,
-								lock_id: None,
-								amount,
-								error: e,
-							});
-						},
-					};
-				}
-
-				if let Ok(result) = BoundedBTreeMap::try_from(mining_mint_history) {
-					MiningMintPerCohort::<T>::put(result);
-				}
-
-				if !amount_minted.is_zero() {
-					Self::deposit_event(Event::<T>::MiningMint {
-						amount: amount_minted,
-						per_miner: microgons_to_print_per_miner,
-						argon_cpi,
-						liquidity: starting_liquidity,
-					});
+			if let Some(ticks) = T::MiningFrameProvider::get_tick_range_for_frame(completed_frame) {
+				let average_cpi = T::PriceProvider::get_average_cpi_for_ticks(ticks);
+				argon_cpi = average_cpi.max(argon_cpi);
+				if argon_cpi.is_negative() {
+					per_seat = Self::get_microgons_to_print_per_miner(u128::from(seats));
 				}
 			}
 
-			BlockMintAction::<T>::put((n, block_mint_action));
+			match T::PositionProvider::allocate_mining_mint(completed_frame, per_seat, seats) {
+				Ok(false) => return,
+				Ok(true) => {},
+				Err(error) => {
+					log::warn!("Failed to fund mining mint for frame {completed_frame}: {error:?}");
+					per_seat = T::Balance::zero();
+				},
+			}
+
+			let (retired, activated) = T::BlockRewardAccountsProvider::get_mining_seat_changes();
+			for account in retired {
+				if let Err(error) = T::PositionProvider::mining_seats_changed(&account, 1, 0) {
+					log::error!("Failed to retire mining seat for {account:?}: {error:?}");
+				}
+			}
+			for account in activated {
+				if let Err(error) = T::PositionProvider::mining_seats_changed(&account, 0, 1) {
+					log::error!("Failed to activate mining seat for {account:?}: {error:?}");
+				}
+			}
+
+			let amount = per_seat * u128::from(seats).into();
+			if !amount.is_zero() {
+				MiningMintPerCohort::<T>::mutate(|history| {
+					for (cohort, count) in cohorts {
+						let amount = per_seat * u128::from(count).into();
+						if let Some(total) = history.get_mut(&cohort) {
+							total.saturating_accrue(amount);
+							continue
+						}
+
+						if history.len() >= T::MaxMintHistoryToMaintain::get() as usize &&
+							let Some(oldest) = history.keys().next().copied()
+						{
+							history.remove(&oldest);
+						}
+						let _ = history.try_insert(cohort, amount);
+					}
+				});
+				Self::track_block_mint(amount);
+				Self::deposit_event(Event::<T>::MiningMint {
+					amount,
+					per_miner: per_seat,
+					argon_cpi,
+					liquidity: starting_liquidity,
+				});
+			}
 		}
 
 		#[cfg(feature = "try-runtime")]

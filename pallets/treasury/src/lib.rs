@@ -1500,7 +1500,7 @@ pub mod pallet {
 				Preservation::Expendable,
 				Fortitude::Force,
 			)?;
-			let auction_earnings = funding.extract(from_pool.total());
+			let auction_earnings = funding.extract(from_pool.total_argons());
 
 			let (vault_earnings, participating_vaults) = Self::distribute_vault_pool(
 				&mut funding,
@@ -1522,7 +1522,7 @@ pub mod pallet {
 			drop(funding);
 
 			let reserved_from_circulation = full_bid_pool_amount
-				.saturating_sub(from_pool.total())
+				.saturating_sub(from_pool.total_argons())
 				.saturating_sub(vault_earnings);
 			for (allocation, budget) in [
 				(marketing_allocation, &mut reserves.marketing),
@@ -1553,13 +1553,13 @@ pub mod pallet {
 
 			let mut earnings = from_pool;
 			earnings.saturating_accrue(&from_reserve);
-			if !earnings.total().is_zero() {
+			if !earnings.total_argons().is_zero() {
 				T::PositionProvider::prepare_collect()?;
 				let collect_account =
 					T::PositionProvider::collect_account().ok_or(DispatchError::Unavailable)?;
 				T::Currency::resolve(&collect_account, auction_earnings)
 					.map_err(|_| Error::<T>::InternalError)?;
-				T::Currency::mint_into(&collect_account, from_reserve.total())?;
+				T::Currency::mint_into(&collect_account, from_reserve.total_argons())?;
 			}
 			if indexed_earnings_active {
 				T::PositionProvider::allocate_frame_earnings(frame_id, &quantities, earnings)?;
@@ -1567,7 +1567,7 @@ pub mod pallet {
 
 			Self::deposit_event(Event::<T>::FrameEarningsAllocated {
 				frame_id,
-				bid_pool_allocated: from_pool.total().saturating_add(vault_earnings),
+				bid_pool_allocated: from_pool.total_argons().saturating_add(vault_earnings),
 				stake_earnings: earnings.stake_earnings,
 				bond_earnings: earnings.bond_earnings,
 				bitcoin_earnings: earnings.bitcoin_earnings,

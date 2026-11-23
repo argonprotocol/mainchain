@@ -22,7 +22,7 @@ fn manual_collect_preserves_failed_claims_and_never_auto_pays() {
 		assert_eq!(Balances::balance(&10), 0);
 		assert_noop!(
 			TreasuryPositions::collect(RuntimeOrigin::signed(9)),
-			sp_runtime::TokenError::BelowMinimum
+			TokenError::BelowMinimum
 		);
 		assert_eq!(CollectedThrough::get()[&9], [11, 9]);
 		assert_eq!(Balances::balance(&9), 0);
@@ -257,7 +257,7 @@ fn indexes_preserve_frame_start_quantities_and_collect_once() {
 			},
 		);
 		assert_eq!(Balances::balance(&9), 0);
-		assert_eq!(PositionsByAccount::<Test>::get(9).unwrap().collect_accrued.total(), 0);
+		assert_eq!(PositionsByAccount::<Test>::get(9).unwrap().collect_accrued.total_argons(), 0);
 		assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(9)));
 		assert_eq!(Balances::balance(&9), 25);
 		assert!(!EarningPositionChanges::<Test>::contains_key(9, 2));
@@ -398,10 +398,141 @@ fn saturated_history_cannot_block_funded_earnings_or_wallet_collection() {
 		assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(9)));
 		assert_eq!(Balances::balance(&9), 10);
 		assert_eq!(Balances::balance(&TreasuryPositions::account_id()), 10);
-		assert_eq!(PositionsByAccount::<Test>::get(9).unwrap().collect_accrued.total(), 0);
+		assert_eq!(PositionsByAccount::<Test>::get(9).unwrap().collect_accrued.total_argons(), 0);
 		assert_eq!(CollectTotals::<Test>::get().funded.bond_earnings, u128::MAX);
 		assert_eq!(CollectTotals::<Test>::get().collected.bond_earnings, u128::MAX);
 		assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(9)));
 		assert_eq!(Balances::balance(&9), 10);
+	});
+}
+
+#[test]
+fn linked_collection_pays_both_currencies_to_the_caller_and_rolls_back_on_failure() {
+	new_test_ext().execute_with(|| {
+		System::set_block_number(1);
+		assert_ok!(TreasuryPositions::mining_seats_changed(&9, 0, 2));
+		assert_ok!(TreasuryPositions::allocate_mining_mint(1, 7, 2));
+		for (source, amount) in [
+			(CollectSource::MiningEarnings, 30),
+			(CollectSource::MiningArgonots, 5),
+			(CollectSource::StabilizerBuys, 10),
+		] {
+			assert_ok!(TreasuryPositions::fund(source, amount));
+			assert_ok!(TreasuryPositions::accrue(&9, source, amount));
+		}
+		assert_noop!(
+			TreasuryPositions::collect_for(RuntimeOrigin::signed(8), 10),
+			Error::<Test>::NotLinkedAccount
+		);
+		assert_noop!(
+			TreasuryPositions::collect_for(RuntimeOrigin::signed(11), 12),
+			Error::<Test>::NotLinkedAccount
+		);
+		assert_noop!(
+			TreasuryPositions::collect_for(RuntimeOrigin::signed(8), 9),
+			TokenError::BelowMinimum
+		);
+		assert_eq!(Balances::balance(&8), 0);
+		assert_eq!(Ownership::balance(&8), 0);
+		assert_eq!(Balances::balance(&9), 0);
+		assert_eq!(PositionsByAccount::<Test>::get(9).unwrap().mining_mint_checkpoint, 0);
+		assert_eq!(CollectTotals::<Test>::get().collected, CollectAmounts::default());
+
+		assert_ok!(TreasuryPositions::fund(CollectSource::MiningArgonots, 5));
+		assert_ok!(TreasuryPositions::accrue(&9, CollectSource::MiningArgonots, 5));
+		assert_ok!(TreasuryPositions::collect_for(RuntimeOrigin::signed(8), 9));
+		assert_eq!(Balances::balance(&8), 54);
+		assert_eq!(Ownership::balance(&8), 10);
+		assert_eq!(Balances::balance(&9), 0);
+		assert_eq!(Ownership::balance(&9), 0);
+		let collected = PositionsByAccount::<Test>::get(9).unwrap().collected;
+		assert_eq!(collected.mining_earnings, 30);
+		assert_eq!(collected.mining_mints, 14);
+		assert_eq!(collected.mining_micronots, 10);
+		assert_eq!(collected.stabilizer_buy_earnings, 10);
+		assert!(!PositionsByAccount::<Test>::contains_key(8));
+		System::assert_last_event(
+			Event::Collected { account: 9, recipient: 8, amounts: collected }.into(),
+		);
+		let event_count = System::events().len();
+		assert_ok!(TreasuryPositions::collect_for(RuntimeOrigin::signed(8), 9));
+		assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(9)));
+		assert_eq!(System::events().len(), event_count);
+		assert_eq!(PositionsByAccount::<Test>::get(9).unwrap().collected, collected);
+		assert_eq!(Balances::balance(&8), 54);
+		assert_eq!(Ownership::balance(&8), 10);
+	});
+}
+
+#[test]
+fn mining_index_preserves_retiring_seats_and_excludes_new_seats_from_old_mints() {
+	new_test_ext().execute_with(|| {
+		assert_ok!(TreasuryPositions::mining_seats_changed(&9, 0, 2));
+		assert_eq!(TreasuryPositions::allocate_mining_mint(1, 7, 2), Ok(true));
+		assert_ok!(TreasuryPositions::mining_seats_changed(&9, 1, 0));
+		assert_ok!(TreasuryPositions::mining_seats_changed(&8, 0, 2));
+		assert_eq!(PositionsByAccount::<Test>::get(9).unwrap().collect_accrued.mining_mints, 14);
+		assert_eq!(TreasuryPositions::allocate_mining_mint(2, 3, 3), Ok(true));
+		let issuance = Balances::total_issuance();
+		assert_eq!(TreasuryPositions::allocate_mining_mint(2, 3, 3), Ok(false));
+		assert_eq!(Balances::total_issuance(), issuance);
+		assert_ok!(TreasuryPositions::mining_seats_changed(&9, 1, 0));
+		assert_ok!(TreasuryPositions::mining_seats_changed(&8, 2, 0));
+		assert_eq!(TreasuryPositions::allocate_mining_mint(3, 0, 0), Ok(true));
+		assert_eq!(MiningMintIndex::<Test>::get().last_processed_frame, Some(3));
+		assert_eq!(MiningMintIndex::<Test>::get().microgons_per_seat, 10);
+		assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(9)));
+		assert_eq!(Balances::balance(&9), 17);
+		assert_eq!(PositionsByAccount::<Test>::get(8).unwrap().collect_accrued.mining_mints, 6);
+		assert_eq!(PositionsByAccount::<Test>::get(9).unwrap().mining_seats, 0);
+		assert_eq!(CollectTotals::<Test>::get().funded.mining_mints, 23);
+	});
+}
+
+#[test]
+fn mining_index_overflow_skips_the_frame_before_funding() {
+	new_test_ext().execute_with(|| {
+		MiningMintIndex::<Test>::put(MiningMintIndexState {
+			microgons_per_seat: u128::MAX,
+			last_processed_frame: Some(1),
+		});
+		let issuance = Balances::total_issuance();
+		assert_eq!(
+			TreasuryPositions::allocate_mining_mint(2, 1, 1),
+			Err(ArithmeticError::Overflow.into())
+		);
+		assert_eq!(Balances::total_issuance(), issuance);
+		assert_eq!(CollectTotals::<Test>::get().funded.mining_mints, 0);
+		assert_eq!(MiningMintIndex::<Test>::get().microgons_per_seat, u128::MAX);
+		assert_eq!(MiningMintIndex::<Test>::get().last_processed_frame, Some(2));
+		assert_eq!(TreasuryPositions::allocate_mining_mint(2, 1, 1), Ok(false));
+	});
+}
+
+#[test]
+fn migrated_source_claims_are_backed_before_new_funding() {
+	new_test_ext().execute_with(|| {
+		TreasuryPositions::migrate_accrued(
+			&9,
+			CollectAmounts { stabilizer_pool_earnings: 20, ..Default::default() },
+		);
+		TreasuryPositions::migrate_accrued(
+			&11,
+			CollectAmounts { stabilizer_buy_earnings: 17, ..Default::default() },
+		);
+		assert_eq!(PendingCollectBacking::<Test>::get().unwrap().total_argons(), 37);
+		assert_eq!(Balances::total_issuance(), 0);
+
+		assert_ok!(TreasuryPositions::fund(CollectSource::StabilizerPools, 100));
+		assert_ok!(TreasuryPositions::accrue(&10, CollectSource::StabilizerPools, 100));
+		assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(10)));
+		assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(9)));
+		assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(11)));
+		assert_eq!(Balances::balance(&10), 100);
+		assert_eq!(Balances::balance(&9), 20);
+		assert_eq!(Balances::balance(&11), 17);
+		assert_eq!(Balances::balance(&TreasuryPositions::account_id()), 10);
+		assert_eq!(Balances::total_issuance(), 147);
+		assert!(!PendingCollectBacking::<Test>::exists());
 	});
 }

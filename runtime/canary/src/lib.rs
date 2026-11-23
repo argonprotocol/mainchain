@@ -220,6 +220,7 @@ impl Get<Tick> for NotebookTickProvider {
 }
 
 impl pallet_block_rewards::Config for Runtime {
+	type PositionProvider = use_unless_benchmark!(TreasuryPositions, benchmarking::BenchmarkTreasuryPositionProvider<AccountId, Balance>);
 	type WeightInfo = pallet_block_rewards::weights::WithProviderWeights<
 		Runtime,
 		weights::pallet_block_rewards::WeightInfo<Runtime>,
@@ -764,6 +765,7 @@ impl pallet_bitcoin_fissions::Config for Runtime {
 }
 
 impl pallet_mint::Config for Runtime {
+	type PositionProvider = use_unless_benchmark!(TreasuryPositions, benchmarking::BenchmarkTreasuryPositionProvider<AccountId, Balance>);
 	type WeightInfo = weights::pallet_mint::WeightInfo<Runtime>;
 	type Currency = Balances;
 	type PriceProvider =
@@ -826,7 +828,8 @@ impl pallet_transaction_payment::Config for Runtime {
 	type WeightToFee = ArgonWeightToFee;
 	type LengthToFee = ConstantMultiplier<Balance, TransactionByteFee>;
 	type FeeMultiplierUpdate = ConstFeeMultiplier<FeeMultiplier>;
-	type WeightInfo = weights::pallet_transaction_payment::WeightInfo<Runtime>;
+	type WeightInfo =
+		WithMiningFeeWeights<Runtime, weights::pallet_transaction_payment::WeightInfo<Runtime>>;
 }
 
 impl pallet_crosschain_transfer::Config for Runtime {
@@ -960,6 +963,11 @@ parameter_types! {
 }
 
 impl pallet_treasury_positions::Config for Runtime {
+	type OwnershipCurrency = Ownership;
+	type BlockRewardAccountsProvider = use_unless_benchmark!(
+		MiningSlot,
+		benchmarking::BenchmarkBlockRewardAccountsProvider<AccountId>
+	);
 	type BitcoinPositionProvider = use_unless_benchmark!(BitcoinLocks, ());
 	type TreasuryPoolProvider = use_unless_benchmark!(Treasury, ());
 	type EarningsSettlementProvider = use_unless_benchmark!(StabilizerPools, ());

@@ -36,6 +36,22 @@ These rules apply to implementation and regular code/PR review, including reused
   order, logical spacing, compound conditions, naming, imports, field documentation, and unnecessary
   indirection. Formatting checks alone do not establish readability.
 
+## Runtime Transactions and Hook Failures
+
+- Use FRAME's `VersionedMigration` with `UncheckedOnRuntimeUpgrade` for ordinary pallet upgrades.
+  Let the wrapper own version checks and writes. Include `pre_upgrade` and `post_upgrade` checks for
+  preserved data and initialized state.
+- Before adding a transaction, trace the concrete caller, its callers, and the provider
+  implementation. Identify the existing FRAME dispatch or block boundary and whether the caller
+  catches errors. Do not add a transaction merely because a function writes several storage items.
+- Default to no extra transaction layers in hooks or provider helpers. Validate fallible work before
+  committing side effects where possible. Add a local rollback boundary only for a concrete partial
+  write that a recovering caller could otherwise retain; explain that need in the review.
+- Preserve non-panicking hook and fee-payment failure handling. Never introduce `expect` or `unwrap`
+  for a recoverable reward, funding, or accounting error that could prevent block production.
+- Keep the existing execution structure unless the requested behavior needs a change. Do not move
+  hook logic into a helper solely to attach a transaction attribute.
+
 ## Pallet Test Dependencies
 
 - Test behavior in the pallet that owns it. Use provider mocks for setup, return values, callback

@@ -4,14 +4,14 @@ use crate::{
 		AccountIndexLookup, ActiveMinersCount, ArgonotsPerMiningSeat, AveragePricePerSeat,
 		BidsForNextSlotCohort, FrameStartBlockNumbers, HistoricalBidsPerSlot,
 		IsNextSlotBiddingOpen, MinerNonceScoringByCohort, MinersByCohort, MiningConfig,
-		NextCohortSize, NextFrameId,
+		NewlyStartedFrameId, NextCohortSize, NextFrameId,
 	},
 	Error, Event, FrameRewardTicksRemaining, FrameStartTicks, HoldReason, MinerNonce,
 	MinerNonceScoring, Registration, ScheduledCohortSizeChangeByFrame, SeatPriceStats,
 };
 use argon_primitives::{
-	block_seal::MiningRegistration, AuthorityProvider, MiningFrameTransitionProvider,
-	MICROGONS_PER_ARGON,
+	block_seal::MiningRegistration, AuthorityProvider, BlockRewardAccountsProvider,
+	MiningFrameTransitionProvider, MICROGONS_PER_ARGON,
 };
 use frame_system::AccountInfo;
 use pallet_balances::{AccountData, Event as OwnershipEvent, ExtraFlags};
@@ -3090,7 +3090,7 @@ fn auction_bid_max_update_enforces_owner_frame_funding_and_auction_window() {
 			IsNextSlotBiddingOpen::<Test>::put(closed_state != 0);
 			crate::AuctionAdmissionClosed::<Test>::put(closed_state == 1);
 			if closed_state == 2 {
-				crate::NewlyStartedFrameId::<Test>::put(2);
+				NewlyStartedFrameId::<Test>::put(2);
 			}
 			assert_noop!(
 				MiningSlots::bid_max(RuntimeOrigin::signed(1), 150 * A, None, None, 2),
@@ -3098,7 +3098,7 @@ fn auction_bid_max_update_enforces_owner_frame_funding_and_auction_window() {
 			);
 		}
 		IsNextSlotBiddingOpen::<Test>::put(true);
-		crate::NewlyStartedFrameId::<Test>::kill();
+		NewlyStartedFrameId::<Test>::kill();
 		crate::AuctionRulesStartAt::<Test>::put(3);
 		assert_noop!(
 			MiningSlots::bid_max(RuntimeOrigin::signed(1), 150 * A, None, None, 2),
@@ -3640,7 +3640,7 @@ fn auction_final_reveals_and_buffer_precede_activation_even_on_tick_jump() {
 					reveal_range(1, 10 * A, 100 * A);
 				}
 				if block < activation_block {
-					assert!(crate::NewlyStartedFrameId::<Test>::get().is_none());
+					assert!(NewlyStartedFrameId::<Test>::get().is_none());
 					assert_noop!(
 						MiningSlots::bid(
 							RuntimeOrigin::signed(2),
@@ -3717,7 +3717,7 @@ fn legacy_upgrade_accepts_bids_in_activation_block() {
 			ElapsedTicks::set(deadline);
 			System::initialize(&2, &System::parent_hash(), &Digest::default());
 			MiningSlots::on_initialize(2);
-			assert_eq!(crate::NewlyStartedFrameId::<Test>::get(), Some(frame));
+			assert_eq!(NewlyStartedFrameId::<Test>::get(), Some(frame));
 			let bid = RuntimeCall::MiningSlots(crate::Call::bid {
 				bid: 20 * A,
 				keys: 2.into(),
@@ -4394,5 +4394,44 @@ fn live_fixed_bids_win_maximum_ties_ahead_of_committed_ranges() {
 		assert_eq!(paid(1), Some(100 * A));
 		assert_eq!(paid(2), None);
 		assert_eq!(Balances::free_balance(BidPoolAccountId::get()), 200 * A);
+	});
+}
+
+#[test]
+fn mint_cohort_counts_and_account_changes_preserve_closing_frame_membership() {
+	new_test_ext().execute_with(|| {
+		let frame = u64::from(FramesPerMiningTerm::get()) + 1;
+		for (cohort, accounts) in [(1, vec![1, 2]), (2, vec![3]), (frame, vec![4])] {
+			let registrations = accounts
+				.into_iter()
+				.map(|account_id| Registration::<Test> {
+					account_id,
+					external_funding_account: Some(9),
+					bid: 0,
+					argonots: 0,
+					authority_keys: account_id.into(),
+					starting_frame_id: cohort,
+					bid_at_tick: 1,
+				})
+				.collect::<Vec<_>>();
+			if cohort == frame {
+				BidsForNextSlotCohort::<Test>::put(
+					BoundedVec::<_, MaxCohortSize>::try_from(registrations).unwrap(),
+				);
+			} else {
+				MinersByCohort::<Test>::insert(
+					cohort,
+					BoundedVec::<_, MaxCohortSize>::try_from(registrations).unwrap(),
+				);
+			}
+		}
+		ActiveMinersCount::<Test>::put(3);
+		NewlyStartedFrameId::<Test>::put(frame);
+		MiningSlots::start_new_frame(frame);
+		let mut cohorts = MiningSlots::get_mint_rewards_cohorts();
+		cohorts.sort();
+		assert_eq!(cohorts, vec![(1, 2), (2, 1)]);
+		assert_eq!(MiningSlots::get_mining_seat_changes(), (vec![9, 9], vec![9]));
+		assert_eq!(MiningSlots::get_active_mining_rewards_accounts(), vec![9, 9]);
 	});
 }

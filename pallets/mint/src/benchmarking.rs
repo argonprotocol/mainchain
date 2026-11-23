@@ -3,11 +3,14 @@ use frame_support::traits::Hooks;
 use pallet_prelude::{
 	argon_primitives::{bitcoin::BitcoinLockId, BitcoinFissionMinting},
 	benchmarking::{
-		set_benchmark_mining_clock, set_benchmark_price_provider_state, BenchmarkMiningClock,
-		BenchmarkPriceProviderState,
+		set_benchmark_block_reward_accounts_count, set_benchmark_mining_clock,
+		set_benchmark_price_provider_state, BenchmarkMiningClock, BenchmarkPriceProviderState,
 	},
 };
 use polkadot_sdk::{frame_benchmarking::v2::*, sp_runtime::FixedU128};
+
+#[cfg(test)]
+use crate::mock::{set_cpi, IsNewFrameStart, MinerRewardsAccounts};
 
 const MAX_PENDING_MINT_PAYOUT_WINDOW_BENCH: u32 = 1_000;
 
@@ -17,6 +20,38 @@ const MAX_PENDING_MINT_PAYOUT_WINDOW_BENCH: u32 = 1_000;
 )]
 mod benchmarks {
 	use super::*;
+
+	#[benchmark]
+	fn on_finalize() {
+		set_benchmark_mining_clock(BenchmarkMiningClock {
+			current_frame_id: 12,
+			current_tick: 20,
+			did_start_new_frame: true,
+		});
+		set_benchmark_block_reward_accounts_count(T::MaxPossibleMiners::get());
+		set_benchmark_price_provider_state(BenchmarkPriceProviderState {
+			argon_price_in_usd: Some(FixedU128::from_u32(2)),
+			argon_target_price_in_usd: Some(FixedU128::one()),
+			circulation: 1_000_000_000,
+			..Default::default()
+		});
+		for cohort in 1..=T::MaxMintHistoryToMaintain::get() {
+			MiningMintPerCohort::<T>::mutate(|history| {
+				history.try_insert(u64::from(cohort), 1u128.into()).unwrap();
+			});
+		}
+		#[cfg(test)]
+		{
+			IsNewFrameStart::set(Some(12));
+			set_cpi(-0.5);
+			MinerRewardsAccounts::set(vec![(1, 1)]);
+		}
+		#[block]
+		{
+			Pallet::<T>::on_finalize(1u32.into());
+		}
+		assert!(!BlockMintAction::<T>::get().1.argon_minted.is_zero());
+	}
 
 	#[benchmark]
 	fn on_initialize(

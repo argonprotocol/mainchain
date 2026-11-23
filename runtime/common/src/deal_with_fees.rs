@@ -1,6 +1,9 @@
 #[macro_export]
 macro_rules! deal_with_fees {
 	() => {
+		use argon_primitives::treasury::{
+			TreasuryPositionProvider, TreasuryPositionProviderWeightInfo,
+		};
 		use sp_runtime::AccountId32;
 		pub struct DealWithFees<R>(PhantomData<R>);
 
@@ -18,10 +21,29 @@ macro_rules! deal_with_fees {
 			) {
 				let author = pallet_block_rewards::Pallet::<R>::fees_account();
 				let amount = imbalance.peek();
-				match <pallet_balances::Pallet<R, ArgonToken>>::resolve(&author, imbalance) {
+				match <R as pallet_block_rewards::Config>::PositionProvider::deposit_mining_earnings::<
+					pallet_balances::Pallet<R, ArgonToken>,
+				>(&author, imbalance)
+				{
 					Ok(()) => pallet_block_rewards::Pallet::<R>::track_fee(amount),
-					Err(x) => drop(x),
+					Err(error) => log::warn!("Failed to deposit mining fees: {error:?}"),
 				}
+			}
+		}
+
+		pub struct WithMiningFeeWeights<R, Base>(PhantomData<(R, Base)>);
+
+		impl<R, Base> pallet_transaction_payment::WeightInfo for WithMiningFeeWeights<R, Base>
+		where
+			R: pallet_block_rewards::Config<Balance = Balance>,
+			Base: pallet_transaction_payment::WeightInfo,
+		{
+			fn charge_transaction_payment() -> Weight {
+				let mining_fee_weight = <R::PositionProvider as TreasuryPositionProvider<
+					R::AccountId,
+					Balance,
+				>>::Weights::deposit_mining_earnings();
+				Base::charge_transaction_payment().saturating_add(mining_fee_weight)
 			}
 		}
 

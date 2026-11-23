@@ -1,13 +1,16 @@
 //! Benchmarking setup for pallet-mining-slot
 
 use super::*;
+use alloc::collections::BTreeMap;
 use argon_primitives::{
 	balance_change::MerkleProof, localchain::BlockVote, AccountId, BlockRewardAccountsProvider,
 	MiningSlotProvider, NotaryId,
 };
+use codec::Decode;
 use frame_system::RawOrigin;
 use polkadot_sdk::{frame_benchmarking::v2::*, sp_runtime::BoundedBTreeMap};
 use sp_core::U256;
+use sp_runtime::traits::TrailingZeroInput;
 
 #[benchmarks(
 	where
@@ -96,6 +99,32 @@ mod benchmarks {
 		frame_system::Pallet::<T>::inc_providers(caller);
 		T::OwnershipCurrency::hold(&HoldReason::RegisterAsMiner.into(), caller, 1u128.into())
 			.expect("funded benchmark collateral");
+	}
+
+	#[benchmark]
+	fn provider_get_mint_rewards_cohorts() {
+		seed_mining_reward_cohorts::<T>();
+		#[block]
+		{
+			assert_eq!(
+				<Pallet<T> as BlockRewardAccountsProvider<T::AccountId>>::get_mint_rewards_cohorts(
+				)
+				.len(),
+				T::FramesPerMiningTerm::get() as usize
+			);
+		}
+	}
+
+	#[benchmark]
+	fn provider_get_mining_seat_changes() {
+		seed_mining_reward_cohorts::<T>();
+		#[block]
+		{
+			let (retired, activated) =
+				<Pallet<T> as BlockRewardAccountsProvider<T::AccountId>>::get_mining_seat_changes();
+			assert_eq!(retired.len(), T::MaxCohortSize::get() as usize);
+			assert_eq!(activated.len(), T::MaxCohortSize::get() as usize);
+		}
 	}
 
 	#[benchmark]
@@ -1433,4 +1462,39 @@ mod benchmarks {
 		}
 	}
 	impl_benchmark_test_suite!(Pallet, crate::mock::new_test_ext(), crate::mock::Test);
+}
+
+fn seed_mining_reward_cohorts<T: Config>() {
+	let term = u64::from(T::FramesPerMiningTerm::get());
+	let keys = T::Keys::decode(&mut TrailingZeroInput::zeroes()).unwrap();
+	for frame in 1..=term + 1 {
+		let cohort: Vec<_> = (0..T::MaxCohortSize::get())
+			.map(|index| Registration::<T> {
+				account_id: account("mint-seat", index, frame as u32),
+				external_funding_account: None,
+				bid: 100u128.into(),
+				argonots: 100u128.into(),
+				authority_keys: keys.clone(),
+				starting_frame_id: frame,
+				bid_at_tick: 0,
+			})
+			.collect();
+		if frame == 1 {
+			ReleasedMinersByAccountId::<T>::put(
+				BoundedBTreeMap::<_, _, T::MaxCohortSize>::try_from(
+					cohort
+						.into_iter()
+						.map(|registration| (registration.account_id.clone(), registration))
+						.collect::<BTreeMap<_, _>>(),
+				)
+				.unwrap(),
+			);
+		} else {
+			MinersByCohort::<T>::insert(
+				frame,
+				BoundedVec::<_, T::MaxCohortSize>::try_from(cohort).unwrap(),
+			);
+		}
+	}
+	NewlyStartedFrameId::<T>::put(term + 1);
 }

@@ -718,6 +718,7 @@ impl pallet_bitcoin_fissions::Config for Test {
 }
 
 impl pallet_mint::Config for Test {
+	type PositionProvider = MockTreasuryPositionProvider;
 	type WeightInfo = ();
 	type Currency = Balances;
 	type Balance = Balance;
