@@ -15,6 +15,8 @@ use pallet_prelude::*;
 use sp_runtime::{traits::OpaqueKeys, RuntimeAppPublic};
 pub use weights::*;
 
+type MiningCohort<T> = BoundedVec<Registration<T>, <T as Config>::MaxCohortSize>;
+
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum BidClearing {
 	Delayed,
@@ -1359,7 +1361,7 @@ impl<T: Config> Pallet<T> {
 		mut pending: Vec<(PendingBid<T>, BidEligibility<BlockNumberFor<T>>)>,
 		clearing: BidClearing,
 		added_bidders: &mut BTreeSet<T::AccountId>,
-	) -> Result<Option<BoundedVec<Registration<T>, T::MaxCohortSize>>, DispatchError> {
+	) -> Result<Option<MiningCohort<T>>, DispatchError> {
 		if pending.is_empty() {
 			return Ok(None);
 		}
@@ -1579,7 +1581,7 @@ impl<T: Config> Pallet<T> {
 				.then_with(|| b_funded_max.cmp(a_funded_max))
 				.then_with(|| a_commitment_priority.cmp(b_commitment_priority))
 		});
-		let cohort = BoundedVec::<Registration<T>, T::MaxCohortSize>::try_from(winners)
+		let cohort = MiningCohort::<T>::try_from(winners)
 			.map_err(|_| Error::<T>::TooManyBlockRegistrants)?;
 		BidsForNextSlotCohort::<T>::put(&cohort);
 		Self::record_bid_stats(automatic_bids, &accepted_prices);
