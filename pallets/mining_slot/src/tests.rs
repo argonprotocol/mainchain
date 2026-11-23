@@ -2907,14 +2907,45 @@ fn auction_standing_maximum_reprices_without_owner_and_funding_caps_it() {
 		settle_batch(23);
 		assert_eq!(paid(1), Some(125 * A + CENT));
 		assert_eq!(crate::StandingBids::<Test>::get(1).unwrap().max, 150 * A);
+		assert_eq!(
+			BidsForNextSlotCohort::<Test>::get()
+				.iter()
+				.map(|r| r.account_id)
+				.collect::<Vec<_>>(),
+			vec![1, 4]
+		);
+
 		// Spend the remaining balance: the paid floor survives, unfunded headroom does not.
 		let spend = Balances::free_balance(1) - 1;
 		assert_ok!(Balances::transfer(&1, &20, spend, Preservation::Protect));
+		let pool = Balances::free_balance(BidPoolAccountId::get());
 		System::set_block_number(34);
-		commit_range(5, 125 * A + 2 * CENT, 130 * A);
+		commit_range(4, 125 * A + CENT, 140 * A);
 		System::set_block_number(35);
-		reveal_range(5, 125 * A + 2 * CENT, 130 * A);
+		reveal_range(4, 125 * A + CENT, 140 * A);
+		System::reset_events();
 		settle_batch(34);
+
+		// Miner 1's standing maximum is higher, but its funded maximum is only its paid bid.
+		assert_eq!(crate::StandingBids::<Test>::get(1).unwrap().max, 150 * A);
+		assert_eq!(
+			BidsForNextSlotCohort::<Test>::get()
+				.iter()
+				.map(|r| (r.account_id, r.bid))
+				.collect::<Vec<_>>(),
+			vec![(4, 125 * A + CENT), (1, 125 * A + CENT)]
+		);
+		System::assert_has_event(
+			Event::SlotBidderAdded { account_id: 4, bid_amount: 125 * A + CENT, index: 0 }.into(),
+		);
+		assert_eq!(Balances::free_balance(BidPoolAccountId::get()), pool);
+		assert_eq!(Balances::free_balance(1), 1);
+
+		System::set_block_number(45);
+		commit_range(5, 125 * A + 2 * CENT, 130 * A);
+		System::set_block_number(46);
+		reveal_range(5, 125 * A + 2 * CENT, 130 * A);
+		settle_batch(45);
 		assert_eq!(paid(1), None);
 		assert_eq!(paid(5), Some(125 * A + 2 * CENT));
 		assert_eq!(Balances::free_balance(1), 125 * A + CENT + 1);
@@ -3595,6 +3626,64 @@ fn auction_commitment_capacity_and_duplicates_are_checked_before_acceptance() {
 }
 
 #[test]
+fn auction_winner_positions_follow_paid_bid_funded_maximum_and_commitment_order() {
+	new_test_ext().execute_with(|| {
+		auction_setup(4);
+		let ranges =
+			[(4, 10 * A, 100 * A), (3, 10 * A, 200 * A), (1, 20 * A, 50 * A), (2, 10 * A, 200 * A)];
+		for &(account, low, high) in &ranges {
+			commit_range(account, low, high);
+		}
+		System::set_block_number(2);
+		for &(account, low, high) in ranges.iter().rev() {
+			reveal_range(account, low, high);
+		}
+		System::reset_events();
+		settle_batch(1);
+
+		let cohort = BidsForNextSlotCohort::<Test>::get();
+		// Paid bid outranks maximum; equal paid bids use funded maximum, then commitment order.
+		assert_eq!(
+			cohort.iter().map(|r| (r.account_id, r.bid)).collect::<Vec<_>>(),
+			vec![(1, 20 * A), (3, 10 * A), (2, 10 * A), (4, 10 * A)]
+		);
+		let positions = System::events()
+			.into_iter()
+			.filter_map(|record| match record.event {
+				RuntimeEvent::MiningSlots(Event::SlotBidderAdded {
+					account_id,
+					bid_amount,
+					index,
+				}) => Some((account_id, bid_amount, index)),
+				_ => None,
+			})
+			.collect::<Vec<_>>();
+		assert_eq!(
+			positions,
+			cohort
+				.iter()
+				.enumerate()
+				.map(|(index, r)| (r.account_id, r.bid, index as u32))
+				.collect::<Vec<_>>()
+		);
+		assert_eq!(Balances::free_balance(BidPoolAccountId::get()), 50 * A);
+
+		MiningSlots::start_new_frame(2);
+
+		assert_eq!(MinersByCohort::<Test>::get(2), cohort);
+		for (index, registration) in cohort.iter().enumerate() {
+			assert_eq!(
+				AccountIndexLookup::<Test>::get(registration.account_id),
+				Some((2, index as u32))
+			);
+		}
+		System::assert_has_event(
+			Event::NewMiners { new_miners: cohort, released_miners: 0, frame_id: 2 }.into(),
+		);
+	});
+}
+
+#[test]
 fn auction_ties_use_commitment_order_and_fixed_priority() {
 	new_test_ext().execute_with(|| {
 		auction_setup(2);
@@ -3615,6 +3704,13 @@ fn auction_ties_use_commitment_order_and_fixed_priority() {
 		assert_eq!(paid(3), Some(100 * A));
 		assert_eq!(paid(1), Some(100 * A));
 		assert_eq!(paid(2), None);
+		assert_eq!(
+			BidsForNextSlotCohort::<Test>::get()
+				.iter()
+				.map(|r| r.account_id)
+				.collect::<Vec<_>>(),
+			vec![1, 3]
+		);
 	});
 }
 
@@ -3970,6 +4066,78 @@ fn live_openings_are_paid_in_the_submission_block_and_survive_expiry() {
 		assert_eq!(Balances::free_balance(BidPoolAccountId::get()), 30 * A);
 		assert_eq!(HistoricalBidsPerSlot::<Test>::get()[0].bids_count, 2);
 	});
+}
+
+#[test]
+fn live_bidder_added_events_match_the_cohort_after_both_clearing_passes() {
+	for evict_disclosed_bidder in [false, true] {
+		new_test_ext().execute_with(|| {
+			live_auction_setup(10);
+			let fixed_bid = |account, amount| {
+				assert_ok!(MiningSlots::bid(
+					RuntimeOrigin::signed(account),
+					amount,
+					MockSessionKeys::from(account),
+					None,
+					Some(2),
+					None,
+				));
+			};
+			auction_block(1, || {
+				for account in 10..18 {
+					fixed_bid(account, 200 * A);
+				}
+				fixed_bid(1, 20 * A);
+				fixed_bid(2, 20 * A - CENT);
+				commit_range(3, 10 * A, 100 * A);
+			});
+			assert_eq!(paid(3), None);
+			System::reset_events();
+
+			auction_block(2, || {
+				reveal_range(3, 10 * A, 100 * A);
+				if evict_disclosed_bidder {
+					fixed_bid(4, 110 * A);
+					fixed_bid(5, 120 * A);
+				} else {
+					fixed_bid(4, 40 * A);
+				}
+			});
+
+			let cohort = BidsForNextSlotCohort::<Test>::get();
+			assert_eq!(cohort.len(), 10);
+			let final_seats = if evict_disclosed_bidder {
+				System::assert_has_event(
+					Event::SlotBidderDropped { account_id: 3, preserved_argonot_hold: false }
+						.into(),
+				);
+				[(5, 120 * A), (4, 110 * A)]
+			} else {
+				[(4, 40 * A), (3, 20 * A + CENT)]
+			};
+			assert_eq!((cohort[8].account_id, cohort[8].bid), final_seats[0]);
+			assert_eq!((cohort[9].account_id, cohort[9].bid), final_seats[1]);
+
+			let added = System::events()
+				.into_iter()
+				.filter_map(|record| match record.event {
+					RuntimeEvent::MiningSlots(Event::SlotBidderAdded {
+						account_id,
+						bid_amount,
+						index,
+					}) => Some((account_id, bid_amount, index)),
+					_ => None,
+				})
+				.collect::<Vec<_>>();
+			assert_eq!(
+				added,
+				vec![
+					(final_seats[0].0, final_seats[0].1, 8),
+					(final_seats[1].0, final_seats[1].1, 9)
+				]
+			);
+		});
+	}
 }
 
 #[test]

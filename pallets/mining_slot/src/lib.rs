@@ -1283,7 +1283,13 @@ impl<T: Config> Pallet<T> {
 				},
 			));
 		}
-		Self::clear_bid_entries(block, pending, BidClearing::Delayed)
+		let mut added_bidders = BTreeSet::new();
+		if let Some(cohort) =
+			Self::clear_bid_entries(block, pending, BidClearing::Delayed, &mut added_bidders)?
+		{
+			Self::emit_added_bidders(&cohort, &added_bidders);
+		}
+		Ok(())
 	}
 
 	/// Maximum changes clear before new openings; deadline cleanup never replays an offer.
@@ -1296,7 +1302,13 @@ impl<T: Config> Pallet<T> {
 				EligibleBids::<T>::get(&miner).ok_or(Error::<T>::MissingBidCommitment)?;
 			disclosures.push((pending, eligibility));
 		}
-		Self::clear_bid_entries(block, disclosures, BidClearing::Disclosure)?;
+		let mut added_bidders = BTreeSet::new();
+		let after_disclosures = Self::clear_bid_entries(
+			block,
+			disclosures,
+			BidClearing::Disclosure,
+			&mut added_bidders,
+		)?;
 
 		let mut openings = Vec::new();
 		for (position, miner) in BidBatches::<T>::get(block).into_iter().enumerate() {
@@ -1316,7 +1328,13 @@ impl<T: Config> Pallet<T> {
 				},
 			));
 		}
-		Self::clear_bid_entries(block, openings, BidClearing::Opening)?;
+		let after_openings =
+			Self::clear_bid_entries(block, openings, BidClearing::Opening, &mut added_bidders)?;
+
+		// Openings can move or displace winners from the disclosure pass.
+		if let Some(cohort) = after_openings.or(after_disclosures) {
+			Self::emit_added_bidders(&cohort, &added_bidders);
+		}
 
 		if block >= T::BidRevealBlocks::get().into() {
 			let submitted = block - T::BidRevealBlocks::get().into();
@@ -1340,9 +1358,10 @@ impl<T: Config> Pallet<T> {
 		block: BlockNumberFor<T>,
 		mut pending: Vec<(PendingBid<T>, BidEligibility<BlockNumberFor<T>>)>,
 		clearing: BidClearing,
-	) -> DispatchResult {
+		added_bidders: &mut BTreeSet<T::AccountId>,
+	) -> Result<Option<BoundedVec<Registration<T>, T::MaxCohortSize>>, DispatchError> {
 		if pending.is_empty() {
-			return Ok(());
+			return Ok(None);
 		}
 		if clearing == BidClearing::Disclosure {
 			pending
@@ -1499,6 +1518,18 @@ impl<T: Config> Pallet<T> {
 				});
 			}
 			winners.push(registration);
+
+			if !applied_offer {
+				continue;
+			}
+			if clearing == BidClearing::Disclosure {
+				let authority_unchanged =
+					previous.is_some_and(|old| old.authority_keys == r.authority_keys);
+				if authority_unchanged {
+					continue;
+				}
+			}
+			added_bidders.insert(r.account_id.clone());
 		}
 		for (entry, _) in &pending {
 			// A rejected replacement does not replace a still-winning incumbent's keys/offer.
@@ -1529,25 +1560,35 @@ impl<T: Config> Pallet<T> {
 				Self::release_failed_bid(registration)?;
 			}
 		}
-		// Display order follows paid prices; stable ties retain original commitment priority.
+		// Rank winners by paid bid, funded maximum, then original commitment priority.
 		let priorities = offers
 			.iter()
-			.map(|(r, s, _)| (r.account_id.clone(), (s.submitted_at, s.position)))
+			.map(|(registration, standing, budget)| {
+				(
+					registration.account_id.clone(),
+					(*budget, (standing.submitted_at, standing.position)),
+				)
+			})
 			.collect::<BTreeMap<_, _>>();
 		winners.sort_by(|a, b| {
+			let (a_funded_max, a_commitment_priority) = &priorities[&a.account_id];
+			let (b_funded_max, b_commitment_priority) = &priorities[&b.account_id];
+
 			b.bid
 				.cmp(&a.bid)
-				.then_with(|| priorities[&a.account_id].cmp(&priorities[&b.account_id]))
+				.then_with(|| b_funded_max.cmp(a_funded_max))
+				.then_with(|| a_commitment_priority.cmp(b_commitment_priority))
 		});
-		for (index, winner) in winners.iter().enumerate() {
-			let applied_submission = pending
-				.iter()
-				.any(|(p, _)| p.miner == winner.account_id && accepted.contains(&p.miner));
-			let membership_changed = old
-				.iter()
-				.find(|r| r.account_id == winner.account_id)
-				.is_none_or(|r| r.authority_keys != winner.authority_keys);
-			if applied_submission && (clearing != BidClearing::Disclosure || membership_changed) {
+		let cohort = BoundedVec::<Registration<T>, T::MaxCohortSize>::try_from(winners)
+			.map_err(|_| Error::<T>::TooManyBlockRegistrants)?;
+		BidsForNextSlotCohort::<T>::put(&cohort);
+		Self::record_bid_stats(automatic_bids, &accepted_prices);
+		Ok(Some(cohort))
+	}
+
+	fn emit_added_bidders(cohort: &[Registration<T>], added_bidders: &BTreeSet<T::AccountId>) {
+		for (index, winner) in cohort.iter().enumerate() {
+			if added_bidders.contains(&winner.account_id) {
 				Self::deposit_event(Event::SlotBidderAdded {
 					account_id: winner.account_id.clone(),
 					bid_amount: winner.bid,
@@ -1555,12 +1596,6 @@ impl<T: Config> Pallet<T> {
 				});
 			}
 		}
-		BidsForNextSlotCohort::<T>::put(
-			BoundedVec::<Registration<T>, T::MaxCohortSize>::try_from(winners)
-				.map_err(|_| Error::<T>::TooManyBlockRegistrants)?,
-		);
-		Self::record_bid_stats(automatic_bids, &accepted_prices);
-		Ok(())
 	}
 }
 
