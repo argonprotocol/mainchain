@@ -4,7 +4,7 @@ use crate::{
 	*,
 };
 use argon_primitives::{PriceIndexUpdated, MICROGONS_PER_ARGON};
-use frame_support::{assert_noop, assert_ok};
+use frame_support::{assert_noop, assert_ok, dispatch::GetDispatchInfo};
 use rstest::rstest;
 use sp_runtime::AccountId32;
 use uniswap_v3_sdk_bigint::utils::{
@@ -1286,14 +1286,15 @@ fn reports_and_resets_preserve_accepted_earnings(#[case] correction: PositionCor
 			));
 		} else {
 			let unchanged = position_change_evidence(160, 1, liquidity, true, (lower, upper));
-			assert_noop!(
-				StabilizerPools::report_position_change(
-					RuntimeOrigin::signed(reporter.clone()),
-					position,
-					Box::new(unchanged)
-				),
-				Error::<Test>::PositionChangeNotProven
-			);
+			let rejected = RuntimeCall::StabilizerPools(crate::Call::report_position_change {
+				position,
+				proof: Box::new(unchanged),
+			})
+			.dispatch(RuntimeOrigin::signed(reporter.clone()))
+			.unwrap_err();
+			assert_eq!(rejected.error, Error::<Test>::PositionChangeNotProven.into());
+			assert_eq!(rejected.post_info.pays_fee, Pays::Yes);
+
 			let reported_liquidity = if revision_report { liquidity * 2 } else { liquidity };
 			let changed = position_change_evidence(
 				170,
@@ -1302,19 +1303,44 @@ fn reports_and_resets_preserve_accepted_earnings(#[case] correction: PositionCor
 				revision_report,
 				(lower, upper),
 			);
-			assert_ok!(StabilizerPools::report_position_change(
-				RuntimeOrigin::signed(reporter.clone()),
+			let call = RuntimeCall::StabilizerPools(crate::Call::report_position_change {
 				position,
-				Box::new(changed.clone())
-			));
-			assert_noop!(
-				StabilizerPools::report_position_change(
-					RuntimeOrigin::signed(reporter.clone()),
-					position,
-					Box::new(changed)
-				),
-				Error::<Test>::PositionNotEnrolled
+				proof: Box::new(changed.clone()),
+			});
+			assert_ok!(StabilizerPools::validate(&call, Some(&reporter)));
+			let pool_key = StabilizerPools::key_for(&call, Some(&reporter)).unwrap();
+			assert_eq!(StabilizerPools::key_for(&call, Some(&owner)), Some(pool_key.clone()));
+			let other_proof = RuntimeCall::StabilizerPools(crate::Call::report_position_change {
+				position,
+				proof: Box::new(position_change_evidence(
+					171,
+					3,
+					reported_liquidity,
+					!revision_report,
+					(lower, upper),
+				)),
+			});
+			assert_eq!(StabilizerPools::key_for(&other_proof, Some(&reporter)), Some(pool_key));
+			assert_eq!(call.get_dispatch_info().pays_fee, Pays::Yes);
+			let result = call.clone().dispatch(RuntimeOrigin::signed(reporter.clone())).unwrap();
+			assert_eq!(result.pays_fee, Pays::No);
+			assert_eq!(
+				StabilizerPools::validate(&call, Some(&reporter)),
+				Err(InvalidTransaction::Stale.into())
 			);
+			assert_eq!(
+				StabilizerPools::validate(&other_proof, Some(&reporter)),
+				Err(InvalidTransaction::Stale.into())
+			);
+
+			let duplicate = RuntimeCall::StabilizerPools(crate::Call::report_position_change {
+				position,
+				proof: Box::new(changed),
+			})
+			.dispatch(RuntimeOrigin::signed(reporter.clone()))
+			.unwrap_err();
+			assert_eq!(duplicate.error, Error::<Test>::PositionNotEnrolled.into());
+			assert_eq!(duplicate.post_info.pays_fee, Pays::Yes);
 		}
 		let expected_next_liquidity = if owner_replaces { liquidity * 3 } else { liquidity };
 		assert_eq!(
@@ -1415,6 +1441,42 @@ fn reports_and_resets_preserve_accepted_earnings(#[case] correction: PositionCor
 		start_mining_frame(5, 50);
 		assert_ok!(StabilizerPools::settle_account(&owner));
 		assert_eq!(PaidClaims::get().len(), usize::from(late || revision_report));
+	});
+}
+
+#[test]
+fn position_change_pool_keys_authenticate_each_enrollment() {
+	new_test_ext().execute_with(|| {
+		let (position, mut checkpoint) = enroll_reward_position();
+		let bounds = (checkpoint.tick_lower, checkpoint.tick_upper);
+		let proof = position_change_evidence(100, 2, checkpoint.liquidity, true, bounds);
+		let call = RuntimeCall::StabilizerPools(crate::Call::report_position_change {
+			position,
+			proof: Box::new(proof.clone()),
+		});
+		let pool_key = StabilizerPools::key_for(&call, Some(&checkpoint.beneficiary)).unwrap();
+
+		let mut forged = proof;
+		let PositionChangeProof::Revision(witness) = &mut forged else { unreachable!() };
+		witness.slots[0].value.0[0] ^= 1;
+		let forged_call = RuntimeCall::StabilizerPools(crate::Call::report_position_change {
+			position,
+			proof: Box::new(forged),
+		});
+		assert_eq!(StabilizerPools::key_for(&forged_call, Some(&checkpoint.beneficiary)), None);
+
+		checkpoint.proven_through_block = ethereum_proof_block(100);
+		checkpoint.maintained_since_block = checkpoint.proven_through_block;
+		checkpoint.revision = 2.into();
+		assert_ok!(checkpoint_nft(position.uniswap_nft_id, &checkpoint));
+		assert_eq!(StabilizerPools::key_for(&call, Some(&checkpoint.beneficiary)), None);
+
+		let next_call = RuntimeCall::StabilizerPools(crate::Call::report_position_change {
+			position,
+			proof: Box::new(position_change_evidence(110, 3, checkpoint.liquidity, true, bounds)),
+		});
+		let next_key = StabilizerPools::key_for(&next_call, Some(&checkpoint.beneficiary)).unwrap();
+		assert_ne!(pool_key, next_key);
 	});
 }
 

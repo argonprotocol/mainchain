@@ -13,11 +13,12 @@ use argon_primitives::{
 		CollectSource, EarningsSettlementProvider, StabilizerPoolFrameClaim,
 		StabilizerPoolRewardProvider, TreasuryPositionProvider,
 	},
-	Balance, BlockSealAuthorityId, EthereumAccountStorageProof, EthereumAccountStorageWitness,
-	EthereumAccountStorageWitnessRef, EthereumExecutionBlockProof, EthereumVerifyProvider,
-	MiningFrameTransitionProvider, OnNewSlot, PriceProvider, UniswapNftId, UniswapTick,
+	Balance, BlockSealAuthorityId, CallTxPoolKeyProvider, CallTxValidityProvider,
+	EthereumAccountStorageProof, EthereumAccountStorageWitness, EthereumAccountStorageWitnessRef,
+	EthereumExecutionBlockProof, EthereumVerifyProvider, MiningFrameTransitionProvider, OnNewSlot,
+	PriceProvider, UniswapNftId, UniswapTick,
 };
-use frame_support::traits::Time;
+use frame_support::traits::{IsSubType, Time};
 pub use pallet::*;
 use pallet_prelude::*;
 use sp_core::U512;
@@ -365,37 +366,21 @@ pub mod pallet {
 
 		/// Any signed account may report a newer revision or ended subscription. Proven rewards
 		/// remain collectable after resets or removal. A timely continuation also preserves the
-		/// enrollment and eligibility that has not yet been committed.
+		/// enrollment and eligibility that has not yet been committed. Successful reports refund
+		/// the transaction fee.
 		#[pallet::call_index(2)]
 		#[pallet::weight(weights::report_position_change::<T>(proof))]
 		pub fn report_position_change(
 			origin: OriginFor<T>,
 			position: StabilizerPoolPositionId,
 			proof: Box<PositionChangeProof>,
-		) -> DispatchResult {
+		) -> DispatchResultWithPostInfo {
 			ensure_signed(origin)?;
-			let Some(StabilizerPoolRegistration::Enrolled(enrollment)) =
-				StabilizerPoolRegistrations::<T>::get(position)
-			else {
-				return Err(Error::<T>::PositionNotEnrolled.into());
-			};
-			let previous =
-				PositionCheckpoints::<T>::get(position.position_manager, position.uniswap_nft_id)
-					.ok_or(Error::<T>::PositionNotEnrolled)?;
+			let (previous, enrollment, observed_at) =
+				Self::verify_position_change(position, &proof)?;
 
-			let (account, witness) = evm::decode_position_change::<T>(position, &previous, &proof)?;
-			let observed_at = T::EthereumVerifier::verify_account_storage_proof(account, witness)
-				.map_err(|_| Error::<T>::InvalidProof)?;
-			ensure!(
-				observed_at.number > previous.proven_through_block.number,
-				Error::<T>::StaleCheckpoint
-			);
-			ensure!(
-				observed_at.timestamp_millis > previous.proven_through_block.timestamp_millis,
-				Error::<T>::StaleCheckpoint
-			);
-
-			Self::remove_reported_position(position, &previous, enrollment, observed_at)
+			Self::remove_reported_position(position, &previous, enrollment, observed_at)?;
+			Ok(Pays::No.into())
 		}
 
 		/// Continue the enrollment with another NFT from the same Uniswap PositionManager.
@@ -897,6 +882,37 @@ pub mod pallet {
 			}
 
 			Ok((next_uncommitted_frame, earnings))
+		}
+
+		fn verify_position_change(
+			position: StabilizerPoolPositionId,
+			proof: &PositionChangeProof,
+		) -> Result<
+			(PositionCheckpoint<T::AccountId>, StabilizerPoolEnrollment, ProofBlock),
+			DispatchError,
+		> {
+			let Some(StabilizerPoolRegistration::Enrolled(enrollment)) =
+				StabilizerPoolRegistrations::<T>::get(position)
+			else {
+				return Err(Error::<T>::PositionNotEnrolled.into());
+			};
+			let previous =
+				PositionCheckpoints::<T>::get(position.position_manager, position.uniswap_nft_id)
+					.ok_or(Error::<T>::PositionNotEnrolled)?;
+
+			let (account, witness) = evm::decode_position_change::<T>(position, &previous, proof)?;
+			let observed_at = T::EthereumVerifier::verify_account_storage_proof(account, witness)
+				.map_err(|_| Error::<T>::InvalidProof)?;
+			ensure!(
+				observed_at.number > previous.proven_through_block.number,
+				Error::<T>::StaleCheckpoint
+			);
+			ensure!(
+				observed_at.timestamp_millis > previous.proven_through_block.timestamp_millis,
+				Error::<T>::StaleCheckpoint
+			);
+
+			Ok((previous, enrollment, observed_at))
 		}
 
 		pub(crate) fn remove_reported_position(
@@ -1439,6 +1455,59 @@ pub mod pallet {
 					*stored = None;
 				}
 			});
+			Ok(())
+		}
+	}
+
+	type RuntimeCallOf<T> = <T as frame_system::Config>::RuntimeCall;
+
+	impl<T: Config> CallTxPoolKeyProvider<RuntimeCallOf<T>, T::AccountId> for Pallet<T>
+	where
+		RuntimeCallOf<T>: IsSubType<Call<T>>,
+	{
+		type Weights = weights::TransactionProviderWeights<T>;
+
+		fn key_for(call: &RuntimeCallOf<T>, _signer: Option<&T::AccountId>) -> Option<Vec<u8>> {
+			let Call::report_position_change { position, proof } = call.is_sub_type()? else {
+				return None;
+			};
+
+			// Only authenticated changes may reserve this enrollment's shared pool key.
+			let (checkpoint, _, _) = Self::verify_position_change(*position, proof).ok()?;
+			Some(
+				(
+					b"stabilizer_pools:report".as_slice(),
+					position,
+					checkpoint.subscriber,
+					checkpoint.revision,
+				)
+					.using_encoded(blake2_256)
+					.to_vec(),
+			)
+		}
+	}
+
+	impl<T: Config> CallTxValidityProvider<RuntimeCallOf<T>, T::AccountId> for Pallet<T>
+	where
+		RuntimeCallOf<T>: IsSubType<Call<T>>,
+	{
+		type Weights = weights::TransactionProviderWeights<T>;
+
+		fn validate(
+			call: &RuntimeCallOf<T>,
+			_signer: Option<&T::AccountId>,
+		) -> Result<(), TransactionValidityError> {
+			let Some(Call::report_position_change { position, .. }) = call.is_sub_type() else {
+				return Ok(());
+			};
+
+			if !matches!(
+				StabilizerPoolRegistrations::<T>::get(position),
+				Some(StabilizerPoolRegistration::Enrolled(_))
+			) {
+				return Err(InvalidTransaction::Stale.into());
+			}
+
 			Ok(())
 		}
 	}

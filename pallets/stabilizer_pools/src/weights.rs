@@ -5,14 +5,17 @@ use argon_primitives::{
 		StabilizerPoolRewardProviderWeightInfo, TreasuryPositionProvider,
 		TreasuryPositionProviderWeightInfo,
 	},
-	EthereumExecutionBlockProof, EthereumVerifyProvider, EthereumVerifyProviderWeightInfo,
-	MiningFrameTransitionProvider, MiningFrameTransitionProviderWeightInfo, PriceProvider,
-	PriceProviderWeightInfo,
+	CallTxPoolKeyProviderWeightInfo, CallTxValidityProviderWeightInfo, EthereumExecutionBlockProof,
+	EthereumVerifyProvider, EthereumVerifyProviderWeightInfo, MiningFrameTransitionProvider,
+	MiningFrameTransitionProviderWeightInfo, PriceProvider, PriceProviderWeightInfo,
 };
 use core::marker::PhantomData;
+use frame_support::traits::IsSubType;
 use pallet_prelude::*;
 
 pub trait WeightInfo {
+	fn position_change_pool_key() -> Weight;
+	fn validate_position_change() -> Weight;
 	fn register_pool() -> Weight;
 	fn report_position_change() -> Weight;
 	fn advance_liquidity_snapshots() -> Weight;
@@ -27,6 +30,12 @@ pub trait WeightInfo {
 }
 
 impl WeightInfo for () {
+	fn position_change_pool_key() -> Weight {
+		Weight::zero()
+	}
+	fn validate_position_change() -> Weight {
+		Weight::zero()
+	}
 	fn prove_position_earnings() -> Weight {
 		Weight::zero()
 	}
@@ -96,19 +105,42 @@ pub(crate) fn continue_enrollment<T: Config>(proof: &PositionContinuationProof) 
 }
 
 pub(crate) fn report_position_change<T: Config>(proof: &PositionChangeProof) -> Weight {
-	type ProofWeights<T> = <<T as Config>::EthereumVerifier as EthereumVerifyProvider>::Weights;
-	let witness = match proof {
-		PositionChangeProof::Revision(witness) | PositionChangeProof::Subscription(witness) =>
-			witness,
-	};
-	let header_count = witness.execution_block_proof.target_to_anchor_header_chain.len() as u32;
 	<T as Config>::WeightInfo::report_position_change()
 		.saturating_add(prove_position_earnings::<T>())
 		.saturating_add(FrameWeights::<T>::get_current_frame_id())
-		.saturating_add(ProofWeights::<T>::verify_account_storage_proof(1, header_count))
+		.saturating_add(position_change_proof_weight::<T>(proof))
 }
 
 type RewardWeights<T> = <<T as Config>::RewardProvider as StabilizerPoolRewardProvider>::Weights;
+
+pub struct TransactionProviderWeights<T>(PhantomData<T>);
+
+impl<T: Config> CallTxPoolKeyProviderWeightInfo<T::RuntimeCall> for TransactionProviderWeights<T>
+where
+	T::RuntimeCall: IsSubType<crate::Call<T>>,
+{
+	fn key_for(call: &T::RuntimeCall) -> Weight {
+		if let Some(crate::Call::report_position_change { proof, .. }) = call.is_sub_type() {
+			return T::WeightInfo::position_change_pool_key()
+				.saturating_add(position_change_proof_weight::<T>(proof));
+		}
+
+		Weight::zero()
+	}
+}
+
+impl<T: Config> CallTxValidityProviderWeightInfo<T::RuntimeCall> for TransactionProviderWeights<T>
+where
+	T::RuntimeCall: IsSubType<crate::Call<T>>,
+{
+	fn validate(call: &T::RuntimeCall) -> Weight {
+		if matches!(call.is_sub_type(), Some(crate::Call::report_position_change { .. })) {
+			return T::WeightInfo::validate_position_change();
+		}
+
+		Weight::zero()
+	}
+}
 
 pub struct PositionProviderWeights<T>(PhantomData<T>);
 impl<T: Config> EarningsSettlementProviderWeightInfo for PositionProviderWeights<T> {
@@ -147,4 +179,14 @@ fn position_proof_weight<T: Config>(block: &EthereumExecutionBlockProof) -> Weig
 	ProofWeights::<T>::verify_account_storage_proof(2, headers)
 		.saturating_add(ProofWeights::<T>::verify_account_storage_proof(2, 0))
 		.saturating_add(ProofWeights::<T>::verify_account_storage_proof(1, 0))
+}
+
+fn position_change_proof_weight<T: Config>(proof: &PositionChangeProof) -> Weight {
+	type ProofWeights<T> = <<T as Config>::EthereumVerifier as EthereumVerifyProvider>::Weights;
+	let witness = match proof {
+		PositionChangeProof::Revision(witness) | PositionChangeProof::Subscription(witness) =>
+			witness,
+	};
+	let headers = witness.execution_block_proof.target_to_anchor_header_chain.len() as u32;
+	ProofWeights::<T>::verify_account_storage_proof(1, headers)
 }

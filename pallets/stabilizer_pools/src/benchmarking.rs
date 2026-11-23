@@ -42,9 +42,78 @@ impl EthereumVerifyProvider for BenchmarkEthereumVerifier {
 	}
 }
 
-#[benchmarks]
+#[benchmarks(where T::RuntimeCall: From<Call<T>> + IsSubType<Call<T>>)]
 mod benchmarks {
 	use super::*;
+
+	#[benchmark]
+	fn position_change_pool_key() {
+		let position = StabilizerPoolPositionId {
+			position_manager: config().position_manager,
+			uniswap_nft_id: U256::one(),
+		};
+		let checkpoint = benchmark_checkpoint(whitelisted_caller::<T::AccountId>());
+		PositionCheckpoints::<T>::insert(
+			position.position_manager,
+			position.uniswap_nft_id,
+			&checkpoint,
+		);
+		StabilizerPoolRegistrations::<T>::insert(
+			position,
+			StabilizerPoolRegistration::Enrolled(StabilizerPoolEnrollment {
+				first_eligible_frame_id: FrameId::MAX,
+				next_claim_frame_id: FrameId::MAX,
+			}),
+		);
+		let call = T::RuntimeCall::from(Call::<T>::report_position_change {
+			position,
+			proof: Box::new(position_change_evidence(
+				200,
+				2,
+				checkpoint.liquidity,
+				true,
+				(checkpoint.tick_lower, checkpoint.tick_upper),
+			)),
+		});
+
+		#[block]
+		{
+			let key = <Pallet<T> as CallTxPoolKeyProvider<T::RuntimeCall, T::AccountId>>::key_for(
+				core::hint::black_box(&call),
+				None,
+			)
+			.unwrap();
+			assert_eq!(key.len(), 32);
+		}
+	}
+
+	#[benchmark]
+	fn validate_position_change() {
+		let position = StabilizerPoolPositionId {
+			position_manager: config().position_manager,
+			uniswap_nft_id: U256::MAX,
+		};
+		StabilizerPoolRegistrations::<T>::insert(
+			position,
+			StabilizerPoolRegistration::Enrolled(StabilizerPoolEnrollment {
+				first_eligible_frame_id: FrameId::MAX,
+				next_claim_frame_id: FrameId::MAX,
+			}),
+		);
+		let call = T::RuntimeCall::from(Call::<T>::report_position_change {
+			position,
+			proof: Box::new(position_change_evidence(200, 2, 1, true, (-100, 100))),
+		});
+
+		#[block]
+		{
+			<Pallet<T> as CallTxValidityProvider<T::RuntimeCall, T::AccountId>>::validate(
+				core::hint::black_box(&call),
+				None,
+			)
+			.unwrap();
+		}
+	}
 
 	#[benchmark]
 	fn read_price_index_context() {
