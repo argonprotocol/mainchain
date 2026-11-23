@@ -29,6 +29,7 @@ pub mod pallet {
 		block_seal::{BlockPayout, BlockRewardType, FrameId},
 		notary::NotaryProvider,
 		providers::{PriceProviderWeightInfo, TickProviderWeightInfo},
+		treasury::{CollectSource, TreasuryPositionProvider},
 		BlockRewardAccountsProvider, BlockRewardsEventHandler, BlockSealAuthorityId,
 		BlockSealerProvider, NotebookProvider, OnNewSlot, PriceProvider, TickProvider,
 	};
@@ -73,6 +74,8 @@ pub mod pallet {
 
 		type BlockSealerProvider: BlockSealerProvider<Self::AccountId>;
 		type BlockRewardAccountsProvider: BlockRewardAccountsProvider<Self::AccountId>;
+		/// Custody funding and account attribution for mining block rewards.
+		type PositionProvider: TreasuryPositionProvider<Self::AccountId, Self::Balance>;
 		type NotaryProvider: NotaryProvider<Self::Block, Self::AccountId>;
 		type NotebookProvider: NotebookProvider;
 		type PriceProvider: PriceProvider<Self::Balance>;
@@ -335,20 +338,24 @@ pub mod pallet {
 			reward: &mut BlockPayout<T::AccountId, T::Balance>,
 		) -> DispatchResult {
 			let is_ownership = TypeId::of::<C>() == TypeId::of::<T::OwnershipCurrency>();
-			let amount = if is_ownership { reward.ownership } else { reward.argons };
+			let reward_amount =
+				if is_ownership { &mut reward.ownership } else { &mut reward.argons };
+			let amount = *reward_amount;
 			if amount == 0u128.into() {
 				return Ok(());
 			}
 
-			C::mint_into(&reward.account_id, amount).inspect_err(|_| {
-				if is_ownership {
-					reward.ownership = 0u128.into();
+			let result = if reward.reward_type == BlockRewardType::Miner {
+				let source = if is_ownership {
+					CollectSource::MiningArgonots
 				} else {
-					reward.argons = 0u128.into();
-				}
-			})?;
-
-			Ok(())
+					CollectSource::MiningEarnings
+				};
+				T::PositionProvider::mint_mining_reward(&reward.account_id, source, amount)
+			} else {
+				C::mint_into(&reward.account_id, amount).map(|_| ())
+			};
+			result.inspect_err(|_| *reward_amount = 0u128.into())
 		}
 
 		pub(crate) fn get_minimum_reward_amounts(elapsed_ticks: Tick) -> RewardAmounts<T> {

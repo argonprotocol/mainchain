@@ -1,7 +1,13 @@
 use crate::{block_seal::FrameId, Balance, VaultId};
 use codec::{Codec, Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
 use polkadot_sdk::{
-	frame_support::weights::Weight,
+	frame_support::{
+		traits::{
+			fungible::{Balanced, Credit},
+			tokens::Balance as TokenBalance,
+		},
+		weights::Weight,
+	},
 	sp_runtime::{
 		traits::{AtLeast32BitUnsigned, Saturating},
 		DispatchError, DispatchResult, FixedPointNumber, FixedU128,
@@ -9,7 +15,7 @@ use polkadot_sdk::{
 };
 use scale_info::TypeInfo;
 
-/// Account collection amounts in ARGON microgons, by source.
+/// Account collection amounts by source, in ARGON microgons except `mining_micronots`.
 #[derive(
 	Encode,
 	Decode,
@@ -48,10 +54,19 @@ where
 	/// Vault revenue awaiting collection, subject to the vault's blockers and expiry policy.
 	#[codec(compact)]
 	pub vault_earnings: Balance,
+	/// ARGON block rewards, transaction fees and tips earned by mining.
+	#[codec(compact)]
+	pub mining_earnings: Balance,
+	/// ARGON expansion mints earned by eligible mining seats.
+	#[codec(compact)]
+	pub mining_mints: Balance,
+	/// Mining block rewards in ARGNOT micronots, collected separately from ARGON.
+	#[codec(compact)]
+	pub mining_micronots: Balance,
 }
 
 impl<Balance: AtLeast32BitUnsigned + Copy + Codec + MaxEncodedLen> CollectAmounts<Balance> {
-	pub fn total(&self) -> Balance {
+	pub fn total_argons(&self) -> Balance {
 		self.bond_earnings
 			.saturating_add(self.stake_earnings)
 			.saturating_add(self.bitcoin_earnings)
@@ -59,6 +74,12 @@ impl<Balance: AtLeast32BitUnsigned + Copy + Codec + MaxEncodedLen> CollectAmount
 			.saturating_add(self.stabilizer_buy_earnings)
 			.saturating_add(self.liquid_repayment_earnings)
 			.saturating_add(self.vault_earnings)
+			.saturating_add(self.mining_earnings)
+			.saturating_add(self.mining_mints)
+	}
+
+	pub fn is_zero(&self) -> bool {
+		self.total_argons().is_zero() && self.mining_micronots.is_zero()
 	}
 
 	pub fn saturating_accrue(&mut self, other: &Self) {
@@ -70,6 +91,9 @@ impl<Balance: AtLeast32BitUnsigned + Copy + Codec + MaxEncodedLen> CollectAmount
 		self.liquid_repayment_earnings
 			.saturating_accrue(other.liquid_repayment_earnings);
 		self.vault_earnings.saturating_accrue(other.vault_earnings);
+		self.mining_earnings.saturating_accrue(other.mining_earnings);
+		self.mining_mints.saturating_accrue(other.mining_mints);
+		self.mining_micronots.saturating_accrue(other.mining_micronots);
 	}
 
 	pub fn saturating_reduce(&mut self, other: &Self) {
@@ -81,10 +105,13 @@ impl<Balance: AtLeast32BitUnsigned + Copy + Codec + MaxEncodedLen> CollectAmount
 		self.liquid_repayment_earnings
 			.saturating_reduce(other.liquid_repayment_earnings);
 		self.vault_earnings.saturating_reduce(other.vault_earnings);
+		self.mining_earnings.saturating_reduce(other.mining_earnings);
+		self.mining_mints.saturating_reduce(other.mining_mints);
+		self.mining_micronots.saturating_reduce(other.mining_micronots);
 	}
 }
 
-/// Issued Collect funding and wallet payments, in ARGON microgons by source.
+/// Collect custody funding and wallet payments, by source and currency.
 #[derive(
 	Encode,
 	Decode,
@@ -101,7 +128,7 @@ pub struct CollectTotals<Balance>
 where
 	Balance: Codec + MaxEncodedLen,
 {
-	/// Source funding issued into custody, excluding its minimum balance.
+	/// Source funding received into custody, excluding each currency's minimum balance.
 	pub funded: CollectAmounts<Balance>,
 	/// Backed amounts delivered to wallets since activation.
 	pub collected: CollectAmounts<Balance>,
@@ -137,6 +164,12 @@ pub enum CollectSource {
 	LiquidRepayments,
 	/// Conditional vault revenue, in ARGON.
 	Vaults,
+	/// ARGON mining block rewards, transaction fees and tips.
+	MiningEarnings,
+	/// ARGON expansion mints allocated to mining seats.
+	MiningMints,
+	/// ARGNOT mining block rewards, in micronots.
+	MiningArgonots,
 }
 
 impl<Balance: AtLeast32BitUnsigned + Copy + Default + Codec + MaxEncodedLen>
@@ -152,6 +185,9 @@ impl<Balance: AtLeast32BitUnsigned + Copy + Default + Codec + MaxEncodedLen>
 			CollectSource::StabilizerBuys => amounts.stabilizer_buy_earnings = amount,
 			CollectSource::LiquidRepayments => amounts.liquid_repayment_earnings = amount,
 			CollectSource::Vaults => amounts.vault_earnings = amount,
+			CollectSource::MiningEarnings => amounts.mining_earnings = amount,
+			CollectSource::MiningMints => amounts.mining_mints = amount,
+			CollectSource::MiningArgonots => amounts.mining_micronots = amount,
 		}
 		amounts
 	}
@@ -492,6 +528,21 @@ where
 }
 
 pub trait TreasuryPositionProviderWeightInfo {
+	fn deposit_mining_earnings() -> Weight {
+		Self::prepare_collect()
+			.saturating_add(Self::record_funding())
+			.saturating_add(Self::accrue())
+	}
+	fn mint_mining_reward() -> Weight {
+		Self::fund().saturating_add(Self::accrue())
+	}
+
+	fn allocate_mining_mint() -> Weight {
+		Weight::zero()
+	}
+	fn mining_seats_changed() -> Weight {
+		Weight::zero()
+	}
 	fn record_funding() -> Weight {
 		Weight::zero()
 	}
@@ -559,7 +610,42 @@ impl TreasuryPositionProviderWeightInfo for () {
 /// Source contributions are replaced atomically with their canonical mutation.
 pub trait TreasuryPositionProvider<AccountId, Balance: Codec + MaxEncodedLen> {
 	type Weights: TreasuryPositionProviderWeightInfo;
-	/// Record issued funds already deposited into Collect custody. The source owns funding
+	/// Deposit native ARGON fee/tip credit and attribute it after successful custody funding.
+	/// The caller supplies the runtime's configured native currency credit.
+	fn deposit_mining_earnings<C>(
+		_account: &AccountId,
+		_credit: Credit<AccountId, C>,
+	) -> DispatchResult
+	where
+		Balance: TokenBalance,
+		C: Balanced<AccountId, Balance = Balance>,
+	{
+		Err(DispatchError::Unavailable)
+	}
+	/// Attempt a completed frame's expansion mint once. False means it was already attempted.
+	/// Funding failure leaves the index unchanged and consumes the frame; seats must still rotate.
+	fn allocate_mining_mint(
+		_frame: FrameId,
+		_per_seat: Balance,
+		_seats: u32,
+	) -> Result<bool, DispatchError> {
+		Err(DispatchError::Unavailable)
+	}
+	/// Settle the old seat count before applying activation or retirement in an accepted mining
+	/// frame.
+	fn mining_seats_changed(_account: &AccountId, _removed: u32, _added: u32) -> DispatchResult {
+		Err(DispatchError::Unavailable)
+	}
+	/// Mint a mining block reward into custody and credit its beneficiary after funding succeeds.
+	fn mint_mining_reward(
+		_account: &AccountId,
+		_source: CollectSource,
+		_amount: Balance,
+	) -> DispatchResult {
+		Err(DispatchError::Unavailable)
+	}
+
+	/// Record funds already deposited into Collect custody. The source owns funding
 	/// authorization and the transaction joining that deposit to this accounting.
 	fn record_funding(_amounts: CollectAmounts<Balance>) {}
 	/// Burn expired vault backing and reduce its account bucket in the source's transaction.

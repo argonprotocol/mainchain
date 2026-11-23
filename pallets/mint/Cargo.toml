@@ -21,6 +21,8 @@ polkadot-sdk = { workspace = true, features = ["frame-support", "frame-system", 
 pallet-prelude = { workspace = true }
 
 [dev-dependencies]
+# expansion_mints_are_backed_before_collection verifies real issuance, custody and collection across pallets.
+pallet-treasury-positions = { workspace = true }
 polkadot-sdk = { workspace = true, features = ["sp-io", "pallet-balances"], default-features = true }
 pallet-prelude = { workspace = true, features = ["test"], default-features = true }
 

@@ -489,6 +489,24 @@ impl<AccountId: FullCodec> BlockRewardAccountsProvider<AccountId>
 			.collect()
 	}
 
+	fn get_mint_rewards_cohorts() -> Vec<(FrameId, u32)> {
+		let last = benchmark_mining_clock().current_frame_id.saturating_sub(1);
+		(last.saturating_sub(9).max(1)..=last)
+			.map(|frame| (frame, benchmark_block_reward_accounts_count()))
+			.collect()
+	}
+	fn get_mining_seat_changes() -> (Vec<AccountId>, Vec<AccountId>) {
+		let accounts: Vec<_> = Self::get_mint_rewards_accounts()
+			.into_iter()
+			.map(|(account, _)| account)
+			.collect();
+		let activated = Self::get_mint_rewards_accounts()
+			.into_iter()
+			.map(|(account, _)| account)
+			.collect();
+		(accounts, activated)
+	}
+
 	fn is_compute_block_eligible_for_rewards() -> bool {
 		true
 	}

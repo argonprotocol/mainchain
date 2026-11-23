@@ -516,6 +516,8 @@ pub(crate) fn new_test_ext() -> TestState {
 }
 
 impl pallet_treasury_positions::Config for Test {
+	type OwnershipCurrency = Ownership;
+	type BlockRewardAccountsProvider = ();
 	type BitcoinPositionProvider = ();
 	type TreasuryPoolProvider = Treasury;
 	type EarningsSettlementProvider = MockStabilizerPoolSettlement;

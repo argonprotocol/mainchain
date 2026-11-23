@@ -8,6 +8,10 @@ use argon_primitives::{
 		VaultEarningsProvider,
 	},
 };
+use frame_support::traits::{
+	fungible::{Balanced, Credit},
+	tokens::Balance as TokenBalance,
+};
 use polkadot_sdk::{frame_benchmarking, sp_runtime::ArithmeticError};
 
 #[derive(Default)]
@@ -30,6 +34,24 @@ where
 	Balance: Codec + MaxEncodedLen + HasCompact + Copy + Default + From<u128> + Into<u128>,
 {
 	type Weights = ();
+	fn deposit_mining_earnings<C>(_: &AccountId, credit: Credit<AccountId, C>) -> DispatchResult
+	where
+		Balance: TokenBalance,
+		C: Balanced<AccountId, Balance = Balance>,
+	{
+		C::resolve(&Self::collect_account().expect("benchmark custody"), credit)
+			.map_err(|_| DispatchError::Unavailable)
+	}
+	fn allocate_mining_mint(_: FrameId, _: Balance, _: u32) -> Result<bool, DispatchError> {
+		Ok(true)
+	}
+	fn mining_seats_changed(_: &AccountId, _: u32, _: u32) -> DispatchResult {
+		Ok(())
+	}
+	fn mint_mining_reward(_: &AccountId, _: CollectSource, _: Balance) -> DispatchResult {
+		Ok(())
+	}
+
 	fn collect_account() -> Option<AccountId> {
 		Some(frame_benchmarking::account("collect-custody", 0, 0))
 	}

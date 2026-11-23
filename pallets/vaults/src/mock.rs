@@ -456,6 +456,8 @@ impl UnixTime for StaticTickProvider {
 
 parameter_types! { pub const TreasuryPositionsPalletId: PalletId = PalletId(*b"arg/colt"); }
 impl pallet_treasury_positions::Config for Test {
+	type OwnershipCurrency = Balances;
+	type BlockRewardAccountsProvider = ();
 	type Balance = Balance;
 	type BitcoinPositionProvider = ();
 	type TreasuryPoolProvider = ();

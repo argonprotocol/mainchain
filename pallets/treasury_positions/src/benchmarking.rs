@@ -13,6 +13,36 @@ mod benchmarks {
 	use super::*;
 
 	#[benchmark]
+	fn allocate_mining_mint() {
+		STORAGE_VERSION.put::<Pallet<T>>();
+		#[block]
+		{
+			assert!(Pallet::<T>::allocate_mining_mint(1, 1_000_000u128.into(), 1440).unwrap());
+		}
+		assert_eq!(MiningMintIndex::<T>::get().last_processed_frame, Some(1));
+	}
+
+	#[benchmark]
+	fn mining_seats_changed() {
+		let owner: T::AccountId = account("mining-beneficiary", 0, 0);
+		let mut position = certified_position::<T>();
+		position.mining_seats = 144;
+		PositionsByAccount::<T>::insert(&owner, position);
+		MiningMintIndex::<T>::put(MiningMintIndexState {
+			microgons_per_seat: 1_000_000u128.into(),
+			last_processed_frame: Some(1),
+		});
+		#[block]
+		{
+			Pallet::<T>::mining_seats_changed(&owner, 1, 1).unwrap();
+		}
+		assert_eq!(
+			PositionsByAccount::<T>::get(owner).unwrap().collect_accrued.mining_mints,
+			144_000_000u128.into()
+		);
+	}
+
+	#[benchmark]
 	fn prepare_collect() {
 		STORAGE_VERSION.put::<Pallet<T>>();
 		let amounts =
@@ -51,7 +81,7 @@ mod benchmarks {
 			PositionQuantities { bonds: 10, stakes: 10, fission_liquidity: 1_000_000u128.into() };
 		T::Currency::mint_into(
 			&Pallet::<T>::account_id(),
-			T::Currency::minimum_balance() + amounts.total(),
+			T::Currency::minimum_balance() + amounts.total_argons(),
 		)
 		.unwrap();
 		EarningsIndexesAtFrameStart::<T>::insert(
@@ -145,6 +175,9 @@ mod benchmarks {
 			stabilizer_buy_earnings: earnings,
 			liquid_repayment_earnings: earnings,
 			vault_earnings: earnings,
+			mining_earnings: earnings,
+			mining_mints: earnings,
+			mining_micronots: earnings,
 		};
 		let amounts = position.collect_accrued;
 		PositionsByAccount::<T>::insert(&caller, position);

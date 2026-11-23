@@ -72,6 +72,8 @@ impl polkadot_sdk::pallet_balances::Config for Test {
 
 #[cfg(test)]
 impl pallet_treasury_positions::Config for Test {
+	type OwnershipCurrency = Balances;
+	type BlockRewardAccountsProvider = ();
 	type Balance = Balance;
 	type MiningFrameTransitionProvider = CurrentFrame;
 	type MaxEarningChangesPerCall = ConstU32<32>;

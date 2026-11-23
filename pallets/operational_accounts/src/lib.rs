@@ -1368,6 +1368,9 @@ pub mod pallet {
 
 	impl<T: Config> OperationalAccountProvider<T::AccountId> for Pallet<T> {
 		type Weights = weights::ProviderWeightAdapter<T>;
+		fn operational_account(account: &T::AccountId) -> Option<T::AccountId> {
+			Self::operational_owner_for(account)
+		}
 		fn upstream_vault(account: &T::AccountId) -> Option<(T::AccountId, VaultId)> {
 			let owner = Self::operational_owner_for(account)?;
 			let account = OperationalAccounts::<T>::get(owner)?;

@@ -1640,7 +1640,7 @@ fn repayment_remainder_stays_held_until_collect_makes_release_possible() {
 		let earnings = collect_accrued(1);
 		assert_eq!(earnings.stabilizer_buy_earnings, 4_500_000);
 		assert_eq!(earnings.liquid_repayment_earnings, 2_499_999);
-		assert_eq!(Balances::total_issuance(), issuance - 99_999_999 + earnings.total());
+		assert_eq!(Balances::total_issuance(), issuance - 99_999_999 + earnings.total_argons());
 		StabilizerBuys::on_initialize(3);
 		assert_eq!(collect_accrued(1), earnings);
 

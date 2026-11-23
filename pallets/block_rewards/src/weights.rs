@@ -5,6 +5,7 @@ use argon_primitives::{
 		BlockSealerProviderWeightInfo, NotebookProvider, NotebookProviderWeightInfo, TickProvider,
 		TickProviderWeightInfo,
 	},
+	treasury::{TreasuryPositionProvider, TreasuryPositionProviderWeightInfo},
 };
 use pallet_prelude::*;
 
@@ -33,6 +34,11 @@ type NotebookProviderWeights<T> =
 	<<T as crate::Config>::NotebookProvider as NotebookProvider>::Weights;
 type TickProviderWeights<T> = <<T as crate::Config>::TickProvider as TickProvider<
 	<T as frame_system::Config>::Block,
+>>::Weights;
+
+type PositionWeights<T> = <<T as crate::Config>::PositionProvider as TreasuryPositionProvider<
+	<T as frame_system::Config>::AccountId,
+	<T as crate::Config>::Balance,
 >>::Weights;
 
 pub struct WithProviderWeights<
@@ -91,6 +97,7 @@ where
 
 	fn on_initialize_with_rewards() -> Weight {
 		Base::on_initialize_with_rewards()
+			.saturating_add(PositionWeights::<T>::mint_mining_reward().saturating_mul(2))
 			.saturating_add(BlockSealerWeight::is_block_vote_seal())
 			.saturating_add(BlockRewardAccountsWeight::is_compute_block_eligible_for_rewards())
 			.saturating_add(TickProviderWeight::elapsed_ticks())

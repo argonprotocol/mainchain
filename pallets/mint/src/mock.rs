@@ -1,10 +1,13 @@
-use pallet_balances::AccountData;
+use frame_support::traits::GetStorageVersion;
+use pallet_balances::{AccountData, Instance2};
 use pallet_prelude::*;
 
 use crate as pallet_mint;
 use crate::{MintIndex, MintedBitcoinMicrogons, PendingBitcoinMint, PendingBitcoinMintsByIndex};
-use argon_primitives::{BlockRewardAccountsProvider, PriceProvider};
-use frame_support::traits::fungible::Unbalanced;
+use argon_primitives::{
+	treasury::TreasuryPositionProvider, BlockRewardAccountsProvider, PriceProvider,
+};
+use frame_support::traits::{fungible::Unbalanced, StorageMapShim};
 use pallet_prelude::argon_primitives::{MiningFrameProvider, MiningFrameTransitionProvider};
 
 type Block = frame_system::mocking::MockBlock<Test>;
@@ -15,6 +18,8 @@ frame_support::construct_runtime!(
 	{
 		System: frame_system,
 		Balances: pallet_balances,
+		Ownership: pallet_balances::<Instance2>,
+		TreasuryPositions: pallet_treasury_positions,
 		Mint: pallet_mint
 	}
 );
@@ -55,6 +60,8 @@ parameter_types! {
 	pub static ArgonCPI: Option<argon_primitives::ArgonCPI> = Some(FixedI128::from_float(-1.00));
 	pub static AverageCPI: argon_primitives::ArgonCPI = FixedI128::from_float(-1.00);
 	pub static MinerRewardsAccounts: Vec<(u64, FrameId)> = vec![];
+	pub static RetiredMiningAccounts: Vec<u64> = vec![];
+	pub static ActivatedMiningAccounts: Vec<u64> = vec![];
 	pub static ArgonCirculation: Balance = 100_000;
 	pub static CurrentFrameId: FrameId = 1;
 	pub static IsNewFrameStart: Option<u64> = None;
@@ -127,12 +134,16 @@ impl BlockRewardAccountsProvider<u64> for StaticBlockRewardAccountsProvider {
 	fn get_mint_rewards_accounts() -> Vec<(u64, FrameId)> {
 		MinerRewardsAccounts::get()
 	}
+	fn get_mining_seat_changes() -> (Vec<u64>, Vec<u64>) {
+		(RetiredMiningAccounts::get(), ActivatedMiningAccounts::get())
+	}
 	fn is_compute_block_eligible_for_rewards() -> bool {
 		todo!()
 	}
 }
 
 impl pallet_mint::Config for Test {
+	type PositionProvider = TreasuryPositions;
 	type WeightInfo = ();
 	type Currency = Balances;
 	type Balance = Balance;
@@ -147,7 +158,18 @@ impl pallet_mint::Config for Test {
 }
 
 pub fn new_test_ext() -> TestState {
-	new_test_with_genesis::<Test>(|_t| {})
+	{
+		RetiredMiningAccounts::set(vec![]);
+		ActivatedMiningAccounts::set(vec![]);
+		let mut ext = new_test_with_genesis::<Test>(|_t| {});
+		ext.execute_with(|| {
+			TreasuryPositions::in_code_storage_version().put::<TreasuryPositions>();
+			for (account, _) in MinerRewardsAccounts::get() {
+				TreasuryPositions::mining_seats_changed(&account, 0, 1).unwrap();
+			}
+		});
+		ext
+	}
 }
 
 pub(crate) fn pending_mints() -> Vec<(MintIndex, PendingBitcoinMint<Test>)> {
@@ -164,4 +186,28 @@ pub(crate) fn set_issuance_sources(mining: Balance, bitcoin: Balance) {
 pub(crate) fn set_cpi(value: f64) {
 	ArgonCPI::set(Some(FixedI128::from_float(value)));
 	AverageCPI::set(FixedI128::from_float(value));
+}
+
+#[derive_impl(pallet_balances::config_preludes::TestDefaultConfig)]
+impl pallet_balances::Config<Instance2> for Test {
+	type Balance = Balance;
+	type ExistentialDeposit = ExistentialDeposit;
+	type AccountStore =
+		StorageMapShim<pallet_balances::Account<Test, Instance2>, u64, AccountData<Balance>>;
+}
+parameter_types! { pub const CollectPalletId: PalletId = PalletId(*b"arg/colt"); }
+impl pallet_treasury_positions::Config for Test {
+	type Balance = Balance;
+	type Currency = Balances;
+	type OwnershipCurrency = Ownership;
+	type PalletId = CollectPalletId;
+	type MaxEarningChangesPerCall = ConstU32<32>;
+	type MiningFrameTransitionProvider = StaticMiningFrameProvider;
+	type BlockRewardAccountsProvider = StaticBlockRewardAccountsProvider;
+	type BitcoinPositionProvider = ();
+	type TreasuryPoolProvider = ();
+	type EarningsSettlementProvider = ();
+	type VaultEarningsProvider = ();
+	type OperationalAccountProvider = ();
+	type WeightInfo = ();
 }

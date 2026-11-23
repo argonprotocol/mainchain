@@ -1599,6 +1599,50 @@ impl<T: Config> BlockRewardAccountsProvider<T::AccountId> for Pallet<T> {
 		result
 	}
 
+	fn get_mint_rewards_cohorts() -> Vec<(FrameId, u32)> {
+		let mut cohorts = vec![];
+		let activating_frame = Self::get_newly_started_frame();
+		for frame in MinersByCohort::<T>::iter_keys() {
+			if Some(frame) == activating_frame {
+				continue
+			}
+			let count = MinersByCohort::<T>::decode_len(frame).unwrap_or_default() as u32;
+			cohorts.push((frame, count));
+		}
+		let released = ReleasedMinersByAccountId::<T>::get();
+		if let Some(registration) = released.values().next() {
+			cohorts.push((registration.starting_frame_id, released.len() as u32));
+		}
+		cohorts
+	}
+
+	fn get_mining_seat_changes() -> (Vec<T::AccountId>, Vec<T::AccountId>) {
+		let retired = ReleasedMinersByAccountId::<T>::get()
+			.values()
+			.map(|registration| registration.rewards_account())
+			.collect();
+		let activated = Self::get_newly_started_frame()
+			.map(|frame| {
+				MinersByCohort::<T>::get(frame)
+					.iter()
+					.map(|registration| registration.rewards_account())
+					.collect()
+			})
+			.unwrap_or_default();
+		(retired, activated)
+	}
+
+	fn max_mining_seat_changes() -> u32 {
+		T::MaxCohortSize::get().saturating_mul(2)
+	}
+
+	fn get_active_mining_rewards_accounts() -> Vec<T::AccountId> {
+		MinersByCohort::<T>::iter_values()
+			.flatten()
+			.map(|registration| registration.rewards_account())
+			.collect()
+	}
+
 	/// Compute blocks only get rewards prior to registered mining being active
 	fn is_compute_block_eligible_for_rewards() -> bool {
 		!Self::is_registered_mining_active()

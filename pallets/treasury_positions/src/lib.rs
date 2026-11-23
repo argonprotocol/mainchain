@@ -13,12 +13,14 @@ use argon_primitives::{
 		PositionQuantities, PositionQuantity, TreasuryPositionProvider, UpstreamPosition,
 		VaultEarningsProvider,
 	},
-	MiningFrameTransitionProvider, OperationalAccountProvider, TreasuryPoolProvider, VaultId,
+	BlockRewardAccountsProvider, MiningFrameTransitionProvider, OperationalAccountProvider,
+	OperationalAccountProviderWeightInfo, TreasuryPoolProvider, VaultId,
 };
 use frame_support::{
 	traits::{
-		fungible::{Inspect, Mutate},
-		tokens::Preservation,
+		fungible::{Balanced, Credit, Inspect, Mutate},
+		tokens::{Balance as TokenBalance, Preservation},
+		Imbalance,
 	},
 	PalletId,
 };
@@ -40,7 +42,7 @@ pub mod weights;
 #[frame_support::pallet]
 pub mod pallet {
 	use super::*;
-	pub(super) const STORAGE_VERSION: StorageVersion = StorageVersion::new(4);
+	pub(super) const STORAGE_VERSION: StorageVersion = StorageVersion::new(3);
 
 	#[pallet::pallet]
 	#[pallet::storage_version(STORAGE_VERSION)]
@@ -66,6 +68,8 @@ pub mod pallet {
 		/// Resolves the actual vault account and its single upstream vault from Operational
 		/// Accounts.
 		type OperationalAccountProvider: OperationalAccountProvider<Self::AccountId>;
+		/// Canonical active mining seats used to initialize account quantities during cutover.
+		type BlockRewardAccountsProvider: BlockRewardAccountsProvider<Self::AccountId>;
 		/// Reads canonical owner-indexed Bitcoin locks when initializing a registration snapshot.
 		type BitcoinPositionProvider: BitcoinLockPositionProvider<Self::AccountId, Self::Balance>;
 		/// Reads canonical upstream bond principal when initializing a registration snapshot.
@@ -84,6 +88,9 @@ pub mod pallet {
 		type MiningFrameTransitionProvider: MiningFrameTransitionProvider;
 		/// Delivers the account's combined ARGON collection.
 		type Currency: Inspect<Self::AccountId, Balance = Self::Balance> + Mutate<Self::AccountId>;
+		/// Holds and delivers ARGNOT mining rewards in micronots.
+		type OwnershipCurrency: Inspect<Self::AccountId, Balance = Self::Balance>
+			+ Mutate<Self::AccountId>;
 		/// Costs of reading and maintaining account aggregates.
 		type WeightInfo: WeightInfo;
 	}
@@ -113,14 +120,44 @@ pub mod pallet {
 		/// Participation in the single vault that onboarded this account. Absent when no upstream
 		/// vault is resolvable, including accounts whose upstream has yet to create a vault.
 		pub upstream: Option<UpstreamPosition<Balance>>,
-		/// Recorded whole microgons, by source. Unsettled indexed earnings are additional.
+		/// Recorded amounts by source and currency. Unsettled indexed earnings are additional.
 		pub collect_accrued: CollectAmounts<Balance>,
 		/// Lifetime amounts delivered through collection, by source. Counters saturate without
 		/// blocking payment.
 		pub collected: CollectAmounts<Balance>,
 		/// Indexed earning quantities and the oldest/newest unsettled quantity changes.
 		pub earning_positions: EarningPositions,
+		/// Seats earning expansion mints for this rewards account; settled before replacement.
+		#[codec(compact)]
+		pub mining_seats: u32,
+		/// Cumulative ARGON microgons per seat already assigned to this account.
+		#[codec(compact)]
+		pub mining_mint_checkpoint: Balance,
 	}
+
+	#[derive(
+		Encode,
+		Decode,
+		DecodeWithMemTracking,
+		Clone,
+		Debug,
+		Default,
+		PartialEq,
+		Eq,
+		TypeInfo,
+		MaxEncodedLen,
+	)]
+	pub struct MiningMintIndexState<Balance> {
+		/// Funded cumulative ARGON microgons per eligible mining seat.
+		pub microgons_per_seat: Balance,
+		/// Completed earning frame whose allocation and seat changes committed together.
+		pub last_processed_frame: Option<FrameId>,
+	}
+
+	/// Expansion mint progress is independent of Treasury's financial indexes.
+	#[pallet::storage]
+	pub type MiningMintIndex<T: Config> =
+		StorageValue<_, MiningMintIndexState<T::Balance>, ValueQuery>;
 
 	#[derive(
 		Encode,
@@ -251,6 +288,8 @@ pub mod pallet {
 		UnfundedEarnings,
 		/// The source tried to expire more vault revenue than its account bucket contains.
 		InsufficientVaultEarnings,
+		/// The caller and beneficiary do not share a registered operational account.
+		NotLinkedAccount,
 	}
 
 	#[pallet::hooks]
@@ -264,8 +303,15 @@ pub mod pallet {
 	#[pallet::event]
 	#[pallet::generate_deposit(pub(super) fn deposit_event)]
 	pub enum Event<T: Config> {
-		/// ARGON delivered to the account, recorded by its source.
-		Collected { account: T::AccountId, amounts: CollectAmounts<T::Balance> },
+		/// ARGON and ARGNOT collected from a position, recorded by source.
+		Collected {
+			/// Account whose position supplied the earnings.
+			account: T::AccountId,
+			/// Account receiving both currencies; the signer of the collection call.
+			recipient: T::AccountId,
+			/// Paid amounts by earnings source, in microgons or mining micronots.
+			amounts: CollectAmounts<T::Balance>,
+		},
 		/// Source earnings backed in custody, before assignment to individual owners.
 		CollectFunded { amounts: CollectAmounts<T::Balance> },
 		/// Already backed earnings assigned to the beneficiary.
@@ -281,34 +327,160 @@ pub mod pallet {
 		#[pallet::weight(weights::collect::<T>())]
 		pub fn collect(origin: OriginFor<T>) -> DispatchResult {
 			let account = ensure_signed(origin)?;
-			Self::complete_backing_cutover()?;
-			T::EarningsSettlementProvider::settle_account(&account)?;
-			Self::settle_account_indexes(&account)?;
+			Self::collect_account_earnings(&account, &account)
+		}
 
-			let Some(mut position) = PositionsByAccount::<T>::get(&account) else { return Ok(()) };
+		/// Collect a linked account's available earnings into the signer's account.
+		#[pallet::call_index(1)]
+		#[pallet::weight(weights::collect::<T>().saturating_add(
+			<T::OperationalAccountProvider as OperationalAccountProvider<T::AccountId>>::Weights::operational_account().saturating_mul(2)
+		))]
+		pub fn collect_for(origin: OriginFor<T>, account: T::AccountId) -> DispatchResult {
+			let caller = ensure_signed(origin)?;
+			if caller != account {
+				let owner = T::OperationalAccountProvider::operational_account(&caller)
+					.ok_or(Error::<T>::NotLinkedAccount)?;
+				ensure!(
+					T::OperationalAccountProvider::operational_account(&account) == Some(owner),
+					Error::<T>::NotLinkedAccount
+				);
+			}
+			Self::collect_account_earnings(&account, &caller)
+		}
+	}
+
+	impl<T: Config> Pallet<T> {
+		fn collect_account_earnings(
+			account: &T::AccountId,
+			recipient: &T::AccountId,
+		) -> DispatchResult {
+			Self::complete_backing_cutover()?;
+			T::EarningsSettlementProvider::settle_account(account)?;
+			Self::settle_account_indexes(account)?;
+
+			let Some(mut position) = PositionsByAccount::<T>::get(account) else { return Ok(()) };
+			Self::settle_mining_mints(&mut position)?;
 			let mut amounts = position.collect_accrued;
-			if !T::VaultEarningsProvider::collect_earnings(&account, amounts.vault_earnings)? {
+			if !T::VaultEarningsProvider::collect_earnings(account, amounts.vault_earnings)? {
 				amounts.vault_earnings = T::Balance::zero();
 			}
 
-			let amount = amounts.total();
-			if amount.is_zero() {
-				return Ok(())
+			let argons = amounts.total_argons();
+			if !argons.is_zero() {
+				T::Currency::transfer(
+					&Self::account_id(),
+					recipient,
+					argons,
+					Preservation::Preserve,
+				)?;
 			}
-
-			T::Currency::transfer(&Self::account_id(), &account, amount, Preservation::Preserve)?;
+			if !amounts.mining_micronots.is_zero() {
+				T::OwnershipCurrency::transfer(
+					&Self::account_id(),
+					recipient,
+					amounts.mining_micronots,
+					Preservation::Preserve,
+				)?;
+			}
 			CollectTotals::<T>::mutate(|totals| totals.collected.saturating_accrue(&amounts));
 			position.collected.saturating_accrue(&amounts);
 			position.collect_accrued.saturating_reduce(&amounts);
-			PositionsByAccount::<T>::insert(&account, position);
+			PositionsByAccount::<T>::insert(account, position);
 
-			Self::deposit_event(Event::Collected { account, amounts });
+			if !amounts.is_zero() {
+				Self::deposit_event(Event::Collected {
+					account: account.clone(),
+					recipient: recipient.clone(),
+					amounts,
+				});
+			}
 			Ok(())
 		}
 	}
 
 	impl<T: Config> TreasuryPositionProvider<T::AccountId, T::Balance> for Pallet<T> {
 		type Weights = ProviderWeightAdapter<T>;
+
+		fn deposit_mining_earnings<C>(
+			account: &T::AccountId,
+			credit: Credit<T::AccountId, C>,
+		) -> DispatchResult
+		where
+			T::Balance: TokenBalance,
+			C: Balanced<T::AccountId, Balance = T::Balance>,
+		{
+			Self::prepare_collect()?;
+			let amount = credit.peek();
+			C::resolve(&Self::account_id(), credit).map_err(|_| TokenError::CannotCreate)?;
+			Self::record_funding(CollectAmounts::from_source(
+				CollectSource::MiningEarnings,
+				amount,
+			));
+			Self::accrue(account, CollectSource::MiningEarnings, amount)
+		}
+
+		fn allocate_mining_mint(
+			frame: FrameId,
+			per_seat: T::Balance,
+			seats: u32,
+		) -> Result<bool, DispatchError> {
+			let mut state = MiningMintIndex::<T>::get();
+			if state.last_processed_frame == Some(frame) {
+				return Ok(false)
+			}
+			ensure!(
+				state.last_processed_frame.is_none_or(|previous| frame > previous),
+				Error::<T>::EarningsFrameOutOfOrder
+			);
+			let result = (|| {
+				let amount = per_seat
+					.checked_mul(&u128::from(seats).into())
+					.ok_or(ArithmeticError::Overflow)?;
+				let index = state
+					.microgons_per_seat
+					.checked_add(&per_seat)
+					.ok_or(ArithmeticError::Overflow)?;
+				Self::fund(CollectSource::MiningMints, amount)?;
+				state.microgons_per_seat = index;
+				Ok(true)
+			})();
+			// A failed frame is skipped; retrying after seats rotate would reward the wrong miners.
+			state.last_processed_frame = Some(frame);
+			MiningMintIndex::<T>::put(state);
+			result
+		}
+
+		fn mining_seats_changed(
+			account: &T::AccountId,
+			removed: u32,
+			added: u32,
+		) -> DispatchResult {
+			PositionsByAccount::<T>::try_mutate(account, |record| -> DispatchResult {
+				let position = match record {
+					Some(position) => {
+						Self::settle_mining_mints(position)?;
+						position
+					},
+					None => record.insert(Self::new_position(account)),
+				};
+				position.mining_seats = position
+					.mining_seats
+					.checked_sub(removed)
+					.ok_or(ArithmeticError::Underflow)?
+					.checked_add(added)
+					.ok_or(ArithmeticError::Overflow)?;
+				Ok(())
+			})
+		}
+
+		fn mint_mining_reward(
+			account: &T::AccountId,
+			source: CollectSource,
+			amount: T::Balance,
+		) -> DispatchResult {
+			Self::fund(source, amount)?;
+			Self::accrue(account, source, amount)
+		}
 
 		fn record_funding(amounts: CollectAmounts<T::Balance>) {
 			CollectTotals::<T>::mutate(|totals| totals.funded.saturating_accrue(&amounts));
@@ -364,7 +536,11 @@ pub mod pallet {
 			}
 
 			Self::prepare_collect()?;
-			T::Currency::mint_into(&Self::account_id(), amount)?;
+			if source == CollectSource::MiningArgonots {
+				T::OwnershipCurrency::mint_into(&Self::account_id(), amount)?;
+			} else {
+				T::Currency::mint_into(&Self::account_id(), amount)?;
+			}
 			Self::record_funding(CollectAmounts::from_source(source, amount));
 			Ok(())
 		}
@@ -391,7 +567,7 @@ pub mod pallet {
 		}
 
 		fn migrate_accrued(account: &T::AccountId, amounts: CollectAmounts<T::Balance>) {
-			if amounts.total().is_zero() {
+			if amounts.is_zero() {
 				return
 			}
 
@@ -434,7 +610,7 @@ pub mod pallet {
 				*index = index.saturating_add(increment);
 			}
 
-			if !amounts.total().is_zero() {
+			if !amounts.total_argons().is_zero() {
 				Self::complete_backing_cutover()?;
 				Self::record_funding(amounts);
 			}
@@ -789,7 +965,8 @@ pub mod pallet {
 			let Some(amounts) = PendingCollectBacking::<T>::get() else { return Ok(()) };
 
 			Self::seed_custody()?;
-			T::Currency::mint_into(&Self::account_id(), amounts.total())?;
+			T::Currency::mint_into(&Self::account_id(), amounts.total_argons())?;
+			T::OwnershipCurrency::mint_into(&Self::account_id(), amounts.mining_micronots)?;
 			CollectTotals::<T>::mutate(|totals| totals.funded.saturating_accrue(&amounts));
 			PendingCollectBacking::<T>::kill();
 			Ok(())
@@ -803,12 +980,36 @@ pub mod pallet {
 			if !missing.is_zero() {
 				T::Currency::mint_into(&account, missing)?;
 			}
+			let missing = T::OwnershipCurrency::minimum_balance()
+				.saturating_sub(T::OwnershipCurrency::balance(&account));
+			if !missing.is_zero() {
+				T::OwnershipCurrency::mint_into(&account, missing)?;
+			}
+			Ok(())
+		}
+
+		fn settle_mining_mints(position: &mut Position<T::Balance>) -> DispatchResult {
+			let index = MiningMintIndex::<T>::get().microgons_per_seat;
+			let amount = index
+				.checked_sub(&position.mining_mint_checkpoint)
+				.ok_or(ArithmeticError::Underflow)?
+				.checked_mul(&u128::from(position.mining_seats).into())
+				.ok_or(ArithmeticError::Overflow)?;
+			position.collect_accrued.mining_mints = position
+				.collect_accrued
+				.mining_mints
+				.checked_add(&amount)
+				.ok_or(ArithmeticError::Overflow)?;
+			position.mining_mint_checkpoint = index;
 			Ok(())
 		}
 
 		fn new_position(account: &T::AccountId) -> Position<T::Balance> {
 			frame_system::Pallet::<T>::inc_providers(account);
-			let mut position = Position::default();
+			let mut position = Position {
+				mining_mint_checkpoint: MiningMintIndex::<T>::get().microgons_per_seat,
+				..Default::default()
+			};
 			let values = EarningsIndexes::<T>::get().values;
 			position.earning_positions.bonds.checkpoint.index = values.bonds;
 			position.earning_positions.stakes.checkpoint.index = values.stakes;

@@ -21,6 +21,34 @@ use core::marker::PhantomData;
 /// Weight functions for `pallet_mining_slot`.
 pub struct WeightInfo<T>(PhantomData<T>);
 impl<T: frame_system::Config> pallet_mining_slot::WeightInfo for WeightInfo<T> {
+	/// Storage: `MiningSlot::ReleasedMinersByAccountId` (r:1 w:0)
+	/// Proof: `MiningSlot::ReleasedMinersByAccountId` (`max_values`: Some(1), `max_size`: Some(30098), added: 30593, mode: `MaxEncodedLen`)
+	/// Storage: `MiningSlot::NewlyStartedFrameId` (r:1 w:0)
+	/// Proof: `MiningSlot::NewlyStartedFrameId` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
+	/// Storage: `MiningSlot::MinersByCohort` (r:1 w:0)
+	/// Proof: `MiningSlot::MinersByCohort` (`max_values`: None, `max_size`: Some(25514), added: 27989, mode: `MaxEncodedLen`)
+	fn provider_get_mining_seat_changes() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `34534`
+		//  Estimated: `31583`
+		// Minimum execution time: 91_000_000 picoseconds.
+		Weight::from_parts(111_000_000, 31583)
+			.saturating_add(T::DbWeight::get().reads(3))
+		}
+	/// Storage: `MiningSlot::NewlyStartedFrameId` (r:1 w:0)
+	/// Proof: `MiningSlot::NewlyStartedFrameId` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
+	/// Storage: `MiningSlot::MinersByCohort` (r:11 w:0)
+	/// Proof: `MiningSlot::MinersByCohort` (`max_values`: None, `max_size`: Some(25514), added: 27989, mode: `MaxEncodedLen`)
+	/// Storage: `MiningSlot::ReleasedMinersByAccountId` (r:1 w:0)
+	/// Proof: `MiningSlot::ReleasedMinersByAccountId` (`max_values`: Some(1), `max_size`: Some(30098), added: 30593, mode: `MaxEncodedLen`)
+	fn provider_get_mint_rewards_cohorts() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `153352`
+		//  Estimated: `308869`
+		// Minimum execution time: 122_000_000 picoseconds.
+		Weight::from_parts(164_000_000, 308869)
+			.saturating_add(T::DbWeight::get().reads(13))
+		}
 	/// Storage: `MiningSlot::FrameStartBlockNumbers` (r:1 w:0)
 	/// Proof: `MiningSlot::FrameStartBlockNumbers` (`max_values`: Some(1), `max_size`: Some(41), added: 536, mode: `MaxEncodedLen`)
 	fn provider_is_first_block_after_frame_start() -> Weight {

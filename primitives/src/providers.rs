@@ -1,4 +1,4 @@
-use alloc::vec::Vec;
+use alloc::{collections::BTreeMap, vec::Vec};
 use polkadot_sdk::*;
 
 use super::{
@@ -86,6 +86,9 @@ impl MiningSlotProviderWeightInfo for () {
 }
 
 pub trait OperationalAccountProviderWeightInfo {
+	fn operational_account() -> Weight {
+		Weight::zero()
+	}
 	fn upstream_vault() -> Weight {
 		Weight::zero()
 	}
@@ -788,6 +791,10 @@ pub trait MiningSlotProvider<AccountId> {
 }
 
 pub trait OperationalAccountProvider<AccountId> {
+	/// Registered operational owner of a primary or linked account.
+	fn operational_account(_account: &AccountId) -> Option<AccountId> {
+		None
+	}
 	fn upstream_vault(_account: &AccountId) -> Option<(AccountId, VaultId)> {
 		None
 	}
@@ -1530,6 +1537,12 @@ pub trait BlockSealerProvider<AccountId: FullCodec, AuthorityId: FullCodec = Blo
 }
 
 pub trait BlockRewardAccountsProviderWeightInfo {
+	fn get_mint_rewards_cohorts() -> Weight {
+		Weight::zero()
+	}
+	fn get_mining_seat_changes() -> Weight {
+		Weight::zero()
+	}
 	fn get_block_rewards_account() -> Weight;
 	fn is_compute_block_eligible_for_rewards() -> Weight;
 }
@@ -1550,8 +1563,44 @@ pub trait BlockRewardAccountsProvider<AccountId: FullCodec> {
 	fn get_block_rewards_account(author: &AccountId) -> Option<(AccountId, FrameId)>;
 	/// Returns mint reward accounts
 	fn get_mint_rewards_accounts() -> Vec<(AccountId, FrameId)>;
+	/// Seat counts by cohort for the completed frame, excluding the newly activated cohort.
+	fn get_mint_rewards_cohorts() -> Vec<(FrameId, u32)> {
+		let mut cohorts = BTreeMap::new();
+		for (_, frame) in Self::get_mint_rewards_accounts() {
+			*cohorts.entry(frame).or_insert(0) += 1;
+		}
+		cohorts.into_iter().collect()
+	}
+	/// Retired and activated rewards accounts, once per changed seat in this frame boundary.
+	fn get_mining_seat_changes() -> (Vec<AccountId>, Vec<AccountId>) {
+		(Vec::new(), Vec::new())
+	}
+	/// Upper bound on incoming plus outgoing seats at one frame boundary.
+	fn max_mining_seat_changes() -> u32 {
+		0
+	}
+	/// Canonical active rewards accounts, once per seat, for upgrade initialization.
+	fn get_active_mining_rewards_accounts() -> Vec<AccountId> {
+		Self::get_mint_rewards_accounts()
+			.into_iter()
+			.map(|(account, _)| account)
+			.collect()
+	}
 	/// Is a compute block still eligible for rewards?
 	fn is_compute_block_eligible_for_rewards() -> bool;
+}
+
+impl<AccountId: FullCodec> BlockRewardAccountsProvider<AccountId> for () {
+	type Weights = ();
+	fn get_block_rewards_account(_: &AccountId) -> Option<(AccountId, FrameId)> {
+		None
+	}
+	fn get_mint_rewards_accounts() -> Vec<(AccountId, FrameId)> {
+		Vec::new()
+	}
+	fn is_compute_block_eligible_for_rewards() -> bool {
+		false
+	}
 }
 
 pub trait MiningFrameTransitionProviderWeightInfo {

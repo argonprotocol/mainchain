@@ -11284,6 +11284,7 @@ name = "pallet-block-rewards"
 version = "1.6.0"
 dependencies = [
  "pallet-prelude",
+ "pallet-treasury-positions",
  "parity-scale-codec",
  "polkadot-sdk",
  "scale-info",
@@ -12151,6 +12152,7 @@ name = "pallet-mint"
 version = "1.6.0"
 dependencies = [
  "pallet-prelude",
+ "pallet-treasury-positions",
  "parity-scale-codec",
  "polkadot-sdk",
  "scale-info",

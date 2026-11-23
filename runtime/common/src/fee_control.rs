@@ -22,7 +22,10 @@ macro_rules! vault_admin_fee_refund_policy {
 			fn is_collect_call(call: &RuntimeCall) -> bool {
 				matches!(
 					call,
-					RuntimeCall::TreasuryPositions(pallet_treasury_positions::Call::collect {})
+					RuntimeCall::TreasuryPositions(
+						pallet_treasury_positions::Call::collect {} |
+							pallet_treasury_positions::Call::collect_for { .. }
+					)
 				)
 			}
 
@@ -82,20 +85,113 @@ macro_rules! vault_admin_fee_refund_policy {
 #[cfg(test)]
 mod tests {
 	use crate::prelude::*;
+	use argon_primitives::treasury::TreasuryPositionProvider;
 	use argon_runtime::{
-		Balances, Runtime, RuntimeCall, RuntimeGenesisConfig, RuntimeOrigin, System,
+		Balances, BlockRewards, DealWithFees, Runtime, RuntimeCall, RuntimeEvent,
+		RuntimeGenesisConfig, RuntimeOrigin, System, TreasuryPositions,
 	};
 	use codec::Encode;
+	use frame_support::traits::{Imbalance, OnUnbalanced, StorageVersion};
+	use pallet_block_rewards::{BlockFees, BlockRewardsPaused};
+	use pallet_block_seal::LastBlockSealerInfo;
 	use pallet_fee_control::{CheckFeeWrapper, WeightInfo};
 	use pallet_transaction_payment::ChargeTransactionPayment;
+	use pallet_treasury_positions::{CollectTotals, PositionsByAccount};
 	use polkadot_sdk::{
 		frame_support::{assert_noop, assert_ok},
 		sp_io::TestExternalities,
 		sp_runtime::{
 			traits::{DispatchTransaction, ExtensionPostDispatchWeightHandler},
-			BuildStorage,
+			AccountId32, BuildStorage,
 		},
 	};
+
+	#[test]
+	fn failed_mining_fee_deposit_burns_the_credit_without_panicking() {
+		TestExternalities::new(RuntimeGenesisConfig::default().build_storage().unwrap())
+			.execute_with(|| {
+				let payer = AccountId32::new([54; 32]);
+				Balances::mint_into(&payer, 10 * ARGON).unwrap();
+				let issuance = Balances::total_issuance();
+				let credit = <Balances as Balanced<_>>::withdraw(
+					&payer,
+					ARGON,
+					Precision::Exact,
+					Preservation::Preserve,
+					Fortitude::Polite,
+				)
+				.unwrap();
+				assert_eq!(credit.peek(), ARGON);
+				StorageVersion::new(2).put::<TreasuryPositions>();
+				LastBlockSealerInfo::<Runtime>::put(BlockSealerInfo {
+					block_author_account_id: payer.clone(),
+					block_vote_rewards_account: None,
+					block_seal_authority: None,
+				});
+
+				DealWithFees::<Runtime>::on_unbalanced(credit);
+
+				assert_eq!(Balances::total_issuance(), issuance - ARGON);
+				assert_eq!(Balances::balance(&payer), 9 * ARGON);
+				assert_eq!(BlockFees::<Runtime>::get(), 0);
+				assert_eq!(CollectTotals::<Runtime>::get().funded.mining_earnings, 0);
+			});
+	}
+
+	#[test]
+	fn fees_and_tips_are_collected_from_custody_when_subsidies_are_paused() {
+		TestExternalities::new(RuntimeGenesisConfig::default().build_storage().unwrap())
+			.execute_with(|| {
+				System::set_block_number(1);
+				let payer = AccountId32::new([51; 32]);
+				let author = AccountId32::new([52; 32]);
+				let recipient = AccountId32::new([53; 32]);
+				Balances::mint_into(&payer, 100 * ARGON).unwrap();
+				assert_ok!(TreasuryPositions::prepare_collect());
+				BlockRewardsPaused::<Runtime>::put(true);
+				LastBlockSealerInfo::<Runtime>::put(BlockSealerInfo {
+					block_author_account_id: author.clone(),
+					block_vote_rewards_account: None,
+					block_seal_authority: None,
+				});
+				let call = RuntimeCall::Balances(pallet_balances::Call::transfer_keep_alive {
+					dest: MultiAddress::Id(recipient.clone()),
+					value: ARGON,
+				});
+				let tip = ARGON / 10;
+				let extension = CheckFeeWrapper::<Runtime, ChargeTransactionPayment<Runtime>>::from(
+					ChargeTransactionPayment::from(tip),
+				);
+				let mut info = call.get_dispatch_info();
+				info.extension_weight = extension.weight(&call);
+				let before = Balances::balance(&payer);
+				let issuance = Balances::total_issuance();
+				extension
+					.test_run(
+						RuntimeOrigin::signed(payer.clone()),
+						&call,
+						&info,
+						call.encoded_size(),
+						0,
+						|origin| call.clone().dispatch(origin),
+					)
+					.unwrap()
+					.unwrap();
+				let received = before - Balances::balance(&payer) - ARGON;
+				assert!(received >= tip);
+				assert_eq!(Balances::total_issuance(), issuance);
+				assert_eq!(Balances::balance(&author), 0);
+				BlockRewards::on_finalize(1);
+				let position = PositionsByAccount::<Runtime>::get(&author).unwrap();
+				assert_eq!(position.collect_accrued.mining_earnings, received);
+				assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(author.clone())));
+				assert_eq!(Balances::balance(&author), received);
+				assert_eq!(Balances::total_issuance(), issuance);
+				assert!(System::events()
+					.iter()
+					.any(|event| matches!(event.event, RuntimeEvent::TreasuryPositions(_))));
+			});
+	}
 
 	#[test]
 	fn proxied_commit_reveal_and_max_update_charge_real_account_without_holding_the_ceiling() {

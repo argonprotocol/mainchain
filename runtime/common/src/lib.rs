@@ -220,13 +220,19 @@ macro_rules! inject_runtime_vars {
 			Migrations,
 		>;
 		#[cfg(test)]
+		use pallet_mining_slot::WeightInfo as _;
+
+		#[cfg(test)]
 		#[test]
 		fn mining_batch_and_activation_fit_initialization_budget() {
-			use frame_support::traits::Get;
-			use pallet_mining_slot::WeightInfo as _;
 			type MiningWeights = <Runtime as pallet_mining_slot::Config>::WeightInfo;
+			type OperationalAccountWeights =
+				<<Runtime as pallet_mining_slot::Config>::OperationalAccountsHook as
+					OperationalAccountsHook<AccountId, Balance>>::Weights;
 			let bids = <<Runtime as pallet_mining_slot::Config>::MaxBidsPerBlock as Get<u32>>::get();
 			let seats = <Runtime as pallet_mining_slot::Config>::MaxCohortSize::get();
+			assert!(MiningWeights::provider_get_mint_rewards_cohorts().ref_time() > 0);
+			assert!(MiningWeights::provider_get_mining_seat_changes().ref_time() > 0);
 			let live = MiningWeights::live_auction(seats);
 			assert!(live.ref_time() > 0, "live auction must have measured weights");
 			let settlement = MiningWeights::settle_bids(bids, seats).max(live);
@@ -239,8 +245,7 @@ macro_rules! inject_runtime_vars {
 			let activation = MiningWeights::start_new_frame(seats)
 				.saturating_add(MiningWeights::on_finalize_frame_adjustments())
 				.saturating_add(
-					<<Runtime as pallet_mining_slot::Config>::OperationalAccountsHook as
-						argon_primitives::OperationalAccountsHook<AccountId, Balance>>::Weights::mining_seat_won()
+					<OperationalAccountWeights as OperationalAccountsHookWeightInfo>::mining_seat_won()
 						.saturating_mul(seats.into()),
 				);
 			// Other pallets' frame callbacks reserve their own weights separately.

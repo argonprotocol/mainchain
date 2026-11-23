@@ -15,16 +15,28 @@ pub(crate) fn check<T: Config>() -> Result<(), sp_runtime::TryRuntimeError> {
 			.and_then(|total| total.checked_add(&amounts.stabilizer_buy_earnings))
 			.and_then(|total| total.checked_add(&amounts.liquid_repayment_earnings))
 			.and_then(|total| total.checked_add(&amounts.vault_earnings))
+			.and_then(|total| total.checked_add(&amounts.mining_earnings))
+			.and_then(|total| total.checked_add(&amounts.mining_mints))
 			.ok_or("Collect amount totals overflow")
 	};
 	let mut accrued = T::Balance::zero();
+	let mut micronots = T::Balance::zero();
+	let mining_index = MiningMintIndex::<T>::get().microgons_per_seat;
 	let mut bonds = 0u128;
 	let mut stakes = 0u128;
 	let mut fission_liquidity = T::Balance::zero();
 	for position in PositionsByAccount::<T>::iter_values() {
+		let mining_mints = mining_index
+			.checked_sub(&position.mining_mint_checkpoint)
+			.and_then(|rate| rate.checked_mul(&u128::from(position.mining_seats).into()))
+			.ok_or("Mining mint checkpoint or quantity is invalid")?;
 		accrued = accrued
 			.checked_add(&checked_total(position.collect_accrued)?)
+			.and_then(|total| total.checked_add(&mining_mints))
 			.ok_or("Collect account accrual overflows")?;
+		micronots = micronots
+			.checked_add(&position.collect_accrued.mining_micronots)
+			.ok_or("Mining micronot accrual overflows")?;
 		bonds = bonds
 			.checked_add(position.quantities.bonds)
 			.ok_or("Treasury Positions account bond quantities overflow")?;
@@ -52,9 +64,23 @@ pub(crate) fn check<T: Config>() -> Result<(), sp_runtime::TryRuntimeError> {
 		.checked_sub(&checked_total(funding.collected)?)
 		.and_then(|total| total.checked_sub(&funding.expired_vault_earnings))
 		.ok_or("Collected amounts exceed Collect funding")?;
-	let pending = checked_total(PendingCollectBacking::<T>::get().unwrap_or_default())?;
+	let pending_backing = PendingCollectBacking::<T>::get().unwrap_or_default();
+	let pending = checked_total(pending_backing)?;
 	let liabilities = outstanding.checked_add(&pending).ok_or("Collect obligations overflow")?;
 	ensure!(accrued <= liabilities, "Account accrual exceeds Collect backing");
+	let outstanding_micronots = funding
+		.funded
+		.mining_micronots
+		.checked_sub(&funding.collected.mining_micronots)
+		.ok_or("Collected micronots exceed funding")?;
+	let pending_micronots = PendingCollectBacking::<T>::get().unwrap_or_default().mining_micronots;
+	ensure!(
+		micronots <=
+			outstanding_micronots
+				.checked_add(&pending_micronots)
+				.ok_or("Micronot obligations overflow")?,
+		"Micronot accrual exceeds backing"
+	);
 
 	if !outstanding.is_zero() {
 		let required = outstanding
@@ -63,6 +89,15 @@ pub(crate) fn check<T: Config>() -> Result<(), sp_runtime::TryRuntimeError> {
 		ensure!(
 			T::Currency::balance(&Pallet::<T>::account_id()) >= required,
 			"Collect custody is underfunded"
+		);
+	}
+	if !outstanding_micronots.is_zero() {
+		let required = outstanding_micronots
+			.checked_add(&T::OwnershipCurrency::minimum_balance())
+			.ok_or("Micronot backing overflows")?;
+		ensure!(
+			T::OwnershipCurrency::balance(&Pallet::<T>::account_id()) >= required,
+			"ARGNOT Collect custody is underfunded"
 		);
 	}
 
@@ -242,7 +277,10 @@ mod tests {
 				PositionQuantities { bonds: 1, ..Default::default() },
 				CollectAmounts { bond_earnings: 10, ..Default::default() },
 			);
-			assert_eq!(PositionsByAccount::<Test>::get(9).unwrap().collect_accrued.total(), 0);
+			assert_eq!(
+				PositionsByAccount::<Test>::get(9).unwrap().collect_accrued.total_argons(),
+				0
+			);
 			assert_ok!(TreasuryPositions::try_state(1));
 
 			assert_ok!(Balances::transfer(

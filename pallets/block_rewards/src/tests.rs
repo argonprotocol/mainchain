@@ -15,7 +15,7 @@ pub(crate) fn test_authority(id: [u8; 32]) -> BlockSealAuthorityId {
 }
 
 #[test]
-fn it_mints_immediately_available_funds() {
+fn mining_rewards_are_backed_and_collected_in_both_currencies() {
 	let id = test_authority([1; 32]);
 	BlockSealer::set(BlockSealerInfo {
 		block_author_account_id: 1,
@@ -52,6 +52,9 @@ fn it_mints_immediately_available_funds() {
 			.into(),
 		);
 
+		assert_eq!(Balances::balance(&1), 0);
+		assert_eq!(Ownership::balance(&1), 0);
+		assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(1)));
 		assert_eq!(
 			Balances::reducible_balance(&1, Preservation::Expendable, Fortitude::Force),
 			3750
@@ -117,6 +120,8 @@ fn it_should_unlock_rewards() {
 			}
 			.into(),
 		);
+		assert_eq!(Balances::balance(&1), 0);
+		assert_ok!(TreasuryPositions::collect(RuntimeOrigin::signed(1)));
 		assert_eq!(Balances::balance(&1), 3750);
 		assert_eq!(Ownership::balance(&1), 3750);
 		assert_eq!(Balances::balance(&2), 1250);

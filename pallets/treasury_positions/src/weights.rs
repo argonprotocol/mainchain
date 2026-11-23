@@ -12,6 +12,12 @@ use core::marker::PhantomData;
 use pallet_prelude::*;
 
 pub trait WeightInfo {
+	fn allocate_mining_mint() -> Weight {
+		Weight::zero()
+	}
+	fn mining_seats_changed() -> Weight {
+		Weight::zero()
+	}
 	fn record_funding() -> Weight;
 	fn expire_vault_earnings() -> Weight;
 	fn allocate_frame_earnings() -> Weight;
@@ -103,6 +109,12 @@ pub fn collect<T: Config>() -> Weight {
 }
 pub struct ProviderWeightAdapter<T>(PhantomData<T>);
 impl<T: Config> TreasuryPositionProviderWeightInfo for ProviderWeightAdapter<T> {
+	fn allocate_mining_mint() -> Weight {
+		T::WeightInfo::allocate_mining_mint()
+	}
+	fn mining_seats_changed() -> Weight {
+		T::WeightInfo::mining_seats_changed().saturating_add(T::WeightInfo::ensure_account())
+	}
 	fn record_funding() -> Weight {
 		T::WeightInfo::record_funding()
 	}
