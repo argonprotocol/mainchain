@@ -21,6 +21,28 @@ use core::marker::PhantomData;
 /// Weight functions for `pallet_stabilizer_pools`.
 pub struct WeightInfo<T>(PhantomData<T>);
 impl<T: frame_system::Config> pallet_stabilizer_pools::WeightInfo for WeightInfo<T> {
+	/// Storage: `StabilizerPools::StabilizerPoolRegistrations` (r:1 w:0)
+	/// Proof: `StabilizerPools::StabilizerPoolRegistrations` (`max_values`: None, `max_size`: Some(117), added: 2592, mode: `MaxEncodedLen`)
+	/// Storage: `StabilizerPools::PositionCheckpoints` (r:1 w:0)
+	/// Proof: `StabilizerPools::PositionCheckpoints` (`max_values`: None, `max_size`: Some(340), added: 2815, mode: `MaxEncodedLen`)
+	fn position_change_pool_key() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `460`
+		//  Estimated: `3805`
+		// Minimum execution time: 11_000_000 picoseconds.
+		Weight::from_parts(13_000_000, 3805)
+			.saturating_add(T::DbWeight::get().reads(2))
+		}
+	/// Storage: `StabilizerPools::StabilizerPoolRegistrations` (r:1 w:0)
+	/// Proof: `StabilizerPools::StabilizerPoolRegistrations` (`max_values`: None, `max_size`: Some(117), added: 2592, mode: `MaxEncodedLen`)
+	fn validate_position_change() -> Weight {
+		// Proof Size summary in bytes:
+		//  Measured:  `90`
+		//  Estimated: `3582`
+		// Minimum execution time: 3_000_000 picoseconds.
+		Weight::from_parts(4_000_000, 3582)
+			.saturating_add(T::DbWeight::get().reads(1))
+		}
 	/// Storage: `Ticks::CurrentTick` (r:1 w:0)
 	/// Proof: `Ticks::CurrentTick` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
 	fn read_price_index_context() -> Weight {

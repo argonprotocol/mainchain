@@ -952,8 +952,8 @@ impl pallet_fee_control::Config for Runtime {
 	);
 	type Balance = Balance;
 	type FeelessCallTxPoolKeyProviders = ();
-	type CallTxPoolKeyProviders = (EthereumVerifier, CrosschainTransfer);
-	type CallTxValidityProviders = (EthereumVerifier, CrosschainTransfer);
+	type CallTxPoolKeyProviders = (EthereumVerifier, CrosschainTransfer, StabilizerPools);
+	type CallTxValidityProviders = (EthereumVerifier, CrosschainTransfer, StabilizerPools);
 	type TransactionSponsorProviders = MiningBidProxyFeeSponsor<Runtime>;
 	type CallFeeRefundProviders = VaultAdminFeeRefundPolicy;
 }

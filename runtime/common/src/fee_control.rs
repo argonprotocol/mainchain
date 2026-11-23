@@ -95,6 +95,10 @@ mod tests {
 	use pallet_block_rewards::{BlockFees, BlockRewardsPaused};
 	use pallet_block_seal::LastBlockSealerInfo;
 	use pallet_fee_control::{CheckFeeWrapper, WeightInfo};
+	use pallet_stabilizer_pools::{
+		PositionChangeProof, StabilizerPoolEnrollment, StabilizerPoolPositionId,
+		StabilizerPoolRegistration, StabilizerPoolRegistrations,
+	};
 	use pallet_transaction_payment::ChargeTransactionPayment;
 	use pallet_treasury_positions::{CollectTotals, PositionsByAccount};
 	use polkadot_sdk::{
@@ -102,9 +106,93 @@ mod tests {
 		sp_io::TestExternalities,
 		sp_runtime::{
 			traits::{DispatchTransaction, ExtensionPostDispatchWeightHandler},
+			transaction_validity::{
+				InvalidTransaction, TransactionSource, TransactionValidityError,
+			},
 			AccountId32, BuildStorage,
 		},
 	};
+
+	#[test]
+	fn reported_positions_are_rejected_before_fees_at_validation_and_prepare() {
+		TestExternalities::new(RuntimeGenesisConfig::default().build_storage().unwrap())
+			.execute_with(|| {
+				let payer = AccountId32::new([55; 32]);
+				Balances::mint_into(&payer, 100 * ARGON).unwrap();
+				let position = StabilizerPoolPositionId {
+					position_manager: sp_core::H160::repeat_byte(1),
+					uniswap_nft_id: U256::one(),
+				};
+				StabilizerPoolRegistrations::<Runtime>::insert(
+					position,
+					StabilizerPoolRegistration::Enrolled(StabilizerPoolEnrollment {
+						first_eligible_frame_id: 2,
+						next_claim_frame_id: 2,
+					}),
+				);
+				let call = RuntimeCall::StabilizerPools(
+					pallet_stabilizer_pools::Call::report_position_change {
+						position,
+						proof: Box::new(PositionChangeProof::Revision(
+							argon_primitives::EthereumAccountStorageProof {
+								execution_block_proof:
+									argon_primitives::EthereumExecutionBlockProof {
+										anchor_block_hash: H256::zero(),
+										target_to_anchor_header_chain: Default::default(),
+									},
+								account_proof: Default::default(),
+								storage_proof: Default::default(),
+								slots: Default::default(),
+							},
+						)),
+					},
+				);
+				let extension = CheckFeeWrapper::<Runtime, ChargeTransactionPayment<Runtime>>::from(
+					ChargeTransactionPayment::from(0),
+				);
+				let info = call.get_dispatch_info();
+				let len = call.encoded_size();
+				let origin = RuntimeOrigin::signed(payer.clone());
+				let (_, validated, validated_origin) = extension
+					.validate_only(
+						origin.clone(),
+						&call,
+						&info,
+						len,
+						TransactionSource::External,
+						0,
+					)
+					.unwrap();
+
+				StabilizerPoolRegistrations::<Runtime>::insert(
+					position,
+					StabilizerPoolRegistration::Removed {
+						reported_at_block: argon_primitives::EthereumProofBlock {
+							hash: H256::repeat_byte(1),
+							number: 1,
+							timestamp_millis: 12_000,
+						},
+					},
+				);
+				let before = Balances::balance(&payer);
+				assert!(matches!(
+					extension.validate_only(
+						origin,
+						&call,
+						&info,
+						len,
+						TransactionSource::External,
+						0
+					),
+					Err(TransactionValidityError::Invalid(InvalidTransaction::Stale))
+				));
+				assert!(matches!(
+					extension.prepare(validated, &validated_origin, &call, &info, len),
+					Err(TransactionValidityError::Invalid(InvalidTransaction::Stale))
+				));
+				assert_eq!(Balances::balance(&payer), before);
+			});
+	}
 
 	#[test]
 	fn failed_mining_fee_deposit_burns_the_credit_without_panicking() {
