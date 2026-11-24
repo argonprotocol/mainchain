@@ -228,9 +228,19 @@ pub(crate) mod utils {
 		let keys1 = keys1.context("failed to register miner_1 primary session keys")?;
 		let keys_1_2 = keys_1_2.context("failed to register miner_1 secondary session keys")?;
 		let keys2 = keys2.context("failed to register miner_2 session keys")?;
+
+		// The funding account must collect its mining ARGONOT before bidding for the miners.
+		let funding = Sr25519Signer::new(Alice.pair());
+		let params = source.client.params_with_best_nonce(&funding.account_id()).await?.build();
+		source
+			.client
+			.submit_tx(&tx().treasury_positions().collect(), &funding, Some(params), true)
+			.await
+			.context("failed to collect mining rewards before miner bids")?;
+
 		register_miners(
 			source,
-			Sr25519Signer::new(Alice.pair()),
+			funding,
 			vec![
 				(miner_2.account_id.clone(), keys2),
 				(miner_1.account_id.clone(), keys1),
