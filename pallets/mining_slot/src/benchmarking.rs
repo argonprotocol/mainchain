@@ -176,10 +176,41 @@ mod benchmarks {
 				None,
 			)?;
 		}
+		// Admission also scans shared-wallet demand during the retained delayed auction.
+		// A squared budget makes every quantity ceiling distinct as well as every maximum.
+		let funding: T::AccountId = account("shared-admission-wallet", 0, 0);
+		let increment = T::BidIncrements::get();
+		let seats = T::MaxCohortSize::get();
+		let maximum = increment.saturating_mul(seats.saturating_mul(seats).into());
+		T::ArgonCurrency::mint_into(
+			&funding,
+			maximum
+				.saturating_sub(increment.saturating_mul(seats.into()))
+				.saturating_add(T::ArgonCurrency::minimum_balance()),
+		)?;
+		BidsForNextSlotCohort::<T>::mutate(|cohort| {
+			for (index, registration) in cohort.iter_mut().enumerate() {
+				registration.external_funding_account = Some(funding.clone());
+				StandingBids::<T>::mutate(&registration.account_id, |standing| {
+					standing.as_mut().expect("standing admission candidate").max =
+						maximum.saturating_add(increment.saturating_mul((index as u32).into()));
+				});
+			}
+		});
+		let incumbents = BidsForNextSlotCohort::<T>::get();
+		let offers = Pallet::<T>::standing_offers(&incumbents);
+		let (candidates, budgets) = Pallet::<T>::auction_candidates(&offers, &incumbents);
+		assert_eq!(candidates.len(), seats as usize);
+		assert_eq!(budgets.len(), 1);
+		let prices = crate::auction::demand(&candidates, &budgets, increment.into())
+			.into_iter()
+			.map(|offer| offer.max)
+			.collect::<BTreeSet<_>>();
+		assert_eq!(prices.len(), seats as usize);
 		#[extrinsic_call]
 		_(
 			RawOrigin::Signed(caller.clone()),
-			T::BidIncrements::get().saturating_mul(3u32.into()),
+			increment.saturating_mul((seats + 1).into()),
 			keys,
 			None,
 			Some(NextFrameId::<T>::get()),
@@ -881,17 +912,138 @@ mod benchmarks {
 		Ok(block)
 	}
 
+	fn share_live_auction_funding<T: Config>() -> Result<(), BenchmarkError>
+	where
+		T::OwnershipCurrency:
+			frame_support::traits::fungible::Mutate<T::AccountId, Balance = T::Balance>,
+	{
+		let funding: T::AccountId = account("shared-auction-wallet", 0, 0);
+		let _ = prepare_bid::<T>(&funding);
+		LiveAuctionStartAt::<T>::put(0);
+		let increment = T::BidIncrements::get();
+		let count = T::MaxCohortSize::get() + MaxBidReveals::<T>::get() + T::MaxBidsPerBlock::get();
+		let maximum = increment.saturating_mul(count.saturating_mul(count).into());
+		let mut prior_funders = BTreeSet::new();
+		BidsForNextSlotCohort::<T>::mutate(|cohort| {
+			for (index, registration) in cohort.iter_mut().enumerate() {
+				prior_funders.insert(
+					registration
+						.external_funding_account
+						.clone()
+						.unwrap_or_else(|| registration.account_id.clone()),
+				);
+				registration.external_funding_account = Some(funding.clone());
+				StandingBids::<T>::mutate(&registration.account_id, |standing| {
+					let standing = standing.as_mut().expect("standing benchmark winner");
+					standing.max =
+						maximum.saturating_add(increment.saturating_mul((index as u32).into()));
+					standing.fixed = false;
+				});
+			}
+		});
+		MinersByCohort::<T>::mutate(1, |cohort| {
+			for registration in cohort {
+				prior_funders.insert(
+					registration
+						.external_funding_account
+						.clone()
+						.unwrap_or_else(|| registration.account_id.clone()),
+				);
+				registration.external_funding_account = Some(funding.clone());
+			}
+		});
+		for (miner, mut pending) in PendingBids::<T>::iter() {
+			prior_funders.insert(pending.funding.clone());
+			pending.funding = funding.clone();
+			pending.registration.external_funding_account = Some(funding.clone());
+			PendingBids::<T>::insert(miner, pending);
+		}
+		for index in 0..MaxBidReveals::<T>::get() {
+			let miner: T::AccountId = account("live", index, 0);
+			PendingBids::<T>::mutate(&miner, |pending| {
+				if let Some(pending) = pending {
+					if pending.max.is_some() {
+						let max = maximum
+							.saturating_add(increment.saturating_mul((count + index).into()));
+						pending.max = Some(max);
+						pending.max_hash = Some(Pallet::<T>::bid_commitment(
+							pending.frame,
+							&funding,
+							&miner,
+							pending.bid,
+							max,
+							&pending.registration.authority_keys,
+							[index as u8; 32],
+						));
+					}
+				}
+			});
+		}
+		// Move the actual collateral ledger together with its owners, including active renewals.
+		let reason = HoldReason::RegisterAsMiner.into();
+		let mut held = T::Balance::zero();
+		for prior in prior_funders {
+			let amount = T::OwnershipCurrency::balance_on_hold(&reason, &prior);
+			T::OwnershipCurrency::release(&reason, &prior, amount, Precision::Exact)?;
+			held = held.saturating_add(amount);
+		}
+		T::OwnershipCurrency::hold(&reason, &funding, held)?;
+		let free =
+			T::ArgonCurrency::reducible_balance(&funding, Preservation::Protect, Fortitude::Polite);
+		T::ArgonCurrency::transfer(
+			&funding,
+			&account("shared-auction-surplus", 0, 0),
+			free.saturating_sub(maximum),
+			Preservation::Protect,
+		)?;
+		// Keep the second pass full too: openings must exceed the shared cohort's
+		// quantity cutoff, rather than being rejected before allocation.
+		let seats = NextCohortSize::<T>::get();
+		if seats > 1 {
+			let paid = BidsForNextSlotCohort::<T>::get()
+				.iter()
+				.fold(T::Balance::zero(), |sum, registration| sum.saturating_add(registration.bid));
+			let budget = maximum.saturating_add(paid);
+			let price = budget / seats.into();
+			let price = price - price % increment;
+			for position in 0..T::MaxBidsPerBlock::get() {
+				let miner: T::AccountId = account("live-opening", position, 0);
+				PendingBids::<T>::mutate(miner, |pending| {
+					let pending = pending.as_mut().expect("current opening");
+					pending.bid =
+						price.saturating_add(increment.saturating_mul((position + 1).into()));
+					pending.registration.bid = pending.bid;
+					pending.max_hash = Some([0; 32]);
+					assert!(pending.bid <= budget);
+				});
+			}
+		}
+		Ok(())
+	}
+
 	#[benchmark]
 	fn live_auction(m: Linear<1, 144>) -> Result<(), BenchmarkError> {
 		let m = m.min(T::MaxCohortSize::get());
-		let block = live_auction_setup::<T>(m, false, LiveAuctionCohort::Uniform)?;
-		assert_eq!(RevealedBids::<T>::get().len(), MaxBidReveals::<T>::get() as usize);
+		let block = live_auction_setup::<T>(m, false, LiveAuctionCohort::UnfundedOpenings)?;
+		share_live_auction_funding::<T>()?;
+		let revealed = RevealedBids::<T>::get();
+		assert_eq!(revealed.len(), MaxBidReveals::<T>::get() as usize);
+		assert_eq!(BidsForNextSlotCohort::<T>::get().len(), m as usize);
+		assert!(BidsForNextSlotCohort::<T>::get()
+			.iter()
+			.all(|registration| !revealed.contains(&registration.account_id)));
 		#[block]
 		{
 			Pallet::<T>::finalize_live_bids(block)?;
 		}
 		assert!(RevealedBids::<T>::get().is_empty());
 		assert_eq!(BidsForNextSlotCohort::<T>::get().len(), m as usize);
+		if m > 1 {
+			for position in 0..T::MaxBidsPerBlock::get() {
+				let miner: T::AccountId = account("live-opening", position, 0);
+				assert!(EligibleBids::<T>::contains_key(miner));
+			}
+		}
 		Ok(())
 	}
 
