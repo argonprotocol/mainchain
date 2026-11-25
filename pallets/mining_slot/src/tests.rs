@@ -3102,7 +3102,7 @@ fn auction_bid_max_update_is_distinct_from_a_pending_reveal() {
 }
 
 #[test]
-fn auction_bid_max_update_enforces_owner_frame_funding_and_auction_window() {
+fn auction_bid_max_update_enforces_owner_frame_paid_floor_and_auction_window() {
 	new_test_ext().execute_with(|| {
 		auction_setup(1);
 		seed_ranges(&[(1, 100 * A, 200 * A)]);
@@ -3139,10 +3139,8 @@ fn auction_bid_max_update_enforces_owner_frame_funding_and_auction_window() {
 
 		let spend = Balances::free_balance(1) - 1;
 		assert_ok!(Balances::transfer(&1, &20, spend, Preservation::Protect));
-		assert_noop!(
-			MiningSlots::bid_max(RuntimeOrigin::signed(1), 300 * A, None, None, 2),
-			Error::<Test>::InsufficientFunds
-		);
+		assert_ok!(MiningSlots::bid_max(RuntimeOrigin::signed(1), 300 * A, None, None, 2));
+		assert_eq!(crate::StandingBids::<Test>::get(1).unwrap().max, 300 * A);
 		// Reducing exposure remains possible after the wallet's available headroom is spent.
 		assert_ok!(MiningSlots::bid_max(RuntimeOrigin::signed(1), 150 * A, None, None, 2));
 		assert_ok!(MiningSlots::bid_max(RuntimeOrigin::signed(1), 100 * A, None, None, 2));
@@ -3370,7 +3368,7 @@ fn auction_max_adjustment_cannot_bypass_entry_rules_after_eviction() {
 }
 
 #[test]
-fn auction_max_adjustment_keeps_the_public_fallback_when_missing_or_unfunded() {
+fn auction_max_adjustment_keeps_a_revealed_limit_when_only_its_public_floor_is_funded() {
 	for reveal_then_spend in [false, true] {
 		new_test_ext().execute_with(|| {
 			auction_setup(1);
@@ -3385,7 +3383,10 @@ fn auction_max_adjustment_keeps_the_public_fallback_when_missing_or_unfunded() {
 			}
 			settle_batch(12);
 			assert_eq!(paid(1), Some(100 * A));
-			assert_eq!(crate::StandingBids::<Test>::get(1).unwrap().max, 100 * A);
+			assert_eq!(
+				crate::StandingBids::<Test>::get(1).unwrap().max,
+				if reveal_then_spend { 300 * A } else { 100 * A }
+			);
 			assert_eq!(Balances::free_balance(BidPoolAccountId::get()), 100 * A);
 		});
 	}
@@ -3451,11 +3452,11 @@ fn auction_max_adjustment_restores_unfunded_headroom_of_other_standing_bids() {
 			));
 		}
 		settle_batch(1);
-		// Before the adjustment, this wallet can fund miner 2 up to 190 and miner 3 only at 10.
+		// Both seats share the remaining wallet budget without reserving their separate ceilings.
 		assert_ok!(Balances::transfer(&1, &20, 100 * A, Preservation::Protect));
 		System::set_block_number(12);
 		commit_funded_range(1, 2, 10 * A, 20 * A);
-		commit_range(4, 10 * A + CENT, 50 * A);
+		commit_range(4, 100 * A + CENT, 150 * A);
 		System::set_block_number(13);
 		assert_ok!(MiningSlots::bid_max(
 			RuntimeOrigin::signed(1),
@@ -3464,15 +3465,15 @@ fn auction_max_adjustment_restores_unfunded_headroom_of_other_standing_bids() {
 			Some(2),
 			2
 		));
-		reveal_range(4, 10 * A + CENT, 50 * A);
+		reveal_range(4, 100 * A + CENT, 150 * A);
 		settle_batch(12);
 		// Freed headroom lets miner 3 defend its seat without submitting another bid.
 		assert_eq!(paid(2), None);
 		assert_eq!(paid(3), Some(20 * A + CENT));
-		assert_eq!(paid(4), Some(20 * A + CENT));
+		assert_eq!(paid(4), Some(100 * A + CENT));
 		assert_eq!(crate::StandingBids::<Test>::get(3).unwrap().max, 100 * A);
 		assert_eq!(Balances::free_balance(1), 180 * A + 1 - CENT);
-		assert_eq!(Balances::free_balance(BidPoolAccountId::get()), 40 * A + 2 * CENT);
+		assert_eq!(Balances::free_balance(BidPoolAccountId::get()), 120 * A + 2 * CENT);
 	});
 }
 
@@ -3977,7 +3978,7 @@ fn unified_bid_invalid_or_missing_maximum_preserves_the_funded_base() {
 }
 
 #[test]
-fn unified_bid_falls_back_when_the_maximum_cannot_be_funded() {
+fn unified_bid_retains_the_maximum_while_spending_only_its_funded_price() {
 	for spend_before_reveal in [false, true] {
 		new_test_ext().execute_with(|| {
 			auction_setup(1);
@@ -3989,14 +3990,17 @@ fn unified_bid_falls_back_when_the_maximum_cannot_be_funded() {
 			}
 			assert_ok!(Balances::transfer(&1, &20, 100 * A, Preservation::Protect));
 			if spend_before_reveal {
-				assert_noop!(
-					MiningSlots::bid_max(RuntimeOrigin::signed(1), 200 * A, Some([1; 32]), None, 2),
-					Error::<Test>::InsufficientFunds
-				);
+				assert_ok!(MiningSlots::bid_max(
+					RuntimeOrigin::signed(1),
+					200 * A,
+					Some([1; 32]),
+					None,
+					2
+				));
 			}
 			settle_batch(1);
 			assert_eq!(paid(1), Some(100 * A));
-			assert_eq!(crate::StandingBids::<Test>::get(1).unwrap().max, 100 * A);
+			assert_eq!(crate::StandingBids::<Test>::get(1).unwrap().max, 200 * A);
 			assert_eq!(Balances::free_balance(1), 1);
 		});
 	}
@@ -4350,7 +4354,7 @@ fn live_disclosures_share_priority_and_establish_one_cutoff_for_new_openings() {
 }
 
 #[test]
-fn live_shared_wallet_disclosures_allocate_headroom_once_in_commitment_order() {
+fn live_shared_wallet_disclosures_keep_maxima_and_share_current_prices() {
 	new_test_ext().execute_with(|| {
 		live_auction_setup(2);
 		set_argons(1, 200 * A + 1);
@@ -4370,24 +4374,24 @@ fn live_shared_wallet_disclosures_allocate_headroom_once_in_commitment_order() {
 			}
 		});
 		assert_eq!(crate::StandingBids::<Test>::get(2).unwrap().max, 150 * A);
-		assert_eq!(crate::StandingBids::<Test>::get(3).unwrap().max, 10 * A);
+		assert_eq!(crate::StandingBids::<Test>::get(3).unwrap().max, 150 * A);
 		assert_eq!(Balances::free_balance(1), 180 * A + 1);
 		auction_block(3, || {
 			assert_ok!(MiningSlots::bid(
 				RuntimeOrigin::signed(4),
-				20 * A,
+				101 * A,
 				4.into(),
 				None,
 				Some(2),
 				None
 			));
 		});
-		assert_eq!(paid(2), Some(10 * A + CENT));
+		assert_eq!(paid(2), Some(100 * A + CENT));
 		assert_eq!(paid(3), None);
-		assert_eq!(paid(4), Some(20 * A));
-		assert_eq!(Balances::free_balance(1), 190 * A - CENT + 1);
+		assert_eq!(paid(4), Some(101 * A));
+		assert_eq!(Balances::free_balance(1), 100 * A - CENT + 1);
 		assert_eq!(Ownership::balance_on_hold(&HoldReason::RegisterAsMiner.into(), &1), 100);
-		assert_eq!(Balances::free_balance(BidPoolAccountId::get()), 30 * A + CENT);
+		assert_eq!(Balances::free_balance(BidPoolAccountId::get()), 201 * A + CENT);
 	});
 
 	new_test_ext().execute_with(|| {
@@ -4399,7 +4403,7 @@ fn live_shared_wallet_disclosures_allocate_headroom_once_in_commitment_order() {
 			assert_ok!(Balances::transfer(&1, &20, 100 * A, Preservation::Protect));
 		});
 		assert_eq!(paid(1), Some(100 * A));
-		assert_eq!(crate::StandingBids::<Test>::get(1).unwrap().max, 100 * A);
+		assert_eq!(crate::StandingBids::<Test>::get(1).unwrap().max, 200 * A);
 		assert_eq!(Balances::free_balance(1), 1);
 		assert_eq!(Balances::free_balance(BidPoolAccountId::get()), 100 * A);
 	});
@@ -4566,6 +4570,7 @@ fn live_fixed_bids_win_maximum_ties_ahead_of_committed_ranges() {
 }
 
 #[test]
+<<<<<<< Updated upstream
 fn mint_cohort_counts_and_account_changes_preserve_closing_frame_membership() {
 	new_test_ext().execute_with(|| {
 		let frame = u64::from(FramesPerMiningTerm::get()) + 1;
@@ -4603,3 +4608,118 @@ fn mint_cohort_counts_and_account_changes_preserve_closing_frame_membership() {
 		assert_eq!(MiningSlots::get_active_mining_rewards_accounts(), vec![9, 9]);
 	});
 }
+=======
+fn live_shared_wallet_keeps_maxima_and_reuses_losing_paid_bids() {
+	new_test_ext().execute_with(|| {
+		live_auction_setup(4);
+		set_argons(1, 700 * A + 1);
+		auction_block(1, || {
+			for miner in [2, 3, 4] {
+				commit_funded_range(1, miner, 100 * A, 500 * A);
+			}
+		});
+		auction_block(2, || {
+			for miner in [2, 3, 4] {
+				assert_ok!(MiningSlots::bid_max(
+					RuntimeOrigin::signed(1),
+					500 * A,
+					Some([miner as u8; 32]),
+					Some(miner),
+					2
+				));
+			}
+		});
+		auction_block(3, || commit_funded_range(1, 5, 100 * A, 500 * A));
+		assert_eq!(BidsForNextSlotCohort::<Test>::get().len(), 4);
+		auction_block(4, || {
+			assert_ok!(MiningSlots::bid_max(
+				RuntimeOrigin::signed(1),
+				500 * A,
+				Some([5; 32]),
+				Some(5),
+				2
+			));
+		});
+		for miner in [2, 3, 4, 5] {
+			assert_eq!(paid(miner), Some(100 * A));
+			assert_eq!(crate::StandingBids::<Test>::get(miner).unwrap().max, 500 * A);
+		}
+		assert_eq!(Balances::free_balance(1), 300 * A + 1);
+		auction_block(5, || {
+			assert_ok!(MiningSlots::bid(
+				RuntimeOrigin::signed(7),
+				176 * A,
+				7.into(),
+				None,
+				Some(2),
+				None
+			));
+		});
+		for miner in [2, 3, 4] {
+			assert_eq!(paid(miner), Some(175 * A + CENT));
+			assert_eq!(crate::StandingBids::<Test>::get(miner).unwrap().max, 500 * A);
+		}
+		assert_eq!(paid(5), None);
+		assert_eq!(paid(7), Some(176 * A));
+		assert_eq!(Balances::free_balance(1), 175 * A - 3 * CENT + 1);
+		assert_eq!(Balances::free_balance(BidPoolAccountId::get()), 701 * A + 3 * CENT);
+		assert_eq!(Ownership::balance_on_hold(&HoldReason::RegisterAsMiner.into(), &1), 300);
+	});
+}
+
+#[test]
+fn live_shared_wallet_refunds_before_increases_and_releases_replacement_collateral() {
+	for replacement in [false, true] {
+		new_test_ext().execute_with(|| {
+			live_auction_setup(2);
+			set_argons(1, 80 * A + 1);
+			auction_block(1, || {
+				for miner in [2, 3] {
+					commit_funded_range(1, miner, 40 * A, 100 * A);
+				}
+				commit_range(4, 0, 70 * A);
+				commit_range(5, 0, 60 * A);
+			});
+			auction_block(2, || {
+				for miner in [2, 3] {
+					assert_ok!(MiningSlots::bid_max(
+						RuntimeOrigin::signed(1),
+						100 * A,
+						Some([miner as u8; 32]),
+						Some(miner),
+						2
+					));
+				}
+			});
+			assert_eq!(Balances::free_balance(1), 1);
+			auction_block(3, || {
+				if replacement {
+					commit_funded_range(1, 3, 40 * A, 100 * A);
+				}
+			});
+			auction_block(4, || {
+				if replacement {
+					assert_ok!(MiningSlots::bid_max(
+						RuntimeOrigin::signed(1),
+						100 * A,
+						Some([3; 32]),
+						Some(3),
+						2
+					));
+				}
+				reveal_range(4, 0, 70 * A);
+				reveal_range(5, 0, 60 * A);
+			});
+			assert_eq!(paid(2), Some(60 * A + CENT));
+			assert_eq!(paid(3), None);
+			assert_eq!(paid(4), Some(60 * A + CENT));
+			assert_eq!(paid(5), None);
+			assert_eq!(crate::StandingBids::<Test>::get(2).unwrap().max, 100 * A);
+			assert_eq!(Balances::free_balance(1), 20 * A - CENT + 1);
+			assert_eq!(Balances::free_balance(BidPoolAccountId::get()), 120 * A + 2 * CENT);
+			assert_eq!(Ownership::balance_on_hold(&HoldReason::RegisterAsMiner.into(), &1), 100);
+			assert!(!crate::PendingBids::<Test>::contains_key(3));
+		});
+	}
+}
+>>>>>>> Stashed changes

@@ -82,6 +82,14 @@ pub mod pallet {
 		<T as Config>::Keys,
 	>;
 
+	#[pallet::extra_constants]
+	impl<T: Config> Pallet<T> {
+		/// Version 1 shares each wallet across current seat prices and recycles losing paid bids.
+		pub fn shared_bid_budget_version() -> u8 {
+			1
+		}
+	}
+
 	#[derive(
 		Clone,
 		Copy,
@@ -795,15 +803,6 @@ pub mod pallet {
 				if let Some(old) = &existing {
 					ensure!(max >= old.bid, Error::<T>::BidCannotBeReduced);
 				}
-				let credit = existing.map(|r| r.bid).unwrap_or_default();
-				ensure!(
-					T::ArgonCurrency::reducible_balance(
-						&funding,
-						Preservation::Protect,
-						Fortitude::Polite
-					) >= max.saturating_sub(credit),
-					Error::<T>::InsufficientFunds
-				);
 				pending.max = Some(max);
 				if Self::live_auction_enabled() {
 					RevealedBids::<T>::try_mutate(|revealed| {
@@ -900,16 +899,6 @@ impl<T: Config> Pallet<T> {
 
 		StandingBids::<T>::try_mutate(&miner, |standing| -> DispatchResult {
 			let standing = standing.as_mut().ok_or(Error::<T>::MissingStandingBid)?;
-			if max > standing.max {
-				ensure!(
-					T::ArgonCurrency::reducible_balance(
-						&funding,
-						Preservation::Protect,
-						Fortitude::Polite,
-					) >= max.saturating_sub(registration.bid),
-					Error::<T>::InsufficientFunds
-				);
-			}
 
 			standing.max = max;
 			standing.fixed = false;
@@ -979,51 +968,70 @@ impl<T: Config> Pallet<T> {
 		})
 	}
 
-	/// Allocate each wallet once, preserving each incumbent's own paid credit.
-	fn funded_standing_offers(
-		old: &[Registration<T>],
-		available: &mut BTreeMap<T::AccountId, T::Balance>,
-	) -> Vec<(Registration<T>, StandingBid<T>, T::Balance)> {
+	/// Keep configured maxima distinct from the shared wallet's spending limit.
+	fn standing_offers(old: &[Registration<T>]) -> Vec<(Registration<T>, StandingBid<T>)> {
 		let mut offers = old
 			.iter()
 			.enumerate()
-			.map(|(i, r)| {
-				let standing = StandingBids::<T>::get(&r.account_id).unwrap_or(StandingBid::<T> {
-					bid: r.bid,
-					max: r.bid,
-					fixed: true,
-					submitted_at: Zero::zero(),
-					position: i as u32,
-				});
-				(r.clone(), standing, r.bid)
+			.map(|(index, registration)| {
+				let standing =
+					StandingBids::<T>::get(&registration.account_id).unwrap_or(StandingBid::<T> {
+						bid: registration.bid,
+						max: registration.bid,
+						fixed: true,
+						submitted_at: Zero::zero(),
+						position: index as u32,
+					});
+				(registration.clone(), standing)
 			})
 			.collect::<Vec<_>>();
 		offers.sort_by(|a, b| {
 			a.1.submitted_at.cmp(&b.1.submitted_at).then(a.1.position.cmp(&b.1.position))
 		});
-		Self::fund_offer_headroom(&mut offers, available);
 		offers
 	}
 
-	/// Allocate only unreserved headroom, leaving each offer's paid credit and budget intact.
-	fn fund_offer_headroom(
-		offers: &mut [(Registration<T>, StandingBid<T>, T::Balance)],
-		available: &mut BTreeMap<T::AccountId, T::Balance>,
-	) {
-		let increment = T::BidIncrements::get();
-		for (r, standing, budget) in offers {
-			let account = r.external_funding_account.as_ref().unwrap_or(&r.account_id);
-			let free = available.entry(account.clone()).or_insert_with(|| {
-				T::ArgonCurrency::reducible_balance(
-					account,
-					Preservation::Protect,
-					Fortitude::Polite,
-				)
-			});
-			let extra = standing.max.saturating_sub(*budget).min(*free / increment * increment);
-			*free -= extra;
-			*budget = budget.saturating_add(extra);
+	fn auction_candidates(
+		offers: &[(Registration<T>, StandingBid<T>)],
+		paid: &[Registration<T>],
+	) -> (Vec<crate::auction::Candidate>, Vec<u128>) {
+		let mut wallets = BTreeMap::new();
+		let mut budgets = Vec::<u128>::new();
+		let candidates = offers
+			.iter()
+			.map(|(registration, standing)| {
+				let funding = registration
+					.external_funding_account
+					.as_ref()
+					.unwrap_or(&registration.account_id);
+				let wallet = *wallets.entry(funding.clone()).or_insert_with(|| {
+					let index = budgets.len();
+					let free = T::ArgonCurrency::reducible_balance(
+						funding,
+						Preservation::Protect,
+						Fortitude::Polite,
+					);
+					budgets.push(free.into());
+					index
+				});
+				crate::auction::Candidate {
+					bid: standing.bid.max(registration.bid).into(),
+					max: standing.max.into(),
+					fixed: standing.fixed,
+					wallet,
+				}
+			})
+			.collect();
+		for registration in paid {
+			let funding = registration
+				.external_funding_account
+				.as_ref()
+				.unwrap_or(&registration.account_id);
+			if let Some(wallet) = wallets.get(funding) {
+				budgets[*wallet] = budgets[*wallet].saturating_add(registration.bid.into());
+			}
 		}
+		(candidates, budgets)
 	}
 
 	fn check_public_bid(
@@ -1045,9 +1053,12 @@ impl<T: Config> Pallet<T> {
 			return Ok(());
 		}
 		if !winners.is_empty() && winners.len() >= NextCohortSize::<T>::get() as usize {
-			let offers = Self::funded_standing_offers(&winners, &mut Default::default());
-			let minimum = offers.iter().map(|(_, _, budget)| *budget).min().expect("nonempty");
-			ensure!(bid > minimum, Error::<T>::BidTooLow);
+			let offers = Self::standing_offers(&winners);
+			let (candidates, budgets) = Self::auction_candidates(&offers, &winners);
+			let demand = crate::auction::demand(&candidates, &budgets, increment.into());
+			if let Some(minimum) = demand.get(winners.len() - 1) {
+				ensure!(bid.into() > minimum.max, Error::<T>::BidTooLow);
+			}
 		}
 		Ok(())
 	}
@@ -1189,12 +1200,19 @@ impl<T: Config> Pallet<T> {
 			let old_max = StandingBids::<T>::get(&miner).map(|s| s.max).unwrap_or(old.bid);
 			ensure!(bid > old_max, Error::<T>::BidCannotBeReduced);
 		}
-		let credit = existing.as_ref().map(|r| r.bid).unwrap_or_default();
-		ensure!(
-			T::ArgonCurrency::reducible_balance(&funding, Preservation::Protect, Fortitude::Polite) >=
-				bid.saturating_sub(credit),
-			Error::<T>::InsufficientFunds
-		);
+		let free =
+			T::ArgonCurrency::reducible_balance(&funding, Preservation::Protect, Fortitude::Polite);
+		let budget = BidsForNextSlotCohort::<T>::get()
+			.iter()
+			.filter(|registration| {
+				registration
+					.external_funding_account
+					.as_ref()
+					.unwrap_or(&registration.account_id) ==
+					&funding
+			})
+			.fold(free, |balance, registration| balance.saturating_add(registration.bid));
+		ensure!(budget >= bid, Error::<T>::InsufficientFunds);
 		let active = Self::get_active_registration(&miner);
 		let argonots = Self::hold_argonots(&funding, &existing, &active)?;
 		let previous =
@@ -1373,28 +1391,26 @@ impl<T: Config> Pallet<T> {
 		let funder = |r: &Registration<T>| {
 			r.external_funding_account.clone().unwrap_or_else(|| r.account_id.clone())
 		};
-		let mut available = BTreeMap::<T::AccountId, T::Balance>::new();
-		let mut offers = Self::funded_standing_offers(&old, &mut available);
-		for (entry, _) in &pending {
-			available.entry(entry.funding.clone()).or_insert_with(|| {
-				T::ArgonCurrency::reducible_balance(
-					&entry.funding,
-					Preservation::Protect,
-					Fortitude::Polite,
-				)
-			});
-		}
+		let mut offers = Self::standing_offers(&old);
 		let increment = T::BidIncrements::get();
 		let mut accepted = BTreeSet::new();
-		// Openings share one cutoff. Disclosures retain their recorded admission.
 		let seats = NextCohortSize::<T>::get() as usize;
+		let (candidates, budgets) = Self::auction_candidates(&offers, &old);
+		let demand = crate::auction::demand(&candidates, &budgets, increment.into());
 		let threshold = if !offers.is_empty() && offers.len() >= seats {
-			offers.iter().map(|(_, _, budget)| *budget).min()
+			demand.get(seats - 1).map(|offer| T::Balance::from(offer.max))
 		} else {
 			None
 		};
+		let mut available = offers
+			.iter()
+			.zip(candidates.iter())
+			.map(|((registration, _), candidate)| {
+				(funder(registration), T::Balance::from(budgets[candidate.wallet]))
+			})
+			.collect::<BTreeMap<_, _>>();
 		for (entry, eligibility) in &pending {
-			let replacement = offers.iter().position(|(r, _, _)| r.account_id == entry.miner);
+			let replacement = offers.iter().position(|(r, _)| r.account_id == entry.miner);
 			let is_max_adjustment = replacement.is_some() && entry.max_hash.is_some();
 			let below_cutoff = threshold.is_some_and(|cutoff| entry.bid <= cutoff);
 			let priority = if clearing == BidClearing::Disclosure {
@@ -1424,22 +1440,22 @@ impl<T: Config> Pallet<T> {
 				priority
 			};
 
-			let allocated = replacement.map(|i| offers[i].2).unwrap_or_default();
-			let free = available.get_mut(&entry.funding).expect("funder inserted");
-			// A disclosed maximum is optional. If it cannot be fully funded, preserve the base bid.
-			let mut max = if clearing == BidClearing::Opening {
+			let budget = *available.entry(entry.funding.clone()).or_insert_with(|| {
+				T::ArgonCurrency::reducible_balance(
+					&entry.funding,
+					Preservation::Protect,
+					Fortitude::Polite,
+				)
+			});
+			if entry.bid > budget {
+				Self::deposit_event(Event::BidRejected { account_id: entry.miner.clone() });
+				continue;
+			}
+			let max = if clearing == BidClearing::Opening {
 				entry.bid
 			} else {
 				entry.max.unwrap_or(entry.bid)
 			};
-			if *free < max.saturating_sub(allocated) {
-				max = entry.bid;
-			}
-
-			if *free < max.saturating_sub(allocated) {
-				Self::deposit_event(Event::BidRejected { account_id: entry.miner.clone() });
-				continue;
-			}
 			if let Some(i) = replacement {
 				if max < offers[i].0.bid {
 					Self::deposit_event(Event::BidRejected { account_id: entry.miner.clone() });
@@ -1451,9 +1467,6 @@ impl<T: Config> Pallet<T> {
 				}
 			}
 
-			// Lowering a ceiling releases its unused reservation, never its already-paid bid.
-			*free = free.saturating_add(allocated.saturating_sub(max));
-			*free -= max.saturating_sub(allocated);
 			let standing = StandingBid::<T> {
 				bid: entry.bid,
 				max,
@@ -1465,30 +1478,54 @@ impl<T: Config> Pallet<T> {
 			registration.bid = replacement.map(|i| offers[i].0.bid).unwrap_or_default();
 			accepted.insert(entry.miner.clone());
 			if let Some(i) = replacement {
-				offers[i] = (registration, standing, max);
+				offers[i] = (registration, standing);
 			} else {
-				offers.push((registration, standing, max));
+				offers.push((registration, standing));
 			}
 		}
 		offers.sort_by(|a, b| {
 			a.1.submitted_at.cmp(&b.1.submitted_at).then(a.1.position.cmp(&b.1.position))
 		});
-		// Shared-wallet incumbents may have been capped before a replacement freed headroom.
-		Self::fund_offer_headroom(&mut offers, &mut available);
-		let candidates = offers
+		let (candidates, budgets) = Self::auction_candidates(&offers, &old);
+		let allocation = crate::auction::clear(&candidates, &budgets, seats, increment.into());
+		let winning_accounts = allocation
 			.iter()
-			.map(|(r, s, budget)| crate::auction::Candidate {
-				bid: s.bid.max(r.bid).into(),
-				max: (*budget).into(),
-				fixed: s.fixed,
-			})
-			.collect::<Vec<_>>();
-		let allocation = crate::auction::clear(&candidates, seats, increment.into());
+			.map(|(index, _)| offers[*index].0.account_id.clone())
+			.collect::<BTreeSet<_>>();
+		for (entry, _) in &pending {
+			// A rejected replacement does not replace a still-winning incumbent's keys/offer.
+			let accepted_winner =
+				winning_accounts.contains(&entry.miner) && accepted.contains(&entry.miner);
+			if clearing == BidClearing::Opening && EligibleBids::<T>::contains_key(&entry.miner) {
+				if winning_accounts.contains(&entry.miner) {
+					// The live registration now owns the seat's collateral. Eviction can
+					// transfer it back to the still-eligible commitment exactly once.
+					PendingBids::<T>::mutate(&entry.miner, |pending| {
+						pending.as_mut().expect("opening commitment").extra_argonots = Zero::zero();
+					});
+				}
+				continue;
+			}
+			if clearing != BidClearing::Delayed {
+				PendingBids::<T>::remove(&entry.miner);
+				EligibleBids::<T>::remove(&entry.miner);
+			}
+			if !accepted_winner {
+				Self::release_argonots_hold(&entry.funding, entry.extra_argonots)?;
+				Self::deposit_event(Event::BidLost { account_id: entry.miner.clone() });
+			}
+		}
+		for registration in &old {
+			if !winning_accounts.contains(&registration.account_id) {
+				StandingBids::<T>::remove(&registration.account_id);
+				Self::release_failed_bid(registration)?;
+			}
+		}
 		let mut winners = Vec::new();
 		let mut accepted_prices = Vec::new();
 		let mut automatic_bids = 0u32;
 		for (index, price) in allocation {
-			let (r, standing, _) = &offers[index];
+			let (r, standing) = &offers[index];
 			let mut registration = r.clone();
 			registration.bid = price.into();
 			let previous = old.iter().find(|old| old.account_id == r.account_id).cloned();
@@ -1533,42 +1570,17 @@ impl<T: Config> Pallet<T> {
 			}
 			added_bidders.insert(r.account_id.clone());
 		}
-		for (entry, _) in &pending {
-			// A rejected replacement does not replace a still-winning incumbent's keys/offer.
-			let accepted_winner = winners.iter().any(|r| r.account_id == entry.miner) &&
-				accepted.contains(&entry.miner);
-			if clearing == BidClearing::Opening && EligibleBids::<T>::contains_key(&entry.miner) {
-				if winners.iter().any(|r| r.account_id == entry.miner) {
-					// The live registration now owns the seat's collateral. Eviction can
-					// transfer it back to the still-eligible commitment exactly once.
-					PendingBids::<T>::mutate(&entry.miner, |pending| {
-						pending.as_mut().expect("opening commitment").extra_argonots = Zero::zero();
-					});
-				}
-				continue;
-			}
-			if clearing != BidClearing::Delayed {
-				PendingBids::<T>::remove(&entry.miner);
-				EligibleBids::<T>::remove(&entry.miner);
-			}
-			if !accepted_winner {
-				Self::release_argonots_hold(&entry.funding, entry.extra_argonots)?;
-				Self::deposit_event(Event::BidLost { account_id: entry.miner.clone() });
-			}
-		}
-		for registration in &old {
-			if !winners.iter().any(|r| r.account_id == registration.account_id) {
-				StandingBids::<T>::remove(&registration.account_id);
-				Self::release_failed_bid(registration)?;
-			}
-		}
-		// Rank winners by paid bid, funded maximum, then original commitment priority.
+		// Rank winners by paid bid, individually affordable maximum, then commitment priority.
 		let priorities = offers
 			.iter()
-			.map(|(registration, standing, budget)| {
+			.enumerate()
+			.map(|(index, (registration, standing))| {
 				(
 					registration.account_id.clone(),
-					(*budget, (standing.submitted_at, standing.position)),
+					(
+						standing.max.min(T::Balance::from(budgets[candidates[index].wallet])),
+						(standing.submitted_at, standing.position),
+					),
 				)
 			})
 			.collect::<BTreeMap<_, _>>();
