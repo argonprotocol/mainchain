@@ -146,7 +146,7 @@ impl RpcMetrics {
 	pub(crate) fn on_call(&self, req: &Request, transport_label: &'static str) {
 		tracing::trace!(
 			target: "rpc_metrics",
-			"[{transport_label}] on_call name={} params={:?}",
+			"[{transport_label}] on_call name={:?} params={:?}",
 			req.method_name(),
 			req.params(),
 		);
@@ -170,7 +170,7 @@ impl RpcMetrics {
 		let micros = now.elapsed().as_micros();
 		tracing::debug!(
 			target: "rpc_metrics",
-			"[{transport_label}] {} call took {} μs",
+			"[{transport_label}] {:?} call took {} μs",
 			req.method_name(),
 			micros,
 		);
@@ -227,5 +227,66 @@ impl Metrics {
 		now: Instant,
 	) {
 		self.inner.on_response(req, rp, is_rate_limited, self.transport_label, now)
+	}
+}
+
+#[cfg(test)]
+mod tests {
+	use super::*;
+	use jsonrpsee::core::server::ResponsePayload;
+	use std::{
+		io,
+		sync::{Arc, Mutex},
+	};
+
+	#[test]
+	fn logs_untrusted_method_names_without_terminal_controls() {
+		let output = Arc::new(Mutex::new(Vec::new()));
+		let writer = LogWriter(output.clone());
+		let subscriber = tracing_subscriber::fmt()
+			.with_ansi(false)
+			.without_time()
+			.with_max_level(tracing::Level::TRACE)
+			.with_writer(move || writer.clone())
+			.finish();
+		let registry = Registry::new();
+		let metrics = RpcMetrics::new(Some(&registry)).unwrap().unwrap();
+
+		tracing::subscriber::with_default(subscriber, || {
+			for method in ["notarize", "\x1b]0;spoofed\x07", "\nforged entry\r"] {
+				let json =
+					serde_json::json!({"jsonrpc": "2.0", "method": method, "id": 1}).to_string();
+				let request: Request = serde_json::from_str(&json).unwrap();
+				let response = MethodResponse::response(
+					request.id.clone(),
+					ResponsePayload::success(()),
+					1024,
+				);
+				metrics.on_call(&request, "ws");
+				metrics.on_response(&request, &response, false, "ws", Instant::now());
+				assert_eq!(metrics.calls_started.with_label_values(&["ws", method]).get(), 1);
+			}
+		});
+
+		let logs = String::from_utf8(output.lock().unwrap().clone()).unwrap();
+		assert!(logs.contains("notarize"));
+		assert!(logs.contains("\\nforged entry\\r"));
+		assert!(!logs.contains('\x1b'));
+		assert!(!logs.contains('\x07'));
+		assert!(!logs.contains("\nforged entry"));
+		assert!(!logs.contains('\r'));
+	}
+
+	#[derive(Clone)]
+	struct LogWriter(Arc<Mutex<Vec<u8>>>);
+
+	impl io::Write for LogWriter {
+		fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+			self.0.lock().unwrap().write(bytes)
+		}
+
+		fn flush(&mut self) -> io::Result<()> {
+			Ok(())
+		}
 	}
 }

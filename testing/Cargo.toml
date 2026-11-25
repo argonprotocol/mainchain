@@ -12,6 +12,7 @@ publish = false
 
 [dependencies]
 argon-client = { workspace = true }
+argon-testing-bitcoin = { workspace = true }
 tracing = { workspace = true, features = ["default"] }
 subxt = { workspace = true }
 anyhow = { workspace = true, features = ["default"] }

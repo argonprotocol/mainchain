@@ -11,4 +11,9 @@ homepage.workspace = true
 publish = false
 
 [dependencies]
-bitcoind = { workspace = true }
+anyhow = { workspace = true }
+bitcoin = { workspace = true, features = ["std"] }
+flate2 = "1.0"
+minreq = { workspace = true }
+tar = "0.4"
+tempfile = "3"
