@@ -74,10 +74,10 @@ pub fn bitcoin_executable() -> anyhow::Result<PathBuf> {
 		unpacked.join(format!("bitcoin-{VERSION}/bin/bitcoind")).is_file(),
 		"Bitcoin Core archive has no bitcoind binary"
 	);
-	if let Err(error) = fs::rename(&unpacked, &install_dir) {
-		if !executable.is_file() {
-			return Err(error.into());
-		}
+	if let Err(error) = fs::rename(&unpacked, &install_dir) &&
+		!executable.is_file()
+	{
+		return Err(error.into());
 	}
 	Ok(executable.canonicalize()?)
 }
