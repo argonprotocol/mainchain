@@ -4570,7 +4570,6 @@ fn live_fixed_bids_win_maximum_ties_ahead_of_committed_ranges() {
 }
 
 #[test]
-<<<<<<< Updated upstream
 fn mint_cohort_counts_and_account_changes_preserve_closing_frame_membership() {
 	new_test_ext().execute_with(|| {
 		let frame = u64::from(FramesPerMiningTerm::get()) + 1;
@@ -4608,7 +4607,8 @@ fn mint_cohort_counts_and_account_changes_preserve_closing_frame_membership() {
 		assert_eq!(MiningSlots::get_active_mining_rewards_accounts(), vec![9, 9]);
 	});
 }
-=======
+
+#[test]
 fn live_shared_wallet_keeps_maxima_and_reuses_losing_paid_bids() {
 	new_test_ext().execute_with(|| {
 		live_auction_setup(4);
@@ -4722,4 +4722,3 @@ fn live_shared_wallet_refunds_before_increases_and_releases_replacement_collater
 		});
 	}
 }
->>>>>>> Stashed changes

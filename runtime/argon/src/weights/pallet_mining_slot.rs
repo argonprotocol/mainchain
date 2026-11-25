@@ -21,7 +21,6 @@ use core::marker::PhantomData;
 /// Weight functions for `pallet_mining_slot`.
 pub struct WeightInfo<T>(PhantomData<T>);
 impl<T: frame_system::Config> pallet_mining_slot::WeightInfo for WeightInfo<T> {
-<<<<<<< Updated upstream
 	/// Storage: `MiningSlot::ReleasedMinersByAccountId` (r:1 w:0)
 	/// Proof: `MiningSlot::ReleasedMinersByAccountId` (`max_values`: Some(1), `max_size`: Some(30098), added: 30593, mode: `MaxEncodedLen`)
 	/// Storage: `MiningSlot::NewlyStartedFrameId` (r:1 w:0)
@@ -50,54 +49,6 @@ impl<T: frame_system::Config> pallet_mining_slot::WeightInfo for WeightInfo<T> {
 		Weight::from_parts(130_000_000, 308869)
 			.saturating_add(T::DbWeight::get().reads(13))
 		}
-	/// Storage: `MiningSlot::FrameStartBlockNumbers` (r:1 w:0)
-	/// Proof: `MiningSlot::FrameStartBlockNumbers` (`max_values`: Some(1), `max_size`: Some(41), added: 536, mode: `MaxEncodedLen`)
-	fn provider_is_first_block_after_frame_start() -> Weight {
-		// Proof Size summary in bytes:
-		//  Measured:  `47`
-		//  Estimated: `1526`
-		// Minimum execution time: 2_000_000 picoseconds.
-		Weight::from_parts(2_000_000, 1526)
-			.saturating_add(T::DbWeight::get().reads(1))
-		}
-
-	/// Storage: `MiningSlot::RevealedBids` (r:1 w:1)
-	/// Proof: `MiningSlot::RevealedBids` (`max_values`: Some(1), `max_size`: Some(5122), added: 5617, mode: `MaxEncodedLen`)
-	/// Storage: `MiningSlot::PendingBids` (r:193 w:192)
-	/// Proof: `MiningSlot::PendingBids` (`max_values`: None, `max_size`: Some(383), added: 2858, mode: `MaxEncodedLen`)
-	/// Storage: `MiningSlot::EligibleBids` (r:192 w:192)
-	/// Proof: `MiningSlot::EligibleBids` (`max_values`: None, `max_size`: Some(57), added: 2532, mode: `MaxEncodedLen`)
-	/// Storage: `MiningSlot::BidsForNextSlotCohort` (r:1 w:1)
-	/// Proof: `MiningSlot::BidsForNextSlotCohort` (`max_values`: Some(1), `max_size`: Some(25490), added: 25985, mode: `MaxEncodedLen`)
-	/// Storage: `MiningSlot::StandingBids` (r:144 w:146)
-	/// Proof: `MiningSlot::StandingBids` (`max_values`: None, `max_size`: Some(89), added: 2564, mode: `MaxEncodedLen`)
-	/// Storage: `System::Account` (r:337 w:194)
-	/// Proof: `System::Account` (`max_values`: None, `max_size`: Some(128), added: 2603, mode: `MaxEncodedLen`)
-	/// Storage: `MiningSlot::NextCohortSize` (r:1 w:0)
-	/// Proof: `MiningSlot::NextCohortSize` (`max_values`: Some(1), `max_size`: Some(4), added: 499, mode: `MaxEncodedLen`)
-	/// Storage: `Ownership::Account` (r:192 w:192)
-	/// Proof: `Ownership::Account` (`max_values`: None, `max_size`: Some(112), added: 2587, mode: `MaxEncodedLen`)
-	/// Storage: `Ownership::Holds` (r:192 w:192)
-	/// Proof: `Ownership::Holds` (`max_values`: None, `max_size`: Some(229), added: 2704, mode: `MaxEncodedLen`)
-	/// Storage: `MiningSlot::AccountIndexLookup` (r:2 w:0)
-	/// Proof: `MiningSlot::AccountIndexLookup` (`max_values`: None, `max_size`: Some(60), added: 2535, mode: `MaxEncodedLen`)
-	/// Storage: `MiningSlot::MinersByCohort` (r:1 w:0)
-	/// Proof: `MiningSlot::MinersByCohort` (`max_values`: None, `max_size`: Some(25514), added: 27989, mode: `MaxEncodedLen`)
-	/// Storage: `MiningSlot::HasAcceptedBidPrice` (r:1 w:1)
-	/// Proof: `MiningSlot::HasAcceptedBidPrice` (`max_values`: Some(1), `max_size`: Some(1), added: 496, mode: `MaxEncodedLen`)
-	/// Storage: `MiningSlot::HistoricalBidsPerSlot` (r:1 w:1)
-	/// Proof: `MiningSlot::HistoricalBidsPerSlot` (`max_values`: Some(1), `max_size`: Some(521), added: 1016, mode: `MaxEncodedLen`)
-	/// Storage: `MiningSlot::BidBatches` (r:2 w:1)
-	/// Proof: `MiningSlot::BidBatches` (`max_values`: None, `max_size`: Some(1037), added: 3512, mode: `MaxEncodedLen`)
-	fn live_auction_with_unfunded_openings() -> Weight {
-		// Maximum observed costs across the supported benchmark range.
-		// Proof bounds include simultaneous prefixes and distinct read/write keys.
-		Weight::from_parts(16_456_000_000, 6_354_297)
-			.saturating_add(T::DbWeight::get().reads(1260))
-			.saturating_add(T::DbWeight::get().writes(1113))
-		}
-=======
->>>>>>> Stashed changes
 	/// Storage: `MiningSlot::NextFrameId` (r:1 w:0)
 	/// Proof: `MiningSlot::NextFrameId` (`max_values`: Some(1), `max_size`: Some(8), added: 503, mode: `MaxEncodedLen`)
 	fn provider_get_current_frame_id() -> Weight {
