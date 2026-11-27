@@ -240,9 +240,10 @@ If you toggle to "Submission", you can submit your bid.
 Use `miningSlot.bid(bid, keys, miningAccountId, targetFrameId, maxHash)` to submit a public opening
 bid. Read `miningSlot.nextFrameId` for the target frame. A `null` target frame selects the current
 auction when the transaction executes; an explicit frame rejects the bid if the auction has changed.
-Pass `null` for `maxHash` for a fixed-price bid. Clients returned by the Node.js SDK's `getClient()`
-also support `miningSlot.bid(bid, keys, miningAccountId)`, defaulting both trailing arguments to
-`null`. Plain Polkadot.js clients must supply all five arguments.
+Pass `null` for `maxHash` for a new fixed-price bid. A hashless replacement of an automatic winner
+retains automatic bidding and sets its maximum to `max(existingMax, newBid)`. Clients returned by
+the Node.js SDK's `getClient()` also support `miningSlot.bid(bid, keys, miningAccountId)`, defaulting
+both trailing arguments to `null`. Plain Polkadot.js clients must supply all five arguments.
 
 For automatic bidding, the Node.js client's `createMiningBidCommitment` helper accepts `bid`, `max`,
 the target frame, accounts and keys, and returns `maxHash` and a random salt. Keep the maximum and
@@ -253,10 +254,10 @@ public `bid` is visible immediately.
 If the initial bid is included in block B, disclose its maximum with
 `miningSlot.bidMax(max, salt, miningAccountId, targetFrameId)` in any block from **B+1 through
 B+5**, inclusive. Pass the same explicit frame used to create the original bid's hash; a different
-frame rejects the reveal with `WrongBidFrame`. The hash must match the original submission. Public
-openings compete together at the end of their inclusion block B. A valid maximum disclosed in B+2
-competes at the end of B+2; B+5 is the disclosure deadline. No maximum disclosure is needed for a
-fixed-price bid. A missing, invalid, or unfunded maximum leaves an accepted opening valid.
+frame rejects the reveal with `WrongBidFrame`. The hash must match the original submission. With
+live clearing, public openings compete together at the end of their inclusion block B. A valid
+maximum disclosed in B+2 competes at the end of B+2. The disclosure deadline is B+5. Fixed-price
+bids require no disclosure. A missing, invalid, or unfunded maximum leaves an accepted opening valid.
 Transaction success means the bid or disclosure was queued. Canonical winners and paid prices are
 published in `bidsForNextSlotCohort` after that block; bidder and price-change events describe the
 result.
@@ -289,12 +290,28 @@ Updating a fixed-price winner enables automatic bidding at the new ceiling.
 Immediate updates are rejected while that miner has any pending bid or after auction admission
 closes. A supplied salt always selects the original commit/reveal behavior and must match a pending
 commitment; an old reveal cannot update a settled maximum. Initial automatic bids still require
-`bid` followed by `bidMax` with the salt. A fresh committed `bid` also remains available for
-replacements that change the public amount or keys. An accepted public replacement changes the live
-offer in its submission block, replacing the previous ceiling with its public amount until the new
-maximum is disclosed. A public replacement below the incumbent's paid price cannot reduce that price
-or replace its current offer; a valid maximum adjustment can still apply when disclosed. An
-incumbent-only adjustment admitted below the entry cutoff cannot reenter after eviction.
+`bid` followed by `bidMax` with the salt.
+
+To replace an automatic winner's public minimum or keys without a new commitment, submit
+`miningSlot.bid(newMin, keys, miningAccountId, targetFrameId, null)` from the same funding account.
+The new minimum must be at least the current paid price. Its maximum becomes
+`max(existingMax, newMin)`. For a 100-to-200 bid, a new minimum of 150 keeps the maximum at 200.
+A new minimum of 250 raises both values to 250. The bid keeps its automatic status and original
+tie priority in both cases. The replacement requires no maximum disclosure. With live clearing,
+it clears at the end of its inclusion block. Existing fixed-price winners still use
+fixed-price replacements that must exceed their previous maximum. New hashless bids are fixed-price.
+
+Earlier disclosures in the replacement's clearing block may raise the paid price or evict the
+miner. A hashless automatic replacement is rejected if its minimum has fallen below that paid
+price or the miner is no longer seated. An unfunded replacement preserves a still-winning offer.
+The existing ceiling remains active while the replacement is queued; only the winning price is
+collected, using the funding wallet's shared budget.
+
+A fresh committed `bid` remains available to replace the public amount or keys with a newly
+committed maximum. An accepted committed opening replaces the previous ceiling with its public
+amount until the new maximum is disclosed. An opening below the incumbent's paid price cannot
+reduce that price or replace its current offer; a valid maximum adjustment can still apply when
+disclosed. An incumbent-only adjustment admitted below the entry cutoff cannot reenter after eviction.
 
 Successful immediate changes emit `BidMaxUpdated` without incrementing bid-activity or
 accepted-price statistics. Later automatic price increases are counted normally. Lowering a maximum
@@ -312,13 +329,19 @@ original deadline. Expiry never replays an applied maximum or removes a winning 
 submissions close before activation, but already queued bids retain their full five-block disclosure
 window, including when random bidding closure occurs.
 
-The upgrade finishes the auction already in progress under its existing rules, including pending
-commitments that settle at B+5, and enables immediate opening and disclosure clearing for the
-following auction. Fresh chains enable immediate clearing from genesis. The runtime specification
-version is 161; the transaction version remains 6. Immediate clearing preserves the existing call
-encoding and pending-bid storage encoding. Use refreshed runtime metadata/bindings for the added
-storage queries. Clients predating the unified `bid` arguments and optional `bidMax` salt must
-update their calls and rebuild transactions encoded with those earlier interfaces.
+When upgrading from mining-slot storage version 12, the new replacement rule takes effect
+immediately. If you already hold a winning automatic bid in the current auction, you can replace
+its minimum without a new hash as soon as the upgrade lands. That auction keeps its five-block
+settlement delay. A replacement included in block B settles at the end of B+5, and bids already
+pending at the upgrade settle on their original schedule. If the chain is upgrading from an earlier
+version that only supported fixed-price bids, the current auction finishes with fixed-price bidding.
+Live clearing for openings and disclosures starts with the next auction. Fresh chains use live
+clearing from genesis.
+
+Immediate clearing preserves the existing call encoding and pending-bid storage encoding. Use
+refreshed runtime metadata/bindings for the added storage queries. Clients predating the unified
+`bid` arguments and optional `bidMax` salt must update their calls and rebuild transactions encoded
+with those earlier interfaces.
 
 `historicalBidsPerSlot.bidsCount` counts each committed bid submission, including replacements and
 submissions that later lose or become unfunded during clearing. Each automatic increase of an

@@ -225,6 +225,8 @@ pub mod pallet {
 		pub max_hash: Option<[u8; 32]>,
 		pub registration: Registration<T>,
 		pub bid: T::Balance,
+		/// Maximum in microgons, either disclosed against `max_hash` or inherited from an
+		/// automatic winner. A hashless inherited maximum requires that winner to remain seated.
 		pub max: Option<T::Balance>,
 		pub extra_argonots: T::Balance,
 	}
@@ -517,7 +519,8 @@ pub mod pallet {
 		CannotChangeFundingAccount,
 		/// The funding account does not have enough funds to cover the bid
 		InsufficientFunds,
-		/// Paid bids cannot decrease; public-only replacements must exceed the standing maximum.
+		/// A replacement is below the paid bid, or a fixed-price replacement does not increase
+		/// the standing maximum. Automatic replacements retain or raise their standing maximum.
 		BidCannotBeReduced,
 		/// Bids must be in allowed increments
 		InvalidBidAmount,
@@ -722,6 +725,8 @@ pub mod pallet {
 		/// Live auctions clear openings at the end of their inclusion block.
 		/// An omitted target frame selects the current auction at dispatch time.
 		/// Standing winners can commit a new maximum without clearing the new-bid entry threshold.
+		/// Without a hash, automatic winners retain their maximum or raise it to the new public
+		/// bid, whichever is larger. Their public bid cannot fall below the current paid price.
 		#[pallet::call_index(0)]
 		#[pallet::weight(T::WeightInfo::bid())]
 		pub fn bid(
@@ -1049,8 +1054,13 @@ impl<T: Config> Pallet<T> {
 			return Ok(());
 		}
 		let winners = BidsForNextSlotCohort::<T>::get();
-		if has_max_commitment && winners.iter().any(|r| &r.account_id == miner) {
-			return Ok(());
+		if winners.iter().any(|r| &r.account_id == miner) {
+			if has_max_commitment {
+				return Ok(());
+			}
+			if StandingBids::<T>::get(miner).is_some_and(|standing| !standing.fixed) {
+				return Ok(());
+			}
 		}
 		if !winners.is_empty() && winners.len() >= NextCohortSize::<T>::get() as usize {
 			let offers = Self::standing_offers(&winners);
@@ -1194,12 +1204,20 @@ impl<T: Config> Pallet<T> {
 		Self::check_bid_identity(&funding, &miner)?;
 		ensure!(!PendingBids::<T>::contains_key(&miner), Error::<T>::DuplicateBidCommitment);
 		let existing = Self::get_pending_cohort_registration(&miner);
+		let mut max = None;
 		if max_hash.is_none() &&
 			let Some(old) = &existing
 		{
-			let old_max = StandingBids::<T>::get(&miner).map(|s| s.max).unwrap_or(old.bid);
-			ensure!(bid > old_max, Error::<T>::BidCannotBeReduced);
+			let standing = StandingBids::<T>::get(&miner);
+			if let Some(automatic) = standing.as_ref().filter(|standing| !standing.fixed) {
+				ensure!(bid >= old.bid, Error::<T>::BidCannotBeReduced);
+				max = Some(automatic.max.max(bid));
+			} else {
+				let old_max = standing.map(|standing| standing.max).unwrap_or(old.bid);
+				ensure!(bid > old_max, Error::<T>::BidCannotBeReduced);
+			}
 		}
+
 		let free =
 			T::ArgonCurrency::reducible_balance(&funding, Preservation::Protect, Fortitude::Polite);
 		let budget = BidsForNextSlotCohort::<T>::get()
@@ -1225,7 +1243,7 @@ impl<T: Config> Pallet<T> {
 			miner: miner.clone(),
 			max_hash,
 			bid,
-			max: None,
+			max,
 			extra_argonots: argonots.saturating_sub(previous),
 			registration: Registration::<T> {
 				account_id: miner.clone(),
@@ -1411,7 +1429,20 @@ impl<T: Config> Pallet<T> {
 			.collect::<BTreeMap<_, _>>();
 		for (entry, eligibility) in &pending {
 			let replacement = offers.iter().position(|(r, _)| r.account_id == entry.miner);
+			let is_min_adjustment = entry.max_hash.is_none() && entry.max.is_some();
+			if is_min_adjustment {
+				let Some(index) = replacement else {
+					Self::deposit_event(Event::BidRejected { account_id: entry.miner.clone() });
+					continue;
+				};
+				// Disclosures clear first and may have raised the incumbent's paid price.
+				if entry.bid < offers[index].0.bid {
+					Self::deposit_event(Event::BidRejected { account_id: entry.miner.clone() });
+					continue;
+				}
+			}
 			let is_max_adjustment = replacement.is_some() && entry.max_hash.is_some();
+			let adjusts_incumbent = is_min_adjustment || is_max_adjustment;
 			let below_cutoff = threshold.is_some_and(|cutoff| entry.bid <= cutoff);
 			let priority = if clearing == BidClearing::Disclosure {
 				if eligibility.incumbent_only && replacement.is_none() {
@@ -1420,7 +1451,7 @@ impl<T: Config> Pallet<T> {
 				}
 				(eligibility.submitted_at, eligibility.position)
 			} else {
-				if !is_max_adjustment && below_cutoff {
+				if !adjusts_incumbent && below_cutoff {
 					Self::deposit_event(Event::BidRejected { account_id: entry.miner.clone() });
 					continue;
 				}
@@ -1451,7 +1482,7 @@ impl<T: Config> Pallet<T> {
 				Self::deposit_event(Event::BidRejected { account_id: entry.miner.clone() });
 				continue;
 			}
-			let max = if clearing == BidClearing::Opening {
+			let max = if clearing == BidClearing::Opening && !is_min_adjustment {
 				entry.bid
 			} else {
 				entry.max.unwrap_or(entry.bid)
@@ -1461,7 +1492,7 @@ impl<T: Config> Pallet<T> {
 					Self::deposit_event(Event::BidRejected { account_id: entry.miner.clone() });
 					continue;
 				}
-				if !is_max_adjustment && max <= offers[i].1.max {
+				if !adjusts_incumbent && max <= offers[i].1.max {
 					Self::deposit_event(Event::BidRejected { account_id: entry.miner.clone() });
 					continue;
 				}
@@ -1470,7 +1501,7 @@ impl<T: Config> Pallet<T> {
 			let standing = StandingBid::<T> {
 				bid: entry.bid,
 				max,
-				fixed: entry.max_hash.is_none(),
+				fixed: entry.max_hash.is_none() && !is_min_adjustment,
 				submitted_at: priority.0,
 				position: priority.1,
 			};
