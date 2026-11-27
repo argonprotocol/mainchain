@@ -3027,6 +3027,273 @@ fn auction_replacement_failure_preserves_original_and_eviction_refunds_credit() 
 }
 
 #[test]
+fn auction_hashless_replacements_preserve_or_raise_an_automatic_maximum() {
+	for live in [false, true] {
+		new_test_ext().execute_with(|| {
+			auction_setup(1);
+			seed_ranges(&[(1, 100 * A, 200 * A)]);
+			if live {
+				crate::LiveAuctionStartAt::<Test>::put(0);
+			}
+			let original = crate::StandingBids::<Test>::get(1).unwrap();
+			let held = Ownership::balance_on_hold(&HoldReason::RegisterAsMiner.into(), &1);
+
+			for (block, bid, max) in
+				[(12, 150 * A, 200 * A), (23, 200 * A, 200 * A), (34, 250 * A, 250 * A)]
+			{
+				System::set_block_number(block);
+				let previous_paid = paid(1);
+				assert_ok!(MiningSlots::bid(
+					RuntimeOrigin::signed(1),
+					bid,
+					99.into(),
+					None,
+					Some(2),
+					None
+				));
+				assert_eq!(paid(1), previous_paid);
+				if live {
+					assert_ok!(MiningSlots::finalize_live_bids(block));
+				} else {
+					settle_batch(block);
+				}
+
+				let standing = crate::StandingBids::<Test>::get(1).unwrap();
+				assert_eq!((standing.bid, standing.max, standing.fixed), (bid, max, false));
+				assert_eq!(
+					(standing.submitted_at, standing.position),
+					(original.submitted_at, original.position)
+				);
+				assert_eq!(paid(1), Some(bid));
+				assert_eq!(BidsForNextSlotCohort::<Test>::get()[0].authority_keys, 99.into());
+				assert_eq!(Balances::free_balance(1), 10_000 * A - bid);
+				assert_eq!(Balances::free_balance(BidPoolAccountId::get()), bid);
+				assert_eq!(
+					Ownership::balance_on_hold(&HoldReason::RegisterAsMiner.into(), &1),
+					held
+				);
+				assert!(!crate::PendingBids::<Test>::contains_key(1));
+			}
+
+			let history = &HistoricalBidsPerSlot::<Test>::get()[0];
+			assert_eq!(history.bids_count, 4);
+			assert_eq!(history.bid_amount_sum, 700 * A);
+			assert_ok!(MiningSlots::bid_max(RuntimeOrigin::signed(1), 300 * A, None, None, 2));
+		});
+	}
+}
+
+#[test]
+fn live_hashless_replacement_continues_automatic_bidding_without_a_reveal() {
+	new_test_ext().execute_with(|| {
+		live_auction_setup(1);
+		auction_block(1, || {
+			commit_range(1, 100 * A, 200 * A);
+			commit_range(2, 100 * A, 190 * A);
+		});
+		auction_block(2, || reveal_range(1, 100 * A, 200 * A));
+		let original = crate::StandingBids::<Test>::get(1).unwrap();
+		auction_block(3, || {
+			assert_ok!(MiningSlots::bid(
+				RuntimeOrigin::signed(1),
+				150 * A,
+				1.into(),
+				None,
+				Some(2),
+				None
+			));
+			assert_noop!(
+				MiningSlots::bid(RuntimeOrigin::signed(1), 160 * A, 1.into(), None, Some(2), None),
+				Error::<Test>::DuplicateBidCommitment
+			);
+		});
+		assert_eq!(paid(1), Some(150 * A));
+		assert!(!crate::PendingBids::<Test>::contains_key(1));
+		assert!(!crate::EligibleBids::<Test>::contains_key(1));
+		assert_noop!(
+			MiningSlots::bid_max(RuntimeOrigin::signed(1), 200 * A, Some([1; 32]), None, 2),
+			Error::<Test>::MissingBidCommitment
+		);
+
+		auction_block(4, || reveal_range(2, 100 * A, 190 * A));
+		assert_eq!(paid(1), Some(190 * A + CENT));
+		assert_eq!(paid(2), None);
+		let standing = crate::StandingBids::<Test>::get(1).unwrap();
+		assert_eq!((standing.bid, standing.max, standing.fixed), (150 * A, 200 * A, false));
+		assert_eq!(
+			(standing.submitted_at, standing.position),
+			(original.submitted_at, original.position)
+		);
+		assert_eq!(Balances::free_balance(1), 10_000 * A - 190 * A - CENT);
+		assert_eq!(Balances::free_balance(BidPoolAccountId::get()), 190 * A + CENT);
+		let history = &HistoricalBidsPerSlot::<Test>::get()[0];
+		assert_eq!(history.bids_count, 4);
+		assert_eq!(history.bid_amount_sum, 440 * A + CENT);
+
+		advance_auction_to(9);
+		assert_eq!(paid(1), Some(190 * A + CENT));
+		assert_eq!(crate::StandingBids::<Test>::get(1).unwrap().max, 200 * A);
+	});
+}
+
+#[test]
+fn live_hashless_replacement_rechecks_the_paid_floor_and_incumbency() {
+	for evict in [false, true] {
+		for replace_first in [false, true] {
+			new_test_ext().execute_with(|| {
+				live_auction_setup(2);
+				auction_block(1, || {
+					commit_range(1, 100 * A, 300 * A);
+					commit_range(2, 100 * A, 100 * A);
+				});
+				auction_block(2, || {
+					reveal_range(1, 100 * A, 300 * A);
+					reveal_range(2, 100 * A, 100 * A);
+				});
+				let max3 = if evict { 400 * A } else { 200 * A };
+				let max4 = if evict { 450 * A } else { 150 * A };
+				auction_block(3, || {
+					commit_range(3, 101 * A, max3);
+					commit_range(4, 150 * A, max4);
+				});
+				assert_eq!(paid(1), Some(101 * A + CENT));
+				System::reset_events();
+
+				auction_block(4, || {
+					let replace = || {
+						let bid = if evict { 500 * A } else { 120 * A };
+						assert_ok!(MiningSlots::bid(
+							RuntimeOrigin::signed(1),
+							bid,
+							99.into(),
+							None,
+							Some(2),
+							None
+						));
+					};
+					if replace_first {
+						replace();
+					}
+					reveal_range(3, 101 * A, max3);
+					reveal_range(4, 150 * A, max4);
+					if !replace_first {
+						replace();
+					}
+				});
+
+				System::assert_has_event(Event::BidRejected { account_id: 1 }.into());
+				assert!(!crate::PendingBids::<Test>::contains_key(1));
+				assert!(!crate::EligibleBids::<Test>::contains_key(1));
+				if evict {
+					assert_eq!(paid(1), None);
+					assert!(!crate::StandingBids::<Test>::contains_key(1));
+					assert_eq!(Balances::free_balance(1), 10_000 * A);
+					assert_eq!(
+						Ownership::balance_on_hold(&HoldReason::RegisterAsMiner.into(), &1),
+						0
+					);
+				} else {
+					assert_eq!(paid(1), Some(150 * A + CENT));
+					let standing = crate::StandingBids::<Test>::get(1).unwrap();
+					assert_eq!(
+						(standing.bid, standing.max, standing.fixed),
+						(100 * A, 300 * A, false)
+					);
+					let cohort = BidsForNextSlotCohort::<Test>::get();
+					assert_eq!(
+						cohort.iter().find(|r| r.account_id == 1).unwrap().authority_keys,
+						1.into()
+					);
+				}
+			});
+		}
+	}
+}
+
+#[test]
+fn live_hashless_replacement_preserves_the_offer_when_funding_is_spent() {
+	new_test_ext().execute_with(|| {
+		live_auction_setup(1);
+		set_argons(1, 200 * A + 1);
+		auction_block(1, || commit_range(1, 100 * A, 200 * A));
+		auction_block(2, || reveal_range(1, 100 * A, 200 * A));
+		let original = crate::StandingBids::<Test>::get(1).unwrap();
+		auction_block(3, || {
+			assert_noop!(
+				MiningSlots::bid(RuntimeOrigin::signed(1), 99 * A, 1.into(), None, Some(2), None),
+				Error::<Test>::BidCannotBeReduced
+			);
+			assert_ok!(MiningSlots::bid(
+				RuntimeOrigin::signed(1),
+				150 * A,
+				99.into(),
+				None,
+				Some(2),
+				None
+			));
+			assert_ok!(Balances::transfer(&1, &20, 100 * A, Preservation::Protect));
+		});
+		System::assert_has_event(Event::BidRejected { account_id: 1 }.into());
+		assert_eq!(crate::StandingBids::<Test>::get(1).unwrap().encode(), original.encode());
+		assert_eq!(paid(1), Some(100 * A));
+		assert_eq!(BidsForNextSlotCohort::<Test>::get()[0].authority_keys, 1.into());
+		assert_eq!(Balances::free_balance(1), 1);
+		assert_eq!(Balances::free_balance(BidPoolAccountId::get()), 100 * A);
+		assert!(!crate::PendingBids::<Test>::contains_key(1));
+		assert_noop!(
+			MiningSlots::bid(RuntimeOrigin::signed(1), 150 * A, 1.into(), None, Some(2), None),
+			Error::<Test>::InsufficientFunds
+		);
+		assert_eq!(HistoricalBidsPerSlot::<Test>::get()[0].bids_count, 2);
+	});
+}
+
+#[test]
+fn live_hashless_replacements_use_a_shared_funding_wallet() {
+	new_test_ext().execute_with(|| {
+		live_auction_setup(2);
+		set_argons(1, 300 * A + 1);
+		auction_block(1, || {
+			for miner in [2, 3] {
+				commit_funded_range(1, miner, 100 * A, 200 * A);
+			}
+		});
+		auction_block(2, || {
+			for miner in [2, 3] {
+				assert_ok!(MiningSlots::bid_max(
+					RuntimeOrigin::signed(1),
+					200 * A,
+					Some([miner as u8; 32]),
+					Some(miner),
+					2
+				));
+			}
+		});
+		auction_block(3, || {
+			for miner in [2, 3] {
+				assert_ok!(MiningSlots::bid(
+					RuntimeOrigin::signed(1),
+					150 * A,
+					miner.into(),
+					Some(miner),
+					Some(2),
+					None
+				));
+			}
+		});
+		for miner in [2, 3] {
+			assert_eq!(paid(miner), Some(150 * A));
+			let standing = crate::StandingBids::<Test>::get(miner).unwrap();
+			assert_eq!((standing.max, standing.fixed), (200 * A, false));
+			assert!(!crate::PendingBids::<Test>::contains_key(miner));
+		}
+		assert_eq!(Balances::free_balance(1), 1);
+		assert_eq!(Balances::free_balance(BidPoolAccountId::get()), 300 * A);
+		assert_eq!(Ownership::balance_on_hold(&HoldReason::RegisterAsMiner.into(), &1), 200);
+	});
+}
+
+#[test]
 fn auction_bid_max_updates_a_standing_ceiling_immediately() {
 	new_test_ext().execute_with(|| {
 		auction_setup(1);

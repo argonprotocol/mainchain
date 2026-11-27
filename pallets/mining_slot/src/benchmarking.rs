@@ -222,13 +222,7 @@ mod benchmarks {
 	#[benchmark]
 	fn bid_renewal() -> Result<(), BenchmarkError> {
 		let caller: T::AccountId = whitelisted_caller();
-		let keys = prepare_bid::<T>(&caller);
-		fill_active_cohort::<T>(
-			&caller,
-			&T::Keys::decode(&mut &vec![0u8; T::Keys::max_encoded_len()][..]).unwrap(),
-		);
-		frame_system::Pallet::<T>::set_block_number(1u32.into());
-		fill_cohort::<T>();
+		let keys = prepare_standing_renewal::<T>(&caller)?;
 		// Exercise full-size incumbent scans and a nearly full commitment vector.
 		NextCohortSize::<T>::put(T::MaxCohortSize::get());
 		for i in 0..T::MaxBidsPerBlock::get().saturating_sub(1) {
@@ -246,13 +240,15 @@ mod benchmarks {
 		#[extrinsic_call]
 		bid(
 			RawOrigin::Signed(caller.clone()),
-			T::BidIncrements::get().saturating_mul(3u32.into()),
+			T::BidIncrements::get(),
 			keys,
 			None,
 			Some(NextFrameId::<T>::get()),
 			None,
 		);
-		assert!(PendingBids::<T>::get(caller).unwrap().max.is_none());
+		let pending = PendingBids::<T>::get(caller).unwrap();
+		assert!(pending.max_hash.is_none());
+		assert_eq!(pending.max, Some(T::BidIncrements::get().saturating_mul(2u32.into())));
 		Ok(())
 	}
 
