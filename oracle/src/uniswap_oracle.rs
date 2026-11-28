@@ -2,6 +2,7 @@ use alloy_contract::Error as ContractError;
 use alloy_eips::{BlockId, BlockNumberOrTag};
 use alloy_primitives::{address, aliases::I56, B256};
 use alloy_provider::{network::Ethereum, Provider, RootProvider};
+use alloy_transport::{TransportError, TransportErrorKind};
 use anyhow::{anyhow, Context, Result};
 use argon_primitives::{
 	prelude::{frame_support::pallet_prelude::Zero, sp_arithmetic::FixedPointNumber},
@@ -13,7 +14,8 @@ use sp_core::U256;
 use sp_runtime::FixedU128;
 #[cfg(test)]
 use std::{collections::HashMap, sync::Arc};
-use std::{env, fmt};
+use std::{env, fmt, future::Future, io, time::Duration};
+use tokio::time::{sleep, timeout};
 use tracing::{error, trace, warn};
 use uniswap_lens::bindings::iuniswapv3pool::IUniswapV3Pool::IUniswapV3PoolInstance;
 use uniswap_v3_sdk::{entities::TickIndex, prelude::*};
@@ -142,12 +144,9 @@ impl UniswapOracle {
 			let mut validated = false;
 			for (index, provider) in self.providers.iter().enumerate() {
 				let contract = IUniswapV3PoolInstance::new(address, provider.clone());
-				let tokens = async {
-					Ok::<_, ContractError>((
-						contract.token0().call().await?,
-						contract.token1().call().await?,
-					))
-				}
+				let tokens = read_with_rpc_retry(|| async {
+					Ok((contract.token0().call().await?, contract.token1().call().await?))
+				})
 				.await;
 				match tokens {
 					Ok((token0, token1)) => {
@@ -162,7 +161,7 @@ impl UniswapOracle {
 						break;
 					},
 					Err(error)
-						if is_internal_rpc_error(&error) && index + 1 < self.providers.len() =>
+						if is_retryable_rpc_error(&error) && index + 1 < self.providers.len() =>
 						continue,
 					Err(error) =>
 						return Err(error).context("Validating Uniswap oracle source tokens"),
@@ -219,7 +218,11 @@ impl UniswapOracle {
 
 		// Fetch tick_cumulatives and liquidity_cumulatives
 		let result = loop {
-			match pool_contract.observe(vec![time_window_seconds, 0]).block(block_id).call().await {
+			let observation = read_with_rpc_retry(|| async {
+				pool_contract.observe(vec![time_window_seconds, 0]).block(block_id).call().await
+			})
+			.await;
+			match observation {
 				Ok(res) => break res,
 				Err(ContractError::ZeroData(..)) =>
 					return Err(UniswapOracleError::NoPoolData.into()),
@@ -302,14 +305,16 @@ impl UniswapOracle {
 		for &pool_address in &self.oracle_addresses {
 			let mut pool_result = None;
 			let mut pool_error = None;
-			for provider in &self.providers {
+			for (index, provider) in self.providers.iter().enumerate() {
 				match self.get_twap_and_liquidity_basis(provider, pool_address).await {
 					Ok(result) => {
 						pool_result = Some(result);
 						break;
 					},
-					Err(e) if has_internal_rpc_error(&e) => {
-						warn!(pool = %pool_address, "Ethereum RPC returned an internal error; trying fallback provider");
+					Err(e) if has_retryable_rpc_error(&e) => {
+						if index + 1 < self.providers.len() {
+							warn!(pool = %pool_address, "Ethereum RPC read failed after retry; trying fallback provider");
+						}
 						pool_error = Some(e);
 					},
 					Err(e) => {
@@ -375,20 +380,58 @@ impl UniswapOracle {
 	}
 }
 
-fn is_internal_rpc_error(error: &ContractError) -> bool {
-	matches!(
-		error,
-		ContractError::TransportError(error)
-			if error.as_error_resp().is_some_and(|response| {
-				response.code == -32603 && response.data.is_none()
-			})
-	)
+async fn read_with_rpc_retry<T, F, Fut>(mut read: F) -> Result<T, ContractError>
+where
+	F: FnMut() -> Fut,
+	Fut: Future<Output = Result<T, ContractError>>,
+{
+	let mut retries_remaining = 1;
+	loop {
+		let result = match timeout(Duration::from_secs(5), read()).await {
+			Ok(result) => result,
+			Err(_) => Err(TransportErrorKind::custom(io::Error::new(
+				io::ErrorKind::TimedOut,
+				"Ethereum RPC read timed out",
+			))
+			.into()),
+		};
+		let error = match result {
+			Ok(value) => return Ok(value),
+			Err(error) => error,
+		};
+		if !is_retryable_rpc_error(&error) {
+			return Err(error);
+		}
+		if retries_remaining == 0 {
+			return Err(error);
+		}
+
+		retries_remaining -= 1;
+		warn!("Ethereum RPC read failed; retrying once");
+		sleep(Duration::from_millis(250)).await;
+	}
 }
 
-fn has_internal_rpc_error(error: &anyhow::Error) -> bool {
+fn is_retryable_rpc_error(error: &ContractError) -> bool {
+	let ContractError::TransportError(error) = error else {
+		return false;
+	};
+	match error {
+		TransportError::Transport(TransportErrorKind::Custom(_)) => true,
+		TransportError::Transport(TransportErrorKind::BackendGone) => true,
+		TransportError::Transport(TransportErrorKind::MissingBatchResponse(_)) => true,
+		TransportError::Transport(TransportErrorKind::HttpError(error)) => {
+			matches!(error.status, 408 | 429 | 500..=599)
+		},
+		TransportError::ErrorResp(response) => response.code == -32603 && response.data.is_none(),
+		_ => false,
+	}
+}
+
+fn has_retryable_rpc_error(error: &anyhow::Error) -> bool {
 	error
 		.chain()
-		.any(|cause| cause.downcast_ref::<ContractError>().is_some_and(is_internal_rpc_error))
+		.any(|cause| cause.downcast_ref::<ContractError>().is_some_and(is_retryable_rpc_error))
 }
 
 #[cfg(test)]
@@ -488,6 +531,7 @@ mod test {
 			secondsPerLiquidityCumulativeX128s: vec![U160::ZERO, U160::from(3_600u128 << 64)],
 		})));
 		primary.push_failure_msg("Internal error");
+		primary.push_failure_msg("Internal error");
 		fallback.push_success(&Bytes::from(observeCall::abi_encode_returns(&observeReturn {
 			tickCumulatives: vec![I56::ZERO, I56::try_from(1_800).unwrap()],
 			secondsPerLiquidityCumulativeX128s: vec![U160::ZERO, U160::from(3_600u128 << 64)],
@@ -499,6 +543,185 @@ mod test {
 			.expect("the fallback provider should return the price");
 
 		assert_eq!(result.liquidity, 2 * ((1u128 << 64) / 1_000_000));
+	}
+
+	#[tokio::test]
+	async fn connection_failures_retry_and_later_reads_recover_after_exhaustion() {
+		let observation = serde_json::json!({"result": Bytes::from(observeCall::abi_encode_returns(&observeReturn {
+			tickCumulatives: vec![I56::ZERO, I56::ZERO],
+			secondsPerLiquidityCumulativeX128s: vec![U160::ZERO, U160::from(3_600u128 << 64)],
+		}))});
+		let (url, server) = http_rpc_responses(vec![
+			None,
+			Some(observation.clone()),
+			None,
+			None,
+			Some(observation),
+		]);
+		let mut oracle = UniswapOracle::new(
+			vec![url],
+			token!(ChainId::MAINNET as u64, USDC_ADDRESS, 6, "USDC"),
+			token!(ChainId::MAINNET as u64, ARGON_ADDRESS, 18, "ARGON"),
+		)
+		.await
+		.unwrap();
+		oracle.oracle_addresses = vec![Address::repeat_byte(1)];
+
+		let price = oracle
+			.get_current_price()
+			.await
+			.expect("a dropped connection should be retried");
+		assert_eq!(price.price, FixedU128::from_inner(1_000_000_000_000 * FixedU128::accuracy()));
+		assert_eq!(price.liquidity, (1u128 << 64) / 1_000_000);
+
+		let error = oracle.get_current_price().await.unwrap_err();
+		assert!(error.chain().any(|cause| cause.downcast_ref::<ContractError>().is_some()));
+		assert_eq!(oracle.get_current_price().await.unwrap(), price);
+		let requests = server.join().unwrap();
+		assert_eq!(requests.len(), 5);
+		assert!(requests.iter().all(|request| request["params"] == requests[0]["params"]));
+	}
+
+	#[tokio::test]
+	async fn connection_failures_fall_back_to_another_rpc_for_the_selected_pool() {
+		let (primary_url, primary) = http_rpc_responses(vec![None, None]);
+		let (fallback_url, fallback) = http_rpc_responses(vec![Some(
+			serde_json::json!({"result": Bytes::from(observeCall::abi_encode_returns(&observeReturn {
+				tickCumulatives: vec![I56::ZERO, I56::ZERO],
+				secondsPerLiquidityCumulativeX128s: vec![U160::ZERO, U160::from(3_600u128 << 64)],
+			}))}),
+		)]);
+		let mut oracle = UniswapOracle::new(
+			vec![primary_url, fallback_url],
+			token!(ChainId::MAINNET as u64, USDC_ADDRESS, 6, "USDC"),
+			token!(ChainId::MAINNET as u64, ARGON_ADDRESS, 18, "ARGON"),
+		)
+		.await
+		.unwrap();
+		oracle.oracle_addresses = vec![Address::repeat_byte(1)];
+
+		let price = oracle
+			.get_current_price()
+			.await
+			.expect("a disconnected primary must not suppress the fallback price");
+		assert_eq!(price.price, FixedU128::from_inner(1_000_000_000_000 * FixedU128::accuracy()));
+		assert_eq!(price.liquidity, (1u128 << 64) / 1_000_000);
+		let primary_requests = primary.join().unwrap();
+		let fallback_requests = fallback.join().unwrap();
+		assert_eq!(primary_requests.len(), 2);
+		assert_eq!(fallback_requests[0]["params"], primary_requests[0]["params"]);
+	}
+
+	#[tokio::test]
+	async fn connection_failures_during_source_validation_use_another_rpc() {
+		use uniswap_lens::bindings::iuniswapv3pool::IUniswapV3Pool::{token0Call, token1Call};
+		let (primary_url, primary) = http_rpc_responses(vec![None, None, None, None]);
+		let (fallback_url, fallback) = http_rpc_responses(vec![
+			Some(
+				serde_json::json!({"result": Bytes::from(token0Call::abi_encode_returns(&USDC_ADDRESS))}),
+			),
+			Some(
+				serde_json::json!({"result": Bytes::from(token1Call::abi_encode_returns(&ARGON_ADDRESS.parse().unwrap()))}),
+			),
+			Some(
+				serde_json::json!({"result": Bytes::from(observeCall::abi_encode_returns(&observeReturn {
+					tickCumulatives: vec![I56::ZERO, I56::ZERO],
+					secondsPerLiquidityCumulativeX128s: vec![U160::ZERO, U160::from(3_600u128 << 64)],
+				}))}),
+			),
+		]);
+		let mut oracle = UniswapOracle::new(
+			vec![primary_url, fallback_url],
+			token!(ChainId::MAINNET as u64, USDC_ADDRESS, 6, "USDC"),
+			token!(ChainId::MAINNET as u64, ARGON_ADDRESS, 18, "ARGON"),
+		)
+		.await
+		.unwrap();
+		let pool = Address::repeat_byte(1);
+
+		oracle
+			.set_oracle_addresses(&pool.to_string())
+			.await
+			.expect("startup validation must fall back after a disconnect");
+		assert_eq!(oracle.oracle_addresses, vec![pool]);
+		let price = oracle.get_current_price().await.unwrap();
+		assert_eq!(price.price, FixedU128::from_inner(1_000_000_000_000 * FixedU128::accuracy()));
+		assert_eq!(price.liquidity, (1u128 << 64) / 1_000_000);
+		assert_eq!(primary.join().unwrap().len(), 4);
+		assert_eq!(fallback.join().unwrap().len(), 3);
+	}
+
+	#[tokio::test]
+	async fn unresponsive_rpc_times_out_and_falls_back_instead_of_stalling_prices() {
+		use jsonrpsee::{server::ServerBuilder, types::ErrorObjectOwned, RpcModule};
+		let server = ServerBuilder::default().build("127.0.0.1:0").await.unwrap();
+		let url = format!("http://{}", server.local_addr().unwrap());
+		let mut module = RpcModule::new(());
+		module
+			.register_async_method("eth_call", |_, _, _| async {
+				std::future::pending::<Result<Bytes, ErrorObjectOwned>>().await
+			})
+			.unwrap();
+		let server = server.start(module);
+		let fallback = Asserter::new();
+		let oracle = UniswapOracle {
+			providers: vec![
+				RootProvider::connect(&url).await.unwrap(),
+				ProviderBuilder::default().connect_mocked_client(fallback.clone()),
+			],
+			usd_token: token!(ChainId::MAINNET as u64, USDC_ADDRESS, 6, "USDC"),
+			lookup_token: token!(ChainId::MAINNET as u64, ARGON_ADDRESS, 18, "ARGON"),
+			oracle_addresses: vec![Address::repeat_byte(1)],
+		};
+		fallback.push_success(&Bytes::from(observeCall::abi_encode_returns(&observeReturn {
+			tickCumulatives: vec![I56::ZERO, I56::ZERO],
+			secondsPerLiquidityCumulativeX128s: vec![U160::ZERO, U160::from(3_600u128 << 64)],
+		})));
+
+		let price = timeout(Duration::from_secs(15), oracle.get_current_price())
+			.await
+			.expect("an unresponsive RPC must not stall price publication")
+			.unwrap();
+		assert_eq!(price.price, FixedU128::from_inner(1_000_000_000_000 * FixedU128::accuracy()));
+		assert_eq!(price.liquidity, (1u128 << 64) / 1_000_000);
+		server.stop().unwrap();
+	}
+
+	#[tokio::test]
+	async fn contract_reverts_are_not_retried_or_replaced_by_another_rpc() {
+		use alloy_sol_types::{Revert, SolError};
+		let primary = Asserter::new();
+		let fallback = Asserter::new();
+		let oracle = UniswapOracle {
+			providers: vec![
+				ProviderBuilder::default().connect_mocked_client(primary.clone()),
+				ProviderBuilder::default().connect_mocked_client(fallback.clone()),
+			],
+			usd_token: token!(ChainId::MAINNET as u64, USDC_ADDRESS, 6, "USDC"),
+			lookup_token: token!(ChainId::MAINNET as u64, ARGON_ADDRESS, 18, "ARGON"),
+			oracle_addresses: vec![Address::repeat_byte(1)],
+		};
+		primary.push_failure(serde_json::from_value(serde_json::json!({
+			"code": 3, "message": "execution reverted", "data": Bytes::from(Revert { reason: "pool rejected".into() }.abi_encode()),
+		})).unwrap());
+		primary.push_success(&Bytes::from(observeCall::abi_encode_returns(&observeReturn {
+			tickCumulatives: vec![I56::ZERO, I56::ZERO],
+			secondsPerLiquidityCumulativeX128s: vec![U160::ZERO, U160::from(3_600u128 << 64)],
+		})));
+		fallback.push_success(&Bytes::from(observeCall::abi_encode_returns(&observeReturn {
+			tickCumulatives: vec![I56::ZERO, I56::ZERO],
+			secondsPerLiquidityCumulativeX128s: vec![U160::ZERO, U160::from(3_600u128 << 64)],
+		})));
+
+		let error = oracle.get_current_price().await.unwrap_err();
+		let revert = error
+			.downcast_ref::<ContractError>()
+			.unwrap()
+			.as_decoded_error::<Revert>()
+			.unwrap();
+		assert_eq!(revert.reason, "pool rejected");
+		assert_eq!(primary.read_q().len(), 1);
+		assert_eq!(fallback.read_q().len(), 1);
 	}
 
 	#[tokio::test]
@@ -734,6 +957,7 @@ mod test {
 		oracle.set_oracle_addresses(&addresses).await.unwrap();
 		let primary = Asserter::new();
 		primary.push_failure_msg("Internal error");
+		primary.push_failure_msg("Internal error");
 		oracle
 			.providers
 			.insert(0, ProviderBuilder::default().connect_mocked_client(primary));
@@ -781,5 +1005,66 @@ mod test {
 			println!("{symbol}: {price:?}");
 			assert!(!price.price.is_zero());
 		}
+	}
+
+	/// Serve real HTTP requests; None drops the response after consuming the request body.
+	fn http_rpc_responses(
+		responses: Vec<Option<serde_json::Value>>,
+	) -> (String, std::thread::JoinHandle<Vec<serde_json::Value>>) {
+		use std::{
+			io::{BufRead, BufReader, Read, Write},
+			net::TcpListener,
+			time::Instant,
+		};
+		let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+		listener.set_nonblocking(true).unwrap();
+		let url = format!("http://{}", listener.local_addr().unwrap());
+		let server = std::thread::spawn(move || {
+			let mut requests = Vec::new();
+			let deadline = Instant::now() + Duration::from_secs(5);
+			for response in responses {
+				let (mut stream, _) = loop {
+					match listener.accept() {
+						Ok(connection) => break connection,
+						Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {
+							assert!(
+								Instant::now() < deadline,
+								"RPC fixture did not receive the expected requests"
+							);
+							std::thread::sleep(Duration::from_millis(10));
+						},
+						Err(error) => panic!("RPC fixture failed to accept a request: {error}"),
+					}
+				};
+				stream.set_read_timeout(Some(Duration::from_secs(5))).unwrap();
+				let mut reader = BufReader::new(stream.try_clone().unwrap());
+				let mut content_length = 0;
+				loop {
+					let mut line = String::new();
+					assert!(reader.read_line(&mut line).unwrap() > 0);
+					if line == "\r\n" {
+						break;
+					}
+					let Some((name, value)) = line.split_once(':') else {
+						continue;
+					};
+					if name.eq_ignore_ascii_case("content-length") {
+						content_length = value.trim().parse().unwrap();
+					}
+				}
+				let mut body = vec![0; content_length];
+				reader.read_exact(&mut body).unwrap();
+				let request: serde_json::Value = serde_json::from_slice(&body).unwrap();
+				if let Some(mut response) = response {
+					response["jsonrpc"] = "2.0".into();
+					response["id"] = request["id"].clone();
+					let body = response.to_string();
+					write!(stream, "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{}", body.len(), body).unwrap();
+				}
+				requests.push(request);
+			}
+			requests
+		});
+		(url, server)
 	}
 }
