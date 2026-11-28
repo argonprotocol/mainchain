@@ -1,5 +1,6 @@
-use bitcoind::downloaded_exe_path;
+use argon_testing_bitcoin::bitcoin_executable;
 
-fn main() {
-	println!("{}", downloaded_exe_path().unwrap());
+fn main() -> anyhow::Result<()> {
+	println!("{}", bitcoin_executable()?.display());
+	Ok(())
 }

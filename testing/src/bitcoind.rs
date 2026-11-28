@@ -1,7 +1,8 @@
 use std::{env, fs::File, str::FromStr};
 
 use anyhow::anyhow;
-use bitcoind::{downloaded_exe_path, BitcoinD, Conf};
+use argon_testing_bitcoin::bitcoin_executable;
+use bitcoind::{BitcoinD, Conf};
 use fs2::FileExt;
 use lazy_static::lazy_static;
 use rand::Rng;
@@ -31,8 +32,9 @@ pub fn start_bitcoind() -> anyhow::Result<(BitcoinD, url::Url, bitcoin::Network)
 	conf.args.push("-blockfilterindex");
 	conf.args.push("-txindex");
 
-	println!("Bitcoin path {}", downloaded_exe_path().unwrap());
-	let bitcoind = match BitcoinD::with_conf(downloaded_exe_path().unwrap(), &conf) {
+	let executable = bitcoin_executable()?;
+	println!("Bitcoin path {}", executable.display());
+	let bitcoind = match BitcoinD::with_conf(executable, &conf) {
 		Ok(bitcoind) => bitcoind,
 		Err(e) => {
 			fs2::FileExt::unlock(&file).expect("Failed to unlock file");
